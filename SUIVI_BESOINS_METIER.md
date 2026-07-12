@@ -14,7 +14,7 @@ Mise à jour : 12 juillet 2026. Ce document distingue ce qui est utilisable, ce 
 | Prestations préenregistrées | ✅ Fait | Catalogue administrable, insertion dans une ligne de devis, sauvegarde rapide d’une ligne manuelle. |
 | Accès selon les postes | ✅ Fait | Chaque module sépare désormais **Consulter** et **Gérer**. La lecture seule affiche les données mais bloque créations, modifications, suppressions, imports, validations et envois côté interface et serveur. « Gérer » active automatiquement « Consulter ». |
 | Rattacher un employé à une entreprise | ✅ Fait | Code entreprise unique, demande en attente, validation par affectation d’un poste. |
-| Pointage arrivée/départ avec localisation et photo | ✅ Fait | Double pointage terrain, GPS et photo à l’arrivée puis au départ, pause saisie et heures normales/supplémentaires calculées automatiquement. La saisie manuelle reste disponible. |
+| Pointage arrivée/départ avec localisation | ✅ Fait | Choix obligatoire du chantier, GPS obligatoire à l’arrivée et au départ, date/heure automatiques, pause saisie et heures calculées. Aucune photo et aucune saisie manuelle dans le nouveau parcours. |
 | Import listes fournisseur Excel/PDF | ✅ Fait | XLSX/CSV/PDF, détection de colonnes, import atomique catalogue. Les PDF image sans texte doivent être passés en OCR ou exportés en Excel. |
 | Import inventaire Excel/PDF | ✅ Fait | Même import en mode Inventaire, écarts convertis en mouvements d’ajustement traçables. |
 | Nuanciers / teintes produits | ✅ Fait | Teintes, référence fabricant, couleur visuelle, sélection sur les mouvements. |

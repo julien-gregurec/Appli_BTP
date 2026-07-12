@@ -355,6 +355,13 @@ git diff --check
 - Mode lecture seule : bandeau explicite, actions de mutation masquées, filtres GET conservés.
 - Protection serveur : les POST sont refusés par le proxy si le droit Gérer du module manque.
 
+### Pointage GPS simplifié — 12 juillet 2026
+
+- Migration 41 appliquée : photo facultative en base et RPC compatible GPS seul.
+- Nouveau pointage : employé + chantier obligatoire + GPS obligatoire ; date et heure automatiques à l’arrivée et au départ.
+- Photos et saisie manuelle retirées de l’interface ; tâche facultative, pause et calcul des heures conservés.
+- Historique dédié avec chantier bien visible, arrivée, départ, durée et liens GPS. Anciennes saisies conservées en archives.
+
 ## Fichiers clés
 
 - `src/components/DevisEditor.tsx`

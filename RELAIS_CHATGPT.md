@@ -228,7 +228,7 @@ git diff --check                   # OK (aucun conflit whitespace)
 ## 14. Lot terrain, emails et imports — 12 juillet 2026
 
 - **Migrations 38 et 39 appliquées dans Supabase** : `sessions_pointage` avec RPC de clôture atomique, puis historique des affectations véhicule avec RPC atomique.
-- `/pointage` propose arrivée puis départ avec GPS et photo obligatoires aux deux étapes. La pause est déduite et les heures normales/supplémentaires sont générées automatiquement dans `pointages`. La saisie manuelle reste repliée dans un panneau secondaire.
+- `/pointage` propose arrivée puis départ avec GPS. Depuis la migration 41, la photo et la saisie manuelle ont été retirées du nouveau parcours (voir §17).
 - Les commandes fournisseur disposent maintenant d’un **bon de commande A4/PDF** (`/imprimer/commandes/[id]`) et du même dialogue email avec destinataire/CC que les devis/factures. Un email fournisseur absent est signalé.
 - La fiche véhicule affiche l’ouvrier courant, l’historique d’affectation, les factures associées avec chantier et un résumé des travaux récents de l’ouvrier assigné.
 - Un outil `hors_service` reste impossible à affecter côté RPC et apparaît explicitement indisponible dans la liste.
@@ -253,4 +253,12 @@ git diff --check                   # OK (aucun conflit whitespace)
 - En authentification réelle, l’interface affiche un bandeau « Mode consultation », masque les formulaires/actions de modification et conserve les filtres de lecture.
 - Le proxy bloque également toute requête POST d’un utilisateur sans droit `gerer_*`, avec redirection 303 vers la page consultée. Le masquage visuel n’est donc pas la seule protection.
 - Les anciennes permissions détaillées clients/chantiers/employés restent en base pour compatibilité mais sont masquées de l’écran simplifié ; les contrôles spéciaux (`gerer_utilisateurs`, `valider_pointages`) restent visibles.
+
+## 17. Pointage GPS simplifié — 12 juillet 2026
+
+- **Migration 41 appliquée** : les photos d’arrivée/départ deviennent facultatives en base et la RPC de clôture accepte un pointage GPS sans photo.
+- Le nouveau parcours est uniquement : **Employé + Chantier + GPS + horodatage automatique**. La tâche reste facultative.
+- Arrivée et départ conservent chacun leurs coordonnées et leur précision GPS ; la pause est déduite et les heures sont calculées automatiquement.
+- La saisie manuelle et la prise de photo ont été retirées de l’interface. Les anciennes saisies restent consultables dans un panneau d’archives pour ne perdre aucun historique.
+- L’historique principal affiche clairement le chantier, la date, les heures d’arrivée et de départ, la durée et deux liens cartographiques GPS.
 ```
