@@ -243,4 +243,14 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Règles responsives centralisées dans le layout : marges réduites, grilles/cartes/formulaires empilés, colonnes étendues, boutons tactiles, modales limitées à la hauteur de l’écran et tableaux avec défilement horizontal interne.
 - Tests réels avec viewport **390×844** puis **360×800** sur `/dashboard`, `/pointage`, `/devis`, `/devis/nouveau`, `/stock`, `/flotte` et `/commandes` : largeur document strictement égale au viewport, aucun débordement horizontal de page.
 - Captures vérifiées : tableau de bord lisible en une colonne, cartes financières sans chevauchement, pointage arrivée/départ entièrement utilisable.
+
+## 16. Permissions Consulter / Gérer — 12 juillet 2026
+
+- **Migration 40 appliquée** : 12 droits `gerer_*` ajoutés en complément des droits `acces_*`, dont clients, chantiers, devis, factures, achats, planning, employés, pointage, stock, flotte, outillage et paramètres.
+- Les descriptions `acces_*` indiquent maintenant clairement « Consulter ». La page `/parametres/acces` affiche des badges bleus **Consulter** et or **Gérer**.
+- Les postes existants ont reçu les nouveaux droits de gestion correspondant à leurs accès afin de ne provoquer aucune régression. L’admin peut décocher seulement « Gérer » pour rendre un poste lecteur.
+- L’enregistrement normalise les droits côté SQL : sélectionner « Gérer » force automatiquement le droit « Consulter » du même module.
+- En authentification réelle, l’interface affiche un bandeau « Mode consultation », masque les formulaires/actions de modification et conserve les filtres de lecture.
+- Le proxy bloque également toute requête POST d’un utilisateur sans droit `gerer_*`, avec redirection 303 vers la page consultée. Le masquage visuel n’est donc pas la seule protection.
+- Les anciennes permissions détaillées clients/chantiers/employés restent en base pour compatibilité mais sont masquées de l’écran simplifié ; les contrôles spéciaux (`gerer_utilisateurs`, `valider_pointages`) restent visibles.
 ```

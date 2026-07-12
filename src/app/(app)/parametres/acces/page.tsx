@@ -33,7 +33,9 @@ export default async function AccesPage({
         .in("statut", ["actif", "en_attente_validation"]),
     ]);
 
-  const permissions = (catalogue ?? []) as Permission[];
+  const permissions = ((catalogue ?? []) as Permission[]).filter((permission) =>
+    permission.cle.startsWith("acces_") || permission.cle.startsWith("gerer_") || permission.cle === "valider_pointages",
+  );
   const groupes = new Map<string, Permission[]>();
   for (const p of permissions) groupes.set(p.module, [...(groupes.get(p.module) ?? []), p]);
   const compte = (id: string) => (membres ?? []).filter((m) => m.poste_id === id).length;
@@ -46,12 +48,17 @@ export default async function AccesPage({
           <Link href="/parametres" className="text-sm text-neutral-500 hover:underline">← Paramètres</Link>
           <h1 className="mt-1 text-xl font-semibold">Accès et rôles</h1>
           <p className="text-sm text-neutral-500">
-            Partagez le code d&apos;entreprise, validez les demandes, puis choisissez précisément les modules accessibles par poste.
+            Séparez l&apos;accès en consultation de la gestion. Un collaborateur peut voir un module sans pouvoir créer, modifier ou supprimer.
           </p>
         </div>
 
         {msg.error && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{msg.error}</p>}
         {msg.success && <p className="rounded bg-green-50 p-3 text-sm text-green-700">{msg.success}</p>}
+
+        <section className="grid gap-3 rounded-md border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-100 md:grid-cols-2">
+          <div><strong>Consulter</strong><p className="mt-1 text-xs opacity-80">Affiche le module et ses informations en lecture seule.</p></div>
+          <div><strong>Gérer</strong><p className="mt-1 text-xs opacity-80">Autorise les créations, modifications, suppressions, imports, validations et envois. Gérer active automatiquement Consulter.</p></div>
+        </section>
 
         <section className="rounded-md border border-[#c9a24a]/40 bg-[#c9a24a]/5 p-4">
           <h2 className="font-semibold">Code d&apos;entreprise</h2>
@@ -125,7 +132,7 @@ export default async function AccesPage({
                             <label key={p.cle} className="flex cursor-pointer gap-2 rounded p-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-900">
                               <input type="checkbox" name="permissions" value={p.cle} defaultChecked={autorise.has(p.cle)} className="mt-0.5" />
                               <span>
-                                <span className="block text-sm font-medium">{p.description}</span>
+                                <span className="flex flex-wrap items-center gap-2 text-sm font-medium"><span className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide ${p.cle.startsWith("acces_")?"bg-blue-100 text-blue-800":"bg-amber-100 text-amber-800"}`}>{p.cle.startsWith("acces_")?"Consulter":p.cle.startsWith("gerer_")?"Gérer":"Contrôle"}</span>{p.description}</span>
                                 <span className="font-mono text-[10px] text-neutral-400">{p.cle}</span>
                               </span>
                             </label>

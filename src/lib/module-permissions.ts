@@ -8,3 +8,13 @@ export const MODULE_PERMISSION_PAR_CHEMIN: [string,string][] = [
   ["/stock","acces_stock"],["/depot","acces_stock"],["/inventaires","acces_stock"],
   ["/flotte","acces_flotte"],["/outillage","acces_outillage"],["/exports","acces_exports"],
 ];
+
+export const GESTION_PERMISSION_PAR_CHEMIN: [string,string][] = [
+  ["/parametres/acces","gerer_utilisateurs"],["/parametres","gerer_parametres"],
+  ["/clients","gerer_clients"],["/chantiers","gerer_chantiers"],
+  ["/prestations","gerer_devis"],["/devis","gerer_devis"],["/factures","gerer_factures"],
+  ["/commandes","gerer_achats"],["/fournisseurs","gerer_achats"],["/depenses","gerer_achats"],["/charges","gerer_achats"],
+  ["/planning","gerer_planning"],["/employes","gerer_employes"],["/pointage","gerer_pointage"],
+  ["/stock","gerer_stock"],["/depot","gerer_stock"],["/inventaires","gerer_stock"],
+  ["/flotte","gerer_flotte"],["/outillage","gerer_outillage"],
+];

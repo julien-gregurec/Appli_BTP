@@ -347,6 +347,14 @@ git diff --check
 - Les tableaux défilent dans leur conteneur sans élargir toute la page.
 - Tests 390×844 et 360×800 réussis sur dashboard, pointage, devis, stock, flotte et commandes, sans débordement horizontal.
 
+### Permissions Consulter / Gérer — 12 juillet 2026
+
+- Migration 40 appliquée : droits `acces_*` de consultation séparés de 12 nouveaux droits `gerer_*`.
+- Postes existants rétrocompatibles : leur gestion a été conservée initialement ; décocher seulement Gérer les rend lecteurs.
+- UI des rôles simplifiée avec badges Consulter/Gérer ; Gérer implique automatiquement Consulter côté SQL.
+- Mode lecture seule : bandeau explicite, actions de mutation masquées, filtres GET conservés.
+- Protection serveur : les POST sont refusés par le proxy si le droit Gérer du module manque.
+
 ## Fichiers clés
 
 - `src/components/DevisEditor.tsx`

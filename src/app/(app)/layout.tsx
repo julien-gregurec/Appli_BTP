@@ -3,6 +3,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { estPlateformeAdmin } from "@/lib/plateforme";
+import { ModuleAccessBoundary } from "@/components/ModuleAccessBoundary";
 
 // Layout des pages authentifiées avec navigation latérale.
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -29,8 +30,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         .app-shell main h2{line-height:1.3}
         .app-shell main .fixed[role="dialog"]>div{max-height:calc(100dvh - 2rem);overflow-y:auto;padding:1rem}
       }`}</style>
+      <style>{`
+        .lecture-seule main form[method="post"],
+        .lecture-seule main a[href$="/nouveau"],
+        .lecture-seule main a[href*="/modifier"],
+        .lecture-seule main button[type="button"]{display:none!important}
+        .lecture-seule main form[method="get"]{display:flex!important}
+        .lecture-seule main form[method="get"] button{display:inline-flex!important}
+      `}</style>
       <Sidebar entrepriseNom={ctx.entrepriseNom} logoUrl={ctx.logoUrl} authDisabled={isEmailLoginDisabled()} permissions={permissions} plateformeAdmin={plateformeAdmin} />
-      <div className="min-w-0 flex-1 overflow-y-auto pt-16 md:pt-0">{children}</div>
+      <ModuleAccessBoundary permissions={permissions}>{children}</ModuleAccessBoundary>
     </div>
   );
 }

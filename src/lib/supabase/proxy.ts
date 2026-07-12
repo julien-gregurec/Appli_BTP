@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
-import { MODULE_PERMISSION_PAR_CHEMIN } from "@/lib/module-permissions";
+import { GESTION_PERMISSION_PAR_CHEMIN, MODULE_PERMISSION_PAR_CHEMIN } from "@/lib/module-permissions";
 
 const PUBLIC_PATHS = ["/login", "/signup", "/auth"];
 
@@ -52,6 +52,16 @@ export async function updateSession(request: NextRequest) {
         const { data: appartenance } = await supabase.from("utilisateurs_entreprises").select("poste_id").eq("utilisateur_id", user.id).eq("entreprise_id", profil.entreprise_active_id).eq("statut", "actif").maybeSingle();
         const { data: droit } = appartenance?.poste_id ? await supabase.from("permissions_poste").select("autorise").eq("entreprise_id", profil.entreprise_active_id).eq("poste_id", appartenance.poste_id).eq("cle_permission", droitRequis).eq("autorise", true).maybeSingle() : { data: null };
         if (!droit) { const url=request.nextUrl.clone();url.pathname="/dashboard";url.searchParams.set("acces","refuse");return NextResponse.redirect(url); }
+      }
+    }
+    const estMutation=!['GET','HEAD','OPTIONS'].includes(request.method);
+    const droitGestion=estMutation?GESTION_PERMISSION_PAR_CHEMIN.find(([chemin])=>request.nextUrl.pathname===chemin||request.nextUrl.pathname.startsWith(chemin+"/"))?.[1]:null;
+    if(droitGestion){
+      const{data:profil}=await supabase.from("utilisateurs").select("entreprise_active_id").eq("id",user.id).maybeSingle();
+      if(profil?.entreprise_active_id){
+        const{data:appartenance}=await supabase.from("utilisateurs_entreprises").select("poste_id").eq("utilisateur_id",user.id).eq("entreprise_id",profil.entreprise_active_id).eq("statut","actif").maybeSingle();
+        const{data:droit}=appartenance?.poste_id?await supabase.from("permissions_poste").select("autorise").eq("entreprise_id",profil.entreprise_active_id).eq("poste_id",appartenance.poste_id).eq("cle_permission",droitGestion).eq("autorise",true).maybeSingle():{data:null};
+        if(!droit){const url=request.nextUrl.clone();url.searchParams.set("lecture","seule");return NextResponse.redirect(url,303);}
       }
     }
   }
