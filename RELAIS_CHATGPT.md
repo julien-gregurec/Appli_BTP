@@ -235,4 +235,12 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Imports XLSX/CSV/PDF ajoutés à `/flotte` et `/outillage` via `src/lib/import-assets.ts`.
 - Les équipes peuvent prendre une photo directement depuis `/chantiers/[id]/documents` et la classer avant/pendant/après travaux.
 - Contrôles : migrations accessibles en anon prototype, 3 affectations véhicules reprises, lint/TypeScript/build Next webpack verts, routes et écrans testés localement.
+
+## 15. Adaptation mobile complète — 12 juillet 2026
+
+- Navigation remplacée sur téléphone par un en-tête compact et un menu latéral coulissant avec fond bloquant et fermeture au changement de page.
+- Le contenu commence sous l’en-tête mobile ; la barre latérale bureau reste inchangée à partir de 768 px.
+- Règles responsives centralisées dans le layout : marges réduites, grilles/cartes/formulaires empilés, colonnes étendues, boutons tactiles, modales limitées à la hauteur de l’écran et tableaux avec défilement horizontal interne.
+- Tests réels avec viewport **390×844** puis **360×800** sur `/dashboard`, `/pointage`, `/devis`, `/devis/nouveau`, `/stock`, `/flotte` et `/commandes` : largeur document strictement égale au viewport, aucun débordement horizontal de page.
+- Captures vérifiées : tableau de bord lisible en une colonne, cartes financières sans chevauchement, pointage arrivée/départ entièrement utilisable.
 ```

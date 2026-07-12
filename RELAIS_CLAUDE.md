@@ -340,6 +340,13 @@ git diff --check
 - Photo chantier rapide depuis téléphone, classée avant/pendant/après travaux.
 - Lint, TypeScript, build webpack et tests visuels locaux verts.
 
+### Adaptation mobile — 12 juillet 2026
+
+- En-tête compact et menu coulissant sur téléphone ; navigation bureau inchangée.
+- Grilles, cartes et formulaires passent en une colonne ; boutons agrandis et modales adaptées à la hauteur disponible.
+- Les tableaux défilent dans leur conteneur sans élargir toute la page.
+- Tests 390×844 et 360×800 réussis sur dashboard, pointage, devis, stock, flotte et commandes, sans débordement horizontal.
+
 ## Fichiers clés
 
 - `src/components/DevisEditor.tsx`

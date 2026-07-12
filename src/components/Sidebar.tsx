@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { logoutAction } from "@/app/actions/auth";
 
 // Navigation latérale — les modules non encore construits sont grisés (désactivés).
@@ -44,9 +45,20 @@ export function Sidebar({
   plateformeAdmin?: boolean;
 }) {
   const pathname = usePathname();
+  const [ouvert, setOuvert] = useState(false);
 
   return (
-    <aside className="flex w-60 flex-none flex-col border-r border-[#243447] bg-[#0d1b2a] text-white">
+    <>
+    <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-[#243447] bg-[#0d1b2a] px-4 text-white md:hidden">
+      <div className="flex min-w-0 items-center gap-3">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={logoUrl||"/liria-concept-logo.png"} alt="LIRIA CONCEPT" className="h-10 w-14 rounded bg-white object-contain p-1" />
+        <div className="min-w-0"><div className="text-sm font-semibold tracking-[0.12em]">LIRIA <span className="text-[#c9a24a]">CONCEPT</span></div><div className="truncate text-[11px] text-white/60">{entrepriseNom}</div></div>
+      </div>
+      <button type="button" onClick={() => setOuvert(true)} aria-expanded={ouvert} aria-controls="navigation-mobile" className="rounded-md border border-white/20 px-3 py-2 text-sm font-medium">☰ Menu</button>
+    </header>
+    {ouvert && <button type="button" aria-label="Fermer le menu" onClick={() => setOuvert(false)} className="fixed inset-0 z-40 bg-black/50 md:hidden" />}
+    <aside id="navigation-mobile" className={`fixed inset-y-0 left-0 z-50 flex w-[min(19rem,86vw)] flex-none transform flex-col border-r border-[#243447] bg-[#0d1b2a] text-white shadow-2xl transition-transform duration-200 md:static md:z-auto md:w-60 md:translate-x-0 md:shadow-none ${ouvert?"translate-x-0":"-translate-x-full"}`}>
       <div className="border-b border-white/10 p-4">
         <div className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -55,6 +67,7 @@ export function Sidebar({
             <div className="text-sm font-semibold tracking-[0.14em]">LIRIA</div>
             <div className="text-[10px] tracking-[0.24em] text-[#c9a24a]">CONCEPT</div>
           </div>
+          <button type="button" onClick={() => setOuvert(false)} className="ml-auto rounded px-2 py-1 text-2xl text-white/70 md:hidden" aria-label="Fermer le menu">×</button>
         </div>
         <div className="mt-3 truncate text-xs text-white/60">{entrepriseNom}</div>
       </div>
@@ -78,6 +91,7 @@ export function Sidebar({
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => setOuvert(false)}
               className={`block rounded-md px-3 py-2 text-sm ${
                 active
                   ? "bg-[#c9a24a] font-medium text-[#0d1b2a]"
@@ -94,6 +108,7 @@ export function Sidebar({
             <div className="my-2 border-t border-white/10" />
             <Link
               href="/plateforme"
+              onClick={() => setOuvert(false)}
               className={`block rounded-md px-3 py-2 text-sm ${
                 pathname === "/plateforme" || pathname.startsWith("/plateforme/")
                   ? "bg-[#c9a24a] font-medium text-[#0d1b2a]"
@@ -119,5 +134,6 @@ export function Sidebar({
         </div>
       )}
     </aside>
+    </>
   );
 }
