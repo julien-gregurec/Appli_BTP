@@ -50,6 +50,12 @@ export default async function DocumentsChantierPage({
         {messages.error && <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">{messages.error}</p>}
         {messages.success && <p className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700 dark:border-green-900 dark:bg-green-950/30 dark:text-green-300">{messages.success}</p>}
 
+        <form action={ajouter} encType="multipart/form-data" className="grid gap-3 rounded-lg border-2 border-[#c9a24a]/60 bg-[#c9a24a]/5 p-4 sm:grid-cols-[1fr_220px_auto]">
+          <div><h2 className="font-semibold">Photo rapide depuis le chantier</h2><p className="text-xs text-neutral-500">L’appareil photo du téléphone s’ouvre directement. Ajoutez une note pour faciliter le suivi.</p><input name="fichier" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" required className="mt-2 block w-full text-sm" /></div>
+          <div><label className="text-xs text-neutral-500">Étape<select name="categorie" defaultValue="photo_pendant" className="mt-1 w-full rounded-md border px-3 py-2 text-sm"><option value="photo_avant">Avant travaux</option><option value="photo_pendant">Pendant les travaux</option><option value="photo_apres">Après travaux</option></select></label><label className="mt-2 block text-xs text-neutral-500">Note<input name="note" placeholder="Zone, tâche, anomalie…" className="mt-1 w-full rounded-md border px-3 py-2 text-sm" /></label></div>
+          <button className="self-end rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-medium text-white">Ajouter la photo</button>
+        </form>
+
         <form action={ajouter} className="grid gap-4 rounded-md border border-neutral-200 p-4 dark:border-neutral-800 md:grid-cols-[1.4fr_1fr]">
           <div className="space-y-1">
             <label htmlFor="fichier" className="text-sm font-medium">Fichier</label>

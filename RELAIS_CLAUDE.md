@@ -1,5 +1,16 @@
 # Relais Claude Code — Plateforme BTP
 
+## Mise à jour Codex — 12 juillet 2026 (à lire en premier)
+
+- Les migrations hébergées **29 à 37 sont appliquées** (`28` est volontairement hors migrations, sous `supabase/production/`). Les migrations 35 code entreprise et 36 espace propriétaire ne sont plus en attente.
+- Migration 36 contrôlée : colonne abonnement, propriétaire, fonctions de liste/modification et grant authentifié = OK. Page `/plateforme` HTTP 200.
+- Planning hebdomadaire multi-ouvriers, accès/rôles, email avec CC, logo importable, pointage GPS+photo, stock Excel/PDF+nuanciers+scan, véhicules affectés et factures liées aux véhicules/outils sont livrés.
+- La facture fournisseur peut être scannée/importée (PDF/image privée 20 Mo) et reliée à un chantier, un employé et un actif.
+- Listes marque/modèle : véhicules via suggestions locales + API officielle vPIC, outillage via suggestions BTP ; saisie libre conservée.
+- Lire `SUIVI_BESOINS_METIER.md` pour la matrice complète fait/partiel/externe.
+- Validations vertes : lint, TypeScript, build webpack, diff-check.
+- Le script de durcissement production a été complété pour les RPC 30–37 et retesté en `BEGIN … ROLLBACK` avec succès ; le prototype est confirmé intact (46 policies anon). Il reste NON APPLIQUÉ.
+
 ## Projet
 
 - Dépôt : `/Users/juliengregurec/Documents/btp-platform`
@@ -309,6 +320,25 @@ git diff --check
 ### Travail en attente à ne pas oublier
 
 - Une fois le SIRET et la forme juridique définitifs de LIRIA connus, compléter les paramètres légaux sans reprendre automatiquement ceux de l’ancienne SAS.
+
+### Historique de démonstration complet — 12 juillet 2026
+
+- Supabase contient désormais plusieurs mois d'activité fictive mais réaliste, sans suppression des données antérieures.
+- Totaux : 8 clients, 9 chantiers, 8 employés, 12 devis, 8 factures, 12 affectations planning, 13 pointages, 10 prestations, 12 articles / 20 mouvements de stock, 3 zones de dépôt, 1 inventaire validé, 7 fournisseurs, 5 commandes, 3 véhicules, 9 outils, 6 dépenses fournisseurs et 3 charges récurrentes.
+- Les liens métier sont renseignés : clients/chantiers/documents/paiements, équipes/temps, stock/chantiers, fournisseurs/commandes/dépenses, véhicules et outils/ouvriers.
+- Coordonnées fictives sur `example.fr`, marqueur `HISTORIQUE_DEMO_LIRIA_2026`, références `DEMO-*`.
+- Script réexécutable sans doublons : `scripts/seed-demo-history.mjs` (double exécution contrôlée avec compteurs identiques).
+
+### Lot terrain, emails et imports — 12 juillet 2026
+
+- Migrations 38/39 appliquées : sessions arrivée/départ GPS+photos et historique atomique des affectations véhicule.
+- `/pointage` calcule automatiquement les heures depuis l’arrivée et le départ, pause déduite ; la saisie manuelle reste disponible.
+- PDF A4 et envoi email assisté avec CC ajoutés aux commandes fournisseur ; devis/factures conservent le même flux.
+- Fiche véhicule enrichie : affectation courante et historique, factures liées avec chantier, résumé des travaux récents de l’ouvrier.
+- Matériel hors service explicitement indisponible et toujours bloqué à l’affectation par la RPC.
+- Imports XLSX/CSV/PDF ajoutés pour flotte et outillage.
+- Photo chantier rapide depuis téléphone, classée avant/pendant/après travaux.
+- Lint, TypeScript, build webpack et tests visuels locaux verts.
 
 ## Fichiers clés
 

@@ -8,8 +8,8 @@
 - Elle possède un membre actif et un poste Admin/Gérant.
 - Le profil public du propriétaire existe et pointe sur `ENT-001` comme entreprise active.
 - Le compte Supabase Auth correspondant existe, a un mot de passe, un email confirmé et a déjà réussi une connexion.
-- Le script de production passe en transaction de test puis peut être annulé sans modifier la base.
-- **Correctif 2026-07-12 (audit reprise Claude) :** le script `sortie_mode_prototype.sql` re-donnait `EXECUTE` à `authenticated` sur 15 RPC mais en oubliait 6 pourtant appelées par l'app (`creer_poste_avec_permissions`, `enregistrer_permissions_poste`, `modifier_poste_membre`, `supprimer_poste_vide`, `importer_articles_stock`, `valider_preuve_pointage`). Sans elles, la gestion des accès/postes, l'import d'articles/nuanciers et la validation des preuves de pointage auraient renvoyé « permission denied » après la coupure. Les 6 grants ont été ajoutés au script.
+- Le script de production passe en transaction de test puis peut être annulé sans modifier la base. Nouveau dry-run après migrations 30–37 réussi ; rollback contrôlé (fonction prototype + accès anon + 46 policies anon toujours présents).
+- **Correctif 2026-07-12 :** le script réaccorde désormais toutes les RPC appelées par l’application après les migrations 30 à 37 : accès/postes, rattachement par code, import stock, validation des pointages, justificatifs fournisseurs et espace propriétaire.
 
 ## Décisions et actions avant la coupure
 

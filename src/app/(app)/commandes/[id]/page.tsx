@@ -6,6 +6,8 @@ import { euros } from "@/lib/devis";
 import { StatutCommandeSelect } from "@/components/StatutCommandeSelect";
 import { enregistrerReceptionCommandeAction, supprimerCommandeAction } from "@/app/actions/commandes";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
+import { EmailDocumentButton } from "@/components/EmailDocumentButton";
+import { contenuEmailCommande } from "@/lib/email";
 
 export default async function CommandeDetailPage({
   params,
@@ -37,6 +39,7 @@ export default async function CommandeDetailPage({
   const peutSupprimer = ["brouillon", "annulee"].includes(commande.statut);
   const supprimer = supprimerCommandeAction.bind(null, id);
   const enregistrerReception = enregistrerReceptionCommandeAction.bind(null, id);
+  const email = fournisseur ? contenuEmailCommande({ numero: commande.numero, fournisseurNom: fournisseur.nom, fournisseurEmail: fournisseur.email, montantTtc: Number(commande.montant_ttc), entrepriseNom: ctx.entrepriseNom, dateLivraison: commande.date_livraison_prevue }) : null;
 
   return (
     <main className="p-8">
@@ -50,7 +53,7 @@ export default async function CommandeDetailPage({
               {chantier && <> · chantier <Link href={`/chantiers/${chantier.id}`} className="hover:underline">{chantier.nom}</Link></>}
             </p>
           </div>
-          <StatutCommandeSelect commandeId={id} statut={commande.statut} />
+          <div className="flex flex-wrap items-center justify-end gap-2"><a href={`/imprimer/commandes/${id}`} target="_blank" rel="noopener" className="rounded-md bg-[#0d1b2a] px-3 py-1.5 text-sm font-medium text-white">Télécharger PDF</a>{email ? <EmailDocumentButton type="commande" id={id} statut={commande.statut} to={email.to} sujet={email.sujet} corps={email.corps} pdfUrl={`/imprimer/commandes/${id}`} /> : <span className="text-xs text-amber-700">Ajoutez l’email du fournisseur pour envoyer</span>}<StatutCommandeSelect commandeId={id} statut={commande.statut} /></div>
         </div>
 
         {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}

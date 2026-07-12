@@ -55,6 +55,13 @@ grant execute on function public.modifier_poste_membre(uuid,uuid,uuid) to authen
 grant execute on function public.supprimer_poste_vide(uuid,uuid) to authenticated;
 grant execute on function public.importer_articles_stock(uuid,text,jsonb) to authenticated;
 grant execute on function public.valider_preuve_pointage(uuid,uuid,text,text) to authenticated;
+grant execute on function public.cloturer_session_pointage(uuid,uuid,timestamptz,integer,numeric,numeric,numeric,text) to authenticated;
+grant execute on function public.affecter_vehicule(uuid,uuid,uuid,text) to authenticated;
+grant execute on function public.rejoindre_entreprise_par_code(text) to authenticated;
+grant execute on function public.lier_justificatif_depense(uuid,uuid,text,text,text,bigint) to authenticated;
+grant execute on function public.est_plateforme_admin() to authenticated;
+grant execute on function public.plateforme_entreprises() to authenticated;
+grant execute on function public.plateforme_modifier_abonnement(uuid,text,date,text) to authenticated;
 
 revoke execute on function public.dev_contexte_entreprise() from public,anon,authenticated;
 drop function public.dev_contexte_entreprise();

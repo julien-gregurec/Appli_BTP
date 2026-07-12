@@ -6,4 +6,6 @@ declare module "@excel.js/exceljs" {
     worksheets: Worksheet[];
     xlsx: { load(buffer: Buffer): Promise<Workbook> };
   }
+  const ExcelJS: { Workbook: typeof Workbook };
+  export default ExcelJS;
 }

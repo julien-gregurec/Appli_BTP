@@ -35,11 +35,13 @@ export function Sidebar({
   logoUrl,
   authDisabled = false,
   permissions = null,
+  plateformeAdmin = false,
 }: {
   entrepriseNom: string;
   logoUrl?: string | null;
   authDisabled?: boolean;
   permissions?: string[] | null;
+  plateformeAdmin?: boolean;
 }) {
   const pathname = usePathname();
 
@@ -86,6 +88,22 @@ export function Sidebar({
             </Link>
           );
         })}
+
+        {plateformeAdmin && (
+          <>
+            <div className="my-2 border-t border-white/10" />
+            <Link
+              href="/plateforme"
+              className={`block rounded-md px-3 py-2 text-sm ${
+                pathname === "/plateforme" || pathname.startsWith("/plateforme/")
+                  ? "bg-[#c9a24a] font-medium text-[#0d1b2a]"
+                  : "text-[#c9a24a] hover:bg-white/10"
+              }`}
+            >
+              ★ Plateforme
+            </Link>
+          </>
+        )}
       </nav>
 
       {!authDisabled && (

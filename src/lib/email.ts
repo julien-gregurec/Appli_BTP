@@ -44,3 +44,17 @@ export function contenuEmailDocument(opts: {
 
   return {to,sujet,corps};
 }
+
+export function contenuEmailCommande(opts: { numero: string; fournisseurNom: string; fournisseurEmail: string | null; montantTtc: number; entrepriseNom: string; dateLivraison?: string | null }) {
+  const to = opts.fournisseurEmail?.trim();
+  if (!to) return null;
+  const sujet = `Commande ${opts.numero} — ${opts.entrepriseNom}`;
+  const corps = [
+    `Bonjour ${opts.fournisseurNom},`, "",
+    `Veuillez trouver ci-joint notre bon de commande ${opts.numero}, d’un montant de ${euros(opts.montantTtc)} TTC.`,
+    opts.dateLivraison ? `Livraison souhaitée au plus tard le ${opts.dateLivraison}.` : null,
+    "", "(Pensez à joindre le PDF ouvert depuis l’application avant l’envoi.)", "",
+    "Merci de nous confirmer la prise en compte de cette commande et le délai de livraison.", "", "Cordialement,", opts.entrepriseNom,
+  ].filter((ligne) => ligne !== null).join("\n");
+  return { to, sujet, corps };
+}

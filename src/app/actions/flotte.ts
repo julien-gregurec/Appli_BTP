@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { lireImportVehicules } from "@/lib/import-assets";
 
 const champ = (f: FormData, n: string) => String(f.get(n) ?? "").trim();
 const dateOuNull = (f: FormData, n: string) => champ(f, n) || null;
@@ -38,3 +39,7 @@ export async function ajouterReleveKilometrageAction(vehiculeId: string, formDat
   if (error) redirect(`/flotte/${vehiculeId}?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/flotte"); revalidatePath(`/flotte/${vehiculeId}`); redirect(`/flotte/${vehiculeId}?success=Kilométrage enregistré`);
 }
+
+export async function affecterVehiculeAction(vehiculeId:string,formData:FormData){const ctx=await getContexteEntreprise(),supabase=await createClient(),employeId=champ(formData,"employe_id")||null;const{error}=await supabase.rpc("affecter_vehicule",{p_entreprise_id:ctx.entrepriseId,p_vehicule_id:vehiculeId,p_employe_id:employeId,p_note:champ(formData,"note")||null});if(error)redirect(`/flotte/${vehiculeId}?error=${encodeURIComponent(error.message)}`);revalidatePath("/flotte");revalidatePath(`/flotte/${vehiculeId}`);redirect(`/flotte/${vehiculeId}?success=Affectation enregistrée et historisée`)}
+
+export async function importerVehiculesAction(formData: FormData) { const fichier=formData.get("fichier"); if(!(fichier instanceof File)||!fichier.size)redirect(`/flotte?error=${encodeURIComponent("Choisissez un fichier")}`); try{const lignes=await lireImportVehicules(fichier);if(!lignes.length)throw new Error("Aucun véhicule exploitable");const ctx=await getContexteEntreprise(),supabase=await createClient();const{error}=await supabase.from("vehicules").upsert(lignes.map(ligne=>({entreprise_id:ctx.entrepriseId,...ligne,statut:"actif"})),{onConflict:"entreprise_id,immatriculation"});if(error)throw error;revalidatePath("/flotte");redirect(`/flotte?success=${encodeURIComponent(`${lignes.length} véhicule(s) importé(s)`)}`)}catch(error){redirect(`/flotte?error=${encodeURIComponent(error instanceof Error?error.message:"Import impossible")}`)} }

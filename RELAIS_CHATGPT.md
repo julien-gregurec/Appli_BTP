@@ -6,6 +6,27 @@
 
 ---
 
+## 0A. MISE À JOUR CODEX — 12 juillet 2026 (ÉTAT AUTORITATIF)
+
+Cette section **prime sur les mentions “à faire / migration à exécuter” plus bas**, conservées uniquement comme historique.
+
+- **Migrations hébergées appliquées jusqu’à 37**, avec le trou volontaire `28` : `29 planning_hebdomadaire`, `30 acces_modules`, `31 membres_postes`, `32 logo_entreprise`, `33 pointage_preuves`, `34 stock_import_nuanciers`, `35 code_entreprise`, `36 plateforme_abonnements`, `37 depenses_actifs_documents`. La migration 28 n’existe plus dans `migrations/` : le script de coupure du prototype est rangé dans `supabase/production/sortie_mode_prototype.sql` et reste **NON APPLIQUÉ**.
+- **Migration 36 passée et contrôlée** : colonne abonnement, propriétaire `julien.gregurec@gmail.com`, RPC de liste/modification et droit `authenticated` tous vérifiés `true`. `/plateforme` répond HTTP 200 et affiche LIRIA CONCEPT + les statuts.
+- **Planning** : vue semaine visuelle, tâche = date + heures + chantier + plusieurs ouvriers, partage email/WhatsApp. Migration 29 et test multi-ouvriers réussis, données test supprimées.
+- **Accès & rôles** : droits par module, rôles, affectation des comptes, suppression de rôle vide, navigation filtrée et routes protégées en auth réelle. Code d’entreprise + membre en attente + activation par poste appliqués.
+- **Email/PDF** : fenêtre email devis/facture avec destinataire, CC multiples, objet/message, accès PDF et passage automatique au statut envoyé. SMTP + pièce jointe automatique reste dépendant d’un fournisseur externe.
+- **Logo** : import entreprise sécurisé, logo LIRIA fourni déjà importé dans le bucket public dédié et utilisé par navigation/PDF.
+- **Pointage terrain** : GPS, précision, photo privée obligatoire, carte, statut à vérifier, validation/rejet et commentaire.
+- **Stock** : import atomique XLSX/CSV/PDF (catalogue ou inventaire), nuanciers, codes-barres, sélection de teinte et mouvement via douchette/saisie. Test Excel réel : article + quantité + mouvement + teinte validés puis nettoyés.
+- **Flotte/outillage/dépenses** : véhicule assigné à un ouvrier, facture fournisseur liée à chantier + employé + véhicule ou outil, historique et total par actif, PDF/photo de facture dans stockage privé.
+- **Listes intelligentes** : véhicule avec repli local + modèles vPIC officiels ; outillage avec suggestions BTP ; saisie libre toujours autorisée.
+- **Suivi complet** : lire `SUIVI_BESOINS_METIER.md`.
+- **Dépendances ajoutées** : `@excel.js/exceljs` et `unpdf`. Le fork Excel ne ramène pas la dépendance `uuid` vulnérable de l’ancien paquet `exceljs`. `npm audit` conserve seulement les 2 alertes modérées préexistantes liées à Next/PostCSS.
+- **Validation finale verte** : `npm run lint`, `npx tsc --noEmit --incremental false`, `npx next build --webpack`, `git diff --check`. Build : 42 pages statiques générées, routes nouvelles `/plateforme`, `/stock/[id]`, `/api/referentiels/vehicules` incluses.
+- **Sécurité production** : `supabase/production/sortie_mode_prototype.sql` a été complété avec toutes les RPC 30–37. Nouveau dry-run complet `BEGIN … ROLLBACK` réussi ; après rollback, fonction prototype présente, droit anon présent et 46 policies anon intactes. Ne pas l’appliquer tant que `DISABLE_EMAIL_LOGIN=true` et sans sauvegarde/validation explicite.
+
+---
+
 ## 0. MISE À JOUR — reprise Claude, 12 juillet 2026 (fin de journée)
 
 **⚡ L'APPLICATION EST EN PRODUCTION.**
@@ -27,13 +48,19 @@
 - Conséquence : une entreprise n'a qu'**un seul compte** (l'admin). La section « Comptes et postes » reste vide de collègues.
 - **Solution recommandée à construire** : invitation par email (table `invitations` : entreprise_id, email, poste_id, token, statut ; l'employé s'inscrit via le lien → rattachement auto à l'entreprise + poste). Alternative : code d'entreprise partagé. **Nécessite une migration SQL + UI.** En attente du choix de l'utilisateur (email vs code).
 
-**NOUVELLE FONCTIONNALITÉ — Code d'entreprise + rattachement des employés (Claude, code prêt, ⏳ migration à exécuter)** :
+**NOUVELLE FONCTIONNALITÉ — Code d'entreprise + rattachement des employés (migration appliquée)** :
 - Choix utilisateur : **code d'entreprise** (pour à terme facturer chaque entreprise/code). L'admin partage un code ; l'employé le saisit à l'inscription pour rejoindre l'entreprise ; il arrive **« en attente »** ; l'admin l'active en lui affectant un poste.
-- **⏳ Migration à exécuter : `supabase/migrations/20260710000035_code_entreprise.sql`** — colonne `entreprises.code_adhesion` (unique, 8 car., trigger de génération + backfill), RPC `rejoindre_entreprise_par_code(text)` (SECURITY DEFINER → insère le membre en `en_attente_validation`), et **remplace `modifier_poste_membre`** pour qu'affecter un poste **active** un membre en attente (statut→actif). Grants anon+authenticated.
+- **✅ Migration appliquée : `supabase/migrations/20260710000035_code_entreprise.sql`** — colonne `entreprises.code_adhesion` (unique, 8 car., trigger de génération + backfill), RPC `rejoindre_entreprise_par_code(text)` et activation par affectation d’un poste.
 - Code applicatif (déjà en place) : `rejoindreEntrepriseAction` dans `src/app/actions/entreprise.ts` ; `getContexteEntreprise` (src/lib/entreprise.ts) redirige un membre non-actif vers **`/en-attente`** (nouvelle page) ; `/onboarding` propose « Créer » **ou** « Rejoindre avec un code » ; `/parametres/acces` **réécrit lisible** : affiche le **code d'entreprise** + liste les membres **en attente** (badge) que l'admin valide via « Valider » (= affecter un poste).
 - ✅ **DÉPLOYÉ EN PROD (commit `988fc70`)** : migration 35 appliquée (LIRIA a le code `BW2HYQTA`), page `/parametres/acces` vérifiée en prod (affiche le code + « Comptes et postes »). Le **rattachement par code lui-même** ne s'active qu'en **auth réelle** (`DISABLE_EMAIL_LOGIN=false`) — à tester quand l'utilisateur réactivera le login.
 - ⚠️ **Piège auth git rencontré** : une session avait mis un helper `credential.https://github.com.helper` = `!/tmp/gh_install/.../gh` dans `~/.gitconfig` (global) ; le binaire temporaire ayant été supprimé, `git push` échouait. **Corrigé** : `gh` réinstallé à un emplacement STABLE `~/.local/gh/bin/gh` (v2.96.0, compte `julien-gregurec`, token `gho_…` scope `repo`), et `git config --global credential."https://github.com".helper "!$HOME/.local/gh/bin/gh auth git-credential"`. Les push fonctionnent désormais.
-- Reste à cadrer avec l'utilisateur : la **facturation par code** (abonnement/paiement par entreprise) = chantier séparé, non commencé.
+- **DIRECTION SAAS validée** : l'utilisateur veut **vendre le logiciel à d'autres entreprises du BTP** (chaque code = client facturable). Feuille de route : Étape 0 codes entreprise (fait) · Étape 1 espace propriétaire plateforme (en cours, voir ci-dessous) · Étape 2 Stripe (abonnements/paiement — nécessite compte Stripe + tarifs + clés de l'utilisateur) · Étape 3 landing + inscription self-service. Super-admin identifié **par email**.
+
+**ÉTAPE 1 — Espace propriétaire plateforme (migration appliquée et contrôlée)** :
+- **✅ Migration appliquée : `20260710000036_plateforme_abonnements.sql`** — ajoute les statuts/échéance/note d’abonnement, le propriétaire et les RPC gardées. Vérification structurelle complète réussie.
+- Code : `src/lib/plateforme.ts` (`estPlateformeAdmin()` → **true en mode prototype** pour démo, sinon RPC email) ; `src/app/actions/plateforme.ts` ; page **`/plateforme`** (liste des entreprises + stats + édition du statut d'abonnement par entreprise) ; lien **★ Plateforme** dans `Sidebar` (prop `plateformeAdmin`, calculé dans `(app)/layout.tsx`).
+- En mode prototype la page requête `entreprises` directement (colonnes ajoutées par la migration) ; en auth réelle elle passe par la RPC gardée par email. **La restriction par email n'est effective qu'en auth réelle** ; en prototype (prod actuelle, public) l'écran est visible de tous — acceptable tant qu'il n'y a qu'une entreprise, à resserrer avant d'ouvrir le SaaS.
+- Reste Étape 2 (Stripe) à faire ; nécessite les choix tarifaires et les clés du compte Stripe.
 
 **État qualité au moment de la reprise** : `npx tsc --noEmit`, `npm run lint`, `npx next build --webpack` = **verts** (y compris après l'ajout du code d'entreprise). Modules live testés en prod (10 routes → HTTP 200).
 
@@ -103,9 +130,11 @@ Menu latéral : Tableau de bord · Clients · Chantiers · Devis · Prestations 
 - **Paramètres** : `/parametres`, modification identité/adresse/SIRET/assurances/pénalités/textes documents ; alimente les impressions.
 - **Sécurité applicative** : les server actions (clients, employés, planning, prestations, chantiers, tâches, devis, factures) vérifient explicitement `entreprise_id` **en plus** de la RLS. Composant `ConfirmSubmitButton` pour les actions sensibles.
 
-## 6. Migrations appliquées sur la base hébergée (27 appliquées)
+## 6. Migrations appliquées sur la base hébergée (01–27 et 29–37)
 
 `01 comptes_entreprises` · `02 trigger_profil` · `03 bootstrap_entreprise` · `04 clients_chantiers` · `05 devis` · `06 factures` · `07 consolidation_financiere` · `08 mode_sans_connexion` · `09 planning` · `10 employes` · `11 affectations` · `12 prestations_catalogue` · `13 modification_devis_atomique` · `14 duplication_devis` · `15 creation_devis_atomique` · `16 delai_paiement_client` · `17 modification_facture_atomique` · `18 pointages` · `19 stock` · `20 synchro_statuts` · `21 commandes_fournisseurs` · `22 documents_chantier` · `23 flotte` · `24 outillage` · `25 depot_inventaires` · `26 depenses_fournisseurs` · `27 charges_recurrentes`.
+
+Puis : `29 planning_hebdomadaire` · `30 acces_modules` · `31 membres_postes` · `32 logo_entreprise` · `33 pointage_preuves` · `34 stock_import_nuanciers` · `35 code_entreprise` · `36 plateforme_abonnements` · `37 depenses_actifs_documents`. Le numéro 28 est réservé au script manuel de production sorti du dossier automatique.
 
 **Migration 20 appliquée et renforcée après audit** : recalcul paiements sérialisé sous verrou, paiements positifs, transfert ancien/nouveau document, préservation du statut en retard, cascade devis→chantier et facture finale/simple→chantier. Les acomptes, situations et avoirs ne clôturent jamais un chantier. Les liens document/chantier sont contraints à la même entreprise et les helpers `SECURITY DEFINER` internes sont interdits à `anon`/`authenticated`. Backfill confirmé : FAC-2026-001/002/003 sont `payee`, montants payés égaux au TTC ; `CHA-2026-001` est `facture`.
 
@@ -186,4 +215,24 @@ git diff --check                   # OK (aucun conflit whitespace)
 - `PRODUCTION_CHECKLIST.md` · `supabase/production/sortie_mode_prototype.sql` (**prêt, testé en rollback, non appliqué et hors migrations automatiques**)
 - `src/app/(app)/…` : dashboard, clients, chantiers, devis, factures, commandes, fournisseurs, planning, employes, pointage, rentabilite, stock, prestations, parametres
 - `supabase/migrations/*` (27 fichiers, tous appliqués ; voir §6)
+
+## 13. Historique de démonstration LIRIA — 12 juillet 2026
+
+- La base Supabase a été enrichie sans suppression des données existantes pour simuler plusieurs mois d'activité.
+- Totaux après remplissage : **8 clients, 9 chantiers, 8 employés, 12 devis, 8 factures, 12 affectations planning, 13 pointages, 10 prestations, 12 articles et 20 mouvements de stock, 3 zones de dépôt, 1 inventaire validé, 7 fournisseurs, 5 commandes, 3 véhicules, 9 outils, 6 dépenses fournisseurs et 3 charges récurrentes**.
+- Les données ajoutées sont cohérentes entre modules : devis et factures rattachés aux clients/chantiers, paiements et statuts automatiques, temps par équipe, sorties de stock par chantier, véhicules/outils affectés et dépenses reliées aux actifs.
+- Les coordonnées ajoutées sont fictives et utilisent `example.fr` pour empêcher tout envoi accidentel à de vraies personnes.
+- Le script idempotent est `scripts/seed-demo-history.mjs`. Il a été exécuté deux fois avec des compteurs strictement identiques, donc sans doublon.
+- Marqueur technique des données : `HISTORIQUE_DEMO_LIRIA_2026` et références `DEMO-*`. Les données originales ont été conservées.
+
+## 14. Lot terrain, emails et imports — 12 juillet 2026
+
+- **Migrations 38 et 39 appliquées dans Supabase** : `sessions_pointage` avec RPC de clôture atomique, puis historique des affectations véhicule avec RPC atomique.
+- `/pointage` propose arrivée puis départ avec GPS et photo obligatoires aux deux étapes. La pause est déduite et les heures normales/supplémentaires sont générées automatiquement dans `pointages`. La saisie manuelle reste repliée dans un panneau secondaire.
+- Les commandes fournisseur disposent maintenant d’un **bon de commande A4/PDF** (`/imprimer/commandes/[id]`) et du même dialogue email avec destinataire/CC que les devis/factures. Un email fournisseur absent est signalé.
+- La fiche véhicule affiche l’ouvrier courant, l’historique d’affectation, les factures associées avec chantier et un résumé des travaux récents de l’ouvrier assigné.
+- Un outil `hors_service` reste impossible à affecter côté RPC et apparaît explicitement indisponible dans la liste.
+- Imports XLSX/CSV/PDF ajoutés à `/flotte` et `/outillage` via `src/lib/import-assets.ts`.
+- Les équipes peuvent prendre une photo directement depuis `/chantiers/[id]/documents` et la classer avant/pendant/après travaux.
+- Contrôles : migrations accessibles en anon prototype, 3 affectations véhicules reprises, lint/TypeScript/build Next webpack verts, routes et écrans testés localement.
 ```

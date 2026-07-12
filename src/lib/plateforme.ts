@@ -1,0 +1,35 @@
+import { createClient } from "@/lib/supabase/server";
+import { isEmailLoginDisabled } from "@/lib/auth-mode";
+
+// L'espace plateforme est réservé au propriétaire (identifié par son email, table plateforme_admins).
+// En mode prototype (sans connexion), on l'autorise pour la démo mono-entreprise.
+export async function estPlateformeAdmin(): Promise<boolean> {
+  if (isEmailLoginDisabled()) return true;
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("est_plateforme_admin");
+  return data === true;
+}
+
+export const ABONNEMENT_STATUTS = [
+  { cle: "essai", libelle: "Essai", couleur: "#b8792e" },
+  { cle: "actif", libelle: "Actif", couleur: "#2f6b47" },
+  { cle: "suspendu", libelle: "Suspendu", couleur: "#a64b45" },
+  { cle: "annule", libelle: "Annulé", couleur: "#8b8f96" },
+] as const;
+
+export function statutAbonnement(cle: string) {
+  return ABONNEMENT_STATUTS.find((s) => s.cle === cle) ?? ABONNEMENT_STATUTS[0];
+}
+
+export type EntrepriseAbonnement = {
+  id: string;
+  nom: string;
+  code_adhesion: string | null;
+  reference_interne: string | null;
+  abonnement_statut: string;
+  abonnement_echeance: string | null;
+  abonnement_note: string | null;
+  nb_membres: number;
+  nb_membres_actifs: number;
+  created_at: string;
+};
