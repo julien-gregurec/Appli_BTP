@@ -70,6 +70,18 @@ export async function getContexteEntreprise(): Promise<ContexteEntreprise> {
     redirect("/onboarding");
   }
 
+  // Un membre qui a rejoint par code reste "en attente" tant que l'admin ne l'a pas
+  // activé (affectation d'un poste). Tant qu'il n'est pas actif, il n'a accès à rien.
+  const { data: appartenance } = await supabase
+    .from("utilisateurs_entreprises")
+    .select("statut")
+    .eq("utilisateur_id", user.id)
+    .eq("entreprise_id", profil.entreprise_active_id)
+    .maybeSingle();
+  if (appartenance && appartenance.statut !== "actif") {
+    redirect("/en-attente");
+  }
+
   const { data: entreprise } = await supabase
     .from("entreprises")
     .select("nom, reference_interne, logo_url")

@@ -1,4 +1,4 @@
-import { createEntrepriseAction } from "@/app/actions/entreprise";
+import { createEntrepriseAction, rejoindreEntrepriseAction } from "@/app/actions/entreprise";
 
 export default async function OnboardingPage({
   searchParams,
@@ -85,6 +85,34 @@ export default async function OnboardingPage({
             className="w-full rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white"
           >
             Créer l&apos;entreprise
+          </button>
+        </form>
+
+        <div className="flex items-center gap-3 text-xs text-neutral-400">
+          <span className="h-px flex-1 bg-neutral-200 dark:bg-neutral-800" />
+          OU
+          <span className="h-px flex-1 bg-neutral-200 dark:bg-neutral-800" />
+        </div>
+
+        <form action={rejoindreEntrepriseAction} className="space-y-3 rounded-md border border-dashed border-neutral-300 p-4 dark:border-neutral-700">
+          <div>
+            <h2 className="text-sm font-medium">Rejoindre une entreprise existante</h2>
+            <p className="text-xs text-neutral-500">
+              Saisis le code fourni par ton employeur. Ton accès sera activé après validation.
+            </p>
+          </div>
+          <input
+            name="code"
+            type="text"
+            required
+            placeholder="Code entreprise (ex. K7M2PQ9R)"
+            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm uppercase tracking-widest"
+          />
+          <button
+            type="submit"
+            className="w-full rounded-md border border-neutral-900 px-3 py-2 text-sm font-medium dark:border-white"
+          >
+            Rejoindre avec le code
           </button>
         </form>
       </div>

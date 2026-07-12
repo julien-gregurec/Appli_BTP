@@ -2,6 +2,41 @@
 
 > Document de passation à jour au **12 juillet 2026**. À lire en entier avant toute modification.
 > Il complète (et prime sur) l'ancien relais Claude collé dans la conversation.
+> Copie synchronisée : `~/RELAIS_CHATGPT.md`. **À mettre à jour à CHAQUE modification.**
+
+---
+
+## 0. MISE À JOUR — reprise Claude, 12 juillet 2026 (fin de journée)
+
+**⚡ L'APPLICATION EST EN PRODUCTION.**
+
+- **URL prod : https://liria-concept-gestion-btp.vercel.app** (Vercel, équipe `julien-gregurec`, plan Hobby, projet unique `liria-concept-gestion-btp`).
+- **GitHub** : `github.com/julien-gregurec/Appli_BTP`, désormais **privé** et **peuplé** (il était vide avant, d'où les échecs de déploiement initiaux). Branche `main`. Le dépôt local a un remote `gh` → push fonctionne via le trousseau macOS (osxkeychain). **Pour redéployer : `git push gh main`** (même un commit `--allow-empty`) → Vercel rebuild auto (~50 s, `next build`).
+- **Variables d'env Vercel (projet)** : `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, et **`DISABLE_EMAIL_LOGIN=true`**.
+  - ⚠️ `DISABLE_EMAIL_LOGIN=true` en prod = **l'app s'ouvre sans connexion** (« Bonjour Prototype »), donc **accessible à quiconque a l'URL**. C'est un choix temporaire de l'utilisateur (test/démo). **À repasser à `false` + lancer le script de durcissement avant un vrai usage.** Après changement d'une variable Vercel, il faut **redéployer** (push) pour qu'elle prenne effet.
+- **Changement de préréglage Vercel** : le framework doit être **Next.js** (piège : ne pas confondre avec « NestJS » ni laisser « Other »). Build Command / Output Directory = laisser **auto** (ne rien mettre).
+
+**Correctif script de production (fait par Claude)** : `supabase/production/sortie_mode_prototype.sql` re-accordait `EXECUTE` à `authenticated` sur 15 RPC mais en **oubliait 6** pourtant appelées par l'app (`creer_poste_avec_permissions`, `enregistrer_permissions_poste`, `modifier_poste_membre`, `supprimer_poste_vide`, `importer_articles_stock`, `valider_preuve_pointage`). **Les 6 grants ont été ajoutés** — sans quoi la gestion des accès, l'import d'articles et la validation des pointages tombaient en « permission denied » après la coupure. Voir `PRODUCTION_CHECKLIST.md`.
+
+**Ajout fonctionnel (Claude)** : bouton **« Envoyer par email »** sur les fiches devis ET facture (lien `mailto:` pré-rempli destinataire/objet/corps, helper `src/lib/email.ts`) — zéro dépendance. Grisé si le client n'a pas d'email.
+
+**⚠️ ÉCART IDENTIFIÉ — gestion des comptes employés (À FAIRE, non commencé)** :
+- Il **n'existe AUCUN moyen pour l'admin de créer/inviter le compte d'un employé.**
+- `/parametres/acces` gère les **postes** + **permissions par module** + **affectation d'un poste à un membre déjà présent** — mais rien pour **ajouter un membre**.
+- `/onboarding` ne fait que **créer une nouvelle entreprise** (le créateur devient Admin/Gérant) ; **pas d'option « rejoindre une entreprise existante »**, pas d'invitation.
+- Conséquence : une entreprise n'a qu'**un seul compte** (l'admin). La section « Comptes et postes » reste vide de collègues.
+- **Solution recommandée à construire** : invitation par email (table `invitations` : entreprise_id, email, poste_id, token, statut ; l'employé s'inscrit via le lien → rattachement auto à l'entreprise + poste). Alternative : code d'entreprise partagé. **Nécessite une migration SQL + UI.** En attente du choix de l'utilisateur (email vs code).
+
+**NOUVELLE FONCTIONNALITÉ — Code d'entreprise + rattachement des employés (Claude, code prêt, ⏳ migration à exécuter)** :
+- Choix utilisateur : **code d'entreprise** (pour à terme facturer chaque entreprise/code). L'admin partage un code ; l'employé le saisit à l'inscription pour rejoindre l'entreprise ; il arrive **« en attente »** ; l'admin l'active en lui affectant un poste.
+- **⏳ Migration à exécuter : `supabase/migrations/20260710000035_code_entreprise.sql`** — colonne `entreprises.code_adhesion` (unique, 8 car., trigger de génération + backfill), RPC `rejoindre_entreprise_par_code(text)` (SECURITY DEFINER → insère le membre en `en_attente_validation`), et **remplace `modifier_poste_membre`** pour qu'affecter un poste **active** un membre en attente (statut→actif). Grants anon+authenticated.
+- Code applicatif (déjà en place) : `rejoindreEntrepriseAction` dans `src/app/actions/entreprise.ts` ; `getContexteEntreprise` (src/lib/entreprise.ts) redirige un membre non-actif vers **`/en-attente`** (nouvelle page) ; `/onboarding` propose « Créer » **ou** « Rejoindre avec un code » ; `/parametres/acces` **réécrit lisible** : affiche le **code d'entreprise** + liste les membres **en attente** (badge) que l'admin valide via « Valider » (= affecter un poste).
+- ⚠️ Ne **fonctionne qu'en mode auth réelle** (`DISABLE_EMAIL_LOGIN=false`). En mode prototype la page `/parametres/acces` affiche le code « — » (dégradation propre, pas de crash) tant que la migration n'est pas passée. **Ordre conseillé : exécuter la migration 35 PUIS `git push gh main`.** Non encore poussé en prod au moment de l'écriture.
+- Reste à cadrer avec l'utilisateur : la **facturation par code** (abonnement/paiement par entreprise) = chantier séparé, non commencé.
+
+**État qualité au moment de la reprise** : `npx tsc --noEmit`, `npm run lint`, `npx next build --webpack` = **verts** (y compris après l'ajout du code d'entreprise). Modules live testés en prod (10 routes → HTTP 200).
+
+**Note** : à ce stade le tableau de bord prod affiche « Total facturé 0,00 € » — à confirmer si l'utilisateur s'attend à retrouver des données de test (mêmes DB Supabase).
 
 ---
 

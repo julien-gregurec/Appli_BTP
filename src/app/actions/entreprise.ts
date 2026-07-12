@@ -58,6 +58,31 @@ export async function createEntrepriseAction(formData: FormData) {
   redirect("/dashboard");
 }
 
+// Rejoindre une entreprise existante via son code d'adhésion (réservé au mode auth réelle).
+export async function rejoindreEntrepriseAction(formData: FormData) {
+  if (isEmailLoginDisabled()) {
+    redirect("/dashboard");
+  }
+  const code = String(formData.get("code") ?? "").trim();
+  if (!code) {
+    redirect(`/onboarding?error=${encodeURIComponent("Entre le code de ton entreprise.")}`);
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { error } = await supabase.rpc("rejoindre_entreprise_par_code", { p_code: code });
+  if (error) {
+    redirect(`/onboarding?error=${encodeURIComponent(error.message)}`);
+  }
+  // Le membre arrive "en attente" : getContexteEntreprise le redirige vers /en-attente
+  // tant que l'admin ne l'a pas activé en lui affectant un poste.
+  redirect("/dashboard");
+}
+
 export async function modifierEntrepriseAction(formData: FormData) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
