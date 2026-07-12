@@ -261,4 +261,12 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Arrivée et départ conservent chacun leurs coordonnées et leur précision GPS ; la pause est déduite et les heures sont calculées automatiquement.
 - La saisie manuelle et la prise de photo ont été retirées de l’interface. Les anciennes saisies restent consultables dans un panneau d’archives pour ne perdre aucun historique.
 - L’historique principal affiche clairement le chantier, la date, les heures d’arrivée et de départ, la durée et deux liens cartographiques GPS.
+
+## 18. Comptes collaborateurs et carte BTP — 13 juillet 2026
+
+- Le parcours collaborateur existe : création d’un compte individuel, choix « Rejoindre une entreprise », saisie du code entreprise, demande en attente, puis validation par l’administrateur avec affectation d’un poste dans `/parametres/acces`.
+- Les droits du poste séparent **Consulter** et **Gérer** par module. Attention : tant que le mode prototype sans connexion reste actif, tous les visiteurs partagent encore le contexte administrateur ; la séparation individuelle sera effective après la bascule d’authentification décrite dans `PRODUCTION_CHECKLIST.md`.
+- **Migration 42 appliquée** : chaque employé peut avoir une carte professionnelle BTP en PDF, PNG, JPG ou WebP (10 Mo maximum), avec numéro et date d’expiration facultatifs.
+- Les fichiers sont dans le bucket privé `documents-employes`. Leur affichage passe par `/api/employes/[id]/carte-btp`, qui vérifie l’entreprise et génère un lien signé court ; aucune URL publique permanente n’est exposée.
+- La fiche `/employes/[id]` permet d’importer/remplacer, présenter, télécharger ou supprimer la carte. Le rendu a été contrôlé sur mobile 360×800 sans débordement horizontal.
 ```

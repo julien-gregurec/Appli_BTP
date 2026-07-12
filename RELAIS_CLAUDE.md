@@ -362,6 +362,14 @@ git diff --check
 - Photos et saisie manuelle retirées de l’interface ; tâche facultative, pause et calcul des heures conservés.
 - Historique dédié avec chantier bien visible, arrivée, départ, durée et liens GPS. Anciennes saisies conservées en archives.
 
+### Comptes collaborateurs et carte BTP — 13 juillet 2026
+
+- Parcours collaborateur déjà présent : inscription individuelle, saisie du code entreprise, demande d’adhésion, validation admin et affectation d’un poste avec droits Consulter/Gérer.
+- La séparation des comptes nécessite encore l’activation volontaire de l’authentification réelle ; en mode prototype sans connexion, le contexte administrateur reste partagé.
+- Migration 42 appliquée : métadonnées de carte BTP sur `employes` et bucket privé `documents-employes` (PDF/PNG/JPEG/WebP, 10 Mo).
+- La fiche employé permet d’importer/remplacer, présenter, télécharger et supprimer la carte ; numéro et expiration sont facultatifs.
+- La route privée `/api/employes/[id]/carte-btp` contrôle l’entreprise puis génère un lien signé temporaire. Test mobile 360×800 validé.
+
 ## Fichiers clés
 
 - `src/components/DevisEditor.tsx`

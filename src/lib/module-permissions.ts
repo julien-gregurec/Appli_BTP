@@ -1,4 +1,5 @@
 export const MODULE_PERMISSION_PAR_CHEMIN: [string,string][] = [
+  ["/api/employes","acces_employes"],
   ["/parametres/acces","gerer_utilisateurs"],["/parametres","acces_parametres"],
   ["/clients","acces_clients"],["/chantiers","acces_chantiers"],
   ["/prestations","acces_devis"],["/devis","acces_devis"],["/factures","acces_factures"],
@@ -10,6 +11,7 @@ export const MODULE_PERMISSION_PAR_CHEMIN: [string,string][] = [
 ];
 
 export const GESTION_PERMISSION_PAR_CHEMIN: [string,string][] = [
+  ["/api/employes","gerer_employes"],
   ["/parametres/acces","gerer_utilisateurs"],["/parametres","gerer_parametres"],
   ["/clients","gerer_clients"],["/chantiers","gerer_chantiers"],
   ["/prestations","gerer_devis"],["/devis","gerer_devis"],["/factures","gerer_factures"],

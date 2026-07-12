@@ -4,9 +4,13 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { contratEmployeLabel, formatDateFr, formatEuro, nomEmploye, statutEmploye } from "@/lib/employes";
 import { StatutEmployeSelect } from "@/components/StatutEmployeSelect";
+import { importerCarteBtpAction, supprimerCarteBtpAction } from "@/app/actions/employes";
+import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
+import Image from "next/image";
 
-export default async function EmployeDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EmployeDetailPage({ params,searchParams }: { params: Promise<{ id: string }>;searchParams:Promise<{error?:string;success?:string}> }) {
   const { id } = await params;
+  const messages=await searchParams;
   await getContexteEntreprise();
   const supabase = await createClient();
 
@@ -25,6 +29,7 @@ export default async function EmployeDetailPage({ params }: { params: Promise<{ 
     .order("created_at", { ascending: false });
 
   const statut = statutEmploye(employe.statut);
+  const importerCarte=importerCarteBtpAction.bind(null,id),supprimerCarte=supprimerCarteBtpAction.bind(null,id);
 
   const ligne = (label: string, value: string | null | undefined) =>
     value ? (
@@ -50,6 +55,8 @@ export default async function EmployeDetailPage({ params }: { params: Promise<{ 
           </Link>
         </div>
 
+        {messages.error&&<p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{messages.error}</p>}{messages.success&&<p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{messages.success}</p>}
+
         <section className="space-y-3 rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
           <div className="flex items-center justify-between gap-4">
             <h2 className="text-sm font-semibold">Fiche</h2>
@@ -67,6 +74,12 @@ export default async function EmployeDetailPage({ params }: { params: Promise<{ 
           {ligne("Taux facturé", formatEuro(employe.taux_horaire))}
           {ligne("Coût interne", formatEuro(employe.cout_horaire))}
           {ligne("Notes", employe.notes)}
+        </section>
+
+        <section className="space-y-4 rounded-md border border-[#c9a24a]/50 bg-[#c9a24a]/5 p-4">
+          <div><h2 className="font-semibold">Carte professionnelle BTP</h2><p className="text-sm text-neutral-500">Copie numérique privée à présenter rapidement en cas de contrôle. Le document original reste la référence officielle.</p></div>
+          {employe.carte_btp_storage_path?<div className="grid gap-4 sm:grid-cols-[220px_1fr]"><a href={`/api/employes/${id}/carte-btp`} target="_blank" rel="noreferrer" className="overflow-hidden rounded-md border bg-white"><div className="flex h-36 items-center justify-center">{employe.carte_btp_mime_type?.startsWith("image/")?<Image src={`/api/employes/${id}/carte-btp`} alt={`Carte BTP de ${nomEmploye(employe)}`} width={220} height={144} unoptimized className="h-36 w-full object-contain"/>:<span className="text-center text-sm font-medium">📄<br/>Ouvrir la carte BTP PDF</span>}</div></a><div className="space-y-2 text-sm"><p><span className="text-neutral-500">Fichier :</span> {employe.carte_btp_nom}</p>{employe.carte_btp_numero&&<p><span className="text-neutral-500">N° de carte :</span> <span className="font-mono">{employe.carte_btp_numero}</span></p>}{employe.carte_btp_expiration&&<p><span className="text-neutral-500">Expiration :</span> {formatDateFr(employe.carte_btp_expiration)}</p>}<div className="flex gap-3"><a href={`/api/employes/${id}/carte-btp`} target="_blank" rel="noreferrer" className="rounded-md bg-[#0d1b2a] px-3 py-2 text-sm font-medium text-white">Présenter la carte</a><a href={`/api/employes/${id}/carte-btp?download=1`} className="rounded-md border px-3 py-2 text-sm">Télécharger</a></div><form action={supprimerCarte}><ConfirmSubmitButton message="Supprimer la copie numérique de cette carte BTP ?" className="text-xs text-red-600">Supprimer la carte</ConfirmSubmitButton></form></div></div>:<p className="rounded border border-dashed p-4 text-sm text-neutral-500">Aucune carte BTP enregistrée.</p>}
+          <form action={importerCarte} className="grid gap-3 border-t pt-4 sm:grid-cols-2"><label className="text-xs text-neutral-500 sm:col-span-2">Importer ou remplacer la carte<input name="carte_btp" type="file" accept="application/pdf,image/png,image/jpeg,image/webp" capture="environment" required className="mt-1 block w-full rounded border px-3 py-2 text-sm"/></label><label className="text-xs text-neutral-500">Numéro de carte <span className="font-normal">(facultatif)</span><input name="carte_btp_numero" defaultValue={employe.carte_btp_numero??""} className="mt-1 w-full rounded border px-3 py-2 text-sm"/></label><label className="text-xs text-neutral-500">Date d’expiration <span className="font-normal">(facultatif)</span><input name="carte_btp_expiration" type="date" defaultValue={employe.carte_btp_expiration??""} className="mt-1 w-full rounded border px-3 py-2 text-sm"/></label><button className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white sm:col-span-2">Enregistrer la carte BTP</button></form>
         </section>
 
         <section className="space-y-3">
