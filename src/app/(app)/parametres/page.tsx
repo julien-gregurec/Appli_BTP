@@ -1,0 +1,44 @@
+import { createClient } from "@/lib/supabase/server";
+import { getContexteEntreprise } from "@/lib/entreprise";
+import { modifierEntrepriseAction, modifierLogoEntrepriseAction } from "@/app/actions/entreprise";
+import Link from "next/link";
+import Image from "next/image";
+
+const input = "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
+
+export default async function ParametresPage({ searchParams }: { searchParams: Promise<{ error?: string; succes?: string }> }) {
+  const [{ error, succes }, ctx] = await Promise.all([searchParams, getContexteEntreprise()]);
+  const supabase = await createClient();
+  const { data: entreprise } = await supabase.from("entreprises").select("*").eq("id", ctx.entrepriseId).single();
+
+  return (
+    <main className="p-8">
+      <div className="mx-auto max-w-3xl space-y-6">
+        <div className="flex items-start justify-between"><div><h1 className="text-xl font-semibold">Paramètres de l’entreprise</h1><p className="text-sm text-neutral-500">Ces informations apparaissent notamment sur les devis et factures.</p></div><Link href="/parametres/acces" className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-neutral-50">Accès et rôles</Link></div>
+        {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        {succes && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Paramètres enregistrés.</p>}
+        <section className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800"><h2 className="text-sm font-semibold">Logo de l’entreprise</h2><div className="mt-3 flex items-center gap-5"><Image src={entreprise?.logo_url||"/liria-concept-logo.png"} alt="Logo actuel" width={144} height={80} unoptimized className="h-20 w-36 rounded border bg-white object-contain p-2"/><form action={modifierLogoEntrepriseAction} className="flex-1" encType="multipart/form-data"><label className="block text-xs text-neutral-500">Nouveau logo (PNG, JPG ou WebP · 5 Mo max.)<input name="logo" type="file" accept="image/png,image/jpeg,image/webp" required className="mt-2 block w-full rounded-md border px-3 py-2 text-sm"/></label><button className="mt-3 rounded-md border px-3 py-2 text-sm font-medium hover:bg-neutral-50">Importer ce logo</button></form></div><p className="mt-2 text-xs text-neutral-500">Le logo est utilisé immédiatement dans le logiciel, les devis et les factures.</p></section>
+        <form action={modifierEntrepriseAction} className="space-y-6">
+          <section className="space-y-4 rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
+            <h2 className="text-sm font-semibold">Identité et adresse</h2>
+            <div className="grid grid-cols-2 gap-4"><div><label className="text-xs text-neutral-500">Nom affiché *</label><input name="nom" required defaultValue={entreprise?.nom ?? ""} className={input} /></div><div><label className="text-xs text-neutral-500">Raison sociale</label><input name="raison_sociale" defaultValue={entreprise?.raison_sociale ?? ""} className={input} /></div></div>
+            <div><label className="text-xs text-neutral-500">SIRET</label><input name="siret" defaultValue={entreprise?.siret ?? ""} className={input} /></div>
+            <div><label className="text-xs text-neutral-500">Adresse</label><input name="adresse" defaultValue={entreprise?.adresse ?? ""} className={input} /></div>
+            <div className="grid grid-cols-2 gap-4"><div><label className="text-xs text-neutral-500">Code postal</label><input name="code_postal" defaultValue={entreprise?.code_postal ?? ""} className={input} /></div><div><label className="text-xs text-neutral-500">Ville</label><input name="ville" defaultValue={entreprise?.ville ?? ""} className={input} /></div></div>
+          </section>
+          <section className="space-y-4 rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
+            <h2 className="text-sm font-semibold">Assurances et mentions légales</h2>
+            <div className="grid grid-cols-2 gap-4"><div><label className="text-xs text-neutral-500">N° assurance décennale</label><input name="assurance_decennale_numero" defaultValue={entreprise?.assurance_decennale_numero ?? ""} className={input} /></div><div><label className="text-xs text-neutral-500">Assureur décennale</label><input name="assurance_decennale_assureur" defaultValue={entreprise?.assurance_decennale_assureur ?? ""} className={input} /></div></div>
+            <div className="grid grid-cols-2 gap-4"><div><label className="text-xs text-neutral-500">N° assurance RC Pro</label><input name="assurance_rc_pro_numero" defaultValue={entreprise?.assurance_rc_pro_numero ?? ""} className={input} /></div><div><label className="text-xs text-neutral-500">Pénalités de retard (%)</label><input name="taux_penalites_retard" type="number" min="0" step="0.01" defaultValue={entreprise?.taux_penalites_retard ?? ""} className={input} /></div></div>
+          </section>
+          <section className="space-y-4 rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
+            <h2 className="text-sm font-semibold">Personnalisation des documents</h2>
+            <div><label className="text-xs text-neutral-500">Texte d’en-tête</label><textarea name="texte_entete" rows={3} defaultValue={entreprise?.texte_entete ?? ""} className={input} /></div>
+            <div><label className="text-xs text-neutral-500">Texte de pied de page</label><textarea name="texte_pied_page" rows={3} defaultValue={entreprise?.texte_pied_page ?? ""} className={input} /></div>
+          </section>
+          <button type="submit" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">Enregistrer les paramètres</button>
+        </form>
+      </div>
+    </main>
+  );
+}

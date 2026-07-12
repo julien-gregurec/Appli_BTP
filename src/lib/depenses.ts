@@ -1,0 +1,2 @@
+export const DEPENSE_CATEGORIES:Record<string,string>={materiaux:"Matériaux",sous_traitance:"Sous-traitance",location:"Location",transport:"Transport",carburant:"Carburant",outillage:"Outillage",assurance:"Assurance",autre:"Autre"};
+export const DEPENSE_STATUTS:Record<string,{label:string;couleur:string}>={a_payer:{label:"À payer",couleur:"#d97706"},payee_partiel:{label:"Partiellement payée",couleur:"#b8792e"},payee:{label:"Payée",couleur:"#16a34a"},litige:{label:"Litige",couleur:"#dc2626"},annulee:{label:"Annulée",couleur:"#6b7280"}};

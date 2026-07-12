@@ -1,0 +1,38 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { getContexteEntreprise } from "@/lib/entreprise";
+import { EmployeForm } from "@/components/EmployeForm";
+import { modifierEmployeAction } from "@/app/actions/employes";
+import { nomEmploye } from "@/lib/employes";
+
+export default async function ModifierEmployePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { id } = await params;
+  const { error } = await searchParams;
+  await getContexteEntreprise();
+  const supabase = await createClient();
+
+  const { data: employe } = await supabase.from("employes").select("*").eq("id", id).single();
+  if (!employe) notFound();
+
+  const action = modifierEmployeAction.bind(null, id);
+
+  return (
+    <main className="p-8">
+      <div className="mx-auto max-w-2xl space-y-6">
+        <div>
+          <Link href={`/employes/${id}`} className="text-sm text-neutral-500 hover:underline">← {nomEmploye(employe)}</Link>
+          <h1 className="mt-1 text-xl font-semibold">Modifier l&apos;employé</h1>
+        </div>
+        {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        <EmployeForm action={action} initial={employe} submitLabel="Enregistrer" />
+      </div>
+    </main>
+  );
+}
