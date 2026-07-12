@@ -370,6 +370,12 @@ git diff --check
 - La fiche employé permet d’importer/remplacer, présenter, télécharger et supprimer la carte ; numéro et expiration sont facultatifs.
 - La route privée `/api/employes/[id]/carte-btp` contrôle l’entreprise puis génère un lien signé temporaire. Test mobile 360×800 validé.
 
+### Affichage compact des postes — 13 juillet 2026
+
+- `/parametres/acces` affiche les postes sous forme de panneaux repliables, fermés par défaut.
+- Chaque résumé indique membres, consultations et gestions ; le détail des permissions se déplie sans perdre l’état des cases.
+- Le bouton d’enregistrement reste dans le panneau développé.
+
 ## Fichiers clés
 
 - `src/components/DevisEditor.tsx`

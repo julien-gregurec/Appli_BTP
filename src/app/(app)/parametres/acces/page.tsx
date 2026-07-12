@@ -111,19 +111,33 @@ export default async function AccesPage({
         <div className="space-y-4">
           {postes?.map((poste) => {
             const autorise = new Set((droits ?? []).filter((d) => d.poste_id === poste.id && d.autorise).map((d) => d.cle_permission));
+            const consultations = Array.from(autorise).filter((cle) => cle.startsWith("acces_")).length;
+            const gestions = Array.from(autorise).filter((cle) => cle.startsWith("gerer_")).length;
             const action = enregistrerPermissionsPosteAction.bind(null, poste.id);
             const supprimer = supprimerPosteAction.bind(null, poste.id);
             return (
-              <article key={poste.id} className="rounded-md border dark:border-neutral-800">
-                <form action={action}>
-                  <header className="flex items-center justify-between border-b px-4 py-3 dark:border-neutral-800">
-                    <div>
-                      <h2 className="font-semibold">{poste.nom}</h2>
-                      <p className="text-xs text-neutral-500">{compte(poste.id)} membre(s) actif(s) · {autorise.size} droit(s)</p>
+              <article key={poste.id} className="overflow-hidden rounded-md border dark:border-neutral-800">
+                <details className="group">
+                  <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 hover:bg-neutral-50 dark:hover:bg-neutral-900 [&::-webkit-details-marker]:hidden">
+                    <div className="min-w-0 flex-1">
+                      <h2 className="truncate font-semibold">{poste.nom}</h2>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
+                        <span>{compte(poste.id)} membre(s)</span>
+                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-blue-800">{consultations} consultation(s)</span>
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">{gestions} gestion(s)</span>
+                      </div>
                     </div>
-                    <button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-medium text-white">Enregistrer</button>
-                  </header>
-                  <div className="grid gap-5 p-4 md:grid-cols-2">
+                    <span className="shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium">
+                      <span className="group-open:hidden">Afficher les droits ↓</span>
+                      <span className="hidden group-open:inline">Réduire les droits ↑</span>
+                    </span>
+                  </summary>
+                  <form action={action} className="border-t dark:border-neutral-800">
+                    <div className="flex flex-wrap items-center justify-between gap-3 bg-neutral-50 px-4 py-3 dark:bg-neutral-900">
+                      <p className="text-xs text-neutral-500">Cochez les droits de ce poste, puis enregistrez.</p>
+                      <button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-medium text-white">Enregistrer les droits</button>
+                    </div>
+                    <div className="grid gap-5 p-4 md:grid-cols-2">
                     {Array.from(groupes.entries()).map(([module, liste]) => (
                       <fieldset key={module}>
                         <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#9a7625]">{module}</legend>
@@ -140,13 +154,14 @@ export default async function AccesPage({
                         </div>
                       </fieldset>
                     ))}
-                  </div>
-                </form>
-                {compte(poste.id) === 0 && (
-                  <form action={supprimer} className="border-t px-4 py-3 text-right dark:border-neutral-800">
-                    <ConfirmSubmitButton message={`Supprimer le poste « ${poste.nom} » ?`} className="text-xs text-red-600 hover:underline">Supprimer ce poste</ConfirmSubmitButton>
+                    </div>
                   </form>
-                )}
+                  {compte(poste.id) === 0 && (
+                    <form action={supprimer} className="border-t px-4 py-3 text-right dark:border-neutral-800">
+                      <ConfirmSubmitButton message={`Supprimer le poste « ${poste.nom} » ?`} className="text-xs text-red-600 hover:underline">Supprimer ce poste</ConfirmSubmitButton>
+                    </form>
+                  )}
+                </details>
               </article>
             );
           })}

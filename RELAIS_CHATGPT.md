@@ -269,4 +269,10 @@ git diff --check                   # OK (aucun conflit whitespace)
 - **Migration 42 appliquée** : chaque employé peut avoir une carte professionnelle BTP en PDF, PNG, JPG ou WebP (10 Mo maximum), avec numéro et date d’expiration facultatifs.
 - Les fichiers sont dans le bucket privé `documents-employes`. Leur affichage passe par `/api/employes/[id]/carte-btp`, qui vérifie l’entreprise et génère un lien signé court ; aucune URL publique permanente n’est exposée.
 - La fiche `/employes/[id]` permet d’importer/remplacer, présenter, télécharger ou supprimer la carte. Le rendu a été contrôlé sur mobile 360×800 sans débordement horizontal.
+
+## 19. Affichage compact des postes — 13 juillet 2026
+
+- Dans `/parametres/acces`, chaque poste est désormais replié par défaut pour éviter une page très longue.
+- La ligne résumée indique le nombre de membres, de droits **Consulter** et de droits **Gérer**.
+- « Afficher les droits » ouvre le détail complet ; « Réduire les droits » le referme. Les cases restent intactes pendant l’ouverture/fermeture et l’enregistrement se fait dans le panneau ouvert.
 ```
