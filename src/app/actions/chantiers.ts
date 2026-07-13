@@ -45,6 +45,44 @@ export async function creerChantierAction(formData: FormData) {
   redirect(`/chantiers/${data.id}`);
 }
 
+// Création rapide d'un chantier depuis l'éditeur de devis (retourne du JSON, pas de redirect).
+export type ChantierRapide = {
+  client_id: string;
+  nom: string;
+  adresse?: string | null;
+  code_postal?: string | null;
+  ville?: string | null;
+};
+
+export async function creerChantierRapideAction(
+  data: ChantierRapide,
+): Promise<{ id: string; label: string } | { error: string }> {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+
+  if (!data.client_id) return { error: "Choisis d'abord un client." };
+  const nom = data.nom?.trim();
+  if (!nom) return { error: "Donne un nom au chantier." };
+
+  const { data: cree, error } = await supabase
+    .from("chantiers")
+    .insert({
+      entreprise_id: ctx.entrepriseId,
+      client_id: data.client_id,
+      nom,
+      adresse: data.adresse?.trim() || null,
+      code_postal: data.code_postal?.trim() || null,
+      ville: data.ville?.trim() || null,
+      statut: "prospect",
+    })
+    .select("id, nom")
+    .single();
+
+  if (error || !cree) return { error: error?.message ?? "Impossible de créer le chantier." };
+  revalidatePath("/chantiers");
+  return { id: cree.id, label: cree.nom };
+}
+
 export async function changerStatutChantierAction(chantierId: string, statut: string) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();

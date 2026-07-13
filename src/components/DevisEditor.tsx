@@ -7,6 +7,7 @@ import { prestationVersLigne, type PrestationCatalogue } from "@/lib/prestations
 import { creerDevisAction, modifierDevisAction } from "@/app/actions/devis";
 import { creerPrestationDepuisLigneAction } from "@/app/actions/prestations";
 import { creerClientRapideAction } from "@/app/actions/clients";
+import { creerChantierRapideAction } from "@/app/actions/chantiers";
 
 type Option = { id: string; label: string };
 type DevisInitial = {
@@ -59,7 +60,12 @@ export function DevisEditor({
   const [nouveauClientOuvert, setNouveauClientOuvert] = useState(clients.length === 0);
   const [nc, setNc] = useState({ type: "particulier", nom: "", prenom: "", societe: "", telephone: "", email: "", code_postal: "", ville: "" });
   const [ncErreur, setNcErreur] = useState<string | null>(null);
+  const [chantiersListe, setChantiersListe] = useState(chantiers);
   const [chantierId, setChantierId] = useState(devisInitial?.chantier_id ?? chantierPreselect ?? "");
+  const [nouveauChantierOuvert, setNouveauChantierOuvert] = useState(false);
+  const [rechercheChantier, setRechercheChantier] = useState("");
+  const [nch, setNch] = useState({ nom: "", adresse: "", code_postal: "", ville: "" });
+  const [nchErreur, setNchErreur] = useState<string | null>(null);
   const [dateValidite, setDateValidite] = useState(devisInitial?.date_validite ?? "");
   const [remiseGlobale, setRemiseGlobale] = useState(Number(devisInitial?.remise_globale ?? 0));
   const [notesClient, setNotesClient] = useState(devisInitial?.notes_client ?? "");
@@ -67,8 +73,35 @@ export function DevisEditor({
   const [prestations, setPrestations] = useState(prestationsInitiales);
   const [messageCatalogue, setMessageCatalogue] = useState<string | null>(null);
 
-  const chantiersFiltres = chantiers.filter((c) => c.client_id === clientId);
+  const chantiersFiltres = chantiersListe
+    .filter((c) => c.client_id === clientId)
+    .filter((c) => c.label.toLowerCase().includes(rechercheChantier.trim().toLowerCase()));
   const totaux = calcTotaux(lignes, remiseGlobale);
+
+  function creerChantier() {
+    setNchErreur(null);
+    if (!clientId) {
+      setNchErreur("Choisis d'abord un client.");
+      return;
+    }
+    startTransition(async () => {
+      const res = await creerChantierRapideAction({
+        client_id: clientId,
+        nom: nch.nom,
+        adresse: nch.adresse,
+        code_postal: nch.code_postal,
+        ville: nch.ville,
+      });
+      if ("error" in res) {
+        setNchErreur(res.error);
+        return;
+      }
+      setChantiersListe((prev) => [{ id: res.id, label: res.label, client_id: clientId }, ...prev]);
+      setChantierId(res.id);
+      setNouveauChantierOuvert(false);
+      setNch({ nom: "", adresse: "", code_postal: "", ville: "" });
+    });
+  }
 
   function majLigne(i: number, champ: keyof LigneDevis, valeur: string | number) {
     setLignes((prev) => prev.map((l, idx) => (idx === i ? { ...l, [champ]: valeur } : l)));
@@ -175,13 +208,49 @@ export function DevisEditor({
           )}
         </div>
         <div className="space-y-1">
-          <label className={label}>Chantier (optionnel)</label>
-          <select value={chantierId} onChange={(e) => setChantierId(e.target.value)} disabled={!clientId} className={input + " w-full"}>
-            <option value="">—</option>
-            {chantiersFiltres.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-          </select>
+          <div className="flex items-center justify-between">
+            <label className={label}>Chantier (optionnel)</label>
+            <button type="button" disabled={!clientId} onClick={() => setNouveauChantierOuvert((v) => !v)} className="text-sm text-neutral-600 hover:underline disabled:opacity-40 dark:text-neutral-400">
+              {nouveauChantierOuvert ? "Choisir dans la liste" : "+ Nouveau chantier"}
+            </button>
+          </div>
+          {!nouveauChantierOuvert && (
+            <>
+              {clientId && chantiersListe.filter((c) => c.client_id === clientId).length > 4 && (
+                <input
+                  value={rechercheChantier}
+                  onChange={(e) => setRechercheChantier(e.target.value)}
+                  placeholder="Rechercher un chantier…"
+                  className={input + " mb-1 w-full"}
+                />
+              )}
+              <select value={chantierId} onChange={(e) => setChantierId(e.target.value)} disabled={!clientId} className={input + " w-full"}>
+                <option value="">—</option>
+                {chantiersFiltres.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+              </select>
+            </>
+          )}
         </div>
       </div>
+
+      {nouveauChantierOuvert && (
+        <div className="space-y-3 rounded-md border border-dashed border-neutral-300 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+          <span className="text-sm font-medium">Nouveau chantier</span>
+          {nchErreur && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{nchErreur}</p>}
+          <div className="grid grid-cols-2 gap-3">
+            <input placeholder="Nom du chantier" value={nch.nom} onChange={(e) => setNch({ ...nch, nom: e.target.value })} className={input + " col-span-2"} />
+            <input placeholder="Adresse" value={nch.adresse} onChange={(e) => setNch({ ...nch, adresse: e.target.value })} className={input + " col-span-2"} />
+            <input placeholder="Code postal" value={nch.code_postal} onChange={(e) => setNch({ ...nch, code_postal: e.target.value })} className={input} />
+            <input placeholder="Ville" value={nch.ville} onChange={(e) => setNch({ ...nch, ville: e.target.value })} className={input} />
+          </div>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={creerChantier} disabled={pending || !clientId} className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900">
+              {pending ? "Création…" : "Créer et sélectionner"}
+            </button>
+            <button type="button" onClick={() => { setNouveauChantierOuvert(false); setNchErreur(null); }} className="text-sm text-neutral-500 hover:underline">Annuler</button>
+          </div>
+        </div>
+      )}
 
       {nouveauClientOuvert && (
         <div className="space-y-3 rounded-md border border-dashed border-neutral-300 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
