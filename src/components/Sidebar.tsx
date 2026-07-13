@@ -9,6 +9,7 @@ import { PwaInstallButton } from "@/components/PwaInstallButton";
 // Navigation latérale — les modules non encore construits sont grisés (désactivés).
 const NAV = [
   { href: "/dashboard", label: "Tableau de bord", actif: true },
+  { href: "/mon-espace", label: "Mon espace", actif: true },
   { href: "/clients", label: "Clients", actif: true,permission:"acces_clients" },
   { href: "/chantiers", label: "Chantiers", actif: true,permission:"acces_chantiers" },
   { href: "/devis", label: "Devis", actif: true,permission:"acces_devis" },
@@ -18,6 +19,7 @@ const NAV = [
   { href: "/fournisseurs", label: "Fournisseurs", actif: true,permission:"acces_achats" },
   { href: "/depenses", label: "Dépenses", actif: true,permission:"acces_achats" },
   { href: "/charges", label: "Charges récurrentes", actif: true,permission:"acces_achats" },
+  { href: "/notes-frais", label: "Notes de frais", actif: true,permission:"acces_achats" },
   { href: "/planning", label: "Planning", actif: true,permission:"acces_planning" },
   { href: "/employes", label: "Employés", actif: true,permission:"acces_employes" },
   { href: "/pointage", label: "Pointage heures", actif: true,permission:"acces_pointage" },
