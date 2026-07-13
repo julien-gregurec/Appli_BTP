@@ -1,14 +1,166 @@
-import Link from"next/link";import{createClient}from"@/lib/supabase/server";import{getContexteEntreprise}from"@/lib/entreprise";import{creerAffectationAction,supprimerGroupeAffectationsAction}from"@/app/actions/planning";import{ConfirmSubmitButton}from"@/components/ConfirmSubmitButton";
-type A={id:string;date:string;heures:number;tache:string|null;chantier:{id:string;nom:string}|{id:string;nom:string}[]|null;employe:{id:string;prenom:string;nom:string}|{id:string;prenom:string;nom:string}[]|null};
-const un=<T,>(v:T|T[]|null):T|null=>Array.isArray(v)?v[0]??null:v;const iso=(d:Date)=>new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Paris"}).format(d);
-function lundi(reference?:string){const d=/^\d{4}-\d{2}-\d{2}$/.test(reference??"")?new Date(`${reference}T12:00:00`):new Date();const decalage=(d.getDay()+6)%7;d.setDate(d.getDate()-decalage);d.setHours(12,0,0,0);return d;}
-const dateFr=(d:Date,large=false)=>new Intl.DateTimeFormat("fr-FR",large?{weekday:"long",day:"numeric",month:"long"}:{weekday:"short",day:"numeric"}).format(d);
-export default async function PlanningPage({searchParams}:{searchParams:Promise<{semaine?:string;error?:string}>}){const p=await searchParams;const debut=lundi(p.semaine),dates=Array.from({length:7},(_,i)=>new Date(debut.getTime()+i*86400000)),fin=dates[6],precedent=new Date(debut.getTime()-7*86400000),suivant=new Date(debut.getTime()+7*86400000),ctx=await getContexteEntreprise(),sb=await createClient();const[{data:chantiers},{data:employes},{data:affectationsData}]=await Promise.all([sb.from("chantiers").select("id,nom").eq("entreprise_id",ctx.entrepriseId).not("statut","in",'(archive,annule)').order("nom"),sb.from("employes").select("id,prenom,nom").eq("entreprise_id",ctx.entrepriseId).eq("statut","actif").order("nom"),sb.from("affectations").select("id,date,heures,tache,chantier:chantiers(id,nom),employe:employes(id,prenom,nom)").eq("entreprise_id",ctx.entrepriseId).gte("date",iso(debut)).lte("date",iso(fin)).order("date")]);const affectations=(affectationsData??[])as A[];
-  type Groupe={cle:string;date:string;heures:number;tache:string|null;chantier:{id:string;nom:string};ouvriers:{id:string;nom:string;affectationId:string}[]};const groupes=new Map<string,Groupe>();for(const a of affectations){const ch=un(a.chantier),e=un(a.employe);if(!ch||!e)continue;const cle=[a.date,ch.id,a.tache??"",a.heures].join("|");const g=groupes.get(cle)??{cle,date:a.date,heures:Number(a.heures),tache:a.tache,chantier:ch,ouvriers:[]};g.ouvriers.push({id:e.id,nom:`${e.prenom} ${e.nom}`,affectationId:a.id});groupes.set(cle,g)}const parJour=new Map<string,Groupe[]>();for(const g of groupes.values()){const l=parJour.get(g.date)??[];l.push(g);parJour.set(g.date,l)}
-  const couleurs=["border-l-blue-500 bg-blue-50/70","border-l-amber-500 bg-amber-50/70","border-l-emerald-500 bg-emerald-50/70","border-l-violet-500 bg-violet-50/70","border-l-rose-500 bg-rose-50/70"];const chantiersIds=[...new Set([...groupes.values()].map(g=>g.chantier.id))];const couleur=(id:string)=>couleurs[Math.max(0,chantiersIds.indexOf(id))%couleurs.length];const total=affectations.reduce((s,a)=>s+Number(a.heures),0),totalOuvriers=new Set(affectations.map(a=>un(a.employe)?.id).filter(Boolean)).size;
-  const lignesPartage=dates.flatMap(d=>(parJour.get(iso(d))??[]).map(g=>`${dateFr(d)} · ${g.chantier.nom}${g.tache?` — ${g.tache}`:""} · ${g.heures} h · ${g.ouvriers.map(o=>o.nom).join(", ")}`));const message=`Planning LIRIA CONCEPT — semaine du ${dateFr(debut,true)} au ${dateFr(fin,true)}\n\n${lignesPartage.length?lignesPartage.join("\n"):"Aucune affectation planifiée."}`;const input="rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
-  return <main className="p-8"><div className="mx-auto max-w-[1500px] space-y-6"><div className="flex items-start justify-between"><div><h1 className="text-xl font-semibold">Planning des équipes</h1><p className="text-sm text-neutral-500">Une date, une durée et plusieurs ouvriers associés à la même tâche.</p></div><div className="flex gap-2"><a href={`mailto:?subject=${encodeURIComponent(`Planning LIRIA — semaine du ${dateFr(debut)}`)}&body=${encodeURIComponent(message)}`} className="rounded-md border px-3 py-2 text-sm hover:bg-neutral-50">Partager par email</a><a href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer" className="rounded-md border px-3 py-2 text-sm hover:bg-neutral-50">Partager par WhatsApp</a></div></div>{p.error&&<p className="rounded bg-red-50 p-3 text-sm text-red-700">{p.error}</p>}
-    <div className="flex items-center justify-between rounded-md border p-3 dark:border-neutral-800"><Link href={`/planning?semaine=${iso(precedent)}`} className="rounded px-3 py-1.5 text-sm hover:bg-neutral-100">← Semaine précédente</Link><div className="text-center"><p className="font-semibold capitalize">{dateFr(debut,true)} — {dateFr(fin,true)}</p><p className="text-xs text-neutral-500">{total} heures planifiées · {totalOuvriers} ouvrier(s)</p></div><div className="flex gap-2"><Link href="/planning" className="rounded px-3 py-1.5 text-sm hover:bg-neutral-100">Aujourd’hui</Link><Link href={`/planning?semaine=${iso(suivant)}`} className="rounded px-3 py-1.5 text-sm hover:bg-neutral-100">Semaine suivante →</Link></div></div>
-    {chantiers?.length&&employes?.length?<form action={creerAffectationAction} className="grid grid-cols-[1.4fr_160px_110px_1.4fr] gap-3 rounded-md border p-4 dark:border-neutral-800"><input type="hidden" name="retour" value={iso(debut)}/><label className="text-xs text-neutral-500">Chantier<select name="chantier_id" required className={`${input} mt-1 w-full`}>{chantiers.map(c=><option key={c.id} value={c.id}>{c.nom}</option>)}</select></label><label className="text-xs text-neutral-500">Date<input name="date" type="date" min={iso(debut)} max={iso(fin)} defaultValue={iso(debut)} required className={`${input} mt-1 w-full`}/></label><label className="text-xs text-neutral-500">Heures<input name="heures" type="number" min="0.5" max="24" step="0.5" defaultValue="7" required className={`${input} mt-1 w-full`}/></label><label className="text-xs text-neutral-500">Tâche<input name="tache" placeholder="Pose cloisons, livraison…" className={`${input} mt-1 w-full`}/></label><fieldset className="col-span-4"><legend className="mb-2 text-xs text-neutral-500">Ouvriers associés</legend><div className="flex flex-wrap gap-2">{employes.map(e=><label key={e.id} className="flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm hover:bg-neutral-50"><input name="employe_ids" value={e.id} type="checkbox"/><span>{e.prenom} {e.nom}</span></label>)}</div></fieldset><div className="col-span-4"><button className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">Ajouter au planning</button></div></form>:<p className="rounded border border-dashed p-5 text-sm text-neutral-500">Ajoutez au moins un chantier et un employé actif.</p>}
-    <div className="overflow-x-auto pb-2"><div className="grid min-w-[1190px] grid-cols-7 gap-2">{dates.map(d=>{const date=iso(d),items=parJour.get(date)??[],heuresJour=items.reduce((s,g)=>s+g.heures*g.ouvriers.length,0),estAujourdhui=date===iso(new Date());return <section key={date} className={`min-h-[360px] rounded-md border ${estAujourdhui?"border-[#c9a24a] ring-1 ring-[#c9a24a]/30":"border-neutral-200 dark:border-neutral-800"}`}><header className={`border-b px-3 py-2 ${estAujourdhui?"bg-[#c9a24a]/10":"bg-neutral-50 dark:bg-neutral-900"}`}><p className="text-sm font-semibold capitalize">{dateFr(d)}</p><p className="text-xs text-neutral-500">{heuresJour} h équipe</p></header><div className="space-y-2 p-2">{items.map(g=><article key={g.cle} className={`rounded border-l-4 p-3 text-sm ${couleur(g.chantier.id)}`}><p className="font-semibold leading-tight">{g.chantier.nom}</p>{g.tache&&<p className="mt-1 text-xs text-neutral-600">{g.tache}</p>}<p className="mt-2 font-mono text-xs font-semibold">{g.heures} h / ouvrier</p><div className="mt-2 space-y-0.5">{g.ouvriers.map(o=><p key={o.id} className="text-xs">• {o.nom}</p>)}</div><form action={supprimerGroupeAffectationsAction} className="mt-2 border-t border-black/5 pt-2"><input type="hidden" name="retour" value={iso(debut)}/>{g.ouvriers.map(o=><input key={o.affectationId} type="hidden" name="ids" value={o.affectationId}/>)}<ConfirmSubmitButton message="Retirer cette tâche du planning pour tous les ouvriers ?" className="text-xs text-red-600 hover:underline">Retirer la tâche</ConfirmSubmitButton></form></article>)}{!items.length&&<p className="px-2 py-6 text-center text-xs text-neutral-400">Aucune tâche</p>}</div></section>})}</div></div>
-  </div></main>}
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import { getContexteEntreprise } from "@/lib/entreprise";
+import { creerAffectationAction, supprimerGroupeAffectationsAction } from "@/app/actions/planning";
+import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
+
+type A = {
+  id: string;
+  date: string;
+  heures: number;
+  tache: string | null;
+  chantier: { id: string; nom: string } | { id: string; nom: string }[] | null;
+  employe: { id: string; prenom: string; nom: string } | { id: string; prenom: string; nom: string }[] | null;
+};
+const un = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? v[0] ?? null : v);
+const iso = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(d);
+function lundi(reference?: string) {
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(reference ?? "") ? new Date(`${reference}T12:00:00`) : new Date();
+  const decalage = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - decalage);
+  d.setHours(12, 0, 0, 0);
+  return d;
+}
+const dateFr = (d: Date, large = false) =>
+  new Intl.DateTimeFormat("fr-FR", large ? { weekday: "long", day: "numeric", month: "long" } : { weekday: "short", day: "numeric" }).format(d);
+
+const input = "rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
+const couleurs = [
+  "border-l-blue-500 bg-blue-50",
+  "border-l-amber-500 bg-amber-50",
+  "border-l-emerald-500 bg-emerald-50",
+  "border-l-violet-500 bg-violet-50",
+  "border-l-rose-500 bg-rose-50",
+  "border-l-cyan-500 bg-cyan-50",
+];
+
+export default async function PlanningPage({ searchParams }: { searchParams: Promise<{ semaine?: string; error?: string }> }) {
+  const p = await searchParams;
+  const debut = lundi(p.semaine);
+  const dates = Array.from({ length: 7 }, (_, i) => new Date(debut.getTime() + i * 86400000));
+  const fin = dates[6];
+  const precedent = new Date(debut.getTime() - 7 * 86400000);
+  const suivant = new Date(debut.getTime() + 7 * 86400000);
+  const ctx = await getContexteEntreprise();
+  const sb = await createClient();
+
+  const [{ data: chantiers }, { data: employes }, { data: affectationsData }] = await Promise.all([
+    sb.from("chantiers").select("id,nom").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(archive,annule)").order("nom"),
+    sb.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif").order("nom"),
+    sb.from("affectations").select("id,date,heures,tache,chantier:chantiers(id,nom),employe:employes(id,prenom,nom)").eq("entreprise_id", ctx.entrepriseId).gte("date", iso(debut)).lte("date", iso(fin)).order("date"),
+  ]);
+
+  const affectations = (affectationsData ?? []) as A[];
+  // Couleur stable par chantier.
+  const chantiersIds = [...new Set(affectations.map((a) => un(a.chantier)?.id).filter(Boolean) as string[])];
+  const couleur = (id: string) => couleurs[Math.max(0, chantiersIds.indexOf(id)) % couleurs.length];
+  const total = affectations.reduce((s, a) => s + Number(a.heures), 0);
+  const totalOuvriers = new Set(affectations.map((a) => un(a.employe)?.id).filter(Boolean)).size;
+  const aujourdhui = iso(new Date());
+
+  // Message de partage (une ligne par affectation, groupé par jour).
+  const lignesPartage = dates.flatMap((d) =>
+    affectations
+      .filter((a) => a.date === iso(d) && un(a.chantier) && un(a.employe))
+      .map((a) => `${dateFr(d)} · ${un(a.employe)!.prenom} ${un(a.employe)!.nom} → ${un(a.chantier)!.nom}${a.tache ? ` (${a.tache})` : ""} · ${a.heures} h`),
+  );
+  const message = `Planning LIRIA CONCEPT — semaine du ${dateFr(debut, true)} au ${dateFr(fin, true)}\n\n${lignesPartage.length ? lignesPartage.join("\n") : "Aucune affectation planifiée."}`;
+
+  return (
+    <main className="p-8">
+      <div className="mx-auto max-w-[1500px] space-y-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold">Planning des équipes</h1>
+            <p className="text-sm text-neutral-500">Tableau par ouvrier et par jour. Une case = un chantier et ses heures.</p>
+          </div>
+          <div className="flex gap-2">
+            <a href={`mailto:?subject=${encodeURIComponent(`Planning LIRIA — semaine du ${dateFr(debut)}`)}&body=${encodeURIComponent(message)}`} className="rounded-md border px-3 py-2 text-sm hover:bg-neutral-50">Partager par email</a>
+            <a href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer" className="rounded-md border px-3 py-2 text-sm hover:bg-neutral-50">Partager par WhatsApp</a>
+          </div>
+        </div>
+        {p.error && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{p.error}</p>}
+
+        <div className="flex items-center justify-between rounded-md border p-3 dark:border-neutral-800">
+          <Link href={`/planning?semaine=${iso(precedent)}`} className="rounded px-3 py-1.5 text-sm hover:bg-neutral-100">← Semaine précédente</Link>
+          <div className="text-center">
+            <p className="font-semibold capitalize">{dateFr(debut, true)} — {dateFr(fin, true)}</p>
+            <p className="text-xs text-neutral-500">{total} heures planifiées · {totalOuvriers} ouvrier(s)</p>
+          </div>
+          <div className="flex gap-2">
+            <Link href="/planning" className="rounded px-3 py-1.5 text-sm hover:bg-neutral-100">Aujourd’hui</Link>
+            <Link href={`/planning?semaine=${iso(suivant)}`} className="rounded px-3 py-1.5 text-sm hover:bg-neutral-100">Semaine suivante →</Link>
+          </div>
+        </div>
+
+        {chantiers?.length && employes?.length ? (
+          <form action={creerAffectationAction} className="grid grid-cols-[1.4fr_160px_110px_1.4fr] gap-3 rounded-md border p-4 dark:border-neutral-800">
+            <input type="hidden" name="retour" value={iso(debut)} />
+            <label className="text-xs text-neutral-500">Chantier<select name="chantier_id" required className={`${input} mt-1 w-full`}>{chantiers.map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}</select></label>
+            <label className="text-xs text-neutral-500">Date<input name="date" type="date" min={iso(debut)} max={iso(fin)} defaultValue={iso(debut)} required className={`${input} mt-1 w-full`} /></label>
+            <label className="text-xs text-neutral-500">Heures<input name="heures" type="number" min="0.5" max="24" step="0.5" defaultValue="7" required className={`${input} mt-1 w-full`} /></label>
+            <label className="text-xs text-neutral-500">Tâche<input name="tache" placeholder="Pose cloisons, livraison…" className={`${input} mt-1 w-full`} /></label>
+            <fieldset className="col-span-4"><legend className="mb-2 text-xs text-neutral-500">Ouvriers associés</legend><div className="flex flex-wrap gap-2">{employes.map((e) => <label key={e.id} className="flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm hover:bg-neutral-50"><input name="employe_ids" value={e.id} type="checkbox" /><span>{e.prenom} {e.nom}</span></label>)}</div></fieldset>
+            <div className="col-span-4"><button className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">Ajouter au planning</button></div>
+          </form>
+        ) : (
+          <p className="rounded border border-dashed p-5 text-sm text-neutral-500">Ajoutez au moins un chantier et un employé actif.</p>
+        )}
+
+        {/* Tableau : lignes = ouvriers, colonnes = jours */}
+        <div className="overflow-x-auto pb-2">
+          <table className="w-full min-w-[900px] border-collapse text-sm">
+            <thead>
+              <tr>
+                <th className="sticky left-0 z-10 border border-neutral-200 bg-neutral-100 px-3 py-2 text-left dark:border-neutral-800 dark:bg-neutral-900">Ouvrier</th>
+                {dates.map((d) => {
+                  const est = iso(d) === aujourdhui;
+                  return <th key={iso(d)} className={`border border-neutral-200 px-2 py-2 text-center capitalize dark:border-neutral-800 ${est ? "bg-[#c9a24a]/20" : "bg-neutral-100 dark:bg-neutral-900"}`}>{dateFr(d)}</th>;
+                })}
+                <th className="border border-neutral-200 bg-neutral-100 px-2 py-2 text-center dark:border-neutral-800 dark:bg-neutral-900">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(employes ?? []).map((e) => {
+                const semaine = affectations.filter((a) => un(a.employe)?.id === e.id);
+                const totalEmp = semaine.reduce((s, a) => s + Number(a.heures), 0);
+                return (
+                  <tr key={e.id} className="align-top">
+                    <th className="sticky left-0 z-10 whitespace-nowrap border border-neutral-200 bg-white px-3 py-2 text-left font-medium dark:border-neutral-800 dark:bg-neutral-950">{e.prenom} {e.nom}</th>
+                    {dates.map((d) => {
+                      const cellules = semaine.filter((a) => a.date === iso(d) && un(a.chantier));
+                      const est = iso(d) === aujourdhui;
+                      return (
+                        <td key={iso(d)} className={`border border-neutral-200 p-1 dark:border-neutral-800 ${est ? "bg-[#c9a24a]/5" : ""}`}>
+                          {cellules.map((a) => {
+                            const ch = un(a.chantier)!;
+                            return (
+                              <div key={a.id} className={`relative mb-1 rounded border-l-4 px-2 py-1 pr-4 ${couleur(ch.id)}`}>
+                                <div className="font-medium leading-tight text-neutral-900">{ch.nom}</div>
+                                {a.tache && <div className="text-[11px] text-neutral-600">{a.tache}</div>}
+                                <div className="font-mono text-[11px] text-neutral-700">{a.heures} h</div>
+                                <form action={supprimerGroupeAffectationsAction} className="absolute right-0.5 top-0.5">
+                                  <input type="hidden" name="retour" value={iso(debut)} />
+                                  <input type="hidden" name="ids" value={a.id} />
+                                  <ConfirmSubmitButton message="Retirer cette affectation ?" className="px-1 text-xs leading-none text-neutral-400 hover:text-red-600">×</ConfirmSubmitButton>
+                                </form>
+                              </div>
+                            );
+                          })}
+                        </td>
+                      );
+                    })}
+                    <td className="border border-neutral-200 px-2 text-center font-mono font-semibold dark:border-neutral-800">{totalEmp} h</td>
+                  </tr>
+                );
+              })}
+              {!employes?.length && (
+                <tr><td colSpan={dates.length + 2} className="border border-neutral-200 px-3 py-6 text-center text-neutral-400 dark:border-neutral-800">Aucun employé actif.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  );
+}
