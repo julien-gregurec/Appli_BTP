@@ -59,6 +59,7 @@ grant execute on function public.valider_preuve_pointage(uuid,uuid,text,text) to
 grant execute on function public.cloturer_session_pointage(uuid,uuid,timestamptz,integer,numeric,numeric,numeric,text) to authenticated;
 grant execute on function public.peut_pointer_pour_employe(uuid,uuid) to authenticated;
 grant execute on function public.peut_consulter_pointage_employe(uuid,uuid) to authenticated;
+grant execute on function public.peut_voir_notes_frais_equipe(uuid) to authenticated;
 grant execute on function public.affecter_vehicule(uuid,uuid,uuid,text) to authenticated;
 grant execute on function public.rejoindre_entreprise_par_code(text) to authenticated;
 grant execute on function public.lier_justificatif_depense(uuid,uuid,text,text,text,bigint) to authenticated;

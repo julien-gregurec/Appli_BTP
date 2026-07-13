@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
+import { isEmailLoginDisabled } from "@/lib/auth-mode";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (isEmailLoginDisabled()) return NextResponse.json({ error: "Accès personnel sécurisé requis" }, { status: 403 });
   const { id } = await params;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
