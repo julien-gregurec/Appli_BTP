@@ -103,6 +103,20 @@ export function DevisEditor({
     });
   }
 
+  function basculerNouveauChantier() {
+    setNchErreur(null);
+    if (nouveauChantierOuvert) {
+      setNouveauChantierOuvert(false);
+      return;
+    }
+    if (!clientId) {
+      setNouveauChantierOuvert(true);
+      setNchErreur("Choisis ou crée d’abord le client : le nouveau chantier lui sera automatiquement rattaché.");
+      return;
+    }
+    setNouveauChantierOuvert(true);
+  }
+
   function majLigne(i: number, champ: keyof LigneDevis, valeur: string | number) {
     setLignes((prev) => prev.map((l, idx) => (idx === i ? { ...l, [champ]: valeur } : l)));
   }
@@ -151,6 +165,8 @@ export function DevisEditor({
       setClientId(res.id);
       setChantierId("");
       setNouveauClientOuvert(false);
+      setNouveauChantierOuvert(true);
+      setNchErreur(null);
       setNc({ type: "particulier", nom: "", prenom: "", societe: "", telephone: "", email: "", code_postal: "", ville: "" });
     });
   }
@@ -199,7 +215,7 @@ export function DevisEditor({
           {!nouveauClientOuvert && (
             <select
               value={clientId}
-              onChange={(e) => { setClientId(e.target.value); setChantierId(""); }}
+              onChange={(e) => { setClientId(e.target.value); setChantierId(""); setNchErreur(null); }}
               className={input + " w-full"}
             >
               <option value="">— Choisir un client —</option>
@@ -210,7 +226,7 @@ export function DevisEditor({
         <div className="space-y-1">
           <div className="flex items-center justify-between">
             <label className={label}>Chantier (optionnel)</label>
-            <button type="button" disabled={!clientId} onClick={() => setNouveauChantierOuvert((v) => !v)} className="text-sm text-neutral-600 hover:underline disabled:opacity-40 dark:text-neutral-400">
+            <button type="button" onClick={basculerNouveauChantier} className="text-sm font-medium text-blue-700 hover:underline dark:text-blue-400">
               {nouveauChantierOuvert ? "Choisir dans la liste" : "+ Nouveau chantier"}
             </button>
           </div>
@@ -225,9 +241,10 @@ export function DevisEditor({
                 />
               )}
               <select value={chantierId} onChange={(e) => setChantierId(e.target.value)} disabled={!clientId} className={input + " w-full"}>
-                <option value="">—</option>
+                <option value="">{!clientId ? "— Choisir d’abord un client —" : chantiersFiltres.length ? "— Sans chantier —" : "— Aucun chantier : créez-en un —"}</option>
                 {chantiersFiltres.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
               </select>
+              {!clientId && <p className="text-xs text-neutral-500">Le chantier doit être rattaché à un client. Utilise « + Nouveau client » si nécessaire.</p>}
             </>
           )}
         </div>

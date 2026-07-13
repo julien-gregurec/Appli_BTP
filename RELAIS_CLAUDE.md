@@ -9,6 +9,7 @@
 - `/flotte` et `/outillage` ont également une vue mobile en cartes. Flotte affiche l’ouvrier assigné, kilométrage et échéances ; Outillage affiche affectation, état, disponibilité et vérification. Les tableaux restent sur ordinateur.
 - `/clients` et `/chantiers` ont maintenant des cartes mobiles avec statut, informations principales et accès pleine largeur à la fiche ; filtres et tableaux ordinateur conservés.
 - `/devis` et `/factures` ont maintenant des cartes mobiles : client, statut, dates, montant, chantier ou reste à encaisser, avec accès direct à l’envoi/PDF. Les tableaux ordinateur restent inchangés.
+- Dans `/devis/nouveau`, `+ Nouveau chantier` est désormais toujours visible et explique le rattachement obligatoire au client. Après création rapide d’un client, le mini-formulaire chantier s’ouvre automatiquement ; la création ajoute et sélectionne le chantier sans quitter le devis.
 - Validations : lint, TypeScript, build webpack et diff-check verts.
 
 ## Mise à jour Codex — 12 juillet 2026 (à lire en premier)

@@ -4,7 +4,7 @@ Mise à jour : 13 juillet 2026. Ce document distingue ce qui est utilisable, ce 
 
 | Besoin | État | Réalisation / reste |
 |---|---|---|
-| Créer un client depuis un nouveau devis | ✅ Fait | Mini-formulaire intégré au devis, création de la fiche puis sélection automatique. |
+| Créer un client ou un chantier depuis un nouveau devis | ✅ Fait | Mini-formulaire client intégré, puis ouverture automatique du mini-formulaire chantier. Le bouton Nouveau chantier reste visible, explique qu’un client est requis, rattache le chantier au client et le sélectionne sans quitter le devis. |
 | Planning simple date + heures + tâche | ✅ Fait | Semaine visuelle lundi-dimanche, sans horaires début/fin. |
 | Plusieurs ouvriers sur une tâche | ✅ Fait | Sélection multiple, carte groupée, total heures-équipe, suppression groupée. |
 | Partager le planning semaine | ✅ Fait | Liens email et WhatsApp avec contenu de la semaine. |
