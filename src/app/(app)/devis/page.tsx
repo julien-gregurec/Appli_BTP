@@ -62,7 +62,38 @@ export default async function DevisPage({ searchParams }: { searchParams: Promis
             {devis?.length ? "Aucun devis ne correspond aux filtres." : "Aucun devis pour l’instant."}
           </div>
         ) : (
-          <div className="overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-800">
+          <>
+          <div className="grid gap-3 md:hidden">
+            {devisFiltres.map((item) => {
+              const st = statutDevis(item.statut);
+              const client = Array.isArray(item.client) ? item.client[0] : item.client;
+              const chantier = Array.isArray(item.chantier) ? item.chantier[0] : item.chantier;
+              return (
+                <article key={item.id} className="space-y-3 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <Link href={`/devis/${item.id}`} className="block truncate font-mono text-sm font-semibold hover:underline">
+                        {item.numero ?? "— brouillon —"}
+                      </Link>
+                      <p className="mt-1 truncate text-sm font-medium">{client ? nomClient(client) : "Client non renseigné"}</p>
+                    </div>
+                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-neutral-100 px-2 py-1 text-xs font-medium dark:bg-neutral-800">
+                      <span className="h-2 w-2 rounded-full" style={{ background: st.couleur }} />{st.libelle}
+                    </span>
+                  </div>
+                  <dl className="grid grid-cols-2 gap-3 text-sm">
+                    <div><dt className="text-xs text-neutral-500">Date d’émission</dt><dd>{item.date_emission}</dd></div>
+                    <div><dt className="text-xs text-neutral-500">Montant TTC</dt><dd className="font-mono font-semibold">{euros(item.montant_ttc)}</dd></div>
+                    <div className="col-span-2"><dt className="text-xs text-neutral-500">Chantier</dt><dd>{chantier?.nom ?? "Sans chantier"}</dd></div>
+                  </dl>
+                  <Link href={`/devis/${item.id}`} className="inline-flex w-full items-center justify-center rounded-md border px-3 py-2 text-sm font-medium">
+                    Ouvrir, envoyer ou télécharger le devis
+                  </Link>
+                </article>
+              );
+            })}
+          </div>
+          <div className="hidden overflow-x-auto rounded-md border border-neutral-200 dark:border-neutral-800 md:block">
             <table className="w-full text-sm">
               <thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500 dark:bg-neutral-900">
                 <tr>
@@ -99,6 +130,7 @@ export default async function DevisPage({ searchParams }: { searchParams: Promis
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
     </main>

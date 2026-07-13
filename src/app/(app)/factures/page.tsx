@@ -12,7 +12,7 @@ export default async function FacturesPage({ searchParams }: { searchParams: Pro
 
   const { data: factures } = await supabase
     .from("factures")
-    .select("id, numero, statut, date_emission, montant_ttc, montant_paye, client:clients(nom, prenom, societe)")
+    .select("id, numero, statut, date_emission, date_echeance, montant_ttc, montant_paye, client:clients(nom, prenom, societe)")
     .eq("entreprise_id", ctx.entrepriseId)
     .order("created_at", { ascending: false });
 
@@ -60,7 +60,39 @@ export default async function FacturesPage({ searchParams }: { searchParams: Pro
             {factures?.length ? "Aucune facture ne correspond aux filtres." : "Aucune facture. Ouvre un devis accepté et clique « Créer une facture »."}
           </div>
         ) : (
-          <div className="overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-800">
+          <>
+          <div className="grid gap-3 md:hidden">
+            {facturesFiltrees.map((facture) => {
+              const st = statutFacture(facture.statut);
+              const client = Array.isArray(facture.client) ? facture.client[0] : facture.client;
+              const resteFacture = Math.max(0, Number(facture.montant_ttc) - Number(facture.montant_paye));
+              return (
+                <article key={facture.id} className="space-y-3 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <Link href={`/factures/${facture.id}`} className="block truncate font-mono text-sm font-semibold hover:underline">
+                        {facture.numero ?? "— brouillon —"}
+                      </Link>
+                      <p className="mt-1 truncate text-sm font-medium">{client ? nomClient(client) : "Client non renseigné"}</p>
+                    </div>
+                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-neutral-100 px-2 py-1 text-xs font-medium dark:bg-neutral-800">
+                      <span className="h-2 w-2 rounded-full" style={{ background: st.couleur }} />{st.libelle}
+                    </span>
+                  </div>
+                  <dl className="grid grid-cols-2 gap-3 text-sm">
+                    <div><dt className="text-xs text-neutral-500">Émise le</dt><dd>{facture.date_emission}</dd></div>
+                    <div><dt className="text-xs text-neutral-500">Échéance</dt><dd>{facture.date_echeance ?? "—"}</dd></div>
+                    <div><dt className="text-xs text-neutral-500">Montant TTC</dt><dd className="font-mono font-semibold">{euros(facture.montant_ttc)}</dd></div>
+                    <div><dt className="text-xs text-neutral-500">Reste à encaisser</dt><dd className={`font-mono font-semibold ${resteFacture > 0 ? "text-amber-700" : "text-green-700"}`}>{euros(resteFacture)}</dd></div>
+                  </dl>
+                  <Link href={`/factures/${facture.id}`} className="inline-flex w-full items-center justify-center rounded-md border px-3 py-2 text-sm font-medium">
+                    Ouvrir, envoyer ou télécharger la facture
+                  </Link>
+                </article>
+              );
+            })}
+          </div>
+          <div className="hidden overflow-x-auto rounded-md border border-neutral-200 dark:border-neutral-800 md:block">
             <table className="w-full text-sm">
               <thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500 dark:bg-neutral-900">
                 <tr>
@@ -99,6 +131,7 @@ export default async function FacturesPage({ searchParams }: { searchParams: Pro
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
     </main>
