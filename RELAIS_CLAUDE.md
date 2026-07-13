@@ -390,6 +390,13 @@ git diff --check
 - Saisie manuelle et douchette conservées en repli. Lint, TypeScript et build webpack verts.
 - `npm audit` remonte deux alertes modérées PostCSS transitives à Next 16.2.10 sans correction stable sûre ; ne pas lancer `npm audit fix --force`.
 
+### Cycle de compte collaborateur — 13 juillet 2026
+
+- Callbacks SSR ajoutés : `/auth/callback` pour PKCE et `/auth/confirm` pour les emails `token_hash`, avec redirections internes filtrées.
+- Inscription reliée au callback et code entreprise conservé jusqu’à l’onboarding.
+- Mot de passe oublié et définition d’un nouveau mot de passe ajoutés ; déconnexion forcée après succès.
+- Les modèles email exacts et redirect URLs à configurer dans Supabase sont documentés dans `PRODUCTION_CHECKLIST.md`.
+
 ## Fichiers clés
 
 - `src/components/DevisEditor.tsx`

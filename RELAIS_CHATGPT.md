@@ -291,4 +291,12 @@ git diff --check                   # OK (aucun conflit whitespace)
 - La lampe est proposée uniquement si le flux caméra la supporte. Les refus de permission, absence de caméra et navigateurs incompatibles affichent une explication claire.
 - La douchette clavier, la recherche par code-barres et la référence article restent disponibles comme replis universels.
 - Audit dépendances : deux alertes modérées proviennent du PostCSS embarqué par Next 16.2.10 ; `npm audit` ne propose qu’un changement Next cassant/incohérent, donc aucun `--force` appliqué. Lint, TypeScript et build webpack restent verts.
+
+## 22. Cycle complet des comptes collaborateurs — 13 juillet 2026
+
+- Ajout des callbacks SSR `/auth/callback` (échange PKCE) et `/auth/confirm` (vérification `token_hash`) avec destinations internes filtrées contre les redirections externes.
+- L’inscription indique maintenant `emailRedirectTo` et conserve le code entreprise dans sa destination d’onboarding.
+- Ajout de `/mot-de-passe-oublie`, du lien sur `/login`, de `/nouveau-mot-de-passe` et des actions Supabase d’envoi puis de mise à jour sécurisée du mot de passe.
+- Après modification, la session de récupération est fermée et l’utilisateur doit se reconnecter avec son nouveau mot de passe.
+- `PRODUCTION_CHECKLIST.md` contient les deux modèles email Supabase à configurer (`email` et `recovery`) et les URLs de callback à autoriser avant la bascule.
 ```

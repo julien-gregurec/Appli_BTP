@@ -15,15 +15,19 @@
 
 1. Choisir l’URL de production et l’hébergement (Vercel recommandé pour ce projet Next.js).
 2. Créer ou vérifier une sauvegarde Supabase restaurable avant la bascule.
-3. Dans Supabase Auth, renseigner le `Site URL` de production et les URLs de redirection locales/production.
-4. Configurer sur l’hébergement :
+3. Dans Supabase Auth, renseigner le `Site URL` de production et autoriser les redirections `https://liria-concept-gestion-btp.vercel.app/auth/callback` et `http://localhost:3000/auth/callback`.
+4. Dans **Authentication → Email Templates**, utiliser les liens SSR suivants :
+   - confirmation d’inscription : `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/onboarding`
+   - récupération de mot de passe : `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/nouveau-mot-de-passe`
+   Ces liens évitent de dépendre du navigateur ayant initié la demande et créent correctement la session en cookie.
+5. Configurer sur l’hébergement :
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY` (clé publiable)
    - `DISABLE_EMAIL_LOGIN=false`
-5. Tester la connexion du propriétaire sur un environnement de préproduction avec `DISABLE_EMAIL_LOGIN=false`.
-6. Appliquer manuellement `supabase/production/sortie_mode_prototype.sql` dans Supabase.
-7. Vérifier qu’un appel REST anonyme aux tables métier est refusé, puis tester en session authentifiée : dashboard, création devis, facture, paiement, document privé, commande, dépense et inventaire.
-8. Déployer la production et conserver le mode prototype uniquement sur une base locale/de démonstration séparée.
+6. Tester la connexion du propriétaire, la confirmation d’un compte test et « Mot de passe oublié » sur un environnement de préproduction avec `DISABLE_EMAIL_LOGIN=false`.
+7. Appliquer manuellement `supabase/production/sortie_mode_prototype.sql` dans Supabase.
+8. Vérifier qu’un appel REST anonyme aux tables métier est refusé, puis tester en session authentifiée : dashboard, création devis, facture, paiement, document privé, commande, dépense et inventaire.
+9. Déployer la production et conserver le mode prototype uniquement sur une base locale/de démonstration séparée.
 
 ## Services externes encore optionnels
 

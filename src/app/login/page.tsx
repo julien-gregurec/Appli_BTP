@@ -44,9 +44,10 @@ export default async function LoginPage({
             />
           </div>
           <div className="space-y-1">
-            <label htmlFor="password" className="text-sm font-medium">
-              Mot de passe
-            </label>
+            <div className="flex items-center justify-between gap-3">
+              <label htmlFor="password" className="text-sm font-medium">Mot de passe</label>
+              <Link href="/mot-de-passe-oublie" className="text-xs text-neutral-500 underline">Mot de passe oublié ?</Link>
+            </div>
             <input
               id="password"
               name="password"
