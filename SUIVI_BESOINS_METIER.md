@@ -32,7 +32,7 @@ Mise à jour : 13 juillet 2026. Ce document distingue ce qui est utilisable, ce 
 | Import véhicules et outillage Excel/PDF | ✅ Fait | Import XLSX/CSV/PDF depuis les listes Flotte et Outillage, détection des colonnes usuelles, doublons véhicules mis à jour et doublons outils ignorés. |
 | Photos chantier par les équipes | ✅ Fait | Prise de photo directe depuis le téléphone, classement avant/pendant/après et note de suivi, en plus du dépôt documentaire complet. |
 | Logo entreprise dans logiciel et documents | ✅ Fait | Import PNG/JPG/WebP dans Paramètres, logo utilisé dans la navigation et les PDF. Logo LIRIA fourni déjà importé. |
-| Utilisation complète sur mobile | ✅ Fait | Navigation par menu latéral coulissant, en-tête compact, cartes et formulaires empilés, boutons tactiles, tableaux défilants horizontalement et fenêtres adaptées à la hauteur du téléphone. Tests validés à 360 px et 390 px. |
+| Utilisation complète sur mobile | ✅ Fait | Interface responsive et application installable sur l’écran d’accueil (manifeste, icône LC, mode autonome). Bouton d’installation Android/Chrome et guide Safari pour iPhone ; aucune donnée privée mise en cache. |
 | Espace propriétaire SaaS | ✅ Fait | Liste des entreprises, codes, membres, statut d’abonnement, échéance et note ; accès réservé au propriétaire en auth réelle. |
 | Stock inspiré d’une application GitHub existante | ⏳ En attente de source | Le socle est opérationnel. Comparaison/fusion détaillée à faire dès réception du dépôt GitHub annoncé par l’utilisateur. |
 

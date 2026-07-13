@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { logoutAction } from "@/app/actions/auth";
+import { PwaInstallButton } from "@/components/PwaInstallButton";
 
 // Navigation latérale — les modules non encore construits sont grisés (désactivés).
 const NAV = [
@@ -121,6 +122,7 @@ export function Sidebar({
         )}
       </nav>
 
+      <PwaInstallButton />
       {!authDisabled && (
         <div className="border-t border-white/10 p-2">
           <form action={logoutAction}>

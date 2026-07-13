@@ -411,6 +411,13 @@ git diff --check
 - Proxy complété pour documents chantier, exports, référentiel véhicules et impressions devis/factures/commandes.
 - Lint, TypeScript et build webpack verts ; prototype conserve tous les modules.
 
+### PWA installable — 13 juillet 2026
+
+- Manifeste `/manifest.webmanifest`, mode standalone, démarrage `/dashboard`, thème LIRIA et icônes LC 192/512/Apple Touch.
+- Bouton d’installation dans la Sidebar pour navigateurs compatibles ; guide Safari spécifique iPhone.
+- Service worker réseau uniquement, sans cache de données métier privées.
+- Build et tests HTTP du manifeste, SW, icônes et métadonnées Apple verts.
+
 ## Fichiers clés
 
 - `src/components/DevisEditor.tsx`

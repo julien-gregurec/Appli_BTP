@@ -315,4 +315,12 @@ git diff --check                   # OK (aucun conflit whitespace)
 - En authentification réelle, une zone **Mes modules** n’affiche que les raccourcis autorisés. Un poste sans aucun accès voit uniquement un message d’attente d’attribution.
 - Protections de chemin ajoutées pour les téléchargements de documents chantier, exports CSV, référentiel véhicule et impressions PDF devis/factures/commandes.
 - Lint, TypeScript et build webpack verts. Le prototype conserve volontairement la vue complète (`permissions=null`).
+
+## 25. Application installable sur mobile — 13 juillet 2026
+
+- Ajout d’un manifeste PWA (`/manifest.webmanifest`) : nom LIRIA BTP, lancement direct sur `/dashboard`, couleurs de marque et affichage autonome sans barre de navigateur.
+- Icônes 192, 512 et Apple Touch générées depuis le monogramme HD LIRIA fourni, sur fond bleu nuit.
+- `PwaInstallButton` apparaît dans le menu quand Chrome/Android émet l’événement d’installation ; sur iPhone il affiche le parcours Safari « Partager → Sur l’écran d’accueil ».
+- Service worker `/sw.js` volontairement réseau uniquement : il permet l’installation sans mettre en cache les données métier privées d’un collaborateur.
+- Vérifications : lint, TypeScript, build webpack, manifeste JSON (`display=standalone`, 3 icônes), service worker, icône et balises Apple servis en HTTP 200.
 ```
