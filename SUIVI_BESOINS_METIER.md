@@ -20,7 +20,7 @@ Mise à jour : 13 juillet 2026. Ce document distingue ce qui est utilisable, ce 
 | Import listes fournisseur Excel/PDF | ✅ Fait | XLSX/CSV/PDF, détection de colonnes, import atomique catalogue. Les PDF image sans texte doivent être passés en OCR ou exportés en Excel. |
 | Import inventaire Excel/PDF | ✅ Fait | Même import en mode Inventaire, écarts convertis en mouvements d’ajustement traçables. |
 | Nuanciers / teintes produits | ✅ Fait | Teintes, référence fabricant, couleur visuelle, sélection sur les mouvements. |
-| Scan entrée/sortie stock | 🟡 Première version | Champ code-barres compatible douchette/lecteur clavier et sélection automatique de l’article. Caméra code-barres mobile à renforcer selon les appareils ciblés. |
+| Scan entrée/sortie stock | ✅ Fait | Scanner caméra mobile multi-format avec caméra arrière, détection automatique, vibration et lampe si disponible. Douchette et saisie manuelle restent disponibles en repli. |
 | Inventaire et déclaration fin d’année | ✅ Socle fait | Inventaires datés, quantités théoriques/comptées, validation atomique et valeur d’achat estimée ; exports comptables CSV disponibles. |
 | Véhicule assigné à un ouvrier | ✅ Fait | Affectation sur la fiche véhicule. |
 | Factures/coûts et travaux par véhicule | ✅ Fait | Dépense liée au véhicule, total, historique des affectations et résumé des travaux récents de l’ouvrier assigné. |
@@ -39,6 +39,5 @@ Mise à jour : 13 juillet 2026. Ce document distingue ce qui est utilisable, ce 
 ## Dépendances externes restantes
 
 1. Envoi email entièrement automatique avec PDF joint : choisir un domaine d’envoi et fournir une clé Resend/SMTP.
-2. Scan caméra code-barres : confirmer les appareils cibles (iPhone/Android/douchettes) pour fiabiliser la couche caméra.
-3. OCR des factures ou catalogues scannés sans texte : choisir un service OCR si les PDF image sont fréquents.
-4. Passage en authentification réelle : sauvegarde, `DISABLE_EMAIL_LOGIN=false`, puis script manuel `supabase/production/sortie_mode_prototype.sql`.
+2. OCR des factures ou catalogues scannés sans texte : choisir un service OCR si les PDF image sont fréquents.
+3. Passage en authentification réelle : sauvegarde, `DISABLE_EMAIL_LOGIN=false`, puis script manuel `supabase/production/sortie_mode_prototype.sql`.

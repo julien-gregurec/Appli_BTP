@@ -383,6 +383,13 @@ git diff --check
 - L’onboarding met l’adhésion en premier et distingue clairement la création d’entreprise pour le dirigeant.
 - Avertissement explicite tant que le mode prototype empêche encore les comptes individuels.
 
+### Scan caméra stock — 13 juillet 2026
+
+- `StockMovementForm` utilise `@zxing/browser` chargé à la demande pour scanner les codes-barres avec la caméra arrière.
+- Détection automatique, vibration, sélection article, lampe conditionnelle et messages précis si permission/caméra indisponible.
+- Saisie manuelle et douchette conservées en repli. Lint, TypeScript et build webpack verts.
+- `npm audit` remonte deux alertes modérées PostCSS transitives à Next 16.2.10 sans correction stable sûre ; ne pas lancer `npm audit fix --force`.
+
 ## Fichiers clés
 
 - `src/components/DevisEditor.tsx`

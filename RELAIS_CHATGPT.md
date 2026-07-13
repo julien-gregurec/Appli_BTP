@@ -283,4 +283,12 @@ git diff --check                   # OK (aucun conflit whitespace)
 - L’onboarding présente d’abord « Rejoindre une entreprise existante », puis sépare clairement la création d’une nouvelle entreprise réservée au dirigeant.
 - En mode prototype, un avertissement précise que le lien est prêt mais que les comptes individuels attendent l’activation de la connexion sécurisée.
 - Vérifications : lint, TypeScript, build webpack et rendu HTTP local des deux écrans verts.
+
+## 21. Scan caméra des mouvements de stock — 13 juillet 2026
+
+- `StockMovementForm` ouvre désormais une fenêtre caméra plein écran mobile avec priorité à la caméra arrière et détection automatique des codes 1D/2D via `@zxing/browser`.
+- À la détection : le scanner s’arrête, le téléphone vibre si possible, l’article correspondant est sélectionné et l’utilisateur complète quantité/type/chantier avant d’enregistrer.
+- La lampe est proposée uniquement si le flux caméra la supporte. Les refus de permission, absence de caméra et navigateurs incompatibles affichent une explication claire.
+- La douchette clavier, la recherche par code-barres et la référence article restent disponibles comme replis universels.
+- Audit dépendances : deux alertes modérées proviennent du PostCSS embarqué par Next 16.2.10 ; `npm audit` ne propose qu’un changement Next cassant/incohérent, donc aucun `--force` appliqué. Lint, TypeScript et build webpack restent verts.
 ```
