@@ -448,6 +448,17 @@ git diff --check
 
 ## Fichiers clés
 
+## Reprise Codex — identité des actions et migrations 47 à 51 — 13 juillet 2026
+
+- Les migrations 47 et 48 sont appliquées et contrôlées dans Supabase. Les anciennes mentions « à passer » sont obsolètes.
+- Migration 49 appliquée : la création d’employé ne produit plus l’erreur de droit sur generer_numero_inscription_employe. Le trigger est security definer, le générateur reste privé. Test sous rôle anon réussi puis annulé.
+- Migration 50 appliquée : une note de frais est obligatoirement créée pour la fiche employé liée au compte. Le formulaire ne permet plus de choisir un collègue en auth réelle. Les droits saisir_ses_notes_frais et gerer_notes_frais séparent dépôt personnel et traitement comptable. Les justificatifs utilisent le bucket privé notes-frais.
+- Migration 51 appliquée : les commandes enregistrent automatiquement le compte auteur et sa fiche employé liée ; aucun auteur alternatif n’est accepté par le formulaire.
+- Le pointage personnel était déjà correctement protégé par la migration 45, y compris côté RLS et RPC.
+- Le parcours installation/invitation a été audité : PWA sur signup, invitation par numéro personnel ou code entreprise, onboarding avec activation de fiche, rejoindre ou créer une entreprise.
+- Important : le mode prototype reste actif. Les comptes individuels ne seront effectifs qu’après la bascule volontaire documentée dans PRODUCTION_CHECKLIST.md.
+- Contrôles Supabase et application verts : lint, TypeScript, build webpack, diff-check et vérification structurelle des migrations.
+
 - `src/components/DevisEditor.tsx`
 - `src/app/actions/devis.ts`
 - `src/app/actions/factures.ts`

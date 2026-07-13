@@ -36,7 +36,7 @@ export default async function AccesPage({
     ]);
 
   const permissions = ((catalogue ?? []) as Permission[]).filter((permission) =>
-    permission.cle.startsWith("acces_") || permission.cle.startsWith("gerer_") || permission.cle === "valider_pointages" || permission.cle === "saisir_son_pointage",
+    permission.cle.startsWith("acces_") || permission.cle.startsWith("gerer_") || permission.cle.startsWith("saisir_") || permission.cle === "valider_pointages",
   );
   const groupes = new Map<string, Permission[]>();
   for (const p of permissions) groupes.set(p.module, [...(groupes.get(p.module) ?? []), p]);

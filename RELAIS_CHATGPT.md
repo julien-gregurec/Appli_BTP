@@ -1,10 +1,24 @@
 # Relais pour ChatGPT — Plateforme BTP « LIRIA CONCEPT »
 
-> Document de passation à jour au **12 juillet 2026**. À lire en entier avant toute modification.
+> Document de passation à jour au **13 juillet 2026**. À lire en entier avant toute modification.
 > Il complète (et prime sur) l'ancien relais Claude collé dans la conversation.
 > Copie synchronisée : `~/RELAIS_CHATGPT.md`. **À mettre à jour à CHAQUE modification.**
 
 ---
+
+## 0Y. REPRISE CODEX — 13 juillet 2026 (ÉTAT LE PLUS RÉCENT)
+
+Cette section prime sur les mentions « migration 47/48 à exécuter » et « à auditer » de la section 0Z.
+
+- Migrations 47 et 48 contrôlées comme déjà appliquées : tables habilitations_employe et notes_frais présentes, deux policies chacune et accès prototype actifs.
+- Migration 49 appliquée : correction définitive de « permission denied for function generer_numero_inscription_employe ». Le trigger de numéro s’exécute en security definer, tandis que le générateur reste inaccessible directement. Test réel sous le rôle anon dans une transaction annulée : création réussie, aucune fiche de test conservée.
+- Migration 50 appliquée : notes de frais strictement personnelles. Chaque poste reçoit le droit de déposer ses propres frais ; le salarié est dérivé du compte connecté et ne peut pas être remplacé par le formulaire. Le responsable/comptable possède un droit séparé pour voir et traiter l’équipe. Quatre policies authenticated et un bucket privé notes-frais contrôlés.
+- Migration 51 appliquée : chaque nouvelle commande en authentification réelle enregistre automatiquement le compte et, s’il existe, la fiche employé qui l’a réellement créée. Aucun formulaire ne permet de commander au nom d’un autre salarié.
+- Le pointage était déjà protégé par la migration 45 : arrivée et départ uniquement pour la fiche liée au compte ; la gestion/validation d’équipe reste une autorisation séparée.
+- Parcours accès vérifié : invitation personnelle par numéro BTP, invitation générale par code entreprise, installation PWA depuis l’inscription, puis choix activer sa fiche / rejoindre une entreprise / créer une entreprise.
+- Authentification réelle toujours volontairement non activée : DISABLE_EMAIL_LOGIN reste à true. Ne pas couper le prototype sans la validation finale de Julien et le test du compte propriétaire.
+- Contrôles base : habilitations=true, notes=true, correctif employé=true, deux droits notes=true, quatre policies notes, bucket privé=true, auteur commande=true.
+- Contrôles code : lint, TypeScript, build webpack et diff-check verts.
 
 ## 0Z. NOUVEAU LOT UTILISATEUR — 13 juillet 2026 (À TRAITER EN PRIORITÉ)
 

@@ -33,6 +33,16 @@ export default async function CommandeDetailPage({
   const { data: lignes } = await supabase
     .from("lignes_commande").select("*").eq("commande_id", id).order("ordre");
 
+  const [{ data: auteurEmploye }, { data: auteurCompte }] = await Promise.all([
+    commande.cree_par_employe_id
+      ? supabase.from("employes").select("prenom, nom").eq("id", commande.cree_par_employe_id).eq("entreprise_id", ctx.entrepriseId).maybeSingle()
+      : Promise.resolve({ data: null }),
+    commande.cree_par_utilisateur_id
+      ? supabase.from("utilisateurs").select("prenom, nom").eq("id", commande.cree_par_utilisateur_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const auteur = auteurEmploye ?? auteurCompte;
+
   const un = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? v[0] ?? null : v);
   const fournisseur = un(commande.fournisseur as { id: string; nom: string; email: string | null; telephone: string | null; contact_nom: string | null } | null);
   const chantier = un(commande.chantier as { id: string; nom: string } | null);
@@ -71,6 +81,7 @@ export default async function CommandeDetailPage({
             <div className="text-xs uppercase text-neutral-500">Dates</div>
             <div className="mt-1">Commande : {commande.date_commande}</div>
             <div>Livraison prévue : {commande.date_livraison_prevue ?? "—"}</div>
+            <div>Créée par : {auteur ? `${auteur.prenom ?? ""} ${auteur.nom ?? ""}`.trim() || "Compte utilisateur" : "Ancienne commande / prototype"}</div>
           </div>
         </div>
 

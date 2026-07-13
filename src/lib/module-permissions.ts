@@ -6,6 +6,7 @@ export const MODULE_PERMISSION_PAR_CHEMIN: [string,string][] = [
   ["/clients","acces_clients"],["/chantiers","acces_chantiers"],
   ["/prestations","acces_devis"],["/devis","acces_devis"],["/factures","acces_factures"],
   ["/commandes","acces_achats"],["/fournisseurs","acces_achats"],["/depenses","acces_achats"],["/charges","acces_achats"],
+  ["/api/notes-frais","saisir_ses_notes_frais"],["/notes-frais","saisir_ses_notes_frais"],
   ["/planning","acces_planning"],["/employes","acces_employes"],["/pointage","acces_pointage"],
   ["/rentabilite","acces_rentabilite"],["/tresorerie","acces_rentabilite"],
   ["/stock","acces_stock"],["/depot","acces_stock"],["/inventaires","acces_stock"],
@@ -18,6 +19,7 @@ export const GESTION_PERMISSION_PAR_CHEMIN: [string,string][] = [
   ["/clients","gerer_clients"],["/chantiers","gerer_chantiers"],
   ["/prestations","gerer_devis"],["/devis","gerer_devis"],["/factures","gerer_factures"],
   ["/commandes","gerer_achats"],["/fournisseurs","gerer_achats"],["/depenses","gerer_achats"],["/charges","gerer_achats"],
+  ["/notes-frais","gerer_notes_frais"],
   ["/planning","gerer_planning"],["/employes","gerer_employes"],["/pointage","gerer_pointage"],
   ["/stock","gerer_stock"],["/depot","gerer_stock"],["/inventaires","gerer_stock"],
   ["/flotte","gerer_flotte"],["/outillage","gerer_outillage"],
@@ -25,4 +27,5 @@ export const GESTION_PERMISSION_PAR_CHEMIN: [string,string][] = [
 
 export const PERMISSIONS_MUTATION_ALTERNATIVES: Record<string,string[]> = {
   "/pointage": ["gerer_pointage", "saisir_son_pointage"],
+  "/notes-frais": ["gerer_notes_frais", "saisir_ses_notes_frais"],
 };

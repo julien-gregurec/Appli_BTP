@@ -19,7 +19,7 @@ const NAV = [
   { href: "/fournisseurs", label: "Fournisseurs", actif: true,permission:"acces_achats" },
   { href: "/depenses", label: "Dépenses", actif: true,permission:"acces_achats" },
   { href: "/charges", label: "Charges récurrentes", actif: true,permission:"acces_achats" },
-  { href: "/notes-frais", label: "Notes de frais", actif: true,permission:"acces_achats" },
+  { href: "/notes-frais", label: "Notes de frais", actif: true,permission:"saisir_ses_notes_frais" },
   { href: "/planning", label: "Planning", actif: true,permission:"acces_planning" },
   { href: "/employes", label: "Employés", actif: true,permission:"acces_employes" },
   { href: "/pointage", label: "Pointage heures", actif: true,permission:"acces_pointage" },

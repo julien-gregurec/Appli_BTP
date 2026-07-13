@@ -16,7 +16,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const telecharger = new URL(request.url).searchParams.get("download") === "1";
   const { data, error } = await supabase.storage
-    .from("documents-employes")
+    .from("notes-frais")
     .createSignedUrl(note.justificatif_storage_path, 120, telecharger ? { download: note.justificatif_nom ?? "justificatif" } : undefined);
   if (error || !data) return NextResponse.json({ error: "Document indisponible" }, { status: 503 });
   return NextResponse.redirect(data.signedUrl);
