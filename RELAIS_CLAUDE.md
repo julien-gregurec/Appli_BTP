@@ -3,6 +3,7 @@
 ## Reprise Codex — 13 juillet 2026 (état le plus récent)
 
 - Nom officiel du logiciel : **Liria Gestion Pro**. `LIRIA CONCEPT` reste l’entreprise utilisatrice et son identité documentaire.
+- `/parametres/acces` contient un aperçu en lecture seule par poste, avec vues téléphone/ordinateur et simulation fidèle du menu, des niveaux Consulter/Gérer/Personnel/Chiffres, du pointage et du planning. Route : `/parametres/acces/apercu/[id]` ; composant `ApercuPoste` ; navigation partagée dans `src/lib/navigation.ts`.
 - Migrations hébergées 47 et 48 contrôlées comme appliquées ; migrations 49 à 51 appliquées pour corriger la création d’employé, rendre les notes de frais strictement personnelles et tracer automatiquement l’auteur réel des commandes.
 - Pointage, notes de frais et commandes audités : aucun formulaire authentifié ne permet d’agir au nom d’un autre salarié. Les fonctions de gestion d’équipe restent séparées.
 - Installation PWA, invitation par numéro BTP, rattachement par code entreprise et création d’entreprise vérifiés. L’authentification réelle reste volontairement désactivée tant que la sortie du prototype n’est pas validée.

@@ -112,6 +112,19 @@ export default async function AccesPage({
           <p className="mt-2 text-xs text-neutral-500">Le nouveau poste commence sans autorisation ; vous pourrez les activer juste après.</p>
         </form>
 
+        <section className="rounded-md border p-4 dark:border-neutral-800">
+          <div><h2 className="font-semibold">Aperçu par poste</h2><p className="text-sm text-neutral-500">Contrôlez le menu, les informations et les actions visibles avant d’attribuer un poste à un collaborateur.</p></div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {postes?.map((poste) => {
+              const autorise = new Set((droits ?? []).filter((d) => d.poste_id === poste.id && d.autorise).map((d) => d.cle_permission));
+              return <Link key={poste.id} href={`/parametres/acces/apercu/${poste.id}`} className="group rounded-md border p-3 transition hover:border-[#c9a24a] hover:bg-[#c9a24a]/5">
+                <div className="flex items-center justify-between gap-2"><strong className="truncate text-sm">{poste.nom}</strong><span className="text-xs text-[#9a7625] group-hover:underline">Voir l’aperçu →</span></div>
+                <div className="mt-2 flex flex-wrap gap-1.5 text-[10px]"><span className="rounded-full bg-blue-100 px-2 py-0.5 text-blue-800">{Array.from(autorise).filter((cle) => cle.startsWith("acces_")).length} consulter</span><span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">{Array.from(autorise).filter((cle) => cle.startsWith("gerer_")).length} gérer</span><span className="rounded-full bg-violet-100 px-2 py-0.5 text-violet-800">{Array.from(autorise).filter((cle) => cle.startsWith("voir_")).length} chiffres</span></div>
+              </Link>;
+            })}
+          </div>
+        </section>
+
         <div className="space-y-4">
           {postes?.map((poste) => {
             const autorise = new Set((droits ?? []).filter((d) => d.poste_id === poste.id && d.autorise).map((d) => d.cle_permission));

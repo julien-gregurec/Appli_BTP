@@ -5,34 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { logoutAction } from "@/app/actions/auth";
 import { PwaInstallButton } from "@/components/PwaInstallButton";
-
-// Navigation latérale — les modules non encore construits sont grisés (désactivés).
-const NAV = [
-  { href: "/dashboard", label: "Tableau de bord", actif: true },
-  { href: "/mon-espace", label: "Mon espace", actif: true },
-  { href: "/clients", label: "Clients", actif: true,permission:"acces_clients" },
-  { href: "/chantiers", label: "Chantiers", actif: true,permission:"acces_chantiers" },
-  { href: "/devis", label: "Devis", actif: true,permission:"acces_devis" },
-  { href: "/prestations", label: "Prestations", actif: true,permission:"acces_devis" },
-  { href: "/factures", label: "Factures", actif: true,permission:"acces_factures" },
-  { href: "/commandes", label: "Commandes", actif: true,permission:"acces_achats" },
-  { href: "/fournisseurs", label: "Fournisseurs", actif: true,permission:"acces_achats" },
-  { href: "/depenses", label: "Dépenses", actif: true,permission:"acces_achats" },
-  { href: "/charges", label: "Charges récurrentes", actif: true,permission:"acces_achats" },
-  { href: "/notes-frais", label: "Notes de frais", actif: true,permission:"saisir_ses_notes_frais" },
-  { href: "/planning", label: "Planning", actif: true,permission:"acces_planning" },
-  { href: "/employes", label: "Employés", actif: true,permission:"acces_employes" },
-  { href: "/pointage", label: "Pointage heures", actif: true,permission:"acces_pointage" },
-  { href: "/rentabilite", label: "Rentabilité", actif: true,permission:"acces_rentabilite" },
-  { href: "/tresorerie", label: "Trésorerie", actif: true,permission:"acces_rentabilite" },
-  { href: "/stock", label: "Stock", actif: true,permission:"acces_stock" },
-  { href: "/flotte", label: "Flotte automobile", actif: true,permission:"acces_flotte" },
-  { href: "/outillage", label: "Outillage", actif: true,permission:"acces_outillage" },
-  { href: "/depot", label: "Dépôt", actif: true,permission:"acces_stock" },
-  { href: "/inventaires", label: "Inventaires", actif: true,permission:"acces_stock" },
-  { href: "/exports", label: "Exports comptables", actif: true,permission:"acces_exports" },
-  { href: "/parametres", label: "Paramètres", actif: true,permission:"acces_parametres" },
-];
+import { NAVIGATION_APPLICATION } from "@/lib/navigation";
 
 export function Sidebar({
   entrepriseNom,
@@ -76,7 +49,7 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2">
-        {NAV.map((item) => {
+        {NAVIGATION_APPLICATION.map((item) => {
           if (item.permission && permissions !== null && !permissions.includes(item.permission)) return null;
           const active = pathname === item.href || pathname.startsWith(item.href + "/");
           if (!item.actif) {
