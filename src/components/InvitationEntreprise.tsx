@@ -9,7 +9,7 @@ export function InvitationEntreprise({ code, inscriptionsActives }: { code: stri
     const lien = `${window.location.origin}/signup?code=${encodeURIComponent(code)}`;
     return {
       lien,
-      texte: `Rejoins notre entreprise sur LIRIA CONCEPT Gestion BTP. Crée ton compte avec ce lien : ${lien} — Code entreprise : ${code}`,
+      texte: `Rejoins notre entreprise sur Liria Gestion Pro. Crée ton compte avec ce lien : ${lien} — Code entreprise : ${code}`,
     };
   };
 
@@ -22,7 +22,7 @@ export function InvitationEntreprise({ code, inscriptionsActives }: { code: stri
   async function partager() {
     const contenu = invitation();
     if (navigator.share) {
-      await navigator.share({ title: "Invitation LIRIA CONCEPT", text: contenu.texte, url: contenu.lien });
+      await navigator.share({ title: "Invitation Liria Gestion Pro", text: contenu.texte, url: contenu.lien });
       return;
     }
     await copier(contenu.texte, "Invitation copiée");

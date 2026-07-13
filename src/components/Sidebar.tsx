@@ -56,7 +56,7 @@ export function Sidebar({
       <div className="flex min-w-0 items-center gap-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={logoUrl||"/liria-concept-logo.png"} alt="LIRIA CONCEPT" className="h-10 w-14 rounded bg-white object-contain p-1" />
-        <div className="min-w-0"><div className="text-sm font-semibold tracking-[0.12em]">LIRIA <span className="text-[#c9a24a]">CONCEPT</span></div><div className="truncate text-[11px] text-white/60">{entrepriseNom}</div></div>
+        <div className="min-w-0"><div className="text-sm font-semibold tracking-[0.08em]">LIRIA <span className="text-[#c9a24a]">GESTION PRO</span></div><div className="truncate text-[11px] text-white/60">{entrepriseNom}</div></div>
       </div>
       <button type="button" onClick={() => setOuvert((valeur) => !valeur)} aria-label="Ouvrir le menu" aria-expanded={ouvert} aria-controls="navigation-mobile" className="relative z-[65] touch-manipulation rounded-md border border-white/30 px-4 py-2 text-sm font-semibold active:bg-white/20">☰ Menu</button>
     </header>
@@ -68,7 +68,7 @@ export function Sidebar({
           <img src={logoUrl||"/liria-concept-logo.png"} alt="LIRIA CONCEPT" width={58} height={40} className="h-10 w-[58px] rounded bg-white object-contain p-1" />
           <div className="min-w-0">
             <div className="text-sm font-semibold tracking-[0.14em]">LIRIA</div>
-            <div className="text-[10px] tracking-[0.24em] text-[#c9a24a]">CONCEPT</div>
+            <div className="text-[10px] tracking-[0.16em] text-[#c9a24a]">GESTION PRO</div>
           </div>
           <button type="button" onClick={() => setOuvert(false)} className="ml-auto rounded px-2 py-1 text-2xl text-white/70 md:hidden" aria-label="Fermer le menu">×</button>
         </div>

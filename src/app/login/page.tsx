@@ -19,7 +19,7 @@ export default async function LoginPage({
       <div className="w-full max-w-sm space-y-6">
         <div>
           <h1 className="text-xl font-semibold">Connexion</h1>
-          <p className="text-sm font-medium tracking-widest text-[#c9a24a]">LIRIA CONCEPT</p>
+          <p className="text-sm font-medium tracking-widest text-[#c9a24a]">LIRIA GESTION PRO</p>
         </div>
 
         {message && (

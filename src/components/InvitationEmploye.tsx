@@ -18,7 +18,7 @@ export function InvitationEmploye({
   const [message, setMessage] = useState("");
   const invitation = () => {
     const lien = `${window.location.origin}/signup?numero=${encodeURIComponent(numero)}`;
-    const texte = `Bonjour ${nom}, ta fiche LIRIA CONCEPT est prête. Crée ton accès personnel ici : ${lien} — Numéro d’inscription : ${numero}. Utilise l’adresse email enregistrée par ton employeur.`;
+    const texte = `Bonjour ${nom}, ta fiche sur Liria Gestion Pro est prête. Crée ton accès personnel ici : ${lien} — Numéro d’inscription : ${numero}. Utilise l’adresse email enregistrée par ton employeur.`;
     return { lien, texte };
   };
 

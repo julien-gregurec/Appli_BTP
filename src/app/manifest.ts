@@ -2,9 +2,9 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "LIRIA CONCEPT — Gestion BTP",
-    short_name: "LIRIA BTP",
-    description: "Gestion des chantiers, équipes, devis, factures, stock et matériel LIRIA CONCEPT.",
+    name: "Liria Gestion Pro",
+    short_name: "Liria Pro",
+    description: "Gestion des chantiers, équipes, devis, factures, stock et matériel pour les entreprises du BTP.",
     start_url: "/dashboard",
     scope: "/",
     display: "standalone",

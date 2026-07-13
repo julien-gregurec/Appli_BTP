@@ -1,4 +1,4 @@
-# Relais pour ChatGPT — Plateforme BTP « LIRIA CONCEPT »
+# Relais pour ChatGPT — « Liria Gestion Pro »
 
 > Document de passation à jour au **13 juillet 2026**. À lire en entier avant toute modification.
 > Il complète (et prime sur) l'ancien relais Claude collé dans la conversation.
@@ -10,6 +10,7 @@
 
 Cette section prime sur les mentions « migration 47/48 à exécuter » et « à auditer » de la section 0Z.
 
+- Nom officiel du logiciel : **Liria Gestion Pro**. `LIRIA CONCEPT` reste le nom de l’entreprise de Julien et l’identité utilisée sur ses documents commerciaux ; ne pas confondre les deux.
 - Migrations 47 et 48 contrôlées comme déjà appliquées : tables habilitations_employe et notes_frais présentes, deux policies chacune et accès prototype actifs.
 - Migration 49 appliquée : correction définitive de « permission denied for function generer_numero_inscription_employe ». Le trigger de numéro s’exécute en security definer, tandis que le générateur reste inaccessible directement. Test réel sous le rôle anon dans une transaction annulée : création réussie, aucune fiche de test conservée.
 - Migration 50 appliquée : notes de frais strictement personnelles. Chaque poste reçoit le droit de déposer ses propres frais ; le salarié est dérivé du compte connecté et ne peut pas être remplacé par le formulaire. Le responsable/comptable possède un droit séparé pour voir et traiter l’équipe. Quatre policies authenticated et un bucket privé notes-frais contrôlés.
