@@ -454,3 +454,46 @@ git diff --check
 - `supabase/migrations/20260710000013_modification_devis_atomique.sql`
 - `supabase/migrations/20260710000014_duplication_devis.sql`
 - `supabase/migrations/20260710000015_creation_devis_atomique.sql`
+
+## Relais de pause — 13 juillet 2026
+
+### Dernier état publié
+
+- Production : `https://liria-concept-gestion-btp.vercel.app`
+- Dernier commit publié sur `main` : `1beee4b feat: prepare les acces personnels des employes`.
+- Migrations **43, 44, 45 et 46 appliquées avec succès** dans Supabase, chacune dans une transaction puis contrôlée.
+- 8 fiches employés : 8 numéros d’inscription uniques, 3 profils `Chef d’équipe`, 5 profils `ouvrier`.
+- Le parcours fiche préparée → numéro `BTP-…` → invitation → inscription → contrôle email → poste/droits automatiques est codé et déployé.
+- Le droit `saisir_son_pointage` limite l’ouvrier à son propre pointage et à ses propres données GPS ; les chefs/admins gardent la vue équipe.
+- Derniers contrôles publiés : lint, TypeScript, build webpack et HTTP production verts.
+
+### Travail local commencé, à terminer en premier
+
+Un lot **« Mon espace »** a été commencé après le commit `1beee4b`, mais il n’est **ni committé ni déployé** :
+
+- `src/components/Sidebar.tsx` modifié avec l’entrée `Mon espace`.
+- `src/app/(app)/mon-espace/page.tsx` nouveau : fiche personnelle, numéro d’inscription, carte BTP, planning futur, véhicule et outillage assignés.
+- `src/app/api/mon-espace/carte-btp/route.ts` nouveau : accès privé à la carte BTP de la seule fiche liée au compte.
+- Lint et TypeScript sont verts. Test HTTP prototype : `/mon-espace` = 200 ; route carte = 404 attendu car le compte prototype admin n’est lié à aucune fiche.
+- À faire avant publication : relire la page, lancer `npx next build --webpack`, `git diff --check`, mettre à jour les suivis, committer, pousser et contrôler la production.
+- Ne pas toucher aux fichiers doublons non suivis suffixés `page 2.tsx` et `StockMovementForm 2.tsx` : ils préexistaient et ont volontairement été laissés hors commits.
+
+### Futures tâches — ordre recommandé
+
+1. **Finir et publier « Mon espace »** (lot local ci-dessus), afin que chaque ouvrier puisse présenter sa propre carte BTP sans accéder au module RH complet.
+2. **Test réel multi-comptes** : créer trois comptes de test Admin / Chef d’équipe / Ouvrier, vérifier invitation personnelle, confirmation email, modules invisibles, lecture seule, pointage personnel GPS, carte BTP et suspension d’un salarié.
+3. **Sortie contrôlée du mode prototype** : configurer les URLs et modèles email Supabase, vérifier le compte propriétaire, sauvegarder, passer `DISABLE_EMAIL_LOGIN=false`, exécuter `supabase/production/sortie_mode_prototype.sql`, puis tester avant/après. Ne pas couper le prototype sans compte admin fonctionnel.
+4. **Droits encore plus fins** : créer un droit dédié `ajouter_photos_chantier` pour qu’un ouvrier puisse déposer des photos sans recevoir `gerer_chantiers`; poursuivre l’audit RLS de lecture pour empêcher aussi les lectures REST directes hors modules autorisés.
+5. **Email automatique avec PDF joint** pour devis, factures et commandes, avec destinataire + CC, historique d’envoi et relance. Dépendance : domaine d’envoi et clé Resend/SMTP fournis par Julien.
+6. **OCR des factures/catalogues scannés** pour extraire fournisseur, date, montant, TVA et lignes depuis les PDF/images sans texte. Dépendance : choix/fourniture d’un service OCR.
+7. **Fusion du module Stock avec l’application GitHub annoncée** : comparer le dépôt source, reprendre les fonctions utiles sans régresser les imports, scans, teintes, mouvements et inventaires. Dépendance : URL GitHub non encore reçue.
+8. **Tests métier de synchronisation bout en bout** : devis accepté → chantier/facture, paiements → statuts, dépenses → chantier/ouvrier/véhicule/outil, matériel hors service → indisponible, suspension employé → compte et affectations.
+9. **Exports comptables de clôture plus poussés** : inventaire valorisé par exercice, historique des corrections, synthèse véhicules/outillage et pièces justificatives associées.
+10. **Notifications d’équipe** après activation des comptes : planning hebdomadaire, changement d’affectation, rappel de pointage ouvert et document/devis à valider, par email puis éventuellement notification PWA/WhatsApp.
+
+### Dépendances externes restantes
+
+- Domaine + clé Resend/SMTP pour l’envoi serveur des PDF.
+- Fournisseur OCR si les documents image doivent être lus automatiquement.
+- Dépôt GitHub de l’application de stock annoncé par Julien.
+- Validation finale de Julien avant la coupure du mode prototype et avant tout envoi réel vers des clients/fournisseurs.

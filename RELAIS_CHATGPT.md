@@ -348,4 +348,11 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Les corrections et suppressions directes restent réservées à `gerer_pointage`; `valider_pointages` reste nécessaire pour valider/rejeter.
 - **Migration 46 appliquée** : profils prudents par défaut. `ouvrier` reçoit Chantiers + Planning + Pointage personnel. `Chef d’équipe` reçoit aussi les consultations Stock/Flotte/Outillage et la gestion/validation du planning et des pointages. Aucun droit devis, facture, finances, clients ou paramètres n’est ajouté.
 - Les 8 fiches historiques sont maintenant préparées : **3 chefs d’équipe** et **5 ouvriers**, toutes avec un numéro d’inscription et un poste d’accès.
+
+## 29. Pause et reprise — 13 juillet 2026
+
+- Dernier commit publié : `1beee4b`. Production et migrations 43 à 46 validées.
+- Lot local non publié en cours : `Mon espace` dans `src/app/(app)/mon-espace/page.tsx`, route privée `src/app/api/mon-espace/carte-btp/route.ts` et entrée Sidebar. Lint/TypeScript/HTTP local verts ; build, commit et déploiement restent à faire.
+- Priorités de reprise : terminer Mon espace ; tester de vrais comptes Admin/Chef/Ouvrier ; préparer puis valider la sortie du prototype ; ajouter le droit photo chantier ; automatiser les emails PDF lorsque Resend/SMTP est fourni ; ajouter OCR quand un fournisseur est choisi ; fusionner le futur dépôt GitHub Stock ; approfondir clôture comptable et notifications.
+- Voir la section « Relais de pause » de `RELAIS_CLAUDE.md` pour la liste complète et ordonnée des tâches et dépendances.
 ```
