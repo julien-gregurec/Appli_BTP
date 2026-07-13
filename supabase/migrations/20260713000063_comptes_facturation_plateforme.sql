@@ -95,7 +95,9 @@ begin
  insert into public.facturation_comptes_mensuelle(entreprise_id,employe_id,poste_id,mois,statut_compte,libelle_poste,code_offre,montant_ht,motif)
  select e.entreprise_id,e.id,e.poste_id,p_mois,e.compte_application_statut,p.nom,p.code_offre,coalesce(p.tarif_compte_mensuel,0),'snapshot_mensuel'
  from public.employes e left join public.postes p on p.id=e.poste_id
- where e.utilisateur_id is not null and e.compte_application_statut in ('actif','pause')
+ where e.utilisateur_id is not null and e.compte_application_statut in ('actif','pause','ferme')
+   and coalesce(e.compte_application_ouvert_at,e.created_at)<(p_mois+interval '1 month')
+   and (e.compte_application_ferme_at is null or e.compte_application_ferme_at>=p_mois::timestamptz)
  on conflict(entreprise_id,employe_id,mois) do nothing;
  get diagnostics v_nb=row_count;
  return v_nb;

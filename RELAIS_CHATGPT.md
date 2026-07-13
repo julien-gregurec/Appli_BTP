@@ -1,6 +1,6 @@
 # Relais pour ChatGPT — « Liria Gestion Pro »
 
-## 00. REPRISE CODEX — 13 juillet 2026, archivage/frais + modules complémentaires (CODE LOCAL PRÊT, MIGRATIONS 57–69 NON APPLIQUÉES)
+## 00. REPRISE CODEX — 13 juillet 2026, archivage/frais + modules complémentaires (CODE LOCAL PRÊT, MIGRATIONS 57–71 NON APPLIQUÉES)
 
 Cette section est l’état le plus récent et prime sur les sections historiques ci-dessous.
 
@@ -15,9 +15,10 @@ Cette section est l’état le plus récent et prime sur les sections historique
 - Migration `68` : QR internes pour article, chantier, véhicule, outil et employé ; QR privés affichés dans les fiches ; borne `/stock/borne` mobile avec scan QR/code-barres, code personnel haché (jamais en clair), chantier obligatoire à la sortie, mouvement attribué à l’employé, journal des tentatives et limitation après erreurs. Le scanner explique le besoin HTTPS et conserve saisie/douchette en repli.
 - Migration `69` : socle de droits personnels obligatoire pour tous les postes présents/futurs : planning, pointage personnel, notes personnelles, congés et borne stock. Les modules non autorisés restent absents du menu.
 - Migration `70` corrige un écart détecté pendant l’audit transversal : `gerer_pointage` n’autorise plus à pointer au nom d’un collègue. Il permet seulement consultation/correction/validation. L’arrivée doit appartenir à la fiche liée au compte et la clôture RPC est l’unique chemin de création du pointage final.
+- Migration `71` + `/plateforme/facturation` : relevés mensuels historiques par entreprise, compte, poste, offre et montant HT. Les comptes ouverts puis fermés dans le mois restent inclus ; les relevés nominatifs sont masqués en prototype.
 - Dépendances ajoutées : `fflate`, `qrcode`; tests via Vitest. Tests structurels Supabase : `supabase/tests/archivage_notes_frais_rls.test.sql` et `borne_stock_securisee.test.sql`.
 - Contrôles au 13/07 : `npm test` = 12/12, TypeScript OK, lint OK, `npm run build` OK. Audit production : deux alertes modérées proviennent du PostCSS embarqué dans Next 16 ; la correction automatique proposée ferait une rétrogradation majeure, donc aucun `--force` n’a été appliqué.
-- **Blocage actuel** : Supabase CLI non lié (`supabase/.temp/project-ref` absent), `SUPABASE_ACCESS_TOKEN` absent et aucune session SQL pilotable. Les migrations 57–70 ne sont donc **pas appliquées** et le lot n’est **pas déployé**. Ne pas déployer avant exécution et test transactionnel des migrations dans l’ordre. `DISABLE_EMAIL_LOGIN=true` reste actif ; les notes personnelles demeurent fermées honnêtement en prototype.
+- **Blocage actuel** : Supabase CLI non lié (`supabase/.temp/project-ref` absent), `SUPABASE_ACCESS_TOKEN` absent et aucune session SQL pilotable. Les migrations 57–71 ne sont donc **pas appliquées** et le lot n’est **pas déployé**. Ne pas déployer avant exécution et test transactionnel des migrations dans l’ordre. `DISABLE_EMAIL_LOGIN=true` reste actif ; les notes personnelles demeurent fermées honnêtement en prototype.
 - Le script futur `supabase/production/sortie_mode_prototype.sql` contient les grants authentifiés de toutes les nouvelles RPC. Il reste volontairement NON APPLIQUÉ jusqu’à la bascule coordonnée des comptes personnels.
 - Ne jamais ajouter/supprimer les doublons non suivis `*page 2.tsx` et `StockMovementForm 2.tsx` : ils ne font pas partie de ce lot.
 

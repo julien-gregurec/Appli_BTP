@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { estPlateformeAdmin, statutAbonnement, type EntrepriseAbonnement } from "@/lib/plateforme";
@@ -47,11 +48,14 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
   return (
     <main className="p-8">
       <div className="mx-auto max-w-5xl space-y-6">
-        <div>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
           <h1 className="text-xl font-semibold">Plateforme — entreprises clientes</h1>
           <p className="text-sm text-neutral-500">
             Vue réservée au propriétaire. Chaque entreprise possède un code et un statut d&apos;abonnement à gérer.
           </p>
+          </div>
+          <Link href="/plateforme/facturation" className="rounded-md border px-3 py-2 text-sm font-medium">Relevés de facturation</Link>
         </div>
 
         {msg.error && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{msg.error}</p>}

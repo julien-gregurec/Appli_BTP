@@ -58,12 +58,15 @@ export async function modifierTarifPostePlateformeAction(posteId: string, formDa
 
 export async function genererSnapshotFacturationAction(formData: FormData) {
   if (!(await estPlateformeAdmin())) redirect("/dashboard");
-  if (isEmailLoginDisabled()) redirect(`/plateforme?error=${encodeURIComponent("Le relevé mensuel sécurisé sera disponible après activation des comptes personnels")}`);
+  const retourBrut = String(formData.get("retour") ?? "/plateforme");
+  const retour = retourBrut.startsWith("/plateforme") && !retourBrut.startsWith("//") ? retourBrut : "/plateforme";
+  if (isEmailLoginDisabled()) redirect(`${retour}${retour.includes("?") ? "&" : "?"}error=${encodeURIComponent("Le relevé mensuel sécurisé sera disponible après activation des comptes personnels")}`);
   const moisSaisi = String(formData.get("mois") ?? "").trim();
   const mois = moisSaisi ? `${moisSaisi}-01` : new Date().toISOString().slice(0, 7) + "-01";
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("plateforme_snapshot_facturation", { p_mois: mois });
-  if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`${retour}${retour.includes("?") ? "&" : "?"}error=${encodeURIComponent(error.message)}`);
   revalidatePath("/plateforme");
-  redirect(`/plateforme?succes=${encodeURIComponent(`${data ?? 0} compte(s) ajouté(s) au relevé mensuel`)}`);
+  revalidatePath("/plateforme/facturation");
+  redirect(`${retour}${retour.includes("?") ? "&" : "?"}succes=${encodeURIComponent(`${data ?? 0} compte(s) ajouté(s) au relevé mensuel`)}`);
 }

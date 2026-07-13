@@ -84,6 +84,7 @@ grant execute on function public.plateforme_creer_entreprise(text,text,text) to 
 grant execute on function public.plateforme_postes_tarifs() to authenticated;
 grant execute on function public.plateforme_modifier_tarif_poste(uuid,text,numeric) to authenticated;
 grant execute on function public.plateforme_snapshot_facturation(date) to authenticated;
+grant execute on function public.plateforme_releve_facturation(date) to authenticated;
 grant execute on function public.mes_devis_chantiers_sans_prix(uuid) to authenticated;
 grant execute on function public.mettre_outil_rebut(uuid,uuid,text) to authenticated;
 grant execute on function public.creer_code_identification(uuid,text,uuid) to authenticated;
