@@ -12,6 +12,7 @@ import { InvitationEntreprise } from "@/components/InvitationEntreprise";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 
 type Permission = { cle: string; module: string; description: string };
+const DROITS_SOCLE = new Set(["acces_planning", "acces_pointage", "saisir_son_pointage", "saisir_ses_notes_frais"]);
 
 export default async function AccesPage({
   searchParams,
@@ -162,10 +163,11 @@ export default async function AccesPage({
                         <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#9a7625]">{module}</legend>
                         <div className="space-y-2">
                           {liste.map((p) => (
-                            <label key={p.cle} className="flex cursor-pointer gap-2 rounded p-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-900">
-                              <input type="checkbox" name="permissions" value={p.cle} defaultChecked={autorise.has(p.cle)} className="mt-0.5" />
+                            <label key={p.cle} className={`flex gap-2 rounded p-1.5 ${DROITS_SOCLE.has(p.cle) ? "cursor-default bg-green-50 dark:bg-green-950/20" : "cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-900"}`}>
+                              {DROITS_SOCLE.has(p.cle) && <input type="hidden" name="permissions" value={p.cle} />}
+                              <input type="checkbox" name={DROITS_SOCLE.has(p.cle) ? undefined : "permissions"} value={p.cle} defaultChecked={DROITS_SOCLE.has(p.cle) || autorise.has(p.cle)} disabled={DROITS_SOCLE.has(p.cle)} className="mt-0.5" />
                               <span>
-                                <span className="flex flex-wrap items-center gap-2 text-sm font-medium"><span className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide ${p.cle.startsWith("acces_")?"bg-blue-100 text-blue-800":p.cle.startsWith("gerer_")?"bg-amber-100 text-amber-800":p.cle.startsWith("voir_")?"bg-violet-100 text-violet-800":"bg-green-100 text-green-800"}`}>{p.cle.startsWith("acces_")?"Consulter":p.cle.startsWith("gerer_")?"Gérer":p.cle.startsWith("voir_")?"Chiffres":"Personnel"}</span>{p.description}</span>
+                                <span className="flex flex-wrap items-center gap-2 text-sm font-medium"><span className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide ${p.cle.startsWith("acces_")?"bg-blue-100 text-blue-800":p.cle.startsWith("gerer_")?"bg-amber-100 text-amber-800":p.cle.startsWith("voir_")?"bg-violet-100 text-violet-800":"bg-green-100 text-green-800"}`}>{p.cle.startsWith("acces_")?"Consulter":p.cle.startsWith("gerer_")?"Gérer":p.cle.startsWith("voir_")?"Chiffres":"Personnel"}</span>{p.description}{DROITS_SOCLE.has(p.cle) && <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] text-green-800">Inclus pour tous</span>}</span>
                                 <span className="font-mono text-[10px] text-neutral-400">{p.cle}</span>
                               </span>
                             </label>

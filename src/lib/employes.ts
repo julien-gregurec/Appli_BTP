@@ -42,3 +42,17 @@ export function formatDateFr(value: string | null | undefined) {
   if (!value) return "—";
   return new Intl.DateTimeFormat("fr-FR").format(new Date(`${value}T12:00:00`));
 }
+
+export function ancienneteEmploye(dateEntree: string | null | undefined, dateSortie?: string | null) {
+  if (!dateEntree) return "—";
+  const debut = new Date(`${dateEntree}T12:00:00`);
+  const fin = dateSortie ? new Date(`${dateSortie}T12:00:00`) : new Date();
+  if (Number.isNaN(debut.getTime()) || Number.isNaN(fin.getTime()) || fin < debut) return "—";
+  let mois = (fin.getFullYear() - debut.getFullYear()) * 12 + fin.getMonth() - debut.getMonth();
+  if (fin.getDate() < debut.getDate()) mois -= 1;
+  const annees = Math.floor(Math.max(0, mois) / 12);
+  const moisRestants = Math.max(0, mois) % 12;
+  if (annees === 0) return `${moisRestants} mois`;
+  if (moisRestants === 0) return `${annees} an${annees > 1 ? "s" : ""}`;
+  return `${annees} an${annees > 1 ? "s" : ""} et ${moisRestants} mois`;
+}

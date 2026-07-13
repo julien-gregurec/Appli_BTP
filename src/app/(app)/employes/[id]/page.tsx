@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
-import { contratEmployeLabel, formatDateFr, formatEuro, nomEmploye, statutEmploye } from "@/lib/employes";
+import { ancienneteEmploye, contratEmployeLabel, formatDateFr, formatEuro, nomEmploye, statutEmploye } from "@/lib/employes";
 import { StatutEmployeSelect } from "@/components/StatutEmployeSelect";
 import { importerCarteBtpAction, supprimerCarteBtpAction } from "@/app/actions/employes";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
@@ -74,7 +74,8 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
           {ligne("Téléphone", employe.telephone)}
           {ligne("Email", employe.email)}
           {ligne("Date d'entrée", formatDateFr(employe.date_entree))}
-          {ligne("Date de sortie", employe.date_sortie ? formatDateFr(employe.date_sortie) : null)}
+          {ligne("Ancienneté", ancienneteEmploye(employe.date_entree, employe.statut === "sorti" ? employe.date_sortie : null))}
+          {employe.statut === "sorti" && ligne("Date de sortie", employe.date_sortie ? formatDateFr(employe.date_sortie) : null)}
           {ligne("Taux facturé", formatEuro(employe.taux_horaire))}
           {ligne("Coût interne", formatEuro(employe.cout_horaire))}
           {ligne("Notes", employe.notes)}

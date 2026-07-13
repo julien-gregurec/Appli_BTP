@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { EMPLOYE_CONTRATS, EMPLOYE_STATUTS } from "@/lib/employes";
 
 type EmployeInitial = {
@@ -35,6 +38,7 @@ export function EmployeForm({
   submitLabel: string;
   postes?: { id: string; nom: string }[];
 }) {
+  const [statut, setStatut] = useState(initial?.statut ?? "actif");
   return (
     <form action={action} className="space-y-5">
       <div className="grid grid-cols-2 gap-4">
@@ -55,7 +59,7 @@ export function EmployeForm({
         </div>
         <div className="space-y-1">
           <label className={labelClass} htmlFor="statut">Statut</label>
-          <select id="statut" name="statut" defaultValue={initial?.statut ?? "actif"} className={inputClass}>
+          <select id="statut" name="statut" value={statut} onChange={(event) => setStatut(event.target.value)} className={inputClass}>
             {EMPLOYE_STATUTS.map((s) => (
               <option key={s.cle} value={s.cle}>{s.libelle}</option>
             ))}
@@ -83,7 +87,7 @@ export function EmployeForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className={`grid gap-4 ${statut === "sorti" ? "grid-cols-3" : "grid-cols-2"}`}>
         <div className="space-y-1">
           <label className={labelClass} htmlFor="type_contrat">Contrat</label>
           <select id="type_contrat" name="type_contrat" defaultValue={initial?.type_contrat ?? "cdi"} className={inputClass}>
@@ -96,10 +100,10 @@ export function EmployeForm({
           <label className={labelClass} htmlFor="date_entree">Entrée</label>
           <input id="date_entree" name="date_entree" type="date" defaultValue={initial?.date_entree ?? ""} className={inputClass} />
         </div>
-        <div className="space-y-1">
+        {statut === "sorti" && <div className="space-y-1">
           <label className={labelClass} htmlFor="date_sortie">Sortie</label>
-          <input id="date_sortie" name="date_sortie" type="date" defaultValue={initial?.date_sortie ?? ""} className={inputClass} />
-        </div>
+          <input id="date_sortie" name="date_sortie" type="date" required defaultValue={initial?.date_sortie ?? ""} className={inputClass} />
+        </div>}
       </div>
 
       <div className="grid grid-cols-2 gap-4">

@@ -18,6 +18,7 @@ function nombre(formData: FormData, nom: string): number | null {
 }
 
 function payloadEmploye(formData: FormData) {
+  const statut = champ(formData, "statut") ?? "actif";
   return {
     prenom: champ(formData, "prenom"),
     nom: champ(formData, "nom"),
@@ -27,10 +28,10 @@ function payloadEmploye(formData: FormData) {
     poste_id: champ(formData, "poste_id"),
     type_contrat: champ(formData, "type_contrat") ?? "cdi",
     date_entree: champ(formData, "date_entree"),
-    date_sortie: champ(formData, "date_sortie"),
+    date_sortie: statut === "sorti" ? champ(formData, "date_sortie") : null,
     taux_horaire: nombre(formData, "taux_horaire"),
     cout_horaire: nombre(formData, "cout_horaire"),
-    statut: champ(formData, "statut") ?? "actif",
+    statut,
     notes: champ(formData, "notes"),
   };
 }
@@ -42,6 +43,9 @@ export async function creerEmployeAction(formData: FormData) {
 
   if (!payload.prenom || !payload.nom) {
     redirect(`/employes/nouveau?error=${encodeURIComponent("Prénom et nom obligatoires")}`);
+  }
+  if (payload.statut === "sorti" && !payload.date_sortie) {
+    redirect(`/employes/nouveau?error=${encodeURIComponent("La date de sortie est obligatoire pour un salarié sorti")}`);
   }
 
   const { data, error } = await supabase
@@ -69,6 +73,9 @@ export async function modifierEmployeAction(employeId: string, formData: FormDat
   if (!payload.prenom || !payload.nom) {
     redirect(`/employes/${employeId}/modifier?error=${encodeURIComponent("Prénom et nom obligatoires")}`);
   }
+  if (payload.statut === "sorti" && !payload.date_sortie) {
+    redirect(`/employes/${employeId}/modifier?error=${encodeURIComponent("La date de sortie est obligatoire pour un salarié sorti")}`);
+  }
 
   const { error } = await supabase
     .from("employes")
@@ -94,7 +101,7 @@ export async function changerStatutEmployeAction(employeId: string, statut: stri
 
   const { error } = await supabase
     .from("employes")
-    .update({ statut, updated_at: new Date().toISOString() })
+    .update({ statut, date_sortie: statut === "sorti" ? new Date().toISOString().slice(0, 10) : null, updated_at: new Date().toISOString() })
     .eq("id", employeId)
     .eq("entreprise_id", ctx.entrepriseId);
 

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
-import { contratEmployeLabel, formatEuro, nomEmploye, statutEmploye } from "@/lib/employes";
+import { ancienneteEmploye, contratEmployeLabel, formatEuro, nomEmploye, statutEmploye } from "@/lib/employes";
 
 type EmployeListe = {
   id: string;
@@ -17,6 +17,8 @@ type EmployeListe = {
   telephone: string | null;
   email: string | null;
   cout_horaire: number;
+  date_entree: string | null;
+  date_sortie: string | null;
 };
 
 type EmployeAvecAcces = EmployeListe & {
@@ -35,7 +37,7 @@ export default async function EmployesPage() {
   const [{ data: employes }, { data: postes }, { data: droits }, { data: catalogue }] = await Promise.all([
     supabase
       .from("employes")
-      .select("id, reference_interne, numero_inscription, utilisateur_id, poste_id, prenom, nom, poste, type_contrat, statut, telephone, email, cout_horaire")
+      .select("id, reference_interne, numero_inscription, utilisateur_id, poste_id, prenom, nom, poste, type_contrat, statut, telephone, email, cout_horaire, date_entree, date_sortie")
       .eq("entreprise_id", ctx.entrepriseId)
       .order("nom", { ascending: true }),
     supabase.from("postes").select("id, nom").eq("entreprise_id", ctx.entrepriseId),
@@ -134,6 +136,7 @@ export default async function EmployesPage() {
                   <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
                     <div><dt className="text-xs text-neutral-500">Fonction</dt><dd>{employe.poste ?? "—"}</dd></div>
                     <div><dt className="text-xs text-neutral-500">Contrat</dt><dd>{contratEmployeLabel(employe.type_contrat)}</dd></div>
+                    <div><dt className="text-xs text-neutral-500">Ancienneté</dt><dd>{ancienneteEmploye(employe.date_entree, employe.statut === "sorti" ? employe.date_sortie : null)}</dd></div>
                     <div><dt className="text-xs text-neutral-500">Contact</dt><dd className="break-words">{employe.telephone ?? employe.email ?? "—"}</dd></div>
                     <div><dt className="text-xs text-neutral-500">Coût horaire</dt><dd>{formatEuro(employe.cout_horaire)}</dd></div>
                   </dl>
@@ -165,6 +168,7 @@ export default async function EmployesPage() {
                   <th className="px-4 py-2 font-medium">Nom</th>
                   <th className="px-4 py-2 font-medium">Fonction</th>
                   <th className="px-4 py-2 font-medium">Contrat</th>
+                  <th className="px-4 py-2 font-medium">Ancienneté</th>
                   <th className="px-4 py-2 font-medium">Contact</th>
                   <th className="px-4 py-2 font-medium">Coût</th>
                   <th className="px-4 py-2 font-medium">Statut</th>
@@ -185,6 +189,7 @@ export default async function EmployesPage() {
                       </td>
                       <td className="px-4 py-2 text-neutral-600 dark:text-neutral-400">{employe.poste ?? "—"}</td>
                       <td className="px-4 py-2 text-neutral-600 dark:text-neutral-400">{contratEmployeLabel(employe.type_contrat)}</td>
+                      <td className="px-4 py-2 whitespace-nowrap text-neutral-600 dark:text-neutral-400">{ancienneteEmploye(employe.date_entree, employe.statut === "sorti" ? employe.date_sortie : null)}</td>
                       <td className="px-4 py-2 text-neutral-600 dark:text-neutral-400">{employe.telephone ?? employe.email ?? "—"}</td>
                       <td className="px-4 py-2 text-neutral-600 dark:text-neutral-400">{formatEuro(employe.cout_horaire)}</td>
                       <td className="px-4 py-2">
