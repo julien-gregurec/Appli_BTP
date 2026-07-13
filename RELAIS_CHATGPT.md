@@ -16,6 +16,7 @@ Cette section prime sur les mentions « migration 47/48 à exécuter » et « à
 - Migration 51 appliquée : chaque nouvelle commande en authentification réelle enregistre automatiquement le compte et, s’il existe, la fiche employé qui l’a réellement créée. Aucun formulaire ne permet de commander au nom d’un autre salarié.
 - Le pointage était déjà protégé par la migration 45 : arrivée et départ uniquement pour la fiche liée au compte ; la gestion/validation d’équipe reste une autorisation séparée.
 - Parcours accès vérifié : invitation personnelle par numéro BTP, invitation générale par code entreprise, installation PWA depuis l’inscription, puis choix activer sa fiche / rejoindre une entreprise / créer une entreprise.
+- Liste des employés améliorée pour le mobile : cartes à 390 px avec numéro interne/BTP, fonction, contrat, contact, coût, état du compte applicatif, poste d’accès et droits Consulter/Gérer/Personnel dépliables. Le tableau détaillé reste affiché sur ordinateur. Test visuel et dépliage des autorisations réussis.
 - Authentification réelle toujours volontairement non activée : DISABLE_EMAIL_LOGIN reste à true. Ne pas couper le prototype sans la validation finale de Julien et le test du compte propriétaire.
 - Contrôles base : habilitations=true, notes=true, correctif employé=true, deux droits notes=true, quatre policies notes, bucket privé=true, auteur commande=true.
 - Contrôles code : lint, TypeScript, build webpack et diff-check verts.
