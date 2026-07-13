@@ -7,6 +7,7 @@
 - Installation PWA, invitation par numéro BTP, rattachement par code entreprise et création d’entreprise vérifiés. L’authentification réelle reste volontairement désactivée tant que la sortie du prototype n’est pas validée.
 - `/employes` possède maintenant une vraie vue mobile en cartes : état de l’accès applicatif, poste, numéro BTP et détail dépliable des droits par salarié. Test réussi à 390 px. Le tableau complet reste sur ordinateur. Commit `b41f747` déployé et contrôlé sur l’adresse publique.
 - `/flotte` et `/outillage` ont également une vue mobile en cartes. Flotte affiche l’ouvrier assigné, kilométrage et échéances ; Outillage affiche affectation, état, disponibilité et vérification. Les tableaux restent sur ordinateur.
+- `/clients` et `/chantiers` ont maintenant des cartes mobiles avec statut, informations principales et accès pleine largeur à la fiche ; filtres et tableaux ordinateur conservés.
 - Validations : lint, TypeScript, build webpack et diff-check verts.
 
 ## Mise à jour Codex — 12 juillet 2026 (à lire en premier)

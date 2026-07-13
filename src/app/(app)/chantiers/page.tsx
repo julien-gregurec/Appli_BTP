@@ -47,7 +47,34 @@ export default async function ChantiersPage({ searchParams }: { searchParams: Pr
             {chantiers?.length ? "Aucun chantier ne correspond aux filtres." : "Aucun chantier pour l’instant."}
           </div>
         ) : (
-          <div className="overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-800">
+          <>
+          <div className="grid gap-3 md:hidden">
+            {chantiersFiltres.map((chantier) => {
+              const st = statutChantier(chantier.statut);
+              const client = Array.isArray(chantier.client) ? chantier.client[0] : chantier.client;
+              return (
+                <article key={chantier.id} className="space-y-3 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <Link href={`/chantiers/${chantier.id}`} className="block truncate font-semibold hover:underline">{chantier.nom}</Link>
+                      <p className="mt-0.5 font-mono text-xs text-neutral-500">{chantier.reference_interne}</p>
+                    </div>
+                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-neutral-100 px-2 py-1 text-xs font-medium dark:bg-neutral-800">
+                      <span className="h-2 w-2 rounded-full" style={{ background: st.couleur }} />{st.libelle}
+                    </span>
+                  </div>
+                  <dl className="grid grid-cols-2 gap-3 text-sm">
+                    <div><dt className="text-xs text-neutral-500">Client</dt><dd className="font-medium">{client ? nomClient(client) : "—"}</dd></div>
+                    <div><dt className="text-xs text-neutral-500">Ville</dt><dd>{chantier.ville ?? "—"}</dd></div>
+                  </dl>
+                  <Link href={`/chantiers/${chantier.id}`} className="inline-flex w-full items-center justify-center rounded-md border px-3 py-2 text-sm font-medium">
+                    Voir le chantier et son suivi
+                  </Link>
+                </article>
+              );
+            })}
+          </div>
+          <div className="hidden overflow-x-auto rounded-md border border-neutral-200 dark:border-neutral-800 md:block">
             <table className="w-full text-sm">
               <thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500 dark:bg-neutral-900">
                 <tr>
@@ -81,6 +108,7 @@ export default async function ChantiersPage({ searchParams }: { searchParams: Pr
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
     </main>
