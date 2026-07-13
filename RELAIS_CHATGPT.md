@@ -349,7 +349,15 @@ git diff --check                   # OK (aucun conflit whitespace)
 - **Migration 46 appliquée** : profils prudents par défaut. `ouvrier` reçoit Chantiers + Planning + Pointage personnel. `Chef d’équipe` reçoit aussi les consultations Stock/Flotte/Outillage et la gestion/validation du planning et des pointages. Aucun droit devis, facture, finances, clients ou paramètres n’est ajouté.
 - Les 8 fiches historiques sont maintenant préparées : **3 chefs d’équipe** et **5 ouvriers**, toutes avec un numéro d’inscription et un poste d’accès.
 
-## 29. Pause et reprise — 13 juillet 2026
+## 30. Visibilité des accès dans la liste Employés — 13 juillet 2026
+
+- La page Employés affiche désormais, pour chaque salarié, si son compte est activé ou si l’invitation reste à envoyer.
+- La liste distingue la fonction métier de l’employé et son poste d’accès applicatif.
+- Une nouvelle colonne Autorisations résume le nombre de droits Consulter, Gérer et spéciaux. Le détail dépliable affiche chaque autorisation avec un libellé lisible et un badge Voir/Gérer/Spécial.
+- Les droits préparés sont visibles avant même l’activation du compte, ce qui permet à l’administrateur de contrôler la fiche avant d’envoyer l’invitation.
+- Le tableau conserve un défilement horizontal interne sur mobile.
+
+## 31. Pause et reprise — 13 juillet 2026
 
 - Dernier commit publié : `1beee4b`. Production et migrations 43 à 46 validées.
 - Lot local non publié en cours : `Mon espace` dans `src/app/(app)/mon-espace/page.tsx`, route privée `src/app/api/mon-espace/carte-btp/route.ts` et entrée Sidebar. Lint/TypeScript/HTTP local verts ; build, commit et déploiement restent à faire.

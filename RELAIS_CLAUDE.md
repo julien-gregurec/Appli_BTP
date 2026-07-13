@@ -440,6 +440,12 @@ git diff --check
 - Migration 46 appliquée : `ouvrier` = Chantiers, Planning, Pointage personnel ; `Chef d’équipe` = mêmes bases + consultations Stock/Flotte/Outillage et gestion/validation planning-pointages. Aucun accès commercial, financier ou paramètres.
 - Les données LIRIA existantes sont préparées : 3 fiches Chef d’équipe et 5 fiches Ouvrier, soit 8/8 avec numéro et poste.
 
+### Droits visibles depuis la liste Employés — 13 juillet 2026
+
+- La liste Employés indique maintenant pour chaque salarié si l’accès est activé ou si l’invitation reste à envoyer, ainsi que le poste applicatif préparé.
+- Une colonne Autorisations résume les droits Consulter, Gérer et spéciaux ; son détail dépliable affiche les libellés lisibles avec les badges Voir/Gérer/Spécial.
+- Les droits sont visibles même avant l’activation du compte, afin de contrôler le profil avant invitation. Le tableau reste utilisable sur mobile grâce à son défilement horizontal interne.
+
 ## Fichiers clés
 
 - `src/components/DevisEditor.tsx`
