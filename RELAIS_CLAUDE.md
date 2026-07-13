@@ -397,6 +397,13 @@ git diff --check
 - Mot de passe oublié et définition d’un nouveau mot de passe ajoutés ; déconnexion forcée après succès.
 - Les modèles email exacts et redirect URLs à configurer dans Supabase sont documentés dans `PRODUCTION_CHECKLIST.md`.
 
+### Renforcement RLS Gérer — 13 juillet 2026
+
+- Audit confirmé : le proxy bloquait les POST, mais les anciennes policies RLS authentifiées restaient trop larges pour un appel direct Supabase.
+- Migration 43 préparée, **non appliquée** : `a_permission`, policies restrictives d’écriture sur 35 tables, tables enfants, buckets privés et wrappers sécurisés autour des RPC `SECURITY DEFINER` métier.
+- Le prototype anon reste compatible. `sortie_mode_prototype.sql` réaccorde désormais `a_permission` à authenticated après durcissement.
+- Syntaxe analysée avec le parseur PostgreSQL natif hors `AS RESTRICTIVE` (non compris par sa vieille grammaire mais conforme à PostgreSQL 13+). Test réel SQL Editor obligatoire avant application et avant auth production.
+
 ## Fichiers clés
 
 - `src/components/DevisEditor.tsx`

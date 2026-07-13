@@ -299,4 +299,12 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Ajout de `/mot-de-passe-oublie`, du lien sur `/login`, de `/nouveau-mot-de-passe` et des actions Supabase d’envoi puis de mise à jour sécurisée du mot de passe.
 - Après modification, la session de récupération est fermée et l’utilisateur doit se reconnecter avec son nouveau mot de passe.
 - `PRODUCTION_CHECKLIST.md` contient les deux modèles email Supabase à configurer (`email` et `recovery`) et les URLs de callback à autoriser avant la bascule.
+
+## 23. Renforcement RLS des droits Gérer — 13 juillet 2026
+
+- Audit : le proxy Next bloquait les mutations sans droit `gerer_*`, mais plusieurs policies Supabase authentifiées autorisaient encore directement tout membre actif. La séparation n’était donc pas suffisante contre un appel REST/RPC volontaire hors interface.
+- Migration **43 préparée mais non appliquée** : `20260713000043_permissions_rls_gestion.sql` crée `a_permission`, ajoute des policies `AS RESTRICTIVE` sur les écritures de 35 tables, protège les tables enfants et impose les droits par bucket Storage.
+- Les RPC `SECURITY DEFINER` achats, stock, inventaires, pointage, flotte, outillage et justificatifs sont placées derrière des wrappers contrôlant le droit Gérer ; leurs implémentations internes ne sont plus exécutables par anon/authenticated.
+- Le prototype anon reste volontairement inchangé. La syntaxe générale a été analysée par le parseur PostgreSQL natif (91 instructions valides après neutralisation de la clause récente `AS RESTRICTIVE`, confirmée séparément par la documentation PostgreSQL officielle).
+- Blocage actuel : pas de session Supabase CLI et pas de Docker local. Exécuter d’abord la migration 43 en transaction/test dans le SQL Editor avant de la considérer appliquée. Ne pas activer l’auth réelle avant ce test.
 ```

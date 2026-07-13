@@ -35,6 +35,7 @@ end $$;
 
 -- Helpers RLS et seules RPC appelées par l'application authentifiée.
 grant execute on function public.est_membre_actif(uuid) to authenticated;
+grant execute on function public.a_permission(uuid,text) to authenticated;
 grant execute on function public.entreprise_sans_membres(uuid) to authenticated;
 grant execute on function public.creer_entreprise_bootstrap(text,text,text,text,text) to authenticated;
 grant execute on function public.creer_devis_brouillon(uuid,jsonb,jsonb) to authenticated;
