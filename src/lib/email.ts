@@ -2,8 +2,9 @@ import { euros } from "@/lib/devis";
 
 type ClientMail = { nom: string | null; prenom: string | null; societe: string | null; email: string | null };
 
-// Construit un lien mailto: pré-rempli pour envoyer un devis ou une facture au client.
-// Le PDF n'est pas joignable via mailto — le corps invite donc à joindre le PDF téléchargé.
+// Construit le message réellement destiné au client. Les consignes d'utilisation
+// (notamment l'ajout manuel du PDF) restent dans l'interface et ne doivent jamais
+// apparaître dans l'e-mail professionnel.
 export function contenuEmailDocument(opts: {
   typeDoc: "devis" | "facture";
   numero: string | null;
@@ -18,21 +19,17 @@ export function contenuEmailDocument(opts: {
   const estFacture = opts.typeDoc === "facture";
   const libelle = estFacture ? "facture" : "devis";
   const ref = opts.numero ?? (estFacture ? "facture" : "devis");
-  const nomClient =
-    opts.client.societe ||
-    [opts.client.prenom, opts.client.nom].filter(Boolean).join(" ") ||
-    "Madame, Monsieur";
+  const contact = [opts.client.prenom, opts.client.nom].filter(Boolean).join(" ");
+  const salutation = contact || "Madame, Monsieur";
 
   const sujet = `${estFacture ? "Facture" : "Devis"} ${ref} — ${opts.entrepriseNom}`;
 
   const corps = [
-    `Bonjour ${nomClient},`,
+    `Bonjour ${salutation},`,
     "",
     estFacture
       ? `Veuillez trouver ci-joint la ${libelle} ${ref} d'un montant de ${euros(opts.montantTtc)} TTC.`
       : `Veuillez trouver ci-joint le ${libelle} ${ref} d'un montant de ${euros(opts.montantTtc)} TTC.`,
-    "",
-    "(Pensez à joindre le PDF téléchargé à cet e-mail avant l'envoi.)",
     "",
     estFacture
       ? "Nous restons à votre disposition pour tout renseignement et vous remercions de votre confiance."
@@ -50,10 +47,10 @@ export function contenuEmailCommande(opts: { numero: string; fournisseurNom: str
   if (!to) return null;
   const sujet = `Commande ${opts.numero} — ${opts.entrepriseNom}`;
   const corps = [
-    `Bonjour ${opts.fournisseurNom},`, "",
+    "Bonjour,", "",
     `Veuillez trouver ci-joint notre bon de commande ${opts.numero}, d’un montant de ${euros(opts.montantTtc)} TTC.`,
     opts.dateLivraison ? `Livraison souhaitée au plus tard le ${opts.dateLivraison}.` : null,
-    "", "(Pensez à joindre le PDF ouvert depuis l’application avant l’envoi.)", "",
+    "",
     "Merci de nous confirmer la prise en compte de cette commande et le délai de livraison.", "", "Cordialement,", opts.entrepriseNom,
   ].filter((ligne) => ligne !== null).join("\n");
   return { to, sujet, corps };

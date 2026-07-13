@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { enregistrerPresenceApplicationAction } from "@/app/actions/suivi-acces";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -27,7 +28,7 @@ export function PwaInstallButton({ publicPage = false }: { publicPage?: boolean 
       event.preventDefault();
       setInvite(event as BeforeInstallPromptEvent);
     };
-    const apresInstallation = () => { setInstallee(true); setInvite(null); };
+    const apresInstallation = () => { setInstallee(true); setInvite(null); enregistrerPresenceApplicationAction(true).catch(() => undefined); };
     window.addEventListener("beforeinstallprompt", avantInstallation);
     window.addEventListener("appinstalled", apresInstallation);
     return () => {
@@ -43,7 +44,7 @@ export function PwaInstallButton({ publicPage = false }: { publicPage?: boolean 
     if (!invite) { setGuide((valeur) => !valeur); return; }
     await invite.prompt();
     const choix = await invite.userChoice;
-    if (choix.outcome === "accepted") setInstallee(true);
+    if (choix.outcome === "accepted") { setInstallee(true); await enregistrerPresenceApplicationAction(true); }
     setInvite(null);
   }
 

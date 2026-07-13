@@ -15,26 +15,29 @@ export async function creerAffectationAction(formData: FormData) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
 
-  const chantierId = champ(formData, "chantier_id");
+  const typeActivite = champ(formData, "type_activite") ?? "chantier";
+  const typesAutorises = ["chantier", "bureau", "depot", "visite_medicale", "formation", "conge", "autre"];
+  const chantierId = typeActivite === "chantier" ? champ(formData, "chantier_id") : null;
   const employeIds = [...new Set(formData.getAll("employe_ids").map(String).filter(Boolean))];
   const date = champ(formData, "date");
   const heures = Number(formData.get("heures"));
 
   const retour = champ(formData, "retour");
   const destination = retour ? `/planning?semaine=${encodeURIComponent(retour)}` : "/planning";
-  if (!chantierId || employeIds.length === 0 || !date) {
-    redirect(`${destination}${destination.includes("?") ? "&" : "?"}error=${encodeURIComponent("Chantier, ouvriers et date obligatoires")}`);
+  if (!typesAutorises.includes(typeActivite) || (typeActivite === "chantier" && !chantierId) || employeIds.length === 0 || !date) {
+    redirect(`${destination}${destination.includes("?") ? "&" : "?"}error=${encodeURIComponent("Activité, ouvriers et date obligatoires")}`);
   }
   if (!heures || heures <= 0) {
     redirect(`${destination}${destination.includes("?") ? "&" : "?"}error=${encodeURIComponent("Nombre d'heures invalide")}`);
   }
   const [{ data: chantier }, { data: employes }] = await Promise.all([
-    supabase.from("chantiers").select("id").eq("id",chantierId).eq("entreprise_id",ctx.entrepriseId).maybeSingle(),
+    chantierId ? supabase.from("chantiers").select("id").eq("id",chantierId).eq("entreprise_id",ctx.entrepriseId).maybeSingle() : Promise.resolve({ data: null }),
     supabase.from("employes").select("id").eq("entreprise_id",ctx.entrepriseId).eq("statut","actif").in("id",employeIds),
   ]);
-  if (!chantier || (employes?.length ?? 0) !== employeIds.length) redirect(`${destination}${destination.includes("?") ? "&" : "?"}error=${encodeURIComponent("Chantier ou ouvrier invalide")}`);
+  if ((chantierId && !chantier) || (employes?.length ?? 0) !== employeIds.length) redirect(`${destination}${destination.includes("?") ? "&" : "?"}error=${encodeURIComponent("Activité ou ouvrier invalide")}`);
   const tache = champ(formData,"tache");
-  const { error } = await supabase.from("affectations").insert(employeIds.map((employeId) => ({ entreprise_id:ctx.entrepriseId,chantier_id:chantierId,employe_id:employeId,date,heures,tache })));
+  const lieuActivite = typeActivite === "chantier" ? null : champ(formData, "lieu_activite");
+  const { error } = await supabase.from("affectations").insert(employeIds.map((employeId) => ({ entreprise_id:ctx.entrepriseId,chantier_id:chantierId,employe_id:employeId,date,heures,tache,type_activite:typeActivite,lieu_activite:lieuActivite })));
 
   if (error) {
     redirect(`${destination}${destination.includes("?") ? "&" : "?"}error=${encodeURIComponent(error.message)}`);

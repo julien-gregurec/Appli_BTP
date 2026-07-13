@@ -3,12 +3,15 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { creerAffectationAction, supprimerGroupeAffectationsAction } from "@/app/actions/planning";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
+import { PlanningAffectationForm } from "@/components/PlanningAffectationForm";
 
 type A = {
   id: string;
   date: string;
   heures: number;
   tache: string | null;
+  type_activite: string;
+  lieu_activite: string | null;
   chantier: { id: string; nom: string } | { id: string; nom: string }[] | null;
   employe: { id: string; prenom: string; nom: string } | { id: string; prenom: string; nom: string }[] | null;
 };
@@ -24,7 +27,6 @@ function lundi(reference?: string) {
 const dateFr = (d: Date, large = false) =>
   new Intl.DateTimeFormat("fr-FR", large ? { weekday: "long", day: "numeric", month: "long" } : { weekday: "short", day: "numeric" }).format(d);
 
-const input = "rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 const couleurs = [
   "border-l-blue-500 bg-blue-50",
   "border-l-amber-500 bg-amber-50",
@@ -33,6 +35,8 @@ const couleurs = [
   "border-l-rose-500 bg-rose-50",
   "border-l-cyan-500 bg-cyan-50",
 ];
+const activites: Record<string, string> = { chantier: "Chantier", bureau: "Bureau", depot: "Dépôt", visite_medicale: "Visite médicale", formation: "Formation", conge: "Congé / absence", autre: "Autre activité" };
+const libelleAffectation = (affectation: A) => un(affectation.chantier)?.nom ?? activites[affectation.type_activite] ?? "Activité interne";
 
 export default async function PlanningPage({ searchParams }: { searchParams: Promise<{ semaine?: string; error?: string }> }) {
   const p = await searchParams;
@@ -47,7 +51,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
   const [{ data: chantiers }, { data: employes }, { data: affectationsData }] = await Promise.all([
     sb.from("chantiers").select("id,nom").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(archive,annule)").order("nom"),
     sb.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif").order("nom"),
-    sb.from("affectations").select("id,date,heures,tache,chantier:chantiers(id,nom),employe:employes(id,prenom,nom)").eq("entreprise_id", ctx.entrepriseId).gte("date", iso(debut)).lte("date", iso(fin)).order("date"),
+    sb.from("affectations").select("id,date,heures,tache,type_activite,lieu_activite,chantier:chantiers(id,nom),employe:employes(id,prenom,nom)").eq("entreprise_id", ctx.entrepriseId).gte("date", iso(debut)).lte("date", iso(fin)).order("date"),
   ]);
 
   const affectations = (affectationsData ?? []) as A[];
@@ -61,8 +65,8 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
   // Message de partage (une ligne par affectation, groupé par jour).
   const lignesPartage = dates.flatMap((d) =>
     affectations
-      .filter((a) => a.date === iso(d) && un(a.chantier) && un(a.employe))
-      .map((a) => `${dateFr(d)} · ${un(a.employe)!.prenom} ${un(a.employe)!.nom} → ${un(a.chantier)!.nom}${a.tache ? ` (${a.tache})` : ""} · ${a.heures} h`),
+      .filter((a) => a.date === iso(d) && un(a.employe))
+      .map((a) => `${dateFr(d)} · ${un(a.employe)!.prenom} ${un(a.employe)!.nom} → ${libelleAffectation(a)}${a.lieu_activite ? ` · ${a.lieu_activite}` : ""}${a.tache ? ` (${a.tache})` : ""} · ${a.heures} h`),
   );
   const message = `Planning LIRIA CONCEPT — semaine du ${dateFr(debut, true)} au ${dateFr(fin, true)}\n\n${lignesPartage.length ? lignesPartage.join("\n") : "Aucune affectation planifiée."}`;
 
@@ -72,7 +76,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold">Planning des équipes</h1>
-            <p className="text-sm text-neutral-500">Tableau par ouvrier et par jour. Une case = un chantier et ses heures.</p>
+            <p className="text-sm text-neutral-500">Tableau par ouvrier et par jour : chantiers, bureau, dépôt, visites médicales, formations et absences.</p>
           </div>
           <div className="flex gap-2">
             <a href={`mailto:?subject=${encodeURIComponent(`Planning LIRIA — semaine du ${dateFr(debut)}`)}&body=${encodeURIComponent(message)}`} className="rounded-md border px-3 py-2 text-sm hover:bg-neutral-50">Partager par email</a>
@@ -93,18 +97,10 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
           </div>
         </div>
 
-        {chantiers?.length && employes?.length ? (
-          <form action={creerAffectationAction} className="grid grid-cols-[1.4fr_160px_110px_1.4fr] gap-3 rounded-md border p-4 dark:border-neutral-800">
-            <input type="hidden" name="retour" value={iso(debut)} />
-            <label className="text-xs text-neutral-500">Chantier<select name="chantier_id" required className={`${input} mt-1 w-full`}>{chantiers.map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}</select></label>
-            <label className="text-xs text-neutral-500">Date<input name="date" type="date" min={iso(debut)} max={iso(fin)} defaultValue={iso(debut)} required className={`${input} mt-1 w-full`} /></label>
-            <label className="text-xs text-neutral-500">Heures<input name="heures" type="number" min="0.5" max="24" step="0.5" defaultValue="7" required className={`${input} mt-1 w-full`} /></label>
-            <label className="text-xs text-neutral-500">Tâche<input name="tache" placeholder="Pose cloisons, livraison…" className={`${input} mt-1 w-full`} /></label>
-            <fieldset className="col-span-4"><legend className="mb-2 text-xs text-neutral-500">Ouvriers associés</legend><div className="flex flex-wrap gap-2">{employes.map((e) => <label key={e.id} className="flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm hover:bg-neutral-50"><input name="employe_ids" value={e.id} type="checkbox" /><span>{e.prenom} {e.nom}</span></label>)}</div></fieldset>
-            <div className="col-span-4"><button className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">Ajouter au planning</button></div>
-          </form>
+        {employes?.length ? (
+          <PlanningAffectationForm action={creerAffectationAction} retour={iso(debut)} debut={iso(debut)} fin={iso(fin)} chantiers={chantiers ?? []} employes={employes} />
         ) : (
-          <p className="rounded border border-dashed p-5 text-sm text-neutral-500">Ajoutez au moins un chantier et un employé actif.</p>
+          <p className="rounded border border-dashed p-5 text-sm text-neutral-500">Ajoutez au moins un employé actif.</p>
         )}
 
         {/* Tableau : lignes = ouvriers, colonnes = jours */}
@@ -128,15 +124,17 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
                   <tr key={e.id} className="align-top">
                     <th className="sticky left-0 z-10 whitespace-nowrap border border-neutral-200 bg-white px-3 py-2 text-left font-medium dark:border-neutral-800 dark:bg-neutral-950">{e.prenom} {e.nom}</th>
                     {dates.map((d) => {
-                      const cellules = semaine.filter((a) => a.date === iso(d) && un(a.chantier));
+                      const cellules = semaine.filter((a) => a.date === iso(d));
                       const est = iso(d) === aujourdhui;
                       return (
                         <td key={iso(d)} className={`border border-neutral-200 p-1 dark:border-neutral-800 ${est ? "bg-[#c9a24a]/5" : ""}`}>
                           {cellules.map((a) => {
-                            const ch = un(a.chantier)!;
+                            const ch = un(a.chantier);
+                            const identifiantCouleur = ch?.id ?? a.type_activite;
                             return (
-                              <div key={a.id} className={`relative mb-1 rounded border-l-4 px-2 py-1 pr-4 ${couleur(ch.id)}`}>
-                                <div className="font-medium leading-tight text-neutral-900">{ch.nom}</div>
+                              <div key={a.id} className={`relative mb-1 rounded border-l-4 px-2 py-1 pr-4 ${couleur(identifiantCouleur)}`}>
+                                <div className="font-medium leading-tight text-neutral-900">{libelleAffectation(a)}</div>
+                                {a.lieu_activite && <div className="text-[11px] text-neutral-600">{a.lieu_activite}</div>}
                                 {a.tache && <div className="text-[11px] text-neutral-600">{a.tache}</div>}
                                 <div className="font-mono text-[11px] text-neutral-700">{a.heures} h</div>
                                 <form action={supprimerGroupeAffectationsAction} className="absolute right-0.5 top-0.5">

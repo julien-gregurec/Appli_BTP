@@ -6,6 +6,27 @@
 
 ---
 
+## 0X. REPRISE CODEX — 13 juillet 2026, lot accès/commandes/planning (MIGRATIONS APPLIQUÉES, PRÊT À DÉPLOYER)
+
+Cette section prime sur les états précédents pour ce lot.
+
+- Deux migrations nouvelles sont **appliquées et contrôlées sur Supabase** :
+  - `20260713000055_activites_hors_chantier.sql` : le planning accepte, sans faux chantier, les types Chantier, Bureau, Dépôt, Visite médicale, Formation, Congé/absence et Autre. `chantier_id` devient nullable avec une contrainte de cohérence ; l’unicité des affectations est adaptée.
+  - `20260713000056_suivi_acces_collaborateurs.sql` : dates d’invitation, activation, première/dernière connexion et installation PWA sur la fiche employé ; RPC sécurisées de suivi ; statistiques SaaS par entreprise (effectif facturable, comptes activés, invitations, installations, connectés sur 30 jours, options utilisées).
+- Le script futur `supabase/production/sortie_mode_prototype.sql` a aussi été complété avec les trois grants authenticated de la migration 56 ; il reste volontairement non appliqué.
+- Employés : la liste et la fiche affichent désormais « À inviter », « Invitation envoyée », « Compte activé » ou « Connecté », avec les dates utiles et la détection d’installation. Copier/partager une invitation enregistre l’événement côté serveur.
+- Plateforme propriétaire : `/plateforme` affiche par entreprise employés facturables, comptes activés, invitations, utilisateurs connectés sur 30 jours, installations, dernière connexion et options actives. Cette vue prépare une facturation selon effectif/options.
+- Limite importante : `DISABLE_EMAIL_LOGIN=true` reste actif. Une session passée dans l’ancien mode partagé ne permet pas d’identifier rétroactivement Nathan (ou un autre salarié). Le suivi individuel fiable commence avec le compte personnel, après la bascule coordonnée vers l’authentification réelle. **Ne pas attribuer artificiellement une connexion anonyme à Nathan.**
+- Nathan Gregurec (`d202eb63-361c-4ece-a602-1f8646ecf548`) a été marqué comme invité par partage le 13/07/2026 à 20:46 (heure de Paris). Son compte, son installation et ses connexions restent honnêtement à « non détecté/jamais » tant qu’il n’utilise pas un compte personnel authentifié. La fiche propose aussi « Marquer comme déjà envoyée » pour reprendre les invitations antérieures au nouveau suivi.
+- Commandes fournisseurs : nouvelle saisie de réception par ligne avec trois choix (non reçu / reçu partiellement / reçu totalement), quantité partielle, calcul visible reçu/manquant et statut automatique. Le tableau affiche aussi la quantité manquante.
+- E-mails : la consigne interne d’ajout manuel du PDF a été retirée du message réellement destiné au client/fournisseur ; elle reste uniquement dans l’interface. La grammaire de la fenêtre est corrigée (`du devis`, `de la facture`, `de la commande`).
+- Dépenses fournisseurs : une personne ayant `gerer_achats` peut annuler un règlement validé par erreur. Le trigger existant recalcule automatiquement montant réglé, reste et statut. Les lecteurs seuls ne voient pas le bouton.
+- Planning : formulaire dynamique de type d’activité, lieu facultatif pour les activités hors chantier, affichage dans le tableau et dans le message de partage email/WhatsApp.
+- Contrôles code verts : `npm run lint`, `npx tsc --noEmit --incremental false`, `npx next build --webpack`, `git diff --check`.
+- Contrôle SQL après exécution : colonnes planning/suivi présentes, trois RPC présentes et droit `authenticated` de présence tous à `true`. Vérifier `/planning`, une commande partielle, une dépense avec annulation de règlement, `/employes`, `/employes/[id]`, `/plateforme`, puis pousser sur `gh main`.
+
+---
+
 ## 0Y. REPRISE CODEX — 13 juillet 2026 (ÉTAT LE PLUS RÉCENT)
 
 Cette section prime sur les mentions « migration 47/48 à exécuter » et « à auditer » de la section 0Z.

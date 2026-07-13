@@ -19,6 +19,10 @@ type EmployeListe = {
   cout_horaire: number;
   date_entree: string | null;
   date_sortie: string | null;
+  invitation_envoyee_at: string | null;
+  application_installee_at: string | null;
+  premiere_connexion_at: string | null;
+  derniere_connexion_at: string | null;
 };
 
 type EmployeAvecAcces = EmployeListe & {
@@ -37,7 +41,7 @@ export default async function EmployesPage() {
   const [{ data: employes }, { data: postes }, { data: droits }, { data: catalogue }] = await Promise.all([
     supabase
       .from("employes")
-      .select("id, reference_interne, numero_inscription, utilisateur_id, poste_id, prenom, nom, poste, type_contrat, statut, telephone, email, cout_horaire, date_entree, date_sortie")
+      .select("id, reference_interne, numero_inscription, utilisateur_id, poste_id, prenom, nom, poste, type_contrat, statut, telephone, email, cout_horaire, date_entree, date_sortie, invitation_envoyee_at, application_installee_at, premiere_connexion_at, derniere_connexion_at")
       .eq("entreprise_id", ctx.entrepriseId)
       .order("nom", { ascending: true }),
     supabase.from("postes").select("id, nom").eq("entreprise_id", ctx.entrepriseId),
@@ -94,6 +98,13 @@ export default async function EmployesPage() {
     </details>
   ) : <span className="text-red-600">Aucun droit accordé</span>;
 
+  const accesEmploye = (employe: EmployeAvecAcces) => {
+    if (employe.derniere_connexion_at) return { label: "Connecté", classe: "bg-green-100 text-green-800", detail: `Dernière connexion ${new Date(employe.derniere_connexion_at).toLocaleString("fr-FR")}${employe.application_installee_at ? " · application installée" : " · navigateur"}` };
+    if (employe.utilisateur_id) return { label: "Compte activé", classe: "bg-blue-100 text-blue-800", detail: "Compte créé, aucune connexion encore enregistrée" };
+    if (employe.invitation_envoyee_at) return { label: "Invitation envoyée", classe: "bg-amber-100 text-amber-800", detail: new Date(employe.invitation_envoyee_at).toLocaleString("fr-FR") };
+    return { label: "À inviter", classe: "bg-neutral-100 text-neutral-700", detail: "Aucune invitation enregistrée" };
+  };
+
   return (
     <main className="p-8">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -116,6 +127,7 @@ export default async function EmployesPage() {
           <div className="grid gap-3 md:hidden">
             {employesAvecAcces.map((employe) => {
               const statut = statutEmploye(employe.statut);
+              const acces = accesEmploye(employe);
               return (
                 <article key={employe.id} className="space-y-3 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
                   <div className="flex items-start justify-between gap-3">
@@ -144,10 +156,11 @@ export default async function EmployesPage() {
                   <div className="rounded-md bg-neutral-50 p-3 text-xs dark:bg-neutral-900">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-medium">Accès à l’application</span>
-                      <span className={`rounded-full px-2 py-1 ${employe.utilisateur_id ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
-                        {employe.utilisateur_id ? "Activé" : "À inviter"}
+                      <span className={`rounded-full px-2 py-1 ${acces.classe}`}>
+                        {acces.label}
                       </span>
                     </div>
+                    <p className="mt-2 text-neutral-500">{acces.detail}</p>
                     <p className="mt-2 font-medium text-neutral-700 dark:text-neutral-300">{employe.posteAcces ?? "Aucun poste d’accès"}</p>
                     <div className="mt-2">{droitsEmploye(employe)}</div>
                   </div>
@@ -179,6 +192,7 @@ export default async function EmployesPage() {
               <tbody>
                 {employesAvecAcces.map((employe) => {
                   const statut = statutEmploye(employe.statut);
+                  const acces = accesEmploye(employe);
                   return (
                     <tr key={employe.id} className="border-t border-neutral-100 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900">
                       <td className="px-4 py-2 font-mono text-xs text-neutral-500">{employe.reference_interne}</td>
@@ -199,7 +213,7 @@ export default async function EmployesPage() {
                         </span>
                       </td>
                       <td className="px-4 py-2 text-xs">
-                        <div className="space-y-1.5"><span className={`inline-block rounded-full px-2 py-1 ${employe.utilisateur_id ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>{employe.utilisateur_id ? "Accès activé" : "Invitation à envoyer"}</span><p className="font-medium text-neutral-700 dark:text-neutral-300">{employe.posteAcces ?? "Aucun poste d’accès"}</p></div>
+                        <div className="space-y-1.5"><span className={`inline-block rounded-full px-2 py-1 ${acces.classe}`}>{acces.label}</span><p className="max-w-56 text-neutral-500">{acces.detail}</p><p className="font-medium text-neutral-700 dark:text-neutral-300">{employe.posteAcces ?? "Aucun poste d’accès"}</p></div>
                       </td>
                       <td className="min-w-64 px-4 py-2 text-xs">
                         {droitsEmploye(employe)}

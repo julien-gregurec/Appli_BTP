@@ -8,6 +8,7 @@ import { enregistrerReceptionCommandeAction, supprimerCommandeAction } from "@/a
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { EmailDocumentButton } from "@/components/EmailDocumentButton";
 import { contenuEmailCommande } from "@/lib/email";
+import { ReceptionCommandeForm } from "@/components/ReceptionCommandeForm";
 
 export default async function CommandeDetailPage({
   params,
@@ -67,7 +68,7 @@ export default async function CommandeDetailPage({
         </div>
 
         {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-        {reception && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Réception enregistrée.</p>}
+        {reception && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Réception enregistrée. Les quantités reçues et manquantes sont à jour.</p>}
 
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800">
@@ -85,18 +86,7 @@ export default async function CommandeDetailPage({
           </div>
         </div>
 
-        {["envoyee", "confirmee", "recue_partiel"].includes(commande.statut) && (
-          <form action={enregistrerReception} className="space-y-3 rounded-md border border-[#c9a24a]/50 bg-amber-50/50 p-4">
-            <div><h2 className="text-sm font-semibold">Réception des articles</h2><p className="text-xs text-neutral-500">Saisissez le cumul reçu pour chaque ligne. Le statut devient partiel ou reçu automatiquement.</p></div>
-            <div className="space-y-2">{(lignes ?? []).map((ligne) => (
-              <label key={ligne.id} className="flex items-center justify-between gap-3 text-sm">
-                <span className="min-w-0 flex-1 truncate">{ligne.designation} <span className="text-neutral-400">· commandé {ligne.quantite} {ligne.unite}</span></span>
-                <input name={`reception_${ligne.id}`} type="number" min="0" max={ligne.quantite} step="0.01" required defaultValue={ligne.quantite_recue} className="w-28 rounded-md border border-neutral-300 px-2 py-1.5 text-right font-mono text-sm" />
-              </label>
-            ))}</div>
-            <button type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white">Enregistrer la réception</button>
-          </form>
-        )}
+        {["envoyee", "confirmee", "recue_partiel"].includes(commande.statut) && <ReceptionCommandeForm action={enregistrerReception} lignes={(lignes ?? []).map((ligne) => ({ id: ligne.id, designation: ligne.designation, quantite: Number(ligne.quantite), quantite_recue: Number(ligne.quantite_recue), unite: ligne.unite }))} />}
 
         <div className="overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-800">
           <table className="w-full text-sm">
@@ -105,6 +95,7 @@ export default async function CommandeDetailPage({
                 <th className="px-3 py-2 font-medium">Désignation</th>
                 <th className="px-3 py-2 text-right font-medium">Qté</th>
                 <th className="px-3 py-2 text-right font-medium">Reçue</th>
+                <th className="px-3 py-2 text-right font-medium">Manquante</th>
                 <th className="px-3 py-2 text-right font-medium">PU HT</th>
                 <th className="px-3 py-2 text-right font-medium">TVA</th>
                 <th className="px-3 py-2 text-right font-medium">Total HT</th>
@@ -118,14 +109,15 @@ export default async function CommandeDetailPage({
                     {l.description && <div className="text-xs text-neutral-500">{l.description}</div>}
                   </td>
                   <td className="px-3 py-2 text-right font-mono">{l.quantite} {l.unite}</td>
-                  <td className="px-3 py-2 text-right font-mono text-neutral-500">{l.quantite_recue}</td>
+                  <td className="px-3 py-2 text-right font-mono text-neutral-500">{l.quantite_recue} {l.unite}</td>
+                  <td className={`px-3 py-2 text-right font-mono ${Number(l.quantite) > Number(l.quantite_recue) ? "font-semibold text-red-700" : "text-neutral-400"}`}>{Math.max(0, Number(l.quantite) - Number(l.quantite_recue))} {l.unite}</td>
                   <td className="px-3 py-2 text-right font-mono">{euros(l.prix_unitaire_ht)}</td>
                   <td className="px-3 py-2 text-right font-mono">{l.taux_tva} %</td>
                   <td className="px-3 py-2 text-right font-mono">{euros(l.quantite * l.prix_unitaire_ht)}</td>
                 </tr>
               ))}
               {(!lignes || lignes.length === 0) && (
-                <tr><td colSpan={6} className="px-3 py-4 text-center text-sm text-neutral-500">Aucune ligne.</td></tr>
+                <tr><td colSpan={7} className="px-3 py-4 text-center text-sm text-neutral-500">Aucune ligne.</td></tr>
               )}
             </tbody>
           </table>

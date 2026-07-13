@@ -5,6 +5,7 @@ import { permissionsUtilisateur } from "@/lib/permissions";
 import { estPlateformeAdmin } from "@/lib/plateforme";
 import { ModuleAccessBoundary } from "@/components/ModuleAccessBoundary";
 import { MobileBack } from "@/components/MobileBack";
+import { AppPresenceTracker } from "@/components/AppPresenceTracker";
 
 // Layout des pages authentifiées avec navigation latérale.
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -14,6 +15,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="app-shell flex min-h-full flex-1">
+      <AppPresenceTracker actif={!isEmailLoginDisabled()} />
       <style>{`@media (max-width:767px){
         /* Le header mobile est fixe (h-16) : on décale le contenu dessous + zone sûre iOS,
            sinon le titre ET les liens « ← Retour » passent cachés sous la barre. */

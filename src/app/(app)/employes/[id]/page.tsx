@@ -86,7 +86,7 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
             <h2 className="font-semibold">Accès personnel à l’application</h2>
             <p className="text-sm text-neutral-500">La fiche, le poste et ses autorisations sont préparés avant que l’employé crée son compte.</p>
           </div>
-          {employe.numero_inscription ? <InvitationEmploye numero={employe.numero_inscription} nom={nomEmploye(employe)} email={employe.email} compteActif={Boolean(employe.utilisateur_id)} inscriptionsActives={!isEmailLoginDisabled()} /> : <p className="text-sm text-red-700">La migration des numéros d’inscription doit être appliquée.</p>}
+          {employe.numero_inscription ? <InvitationEmploye employeId={employe.id} numero={employe.numero_inscription} nom={nomEmploye(employe)} email={employe.email} compteActif={Boolean(employe.utilisateur_id)} inscriptionsActives={!isEmailLoginDisabled()} invitationEnvoyeeAt={employe.invitation_envoyee_at} premiereConnexionAt={employe.premiere_connexion_at} derniereConnexionAt={employe.derniere_connexion_at} applicationInstalleeAt={employe.application_installee_at} /> : <p className="text-sm text-red-700">La migration des numéros d’inscription doit être appliquée.</p>}
         </section>
 
         <section className="space-y-4 rounded-md border border-[#c9a24a]/50 bg-[#c9a24a]/5 p-4">

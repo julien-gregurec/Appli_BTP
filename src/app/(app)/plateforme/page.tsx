@@ -18,14 +18,24 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
       .select("id, nom, code_adhesion, reference_interne, abonnement_statut, abonnement_echeance, abonnement_note, created_at")
       .order("created_at", { ascending: false });
     const { data: membres } = await supabase.from("utilisateurs_entreprises").select("entreprise_id, statut");
+    const { data: employes } = await supabase.from("employes").select("entreprise_id, statut, utilisateur_id, invitation_envoyee_at, application_installee_at, derniere_connexion_at");
+    const { data: droits } = await supabase.from("permissions_poste").select("entreprise_id, cle_permission, autorise").eq("autorise", true).like("cle_permission", "acces_%");
     entreprises = (ents ?? []).map((e) => ({
       ...e,
       nb_membres: (membres ?? []).filter((m) => m.entreprise_id === e.id).length,
       nb_membres_actifs: (membres ?? []).filter((m) => m.entreprise_id === e.id && m.statut === "actif").length,
+      nb_fiches_employes: (employes ?? []).filter((item) => item.entreprise_id === e.id && item.statut !== "sorti").length,
+      nb_comptes_actives: (employes ?? []).filter((item) => item.entreprise_id === e.id && item.utilisateur_id && !["sorti", "suspendu"].includes(item.statut)).length,
+      nb_invitations_envoyees: (employes ?? []).filter((item) => item.entreprise_id === e.id && item.invitation_envoyee_at).length,
+      nb_applications_installees: (employes ?? []).filter((item) => item.entreprise_id === e.id && item.application_installee_at).length,
+      nb_connectes_30j: (employes ?? []).filter((item) => item.entreprise_id === e.id && item.derniere_connexion_at && new Date(item.derniere_connexion_at).getTime() >= Date.now() - 30 * 86400000).length,
+      derniere_connexion: (employes ?? []).filter((item) => item.entreprise_id === e.id && item.derniere_connexion_at).map((item) => item.derniere_connexion_at as string).sort().at(-1) ?? null,
+      options_actives: [...new Set((droits ?? []).filter((item) => item.entreprise_id === e.id).map((item) => item.cle_permission.replace("acces_", "")))].sort(),
     })) as EntrepriseAbonnement[];
   } else {
-    const { data } = await supabase.rpc("plateforme_entreprises");
-    entreprises = (data ?? []) as EntrepriseAbonnement[];
+    const [{ data }, { data: usages }] = await Promise.all([supabase.rpc("plateforme_entreprises"), supabase.rpc("plateforme_usage_entreprises")]);
+    const usageParEntreprise = new Map<string, Partial<EntrepriseAbonnement>>(((usages ?? []) as Array<Partial<EntrepriseAbonnement> & { entreprise_id: string }>).map((usage) => [usage.entreprise_id, usage]));
+    entreprises = ((data ?? []) as EntrepriseAbonnement[]).map((entreprise) => ({ ...entreprise, ...(usageParEntreprise.get(entreprise.id) ?? {}) }));
   }
 
   const parStatut = (cle: string) => entreprises.filter((e) => e.abonnement_statut === cle).length;
@@ -77,6 +87,14 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                       {" · "}{e.nb_membres_actifs}/{e.nb_membres} membre(s) actif(s)
                       {" · créée le "}{new Date(e.created_at).toLocaleDateString("fr-FR")}
                     </p>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
+                      <p className="rounded bg-neutral-50 px-2 py-1.5 dark:bg-neutral-900"><strong className="block text-base">{e.nb_fiches_employes ?? 0}</strong> employés facturables</p>
+                      <p className="rounded bg-blue-50 px-2 py-1.5 text-blue-900 dark:bg-blue-950/30 dark:text-blue-200"><strong className="block text-base">{e.nb_comptes_actives ?? 0}</strong> comptes activés</p>
+                      <p className="rounded bg-amber-50 px-2 py-1.5 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200"><strong className="block text-base">{e.nb_invitations_envoyees ?? 0}</strong> invitations</p>
+                      <p className="rounded bg-green-50 px-2 py-1.5 text-green-900 dark:bg-green-950/30 dark:text-green-200"><strong className="block text-base">{e.nb_connectes_30j ?? 0}</strong> connectés · 30 j</p>
+                      <p className="rounded bg-violet-50 px-2 py-1.5 text-violet-900 dark:bg-violet-950/30 dark:text-violet-200"><strong className="block text-base">{e.nb_applications_installees ?? 0}</strong> installations</p>
+                    </div>
+                    <p className="mt-2 text-xs text-neutral-500">Options utilisées : {e.options_actives?.length ? e.options_actives.join(", ") : "aucune"}{e.derniere_connexion ? ` · dernière connexion ${new Date(e.derniere_connexion).toLocaleString("fr-FR")}` : ""}</p>
                   </div>
                 </div>
 

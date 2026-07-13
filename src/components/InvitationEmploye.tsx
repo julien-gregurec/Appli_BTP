@@ -1,29 +1,55 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { marquerInvitationEmployeAction } from "@/app/actions/suivi-acces";
 
 export function InvitationEmploye({
+  employeId,
   numero,
   nom,
   email,
   compteActif,
   inscriptionsActives,
+  invitationEnvoyeeAt,
+  premiereConnexionAt,
+  derniereConnexionAt,
+  applicationInstalleeAt,
 }: {
+  employeId: string;
   numero: string;
   nom: string;
   email: string | null;
   compteActif: boolean;
   inscriptionsActives: boolean;
+  invitationEnvoyeeAt: string | null;
+  premiereConnexionAt: string | null;
+  derniereConnexionAt: string | null;
+  applicationInstalleeAt: string | null;
 }) {
   const [message, setMessage] = useState("");
+  const [invitationDate, setInvitationDate] = useState(invitationEnvoyeeAt);
+  const router = useRouter();
   const invitation = () => {
     const lien = `${window.location.origin}/signup?numero=${encodeURIComponent(numero)}`;
     const texte = `Bonjour ${nom}, ta fiche sur Liria Gestion Pro est prête. Crée ton accès personnel ici : ${lien} — Numéro d’inscription : ${numero}. Utilise l’adresse email enregistrée par ton employeur.`;
     return { lien, texte };
   };
 
-  async function copier(texte: string, confirmation: string) {
+  async function enregistrerInvitation(canal: "copie" | "partage") {
+    const resultat = await marquerInvitationEmployeAction(employeId, canal);
+    if (resultat?.error) {
+      setMessage(`Suivi de l’invitation impossible : ${resultat.error}`);
+      return false;
+    }
+    setInvitationDate(new Date().toISOString());
+    router.refresh();
+    return true;
+  }
+
+  async function copier(texte: string, confirmation: string, suivre = false) {
     await navigator.clipboard.writeText(texte);
+    if (suivre) await enregistrerInvitation("copie");
     setMessage(confirmation);
     window.setTimeout(() => setMessage(""), 2500);
   }
@@ -32,9 +58,11 @@ export function InvitationEmploye({
     const contenu = invitation();
     if (navigator.share) {
       await navigator.share({ title: `Invitation de ${nom}`, text: contenu.texte, url: contenu.lien });
+      await enregistrerInvitation("partage");
+      setMessage("Invitation partagée et enregistrée");
       return;
     }
-    await copier(contenu.texte, "Invitation copiée");
+    await copier(contenu.texte, "Invitation copiée et enregistrée", true);
   }
 
   return (
@@ -42,7 +70,7 @@ export function InvitationEmploye({
       <div className="flex flex-wrap items-center gap-3">
         <span className="rounded-md border bg-white px-3 py-2 font-mono text-sm font-semibold tracking-wider dark:bg-neutral-900">{numero}</span>
         <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${compteActif ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
-          {compteActif ? "Compte activé" : "À inviter"}
+          {compteActif ? "Compte activé" : invitationDate ? "Invitation envoyée" : "À inviter"}
         </span>
       </div>
       {!compteActif && <>
@@ -51,11 +79,19 @@ export function InvitationEmploye({
         </p>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={() => copier(numero, "Numéro copié")} className="rounded-md border px-3 py-2 text-sm font-medium">Copier le numéro</button>
-          <button type="button" disabled={!email} onClick={() => copier(invitation().texte, "Invitation copiée")} className="rounded-md border px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40">Copier l’invitation</button>
+          <button type="button" disabled={!email} onClick={() => copier(invitation().texte, "Invitation copiée et enregistrée", true)} className="rounded-md border px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40">Copier l’invitation</button>
           <button type="button" disabled={!email} onClick={partager} className="rounded-md bg-[#0d1b2a] px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40">Partager</button>
+          {!invitationDate && <button type="button" onClick={async () => { if (await enregistrerInvitation("partage")) setMessage("Invitation déjà envoyée enregistrée"); }} className="rounded-md border border-amber-400 px-3 py-2 text-sm font-medium text-amber-800">Marquer comme déjà envoyée</button>}
         </div>
         <p className="text-xs text-neutral-500">Après installation de l’application, ce même numéro peut être saisi dans « Activer ma fiche employé ».</p>
       </>}
+      <div className="grid gap-2 rounded-md border bg-white p-3 text-xs dark:border-neutral-800 dark:bg-neutral-950 sm:grid-cols-2">
+        <p><span className="text-neutral-500">Invitation :</span> {invitationDate ? new Date(invitationDate).toLocaleString("fr-FR") : "non envoyée"}</p>
+        <p><span className="text-neutral-500">Compte :</span> {compteActif ? "activé" : "non activé"}</p>
+        <p><span className="text-neutral-500">Première connexion :</span> {premiereConnexionAt ? new Date(premiereConnexionAt).toLocaleString("fr-FR") : "jamais"}</p>
+        <p><span className="text-neutral-500">Dernière connexion :</span> {derniereConnexionAt ? new Date(derniereConnexionAt).toLocaleString("fr-FR") : "jamais"}</p>
+        <p className="sm:col-span-2"><span className="text-neutral-500">Installation :</span> {applicationInstalleeAt ? `détectée le ${new Date(applicationInstalleeAt).toLocaleString("fr-FR")}` : "non détectée"}</p>
+      </div>
       {message && <p role="status" className="text-xs font-medium text-green-700">✓ {message}</p>}
       {!inscriptionsActives && !compteActif && <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">L’invitation est prête. L’accès individuel deviendra utilisable après l’activation de la connexion sécurisée.</p>}
     </div>

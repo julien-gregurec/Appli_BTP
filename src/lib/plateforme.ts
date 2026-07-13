@@ -31,5 +31,12 @@ export type EntrepriseAbonnement = {
   abonnement_note: string | null;
   nb_membres: number;
   nb_membres_actifs: number;
+  nb_fiches_employes?: number;
+  nb_comptes_actives?: number;
+  nb_invitations_envoyees?: number;
+  nb_applications_installees?: number;
+  nb_connectes_30j?: number;
+  derniere_connexion?: string | null;
+  options_actives?: string[];
   created_at: string;
 };
