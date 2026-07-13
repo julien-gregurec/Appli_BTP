@@ -6,6 +6,7 @@ type EmployeInitial = {
   email?: string | null;
   telephone?: string | null;
   poste?: string | null;
+  poste_id?: string | null;
   type_contrat?: string | null;
   date_entree?: string | null;
   date_sortie?: string | null;
@@ -27,10 +28,12 @@ export function EmployeForm({
   action,
   initial,
   submitLabel,
+  postes = [],
 }: {
   action: (formData: FormData) => void;
   initial?: EmployeInitial;
   submitLabel: string;
+  postes?: { id: string; nom: string }[];
 }) {
   return (
     <form action={action} className="space-y-5">
@@ -47,7 +50,7 @@ export function EmployeForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <label className={labelClass} htmlFor="poste">Poste</label>
+          <label className={labelClass} htmlFor="poste">Métier / fonction</label>
           <input id="poste" name="poste" placeholder="Chef d'équipe, plaquiste…" defaultValue={initial?.poste ?? ""} className={inputClass} />
         </div>
         <div className="space-y-1">
@@ -58,6 +61,15 @@ export function EmployeForm({
             ))}
           </select>
         </div>
+      </div>
+
+      <div className="space-y-1 rounded-md border border-blue-200 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-950/20">
+        <label className={labelClass} htmlFor="poste_id">Poste et autorisations dans l’application</label>
+        <select id="poste_id" name="poste_id" required defaultValue={initial?.poste_id ?? ""} className={inputClass}>
+          <option value="" disabled>Choisir un poste d’accès</option>
+          {postes.map((poste) => <option key={poste.id} value={poste.id}>{poste.nom}</option>)}
+        </select>
+        <p className="text-xs text-neutral-500">Les droits Consulter/Gérer de ce poste seront appliqués automatiquement lorsque l’employé activera son compte. Les postes se préparent dans Paramètres → Accès et rôles.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-4">

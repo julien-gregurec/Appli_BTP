@@ -7,17 +7,20 @@ import { StatutEmployeSelect } from "@/components/StatutEmployeSelect";
 import { importerCarteBtpAction, supprimerCarteBtpAction } from "@/app/actions/employes";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import Image from "next/image";
+import { InvitationEmploye } from "@/components/InvitationEmploye";
+import { isEmailLoginDisabled } from "@/lib/auth-mode";
 
 export default async function EmployeDetailPage({ params,searchParams }: { params: Promise<{ id: string }>;searchParams:Promise<{error?:string;success?:string}> }) {
   const { id } = await params;
   const messages=await searchParams;
-  await getContexteEntreprise();
+  const ctx = await getContexteEntreprise();
   const supabase = await createClient();
 
   const { data: employe } = await supabase
     .from("employes")
-    .select("*")
+    .select("*, profil_acces:postes(nom)")
     .eq("id", id)
+    .eq("entreprise_id", ctx.entrepriseId)
     .single();
 
   if (!employe) notFound();
@@ -67,6 +70,7 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
             {statut.libelle}
           </div>
           {ligne("Poste", employe.poste)}
+          {ligne("Profil d’accès", Array.isArray(employe.profil_acces) ? employe.profil_acces[0]?.nom : employe.profil_acces?.nom)}
           {ligne("Téléphone", employe.telephone)}
           {ligne("Email", employe.email)}
           {ligne("Date d'entrée", formatDateFr(employe.date_entree))}
@@ -74,6 +78,14 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
           {ligne("Taux facturé", formatEuro(employe.taux_horaire))}
           {ligne("Coût interne", formatEuro(employe.cout_horaire))}
           {ligne("Notes", employe.notes)}
+        </section>
+
+        <section className="space-y-4 rounded-md border border-blue-200 bg-blue-50/60 p-4 dark:border-blue-900 dark:bg-blue-950/20">
+          <div>
+            <h2 className="font-semibold">Accès personnel à l’application</h2>
+            <p className="text-sm text-neutral-500">La fiche, le poste et ses autorisations sont préparés avant que l’employé crée son compte.</p>
+          </div>
+          {employe.numero_inscription ? <InvitationEmploye numero={employe.numero_inscription} nom={nomEmploye(employe)} email={employe.email} compteActif={Boolean(employe.utilisateur_id)} inscriptionsActives={!isEmailLoginDisabled()} /> : <p className="text-sm text-red-700">La migration des numéros d’inscription doit être appliquée.</p>}
         </section>
 
         <section className="space-y-4 rounded-md border border-[#c9a24a]/50 bg-[#c9a24a]/5 p-4">

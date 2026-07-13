@@ -22,3 +22,7 @@ export const GESTION_PERMISSION_PAR_CHEMIN: [string,string][] = [
   ["/stock","gerer_stock"],["/depot","gerer_stock"],["/inventaires","gerer_stock"],
   ["/flotte","gerer_flotte"],["/outillage","gerer_outillage"],
 ];
+
+export const PERMISSIONS_MUTATION_ALTERNATIVES: Record<string,string[]> = {
+  "/pointage": ["gerer_pointage", "saisir_son_pointage"],
+};

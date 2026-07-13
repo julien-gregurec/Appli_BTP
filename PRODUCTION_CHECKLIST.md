@@ -10,7 +10,7 @@
 - Le compte Supabase Auth correspondant existe, a un mot de passe, un email confirmé et a déjà réussi une connexion.
 - Le script de production passe en transaction de test puis peut être annulé sans modifier la base. Nouveau dry-run après migrations 30–37 réussi ; rollback contrôlé (fonction prototype + accès anon + 46 policies anon toujours présents).
 - **Correctif 2026-07-12 :** le script réaccorde désormais toutes les RPC appelées par l’application après les migrations 30 à 37 : accès/postes, rattachement par code, import stock, validation des pointages, justificatifs fournisseurs et espace propriétaire.
-- **Renforcement 2026-07-13 :** appliquer et tester la migration 43 avant la coupure. Elle impose les droits `gerer_*` au niveau RLS, stockage et wrappers RPC ; le script de production réaccorde `a_permission` après avoir retiré les droits anonymes.
+- **Renforcement 2026-07-13 validé :** les migrations 43 et 44 sont appliquées. La 43 impose les droits `gerer_*` au niveau RLS, stockage et wrappers RPC ; la 44 prépare les comptes depuis les fiches employés. Le script de production réaccorde `a_permission` après avoir retiré les droits anonymes.
 
 ## Décisions et actions avant la coupure
 

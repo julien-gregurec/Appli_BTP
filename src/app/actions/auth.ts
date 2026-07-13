@@ -20,6 +20,7 @@ export async function signupAction(formData: FormData) {
   const nom = String(formData.get("nom") ?? "");
   const prenom = String(formData.get("prenom") ?? "");
   const codeEntreprise = String(formData.get("code_entreprise") ?? "").trim().toUpperCase();
+  const numeroEmploye = String(formData.get("numero_employe") ?? "").trim().toUpperCase();
 
   const supabase = await createClient();
   const origine = await origineApplication();
@@ -30,8 +31,8 @@ export async function signupAction(formData: FormData) {
     email,
     password,
     options: {
-      data: { nom, prenom, code_entreprise: codeEntreprise || null },
-      emailRedirectTo: `${origine}/auth/callback?next=${encodeURIComponent(codeEntreprise ? `/onboarding?code=${codeEntreprise}` : "/onboarding")}`,
+      data: { nom, prenom, code_entreprise: codeEntreprise || null, numero_employe: numeroEmploye || null },
+      emailRedirectTo: `${origine}/auth/callback?next=${encodeURIComponent(numeroEmploye ? `/onboarding?numero=${numeroEmploye}` : codeEntreprise ? `/onboarding?code=${codeEntreprise}` : "/onboarding")}`,
     },
   });
   if (error) {
@@ -46,7 +47,7 @@ export async function signupAction(formData: FormData) {
     redirect("/login?message=" + encodeURIComponent("Compte créé. Vérifie tes emails pour confirmer, puis connecte-toi."));
   }
 
-  redirect(codeEntreprise ? `/onboarding?code=${encodeURIComponent(codeEntreprise)}` : "/onboarding");
+  redirect(numeroEmploye ? `/onboarding?numero=${encodeURIComponent(numeroEmploye)}` : codeEntreprise ? `/onboarding?code=${encodeURIComponent(codeEntreprise)}` : "/onboarding");
 }
 
 export async function loginAction(formData: FormData) {

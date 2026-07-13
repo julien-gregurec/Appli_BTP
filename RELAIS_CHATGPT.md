@@ -214,7 +214,7 @@ git diff --check                   # OK (aucun conflit whitespace)
 - `src/app/(app)/tresorerie/page.tsx` · `src/lib/tresorerie.ts`
 - `PRODUCTION_CHECKLIST.md` · `supabase/production/sortie_mode_prototype.sql` (**prêt, testé en rollback, non appliqué et hors migrations automatiques**)
 - `src/app/(app)/…` : dashboard, clients, chantiers, devis, factures, commandes, fournisseurs, planning, employes, pointage, rentabilite, stock, prestations, parametres
-- `supabase/migrations/*` (27 fichiers, tous appliqués ; voir §6)
+- `supabase/migrations/*` (migrations 01 à 44 appliquées ; voir les sections de suivi)
 
 ## 13. Historique de démonstration LIRIA — 12 juillet 2026
 
@@ -303,10 +303,10 @@ git diff --check                   # OK (aucun conflit whitespace)
 ## 23. Renforcement RLS des droits Gérer — 13 juillet 2026
 
 - Audit : le proxy Next bloquait les mutations sans droit `gerer_*`, mais plusieurs policies Supabase authentifiées autorisaient encore directement tout membre actif. La séparation n’était donc pas suffisante contre un appel REST/RPC volontaire hors interface.
-- Migration **43 préparée mais non appliquée** : `20260713000043_permissions_rls_gestion.sql` crée `a_permission`, ajoute des policies `AS RESTRICTIVE` sur les écritures de 35 tables, protège les tables enfants et impose les droits par bucket Storage.
+- Migration **43 appliquée avec succès dans une transaction Supabase** : `20260713000043_permissions_rls_gestion.sql` crée `a_permission`, ajoute des policies `AS RESTRICTIVE` sur les écritures de 35 tables, protège les tables enfants et impose les droits par bucket Storage.
 - Les RPC `SECURITY DEFINER` achats, stock, inventaires, pointage, flotte, outillage et justificatifs sont placées derrière des wrappers contrôlant le droit Gérer ; leurs implémentations internes ne sont plus exécutables par anon/authenticated.
 - Le prototype anon reste volontairement inchangé. La syntaxe générale a été analysée par le parseur PostgreSQL natif (91 instructions valides après neutralisation de la clause récente `AS RESTRICTIVE`, confirmée séparément par la documentation PostgreSQL officielle).
-- Blocage actuel : pas de session Supabase CLI et pas de Docker local. Exécuter d’abord la migration 43 en transaction/test dans le SQL Editor avant de la considérer appliquée. Ne pas activer l’auth réelle avant ce test.
+- Contrôle après application : `a_permission(uuid,text)` existe et les wrappers RPC ont été créés. L’auth réelle reste volontairement désactivée jusqu’au réglage final des emails et URLs Supabase.
 
 ## 24. Invisibilité des modules non autorisés — 13 juillet 2026
 
@@ -330,4 +330,22 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Dans les archives de pointage, les boutons Valider/Rejeter ne sont rendus que si le poste possède `valider_pointages`. Le droit général `gerer_pointage` ne suffit plus à afficher ce contrôle spécial.
 - Suppression d’un ancien pointage reste liée à `gerer_pointage`; le serveur conserve les validations déjà protégées par leur permission dédiée.
 - Lint, TypeScript et build webpack verts.
+
+## 27. Numéros d’inscription et activation des employés — 13 juillet 2026
+
+- **Migration 44 appliquée** : chaque fiche employé reçoit un numéro personnel aléatoire `BTP-…`, unique et non séquentiel. Les 8 fiches existantes ont toutes reçu un numéro distinct.
+- La création/modification d’un employé impose maintenant de choisir un poste applicatif préparé dans Paramètres → Accès et rôles. Les droits Consulter/Gérer de ce poste sont donc définis avant l’invitation.
+- La fiche employé affiche l’état `À inviter` / `Compte activé`, permet de copier le numéro, copier l’invitation ou la partager depuis le téléphone.
+- Le lien personnel ouvre `/signup?numero=…`. Après confirmation du compte, l’employé active sa fiche avec son numéro ; l’activation vérifie que l’email correspond à la fiche et rattache automatiquement le compte, l’entreprise et le poste.
+- Le numéro peut aussi être saisi manuellement depuis l’onboarding après installation de la PWA. Le bouton d’installation est désormais disponible dès la page d’inscription.
+- Les changements futurs de poste ou les statuts `suspendu`/`sorti` sont synchronisés avec le compte applicatif.
+- Migrations 43 et 44 exécutées dans des transactions Supabase puis contrôlées : fonctions présentes, 8 numéros attribués, 8 uniques. Lint, TypeScript, build webpack et écrans HTTP employés verts.
+
+## 28. Pointage personnel et profils terrain — 13 juillet 2026
+
+- **Migration 45 appliquée** : nouveau droit `saisir_son_pointage`, distinct de `gerer_pointage`. Un ouvrier peut enregistrer son arrivée/départ GPS sans pouvoir gérer les heures de l’équipe.
+- La liaison `employes.utilisateur_id` est vérifiée dans l’interface, le proxy, les policies RLS et la RPC de clôture. En authentification réelle, l’ouvrier ne voit que ses propres sessions, heures et positions GPS ; le gestionnaire conserve la vue équipe.
+- Les corrections et suppressions directes restent réservées à `gerer_pointage`; `valider_pointages` reste nécessaire pour valider/rejeter.
+- **Migration 46 appliquée** : profils prudents par défaut. `ouvrier` reçoit Chantiers + Planning + Pointage personnel. `Chef d’équipe` reçoit aussi les consultations Stock/Flotte/Outillage et la gestion/validation du planning et des pointages. Aucun droit devis, facture, finances, clients ou paramètres n’est ajouté.
+- Les 8 fiches historiques sont maintenant préparées : **3 chefs d’équipe** et **5 ouvriers**, toutes avec un numéro d’inscription et un poste d’accès.
 ```

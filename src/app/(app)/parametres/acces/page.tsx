@@ -36,7 +36,7 @@ export default async function AccesPage({
     ]);
 
   const permissions = ((catalogue ?? []) as Permission[]).filter((permission) =>
-    permission.cle.startsWith("acces_") || permission.cle.startsWith("gerer_") || permission.cle === "valider_pointages",
+    permission.cle.startsWith("acces_") || permission.cle.startsWith("gerer_") || permission.cle === "valider_pointages" || permission.cle === "saisir_son_pointage",
   );
   const groupes = new Map<string, Permission[]>();
   for (const p of permissions) groupes.set(p.module, [...(groupes.get(p.module) ?? []), p]);
@@ -65,7 +65,7 @@ export default async function AccesPage({
         <section className="rounded-md border border-[#c9a24a]/40 bg-[#c9a24a]/5 p-4">
           <h2 className="font-semibold">Code d&apos;entreprise</h2>
           <p className="text-sm text-neutral-500">
-            Communiquez ce code à vos employés. À l&apos;inscription, ils choisissent « Rejoindre une entreprise » et le saisissent. Vous validez ensuite leur accès ci-dessous en leur affectant un poste.
+            Pour un employé, préparez d&apos;abord sa fiche, son poste et ses droits dans le module Employés : sa fiche produit une invitation personnelle. Ce code général reste disponible pour un collaborateur qui n&apos;a pas encore de fiche.
           </p>
           {entreprise?.code_adhesion ? (
             <InvitationEntreprise code={entreprise.code_adhesion} inscriptionsActives={!isEmailLoginDisabled()} />

@@ -83,6 +83,18 @@ export async function rejoindreEntrepriseAction(formData: FormData) {
   redirect("/dashboard");
 }
 
+export async function activerCompteEmployeAction(formData: FormData) {
+  if (isEmailLoginDisabled()) redirect("/dashboard");
+  const numero = String(formData.get("numero") ?? "").trim().toUpperCase();
+  if (!numero) redirect(`/onboarding?error=${encodeURIComponent("Saisissez votre numéro d’inscription.")}`);
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect(`/signup?numero=${encodeURIComponent(numero)}`);
+  const { error } = await supabase.rpc("activer_compte_employe", { p_numero: numero });
+  if (error) redirect(`/onboarding?numero=${encodeURIComponent(numero)}&error=${encodeURIComponent(error.message)}`);
+  redirect("/dashboard");
+}
+
 export async function modifierEntrepriseAction(formData: FormData) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();

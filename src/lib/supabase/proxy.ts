@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
-import { GESTION_PERMISSION_PAR_CHEMIN, MODULE_PERMISSION_PAR_CHEMIN } from "@/lib/module-permissions";
+import { GESTION_PERMISSION_PAR_CHEMIN, MODULE_PERMISSION_PAR_CHEMIN, PERMISSIONS_MUTATION_ALTERNATIVES } from "@/lib/module-permissions";
 
 const PUBLIC_PATHS = ["/login", "/signup", "/auth", "/mot-de-passe-oublie", "/nouveau-mot-de-passe"];
 
@@ -60,7 +60,9 @@ export async function updateSession(request: NextRequest) {
       const{data:profil}=await supabase.from("utilisateurs").select("entreprise_active_id").eq("id",user.id).maybeSingle();
       if(profil?.entreprise_active_id){
         const{data:appartenance}=await supabase.from("utilisateurs_entreprises").select("poste_id").eq("utilisateur_id",user.id).eq("entreprise_id",profil.entreprise_active_id).eq("statut","actif").maybeSingle();
-        const{data:droit}=appartenance?.poste_id?await supabase.from("permissions_poste").select("autorise").eq("entreprise_id",profil.entreprise_active_id).eq("poste_id",appartenance.poste_id).eq("cle_permission",droitGestion).eq("autorise",true).maybeSingle():{data:null};
+        const cheminAlternatif=Object.keys(PERMISSIONS_MUTATION_ALTERNATIVES).find(chemin=>request.nextUrl.pathname===chemin||request.nextUrl.pathname.startsWith(chemin+"/"));
+        const droitsAcceptes=cheminAlternatif?PERMISSIONS_MUTATION_ALTERNATIVES[cheminAlternatif]:[droitGestion];
+        const{data:droit}=appartenance?.poste_id?await supabase.from("permissions_poste").select("autorise").eq("entreprise_id",profil.entreprise_active_id).eq("poste_id",appartenance.poste_id).in("cle_permission",droitsAcceptes).eq("autorise",true).limit(1).maybeSingle():{data:null};
         if(!droit){const url=request.nextUrl.clone();url.searchParams.set("lecture","seule");return NextResponse.redirect(url,303);}
       }
     }

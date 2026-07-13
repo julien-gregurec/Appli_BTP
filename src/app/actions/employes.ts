@@ -24,6 +24,7 @@ function payloadEmploye(formData: FormData) {
     email: champ(formData, "email"),
     telephone: champ(formData, "telephone"),
     poste: champ(formData, "poste"),
+    poste_id: champ(formData, "poste_id"),
     type_contrat: champ(formData, "type_contrat") ?? "cdi",
     date_entree: champ(formData, "date_entree"),
     date_sortie: champ(formData, "date_sortie"),

@@ -15,10 +15,13 @@ export default async function ModifierEmployePage({
 }) {
   const { id } = await params;
   const { error } = await searchParams;
-  await getContexteEntreprise();
+  const ctx = await getContexteEntreprise();
   const supabase = await createClient();
 
-  const { data: employe } = await supabase.from("employes").select("*").eq("id", id).single();
+  const [{ data: employe }, { data: postes }] = await Promise.all([
+    supabase.from("employes").select("*").eq("id", id).eq("entreprise_id", ctx.entrepriseId).single(),
+    supabase.from("postes").select("id, nom").eq("entreprise_id", ctx.entrepriseId).order("nom"),
+  ]);
   if (!employe) notFound();
 
   const action = modifierEmployeAction.bind(null, id);
@@ -31,7 +34,7 @@ export default async function ModifierEmployePage({
           <h1 className="mt-1 text-xl font-semibold">Modifier l&apos;employé</h1>
         </div>
         {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-        <EmployeForm action={action} initial={employe} submitLabel="Enregistrer" />
+        <EmployeForm action={action} initial={employe} postes={postes ?? []} submitLabel="Enregistrer" />
       </div>
     </main>
   );

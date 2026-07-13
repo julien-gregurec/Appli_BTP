@@ -9,7 +9,7 @@ export default async function EmployesPage() {
 
   const { data: employes } = await supabase
     .from("employes")
-    .select("id, reference_interne, prenom, nom, poste, type_contrat, statut, telephone, email, cout_horaire")
+    .select("id, reference_interne, numero_inscription, utilisateur_id, prenom, nom, poste, type_contrat, statut, telephone, email, cout_horaire")
     .eq("entreprise_id", ctx.entrepriseId)
     .order("nom", { ascending: true });
 
@@ -42,6 +42,7 @@ export default async function EmployesPage() {
                   <th className="px-4 py-2 font-medium">Contact</th>
                   <th className="px-4 py-2 font-medium">Coût</th>
                   <th className="px-4 py-2 font-medium">Statut</th>
+                  <th className="px-4 py-2 font-medium">Application</th>
                 </tr>
               </thead>
               <tbody>
@@ -64,6 +65,9 @@ export default async function EmployesPage() {
                           <span className="h-2 w-2 rounded-full" style={{ background: statut.couleur }} />
                           {statut.libelle}
                         </span>
+                      </td>
+                      <td className="px-4 py-2 text-xs">
+                        <span className={`rounded-full px-2 py-1 ${employe.utilisateur_id ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>{employe.utilisateur_id ? "Activé" : "À inviter"}</span>
                       </td>
                     </tr>
                   );

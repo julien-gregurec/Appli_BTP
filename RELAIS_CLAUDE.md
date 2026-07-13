@@ -400,9 +400,9 @@ git diff --check
 ### Renforcement RLS Gérer — 13 juillet 2026
 
 - Audit confirmé : le proxy bloquait les POST, mais les anciennes policies RLS authentifiées restaient trop larges pour un appel direct Supabase.
-- Migration 43 préparée, **non appliquée** : `a_permission`, policies restrictives d’écriture sur 35 tables, tables enfants, buckets privés et wrappers sécurisés autour des RPC `SECURITY DEFINER` métier.
+- Migration 43 **appliquée avec succès dans Supabase** : `a_permission`, policies restrictives d’écriture sur 35 tables, tables enfants, buckets privés et wrappers sécurisés autour des RPC `SECURITY DEFINER` métier.
 - Le prototype anon reste compatible. `sortie_mode_prototype.sql` réaccorde désormais `a_permission` à authenticated après durcissement.
-- Syntaxe analysée avec le parseur PostgreSQL natif hors `AS RESTRICTIVE` (non compris par sa vieille grammaire mais conforme à PostgreSQL 13+). Test réel SQL Editor obligatoire avant application et avant auth production.
+- Exécution réelle effectuée dans une transaction SQL Editor, puis présence de `a_permission(uuid,text)` contrôlée. L’auth production reste volontairement désactivée jusqu’aux réglages emails/URLs.
 
 ### Modules non autorisés invisibles — 13 juillet 2026
 
@@ -423,6 +423,22 @@ git diff --check
 - Lien `/parametres/acces` masqué sans `gerer_utilisateurs`, même avec consultation des paramètres.
 - Boutons Valider/Rejeter des anciennes saisies masqués sans `valider_pointages`; suppression reste sous `gerer_pointage`.
 - Lint, TypeScript et build webpack verts.
+
+### Numéro d’inscription et invitation employé — 13 juillet 2026
+
+- Migration 44 appliquée : `employes.numero_inscription`, `poste_id`, `utilisateur_id`, `compte_active_at`, fonctions et triggers de synchronisation.
+- Chaque fiche reçoit un numéro personnel aléatoire `BTP-…`; contrôle Supabase : 8 employés, 8 numéros attribués, 8 uniques.
+- La fiche employé doit désormais être préparée avec un poste applicatif. Elle affiche `À inviter`/`Compte activé` et permet copier/partager une invitation personnelle.
+- `/signup?numero=…` et `/onboarding` conservent le numéro. La RPC `activer_compte_employe` vérifie l’email de la fiche, rattache le compte à l’entreprise et applique directement le poste et ses droits.
+- Un changement de poste est répercuté dans les deux sens; `suspendu`/`sorti` désactive l’appartenance. Le numéro peut aussi être saisi après installation de la PWA et le bouton Installer est accessible dès l’inscription.
+- Lint, TypeScript, build webpack et écrans HTTP employés verts.
+
+### Pointage personnel et profils terrain — 13 juillet 2026
+
+- Migration 45 appliquée : droit `saisir_son_pointage`, lecture RLS limitée à la fiche liée au compte et arrivée/départ GPS autorisés uniquement pour soi. Les corrections/suppressions restent sous `gerer_pointage`.
+- Le proxy et le bandeau lecture seule acceptent ce droit spécialisé sans ouvrir les autres actions de gestion ; l’écran ne propose que la fiche du compte à l’ouvrier.
+- Migration 46 appliquée : `ouvrier` = Chantiers, Planning, Pointage personnel ; `Chef d’équipe` = mêmes bases + consultations Stock/Flotte/Outillage et gestion/validation planning-pointages. Aucun accès commercial, financier ou paramètres.
+- Les données LIRIA existantes sont préparées : 3 fiches Chef d’équipe et 5 fiches Ouvrier, soit 8/8 avec numéro et poste.
 
 ## Fichiers clés
 

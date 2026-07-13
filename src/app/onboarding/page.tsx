@@ -1,15 +1,16 @@
-import { createEntrepriseAction, rejoindreEntrepriseAction } from "@/app/actions/entreprise";
+import { activerCompteEmployeAction, createEntrepriseAction, rejoindreEntrepriseAction } from "@/app/actions/entreprise";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function OnboardingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; code?: string }>;
+  searchParams: Promise<{ error?: string; code?: string; numero?: string }>;
 }) {
-  const { error, code } = await searchParams;
+  const { error, code, numero } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const codeInvitation = (code || String(user?.user_metadata?.code_entreprise ?? "")).trim().toUpperCase();
+  const numeroEmploye = (numero || String(user?.user_metadata?.numero_employe ?? "")).trim().toUpperCase();
 
   return (
     <main className="flex flex-1 items-center justify-center p-6">
@@ -25,7 +26,18 @@ export default async function OnboardingPage({
           <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
         )}
 
-        <form action={rejoindreEntrepriseAction} className={`space-y-3 rounded-md border p-4 ${codeInvitation ? "border-blue-300 bg-blue-50/60 dark:border-blue-800 dark:bg-blue-950/20" : "border-neutral-300"}`}>
+        <form action={activerCompteEmployeAction} className={`space-y-3 rounded-md border p-4 ${numeroEmploye ? "border-blue-300 bg-blue-50/60 dark:border-blue-800 dark:bg-blue-950/20" : "border-neutral-300"}`}>
+          <div>
+            <h2 className="font-medium">Activer ma fiche employé</h2>
+            <p className="text-xs text-neutral-500">Votre employeur a déjà préparé votre poste et vos autorisations. Saisissez le numéro personnel reçu.</p>
+          </div>
+          <input name="numero" type="text" required autoFocus={Boolean(numeroEmploye)} defaultValue={numeroEmploye} placeholder="Numéro d’inscription (BTP-…)" className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm uppercase tracking-widest" />
+          <button type="submit" className="w-full rounded-md bg-[#0d1b2a] px-3 py-2 text-sm font-medium text-white">Activer mon accès</button>
+        </form>
+
+        <details className="rounded-md border border-neutral-300 p-4">
+          <summary className="cursor-pointer text-sm font-medium">Je n’ai qu’un code général d’entreprise</summary>
+        <form action={rejoindreEntrepriseAction} className={`mt-3 space-y-3 ${codeInvitation ? "rounded-md bg-blue-50/60 p-3 dark:bg-blue-950/20" : ""}`}>
           <div>
             <h2 className="font-medium">Rejoindre une entreprise existante</h2>
             <p className="text-xs text-neutral-500">
@@ -45,6 +57,7 @@ export default async function OnboardingPage({
             Envoyer ma demande d’accès
           </button>
         </form>
+        </details>
 
         <div className="flex items-center gap-3 text-xs text-neutral-400">
           <span className="h-px flex-1 bg-neutral-200 dark:bg-neutral-800" />

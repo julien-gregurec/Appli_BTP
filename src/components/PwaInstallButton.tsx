@@ -7,7 +7,7 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
-export function PwaInstallButton() {
+export function PwaInstallButton({ publicPage = false }: { publicPage?: boolean }) {
   const [invite, setInvite] = useState<BeforeInstallPromptEvent | null>(null);
   const [ios, setIos] = useState(false);
   const [installee, setInstallee] = useState(false);
@@ -48,11 +48,11 @@ export function PwaInstallButton() {
   }
 
   return (
-    <div className="border-t border-white/10 p-2">
-      <button type="button" onClick={installer} className="w-full rounded-md px-3 py-2 text-left text-sm text-[#c9a24a] hover:bg-white/10">
+    <div className={publicPage ? "rounded-md border border-[#c9a24a]/50 bg-[#c9a24a]/5 p-2" : "border-t border-white/10 p-2"}>
+      <button type="button" onClick={installer} className={`w-full rounded-md px-3 py-2 text-sm text-[#c9a24a] ${publicPage ? "text-center font-medium hover:bg-[#c9a24a]/10" : "text-left hover:bg-white/10"}`}>
         ＋ Installer l’application
       </button>
-      {guide && <div className="mx-2 mb-2 rounded-md bg-white/10 p-3 text-xs leading-relaxed text-white/80">Sur iPhone : ouvrez cette page dans Safari, touchez <strong>Partager</strong> puis <strong>Sur l’écran d’accueil</strong>.</div>}
+      {guide && <div className={`mx-2 mb-2 rounded-md p-3 text-xs leading-relaxed ${publicPage ? "bg-white text-neutral-700" : "bg-white/10 text-white/80"}`}>Sur iPhone : ouvrez cette page dans Safari, touchez <strong>Partager</strong> puis <strong>Sur l’écran d’accueil</strong>.</div>}
     </div>
   );
 }

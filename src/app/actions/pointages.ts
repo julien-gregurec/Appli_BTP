@@ -46,7 +46,10 @@ export async function enregistrerDepartAction(sessionId: string, formData: FormD
 export async function supprimerPointageAction(pointageId: string, mois: string) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  const{data:p}=await supabase.from("pointages").select("photo_storage_path").eq("id",pointageId).eq("entreprise_id",ctx.entrepriseId).maybeSingle();if(p?.photo_storage_path)await supabase.storage.from("pointage-preuves").remove([p.photo_storage_path]);await supabase.from("pointages").delete().eq("id", pointageId).eq("entreprise_id", ctx.entrepriseId);
+  const{data:p}=await supabase.from("pointages").select("photo_storage_path").eq("id",pointageId).eq("entreprise_id",ctx.entrepriseId).maybeSingle();
+  const{error}=await supabase.from("pointages").delete().eq("id", pointageId).eq("entreprise_id", ctx.entrepriseId);
+  if(error)redirect(`/pointage?mois=${mois}&error=${encodeURIComponent(error.message)}`);
+  if(p?.photo_storage_path)await supabase.storage.from("pointage-preuves").remove([p.photo_storage_path]);
   revalidatePath("/pointage");
   redirect(`/pointage?mois=${mois}`);
 }
