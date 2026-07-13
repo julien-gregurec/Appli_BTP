@@ -404,6 +404,13 @@ git diff --check
 - Le prototype anon reste compatible. `sortie_mode_prototype.sql` réaccorde désormais `a_permission` à authenticated après durcissement.
 - Syntaxe analysée avec le parseur PostgreSQL natif hors `AS RESTRICTIVE` (non compris par sa vieille grammaire mais conforme à PostgreSQL 13+). Test réel SQL Editor obligatoire avant application et avant auth production.
 
+### Modules non autorisés invisibles — 13 juillet 2026
+
+- Sidebar bureau/mobile déjà filtrée ; dashboard désormais filtré serveur et sans requête vers les modules interdits.
+- Zone « Mes modules » limitée aux permissions `acces_*`; aucun poste attribué affiche seulement l’attente d’un admin.
+- Proxy complété pour documents chantier, exports, référentiel véhicules et impressions devis/factures/commandes.
+- Lint, TypeScript et build webpack verts ; prototype conserve tous les modules.
+
 ## Fichiers clés
 
 - `src/components/DevisEditor.tsx`

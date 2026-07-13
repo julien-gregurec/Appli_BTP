@@ -307,4 +307,12 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Les RPC `SECURITY DEFINER` achats, stock, inventaires, pointage, flotte, outillage et justificatifs sont placées derrière des wrappers contrôlant le droit Gérer ; leurs implémentations internes ne sont plus exécutables par anon/authenticated.
 - Le prototype anon reste volontairement inchangé. La syntaxe générale a été analysée par le parseur PostgreSQL natif (91 instructions valides après neutralisation de la clause récente `AS RESTRICTIVE`, confirmée séparément par la documentation PostgreSQL officielle).
 - Blocage actuel : pas de session Supabase CLI et pas de Docker local. Exécuter d’abord la migration 43 en transaction/test dans le SQL Editor avant de la considérer appliquée. Ne pas activer l’auth réelle avant ce test.
+
+## 24. Invisibilité des modules non autorisés — 13 juillet 2026
+
+- Le menu bureau/mobile masquait déjà les entrées sans `acces_*` et le proxy redirigeait les URLs métier directes.
+- Le dashboard est maintenant filtré côté serveur : aucune requête ni carte financière, devis, chantier, planning, stock, flotte, outillage ou achats n’est générée sans le droit correspondant.
+- En authentification réelle, une zone **Mes modules** n’affiche que les raccourcis autorisés. Un poste sans aucun accès voit uniquement un message d’attente d’attribution.
+- Protections de chemin ajoutées pour les téléchargements de documents chantier, exports CSV, référentiel véhicule et impressions PDF devis/factures/commandes.
+- Lint, TypeScript et build webpack verts. Le prototype conserve volontairement la vue complète (`permissions=null`).
 ```
