@@ -323,4 +323,11 @@ git diff --check                   # OK (aucun conflit whitespace)
 - `PwaInstallButton` apparaît dans le menu quand Chrome/Android émet l’événement d’installation ; sur iPhone il affiche le parcours Safari « Partager → Sur l’écran d’accueil ».
 - Service worker `/sw.js` volontairement réseau uniquement : il permet l’installation sans mettre en cache les données métier privées d’un collaborateur.
 - Vérifications : lint, TypeScript, build webpack, manifeste JSON (`display=standalone`, 3 icônes), service worker, icône et balises Apple servis en HTTP 200.
+
+## 26. Sous-droits sensibles invisibles — 13 juillet 2026
+
+- Un utilisateur ayant seulement `acces_parametres` ne voit plus le lien **Accès et rôles** ; celui-ci exige désormais explicitement `gerer_utilisateurs` dans l’interface en plus du proxy/RPC.
+- Dans les archives de pointage, les boutons Valider/Rejeter ne sont rendus que si le poste possède `valider_pointages`. Le droit général `gerer_pointage` ne suffit plus à afficher ce contrôle spécial.
+- Suppression d’un ancien pointage reste liée à `gerer_pointage`; le serveur conserve les validations déjà protégées par leur permission dédiée.
+- Lint, TypeScript et build webpack verts.
 ```

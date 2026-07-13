@@ -418,6 +418,12 @@ git diff --check
 - Service worker réseau uniquement, sans cache de données métier privées.
 - Build et tests HTTP du manifeste, SW, icônes et métadonnées Apple verts.
 
+### Sous-droits sensibles invisibles — 13 juillet 2026
+
+- Lien `/parametres/acces` masqué sans `gerer_utilisateurs`, même avec consultation des paramètres.
+- Boutons Valider/Rejeter des anciennes saisies masqués sans `valider_pointages`; suppression reste sous `gerer_pointage`.
+- Lint, TypeScript et build webpack verts.
+
 ## Fichiers clés
 
 - `src/components/DevisEditor.tsx`
