@@ -4,12 +4,14 @@ export const MODULE_PERMISSION_PAR_CHEMIN: [string,string][] = [
   ["/imprimer/devis","acces_devis"],["/imprimer/factures","acces_factures"],["/imprimer/commandes","acces_achats"],
   ["/parametres/acces","gerer_utilisateurs"],["/parametres","acces_parametres"],
   ["/clients","acces_clients"],["/chantiers","acces_chantiers"],
+  ["/mes-travaux","voir_devis_chantier_sans_prix"],
   ["/prestations","acces_devis"],["/devis","acces_devis"],["/factures","acces_factures"],
   ["/commandes","acces_achats"],["/fournisseurs","acces_achats"],["/depenses","acces_achats"],["/charges","acces_achats"],
   ["/api/notes-frais","saisir_ses_notes_frais"],["/notes-frais","saisir_ses_notes_frais"],
+  ["/conges","demander_ses_conges"],
   ["/planning","acces_planning"],["/employes","acces_employes"],["/pointage","acces_pointage"],
   ["/rentabilite","acces_rentabilite"],["/tresorerie","acces_rentabilite"],
-  ["/stock","acces_stock"],["/depot","acces_stock"],["/inventaires","acces_stock"],
+  ["/stock/borne","utiliser_borne_stock"],["/stock","acces_stock"],["/depot","acces_stock"],["/inventaires","acces_stock"],
   ["/flotte","acces_flotte"],["/outillage","acces_outillage"],["/exports","acces_exports"],
 ];
 
@@ -20,12 +22,14 @@ export const GESTION_PERMISSION_PAR_CHEMIN: [string,string][] = [
   ["/prestations","gerer_devis"],["/devis","gerer_devis"],["/factures","gerer_factures"],
   ["/commandes","gerer_achats"],["/fournisseurs","gerer_achats"],["/depenses","gerer_achats"],["/charges","gerer_achats"],
   ["/notes-frais","gerer_notes_frais"],
+  ["/conges","gerer_conges"],
   ["/planning","gerer_planning"],["/employes","gerer_employes"],["/pointage","gerer_pointage"],
-  ["/stock","gerer_stock"],["/depot","gerer_stock"],["/inventaires","gerer_stock"],
+  ["/stock/borne","utiliser_borne_stock"],["/stock","gerer_stock"],["/depot","gerer_stock"],["/inventaires","gerer_stock"],
   ["/flotte","gerer_flotte"],["/outillage","gerer_outillage"],
 ];
 
 export const PERMISSIONS_MUTATION_ALTERNATIVES: Record<string,string[]> = {
   "/pointage": ["gerer_pointage", "saisir_son_pointage"],
   "/notes-frais": ["gerer_notes_frais", "saisir_ses_notes_frais"],
+  "/conges": ["gerer_conges", "demander_ses_conges"],
 };

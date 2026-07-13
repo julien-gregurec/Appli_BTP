@@ -53,6 +53,7 @@ export default async function DepensePage({ params, searchParams }: { params: Pr
         {outil && <p><b>Outil :</b> <Link href={`/outillage/${outil.id}`} className="hover:underline">{outil.reference} · {outil.designation}</Link></p>}
         {employe && <p><b>Ouvrier :</b> <Link href={`/employes/${employe.id}`} className="hover:underline">{employe.prenom} {employe.nom}</Link></p>}
       </section>
+      {depense.travaux_effectues&&<section className="rounded border p-4"><h2 className="font-semibold">Travaux et pièces détaillés</h2><p className="mt-2 whitespace-pre-wrap text-sm">{depense.travaux_effectues}</p></section>}
 
       <section className="rounded border p-4 dark:border-neutral-800">
         <div className="flex items-center justify-between"><div><h2 className="font-semibold">Facture numérisée</h2><p className="text-xs text-neutral-500">PDF, photo ou scan · 20 Mo maximum</p></div>{justificatifUrl && <a href={justificatifUrl} target="_blank" rel="noreferrer" className="rounded border px-3 py-2 text-sm font-medium">Ouvrir le justificatif</a>}</div>

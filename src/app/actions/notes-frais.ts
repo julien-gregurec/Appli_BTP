@@ -6,109 +6,199 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { permissionsUtilisateur } from "@/lib/permissions";
+import { verifierTotaux } from "@/lib/expenses/workflow";
+import { ajouterAudit } from "@/lib/expenses/audit";
 
-const FORMATS: Record<string, string> = {
-  "application/pdf": "pdf",
-  "image/png": "png",
-  "image/jpeg": "jpg",
-  "image/webp": "webp",
-};
+const TYPES_DOCUMENT = new Set([
+  "facture", "ticket_caisse", "recu_paiement", "recu_carte_bancaire",
+  "facture_electronique_originale", "autre_justificatif",
+]);
 
-export async function creerNoteFraisAction(formData: FormData) {
-  const ctx = await getContexteEntreprise();
-  const supabase = await createClient();
-  const prototype = isEmailLoginDisabled();
-  if (prototype) {
-    redirect(`/notes-frais?error=${encodeURIComponent("Les notes de frais personnelles nécessitent l’activation des comptes sécurisés")}`);
-  }
-
-  const montant = Number(String(formData.get("montant_ttc") ?? "").replace(",", "."));
-  if (!Number.isFinite(montant) || montant < 0) {
-    redirect(`/notes-frais?error=${encodeURIComponent("Montant invalide")}`);
-  }
-  const { data: employePersonnel } = prototype
-    ? { data: null }
-    : await supabase
-        .from("employes")
-        .select("id")
-        .eq("entreprise_id", ctx.entrepriseId)
-        .eq("utilisateur_id", ctx.userId)
-        .not("statut", "in", "(sorti,suspendu)")
-        .maybeSingle();
-  const employeId = employePersonnel?.id ?? null;
-  if (!employeId) {
-    redirect(`/notes-frais?error=${encodeURIComponent("Votre compte doit être lié à une fiche employé active")}`);
-  }
-  const dateFrais = String(formData.get("date_frais") ?? "").trim() || new Date().toISOString().slice(0, 10);
-  const categorie = String(formData.get("categorie") ?? "").trim() || null;
-  const description = String(formData.get("description") ?? "").trim() || null;
-  const chantierId = String(formData.get("chantier_id") ?? "").trim() || null;
-  if (chantierId) {
-    const { data: chantier } = await supabase.from("chantiers").select("id").eq("id", chantierId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
-    if (!chantier) redirect(`/notes-frais?error=${encodeURIComponent("Chantier invalide ou inaccessible")}`);
-  }
-
-  // Justificatif (facultatif mais recommandé).
-  const fichier = formData.get("justificatif");
-  let storagePath: string | null = null;
-  let nom: string | null = null;
-  let mime: string | null = null;
-  if (fichier instanceof File && fichier.size > 0) {
-    const ext = FORMATS[fichier.type];
-    if (!ext) redirect(`/notes-frais?error=${encodeURIComponent("Justificatif : PDF, PNG, JPG ou WebP")}`);
-    if (fichier.size > 10 * 1024 * 1024) redirect(`/notes-frais?error=${encodeURIComponent("Justificatif : 10 Mo maximum")}`);
-    const path = `${ctx.entrepriseId}/${employeId}/${crypto.randomUUID()}.${ext}`;
-    const { error: up } = await supabase.storage.from("notes-frais").upload(path, fichier, { contentType: fichier.type, upsert: false });
-    if (up) redirect(`/notes-frais?error=${encodeURIComponent(up.message)}`);
-    storagePath = path;
-    nom = fichier.name;
-    mime = fichier.type;
-  }
-
-  const { error } = await supabase.from("notes_frais").insert({
-    entreprise_id: ctx.entrepriseId,
-    employe_id: employeId,
-    date_frais: dateFrais,
-    montant_ttc: montant,
-    categorie,
-    description,
-    chantier_id: chantierId,
-    cree_par_utilisateur_id: ctx.userId,
-    justificatif_storage_path: storagePath,
-    justificatif_nom: nom,
-    justificatif_mime_type: mime,
-  });
-  if (error) {
-    if (storagePath) await supabase.storage.from("notes-frais").remove([storagePath]);
-    redirect(`/notes-frais?error=${encodeURIComponent(error.message)}`);
-  }
-  revalidatePath("/notes-frais");
-  redirect("/notes-frais?succes=1");
+function texte(formData: FormData, nom: string) {
+  return String(formData.get(nom) ?? "").trim() || null;
 }
 
-export async function changerStatutNoteFraisAction(id: string, statut: string) {
+function nombre(formData: FormData, nom: string): number | null {
+  const brut = texte(formData, nom);
+  if (brut === null) return null;
+  const valeur = Number(brut.replace(",", "."));
+  return Number.isFinite(valeur) ? valeur : Number.NaN;
+}
+
+async function employeDuCompte(entrepriseId: string, userId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase.from("employes").select("id")
+    .eq("entreprise_id", entrepriseId).eq("utilisateur_id", userId)
+    .not("statut", "in", "(sorti,suspendu)").maybeSingle();
+  return data?.id ?? null;
+}
+
+function erreur(message: string, noteId?: string): never {
+  redirect(`${noteId ? `/notes-frais/${noteId}` : "/notes-frais"}?error=${encodeURIComponent(message)}`);
+}
+
+function verifierAuthentification(): void {
+  if (isEmailLoginDisabled()) erreur("Les notes de frais nécessitent un compte personnel sécurisé");
+}
+
+export async function creerNoteFraisAction(formData: FormData) {
+  verifierAuthentification();
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  if (isEmailLoginDisabled()) redirect(`/notes-frais?error=${encodeURIComponent("Gestion indisponible sans compte sécurisé")}`);
-  const permissions = await permissionsUtilisateur(ctx);
-  if (permissions !== null && (!permissions.includes("gerer_notes_frais") || !permissions.includes("voir_indicateurs_financiers"))) {
-    redirect(`/notes-frais?error=${encodeURIComponent("Vous ne pouvez pas gérer les notes de frais des autres salariés")}`);
+  const employeId = await employeDuCompte(ctx.entrepriseId, ctx.userId);
+  if (!employeId) erreur("Votre compte doit être lié à une fiche employé active");
+  const montantTtc = nombre(formData, "montant_ttc");
+  if (montantTtc === null || !Number.isFinite(montantTtc) || montantTtc < 0) erreur("Montant TTC invalide");
+  const montantHt = nombre(formData, "montant_ht");
+  const montantTva = nombre(formData, "montant_tva");
+  const erreursTotaux = verifierTotaux(montantHt, montantTva, montantTtc);
+  if (erreursTotaux.length) erreur(erreursTotaux.join(" · "));
+  const chantierId = texte(formData, "chantier_id");
+  if (chantierId) {
+    const { data: chantier } = await supabase.from("chantiers").select("id").eq("id", chantierId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+    if (!chantier) erreur("Chantier invalide ou inaccessible");
   }
-  if (!["soumise", "validee", "remboursee", "refusee"].includes(statut)) return;
-  await supabase.from("notes_frais").update({ statut }).eq("id", id).eq("entreprise_id", ctx.entrepriseId);
+  const typeDocument = texte(formData, "type_document_principal");
+  if (typeDocument && !TYPES_DOCUMENT.has(typeDocument)) erreur("Type de justificatif invalide");
+  const dateFrais = texte(formData, "date_frais") ?? new Date().toISOString().slice(0, 10);
+  if (dateFrais > new Date().toISOString().slice(0, 10)) erreur("La date du justificatif ne peut pas être dans le futur");
+  const { data, error: insertError } = await supabase.from("notes_frais").insert({
+    entreprise_id: ctx.entrepriseId,
+    employe_id: employeId,
+    chantier_id: chantierId,
+    date_frais: dateFrais,
+    montant_ht: montantHt,
+    montant_tva: montantTva,
+    taux_tva: nombre(formData, "taux_tva"),
+    montant_ttc: montantTtc,
+    devise: texte(formData, "devise") ?? "EUR",
+    categorie: texte(formData, "categorie"),
+    fournisseur: texte(formData, "fournisseur"),
+    moyen_paiement: texte(formData, "moyen_paiement"),
+    commentaire_salarie: texte(formData, "commentaire_salarie"),
+    description: texte(formData, "commentaire_salarie"),
+    type_document_principal: typeDocument,
+    statut: "brouillon",
+    cree_par_utilisateur_id: ctx.userId,
+  }).select("id").single();
+  if (insertError || !data) erreur(insertError?.message ?? "Création impossible");
+  await ajouterAudit(supabase, {
+    entrepriseId: ctx.entrepriseId,
+    action: "document_cree",
+    ressourceType: "note_frais",
+    ressourceId: data.id,
+    nouveauStatut: "brouillon",
+  });
   revalidatePath("/notes-frais");
+  redirect(`/notes-frais/${data.id}?succes=${encodeURIComponent("Brouillon créé. Ajoutez le justificatif puis soumettez-le.")}`);
+}
+
+export async function modifierNoteFraisAction(noteId: string, formData: FormData) {
+  verifierAuthentification();
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const montantTtc = nombre(formData, "montant_ttc");
+  if (montantTtc === null || !Number.isFinite(montantTtc) || montantTtc < 0) erreur("Montant TTC invalide", noteId);
+  const montantHt = nombre(formData, "montant_ht");
+  const montantTva = nombre(formData, "montant_tva");
+  const erreursTotaux = verifierTotaux(montantHt, montantTva, montantTtc);
+  if (erreursTotaux.length) erreur(erreursTotaux.join(" · "), noteId);
+  const typeDocument = texte(formData, "type_document_principal");
+  if (typeDocument && !TYPES_DOCUMENT.has(typeDocument)) erreur("Type de justificatif invalide", noteId);
+  const { data: avant } = await supabase.from("notes_frais").select("id,statut").eq("id", noteId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+  if (!avant) erreur("Dépense inaccessible", noteId);
+  const { error: updateError } = await supabase.from("notes_frais").update({
+    chantier_id: texte(formData, "chantier_id"),
+    date_frais: texte(formData, "date_frais"),
+    montant_ht: montantHt,
+    montant_tva: montantTva,
+    taux_tva: nombre(formData, "taux_tva"),
+    montant_ttc: montantTtc,
+    devise: texte(formData, "devise") ?? "EUR",
+    categorie: texte(formData, "categorie"),
+    fournisseur: texte(formData, "fournisseur"),
+    moyen_paiement: texte(formData, "moyen_paiement"),
+    commentaire_salarie: texte(formData, "commentaire_salarie"),
+    description: texte(formData, "commentaire_salarie"),
+    type_document_principal: typeDocument,
+  }).eq("id", noteId).eq("entreprise_id", ctx.entrepriseId);
+  if (updateError) erreur(updateError.message, noteId);
+  await ajouterAudit(supabase, {
+    entrepriseId: ctx.entrepriseId,
+    action: "informations_modifiees",
+    ressourceType: "note_frais",
+    ressourceId: noteId,
+    ancienStatut: avant.statut,
+    nouveauStatut: avant.statut,
+  });
+  revalidatePath(`/notes-frais/${noteId}`);
+  revalidatePath("/notes-frais");
+  redirect(`/notes-frais/${noteId}?succes=${encodeURIComponent("Informations enregistrées")}`);
+}
+
+export async function transitionNoteFraisAction(noteId: string, nouveauStatut: string, formData?: FormData) {
+  verifierAuthentification();
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const message = formData ? texte(formData, "message") : null;
+  const { data: avant } = await supabase.from("notes_frais").select("statut").eq("id", noteId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+  if (!avant) erreur("Dépense inaccessible", noteId);
+  const { error: transitionError } = await supabase.rpc("transition_note_frais", {
+    p_note_id: noteId,
+    p_nouveau_statut: nouveauStatut,
+    p_message: message,
+  });
+  if (transitionError) erreur(transitionError.message, noteId);
+  await ajouterAudit(supabase, {
+    entrepriseId: ctx.entrepriseId,
+    action: nouveauStatut === "correction_demandee" ? "correction_demandee" : nouveauStatut,
+    ressourceType: "note_frais",
+    ressourceId: noteId,
+    ancienStatut: avant.statut,
+    nouveauStatut,
+    metadata: message ? { message } : {},
+  });
+  revalidatePath(`/notes-frais/${noteId}`);
+  revalidatePath("/notes-frais");
+  redirect(`/notes-frais/${noteId}?succes=${encodeURIComponent("Statut mis à jour")}`);
+}
+
+export async function enregistrerReferenceComptableAction(noteId: string, formData: FormData) {
+  verifierAuthentification();
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const permissions = await permissionsUtilisateur(ctx);
+  if (!permissions?.includes("comptabiliser_notes_frais")) erreur("Autorisation comptable requise", noteId);
+  const { error: rpcError } = await supabase.rpc("modifier_reference_comptable_note_frais", {
+    p_note_id: noteId,
+    p_reference: texte(formData, "reference_comptable"),
+  });
+  if (rpcError) erreur(rpcError.message, noteId);
+  await ajouterAudit(supabase, {
+    entrepriseId: ctx.entrepriseId,
+    action: "reference_comptable_modifiee",
+    ressourceType: "note_frais",
+    ressourceId: noteId,
+  });
+  revalidatePath(`/notes-frais/${noteId}`);
+}
+
+// Compatibilité avec l'ancienne interface pendant la migration visuelle.
+export async function changerStatutNoteFraisAction(id: string, statut: string) {
+  const correspondance: Record<string, string> = { soumise: "soumis", validee: "valide", refusee: "refuse", remboursee: "valide" };
+  return transitionNoteFraisAction(id, correspondance[statut] ?? statut);
 }
 
 export async function supprimerNoteFraisAction(id: string) {
+  verifierAuthentification();
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  if (isEmailLoginDisabled()) redirect(`/notes-frais?error=${encodeURIComponent("Gestion indisponible sans compte sécurisé")}`);
-  const permissions = await permissionsUtilisateur(ctx);
-  if (permissions !== null && (!permissions.includes("gerer_notes_frais") || !permissions.includes("voir_indicateurs_financiers"))) {
-    redirect(`/notes-frais?error=${encodeURIComponent("Vous ne pouvez pas supprimer cette note de frais")}`);
-  }
-  const { data: note } = await supabase.from("notes_frais").select("justificatif_storage_path").eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
-  if (note?.justificatif_storage_path) await supabase.storage.from("notes-frais").remove([note.justificatif_storage_path]);
-  await supabase.from("notes_frais").delete().eq("id", id).eq("entreprise_id", ctx.entrepriseId);
+  const { data: note } = await supabase.from("notes_frais").select("statut").eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+  if (!note || note.statut !== "brouillon") erreur("Seul un brouillon sans archive peut être supprimé", id);
+  const { count } = await supabase.from("documents_notes_frais").select("id", { count: "exact", head: true }).eq("note_frais_id", id);
+  if (count) erreur("Retirez ce brouillon de la liste sans supprimer son historique documentaire", id);
+  const { error: deleteError } = await supabase.from("notes_frais").delete().eq("id", id).eq("entreprise_id", ctx.entrepriseId);
+  if (deleteError) erreur(deleteError.message, id);
   revalidatePath("/notes-frais");
+  redirect("/notes-frais");
 }

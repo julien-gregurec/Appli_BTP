@@ -4,11 +4,12 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { ancienneteEmploye, contratEmployeLabel, formatDateFr, formatEuro, nomEmploye, statutEmploye } from "@/lib/employes";
 import { StatutEmployeSelect } from "@/components/StatutEmployeSelect";
-import { importerCarteBtpAction, supprimerCarteBtpAction } from "@/app/actions/employes";
+import { changerStatutCompteApplicationAction, definirCodeStockEmployeAction, importerCarteBtpAction, supprimerCarteBtpAction } from "@/app/actions/employes";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import Image from "next/image";
 import { InvitationEmploye } from "@/components/InvitationEmploye";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
+import { IdentificationCodeCard } from "@/components/IdentificationCodeCard";
 
 export default async function EmployeDetailPage({ params,searchParams }: { params: Promise<{ id: string }>;searchParams:Promise<{error?:string;success?:string}> }) {
   const { id } = await params;
@@ -24,6 +25,8 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
     .single();
 
   if (!employe) notFound();
+
+  const { data: codeIdentification } = await supabase.from("codes_identification").select("id,code").eq("entreprise_id", ctx.entrepriseId).eq("type_ressource", "employe").eq("ressource_id", id).eq("actif", true).maybeSingle();
 
   const { data: chantiers } = await supabase
     .from("chantiers")
@@ -87,7 +90,17 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
             <p className="text-sm text-neutral-500">La fiche, le poste et ses autorisations sont préparés avant que l’employé crée son compte.</p>
           </div>
           {employe.numero_inscription ? <InvitationEmploye employeId={employe.id} numero={employe.numero_inscription} nom={nomEmploye(employe)} email={employe.email} compteActif={Boolean(employe.utilisateur_id)} inscriptionsActives={!isEmailLoginDisabled()} invitationEnvoyeeAt={employe.invitation_envoyee_at} premiereConnexionAt={employe.premiere_connexion_at} derniereConnexionAt={employe.derniere_connexion_at} applicationInstalleeAt={employe.application_installee_at} /> : <p className="text-sm text-red-700">La migration des numéros d’inscription doit être appliquée.</p>}
+          {employe.utilisateur_id&&<div className="rounded-md border bg-white p-3"><p className="text-sm"><strong>État du compte :</strong> {employe.compte_application_statut?.replaceAll("_"," ")??"actif"}</p><p className="mt-1 text-xs text-neutral-500">Un compte en pause ne peut plus entrer dans l’entreprise, mais reste facturé pour le mois. La fermeture conserve l’historique.</p><div className="mt-3 flex flex-wrap gap-2">{employe.compte_application_statut!=="actif"&&<form action={changerStatutCompteApplicationAction.bind(null,id,"actif")}><button className="rounded bg-green-700 px-3 py-2 text-sm text-white">Réactiver</button></form>}{employe.compte_application_statut!=="pause"&&<form action={changerStatutCompteApplicationAction.bind(null,id,"pause")}><button className="rounded border px-3 py-2 text-sm">Mettre en pause</button></form>}{employe.compte_application_statut!=="ferme"&&<form action={changerStatutCompteApplicationAction.bind(null,id,"ferme")}><ConfirmSubmitButton message="Fermer l’accès de ce compte ? Le mois entamé restera facturé." className="rounded border border-red-400 px-3 py-2 text-sm text-red-700">Fermer le compte</ConfirmSubmitButton></form>}</div></div>}
         </section>
+
+        <section className="space-y-4 rounded-md border p-4 dark:border-neutral-800">
+          <div><h2 className="font-semibold">Identification stock et QR employé</h2><p className="text-sm text-neutral-500">Le code secret permet d’attribuer chaque entrée ou sortie à cette personne. Il n’est jamais affiché ni conservé en clair.</p></div>
+          <div className="flex items-center gap-2 text-sm"><span className={`h-2.5 w-2.5 rounded-full ${employe.code_stock_active ? "bg-green-600" : "bg-neutral-300"}`} /><strong>{employe.code_stock_active ? "Code personnel actif" : "Aucun code personnel actif"}</strong></div>
+          <form action={definirCodeStockEmployeAction.bind(null, id)} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]"><input name="code_stock" type="password" inputMode="numeric" pattern="[0-9]{4,8}" placeholder="Nouveau code (4 à 8 chiffres)" required className="rounded border px-3 py-2 text-sm"/><input name="code_stock_confirmation" type="password" inputMode="numeric" pattern="[0-9]{4,8}" placeholder="Confirmer le code" required className="rounded border px-3 py-2 text-sm"/><button className="rounded bg-[#0d1b2a] px-3 py-2 text-sm text-white">Définir le code</button></form>
+          {employe.code_stock_active && <form action={definirCodeStockEmployeAction.bind(null, id)}><input type="hidden" name="intention" value="desactiver"/><ConfirmSubmitButton message="Désactiver le code de stock de cet employé ?" className="text-sm text-red-700">Désactiver le code personnel</ConfirmSubmitButton></form>}
+        </section>
+
+        {codeIdentification && <IdentificationCodeCard id={codeIdentification.id} code={codeIdentification.code} label="QR code de la fiche employé" />}
 
         <section className="space-y-4 rounded-md border border-[#c9a24a]/50 bg-[#c9a24a]/5 p-4">
           <div className="flex flex-wrap items-start justify-between gap-2"><div><h2 className="font-semibold">Carte professionnelle BTP</h2><p className="text-sm text-neutral-500">Copie numérique privée à présenter rapidement en cas de contrôle. Le document original reste la référence officielle.</p></div><Link href={`/employes/${id}/carte`} className="rounded-md border border-[#0d1b2a] px-3 py-1.5 text-sm font-medium">Badge & habilitations →</Link></div>

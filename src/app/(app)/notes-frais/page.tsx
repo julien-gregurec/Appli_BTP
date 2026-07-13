@@ -1,152 +1,63 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { euros } from "@/lib/devis";
-import { CATEGORIES_FRAIS, statutNoteFrais, NOTE_FRAIS_STATUTS } from "@/lib/notes-frais";
-import { creerNoteFraisAction, changerStatutNoteFraisAction, supprimerNoteFraisAction } from "@/app/actions/notes-frais";
-import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
+import { TYPES_JUSTIFICATIF, statutNoteFrais } from "@/lib/notes-frais";
+import { creerNoteFraisAction } from "@/app/actions/notes-frais";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 
-const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
+const input = "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
-export default async function NotesFraisPage({ searchParams }: { searchParams: Promise<{ error?: string; succes?: string }> }) {
-  const msg = await searchParams;
+export default async function NotesFraisPage({ searchParams }: { searchParams: Promise<{ error?: string; statut?: string; categorie?: string }> }) {
+  const filtres = await searchParams;
   const ctx = await getContexteEntreprise();
-  const sb = await createClient();
-  const permissions = await permissionsUtilisateur(ctx);
+  const supabase = await createClient();
   const prototype = isEmailLoginDisabled();
-  const peutVoirEquipe = permissions !== null && permissions.includes("gerer_notes_frais") && permissions.includes("voir_indicateurs_financiers");
-  const peutGerer = peutVoirEquipe;
+  const permissions = await permissionsUtilisateur(ctx);
+  const peutExporter = permissions?.includes("exporter_notes_frais") ?? false;
+  const peutAdministrer = permissions?.includes("administrer_archivage_notes_frais") ?? false;
+  if (prototype) return <main className="p-8"><div className="mx-auto max-w-4xl space-y-4"><h1 className="text-xl font-semibold">Notes de frais et justificatifs</h1><p className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"><strong>Module sécurisé fermé en mode prototype.</strong><br />Les justificatifs personnels exigent une identité individuelle. Ils deviendront accessibles après l’activation des comptes sécurisés et de la RLS de production.</p></div></main>;
 
-  const requeteEmployes = prototype
-    ? Promise.resolve({ data: [] })
-    : sb.from("employes").select("id, prenom, nom").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif").eq("utilisateur_id", ctx.userId).order("nom");
-  const [{ data: employes }, { data: chantiers }] = await Promise.all([
-    requeteEmployes,
-    prototype ? Promise.resolve({ data: [] }) : sb.from("chantiers").select("id,nom").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(archive,annule)").order("nom"),
+  const [{ data: employe }, { data: categories }, { data: chantiers }] = await Promise.all([
+    supabase.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("utilisateur_id", ctx.userId).maybeSingle(),
+    supabase.from("categories_notes_frais").select("code,libelle").eq("entreprise_id", ctx.entrepriseId).eq("actif", true).order("ordre"),
+    supabase.from("chantiers").select("id,nom").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(archive,annule)").order("nom"),
   ]);
-
-  const un = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? v[0] ?? null : v);
-  const employePersonnel = !prototype ? employes?.[0] ?? null : null;
-  const { data: notes } = prototype
-    ? { data: [] }
-    : employePersonnel || peutVoirEquipe
-      ? await (() => {
-          let requete = sb.from("notes_frais").select("id, date_frais, montant_ttc, categorie, description, statut, justificatif_storage_path, employe:employes(prenom, nom), chantier:chantiers!notes_frais_chantier_entreprise_fkey(nom)").eq("entreprise_id", ctx.entrepriseId).order("date_frais", { ascending: false }).limit(200);
-          if (!peutVoirEquipe && employePersonnel) requete = requete.eq("employe_id", employePersonnel.id);
-          return requete;
-        })()
-      : { data: [] };
+  let requete = supabase.from("notes_frais").select("id,reference,date_frais,montant_ttc,devise,categorie,fournisseur,statut,statut_export,verrouille_at,employe:employes(prenom,nom),chantier:chantiers!notes_frais_chantier_entreprise_fkey(nom)")
+    .eq("entreprise_id", ctx.entrepriseId).order("date_frais", { ascending: false }).limit(300);
+  if (filtres.statut) requete = requete.eq("statut", filtres.statut);
+  if (filtres.categorie) requete = requete.eq("categorie", filtres.categorie);
+  const { data: notes } = await requete;
   const liste = notes ?? [];
-  const aRembourser = liste.filter((n) => n.statut === "validee").reduce((s, n) => s + Number(n.montant_ttc), 0);
-  const enAttente = liste.filter((n) => n.statut === "soumise").length;
+  const un = <T,>(value: T | T[] | null): T | null => Array.isArray(value) ? value[0] ?? null : value;
 
-  return (
-    <main className="p-8">
-      <div className="mx-auto max-w-4xl space-y-6">
-        <div>
-          <h1 className="text-xl font-semibold">Notes de frais</h1>
-          <p className="text-sm text-neutral-500">Le salarié scanne son justificatif, la note arrive directement ici pour validation et remboursement.</p>
-        </div>
+  return <main className="p-8"><div className="mx-auto max-w-6xl space-y-6">
+    <div className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-xl font-semibold">Notes de frais et justificatifs</h1><p className="text-sm text-neutral-500">Création personnelle, validation, intégrité et transmission comptable.</p></div><div className="flex gap-2">{peutExporter && <Link href="/notes-frais/exports" className="rounded-md border px-3 py-2 text-sm font-medium">Exports comptables</Link>}{peutAdministrer && <Link href="/parametres/notes-frais" className="rounded-md border px-3 py-2 text-sm font-medium">Paramètres d’archivage</Link>}</div></div>
+    {filtres.error && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{filtres.error}</p>}
+    {!employe && <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">Votre compte doit être lié à une fiche employé active pour créer une dépense.</p>}
 
-        {msg.error && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{msg.error}</p>}
-        {msg.succes && <p className="rounded bg-green-50 p-3 text-sm text-green-700">Note de frais enregistrée.</p>}
-        {prototype && <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><strong>Confidentialité activée.</strong> Les notes personnelles sont masquées en mode prototype, car ce mode ne permet pas d’identifier l’utilisateur. Elles seront disponibles avec les comptes individuels sécurisés.</p>}
-        {!prototype && !employePersonnel && <p className="rounded bg-amber-50 p-3 text-sm text-amber-800">Votre compte doit être lié à une fiche employé active avant de pouvoir envoyer une note de frais.</p>}
+    <section className="rounded-lg border p-4"><h2 className="font-semibold">Nouvelle dépense</h2><p className="mt-1 text-xs text-neutral-500">Le brouillon sera créé d’abord. Vous pourrez ensuite photographier ou importer plusieurs pages.</p>
+      <form action={creerNoteFraisAction} className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <label className="text-xs text-neutral-500">Date du justificatif<input name="date_frais" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} className={`${input} mt-1`} /></label>
+        <label className="text-xs text-neutral-500">Fournisseur / commerçant<input name="fournisseur" placeholder="Nom du fournisseur" className={`${input} mt-1`} /></label>
+        <label className="text-xs text-neutral-500">Catégorie<select name="categorie" className={`${input} mt-1`}>{(categories ?? []).map((c) => <option key={c.code} value={c.code}>{c.libelle}</option>)}</select></label>
+        <label className="text-xs text-neutral-500">Type de justificatif<select name="type_document_principal" className={`${input} mt-1`}>{TYPES_JUSTIFICATIF.map((t) => <option key={t.cle} value={t.cle}>{t.libelle}</option>)}</select></label>
+        <label className="text-xs text-neutral-500">Montant HT<input name="montant_ht" type="number" min="0" step="0.01" className={`${input} mt-1`} /></label>
+        <label className="text-xs text-neutral-500">TVA<input name="montant_tva" type="number" min="0" step="0.01" className={`${input} mt-1`} /></label>
+        <label className="text-xs text-neutral-500">Montant TTC<input name="montant_ttc" type="number" min="0" step="0.01" required className={`${input} mt-1`} /></label>
+        <label className="text-xs text-neutral-500">Taux TVA<select name="taux_tva" className={`${input} mt-1`}><option value="">Non renseigné</option><option value="0">0 %</option><option value="5.5">5,5 %</option><option value="10">10 %</option><option value="20">20 %</option></select></label>
+        <label className="text-xs text-neutral-500">Chantier<select name="chantier_id" className={`${input} mt-1`}><option value="">Frais généraux</option>{(chantiers ?? []).map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}</select></label>
+        <label className="text-xs text-neutral-500">Moyen de paiement<select name="moyen_paiement" className={`${input} mt-1`}><option value="">Non renseigné</option><option value="carte_entreprise">Carte entreprise</option><option value="carte_personnelle">Carte personnelle</option><option value="especes">Espèces</option><option value="virement">Virement</option><option value="autre">Autre</option></select></label>
+        <label className="text-xs text-neutral-500">Devise<select name="devise" className={`${input} mt-1`}><option value="EUR">EUR</option><option value="CHF">CHF</option><option value="GBP">GBP</option><option value="USD">USD</option></select></label>
+        <label className="text-xs text-neutral-500 sm:col-span-2 lg:col-span-4">Commentaire<textarea name="commentaire_salarie" rows={2} className={`${input} mt-1`} /></label>
+        <button disabled={!employe} className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40 sm:col-span-2 lg:col-span-4">Créer le brouillon et ajouter le justificatif</button>
+      </form>
+    </section>
 
-        {!prototype && <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-          <div className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800"><div className="text-xs uppercase text-neutral-500">{peutVoirEquipe ? "Notes à traiter" : "Mes notes en attente"}</div><div className="mt-1 text-2xl font-semibold">{enAttente}</div></div>
-          <div className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800"><div className="text-xs uppercase text-neutral-500">{peutVoirEquipe ? "À rembourser" : "À me rembourser"}</div><div className="mt-1 text-2xl font-semibold">{euros(aRembourser)}</div></div>
-        </div>}
+    <form method="get" className="flex flex-wrap gap-2 rounded-lg border p-3"><select name="statut" defaultValue={filtres.statut ?? ""} className="rounded-md border px-3 py-2 text-sm"><option value="">Tous les statuts</option>{["brouillon","soumis","en_verification","correction_demandee","valide","refuse","exporte_comptabilite","verrouille","archive"].map((s) => <option key={s} value={s}>{statutNoteFrais(s).libelle}</option>)}</select><select name="categorie" defaultValue={filtres.categorie ?? ""} className="rounded-md border px-3 py-2 text-sm"><option value="">Toutes les catégories</option>{(categories ?? []).map((c) => <option key={c.code} value={c.code}>{c.libelle}</option>)}</select><button className="rounded-md border px-3 py-2 text-sm">Filtrer</button></form>
 
-        {!prototype && <form action={creerNoteFraisAction} className="space-y-3 rounded-md border border-dashed border-neutral-300 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
-          <div className="text-sm font-medium">Nouvelle note de frais</div>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-            <label className="text-xs text-neutral-500">Salarié
-                <input type="hidden" name="employe_id" value={employePersonnel?.id ?? ""} />
-                <span className="mt-1 block rounded-md border border-neutral-200 bg-white px-2 py-2 text-sm font-medium text-neutral-800 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200">
-                  {employePersonnel ? `${employePersonnel.prenom} ${employePersonnel.nom}` : "Fiche employé non liée"}
-                </span>
-            </label>
-            <label className="text-xs text-neutral-500">Date
-              <input name="date_frais" type="date" defaultValue={new Date().toISOString().slice(0, 10)} className={input + " mt-1 w-full"} />
-            </label>
-            <label className="text-xs text-neutral-500">Montant TTC (€)
-              <input name="montant_ttc" type="number" step="0.01" min="0" required className={input + " mt-1 w-full"} />
-            </label>
-            <label className="text-xs text-neutral-500">Catégorie
-              <select name="categorie" className={input + " mt-1 w-full"}>
-                {CATEGORIES_FRAIS.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </label>
-            <label className="text-xs text-neutral-500 md:col-span-2">Chantier
-              <select name="chantier_id" className={input + " mt-1 w-full"}>
-                <option value="">Aucun chantier / frais généraux</option>
-                {(chantiers ?? []).map((chantier) => <option key={chantier.id} value={chantier.id}>{chantier.nom}</option>)}
-              </select>
-            </label>
-            <label className="text-xs text-neutral-500 md:col-span-2">Description
-              <input name="description" placeholder="Restaurant chantier Kléber…" className={input + " mt-1 w-full"} />
-            </label>
-            <label className="text-xs text-neutral-500 md:col-span-3">Justificatif (photo ou PDF)
-              <input name="justificatif" type="file" accept="application/pdf,image/png,image/jpeg,image/webp" capture="environment" className="mt-1 block w-full rounded border px-3 py-2 text-sm" />
-            </label>
-          </div>
-          <button type="submit" disabled={!prototype && !employePersonnel} className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900">Envoyer ma note de frais</button>
-        </form>}
-
-        {!prototype && <div className="overflow-x-auto rounded-md border border-neutral-200 dark:border-neutral-800">
-          <table className="w-full text-sm">
-            <thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500 dark:bg-neutral-900">
-              <tr>
-                <th className="px-3 py-2 font-medium">Date</th>
-                <th className="px-3 py-2 font-medium">Salarié</th>
-                <th className="px-3 py-2 font-medium">Catégorie</th>
-                <th className="px-3 py-2 font-medium">Chantier</th>
-                <th className="px-3 py-2 text-right font-medium">Montant</th>
-                <th className="px-3 py-2 font-medium">Justif.</th>
-                <th className="px-3 py-2 font-medium">Statut</th>
-                <th className="px-3 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {liste.map((n) => {
-                const emp = un(n.employe as { prenom: string; nom: string } | { prenom: string; nom: string }[] | null);
-                const chantier = un(n.chantier as { nom: string } | { nom: string }[] | null);
-                const st = statutNoteFrais(n.statut);
-                return (
-                  <tr key={n.id} className="border-t border-neutral-100 align-top dark:border-neutral-800">
-                    <td className="px-3 py-2 text-neutral-500">{n.date_frais}</td>
-                    <td className="px-3 py-2">{emp ? `${emp.prenom} ${emp.nom}` : "—"}</td>
-                    <td className="px-3 py-2">{n.categorie ?? "—"}{n.description && <div className="text-xs text-neutral-400">{n.description}</div>}</td>
-                    <td className="px-3 py-2 text-xs text-neutral-500">{chantier?.nom ?? "Frais généraux"}</td>
-                    <td className="px-3 py-2 text-right font-mono">{euros(n.montant_ttc)}</td>
-                    <td className="px-3 py-2">{n.justificatif_storage_path ? <a href={`/api/notes-frais/${n.id}/justificatif`} target="_blank" rel="noopener" className="text-xs underline">Voir</a> : <span className="text-xs text-neutral-400">—</span>}</td>
-                    <td className="px-3 py-2">
-                      <span className="inline-flex items-center gap-1.5 text-xs"><span className="h-2 w-2 rounded-full" style={{ background: st.couleur }} />{st.libelle}</span>
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      {peutGerer && <div className="flex flex-wrap justify-end gap-1">
-                        {NOTE_FRAIS_STATUTS.filter((s) => s.cle !== n.statut).map((s) => (
-                          <form key={s.cle} action={changerStatutNoteFraisAction.bind(null, n.id, s.cle)}>
-                            <button className="rounded border px-2 py-0.5 text-[11px] hover:bg-neutral-50 dark:border-neutral-700">{s.libelle}</button>
-                          </form>
-                        ))}
-                        <form action={supprimerNoteFraisAction.bind(null, n.id)}>
-                          <ConfirmSubmitButton message="Supprimer cette note de frais ?" className="rounded border border-red-200 px-2 py-0.5 text-[11px] text-red-600">×</ConfirmSubmitButton>
-                        </form>
-                      </div>}
-                    </td>
-                  </tr>
-                );
-              })}
-              {liste.length === 0 && (
-                <tr><td colSpan={8} className="px-3 py-6 text-center text-sm text-neutral-500">Aucune note de frais pour l&apos;instant.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>}
-      </div>
-    </main>
-  );
+    <div className="grid gap-3 md:hidden">{liste.map((n) => { const st = statutNoteFrais(n.statut); const emp = un(n.employe as {prenom:string;nom:string}|{prenom:string;nom:string}[]|null); const chantier = un(n.chantier as {nom:string}|{nom:string}[]|null); return <Link key={n.id} href={`/notes-frais/${n.id}`} className="rounded-lg border p-4"><div className="flex justify-between gap-3"><strong>{n.reference}</strong><span className="text-xs" style={{color:st.couleur}}>{st.libelle}</span></div><p className="mt-2 text-sm">{n.fournisseur ?? "Sans fournisseur"} · {euros(n.montant_ttc)}</p><p className="mt-1 text-xs text-neutral-500">{n.date_frais} · {emp ? `${emp.prenom} ${emp.nom}` : "—"} · {chantier?.nom ?? "Frais généraux"}</p>{n.verrouille_at && <span className="mt-2 inline-block rounded-full bg-neutral-900 px-2 py-1 text-[10px] text-white">Document verrouillé</span>}</Link>; })}</div>
+    <div className="hidden overflow-x-auto rounded-lg border md:block"><table className="w-full text-sm"><thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500"><tr><th className="px-3 py-2">Référence</th><th className="px-3 py-2">Date</th><th className="px-3 py-2">Salarié</th><th className="px-3 py-2">Fournisseur</th><th className="px-3 py-2">Chantier</th><th className="px-3 py-2 text-right">TTC</th><th className="px-3 py-2">Statut</th></tr></thead><tbody>{liste.map((n) => { const st = statutNoteFrais(n.statut); const emp = un(n.employe as {prenom:string;nom:string}|{prenom:string;nom:string}[]|null); const chantier = un(n.chantier as {nom:string}|{nom:string}[]|null); return <tr key={n.id} className="border-t"><td className="px-3 py-2"><Link href={`/notes-frais/${n.id}`} className="font-mono font-semibold hover:underline">{n.reference}</Link></td><td className="px-3 py-2">{n.date_frais}</td><td className="px-3 py-2">{emp ? `${emp.prenom} ${emp.nom}` : "—"}</td><td className="px-3 py-2">{n.fournisseur ?? "—"}</td><td className="px-3 py-2">{chantier?.nom ?? "Frais généraux"}</td><td className="px-3 py-2 text-right font-mono">{euros(n.montant_ttc)}</td><td className="px-3 py-2"><span style={{color:st.couleur}}>{st.libelle}</span>{n.verrouille_at && " 🔒"}</td></tr>; })}{!liste.length && <tr><td colSpan={7} className="p-8 text-center text-neutral-500">Aucune dépense accessible.</td></tr>}</tbody></table></div>
+  </div></main>;
 }

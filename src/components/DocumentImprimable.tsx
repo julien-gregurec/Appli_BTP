@@ -14,6 +14,11 @@ export type EntrepriseEntete = {
   taux_penalites_retard?: number | null;
   texte_entete?: string | null;
   texte_pied_page?: string | null;
+  police_documents?: "arial" | "georgia" | "trebuchet" | "verdana" | null;
+  taille_police_documents?: number | null;
+  logo_largeur_documents?: number | null;
+  couleur_documents?: string | null;
+  mise_en_page_documents?: "classique" | "compacte" | "epuree" | null;
 };
 
 export type ClientEntete = {
@@ -62,6 +67,11 @@ export function DocumentImprimable({
   notesClient?: string | null;
   estFacture: boolean;
 }) {
+  const polices={arial:"Arial, Helvetica, sans-serif",georgia:"Georgia, 'Times New Roman', serif",trebuchet:"'Trebuchet MS', Arial, sans-serif",verdana:"Verdana, Geneva, sans-serif"};
+  const police=polices[entreprise.police_documents??"arial"]??polices.arial;
+  const couleur=/^#[0-9a-f]{6}$/i.test(entreprise.couleur_documents??"")?entreprise.couleur_documents!:"#0d1b2a";
+  const compacte=entreprise.mise_en_page_documents==="compacte";
+  const epuree=entreprise.mise_en_page_documents==="epuree";
   const adresseEntreprise = [entreprise.adresse, [entreprise.code_postal, entreprise.ville].filter(Boolean).join(" ")]
     .filter(Boolean)
     .join(" · ");
@@ -74,10 +84,10 @@ export function DocumentImprimable({
       style={{
         maxWidth: "800px",
         margin: "0 auto",
-        padding: "32px",
-        fontFamily: "Arial, Helvetica, sans-serif",
-        color: "#0d1b2a",
-        fontSize: "13px",
+        padding: compacte ? "20px" : "32px",
+        fontFamily: police,
+        color: couleur,
+        fontSize: `${entreprise.taille_police_documents??13}px`,
         lineHeight: 1.5,
         background: "#fff",
       }}
@@ -86,7 +96,7 @@ export function DocumentImprimable({
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", maxWidth: "62%" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={entreprise.logo_url || "/liria-concept-logo.png"} alt="Logo LIRIA CONCEPT" style={{ width: "105px", height: "64px", objectFit: "contain" }} />
+          <img src={entreprise.logo_url || "/liria-concept-logo.png"} alt="Logo LIRIA CONCEPT" style={{ width: `${entreprise.logo_largeur_documents??105}px`, height: "64px", objectFit: "contain" }} />
           <div>
           <div style={{ fontSize: "18px", fontWeight: 700, letterSpacing: "0.04em" }}>{entreprise.nom}</div>
           {entreprise.raison_sociale && entreprise.raison_sociale !== entreprise.nom && <div style={{ color: "#555" }}>{entreprise.raison_sociale}</div>}
@@ -96,14 +106,14 @@ export function DocumentImprimable({
           </div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: "22px", fontWeight: 700, textTransform: "uppercase", color: "#0d1b2a" }}>{typeDoc}</div>
+          <div style={{ fontSize: "22px", fontWeight: 700, textTransform: "uppercase", color: couleur }}>{typeDoc}</div>
           <div style={{ fontFamily: "monospace", fontSize: "15px" }}>{numero}</div>
           <div style={{ color: "#555", marginTop: "4px" }}>Émis le {dateEmission}</div>
           {dateSecondaire && <div style={{ color: "#555" }}>{dateSecondaire.label} {dateSecondaire.valeur}</div>}
         </div>
       </div>
 
-      <hr style={{ border: "none", borderTop: "3px solid #c9a24a", margin: "12px 0 20px" }} />
+      <hr style={{ border: "none", borderTop: epuree ? `1px solid ${couleur}` : "3px solid #c9a24a", margin: compacte ? "8px 0 12px" : "12px 0 20px" }} />
 
       {/* Client */}
       <div style={{ marginBottom: "20px" }}>
@@ -118,7 +128,7 @@ export function DocumentImprimable({
       {/* Lignes */}
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
         <thead>
-          <tr style={{ background: "#0d1b2a", color: "#fff", textAlign: "left" }}>
+          <tr style={{ background: couleur, color: "#fff", textAlign: "left" }}>
             <th style={{ padding: "8px", fontSize: "10px", textTransform: "uppercase" }}>Désignation</th>
             <th style={{ padding: "8px", fontSize: "10px", textTransform: "uppercase", textAlign: "right" }}>Qté</th>
             <th style={{ padding: "8px", fontSize: "10px", textTransform: "uppercase", textAlign: "right" }}>PU HT</th>

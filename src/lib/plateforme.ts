@@ -33,10 +33,14 @@ export type EntrepriseAbonnement = {
   nb_membres_actifs: number;
   nb_fiches_employes?: number;
   nb_comptes_actives?: number;
+  nb_comptes_pause?: number;
+  nb_comptes_facturables?: number;
   nb_invitations_envoyees?: number;
   nb_applications_installees?: number;
   nb_connectes_30j?: number;
   derniere_connexion?: string | null;
   options_actives?: string[];
+  estimation_mensuelle_ht?: number;
+  detail_comptes?: Array<{poste:string;comptes:number;tarif_unitaire:number;total:number}>;
   created_at: string;
 };

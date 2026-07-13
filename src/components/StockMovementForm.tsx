@@ -22,6 +22,7 @@ export function StockMovementForm({ articles, chantiers }: { articles: Article[]
   const [id, setId] = useState(articles[0]?.id ?? "");
   const [scan, setScan] = useState("");
   const [message, setMessage] = useState("");
+  const [typeMouvement, setTypeMouvement] = useState("entree");
   const [cameraOuverte, setCameraOuverte] = useState(false);
   const [cameraErreur, setCameraErreur] = useState("");
   const [cameraPrete, setCameraPrete] = useState(false);
@@ -152,7 +153,7 @@ export function StockMovementForm({ articles, chantiers }: { articles: Article[]
           <select name="article_id" required value={id} onChange={(event) => setId(event.target.value)} className={input}>
             {articles.map((item) => <option key={item.id} value={item.id}>{item.reference} · {item.designation} ({item.quantite_stock} {item.unite})</option>)}
           </select>
-          <select name="type" className={input}>
+          <select name="type" value={typeMouvement} onChange={(event) => setTypeMouvement(event.target.value)} className={input}>
             <option value="entree">Entrée</option><option value="sortie">Sortie chantier</option><option value="ajustement_plus">Ajustement +</option><option value="ajustement_moins">Ajustement -</option>
           </select>
           <select name="teinte_id" className={input}>
@@ -160,7 +161,7 @@ export function StockMovementForm({ articles, chantiers }: { articles: Article[]
           </select>
           <input name="quantite" type="number" min="0.01" step="0.01" required placeholder="Quantité" className={input} />
           <input name="date" type="date" defaultValue={new Date().toISOString().slice(0, 10)} className={input} />
-          <select name="chantier_id" className={input}><option value="">Sans chantier</option>{chantiers.map((chantier) => <option key={chantier.id} value={chantier.id}>{chantier.nom}</option>)}</select>
+          <select name="chantier_id" required={typeMouvement === "sortie"} className={input}><option value="">{typeMouvement === "sortie" ? "Chantier obligatoire" : "Sans chantier"}</option>{chantiers.map((chantier) => <option key={chantier.id} value={chantier.id}>{chantier.nom}</option>)}</select>
           <input name="motif" placeholder="Motif / bon de livraison" className={`${input} col-span-2`} />
         </div>
         <button className="rounded-md bg-neutral-900 px-3 py-2 text-sm text-white">Enregistrer le mouvement</button>

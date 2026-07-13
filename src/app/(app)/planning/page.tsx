@@ -15,6 +15,7 @@ type A = {
   chantier: { id: string; nom: string } | { id: string; nom: string }[] | null;
   employe: { id: string; prenom: string; nom: string } | { id: string; prenom: string; nom: string }[] | null;
 };
+type P={date:string;heures_normales:number;heures_supplementaires:number;verification_statut:string;employe_id:string;chantier_id:string|null};
 const un = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? v[0] ?? null : v);
 const iso = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(d);
 function lundi(reference?: string) {
@@ -48,13 +49,16 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
   const ctx = await getContexteEntreprise();
   const sb = await createClient();
 
-  const [{ data: chantiers }, { data: employes }, { data: affectationsData }] = await Promise.all([
+  const [{ data: chantiers }, { data: employes }, { data: affectationsData }, {data:pointagesData}] = await Promise.all([
     sb.from("chantiers").select("id,nom").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(archive,annule)").order("nom"),
     sb.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif").order("nom"),
     sb.from("affectations").select("id,date,heures,tache,type_activite,lieu_activite,chantier:chantiers(id,nom),employe:employes(id,prenom,nom)").eq("entreprise_id", ctx.entrepriseId).gte("date", iso(debut)).lte("date", iso(fin)).order("date"),
+    sb.from("pointages").select("date,heures_normales,heures_supplementaires,verification_statut,employe_id,chantier_id").eq("entreprise_id",ctx.entrepriseId).gte("date",iso(debut)).lte("date",iso(fin)).eq("verification_statut","valide"),
   ]);
 
   const affectations = (affectationsData ?? []) as A[];
+  const pointages=(pointagesData??[]) as P[];
+  const heuresRealisees=(employeId:string,date:string,chantierId?:string|null)=>pointages.filter(p=>p.employe_id===employeId&&p.date===date&&(!chantierId||p.chantier_id===chantierId)).reduce((s,p)=>s+Number(p.heures_normales)+Number(p.heures_supplementaires),0);
   // Couleur stable par chantier.
   const chantiersIds = [...new Set(affectations.map((a) => un(a.chantier)?.id).filter(Boolean) as string[])];
   const couleur = (id: string) => couleurs[Math.max(0, chantiersIds.indexOf(id)) % couleurs.length];
@@ -136,7 +140,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
                                 <div className="font-medium leading-tight text-neutral-900">{libelleAffectation(a)}</div>
                                 {a.lieu_activite && <div className="text-[11px] text-neutral-600">{a.lieu_activite}</div>}
                                 {a.tache && <div className="text-[11px] text-neutral-600">{a.tache}</div>}
-                                <div className="font-mono text-[11px] text-neutral-700">{a.heures} h</div>
+                                <div className="font-mono text-[11px] text-neutral-700">Prévu {a.heures} h{heuresRealisees(e.id,a.date,ch?.id)>0&&<span className="ml-1 font-semibold text-green-700">· validé {heuresRealisees(e.id,a.date,ch?.id)} h</span>}</div>
                                 <form action={supprimerGroupeAffectationsAction} className="absolute right-0.5 top-0.5">
                                   <input type="hidden" name="retour" value={iso(debut)} />
                                   <input type="hidden" name="ids" value={a.id} />

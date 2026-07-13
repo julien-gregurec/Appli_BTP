@@ -1,5 +1,26 @@
 # Relais pour ChatGPT — « Liria Gestion Pro »
 
+## 00. REPRISE CODEX — 13 juillet 2026, archivage/frais + modules complémentaires (CODE LOCAL PRÊT, MIGRATIONS 57–69 NON APPLIQUÉES)
+
+Cette section est l’état le plus récent et prime sur les sections historiques ci-dessous.
+
+- Un module complet de justificatifs et notes de frais a été développé avec stockage privé, contrôle MIME réel, fichiers originaux non recompressés, SHA-256, versions, mode simple/renforcé non qualifié, horodatage serveur non qualifié, journal d’audit append-only chaîné, workflow salarié/responsable/comptable/admin, legal hold, doublons, téléchargement avec vérification d’intégrité et export ZIP (CSV, originaux, historique, manifeste et empreintes).
+- Migrations `57` à `61` : socle dépenses, audit/exports, permissions/workflow, intégrité/storage et exports sécurisés. Code sous `src/lib/expenses/`, API sous `src/app/api/notes-frais/`, écrans `/notes-frais`, `/notes-frais/[id]`, `/notes-frais/exports`, `/parametres/notes-frais`. Documentation : `docs/ARCHIVAGE_JUSTIFICATIFS.md`.
+- Migration `62` + `/conges` : demandes personnelles, correction/refus/validation et création automatique d’affectations planning en semaine.
+- Migration `63` : état des comptes actif/pause/fermé, facturation mensuelle par poste, comptes en pause facturables pour le mois, création d’entreprise depuis `/plateforme`, tarifs par poste et snapshot mensuel. Le snapshot d’une première activation est fait après la transition pour ne pas perdre le mois.
+- Migration `64` : personnalisation rare des devis/factures (police, taille, couleur, largeur logo, mise en page) dans Paramètres et `DocumentImprimable`.
+- Migration `65` : liaison pointage ↔ affectation, heures planifiées/validées dans planning et chantiers, validation/refus. Le reliquat de l’ancienne obligation de photo est retiré : le GPS/date/heure serveur reste obligatoire.
+- Migration `66` + `/mes-travaux` : devis chantier expurgé de tous les prix/totaux pour les ouvriers affectés, via RPC SECURITY DEFINER qui ne renvoie que les tâches utiles.
+- Migration `67` : outillage hors service indisponible, alerte réparation, remise en service ou mise au rebut définitive auditée ; détail des travaux sur factures véhicule.
+- Migration `68` : QR internes pour article, chantier, véhicule, outil et employé ; QR privés affichés dans les fiches ; borne `/stock/borne` mobile avec scan QR/code-barres, code personnel haché (jamais en clair), chantier obligatoire à la sortie, mouvement attribué à l’employé, journal des tentatives et limitation après erreurs. Le scanner explique le besoin HTTPS et conserve saisie/douchette en repli.
+- Migration `69` : socle de droits personnels obligatoire pour tous les postes présents/futurs : planning, pointage personnel, notes personnelles, congés et borne stock. Les modules non autorisés restent absents du menu.
+- Migration `70` corrige un écart détecté pendant l’audit transversal : `gerer_pointage` n’autorise plus à pointer au nom d’un collègue. Il permet seulement consultation/correction/validation. L’arrivée doit appartenir à la fiche liée au compte et la clôture RPC est l’unique chemin de création du pointage final.
+- Dépendances ajoutées : `fflate`, `qrcode`; tests via Vitest. Tests structurels Supabase : `supabase/tests/archivage_notes_frais_rls.test.sql` et `borne_stock_securisee.test.sql`.
+- Contrôles au 13/07 : `npm test` = 12/12, TypeScript OK, lint OK, `npm run build` OK. Audit production : deux alertes modérées proviennent du PostCSS embarqué dans Next 16 ; la correction automatique proposée ferait une rétrogradation majeure, donc aucun `--force` n’a été appliqué.
+- **Blocage actuel** : Supabase CLI non lié (`supabase/.temp/project-ref` absent), `SUPABASE_ACCESS_TOKEN` absent et aucune session SQL pilotable. Les migrations 57–70 ne sont donc **pas appliquées** et le lot n’est **pas déployé**. Ne pas déployer avant exécution et test transactionnel des migrations dans l’ordre. `DISABLE_EMAIL_LOGIN=true` reste actif ; les notes personnelles demeurent fermées honnêtement en prototype.
+- Le script futur `supabase/production/sortie_mode_prototype.sql` contient les grants authentifiés de toutes les nouvelles RPC. Il reste volontairement NON APPLIQUÉ jusqu’à la bascule coordonnée des comptes personnels.
+- Ne jamais ajouter/supprimer les doublons non suivis `*page 2.tsx` et `StockMovementForm 2.tsx` : ils ne font pas partie de ce lot.
+
 > Document de passation à jour au **13 juillet 2026**. À lire en entier avant toute modification.
 > Il complète (et prime sur) l'ancien relais Claude collé dans la conversation.
 > Copie synchronisée : `~/RELAIS_CHATGPT.md`. **À mettre à jour à CHAQUE modification.**

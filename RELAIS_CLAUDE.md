@@ -1,5 +1,17 @@
 # Relais Claude Code — Liria Gestion Pro
 
+## Reprise Codex — 13 juillet 2026, lot local en attente des migrations 57–70
+
+- État autoritatif : un important lot est terminé localement mais **pas encore appliqué à Supabase ni déployé**. Le CLI n’est pas lié, aucun `SUPABASE_ACCESS_TOKEN` n’est disponible et le navigateur SQL n’est pas pilotable. Exécuter les migrations `20260713000057` à `20260713000070` dans l’ordre avant toute publication.
+- `57–61` : archivage des notes de frais (originaux privés, MIME réel, SHA-256, versions, workflow, audit append-only, legal hold, contrôle d’intégrité et export ZIP avec CSV/manifeste/historique). Lire `docs/ARCHIVAGE_JUSTIFICATIFS.md`.
+- `62` : congés personnels reliés au planning. `63` : cycle de vie et facturation des comptes par poste, création entreprise plateforme, tarifs et snapshots mensuels. `64` : personnalisation des documents. `65` : pointage/affectations/heures chantiers. `66` : devis sans prix pour intervenants. `67` : réparation/rebut outillage et travaux véhicule.
+- `68–69` : registre QR articles/chantiers/véhicules/outils/employés, borne stock mobile par code personnel haché et chantier obligatoire, limitation des essais, puis socle de droits personnels obligatoire pour tous les postes futurs.
+- `70` : durcissement pointage au nom propre. Le droit de gestion ne peut plus créer/clôturer pour un autre employé ; il reste limité à la consultation, correction et validation de l’équipe.
+- Routes clés : `/notes-frais/[id]`, `/notes-frais/exports`, `/parametres/notes-frais`, `/conges`, `/mes-travaux`, `/stock/borne`, `/plateforme`.
+- Contrôles verts : 12 tests Vitest, TypeScript, lint et build de production. Tests SQL pgTAP préparés sous `supabase/tests/` mais non exécutés faute de base liée.
+- `DISABLE_EMAIL_LOGIN=true` reste actif. Ne pas ouvrir les justificatifs personnels dans ce mode et ne pas appliquer `supabase/production/sortie_mode_prototype.sql` sans bascule auth coordonnée.
+- Les fichiers doublons non suivis `*page 2.tsx` / `StockMovementForm 2.tsx` sont hors périmètre : ne pas les inclure.
+
 ## Reprise Codex — 13 juillet 2026 (état le plus récent)
 
 - Nom officiel du logiciel : **Liria Gestion Pro**. `LIRIA CONCEPT` reste l’entreprise utilisatrice et son identité documentaire.

@@ -69,6 +69,26 @@ grant execute on function public.plateforme_modifier_abonnement(uuid,text,date,t
 grant execute on function public.marquer_invitation_employe(uuid,uuid,text) to authenticated;
 grant execute on function public.enregistrer_presence_application(boolean) to authenticated;
 grant execute on function public.plateforme_usage_entreprises() to authenticated;
+grant execute on function public.peut_consulter_note_frais(uuid) to authenticated;
+grant execute on function public.peut_modifier_note_frais_personnelle(uuid) to authenticated;
+grant execute on function public.role_courant_entreprise(uuid) to authenticated;
+grant execute on function public.transition_note_frais(uuid,text,text) to authenticated;
+grant execute on function public.modifier_reference_comptable_note_frais(uuid,text) to authenticated;
+grant execute on function public.ajouter_audit_note_frais(uuid,text,text,uuid,text,text,jsonb,text,text,text) to authenticated;
+grant execute on function public.existe_doublon_note_frais(uuid,text,uuid) to authenticated;
+grant execute on function public.journaliser_acces_refuse_note_frais(uuid,text,uuid,text,text,text,text) to authenticated;
+grant execute on function public.finaliser_export_notes_frais(uuid,text,text,text,bigint,jsonb) to authenticated;
+grant execute on function public.transition_demande_conge(uuid,text,text) to authenticated;
+grant execute on function public.changer_statut_compte_application(uuid,uuid,text) to authenticated;
+grant execute on function public.plateforme_creer_entreprise(text,text,text) to authenticated;
+grant execute on function public.plateforme_postes_tarifs() to authenticated;
+grant execute on function public.plateforme_modifier_tarif_poste(uuid,text,numeric) to authenticated;
+grant execute on function public.plateforme_snapshot_facturation(date) to authenticated;
+grant execute on function public.mes_devis_chantiers_sans_prix(uuid) to authenticated;
+grant execute on function public.mettre_outil_rebut(uuid,uuid,text) to authenticated;
+grant execute on function public.creer_code_identification(uuid,text,uuid) to authenticated;
+grant execute on function public.definir_code_stock_employe(uuid,uuid,text,boolean) to authenticated;
+grant execute on function public.enregistrer_mouvement_stock_borne(uuid,text,text,text,numeric,uuid,text,uuid,text) to authenticated;
 
 revoke execute on function public.dev_contexte_entreprise() from public,anon,authenticated;
 drop function public.dev_contexte_entreprise();

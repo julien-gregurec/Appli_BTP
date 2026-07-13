@@ -120,6 +120,11 @@ export async function modifierEntrepriseAction(formData: FormData) {
     taux_penalites_retard: taux,
     texte_entete: champ(formData, "texte_entete"),
     texte_pied_page: champ(formData, "texte_pied_page"),
+    police_documents: champ(formData,"police_documents") ?? "arial",
+    taille_police_documents: Math.min(16,Math.max(10,Number(champ(formData,"taille_police_documents"))||13)),
+    logo_largeur_documents: Math.min(180,Math.max(60,Number(champ(formData,"logo_largeur_documents"))||105)),
+    couleur_documents: /^#[0-9a-f]{6}$/i.test(champ(formData,"couleur_documents")??"") ? champ(formData,"couleur_documents") : "#0d1b2a",
+    mise_en_page_documents: champ(formData,"mise_en_page_documents") ?? "classique",
     updated_at: new Date().toISOString(),
   }).eq("id", ctx.entrepriseId);
 

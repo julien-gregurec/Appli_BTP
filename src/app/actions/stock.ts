@@ -19,11 +19,40 @@ export async function creerMouvementStockAction(fd: FormData) {
   const ctx = await getContexteEntreprise(); const supabase = await createClient();
   const articleId = champ(fd, "article_id"); const type = champ(fd, "type"); const quantite = Number(fd.get("quantite"));
   if (!articleId || !type || !quantite || quantite <= 0) redirect(`/stock?error=${encodeURIComponent("Mouvement invalide")}`);
+  if (type === "sortie" && !champ(fd, "chantier_id")) redirect(`/stock?error=${encodeURIComponent("Le chantier est obligatoire pour une sortie de stock")}`);
   const { data: article } = await supabase.from("articles_stock").select("id").eq("id", articleId).eq("entreprise_id", ctx.entrepriseId).single();
   if (!article) redirect(`/stock?error=${encodeURIComponent("Article introuvable")}`);
-  const { error } = await supabase.from("mouvements_stock").insert({ entreprise_id: ctx.entrepriseId, article_id: articleId, chantier_id: champ(fd, "chantier_id"),teinte_id:champ(fd,"teinte_id"), type, quantite, date: champ(fd, "date") ?? new Date().toISOString().slice(0, 10), motif: champ(fd, "motif") });
+  const { data: employe } = await supabase.from("employes").select("id").eq("entreprise_id", ctx.entrepriseId).eq("utilisateur_id", ctx.userId).maybeSingle();
+  const { error } = await supabase.from("mouvements_stock").insert({ entreprise_id: ctx.entrepriseId, article_id: articleId, chantier_id: champ(fd, "chantier_id"),teinte_id:champ(fd,"teinte_id"), type, quantite, date: champ(fd, "date") ?? new Date().toISOString().slice(0, 10), motif: champ(fd, "motif"), employe_id: employe?.id ?? null, cree_par_utilisateur_id: ctx.userId });
   if (error) redirect(`/stock?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/stock"); redirect("/stock?succes=mouvement");
+}
+
+export async function mouvementStockBorneAction(fd: FormData) {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const type = champ(fd, "type") ?? "sortie";
+  const quantite = Number(fd.get("quantite"));
+  const codePersonnel = champ(fd, "code_personnel");
+  const codeArticle = champ(fd, "code_article");
+  if (!codePersonnel || !codeArticle || !Number.isFinite(quantite) || quantite <= 0) {
+    redirect(`/stock/borne?error=${encodeURIComponent("Code personnel, article et quantité sont obligatoires")}`);
+  }
+  const { error } = await supabase.rpc("enregistrer_mouvement_stock_borne", {
+    p_entreprise_id: ctx.entrepriseId,
+    p_code_personnel: codePersonnel,
+    p_code_article: codeArticle,
+    p_type: type,
+    p_quantite: quantite,
+    p_chantier_id: champ(fd, "chantier_id"),
+    p_code_chantier: champ(fd, "code_chantier"),
+    p_teinte_id: null,
+    p_motif: champ(fd, "motif"),
+  });
+  if (error) redirect(`/stock/borne?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/stock");
+  revalidatePath("/stock/borne");
+  redirect(`/stock/borne?succes=${encodeURIComponent("Mouvement enregistré à votre nom")}`);
 }
 
 export async function importerStockAction(fd:FormData){const ctx=await getContexteEntreprise(),supabase=await createClient(),fichier=fd.get("fichier"),type=String(fd.get("type_import")??"");if(!(fichier instanceof File)||!fichier.size)redirect(`/stock?error=${encodeURIComponent("Choisissez un fichier")}`);if(fichier.size>20*1024*1024)redirect(`/stock?error=${encodeURIComponent("Le fichier dépasse 20 Mo")}`);try{const lignes=await lireImportStock(fichier);if(!lignes.length)throw new Error("Aucune ligne produit détectée");const{data,error}=await supabase.rpc("importer_articles_stock",{p_entreprise_id:ctx.entrepriseId,p_type:type,p_lignes:lignes});if(error)throw error;revalidatePath("/stock");revalidatePath("/inventaires");redirect(`/stock?succes=${encodeURIComponent(`${data} ligne(s) importée(s)`)}`)}catch(e){if(e&&typeof e==="object"&&"digest"in e)throw e;redirect(`/stock?error=${encodeURIComponent(e instanceof Error?e.message:"Import impossible")}`)}}

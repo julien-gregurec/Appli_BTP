@@ -44,9 +44,10 @@ export default async function OutillagePage({
   const aujourdHui = new Date().toISOString().slice(0, 10);
   const verificationEchue = (date: string | null) => Boolean(date && date <= aujourdHui);
   const alertes = outils.filter((outil) => verificationEchue(outil.prochaine_verification)).length;
+  const alertesHorsService = outils.filter((outil) => outil.statut === "hors_service").length;
 
   const affectation = (outil: OutilListe) => {
-    if (outil.statut === "hors_service") return "Indisponible";
+    if (["hors_service", "rebut"].includes(outil.statut)) return "Indisponible";
     const employe = un(outil.employe);
     const chantier = un(outil.chantier);
     if (employe) return `${employe.prenom} ${employe.nom}`;
@@ -59,7 +60,7 @@ export default async function OutillagePage({
         <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold">Outillage</h1>
-            <p className="text-sm text-neutral-500">{outils.length} outil(s) · {alertes} vérification(s) échue(s)</p>
+            <p className="text-sm text-neutral-500">{outils.length} outil(s) · {alertes} vérification(s) échue(s) · {alertesHorsService} décision(s) réparation/rebut</p>
           </div>
           <Link href="/outillage/nouveau" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white">
             + Nouvel outil
