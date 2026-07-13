@@ -24,6 +24,7 @@ type EmployeAvecAcces = EmployeListe & {
   autorisations: string[];
   consultations: number;
   gestions: number;
+  visualisations: number;
   speciaux: number;
 };
 
@@ -56,7 +57,8 @@ export default async function EmployesPage() {
       autorisations,
       consultations: autorisations.filter((cle) => cle.startsWith("acces_")).length,
       gestions: autorisations.filter((cle) => cle.startsWith("gerer_")).length,
-      speciaux: autorisations.filter((cle) => !cle.startsWith("acces_") && !cle.startsWith("gerer_")).length,
+      visualisations: autorisations.filter((cle) => cle.startsWith("voir_")).length,
+      speciaux: autorisations.filter((cle) => !cle.startsWith("acces_") && !cle.startsWith("gerer_") && !cle.startsWith("voir_")).length,
     };
   });
 
@@ -64,6 +66,7 @@ export default async function EmployesPage() {
     <details>
       <summary className="cursor-pointer list-none font-medium text-blue-700 hover:underline [&::-webkit-details-marker]:hidden">
         {employe.consultations} consulter · {employe.gestions} gérer
+        {employe.visualisations ? ` · ${employe.visualisations} chiffres` : ""}
         {employe.speciaux ? ` · ${employe.speciaux} personnel` : ""} ▾
       </summary>
       <div className="mt-2 space-y-1.5 rounded-md border bg-white p-2 shadow-sm dark:border-neutral-700 dark:bg-neutral-950">
@@ -76,9 +79,11 @@ export default async function EmployesPage() {
                   ? "bg-blue-100 text-blue-800"
                   : cle.startsWith("gerer_")
                     ? "bg-amber-100 text-amber-800"
+                    : cle.startsWith("voir_")
+                      ? "bg-violet-100 text-violet-800"
                     : "bg-violet-100 text-violet-800"
               }`}>
-                {cle.startsWith("acces_") ? "Voir" : cle.startsWith("gerer_") ? "Gérer" : "Personnel"}
+                {cle.startsWith("acces_") ? "Voir" : cle.startsWith("gerer_") ? "Gérer" : cle.startsWith("voir_") ? "Chiffres" : "Personnel"}
               </span>
               <span>{descriptions.get(cle) ?? cle}</span>
             </div>

@@ -10,6 +10,9 @@
 - `/clients` et `/chantiers` ont maintenant des cartes mobiles avec statut, informations principales et accès pleine largeur à la fiche ; filtres et tableaux ordinateur conservés.
 - `/devis` et `/factures` ont maintenant des cartes mobiles : client, statut, dates, montant, chantier ou reste à encaisser, avec accès direct à l’envoi/PDF. Les tableaux ordinateur restent inchangés.
 - Dans `/devis/nouveau`, `+ Nouveau chantier` est désormais toujours visible et explique le rattachement obligatoire au client. Après création rapide d’un client, le mini-formulaire chantier s’ouvre automatiquement ; la création ajoute et sélectionne le chantier sans quitter le devis.
+- Migration 52 appliquée et vérifiée : permission indépendante `voir_indicateurs_financiers`, chiffres globaux/alertes/devis masqués sans ce droit, deux postes de gestion autorisés actuellement. Le pointage est strictement personnel côté page, action serveur et RLS ; la gestion d’équipe ne permet jamais de pointer pour autrui.
+- Le tableau de bord terrain contient le pointage arrivée/départ et le planning personnel. Le mobile possède un menu renforcé et un retour déterministe ; l’accueil devient `Bonjour Prénom` avec un vrai compte.
+- `DISABLE_EMAIL_LOGIN=true` reste le dernier verrou : le prototype masque les chiffres mais ne peut pas appliquer une identité différente par ouvrier. La sortie coordonnée du prototype nécessite l’accord explicite de Julien, puis script `supabase/production/sortie_mode_prototype.sql` + variable Vercel à `false` + redéploiement.
 - Validations : lint, TypeScript, build webpack et diff-check verts.
 
 ## Mise à jour Codex — 12 juillet 2026 (à lire en premier)

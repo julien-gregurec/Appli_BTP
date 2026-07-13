@@ -57,6 +57,8 @@ grant execute on function public.supprimer_poste_vide(uuid,uuid) to authenticate
 grant execute on function public.importer_articles_stock(uuid,text,jsonb) to authenticated;
 grant execute on function public.valider_preuve_pointage(uuid,uuid,text,text) to authenticated;
 grant execute on function public.cloturer_session_pointage(uuid,uuid,timestamptz,integer,numeric,numeric,numeric,text) to authenticated;
+grant execute on function public.peut_pointer_pour_employe(uuid,uuid) to authenticated;
+grant execute on function public.peut_consulter_pointage_employe(uuid,uuid) to authenticated;
 grant execute on function public.affecter_vehicule(uuid,uuid,uuid,text) to authenticated;
 grant execute on function public.rejoindre_entreprise_par_code(text) to authenticated;
 grant execute on function public.lier_justificatif_depense(uuid,uuid,text,text,text,bigint) to authenticated;

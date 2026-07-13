@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { euros, statutDevis } from "@/lib/devis";
 import { statutChantier } from "@/lib/chantier-statuts";
 import { permissionsUtilisateur } from "@/lib/permissions";
+import { PointageArriveeDepart } from "@/components/PointageArriveeDepart";
 
 function un<T>(valeur: T | T[] | null): T | null {
   if (!valeur) return null;
@@ -19,8 +20,13 @@ export default async function DashboardPage() {
   const voir = {
     devis: autorise("acces_devis"), factures: autorise("acces_factures"), chantiers: autorise("acces_chantiers"),
     planning: autorise("acces_planning"), stock: autorise("acces_stock"), flotte: autorise("acces_flotte"),
-    outillage: autorise("acces_outillage"), achats: autorise("acces_achats"),
+    outillage: autorise("acces_outillage"), achats: autorise("acces_achats"), pointage: autorise("acces_pointage"),
   };
+  // En mode prototype aucune identité individuelle n'est fiable : les chiffres globaux
+  // restent masqués. En authentification réelle, ils exigent un droit dédié.
+  const voirIndicateursFinanciers = permissions !== null && permissions.includes("voir_indicateurs_financiers");
+  const peutPointer = permissions !== null && permissions.includes("saisir_son_pointage");
+  const peutGererPlanning = permissions === null || permissions.includes("gerer_planning");
   const auMoinsUnModule = permissions === null || permissions.some((cle) => cle.startsWith("acces_"));
   const raccourcis = [
     ["acces_pointage", "/pointage", "Pointage"], ["acces_planning", "/planning", "Planning"],
@@ -32,19 +38,28 @@ export default async function DashboardPage() {
     ["acces_exports", "/exports", "Exports"], ["acces_parametres", "/parametres", "Paramètres"],
   ].filter(([permission]) => autorise(permission));
 
-  const [devisResult, facturesResult, chantiersResult, affectationsResult, articlesResult, vehiculesResult, outilsResult, commandesResult] = await Promise.all([
+  const { data: employeCompte } = permissions !== null && (peutPointer || voir.planning)
+    ? await supabase.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("utilisateur_id", ctx.userId).eq("statut", "actif").maybeSingle()
+    : { data: null };
+  let requeteAffectations = supabase.from("affectations").select("id, date, heures, tache, chantier:chantiers(nom), employe:employes(prenom, nom)").eq("entreprise_id", ctx.entrepriseId).gte("date", aujourdhui).order("date").limit(6);
+  if (permissions !== null && !peutGererPlanning) requeteAffectations = requeteAffectations.eq("employe_id", employeCompte?.id ?? "00000000-0000-0000-0000-000000000000");
+
+  const [devisResult, facturesResult, chantiersResult, affectationsResult, articlesResult, vehiculesResult, outilsResult, commandesResult, chantiersPointageResult, sessionsPointageResult] = await Promise.all([
     voir.devis ? supabase.from("devis").select("id, numero, statut, montant_ttc, date_emission, date_validite, client:clients(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }) : null,
     voir.factures ? supabase.from("factures").select("id, numero, statut, date_echeance, montant_ttc, montant_paye, client:clients(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId) : null,
     voir.chantiers ? supabase.from("chantiers").select("id, nom, statut").eq("entreprise_id", ctx.entrepriseId).order("updated_at", { ascending: false }) : null,
-    voir.planning ? supabase.from("affectations").select("id, date, heures, tache, chantier:chantiers(nom), employe:employes(prenom, nom)").eq("entreprise_id", ctx.entrepriseId).gte("date", aujourdhui).order("date").limit(6) : null,
+    voir.planning ? requeteAffectations : null,
     voir.stock ? supabase.from("articles_stock").select("id, reference, designation, quantite_stock, seuil_alerte, unite").eq("entreprise_id", ctx.entrepriseId).eq("actif", true) : null,
     voir.flotte ? supabase.from("vehicules").select("id, immatriculation, marque, modele, kilometrage, controle_technique_echeance, assurance_echeance, prochain_entretien_date, prochain_entretien_km").eq("entreprise_id", ctx.entrepriseId).in("statut", ["actif", "maintenance"]) : null,
     voir.outillage ? supabase.from("outils").select("id, reference, designation, prochaine_verification").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(hors_service,perdu)") : null,
     voir.achats ? supabase.from("commandes_fournisseurs").select("id, numero, statut, date_livraison_prevue, fournisseur:fournisseurs(nom)").eq("entreprise_id", ctx.entrepriseId).in("statut", ["envoyee", "confirmee", "recue_partiel"]) : null,
+    peutPointer && employeCompte ? supabase.from("chantiers").select("id,nom").eq("entreprise_id",ctx.entrepriseId).not("statut","in",'(archive,annule)').order("nom") : null,
+    peutPointer && employeCompte ? supabase.from("sessions_pointage").select("id,arrivee_at,tache,employe:employes(id,prenom,nom),chantier:chantiers(id,nom)").eq("entreprise_id",ctx.entrepriseId).eq("employe_id",employeCompte.id).is("depart_at",null).order("arrivee_at",{ascending:false}) : null,
   ]);
   const devis = devisResult?.data ?? [], factures = facturesResult?.data ?? [], chantiers = chantiersResult?.data ?? [];
   const affectations = affectationsResult?.data ?? [], articles = articlesResult?.data ?? [], vehicules = vehiculesResult?.data ?? [];
   const outils = outilsResult?.data ?? [], commandes = commandesResult?.data ?? [];
+  const chantiersPointage = chantiersPointageResult?.data ?? [], sessionsPointage = sessionsPointageResult?.data ?? [];
 
   const totalFacture = (factures ?? []).filter((f) => f.statut !== "annulee").reduce((s, f) => s + Number(f.montant_ttc ?? 0), 0);
   const totalEncaisse = (factures ?? []).reduce((s, f) => s + Number(f.montant_paye ?? 0), 0);
@@ -64,11 +79,11 @@ export default async function DashboardPage() {
   for (const facture of factures ?? []) {
     if (facture.date_echeance && !["payee", "annulee", "avoir_emis"].includes(facture.statut)) {
       const client = un(facture.client);
-      ajouterEcheance({ id: `facture-${facture.id}`, domaine: "Facturation", titre: `${facture.numero ?? "Facture"} à encaisser`, detail: `${client?.societe || [client?.prenom, client?.nom].filter(Boolean).join(" ") || "Client"} · reste ${euros(Number(facture.montant_ttc) - Number(facture.montant_paye))}`, href: `/factures/${facture.id}` }, facture.date_echeance, 7);
+      ajouterEcheance({ id: `facture-${facture.id}`, domaine: "Facturation", titre: `${facture.numero ?? "Facture"} à encaisser`, detail: voirIndicateursFinanciers ? `${client?.societe || [client?.prenom, client?.nom].filter(Boolean).join(" ") || "Client"} · reste ${euros(Number(facture.montant_ttc) - Number(facture.montant_paye))}` : `${client?.societe || [client?.prenom, client?.nom].filter(Boolean).join(" ") || "Client"} · échéance de règlement`, href: `/factures/${facture.id}` }, facture.date_echeance, 7);
     }
   }
   for (const itemDevis of devis ?? []) {
-    if (itemDevis.date_validite && itemDevis.statut === "envoye") ajouterEcheance({ id: `devis-${itemDevis.id}`, domaine: "Commercial", titre: `${itemDevis.numero ?? "Devis"} arrive à expiration`, detail: `Montant ${euros(itemDevis.montant_ttc)}`, href: `/devis/${itemDevis.id}` }, itemDevis.date_validite, 7);
+    if (itemDevis.date_validite && itemDevis.statut === "envoye") ajouterEcheance({ id: `devis-${itemDevis.id}`, domaine: "Commercial", titre: `${itemDevis.numero ?? "Devis"} arrive à expiration`, detail: voirIndicateursFinanciers ? `Montant ${euros(itemDevis.montant_ttc)}` : "Validité à contrôler", href: `/devis/${itemDevis.id}` }, itemDevis.date_validite, 7);
   }
   for (const article of articles ?? []) {
     const stock = Number(article.quantite_stock), seuil = Number(article.seuil_alerte);
@@ -94,12 +109,13 @@ export default async function DashboardPage() {
   alertes.sort((a, b) => ordreNiveau[a.niveau] - ordreNiveau[b.niveau] || (a.date ?? "9999").localeCompare(b.date ?? "9999"));
   const nbCritiques = alertes.filter((a) => a.niveau === "critique").length;
   const domainesAlertes = [...new Set(alertes.map((a) => a.domaine))];
+  const prenomAffiche = ctx.prenom && ctx.prenom.toLocaleLowerCase("fr") !== "prototype" ? ctx.prenom : null;
 
   return (
     <main className="p-8">
       <div className="mx-auto max-w-6xl space-y-6">
         <div>
-          <h1 className="text-xl font-semibold">Bonjour {ctx.prenom ?? ""}</h1>
+          <h1 className="text-xl font-semibold">Bonjour{prenomAffiche ? ` ${prenomAffiche}` : ""}</h1>
           <p className="text-sm text-neutral-500">{ctx.entrepriseNom} · {ctx.entrepriseReference}</p>
         </div>
 
@@ -107,7 +123,7 @@ export default async function DashboardPage() {
 
         {!auMoinsUnModule && <section className="rounded-md border border-dashed p-6 text-center"><h2 className="font-semibold">Aucun module attribué</h2><p className="mt-1 text-sm text-neutral-500">Un administrateur doit encore définir les accès de votre poste.</p></section>}
 
-        {(voir.factures || voir.devis) && <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {voirIndicateursFinanciers && (voir.factures || voir.devis) && <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {voir.factures && <><Link href="/factures" className="rounded-md border border-neutral-200 p-4 transition hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"><div className="text-xs text-neutral-500">Total facturé</div><div className="mt-1 font-mono text-xl font-semibold">{euros(totalFacture)}</div></Link><Link href="/factures?statut=payee" className="rounded-md border border-neutral-200 p-4 transition hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"><div className="text-xs text-neutral-500">Encaissé</div><div className="mt-1 font-mono text-xl font-semibold text-green-700 dark:text-green-400">{euros(totalEncaisse)}</div></Link><Link href="/factures" className="rounded-md border border-neutral-200 p-4 transition hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"><div className="text-xs text-neutral-500">Reste à encaisser</div><div className="mt-1 font-mono text-xl font-semibold text-amber-700 dark:text-amber-400">{euros(resteAEncaisser)}</div></Link></>}
           {voir.devis && <Link href="/devis?statut=accepte" className="rounded-md border border-neutral-200 p-4 transition hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"><div className="text-xs text-neutral-500">Devis acceptés</div><div className="mt-1 font-mono text-xl font-semibold">{euros(devisAcceptes)}</div></Link>}
         </div>}
@@ -115,7 +131,7 @@ export default async function DashboardPage() {
         {(voir.devis || voir.chantiers) && <div className="grid gap-4 md:grid-cols-2">
           {voir.devis && <section className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
             <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-semibold">Devis à suivre</h2><Link href="/devis" className="text-xs text-neutral-500 hover:underline">Tout voir</Link></div>
-            {devisASuivre.length ? <div className="space-y-2">{devisASuivre.map((devis) => { const st = statutDevis(devis.statut); const client = un(devis.client); return <Link key={devis.id} href={`/devis/${devis.id}`} className="flex items-center justify-between rounded-md px-2 py-2 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900"><div><div className="font-medium">{devis.numero ?? "Brouillon"}</div><div className="text-xs text-neutral-500">{client?.societe || [client?.prenom, client?.nom].filter(Boolean).join(" ") || "—"}</div></div><div className="text-right"><div className="font-mono">{euros(devis.montant_ttc)}</div><div className="text-xs" style={{ color: st.couleur }}>{st.libelle}</div></div></Link>; })}</div> : <p className="text-sm text-neutral-500">Aucun devis en attente.</p>}
+            {devisASuivre.length ? <div className="space-y-2">{devisASuivre.map((devis) => { const st = statutDevis(devis.statut); const client = un(devis.client); return <Link key={devis.id} href={`/devis/${devis.id}`} className="flex items-center justify-between rounded-md px-2 py-2 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900"><div><div className="font-medium">{devis.numero ?? "Brouillon"}</div><div className="text-xs text-neutral-500">{client?.societe || [client?.prenom, client?.nom].filter(Boolean).join(" ") || "—"}</div></div><div className="text-right">{voirIndicateursFinanciers && <div className="font-mono">{euros(devis.montant_ttc)}</div>}<div className="text-xs" style={{ color: st.couleur }}>{st.libelle}</div></div></Link>; })}</div> : <p className="text-sm text-neutral-500">Aucun devis en attente.</p>}
           </section>}
 
           {voir.chantiers && <section className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
@@ -132,6 +148,10 @@ export default async function DashboardPage() {
           {alertes.length ? <div className="mt-3 grid grid-cols-2 gap-2">{alertes.slice(0, 12).map((alerte) => <Link key={alerte.id} href={alerte.href} className="flex items-start gap-3 rounded-md border border-black/5 bg-white/70 p-3 text-sm transition hover:bg-white dark:border-white/10 dark:bg-black/20 dark:hover:bg-black/30"><span className={`mt-1 h-2.5 w-2.5 flex-none rounded-full ${alerte.niveau === "critique" ? "bg-red-600" : "bg-amber-500"}`} /><span className="min-w-0 flex-1"><span className="flex items-center justify-between gap-2"><strong className="truncate">{alerte.titre}</strong><span className="flex-none text-[10px] uppercase tracking-wide text-neutral-500">{alerte.domaine}</span></span><span className="mt-0.5 block text-xs text-neutral-600 dark:text-neutral-400">{alerte.detail}{alerte.date ? ` · ${alerte.date}` : ""}</span></span></Link>)}</div> : <p className="mt-3 text-sm text-green-800 dark:text-green-300">Aucune alerte active. Toutes les échéances suivies sont sous contrôle.</p>}
           {domainesAlertes.length > 0 && <p className="mt-3 text-xs text-neutral-500">Domaines concernés : {domainesAlertes.join(" · ")}</p>}
         </section>}
+
+        {peutPointer && employeCompte && chantiersPointage.length > 0 && <PointageArriveeDepart employes={[{id:employeCompte.id,nom:`${employeCompte.prenom ?? ""} ${employeCompte.nom}`.trim()}]} chantiers={chantiersPointage.map((chantier)=>({id:chantier.id,nom:chantier.nom}))} sessions={sessionsPointage.map((session)=>{const employe=un(session.employe),chantier=un(session.chantier);return{id:session.id,arrivee_at:session.arrivee_at,tache:session.tache,employe:employe?{id:employe.id,nom:`${employe.prenom ?? ""} ${employe.nom}`.trim()}:null,chantier:chantier?{id:chantier.id,nom:chantier.nom}:null};})} />}
+
+        {peutPointer && !employeCompte && <section className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"><strong>Pointage indisponible</strong><p className="mt-1">Votre compte doit être lié à votre fiche employé pour pointer en votre nom.</p></section>}
 
         {voir.planning && <section className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
           <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-semibold">Prochaines affectations</h2><Link href="/planning" className="text-xs text-neutral-500 hover:underline">Ouvrir le planning</Link></div>

@@ -52,16 +52,16 @@ export function Sidebar({
 
   return (
     <>
-    <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-[#243447] bg-[#0d1b2a] px-4 text-white md:hidden">
+    <header className="fixed inset-x-0 top-0 z-[60] flex h-16 items-center justify-between border-b border-[#243447] bg-[#0d1b2a] px-4 text-white md:hidden">
       <div className="flex min-w-0 items-center gap-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={logoUrl||"/liria-concept-logo.png"} alt="LIRIA CONCEPT" className="h-10 w-14 rounded bg-white object-contain p-1" />
         <div className="min-w-0"><div className="text-sm font-semibold tracking-[0.12em]">LIRIA <span className="text-[#c9a24a]">CONCEPT</span></div><div className="truncate text-[11px] text-white/60">{entrepriseNom}</div></div>
       </div>
-      <button type="button" onClick={() => setOuvert(true)} aria-expanded={ouvert} aria-controls="navigation-mobile" className="rounded-md border border-white/20 px-3 py-2 text-sm font-medium">☰ Menu</button>
+      <button type="button" onClick={() => setOuvert((valeur) => !valeur)} aria-label="Ouvrir le menu" aria-expanded={ouvert} aria-controls="navigation-mobile" className="relative z-[65] touch-manipulation rounded-md border border-white/30 px-4 py-2 text-sm font-semibold active:bg-white/20">☰ Menu</button>
     </header>
-    {ouvert && <button type="button" aria-label="Fermer le menu" onClick={() => setOuvert(false)} className="fixed inset-0 z-40 bg-black/50 md:hidden" />}
-    <aside id="navigation-mobile" className={`fixed inset-y-0 left-0 z-50 flex w-[min(19rem,86vw)] flex-none transform flex-col border-r border-[#243447] bg-[#0d1b2a] text-white shadow-2xl transition-transform duration-200 md:static md:z-auto md:w-60 md:translate-x-0 md:shadow-none ${ouvert?"translate-x-0":"-translate-x-full"}`}>
+    {ouvert && <button type="button" aria-label="Fermer le menu" onClick={() => setOuvert(false)} className="fixed inset-0 z-[70] touch-manipulation bg-black/50 md:hidden" />}
+    <aside id="navigation-mobile" className={`fixed inset-y-0 left-0 z-[80] flex w-[min(19rem,86vw)] flex-none transform flex-col border-r border-[#243447] bg-[#0d1b2a] text-white shadow-2xl transition-transform duration-200 md:static md:z-auto md:w-60 md:translate-x-0 md:shadow-none ${ouvert?"translate-x-0":"-translate-x-full"}`}>
       <div className="border-b border-white/10 p-4">
         <div className="flex items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}

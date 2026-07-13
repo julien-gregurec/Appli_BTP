@@ -36,7 +36,7 @@ export default async function AccesPage({
     ]);
 
   const permissions = ((catalogue ?? []) as Permission[]).filter((permission) =>
-    permission.cle.startsWith("acces_") || permission.cle.startsWith("gerer_") || permission.cle.startsWith("saisir_") || permission.cle === "valider_pointages",
+    permission.cle.startsWith("acces_") || permission.cle.startsWith("gerer_") || permission.cle.startsWith("saisir_") || permission.cle.startsWith("voir_") || permission.cle === "valider_pointages",
   );
   const groupes = new Map<string, Permission[]>();
   for (const p of permissions) groupes.set(p.module, [...(groupes.get(p.module) ?? []), p]);
@@ -117,6 +117,7 @@ export default async function AccesPage({
             const autorise = new Set((droits ?? []).filter((d) => d.poste_id === poste.id && d.autorise).map((d) => d.cle_permission));
             const consultations = Array.from(autorise).filter((cle) => cle.startsWith("acces_")).length;
             const gestions = Array.from(autorise).filter((cle) => cle.startsWith("gerer_")).length;
+            const visualisations = Array.from(autorise).filter((cle) => cle.startsWith("voir_")).length;
             const action = enregistrerPermissionsPosteAction.bind(null, poste.id);
             const supprimer = supprimerPosteAction.bind(null, poste.id);
             return (
@@ -129,6 +130,7 @@ export default async function AccesPage({
                         <span>{compte(poste.id)} membre(s)</span>
                         <span className="rounded-full bg-blue-100 px-2 py-0.5 text-blue-800">{consultations} consultation(s)</span>
                         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">{gestions} gestion(s)</span>
+                        {visualisations > 0 && <span className="rounded-full bg-violet-100 px-2 py-0.5 text-violet-800">{visualisations} donnée(s) sensible(s)</span>}
                       </div>
                     </div>
                     <span className="shrink-0 rounded-md border px-3 py-1.5 text-xs font-medium">
@@ -150,7 +152,7 @@ export default async function AccesPage({
                             <label key={p.cle} className="flex cursor-pointer gap-2 rounded p-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-900">
                               <input type="checkbox" name="permissions" value={p.cle} defaultChecked={autorise.has(p.cle)} className="mt-0.5" />
                               <span>
-                                <span className="flex flex-wrap items-center gap-2 text-sm font-medium"><span className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide ${p.cle.startsWith("acces_")?"bg-blue-100 text-blue-800":"bg-amber-100 text-amber-800"}`}>{p.cle.startsWith("acces_")?"Consulter":p.cle.startsWith("gerer_")?"Gérer":"Contrôle"}</span>{p.description}</span>
+                                <span className="flex flex-wrap items-center gap-2 text-sm font-medium"><span className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide ${p.cle.startsWith("acces_")?"bg-blue-100 text-blue-800":p.cle.startsWith("gerer_")?"bg-amber-100 text-amber-800":p.cle.startsWith("voir_")?"bg-violet-100 text-violet-800":"bg-green-100 text-green-800"}`}>{p.cle.startsWith("acces_")?"Consulter":p.cle.startsWith("gerer_")?"Gérer":p.cle.startsWith("voir_")?"Chiffres":"Personnel"}</span>{p.description}</span>
                                 <span className="font-mono text-[10px] text-neutral-400">{p.cle}</span>
                               </span>
                             </label>

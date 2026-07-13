@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { isEmailLoginDisabled } from "@/lib/auth-mode";
 
 const texte = (formData: FormData, nom: string) => String(formData.get(nom) ?? "").trim() || null;
 function positionTerrain(formData:FormData){const latitude=Number(formData.get("latitude")),longitude=Number(formData.get("longitude")),precision=Number(formData.get("precision_metres"));if(!Number.isFinite(latitude)||latitude < -90||latitude>90||!Number.isFinite(longitude)||longitude < -180||longitude>180)throw new Error("La position GPS est obligatoire");return{latitude,longitude,precision:Number.isFinite(precision)?precision:null};}
@@ -11,8 +12,12 @@ function positionTerrain(formData:FormData){const latitude=Number(formData.get("
 export async function enregistrerArriveeAction(formData: FormData) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  const employeId = texte(formData, "employe_id");
+  let employeId = texte(formData, "employe_id");
   const chantierId = texte(formData, "chantier_id");
+  if (!isEmailLoginDisabled()) {
+    const { data: employeCompte } = await supabase.from("employes").select("id").eq("entreprise_id",ctx.entrepriseId).eq("utilisateur_id",ctx.userId).eq("statut","actif").maybeSingle();
+    employeId = employeCompte?.id ?? null;
+  }
   if (!employeId || !chantierId) redirect(`/pointage?error=${encodeURIComponent("Employé et chantier obligatoires")}`);
   let preuve;
   try { preuve = positionTerrain(formData); } catch (error) { redirect(`/pointage?error=${encodeURIComponent(error instanceof Error ? error.message : "Position invalide")}`); }
@@ -25,6 +30,7 @@ export async function enregistrerArriveeAction(formData: FormData) {
   });
   if (error) redirect(`/pointage?error=${encodeURIComponent(error.code === "23505" ? "Cet employé a déjà une arrivée ouverte" : error.message)}`);
   revalidatePath("/pointage");
+  revalidatePath("/dashboard");
   redirect("/pointage?succes=arrivee");
 }
 
@@ -40,6 +46,7 @@ export async function enregistrerDepartAction(sessionId: string, formData: FormD
   });
   if (error) redirect(`/pointage?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/pointage");
+  revalidatePath("/dashboard");
   redirect("/pointage?succes=depart");
 }
 

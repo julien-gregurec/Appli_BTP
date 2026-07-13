@@ -17,7 +17,8 @@ export default async function PointagePage({searchParams}:{searchParams:Promise<
   const params=await searchParams,mois=/^\d{4}-\d{2}$/.test(params.mois??"")?params.mois!:new Date().toISOString().slice(0,7),debut=`${mois}-01`,finDate=new Date(Number(mois.slice(0,4)),Number(mois.slice(5,7)),0),fin=`${mois}-${String(finDate.getDate()).padStart(2,"0")}`,ctx=await getContexteEntreprise(),supabase=await createClient();
   const permissions=await permissionsUtilisateur(ctx),peutGerer=permissions===null||permissions.includes("gerer_pointage"),peutPointer=peutGerer||permissions?.includes("saisir_son_pointage")===true;
   let requeteEmployes=supabase.from("employes").select("id,prenom,nom").eq("entreprise_id",ctx.entrepriseId).eq("statut","actif").order("nom");
-  if(!peutGerer)requeteEmployes=requeteEmployes.eq("utilisateur_id",ctx.userId);
+  // En authentification réelle, même un responsable pointe uniquement avec sa propre fiche.
+  if(permissions!==null)requeteEmployes=requeteEmployes.eq("utilisateur_id",ctx.userId);
   const[{data:employes},{data:chantiers},{data:pointagesData},{data:sessionsData}]=await Promise.all([
     requeteEmployes,
     supabase.from("chantiers").select("id,nom").eq("entreprise_id",ctx.entrepriseId).not("statut","in",'(archive,annule)').order("nom"),
