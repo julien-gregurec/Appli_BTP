@@ -19,7 +19,7 @@ export default async function DevisDetailPage({ params, searchParams }: { params
 
   const { data: devis } = await supabase
     .from("devis")
-    .select("*, client:clients(id, nom, prenom, societe, email), chantier:chantiers(id, nom)")
+    .select("*, client:clients(id, nom, prenom, societe, email), chantier:chantiers!devis_chantier_id_fkey(id, nom)")
     .eq("id", id)
     .single();
 

@@ -6,6 +6,24 @@
 
 ---
 
+## 0Z. NOUVEAU LOT UTILISATEUR — 13 juillet 2026 (À TRAITER EN PRIORITÉ)
+
+Demandes et bugs remontés par Julien après tests sur mobile. **Traiter d'abord les BUGS (mobile prod cassé).**
+
+### 🐞 Bugs mobile (priorité haute)
+1. **Barre de menu trop haute / non cliquable** : sur téléphone, l'en-tête/menu déborde en haut et n'est pas cliquable. **Et impossible de revenir en arrière** une fois entré dans un onglet (pas de bouton retour). → revoir l'en-tête mobile (safe-area iOS, hauteur, z-index) et ajouter une navigation retour.
+2. **Erreur 404 à la création d'un devis sur mobile** (`/devis/nouveau` ou le flux depuis mobile renvoie 404). À reproduire et corriger.
+
+### 🔧 Fonctionnalités demandées
+3. **Nouveau devis — chantier inline + liste intelligente** : dans la création de devis, pouvoir **créer un nouveau chantier** à la volée OU **choisir un chantier existant via une liste intelligente** (autocomplétion/recherche), en plus du client déjà géré.
+4. **Planning partagé en tableau** : le planning partagé doit être un **tableau colonnes = dates / lignes = employés** (modèle du planning « MAYART » partagé par Julien, mais en mieux : cellules = lieu/chantier + heures, gestion congés/absences colorés). Voir la capture MAYART fournie.
+5. **Carte BTP — vue complète par salarié** (dans la fiche employé / « Mon espace ») : photo ; nom + prénom ; employeur + SIRET ; fonction (poseur, chef d'équipe, chef de chantier…) ; numéro interne du salarié ; chantiers affectés ; **habilitations + dates de validité** (SST, CACES, travail en hauteur, habilitation électrique) ; **statut carte BTP** (valide / en attente / expirée / à renouveler) ; copie visuelle de la carte marquée « **copie numérique — ne remplace pas l'original** » ; bouton pour ouvrir l'attestation provisoire officielle CIBTP quand elle est valable. **⚠️ Avertissement obligatoire à afficher** : « Cette carte numérique est un badge professionnel interne. Elle ne constitue pas la Carte d'identification professionnelle BTP délivrée par CIBTP France. »
+6. **Note de frais** : un employé peut **scanner une facture / un justificatif** qui part **directement au comptable** (flux dédié note de frais, rattaché à l'employé, visible côté gestion/compta).
+7. **Actions strictement au nom propre** : chaque employé n'agit **que pour lui-même** — il ne peut **pas pointer, commander, ni agir au nom d'un autre**. Selon ses autorisations (`gerer_*`) il peut gérer certaines choses pour l'équipe (ex. valider des pointages), mais jamais **saisir** un pointage/une commande à la place de quelqu'un d'autre. À auditer sur tous les flux de création.
+8. **Accès / installation** : deux entrées possibles — soit **installer l'app** (PWA) soit **recevoir une invitation** donnant accès à son compte. Si installation directe : proposer **créer une entreprise** OU **rejoindre une entreprise** avec l'identifiant/code donné par l'admin. (Le socle existe — code entreprise + invitation par numéro — à vérifier de bout en bout en auth réelle.)
+
+---
+
 ## 0A. MISE À JOUR CODEX — 12 juillet 2026 (ÉTAT AUTORITATIF)
 
 Cette section **prime sur les mentions “à faire / migration à exécuter” plus bas**, conservées uniquement comme historique.

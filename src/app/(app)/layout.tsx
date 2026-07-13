@@ -4,6 +4,7 @@ import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { estPlateformeAdmin } from "@/lib/plateforme";
 import { ModuleAccessBoundary } from "@/components/ModuleAccessBoundary";
+import { MobileBack } from "@/components/MobileBack";
 
 // Layout des pages authentifiées avec navigation latérale.
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -14,7 +15,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="app-shell flex min-h-full flex-1">
       <style>{`@media (max-width:767px){
-        .app-shell main{width:100%;min-width:0;padding:1rem!important}
+        /* Le header mobile est fixe (h-16) : on décale le contenu dessous + zone sûre iOS,
+           sinon le titre ET les liens « ← Retour » passent cachés sous la barre. */
+        .app-shell>header{padding-top:env(safe-area-inset-top)!important;height:auto!important;min-height:4rem}
+        .app-shell main{width:100%;min-width:0;padding:calc(4rem + env(safe-area-inset-top) + 0.5rem) 1rem calc(1rem + env(safe-area-inset-bottom))!important}
         .app-shell main>div{width:100%;min-width:0}
         .app-shell main [class*="grid-cols-"]{grid-template-columns:minmax(0,1fr)!important}
         .app-shell main [class*="col-span-"]{grid-column:auto!important}
@@ -40,6 +44,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       `}</style>
       <Sidebar entrepriseNom={ctx.entrepriseNom} logoUrl={ctx.logoUrl} authDisabled={isEmailLoginDisabled()} permissions={permissions} plateformeAdmin={plateformeAdmin} />
       <ModuleAccessBoundary permissions={permissions}>{children}</ModuleAccessBoundary>
+      <MobileBack />
     </div>
   );
 }

@@ -11,7 +11,7 @@ export default async function DevisPage({ searchParams }: { searchParams: Promis
 
   const { data: devis } = await supabase
     .from("devis")
-    .select("id, numero, statut, date_emission, montant_ttc, client:clients(nom, prenom, societe), chantier:chantiers(nom)")
+    .select("id, numero, statut, date_emission, montant_ttc, client:clients(nom, prenom, societe), chantier:chantiers!devis_chantier_id_fkey(nom)")
     .eq("entreprise_id", ctx.entrepriseId)
     .order("created_at", { ascending: false });
 
