@@ -25,7 +25,7 @@ Mise à jour : 13 juillet 2026. Ce document distingue ce qui est utilisable, ce 
 | Nuanciers / teintes produits | ✅ Fait | Teintes, référence fabricant, couleur visuelle, sélection sur les mouvements. |
 | Scan entrée/sortie stock | ✅ Fait | Scanner caméra mobile multi-format avec caméra arrière, détection automatique, vibration et lampe si disponible. Douchette et saisie manuelle restent disponibles en repli. |
 | Inventaire et déclaration fin d’année | ✅ Socle fait | Inventaires datés, quantités théoriques/comptées, validation atomique et valeur d’achat estimée ; exports comptables CSV disponibles. |
-| Véhicule assigné à un ouvrier | ✅ Fait | Affectation sur la fiche véhicule. |
+| Véhicule assigné à un ouvrier | ✅ Fait | Affectation sur la fiche véhicule et ouvrier visible directement dans la liste Flotte, en cartes sur mobile comme dans le tableau ordinateur. |
 | Factures/coûts et travaux par véhicule | ✅ Fait | Dépense liée au véhicule, total, historique des affectations et résumé des travaux récents de l’ouvrier assigné. |
 | Outil assigné à un ouvrier/chantier | ✅ Fait | Affectation/retour/maintenance historisés. |
 | Factures/coûts par outil | ✅ Fait | Dépense liée à l’outil, total, historique et présence du scan. |
@@ -35,7 +35,7 @@ Mise à jour : 13 juillet 2026. Ce document distingue ce qui est utilisable, ce 
 | Import véhicules et outillage Excel/PDF | ✅ Fait | Import XLSX/CSV/PDF depuis les listes Flotte et Outillage, détection des colonnes usuelles, doublons véhicules mis à jour et doublons outils ignorés. |
 | Photos chantier par les équipes | ✅ Fait | Prise de photo directe depuis le téléphone, classement avant/pendant/après et note de suivi, en plus du dépôt documentaire complet. |
 | Logo entreprise dans logiciel et documents | ✅ Fait | Import PNG/JPG/WebP dans Paramètres, logo utilisé dans la navigation et les PDF. Logo LIRIA fourni déjà importé. |
-| Utilisation complète sur mobile | ✅ Fait | Interface responsive et application installable sur l’écran d’accueil (manifeste, icône LC, mode autonome). Bouton d’installation Android/Chrome et guide Safari pour iPhone ; aucune donnée privée mise en cache. |
+| Utilisation complète sur mobile | ✅ Fait | Interface responsive et application installable sur l’écran d’accueil. Les listes Employés, Flotte et Outillage ont des cartes mobiles dédiées avec leurs informations métier et actions principales ; les tableaux détaillés restent sur ordinateur. Bouton d’installation Android/Chrome et guide Safari pour iPhone ; aucune donnée privée mise en cache. |
 | Espace propriétaire SaaS | ✅ Fait | Liste des entreprises, codes, membres, statut d’abonnement, échéance et note ; accès réservé au propriétaire en auth réelle. |
 | Stock inspiré d’une application GitHub existante | ⏳ En attente de source | Le socle est opérationnel. Comparaison/fusion détaillée à faire dès réception du dépôt GitHub annoncé par l’utilisateur. |
 
