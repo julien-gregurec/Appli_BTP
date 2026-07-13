@@ -5,8 +5,8 @@
 - Migrations hébergées 47 et 48 contrôlées comme appliquées ; migrations 49 à 51 appliquées pour corriger la création d’employé, rendre les notes de frais strictement personnelles et tracer automatiquement l’auteur réel des commandes.
 - Pointage, notes de frais et commandes audités : aucun formulaire authentifié ne permet d’agir au nom d’un autre salarié. Les fonctions de gestion d’équipe restent séparées.
 - Installation PWA, invitation par numéro BTP, rattachement par code entreprise et création d’entreprise vérifiés. L’authentification réelle reste volontairement désactivée tant que la sortie du prototype n’est pas validée.
-- `/employes` possède maintenant une vraie vue mobile en cartes : état de l’accès applicatif, poste, numéro BTP et détail dépliable des droits par salarié. Test réussi à 390 px. Le tableau complet reste sur ordinateur.
-- Validations : lint et build webpack avec TypeScript verts. Production à republier avec le prochain commit après cette section.
+- `/employes` possède maintenant une vraie vue mobile en cartes : état de l’accès applicatif, poste, numéro BTP et détail dépliable des droits par salarié. Test réussi à 390 px. Le tableau complet reste sur ordinateur. Commit `b41f747` déployé et contrôlé sur l’adresse publique.
+- Validations : lint, TypeScript, build webpack et diff-check verts.
 
 ## Mise à jour Codex — 12 juillet 2026 (à lire en premier)
 
