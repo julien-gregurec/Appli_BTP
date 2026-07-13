@@ -6,13 +6,13 @@ import { isEmailLoginDisabled } from "@/lib/auth-mode";
 export default async function SignupPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; code?: string }>;
 }) {
   if (isEmailLoginDisabled()) {
     redirect("/dashboard");
   }
 
-  const { error } = await searchParams;
+  const { error, code } = await searchParams;
 
   return (
     <main className="flex flex-1 items-center justify-center p-6">
@@ -20,8 +20,9 @@ export default async function SignupPage({
         <div>
           <h1 className="text-xl font-semibold">Créer un compte</h1>
           <p className="text-sm text-neutral-500">
-            LIRIA CONCEPT — installation sans accès entreprise, tu en crées ou rejoins une ensuite.
+            Créez votre accès personnel, puis rejoignez votre entreprise avec le code fourni par votre employeur.
           </p>
+          {code && <p className="mt-2 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800">Invitation détectée · code <span className="font-mono font-semibold">{code.toUpperCase()}</span></p>}
         </div>
 
         {error && (
@@ -29,6 +30,7 @@ export default async function SignupPage({
         )}
 
         <form action={signupAction} className="space-y-4">
+          {code && <input type="hidden" name="code_entreprise" value={code.toUpperCase()} />}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <label htmlFor="prenom" className="text-sm font-medium">

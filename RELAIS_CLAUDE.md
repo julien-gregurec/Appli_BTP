@@ -376,6 +376,13 @@ git diff --check
 - Chaque résumé indique membres, consultations et gestions ; le détail des permissions se déplie sans perdre l’état des cases.
 - Le bouton d’enregistrement reste dans le panneau développé.
 
+### Invitation guidée des collaborateurs — 13 juillet 2026
+
+- `/parametres/acces` permet de copier le code, copier un message d’invitation ou partager via le téléphone.
+- Le lien `/signup?code=…` conserve le code dans les métadonnées Auth et le préremplit sur `/onboarding`, même après confirmation d’email.
+- L’onboarding met l’adhésion en premier et distingue clairement la création d’entreprise pour le dirigeant.
+- Avertissement explicite tant que le mode prototype empêche encore les comptes individuels.
+
 ## Fichiers clés
 
 - `src/components/DevisEditor.tsx`

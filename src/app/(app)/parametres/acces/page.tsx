@@ -8,6 +8,8 @@ import {
   supprimerPosteAction,
 } from "@/app/actions/acces";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
+import { InvitationEntreprise } from "@/components/InvitationEntreprise";
+import { isEmailLoginDisabled } from "@/lib/auth-mode";
 
 type Permission = { cle: string; module: string; description: string };
 
@@ -65,9 +67,11 @@ export default async function AccesPage({
           <p className="text-sm text-neutral-500">
             Communiquez ce code à vos employés. À l&apos;inscription, ils choisissent « Rejoindre une entreprise » et le saisissent. Vous validez ensuite leur accès ci-dessous en leur affectant un poste.
           </p>
-          <div className="mt-3 inline-block rounded-md border bg-white px-4 py-2 font-mono text-lg tracking-[0.3em] dark:bg-neutral-900">
-            {entreprise?.code_adhesion ?? "—"}
-          </div>
+          {entreprise?.code_adhesion ? (
+            <InvitationEntreprise code={entreprise.code_adhesion} inscriptionsActives={!isEmailLoginDisabled()} />
+          ) : (
+            <p className="mt-3 text-sm text-red-600">Aucun code d’entreprise disponible.</p>
+          )}
         </section>
 
         <section className="rounded-md border p-4 dark:border-neutral-800">

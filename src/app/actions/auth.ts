@@ -13,6 +13,7 @@ export async function signupAction(formData: FormData) {
   const password = String(formData.get("password") ?? "");
   const nom = String(formData.get("nom") ?? "");
   const prenom = String(formData.get("prenom") ?? "");
+  const codeEntreprise = String(formData.get("code_entreprise") ?? "").trim().toUpperCase();
 
   const supabase = await createClient();
 
@@ -21,7 +22,7 @@ export async function signupAction(formData: FormData) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { nom, prenom } },
+    options: { data: { nom, prenom, code_entreprise: codeEntreprise || null } },
   });
   if (error) {
     redirect(`/signup?error=${encodeURIComponent(error.message)}`);
@@ -35,7 +36,7 @@ export async function signupAction(formData: FormData) {
     redirect("/login?message=" + encodeURIComponent("Compte créé. Vérifie tes emails pour confirmer, puis connecte-toi."));
   }
 
-  redirect("/onboarding");
+  redirect(codeEntreprise ? `/onboarding?code=${encodeURIComponent(codeEntreprise)}` : "/onboarding");
 }
 
 export async function loginAction(formData: FormData) {

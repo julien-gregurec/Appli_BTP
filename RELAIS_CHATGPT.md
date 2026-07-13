@@ -275,4 +275,12 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Dans `/parametres/acces`, chaque poste est désormais replié par défaut pour éviter une page très longue.
 - La ligne résumée indique le nombre de membres, de droits **Consulter** et de droits **Gérer**.
 - « Afficher les droits » ouvre le détail complet ; « Réduire les droits » le referme. Les cases restent intactes pendant l’ouverture/fermeture et l’enregistrement se fait dans le panneau ouvert.
+
+## 20. Invitation guidée des collaborateurs — 13 juillet 2026
+
+- Le bloc Code entreprise de `/parametres/acces` propose maintenant **Copier le code**, **Copier l’invitation** et **Partager** (partage natif mobile quand disponible).
+- Le lien produit pointe vers `/signup?code=…`. Le code est affiché sur l’inscription, enregistré dans les métadonnées du compte puis prérempli sur l’onboarding, y compris après une confirmation d’email différée.
+- L’onboarding présente d’abord « Rejoindre une entreprise existante », puis sépare clairement la création d’une nouvelle entreprise réservée au dirigeant.
+- En mode prototype, un avertissement précise que le lien est prêt mais que les comptes individuels attendent l’activation de la connexion sécurisée.
+- Vérifications : lint, TypeScript, build webpack et rendu HTTP local des deux écrans verts.
 ```
