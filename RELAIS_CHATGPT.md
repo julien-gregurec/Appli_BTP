@@ -5,7 +5,7 @@
 - L’ancienne identité statique `Liria Concept` a été retirée de l’interface : nouveau logo `public/liria-gestion-pro-logo.png`, nouvelles icônes PWA et textes génériques pour les exports/plannings d’entreprise. Les logos propres aux entreprises restent prioritaires sur les documents.
 - Tutoriel Full HD créé : `output/video/Liria_Gestion_Pro_Guide_Video_Complet.mp4`, 7 min 30, voix féminine française, musique originale discrète, sous-titres SRT. Il couvre accès, droits, planning, pointage, clients/chantiers, devis/factures, achats, notes de frais, stock, RH, flotte, pilotage et paramètres.
 - Publicité Full HD créée : `output/video/Liria_Gestion_Pro_Publicite_60s.mp4`, 53 s, voix féminine, présentatrice blonde adulte et sous-titres SRT.
-- Le tutoriel est intégré à `/aide` avec lecteur, sous-titres WebVTT et téléchargement. Le chemin statique `/videos` est public pour permettre le partage direct ; la publicité reste un livrable externe.
+- Le tutoriel est intégré à `/aide` avec lecteur, sous-titres WebVTT et téléchargement. Le chemin statique `/videos` est public pour permettre le partage direct du tutoriel et de la publicité.
 - Le guide PDF conserve 24 pages et 33 signets, mais sa couverture utilise désormais le nouveau logo et ne contient plus `LIRIA CONCEPT` comme éditeur. Générateur de mise à jour : `scripts/update-guide-branding.py`.
 - Générateur reproductible des vidéos : `scripts/create-liria-videos.py`. Contrôles : 1920×1080 H.264, audio AAC stéréo, niveaux sonores vérifiés et sept captures extraites contrôlées visuellement.
 
