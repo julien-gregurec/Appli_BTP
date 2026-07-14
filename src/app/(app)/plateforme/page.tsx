@@ -3,7 +3,10 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { estPlateformeAdmin, statutAbonnement, prixAbonnementMensuel, type EntrepriseAbonnement } from "@/lib/plateforme";
-import { creerEntreprisePlateformeAction, genererSnapshotFacturationAction, modifierAbonnementAction, modifierTarifPostePlateformeAction } from "@/app/actions/plateforme";
+import { ajouterAdminPlateformeAction, creerEntreprisePlateformeAction, genererSnapshotFacturationAction, modifierAbonnementAction, modifierTarifPostePlateformeAction, retirerAdminPlateformeAction } from "@/app/actions/plateforme";
+
+type MembrePlateforme = { email: string; role: string; nom: string | null; ajoute_par: string | null; created_at: string };
+const ROLE_LABEL: Record<string, string> = { total: "Accès total", support: "Support", facturation: "Facturation", lecture: "Lecture seule" };
 
 const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -43,6 +46,15 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
     tarifsPostes = (tarifs ?? []) as typeof tarifsPostes;
   }
 
+  let membresPlateforme: MembrePlateforme[] = [];
+  if (isEmailLoginDisabled()) {
+    const { data } = await supabase.from("plateforme_admins").select("email, role, nom, ajoute_par, created_at").order("created_at");
+    membresPlateforme = (data ?? []) as MembrePlateforme[];
+  } else {
+    const { data } = await supabase.rpc("plateforme_lister_admins");
+    membresPlateforme = (data ?? []) as MembrePlateforme[];
+  }
+
   const parStatut = (cle: string) => entreprises.filter((e) => e.abonnement_statut === cle).length;
 
   return (
@@ -76,6 +88,39 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
         </div>
         <form action={creerEntreprisePlateformeAction} className="grid gap-2 rounded-md border p-4 sm:grid-cols-[2fr_1fr_1fr_auto]"><div className="sm:col-span-4"><h2 className="font-semibold">Ajouter une entreprise cliente</h2><p className="text-xs text-neutral-500">L’entreprise est créée en essai avec ses postes de départ. Son administrateur pourra ensuite être invité.</p></div><input name="nom" required placeholder="Nom de l’entreprise" className={input}/><input name="siret" placeholder="SIRET" className={input}/><input name="ville" placeholder="Ville" className={input}/><button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Créer</button></form>
         <form action={genererSnapshotFacturationAction} className="flex flex-wrap items-end gap-3 rounded-md border border-blue-200 bg-blue-50/50 p-4"><div className="flex-1"><h2 className="font-semibold">Relevé mensuel des comptes facturables</h2><p className="text-xs text-neutral-500">Les comptes actifs et en pause sont figés avec le tarif de leur poste pour le mois choisi.</p></div><label className="text-xs text-neutral-500">Mois<input name="mois" type="month" defaultValue={new Date().toISOString().slice(0,7)} className={`${input} mt-1 block`}/></label><button className="rounded-md bg-blue-800 px-4 py-2 text-sm font-semibold text-white">Générer le relevé</button></form>
+
+        <section className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
+          <h2 className="font-semibold">Équipe plateforme</h2>
+          <p className="text-xs text-neutral-500">Les collaborateurs LIRIA qui peuvent assister toutes les entreprises. Accès total pour l&apos;instant ; les niveaux d&apos;accès seront affinés ensuite.</p>
+          <ul className="mt-3 space-y-2">
+            {membresPlateforme.map((m) => (
+              <li key={m.email} className="flex flex-wrap items-center justify-between gap-2 rounded border border-neutral-100 p-2 text-sm dark:border-neutral-800">
+                <div>
+                  <strong>{m.nom || m.email}</strong>
+                  {m.nom && <span className="ml-2 text-neutral-500">{m.email}</span>}
+                  <span className="ml-2 rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">{ROLE_LABEL[m.role] ?? m.role}</span>
+                </div>
+                <form action={retirerAdminPlateformeAction}>
+                  <input type="hidden" name="email" value={m.email} />
+                  <button className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50">Retirer</button>
+                </form>
+              </li>
+            ))}
+            {membresPlateforme.length === 0 && <li className="text-sm text-neutral-500">Aucun membre listé.</li>}
+          </ul>
+          <form action={ajouterAdminPlateformeAction} className="mt-3 grid gap-2 border-t border-neutral-100 pt-3 dark:border-neutral-800 sm:grid-cols-[1.5fr_1fr_1fr_auto]">
+            <input name="email" type="email" required placeholder="email@liria.fr" className={input} />
+            <input name="nom" placeholder="Nom (optionnel)" className={input} />
+            <select name="role" className={input} defaultValue="total">
+              <option value="total">Accès total</option>
+              <option value="support">Support</option>
+              <option value="facturation">Facturation</option>
+              <option value="lecture">Lecture seule</option>
+            </select>
+            <button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Ajouter</button>
+          </form>
+          <p className="mt-2 text-xs text-neutral-500">Après ajout : créez le compte de connexion dans Supabase (Authentication → Add user) avec le même email, puis communiquez le mot de passe au collaborateur.</p>
+        </section>
 
         <div className="space-y-3">
           {entreprises.map((e) => {
