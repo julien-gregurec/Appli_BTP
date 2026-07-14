@@ -9,12 +9,14 @@ export function TacheItem({
   libelle,
   echeance,
   fait,
+  modifiable = true,
 }: {
   tacheId: string;
   chantierId: string;
   libelle: string;
   echeance: string | null;
   fait: boolean;
+  modifiable?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
 
@@ -23,14 +25,14 @@ export function TacheItem({
       <input
         type="checkbox"
         defaultChecked={fait}
-        disabled={pending}
+        disabled={pending || !modifiable}
         onChange={(e) => {
           const checked = e.target.checked;
           startTransition(() => {
             basculerTacheAction(tacheId, chantierId, checked);
           });
         }}
-        className="h-4 w-4"
+        className="h-4 w-4 disabled:cursor-default"
       />
       <span className={fait ? "text-neutral-400 line-through" : ""}>{libelle}</span>
       {echeance && <span className="ml-auto text-xs text-neutral-400">{echeance}</span>}

@@ -40,7 +40,7 @@ export default async function AidePage({ searchParams }: { searchParams: Promise
         <section className="overflow-hidden rounded-lg border border-blue-200 bg-white dark:border-blue-900 dark:bg-neutral-950">
           <div className="space-y-1 p-4">
             <h2 className="font-semibold">Guide vidéo complet</h2>
-            <p className="text-sm text-neutral-600 dark:text-neutral-300">7 min 30 avec voix française : accès, planning, pointage GPS, devis, factures, achats, justificatifs, stock, employés, flotte, pilotage et paramètres.</p>
+            <p className="text-sm text-neutral-600 dark:text-neutral-300">8 min 23 avec voix française et sous-titres : accès, planning, pointage GPS, devis, factures, achats, justificatifs, stock, employés, flotte, pilotage et paramètres.</p>
           </div>
           <video controls preload="metadata" poster="/videos/Liria_Gestion_Pro_Guide_Poster.jpg" className="aspect-video w-full bg-[#0b1f35]">
             <source src="/videos/Liria_Gestion_Pro_Guide_Video_Complet.mp4" type="video/mp4" />
@@ -49,6 +49,21 @@ export default async function AidePage({ searchParams }: { searchParams: Promise
           </video>
           <div className="flex justify-end p-3">
             <a href="/videos/Liria_Gestion_Pro_Guide_Video_Complet.mp4" download className="rounded-md border border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950">Télécharger la vidéo</a>
+          </div>
+        </section>
+
+        <section className="overflow-hidden rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
+          <div className="space-y-1 p-4">
+            <h2 className="font-semibold">Présentation commerciale</h2>
+            <p className="text-sm text-neutral-600 dark:text-neutral-300">Vidéo de 59 secondes avec présentatrice, voix française, démonstrations animées et sous-titres.</p>
+          </div>
+          <video controls preload="metadata" className="aspect-video w-full bg-[#0b1f35]">
+            <source src="/videos/Liria_Gestion_Pro_Publicite_60s.mp4" type="video/mp4" />
+            <track kind="captions" src="/videos/Liria_Gestion_Pro_Publicite_60s.vtt" srcLang="fr" label="Français" default />
+            Votre navigateur ne peut pas lire cette vidéo.
+          </video>
+          <div className="flex justify-end p-3">
+            <a href="/videos/Liria_Gestion_Pro_Publicite_60s.mp4" download className="rounded-md border px-3 py-2 text-sm font-medium">Télécharger la publicité</a>
           </div>
         </section>
 

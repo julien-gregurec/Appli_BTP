@@ -1,0 +1,416 @@
+WEBVTT
+
+1
+00:00:00.100 --> 00:00:03.535
+Bonjour et bienvenue dans Liria Gestion Pro.
+
+2
+00:00:03.485 --> 00:00:12.236
+Dans cette présentation, nous allons parcourir l'ensemble
+du logiciel, depuis la création des accès jusqu'au
+pilotage de l'entreprise.
+
+3
+00:00:12.236 --> 00:00:23.631
+L'application centralise les clients, les chantiers, les
+devis, les factures, les équipes, le planning, le
+pointage, les achats, le stock et le matériel.
+
+4
+00:00:23.631 --> 00:00:28.144
+Chaque collaborateur dispose d'un espace adapté à son
+poste.
+
+5
+00:00:29.300 --> 00:00:35.171
+Pour commencer, ouvrez l'adresse de Liria Gestion Pro dans
+Chrome, Safari ou Edge.
+
+6
+00:00:35.121 --> 00:00:38.146
+Un dirigeant peut créer son entreprise.
+
+7
+00:00:38.146 --> 00:00:44.068
+Un collaborateur rejoint l'entreprise avec l'invitation
+préparée par son administrateur.
+
+8
+00:00:44.068 --> 00:00:49.068
+Sur téléphone, ajoutez ensuite l'application à l'écran
+d'accueil.
+
+9
+00:00:49.068 --> 00:00:52.239
+Le compte reste normalement connecté.
+
+10
+00:00:52.239 --> 00:00:58.606
+Autorisez la localisation pour le pointage et la caméra
+pour les scans lorsque le téléphone le demande.
+
+11
+00:00:59.750 --> 00:01:03.213
+Le tableau de bord s'adapte au compte connecté.
+
+12
+00:01:03.163 --> 00:01:07.084
+Un ouvrier retrouve d'abord son planning et son pointage.
+
+13
+00:01:07.084 --> 00:01:10.492
+Un responsable voit les éléments à contrôler.
+
+14
+00:01:10.492 --> 00:01:18.071
+Les indicateurs financiers, comme le total facturé ou le
+reste à encaisser, sont réservés aux postes autorisés.
+
+15
+00:01:18.071 --> 00:01:23.636
+Un module non autorisé disparaît du menu et reste
+également protégé côté serveur.
+
+16
+00:01:24.800 --> 00:01:32.394
+Dans Employés, l'administrateur crée d'abord la fiche,
+renseigne la fonction et choisit le poste applicatif.
+
+17
+00:01:32.344 --> 00:01:38.081
+Il règle séparément les droits de consultation, de gestion
+et les actions sensibles.
+
+18
+00:01:38.081 --> 00:01:44.423
+L'aperçu du poste montre exactement ce que verra le
+collaborateur sur téléphone et ordinateur.
+
+19
+00:01:44.423 --> 00:01:51.713
+Lorsque tout est prêt, l'invitation personnelle permet au
+salarié de créer son propre mot de passe et d'activer son
+compte.
+
+20
+00:01:52.870 --> 00:01:59.121
+Le planning présente les ouvriers par jour sur ordinateur
+et une lecture simplifiée sur téléphone.
+
+21
+00:01:59.071 --> 00:02:07.572
+Pour ajouter une affectation, choisissez le salarié, la
+date, le nombre d'heures, puis le chantier ou une activité
+hors chantier.
+
+22
+00:02:07.572 --> 00:02:14.177
+Vous pouvez donc planifier du temps au bureau, au dépôt,
+en formation ou en visite médicale.
+
+23
+00:02:14.177 --> 00:02:19.020
+Le planning hebdomadaire peut aussi être partagé par email
+ou WhatsApp.
+
+24
+00:02:20.170 --> 00:02:26.225
+Pour pointer, le salarié sélectionne son chantier et
+autorise la position précise.
+
+25
+00:02:26.175 --> 00:02:30.977
+Le bouton Pointer mon arrivée enregistre l'heure du
+serveur et le GPS.
+
+26
+00:02:30.977 --> 00:02:37.017
+En fin de journée, Pointer mon départ clôture la session
+et calcule la durée après la pause.
+
+27
+00:02:37.017 --> 00:02:42.754
+Personne, même un responsable, ne peut pointer à la place
+d'un autre salarié.
+
+28
+00:02:42.754 --> 00:02:48.293
+Le responsable peut uniquement contrôler, corriger ou
+valider selon ses droits.
+
+29
+00:02:49.470 --> 00:02:55.591
+Le module Clients regroupe les coordonnées, les conditions
+de paiement et l'historique commercial.
+
+30
+00:02:55.541 --> 00:03:03.277
+Le chantier rassemble l'adresse, le responsable, les
+documents, les salariés intervenus et le détail des
+heures.
+
+31
+00:03:03.277 --> 00:03:08.789
+Depuis un nouveau devis, vous pouvez créer le client puis
+le chantier sans quitter l'éditeur.
+
+32
+00:03:08.789 --> 00:03:13.554
+Les ouvriers autorisés peuvent consulter leurs prestations
+sans voir les prix.
+
+33
+00:03:14.710 --> 00:03:22.357
+Dans le catalogue Prestations, mémorisez les désignations,
+unités, prix et taux de TVA utilisés régulièrement.
+
+34
+00:03:22.307 --> 00:03:30.110
+Lors de la création du devis, choisissez le client et le
+chantier, puis insérez ces prestations ou ajoutez des
+lignes libres.
+
+35
+00:03:30.110 --> 00:03:33.267
+Les totaux se recalculent automatiquement.
+
+36
+00:03:33.267 --> 00:03:37.557
+Après acceptation, créez la facture depuis le devis.
+
+37
+00:03:37.557 --> 00:03:42.465
+Les paiements mettent à jour le montant encaissé, le reste
+dû et le statut.
+
+38
+00:03:43.620 --> 00:03:49.673
+Depuis un devis, une facture ou une commande, ouvrez
+l'aperçu et téléchargez le PDF.
+
+39
+00:03:49.623 --> 00:03:56.901
+Le bouton d'envoi prépare le destinataire, les personnes
+en copie, l'objet et le message dans votre messagerie.
+
+40
+00:03:56.901 --> 00:04:02.848
+Dans la version actuelle, ajoutez encore manuellement le
+PDF en pièce jointe avant l'envoi.
+
+41
+00:04:02.848 --> 00:04:09.625
+Si un paiement a été saisi par erreur, une personne
+autorisée peut le supprimer et les totaux sont recalculés.
+
+42
+00:04:10.780 --> 00:04:16.414
+Le module Fournisseurs conserve les contacts, commandes,
+dépenses et règlements.
+
+43
+00:04:16.364 --> 00:04:21.362
+Une commande peut être rattachée au chantier concerné puis
+envoyée en PDF.
+
+44
+00:04:21.362 --> 00:04:24.614
+À la livraison, contrôlez chaque ligne.
+
+45
+00:04:24.614 --> 00:04:32.851
+En cas de réception partielle, saisissez la quantité
+réellement reçue : Liria Gestion Pro affiche ce qui est
+reçu et ce qui manque.
+
+46
+00:04:32.851 --> 00:04:36.876
+Ajoutez ensuite la facture fournisseur et son règlement.
+
+47
+00:04:38.010 --> 00:04:47.090
+Chaque salarié peut créer sa propre note de frais, choisir
+le chantier, saisir les montants puis photographier ou
+importer le justificatif.
+
+48
+00:04:47.040 --> 00:04:51.528
+Vérifiez que le document est complet, en couleur et
+lisible.
+
+49
+00:04:51.528 --> 00:04:57.133
+Le responsable peut demander une correction, valider ou
+refuser avec un motif.
+
+50
+00:04:57.133 --> 00:05:01.290
+Le comptable peut ensuite exporter les dépenses
+autorisées.
+
+51
+00:05:01.290 --> 00:05:08.015
+Conservez toujours l'original papier jusqu'à confirmation
+de la procédure de conservation de l'entreprise.
+
+52
+00:05:09.180 --> 00:05:16.906
+Chaque article possède une référence, un stock, un seuil
+d'alerte, un emplacement et un code d'identification.
+
+53
+00:05:16.856 --> 00:05:21.828
+La borne du dépôt reste connectée sur un compte partagé
+limité au stock.
+
+54
+00:05:21.828 --> 00:05:28.751
+Pour chaque entrée ou sortie, le salarié saisit son
+identifiant interne et son mot de passe stock personnel.
+
+55
+00:05:28.751 --> 00:05:31.830
+Une sortie est rattachée à un chantier.
+
+56
+00:05:31.830 --> 00:05:35.987
+Les inventaires enregistrent les quantités physiques et
+les écarts.
+
+57
+00:05:37.160 --> 00:05:43.136
+La fiche employé rassemble l'ancienneté, le poste, les
+affectations et les accès.
+
+58
+00:05:43.086 --> 00:05:49.928
+La copie numérique de la Carte BTP peut être ajoutée avec
+les habilitations et leurs dates de validité.
+
+59
+00:05:49.928 --> 00:05:54.532
+Elle doit rester marquée comme copie et ne remplace pas la
+carte officielle.
+
+60
+00:05:54.532 --> 00:06:00.098
+Depuis son compte, le salarié peut également envoyer sa
+propre demande de congé.
+
+61
+00:06:00.098 --> 00:06:03.400
+Une demande acceptée alimente le planning.
+
+62
+00:06:04.540 --> 00:06:14.055
+Dans Flotte, suivez le véhicule, son conducteur, le
+kilométrage, les échéances et les factures d'entretien
+avec le détail des travaux.
+
+63
+00:06:14.005 --> 00:06:21.242
+Dans Outillage, enregistrez la référence, la marque,
+l'état, la localisation et l'affectation.
+
+64
+00:06:21.242 --> 00:06:26.229
+Un outil déclaré hors service devient indisponible et
+déclenche une alerte.
+
+65
+00:06:26.229 --> 00:06:31.413
+Il peut ensuite être envoyé en réparation, remis en
+service ou mis au rebut.
+
+66
+00:06:32.590 --> 00:06:38.224
+Les responsables autorisés disposent du suivi de
+rentabilité et de trésorerie.
+
+67
+00:06:38.174 --> 00:06:44.726
+La qualité des résultats dépend du rattachement des
+heures, achats, frais et matériels au bon chantier.
+
+68
+00:06:44.726 --> 00:06:51.990
+Les exports comptables permettent de choisir une période
+et de télécharger les journaux de ventes, règlements et
+TVA.
+
+69
+00:06:51.990 --> 00:06:59.147
+Les justificatifs de notes de frais peuvent être regroupés
+dans un export sécurisé avec manifeste et empreintes.
+
+70
+00:07:00.300 --> 00:07:07.526
+Dans Paramètres, renseignez l'identité de l'entreprise,
+son logo et les mentions utilisées sur les documents.
+
+71
+00:07:07.476 --> 00:07:12.989
+Vous pouvez choisir la police, la couleur et la mise en
+page des devis et factures.
+
+72
+00:07:12.989 --> 00:07:18.357
+La section Accès et rôles permet de réduire ou d'élargir
+les droits de chaque poste.
+
+73
+00:07:18.357 --> 00:07:27.818
+Enfin, l'assistant d'import accepte les listes structurées
+de clients, chantiers, salariés et prestations depuis un
+fichier CSV ou Excel.
+
+74
+00:07:28.970 --> 00:07:36.498
+Pour résumer la journée d'un salarié : il consulte son
+planning, sélectionne son chantier et pointe son arrivée.
+
+75
+00:07:36.448 --> 00:07:40.843
+Il ouvre Mes travaux pour lire les prestations et
+consignes sans les prix.
+
+76
+00:07:40.843 --> 00:07:45.264
+Au dépôt, il s'identifie personnellement pour chaque
+mouvement.
+
+77
+00:07:45.264 --> 00:07:49.304
+Il peut transmettre une photo de chantier ou une note de
+frais.
+
+78
+00:07:49.304 --> 00:07:52.291
+Enfin, il pointe son départ.
+
+79
+00:07:52.291 --> 00:07:55.804
+Toutes ces actions restent enregistrées en son nom propre.
+
+80
+00:07:56.970 --> 00:08:01.433
+Vous connaissez maintenant les principaux parcours de
+Liria Gestion Pro.
+
+81
+00:08:01.383 --> 00:08:07.330
+Commencez par configurer les postes et les droits, puis
+créez vos équipes, clients et chantiers.
+
+82
+00:08:07.330 --> 00:08:13.539
+Utilisez ensuite le planning, le pointage et les
+rattachements pour obtenir un suivi fiable.
+
+83
+00:08:13.539 --> 00:08:17.488
+Retrouvez le guide complet directement dans le menu Aide.
+
+84
+00:08:17.488 --> 00:08:22.067
+Liria Gestion Pro : gérer, suivre, piloter.

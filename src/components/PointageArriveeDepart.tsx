@@ -1,14 +1,22 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { enregistrerArriveeAction, enregistrerDepartAction } from "@/app/actions/pointages";
 type Option={id:string;nom:string};
 type Session={id:string;arrivee_at:string;tache:string|null;employe:Option|null;chantier:Option|null};
 const input="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
 function PositionEtValidation({libelle,bouton,couleur}:{libelle:string;bouton:string;couleur:string}){
-  const[position,setPosition]=useState<{lat:number;lng:number;precision:number}|null>(null),[erreur,setErreur]=useState(""),[charge,setCharge]=useState(false);
-  const localiser=()=>{setCharge(true);setErreur("");if(!navigator.geolocation){setErreur("La géolocalisation n’est pas disponible sur cet appareil.");setCharge(false);return;}navigator.geolocation.getCurrentPosition(p=>{setPosition({lat:p.coords.latitude,lng:p.coords.longitude,precision:p.coords.accuracy});setCharge(false);},e=>{setErreur(e.message||"Position impossible à obtenir.");setCharge(false);},{enableHighAccuracy:true,timeout:15000,maximumAge:0});};
-  return <div className="rounded-md border border-dashed p-3"><input type="hidden" name="latitude" value={position?.lat??""}/><input type="hidden" name="longitude" value={position?.lng??""}/><input type="hidden" name="precision_metres" value={position?.precision??""}/><div className="flex items-center justify-between gap-3"><div><p className="text-sm font-medium">Position GPS {libelle}</p><p className="text-xs text-neutral-500">La date et l’heure sont enregistrées automatiquement.</p></div><button type="button" onClick={localiser} disabled={charge} className="rounded-md border px-3 py-2 text-sm">{charge?"Localisation…":position?"Actualiser":"Me localiser"}</button></div>{position&&<p className="mt-2 text-xs text-green-700">GPS prêt · précision ± {Math.round(position.precision)} m</p>}{erreur&&<p className="mt-2 text-xs text-red-600">{erreur}</p>}<button disabled={!position} className={`mt-3 w-full rounded-md px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40 ${couleur}`}>{bouton}</button></div>;
+  const[position,setPosition]=useState<{lat:number;lng:number;precision:number}|null>(null),[erreur,setErreur]=useState(""),[charge,setCharge]=useState(true);
+  useEffect(()=>{
+    if(!navigator.geolocation){queueMicrotask(()=>{setErreur("La géolocalisation n’est pas disponible sur cet appareil.");setCharge(false);});return;}
+    const suivi=navigator.geolocation.watchPosition(
+      p=>{setPosition({lat:p.coords.latitude,lng:p.coords.longitude,precision:p.coords.accuracy});setErreur("");setCharge(false);},
+      e=>{setErreur(e.message||"Position impossible à obtenir. Autorisez la localisation dans les réglages du navigateur.");setCharge(false);},
+      {enableHighAccuracy:true,timeout:15000,maximumAge:10000},
+    );
+    return()=>navigator.geolocation.clearWatch(suivi);
+  },[]);
+  return <div className="rounded-md border border-dashed p-3"><input type="hidden" name="latitude" value={position?.lat??""}/><input type="hidden" name="longitude" value={position?.lng??""}/><input type="hidden" name="precision_metres" value={position?.precision??""}/><div><p className="text-sm font-medium">Position GPS {libelle}</p><p className="text-xs text-neutral-500">La localisation, la date et l’heure sont enregistrées automatiquement.</p></div>{charge&&<p className="mt-2 text-xs text-blue-700" aria-live="polite">Acquisition automatique de la position GPS…</p>}{position&&<p className="mt-2 text-xs text-green-700" aria-live="polite">GPS prêt · précision ± {Math.round(position.precision)} m</p>}{erreur&&<p className="mt-2 text-xs text-red-600" role="alert">{erreur}</p>}<button disabled={!position} className={`mt-3 w-full rounded-md px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40 ${couleur}`}>{charge?"Localisation en cours…":bouton}</button></div>;
 }
 
 export function PointageArriveeDepart({employes,chantiers,sessions}:{employes:Option[];chantiers:Option[];sessions:Session[]}){

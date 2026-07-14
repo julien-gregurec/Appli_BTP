@@ -11,6 +11,7 @@ import {
 } from "@/lib/carte-btp";
 import { ajouterHabilitationAction, supprimerHabilitationAction } from "@/app/actions/habilitations";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
+import { permissionsUtilisateur } from "@/lib/permissions";
 
 const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -25,12 +26,14 @@ export default async function CarteBtpPage({
   const msg = await searchParams;
   const ctx = await getContexteEntreprise();
   const sb = await createClient();
+  const permissions = await permissionsUtilisateur(ctx);
+  const peutGerer = permissions === null || permissions.includes("gerer_employes");
 
   const [{ data: employe }, { data: entreprise }, { data: habilitations }, { data: affectations }] = await Promise.all([
     sb.from("employes").select("id, prenom, nom, poste, identifiant_interne, numero_inscription, reference_interne, telephone, email, carte_btp_numero, carte_btp_expiration, carte_btp_mime_type, carte_btp_storage_path").eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),
     sb.from("entreprises").select("nom, siret").eq("id", ctx.entrepriseId).maybeSingle(),
     sb.from("habilitations_employe").select("id, type, libelle, date_obtention, date_expiration").eq("employe_id", id).eq("entreprise_id", ctx.entrepriseId).order("type"),
-    sb.from("affectations").select("date, chantier:chantiers(id, nom)").eq("employe_id", id).eq("entreprise_id", ctx.entrepriseId).order("date", { ascending: false }).limit(60),
+    sb.from("equipes_chantiers").select("date_debut, chantier:chantiers(id, nom)").eq("employe_id", id).eq("entreprise_id", ctx.entrepriseId).is("date_fin", null).order("date_debut", { ascending: false }),
   ]);
 
   if (!employe) notFound();
@@ -113,9 +116,9 @@ export default async function CarteBtpPage({
                       {h.date_obtention ? `obtenu ${h.date_obtention}` : ""}{h.date_expiration ? ` · expire ${h.date_expiration}` : ""}
                     </span>
                     <span className="rounded-full px-2 py-0.5 text-xs" style={{ background: st.couleur + "22", color: st.couleur }}>{st.libelle}</span>
-                    <form action={supprimer} className="ml-auto">
+                    {peutGerer&&<form action={supprimer} className="ml-auto">
                       <ConfirmSubmitButton message="Retirer cette habilitation ?" className="text-xs text-neutral-400 hover:text-red-600">Retirer</ConfirmSubmitButton>
-                    </form>
+                    </form>}
                   </div>
                 );
               })}
@@ -124,7 +127,7 @@ export default async function CarteBtpPage({
             <p className="text-sm text-neutral-500">Aucune habilitation enregistrée.</p>
           )}
 
-          <form action={ajouter} className="flex flex-wrap items-end gap-2 border-t border-neutral-100 pt-3 dark:border-neutral-800">
+          {peutGerer&&<form action={ajouter} className="flex flex-wrap items-end gap-2 border-t border-neutral-100 pt-3 dark:border-neutral-800">
             <div className="space-y-1">
               <label className="text-xs text-neutral-500">Type</label>
               <select name="type" className={input}>
@@ -144,7 +147,7 @@ export default async function CarteBtpPage({
               <input name="date_expiration" type="date" className={input} />
             </div>
             <button type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">Ajouter</button>
-          </form>
+          </form>}
         </section>
       </div>
     </main>

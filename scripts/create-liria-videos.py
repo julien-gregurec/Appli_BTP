@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Create the Liria Gestion Pro tutorial and advertising videos.
 
-The script renders deterministic 1080p interface scenes, produces a French
-female voice-over with the macOS speech engine and encodes MP4 files with a
-temporary ffmpeg binary. It never uses customer data or the old product name.
+The script renders animated 1080p interface demonstrations, produces a native
+French neural female voice, burns readable subtitles and normalizes the mix.
+It never uses customer data or the former product identity.
 """
 
 from __future__ import annotations
 
 import math
+import os
 import re
 import shutil
 import subprocess
@@ -28,7 +29,8 @@ ASSETS = OUT / "assets"
 LOGO_PATH = ASSETS / "liria-gestion-pro-logo.png"
 PRESENTER_PATH = ASSETS / "presentatrice-liria.png"
 FFMPEG = Path("/tmp/liria-video-tools/node_modules/@ffmpeg-installer/darwin-x64/ffmpeg")
-VOICE = "Sandy (Français (France))"
+EDGE_TTS = Path(os.environ.get("EDGE_TTS_BIN", "/tmp/liria-edge-tts/bin/edge-tts"))
+VOICE = "fr-FR-DeniseNeural"
 FPS = 30
 SIZE = (1920, 1080)
 
@@ -241,6 +243,7 @@ def fit_logo() -> Image.Image:
 
 LOGO = None
 LOGO_MARK = None
+PRESENTER_BADGE = None
 
 
 def paste_logo(canvas: Image.Image, x: int, y: int, width: int):
@@ -261,6 +264,25 @@ def paste_mark(canvas: Image.Image, x: int, y: int, height: int):
     ratio = height / LOGO_MARK.height
     mark = LOGO_MARK.resize((int(LOGO_MARK.width * ratio), height), Image.Resampling.LANCZOS)
     canvas.alpha_composite(mark, (x, y))
+
+
+def paste_presenter_badge(canvas: Image.Image, x: int = 1535, y: int = 765, size: int = 275):
+    global PRESENTER_BADGE
+    if PRESENTER_BADGE is None:
+        src = Image.open(PRESENTER_PATH).convert("RGBA")
+        crop = src.crop((int(src.width * 0.57), int(src.height * 0.01), int(src.width * 0.89), int(src.height * 0.67)))
+        side = min(crop.width, crop.height)
+        crop = crop.crop(((crop.width - side) // 2, 0, (crop.width + side) // 2, side))
+        crop = crop.resize((size, size), Image.Resampling.LANCZOS)
+        mask = Image.new("L", (size, size), 0)
+        ImageDraw.Draw(mask).ellipse((5, 5, size - 5, size - 5), fill=255)
+        badge = Image.new("RGBA", (size + 16, size + 16), (255, 255, 255, 0))
+        border = Image.new("RGBA", (size + 16, size + 16), (255, 255, 255, 0))
+        ImageDraw.Draw(border).ellipse((0, 0, size + 15, size + 15), fill=WHITE, outline=BLUE, width=7)
+        badge.alpha_composite(border)
+        badge.paste(crop, (8, 8), mask)
+        PRESENTER_BADGE = badge
+    canvas.alpha_composite(PRESENTER_BADGE, (x, y))
 
 
 def text_wrap(draw, text, xy, max_width, fnt, fill=TEXT, spacing=10, max_lines=None):
@@ -618,6 +640,7 @@ def render_scene(scene: Scene) -> Image.Image:
             draw.text((620, yy + 44), detail, font=font(23, True), fill=TEXT)
     else:
         draw.text((500, 400), scene.title, font=font(45, True), fill=TEXT)
+    paste_presenter_badge(canvas)
     return canvas
 
 
@@ -640,6 +663,48 @@ def format_srt_time(seconds: float) -> str:
     m, ms = divmod(ms, 60_000)
     s, ms = divmod(ms, 1000)
     return f"{h:02}:{m:02}:{s:02},{ms:03}"
+
+
+def parse_srt_time(value: str) -> float:
+    h, m, rest = value.strip().replace(".", ",").split(":")
+    s, ms = rest.split(",")
+    return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000
+
+
+def read_srt(path: Path):
+    content = path.read_text(encoding="utf-8").strip()
+    entries = []
+    for block in re.split(r"\n\s*\n", content):
+        lines = block.splitlines()
+        timing_index = next((i for i, line in enumerate(lines) if " --> " in line), None)
+        if timing_index is None:
+            continue
+        start, end = lines[timing_index].split(" --> ", 1)
+        text = " ".join(line.strip() for line in lines[timing_index + 1:] if line.strip())
+        if text:
+            entries.append((parse_srt_time(start), parse_srt_time(end), text))
+    return entries
+
+
+def write_subtitles(path: Path, entries, *, webvtt=False):
+    blocks = ["WEBVTT\n"] if webvtt else []
+    for i, (start, end, content) in enumerate(entries, 1):
+        wrapped = "\n".join(textwrap.wrap(content, 58))
+        start_text = format_srt_time(start)
+        end_text = format_srt_time(end)
+        if webvtt:
+            start_text, end_text = start_text.replace(",", "."), end_text.replace(",", ".")
+        blocks.append(f"{i}\n{start_text} --> {end_text}\n{wrapped}\n")
+    path.write_text("\n".join(blocks), encoding="utf-8")
+
+
+def cursor_asset(path: Path):
+    canvas = Image.new("RGBA", (110, 110), (255, 255, 255, 0))
+    draw = ImageDraw.Draw(canvas)
+    draw.ellipse((8, 8, 102, 102), fill=(13, 103, 232, 40), outline=(13, 103, 232, 150), width=5)
+    draw.ellipse((36, 36, 74, 74), fill=(255, 255, 255, 245), outline=BLUE, width=7)
+    draw.ellipse((49, 49, 61, 61), fill=BLUE)
+    canvas.save(path)
 
 
 def music_bed(path: Path, duration: float, promo: bool):
@@ -679,28 +744,53 @@ def create_video(name: str, scenes: tuple[Scene, ...], promo=False):
     durations = []
     subtitles = []
     cursor = 0.0
-    rate = "165" if promo else "160"
+    rate = "+2%" if promo else "-5%"
+    cursor_png = work / "cursor.png"
+    cursor_asset(cursor_png)
+    targets = {
+        "login": (945, 815), "dashboard": (1040, 405), "permissions": (1015, 675),
+        "planning": (1080, 650), "pointage": (890, 735), "clients": (720, 645),
+        "devis": (1170, 410), "document": (1155, 500), "orders": (1200, 660),
+        "expenses": (650, 840), "stock": (1080, 910), "employees": (1100, 475),
+        "assets": (1120, 790), "finance": (1040, 745), "settings": (1080, 905),
+        "routine": (900, 810), "standard": (950, 650), "presenter": (860, 620),
+    }
     for idx, scene in enumerate(scenes, 1):
         png = work / f"{idx:02}-{scene.key}.png"
-        txt = work / f"{idx:02}-{scene.key}.txt"
-        aiff = work / f"{idx:02}-{scene.key}.aiff"
+        voice = work / f"{idx:02}-{scene.key}.mp3"
+        captions = work / f"{idx:02}-{scene.key}.srt"
         segment = work / f"{idx:02}-{scene.key}.mp4"
         render_scene(scene).convert("RGB").save(png, quality=95)
-        txt.write_text(scene.voice, encoding="utf-8")
-        run(["/usr/bin/say", "-v", VOICE, "-r", rate, "-f", txt, "-o", aiff])
-        voice_duration = audio_duration(aiff)
-        duration = voice_duration + (0.55 if promo else 0.9)
+        run([
+            EDGE_TTS, "--voice", VOICE, f"--rate={rate}", "--pitch=+0Hz", "--volume=+0%",
+            "--text", scene.voice, "--write-media", voice, "--write-subtitles", captions,
+        ])
+        voice_duration = audio_duration(voice)
+        duration = voice_duration + (0.7 if promo else 1.0)
         durations.append(duration)
         fade_out = max(0.1, duration - 0.35)
-        vf = f"scale=1920:1080,fade=t=in:st=0:d=0.25:color=white,fade=t=out:st={fade_out:.3f}:d=0.35:color=white,format=yuv420p"
+        target_x, target_y = targets.get(scene.kind, targets["standard"])
+        start_x, start_y = 520, 920
+        vf = (
+            "[0:v]scale=1920:1080,"
+            "zoompan=z='1+0.025*(1-exp(-on/110))':"
+            "x='iw/2-(iw/zoom/2)+6*sin(on/45)':y='ih/2-(ih/zoom/2)+4*cos(on/55)':"
+            "d=1:s=1920x1080:fps=30,"
+            f"fade=t=in:st=0:d=0.25:color=white,fade=t=out:st={fade_out:.3f}:d=0.35:color=white[base];"
+            f"[2:v]format=rgba,fade=t=in:st=0.45:d=0.25,fade=t=out:st={max(0.5,duration-0.45):.3f}:d=0.35[cur];"
+            f"[base][cur]overlay=x='{start_x}+({target_x}-{start_x})*min(t/2.5,1)':"
+            f"y='{start_y}+({target_y}-{start_y})*min(t/2.5,1)':shortest=1,format=yuv420p"
+        )
         run([
-            FFMPEG, "-y", "-loop", "1", "-framerate", str(FPS), "-i", png, "-i", aiff,
-            "-vf", vf, "-af", f"apad,afade=t=in:st=0:d=0.12,afade=t=out:st={max(0.1, duration-0.3):.3f}:d=0.3",
+            FFMPEG, "-y", "-loop", "1", "-framerate", str(FPS), "-i", png, "-i", voice,
+            "-loop", "1", "-framerate", str(FPS), "-i", cursor_png,
+            "-filter_complex", vf, "-af", f"apad,afade=t=in:st=0:d=0.12,afade=t=out:st={max(0.1, duration-0.3):.3f}:d=0.3",
             "-t", f"{duration:.3f}", "-r", str(FPS), "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
             "-c:a", "aac", "-b:a", "160k", "-ar", "44100", "-ac", "2", "-movflags", "+faststart", segment,
         ])
         segments.append(segment)
-        subtitles.append((cursor, cursor + duration, scene.voice))
+        for start, end, content in read_srt(captions):
+            subtitles.append((cursor + start, min(cursor + end, cursor + duration), content))
         cursor += duration
 
     concat_file = work / "concat.txt"
@@ -710,18 +800,21 @@ def create_video(name: str, scenes: tuple[Scene, ...], promo=False):
     music = work / "music.wav"
     music_bed(music, cursor + 1, promo)
     final = OUT / ("Liria_Gestion_Pro_Publicite_60s.mp4" if promo else "Liria_Gestion_Pro_Guide_Video_Complet.mp4")
-    volume = "0.11" if promo else "0.035"
+    srt = final.with_suffix(".srt")
+    vtt = final.with_suffix(".vtt")
+    write_subtitles(srt, subtitles)
+    write_subtitles(vtt, subtitles, webvtt=True)
+    volume = "0.055" if promo else "0.022"
+    subtitle_path = str(srt).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
     run([
         FFMPEG, "-y", "-i", raw, "-i", music,
-        "-filter_complex", f"[0:a]volume=1.0[voice];[1:a]volume={volume}[music];[voice][music]amix=inputs=2:duration=first:dropout_transition=2[a]",
-        "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", final,
+        "-filter_complex",
+        f"[0:v]subtitles='{subtitle_path}':force_style='FontName=Arial,FontSize=13,PrimaryColour=&H00FFFFFF,OutlineColour=&H00351F0B,BorderStyle=3,BackColour=&HC0351F0B,Outline=1,Shadow=0,MarginV=22,Alignment=2'[v];"
+        f"[0:a]highpass=f=75,lowpass=f=15000,volume=1.08[voice];[1:a]volume={volume}[music];"
+        "[voice][music]amix=inputs=2:duration=first:dropout_transition=2,loudnorm=I=-16:TP=-1.5:LRA=7[a]",
+        "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "veryfast", "-crf", "19",
+        "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", final,
     ])
-    srt = final.with_suffix(".srt")
-    entries = []
-    for i, (start, end, content) in enumerate(subtitles, 1):
-        wrapped = "\n".join(textwrap.wrap(content, 78))
-        entries.append(f"{i}\n{format_srt_time(start)} --> {format_srt_time(end)}\n{wrapped}\n")
-    srt.write_text("\n".join(entries), encoding="utf-8")
     return final, cursor
 
 
@@ -732,10 +825,15 @@ def main():
         raise SystemExit("Missing video assets")
     if not FFMPEG.exists():
         raise SystemExit(f"Missing ffmpeg: {FFMPEG}")
-    tutorial, tutorial_duration = create_video("tutoriel", TUTORIAL, promo=False)
-    promo, promo_duration = create_video("publicite", PROMO, promo=True)
-    print(f"TUTORIAL={tutorial} DURATION={tutorial_duration:.1f}s")
-    print(f"PROMO={promo} DURATION={promo_duration:.1f}s")
+    if not EDGE_TTS.exists():
+        raise SystemExit(f"Missing native French neural voice tool: {EDGE_TTS}")
+    target = os.environ.get("LIRIA_VIDEO_TARGET", "all")
+    if target in ("all", "tutorial"):
+        tutorial, tutorial_duration = create_video("tutoriel", TUTORIAL, promo=False)
+        print(f"TUTORIAL={tutorial} DURATION={tutorial_duration:.1f}s")
+    if target in ("all", "promo"):
+        promo, promo_duration = create_video("publicite", PROMO, promo=True)
+        print(f"PROMO={promo} DURATION={promo_duration:.1f}s")
 
 
 if __name__ == "__main__":

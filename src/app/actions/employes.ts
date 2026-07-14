@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { permissionsUtilisateur } from "@/lib/permissions";
 
 function champ(formData: FormData, nom: string): string | null {
   const v = String(formData.get(nom) ?? "").trim();
@@ -15,6 +16,13 @@ function nombre(formData: FormData, nom: string): number | null {
   if (!value) return null;
   const parsed = Number(value.replace(",", "."));
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+async function exigerGestionEmployes(ctx: Awaited<ReturnType<typeof getContexteEntreprise>>, retour = "/employes") {
+  const permissions = await permissionsUtilisateur(ctx);
+  if (permissions !== null && !permissions.includes("gerer_employes")) {
+    redirect(`${retour}?error=${encodeURIComponent("Votre poste permet de consulter les employés, mais pas de les modifier.")}`);
+  }
 }
 
 function payloadEmploye(formData: FormData) {
@@ -38,6 +46,7 @@ function payloadEmploye(formData: FormData) {
 
 export async function creerEmployeAction(formData: FormData) {
   const ctx = await getContexteEntreprise();
+  await exigerGestionEmployes(ctx);
   const supabase = await createClient();
   const payload = payloadEmploye(formData);
 
@@ -67,6 +76,7 @@ export async function creerEmployeAction(formData: FormData) {
 
 export async function modifierEmployeAction(employeId: string, formData: FormData) {
   const ctx = await getContexteEntreprise();
+  await exigerGestionEmployes(ctx, `/employes/${employeId}`);
   const supabase = await createClient();
   const payload = payloadEmploye(formData);
 
@@ -97,6 +107,7 @@ export async function modifierEmployeAction(employeId: string, formData: FormDat
 
 export async function changerStatutEmployeAction(employeId: string, statut: string) {
   const ctx = await getContexteEntreprise();
+  await exigerGestionEmployes(ctx, `/employes/${employeId}`);
   const supabase = await createClient();
 
   const { error } = await supabase
@@ -111,10 +122,11 @@ export async function changerStatutEmployeAction(employeId: string, statut: stri
   }
 }
 
-export async function changerStatutCompteApplicationAction(employeId:string,statut:string){const ctx=await getContexteEntreprise();const supabase=await createClient();const{error}=await supabase.rpc("changer_statut_compte_application",{p_entreprise_id:ctx.entrepriseId,p_employe_id:employeId,p_statut:statut});if(error)redirect(`/employes/${employeId}?error=${encodeURIComponent(error.message)}`);revalidatePath("/employes");revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent(statut==="pause"?"Compte mis en pause — il reste facturable pour le mois":"Statut du compte mis à jour")}`);}
+export async function changerStatutCompteApplicationAction(employeId:string,statut:string){const ctx=await getContexteEntreprise();await exigerGestionEmployes(ctx,`/employes/${employeId}`);const supabase=await createClient();const{error}=await supabase.rpc("changer_statut_compte_application",{p_entreprise_id:ctx.entrepriseId,p_employe_id:employeId,p_statut:statut});if(error)redirect(`/employes/${employeId}?error=${encodeURIComponent(error.message)}`);revalidatePath("/employes");revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent(statut==="pause"?"Compte mis en pause — il reste facturable pour le mois":"Statut du compte mis à jour")}`);}
 
 export async function reinitialiserMotDePasseStockEmployeAction(employeId: string) {
   const ctx = await getContexteEntreprise();
+  await exigerGestionEmployes(ctx, `/employes/${employeId}`);
   const supabase = await createClient();
   const { error } = await supabase.rpc("reinitialiser_mot_de_passe_stock_employe", {
     p_entreprise_id: ctx.entrepriseId,
@@ -126,7 +138,9 @@ export async function reinitialiserMotDePasseStockEmployeAction(employeId: strin
 }
 
 export async function importerCarteBtpAction(employeId:string,formData:FormData){
-  const ctx=await getContexteEntreprise(),supabase=await createClient();
+  const ctx=await getContexteEntreprise();
+  await exigerGestionEmployes(ctx,`/employes/${employeId}`);
+  const supabase=await createClient();
   const fichier=formData.get("carte_btp"),numero=champ(formData,"carte_btp_numero"),expiration=champ(formData,"carte_btp_expiration");
   const formats:Record<string,string>={"application/pdf":"pdf","image/png":"png","image/jpeg":"jpg","image/webp":"webp"};
   const{data:employe}=await supabase.from("employes").select("id,carte_btp_storage_path").eq("id",employeId).eq("entreprise_id",ctx.entrepriseId).maybeSingle();
@@ -141,4 +155,4 @@ export async function importerCarteBtpAction(employeId:string,formData:FormData)
   revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent("Carte BTP enregistrée")}`);
 }
 
-export async function supprimerCarteBtpAction(employeId:string){const ctx=await getContexteEntreprise(),supabase=await createClient(),{data:employe}=await supabase.from("employes").select("carte_btp_storage_path").eq("id",employeId).eq("entreprise_id",ctx.entrepriseId).maybeSingle();if(employe?.carte_btp_storage_path)await supabase.storage.from("documents-employes").remove([employe.carte_btp_storage_path]);await supabase.from("employes").update({carte_btp_storage_path:null,carte_btp_nom:null,carte_btp_mime_type:null,carte_btp_taille_octets:null,carte_btp_numero:null,carte_btp_expiration:null,updated_at:new Date().toISOString()}).eq("id",employeId).eq("entreprise_id",ctx.entrepriseId);revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent("Carte BTP supprimée")}`);}
+export async function supprimerCarteBtpAction(employeId:string){const ctx=await getContexteEntreprise();await exigerGestionEmployes(ctx,`/employes/${employeId}`);const supabase=await createClient(),{data:employe}=await supabase.from("employes").select("carte_btp_storage_path").eq("id",employeId).eq("entreprise_id",ctx.entrepriseId).maybeSingle();if(employe?.carte_btp_storage_path)await supabase.storage.from("documents-employes").remove([employe.carte_btp_storage_path]);await supabase.from("employes").update({carte_btp_storage_path:null,carte_btp_nom:null,carte_btp_mime_type:null,carte_btp_taille_octets:null,carte_btp_numero:null,carte_btp_expiration:null,updated_at:new Date().toISOString()}).eq("id",employeId).eq("entreprise_id",ctx.entrepriseId);revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent("Carte BTP supprimée")}`);}

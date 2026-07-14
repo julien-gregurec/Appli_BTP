@@ -20,6 +20,20 @@ export function statutChantier(cle: string) {
   return CHANTIER_STATUTS.find((s) => s.cle === cle) ?? CHANTIER_STATUTS[0];
 }
 
+export const ROLES_CHANTIER = [
+  { cle: "ouvrier", libelle: "Ouvrier" },
+  { cle: "chef_equipe", libelle: "Chef d’équipe" },
+  { cle: "chef_chantier", libelle: "Chef de chantier" },
+  { cle: "conducteur_travaux", libelle: "Conducteur de travaux" },
+  { cle: "autre", libelle: "Autre intervenant" },
+] as const;
+
+export type RoleChantier = (typeof ROLES_CHANTIER)[number]["cle"];
+
+export function roleChantier(cle: string) {
+  return ROLES_CHANTIER.find((role) => role.cle === cle) ?? ROLES_CHANTIER[0];
+}
+
 export const CLIENT_TYPES = [
   { cle: "particulier", libelle: "Particulier" },
   { cle: "professionnel", libelle: "Professionnel" },

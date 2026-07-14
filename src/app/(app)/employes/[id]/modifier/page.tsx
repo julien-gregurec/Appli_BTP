@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { EmployeForm } from "@/components/EmployeForm";
 import { modifierEmployeAction } from "@/app/actions/employes";
 import { nomEmploye } from "@/lib/employes";
+import { permissionsUtilisateur } from "@/lib/permissions";
 
 export default async function ModifierEmployePage({
   params,
@@ -16,6 +17,8 @@ export default async function ModifierEmployePage({
   const { id } = await params;
   const { error } = await searchParams;
   const ctx = await getContexteEntreprise();
+  const permissions = await permissionsUtilisateur(ctx);
+  if (permissions !== null && !permissions.includes("gerer_employes")) redirect(`/employes/${id}?error=Acc%C3%A8s%20en%20lecture%20seule`);
   const supabase = await createClient();
 
   const [{ data: employe }, { data: postes }] = await Promise.all([

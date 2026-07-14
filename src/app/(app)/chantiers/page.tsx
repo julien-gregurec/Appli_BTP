@@ -2,11 +2,14 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { CHANTIER_STATUTS, statutChantier, nomClient } from "@/lib/chantier-statuts";
+import { permissionsUtilisateur } from "@/lib/permissions";
 
-export default async function ChantiersPage({ searchParams }: { searchParams: Promise<{ q?: string; statut?: string }> }) {
-  const { q = "", statut = "" } = await searchParams;
+export default async function ChantiersPage({ searchParams }: { searchParams: Promise<{ q?: string; statut?: string; error?: string }> }) {
+  const { q = "", statut = "", error } = await searchParams;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  const permissions = await permissionsUtilisateur(ctx);
+  const peutGerer = permissions === null || permissions.includes("gerer_chantiers");
 
   const { data: chantiers } = await supabase
     .from("chantiers")
@@ -30,10 +33,12 @@ export default async function ChantiersPage({ searchParams }: { searchParams: Pr
             <h1 className="text-xl font-semibold">Chantiers</h1>
             <p className="text-sm text-neutral-500">{chantiersFiltres.length} chantier(s) affiché(s) sur {chantiers?.length ?? 0}</p>
           </div>
-          <Link href="/chantiers/nouveau" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">
+          {peutGerer&&<Link href="/chantiers/nouveau" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">
             + Nouveau chantier
-          </Link>
+          </Link>}
         </div>
+
+        {error&&<p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
         <form method="get" className="flex flex-wrap gap-2 rounded-md border border-neutral-200 p-3 dark:border-neutral-800">
           <input name="q" defaultValue={q} placeholder="Référence, chantier, client ou ville" className="min-w-64 flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900" />

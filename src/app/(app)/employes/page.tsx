@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { ancienneteEmploye, contratEmployeLabel, formatEuro, nomEmploye, statutEmploye } from "@/lib/employes";
+import { permissionsUtilisateur } from "@/lib/permissions";
 
 type EmployeListe = {
   id: string;
@@ -38,6 +39,9 @@ type EmployeAvecAcces = EmployeListe & {
 export default async function EmployesPage() {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  const permissions = await permissionsUtilisateur(ctx);
+  const peutGerer = permissions === null || permissions.includes("gerer_employes");
+  const peutVoirFinances = permissions === null || permissions.includes("voir_indicateurs_financiers");
 
   const [{ data: employes }, { data: postes }, { data: droits }, { data: catalogue }] = await Promise.all([
     supabase
@@ -114,9 +118,9 @@ export default async function EmployesPage() {
             <h1 className="text-xl font-semibold">Employés</h1>
             <p className="text-sm text-neutral-500">{employes?.length ?? 0} fiche(s)</p>
           </div>
-          <Link href="/employes/nouveau" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">
+          {peutGerer&&<Link href="/employes/nouveau" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">
             + Nouvel employé
-          </Link>
+          </Link>}
         </div>
 
         {employesAvecAcces.length === 0 ? (
@@ -151,7 +155,7 @@ export default async function EmployesPage() {
                     <div><dt className="text-xs text-neutral-500">Contrat</dt><dd>{contratEmployeLabel(employe.type_contrat)}</dd></div>
                     <div><dt className="text-xs text-neutral-500">Ancienneté</dt><dd>{ancienneteEmploye(employe.date_entree, employe.statut === "sorti" ? employe.date_sortie : null)}</dd></div>
                     <div><dt className="text-xs text-neutral-500">Contact</dt><dd className="break-words">{employe.telephone ?? employe.email ?? "—"}</dd></div>
-                    <div><dt className="text-xs text-neutral-500">Coût horaire</dt><dd>{formatEuro(employe.cout_horaire)}</dd></div>
+                    {peutVoirFinances&&<div><dt className="text-xs text-neutral-500">Coût horaire</dt><dd>{formatEuro(employe.cout_horaire)}</dd></div>}
                   </dl>
 
                   <div className="rounded-md bg-neutral-50 p-3 text-xs dark:bg-neutral-900">
@@ -163,7 +167,7 @@ export default async function EmployesPage() {
                     </div>
                     <p className="mt-2 text-neutral-500">{acces.detail}</p>
                     <p className="mt-2 font-medium text-neutral-700 dark:text-neutral-300">{employe.posteAcces ?? "Aucun poste d’accès"}</p>
-                    <div className="mt-2">{droitsEmploye(employe)}</div>
+                    <div className="mt-2">{peutGerer?droitsEmploye(employe):<span className="text-neutral-500">Détails réservés aux gestionnaires</span>}</div>
                   </div>
 
                   <Link href={`/employes/${employe.id}`} className="inline-flex w-full items-center justify-center rounded-md border px-3 py-2 text-sm font-medium">
@@ -184,7 +188,7 @@ export default async function EmployesPage() {
                   <th className="px-4 py-2 font-medium">Contrat</th>
                   <th className="px-4 py-2 font-medium">Ancienneté</th>
                   <th className="px-4 py-2 font-medium">Contact</th>
-                  <th className="px-4 py-2 font-medium">Coût</th>
+                  {peutVoirFinances&&<th className="px-4 py-2 font-medium">Coût</th>}
                   <th className="px-4 py-2 font-medium">Statut</th>
                   <th className="px-4 py-2 font-medium">Application</th>
                   <th className="px-4 py-2 font-medium">Autorisations</th>
@@ -206,7 +210,7 @@ export default async function EmployesPage() {
                       <td className="px-4 py-2 text-neutral-600 dark:text-neutral-400">{contratEmployeLabel(employe.type_contrat)}</td>
                       <td className="px-4 py-2 whitespace-nowrap text-neutral-600 dark:text-neutral-400">{ancienneteEmploye(employe.date_entree, employe.statut === "sorti" ? employe.date_sortie : null)}</td>
                       <td className="px-4 py-2 text-neutral-600 dark:text-neutral-400">{employe.telephone ?? employe.email ?? "—"}</td>
-                      <td className="px-4 py-2 text-neutral-600 dark:text-neutral-400">{formatEuro(employe.cout_horaire)}</td>
+                      {peutVoirFinances&&<td className="px-4 py-2 text-neutral-600 dark:text-neutral-400">{formatEuro(employe.cout_horaire)}</td>}
                       <td className="px-4 py-2">
                         <span className="inline-flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400">
                           <span className="h-2 w-2 rounded-full" style={{ background: statut.couleur }} />
@@ -217,7 +221,7 @@ export default async function EmployesPage() {
                         <div className="space-y-1.5"><span className={`inline-block rounded-full px-2 py-1 ${acces.classe}`}>{acces.label}</span><p className="max-w-56 text-neutral-500">{acces.detail}</p><p className="font-medium text-neutral-700 dark:text-neutral-300">{employe.posteAcces ?? "Aucun poste d’accès"}</p></div>
                       </td>
                       <td className="min-w-64 px-4 py-2 text-xs">
-                        {droitsEmploye(employe)}
+                        {peutGerer?droitsEmploye(employe):<span className="text-neutral-500">Détails réservés aux gestionnaires</span>}
                       </td>
                     </tr>
                   );

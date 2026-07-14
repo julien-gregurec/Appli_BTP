@@ -3,6 +3,8 @@ import { EmployeForm } from "@/components/EmployeForm";
 import { creerEmployeAction } from "@/app/actions/employes";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { permissionsUtilisateur } from "@/lib/permissions";
+import { redirect } from "next/navigation";
 
 export default async function NouvelEmployePage({
   searchParams,
@@ -11,6 +13,8 @@ export default async function NouvelEmployePage({
 }) {
   const { error } = await searchParams;
   const ctx = await getContexteEntreprise();
+  const permissions = await permissionsUtilisateur(ctx);
+  if (permissions !== null && !permissions.includes("gerer_employes")) redirect("/employes?error=Acc%C3%A8s%20en%20lecture%20seule");
   const supabase = await createClient();
   const { data: postes } = await supabase.from("postes").select("id, nom").eq("entreprise_id", ctx.entrepriseId).order("nom");
 
