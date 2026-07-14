@@ -1,3 +1,11 @@
+# ✅ IMPORT DE DONNÉES (MIGRATION DEPUIS BATAPPLI…) — 14 juillet (Claude)
+
+**Code poussé (`36b183f`) — AUCUNE migration SQL (utilise les tables existantes).** Module d'import générique CSV/Excel pour faire basculer une entreprise depuis un autre logiciel (Batappli, EBP, Codial…). Page `/parametres/import` (gated `gerer_utilisateurs`, lien dans Paramètres). 4 types : **clients**, **chantiers** (client rattaché/créé par nom), **employés**, **catalogue** (`prestations_catalogue`). Flux : upload → parse serveur (`src/lib/import/parse.ts` : CSV avec détection séparateur `;`/`,` + Excel via `@excel.js/exceljs`) → auto-mapping des colonnes → aperçu → insertion par lots de 200 sous RLS (entreprise du user). Config champs : `src/lib/import/config.ts`. Actions : `src/app/actions/import.ts` (`analyserFichierImport`, `importerDonneesAction`). Assistant client : `src/components/ImportWizard.tsx`. Normalisation : nombres (virgule FR), dates (AAAA-MM-JJ ou JJ/MM/AAAA), enums validés/défauts. Cap 5000 lignes, fichier 8 Mo max. **Pas de fichier Batappli réel encore** → mapping manuel ; preset Batappli à caler quand un export sera fourni. Import Excel natif OK.
+
+**Seed de test dispo (non poussé, scratchpad)** : `seed_donnees_test.sql` génère 40 employés + 100 chantiers + 80 outils + 40 véhicules pour une entreprise cible (`v_cible`, défaut 'juju'). Fourni à Julien via presse-papier pour ses tests.
+
+---
+
 # ✅ QUESTIONNAIRE INSCRIPTION + SUPPORT CHAT + RESET ACCÈS — 14 juillet (Claude)
 
 **Migration 73 `20260714000073_besoins_et_support.sql` APPLIQUÉE + code poussé (`513d6a5`).**
