@@ -1,5 +1,11 @@
 # ÉTAT AUTORITATIF — 14 juillet 2026, audit global, équipes chantier et nouvelles vidéos (Codex)
 
+**Migrations 77, 78 et 79 + nettoyage des entreprises de test confirmés appliqués par Julien. Lot publié sur `main` au commit `544d35a` et déployé par Vercel.**
+
+- Contrôle post-migration : `entreprises`, `employes` et `equipes_chantiers` refusent désormais toute lecture anonyme. La faille prototype est fermée.
+- Le script de nettoyage a conservé LIRIA CONCEPT et supprimé les deux entreprises juju avec leurs données liées.
+- Les vidéos finales sont disponibles dans `/aide`, en téléchargement public contrôlé, et dans le dossier Bureau `Liria Gestion Pro`.
+
 - Produit : **Liria Gestion Pro**. Le logo logiciel est `public/liria-gestion-pro-logo.png`; le logo de l’entreprise active est séparé dans la navigation et reste utilisé sur ses documents.
 - Vidéos entièrement régénérées : guide Full HD **8 min 23** et publicité **59 s**, voix féminine française `fr-FR-DeniseNeural`, musique abaissée, mix normalisé à environ -16 LUFS, sous-titres incrustés + WebVTT, présentatrice adulte et interfaces animées. Fichiers finaux dans `output/video/` et `public/videos/`.
 - Pointage : acquisition GPS automatique à l’ouverture, date/heure serveur, bouton bloqué tant que la position n’est pas prête ; aucune action « Me localiser ».
@@ -9,7 +15,7 @@
 - Encodage : « Compte dépôt » corrigé immédiatement dans les trois anciennes lignes ; migration **79** rend le correctif reproductible.
 - Entreprises de test : la base contient LIRIA CONCEPT et deux doublons juju. Le compte test a été détaché, mais la suppression finale est bloquée par la table d’audit protégée. Exécuter `supabase/production/supprimer_entreprises_test.sql` en administrateur Supabase : il conserve LIRIA CONCEPT et supprime seulement les deux juju.
 - Audit local : **39/39 routes** ordinateur/mobile sans erreur HTTP ou page. ESLint OK, TypeScript OK, **14/14 tests**, build webpack **63 pages**, `npm audit --omit=dev` = **0 vulnérabilité**, `git diff --check` OK.
-- Publication retenue jusqu’à l’application des migrations 77, 78 et 79 et du script de nettoyage.
+- Publication terminée ; ne plus rejouer le script de nettoyage sauf restauration volontaire des entreprises de test.
 
 ---
 

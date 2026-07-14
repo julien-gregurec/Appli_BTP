@@ -7,7 +7,7 @@ Mise à jour : 14 juillet 2026. Ce document distingue ce qui est utilisable, ce 
 | Créer un client ou un chantier depuis un nouveau devis | ✅ Fait | Mini-formulaire client intégré, puis ouverture automatique du mini-formulaire chantier. Le bouton Nouveau chantier reste visible, explique qu’un client est requis, rattache le chantier au client et le sélectionne sans quitter le devis. |
 | Planning simple date + heures + tâche | ✅ Fait | Semaine visuelle lundi-dimanche, sans horaires début/fin. |
 | Plusieurs ouvriers sur une tâche | ✅ Fait | Sélection multiple, carte groupée, total heures-équipe, suppression groupée. |
-| Équipe permanente par chantier | ✅ Code prêt · migration 77 | Ouvrier, chef d’équipe, chef de chantier ou conducteur de travaux, avec rôle et dates. Visible depuis le chantier, la fiche salarié, la carte BTP et Mes travaux. |
+| Équipe permanente par chantier | ✅ Fait | Migration 77 appliquée : ouvrier, chef d’équipe, chef de chantier ou conducteur de travaux, avec rôle et dates. Visible depuis le chantier, la fiche salarié, la carte BTP et Mes travaux. |
 | Partager le planning semaine | ✅ Fait | Liens email et WhatsApp avec contenu de la semaine. |
 | PDF devis et factures | ✅ Fait | Pages A4 et bouton Télécharger PDF / impression. |
 | Email devis/facture/commande avec copies | 🟡 Fonctionnel assisté | Fenêtre destinataire + CC + objet + message + PDF à joindre ; ouvre la messagerie configurée et met le statut à Envoyé. Les commandes fournisseur ont désormais leur propre bon PDF. L’envoi serveur avec pièce jointe nécessite un domaine et une clé SMTP/Resend. |
