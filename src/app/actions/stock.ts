@@ -33,14 +33,16 @@ export async function mouvementStockBorneAction(fd: FormData) {
   const supabase = await createClient();
   const type = champ(fd, "type") ?? "sortie";
   const quantite = Number(fd.get("quantite"));
-  const codePersonnel = champ(fd, "code_personnel");
+  const numeroEmploye = champ(fd, "numero_employe");
+  const motDePasse = champ(fd, "mot_de_passe_stock");
   const codeArticle = champ(fd, "code_article");
-  if (!codePersonnel || !codeArticle || !Number.isFinite(quantite) || quantite <= 0) {
-    redirect(`/stock/borne?error=${encodeURIComponent("Code personnel, article et quantité sont obligatoires")}`);
+  if (!numeroEmploye || !motDePasse || !codeArticle || !Number.isFinite(quantite) || quantite <= 0) {
+    redirect(`/stock/borne?error=${encodeURIComponent("Numéro employé, mot de passe, article et quantité sont obligatoires")}`);
   }
-  const { error } = await supabase.rpc("enregistrer_mouvement_stock_borne", {
+  const { error } = await supabase.rpc("enregistrer_mouvement_stock_borne_v2", {
     p_entreprise_id: ctx.entrepriseId,
-    p_code_personnel: codePersonnel,
+    p_numero_employe: numeroEmploye,
+    p_mot_de_passe: motDePasse,
     p_code_article: codeArticle,
     p_type: type,
     p_quantite: quantite,
@@ -53,6 +55,26 @@ export async function mouvementStockBorneAction(fd: FormData) {
   revalidatePath("/stock");
   revalidatePath("/stock/borne");
   redirect(`/stock/borne?succes=${encodeURIComponent("Mouvement enregistré à votre nom")}`);
+}
+
+export async function definirMotDePasseStockPersonnelAction(fd: FormData) {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const motDePasse = champ(fd, "mot_de_passe_stock") ?? "";
+  const confirmation = champ(fd, "mot_de_passe_stock_confirmation") ?? "";
+  if (motDePasse !== confirmation) {
+    redirect(`/mon-espace?error=${encodeURIComponent("Les deux mots de passe ne correspondent pas")}`);
+  }
+  if (motDePasse.length < 8 || motDePasse.length > 72 || !/[A-Za-zÀ-ÿ]/.test(motDePasse) || !/[0-9]/.test(motDePasse)) {
+    redirect(`/mon-espace?error=${encodeURIComponent("Utilisez 8 à 72 caractères avec au moins une lettre et un chiffre")}`);
+  }
+  const { error } = await supabase.rpc("definir_mot_de_passe_stock_personnel", {
+    p_entreprise_id: ctx.entrepriseId,
+    p_mot_de_passe: motDePasse,
+  });
+  if (error) redirect(`/mon-espace?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/mon-espace");
+  redirect(`/mon-espace?succes=${encodeURIComponent("Votre accès personnel à la borne stock est actif")}`);
 }
 
 export async function importerStockAction(fd:FormData){const ctx=await getContexteEntreprise(),supabase=await createClient(),fichier=fd.get("fichier"),type=String(fd.get("type_import")??"");if(!(fichier instanceof File)||!fichier.size)redirect(`/stock?error=${encodeURIComponent("Choisissez un fichier")}`);if(fichier.size>20*1024*1024)redirect(`/stock?error=${encodeURIComponent("Le fichier dépasse 20 Mo")}`);try{const lignes=await lireImportStock(fichier);if(!lignes.length)throw new Error("Aucune ligne produit détectée");const{data,error}=await supabase.rpc("importer_articles_stock",{p_entreprise_id:ctx.entrepriseId,p_type:type,p_lignes:lignes});if(error)throw error;revalidatePath("/stock");revalidatePath("/inventaires");redirect(`/stock?succes=${encodeURIComponent(`${data} ligne(s) importée(s)`)}`)}catch(e){if(e&&typeof e==="object"&&"digest"in e)throw e;redirect(`/stock?error=${encodeURIComponent(e instanceof Error?e.message:"Import impossible")}`)}}

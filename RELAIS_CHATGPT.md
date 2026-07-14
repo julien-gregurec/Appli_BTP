@@ -1,3 +1,18 @@
+# 🔒 BORNE DÉPÔT PERSONNELLE + PLANNING MOBILE + ABONNEMENT AUTO — 14 juillet (Codex)
+
+**Code local vérifié, pas encore poussé. Migration 74 à appliquer avant publication :** `supabase/migrations/20260714000074_acces_stock_personnel.sql`.
+
+- Sessions ordinaires PC/smartphone : persistance Supabase SSR déjà correcte (cookies renouvelés, 400 jours maximum par défaut), aucune reconnexion quotidienne ajoutée.
+- Borne stock partagée : reste connectée au dépôt, mais exige à chaque mouvement le numéro `BTP-…` et un mot de passe stock créé par le salarié dans `/mon-espace`. Les anciens PIN administrateur sont invalidés ; l’admin peut uniquement réinitialiser.
+- Nouvelle RPC sécurisée `enregistrer_mouvement_stock_borne_v2` : droit `utiliser_borne_stock`, limitation des tentatives, erreur générique, mouvement strictement attribué à l’employé authentifié par ses identifiants dépôt.
+- Planning mobile refait jour par jour avec navigation collante et détails lisibles ; tableau ordinateur conservé.
+- Prix plateforme corrigé : offre recommandée (49/89/149 € avec 3 comptes inclus) + 12 € par compte actif ou en pause supplémentaire. L’ancien mauvais compteur des membres n’est plus utilisé.
+- QR/code-barres existants et futurs déjà assurés par migration 68 ; pointage au nom d’un autre déjà interdit par migration 70.
+- Contrôles : ESLint, TypeScript, 14/14 tests, build webpack et diff-check OK.
+- Déploiement volontairement retenu : appliquer migration 74, tester le parcours réel, puis commit/push. CLI Supabase non connecté et navigateur intégré indisponible pendant ce passage.
+
+---
+
 # ✅ IMPORT DE DONNÉES (MIGRATION DEPUIS BATAPPLI…) — 14 juillet (Claude)
 
 **Code poussé (`36b183f`) — AUCUNE migration SQL (utilise les tables existantes).** Module d'import générique CSV/Excel pour faire basculer une entreprise depuis un autre logiciel (Batappli, EBP, Codial…). Page `/parametres/import` (gated `gerer_utilisateurs`, lien dans Paramètres). 4 types : **clients**, **chantiers** (client rattaché/créé par nom), **employés**, **catalogue** (`prestations_catalogue`). Flux : upload → parse serveur (`src/lib/import/parse.ts` : CSV avec détection séparateur `;`/`,` + Excel via `@excel.js/exceljs`) → auto-mapping des colonnes → aperçu → insertion par lots de 200 sous RLS (entreprise du user). Config champs : `src/lib/import/config.ts`. Actions : `src/app/actions/import.ts` (`analyserFichierImport`, `importerDonneesAction`). Assistant client : `src/components/ImportWizard.tsx`. Normalisation : nombres (virgule FR), dates (AAAA-MM-JJ ou JJ/MM/AAAA), enums validés/défauts. Cap 5000 lignes, fichier 8 Mo max. **Pas de fichier Batappli réel encore** → mapping manuel ; preset Batappli à caler quand un export sera fourni. Import Excel natif OK.

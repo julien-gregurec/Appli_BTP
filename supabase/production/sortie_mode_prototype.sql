@@ -88,8 +88,9 @@ grant execute on function public.plateforme_releve_facturation(date) to authenti
 grant execute on function public.mes_devis_chantiers_sans_prix(uuid) to authenticated;
 grant execute on function public.mettre_outil_rebut(uuid,uuid,text) to authenticated;
 grant execute on function public.creer_code_identification(uuid,text,uuid) to authenticated;
-grant execute on function public.definir_code_stock_employe(uuid,uuid,text,boolean) to authenticated;
-grant execute on function public.enregistrer_mouvement_stock_borne(uuid,text,text,text,numeric,uuid,text,uuid,text) to authenticated;
+grant execute on function public.definir_mot_de_passe_stock_personnel(uuid,text) to authenticated;
+grant execute on function public.reinitialiser_mot_de_passe_stock_employe(uuid,uuid) to authenticated;
+grant execute on function public.enregistrer_mouvement_stock_borne_v2(uuid,text,text,text,text,numeric,uuid,text,uuid,text) to authenticated;
 
 revoke execute on function public.dev_contexte_entreprise() from public,anon,authenticated;
 drop function public.dev_contexte_entreprise();

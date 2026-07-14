@@ -65,6 +65,10 @@ export default async function LoginPage({
           </button>
         </form>
 
+        <p className="rounded-md bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
+          Votre connexion reste active sur cet ordinateur ou ce téléphone jusqu’à votre déconnexion. Sur un appareil partagé, pensez à utiliser « Se déconnecter ».
+        </p>
+
         <p className="text-sm text-neutral-500">
           Pas encore de compte ?{" "}
           <Link href="/signup" className="font-medium text-neutral-900 underline">

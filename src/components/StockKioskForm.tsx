@@ -73,8 +73,11 @@ export function StockKioskForm({ chantiers }: { chantiers: Chantier[] }) {
       <form action={mouvementStockBorneAction} className="space-y-5 rounded-xl border bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950 sm:p-6">
         <div className="rounded-lg bg-[#0d1b2a] p-4 text-white">
           <h2 className="text-lg font-semibold">Identification personnelle</h2>
-          <p className="mt-1 text-sm text-white/70">Le mouvement sera enregistré uniquement à votre nom. Ne communiquez pas votre code.</p>
-          <input name="code_personnel" type="password" inputMode="numeric" pattern="[0-9]{4,8}" minLength={4} maxLength={8} required autoComplete="off" placeholder="Votre code personnel (4 à 8 chiffres)" className="mt-3 w-full rounded-lg border border-white/30 bg-white px-3 py-3 text-lg tracking-[0.35em] text-neutral-950" />
+          <p className="mt-1 text-sm text-white/70">Le mouvement sera enregistré uniquement à votre nom. Utilisez le numéro indiqué dans « Mon espace » et votre mot de passe stock personnel.</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <input name="numero_employe" required autoComplete="off" autoCapitalize="characters" placeholder="N° employé (BTP-…)" className="w-full rounded-lg border border-white/30 bg-white px-3 py-3 text-base uppercase text-neutral-950" />
+            <input name="mot_de_passe_stock" type="password" minLength={8} maxLength={72} required autoComplete="off" placeholder="Mot de passe stock" className="w-full rounded-lg border border-white/30 bg-white px-3 py-3 text-base text-neutral-950" />
+          </div>
         </div>
 
         <fieldset className="space-y-3">

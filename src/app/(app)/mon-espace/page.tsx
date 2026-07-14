@@ -4,12 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { formatDateFr, nomEmploye } from "@/lib/employes";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
+import { definirMotDePasseStockPersonnelAction } from "@/app/actions/stock";
 
 const relation=<T,>(valeur:T|T[]|null):T|null=>Array.isArray(valeur)?valeur[0]??null:valeur;
 
-export default async function MonEspacePage(){
+export default async function MonEspacePage({searchParams}:{searchParams:Promise<{error?:string;succes?:string}>}){
+  const messages=await searchParams;
   const ctx=await getContexteEntreprise(),supabase=await createClient();
-  const{data:employe}=await supabase.from("employes").select("id,prenom,nom,email,telephone,poste,numero_inscription,carte_btp_storage_path,carte_btp_numero,carte_btp_expiration,utilisateur_id,profil_acces:postes(nom)").eq("entreprise_id",ctx.entrepriseId).eq("utilisateur_id",ctx.userId).maybeSingle();
+  const{data:employe}=await supabase.from("employes").select("id,prenom,nom,email,telephone,poste,numero_inscription,code_stock_active,code_stock_modifie_at,carte_btp_storage_path,carte_btp_numero,carte_btp_expiration,utilisateur_id,profil_acces:postes(nom)").eq("entreprise_id",ctx.entrepriseId).eq("utilisateur_id",ctx.userId).maybeSingle();
   if(!employe)return <main className="p-8"><div className="mx-auto max-w-3xl space-y-5"><div><h1 className="text-xl font-semibold">Mon espace</h1><p className="text-sm text-neutral-500">Votre fiche personnelle, votre carte BTP et vos affectations.</p></div><div className="rounded-md border border-dashed p-6 text-sm text-neutral-600">{isEmailLoginDisabled()?"Le mode prototype partage encore le compte administrateur. Cet espace affichera la fiche personnelle de chaque collaborateur après l’activation des connexions individuelles.":"Aucune fiche employé n’est encore liée à votre compte. Demandez à votre administrateur de vérifier votre numéro d’inscription."}</div></div></main>;
   const[{data:vehicules},{data:outils},{data:planning}]=await Promise.all([
     supabase.from("vehicules").select("id,immatriculation,marque,modele").eq("entreprise_id",ctx.entrepriseId).eq("employe_id",employe.id).order("immatriculation"),
@@ -17,11 +19,22 @@ export default async function MonEspacePage(){
     supabase.from("affectations").select("id,date,heures,tache,chantier:chantiers(id,nom)").eq("entreprise_id",ctx.entrepriseId).eq("employe_id",employe.id).gte("date",new Date().toISOString().slice(0,10)).order("date").limit(8),
   ]);
   const profil=relation(employe.profil_acces as {nom:string}|{nom:string}[]|null);
-  return <main className="p-8"><div className="mx-auto max-w-4xl space-y-6">
+  return <main className="p-4 sm:p-8"><div className="mx-auto max-w-4xl space-y-6">
     <div><h1 className="text-xl font-semibold">Mon espace</h1><p className="text-sm text-neutral-500">Mes informations professionnelles et mes prochaines affectations.</p></div>
+    {messages.error&&<p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{messages.error}</p>}{messages.succes&&<p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{messages.succes}</p>}
     <section className="grid gap-4 rounded-md border p-4 sm:grid-cols-[1fr_auto]">
       <div className="space-y-2"><h2 className="text-lg font-semibold">{nomEmploye(employe)}</h2><p className="text-sm text-neutral-500">{employe.poste??"Fonction non renseignée"} · {profil?.nom??"Poste d’accès non renseigné"}</p><p className="font-mono text-xs text-neutral-500">N° d’inscription : {employe.numero_inscription}</p>{employe.email&&<p className="text-sm">{employe.email}</p>}{employe.telephone&&<a href={`tel:${employe.telephone}`} className="block text-sm text-blue-700">{employe.telephone}</a>}</div>
       <div className="flex gap-2"><Link href="/pointage" className="rounded-md bg-[#0d1b2a] px-3 py-2 text-sm font-medium text-white">Pointer</Link><Link href="/planning" className="rounded-md border px-3 py-2 text-sm font-medium">Planning</Link></div>
+    </section>
+    <section className="space-y-4 rounded-md border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-900 dark:bg-blue-950/20">
+      <div><h2 className="font-semibold">Mon accès à la borne stock</h2><p className="text-sm text-neutral-600 dark:text-neutral-300">Au dépôt, saisissez votre numéro <strong className="font-mono">{employe.numero_inscription}</strong> puis ce mot de passe. Chaque mouvement sera enregistré uniquement à votre nom.</p></div>
+      <div className="flex items-center gap-2 text-sm"><span className={`h-2.5 w-2.5 rounded-full ${employe.code_stock_active?"bg-green-600":"bg-neutral-300"}`}/><strong>{employe.code_stock_active?"Mot de passe stock actif":"Mot de passe stock à créer"}</strong></div>
+      <form action={definirMotDePasseStockPersonnelAction} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+        <input name="mot_de_passe_stock" type="password" minLength={8} maxLength={72} autoComplete="new-password" required placeholder={employe.code_stock_active?"Nouveau mot de passe":"Mot de passe (8 caractères minimum)"} className="rounded-md border bg-white px-3 py-2 text-sm dark:bg-neutral-950"/>
+        <input name="mot_de_passe_stock_confirmation" type="password" minLength={8} maxLength={72} autoComplete="new-password" required placeholder="Confirmer le mot de passe" className="rounded-md border bg-white px-3 py-2 text-sm dark:bg-neutral-950"/>
+        <button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">{employe.code_stock_active?"Modifier":"Activer"}</button>
+      </form>
+      <p className="text-xs text-neutral-500">Au moins une lettre et un chiffre. Ne communiquez pas ce mot de passe : l’administrateur peut le réinitialiser, mais jamais le consulter.</p>
     </section>
     <section className="space-y-4 rounded-md border border-[#c9a24a]/50 bg-[#c9a24a]/5 p-4"><div><h2 className="font-semibold">Ma carte professionnelle BTP</h2><p className="text-sm text-neutral-500">Copie privée à présenter rapidement en cas de contrôle.</p></div>{employe.carte_btp_storage_path?<div className="grid gap-4 sm:grid-cols-[220px_1fr]"><a href="/api/mon-espace/carte-btp" target="_blank" rel="noreferrer" className="overflow-hidden rounded-md border bg-white"><div className="flex h-36 items-center justify-center"><Image src="/api/mon-espace/carte-btp" alt="Ma carte BTP" width={220} height={144} unoptimized className="h-36 w-full object-contain"/></div></a><div className="space-y-2 text-sm">{employe.carte_btp_numero&&<p><span className="text-neutral-500">N° de carte :</span> <span className="font-mono">{employe.carte_btp_numero}</span></p>}{employe.carte_btp_expiration&&<p><span className="text-neutral-500">Expiration :</span> {formatDateFr(employe.carte_btp_expiration)}</p>}<div className="flex gap-2"><a href="/api/mon-espace/carte-btp" target="_blank" rel="noreferrer" className="rounded-md bg-[#0d1b2a] px-3 py-2 text-sm font-medium text-white">Présenter</a><a href="/api/mon-espace/carte-btp?download=1" className="rounded-md border px-3 py-2 text-sm">Télécharger</a></div></div></div>:<p className="rounded border border-dashed p-4 text-sm text-neutral-500">Aucune copie enregistrée. L’administrateur peut l’ajouter depuis votre fiche employé.</p>}</section>
     <section className="space-y-3"><h2 className="font-semibold">Mes prochaines affectations</h2><div className="grid gap-3 sm:grid-cols-2">{(planning??[]).map(ligne=>{const chantier=relation(ligne.chantier as {id:string;nom:string}|{id:string;nom:string}[]|null);return <article key={ligne.id} className="rounded-md border p-3"><p className="text-xs text-neutral-500">{formatDateFr(ligne.date)} · {Number(ligne.heures)} h</p><p className="font-medium">{chantier?.nom??"Chantier"}</p>{ligne.tache&&<p className="text-sm text-neutral-600">{ligne.tache}</p>}</article>})}{!planning?.length&&<p className="text-sm text-neutral-500">Aucune affectation à venir.</p>}</div></section>

@@ -1,5 +1,30 @@
 # Relais Claude Code — Liria Gestion Pro
 
+## ÉTAT AUTORITATIF — 14 juillet 2026, borne dépôt et mobile (Codex)
+
+- Les migrations **57 à 73 sont appliquées** et l’authentification réelle est active en production. Les anciennes sections indiquant `57–71 non appliquées` ou `DISABLE_EMAIL_LOGIN=true` sont historiques et ne doivent plus guider la reprise.
+- Lot local terminé et vérifié, **non publié tant que la migration 74 n’est pas appliquée** : `supabase/migrations/20260714000074_acces_stock_personnel.sql`.
+- Connexions PC/téléphone : aucun raccourcissement de session n’a été ajouté. Supabase SSR conserve et renouvelle déjà les cookies de session (durée maximale par défaut de la bibliothèque : 400 jours), jusqu’à déconnexion volontaire ou révocation du compte. Le login l’explique désormais clairement.
+- Borne dépôt : le compte partagé peut rester connecté, mais chaque mouvement exige `numero_inscription` (`BTP-…`) + mot de passe stock personnel. Les anciens PIN définis par un administrateur sont invalidés par la migration 74.
+- Le salarié crée/modifie lui-même ce mot de passe dans `/mon-espace` (8–72 caractères, lettre + chiffre, bcrypt/pgcrypto, jamais stocké en clair). L’administrateur voit seulement l’état actif et peut réinitialiser, jamais définir ni lire le secret.
+- La RPC `enregistrer_mouvement_stock_borne_v2` impose une session membre avec droit `utiliser_borne_stock`, limite les essais, renvoie un message générique en cas d’identifiants invalides et attribue le mouvement à l’employé identifié.
+- Planning téléphone : vue remplacée par une lecture **jour par jour**, barre de navigation hebdomadaire collante, activités empilées avec employé, chantier/lieu/tâche, heures prévues et heures validées. Le tableau ouvriers × jours reste sur ordinateur.
+- Plateforme : le prix affiché utilise désormais les **comptes facturables** (`actif` + `pause`), et non les membres. Formule automatique : base de l’offre recommandée Essentiel/Pro/Premium (49/89/149 €) incluant 3 comptes + 12 € par compte supplémentaire. Deux tests Vitest couvrent la formule.
+- QR/code-barres : le registre et les triggers de la migration 68 couvrent déjà employés, véhicules, outils, références stock et chantiers existants/futurs. Le pointage au nom d’autrui reste bloqué par la migration 70.
+- Vérifications de ce lot : ESLint OK, TypeScript OK, **14/14 tests**, build Next webpack OK (seul avertissement connu `unpdf/import.meta`). `git diff --check` OK.
+- Blocage de publication : ni session CLI Supabase (`SUPABASE_ACCESS_TOKEN` absent), ni contrôle navigateur utilisable dans cette session. Appliquer la migration 74 dans le SQL Editor, puis refaire un test réel `/mon-espace` → création mot de passe → `/stock/borne` → mouvement, avant commit/push.
+
+### Fichiers du lot local
+
+- `supabase/migrations/20260714000074_acces_stock_personnel.sql`
+- `src/app/actions/stock.ts`, `src/components/StockKioskForm.tsx`, `/stock/borne`, `/mon-espace`
+- fiche admin employé + action de réinitialisation dans `src/app/actions/employes.ts`
+- `src/app/(app)/planning/page.tsx`
+- `src/app/(app)/plateforme/page.tsx`, `src/lib/plateforme.ts`, `src/lib/plateforme.test.ts`
+- `src/app/login/page.tsx`, `supabase/production/sortie_mode_prototype.sql`, test pgTAP borne stock
+
+---
+
 ## Reprise Codex — 13 juillet 2026, lot local en attente des migrations 57–71
 
 - État autoritatif : un important lot est terminé localement mais **pas encore appliqué à Supabase ni déployé**. Le CLI n’est pas lié, aucun `SUPABASE_ACCESS_TOKEN` n’est disponible et le navigateur SQL n’est pas pilotable. Exécuter les migrations `20260713000057` à `20260713000071` dans l’ordre avant toute publication.

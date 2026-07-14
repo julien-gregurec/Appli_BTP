@@ -75,7 +75,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
   const message = `Planning LIRIA CONCEPT — semaine du ${dateFr(debut, true)} au ${dateFr(fin, true)}\n\n${lignesPartage.length ? lignesPartage.join("\n") : "Aucune affectation planifiée."}`;
 
   return (
-    <main className="p-8">
+    <main className="p-4 sm:p-8">
       <div className="mx-auto max-w-[1500px] space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -107,53 +107,34 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
           <p className="rounded border border-dashed p-5 text-sm text-neutral-500">Ajoutez au moins un employé actif.</p>
         )}
 
-        {/* Vue mobile : une carte par ouvrier, jours empilés (le tableau déborde sur téléphone) */}
-        <div className="space-y-3 md:hidden">
-          {(employes ?? []).map((e) => {
-            const semaine = affectations.filter((a) => un(a.employe)?.id === e.id);
-            const totalEmp = semaine.reduce((s, a) => s + Number(a.heures), 0);
-            if (!semaine.length) return null;
-            return (
-              <div key={e.id} className="overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-800">
-                <div className="flex items-center justify-between border-b border-neutral-200 bg-neutral-50 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900">
-                  <span className="font-medium">{e.prenom} {e.nom}</span>
-                  <span className="font-mono text-xs text-neutral-500">{totalEmp} h</span>
-                </div>
-                <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                  {dates.map((d) => {
-                    const cellules = semaine.filter((a) => a.date === iso(d));
-                    if (!cellules.length) return null;
-                    return (
-                      <div key={iso(d)} className="px-3 py-2">
-                        <div className="mb-1 text-xs font-semibold capitalize text-neutral-500">{dateFr(d)}</div>
-                        <div className="space-y-1">
-                          {cellules.map((a) => {
-                            const ch = un(a.chantier);
-                            return (
-                              <div key={a.id} className={`flex items-start justify-between gap-2 rounded border-l-4 px-2 py-1 ${couleur(ch?.id ?? a.type_activite)}`}>
-                                <div className="min-w-0">
-                                  <div className="text-sm font-medium leading-tight text-neutral-900">{libelleAffectation(a)}</div>
-                                  {a.lieu_activite && <div className="text-[11px] text-neutral-600">{a.lieu_activite}</div>}
-                                  {a.tache && <div className="text-[11px] text-neutral-600">{a.tache}</div>}
-                                  <div className="font-mono text-[11px] text-neutral-700">{a.heures} h</div>
-                                </div>
-                                <form action={supprimerGroupeAffectationsAction}>
-                                  <input type="hidden" name="retour" value={iso(debut)} />
-                                  <input type="hidden" name="ids" value={a.id} />
-                                  <ConfirmSubmitButton message="Retirer cette affectation ?" className="px-1 text-sm text-neutral-400 hover:text-red-600">×</ConfirmSubmitButton>
-                                </form>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+        {/* Vue mobile : lecture jour par jour, sans tableau horizontal. */}
+        <div className="space-y-4 md:hidden">
+          <nav aria-label="Jours de la semaine" className="sticky top-16 z-20 -mx-4 flex gap-2 overflow-x-auto border-y bg-white/95 px-4 py-2 shadow-sm backdrop-blur dark:bg-neutral-950/95">
+            {dates.map((d) => {
+              const jour = iso(d);
+              const nombre = affectations.filter((a) => a.date === jour).length;
+              return <a key={jour} href={`#jour-${jour}`} className={`min-w-[72px] rounded-lg border px-3 py-2 text-center ${jour===aujourdhui?"border-[#c9a24a] bg-[#c9a24a]/15":"bg-white dark:bg-neutral-950"}`}><span className="block text-xs font-semibold capitalize">{dateFr(d)}</span><span className="text-[10px] text-neutral-500">{nombre} activité{nombre>1?"s":""}</span></a>;
+            })}
+          </nav>
+          {dates.map((d) => {
+            const jour=iso(d);
+            const cellules=affectations.filter((a)=>a.date===jour);
+            const totalJour=cellules.reduce((s,a)=>s+Number(a.heures),0);
+            return <section id={`jour-${jour}`} key={jour} className={`scroll-mt-36 overflow-hidden rounded-xl border ${jour===aujourdhui?"border-[#c9a24a] ring-1 ring-[#c9a24a]/30":"border-neutral-200 dark:border-neutral-800"}`}>
+              <header className="flex items-center justify-between bg-neutral-50 px-4 py-3 dark:bg-neutral-900"><div><h2 className="font-semibold capitalize">{dateFr(d,true)}</h2>{jour===aujourdhui&&<span className="text-xs font-medium text-[#9a741d]">Aujourd’hui</span>}</div><span className="font-mono text-xs text-neutral-500">{totalJour} h prévues</span></header>
+              <div className="space-y-2 p-3">
+                {cellules.map((a)=>{const ch=un(a.chantier);const emp=un(a.employe);const realise=emp?heuresRealisees(emp.id,a.date,ch?.id):0;return <article key={a.id} className={`relative rounded-lg border-l-4 p-3 pr-9 ${couleur(ch?.id??a.type_activite)}`}>
+                  <p className="text-sm font-semibold text-neutral-950">{emp?`${emp.prenom} ${emp.nom}`:"Employé non renseigné"}</p>
+                  <p className="mt-0.5 text-sm font-medium text-neutral-800">{libelleAffectation(a)}</p>
+                  {a.lieu_activite&&<p className="mt-1 text-xs text-neutral-600">Lieu : {a.lieu_activite}</p>}
+                  {a.tache&&<p className="mt-1 text-xs text-neutral-600">Tâche : {a.tache}</p>}
+                  <p className="mt-2 font-mono text-xs text-neutral-700">Prévu {a.heures} h{realise>0&&<span className="ml-2 font-semibold text-green-700">· Validé {realise} h</span>}</p>
+                  <form action={supprimerGroupeAffectationsAction} className="absolute right-2 top-2"><input type="hidden" name="retour" value={iso(debut)}/><input type="hidden" name="ids" value={a.id}/><ConfirmSubmitButton message="Retirer cette affectation ?" className="flex h-7 w-7 items-center justify-center rounded-full bg-white/80 text-neutral-500 shadow-sm hover:text-red-600">×</ConfirmSubmitButton></form>
+                </article>})}
+                {!cellules.length&&<p className="py-4 text-center text-sm text-neutral-500">Aucune activité planifiée.</p>}
               </div>
-            );
+            </section>;
           })}
-          {!affectations.length && <p className="rounded border border-dashed p-5 text-center text-sm text-neutral-500">Aucune affectation cette semaine.</p>}
         </div>
 
         {/* Tableau (ordinateur) : lignes = ouvriers, colonnes = jours */}

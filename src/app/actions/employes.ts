@@ -113,24 +113,16 @@ export async function changerStatutEmployeAction(employeId: string, statut: stri
 
 export async function changerStatutCompteApplicationAction(employeId:string,statut:string){const ctx=await getContexteEntreprise();const supabase=await createClient();const{error}=await supabase.rpc("changer_statut_compte_application",{p_entreprise_id:ctx.entrepriseId,p_employe_id:employeId,p_statut:statut});if(error)redirect(`/employes/${employeId}?error=${encodeURIComponent(error.message)}`);revalidatePath("/employes");revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent(statut==="pause"?"Compte mis en pause — il reste facturable pour le mois":"Statut du compte mis à jour")}`);}
 
-export async function definirCodeStockEmployeAction(employeId: string, formData: FormData) {
+export async function reinitialiserMotDePasseStockEmployeAction(employeId: string) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  const desactiver = champ(formData, "intention") === "desactiver";
-  const code = champ(formData, "code_stock") ?? "";
-  const confirmation = champ(formData, "code_stock_confirmation") ?? "";
-  if (!desactiver && (code !== confirmation || !/^[0-9]{4,8}$/.test(code))) {
-    redirect(`/employes/${employeId}?error=${encodeURIComponent("Le code et sa confirmation doivent contenir les mêmes 4 à 8 chiffres")}`);
-  }
-  const { error } = await supabase.rpc("definir_code_stock_employe", {
+  const { error } = await supabase.rpc("reinitialiser_mot_de_passe_stock_employe", {
     p_entreprise_id: ctx.entrepriseId,
     p_employe_id: employeId,
-    p_code: desactiver ? "" : code,
-    p_actif: !desactiver,
   });
   if (error) redirect(`/employes/${employeId}?error=${encodeURIComponent(error.message)}`);
   revalidatePath(`/employes/${employeId}`);
-  redirect(`/employes/${employeId}?success=${encodeURIComponent(desactiver ? "Code de stock désactivé" : "Code personnel de stock défini")}`);
+  redirect(`/employes/${employeId}?success=${encodeURIComponent("Accès stock réinitialisé. L’employé doit créer un nouveau mot de passe depuis Mon espace")}`);
 }
 
 export async function importerCarteBtpAction(employeId:string,formData:FormData){

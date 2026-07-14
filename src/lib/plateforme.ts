@@ -42,6 +42,7 @@ export type EntrepriseAbonnement = {
   options_actives?: string[];
   estimation_mensuelle_ht?: number;
   detail_comptes?: Array<{poste:string;comptes:number;tarif_unitaire:number;total:number}>;
+  offre_recommandee?: string | null;
   created_at: string;
 };
 
@@ -49,8 +50,8 @@ export type EntrepriseAbonnement = {
 // Barème par défaut, ajustable ici.
 export const TARIF_ABONNEMENT = { base: 49, employesInclus: 3, parEmployeSup: 12 };
 
-export function prixAbonnementMensuel(nbEmployesActifs: number, base: number = TARIF_ABONNEMENT.base) {
-  const sup = Math.max(0, nbEmployesActifs - TARIF_ABONNEMENT.employesInclus);
+export function prixAbonnementMensuel(nbComptesFacturables: number, base: number = TARIF_ABONNEMENT.base) {
+  const sup = Math.max(0, nbComptesFacturables - TARIF_ABONNEMENT.employesInclus);
   return {
     total: base + sup * TARIF_ABONNEMENT.parEmployeSup,
     base,
