@@ -44,3 +44,18 @@ export type EntrepriseAbonnement = {
   detail_comptes?: Array<{poste:string;comptes:number;tarif_unitaire:number;total:number}>;
   created_at: string;
 };
+
+// Tarification simple : prix mensuel = abonnement de base (incluant N employés) + employés supplémentaires.
+// Barème par défaut, ajustable ici.
+export const TARIF_ABONNEMENT = { base: 49, employesInclus: 3, parEmployeSup: 12 };
+
+export function prixAbonnementMensuel(nbEmployesActifs: number) {
+  const sup = Math.max(0, nbEmployesActifs - TARIF_ABONNEMENT.employesInclus);
+  return {
+    total: TARIF_ABONNEMENT.base + sup * TARIF_ABONNEMENT.parEmployeSup,
+    base: TARIF_ABONNEMENT.base,
+    employesSupplementaires: sup,
+    parEmployeSup: TARIF_ABONNEMENT.parEmployeSup,
+    employesInclus: TARIF_ABONNEMENT.employesInclus,
+  };
+}

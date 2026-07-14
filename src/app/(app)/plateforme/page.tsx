@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
-import { estPlateformeAdmin, statutAbonnement, type EntrepriseAbonnement } from "@/lib/plateforme";
+import { estPlateformeAdmin, statutAbonnement, prixAbonnementMensuel, type EntrepriseAbonnement } from "@/lib/plateforme";
 import { creerEntreprisePlateformeAction, genererSnapshotFacturationAction, modifierAbonnementAction, modifierTarifPostePlateformeAction } from "@/app/actions/plateforme";
 
 const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
@@ -81,6 +81,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
           {entreprises.map((e) => {
             const st = statutAbonnement(e.abonnement_statut);
             const action = modifierAbonnementAction.bind(null, e.id);
+            const prix = prixAbonnementMensuel(e.nb_membres_actifs);
             return (
               <article key={e.id} className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -97,6 +98,12 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                       {" · "}{e.nb_membres_actifs}/{e.nb_membres} membre(s) actif(s)
                       {" · créée le "}{new Date(e.created_at).toLocaleDateString("fr-FR")}
                     </p>
+                    <div className="mt-2 inline-flex items-baseline gap-2 rounded-md bg-[#c9a24a]/10 px-3 py-1.5">
+                      <span className="text-lg font-semibold text-[#0d1b2a] dark:text-[#c9a24a]">{prix.total} €<span className="text-xs font-normal">/mois</span></span>
+                      <span className="text-[11px] text-neutral-500">
+                        abonnement {prix.base} € (jusqu&apos;à {prix.employesInclus} salariés){prix.employesSupplementaires > 0 ? ` + ${prix.employesSupplementaires} × ${prix.parEmployeSup} €` : ""}
+                      </span>
+                    </div>
                     <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
                       <p className="rounded bg-neutral-50 px-2 py-1.5 dark:bg-neutral-900"><strong className="block text-base">{e.nb_fiches_employes ?? 0}</strong> employés facturables</p>
                       <p className="rounded bg-blue-50 px-2 py-1.5 text-blue-900 dark:bg-blue-950/30 dark:text-blue-200"><strong className="block text-base">{e.nb_comptes_facturables ?? e.nb_comptes_actives ?? 0}</strong> comptes facturables{e.nb_comptes_pause ? ` · ${e.nb_comptes_pause} en pause` : ""}</p>
