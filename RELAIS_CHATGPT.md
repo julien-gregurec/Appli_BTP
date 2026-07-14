@@ -1,3 +1,9 @@
+# ✅ LOT 57→71 DÉPLOYÉ EN PRODUCTION — 13 juillet (Claude)
+
+Les 15 migrations 57→71 ont été **appliquées** (guidées une par une via presse-papier ; la 57 était déjà en base) et le code a été **poussé** (commit `c59ae13`, `f94aba7..c59ae13`). Vérifié en prod : `/planning`, `/plateforme/facturation`, `/conges`, `/stock/borne`, `/mes-travaux`, `/notes-frais`, `/dashboard`, `/employes`, `/commandes`, `/plateforme` = **HTTP 200** avec vrai contenu. QR codes présents (`codes_identification` a déjà des lignes). `notes-frais` reste fermé en prototype (auth requise, par design). Reste (Claude, en cours) : améliorer la lisibilité mobile du planning, et la formule d'abonnement « base + employés supplémentaires » côté /plateforme.
+
+---
+
 # Relais pour ChatGPT — « Liria Gestion Pro »
 
 ## 00. REPRISE CODEX — 13 juillet 2026, archivage/frais + modules complémentaires (CODE LOCAL PRÊT, MIGRATIONS 57–71 NON APPLIQUÉES)
