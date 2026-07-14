@@ -1,0 +1,157 @@
+1
+00:00:00,000 --> 00:00:25,560
+Bonjour et bienvenue dans Liria Gestion Pro. Dans cette présentation, nous
+allons parcourir l'ensemble du logiciel, depuis la création des accès jusqu'au
+pilotage de l'entreprise. L'application centralise les clients, les chantiers,
+les devis, les factures, les équipes, le planning, le pointage, les achats, le
+stock et le matériel. Chaque collaborateur dispose d'un espace adapté à son
+poste.
+
+2
+00:00:25,560 --> 00:00:52,840
+Pour commencer, ouvrez l'adresse de Liria Gestion Pro dans Chrome, Safari ou
+Edge. Un dirigeant peut créer son entreprise. Un collaborateur rejoint
+l'entreprise avec l'invitation préparée par son administrateur. Sur téléphone,
+ajoutez ensuite l'application à l'écran d'accueil. Le compte reste normalement
+connecté. Autorisez la localisation pour le pointage et la caméra pour les
+scans lorsque le téléphone le demande.
+
+3
+00:00:52,840 --> 00:01:14,450
+Le tableau de bord s'adapte au compte connecté. Un ouvrier retrouve d'abord
+son planning et son pointage. Un responsable voit les éléments à contrôler.
+Les indicateurs financiers, comme le total facturé ou le reste à encaisser,
+sont réservés aux postes autorisés. Un module non autorisé disparaît du menu
+et reste également protégé côté serveur.
+
+4
+00:01:14,450 --> 00:01:40,100
+Dans Employés, l'administrateur crée d'abord la fiche, renseigne la fonction
+et choisit le poste applicatif. Il règle séparément les droits de
+consultation, de gestion et les actions sensibles. L'aperçu du poste montre
+exactement ce que verra le collaborateur sur téléphone et ordinateur. Lorsque
+tout est prêt, l'invitation personnelle permet au salarié de créer son propre
+mot de passe et d'activer son compte.
+
+5
+00:01:40,100 --> 00:02:04,550
+Le planning présente les ouvriers par jour sur ordinateur et une lecture
+simplifiée sur téléphone. Pour ajouter une affectation, choisissez le salarié,
+la date, le nombre d'heures, puis le chantier ou une activité hors chantier.
+Vous pouvez donc planifier du temps au bureau, au dépôt, en formation ou en
+visite médicale. Le planning hebdomadaire peut aussi être partagé par email ou
+WhatsApp.
+
+6
+00:02:04,550 --> 00:02:30,430
+Pour pointer, le salarié sélectionne son chantier et autorise la position
+précise. Le bouton Pointer mon arrivée enregistre l'heure du serveur et le
+GPS. En fin de journée, Pointer mon départ clôture la session et calcule la
+durée après la pause. Personne, même un responsable, ne peut pointer à la
+place d'un autre salarié. Le responsable peut uniquement contrôler, corriger
+ou valider selon ses droits.
+
+7
+00:02:30,430 --> 00:02:53,340
+Le module Clients regroupe les coordonnées, les conditions de paiement et
+l'historique commercial. Le chantier rassemble l'adresse, le responsable, les
+documents, les salariés intervenus et le détail des heures. Depuis un nouveau
+devis, vous pouvez créer le client puis le chantier sans quitter l'éditeur.
+Les ouvriers autorisés peuvent consulter leurs prestations sans voir les prix.
+
+8
+00:02:53,340 --> 00:03:19,500
+Dans le catalogue Prestations, mémorisez les désignations, unités, prix et
+taux de TVA utilisés régulièrement. Lors de la création du devis, choisissez
+le client et le chantier, puis insérez ces prestations ou ajoutez des lignes
+libres. Les totaux se recalculent automatiquement. Après acceptation, créez la
+facture depuis le devis. Les paiements mettent à jour le montant encaissé, le
+reste dû et le statut.
+
+9
+00:03:19,500 --> 00:03:44,730
+Depuis un devis, une facture ou une commande, ouvrez l'aperçu et téléchargez
+le PDF. Le bouton d'envoi prépare le destinataire, les personnes en copie,
+l'objet et le message dans votre messagerie. Dans la version actuelle, ajoutez
+encore manuellement le PDF en pièce jointe avant l'envoi. Si un paiement a été
+saisi par erreur, une personne autorisée peut le supprimer et les totaux sont
+recalculés.
+
+10
+00:03:44,730 --> 00:04:09,830
+Le module Fournisseurs conserve les contacts, commandes, dépenses et
+règlements. Une commande peut être rattachée au chantier concerné puis envoyée
+en PDF. À la livraison, contrôlez chaque ligne. En cas de réception partielle,
+saisissez la quantité réellement reçue : Liria Gestion Pro affiche ce qui est
+reçu et ce qui manque. Ajoutez ensuite la facture fournisseur et son
+règlement.
+
+11
+00:04:09,830 --> 00:04:37,760
+Chaque salarié peut créer sa propre note de frais, choisir le chantier, saisir
+les montants puis photographier ou importer le justificatif. Vérifiez que le
+document est complet, en couleur et lisible. Le responsable peut demander une
+correction, valider ou refuser avec un motif. Le comptable peut ensuite
+exporter les dépenses autorisées. Conservez toujours l'original papier jusqu'à
+confirmation de la procédure de conservation de l'entreprise.
+
+12
+00:04:37,760 --> 00:05:02,440
+Chaque article possède une référence, un stock, un seuil d'alerte, un
+emplacement et un code d'identification. La borne du dépôt reste connectée sur
+un compte partagé limité au stock. Pour chaque entrée ou sortie, le salarié
+saisit son identifiant interne et son mot de passe stock personnel. Une sortie
+est rattachée à un chantier. Les inventaires enregistrent les quantités
+physiques et les écarts.
+
+13
+00:05:02,440 --> 00:05:26,560
+La fiche employé rassemble l'ancienneté, le poste, les affectations et les
+accès. La copie numérique de la Carte BTP peut être ajoutée avec les
+habilitations et leurs dates de validité. Elle doit rester marquée comme copie
+et ne remplace pas la carte officielle. Depuis son compte, le salarié peut
+également envoyer sa propre demande de congé. Une demande acceptée alimente le
+planning.
+
+14
+00:05:26,560 --> 00:05:52,120
+Dans Flotte, suivez le véhicule, son conducteur, le kilométrage, les échéances
+et les factures d'entretien avec le détail des travaux. Dans Outillage,
+enregistrez la référence, la marque, l'état, la localisation et l'affectation.
+Un outil déclaré hors service devient indisponible et déclenche une alerte. Il
+peut ensuite être envoyé en réparation, remis en service ou mis au rebut.
+
+15
+00:05:52,120 --> 00:06:16,840
+Les responsables autorisés disposent du suivi de rentabilité et de trésorerie.
+La qualité des résultats dépend du rattachement des heures, achats, frais et
+matériels au bon chantier. Les exports comptables permettent de choisir une
+période et de télécharger les journaux de ventes, règlements et TVA. Les
+justificatifs de notes de frais peuvent être regroupés dans un export sécurisé
+avec manifeste et empreintes.
+
+16
+00:06:16,840 --> 00:06:42,310
+Dans Paramètres, renseignez l'identité de l'entreprise, son logo et les
+mentions utilisées sur les documents. Vous pouvez choisir la police, la
+couleur et la mise en page des devis et factures. La section Accès et rôles
+permet de réduire ou d'élargir les droits de chaque poste. Enfin, l'assistant
+d'import accepte les listes structurées de clients, chantiers, salariés et
+prestations depuis un fichier CSV ou Excel.
+
+17
+00:06:42,310 --> 00:07:06,760
+Pour résumer la journée d'un salarié : il consulte son planning, sélectionne
+son chantier et pointe son arrivée. Il ouvre Mes travaux pour lire les
+prestations et consignes sans les prix. Au dépôt, il s'identifie
+personnellement pour chaque mouvement. Il peut transmettre une photo de
+chantier ou une note de frais. Enfin, il pointe son départ. Toutes ces actions
+restent enregistrées en son nom propre.
+
+18
+00:07:06,760 --> 00:07:29,670
+Vous connaissez maintenant les principaux parcours de Liria Gestion Pro.
+Commencez par configurer les postes et les droits, puis créez vos équipes,
+clients et chantiers. Utilisez ensuite le planning, le pointage et les
+rattachements pour obtenir un suivi fiable. Retrouvez le guide complet
+directement dans le menu Aide. Liria Gestion Pro : gérer, suivre, piloter.

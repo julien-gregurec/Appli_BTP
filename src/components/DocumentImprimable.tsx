@@ -96,7 +96,7 @@ export function DocumentImprimable({
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", maxWidth: "62%" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={entreprise.logo_url || "/liria-concept-logo.png"} alt="Logo LIRIA CONCEPT" style={{ width: `${entreprise.logo_largeur_documents??105}px`, height: "64px", objectFit: "contain" }} />
+          <img src={entreprise.logo_url || "/liria-gestion-pro-logo.png"} alt="Logo de l’entreprise" style={{ width: `${entreprise.logo_largeur_documents??105}px`, height: "64px", objectFit: "contain" }} />
           <div>
           <div style={{ fontSize: "18px", fontWeight: 700, letterSpacing: "0.04em" }}>{entreprise.nom}</div>
           {entreprise.raison_sociale && entreprise.raison_sociale !== entreprise.nom && <div style={{ color: "#555" }}>{entreprise.raison_sociale}</div>}

@@ -19,6 +19,7 @@
 
 # production
 /build
+/output/video/tmp/
 
 # misc
 .DS_Store

@@ -72,7 +72,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
       .filter((a) => a.date === iso(d) && un(a.employe))
       .map((a) => `${dateFr(d)} · ${un(a.employe)!.prenom} ${un(a.employe)!.nom} → ${libelleAffectation(a)}${a.lieu_activite ? ` · ${a.lieu_activite}` : ""}${a.tache ? ` (${a.tache})` : ""} · ${a.heures} h`),
   );
-  const message = `Planning LIRIA CONCEPT — semaine du ${dateFr(debut, true)} au ${dateFr(fin, true)}\n\n${lignesPartage.length ? lignesPartage.join("\n") : "Aucune affectation planifiée."}`;
+  const message = `Planning ${ctx.entrepriseNom} — semaine du ${dateFr(debut, true)} au ${dateFr(fin, true)}\n\n${lignesPartage.length ? lignesPartage.join("\n") : "Aucune affectation planifiée."}`;
 
   return (
     <main className="p-4 sm:p-8">
@@ -83,7 +83,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
             <p className="text-sm text-neutral-500">Tableau par ouvrier et par jour : chantiers, bureau, dépôt, visites médicales, formations et absences.</p>
           </div>
           <div className="flex gap-2">
-            <a href={`mailto:?subject=${encodeURIComponent(`Planning LIRIA — semaine du ${dateFr(debut)}`)}&body=${encodeURIComponent(message)}`} className="rounded-md border px-3 py-2 text-sm hover:bg-neutral-50">Partager par email</a>
+            <a href={`mailto:?subject=${encodeURIComponent(`Planning ${ctx.entrepriseNom} — semaine du ${dateFr(debut)}`)}&body=${encodeURIComponent(message)}`} className="rounded-md border px-3 py-2 text-sm hover:bg-neutral-50">Partager par email</a>
             <a href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer" className="rounded-md border px-3 py-2 text-sm hover:bg-neutral-50">Partager par WhatsApp</a>
           </div>
         </div>

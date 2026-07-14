@@ -1,5 +1,15 @@
 # Relais Claude Code — Liria Gestion Pro
 
+## ÉTAT AUTORITATIF — 14 juillet 2026, identité et vidéos (Codex)
+
+- Produit confirmé : **Liria Gestion Pro**. L’ancien logo statique `Liria Concept` est supprimé et remplacé par `public/liria-gestion-pro-logo.png`; icônes PWA 192/512/Apple Touch régénérées. Les logos importés par les entreprises continuent de primer sur les devis et factures.
+- Deux MP4 Full HD livrés sous `output/video/` : tutoriel complet 7 min 30 et publicité 53 s. Voix féminine française, présentatrice blonde adulte, musique originale et sous-titres SRT. Sources reproductibles dans `scripts/create-liria-videos.py`.
+- `/aide` intègre le tutoriel avec lecteur, poster, sous-titres WebVTT et téléchargement (`public/videos/`). La publicité est destinée à la communication externe.
+- Couverture du guide PDF refaite avec le nouveau logo. Le PDF public reste à 24 pages avec 33 signets et ne contient plus `LIRIA CONCEPT` dans le texte extrait. Script : `scripts/update-guide-branding.py`.
+- Contrôles terminés : TypeScript OK, ESLint OK, 14/14 tests, build webpack OK, PDF 24 pages/33 signets, MP4 1080p avec pistes audio vérifiées. Reste uniquement la publication Git/Vercel de ce lot.
+
+---
+
 ## ÉTAT AUTORITATIF — 14 juillet 2026, lot 76 et données juju (Codex)
 
 - Migration 76 appliquée par Julien. Lot identifiants salariés + compte partagé du dépôt publié sur `main` (`2664259`, puis `7572ff0`) et déployé par Vercel.
