@@ -65,13 +65,13 @@ begin
   limit 1;
 
   if v_entreprise is null then
-    raise exception 'Entreprise de test « juju » introuvable : aucune donnée n''a été modifiée';
+    raise exception U&'Entreprise de test \00AB juju \00BB introuvable : aucune donn\00E9e n''a \00E9t\00E9 modifi\00E9e';
   end if;
 
   select p.id into v_admin_poste
   from public.postes p
   where p.entreprise_id = v_entreprise
-    and (lower(p.nom) like '%admin%' or lower(p.nom) like '%gérant%' or lower(p.nom) like '%gerant%')
+    and (lower(p.nom) like '%admin%' or lower(p.nom) like U&'%g\00E9rant%' or lower(p.nom) like '%gerant%')
   order by case when lower(p.nom) like '%admin%' then 0 else 1 end, p.created_at
   limit 1;
 
@@ -88,14 +88,14 @@ begin
   limit 1;
 
   if v_admin is null or v_email is null then
-    raise exception 'Aucun compte de connexion existant n''est rattaché à juju : aucune donnée n''a été modifiée';
+    raise exception U&'Aucun compte de connexion existant n''est rattach\00E9 \00E0 juju : aucune donn\00E9e n''a \00E9t\00E9 modifi\00E9e';
   end if;
 
   -- Réactivation du compte test et attribution du poste administrateur.
   update public.entreprises
   set abonnement_statut = 'actif',
       abonnement_echeance = current_date + 365,
-      abonnement_note = 'Compte de démonstration juju — historique de six mois',
+      abonnement_note = U&'Compte de d\00E9monstration juju \2014 historique de six mois',
       impaye_signale_at = null,
       suspension_prevue_at = null,
       impaye_message = null,
@@ -149,11 +149,11 @@ begin
       v_entreprise,'JUJU-CLI-'||lpad(v_i::text,3,'0'),
       case when v_i % 3 = 0 then 'professionnel' else 'particulier' end,
       case when v_i % 3 = 0 then null else (array['Martin','Bernard','Petit','Robert','Richard','Durand','Dubois','Moreau','Laurent','Simon'])[1+((v_i-1)%10)] end,
-      case when v_i % 3 = 0 then null else (array['Camille','Thomas','Julie','Nicolas','Sophie','Alexandre','Émilie','Maxime','Laura','Julien'])[1+((v_i-1)%10)] end,
-      case when v_i % 3 = 0 then 'Société Démo '||v_i else null end,
-      case when v_i % 3 = 0 then 'Société Démo '||v_i else null end,
-      (10+v_i)||' rue de la République','69'||lpad((100+v_i)::text,3,'0'),'Lyon',
-      '060000'||lpad(v_i::text,4,'0'),'client.'||v_i||'@example.test','30 jours','actif','[JUJU 6M] Client de démonstration',
+      case when v_i % 3 = 0 then null else (array['Camille','Thomas','Julie','Nicolas','Sophie','Alexandre',U&'\00C9milie','Maxime','Laura','Julien'])[1+((v_i-1)%10)] end,
+      case when v_i % 3 = 0 then U&'Soci\00E9t\00E9 D\00E9mo '||v_i else null end,
+      case when v_i % 3 = 0 then U&'Soci\00E9t\00E9 D\00E9mo '||v_i else null end,
+      (10+v_i)||U&' rue de la R\00E9publique','69'||lpad((100+v_i)::text,3,'0'),'Lyon',
+      '060000'||lpad(v_i::text,4,'0'),'client.'||v_i||'@example.test','30 jours','actif',U&'[JUJU 6M] Client de d\00E9monstration',
       now() - interval '7 months'
     ) on conflict(entreprise_id,reference_interne) do nothing;
 
@@ -162,7 +162,7 @@ begin
       date_debut_prevue,date_fin_prevue,date_debut_reelle,budget_previsionnel,created_at
     )
     select v_entreprise,'JUJU-CHA-'||lpad(v_i::text,3,'0'),c.id,
-      (array['Rénovation bureaux','Cloisons amovibles','Cabines sanitaires','Agencement accueil','Pose sol stratifié'])[1+((v_i-1)%5)]||' — Démo '||v_i,
+      (array[U&'R\00E9novation bureaux','Cloisons amovibles','Cabines sanitaires','Agencement accueil',U&'Pose sol stratifi\00E9'])[1+((v_i-1)%5)]||U&' \2014 D\00E9mo '||v_i,
       (30+v_i)||' avenue des Artisans','69'||lpad((200+v_i)::text,3,'0'),'Lyon',
       case when v_i <= 8 then 'facture' when v_i <= 14 then 'en_cours' when v_i <= 17 then 'accepte' else 'prospect' end,
       (date_trunc('month',current_date)-interval '5 months')::date + ((v_i-1)*5),
@@ -182,10 +182,10 @@ begin
   from public.employes where entreprise_id=v_entreprise and statut in ('actif','en_conge');
 
   if coalesce(array_length(v_clients,1),0)=0 or coalesce(array_length(v_chantiers,1),0)=0 then
-    raise exception 'Le jeu clients/chantiers de juju n''a pas pu être préparé';
+    raise exception U&'Le jeu clients/chantiers de juju n''a pas pu \00EAtre pr\00E9par\00E9';
   end if;
   if coalesce(array_length(v_employes,1),0)=0 then
-    raise exception 'Aucun employé actif dans juju : le seed a été annulé';
+    raise exception U&'Aucun employ\00E9 actif dans juju : le seed a \00E9t\00E9 annul\00E9';
   end if;
 
   -- Nettoyage ciblé des données d'une éventuelle exécution précédente.
@@ -213,17 +213,17 @@ begin
         conditions,notes_client,notes_internes,remise_globale,created_at
       )
       select v_entreprise,'DEV-JUJU-'||to_char(v_date,'YYYYMM')||'-'||lpad(v_index::text,3,'0'),
-        c.client_id,v_chantier,v_statut,v_date,v_date+30,'Validité 30 jours — acompte de 30 % à la commande',
-        'Merci pour votre confiance.','[JUJU 6M] Historique de démonstration',case when v_index%9=0 then 5 else 0 end,
+        c.client_id,v_chantier,v_statut,v_date,v_date+30,U&'Validit\00E9 30 jours \2014 acompte de 30 % \00E0 la commande',
+        'Merci pour votre confiance.',U&'[JUJU 6M] Historique de d\00E9monstration',case when v_index%9=0 then 5 else 0 end,
         v_date::timestamptz + interval '9 hours'
       from public.chantiers c where c.id=v_chantier
       returning id into v_devis;
 
       insert into public.lignes_devis(devis_id,designation,description,type,quantite,unite,prix_unitaire_ht,remise_ligne,taux_tva,ordre)
       values
-        (v_devis,(array['Pose cloisons amovibles','Agencement intérieur sur mesure','Création cabine sanitaire','Pose panneaux décoratifs'])[1+((v_index-1)%4)],'Préparation, implantation et pose complète','main_oeuvre',24+(v_index%20),'h',52,0,20,1),
-        (v_devis,'Fournitures et quincaillerie','Profilés, panneaux, fixations et consommables','fourniture',12+(v_index%15),'u',95+(v_index%4)*18,0,20,2),
-        (v_devis,'Déplacement et protection du chantier','Livraison, protections et nettoyage','forfait',1,'forfait',280+(v_index%5)*35,0,20,3);
+        (v_devis,(array['Pose cloisons amovibles',U&'Agencement int\00E9rieur sur mesure',U&'Cr\00E9ation cabine sanitaire',U&'Pose panneaux d\00E9coratifs'])[1+((v_index-1)%4)],U&'Pr\00E9paration, implantation et pose compl\00E8te','main_oeuvre',24+(v_index%20),'h',52,0,20,1),
+        (v_devis,'Fournitures et quincaillerie',U&'Profil\00E9s, panneaux, fixations et consommables','fourniture',12+(v_index%15),'u',95+(v_index%4)*18,0,20,2),
+        (v_devis,U&'D\00E9placement et protection du chantier','Livraison, protections et nettoyage','forfait',1,'forfait',280+(v_index%5)*35,0,20,3);
 
       if v_statut='accepte' then
         insert into public.factures(
@@ -233,7 +233,7 @@ begin
         select v_entreprise,'FAC-JUJU-'||to_char(v_date+7,'YYYYMM')||'-'||lpad(v_index::text,3,'0'),
           d.client_id,d.chantier_id,d.id,
           case when v_index%5=0 then 'acompte' else 'simple' end,
-          'envoyee',v_date+7,v_date+37,'Règlement par virement.','[JUJU 6M] Historique de démonstration',
+          'envoyee',v_date+7,v_date+37,U&'R\00E8glement par virement.',U&'[JUJU 6M] Historique de d\00E9monstration',
           (v_date+7)::timestamptz + interval '10 hours'
         from public.devis d where d.id=v_devis
         returning id into v_facture;
@@ -270,8 +270,8 @@ begin
         ) values (
           v_entreprise,v_chantier,v_employe,v_date,
           case when (v_jour+v_i)%5=0 then 8 else 7.5 end,
-          '[JUJU 6M] '||(array['Pose et réglages','Préparation supports','Montage cloisons','Finitions','Nettoyage et réception'])[1+(v_jour%5)],
-          'Planning historique de démonstration','chantier',v_date::timestamptz+interval '6 hours'
+          '[JUJU 6M] '||(array[U&'Pose et r\00E9glages',U&'Pr\00E9paration supports','Montage cloisons','Finitions',U&'Nettoyage et r\00E9ception'])[1+(v_jour%5)],
+          U&'Planning historique de d\00E9monstration','chantier',v_date::timestamptz+interval '6 hours'
         ) returning id into v_affectation;
 
         insert into public.pointages(
@@ -282,9 +282,9 @@ begin
         ) values (
           v_entreprise,v_employe,v_chantier,v_date,7.5,
           case when (v_jour+v_i)%5=0 then 0.5 else 0 end,
-          45,'[JUJU 6M] Travail réalisé','Pointage historique GPS de démonstration',
+          45,U&'[JUJU 6M] Travail r\00E9alis\00E9',U&'Pointage historique GPS de d\00E9monstration',
           45.764000 + (v_i::numeric/10000),4.835700 + (v_jour::numeric/10000),12+(v_i%8),
-          'valide',v_date::timestamptz+interval '18 hours',v_admin,'Pointage contrôlé et validé',
+          'valide',v_date::timestamptz+interval '18 hours',v_admin,U&'Pointage contr\00F4l\00E9 et valid\00E9',
           v_affectation,v_date::timestamptz+interval '18 hours',v_date::timestamptz+interval '18 hours'
         );
       end loop;
@@ -297,9 +297,9 @@ begin
       entreprise_id,reference,designation,unite,quantite_stock,seuil_alerte,prix_achat_ht,emplacement,actif
     ) values (
       v_entreprise,'JUJU-STK-'||lpad(v_i::text,3,'0'),
-      (array['Plaque BA13','Rail métallique 48','Montant métallique 48','Vis placo 25 mm','Bande à joint','Enduit de finition','Laine minérale','Profil aluminium','Panneau mélaminé','Silicone sanitaire'])[1+((v_i-1)%10)]||' '||v_i,
+      (array['Plaque BA13',U&'Rail m\00E9tallique 48',U&'Montant m\00E9tallique 48','Vis placo 25 mm',U&'Bande \00E0 joint','Enduit de finition',U&'Laine min\00E9rale','Profil aluminium',U&'Panneau m\00E9lamin\00E9','Silicone sanitaire'])[1+((v_i-1)%10)]||' '||v_i,
       case when v_i%4=0 then 'boite' when v_i%3=0 then 'ml' else 'u' end,
-      0,12+(v_i%8),4.5+v_i*2.15,'Dépôt — Zone '||chr(65+((v_i-1)%5)),true
+      0,12+(v_i%8),4.5+v_i*2.15,U&'D\00E9p\00F4t \2014 Zone '||chr(65+((v_i-1)%5)),true
     ) on conflict(entreprise_id,reference) do update
       set designation=excluded.designation,seuil_alerte=excluded.seuil_alerte,
           prix_achat_ht=excluded.prix_achat_ht,emplacement=excluded.emplacement,actif=true;
@@ -324,9 +324,9 @@ begin
       entreprise_id,reference,nom,contact_nom,email,telephone,adresse,code_postal,ville,notes,actif
     ) values (
       v_entreprise,'JUJU-FRN-'||lpad(v_i::text,3,'0'),
-      (array['Point.P','Sonepar','Kiloutou','Rexel','Dispano','Legallais','Würth','La Plateforme du Bâtiment'])[v_i],
+      (array['Point.P','Sonepar','Kiloutou','Rexel','Dispano','Legallais',U&'W\00FCrth',U&'La Plateforme du B\00E2timent'])[v_i],
       'Service professionnel','commandes.'||v_i||'@example.test','040000'||lpad(v_i::text,4,'0'),
-      v_i||' rue des Fournisseurs','6900'||v_i,'Lyon','[JUJU 6M] Fournisseur de démonstration',true
+      v_i||' rue des Fournisseurs','6900'||v_i,'Lyon',U&'[JUJU 6M] Fournisseur de d\00E9monstration',true
     ) on conflict(entreprise_id,reference) do update set nom=excluded.nom,actif=true;
   end loop;
   select array_agg(id order by reference) into v_fournisseurs
@@ -349,7 +349,7 @@ begin
       insert into public.lignes_commande(
         entreprise_id,commande_id,designation,description,quantite,unite,prix_unitaire_ht,taux_tva,quantite_recue,ordre
       ) values
-        (v_entreprise,v_commande,'Matériaux chantier','Panneaux et profilés',10,'u',95+(v_index%5)*12,20,case when v_statut='recue_partiel' then 6 when v_statut='recue' then 10 else 0 end,1),
+        (v_entreprise,v_commande,U&'Mat\00E9riaux chantier',U&'Panneaux et profil\00E9s',10,'u',95+(v_index%5)*12,20,case when v_statut='recue_partiel' then 6 when v_statut='recue' then 10 else 0 end,1),
         (v_entreprise,v_commande,'Consommables','Fixations et produits de finition',20,'u',18+(v_index%4)*3,20,case when v_statut='recue_partiel' then 12 when v_statut='recue' then 20 else 0 end,2);
 
       if v_statut in ('recue','recue_partiel') then
@@ -359,7 +359,7 @@ begin
         ) values (
           v_entreprise,v_fournisseur,v_chantier,v_commande,'ACH-JUJU-'||lpad(v_index::text,4,'0'),'materiaux',
           v_date+8,v_date+38,1250+(v_index%6)*175,round((1250+(v_index%6)*175)*0.2,2),
-          '[JUJU 6M] Facture fournisseur liée à la commande',v_date::timestamptz+interval '9 days'
+          U&'[JUJU 6M] Facture fournisseur li\00E9e \00E0 la commande',v_date::timestamptz+interval '9 days'
         ) returning id into v_depense;
         select montant_ttc into v_total from public.depenses_fournisseurs where id=v_depense;
         if v_index%5<>0 then
@@ -375,10 +375,10 @@ begin
   insert into public.charges_recurrentes(
     entreprise_id,libelle,fournisseur_id,categorie,periodicite,montant_ht,montant_tva,prochaine_echeance,actif,notes
   ) values
-    (v_entreprise,'[JUJU 6M] Assurance flotte',v_fournisseurs[1],'assurance','mensuelle',620,0,date_trunc('month',current_date)::date+interval '1 month',true,'Charge de démonstration'),
-    (v_entreprise,'[JUJU 6M] Location dépôt',v_fournisseurs[2],'location','mensuelle',1800,360,date_trunc('month',current_date)::date+interval '1 month',true,'Charge de démonstration'),
-    (v_entreprise,'[JUJU 6M] Carburant cartes flotte',v_fournisseurs[3],'carburant','mensuelle',1450,290,date_trunc('month',current_date)::date+interval '1 month',true,'Charge de démonstration'),
-    (v_entreprise,'[JUJU 6M] Téléphonie équipe',v_fournisseurs[4],'autre','mensuelle',380,76,date_trunc('month',current_date)::date+interval '1 month',true,'Charge de démonstration')
+    (v_entreprise,'[JUJU 6M] Assurance flotte',v_fournisseurs[1],'assurance','mensuelle',620,0,date_trunc('month',current_date)::date+interval '1 month',true,U&'Charge de d\00E9monstration'),
+    (v_entreprise,U&'[JUJU 6M] Location d\00E9p\00F4t',v_fournisseurs[2],'location','mensuelle',1800,360,date_trunc('month',current_date)::date+interval '1 month',true,U&'Charge de d\00E9monstration'),
+    (v_entreprise,'[JUJU 6M] Carburant cartes flotte',v_fournisseurs[3],'carburant','mensuelle',1450,290,date_trunc('month',current_date)::date+interval '1 month',true,U&'Charge de d\00E9monstration'),
+    (v_entreprise,U&'[JUJU 6M] T\00E9l\00E9phonie \00E9quipe',v_fournisseurs[4],'autre','mensuelle',380,76,date_trunc('month',current_date)::date+interval '1 month',true,U&'Charge de d\00E9monstration')
   on conflict(entreprise_id,libelle) do update
     set fournisseur_id=excluded.fournisseur_id,montant_ht=excluded.montant_ht,
         montant_tva=excluded.montant_tva,prochaine_echeance=excluded.prochaine_echeance,actif=true;
@@ -397,11 +397,11 @@ begin
     ) values (
       v_entreprise,v_employe,v_chantier,v_date,v_total,
       (array['repas','carburant','peage','stationnement','petit_materiel','achat_chantier'])[1+((v_i-1)%6)],
-      '[JUJU 6M] Dépense professionnelle historique',
+      U&'[JUJU 6M] D\00E9pense professionnelle historique',
       case when v_i%9=0 then 'soumis' when v_i%13=0 then 'refuse' else 'valide' end,
       (array['TotalEnergies','Boulangerie du chantier','VINCI Autoroutes','Parking Lyon','Quincaillerie Pro'])[1+((v_i-1)%5)],
       v_date::timestamptz+interval '18 hours',round(v_total/1.2,2),round(v_total-v_total/1.2,2),20,'EUR','cb',
-      'Dépense engagée pour les besoins du chantier','ticket_caisse','incomplet',
+      U&'D\00E9pense engag\00E9e pour les besoins du chantier','ticket_caisse','incomplet',
       v_date::timestamptz+interval '19 hours',
       case when v_i%9<>0 and v_i%13<>0 then v_date::timestamptz+interval '2 days' else null end,
       case when v_i%9<>0 and v_i%13<>0 then v_admin else null end,
@@ -418,8 +418,8 @@ begin
     ) values (
       v_entreprise,v_employes[1+((v_i-1)%least(12,array_length(v_employes,1)))],
       case when v_i%5=0 then 'rtt' else 'conges_payes' end,v_date,v_date+case when v_i%4=0 then 4 else 0 end,
-      '[JUJU 6M] Demande historique de démonstration',case when v_i%7=0 then 'refusee' else 'approuvee' end,
-      case when v_i%7=0 then 'Période déjà complète' else 'Validée par le responsable' end,
+      U&'[JUJU 6M] Demande historique de d\00E9monstration',case when v_i%7=0 then 'refusee' else 'approuvee' end,
+      case when v_i%7=0 then U&'P\00E9riode d\00E9j\00E0 compl\00E8te' else U&'Valid\00E9e par le responsable' end,
       v_admin,v_date::timestamptz-interval '5 days',v_date::timestamptz-interval '7 days',v_admin,
       v_date::timestamptz-interval '7 days',v_date::timestamptz-interval '5 days'
     );
@@ -437,7 +437,7 @@ begin
           v_km:=v_km+650+v_i*18+v_mois*12;
           insert into public.releves_kilometrage(entreprise_id,vehicule_id,date_releve,kilometrage,note,created_at)
           values(v_entreprise,v_vehicule,(date_trunc('month',current_date)-interval '5 months'+make_interval(months=>v_mois))::date+25,
-            v_km,'[JUJU 6M] Relevé mensuel',(date_trunc('month',current_date)-interval '5 months'+make_interval(months=>v_mois))::timestamptz+interval '25 days');
+            v_km,U&'[JUJU 6M] Relev\00E9 mensuel',(date_trunc('month',current_date)-interval '5 months'+make_interval(months=>v_mois))::timestamptz+interval '25 days');
         end loop;
       end if;
       v_fournisseur:=v_fournisseurs[1+((v_i-1)%array_length(v_fournisseurs,1))];
@@ -447,8 +447,8 @@ begin
       ) values (
         v_entreprise,v_fournisseur,v_vehicule,'ENT-JUJU-'||lpad(v_i::text,4,'0'),'transport',
         current_date-(v_i*11),current_date-(v_i*11)+30,180+v_i*35,round((180+v_i*35)*0.2,2),
-        '[JUJU 6M] Entretien véhicule historique',
-        case when v_i%3=0 then 'Révision complète, filtres et niveaux' when v_i%3=1 then 'Remplacement pneumatiques et contrôle géométrie' else 'Vidange et contrôle de sécurité' end,
+        U&'[JUJU 6M] Entretien v\00E9hicule historique',
+        case when v_i%3=0 then U&'R\00E9vision compl\00E8te, filtres et niveaux' when v_i%3=1 then U&'Remplacement pneumatiques et contr\00F4le g\00E9om\00E9trie' else U&'Vidange et contr\00F4le de s\00E9curit\00E9' end,
         (current_date-(v_i*11))::timestamptz+interval '9 hours'
       ) returning id into v_depense;
       select montant_ttc into v_total from public.depenses_fournisseurs where id=v_depense;
@@ -503,5 +503,5 @@ select
   email_connexion as "Email de connexion",
   mot_de_passe_temporaire as "Mot de passe temporaire",
   code_entreprise as "Code entreprise",
-  resume as "Données présentes"
+  resume as U&"Donn\00E9es pr\00E9sentes"
 from juju_seed_resultat;
