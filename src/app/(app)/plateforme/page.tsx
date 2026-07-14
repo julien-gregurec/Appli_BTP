@@ -67,7 +67,10 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
             Vue réservée au propriétaire. Chaque entreprise possède un code et un statut d&apos;abonnement à gérer.
           </p>
           </div>
-          <Link href="/plateforme/facturation" className="rounded-md border px-3 py-2 text-sm font-medium">Relevés de facturation</Link>
+          <div className="flex gap-2">
+            <Link href="/plateforme/support" className="rounded-md border px-3 py-2 text-sm font-medium">Support</Link>
+            <Link href="/plateforme/facturation" className="rounded-md border px-3 py-2 text-sm font-medium">Relevés de facturation</Link>
+          </div>
         </div>
 
         {msg.error && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{msg.error}</p>}

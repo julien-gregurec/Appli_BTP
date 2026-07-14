@@ -55,7 +55,8 @@ export async function createEntrepriseAction(formData: FormData) {
     redirect(`/onboarding?error=${encodeURIComponent(error.message)}`);
   }
 
-  redirect("/dashboard");
+  // Nouveau dirigeant : on l'oriente vers le questionnaire de besoins → recommandation d'offre.
+  redirect("/onboarding/besoins");
 }
 
 // Rejoindre une entreprise existante via son code d'adhésion (réservé au mode auth réelle).

@@ -5,6 +5,7 @@ import { permissionsUtilisateur } from "@/lib/permissions";
 import { estPlateformeAdmin } from "@/lib/plateforme";
 import { ModuleAccessBoundary } from "@/components/ModuleAccessBoundary";
 import { MobileBack } from "@/components/MobileBack";
+import { AideButton } from "@/components/AideButton";
 import { AppPresenceTracker } from "@/components/AppPresenceTracker";
 
 // Layout des pages authentifiées avec navigation latérale.
@@ -47,6 +48,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <Sidebar entrepriseNom={ctx.entrepriseNom} logoUrl={ctx.logoUrl} authDisabled={isEmailLoginDisabled()} permissions={permissions} plateformeAdmin={plateformeAdmin} />
       <ModuleAccessBoundary permissions={permissions}>{children}</ModuleAccessBoundary>
       <MobileBack />
+      <AideButton />
     </div>
   );
 }

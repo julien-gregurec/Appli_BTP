@@ -49,13 +49,60 @@ export type EntrepriseAbonnement = {
 // Barème par défaut, ajustable ici.
 export const TARIF_ABONNEMENT = { base: 49, employesInclus: 3, parEmployeSup: 12 };
 
-export function prixAbonnementMensuel(nbEmployesActifs: number) {
+export function prixAbonnementMensuel(nbEmployesActifs: number, base: number = TARIF_ABONNEMENT.base) {
   const sup = Math.max(0, nbEmployesActifs - TARIF_ABONNEMENT.employesInclus);
   return {
-    total: TARIF_ABONNEMENT.base + sup * TARIF_ABONNEMENT.parEmployeSup,
-    base: TARIF_ABONNEMENT.base,
+    total: base + sup * TARIF_ABONNEMENT.parEmployeSup,
+    base,
     employesSupplementaires: sup,
     parEmployeSup: TARIF_ABONNEMENT.parEmployeSup,
     employesInclus: TARIF_ABONNEMENT.employesInclus,
   };
+}
+
+// ─────────────────────────────────────────────────────────────
+// Questionnaire d'inscription : besoins → offre recommandée.
+// Chaque besoin est rattaché à un palier minimum. L'offre recommandée
+// est le palier le plus élevé exigé par les besoins cochés.
+// (Montants placeholders, à ajuster ici.)
+// ─────────────────────────────────────────────────────────────
+export const BESOINS_OPTIONS = [
+  { cle: "devis_factures", libelle: "Devis & factures", palier: 1 },
+  { cle: "clients_chantiers", libelle: "Clients & chantiers", palier: 1 },
+  { cle: "planning", libelle: "Planning des équipes", palier: 2 },
+  { cle: "pointage", libelle: "Pointage des heures", palier: 2 },
+  { cle: "stock", libelle: "Gestion du stock", palier: 2 },
+  { cle: "flotte", libelle: "Flotte & véhicules", palier: 2 },
+  { cle: "outillage", libelle: "Outillage", palier: 2 },
+  { cle: "notes_frais", libelle: "Notes de frais & justificatifs", palier: 3 },
+  { cle: "portail_client", libelle: "Portail client & signature", palier: 3 },
+  { cle: "exports_compta", libelle: "Exports comptables", palier: 3 },
+  { cle: "qr_codes", libelle: "QR codes & borne stock", palier: 3 },
+] as const;
+
+export const ATTENTES_OPTIONS = [
+  { cle: "gagner_temps", libelle: "Gagner du temps administratif" },
+  { cle: "suivre_rentabilite", libelle: "Suivre la rentabilité des chantiers" },
+  { cle: "gerer_equipes", libelle: "Mieux gérer les équipes sur le terrain" },
+  { cle: "professionnaliser", libelle: "Professionnaliser mes devis / factures" },
+  { cle: "respecter_obligations", libelle: "Respecter mes obligations (heures, CIBTP…)" },
+  { cle: "centraliser", libelle: "Tout centraliser au même endroit" },
+] as const;
+
+export const OFFRES = [
+  { cle: "essentiel", palier: 1, nom: "Essentiel", base: 49, resume: "Devis, factures, clients & chantiers." },
+  { cle: "pro", palier: 2, nom: "Pro", base: 89, resume: "Essentiel + planning, pointage, stock, flotte & outillage." },
+  { cle: "premium", palier: 3, nom: "Premium", base: 149, resume: "Pro + notes de frais, portail client, exports comptables & QR codes." },
+] as const;
+
+export function offreParCle(cle: string) {
+  return OFFRES.find((o) => o.cle === cle) ?? OFFRES[0];
+}
+
+export function recommanderOffre(besoins: string[], nbEmployes: number) {
+  const paliers = besoins.map((b) => BESOINS_OPTIONS.find((o) => o.cle === b)?.palier ?? 1);
+  const palierMax = paliers.length ? Math.max(...paliers) : 1;
+  const offre = OFFRES.find((o) => o.palier === palierMax) ?? OFFRES[0];
+  const prix = prixAbonnementMensuel(Math.max(1, nbEmployes || 1), offre.base);
+  return { offre, prix };
 }
