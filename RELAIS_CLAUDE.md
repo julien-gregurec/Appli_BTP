@@ -2,16 +2,15 @@
 
 ## ÉTAT AUTORITATIF — 14 juillet 2026, accès propriétaire et impayés (Codex)
 
-- **Migration 74 appliquée par Julien** puis lot `667016b` poussé sur `gh/main`. Borne dépôt, planning mobile et formule d’abonnement sont donc en déploiement Vercel.
-- Nouveau lot local vérifié, **migration 75 à appliquer avant publication** : `supabase/migrations/20260714000075_acces_plateforme_impayes.sql`.
+- **Migrations 74 et 75 appliquées par Julien.** Lots `667016b` puis `ddf3ea1` poussés sur `gh/main` et déployés par Vercel.
 - Depuis `/plateforme`, un membre plateforme de rôle `total` ou `support` peut entrer dans une entreprise avec droits administrateur après saisie d’un motif obligatoire. Aucune fiche salarié/membership facturable n’est créée.
 - L’accès support est une session explicite dans `plateforme_acces_entreprises` : entreprise précédente conservée, entrée/sortie horodatées, motif journalisé, bandeau permanent et bouton « Quitter l’entreprise ». `est_membre_actif` et `a_permission` reconnaissent cette session ; le proxy et le calcul des permissions accordent alors les droits complets.
 - Impayés : bouton plateforme « Signaler l’impayé · délai 10 jours », message administrateur, échéance serveur exacte, compteur plateforme et compte à rebours côté entreprise. Seuls les comptes ayant `gerer_utilisateurs` ou `gerer_parametres` voient l’avertissement.
 - Suspension réellement automatique : dès que `suspension_prevue_at <= now()`, `est_membre_actif` refuse les accès même sans tâche cron ni visite de la plateforme. Le client est envoyé vers `/abonnement-suspendu`. La prochaine lecture plateforme matérialise également `abonnement_statut='suspendu'`.
 - « Règlement reçu » annule le compte à rebours, enregistre la date, remet un compte suspendu à actif et rétablit les accès. La suspension manuelle existante reste disponible.
 - Alertes de ce lot = alertes dans l’application. Aucun email automatique n’est envoyé tant que Resend/SMTP n’est pas configuré.
-- Contrôles : ESLint OK, TypeScript OK, 14/14 tests, build Next webpack OK, diff-check OK. Test pgTAP structurel ajouté sous `supabase/tests/plateforme_impayes.test.sql` mais non exécuté sans base liée.
-- Ne pas pousser le lot 75 avant application SQL et test réel : plateforme → entrer entreprise → quitter ; signaler impayé → bandeau admin ; règlement reçu → disparition du bandeau.
+- Contrôles : ESLint OK, TypeScript OK, 14/14 tests, build Next webpack OK, diff-check OK. Production : `/abonnement-suspendu` répond HTTP 200 ; `/plateforme` redirige bien vers `/login` sans session. Test pgTAP structurel ajouté sous `supabase/tests/plateforme_impayes.test.sql` mais non exécuté sans base liée.
+- Reste un test fonctionnel authentifié depuis le compte propriétaire : plateforme → entrer entreprise → quitter ; signaler impayé → bandeau admin ; règlement reçu → disparition du bandeau. Éviter de tester la suspension sur une entreprise réelle sans prévenir ses utilisateurs.
 
 ---
 

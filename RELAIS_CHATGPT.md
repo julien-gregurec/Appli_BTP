@@ -1,6 +1,6 @@
 # 🛡️ ACCÈS PROPRIÉTAIRE + SUSPENSION AUTOMATIQUE DES IMPAYÉS — 14 juillet (Codex)
 
-**Lot local vérifié, non poussé. Migration 75 à appliquer avant publication :** `supabase/migrations/20260714000075_acces_plateforme_impayes.sql`.
+**Migration 75 appliquée, code poussé (`ddf3ea1`) et déployé.**
 
 - `/plateforme` permet d’entrer dans une entreprise avec droits administrateur, motif obligatoire, session d’intervention journalisée et bouton de sortie. Aucun salarié ou compte facturable artificiel n’est créé.
 - Un impayé déclenche un avertissement de 10 jours, un compte à rebours chez les administrateurs clients et une alerte dans la plateforme.
@@ -8,7 +8,7 @@
 - « Règlement reçu » annule la suspension prévue et réactive immédiatement un abonnement suspendu.
 - Emails automatiques non inclus faute de fournisseur SMTP/Resend ; alertes applicatives complètes.
 - ESLint, TypeScript, 14/14 tests, build webpack, diff-check OK.
-- Migration 74 confirmée appliquée par Julien ; commit `667016b` poussé sur `gh/main`.
+- Migrations 74 et 75 confirmées appliquées par Julien ; commits `667016b` et `ddf3ea1` poussés sur `gh/main`. Production contrôlée : page suspendue HTTP 200, plateforme protégée par login.
 
 ---
 
