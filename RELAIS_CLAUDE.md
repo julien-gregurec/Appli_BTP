@@ -2,7 +2,7 @@
 
 ## ÉTAT AUTORITATIF — 14 juillet 2026, lot 76 et données juju (Codex)
 
-- Migration 76 appliquée par Julien. Lot identifiants salariés + compte partagé du dépôt vérifié et prêt à publier.
+- Migration 76 appliquée par Julien. Lot identifiants salariés + compte partagé du dépôt publié sur `main` (`2664259`, puis `7572ff0`) et déployé par Vercel.
 - Paramètres entreprise : identifiant interne existant ou préfixe 2–8 caractères + quatre chiffres. La fonction `configurer_identifiants_employes` renumérote proprement les salariés sans changer leurs comptes, invitations ni historiques.
 - Le numéro `BTP-…` reste le secret d’activation/invitation. Le nouvel `identifiant_interne` est celui affiché et utilisé sur la borne stock.
 - Poste spécial `Compte dépôt` pour entreprises présentes et futures : uniquement Stock/Borne/Dépôt, terminal verrouillé tant que ce compte reste connecté, déconnexion explicite obligatoire avant un autre compte.
@@ -11,7 +11,7 @@
 - Guide complet livré : PDF A4 de 24 pages dans `output/pdf/Guide_utilisation_Liria_Gestion_Pro.pdf`, copie applicative sous `public/guides/`, lien ajouté sur `/aide`. Contrôle des 24 rendus PNG effectué sans coupure ni chevauchement ; 41 458 caractères extractibles et 33 entrées de plan PDF.
 - Fichiers applicatifs concernés : paramètres entreprise, actions entreprise/stock, borne stock, Sidebar/proxy, liste/fiche/carte employés et Mon espace.
 - Contrôles actuels : TypeScript, ESLint, 14/14 tests, diff-check et build webpack complet verts. Seul l’avertissement connu `unpdf/import.meta` reste non bloquant.
-- Prochaine séquence : commit/push → contrôle Vercel → test authentifié compte dépôt et changement de préfixe.
+- Production : le guide public répond HTTP 200 avec `content-type: application/pdf`. Prochaine séquence : test authentifié du compte dépôt et d'un changement de préfixe ; aucun autre déploiement n'est requis pour le lot.
 
 ---
 
