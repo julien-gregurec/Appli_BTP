@@ -102,6 +102,18 @@ export function Sidebar({
       </nav>
 
       {compteDepot&&<div className="border-t border-white/10 px-4 py-3 text-xs text-white/65"><strong className="block text-[#c9a24a]">Compte dépôt prioritaire</strong>Les salariés s’identifient dans la borne pour chaque mouvement.</div>}
+      {!compteDepot&&<div className="border-t border-white/10 p-2">
+        <Link
+          href="/guides/Guide_utilisation_Liria_Gestion_Pro.pdf"
+          target="_blank"
+          rel="noopener"
+          onClick={() => setOuvert(false)}
+          className="flex items-center justify-between rounded-md border border-[#c9a24a]/50 px-3 py-2 text-sm font-medium text-[#e5c978] hover:bg-white/10"
+        >
+          <span>Guide d&apos;utilisation</span>
+          <span className="rounded bg-[#c9a24a] px-1.5 py-0.5 text-[9px] font-bold text-[#0d1b2a]">PDF</span>
+        </Link>
+      </div>}
       <PwaInstallButton />
       {!authDisabled && (
         <div className="border-t border-white/10 p-2">
