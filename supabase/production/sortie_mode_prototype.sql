@@ -66,6 +66,12 @@ grant execute on function public.lier_justificatif_depense(uuid,uuid,text,text,t
 grant execute on function public.est_plateforme_admin() to authenticated;
 grant execute on function public.plateforme_entreprises() to authenticated;
 grant execute on function public.plateforme_modifier_abonnement(uuid,text,date,text) to authenticated;
+grant execute on function public.est_acces_support_actif(uuid) to authenticated;
+grant execute on function public.plateforme_entrer_entreprise(uuid,text) to authenticated;
+grant execute on function public.plateforme_quitter_entreprise() to authenticated;
+grant execute on function public.plateforme_signaler_impaye(uuid,text) to authenticated;
+grant execute on function public.plateforme_enregistrer_reglement(uuid,text) to authenticated;
+grant execute on function public.contexte_abonnement_courant() to authenticated;
 grant execute on function public.marquer_invitation_employe(uuid,uuid,text) to authenticated;
 grant execute on function public.enregistrer_presence_application(boolean) to authenticated;
 grant execute on function public.plateforme_usage_entreprises() to authenticated;

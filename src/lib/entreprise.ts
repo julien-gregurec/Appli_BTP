@@ -9,6 +9,10 @@ export type ContexteEntreprise = {
   entrepriseNom: string;
   entrepriseReference: string | null;
   logoUrl: string | null;
+  abonnementStatut: string;
+  suspensionPrevueAt: string | null;
+  impayeMessage: string | null;
+  accesSupportPlateforme: boolean;
 };
 
 type DevContexteEntreprise = {
@@ -17,6 +21,17 @@ type DevContexteEntreprise = {
   entreprise_id: string | null;
   entreprise_nom: string | null;
   entreprise_reference: string | null;
+};
+
+type ContexteAbonnementCourant = {
+  entreprise_id: string;
+  nom: string | null;
+  reference_interne: string | null;
+  logo_url: string | null;
+  abonnement_statut: string;
+  suspension_prevue_at: string | null;
+  impaye_message: string | null;
+  acces_support: boolean;
 };
 
 async function getContexteEntrepriseSansConnexion(): Promise<ContexteEntreprise> {
@@ -42,6 +57,10 @@ async function getContexteEntrepriseSansConnexion(): Promise<ContexteEntreprise>
     entrepriseNom: contexte.entreprise_nom ?? "",
     entrepriseReference: contexte.entreprise_reference ?? null,
     logoUrl: entreprise?.logo_url ?? null,
+    abonnementStatut: "actif",
+    suspensionPrevueAt: null,
+    impayeMessage: null,
+    accesSupportPlateforme: false,
   };
 }
 
@@ -70,6 +89,17 @@ export async function getContexteEntreprise(): Promise<ContexteEntreprise> {
     redirect("/onboarding");
   }
 
+  const { data: abonnementData } = await supabase
+    .rpc("contexte_abonnement_courant")
+    .maybeSingle();
+  const abonnement = abonnementData as ContexteAbonnementCourant | null;
+  if (!abonnement?.entreprise_id) redirect("/onboarding");
+  const suspensionAt = abonnement.suspension_prevue_at ? new Date(abonnement.suspension_prevue_at).getTime() : null;
+  const accesSupport = abonnement.acces_support === true;
+  if (!accesSupport && (["suspendu", "annule"].includes(abonnement.abonnement_statut) || (suspensionAt !== null && suspensionAt <= Date.now()))) {
+    redirect("/abonnement-suspendu");
+  }
+
   // Un membre qui a rejoint par code reste "en attente" tant que l'admin ne l'a pas
   // activé (affectation d'un poste). Tant qu'il n'est pas actif, il n'a accès à rien.
   const { data: appartenance } = await supabase
@@ -82,18 +112,16 @@ export async function getContexteEntreprise(): Promise<ContexteEntreprise> {
     redirect("/en-attente");
   }
 
-  const { data: entreprise } = await supabase
-    .from("entreprises")
-    .select("nom, reference_interne, logo_url")
-    .eq("id", profil.entreprise_active_id)
-    .single();
-
   return {
     userId: user.id,
     prenom: profil.prenom,
     entrepriseId: profil.entreprise_active_id,
-    entrepriseNom: entreprise?.nom ?? "",
-    entrepriseReference: entreprise?.reference_interne ?? null,
-    logoUrl: entreprise?.logo_url ?? null,
+    entrepriseNom: abonnement.nom ?? "",
+    entrepriseReference: abonnement.reference_interne ?? null,
+    logoUrl: abonnement.logo_url ?? null,
+    abonnementStatut: abonnement.abonnement_statut,
+    suspensionPrevueAt: abonnement.suspension_prevue_at ?? null,
+    impayeMessage: abonnement.impaye_message ?? null,
+    accesSupportPlateforme: accesSupport,
   };
 }

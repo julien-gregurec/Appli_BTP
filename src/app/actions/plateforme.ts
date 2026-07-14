@@ -104,3 +104,50 @@ export async function genererSnapshotFacturationAction(formData: FormData) {
   revalidatePath("/plateforme/facturation");
   redirect(`${retour}${retour.includes("?") ? "&" : "?"}succes=${encodeURIComponent(`${data ?? 0} compte(s) ajouté(s) au relevé mensuel`)}`);
 }
+
+export async function entrerEntreprisePlateformeAction(entrepriseId:string,formData:FormData){
+  if(!(await estPlateformeAdmin()))redirect("/dashboard");
+  if(isEmailLoginDisabled())redirect(`/plateforme?error=${encodeURIComponent("L’accès support nécessite un compte plateforme authentifié")}`);
+  const motif=String(formData.get("motif")??"").trim();
+  if(motif.length<5)redirect(`/plateforme?error=${encodeURIComponent("Indiquez un motif d’intervention d’au moins 5 caractères")}`);
+  const supabase=await createClient();
+  const{error}=await supabase.rpc("plateforme_entrer_entreprise",{p_entreprise_id:entrepriseId,p_motif:motif});
+  if(error)redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/dashboard");redirect("/dashboard");
+}
+
+export async function quitterEntreprisePlateformeAction(){
+  const supabase=await createClient();
+  const{error}=await supabase.rpc("plateforme_quitter_entreprise");
+  if(error)redirect(`/dashboard?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/plateforme");redirect("/plateforme");
+}
+
+export async function signalerImpayePlateformeAction(entrepriseId:string,formData:FormData){
+  if(!(await estPlateformeAdmin()))redirect("/dashboard");
+  const message=String(formData.get("message")??"").trim()||"Règlement mensuel non reçu";
+  const supabase=await createClient();
+  if(isEmailLoginDisabled()){
+    const echeance=new Date(Date.now()+10*86400000).toISOString();
+    const{error}=await supabase.from("entreprises").update({impaye_signale_at:new Date().toISOString(),suspension_prevue_at:echeance,impaye_message:message,updated_at:new Date().toISOString()}).eq("id",entrepriseId);
+    if(error)redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
+  }else{
+    const{error}=await supabase.rpc("plateforme_signaler_impaye",{p_entreprise_id:entrepriseId,p_message:message});
+    if(error)redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
+  }
+  revalidatePath("/plateforme");redirect(`/plateforme?succes=${encodeURIComponent("Avertissement envoyé : suspension automatique dans 10 jours")}`);
+}
+
+export async function enregistrerReglementPlateformeAction(entrepriseId:string,formData:FormData){
+  if(!(await estPlateformeAdmin()))redirect("/dashboard");
+  const note=String(formData.get("note")??"").trim()||"Règlement reçu";
+  const supabase=await createClient();
+  if(isEmailLoginDisabled()){
+    const{error}=await supabase.from("entreprises").update({abonnement_statut:"actif",impaye_signale_at:null,suspension_prevue_at:null,impaye_message:null,dernier_reglement_at:new Date().toISOString(),abonnement_note:note,updated_at:new Date().toISOString()}).eq("id",entrepriseId);
+    if(error)redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
+  }else{
+    const{error}=await supabase.rpc("plateforme_enregistrer_reglement",{p_entreprise_id:entrepriseId,p_note:note});
+    if(error)redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
+  }
+  revalidatePath("/plateforme");redirect(`/plateforme?succes=${encodeURIComponent("Règlement enregistré et accès rétabli")}`);
+}

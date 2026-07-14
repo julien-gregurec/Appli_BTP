@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { GESTION_PERMISSION_PAR_CHEMIN, MODULE_PERMISSION_PAR_CHEMIN, PERMISSIONS_MUTATION_ALTERNATIVES } from "@/lib/module-permissions";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/auth", "/mot-de-passe-oublie", "/nouveau-mot-de-passe"];
+const PUBLIC_PATHS = ["/login", "/signup", "/auth", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -49,6 +49,8 @@ export async function updateSession(request: NextRequest) {
     if (droitRequis) {
       const { data: profil } = await supabase.from("utilisateurs").select("entreprise_active_id").eq("id", user.id).maybeSingle();
       if (profil?.entreprise_active_id) {
+        const { data: accesSupport } = await supabase.rpc("est_acces_support_actif", { p_entreprise_id: profil.entreprise_active_id });
+        if (accesSupport === true) return response;
         const { data: appartenance } = await supabase.from("utilisateurs_entreprises").select("poste_id").eq("utilisateur_id", user.id).eq("entreprise_id", profil.entreprise_active_id).eq("statut", "actif").maybeSingle();
         const { data: droit } = appartenance?.poste_id ? await supabase.from("permissions_poste").select("autorise").eq("entreprise_id", profil.entreprise_active_id).eq("poste_id", appartenance.poste_id).eq("cle_permission", droitRequis).eq("autorise", true).maybeSingle() : { data: null };
         if (!droit) { const url=request.nextUrl.clone();url.pathname="/dashboard";url.searchParams.set("acces","refuse");return NextResponse.redirect(url); }
@@ -59,6 +61,8 @@ export async function updateSession(request: NextRequest) {
     if(droitGestion){
       const{data:profil}=await supabase.from("utilisateurs").select("entreprise_active_id").eq("id",user.id).maybeSingle();
       if(profil?.entreprise_active_id){
+        const{data:accesSupport}=await supabase.rpc("est_acces_support_actif",{p_entreprise_id:profil.entreprise_active_id});
+        if(accesSupport===true)return response;
         const{data:appartenance}=await supabase.from("utilisateurs_entreprises").select("poste_id").eq("utilisateur_id",user.id).eq("entreprise_id",profil.entreprise_active_id).eq("statut","actif").maybeSingle();
         const cheminAlternatif=Object.keys(PERMISSIONS_MUTATION_ALTERNATIVES).find(chemin=>request.nextUrl.pathname===chemin||request.nextUrl.pathname.startsWith(chemin+"/"));
         const droitsAcceptes=cheminAlternatif?PERMISSIONS_MUTATION_ALTERNATIVES[cheminAlternatif]:[droitGestion];

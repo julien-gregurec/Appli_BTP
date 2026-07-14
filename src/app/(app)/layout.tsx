@@ -7,12 +7,15 @@ import { ModuleAccessBoundary } from "@/components/ModuleAccessBoundary";
 import { MobileBack } from "@/components/MobileBack";
 import { AideButton } from "@/components/AideButton";
 import { AppPresenceTracker } from "@/components/AppPresenceTracker";
+import { AbonnementBanner } from "@/components/AbonnementBanner";
+import { SupportAccessBanner } from "@/components/SupportAccessBanner";
 
 // Layout des pages authentifiées avec navigation latérale.
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getContexteEntreprise();
   const permissions = await permissionsUtilisateur(ctx);
   const plateformeAdmin = await estPlateformeAdmin();
+  const peutVoirAlerteAbonnement = permissions === null || permissions.includes("gerer_utilisateurs") || permissions.includes("gerer_parametres");
 
   return (
     <div className="app-shell flex min-h-full flex-1">
@@ -46,7 +49,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         .lecture-seule main form[method="get"] button{display:inline-flex!important}
       `}</style>
       <Sidebar entrepriseNom={ctx.entrepriseNom} logoUrl={ctx.logoUrl} authDisabled={isEmailLoginDisabled()} permissions={permissions} plateformeAdmin={plateformeAdmin} />
-      <ModuleAccessBoundary permissions={permissions}>{children}</ModuleAccessBoundary>
+      <div className="min-w-0 flex-1">
+        {ctx.accesSupportPlateforme&&<SupportAccessBanner entrepriseNom={ctx.entrepriseNom}/>}
+        {!ctx.accesSupportPlateforme&&ctx.suspensionPrevueAt&&peutVoirAlerteAbonnement&&<AbonnementBanner echeance={ctx.suspensionPrevueAt} message={ctx.impayeMessage}/>}
+        <ModuleAccessBoundary permissions={permissions}>{children}</ModuleAccessBoundary>
+      </div>
       <MobileBack />
       <AideButton />
     </div>

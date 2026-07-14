@@ -29,6 +29,10 @@ export type EntrepriseAbonnement = {
   abonnement_statut: string;
   abonnement_echeance: string | null;
   abonnement_note: string | null;
+  impaye_signale_at?: string | null;
+  suspension_prevue_at?: string | null;
+  impaye_message?: string | null;
+  dernier_reglement_at?: string | null;
   nb_membres: number;
   nb_membres_actifs: number;
   nb_fiches_employes?: number;

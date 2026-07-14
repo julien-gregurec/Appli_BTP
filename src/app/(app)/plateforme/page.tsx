@@ -3,7 +3,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { estPlateformeAdmin, statutAbonnement, prixAbonnementMensuel, offreParCle, type EntrepriseAbonnement } from "@/lib/plateforme";
-import { ajouterAdminPlateformeAction, creerEntreprisePlateformeAction, genererSnapshotFacturationAction, modifierAbonnementAction, modifierTarifPostePlateformeAction, retirerAdminPlateformeAction } from "@/app/actions/plateforme";
+import { ajouterAdminPlateformeAction, creerEntreprisePlateformeAction, entrerEntreprisePlateformeAction, enregistrerReglementPlateformeAction, genererSnapshotFacturationAction, modifierAbonnementAction, modifierTarifPostePlateformeAction, retirerAdminPlateformeAction, signalerImpayePlateformeAction } from "@/app/actions/plateforme";
+import { AbonnementCountdown } from "@/components/AbonnementCountdown";
 
 type MembrePlateforme = { email: string; role: string; nom: string | null; ajoute_par: string | null; created_at: string };
 const ROLE_LABEL: Record<string, string> = { total: "Accès total", support: "Support", facturation: "Facturation", lecture: "Lecture seule" };
@@ -20,7 +21,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
   if (isEmailLoginDisabled()) {
     const { data: ents } = await supabase
       .from("entreprises")
-      .select("id, nom, code_adhesion, reference_interne, abonnement_statut, abonnement_echeance, abonnement_note, created_at")
+      .select("id, nom, code_adhesion, reference_interne, abonnement_statut, abonnement_echeance, abonnement_note, impaye_signale_at, suspension_prevue_at, impaye_message, dernier_reglement_at, created_at")
       .order("created_at", { ascending: false });
     const { data: membres } = await supabase.from("utilisateurs_entreprises").select("entreprise_id, statut");
     const { data: employes } = await supabase.from("employes").select("entreprise_id, poste_id, statut, compte_application_statut, utilisateur_id, invitation_envoyee_at, application_installee_at, derniere_connexion_at");
@@ -61,10 +62,11 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
   }
 
   const parStatut = (cle: string) => entreprises.filter((e) => e.abonnement_statut === cle).length;
+  const impayes = entreprises.filter((e) => Boolean(e.suspension_prevue_at)).length;
 
   return (
     <main className="p-8">
-      <div className="mx-auto max-w-5xl space-y-6">
+      <div className="mx-auto max-w-6xl space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
           <h1 className="text-xl font-semibold">Plateforme — entreprises clientes</h1>
@@ -79,14 +81,15 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
         </div>
 
         {msg.error && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{msg.error}</p>}
-        {msg.succes && <p className="rounded bg-green-50 p-3 text-sm text-green-700">Abonnement mis à jour.</p>}
+        {msg.succes && <p className="rounded bg-green-50 p-3 text-sm text-green-700">{msg.succes}</p>}
 
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
           {[
             { label: "Entreprises", valeur: entreprises.length },
             { label: "Actives", valeur: parStatut("actif") },
             { label: "En essai", valeur: parStatut("essai") },
             { label: "Suspendues", valeur: parStatut("suspendu") },
+            { label: "Impayés à suivre", valeur: impayes },
           ].map((s) => (
             <div key={s.label} className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
               <div className="text-xs uppercase text-neutral-500">{s.label}</div>
@@ -171,6 +174,10 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                     <details className="mt-3 rounded border bg-neutral-50 p-3 dark:bg-neutral-900"><summary className="cursor-pointer text-sm font-semibold">Tarifs par poste</summary><div className="mt-3 space-y-2">{tarifsPostes.filter((poste) => poste.entreprise_id === e.id).map((poste) => <form key={poste.poste_id} action={modifierTarifPostePlateformeAction.bind(null, poste.poste_id)} className="grid items-end gap-2 text-sm sm:grid-cols-[1fr_130px_130px_auto]"><div><strong>{poste.nom}</strong><p className="text-xs text-neutral-500">{poste.nb_comptes_facturables} compte(s) facturable(s)</p></div><label className="text-xs text-neutral-500">Offre<input name="code_offre" defaultValue={poste.code_offre} className={`${input} mt-1 w-full`}/></label><label className="text-xs text-neutral-500">€/compte/mois<input name="tarif" type="number" min="0" step="0.01" defaultValue={poste.tarif_compte_mensuel} className={`${input} mt-1 w-full`}/></label><button className="rounded border px-3 py-2">Enregistrer</button></form>)}</div></details>
                   </div>
                 </div>
+
+                {e.suspension_prevue_at?<section className="mt-4 rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-950 dark:border-red-900 dark:bg-red-950/30 dark:text-red-100"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">Règlement non reçu — suspension automatique dans <AbonnementCountdown echeance={e.suspension_prevue_at}/></p><p className="mt-1 text-xs">Échéance : {new Date(e.suspension_prevue_at).toLocaleString("fr-FR")}{e.impaye_message?` · ${e.impaye_message}`:""}</p></div><form action={enregistrerReglementPlateformeAction.bind(null,e.id)} className="flex gap-2"><input name="note" placeholder="Référence du règlement" className={input}/><button className="rounded-md bg-green-700 px-3 py-2 text-xs font-semibold text-white">Règlement reçu</button></form></div></section>:<form action={signalerImpayePlateformeAction.bind(null,e.id)} className="mt-4 flex flex-wrap items-end gap-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-900 dark:bg-amber-950/20"><label className="min-w-[240px] flex-1 text-xs text-neutral-600">Message destiné à l’administrateur<input name="message" defaultValue="Règlement mensuel non reçu" className={`${input} mt-1 w-full`}/></label><button className="rounded-md border border-amber-700 px-3 py-2 text-xs font-semibold text-amber-900 dark:text-amber-200">Signaler l’impayé · délai 10 jours</button></form>}
+
+                <form action={entrerEntreprisePlateformeAction.bind(null,e.id)} className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-900 dark:bg-blue-950/20"><label className="min-w-[240px] flex-1 text-xs text-neutral-600 dark:text-neutral-300">Motif obligatoire de l’intervention<input name="motif" required minLength={5} placeholder="Ex. Assistance au paramétrage demandée par le client" className={`${input} mt-1 w-full`}/></label><button className="rounded-md bg-blue-900 px-3 py-2 text-xs font-semibold text-white">Accéder comme administrateur</button><p className="w-full text-[11px] text-neutral-500">L’entrée et la sortie sont journalisées. Ce compte plateforme n’est pas ajouté aux salariés facturables.</p></form>
 
                 <form action={action} className="mt-3 flex flex-wrap items-end gap-2 border-t border-neutral-100 pt-3 dark:border-neutral-800">
                   <div className="space-y-1">
