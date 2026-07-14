@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { GESTION_PERMISSION_PAR_CHEMIN, MODULE_PERMISSION_PAR_CHEMIN, PERMISSIONS_MUTATION_ALTERNATIVES } from "@/lib/module-permissions";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/auth", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu"];
+const PUBLIC_PATHS = ["/login", "/signup", "/auth", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu", "/guides"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
