@@ -13,9 +13,9 @@ export default function manifest(): MetadataRoute.Manifest {
     lang: "fr",
     categories: ["business", "productivity"],
     icons: [
-      { src: "/icons/liria-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: "/icons/liria-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-      { src: "/icons/liria-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: "/icons/liria-gestion-pro-v3-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/icons/liria-gestion-pro-v3-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/icons/liria-gestion-pro-v3-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   };
 }

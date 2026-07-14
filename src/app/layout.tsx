@@ -7,8 +7,11 @@ export const metadata: Metadata = {
   applicationName: "Liria Gestion Pro",
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: [{ url: "/icons/liria-192.png", sizes: "192x192", type: "image/png" }, { url: "/icons/liria-512.png", sizes: "512x512", type: "image/png" }],
-    apple: [{ url: "/icons/liria-apple-touch.png", sizes: "180x180", type: "image/png" }],
+    icon: [
+      { url: "/icons/liria-gestion-pro-v3-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/liria-gestion-pro-v3-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/liria-gestion-pro-v3-apple-touch.png", sizes: "180x180", type: "image/png" }],
   },
   appleWebApp: { capable: true, title: "Liria Gestion Pro", statusBarStyle: "black-translucent" },
   formatDetection: { telephone: false },
