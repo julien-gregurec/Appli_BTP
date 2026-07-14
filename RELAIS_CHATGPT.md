@@ -1,3 +1,18 @@
+# ✅ BASCULE AUTH RÉELLE + ÉQUIPE PLATEFORME — 14 juillet (Claude)
+
+**Bascule production faite.** `DISABLE_EMAIL_LOGIN=false` sur Vercel : la connexion réelle est ACTIVE. `/dashboard` et `/plateforme` redirigent (307) vers `/login`. Owner : `julien.gregurec@gmail.com` (auth id `c913921d`), profil + membership LIRIA admin OK, mot de passe posé par l'utilisateur. Le mode prototype (`isEmailLoginDisabled()`, `dev_contexte_entreprise`, policies anon) reste dans le code pour le dev local mais n'est plus actif en prod.
+
+**Migration 72 `20260714000072_plateforme_equipe.sql` APPLIQUÉE + code poussé (`3db83ac`, `3ffa889..3db83ac`).** Module « Équipe plateforme » sur `/plateforme` : plusieurs comptes du personnel LIRIA pour dépanner toutes les entreprises.
+- `plateforme_admins` gagne `role` (`total`/`support`/`facturation`/`lecture`, défaut `total`), `nom`, `ajoute_par`.
+- RPC `plateforme_lister_admins()`, `plateforme_ajouter_admin(email,nom,role)`, `plateforme_retirer_admin(email)` — SECURITY DEFINER, gardées par `est_plateforme_admin()`, execute réservé à `authenticated`. Retrait protégé : pas soi-même, pas le dernier membre.
+- Actions `ajouterAdminPlateformeAction` / `retirerAdminPlateformeAction` dans `src/app/actions/plateforme.ts`. Section UI ajoutée sur `src/app/(app)/plateforme/page.tsx`.
+- **Flux compte plateforme** : ajouter l'email dans l'UI → créer le compte de connexion dans Supabase (Authentication → Add user, même email) → transmettre le mot de passe. Accès = espace plateforme (entreprises, abonnements, facturation).
+- **NON FAIT (volontaire, "on verra par la suite")** : entrer DANS les données d'une entreprise cliente (chantiers/devis) pour dépanner = changement RLS (bypass plateforme sur les policies `est_membre_actif`). À concevoir prudemment plus tard. Les niveaux d'accès différenciés (`role`) sont stockés mais pas encore appliqués côté droits.
+
+⚠️ Codex est en pause à la demande de l'utilisateur (« je fais tout, dis à Codex de s'arrêter ») pour éviter les conflits sur la même base.
+
+---
+
 # ✅ LOT 57→71 DÉPLOYÉ EN PRODUCTION — 13 juillet (Claude)
 
 Les 15 migrations 57→71 ont été **appliquées** (guidées une par une via presse-papier ; la 57 était déjà en base) et le code a été **poussé** (commit `c59ae13`, `f94aba7..c59ae13`). Vérifié en prod : `/planning`, `/plateforme/facturation`, `/conges`, `/stock/borne`, `/mes-travaux`, `/notes-frais`, `/dashboard`, `/employes`, `/commandes`, `/plateforme` = **HTTP 200** avec vrai contenu. QR codes présents (`codes_identification` a déjà des lignes). `notes-frais` reste fermé en prototype (auth requise, par design). ✅ Planning : vue mobile en cartes ajoutée (commit `7f36f6c`). ✅ /plateforme : prix mensuel auto par client = abonnement de base (49 €, ≤3 salariés) + employés supplémentaires (12 €/salarié), barème dans `src/lib/plateforme.ts` `TARIF_ABONNEMENT` (commit `dfee6d7`). Les 4 demandes utilisateur (QR, pointage strict, planning mobile, formule abonnement) sont livrées et déployées.
