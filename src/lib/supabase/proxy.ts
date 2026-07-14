@@ -44,6 +44,22 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  if (user) {
+    const { data: compteDepot } = await supabase.rpc("est_compte_depot_courant");
+    const cheminDepotAutorise = request.nextUrl.pathname === "/depot" || request.nextUrl.pathname === "/stock" || request.nextUrl.pathname.startsWith("/stock/");
+
+    // Tant que le compte partagé est connecté, il reste prioritaire : aucune
+    // page de connexion ni aucun autre module n'est accessible sans déconnexion.
+    if (compteDepot && !cheminDepotAutorise) {
+      const url=request.nextUrl.clone();url.pathname="/stock/borne";url.search="";
+      return NextResponse.redirect(url);
+    }
+    if ((request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/signup") && !compteDepot) {
+      const url=request.nextUrl.clone();url.pathname="/dashboard";url.search="";
+      return NextResponse.redirect(url);
+    }
+  }
+
   if (user && !isPublic) {
     const droitRequis = MODULE_PERMISSION_PAR_CHEMIN.find(([chemin]) => request.nextUrl.pathname === chemin || request.nextUrl.pathname.startsWith(chemin + "/"))?.[1];
     if (droitRequis) {

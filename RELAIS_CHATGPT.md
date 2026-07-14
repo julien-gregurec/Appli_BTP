@@ -1,3 +1,19 @@
+# IDENTIFIANTS SALARIÉS + COMPTE DÉPÔT + SEED JUJU — 14 juillet (Codex)
+
+**Migration 76 appliquée par Julien. Lot vérifié, prêt à publier.**
+
+- `supabase/migrations/20260714000076_identifiants_et_compte_depot.sql` ajoute le choix d’identifiant salarié : référence interne existante ou préfixe personnalisable sur 2 à 8 caractères suivi de 4 chiffres (`LIR-0001`). La renumérotation est atomique et ne modifie ni comptes ni historiques.
+- Un poste protégé `Compte dépôt` est créé pour les entreprises actuelles et futures. Il ne reçoit que Stock, Borne stock et le mode dépôt ; le proxy verrouille le terminal sur ces pages jusqu’à déconnexion explicite.
+- Chaque mouvement de borne continue d’exiger le mot de passe stock personnel. La RPC v3 contrôle en plus, sur le poste du salarié identifié, le droit distinct `effectuer_entree_stock` ou `effectuer_sortie_stock`. Le mouvement reste attribué au salarié, jamais au compte partagé.
+- L’identifiant de borne est affiché dans Employés, la fiche, Mon espace et la carte interne. Le numéro aléatoire `BTP-…` reste réservé à l’invitation/activation du compte applicatif.
+- Le script `supabase/production/seed_juju_6_mois.sql` a rempli avec succès l’entreprise nommée exactement `juju` avec six mois de clients, chantiers, devis, factures, règlements, planning, pointages, stock, achats, flotte, outillage et frais. Les accès de test ont été générés dans la dernière ligne du résultat.
+- Correctif du seed après erreur `affectations_lieu_coherent_check` : deux rotations de tableaux pouvaient produire l’index PostgreSQL `0` et donc un chantier NULL. Les formules sont maintenant strictement comprises entre 1 et la taille du tableau. L’exécution échouée ayant été annulée par la transaction, le script complet corrigé peut être relancé.
+- Manuel utilisateur complet créé et contrôlé visuellement : `output/pdf/Guide_utilisation_Liria_Gestion_Pro.pdf`, 24 pages A4, sommaire et signets. Une copie servie par l’application se trouve sous `public/guides/Guide_utilisation_Liria_Gestion_Pro.pdf`; `/aide` propose le bouton « Ouvrir le guide PDF ».
+- Contrôles finaux du lot : TypeScript OK, ESLint OK, 14/14 tests, `git diff --check` OK et build webpack complet OK. Seul l’avertissement connu `unpdf/import.meta` reste présent sans bloquer la compilation.
+- À terminer : commit/push/déploiement, puis contrôle production du guide, des identifiants et du compte dépôt.
+
+---
+
 # 🛡️ ACCÈS PROPRIÉTAIRE + SUSPENSION AUTOMATIQUE DES IMPAYÉS — 14 juillet (Codex)
 
 **Migration 75 appliquée, code poussé (`ddf3ea1`) et déployé.**

@@ -37,7 +37,7 @@ export default async function AccesPage({
     ]);
 
   const permissions = ((catalogue ?? []) as Permission[]).filter((permission) =>
-    permission.cle.startsWith("acces_") || permission.cle.startsWith("gerer_") || permission.cle.startsWith("saisir_") || permission.cle.startsWith("voir_") || permission.cle === "valider_pointages",
+    permission.cle.startsWith("acces_") || permission.cle.startsWith("gerer_") || permission.cle.startsWith("saisir_") || permission.cle.startsWith("voir_") || permission.cle.startsWith("effectuer_") || permission.cle === "valider_pointages",
   );
   const groupes = new Map<string, Permission[]>();
   for (const p of permissions) groupes.set(p.module, [...(groupes.get(p.module) ?? []), p]);
@@ -73,6 +73,12 @@ export default async function AccesPage({
           ) : (
             <p className="mt-3 text-sm text-red-600">Aucun code d’entreprise disponible.</p>
           )}
+        </section>
+
+        <section className="rounded-md border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-100">
+          <h2 className="font-semibold">Compte partagé du dépôt</h2>
+          <p className="mt-1">Créez un compte utilisateur dédié, puis affectez-le au poste protégé <strong>Compte dépôt</strong>. Ce compte reste connecté sur l’appareil du dépôt et ne voit que Stock, Borne stock et Dépôt.</p>
+          <p className="mt-2 text-xs opacity-80">Chaque salarié saisit ensuite son identifiant et son mot de passe personnel sur la borne. Les droits « entrée de stock » et « sortie de stock » sont contrôlés sur son propre poste. Un autre compte ne peut se connecter à cet appareil qu’après déconnexion explicite du compte dépôt.</p>
         </section>
 
         <section className="rounded-md border p-4 dark:border-neutral-800">
@@ -167,7 +173,7 @@ export default async function AccesPage({
                               {DROITS_SOCLE.has(p.cle) && <input type="hidden" name="permissions" value={p.cle} />}
                               <input type="checkbox" name={DROITS_SOCLE.has(p.cle) ? undefined : "permissions"} value={p.cle} defaultChecked={DROITS_SOCLE.has(p.cle) || autorise.has(p.cle)} disabled={DROITS_SOCLE.has(p.cle)} className="mt-0.5" />
                               <span>
-                                <span className="flex flex-wrap items-center gap-2 text-sm font-medium"><span className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide ${p.cle.startsWith("acces_")?"bg-blue-100 text-blue-800":p.cle.startsWith("gerer_")?"bg-amber-100 text-amber-800":p.cle.startsWith("voir_")?"bg-violet-100 text-violet-800":"bg-green-100 text-green-800"}`}>{p.cle.startsWith("acces_")?"Consulter":p.cle.startsWith("gerer_")?"Gérer":p.cle.startsWith("voir_")?"Chiffres":"Personnel"}</span>{p.description}{DROITS_SOCLE.has(p.cle) && <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] text-green-800">Inclus pour tous</span>}</span>
+                                <span className="flex flex-wrap items-center gap-2 text-sm font-medium"><span className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide ${p.cle.startsWith("acces_")?"bg-blue-100 text-blue-800":p.cle.startsWith("gerer_")?"bg-amber-100 text-amber-800":p.cle.startsWith("voir_")?"bg-violet-100 text-violet-800":p.cle.startsWith("effectuer_")?"bg-cyan-100 text-cyan-800":"bg-green-100 text-green-800"}`}>{p.cle.startsWith("acces_")?"Consulter":p.cle.startsWith("gerer_")?"Gérer":p.cle.startsWith("voir_")?"Chiffres":p.cle.startsWith("effectuer_")?"Action":"Personnel"}</span>{p.description}{DROITS_SOCLE.has(p.cle) && <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] text-green-800">Inclus pour tous</span>}</span>
                                 <span className="font-mono text-[10px] text-neutral-400">{p.cle}</span>
                               </span>
                             </label>

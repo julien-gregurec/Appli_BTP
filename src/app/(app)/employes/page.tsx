@@ -6,6 +6,7 @@ import { ancienneteEmploye, contratEmployeLabel, formatEuro, nomEmploye, statutE
 type EmployeListe = {
   id: string;
   reference_interne: string;
+  identifiant_interne: string;
   numero_inscription: string | null;
   utilisateur_id: string | null;
   poste_id: string | null;
@@ -41,7 +42,7 @@ export default async function EmployesPage() {
   const [{ data: employes }, { data: postes }, { data: droits }, { data: catalogue }] = await Promise.all([
     supabase
       .from("employes")
-      .select("id, reference_interne, numero_inscription, utilisateur_id, poste_id, prenom, nom, poste, type_contrat, statut, telephone, email, cout_horaire, date_entree, date_sortie, invitation_envoyee_at, application_installee_at, premiere_connexion_at, derniere_connexion_at")
+      .select("id, reference_interne, identifiant_interne, numero_inscription, utilisateur_id, poste_id, prenom, nom, poste, type_contrat, statut, telephone, email, cout_horaire, date_entree, date_sortie, invitation_envoyee_at, application_installee_at, premiere_connexion_at, derniere_connexion_at")
       .eq("entreprise_id", ctx.entrepriseId)
       .order("nom", { ascending: true }),
     supabase.from("postes").select("id, nom").eq("entreprise_id", ctx.entrepriseId),
@@ -136,7 +137,7 @@ export default async function EmployesPage() {
                         {nomEmploye(employe)}
                       </Link>
                       <p className="mt-0.5 font-mono text-xs text-neutral-500">
-                        {employe.reference_interne}{employe.numero_inscription ? ` · ${employe.numero_inscription}` : ""}
+                        {employe.identifiant_interne ?? employe.reference_interne}
                       </p>
                     </div>
                     <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400">
@@ -195,7 +196,7 @@ export default async function EmployesPage() {
                   const acces = accesEmploye(employe);
                   return (
                     <tr key={employe.id} className="border-t border-neutral-100 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900">
-                      <td className="px-4 py-2 font-mono text-xs text-neutral-500">{employe.reference_interne}</td>
+                      <td className="px-4 py-2 font-mono text-xs text-neutral-500">{employe.identifiant_interne ?? employe.reference_interne}</td>
                       <td className="px-4 py-2">
                         <Link href={`/employes/${employe.id}`} className="font-medium hover:underline">
                           {nomEmploye(employe)}

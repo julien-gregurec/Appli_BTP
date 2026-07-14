@@ -27,7 +27,7 @@ export default async function CarteBtpPage({
   const sb = await createClient();
 
   const [{ data: employe }, { data: entreprise }, { data: habilitations }, { data: affectations }] = await Promise.all([
-    sb.from("employes").select("id, prenom, nom, poste, numero_inscription, reference_interne, telephone, email, carte_btp_numero, carte_btp_expiration, carte_btp_mime_type, carte_btp_storage_path").eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),
+    sb.from("employes").select("id, prenom, nom, poste, identifiant_interne, numero_inscription, reference_interne, telephone, email, carte_btp_numero, carte_btp_expiration, carte_btp_mime_type, carte_btp_storage_path").eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),
     sb.from("entreprises").select("nom, siret").eq("id", ctx.entrepriseId).maybeSingle(),
     sb.from("habilitations_employe").select("id, type, libelle, date_obtention, date_expiration").eq("employe_id", id).eq("entreprise_id", ctx.entrepriseId).order("type"),
     sb.from("affectations").select("date, chantier:chantiers(id, nom)").eq("employe_id", id).eq("entreprise_id", ctx.entrepriseId).order("date", { ascending: false }).limit(60),
@@ -84,7 +84,7 @@ export default async function CarteBtpPage({
             <div className="space-y-2 text-sm">
               <div><span className="text-neutral-500">Nom : </span><span className="font-medium">{employe.prenom} {employe.nom}</span></div>
               <div><span className="text-neutral-500">Fonction : </span>{employe.poste || "—"}</div>
-              <div><span className="text-neutral-500">N° interne : </span><span className="font-mono">{employe.numero_inscription ?? employe.reference_interne ?? "—"}</span></div>
+              <div><span className="text-neutral-500">N° interne : </span><span className="font-mono">{employe.identifiant_interne ?? employe.reference_interne ?? "—"}</span></div>
               <div><span className="text-neutral-500">N° carte BTP : </span><span className="font-mono">{employe.carte_btp_numero ?? "—"}</span></div>
               <div><span className="text-neutral-500">Validité : </span>{employe.carte_btp_expiration ?? "—"}</div>
               <div>

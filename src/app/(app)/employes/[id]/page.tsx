@@ -53,7 +53,7 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
             <Link href="/employes" className="text-sm text-neutral-500 hover:underline">← Employés</Link>
             <h1 className="mt-1 text-xl font-semibold">{nomEmploye(employe)}</h1>
             <p className="font-mono text-xs text-neutral-500">
-              {employe.reference_interne} · {contratEmployeLabel(employe.type_contrat)} · {statut.libelle}
+              {employe.identifiant_interne ?? employe.reference_interne} · {contratEmployeLabel(employe.type_contrat)} · {statut.libelle}
             </p>
           </div>
           <Link href={`/employes/${id}/modifier`} className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700">
@@ -96,7 +96,7 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
         <section className="space-y-4 rounded-md border p-4 dark:border-neutral-800">
           <div><h2 className="font-semibold">Identification stock et QR employé</h2><p className="text-sm text-neutral-500">L’employé crée lui-même son mot de passe stock depuis « Mon espace ». L’administrateur peut seulement le réinitialiser ; il n’est jamais affiché ni conservé en clair.</p></div>
           <div className="flex items-center gap-2 text-sm"><span className={`h-2.5 w-2.5 rounded-full ${employe.code_stock_active ? "bg-green-600" : "bg-neutral-300"}`} /><strong>{employe.code_stock_active ? "Accès personnel actif" : "Mot de passe stock à créer"}</strong></div>
-          <p className="rounded bg-neutral-50 p-3 font-mono text-sm dark:bg-neutral-900">Numéro à saisir au dépôt : {employe.numero_inscription}</p>
+          <p className="rounded bg-neutral-50 p-3 font-mono text-sm dark:bg-neutral-900">Identifiant à saisir au dépôt : {employe.identifiant_interne ?? employe.reference_interne}</p>
           {employe.code_stock_active && <form action={reinitialiserMotDePasseStockEmployeAction.bind(null, id)}><ConfirmSubmitButton message="Réinitialiser l’accès stock ? L’employé devra créer un nouveau mot de passe depuis Mon espace." className="text-sm text-red-700">Réinitialiser le mot de passe stock</ConfirmSubmitButton></form>}
         </section>
 

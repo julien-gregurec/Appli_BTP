@@ -108,6 +108,22 @@ export async function modifierEntrepriseAction(formData: FormData) {
     redirect(`/parametres?error=${encodeURIComponent("Taux de pénalités invalide")}`);
   }
 
+  const modeIdentifiant = champ(formData, "mode_identifiant_employe") ?? "reference_interne";
+  const prefixeIdentifiant = (champ(formData, "prefixe_identifiant_employe") ?? "EMP").toUpperCase();
+  if (!["reference_interne", "prefixe_4_chiffres"].includes(modeIdentifiant)) {
+    redirect(`/parametres?error=${encodeURIComponent("Format d’identifiant salarié invalide")}`);
+  }
+  if (!/^[A-Z0-9]{2,8}$/.test(prefixeIdentifiant)) {
+    redirect(`/parametres?error=${encodeURIComponent("Le préfixe salarié doit contenir 2 à 8 lettres ou chiffres")}`);
+  }
+
+  const { error: identifiantsError } = await supabase.rpc("configurer_identifiants_employes", {
+    p_entreprise_id: ctx.entrepriseId,
+    p_mode: modeIdentifiant,
+    p_prefixe: prefixeIdentifiant,
+  });
+  if (identifiantsError) redirect(`/parametres?error=${encodeURIComponent(identifiantsError.message)}`);
+
   const { error } = await supabase.from("entreprises").update({
     nom,
     raison_sociale: champ(formData, "raison_sociale"),

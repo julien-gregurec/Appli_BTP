@@ -33,15 +33,15 @@ export async function mouvementStockBorneAction(fd: FormData) {
   const supabase = await createClient();
   const type = champ(fd, "type") ?? "sortie";
   const quantite = Number(fd.get("quantite"));
-  const numeroEmploye = champ(fd, "numero_employe");
+  const identifiantEmploye = champ(fd, "identifiant_employe");
   const motDePasse = champ(fd, "mot_de_passe_stock");
   const codeArticle = champ(fd, "code_article");
-  if (!numeroEmploye || !motDePasse || !codeArticle || !Number.isFinite(quantite) || quantite <= 0) {
-    redirect(`/stock/borne?error=${encodeURIComponent("Numéro employé, mot de passe, article et quantité sont obligatoires")}`);
+  if (!identifiantEmploye || !motDePasse || !codeArticle || !Number.isFinite(quantite) || quantite <= 0) {
+    redirect(`/stock/borne?error=${encodeURIComponent("Identifiant salarié, mot de passe, article et quantité sont obligatoires")}`);
   }
-  const { error } = await supabase.rpc("enregistrer_mouvement_stock_borne_v2", {
+  const { error } = await supabase.rpc("enregistrer_mouvement_stock_borne_v3", {
     p_entreprise_id: ctx.entrepriseId,
-    p_numero_employe: numeroEmploye,
+    p_identifiant_employe: identifiantEmploye,
     p_mot_de_passe: motDePasse,
     p_code_article: codeArticle,
     p_type: type,

@@ -22,6 +22,10 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const [ouvert, setOuvert] = useState(false);
+  const compteDepot = permissions?.includes("mode_compte_depot") === true;
+  const navigation = compteDepot
+    ? NAVIGATION_APPLICATION.filter((item) => ["/stock", "/stock/borne", "/depot"].includes(item.href))
+    : NAVIGATION_APPLICATION;
 
   return (
     <>
@@ -49,7 +53,7 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2">
-        {NAVIGATION_APPLICATION.map((item) => {
+        {navigation.map((item) => {
           if (item.permission && permissions !== null && !permissions.includes(item.permission)) return null;
           const active = pathname === item.href || pathname.startsWith(item.href + "/");
           if (!item.actif) {
@@ -79,7 +83,7 @@ export function Sidebar({
           );
         })}
 
-        {plateformeAdmin && (
+        {plateformeAdmin && !compteDepot && (
           <>
             <div className="my-2 border-t border-white/10" />
             <Link
@@ -97,6 +101,7 @@ export function Sidebar({
         )}
       </nav>
 
+      {compteDepot&&<div className="border-t border-white/10 px-4 py-3 text-xs text-white/65"><strong className="block text-[#c9a24a]">Compte dépôt prioritaire</strong>Les salariés s’identifient dans la borne pour chaque mouvement.</div>}
       <PwaInstallButton />
       {!authDisabled && (
         <div className="border-t border-white/10 p-2">
@@ -105,7 +110,7 @@ export function Sidebar({
               type="submit"
               className="w-full rounded-md px-3 py-2 text-left text-sm text-white/60 hover:bg-white/10 hover:text-white"
             >
-              Se déconnecter
+              {compteDepot?"Déconnecter le compte dépôt":"Se déconnecter"}
             </button>
           </form>
         </div>

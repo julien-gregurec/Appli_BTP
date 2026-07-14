@@ -8,7 +8,7 @@ type Chantier = { id: string; nom: string };
 type CibleScan = "article" | "chantier";
 const input = "w-full rounded-lg border border-neutral-300 bg-white px-3 py-3 text-base dark:border-neutral-700 dark:bg-neutral-900";
 
-export function StockKioskForm({ chantiers }: { chantiers: Chantier[] }) {
+export function StockKioskForm({ chantiers, identifiantExemple = "EMP-0001" }: { chantiers: Chantier[]; identifiantExemple?: string }) {
   const [codeArticle, setCodeArticle] = useState("");
   const [codeChantier, setCodeChantier] = useState("");
   const [cible, setCible] = useState<CibleScan | null>(null);
@@ -73,9 +73,9 @@ export function StockKioskForm({ chantiers }: { chantiers: Chantier[] }) {
       <form action={mouvementStockBorneAction} className="space-y-5 rounded-xl border bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950 sm:p-6">
         <div className="rounded-lg bg-[#0d1b2a] p-4 text-white">
           <h2 className="text-lg font-semibold">Identification personnelle</h2>
-          <p className="mt-1 text-sm text-white/70">Le mouvement sera enregistré uniquement à votre nom. Utilisez le numéro indiqué dans « Mon espace » et votre mot de passe stock personnel.</p>
+          <p className="mt-1 text-sm text-white/70">Le mouvement sera enregistré uniquement à votre nom. Utilisez l’identifiant indiqué dans « Mon espace » et votre mot de passe stock personnel.</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <input name="numero_employe" required autoComplete="off" autoCapitalize="characters" placeholder="N° employé (BTP-…)" className="w-full rounded-lg border border-white/30 bg-white px-3 py-3 text-base uppercase text-neutral-950" />
+            <input name="identifiant_employe" required autoComplete="off" autoCapitalize="characters" placeholder={`Identifiant salarié (${identifiantExemple})`} className="w-full rounded-lg border border-white/30 bg-white px-3 py-3 text-base uppercase text-neutral-950" />
             <input name="mot_de_passe_stock" type="password" minLength={8} maxLength={72} required autoComplete="off" placeholder="Mot de passe stock" className="w-full rounded-lg border border-white/30 bg-white px-3 py-3 text-base text-neutral-950" />
           </div>
         </div>

@@ -1,5 +1,20 @@
 # Relais Claude Code — Liria Gestion Pro
 
+## ÉTAT AUTORITATIF — 14 juillet 2026, lot 76 et données juju (Codex)
+
+- Migration 76 appliquée par Julien. Lot identifiants salariés + compte partagé du dépôt vérifié et prêt à publier.
+- Paramètres entreprise : identifiant interne existant ou préfixe 2–8 caractères + quatre chiffres. La fonction `configurer_identifiants_employes` renumérote proprement les salariés sans changer leurs comptes, invitations ni historiques.
+- Le numéro `BTP-…` reste le secret d’activation/invitation. Le nouvel `identifiant_interne` est celui affiché et utilisé sur la borne stock.
+- Poste spécial `Compte dépôt` pour entreprises présentes et futures : uniquement Stock/Borne/Dépôt, terminal verrouillé tant que ce compte reste connecté, déconnexion explicite obligatoire avant un autre compte.
+- Borne v3 : mot de passe personnel + contrôle des droits entrée/sortie du poste du salarié. Le compte dépôt ne peut jamais faire passer un mouvement en son propre nom sans identification personnelle.
+- Seed six mois exécuté avec succès sur la cible exacte `juju`. Le premier essai avait été intégralement annulé par `affectations_lieu_coherent_check` ; les deux rotations de tableaux sont corrigées dans `supabase/production/seed_juju_6_mois.sql`. Les accès de test et les compteurs ont bien été renvoyés.
+- Guide complet livré : PDF A4 de 24 pages dans `output/pdf/Guide_utilisation_Liria_Gestion_Pro.pdf`, copie applicative sous `public/guides/`, lien ajouté sur `/aide`. Contrôle des 24 rendus PNG effectué sans coupure ni chevauchement ; 41 458 caractères extractibles et 33 entrées de plan PDF.
+- Fichiers applicatifs concernés : paramètres entreprise, actions entreprise/stock, borne stock, Sidebar/proxy, liste/fiche/carte employés et Mon espace.
+- Contrôles actuels : TypeScript, ESLint, 14/14 tests, diff-check et build webpack complet verts. Seul l’avertissement connu `unpdf/import.meta` reste non bloquant.
+- Prochaine séquence : commit/push → contrôle Vercel → test authentifié compte dépôt et changement de préfixe.
+
+---
+
 ## ÉTAT AUTORITATIF — 14 juillet 2026, accès propriétaire et impayés (Codex)
 
 - **Migrations 74 et 75 appliquées par Julien.** Lots `667016b` puis `ddf3ea1` poussés sur `gh/main` et déployés par Vercel.
