@@ -107,8 +107,57 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
           <p className="rounded border border-dashed p-5 text-sm text-neutral-500">Ajoutez au moins un employé actif.</p>
         )}
 
-        {/* Tableau : lignes = ouvriers, colonnes = jours */}
-        <div className="overflow-x-auto pb-2">
+        {/* Vue mobile : une carte par ouvrier, jours empilés (le tableau déborde sur téléphone) */}
+        <div className="space-y-3 md:hidden">
+          {(employes ?? []).map((e) => {
+            const semaine = affectations.filter((a) => un(a.employe)?.id === e.id);
+            const totalEmp = semaine.reduce((s, a) => s + Number(a.heures), 0);
+            if (!semaine.length) return null;
+            return (
+              <div key={e.id} className="overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-800">
+                <div className="flex items-center justify-between border-b border-neutral-200 bg-neutral-50 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900">
+                  <span className="font-medium">{e.prenom} {e.nom}</span>
+                  <span className="font-mono text-xs text-neutral-500">{totalEmp} h</span>
+                </div>
+                <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                  {dates.map((d) => {
+                    const cellules = semaine.filter((a) => a.date === iso(d));
+                    if (!cellules.length) return null;
+                    return (
+                      <div key={iso(d)} className="px-3 py-2">
+                        <div className="mb-1 text-xs font-semibold capitalize text-neutral-500">{dateFr(d)}</div>
+                        <div className="space-y-1">
+                          {cellules.map((a) => {
+                            const ch = un(a.chantier);
+                            return (
+                              <div key={a.id} className={`flex items-start justify-between gap-2 rounded border-l-4 px-2 py-1 ${couleur(ch?.id ?? a.type_activite)}`}>
+                                <div className="min-w-0">
+                                  <div className="text-sm font-medium leading-tight text-neutral-900">{libelleAffectation(a)}</div>
+                                  {a.lieu_activite && <div className="text-[11px] text-neutral-600">{a.lieu_activite}</div>}
+                                  {a.tache && <div className="text-[11px] text-neutral-600">{a.tache}</div>}
+                                  <div className="font-mono text-[11px] text-neutral-700">{a.heures} h</div>
+                                </div>
+                                <form action={supprimerGroupeAffectationsAction}>
+                                  <input type="hidden" name="retour" value={iso(debut)} />
+                                  <input type="hidden" name="ids" value={a.id} />
+                                  <ConfirmSubmitButton message="Retirer cette affectation ?" className="px-1 text-sm text-neutral-400 hover:text-red-600">×</ConfirmSubmitButton>
+                                </form>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+          {!affectations.length && <p className="rounded border border-dashed p-5 text-center text-sm text-neutral-500">Aucune affectation cette semaine.</p>}
+        </div>
+
+        {/* Tableau (ordinateur) : lignes = ouvriers, colonnes = jours */}
+        <div className="hidden overflow-x-auto pb-2 md:block">
           <table className="w-full min-w-[900px] border-collapse text-sm">
             <thead>
               <tr>
