@@ -1,3 +1,17 @@
+# ✅ QUESTIONNAIRE INSCRIPTION + SUPPORT CHAT + RESET ACCÈS — 14 juillet (Claude)
+
+**Migration 73 `20260714000073_besoins_et_support.sql` APPLIQUÉE + code poussé (`513d6a5`).**
+
+**(A) Questionnaire d'inscription → recommandation d'abonnement.** Après création d'entreprise (`createEntrepriseAction`, chemin auth réelle), le dirigeant est redirigé vers `/onboarding/besoins` : nb salariés + besoins (cases) + attentes + commentaire. `enregistrerBesoinsAction` (`src/app/actions/besoins.ts`) upsert dans `entreprise_besoins` et calcule l'offre via `recommanderOffre()`. Écran de reco (Essentiel 49 € / Pro 89 € / Premium 149 €, **placeholders**) avec prix mensuel = base offre + salariés sup. Logique dans `src/lib/plateforme.ts` (`BESOINS_OPTIONS`, `ATTENTES_OPTIONS`, `OFFRES`, `recommanderOffre`, `prixAbonnementMensuel(nb, base)`). RPC `plateforme_besoins()` pour la vue plateforme.
+
+**(B) Support chat entreprise ↔ plateforme.** Table `support_messages` (cote entreprise/plateforme, RLS `est_membre_actif` côté entreprise, RPC SECURITY DEFINER côté plateforme). Bouton flottant « Aide » (`src/components/AideButton.tsx`) dans le shell `(app)/layout.tsx` → `/aide` (chat entreprise, `src/app/(app)/aide/page.tsx`, actions `src/app/actions/support.ts`). Côté plateforme : `/plateforme/support` (boîte de réception + badge non-lus + réponse), lien « Support » sur `/plateforme`. RPC `plateforme_support_fils()`, `plateforme_support_messages(uuid)` (marque lus), `plateforme_support_repondre(uuid,text)`, `support_marquer_lus_entreprise(uuid)`. Chat par rafraîchissement (pas de temps réel Supabase Realtime — évolution possible).
+
+**(C) Reset accès employés effectué (à la demande de Julien, pour re-tester).** Toutes les adhésions `utilisateurs_entreprises` supprimées sauf comptes protégés (julien.gregurec@gmail.com + plateforme_admins) ; fiches `employes` déliées + repassées `compte_application_statut='non_ouvert'` + timestamps invitation/installation/connexion effacés. Aucun compte de connexion supprimé (FK `restrict` sur `codes_acces`/`chantier_transferts`/`demandes_conges.created_by` rendraient la suppression fragile). Contrôle post-reset : 1 adhésion restante (LIRIA), 0 fiche avec accès, 0 fiche liée. **julien.gregurec@gmail.com intouchable jusqu'à création de sa société.**
+
+Lien d'inscription nouvelle entreprise : `https://liria-concept-gestion-btp.vercel.app/signup` → onboarding (créer entreprise) → questionnaire besoins → dashboard.
+
+---
+
 # ✅ BASCULE AUTH RÉELLE + ÉQUIPE PLATEFORME — 14 juillet (Claude)
 
 **Bascule production faite.** `DISABLE_EMAIL_LOGIN=false` sur Vercel : la connexion réelle est ACTIVE. `/dashboard` et `/plateforme` redirigent (307) vers `/login`. Owner : `julien.gregurec@gmail.com` (auth id `c913921d`), profil + membership LIRIA admin OK, mot de passe posé par l'utilisateur. Le mode prototype (`isEmailLoginDisabled()`, `dev_contexte_entreprise`, policies anon) reste dans le code pour le dev local mais n'est plus actif en prod.
