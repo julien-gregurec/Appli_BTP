@@ -116,7 +116,7 @@ export default async function DashboardPage() {
       <div className="mx-auto max-w-6xl space-y-6">
         <div>
           <h1 className="text-xl font-semibold">Bonjour{prenomAffiche ? ` ${prenomAffiche}` : ""}</h1>
-          <p className="text-sm text-neutral-500">{ctx.entrepriseNom} · {ctx.entrepriseReference}</p>
+          <p className="text-sm text-neutral-500">{ctx.entrepriseNom}</p>
         </div>
 
         {permissions !== null && raccourcis.length > 0 && <section><h2 className="mb-2 text-sm font-semibold">Mes modules</h2><div className="flex flex-wrap gap-2">{raccourcis.map(([, href, label]) => <Link key={href} href={href} className="rounded-full border border-neutral-300 px-3 py-2 text-sm font-medium hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900">{label}</Link>)}</div></section>}
