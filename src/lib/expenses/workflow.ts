@@ -44,3 +44,19 @@ export function verifierTotaux(ht: number | null, tva: number | null, ttc: numbe
   if (ht !== null && tva !== null && Math.abs(ht + tva - ttc) > 0.02) erreurs.push("HT + TVA est différent du TTC");
   return erreurs;
 }
+
+export function calculerTotauxDepense(ht: number | null, tva: number | null, ttc: number | null, taux: number | null) {
+  const arrondi = (value: number) => Math.round(value * 100) / 100;
+  if (ttc !== null && taux !== null && taux >= 0 && (ht === null || tva === null)) {
+    const montantHt = arrondi(ttc / (1 + taux / 100));
+    return { ht: montantHt, tva: arrondi(ttc - montantHt), ttc, taux };
+  }
+  if (ht !== null && taux !== null && taux >= 0 && (tva === null || ttc === null)) {
+    const montantTva = arrondi(ht * taux / 100);
+    return { ht, tva: montantTva, ttc: arrondi(ht + montantTva), taux };
+  }
+  if (ht !== null && tva !== null && ttc === null) {
+    return { ht, tva, ttc: arrondi(ht + tva), taux: taux ?? (ht > 0 ? arrondi(tva / ht * 100) : null) };
+  }
+  return { ht, tva, ttc, taux };
+}

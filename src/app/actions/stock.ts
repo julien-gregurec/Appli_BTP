@@ -10,7 +10,7 @@ export async function creerArticleStockAction(fd: FormData) {
   const ctx = await getContexteEntreprise(); const supabase = await createClient();
   const reference = champ(fd, "reference"); const designation = champ(fd, "designation");
   if (!reference || !designation) redirect(`/stock?error=${encodeURIComponent("Référence et désignation obligatoires")}`);
-  const { error } = await supabase.from("articles_stock").insert({ entreprise_id: ctx.entrepriseId, reference, designation, unite: champ(fd, "unite") ?? "u", seuil_alerte: Number(fd.get("seuil_alerte")) || 0, prix_achat_ht: Number(fd.get("prix_achat_ht")) || 0, emplacement: champ(fd, "emplacement"),marque:champ(fd,"marque"),code_barres:champ(fd,"code_barres") });
+  const { error } = await supabase.from("articles_stock").insert({ entreprise_id: ctx.entrepriseId, reference, designation, unite: champ(fd, "unite") ?? "u", seuil_alerte: Number(fd.get("seuil_alerte")) || 0, prix_achat_ht: Number(fd.get("prix_achat_ht")) || 0, prix_vente_ht: Number(fd.get("prix_vente_ht")) || 0, emplacement: champ(fd, "emplacement"),marque:champ(fd,"marque"),code_barres:champ(fd,"code_barres") });
   if (error) redirect(`/stock?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/stock"); redirect("/stock?succes=article");
 }
@@ -28,16 +28,30 @@ export async function creerMouvementStockAction(fd: FormData) {
   revalidatePath("/stock"); redirect("/stock?succes=mouvement");
 }
 
+export async function modifierPrixArticleStockAction(articleId:string,fd:FormData){
+  const ctx=await getContexteEntreprise(),supabase=await createClient();
+  const achat=Number(fd.get("prix_achat_ht")),vente=Number(fd.get("prix_vente_ht"));
+  if(!Number.isFinite(achat)||achat<0||!Number.isFinite(vente)||vente<0)redirect(`/stock/${articleId}?error=${encodeURIComponent("Prix invalides")}`);
+  const{error}=await supabase.from("articles_stock").update({prix_achat_ht:achat,prix_vente_ht:vente}).eq("id",articleId).eq("entreprise_id",ctx.entrepriseId);
+  if(error)redirect(`/stock/${articleId}?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/stock");revalidatePath(`/stock/${articleId}`);redirect(`/stock/${articleId}?success=${encodeURIComponent("Prix enregistrés")}`);
+}
+
 export async function mouvementStockBorneAction(fd: FormData) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const type = champ(fd, "type") ?? "sortie";
   const quantite = Number(fd.get("quantite"));
-  const identifiantEmploye = champ(fd, "identifiant_employe");
+  let identifiantEmploye = champ(fd, "identifiant_employe");
   const motDePasse = champ(fd, "mot_de_passe_stock");
   const codeArticle = champ(fd, "code_article");
   if (!identifiantEmploye || !motDePasse || !codeArticle || !Number.isFinite(quantite) || quantite <= 0) {
     redirect(`/stock/borne?error=${encodeURIComponent("Identifiant salarié, mot de passe, article et quantité sont obligatoires")}`);
+  }
+  if(identifiantEmploye.toUpperCase().startsWith("LGP-EMP-")){
+    const{data,error}=await supabase.rpc("identifiant_employe_depuis_qr_borne",{p_entreprise_id:ctx.entrepriseId,p_code:identifiantEmploye});
+    if(error||!data)redirect(`/stock/borne?error=${encodeURIComponent("QR salarié inconnu ou inactif")}`);
+    identifiantEmploye=data;
   }
   const { error } = await supabase.rpc("enregistrer_mouvement_stock_borne_v3", {
     p_entreprise_id: ctx.entrepriseId,

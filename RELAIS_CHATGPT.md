@@ -1,3 +1,14 @@
+# REPRISE — 15 juillet 2026, sécurité terrain et correctifs mobiles (LOCAL VALIDÉ)
+
+- Ne pas déployer avant d’appliquer, dans l’ordre, `20260715000080_suite_metier_complete.sql` puis `20260715000081_securite_terrain_alertes_personnalisation.sql`.
+- Migration 81 : correction des `+` dans les e-mails iOS, réparation prudente du mojibake en base, prix achat/revente du stock, horaires contractuels par jour, seuil d’écart et alertes de pointage, pointage oublié toujours soumis à vérification, notifications personnelles, documents chantier par audience, QR salarié de borne et lecture chantier limitée aux projets actifs assignés.
+- Le pointage propose d’abord le chantier du jour, puis les chantiers assignés, puis les autres chantiers actifs via une RPC ne retournant aucune donnée client ou financière.
+- Interface : calcul automatique HT/TVA/TTC des notes de frais, demandes de congé envoyées immédiatement, accueil personnalisable uniquement parmi les modules autorisés, chiffres et état global des chantiers masqués aux ouvriers, workflow responsable des notes de frais inchangé et protégé côté serveur.
+- Compte dépôt : restriction Stock/Borne/Dépôt déjà en place ; QR salarié accepté mais mot de passe stock personnel toujours obligatoire. Les réceptions fournisseur restent accessibles dans le flux Stock/Achats selon les droits.
+- Contrôles locaux du lot : ESLint, TypeScript, tests Vitest, `git diff --check` et build webpack verts. Le SQL 81 doit encore être exécuté et contrôlé sur Supabase avant publication.
+
+---
+
 # ÉTAT AUTORITATIF — 14 juillet 2026, audit global, équipes chantier et nouvelles vidéos (Codex)
 
 **Migrations 77, 78 et 79 + nettoyage des entreprises de test confirmés appliqués par Julien. Lot publié sur `main` au commit `544d35a` et déployé par Vercel.**
@@ -121,6 +132,19 @@ Les 15 migrations 57→71 ont été **appliquées** (guidées une par une via pr
 ---
 
 # Relais pour ChatGPT — « Liria Gestion Pro »
+
+## REPRISE CODEX — 15 juillet 2026, correctifs terrain et sécurité (LOCAL VALIDÉ, MIGRATIONS 80 ET 81 À PASSER)
+
+- Le lot précédent `e6b0068` ajoute la suite métier avancée et Stripe Connect ; sa migration `20260715000080_suite_metier_complete.sql` n’est pas encore confirmée comme appliquée. Ne pas déployer avant passage des migrations 80 puis 81.
+- Migration 81 : prix de revente stock, horaires attendus par jour, seuil d’écart, anomalies de pointage (>12 h vérification, >=15 h critique), notifications personnelles, décisions congés/notes de frais, visibilité des documents chantier par audience, QR salarié sécurisé sur borne et correction des données mojibake.
+- E-mails devis/factures/commandes : construction `mailto:` corrigée avec `encodeURIComponent`; Mail iOS ne reçoit plus des `+` à la place des espaces et conserve les accents.
+- Notes de frais : champs HT/TVA/TTC/taux liés automatiquement et recalcul défensif côté serveur. Les transitions de responsable restent protégées en base ; le salarié reçoit désormais les décisions.
+- Tableau de bord : vue globale chantier réservée aux gestionnaires/encadrants, « Mes travaux » reste strictement affecté et sans prix, raccourcis autorisés masquables par l’utilisateur, notifications visibles.
+- Stock : prix achat et revente séparés sur la fiche article. La borne accepte le QR salarié comme identifiant mais exige toujours son mot de passe personnel et les droits entrée/sortie du poste.
+- Congés : la création soumet immédiatement la demande ; plus de brouillon ni seconde action. Le responsable est notifié.
+- Documents chantier : audience `équipe affectée`, `encadrement` ou `gestionnaires`, contrôlée en RLS et lors du téléchargement signé.
+- Pointage : chaque clôture reste à vérifier, compare les heures aux horaires journaliers de l’entreprise, affiche les anomalies et permet au responsable autorisé de valider/rejeter directement la session.
+- Contrôles : TypeScript OK, lint OK, 18 tests OK, build webpack production OK (seul avertissement historique `unpdf/import.meta`).
 
 ## 00. REPRISE CODEX — 13 juillet 2026, archivage/frais + modules complémentaires (CODE LOCAL PRÊT, MIGRATIONS 57–71 NON APPLIQUÉES)
 

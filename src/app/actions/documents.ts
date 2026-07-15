@@ -23,6 +23,7 @@ export async function ajouterDocumentChantierAction(chantierId: string, formData
   const fichier = formData.get("fichier");
   const categorie = String(formData.get("categorie") ?? "autre");
   const note = String(formData.get("note") ?? "").trim();
+  const audience = String(formData.get("audience") ?? "gestionnaires");
 
   const { data: chantier } = await supabase.from("chantiers").select("id")
     .eq("id", chantierId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
@@ -35,6 +36,7 @@ export async function ajouterDocumentChantierAction(chantierId: string, formData
   if (!DOCUMENT_CATEGORIES.some((item) => item.value === categorie)) {
     retour(chantierId, "error", "Catégorie invalide");
   }
+  if (!["tous_affectes","encadrement","gestionnaires"].includes(audience)) retour(chantierId,"error","Visibilité invalide");
 
   const path = `${ctx.entrepriseId}/${chantierId}/${crypto.randomUUID()}-${nomFichierSecurise(fichier.name)}`;
   const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, fichier, {
@@ -53,6 +55,7 @@ export async function ajouterDocumentChantierAction(chantierId: string, formData
     mime_type: fichier.type,
     taille_octets: fichier.size,
     note: note || null,
+    audience,
   });
   if (insertError) {
     await supabase.storage.from(BUCKET).remove([path]);

@@ -5,12 +5,13 @@ import type { IScannerControls } from "@zxing/browser";
 import { mouvementStockBorneAction } from "@/app/actions/stock";
 
 type Chantier = { id: string; nom: string };
-type CibleScan = "article" | "chantier";
+type CibleScan = "employe" | "article" | "chantier";
 const input = "w-full rounded-lg border border-neutral-300 bg-white px-3 py-3 text-base dark:border-neutral-700 dark:bg-neutral-900";
 
 export function StockKioskForm({ chantiers, identifiantExemple = "EMP-0001" }: { chantiers: Chantier[]; identifiantExemple?: string }) {
   const [codeArticle, setCodeArticle] = useState("");
   const [codeChantier, setCodeChantier] = useState("");
+  const [identifiantEmploye, setIdentifiantEmploye] = useState("");
   const [cible, setCible] = useState<CibleScan | null>(null);
   const [cameraPrete, setCameraPrete] = useState(false);
   const [erreurCamera, setErreurCamera] = useState("");
@@ -40,7 +41,7 @@ export function StockKioskForm({ chantiers, identifiantExemple = "EMP-0001" }: {
           (result) => {
             if (!result) return;
             const code = result.getText().trim().toUpperCase();
-            if (cible === "article") setCodeArticle(code); else setCodeChantier(code);
+            if (cible === "article") setCodeArticle(code); else if(cible === "employe") setIdentifiantEmploye(code); else setCodeChantier(code);
             navigator.vibrate?.(100);
             fermer();
           },
@@ -75,7 +76,7 @@ export function StockKioskForm({ chantiers, identifiantExemple = "EMP-0001" }: {
           <h2 className="text-lg font-semibold">Identification personnelle</h2>
           <p className="mt-1 text-sm text-white/70">Le mouvement sera enregistré uniquement à votre nom. Utilisez l’identifiant indiqué dans « Mon espace » et votre mot de passe stock personnel.</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <input name="identifiant_employe" required autoComplete="off" autoCapitalize="characters" placeholder={`Identifiant salarié (${identifiantExemple})`} className="w-full rounded-lg border border-white/30 bg-white px-3 py-3 text-base uppercase text-neutral-950" />
+            <div className="flex gap-2"><input name="identifiant_employe" value={identifiantEmploye} onChange={event=>setIdentifiantEmploye(event.target.value.toUpperCase())} required autoComplete="off" autoCapitalize="characters" placeholder={`Identifiant salarié (${identifiantExemple})`} className="min-w-0 flex-1 rounded-lg border border-white/30 bg-white px-3 py-3 text-base uppercase text-neutral-950" /><button type="button" onClick={()=>setCible("employe")} className="rounded-lg border border-[#c9a24a] bg-[#c9a24a] px-3 text-sm font-semibold text-[#0d1b2a]">QR salarié</button></div>
             <input name="mot_de_passe_stock" type="password" minLength={8} maxLength={72} required autoComplete="off" placeholder="Mot de passe stock" className="w-full rounded-lg border border-white/30 bg-white px-3 py-3 text-base text-neutral-950" />
           </div>
         </div>
@@ -111,7 +112,7 @@ export function StockKioskForm({ chantiers, identifiantExemple = "EMP-0001" }: {
 
       {cible && <div role="dialog" aria-modal="true" className="fixed inset-0 z-[90] flex items-center justify-center bg-black/85 p-3">
         <div className="w-full max-w-lg overflow-hidden rounded-xl bg-neutral-950 text-white">
-          <div className="flex items-center justify-between p-4"><div><h3 className="font-semibold">Scanner {cible === "article" ? "l’article" : "le chantier"}</h3><p className="text-xs text-neutral-400">QR code et codes-barres sont reconnus.</p></div><button type="button" onClick={fermer} className="rounded border border-white/30 px-3 py-2">Fermer</button></div>
+          <div className="flex items-center justify-between p-4"><div><h3 className="font-semibold">Scanner {cible === "article" ? "l’article" : cible === "employe" ? "le QR du salarié" : "le chantier"}</h3><p className="text-xs text-neutral-400">QR code et codes-barres sont reconnus.</p></div><button type="button" onClick={fermer} className="rounded border border-white/30 px-3 py-2">Fermer</button></div>
           <div className="relative aspect-[4/3] bg-black"><video ref={videoRef} muted playsInline className="h-full w-full object-cover" />{!erreurCamera && <div className="pointer-events-none absolute inset-[18%_8%] rounded-xl border-2 border-[#c9a24a] shadow-[0_0_0_999px_rgba(0,0,0,.3)]" />}{!cameraPrete && !erreurCamera && <div className="absolute inset-0 flex items-center justify-center bg-black/40">Ouverture de la caméra…</div>}{erreurCamera && <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-red-200">{erreurCamera}</div>}</div>
         </div>
       </div>}

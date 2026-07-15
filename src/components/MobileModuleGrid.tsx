@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 
 export type MobileModuleIconName =
   | "profil"
@@ -70,6 +73,10 @@ function ModuleIcon({ nom, grand = false }: { nom: MobileModuleIconName; grand?:
 }
 
 export function MobileModuleGrid({ modules }: { modules: MobileModuleLink[] }) {
+  const [edition,setEdition]=useState(false);
+  const [masques,setMasques]=useState<string[]>(()=>{if(typeof window==="undefined")return[];try{return JSON.parse(localStorage.getItem("liria-dashboard-masques")??"[]");}catch{return[];}});
+  const basculer=(href:string)=>setMasques(courants=>{const suivants=courants.includes(href)?courants.filter(item=>item!==href):[...courants,href];localStorage.setItem("liria-dashboard-masques",JSON.stringify(suivants));return suivants;});
+  const visibles=modules.filter(module=>!masques.includes(module.href));
   const couleurs: Record<MobileModuleIconName, string> = {
     profil: "#355b7d", travaux: "#6b5b95", pointage: "#d07a32", planning: "#be4d46",
     chantiers: "#967044", employes: "#2d8790", clients: "#1f9bc8", devis: "#ed8b00",
@@ -86,10 +93,11 @@ export function MobileModuleGrid({ modules }: { modules: MobileModuleLink[] }) {
           <h2 id="modules-mobile-title" className="font-semibold">Mes modules</h2>
           <p className="text-xs text-neutral-500">Accès disponibles pour votre poste</p>
         </div>
-        <span className="rounded-full bg-[#c9a24a]/15 px-2.5 py-1 text-xs font-semibold text-[#8a681d]">{modules.length}</span>
+        <div className="flex items-center gap-2"><span className="rounded-full bg-[#c9a24a]/15 px-2.5 py-1 text-xs font-semibold text-[#8a681d]">{visibles.length}</span><button type="button" onClick={()=>setEdition(value=>!value)} className="rounded-md border px-2.5 py-1 text-xs font-medium">{edition?"Terminer":"Personnaliser"}</button></div>
       </div>
+      {edition&&<div className="mb-3 rounded-xl border bg-neutral-50 p-3 dark:bg-neutral-900"><p className="mb-2 text-xs text-neutral-500">Choisissez les raccourcis affichés sur cet appareil. Les autorisations de votre poste restent toujours prioritaires.</p><div className="flex flex-wrap gap-2">{modules.map(module=><label key={module.href} className="flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 text-xs dark:bg-neutral-950"><input type="checkbox" checked={!masques.includes(module.href)} onChange={()=>basculer(module.href)}/>{module.label}</label>)}</div></div>}
       <div className="mobile-module-grid grid gap-x-3 gap-y-5 rounded-2xl border border-[#c9a24a]/25 bg-gradient-to-b from-white to-[#fffaf0] px-3 py-5 shadow-sm dark:from-neutral-950 dark:to-[#18140b] md:hidden" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
-        {modules.map((module) => (
+        {visibles.map((module) => (
           <Link key={module.href} href={module.href} className="group flex min-w-0 flex-col items-center gap-2 text-center active:scale-95">
             <span className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-[#c9a24a] bg-white text-[#b38a2d] shadow-[0_4px_14px_rgba(201,162,74,0.15)] transition group-hover:bg-[#c9a24a] group-hover:text-white dark:bg-neutral-950">
               <ModuleIcon nom={module.icon} />
@@ -99,7 +107,7 @@ export function MobileModuleGrid({ modules }: { modules: MobileModuleLink[] }) {
         ))}
       </div>
       <div className="hidden gap-4 rounded-2xl border bg-neutral-50 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950 md:grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(105px, 1fr))" }}>
-        {modules.map((module) => (
+        {visibles.map((module) => (
           <Link key={module.href} href={module.href} className="group flex min-w-0 flex-col items-center gap-2 rounded-xl p-2 text-center transition hover:-translate-y-1 hover:bg-white hover:shadow-md dark:hover:bg-neutral-900">
             <span className="flex aspect-square w-full max-w-[112px] items-center justify-center rounded-2xl text-white shadow-sm transition group-hover:shadow-lg" style={{ backgroundColor: couleurs[module.icon] }}>
               <ModuleIcon nom={module.icon} grand />

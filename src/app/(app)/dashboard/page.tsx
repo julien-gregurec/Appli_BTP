@@ -19,8 +19,9 @@ export default async function DashboardPage() {
   const supabase = await createClient();
   const aujourdhui = new Date().toISOString().slice(0, 10);
   const autorise = (cle: string) => permissions === null || permissions.includes(cle);
+  const voirVueEnsembleChantiers = permissions === null || permissions.includes("gerer_chantiers") || permissions.includes("voir_heures_chantiers");
   const voir = {
-    devis: autorise("acces_devis"), factures: autorise("acces_factures"), chantiers: autorise("acces_chantiers"),
+    devis: autorise("acces_devis"), factures: autorise("acces_factures"), chantiers: autorise("acces_chantiers") && voirVueEnsembleChantiers,
     planning: autorise("acces_planning"), stock: autorise("acces_stock"), flotte: autorise("acces_flotte"),
     outillage: autorise("acces_outillage"), achats: autorise("acces_achats"), pointage: autorise("acces_pointage"),
   };
@@ -35,7 +36,7 @@ export default async function DashboardPage() {
     { permission: "voir_devis_chantier_sans_prix", href: "/mes-travaux", label: "Mes travaux", icon: "travaux" },
     { permission: "acces_pointage", href: "/pointage", label: "Pointage", icon: "pointage" },
     { permission: "acces_planning", href: "/planning", label: "Planning", icon: "planning" },
-    { permission: "acces_chantiers", href: "/chantiers", label: "Chantiers", icon: "chantiers" },
+    ...(voirVueEnsembleChantiers ? [{ permission: "acces_chantiers", href: "/chantiers", label: "Chantiers", icon: "chantiers" as const }] : []),
     { permission: "acces_employes", href: "/employes", label: "Employés", icon: "employes" },
     { permission: "acces_clients", href: "/clients", label: "Clients", icon: "clients" },
     { permission: "acces_devis", href: "/devis", label: "Devis", icon: "devis" },
@@ -78,6 +79,7 @@ export default async function DashboardPage() {
   const affectations = affectationsResult?.data ?? [], articles = articlesResult?.data ?? [], vehicules = vehiculesResult?.data ?? [];
   const outils = outilsResult?.data ?? [], commandes = commandesResult?.data ?? [];
   const chantiersPointage = chantiersPointageResult?.data ?? [], sessionsPointage = sessionsPointageResult?.data ?? [];
+  const {data:notifications}=permissions!==null?await supabase.from("notifications_utilisateurs").select("id,titre,message,lien,niveau,created_at").eq("entreprise_id",ctx.entrepriseId).is("lue_at",null).order("created_at",{ascending:false}).limit(8):{data:[]};
 
   const totalFacture = (factures ?? []).filter((f) => f.statut !== "annulee").reduce((s, f) => s + Number(f.montant_ttc ?? 0), 0);
   const totalEncaisse = (factures ?? []).reduce((s, f) => s + Number(f.montant_paye ?? 0), 0);
@@ -146,6 +148,8 @@ export default async function DashboardPage() {
           <h1 className="text-xl font-semibold">Bonjour{prenomAffiche ? ` ${prenomAffiche}` : ""}</h1>
           <p className="text-sm text-neutral-500">{ctx.entrepriseNom}</p>
         </div>
+
+        {(notifications??[]).length>0&&<section className="rounded-xl border border-blue-200 bg-blue-50 p-4"><div className="mb-3 flex items-center justify-between"><div><h2 className="font-semibold">Mes notifications</h2><p className="text-xs text-neutral-500">Décisions, demandes et vérifications qui vous concernent.</p></div><span className="rounded-full bg-blue-700 px-2.5 py-1 text-xs font-semibold text-white">{notifications?.length}</span></div><div className="grid gap-2 sm:grid-cols-2">{notifications?.map(notification=><Link key={notification.id} href={notification.lien??"/dashboard"} className={`rounded-lg border bg-white p-3 text-sm ${notification.niveau==="critique"?"border-red-400":notification.niveau==="attention"?"border-amber-300":"border-blue-200"}`}><strong>{notification.titre}</strong>{notification.message&&<p className="mt-1 text-xs text-neutral-600">{notification.message}</p>}</Link>)}</div></section>}
 
         {raccourcis.length > 0 && (
           <MobileModuleGrid modules={raccourcis} />

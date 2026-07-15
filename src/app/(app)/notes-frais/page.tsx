@@ -6,6 +6,7 @@ import { TYPES_JUSTIFICATIF, statutNoteFrais } from "@/lib/notes-frais";
 import { creerNoteFraisAction } from "@/app/actions/notes-frais";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
+import { ExpenseAmountFields } from "@/components/ExpenseAmountFields";
 
 const input = "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -43,10 +44,7 @@ export default async function NotesFraisPage({ searchParams }: { searchParams: P
         <label className="text-xs text-neutral-500">Fournisseur / commerçant<input name="fournisseur" placeholder="Nom du fournisseur" className={`${input} mt-1`} /></label>
         <label className="text-xs text-neutral-500">Catégorie<select name="categorie" className={`${input} mt-1`}>{(categories ?? []).map((c) => <option key={c.code} value={c.code}>{c.libelle}</option>)}</select></label>
         <label className="text-xs text-neutral-500">Type de justificatif<select name="type_document_principal" className={`${input} mt-1`}>{TYPES_JUSTIFICATIF.map((t) => <option key={t.cle} value={t.cle}>{t.libelle}</option>)}</select></label>
-        <label className="text-xs text-neutral-500">Montant HT<input name="montant_ht" type="number" min="0" step="0.01" className={`${input} mt-1`} /></label>
-        <label className="text-xs text-neutral-500">TVA<input name="montant_tva" type="number" min="0" step="0.01" className={`${input} mt-1`} /></label>
-        <label className="text-xs text-neutral-500">Montant TTC<input name="montant_ttc" type="number" min="0" step="0.01" required className={`${input} mt-1`} /></label>
-        <label className="text-xs text-neutral-500">Taux TVA<select name="taux_tva" className={`${input} mt-1`}><option value="">Non renseigné</option><option value="0">0 %</option><option value="5.5">5,5 %</option><option value="10">10 %</option><option value="20">20 %</option></select></label>
+        <ExpenseAmountFields />
         <label className="text-xs text-neutral-500">Chantier<select name="chantier_id" className={`${input} mt-1`}><option value="">Frais généraux</option>{(chantiers ?? []).map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}</select></label>
         <label className="text-xs text-neutral-500">Moyen de paiement<select name="moyen_paiement" className={`${input} mt-1`}><option value="">Non renseigné</option><option value="carte_entreprise">Carte entreprise</option><option value="carte_personnelle">Carte personnelle</option><option value="especes">Espèces</option><option value="virement">Virement</option><option value="autre">Autre</option></select></label>
         <label className="text-xs text-neutral-500">Devise<select name="devise" className={`${input} mt-1`}><option value="EUR">EUR</option><option value="CHF">CHF</option><option value="GBP">GBP</option><option value="USD">USD</option></select></label>

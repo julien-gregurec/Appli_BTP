@@ -50,6 +50,13 @@ export async function enregistrerDepartAction(sessionId: string, formData: FormD
   redirect("/pointage?succes=depart");
 }
 
+export async function declarerPointageOublieAction(formData:FormData){
+ const ctx=await getContexteEntreprise(),supabase=await createClient();let preuve;
+ try{preuve=positionTerrain(formData);}catch(error){redirect(`/pointage?error=${encodeURIComponent(error instanceof Error?error.message:"Position invalide")}`);}
+ const{error}=await supabase.rpc("declarer_pointage_oublie",{p_entreprise_id:ctx.entrepriseId,p_chantier_id:texte(formData,"chantier_id"),p_date:texte(formData,"date"),p_arrivee:texte(formData,"heure_arrivee"),p_depart:texte(formData,"heure_depart"),p_pause_minutes:Math.max(0,Number(formData.get("pause_minutes"))||0),p_latitude:preuve.latitude,p_longitude:preuve.longitude,p_precision:preuve.precision,p_commentaire:texte(formData,"commentaire")});
+ if(error)redirect(`/pointage?error=${encodeURIComponent(error.message)}`);revalidatePath("/pointage");revalidatePath("/dashboard");redirect(`/pointage?succes=${encodeURIComponent("Pointage oublié enregistré et transmis au responsable")}`);
+}
+
 export async function supprimerPointageAction(pointageId: string, mois: string) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();

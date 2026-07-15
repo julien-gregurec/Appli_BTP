@@ -21,7 +21,7 @@ export default async function DocumentsChantierPage({
     supabase.from("chantiers").select("id, nom, reference_interne")
       .eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),
     supabase.from("documents_chantier")
-      .select("id, nom, categorie, storage_path, mime_type, taille_octets, note, created_at")
+      .select("id, nom, categorie, storage_path, mime_type, taille_octets, note, audience, created_at")
       .eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId)
       .order("created_at", { ascending: false }),
   ]);
@@ -52,7 +52,7 @@ export default async function DocumentsChantierPage({
 
         <form action={ajouter} className="grid gap-3 rounded-lg border-2 border-[#c9a24a]/60 bg-[#c9a24a]/5 p-4 sm:grid-cols-[1fr_220px_auto]">
           <div><h2 className="font-semibold">Photo rapide depuis le chantier</h2><p className="text-xs text-neutral-500">L’appareil photo du téléphone s’ouvre directement. Ajoutez une note pour faciliter le suivi.</p><input name="fichier" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" capture="environment" required className="mt-2 block w-full text-sm" /></div>
-          <div><label className="text-xs text-neutral-500">Étape<select name="categorie" defaultValue="photo_pendant" className="mt-1 w-full rounded-md border px-3 py-2 text-sm"><option value="photo_avant">Avant travaux</option><option value="photo_pendant">Pendant les travaux</option><option value="photo_apres">Après travaux</option></select></label><label className="mt-2 block text-xs text-neutral-500">Note<input name="note" placeholder="Zone, tâche, anomalie…" className="mt-1 w-full rounded-md border px-3 py-2 text-sm" /></label></div>
+          <div><label className="text-xs text-neutral-500">Étape<select name="categorie" defaultValue="photo_pendant" className="mt-1 w-full rounded-md border px-3 py-2 text-sm"><option value="photo_avant">Avant travaux</option><option value="photo_pendant">Pendant les travaux</option><option value="photo_apres">Après travaux</option></select></label><label className="mt-2 block text-xs text-neutral-500">Visible par<select name="audience" defaultValue="tous_affectes" className="mt-1 w-full rounded-md border px-3 py-2 text-sm"><option value="tous_affectes">Toute l’équipe affectée</option><option value="encadrement">Encadrement du chantier</option><option value="gestionnaires">Gestionnaires uniquement</option></select></label><label className="mt-2 block text-xs text-neutral-500">Note<input name="note" placeholder="Zone, tâche, anomalie…" className="mt-1 w-full rounded-md border px-3 py-2 text-sm" /></label></div>
           <button className="self-end rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-medium text-white">Ajouter la photo</button>
         </form>
 
@@ -72,6 +72,7 @@ export default async function DocumentsChantierPage({
             <label htmlFor="note" className="text-sm font-medium">Note <span className="font-normal text-neutral-500">(facultatif)</span></label>
             <input id="note" name="note" maxLength={500} placeholder="Ex. réception du lot cloisons" className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900" />
           </div>
+          <div className="space-y-1 md:col-span-2"><label htmlFor="audience" className="text-sm font-medium">Visibilité</label><select id="audience" name="audience" defaultValue="gestionnaires" className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"><option value="tous_affectes">Toute l’équipe affectée au chantier</option><option value="encadrement">Chef d’équipe, chef de chantier et conducteur</option><option value="gestionnaires">Gestionnaires uniquement</option></select></div>
           <div className="md:col-span-2">
             <button type="submit" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">Ajouter le document</button>
           </div>
@@ -92,7 +93,7 @@ export default async function DocumentsChantierPage({
                   <div className="space-y-3 p-3">
                     <div>
                       <p className="truncate text-sm font-medium" title={document.nom}>{document.nom}</p>
-                      <p className="mt-0.5 text-xs text-neutral-500">{libelleCategorie(document.categorie)} · {tailleLisible(Number(document.taille_octets))}</p>
+                      <p className="mt-0.5 text-xs text-neutral-500">{libelleCategorie(document.categorie)} · {tailleLisible(Number(document.taille_octets))}</p><p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-[#9a7625]">{document.audience==="tous_affectes"?"Équipe affectée":document.audience==="encadrement"?"Encadrement":"Gestionnaires"}</p>
                     </div>
                     {document.note && <p className="line-clamp-2 text-sm text-neutral-600 dark:text-neutral-400">{document.note}</p>}
                     <div className="flex items-center justify-between border-t border-neutral-100 pt-3 text-sm dark:border-neutral-800">

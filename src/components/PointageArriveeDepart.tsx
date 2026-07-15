@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { enregistrerArriveeAction, enregistrerDepartAction } from "@/app/actions/pointages";
-type Option={id:string;nom:string};
+type Option={id:string;nom:string;priorite?:"jour"|"affecte"|"autre"};
 type Session={id:string;arrivee_at:string;tache:string|null;employe:Option|null;chantier:Option|null};
 const input="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 

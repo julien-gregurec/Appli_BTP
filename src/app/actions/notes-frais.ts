@@ -6,7 +6,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { permissionsUtilisateur } from "@/lib/permissions";
-import { verifierTotaux } from "@/lib/expenses/workflow";
+import { calculerTotauxDepense, verifierTotaux } from "@/lib/expenses/workflow";
 import { ajouterAudit } from "@/lib/expenses/audit";
 
 const TYPES_DOCUMENT = new Set([
@@ -47,10 +47,11 @@ export async function creerNoteFraisAction(formData: FormData) {
   const supabase = await createClient();
   const employeId = await employeDuCompte(ctx.entrepriseId, ctx.userId);
   if (!employeId) erreur("Votre compte doit être lié à une fiche employé active");
-  const montantTtc = nombre(formData, "montant_ttc");
+  const totaux = calculerTotauxDepense(nombre(formData, "montant_ht"), nombre(formData, "montant_tva"), nombre(formData, "montant_ttc"), nombre(formData, "taux_tva"));
+  const montantTtc = totaux.ttc;
   if (montantTtc === null || !Number.isFinite(montantTtc) || montantTtc < 0) erreur("Montant TTC invalide");
-  const montantHt = nombre(formData, "montant_ht");
-  const montantTva = nombre(formData, "montant_tva");
+  const montantHt = totaux.ht;
+  const montantTva = totaux.tva;
   const erreursTotaux = verifierTotaux(montantHt, montantTva, montantTtc);
   if (erreursTotaux.length) erreur(erreursTotaux.join(" · "));
   const chantierId = texte(formData, "chantier_id");
@@ -69,7 +70,7 @@ export async function creerNoteFraisAction(formData: FormData) {
     date_frais: dateFrais,
     montant_ht: montantHt,
     montant_tva: montantTva,
-    taux_tva: nombre(formData, "taux_tva"),
+    taux_tva: totaux.taux,
     montant_ttc: montantTtc,
     devise: texte(formData, "devise") ?? "EUR",
     categorie: texte(formData, "categorie"),
@@ -97,10 +98,11 @@ export async function modifierNoteFraisAction(noteId: string, formData: FormData
   verifierAuthentification();
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  const montantTtc = nombre(formData, "montant_ttc");
+  const totaux = calculerTotauxDepense(nombre(formData, "montant_ht"), nombre(formData, "montant_tva"), nombre(formData, "montant_ttc"), nombre(formData, "taux_tva"));
+  const montantTtc = totaux.ttc;
   if (montantTtc === null || !Number.isFinite(montantTtc) || montantTtc < 0) erreur("Montant TTC invalide", noteId);
-  const montantHt = nombre(formData, "montant_ht");
-  const montantTva = nombre(formData, "montant_tva");
+  const montantHt = totaux.ht;
+  const montantTva = totaux.tva;
   const erreursTotaux = verifierTotaux(montantHt, montantTva, montantTtc);
   if (erreursTotaux.length) erreur(erreursTotaux.join(" · "), noteId);
   const typeDocument = texte(formData, "type_document_principal");
@@ -112,7 +114,7 @@ export async function modifierNoteFraisAction(noteId: string, formData: FormData
     date_frais: texte(formData, "date_frais"),
     montant_ht: montantHt,
     montant_tva: montantTva,
-    taux_tva: nombre(formData, "taux_tva"),
+    taux_tva: totaux.taux,
     montant_ttc: montantTtc,
     devise: texte(formData, "devise") ?? "EUR",
     categorie: texte(formData, "categorie"),

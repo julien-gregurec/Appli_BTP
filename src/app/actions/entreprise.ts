@@ -116,6 +116,9 @@ export async function modifierEntrepriseAction(formData: FormData) {
   if (!/^[A-Z0-9]{2,8}$/.test(prefixeIdentifiant)) {
     redirect(`/parametres?error=${encodeURIComponent("Le préfixe salarié doit contenir 2 à 8 lettres ou chiffres")}`);
   }
+  const horaires=Object.fromEntries(Array.from({length:7},(_,index)=>{const valeur=Number(champ(formData,`heures_jour_${index+1}`)?.replace(",",".")??0);if(!Number.isFinite(valeur)||valeur<0||valeur>24)redirect(`/parametres?error=${encodeURIComponent("Les horaires journaliers doivent être compris entre 0 et 24 heures")}`);return[String(index+1),valeur];}));
+  const seuilEcart=Number(champ(formData,"seuil_ecart_pointage")?.replace(",",".")??0.25);
+  if(!Number.isFinite(seuilEcart)||seuilEcart<0||seuilEcart>8)redirect(`/parametres?error=${encodeURIComponent("Seuil d’écart de pointage invalide")}`);
 
   const { error: identifiantsError } = await supabase.rpc("configurer_identifiants_employes", {
     p_entreprise_id: ctx.entrepriseId,
@@ -142,6 +145,8 @@ export async function modifierEntrepriseAction(formData: FormData) {
     logo_largeur_documents: Math.min(180,Math.max(60,Number(champ(formData,"logo_largeur_documents"))||105)),
     couleur_documents: /^#[0-9a-f]{6}$/i.test(champ(formData,"couleur_documents")??"") ? champ(formData,"couleur_documents") : "#0d1b2a",
     mise_en_page_documents: champ(formData,"mise_en_page_documents") ?? "classique",
+    horaires_journaliers: horaires,
+    seuil_ecart_pointage: seuilEcart,
     updated_at: new Date().toISOString(),
   }).eq("id", ctx.entrepriseId);
 
