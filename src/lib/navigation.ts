@@ -14,6 +14,10 @@ export const NAVIGATION_APPLICATION: NavigationApplication[] = [
   { href: "/devis", label: "Devis", actif: true, permission: "acces_devis" },
   { href: "/prestations", label: "Prestations", actif: true, permission: "acces_devis" },
   { href: "/factures", label: "Factures", actif: true, permission: "acces_factures" },
+  { href: "/facturation-avancee", label: "Situations & DGD", actif: true, permission: "acces_facturation_avancee" },
+  { href: "/ouvrages", label: "Ouvrages & métrés", actif: true, permission: "acces_ouvrages" },
+  { href: "/interventions", label: "Interventions", actif: true, permission: "acces_interventions" },
+  { href: "/crm", label: "CRM & relances", actif: true, permission: "acces_crm" },
   { href: "/commandes", label: "Commandes", actif: true, permission: "acces_achats" },
   { href: "/fournisseurs", label: "Fournisseurs", actif: true, permission: "acces_achats" },
   { href: "/depenses", label: "Dépenses", actif: true, permission: "acces_achats" },
@@ -32,5 +36,6 @@ export const NAVIGATION_APPLICATION: NavigationApplication[] = [
   { href: "/depot", label: "Dépôt", actif: true, permission: "acces_stock" },
   { href: "/inventaires", label: "Inventaires", actif: true, permission: "acces_stock" },
   { href: "/exports", label: "Exports comptables", actif: true, permission: "acces_exports" },
+  { href: "/connecteurs", label: "Connecteurs", actif: true, permission: "acces_connecteurs" },
   { href: "/parametres", label: "Paramètres", actif: true, permission: "acces_parametres" },
 ];

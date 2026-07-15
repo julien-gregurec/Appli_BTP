@@ -40,6 +40,10 @@ export default async function DashboardPage() {
     { permission: "acces_clients", href: "/clients", label: "Clients", icon: "clients" },
     { permission: "acces_devis", href: "/devis", label: "Devis", icon: "devis" },
     { permission: "acces_factures", href: "/factures", label: "Factures", icon: "factures" },
+    { permission: "acces_facturation_avancee", href: "/facturation-avancee", label: "Situations", icon: "facturation" },
+    { permission: "acces_ouvrages", href: "/ouvrages", label: "Ouvrages", icon: "ouvrages" },
+    { permission: "acces_interventions", href: "/interventions", label: "Interventions", icon: "interventions" },
+    { permission: "acces_crm", href: "/crm", label: "CRM", icon: "crm" },
     { permission: "acces_achats", href: "/commandes", label: "Achats", icon: "achats" },
     { permission: "acces_stock", href: "/stock", label: "Stock", icon: "stock" },
     { permission: "acces_flotte", href: "/flotte", label: "Flotte", icon: "flotte" },
@@ -48,6 +52,7 @@ export default async function DashboardPage() {
     { permission: "demander_ses_conges", href: "/conges", label: "Congés", icon: "conges" },
     { permission: "acces_rentabilite", href: "/rentabilite", label: "Rentabilité", icon: "rentabilite" },
     { permission: "acces_exports", href: "/exports", label: "Exports", icon: "exports" },
+    { permission: "acces_connecteurs", href: "/connecteurs", label: "Connecteurs", icon: "connecteurs" },
     { permission: "acces_parametres", href: "/parametres", label: "Paramètres", icon: "parametres" },
   ] as Array<MobileModuleLink & { permission: string | null }>).filter((module) => module.permission === null || autorise(module.permission));
 

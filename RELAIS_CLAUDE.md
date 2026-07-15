@@ -633,3 +633,14 @@ Un lot **« Mon espace »** a été commencé après le commit `1beee4b`, mais i
 - Fournisseur OCR si les documents image doivent être lus automatiquement.
 - Dépôt GitHub de l’application de stock annoncé par Julien.
 - Validation finale de Julien avant la coupure du mode prototype et avant tout envoi réel vers des clients/fournisseurs.
+
+## Reprise — suite métier migration 80 — 15 juillet 2026
+
+- Travail local non publié : migration `20260715000080_suite_metier_complete.sql`, actions `src/app/actions/suite-metier.ts` et cinq écrans métier.
+- Écrans : `/facturation-avancee`, `/interventions`, `/crm`, `/ouvrages`, `/connecteurs`.
+- La migration ajoute les permissions Consulter/Gérer correspondantes, les tables situations/modèles/métrés/contrats/interventions/BL/CRM/relances/champs personnalisés/remises/connecteurs/tarifs/audit et les RPC atomiques de facturation avancée.
+- Navigation, contrôle des chemins, grille mobile et dashboard sont raccordés aux nouveaux droits.
+- Contrôles déjà verts : `npm run lint`, `npx tsc --noEmit --incremental false`, `npm test -- --run` (14/14), `npx next build --webpack`.
+- Prochaine étape obligatoire : faire appliquer puis contrôler la migration 80 dans Supabase. Ensuite seulement, commit/push/déploiement et tests réels des cinq écrans.
+- À poursuivre après cette tranche : génération/édition complète des bons de livraison, lignes multiples dans les modèles et métrés, exports DGD/remises, automatisation des relances, puis connecteurs réels Stripe/SMS/comptabilité/fournisseurs selon les clés/licences officielles.
+- Stripe Connect préparé dans le même lot : compte Express par entreprise, direct charge Checkout, webhook Connect signé/idempotent et synchronisation des paiements. Ne peut pas être activé sans les quatre variables documentées dans `.env.local.example` et la configuration du webhook dans le Dashboard Stripe.

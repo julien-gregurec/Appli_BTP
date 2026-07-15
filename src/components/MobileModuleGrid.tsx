@@ -10,6 +10,11 @@ export type MobileModuleIconName =
   | "clients"
   | "devis"
   | "factures"
+  | "facturation"
+  | "ouvrages"
+  | "interventions"
+  | "crm"
+  | "connecteurs"
   | "achats"
   | "stock"
   | "flotte"
@@ -46,6 +51,11 @@ function ModuleIcon({ nom, grand = false }: { nom: MobileModuleIconName; grand?:
       {nom === "clients" && <><circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M2.5 19c.4-4 2.2-6 5.5-6s5.1 2 5.5 6M10.5 19c.4-4 2.2-6 5.5-6s5.1 2 5.5 6"/></>}
       {nom === "devis" && <><path d="M6 3h9l3 3v15H6z"/><path d="M14 3v4h4M9 11h6M9 15h6M9 18h4"/></>}
       {nom === "factures" && <><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></>}
+      {nom === "facturation" && <><path d="M5 3h14v18H5zM8 7h8M8 11h3M8 15h3"/><path d="M15 13v5M13 15.5h4"/></>}
+      {nom === "ouvrages" && <><path d="M4 19h16M6 16l4-10 4 10M8 11h4"/><path d="M16 5v11M19 8h-3M19 13h-3"/></>}
+      {nom === "interventions" && <><path d="m14 5 5 5-8 8H6v-5z"/><path d="m13 6 2-2 5 5-2 2M4 20h7"/></>}
+      {nom === "crm" && <><circle cx="9" cy="9" r="3"/><path d="M3.5 19c.5-4 2.3-6 5.5-6s5 2 5.5 6"/><path d="M16 7h5M16 11h4M17 15h3"/></>}
+      {nom === "connecteurs" && <><path d="M8 12h8M7 8H5a3 3 0 0 0 0 6h2M17 8h2a3 3 0 1 1 0 6h-2"/><path d="m10 9 4 6M14 9l-4 6"/></>}
       {nom === "achats" && <><path d="M3 5h2l2 10h10l2-7H6"/><circle cx="9" cy="19" r="1"/><circle cx="17" cy="19" r="1"/></>}
       {nom === "stock" && <><path d="m4 8 8-4 8 4-8 4zM4 8v9l8 4 8-4V8M12 12v9"/></>}
       {nom === "flotte" && <><path d="M4 16V9l2-4h11l3 4v7"/><path d="M4 11h16M7 14h.01M17 14h.01"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></>}
@@ -64,6 +74,7 @@ export function MobileModuleGrid({ modules }: { modules: MobileModuleLink[] }) {
     profil: "#355b7d", travaux: "#6b5b95", pointage: "#d07a32", planning: "#be4d46",
     chantiers: "#967044", employes: "#2d8790", clients: "#1f9bc8", devis: "#ed8b00",
     factures: "#789b22", achats: "#b35d3f", stock: "#8c6845", flotte: "#d9674e",
+    facturation: "#5668b8", ouvrages: "#8d6a3f", interventions: "#477e98", crm: "#7a5f9a", connecteurs: "#3d7a79",
     outillage: "#c05467", frais: "#476d97", conges: "#4d8a65", rentabilite: "#6f7f8f",
     exports: "#3d7a79", parametres: "#6c6c6c",
   };

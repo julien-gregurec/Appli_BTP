@@ -576,4 +576,21 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Lot local non publié en cours : `Mon espace` dans `src/app/(app)/mon-espace/page.tsx`, route privée `src/app/api/mon-espace/carte-btp/route.ts` et entrée Sidebar. Lint/TypeScript/HTTP local verts ; build, commit et déploiement restent à faire.
 - Priorités de reprise : terminer Mon espace ; tester de vrais comptes Admin/Chef/Ouvrier ; préparer puis valider la sortie du prototype ; ajouter le droit photo chantier ; automatiser les emails PDF lorsque Resend/SMTP est fourni ; ajouter OCR quand un fournisseur est choisi ; fusionner le futur dépôt GitHub Stock ; approfondir clôture comptable et notifications.
 - Voir la section « Relais de pause » de `RELAIS_CLAUDE.md` pour la liste complète et ordonnée des tâches et dépendances.
+
+## 32. Suite métier complète préparée — 15 juillet 2026
+
+- Migration **80 préparée mais pas encore appliquée** : `20260715000080_suite_metier_complete.sql`.
+- Nouveaux droits séparés Consulter/Gérer : facturation avancée, interventions, CRM, ouvrages/métrés et connecteurs.
+- Facturation avancée : situations cumulées sécurisées côté base, retenue de garantie, transformation en facture, acomptes, avoirs, facture finale, DGD et remises en banque.
+- Contrats et terrain : contrats d’entretien, interventions/SAV/bons de travail assignables à un employé et bons de livraison.
+- Chiffrage : modèles de devis chiffrés hiérarchiques, bibliothèque personnalisée et métrés assistés.
+- CRM : journal des appels/emails/SMS/courriers/rendez-vous, rappels et relances d’impayés par niveau.
+- Personnalisation et intégrations : champs personnalisés, connecteurs fournisseur/comptabilité/paiement/SMS/Batichiffrage et catalogue de tarifs négociés.
+- Écrans préparés : `/facturation-avancee`, `/interventions`, `/crm`, `/ouvrages`, `/connecteurs`. Navigation et grille mobile filtrées selon les nouveaux droits.
+- Sécurité : calculs financiers réalisés dans des RPC contrôlées par permission ; journal d’activité append-only ; aucune clé fournisseur n’est stockée dans la configuration, seulement une référence vers un secret sécurisé.
+- Vérifications locales : ESLint vert, TypeScript vert, 14 tests verts, build Next production vert (seul avertissement historique `unpdf/import.meta`).
+- **Ne pas déployer les écrans avant application de la migration 80**, car ils interrogent les nouvelles tables. Les intégrations Stripe/SMS/Batichiffrage/API fournisseurs ne doivent être marquées actives qu’après fourniture des contrats, licences et clés officielles.
+- Stripe Connect est aussi préparé : onboarding Express de chaque entreprise, Checkout en charge directe sur son propre compte, webhook signé et idempotent, paiement et statut de facture synchronisés. Variables requises : `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`. Le webhook Connect à déclarer chez Stripe est `/api/stripe/webhook`.
+- Le flux respecte le modèle multi-entreprises : les fonds d’un client arrivent sur le compte Stripe connecté de son entreprise, pas sur le compte bancaire de Liria Gestion Pro. Activation impossible tant que les clés et l’onboarding officiel Stripe ne sont pas achevés.
+- Contrôles après Stripe : ESLint et TypeScript verts, **17 tests verts**, build production vert.
 ```

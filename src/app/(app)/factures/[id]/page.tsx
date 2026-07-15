@@ -10,6 +10,8 @@ import { enregistrerPaiementAction, modifierEcheanceFactureAction, supprimerPaie
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { contenuEmailDocument } from "@/lib/email";
 import { EmailDocumentButton } from "@/components/EmailDocumentButton";
+import { creerPaiementStripeAction } from "@/app/actions/paiements-en-ligne";
+import { stripeEstConfigure } from "@/lib/stripe";
 
 const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -197,6 +199,7 @@ export default async function FactureDetailPage({
             </button>
           </form> : <p className="border-t border-neutral-100 pt-3 text-sm text-neutral-500 dark:border-neutral-800">{resteAPayer <= 0 ? "Cette facture est entièrement réglée." : "Les paiements ne sont pas disponibles pour ce statut."}</p>}
         </section>
+        {!['brouillon','annulee','avoir_emis','payee'].includes(facture.statut) && resteAPayer>0 && <section className="rounded-md border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/30"><h2 className="text-sm font-semibold">Paiement en ligne sécurisé</h2><p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">Crée un règlement Stripe correspondant exactement au reste dû de {euros(resteAPayer)}.</p>{stripeEstConfigure()?<form action={creerPaiementStripeAction.bind(null,id)} className="mt-3"><button className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white">Créer et ouvrir le lien de paiement</button></form>:<p className="mt-3 rounded bg-white/70 p-2 text-xs text-amber-800 dark:bg-neutral-900">À activer avec les clés Stripe de la plateforme dans les paramètres de déploiement.</p>}</section>}
       </div>
     </main>
   );
