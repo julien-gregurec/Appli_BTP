@@ -1,6 +1,6 @@
-# REPRISE — 15 juillet 2026, sécurité terrain et correctifs mobiles (LOCAL VALIDÉ)
+# REPRISE — 15 juillet 2026, sécurité terrain et correctifs mobiles (MIGRATION 80 APPLIQUÉE)
 
-- Ne pas déployer avant d’appliquer, dans l’ordre, `20260715000080_suite_metier_complete.sql` puis `20260715000081_securite_terrain_alertes_personnalisation.sql`.
+- Migration `20260715000080_suite_metier_complete.sql` confirmée appliquée par Julien. Ne pas déployer avant d’appliquer `20260715000081_securite_terrain_alertes_personnalisation.sql`.
 - Migration 81 : correction des `+` dans les e-mails iOS, réparation prudente du mojibake en base, prix achat/revente du stock, horaires contractuels par jour, seuil d’écart et alertes de pointage, pointage oublié toujours soumis à vérification, notifications personnelles, documents chantier par audience, QR salarié de borne et lecture chantier limitée aux projets actifs assignés.
 - Le pointage propose d’abord le chantier du jour, puis les chantiers assignés, puis les autres chantiers actifs via une RPC ne retournant aucune donnée client ou financière.
 - Interface : calcul automatique HT/TVA/TTC des notes de frais, demandes de congé envoyées immédiatement, accueil personnalisable uniquement parmi les modules autorisés, chiffres et état global des chantiers masqués aux ouvriers, workflow responsable des notes de frais inchangé et protégé côté serveur.

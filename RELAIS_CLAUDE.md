@@ -100,9 +100,9 @@
 - `DISABLE_EMAIL_LOGIN=true` reste actif. Ne pas ouvrir les justificatifs personnels dans ce mode et ne pas appliquer `supabase/production/sortie_mode_prototype.sql` sans bascule auth coordonnée.
 - Les fichiers doublons non suivis `*page 2.tsx` / `StockMovementForm 2.tsx` sont hors périmètre : ne pas les inclure.
 
-## Reprise Codex — 15 juillet 2026 (état le plus récent)
+## Reprise Codex — 15 juillet 2026 (migration 80 appliquée)
 
-- Migrations à appliquer dans l’ordre avant tout déploiement : `20260715000080_suite_metier_complete.sql`, puis `20260715000081_securite_terrain_alertes_personnalisation.sql`.
+- Migration `20260715000080_suite_metier_complete.sql` confirmée appliquée par Julien. Il reste à appliquer `20260715000081_securite_terrain_alertes_personnalisation.sql` avant tout déploiement.
 - Migration 81 et code associé corrigent l’e-mail iOS (`+`), le mojibake, les calculs automatiques HT/TVA/TTC, les prix achat/revente du stock, le QR salarié + mot de passe de la borne, les horaires par jour et alertes de pointage, les notifications congés/notes de frais, les pièces jointes chantier par audience et la confidentialité de l’accueil ouvrier.
 - Congés envoyés immédiatement sans brouillon. Tableau de bord personnalisable par masquage de raccourcis autorisés. « Mes travaux » reste sans aucun prix.
 - Contrôles locaux : TypeScript, lint, tests et build webpack verts ; avertissement `unpdf/import.meta` historique uniquement.
