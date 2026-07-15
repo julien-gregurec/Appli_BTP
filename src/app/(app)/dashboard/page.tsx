@@ -6,6 +6,7 @@ import { statutChantier } from "@/lib/chantier-statuts";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { PointageArriveeDepart } from "@/components/PointageArriveeDepart";
 import { MobileModuleGrid, type MobileModuleLink } from "@/components/MobileModuleGrid";
+import { DashboardAnalytics } from "@/components/DashboardAnalytics";
 
 function un<T>(valeur: T | T[] | null): T | null {
   if (!valeur) return null;
@@ -58,7 +59,7 @@ export default async function DashboardPage() {
 
   const [devisResult, facturesResult, chantiersResult, affectationsResult, articlesResult, vehiculesResult, outilsResult, commandesResult, chantiersPointageResult, sessionsPointageResult] = await Promise.all([
     voir.devis ? supabase.from("devis").select("id, numero, statut, montant_ttc, date_emission, date_validite, client:clients(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }) : null,
-    voir.factures ? supabase.from("factures").select("id, numero, statut, date_echeance, montant_ttc, montant_paye, client:clients(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId) : null,
+    voir.factures ? supabase.from("factures").select("id, numero, statut, date_emission, date_echeance, montant_ttc, montant_paye, client:clients(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId) : null,
     voir.chantiers ? supabase.from("chantiers").select("id, nom, statut").eq("entreprise_id", ctx.entrepriseId).order("updated_at", { ascending: false }) : null,
     voir.planning ? requeteAffectations : null,
     voir.stock ? supabase.from("articles_stock").select("id, reference, designation, quantite_stock, seuil_alerte, unite").eq("entreprise_id", ctx.entrepriseId).eq("actif", true) : null,
@@ -122,6 +123,16 @@ export default async function DashboardPage() {
   const nbCritiques = alertes.filter((a) => a.niveau === "critique").length;
   const domainesAlertes = [...new Set(alertes.map((a) => a.domaine))];
   const prenomAffiche = ctx.prenom && ctx.prenom.toLocaleLowerCase("fr") !== "prototype" ? ctx.prenom : null;
+  const chantierGraphique = voir.chantiers ? [...new Set((chantiers ?? []).map((chantier) => chantier.statut))].map((statut) => {
+    const presentation = statutChantier(statut);
+    return { label: presentation.libelle, value: (chantiers ?? []).filter((chantier) => chantier.statut === statut).length, color: presentation.couleur };
+  }) : undefined;
+  const moisGraphique = voirIndicateursFinanciers && (voir.devis || voir.factures) ? Array.from({length:6},(_,index)=>{
+    const date=new Date();date.setDate(1);date.setMonth(date.getMonth()-(5-index));
+    const cle=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}`;
+    const label=new Intl.DateTimeFormat("fr-FR",{month:"short"}).format(date).replace(".","");
+    return {label,devis:(devis??[]).filter(item=>item.date_emission?.startsWith(cle)&&item.statut!=="annule").reduce((s,item)=>s+Number(item.montant_ttc),0),factures:(factures??[]).filter(item=>item.date_emission?.startsWith(cle)&&item.statut!=="annulee").reduce((s,item)=>s+Number(item.montant_ttc),0)};
+  }) : undefined;
 
   return (
     <main className="p-8">
@@ -131,9 +142,19 @@ export default async function DashboardPage() {
           <p className="text-sm text-neutral-500">{ctx.entrepriseNom}</p>
         </div>
 
-        {raccourcis.length > 0 && <><MobileModuleGrid modules={raccourcis}/><section className="hidden md:block"><h2 className="mb-2 text-sm font-semibold">Mes modules</h2><div className="flex flex-wrap gap-2">{raccourcis.map(({href,label}) => <Link key={href} href={href} className="rounded-full border border-neutral-300 px-3 py-2 text-sm font-medium hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900">{label}</Link>)}</div></section></>}
+        {raccourcis.length > 0 && (
+          <MobileModuleGrid modules={raccourcis} />
+        )}
 
         {!auMoinsUnModule && <section className="rounded-md border border-dashed p-6 text-center"><h2 className="font-semibold">Aucun module attribué</h2><p className="mt-1 text-sm text-neutral-500">Un administrateur doit encore définir les accès de votre poste.</p></section>}
+
+        {(chantierGraphique || moisGraphique || (voirIndicateursFinanciers && voir.factures)) && (
+          <DashboardAnalytics
+            chantiers={chantierGraphique}
+            months={moisGraphique}
+            finance={voirIndicateursFinanciers && voir.factures ? { facture: totalFacture, encaisse: totalEncaisse } : undefined}
+          />
+        )}
 
         {voirIndicateursFinanciers && (voir.factures || voir.devis) && <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {voir.factures && <><Link href="/factures" className="rounded-md border border-neutral-200 p-4 transition hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"><div className="text-xs text-neutral-500">Total facturé</div><div className="mt-1 font-mono text-xl font-semibold">{euros(totalFacture)}</div></Link><Link href="/factures?statut=payee" className="rounded-md border border-neutral-200 p-4 transition hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"><div className="text-xs text-neutral-500">Encaissé</div><div className="mt-1 font-mono text-xl font-semibold text-green-700 dark:text-green-400">{euros(totalEncaisse)}</div></Link><Link href="/factures" className="rounded-md border border-neutral-200 p-4 transition hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"><div className="text-xs text-neutral-500">Reste à encaisser</div><div className="mt-1 font-mono text-xl font-semibold text-amber-700 dark:text-amber-400">{euros(resteAEncaisser)}</div></Link></>}

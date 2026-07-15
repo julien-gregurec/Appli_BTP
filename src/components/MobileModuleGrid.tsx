@@ -26,7 +26,7 @@ export type MobileModuleLink = {
   icon: MobileModuleIconName;
 };
 
-function ModuleIcon({ nom }: { nom: MobileModuleIconName }) {
+function ModuleIcon({ nom, grand = false }: { nom: MobileModuleIconName; grand?: boolean }) {
   const commun = {
     fill: "none",
     stroke: "currentColor",
@@ -36,7 +36,7 @@ function ModuleIcon({ nom }: { nom: MobileModuleIconName }) {
   };
 
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-8 w-8" {...commun}>
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={grand ? "h-11 w-11" : "h-8 w-8"} {...commun}>
       {nom === "profil" && <><circle cx="12" cy="8" r="3"/><path d="M5.5 19c.8-4 3-6 6.5-6s5.7 2 6.5 6"/></>}
       {nom === "travaux" && <><path d="M4 19h16M6 17V8l6-3 6 3v9"/><path d="M9 17v-5h6v5M9 9h.01M15 9h.01"/></>}
       {nom === "pointage" && <><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/><path d="M8 3 6 5M16 3l2 2"/></>}
@@ -60,8 +60,16 @@ function ModuleIcon({ nom }: { nom: MobileModuleIconName }) {
 }
 
 export function MobileModuleGrid({ modules }: { modules: MobileModuleLink[] }) {
+  const couleurs: Record<MobileModuleIconName, string> = {
+    profil: "#355b7d", travaux: "#6b5b95", pointage: "#d07a32", planning: "#be4d46",
+    chantiers: "#967044", employes: "#2d8790", clients: "#1f9bc8", devis: "#ed8b00",
+    factures: "#789b22", achats: "#b35d3f", stock: "#8c6845", flotte: "#d9674e",
+    outillage: "#c05467", frais: "#476d97", conges: "#4d8a65", rentabilite: "#6f7f8f",
+    exports: "#3d7a79", parametres: "#6c6c6c",
+  };
+
   return (
-    <section className="md:hidden" aria-labelledby="modules-mobile-title">
+    <section aria-labelledby="modules-mobile-title">
       <div className="mb-3 flex items-center justify-between">
         <div>
           <h2 id="modules-mobile-title" className="font-semibold">Mes modules</h2>
@@ -69,13 +77,23 @@ export function MobileModuleGrid({ modules }: { modules: MobileModuleLink[] }) {
         </div>
         <span className="rounded-full bg-[#c9a24a]/15 px-2.5 py-1 text-xs font-semibold text-[#8a681d]">{modules.length}</span>
       </div>
-      <div className="mobile-module-grid grid gap-x-3 gap-y-5 rounded-2xl border border-[#c9a24a]/25 bg-gradient-to-b from-white to-[#fffaf0] px-3 py-5 shadow-sm dark:from-neutral-950 dark:to-[#18140b]" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
+      <div className="mobile-module-grid grid gap-x-3 gap-y-5 rounded-2xl border border-[#c9a24a]/25 bg-gradient-to-b from-white to-[#fffaf0] px-3 py-5 shadow-sm dark:from-neutral-950 dark:to-[#18140b] md:hidden" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
         {modules.map((module) => (
           <Link key={module.href} href={module.href} className="group flex min-w-0 flex-col items-center gap-2 text-center active:scale-95">
             <span className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-[#c9a24a] bg-white text-[#b38a2d] shadow-[0_4px_14px_rgba(201,162,74,0.15)] transition group-hover:bg-[#c9a24a] group-hover:text-white dark:bg-neutral-950">
               <ModuleIcon nom={module.icon} />
             </span>
             <span className="max-w-full text-[11px] font-semibold leading-tight text-[#0d1b2a] dark:text-neutral-100">{module.label}</span>
+          </Link>
+        ))}
+      </div>
+      <div className="hidden gap-4 rounded-2xl border bg-neutral-50 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950 md:grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(105px, 1fr))" }}>
+        {modules.map((module) => (
+          <Link key={module.href} href={module.href} className="group flex min-w-0 flex-col items-center gap-2 rounded-xl p-2 text-center transition hover:-translate-y-1 hover:bg-white hover:shadow-md dark:hover:bg-neutral-900">
+            <span className="flex aspect-square w-full max-w-[112px] items-center justify-center rounded-2xl text-white shadow-sm transition group-hover:shadow-lg" style={{ backgroundColor: couleurs[module.icon] }}>
+              <ModuleIcon nom={module.icon} grand />
+            </span>
+            <span className="text-sm font-semibold leading-tight text-[#0d1b2a] dark:text-neutral-100">{module.label}</span>
           </Link>
         ))}
       </div>

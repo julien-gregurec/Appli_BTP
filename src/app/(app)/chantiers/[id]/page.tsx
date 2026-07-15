@@ -12,6 +12,7 @@ import { permissionsUtilisateur } from "@/lib/permissions";
 import { IdentificationCodeCard } from "@/components/IdentificationCodeCard";
 import { ROLES_CHANTIER, roleChantier } from "@/lib/chantier-statuts";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
+import { ChantierProgressCharts } from "@/components/ChantierProgressCharts";
 
 export default async function ChantierDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; success?: string }> }) {
   const { id } = await params;
@@ -98,6 +99,12 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
           {ligne("Fin prévue", chantier.date_fin_prevue)}
           {ligne("Budget prévisionnel", chantier.budget_previsionnel ? `${chantier.budget_previsionnel} €` : null)}
         </section>
+
+        <ChantierProgressCharts
+          finances={peutVoirFinances ? { devis: totalDevisAccepte, facture: totalFacture, paye: totalPaye } : null}
+          heures={peutVoirHeures ? { planifiees: totalHeures, validees: totalHeuresRealisees } : null}
+          taches={{ total: taches?.length ?? 0, faites: (taches ?? []).filter((tache) => tache.statut === "fait").length }}
+        />
 
         {codeIdentification&&<IdentificationCodeCard id={codeIdentification.id} code={codeIdentification.code} label="QR code du chantier"/>}
 
