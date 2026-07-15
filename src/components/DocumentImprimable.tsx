@@ -18,7 +18,12 @@ export type EntrepriseEntete = {
   taille_police_documents?: number | null;
   logo_largeur_documents?: number | null;
   couleur_documents?: string | null;
-  mise_en_page_documents?: "classique" | "compacte" | "epuree" | null;
+  couleur_secondaire_documents?: string | null;
+  mise_en_page_documents?: "classique" | "compacte" | "epuree" | "moderne" | "elegante" | "technique" | null;
+  position_logo_documents?: "gauche" | "centre" | "droite" | null;
+  afficher_logo_documents?: boolean | null;
+  afficher_descriptions_documents?: boolean | null;
+  afficher_tva_lignes_documents?: boolean | null;
 };
 
 export type ClientEntete = {
@@ -70,8 +75,17 @@ export function DocumentImprimable({
   const polices={arial:"Arial, Helvetica, sans-serif",georgia:"Georgia, 'Times New Roman', serif",trebuchet:"'Trebuchet MS', Arial, sans-serif",verdana:"Verdana, Geneva, sans-serif"};
   const police=polices[entreprise.police_documents??"arial"]??polices.arial;
   const couleur=/^#[0-9a-f]{6}$/i.test(entreprise.couleur_documents??"")?entreprise.couleur_documents!:"#0d1b2a";
+  const accent=/^#[0-9a-f]{6}$/i.test(entreprise.couleur_secondaire_documents??"")?entreprise.couleur_secondaire_documents!:"#c9a24a";
+  const modele=entreprise.mise_en_page_documents??"classique";
   const compacte=entreprise.mise_en_page_documents==="compacte";
   const epuree=entreprise.mise_en_page_documents==="epuree";
+  const moderne=modele==="moderne";
+  const elegante=modele==="elegante";
+  const technique=modele==="technique";
+  const positionLogo=entreprise.position_logo_documents??"gauche";
+  const afficherLogo=entreprise.afficher_logo_documents!==false;
+  const afficherDescriptions=entreprise.afficher_descriptions_documents!==false;
+  const afficherTva=entreprise.afficher_tva_lignes_documents!==false;
   const adresseEntreprise = [entreprise.adresse, [entreprise.code_postal, entreprise.ville].filter(Boolean).join(" ")]
     .filter(Boolean)
     .join(" · ");
@@ -93,30 +107,31 @@ export function DocumentImprimable({
       }}
     >
       {/* En-tête */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", maxWidth: "62%" }}>
+      <div style={{ display: "flex", flexDirection: positionLogo==="droite"?"row-reverse":"row", justifyContent: positionLogo==="centre"?"center":"space-between", alignItems: "flex-start", gap:"20px", marginBottom: "8px", padding:moderne?"18px":"0", background:moderne?couleur:"transparent", color:moderne?"#fff":couleur, textAlign:positionLogo==="centre"?"center":"left" }}>
+        <div style={{ display: "flex", flexDirection:positionLogo==="centre"?"column":"row", alignItems: positionLogo==="centre"?"center":"flex-start", gap: "14px", maxWidth: positionLogo==="centre"?"72%":"62%" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={entreprise.logo_url || "/liria-gestion-pro-logo-v3.png"} alt="Logo de l’entreprise" style={{ width: `${entreprise.logo_largeur_documents??105}px`, height: "64px", objectFit: "contain" }} />
+          {afficherLogo&&<img src={entreprise.logo_url || "/liria-gestion-pro-logo-v3.png"} alt="Logo de l’entreprise" style={{ width: `${entreprise.logo_largeur_documents??105}px`, height: "64px", objectFit: "contain", background:moderne?"#fff":"transparent", borderRadius:moderne?"4px":"0", padding:moderne?"4px":"0" }} />}
           <div>
           <div style={{ fontSize: "18px", fontWeight: 700, letterSpacing: "0.04em" }}>{entreprise.nom}</div>
-          {entreprise.raison_sociale && entreprise.raison_sociale !== entreprise.nom && <div style={{ color: "#555" }}>{entreprise.raison_sociale}</div>}
-          {adresseEntreprise && <div style={{ color: "#555" }}>{adresseEntreprise}</div>}
-          {entreprise.siret && <div style={{ color: "#555" }}>SIRET {entreprise.siret}</div>}
-          {entreprise.texte_entete && <div style={{ marginTop: "4px", color: "#555" }}>{entreprise.texte_entete}</div>}
+          {entreprise.raison_sociale && entreprise.raison_sociale !== entreprise.nom && <div style={{ color: moderne?"#fff":"#555" }}>{entreprise.raison_sociale}</div>}
+          {adresseEntreprise && <div style={{ color: moderne?"#fff":"#555" }}>{adresseEntreprise}</div>}
+          {entreprise.siret && <div style={{ color: moderne?"#fff":"#555" }}>SIRET {entreprise.siret}</div>}
+          {entreprise.texte_entete && <div style={{ marginTop: "4px", color: moderne?"#fff":"#555" }}>{entreprise.texte_entete}</div>}
           </div>
         </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: "22px", fontWeight: 700, textTransform: "uppercase", color: couleur }}>{typeDoc}</div>
+        <div style={{ textAlign: positionLogo==="droite"?"left":"right", display:positionLogo==="centre"?"none":"block" }}>
+          <div style={{ fontSize: "22px", fontWeight: 700, textTransform: "uppercase", color: moderne?"#fff":couleur }}>{typeDoc}</div>
           <div style={{ fontFamily: "monospace", fontSize: "15px" }}>{numero}</div>
           <div style={{ color: "#555", marginTop: "4px" }}>Émis le {dateEmission}</div>
           {dateSecondaire && <div style={{ color: "#555" }}>{dateSecondaire.label} {dateSecondaire.valeur}</div>}
         </div>
       </div>
 
-      <hr style={{ border: "none", borderTop: epuree ? `1px solid ${couleur}` : "3px solid #c9a24a", margin: compacte ? "8px 0 12px" : "12px 0 20px" }} />
+      {positionLogo==="centre"&&<div style={{textAlign:"center",marginBottom:"8px"}}><strong style={{fontSize:"22px",textTransform:"uppercase"}}>{typeDoc}</strong><div style={{fontFamily:"monospace"}}>{numero} · Émis le {dateEmission}</div></div>}
+      <hr style={{ border: "none", borderTop: epuree ? `1px solid ${couleur}` : elegante?`1px solid ${accent}`:`3px solid ${accent}`, margin: compacte ? "8px 0 12px" : "12px 0 20px" }} />
 
       {/* Client */}
-      <div style={{ marginBottom: "20px" }}>
+      <div style={{ marginBottom: "20px", marginLeft: moderne?"auto":"0", padding:moderne||technique?"12px":"0", width:moderne?"48%":"auto", background:moderne?`${accent}18`:technique?"#f3f4f6":"transparent", borderLeft:moderne?`4px solid ${accent}`:"none" }}>
         <div style={{ fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em", color: "#888" }}>
           {estFacture ? "Facturé à" : "Destinataire"}
         </div>
@@ -128,11 +143,11 @@ export function DocumentImprimable({
       {/* Lignes */}
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
         <thead>
-          <tr style={{ background: couleur, color: "#fff", textAlign: "left" }}>
+          <tr style={{ background: epuree||elegante?"transparent":couleur, color: epuree||elegante?couleur:"#fff", textAlign: "left", borderTop:elegante?`1px solid ${accent}`:"none", borderBottom:epuree||elegante?`2px solid ${couleur}`:"none" }}>
             <th style={{ padding: "8px", fontSize: "10px", textTransform: "uppercase" }}>Désignation</th>
             <th style={{ padding: "8px", fontSize: "10px", textTransform: "uppercase", textAlign: "right" }}>Qté</th>
             <th style={{ padding: "8px", fontSize: "10px", textTransform: "uppercase", textAlign: "right" }}>PU HT</th>
-            <th style={{ padding: "8px", fontSize: "10px", textTransform: "uppercase", textAlign: "right" }}>TVA</th>
+            {afficherTva&&<th style={{ padding: "8px", fontSize: "10px", textTransform: "uppercase", textAlign: "right" }}>TVA</th>}
             <th style={{ padding: "8px", fontSize: "10px", textTransform: "uppercase", textAlign: "right" }}>Total HT</th>
           </tr>
         </thead>
@@ -140,14 +155,14 @@ export function DocumentImprimable({
           {lignes.map((l, i) => {
             const ht = l.quantite * l.prix_unitaire_ht * (1 - l.remise_ligne / 100);
             return (
-              <tr key={i} style={{ borderBottom: "1px solid #e5e5e5" }}>
+              <tr key={i} style={{ borderBottom: "1px solid #e5e5e5", background:technique&&i%2===1?"#f5f6f7":"transparent" }}>
                 <td style={{ padding: "8px" }}>
                   {l.designation}
-                  {l.description && <div style={{ color: "#777", fontSize: "11px" }}>{l.description}</div>}
+                  {afficherDescriptions&&l.description && <div style={{ color: "#777", fontSize: "11px" }}>{l.description}</div>}
                 </td>
                 <td style={{ padding: "8px", textAlign: "right", fontFamily: "monospace" }}>{l.quantite} {l.unite}</td>
                 <td style={{ padding: "8px", textAlign: "right", fontFamily: "monospace" }}>{euros(l.prix_unitaire_ht)}</td>
-                <td style={{ padding: "8px", textAlign: "right", fontFamily: "monospace" }}>{l.taux_tva} %</td>
+                {afficherTva&&<td style={{ padding: "8px", textAlign: "right", fontFamily: "monospace" }}>{l.taux_tva} %</td>}
                 <td style={{ padding: "8px", textAlign: "right", fontFamily: "monospace" }}>{euros(ht)}</td>
               </tr>
             );
@@ -167,7 +182,7 @@ export function DocumentImprimable({
               <td style={{ padding: "3px 8px", color: "#555" }}>TVA</td>
               <td style={{ padding: "3px 8px", textAlign: "right", fontFamily: "monospace" }}>{euros(montantTva)}</td>
             </tr>
-            <tr style={{ borderTop: "2px solid #c9a24a", fontWeight: 700 }}>
+            <tr style={{ borderTop: `2px solid ${accent}`, fontWeight: 700, background:moderne?`${accent}18`:"transparent" }}>
               <td style={{ padding: "6px 8px" }}>Total TTC</td>
               <td style={{ padding: "6px 8px", textAlign: "right", fontFamily: "monospace" }}>{euros(montantTtc)}</td>
             </tr>

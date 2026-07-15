@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
+import { connecteurFournisseurConnu } from "@/lib/fournisseur-connecteurs";
 
 const texte = (formData: FormData, cle: string) => String(formData.get(cle) ?? "").trim();
 const nombre = (formData: FormData, cle: string, defaut = 0) => {
@@ -225,10 +226,126 @@ export async function creerConnecteurAction(formData: FormData) {
     nom: texte(formData, "nom"),
     type: texte(formData, "type"),
     statut: "a_configurer",
-    secret_reference: optionnel(formData, "secret_reference"),
+    secret_reference: null,
     configuration: {},
   });
   if (error) retourErreur("/connecteurs", error.message);
   revalidatePath("/connecteurs");
   redirect("/connecteurs?success=Connecteur préparé");
+}
+
+export async function preparerConnecteurFournisseurAction(codeFournisseur: string, formData: FormData) {
+  const preset = connecteurFournisseurConnu(codeFournisseur);
+  if (!preset) return retourErreur("/connecteurs", "Fournisseur inconnu");
+  const mode = texte(formData, "type");
+  if (!preset.modes.includes(mode as (typeof preset.modes)[number])) {
+    retourErreur("/connecteurs", "Mode de connexion non autorisé pour ce fournisseur");
+  }
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const { data: existant } = await supabase
+    .from("fournisseurs")
+    .select("id")
+    .eq("entreprise_id", ctx.entrepriseId)
+    .ilike("nom", preset.nomFournisseur)
+    .limit(1)
+    .maybeSingle();
+  let fournisseurId = existant?.id;
+  if (!fournisseurId) {
+    const { data: cree, error: erreurFournisseur } = await supabase
+      .from("fournisseurs")
+      .insert({ entreprise_id: ctx.entrepriseId, nom: preset.nomFournisseur })
+      .select("id")
+      .single();
+    if (erreurFournisseur || !cree) return retourErreur("/connecteurs", erreurFournisseur?.message ?? "Fournisseur non créé");
+    fournisseurId = cree.id;
+  }
+  const referenceCompte = optionnel(formData, "compte_client_reference");
+  const { error } = await supabase.from("connecteurs_externes").upsert({
+    entreprise_id: ctx.entrepriseId,
+    domaine: "fournisseur",
+    fournisseur_id: fournisseurId,
+    fournisseur_code: preset.code,
+    nom: preset.nom,
+    type: mode,
+    statut: "a_configurer",
+    compte_client_reference: referenceCompte,
+    capacites: preset.capacites,
+    activation_demandee_at: new Date().toISOString(),
+    contact_technique_email: preset.contactIntegration ?? null,
+    configuration: {
+      portail_url: preset.portailUrl,
+      integration_publique: preset.integrationPublique,
+      aucun_secret_stocke: true,
+    },
+    dernier_message: preset.integrationPublique
+      ? "Demande préparée. L’activation nécessite les paramètres officiels remis par le fournisseur."
+      : "Compte référencé. Utilisez le portail ou un export officiel tant qu’aucune interface partenaire n’est fournie.",
+    updated_at: new Date().toISOString(),
+  }, { onConflict: "entreprise_id,domaine,nom" });
+  if (error) retourErreur("/connecteurs", error.message);
+  revalidatePath("/connecteurs");
+  revalidatePath("/fournisseurs");
+  redirect("/connecteurs?success=Connexion fournisseur préparée sans enregistrer de mot de passe");
+}
+
+const MODES_FOURNISSEUR_LIBRE = ["portail", "csv", "xlsx", "fabdis", "api", "edi", "punchout_oci", "punchout_cxml", "oauth2"] as const;
+
+export async function preparerConnecteurFournisseurLibreAction(formData: FormData) {
+  let nomFournisseur = texte(formData, "nom_fournisseur");
+  const referenceCompte = optionnel(formData, "compte_client_reference");
+  const mode = texte(formData, "type") || "portail";
+  const portailBrut = optionnel(formData, "portail_url");
+  if (!MODES_FOURNISSEUR_LIBRE.includes(mode as (typeof MODES_FOURNISSEUR_LIBRE)[number])) retourErreur("/connecteurs", "Mode de connexion fournisseur invalide");
+  let portailUrl: string | null = null;
+  if (portailBrut) {
+    try {
+      const url = new URL(portailBrut);
+      if (url.protocol !== "https:") throw new Error("https requis");
+      portailUrl = url.toString();
+    } catch {
+      retourErreur("/connecteurs", "L’adresse du portail doit être une URL sécurisée commençant par https://");
+    }
+  }
+
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const fournisseurChoisi = optionnel(formData, "fournisseur_id");
+  let fournisseurId = fournisseurChoisi;
+  if (fournisseurId) {
+    const { data } = await supabase.from("fournisseurs").select("id,nom").eq("id", fournisseurId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+    if (!data) return retourErreur("/connecteurs", "Fournisseur inaccessible");
+    nomFournisseur = data.nom;
+  } else {
+    if (nomFournisseur.length < 2 || nomFournisseur.length > 120) retourErreur("/connecteurs", "Saisissez le nom du fournisseur à créer");
+    const { data: existant } = await supabase.from("fournisseurs").select("id").eq("entreprise_id", ctx.entrepriseId).ilike("nom", nomFournisseur).limit(1).maybeSingle();
+    fournisseurId = existant?.id ?? null;
+    if (!fournisseurId) {
+      const { data: cree, error: erreurCreation } = await supabase.from("fournisseurs").insert({ entreprise_id: ctx.entrepriseId, nom: nomFournisseur }).select("id").single();
+      if (erreurCreation || !cree) retourErreur("/connecteurs", erreurCreation?.message ?? "Fournisseur non créé");
+      fournisseurId = cree!.id;
+    }
+  }
+
+  const { error } = await supabase.from("connecteurs_externes").upsert({
+    entreprise_id: ctx.entrepriseId,
+    domaine: "fournisseur",
+    fournisseur_id: fournisseurId,
+    fournisseur_code: null,
+    nom: `Compte ${nomFournisseur}`,
+    type: mode,
+    statut: "a_configurer",
+    compte_client_reference: referenceCompte,
+    capacites: ["tarifs_negocies", "catalogue", "commandes"],
+    activation_demandee_at: new Date().toISOString(),
+    configuration: { portail_url: portailUrl, fournisseur_libre: true, aucun_secret_stocke: true },
+    dernier_message: mode === "portail"
+      ? "Compte fournisseur référencé. Le portail peut être ouvert depuis Liria Gestion Pro et les tarifs peuvent être importés."
+      : "Connexion préparée. Demandez au fournisseur ses paramètres officiels ou son fichier de tarifs négociés.",
+    updated_at: new Date().toISOString(),
+  }, { onConflict: "entreprise_id,domaine,nom" });
+  if (error) retourErreur("/connecteurs", error.message);
+  revalidatePath("/connecteurs");
+  revalidatePath("/fournisseurs");
+  redirect("/connecteurs?success=Compte fournisseur ajouté");
 }

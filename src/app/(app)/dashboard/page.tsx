@@ -7,6 +7,7 @@ import { permissionsUtilisateur } from "@/lib/permissions";
 import { PointageArriveeDepart } from "@/components/PointageArriveeDepart";
 import { MobileModuleGrid, type MobileModuleLink } from "@/components/MobileModuleGrid";
 import { DashboardAnalytics } from "@/components/DashboardAnalytics";
+import { DashboardWidget, DashboardWidgetPreferences } from "@/components/DashboardWidgets";
 
 function un<T>(valeur: T | T[] | null): T | null {
   if (!valeur) return null;
@@ -149,28 +150,39 @@ export default async function DashboardPage() {
           <p className="text-sm text-neutral-500">{ctx.entrepriseNom}</p>
         </div>
 
-        {(notifications??[]).length>0&&<section className="rounded-xl border border-blue-200 bg-blue-50 p-4"><div className="mb-3 flex items-center justify-between"><div><h2 className="font-semibold">Mes notifications</h2><p className="text-xs text-neutral-500">Décisions, demandes et vérifications qui vous concernent.</p></div><span className="rounded-full bg-blue-700 px-2.5 py-1 text-xs font-semibold text-white">{notifications?.length}</span></div><div className="grid gap-2 sm:grid-cols-2">{notifications?.map(notification=><Link key={notification.id} href={notification.lien??"/dashboard"} className={`rounded-lg border bg-white p-3 text-sm ${notification.niveau==="critique"?"border-red-400":notification.niveau==="attention"?"border-amber-300":"border-blue-200"}`}><strong>{notification.titre}</strong>{notification.message&&<p className="mt-1 text-xs text-neutral-600">{notification.message}</p>}</Link>)}</div></section>}
+        <DashboardWidgetPreferences options={[
+          ...((notifications??[]).length ? [{id:"notifications",label:"Notifications"}] : []),
+          ...(raccourcis.length ? [{id:"modules",label:"Raccourcis modules"}] : []),
+          ...((chantierGraphique || moisGraphique || (voirIndicateursFinanciers && voir.factures)) ? [{id:"analyses",label:"Graphiques et analyses"}] : []),
+          ...(voirIndicateursFinanciers && (voir.factures || voir.devis) ? [{id:"indicateurs",label:"Indicateurs financiers"}] : []),
+          ...((voir.devis || voir.chantiers) ? [{id:"suivi",label:"Devis et chantiers à suivre"}] : []),
+          ...((voir.factures || voir.devis || voir.achats || voir.stock || voir.flotte || voir.outillage) ? [{id:"alertes",label:"Alertes opérationnelles"}] : []),
+          ...(peutPointer && employeCompte ? [{id:"pointage",label:"Pointage rapide"}] : []),
+          ...(voir.planning ? [{id:"planning",label:"Prochaines affectations"}] : []),
+        ]}/>
+
+        {(notifications??[]).length>0&&<DashboardWidget id="notifications"><section className="rounded-xl border border-blue-200 bg-blue-50 p-4"><div className="mb-3 flex items-center justify-between"><div><h2 className="font-semibold">Mes notifications</h2><p className="text-xs text-neutral-500">Décisions, demandes et vérifications qui vous concernent.</p></div><span className="rounded-full bg-blue-700 px-2.5 py-1 text-xs font-semibold text-white">{notifications?.length}</span></div><div className="grid gap-2 sm:grid-cols-2">{notifications?.map(notification=><Link key={notification.id} href={notification.lien??"/dashboard"} className={`rounded-lg border bg-white p-3 text-sm ${notification.niveau==="critique"?"border-red-400":notification.niveau==="attention"?"border-amber-300":"border-blue-200"}`}><strong>{notification.titre}</strong>{notification.message&&<p className="mt-1 text-xs text-neutral-600">{notification.message}</p>}</Link>)}</div></section></DashboardWidget>}
 
         {raccourcis.length > 0 && (
-          <MobileModuleGrid modules={raccourcis} />
+          <DashboardWidget id="modules"><MobileModuleGrid modules={raccourcis} /></DashboardWidget>
         )}
 
         {!auMoinsUnModule && <section className="rounded-md border border-dashed p-6 text-center"><h2 className="font-semibold">Aucun module attribué</h2><p className="mt-1 text-sm text-neutral-500">Un administrateur doit encore définir les accès de votre poste.</p></section>}
 
         {(chantierGraphique || moisGraphique || (voirIndicateursFinanciers && voir.factures)) && (
-          <DashboardAnalytics
+          <DashboardWidget id="analyses"><DashboardAnalytics
             chantiers={chantierGraphique}
             months={moisGraphique}
             finance={voirIndicateursFinanciers && voir.factures ? { facture: totalFacture, encaisse: totalEncaisse } : undefined}
-          />
+          /></DashboardWidget>
         )}
 
-        {voirIndicateursFinanciers && (voir.factures || voir.devis) && <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {voirIndicateursFinanciers && (voir.factures || voir.devis) && <DashboardWidget id="indicateurs"><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {voir.factures && <><Link href="/factures" className="rounded-md border border-neutral-200 p-4 transition hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"><div className="text-xs text-neutral-500">Total facturé</div><div className="mt-1 font-mono text-xl font-semibold">{euros(totalFacture)}</div></Link><Link href="/factures?statut=payee" className="rounded-md border border-neutral-200 p-4 transition hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"><div className="text-xs text-neutral-500">Encaissé</div><div className="mt-1 font-mono text-xl font-semibold text-green-700 dark:text-green-400">{euros(totalEncaisse)}</div></Link><Link href="/factures" className="rounded-md border border-neutral-200 p-4 transition hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"><div className="text-xs text-neutral-500">Reste à encaisser</div><div className="mt-1 font-mono text-xl font-semibold text-amber-700 dark:text-amber-400">{euros(resteAEncaisser)}</div></Link></>}
           {voir.devis && <Link href="/devis?statut=accepte" className="rounded-md border border-neutral-200 p-4 transition hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"><div className="text-xs text-neutral-500">Devis acceptés</div><div className="mt-1 font-mono text-xl font-semibold">{euros(devisAcceptes)}</div></Link>}
-        </div>}
+        </div></DashboardWidget>}
 
-        {(voir.devis || voir.chantiers) && <div className="grid gap-4 md:grid-cols-2">
+        {(voir.devis || voir.chantiers) && <DashboardWidget id="suivi"><div className="grid gap-4 md:grid-cols-2">
           {voir.devis && <section className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
             <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-semibold">Devis à suivre</h2><Link href="/devis" className="text-xs text-neutral-500 hover:underline">Tout voir</Link></div>
             {devisASuivre.length ? <div className="space-y-2">{devisASuivre.map((devis) => { const st = statutDevis(devis.statut); const client = un(devis.client); return <Link key={devis.id} href={`/devis/${devis.id}`} className="flex items-center justify-between rounded-md px-2 py-2 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900"><div><div className="font-medium">{devis.numero ?? "Brouillon"}</div><div className="text-xs text-neutral-500">{client?.societe || [client?.prenom, client?.nom].filter(Boolean).join(" ") || "—"}</div></div><div className="text-right">{voirIndicateursFinanciers && <div className="font-mono">{euros(devis.montant_ttc)}</div>}<div className="text-xs" style={{ color: st.couleur }}>{st.libelle}</div></div></Link>; })}</div> : <p className="text-sm text-neutral-500">Aucun devis en attente.</p>}
@@ -180,25 +192,25 @@ export default async function DashboardPage() {
             <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-semibold">Chantiers actifs</h2><Link href="/chantiers" className="text-xs text-neutral-500 hover:underline">Tout voir</Link></div>
             {chantiersActifs.length ? <div className="space-y-2">{chantiersActifs.slice(0, 6).map((chantier) => { const st = statutChantier(chantier.statut); return <Link key={chantier.id} href={`/chantiers/${chantier.id}`} className="flex items-center justify-between rounded-md px-2 py-2 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900"><span className="font-medium">{chantier.nom}</span><span className="inline-flex items-center gap-1.5 text-xs text-neutral-500"><span className="h-2 w-2 rounded-full" style={{ background: st.couleur }} />{st.libelle}</span></Link>; })}</div> : <p className="text-sm text-neutral-500">Aucun chantier actif.</p>}
           </section>}
-        </div>}
+        </div></DashboardWidget>}
 
-        {(voir.factures || voir.devis || voir.achats || voir.stock || voir.flotte || voir.outillage) && <section className={`rounded-md border p-4 ${alertes.length ? "border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30" : "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30"}`}>
+        {(voir.factures || voir.devis || voir.achats || voir.stock || voir.flotte || voir.outillage) && <DashboardWidget id="alertes"><section className={`rounded-md border p-4 ${alertes.length ? "border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30" : "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30"}`}>
           <div className="flex items-start justify-between gap-4">
             <div><h2 className="text-sm font-semibold">Centre d’alertes opérationnelles</h2><p className="mt-0.5 text-xs text-neutral-600 dark:text-neutral-400">Uniquement les domaines autorisés pour votre poste.</p></div>
             <div className="flex gap-2 text-xs"><span className="rounded-full bg-red-100 px-2 py-1 text-red-700 dark:bg-red-950 dark:text-red-300">{nbCritiques} critique{nbCritiques > 1 ? "s" : ""}</span><span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700 dark:bg-amber-950 dark:text-amber-300">{alertes.length - nbCritiques} à anticiper</span></div>
           </div>
           {alertes.length ? <div className="mt-3 grid grid-cols-2 gap-2">{alertes.slice(0, 12).map((alerte) => <Link key={alerte.id} href={alerte.href} className="flex items-start gap-3 rounded-md border border-black/5 bg-white/70 p-3 text-sm transition hover:bg-white dark:border-white/10 dark:bg-black/20 dark:hover:bg-black/30"><span className={`mt-1 h-2.5 w-2.5 flex-none rounded-full ${alerte.niveau === "critique" ? "bg-red-600" : "bg-amber-500"}`} /><span className="min-w-0 flex-1"><span className="flex items-center justify-between gap-2"><strong className="truncate">{alerte.titre}</strong><span className="flex-none text-[10px] uppercase tracking-wide text-neutral-500">{alerte.domaine}</span></span><span className="mt-0.5 block text-xs text-neutral-600 dark:text-neutral-400">{alerte.detail}{alerte.date ? ` · ${alerte.date}` : ""}</span></span></Link>)}</div> : <p className="mt-3 text-sm text-green-800 dark:text-green-300">Aucune alerte active. Toutes les échéances suivies sont sous contrôle.</p>}
           {domainesAlertes.length > 0 && <p className="mt-3 text-xs text-neutral-500">Domaines concernés : {domainesAlertes.join(" · ")}</p>}
-        </section>}
+        </section></DashboardWidget>}
 
-        {peutPointer && employeCompte && chantiersPointage.length > 0 && <PointageArriveeDepart employes={[{id:employeCompte.id,nom:`${employeCompte.prenom ?? ""} ${employeCompte.nom}`.trim()}]} chantiers={chantiersPointage.map((chantier)=>({id:chantier.id,nom:chantier.nom}))} sessions={sessionsPointage.map((session)=>{const employe=un(session.employe),chantier=un(session.chantier);return{id:session.id,arrivee_at:session.arrivee_at,tache:session.tache,employe:employe?{id:employe.id,nom:`${employe.prenom ?? ""} ${employe.nom}`.trim()}:null,chantier:chantier?{id:chantier.id,nom:chantier.nom}:null};})} />}
+        {peutPointer && employeCompte && chantiersPointage.length > 0 && <DashboardWidget id="pointage"><PointageArriveeDepart employes={[{id:employeCompte.id,nom:`${employeCompte.prenom ?? ""} ${employeCompte.nom}`.trim()}]} chantiers={chantiersPointage.map((chantier)=>({id:chantier.id,nom:chantier.nom}))} sessions={sessionsPointage.map((session)=>{const employe=un(session.employe),chantier=un(session.chantier);return{id:session.id,arrivee_at:session.arrivee_at,tache:session.tache,employe:employe?{id:employe.id,nom:`${employe.prenom ?? ""} ${employe.nom}`.trim()}:null,chantier:chantier?{id:chantier.id,nom:chantier.nom}:null};})} /></DashboardWidget>}
 
         {peutPointer && !employeCompte && <section className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"><strong>Pointage indisponible</strong><p className="mt-1">Votre compte doit être lié à votre fiche employé pour pointer en votre nom.</p></section>}
 
-        {voir.planning && <section className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
+        {voir.planning && <DashboardWidget id="planning"><section className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
           <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-semibold">Prochaines affectations</h2><Link href="/planning" className="text-xs text-neutral-500 hover:underline">Ouvrir le planning</Link></div>
           {affectations?.length ? <div className="grid grid-cols-3 gap-2">{affectations.map((affectation) => { const chantier = un(affectation.chantier); const employe = un(affectation.employe); return <div key={affectation.id} className="rounded-md bg-neutral-50 p-3 text-sm dark:bg-neutral-900"><div className="text-xs text-neutral-500">{new Date(`${affectation.date}T00:00:00`).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })} · {Number(affectation.heures)} h</div><div className="mt-1 font-medium">{employe ? `${employe.prenom} ${employe.nom}` : "—"}</div><div className="text-xs text-neutral-500">{chantier?.nom ?? "—"}{affectation.tache ? ` · ${affectation.tache}` : ""}</div></div>; })}</div> : <p className="text-sm text-neutral-500">Aucune affectation à venir.</p>}
-        </section>}
+        </section></DashboardWidget>}
       </div>
     </main>
   );

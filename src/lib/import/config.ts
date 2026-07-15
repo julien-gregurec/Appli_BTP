@@ -9,7 +9,7 @@ export type ChampImport = {
 };
 
 export type TypeImport = {
-  cle: "clients" | "chantiers" | "employes" | "catalogue";
+  cle: "clients" | "chantiers" | "employes" | "catalogue" | "tarifs_fournisseurs";
   libelle: string;
   table: string;
   description: string;
@@ -79,6 +79,26 @@ export const TYPES_IMPORT: TypeImport[] = [
       { cle: "unite", libelle: "Unité", aide: "h, m², ml, u, forfait…" },
       { cle: "prix_unitaire_ht", libelle: "Prix unitaire HT" },
       { cle: "taux_tva", libelle: "Taux TVA (%)" },
+    ],
+  },
+  {
+    cle: "tarifs_fournisseurs",
+    libelle: "Tarifs négociés fournisseurs",
+    table: "tarifs_fournisseurs",
+    description: "Catalogues CSV ou Excel remis officiellement par Würth, Foussier, SIEHR, Aubade, PROVITRAGE ou un autre fournisseur.",
+    champs: [
+      { cle: "fournisseur_nom", libelle: "Fournisseur", requis: true, aide: "Le fournisseur est créé s’il n’existe pas encore" },
+      { cle: "reference_fournisseur", libelle: "Référence fournisseur", requis: true },
+      { cle: "eancode", libelle: "EAN / code-barres" },
+      { cle: "designation", libelle: "Désignation", requis: true },
+      { cle: "unite", libelle: "Unité", aide: "u, boîte, m², ml…" },
+      { cle: "prix_public_ht", libelle: "Prix public HT" },
+      { cle: "prix_negocie_ht", libelle: "Prix négocié HT", requis: true },
+      { cle: "devise", libelle: "Devise", aide: "EUR par défaut" },
+      { cle: "disponibilite", libelle: "Disponibilité" },
+      { cle: "minimum_commande", libelle: "Minimum de commande" },
+      { cle: "valide_du", libelle: "Valide du" },
+      { cle: "valide_au", libelle: "Valide au" },
     ],
   },
 ];

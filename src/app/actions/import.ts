@@ -105,6 +105,57 @@ export async function importerDonneesAction(payload: {
         taux_tva: nombre(val(l, "taux_tva")) ?? 20,
       });
     }
+  } else if (payload.type === "tarifs_fournisseurs") {
+    const { data: fournisseursExistants } = await supabase
+      .from("fournisseurs")
+      .select("id,nom")
+      .eq("entreprise_id", entrepriseId);
+    const indexFournisseurs = new Map(
+      (fournisseursExistants ?? []).map((fournisseur) => [fournisseur.nom.trim().toLocaleLowerCase("fr"), fournisseur.id]),
+    );
+    for (const l of lignes) {
+      const nomFournisseur = val(l, "fournisseur_nom");
+      const reference = val(l, "reference_fournisseur");
+      const designation = val(l, "designation");
+      const prixNegocie = nombre(val(l, "prix_negocie_ht"));
+      if (!nomFournisseur || !reference || !designation || prixNegocie === null || prixNegocie < 0) {
+        ignores++;
+        continue;
+      }
+      const cleFournisseur = nomFournisseur.toLocaleLowerCase("fr");
+      let fournisseurId = indexFournisseurs.get(cleFournisseur);
+      if (!fournisseurId) {
+        const { data: nouveau, error } = await supabase
+          .from("fournisseurs")
+          .insert({ entreprise_id: entrepriseId, nom: nomFournisseur })
+          .select("id")
+          .single();
+        if (error || !nouveau) {
+          erreurs.push(`Fournisseur « ${nomFournisseur} » : ${error?.message ?? "création impossible"}`);
+          ignores++;
+          continue;
+        }
+        fournisseurId = nouveau.id;
+        indexFournisseurs.set(cleFournisseur, fournisseurId);
+      }
+      enregistrements.push({
+        entreprise_id: entrepriseId,
+        fournisseur_id: fournisseurId,
+        reference_fournisseur: reference,
+        eancode: val(l, "eancode") || null,
+        designation,
+        unite: val(l, "unite") || "u",
+        prix_public_ht: nombre(val(l, "prix_public_ht")),
+        prix_negocie_ht: prixNegocie,
+        devise: val(l, "devise").toUpperCase() || "EUR",
+        disponibilite: val(l, "disponibilite") || null,
+        minimum_commande: nombre(val(l, "minimum_commande")),
+        valide_du: dateIso(val(l, "valide_du")),
+        valide_au: dateIso(val(l, "valide_au")),
+        source: "import_utilisateur",
+        updated_at: new Date().toISOString(),
+      });
+    }
   } else if (payload.type === "chantiers") {
     // Résolution des clients par nom (existants + créés à la volée).
     const { data: clientsExistants } = await supabase.from("clients").select("id, nom, societe").eq("entreprise_id", entrepriseId);
@@ -139,7 +190,10 @@ export async function importerDonneesAction(payload: {
   let inseres = 0;
   for (let i = 0; i < enregistrements.length; i += 200) {
     const lot = enregistrements.slice(i, i + 200);
-    const { error, count } = await supabase.from(conf.table).insert(lot, { count: "exact" });
+    const requete = payload.type === "tarifs_fournisseurs"
+      ? supabase.from(conf.table).upsert(lot, { onConflict: "entreprise_id,fournisseur_id,reference_fournisseur", count: "exact" })
+      : supabase.from(conf.table).insert(lot, { count: "exact" });
+    const { error, count } = await requete;
     if (error) erreurs.push(`Lot ${i / 200 + 1} : ${error.message}`);
     else inseres += count ?? lot.length;
   }

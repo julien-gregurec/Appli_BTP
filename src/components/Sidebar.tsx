@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { logoutAction } from "@/app/actions/auth";
 import { PwaInstallButton } from "@/components/PwaInstallButton";
-import { NAVIGATION_APPLICATION } from "@/lib/navigation";
+import { NAVIGATION_APPLICATION, NAVIGATION_GROUPES } from "@/lib/navigation";
 
 export function Sidebar({
   entrepriseNom,
@@ -23,9 +23,10 @@ export function Sidebar({
   const pathname = usePathname();
   const [ouvert, setOuvert] = useState(false);
   const compteDepot = permissions?.includes("mode_compte_depot") === true;
-  const navigation = compteDepot
+  const navigationBrute = compteDepot
     ? NAVIGATION_APPLICATION.filter((item) => ["/stock", "/stock/borne", "/depot"].includes(item.href))
     : NAVIGATION_APPLICATION;
+  const navigation = navigationBrute.filter((item) => !item.permission || permissions === null || permissions.includes(item.permission));
 
   return (
     <>
@@ -57,34 +58,21 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2">
-        {navigation.map((item) => {
-          if (item.permission && permissions !== null && !permissions.includes(item.permission)) return null;
-          const active = pathname === item.href || pathname.startsWith(item.href + "/");
-          if (!item.actif) {
-            return (
-              <span
-                key={item.href}
-                className="block cursor-default rounded-md px-3 py-2 text-sm text-neutral-400 dark:text-neutral-600"
-                title="Module à venir"
-              >
-                {item.label}
-              </span>
-            );
-          }
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setOuvert(false)}
-              className={`block rounded-md px-3 py-2 text-sm ${
-                active
-                  ? "bg-[#c9a24a] font-medium text-[#0d1b2a]"
-                  : "text-white/80 hover:bg-white/10 hover:text-white"
-              }`}
-            >
-              {item.label}
-            </Link>
-          );
+        {NAVIGATION_GROUPES.map((groupe) => {
+          const items = navigation.filter((item) => item.groupe === groupe.cle);
+          if (!items.length) return null;
+          const groupeActif = items.some((item) => pathname === item.href || pathname.startsWith(item.href + "/"));
+          return <details key={groupe.cle} className="group mb-1" open={groupe.cle === "principal" || groupeActif}>
+            <summary className={`flex cursor-pointer list-none items-center justify-between rounded-md px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] ${groupeActif?"text-[#e5c978]":"text-white/45 hover:bg-white/5 hover:text-white/70"}`}>
+              <span>{groupe.label}</span><span className="text-sm transition group-open:rotate-90">›</span>
+            </summary>
+            <div className="ml-2 border-l border-white/10 pl-1">
+              {items.map((item) => {
+                const active = pathname === item.href || pathname.startsWith(item.href + "/");
+                return item.actif ? <Link key={item.href} href={item.href} onClick={() => setOuvert(false)} className={`block rounded-md px-3 py-2 text-sm ${active?"bg-[#c9a24a] font-medium text-[#0d1b2a]":"text-white/80 hover:bg-white/10 hover:text-white"}`}>{item.label}</Link> : <span key={item.href} className="block cursor-default rounded-md px-3 py-2 text-sm text-neutral-400" title="Module à venir">{item.label}</span>;
+              })}
+            </div>
+          </details>;
         })}
 
         {plateformeAdmin && !compteDepot && (

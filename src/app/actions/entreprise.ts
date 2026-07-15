@@ -119,6 +119,10 @@ export async function modifierEntrepriseAction(formData: FormData) {
   const horaires=Object.fromEntries(Array.from({length:7},(_,index)=>{const valeur=Number(champ(formData,`heures_jour_${index+1}`)?.replace(",",".")??0);if(!Number.isFinite(valeur)||valeur<0||valeur>24)redirect(`/parametres?error=${encodeURIComponent("Les horaires journaliers doivent être compris entre 0 et 24 heures")}`);return[String(index+1),valeur];}));
   const seuilEcart=Number(champ(formData,"seuil_ecart_pointage")?.replace(",",".")??0.25);
   if(!Number.isFinite(seuilEcart)||seuilEcart<0||seuilEcart>8)redirect(`/parametres?error=${encodeURIComponent("Seuil d’écart de pointage invalide")}`);
+  const modeleDocument = champ(formData,"mise_en_page_documents") ?? "classique";
+  if(!["classique","compacte","epuree","moderne","elegante","technique"].includes(modeleDocument)) redirect(`/parametres?error=${encodeURIComponent("Modèle de document invalide")}`);
+  const positionLogo = champ(formData,"position_logo_documents") ?? "gauche";
+  if(!["gauche","centre","droite"].includes(positionLogo)) redirect(`/parametres?error=${encodeURIComponent("Position du logo invalide")}`);
 
   const { error: identifiantsError } = await supabase.rpc("configurer_identifiants_employes", {
     p_entreprise_id: ctx.entrepriseId,
@@ -144,7 +148,12 @@ export async function modifierEntrepriseAction(formData: FormData) {
     taille_police_documents: Math.min(16,Math.max(10,Number(champ(formData,"taille_police_documents"))||13)),
     logo_largeur_documents: Math.min(180,Math.max(60,Number(champ(formData,"logo_largeur_documents"))||105)),
     couleur_documents: /^#[0-9a-f]{6}$/i.test(champ(formData,"couleur_documents")??"") ? champ(formData,"couleur_documents") : "#0d1b2a",
-    mise_en_page_documents: champ(formData,"mise_en_page_documents") ?? "classique",
+    couleur_secondaire_documents: /^#[0-9a-f]{6}$/i.test(champ(formData,"couleur_secondaire_documents")??"") ? champ(formData,"couleur_secondaire_documents") : "#c9a24a",
+    mise_en_page_documents: modeleDocument,
+    position_logo_documents: positionLogo,
+    afficher_logo_documents: formData.get("afficher_logo_documents") === "on",
+    afficher_descriptions_documents: formData.get("afficher_descriptions_documents") === "on",
+    afficher_tva_lignes_documents: formData.get("afficher_tva_lignes_documents") === "on",
     horaires_journaliers: horaires,
     seuil_ecart_pointage: seuilEcart,
     updated_at: new Date().toISOString(),

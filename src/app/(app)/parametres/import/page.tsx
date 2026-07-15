@@ -7,8 +7,8 @@ import { ImportWizard } from "@/components/ImportWizard";
 export default async function ImportPage() {
   const ctx = await getContexteEntreprise();
   const permissions = await permissionsUtilisateur(ctx);
-  const peutGererAcces = permissions === null || permissions.includes("gerer_utilisateurs");
-  if (!peutGererAcces) notFound();
+  const peutImporter = permissions === null || permissions.includes("gerer_utilisateurs") || permissions.includes("gerer_connecteurs");
+  if (!peutImporter) notFound();
 
   return (
     <main className="p-8">
@@ -17,7 +17,7 @@ export default async function ImportPage() {
           <Link href="/parametres" className="text-sm text-neutral-500">← Paramètres</Link>
           <h1 className="mt-2 text-xl font-semibold">Importer des données</h1>
           <p className="text-sm text-neutral-500">
-            Migrez vos clients, chantiers, employés et catalogue depuis un autre logiciel (Batappli, EBP, Codial…).
+            Migrez vos clients, chantiers, employés, catalogue et tarifs fournisseurs depuis un autre logiciel ou un export officiel.
             Exportez vos données en CSV ou Excel depuis votre ancien logiciel, puis déposez le fichier ici.
           </p>
         </div>

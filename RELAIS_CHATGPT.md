@@ -1,3 +1,27 @@
+# REPRISE — 15 juillet 2026, personnalisation et fournisseurs libres (MIGRATIONS 82–83 À APPLIQUER)
+
+- Lot local vérifié mais non déployé. Contrôle direct du schéma le 15/07 : les colonnes 82 et 83 sont absentes. Appliquer dans l’ordre `20260715000082_connecteurs_fournisseurs_sans_batichiffrage.sql`, puis `20260715000083_modeles_documents_et_personnalisation.sql` avant publication.
+- `/connecteurs` accepte désormais **n’importe quel fournisseur** : fournisseur existant repris avec son vrai nom ou créé automatiquement, numéro de compte client, portail HTTPS ouvrable depuis la fiche et mode portail/CSV/Excel/FAB-DIS/API/EDI/PunchOut/OAuth. Aucun mot de passe n’est demandé ni stocké ; une synchro automatique reste conditionnée par une interface officielle du fournisseur.
+- Les devis/factures/commandes disposent de six modèles réels : Classique, Moderne, Élégant, Technique, Compact et Épuré. Réglages supplémentaires : deux couleurs, police, taille, largeur/position/visibilité du logo, descriptions et colonne TVA.
+- Le menu est maintenant organisé en dossiers repliables : Accueil, Clients & ventes, Chantiers & interventions, Équipe & temps, Achats & stock, Matériel, Pilotage et Administration. Les droits continuent de masquer les modules interdits avant regroupement. L’aperçu administrateur d’un poste reproduit aussi ces mêmes dossiers.
+- Le tableau de bord propose « Modifier les widgets » : notifications, raccourcis, analyses, indicateurs, suivis, alertes, pointage et planning sont affichables/masquables. Les raccourcis restent personnalisables séparément et les permissions restent prioritaires.
+- Manuel entièrement reconstruit : `output/pdf/Guide_utilisation_detaille_Liria_Gestion_Pro.pdf`, **55 pages A4**, sommaire et signets, captures ordinateur/mobile, 26 chapitres modules, 19 fiches opérationnelles de bout en bout, matrice complète des synchronisations, parcours par rôle, dépannage, sécurité et limites. La copie servie dans `/aide` remplace l'ancien PDF sous `public/guides/Guide_utilisation_Liria_Gestion_Pro.pdf`; copie également déposée dans le dossier Bureau `Liria Gestion Pro`. Générateur reproductible : `scripts/create-guide-utilisateur-detaille.py`. Les 55 pages ont été rendues en PNG et inspectées ; défaut de tableau corrigé avant livraison.
+- Contrôles verts : TypeScript, ESLint, **23 tests Vitest**, `git diff --check`, build Next webpack complet de 73 routes. La préférence des widgets utilise désormais un abonnement au stockage local sans rendu en cascade. Seul l’avertissement historique `unpdf/import.meta` reste non bloquant.
+
+---
+
+# REPRISE — 15 juillet 2026, connecteurs fournisseurs et budget SaaS (MIGRATION 82 À APPLIQUER)
+
+- Nouveau lot local non déployé : `20260715000082_connecteurs_fournisseurs_sans_batichiffrage.sql` retire BatiChiffrage des domaines autorisés et supprime les éventuelles connexions historiques correspondantes.
+- `/connecteurs` propose désormais Würth, Foussier, SIEHR, Espace Aubade/eBat et Saint-Gobain Vitrage Bâtiment/PROVITRAGE. Le numéro client non secret peut être enregistré ; aucun mot de passe fournisseur n’est demandé ni stocké.
+- Würth et Foussier sont présentés avec leurs capacités officielles catalogue/PunchOut/EDI. SIEHR, Aubade et PROVITRAGE restent honnêtement en mode portail/import jusqu’à remise d’une API ou d’un flux partenaire officiel.
+- L’import générique CSV/Excel accepte maintenant les tarifs négociés : fournisseur, référence, EAN, désignation, unité, prix public/négocié, disponibilité, minimum et période de validité. Les références existantes sont mises à jour sans doublon.
+- Budget documenté dans `docs/BUDGET_MISE_EN_SERVICE.md` : minimum 45 $/mois + domaine ; configuration commerciale recommandée 65 $/mois + consommations OCR/SMS/Stripe. BatiChiffrage = 0 € car retiré.
+- Contrôles déjà verts : ESLint, TypeScript, **21 tests Vitest**, `git diff --check` et build webpack complet de 73 routes. Déploiement seulement après application de la migration 82, désormais placée dans le presse-papiers.
+- Dépendances réelles : paramètres contractuels Würth/Foussier ; accord ou export officiel SIEHR/Aubade/PROVITRAGE ; clés Resend, Stripe, OCR et SMS pour les autres automatisations. Ne jamais simuler une connexion active sans ces éléments.
+
+---
+
 # REPRISE — 15 juillet 2026, sécurité terrain et correctifs mobiles (MIGRATIONS 80 ET 81 APPLIQUÉES)
 
 - Migrations `20260715000080_suite_metier_complete.sql` et `20260715000081_securite_terrain_alertes_personnalisation.sql` confirmées appliquées par Julien ; le code associé est déployé en production.
@@ -615,11 +639,11 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Contrats et terrain : contrats d’entretien, interventions/SAV/bons de travail assignables à un employé et bons de livraison.
 - Chiffrage : modèles de devis chiffrés hiérarchiques, bibliothèque personnalisée et métrés assistés.
 - CRM : journal des appels/emails/SMS/courriers/rendez-vous, rappels et relances d’impayés par niveau.
-- Personnalisation et intégrations : champs personnalisés, connecteurs fournisseur/comptabilité/paiement/SMS/Batichiffrage et catalogue de tarifs négociés.
+- Personnalisation et intégrations : champs personnalisés, connecteurs fournisseur/comptabilité/paiement/SMS et catalogue de tarifs négociés. BatiChiffrage a ensuite été retiré à la demande de Julien dans le lot 82.
 - Écrans préparés : `/facturation-avancee`, `/interventions`, `/crm`, `/ouvrages`, `/connecteurs`. Navigation et grille mobile filtrées selon les nouveaux droits.
 - Sécurité : calculs financiers réalisés dans des RPC contrôlées par permission ; journal d’activité append-only ; aucune clé fournisseur n’est stockée dans la configuration, seulement une référence vers un secret sécurisé.
 - Vérifications locales : ESLint vert, TypeScript vert, 14 tests verts, build Next production vert (seul avertissement historique `unpdf/import.meta`).
-- **Ne pas déployer les écrans avant application de la migration 80**, car ils interrogent les nouvelles tables. Les intégrations Stripe/SMS/Batichiffrage/API fournisseurs ne doivent être marquées actives qu’après fourniture des contrats, licences et clés officielles.
+- **Ne pas déployer les écrans avant application de la migration 80**, car ils interrogent les nouvelles tables. Les intégrations Stripe/SMS/API fournisseurs ne doivent être marquées actives qu’après fourniture des contrats et clés officielles.
 - Stripe Connect est aussi préparé : onboarding Express de chaque entreprise, Checkout en charge directe sur son propre compte, webhook signé et idempotent, paiement et statut de facture synchronisés. Variables requises : `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`. Le webhook Connect à déclarer chez Stripe est `/api/stripe/webhook`.
 - Le flux respecte le modèle multi-entreprises : les fonds d’un client arrivent sur le compte Stripe connecté de son entreprise, pas sur le compte bancaire de Liria Gestion Pro. Activation impossible tant que les clés et l’onboarding officiel Stripe ne sont pas achevés.
 - Contrôles après Stripe : ESLint et TypeScript verts, **17 tests verts**, build production vert.

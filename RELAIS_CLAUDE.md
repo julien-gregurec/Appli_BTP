@@ -1,3 +1,25 @@
+# REPRISE — 15 juillet 2026, personnalisation et fournisseurs libres (MIGRATIONS 82–83 À APPLIQUER)
+
+- Le schéma Supabase a été contrôlé directement : `fournisseur_code` et `couleur_secondaire_documents` sont absents, donc les migrations 82 puis 83 ne sont pas passées. Ne pas publier le code avant leur application.
+- N’importe quel fournisseur peut être relié depuis `/connecteurs`, qu’il existe déjà ou qu’il soit créé sur place. Le vrai nom est repris, le portail HTTPS est ouvrable depuis la connexion et aucun mot de passe n’est stocké.
+- Six styles de documents, menu regroupé par dossiers, aperçu de poste cohérent et widgets d’accueil affichables/masquables sont intégrés.
+- Guide complet livré et intégré à `/aide` : `output/pdf/Guide_utilisation_detaille_Liria_Gestion_Pro.pdf`, 55 pages contrôlées visuellement, avec captures et synchronisations.
+- Contrôles finaux locaux : ESLint, TypeScript, 23 tests, diff-check et build webpack de 73 routes verts. Publication Git/Vercel à faire seulement après les migrations 82–83.
+
+---
+
+# REPRISE — 15 juillet 2026, connecteurs fournisseurs et budget SaaS (MIGRATION 82 À APPLIQUER)
+
+- Lot local non publié : migration `20260715000082_connecteurs_fournisseurs_sans_batichiffrage.sql` et nouvelle interface fournisseurs.
+- BatiChiffrage est retiré de l’application et du schéma cible. Ne pas réintroduire cette option.
+- Fournisseurs préparés : Würth, Foussier, SIEHR, Espace Aubade/eBat et Saint-Gobain Vitrage Bâtiment/PROVITRAGE. Numéro client uniquement, jamais de mot de passe.
+- Würth/Foussier : catalogue, PunchOut et EDI annoncés officiellement, mais activation réelle conditionnée par les paramètres de leurs équipes e-procurement. SIEHR/Aubade/PROVITRAGE : portail et imports CSV/Excel tant qu’aucune API partenaire n’est fournie.
+- Import de tarifs négociés ajouté dans `/parametres/import`, avec mise à jour sans doublon des références fournisseur.
+- Budget actuel dans `docs/BUDGET_MISE_EN_SERVICE.md` : 45 $/mois minimum + domaine, 65 $/mois recommandé avec e-mails professionnels, puis OCR/SMS/Stripe à l’usage.
+- Vérifications : ESLint, TypeScript, **21/21 tests**, diff-check et build webpack complet de 73 routes verts. La migration 82 est dans le presse-papiers ; l’appliquer avant publication et test authentifié `/connecteurs`.
+
+---
+
 # ÉTAT AUTORITATIF — 14 juillet 2026, audit global, équipes chantier et nouvelles vidéos (Codex)
 
 **Migrations 77, 78 et 79 + nettoyage des entreprises de test confirmés appliqués par Julien. Lot publié sur `main` au commit `544d35a` et déployé par Vercel.**
@@ -651,5 +673,16 @@ Un lot **« Mon espace »** a été commencé après le commit `1beee4b`, mais i
 - Navigation, contrôle des chemins, grille mobile et dashboard sont raccordés aux nouveaux droits.
 - Contrôles déjà verts : `npm run lint`, `npx tsc --noEmit --incremental false`, `npm test -- --run` (14/14), `npx next build --webpack`.
 - Prochaine étape obligatoire : faire appliquer puis contrôler la migration 80 dans Supabase. Ensuite seulement, commit/push/déploiement et tests réels des cinq écrans.
-- À poursuivre après cette tranche : génération/édition complète des bons de livraison, lignes multiples dans les modèles et métrés, exports DGD/remises, automatisation des relances, puis connecteurs réels Stripe/SMS/comptabilité/fournisseurs selon les clés/licences officielles.
+- À poursuivre après cette tranche : génération/édition complète des bons de livraison, lignes multiples dans les modèles et métrés, exports DGD/remises, automatisation des relances, puis connecteurs réels Stripe/SMS/comptabilité/fournisseurs selon les clés et contrats officiels. BatiChiffrage a été retiré dans le lot 82.
 - Stripe Connect préparé dans le même lot : compte Express par entreprise, direct charge Checkout, webhook Connect signé/idempotent et synchronisation des paiements. Ne peut pas être activé sans les quatre variables documentées dans `.env.local.example` et la configuration du webhook dans le Dashboard Stripe.
+# REPRISE — 15 juillet 2026, personnalisation et fournisseurs libres (MIGRATIONS 82–83 À APPLIQUER)
+
+- Lot local non déployé. Passer `20260715000082_connecteurs_fournisseurs_sans_batichiffrage.sql` puis `20260715000083_modeles_documents_et_personnalisation.sql`.
+- Fournisseurs : ajout universel avec compte client, portail HTTPS et mode d’échange, création automatique de la fiche si nécessaire, jamais de mot de passe stocké.
+- Documents : six modèles d’impression et réglages avancés (couleurs, police, logo, descriptions, TVA).
+- Navigation : dossiers métiers repliables, après filtrage strict des permissions.
+- Accueil : widgets affichables/masquables par appareil ; les droits restent prioritaires.
+- Guide PDF refait de zéro : 55 pages illustrées et contrôlées, sommaire/signets, tous les modules, 19 procédures détaillées et matrice des synchronisations. Fichiers : `output/pdf/Guide_utilisation_detaille_Liria_Gestion_Pro.pdf`, copie publique existante remplacée, générateur `scripts/create-guide-utilisateur-detaille.py`.
+- Validation locale : tsc, lint, 21 tests, diff-check et build 73 routes verts ; avertissement `unpdf` connu uniquement.
+
+---
