@@ -43,6 +43,17 @@
 
 # Relais Claude Code — Liria Gestion Pro
 
+## REPRISE PRIORITAIRE — 16 juillet 2026, factures fournisseurs classées (MIGRATIONS 82–84 APPLIQUÉES)
+
+- Migrations `20260715000082`, `83` et `84` appliquées dans Supabase. La RPC 84 `classer_facture_fournisseur` exige une session authentifiée, l’appartenance à l’entreprise et `gerer_achats`.
+- `/factures` contient maintenant deux vues : factures clients et factures fournisseurs. La seconde reste invisible sans `acces_achats` et fonctionne en cartes mobiles comme en tableau ordinateur.
+- La fiche chantier liste les factures fournisseurs classées avec total TTC, réglé et reste à payer. Elle permet de créer une facture déjà rattachée ou de classer directement une facture restée en frais généraux si le compte a `gerer_achats`.
+- La fiche fournisseur permet de classer/déplacer/retirer la facture d’un chantier. Le cache de l’ancien et du nouveau chantier est réactualisé.
+- Contrôles terminés : TypeScript, ESLint, 23 tests Vitest, diff-check et build webpack complet de 73 routes. Avertissement historique `unpdf/import.meta` seulement.
+- Reste à publier le commit Git/Vercel de ce lot. Ne jamais inclure le fichier utilisateur non suivi `src/app/(app)/conges/page 2.tsx`.
+
+---
+
 ## ÉTAT AUTORITATIF — 14 juillet 2026, identité et vidéos (Codex)
 
 - Produit confirmé : **Liria Gestion Pro**. L’ancien logo statique `Liria Concept` est supprimé et remplacé par `public/liria-gestion-pro-logo.png`; icônes PWA 192/512/Apple Touch régénérées. Les logos importés par les entreprises continuent de primer sur les devis et factures.

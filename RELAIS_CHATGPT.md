@@ -1,6 +1,17 @@
-# REPRISE — 15 juillet 2026, personnalisation et fournisseurs libres (MIGRATIONS 82–83 À APPLIQUER)
+# REPRISE — 16 juillet 2026, classement des factures fournisseurs (MIGRATIONS 82–84 APPLIQUÉES)
 
-- Lot local vérifié mais non déployé. Contrôle direct du schéma le 15/07 : les colonnes 82 et 83 sont absentes. Appliquer dans l’ordre `20260715000082_connecteurs_fournisseurs_sans_batichiffrage.sql`, puis `20260715000083_modeles_documents_et_personnalisation.sql` avant publication.
+- Les migrations `20260715000082`, `83` et `84` sont appliquées dans le projet Supabase `uykukebthgmqtxlmkpnn`. La fonction 84 `classer_facture_fournisseur` est exposée uniquement aux comptes authentifiés et contrôle `gerer_achats` ainsi que l’appartenance du chantier et de la facture à la même entreprise.
+- `/factures` sépare désormais clairement **Factures clients** et **Factures fournisseurs**. L’onglet fournisseurs n’est visible qu’avec `acces_achats` et affiche fournisseur, chantier/frais généraux, catégorie, statut, TTC, règlement et reste à payer sur ordinateur et mobile.
+- Chaque fiche chantier affiche ses factures fournisseurs, leurs totaux TTC/réglé/reste, un accès de création préclassé dans le chantier et, pour `gerer_achats`, un sélecteur permettant de rattacher directement une facture encore classée en frais généraux.
+- La fiche d’une facture fournisseur permet de la classer, la déplacer ou la retirer d’un chantier. L’action est réalisée par RPC sécurisée ; les pages Factures, Dépenses et les anciens/nouveaux chantiers sont réactualisées.
+- Contrôles verts : TypeScript, ESLint, 23 tests Vitest, `git diff --check` et build Next webpack complet de 73 routes. Le contrôle local visuel sans compte n’est pas représentatif car l’ancien mode prototype est désormais fermé par la sécurité de production ; aucun contournement n’a été utilisé.
+- Publication Git/Vercel à terminer après le commit du présent lot. Le fichier utilisateur non suivi `src/app/(app)/conges/page 2.tsx` reste volontairement intact et hors commit.
+
+---
+
+# REPRISE — 15 juillet 2026, personnalisation et fournisseurs libres (MIGRATIONS 82–83 APPLIQUÉES)
+
+- Migrations 82 et 83 confirmées appliquées le 16/07 avant le lot de classement des factures fournisseurs.
 - `/connecteurs` accepte désormais **n’importe quel fournisseur** : fournisseur existant repris avec son vrai nom ou créé automatiquement, numéro de compte client, portail HTTPS ouvrable depuis la fiche et mode portail/CSV/Excel/FAB-DIS/API/EDI/PunchOut/OAuth. Aucun mot de passe n’est demandé ni stocké ; une synchro automatique reste conditionnée par une interface officielle du fournisseur.
 - Les devis/factures/commandes disposent de six modèles réels : Classique, Moderne, Élégant, Technique, Compact et Épuré. Réglages supplémentaires : deux couleurs, police, taille, largeur/position/visibilité du logo, descriptions et colonne TVA.
 - Le menu est maintenant organisé en dossiers repliables : Accueil, Clients & ventes, Chantiers & interventions, Équipe & temps, Achats & stock, Matériel, Pilotage et Administration. Les droits continuent de masquer les modules interdits avant regroupement. L’aperçu administrateur d’un poste reproduit aussi ces mêmes dossiers.

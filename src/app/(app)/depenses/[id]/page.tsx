@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ajouterJustificatifDepenseAction, ajouterReglementDepenseAction, supprimerReglementDepenseAction } from "@/app/actions/depenses";
+import { ajouterJustificatifDepenseAction, ajouterReglementDepenseAction, classerFactureFournisseurAction, supprimerReglementDepenseAction } from "@/app/actions/depenses";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
@@ -18,9 +18,12 @@ export default async function DepensePage({ params, searchParams }: { params: Pr
   const supabase = await createClient();
   const permissions = await permissionsUtilisateur(contexte);
   const peutGerer = permissions === null || permissions.includes("gerer_achats");
-  const [{ data: depense }, { data: reglements }] = await Promise.all([
+  const [{ data: depense }, { data: reglements }, { data: chantiers }] = await Promise.all([
     supabase.from("depenses_fournisseurs").select("*,fournisseur:fournisseurs(nom),chantier:chantiers(id,nom),commande:commandes_fournisseurs(id,numero),vehicule:vehicules(id,immatriculation,marque,modele),outil:outils(id,reference,designation),employe:employes(id,prenom,nom)").eq("id", id).eq("entreprise_id", contexte.entrepriseId).maybeSingle(),
     supabase.from("reglements_fournisseurs").select("*").eq("depense_id", id).eq("entreprise_id", contexte.entrepriseId).order("date", { ascending: false }),
+    peutGerer
+      ? supabase.from("chantiers").select("id,nom,reference_interne").eq("entreprise_id", contexte.entrepriseId).not("statut", "in", "(archive,annule)").order("nom")
+      : Promise.resolve({ data: [] }),
   ]);
   if (!depense) notFound();
 
@@ -39,13 +42,13 @@ export default async function DepensePage({ params, searchParams }: { params: Pr
   }
 
   return (
-    <main className="p-8"><div className="mx-auto max-w-4xl space-y-6">
+    <main className="p-4 sm:p-8"><div className="mx-auto max-w-4xl space-y-6">
       <div><Link href="/depenses" className="text-sm text-neutral-500 hover:underline">← Dépenses</Link><h1 className="mt-1 text-xl font-semibold">{depense.numero_piece}</h1><p className="text-sm text-neutral-500">{fournisseur?.nom} · {DEPENSE_CATEGORIES[depense.categorie]}</p></div>
       {messages.error && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{messages.error}</p>}
       {messages.success && <p className="rounded bg-green-50 p-3 text-sm text-green-700">{messages.success}</p>}
-      <div className="grid grid-cols-3 gap-3"><div className="rounded border p-3">TTC<strong className="block">{euros(depense.montant_ttc)}</strong></div><div className="rounded border p-3">Réglé<strong className="block text-green-700">{euros(depense.montant_regle)}</strong></div><div className="rounded border p-3">Reste<strong className="block text-amber-700">{euros(reste)}</strong></div></div>
+      <div className="grid gap-3 sm:grid-cols-3"><div className="rounded border p-3">TTC<strong className="block">{euros(depense.montant_ttc)}</strong></div><div className="rounded border p-3">Réglé<strong className="block text-green-700">{euros(depense.montant_regle)}</strong></div><div className="rounded border p-3">Reste<strong className="block text-amber-700">{euros(reste)}</strong></div></div>
 
-      <section className="grid grid-cols-2 gap-2 rounded border p-4 text-sm dark:border-neutral-800">
+      <section className="grid gap-2 rounded border p-4 text-sm dark:border-neutral-800 sm:grid-cols-2">
         <p><b>Statut :</b> <span style={{ color: statut?.couleur }}>{statut?.label}</span></p><p><b>Date :</b> {depense.date_piece} · <b>Échéance :</b> {depense.date_echeance ?? "—"}</p><p><b>HT :</b> {euros(depense.montant_ht)} · <b>TVA :</b> {euros(depense.montant_tva)}</p>
         {chantier && <p><b>Chantier :</b> <Link href={`/chantiers/${chantier.id}`} className="hover:underline">{chantier.nom}</Link></p>}
         {commande && <p><b>Commande :</b> <Link href={`/commandes/${commande.id}`} className="hover:underline">{commande.numero}</Link></p>}
@@ -53,6 +56,15 @@ export default async function DepensePage({ params, searchParams }: { params: Pr
         {outil && <p><b>Outil :</b> <Link href={`/outillage/${outil.id}`} className="hover:underline">{outil.reference} · {outil.designation}</Link></p>}
         {employe && <p><b>Ouvrier :</b> <Link href={`/employes/${employe.id}`} className="hover:underline">{employe.prenom} {employe.nom}</Link></p>}
       </section>
+      {peutGerer && <form action={classerFactureFournisseurAction.bind(null, id)} className="flex flex-col gap-3 rounded border p-4 sm:flex-row sm:items-end dark:border-neutral-800">
+        <label className="flex-1 text-sm font-medium">Classer dans un chantier
+          <select name="chantier_id" defaultValue={chantier?.id ?? ""} className="mt-1 w-full rounded border px-3 py-2 text-sm dark:bg-neutral-900">
+            <option value="">Sans chantier · frais généraux</option>
+            {(chantiers ?? []).map((item) => <option key={item.id} value={item.id}>{item.nom}{item.reference_interne ? ` · ${item.reference_interne}` : ""}</option>)}
+          </select>
+        </label>
+        <button className="rounded bg-[#0d1b2a] px-4 py-2 text-sm font-medium text-white">Enregistrer le classement</button>
+      </form>}
       {depense.travaux_effectues&&<section className="rounded border p-4"><h2 className="font-semibold">Travaux et pièces détaillés</h2><p className="mt-2 whitespace-pre-wrap text-sm">{depense.travaux_effectues}</p></section>}
 
       <section className="rounded border p-4 dark:border-neutral-800">
@@ -61,7 +73,7 @@ export default async function DepensePage({ params, searchParams }: { params: Pr
         {peutGerer && <form action={ajouterJustificatifDepenseAction.bind(null, id)} encType="multipart/form-data" className="mt-3 flex gap-3 border-t pt-3"><input name="justificatif" type="file" accept="application/pdf,image/png,image/jpeg,image/webp" capture="environment" required className="flex-1 rounded border px-3 py-2 text-sm"/><button className="rounded bg-[#0d1b2a] px-4 py-2 text-sm font-medium text-white">{depense.justificatif_storage_path ? "Remplacer" : "Scanner / importer"}</button></form>}
       </section>
 
-      {peutGerer && reste > 0 && !["annulee", "litige"].includes(depense.statut) && <form action={ajouterReglementDepenseAction.bind(null, id)} className="grid grid-cols-4 gap-2 rounded border p-4 dark:border-neutral-800"><input name="montant" type="number" min="0.01" max={reste} step="0.01" defaultValue={reste} required className="rounded border px-3 py-2 text-sm dark:bg-neutral-900"/><input name="date" type="date" defaultValue={new Date().toISOString().slice(0,10)} required className="rounded border px-3 py-2 text-sm dark:bg-neutral-900"/><select name="mode" className="rounded border px-3 py-2 text-sm dark:bg-neutral-900"><option value="virement">Virement</option><option value="prelevement">Prélèvement</option><option value="cb">Carte</option><option value="cheque">Chèque</option><option value="especes">Espèces</option></select><input name="reference" placeholder="Référence" className="rounded border px-3 py-2 text-sm dark:bg-neutral-900"/><button className="col-span-4 rounded bg-neutral-900 px-4 py-2 text-sm text-white dark:bg-white dark:text-neutral-900">Enregistrer le règlement</button></form>}
+      {peutGerer && reste > 0 && !["annulee", "litige"].includes(depense.statut) && <form action={ajouterReglementDepenseAction.bind(null, id)} className="grid gap-2 rounded border p-4 dark:border-neutral-800 sm:grid-cols-2 lg:grid-cols-4"><input name="montant" type="number" min="0.01" max={reste} step="0.01" defaultValue={reste} required className="rounded border px-3 py-2 text-sm dark:bg-neutral-900"/><input name="date" type="date" defaultValue={new Date().toISOString().slice(0,10)} required className="rounded border px-3 py-2 text-sm dark:bg-neutral-900"/><select name="mode" className="rounded border px-3 py-2 text-sm dark:bg-neutral-900"><option value="virement">Virement</option><option value="prelevement">Prélèvement</option><option value="cb">Carte</option><option value="cheque">Chèque</option><option value="especes">Espèces</option></select><input name="reference" placeholder="Référence" className="rounded border px-3 py-2 text-sm dark:bg-neutral-900"/><button className="rounded bg-neutral-900 px-4 py-2 text-sm text-white dark:bg-white dark:text-neutral-900 sm:col-span-2 lg:col-span-4">Enregistrer le règlement</button></form>}
 
       <section><h2 className="mb-2 font-semibold">Règlements</h2>{reglements?.map((reglement) => <div key={reglement.id} className="flex flex-wrap items-center justify-between gap-3 border-t py-2 text-sm"><span>{reglement.date} · {reglement.mode}</span><span className="text-neutral-500">{reglement.reference ?? ""}</span><strong>{euros(reglement.montant)}</strong>{peutGerer && <form action={supprimerReglementDepenseAction.bind(null, id, reglement.id)}><ConfirmSubmitButton message={`Annuler ce règlement de ${euros(reglement.montant)} ? Le solde de la facture fournisseur sera recalculé automatiquement.`} className="text-xs text-red-600 hover:underline">Annuler ce paiement</ConfirmSubmitButton></form>}</div>)}{(!reglements || !reglements.length) && <p className="text-sm text-neutral-500">Aucun règlement.</p>}</section>
     </div></main>
