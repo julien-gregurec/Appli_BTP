@@ -1,6 +1,6 @@
-# REPRISE — 15 juillet 2026, sécurité terrain et correctifs mobiles (MIGRATION 80 APPLIQUÉE)
+# REPRISE — 15 juillet 2026, sécurité terrain et correctifs mobiles (MIGRATIONS 80 ET 81 APPLIQUÉES)
 
-- Migration `20260715000080_suite_metier_complete.sql` confirmée appliquée par Julien. Ne pas déployer avant d’appliquer `20260715000081_securite_terrain_alertes_personnalisation.sql`.
+- Migrations `20260715000080_suite_metier_complete.sql` et `20260715000081_securite_terrain_alertes_personnalisation.sql` confirmées appliquées par Julien. Le lot peut maintenant être déployé et contrôlé en production.
 - Migration 81 : correction des `+` dans les e-mails iOS, réparation prudente du mojibake en base, prix achat/revente du stock, horaires contractuels par jour, seuil d’écart et alertes de pointage, pointage oublié toujours soumis à vérification, notifications personnelles, documents chantier par audience, QR salarié de borne et lecture chantier limitée aux projets actifs assignés.
 - Le pointage propose d’abord le chantier du jour, puis les chantiers assignés, puis les autres chantiers actifs via une RPC ne retournant aucune donnée client ou financière.
 - Interface : calcul automatique HT/TVA/TTC des notes de frais, demandes de congé envoyées immédiatement, accueil personnalisable uniquement parmi les modules autorisés, chiffres et état global des chantiers masqués aux ouvriers, workflow responsable des notes de frais inchangé et protégé côté serveur.
@@ -9,7 +9,7 @@
 - Les plans et pièces jointes autorisées sont désormais visibles directement sur la fiche chantier. Les fichiers s’ouvrent dans le navigateur et conservent un téléchargement explicite.
 - Les justificatifs de notes de frais sont renvoyés directement par le serveur après contrôle des droits et de l’empreinte ; un accès de compatibilité est affiché pour les anciennes factures numérisées.
 - L’encodage e-mail est centralisé et couvert par un test garantissant l’absence de `+` dans le lien `mailto` sur ordinateur et téléphone.
-- Contrôles locaux du lot : ESLint, TypeScript, tests Vitest, `git diff --check` et build webpack verts. Le SQL 81 doit encore être exécuté et contrôlé sur Supabase avant publication.
+- Contrôles locaux du lot : ESLint, TypeScript, **19 tests Vitest**, `git diff --check` et build webpack de 73 routes verts.
 
 ---
 

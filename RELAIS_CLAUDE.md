@@ -100,9 +100,9 @@
 - `DISABLE_EMAIL_LOGIN=true` reste actif. Ne pas ouvrir les justificatifs personnels dans ce mode et ne pas appliquer `supabase/production/sortie_mode_prototype.sql` sans bascule auth coordonnée.
 - Les fichiers doublons non suivis `*page 2.tsx` / `StockMovementForm 2.tsx` sont hors périmètre : ne pas les inclure.
 
-## Reprise Codex — 15 juillet 2026 (migration 80 appliquée)
+## Reprise Codex — 15 juillet 2026 (migrations 80 et 81 appliquées)
 
-- Migration `20260715000080_suite_metier_complete.sql` confirmée appliquée par Julien. Il reste à appliquer `20260715000081_securite_terrain_alertes_personnalisation.sql` avant tout déploiement.
+- Migrations `20260715000080_suite_metier_complete.sql` et `20260715000081_securite_terrain_alertes_personnalisation.sql` confirmées appliquées par Julien. Le déploiement et les contrôles de production peuvent être lancés.
 - Migration 81 et code associé corrigent l’e-mail iOS (`+`), le mojibake, les calculs automatiques HT/TVA/TTC, les prix achat/revente du stock, le QR salarié + mot de passe de la borne, les horaires par jour et alertes de pointage, les notifications congés/notes de frais, les pièces jointes chantier par audience et la confidentialité de l’accueil ouvrier.
 - Congés envoyés immédiatement sans brouillon. Tableau de bord personnalisable par masquage de raccourcis autorisés. « Mes travaux » reste sans aucun prix.
 - Complément local : les lignes de devis acceptées deviennent des tâches chantier et les anciens devis acceptés sont rétroactivement synchronisés par la migration 81. Plans autorisés visibles sur la fiche chantier ; justificatifs de notes de frais servis directement après contrôle ; test e-mail sans `+` ajouté.
