@@ -5,6 +5,7 @@ import { euros, statutDevis } from "@/lib/devis";
 import { statutChantier } from "@/lib/chantier-statuts";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { PointageArriveeDepart } from "@/components/PointageArriveeDepart";
+import { MobileModuleGrid, type MobileModuleLink } from "@/components/MobileModuleGrid";
 
 function un<T>(valeur: T | T[] | null): T | null {
   if (!valeur) return null;
@@ -28,15 +29,26 @@ export default async function DashboardPage() {
   const peutPointer = permissions !== null && permissions.includes("saisir_son_pointage");
   const peutGererPlanning = permissions === null || permissions.includes("gerer_planning");
   const auMoinsUnModule = permissions === null || permissions.some((cle) => cle.startsWith("acces_"));
-  const raccourcis = [
-    ["acces_pointage", "/pointage", "Pointage"], ["acces_planning", "/planning", "Planning"],
-    ["acces_chantiers", "/chantiers", "Chantiers"], ["acces_employes", "/employes", "Employés"],
-    ["acces_clients", "/clients", "Clients"], ["acces_devis", "/devis", "Devis"],
-    ["acces_factures", "/factures", "Factures"], ["acces_achats", "/commandes", "Achats"],
-    ["acces_stock", "/stock", "Stock"], ["acces_flotte", "/flotte", "Flotte"],
-    ["acces_outillage", "/outillage", "Outillage"], ["acces_rentabilite", "/rentabilite", "Rentabilité"],
-    ["acces_exports", "/exports", "Exports"], ["acces_parametres", "/parametres", "Paramètres"],
-  ].filter(([permission]) => autorise(permission));
+  const raccourcis = ([
+    { permission: null, href: "/mon-espace", label: "Mon espace", icon: "profil" },
+    { permission: "voir_devis_chantier_sans_prix", href: "/mes-travaux", label: "Mes travaux", icon: "travaux" },
+    { permission: "acces_pointage", href: "/pointage", label: "Pointage", icon: "pointage" },
+    { permission: "acces_planning", href: "/planning", label: "Planning", icon: "planning" },
+    { permission: "acces_chantiers", href: "/chantiers", label: "Chantiers", icon: "chantiers" },
+    { permission: "acces_employes", href: "/employes", label: "Employés", icon: "employes" },
+    { permission: "acces_clients", href: "/clients", label: "Clients", icon: "clients" },
+    { permission: "acces_devis", href: "/devis", label: "Devis", icon: "devis" },
+    { permission: "acces_factures", href: "/factures", label: "Factures", icon: "factures" },
+    { permission: "acces_achats", href: "/commandes", label: "Achats", icon: "achats" },
+    { permission: "acces_stock", href: "/stock", label: "Stock", icon: "stock" },
+    { permission: "acces_flotte", href: "/flotte", label: "Flotte", icon: "flotte" },
+    { permission: "acces_outillage", href: "/outillage", label: "Outillage", icon: "outillage" },
+    { permission: "saisir_ses_notes_frais", href: "/notes-frais", label: "Notes de frais", icon: "frais" },
+    { permission: "demander_ses_conges", href: "/conges", label: "Congés", icon: "conges" },
+    { permission: "acces_rentabilite", href: "/rentabilite", label: "Rentabilité", icon: "rentabilite" },
+    { permission: "acces_exports", href: "/exports", label: "Exports", icon: "exports" },
+    { permission: "acces_parametres", href: "/parametres", label: "Paramètres", icon: "parametres" },
+  ] as Array<MobileModuleLink & { permission: string | null }>).filter((module) => module.permission === null || autorise(module.permission));
 
   const { data: employeCompte } = permissions !== null && (peutPointer || voir.planning)
     ? await supabase.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("utilisateur_id", ctx.userId).eq("statut", "actif").maybeSingle()
@@ -119,7 +131,7 @@ export default async function DashboardPage() {
           <p className="text-sm text-neutral-500">{ctx.entrepriseNom}</p>
         </div>
 
-        {permissions !== null && raccourcis.length > 0 && <section><h2 className="mb-2 text-sm font-semibold">Mes modules</h2><div className="flex flex-wrap gap-2">{raccourcis.map(([, href, label]) => <Link key={href} href={href} className="rounded-full border border-neutral-300 px-3 py-2 text-sm font-medium hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900">{label}</Link>)}</div></section>}
+        {raccourcis.length > 0 && <><MobileModuleGrid modules={raccourcis}/><section className="hidden md:block"><h2 className="mb-2 text-sm font-semibold">Mes modules</h2><div className="flex flex-wrap gap-2">{raccourcis.map(({href,label}) => <Link key={href} href={href} className="rounded-full border border-neutral-300 px-3 py-2 text-sm font-medium hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900">{label}</Link>)}</div></section></>}
 
         {!auMoinsUnModule && <section className="rounded-md border border-dashed p-6 text-center"><h2 className="font-semibold">Aucun module attribué</h2><p className="mt-1 text-sm text-neutral-500">Un administrateur doit encore définir les accès de votre poste.</p></section>}
 
