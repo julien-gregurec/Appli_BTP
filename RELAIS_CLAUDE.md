@@ -50,7 +50,7 @@
 - La fiche chantier liste les factures fournisseurs classées avec total TTC, réglé et reste à payer. Elle permet de créer une facture déjà rattachée ou de classer directement une facture restée en frais généraux si le compte a `gerer_achats`.
 - La fiche fournisseur permet de classer/déplacer/retirer la facture d’un chantier. Le cache de l’ancien et du nouveau chantier est réactualisé.
 - Contrôles terminés : TypeScript, ESLint, 23 tests Vitest, diff-check et build webpack complet de 73 routes. Avertissement historique `unpdf/import.meta` seulement.
-- Reste à publier le commit Git/Vercel de ce lot. Ne jamais inclure le fichier utilisateur non suivi `src/app/(app)/conges/page 2.tsx`.
+- Lot publié sur `gh/main` au commit `5fda012` et déploiement Vercel confirmé terminé avec succès. `/login` répond 200 et les routes protégées redirigent correctement vers la connexion. Ne jamais inclure le fichier utilisateur non suivi `src/app/(app)/conges/page 2.tsx`.
 
 ---
 

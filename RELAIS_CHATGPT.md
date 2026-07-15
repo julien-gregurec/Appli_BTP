@@ -5,7 +5,7 @@
 - Chaque fiche chantier affiche ses factures fournisseurs, leurs totaux TTC/réglé/reste, un accès de création préclassé dans le chantier et, pour `gerer_achats`, un sélecteur permettant de rattacher directement une facture encore classée en frais généraux.
 - La fiche d’une facture fournisseur permet de la classer, la déplacer ou la retirer d’un chantier. L’action est réalisée par RPC sécurisée ; les pages Factures, Dépenses et les anciens/nouveaux chantiers sont réactualisées.
 - Contrôles verts : TypeScript, ESLint, 23 tests Vitest, `git diff --check` et build Next webpack complet de 73 routes. Le contrôle local visuel sans compte n’est pas représentatif car l’ancien mode prototype est désormais fermé par la sécurité de production ; aucun contournement n’a été utilisé.
-- Publication Git/Vercel à terminer après le commit du présent lot. Le fichier utilisateur non suivi `src/app/(app)/conges/page 2.tsx` reste volontairement intact et hors commit.
+- Lot publié sur `gh/main` au commit `5fda012` (avec le lot 82–83 `f08eeee`) et déploiement Vercel confirmé **success**. Production contrôlée : `/login` répond 200 ; `/factures` et `/chantiers` redirigent les visiteurs non connectés vers `/login`. Le fichier utilisateur non suivi `src/app/(app)/conges/page 2.tsx` reste volontairement intact et hors commit.
 
 ---
 
