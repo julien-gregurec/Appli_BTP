@@ -17,9 +17,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!note?.justificatif_storage_path) return NextResponse.json({ error: "Justificatif introuvable" }, { status: 404 });
 
   const telecharger = new URL(request.url).searchParams.get("download") === "1";
-  const { data, error } = await supabase.storage
-    .from("notes-frais")
-    .createSignedUrl(note.justificatif_storage_path, 120, telecharger ? { download: note.justificatif_nom ?? "justificatif" } : undefined);
-  if (error || !data) return NextResponse.json({ error: "Document indisponible" }, { status: 503 });
-  return NextResponse.redirect(data.signedUrl);
+  const {data:fichier,error}=await supabase.storage.from("notes-frais").download(note.justificatif_storage_path);
+  if(error||!fichier)return NextResponse.json({error:"Document indisponible"},{status:503});
+  const bytes=new Uint8Array(await fichier.arrayBuffer()),nom=(note.justificatif_nom??"justificatif").replace(/[\r\n"]/g,"_");
+  const contenu=bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength) as ArrayBuffer;
+  return new NextResponse(contenu,{headers:{
+    "Content-Type":fichier.type||"application/octet-stream",
+    "Content-Length":String(bytes.byteLength),
+    "Cache-Control":"private, no-store",
+    "Content-Disposition":`${telecharger?"attachment":"inline"}; filename="justificatif"; filename*=UTF-8''${encodeURIComponent(nom)}`,
+  }});
 }

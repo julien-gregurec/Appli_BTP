@@ -97,7 +97,7 @@ export default async function DocumentsChantierPage({
                     </div>
                     {document.note && <p className="line-clamp-2 text-sm text-neutral-600 dark:text-neutral-400">{document.note}</p>}
                     <div className="flex items-center justify-between border-t border-neutral-100 pt-3 text-sm dark:border-neutral-800">
-                      <a href={`/api/documents/${document.id}`} className="font-medium hover:underline">Télécharger</a>
+                      <a href={`/api/documents/${document.id}?download=1`} className="font-medium hover:underline">Télécharger</a>
                       <form action={supprimer}>
                         <ConfirmSubmitButton message={`Supprimer « ${document.nom} » ?`} className="text-red-600 hover:underline dark:text-red-400">Supprimer</ConfirmSubmitButton>
                       </form>

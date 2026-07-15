@@ -32,16 +32,16 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
 
   const { data: taches } = await supabase
     .from("taches")
-    .select("id, libelle, statut, echeance")
+    .select("id, libelle, description, statut, echeance, devis_id")
     .eq("chantier_id", id)
     .order("created_at");
 
-  const [{ data: devis }, { data: factures }, { data: affectations }, {data:pointages}, { count: documentsCount }, {data:codeIdentification}, {data:equipe}, {data:employes}] = await Promise.all([
+  const [{ data: devis }, { data: factures }, { data: affectations }, {data:pointages}, {data:documents}, {data:codeIdentification}, {data:equipe}, {data:employes}] = await Promise.all([
     supabase.from("devis").select("id, numero, statut, montant_ttc").eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
     supabase.from("factures").select("id, numero, statut, montant_ttc, montant_paye").eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
     supabase.from("affectations").select("heures").eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId),
     peutVoirHeures?supabase.from("pointages").select("id,date,heures_normales,heures_supplementaires,tache,verification_statut,employe:employes(prenom,nom)").eq("chantier_id",id).eq("entreprise_id",ctx.entrepriseId).order("date",{ascending:false}):Promise.resolve({data:[]}),
-    supabase.from("documents_chantier").select("id", { count: "exact", head: true }).eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId),
+    supabase.from("documents_chantier").select("id,nom,categorie,note,mime_type,audience,created_at").eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId).order("created_at",{ascending:false}),
     supabase.from("codes_identification").select("id,code").eq("entreprise_id",ctx.entrepriseId).eq("type_ressource","chantier").eq("ressource_id",id).eq("actif",true).maybeSingle(),
     supabase.from("equipes_chantiers").select("id,role_chantier,date_debut,date_fin,note,employe:employes(id,prenom,nom,poste,statut)").eq("entreprise_id",ctx.entrepriseId).eq("chantier_id",id).order("date_fin",{ascending:true}).order("role_chantier"),
     peutGerer?supabase.from("employes").select("id,prenom,nom,poste").eq("entreprise_id",ctx.entrepriseId).not("statut","in",'(sorti,suspendu)').order("nom"):Promise.resolve({data:[]}),
@@ -75,7 +75,7 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Link href={`/chantiers/${id}/documents`} className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900">
-              Photos & documents{documentsCount ? ` (${documentsCount})` : ""}
+              Photos & documents{documents?.length ? ` (${documents.length})` : ""}
             </Link>
             {peutGerer?<StatutChantierSelect chantierId={id} statut={chantier.statut} />:<span className="rounded-full bg-neutral-100 px-3 py-1 text-sm dark:bg-neutral-800">{chantier.statut.replaceAll("_"," ")}</span>}
           </div>
@@ -99,6 +99,8 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
           {ligne("Fin prévue", chantier.date_fin_prevue)}
           {ligne("Budget prévisionnel", chantier.budget_previsionnel ? `${chantier.budget_previsionnel} €` : null)}
         </section>
+
+        {(documents??[]).length>0&&<section className="space-y-3 rounded-md border border-blue-200 bg-blue-50/40 p-4"><div className="flex items-center justify-between gap-3"><div><h2 className="font-semibold">Plans et pièces jointes autorisées</h2><p className="text-sm text-neutral-500">Seuls les documents autorisés pour votre rôle sont affichés.</p></div><Link href={`/chantiers/${id}/documents`} className="text-sm font-medium text-blue-800 hover:underline">Tout consulter</Link></div><div className="grid gap-2 sm:grid-cols-2">{(documents??[]).slice().sort((a,b)=>(a.categorie==="plan"?0:1)-(b.categorie==="plan"?0:1)).slice(0,6).map(document=><a key={document.id} href={`/api/documents/${document.id}`} target="_blank" rel="noopener" className="rounded-md border bg-white p-3 text-sm hover:border-blue-400"><strong className="block truncate">{document.categorie==="plan"?"📐 Plan · ":"📎 "}{document.nom}</strong>{document.note&&<span className="mt-1 block text-xs text-neutral-500">{document.note}</span>}</a>)}</div></section>}
 
         <ChantierProgressCharts
           finances={peutVoirFinances ? { devis: totalDevisAccepte, facture: totalFacture, paye: totalPaye } : null}
@@ -140,6 +142,7 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
                   tacheId={t.id}
                   chantierId={id}
                   libelle={t.libelle}
+                  description={t.description}
                   echeance={t.echeance}
                   fait={t.statut === "fait"}
                   modifiable={peutGerer}

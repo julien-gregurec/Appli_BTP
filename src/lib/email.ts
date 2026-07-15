@@ -2,6 +2,12 @@ import { euros } from "@/lib/devis";
 
 type ClientMail = { nom: string | null; prenom: string | null; societe: string | null; email: string | null };
 
+export function construireLienMailto(opts:{to:string;sujet:string;corps:string;cc?:string}){
+  const parametres=[`subject=${encodeURIComponent(opts.sujet)}`,`body=${encodeURIComponent(opts.corps)}`];
+  if(opts.cc?.trim())parametres.push(`cc=${encodeURIComponent(opts.cc.split(/[;,]/).map(adresse=>adresse.trim()).filter(Boolean).join(","))}`);
+  return `mailto:${encodeURIComponent(opts.to.trim())}?${parametres.join("&")}`;
+}
+
 // Construit le message réellement destiné au client. Les consignes d'utilisation
 // (notamment l'ajout manuel du PDF) restent dans l'interface et ne doivent jamais
 // apparaître dans l'e-mail professionnel.

@@ -5,6 +5,10 @@
 - Le pointage propose d’abord le chantier du jour, puis les chantiers assignés, puis les autres chantiers actifs via une RPC ne retournant aucune donnée client ou financière.
 - Interface : calcul automatique HT/TVA/TTC des notes de frais, demandes de congé envoyées immédiatement, accueil personnalisable uniquement parmi les modules autorisés, chiffres et état global des chantiers masqués aux ouvriers, workflow responsable des notes de frais inchangé et protégé côté serveur.
 - Compte dépôt : restriction Stock/Borne/Dépôt déjà en place ; QR salarié accepté mais mot de passe stock personnel toujours obligatoire. Les réceptions fournisseur restent accessibles dans le flux Stock/Achats selon les droits.
+- Complément ajouté pendant l’incident Supabase : chaque ligne d’un devis accepté génère automatiquement une tâche chantier sans prix, sans doublon, visible par l’équipe affectée. La migration 81 rétroalimente aussi tous les devis déjà acceptés.
+- Les plans et pièces jointes autorisées sont désormais visibles directement sur la fiche chantier. Les fichiers s’ouvrent dans le navigateur et conservent un téléchargement explicite.
+- Les justificatifs de notes de frais sont renvoyés directement par le serveur après contrôle des droits et de l’empreinte ; un accès de compatibilité est affiché pour les anciennes factures numérisées.
+- L’encodage e-mail est centralisé et couvert par un test garantissant l’absence de `+` dans le lien `mailto` sur ordinateur et téléphone.
 - Contrôles locaux du lot : ESLint, TypeScript, tests Vitest, `git diff --check` et build webpack verts. Le SQL 81 doit encore être exécuté et contrôlé sur Supabase avant publication.
 
 ---

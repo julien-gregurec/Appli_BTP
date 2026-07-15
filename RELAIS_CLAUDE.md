@@ -105,7 +105,8 @@
 - Migration `20260715000080_suite_metier_complete.sql` confirmée appliquée par Julien. Il reste à appliquer `20260715000081_securite_terrain_alertes_personnalisation.sql` avant tout déploiement.
 - Migration 81 et code associé corrigent l’e-mail iOS (`+`), le mojibake, les calculs automatiques HT/TVA/TTC, les prix achat/revente du stock, le QR salarié + mot de passe de la borne, les horaires par jour et alertes de pointage, les notifications congés/notes de frais, les pièces jointes chantier par audience et la confidentialité de l’accueil ouvrier.
 - Congés envoyés immédiatement sans brouillon. Tableau de bord personnalisable par masquage de raccourcis autorisés. « Mes travaux » reste sans aucun prix.
-- Contrôles locaux : TypeScript, lint, tests et build webpack verts ; avertissement `unpdf/import.meta` historique uniquement.
+- Complément local : les lignes de devis acceptées deviennent des tâches chantier et les anciens devis acceptés sont rétroactivement synchronisés par la migration 81. Plans autorisés visibles sur la fiche chantier ; justificatifs de notes de frais servis directement après contrôle ; test e-mail sans `+` ajouté.
+- Contrôles locaux : TypeScript, lint, **19 tests** et build webpack verts ; avertissement `unpdf/import.meta` historique uniquement.
 
 ## Reprise Codex — 13 juillet 2026
 

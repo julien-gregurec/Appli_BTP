@@ -217,6 +217,58 @@ end;$$;
 revoke all on function public.identifiant_employe_depuis_qr_borne(uuid,text) from public,anon;
 grant execute on function public.identifiant_employe_depuis_qr_borne(uuid,text) to authenticated;
 
+-- Chaque ligne d'un devis accepté devient une tâche terrain visible par
+-- l'équipe affectée. Le lien à la ligne source évite toute duplication.
+alter table public.taches
+ add column if not exists devis_id uuid references public.devis(id) on delete cascade,
+ add column if not exists ligne_devis_id uuid references public.lignes_devis(id) on delete cascade;
+create unique index if not exists taches_ligne_devis_unique on public.taches(ligne_devis_id) where ligne_devis_id is not null;
+create index if not exists taches_devis_idx on public.taches(devis_id) where devis_id is not null;
+
+create or replace function public.synchroniser_taches_devis_accepte(p_devis_id uuid)
+returns void language plpgsql security definer set search_path=public as $$
+declare v_devis public.devis;
+begin
+ select * into v_devis from public.devis where id=p_devis_id;
+ if not found then return;end if;
+ if v_devis.statut<>'accepte' or v_devis.chantier_id is null then return;end if;
+ insert into public.taches(chantier_id,libelle,description,statut,priorite,devis_id,ligne_devis_id)
+ select v_devis.chantier_id,
+  l.designation||case when coalesce(l.quantite,0)<>0 then ' · '||trim(to_char(l.quantite,'FM999999990D99'))||' '||l.unite else '' end,
+  nullif(btrim(l.description),''),'a_faire','normale',v_devis.id,l.id
+ from public.lignes_devis l where l.devis_id=v_devis.id
+ on conflict(ligne_devis_id) where ligne_devis_id is not null do update set
+  chantier_id=excluded.chantier_id,
+  libelle=case when public.taches.statut='fait' then public.taches.libelle else excluded.libelle end,
+  description=case when public.taches.statut='fait' then public.taches.description else excluded.description end,
+  devis_id=excluded.devis_id;
+ delete from public.taches t where t.devis_id=v_devis.id and t.ligne_devis_id is not null
+  and not exists(select 1 from public.lignes_devis l where l.id=t.ligne_devis_id and l.devis_id=v_devis.id);
+end;$$;
+revoke all on function public.synchroniser_taches_devis_accepte(uuid) from public,anon,authenticated;
+
+create or replace function public.trg_synchroniser_taches_devis() returns trigger
+language plpgsql security definer set search_path=public as $$begin
+ perform public.synchroniser_taches_devis_accepte(coalesce(new.id,old.id));return null;
+end;$$;
+drop trigger if exists synchroniser_taches_devis on public.devis;
+create trigger synchroniser_taches_devis after insert or update of statut,chantier_id on public.devis
+ for each row execute function public.trg_synchroniser_taches_devis();
+
+create or replace function public.trg_synchroniser_taches_ligne_devis() returns trigger
+language plpgsql security definer set search_path=public as $$begin
+ perform public.synchroniser_taches_devis_accepte(coalesce(new.devis_id,old.devis_id));return null;
+end;$$;
+drop trigger if exists synchroniser_taches_ligne_devis on public.lignes_devis;
+create trigger synchroniser_taches_ligne_devis after insert or update or delete on public.lignes_devis
+ for each row execute function public.trg_synchroniser_taches_ligne_devis();
+
+do $$declare r record;begin
+ for r in select id from public.devis where statut='accepte' and chantier_id is not null loop
+  perform public.synchroniser_taches_devis_accepte(r.id);
+ end loop;
+end$$;
+
 -- Réparation prudente des séquences d'encodage déjà stockées.
 create or replace function public.corriger_mojibake(p_texte text) returns text language sql immutable as $$
  select replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(p_texte,
