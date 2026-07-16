@@ -10,8 +10,9 @@ import { enregistrerPaiementAction, modifierEcheanceFactureAction, supprimerPaie
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { contenuEmailDocument } from "@/lib/email";
 import { EmailDocumentButton } from "@/components/EmailDocumentButton";
-import { creerPaiementStripeAction } from "@/app/actions/paiements-en-ligne";
-import { stripeEstConfigure } from "@/lib/stripe";
+import { creerLienPaiementStripeAction } from "@/app/actions/paiements-en-ligne";
+import { lienPaiementStripeEstActif, stripeEstConfigure } from "@/lib/stripe";
+import { CopierLienPaiement } from "@/components/CopierLienPaiement";
 
 const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -20,10 +21,10 @@ export default async function FactureDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; success?: string }>;
 }) {
   const { id } = await params;
-  const { error } = await searchParams;
+  const { error, success } = await searchParams;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
 
@@ -47,6 +48,9 @@ export default async function FactureDetailPage({
   const typeLigne = (t: string) => LIGNE_TYPES.find((x) => x.cle === t)?.libelle ?? t;
   const modeLabel = (m: string) => MODES_PAIEMENT.find((x) => x.cle === m)?.libelle ?? m;
   const resteAPayer = Number(facture.montant_ttc) - Number(facture.montant_paye);
+  const lienPaiement = lienPaiementStripeEstActif(facture.stripe_checkout_url, facture.lien_paiement_expire_at)
+    ? facture.stripe_checkout_url
+    : null;
   const enregistrer = enregistrerPaiementAction.bind(null, id);
   const modifierEcheance = modifierEcheanceFactureAction.bind(null, id);
   const email = contenuEmailDocument({
@@ -85,7 +89,15 @@ export default async function FactureDetailPage({
               Télécharger PDF
             </a>
             {email ? (
-              <EmailDocumentButton type="facture" id={id} statut={facture.statut} to={email.to} sujet={email.sujet} corps={email.corps} pdfUrl={`/imprimer/factures/${id}`} />
+              <EmailDocumentButton
+                type="facture"
+                id={id}
+                statut={facture.statut}
+                to={email.to}
+                sujet={email.sujet}
+                corps={lienPaiement ? `${email.corps}\n\nVous pouvez régler cette facture en ligne de façon sécurisée :\n${lienPaiement}` : email.corps}
+                pdfUrl={`/imprimer/factures/${id}`}
+              />
             ) : (
               <span className="cursor-default rounded-md border border-neutral-200 px-3 py-1.5 text-sm text-neutral-400 dark:border-neutral-800" title="Aucun email renseigné pour ce client">
                 Envoyer par email
@@ -96,6 +108,7 @@ export default async function FactureDetailPage({
         </div>
 
         {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        {success && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{success}</p>}
 
         <form action={modifierEcheance} className="flex items-end gap-2 rounded-md border border-neutral-200 p-3 dark:border-neutral-800">
           <div className="space-y-1"><label className="text-xs text-neutral-500">Date d’échéance</label><input name="date_echeance" type="date" defaultValue={facture.date_echeance ?? ""} className={input} /></div>
@@ -151,7 +164,8 @@ export default async function FactureDetailPage({
         </div>
 
         <section className="space-y-3 rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
-          <h2 className="text-sm font-semibold">Paiements</h2>
+          <h2 className="text-sm font-semibold">Encaissements client</h2>
+          <p className="text-xs text-neutral-500">Cette zone enregistre l’argent reçu de votre client pour cette facture.</p>
           {paiements && paiements.length > 0 ? (
             <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
               {paiements.map((p) => {
@@ -170,7 +184,7 @@ export default async function FactureDetailPage({
               })}
             </div>
           ) : (
-            <p className="text-sm text-neutral-500">Aucun paiement enregistré.</p>
+            <p className="text-sm text-neutral-500">Aucun encaissement client enregistré.</p>
           )}
 
           {!['brouillon', 'annulee', 'avoir_emis'].includes(facture.statut) && resteAPayer > 0 ? <form action={enregistrer} className="flex flex-wrap items-end gap-2 border-t border-neutral-100 pt-3 dark:border-neutral-800">
@@ -195,11 +209,34 @@ export default async function FactureDetailPage({
               <input name="reference" placeholder="n° chèque…" className={input + " w-32"} />
             </div>
             <button type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">
-              Enregistrer
+              Enregistrer l’encaissement
             </button>
           </form> : <p className="border-t border-neutral-100 pt-3 text-sm text-neutral-500 dark:border-neutral-800">{resteAPayer <= 0 ? "Cette facture est entièrement réglée." : "Les paiements ne sont pas disponibles pour ce statut."}</p>}
         </section>
-        {!['brouillon','annulee','avoir_emis','payee'].includes(facture.statut) && resteAPayer>0 && <section className="rounded-md border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/30"><h2 className="text-sm font-semibold">Paiement en ligne sécurisé</h2><p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">Crée un règlement Stripe correspondant exactement au reste dû de {euros(resteAPayer)}.</p>{stripeEstConfigure()?<form action={creerPaiementStripeAction.bind(null,id)} className="mt-3"><button className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white">Créer et ouvrir le lien de paiement</button></form>:<p className="mt-3 rounded bg-white/70 p-2 text-xs text-amber-800 dark:bg-neutral-900">À activer avec les clés Stripe de la plateforme dans les paramètres de déploiement.</p>}</section>}
+        {!['brouillon', 'annulee', 'avoir_emis', 'payee'].includes(facture.statut) && resteAPayer > 0 && (
+          <section className="rounded-md border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/30">
+            <h2 className="text-sm font-semibold">Lien de paiement à envoyer au client</h2>
+            <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">
+              Le client réglera le reste dû de {euros(resteAPayer)} sur la page sécurisée Stripe. La création du lien ne débite personne et ne vous ouvre plus la page de paiement.
+            </p>
+            {stripeEstConfigure() ? (
+              <div className="mt-3 space-y-3">
+                {lienPaiement ? (
+                  <>
+                    <CopierLienPaiement url={lienPaiement} />
+                    <p className="text-xs text-blue-900">Le bouton « Envoyer par email » ajoute automatiquement ce lien au message destiné au client.</p>
+                  </>
+                ) : (
+                  <form action={creerLienPaiementStripeAction.bind(null, id)}>
+                    <button className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white">Créer le lien de paiement client</button>
+                  </form>
+                )}
+              </div>
+            ) : (
+              <p className="mt-3 rounded bg-white/70 p-2 text-xs text-amber-800 dark:bg-neutral-900">À activer avec les clés Stripe de la plateforme dans les paramètres de déploiement.</p>
+            )}
+          </section>
+        )}
       </div>
     </main>
   );

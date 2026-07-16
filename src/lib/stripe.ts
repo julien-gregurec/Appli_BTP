@@ -6,6 +6,12 @@ export function stripeEstConfigure() {
   return Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET && process.env.NEXT_PUBLIC_APP_URL);
 }
 
+export function lienPaiementStripeEstActif(url: unknown, expiration: unknown): url is string {
+  return typeof url === "string"
+    && typeof expiration === "string"
+    && new Date(expiration).getTime() > Date.now();
+}
+
 export function stripeConnectOAuthEstConfigure(){return stripeEstConfigure()&&Boolean(process.env.STRIPE_CONNECT_CLIENT_ID);}
 
 export async function creerSessionStripe(params: {
@@ -16,8 +22,8 @@ export async function creerSessionStripe(params: {
   if (!secret || !baseUrl) throw new Error("Stripe n’est pas encore configuré");
   const corps = new URLSearchParams({
     mode: "payment",
-    success_url: `${baseUrl}/paiement/succes?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${baseUrl}/paiement/annule`,
+    success_url: `${baseUrl}/paiement/succes?session_id={CHECKOUT_SESSION_ID}&facture_id=${encodeURIComponent(params.factureId)}`,
+    cancel_url: `${baseUrl}/paiement/annule?facture_id=${encodeURIComponent(params.factureId)}`,
     client_reference_id: params.factureId,
     "metadata[facture_id]": params.factureId,
     "metadata[entreprise_id]": params.entrepriseId,
