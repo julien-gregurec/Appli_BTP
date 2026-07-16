@@ -86,6 +86,15 @@ async function connecter(context) {
   return page;
 }
 
+// Hauteur maximale d'une capture : au-delà, l'image devient un ruban illisible
+// une fois réduite à la largeur d'une page A4. On garde le haut de l'écran,
+// qui est ce que l'utilisateur voit réellement en arrivant sur la page.
+const HAUTEUR_MAX = { desktop: 1100, mobile: 844 };
+
+// Écrans où la barre latérale fait partie de l'explication : on garde alors
+// la fenêtre entière. Partout ailleurs, on cadre sur le contenu.
+const gardeLeMenu = new Set(["dashboard", "parametres-acces", "mon-espace"]);
+
 async function capturer(page, profil, cle, route) {
   const nom = `${profil}-${cle}.png`;
   try {
@@ -99,9 +108,29 @@ async function capturer(page, profil, cle, route) {
     // Laisse les graphiques et images finir de s'afficher.
     await page.waitForTimeout(700);
     const titre = await page.locator("h1").first().textContent().catch(() => null);
-    await page.screenshot({ path: path.join(outputDir, nom), fullPage: true });
-    captures.push({ profil, cle, route, fichier: nom, titre: titre?.trim() ?? null });
-    console.log(`  ✓ ${nom}`);
+
+    // Hauteur réelle de la page, bornée : une capture trop haute devient
+    // illisible une fois réduite à la largeur d'une page A4.
+    const vue = page.viewportSize();
+    const hauteurPage = await page.evaluate(() => document.documentElement.scrollHeight);
+    const hauteur = Math.min(hauteurPage, HAUTEUR_MAX[profil] ?? vue.height);
+
+    // Sur ordinateur, on cadre sur la zone de contenu : garder la barre latérale
+    // écraserait le contenu utile et le rendrait illisible une fois réduit.
+    // Le mobile garde l'écran entier (le menu y est replié).
+    let zone = { x: 0, y: 0, width: vue.width, height: hauteur };
+    if (profil === "desktop" && !gardeLeMenu.has(cle)) {
+      const boite = await page.locator("main").first().boundingBox().catch(() => null);
+      if (boite && boite.width > 400) {
+        zone = { x: Math.round(boite.x), y: 0,
+                 width: Math.round(Math.min(boite.width, vue.width - boite.x)), height: hauteur };
+      }
+    }
+    await page.screenshot({ path: path.join(outputDir, nom), clip: zone });
+
+    captures.push({ profil, cle, route, fichier: nom, titre: titre?.trim() ?? null,
+                    tronquee: hauteurPage > hauteur });
+    console.log(`  ✓ ${nom}${hauteurPage > hauteur ? " (haut de page)" : ""}`);
     return true;
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : String(cause);
