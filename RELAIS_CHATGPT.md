@@ -1,3 +1,15 @@
+# REPRISE — 16 juillet 2026, séparation encaissements clients / paiements fournisseurs
+
+- Erreur métier critique corrigée : l’administrateur ne lance plus lui-même Checkout depuis une facture client. L’action crée désormais un **lien de paiement destiné au client**, revient sur la facture, puis permet de copier/tester le lien ou de l’ajouter automatiquement au message « Envoyer par email ».
+- La fiche facture emploie maintenant le libellé explicite **« Encaissements client »** pour les sommes reçues. Le droit `gerer_factures` est vérifié côté serveur avant toute création de lien Stripe.
+- Le retour Stripe est terminé : après succès, un administrateur encore connecté revient automatiquement sur la facture en quatre secondes et dispose d’un bouton immédiat ; un client public revient vers Liria Gestion Pro sans accéder à la fiche privée. Le retour d’annulation distingue également client public et utilisateur connecté.
+- Les factures fournisseurs affichent désormais **« Paiements fournisseur — sorties d’argent »**. Le formulaire enregistre uniquement un paiement réellement effectué depuis la banque, un prélèvement, une carte ou un chèque.
+- Limite volontaire et obligatoire : Liria ne simule aucun virement fournisseur. Un paiement bancaire déclenché depuis l’application exigera un prestataire réglementé d’initiation de paiement/Open Banking, ses contrats et ses clés. Stripe Connect reste réservé à l’encaissement des clients sur le compte Stripe de l’entreprise.
+- Contrôles verts : TypeScript, ESLint, 24 tests Vitest, `git diff --check` et build Next webpack complet de 75 pages. Commit `4a837a6`, inclus dans le déploiement Vercel `3c7feef`, statut **success**. Production contrôlée : `/paiement/succes` et `/paiement/annule` répondent 200 ; `/factures` redirige un visiteur non connecté vers `/login`.
+- Aucune migration Supabase supplémentaire n’est nécessaire pour ce correctif.
+
+---
+
 # 🚨 BUG CRITIQUE INSCRIPTION + CAUSE RACINE DU MOJIBAKE — 16 juillet (Claude)
 
 **Trois découvertes en préparant les captures du manuel. Migrations 86, 87, 88 APPLIQUÉES.**
