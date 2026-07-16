@@ -203,5 +203,138 @@ def chapitres():
         chapitre(modules.CHANTIERS),
         chapitre_devis(),
         chapitre(modules.FACTURES),
+        chapitre(modules.PLANNING),
+        chapitre(modules.POINTAGE),
+        chapitre(modules.EMPLOYES),
+        chapitre(modules.CONGES),
+        chapitre(modules.NOTES_FRAIS),
+        chapitre(modules.STOCK),
+        chapitre(modules.BORNE),
+        chapitre(modules.OUTILLAGE),
+        chapitre(modules.FLOTTE),
+        chapitre(modules.COMMANDES),
+        chapitre(modules.RENTABILITE),
+        chapitre(modules.TRESORERIE),
+        chapitre(modules.PARAMETRES),
+        chapitre(modules.ACCES),
+        chapitre(modules.IMPORT),
+        chapitre(modules.AIDE),
+        parcours_par_role(),
+        securite(),
+        depannage(),
         annexe_droits(),
+    ]
+
+
+# ═══════════════════════════════════════════════════════════════════
+def parcours_par_role():
+    return [
+        Titre("Le logiciel selon votre métier", 1),
+        p("Deux personnes n'utilisent pas Liria Gestion Pro de la même façon. Cette partie décrit le "
+          "quotidien de chaque rôle : ce que vous ouvrez le matin, ce que vous faites, ce que vous ne "
+          "voyez pas.", "chapo"),
+
+        Titre("Le dirigeant", 2),
+        p("Vous voyez tout : les marges, la trésorerie, les devis en attente. Votre écran d'accueil "
+          "concentre les chiffres et les alertes."),
+        *tableau(["Quand", "Ce que vous faites", "Où"], [
+            ["Le matin", "Vérifier les alertes, les devis à relancer et les factures en retard.", "Tableau de bord"],
+            ["Dans la journée", "Chiffrer, envoyer les devis, convertir les acceptés en factures.", "Devis, Factures"],
+            ["Chaque semaine", "Valider les pointages, suivre la marge des chantiers en cours.", "Pointage, Rentabilité"],
+            ["Chaque mois", "Exporter pour le comptable, suivre les impayés.", "Exports, Trésorerie"],
+        ], [2.8 * cm, 9.6 * cm, 4 * cm]),
+
+        Titre("Le conducteur de travaux", 2),
+        p("Vous organisez : le planning, les équipes, les commandes. Vous voyez les chantiers et les "
+          "coûts, mais la trésorerie de l'entreprise ne vous concerne pas."),
+        *tableau(["Quand", "Ce que vous faites", "Où"], [
+            ["Le matin", "Vérifier qui est où, ajuster les affectations.", "Planning"],
+            ["Dans la journée", "Suivre l'avancement, commander le matériel manquant.", "Chantiers, Commandes"],
+            ["En fin de semaine", "Contrôler et valider les heures de l'équipe.", "Pointage"],
+        ], [2.8 * cm, 9.6 * cm, 4 * cm]),
+
+        Titre("Le chef de chantier", 2),
+        p("Vous êtes sur le terrain avec votre téléphone. Vous voyez votre chantier, vos tâches, votre "
+          "équipe — pas les prix."),
+        *tableau(["Quand", "Ce que vous faites", "Où"], [
+            ["En arrivant", "Consulter les tâches du jour et les plans.", "Mes travaux"],
+            ["Pendant le chantier", "Photographier l'avancement, signaler un problème.", "Chantiers, Aide"],
+            ["En repartant", "Pointer ses heures.", "Pointage"],
+        ], [2.8 * cm, 9.6 * cm, 4 * cm]),
+
+        Titre("L'ouvrier", 2),
+        p("Votre usage tient en trois écrans : votre planning, votre pointage, vos notes de frais. "
+          "Aucun montant ne vous est affiché — ni prix de vente, ni marge, ni coût."),
+        *tableau(["Quand", "Ce que vous faites", "Où"], [
+            ["Le matin", "Voir où je travaille aujourd'hui.", "Planning, Mon espace"],
+            ["Au dépôt", "Prendre du matériel avec mon identifiant.", "Borne dépôt"],
+            ["Le soir", "Pointer mes heures.", "Pointage"],
+            ["Au besoin", "Photographier un ticket, demander un congé.", "Notes de frais, Congés"],
+        ], [2.8 * cm, 9.6 * cm, 4 * cm]),
+
+        Titre("Le comptable", 2),
+        p("Vous traitez les justificatifs et les exports. Vous ne modifiez ni les devis ni les chantiers."),
+        *tableau(["Quand", "Ce que vous faites", "Où"], [
+            ["Au fil de l'eau", "Contrôler et rembourser les notes de frais.", "Notes de frais"],
+            ["Chaque mois", "Exporter les factures, avoirs, règlements et justificatifs.", "Exports"],
+        ], [2.8 * cm, 9.6 * cm, 4 * cm]),
+        PageBreak(),
+    ]
+
+
+def securite():
+    return [
+        Titre("Sécurité et confidentialité", 1),
+        p("Ce chapitre explique ce que le logiciel protège, comment, et ce qui reste de votre "
+          "responsabilité.", "chapo"),
+
+        Titre("Chaque entreprise est étanche", 2),
+        p("Les données d'une entreprise ne sont jamais visibles par une autre. Cette séparation est "
+          "appliquée par la base de données elle-même, à chaque requête, et non par l'interface. Même "
+          "en cas de faille dans l'application, les données d'une autre entreprise restent inaccessibles."),
+
+        Titre("Les droits sont vérifiés côté serveur", 2),
+        p("Masquer un bouton ne protège rien. Chaque action est revérifiée sur le serveur : un salarié "
+          "qui devinerait l'adresse d'une page interdite obtiendrait quand même un refus."),
+
+        Titre("Ce que le logiciel ne fait jamais", 2),
+        *tableau(["Règle", "Pourquoi"], [
+            ["Aucun mot de passe fournisseur n'est demandé ni stocké.", "Un mot de passe stocké est un mot de passe qui fuira un jour."],
+            ["Le mot de passe stock est haché.", "Ni l'administrateur ni l'éditeur ne peuvent le lire."],
+            ["Une facture émise n'est jamais supprimée.", "La numérotation légale doit rester continue. On émet un avoir."],
+            ["Un justificatif n'est jamais recompressé.", "Seul l'original a valeur probante."],
+            ["Personne ne pointe pour un autre.", "Les heures engagent la personne qui les déclare."],
+        ], [7 * cm, 9.4 * cm]),
+
+        Titre("Ce qui reste de votre responsabilité", 2),
+        *tableau(["À faire", "Conséquence si négligé"], [
+            ["Attribuer les postes avec discernement.", "Un poste trop permissif expose vos marges à toute l'équipe."],
+            ["Retirer les accès des salariés sortis.", "Un ancien salarié conserverait son accès."],
+            ["Ne jamais accorder « mode_compte_depot » à un poste de direction.", "Le compte serait verrouillé sur la borne."],
+            ["Vérifier les mentions légales de vos documents.", "Un devis sans assurance décennale n'est pas conforme."],
+        ], [7 * cm, 9.4 * cm]),
+        PageBreak(),
+    ]
+
+
+def depannage():
+    return [
+        Titre("Dépannage", 1),
+        p("Les situations les plus fréquentes, et quoi faire.", "chapo"),
+        *tableau(["Symptôme", "Cause la plus probable", "Solution"], [
+            ["Je ne peux pas me connecter", "Mot de passe oublié.", "Utilisez « Mot de passe oublié » depuis l'écran de connexion."],
+            ["Un module a disparu de mon menu", "Votre poste n'a plus le droit d'accès correspondant.", "Demandez à votre administrateur d'ouvrir ce module pour votre poste."],
+            ["Je ne vois que le stock et la borne", "Votre poste a reçu le droit « mode_compte_depot ».", "Ce droit est réservé au compte dépôt partagé. L'administrateur doit le retirer."],
+            ["Je n'arrive pas à pointer", "Le chantier n'est pas actif, ou vous n'y êtes pas affecté.", "Vérifiez le planning et le statut du chantier."],
+            ["Mes heures n'apparaissent pas en rentabilité", "Elles ne sont pas validées.", "Seules les heures validées par un responsable sont valorisées."],
+            ["Le scanner ne s'ouvre pas", "La caméra exige une connexion HTTPS.", "Utilisez l'adresse en https, ou saisissez la référence à la main."],
+            ["La marge d'un chantier est fausse", "Coût horaire manquant, ou achats en frais généraux.", "Renseignez les coûts horaires et classez les factures sur le chantier."],
+            ["Les accents sont abîmés après un import", "Le fichier CSV n'est pas en UTF-8.", "Réexportez en UTF-8 ou utilisez le format Excel."],
+            ["Une facture est fausse et déjà envoyée", "Une facture émise est figée par la loi.", "Émettez un avoir, puis une nouvelle facture."],
+        ], [4.4 * cm, 5.4 * cm, 6.6 * cm]),
+        *encadre("Avant de contacter le support",
+                 "Notez la page, l'heure, le compte utilisé, ce que vous faisiez et le message affiché. "
+                 "Joignez une capture d'écran ne contenant ni mot de passe ni donnée bancaire complète. "
+                 "Le bouton « Aide » est en bas à droite de chaque écran."),
+        PageBreak(),
     ]
