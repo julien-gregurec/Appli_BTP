@@ -138,6 +138,37 @@ def capture(nom, legende, hauteur_max=8 * cm, rogner=False):
     return [CondPageBreak(hauteur * ratio + 28), Spacer(1, 4), img, p(legende, "legende")]
 
 
+# Seuil du saut de chapitre : « la page est-elle déjà vierge ? »
+#
+# On ne peut pas comparer à la hauteur exacte du cadre. Le dernier tableau d'un
+# chapitre laisse un Spacer de 8 pt qui déborde parfois seul en haut de la page
+# suivante : il ne reste alors que 714,83 pt sur 722,83, et un seuil trop strict
+# déclenchait un saut sur une page pourtant vide — c'était la cause des pages
+# blanches. Une marge de 25 pt absorbe ces résidus : une page qui n'a reçu que
+# quelques points d'espacement compte comme vierge.
+HAUTEUR_CADRE = A4[1] - 4.2 * cm - 25
+
+
+def saut_de_chapitre():
+    """Passe à une page neuve, sauf si l'on s'y trouve déjà.
+
+    PageBreak() saute toujours : quand un chapitre se termine pile en bas de
+    page, il fabrique une page blanche. CondPageBreak ne saute que s'il reste
+    moins que la hauteur du cadre, c'est-à-dire si la page est entamée.
+    """
+    return CondPageBreak(HAUTEUR_CADRE)
+
+
+def titre(texte, niveau, reserve=110):
+    """Titre précédé d'une réserve de place.
+
+    Le garde-fou doit être posé AVANT le titre : placé après, il ferait sauter
+    la page en laissant justement le titre orphelin. 110 pt couvrent le titre,
+    l'en-tête d'un tableau et ses deux premières lignes.
+    """
+    return [CondPageBreak(reserve), Titre(texte, niveau)]
+
+
 def section(texte, niveau, blocs):
     """Titre + son contenu, garantis sur la même page.
 
@@ -169,11 +200,10 @@ def tableau(entetes, lignes, largeurs):
         ("LEFTPADDING", (0, 0), (-1, -1), 5), ("RIGHTPADDING", (0, 0), (-1, -1), 5),
         ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
     ]))
-    # Un tableau court ne doit pas se scinder en laissant deux lignes orphelines
-    # sur la page suivante : on réserve sa hauteur estimée. Les longs tableaux
-    # (matrice des droits) restent scindables, sinon ils ne tiendraient nulle part.
-    hauteur, _ = t.wrap(sum(largeurs), 0)
-    return ([CondPageBreak(hauteur + 12)] if hauteur < 260 else []) + [t, Spacer(1, 8)]
+    # Ne jamais appeler t.wrap() ici : mesurer un tableau avant qu'il soit placé
+    # corrompt son état de découpe et produit des pages blanches. La place se
+    # réserve en amont, via titre() / section().
+    return [t, Spacer(1, 8)]
 
 
 def encadre(titre, texte, couleur=OR):
@@ -241,7 +271,11 @@ def _document():
     doc = BaseDocTemplate(str(SORTIE), pagesize=A4, title="Manuel d'utilisation — Liria Gestion Pro",
                           author="Liria Gestion Pro", leftMargin=2 * cm, rightMargin=2 * cm,
                           topMargin=2 * cm, bottomMargin=2.2 * cm)
-    cadre = Frame(2 * cm, 2.2 * cm, 17 * cm, A4[1] - 4.2 * cm, id="c")
+    # Marges intérieures annulées : sinon la hauteur utile réelle (710 pt) ne
+    # correspond plus à HAUTEUR_CADRE et le saut de chapitre se déclencherait
+    # même en haut d'une page vierge.
+    cadre = Frame(2 * cm, 2.2 * cm, 17 * cm, A4[1] - 4.2 * cm, id="c",
+                  leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0)
     doc.addPageTemplates([
         PageTemplate(id="couverture", frames=[cadre], onPage=page_couverture),
         PageTemplate(id="courante", frames=[cadre], onPage=page_courante),

@@ -13,6 +13,7 @@ from pathlib import Path
 
 from reportlab.lib.units import cm
 from reportlab.platypus import KeepTogether, PageBreak, Spacer
+from generer_manuel import saut_de_chapitre
 
 from generer_manuel import Titre, capture, encadre, etapes, p, section, tableau
 from trame import chapitre
@@ -55,7 +56,7 @@ def introduction():
             ["Fiche employé", "La fiche RH d'un salarié. Elle existe même si le salarié n'a pas encore de compte pour se connecter."],
             ["Compte", "L'accès personnel d'un salarié (email + mot de passe). Il est rattaché à sa fiche employé."],
         ], [4 * cm, 12.4 * cm]),
-        PageBreak(),
+        saut_de_chapitre(),
     ]
 
 
@@ -173,7 +174,7 @@ def chapitre_devis():
             ["Le total ne correspond pas", "Une remise de ligne ou une remise globale s'applique.", "Vérifiez la colonne remise et la remise globale sous les totaux."],
             ["Le chantier ne montre pas les tâches", "Le devis n'est pas passé en « Accepté ».", "Les tâches ne sont créées qu'à l'acceptation."],
         ], [4 * cm, 5.6 * cm, 6.8 * cm]),
-        PageBreak(),
+        saut_de_chapitre(),
     ]
 
 
@@ -278,7 +279,7 @@ def parcours_par_role():
             ["Au fil de l'eau", "Contrôler et rembourser les notes de frais.", "Notes de frais"],
             ["Chaque mois", "Exporter les factures, avoirs, règlements et justificatifs.", "Exports"],
         ], [2.8 * cm, 9.6 * cm, 4 * cm]),
-        PageBreak(),
+        saut_de_chapitre(),
     ]
 
 
@@ -313,7 +314,7 @@ def securite():
             ["Ne jamais accorder « mode_compte_depot » à un poste de direction.", "Le compte serait verrouillé sur la borne."],
             ["Vérifier les mentions légales de vos documents.", "Un devis sans assurance décennale n'est pas conforme."],
         ], [7 * cm, 9.4 * cm]),
-        PageBreak(),
+        saut_de_chapitre(),
     ]
 
 
@@ -336,5 +337,5 @@ def depannage():
                  "Notez la page, l'heure, le compte utilisé, ce que vous faisiez et le message affiché. "
                  "Joignez une capture d'écran ne contenant ni mot de passe ni donnée bancaire complète. "
                  "Le bouton « Aide » est en bas à droite de chaque écran."),
-        PageBreak(),
+        saut_de_chapitre(),
     ]
