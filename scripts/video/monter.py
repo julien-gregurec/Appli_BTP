@@ -21,7 +21,9 @@ TTS = "/private/tmp/claude-501/-Users-juliengregurec/0fd16bf3-830d-4b6c-a1d8-e3d
 PLANS = RACINE / "output/video/plans"
 TMP = RACINE / "output/video/montage"
 SORTIE = RACINE / "output/video"
-MUSIQUE = RACINE / "output/video/tmp/tutoriel/music.wav"
+# Piste originale composée d'après l'analyse du morceau de référence fourni
+# (tempo, tonalité, équilibre spectral). Voir scripts/video/musique.py.
+MUSIQUE = RACINE / "output/video/fond.wav"
 IMPACT = "/System/Library/Fonts/Supplemental/Impact.ttf"
 ARIAL_B = "/System/Library/Fonts/Supplemental/Arial Bold.ttf"
 
