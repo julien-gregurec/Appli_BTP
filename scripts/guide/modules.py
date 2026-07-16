@@ -881,3 +881,253 @@ AIDE = {
     "mobile_texte": "Le bouton « Aide » suit sur téléphone : un problème peut être signalé depuis le chantier.",
     "liens": [["Tous les modules", "Le bouton d'aide est présent sur chaque écran de l'application."]],
 }
+
+DEMARRAGE = {
+    "titre": "Démarrer avec Liria Gestion Pro",
+    "chapo": "Ce chapitre couvre les toutes premières minutes : installer l'application sur son "
+             "téléphone, créer son accès, rejoindre son entreprise. C'est le seul chapitre à lire "
+             "avant tous les autres.",
+    "liste": ("desktop-mon-espace.png", "« Mon espace » : votre identité, vos identifiants et vos accès."),
+    "intro_liste": "Le logiciel s'utilise depuis un ordinateur comme depuis un téléphone, avec le même "
+                   "compte. Installée sur le téléphone, l'application se lance comme n'importe quelle "
+                   "autre, sans passer par le navigateur.",
+    "titre_creer": "Vos premiers pas",
+    "etapes": [
+        ("Installer l'application", "Ouvrez l'adresse du logiciel sur votre téléphone, puis « Ajouter "
+         "à l'écran d'accueil ». Une icône apparaît : l'application se lance ensuite directement."),
+        ("Créer son compte personnel", "Prénom, nom, email et mot de passe. Ce compte est le vôtre : "
+         "il ne se partage pas."),
+        ("Activer sa fiche employé", "Saisissez le numéro d'inscription (BTP-…) que votre employeur "
+         "vous a communiqué. Votre poste et vos droits sont déjà préparés."),
+        ("Ou créer son entreprise", "Si vous êtes le dirigeant, créez l'entreprise : vous en devenez "
+         "administrateur avec tous les droits."),
+        ("Vérifier « Mon espace »", "Vous y retrouvez votre identifiant, votre poste et votre mot de "
+         "passe stock personnel."),
+    ],
+    "note": ("Un compte par personne, jamais de compte partagé",
+             "Les heures pointées, les mouvements de stock et les notes de frais engagent la personne "
+             "qui les saisit. Un compte partagé rendrait toute traçabilité impossible. La seule "
+             "exception assumée est le compte dépôt, où chaque salarié s'identifie à chaque mouvement."),
+    "mobile": ("mobile-mon-espace.png", "« Mon espace » sur téléphone."),
+    "mobile_texte": "C'est l'écran à connaître : il contient votre identifiant salarié et votre QR "
+                    "personnel, nécessaires à la borne du dépôt.",
+    "liens": [
+        ["Employés", "Votre fiche est préparée par votre employeur avant votre arrivée."],
+        ["Accès et rôles", "Votre poste détermine ce que vous voyez."],
+        ["Borne dépôt", "Votre identifiant et votre mot de passe stock viennent d'ici."],
+    ],
+    "erreurs": [
+        ["Le numéro d'inscription est refusé", "Il est mal saisi, ou l'email ne correspond pas à celui enregistré.", "Utilisez l'adresse email enregistrée par votre employeur, et vérifiez le numéro sur sa fiche."],
+        ["Je n'ai pas d'icône sur mon téléphone", "L'application n'est pas installée.", "Ouvrez l'adresse dans le navigateur, puis « Ajouter à l'écran d'accueil »."],
+        ["Je suis bloqué sur « en attente »", "Votre administrateur ne vous a pas encore attribué un poste.", "Sans poste, aucun droit. Contactez-le."],
+    ],
+}
+
+TABLEAU_BORD = {
+    "titre": "Le tableau de bord",
+    "chapo": "C'est l'écran d'accueil, et le plus consulté de tous. Il résume ce qui demande votre "
+             "attention aujourd'hui — et son contenu dépend entièrement de votre poste.",
+    "droits": [("acces_tableau_bord", "Voir l'accueil. Accordé à tous les postes.")],
+    "liste": ("desktop-dashboard.png", "Le tableau de bord : indicateurs, alertes et raccourcis. Le menu à gauche n'affiche que les modules autorisés."),
+    "intro_liste": "Un dirigeant y voit des chiffres et des marges ; un ouvrier y voit son planning et "
+                   "son pointage. Ce n'est pas le même écran, et c'est voulu : personne ne voit ce qui "
+                   "ne le concerne pas.",
+    "titre_creer": "Personnaliser son accueil",
+    "etapes": [
+        ("Ouvrir « Modifier les widgets »", "Depuis le tableau de bord."),
+        ("Choisir ce qu'on affiche", "Notifications, raccourcis, analyses, indicateurs, suivis, "
+         "alertes, pointage, planning."),
+        ("Régler ses raccourcis", "Les modules que vous ouvrez le plus souvent."),
+    ],
+    "note": ("Les droits l'emportent toujours sur la personnalisation",
+             "Vous ne pouvez afficher que des widgets portant sur des modules auxquels votre poste "
+             "donne accès. Personnaliser son accueil ne permet jamais de contourner une restriction."),
+    "mobile": ("mobile-dashboard.png", "L'accueil sur téléphone, en icônes."),
+    "mobile_texte": "Sur téléphone, l'accueil devient une grille d'icônes limitée aux modules "
+                    "autorisés : deux appuis suffisent pour pointer.",
+    "liens": [["Tous les modules", "Chaque indicateur renvoie vers son module d'origine."],
+              ["Accès et rôles", "Le poste détermine les widgets disponibles."]],
+    "erreurs": [
+        ["Mon accueil est vide", "Votre poste n'ouvre presque aucun module.", "Demandez à votre administrateur d'élargir vos droits."],
+        ["Un widget a disparu", "Il a été masqué, ou le droit correspondant a été retiré.", "Vérifiez « Modifier les widgets », puis vos droits."],
+    ],
+}
+
+MES_TRAVAUX = {
+    "titre": "Mes travaux",
+    "chapo": "C'est l'écran de l'ouvrier : ce qu'il y a à faire aujourd'hui, sur quel chantier, avec "
+             "quels plans. Tout y est expurgé de la moindre valeur monétaire.",
+    "droits": [("acces_terrain", "Voir ses chantiers et ses tâches. Accordé aux postes de terrain.")],
+    "liste": ("desktop-mes-travaux.png", "« Mes travaux » : les tâches issues du devis accepté, sans aucun prix."),
+    "intro_liste": "Les tâches proviennent des lignes du devis accepté, recopiées automatiquement sans "
+                   "les montants. Le salarié sait quoi faire ; le chiffrage reste confidentiel.",
+    "note": ("Comment les prix sont réellement masqués",
+             "Ce n'est pas l'affichage qui cache les prix : le serveur ne les envoie jamais. Une "
+             "fonction dédiée ne renvoie que les tâches utiles à l'équipe affectée. Même en "
+             "inspectant la page, aucun montant n'est accessible."),
+    "mobile": ("mobile-mes-travaux.png", "« Mes travaux » sur téléphone."),
+    "mobile_texte": "L'écran est fait pour le chantier : les tâches du jour, l'adresse, les plans.",
+    "liens": [
+        ["Devis", "Les tâches naissent des lignes du devis accepté."],
+        ["Chantiers", "Seuls les chantiers actifs où vous êtes affecté apparaissent."],
+        ["Planning", "L'affectation détermine ce que vous voyez."],
+    ],
+    "erreurs": [
+        ["Aucune tâche affichée", "Le devis n'est pas accepté, ou vous n'êtes pas affecté au chantier.", "Les tâches ne sont créées qu'à l'acceptation du devis."],
+    ],
+}
+
+PRESTATIONS = {
+    "titre": "Le catalogue de prestations",
+    "chapo": "Le catalogue évite de resaisir les mêmes lignes à chaque devis. Vous y enregistrez vos "
+             "prestations habituelles avec leur prix, et vous les insérez d'un clic.",
+    "droits": [("gerer_devis", "Gérer le catalogue : il fait partie du module Devis.")],
+    "liste": ("desktop-prestations.png", "Le catalogue de prestations : désignation, type, unité, prix et TVA."),
+    "champs": [
+        ["Désignation", "L'intitulé vu par le client.", "Obligatoire."],
+        ["Description", "Le détail de la prestation.", "Facultatif."],
+        ["Type", "Main d'œuvre, fourniture, sous-traitance, déplacement, forfait.", "Sert aux analyses de rentabilité."],
+        ["Unité", "h, m², ml, u, forfait…", "« h » par défaut."],
+        ["Prix unitaire HT", "Votre tarif habituel.", "Modifiable ligne par ligne dans un devis."],
+        ["Taux TVA", "Le taux applicable.", "20 % par défaut."],
+        ["Actif", "Une prestation inactive n'est plus proposée.", "Préférez désactiver plutôt que supprimer."],
+    ],
+    "liens": [
+        ["Devis", "Les prestations s'insèrent dans un devis en un clic."],
+        ["Import", "Le catalogue s'importe depuis un autre logiciel."],
+        ["Rentabilité", "Le type de prestation alimente les analyses."],
+    ],
+    "erreurs": [
+        ["Le prix du devis ne suit pas le catalogue", "Le prix a été modifié dans le devis.", "C'est voulu : le catalogue propose, le devis dispose."],
+    ],
+}
+
+FOURNISSEURS = {
+    "titre": "Les fournisseurs",
+    "chapo": "Le carnet de fournisseurs alimente les commandes et les factures d'achat. Chaque "
+             "fournisseur peut porter ses coordonnées, son numéro de compte client et son portail.",
+    "droits": [
+        ("acces_achats", "Consulter le carnet."),
+        ("gerer_achats", "Créer et modifier un fournisseur."),
+    ],
+    "liste": ("desktop-fournisseurs.png", "Le carnet de fournisseurs."),
+    "liens": [
+        ["Commandes", "La commande est adressée à un fournisseur du carnet."],
+        ["Dépenses", "La facture d'achat est rattachée au fournisseur."],
+        ["Connecteurs", "Un fournisseur peut être relié à son portail ou à son catalogue."],
+        ["Stock", "Les tarifs négociés s'importent par fournisseur."],
+    ],
+    "erreurs": [
+        ["Un doublon de fournisseur", "Il a été créé deux fois sous des noms proches.", "L'import reprend le fournisseur existant s'il porte le même nom exact."],
+    ],
+}
+
+CONNECTEURS = {
+    "titre": "Les connecteurs fournisseurs",
+    "chapo": "Un connecteur relie un fournisseur à son portail ou à son catalogue, pour éviter de "
+             "ressaisir les références et les tarifs. Aucun mot de passe fournisseur n'est jamais "
+             "demandé ni stocké.",
+    "droits": [("gerer_connecteurs", "Configurer les connecteurs. Réservé à l'administrateur.")],
+    "liste": ("desktop-connecteurs.png", "Les connecteurs : fournisseur, numéro de compte, portail et mode d'échange."),
+    "intro_liste": "N'importe quel fournisseur peut être ajouté. Les grands distributeurs du bâtiment "
+                   "sont proposés avec leurs capacités réelles ; les autres restent en mode portail ou "
+                   "import de catalogue.",
+    "champs": [
+        ["Fournisseur", "Repris du carnet, ou créé.", "Obligatoire."],
+        ["Numéro de compte client", "Votre identifiant chez ce fournisseur.", "Non secret. Aucun mot de passe n'est demandé."],
+        ["Portail", "L'adresse HTTPS du site fournisseur.", "Ouvrable depuis la fiche."],
+        ["Mode", "Portail, CSV, Excel, FAB-DIS, API, EDI, PunchOut ou OAuth.", "Décrit la façon réelle d'échanger."],
+    ],
+    "note": ("Pourquoi aucun mot de passe fournisseur n'est stocké",
+             "Un mot de passe conservé est un mot de passe qui finira par fuir. Une synchronisation "
+             "automatique n'est possible que si le fournisseur fournit une interface officielle "
+             "(API, EDI, PunchOut). Sans cela, le connecteur reste honnêtement en mode portail ou "
+             "import : le logiciel ne prétendra jamais être connecté s'il ne l'est pas."),
+    "liens": [
+        ["Fournisseurs", "Le connecteur prolonge une fiche fournisseur."],
+        ["Import", "Les tarifs négociés s'importent en CSV ou Excel."],
+        ["Stock", "Les catalogues alimentent les articles."],
+    ],
+    "erreurs": [
+        ["La synchronisation ne se fait pas", "Le fournisseur ne fournit pas d'interface officielle.", "Utilisez l'import de son catalogue en CSV ou Excel."],
+    ],
+}
+
+DEPENSES = {
+    "titre": "Les dépenses et factures fournisseurs",
+    "chapo": "Toute facture d'achat se classe ici : sur un chantier, ou en frais généraux. Ce "
+             "classement décide directement de la justesse de vos marges.",
+    "droits": [
+        ("acces_achats", "Consulter les dépenses."),
+        ("gerer_achats", "Saisir une facture fournisseur et la classer sur un chantier."),
+    ],
+    "liste": ("desktop-depenses.png", "Les factures fournisseurs : chantier, catégorie, statut et reste à payer."),
+    "titre_creer": "Saisir une facture fournisseur",
+    "etapes": [
+        ("Choisir le fournisseur", "Depuis le carnet."),
+        ("Saisir les montants", "HT, TVA et TTC."),
+        ("Classer la dépense", "Sur un chantier si elle le concerne, sinon en frais généraux. "
+         "C'est l'étape décisive."),
+        ("Joindre le justificatif", "Le PDF ou la photo d'origine, jamais une capture d'écran."),
+        ("Enregistrer les règlements", "Le reste à payer se met à jour."),
+    ],
+    "note": ("Le classement décide de la vérité de vos marges",
+             "Une facture laissée en frais généraux n'apparaît pas dans la rentabilité du chantier "
+             "concerné : la marge affichée sera trop belle. Vous pouvez rattacher une facture à un "
+             "chantier après coup, depuis la facture ou depuis la fiche chantier."),
+    "liens": [
+        ["Fournisseurs", "La facture est rattachée à un fournisseur."],
+        ["Chantiers", "Le classement impute le coût au chantier."],
+        ["Commandes", "La facture se rapproche de la commande."],
+        ["Rentabilité", "Les achats imputés pèsent sur la marge."],
+        ["Trésorerie", "Les règlements constituent les décaissements."],
+    ],
+    "erreurs": [
+        ["La marge du chantier est trop belle", "Les factures sont restées en frais généraux.", "Classez-les sur le chantier."],
+        ["Le justificatif est refusé", "Format non reconnu.", "Déposez le PDF ou la photo d'origine."],
+    ],
+}
+
+CHARGES = {
+    "titre": "Les charges récurrentes",
+    "chapo": "Loyer, assurances, abonnements, crédits : les charges qui tombent chaque mois, "
+             "indépendamment des chantiers. Les enregistrer permet d'anticiper la trésorerie.",
+    "droits": [
+        ("acces_achats", "Consulter les charges."),
+        ("gerer_achats", "Créer et modifier une charge récurrente."),
+    ],
+    "liste": ("desktop-charges.png", "Les charges récurrentes et leur échéancier."),
+    "liens": [
+        ["Trésorerie", "Les charges sont anticipées dans les décaissements."],
+        ["Rentabilité", "Elles relèvent des frais généraux, pas d'un chantier."],
+    ],
+    "erreurs": [
+        ["Une charge n'apparaît pas en trésorerie", "Sa périodicité ou sa date de début manque.", "Complétez l'échéancier."],
+    ],
+}
+
+EXPORTS = {
+    "titre": "Les exports comptables",
+    "chapo": "L'export livre à votre comptable ce qu'il attend : factures, avoirs, règlements et "
+             "justificatifs, sur la période choisie, dans un format qu'il peut reprendre.",
+    "droits": [("acces_comptabilite", "Produire les exports. Réservé à la direction et au comptable.")],
+    "liste": ("desktop-exports.png", "Les exports : période, contenu et format."),
+    "titre_creer": "Produire un export",
+    "etapes": [
+        ("Choisir la période", "Le mois ou le trimestre à transmettre."),
+        ("Choisir le contenu", "Factures et avoirs, règlements, ou notes de frais avec justificatifs."),
+        ("Télécharger", "Un fichier CSV, ou une archive complète pour les justificatifs."),
+    ],
+    "note": ("L'export des justificatifs est traçable",
+             "L'archive contient les originaux, un manifeste et les empreintes de chaque fichier. "
+             "Votre comptable peut vérifier qu'aucune pièce n'a été altérée depuis son dépôt."),
+    "liens": [
+        ["Factures", "Factures, avoirs et règlements alimentent l'export."],
+        ["Notes de frais", "Les justificatifs s'exportent avec leur manifeste."],
+        ["Clients", "La référence client est reprise dans l'export."],
+    ],
+    "erreurs": [
+        ["L'export est vide", "Aucune facture sur la période choisie.", "Vérifiez les dates."],
+        ["Le comptable ne peut pas lire le fichier", "Le séparateur ou l'encodage attendu diffère.", "Le CSV est produit en UTF-8 : précisez-le à l'ouverture dans son logiciel."],
+    ],
+}
