@@ -659,3 +659,16 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Le flux respecte le modèle multi-entreprises : les fonds d’un client arrivent sur le compte Stripe connecté de son entreprise, pas sur le compte bancaire de Liria Gestion Pro. Activation impossible tant que les clés et l’onboarding officiel Stripe ne sont pas achevés.
 - Contrôles après Stripe : ESLint et TypeScript verts, **17 tests verts**, build production vert.
 ```
+# REPRISE — 16 juillet 2026, pointage administrateur et entreprise de démonstration 18 mois (MIGRATION 85 APPLIQUÉE)
+
+- La migration `20260716000085_admin_pointage_photos_appareils.sql` est appliquée dans Supabase. Elle ajoute les photos salariés privées, le suivi des appareils, les alertes au-delà de deux appareils, les vues plateforme des rôles et la création sécurisée de la fiche personnelle de pointage d’un administrateur.
+- Un administrateur autorisé peut désormais activer puis utiliser son propre pointage chantier. Il ne peut jamais pointer au nom d’un autre salarié. Un accès support temporaire depuis la plateforme ne crée ni fiche salarié ni compte facturable.
+- La plateforme affiche le nombre d’appareils actifs par entreprise et une alerte si un même compte dépasse deux appareils. La fiche salarié montre les appareils associés et permet de révoquer un ancien appareil.
+- Les fiches salariés acceptent une photo privée. La liste et la fiche affichent aussi les portraits de démonstration sans transformer ces images en justificatifs officiels.
+- Nouvel écran `/plateforme/roles-demo` : huit rôles de l’entreprise de démonstration, permissions détaillées et aperçu exact de l’interface correspondant à chaque poste.
+- Entreprise créée dans Supabase avec 18 mois d’activité : **Liria Gestion Pro - Entreprise Demo**, référence `DEMO-18M`, code d’adhésion `QMHVQ6NU`, ID `85393678-aad4-4a79-9c94-bc1e1fe686b5`. Données : 8 rôles, 12 salariés, 24 habilitations, 30 clients/chantiers, 108 devis, 72 factures, 2 340 pointages, 30 articles, 8 véhicules et 24 outils.
+- Tous les salariés de démonstration possèdent un numéro et une échéance Carte BTP ainsi qu’un CACES ; plusieurs possèdent aussi SST, travail en hauteur ou habilitation électrique. Les cartes visibles sont des badges internes de démonstration et ne sont jamais présentées comme des cartes officielles CIBTP.
+- Les modes de règlement CB et carte en ligne sont présents. Le parcours Stripe sécurisé existe déjà dans le produit ; le paiement réel reste conditionné aux clés Stripe de la plateforme, au webhook et à l’onboarding Stripe Connect de chaque entreprise.
+- Contrôles du lot : TypeScript, ESLint, 23 tests Vitest, `git diff --check` et build Next webpack complet de 74 pages verts. Seul l’avertissement historique `unpdf/import.meta` demeure non bloquant.
+
+---

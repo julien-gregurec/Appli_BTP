@@ -156,3 +156,34 @@ export async function importerCarteBtpAction(employeId:string,formData:FormData)
 }
 
 export async function supprimerCarteBtpAction(employeId:string){const ctx=await getContexteEntreprise();await exigerGestionEmployes(ctx,`/employes/${employeId}`);const supabase=await createClient(),{data:employe}=await supabase.from("employes").select("carte_btp_storage_path").eq("id",employeId).eq("entreprise_id",ctx.entrepriseId).maybeSingle();if(employe?.carte_btp_storage_path)await supabase.storage.from("documents-employes").remove([employe.carte_btp_storage_path]);await supabase.from("employes").update({carte_btp_storage_path:null,carte_btp_nom:null,carte_btp_mime_type:null,carte_btp_taille_octets:null,carte_btp_numero:null,carte_btp_expiration:null,updated_at:new Date().toISOString()}).eq("id",employeId).eq("entreprise_id",ctx.entrepriseId);revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent("Carte BTP supprimée")}`);}
+
+export async function importerPhotoEmployeAction(employeId:string,formData:FormData){
+  const ctx=await getContexteEntreprise();await exigerGestionEmployes(ctx,`/employes/${employeId}`);
+  const supabase=await createClient(),fichier=formData.get("photo");
+  const formats:Record<string,string>={"image/png":"png","image/jpeg":"jpg","image/webp":"webp"};
+  const{data:employe}=await supabase.from("employes").select("id,photo_storage_path").eq("id",employeId).eq("entreprise_id",ctx.entrepriseId).maybeSingle();
+  if(!employe)redirect(`/employes/${employeId}?error=${encodeURIComponent("Employé introuvable")}`);
+  if(!(fichier instanceof File)||!fichier.size||!formats[fichier.type]||fichier.size>10*1024*1024)redirect(`/employes/${employeId}?error=${encodeURIComponent("Ajoutez une photo JPG, PNG ou WebP de moins de 10 Mo")}`);
+  const path=`${ctx.entrepriseId}/${employeId}/portrait-${crypto.randomUUID()}.${formats[fichier.type]}`;
+  const{error:upload}=await supabase.storage.from("documents-employes").upload(path,fichier,{contentType:fichier.type,upsert:false});
+  if(upload)redirect(`/employes/${employeId}?error=${encodeURIComponent(upload.message)}`);
+  const{error}=await supabase.from("employes").update({photo_storage_path:path,photo_url:null,photo_nom:fichier.name,photo_mime_type:fichier.type,photo_taille_octets:fichier.size,updated_at:new Date().toISOString()}).eq("id",employeId).eq("entreprise_id",ctx.entrepriseId);
+  if(error){await supabase.storage.from("documents-employes").remove([path]);redirect(`/employes/${employeId}?error=${encodeURIComponent(error.message)}`);}
+  if(employe.photo_storage_path)await supabase.storage.from("documents-employes").remove([employe.photo_storage_path]);
+  revalidatePath("/employes");revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent("Photo de l’employé enregistrée")}`);
+}
+
+export async function supprimerPhotoEmployeAction(employeId:string){
+  const ctx=await getContexteEntreprise();await exigerGestionEmployes(ctx,`/employes/${employeId}`);const supabase=await createClient();
+  const{data:employe}=await supabase.from("employes").select("photo_storage_path").eq("id",employeId).eq("entreprise_id",ctx.entrepriseId).maybeSingle();
+  if(employe?.photo_storage_path)await supabase.storage.from("documents-employes").remove([employe.photo_storage_path]);
+  await supabase.from("employes").update({photo_storage_path:null,photo_url:null,photo_nom:null,photo_mime_type:null,photo_taille_octets:null,updated_at:new Date().toISOString()}).eq("id",employeId).eq("entreprise_id",ctx.entrepriseId);
+  revalidatePath("/employes");revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent("Photo supprimée")}`);
+}
+
+export async function revoquerAppareilEmployeAction(employeId:string,appareilId:string){
+  const ctx=await getContexteEntreprise();await exigerGestionEmployes(ctx,`/employes/${employeId}`);const supabase=await createClient();
+  const{error}=await supabase.rpc("revoquer_appareil_compte",{p_entreprise_id:ctx.entrepriseId,p_appareil_id:appareilId});
+  if(error)redirect(`/employes/${employeId}?error=${encodeURIComponent(error.message)}`);
+  revalidatePath(`/employes/${employeId}`);revalidatePath("/plateforme");redirect(`/employes/${employeId}?success=${encodeURIComponent("Appareil révoqué")}`);
+}

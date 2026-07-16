@@ -15,8 +15,13 @@ export async function marquerInvitationEmployeAction(employeId: string, canal: s
   return { ok: true };
 }
 
-export async function enregistrerPresenceApplicationAction(installee: boolean) {
+export async function enregistrerPresenceApplicationAction(installee: boolean,appareil?:{id:string;nom:string;type:"ordinateur"|"telephone"|"tablette"|"autre"}) {
   if (isEmailLoginDisabled()) return;
+  const ctx=await getContexteEntreprise();
   const supabase = await createClient();
+  if(appareil?.id){
+    const{error}=await supabase.rpc("enregistrer_appareil_courant",{p_entreprise_id:ctx.entrepriseId,p_identifiant_appareil:appareil.id,p_nom_appareil:appareil.nom,p_type_appareil:appareil.type,p_application_installee:installee});
+    if(!error)return;
+  }
   await supabase.rpc("enregistrer_presence_application", { p_installee: installee });
 }

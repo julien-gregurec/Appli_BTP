@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { ancienneteEmploye, contratEmployeLabel, formatEuro, nomEmploye, statutEmploye } from "@/lib/employes";
 import { permissionsUtilisateur } from "@/lib/permissions";
+import Image from "next/image";
 
 type EmployeListe = {
   id: string;
@@ -25,6 +26,8 @@ type EmployeListe = {
   application_installee_at: string | null;
   premiere_connexion_at: string | null;
   derniere_connexion_at: string | null;
+  photo_storage_path: string | null;
+  photo_url: string | null;
 };
 
 type EmployeAvecAcces = EmployeListe & {
@@ -46,7 +49,7 @@ export default async function EmployesPage() {
   const [{ data: employes }, { data: postes }, { data: droits }, { data: catalogue }] = await Promise.all([
     supabase
       .from("employes")
-      .select("id, reference_interne, identifiant_interne, numero_inscription, utilisateur_id, poste_id, prenom, nom, poste, type_contrat, statut, telephone, email, cout_horaire, date_entree, date_sortie, invitation_envoyee_at, application_installee_at, premiere_connexion_at, derniere_connexion_at")
+      .select("id, reference_interne, identifiant_interne, numero_inscription, utilisateur_id, poste_id, prenom, nom, poste, type_contrat, statut, telephone, email, cout_horaire, date_entree, date_sortie, invitation_envoyee_at, application_installee_at, premiere_connexion_at, derniere_connexion_at, photo_storage_path, photo_url")
       .eq("entreprise_id", ctx.entrepriseId)
       .order("nom", { ascending: true }),
     supabase.from("postes").select("id, nom").eq("entreprise_id", ctx.entrepriseId),
@@ -136,13 +139,16 @@ export default async function EmployesPage() {
               return (
                 <article key={employe.id} className="space-y-3 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-neutral-100 text-sm font-semibold text-neutral-500">{employe.photo_storage_path||employe.photo_url?<Image src={employe.photo_storage_path?`/api/employes/${employe.id}/photo`:employe.photo_url!} alt={`Photo de ${nomEmploye(employe)}`} width={48} height={48} unoptimized className="h-full w-full object-cover"/>:<span>{employe.prenom[0]}{employe.nom[0]}</span>}</div>
+                      <div className="min-w-0">
                       <Link href={`/employes/${employe.id}`} className="block truncate font-semibold hover:underline">
                         {nomEmploye(employe)}
                       </Link>
                       <p className="mt-0.5 font-mono text-xs text-neutral-500">
                         {employe.identifiant_interne ?? employe.reference_interne}
                       </p>
+                      </div>
                     </div>
                     <span className="inline-flex shrink-0 items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400">
                       <span className="h-2 w-2 rounded-full" style={{ background: statut.couleur }} />
@@ -201,10 +207,9 @@ export default async function EmployesPage() {
                   return (
                     <tr key={employe.id} className="border-t border-neutral-100 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900">
                       <td className="px-4 py-2 font-mono text-xs text-neutral-500">{employe.identifiant_interne ?? employe.reference_interne}</td>
-                      <td className="px-4 py-2">
-                        <Link href={`/employes/${employe.id}`} className="font-medium hover:underline">
+                      <td className="px-4 py-2"><div className="flex items-center gap-2"><div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-neutral-100 text-xs font-semibold text-neutral-500">{employe.photo_storage_path||employe.photo_url?<Image src={employe.photo_storage_path?`/api/employes/${employe.id}/photo`:employe.photo_url!} alt="" width={36} height={36} unoptimized className="h-full w-full object-cover"/>:<span>{employe.prenom[0]}{employe.nom[0]}</span>}</div><Link href={`/employes/${employe.id}`} className="font-medium hover:underline">
                           {nomEmploye(employe)}
-                        </Link>
+                        </Link></div>
                       </td>
                       <td className="px-4 py-2 text-neutral-600 dark:text-neutral-400">{employe.poste ?? "—"}</td>
                       <td className="px-4 py-2 text-neutral-600 dark:text-neutral-400">{contratEmployeLabel(employe.type_contrat)}</td>

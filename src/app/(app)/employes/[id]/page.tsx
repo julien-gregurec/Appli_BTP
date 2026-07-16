@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { ancienneteEmploye, contratEmployeLabel, formatDateFr, formatEuro, nomEmploye, statutEmploye } from "@/lib/employes";
 import { StatutEmployeSelect } from "@/components/StatutEmployeSelect";
-import { changerStatutCompteApplicationAction, reinitialiserMotDePasseStockEmployeAction, importerCarteBtpAction, supprimerCarteBtpAction } from "@/app/actions/employes";
+import { changerStatutCompteApplicationAction, reinitialiserMotDePasseStockEmployeAction, importerCarteBtpAction, supprimerCarteBtpAction, importerPhotoEmployeAction, supprimerPhotoEmployeAction, revoquerAppareilEmployeAction } from "@/app/actions/employes";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import Image from "next/image";
 import { InvitationEmploye } from "@/components/InvitationEmploye";
@@ -32,6 +32,7 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
   if (!employe) notFound();
 
   const { data: codeIdentification } = await supabase.from("codes_identification").select("id,code").eq("entreprise_id", ctx.entrepriseId).eq("type_ressource", "employe").eq("ressource_id", id).eq("actif", true).maybeSingle();
+  const { data: appareils } = employe.utilisateur_id ? await supabase.from("appareils_comptes").select("id,nom_appareil,type_appareil,application_installee,premiere_activite_at,derniere_activite_at,revoque_at").eq("entreprise_id",ctx.entrepriseId).eq("utilisateur_id",employe.utilisateur_id).order("derniere_activite_at",{ascending:false}) : {data:[]};
 
   const { data: equipesChantiers } = await supabase
     .from("equipes_chantiers")
@@ -55,13 +56,16 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
   return (
     <main className="p-8">
       <div className="mx-auto max-w-3xl space-y-6">
-        <div className="flex items-start justify-between">
-          <div>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-neutral-100 text-xl font-semibold text-neutral-500">{employe.photo_storage_path||employe.photo_url?<Image src={employe.photo_storage_path?`/api/employes/${id}/photo`:employe.photo_url} alt={`Photo de ${nomEmploye(employe)}`} width={80} height={80} unoptimized className="h-full w-full object-cover"/>:<span>{employe.prenom?.[0]}{employe.nom?.[0]}</span>}</div>
+            <div className="min-w-0">
             <Link href="/employes" className="text-sm text-neutral-500 hover:underline">← Employés</Link>
             <h1 className="mt-1 text-xl font-semibold">{nomEmploye(employe)}</h1>
             <p className="font-mono text-xs text-neutral-500">
               {employe.identifiant_interne ?? employe.reference_interne} · {contratEmployeLabel(employe.type_contrat)} · {statut.libelle}
             </p>
+            </div>
           </div>
           {peutGerer&&<Link href={`/employes/${id}/modifier`} className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700">
             Modifier
@@ -91,6 +95,8 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
           {ligne("Notes", employe.notes)}
         </section>
 
+        {peutGerer&&<section className="space-y-3 rounded-md border p-4 dark:border-neutral-800"><div><h2 className="font-semibold">Photo de l’employé</h2><p className="text-sm text-neutral-500">Portrait visible dans l’annuaire et la fiche interne.</p></div><form action={importerPhotoEmployeAction.bind(null,id)} className="flex flex-col gap-3 sm:flex-row"><input name="photo" type="file" accept="image/png,image/jpeg,image/webp" capture="user" required className="min-w-0 flex-1 rounded border px-3 py-2 text-sm"/><button className="rounded bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">{employe.photo_storage_path?"Remplacer la photo":"Ajouter la photo"}</button></form>{employe.photo_storage_path&&<form action={supprimerPhotoEmployeAction.bind(null,id)}><ConfirmSubmitButton message="Supprimer la photo de cet employé ?" className="text-xs text-red-700">Supprimer la photo</ConfirmSubmitButton></form>}</section>}
+
         {peutGerer&&<><section className="space-y-4 rounded-md border border-blue-200 bg-blue-50/60 p-4 dark:border-blue-900 dark:bg-blue-950/20">
           <div>
             <h2 className="font-semibold">Accès personnel à l’application</h2>
@@ -98,6 +104,7 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
           </div>
           {employe.numero_inscription ? <InvitationEmploye employeId={employe.id} numero={employe.numero_inscription} nom={nomEmploye(employe)} email={employe.email} compteActif={Boolean(employe.utilisateur_id)} inscriptionsActives={!isEmailLoginDisabled()} invitationEnvoyeeAt={employe.invitation_envoyee_at} premiereConnexionAt={employe.premiere_connexion_at} derniereConnexionAt={employe.derniere_connexion_at} applicationInstalleeAt={employe.application_installee_at} /> : <p className="text-sm text-red-700">La migration des numéros d’inscription doit être appliquée.</p>}
           {employe.utilisateur_id&&<div className="rounded-md border bg-white p-3"><p className="text-sm"><strong>État du compte :</strong> {employe.compte_application_statut?.replaceAll("_"," ")??"actif"}</p><p className="mt-1 text-xs text-neutral-500">Un compte en pause ne peut plus entrer dans l’entreprise, mais reste facturé pour le mois. La fermeture conserve l’historique.</p><div className="mt-3 flex flex-wrap gap-2">{employe.compte_application_statut!=="actif"&&<form action={changerStatutCompteApplicationAction.bind(null,id,"actif")}><button className="rounded bg-green-700 px-3 py-2 text-sm text-white">Réactiver</button></form>}{employe.compte_application_statut!=="pause"&&<form action={changerStatutCompteApplicationAction.bind(null,id,"pause")}><button className="rounded border px-3 py-2 text-sm">Mettre en pause</button></form>}{employe.compte_application_statut!=="ferme"&&<form action={changerStatutCompteApplicationAction.bind(null,id,"ferme")}><ConfirmSubmitButton message="Fermer l’accès de ce compte ? Le mois entamé restera facturé." className="rounded border border-red-400 px-3 py-2 text-sm text-red-700">Fermer le compte</ConfirmSubmitButton></form>}</div></div>}
+          {employe.utilisateur_id&&<div className="rounded-md border bg-white p-3"><div className="flex items-center justify-between gap-3"><div><p className="text-sm font-semibold">Appareils enregistrés</p><p className="text-xs text-neutral-500">Deux appareils sont autorisés par compte. Révoquez un ancien appareil avant d’en ajouter un nouveau.</p></div><span className={`rounded-full px-2 py-1 text-xs font-semibold ${(appareils??[]).filter(a=>!a.revoque_at).length>2?"bg-red-100 text-red-800":"bg-green-100 text-green-800"}`}>{(appareils??[]).filter(a=>!a.revoque_at).length} actif(s)</span></div><div className="mt-3 space-y-2">{(appareils??[]).map(appareil=><div key={appareil.id} className={`flex flex-wrap items-center justify-between gap-2 rounded border p-2 text-sm ${appareil.revoque_at?"opacity-50":""}`}><div><strong>{appareil.nom_appareil}</strong><p className="text-xs text-neutral-500">{appareil.type_appareil} · {appareil.application_installee?"application installée":"navigateur"} · dernière activité {new Date(appareil.derniere_activite_at).toLocaleString("fr-FR")}</p></div>{!appareil.revoque_at&&<form action={revoquerAppareilEmployeAction.bind(null,id,appareil.id)}><ConfirmSubmitButton message="Révoquer cet appareil ? Il sera réenregistré lors d’une prochaine connexion sur cet appareil." className="text-xs text-red-700">Révoquer</ConfirmSubmitButton></form>}</div>)}{!(appareils??[]).length&&<p className="text-xs text-neutral-500">Aucun appareil enregistré pour l’instant.</p>}</div></div>}
         </section>
 
         <section className="space-y-4 rounded-md border p-4 dark:border-neutral-800">

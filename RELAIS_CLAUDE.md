@@ -43,6 +43,19 @@
 
 # Relais Claude Code — Liria Gestion Pro
 
+## REPRISE PRIORITAIRE — 16 juillet 2026, pointage administrateur et démonstration 18 mois (MIGRATION 85 APPLIQUÉE)
+
+- Migration `20260716000085_admin_pointage_photos_appareils.sql` appliquée : photos salariés privées, appareils par compte, alertes plateforme au-delà de deux appareils, RPC des rôles et activation sécurisée du pointage personnel administrateur.
+- Un administrateur doté de `gerer_pointage` et `saisir_son_pointage` peut créer/lier sa propre fiche puis pointer sur chantier. Jamais de pointage au nom d’un tiers. L’accès support temporaire de la plateforme est explicitement exclu pour ne pas créer de salarié facturable.
+- `/plateforme` montre les appareils actifs et dépassements ; `/employes/[id]` permet de voir/révoquer les appareils et d’importer/supprimer la photo privée du salarié.
+- `/plateforme/roles-demo` présente les rôles et permissions, puis rend un aperçu fidèle de l’interface de chaque poste.
+- Entreprise de test réellement créée dans Supabase : `Liria Gestion Pro - Entreprise Demo`, référence `DEMO-18M`, code `QMHVQ6NU`, ID `85393678-aad4-4a79-9c94-bc1e1fe686b5`. Elle contient 18 mois d’historique, 8 rôles, 12 salariés, 24 habilitations, 30 clients/chantiers, 108 devis, 72 factures, 2 340 pointages, 30 articles, 8 véhicules et 24 outils.
+- Les douze salariés ont un numéro/une échéance Carte BTP et un CACES ; des habilitations SST, hauteur ou électrique complètent certains profils. Les portraits et cartes sont des données de démonstration, pas des documents CIBTP officiels.
+- Les paiements CB et carte en ligne sont préparés dans les données et l’interface. Stripe Connect/webhook sont déjà codés ; ne pas annoncer un paiement réel avant configuration des clés Stripe et onboarding de l’entreprise.
+- Validation locale : TypeScript, ESLint, 23 tests, diff-check et build webpack de 74 pages verts. Avertissement historique `unpdf/import.meta` uniquement.
+
+---
+
 ## REPRISE PRIORITAIRE — 16 juillet 2026, factures fournisseurs classées (MIGRATIONS 82–84 APPLIQUÉES)
 
 - Migrations `20260715000082`, `83` et `84` appliquées dans Supabase. La RPC 84 `classer_facture_fournisseur` exige une session authentifiée, l’appartenance à l’entreprise et `gerer_achats`.

@@ -69,3 +69,13 @@ export async function supprimerPointageAction(pointageId: string, mois: string) 
 }
 
 export async function validerPointageAction(pointageId:string,statut:"valide"|"rejete",mois:string,formData:FormData){const ctx=await getContexteEntreprise(),supabase=await createClient(),{error}=await supabase.rpc("valider_preuve_pointage",{p_entreprise_id:ctx.entrepriseId,p_pointage_id:pointageId,p_statut:statut,p_commentaire:texte(formData,"commentaire_verification")});if(error)redirect(`/pointage?mois=${mois}&error=${encodeURIComponent(error.message)}`);revalidatePath("/pointage");redirect(`/pointage?mois=${mois}&succes=validation`)}
+
+export async function creerMaFichePointageAdministrateurAction(){
+  const ctx=await getContexteEntreprise();
+  const supabase=await createClient();
+  const{error}=await supabase.rpc("garantir_fiche_pointage_courante",{p_entreprise_id:ctx.entrepriseId});
+  if(error)redirect(`/pointage?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/pointage");
+  revalidatePath("/employes");
+  redirect("/pointage?succes=fiche_admin");
+}
