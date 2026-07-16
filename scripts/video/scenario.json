@@ -1,0 +1,22 @@
+{
+  "guide": {
+    "titre": "Liria Gestion Pro — le tour du logiciel",
+    "scenes": [
+      {"cle": "intro", "texte": "Liria Gestion Pro réunit dans un seul logiciel tout ce qu'une entreprise du bâtiment manipule au quotidien : les clients, les chantiers, les devis, les factures, le planning, les heures et la rentabilité."},
+      {"cle": "connexion", "texte": "Tout commence par une connexion personnelle. Chaque salarié a son propre compte : les heures pointées et les mouvements de stock engagent la personne qui les saisit."},
+      {"cle": "dashboard", "texte": "Le tableau de bord résume ce qui demande votre attention aujourd'hui. Son contenu dépend de votre poste : un dirigeant y voit ses marges, un ouvrier y voit son planning."},
+      {"cle": "clients", "texte": "Le fichier clients est la base de tout. Une fiche bien remplie évite de resaisir l'adresse de facturation et le SIRET sur chaque document."},
+      {"cle": "chantiers", "texte": "Le chantier est le point de rencontre du logiciel. Le devis le remplit, le planning y envoie les équipes, le pointage y accumule les heures, les achats y imputent les dépenses."},
+      {"cle": "devis", "texte": "Voici la liste des devis. Chacun porte son numéro, son client, son montant et son statut. Créons-en un."},
+      {"cle": "devis_creation", "texte": "On choisit le client, on rattache un chantier, puis on ajoute les lignes de prestation. Les totaux se recalculent à chaque frappe."},
+      {"cle": "devis_fiche", "texte": "Une fois le devis accepté, chaque ligne devient une tâche sur le chantier, sans aucun prix. Vos ouvriers savent quoi faire, vos marges restent confidentielles."},
+      {"cle": "factures", "texte": "Les factures clients et les factures fournisseurs sont clairement séparées. Chaque règlement met à jour le reste à payer."},
+      {"cle": "planning", "texte": "Le planning répond à une seule question : qui est où, quel jour. Les salariés en lignes, les jours en colonnes."},
+      {"cle": "pointage", "texte": "Sur le terrain, le salarié pointe ses heures depuis son téléphone. La position et l'heure du serveur sont enregistrées comme preuve. Personne ne peut pointer au nom d'un autre."},
+      {"cle": "employes", "texte": "Chaque salarié a sa fiche : son contrat, son coût horaire, ses habilitations et sa carte BTP. C'est son poste qui détermine ce qu'il voit dans le logiciel."},
+      {"cle": "stock", "texte": "Le stock suit ce qui est en dépôt et ce qui part sur les chantiers. Au dépôt, chaque salarié s'identifie à la borne pour prendre du matériel."},
+      {"cle": "rentabilite", "texte": "Et voici l'écran qui compte vraiment : la rentabilité confronte ce que vous avez facturé aux heures réellement pointées et aux achats réellement imputés."},
+      {"cle": "fin", "texte": "Liria Gestion Pro. Un seul logiciel, du devis à la rentabilité."}
+    ]
+  }
+}

@@ -46,3 +46,5 @@ next-env.d.ts
 # Identifiants de capture (jamais commités)
 .env.audit
 output/audit/
+output/video/brut/
+output/video/audio/
