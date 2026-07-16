@@ -670,5 +670,6 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Tous les salariés de démonstration possèdent un numéro et une échéance Carte BTP ainsi qu’un CACES ; plusieurs possèdent aussi SST, travail en hauteur ou habilitation électrique. Les cartes visibles sont des badges internes de démonstration et ne sont jamais présentées comme des cartes officielles CIBTP.
 - Les modes de règlement CB et carte en ligne sont présents. Le parcours Stripe sécurisé existe déjà dans le produit ; le paiement réel reste conditionné aux clés Stripe de la plateforme, au webhook et à l’onboarding Stripe Connect de chaque entreprise.
 - Contrôles du lot : TypeScript, ESLint, 23 tests Vitest, `git diff --check` et build Next webpack complet de 74 pages verts. Seul l’avertissement historique `unpdf/import.meta` demeure non bloquant.
+- Lot publié sur `gh/main` au commit `7ee330a` et déploiement Vercel confirmé **success**. Production contrôlée : `/login` répond 200 ; `/plateforme/roles-demo` et `/pointage` redirigent correctement une personne non connectée vers `/login`.
 
 ---

@@ -53,6 +53,7 @@
 - Les douze salariés ont un numéro/une échéance Carte BTP et un CACES ; des habilitations SST, hauteur ou électrique complètent certains profils. Les portraits et cartes sont des données de démonstration, pas des documents CIBTP officiels.
 - Les paiements CB et carte en ligne sont préparés dans les données et l’interface. Stripe Connect/webhook sont déjà codés ; ne pas annoncer un paiement réel avant configuration des clés Stripe et onboarding de l’entreprise.
 - Validation locale : TypeScript, ESLint, 23 tests, diff-check et build webpack de 74 pages verts. Avertissement historique `unpdf/import.meta` uniquement.
+- Lot publié sur `gh/main` au commit `7ee330a`; déploiement Vercel terminé avec succès. `/login` répond 200 et les nouvelles routes protégées redirigent correctement vers la connexion sans session.
 
 ---
 
