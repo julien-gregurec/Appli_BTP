@@ -1,3 +1,22 @@
+# 🚨 BUG CRITIQUE INSCRIPTION + CAUSE RACINE DU MOJIBAKE — 16 juillet (Claude)
+
+**Trois découvertes en préparant les captures du manuel. Migrations 86, 87, 88 APPLIQUÉES.**
+
+**1. 🔴 CRITIQUE — tout nouveau client s'inscrivant avait un logiciel cassé.**
+`creer_entreprise_bootstrap` accordait `autorise = true` à **tous** les droits du catalogue pour le poste Admin/Gérant. La migration 76 a introduit `mode_compte_depot` — un droit d'usage qui **verrouille l'interface sur Stock/Borne/Dépôt** et fait rediriger toute la navigation vers la borne par `src/lib/supabase/proxy.ts` — **sans mettre le bootstrap à jour**. Chaque dirigeant créant son entreprise héritait donc du verrou : ni devis, ni chantiers, ni factures. Détecté parce que 58 captures « clients/chantiers/devis » montraient toutes la borne stock. **Migration `20260716000086_correctif_mode_compte_depot_admin.sql`** : le bootstrap exclut désormais `mode_compte_depot` (`select … cle <> 'mode_compte_depot'`) + réparation de l'existant. ⚠️ `creerEntreprisePlateformeAction` (branche prototype, `src/app/actions/plateforme.ts`) a le **même défaut** (`autorise: poste.nom.startsWith("Admin")`) — inoffensif tant que le prototype est fermé, mais à corriger si réactivé. Vérifier aussi `plateforme_creer_entreprise`.
+
+**2. 🟠 CAUSE RACINE DU MOJIBAKE — enfin identifiée, ne plus traiter en aval.**
+`pbcopy` **sans locale UTF-8** interprète les octets UTF-8 en MacRoman : « é » devient « √© », « « » devient « ¬´ ». Tout SQL accentué collé dans l'éditeur Supabase arrivait **corrompu**, insérant du mojibake en base. C'est l'origine du mojibake que la migration 81 « réparait prudemment » — le problème était soigné à l'arrivée, jamais à la source. Le test aller-retour `pbcopy | pbpaste` est **trompeur** (double conversion qui s'annule) : il faut relire avec `LC_ALL=en_US.UTF-8 pbpaste`.
+👉 **Règle : toujours `LC_ALL=en_US.UTF-8 pbcopy < fichier.sql`, puis vérifier avec `LC_ALL=en_US.UTF-8 pbpaste`.**
+Dégât collatéral : le littéral `'compte dépôt'` de la migration 86 est arrivé corrompu → la clause ne matchait plus le vrai poste, qui a perdu son `mode_compte_depot`. **Correctif 87** l'a restauré, avec des comparaisons désormais **tolérantes à l'encodage** (motif ASCII `compte d%p%t`). **Correctif 88** a nettoyé le mojibake résiduel en base (postes, entreprises, employés, clients, chantiers).
+
+**3. 🟢 Environnement de démonstration prêt pour la documentation.**
+L'entreprise `reference_interne='DEMO-18M'` est renommée **« Entreprise Test »** (nom + raison sociale) — le code la retrouve par sa référence, jamais par son nom, donc `/plateforme/roles-demo` et le script de seed restent intacts. Compte de démo **jetable** `demo@entreprise-test.fr` / `LiriaDemo2026!`, Administrateur, **membre de cette seule entreprise**, **jamais admin plateforme** (vérifié : `/plateforme` renvoie 404 pour lui — comportement attendu). Données 100 % fictives (Emma Bernard, Lucas Morel…). ⚠️ **À supprimer à la mise en service.**
+**Nouveau script `scripts/capturer-guide.mjs`** (Playwright) : connexion réelle, ~40 sections, découverte automatique des identifiants pour capturer les **fiches détail**, capture des **documents imprimés** (`/imprimer/devis|factures|commandes/[id]`) et passe **mobile** (390×844). Sortie `output/audit/` + `manifeste.json`. Remplace `audit-application.mjs` (30 routes, aucune fiche, aucune impression). Identifiants via `.env.audit` (gitignoré, jamais commité).
+**À savoir sur les médias existants** : la « présentatrice » des vidéos est un **PNG statique** (`assets/presentatrice-liria.png`) collé par PIL, et les « interfaces animées » sont des **maquettes dessinées**, pas le vrai logiciel. Le guide 55 pages n'a que **14 captures pour 26 modules**. Refonte en cours par Claude : manuel ~375 pages avec vraies captures, et vidéos de vraies démos enregistrées par Playwright.
+
+---
+
 # REPRISE — 16 juillet 2026, classement des factures fournisseurs (MIGRATIONS 82–84 APPLIQUÉES)
 
 - Les migrations `20260715000082`, `83` et `84` sont appliquées dans le projet Supabase `uykukebthgmqtxlmkpnn`. La fonction 84 `classer_facture_fournisseur` est exposée uniquement aux comptes authentifiés et contrôle `gerer_achats` ainsi que l’appartenance du chantier et de la facture à la même entreprise.
