@@ -1,0 +1,8 @@
+import { NextResponse } from "next/server";
+import { getContexteEntreprise } from "@/lib/entreprise";
+import { permissionsUtilisateur } from "@/lib/permissions";
+import { createClient } from "@/lib/supabase/server";
+import { echangerCodeStripeOAuth, verifierEtatStripeOAuth } from "@/lib/stripe";
+
+function retour(request:Request,type:"error"|"success",message:string){const url=new URL("/connecteurs",request.url);url.searchParams.set(type,message);return NextResponse.redirect(url);}
+export async function GET(request:Request){const url=new URL(request.url),code=url.searchParams.get("code"),etatBrut=url.searchParams.get("state"),erreur=url.searchParams.get("error_description");if(erreur)return retour(request,"error",erreur);if(!code||!etatBrut)return retour(request,"error","Réponse Stripe incomplète");const ctx=await getContexteEntreprise(),droits=await permissionsUtilisateur(ctx),etat=verifierEtatStripeOAuth(etatBrut);if(!etat||etat.entrepriseId!==ctx.entrepriseId||etat.userId!==ctx.userId)return retour(request,"error","Connexion Stripe expirée ou invalide");if(droits!==null&&!droits.includes("gerer_parametres"))return retour(request,"error","Votre poste ne permet pas de configurer Stripe");try{const resultat=await echangerCodeStripeOAuth(code),sb=await createClient();const{error}=await sb.from("entreprises").update({stripe_account_id:resultat.stripe_user_id,stripe_onboarding_complete:true}).eq("id",ctx.entrepriseId);if(error)throw error;return retour(request,"success",`Compte Stripe ${resultat.livemode?"de production":"de test"} connecté avec succès`);}catch(error){return retour(request,"error",error instanceof Error?error.message:"Connexion Stripe impossible");}}

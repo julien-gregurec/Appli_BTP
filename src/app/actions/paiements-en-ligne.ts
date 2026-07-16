@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { permissionsUtilisateur } from "@/lib/permissions";
-import { completerVerificationCompteStripeTest, creerCompteStripeConnect, creerLienOnboardingStripe, creerSessionStripe } from "@/lib/stripe";
+import { creerSessionStripe, creerUrlStripeOAuth } from "@/lib/stripe";
 
 export async function creerPaiementStripeAction(factureId: string) {
   const ctx = await getContexteEntreprise();
@@ -29,6 +29,4 @@ export async function creerPaiementStripeAction(factureId: string) {
   redirect(destination);
 }
 
-export async function connecterStripeAction(){const ctx=await getContexteEntreprise();const sb=await createClient();const[{data:entreprise},{data:{user}}]=await Promise.all([sb.from("entreprises").select("stripe_account_id").eq("id",ctx.entrepriseId).single(),sb.auth.getUser()]);let accountId=entreprise?.stripe_account_id;let destination:string;try{if(!accountId){accountId=await creerCompteStripeConnect(ctx.entrepriseId,user?.email);const{error}=await sb.from("entreprises").update({stripe_account_id:accountId}).eq("id",ctx.entrepriseId);if(error)throw error;}destination=await creerLienOnboardingStripe(accountId);}catch(error){redirect(`/connecteurs?error=${encodeURIComponent(error instanceof Error?error.message:"Connexion Stripe impossible")}`);}redirect(destination);}
-
-export async function completerStripeTestAction(){const ctx=await getContexteEntreprise(),droits=await permissionsUtilisateur(ctx);if(droits!==null&&!droits.includes("gerer_parametres"))redirect(`/connecteurs?error=${encodeURIComponent("Votre poste ne permet pas de configurer Stripe")}`);const sb=await createClient(),{data:entreprise}=await sb.from("entreprises").select("stripe_account_id").eq("id",ctx.entrepriseId).single();if(!entreprise?.stripe_account_id)redirect(`/connecteurs?error=${encodeURIComponent("Connectez d’abord le compte Stripe de test")}`);try{const resultat=await completerVerificationCompteStripeTest(entreprise.stripe_account_id);redirect(`/connecteurs?success=${encodeURIComponent(`Justificatif Stripe de test appliqué à ${resultat.misesAJour} représentant(s). ${resultat.exigences.length?`${resultat.exigences.length} étape(s) restent à compléter dans Stripe.`:"La vérification documentaire de test est terminée."}`)}`);}catch(error){redirect(`/connecteurs?error=${encodeURIComponent(error instanceof Error?error.message:"Simulation Stripe impossible")}`);}}
+export async function connecterStripeAction(){const ctx=await getContexteEntreprise(),droits=await permissionsUtilisateur(ctx);if(droits!==null&&!droits.includes("gerer_parametres"))redirect(`/connecteurs?error=${encodeURIComponent("Votre poste ne permet pas de configurer Stripe")}`);let destination:string;try{destination=creerUrlStripeOAuth(ctx.entrepriseId,ctx.userId);}catch(error){redirect(`/connecteurs?error=${encodeURIComponent(error instanceof Error?error.message:"Connexion Stripe impossible")}`);}redirect(destination);}

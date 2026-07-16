@@ -6,6 +6,8 @@ export function stripeEstConfigure() {
   return Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET && process.env.NEXT_PUBLIC_APP_URL);
 }
 
+export function stripeConnectOAuthEstConfigure(){return stripeEstConfigure()&&Boolean(process.env.STRIPE_CONNECT_CLIENT_ID);}
+
 export async function creerSessionStripe(params: {
   factureId: string; entrepriseId: string; numero: string; montantCentimes: number; stripeAccountId: string; email?: string | null;
 }) {
@@ -38,21 +40,11 @@ export async function creerSessionStripe(params: {
   return donnees;
 }
 
-async function requeteStripe(chemin:string,corps:URLSearchParams){const secret=process.env.STRIPE_SECRET_KEY;if(!secret)throw new Error("Stripe n’est pas configuré");const reponse=await fetch(`https://api.stripe.com${chemin}`,{method:"POST",headers:{Authorization:`Bearer ${secret}`,"Content-Type":"application/x-www-form-urlencoded"},body:corps,cache:"no-store"});const donnees=await reponse.json() as {id?:string;url?:string;error?:{message?:string}};if(!reponse.ok)throw new Error(donnees.error?.message||"Stripe a refusé la demande");return donnees;}
-export async function creerCompteStripeConnect(entrepriseId:string,email?:string|null){const corps=new URLSearchParams({type:"express",country:"FR","capabilities[card_payments][requested]":"true","capabilities[transfers][requested]":"true","metadata[entreprise_id]":entrepriseId});if(email)corps.set("email",email);const resultat=await requeteStripe("/v1/accounts",corps);if(!resultat.id)throw new Error("Compte Stripe non créé");return resultat.id;}
-export async function creerLienOnboardingStripe(accountId:string){const base=process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/,"");if(!base)throw new Error("URL publique non configurée");const resultat=await requeteStripe("/v1/account_links",new URLSearchParams({account:accountId,refresh_url:`${base}/connecteurs?stripe=relancer`,return_url:`${base}/connecteurs?stripe=retour`,type:"account_onboarding"}));if(!resultat.url)throw new Error("Lien Stripe non créé");return resultat.url;}
-
-type StripePersonneTest={id:string;verification?:{status?:string}};
-type StripeCompteTest={charges_enabled?:boolean;details_submitted?:boolean;requirements?:{currently_due?:string[];past_due?:string[]}};
-async function lireStripe<T>(chemin:string){const secret=process.env.STRIPE_SECRET_KEY;if(!secret)throw new Error("Stripe n’est pas configuré");const reponse=await fetch(`https://api.stripe.com${chemin}`,{headers:{Authorization:`Bearer ${secret}`},cache:"no-store"});const donnees=await reponse.json() as T&{error?:{message?:string}};if(!reponse.ok)throw new Error(donnees.error?.message||"Stripe a refusé la demande");return donnees;}
-export async function completerVerificationCompteStripeTest(accountId:string){
- const secret=process.env.STRIPE_SECRET_KEY;
- if(!secret?.startsWith("sk_test_"))throw new Error("Cette action est strictement réservée à l’environnement Stripe de test");
- if(!/^acct_[A-Za-z0-9]+$/.test(accountId))throw new Error("Identifiant Stripe invalide");
- const personnes=await lireStripe<{data:StripePersonneTest[]}>(`/v1/accounts/${accountId}/persons?limit=100`);let misesAJour=0;
- for(const personne of personnes.data){if(personne.verification?.status==="verified")continue;await requeteStripe(`/v1/accounts/${accountId}/persons/${personne.id}`,new URLSearchParams({"verification[document][front]":"file_identity_document_success","verification[document][back]":"file_identity_document_success"}));misesAJour++;}
- const compte=await lireStripe<StripeCompteTest>(`/v1/accounts/${accountId}`);return{misesAJour,chargesActives:compte.charges_enabled===true,dossierSoumis:compte.details_submitted===true,exigences:[...(compte.requirements?.currently_due??[]),...(compte.requirements?.past_due??[])]};
-}
+type EtatStripeOAuth={entrepriseId:string;userId:string;expireAt:number};
+export function creerEtatStripeOAuth(entrepriseId:string,userId:string){const secret=process.env.STRIPE_SECRET_KEY;if(!secret)throw new Error("Stripe n’est pas configuré");const corps=Buffer.from(JSON.stringify({entrepriseId,userId,expireAt:Date.now()+15*60_000} satisfies EtatStripeOAuth)).toString("base64url"),signature=createHmac("sha256",secret).update(corps).digest("base64url");return`${corps}.${signature}`;}
+export function verifierEtatStripeOAuth(etat:string){const secret=process.env.STRIPE_SECRET_KEY;if(!secret)return null;const[corps,signature]=etat.split(".");if(!corps||!signature)return null;const attendu=createHmac("sha256",secret).update(corps).digest("base64url"),a=Buffer.from(signature),b=Buffer.from(attendu);if(a.length!==b.length||!timingSafeEqual(a,b))return null;try{const valeur=JSON.parse(Buffer.from(corps,"base64url").toString("utf8")) as EtatStripeOAuth;if(!valeur.entrepriseId||!valeur.userId||valeur.expireAt<Date.now())return null;return valeur;}catch{return null;}}
+export function creerUrlStripeOAuth(entrepriseId:string,userId:string){const clientId=process.env.STRIPE_CONNECT_CLIENT_ID,base=process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/,"");if(!clientId||!base)throw new Error("Stripe Connect OAuth n’est pas configuré");const url=new URL("https://connect.stripe.com/oauth/authorize");url.searchParams.set("response_type","code");url.searchParams.set("client_id",clientId);url.searchParams.set("scope","read_write");url.searchParams.set("redirect_uri",`${base}/api/stripe/oauth/callback`);url.searchParams.set("state",creerEtatStripeOAuth(entrepriseId,userId));return url.toString();}
+export async function echangerCodeStripeOAuth(code:string){const secret=process.env.STRIPE_SECRET_KEY;if(!secret)throw new Error("Stripe n’est pas configuré");const reponse=await fetch("https://connect.stripe.com/oauth/token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({client_secret:secret,code,grant_type:"authorization_code"}),cache:"no-store"});const donnees=await reponse.json() as{stripe_user_id?:string;livemode?:boolean;error_description?:string};if(!reponse.ok||!donnees.stripe_user_id)throw new Error(donnees.error_description||"Connexion Stripe refusée");return donnees;}
 
 export function verifierSignatureStripe(payload: string, signature: string | null) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
