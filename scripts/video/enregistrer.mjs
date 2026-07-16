@@ -28,10 +28,10 @@ const duree = (cle) => (scenes.find((s) => s.cle === cle)?.duree ?? 5) * 1000;
 // suivante se fait pendant ce silence : la voix off démarre donc toujours sur
 // la bonne page. Sans elle, le chargement mordait sur le début du texte et
 // l'image retardait d'une scène sur le commentaire.
-// 6 s : c'est le temps réel d'affichage de la page la plus lourde (/rentabilite,
-// 3,6 s) plus une marge. En dessous, la voix off commençait à décrire un écran
-// encore en cours de chargement.
-const RESPIRATION = 6000;
+// Respiration entre deux narrations : le temps que la page s'affiche, pas plus.
+// À 6 s le montage comptait 90 s de silence sur 240 : la vidéo traînait.
+// 2,5 s couvrent l'affichage (~2,5 s) sans laisser de vide.
+const RESPIRATION = 2500;
 
 await rm(sortie, { recursive: true, force: true });
 await mkdir(sortie, { recursive: true });
@@ -69,7 +69,7 @@ async function aller(route) {
   // s'y stabiliser, alors qu'elles sont lisibles au bout de ~2,5 s. Attendre le
   // silence réseau décalait la vidéo d'une scène entière sur la narration.
   await page.goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded", timeout: 60_000 });
-  await page.waitForTimeout(1300);
+  await page.waitForTimeout(400);
 }
 
 // Horloge globale : chaque scène se termine à son échéance absolue depuis le
@@ -94,7 +94,7 @@ async function tenir(cle, { route, action } = {}) {
   // L'ancien aller-retour en boucle donnait une nervosité mécanique.
   const budget = fin - Date.now();
   if (budget > 4500) {
-    await page.waitForTimeout(budget * 0.40);
+    await page.waitForTimeout(budget * 0.32);
     const aVoir = await page.evaluate(
       () => Math.max(0, document.documentElement.scrollHeight - window.innerHeight));
     if (aVoir > 150) {
