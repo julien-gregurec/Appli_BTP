@@ -1,3 +1,15 @@
+# REPRISE PRIORITAIRE — 16 juillet 2026, banque, virements et paie (MIGRATION 89 APPLIQUÉE)
+
+- Migration `20260716000089_paiements_bancaires_paie.sql` appliquée directement dans Supabase : coffre RIB salariés/fournisseurs, bulletins PDF privés, prestataires bancaires, lots/ordres et audit append-only.
+- `/paiements-bancaires` couvre trois sorties séparées des encaissements clients Stripe : factures fournisseurs, salaires issus des bulletins validés et remboursements des notes de frais.
+- Coffre : AES-256-GCM côté serveur, hash SHA-256, quatre derniers caractères seulement en interface. `BANK_DATA_ENCRYPTION_KEY` est déjà enregistrée comme secret Vercel Production et ne doit jamais être remplacée sans rotation/rechiffrement.
+- Workflow sans débit automatique : RIB vérifié, source validée, lot préparé, lot validé, transmission Powens, authentification forte bancaire, puis rapprochement. Un bulletin reçu ne déclenche jamais seul un salaire.
+- Import expert-comptable prêt via `/api/paie/import`; ajouter `PAYROLL_IMPORT_SECRET` seulement lors de l’accord d’intégration. Powens reste non opérationnel tant que le contrat et les quatre variables `POWENS_*` ne sont pas fournis.
+- SIRET entreprise/fournisseur et forme juridique sont obligatoires avant envoi. L’accès support plateforme est explicitement bloqué. Documentation complète : `docs/PAIEMENTS_BANCAIRES_ET_PAIE.md`.
+- Validation : TypeScript, ESLint, 28 tests, diff-check et build webpack 78 pages verts. Ne pas commiter les vidéos et fichiers `page 2.tsx` non suivis de l’utilisateur.
+
+---
+
 # REPRISE — 15 juillet 2026, personnalisation et fournisseurs libres (MIGRATIONS 82–83 À APPLIQUER)
 
 - Le schéma Supabase a été contrôlé directement : `fournisseur_code` et `couleur_secondaire_documents` sont absents, donc les migrations 82 puis 83 ne sont pas passées. Ne pas publier le code avant leur application.

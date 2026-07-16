@@ -65,7 +65,7 @@ def plan(cle, debut, longueur, sortie, texte=None, sous_texte=None, zoom=False, 
         # pas la durée du plan. Avec d=longueur*25, chaque image en produisait
         # 75 : un plan de 3 s rendait 225 s de vidéo. d=1 est le bon réglage.
         filtres.append(
-            f"zoompan=z='min(zoom+0.0012,1.12)':d=1:"
+            f"zoompan=z='min(zoom+0.0006,1.09)':d=1:"
             f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1280x720:fps=25")
     if texte:
         filtres.append(
@@ -162,26 +162,26 @@ def finaliser(video, sortie, voix_mp3=None, musique_db=-20, avec_musique=True):
 # ═══════════════════════════════════════════════════════════════════
 def punchy():
     m = []
-    carton("VOTRE BOÎTE\nDU BÂTIMENT", "Devis. Chantiers. Heures. Marge.", 2.6, TMP / "p00.mp4")
+    carton("VOTRE BOÎTE\nDU BÂTIMENT", "Devis. Chantiers. Heures. Marge.", 4.0, TMP / "p00.mp4")
     m.append(TMP / "p00.mp4")
 
     plans = [
-        ("devis", 2.0, 3.0, "108 DEVIS", "537 840 € en portefeuille", True),
-        ("devis_creation", 4.0, 3.4, "CHIFFRÉ EN 30 s", "Les totaux se calculent seuls", False),
-        ("devis_fiche", 3.0, 2.6, "ACCEPTÉ ?", "Le chantier se remplit tout seul", False),
-        ("chantiers", 3.0, 2.6, "24 CHANTIERS", "Chacun sait où il en est", True),
-        ("planning", 3.0, 2.8, "QUI EST OÙ ?", "Le planning répond en un écran", False),
-        ("pointage", 2.0, 2.8, "372 HEURES", "Pointées au GPS, jamais retapées", True),
-        ("stock", 2.0, 2.6, "LE DÉPÔT SUIT", "Chaque sortie part sur un chantier", False),
-        ("factures", 2.0, 2.8, "262 058 € ENCAISSÉS", "Et le reste à encaisser, en direct", True),
-        ("rentabilite", 3.0, 3.6, "16,8 % DE MARGE", "Calculée, pas devinée", True),
+        ("devis", 1.5, 5.0, "108 DEVIS", "537 840 € en portefeuille", True),
+        ("devis_creation", 3.5, 5.6, "CHIFFRÉ EN 30 s", "Les totaux se calculent seuls", False),
+        ("devis_fiche", 2.5, 4.6, "ACCEPTÉ ?", "Le chantier se remplit tout seul", False),
+        ("chantiers", 2.5, 4.6, "24 CHANTIERS", "Chacun sait où il en est", True),
+        ("planning", 2.5, 4.8, "QUI EST OÙ ?", "Le planning répond en un écran", False),
+        ("pointage", 1.5, 4.8, "372 HEURES", "Pointées au GPS, jamais retapées", True),
+        ("stock", 1.5, 4.6, "LE DÉPÔT SUIT", "Chaque sortie part sur un chantier", False),
+        ("factures", 1.5, 4.8, "262 058 € ENCAISSÉS", "Et le reste à encaisser, en direct", True),
+        ("rentabilite", 2.5, 5.6, "16,8 % DE MARGE", "Calculée, pas devinée", True),
     ]
     for i, (cle, d, l, t, s, z) in enumerate(plans, 1):
         f = TMP / f"p{i:02}.mp4"
         plan(cle, d, l, f, texte=t, sous_texte=s, zoom=z, taille=60)
         m.append(f)
 
-    carton("LIRIA GESTION PRO", "Du devis à la marge. Un seul logiciel.", 3.2, TMP / "p99.mp4",
+    carton("LIRIA GESTION PRO", "Du devis à la marge. Un seul logiciel.", 4.5, TMP / "p99.mp4",
            couleur="white", taille=64)
     m.append(TMP / "p99.mp4")
 
@@ -209,11 +209,11 @@ def journee():
          [("rentabilite", 3.0, None)], "18:00", "Votre marge, sans un seul tableur"),
     ]
     m = []
-    carton("UNE JOURNÉE", "avec Liria Gestion Pro", 2.4, TMP / "j00.mp4")
+    carton("UNE JOURNÉE", "avec Liria Gestion Pro", 3.6, TMP / "j00.mp4")
     m.append(TMP / "j00.mp4")
     pistes = []
     for cle, texte, plans_, heure, accroche in etapes:
-        f, d = voix(cle, texte, "+6%")
+        f, d = voix(cle, texte, "-4%")
         pistes.append(f)
         part = d / len(plans_)
         for i, (p, deb, _) in enumerate(plans_):
@@ -221,7 +221,7 @@ def journee():
             plan(p, deb, part, g, texte=heure if i == 0 else None,
                  sous_texte=accroche if i == 0 else None, zoom=(i == 0), taille=58)
             m.append(g)
-    carton("LIRIA GESTION PRO", "Du devis à la marge, sans jamais ressaisir.", 3.0, TMP / "j99.mp4")
+    carton("LIRIA GESTION PRO", "Du devis à la marge, sans jamais ressaisir.", 4.2, TMP / "j99.mp4")
     m.append(TMP / "j99.mp4")
 
     liste = TMP / "voix_journee.txt"
@@ -230,7 +230,7 @@ def journee():
     sh([FF, "-y", "-f", "concat", "-safe", "0", "-i", str(liste), "-c", "copy", str(vx)])
     # La voix démarre après le carton d'ouverture.
     vx2 = TMP / "voix_journee_cale.mp3"
-    sh([FF, "-y", "-i", str(vx), "-af", "adelay=2400|2400", str(vx2)])
+    sh([FF, "-y", "-i", str(vx), "-af", "adelay=3600|3600", str(vx2)])
 
     brut = TMP / "journee_brut.mp4"
     coller(m, brut)
@@ -247,24 +247,24 @@ def avant():
         ("La marge ? On verra à la fin.", "Souvent trop tard."),
     ]
     reponses = [
-        ("devis_creation", 3.5, 3.2, "CHIFFRÉ SUR PLACE", "Totaux et TVA calculés en direct"),
-        ("pointage", 2.0, 3.0, "POINTÉ AU GPS", "372 h, zéro ressaisie"),
-        ("rentabilite", 3.0, 3.6, "MARGE : 16,8 %", "Connue avant la fin du chantier"),
+        ("devis_creation", 3.0, 5.4, "CHIFFRÉ SUR PLACE", "Totaux et TVA calculés en direct"),
+        ("pointage", 1.5, 5.0, "POINTÉ AU GPS", "372 h, zéro ressaisie"),
+        ("rentabilite", 2.5, 5.8, "MARGE : 16,8 %", "Connue avant la fin du chantier"),
     ]
     m = []
-    carton("AVANT", "", 1.6, TMP / "a00.mp4", fond="0x1a1a1a", couleur="0x8b8f96", taille=90)
+    carton("AVANT", "", 2.4, TMP / "a00.mp4", fond="0x1a1a1a", couleur="0x8b8f96", taille=90)
     m.append(TMP / "a00.mp4")
     for i, (t, s) in enumerate(douleurs, 1):
         f = TMP / f"a1{i}.mp4"
-        carton(t, s, 2.4, f, fond="0x1a1a1a", couleur="0xd0d0d0", taille=52)
+        carton(t, s, 3.8, f, fond="0x1a1a1a", couleur="0xd0d0d0", taille=52)
         m.append(f)
-    carton("APRÈS", "Liria Gestion Pro", 1.8, TMP / "a50.mp4", taille=90)
+    carton("APRÈS", "Liria Gestion Pro", 2.6, TMP / "a50.mp4", taille=90)
     m.append(TMP / "a50.mp4")
     for i, (cle, d, l, t, s) in enumerate(reponses, 1):
         f = TMP / f"a2{i}.mp4"
         plan(cle, d, l, f, texte=t, sous_texte=s, zoom=True, taille=58)
         m.append(f)
-    carton("ARRÊTEZ DE DEVINER", "Liria Gestion Pro — du devis à la marge.", 3.0, TMP / "a99.mp4")
+    carton("ARRÊTEZ DE DEVINER", "Liria Gestion Pro — du devis à la marge.", 4.2, TMP / "a99.mp4")
     m.append(TMP / "a99.mp4")
 
     brut = TMP / "avant_brut.mp4"

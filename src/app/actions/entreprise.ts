@@ -134,6 +134,7 @@ export async function modifierEntrepriseAction(formData: FormData) {
   const { error } = await supabase.from("entreprises").update({
     nom,
     raison_sociale: champ(formData, "raison_sociale"),
+    forme_juridique: champ(formData, "forme_juridique"),
     siret: champ(formData, "siret"),
     adresse: champ(formData, "adresse"),
     code_postal: champ(formData, "code_postal"),

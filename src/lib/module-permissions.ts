@@ -15,6 +15,7 @@ export const MODULE_PERMISSION_PAR_CHEMIN: [string,string][] = [
   ["/rentabilite","acces_rentabilite"],["/tresorerie","acces_rentabilite"],
   ["/stock/borne","utiliser_borne_stock"],["/stock","acces_stock"],["/depot","acces_stock"],["/inventaires","acces_stock"],
   ["/flotte","acces_flotte"],["/outillage","acces_outillage"],["/exports","acces_exports"],
+  ["/paiements-bancaires","acces_paiements_bancaires"],
 ];
 
 export const GESTION_PERMISSION_PAR_CHEMIN: [string,string][] = [
@@ -30,10 +31,12 @@ export const GESTION_PERMISSION_PAR_CHEMIN: [string,string][] = [
   ["/planning","gerer_planning"],["/employes","gerer_employes"],["/pointage","gerer_pointage"],
   ["/stock/borne","utiliser_borne_stock"],["/stock","gerer_stock"],["/depot","gerer_stock"],["/inventaires","gerer_stock"],
   ["/flotte","gerer_flotte"],["/outillage","gerer_outillage"],
+  ["/paiements-bancaires","preparer_virements"],
 ];
 
 export const PERMISSIONS_MUTATION_ALTERNATIVES: Record<string,string[]> = {
   "/pointage": ["gerer_pointage", "saisir_son_pointage"],
   "/notes-frais": ["gerer_notes_frais", "saisir_ses_notes_frais"],
   "/conges": ["gerer_conges", "demander_ses_conges"],
+  "/paiements-bancaires": ["gerer_coordonnees_bancaires", "gerer_paie", "preparer_virements", "valider_virements", "executer_virements"],
 };

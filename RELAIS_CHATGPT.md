@@ -1,3 +1,16 @@
+# REPRISE — 16 juillet 2026, banque, virements, paie et coffre RIB (MIGRATION 89 APPLIQUÉE)
+
+- Migration `20260716000089_paiements_bancaires_paie.sql` appliquée avec succès dans Supabase. Elle ajoute la forme juridique de l’entreprise, les RIB chiffrés salariés/fournisseurs, bulletins de paie privés, connexions bancaires, lots/ordres de virements et journal append-only.
+- Nouveau module protégé `/paiements-bancaires` : règlement des factures fournisseurs, salaires provenant des bulletins contrôlés de l’expert-comptable et remboursement des notes de frais validées. Les flux restent distincts des liens Stripe destinés aux clients.
+- Les IBAN sont validés puis chiffrés AES-256-GCM côté serveur ; l’interface ne relit jamais l’IBAN complet et n’affiche que les quatre derniers caractères. La clé `BANK_DATA_ENCRYPTION_KEY` a été créée directement comme secret Vercel Production et n’a jamais été affichée.
+- Circuit obligatoire : RIB vérifié → source validée → lot préparé → validation par un second droit → transmission Powens → authentification forte bancaire → rapprochement du statut. La réception d’un bulletin ne débite jamais automatiquement le compte.
+- Import manuel des PDF de paie et endpoint sécurisé `/api/paie/import` prêts. Pour l’automatisation réelle avec l’expert-comptable, définir `PAYROLL_IMPORT_SECRET` puis convenir du format et du canal ; à terme préférer un identifiant distinct par cabinet.
+- L’adaptateur Powens Pay et son callback signé sont codés. Aucun virement réel ne fonctionnera avant souscription du contrat Powens et ajout dans Vercel de `POWENS_API_BASE_URL`, `POWENS_WEBVIEW_BASE_URL`, `POWENS_CLIENT_ID` et `POWENS_CLIENT_SECRET`. SIRET entreprise/fournisseur et forme juridique sont exigés avant transmission.
+- Permissions : `acces_paiements_bancaires`, `gerer_coordonnees_bancaires`, `gerer_paie`, `preparer_virements`, `valider_virements`, `executer_virements`. Le support plateforme est exclu de toute action bancaire.
+- Contrôles locaux verts : TypeScript, ESLint, 28 tests Vitest, `git diff --check` et build Next webpack complet de 78 pages. Documentation : `docs/PAIEMENTS_BANCAIRES_ET_PAIE.md`.
+
+---
+
 # REPRISE — 16 juillet 2026, séparation encaissements clients / paiements fournisseurs
 
 - Erreur métier critique corrigée : l’administrateur ne lance plus lui-même Checkout depuis une facture client. L’action crée désormais un **lien de paiement destiné au client**, revient sur la facture, puis permet de copier/tester le lien ou de l’ajouter automatiquement au message « Envoyer par email ».

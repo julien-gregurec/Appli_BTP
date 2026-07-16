@@ -26,6 +26,7 @@ export type MobileModuleIconName =
   | "conges"
   | "rentabilite"
   | "exports"
+  | "banque"
   | "parametres";
 
 export type MobileModuleLink = {
@@ -67,6 +68,7 @@ function ModuleIcon({ nom, grand = false }: { nom: MobileModuleIconName; grand?:
       {nom === "conges" && <><path d="M5 20c3-3 4-7 4-12 5 2 8 6 10 11"/><path d="M4 20h16M9 8c2-3 5-4 8-4-1 3-3 5-6 6"/></>}
       {nom === "rentabilite" && <><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/><path d="m4 7 6-4 6 5 5-5"/></>}
       {nom === "exports" && <><path d="M12 3v12M8 7l4-4 4 4"/><path d="M5 13v7h14v-7"/></>}
+      {nom === "banque" && <><path d="M3 9h18L12 3zM5 9v8M9 9v8M15 9v8M19 9v8M3 20h18"/><path d="M8 13h8"/></>}
       {nom === "parametres" && <><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></>}
     </svg>
   );
@@ -83,7 +85,7 @@ export function MobileModuleGrid({ modules }: { modules: MobileModuleLink[] }) {
     factures: "#789b22", achats: "#b35d3f", stock: "#8c6845", flotte: "#d9674e",
     facturation: "#5668b8", ouvrages: "#8d6a3f", interventions: "#477e98", crm: "#7a5f9a", connecteurs: "#3d7a79",
     outillage: "#c05467", frais: "#476d97", conges: "#4d8a65", rentabilite: "#6f7f8f",
-    exports: "#3d7a79", parametres: "#6c6c6c",
+    exports: "#3d7a79", banque: "#315f78", parametres: "#6c6c6c",
   };
 
   return (

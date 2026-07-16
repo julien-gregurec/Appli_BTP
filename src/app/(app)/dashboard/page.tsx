@@ -54,6 +54,7 @@ export default async function DashboardPage() {
     { permission: "demander_ses_conges", href: "/conges", label: "Congés", icon: "conges" },
     { permission: "acces_rentabilite", href: "/rentabilite", label: "Rentabilité", icon: "rentabilite" },
     { permission: "acces_exports", href: "/exports", label: "Exports", icon: "exports" },
+    { permission: "acces_paiements_bancaires", href: "/paiements-bancaires", label: "Banque & paie", icon: "banque" },
     { permission: "acces_connecteurs", href: "/connecteurs", label: "Connecteurs", icon: "connecteurs" },
     { permission: "acces_parametres", href: "/parametres", label: "Paramètres", icon: "parametres" },
   ] as Array<MobileModuleLink & { permission: string | null }>).filter((module) => module.permission === null || autorise(module.permission));
