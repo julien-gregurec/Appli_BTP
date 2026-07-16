@@ -48,3 +48,5 @@ next-env.d.ts
 output/audit/
 output/video/brut/
 output/video/audio/
+output/video/montage/
+output/video/plans/
