@@ -46,10 +46,22 @@ const context = await browser.newContext({
 });
 const page = await context.newPage();
 
-// Défilement doux : un saut brutal est illisible à l'écran.
-async function defiler(pixels) {
-  await page.evaluate((y) => window.scrollTo({ top: y, behavior: "smooth" }), pixels);
-  await page.waitForTimeout(900);
+// Défilement lent, avec démarrage et freinage progressifs, comme une main qui
+// fait défiler une page. `window.scrollTo({behavior:"smooth"})` est trop rapide
+// et trop sec pour une vidéo.
+async function defilerDoucement(cible, duree) {
+  await page.evaluate(([cible, duree]) => new Promise((fini) => {
+    const depart = window.scrollY;
+    const delta = cible - depart;
+    const t0 = performance.now();
+    function pas(t) {
+      const p = Math.min(1, (t - t0) / duree);
+      const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; // ease-in-out
+      window.scrollTo(0, depart + delta * e);
+      if (p < 1) requestAnimationFrame(pas); else fini();
+    }
+    requestAnimationFrame(pas);
+  }), [cible, duree]);
 }
 
 async function aller(route) {
@@ -76,11 +88,20 @@ async function tenir(cle, { route, action } = {}) {
   echeance += duree(cle) + RESPIRATION;
   const fin = debut + echeance;
   if (action) await action();
-  while (Date.now() < fin - 1400) {
-    await defiler(420);
-    if (Date.now() >= fin - 1400) break;
-    await defiler(0);
+
+  // Rythme naturel : on arrive, on laisse le temps de lire, puis UN SEUL
+  // défilement lent s'il y a quelque chose de plus bas, et on s'arrête.
+  // L'ancien aller-retour en boucle donnait une nervosité mécanique.
+  const budget = fin - Date.now();
+  if (budget > 4500) {
+    await page.waitForTimeout(budget * 0.40);
+    const aVoir = await page.evaluate(
+      () => Math.max(0, document.documentElement.scrollHeight - window.innerHeight));
+    if (aVoir > 150) {
+      await defilerDoucement(Math.min(aVoir, 520), Math.min(budget * 0.45, 5200));
+    }
   }
+
   const reste = fin - Date.now();
   if (reste > 0) await page.waitForTimeout(reste);
   else if (reste < -1500) console.log(`  retard ${(-reste / 1000).toFixed(1)}s sur « ${cle} »`);
