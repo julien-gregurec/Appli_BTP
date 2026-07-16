@@ -1,14 +1,14 @@
 // Enregistre une démonstration réelle de Liria Gestion Pro.
 //
-// Playwright pilote un vrai navigateur connecté et filme la session. Chaque
-// scène dure exactement le temps de sa narration (mesurée en amont) : l'image
-// et la voix off sont donc synchrones par construction, sans montage manuel.
+// Principe : la voix off est générée d'abord, sa durée pilote le tournage.
+// Chaque geste est déclenché à la seconde précise où la narration en parle —
+// on saisit les identifiants PENDANT qu'on explique qu'on les saisit, au lieu
+// de faire puis commenter. C'est ce qui rend la démonstration fluide.
 //
-// Rien n'est simulé : ce sont les vraies pages, avec les vraies données de
-// l'entreprise de démonstration.
+// Rien n'est simulé : vraies pages, vraies données de l'entreprise de démo.
 //
 //   node scripts/video/enregistrer.mjs
-// Sortie : output/video/brut/*.webm
+// Sortie : output/video/brut/demo.webm
 
 import { chromium } from "playwright";
 import path from "node:path";
@@ -24,14 +24,9 @@ if (!email || !password) throw new Error("LIRIA_AUDIT_EMAIL et LIRIA_AUDIT_PASSW
 const scenes = JSON.parse(await readFile("output/video/scenes.json", "utf8"));
 const duree = (cle) => (scenes.find((s) => s.cle === cle)?.duree ?? 5) * 1000;
 
-// Respiration insérée entre deux narrations. La navigation vers la page
-// suivante se fait pendant ce silence : la voix off démarre donc toujours sur
-// la bonne page. Sans elle, le chargement mordait sur le début du texte et
-// l'image retardait d'une scène sur le commentaire.
-// Respiration entre deux narrations : le temps que la page s'affiche, pas plus.
-// À 6 s le montage comptait 90 s de silence sur 240 : la vidéo traînait.
-// 2,5 s couvrent l'affichage (~2,5 s) sans laisser de vide.
-const RESPIRATION = 2500;
+// Courte respiration entre deux phrases, le temps que la page s'affiche.
+// Volontairement brève : à 6 s, le montage comptait 37 % de silence.
+const RESPIRATION = 1500;
 
 await rm(sortie, { recursive: true, force: true });
 await mkdir(sortie, { recursive: true });
@@ -46,124 +41,161 @@ const context = await browser.newContext({
 });
 const page = await context.newPage();
 
-// Défilement lent, avec démarrage et freinage progressifs, comme une main qui
-// fait défiler une page. `window.scrollTo({behavior:"smooth"})` est trop rapide
-// et trop sec pour une vidéo.
-async function defilerDoucement(cible, duree) {
-  await page.evaluate(([cible, duree]) => new Promise((fini) => {
-    const depart = window.scrollY;
-    const delta = cible - depart;
-    const t0 = performance.now();
-    function pas(t) {
-      const p = Math.min(1, (t - t0) / duree);
-      const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2; // ease-in-out
+// Défilement lent, démarrage et freinage progressifs, comme une main humaine.
+async function defiler(cible, ms) {
+  await page.evaluate(([cible, ms]) => new Promise((fini) => {
+    const depart = window.scrollY, delta = cible - depart, t0 = performance.now();
+    (function pas(t) {
+      const p = Math.min(1, ((t ?? performance.now()) - t0) / ms);
+      const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
       window.scrollTo(0, depart + delta * e);
       if (p < 1) requestAnimationFrame(pas); else fini();
-    }
-    requestAnimationFrame(pas);
-  }), [cible, duree]);
+    })();
+  }), [cible, ms]);
 }
 
 async function aller(route) {
-  // On n'attend pas `networkidle` : en production les pages mettent 6 à 10 s à
-  // s'y stabiliser, alors qu'elles sont lisibles au bout de ~2,5 s. Attendre le
-  // silence réseau décalait la vidéo d'une scène entière sur la narration.
+  // On n'attend pas `networkidle` : les pages mettent 6 à 10 s à s'y stabiliser
+  // alors qu'elles sont lisibles en ~2,5 s.
   await page.goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded", timeout: 60_000 });
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(350);
 }
 
-// Horloge globale : chaque scène se termine à son échéance absolue depuis le
-// début de l'enregistrement. Sans cela, le temps de navigation s'ajoute à
-// chaque scène et l'écart s'accumule — la vidéo finissait 2 minutes plus longue
-// que la voix off, donc décalée par rapport à la narration.
+async function taper(selecteur, texte, delai = 45) {
+  const champ = page.locator(selecteur).first();
+  if (!(await champ.count())) return false;
+  await champ.click({ timeout: 5000 }).catch(() => {});
+  await champ.type(texte, { delay: delai });
+  return true;
+}
+
 const debut = Date.now();
 let echeance = 0;
 
-// `tenir` couvre la narration d'une scène. `route` est chargée AVANT que la
-// narration ne commence, pendant le silence qui précède : sans cela, la voix
-// décrit une page qui met encore 2 à 4 s à s'afficher, et l'image retarde d'une
-// scène entière sur le commentaire.
-async function tenir(cle, { route, action } = {}) {
-  if (route) await aller(route);          // pendant le silence précédent
-  echeance += duree(cle) + RESPIRATION;
+// Joue une scène. `choreo` reçoit `a(ms)` : « être à telle milliseconde de la
+// narration », ce qui permet de caler chaque geste sur les mots prononcés.
+async function scene(cle, { route, choreo } = {}) {
+  if (route) await aller(route);
+  const debutVoix = debut + echeance + RESPIRATION;
+  echeance += RESPIRATION + duree(cle);
   const fin = debut + echeance;
-  if (action) await action();
 
-  // Rythme naturel : on arrive, on laisse le temps de lire, puis UN SEUL
-  // défilement lent s'il y a quelque chose de plus bas, et on s'arrête.
-  // L'ancien aller-retour en boucle donnait une nervosité mécanique.
-  const budget = fin - Date.now();
-  if (budget > 4500) {
-    await page.waitForTimeout(budget * 0.32);
-    const aVoir = await page.evaluate(
-      () => Math.max(0, document.documentElement.scrollHeight - window.innerHeight));
-    if (aVoir > 150) {
-      await defilerDoucement(Math.min(aVoir, 520), Math.min(budget * 0.45, 5200));
+  const a = async (ms) => {
+    const attente = debutVoix + ms - Date.now();
+    if (attente > 0) await page.waitForTimeout(attente);
+  };
+
+  if (choreo) {
+    await choreo(a);
+  } else {
+    // Aucun geste : on laisse lire, puis un seul défilement lent.
+    const budget = fin - Date.now();
+    if (budget > 4000) {
+      await page.waitForTimeout(budget * 0.3);
+      const bas = await page.evaluate(
+        () => Math.max(0, document.documentElement.scrollHeight - window.innerHeight));
+      if (bas > 150) await defiler(Math.min(bas, 500), Math.min(budget * 0.5, 4800));
     }
   }
 
   const reste = fin - Date.now();
   if (reste > 0) await page.waitForTimeout(reste);
-  else if (reste < -1500) console.log(`  retard ${(-reste / 1000).toFixed(1)}s sur « ${cle} »`);
+  else if (reste < -1200) console.log(`  retard ${(-reste / 1000).toFixed(1)}s sur « ${cle} »`);
 }
 
 try {
-  // 1. Intro et connexion — la vraie page de login.
-  await tenir("intro", { route: "/login" });
+  await scene("intro", { route: "/login" });
 
-  await page.locator("#email").fill(email, { timeout: 15_000 });
-  await page.waitForTimeout(400);
-  // Le mot de passe est saisi caractère par caractère mais jamais affiché :
-  // le champ est de type password, l'enregistrement ne montre que des points.
-  await page.locator("#password").fill(password);
-  await page.waitForTimeout(600);
-  await Promise.all([
-    page.waitForURL((u) => !u.pathname.startsWith("/login"), { timeout: 60_000 }),
-    page.getByRole("button", { name: "Se connecter" }).click(),
-  ]);
-  await page.waitForTimeout(1200);
-  await tenir("connexion");
+  // « Je saisis mon adresse… mon mot de passe… et je me connecte. »
+  await scene("connexion", {
+    choreo: async (a) => {
+      await a(400);
+      await taper("#email", email, 42);
+      await a(3000);
+      await taper("#password", password, 42);
+      await a(5400);
+      await page.getByRole("button", { name: "Se connecter" }).click();
+      await page.waitForURL((u) => !u.pathname.startsWith("/login"), { timeout: 60_000 });
+    },
+  });
 
-  await tenir("dashboard");
+  // « … Je descends : les indicateurs, les alertes, les raccourcis. »
+  await scene("dashboard", {
+    choreo: async (a) => { await a(5200); await defiler(520, 4200); },
+  });
 
-  await tenir("clients", { route: "/clients" });
+  // « Je tape dans la recherche… et la liste se filtre à la volée. »
+  await scene("clients", {
+    route: "/clients",
+    choreo: async (a) => {
+      await a(3400);
+      await taper('input[name="q"]', "Societe", 80);
+      await a(6200);
+      await page.getByRole("button", { name: "Filtrer" }).first().click().catch(() => {});
+    },
+  });
 
-  await tenir("chantiers", { route: "/chantiers" });
+  // « Je filtre sur les chantiers en cours… »
+  await scene("chantiers", {
+    route: "/chantiers",
+    choreo: async (a) => {
+      await a(3600);
+      await defiler(360, 2600);
+      await a(6600);
+      await page.locator('select[name="statut"]').first()
+        .selectOption({ label: "En cours" }).catch(() => {});
+    },
+  });
 
-  await tenir("devis", { route: "/devis" });
+  await scene("devis", {
+    route: "/devis",
+    choreo: async (a) => { await a(5200); await defiler(300, 2400); },
+  });
 
-  // Création réelle d'un devis : on remplit vraiment le formulaire.
-  await tenir("devis_creation", { route: "/devis/nouveau", action: async () => {
-    const designation = page.locator('input[name="designation"]').first();
-    if (await designation.count()) {
-      await designation.click();
-      await designation.type("Pose de carrelage", { delay: 55 });
-      await page.waitForTimeout(500);
-    }
-  } });
+  // « Je choisis le client… je tape ma prestation… la quantité… le prix. »
+  await scene("devis_creation", {
+    route: "/devis/nouveau",
+    choreo: async (a) => {
+      await a(1200);
+      await page.locator("select").first().selectOption({ index: 1 }).catch(() => {});
+      await a(3200);
+      await taper('input[name="designation"]', "Pose de carrelage", 55);
+      await a(7000);
+      await taper('input[name="quantite"]', "24", 110);
+      await a(8600);
+      await taper('input[name="prix_unitaire_ht"]', "55", 110);
+      await a(10200);
+      await defiler(320, 1600);
+    },
+  });
 
-  // Un devis existant, pour montrer le résultat abouti.
   const lien = await page.evaluate(async (url) => {
     const r = await fetch(url + "/devis");
-    const t = await r.text();
-    const m = t.match(/\/devis\/[0-9a-f-]{36}/);
+    const m = (await r.text()).match(/\/devis\/[0-9a-f-]{36}/);
     return m ? m[0] : null;
   }, baseUrl).catch(() => null);
-  await tenir("devis_fiche", { route: lien ?? "/devis" });
+  await scene("devis_fiche", { route: lien ?? "/devis" });
 
-  await tenir("factures", { route: "/factures" });
+  await scene("factures", {
+    route: "/factures",
+    choreo: async (a) => { await a(4600); await defiler(420, 3600); },
+  });
 
-  await tenir("planning", { route: "/planning" });
+  await scene("planning", {
+    route: "/planning",
+    choreo: async (a) => {
+      await a(4200);
+      await page.locator("select").first().selectOption({ index: 1 }).catch(() => {});
+      await a(6800);
+      await defiler(400, 2600);
+    },
+  });
 
-  await tenir("pointage", { route: "/pointage" });
-
-  await tenir("employes", { route: "/employes" });
-
-  await tenir("stock", { route: "/stock" });
-
-  await tenir("rentabilite", { route: "/rentabilite" });
-
-  await tenir("fin", { route: "/dashboard" });
+  await scene("pointage", { route: "/pointage" });
+  await scene("employes", { route: "/employes" });
+  await scene("stock", { route: "/stock" });
+  await scene("rentabilite", { route: "/rentabilite" });
+  await scene("fin", { route: "/dashboard" });
 } finally {
   await page.close();
   await context.close();
@@ -174,6 +206,4 @@ const fichiers = (await readdir(sortie)).filter((f) => f.endsWith(".webm"));
 if (fichiers.length) {
   await rename(path.join(sortie, fichiers[0]), path.join(sortie, "demo.webm"));
   console.log(`Vidéo brute : ${sortie}/demo.webm`);
-} else {
-  console.log("Aucune vidéo produite.");
 }
