@@ -7,6 +7,7 @@
 - Import expert-comptable prêt via `/api/paie/import`; ajouter `PAYROLL_IMPORT_SECRET` seulement lors de l’accord d’intégration. Powens reste non opérationnel tant que le contrat et les quatre variables `POWENS_*` ne sont pas fournis.
 - SIRET entreprise/fournisseur et forme juridique sont obligatoires avant envoi. L’accès support plateforme est explicitement bloqué. Documentation complète : `docs/PAIEMENTS_BANCAIRES_ET_PAIE.md`.
 - Validation : TypeScript, ESLint, 28 tests, diff-check et build webpack 78 pages verts. Ne pas commiter les vidéos et fichiers `page 2.tsx` non suivis de l’utilisateur.
+- Lot inclus sur `gh/main` au commit `2a11e86`, Vercel Production **Ready**. Vérification publique : login 200, page bancaire protégée, import paie non authentifié refusé 401.
 
 ---
 

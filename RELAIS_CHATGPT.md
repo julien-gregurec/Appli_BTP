@@ -8,6 +8,7 @@
 - L’adaptateur Powens Pay et son callback signé sont codés. Aucun virement réel ne fonctionnera avant souscription du contrat Powens et ajout dans Vercel de `POWENS_API_BASE_URL`, `POWENS_WEBVIEW_BASE_URL`, `POWENS_CLIENT_ID` et `POWENS_CLIENT_SECRET`. SIRET entreprise/fournisseur et forme juridique sont exigés avant transmission.
 - Permissions : `acces_paiements_bancaires`, `gerer_coordonnees_bancaires`, `gerer_paie`, `preparer_virements`, `valider_virements`, `executer_virements`. Le support plateforme est exclu de toute action bancaire.
 - Contrôles locaux verts : TypeScript, ESLint, 28 tests Vitest, `git diff --check` et build Next webpack complet de 78 pages. Documentation : `docs/PAIEMENTS_BANCAIRES_ET_PAIE.md`.
+- Lot inclus sur `gh/main` au commit `2a11e86` et déploiement Vercel Production confirmé **Ready**. Contrôle public : `/login` = 200, `/paiements-bancaires` redirige sans session vers `/login`, `/api/paie/import` refuse sans secret avec 401.
 
 ---
 
