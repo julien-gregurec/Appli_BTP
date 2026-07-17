@@ -60,11 +60,14 @@ export default async function InventairePage({
             <h1 className="mt-1 text-2xl font-semibold">{inventaire.numero}</h1>
             <p className="text-sm text-neutral-500">{inventaire.date_inventaire} · <span className="capitalize">{inventaire.statut}</span></p>
           </div>
-          {cloture && (
+          {cloture && <div className="flex flex-wrap gap-2">
             <a href={`/api/inventaires/${id}/cloture`} className="rounded-md bg-[#0d1b2a] px-4 py-2 text-center text-sm font-semibold text-white">
-              Exporter la clôture comptable CSV
+              Exporter la clôture Excel
             </a>
-          )}
+            <a href={`/api/inventaires/${id}/cloture?format=csv`} className="rounded-md border px-3 py-2 text-center text-sm">
+              CSV brut
+            </a>
+          </div>}
         </div>
 
         {message.error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{message.error}</p>}

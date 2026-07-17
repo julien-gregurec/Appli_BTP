@@ -1,13 +1,14 @@
-import { reponseCsv, nombreCsv } from "@/lib/csv";
+import { reponseCsv } from "@/lib/csv";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { calculerSyntheseInventaire } from "@/lib/inventaires";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
+import { reponseXlsx } from "@/lib/xlsx";
 
 type Article = { reference: string; designation: string; unite: string };
 const un = <T,>(valeur: T | T[] | null): T | null => Array.isArray(valeur) ? valeur[0] ?? null : valeur;
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const contexte = await getContexteEntreprise();
   const permissions = await permissionsUtilisateur(contexte);
@@ -54,11 +55,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     ["SYNTHÈSE"],
     ["Nombre d’articles", synthese.articles],
     ["Articles avec écart", synthese.articlesAvecEcart],
-    ["Quantités manquantes", nombreCsv(synthese.quantiteManquante)],
-    ["Quantités excédentaires", nombreCsv(synthese.quantiteExcedentaire)],
-    ["Valeur théorique HT", nombreCsv(synthese.valeurTheoriqueHt)],
-    ["Valeur comptée HT", nombreCsv(synthese.valeurCompteeHt)],
-    ["Écart de valeur HT", nombreCsv(synthese.ecartValeurHt)],
+    ["Quantités manquantes", synthese.quantiteManquante],
+    ["Quantités excédentaires", synthese.quantiteExcedentaire],
+    ["Valeur théorique HT", synthese.valeurTheoriqueHt],
+    ["Valeur comptée HT", synthese.valeurCompteeHt],
+    ["Écart de valeur HT", synthese.ecartValeurHt],
     [],
     ["Référence", "Article", "Unité", "Quantité théorique", "Quantité comptée", "Écart quantité", "Prix achat unitaire HT figé", "Valeur théorique HT", "Valeur comptée HT", "Écart de valeur HT"],
   ];
@@ -67,15 +68,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       ligne.article?.reference ?? "",
       ligne.article?.designation ?? "",
       ligne.article?.unite ?? "",
-      nombreCsv(ligne.theorique),
-      nombreCsv(ligne.compte),
-      nombreCsv(ligne.ecart),
-      nombreCsv(ligne.prix),
-      nombreCsv(ligne.valeurTheorique),
-      nombreCsv(ligne.valeurComptee),
-      nombreCsv(ligne.valeurComptee - ligne.valeurTheorique),
+      ligne.theorique,
+      ligne.compte,
+      ligne.ecart,
+      ligne.prix,
+      ligne.valeurTheorique,
+      ligne.valeurComptee,
+      ligne.valeurComptee - ligne.valeurTheorique,
     ]);
   }
   csv.push([], ["Document préparatoire à transmettre à l’expert-comptable. La méthode de valorisation, les prix historiques et les éventuelles dépréciations restent à valider."]);
-  return reponseCsv(csv, `cloture-inventaire-${inventaire.numero}-${inventaire.date_inventaire}.csv`);
+  const nom = `cloture-inventaire-${inventaire.numero}-${inventaire.date_inventaire}`;
+  if (new URL(request.url).searchParams.get("format") === "csv") return reponseCsv(csv, `${nom}.csv`);
+  return reponseXlsx(csv, `${nom}.xlsx`, { nomFeuille: "Clôture inventaire", ligneEntetes: 18 });
 }

@@ -58,6 +58,14 @@
 - Dans Trésorerie, chaque semaine est maintenant dépliable. Le détail présente chaque échéance avec sa date, son retard éventuel, sa nature, sa référence, le client ou fournisseur, le chantier, le montant et un lien direct vers le document.
 - Aucun changement de schéma n'est requis pour ce lot. Contrôles locaux : ESLint, TypeScript, 36 tests Vitest et build Next webpack complets verts.
 
+## 96. Exports Excel propres et cellules adaptatives — 17 juillet 2026
+
+- Les cinq exports comptables (ventes, achats, règlements, TVA collectée et TVA déductible) sont maintenant proposés par défaut en véritable classeur `.xlsx` ; le CSV brut reste disponible pour les logiciels comptables qui l’exigent.
+- Les fichiers Excel séparent réellement les cellules, adaptent automatiquement chaque largeur de colonne avec un plafond lisible, figent les en-têtes, activent les filtres et utilisent une mise en page Liria Gestion Pro cohérente.
+- Les dates restent de vraies dates triables, les montants restent numériques avec un format monétaire et les taux de TVA sont formatés séparément. Les valeurs textuelles susceptibles d’être interprétées comme des formules sont neutralisées.
+- La clôture d’inventaire bénéficie du même export Excel mis en forme, avec son rapport, sa synthèse et son tableau détaillé ; son CSV brut reste accessible en second choix.
+- Vérification visuelle effectuée sur un journal des ventes représentatif : 12 colonnes lisibles sans mélange ni découpage. TypeScript, ESLint, tests Vitest et build Next webpack complet de 78 routes verts. Aucune migration nécessaire.
+
 ## 17 juillet 2026 — Réception des commandes fournisseurs réparée
 
 - Cause identifiée : depuis le durcissement des droits de la migration 43, la RPC sécurisée `enregistrer_reception_commande` attend le paramètre JSON `p_lignes`, mais l’action serveur envoyait encore l’ancien nom `p_receptions`. Supabase refusait donc l’appel avant toute mise à jour.
