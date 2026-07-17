@@ -832,3 +832,4 @@ git diff --check                   # OK (aucun conflit whitespace)
 - La liste des factures fournisseurs signale les échéances proches, celles dues aujourd’hui et les retards.
 - Migration `20260717000095_rib_fiches_delais_fournisseurs.sql` appliquée avec succès dans Supabase.
 - Contrôles : 40 tests Vitest, ESLint et build Next webpack complet de 79 pages verts. Seul l’avertissement historique `unpdf/import.meta` demeure non bloquant.
+- Lot publié sur `gh/main` au commit `ae169d5` et déploiement Vercel confirmé **Ready**. Les routes `/banque-paie`, `/paiements-bancaires` et `/fournisseurs` répondent en production et redirigent correctement une personne non connectée vers `/login`.
