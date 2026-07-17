@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { importerVehiculesAction } from "@/app/actions/flotte";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
+import { Lien as Link } from "@/components/Lien";
 
 type EmployeLie = { prenom: string; nom: string };
 

@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { euros } from "@/lib/devis";
 import { projectionHebdomadaire, type FluxTresorerie } from "@/lib/tresorerie";
+import { Lien as Link } from "@/components/Lien";
 
 const JOUR = 86_400_000;
 const iso = (date: Date) => date.toISOString().slice(0, 10);

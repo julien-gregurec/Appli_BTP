@@ -17,7 +17,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
   const supabase = await createClient();
 
   let entreprises: EntrepriseAbonnement[] = [];
-  let appareilsParEntreprise = new Map<string,{nb_appareils_actifs:number;nb_comptes_plus_de_deux:number;maximum_appareils_compte:number}>();
+  let appareilsParEntreprise = new Map<string,{nb_appareils_actifs:number;nb_comptes_plus_de_deux:number;maximum_appareils_compte:number;montant_depassements_ht:number}>();
   let tarifsPostes: { entreprise_id: string; poste_id: string; nom: string; code_offre: string; tarif_compte_mensuel: number; nb_comptes_facturables: number }[] = [];
   if (isEmailLoginDisabled()) {
     const { data: ents } = await supabase
@@ -46,14 +46,14 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
     })) as EntrepriseAbonnement[];
     tarifsPostes = (postes ?? []).map((poste) => ({ entreprise_id: poste.entreprise_id, poste_id: poste.id, nom: poste.nom, code_offre: poste.code_offre, tarif_compte_mensuel: Number(poste.tarif_compte_mensuel), nb_comptes_facturables: (employes ?? []).filter((employe) => employe.entreprise_id === poste.entreprise_id && employe.poste_id === poste.id && ["actif", "pause"].includes(employe.compte_application_statut ?? "")).length }));
     const{data:appareils}=await supabase.from("appareils_comptes").select("entreprise_id,utilisateur_id,revoque_at").is("revoque_at",null);
-    for(const entreprise of entreprises){const actifs=(appareils??[]).filter(a=>a.entreprise_id===entreprise.id),comptes=new Map<string,number>();for(const appareil of actifs)comptes.set(appareil.utilisateur_id,(comptes.get(appareil.utilisateur_id)??0)+1);appareilsParEntreprise.set(entreprise.id,{nb_appareils_actifs:actifs.length,nb_comptes_plus_de_deux:[...comptes.values()].filter(n=>n>2).length,maximum_appareils_compte:Math.max(0,...comptes.values())});}
+    for(const entreprise of entreprises){const actifs=(appareils??[]).filter(a=>a.entreprise_id===entreprise.id),comptes=new Map<string,number>();for(const appareil of actifs)comptes.set(appareil.utilisateur_id,(comptes.get(appareil.utilisateur_id)??0)+1);const utilisateursDepasses=[...comptes.entries()].filter(([,nombre])=>nombre>2).map(([utilisateurId])=>utilisateurId);const montantDepassements=utilisateursDepasses.reduce((total,utilisateurId)=>{const employe=(employes??[]).find(item=>item.entreprise_id===entreprise.id&&item.utilisateur_id===utilisateurId);const poste=(postes??[]).find(item=>item.id===employe?.poste_id);return total+Number(poste?.tarif_compte_mensuel??0);},0);appareilsParEntreprise.set(entreprise.id,{nb_appareils_actifs:actifs.length,nb_comptes_plus_de_deux:utilisateursDepasses.length,maximum_appareils_compte:Math.max(0,...comptes.values()),montant_depassements_ht:montantDepassements});}
   } else {
     const [{ data }, { data: usages }, { data: tarifs }, { data: besoins },{data:usageAppareils}] = await Promise.all([supabase.rpc("plateforme_entreprises"), supabase.rpc("plateforme_usage_entreprises"), supabase.rpc("plateforme_postes_tarifs"), supabase.rpc("plateforme_besoins"),supabase.rpc("plateforme_usage_appareils")]);
     const usageParEntreprise = new Map<string, Partial<EntrepriseAbonnement>>(((usages ?? []) as Array<Partial<EntrepriseAbonnement> & { entreprise_id: string }>).map((usage) => [usage.entreprise_id, usage]));
     const offreParEntreprise = new Map<string, string>(((besoins ?? []) as Array<{entreprise_id:string;offre_recommandee:string|null}>).map((besoin) => [besoin.entreprise_id, besoin.offre_recommandee ?? "essentiel"]));
     entreprises = ((data ?? []) as EntrepriseAbonnement[]).map((entreprise) => ({ ...entreprise, ...(usageParEntreprise.get(entreprise.id) ?? {}), offre_recommandee: offreParEntreprise.get(entreprise.id) ?? "essentiel" }));
     tarifsPostes = (tarifs ?? []) as typeof tarifsPostes;
-    appareilsParEntreprise=new Map(((usageAppareils??[])as Array<{entreprise_id:string;nb_appareils_actifs:number;nb_comptes_plus_de_deux:number;maximum_appareils_compte:number}>).map(usage=>[usage.entreprise_id,{nb_appareils_actifs:Number(usage.nb_appareils_actifs),nb_comptes_plus_de_deux:Number(usage.nb_comptes_plus_de_deux),maximum_appareils_compte:Number(usage.maximum_appareils_compte)}]));
+    appareilsParEntreprise=new Map(((usageAppareils??[])as Array<{entreprise_id:string;nb_appareils_actifs:number;nb_comptes_plus_de_deux:number;maximum_appareils_compte:number;montant_depassements_ht:number}>).map(usage=>[usage.entreprise_id,{nb_appareils_actifs:Number(usage.nb_appareils_actifs),nb_comptes_plus_de_deux:Number(usage.nb_comptes_plus_de_deux),maximum_appareils_compte:Number(usage.maximum_appareils_compte),montant_depassements_ht:Number(usage.montant_depassements_ht)}]));
   }
 
   let membresPlateforme: MembrePlateforme[] = [];
@@ -146,8 +146,8 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
             const action = modifierAbonnementAction.bind(null, e.id);
             const comptesFacturables = e.nb_comptes_facturables ?? e.nb_comptes_actives ?? e.nb_membres_actifs;
             const offre = offreParCle(e.offre_recommandee ?? "essentiel");
-            const prix = prixAbonnementMensuel(comptesFacturables, offre.base);
-            const usageAppareils=appareilsParEntreprise.get(e.id)??{nb_appareils_actifs:0,nb_comptes_plus_de_deux:0,maximum_appareils_compte:0};
+            const usageAppareils=appareilsParEntreprise.get(e.id)??{nb_appareils_actifs:0,nb_comptes_plus_de_deux:0,maximum_appareils_compte:0,montant_depassements_ht:0};
+            const prix = prixAbonnementMensuel(comptesFacturables, offre.base, usageAppareils.montant_depassements_ht);
             return (
               <article key={e.id} className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -167,7 +167,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                     <div className="mt-2 inline-flex items-baseline gap-2 rounded-md bg-[#c9a24a]/10 px-3 py-1.5">
                       <span className="text-lg font-semibold text-[#0d1b2a] dark:text-[#c9a24a]">{prix.total} €<span className="text-xs font-normal">/mois</span></span>
                       <span className="text-[11px] text-neutral-500">
-                        offre {offre.nom} {prix.base} € (jusqu&apos;à {prix.employesInclus} comptes){prix.employesSupplementaires > 0 ? ` + ${prix.employesSupplementaires} × ${prix.parEmployeSup} €` : ""}
+                        offre {offre.nom} {prix.base} € (jusqu&apos;à {prix.employesInclus} comptes){prix.employesSupplementaires > 0 ? ` + ${prix.employesSupplementaires} × ${prix.parEmployeSup} €` : ""}{prix.supplementAppareils > 0 ? ` + ${prix.supplementAppareils.toLocaleString("fr-FR")} € appareils` : ""}
                       </span>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
@@ -178,7 +178,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                       <p className="rounded bg-violet-50 px-2 py-1.5 text-violet-900 dark:bg-violet-950/30 dark:text-violet-200"><strong className="block text-base">{e.nb_applications_installees ?? 0}</strong> installations</p>
                     </div>
                     <p className="mt-2 text-xs text-neutral-500">Options utilisées : {e.options_actives?.length ? e.options_actives.join(", ") : "aucune"}{e.derniere_connexion ? ` · dernière connexion ${new Date(e.derniere_connexion).toLocaleString("fr-FR")}` : ""}</p>
-                    <div className={`mt-2 rounded-md border p-3 text-sm ${usageAppareils.nb_comptes_plus_de_deux>0?"border-red-300 bg-red-50 text-red-900":"border-green-200 bg-green-50 text-green-900"}`}><strong>{usageAppareils.nb_appareils_actifs} appareil(s) actif(s)</strong><span className="ml-2 text-xs">Limite : 2 par compte</span>{usageAppareils.nb_comptes_plus_de_deux>0&&<p className="mt-1 font-semibold">⚠ {usageAppareils.nb_comptes_plus_de_deux} compte(s) dépassent la limite · maximum observé : {usageAppareils.maximum_appareils_compte}</p>}</div>
+                    <div className={`mt-2 rounded-md border p-3 text-sm ${usageAppareils.nb_comptes_plus_de_deux>0?"border-red-300 bg-red-50 text-red-900":"border-green-200 bg-green-50 text-green-900"}`}><strong>{usageAppareils.nb_appareils_actifs} appareil(s) actif(s)</strong><span className="ml-2 text-xs">2 appareils inclus par compte</span>{usageAppareils.nb_comptes_plus_de_deux>0&&<p className="mt-1 font-semibold">⚠ {usageAppareils.nb_comptes_plus_de_deux} compte(s) dépassent la limite · {usageAppareils.montant_depassements_ht.toLocaleString("fr-FR",{style:"currency",currency:"EUR"})} HT/mois ajouté(s) au tarif de leur poste · maximum observé : {usageAppareils.maximum_appareils_compte}</p>}</div>
                     <p className="mt-2 text-sm font-semibold">Prix automatique mensuel : {prix.total.toLocaleString("fr-FR",{style:"currency",currency:"EUR"})} HT</p>
                     <details className="mt-3 rounded border bg-neutral-50 p-3 dark:bg-neutral-900"><summary className="cursor-pointer text-sm font-semibold">Tarifs par poste</summary><div className="mt-3 space-y-2">{tarifsPostes.filter((poste) => poste.entreprise_id === e.id).map((poste) => <form key={poste.poste_id} action={modifierTarifPostePlateformeAction.bind(null, poste.poste_id)} className="grid items-end gap-2 text-sm sm:grid-cols-[1fr_130px_130px_auto]"><div><strong>{poste.nom}</strong><p className="text-xs text-neutral-500">{poste.nb_comptes_facturables} compte(s) facturable(s)</p></div><label className="text-xs text-neutral-500">Offre<input name="code_offre" defaultValue={poste.code_offre} className={`${input} mt-1 w-full`}/></label><label className="text-xs text-neutral-500">€/compte/mois<input name="tarif" type="number" min="0" step="0.01" defaultValue={poste.tarif_compte_mensuel} className={`${input} mt-1 w-full`}/></label><button className="rounded border px-3 py-2">Enregistrer</button></form>)}</div></details>
                   </div>

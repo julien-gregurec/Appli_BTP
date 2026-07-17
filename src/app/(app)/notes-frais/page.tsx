@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { euros } from "@/lib/devis";
@@ -8,6 +7,7 @@ import { permissionsUtilisateur } from "@/lib/permissions";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { ExpenseAmountFields } from "@/components/ExpenseAmountFields";
 import { SearchableSelect } from "@/components/SearchableSelect";
+import { Lien as Link } from "@/components/Lien";
 
 const input = "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 

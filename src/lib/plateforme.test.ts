@@ -15,4 +15,11 @@ describe("prixAbonnementMensuel", () => {
     });
     expect(prixAbonnementMensuel(8).total).toBe(109);
   });
+
+  it("ajoute le dépassement d'appareils au tarif du poste", () => {
+    expect(prixAbonnementMensuel(3, 49, 28)).toMatchObject({
+      total: 77,
+      supplementAppareils: 28,
+    });
+  });
 });

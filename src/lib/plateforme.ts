@@ -54,14 +54,16 @@ export type EntrepriseAbonnement = {
 // Barème par défaut, ajustable ici.
 export const TARIF_ABONNEMENT = { base: 49, employesInclus: 3, parEmployeSup: 12 };
 
-export function prixAbonnementMensuel(nbComptesFacturables: number, base: number = TARIF_ABONNEMENT.base) {
+export function prixAbonnementMensuel(nbComptesFacturables: number, base: number = TARIF_ABONNEMENT.base, supplementAppareils: number = 0) {
   const sup = Math.max(0, nbComptesFacturables - TARIF_ABONNEMENT.employesInclus);
+  const supplementAppareilsSecurise = Number.isFinite(supplementAppareils) ? Math.max(0, supplementAppareils) : 0;
   return {
-    total: base + sup * TARIF_ABONNEMENT.parEmployeSup,
+    total: base + sup * TARIF_ABONNEMENT.parEmployeSup + supplementAppareilsSecurise,
     base,
     employesSupplementaires: sup,
     parEmployeSup: TARIF_ABONNEMENT.parEmployeSup,
     employesInclus: TARIF_ABONNEMENT.employesInclus,
+    supplementAppareils: supplementAppareilsSecurise,
   };
 }
 

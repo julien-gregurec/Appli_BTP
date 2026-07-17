@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { euros } from "@/lib/devis";
 import { statutCommande } from "@/lib/commandes";
+import { Lien as Link } from "@/components/Lien";
 
 export default async function CommandesPage() {
   const ctx = await getContexteEntreprise();

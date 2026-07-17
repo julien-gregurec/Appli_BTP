@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { creerAffectationAction, supprimerGroupeAffectationsAction } from "@/app/actions/planning";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { PlanningAffectationForm } from "@/components/PlanningAffectationForm";
+import { Lien as Link } from "@/components/Lien";
 
 type A = {
   id: string;

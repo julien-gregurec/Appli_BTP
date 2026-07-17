@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { euros } from "@/lib/devis";
 import { typePrestationLabel } from "@/lib/prestations";
 import { changerActivationPrestationAction } from "@/app/actions/prestations";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
+import { Lien as Link } from "@/components/Lien";
 
 export default async function PrestationsPage() {
   const ctx = await getContexteEntreprise();

@@ -1,9 +1,9 @@
-import Link from "next/link";
 import {createClient} from "@/lib/supabase/server";
 import {getContexteEntreprise} from "@/lib/entreprise";
 import {creerDepenseAction} from "@/app/actions/depenses";
 import {DEPENSE_CATEGORIES,DEPENSE_STATUTS} from "@/lib/depenses";
 import {euros} from "@/lib/devis";
+import { Lien as Link } from "@/components/Lien";
 const un=<T,>(v:T|T[]|null):T|null=>Array.isArray(v)?v[0]??null:v;
 export default async function DepensesPage({searchParams}:{searchParams:Promise<{error?:string;chantier?:string}>}){
  const{error,chantier=""}=await searchParams;const ctx=await getContexteEntreprise();const sb=await createClient();

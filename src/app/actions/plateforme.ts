@@ -102,7 +102,7 @@ export async function genererSnapshotFacturationAction(formData: FormData) {
   if (error) redirect(`${retour}${retour.includes("?") ? "&" : "?"}error=${encodeURIComponent(error.message)}`);
   revalidatePath("/plateforme");
   revalidatePath("/plateforme/facturation");
-  redirect(`${retour}${retour.includes("?") ? "&" : "?"}succes=${encodeURIComponent(`${data ?? 0} compte(s) ajouté(s) au relevé mensuel`)}`);
+  redirect(`${retour}${retour.includes("?") ? "&" : "?"}succes=${encodeURIComponent(`${data ?? 0} compte(s) actualisé(s), dépassements d’appareils inclus`)}`);
 }
 
 export async function entrerEntreprisePlateformeAction(entrepriseId:string,formData:FormData){
