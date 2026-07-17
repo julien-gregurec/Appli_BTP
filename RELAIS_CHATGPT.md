@@ -1,14 +1,15 @@
 # REPRISE — 17 juillet 2026, facturation des comptes utilisant plus de deux appareils (MIGRATION 90 APPLIQUÉE)
 
-## 17 juillet 2026 — TVA automatique des factures fournisseurs (MIGRATION 91 À APPLIQUER)
+## 17 juillet 2026 — TVA automatique et virement direct des factures fournisseurs (MIGRATION 91 APPLIQUÉE)
 
-- Migration préparée : `20260717000091_tva_factures_fournisseurs.sql`. Elle ajoute `taux_tva` aux factures fournisseurs, reprend les données existantes, limite les nouveaux taux à 0 %, 2,1 %, 5,5 %, 10 % et 20 %, puis recalcule systématiquement le montant de TVA côté PostgreSQL.
+- Migration `20260717000091_tva_factures_fournisseurs.sql` appliquée avec succès directement dans Supabase. Elle ajoute `taux_tva` aux factures fournisseurs, reprend les données existantes, limite les nouveaux taux à 0 %, 2,1 %, 5,5 %, 10 % et 20 %, puis recalcule systématiquement le montant de TVA côté PostgreSQL.
 - Le formulaire `/depenses` propose les taux de France métropolitaine, calcule immédiatement TVA et TTC à partir du HT et recalcule encore côté serveur avant l’écriture. Les valeurs envoyées par le navigateur ne sont jamais considérées comme fiables.
 - Les commandes proposées sont maintenant filtrées selon le fournisseur choisi, ce qui empêche l’erreur « La commande et la facture doivent concerner le même fournisseur » observée sur la capture.
 - La liste et la fiche facture affichent le taux, les montants HT, TVA et TTC.
 - Les exports comptables proposent désormais le **Journal des achats** et la **TVA déductible sur les achats**, détaillée puis synthétisée par taux. La TVA sur les ventes est explicitement renommée TVA collectée.
+- La fiche facture fournisseur propose maintenant une action principale **« Préparer le virement »** avec facture, fournisseur, solde et date repris automatiquement. Elle vérifie le RIB fournisseur et son statut avant de créer le lot bancaire ; la facture ne passe payée qu’après confirmation du prestataire. Le formulaire historique est replié et renommé **« paiement effectué hors Liria »** pour éviter toute confusion.
+- Le parcours bancaire réel reste : RIB vérifié → lot préparé → validation → transmission Powens → authentification forte auprès de la banque → confirmation et comptabilisation. Sans contrat et clés Powens, le bouton prépare le lot mais aucun argent ne peut être transmis.
 - Contrôles locaux : TypeScript, ESLint, 32 tests Vitest, `git diff --check` et build Next webpack verts. Seul l’avertissement historique `unpdf/import.meta` demeure non bloquant.
-- Ne pas publier le code avant l’application de la migration 91, car le nouvel écran et les exports lisent la colonne `taux_tva`.
 
 - Liaison devis ↔ chantier complétée sans migration : depuis une fiche chantier, l'utilisateur autorisé recherche et associe un devis du même client ; depuis une fiche devis, il recherche, associe, change ou retire le chantier. Les deux fiches reflètent immédiatement la même relation. Les rapprochements entre clients différents sont refusés côté serveur. Un devis accepté peut être déplacé mais ne peut plus rester sans chantier, afin de préserver la synchronisation de ses tâches. Les anciens et nouveaux chantiers, le PDF et « Mes travaux » sont invalidés après changement.
 - Le relevé `/plateforme/facturation` présente maintenant une ligne unique par employé. Le nom est sélectionnable : la ligne est surlignée et ouvre, sur la même page et pour le mois consulté, le détail du poste, de l'offre, du statut, du nombre d'appareils, du tarif du compte, du supplément éventuel et du total HT. Aucun changement de base nécessaire.
