@@ -187,3 +187,34 @@ export async function revoquerAppareilEmployeAction(employeId:string,appareilId:
   if(error)redirect(`/employes/${employeId}?error=${encodeURIComponent(error.message)}`);
   revalidatePath(`/employes/${employeId}`);revalidatePath("/plateforme");redirect(`/employes/${employeId}?success=${encodeURIComponent("Appareil révoqué")}`);
 }
+
+// ─── Signature numérique dessinée de l'employé ───────────────────────
+export async function enregistrerSignatureEmployeAction(employeId: string, dataUrl: string) {
+  const ctx = await getContexteEntreprise();
+  await exigerGestionEmployes(ctx, `/employes/${employeId}`);
+  const supabase = await createClient();
+  const m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec((dataUrl ?? "").trim());
+  if (!m) return { ok: false as const, erreur: "Signature invalide." };
+  const buffer = Buffer.from(m[1], "base64");
+  if (!buffer.length || buffer.length > 2 * 1024 * 1024) return { ok: false as const, erreur: "Signature vide ou trop volumineuse." };
+  const { data: employe } = await supabase.from("employes").select("id, signature_storage_path").eq("id", employeId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+  if (!employe) return { ok: false as const, erreur: "Employé introuvable." };
+  const path = `${ctx.entrepriseId}/${employeId}/signature-${crypto.randomUUID()}.png`;
+  const { error: upload } = await supabase.storage.from("documents-employes").upload(path, buffer, { contentType: "image/png", upsert: false });
+  if (upload) return { ok: false as const, erreur: upload.message };
+  const { error } = await supabase.from("employes").update({ signature_storage_path: path, signature_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", employeId).eq("entreprise_id", ctx.entrepriseId);
+  if (error) { await supabase.storage.from("documents-employes").remove([path]); return { ok: false as const, erreur: error.message }; }
+  if (employe.signature_storage_path) await supabase.storage.from("documents-employes").remove([employe.signature_storage_path]);
+  revalidatePath(`/employes/${employeId}`);
+  return { ok: true as const };
+}
+
+export async function supprimerSignatureEmployeAction(employeId: string) {
+  const ctx = await getContexteEntreprise();
+  await exigerGestionEmployes(ctx, `/employes/${employeId}`);
+  const supabase = await createClient();
+  const { data: employe } = await supabase.from("employes").select("signature_storage_path").eq("id", employeId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+  if (employe?.signature_storage_path) await supabase.storage.from("documents-employes").remove([employe.signature_storage_path]);
+  await supabase.from("employes").update({ signature_storage_path: null, signature_at: null }).eq("id", employeId).eq("entreprise_id", ctx.entrepriseId);
+  revalidatePath(`/employes/${employeId}`);
+}

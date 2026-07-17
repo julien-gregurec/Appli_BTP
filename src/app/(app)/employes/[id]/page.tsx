@@ -15,6 +15,7 @@ import { roleChantier } from "@/lib/chantier-statuts";
 import { CoordonneesBancairesForm } from "@/components/CoordonneesBancairesForm";
 import { statutNoteFrais } from "@/lib/notes-frais";
 import { euros } from "@/lib/devis";
+import { SignatureEmploye } from "@/components/SignatureEmploye";
 
 export default async function EmployeDetailPage({ params,searchParams }: { params: Promise<{ id: string }>;searchParams:Promise<{error?:string;success?:string}> }) {
   const { id } = await params;
@@ -112,6 +113,8 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
         )}
 
         {peutGerer&&<section className="space-y-3 rounded-md border p-4 dark:border-neutral-800"><div><h2 className="font-semibold">Photo de l’employé</h2><p className="text-sm text-neutral-500">Portrait visible dans l’annuaire et la fiche interne.</p></div><form action={importerPhotoEmployeAction.bind(null,id)} className="flex flex-col gap-3 sm:flex-row"><input name="photo" type="file" accept="image/png,image/jpeg,image/webp" capture="user" required className="min-w-0 flex-1 rounded border px-3 py-2 text-sm"/><button className="rounded bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">{employe.photo_storage_path?"Remplacer la photo":"Ajouter la photo"}</button></form>{employe.photo_storage_path&&<form action={supprimerPhotoEmployeAction.bind(null,id)}><ConfirmSubmitButton message="Supprimer la photo de cet employé ?" className="text-xs text-red-700">Supprimer la photo</ConfirmSubmitButton></form>}</section>}
+
+        {peutGerer&&<section className="space-y-3 rounded-md border p-4 dark:border-neutral-800"><div><h2 className="font-semibold">Signature de l’employé</h2><p className="text-sm text-neutral-500">Signature numérique dessinée, conservée dans le dossier du salarié{employe.signature_at?` · enregistrée le ${new Date(employe.signature_at).toLocaleDateString("fr-FR")}`:""}.</p></div><SignatureEmploye employeId={id} aDejaSignature={Boolean(employe.signature_storage_path)}/></section>}
 
         {peutGerer&&<><section className="space-y-4 rounded-md border border-blue-200 bg-blue-50/60 p-4 dark:border-blue-900 dark:bg-blue-950/20">
           <div>
