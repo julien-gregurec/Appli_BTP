@@ -806,3 +806,11 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Lot publié sur `gh/main` au commit `7ee330a` et déploiement Vercel confirmé **success**. Production contrôlée : `/login` répond 200 ; `/plateforme/roles-demo` et `/pointage` redirigent correctement une personne non connectée vers `/login`.
 
 ---
+## 97. Aperçus des modèles de documents rendus lisibles — 17 juillet 2026
+
+- Les six vignettes de personnalisation des devis, factures et commandes ne sont plus de simples aplats presque vides.
+- Chaque modèle affiche désormais un véritable mini-document : logo, en-tête, client/chantier, lignes de prestation, montants et total.
+- Les différences entre Classique, Moderne, Élégant, Technique, Compact et Épuré sont visibles avant sélection.
+- Les couleurs principale et secondaire configurées par l’entreprise sont reprises dans les aperçus.
+- Les cartes disposent d’un meilleur état sélectionné, d’un survol lisible et d’un focus clavier.
+- TypeScript, lint et build de production validés.
