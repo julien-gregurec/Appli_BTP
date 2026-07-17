@@ -1,5 +1,26 @@
-// Configuration du module d'import générique (CSV / Excel) depuis un autre logiciel (Batappli, EBP…).
-// Chaque type d'import cible une table existante ; les champs sont mappés manuellement par l'utilisateur.
+// Configuration du module universel de reprise CSV / Excel.
+// Les profils facilitent la reconnaissance des exports sans dépendre d'un format propriétaire.
+
+export type LogicielSource = {
+  cle: string;
+  libelle: string;
+  description: string;
+};
+
+export const LOGICIELS_SOURCE: LogicielSource[] = [
+  { cle: "generique", libelle: "Fichier CSV / Excel générique", description: "Export structuré provenant de n'importe quel logiciel." },
+  { cle: "batigest", libelle: "Sage Batigest / Batigest Connect", description: "Clients, chantiers, articles, stock et journaux exportés depuis Batigest." },
+  { cle: "batappli", libelle: "Batappli", description: "Exports de gestion, catalogue, stock et comptabilité Batappli." },
+  { cle: "ebp_batiment", libelle: "EBP Bâtiment", description: "Exports EBP Gestion Bâtiment ou EBP Gestion Commerciale." },
+  { cle: "obat", libelle: "Obat", description: "Exports clients, chantiers et bibliothèque d'ouvrages Obat." },
+  { cle: "tolteck", libelle: "Tolteck", description: "Exports clients, documents et catalogue Tolteck." },
+  { cle: "extrabat", libelle: "Extrabat", description: "Exports CRM, chantiers et articles Extrabat." },
+  { cle: "autre", libelle: "Autre logiciel", description: "Tout logiciel capable de produire un fichier CSV ou Excel." },
+];
+
+export function logicielSource(cle: string): LogicielSource {
+  return LOGICIELS_SOURCE.find((logiciel) => logiciel.cle === cle) ?? LOGICIELS_SOURCE[0];
+}
 
 export type ChampImport = {
   cle: string;
@@ -85,7 +106,7 @@ export const TYPES_IMPORT: TypeImport[] = [
     cle: "stock",
     libelle: "Stock et codes-barres",
     table: "articles_stock",
-    description: "Articles, quantités, emplacements, prix d’achat/revente et codes-barres exportés de Batappli ou d’un autre logiciel.",
+    description: "Articles, quantités, emplacements, prix d’achat/revente et codes-barres exportés de l’ancien logiciel.",
     champs: [
       { cle: "reference", libelle: "Référence", requis: true },
       { cle: "designation", libelle: "Désignation", requis: true },
@@ -103,7 +124,7 @@ export const TYPES_IMPORT: TypeImport[] = [
     cle: "ecritures_comptables",
     libelle: "Écritures comptables historiques",
     table: "ecritures_comptables_importees",
-    description: "Journal comptable exporté de Batappli, EBP ou du cabinet comptable. Les écritures restent identifiées comme données historiques importées.",
+    description: "Journal comptable exporté de l’ancien logiciel ou du cabinet comptable. Les écritures restent identifiées comme données historiques importées.",
     champs: [
       { cle: "journal", libelle: "Journal", requis: true, aide: "Ex. VE, AC, BQ, OD" },
       { cle: "date_ecriture", libelle: "Date d’écriture", requis: true },
@@ -112,7 +133,7 @@ export const TYPES_IMPORT: TypeImport[] = [
       { cle: "libelle", libelle: "Libellé", requis: true },
       { cle: "debit", libelle: "Débit" },
       { cle: "credit", libelle: "Crédit" },
-      { cle: "source_logiciel", libelle: "Logiciel source", aide: "Batappli par défaut" },
+      { cle: "source_logiciel", libelle: "Logiciel source", aide: "Le profil sélectionné est utilisé par défaut" },
       { cle: "reference_source", libelle: "Référence source" },
     ],
   },
@@ -140,4 +161,104 @@ export const TYPES_IMPORT: TypeImport[] = [
 
 export function typeImport(cle: string): TypeImport | undefined {
   return TYPES_IMPORT.find((t) => t.cle === cle);
+}
+
+export function normaliserEnteteImport(valeur: string): string {
+  return valeur
+    .toLocaleLowerCase("fr")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+const ALIASES_COMMUNS: Record<string, string[]> = {
+  nom: ["nom", "nomclient", "raisonsociale", "tiers", "intitule", "intituletiers"],
+  prenom: ["prenom", "prenomclient", "contactprenom"],
+  societe: ["societe", "entreprise", "raisonsociale", "nomcommercial"],
+  siret: ["siret", "numerosiret", "nosiret"],
+  adresse: ["adresse", "adresse1", "adressechantier", "rue"],
+  adresse_facturation: ["adresse", "adresse1", "adressefacturation", "rue"],
+  code_postal: ["codepostal", "cp", "zipcode"],
+  ville: ["ville", "localite"],
+  telephone: ["telephone", "tel", "telportable", "telephoneportable", "mobile", "portable"],
+  email: ["email", "courriel", "mail", "adressemail"],
+  designation: ["designation", "libellearticle", "libelle", "article", "descriptionarticle"],
+  description: ["description", "descriptionlongue", "detail"],
+  reference: ["reference", "ref", "codearticle", "referencearticle", "codeproduit"],
+  code_barres: ["codebarres", "ean", "ean13", "codeean", "gtin"],
+  marque: ["marque", "fabricant"],
+  unite: ["unite", "unitedevente", "unitestock", "uvente"],
+  prix_achat_ht: ["prixachatht", "paht", "prixachat", "coutunitaire", "prixrevient"],
+  prix_vente_ht: ["prixventeht", "pvht", "prixvente", "tarifht"],
+  prix_unitaire_ht: ["prixunitaireht", "puht", "prixventeht", "tarifht"],
+  taux_tva: ["tauxtva", "tva", "pourcentagetva"],
+  quantite_stock: ["quantitestock", "stockreel", "stockactuel", "qtestock", "quantite", "stock"],
+  seuil_alerte: ["seuilalerte", "stockminimum", "stockmini", "seuilreapprovisionnement"],
+  emplacement: ["emplacement", "depot", "zone", "rayon", "localisation"],
+  date_entree: ["dateentree", "datedembauche", "debutcontrat"],
+  taux_horaire: ["tauxhoraire", "couthoraire", "tarifhoraire"],
+  date_ecriture: ["dateecriture", "datecomptable", "datepiece", "date"],
+  numero_piece: ["numeropiece", "nopiece", "piece", "referencepiece"],
+  journal: ["journal", "codejournal", "journalcode"],
+  compte: ["compte", "numerocompte", "nocompte", "comptegeneral"],
+  libelle: ["libelle", "libelleecriture", "description", "intitule"],
+  debit: ["debit", "montantdebit"],
+  credit: ["credit", "montantcredit"],
+  reference_source: ["referencesource", "idexterne", "identifiantorigine"],
+};
+
+const ALIASES_PAR_TYPE: Partial<Record<TypeImport["cle"], Record<string, string[]>>> = {
+  chantiers: {
+    nom: ["nomchantier", "libellechantier", "affaire", "nomaffaire", "libelleaffaire", "objet"],
+    client_nom: ["nomclient", "client", "raisonsocialeclient", "tiers", "maitredouvrage"],
+    budget_previsionnel: ["budgetprevisionnel", "budget", "montantprevu", "montantaffaire"],
+    date_debut_prevue: ["datedebutprevue", "datedebut", "debutchantier"],
+  },
+  employes: {
+    nom: ["nom", "nomsalarie", "nomemploye"],
+    prenom: ["prenom", "prenomsalarie", "prenomemploye"],
+    poste: ["poste", "fonction", "emploi", "qualification"],
+    type_contrat: ["typecontrat", "contrat", "naturecontrat"],
+  },
+  catalogue: {
+    type: ["type", "typearticle", "nature", "famille"],
+  },
+  stock: {
+    designation: ["designation", "libellearticle", "nomarticle", "article"],
+  },
+  ecritures_comptables: {
+    source_logiciel: ["logicielsource", "source", "origine"],
+  },
+  tarifs_fournisseurs: {
+    fournisseur_nom: ["fournisseur", "nomfournisseur", "raisonsocialefournisseur"],
+    reference_fournisseur: ["referencefournisseur", "reffournisseur", "referencearticle", "codearticle"],
+    eancode: ["ean", "ean13", "codebarres", "codeean", "gtin"],
+    prix_public_ht: ["prixpublicht", "tarifpublicht", "prixcatalogueht"],
+    prix_negocie_ht: ["prixnegocieht", "prixnetht", "prixclientht", "prixachatht", "paht"],
+    minimum_commande: ["minimumcommande", "quantiteminimum", "qtemini"],
+  },
+};
+
+export function suggererMappingImport(typeCle: string, colonnes: string[]): Record<string, number> {
+  const conf = typeImport(typeCle);
+  if (!conf) return {};
+  const normalisees = colonnes.map(normaliserEnteteImport);
+  const dejaUtilisees = new Set<number>();
+  const mapping: Record<string, number> = {};
+
+  for (const champ of conf.champs) {
+    const aliases = [
+      ...(ALIASES_PAR_TYPE[conf.cle]?.[champ.cle] ?? []),
+      ...(ALIASES_COMMUNS[champ.cle] ?? []),
+      champ.cle,
+      champ.libelle,
+    ].map(normaliserEnteteImport).filter(Boolean);
+    let index = normalisees.findIndex((colonne, i) => !dejaUtilisees.has(i) && aliases.includes(colonne));
+    if (index < 0) {
+      index = normalisees.findIndex((colonne, i) => !dejaUtilisees.has(i) && aliases.some((alias) => alias.length >= 5 && (colonne.includes(alias) || alias.includes(colonne))));
+    }
+    mapping[champ.cle] = index;
+    if (index >= 0) dejaUtilisees.add(index);
+  }
+  return mapping;
 }

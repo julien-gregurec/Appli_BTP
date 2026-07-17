@@ -847,3 +847,12 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Navigation et permissions mises à jour pour Messagerie et Appels d’offres. Les écrans prototype ne simulent pas la confidentialité des conversations : la messagerie y reste fermée jusqu’à l’activation de comptes individuels.
 - Contrôles verts : TypeScript, ESLint, 40 tests Vitest et build Next webpack complet de 81 pages. Seul l’avertissement historique `unpdf/import.meta` demeure non bloquant.
 - Lot fonctionnel publié sur `gh/main` au commit `25dfef1`. Déploiement Vercel Production confirmé **Ready** ; `/messagerie`, `/appels-offres`, `/parametres/import` et `/connecteurs` sont servis et redirigent correctement un visiteur non connecté vers `/login`.
+
+## 101. Reprise universelle Batigest, Batappli, EBP et autres — 17 juillet 2026
+
+- L’assistant `/parametres/import` n’est plus présenté comme un transfert propre à Batappli : il propose maintenant des profils Sage Batigest/Batigest Connect, Batappli, EBP Bâtiment, Obat, Tolteck, Extrabat, CSV/Excel générique et autre logiciel.
+- Le transfert reste volontairement fondé sur les exports officiels CSV/XLSX : aucun mot de passe de l’ancien logiciel ni sauvegarde propriétaire opaque n’est demandé.
+- La reconnaissance automatique des colonnes a été renforcée pour les intitulés fréquents : raison sociale, adresse, téléphone, code article, EAN, prix achat/vente, stock réel, code journal, compte comptable, débit/crédit, etc.
+- L’utilisateur conserve la validation finale de chaque correspondance avant écriture. Les données sont toujours isolées dans l’entreprise active et limitées à 5 000 lignes par fichier de 8 Mo maximum.
+- Les écritures comptables mémorisent désormais le logiciel d’origine sélectionné au lieu d’utiliser Batappli comme valeur par défaut.
+- Contrôles : 44 tests Vitest, TypeScript, ESLint et build Next webpack complet de 81 pages verts. Seul l’avertissement historique `unpdf/import.meta` demeure non bloquant.

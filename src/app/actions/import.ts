@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { analyserFichier, type FichierAnalyse } from "@/lib/import/parse";
-import { typeImport } from "@/lib/import/config";
+import { logicielSource, typeImport } from "@/lib/import/config";
 
 const MAX_LIGNES = 5000;
 
@@ -49,6 +49,7 @@ export async function importerDonneesAction(payload: {
   type: string;
   mapping: Record<string, number>;
   lignes: string[][];
+  sourceLogiciel?: string;
 }): Promise<ResultatImport> {
   const ctx = await getContexteEntreprise();
   const entrepriseId = ctx.entrepriseId;
@@ -128,7 +129,8 @@ export async function importerDonneesAction(payload: {
       if (!journal || !dateEcriture || !compte || !libelle || (debit <= 0 && credit <= 0)) { ignores++; continue; }
       enregistrements.push({ entreprise_id: entrepriseId, journal, date_ecriture: dateEcriture,
         numero_piece: val(l, "numero_piece") || null, compte, libelle, debit, credit,
-        source_logiciel: val(l, "source_logiciel") || "Batappli", reference_source: val(l, "reference_source") || null });
+        source_logiciel: val(l, "source_logiciel") || payload.sourceLogiciel || logicielSource("generique").libelle,
+        reference_source: val(l, "reference_source") || null });
     }
   } else if (payload.type === "tarifs_fournisseurs") {
     const { data: fournisseursExistants } = await supabase

@@ -2,12 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { analyserFichierImport, importerDonneesAction, type ResultatImport } from "@/app/actions/import";
-import { TYPES_IMPORT, typeImport } from "@/lib/import/config";
-
-const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+import { LOGICIELS_SOURCE, logicielSource, suggererMappingImport, TYPES_IMPORT, typeImport } from "@/lib/import/config";
 
 export function ImportWizard() {
   const [typeCle, setTypeCle] = useState("clients");
+  const [sourceCle, setSourceCle] = useState("generique");
   const [entete, setEntete] = useState<string[]>([]);
   const [lignes, setLignes] = useState<string[][]>([]);
   const [total, setTotal] = useState(0);
@@ -19,16 +18,6 @@ export function ImportWizard() {
 
   const conf = typeImport(typeCle)!;
 
-  function autoMapper(colonnes: string[]) {
-    const m: Record<string, number> = {};
-    for (const champ of conf.champs) {
-      const cibles = [norm(champ.cle), norm(champ.libelle)];
-      const idx = colonnes.findIndex((c) => { const nc = norm(c); return cibles.some((t) => nc === t || nc.includes(t) || t.includes(nc)); });
-      m[champ.cle] = idx;
-    }
-    return m;
-  }
-
   function onFichier(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setErreur(null); setResultat(null);
@@ -38,7 +27,7 @@ export function ImportWizard() {
       if (res.erreur) { setErreur(res.erreur); setEntete([]); setLignes([]); return; }
       if (res.total === 0) { setErreur("Aucune ligne de données détectée."); setEntete([]); setLignes([]); return; }
       setEntete(res.entete); setLignes(res.lignes); setTotal(res.total);
-      setMapping(autoMapper(res.entete));
+      setMapping(suggererMappingImport(typeCle, res.entete));
     });
   }
 
@@ -47,7 +36,12 @@ export function ImportWizard() {
     if (manquants.length) { setErreur(`Champs obligatoires non mappés : ${manquants.map((c) => c.libelle).join(", ")}`); return; }
     setErreur(null);
     demarrerImport(async () => {
-      const res = await importerDonneesAction({ type: typeCle, mapping, lignes });
+      const res = await importerDonneesAction({
+        type: typeCle,
+        mapping,
+        lignes,
+        sourceLogiciel: logicielSource(sourceCle).libelle,
+      });
       setResultat(res);
     });
   }
@@ -58,10 +52,19 @@ export function ImportWizard() {
     <div className="space-y-6">
       {/* Étape 1 : type + fichier */}
       <form onSubmit={onFichier} className="space-y-3 rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 lg:grid-cols-3">
+          <label className="text-sm">
+            <span className="font-medium">Logiciel d’origine</span>
+            <select value={sourceCle} onChange={(e) => {
+              setSourceCle(e.target.value);
+              if (entete.length) setMapping(suggererMappingImport(typeCle, entete));
+            }} className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900">
+              {LOGICIELS_SOURCE.map((logiciel) => <option key={logiciel.cle} value={logiciel.cle}>{logiciel.libelle}</option>)}
+            </select>
+          </label>
           <label className="text-sm">
             <span className="font-medium">Type de données</span>
-            <select value={typeCle} onChange={(e) => { setTypeCle(e.target.value); setEntete([]); setLignes([]); setResultat(null); }}
+            <select value={typeCle} onChange={(e) => { setTypeCle(e.target.value); setEntete([]); setLignes([]); setResultat(null); setMapping({}); }}
               className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900">
               {TYPES_IMPORT.map((t) => <option key={t.cle} value={t.cle}>{t.libelle}</option>)}
             </select>
@@ -72,7 +75,12 @@ export function ImportWizard() {
               className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900" />
           </label>
         </div>
-        <p className="text-xs text-neutral-500">{conf.description} La première ligne du fichier doit contenir les intitulés de colonnes.</p>
+        <p className="text-xs text-neutral-500">
+          {logicielSource(sourceCle).description} {conf.description} La première ligne du fichier doit contenir les intitulés de colonnes.
+        </p>
+        <p className="rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800 dark:bg-blue-950/30 dark:text-blue-200">
+          Aucun mot de passe ni sauvegarde propriétaire n’est demandé : utilisez l’export CSV/XLSX officiel de votre logiciel. Vous pourrez contrôler chaque correspondance avant l’import.
+        </p>
         <button type="submit" disabled={analyse} className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
           {analyse ? "Analyse…" : "Analyser le fichier"}
         </button>
@@ -85,7 +93,7 @@ export function ImportWizard() {
         <div className="space-y-4 rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
           <div>
             <h3 className="font-semibold">Correspondance des colonnes</h3>
-            <p className="text-xs text-neutral-500">{total} ligne(s) détectée(s). Associez chaque champ à une colonne de votre fichier.</p>
+            <p className="text-xs text-neutral-500">{total} ligne(s) détectée(s). Le profil {logicielSource(sourceCle).libelle} a proposé les correspondances ; vérifiez-les avant l’import.</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {conf.champs.map((champ) => (
