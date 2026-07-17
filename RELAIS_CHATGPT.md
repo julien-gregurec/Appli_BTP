@@ -11,6 +11,15 @@
 
 ---
 
+## 17 juillet 2026 — Réception des commandes fournisseurs réparée
+
+- Cause identifiée : depuis le durcissement des droits de la migration 43, la RPC sécurisée `enregistrer_reception_commande` attend le paramètre JSON `p_lignes`, mais l’action serveur envoyait encore l’ancien nom `p_receptions`. Supabase refusait donc l’appel avant toute mise à jour.
+- Correction dans `src/app/actions/commandes.ts` : utilisation de `p_lignes`, avec conservation des trois choix par ligne (non reçu, reçu partiellement, reçu totalement).
+- Les quantités sont maintenant contrôlées côté serveur : valeur obligatoire, positive ou nulle, finie et jamais supérieure à la quantité commandée. Une commande sans ligne reçoit un message explicite.
+- Après réception, la fiche commande, la liste des commandes et le tableau de bord sont réactualisés. Le statut reste synchronisé par la base : `recue_partiel` si une quantité manque, `recue` si tout est livré.
+- Aucune migration supplémentaire n’est requise pour ce correctif.
+- Contrôles : TypeScript, ESLint, 29 tests Vitest, `git diff --check` et build Next webpack verts. Seul l’avertissement historique `unpdf/import.meta` demeure non bloquant.
+
 # REPRISE — 17 juillet 2026, recherches chantier et relances réellement utilisables
 
 - Contrôle direct Supabase : aucune donnée chantier n’est perdue. LIRIA CONCEPT possède 10 chantiers accessibles et Entreprise Test 30. Le défaut venait des listes natives longues et peu lisibles.

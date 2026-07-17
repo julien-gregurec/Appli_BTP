@@ -158,16 +158,30 @@ export async function enregistrerReceptionCommandeAction(id: string, formData: F
   }
   const { data: lignes } = await supabase.from("lignes_commande")
     .select("id, quantite").eq("commande_id", id).eq("entreprise_id", ctx.entrepriseId);
+  if (!lignes?.length) {
+    redirect(`/commandes/${id}?error=${encodeURIComponent("Cette commande ne contient aucune ligne à réceptionner")}`);
+  }
+
   const receptions = (lignes ?? []).map((ligne) => ({
     ligne_id: ligne.id,
     quantite_recue: Number(formData.get(`reception_${ligne.id}`)),
   }));
+  const quantitesInvalides = receptions.some((reception, index) => (
+    !Number.isFinite(reception.quantite_recue)
+    || reception.quantite_recue < 0
+    || reception.quantite_recue > Number(lignes[index].quantite)
+  ));
+  if (quantitesInvalides) {
+    redirect(`/commandes/${id}?error=${encodeURIComponent("Une quantité reçue est invalide ou supérieure à la quantité commandée")}`);
+  }
+
   const { error } = await supabase.rpc("enregistrer_reception_commande", {
-    p_entreprise_id: ctx.entrepriseId, p_commande_id: id, p_receptions: receptions,
+    p_entreprise_id: ctx.entrepriseId, p_commande_id: id, p_lignes: receptions,
   });
   if (error) redirect(`/commandes/${id}?error=${encodeURIComponent(error.message)}`);
   revalidatePath(`/commandes/${id}`);
   revalidatePath("/commandes");
+  revalidatePath("/dashboard");
   redirect(`/commandes/${id}?reception=1`);
 }
 
