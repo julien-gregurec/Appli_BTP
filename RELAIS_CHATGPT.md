@@ -856,3 +856,4 @@ git diff --check                   # OK (aucun conflit whitespace)
 - L’utilisateur conserve la validation finale de chaque correspondance avant écriture. Les données sont toujours isolées dans l’entreprise active et limitées à 5 000 lignes par fichier de 8 Mo maximum.
 - Les écritures comptables mémorisent désormais le logiciel d’origine sélectionné au lieu d’utiliser Batappli comme valeur par défaut.
 - Contrôles : 44 tests Vitest, TypeScript, ESLint et build Next webpack complet de 81 pages verts. Seul l’avertissement historique `unpdf/import.meta` demeure non bloquant.
+- Lot publié sur `gh/main` au commit `dbe5fb0`. Déploiement Vercel Production confirmé **Ready** sur l’alias principal.
