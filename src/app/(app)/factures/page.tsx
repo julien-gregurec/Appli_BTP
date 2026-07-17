@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { FACTURE_STATUTS, statutFacture } from "@/lib/factures";
@@ -6,6 +5,7 @@ import { euros } from "@/lib/devis";
 import { nomClient } from "@/lib/chantier-statuts";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { DEPENSE_CATEGORIES, DEPENSE_STATUTS } from "@/lib/depenses";
+import { Lien as Link } from "@/components/Lien";
 
 const relation = <T,>(valeur: T | T[] | null): T | null => Array.isArray(valeur) ? valeur[0] ?? null : valeur;
 

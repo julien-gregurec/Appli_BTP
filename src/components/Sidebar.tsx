@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { logoutAction } from "@/app/actions/auth";
 import { PwaInstallButton } from "@/components/PwaInstallButton";
 import { NAVIGATION_APPLICATION, NAVIGATION_GROUPES } from "@/lib/navigation";
+import { Lien as Link } from "@/components/Lien";
 
 export function Sidebar({
   entrepriseNom,

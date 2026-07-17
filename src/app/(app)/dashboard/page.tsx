@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { euros, statutDevis } from "@/lib/devis";
@@ -8,6 +7,7 @@ import { PointageArriveeDepart } from "@/components/PointageArriveeDepart";
 import { MobileModuleGrid, type MobileModuleLink } from "@/components/MobileModuleGrid";
 import { DashboardAnalytics } from "@/components/DashboardAnalytics";
 import { DashboardWidget, DashboardWidgetPreferences } from "@/components/DashboardWidgets";
+import { Lien as Link } from "@/components/Lien";
 
 function un<T>(valeur: T | T[] | null): T | null {
   if (!valeur) return null;

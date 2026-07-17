@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { CHANTIER_STATUTS, statutChantier, nomClient } from "@/lib/chantier-statuts";
 import { permissionsUtilisateur } from "@/lib/permissions";
+import { Lien as Link } from "@/components/Lien";
 
 export default async function ChantiersPage({ searchParams }: { searchParams: Promise<{ q?: string; statut?: string; error?: string }> }) {
   const { q = "", statut = "", error } = await searchParams;

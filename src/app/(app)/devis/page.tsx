@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { DEVIS_STATUTS, statutDevis, euros } from "@/lib/devis";
 import { nomClient } from "@/lib/chantier-statuts";
+import { Lien as Link } from "@/components/Lien";
 
 export default async function DevisPage({ searchParams }: { searchParams: Promise<{ q?: string; statut?: string }> }) {
   const { q = "", statut = "" } = await searchParams;

@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { importerOutilsAction } from "@/app/actions/outillage";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { OUTIL_CATEGORIES, OUTIL_ETATS, OUTIL_STATUTS } from "@/lib/outillage";
 import { createClient } from "@/lib/supabase/server";
+import { Lien as Link } from "@/components/Lien";
 
 type EmployeLie = { prenom: string; nom: string };
 type ChantierLie = { nom: string };

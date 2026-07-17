@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { nomClient, CLIENT_TYPES, CLIENT_STATUTS } from "@/lib/chantier-statuts";
+import { Lien as Link } from "@/components/Lien";
 
 export default async function ClientsPage({ searchParams }: { searchParams: Promise<{ q?: string; type?: string; statut?: string }> }) {
   const { q = "", type = "", statut = "" } = await searchParams;

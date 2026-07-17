@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { ancienneteEmploye, contratEmployeLabel, formatEuro, nomEmploye, statutEmploye } from "@/lib/employes";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import Image from "next/image";
+import { Lien as Link } from "@/components/Lien";
 
 type EmployeListe = {
   id: string;
