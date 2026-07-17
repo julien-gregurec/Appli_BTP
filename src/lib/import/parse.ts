@@ -2,6 +2,27 @@ import "server-only";
 
 export type FichierAnalyse = { entete: string[]; lignes: string[][]; total: number };
 
+/**
+ * Décode le texte d'un CSV en détectant son encodage.
+ *
+ * `file.text()` décode TOUJOURS en UTF-8. Or les exports CSV d'Excel en France
+ * sont le plus souvent en Windows-1252 (Latin-1) : lus comme de l'UTF-8, les
+ * accents deviennent du mojibake (« é » -> « Ã© »). C'était la cause d'accents
+ * cassés qui réapparaissaient à chaque import.
+ *
+ * On tente donc l'UTF-8 en mode strict ; s'il échoue (octet invalide, signe
+ * d'un fichier Latin-1), on retombe sur Windows-1252, qui couvre tous les
+ * accents français.
+ */
+function decoderTexte(buffer: ArrayBuffer): string {
+  const octets = new Uint8Array(buffer);
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(octets);
+  } catch {
+    return new TextDecoder("windows-1252").decode(octets);
+  }
+}
+
 // Parse un CSV en détectant le séparateur (`,` ou `;`, courant en France) et en gérant les guillemets.
 function parseCsv(texte: string): string[][] {
   const contenu = texte.replace(/^﻿/, ""); // BOM
@@ -59,7 +80,9 @@ export async function analyserFichier(file: File): Promise<FichierAnalyse> {
   if (nom.endsWith(".xlsx") || nom.endsWith(".xls")) {
     matrice = await parseXlsx(await file.arrayBuffer());
   } else {
-    matrice = parseCsv(await file.text());
+    // On lit les octets bruts et on détecte l'encodage, au lieu de file.text()
+    // qui imposerait l'UTF-8 et corromprait les CSV Latin-1.
+    matrice = parseCsv(decoderTexte(await file.arrayBuffer()));
   }
   if (matrice.length === 0) return { entete: [], lignes: [], total: 0 };
   const entete = matrice[0].map((v) => v.trim());
