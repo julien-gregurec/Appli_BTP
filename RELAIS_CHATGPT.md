@@ -1,5 +1,14 @@
 # REPRISE — 17 juillet 2026, facturation des comptes utilisant plus de deux appareils (MIGRATION 90 APPLIQUÉE)
 
+## 17 juillet 2026 — Valorisation comptable des inventaires (MIGRATION 93 APPLIQUÉE)
+
+- Migration `20260717000093_valorisation_inventaires.sql` appliquée avec succès dans Supabase. Chaque ligne d’inventaire conserve maintenant un instantané du prix d’achat HT de l’article au moment de sa création : une modification ultérieure du catalogue ne change donc pas silencieusement la valorisation historique.
+- La fiche d’un inventaire affiche le nombre d’articles comptés, les références avec écart, les quantités manquantes et excédentaires, la valeur théorique HT, la valeur réellement comptée HT et l’écart de valeur HT.
+- Le détail par article présente stock théorique, stock compté, écart de quantité, prix d’achat HT figé et impact financier. Les articles sans prix d’achat sont signalés pour correction.
+- Après validation de l’inventaire, un bouton **« Exporter la clôture CSV »** produit un état exploitable par l’expert-comptable : métadonnées, synthèse, détail des écarts et méthode de valorisation.
+- La valorisation reste une aide à la clôture : l’expert-comptable doit confirmer la méthode retenue et les éventuelles dépréciations ou provisions avant comptabilisation définitive.
+- Contrôles verts : ESLint, TypeScript via le build Next complet, 34 tests Vitest, `git diff --check` et build webpack. Seul l’avertissement historique `unpdf/import.meta` demeure non bloquant.
+
 ## 17 juillet 2026 — TVA automatique des charges récurrentes (MIGRATION 92 APPLIQUÉE)
 
 - Migration `20260717000092_tva_charges_recurrentes.sql` appliquée avec succès dans Supabase. Elle ajoute `taux_tva` aux charges récurrentes, reprend les données existantes, limite les taux à 0 %, 2,1 %, 5,5 %, 10 % et 20 %, puis recalcule systématiquement la TVA côté PostgreSQL.
