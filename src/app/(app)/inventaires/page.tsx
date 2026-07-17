@@ -1,3 +1,58 @@
-import Link from"next/link";import{createClient}from"@/lib/supabase/server";import{getContexteEntreprise}from"@/lib/entreprise";import{creerInventaireAction}from"@/app/actions/inventaires";
-const un=<T,>(v:T|T[]|null):T|null=>Array.isArray(v)?v[0]??null:v;
-export default async function InventairesPage({searchParams}:{searchParams:Promise<{error?:string}>}){const{error}=await searchParams;const ctx=await getContexteEntreprise();const sb=await createClient();const[{data:zones},{data:inventaires}]=await Promise.all([sb.from("zones_depot").select("id,code,nom").eq("entreprise_id",ctx.entrepriseId).eq("actif",true).order("code"),sb.from("inventaires").select("id,numero,date_inventaire,statut,commentaire,zone:zones_depot(code,nom),lignes:lignes_inventaire(id)").eq("entreprise_id",ctx.entrepriseId).order("created_at",{ascending:false})]);return <main className="p-8"><div className="mx-auto max-w-5xl space-y-6"><div><h1 className="text-xl font-semibold">Inventaires</h1><p className="text-sm text-neutral-500">Comptages physiques et ajustements contrôlés du stock.</p></div>{error&&<p className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</p>}<form action={creerInventaireAction} className="flex gap-2 rounded-md border p-4 dark:border-neutral-800"><select name="zone_id" className="rounded-md border px-3 py-2 text-sm dark:bg-neutral-900"><option value="">Tous les articles</option>{zones?.map(z=><option key={z.id} value={z.id}>{z.code} · {z.nom}</option>)}</select><input name="commentaire" placeholder="Commentaire facultatif" className="flex-1 rounded-md border px-3 py-2 text-sm dark:bg-neutral-900"/><button className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white dark:bg-white dark:text-neutral-900">Démarrer un inventaire</button></form><div className="overflow-hidden rounded-md border dark:border-neutral-800"><table className="w-full text-sm"><thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500 dark:bg-neutral-900"><tr><th className="px-3 py-2">N°</th><th>Date</th><th>Zone</th><th>Articles</th><th>Statut</th></tr></thead><tbody>{inventaires?.map(i=>{const z=un(i.zone as {code:string;nom:string}|{code:string;nom:string}[]|null);return <tr key={i.id} className="border-t dark:border-neutral-800"><td className="px-3 py-3 font-mono"><Link href={`/inventaires/${i.id}`} className="hover:underline">{i.numero}</Link></td><td>{i.date_inventaire}</td><td>{z?`${z.code} · ${z.nom}`:"Tous les articles"}</td><td>{Array.isArray(i.lignes)?i.lignes.length:0}</td><td className="capitalize">{i.statut}</td></tr>})}{(!inventaires||!inventaires.length)&&<tr><td colSpan={5} className="p-8 text-center text-neutral-500">Aucun inventaire.</td></tr>}</tbody></table></div></div></main>}
+import Link from "next/link";
+import { InventaireCreationForm } from "@/components/InventaireCreationForm";
+import { getContexteEntreprise } from "@/lib/entreprise";
+import { createClient } from "@/lib/supabase/server";
+
+type Zone = { id: string; code: string; nom: string };
+type Article = { id: string; reference: string; designation: string; quantite_stock: number; unite: string; zone_id: string | null };
+type ZoneLiee = { code: string; nom: string };
+const un = <T,>(valeur: T | T[] | null): T | null => Array.isArray(valeur) ? valeur[0] ?? null : valeur;
+
+export default async function InventairesPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const { error } = await searchParams;
+  const contexte = await getContexteEntreprise();
+  const supabase = await createClient();
+  const [{ data: zonesData }, { data: articlesData }, { data: inventaires }] = await Promise.all([
+    supabase.from("zones_depot").select("id,code,nom").eq("entreprise_id", contexte.entrepriseId).eq("actif", true).order("code"),
+    supabase.from("articles_stock").select("id,reference,designation,quantite_stock,unite,zone_id").eq("entreprise_id", contexte.entrepriseId).eq("actif", true).order("designation"),
+    supabase.from("inventaires").select("id,numero,date_inventaire,statut,commentaire,zone:zones_depot(code,nom),lignes:lignes_inventaire(id)").eq("entreprise_id", contexte.entrepriseId).order("created_at", { ascending: false }),
+  ]);
+  const zones = (zonesData ?? []) as Zone[];
+  const articles = (articlesData ?? []).map((article) => ({ ...article, quantite_stock: Number(article.quantite_stock) })) as Article[];
+
+  return (
+    <main className="p-4 sm:p-8">
+      <div className="mx-auto max-w-6xl space-y-6">
+        <div>
+          <h1 className="text-xl font-semibold">Inventaires</h1>
+          <p className="text-sm text-neutral-500">Choisissez une zone du dépôt et les références à compter, puis analysez les écarts physiques et financiers.</p>
+        </div>
+        {error && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+        <InventaireCreationForm zones={zones} articles={articles} />
+
+        <div className="overflow-x-auto rounded-md border dark:border-neutral-800">
+          <table className="min-w-[680px] w-full text-sm">
+            <thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500 dark:bg-neutral-900">
+              <tr><th className="px-3 py-2">N°</th><th>Date</th><th>Zone</th><th>Articles</th><th>Statut</th></tr>
+            </thead>
+            <tbody>
+              {inventaires?.map((inventaire) => {
+                const zone = un(inventaire.zone as ZoneLiee | ZoneLiee[] | null);
+                return (
+                  <tr key={inventaire.id} className="border-t dark:border-neutral-800">
+                    <td className="px-3 py-3 font-mono"><Link href={`/inventaires/${inventaire.id}`} className="hover:underline">{inventaire.numero}</Link></td>
+                    <td>{inventaire.date_inventaire}</td>
+                    <td>{zone ? `${zone.code} · ${zone.nom}` : "Sélection libre"}</td>
+                    <td>{Array.isArray(inventaire.lignes) ? inventaire.lignes.length : 0}</td>
+                    <td className="capitalize">{inventaire.statut}</td>
+                  </tr>
+                );
+              })}
+              {!inventaires?.length && <tr><td colSpan={5} className="p-8 text-center text-neutral-500">Aucun inventaire.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  );
+}

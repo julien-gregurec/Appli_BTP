@@ -1,5 +1,14 @@
 # REPRISE — 17 juillet 2026, facturation des comptes utilisant plus de deux appareils (MIGRATION 90 APPLIQUÉE)
 
+## 17 juillet 2026 — Sélection du contenu à inventorier (MIGRATION 94 APPLIQUÉE)
+
+- La création d’un inventaire permet maintenant de choisir une zone du dépôt, puis de sélectionner ou décocher chaque référence à compter.
+- Une recherche intelligente réduit la liste par référence ou désignation, sans être sensible aux accents. Les boutons **Tout sélectionner** et **Tout décocher** accélèrent les inventaires partiels.
+- La quantité en stock et l’unité restent visibles pendant la sélection. Le nombre d’articles retenus est affiché avant le démarrage.
+- Migration `20260717000094_selection_articles_inventaire.sql` appliquée avec succès dans Supabase. La RPC sécurisée `creer_inventaire_stock_selection` réutilise le contrôle `gerer_stock`, la validation de la zone et la création atomique existante, puis ne conserve que les références valides cochées dans cette zone. Une sélection vide ou devenue invalide annule intégralement la création.
+- Le prix d’achat figé et la valorisation de la migration 93 continuent de s’appliquer à chaque ligne créée.
+- Contrôles verts : ESLint, TypeScript, 34 tests Vitest, `git diff --check` et build Next webpack complet de 78 routes. Seul l’avertissement historique `unpdf/import.meta` demeure non bloquant.
+
 ## 17 juillet 2026 — Valorisation comptable des inventaires (MIGRATION 93 APPLIQUÉE)
 
 - Migration `20260717000093_valorisation_inventaires.sql` appliquée avec succès dans Supabase. Chaque nouvelle ligne d’inventaire conserve maintenant un instantané du prix d’achat HT de l’article au moment de sa création : une modification ultérieure du catalogue ne change donc pas silencieusement sa valorisation.
