@@ -50,7 +50,7 @@ export default async function DepensePage({ params, searchParams }: { params: Pr
       <div className="grid gap-3 sm:grid-cols-3"><div className="rounded border p-3">TTC<strong className="block">{euros(depense.montant_ttc)}</strong></div><div className="rounded border p-3">Réglé<strong className="block text-green-700">{euros(depense.montant_regle)}</strong></div><div className="rounded border p-3">Reste<strong className="block text-amber-700">{euros(reste)}</strong></div></div>
 
       <section className="grid gap-2 rounded border p-4 text-sm dark:border-neutral-800 sm:grid-cols-2">
-        <p><b>Statut :</b> <span style={{ color: statut?.couleur }}>{statut?.label}</span></p><p><b>Date :</b> {depense.date_piece} · <b>Échéance :</b> {depense.date_echeance ?? "—"}</p><p><b>HT :</b> {euros(depense.montant_ht)} · <b>TVA :</b> {euros(depense.montant_tva)}</p>
+        <p><b>Statut :</b> <span style={{ color: statut?.couleur }}>{statut?.label}</span></p><p><b>Date :</b> {depense.date_piece} · <b>Échéance :</b> {depense.date_echeance ?? "—"}</p><p><b>HT :</b> {euros(depense.montant_ht)} · <b>TVA ({Number(depense.taux_tva).toLocaleString("fr-FR")} %) :</b> {euros(depense.montant_tva)} · <b>TTC :</b> {euros(depense.montant_ttc)}</p>
         {chantier && <p><b>Chantier :</b> <Link href={`/chantiers/${chantier.id}`} className="hover:underline">{chantier.nom}</Link></p>}
         {commande && <p><b>Commande :</b> <Link href={`/commandes/${commande.id}`} className="hover:underline">{commande.numero}</Link></p>}
         {vehicule && <p><b>Véhicule :</b> <Link href={`/flotte/${vehicule.id}`} className="hover:underline">{vehicule.immatriculation} · {vehicule.marque} {vehicule.modele}</Link></p>}

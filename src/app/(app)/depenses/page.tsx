@@ -1,25 +1,88 @@
-import {createClient} from "@/lib/supabase/server";
-import {getContexteEntreprise} from "@/lib/entreprise";
-import {creerDepenseAction} from "@/app/actions/depenses";
-import {DEPENSE_CATEGORIES,DEPENSE_STATUTS} from "@/lib/depenses";
-import {euros} from "@/lib/devis";
+import { createClient } from "@/lib/supabase/server";
+import { getContexteEntreprise } from "@/lib/entreprise";
+import { DEPENSE_CATEGORIES, DEPENSE_STATUTS } from "@/lib/depenses";
+import { euros } from "@/lib/devis";
 import { Lien as Link } from "@/components/Lien";
-const un=<T,>(v:T|T[]|null):T|null=>Array.isArray(v)?v[0]??null:v;
-export default async function DepensesPage({searchParams}:{searchParams:Promise<{error?:string;chantier?:string}>}){
- const{error,chantier=""}=await searchParams;const ctx=await getContexteEntreprise();const sb=await createClient();
- const[{data:depenses},{data:fournisseurs},{data:chantiers},{data:commandes},{data:vehicules},{data:outils},{data:employes}]=await Promise.all([
-  sb.from("depenses_fournisseurs").select("*,fournisseur:fournisseurs(nom),chantier:chantiers(nom)").eq("entreprise_id",ctx.entrepriseId).order("date_piece",{ascending:false}),
-  sb.from("fournisseurs").select("id,nom").eq("entreprise_id",ctx.entrepriseId).eq("actif",true).order("nom"),
-  sb.from("chantiers").select("id,nom").eq("entreprise_id",ctx.entrepriseId).order("nom"),
-  sb.from("commandes_fournisseurs").select("id,numero,fournisseur_id").eq("entreprise_id",ctx.entrepriseId).order("date_commande",{ascending:false}),
-  sb.from("vehicules").select("id,immatriculation,marque,modele").eq("entreprise_id",ctx.entrepriseId).neq("statut","vendu").order("immatriculation"),
-  sb.from("outils").select("id,reference,designation").eq("entreprise_id",ctx.entrepriseId).not("statut","in",'(hors_service,perdu,rebut)').order("designation"),
-  sb.from("employes").select("id,prenom,nom").eq("entreprise_id",ctx.entrepriseId).eq("statut","actif").order("nom"),
- ]);
- const cls="rounded-md border px-3 py-2 text-sm dark:bg-neutral-900";const total=(depenses??[]).filter(d=>d.statut!=="annulee").reduce((s,d)=>s+Number(d.montant_ttc),0);const regle=(depenses??[]).reduce((s,d)=>s+Number(d.montant_regle),0);
- return <main className="p-4 sm:p-8"><div className="mx-auto max-w-6xl space-y-6"><div><h1 className="text-xl font-semibold">Factures fournisseurs</h1><p className="text-sm text-neutral-500">Factures numérisées reliées aux chantiers, ouvriers, véhicules et outils.</p></div>{error&&<p className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</p>}
- <div className="grid gap-3 sm:grid-cols-3"><div className="rounded border p-3">Total TTC <strong className="block">{euros(total)}</strong></div><div className="rounded border p-3">Réglé <strong className="block text-green-700">{euros(regle)}</strong></div><div className="rounded border p-3">À payer <strong className="block text-amber-700">{euros(Math.max(0,total-regle))}</strong></div></div>
- <form action={creerDepenseAction} className="grid gap-3 rounded border p-4 sm:grid-cols-2 lg:grid-cols-4"><h2 className="font-semibold sm:col-span-2 lg:col-span-4">Nouvelle facture fournisseur</h2><select name="fournisseur_id" required className={cls}><option value="">Fournisseur *</option>{fournisseurs?.map(x=><option key={x.id} value={x.id}>{x.nom}</option>)}</select><input name="numero_piece" required placeholder="N° facture fournisseur *" className={cls}/><select name="categorie" className={cls}>{Object.entries(DEPENSE_CATEGORIES).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select><select name="chantier_id" defaultValue={chantier} className={cls}><option value="">Sans chantier</option>{chantiers?.map(x=><option key={x.id} value={x.id}>{x.nom}</option>)}</select><input name="date_piece" type="date" required defaultValue={new Date().toISOString().slice(0,10)} className={cls}/><input name="date_echeance" type="date" className={cls}/><input name="montant_ht" type="number" min="0" step="0.01" required placeholder="Montant HT" className={cls}/><input name="montant_tva" type="number" min="0" step="0.01" required placeholder="TVA" className={cls}/><select name="commande_id" className={cls}><option value="">Sans commande liée</option>{commandes?.map(x=><option key={x.id} value={x.id}>{x.numero}</option>)}</select><select name="actif_id" className={cls}><option value="">Sans véhicule ni outil</option><optgroup label="Véhicules">{vehicules?.map(x=><option key={x.id} value={`vehicule:${x.id}`}>{x.immatriculation} · {x.marque} {x.modele}</option>)}</optgroup><optgroup label="Outillage">{outils?.map(x=><option key={x.id} value={`outil:${x.id}`}>{x.reference} · {x.designation}</option>)}</optgroup></select><select name="employe_id" className={cls}><option value="">Ouvrier affecté automatiquement</option>{employes?.map(x=><option key={x.id} value={x.id}>{x.prenom} {x.nom}</option>)}</select><input name="notes" placeholder="Notes" className={cls}/><textarea name="travaux_effectues" rows={2} placeholder="Travaux effectués, pièces remplacées, diagnostic… (utile pour véhicule ou outil)" className={`${cls} sm:col-span-2 lg:col-span-4`}/><button className="rounded bg-neutral-900 px-4 py-2 text-sm text-white dark:bg-white dark:text-neutral-900 sm:col-span-2 lg:col-span-4">Enregistrer</button></form>
- <div className="overflow-x-auto rounded border dark:border-neutral-800"><table className="w-full min-w-[780px] text-sm"><thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500 dark:bg-neutral-900"><tr><th className="px-3 py-2">Date</th><th>N° pièce</th><th>Fournisseur</th><th>Chantier</th><th>Catégorie</th><th>Statut</th><th className="text-right">TTC</th><th className="px-3 text-right">Reste</th></tr></thead><tbody>{depenses?.map(d=>{const f=un(d.fournisseur as {nom:string}|{nom:string}[]|null);const c=un(d.chantier as {nom:string}|{nom:string}[]|null);const st=DEPENSE_STATUTS[d.statut];return <tr key={d.id} className="border-t dark:border-neutral-800"><td className="px-3 py-2">{d.date_piece}</td><td><Link href={`/depenses/${d.id}`} className="font-medium hover:underline">{d.numero_piece}</Link></td><td>{f?.nom}</td><td>{c?.nom??"—"}</td><td>{DEPENSE_CATEGORIES[d.categorie]}</td><td style={{color:st?.couleur}}>{st?.label}</td><td className="text-right">{euros(d.montant_ttc)}</td><td className="px-3 text-right">{euros(Number(d.montant_ttc)-Number(d.montant_regle))}</td></tr>})}{(!depenses||!depenses.length)&&<tr><td colSpan={8} className="p-8 text-center text-neutral-500">Aucune dépense.</td></tr>}</tbody></table></div>
- </div></main>;
+import { DepenseFournisseurForm } from "@/components/DepenseFournisseurForm";
+
+const un = <T,>(valeur: T | T[] | null): T | null => Array.isArray(valeur) ? valeur[0] ?? null : valeur;
+
+export default async function DepensesPage({ searchParams }: { searchParams: Promise<{ error?: string; chantier?: string }> }) {
+  const { error, chantier = "" } = await searchParams;
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const [
+    { data: depenses },
+    { data: fournisseurs },
+    { data: chantiers },
+    { data: commandes },
+    { data: vehicules },
+    { data: outils },
+    { data: employes },
+  ] = await Promise.all([
+    supabase.from("depenses_fournisseurs").select("*,fournisseur:fournisseurs(nom),chantier:chantiers(nom)").eq("entreprise_id", ctx.entrepriseId).order("date_piece", { ascending: false }),
+    supabase.from("fournisseurs").select("id,nom").eq("entreprise_id", ctx.entrepriseId).eq("actif", true).order("nom"),
+    supabase.from("chantiers").select("id,nom").eq("entreprise_id", ctx.entrepriseId).order("nom"),
+    supabase.from("commandes_fournisseurs").select("id,numero,fournisseur_id").eq("entreprise_id", ctx.entrepriseId).order("date_commande", { ascending: false }),
+    supabase.from("vehicules").select("id,immatriculation,marque,modele").eq("entreprise_id", ctx.entrepriseId).neq("statut", "vendu").order("immatriculation"),
+    supabase.from("outils").select("id,reference,designation").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(hors_service,perdu,rebut)").order("designation"),
+    supabase.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif").order("nom"),
+  ]);
+
+  const total = (depenses ?? []).filter((depense) => depense.statut !== "annulee").reduce((somme, depense) => somme + Number(depense.montant_ttc), 0);
+  const regle = (depenses ?? []).reduce((somme, depense) => somme + Number(depense.montant_regle), 0);
+
+  return (
+    <main className="p-4 sm:p-8">
+      <div className="mx-auto max-w-6xl space-y-6">
+        <div>
+          <h1 className="text-xl font-semibold">Factures fournisseurs</h1>
+          <p className="text-sm text-neutral-500">Factures numérisées reliées aux chantiers, ouvriers, véhicules et outils.</p>
+        </div>
+        {error && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded border p-3">Total TTC <strong className="block">{euros(total)}</strong></div>
+          <div className="rounded border p-3">Réglé <strong className="block text-green-700">{euros(regle)}</strong></div>
+          <div className="rounded border p-3">À payer <strong className="block text-amber-700">{euros(Math.max(0, total - regle))}</strong></div>
+        </div>
+        <DepenseFournisseurForm
+          fournisseurs={fournisseurs ?? []}
+          chantiers={chantiers ?? []}
+          commandes={commandes ?? []}
+          vehicules={vehicules ?? []}
+          outils={outils ?? []}
+          employes={employes ?? []}
+          chantierInitial={chantier}
+        />
+        <div className="overflow-x-auto rounded border dark:border-neutral-800">
+          <table className="w-full min-w-[850px] text-sm">
+            <thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500 dark:bg-neutral-900">
+              <tr><th className="px-3 py-2">Date</th><th>N° pièce</th><th>Fournisseur</th><th>Chantier</th><th>Catégorie</th><th>Statut</th><th className="text-right">TVA</th><th className="text-right">TTC</th><th className="px-3 text-right">Reste</th></tr>
+            </thead>
+            <tbody>
+              {depenses?.map((depense) => {
+                const fournisseur = un(depense.fournisseur as { nom: string } | { nom: string }[] | null);
+                const chantierLie = un(depense.chantier as { nom: string } | { nom: string }[] | null);
+                const statut = DEPENSE_STATUTS[depense.statut];
+                return (
+                  <tr key={depense.id} className="border-t dark:border-neutral-800">
+                    <td className="px-3 py-2">{depense.date_piece}</td>
+                    <td><Link href={`/depenses/${depense.id}`} className="font-medium hover:underline">{depense.numero_piece}</Link></td>
+                    <td>{fournisseur?.nom}</td>
+                    <td>{chantierLie?.nom ?? "—"}</td>
+                    <td>{DEPENSE_CATEGORIES[depense.categorie]}</td>
+                    <td style={{ color: statut?.couleur }}>{statut?.label}</td>
+                    <td className="text-right">{depense.taux_tva === undefined ? "—" : `${Number(depense.taux_tva).toLocaleString("fr-FR")} %`}</td>
+                    <td className="text-right">{euros(depense.montant_ttc)}</td>
+                    <td className="px-3 text-right">{euros(Number(depense.montant_ttc) - Number(depense.montant_regle))}</td>
+                  </tr>
+                );
+              })}
+              {(!depenses || !depenses.length) && <tr><td colSpan={9} className="p-8 text-center text-neutral-500">Aucune dépense.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  );
 }
