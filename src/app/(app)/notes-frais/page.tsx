@@ -7,6 +7,7 @@ import { creerNoteFraisAction } from "@/app/actions/notes-frais";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { ExpenseAmountFields } from "@/components/ExpenseAmountFields";
+import { SearchableSelect } from "@/components/SearchableSelect";
 
 const input = "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -45,7 +46,7 @@ export default async function NotesFraisPage({ searchParams }: { searchParams: P
         <label className="text-xs text-neutral-500">Catégorie<select name="categorie" className={`${input} mt-1`}>{(categories ?? []).map((c) => <option key={c.code} value={c.code}>{c.libelle}</option>)}</select></label>
         <label className="text-xs text-neutral-500">Type de justificatif<select name="type_document_principal" className={`${input} mt-1`}>{TYPES_JUSTIFICATIF.map((t) => <option key={t.cle} value={t.cle}>{t.libelle}</option>)}</select></label>
         <ExpenseAmountFields />
-        <label className="text-xs text-neutral-500">Chantier<select name="chantier_id" className={`${input} mt-1`}><option value="">Frais généraux</option>{(chantiers ?? []).map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}</select></label>
+        <label className="text-xs text-neutral-500">Chantier<SearchableSelect name="chantier_id" options={(chantiers ?? []).map((c) => ({ value: c.id, label: c.nom }))} placeholder="Écrire le nom du chantier…" emptyLabel="Frais généraux" className="mt-1" /></label>
         <label className="text-xs text-neutral-500">Moyen de paiement<select name="moyen_paiement" className={`${input} mt-1`}><option value="">Non renseigné</option><option value="carte_entreprise">Carte entreprise</option><option value="carte_personnelle">Carte personnelle</option><option value="especes">Espèces</option><option value="virement">Virement</option><option value="autre">Autre</option></select></label>
         <label className="text-xs text-neutral-500">Devise<select name="devise" className={`${input} mt-1`}><option value="EUR">EUR</option><option value="CHF">CHF</option><option value="GBP">GBP</option><option value="USD">USD</option></select></label>
         <label className="text-xs text-neutral-500 sm:col-span-2 lg:col-span-4">Commentaire<textarea name="commentaire_salarie" rows={2} className={`${input} mt-1`} /></label>

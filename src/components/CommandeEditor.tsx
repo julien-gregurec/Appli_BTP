@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { euros, UNITES, TAUX_TVA } from "@/lib/devis";
 import { totauxCommande, type LigneCommande } from "@/lib/commandes";
 import { creerCommandeAction, creerFournisseurRapideAction } from "@/app/actions/commandes";
+import { SearchableSelect } from "@/components/SearchableSelect";
 
 type Option = { id: string; label: string };
 
@@ -100,10 +101,7 @@ export function CommandeEditor({
         </div>
         <div className="space-y-1">
           <label className={label}>Chantier (optionnel)</label>
-          <select value={chantierId} onChange={(e) => setChantierId(e.target.value)} className={input + " w-full"}>
-            <option value="">—</option>
-            {chantiers.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-          </select>
+          <SearchableSelect value={chantierId} onValueChange={setChantierId} options={chantiers.map((c) => ({ value: c.id, label: c.label }))} placeholder="Écrire le nom du chantier…" emptyLabel="Sans chantier" />
         </div>
       </div>
 

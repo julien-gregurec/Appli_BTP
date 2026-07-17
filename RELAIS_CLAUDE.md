@@ -1,3 +1,12 @@
+# REPRISE PRIORITAIRE — 17 juillet 2026, listes chantier filtrantes et relances corrigées
+
+- Base contrôlée : LIRIA CONCEPT = 10 chantiers accessibles, Entreprise Test = 30. Aucune perte de données.
+- `SearchableSelect` remplace les longues listes chantier dans commandes, notes de frais, planning, pointage et régularisation de pointage ; la recherche se réduit à chaque saisie et ignore les accents.
+- CRM : recherche d’impayé par facture/client/chantier. Une relance e-mail ouvre maintenant réellement la messagerie avec le texte complet prérempli ; auparavant elle ne faisait qu’insérer un enregistrement. Bouton de confirmation « Marquer envoyée » ajouté.
+- Validation serveur de l’entreprise, du solde, de l’e-mail et des doublons de niveau. Aucun SQL. ESLint, TypeScript, 28 tests, diff-check et build webpack 78 routes verts.
+
+---
+
 # REPRISE PRIORITAIRE — 16 juillet 2026, banque, virements et paie (MIGRATION 89 APPLIQUÉE)
 
 - Migration `20260716000089_paiements_bancaires_paie.sql` appliquée directement dans Supabase : coffre RIB salariés/fournisseurs, bulletins PDF privés, prestataires bancaires, lots/ordres et audit append-only.

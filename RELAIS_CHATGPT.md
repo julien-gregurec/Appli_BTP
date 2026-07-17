@@ -1,3 +1,14 @@
+# REPRISE — 17 juillet 2026, recherches chantier et relances réellement utilisables
+
+- Contrôle direct Supabase : aucune donnée chantier n’est perdue. LIRIA CONCEPT possède 10 chantiers accessibles et Entreprise Test 30. Le défaut venait des listes natives longues et peu lisibles.
+- Nouveau composant `SearchableSelect` : la liste se réduit à chaque mot saisi, sans tenir compte des accents. Il est utilisé pour les chantiers des commandes, notes de frais, planning, pointage GPS et correction d’un pointage oublié.
+- `/crm` recherche maintenant une facture impayée par numéro, client ou chantier et affiche le chantier dans chaque résultat.
+- Correction fonctionnelle des relances : l’ancien bouton créait seulement une ligne en base. Une relance e-mail enregistre désormais la préparation puis ouvre réellement la messagerie avec destinataire, objet, montant restant, facture, échéance, chantier et message préremplis. Les autres canaux restent programmés et l’historique permet de marquer une relance envoyée.
+- Sécurité : la facture est relue côté serveur dans l’entreprise active, une facture soldée est refusée, l’e-mail client est exigé pour le canal e-mail et le doublon facture/niveau produit un message compréhensible.
+- Aucun SQL supplémentaire. Contrôles verts : ESLint, TypeScript, 28 tests, diff-check et build webpack de 78 routes. Seul l’avertissement historique `unpdf/import.meta` subsiste.
+
+---
+
 # REPRISE — 16 juillet 2026, banque, virements, paie et coffre RIB (MIGRATION 89 APPLIQUÉE)
 
 - Migration `20260716000089_paiements_bancaires_paie.sql` appliquée avec succès dans Supabase. Elle ajoute la forme juridique de l’entreprise, les RIB chiffrés salariés/fournisseurs, bulletins de paie privés, connexions bancaires, lots/ordres de virements et journal append-only.

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { connecteurFournisseurConnu } from "@/lib/fournisseur-connecteurs";
+import { construireLienMailto } from "@/lib/email";
 
 const texte = (formData: FormData, cle: string) => String(formData.get(cle) ?? "").trim();
 const nombre = (formData: FormData, cle: string, defaut = 0) => {
@@ -134,20 +135,49 @@ export async function creerAppelAction(formData: FormData) {
 export async function creerRelanceAction(formData: FormData) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  const factureId = texte(formData, "facture_id");
+  const canal = texte(formData, "canal") || "email";
+  const { data: facture, error: factureError } = await supabase.from("factures")
+    .select("id,numero,montant_ttc,montant_paye,date_echeance,client:clients(nom,prenom,societe,email),chantier:chantiers(nom)")
+    .eq("id", factureId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+  if (factureError || !facture) return { error: "Facture introuvable ou inaccessible" };
+  if (Number(facture.montant_ttc) <= Number(facture.montant_paye)) return { error: "Cette facture est déjà entièrement réglée" };
+  const client = Array.isArray(facture.client) ? facture.client[0] : facture.client;
+  const chantier = Array.isArray(facture.chantier) ? facture.chantier[0] : facture.chantier;
+  const destinataire = optionnel(formData, "destinataire") ?? client?.email?.trim() ?? null;
+  if (canal === "email" && !destinataire) return { error: "Ajoutez l’adresse e-mail du client avant de préparer la relance" };
+  const reste = Number(facture.montant_ttc) - Number(facture.montant_paye);
+  const nomClient = client?.societe || [client?.prenom, client?.nom].filter(Boolean).join(" ") || "Madame, Monsieur";
+  const sujet = optionnel(formData, "sujet") ?? `Rappel concernant la facture ${facture.numero}`;
+  const message = optionnel(formData, "message") ?? [
+    `Bonjour ${nomClient},`, "",
+    `Sauf erreur de notre part, la facture ${facture.numero} présente encore un solde de ${reste.toLocaleString("fr-FR", { style: "currency", currency: "EUR" })} à régler.`,
+    chantier?.nom ? `Chantier concerné : ${chantier.nom}.` : null,
+    "", "Merci de bien vouloir procéder à son règlement ou de nous contacter si celui-ci a déjà été effectué.", "", "Cordialement,",
+  ].filter((ligne) => ligne !== null).join("\n");
   const { error } = await supabase.from("relances_impayes").insert({
     entreprise_id: ctx.entrepriseId,
-    facture_id: texte(formData, "facture_id"),
+    facture_id: factureId,
     niveau: nombre(formData, "niveau", 1),
-    canal: texte(formData, "canal") || "email",
+    canal,
+    statut: canal === "email" ? "preparee" : "a_envoyer",
     date_prevue: texte(formData, "date_prevue") || new Date().toISOString().slice(0, 10),
-    destinataire: optionnel(formData, "destinataire"),
-    sujet: optionnel(formData, "sujet"),
-    message: optionnel(formData, "message"),
+    destinataire,
+    sujet,
+    message,
     created_by: ctx.userId,
   });
+  if (error) return { error: error.code === "23505" ? "Ce niveau de relance existe déjà pour cette facture" : error.message };
+  revalidatePath("/crm");
+  return { success: canal === "email" ? "Relance enregistrée ; votre messagerie va s’ouvrir" : "Relance programmée", mailto: canal === "email" && destinataire ? construireLienMailto({ to: destinataire, sujet, corps: message }) : undefined };
+}
+
+export async function marquerRelanceEnvoyeeAction(id: string) {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const { error } = await supabase.from("relances_impayes").update({ statut: "envoyee", date_envoi: new Date().toISOString() }).eq("id", id).eq("entreprise_id", ctx.entrepriseId);
   if (error) retourErreur("/crm", error.message);
   revalidatePath("/crm");
-  redirect("/crm?success=Relance programmée");
 }
 
 export async function creerModeleDevisAction(formData: FormData) {
