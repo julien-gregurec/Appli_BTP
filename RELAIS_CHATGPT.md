@@ -857,3 +857,12 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Les écritures comptables mémorisent désormais le logiciel d’origine sélectionné au lieu d’utiliser Batappli comme valeur par défaut.
 - Contrôles : 44 tests Vitest, TypeScript, ESLint et build Next webpack complet de 81 pages verts. Seul l’avertissement historique `unpdf/import.meta` demeure non bloquant.
 - Lot publié sur `gh/main` au commit `dbe5fb0`. Déploiement Vercel Production confirmé **Ready** sur l’alias principal.
+
+## 102. Scanner universel de la borne stock — 17 juillet 2026
+
+- La borne `/stock/borne` propose maintenant un **scan intelligent unique**. Les préfixes sécurisés Liria classent automatiquement le code dans la bonne zone : salarié (`LGP-EMP-`), article (`LGP-ART-`), chantier (`LGP-CH-`), véhicule (`LGP-VEH-`) ou outillage (`LGP-OUT-`).
+- Un code-barres fournisseur ou EAN sans préfixe reste traité comme un article de stock. Un QR Liria connu conserve toujours son type réel, même s’il est lu depuis un bouton de scan spécialisé.
+- Une sortie de stock peut désormais être affectée à une seule destination : chantier, camionnette/véhicule ou outil/matériel. Scanner une nouvelle destination efface automatiquement la précédente afin d’éviter les doubles affectations.
+- Le serveur vérifie le type du QR, l’entreprise propriétaire, la disponibilité du véhicule ou de l’outil et l’unicité de la destination. Un QR véhicule ne peut donc pas être enregistré comme article ou chantier.
+- La migration `20260717000097_scanner_universel_destinations_stock.sql` est appliquée dans Supabase. Contrôle direct réussi : fonction `enregistrer_mouvement_stock_borne_v4`, colonnes `vehicule_id` et `outil_id` présentes.
+- Contrôles verts : 50 tests Vitest, TypeScript, ESLint, `git diff --check` et build Next webpack complet de 81 pages. Seul l’avertissement historique `unpdf/import.meta` demeure non bloquant.

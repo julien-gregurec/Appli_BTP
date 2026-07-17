@@ -54,7 +54,7 @@ export async function mouvementStockBorneAction(fd: FormData) {
     if(error||!data)redirect(`/stock/borne?error=${encodeURIComponent("QR salarié inconnu ou inactif")}`);
     identifiantEmploye=data;
   }
-  const { error } = await supabase.rpc("enregistrer_mouvement_stock_borne_v3", {
+  const { error } = await supabase.rpc("enregistrer_mouvement_stock_borne_v4", {
     p_entreprise_id: ctx.entrepriseId,
     p_identifiant_employe: identifiantEmploye,
     p_mot_de_passe: motDePasse,
@@ -63,6 +63,10 @@ export async function mouvementStockBorneAction(fd: FormData) {
     p_quantite: quantite,
     p_chantier_id: champ(fd, "chantier_id"),
     p_code_chantier: champ(fd, "code_chantier"),
+    p_vehicule_id: champ(fd, "vehicule_id"),
+    p_code_vehicule: champ(fd, "code_vehicule"),
+    p_outil_id: champ(fd, "outil_id"),
+    p_code_outil: champ(fd, "code_outil"),
     p_teinte_id: null,
     p_motif: champ(fd, "motif"),
   });
