@@ -1,3 +1,14 @@
+# REPRISE — 17 juillet 2026, facturation des comptes utilisant plus de deux appareils (MIGRATION 90 APPLIQUÉE)
+
+- Règle désormais active : chaque compte inclut deux appareils. Dès qu’un troisième appareil est enregistré ou qu’un ancien appareil est réactivé, le compte est facturé comme un compte salarié supplémentaire au tarif mensuel de son poste.
+- Le dépassement est facturé une seule fois par compte concerné et par mois, même si quatre appareils ou davantage sont enregistrés. La révocation ultérieure ne retire pas silencieusement un supplément déjà constaté pendant le mois.
+- Migration `20260717000090_facturation_depassement_appareils.sql` appliquée dans Supabase. Vérification directe : colonne de supplément, déclencheur automatique et nouvelle synthèse tarifaire présents (`true / true / true`).
+- `/plateforme` inclut maintenant le montant HT des dépassements dans l’estimation mensuelle et indique le nombre de comptes concernés. `/plateforme/facturation` détaille par salarié le nombre d’appareils, le tarif du compte, le supplément et le total.
+- La fiche employé explique clairement la règle et permet toujours de révoquer un ancien appareil.
+- Contrôles verts : ESLint, TypeScript, 29 tests Vitest, `git diff --check` et build Next webpack complet de 78 routes. Seul l’avertissement historique `unpdf/import.meta` subsiste.
+
+---
+
 # REPRISE — 17 juillet 2026, recherches chantier et relances réellement utilisables
 
 - Contrôle direct Supabase : aucune donnée chantier n’est perdue. LIRIA CONCEPT possède 10 chantiers accessibles et Entreprise Test 30. Le défaut venait des listes natives longues et peu lisibles.
