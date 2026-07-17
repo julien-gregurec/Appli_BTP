@@ -49,6 +49,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     ["Date de validation", inventaire.valide_at ?? ""],
     ["Statut", inventaire.statut],
     ["Commentaire", inventaire.commentaire ?? ""],
+    ["Traçabilité du prix", String(inventaire.date_inventaire) < "2026-07-17" ? "Inventaire antérieur à la migration 93 : prix initialisés depuis le catalogue le 17/07/2026, à vérifier" : "Prix d’achat HT figés à la création de l’inventaire"],
     [],
     ["SYNTHÈSE"],
     ["Nombre d’articles", synthese.articles],
@@ -75,6 +76,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       nombreCsv(ligne.valeurComptee - ligne.valeurTheorique),
     ]);
   }
-  csv.push([], ["Document préparatoire à transmettre à l’expert-comptable. La méthode de valorisation et les éventuelles dépréciations restent à valider."]);
+  csv.push([], ["Document préparatoire à transmettre à l’expert-comptable. La méthode de valorisation, les prix historiques et les éventuelles dépréciations restent à valider."]);
   return reponseCsv(csv, `cloture-inventaire-${inventaire.numero}-${inventaire.date_inventaire}.csv`);
 }

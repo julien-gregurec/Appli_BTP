@@ -49,6 +49,7 @@ export default async function InventairePage({
   const action = enregistrerInventaireAction.bind(null, id);
   const cloture = inventaire.statut === "valide";
   const prixManquants = lignes.filter((ligne) => Number(ligne.prix_achat_ht_snapshot) === 0).length;
+  const inventaireHistorique = String(inventaire.date_inventaire) < "2026-07-17";
 
   return (
     <main className="p-4 sm:p-8">
@@ -73,10 +74,15 @@ export default async function InventairePage({
             {prixManquants} article{prixManquants > 1 ? "s ont" : " a"} un prix d’achat nul. Complétez les prix avant le prochain inventaire pour obtenir une valorisation comptable complète.
           </p>
         )}
+        {inventaireHistorique && (
+          <p className="rounded-md border border-blue-300 bg-blue-50 p-3 text-sm text-blue-900">
+            Inventaire antérieur à la valorisation automatique : les prix ont été initialisés depuis le catalogue lors de la migration du 17 juillet 2026. Faites-les vérifier par l’expert-comptable avant utilisation pour la clôture.
+          </p>
+        )}
 
         <section>
           <h2 className="font-semibold">Synthèse de clôture au prix d’achat HT</h2>
-          <p className="mt-1 text-sm text-neutral-500">Les prix sont figés au démarrage de l’inventaire : une modification ultérieure du catalogue ne change pas ce rapport.</p>
+          <p className="mt-1 text-sm text-neutral-500">Pour les inventaires créés depuis le 17 juillet 2026, les prix sont figés au démarrage : une modification ultérieure du catalogue ne change pas le rapport.</p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <Carte label="Articles comptés" valeur={`${synthese.articlesComptes} / ${synthese.articles}`} />
             <Carte label="Articles avec écart" valeur={String(synthese.articlesAvecEcart)} alerte={synthese.articlesAvecEcart > 0} />

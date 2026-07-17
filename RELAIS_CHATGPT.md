@@ -2,7 +2,8 @@
 
 ## 17 juillet 2026 — Valorisation comptable des inventaires (MIGRATION 93 APPLIQUÉE)
 
-- Migration `20260717000093_valorisation_inventaires.sql` appliquée avec succès dans Supabase. Chaque ligne d’inventaire conserve maintenant un instantané du prix d’achat HT de l’article au moment de sa création : une modification ultérieure du catalogue ne change donc pas silencieusement la valorisation historique.
+- Migration `20260717000093_valorisation_inventaires.sql` appliquée avec succès dans Supabase. Chaque nouvelle ligne d’inventaire conserve maintenant un instantané du prix d’achat HT de l’article au moment de sa création : une modification ultérieure du catalogue ne change donc pas silencieusement sa valorisation.
+- Les inventaires antérieurs au 17 juillet 2026 ont été initialisés avec le prix présent dans le catalogue lors de la migration, faute d’historique reconstituable. L’écran et le CSV les signalent explicitement comme prix historiques à faire vérifier avant clôture.
 - La fiche d’un inventaire affiche le nombre d’articles comptés, les références avec écart, les quantités manquantes et excédentaires, la valeur théorique HT, la valeur réellement comptée HT et l’écart de valeur HT.
 - Le détail par article présente stock théorique, stock compté, écart de quantité, prix d’achat HT figé et impact financier. Les articles sans prix d’achat sont signalés pour correction.
 - Après validation de l’inventaire, un bouton **« Exporter la clôture CSV »** produit un état exploitable par l’expert-comptable : métadonnées, synthèse, détail des écarts et méthode de valorisation.
