@@ -73,6 +73,44 @@ export async function logoutAction() {
   }
 
   const supabase = await createClient();
+  // Un compte dépôt ne peut pas être déconnecté sans son mot de passe : sinon
+  // n'importe qui à la borne le sortirait d'un clic. On l'envoie vers la borne
+  // où la déconnexion protégée est proposée.
+  const { data: compteDepot } = await supabase.rpc("est_compte_depot_courant");
+  if (compteDepot === true) {
+    redirect("/stock/borne?deconnexion=1");
+  }
+  await supabase.auth.signOut();
+  redirect("/login");
+}
+
+/**
+ * Déconnexion protégée du compte dépôt : seule une personne connaissant le mot
+ * de passe du compte peut le déconnecter. On revérifie le mot de passe du compte
+ * courant avant de fermer la session ; un mot de passe erroné ne touche pas la
+ * session en cours (la borne reste ouverte).
+ */
+export async function deconnecterCompteDepotAction(formData: FormData) {
+  if (isEmailLoginDisabled()) redirect("/dashboard");
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user?.email) redirect("/login");
+
+  const { data: compteDepot } = await supabase.rpc("est_compte_depot_courant");
+  if (compteDepot !== true) {
+    // Compte ordinaire : déconnexion simple.
+    await supabase.auth.signOut();
+    redirect("/login");
+  }
+
+  const motDePasse = String(formData.get("mot_de_passe") ?? "");
+  if (!motDePasse) redirect(`/stock/borne?deconnexion=1&erreur=${encodeURIComponent("Mot de passe requis")}`);
+
+  // Revérifie le mot de passe du compte dépôt lui-même.
+  const { error } = await supabase.auth.signInWithPassword({ email: user.email, password: motDePasse });
+  if (error) {
+    redirect(`/stock/borne?deconnexion=1&erreur=${encodeURIComponent("Mot de passe incorrect")}`);
+  }
   await supabase.auth.signOut();
   redirect("/login");
 }
