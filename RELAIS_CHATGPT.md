@@ -1,5 +1,6 @@
 # REPRISE — 17 juillet 2026, facturation des comptes utilisant plus de deux appareils (MIGRATION 90 APPLIQUÉE)
 
+- Le relevé `/plateforme/facturation` présente maintenant une ligne unique par employé. Le nom est sélectionnable : la ligne est surlignée et ouvre, sur la même page et pour le mois consulté, le détail du poste, de l'offre, du statut, du nombre d'appareils, du tarif du compte, du supplément éventuel et du total HT. Aucun changement de base nécessaire.
 - Règle désormais active : chaque compte inclut deux appareils. Dès qu’un troisième appareil est enregistré ou qu’un ancien appareil est réactivé, le compte est facturé comme un compte salarié supplémentaire au tarif mensuel de son poste.
 - Le dépassement est facturé une seule fois par compte concerné et par mois, même si quatre appareils ou davantage sont enregistrés. La révocation ultérieure ne retire pas silencieusement un supplément déjà constaté pendant le mois.
 - Migration `20260717000090_facturation_depassement_appareils.sql` appliquée dans Supabase. Vérification directe : colonne de supplément, déclencheur automatique et nouvelle synthèse tarifaire présents (`true / true / true`).
