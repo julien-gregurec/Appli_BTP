@@ -814,3 +814,10 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Les couleurs principale et secondaire configurées par l’entreprise sont reprises dans les aperçus.
 - Les cartes disposent d’un meilleur état sélectionné, d’un survol lisible et d’un focus clavier.
 - TypeScript, lint et build de production validés.
+## 98. FAQ intégrée à l’aide — 17 juillet 2026
+
+- La page Aide contient maintenant une FAQ dépliable et adaptée au mobile.
+- 20 réponses sont regroupées en cinq rubriques : compte et accès, devis/factures, planning/pointage, achats/stock, notes de frais/congés/exports.
+- Des raccourcis permettent d’accéder directement à chaque rubrique.
+- Les réponses rappellent notamment la confidentialité des prix, le pointage personnel, la Carte BTP officielle, la conservation des justificatifs papier et le classement comptable.
+- Le formulaire de support reste disponible sous la FAQ pour les questions non résolues.

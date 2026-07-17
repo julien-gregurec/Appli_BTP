@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { envoyerMessageSupportAction } from "@/app/actions/support";
+import { FaqAide } from "@/components/FaqAide";
 
 type Message = { id: string; cote: string; auteur_nom: string | null; contenu: string; created_at: string };
 
@@ -66,6 +67,8 @@ export default async function AidePage({ searchParams }: { searchParams: Promise
             <a href="/videos/Liria_Gestion_Pro_Publicite_60s.mp4" download className="rounded-md border px-3 py-2 text-sm font-medium">Télécharger la publicité</a>
           </div>
         </section>
+
+        <FaqAide />
 
         {envoye && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Message envoyé. L&apos;équipe vous répondra ici.</p>}
         {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
