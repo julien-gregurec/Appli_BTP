@@ -105,6 +105,31 @@ export async function importerDonneesAction(payload: {
         taux_tva: nombre(val(l, "taux_tva")) ?? 20,
       });
     }
+  } else if (payload.type === "stock") {
+    for (const l of lignes) {
+      const reference = val(l, "reference");
+      const designation = val(l, "designation");
+      if (!reference || !designation) { ignores++; continue; }
+      enregistrements.push({
+        entreprise_id: entrepriseId, reference, designation,
+        code_barres: val(l, "code_barres") || null, marque: val(l, "marque") || null,
+        unite: val(l, "unite") || "u", quantite_stock: Math.max(0, nombre(val(l, "quantite_stock")) ?? 0),
+        seuil_alerte: Math.max(0, nombre(val(l, "seuil_alerte")) ?? 0),
+        prix_achat_ht: Math.max(0, nombre(val(l, "prix_achat_ht")) ?? 0),
+        prix_vente_ht: Math.max(0, nombre(val(l, "prix_vente_ht")) ?? 0),
+        emplacement: val(l, "emplacement") || null, actif: true, updated_at: new Date().toISOString(),
+      });
+    }
+  } else if (payload.type === "ecritures_comptables") {
+    for (const l of lignes) {
+      const journal = val(l, "journal"), dateEcriture = dateIso(val(l, "date_ecriture"));
+      const compte = val(l, "compte"), libelle = val(l, "libelle");
+      const debit = Math.max(0, nombre(val(l, "debit")) ?? 0), credit = Math.max(0, nombre(val(l, "credit")) ?? 0);
+      if (!journal || !dateEcriture || !compte || !libelle || (debit <= 0 && credit <= 0)) { ignores++; continue; }
+      enregistrements.push({ entreprise_id: entrepriseId, journal, date_ecriture: dateEcriture,
+        numero_piece: val(l, "numero_piece") || null, compte, libelle, debit, credit,
+        source_logiciel: val(l, "source_logiciel") || "Batappli", reference_source: val(l, "reference_source") || null });
+    }
   } else if (payload.type === "tarifs_fournisseurs") {
     const { data: fournisseursExistants } = await supabase
       .from("fournisseurs")
@@ -192,12 +217,16 @@ export async function importerDonneesAction(payload: {
     const lot = enregistrements.slice(i, i + 200);
     const requete = payload.type === "tarifs_fournisseurs"
       ? supabase.from(conf.table).upsert(lot, { onConflict: "entreprise_id,fournisseur_id,reference_fournisseur", count: "exact" })
-      : supabase.from(conf.table).insert(lot, { count: "exact" });
+      : payload.type === "stock"
+        ? supabase.from(conf.table).upsert(lot, { onConflict: "entreprise_id,reference", count: "exact" })
+        : supabase.from(conf.table).insert(lot, { count: "exact" });
     const { error, count } = await requete;
     if (error) erreurs.push(`Lot ${i / 200 + 1} : ${error.message}`);
     else inseres += count ?? lot.length;
   }
 
   revalidatePath("/parametres/import");
+  if (payload.type === "stock") { revalidatePath("/stock"); revalidatePath("/inventaires"); }
+  if (payload.type === "ecritures_comptables") revalidatePath("/exports");
   return { inseres, ignores, erreurs };
 }

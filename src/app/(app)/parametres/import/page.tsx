@@ -12,19 +12,21 @@ export default async function ImportPage() {
 
   return (
     <main className="p-8">
-      <div className="mx-auto max-w-3xl space-y-6">
+      <div className="mx-auto max-w-5xl space-y-6">
         <div>
           <Link href="/parametres" className="text-sm text-neutral-500">← Paramètres</Link>
           <h1 className="mt-2 text-xl font-semibold">Importer des données</h1>
           <p className="text-sm text-neutral-500">
-            Migrez vos clients, chantiers, employés, catalogue et tarifs fournisseurs depuis un autre logiciel ou un export officiel.
+            Migrez vos clients, chantiers, employés, catalogue, stock, codes-barres, tarifs fournisseurs et écritures comptables depuis un autre logiciel ou un export officiel.
             Exportez vos données en CSV ou Excel depuis votre ancien logiciel, puis déposez le fichier ici.
           </p>
         </div>
+        <section className="grid gap-3 sm:grid-cols-3"><div className="rounded border p-4"><strong>1. Export sécurisé</strong><p className="mt-1 text-xs text-neutral-500">Depuis Batappli ou le logiciel source, exportez chaque famille en CSV/XLSX sans transmettre de mot de passe.</p></div><div className="rounded border p-4"><strong>2. Aperçu et correspondance</strong><p className="mt-1 text-xs text-neutral-500">Liria affiche les premières lignes et vous laisse associer chaque colonne avant toute écriture.</p></div><div className="rounded border p-4"><strong>3. Entreprise pilote isolée</strong><p className="mt-1 text-xs text-neutral-500">Créez l’entreprise de test depuis Plateforme, importez ses données, puis attribuez ses postes et permissions.</p></div></section>
         <ImportWizard />
         <p className="text-xs text-neutral-500">
           Astuce : depuis Batappli/EBP, utilisez « Exporter » ou « Enregistrer sous » au format Excel (.xlsx) ou CSV.
           La première ligne doit contenir les intitulés de colonnes. Vous associez ensuite chaque colonne à un champ.
+          Pour un essai réel, commencez par les clients et chantiers, puis le stock/codes-barres, et enfin les écritures comptables historiques.
         </p>
       </div>
     </main>

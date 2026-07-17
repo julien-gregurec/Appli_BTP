@@ -9,7 +9,7 @@ export type ChampImport = {
 };
 
 export type TypeImport = {
-  cle: "clients" | "chantiers" | "employes" | "catalogue" | "tarifs_fournisseurs";
+  cle: "clients" | "chantiers" | "employes" | "catalogue" | "tarifs_fournisseurs" | "stock" | "ecritures_comptables";
   libelle: string;
   table: string;
   description: string;
@@ -79,6 +79,41 @@ export const TYPES_IMPORT: TypeImport[] = [
       { cle: "unite", libelle: "Unité", aide: "h, m², ml, u, forfait…" },
       { cle: "prix_unitaire_ht", libelle: "Prix unitaire HT" },
       { cle: "taux_tva", libelle: "Taux TVA (%)" },
+    ],
+  },
+  {
+    cle: "stock",
+    libelle: "Stock et codes-barres",
+    table: "articles_stock",
+    description: "Articles, quantités, emplacements, prix d’achat/revente et codes-barres exportés de Batappli ou d’un autre logiciel.",
+    champs: [
+      { cle: "reference", libelle: "Référence", requis: true },
+      { cle: "designation", libelle: "Désignation", requis: true },
+      { cle: "code_barres", libelle: "Code-barres / EAN" },
+      { cle: "marque", libelle: "Marque / fabricant" },
+      { cle: "unite", libelle: "Unité" },
+      { cle: "quantite_stock", libelle: "Quantité en stock" },
+      { cle: "seuil_alerte", libelle: "Seuil d’alerte" },
+      { cle: "prix_achat_ht", libelle: "Prix d’achat HT" },
+      { cle: "prix_vente_ht", libelle: "Prix de vente HT" },
+      { cle: "emplacement", libelle: "Emplacement" },
+    ],
+  },
+  {
+    cle: "ecritures_comptables",
+    libelle: "Écritures comptables historiques",
+    table: "ecritures_comptables_importees",
+    description: "Journal comptable exporté de Batappli, EBP ou du cabinet comptable. Les écritures restent identifiées comme données historiques importées.",
+    champs: [
+      { cle: "journal", libelle: "Journal", requis: true, aide: "Ex. VE, AC, BQ, OD" },
+      { cle: "date_ecriture", libelle: "Date d’écriture", requis: true },
+      { cle: "numero_piece", libelle: "Numéro de pièce" },
+      { cle: "compte", libelle: "Compte comptable", requis: true },
+      { cle: "libelle", libelle: "Libellé", requis: true },
+      { cle: "debit", libelle: "Débit" },
+      { cle: "credit", libelle: "Crédit" },
+      { cle: "source_logiciel", libelle: "Logiciel source", aide: "Batappli par défaut" },
+      { cle: "reference_source", libelle: "Référence source" },
     ],
   },
   {

@@ -104,6 +104,8 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
             <Link href={`/chantiers/${id}/documents`} className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900">
               Photos & documents{documents?.length ? ` (${documents.length})` : ""}
             </Link>
+            <Link href={`/chantiers/${id}/doe`} className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900">DOE automatique</Link>
+            <Link href={`/chantiers/${id}/emails`} className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900">E-mails</Link>
             {peutGerer?<StatutChantierSelect chantierId={id} statut={chantier.statut} />:<span className="rounded-full bg-neutral-100 px-3 py-1 text-sm dark:bg-neutral-800">{chantier.statut.replaceAll("_"," ")}</span>}
           </div>
         </div>

@@ -13,6 +13,8 @@ import { IdentificationCodeCard } from "@/components/IdentificationCodeCard";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { roleChantier } from "@/lib/chantier-statuts";
 import { CoordonneesBancairesForm } from "@/components/CoordonneesBancairesForm";
+import { statutNoteFrais } from "@/lib/notes-frais";
+import { euros } from "@/lib/devis";
 
 export default async function EmployeDetailPage({ params,searchParams }: { params: Promise<{ id: string }>;searchParams:Promise<{error?:string;success?:string}> }) {
   const { id } = await params;
@@ -32,12 +34,14 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
     .single();
 
   if (!employe) notFound();
+  const peutVoirHistoriqueFrais = employe.utilisateur_id === ctx.userId || permissions === null || permissions.includes("gerer_notes_frais") || permissions.includes("verifier_notes_frais") || permissions.includes("comptabiliser_notes_frais");
 
   const { data: rib } = peutGererRib ? await supabase.from("coordonnees_bancaires")
     .select("titulaire,iban_quatre_derniers,verification_statut,verification_message")
     .eq("entreprise_id", ctx.entrepriseId).eq("employe_id", id).eq("actif", true).maybeSingle() : { data: null };
 
   const { data: codeIdentification } = await supabase.from("codes_identification").select("id,code").eq("entreprise_id", ctx.entrepriseId).eq("type_ressource", "employe").eq("ressource_id", id).eq("actif", true).maybeSingle();
+  const { data: notesFrais } = peutVoirHistoriqueFrais ? await supabase.from("notes_frais").select("id,reference,date_frais,fournisseur,montant_ttc,statut,chantier:chantiers!notes_frais_chantier_entreprise_fkey(nom)").eq("entreprise_id",ctx.entrepriseId).eq("employe_id",id).order("date_frais",{ascending:false}).limit(100) : {data:[]};
   const { data: appareils } = employe.utilisateur_id ? await supabase.from("appareils_comptes").select("id,nom_appareil,type_appareil,application_installee,premiere_activite_at,derniere_activite_at,revoque_at").eq("entreprise_id",ctx.entrepriseId).eq("utilisateur_id",employe.utilisateur_id).order("derniere_activite_at",{ascending:false}) : {data:[]};
 
   const { data: equipesChantiers } = await supabase
@@ -100,6 +104,8 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
           {peutVoirFinances&&ligne("Coût interne", formatEuro(employe.cout_horaire))}
           {ligne("Notes", employe.notes)}
         </section>
+
+        {peutVoirHistoriqueFrais&&<section className="space-y-3 rounded-md border p-4 dark:border-neutral-800"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold">Historique des notes de frais</h2><p className="text-sm text-neutral-500">Justificatifs, décisions et montants conservés dans la fiche du salarié.</p></div><Link href={`/notes-frais?employe=${id}`} className="rounded border px-3 py-2 text-sm font-medium">Ouvrir le dossier complet</Link></div><div className="grid gap-2">{(notesFrais??[]).slice(0,12).map(note=>{const statut=statutNoteFrais(note.statut);const chantier=Array.isArray(note.chantier)?note.chantier[0]:note.chantier;return <Link key={note.id} href={`/notes-frais/${note.id}`} className="grid gap-1 rounded border p-3 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900 sm:grid-cols-[120px_1fr_1fr_auto_auto] sm:items-center"><strong className="font-mono">{note.reference}</strong><span>{note.fournisseur??"Sans fournisseur"}</span><span className="text-neutral-500">{chantier?.nom??"Frais généraux"} · {note.date_frais}</span><span style={{color:statut.couleur}}>{statut.libelle}</span><strong className="font-mono">{euros(note.montant_ttc)}</strong></Link>})}{!(notesFrais??[]).length&&<p className="rounded border border-dashed p-4 text-sm text-neutral-500">Aucune note de frais enregistrée pour cet employé.</p>}</div></section>}
 
         {peutGererRib && (
           <CoordonneesBancairesForm type="employe" beneficiaireId={id} retour={`/employes/${id}`} rib={rib}/>

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { lireImportStock } from "@/lib/import-stock";
+import { nomFichierSecurise } from "@/lib/documents";
 const champ = (fd: FormData, nom: string) => String(fd.get(nom) ?? "").trim() || null;
 
 export async function creerArticleStockAction(fd: FormData) {
@@ -93,3 +94,20 @@ export async function definirMotDePasseStockPersonnelAction(fd: FormData) {
 
 export async function importerStockAction(fd:FormData){const ctx=await getContexteEntreprise(),supabase=await createClient(),fichier=fd.get("fichier"),type=String(fd.get("type_import")??"");if(!(fichier instanceof File)||!fichier.size)redirect(`/stock?error=${encodeURIComponent("Choisissez un fichier")}`);if(fichier.size>20*1024*1024)redirect(`/stock?error=${encodeURIComponent("Le fichier dépasse 20 Mo")}`);try{const lignes=await lireImportStock(fichier);if(!lignes.length)throw new Error("Aucune ligne produit détectée");const{data,error}=await supabase.rpc("importer_articles_stock",{p_entreprise_id:ctx.entrepriseId,p_type:type,p_lignes:lignes});if(error)throw error;revalidatePath("/stock");revalidatePath("/inventaires");redirect(`/stock?succes=${encodeURIComponent(`${data} ligne(s) importée(s)`)}`)}catch(e){if(e&&typeof e==="object"&&"digest"in e)throw e;redirect(`/stock?error=${encodeURIComponent(e instanceof Error?e.message:"Import impossible")}`)}}
 export async function ajouterTeinteAction(articleId:string,fd:FormData){const ctx=await getContexteEntreprise(),supabase=await createClient(),nom=champ(fd,"nom"),hex=champ(fd,"code_hex");if(!nom)redirect(`/stock/${articleId}?error=${encodeURIComponent("Nom de teinte obligatoire")}`);const{data:a}=await supabase.from("articles_stock").select("id").eq("id",articleId).eq("entreprise_id",ctx.entrepriseId).maybeSingle();if(!a)redirect("/stock");const{error}=await supabase.from("article_teintes").insert({entreprise_id:ctx.entrepriseId,article_id:articleId,nom,reference:champ(fd,"reference"),code_hex:hex});if(error)redirect(`/stock/${articleId}?error=${encodeURIComponent(error.message)}`);revalidatePath("/stock");revalidatePath(`/stock/${articleId}`);redirect(`/stock/${articleId}?success=Teinte ajoutée`)}
+
+export async function ajouterFicheTechniqueArticleAction(articleId:string,fd:FormData){
+  const ctx=await getContexteEntreprise(),supabase=await createClient();const fichier=fd.get("fichier");
+  if(!(fichier instanceof File)||!fichier.size)redirect(`/stock/${articleId}?error=${encodeURIComponent("Choisissez une fiche technique")}`);
+  if(fichier.size>20*1024*1024)redirect(`/stock/${articleId}?error=${encodeURIComponent("Le fichier dépasse 20 Mo")}`);
+  if(!["application/pdf","image/png","image/jpeg","image/webp"].includes(fichier.type))redirect(`/stock/${articleId}?error=${encodeURIComponent("Format accepté : PDF, PNG, JPG ou WebP")}`);
+  const{data:article}=await supabase.from("articles_stock").select("id").eq("id",articleId).eq("entreprise_id",ctx.entrepriseId).maybeSingle();if(!article)redirect("/stock");
+  const path=`${ctx.entrepriseId}/${articleId}/${crypto.randomUUID()}-${nomFichierSecurise(fichier.name)}`;
+  const{error:uploadError}=await supabase.storage.from("fiches-techniques").upload(path,fichier,{contentType:fichier.type,upsert:false});
+  if(uploadError)redirect(`/stock/${articleId}?error=${encodeURIComponent(uploadError.message)}`);
+  const titre=champ(fd,"titre")??fichier.name;
+  const{error}=await supabase.from("fiches_techniques_articles").insert({entreprise_id:ctx.entrepriseId,article_id:articleId,
+    type_document:champ(fd,"type_document")??"fiche_technique",titre,fabricant:champ(fd,"fabricant"),reference_fabricant:champ(fd,"reference_fabricant"),
+    storage_path:path,nom_original:fichier.name,mime_type:fichier.type,taille_octets:fichier.size,source_url:champ(fd,"source_url"),version:champ(fd,"version")});
+  if(error){await supabase.storage.from("fiches-techniques").remove([path]);redirect(`/stock/${articleId}?error=${encodeURIComponent(error.message)}`);}
+  revalidatePath(`/stock/${articleId}`);redirect(`/stock/${articleId}?success=${encodeURIComponent("Fiche technique ajoutée au dossier produit")}`);
+}
