@@ -1,5 +1,13 @@
 # REPRISE — 17 juillet 2026, facturation des comptes utilisant plus de deux appareils (MIGRATION 90 APPLIQUÉE)
 
+## 17 juillet 2026 — TVA automatique des charges récurrentes (MIGRATION 92 APPLIQUÉE)
+
+- Migration `20260717000092_tva_charges_recurrentes.sql` appliquée avec succès dans Supabase. Elle ajoute `taux_tva` aux charges récurrentes, reprend les données existantes, limite les taux à 0 %, 2,1 %, 5,5 %, 10 % et 20 %, puis recalcule systématiquement la TVA côté PostgreSQL.
+- Le formulaire `/charges` reprend le même fonctionnement que les factures fournisseurs : saisie du montant HT, choix du taux français, calcul immédiat et non modifiable de la TVA et du TTC.
+- L'action serveur recalcule elle aussi les montants avant l'écriture : une valeur TVA falsifiée ou obsolète envoyée par le navigateur n'est jamais utilisée.
+- Lorsqu'une charge récurrente est matérialisée en facture fournisseur, son taux est transmis à la facture. Le journal des achats et l'export de TVA déductible reçoivent donc le bon HT, la bonne TVA et le bon TTC.
+- Contrôles verts : TypeScript, ESLint, 32 tests Vitest, `git diff --check` et build Next webpack complet de 78 routes. Seul l'avertissement historique `unpdf/import.meta` demeure non bloquant.
+
 ## 17 juillet 2026 — TVA automatique et virement direct des factures fournisseurs (MIGRATION 91 APPLIQUÉE)
 
 - Migration `20260717000091_tva_factures_fournisseurs.sql` appliquée avec succès directement dans Supabase. Elle ajoute `taux_tva` aux factures fournisseurs, reprend les données existantes, limite les nouveaux taux à 0 %, 2,1 %, 5,5 %, 10 % et 20 %, puis recalcule systématiquement le montant de TVA côté PostgreSQL.
