@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
+import Link from "next/link";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { euros } from "@/lib/devis";
@@ -24,7 +24,14 @@ const statutLot: Record<string, string> = { brouillon: "Brouillon", a_valider: "
 export default async function PaiementsBancairesPage({ searchParams }: { searchParams: Promise<{ error?: string; success?: string }> }) {
   const messages = await searchParams;
   const contexte = await getContexteEntreprise();
-  if (contexte.accesSupportPlateforme) notFound();
+  if (contexte.accesSupportPlateforme) return <main className="p-4 sm:p-8"><div className="mx-auto max-w-3xl space-y-5">
+    <header><h1 className="text-2xl font-semibold">Banque, virements et paie</h1><p className="text-sm text-neutral-500">Protection renforcée des données bancaires et salariales.</p></header>
+    <section className="rounded-xl border border-amber-300 bg-amber-50 p-5 text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+      <h2 className="font-semibold">Accès bancaire indisponible en mode administrateur plateforme</h2>
+      <p className="mt-2 text-sm">Ce n’est pas une erreur 404 : les RIB, bulletins de paie et virements d’une entreprise cliente sont volontairement masqués au support de la plateforme. Connectez-vous avec un compte administrateur membre de cette entreprise pour les gérer.</p>
+      <Link href="/plateforme" className="mt-4 inline-flex rounded-md bg-amber-900 px-4 py-2 text-sm font-semibold text-white">Retour à la plateforme</Link>
+    </section>
+  </div></main>;
   const supabase = await createClient();
   const permissions = await permissionsUtilisateur(contexte);
   const autorise = (droit: string) => permissions === null || permissions.includes(droit);

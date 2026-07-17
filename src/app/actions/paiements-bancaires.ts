@@ -26,6 +26,12 @@ const chemin = "/paiements-bancaires";
 const texte = (formData: FormData, cle: string) => String(formData.get(cle) ?? "").trim();
 const erreur = (message: string): never => redirect(`${chemin}?error=${encodeURIComponent(message)}`);
 const succes = (message: string): never => redirect(`${chemin}?success=${encodeURIComponent(message)}`);
+const retourAutorise = (formData: FormData) => {
+  const retour = texte(formData, "retour");
+  return retour.startsWith("/") && !retour.startsWith("//") && !retour.includes(":") ? retour : chemin;
+};
+const redirigerMessage = (retour: string, type: "error" | "success", message: string): never =>
+  redirect(`${retour}${retour.includes("?") ? "&" : "?"}${type}=${encodeURIComponent(message)}`);
 
 async function exigerPermission(permission: string) {
   const contexte = await getContexteEntreprise();
@@ -36,21 +42,22 @@ async function exigerPermission(permission: string) {
 }
 
 export async function enregistrerRibAction(type: "employe" | "fournisseur", beneficiaireId: string, formData: FormData) {
+  const retour = retourAutorise(formData);
   const contexte = await exigerPermission("gerer_coordonnees_bancaires");
   const iban = normaliserIban(texte(formData, "iban"));
   const bicBrut = texte(formData, "bic");
   const bic = bicBrut ? normaliserBic(bicBrut) : "";
   const titulaire = texte(formData, "titulaire");
-  if (!titulaire) erreur("Le titulaire du compte est obligatoire");
-  if (!ibanEstValide(iban)) erreur("L’IBAN est invalide");
-  if (bic && !bicEstValide(bic)) erreur("Le BIC est invalide");
+  if (!titulaire) redirigerMessage(retour, "error", "Le titulaire du compte est obligatoire");
+  if (!ibanEstValide(iban)) redirigerMessage(retour, "error", "L’IBAN est invalide");
+  if (bic && !bicEstValide(bic)) redirigerMessage(retour, "error", "Le BIC est invalide");
   let ibanChiffre: string;
   let bicChiffre: string | null = null;
   try {
     ibanChiffre = chiffrerDonneeBancaire(iban);
     if (bic) bicChiffre = chiffrerDonneeBancaire(bic);
   } catch (cause) {
-    erreur(cause instanceof Error ? cause.message : "Chiffrement bancaire indisponible");
+    redirigerMessage(retour, "error", cause instanceof Error ? cause.message : "Chiffrement bancaire indisponible");
   }
   const supabase = await createClient();
   const { error } = await supabase.rpc("enregistrer_coordonnees_bancaires", {
@@ -63,9 +70,10 @@ export async function enregistrerRibAction(type: "employe" | "fournisseur", bene
     p_iban_quatre_derniers: finIban(iban),
     p_bic_chiffre: bicChiffre,
   });
-  if (error) erreur(error.message);
+  if (error) redirigerMessage(retour, "error", error.message);
   revalidatePath(chemin);
-  succes("RIB enregistré et placé en attente de vérification");
+  revalidatePath(retour);
+  redirigerMessage(retour, "success", "RIB enregistré et placé en attente de vérification");
 }
 
 export async function enregistrerRibDepuisFormAction(formData: FormData) {

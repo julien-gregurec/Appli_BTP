@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { TRANSITIONS_COMMANDES, type LigneCommande } from "@/lib/commandes";
+import { delaiPaiementFournisseurValide } from "@/lib/echeances-fournisseurs";
 
 function champ(formData: FormData, nom: string) {
   return String(formData.get(nom) ?? "").trim();
@@ -16,7 +17,9 @@ export async function creerFournisseurAction(formData: FormData) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const nom = champ(formData, "nom");
+  const delaiPaiement = Number(champ(formData, "delai_paiement_jours") || "30");
   if (!nom) redirect(`/fournisseurs?error=${encodeURIComponent("Le nom du fournisseur est obligatoire")}`);
+  if (!delaiPaiementFournisseurValide(delaiPaiement)) redirect(`/fournisseurs?error=${encodeURIComponent("Le délai de paiement est invalide")}`);
 
   const { error } = await supabase.from("fournisseurs").insert({
     entreprise_id: ctx.entrepriseId,
@@ -29,12 +32,40 @@ export async function creerFournisseurAction(formData: FormData) {
     ville: champ(formData, "ville") || null,
     siret: champ(formData, "siret") || null,
     notes: champ(formData, "notes") || null,
+    delai_paiement_jours: delaiPaiement,
   });
 
   if (error) redirect(`/fournisseurs?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/fournisseurs");
   revalidatePath("/commandes/nouveau");
   redirect("/fournisseurs");
+}
+
+export async function modifierFournisseurAction(id: string, formData: FormData) {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const nom = champ(formData, "nom");
+  const delaiPaiement = Number(champ(formData, "delai_paiement_jours") || "30");
+  if (!nom) redirect(`/fournisseurs/${id}?error=${encodeURIComponent("Le nom du fournisseur est obligatoire")}`);
+  if (!delaiPaiementFournisseurValide(delaiPaiement)) redirect(`/fournisseurs/${id}?error=${encodeURIComponent("Le délai de paiement est invalide")}`);
+  const { error } = await supabase.from("fournisseurs").update({
+    nom,
+    contact_nom: champ(formData, "contact_nom") || null,
+    email: champ(formData, "email") || null,
+    telephone: champ(formData, "telephone") || null,
+    adresse: champ(formData, "adresse") || null,
+    code_postal: champ(formData, "code_postal") || null,
+    ville: champ(formData, "ville") || null,
+    siret: champ(formData, "siret") || null,
+    notes: champ(formData, "notes") || null,
+    delai_paiement_jours: delaiPaiement,
+    updated_at: new Date().toISOString(),
+  }).eq("id", id).eq("entreprise_id", ctx.entrepriseId);
+  if (error) redirect(`/fournisseurs/${id}?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/fournisseurs");
+  revalidatePath(`/fournisseurs/${id}`);
+  revalidatePath("/depenses");
+  redirect(`/fournisseurs/${id}?success=${encodeURIComponent("Fournisseur mis à jour")}`);
 }
 
 export async function changerActivationFournisseurAction(id: string, actif: boolean) {

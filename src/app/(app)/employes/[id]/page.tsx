@@ -12,6 +12,7 @@ import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { IdentificationCodeCard } from "@/components/IdentificationCodeCard";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { roleChantier } from "@/lib/chantier-statuts";
+import { CoordonneesBancairesForm } from "@/components/CoordonneesBancairesForm";
 
 export default async function EmployeDetailPage({ params,searchParams }: { params: Promise<{ id: string }>;searchParams:Promise<{error?:string;success?:string}> }) {
   const { id } = await params;
@@ -21,6 +22,7 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
   const permissions = await permissionsUtilisateur(ctx);
   const peutGerer = permissions === null || permissions.includes("gerer_employes");
   const peutVoirFinances = permissions === null || permissions.includes("voir_indicateurs_financiers");
+  const peutGererRib = !ctx.accesSupportPlateforme && (permissions === null || permissions.includes("gerer_coordonnees_bancaires"));
 
   const { data: employe } = await supabase
     .from("employes")
@@ -30,6 +32,10 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
     .single();
 
   if (!employe) notFound();
+
+  const { data: rib } = peutGererRib ? await supabase.from("coordonnees_bancaires")
+    .select("titulaire,iban_quatre_derniers,verification_statut,verification_message")
+    .eq("entreprise_id", ctx.entrepriseId).eq("employe_id", id).eq("actif", true).maybeSingle() : { data: null };
 
   const { data: codeIdentification } = await supabase.from("codes_identification").select("id,code").eq("entreprise_id", ctx.entrepriseId).eq("type_ressource", "employe").eq("ressource_id", id).eq("actif", true).maybeSingle();
   const { data: appareils } = employe.utilisateur_id ? await supabase.from("appareils_comptes").select("id,nom_appareil,type_appareil,application_installee,premiere_activite_at,derniere_activite_at,revoque_at").eq("entreprise_id",ctx.entrepriseId).eq("utilisateur_id",employe.utilisateur_id).order("derniere_activite_at",{ascending:false}) : {data:[]};
@@ -94,6 +100,10 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
           {peutVoirFinances&&ligne("Coût interne", formatEuro(employe.cout_horaire))}
           {ligne("Notes", employe.notes)}
         </section>
+
+        {peutGererRib && (
+          <CoordonneesBancairesForm type="employe" beneficiaireId={id} retour={`/employes/${id}`} rib={rib}/>
+        )}
 
         {peutGerer&&<section className="space-y-3 rounded-md border p-4 dark:border-neutral-800"><div><h2 className="font-semibold">Photo de l’employé</h2><p className="text-sm text-neutral-500">Portrait visible dans l’annuaire et la fiche interne.</p></div><form action={importerPhotoEmployeAction.bind(null,id)} className="flex flex-col gap-3 sm:flex-row"><input name="photo" type="file" accept="image/png,image/jpeg,image/webp" capture="user" required className="min-w-0 flex-1 rounded border px-3 py-2 text-sm"/><button className="rounded bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">{employe.photo_storage_path?"Remplacer la photo":"Ajouter la photo"}</button></form>{employe.photo_storage_path&&<form action={supprimerPhotoEmployeAction.bind(null,id)}><ConfirmSubmitButton message="Supprimer la photo de cet employé ?" className="text-xs text-red-700">Supprimer la photo</ConfirmSubmitButton></form>}</section>}
 

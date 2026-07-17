@@ -4,8 +4,9 @@ import { useMemo, useState } from "react";
 import { creerDepenseAction } from "@/app/actions/depenses";
 import { DEPENSE_CATEGORIES } from "@/lib/depenses";
 import { calculerMontantsTva, TAUX_TVA_FRANCE } from "@/lib/tva";
+import { calculerEcheanceFournisseur, libelleDelaiPaiementFournisseur } from "@/lib/echeances-fournisseurs";
 
-type Option = { id: string; nom: string };
+type Option = { id: string; nom: string; delai_paiement_jours?: number | null };
 type Commande = { id: string; numero: string; fournisseur_id: string };
 type Vehicule = { id: string; immatriculation: string; marque: string; modele: string };
 type Outil = { id: string; reference: string; designation: string };
@@ -35,6 +36,9 @@ export function DepenseFournisseurForm({
   const [commandeId, setCommandeId] = useState("");
   const [htBrut, setHtBrut] = useState("");
   const [taux, setTaux] = useState(20);
+  const dateAujourdhui = new Date().toISOString().slice(0, 10);
+  const [datePiece, setDatePiece] = useState(dateAujourdhui);
+  const [dateEcheance, setDateEcheance] = useState("");
 
   const commandesDisponibles = useMemo(
     () => commandes.filter((commande) => commande.fournisseur_id === fournisseurId),
@@ -42,6 +46,20 @@ export function DepenseFournisseurForm({
   );
   const ht = htBrut === "" ? null : Number(htBrut);
   const calcul = ht !== null && Number.isFinite(ht) && ht >= 0 ? calculerMontantsTva(ht, taux) : null;
+  const fournisseurSelectionne = fournisseurs.find((item) => item.id === fournisseurId);
+  const delaiSelectionne = Number(fournisseurSelectionne?.delai_paiement_jours ?? 30);
+
+  const actualiserFournisseur = (id: string) => {
+    setFournisseurId(id);
+    setCommandeId("");
+    const delai = Number(fournisseurs.find((item) => item.id === id)?.delai_paiement_jours ?? 30);
+    setDateEcheance(id ? calculerEcheanceFournisseur(datePiece, delai) : "");
+  };
+
+  const actualiserDatePiece = (date: string) => {
+    setDatePiece(date);
+    setDateEcheance(fournisseurId ? calculerEcheanceFournisseur(date, delaiSelectionne) : "");
+  };
 
   return (
     <form action={creerDepenseAction} className="grid gap-3 rounded border p-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -53,7 +71,7 @@ export function DepenseFournisseurForm({
         name="fournisseur_id"
         required
         value={fournisseurId}
-        onChange={(event) => { setFournisseurId(event.target.value); setCommandeId(""); }}
+        onChange={(event) => actualiserFournisseur(event.target.value)}
         className={cls}
       >
         <option value="">Fournisseur *</option>
@@ -62,8 +80,8 @@ export function DepenseFournisseurForm({
       <input name="numero_piece" required placeholder="N° facture fournisseur *" className={cls}/>
       <select name="categorie" className={cls}>{Object.entries(DEPENSE_CATEGORIES).map(([valeur, libelle]) => <option key={valeur} value={valeur}>{libelle}</option>)}</select>
       <select name="chantier_id" defaultValue={chantierInitial} className={cls}><option value="">Sans chantier</option>{chantiers.map((item) => <option key={item.id} value={item.id}>{item.nom}</option>)}</select>
-      <input name="date_piece" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} className={cls}/>
-      <input name="date_echeance" type="date" className={cls}/>
+      <label className="text-xs text-neutral-500">Date de facture<input name="date_piece" type="date" required value={datePiece} onChange={(event) => actualiserDatePiece(event.target.value)} className={`mt-1 w-full ${cls}`}/></label>
+      <label className="text-xs text-neutral-500">Échéance calculée<input name="date_echeance" type="date" value={dateEcheance} onChange={(event) => setDateEcheance(event.target.value)} className={`mt-1 w-full ${cls}`}/>{fournisseurId && <small className="mt-1 block">Délai fournisseur : {libelleDelaiPaiementFournisseur(delaiSelectionne)}</small>}</label>
       <label className="text-xs text-neutral-500">Montant HT
         <input name="montant_ht" type="number" inputMode="decimal" min="0" step="0.01" required value={htBrut} onChange={(event) => setHtBrut(event.target.value)} className={`mt-1 w-full ${cls}`}/>
       </label>
@@ -91,4 +109,3 @@ export function DepenseFournisseurForm({
     </form>
   );
 }
-

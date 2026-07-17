@@ -4,6 +4,7 @@ import { DEPENSE_CATEGORIES, DEPENSE_STATUTS } from "@/lib/depenses";
 import { euros } from "@/lib/devis";
 import { Lien as Link } from "@/components/Lien";
 import { DepenseFournisseurForm } from "@/components/DepenseFournisseurForm";
+import { etatEcheanceFournisseur } from "@/lib/echeances-fournisseurs";
 
 const un = <T,>(valeur: T | T[] | null): T | null => Array.isArray(valeur) ? valeur[0] ?? null : valeur;
 
@@ -21,7 +22,7 @@ export default async function DepensesPage({ searchParams }: { searchParams: Pro
     { data: employes },
   ] = await Promise.all([
     supabase.from("depenses_fournisseurs").select("*,fournisseur:fournisseurs(nom),chantier:chantiers(nom)").eq("entreprise_id", ctx.entrepriseId).order("date_piece", { ascending: false }),
-    supabase.from("fournisseurs").select("id,nom").eq("entreprise_id", ctx.entrepriseId).eq("actif", true).order("nom"),
+    supabase.from("fournisseurs").select("*").eq("entreprise_id", ctx.entrepriseId).eq("actif", true).order("nom"),
     supabase.from("chantiers").select("id,nom").eq("entreprise_id", ctx.entrepriseId).order("nom"),
     supabase.from("commandes_fournisseurs").select("id,numero,fournisseur_id").eq("entreprise_id", ctx.entrepriseId).order("date_commande", { ascending: false }),
     supabase.from("vehicules").select("id,immatriculation,marque,modele").eq("entreprise_id", ctx.entrepriseId).neq("statut", "vendu").order("immatriculation"),
@@ -57,19 +58,21 @@ export default async function DepensesPage({ searchParams }: { searchParams: Pro
         <div className="overflow-x-auto rounded border dark:border-neutral-800">
           <table className="w-full min-w-[850px] text-sm">
             <thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500 dark:bg-neutral-900">
-              <tr><th className="px-3 py-2">Date</th><th>N° pièce</th><th>Fournisseur</th><th>Chantier</th><th>Catégorie</th><th>Statut</th><th className="text-right">TVA</th><th className="text-right">TTC</th><th className="px-3 text-right">Reste</th></tr>
+              <tr><th className="px-3 py-2">Date</th><th>N° pièce</th><th>Fournisseur</th><th>Chantier</th><th>Échéance</th><th>Catégorie</th><th>Statut</th><th className="text-right">TVA</th><th className="text-right">TTC</th><th className="px-3 text-right">Reste</th></tr>
             </thead>
             <tbody>
               {depenses?.map((depense) => {
                 const fournisseur = un(depense.fournisseur as { nom: string } | { nom: string }[] | null);
                 const chantierLie = un(depense.chantier as { nom: string } | { nom: string }[] | null);
                 const statut = DEPENSE_STATUTS[depense.statut];
+                const echeance = !["payee", "annulee"].includes(depense.statut) ? etatEcheanceFournisseur(depense.date_echeance) : null;
                 return (
                   <tr key={depense.id} className="border-t dark:border-neutral-800">
                     <td className="px-3 py-2">{depense.date_piece}</td>
                     <td><Link href={`/depenses/${depense.id}`} className="font-medium hover:underline">{depense.numero_piece}</Link></td>
                     <td>{fournisseur?.nom}</td>
                     <td>{chantierLie?.nom ?? "—"}</td>
+                    <td><span className={echeance?.niveau === "retard" ? "font-semibold text-red-700" : echeance?.niveau === "urgent" || echeance?.niveau === "proche" ? "font-semibold text-amber-700" : "text-neutral-500"}>{echeance?.libelle ?? depense.date_echeance ?? "—"}</span><small className="block text-neutral-500">{depense.date_echeance ?? ""}</small></td>
                     <td>{DEPENSE_CATEGORIES[depense.categorie]}</td>
                     <td style={{ color: statut?.couleur }}>{statut?.label}</td>
                     <td className="text-right">{depense.taux_tva === undefined ? "—" : `${Number(depense.taux_tva).toLocaleString("fr-FR")} %`}</td>
@@ -78,7 +81,7 @@ export default async function DepensesPage({ searchParams }: { searchParams: Pro
                   </tr>
                 );
               })}
-              {(!depenses || !depenses.length) && <tr><td colSpan={9} className="p-8 text-center text-neutral-500">Aucune dépense.</td></tr>}
+              {(!depenses || !depenses.length) && <tr><td colSpan={10} className="p-8 text-center text-neutral-500">Aucune dépense.</td></tr>}
             </tbody>
           </table>
         </div>

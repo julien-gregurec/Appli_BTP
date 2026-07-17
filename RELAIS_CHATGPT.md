@@ -821,3 +821,14 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Des raccourcis permettent d’accéder directement à chaque rubrique.
 - Les réponses rappellent notamment la confidentialité des prix, le pointage personnel, la Carte BTP officielle, la conservation des justificatifs papier et le classement comptable.
 - Le formulaire de support reste disponible sous la FAQ pour les questions non résolues.
+
+## 99. Banque & paie, RIB par fiche et échéances fournisseurs — 17 juillet 2026
+
+- La route historique `/banque-paie` redirige maintenant vers `/paiements-bancaires` : l’écran n’est plus une page 404.
+- En accès support depuis la plateforme, les données bancaires et salariales restent volontairement masquées. Un écran explicatif remplace le 404 et rappelle qu’un compte administrateur membre de l’entreprise est requis.
+- Les coordonnées bancaires peuvent être saisies directement dans chaque fiche employé et chaque fiche fournisseur par un utilisateur possédant `gerer_coordonnees_bancaires`.
+- Les IBAN/BIC réutilisent le coffre existant : chiffrement côté serveur, IBAN jamais réaffiché intégralement, vérification obligatoire avant préparation d’un virement et isolation par entreprise.
+- Chaque fournisseur dispose désormais d’un délai contractuel : immédiat, 30, 45, 60 ou 90 jours. Ce délai préremplit automatiquement l’échéance des nouvelles factures fournisseurs ; l’échéance reste ajustable selon la pièce reçue.
+- La liste des factures fournisseurs signale les échéances proches, celles dues aujourd’hui et les retards.
+- Migration `20260717000095_rib_fiches_delais_fournisseurs.sql` appliquée avec succès dans Supabase.
+- Contrôles : 40 tests Vitest, ESLint et build Next webpack complet de 79 pages verts. Seul l’avertissement historique `unpdf/import.meta` demeure non bloquant.

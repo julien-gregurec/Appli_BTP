@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { creerFournisseurAction, changerActivationFournisseurAction } from "@/app/actions/commandes";
 import { Lien as Link } from "@/components/Lien";
+import { DELAIS_PAIEMENT_FOURNISSEUR, libelleDelaiPaiementFournisseur } from "@/lib/echeances-fournisseurs";
 
 const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -38,6 +39,7 @@ export default async function FournisseursPage({ searchParams }: { searchParams:
             <input name="email" placeholder="Email" className={input} />
             <input name="ville" placeholder="Ville" className={input} />
             <input name="siret" placeholder="SIRET" className={input} />
+            <select name="delai_paiement_jours" defaultValue="30" className={input}>{DELAIS_PAIEMENT_FOURNISSEUR.map((delai) => <option key={delai} value={delai}>{libelleDelaiPaiementFournisseur(delai)}</option>)}</select>
           </div>
           <button type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">
             Ajouter le fournisseur
@@ -60,7 +62,7 @@ export default async function FournisseursPage({ searchParams }: { searchParams:
                 <tr key={f.id} className={`border-t border-neutral-100 dark:border-neutral-800 ${!f.actif ? "opacity-50" : ""}`}>
                   <td className="px-3 py-2 font-mono text-xs text-neutral-500">{f.reference}</td>
                   <td className="px-3 py-2">
-                    <div className="font-medium">{f.nom}</div>
+                    <Link href={`/fournisseurs/${f.id}`} className="font-medium hover:underline">{f.nom}</Link>
                     {f.email && <div className="text-xs text-neutral-500">{f.email}</div>}
                   </td>
                   <td className="px-3 py-2 text-neutral-600 dark:text-neutral-300">
@@ -69,11 +71,11 @@ export default async function FournisseursPage({ searchParams }: { searchParams:
                   </td>
                   <td className="px-3 py-2 text-neutral-600 dark:text-neutral-300">{f.ville || "—"}</td>
                   <td className="px-3 py-2 text-right">
-                    <form action={changerActivationFournisseurAction.bind(null, f.id, !f.actif)}>
+                    <div className="flex justify-end gap-3"><Link href={`/fournisseurs/${f.id}`} className="text-xs text-blue-700 hover:underline">Gérer</Link><form action={changerActivationFournisseurAction.bind(null, f.id, !f.actif)}>
                       <button type="submit" className="text-xs text-neutral-400 hover:underline">
                         {f.actif ? "Désactiver" : "Réactiver"}
                       </button>
-                    </form>
+                    </form></div>
                   </td>
                 </tr>
               ))}
