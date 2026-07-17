@@ -5,22 +5,27 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { euros, LIGNE_TYPES } from "@/lib/devis";
 import { nomClient } from "@/lib/chantier-statuts";
 import { StatutDevisSelect } from "@/components/StatutDevisSelect";
-import { dupliquerDevisAction, supprimerDevisAction } from "@/app/actions/devis";
+import { associerDevisChantierAction, dupliquerDevisAction, supprimerDevisAction } from "@/app/actions/devis";
 import { creerFactureDepuisDevisAction } from "@/app/actions/factures";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { contenuEmailDocument } from "@/lib/email";
 import { EmailDocumentButton } from "@/components/EmailDocumentButton";
+import { permissionsUtilisateur } from "@/lib/permissions";
+import { SearchableSelect } from "@/components/SearchableSelect";
 
-export default async function DevisDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string }> }) {
+export default async function DevisDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; success?: string }> }) {
   const { id } = await params;
-  const { error: erreurAction } = await searchParams;
+  const { error: erreurAction, success: succesAction } = await searchParams;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  const permissions = await permissionsUtilisateur(ctx);
+  const peutGererDevis = permissions === null || permissions.includes("gerer_devis");
 
   const { data: devis } = await supabase
     .from("devis")
     .select("*, client:clients(id, nom, prenom, societe, email), chantier:chantiers!devis_chantier_id_fkey(id, nom)")
     .eq("id", id)
+    .eq("entreprise_id", ctx.entrepriseId)
     .single();
 
   if (!devis) notFound();
@@ -30,6 +35,10 @@ export default async function DevisDetailPage({ params, searchParams }: { params
     .select("*")
     .eq("devis_id", id)
     .order("ordre");
+
+  const chantiersClient = peutGererDevis
+    ? (await supabase.from("chantiers").select("id,nom,ville,statut").eq("entreprise_id", ctx.entrepriseId).eq("client_id", devis.client_id).not("statut", "in", "(archive,annule)").order("nom")).data ?? []
+    : [];
 
   const client = Array.isArray(devis.client) ? devis.client[0] : devis.client;
   const chantier = Array.isArray(devis.chantier) ? devis.chantier[0] : devis.chantier;
@@ -51,6 +60,7 @@ export default async function DevisDetailPage({ params, searchParams }: { params
     <main className="p-8">
       <div className="mx-auto max-w-3xl space-y-6">
         {erreurAction && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erreurAction}</p>}
+        {succesAction && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{succesAction}</p>}
         <div className="flex items-start justify-between">
           <div>
             <Link href="/devis" className="text-sm text-neutral-500 hover:underline">← Devis</Link>
@@ -89,6 +99,8 @@ export default async function DevisDetailPage({ params, searchParams }: { params
             <StatutDevisSelect devisId={id} statut={devis.statut} />
           </div>
         </div>
+
+        {peutGererDevis && <section className="rounded-md border border-blue-200 bg-blue-50/40 p-4 dark:border-blue-900 dark:bg-blue-950/20"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold">Chantier associé au devis</h2><p className="text-sm text-neutral-500">La liste contient uniquement les chantiers du même client. La fiche chantier affichera automatiquement ce devis.</p></div>{chantier && <Link href={`/chantiers/${chantier.id}`} className="text-sm font-medium text-blue-700 hover:underline dark:text-blue-300">Ouvrir {chantier.nom}</Link>}</div><form action={associerDevisChantierAction.bind(null, id, `/devis/${id}`)} className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end"><label className="flex-1 text-xs text-neutral-500">Sélectionner un chantier<SearchableSelect name="chantier_id" defaultValue={devis.chantier_id ?? ""} options={chantiersClient.map((item) => ({ value: item.id, label: `${item.nom}${item.ville ? ` · ${item.ville}` : ""}`, search: item.statut }))} placeholder="Écrire le nom du chantier…" emptyLabel={devis.statut === "accepte" ? undefined : "— Aucun chantier —"} className="mt-1" /></label><button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Enregistrer l’association</button></form>{devis.statut === "accepte" && <p className="mt-2 text-xs text-amber-800 dark:text-amber-300">Un devis accepté peut être déplacé vers un autre chantier, mais ne peut plus être laissé sans chantier afin de conserver ses tâches synchronisées.</p>}</section>}
 
         <div className="overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-800">
           <table className="w-full text-sm">
