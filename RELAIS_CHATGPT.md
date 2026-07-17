@@ -49,6 +49,15 @@
 
 ---
 
+## 95. Dépenses chantier et détail des échéances — 17 juillet 2026
+
+- La fiche chantier consolide désormais les dépenses directement rattachées : factures fournisseurs et notes de frais, avec séparation entre montants validés et montants encore en attente.
+- Les notes de frais d'équipe restent confidentielles : leur liste et leurs montants exigent à la fois les droits de gestion des notes de frais et de consultation des indicateurs financiers. Un salarié conserve uniquement la visibilité prévue sur ses propres frais.
+- Le pilotage du chantier affiche le budget, le devis accepté, la facturation, les encaissements et les dépenses autorisées. Un message explique clairement pourquoi les montants ou les tâches restent à zéro lorsqu'aucun devis accepté n'est associé au chantier.
+- Les notes de frais peuvent être ouvertes depuis la fiche chantier avec le chantier déjà filtré et présélectionné. Les créations, modifications et changements de statut actualisent immédiatement la fiche chantier concernée.
+- Dans Trésorerie, chaque semaine est maintenant dépliable. Le détail présente chaque échéance avec sa date, son retard éventuel, sa nature, sa référence, le client ou fournisseur, le chantier, le montant et un lien direct vers le document.
+- Aucun changement de schéma n'est requis pour ce lot. Contrôles locaux : ESLint, TypeScript, 36 tests Vitest et build Next webpack complets verts.
+
 ## 17 juillet 2026 — Réception des commandes fournisseurs réparée
 
 - Cause identifiée : depuis le durcissement des droits de la migration 43, la RPC sécurisée `enregistrer_reception_commande` attend le paramètre JSON `p_lignes`, mais l’action serveur envoyait encore l’ancien nom `p_receptions`. Supabase refusait donc l’appel avant toute mise à jour.

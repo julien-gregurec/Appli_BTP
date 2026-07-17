@@ -1,12 +1,22 @@
-export type FluxTresorerie = { date: string; montant: number; type: "entree" | "sortie" };
-export type SemaineTresorerie = { index: number; debut: Date; fin: Date; entrees: number; sorties: number; detailsEntrees: number; detailsSorties: number; net: number; cumul: number };
+export type FluxTresorerie = {
+  date: string;
+  montant: number;
+  type: "entree" | "sortie";
+  source?: "facture_client" | "facture_fournisseur" | "charge_recurrente";
+  reference?: string | null;
+  libelle?: string | null;
+  tiers?: string | null;
+  chantier?: string | null;
+  href?: string | null;
+};
+export type SemaineTresorerie = { index: number; debut: Date; fin: Date; entrees: number; sorties: number; detailsEntrees: number; detailsSorties: number; details: FluxTresorerie[]; net: number; cumul: number };
 
 const JOUR = 86_400_000;
 export function projectionHebdomadaire(flux: FluxTresorerie[], dateReference: string, nombreSemaines = 13): SemaineTresorerie[] {
   const reference = new Date(`${dateReference}T12:00:00`);
   const semaines = Array.from({ length: nombreSemaines }, (_, index) => {
     const debut = new Date(reference.getTime() + index * 7 * JOUR);
-    return { index, debut, fin: new Date(debut.getTime() + 6 * JOUR), entrees: 0, sorties: 0, detailsEntrees: 0, detailsSorties: 0 };
+    return { index, debut, fin: new Date(debut.getTime() + 6 * JOUR), entrees: 0, sorties: 0, detailsEntrees: 0, detailsSorties: 0, details: [] as FluxTresorerie[] };
   });
   for (const item of flux) {
     const date = Date.parse(`${item.date}T12:00:00`);
@@ -14,9 +24,10 @@ export function projectionHebdomadaire(flux: FluxTresorerie[], dateReference: st
     const ecart = Math.floor((date - reference.getTime()) / (7 * JOUR));
     if (ecart >= nombreSemaines) continue;
     const semaine = semaines[Math.max(0, ecart)];
+    semaine.details.push(item);
     if (item.type === "entree") { semaine.entrees += item.montant; semaine.detailsEntrees += 1; }
     else { semaine.sorties += item.montant; semaine.detailsSorties += 1; }
   }
   let cumul = 0;
-  return semaines.map((semaine) => { const net = semaine.entrees - semaine.sorties; cumul += net; return { ...semaine, net, cumul }; });
+  return semaines.map((semaine) => { const net = semaine.entrees - semaine.sorties; cumul += net; semaine.details.sort((a,b)=>a.date.localeCompare(b.date)||a.type.localeCompare(b.type)); return { ...semaine, net, cumul }; });
 }

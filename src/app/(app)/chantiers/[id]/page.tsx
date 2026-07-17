@@ -17,13 +17,21 @@ import { classerFactureDepuisChantierAction } from "@/app/actions/depenses";
 import { DEPENSE_CATEGORIES, DEPENSE_STATUTS } from "@/lib/depenses";
 import { associerDevisDepuisChantierAction } from "@/app/actions/devis";
 import { SearchableSelect } from "@/components/SearchableSelect";
+import { statutNoteFrais } from "@/lib/notes-frais";
 
 export default async function ChantierDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; success?: string }> }) {
   const { id } = await params;
   const messages = await searchParams;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  const permissions=await permissionsUtilisateur(ctx);const peutVoirFinances=permissions===null||permissions.includes("voir_indicateurs_financiers");const peutVoirHeures=permissions===null||permissions.includes("voir_heures_chantiers")||permissions.includes("gerer_pointage");const peutGerer=permissions===null||permissions.includes("gerer_chantiers");const peutCreerDevis=permissions===null||permissions.includes("gerer_devis");const peutVoirAchats=permissions===null||permissions.includes("acces_achats");const peutGererAchats=permissions===null||permissions.includes("gerer_achats");
+  const permissions = await permissionsUtilisateur(ctx);
+  const peutVoirFinances = permissions === null || permissions.includes("voir_indicateurs_financiers");
+  const peutVoirHeures = permissions === null || permissions.includes("voir_heures_chantiers") || permissions.includes("gerer_pointage");
+  const peutGerer = permissions === null || permissions.includes("gerer_chantiers");
+  const peutCreerDevis = permissions === null || permissions.includes("gerer_devis");
+  const peutVoirAchats = permissions === null || permissions.includes("acces_achats");
+  const peutGererAchats = permissions === null || permissions.includes("gerer_achats");
+  const peutVoirNotesEquipe = permissions === null || (permissions.includes("gerer_notes_frais") && permissions.includes("voir_indicateurs_financiers"));
 
   const { data: chantier } = await supabase
     .from("chantiers")
@@ -40,7 +48,7 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
     .eq("chantier_id", id)
     .order("created_at");
 
-  const [{ data: devis }, { data: factures }, { data: affectations }, {data:pointages}, {data:documents}, {data:codeIdentification}, {data:equipe}, {data:employes}, {data:facturesFournisseurs}, {data:facturesSansChantier}] = await Promise.all([
+  const [{ data: devis }, { data: factures }, { data: affectations }, {data:pointages}, {data:documents}, {data:codeIdentification}, {data:equipe}, {data:employes}, {data:facturesFournisseurs}, {data:facturesSansChantier}, {data:notesFrais}] = await Promise.all([
     supabase.from("devis").select("id, numero, statut, montant_ttc").eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
     supabase.from("factures").select("id, numero, statut, montant_ttc, montant_paye").eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
     supabase.from("affectations").select("heures").eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId),
@@ -51,6 +59,7 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
     peutGerer?supabase.from("employes").select("id,prenom,nom,poste").eq("entreprise_id",ctx.entrepriseId).not("statut","in",'(sorti,suspendu)').order("nom"):Promise.resolve({data:[]}),
     peutVoirAchats?supabase.from("depenses_fournisseurs").select("id,numero_piece,categorie,date_piece,statut,montant_ttc,montant_regle,justificatif_storage_path,fournisseur:fournisseurs(nom)").eq("entreprise_id",ctx.entrepriseId).eq("chantier_id",id).order("date_piece",{ascending:false}):Promise.resolve({data:[]}),
     peutGererAchats?supabase.from("depenses_fournisseurs").select("id,numero_piece,date_piece,montant_ttc,fournisseur:fournisseurs(nom)").eq("entreprise_id",ctx.entrepriseId).is("chantier_id",null).neq("statut","annulee").order("date_piece",{ascending:false}).limit(100):Promise.resolve({data:[]}),
+    peutVoirNotesEquipe?supabase.from("notes_frais").select("id,reference,date_frais,fournisseur,categorie,statut,montant_ttc,employe:employes(prenom,nom)").eq("entreprise_id",ctx.entrepriseId).eq("chantier_id",id).order("date_frais",{ascending:false}):Promise.resolve({data:[]}),
   ]);
   const devisDuClient = peutCreerDevis
     ? (await supabase.from("devis").select("id,numero,statut,chantier_id,chantier:chantiers!devis_chantier_id_fkey(nom)").eq("entreprise_id",ctx.entrepriseId).eq("client_id",chantier.client_id).order("created_at",{ascending:false})).data ?? []
@@ -62,6 +71,13 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
   const pointagesValides=(pointages??[]).filter(p=>p.verification_statut==="valide");const totalHeuresRealisees=pointagesValides.reduce((s,p)=>s+Number(p.heures_normales)+Number(p.heures_supplementaires),0);const relation=<T,>(v:T|T[]|null)=>Array.isArray(v)?v[0]??null:v;
   const totalFacturesFournisseurs=(facturesFournisseurs??[]).filter(item=>item.statut!=="annulee").reduce((total,item)=>total+Number(item.montant_ttc??0),0);
   const totalRegleFournisseurs=(facturesFournisseurs??[]).reduce((total,item)=>total+Number(item.montant_regle??0),0);
+  const statutsNotesValidees = new Set(["valide", "exporte_comptabilite", "verrouille", "archive", "validee", "remboursee"]);
+  const notesFraisValidees = (notesFrais ?? []).filter((note) => statutsNotesValidees.has(note.statut));
+  const notesFraisEnCours = (notesFrais ?? []).filter((note) => !statutsNotesValidees.has(note.statut) && !["refuse", "refusee"].includes(note.statut));
+  const totalNotesFraisValidees = notesFraisValidees.reduce((total, note) => total + Number(note.montant_ttc ?? 0), 0);
+  const totalNotesFraisEnCours = notesFraisEnCours.reduce((total, note) => total + Number(note.montant_ttc ?? 0), 0);
+  const totalDepensesValidees = totalFacturesFournisseurs + totalNotesFraisValidees;
+  const budgetPrevisionnel = Number(chantier.budget_previsionnel ?? 0);
 
   const client = Array.isArray(chantier.client) ? chantier.client[0] : chantier.client;
   const type = Array.isArray(chantier.type) ? chantier.type[0] : chantier.type;
@@ -114,10 +130,12 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
         {(documents??[]).length>0&&<section className="space-y-3 rounded-md border border-blue-200 bg-blue-50/40 p-4"><div className="flex items-center justify-between gap-3"><div><h2 className="font-semibold">Plans et pièces jointes autorisées</h2><p className="text-sm text-neutral-500">Seuls les documents autorisés pour votre rôle sont affichés.</p></div><Link href={`/chantiers/${id}/documents`} className="text-sm font-medium text-blue-800 hover:underline">Tout consulter</Link></div><div className="grid gap-2 sm:grid-cols-2">{(documents??[]).slice().sort((a,b)=>(a.categorie==="plan"?0:1)-(b.categorie==="plan"?0:1)).slice(0,6).map(document=><a key={document.id} href={`/api/documents/${document.id}`} target="_blank" rel="noopener" className="rounded-md border bg-white p-3 text-sm hover:border-blue-400"><strong className="block truncate">{document.categorie==="plan"?"📐 Plan · ":"📎 "}{document.nom}</strong>{document.note&&<span className="mt-1 block text-xs text-neutral-500">{document.note}</span>}</a>)}</div></section>}
 
         <ChantierProgressCharts
-          finances={peutVoirFinances ? { devis: totalDevisAccepte, facture: totalFacture, paye: totalPaye } : null}
+          finances={peutVoirFinances ? { budget: budgetPrevisionnel, devis: totalDevisAccepte, facture: totalFacture, paye: totalPaye, depenses: peutVoirAchats || peutVoirNotesEquipe ? totalDepensesValidees : null } : null}
           heures={peutVoirHeures ? { planifiees: totalHeures, validees: totalHeuresRealisees } : null}
           taches={{ total: taches?.length ?? 0, faites: (taches ?? []).filter((tache) => tache.statut === "fait").length }}
         />
+
+        {peutVoirFinances&&totalDevisAccepte===0&&<p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100"><strong>Pourquoi les montants et les tâches sont à zéro :</strong> aucun devis accepté n’est actuellement rattaché à ce chantier. Associez ci-dessous un devis du même client puis passez-le au statut « Accepté ». Ses lignes deviendront automatiquement les tâches du chantier.</p>}
 
         {codeIdentification&&<IdentificationCodeCard id={codeIdentification.id} code={codeIdentification.code} label="QR code du chantier"/>}
 
@@ -136,11 +154,18 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
             <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Facturé</div><div className="mt-1 font-mono font-semibold">{euros(totalFacture)}</div></div>
             <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Encaissé</div><div className="mt-1 font-mono font-semibold text-green-700 dark:text-green-400">{euros(totalPaye)}</div></div>
             <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Heures planifiées / validées</div><div className="mt-1 font-mono font-semibold">{totalHeures} h / {totalHeuresRealisees} h</div></div>
+            {(peutVoirAchats||peutVoirNotesEquipe)&&<div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Dépenses chantier validées</div><div className="mt-1 font-mono font-semibold text-amber-700 dark:text-amber-400">{euros(totalDepensesValidees)}</div></div>}
+            {budgetPrevisionnel>0&&(peutVoirAchats||peutVoirNotesEquipe)&&<div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Budget restant après dépenses</div><div className={`mt-1 font-mono font-semibold ${budgetPrevisionnel-totalDepensesValidees<0?"text-red-700 dark:text-red-400":"text-green-700 dark:text-green-400"}`}>{euros(budgetPrevisionnel-totalDepensesValidees)}</div></div>}
           </div>
           <div className="grid gap-3 md:grid-cols-2">
             <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="mb-2 text-xs font-semibold uppercase text-neutral-500">Devis</div>{devis?.length ? devis.slice(0, 5).map((item) => { const st = statutDevis(item.statut); return <Link key={item.id} href={`/devis/${item.id}`} className="flex justify-between rounded px-1 py-1 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900"><span>{item.numero ?? "Brouillon"}</span><span className="font-mono">{euros(item.montant_ttc)}</span><span className="text-xs" style={{ color: st.couleur }}>{st.libelle}</span></Link>; }) : <p className="text-sm text-neutral-500">Aucun devis.</p>}</div>
             <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="mb-2 text-xs font-semibold uppercase text-neutral-500">Factures</div>{factures?.length ? factures.slice(0, 5).map((item) => { const st = statutFacture(item.statut); return <Link key={item.id} href={`/factures/${item.id}`} className="flex justify-between rounded px-1 py-1 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900"><span>{item.numero ?? "Brouillon"}</span><span className="font-mono">{euros(item.montant_ttc)}</span><span className="text-xs" style={{ color: st.couleur }}>{st.libelle}</span></Link>; }) : <p className="text-sm text-neutral-500">Aucune facture.</p>}</div>
           </div>
+        </section>}
+        {peutVoirNotesEquipe&&<section className="space-y-4 rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
+          <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold">Notes de frais du chantier</h2><p className="text-sm text-neutral-500">Dépenses des collaborateurs rattachées à ce chantier. Les montants en vérification ne sont pas comptabilisés dans les dépenses validées.</p></div><Link href={`/notes-frais?chantier=${id}`} className="rounded-md border px-3 py-2 text-sm font-medium">Voir ou ajouter une note de frais</Link></div>
+          <div className="grid gap-3 sm:grid-cols-3"><div className="rounded border p-3 text-sm"><span className="text-neutral-500">Validé</span><strong className="block font-mono text-green-700 dark:text-green-400">{euros(totalNotesFraisValidees)}</strong></div><div className="rounded border p-3 text-sm"><span className="text-neutral-500">En vérification</span><strong className="block font-mono text-amber-700 dark:text-amber-400">{euros(totalNotesFraisEnCours)}</strong></div><div className="rounded border p-3 text-sm"><span className="text-neutral-500">Nombre de justificatifs</span><strong className="block font-mono">{(notesFrais??[]).length}</strong></div></div>
+          <div className="divide-y dark:divide-neutral-800">{(notesFrais??[]).map(note=>{const employe=relation(note.employe as {prenom:string;nom:string}|{prenom:string;nom:string}[]|null);const statut=statutNoteFrais(note.statut);return <Link key={note.id} href={`/notes-frais/${note.id}`} className="grid gap-1 py-3 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:gap-4"><div><strong>{note.reference}</strong><p className="text-xs text-neutral-500">{note.fournisseur??"Sans fournisseur"} · {employe?`${employe.prenom} ${employe.nom}`:"Collaborateur"} · {note.date_frais}</p></div><span className="text-xs" style={{color:statut.couleur}}>{statut.libelle}</span><span className="font-mono font-semibold">{euros(note.montant_ttc)}</span></Link>})}{!(notesFrais??[]).length&&<p className="rounded border border-dashed p-4 text-sm text-neutral-500">Aucune note de frais n’est rattachée à ce chantier. Lors de la création d’une note, choisissez ce chantier dans le champ « Chantier ».</p>}</div>
         </section>}
         {peutVoirAchats&&<section className="space-y-4 rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
           <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold">Factures fournisseurs du chantier</h2><p className="text-sm text-neutral-500">Achats, matériaux et frais directement classés dans ce chantier.</p></div><Link href={`/depenses?chantier=${id}`} className="rounded-md border px-3 py-2 text-sm font-medium">+ Nouvelle facture fournisseur</Link></div>

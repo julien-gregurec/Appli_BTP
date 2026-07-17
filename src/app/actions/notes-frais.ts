@@ -91,6 +91,7 @@ export async function creerNoteFraisAction(formData: FormData) {
     nouveauStatut: "brouillon",
   });
   revalidatePath("/notes-frais");
+  if (chantierId) revalidatePath(`/chantiers/${chantierId}`);
   redirect(`/notes-frais/${data.id}?succes=${encodeURIComponent("Brouillon créé. Ajoutez le justificatif puis soumettez-le.")}`);
 }
 
@@ -107,10 +108,11 @@ export async function modifierNoteFraisAction(noteId: string, formData: FormData
   if (erreursTotaux.length) erreur(erreursTotaux.join(" · "), noteId);
   const typeDocument = texte(formData, "type_document_principal");
   if (typeDocument && !TYPES_DOCUMENT.has(typeDocument)) erreur("Type de justificatif invalide", noteId);
-  const { data: avant } = await supabase.from("notes_frais").select("id,statut").eq("id", noteId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+  const { data: avant } = await supabase.from("notes_frais").select("id,statut,chantier_id").eq("id", noteId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
   if (!avant) erreur("Dépense inaccessible", noteId);
+  const nouveauChantierId = texte(formData, "chantier_id");
   const { error: updateError } = await supabase.from("notes_frais").update({
-    chantier_id: texte(formData, "chantier_id"),
+    chantier_id: nouveauChantierId,
     date_frais: texte(formData, "date_frais"),
     montant_ht: montantHt,
     montant_tva: montantTva,
@@ -135,6 +137,8 @@ export async function modifierNoteFraisAction(noteId: string, formData: FormData
   });
   revalidatePath(`/notes-frais/${noteId}`);
   revalidatePath("/notes-frais");
+  if (avant.chantier_id) revalidatePath(`/chantiers/${avant.chantier_id}`);
+  if (nouveauChantierId) revalidatePath(`/chantiers/${nouveauChantierId}`);
   redirect(`/notes-frais/${noteId}?succes=${encodeURIComponent("Informations enregistrées")}`);
 }
 
@@ -143,7 +147,7 @@ export async function transitionNoteFraisAction(noteId: string, nouveauStatut: s
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const message = formData ? texte(formData, "message") : null;
-  const { data: avant } = await supabase.from("notes_frais").select("statut").eq("id", noteId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+  const { data: avant } = await supabase.from("notes_frais").select("statut,chantier_id").eq("id", noteId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
   if (!avant) erreur("Dépense inaccessible", noteId);
   const { error: transitionError } = await supabase.rpc("transition_note_frais", {
     p_note_id: noteId,
@@ -162,6 +166,7 @@ export async function transitionNoteFraisAction(noteId: string, nouveauStatut: s
   });
   revalidatePath(`/notes-frais/${noteId}`);
   revalidatePath("/notes-frais");
+  if (avant.chantier_id) revalidatePath(`/chantiers/${avant.chantier_id}`);
   redirect(`/notes-frais/${noteId}?succes=${encodeURIComponent("Statut mis à jour")}`);
 }
 
@@ -195,12 +200,13 @@ export async function supprimerNoteFraisAction(id: string) {
   verifierAuthentification();
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  const { data: note } = await supabase.from("notes_frais").select("statut").eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+  const { data: note } = await supabase.from("notes_frais").select("statut,chantier_id").eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
   if (!note || note.statut !== "brouillon") erreur("Seul un brouillon sans archive peut être supprimé", id);
   const { count } = await supabase.from("documents_notes_frais").select("id", { count: "exact", head: true }).eq("note_frais_id", id);
   if (count) erreur("Retirez ce brouillon de la liste sans supprimer son historique documentaire", id);
   const { error: deleteError } = await supabase.from("notes_frais").delete().eq("id", id).eq("entreprise_id", ctx.entrepriseId);
   if (deleteError) erreur(deleteError.message, id);
   revalidatePath("/notes-frais");
+  if (note.chantier_id) revalidatePath(`/chantiers/${note.chantier_id}`);
   redirect("/notes-frais");
 }

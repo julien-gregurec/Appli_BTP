@@ -11,7 +11,7 @@ import { Lien as Link } from "@/components/Lien";
 
 const input = "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
-export default async function NotesFraisPage({ searchParams }: { searchParams: Promise<{ error?: string; statut?: string; categorie?: string }> }) {
+export default async function NotesFraisPage({ searchParams }: { searchParams: Promise<{ error?: string; statut?: string; categorie?: string; chantier?: string }> }) {
   const filtres = await searchParams;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
@@ -30,6 +30,7 @@ export default async function NotesFraisPage({ searchParams }: { searchParams: P
     .eq("entreprise_id", ctx.entrepriseId).order("date_frais", { ascending: false }).limit(300);
   if (filtres.statut) requete = requete.eq("statut", filtres.statut);
   if (filtres.categorie) requete = requete.eq("categorie", filtres.categorie);
+  if (filtres.chantier) requete = requete.eq("chantier_id", filtres.chantier);
   const { data: notes } = await requete;
   const liste = notes ?? [];
   const un = <T,>(value: T | T[] | null): T | null => Array.isArray(value) ? value[0] ?? null : value;
@@ -46,7 +47,7 @@ export default async function NotesFraisPage({ searchParams }: { searchParams: P
         <label className="text-xs text-neutral-500">Catégorie<select name="categorie" className={`${input} mt-1`}>{(categories ?? []).map((c) => <option key={c.code} value={c.code}>{c.libelle}</option>)}</select></label>
         <label className="text-xs text-neutral-500">Type de justificatif<select name="type_document_principal" className={`${input} mt-1`}>{TYPES_JUSTIFICATIF.map((t) => <option key={t.cle} value={t.cle}>{t.libelle}</option>)}</select></label>
         <ExpenseAmountFields />
-        <label className="text-xs text-neutral-500">Chantier<SearchableSelect name="chantier_id" options={(chantiers ?? []).map((c) => ({ value: c.id, label: c.nom }))} placeholder="Écrire le nom du chantier…" emptyLabel="Frais généraux" className="mt-1" /></label>
+        <label className="text-xs text-neutral-500">Chantier<SearchableSelect name="chantier_id" defaultValue={(chantiers??[]).some((c)=>c.id===filtres.chantier)?filtres.chantier:""} options={(chantiers ?? []).map((c) => ({ value: c.id, label: c.nom }))} placeholder="Écrire le nom du chantier…" emptyLabel="Frais généraux" className="mt-1" /></label>
         <label className="text-xs text-neutral-500">Moyen de paiement<select name="moyen_paiement" className={`${input} mt-1`}><option value="">Non renseigné</option><option value="carte_entreprise">Carte entreprise</option><option value="carte_personnelle">Carte personnelle</option><option value="especes">Espèces</option><option value="virement">Virement</option><option value="autre">Autre</option></select></label>
         <label className="text-xs text-neutral-500">Devise<select name="devise" className={`${input} mt-1`}><option value="EUR">EUR</option><option value="CHF">CHF</option><option value="GBP">GBP</option><option value="USD">USD</option></select></label>
         <label className="text-xs text-neutral-500 sm:col-span-2 lg:col-span-4">Commentaire<textarea name="commentaire_salarie" rows={2} className={`${input} mt-1`} /></label>
