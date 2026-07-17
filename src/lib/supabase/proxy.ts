@@ -31,12 +31,21 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
+  const isPublic = PUBLIC_PATHS.some((path) => request.nextUrl.pathname.startsWith(path));
+
+  // Les chemins purement statiques n'ont aucune règle d'accès : inutile de
+  // vérifier le jeton auprès de Supabase, ce qui coûtait un aller-retour
+  // réseau pour servir un PDF ou une vidéo.
+  const CHEMINS_SANS_SESSION = ["/guides", "/videos", "/api/stripe/webhook",
+                                "/api/paiements-bancaires/powens", "/api/paie/import"];
+  if (CHEMINS_SANS_SESSION.some((c) => request.nextUrl.pathname.startsWith(c))) {
+    return response;
+  }
+
   // getUser() vérifie le token auprès du serveur Auth — ne jamais se fier à getSession() ici.
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  const isPublic = PUBLIC_PATHS.some((path) => request.nextUrl.pathname.startsWith(path));
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();

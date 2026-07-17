@@ -88,19 +88,17 @@ export const getContexteEntreprise = cache(async function getContexteEntreprise(
     redirect("/login");
   }
 
-  const { data: profil } = await supabase
-    .from("utilisateurs")
-    .select("prenom, entreprise_active_id")
-    .eq("id", user.id)
-    .single();
+  // Le profil et l'abonnement ne dépendent que de la session, pas l'un de
+  // l'autre : les enchaîner coûtait un aller-retour pour rien.
+  const [{ data: profil }, { data: abonnementData }] = await Promise.all([
+    supabase.from("utilisateurs").select("prenom, entreprise_active_id").eq("id", user.id).single(),
+    supabase.rpc("contexte_abonnement_courant").maybeSingle(),
+  ]);
 
   if (!profil?.entreprise_active_id) {
     redirect("/onboarding");
   }
 
-  const { data: abonnementData } = await supabase
-    .rpc("contexte_abonnement_courant")
-    .maybeSingle();
   const abonnement = abonnementData as ContexteAbonnementCourant | null;
   if (!abonnement?.entreprise_id) redirect("/onboarding");
   const suspensionAt = abonnement.suspension_prevue_at ? new Date(abonnement.suspension_prevue_at).getTime() : null;
