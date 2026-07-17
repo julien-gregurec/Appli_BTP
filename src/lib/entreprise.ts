@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
@@ -65,7 +66,15 @@ async function getContexteEntrepriseSansConnexion(): Promise<ContexteEntreprise>
 }
 
 // Résout l'utilisateur connecté + son entreprise active, ou redirige (login / onboarding).
-export async function getContexteEntreprise(): Promise<ContexteEntreprise> {
+/**
+ * Résout l'utilisateur connecté et son entreprise active.
+ *
+ * `cache()` dédoublonne les appels au sein d'un même rendu : le layout ET la
+ * page appelaient chacun cette fonction, et chaque appel refaisait ses 4 à 5
+ * allers-retours vers Supabase. À ~200 ms l'aller-retour, c'était ~1 s perdu
+ * par page, pour le même résultat.
+ */
+export const getContexteEntreprise = cache(async function getContexteEntreprise(): Promise<ContexteEntreprise> {
   if (isEmailLoginDisabled()) {
     return getContexteEntrepriseSansConnexion();
   }
@@ -124,4 +133,4 @@ export async function getContexteEntreprise(): Promise<ContexteEntreprise> {
     impayeMessage: abonnement.impaye_message ?? null,
     accesSupportPlateforme: accesSupport,
   };
-}
+});
