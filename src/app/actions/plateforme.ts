@@ -36,7 +36,30 @@ export async function modifierAbonnementAction(entrepriseId: string, formData: F
 }
 
 export async function creerEntreprisePlateformeAction(formData:FormData){
-  if(!(await estPlateformeAdmin()))redirect("/dashboard");const nom=String(formData.get("nom")??"").trim(),siret=String(formData.get("siret")??"").trim()||null,ville=String(formData.get("ville")??"").trim()||null;if(!nom)redirect(`/plateforme?error=${encodeURIComponent("Nom obligatoire")}`);const supabase=await createClient();if(isEmailLoginDisabled()){const{data:entreprise,error}=await supabase.from("entreprises").insert({nom,raison_sociale:nom,siret,ville,abonnement_statut:"essai",abonnement_note:"Créée par la plateforme"}).select("id").single();if(error||!entreprise)redirect(`/plateforme?error=${encodeURIComponent(error?.message??"Création impossible")}`);const noms=["Admin / Gérant","Conducteur de travaux","Chef de chantier","Chef d’équipe","Ouvrier","RH / Comptable"];const{data:postes,error:postesError}=await supabase.from("postes").insert(noms.map((poste)=>({entreprise_id:entreprise.id,nom:poste,tarif_compte_mensuel:0}))).select("id,nom");if(postesError)redirect(`/plateforme?error=${encodeURIComponent(postesError.message)}`);const{data:droits}=await supabase.from("permissions_disponibles").select("cle");if(postes?.length&&droits?.length){const socle=new Set(["acces_planning","acces_pointage","saisir_son_pointage","saisir_ses_notes_frais","demander_ses_conges","utiliser_borne_stock"]);const lignes=postes.flatMap((poste)=>droits.map((droit)=>({entreprise_id:entreprise.id,poste_id:poste.id,cle_permission:droit.cle,autorise:poste.nom.startsWith("Admin")||socle.has(droit.cle)})));const{error:permissionsError}=await supabase.from("permissions_poste").insert(lignes);if(permissionsError)redirect(`/plateforme?error=${encodeURIComponent(permissionsError.message)}`);}}else{const{error}=await supabase.rpc("plateforme_creer_entreprise",{p_nom:nom,p_siret:siret,p_ville:ville});if(error)redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);}revalidatePath("/plateforme");redirect("/plateforme?succes=entreprise");
+  if(!(await estPlateformeAdmin()))redirect("/dashboard");
+  const nom=String(formData.get("nom")??"").trim(),siret=String(formData.get("siret")??"").trim()||null,ville=String(formData.get("ville")??"").trim()||null;
+  if(!nom)redirect(`/plateforme?error=${encodeURIComponent("Nom obligatoire")}`);
+  const supabase=await createClient();
+  if(isEmailLoginDisabled()){
+    const{data:entreprise,error}=await supabase.from("entreprises").insert({nom,raison_sociale:nom,siret,ville,abonnement_statut:"essai",abonnement_note:"Créée par la plateforme"}).select("id").single();
+    if(error||!entreprise)redirect(`/plateforme?error=${encodeURIComponent(error?.message??"Création impossible")}`);
+    const[{data:modeles,error:modelesError},{data:droits,error:droitsError}]=await Promise.all([
+      supabase.from("modeles_roles_predefinis").select("cle,nom,permissions,tous_les_droits").order("ordre"),
+      supabase.from("permissions_disponibles").select("cle"),
+    ]);
+    if(modelesError||droitsError||!modeles?.length||!droits?.length)redirect(`/plateforme?error=${encodeURIComponent(modelesError?.message??droitsError?.message??"Catalogue des rôles indisponible")}`);
+    const{data:postes,error:postesError}=await supabase.from("postes").insert(modeles.map((modele)=>({entreprise_id:entreprise.id,nom:modele.nom,tarif_compte_mensuel:0}))).select("id,nom");
+    if(postesError)redirect(`/plateforme?error=${encodeURIComponent(postesError.message)}`);
+    const socle=new Set(["acces_planning","acces_pointage","saisir_son_pointage","saisir_ses_notes_frais","demander_ses_conges","utiliser_borne_stock","acces_messagerie"]);
+    const modelesParNom=new Map(modeles.map((modele)=>[modele.nom,modele]));
+    const lignes=(postes??[]).flatMap((poste)=>{const modele=modelesParNom.get(poste.nom);const autorisations=new Set([...(modele?.permissions??[]),...socle]);return droits.map((droit)=>({entreprise_id:entreprise.id,poste_id:poste.id,cle_permission:droit.cle,autorise:droit.cle!=="mode_compte_depot"&&(modele?.tous_les_droits===true||autorisations.has(droit.cle))}));});
+    const{error:permissionsError}=await supabase.from("permissions_poste").insert(lignes);
+    if(permissionsError)redirect(`/plateforme?error=${encodeURIComponent(permissionsError.message)}`);
+  }else{
+    const{error}=await supabase.rpc("plateforme_creer_entreprise",{p_nom:nom,p_siret:siret,p_ville:ville});
+    if(error)redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
+  }
+  revalidatePath("/plateforme");redirect("/plateforme?succes=entreprise");
 }
 
 export async function ajouterAdminPlateformeAction(formData: FormData) {

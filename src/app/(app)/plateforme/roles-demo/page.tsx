@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { estPlateformeAdmin } from "@/lib/plateforme";
 import { entrerEntreprisePlateformeAction } from "@/app/actions/plateforme";
 import { ApercuPoste } from "@/components/ApercuPoste";
+import { estPermissionConfigurable } from "@/lib/roles-predefinis";
 
 type EntreprisePlateforme={id:string;nom:string;reference_interne:string|null};
 type RoleDemo={poste_id:string;poste_nom:string;nb_employes:number;permissions:string[]};
@@ -19,7 +20,7 @@ export default async function RolesDemoPage({searchParams}:{searchParams:Promise
   const demo=((entreprises??[])as EntreprisePlateforme[]).find(entreprise=>entreprise.reference_interne==="DEMO-18M")??null;
   const{data:roles}=demo?await supabase.rpc("plateforme_roles_entreprise",{p_entreprise_id:demo.id}):{data:[]};
   const liste=(roles??[])as RoleDemo[],selection=liste.find(role=>role.poste_id===poste)??liste.find(role=>role.poste_nom==="Ouvrier")??liste[0]??null;
-  const details=((catalogue??[])as PermissionDetail[]).filter(permission=>permission.cle.startsWith("acces_")||permission.cle.startsWith("gerer_")||permission.cle.startsWith("saisir_")||permission.cle.startsWith("voir_")||permission.cle==="valider_pointages");
+  const details=((catalogue??[])as PermissionDetail[]).filter(permission=>estPermissionConfigurable(permission.cle));
   return <main className="p-4 sm:p-8"><div className="mx-auto max-w-7xl space-y-6">
     <div><Link href="/plateforme" className="text-sm text-neutral-500 hover:underline">← Plateforme</Link><h1 className="mt-1 text-xl font-semibold">Entreprise test et rôles</h1><p className="text-sm text-neutral-500">Simulez exactement le menu et les informations visibles par chaque poste sans utiliser le compte d’un salarié réel.</p></div>
     {!demo?<section className="rounded-md border border-amber-300 bg-amber-50 p-5 text-sm text-amber-950"><h2 className="font-semibold">Entreprise de démonstration à initialiser</h2><p className="mt-1">Exécutez le script <code>creer_entreprise_demo_18_mois.sql</code> pour ajouter 18 mois d’activité, les salariés, cartes BTP et habilitations.</p></section>:<>

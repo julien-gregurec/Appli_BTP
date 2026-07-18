@@ -915,3 +915,12 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Sans photo, la carte affiche un emplacement propre avec les initiales et l’indication « Photo à ajouter ».
 - La grille passe automatiquement de une à quatre colonnes selon la taille de l’écran et chaque carte ouvre la fiche complète de l’employé.
 - Contrôles verts : TypeScript, ESLint, `git diff --check` et build Next webpack complet de 88 pages. Les avertissements historiques hors lot restent non bloquants.
+
+## 106. Rôles BTP prédéfinis et personnalisables — 18 juillet 2026
+
+- Neuf modèles de rôles sont maintenant installés dans chaque entreprise : **Ouvrier, Chef d’équipe, Chef de chantier, Conducteur de travaux, Directeur travaux, Administration, RH, Comptable et Gérant**.
+- La matrice sépare consultation, gestion, indicateurs financiers, préparation, validation, exécution et actions strictement personnelles. Les droits bancaires sensibles sont répartis ; seul le Gérant reçoit tous les droits configurables.
+- L’administrateur peut modifier les autorisations de chaque rôle, réappliquer le modèle recommandé ou créer un rôle libre supplémentaire depuis `/parametres/acces`.
+- Les nouvelles entreprises créées depuis l’inscription ou par l’administrateur plateforme reçoivent automatiquement les neuf rôles. Le créateur d’une entreprise est affecté au rôle Gérant.
+- Migration `20260718000104_roles_predefinis.sql` appliquée et vérifiée dans Supabase : 9 modèles, 2 entreprises existantes, minimum 9 rôles standards dans chacune.
+- Contrôles verts : ESLint, `git diff --check` et build Next webpack complet de 88 pages. Les avertissements historiques hors lot restent non bloquants.

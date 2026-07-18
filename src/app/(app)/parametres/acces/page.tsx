@@ -4,15 +4,23 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import {
   creerPosteAction,
   enregistrerPermissionsPosteAction,
+  installerRolesPredefinisAction,
   modifierPosteMembreAction,
+  reinitialiserRolePredefiniAction,
   supprimerPosteAction,
 } from "@/app/actions/acces";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { InvitationEntreprise } from "@/components/InvitationEntreprise";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
+import {
+  categoriePermission,
+  estPermissionConfigurable,
+  normaliserNomRole,
+  type ModeleRolePredefini,
+} from "@/lib/roles-predefinis";
 
 type Permission = { cle: string; module: string; description: string };
-const DROITS_SOCLE = new Set(["acces_planning", "acces_pointage", "saisir_son_pointage", "saisir_ses_notes_frais"]);
+const DROITS_SOCLE = new Set(["acces_planning", "acces_pointage", "saisir_son_pointage", "saisir_ses_notes_frais", "demander_ses_conges", "utiliser_borne_stock"]);
 
 export default async function AccesPage({
   searchParams,
@@ -23,7 +31,7 @@ export default async function AccesPage({
   const ctx = await getContexteEntreprise();
   const sb = await createClient();
 
-  const [{ data: entreprise }, { data: postes }, { data: catalogue }, { data: droits }, { data: membres }] =
+  const [{ data: entreprise }, { data: postes }, { data: catalogue }, { data: droits }, { data: membres }, { data: modeles }] =
     await Promise.all([
       sb.from("entreprises").select("code_adhesion").eq("id", ctx.entrepriseId).maybeSingle(),
       sb.from("postes").select("id, nom").eq("entreprise_id", ctx.entrepriseId).order("nom"),
@@ -34,15 +42,17 @@ export default async function AccesPage({
         .select("utilisateur_id, poste_id, statut, utilisateur:utilisateurs(prenom, nom)")
         .eq("entreprise_id", ctx.entrepriseId)
         .in("statut", ["actif", "en_attente_validation"]),
+      sb.from("modeles_roles_predefinis").select("cle, nom, description, ordre, permissions, tous_les_droits").order("ordre"),
     ]);
 
-  const permissions = ((catalogue ?? []) as Permission[]).filter((permission) =>
-    permission.cle.startsWith("acces_") || permission.cle.startsWith("gerer_") || permission.cle.startsWith("saisir_") || permission.cle.startsWith("voir_") || permission.cle.startsWith("effectuer_") || permission.cle === "valider_pointages",
-  );
+  const permissions = ((catalogue ?? []) as Permission[]).filter((permission) => estPermissionConfigurable(permission.cle));
   const groupes = new Map<string, Permission[]>();
   for (const p of permissions) groupes.set(p.module, [...(groupes.get(p.module) ?? []), p]);
   const compte = (id: string) => (membres ?? []).filter((m) => m.poste_id === id).length;
   const un = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? v[0] ?? null : v);
+  const rolesPredefinis = (modeles ?? []) as ModeleRolePredefini[];
+  const nomsPostes = new Set((postes ?? []).map((poste) => normaliserNomRole(poste.nom)));
+  const modeleDuPoste = (nom: string) => rolesPredefinis.find((modele) => normaliserNomRole(modele.nom) === normaliserNomRole(nom));
 
   return (
     <main className="p-8">
@@ -79,6 +89,27 @@ export default async function AccesPage({
           <h2 className="font-semibold">Compte partagé du dépôt</h2>
           <p className="mt-1">Créez un compte utilisateur dédié, puis affectez-le au poste protégé <strong>Compte dépôt</strong>. Ce compte reste connecté sur l’appareil du dépôt et ne voit que Stock, Borne stock et Dépôt.</p>
           <p className="mt-2 text-xs opacity-80">Chaque salarié saisit ensuite son identifiant et son mot de passe personnel sur la borne. Les droits « entrée de stock » et « sortie de stock » sont contrôlés sur son propre poste. Un autre compte ne peut se connecter à cet appareil qu’après déconnexion explicite du compte dépôt.</p>
+        </section>
+
+        <section className="rounded-md border p-4 dark:border-neutral-800">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">Rôles prédéfinis BTP</h2>
+              <p className="mt-1 text-sm text-neutral-500">Neuf modèles prêts à l’emploi. Leurs autorisations restent entièrement modifiables et vous pouvez toujours ajouter des rôles personnalisés.</p>
+            </div>
+            <form action={installerRolesPredefinisAction}>
+              <button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-medium text-white">Ajouter les rôles manquants</button>
+            </form>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {rolesPredefinis.map((modele) => {
+              const installe = nomsPostes.has(normaliserNomRole(modele.nom));
+              return <div key={modele.cle} className={`rounded-md border p-3 ${installe ? "border-green-200 bg-green-50/60 dark:border-green-900 dark:bg-green-950/20" : "dark:border-neutral-800"}`}>
+                <div className="flex items-center justify-between gap-2"><strong className="text-sm">{modele.nom}</strong><span className={`rounded-full px-2 py-0.5 text-[10px] ${installe ? "bg-green-100 text-green-800" : "bg-neutral-100 text-neutral-600"}`}>{installe ? "Installé" : "À ajouter"}</span></div>
+                <p className="mt-1 text-xs text-neutral-500">{modele.description}</p>
+              </div>;
+            })}
+          </div>
         </section>
 
         <section className="rounded-md border p-4 dark:border-neutral-800">
@@ -140,12 +171,13 @@ export default async function AccesPage({
             const visualisations = Array.from(autorise).filter((cle) => cle.startsWith("voir_")).length;
             const action = enregistrerPermissionsPosteAction.bind(null, poste.id);
             const supprimer = supprimerPosteAction.bind(null, poste.id);
+            const modele = modeleDuPoste(poste.nom);
             return (
               <article key={poste.id} className="overflow-hidden rounded-md border dark:border-neutral-800">
                 <details className="group">
                   <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 hover:bg-neutral-50 dark:hover:bg-neutral-900 [&::-webkit-details-marker]:hidden">
                     <div className="min-w-0 flex-1">
-                      <h2 className="truncate font-semibold">{poste.nom}</h2>
+                      <div className="flex flex-wrap items-center gap-2"><h2 className="truncate font-semibold">{poste.nom}</h2>{modele && <span className="rounded-full bg-[#c9a24a]/15 px-2 py-0.5 text-[10px] font-medium text-[#8a681f]">Rôle prédéfini</span>}</div>
                       <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
                         <span>{compte(poste.id)} membre(s)</span>
                         <span className="rounded-full bg-blue-100 px-2 py-0.5 text-blue-800">{consultations} consultation(s)</span>
@@ -158,6 +190,10 @@ export default async function AccesPage({
                       <span className="hidden group-open:inline">Réduire les droits ↑</span>
                     </span>
                   </summary>
+                  {modele && <form action={reinitialiserRolePredefiniAction.bind(null,poste.id,modele.cle)} className="flex flex-wrap items-center justify-between gap-3 border-t bg-[#c9a24a]/5 px-4 py-3 dark:border-neutral-800">
+                    <p className="text-xs text-neutral-600">Vous pouvez personnaliser ce rôle ci-dessous ou restaurer à tout moment les droits recommandés.</p>
+                    <button className="rounded-md border border-[#c9a24a] px-3 py-1.5 text-xs font-medium text-[#8a681f]">Réappliquer le modèle recommandé</button>
+                  </form>}
                   <form action={action} className="border-t dark:border-neutral-800">
                     <div className="flex flex-wrap items-center justify-between gap-3 bg-neutral-50 px-4 py-3 dark:bg-neutral-900">
                       <p className="text-xs text-neutral-500">Cochez les droits de ce poste, puis enregistrez.</p>
@@ -168,16 +204,18 @@ export default async function AccesPage({
                       <fieldset key={module}>
                         <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#9a7625]">{module}</legend>
                         <div className="space-y-2">
-                          {liste.map((p) => (
+                          {liste.map((p) => {
+                            const categorie = categoriePermission(p.cle);
+                            return (
                             <label key={p.cle} className={`flex gap-2 rounded p-1.5 ${DROITS_SOCLE.has(p.cle) ? "cursor-default bg-green-50 dark:bg-green-950/20" : "cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-900"}`}>
                               {DROITS_SOCLE.has(p.cle) && <input type="hidden" name="permissions" value={p.cle} />}
                               <input type="checkbox" name={DROITS_SOCLE.has(p.cle) ? undefined : "permissions"} value={p.cle} defaultChecked={DROITS_SOCLE.has(p.cle) || autorise.has(p.cle)} disabled={DROITS_SOCLE.has(p.cle)} className="mt-0.5" />
                               <span>
-                                <span className="flex flex-wrap items-center gap-2 text-sm font-medium"><span className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide ${p.cle.startsWith("acces_")?"bg-blue-100 text-blue-800":p.cle.startsWith("gerer_")?"bg-amber-100 text-amber-800":p.cle.startsWith("voir_")?"bg-violet-100 text-violet-800":p.cle.startsWith("effectuer_")?"bg-cyan-100 text-cyan-800":"bg-green-100 text-green-800"}`}>{p.cle.startsWith("acces_")?"Consulter":p.cle.startsWith("gerer_")?"Gérer":p.cle.startsWith("voir_")?"Chiffres":p.cle.startsWith("effectuer_")?"Action":"Personnel"}</span>{p.description}{DROITS_SOCLE.has(p.cle) && <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] text-green-800">Inclus pour tous</span>}</span>
+                                <span className="flex flex-wrap items-center gap-2 text-sm font-medium"><span className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide ${categorie.classes}`}>{categorie.libelle}</span>{p.description}{DROITS_SOCLE.has(p.cle) && <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] text-green-800">Inclus pour tous</span>}</span>
                                 <span className="font-mono text-[10px] text-neutral-400">{p.cle}</span>
                               </span>
                             </label>
-                          ))}
+                          );})}
                         </div>
                       </fieldset>
                     ))}

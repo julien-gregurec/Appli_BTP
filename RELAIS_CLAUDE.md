@@ -27,6 +27,17 @@
 
 ---
 
+# REPRISE — 18 juillet 2026, rôles BTP prédéfinis (MIGRATION 104 APPLIQUÉE)
+
+- Neuf modèles de rôles sont maintenant installés dans chaque entreprise : **Ouvrier, Chef d’équipe, Chef de chantier, Conducteur de travaux, Directeur travaux, Administration, RH, Comptable et Gérant**.
+- La matrice sépare consultation, gestion, chiffres, préparation, validation, exécution et actions personnelles. Les droits bancaires sensibles restent distribués entre plusieurs niveaux ; seul le Gérant possède tous les droits configurables.
+- Les rôles restent entièrement personnalisables depuis `/parametres/acces`, et les entreprises peuvent toujours créer leurs propres rôles. Un bouton permet de réappliquer ultérieurement le modèle recommandé.
+- Les nouvelles entreprises créées depuis l’inscription ou la plateforme reçoivent automatiquement les neuf rôles ; le créateur d’une entreprise devient Gérant.
+- Migration `20260718000104_roles_predefinis.sql` appliquée dans Supabase et contrôlée : **9 modèles**, **2 entreprises**, minimum **9 rôles prédéfinis par entreprise**.
+- Contrôles verts : ESLint, `git diff --check` et build Next webpack complet de 88 pages. L’avertissement historique `unpdf/import.meta` et l’avertissement `<img>` de la signature employé restent non bloquants et hors lot.
+
+---
+
 # REPRISE PRIORITAIRE — 16 juillet 2026, banque, virements et paie (MIGRATION 89 APPLIQUÉE)
 
 - Migration `20260716000089_paiements_bancaires_paie.sql` appliquée directement dans Supabase : coffre RIB salariés/fournisseurs, bulletins PDF privés, prestataires bancaires, lots/ordres et audit append-only.
