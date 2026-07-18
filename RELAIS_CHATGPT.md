@@ -942,3 +942,13 @@ git diff --check                   # OK (aucun conflit whitespace)
 - La personnalisation complète reste accessible à tout moment dans `/parametres`, dans la section « Personnalisation de ma page d’accueil ».
 - Aucun changement de base de données n’est nécessaire : ce réglage d’affichage personnel reste local au navigateur et ne contient aucune donnée métier.
 - Contrôles verts : 76 tests Vitest, TypeScript, ESLint et build Next webpack complet. L’avertissement historique `SignatureEmploye.tsx` reste non bloquant et hors lot.
+
+## 109. Messagerie ouvrier et lieux des notes de frais — 18 juillet 2026
+
+- Migration `20260718000106_correctif_rls_messagerie_ouvrier.sql` appliquée : un salarié peut créer une conversation et récupérer immédiatement son identifiant sans erreur RLS. La lecture ajoutée reste limitée au membre actif et à la fiche employé reliée au compte créateur.
+- Migration `20260718000107_lieux_notes_frais.sql` appliquée : une note de frais peut maintenant être affectée distinctement à **Sans chantier**, **Dépôt**, **Bureau** ou à un chantier réel, sans créer de faux chantier.
+- Les anciennes notes sans chantier sont reprises comme `sans_chantier`. Une contrainte garantit qu’une dépense ne peut pas viser simultanément un chantier et un lieu hors chantier.
+- Le choix est conservé et affiché dans la liste, le regroupement par salarié, la vue mobile et le détail de la note. La modification d’une note vérifie également que le chantier choisi appartient bien à l’entreprise active.
+- La création de notes par un ouvrier est réparée : la policy directe du créateur permet le `insert ... returning id` utilisé par l’application, sans donner accès aux notes des autres salariés.
+- Contrôle direct Supabase réussi avec l’identité du compte ouvrier de démonstration : création d’un brouillon affecté au dépôt et retour de la référence, dans une transaction annulée sans donnée de test persistante.
+- Contrôles verts : 80 tests Vitest, TypeScript, ESLint et build Next webpack complet dans une copie isolée. Le build standard du dossier partagé n’a pas été forcé afin de préserver le `.next` utilisé simultanément par une autre tâche.

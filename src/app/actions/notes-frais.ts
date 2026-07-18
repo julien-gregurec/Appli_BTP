@@ -8,6 +8,7 @@ import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { calculerTotauxDepense, verifierTotaux } from "@/lib/expenses/workflow";
 import { ajouterAudit } from "@/lib/expenses/audit";
+import { analyserAffectationDepense } from "@/lib/expenses/affectation";
 
 const TYPES_DOCUMENT = new Set([
   "facture", "ticket_caisse", "recu_paiement", "recu_carte_bancaire",
@@ -54,7 +55,13 @@ export async function creerNoteFraisAction(formData: FormData) {
   const montantTva = totaux.tva;
   const erreursTotaux = verifierTotaux(montantHt, montantTva, montantTtc);
   if (erreursTotaux.length) erreur(erreursTotaux.join(" · "));
-  const chantierId = texte(formData, "chantier_id");
+  let affectation;
+  try {
+    affectation = analyserAffectationDepense(texte(formData, "chantier_id"));
+  } catch (error) {
+    erreur(error instanceof Error ? error.message : "Lieu de dépense invalide");
+  }
+  const { chantierId, lieuHorsChantier } = affectation;
   if (chantierId) {
     const { data: chantier } = await supabase.from("chantiers").select("id").eq("id", chantierId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
     if (!chantier) erreur("Chantier invalide ou inaccessible");
@@ -67,6 +74,7 @@ export async function creerNoteFraisAction(formData: FormData) {
     entreprise_id: ctx.entrepriseId,
     employe_id: employeId,
     chantier_id: chantierId,
+    lieu_hors_chantier: lieuHorsChantier,
     date_frais: dateFrais,
     montant_ht: montantHt,
     montant_tva: montantTva,
@@ -110,9 +118,20 @@ export async function modifierNoteFraisAction(noteId: string, formData: FormData
   if (typeDocument && !TYPES_DOCUMENT.has(typeDocument)) erreur("Type de justificatif invalide", noteId);
   const { data: avant } = await supabase.from("notes_frais").select("id,statut,chantier_id").eq("id", noteId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
   if (!avant) erreur("Dépense inaccessible", noteId);
-  const nouveauChantierId = texte(formData, "chantier_id");
+  let nouvelleAffectation;
+  try {
+    nouvelleAffectation = analyserAffectationDepense(texte(formData, "chantier_id"));
+  } catch (error) {
+    erreur(error instanceof Error ? error.message : "Lieu de dépense invalide", noteId);
+  }
+  const { chantierId: nouveauChantierId, lieuHorsChantier } = nouvelleAffectation;
+  if (nouveauChantierId) {
+    const { data: chantier } = await supabase.from("chantiers").select("id").eq("id", nouveauChantierId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+    if (!chantier) erreur("Chantier invalide ou inaccessible", noteId);
+  }
   const { error: updateError } = await supabase.from("notes_frais").update({
     chantier_id: nouveauChantierId,
+    lieu_hors_chantier: lieuHorsChantier,
     date_frais: texte(formData, "date_frais"),
     montant_ht: montantHt,
     montant_tva: montantTva,
