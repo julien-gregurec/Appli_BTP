@@ -207,3 +207,15 @@ notify pgrst, 'reload schema';
 7. **Puis** part variable Phase 2 (3.8).
 
 Socle = étapes 1→6 : dès qu'elles tournent et que Julien a fait la section 4, **tout l'abonnement de base est automatique** (souscription, essai, prélèvement, facture envoyée, relances, résiliation self-service, statut synchronisé).
+
+---
+
+## 7. État réalisé au 18 juillet 2026
+
+- Socle Stripe Billing livré par la migration 100 et le lot applicatif associé.
+- Part variable comptes/appareils livrée.
+- Part variable stockage livrée par `20260718000101_facturation_stockage.sql`, appliquée et vérifiée dans Supabase.
+- Quotas provisoires : 5 / 25 / 100 Go ; dépassement provisoire : 0,50 € HT / Go / mois.
+- Jauge entreprise, alertes à 80 % et dépassement, grille tarifaire et journal des relevés intégrés.
+- La facture initiale d’essai est exclue des dépassements ; les lignes Stripe sont idempotentes et séparées du flux Connect.
+- Restent externes : validation commerciale des quotas/tarifs et réglages manuels Stripe/Vercel listés en section 4.

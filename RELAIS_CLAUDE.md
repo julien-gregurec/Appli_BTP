@@ -757,3 +757,13 @@ Un lot **« Mon espace »** a été commencé après le commit `1beee4b`, mais i
 - Avant encaissement réel, Julien doit terminer les réglages externes Stripe/Vercel listés dans `RELAIS_CODEX_ABONNEMENT.md` : entité légale, produits/prix, portail, relances, webhook, variables et `CRON_SECRET`.
 
 ---
+# REPRISE — 18 juillet 2026, quotas et facturation du stockage (MIGRATION 101 APPLIQUÉE)
+
+- Migration `20260718000101_facturation_stockage.sql` appliquée et vérifiée dans Supabase (`fonction_stockage=true`, `journal_stockage=true`).
+- Quotas provisoires : Essentiel 5 Go, Pro 25 Go, Premium 100 Go ; dépassement 0,50 € HT / Go / mois. À valider commercialement avant ouverture publique.
+- Mesure isolée par entreprise sur les neuf buckets métier, sans accès public aux fichiers. Le journal conserve le détail de chaque relevé rattaché à une facture Stripe.
+- Webhook abonnement : ajout idempotent du dépassement sur `invoice.created`, hors facture initiale de l’essai. Aucun changement sur Stripe Connect.
+- Interfaces : jauge et alertes dans `/abonnement`, quotas visibles dans `/tarifs`.
+- Contrôles verts : tests ciblés, TypeScript, ESLint, build Next webpack 88 pages et migration contrôlée en production Supabase.
+
+---

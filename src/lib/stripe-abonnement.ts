@@ -7,6 +7,22 @@ export type OffreAbonnement = (typeof OFFRES_ABONNEMENT)[number];
 export type PeriodiciteAbonnement = (typeof PERIODICITES_ABONNEMENT)[number];
 export type StatutAbonnement = "essai" | "actif" | "suspendu" | "annule";
 
+export const OCTETS_PAR_GO = 1_000_000_000;
+export const TARIF_STOCKAGE_SUPPLEMENTAIRE_HT_PAR_GO = 0.5;
+
+export function calculerFacturationStockage(params: {
+  octetsUtilises: number;
+  quotaGo: number;
+  periodicite: PeriodiciteAbonnement;
+}) {
+  const utilisationGo = Math.max(0, params.octetsUtilises) / OCTETS_PAR_GO;
+  const depassementExact = Math.max(0, utilisationGo - Math.max(0, params.quotaGo));
+  const depassementGo = Math.ceil(depassementExact * 100) / 100;
+  const nombreMois = params.periodicite === "annuel" ? 12 : 1;
+  const montantHt = Math.round(depassementGo * TARIF_STOCKAGE_SUPPLEMENTAIRE_HT_PAR_GO * nombreMois * 100) / 100;
+  return { utilisationGo, depassementGo, nombreMois, montantHt };
+}
+
 type StripeErreur = { error?: { message?: string } };
 type StripeCustomer = { id: string };
 type StripeSession = { id: string; url: string | null };
@@ -260,4 +276,80 @@ export async function ajouterDepassementAppareilsFacture(params: { entrepriseId:
     corps: new URLSearchParams({ customer: params.customerId, invoice: params.invoiceId, amount: String(Math.round(params.montantHt * 100)), currency: "eur", description: "Dépassement de la limite de 2 appareils par compte", "metadata[entreprise_id]": params.entrepriseId }),
     idempotence: `abonnement-appareils-${params.invoiceId}`,
   });
+}
+
+export async function ajouterDepassementStockageFacture(params: {
+  entrepriseId: string;
+  customerId: string;
+  invoiceId: string;
+}) {
+  const admin = createAdminClient();
+  const { data: releveExistant } = await admin
+    .from("abonnement_stockage_releves")
+    .select("stripe_invoice_item_id,montant_ht")
+    .eq("stripe_invoice_id", params.invoiceId)
+    .maybeSingle();
+  if (releveExistant?.stripe_invoice_item_id || Number(releveExistant?.montant_ht ?? 0) === 0 && releveExistant) {
+    return releveExistant;
+  }
+
+  const [{ data: entreprise, error: entrepriseErreur }, { data: utilisation, error: utilisationErreur }] = await Promise.all([
+    admin
+      .from("entreprises")
+      .select("abonnement_offre,abonnement_periodicite")
+      .eq("id", params.entrepriseId)
+      .single(),
+    admin.rpc("utilisation_stockage_entreprise", { p_entreprise_id: params.entrepriseId }),
+  ]);
+  if (entrepriseErreur || !entreprise) throw new Error("Offre de l’entreprise introuvable");
+  if (utilisationErreur) throw new Error(utilisationErreur.message);
+
+  const offreBrute = String(entreprise.abonnement_offre ?? "essentiel");
+  const periodiciteBrute = String(entreprise.abonnement_periodicite ?? "mensuel");
+  const offre: OffreAbonnement = estOffreAbonnement(offreBrute) ? offreBrute : "essentiel";
+  const periodicite: PeriodiciteAbonnement = estPeriodiciteAbonnement(periodiciteBrute) ? periodiciteBrute : "mensuel";
+  const ligneUtilisation = Array.isArray(utilisation) ? utilisation[0] : utilisation;
+  const octetsUtilises = Number(ligneUtilisation?.octets_utilises ?? 0);
+  const fichiers = Number(ligneUtilisation?.fichiers ?? 0);
+  const quotaGo = offreParCle(offre).stockageGoInclus;
+  const calcul = calculerFacturationStockage({ octetsUtilises, quotaGo, periodicite });
+
+  const { error: releveErreur } = await admin.from("abonnement_stockage_releves").upsert({
+    entreprise_id: params.entrepriseId,
+    stripe_invoice_id: params.invoiceId,
+    offre,
+    periodicite,
+    octets_utilises: octetsUtilises,
+    fichiers,
+    quota_go: quotaGo,
+    depassement_go: calcul.depassementGo,
+    tarif_go_ht: TARIF_STOCKAGE_SUPPLEMENTAIRE_HT_PAR_GO,
+    nombre_mois: calcul.nombreMois,
+    montant_ht: calcul.montantHt,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: "stripe_invoice_id" });
+  if (releveErreur) throw new Error(releveErreur.message);
+  if (calcul.montantHt <= 0) return { montant_ht: 0, stripe_invoice_item_id: null };
+
+  const suffixePeriode = calcul.nombreMois === 12 ? " · période annuelle de 12 mois" : "";
+  const ligne = await requeteStripe<{ id: string }>("invoiceitems", {
+    corps: new URLSearchParams({
+      customer: params.customerId,
+      invoice: params.invoiceId,
+      amount: String(Math.round(calcul.montantHt * 100)),
+      currency: "eur",
+      description: `Stockage supplémentaire : ${calcul.depassementGo.toLocaleString("fr-FR")} Go au-delà de ${quotaGo} Go inclus${suffixePeriode}`,
+      "metadata[entreprise_id]": params.entrepriseId,
+      "metadata[usage_octets]": String(octetsUtilises),
+      "metadata[quota_go]": String(quotaGo),
+      "metadata[depassement_go]": String(calcul.depassementGo),
+    }),
+    idempotence: `abonnement-stockage-${params.invoiceId}`,
+  });
+  const { error: miseAJourErreur } = await admin
+    .from("abonnement_stockage_releves")
+    .update({ stripe_invoice_item_id: ligne.id, updated_at: new Date().toISOString() })
+    .eq("stripe_invoice_id", params.invoiceId);
+  if (miseAJourErreur) throw new Error(miseAJourErreur.message);
+  return ligne;
 }

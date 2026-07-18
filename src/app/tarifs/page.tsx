@@ -40,6 +40,9 @@ export default function TarifsPage() {
                 <p className="mt-1 text-xs text-neutral-500">
                   {offre.comptesInclus} comptes inclus, puis {offre.parCompteSup} € / compte supplémentaire
                 </p>
+                <p className="mt-1 text-xs text-neutral-500">
+                  {offre.stockageGoInclus} Go de fichiers inclus, puis 0,50 € HT / Go / mois
+                </p>
 
                 <ul className="mt-5 flex-1 space-y-2 text-sm">
                   {inclus.map((b) => (

@@ -878,3 +878,13 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Contrôles : **63 tests**, TypeScript, ESLint, `git diff --check` et build Next webpack complet de **88 pages** verts. Deux avertissements historiques sans rapport restent non bloquants.
 - Réglages externes encore obligatoires avant encaissement : entité légale Stripe, produits/prix, portail et relances, webhook, variables Vercel et `CRON_SECRET`. Sans ces secrets, les boutons de souscription restent volontairement désactivés et les entreprises existantes ne sont pas bloquées.
 - Relais détaillé : `RELAIS_CODEX_ABONNEMENT.md`.
+
+## 104. Quotas et refacturation du stockage — 18 juillet 2026
+
+- Migration `20260718000101_facturation_stockage.sql` appliquée et vérifiée dans Supabase : fonction sécurisée de mesure par entreprise et journal mensuel des relevés présents (`true / true`).
+- La mesure additionne uniquement les fichiers de l’entreprise dans les neuf buckets métier privés : chantiers, actifs entreprise, documents employés, notes de frais, factures fournisseurs, fiches techniques, bulletins de paie, preuves de pointage et exports de notes de frais.
+- Quotas provisoires intégrés aux offres : Essentiel 5 Go, Pro 25 Go, Premium 100 Go. Dépassement provisoire : 0,50 € HT / Go / mois. Ces valeurs restent à valider commercialement avant ouverture publique des abonnements.
+- La page `/abonnement` affiche désormais la consommation, le nombre de fichiers, une jauge, une alerte à 80 % et une alerte de dépassement. La page publique `/tarifs` annonce le quota et le prix du dépassement.
+- Sur chaque vraie échéance Stripe, un invoice item séparé et idempotent est créé si le quota est dépassé. Le relevé conserve usage, quota, dépassement, tarif, période, montant et identifiant Stripe. La facture initiale à 0 € de l’essai est explicitement ignorée pour ne provoquer aucun débit anticipé.
+- Les abonnements annuels appliquent douze mois de stockage sur leur échéance annuelle ; les abonnements mensuels appliquent un mois.
+- Contrôles verts : tests ciblés stockage/Stripe, TypeScript, ESLint, `git diff --check` et build Next webpack complet de 88 pages. Avertissement historique `unpdf/import.meta` toujours non bloquant.

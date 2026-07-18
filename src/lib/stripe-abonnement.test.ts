@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  calculerFacturationStockage,
   prixStripePour,
   statutAbonnementDepuisStripe,
   stripeBillingEstConfigure,
@@ -44,5 +45,31 @@ describe("statuts Stripe Billing", () => {
     ["incomplete_expired", "annule"],
   ])("convertit %s en %s", (stripe, attendu) => {
     expect(statutAbonnementDepuisStripe(stripe)).toBe(attendu);
+  });
+});
+
+describe("facturation du stockage", () => {
+  it("ne facture rien sous le quota", () => {
+    expect(calculerFacturationStockage({
+      octetsUtilises: 4_500_000_000,
+      quotaGo: 5,
+      periodicite: "mensuel",
+    })).toMatchObject({ depassementGo: 0, montantHt: 0, nombreMois: 1 });
+  });
+
+  it("arrondit le dépassement au centième de Go", () => {
+    expect(calculerFacturationStockage({
+      octetsUtilises: 6_001_000_000,
+      quotaGo: 5,
+      periodicite: "mensuel",
+    })).toMatchObject({ depassementGo: 1.01, montantHt: 0.51 });
+  });
+
+  it("applique douze mois sur une facture annuelle", () => {
+    expect(calculerFacturationStockage({
+      octetsUtilises: 27_000_000_000,
+      quotaGo: 25,
+      periodicite: "annuel",
+    })).toMatchObject({ depassementGo: 2, montantHt: 12, nombreMois: 12 });
   });
 });

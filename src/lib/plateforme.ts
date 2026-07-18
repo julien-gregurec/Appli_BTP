@@ -121,11 +121,11 @@ export const ATTENTES_OPTIONS = [
 // (au-dessus des outils devis-factures simples). Ajuster ici après validation
 // auprès de prospects réels.
 export const OFFRES = [
-  { cle: "essentiel", palier: 1, nom: "Essentiel", base: 59, comptesInclus: 2, parCompteSup: 15,
+  { cle: "essentiel", palier: 1, nom: "Essentiel", base: 59, comptesInclus: 2, parCompteSup: 15, stockageGoInclus: 5,
     resume: "Devis, factures, clients & chantiers. Pour l'artisan seul ou une petite équipe." },
-  { cle: "pro", palier: 2, nom: "Pro", base: 129, comptesInclus: 5, parCompteSup: 15,
+  { cle: "pro", palier: 2, nom: "Pro", base: 129, comptesInclus: 5, parCompteSup: 15, stockageGoInclus: 25,
     resume: "Essentiel + planning, pointage GPS, stock, flotte & outillage. Pour 3 à 15 salariés." },
-  { cle: "premium", palier: 3, nom: "Premium", base: 249, comptesInclus: 10, parCompteSup: 12,
+  { cle: "premium", palier: 3, nom: "Premium", base: 249, comptesInclus: 10, parCompteSup: 12, stockageGoInclus: 100,
     resume: "Pro + notes de frais probantes, portail client, exports comptables & QR codes. Au-delà de 15 salariés." },
 ] as const;
 

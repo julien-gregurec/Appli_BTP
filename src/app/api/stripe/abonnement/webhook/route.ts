@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ajouterDepassementAppareilsFacture, calculerDepassementAppareils, reconcilierAbonnementStripe, recupererAbonnementStripe, statutAbonnementDepuisStripe, type StripeSubscription } from "@/lib/stripe-abonnement";
+import { ajouterDepassementAppareilsFacture, ajouterDepassementStockageFacture, calculerDepassementAppareils, reconcilierAbonnementStripe, recupererAbonnementStripe, statutAbonnementDepuisStripe, type StripeSubscription } from "@/lib/stripe-abonnement";
 import { verifierSignatureStripe } from "@/lib/stripe";
 
 type StripeReference = string | { id?: string } | null | undefined;
@@ -12,6 +12,7 @@ type StripeObjet = {
   status?: string;
   mode?: string;
   payment_status?: string;
+  billing_reason?: string;
   hosted_invoice_url?: string | null;
   invoice_pdf?: string | null;
   created?: number;
@@ -116,11 +117,14 @@ export async function POST(request: Request) {
     } else if (["customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"].includes(evenement.type)) {
       if (!entrepriseId) throw new Error("Entreprise Stripe introuvable");
       statutResultant = await synchroniserAbonnement(entrepriseId, objet as StripeSubscription);
-    } else if (evenement.type === "invoice.created") {
+    } else if (evenement.type === "invoice.created" && objet.billing_reason !== "subscription_create") {
       if (!entrepriseId) throw new Error("Entreprise de la facture Stripe introuvable");
       const customerId = identifiant(objet.customer);
       if (!customerId) throw new Error("Client Stripe absent de la facture");
-      await ajouterDepassementAppareilsFacture({ entrepriseId, customerId, invoiceId: objet.id, montantHt: await calculerDepassementAppareils(entrepriseId) });
+      await Promise.all([
+        ajouterDepassementAppareilsFacture({ entrepriseId, customerId, invoiceId: objet.id, montantHt: await calculerDepassementAppareils(entrepriseId) }),
+        ajouterDepassementStockageFacture({ entrepriseId, customerId, invoiceId: objet.id }),
+      ]);
     } else if (["invoice.paid", "invoice.payment_failed", "invoice.payment_action_required"].includes(evenement.type)) {
       if (!entrepriseId) throw new Error("Entreprise de la facture Stripe introuvable");
       statutResultant = evenement.type === "invoice.paid" ? "actif" : "suspendu";
