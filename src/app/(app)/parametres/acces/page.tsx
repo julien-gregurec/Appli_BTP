@@ -39,7 +39,7 @@ export default async function AccesPage({
       sb.from("permissions_poste").select("poste_id, cle_permission, autorise").eq("entreprise_id", ctx.entrepriseId),
       sb
         .from("utilisateurs_entreprises")
-        .select("utilisateur_id, poste_id, statut, utilisateur:utilisateurs(prenom, nom)")
+        .select("utilisateur_id, poste_id, statut, pointage_personnel_actif, utilisateur:utilisateurs(prenom, nom)")
         .eq("entreprise_id", ctx.entrepriseId)
         .in("statut", ["actif", "en_attente_validation"]),
       sb.from("modeles_roles_predefinis").select("cle, nom, description, ordre, permissions, tous_les_droits").order("ordre"),
@@ -74,9 +74,9 @@ export default async function AccesPage({
         </section>
 
         <section className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-          <h2 className="font-semibold">Pointage facultatif selon le poste</h2>
+          <h2 className="font-semibold">Pointage facultatif par collaborateur</h2>
           <p className="mt-1 text-xs opacity-80">
-            Vous choisissez les comptes qui utilisent le pointage. Activez séparément l’accès au module, la saisie en son nom, la consultation de l’équipe, la gestion et la validation. Les modèles Administration et Conducteur de travaux ne pointent pas par défaut.
+            Vous choisissez ci-dessous, compte par compte, qui peut pointer en son nom. La consultation de l’équipe, la gestion et la validation restent des droits distincts du poste. Les modèles Administration et Conducteur de travaux ne pointent pas par défaut.
           </p>
         </section>
 
@@ -127,7 +127,7 @@ export default async function AccesPage({
               const enAttente = m.statut === "en_attente_validation";
               const action = modifierPosteMembreAction.bind(null, m.utilisateur_id);
               return (
-                <form key={m.utilisateur_id} action={action} className="flex items-center gap-3 rounded bg-neutral-50 p-2 dark:bg-neutral-900">
+                <form key={m.utilisateur_id} action={action} className="grid gap-2 rounded bg-neutral-50 p-3 dark:bg-neutral-900 md:grid-cols-[minmax(180px,1fr)_minmax(180px,240px)_minmax(170px,220px)_auto] md:items-center">
                   <span className="flex-1 text-sm font-medium">
                     {[u?.prenom, u?.nom].filter(Boolean).join(" ") || "Compte utilisateur"}
                     {enAttente && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-normal text-amber-800">En attente</span>}
@@ -136,6 +136,13 @@ export default async function AccesPage({
                     <option value="">Choisir un poste</option>
                     {postes?.map((p) => <option key={p.id} value={p.id}>{p.nom}</option>)}
                   </select>
+                  <label className="grid gap-1 text-xs text-neutral-500">
+                    Pointage personnel
+                    <select name="pointage_personnel_actif" defaultValue={m.pointage_personnel_actif ? "true" : "false"} className="rounded border px-3 py-1.5 text-sm font-medium text-neutral-900 dark:bg-neutral-900 dark:text-neutral-100">
+                      <option value="true">Pointage activé</option>
+                      <option value="false">Pointage désactivé</option>
+                    </select>
+                  </label>
                   <button className="rounded border px-3 py-1.5 text-sm font-medium">
                     {enAttente ? "Valider" : "Affecter"}
                   </button>

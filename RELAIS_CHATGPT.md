@@ -974,3 +974,11 @@ git diff --check                   # OK (aucun conflit whitespace)
 - La création des nouvelles entreprises et la réapplication d’un rôle prédéfini respectent ce choix : aucun droit de pointage n’est réinjecté par le socle commun.
 - Migration `20260718000109_pointage_optionnel_par_poste.sql` appliquée dans Supabase. Contrôle direct réussi : modèles Administration/Conducteur sans pointage, postes existants mis à niveau, modèle Ouvrier inchangé et fonctions d’installation/réinitialisation sans pointage forcé (`true` sur les cinq vérifications).
 - Contrôles verts : 80 tests Vitest, TypeScript, ESLint et `git diff --check`. L’avertissement historique `SignatureEmploye.tsx` reste non bloquant et hors lot.
+
+## 112. Activation individuelle du pointage par compte — 18 juillet 2026
+
+- L’écran `/parametres/acces` affiche désormais, sur chaque ligne de collaborateur, un choix explicite **Pointage activé** ou **Pointage désactivé**. L’administrateur n’a plus besoin de créer un poste spécial pour traiter une exception individuelle.
+- Le réglage personnel pilote réellement l’apparition du module et la saisie du pointage. Lorsqu’il est désactivé, le compte ne peut pas pointer en son nom, même si son poste historique contenait encore cette permission.
+- Les droits de supervision restent séparés : voir les pointages de l’équipe, modifier, valider ou rejeter continuent de dépendre du poste. Activer le pointage personnel ne donne donc aucun accès aux heures des autres salariés.
+- La mise à jour du poste et du pointage personnel est atomique dans une fonction serveur contrôlée. Les comptes terrain existants conservent leur accès lors de la migration ; les nouveaux comptes commencent avec le pointage désactivé jusqu’au choix de l’administrateur.
+- Migration : `20260718000110_pointage_individuel_comptes.sql`.
