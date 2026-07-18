@@ -12,12 +12,14 @@ export default async function ReceptionPage() {
   if (!peut("effectuer_entree_stock") && !peut("effectuer_sortie_stock")) notFound();
 
   const supabase = await createClient();
-  const [{ data: articles }, { data: lignesOuvertes }, { data: chantiers }] = await Promise.all([
+  const [{ data: articles }, { data: lignesOuvertes }, { data: chantiers }, { data: vehicules }, { data: outils }] = await Promise.all([
     supabase.from("articles_stock").select("id, reference, designation, code_barres, unite")
       .eq("entreprise_id", ctx.entrepriseId).eq("actif", true).order("designation"),
     supabase.rpc("receptions_lignes_ouvertes", { p_entreprise_id: ctx.entrepriseId }),
     supabase.from("chantiers").select("id, nom").eq("entreprise_id", ctx.entrepriseId)
       .not("statut", "in", "(archive,annule,termine)").order("nom"),
+    supabase.from("vehicules").select("id,immatriculation,marque,modele").eq("entreprise_id", ctx.entrepriseId).neq("statut", "vendu").order("immatriculation"),
+    supabase.from("outils").select("id,reference,designation").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(hors_service,perdu,rebut)").order("designation"),
   ]);
 
   return (
@@ -37,6 +39,8 @@ export default async function ReceptionPage() {
           articles={(articles ?? []).map((a) => ({ ...a, code_barres: a.code_barres ?? null }))}
           lignesOuvertes={(lignesOuvertes ?? []) as never[]}
           chantiers={chantiers ?? []}
+          vehicules={vehicules ?? []}
+          outils={outils ?? []}
         />
       </div>
     </main>

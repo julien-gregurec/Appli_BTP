@@ -13,6 +13,7 @@ import { EmailDocumentButton } from "@/components/EmailDocumentButton";
 import { creerLienPaiementStripeAction } from "@/app/actions/paiements-en-ligne";
 import { lienPaiementStripeEstActif, stripeEstConfigure } from "@/lib/stripe";
 import { CopierLienPaiement } from "@/components/CopierLienPaiement";
+import { SignatureDocumentMetier } from "@/components/SignatureDocumentMetier";
 
 const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -162,6 +163,8 @@ export default async function FactureDetailPage({
             </div>
           </div>
         </div>
+
+        <SignatureDocumentMetier type="facture" documentId={id} />
 
         <section className="space-y-3 rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
           <h2 className="text-sm font-semibold">Encaissements client</h2>

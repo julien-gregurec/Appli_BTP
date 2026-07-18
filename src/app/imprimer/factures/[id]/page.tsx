@@ -19,11 +19,11 @@ export default async function ImprimerFacturePage({ params }: { params: Promise<
 
   if (!facture) notFound();
 
-  const { data: lignes } = await supabase
-    .from("lignes_factures").select("*").eq("facture_id", id).order("ordre");
-
-  const { data: entreprise } = await supabase
-    .from("entreprises").select("*").eq("id", ctx.entrepriseId).single();
+  const [{ data: lignes }, { data: entreprise }, { data: signatures }] = await Promise.all([
+    supabase.from("lignes_factures").select("*").eq("facture_id", id).order("ordre"),
+    supabase.from("entreprises").select("*").eq("id", ctx.entrepriseId).single(),
+    supabase.from("signatures_documents").select("id,employe_id,nom_signataire,fonction_signataire,signed_at,document_sha256").eq("entreprise_id", ctx.entrepriseId).eq("type_document", "facture").eq("document_id", id).order("signed_at"),
+  ]);
 
   const client = Array.isArray(facture.client) ? facture.client[0] : facture.client;
   const typeDoc = facture.type === "simple" ? "Facture" : `Facture — ${typeFactureLabel(facture.type)}`;
@@ -58,6 +58,7 @@ export default async function ImprimerFacturePage({ params }: { params: Promise<
         montantTtc={facture.montant_ttc}
         notesClient={facture.notes_client}
         estFacture={true}
+        signatures={signatures ?? []}
       />
     </>
   );

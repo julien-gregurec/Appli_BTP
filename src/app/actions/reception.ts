@@ -6,6 +6,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 
 type LigneLot = { article_id: string; quantite: number };
 type Attribution = { ligne_commande_id: string; quantite: number };
+export type TypeDestinationSortie = "chantier" | "vehicule" | "outil" | null;
 
 export type ResultatReception = {
   ok: boolean;
@@ -39,16 +40,18 @@ export type ResultatSortie = { ok: boolean; sorties?: number; erreur?: string };
 
 export async function sortieLotAction(
   lignes: LigneLot[],
-  chantierId: string | null,
+  typeDestination: TypeDestinationSortie,
+  destinationId: string | null,
   motif: string | null,
 ): Promise<ResultatSortie> {
   const ctx = await getContexteEntreprise();
   if (!lignes.length) return { ok: false, erreur: "Aucun article scanné." };
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("enregistrer_sortie_lot", {
+  const { data, error } = await supabase.rpc("enregistrer_sortie_lot_v2", {
     p_entreprise_id: ctx.entrepriseId,
     p_lignes: lignes,
-    p_chantier_id: chantierId,
+    p_type_destination: typeDestination,
+    p_destination_id: destinationId,
     p_motif: motif,
   });
   if (error) return { ok: false, erreur: error.message };

@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { receptionLotAction, sortieLotAction } from "@/app/actions/reception";
+import type { TypeDestinationSortie } from "@/app/actions/reception";
 
 type Article = { id: string; reference: string; designation: string; code_barres: string | null; unite: string };
 type LigneOuverte = {
@@ -17,16 +18,19 @@ const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCa
 const tokens = (s: string) => norm(s).split(/[^a-z0-9]+/).filter((t) => t.length >= 4);
 
 export function ReceptionScanner({
-  articles, lignesOuvertes, chantiers,
+  articles, lignesOuvertes, chantiers, vehicules, outils,
 }: {
   articles: Article[];
   lignesOuvertes: LigneOuverte[];
   chantiers: { id: string; nom: string }[];
+  vehicules: { id: string; immatriculation: string; marque: string; modele: string | null }[];
+  outils: { id: string; reference: string; designation: string }[];
 }) {
   const [mode, setMode] = useState<"reception" | "sortie">("reception");
   const [panier, setPanier] = useState<PanierLigne[]>([]);
   const [code, setCode] = useState("");
-  const [chantierId, setChantierId] = useState("");
+  const [typeDestination, setTypeDestination] = useState<TypeDestinationSortie>("chantier");
+  const [destinationId, setDestinationId] = useState("");
   const [message, setMessage] = useState<{ type: "ok" | "err"; texte: string } | null>(null);
   const [enCours, demarrer] = useTransition();
   const champ = useRef<HTMLInputElement>(null);
@@ -103,7 +107,11 @@ export function ReceptionScanner({
         const maj = (r.commandes ?? []).length;
         setMessage({ type: "ok", texte: `${r.entrees} entrée(s) enregistrée(s)${maj ? ` · ${maj} commande(s) mise(s) à jour` : ""}.` });
       } else {
-        const r = await sortieLotAction(lignes, chantierId || null, null);
+        if (typeDestination && !destinationId) {
+          setMessage({ type: "err", texte: "Choisissez la destination de la sortie." });
+          return;
+        }
+        const r = await sortieLotAction(lignes, typeDestination, destinationId || null, null);
         if (!r.ok) { setMessage({ type: "err", texte: r.erreur ?? "Échec." }); return; }
         setMessage({ type: "ok", texte: `${r.sorties} sortie(s) enregistrée(s).` });
       }
@@ -125,13 +133,21 @@ export function ReceptionScanner({
       </div>
 
       {mode === "sortie" && (
-        <label className="block text-sm">
-          <span className="font-medium">Chantier de destination (facultatif)</span>
-          <select value={chantierId} onChange={(e) => setChantierId(e.target.value)} className={`${input} mt-1 block w-full max-w-md`}>
-            <option value="">— Aucun (frais généraux) —</option>
-            {chantiers.map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
-          </select>
-        </label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-sm"><span className="font-medium">Type de destination</span>
+            <select value={typeDestination ?? ""} onChange={(e) => { setTypeDestination((e.target.value || null) as TypeDestinationSortie); setDestinationId(""); }} className={`${input} mt-1 block w-full`}>
+              <option value="chantier">Chantier</option><option value="vehicule">Véhicule</option><option value="outil">Outillage</option><option value="">Frais généraux / aucune affectation</option>
+            </select>
+          </label>
+          {typeDestination && <label className="block text-sm"><span className="font-medium">Destination</span>
+            <select value={destinationId} onChange={(e) => setDestinationId(e.target.value)} className={`${input} mt-1 block w-full`}>
+              <option value="">— Choisir —</option>
+              {typeDestination === "chantier" && chantiers.map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
+              {typeDestination === "vehicule" && vehicules.map((v) => <option key={v.id} value={v.id}>{v.immatriculation} · {v.marque} {v.modele ?? ""}</option>)}
+              {typeDestination === "outil" && outils.map((o) => <option key={o.id} value={o.id}>{o.reference} · {o.designation}</option>)}
+            </select>
+          </label>}
+        </div>
       )}
 
       <div className="flex flex-wrap gap-2">

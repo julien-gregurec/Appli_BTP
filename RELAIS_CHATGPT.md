@@ -1,5 +1,15 @@
 # REPRISE — 17 juillet 2026, facturation des comptes utilisant plus de deux appareils (MIGRATION 90 APPLIQUÉE)
 
+## 18 juillet 2026 — Migrations 98, 99, 102 et 103 vérifiées/appliquées
+
+- **Migration 98 — `20260717000098_reception_sortie_lot.sql` : appliquée et vérifiée.** Elle permet de scanner plusieurs articles successivement, de corriger leurs quantités, de rapprocher une même réception de plusieurs commandes fournisseurs et de recalculer automatiquement leurs statuts. La fonction `enregistrer_reception_lot(uuid,jsonb,jsonb,text)` est bien présente dans Supabase.
+- **Migration 99 — `20260717000099_signature_employe.sql` : appliquée et vérifiée.** Chaque fiche salarié peut conserver une signature PNG privée dans `documents-employes`, avec date serveur. La colonne `employes.signature_storage_path` est bien présente dans Supabase.
+- **Migration 102 — `20260718000102_signatures_documents_metier.sql` : appliquée et vérifiée.** Les devis, factures, bons de commande, interventions et bons de livraison peuvent désormais être signés en nom propre avec la signature enregistrée du salarié. Chaque apposition crée une copie figée, horodatée côté serveur, les empreintes SHA-256 de la signature et du document, ainsi qu'une entrée d'audit. La table est append-only et l'interface précise qu'il ne s'agit pas d'une signature qualifiée eIDAS.
+- **Migration 103 — `20260718000103_sorties_lot_destinations.sql` : appliquée et vérifiée.** Le scanner multi-articles accepte maintenant une destination chantier, véhicule ou outillage, avec les mêmes contrôles de disponibilité que le scanner individuel. La fonction `enregistrer_sortie_lot_v2(uuid,jsonb,text,uuid,text)` est présente dans Supabase.
+- Les impressions/PDF des devis, factures et commandes affichent les signatures traçables. Les interventions et bons de livraison exposent la même action depuis leur écran métier.
+- Contrôles du lot : **69 tests**, ESLint sans erreur, TypeScript et build Next webpack **88 routes** verts. Seul l'avertissement historique `unpdf/import.meta` demeure non bloquant.
+- Le lot Stripe Billing 100 reste techniquement livré. Audit Vercel Production du 18 juillet : `STRIPE_SECRET_KEY` et `NEXT_PUBLIC_APP_URL` sont présents ; `STRIPE_WEBHOOK_ABONNEMENT_SECRET`, `CRON_SECRET` et les 12 variables de prix abonnement/compte supplémentaire sont encore absents. L'encaissement réel dépend donc uniquement de l'entité légale, de l'activation Stripe, de la création des prix, du nouvel endpoint webhook et de leurs secrets confidentiels ; ne pas confondre ce flux avec Stripe Connect, utilisé par les entreprises pour encaisser leurs propres clients.
+
 ## 17 juillet 2026 — Sélection du contenu à inventorier (MIGRATION 94 APPLIQUÉE)
 
 - La création d’un inventaire permet maintenant de choisir une zone du dépôt, puis de sélectionner ou décocher chaque référence à compter.

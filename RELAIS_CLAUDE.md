@@ -1,4 +1,16 @@
-# REPRISE PRIORITAIRE — 17 juillet 2026, listes chantier filtrantes et relances corrigées
+# Relais Claude Code — Liria Gestion Pro
+
+## REPRISE AUTORITATIVE — 18 juillet 2026, signatures métier et sorties groupées
+
+- **Migration 98 — `20260717000098_reception_sortie_lot.sql` : appliquée et vérifiée.** Réceptions multi-articles, quantités modifiables, rapprochement de plusieurs commandes et statut de réception synchronisé. RPC `enregistrer_reception_lot(uuid,jsonb,jsonb,text)` présente.
+- **Migration 99 — `20260717000099_signature_employe.sql` : appliquée et vérifiée.** Signature PNG privée et date serveur sur la fiche salarié ; colonne `employes.signature_storage_path` présente.
+- **Migration 102 — `20260718000102_signatures_documents_metier.sql` : appliquée et vérifiée.** Signature en nom propre des devis, factures, commandes, interventions et bons de livraison. Copie immuable, empreintes SHA-256, horodatage serveur et audit. Rendu inclus dans les impressions/PDF disponibles. Ne pas annoncer une signature qualifiée eIDAS.
+- **Migration 103 — `20260718000103_sorties_lot_destinations.sql` : appliquée et vérifiée.** Le scanner multi-articles sait sortir un lot vers un chantier, un véhicule ou un outil et refuse les destinations indisponibles.
+- Vérification SQL directe : `signatures_documents = true`, `sortie_lot_v2 = true`, `migration_98_reception_lot = true`, `migration_99_signature_employe = true`.
+- Contrôles du lot : **69 tests**, ESLint sans erreur, TypeScript et build Next webpack **88 routes** verts. Seul l'avertissement historique `unpdf/import.meta` demeure non bloquant.
+- Le code Stripe Billing (migration 100) est terminé. Audit Vercel Production du 18 juillet : `STRIPE_SECRET_KEY` et `NEXT_PUBLIC_APP_URL` sont présents ; `STRIPE_WEBHOOK_ABONNEMENT_SECRET`, `CRON_SECRET` et les 12 variables de prix abonnement/compte supplémentaire sont encore absents. Les réglages restants sont donc externes et confidentiels : entité légale, compte Stripe activé, création des prix, nouvel endpoint webhook et secrets. Ne jamais mélanger ce flux d'abonnement SaaS avec Stripe Connect.
+
+## REPRISE PRIORITAIRE — 17 juillet 2026, listes chantier filtrantes et relances corrigées
 
 - Base contrôlée : LIRIA CONCEPT = 10 chantiers accessibles, Entreprise Test = 30. Aucune perte de données.
 - `SearchableSelect` remplace les longues listes chantier dans commandes, notes de frais, planning, pointage et régularisation de pointage ; la recherche se réduit à chaque saisie et ignore les accents.
@@ -62,8 +74,6 @@
 - Publication terminée ; ne plus rejouer le script de nettoyage sauf restauration volontaire des entreprises de test.
 
 ---
-
-# Relais Claude Code — Liria Gestion Pro
 
 ## REPRISE PRIORITAIRE — 16 juillet 2026, pointage administrateur et démonstration 18 mois (MIGRATION 85 APPLIQUÉE)
 

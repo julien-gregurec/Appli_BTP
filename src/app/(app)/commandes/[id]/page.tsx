@@ -7,6 +7,7 @@ import { StatutCommandeSelect } from "@/components/StatutCommandeSelect";
 import { enregistrerReceptionCommandeAction, supprimerCommandeAction } from "@/app/actions/commandes";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { EmailDocumentButton } from "@/components/EmailDocumentButton";
+import { SignatureDocumentMetier } from "@/components/SignatureDocumentMetier";
 import { contenuEmailCommande } from "@/lib/email";
 import { ReceptionCommandeForm } from "@/components/ReceptionCommandeForm";
 
@@ -139,6 +140,8 @@ export default async function CommandeDetailPage({
             <p className="mt-1 whitespace-pre-wrap">{commande.notes}</p>
           </div>
         )}
+
+        <SignatureDocumentMetier type="commande" documentId={id} />
 
         {peutSupprimer && (
           <div className="border-t border-neutral-100 pt-4 dark:border-neutral-800">

@@ -44,6 +44,15 @@ export type LigneImprimable = {
   taux_tva: number;
 };
 
+export type SignatureImprimable = {
+  id: string;
+  employe_id: string;
+  nom_signataire: string;
+  fonction_signataire: string | null;
+  signed_at: string;
+  document_sha256: string;
+};
+
 // Document A4 imprimable partagé devis / facture. Styles inline pour un rendu fiable à l'impression.
 export function DocumentImprimable({
   typeDoc,
@@ -58,6 +67,7 @@ export function DocumentImprimable({
   montantTtc,
   notesClient,
   estFacture,
+  signatures = [],
 }: {
   typeDoc: string;
   numero: string;
@@ -71,6 +81,7 @@ export function DocumentImprimable({
   montantTtc: number;
   notesClient?: string | null;
   estFacture: boolean;
+  signatures?: SignatureImprimable[];
 }) {
   const polices={arial:"Arial, Helvetica, sans-serif",georgia:"Georgia, 'Times New Roman', serif",trebuchet:"'Trebuchet MS', Arial, sans-serif",verdana:"Verdana, Geneva, sans-serif"};
   const police=polices[entreprise.police_documents??"arial"]??polices.arial;
@@ -194,6 +205,24 @@ export function DocumentImprimable({
         <div style={{ marginTop: "24px", padding: "12px", background: "#f9f9f9", borderRadius: "4px" }}>
           <div style={{ fontSize: "10px", textTransform: "uppercase", color: "#888" }}>Notes</div>
           <div style={{ whiteSpace: "pre-wrap" }}>{notesClient}</div>
+        </div>
+      )}
+
+      {signatures.length > 0 && (
+        <div style={{ marginTop: "24px", breakInside: "avoid" }}>
+          <div style={{ marginBottom: "8px", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em", color: "#777" }}>Signatures internes traçables</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
+            {signatures.map((signature) => (
+              <div key={signature.id} style={{ minWidth: "190px", padding: "10px", border: "1px solid #ddd", borderRadius: "4px" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`/api/employes/${signature.employe_id}/signature?document=${signature.id}`} alt={`Signature de ${signature.nom_signataire}`} style={{ width: "150px", height: "55px", objectFit: "contain" }} />
+                <div style={{ fontWeight: 600 }}>{signature.nom_signataire}</div>
+                <div style={{ color: "#666", fontSize: "9px" }}>{signature.fonction_signataire || "Fonction non renseignée"} · {new Date(signature.signed_at).toLocaleString("fr-FR")}</div>
+                <div style={{ color: "#999", fontFamily: "monospace", fontSize: "8px" }}>Empreinte {signature.document_sha256.slice(0, 16)}…</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: "5px", color: "#888", fontSize: "8px" }}>Signature interne avec date serveur et empreinte SHA-256 — ne constitue pas une signature électronique qualifiée eIDAS.</div>
         </div>
       )}
 

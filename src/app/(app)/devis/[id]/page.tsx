@@ -12,6 +12,7 @@ import { contenuEmailDocument } from "@/lib/email";
 import { EmailDocumentButton } from "@/components/EmailDocumentButton";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { SearchableSelect } from "@/components/SearchableSelect";
+import { SignatureDocumentMetier } from "@/components/SignatureDocumentMetier";
 
 export default async function DevisDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; success?: string }> }) {
   const { id } = await params;
@@ -159,6 +160,8 @@ export default async function DevisDetailPage({ params, searchParams }: { params
             <p className="mt-1 whitespace-pre-wrap">{devis.notes_client}</p>
           </div>
         )}
+
+        <SignatureDocumentMetier type="devis" documentId={id} />
 
         <div className="flex items-center justify-between border-t border-neutral-100 pt-4 dark:border-neutral-800">
           {devis.statut === "accepte" ? (

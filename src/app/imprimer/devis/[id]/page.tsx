@@ -18,11 +18,11 @@ export default async function ImprimerDevisPage({ params }: { params: Promise<{ 
 
   if (!devis) notFound();
 
-  const { data: lignes } = await supabase
-    .from("lignes_devis").select("*").eq("devis_id", id).order("ordre");
-
-  const { data: entreprise } = await supabase
-    .from("entreprises").select("*").eq("id", ctx.entrepriseId).single();
+  const [{ data: lignes }, { data: entreprise }, { data: signatures }] = await Promise.all([
+    supabase.from("lignes_devis").select("*").eq("devis_id", id).order("ordre"),
+    supabase.from("entreprises").select("*").eq("id", ctx.entrepriseId).single(),
+    supabase.from("signatures_documents").select("id,employe_id,nom_signataire,fonction_signataire,signed_at,document_sha256").eq("entreprise_id", ctx.entrepriseId).eq("type_document", "devis").eq("document_id", id).order("signed_at"),
+  ]);
 
   const client = Array.isArray(devis.client) ? devis.client[0] : devis.client;
 
@@ -56,6 +56,7 @@ export default async function ImprimerDevisPage({ params }: { params: Promise<{ 
         montantTtc={devis.montant_ttc}
         notesClient={devis.notes_client}
         estFacture={false}
+        signatures={signatures ?? []}
       />
     </>
   );
