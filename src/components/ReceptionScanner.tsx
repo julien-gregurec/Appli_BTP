@@ -18,19 +18,22 @@ const norm = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCa
 const tokens = (s: string) => norm(s).split(/[^a-z0-9]+/).filter((t) => t.length >= 4);
 
 export function ReceptionScanner({
-  articles, lignesOuvertes, chantiers, vehicules, outils,
+  articles, lignesOuvertes, chantiers, vehicules, outils, identificationPersonnelle = false,
 }: {
   articles: Article[];
   lignesOuvertes: LigneOuverte[];
   chantiers: { id: string; nom: string }[];
   vehicules: { id: string; immatriculation: string; marque: string; modele: string | null }[];
   outils: { id: string; reference: string; designation: string }[];
+  identificationPersonnelle?: boolean;
 }) {
   const [mode, setMode] = useState<"reception" | "sortie">("reception");
   const [panier, setPanier] = useState<PanierLigne[]>([]);
   const [code, setCode] = useState("");
   const [typeDestination, setTypeDestination] = useState<TypeDestinationSortie>("chantier");
   const [destinationId, setDestinationId] = useState("");
+  const [identifiantEmploye, setIdentifiantEmploye] = useState("");
+  const [motDePasseStock, setMotDePasseStock] = useState("");
   const [message, setMessage] = useState<{ type: "ok" | "err"; texte: string } | null>(null);
   const [enCours, demarrer] = useTransition();
   const champ = useRef<HTMLInputElement>(null);
@@ -97,12 +100,19 @@ export function ReceptionScanner({
   const valider = () => {
     const lignes = panier.filter((l) => l.quantite > 0).map((l) => ({ article_id: l.article.id, quantite: l.quantite }));
     if (!lignes.length) { setMessage({ type: "err", texte: "Le panier est vide." }); return; }
+    if (identificationPersonnelle && (!identifiantEmploye.trim() || !motDePasseStock)) {
+      setMessage({ type: "err", texte: "Identifiez le salarié qui réalise le mouvement." });
+      return;
+    }
+    const identite = identificationPersonnelle
+      ? { identifiantEmploye: identifiantEmploye.trim(), motDePasseStock }
+      : null;
     demarrer(async () => {
       if (mode === "reception") {
         const attributions = panier
           .filter((l) => l.rattacherLigneId && l.quantiteRattachee > 0)
           .map((l) => ({ ligne_commande_id: l.rattacherLigneId!, quantite: l.quantiteRattachee }));
-        const r = await receptionLotAction(lignes, attributions, null);
+        const r = await receptionLotAction(lignes, attributions, null, identite);
         if (!r.ok) { setMessage({ type: "err", texte: r.erreur ?? "Échec." }); return; }
         const maj = (r.commandes ?? []).length;
         setMessage({ type: "ok", texte: `${r.entrees} entrée(s) enregistrée(s)${maj ? ` · ${maj} commande(s) mise(s) à jour` : ""}.` });
@@ -111,11 +121,12 @@ export function ReceptionScanner({
           setMessage({ type: "err", texte: "Choisissez la destination de la sortie." });
           return;
         }
-        const r = await sortieLotAction(lignes, typeDestination, destinationId || null, null);
+        const r = await sortieLotAction(lignes, typeDestination, destinationId || null, null, identite);
         if (!r.ok) { setMessage({ type: "err", texte: r.erreur ?? "Échec." }); return; }
         setMessage({ type: "ok", texte: `${r.sorties} sortie(s) enregistrée(s).` });
       }
       setPanier([]);
+      setMotDePasseStock("");
     });
   };
 
@@ -123,6 +134,22 @@ export function ReceptionScanner({
 
   return (
     <div className="space-y-4">
+      {identificationPersonnelle && (
+        <section className="rounded-lg bg-[#0d1b2a] p-4 text-white">
+          <h2 className="font-semibold">Identification personnelle obligatoire</h2>
+          <p className="mt-1 text-sm text-white/70">
+            Chaque réception ou sortie est enregistrée au nom du salarié identifié, jamais au nom du compte dépôt partagé.
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <input value={identifiantEmploye} onChange={(e) => setIdentifiantEmploye(e.target.value.toUpperCase())}
+              autoComplete="off" autoCapitalize="characters" placeholder="Identifiant salarié"
+              className="rounded-md border border-white/30 bg-white px-3 py-2 text-sm uppercase text-neutral-950" />
+            <input value={motDePasseStock} onChange={(e) => setMotDePasseStock(e.target.value)}
+              type="password" minLength={8} maxLength={72} autoComplete="off" placeholder="Mot de passe stock personnel"
+              className="rounded-md border border-white/30 bg-white px-3 py-2 text-sm text-neutral-950" />
+          </div>
+        </section>
+      )}
       <div className="inline-flex rounded-lg border border-neutral-200 p-1 dark:border-neutral-800">
         {(["reception", "sortie"] as const).map((m) => (
           <button key={m} onClick={() => { setMode(m); setPanier([]); setMessage(null); }}

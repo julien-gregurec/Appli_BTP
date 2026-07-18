@@ -9,7 +9,8 @@ export default async function ReceptionPage() {
   const ctx = await getContexteEntreprise();
   const permissions = await permissionsUtilisateur(ctx);
   const peut = (cle: string) => permissions === null || permissions.includes(cle);
-  if (!peut("effectuer_entree_stock") && !peut("effectuer_sortie_stock")) notFound();
+  const compteDepot = peut("mode_compte_depot");
+  if (!compteDepot && !peut("effectuer_entree_stock") && !peut("effectuer_sortie_stock")) notFound();
 
   const supabase = await createClient();
   const [{ data: articles }, { data: lignesOuvertes }, { data: chantiers }, { data: vehicules }, { data: outils }] = await Promise.all([
@@ -41,6 +42,7 @@ export default async function ReceptionPage() {
           chantiers={chantiers ?? []}
           vehicules={vehicules ?? []}
           outils={outils ?? []}
+          identificationPersonnelle={compteDepot}
         />
       </div>
     </main>

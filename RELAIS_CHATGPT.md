@@ -1,5 +1,13 @@
 # REPRISE — 17 juillet 2026, facturation des comptes utilisant plus de deux appareils (MIGRATION 90 APPLIQUÉE)
 
+## 18 juillet 2026 — Réception groupée sécurisée sur le compte dépôt (MIGRATION 112 APPLIQUÉE)
+
+- Le contrôle mobile a révélé que le bouton « Réception / sortie par scan » du stock menait vers une page 404 lorsque le compte partagé « Compte dépôt » était connecté.
+- La page est désormais accessible au compte dépôt, mais aucun mouvement n'est attribué au compte partagé : l'identifiant salarié et le mot de passe stock personnel sont obligatoires avant de valider un lot.
+- La migration `20260718000112_reception_lot_securisee_compte_depot.sql` est appliquée dans Supabase. Elle vérifie côté base l'identité du salarié, son statut, le mot de passe chiffré, le droit d'entrée ou de sortie de son poste et la limite de tentatives.
+- Les réceptions groupées conservent le rapprochement avec plusieurs commandes fournisseurs ; les sorties groupées conservent les destinations chantier, véhicule, outillage ou frais généraux. Chaque mouvement enregistre le salarié, l'utilisateur du terminal et le passage par la borne.
+- Contrôles : **80 tests**, ESLint sans erreur, TypeScript et build Next webpack **96 pages** verts. Seul l'avertissement historique `unpdf/import.meta` demeure non bloquant.
+
 ## 18 juillet 2026 — Coût client et avertissement appareils dans Abonnement
 
 - Le message de facturation des appareils supplémentaires a été supprimé du tableau de bord.
