@@ -767,3 +767,15 @@ Un lot **« Mon espace »** a été commencé après le commit `1beee4b`, mais i
 - Contrôles verts : tests ciblés, TypeScript, ESLint, build Next webpack 88 pages et migration contrôlée en production Supabase.
 
 ---
+# REPRISE — 18 juillet 2026, trombinoscope employés par métier
+
+- `/employes` utilise désormais des cartes avec grande photo au lieu du tableau dense, sur ordinateur comme sur mobile.
+- Regroupement automatique : équipe terrain, encadrement, administration et support, avec un code couleur propre à chaque famille.
+- Toutes les protections précédentes sont conservées : le coût horaire reste conditionné à `voir_indicateurs_financiers` et le détail des autorisations à `gerer_employes`.
+- Une carte sans photo affiche les initiales ; chaque carte donne accès à la fiche complète, au statut du compte et aux droits.
+- Aucun changement de base de données ni migration nécessaire.
+- TypeScript, ESLint, `git diff --check` et build Next webpack 88 pages validés.
+
+---
+
+---

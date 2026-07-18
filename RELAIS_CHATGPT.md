@@ -888,3 +888,12 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Sur chaque vraie échéance Stripe, un invoice item séparé et idempotent est créé si le quota est dépassé. Le relevé conserve usage, quota, dépassement, tarif, période, montant et identifiant Stripe. La facture initiale à 0 € de l’essai est explicitement ignorée pour ne provoquer aucun débit anticipé.
 - Les abonnements annuels appliquent douze mois de stockage sur leur échéance annuelle ; les abonnements mensuels appliquent un mois.
 - Contrôles verts : tests ciblés stockage/Stripe, TypeScript, ESLint, `git diff --check` et build Next webpack complet de 88 pages. Avertissement historique `unpdf/import.meta` toujours non bloquant.
+
+## 105. Trombinoscope des employés par métier — 18 juillet 2026
+
+- La liste dense des employés est remplacée par un trombinoscope responsive inspiré d’un tableau des métiers : grande photo, nom, fonction, identifiant et code couleur immédiatement lisibles.
+- Les salariés sont regroupés automatiquement en trois familles selon leur fonction : équipe terrain, encadrement, administration et support. Les accents sont normalisés uniquement pour le classement ; les libellés affichés restent inchangés.
+- Chaque carte conserve les informations métier et de sécurité existantes : statut salarié, contrat, ancienneté, état du compte, poste d’accès, autorisations et coût horaire uniquement pour les personnes habilitées.
+- Sans photo, la carte affiche un emplacement propre avec les initiales et l’indication « Photo à ajouter ».
+- La grille passe automatiquement de une à quatre colonnes selon la taille de l’écran et chaque carte ouvre la fiche complète de l’employé.
+- Contrôles verts : TypeScript, ESLint, `git diff --check` et build Next webpack complet de 88 pages. Les avertissements historiques hors lot restent non bloquants.
