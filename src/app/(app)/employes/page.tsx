@@ -221,15 +221,16 @@ export default async function EmployesPage() {
                     return (
                       <article
                         key={employe.id}
-                        className="group overflow-hidden rounded-[1.35rem] border border-neutral-200 bg-white shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-xl dark:border-neutral-800 dark:bg-neutral-950"
+                        className="group min-w-0 overflow-hidden rounded-[1.35rem] border border-neutral-200 bg-white shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-xl dark:border-neutral-800 dark:bg-neutral-950"
                       >
                         <div className={`bg-gradient-to-r px-4 py-3 text-white ${configuration.bandeau}`}>
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <Link href={`/employes/${employe.id}`} className="block truncate text-lg font-bold leading-tight hover:underline">
-                                {nomEmploye(employe)}
+                              <Link href={`/employes/${employe.id}`} className="block leading-tight hover:underline">
+                                <span className="block text-lg font-bold">{employe.prenom}</span>
+                                <span className="mt-0.5 block break-words text-[11px] font-semibold uppercase tracking-wider text-white/85">{employe.nom}</span>
                               </Link>
-                              <p className="mt-1 min-h-8 text-xs font-medium leading-4 text-white/90">
+                              <p className="mt-1.5 min-h-4 text-xs font-medium leading-4 text-white/90">
                                 {employe.poste ?? employe.posteAcces ?? "Fonction à renseigner"}
                               </p>
                             </div>
