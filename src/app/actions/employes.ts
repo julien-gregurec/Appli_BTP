@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur } from "@/lib/permissions";
+import { reconcilierAbonnementStripe } from "@/lib/stripe-abonnement";
 
 function champ(formData: FormData, nom: string): string | null {
   const v = String(formData.get(nom) ?? "").trim();
@@ -122,7 +123,7 @@ export async function changerStatutEmployeAction(employeId: string, statut: stri
   }
 }
 
-export async function changerStatutCompteApplicationAction(employeId:string,statut:string){const ctx=await getContexteEntreprise();await exigerGestionEmployes(ctx,`/employes/${employeId}`);const supabase=await createClient();const{error}=await supabase.rpc("changer_statut_compte_application",{p_entreprise_id:ctx.entrepriseId,p_employe_id:employeId,p_statut:statut});if(error)redirect(`/employes/${employeId}?error=${encodeURIComponent(error.message)}`);revalidatePath("/employes");revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent(statut==="pause"?"Compte mis en pause — il reste facturable pour le mois":"Statut du compte mis à jour")}`);}
+export async function changerStatutCompteApplicationAction(employeId:string,statut:string){const ctx=await getContexteEntreprise();await exigerGestionEmployes(ctx,`/employes/${employeId}`);const supabase=await createClient();const{error}=await supabase.rpc("changer_statut_compte_application",{p_entreprise_id:ctx.entrepriseId,p_employe_id:employeId,p_statut:statut});if(error)redirect(`/employes/${employeId}?error=${encodeURIComponent(error.message)}`);await reconcilierAbonnementStripe(ctx.entrepriseId).catch(()=>undefined);revalidatePath("/employes");revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent(statut==="pause"?"Compte mis en pause — il reste facturable pour le mois":"Statut du compte mis à jour")}`);}
 
 export async function reinitialiserMotDePasseStockEmployeAction(employeId: string) {
   const ctx = await getContexteEntreprise();

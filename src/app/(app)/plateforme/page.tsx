@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
-import { estPlateformeAdmin, statutAbonnement, prixAbonnementMensuel, offreParCle, type EntrepriseAbonnement } from "@/lib/plateforme";
+import { estPlateformeAdmin, statutAbonnement, prixAbonnementMensuel, offreParCle, REDUCTION_ANNUELLE, type EntrepriseAbonnement } from "@/lib/plateforme";
 import { ajouterAdminPlateformeAction, creerEntreprisePlateformeAction, entrerEntreprisePlateformeAction, enregistrerReglementPlateformeAction, genererSnapshotFacturationAction, modifierAbonnementAction, modifierTarifPostePlateformeAction, retirerAdminPlateformeAction, signalerImpayePlateformeAction } from "@/app/actions/plateforme";
 import { AbonnementCountdown } from "@/components/AbonnementCountdown";
 
@@ -68,6 +68,13 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
   const parStatut = (cle: string) => entreprises.filter((e) => e.abonnement_statut === cle).length;
   const impayes = entreprises.filter((e) => Boolean(e.suspension_prevue_at)).length;
   const alertesAppareils=[...appareilsParEntreprise.values()].reduce((total,usage)=>total+usage.nb_comptes_plus_de_deux,0);
+  const revenuMensuelRecurrent = entreprises.filter((e)=>e.abonnement_statut==="actif").reduce((total,e)=>{
+    const comptes=e.nb_comptes_facturables??e.nb_comptes_actives??e.nb_membres_actifs;
+    const offre=offreParCle(e.abonnement_offre??e.offre_recommandee??"essentiel");
+    const appareils=appareilsParEntreprise.get(e.id)?.montant_depassements_ht??0;
+    const mensuel=prixAbonnementMensuel(comptes,offre,appareils).total;
+    return total+mensuel*(e.abonnement_periodicite==="annuel"?1-REDUCTION_ANNUELLE:1);
+  },0);
 
   return (
     <main className="p-8">
@@ -89,7 +96,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
         {msg.error && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{msg.error}</p>}
         {msg.succes && <p className="rounded bg-green-50 p-3 text-sm text-green-700">{msg.succes}</p>}
 
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
           {[
             { label: "Entreprises", valeur: entreprises.length },
             { label: "Actives", valeur: parStatut("actif") },
@@ -97,6 +104,8 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
             { label: "Suspendues", valeur: parStatut("suspendu") },
             { label: "Impayés à suivre", valeur: impayes },
             { label: "Alertes appareils", valeur: alertesAppareils },
+            { label: "MRR HT", valeur: `${revenuMensuelRecurrent.toLocaleString("fr-FR",{maximumFractionDigits:0})} €` },
+            { label: "ARR HT", valeur: `${(revenuMensuelRecurrent*12).toLocaleString("fr-FR",{maximumFractionDigits:0})} €` },
           ].map((s) => (
             <div key={s.label} className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
               <div className="text-xs uppercase text-neutral-500">{s.label}</div>
@@ -145,7 +154,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
             const st = statutAbonnement(e.abonnement_statut);
             const action = modifierAbonnementAction.bind(null, e.id);
             const comptesFacturables = e.nb_comptes_facturables ?? e.nb_comptes_actives ?? e.nb_membres_actifs;
-            const offre = offreParCle(e.offre_recommandee ?? "essentiel");
+            const offre = offreParCle(e.abonnement_offre ?? e.offre_recommandee ?? "essentiel");
             const usageAppareils=appareilsParEntreprise.get(e.id)??{nb_appareils_actifs:0,nb_comptes_plus_de_deux:0,maximum_appareils_compte:0,montant_depassements_ht:0};
             const prix = prixAbonnementMensuel(comptesFacturables, offre, usageAppareils.montant_depassements_ht);
             return (
@@ -180,6 +189,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                     <p className="mt-2 text-xs text-neutral-500">Options utilisées : {e.options_actives?.length ? e.options_actives.join(", ") : "aucune"}{e.derniere_connexion ? ` · dernière connexion ${new Date(e.derniere_connexion).toLocaleString("fr-FR")}` : ""}</p>
                     <div className={`mt-2 rounded-md border p-3 text-sm ${usageAppareils.nb_comptes_plus_de_deux>0?"border-red-300 bg-red-50 text-red-900":"border-green-200 bg-green-50 text-green-900"}`}><strong>{usageAppareils.nb_appareils_actifs} appareil(s) actif(s)</strong><span className="ml-2 text-xs">2 appareils inclus par compte</span>{usageAppareils.nb_comptes_plus_de_deux>0&&<p className="mt-1 font-semibold">⚠ {usageAppareils.nb_comptes_plus_de_deux} compte(s) dépassent la limite · {usageAppareils.montant_depassements_ht.toLocaleString("fr-FR",{style:"currency",currency:"EUR"})} HT/mois ajouté(s) au tarif de leur poste · maximum observé : {usageAppareils.maximum_appareils_compte}</p>}</div>
                     <p className="mt-2 text-sm font-semibold">Prix automatique mensuel : {prix.total.toLocaleString("fr-FR",{style:"currency",currency:"EUR"})} HT</p>
+                    {e.stripe_subscription_id&&<div className="mt-2 flex flex-wrap items-center gap-2 text-xs"><span className="rounded bg-green-50 px-2 py-1 font-medium text-green-800">Stripe Billing relié · {e.abonnement_periodicite??"périodicité inconnue"}</span>{e.derniere_facture_url&&<Link href={e.derniere_facture_url} target="_blank" rel="noreferrer" className="underline">Dernière facture ({e.derniere_facture_statut??"statut inconnu"})</Link>}{e.abonnement_essai_fin&&<span>fin d’essai {new Date(e.abonnement_essai_fin).toLocaleDateString("fr-FR")}</span>}</div>}
                     <details className="mt-3 rounded border bg-neutral-50 p-3 dark:bg-neutral-900"><summary className="cursor-pointer text-sm font-semibold">Tarifs par poste</summary><div className="mt-3 space-y-2">{tarifsPostes.filter((poste) => poste.entreprise_id === e.id).map((poste) => <form key={poste.poste_id} action={modifierTarifPostePlateformeAction.bind(null, poste.poste_id)} className="grid items-end gap-2 text-sm sm:grid-cols-[1fr_130px_130px_auto]"><div><strong>{poste.nom}</strong><p className="text-xs text-neutral-500">{poste.nb_comptes_facturables} compte(s) facturable(s)</p></div><label className="text-xs text-neutral-500">Offre<input name="code_offre" defaultValue={poste.code_offre} className={`${input} mt-1 w-full`}/></label><label className="text-xs text-neutral-500">€/compte/mois<input name="tarif" type="number" min="0" step="0.01" defaultValue={poste.tarif_compte_mensuel} className={`${input} mt-1 w-full`}/></label><button className="rounded border px-3 py-2">Enregistrer</button></form>)}</div></details>
                   </div>
                 </div>

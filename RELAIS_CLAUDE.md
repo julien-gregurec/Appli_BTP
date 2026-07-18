@@ -744,3 +744,16 @@ Un lot **« Mon espace »** a été commencé après le commit `1beee4b`, mais i
 - Aucune migration Supabase supplémentaire n’est nécessaire pour ce correctif.
 
 ---
+# REPRISE — 18 juillet 2026, abonnements SaaS Stripe Billing (MIGRATION 100 APPLIQUÉE)
+
+- Flux **Liria → entreprises clientes** isolé du Stripe Connect entreprise → client : bibliothèque, Checkout, portail et webhook dédiés, sans en-tête `Stripe-Account`.
+- Souscription par carte obligatoire avec essai 30 jours, offres Essentiel/Pro/Premium, périodicité mensuelle/annuelle et réduction annuelle de 20 %.
+- Webhook abonnement signé et idempotent : Checkout, abonnements, création/paiement/échec de facture, journal d’audit et refus explicite des événements Connect.
+- Statuts `essai`, `actif`, `suspendu`, `annule`, dates d’échéance et de résiliation synchronisés automatiquement. Un administrateur suspendu conserve uniquement l’accès au portail Stripe pour régulariser.
+- Part variable intégrée : comptes supplémentaires par quantité Stripe et dépassements d’appareils par ligne de facture. Un cron Vercel nocturne rattrape les écarts.
+- Écrans : `/abonnement`, retours de paiement abonnement, plateforme propriétaire enrichie avec MRR/ARR et dernière facture.
+- Migration `20260718000100_abonnement_stripe_billing.sql` **appliquée et vérifiée** dans Supabase (`true / true / true`).
+- Contrôles verts : **63 tests**, TypeScript, ESLint et build Next webpack complet de **88 pages**. Avertissements historiques non bloquants et hors lot.
+- Avant encaissement réel, Julien doit terminer les réglages externes Stripe/Vercel listés dans `RELAIS_CODEX_ABONNEMENT.md` : entité légale, produits/prix, portail, relances, webhook, variables et `CRON_SECRET`.
+
+---

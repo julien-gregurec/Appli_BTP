@@ -11,6 +11,8 @@ export type ContexteEntreprise = {
   entrepriseReference: string | null;
   logoUrl: string | null;
   abonnementStatut: string;
+  abonnementEcheance: string | null;
+  abonnementEssaiFin: string | null;
   suspensionPrevueAt: string | null;
   impayeMessage: string | null;
   accesSupportPlateforme: boolean;
@@ -30,6 +32,8 @@ type ContexteAbonnementCourant = {
   reference_interne: string | null;
   logo_url: string | null;
   abonnement_statut: string;
+  abonnement_echeance: string | null;
+  abonnement_essai_fin: string | null;
   suspension_prevue_at: string | null;
   impaye_message: string | null;
   acces_support: boolean;
@@ -59,6 +63,8 @@ async function getContexteEntrepriseSansConnexion(): Promise<ContexteEntreprise>
     entrepriseReference: contexte.entreprise_reference ?? null,
     logoUrl: entreprise?.logo_url ?? null,
     abonnementStatut: "actif",
+    abonnementEcheance: null,
+    abonnementEssaiFin: null,
     suspensionPrevueAt: null,
     impayeMessage: null,
     accesSupportPlateforme: false,
@@ -102,8 +108,9 @@ export const getContexteEntreprise = cache(async function getContexteEntreprise(
   const abonnement = abonnementData as ContexteAbonnementCourant | null;
   if (!abonnement?.entreprise_id) redirect("/onboarding");
   const suspensionAt = abonnement.suspension_prevue_at ? new Date(abonnement.suspension_prevue_at).getTime() : null;
+  const essaiFin = abonnement.abonnement_essai_fin ? new Date(`${abonnement.abonnement_essai_fin}T23:59:59.999Z`).getTime() : null;
   const accesSupport = abonnement.acces_support === true;
-  if (!accesSupport && (["suspendu", "annule"].includes(abonnement.abonnement_statut) || (suspensionAt !== null && suspensionAt <= Date.now()))) {
+  if (!accesSupport && (["suspendu", "annule"].includes(abonnement.abonnement_statut) || (suspensionAt !== null && suspensionAt <= Date.now()) || (abonnement.abonnement_statut === "essai" && essaiFin !== null && essaiFin < Date.now()))) {
     redirect("/abonnement-suspendu");
   }
 
@@ -127,6 +134,8 @@ export const getContexteEntreprise = cache(async function getContexteEntreprise(
     entrepriseReference: abonnement.reference_interne ?? null,
     logoUrl: abonnement.logo_url ?? null,
     abonnementStatut: abonnement.abonnement_statut,
+    abonnementEcheance: abonnement.abonnement_echeance ?? null,
+    abonnementEssaiFin: abonnement.abonnement_essai_fin ?? null,
     suspensionPrevueAt: abonnement.suspension_prevue_at ?? null,
     impayeMessage: abonnement.impaye_message ?? null,
     accesSupportPlateforme: accesSupport,

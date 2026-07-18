@@ -866,3 +866,15 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Le serveur vérifie le type du QR, l’entreprise propriétaire, la disponibilité du véhicule ou de l’outil et l’unicité de la destination. Un QR véhicule ne peut donc pas être enregistré comme article ou chantier.
 - La migration `20260717000097_scanner_universel_destinations_stock.sql` est appliquée dans Supabase. Contrôle direct réussi : fonction `enregistrer_mouvement_stock_borne_v4`, colonnes `vehicule_id` et `outil_id` présentes.
 - Contrôles verts : 50 tests Vitest, TypeScript, ESLint, `git diff --check` et build Next webpack complet de 81 pages. Seul l’avertissement historique `unpdf/import.meta` demeure non bloquant.
+
+## 103. Abonnements SaaS Stripe Billing automatisés — 18 juillet 2026
+
+- Le paiement des abonnements **Liria → entreprises clientes** est totalement séparé du flux Stripe Connect utilisé par les entreprises pour encaisser leurs propres clients.
+- Parcours livré : choix Essentiel/Pro/Premium, mensuel ou annuel, carte enregistrée par Stripe, essai de 30 jours, prélèvement automatique, facture Stripe, portail client, résiliation et changement de carte.
+- Nouveau webhook signé `/api/stripe/abonnement/webhook` : événements plateforme uniquement, déduplication, statut synchronisé, dernière facture et suspension en cas d’impayé. Les événements Connect sont explicitement refusés sur ce point d’entrée.
+- Part variable prête : comptes supplémentaires synchronisés après changement de statut et par cron nocturne ; dépassement de deux appareils ajouté à la facture selon le tarif du poste.
+- Nouvel écran `/abonnement`, reprise depuis `/abonnement-suspendu`, indicateurs MRR/ARR et détails Stripe sur la plateforme propriétaire.
+- Migration `20260718000100_abonnement_stripe_billing.sql` appliquée dans Supabase et contrôlée : souscription, fonction de contexte et journal d’audit présents.
+- Contrôles : **63 tests**, TypeScript, ESLint, `git diff --check` et build Next webpack complet de **88 pages** verts. Deux avertissements historiques sans rapport restent non bloquants.
+- Réglages externes encore obligatoires avant encaissement : entité légale Stripe, produits/prix, portail et relances, webhook, variables Vercel et `CRON_SECRET`. Sans ces secrets, les boutons de souscription restent volontairement désactivés et les entreprises existantes ne sont pas bloquées.
+- Relais détaillé : `RELAIS_CODEX_ABONNEMENT.md`.

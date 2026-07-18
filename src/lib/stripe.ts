@@ -52,8 +52,8 @@ export function verifierEtatStripeOAuth(etat:string){const secret=process.env.ST
 export function creerUrlStripeOAuth(entrepriseId:string,userId:string){const clientId=process.env.STRIPE_CONNECT_CLIENT_ID,base=process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/,"");if(!clientId||!base)throw new Error("Stripe Connect OAuth n’est pas configuré");const url=new URL("https://connect.stripe.com/oauth/authorize");url.searchParams.set("response_type","code");url.searchParams.set("client_id",clientId);url.searchParams.set("scope","read_write");url.searchParams.set("redirect_uri",`${base}/api/stripe/oauth/callback`);url.searchParams.set("state",creerEtatStripeOAuth(entrepriseId,userId));return url.toString();}
 export async function echangerCodeStripeOAuth(code:string){const secret=process.env.STRIPE_SECRET_KEY;if(!secret)throw new Error("Stripe n’est pas configuré");const reponse=await fetch("https://connect.stripe.com/oauth/token",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({client_secret:secret,code,grant_type:"authorization_code"}),cache:"no-store"});const donnees=await reponse.json() as{stripe_user_id?:string;livemode?:boolean;error_description?:string};if(!reponse.ok||!donnees.stripe_user_id)throw new Error(donnees.error_description||"Connexion Stripe refusée");return donnees;}
 
-export function verifierSignatureStripe(payload: string, signature: string | null) {
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+export function verifierSignatureStripe(payload: string, signature: string | null, secretExplicite?: string) {
+  const secret = secretExplicite ?? process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret || !signature) return false;
   const morceaux = signature.split(",");
   const horodatage = morceaux.find(v => v.startsWith("t="))?.slice(2);

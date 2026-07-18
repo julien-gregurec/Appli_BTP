@@ -3,6 +3,7 @@ export const MODULE_PERMISSION_PAR_CHEMIN: [string,string][] = [
   ["/api/documents","acces_chantiers"],["/api/exports","acces_exports"],["/api/referentiels/vehicules","acces_flotte"],
   ["/imprimer/devis","acces_devis"],["/imprimer/factures","acces_factures"],["/imprimer/commandes","acces_achats"],
   ["/parametres/acces","gerer_utilisateurs"],["/parametres","acces_parametres"],
+  ["/abonnement","acces_parametres"],
   ["/clients","acces_clients"],["/chantiers","acces_chantiers"],
   ["/mes-travaux","voir_devis_chantier_sans_prix"],
   ["/prestations","acces_devis"],["/devis","acces_devis"],["/factures","acces_factures"],
@@ -22,6 +23,7 @@ export const MODULE_PERMISSION_PAR_CHEMIN: [string,string][] = [
 export const GESTION_PERMISSION_PAR_CHEMIN: [string,string][] = [
   ["/api/employes","gerer_employes"],
   ["/parametres/acces","gerer_utilisateurs"],["/parametres","gerer_parametres"],
+  ["/abonnement","gerer_parametres"],
   ["/clients","gerer_clients"],["/chantiers","gerer_chantiers"],
   ["/prestations","gerer_devis"],["/devis","gerer_devis"],["/factures","gerer_factures"],
   ["/facturation-avancee","gerer_facturation_avancee"],["/ouvrages","gerer_ouvrages"],

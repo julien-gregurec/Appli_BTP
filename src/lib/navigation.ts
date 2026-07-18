@@ -62,5 +62,6 @@ export const NAVIGATION_APPLICATION: NavigationApplication[] = [
   { href: "/exports", label: "Exports comptables", actif: true, permission: "acces_exports", groupe: "pilotage" },
   { href: "/paiements-bancaires", label: "Banque & paie", actif: true, permission: "acces_paiements_bancaires", groupe: "pilotage" },
   { href: "/connecteurs", label: "Connecteurs", actif: true, permission: "acces_connecteurs", groupe: "administration" },
+  { href: "/abonnement", label: "Abonnement", actif: true, permission: "acces_parametres", groupe: "administration" },
   { href: "/parametres", label: "Paramètres", actif: true, permission: "acces_parametres", groupe: "administration" },
 ];

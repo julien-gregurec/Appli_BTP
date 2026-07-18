@@ -33,6 +33,15 @@ export type EntrepriseAbonnement = {
   suspension_prevue_at?: string | null;
   impaye_message?: string | null;
   dernier_reglement_at?: string | null;
+  abonnement_offre?: string | null;
+  abonnement_periodicite?: string | null;
+  abonnement_essai_fin?: string | null;
+  abonnement_annulation_prevue_at?: string | null;
+  stripe_customer_id?: string | null;
+  stripe_subscription_id?: string | null;
+  derniere_facture_url?: string | null;
+  derniere_facture_pdf?: string | null;
+  derniere_facture_statut?: string | null;
   nb_membres: number;
   nb_membres_actifs: number;
   nb_fiches_employes?: number;
