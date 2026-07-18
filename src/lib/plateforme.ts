@@ -50,20 +50,31 @@ export type EntrepriseAbonnement = {
   created_at: string;
 };
 
-// Tarification simple : prix mensuel = abonnement de base (incluant N employés) + employés supplémentaires.
-// Barème par défaut, ajustable ici.
-export const TARIF_ABONNEMENT = { base: 49, employesInclus: 3, parEmployeSup: 12 };
+// Essai gratuit à l'inscription, et réduction du paiement annuel.
+export const DUREE_ESSAI_JOURS = 30;
+export const REDUCTION_ANNUELLE = 0.2; // -20 % en paiement annuel
 
-export function prixAbonnementMensuel(nbComptesFacturables: number, base: number = TARIF_ABONNEMENT.base, supplementAppareils: number = 0) {
-  const sup = Math.max(0, nbComptesFacturables - TARIF_ABONNEMENT.employesInclus);
-  const supplementAppareilsSecurise = Number.isFinite(supplementAppareils) ? Math.max(0, supplementAppareils) : 0;
+// Prix mensuel = base de l'offre (incluant N comptes) + comptes supplémentaires
+// au tarif de l'offre + éventuels dépassements d'appareils. Les montants sont
+// portés par chaque offre (voir OFFRES ci-dessous).
+export function prixAbonnementMensuel(
+  nbComptesFacturables: number,
+  offre: Offre = OFFRES[0],
+  supplementAppareils: number = 0,
+) {
+  const sup = Math.max(0, nbComptesFacturables - offre.comptesInclus);
+  const supAppareils = Number.isFinite(supplementAppareils) ? Math.max(0, supplementAppareils) : 0;
+  const total = offre.base + sup * offre.parCompteSup + supAppareils;
   return {
-    total: base + sup * TARIF_ABONNEMENT.parEmployeSup + supplementAppareilsSecurise,
-    base,
+    total,
+    base: offre.base,
+    employesInclus: offre.comptesInclus,
     employesSupplementaires: sup,
-    parEmployeSup: TARIF_ABONNEMENT.parEmployeSup,
-    employesInclus: TARIF_ABONNEMENT.employesInclus,
-    supplementAppareils: supplementAppareilsSecurise,
+    parEmployeSup: offre.parCompteSup,
+    supplementAppareils: supAppareils,
+    // Équivalent en paiement annuel (remise appliquée).
+    mensuelSiAnnuel: Math.round(total * (1 - REDUCTION_ANNUELLE)),
+    totalAnnuel: Math.round(total * 12 * (1 - REDUCTION_ANNUELLE)),
   };
 }
 
@@ -96,13 +107,22 @@ export const ATTENTES_OPTIONS = [
   { cle: "centraliser", libelle: "Tout centraliser au même endroit" },
 ] as const;
 
+// Grille tarifaire publique. `base` inclut `comptesInclus` comptes ; chaque
+// compte au-delà est facturé `parCompteSup`. Positionnement ERP BTP complet
+// (au-dessus des outils devis-factures simples). Ajuster ici après validation
+// auprès de prospects réels.
 export const OFFRES = [
-  { cle: "essentiel", palier: 1, nom: "Essentiel", base: 49, resume: "Devis, factures, clients & chantiers." },
-  { cle: "pro", palier: 2, nom: "Pro", base: 89, resume: "Essentiel + planning, pointage, stock, flotte & outillage." },
-  { cle: "premium", palier: 3, nom: "Premium", base: 149, resume: "Pro + notes de frais, portail client, exports comptables & QR codes." },
+  { cle: "essentiel", palier: 1, nom: "Essentiel", base: 59, comptesInclus: 2, parCompteSup: 15,
+    resume: "Devis, factures, clients & chantiers. Pour l'artisan seul ou une petite équipe." },
+  { cle: "pro", palier: 2, nom: "Pro", base: 129, comptesInclus: 5, parCompteSup: 15,
+    resume: "Essentiel + planning, pointage GPS, stock, flotte & outillage. Pour 3 à 15 salariés." },
+  { cle: "premium", palier: 3, nom: "Premium", base: 249, comptesInclus: 10, parCompteSup: 12,
+    resume: "Pro + notes de frais probantes, portail client, exports comptables & QR codes. Au-delà de 15 salariés." },
 ] as const;
 
-export function offreParCle(cle: string) {
+export type Offre = (typeof OFFRES)[number];
+
+export function offreParCle(cle: string): Offre {
   return OFFRES.find((o) => o.cle === cle) ?? OFFRES[0];
 }
 
@@ -110,6 +130,6 @@ export function recommanderOffre(besoins: string[], nbEmployes: number) {
   const paliers = besoins.map((b) => BESOINS_OPTIONS.find((o) => o.cle === b)?.palier ?? 1);
   const palierMax = paliers.length ? Math.max(...paliers) : 1;
   const offre = OFFRES.find((o) => o.palier === palierMax) ?? OFFRES[0];
-  const prix = prixAbonnementMensuel(Math.max(1, nbEmployes || 1), offre.base);
+  const prix = prixAbonnementMensuel(Math.max(1, nbEmployes || 1), offre);
   return { offre, prix };
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { enregistrerBesoinsAction } from "@/app/actions/besoins";
-import { ATTENTES_OPTIONS, BESOINS_OPTIONS, offreParCle, prixAbonnementMensuel } from "@/lib/plateforme";
+import { ATTENTES_OPTIONS, BESOINS_OPTIONS, DUREE_ESSAI_JOURS, offreParCle, prixAbonnementMensuel } from "@/lib/plateforme";
 
 export default async function BesoinsPage({
   searchParams,
@@ -13,7 +13,7 @@ export default async function BesoinsPage({
   if (recommande) {
     const offre = offreParCle(recommande);
     const nbEmployes = Math.max(1, Number(nb ?? "1") || 1);
-    const prix = prixAbonnementMensuel(nbEmployes, offre.base);
+    const prix = prixAbonnementMensuel(nbEmployes, offre);
     return (
       <main className="flex flex-1 items-center justify-center p-6">
         <div className="w-full max-w-md space-y-6">
@@ -25,11 +25,17 @@ export default async function BesoinsPage({
           <div className="rounded-xl border border-neutral-200 p-6 text-center dark:border-neutral-800">
             <div className="text-4xl font-bold">{prix.total} € <span className="text-base font-normal text-neutral-500">/ mois HT</span></div>
             <p className="mt-2 text-xs text-neutral-500">
-              Base {prix.base} € (jusqu&apos;à {prix.employesInclus} salariés)
-              {prix.employesSupplementaires > 0 && <> + {prix.employesSupplementaires} salarié(s) × {prix.parEmployeSup} €</>}
+              Base {prix.base} € (jusqu&apos;à {prix.employesInclus} comptes inclus)
+              {prix.employesSupplementaires > 0 && <> + {prix.employesSupplementaires} compte(s) × {prix.parEmployeSup} €</>}
               {" "}· pour {nbEmployes} salarié(s)
             </p>
-            <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+            <p className="mt-2 text-sm font-medium text-green-700 dark:text-green-400">
+              ou {prix.mensuelSiAnnuel} € / mois en paiement annuel <span className="text-xs font-normal">(−20 %)</span>
+            </p>
+            <p className="mt-3 rounded-md bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800 dark:bg-blue-950/30 dark:text-blue-200">
+              Essai gratuit {DUREE_ESSAI_JOURS} jours, sans engagement ni carte bancaire.
+            </p>
+            <p className="mt-2 text-xs text-neutral-500">
               Estimation indicative. La tarification définitive vous sera confirmée par LIRIA.
             </p>
           </div>

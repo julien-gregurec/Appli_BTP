@@ -147,7 +147,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
             const comptesFacturables = e.nb_comptes_facturables ?? e.nb_comptes_actives ?? e.nb_membres_actifs;
             const offre = offreParCle(e.offre_recommandee ?? "essentiel");
             const usageAppareils=appareilsParEntreprise.get(e.id)??{nb_appareils_actifs:0,nb_comptes_plus_de_deux:0,maximum_appareils_compte:0,montant_depassements_ht:0};
-            const prix = prixAbonnementMensuel(comptesFacturables, offre.base, usageAppareils.montant_depassements_ht);
+            const prix = prixAbonnementMensuel(comptesFacturables, offre, usageAppareils.montant_depassements_ht);
             return (
               <article key={e.id} className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
                 <div className="flex flex-wrap items-start justify-between gap-3">
