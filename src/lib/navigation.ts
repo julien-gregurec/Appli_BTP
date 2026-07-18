@@ -42,6 +42,7 @@ export const NAVIGATION_APPLICATION: NavigationApplication[] = [
   { href: "/mes-travaux", label: "Mes travaux", actif: true, permission: "voir_devis_chantier_sans_prix", groupe: "chantier" },
   { href: "/ouvrages", label: "Ouvrages & métrés", actif: true, permission: "acces_ouvrages", groupe: "chantier" },
   { href: "/interventions", label: "Interventions", actif: true, permission: "acces_interventions", groupe: "chantier" },
+  { href: "/sous-traitants", label: "Sous-traitants", actif: true, permission: "acces_sous_traitants", groupe: "chantier" },
   { href: "/planning", label: "Planning", actif: true, permission: "acces_planning", groupe: "equipe" },
   { href: "/pointage", label: "Pointage heures", actif: true, permission: "acces_pointage", groupe: "equipe" },
   { href: "/employes", label: "Employés", actif: true, permission: "acces_employes", groupe: "equipe" },

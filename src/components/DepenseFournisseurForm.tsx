@@ -23,6 +23,8 @@ export function DepenseFournisseurForm({
   outils,
   employes,
   chantierInitial = "",
+  fournisseurInitial = "",
+  categorieInitiale = "materiaux",
 }: {
   fournisseurs: Option[];
   chantiers: Option[];
@@ -31,14 +33,21 @@ export function DepenseFournisseurForm({
   outils: Outil[];
   employes: Employe[];
   chantierInitial?: string;
+  fournisseurInitial?: string;
+  categorieInitiale?: string;
 }) {
-  const [fournisseurId, setFournisseurId] = useState("");
+  const fournisseurInitialValide = fournisseurs.some((item) => item.id === fournisseurInitial) ? fournisseurInitial : "";
+  const categorieInitialeValide = Object.hasOwn(DEPENSE_CATEGORIES, categorieInitiale) ? categorieInitiale : "materiaux";
+  const dateAujourdhui = new Date().toISOString().slice(0, 10);
+  const delaiInitial = Number(fournisseurs.find((item) => item.id === fournisseurInitialValide)?.delai_paiement_jours ?? 30);
+  const [fournisseurId, setFournisseurId] = useState(fournisseurInitialValide);
   const [commandeId, setCommandeId] = useState("");
   const [htBrut, setHtBrut] = useState("");
   const [taux, setTaux] = useState(20);
-  const dateAujourdhui = new Date().toISOString().slice(0, 10);
   const [datePiece, setDatePiece] = useState(dateAujourdhui);
-  const [dateEcheance, setDateEcheance] = useState("");
+  const [dateEcheance, setDateEcheance] = useState(
+    fournisseurInitialValide ? calculerEcheanceFournisseur(dateAujourdhui, delaiInitial) : "",
+  );
 
   const commandesDisponibles = useMemo(
     () => commandes.filter((commande) => commande.fournisseur_id === fournisseurId),
@@ -78,7 +87,7 @@ export function DepenseFournisseurForm({
         {fournisseurs.map((item) => <option key={item.id} value={item.id}>{item.nom}</option>)}
       </select>
       <input name="numero_piece" required placeholder="N° facture fournisseur *" className={cls}/>
-      <select name="categorie" className={cls}>{Object.entries(DEPENSE_CATEGORIES).map(([valeur, libelle]) => <option key={valeur} value={valeur}>{libelle}</option>)}</select>
+      <select name="categorie" defaultValue={categorieInitialeValide} className={cls}>{Object.entries(DEPENSE_CATEGORIES).map(([valeur, libelle]) => <option key={valeur} value={valeur}>{libelle}</option>)}</select>
       <select name="chantier_id" defaultValue={chantierInitial} className={cls}><option value="">Sans chantier</option>{chantiers.map((item) => <option key={item.id} value={item.id}>{item.nom}</option>)}</select>
       <label className="text-xs text-neutral-500">Date de facture<input name="date_piece" type="date" required value={datePiece} onChange={(event) => actualiserDatePiece(event.target.value)} className={`mt-1 w-full ${cls}`}/></label>
       <label className="text-xs text-neutral-500">Échéance calculée<input name="date_echeance" type="date" value={dateEcheance} onChange={(event) => setDateEcheance(event.target.value)} className={`mt-1 w-full ${cls}`}/>{fournisseurId && <small className="mt-1 block">Délai fournisseur : {libelleDelaiPaiementFournisseur(delaiSelectionne)}</small>}</label>

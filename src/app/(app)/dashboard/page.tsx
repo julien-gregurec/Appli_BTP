@@ -48,6 +48,7 @@ export default async function DashboardPage() {
     { permission: "acces_facturation_avancee", href: "/facturation-avancee", label: "Situations", icon: "facturation" },
     { permission: "acces_ouvrages", href: "/ouvrages", label: "Ouvrages", icon: "ouvrages" },
     { permission: "acces_interventions", href: "/interventions", label: "Interventions", icon: "interventions" },
+    { permission: "acces_sous_traitants", href: "/sous-traitants", label: "Sous-traitants", icon: "sous_traitants" },
     { permission: "acces_crm", href: "/crm", label: "CRM", icon: "crm" },
     { permission: "acces_achats", href: "/commandes", label: "Achats", icon: "achats" },
     { permission: "acces_stock", href: "/stock", label: "Stock", icon: "stock" },

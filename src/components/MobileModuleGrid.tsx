@@ -16,6 +16,7 @@ export type MobileModuleIconName =
   | "facturation"
   | "ouvrages"
   | "interventions"
+  | "sous_traitants"
   | "crm"
   | "connecteurs"
   | "achats"
@@ -58,6 +59,7 @@ function ModuleIcon({ nom, grand = false }: { nom: MobileModuleIconName; grand?:
       {nom === "facturation" && <><path d="M5 3h14v18H5zM8 7h8M8 11h3M8 15h3"/><path d="M15 13v5M13 15.5h4"/></>}
       {nom === "ouvrages" && <><path d="M4 19h16M6 16l4-10 4 10M8 11h4"/><path d="M16 5v11M19 8h-3M19 13h-3"/></>}
       {nom === "interventions" && <><path d="m14 5 5 5-8 8H6v-5z"/><path d="m13 6 2-2 5 5-2 2M4 20h7"/></>}
+      {nom === "sous_traitants" && <><circle cx="8" cy="8" r="3"/><path d="M2.5 19c.5-4 2.3-6 5.5-6s5 2 5.5 6"/><path d="m15 8 2 2 4-4M15 14h6M15 18h4"/></>}
       {nom === "crm" && <><circle cx="9" cy="9" r="3"/><path d="M3.5 19c.5-4 2.3-6 5.5-6s5 2 5.5 6"/><path d="M16 7h5M16 11h4M17 15h3"/></>}
       {nom === "connecteurs" && <><path d="M8 12h8M7 8H5a3 3 0 0 0 0 6h2M17 8h2a3 3 0 1 1 0 6h-2"/><path d="m10 9 4 6M14 9l-4 6"/></>}
       {nom === "achats" && <><path d="M3 5h2l2 10h10l2-7H6"/><circle cx="9" cy="19" r="1"/><circle cx="17" cy="19" r="1"/></>}
@@ -83,7 +85,7 @@ export function MobileModuleGrid({ modules }: { modules: MobileModuleLink[] }) {
     profil: "#355b7d", travaux: "#6b5b95", pointage: "#d07a32", planning: "#be4d46",
     chantiers: "#967044", employes: "#2d8790", clients: "#1f9bc8", devis: "#ed8b00",
     factures: "#789b22", achats: "#b35d3f", stock: "#8c6845", flotte: "#d9674e",
-    facturation: "#5668b8", ouvrages: "#8d6a3f", interventions: "#477e98", crm: "#7a5f9a", connecteurs: "#3d7a79",
+    facturation: "#5668b8", ouvrages: "#8d6a3f", interventions: "#477e98", sous_traitants: "#80654a", crm: "#7a5f9a", connecteurs: "#3d7a79",
     outillage: "#c05467", frais: "#476d97", conges: "#4d8a65", rentabilite: "#6f7f8f",
     exports: "#3d7a79", banque: "#315f78", parametres: "#6c6c6c",
   };

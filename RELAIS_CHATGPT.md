@@ -982,3 +982,15 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Les droits de supervision restent séparés : voir les pointages de l’équipe, modifier, valider ou rejeter continuent de dépendre du poste. Activer le pointage personnel ne donne donc aucun accès aux heures des autres salariés.
 - La mise à jour du poste et du pointage personnel est atomique dans une fonction serveur contrôlée. Les comptes terrain existants conservent leur accès lors de la migration ; les nouveaux comptes commencent avec le pointage désactivé jusqu’au choix de l’administrateur.
 - Migration : `20260718000110_pointage_individuel_comptes.sql`.
+
+## 113. Sous-traitants, coûts chantier, RIB et règlements — 18 juillet 2026
+
+- Nouveau module `/sous-traitants` avec droit de consultation `acces_sous_traitants` et droit de gestion séparé `gerer_sous_traitants`. Les modèles Chef de chantier, Conducteur, Directeur travaux, Administration, Comptable et Gérant reçoivent les droits adaptés à leur fonction.
+- Une fiche sous-traitant regroupe raison sociale, spécialité, coordonnées, SIRET, TVA intracommunautaire, RC Pro, décennale, validité des assurances et délai de paiement.
+- Le RIB utilise le stockage bancaire chiffré déjà en place. Il n’est consultable/modifiable que par les comptes disposant de `gerer_coordonnees_bancaires` et reste inaccessible au support plateforme.
+- Chaque sous-traitant peut être affecté à un ou plusieurs chantiers avec mission, dates, statut et budget HT prévisionnel. Le chantier affiche son équipe de sous-traitance et le budget associé.
+- Les factures réelles sont enregistrées dans le circuit des factures fournisseurs avec la catégorie `sous_traitance`, le sous-traitant prérempli et la TVA calculée. Elles apparaissent dans sa fiche, dans le chantier et dans la rentabilité, séparément des achats de matériaux.
+- Les règlements suivent le circuit sécurisé des fournisseurs : échéance, RIB bénéficiaire, préparation bancaire, validation et historique. L’application ne simule aucun virement si aucun prestataire bancaire réglementé n’est connecté.
+- La table commune des tiers distingue désormais `fournisseur` et `sous_traitant`. Les listes fournisseurs ordinaires restent filtrées, et un gestionnaire sous-traitants ne peut pas modifier un fournisseur ordinaire.
+- Migration `20260718000111_sous_traitants.sql` appliquée et vérifiée dans Supabase. Les politiques restrictives de lecture et de gestion renvoient `true`.
+- Contrôles verts : 80 tests Vitest, TypeScript, ESLint, `git diff --check` et build Next webpack complet de 96 pages. L’avertissement historique `SignatureEmploye.tsx` et celui d’`unpdf/import.meta` restent non bloquants et hors lot.

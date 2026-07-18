@@ -8,8 +8,8 @@ import { etatEcheanceFournisseur } from "@/lib/echeances-fournisseurs";
 
 const un = <T,>(valeur: T | T[] | null): T | null => Array.isArray(valeur) ? valeur[0] ?? null : valeur;
 
-export default async function DepensesPage({ searchParams }: { searchParams: Promise<{ error?: string; chantier?: string }> }) {
-  const { error, chantier = "" } = await searchParams;
+export default async function DepensesPage({ searchParams }: { searchParams: Promise<{ error?: string; chantier?: string; fournisseur?: string; categorie?: string }> }) {
+  const { error, chantier = "", fournisseur = "", categorie = "materiaux" } = await searchParams;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const [
@@ -54,6 +54,8 @@ export default async function DepensesPage({ searchParams }: { searchParams: Pro
           outils={outils ?? []}
           employes={employes ?? []}
           chantierInitial={chantier}
+          fournisseurInitial={fournisseur}
+          categorieInitiale={categorie}
         />
         <div className="overflow-x-auto rounded border dark:border-neutral-800">
           <table className="w-full min-w-[850px] text-sm">

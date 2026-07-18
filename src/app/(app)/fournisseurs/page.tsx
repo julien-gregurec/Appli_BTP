@@ -15,6 +15,7 @@ export default async function FournisseursPage({ searchParams }: { searchParams:
     .from("fournisseurs")
     .select("id, reference, nom, contact_nom, email, telephone, ville, actif")
     .eq("entreprise_id", ctx.entrepriseId)
+    .eq("type_tiers", "fournisseur")
     .order("nom");
 
   return (
@@ -23,7 +24,7 @@ export default async function FournisseursPage({ searchParams }: { searchParams:
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold">Fournisseurs</h1>
-            <p className="text-sm text-neutral-500">Carnet des fournisseurs et sous-traitants matériels.</p>
+            <p className="text-sm text-neutral-500">Carnet des fournisseurs de matériaux, services et équipements.</p>
           </div>
           <div className="flex items-center gap-2"><Link href="/connecteurs" className="rounded-md border px-3 py-2 text-sm font-medium">Connecter mes comptes</Link><Link href="/commandes" className="text-sm text-neutral-500 hover:underline">Commandes →</Link></div>
         </div>

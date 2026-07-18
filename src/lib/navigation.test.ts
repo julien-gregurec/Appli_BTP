@@ -13,5 +13,6 @@ describe("navigation regroupée", () => {
     expect(publics).toEqual(["/dashboard", "/mon-espace"]);
     expect(NAVIGATION_APPLICATION.find((item) => item.href === "/connecteurs")?.permission).toBe("acces_connecteurs");
     expect(NAVIGATION_APPLICATION.find((item) => item.href === "/rentabilite")?.permission).toBe("acces_rentabilite");
+    expect(NAVIGATION_APPLICATION.find((item) => item.href === "/sous-traitants")?.permission).toBe("acces_sous_traitants");
   });
 });
