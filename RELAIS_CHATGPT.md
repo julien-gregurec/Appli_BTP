@@ -933,3 +933,12 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Les identifiants salariés déjà attribués ne sont pas renumérotés automatiquement, afin de préserver les accès existants. Seul l’ancien préfixe de configuration générique `EMP` est remplacé par le préfixe de l’entreprise.
 - Migration `20260718000105_prefixe_identifiants_depot.sql` appliquée et vérifiée dans Supabase : `LIR`, `ELA` pour `Élan Bâtiment` et le nouveau mode par défaut sont tous confirmés.
 - Contrôles verts : 76 tests Vitest, TypeScript, ESLint, `git diff --check` et build Next webpack complet de 88 pages. Les avertissements historiques hors lot restent non bloquants.
+
+## 108. Personnalisation du tableau de bord déplacée — 18 juillet 2026
+
+- Le panneau permanent « Ma page d’accueil » a été retiré du tableau de bord : il ne prend plus de place pendant l’utilisation quotidienne.
+- À la première ouverture du tableau de bord sur un appareil, une fenêtre guidée propose une seule fois les widgets réellement disponibles selon les droits du compte.
+- Une fois le choix enregistré, la fenêtre ne réapparaît plus. Les widgets masqués restent masqués sur cet appareil et les autorisations du poste restent toujours prioritaires.
+- La personnalisation complète reste accessible à tout moment dans `/parametres`, dans la section « Personnalisation de ma page d’accueil ».
+- Aucun changement de base de données n’est nécessaire : ce réglage d’affichage personnel reste local au navigateur et ne contient aucune donnée métier.
+- Contrôles verts : 76 tests Vitest, TypeScript, ESLint et build Next webpack complet. L’avertissement historique `SignatureEmploye.tsx` reste non bloquant et hors lot.

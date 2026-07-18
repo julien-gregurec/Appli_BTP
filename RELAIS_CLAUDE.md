@@ -817,5 +817,14 @@ Un lot **« Mon espace »** a été commencé après le commit `1beee4b`, mais i
 - TypeScript, ESLint, `git diff --check` et build Next webpack 88 pages validés.
 
 ---
+# REPRISE — 18 juillet 2026, personnalisation du tableau de bord
+
+- Le bloc permanent de sélection des widgets a été retiré de `/dashboard`.
+- Une fenêtre de personnalisation est proposée une seule fois à la première ouverture sur l’appareil, avec uniquement les widgets autorisés pour le compte.
+- Les choix restent modifiables dans `/parametres` via « Personnalisation de ma page d’accueil ».
+- Le réglage reste local au navigateur ; aucune migration Supabase n’est nécessaire et les permissions continuent de primer sur les préférences visuelles.
+- Contrôles verts : 76 tests, TypeScript, ESLint et build Next webpack complet.
+
+---
 
 ---

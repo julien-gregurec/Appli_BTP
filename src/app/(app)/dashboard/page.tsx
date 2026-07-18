@@ -6,7 +6,7 @@ import { permissionsUtilisateur } from "@/lib/permissions";
 import { PointageArriveeDepart } from "@/components/PointageArriveeDepart";
 import { MobileModuleGrid, type MobileModuleLink } from "@/components/MobileModuleGrid";
 import { DashboardAnalytics } from "@/components/DashboardAnalytics";
-import { DashboardWidget, DashboardWidgetPreferences } from "@/components/DashboardWidgets";
+import { DashboardWidget, DashboardWidgetFirstConnection } from "@/components/DashboardWidgets";
 import { Lien as Link } from "@/components/Lien";
 
 function un<T>(valeur: T | T[] | null): T | null {
@@ -142,6 +142,16 @@ export default async function DashboardPage() {
     const label=new Intl.DateTimeFormat("fr-FR",{month:"short"}).format(date).replace(".","");
     return {label,devis:(devis??[]).filter(item=>item.date_emission?.startsWith(cle)&&item.statut!=="annule").reduce((s,item)=>s+Number(item.montant_ttc),0),factures:(factures??[]).filter(item=>item.date_emission?.startsWith(cle)&&item.statut!=="annulee").reduce((s,item)=>s+Number(item.montant_ttc),0)};
   }) : undefined;
+  const optionsWidgets = [
+    ...((notifications??[]).length ? [{id:"notifications",label:"Notifications"}] : []),
+    ...(raccourcis.length ? [{id:"modules",label:"Raccourcis modules"}] : []),
+    ...((chantierGraphique || moisGraphique || (voirIndicateursFinanciers && voir.factures)) ? [{id:"analyses",label:"Graphiques et analyses"}] : []),
+    ...(voirIndicateursFinanciers && (voir.factures || voir.devis) ? [{id:"indicateurs",label:"Indicateurs financiers"}] : []),
+    ...((voir.devis || voir.chantiers) ? [{id:"suivi",label:"Devis et chantiers à suivre"}] : []),
+    ...((voir.factures || voir.devis || voir.achats || voir.stock || voir.flotte || voir.outillage) ? [{id:"alertes",label:"Alertes opérationnelles"}] : []),
+    ...(peutPointer && employeCompte ? [{id:"pointage",label:"Pointage rapide"}] : []),
+    ...(voir.planning ? [{id:"planning",label:"Prochaines affectations"}] : []),
+  ];
 
   return (
     <main className="p-8">
@@ -150,17 +160,7 @@ export default async function DashboardPage() {
           <h1 className="text-xl font-semibold">Bonjour{prenomAffiche ? ` ${prenomAffiche}` : ""}</h1>
           <p className="text-sm text-neutral-500">{ctx.entrepriseNom}</p>
         </div>
-
-        <DashboardWidgetPreferences options={[
-          ...((notifications??[]).length ? [{id:"notifications",label:"Notifications"}] : []),
-          ...(raccourcis.length ? [{id:"modules",label:"Raccourcis modules"}] : []),
-          ...((chantierGraphique || moisGraphique || (voirIndicateursFinanciers && voir.factures)) ? [{id:"analyses",label:"Graphiques et analyses"}] : []),
-          ...(voirIndicateursFinanciers && (voir.factures || voir.devis) ? [{id:"indicateurs",label:"Indicateurs financiers"}] : []),
-          ...((voir.devis || voir.chantiers) ? [{id:"suivi",label:"Devis et chantiers à suivre"}] : []),
-          ...((voir.factures || voir.devis || voir.achats || voir.stock || voir.flotte || voir.outillage) ? [{id:"alertes",label:"Alertes opérationnelles"}] : []),
-          ...(peutPointer && employeCompte ? [{id:"pointage",label:"Pointage rapide"}] : []),
-          ...(voir.planning ? [{id:"planning",label:"Prochaines affectations"}] : []),
-        ]}/>
+        <DashboardWidgetFirstConnection options={optionsWidgets}/>
 
         {(notifications??[]).length>0&&<DashboardWidget id="notifications"><section className="rounded-xl border border-blue-200 bg-blue-50 p-4"><div className="mb-3 flex items-center justify-between"><div><h2 className="font-semibold">Mes notifications</h2><p className="text-xs text-neutral-500">Décisions, demandes et vérifications qui vous concernent.</p></div><span className="rounded-full bg-blue-700 px-2.5 py-1 text-xs font-semibold text-white">{notifications?.length}</span></div><div className="grid gap-2 sm:grid-cols-2">{notifications?.map(notification=><Link key={notification.id} href={notification.lien??"/dashboard"} className={`rounded-lg border bg-white p-3 text-sm ${notification.niveau==="critique"?"border-red-400":notification.niveau==="attention"?"border-amber-300":"border-blue-200"}`}><strong>{notification.titre}</strong>{notification.message&&<p className="mt-1 text-xs text-neutral-600">{notification.message}</p>}</Link>)}</div></section></DashboardWidget>}
 
