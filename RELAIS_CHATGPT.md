@@ -1,5 +1,13 @@
 # REPRISE — 17 juillet 2026, facturation des comptes utilisant plus de deux appareils (MIGRATION 90 APPLIQUÉE)
 
+## 18 juillet 2026 — Coût client et avertissement appareils dans Abonnement
+
+- Le message de facturation des appareils supplémentaires a été supprimé du tableau de bord.
+- La page `/abonnement` présente maintenant le coût estimé complet de Liria Gestion Pro : tarif de l’offre, nombre de comptes facturables, supplément de comptes, supplément d’appareils, dépassement de stockage, total mensuel ou annuel et équivalent mensuel.
+- L’alerte appareils ne s’affiche sur cette page que lorsqu’un salarié actif ou en pause utilise plus de deux appareils actifs. Les appareils sans fiche salarié et les comptes fermés ne déclenchent plus de faux avertissement.
+- Le calcul Stripe du supplément réutilise exactement la même règle. Aucun SQL supplémentaire n’est requis.
+- Contrôles : **73 tests**, ESLint sans erreur, TypeScript et build Next webpack **88 routes** verts. Seul l’avertissement historique `unpdf/import.meta` demeure non bloquant.
+
 ## 18 juillet 2026 — Migrations 98, 99, 102 et 103 vérifiées/appliquées
 
 - **Migration 98 — `20260717000098_reception_sortie_lot.sql` : appliquée et vérifiée.** Elle permet de scanner plusieurs articles successivement, de corriger leurs quantités, de rapprocher une même réception de plusieurs commandes fournisseurs et de recalculer automatiquement leurs statuts. La fonction `enregistrer_reception_lot(uuid,jsonb,jsonb,text)` est bien présente dans Supabase.

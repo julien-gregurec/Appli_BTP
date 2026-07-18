@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { calculerDepassementsAppareilsFacturables } from "@/lib/facturation-appareils";
 import { DUREE_ESSAI_JOURS, offreParCle, REDUCTION_ANNUELLE } from "@/lib/plateforme";
 
 export const OFFRES_ABONNEMENT = ["essentiel", "pro", "premium"] as const;
@@ -256,17 +257,15 @@ export async function calculerDepassementAppareils(entrepriseId: string) {
   const admin = createAdminClient();
   const [{ data: appareils }, { data: employes }, { data: postes }, { data: entreprise }] = await Promise.all([
     admin.from("appareils_comptes").select("utilisateur_id").eq("entreprise_id", entrepriseId).is("revoque_at", null),
-    admin.from("employes").select("utilisateur_id,poste_id").eq("entreprise_id", entrepriseId),
-    admin.from("postes").select("id,tarif_compte_mensuel").eq("entreprise_id", entrepriseId),
+    admin.from("employes").select("utilisateur_id,prenom,nom,poste_id,compte_application_statut").eq("entreprise_id", entrepriseId).in("compte_application_statut", ["actif", "pause"]),
+    admin.from("postes").select("id,nom,tarif_compte_mensuel").eq("entreprise_id", entrepriseId),
     admin.from("entreprises").select("abonnement_periodicite").eq("id", entrepriseId).maybeSingle(),
   ]);
-  const nombres = new Map<string, number>();
-  for (const appareil of appareils ?? []) nombres.set(appareil.utilisateur_id, (nombres.get(appareil.utilisateur_id) ?? 0) + 1);
-  const mensuel = [...nombres].filter(([, nombre]) => nombre > 2).reduce((total, [utilisateurId]) => {
-    const employe = (employes ?? []).find((item) => item.utilisateur_id === utilisateurId);
-    const poste = (postes ?? []).find((item) => item.id === employe?.poste_id);
-    return total + Number(poste?.tarif_compte_mensuel ?? 0);
-  }, 0);
+  const mensuel = calculerDepassementsAppareilsFacturables({
+    appareils: appareils ?? [],
+    employes: employes ?? [],
+    postes: postes ?? [],
+  }).reduce((total, ligne) => total + ligne.supplementMensuelHt, 0);
   return entreprise?.abonnement_periodicite === "annuel" ? Math.round(mensuel * 12 * (1 - REDUCTION_ANNUELLE) * 100) / 100 : mensuel;
 }
 

@@ -8,7 +8,6 @@ import { MobileModuleGrid, type MobileModuleLink } from "@/components/MobileModu
 import { DashboardAnalytics } from "@/components/DashboardAnalytics";
 import { DashboardWidget, DashboardWidgetPreferences } from "@/components/DashboardWidgets";
 import { Lien as Link } from "@/components/Lien";
-import { AlerteDepassementAppareils } from "@/components/AlerteDepassementAppareils";
 
 function un<T>(valeur: T | T[] | null): T | null {
   if (!valeur) return null;
@@ -151,8 +150,6 @@ export default async function DashboardPage() {
           <h1 className="text-xl font-semibold">Bonjour{prenomAffiche ? ` ${prenomAffiche}` : ""}</h1>
           <p className="text-sm text-neutral-500">{ctx.entrepriseNom}</p>
         </div>
-
-        <AlerteDepassementAppareils />
 
         <DashboardWidgetPreferences options={[
           ...((notifications??[]).length ? [{id:"notifications",label:"Notifications"}] : []),

@@ -1,18 +1,23 @@
 import Link from "next/link";
 import { demarrerAbonnementAction, ouvrirPortailAbonnementAction } from "@/app/actions/abonnement";
+import { AlerteDepassementAppareils } from "@/components/AlerteDepassementAppareils";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { calculerDepassementsAppareilsFacturables } from "@/lib/facturation-appareils";
 import { offreParCle, OFFRES, prixAbonnementMensuel, REDUCTION_ANNUELLE, statutAbonnement } from "@/lib/plateforme";
-import { OCTETS_PAR_GO, stripeBillingEstConfigure, TARIF_STOCKAGE_SUPPLEMENTAIRE_HT_PAR_GO } from "@/lib/stripe-abonnement";
+import { calculerFacturationStockage, OCTETS_PAR_GO, stripeBillingEstConfigure, TARIF_STOCKAGE_SUPPLEMENTAIRE_HT_PAR_GO } from "@/lib/stripe-abonnement";
 
 const input = "rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
 export default async function AbonnementPage({ searchParams }: { searchParams: Promise<{ error?: string; succes?: string }> }) {
   const [{ error, succes }, ctx] = await Promise.all([searchParams, getContexteEntreprise()]);
   const supabase = await createClient();
-  const [{ data: entreprise }, { data: utilisationStockage }] = await Promise.all([
+  const [{ data: entreprise }, { data: utilisationStockage }, { data: employesFacturables }, { data: postes }, { data: appareils }] = await Promise.all([
     supabase.from("entreprises").select("abonnement_statut,abonnement_echeance,abonnement_offre,abonnement_periodicite,abonnement_essai_fin,abonnement_annulation_prevue_at,stripe_customer_id,stripe_subscription_id,derniere_facture_url,derniere_facture_pdf,derniere_facture_statut,derniere_facture_at").eq("id",ctx.entrepriseId).single(),
     supabase.rpc("utilisation_stockage_entreprise", { p_entreprise_id: ctx.entrepriseId }),
+    supabase.from("employes").select("utilisateur_id,prenom,nom,poste_id,compte_application_statut").eq("entreprise_id", ctx.entrepriseId).in("compte_application_statut", ["actif", "pause"]),
+    supabase.from("postes").select("id,nom,tarif_compte_mensuel").eq("entreprise_id", ctx.entrepriseId),
+    supabase.from("appareils_comptes").select("utilisateur_id").eq("entreprise_id", ctx.entrepriseId).is("revoque_at", null),
   ]);
   const statut = statutAbonnement(entreprise?.abonnement_statut ?? "essai");
   const configure = stripeBillingEstConfigure();
@@ -23,6 +28,26 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
   const stockagePourcentage = offre.stockageGoInclus > 0 ? stockageGo / offre.stockageGoInclus * 100 : 0;
   const stockageAlerte = stockagePourcentage >= 80;
   const stockageDepasse = stockagePourcentage > 100;
+  const depassementsAppareils = calculerDepassementsAppareilsFacturables({
+    appareils: appareils ?? [],
+    employes: employesFacturables ?? [],
+    postes: postes ?? [],
+  });
+  const nbComptesFacturables = employesFacturables?.length ?? 0;
+  const supplementAppareilsMensuel = depassementsAppareils.reduce((total, ligne) => total + ligne.supplementMensuelHt, 0);
+  const prixComptes = prixAbonnementMensuel(nbComptesFacturables, offre);
+  const stockageMensuel = calculerFacturationStockage({
+    octetsUtilises: Number(stockage?.octets_utilises ?? 0),
+    quotaGo: offre.stockageGoInclus,
+    periodicite: "mensuel",
+  });
+  const annuel = entreprise?.abonnement_periodicite === "annuel";
+  const abonnementAvantRemiseMensuel = prixComptes.total + supplementAppareilsMensuel;
+  const coutMensuelEstime = annuel
+    ? abonnementAvantRemiseMensuel * (1 - REDUCTION_ANNUELLE) + stockageMensuel.montantHt
+    : abonnementAvantRemiseMensuel + stockageMensuel.montantHt;
+  const coutPeriodeEstime = annuel ? coutMensuelEstime * 12 : coutMensuelEstime;
+  const euros = (montant: number) => montant.toLocaleString("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
 
   return <main className="p-4 sm:p-8"><div className="mx-auto max-w-5xl space-y-6">
     <header><h1 className="text-xl font-semibold">Mon abonnement Liria Gestion Pro</h1><p className="text-sm text-neutral-500">Offre, moyen de paiement, échéances et factures de votre entreprise.</p></header>
@@ -34,6 +59,28 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
       <div><p className="text-xs uppercase text-neutral-500">Prochaine échéance</p><p className="mt-1 font-semibold">{entreprise?.abonnement_echeance ? new Date(entreprise.abonnement_echeance).toLocaleDateString("fr-FR") : entreprise?.abonnement_essai_fin ? new Date(entreprise.abonnement_essai_fin).toLocaleDateString("fr-FR") : "—"}</p></div>
       {entreprise?.abonnement_annulation_prevue_at&&<p className="sm:col-span-3 rounded bg-amber-50 p-3 text-sm text-amber-900">Résiliation programmée le {new Date(entreprise.abonnement_annulation_prevue_at).toLocaleDateString("fr-FR")}.</p>}
     </section>
+
+    <section className="rounded-xl border p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="font-semibold">Coût actuel de l’application</h2>
+          <p className="mt-1 text-sm text-neutral-500">Estimation HT selon l’offre, les comptes facturables, les appareils actifs et le stockage utilisé.</p>
+        </div>
+        <div className="text-right">
+          <p className="text-2xl font-bold">{euros(coutPeriodeEstime)} <span className="text-sm font-normal text-neutral-500">HT/{annuel ? "an" : "mois"}</span></p>
+          {annuel&&<p className="text-xs text-neutral-500">soit {euros(coutMensuelEstime)} HT/mois en moyenne</p>}
+        </div>
+      </div>
+      <dl className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-lg bg-neutral-50 p-3 dark:bg-neutral-900"><dt className="text-xs uppercase text-neutral-500">Offre {offre.nom}</dt><dd className="mt-1 font-semibold">{euros(offre.base)} HT/mois</dd><p className="text-xs text-neutral-500">{offre.comptesInclus} compte(s) inclus</p></div>
+        <div className="rounded-lg bg-neutral-50 p-3 dark:bg-neutral-900"><dt className="text-xs uppercase text-neutral-500">Comptes de l’entreprise</dt><dd className="mt-1 font-semibold">{nbComptesFacturables} compte(s) facturable(s)</dd><p className="text-xs text-neutral-500">{prixComptes.employesSupplementaires > 0 ? `${prixComptes.employesSupplementaires} supplémentaire(s) × ${euros(prixComptes.parEmployeSup)} HT/mois` : "Aucun compte supplémentaire"}</p></div>
+        <div className="rounded-lg bg-neutral-50 p-3 dark:bg-neutral-900"><dt className="text-xs uppercase text-neutral-500">Appareils supplémentaires</dt><dd className="mt-1 font-semibold">{euros(supplementAppareilsMensuel)} HT/mois</dd><p className="text-xs text-neutral-500">Deux appareils actifs sont inclus par salarié</p></div>
+        <div className="rounded-lg bg-neutral-50 p-3 dark:bg-neutral-900"><dt className="text-xs uppercase text-neutral-500">Stockage supplémentaire</dt><dd className="mt-1 font-semibold">{euros(stockageMensuel.montantHt)} HT/mois</dd><p className="text-xs text-neutral-500">{stockageMensuel.depassementGo > 0 ? `${stockageMensuel.depassementGo.toLocaleString("fr-FR")} Go au-delà du quota` : "Aucun dépassement"}</p></div>
+      </dl>
+      <p className="mt-3 text-xs text-neutral-500">Les comptes actifs et en pause restent facturables. {annuel ? `La réduction annuelle de ${Math.round(REDUCTION_ANNUELLE * 100)} % est appliquée à l’offre, aux comptes et aux appareils supplémentaires ; le dépassement de stockage reste facturé à l’usage.` : "Le montant définitif peut varier en cas de prorata ou de changement en cours de période."}</p>
+    </section>
+
+    <AlerteDepassementAppareils lignes={depassementsAppareils}/>
 
     <section className="rounded-xl border p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">

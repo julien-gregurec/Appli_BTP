@@ -1,5 +1,13 @@
 # Relais Claude Code — Liria Gestion Pro
 
+## REPRISE AUTORITATIVE — 18 juillet 2026, coût client et appareils déplacés dans Abonnement
+
+- L’avertissement de dépassement d’appareils a été retiré du tableau de bord : aucune information de facturation SaaS n’encombre désormais l’accueil opérationnel.
+- `/abonnement` affiche le coût estimé actuel de Liria Gestion Pro : offre, comptes actifs/en pause facturables, comptes supplémentaires, appareils au-delà de deux par salarié, stockage hors quota, périodicité et réduction annuelle.
+- L’avertissement détaillé apparaît uniquement dans `/abonnement` et uniquement lorsqu’un vrai compte salarié actif ou en pause possède plus de deux appareils non révoqués. Les appareils orphelins et les comptes fermés sont ignorés.
+- Le même filtre est utilisé par le calcul réel du supplément Stripe, afin que l’interface client et la future facture restent cohérentes.
+- Aucun changement de schéma ni migration. Contrôles : **73 tests**, ESLint sans erreur, TypeScript et build Next webpack **88 routes** verts. L’avertissement historique `unpdf/import.meta` reste non bloquant.
+
 ## REPRISE AUTORITATIVE — 18 juillet 2026, signatures métier et sorties groupées
 
 - **Migration 98 — `20260717000098_reception_sortie_lot.sql` : appliquée et vérifiée.** Réceptions multi-articles, quantités modifiables, rapprochement de plusieurs commandes et statut de réception synchronisé. RPC `enregistrer_reception_lot(uuid,jsonb,jsonb,text)` présente.

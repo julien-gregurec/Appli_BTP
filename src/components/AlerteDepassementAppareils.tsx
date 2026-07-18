@@ -1,6 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
-import { getContexteEntreprise } from "@/lib/entreprise";
-import { permissionsUtilisateur } from "@/lib/permissions";
+import type { DepassementAppareilsFacturable } from "@/lib/facturation-appareils";
 
 /**
  * Prévient l'entreprise cliente qu'un ou plusieurs de ses comptes dépassent
@@ -13,59 +11,11 @@ import { permissionsUtilisateur } from "@/lib/permissions";
  * calcul (même filtre `revoque_at is null`, même forfait) pour afficher le
  * montant que le client verra sur sa facture, sans surprise.
  *
- * Composant de lecture seule : aucune écriture, aucune migration. Réservé aux
- * comptes qui gèrent les employés ou les accès (la RLS l'impose déjà).
+ * Composant de lecture seule affiché uniquement sur la page Abonnement.
  */
-export async function AlerteDepassementAppareils() {
-  const ctx = await getContexteEntreprise();
-  const permissions = await permissionsUtilisateur(ctx);
-  const peutVoir = permissions === null
-    || permissions.includes("gerer_employes")
-    || permissions.includes("gerer_utilisateurs");
-  if (!peutVoir) return null;
-
-  const supabase = await createClient();
-
-  // Appareils actifs, comme la facturation : on ignore les appareils révoqués.
-  const { data: appareils } = await supabase
-    .from("appareils_comptes")
-    .select("utilisateur_id")
-    .eq("entreprise_id", ctx.entrepriseId)
-    .is("revoque_at", null);
-  if (!appareils?.length) return null;
-
-  const parCompte = new Map<string, number>();
-  for (const a of appareils) parCompte.set(a.utilisateur_id, (parCompte.get(a.utilisateur_id) ?? 0) + 1);
-
-  const comptesEnDepassement = [...parCompte.entries()].filter(([, n]) => n > 2);
-  if (!comptesEnDepassement.length) return null;
-
-  // Nom et tarif du poste de chaque compte concerné.
-  const idsConcernes = comptesEnDepassement.map(([id]) => id);
-  const { data: employes } = await supabase
-    .from("employes")
-    .select("utilisateur_id, prenom, nom, poste_id")
-    .eq("entreprise_id", ctx.entrepriseId)
-    .in("utilisateur_id", idsConcernes);
-  const posteIds = [...new Set((employes ?? []).map((e) => e.poste_id).filter(Boolean))] as string[];
-  const { data: postes } = posteIds.length
-    ? await supabase.from("postes").select("id, nom, tarif_compte_mensuel").in("id", posteIds)
-    : { data: [] };
-  const tarifParPoste = new Map((postes ?? []).map((p) => [p.id, { nom: p.nom, tarif: Number(p.tarif_compte_mensuel) }]));
-  const employeParCompte = new Map((employes ?? []).map((e) => [e.utilisateur_id, e]));
-
-  const lignes = comptesEnDepassement.map(([utilisateurId, nbAppareils]) => {
-    const employe = employeParCompte.get(utilisateurId);
-    const poste = employe?.poste_id ? tarifParPoste.get(employe.poste_id) : undefined;
-    return {
-      nom: employe ? `${employe.prenom} ${employe.nom}`.trim() : "Compte",
-      posteNom: poste?.nom ?? "—",
-      nbAppareils,
-      // Forfait : un poste supplémentaire au tarif du poste, comme la facture.
-      supplement: poste?.tarif ?? 0,
-    };
-  });
-  const total = lignes.reduce((s, l) => s + l.supplement, 0);
+export function AlerteDepassementAppareils({ lignes }: { lignes: DepassementAppareilsFacturable[] }) {
+  if (!lignes.length) return null;
+  const total = lignes.reduce((s, ligne) => s + ligne.supplementMensuelHt, 0);
   const euros = (n: number) => n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 
   return (
@@ -81,15 +31,15 @@ export async function AlerteDepassementAppareils() {
             Facturation d&apos;appareils supplémentaires
           </h2>
           <p className="mt-1 text-sm text-amber-800 dark:text-amber-200/90">
-            {comptesEnDepassement.length === 1 ? "Un compte utilise" : `${comptesEnDepassement.length} comptes utilisent`}{" "}
-            plus de deux appareils. Chaque compte au-delà de deux appareils est facturé comme un poste
-            supplémentaire, au tarif mensuel de son poste — soit <strong>{euros(total)} HT / mois</strong> au total.
+            {lignes.length === 1 ? "Un salarié utilise" : `${lignes.length} salariés utilisent`}{" "}
+            plus de deux appareils actifs. Pour chaque salarié concerné, un poste supplémentaire est facturé
+            au tarif mensuel de son poste — soit <strong>{euros(total)} HT / mois</strong> au total.
           </p>
           <ul className="mt-2 space-y-1 text-sm">
-            {lignes.map((l, i) => (
-              <li key={i} className="flex flex-wrap items-center justify-between gap-2 rounded border border-amber-200 bg-white/60 px-3 py-1.5 dark:border-amber-900 dark:bg-amber-950/20">
+            {lignes.map((l) => (
+              <li key={l.utilisateurId} className="flex flex-wrap items-center justify-between gap-2 rounded border border-amber-200 bg-white/60 px-3 py-1.5 dark:border-amber-900 dark:bg-amber-950/20">
                 <span><strong>{l.nom}</strong> · {l.posteNom} · {l.nbAppareils} appareils</span>
-                <span className="font-mono">{l.supplement > 0 ? `+ ${euros(l.supplement)} / mois` : "poste non tarifé"}</span>
+                <span className="font-mono">{l.supplementMensuelHt > 0 ? `+ ${euros(l.supplementMensuelHt)} / mois` : "poste non tarifé"}</span>
               </li>
             ))}
           </ul>
