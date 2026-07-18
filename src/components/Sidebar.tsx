@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { logoutAction } from "@/app/actions/auth";
 import { PwaInstallButton } from "@/components/PwaInstallButton";
-import { NAVIGATION_APPLICATION, NAVIGATION_GROUPES } from "@/lib/navigation";
+import { NAVIGATION_APPLICATION, NAVIGATION_GROUPES, navigationAutorisee } from "@/lib/navigation";
 import { Lien as Link } from "@/components/Lien";
 
 export function Sidebar({
@@ -26,7 +26,7 @@ export function Sidebar({
   const navigationBrute = compteDepot
     ? NAVIGATION_APPLICATION.filter((item) => ["/stock", "/stock/borne", "/depot"].includes(item.href))
     : NAVIGATION_APPLICATION;
-  const navigation = navigationBrute.filter((item) => !item.permission || permissions === null || permissions.includes(item.permission));
+  const navigation = navigationBrute.filter((item) => navigationAutorisee(item.permission, permissions));
 
   return (
     <>

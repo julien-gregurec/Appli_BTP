@@ -5,13 +5,26 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { lireImportStock } from "@/lib/import-stock";
 import { nomFichierSecurise } from "@/lib/documents";
+import { permissionsUtilisateur } from "@/lib/permissions";
 const champ = (fd: FormData, nom: string) => String(fd.get(nom) ?? "").trim() || null;
+
+async function peutGererPrixStock(ctx: Awaited<ReturnType<typeof getContexteEntreprise>>) {
+  const permissions = await permissionsUtilisateur(ctx);
+  return permissions === null || permissions.includes("gerer_prix_stock");
+}
+
+async function exigerGestionPrixStock(ctx: Awaited<ReturnType<typeof getContexteEntreprise>>, retour: string) {
+  if (!await peutGererPrixStock(ctx)) {
+    redirect(`${retour}?error=${encodeURIComponent("Votre administrateur ne vous a pas autorisé à modifier les prix du stock")}`);
+  }
+}
 
 export async function creerArticleStockAction(fd: FormData) {
   const ctx = await getContexteEntreprise(); const supabase = await createClient();
   const reference = champ(fd, "reference"); const designation = champ(fd, "designation");
   if (!reference || !designation) redirect(`/stock?error=${encodeURIComponent("Référence et désignation obligatoires")}`);
-  const { error } = await supabase.from("articles_stock").insert({ entreprise_id: ctx.entrepriseId, reference, designation, unite: champ(fd, "unite") ?? "u", seuil_alerte: Number(fd.get("seuil_alerte")) || 0, prix_achat_ht: Number(fd.get("prix_achat_ht")) || 0, prix_vente_ht: Number(fd.get("prix_vente_ht")) || 0, emplacement: champ(fd, "emplacement"),marque:champ(fd,"marque"),code_barres:champ(fd,"code_barres") });
+  const gestionPrix = await peutGererPrixStock(ctx);
+  const { error } = await supabase.from("articles_stock").insert({ entreprise_id: ctx.entrepriseId, reference, designation, unite: champ(fd, "unite") ?? "u", seuil_alerte: Number(fd.get("seuil_alerte")) || 0, prix_achat_ht: gestionPrix ? Number(fd.get("prix_achat_ht")) || 0 : 0, prix_vente_ht: gestionPrix ? Number(fd.get("prix_vente_ht")) || 0 : 0, emplacement: champ(fd, "emplacement"),marque:champ(fd,"marque"),code_barres:champ(fd,"code_barres") });
   if (error) redirect(`/stock?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/stock"); redirect("/stock?succes=article");
 }
@@ -31,6 +44,7 @@ export async function creerMouvementStockAction(fd: FormData) {
 
 export async function modifierPrixArticleStockAction(articleId:string,fd:FormData){
   const ctx=await getContexteEntreprise(),supabase=await createClient();
+  await exigerGestionPrixStock(ctx, `/stock/${articleId}`);
   const achat=Number(fd.get("prix_achat_ht")),vente=Number(fd.get("prix_vente_ht"));
   if(!Number.isFinite(achat)||achat<0||!Number.isFinite(vente)||vente<0)redirect(`/stock/${articleId}?error=${encodeURIComponent("Prix invalides")}`);
   const{error}=await supabase.from("articles_stock").update({prix_achat_ht:achat,prix_vente_ht:vente}).eq("id",articleId).eq("entreprise_id",ctx.entrepriseId);
@@ -96,7 +110,7 @@ export async function definirMotDePasseStockPersonnelAction(fd: FormData) {
   redirect(`/mon-espace?succes=${encodeURIComponent("Votre accès personnel à la borne stock est actif")}`);
 }
 
-export async function importerStockAction(fd:FormData){const ctx=await getContexteEntreprise(),supabase=await createClient(),fichier=fd.get("fichier"),type=String(fd.get("type_import")??"");if(!(fichier instanceof File)||!fichier.size)redirect(`/stock?error=${encodeURIComponent("Choisissez un fichier")}`);if(fichier.size>20*1024*1024)redirect(`/stock?error=${encodeURIComponent("Le fichier dépasse 20 Mo")}`);try{const lignes=await lireImportStock(fichier);if(!lignes.length)throw new Error("Aucune ligne produit détectée");const{data,error}=await supabase.rpc("importer_articles_stock",{p_entreprise_id:ctx.entrepriseId,p_type:type,p_lignes:lignes});if(error)throw error;revalidatePath("/stock");revalidatePath("/inventaires");redirect(`/stock?succes=${encodeURIComponent(`${data} ligne(s) importée(s)`)}`)}catch(e){if(e&&typeof e==="object"&&"digest"in e)throw e;redirect(`/stock?error=${encodeURIComponent(e instanceof Error?e.message:"Import impossible")}`)}}
+export async function importerStockAction(fd:FormData){const ctx=await getContexteEntreprise();await exigerGestionPrixStock(ctx,"/stock");const supabase=await createClient(),fichier=fd.get("fichier"),type=String(fd.get("type_import")??"");if(!(fichier instanceof File)||!fichier.size)redirect(`/stock?error=${encodeURIComponent("Choisissez un fichier")}`);if(fichier.size>20*1024*1024)redirect(`/stock?error=${encodeURIComponent("Le fichier dépasse 20 Mo")}`);try{const lignes=await lireImportStock(fichier);if(!lignes.length)throw new Error("Aucune ligne produit détectée");const{data,error}=await supabase.rpc("importer_articles_stock",{p_entreprise_id:ctx.entrepriseId,p_type:type,p_lignes:lignes});if(error)throw error;revalidatePath("/stock");revalidatePath("/inventaires");redirect(`/stock?succes=${encodeURIComponent(`${data} ligne(s) importée(s)`)}`)}catch(e){if(e&&typeof e==="object"&&"digest"in e)throw e;redirect(`/stock?error=${encodeURIComponent(e instanceof Error?e.message:"Import impossible")}`)}}
 export async function ajouterTeinteAction(articleId:string,fd:FormData){const ctx=await getContexteEntreprise(),supabase=await createClient(),nom=champ(fd,"nom"),hex=champ(fd,"code_hex");if(!nom)redirect(`/stock/${articleId}?error=${encodeURIComponent("Nom de teinte obligatoire")}`);const{data:a}=await supabase.from("articles_stock").select("id").eq("id",articleId).eq("entreprise_id",ctx.entrepriseId).maybeSingle();if(!a)redirect("/stock");const{error}=await supabase.from("article_teintes").insert({entreprise_id:ctx.entrepriseId,article_id:articleId,nom,reference:champ(fd,"reference"),code_hex:hex});if(error)redirect(`/stock/${articleId}?error=${encodeURIComponent(error.message)}`);revalidatePath("/stock");revalidatePath(`/stock/${articleId}`);redirect(`/stock/${articleId}?success=Teinte ajoutée`)}
 
 export async function ajouterFicheTechniqueArticleAction(articleId:string,fd:FormData){

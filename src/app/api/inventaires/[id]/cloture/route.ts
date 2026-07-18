@@ -6,32 +6,42 @@ import { createClient } from "@/lib/supabase/server";
 import { reponseXlsx } from "@/lib/xlsx";
 
 type Article = { reference: string; designation: string; unite: string };
-const un = <T,>(valeur: T | T[] | null): T | null => Array.isArray(valeur) ? valeur[0] ?? null : valeur;
+type LignePrix = {
+  reference: string;
+  designation: string;
+  unite: string;
+  quantite_theorique: number;
+  quantite_comptee: number | null;
+  prix_achat_ht_snapshot: number;
+};
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const contexte = await getContexteEntreprise();
   const permissions = await permissionsUtilisateur(contexte);
-  if (permissions !== null && !permissions.includes("acces_stock") && !permissions.includes("gerer_stock")) {
+  const peutVoirPrix = permissions === null || permissions.includes("voir_prix_stock") || permissions.includes("gerer_prix_stock");
+  if (!peutVoirPrix) {
     return Response.json({ error: "Accès refusé" }, { status: 403 });
   }
 
   const supabase = await createClient();
   const [{ data: inventaire, error: erreurInventaire }, { data: lignes, error: erreurLignes }] = await Promise.all([
     supabase.from("inventaires").select("numero,date_inventaire,statut,commentaire,valide_at").eq("id", id).eq("entreprise_id", contexte.entrepriseId).maybeSingle(),
-    supabase
-      .from("lignes_inventaire")
-      .select("quantite_theorique,quantite_comptee,prix_achat_ht_snapshot,article:articles_stock(reference,designation,unite)")
-      .eq("inventaire_id", id)
-      .eq("entreprise_id", contexte.entrepriseId)
-      .order("created_at"),
+    supabase.rpc("lignes_inventaire_avec_prix", {
+      p_entreprise_id: contexte.entrepriseId,
+      p_inventaire_id: id,
+    }),
   ]);
   if (erreurInventaire || erreurLignes) return Response.json({ error: erreurInventaire?.message ?? erreurLignes?.message }, { status: 503 });
   if (!inventaire) return Response.json({ error: "Inventaire introuvable" }, { status: 404 });
   if (inventaire.statut !== "valide") return Response.json({ error: "L’inventaire doit être validé avant son export comptable" }, { status: 409 });
 
-  const details = (lignes ?? []).map((ligne) => {
-    const article = un(ligne.article as Article | Article[] | null);
+  const details = ((lignes ?? []) as LignePrix[]).map((ligne) => {
+    const article: Article = {
+      reference: String(ligne.reference ?? ""),
+      designation: String(ligne.designation ?? ""),
+      unite: String(ligne.unite ?? ""),
+    };
     const theorique = Number(ligne.quantite_theorique);
     const compte = Number(ligne.quantite_comptee);
     const prix = Number(ligne.prix_achat_ht_snapshot);

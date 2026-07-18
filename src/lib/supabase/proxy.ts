@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
-import { GESTION_PERMISSION_PAR_CHEMIN, MODULE_PERMISSION_PAR_CHEMIN, PERMISSIONS_MUTATION_ALTERNATIVES } from "@/lib/module-permissions";
+import { GESTION_PERMISSION_PAR_CHEMIN, MODULE_PERMISSION_PAR_CHEMIN, PERMISSIONS_ACCES_ALTERNATIVES, PERMISSIONS_MUTATION_ALTERNATIVES } from "@/lib/module-permissions";
 
 const PUBLIC_PATHS = ["/login", "/signup", "/tarifs", "/auth", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu", "/guides", "/videos", "/paiement", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/cron/abonnements", "/api/paiements-bancaires/powens", "/api/paie/import"];
 
@@ -77,7 +77,9 @@ export async function updateSession(request: NextRequest) {
         const { data: accesSupport } = await supabase.rpc("est_acces_support_actif", { p_entreprise_id: profil.entreprise_active_id });
         if (accesSupport === true) return response;
         const { data: appartenance } = await supabase.from("utilisateurs_entreprises").select("poste_id").eq("utilisateur_id", user.id).eq("entreprise_id", profil.entreprise_active_id).eq("statut", "actif").maybeSingle();
-        const { data: droit } = appartenance?.poste_id ? await supabase.from("permissions_poste").select("autorise").eq("entreprise_id", profil.entreprise_active_id).eq("poste_id", appartenance.poste_id).eq("cle_permission", droitRequis).eq("autorise", true).maybeSingle() : { data: null };
+        const cheminAlternatif=Object.keys(PERMISSIONS_ACCES_ALTERNATIVES).find(chemin=>request.nextUrl.pathname===chemin||request.nextUrl.pathname.startsWith(chemin+"/"));
+        const droitsAcceptes=cheminAlternatif?PERMISSIONS_ACCES_ALTERNATIVES[cheminAlternatif]:[droitRequis];
+        const { data: droit } = appartenance?.poste_id ? await supabase.from("permissions_poste").select("autorise").eq("entreprise_id", profil.entreprise_active_id).eq("poste_id", appartenance.poste_id).in("cle_permission",droitsAcceptes).eq("autorise", true).limit(1).maybeSingle() : { data: null };
         if (!droit) { const url=request.nextUrl.clone();url.pathname="/dashboard";url.searchParams.set("acces","refuse");return NextResponse.redirect(url); }
       }
     }

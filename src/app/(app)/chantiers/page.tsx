@@ -10,6 +10,9 @@ export default async function ChantiersPage({ searchParams }: { searchParams: Pr
   const supabase = await createClient();
   const permissions = await permissionsUtilisateur(ctx);
   const peutGerer = permissions === null || permissions.includes("gerer_chantiers");
+  const vueChantiersAffectes = permissions !== null
+    && !permissions.includes("acces_chantiers")
+    && permissions.includes("voir_chantiers_assignes");
 
   const { data: chantiers } = await supabase
     .from("chantiers")
@@ -39,6 +42,7 @@ export default async function ChantiersPage({ searchParams }: { searchParams: Pr
         </div>
 
         {error&&<p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        {vueChantiersAffectes&&<p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">Votre poste affiche uniquement les chantiers auxquels vous êtes affecté. L’administrateur peut modifier ce choix dans les droits du poste.</p>}
 
         <form method="get" className="flex flex-wrap gap-2 rounded-md border border-neutral-200 p-3 dark:border-neutral-800">
           <input name="q" defaultValue={q} placeholder="Référence, chantier, client ou ville" className="min-w-64 flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900" />

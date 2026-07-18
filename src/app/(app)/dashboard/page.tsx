@@ -20,9 +20,12 @@ export default async function DashboardPage() {
   const supabase = await createClient();
   const aujourdhui = new Date().toISOString().slice(0, 10);
   const autorise = (cle: string) => permissions === null || permissions.includes(cle);
-  const voirVueEnsembleChantiers = permissions === null || permissions.includes("gerer_chantiers") || permissions.includes("voir_heures_chantiers");
+  // La base filtre elle-même les chantiers selon le choix de l'administrateur :
+  // vue globale (`acces_chantiers`) ou uniquement les chantiers affectés.
+  // Les compteurs et graphiques utilisent donc exactement le même périmètre.
+  const peutVoirChantiers = autorise("acces_chantiers") || autorise("voir_chantiers_assignes");
   const voir = {
-    devis: autorise("acces_devis"), factures: autorise("acces_factures"), chantiers: autorise("acces_chantiers") && voirVueEnsembleChantiers,
+    devis: autorise("acces_devis"), factures: autorise("acces_factures"), chantiers: peutVoirChantiers,
     planning: autorise("acces_planning"), stock: autorise("acces_stock"), flotte: autorise("acces_flotte"),
     outillage: autorise("acces_outillage"), achats: autorise("acces_achats"), pointage: autorise("acces_pointage"),
   };
@@ -37,7 +40,7 @@ export default async function DashboardPage() {
     { permission: "voir_devis_chantier_sans_prix", href: "/mes-travaux", label: "Mes travaux", icon: "travaux" },
     { permission: "acces_pointage", href: "/pointage", label: "Pointage", icon: "pointage" },
     { permission: "acces_planning", href: "/planning", label: "Planning", icon: "planning" },
-    ...(voirVueEnsembleChantiers ? [{ permission: "acces_chantiers", href: "/chantiers", label: "Chantiers", icon: "chantiers" as const }] : []),
+    ...(peutVoirChantiers ? [{ permission: null, href: "/chantiers", label: "Chantiers", icon: "chantiers" as const }] : []),
     { permission: "acces_employes", href: "/employes", label: "Employés", icon: "employes" },
     { permission: "acces_clients", href: "/clients", label: "Clients", icon: "clients" },
     { permission: "acces_devis", href: "/devis", label: "Devis", icon: "devis" },

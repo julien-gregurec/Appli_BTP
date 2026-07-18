@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { NAVIGATION_APPLICATION, NAVIGATION_GROUPES } from "@/lib/navigation";
+import { NAVIGATION_APPLICATION, NAVIGATION_GROUPES, navigationAutorisee } from "@/lib/navigation";
 import { GESTION_PERMISSION_PAR_CHEMIN, PERMISSIONS_MUTATION_ALTERNATIVES } from "@/lib/module-permissions";
 
 type PermissionDetail = { cle: string; module: string; description: string };
@@ -21,7 +21,7 @@ export function ApercuPoste({ poste, entrepriseNom, permissions, catalogue }: {
 }) {
   const [mobile, setMobile] = useState(false);
   const autorise = new Set(permissions);
-  const navigation = NAVIGATION_APPLICATION.filter((item) => !item.permission || autorise.has(item.permission));
+  const navigation = NAVIGATION_APPLICATION.filter((item) => navigationAutorisee(item.permission, [...autorise]));
   const peutVoirChiffres = autorise.has("voir_indicateurs_financiers");
   const peutPointer = autorise.has("saisir_son_pointage");
   const peutVoirPlanning = autorise.has("acces_planning");

@@ -952,3 +952,16 @@ git diff --check                   # OK (aucun conflit whitespace)
 - La création de notes par un ouvrier est réparée : la policy directe du créateur permet le `insert ... returning id` utilisé par l’application, sans donner accès aux notes des autres salariés.
 - Contrôle direct Supabase réussi avec l’identité du compte ouvrier de démonstration : création d’un brouillon affecté au dépôt et retour de la référence, dans une transaction annulée sans donnée de test persistante.
 - Contrôles verts : 80 tests Vitest, TypeScript, ESLint et build Next webpack complet dans une copie isolée. Le build standard du dossier partagé n’a pas été forcé afin de préserver le `.next` utilisé simultanément par une autre tâche.
+
+## 110. Confidentialité pointages, chantiers affectés et prix du stock — 18 juillet 2026
+
+- Migration `20260718000108_droits_pointages_chantiers_prix_stock.sql` appliquée et vérifiée dans Supabase : quatre droits administrables sont ajoutés à la matrice des postes : `voir_pointages_equipe`, `voir_chantiers_assignes`, `voir_prix_stock` et `gerer_prix_stock`.
+- Un salarié conserve toujours l’accès à ses propres pointages. La lecture des pointages des autres, leur modification et leur validation sont trois autorisations distinctes ; les politiques RLS filtrent les données même en cas d’accès direct.
+- Sans accès global aux chantiers, l’application et la base ne renvoient que les chantiers auxquels l’utilisateur est affecté par l’équipe chantier ou le planning. Le sélecteur de pointage suit la même règle. L’administrateur peut choisir entre accès global, affectations uniquement ou aucun accès.
+- Les prix d’achat, prix de revente, valorisations de stock et valorisations d’inventaire sont masqués sans autorisation. Les colonnes sensibles ne sont plus lisibles directement par un compte standard ; des fonctions serveur contrôlées les restituent uniquement aux postes habilités.
+- La saisie, la modification et l’import de prix nécessitent `gerer_prix_stock`. Un déclencheur en base bloque également toute écriture de prix non autorisée provenant d’un ancien écran ou d’un appel direct.
+- Les exports comptables de clôture d’inventaire exigent le droit de voir les prix. Les utilisateurs non habilités conservent les quantités nécessaires au comptage, sans aucune valeur financière.
+- Les modèles Ouvrier et Chef d’équipe passent par défaut en vue « chantiers affectés ». Le Chef d’équipe n’a pas accès aux appels d’offres par défaut ; l’administrateur peut exceptionnellement lui ajouter ce droit.
+- La vue d’ensemble, le graphique d’état et la liste des chantiers actifs utilisent le même périmètre que la page Chantiers : tous les chantiers avec le droit global, uniquement les chantiers affectés avec le droit restreint, ou aucun chantier sans droit.
+- Vérification directe en production : les quatre permissions, les fonctions de filtrage chantier et inventaire, ainsi que l’absence d’appels d’offres pour le modèle Chef d’équipe renvoient toutes `true`.
+- Contrôles réalisés avant livraison : 80 tests Vitest, TypeScript, ESLint et `git diff --check` verts. L’avertissement historique `SignatureEmploye.tsx` reste non bloquant et hors lot.

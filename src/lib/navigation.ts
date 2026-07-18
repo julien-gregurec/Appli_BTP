@@ -2,7 +2,7 @@ export type NavigationApplication = {
   href: string;
   label: string;
   actif: boolean;
-  permission?: string;
+  permission?: string | string[];
   groupe: NavigationGroupe;
 };
 
@@ -38,7 +38,7 @@ export const NAVIGATION_APPLICATION: NavigationApplication[] = [
   { href: "/facturation-avancee", label: "Situations & DGD", actif: true, permission: "acces_facturation_avancee", groupe: "commercial" },
   { href: "/crm", label: "CRM & relances", actif: true, permission: "acces_crm", groupe: "commercial" },
   { href: "/appels-offres", label: "Appels d’offres", actif: true, permission: "acces_appels_offres", groupe: "commercial" },
-  { href: "/chantiers", label: "Chantiers", actif: true, permission: "acces_chantiers", groupe: "chantier" },
+  { href: "/chantiers", label: "Chantiers", actif: true, permission: ["acces_chantiers", "voir_chantiers_assignes"], groupe: "chantier" },
   { href: "/mes-travaux", label: "Mes travaux", actif: true, permission: "voir_devis_chantier_sans_prix", groupe: "chantier" },
   { href: "/ouvrages", label: "Ouvrages & métrés", actif: true, permission: "acces_ouvrages", groupe: "chantier" },
   { href: "/interventions", label: "Interventions", actif: true, permission: "acces_interventions", groupe: "chantier" },
@@ -65,3 +65,9 @@ export const NAVIGATION_APPLICATION: NavigationApplication[] = [
   { href: "/abonnement", label: "Abonnement", actif: true, permission: "acces_parametres", groupe: "administration" },
   { href: "/parametres", label: "Paramètres", actif: true, permission: "acces_parametres", groupe: "administration" },
 ];
+
+export function navigationAutorisee(permission: string | string[] | undefined, autorisations: string[] | null) {
+  if (!permission || autorisations === null) return true;
+  const attendues = Array.isArray(permission) ? permission : [permission];
+  return attendues.some((droit) => autorisations.includes(droit));
+}

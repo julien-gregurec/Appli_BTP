@@ -44,3 +44,7 @@ export const PERMISSIONS_MUTATION_ALTERNATIVES: Record<string,string[]> = {
   "/conges": ["gerer_conges", "demander_ses_conges"],
   "/paiements-bancaires": ["gerer_coordonnees_bancaires", "gerer_paie", "preparer_virements", "valider_virements", "executer_virements"],
 };
+
+export const PERMISSIONS_ACCES_ALTERNATIVES: Record<string,string[]> = {
+  "/chantiers": ["acces_chantiers", "voir_chantiers_assignes"],
+};

@@ -4,6 +4,7 @@ import { enregistrerInventaireAction } from "@/app/actions/inventaires";
 import { euros } from "@/lib/devis";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { calculerSyntheseInventaire } from "@/lib/inventaires";
+import { permissionsUtilisateur } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 
 type ArticleInventaire = { reference: string; designation: string; unite: string };
@@ -11,7 +12,7 @@ type LigneInventaire = {
   id: string;
   quantite_theorique: number;
   quantite_comptee: number | null;
-  prix_achat_ht_snapshot: number;
+  prix_achat_ht_snapshot?: number;
   article: ArticleInventaire | ArticleInventaire[] | null;
 };
 
@@ -28,19 +29,35 @@ export default async function InventairePage({
   const { id } = await params;
   const message = await searchParams;
   const contexte = await getContexteEntreprise();
+  const permissions = await permissionsUtilisateur(contexte);
+  const peutVoirPrix = permissions === null || permissions.includes("voir_prix_stock") || permissions.includes("gerer_prix_stock");
   const supabase = await createClient();
-  const [{ data: inventaire }, { data: lignesData }] = await Promise.all([
-    supabase.from("inventaires").select("*").eq("id", id).eq("entreprise_id", contexte.entrepriseId).maybeSingle(),
-    supabase
+  const lignesPromise = peutVoirPrix
+    ? supabase.rpc("lignes_inventaire_avec_prix", {
+      p_entreprise_id: contexte.entrepriseId,
+      p_inventaire_id: id,
+    })
+    : supabase
       .from("lignes_inventaire")
-      .select("id,quantite_theorique,quantite_comptee,prix_achat_ht_snapshot,article:articles_stock(reference,designation,unite)")
+      .select("id,quantite_theorique,quantite_comptee,article:articles_stock(reference,designation,unite)")
       .eq("inventaire_id", id)
       .eq("entreprise_id", contexte.entrepriseId)
-      .order("created_at"),
+      .order("created_at");
+  const [{ data: inventaire }, { data: lignesData }] = await Promise.all([
+    supabase.from("inventaires").select("*").eq("id", id).eq("entreprise_id", contexte.entrepriseId).maybeSingle(),
+    lignesPromise,
   ]);
   if (!inventaire) notFound();
 
-  const lignes = (lignesData ?? []) as LigneInventaire[];
+  const lignes = ((lignesData ?? []) as Array<Record<string, unknown>>).map((ligne) => ({
+    id: String(ligne.id),
+    quantite_theorique: Number(ligne.quantite_theorique),
+    quantite_comptee: ligne.quantite_comptee === null ? null : Number(ligne.quantite_comptee),
+    prix_achat_ht_snapshot: peutVoirPrix ? Number(ligne.prix_achat_ht_snapshot ?? 0) : undefined,
+    article: "article" in ligne
+      ? ligne.article as ArticleInventaire | ArticleInventaire[] | null
+      : { reference: String(ligne.reference ?? ""), designation: String(ligne.designation ?? ""), unite: String(ligne.unite ?? "") },
+  })) as LigneInventaire[];
   const synthese = calculerSyntheseInventaire(lignes.map((ligne) => ({
     quantiteTheorique: Number(ligne.quantite_theorique),
     quantiteComptee: ligne.quantite_comptee === null ? null : Number(ligne.quantite_comptee),
@@ -48,7 +65,7 @@ export default async function InventairePage({
   })));
   const action = enregistrerInventaireAction.bind(null, id);
   const cloture = inventaire.statut === "valide";
-  const prixManquants = lignes.filter((ligne) => Number(ligne.prix_achat_ht_snapshot) === 0).length;
+  const prixManquants = peutVoirPrix ? lignes.filter((ligne) => Number(ligne.prix_achat_ht_snapshot) === 0).length : 0;
   const inventaireHistorique = String(inventaire.date_inventaire) < "2026-07-17";
 
   return (
@@ -60,7 +77,7 @@ export default async function InventairePage({
             <h1 className="mt-1 text-2xl font-semibold">{inventaire.numero}</h1>
             <p className="text-sm text-neutral-500">{inventaire.date_inventaire} · <span className="capitalize">{inventaire.statut}</span></p>
           </div>
-          {cloture && <div className="flex flex-wrap gap-2">
+          {cloture && peutVoirPrix && <div className="flex flex-wrap gap-2">
             <a href={`/api/inventaires/${id}/cloture`} className="rounded-md bg-[#0d1b2a] px-4 py-2 text-center text-sm font-semibold text-white">
               Exporter la clôture Excel
             </a>
@@ -72,6 +89,7 @@ export default async function InventairePage({
 
         {message.error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{message.error}</p>}
         {message.success && <p className="rounded-md bg-green-50 p-3 text-sm text-green-700">{message.success}</p>}
+        {!peutVoirPrix && <p className="rounded-md border border-blue-300 bg-blue-50 p-3 text-sm text-blue-900">Les quantités restent accessibles. Les prix et la valorisation comptable sont masqués selon les droits définis par l’administrateur.</p>}
         {prixManquants > 0 && (
           <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
             {prixManquants} article{prixManquants > 1 ? "s ont" : " a"} un prix d’achat nul. Complétez les prix avant le prochain inventaire pour obtenir une valorisation comptable complète.
@@ -84,18 +102,18 @@ export default async function InventairePage({
         )}
 
         <section>
-          <h2 className="font-semibold">Synthèse de clôture au prix d’achat HT</h2>
-          <p className="mt-1 text-sm text-neutral-500">Pour les inventaires créés depuis le 17 juillet 2026, les prix sont figés au démarrage : une modification ultérieure du catalogue ne change pas le rapport.</p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <h2 className="font-semibold">{peutVoirPrix ? "Synthèse de clôture au prix d’achat HT" : "Synthèse des quantités"}</h2>
+          {peutVoirPrix && <p className="mt-1 text-sm text-neutral-500">Pour les inventaires créés depuis le 17 juillet 2026, les prix sont figés au démarrage : une modification ultérieure du catalogue ne change pas le rapport.</p>}
+          <div className={`mt-3 grid gap-3 sm:grid-cols-2 ${peutVoirPrix ? "xl:grid-cols-5" : "xl:grid-cols-2"}`}>
             <Carte label="Articles comptés" valeur={`${synthese.articlesComptes} / ${synthese.articles}`} />
             <Carte label="Articles avec écart" valeur={String(synthese.articlesAvecEcart)} alerte={synthese.articlesAvecEcart > 0} />
-            <Carte label="Valeur théorique HT" valeur={euros(synthese.valeurTheoriqueHt)} />
-            <Carte label="Valeur comptée HT" valeur={euros(synthese.valeurCompteeHt)} />
-            <Carte
+            {peutVoirPrix && <Carte label="Valeur théorique HT" valeur={euros(synthese.valeurTheoriqueHt)} />}
+            {peutVoirPrix && <Carte label="Valeur comptée HT" valeur={euros(synthese.valeurCompteeHt)} />}
+            {peutVoirPrix && <Carte
               label="Écart de valeur HT"
               valeur={`${synthese.ecartValeurHt > 0 ? "+" : ""}${euros(synthese.ecartValeurHt)}`}
               tonalite={synthese.ecartValeurHt < 0 ? "negatif" : synthese.ecartValeurHt > 0 ? "positif" : "neutre"}
-            />
+            />}
           </div>
           <div className="mt-3 flex flex-wrap gap-3 text-sm">
             <span className="rounded-full bg-red-50 px-3 py-1 text-red-700">Quantités manquantes : {nombre(synthese.quantiteManquante)}</span>
@@ -105,7 +123,7 @@ export default async function InventairePage({
 
         <form action={action}>
           <div className="overflow-x-auto rounded-md border dark:border-neutral-800">
-            <table className="min-w-[1050px] w-full text-sm">
+            <table className={`${peutVoirPrix ? "min-w-[1050px]" : "min-w-[650px]"} w-full text-sm`}>
               <thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500 dark:bg-neutral-900">
                 <tr>
                   <th className="px-3 py-3">Référence</th>
@@ -113,10 +131,10 @@ export default async function InventairePage({
                   <th className="text-right">Théorique</th>
                   <th className="text-right">Compté</th>
                   <th className="text-right">Écart</th>
-                  <th className="text-right">Prix achat HT</th>
-                  <th className="text-right">Valeur théorique</th>
-                  <th className="px-3 text-right">Valeur comptée</th>
-                  <th className="px-3 text-right">Écart HT</th>
+                  {peutVoirPrix && <th className="text-right">Prix achat HT</th>}
+                  {peutVoirPrix && <th className="text-right">Valeur théorique</th>}
+                  {peutVoirPrix && <th className="px-3 text-right">Valeur comptée</th>}
+                  {peutVoirPrix && <th className="px-3 text-right">Écart HT</th>}
                 </tr>
               </thead>
               <tbody>
@@ -149,12 +167,12 @@ export default async function InventairePage({
                       <td className={`text-right font-mono ${ecartQuantite && ecartQuantite < 0 ? "text-red-700" : ecartQuantite && ecartQuantite > 0 ? "text-green-700" : ""}`}>
                         {ecartQuantite === null ? "—" : `${ecartQuantite > 0 ? "+" : ""}${nombre(ecartQuantite)}`}
                       </td>
-                      <td className="text-right font-mono">{euros(prix)}</td>
-                      <td className="text-right font-mono">{euros(valeurTheorique)}</td>
-                      <td className="px-3 text-right font-mono">{valeurComptee === null ? "—" : euros(valeurComptee)}</td>
-                      <td className={`px-3 text-right font-mono font-semibold ${ecartValeur !== null && ecartValeur < 0 ? "text-red-700" : ecartValeur !== null && ecartValeur > 0 ? "text-green-700" : ""}`}>
+                      {peutVoirPrix && <td className="text-right font-mono">{euros(prix)}</td>}
+                      {peutVoirPrix && <td className="text-right font-mono">{euros(valeurTheorique)}</td>}
+                      {peutVoirPrix && <td className="px-3 text-right font-mono">{valeurComptee === null ? "—" : euros(valeurComptee)}</td>}
+                      {peutVoirPrix && <td className={`px-3 text-right font-mono font-semibold ${ecartValeur !== null && ecartValeur < 0 ? "text-red-700" : ecartValeur !== null && ecartValeur > 0 ? "text-green-700" : ""}`}>
                         {ecartValeur === null ? "—" : `${ecartValeur > 0 ? "+" : ""}${euros(ecartValeur)}`}
-                      </td>
+                      </td>}
                     </tr>
                   );
                 })}
@@ -169,9 +187,9 @@ export default async function InventairePage({
           )}
         </form>
 
-        <p className="rounded-md border bg-neutral-50 p-4 text-sm text-neutral-600 dark:bg-neutral-900">
+        {peutVoirPrix && <p className="rounded-md border bg-neutral-50 p-4 text-sm text-neutral-600 dark:bg-neutral-900">
           Ce rapport fournit une valorisation au prix d’achat HT pour préparer la clôture. L’expert-comptable reste responsable de la méthode de valorisation retenue, des dépréciations éventuelles et de l’écriture comptable définitive.
-        </p>
+        </p>}
       </div>
     </main>
   );
