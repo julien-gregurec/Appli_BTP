@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { revalidatePath } from "next/cache";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { prefixeIdentifiantEntreprise } from "@/lib/identifiants";
 
 function champ(formData: FormData, nom: string) {
   const valeur = String(formData.get(nom) ?? "").trim();
@@ -108,8 +109,8 @@ export async function modifierEntrepriseAction(formData: FormData) {
     redirect(`/parametres?error=${encodeURIComponent("Taux de pénalités invalide")}`);
   }
 
-  const modeIdentifiant = champ(formData, "mode_identifiant_employe") ?? "reference_interne";
-  const prefixeIdentifiant = (champ(formData, "prefixe_identifiant_employe") ?? "EMP").toUpperCase();
+  const modeIdentifiant = champ(formData, "mode_identifiant_employe") ?? "prefixe_4_chiffres";
+  const prefixeIdentifiant = (champ(formData, "prefixe_identifiant_employe") ?? prefixeIdentifiantEntreprise(nom)).toUpperCase();
   if (!["reference_interne", "prefixe_4_chiffres"].includes(modeIdentifiant)) {
     redirect(`/parametres?error=${encodeURIComponent("Format d’identifiant salarié invalide")}`);
   }

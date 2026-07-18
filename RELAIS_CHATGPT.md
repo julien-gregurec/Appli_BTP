@@ -924,3 +924,12 @@ git diff --check                   # OK (aucun conflit whitespace)
 - Les nouvelles entreprises créées depuis l’inscription ou par l’administrateur plateforme reçoivent automatiquement les neuf rôles. Le créateur d’une entreprise est affecté au rôle Gérant.
 - Migration `20260718000104_roles_predefinis.sql` appliquée et vérifiée dans Supabase : 9 modèles, 2 entreprises existantes, minimum 9 rôles standards dans chacune.
 - Contrôles verts : ESLint, `git diff --check` et build Next webpack complet de 88 pages. Les avertissements historiques hors lot restent non bloquants.
+
+## 107. Identifiants dépôt dérivés de l’entreprise — 18 juillet 2026
+
+- Le mode par défaut des identifiants salariés utilisés sur la borne dépôt devient **3 lettres de l’entreprise + 4 chiffres** : `Liria Concept` génère par exemple `LIR-0001`.
+- Le préfixe est calculé en majuscules, sans accent ni caractère spécial. Un nom de moins de trois caractères est complété avec `X` ; le repli technique est `DEP`.
+- L’administrateur peut toujours remplacer ce préfixe dans `/parametres`. La borne affiche un exemple correspondant au réglage actif.
+- Les identifiants salariés déjà attribués ne sont pas renumérotés automatiquement, afin de préserver les accès existants. Seul l’ancien préfixe de configuration générique `EMP` est remplacé par le préfixe de l’entreprise.
+- Migration `20260718000105_prefixe_identifiants_depot.sql` appliquée et vérifiée dans Supabase : `LIR`, `ELA` pour `Élan Bâtiment` et le nouveau mode par défaut sont tous confirmés.
+- Contrôles verts : 76 tests Vitest, TypeScript, ESLint, `git diff --check` et build Next webpack complet de 88 pages. Les avertissements historiques hors lot restent non bloquants.

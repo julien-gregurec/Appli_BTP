@@ -27,6 +27,17 @@
 
 ---
 
+# REPRISE — 18 juillet 2026, identifiants dépôt par entreprise (MIGRATION 105 APPLIQUÉE)
+
+- Les identifiants salariés de la borne dépôt utilisent désormais par défaut les trois premières lettres utiles du nom de l’entreprise suivies de quatre chiffres : `Liria Concept` → `LIR-0001`.
+- Le calcul supprime accents, espaces et caractères spéciaux, passe en majuscules, complète les noms courts avec `X` et utilise `DEP` comme repli technique.
+- Le préfixe reste modifiable dans `/parametres`; la borne affiche l’exemple réellement configuré.
+- Aucun identifiant déjà attribué n’est renuméroté. Seul l’ancien préfixe de configuration générique `EMP` est remplacé automatiquement pour les entreprises existantes.
+- Migration `20260718000105_prefixe_identifiants_depot.sql` appliquée et vérifiée dans Supabase (`LIR=true`, accents=true, défaut=true).
+- Contrôles verts : 76 tests Vitest, TypeScript, ESLint, `git diff --check` et build Next webpack complet de 88 pages.
+
+---
+
 # REPRISE — 18 juillet 2026, rôles BTP prédéfinis (MIGRATION 104 APPLIQUÉE)
 
 - Neuf modèles de rôles sont maintenant installés dans chaque entreprise : **Ouvrier, Chef d’équipe, Chef de chantier, Conducteur de travaux, Directeur travaux, Administration, RH, Comptable et Gérant**.

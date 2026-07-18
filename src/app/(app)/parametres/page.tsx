@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { DocumentTemplatePreview } from "@/components/DocumentTemplatePreview";
+import { prefixeIdentifiantEntreprise } from "@/lib/identifiants";
 
 const input = "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -14,6 +15,7 @@ export default async function ParametresPage({ searchParams }: { searchParams: P
   const permissions = await permissionsUtilisateur(ctx);
   const peutGererAcces = permissions === null || permissions.includes("gerer_utilisateurs");
   const { data: entreprise } = await supabase.from("entreprises").select("*").eq("id", ctx.entrepriseId).single();
+  const prefixeIdentifiant = entreprise?.prefixe_identifiant_employe ?? prefixeIdentifiantEntreprise(entreprise?.nom ?? "");
 
   return (
     <main className="p-8">
@@ -33,8 +35,8 @@ export default async function ParametresPage({ searchParams }: { searchParams: P
           <section className="space-y-4 rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
             <div><h2 className="text-sm font-semibold">Identifiants des salariés</h2><p className="text-xs text-neutral-500">Cet identifiant est affiché sur la fiche du salarié et sert à s’identifier sur la borne du dépôt. Le numéro d’invitation à l’application reste séparé et privé.</p></div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div><label className="text-xs text-neutral-500">Format</label><select name="mode_identifiant_employe" defaultValue={entreprise?.mode_identifiant_employe??"reference_interne"} className={input}><option value="reference_interne">Référence interne existante — EMP-0001</option><option value="prefixe_4_chiffres">Préfixe personnalisé + 4 chiffres</option></select></div>
-              <div><label className="text-xs text-neutral-500">Préfixe personnalisé</label><input name="prefixe_identifiant_employe" minLength={2} maxLength={8} pattern="[A-Za-z0-9]{2,8}" defaultValue={entreprise?.prefixe_identifiant_employe??"EMP"} placeholder="Ex. LIR" className={`${input} uppercase`}/><p className="mt-1 text-[11px] text-neutral-500">Exemple : LIR-0001. Lettres et chiffres uniquement.</p></div>
+              <div><label className="text-xs text-neutral-500">Format</label><select name="mode_identifiant_employe" defaultValue={entreprise?.mode_identifiant_employe??"prefixe_4_chiffres"} className={input}><option value="reference_interne">Référence interne existante</option><option value="prefixe_4_chiffres">3 lettres de l’entreprise + 4 chiffres</option></select></div>
+              <div><label className="text-xs text-neutral-500">Préfixe du dépôt</label><input name="prefixe_identifiant_employe" minLength={2} maxLength={8} pattern="[A-Za-z0-9]{2,8}" defaultValue={prefixeIdentifiant} placeholder="Ex. LIR" className={`${input} uppercase`}/><p className="mt-1 text-[11px] text-neutral-500">Par défaut : trois premières lettres du nom de l’entreprise, sans accent. Exemple : {prefixeIdentifiant}-0001. Le préfixe reste modifiable.</p></div>
             </div>
             <p className="rounded-md bg-amber-50 p-3 text-xs text-amber-900">Un changement de format renumérote les identifiants visibles des salariés. Les comptes et historiques ne sont pas modifiés.</p>
           </section>
