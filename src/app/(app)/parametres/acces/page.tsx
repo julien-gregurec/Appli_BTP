@@ -20,7 +20,7 @@ import {
 } from "@/lib/roles-predefinis";
 
 type Permission = { cle: string; module: string; description: string };
-const DROITS_SOCLE = new Set(["acces_planning", "acces_pointage", "saisir_son_pointage", "saisir_ses_notes_frais", "demander_ses_conges", "utiliser_borne_stock"]);
+const DROITS_SOCLE = new Set(["acces_planning", "saisir_ses_notes_frais", "demander_ses_conges", "utiliser_borne_stock"]);
 
 export default async function AccesPage({
   searchParams,
@@ -71,6 +71,13 @@ export default async function AccesPage({
         <section className="grid gap-3 rounded-md border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-100 md:grid-cols-2">
           <div><strong>Consulter</strong><p className="mt-1 text-xs opacity-80">Affiche le module et ses informations en lecture seule.</p></div>
           <div><strong>Gérer</strong><p className="mt-1 text-xs opacity-80">Autorise les créations, modifications, suppressions, imports, validations et envois. Gérer active automatiquement Consulter.</p></div>
+        </section>
+
+        <section className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+          <h2 className="font-semibold">Pointage facultatif selon le poste</h2>
+          <p className="mt-1 text-xs opacity-80">
+            Vous choisissez les comptes qui utilisent le pointage. Activez séparément l’accès au module, la saisie en son nom, la consultation de l’équipe, la gestion et la validation. Les modèles Administration et Conducteur de travaux ne pointent pas par défaut.
+          </p>
         </section>
 
         <section className="rounded-md border border-[#c9a24a]/40 bg-[#c9a24a]/5 p-4">

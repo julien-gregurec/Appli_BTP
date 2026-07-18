@@ -965,3 +965,12 @@ git diff --check                   # OK (aucun conflit whitespace)
 - La vue d’ensemble, le graphique d’état et la liste des chantiers actifs utilisent le même périmètre que la page Chantiers : tous les chantiers avec le droit global, uniquement les chantiers affectés avec le droit restreint, ou aucun chantier sans droit.
 - Vérification directe en production : les quatre permissions, les fonctions de filtrage chantier et inventaire, ainsi que l’absence d’appels d’offres pour le modèle Chef d’équipe renvoient toutes `true`.
 - Contrôles réalisés avant livraison : 80 tests Vitest, TypeScript, ESLint et `git diff --check` verts. L’avertissement historique `SignatureEmploye.tsx` reste non bloquant et hors lot.
+
+## 111. Pointage activé au choix par l’administrateur — 18 juillet 2026
+
+- Le pointage n’est plus inclus de force dans les droits communs de tous les comptes. L’administrateur choisit désormais les postes qui accèdent au module et active séparément la saisie personnelle, la consultation de l’équipe, la gestion et la validation.
+- Les modèles **Administration** et **Conducteur de travaux** n’ont aucun droit de pointage par défaut. L’administrateur peut leur redonner tout ou partie de ces droits depuis `/parametres/acces` s’il le souhaite.
+- Les modèles terrain conservent leurs réglages recommandés. Un poste personnalisé peut également être créé pour traiter une exception individuelle, puis affecté au compte concerné.
+- La création des nouvelles entreprises et la réapplication d’un rôle prédéfini respectent ce choix : aucun droit de pointage n’est réinjecté par le socle commun.
+- Migration `20260718000109_pointage_optionnel_par_poste.sql` appliquée dans Supabase. Contrôle direct réussi : modèles Administration/Conducteur sans pointage, postes existants mis à niveau, modèle Ouvrier inchangé et fonctions d’installation/réinitialisation sans pointage forcé (`true` sur les cinq vérifications).
+- Contrôles verts : 80 tests Vitest, TypeScript, ESLint et `git diff --check`. L’avertissement historique `SignatureEmploye.tsx` reste non bloquant et hors lot.
