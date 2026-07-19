@@ -114,11 +114,18 @@ try {
       if (await societe.count()) await societe.fill(`${marqueur} SARL`);
       const delai = page.locator('input[name="delai_paiement_jours"]');
       if (await delai.count()) await delai.fill("30");
-      await page.locator('form button[type="submit"]').first().click();
-      await page.waitForLoadState("networkidle", { timeout: 45_000 });
-      await page.goto(`${baseUrl}/clients`, { waitUntil: "networkidle" });
-      clientOk = (await page.locator("body").innerText()).includes(nomClient);
-      if (clientOk) clientDetail = "visible dans la liste";
+      // Cibler le bouton par son nom : la barre latérale contient aussi un
+      // bouton de soumission (« Se déconnecter ») qui vient avant dans le DOM.
+      // Preuve de création : l'action redirige vers la fiche du client créé.
+      // (Ne pas chercher le nom dans la liste : elle affiche la société en priorité.
+      //  Ne pas se fier à networkidle : il rend la main avant la fin de la redirection.)
+      await Promise.all([
+        page.waitForURL((u) => /^\/clients\/[0-9a-f-]{36}$/.test(u.pathname), { timeout: 45_000 }),
+        page.getByRole("button", { name: "Créer le client" }).click(),
+      ]);
+      const chemin = new URL(page.url()).pathname;
+      clientOk = /^\/clients\/[0-9a-f-]{36}$/.test(chemin);
+      clientDetail = clientOk ? `fiche créée (${chemin})` : `resté sur ${chemin}`;
     } catch (e) {
       clientDetail = e.message.slice(0, 120);
     }
@@ -131,17 +138,20 @@ try {
     try {
       await page.goto(`${baseUrl}/chantiers/nouveau`, { waitUntil: "networkidle", timeout: 45_000 });
       await page.locator('input[name="nom"]').fill(nomChantier);
+      // Sélection par valeur : les libellés varient (société affichée en priorité).
       const select = page.locator('select[name="client_id"]');
-      if (await select.count()) {
-        const options = await select.locator("option").allTextContents();
-        const cible = options.find((o) => o.includes(nomClient)) ?? options.find((o) => o.trim());
-        if (cible) await select.selectOption({ label: cible });
-      }
-      await page.locator('form button[type="submit"]').first().click();
-      await page.waitForLoadState("networkidle", { timeout: 45_000 });
-      await page.goto(`${baseUrl}/chantiers`, { waitUntil: "networkidle" });
-      chantierOk = (await page.locator("body").innerText()).includes(nomChantier);
-      if (chantierOk) chantierDetail = "visible dans la liste";
+      await select.waitFor({ state: "visible", timeout: 30_000 });
+      const valeurs = await select.locator("option").evaluateAll((opts) =>
+        opts.map((o) => o.value).filter(Boolean),
+      );
+      if (valeurs.length) await select.selectOption(valeurs[0]);
+      await Promise.all([
+        page.waitForURL((u) => /^\/chantiers\/[0-9a-f-]{36}$/.test(u.pathname), { timeout: 45_000 }),
+        page.getByRole("button", { name: "Créer le chantier" }).click(),
+      ]);
+      const chemin = new URL(page.url()).pathname;
+      chantierOk = /^\/chantiers\/[0-9a-f-]{36}$/.test(chemin);
+      chantierDetail = chantierOk ? `fiche créée (${chemin})` : `resté sur ${chemin}`;
     } catch (e) {
       chantierDetail = e.message.slice(0, 120);
     }
