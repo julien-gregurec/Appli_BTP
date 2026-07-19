@@ -38,15 +38,30 @@ if (!email || !password) {
 }
 
 const ROUTES = [
+  // Écrans de consultation
   "/dashboard", "/clients", "/chantiers", "/devis", "/factures", "/prestations",
   "/commandes", "/fournisseurs", "/depenses", "/charges", "/notes-frais",
   "/conges", "/planning", "/employes", "/pointage", "/rentabilite", "/tresorerie",
   "/stock", "/stock/borne", "/stock/reception", "/flotte", "/outillage",
   "/inventaires", "/exports", "/parametres", "/parametres/donnees", "/aide",
+  // Écrans de création : un éditeur cassé se voit ici sans polluer les données
+  "/clients/nouveau", "/chantiers/nouveau", "/devis/nouveau", "/commandes/nouveau",
+  "/employes/nouveau", "/flotte/nouveau", "/outillage/nouveau", "/prestations/nouveau",
+  "/parametres/import", "/parametres/acces",
+];
+
+// Contrôle de sécurité : l'espace plateforme est réservé à l'équipe Liria.
+// Avec un compte d'entreprise ordinaire il DOIT rester inaccessible (404, qui
+// ne révèle même pas son existence). Un accès réussi ici serait une faille.
+const ROUTES_INTERDITES = [
+  "/plateforme", "/plateforme/support", "/plateforme/facturation", "/plateforme/roles-demo",
 ];
 
 const incidents = [];
 const parcours = [];
+// Pendant les contrôles de sécurité on demande exprès des pages interdites :
+// les 404 qui en découlent sont attendus et ne doivent pas être comptés.
+let phaseSecurite = false;
 const marqueur = `[TEST AUTO] ${new Date().toISOString().slice(0, 16)}`;
 
 function noter(nom, ok, detail = null) {
@@ -62,12 +77,12 @@ const context = await browser.newContext({
 });
 const page = await context.newPage();
 
-page.on("pageerror", (e) => incidents.push({ type: "erreur_page", message: e.message, url: page.url() }));
+page.on("pageerror", (e) => { if (!phaseSecurite) incidents.push({ type: "erreur_page", message: e.message, url: page.url() }); });
 page.on("console", (m) => {
-  if (m.type() === "error") incidents.push({ type: "console", message: m.text(), url: page.url() });
+  if (m.type() === "error" && !phaseSecurite) incidents.push({ type: "console", message: m.text(), url: page.url() });
 });
 page.on("response", (r) => {
-  if (r.status() >= 500) incidents.push({ type: "serveur", message: `HTTP ${r.status()}`, url: r.url() });
+  if (r.status() >= 500 && !phaseSecurite) incidents.push({ type: "serveur", message: `HTTP ${r.status()}`, url: r.url() });
 });
 
 try {
@@ -99,6 +114,23 @@ try {
     }
     noter(`Page ${route}`, ok, ok ? null : detail);
   }
+
+  // ── Contrôle de sécurité : l'espace plateforme doit rester fermé ──
+  phaseSecurite = true;
+  for (const route of ROUTES_INTERDITES) {
+    let bloque = false;
+    let detail = null;
+    try {
+      const rep = await page.goto(`${baseUrl}${route}`, { waitUntil: "networkidle", timeout: 45_000 });
+      const statut = rep?.status() ?? 0;
+      bloque = statut === 404 || statut === 403;
+      detail = bloque ? `correctement bloqué (HTTP ${statut})` : `ACCESSIBLE — faille (HTTP ${statut})`;
+    } catch (e) {
+      detail = e.message.slice(0, 120);
+    }
+    noter(`Sécurité ${route} inaccessible`, bloque, detail);
+  }
+  phaseSecurite = false;
 
   // ── Parcours ÉCRITURE (optionnel) ────────────────────────────
   if (avecEcriture) {
