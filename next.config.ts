@@ -1,7 +1,36 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
+// ExcelJS charge ses dépendances par des require dynamiques dans des .mjs, que
+// le traçage de Next ne détecte pas : elles manquaient dans la fonction déployée
+// et les exports tombaient en erreur 500 (« Cannot find module 'fast-csv' »).
+// On liste ici toute la chaîne, transitives comprises, pour les deux routes qui
+// génèrent des fichiers Excel.
+const FICHIERS_EXCELJS = [
+  "./node_modules/@excel.js/**/*",
+  "./node_modules/fast-csv/**/*",
+  "./node_modules/@fast-csv/**/*",
+  "./node_modules/saxes/**/*",
+  "./node_modules/xmlchars/**/*",
+  "./node_modules/tmp/**/*",
+  "./node_modules/dayjs/**/*",
+  "./node_modules/lodash.escaperegexp/**/*",
+  "./node_modules/lodash.groupby/**/*",
+  "./node_modules/lodash.uniq/**/*",
+  "./node_modules/lie/**/*",
+  "./node_modules/pako/**/*",
+  "./node_modules/binary/**/*",
+  "./node_modules/bluebird/**/*",
+];
+
 const nextConfig: NextConfig = {
+  // Chargé depuis node_modules à l'exécution plutôt que bundlé : c'est ce qui
+  // permet aux require dynamiques d'ExcelJS de se résoudre.
+  serverExternalPackages: ["@excel.js/exceljs"],
+  outputFileTracingIncludes: {
+    "/api/exports/*": FICHIERS_EXCELJS,
+    "/api/inventaires/*/cloture": FICHIERS_EXCELJS,
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "15mb",
