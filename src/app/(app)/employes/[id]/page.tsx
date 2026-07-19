@@ -5,6 +5,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { ancienneteEmploye, contratEmployeLabel, formatDateFr, formatEuro, nomEmploye, statutEmploye } from "@/lib/employes";
 import { StatutEmployeSelect } from "@/components/StatutEmployeSelect";
 import { changerStatutCompteApplicationAction, reinitialiserMotDePasseStockEmployeAction, importerCarteBtpAction, supprimerCarteBtpAction, importerPhotoEmployeAction, supprimerPhotoEmployeAction, revoquerAppareilEmployeAction } from "@/app/actions/employes";
+import { anonymiserEmployeAction } from "@/app/actions/rgpd";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import Image from "next/image";
 import { InvitationEmploye } from "@/components/InvitationEmploye";
@@ -163,6 +164,33 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
                 </tbody>
               </table>
             </div>
+          )}
+        </section>
+
+        <section className="rounded-md border border-red-200 p-4 dark:border-red-900/50">
+          <h2 className="text-sm font-semibold text-red-700 dark:text-red-400">Effacement des données (RGPD)</h2>
+          {employe.anonymise_at ? (
+            <p className="mt-2 text-xs text-neutral-500">
+              Ce salarié a été anonymisé le {new Date(employe.anonymise_at).toLocaleDateString("fr-FR")}. Son identité et ses
+              coordonnées ont été effacées ; les éléments légalement obligatoires ont été conservés.
+            </p>
+          ) : (
+            <>
+              <p className="mt-2 text-xs text-neutral-500">
+                Efface définitivement l&apos;identité et les coordonnées de ce salarié (nom, contact,
+                photo, signature, documents personnels). Les heures travaillées, la paie et la
+                comptabilité sont conservées, comme la loi l&apos;impose. Action irréversible.
+              </p>
+              <form action={anonymiserEmployeAction} className="mt-3">
+                <input type="hidden" name="employe_id" value={employe.id} />
+                <ConfirmSubmitButton
+                  message="Anonymiser ce salarié ? Son identité et ses coordonnées seront effacées définitivement."
+                  className="rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-400"
+                >
+                  Anonymiser ce salarié
+                </ConfirmSubmitButton>
+              </form>
+            </>
           )}
         </section>
       </div>

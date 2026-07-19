@@ -21,7 +21,7 @@ export default async function ParametresPage({ searchParams }: { searchParams: P
   return (
     <main className="p-8">
       <div className="mx-auto max-w-3xl space-y-6">
-        <div className="flex items-start justify-between"><div><h1 className="text-xl font-semibold">Paramètres de l’entreprise</h1><p className="text-sm text-neutral-500">Ces informations apparaissent notamment sur les devis et factures.</p></div><div className="flex gap-2">{peutGererAcces&&<Link href="/parametres/import" className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-neutral-50">Importer des données</Link>}{peutGererAcces&&<Link href="/parametres/acces" className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-neutral-50">Accès et rôles</Link>}</div></div>
+        <div className="flex items-start justify-between"><div><h1 className="text-xl font-semibold">Paramètres de l’entreprise</h1><p className="text-sm text-neutral-500">Ces informations apparaissent notamment sur les devis et factures.</p></div><div className="flex gap-2">{peutGererAcces&&<Link href="/parametres/import" className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-neutral-50">Importer des données</Link>}{peutGererAcces&&<Link href="/parametres/acces" className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-neutral-50">Accès et rôles</Link>}<Link href="/parametres/donnees" className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-neutral-50">Mes données</Link></div></div>
         {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         {succes && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Paramètres enregistrés.</p>}
         <DashboardWidgetPreferences />
