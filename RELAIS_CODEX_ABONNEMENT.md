@@ -165,7 +165,7 @@ notify pgrst, 'reload schema';
 
 À faire dans le dashboard Stripe + Vercel. **Sans ça, rien ne s'encaisse.**
 
-1. **Entité légale qui facture** : activer le compte Stripe au nom de la société qui encaisse. ⚠️ **NE PAS** réutiliser les coordonnées de l'ancienne « JULIEN GREGUREC MULTISERVICES SAS » (consigne). Trancher l'entité d'abord.
+1. **Entité légale qui facture** : ⚠️ **aucune société n'existe encore** — Julien doit en **créer une** (SASU/EURL ou équivalent) avant de pouvoir activer Stripe et émettre des factures. Trancher et créer l'entité d'abord.
 2. Renseigner infos société + logo (Stripe → Settings → Business) → apparaissent sur les factures.
 3. Activer **l'envoi automatique des factures/reçus par email** (Billing → Invoices/Subscriptions settings).
 4. Activer et configurer le **Customer Portal** (autoriser : annuler, changer de carte, changer d'offre, télécharger factures).
@@ -190,7 +190,7 @@ notify pgrst, 'reload schema';
 - **Accents / SQL** : toujours `LC_ALL=en_US.UTF-8 pbcopy` quand tu donnes du SQL à coller (sinon mojibake `√©`). Vérifier avec `LC_ALL=en_US.UTF-8 pbpaste`.
 - **Ne pas toucher** au flux Connect (facturation client) ni à son webhook.
 - **Ne pas commit** `.env.audit` (gitignored) ; ne pas y lire les identifiants.
-- **Ne pas réutiliser** les coordonnées légales de l'ancienne SAS.
+- **Aucune société existante** : l'entité qui facture reste à créer (prérequis de Julien, pas un blocage code).
 - Fichiers dupliqués à ignorer (`page 2.tsx`, `factures/page 2.tsx`, `StockMovementForm 2.tsx`).
 - **Sécurité webhook** : vérifier la signature avant tout traitement ; dédup obligatoire ; jamais faire confiance au corps sans signature valide.
 

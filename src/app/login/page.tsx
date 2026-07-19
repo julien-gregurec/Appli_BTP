@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { loginAction } from "@/app/actions/auth";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
+import { PiedLegal } from "@/components/PiedLegal";
 
 export default async function LoginPage({
   searchParams,
@@ -75,6 +76,8 @@ export default async function LoginPage({
             Créer un compte
           </Link>
         </p>
+
+        <PiedLegal />
       </div>
     </main>
   );

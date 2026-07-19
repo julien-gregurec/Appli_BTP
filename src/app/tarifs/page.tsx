@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { OFFRES, BESOINS_OPTIONS, DUREE_ESSAI_JOURS, prixAbonnementMensuel } from "@/lib/plateforme";
+import { PiedLegal } from "@/components/PiedLegal";
 
 export const metadata: Metadata = {
   title: "Tarifs — Liria Gestion Pro",
@@ -84,6 +85,8 @@ export default function TarifsPage() {
         <p className="mt-8 text-center text-sm text-neutral-500">
           Déjà un compte ? <Link href="/login" className="font-medium text-[#0d1b2a] underline dark:text-white">Se connecter</Link>
         </p>
+
+        <PiedLegal />
       </div>
     </main>
   );
