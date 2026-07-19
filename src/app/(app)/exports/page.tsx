@@ -1,4 +1,3 @@
-import Link from "next/link";
 
 const exportsComptables = [
   { type: "ventes", titre: "Journal des ventes", detail: "Une ligne par facture ou avoir : client, HT, TVA, TTC, encaissé et reste dû." },
@@ -34,8 +33,10 @@ export default async function ExportsPage({ searchParams }: { searchParams: Prom
             <p className="mt-2 text-xs text-neutral-400">Période : {debut} → {fin}</p>
           </div>
           <div className="flex flex-wrap gap-2 md:justify-end">
-            <Link href={href(item.type, "xlsx")} className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Télécharger Excel</Link>
-            <Link href={href(item.type, "csv")} className="rounded-md border border-neutral-300 px-3 py-2 text-sm hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900">CSV brut</Link>
+            {/* Téléchargements : <a> et non <Link>. Next préchargeait ces liens,
+                ce qui générait tous les fichiers à la simple ouverture de la page. */}
+            <a href={href(item.type, "xlsx")} download className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Télécharger Excel</a>
+            <a href={href(item.type, "csv")} download className="rounded-md border border-neutral-300 px-3 py-2 text-sm hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900">CSV brut</a>
           </div>
         </article>)}
       </div>
