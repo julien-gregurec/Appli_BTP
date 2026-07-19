@@ -188,6 +188,77 @@ try {
       chantierDetail = e.message.slice(0, 120);
     }
     noter("Création chantier", chantierOk, chantierDetail);
+
+    // ── Conversion devis → facture (le chemin de l'argent) ──────
+    let factureOk = false;
+    let factureDetail = "aucun devis accepté trouvé";
+    try {
+      await page.goto(`${baseUrl}/devis?statut=accepte`, { waitUntil: "networkidle", timeout: 45_000 });
+      const lien = await page.evaluate(() =>
+        [...document.querySelectorAll('a[href^="/devis/"]')]
+          .map((a) => a.getAttribute("href"))
+          .find((h) => /^\/devis\/[0-9a-f-]{36}$/.test(h)),
+      );
+      if (lien) {
+        await page.goto(`${baseUrl}${lien}`, { waitUntil: "networkidle", timeout: 45_000 });
+        const bouton = page.getByRole("button", { name: "Créer une facture depuis ce devis" });
+        if (await bouton.count()) {
+          await Promise.all([
+            page.waitForURL((u) => /^\/factures\/[0-9a-f-]{36}$/.test(u.pathname), { timeout: 45_000 }),
+            bouton.click(),
+          ]);
+          const chemin = new URL(page.url()).pathname;
+          factureOk = /^\/factures\/[0-9a-f-]{36}$/.test(chemin);
+          factureDetail = factureOk ? `facture créée (${chemin})` : `resté sur ${chemin}`;
+        } else {
+          factureDetail = "bouton de conversion absent sur un devis accepté";
+        }
+      }
+    } catch (e) {
+      factureDetail = e.message.slice(0, 120);
+    }
+    noter("Conversion devis → facture", factureOk, factureDetail);
+
+    // ── Mouvement de stock : entrée +1 puis ajustement −1 ───────
+    // Le couple laisse le stock au niveau exact où il était.
+    let stockOk = false;
+    let stockDetail = "formulaire de mouvement introuvable";
+    try {
+      let article = null;
+      for (const type of ["entree", "ajustement_moins"]) {
+        await page.goto(`${baseUrl}/stock`, { waitUntil: "networkidle", timeout: 45_000 });
+        const selArticle = page.locator('select[name="article_id"]');
+        await selArticle.waitFor({ state: "visible", timeout: 30_000 });
+        if (!article) {
+          const vals = await selArticle.locator("option").evaluateAll((o) => o.map((x) => x.value).filter(Boolean));
+          article = vals[0];
+        }
+        if (!article) { stockDetail = "aucun article en stock"; break; }
+        await selArticle.selectOption(article);
+        await page.locator('select[name="type"]').selectOption(type);
+        await page.locator('input[name="quantite"]').fill("1");
+        const motif = page.locator('input[name="motif"], textarea[name="motif"]');
+        if (await motif.count()) await motif.first().fill("Vérification automatisée");
+        const chantier = page.locator('select[name="chantier_id"]');
+        if (await chantier.count()) {
+          const vc = await chantier.locator("option").evaluateAll((o) => o.map((x) => x.value).filter(Boolean));
+          if (vc.length) await chantier.selectOption(vc[0]);
+        }
+        await page.getByRole("button", { name: "Enregistrer le mouvement" }).click();
+        await page.waitForLoadState("networkidle", { timeout: 45_000 });
+        const texte = await page.locator("body").innerText();
+        if (/erreur|impossible|refus/i.test(texte.slice(0, 800))) {
+          stockDetail = `refusé sur le mouvement « ${type} »`;
+          stockOk = false;
+          break;
+        }
+        stockOk = true;
+        stockDetail = "entrée +1 puis ajustement −1 (stock inchangé)";
+      }
+    } catch (e) {
+      stockDetail = e.message.slice(0, 120);
+    }
+    noter("Mouvement de stock", stockOk, stockDetail);
   }
 } finally {
   await context.close();
