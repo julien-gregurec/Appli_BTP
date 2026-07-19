@@ -6,21 +6,28 @@ import { withSentryConfig } from "@sentry/nextjs";
 // et les exports tombaient en erreur 500 (« Cannot find module 'fast-csv' »).
 // On liste ici toute la chaîne, transitives comprises, pour les deux routes qui
 // génèrent des fichiers Excel.
+// Fermeture transitive complète (22 paquets) : une seule dépendance manquante
+// suffit à faire crasher la fonction au démarrage.
 const FICHIERS_EXCELJS = [
   "./node_modules/@excel.js/**/*",
-  "./node_modules/fast-csv/**/*",
-  "./node_modules/@fast-csv/**/*",
-  "./node_modules/saxes/**/*",
-  "./node_modules/xmlchars/**/*",
-  "./node_modules/tmp/**/*",
+  "./node_modules/@fast-csv/format/**/*",
+  "./node_modules/@fast-csv/parse/**/*",
+  "./node_modules/binary/**/*",
+  "./node_modules/bluebird/**/*",
+  "./node_modules/buffers/**/*",
+  "./node_modules/chainsaw/**/*",
   "./node_modules/dayjs/**/*",
+  "./node_modules/fast-csv/**/*",
+  "./node_modules/immediate/**/*",
+  "./node_modules/lie/**/*",
   "./node_modules/lodash.escaperegexp/**/*",
   "./node_modules/lodash.groupby/**/*",
   "./node_modules/lodash.uniq/**/*",
-  "./node_modules/lie/**/*",
   "./node_modules/pako/**/*",
-  "./node_modules/binary/**/*",
-  "./node_modules/bluebird/**/*",
+  "./node_modules/saxes/**/*",
+  "./node_modules/tmp/**/*",
+  "./node_modules/traverse/**/*",
+  "./node_modules/xmlchars/**/*",
 ];
 
 const nextConfig: NextConfig = {
