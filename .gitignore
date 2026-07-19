@@ -50,3 +50,6 @@ output/video/brut/
 output/video/audio/
 output/video/montage/
 output/video/plans/
+
+# Rapports de vérification automatisée
+output/verification/
