@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
-import { connecteurFournisseurConnu } from "@/lib/fournisseur-connecteurs";
 import { construireLienMailto } from "@/lib/email";
 
 const texte = (formData: FormData, cle: string) => String(formData.get(cle) ?? "").trim();
@@ -262,61 +261,6 @@ export async function creerConnecteurAction(formData: FormData) {
   if (error) retourErreur("/connecteurs", error.message);
   revalidatePath("/connecteurs");
   redirect("/connecteurs?success=Connecteur préparé");
-}
-
-export async function preparerConnecteurFournisseurAction(codeFournisseur: string, formData: FormData) {
-  const preset = connecteurFournisseurConnu(codeFournisseur);
-  if (!preset) return retourErreur("/connecteurs", "Fournisseur inconnu");
-  const mode = texte(formData, "type");
-  if (!preset.modes.includes(mode as (typeof preset.modes)[number])) {
-    retourErreur("/connecteurs", "Mode de connexion non autorisé pour ce fournisseur");
-  }
-  const ctx = await getContexteEntreprise();
-  const supabase = await createClient();
-  const { data: existant } = await supabase
-    .from("fournisseurs")
-    .select("id")
-    .eq("entreprise_id", ctx.entrepriseId)
-    .ilike("nom", preset.nomFournisseur)
-    .limit(1)
-    .maybeSingle();
-  let fournisseurId = existant?.id;
-  if (!fournisseurId) {
-    const { data: cree, error: erreurFournisseur } = await supabase
-      .from("fournisseurs")
-      .insert({ entreprise_id: ctx.entrepriseId, nom: preset.nomFournisseur })
-      .select("id")
-      .single();
-    if (erreurFournisseur || !cree) return retourErreur("/connecteurs", erreurFournisseur?.message ?? "Fournisseur non créé");
-    fournisseurId = cree.id;
-  }
-  const referenceCompte = optionnel(formData, "compte_client_reference");
-  const { error } = await supabase.from("connecteurs_externes").upsert({
-    entreprise_id: ctx.entrepriseId,
-    domaine: "fournisseur",
-    fournisseur_id: fournisseurId,
-    fournisseur_code: preset.code,
-    nom: preset.nom,
-    type: mode,
-    statut: "a_configurer",
-    compte_client_reference: referenceCompte,
-    capacites: preset.capacites,
-    activation_demandee_at: new Date().toISOString(),
-    contact_technique_email: preset.contactIntegration ?? null,
-    configuration: {
-      portail_url: preset.portailUrl,
-      integration_publique: preset.integrationPublique,
-      aucun_secret_stocke: true,
-    },
-    dernier_message: preset.integrationPublique
-      ? "Demande préparée. L’activation nécessite les paramètres officiels remis par le fournisseur."
-      : "Compte référencé. Utilisez le portail ou un export officiel tant qu’aucune interface partenaire n’est fournie.",
-    updated_at: new Date().toISOString(),
-  }, { onConflict: "entreprise_id,domaine,nom" });
-  if (error) retourErreur("/connecteurs", error.message);
-  revalidatePath("/connecteurs");
-  revalidatePath("/fournisseurs");
-  redirect("/connecteurs?success=Connexion fournisseur préparée sans enregistrer de mot de passe");
 }
 
 const MODES_FOURNISSEUR_LIBRE = ["portail", "csv", "xlsx", "fabdis", "api", "edi", "punchout_oci", "punchout_cxml", "oauth2"] as const;
