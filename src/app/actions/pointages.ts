@@ -7,7 +7,19 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 
 const texte = (formData: FormData, nom: string) => String(formData.get(nom) ?? "").trim() || null;
-function positionTerrain(formData:FormData){const latitude=Number(formData.get("latitude")),longitude=Number(formData.get("longitude")),precision=Number(formData.get("precision_metres"));if(!Number.isFinite(latitude)||latitude < -90||latitude>90||!Number.isFinite(longitude)||longitude < -180||longitude>180)throw new Error("La position GPS est obligatoire");return{latitude,longitude,precision:Number.isFinite(precision)?precision:null};}
+// Le GPS reste la preuve par defaut, mais un poste de bureau (pas de puce GPS) ou un
+// reseau indisponible ne doivent pas bloquer le pointage : un motif explicite permet
+// de continuer sans position, conserve dans le commentaire pour le validateur.
+function positionTerrain(formData: FormData): { latitude: number | null; longitude: number | null; precision: number | null; motifSansGps: string | null } {
+  const latitude = Number(formData.get("latitude"));
+  const longitude = Number(formData.get("longitude"));
+  const precision = Number(formData.get("precision_metres"));
+  const gpsValide = Number.isFinite(latitude) && latitude >= -90 && latitude <= 90 && Number.isFinite(longitude) && longitude >= -180 && longitude <= 180;
+  if (gpsValide) return { latitude, longitude, precision: Number.isFinite(precision) ? precision : null, motifSansGps: null };
+  const motifSansGps = String(formData.get("motif_sans_gps") ?? "").trim();
+  if (!motifSansGps) throw new Error("La position GPS est obligatoire, ou indique un motif si elle est indisponible.");
+  return { latitude: null, longitude: null, precision: null, motifSansGps };
+}
 
 export async function enregistrerArriveeAction(formData: FormData) {
   const ctx = await getContexteEntreprise();
@@ -22,11 +34,13 @@ export async function enregistrerArriveeAction(formData: FormData) {
   let preuve;
   try { preuve = positionTerrain(formData); } catch (error) { redirect(`/pointage?error=${encodeURIComponent(error instanceof Error ? error.message : "Position invalide")}`); }
   const sessionId = crypto.randomUUID();
+  const commentaireBase = texte(formData, "commentaire");
+  const commentaire = preuve.motifSansGps ? [commentaireBase, `Sans GPS (arrivée) : ${preuve.motifSansGps}`].filter(Boolean).join(" - ") : commentaireBase;
   const { error } = await supabase.from("sessions_pointage").insert({
     id: sessionId, entreprise_id: ctx.entrepriseId, employe_id: employeId, chantier_id: chantierId,
     arrivee_at: new Date().toISOString(), latitude_arrivee: preuve.latitude, longitude_arrivee: preuve.longitude,
     precision_arrivee_metres: preuve.precision, photo_arrivee_storage_path: null,
-    tache: texte(formData, "tache"), commentaire: texte(formData, "commentaire"),
+    tache: texte(formData, "tache"), commentaire,
   });
   if (error) redirect(`/pointage?error=${encodeURIComponent(error.code === "23505" ? "Cet employé a déjà une arrivée ouverte" : error.message)}`);
   revalidatePath("/pointage");
@@ -43,6 +57,7 @@ export async function enregistrerDepartAction(sessionId: string, formData: FormD
     p_entreprise_id: ctx.entrepriseId, p_session_id: sessionId, p_depart_at: new Date().toISOString(),
     p_pause_minutes: Math.max(0, Number(formData.get("pause_minutes")) || 0), p_latitude: preuve.latitude,
     p_longitude: preuve.longitude, p_precision: preuve.precision, p_photo_path: null,
+    p_motif_sans_gps: preuve.motifSansGps,
   });
   if (error) redirect(`/pointage?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/pointage");
@@ -53,6 +68,8 @@ export async function enregistrerDepartAction(sessionId: string, formData: FormD
 export async function declarerPointageOublieAction(formData:FormData){
  const ctx=await getContexteEntreprise(),supabase=await createClient();let preuve;
  try{preuve=positionTerrain(formData);}catch(error){redirect(`/pointage?error=${encodeURIComponent(error instanceof Error?error.message:"Position invalide")}`);}
+ // Le motif GPS reprend simplement l'explication deja obligatoire de ce formulaire
+ // (voir ForgottenPointageForm) : pas besoin d'un second champ pour la meme raison.
  const{error}=await supabase.rpc("declarer_pointage_oublie",{p_entreprise_id:ctx.entrepriseId,p_chantier_id:texte(formData,"chantier_id"),p_date:texte(formData,"date"),p_arrivee:texte(formData,"heure_arrivee"),p_depart:texte(formData,"heure_depart"),p_pause_minutes:Math.max(0,Number(formData.get("pause_minutes"))||0),p_latitude:preuve.latitude,p_longitude:preuve.longitude,p_precision:preuve.precision,p_commentaire:texte(formData,"commentaire")});
  if(error)redirect(`/pointage?error=${encodeURIComponent(error.message)}`);revalidatePath("/pointage");revalidatePath("/dashboard");redirect(`/pointage?succes=${encodeURIComponent("Pointage oublié enregistré et transmis au responsable")}`);
 }

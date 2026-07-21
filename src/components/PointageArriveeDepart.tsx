@@ -8,6 +8,7 @@ const input="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:
 
 function PositionEtValidation({libelle,bouton,couleur}:{libelle:string;bouton:string;couleur:string}){
   const[position,setPosition]=useState<{lat:number;lng:number;precision:number}|null>(null),[erreur,setErreur]=useState(""),[charge,setCharge]=useState(true);
+  const[motifSansGps,setMotifSansGps]=useState("");
   useEffect(()=>{
     if(!navigator.geolocation){queueMicrotask(()=>{setErreur("La géolocalisation n’est pas disponible sur cet appareil.");setCharge(false);});return;}
     const suivi=navigator.geolocation.watchPosition(
@@ -17,7 +18,9 @@ function PositionEtValidation({libelle,bouton,couleur}:{libelle:string;bouton:st
     );
     return()=>navigator.geolocation.clearWatch(suivi);
   },[]);
-  return <div className="rounded-md border border-dashed p-3"><input type="hidden" name="latitude" value={position?.lat??""}/><input type="hidden" name="longitude" value={position?.lng??""}/><input type="hidden" name="precision_metres" value={position?.precision??""}/><div><p className="text-sm font-medium">Position GPS {libelle}</p><p className="text-xs text-neutral-500">La localisation, la date et l’heure sont enregistrées automatiquement.</p></div>{charge&&<p className="mt-2 text-xs text-blue-700" aria-live="polite">Acquisition automatique de la position GPS…</p>}{position&&<p className="mt-2 text-xs text-green-700" aria-live="polite">GPS prêt · précision ± {Math.round(position.precision)} m</p>}{erreur&&<p className="mt-2 text-xs text-red-600" role="alert">{erreur}</p>}<button disabled={!position} className={`mt-3 w-full rounded-md px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40 ${couleur}`}>{charge?"Localisation en cours…":bouton}</button></div>;
+  const gpsIndisponible=!charge&&!position;
+  const peutContinuer=Boolean(position)||motifSansGps.trim().length>0;
+  return <div className="rounded-md border border-dashed p-3"><input type="hidden" name="latitude" value={position?.lat??""}/><input type="hidden" name="longitude" value={position?.lng??""}/><input type="hidden" name="precision_metres" value={position?.precision??""}/><input type="hidden" name="motif_sans_gps" value={position?"":motifSansGps}/><div><p className="text-sm font-medium">Position GPS {libelle}</p><p className="text-xs text-neutral-500">La localisation, la date et l’heure sont enregistrées automatiquement.</p></div>{charge&&<p className="mt-2 text-xs text-blue-700" aria-live="polite">Acquisition automatique de la position GPS…</p>}{position&&<p className="mt-2 text-xs text-green-700" aria-live="polite">GPS prêt · précision ± {Math.round(position.precision)} m</p>}{erreur&&<p className="mt-2 text-xs text-red-600" role="alert">{erreur}</p>}{gpsIndisponible&&<div className="mt-2 rounded-md bg-amber-50 p-2 dark:bg-amber-950/30"><label className="text-xs font-medium text-amber-800 dark:text-amber-300">Pas de GPS (poste de bureau, réseau indisponible…) ? Indique pourquoi pour continuer sans position<input value={motifSansGps} onChange={e=>setMotifSansGps(e.target.value)} placeholder="Ex. poste fixe au bureau, sans wifi" className="mt-1 w-full rounded-md border px-2 py-1.5 text-sm dark:bg-neutral-900"/></label></div>}<button disabled={!peutContinuer} className={`mt-3 w-full rounded-md px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40 ${couleur}`}>{charge?"Localisation en cours…":bouton}</button></div>;
 }
 
 export function PointageArriveeDepart({employes,chantiers,sessions}:{employes:Option[];chantiers:Option[];sessions:Session[]}){
