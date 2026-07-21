@@ -212,7 +212,7 @@ export function AssistantIA() {
     if (!message.proposition) return;
     startTransition(async () => {
       const res = await creerAffectationDepuisPropositionAction({
-        employeId: message.proposition!.employeId,
+        employeIds: message.proposition!.employeIds,
         typeActivite: message.proposition!.typeActivite,
         chantierId: message.proposition!.chantierId,
         lieuActivite: message.proposition!.lieuActivite,
@@ -290,7 +290,7 @@ export function AssistantIA() {
                 </span>
                 {m.proposition && (
                   <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-liria-gold/60 bg-liria-gold/10 p-3 text-left text-sm">
-                    <p><strong>{m.proposition.employeNom}</strong> → {m.proposition.typeActivite === "chantier" ? m.proposition.chantierNom : LIBELLES_TYPE_ACTIVITE[m.proposition.typeActivite]}</p>
+                    <p><strong>{m.proposition.employeNoms.join(", ")}</strong> → {m.proposition.typeActivite === "chantier" ? m.proposition.chantierNom : LIBELLES_TYPE_ACTIVITE[m.proposition.typeActivite]}</p>
                     {m.proposition.typeActivite !== "chantier" && m.proposition.lieuActivite && (
                       <p className="text-neutral-600 dark:text-neutral-300">{m.proposition.lieuActivite} · <a href={lienMaps(m.proposition.lieuActivite)} target="_blank" rel="noopener" className="text-blue-700 hover:underline">Itinéraire</a></p>
                     )}

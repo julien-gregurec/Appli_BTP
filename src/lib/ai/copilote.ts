@@ -266,14 +266,16 @@ export const OUTILS_COPILOTE: OutilIA[] = [
       "au début de cette conversation pour savoir si c'est le cas ; si non, ne l'utilise pas, oriente vers proposer_demande_conge ou un responsable. " +
       "Quand c'est autorisé, employe_id peut être n'importe quel employé de l'entreprise (pas seulement l'utilisateur), et l'affectation est effective " +
       "dès validation, sans approbation. À utiliser uniquement après avoir identifié l'employé (via chercher_employe) et vérifié la disponibilité (verifier_disponibilite_employe). " +
-      "Ne te limite pas à quelques cas prévus : c'est l'outil à utiliser pour TOUT ce qui occupe du temps d'un employé un jour donné — " +
+      "Ne te limite pas à quelques cas prévus : c'est l'outil à utiliser pour TOUT ce qui occupe du temps d'un ou plusieurs employés un jour donné — " +
       "chantier, bureau, dépôt, visite médicale, formation, absence/congé posé directement, chantier pas encore enregistré, repas d'affaires, rendez-vous, réunion externe, etc. " +
+      "Si PLUSIEURS employés sont concernés par la même activité (ex. deux ouvriers sur le même chantier, une réunion à trois), mets tous leurs identifiants dans employe_ids " +
+      "en un seul appel — une affectation identique (même date, mêmes heures, même contexte) est créée pour chacun ; n'appelle jamais cet outil séparément pour chaque personne. " +
       "Dès que type_activite n'est pas \"chantier\", mets dans lieu_activite exactement ce que l'utilisateur a dit sur le lieu ou l'événement " +
       "(adresse, nom de lieu, avec qui, contexte) — un lien d'itinéraire sera généré automatiquement à partir de ce texte, pas besoin de le structurer.",
     parametres: {
       type: "object",
       properties: {
-        employe_id: { type: "string" },
+        employe_ids: { type: "array", items: { type: "string" }, description: "Un ou plusieurs identifiants d'employé (obtenus via chercher_employe). Une même affectation est créée pour chacun." },
         type_activite: { type: "string", enum: ["chantier", "bureau", "depot", "visite_medicale", "formation", "conge", "autre"], description: "\"chantier\" par défaut. \"conge\" pose une absence directement (sans passer par une demande à approuver). \"autre\" couvre tout le reste (repas, rendez-vous, réunion externe, chantier pas encore créé dans Liria...)." },
         chantier_id: { type: "string", description: "Obligatoire uniquement si type_activite=\"chantier\"" },
         lieu_activite: { type: "string", description: "Quand type_activite n'est pas \"chantier\" : reprends fidèlement ce que l'utilisateur a dit sur le lieu/contexte (ex. \"Restaurant avec le président du RCSA\", \"Dépôt principal\", \"Chantier non enregistré : nom cité\")" },
@@ -282,7 +284,7 @@ export const OUTILS_COPILOTE: OutilIA[] = [
         tache: { type: "string", description: "Description courte de la tâche, ou chaîne vide" },
         commentaire: { type: "string", description: "Ce que tu veux dire à l'utilisateur avant de lui proposer cette affectation (ex. avertissement si l'employé a déjà des heures ce jour-là)" },
       },
-      required: ["employe_id", "date", "heures"],
+      required: ["employe_ids", "date", "heures"],
     },
   },
   {

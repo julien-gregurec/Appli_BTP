@@ -11,7 +11,7 @@ import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 const TYPES_ACTIVITE_AUTORISES = ["chantier", "bureau", "depot", "visite_medicale", "formation", "conge", "autre"];
 
 export async function creerAffectationDepuisPropositionAction(proposition: {
-  employeId: string;
+  employeIds: string[];
   typeActivite: string;
   chantierId: string | null;
   lieuActivite: string | null;
@@ -28,26 +28,29 @@ export async function creerAffectationDepuisPropositionAction(proposition: {
   if (!(permissions === null || permissions.includes("gerer_planning"))) return { error: "Ton poste n'a pas le droit de modifier le planning." };
   if (!TYPES_ACTIVITE_AUTORISES.includes(proposition.typeActivite)) return { error: "Type d'activité invalide." };
   if (!proposition.heures || proposition.heures <= 0) return { error: "Nombre d'heures invalide." };
+  if (!proposition.employeIds.length) return { error: "Aucun employé sélectionné." };
 
   const estChantier = proposition.typeActivite === "chantier";
   if (estChantier !== Boolean(proposition.chantierId)) return { error: "Chantier invalide." };
 
-  const [{ data: employe }, { data: chantier }] = await Promise.all([
-    supabase.from("employes").select("id").eq("id", proposition.employeId).eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif").maybeSingle(),
+  const [{ data: employes }, { data: chantier }] = await Promise.all([
+    supabase.from("employes").select("id").in("id", proposition.employeIds).eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif"),
     estChantier ? supabase.from("chantiers").select("id").eq("id", proposition.chantierId as string).eq("entreprise_id", ctx.entrepriseId).maybeSingle() : Promise.resolve({ data: null }),
   ]);
-  if (!employe || (estChantier && !chantier)) return { error: "Employé ou chantier invalide." };
+  if (!employes || employes.length !== proposition.employeIds.length || (estChantier && !chantier)) return { error: "Employé ou chantier invalide." };
 
-  const { error } = await supabase.from("affectations").insert({
-    entreprise_id: ctx.entrepriseId,
-    chantier_id: proposition.chantierId,
-    employe_id: proposition.employeId,
-    date: proposition.date,
-    heures: proposition.heures,
-    tache: proposition.tache,
-    type_activite: proposition.typeActivite,
-    lieu_activite: estChantier ? null : proposition.lieuActivite,
-  });
+  const { error } = await supabase.from("affectations").insert(
+    proposition.employeIds.map((employeId) => ({
+      entreprise_id: ctx.entrepriseId,
+      chantier_id: proposition.chantierId,
+      employe_id: employeId,
+      date: proposition.date,
+      heures: proposition.heures,
+      tache: proposition.tache,
+      type_activite: proposition.typeActivite,
+      lieu_activite: estChantier ? null : proposition.lieuActivite,
+    })),
+  );
   if (error) return { error: error.message };
 
   revalidatePath("/planning");

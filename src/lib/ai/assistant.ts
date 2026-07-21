@@ -14,8 +14,8 @@ export const TYPES_ACTIVITE_PROPOSABLES_IA = ["chantier", "bureau", "depot", "vi
 export type TypeActiviteProposable = (typeof TYPES_ACTIVITE_PROPOSABLES_IA)[number];
 
 export type PropositionAffectation = {
-  employeId: string;
-  employeNom: string;
+  employeIds: string[];
+  employeNoms: string[];
   typeActivite: TypeActiviteProposable;
   chantierId: string | null;
   chantierNom: string | null;
@@ -57,16 +57,20 @@ async function resoudrePropositionAffectation(
   input: Record<string, unknown>,
 ): Promise<PropositionAffectation | null> {
   if (!peutGererPlanning) return null;
-  const employeId = String(input.employe_id ?? "");
+  const brutIds = Array.isArray(input.employe_ids) ? input.employe_ids : input.employe_id ? [input.employe_id] : [];
+  const employeIds = [...new Set(brutIds.map((v) => String(v)).filter(Boolean))];
   const typeActiviteBrut = typeof input.type_activite === "string" && input.type_activite ? input.type_activite : "chantier";
   const date = String(input.date ?? "");
   const heures = Number(input.heures);
-  if (!employeId || !date || !heures || heures <= 0) return null;
+  if (!employeIds.length || !date || !heures || heures <= 0) return null;
   if (!(TYPES_ACTIVITE_PROPOSABLES_IA as readonly string[]).includes(typeActiviteBrut)) return null;
   const typeActivite = typeActiviteBrut as TypeActiviteProposable;
 
-  const { data: employe } = await supabase.from("employes").select("nom, prenom").eq("id", employeId).eq("entreprise_id", entrepriseId).maybeSingle();
-  if (!employe) return null;
+  const { data: employes } = await supabase.from("employes").select("id, nom, prenom").in("id", employeIds).eq("entreprise_id", entrepriseId);
+  if (!employes || employes.length !== employeIds.length) return null;
+  // Meme ordre que celui demande, pour un affichage previsible dans la carte de proposition.
+  const employesParId = new Map(employes.map((e) => [e.id, e]));
+  const employeNoms = employeIds.map((id) => { const e = employesParId.get(id)!; return `${e.prenom} ${e.nom}`; });
 
   const tache = typeof input.tache === "string" && input.tache.trim() ? input.tache.trim() : null;
   const lieuActivite = typeof input.lieu_activite === "string" && input.lieu_activite.trim() ? input.lieu_activite.trim() : null;
@@ -76,10 +80,10 @@ async function resoudrePropositionAffectation(
     if (!chantierId) return null;
     const { data: chantier } = await supabase.from("chantiers").select("nom").eq("id", chantierId).eq("entreprise_id", entrepriseId).maybeSingle();
     if (!chantier) return null;
-    return { employeId, employeNom: `${employe.prenom} ${employe.nom}`, typeActivite, chantierId, chantierNom: chantier.nom, lieuActivite: null, date, heures, tache };
+    return { employeIds, employeNoms, typeActivite, chantierId, chantierNom: chantier.nom, lieuActivite: null, date, heures, tache };
   }
 
-  return { employeId, employeNom: `${employe.prenom} ${employe.nom}`, typeActivite, chantierId: null, chantierNom: null, lieuActivite, date, heures, tache };
+  return { employeIds, employeNoms, typeActivite, chantierId: null, chantierNom: null, lieuActivite, date, heures, tache };
 }
 
 // Les demandes de conge sont toujours personnelles : contrairement a proposer_affectation,
@@ -169,7 +173,8 @@ export async function* demanderAssistantIAStream(
       `Utilise chercher_employe (et chercher_chantier_planning si un chantier existant est cité) puis verifier_disponibilite_employe avant de conclure avec proposer_affectation — tu ne crées jamais d'affectation toi-même, tu ne fais que la proposer ; l'utilisateur valide ou non. ` +
       `Dès que type_activite n'est pas "chantier", mets dans lieu_activite exactement ce que l'utilisateur a dit sur le lieu/contexte (adresse, nom de lieu, avec qui) : un lien d'itinéraire est généré automatiquement à partir de ce texte, inutile de le reformuler ou de le structurer. ` +
       `Pour une absence/congé, tu peux utiliser proposer_affectation (type_activite="conge", effet immédiat) OU proposer_demande_conge (passe par une approbation) — préfère proposer_affectation puisque cette personne peut déjà valider elle-même ce genre de demande, sauf si elle précise vouloir la soumettre formellement. ` +
-      `Pour un rendez-vous ou un entretien entre l'utilisateur et un employé nommé (ex. « place-moi un rendez-vous avec l'employé X »), l'affectation se place sur la fiche de l'employé nommé (X), jamais sur celle de l'utilisateur qui fait la demande — une seule proposer_affectation, jamais une par personne. `
+      `Pour un rendez-vous ou un entretien entre l'utilisateur et un employé nommé (ex. « place-moi un rendez-vous avec l'employé X »), l'affectation se place sur la fiche de l'employé nommé (X), jamais sur celle de l'utilisateur qui fait la demande. ` +
+      `Si PLUSIEURS employés sont concernés par la même affectation (ex. « X et Y sont sur le chantier Dupont », une réunion à trois, une équipe entière) — cherche chaque employé cité puis fais UN SEUL appel à proposer_affectation avec tous leurs identifiants dans employe_ids ; ne fais jamais un appel séparé par personne. `
     : `Cette personne n'a pas le droit de modifier le planning (droit réservé à certains postes) : n'utilise jamais proposer_affectation, tu n'as accès à aucun outil d'écriture sur le planning des autres. ` +
       `Pour une absence/congé sur elle-même (« mets-moi absent », « je pose une demi-journée »…), utilise proposer_demande_conge — c'est le seul outil d'écriture qui lui est ouvert, et la demande sera soumise pour approbation à un responsable, jamais acceptée automatiquement. ` +
       `Pour toute autre demande de modification du planning (la sienne ou celle d'un collègue), explique que ce n'est pas possible avec ses droits actuels et qu'il faut passer par un responsable planning. `;
