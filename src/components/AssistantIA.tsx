@@ -166,20 +166,26 @@ export function AssistantIA() {
     if (!Ctor) return;
     const reco = new Ctor();
     reco.lang = "fr-FR";
-    reco.continuous = false;
+    // continuous=true : ne coupe pas au premier silence entre deux phrases, seulement
+    // sur arrêt manuel (bouton micro) ou silence prolongé — sinon un vocal un peu long
+    // se faisait tronquer et envoyer avant que l'utilisateur ait fini de parler.
+    reco.continuous = true;
     reco.interimResults = true;
+    let dernierTexte = "";
     reco.onresult = (event) => {
       let texte = "";
-      let final = false;
       for (let i = 0; i < event.results.length; i++) {
         texte += event.results[i][0].transcript;
-        if (event.results[i].isFinal) final = true;
       }
+      dernierTexte = texte;
       setSaisie(texte);
-      if (final) envoyerRef.current(texte);
     };
     reco.onerror = () => setEcoute(false);
-    reco.onend = () => setEcoute(false);
+    reco.onend = () => {
+      setEcoute(false);
+      if (dernierTexte.trim()) envoyerRef.current(dernierTexte);
+      dernierTexte = "";
+    };
     reconnaissanceRef.current = reco;
   }, []);
 

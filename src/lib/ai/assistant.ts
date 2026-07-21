@@ -180,6 +180,7 @@ export async function* demanderAssistantIAStream(
     `Utilise systématiquement les outils à ta disposition pour aller chercher les données réelles avant de répondre — ne devine et n'invente jamais un chiffre ou un nom. ` +
     `Si aucun outil ne permet de répondre à la question, dis-le clairement plutôt que d'inventer une réponse. ` +
     consigneAffectation +
+    `Tu n'as accès à aucun outil de recherche de lieu réel (pas de carte, pas d'annuaire) : si l'utilisateur cite un lieu vague ou qui peut désigner plusieurs endroits (ex. un nom de restaurant courant, sans ville ni quartier), ne devine pas et ne l'invente pas — propose 2-3 hypothèses plausibles à partir de ta connaissance générale et demande laquelle est la bonne avant de conclure la proposition ; si le lieu est déjà précis (adresse, ville, quartier, nom distinctif), pas besoin de demander. ` +
     `Ne redirige jamais vers un menu que tu n'as pas vérifié. ` +
     `Formate tes réponses avec des tirets courts, pas de tableaux markdown, pas de titres.`;
 
