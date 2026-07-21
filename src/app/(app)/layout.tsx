@@ -6,6 +6,7 @@ import { estPlateformeAdmin } from "@/lib/plateforme";
 import { ModuleAccessBoundary } from "@/components/ModuleAccessBoundary";
 import { MobileBack } from "@/components/MobileBack";
 import { AideButton } from "@/components/AideButton";
+import { AssistantIA } from "@/components/AssistantIA";
 import { AppPresenceTracker } from "@/components/AppPresenceTracker";
 import { AbonnementBanner } from "@/components/AbonnementBanner";
 import { SupportAccessBanner } from "@/components/SupportAccessBanner";
