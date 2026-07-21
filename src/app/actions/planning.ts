@@ -47,20 +47,37 @@ export async function creerAffectationAction(formData: FormData) {
   redirect(destination);
 }
 
+// Compare deux valeurs "chantier_id/lieu_activite/tache" en traitant null a part :
+// Postgrest utilise .is() pour null et .eq() pour une vraie valeur, jamais l'un pour l'autre.
+function surColonne<T>(requete: T, colonne: string, valeur: string | null) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (valeur === null ? (requete as any).is(colonne, null) : (requete as any).eq(colonne, valeur)) as T;
+}
+
 // Meme validation que creerAffectationAction, mais pour une affectation existante :
 // permet de corriger un doublon ou une erreur de saisie sans avoir a supprimer/recréer.
+// Quand appliquer_a_tous est coche, la meme modification est propagee a toutes les
+// affectations qui partagent exactement date/heures/type/chantier-ou-lieu/tache avec la
+// version AVANT modification (typiquement les autres employes d'une meme saisie groupee),
+// puisque rien ne relie ces lignes entre elles autrement que ces valeurs identiques.
 export async function modifierAffectationAction(affectationId: string, formData: FormData) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+
+  const { data: original } = await supabase.from("affectations").select("date,heures,type_activite,chantier_id,lieu_activite,tache").eq("id", affectationId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
 
   const typeActivite = champ(formData, "type_activite") ?? "chantier";
   const typesAutorises = ["chantier", "bureau", "depot", "visite_medicale", "formation", "conge", "autre"];
   const chantierId = typeActivite === "chantier" ? champ(formData, "chantier_id") : null;
   const date = champ(formData, "date");
   const heures = Number(formData.get("heures"));
+  const appliquerATous = formData.get("appliquer_a_tous") === "on";
 
   const retour = champ(formData, "retour");
   const destination = retour ? `/planning?semaine=${encodeURIComponent(retour)}` : "/planning";
+  if (!original) {
+    redirect(`${destination}${destination.includes("?") ? "&" : "?"}error=${encodeURIComponent("Affectation introuvable")}`);
+  }
   if (!typesAutorises.includes(typeActivite) || (typeActivite === "chantier" && !chantierId) || !date) {
     redirect(`${destination}${destination.includes("?") ? "&" : "?"}error=${encodeURIComponent("Activité et date obligatoires")}`);
   }
@@ -73,7 +90,12 @@ export async function modifierAffectationAction(affectationId: string, formData:
   }
   const tache = champ(formData, "tache");
   const lieuActivite = typeActivite === "chantier" ? null : champ(formData, "lieu_activite");
-  const { error } = await supabase.from("affectations").update({ chantier_id: chantierId, date, heures, tache, type_activite: typeActivite, lieu_activite: lieuActivite }).eq("id", affectationId).eq("entreprise_id", ctx.entrepriseId);
+
+  let requete = supabase.from("affectations").update({ chantier_id: chantierId, date, heures, tache, type_activite: typeActivite, lieu_activite: lieuActivite }).eq("entreprise_id", ctx.entrepriseId);
+  requete = appliquerATous
+    ? surColonne(surColonne(surColonne(requete.eq("date", original!.date).eq("heures", original!.heures).eq("type_activite", original!.type_activite), "chantier_id", original!.chantier_id), "lieu_activite", original!.lieu_activite), "tache", original!.tache)
+    : requete.eq("id", affectationId);
+  const { error } = await requete;
 
   if (error) {
     redirect(`${destination}${destination.includes("?") ? "&" : "?"}error=${encodeURIComponent(error.message)}`);

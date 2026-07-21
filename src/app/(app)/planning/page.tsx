@@ -45,7 +45,7 @@ const champInput = "mt-1 w-full rounded border px-2 py-1 text-xs dark:bg-neutral
 // toujours visibles (pas de JS pour les basculer selon le type) — le serveur ne retient que
 // celui qui correspond au type_activite soumis. Permet de corriger une saisie ou un doublon
 // sans passer par supprimer + recréer.
-function FormulaireModifierAffectation({ a, chantiers, retour }: { a: A; chantiers: { id: string; nom: string }[]; retour: string }) {
+function FormulaireModifierAffectation({ a, chantiers, retour, autresMemeLot }: { a: A; chantiers: { id: string; nom: string }[]; retour: string; autresMemeLot: number }) {
   const ch = un(a.chantier);
   const modifier = modifierAffectationAction.bind(null, a.id);
   return (
@@ -59,6 +59,12 @@ function FormulaireModifierAffectation({ a, chantiers, retour }: { a: A; chantie
         <label className="text-[10px] text-neutral-500">Date<input name="date" type="date" defaultValue={a.date} required className={champInput} /></label>
         <label className="text-[10px] text-neutral-500">Heures<input name="heures" type="number" min="0.5" max="24" step="0.5" defaultValue={a.heures} required className={champInput} /></label>
         <label className="text-[10px] text-neutral-500">Tâche / motif<input name="tache" defaultValue={a.tache ?? ""} className={champInput} /></label>
+        {autresMemeLot > 0 && (
+          <label className="flex items-start gap-1.5 text-[10px] text-neutral-600 dark:text-neutral-400">
+            <input type="checkbox" name="appliquer_a_tous" className="mt-0.5" />
+            <span>Appliquer aussi aux {autresMemeLot} autre{autresMemeLot > 1 ? "s" : ""} employé{autresMemeLot > 1 ? "s" : ""} affecté{autresMemeLot > 1 ? "s" : ""} au même moment sur la même activité</span>
+          </label>
+        )}
         <button className="mt-1 rounded bg-neutral-900 px-2 py-1 text-xs font-medium text-white dark:bg-white dark:text-neutral-900">Enregistrer</button>
       </form>
     </details>
@@ -88,6 +94,10 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
   // Couleur stable par chantier.
   const chantiersIds = [...new Set(affectations.map((a) => un(a.chantier)?.id).filter(Boolean) as string[])];
   const couleur = (id: string) => couleurs[Math.max(0, chantiersIds.indexOf(id)) % couleurs.length];
+  // Nombre d'autres affectations identiques (meme jour, heures, activite, chantier/lieu,
+  // tache) pour un employe different — signe qu'elles viennent de la meme saisie groupee
+  // (planning manuel multi-ouvriers, ou l'assistant IA), rien d'autre ne les relie en base.
+  const autresMemeLot = (a: A) => affectations.filter((autre) => autre.id !== a.id && autre.date === a.date && Number(autre.heures) === Number(a.heures) && autre.type_activite === a.type_activite && (un(autre.chantier)?.id ?? null) === (un(a.chantier)?.id ?? null) && autre.lieu_activite === a.lieu_activite && autre.tache === a.tache).length;
   const total = affectations.reduce((s, a) => s + Number(a.heures), 0);
   const totalOuvriers = new Set(affectations.map((a) => un(a.employe)?.id).filter(Boolean)).size;
   const aujourdhui = iso(new Date());
@@ -155,7 +165,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
                   {a.lieu_activite&&<p className="mt-1 text-xs text-neutral-600">Lieu : {a.lieu_activite} · <a href={lienMaps(a.lieu_activite)} target="_blank" rel="noopener" className="text-blue-700 hover:underline">Itinéraire</a></p>}
                   {a.tache&&<p className="mt-1 text-xs text-neutral-600">Tâche : {a.tache}</p>}
                   <p className="mt-2 font-mono text-xs text-neutral-700">Prévu {a.heures} h{realise>0&&<span className="ml-2 font-semibold text-green-700">· Validé {realise} h</span>}</p>
-                  <FormulaireModifierAffectation a={a} chantiers={chantiers ?? []} retour={iso(debut)} />
+                  <FormulaireModifierAffectation a={a} chantiers={chantiers ?? []} retour={iso(debut)} autresMemeLot={autresMemeLot(a)} />
                   <form action={supprimerGroupeAffectationsAction} className="absolute right-2 top-2"><input type="hidden" name="retour" value={iso(debut)}/><input type="hidden" name="ids" value={a.id}/><ConfirmSubmitButton message="Retirer cette affectation ?" className="flex h-7 w-7 items-center justify-center rounded-full bg-white/80 text-neutral-500 shadow-sm hover:text-red-600">×</ConfirmSubmitButton></form>
                 </article>})}
                 {!cellules.length&&<p className="py-4 text-center text-sm text-neutral-500">Aucune activité planifiée.</p>}
@@ -198,7 +208,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
                                 {a.lieu_activite && <div className="text-[11px] text-neutral-600">{a.lieu_activite} · <a href={lienMaps(a.lieu_activite)} target="_blank" rel="noopener" className="text-blue-700 hover:underline">Itinéraire</a></div>}
                                 {a.tache && <div className="text-[11px] text-neutral-600">{a.tache}</div>}
                                 <div className="font-mono text-[11px] text-neutral-700">Prévu {a.heures} h{heuresRealisees(e.id,a.date,ch?.id)>0&&<span className="ml-1 font-semibold text-green-700">· validé {heuresRealisees(e.id,a.date,ch?.id)} h</span>}</div>
-                                <FormulaireModifierAffectation a={a} chantiers={chantiers ?? []} retour={iso(debut)} />
+                                <FormulaireModifierAffectation a={a} chantiers={chantiers ?? []} retour={iso(debut)} autresMemeLot={autresMemeLot(a)} />
                                 <form action={supprimerGroupeAffectationsAction} className="absolute right-0.5 top-0.5">
                                   <input type="hidden" name="retour" value={iso(debut)} />
                                   <input type="hidden" name="ids" value={a.id} />
