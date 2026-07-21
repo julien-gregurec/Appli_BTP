@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { OutilIA } from "@/lib/ai/provider";
+import { calculerRentabiliteChantiers } from "@/lib/rentabilite";
 
 type Supabase = SupabaseClient;
 
@@ -114,6 +115,14 @@ async function heuresSupplementairesSemaine(supabase: Supabase, entrepriseId: st
   return [...parEmploye.values()].sort((a, b) => b.total - a.total);
 }
 
+async function rentabiliteChantiers(supabase: Supabase, entrepriseId: string) {
+  const lignes = await calculerRentabiliteChantiers(supabase, entrepriseId);
+  return lignes
+    .filter((l) => l.factureHt > 0 || l.coutMainOeuvre > 0 || l.coutAchats > 0 || l.coutSousTraitance > 0)
+    .sort((a, b) => a.marge - b.marge)
+    .slice(0, 30);
+}
+
 async function chercherEmploye(supabase: Supabase, entrepriseId: string, input: { terme: string }) {
   const { data } = await supabase
     .from("employes")
@@ -195,6 +204,13 @@ export const OUTILS_COPILOTE: OutilIA[] = [
     parametres: { type: "object", properties: {} },
   },
   {
+    nom: "rentabilite_chantiers",
+    description:
+      "Liste la rentabilité de chaque chantier (facturé HT, coût main-d'œuvre, achats, sous-traitance, marge, taux de marge), " +
+      "du moins rentable au plus rentable. Utilise cet outil pour toute question sur la marge, le résultat, les coûts ou la rentabilité d'un ou plusieurs chantiers.",
+    parametres: { type: "object", properties: {} },
+  },
+  {
     nom: "chercher_employe",
     description: "Recherche un employé actif par nom ou prénom approximatif, pour obtenir son identifiant.",
     parametres: {
@@ -268,6 +284,8 @@ export async function executerOutilCopilote(
       return vehiculesEntretien(supabase, entrepriseId);
     case "heures_supplementaires_semaine":
       return heuresSupplementairesSemaine(supabase, entrepriseId);
+    case "rentabilite_chantiers":
+      return rentabiliteChantiers(supabase, entrepriseId);
     case "chercher_employe":
       return chercherEmploye(supabase, entrepriseId, input as { terme: string });
     case "chercher_chantier_planning":

@@ -4,7 +4,10 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { creerAffectationDepuisPropositionAction } from "@/app/actions/assistant";
 import type { MessageChat, PropositionAffectation } from "@/lib/ai/assistant";
 
-type MessageAffiche = MessageChat & { proposition?: PropositionAffectation; propositionStatut?: "en_attente" | "creee" | "refusee" };
+type MessageAffiche = MessageChat & { proposition?: PropositionAffectation; propositionStatut?: "en_attente" | "creee" | "refusee"; fichierNom?: string };
+type FichierJoint = { base64: string; mimeType: string; nom: string };
+const MIME_PIECES_JOINTES_ACCEPTEES = "image/jpeg,image/png,image/webp,application/pdf";
+const TAILLE_MAX_PIECE_JOINTE = 6 * 1024 * 1024;
 type EvenementSSE =
   | { type: "texte"; delta: string }
   | { type: "proposition"; proposition: PropositionAffectation }
@@ -42,9 +45,30 @@ export function AssistantIA() {
   const [ecoute, setEcoute] = useState(false);
   const [micSupporte] = useState(() => !!ctorReconnaissance());
   const [voixActive, setVoixActive] = useState(true);
+  const [fichierJoint, setFichierJoint] = useState<FichierJoint | null>(null);
   const finRef = useRef<HTMLDivElement>(null);
   const reconnaissanceRef = useRef<ReconnaissanceVocale | null>(null);
   const envoyerRef = useRef<(texte: string) => void>(() => {});
+  const fichierInputRef = useRef<HTMLInputElement>(null);
+
+  function choisirFichier(e: React.ChangeEvent<HTMLInputElement>) {
+    const fichier = e.target.files?.[0];
+    e.target.value = "";
+    if (!fichier) return;
+    setErreur(null);
+    if (fichier.size > TAILLE_MAX_PIECE_JOINTE) {
+      setErreur("Pièce jointe trop volumineuse (6 Mo maximum).");
+      return;
+    }
+    const lecteur = new FileReader();
+    lecteur.onload = () => {
+      const dataUrl = String(lecteur.result);
+      const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+      setFichierJoint({ base64, mimeType: fichier.type, nom: fichier.name });
+    };
+    lecteur.onerror = () => setErreur("Impossible de lire ce fichier.");
+    lecteur.readAsDataURL(fichier);
+  }
 
   useEffect(() => {
     finRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -58,11 +82,14 @@ export function AssistantIA() {
 
   function envoyer(texte?: string) {
     const question = (texte ?? saisie).trim();
-    if (!question) return;
+    const fichier = fichierJoint;
+    if (!question && !fichier) return;
     setErreur(null);
-    const historiqueEnvoye = [...messages, { role: "user" as const, contenu: question }];
+    const nouveauMessage: MessageAffiche = { role: "user", contenu: question, fichier: fichier ?? undefined, fichierNom: fichier?.nom };
+    const historiqueEnvoye = [...messages, nouveauMessage];
     setMessages([...historiqueEnvoye, { role: "assistant", contenu: "" }]);
     setSaisie("");
+    setFichierJoint(null);
 
     startTransition(async () => {
       let texteAccumule = "";
@@ -70,7 +97,9 @@ export function AssistantIA() {
         const res = await fetch("/api/assistant/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ historique: historiqueEnvoye.map((m) => ({ role: m.role, contenu: m.contenu })) }),
+          body: JSON.stringify({
+            historique: historiqueEnvoye.map((m) => ({ role: m.role, contenu: m.contenu, fichier: m.fichier })),
+          }),
         });
         if (!res.ok || !res.body) {
           const data = await res.json().catch(() => null);
@@ -214,6 +243,7 @@ export function AssistantIA() {
                       : "bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100")
                   }
                 >
+                  {m.fichierNom && <span className="mb-1 block text-xs opacity-80">📎 {m.fichierNom}</span>}
                   {m.contenu || (m.role === "assistant" && i === messages.length - 1 && pending ? "…" : "")}
                 </span>
                 {m.proposition && (
@@ -241,38 +271,56 @@ export function AssistantIA() {
             <div ref={finRef} />
           </div>
 
-          <div className="flex items-center gap-2 border-t border-neutral-200 p-3 dark:border-neutral-700">
-            {micSupporte && (
+          <div className="border-t border-neutral-200 p-3 dark:border-neutral-700">
+            {fichierJoint && (
+              <div className="mb-2 flex items-center gap-2 rounded-md bg-liria-gold/10 px-2 py-1 text-xs">
+                <span className="min-w-0 flex-1 truncate">📎 {fichierJoint.nom}</span>
+                <button type="button" onClick={() => setFichierJoint(null)} aria-label="Retirer la pièce jointe" className="text-neutral-500 hover:text-red-600">×</button>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <input ref={fichierInputRef} type="file" accept={MIME_PIECES_JOINTES_ACCEPTEES} onChange={choisirFichier} className="hidden" />
               <button
                 type="button"
-                onClick={basculerEcoute}
-                aria-label={ecoute ? "Arrêter le micro" : "Parler à l'assistant"}
-                title={ecoute ? "Arrêter le micro" : "Parler à l'assistant"}
-                className={`rounded-md px-3 py-2 text-sm ${ecoute ? "bg-red-600 text-white" : "border border-neutral-300 dark:border-neutral-700"}`}
+                onClick={() => fichierInputRef.current?.click()}
+                aria-label="Joindre un fichier"
+                title="Joindre une photo ou un PDF"
+                className="rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700"
               >
-                🎙️
+                📎
               </button>
-            )}
-            <input
-              value={saisie}
-              onChange={(e) => setSaisie(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  envoyer();
-                }
-              }}
-              placeholder="Écris ou parle…"
-              className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
-            />
-            <button
-              type="button"
-              onClick={() => envoyer()}
-              disabled={pending || !saisie.trim()}
-              className="rounded-md bg-liria-navy px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-            >
-              Envoyer
-            </button>
+              {micSupporte && (
+                <button
+                  type="button"
+                  onClick={basculerEcoute}
+                  aria-label={ecoute ? "Arrêter le micro" : "Parler à l'assistant"}
+                  title={ecoute ? "Arrêter le micro" : "Parler à l'assistant"}
+                  className={`rounded-md px-3 py-2 text-sm ${ecoute ? "bg-red-600 text-white" : "border border-neutral-300 dark:border-neutral-700"}`}
+                >
+                  🎙️
+                </button>
+              )}
+              <input
+                value={saisie}
+                onChange={(e) => setSaisie(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    envoyer();
+                  }
+                }}
+                placeholder="Écris ou parle…"
+                className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+              />
+              <button
+                type="button"
+                onClick={() => envoyer()}
+                disabled={pending || (!saisie.trim() && !fichierJoint)}
+                className="rounded-md bg-liria-navy px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                Envoyer
+              </button>
+            </div>
           </div>
         </div>
       )}

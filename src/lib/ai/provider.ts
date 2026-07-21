@@ -1,7 +1,9 @@
 import { creerProviderOpenAI } from "@/lib/ai/providers/openai";
 
+export type FichierIA = { base64: string; mimeType: string };
+
 export type MessageIA =
-  | { role: "user"; contenu: string }
+  | { role: "user"; contenu: string; fichier?: FichierIA }
   | { role: "assistant"; contenu: string; appelsOutils?: AppelOutilIA[] }
   | { role: "outil"; appelId: string; resultat: string };
 
@@ -14,8 +16,6 @@ export type ReponseCompletion = { texte: string; appelsOutils: AppelOutilIA[] };
 export type EvenementStreamIA =
   | { type: "texte"; delta: string }
   | { type: "appel_outil"; appel: AppelOutilIA };
-
-export type FichierIA = { base64: string; mimeType: string };
 
 export interface ProviderIA {
   /** Complétion simple ou multi-tours, avec outils optionnels (auto ou forcés). */

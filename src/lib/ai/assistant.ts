@@ -1,8 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { obtenirProviderIA, type MessageIA, type ReponseCompletion } from "@/lib/ai/provider";
+import { obtenirProviderIA, type FichierIA, type MessageIA, type ReponseCompletion } from "@/lib/ai/provider";
 import { OUTILS_COPILOTE, executerOutilCopilote } from "@/lib/ai/copilote";
 
-export type MessageChat = { role: "user" | "assistant"; contenu: string };
+export type MessageChat = { role: "user" | "assistant"; contenu: string; fichier?: FichierIA };
 
 export type PropositionAffectation = {
   employeId: string;
@@ -71,7 +71,9 @@ export async function* demanderAssistantIAStream(
     `tu ne crées jamais d'affectation toi-même, tu ne fais que la proposer ; l'utilisateur valide ou non. ` +
     `Formate tes réponses avec des tirets courts, pas de tableaux markdown, pas de titres.`;
 
-  const conversation: MessageIA[] = historique.map((m) => ({ role: m.role, contenu: m.contenu }));
+  const conversation: MessageIA[] = historique.map((m) =>
+    m.role === "user" ? { role: "user", contenu: m.contenu, fichier: m.fichier } : { role: "assistant", contenu: m.contenu },
+  );
 
   for (let tour = 0; tour < MAX_TOURS_OUTILS; tour++) {
     const flux = provider.streamer({ system, historique: conversation, outils: OUTILS_COPILOTE, maxTokens: 1500 });

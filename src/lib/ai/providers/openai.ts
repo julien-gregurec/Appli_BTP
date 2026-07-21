@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import type {
   AppelOutilIA,
   EvenementStreamIA,
+  FichierIA,
   MessageIA,
   OutilIA,
   ProviderIA,
@@ -10,11 +11,22 @@ import type {
 
 const MODELE_PAR_DEFAUT = "gpt-5.1";
 
+function construireContenuFichier(fichier: FichierIA): OpenAI.Responses.ResponseInputContent {
+  const estImage = fichier.mimeType.startsWith("image/");
+  return estImage
+    ? { type: "input_image", image_url: `data:${fichier.mimeType};base64,${fichier.base64}`, detail: "auto" }
+    : { type: "input_file", file_data: `data:${fichier.mimeType};base64,${fichier.base64}`, filename: "piece-jointe.pdf" };
+}
+
 function construireInput(historique: MessageIA[]): OpenAI.Responses.ResponseInputItem[] {
   const items: OpenAI.Responses.ResponseInputItem[] = [];
   for (const message of historique) {
     if (message.role === "user") {
-      items.push({ role: "user", content: message.contenu });
+      if (message.fichier) {
+        items.push({ role: "user", content: [construireContenuFichier(message.fichier), { type: "input_text", text: message.contenu || "Analyse ce fichier." }] });
+      } else {
+        items.push({ role: "user", content: message.contenu });
+      }
     } else if (message.role === "assistant") {
       if (message.contenu) items.push({ role: "assistant", content: message.contenu });
       for (const appel of message.appelsOutils ?? []) {
@@ -65,14 +77,10 @@ export function creerProviderOpenAI(): ProviderIA {
     },
 
     async completerAvecFichier({ system, texte, fichier, maxTokens }): Promise<string> {
-      const estImage = fichier.mimeType.startsWith("image/");
-      const contenuFichier: OpenAI.Responses.ResponseInputContent = estImage
-        ? { type: "input_image", image_url: `data:${fichier.mimeType};base64,${fichier.base64}`, detail: "auto" }
-        : { type: "input_file", file_data: `data:${fichier.mimeType};base64,${fichier.base64}`, filename: "document.pdf" };
       const response = await client.responses.create({
         model: modele,
         instructions: system,
-        input: [{ role: "user", content: [contenuFichier, { type: "input_text", text: texte }] }],
+        input: [{ role: "user", content: [construireContenuFichier(fichier), { type: "input_text", text: texte }] }],
         max_output_tokens: maxTokens,
       });
       return response.output_text ?? "";

@@ -3,6 +3,9 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { demanderAssistantIAStream, type MessageChat } from "@/lib/ai/assistant";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
+import { MIME_ANALYSABLES_IA } from "@/lib/ai/documents";
+
+const TAILLE_MAX_PIECE_JOINTE_BASE64 = 8_000_000; // ~6 Mo de fichier une fois décodé
 
 export async function POST(request: Request) {
   const ctx = await getContexteEntreprise();
@@ -19,6 +22,14 @@ export async function POST(request: Request) {
   }
   if (historique.length > 30) {
     return Response.json({ error: "Conversation trop longue, démarre une nouvelle discussion." }, { status: 400 });
+  }
+  if (dernierMessage.fichier) {
+    if (!MIME_ANALYSABLES_IA.includes(dernierMessage.fichier.mimeType)) {
+      return Response.json({ error: "Format de pièce jointe non pris en charge (images JPEG/PNG/WebP ou PDF)." }, { status: 400 });
+    }
+    if (dernierMessage.fichier.base64.length > TAILLE_MAX_PIECE_JOINTE_BASE64) {
+      return Response.json({ error: "Pièce jointe trop volumineuse (6 Mo maximum)." }, { status: 400 });
+    }
   }
 
   const depassement = await verifierPlafondIA(supabase, ctx.entrepriseId);
