@@ -19,7 +19,7 @@ export default async function MessageriePage({ searchParams }: { searchParams: P
     supabase.from("employes").select("id,prenom,nom").eq("entreprise_id",ctx.entrepriseId).eq("utilisateur_id",ctx.userId).maybeSingle(),
     supabase.rpc("contacts_messagerie",{p_entreprise_id:ctx.entrepriseId}),
     supabase.from("chantiers").select("id,nom,reference_interne").eq("entreprise_id",ctx.entrepriseId).not("statut","in","(archive,annule)").order("nom"),
-    supabase.from("conversations_internes").select("id,type,titre,chantier:chantiers(id,nom),createur:employes!conversations_internes_cree_par_employe_id_fkey(id,prenom,nom),destinataire:employes!conversations_internes_destinataire_employe_id_fkey(id,prenom,nom),derniere_activite_at").eq("entreprise_id",ctx.entrepriseId).order("derniere_activite_at",{ascending:false}),
+    supabase.from("conversations_internes").select("id,type,titre,chantier:chantiers(id,nom),createur:employes!conversations_createur_fkey(id,prenom,nom),destinataire:employes!conversations_destinataire_fkey(id,prenom,nom),derniere_activite_at").eq("entreprise_id",ctx.entrepriseId).order("derniere_activite_at",{ascending:false}),
   ]);
   const conversationId = query.conversation && (conversations ?? []).some((c)=>c.id===query.conversation) ? query.conversation : conversations?.[0]?.id;
   const { data: messages } = conversationId ? await supabase.from("messages_internes").select("id,contenu,created_at,auteur:employes(id,prenom,nom)").eq("conversation_id",conversationId).order("created_at") : { data: [] };
