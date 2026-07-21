@@ -4,6 +4,7 @@ import { creerAffectationAction, supprimerGroupeAffectationsAction } from "@/app
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { PlanningAffectationForm } from "@/components/PlanningAffectationForm";
 import { Lien as Link } from "@/components/Lien";
+import { lienMaps } from "@/lib/maps";
 
 type A = {
   id: string;
@@ -126,7 +127,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
                 {cellules.map((a)=>{const ch=un(a.chantier);const emp=un(a.employe);const realise=emp?heuresRealisees(emp.id,a.date,ch?.id):0;return <article key={a.id} className={`relative rounded-lg border-l-4 p-3 pr-9 ${couleur(ch?.id??a.type_activite)}`}>
                   <p className="text-sm font-semibold text-neutral-950">{emp?`${emp.prenom} ${emp.nom}`:"Employé non renseigné"}</p>
                   <p className="mt-0.5 text-sm font-medium text-neutral-800">{libelleAffectation(a)}</p>
-                  {a.lieu_activite&&<p className="mt-1 text-xs text-neutral-600">Lieu : {a.lieu_activite}</p>}
+                  {a.lieu_activite&&<p className="mt-1 text-xs text-neutral-600">Lieu : {a.lieu_activite} · <a href={lienMaps(a.lieu_activite)} target="_blank" rel="noopener" className="text-blue-700 hover:underline">Itinéraire</a></p>}
                   {a.tache&&<p className="mt-1 text-xs text-neutral-600">Tâche : {a.tache}</p>}
                   <p className="mt-2 font-mono text-xs text-neutral-700">Prévu {a.heures} h{realise>0&&<span className="ml-2 font-semibold text-green-700">· Validé {realise} h</span>}</p>
                   <form action={supprimerGroupeAffectationsAction} className="absolute right-2 top-2"><input type="hidden" name="retour" value={iso(debut)}/><input type="hidden" name="ids" value={a.id}/><ConfirmSubmitButton message="Retirer cette affectation ?" className="flex h-7 w-7 items-center justify-center rounded-full bg-white/80 text-neutral-500 shadow-sm hover:text-red-600">×</ConfirmSubmitButton></form>
@@ -168,7 +169,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
                             return (
                               <div key={a.id} className={`relative mb-1 rounded border-l-4 px-2 py-1 pr-4 ${couleur(identifiantCouleur)}`}>
                                 <div className="font-medium leading-tight text-neutral-900">{libelleAffectation(a)}</div>
-                                {a.lieu_activite && <div className="text-[11px] text-neutral-600">{a.lieu_activite}</div>}
+                                {a.lieu_activite && <div className="text-[11px] text-neutral-600">{a.lieu_activite} · <a href={lienMaps(a.lieu_activite)} target="_blank" rel="noopener" className="text-blue-700 hover:underline">Itinéraire</a></div>}
                                 {a.tache && <div className="text-[11px] text-neutral-600">{a.tache}</div>}
                                 <div className="font-mono text-[11px] text-neutral-700">Prévu {a.heures} h{heuresRealisees(e.id,a.date,ch?.id)>0&&<span className="ml-1 font-semibold text-green-700">· validé {heuresRealisees(e.id,a.date,ch?.id)} h</span>}</div>
                                 <form action={supprimerGroupeAffectationsAction} className="absolute right-0.5 top-0.5">

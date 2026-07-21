@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { creerAffectationDepuisPropositionAction, creerDemandeCongeDepuisPropositionAction } from "@/app/actions/assistant";
 import type { MessageChat, PropositionAffectation, PropositionConge } from "@/lib/ai/assistant";
+import { lienMaps } from "@/lib/maps";
 
 type MessageAffiche = MessageChat & {
   proposition?: PropositionAffectation;
@@ -278,7 +279,10 @@ export function AssistantIA() {
                 </span>
                 {m.proposition && (
                   <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-liria-gold/60 bg-liria-gold/10 p-3 text-left text-sm">
-                    <p><strong>{m.proposition.employeNom}</strong> → {m.proposition.typeActivite === "chantier" ? m.proposition.chantierNom : `${LIBELLES_TYPE_ACTIVITE[m.proposition.typeActivite]}${m.proposition.lieuActivite ? ` · ${m.proposition.lieuActivite}` : ""}`}</p>
+                    <p><strong>{m.proposition.employeNom}</strong> → {m.proposition.typeActivite === "chantier" ? m.proposition.chantierNom : LIBELLES_TYPE_ACTIVITE[m.proposition.typeActivite]}</p>
+                    {m.proposition.typeActivite !== "chantier" && m.proposition.lieuActivite && (
+                      <p className="text-neutral-600 dark:text-neutral-300">{m.proposition.lieuActivite} · <a href={lienMaps(m.proposition.lieuActivite)} target="_blank" rel="noopener" className="text-blue-700 hover:underline">Itinéraire</a></p>
+                    )}
                     <p className="text-neutral-600 dark:text-neutral-300">{m.proposition.date} · {m.proposition.heures} h{m.proposition.tache ? ` · ${m.proposition.tache}` : ""}</p>
                     {m.propositionStatut === "en_attente" && (
                       <div className="mt-2 flex gap-2">

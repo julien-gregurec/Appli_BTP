@@ -264,14 +264,17 @@ export const OUTILS_COPILOTE: OutilIA[] = [
       "Termine la conversation en proposant à l'utilisateur une affectation précise, pour validation manuelle. " +
       "N'écrit rien en base : c'est une proposition seulement. À utiliser uniquement après avoir identifié l'employé " +
       "(via chercher_employe) et vérifié la disponibilité (verifier_disponibilite_employe). " +
-      "Couvre aussi les heures hors chantier (bureau, dépôt, visite médicale, formation) et les chantiers pas encore enregistrés dans Liria (type_activite=\"autre\" + lieu_activite).",
+      "Ne te limite pas à quelques cas prévus : c'est l'outil à utiliser pour TOUT ce qui occupe du temps d'un employé un jour donné — " +
+      "chantier, bureau, dépôt, visite médicale, formation, chantier pas encore enregistré, repas d'affaires, rendez-vous, réunion externe, etc. " +
+      "Dès que type_activite n'est pas \"chantier\", mets dans lieu_activite exactement ce que l'utilisateur a dit sur le lieu ou l'événement " +
+      "(adresse, nom de lieu, avec qui, contexte) — un lien d'itinéraire sera généré automatiquement à partir de ce texte, pas besoin de le structurer.",
     parametres: {
       type: "object",
       properties: {
         employe_id: { type: "string" },
-        type_activite: { type: "string", enum: ["chantier", "bureau", "depot", "visite_medicale", "formation", "autre"], description: "\"chantier\" par défaut. Utilise un autre type pour du temps hors chantier ou un chantier pas encore créé dans Liria." },
+        type_activite: { type: "string", enum: ["chantier", "bureau", "depot", "visite_medicale", "formation", "autre"], description: "\"chantier\" par défaut. \"autre\" couvre tout le reste (repas, rendez-vous, réunion externe, chantier pas encore créé dans Liria...)." },
         chantier_id: { type: "string", description: "Obligatoire uniquement si type_activite=\"chantier\"" },
-        lieu_activite: { type: "string", description: "Précision de lieu quand type_activite n'est pas \"chantier\" (ex. \"Dépôt principal\", ou \"Chantier non enregistré : nom cité par l'utilisateur\")" },
+        lieu_activite: { type: "string", description: "Quand type_activite n'est pas \"chantier\" : reprends fidèlement ce que l'utilisateur a dit sur le lieu/contexte (ex. \"Restaurant avec le président du RCSA\", \"Dépôt principal\", \"Chantier non enregistré : nom cité\")" },
         date: { type: "string", description: "Date au format AAAA-MM-JJ" },
         heures: { type: "number" },
         tache: { type: "string", description: "Description courte de la tâche, ou chaîne vide" },
