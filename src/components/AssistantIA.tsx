@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { demanderAssistantIAAction } from "@/app/actions/assistant";
-import type { MessageChat } from "@/lib/ai/assistant";
+import { demanderAssistantIAAction, creerAffectationDepuisPropositionAction } from "@/app/actions/assistant";
+import type { MessageChat, PropositionAffectation } from "@/lib/ai/assistant";
+
+type MessageAffiche = MessageChat & { proposition?: PropositionAffectation; propositionStatut?: "en_attente" | "creee" | "refusee" };
 
 export function AssistantIA() {
   const [ouvert, setOuvert] = useState(false);
-  const [messages, setMessages] = useState<MessageChat[]>([]);
+  const [messages, setMessages] = useState<MessageAffiche[]>([]);
   const [saisie, setSaisie] = useState("");
   const [erreur, setErreur] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -24,15 +26,41 @@ export function AssistantIA() {
     setMessages(historique);
     setSaisie("");
     startTransition(async () => {
-      const res = await demanderAssistantIAAction(historique);
-      if ("error" in res && res.error) {
+      const res = await demanderAssistantIAAction(historique.map((m) => ({ role: m.role, contenu: m.contenu })));
+      if ("error" in res) {
         setErreur(res.error);
         return;
       }
-      if (res.reponse) {
-        setMessages((prev) => [...prev, { role: "assistant", contenu: res.reponse! }]);
-      }
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          contenu: res.texte ?? "",
+          proposition: res.proposition,
+          propositionStatut: res.proposition ? "en_attente" : undefined,
+        },
+      ]);
     });
+  }
+
+  function validerProposition(index: number) {
+    const message = messages[index];
+    if (!message.proposition) return;
+    startTransition(async () => {
+      const res = await creerAffectationDepuisPropositionAction({
+        employeId: message.proposition!.employeId,
+        chantierId: message.proposition!.chantierId,
+        date: message.proposition!.date,
+        heures: message.proposition!.heures,
+        tache: message.proposition!.tache,
+      });
+      setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, propositionStatut: "error" in res ? "en_attente" : "creee" } : m)));
+      if ("error" in res) setErreur(res.error);
+    });
+  }
+
+  function refuserProposition(index: number) {
+    setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, propositionStatut: "refusee" } : m)));
   }
 
   return (
@@ -50,7 +78,7 @@ export function AssistantIA() {
             {messages.length === 0 && (
               <p className="text-sm text-neutral-500">
                 Pose une question sur ton activité : « quels chantiers sont en retard ? », « qui est absent aujourd'hui ? »,
-                « quelles factures sont impayées ? »…
+                « programme Julien sur le chantier Dupont demain »…
               </p>
             )}
             {messages.map((m, i) => (
@@ -65,6 +93,24 @@ export function AssistantIA() {
                 >
                   {m.contenu}
                 </span>
+                {m.proposition && (
+                  <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-liria-gold/60 bg-liria-gold/10 p-3 text-left text-sm">
+                    <p><strong>{m.proposition.employeNom}</strong> → {m.proposition.chantierNom}</p>
+                    <p className="text-neutral-600 dark:text-neutral-300">{m.proposition.date} · {m.proposition.heures} h{m.proposition.tache ? ` · ${m.proposition.tache}` : ""}</p>
+                    {m.propositionStatut === "en_attente" && (
+                      <div className="mt-2 flex gap-2">
+                        <button type="button" onClick={() => validerProposition(i)} disabled={pending} className="rounded-md bg-green-700 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">
+                          Valider et créer
+                        </button>
+                        <button type="button" onClick={() => refuserProposition(i)} className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium">
+                          Ignorer
+                        </button>
+                      </div>
+                    )}
+                    {m.propositionStatut === "creee" && <p className="mt-2 text-xs font-medium text-green-700">✓ Affectation créée</p>}
+                    {m.propositionStatut === "refusee" && <p className="mt-2 text-xs text-neutral-500">Ignorée</p>}
+                  </div>
+                )}
               </div>
             ))}
             {pending && <p className="text-sm text-neutral-400">…</p>}

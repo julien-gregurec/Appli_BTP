@@ -114,6 +114,41 @@ async function heuresSupplementairesSemaine(supabase: Supabase, entrepriseId: st
   return [...parEmploye.values()].sort((a, b) => b.total - a.total);
 }
 
+async function chercherEmploye(supabase: Supabase, entrepriseId: string, input: { terme: string }) {
+  const { data } = await supabase
+    .from("employes")
+    .select("id, nom, prenom, poste")
+    .eq("entreprise_id", entrepriseId)
+    .eq("statut", "actif")
+    .or(`nom.ilike.%${input.terme}%,prenom.ilike.%${input.terme}%`)
+    .limit(5);
+  return data ?? [];
+}
+
+async function chercherChantierParNom(supabase: Supabase, entrepriseId: string, input: { terme: string }) {
+  const { data } = await supabase
+    .from("chantiers")
+    .select("id, nom, ville, statut")
+    .eq("entreprise_id", entrepriseId)
+    .ilike("nom", `%${input.terme}%`)
+    .limit(5);
+  return data ?? [];
+}
+
+async function verifierDisponibiliteEmploye(supabase: Supabase, entrepriseId: string, input: { employe_id: string; date: string }) {
+  const [{ data: affectations }, { data: conge }, { data: habilitations }] = await Promise.all([
+    supabase.from("affectations").select("heures, tache, chantier_id, type_activite").eq("entreprise_id", entrepriseId).eq("employe_id", input.employe_id).eq("date", input.date),
+    supabase.from("demandes_conges").select("type_conge").eq("entreprise_id", entrepriseId).eq("employe_id", input.employe_id).eq("statut", "approuvee").lte("date_debut", input.date).gte("date_fin", input.date).maybeSingle(),
+    supabase.from("habilitations_employe").select("type, libelle, date_expiration").eq("entreprise_id", entrepriseId).eq("employe_id", input.employe_id),
+  ]);
+  return {
+    deja_affecte_ce_jour: affectations ?? [],
+    heures_deja_prevues: (affectations ?? []).reduce((s, a) => s + Number(a.heures), 0),
+    en_conge_ce_jour: conge ? conge.type_conge : null,
+    habilitations: habilitations ?? [],
+  };
+}
+
 export const OUTILS_COPILOTE: Anthropic.Tool[] = [
   {
     name: "rechercher",
@@ -159,6 +194,55 @@ export const OUTILS_COPILOTE: Anthropic.Tool[] = [
     description: "Liste les employés ayant fait des heures supplémentaires cette semaine, du plus au moins.",
     input_schema: { type: "object", properties: {} },
   },
+  {
+    name: "chercher_employe",
+    description: "Recherche un employé actif par nom ou prénom approximatif, pour obtenir son identifiant.",
+    input_schema: {
+      type: "object",
+      properties: { terme: { type: "string" } },
+      required: ["terme"],
+    },
+  },
+  {
+    name: "chercher_chantier_planning",
+    description: "Recherche un chantier par nom approximatif, pour obtenir son identifiant.",
+    input_schema: {
+      type: "object",
+      properties: { terme: { type: "string" } },
+      required: ["terme"],
+    },
+  },
+  {
+    name: "verifier_disponibilite_employe",
+    description: "Vérifie si un employé est déjà affecté, en congé, et liste ses habilitations, pour une date donnée (AAAA-MM-JJ). À utiliser avant toute proposition d'affectation.",
+    input_schema: {
+      type: "object",
+      properties: {
+        employe_id: { type: "string" },
+        date: { type: "string", description: "Date au format AAAA-MM-JJ" },
+      },
+      required: ["employe_id", "date"],
+    },
+  },
+  {
+    name: "proposer_affectation",
+    description:
+      "Termine la conversation en proposant à l'utilisateur une affectation précise, pour validation manuelle. " +
+      "N'écrit rien en base : c'est une proposition seulement. À utiliser uniquement après avoir identifié l'employé et le chantier " +
+      "(via chercher_employe / chercher_chantier_planning) et vérifié la disponibilité (verifier_disponibilite_employe).",
+    input_schema: {
+      type: "object",
+      properties: {
+        employe_id: { type: "string" },
+        chantier_id: { type: "string" },
+        date: { type: "string", description: "Date au format AAAA-MM-JJ" },
+        heures: { type: "number" },
+        tache: { type: "string", description: "Description courte de la tâche, ou chaîne vide" },
+        commentaire: { type: "string", description: "Ce que tu veux dire à l'utilisateur avant de lui proposer cette affectation (ex. avertissement si l'employé a déjà des heures ce jour-là)" },
+      },
+      required: ["employe_id", "chantier_id", "date", "heures"],
+    },
+  },
 ];
 
 export async function executerOutilCopilote(
@@ -184,6 +268,12 @@ export async function executerOutilCopilote(
       return vehiculesEntretien(supabase, entrepriseId);
     case "heures_supplementaires_semaine":
       return heuresSupplementairesSemaine(supabase, entrepriseId);
+    case "chercher_employe":
+      return chercherEmploye(supabase, entrepriseId, input as { terme: string });
+    case "chercher_chantier_planning":
+      return chercherChantierParNom(supabase, entrepriseId, input as { terme: string });
+    case "verifier_disponibilite_employe":
+      return verifierDisponibiliteEmploye(supabase, entrepriseId, input as { employe_id: string; date: string });
     default:
       return { error: `Outil inconnu : ${nom}` };
   }
