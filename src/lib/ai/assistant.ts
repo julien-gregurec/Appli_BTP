@@ -4,11 +4,19 @@ import { OUTILS_COPILOTE, executerOutilCopilote } from "@/lib/ai/copilote";
 
 export type MessageChat = { role: "user" | "assistant"; contenu: string; fichier?: FichierIA };
 
+// Doit rester synchronise avec la liste dans src/app/actions/planning.ts (formulaire manuel) —
+// "conge" est volontairement exclu ici : ces lignes sont creees par le workflow de demandes de
+// conges (validation dediee), jamais proposees directement par l'assistant.
+export const TYPES_ACTIVITE_PROPOSABLES_IA = ["chantier", "bureau", "depot", "visite_medicale", "formation", "autre"] as const;
+export type TypeActiviteProposable = (typeof TYPES_ACTIVITE_PROPOSABLES_IA)[number];
+
 export type PropositionAffectation = {
   employeId: string;
   employeNom: string;
-  chantierId: string;
-  chantierNom: string;
+  typeActivite: TypeActiviteProposable;
+  chantierId: string | null;
+  chantierNom: string | null;
+  lieuActivite: string | null;
   date: string;
   heures: number;
   tache: string | null;
@@ -26,26 +34,28 @@ async function resoudrePropositionAffectation(
   input: Record<string, unknown>,
 ): Promise<PropositionAffectation | null> {
   const employeId = String(input.employe_id ?? "");
-  const chantierId = String(input.chantier_id ?? "");
+  const typeActiviteBrut = typeof input.type_activite === "string" && input.type_activite ? input.type_activite : "chantier";
   const date = String(input.date ?? "");
   const heures = Number(input.heures);
-  if (!employeId || !chantierId || !date || !heures || heures <= 0) return null;
+  if (!employeId || !date || !heures || heures <= 0) return null;
+  if (!(TYPES_ACTIVITE_PROPOSABLES_IA as readonly string[]).includes(typeActiviteBrut)) return null;
+  const typeActivite = typeActiviteBrut as TypeActiviteProposable;
 
-  const [{ data: employe }, { data: chantier }] = await Promise.all([
-    supabase.from("employes").select("nom, prenom").eq("id", employeId).eq("entreprise_id", entrepriseId).maybeSingle(),
-    supabase.from("chantiers").select("nom").eq("id", chantierId).eq("entreprise_id", entrepriseId).maybeSingle(),
-  ]);
-  if (!employe || !chantier) return null;
+  const { data: employe } = await supabase.from("employes").select("nom, prenom").eq("id", employeId).eq("entreprise_id", entrepriseId).maybeSingle();
+  if (!employe) return null;
 
-  return {
-    employeId,
-    employeNom: `${employe.prenom} ${employe.nom}`,
-    chantierId,
-    chantierNom: chantier.nom,
-    date,
-    heures,
-    tache: typeof input.tache === "string" && input.tache.trim() ? input.tache.trim() : null,
-  };
+  const tache = typeof input.tache === "string" && input.tache.trim() ? input.tache.trim() : null;
+  const lieuActivite = typeof input.lieu_activite === "string" && input.lieu_activite.trim() ? input.lieu_activite.trim() : null;
+
+  if (typeActivite === "chantier") {
+    const chantierId = String(input.chantier_id ?? "");
+    if (!chantierId) return null;
+    const { data: chantier } = await supabase.from("chantiers").select("nom").eq("id", chantierId).eq("entreprise_id", entrepriseId).maybeSingle();
+    if (!chantier) return null;
+    return { employeId, employeNom: `${employe.prenom} ${employe.nom}`, typeActivite, chantierId, chantierNom: chantier.nom, lieuActivite: null, date, heures, tache };
+  }
+
+  return { employeId, employeNom: `${employe.prenom} ${employe.nom}`, typeActivite, chantierId: null, chantierNom: null, lieuActivite, date, heures, tache };
 }
 
 async function decrireUtilisateurCourant(supabase: SupabaseClient, entrepriseId: string, utilisateurId: string, prenomCompte: string | null): Promise<string> {
@@ -99,8 +109,10 @@ export async function* demanderAssistantIAStream(
     `Réponds en français, de façon concise et directe, comme un collègue qui connaît bien l'activité. ` +
     `Utilise systématiquement les outils à ta disposition pour aller chercher les données réelles avant de répondre — ne devine et n'invente jamais un chiffre ou un nom. ` +
     `Si aucun outil ne permet de répondre à la question, dis-le clairement plutôt que d'inventer une réponse. ` +
-    `Pour toute demande d'affectation planning, utilise chercher_employe, chercher_chantier_planning puis verifier_disponibilite_employe avant de conclure avec proposer_affectation — ` +
+    `Pour toute demande d'affectation planning, utilise chercher_employe (et chercher_chantier_planning si un chantier existant est cité) puis verifier_disponibilite_employe avant de conclure avec proposer_affectation — ` +
     `tu ne crées jamais d'affectation toi-même, tu ne fais que la proposer ; l'utilisateur valide ou non. ` +
+    `proposer_affectation gère aussi les heures hors chantier : pour du temps au bureau ou au dépôt, appelle-le avec type_activite="bureau" ou "depot" (sans chantier_id), et précise lieu_activite si utile. ` +
+    `Si on te parle d'un chantier qui n'est pas encore enregistré dans Liria (chercher_chantier_planning ne le trouve pas), ne bloque pas : propose l'affectation avec type_activite="autre" et lieu_activite décrivant le chantier (ex. "Chantier non enregistré : nom cité"), et signale à l'utilisateur qu'il faudra créer la fiche chantier pour la relier plus tard. ` +
     `Formate tes réponses avec des tirets courts, pas de tableaux markdown, pas de titres.`;
 
   const conversation: MessageIA[] = historique.map((m) =>

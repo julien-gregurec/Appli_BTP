@@ -5,6 +5,7 @@ import { creerAffectationDepuisPropositionAction } from "@/app/actions/assistant
 import type { MessageChat, PropositionAffectation } from "@/lib/ai/assistant";
 
 type MessageAffiche = MessageChat & { proposition?: PropositionAffectation; propositionStatut?: "en_attente" | "creee" | "refusee"; fichierNom?: string };
+const LIBELLES_TYPE_ACTIVITE: Record<string, string> = { chantier: "Chantier", bureau: "Bureau", depot: "Dépôt", visite_medicale: "Visite médicale", formation: "Formation", autre: "Autre" };
 type FichierJoint = { base64: string; mimeType: string; nom: string };
 const MIME_PIECES_JOINTES_ACCEPTEES = "image/jpeg,image/png,image/webp,application/pdf";
 const TAILLE_MAX_PIECE_JOINTE = 6 * 1024 * 1024;
@@ -190,7 +191,9 @@ export function AssistantIA() {
     startTransition(async () => {
       const res = await creerAffectationDepuisPropositionAction({
         employeId: message.proposition!.employeId,
+        typeActivite: message.proposition!.typeActivite,
         chantierId: message.proposition!.chantierId,
+        lieuActivite: message.proposition!.lieuActivite,
         date: message.proposition!.date,
         heures: message.proposition!.heures,
         tache: message.proposition!.tache,
@@ -248,7 +251,7 @@ export function AssistantIA() {
                 </span>
                 {m.proposition && (
                   <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-liria-gold/60 bg-liria-gold/10 p-3 text-left text-sm">
-                    <p><strong>{m.proposition.employeNom}</strong> → {m.proposition.chantierNom}</p>
+                    <p><strong>{m.proposition.employeNom}</strong> → {m.proposition.typeActivite === "chantier" ? m.proposition.chantierNom : `${LIBELLES_TYPE_ACTIVITE[m.proposition.typeActivite]}${m.proposition.lieuActivite ? ` · ${m.proposition.lieuActivite}` : ""}`}</p>
                     <p className="text-neutral-600 dark:text-neutral-300">{m.proposition.date} · {m.proposition.heures} h{m.proposition.tache ? ` · ${m.proposition.tache}` : ""}</p>
                     {m.propositionStatut === "en_attente" && (
                       <div className="mt-2 flex gap-2">

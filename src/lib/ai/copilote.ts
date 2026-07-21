@@ -262,19 +262,22 @@ export const OUTILS_COPILOTE: OutilIA[] = [
     nom: "proposer_affectation",
     description:
       "Termine la conversation en proposant à l'utilisateur une affectation précise, pour validation manuelle. " +
-      "N'écrit rien en base : c'est une proposition seulement. À utiliser uniquement après avoir identifié l'employé et le chantier " +
-      "(via chercher_employe / chercher_chantier_planning) et vérifié la disponibilité (verifier_disponibilite_employe).",
+      "N'écrit rien en base : c'est une proposition seulement. À utiliser uniquement après avoir identifié l'employé " +
+      "(via chercher_employe) et vérifié la disponibilité (verifier_disponibilite_employe). " +
+      "Couvre aussi les heures hors chantier (bureau, dépôt, visite médicale, formation) et les chantiers pas encore enregistrés dans Liria (type_activite=\"autre\" + lieu_activite).",
     parametres: {
       type: "object",
       properties: {
         employe_id: { type: "string" },
-        chantier_id: { type: "string" },
+        type_activite: { type: "string", enum: ["chantier", "bureau", "depot", "visite_medicale", "formation", "autre"], description: "\"chantier\" par défaut. Utilise un autre type pour du temps hors chantier ou un chantier pas encore créé dans Liria." },
+        chantier_id: { type: "string", description: "Obligatoire uniquement si type_activite=\"chantier\"" },
+        lieu_activite: { type: "string", description: "Précision de lieu quand type_activite n'est pas \"chantier\" (ex. \"Dépôt principal\", ou \"Chantier non enregistré : nom cité par l'utilisateur\")" },
         date: { type: "string", description: "Date au format AAAA-MM-JJ" },
         heures: { type: "number" },
         tache: { type: "string", description: "Description courte de la tâche, ou chaîne vide" },
         commentaire: { type: "string", description: "Ce que tu veux dire à l'utilisateur avant de lui proposer cette affectation (ex. avertissement si l'employé a déjà des heures ce jour-là)" },
       },
-      required: ["employe_id", "chantier_id", "date", "heures"],
+      required: ["employe_id", "date", "heures"],
     },
   },
 ];
