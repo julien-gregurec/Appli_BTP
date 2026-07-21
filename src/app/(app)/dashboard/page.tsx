@@ -71,7 +71,7 @@ export default async function DashboardPage() {
   let requeteAffectations = supabase.from("affectations").select("id, date, heures, tache, chantier:chantiers(nom), employe:employes(prenom, nom)").eq("entreprise_id", ctx.entrepriseId).gte("date", aujourdhui).order("date").limit(6);
   if (permissions !== null && !peutGererPlanning) requeteAffectations = requeteAffectations.eq("employe_id", employeCompte?.id ?? "00000000-0000-0000-0000-000000000000");
 
-  const [devisResult, facturesResult, chantiersResult, affectationsResult, articlesResult, vehiculesResult, outilsResult, commandesResult, chantiersPointageResult, sessionsPointageResult, employesActifsResult, congesAujourdhuiResult] = await Promise.all([
+  const [devisResult, facturesResult, chantiersResult, affectationsResult, articlesResult, vehiculesResult, outilsResult, commandesResult, chantiersPointageResult, sessionsPointageResult, employesActifsResult, congesAujourdhuiResult, notificationsResult] = await Promise.all([
     voir.devis ? supabase.from("devis").select("id, numero, statut, montant_ttc, date_emission, date_validite, client:clients(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }) : null,
     voir.factures ? supabase.from("factures").select("id, numero, statut, date_emission, date_echeance, montant_ttc, montant_paye, client:clients(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId) : null,
     voir.chantiers ? supabase.from("chantiers").select("id, nom, statut, date_fin_prevue").eq("entreprise_id", ctx.entrepriseId).order("updated_at", { ascending: false }) : null,
@@ -84,13 +84,14 @@ export default async function DashboardPage() {
     peutPointer && employeCompte ? supabase.from("sessions_pointage").select("id,arrivee_at,tache,employe:employes(id,prenom,nom),chantier:chantiers(id,nom)").eq("entreprise_id",ctx.entrepriseId).eq("employe_id",employeCompte.id).is("depart_at",null).order("arrivee_at",{ascending:false}) : null,
     peutVoirBriefing ? supabase.from("employes").select("id").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif") : null,
     peutVoirBriefing ? supabase.from("demandes_conges").select("employe_id").eq("entreprise_id", ctx.entrepriseId).eq("statut", "approuvee").lte("date_debut", aujourdhui).gte("date_fin", aujourdhui) : null,
+    permissions !== null ? supabase.from("notifications_utilisateurs").select("id,titre,message,lien,niveau,created_at").eq("entreprise_id", ctx.entrepriseId).is("lue_at", null).order("created_at", { ascending: false }).limit(8) : null,
   ]);
   const devis = devisResult?.data ?? [], factures = facturesResult?.data ?? [], chantiers = chantiersResult?.data ?? [];
   const affectations = affectationsResult?.data ?? [], articles = articlesResult?.data ?? [], vehicules = vehiculesResult?.data ?? [];
   const outils = outilsResult?.data ?? [], commandes = commandesResult?.data ?? [];
   const chantiersPointage = chantiersPointageResult?.data ?? [], sessionsPointage = sessionsPointageResult?.data ?? [];
   const employesActifs = employesActifsResult?.data ?? [], congesAujourdhui = congesAujourdhuiResult?.data ?? [];
-  const {data:notifications}=permissions!==null?await supabase.from("notifications_utilisateurs").select("id,titre,message,lien,niveau,created_at").eq("entreprise_id",ctx.entrepriseId).is("lue_at",null).order("created_at",{ascending:false}).limit(8):{data:[]};
+  const notifications = notificationsResult?.data ?? [];
 
   const totalFacture = (factures ?? []).filter((f) => f.statut !== "annulee").reduce((s, f) => s + Number(f.montant_ttc ?? 0), 0);
   const totalEncaisse = (factures ?? []).reduce((s, f) => s + Number(f.montant_paye ?? 0), 0);

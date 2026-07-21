@@ -14,8 +14,9 @@ import { SupportAccessBanner } from "@/components/SupportAccessBanner";
 // Layout des pages authentifiées avec navigation latérale.
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getContexteEntreprise();
-  const permissions = await permissionsUtilisateur(ctx);
-  const plateformeAdmin = await estPlateformeAdmin();
+  // Independants l'un de l'autre (aucun n'attend le resultat de l'autre) : les lancer en
+  // parallele evite un aller-retour reseau supplementaire sur chaque navigation.
+  const [permissions, plateformeAdmin] = await Promise.all([permissionsUtilisateur(ctx), estPlateformeAdmin()]);
   const peutVoirAlerteAbonnement = permissions === null || permissions.includes("gerer_utilisateurs") || permissions.includes("gerer_parametres");
 
   return (
