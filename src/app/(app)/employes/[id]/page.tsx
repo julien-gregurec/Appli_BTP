@@ -25,7 +25,8 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
   const supabase = await createClient();
   const permissions = await permissionsUtilisateur(ctx);
   const peutGerer = permissions === null || permissions.includes("gerer_employes");
-  const peutVoirFinances = permissions === null || permissions.includes("voir_indicateurs_financiers");
+  const peutVoirTauxFacture = permissions === null || permissions.includes("voir_taux_facture_employe");
+  const peutVoirCoutInterne = permissions === null || permissions.includes("voir_cout_interne_employe");
   const peutGererRib = !ctx.accesSupportPlateforme && (permissions === null || permissions.includes("gerer_coordonnees_bancaires"));
 
   const { data: employe } = await supabase
@@ -102,8 +103,8 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
           {ligne("Date d'entrée", formatDateFr(employe.date_entree))}
           {ligne("Ancienneté", ancienneteEmploye(employe.date_entree, employe.statut === "sorti" ? employe.date_sortie : null))}
           {employe.statut === "sorti" && ligne("Date de sortie", employe.date_sortie ? formatDateFr(employe.date_sortie) : null)}
-          {peutVoirFinances&&ligne("Taux facturé", formatEuro(employe.taux_horaire))}
-          {peutVoirFinances&&ligne("Coût interne", formatEuro(employe.cout_horaire))}
+          {peutVoirTauxFacture&&ligne("Taux facturé", formatEuro(employe.taux_horaire))}
+          {peutVoirCoutInterne&&ligne("Coût interne", formatEuro(employe.cout_horaire))}
           {ligne("Notes", employe.notes)}
         </section>
 
