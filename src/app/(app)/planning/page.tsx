@@ -45,7 +45,7 @@ const champInput = "mt-1 w-full rounded border px-2 py-1 text-xs dark:bg-neutral
 // toujours visibles (pas de JS pour les basculer selon le type) — le serveur ne retient que
 // celui qui correspond au type_activite soumis. Permet de corriger une saisie ou un doublon
 // sans passer par supprimer + recréer.
-function FormulaireModifierAffectation({ a, chantiers, retour, autresMemeLot }: { a: A; chantiers: { id: string; nom: string }[]; retour: string; autresMemeLot: number }) {
+function FormulaireModifierAffectation({ a, chantiers, retour, autresMemeLot }: { a: A; chantiers: { id: string; nom: string }[]; retour: string; autresMemeLot: A[] }) {
   const ch = un(a.chantier);
   const modifier = modifierAffectationAction.bind(null, a.id);
   return (
@@ -59,11 +59,21 @@ function FormulaireModifierAffectation({ a, chantiers, retour, autresMemeLot }: 
         <label className="text-[10px] text-neutral-500">Date<input name="date" type="date" defaultValue={a.date} required className={champInput} /></label>
         <label className="text-[10px] text-neutral-500">Heures<input name="heures" type="number" min="0.5" max="24" step="0.5" defaultValue={a.heures} required className={champInput} /></label>
         <label className="text-[10px] text-neutral-500">Tâche / motif<input name="tache" defaultValue={a.tache ?? ""} className={champInput} /></label>
-        {autresMemeLot > 0 && (
-          <label className="flex items-start gap-1.5 text-[10px] text-neutral-600 dark:text-neutral-400">
-            <input type="checkbox" name="appliquer_a_tous" className="mt-0.5" />
-            <span>Appliquer aussi aux {autresMemeLot} autre{autresMemeLot > 1 ? "s" : ""} employé{autresMemeLot > 1 ? "s" : ""} affecté{autresMemeLot > 1 ? "s" : ""} au même moment sur la même activité</span>
-          </label>
+        {autresMemeLot.length > 0 && (
+          <fieldset className="text-[10px] text-neutral-600 dark:text-neutral-400">
+            <legend className="mb-0.5">Appliquer aussi à (même moment, même activité) :</legend>
+            <div className="flex flex-col gap-0.5">
+              {autresMemeLot.map((autre) => {
+                const emp = un(autre.employe);
+                return (
+                  <label key={autre.id} className="flex items-center gap-1.5">
+                    <input type="checkbox" name="ids_supplementaires" value={autre.id} />
+                    <span>{emp ? `${emp.prenom} ${emp.nom}` : "Employé"}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
         )}
         <button className="mt-1 rounded bg-neutral-900 px-2 py-1 text-xs font-medium text-white dark:bg-white dark:text-neutral-900">Enregistrer</button>
       </form>
@@ -94,10 +104,11 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
   // Couleur stable par chantier.
   const chantiersIds = [...new Set(affectations.map((a) => un(a.chantier)?.id).filter(Boolean) as string[])];
   const couleur = (id: string) => couleurs[Math.max(0, chantiersIds.indexOf(id)) % couleurs.length];
-  // Nombre d'autres affectations identiques (meme jour, heures, activite, chantier/lieu,
-  // tache) pour un employe different — signe qu'elles viennent de la meme saisie groupee
-  // (planning manuel multi-ouvriers, ou l'assistant IA), rien d'autre ne les relie en base.
-  const autresMemeLot = (a: A) => affectations.filter((autre) => autre.id !== a.id && autre.date === a.date && Number(autre.heures) === Number(a.heures) && autre.type_activite === a.type_activite && (un(autre.chantier)?.id ?? null) === (un(a.chantier)?.id ?? null) && autre.lieu_activite === a.lieu_activite && autre.tache === a.tache).length;
+  // Autres affectations identiques (meme jour, heures, activite, chantier/lieu, tache) pour
+  // un employe different — signe qu'elles viennent de la meme saisie groupee (planning manuel
+  // multi-ouvriers, ou l'assistant IA), rien d'autre ne les relie en base. Proposees en cases
+  // a cocher individuelles : chacune reste un choix explicite, jamais une propagation globale.
+  const autresMemeLot = (a: A) => affectations.filter((autre) => autre.id !== a.id && autre.date === a.date && Number(autre.heures) === Number(a.heures) && autre.type_activite === a.type_activite && (un(autre.chantier)?.id ?? null) === (un(a.chantier)?.id ?? null) && autre.lieu_activite === a.lieu_activite && autre.tache === a.tache);
   const total = affectations.reduce((s, a) => s + Number(a.heures), 0);
   const totalOuvriers = new Set(affectations.map((a) => un(a.employe)?.id).filter(Boolean)).size;
   const aujourdhui = iso(new Date());

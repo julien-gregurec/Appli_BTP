@@ -67,6 +67,7 @@ export function AssistantIA() {
   const [fichierJoint, setFichierJoint] = useState<FichierJoint | null>(null);
   const finRef = useRef<HTMLDivElement>(null);
   const reconnaissanceRef = useRef<ReconnaissanceVocale | null>(null);
+  const dernierTexteVocalRef = useRef("");
   const envoyerRef = useRef<(texte: string) => void>(() => {});
   const fichierInputRef = useRef<HTMLInputElement>(null);
 
@@ -103,6 +104,13 @@ export function AssistantIA() {
     const question = (texte ?? saisie).trim();
     const fichier = fichierJoint;
     if (!question && !fichier) return;
+    // Coupe le micro si on envoie manuellement pendant une dictée : sinon la reconnaissance
+    // continue en arrière-plan et renvoie le même texte une seconde fois à son arrêt naturel.
+    if (ecoute) {
+      dernierTexteVocalRef.current = "";
+      reconnaissanceRef.current?.stop();
+      setEcoute(false);
+    }
     setErreur(null);
     const nouveauMessage: MessageAffiche = { role: "user", contenu: question, fichier: fichier ?? undefined, fichierNom: fichier?.nom };
     const historiqueEnvoye = [...messages, nouveauMessage];
@@ -184,7 +192,6 @@ export function AssistantIA() {
     // se faisait tronquer et envoyer avant que l'utilisateur ait fini de parler.
     reco.continuous = true;
     reco.interimResults = true;
-    let dernierTexte = "";
     reco.onresult = (event) => {
       // En continuous=true, chaque segment reconnu (final ou en cours) doit être joint avec
       // un espace explicite : certains navigateurs ne mettent pas d'espace de bord, ce qui
@@ -195,14 +202,15 @@ export function AssistantIA() {
         if (morceau) morceaux.push(morceau);
       }
       const texte = morceaux.join(" ");
-      dernierTexte = texte;
+      dernierTexteVocalRef.current = texte;
       setSaisie(texte);
     };
     reco.onerror = () => setEcoute(false);
     reco.onend = () => {
       setEcoute(false);
-      if (dernierTexte.trim()) envoyerRef.current(dernierTexte);
-      dernierTexte = "";
+      const texteFinal = dernierTexteVocalRef.current;
+      dernierTexteVocalRef.current = "";
+      if (texteFinal.trim()) envoyerRef.current(texteFinal);
     };
     reconnaissanceRef.current = reco;
   }, []);
