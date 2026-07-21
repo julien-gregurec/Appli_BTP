@@ -11,6 +11,7 @@ import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 const TYPES_ACTIVITE_AUTORISES = ["chantier", "bureau", "depot", "visite_medicale", "formation", "conge", "autre"];
 
 export async function creerAffectationDepuisPropositionAction(proposition: {
+  affectationId: string | null;
   employeIds: string[];
   typeActivite: string;
   chantierId: string | null;
@@ -39,18 +40,23 @@ export async function creerAffectationDepuisPropositionAction(proposition: {
   ]);
   if (!employes || employes.length !== proposition.employeIds.length || (estChantier && !chantier)) return { error: "Employé ou chantier invalide." };
 
-  const { error } = await supabase.from("affectations").insert(
-    proposition.employeIds.map((employeId) => ({
-      entreprise_id: ctx.entrepriseId,
-      chantier_id: proposition.chantierId,
-      employe_id: employeId,
-      date: proposition.date,
-      heures: proposition.heures,
-      tache: proposition.tache,
-      type_activite: proposition.typeActivite,
-      lieu_activite: estChantier ? null : proposition.lieuActivite,
-    })),
-  );
+  const valeurs = {
+    chantier_id: proposition.chantierId,
+    date: proposition.date,
+    heures: proposition.heures,
+    tache: proposition.tache,
+    type_activite: proposition.typeActivite,
+    lieu_activite: estChantier ? null : proposition.lieuActivite,
+  };
+
+  if (proposition.affectationId) {
+    const { error } = await supabase.from("affectations").update(valeurs).eq("id", proposition.affectationId).eq("entreprise_id", ctx.entrepriseId);
+    if (error) return { error: error.message };
+    revalidatePath("/planning");
+    return { ok: true };
+  }
+
+  const { error } = await supabase.from("affectations").insert(proposition.employeIds.map((employeId) => ({ entreprise_id: ctx.entrepriseId, employe_id: employeId, ...valeurs })));
   if (error) return { error: error.message };
 
   revalidatePath("/planning");

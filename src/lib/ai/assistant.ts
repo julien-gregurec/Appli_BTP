@@ -14,6 +14,7 @@ export const TYPES_ACTIVITE_PROPOSABLES_IA = ["chantier", "bureau", "depot", "vi
 export type TypeActiviteProposable = (typeof TYPES_ACTIVITE_PROPOSABLES_IA)[number];
 
 export type PropositionAffectation = {
+  affectationId: string | null;
   employeIds: string[];
   employeNoms: string[];
   typeActivite: TypeActiviteProposable;
@@ -23,6 +24,7 @@ export type PropositionAffectation = {
   date: string;
   heures: number;
   tache: string | null;
+  avertissement: string | null;
 };
 
 // Doit rester synchronise avec `types` dans src/app/(app)/conges/page.tsx et le check
@@ -64,6 +66,58 @@ export type EvenementAssistant =
 
 const MAX_TOURS_OUTILS = 5;
 
+type ChampsAffectation = { typeActivite: TypeActiviteProposable; date: string; heures: number; tache: string | null; lieuActivite: string | null; commentaireModele: string | null };
+
+function analyserChampsAffectation(input: Record<string, unknown>): ChampsAffectation | null {
+  const typeActiviteBrut = typeof input.type_activite === "string" && input.type_activite ? input.type_activite : "chantier";
+  const date = String(input.date ?? "");
+  const heures = Number(input.heures);
+  if (!date || !heures || heures <= 0) return null;
+  if (!(TYPES_ACTIVITE_PROPOSABLES_IA as readonly string[]).includes(typeActiviteBrut)) return null;
+  return {
+    typeActivite: typeActiviteBrut as TypeActiviteProposable,
+    date,
+    heures,
+    tache: typeof input.tache === "string" && input.tache.trim() ? input.tache.trim() : null,
+    lieuActivite: typeof input.lieu_activite === "string" && input.lieu_activite.trim() ? input.lieu_activite.trim() : null,
+    commentaireModele: typeof input.commentaire === "string" && input.commentaire.trim() ? input.commentaire.trim() : null,
+  };
+}
+
+// Une personne ne peut pas etre sur deux chantiers differents le meme jour : si la nouvelle
+// affectation est de type "chantier", on signale toute AUTRE affectation chantier existante
+// ce jour-la (hors celle qu'on est en train de modifier, le cas echeant) pointant vers un
+// chantier different, plutot que de laisser un doublon silencieux se creer.
+async function detecterConflitChantier(
+  supabase: SupabaseClient,
+  entrepriseId: string,
+  employeId: string,
+  date: string,
+  typeActivite: TypeActiviteProposable,
+  chantierId: string | null,
+  exclureAffectationId: string | null,
+): Promise<string | null> {
+  if (typeActivite !== "chantier" || !chantierId) return null;
+  let requete = supabase
+    .from("affectations")
+    .select("chantier:chantiers(nom), heures")
+    .eq("entreprise_id", entrepriseId)
+    .eq("employe_id", employeId)
+    .eq("date", date)
+    .eq("type_activite", "chantier")
+    .neq("chantier_id", chantierId);
+  if (exclureAffectationId) requete = requete.neq("id", exclureAffectationId);
+  const { data: conflits } = await requete;
+  if (!conflits?.length) return null;
+  const noms = conflits
+    .map((c) => {
+      const chantier = Array.isArray(c.chantier) ? c.chantier[0] : c.chantier;
+      return chantier ? `${chantier.nom} (${c.heures} h)` : null;
+    })
+    .filter((v): v is string => Boolean(v));
+  return noms.length ? `Déjà affecté ce jour-là sur : ${noms.join(", ")}. Vérifie avant de valider.` : null;
+}
+
 async function resoudrePropositionAffectation(
   supabase: SupabaseClient,
   entrepriseId: string,
@@ -71,14 +125,11 @@ async function resoudrePropositionAffectation(
   input: Record<string, unknown>,
 ): Promise<PropositionAffectation | null> {
   if (!peutGererPlanning) return null;
+  const champs = analyserChampsAffectation(input);
+  if (!champs) return null;
   const brutIds = Array.isArray(input.employe_ids) ? input.employe_ids : input.employe_id ? [input.employe_id] : [];
   const employeIds = [...new Set(brutIds.map((v) => String(v)).filter(Boolean))];
-  const typeActiviteBrut = typeof input.type_activite === "string" && input.type_activite ? input.type_activite : "chantier";
-  const date = String(input.date ?? "");
-  const heures = Number(input.heures);
-  if (!employeIds.length || !date || !heures || heures <= 0) return null;
-  if (!(TYPES_ACTIVITE_PROPOSABLES_IA as readonly string[]).includes(typeActiviteBrut)) return null;
-  const typeActivite = typeActiviteBrut as TypeActiviteProposable;
+  if (!employeIds.length) return null;
 
   const { data: employes } = await supabase.from("employes").select("id, nom, prenom").in("id", employeIds).eq("entreprise_id", entrepriseId);
   if (!employes || employes.length !== employeIds.length) return null;
@@ -86,18 +137,81 @@ async function resoudrePropositionAffectation(
   const employesParId = new Map(employes.map((e) => [e.id, e]));
   const employeNoms = employeIds.map((id) => { const e = employesParId.get(id)!; return `${e.prenom} ${e.nom}`; });
 
-  const tache = typeof input.tache === "string" && input.tache.trim() ? input.tache.trim() : null;
-  const lieuActivite = typeof input.lieu_activite === "string" && input.lieu_activite.trim() ? input.lieu_activite.trim() : null;
-
-  if (typeActivite === "chantier") {
-    const chantierId = String(input.chantier_id ?? "");
+  let chantierId: string | null = null;
+  let chantierNom: string | null = null;
+  if (champs.typeActivite === "chantier") {
+    chantierId = String(input.chantier_id ?? "");
     if (!chantierId) return null;
     const { data: chantier } = await supabase.from("chantiers").select("nom").eq("id", chantierId).eq("entreprise_id", entrepriseId).maybeSingle();
     if (!chantier) return null;
-    return { employeIds, employeNoms, typeActivite, chantierId, chantierNom: chantier.nom, lieuActivite: null, date, heures, tache };
+    chantierNom = chantier.nom;
   }
 
-  return { employeIds, employeNoms, typeActivite, chantierId: null, chantierNom: null, lieuActivite, date, heures, tache };
+  const conflits = await Promise.all(employeIds.map((id) => detecterConflitChantier(supabase, entrepriseId, id, champs.date, champs.typeActivite, chantierId, null)));
+  const avertissementsConflit = employeIds.map((id, i) => (conflits[i] ? `${employesParId.get(id)!.prenom} : ${conflits[i]}` : null)).filter((v): v is string => Boolean(v));
+  const avertissement = [champs.commentaireModele, ...avertissementsConflit].filter(Boolean).join(" ") || null;
+
+  return {
+    affectationId: null,
+    employeIds,
+    employeNoms,
+    typeActivite: champs.typeActivite,
+    chantierId: champs.typeActivite === "chantier" ? chantierId : null,
+    chantierNom: champs.typeActivite === "chantier" ? chantierNom : null,
+    lieuActivite: champs.typeActivite === "chantier" ? null : champs.lieuActivite,
+    date: champs.date,
+    heures: champs.heures,
+    tache: champs.tache,
+    avertissement,
+  };
+}
+
+// Cible une affectation deja existante (contrairement a resoudrePropositionAffectation qui en
+// cree de nouvelles) : le seul moyen d'eviter qu'une demande de correction n'aboutisse a un
+// doublon (l'ancienne ET la nouvelle affectation actives en meme temps).
+async function resoudrePropositionModificationAffectation(
+  supabase: SupabaseClient,
+  entrepriseId: string,
+  peutGererPlanning: boolean,
+  input: Record<string, unknown>,
+): Promise<PropositionAffectation | null> {
+  if (!peutGererPlanning) return null;
+  const affectationId = String(input.affectation_id ?? "");
+  if (!affectationId) return null;
+  const { data: existante } = await supabase.from("affectations").select("employe:employes(id, nom, prenom)").eq("id", affectationId).eq("entreprise_id", entrepriseId).maybeSingle();
+  if (!existante) return null;
+  const employe = Array.isArray(existante.employe) ? existante.employe[0] : existante.employe;
+  if (!employe) return null;
+
+  const champs = analyserChampsAffectation(input);
+  if (!champs) return null;
+
+  let chantierId: string | null = null;
+  let chantierNom: string | null = null;
+  if (champs.typeActivite === "chantier") {
+    chantierId = String(input.chantier_id ?? "");
+    if (!chantierId) return null;
+    const { data: chantier } = await supabase.from("chantiers").select("nom").eq("id", chantierId).eq("entreprise_id", entrepriseId).maybeSingle();
+    if (!chantier) return null;
+    chantierNom = chantier.nom;
+  }
+
+  const conflit = await detecterConflitChantier(supabase, entrepriseId, employe.id, champs.date, champs.typeActivite, chantierId, affectationId);
+  const avertissement = [champs.commentaireModele, conflit].filter(Boolean).join(" ") || null;
+
+  return {
+    affectationId,
+    employeIds: [employe.id],
+    employeNoms: [`${employe.prenom} ${employe.nom}`],
+    typeActivite: champs.typeActivite,
+    chantierId: champs.typeActivite === "chantier" ? chantierId : null,
+    chantierNom: champs.typeActivite === "chantier" ? chantierNom : null,
+    lieuActivite: champs.typeActivite === "chantier" ? null : champs.lieuActivite,
+    date: champs.date,
+    heures: champs.heures,
+    tache: champs.tache,
+    avertissement,
+  };
 }
 
 // Les demandes de conge sont toujours personnelles : contrairement a proposer_affectation,
@@ -218,7 +332,8 @@ export async function* demanderAssistantIAStream(
       `Dès que type_activite n'est pas "chantier", mets dans lieu_activite exactement ce que l'utilisateur a dit sur le lieu/contexte (adresse, nom de lieu, avec qui) : un lien d'itinéraire est généré automatiquement à partir de ce texte, inutile de le reformuler ou de le structurer. ` +
       `Pour une absence/congé, tu peux utiliser proposer_affectation (type_activite="conge", effet immédiat) OU proposer_demande_conge (passe par une approbation) — préfère proposer_affectation puisque cette personne peut déjà valider elle-même ce genre de demande, sauf si elle précise vouloir la soumettre formellement. ` +
       `Pour un rendez-vous ou un entretien entre l'utilisateur et un employé nommé (ex. « place-moi un rendez-vous avec l'employé X »), l'affectation se place sur la fiche de l'employé nommé (X), jamais sur celle de l'utilisateur qui fait la demande. ` +
-      `Si PLUSIEURS employés sont concernés par la même affectation (ex. « X et Y sont sur le chantier Dupont », une réunion à trois, une équipe entière) — cherche chaque employé cité puis fais UN SEUL appel à proposer_affectation avec tous leurs identifiants dans employe_ids ; ne fais jamais un appel séparé par personne. `
+      `Si PLUSIEURS employés sont concernés par la même affectation (ex. « X et Y sont sur le chantier Dupont », une réunion à trois, une équipe entière) — cherche chaque employé cité puis fais UN SEUL appel à proposer_affectation avec tous leurs identifiants dans employe_ids ; ne fais jamais un appel séparé par personne. ` +
+      `Corriger, déplacer ou remplacer une affectation qui existe déjà (visible via verifier_disponibilite_employe) : utilise proposer_modification_affectation, jamais proposer_affectation — sinon l'ancienne affectation reste active en même temps que la nouvelle et la personne se retrouve sur deux activités en même temps. `
     : `Cette personne n'a pas le droit de modifier le planning (droit réservé à certains postes) : n'utilise jamais proposer_affectation, tu n'as accès à aucun outil d'écriture sur le planning des autres. ` +
       `Pour une absence/congé sur elle-même (« mets-moi absent », « je pose une demi-journée »…), utilise proposer_demande_conge — c'est le seul outil d'écriture qui lui est ouvert, et la demande sera soumise pour approbation à un responsable, jamais acceptée automatiquement. ` +
       `Pour toute autre demande de modification du planning (la sienne ou celle d'un collègue), explique que ce n'est pas possible avec ses droits actuels et qu'il faut passer par un responsable planning. `;
@@ -266,6 +381,20 @@ export async function* demanderAssistantIAStream(
         const message = peutGererPlanning
           ? "\n\nJe n'ai pas pu identifier précisément l'employé ou le chantier, peux-tu préciser ?"
           : "\n\nTon poste n'a pas le droit de modifier le planning. Pour une absence te concernant, dis-le-moi directement (je peux soumettre une demande de congé pour approbation) ; sinon, il faut passer par un responsable planning.";
+        yield { type: "texte", delta: message };
+      }
+      return;
+    }
+
+    const appelModificationAffectation = resultat.appelsOutils.find((a) => a.nom === "proposer_modification_affectation");
+    if (appelModificationAffectation) {
+      const proposition = await resoudrePropositionModificationAffectation(supabase, entrepriseId, peutGererPlanning, appelModificationAffectation.entree);
+      if (proposition) {
+        yield { type: "proposition", proposition };
+      } else {
+        const message = peutGererPlanning
+          ? "\n\nJe n'ai pas retrouvé cette affectation, peux-tu préciser laquelle modifier ?"
+          : "\n\nTon poste n'a pas le droit de modifier le planning.";
         yield { type: "texte", delta: message };
       }
       return;

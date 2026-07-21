@@ -164,7 +164,7 @@ async function chercherChantierParNom(supabase: Supabase, entrepriseId: string, 
 
 async function verifierDisponibiliteEmploye(supabase: Supabase, entrepriseId: string, input: { employe_id: string; date: string }) {
   const [{ data: affectations }, { data: conge }, { data: habilitations }] = await Promise.all([
-    supabase.from("affectations").select("heures, tache, chantier_id, type_activite").eq("entreprise_id", entrepriseId).eq("employe_id", input.employe_id).eq("date", input.date),
+    supabase.from("affectations").select("id, heures, tache, chantier_id, chantier:chantiers(nom), lieu_activite, type_activite").eq("entreprise_id", entrepriseId).eq("employe_id", input.employe_id).eq("date", input.date),
     supabase.from("demandes_conges").select("type_conge").eq("entreprise_id", entrepriseId).eq("employe_id", input.employe_id).eq("statut", "approuvee").lte("date_debut", input.date).gte("date_fin", input.date).maybeSingle(),
     supabase.from("habilitations_employe").select("type, libelle, date_expiration").eq("entreprise_id", entrepriseId).eq("employe_id", input.employe_id),
   ]);
@@ -271,7 +271,10 @@ export const OUTILS_COPILOTE: OutilIA[] = [
       "Si PLUSIEURS employés sont concernés par la même activité (ex. deux ouvriers sur le même chantier, une réunion à trois), mets tous leurs identifiants dans employe_ids " +
       "en un seul appel — une affectation identique (même date, mêmes heures, même contexte) est créée pour chacun ; n'appelle jamais cet outil séparément pour chaque personne. " +
       "Dès que type_activite n'est pas \"chantier\", mets dans lieu_activite exactement ce que l'utilisateur a dit sur le lieu ou l'événement " +
-      "(adresse, nom de lieu, avec qui, contexte) — un lien d'itinéraire sera généré automatiquement à partir de ce texte, pas besoin de le structurer.",
+      "(adresse, nom de lieu, avec qui, contexte) — un lien d'itinéraire sera généré automatiquement à partir de ce texte, pas besoin de le structurer. " +
+      "IMPORTANT : uniquement pour une NOUVELLE affectation. Si l'utilisateur demande de corriger, changer ou déplacer une affectation qui existe déjà " +
+      "(visible dans verifier_disponibilite_employe), utilise proposer_modification_affectation à la place — jamais celui-ci, qui créerait un doublon " +
+      "et mettrait la personne sur deux activités en même temps.",
     parametres: {
       type: "object",
       properties: {
@@ -285,6 +288,29 @@ export const OUTILS_COPILOTE: OutilIA[] = [
         commentaire: { type: "string", description: "Ce que tu veux dire à l'utilisateur avant de lui proposer cette affectation (ex. avertissement si l'employé a déjà des heures ce jour-là)" },
       },
       required: ["employe_ids", "date", "heures"],
+    },
+  },
+  {
+    nom: "proposer_modification_affectation",
+    description:
+      "Termine la conversation en proposant de MODIFIER une affectation déjà existante (identifiée par affectation_id, obtenu via le champ id renvoyé " +
+      "par verifier_disponibilite_employe pour cet employé et cette date), plutôt que d'en créer une nouvelle. À utiliser dès que l'utilisateur demande de " +
+      "changer, corriger, déplacer ou remplacer une affectation existante — jamais proposer_affectation dans ce cas, qui créerait un doublon et laisserait " +
+      "l'ancienne affectation active en même temps que la nouvelle (l'employé se retrouverait sur deux activités en même temps). " +
+      "N'écrit rien en base tant que l'utilisateur n'a pas validé. Mêmes champs que proposer_affectation, sauf qu'il n'y a qu'une seule affectation ciblée (pas de liste d'employés).",
+    parametres: {
+      type: "object",
+      properties: {
+        affectation_id: { type: "string", description: "Identifiant de l'affectation existante à modifier (champ id de verifier_disponibilite_employe)" },
+        type_activite: { type: "string", enum: ["chantier", "bureau", "depot", "visite_medicale", "formation", "conge", "autre"], description: "Nouvelle valeur (peut être inchangée)" },
+        chantier_id: { type: "string", description: "Obligatoire uniquement si type_activite=\"chantier\"" },
+        lieu_activite: { type: "string", description: "Quand type_activite n'est pas \"chantier\"" },
+        date: { type: "string", description: "Date au format AAAA-MM-JJ" },
+        heures: { type: "number" },
+        tache: { type: "string", description: "Description courte de la tâche, ou chaîne vide" },
+        commentaire: { type: "string", description: "Ce que tu veux dire à l'utilisateur avant de lui proposer cette modification" },
+      },
+      required: ["affectation_id", "date", "heures"],
     },
   },
   {
