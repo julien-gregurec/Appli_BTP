@@ -11,7 +11,7 @@ type MessageAffiche = MessageChat & {
   propositionStatut?: "en_attente" | "creee" | "refusee";
   fichierNom?: string;
 };
-const LIBELLES_TYPE_ACTIVITE: Record<string, string> = { chantier: "Chantier", bureau: "Bureau", depot: "Dépôt", visite_medicale: "Visite médicale", formation: "Formation", autre: "Autre" };
+const LIBELLES_TYPE_ACTIVITE: Record<string, string> = { chantier: "Chantier", bureau: "Bureau", depot: "Dépôt", visite_medicale: "Visite médicale", formation: "Formation", conge: "Congé / absence", autre: "Autre" };
 const LIBELLES_TYPE_CONGE: Record<string, string> = { conges_payes: "Congés payés", rtt: "RTT", sans_solde: "Sans solde", maladie: "Maladie", evenement_familial: "Événement familial", recuperation: "Récupération", autre: "Autre" };
 const LIBELLES_DEMI_JOURNEE: Record<string, string> = { journee: "journée entière", matin: "matin", apres_midi: "après-midi" };
 type FichierJoint = { base64: string; mimeType: string; nom: string };

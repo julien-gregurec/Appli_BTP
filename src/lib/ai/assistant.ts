@@ -4,10 +4,13 @@ import { OUTILS_COPILOTE, executerOutilCopilote } from "@/lib/ai/copilote";
 
 export type MessageChat = { role: "user" | "assistant"; contenu: string; fichier?: FichierIA };
 
-// Doit rester synchronise avec la liste dans src/app/actions/planning.ts (formulaire manuel) —
-// "conge" est volontairement exclu ici : ces lignes sont creees par le workflow de demandes de
-// conges (validation dediee), jamais proposees directement par l'assistant.
-export const TYPES_ACTIVITE_PROPOSABLES_IA = ["chantier", "bureau", "depot", "visite_medicale", "formation", "autre"] as const;
+// Doit rester synchronise avec la liste dans src/app/actions/planning.ts (formulaire manuel).
+// L'ecriture reelle est de toute facon protegee par la RLS Postgres sur `affectations`
+// (droit gerer_planning, cf. migration 20260713000043) : proposer_affectation n'est donc
+// utilisable que par les postes qui ont deja le droit de modifier le planning de n'importe
+// qui, "conge" inclus (une pose d'absence directe, sans passer par le circuit d'approbation
+// des demandes de conges — voir resoudrePropositionAffectation).
+export const TYPES_ACTIVITE_PROPOSABLES_IA = ["chantier", "bureau", "depot", "visite_medicale", "formation", "conge", "autre"] as const;
 export type TypeActiviteProposable = (typeof TYPES_ACTIVITE_PROPOSABLES_IA)[number];
 
 export type PropositionAffectation = {
@@ -50,8 +53,10 @@ const MAX_TOURS_OUTILS = 5;
 async function resoudrePropositionAffectation(
   supabase: SupabaseClient,
   entrepriseId: string,
+  peutGererPlanning: boolean,
   input: Record<string, unknown>,
 ): Promise<PropositionAffectation | null> {
+  if (!peutGererPlanning) return null;
   const employeId = String(input.employe_id ?? "");
   const typeActiviteBrut = typeof input.type_activite === "string" && input.type_activite ? input.type_activite : "chantier";
   const date = String(input.date ?? "");
@@ -151,11 +156,22 @@ export async function* demanderAssistantIAStream(
   entrepriseNom: string,
   utilisateurId: string,
   prenomCompte: string | null,
+  peutGererPlanning: boolean,
   historique: MessageChat[],
 ): AsyncGenerator<EvenementAssistant, void, unknown> {
   const provider = obtenirProviderIA();
   const aujourdhui = new Intl.DateTimeFormat("fr-FR", { dateStyle: "full", timeZone: "Europe/Paris" }).format(new Date());
   const descriptionUtilisateur = await decrireUtilisateurCourant(supabase, entrepriseId, utilisateurId, prenomCompte);
+
+  const consigneAffectation = peutGererPlanning
+    ? `Pour TOUTE demande qui occupe le temps de N'IMPORTE QUEL employé un jour donné — chantier, bureau, dépôt, visite médicale, formation, absence/congé posé directement, repas d'affaires, rendez-vous, réunion externe, chantier pas encore enregistré, ou n'importe quoi d'autre — utilise proposer_affectation, y compris pour d'autres personnes que l'utilisateur (ex. une secrétaire qui remplit le planning d'un collègue) : cette personne a le droit de modifier le planning de tout le monde, donc pas besoin d'approbation, l'affectation est effective dès validation. ` +
+      `N'invente jamais de procédure manuelle et ne dis jamais que tu ne peux pas le faire : prends le cas le plus proche (type_activite="autre" par défaut si aucun des autres types ne convient) plutôt que de refuser. ` +
+      `Utilise chercher_employe (et chercher_chantier_planning si un chantier existant est cité) puis verifier_disponibilite_employe avant de conclure avec proposer_affectation — tu ne crées jamais d'affectation toi-même, tu ne fais que la proposer ; l'utilisateur valide ou non. ` +
+      `Dès que type_activite n'est pas "chantier", mets dans lieu_activite exactement ce que l'utilisateur a dit sur le lieu/contexte (adresse, nom de lieu, avec qui) : un lien d'itinéraire est généré automatiquement à partir de ce texte, inutile de le reformuler ou de le structurer. ` +
+      `Pour une absence/congé, tu peux utiliser proposer_affectation (type_activite="conge", effet immédiat) OU proposer_demande_conge (passe par une approbation) — préfère proposer_affectation puisque cette personne peut déjà valider elle-même ce genre de demande, sauf si elle précise vouloir la soumettre formellement. `
+    : `Cette personne n'a pas le droit de modifier le planning (droit réservé à certains postes) : n'utilise jamais proposer_affectation, tu n'as accès à aucun outil d'écriture sur le planning des autres. ` +
+      `Pour une absence/congé sur elle-même (« mets-moi absent », « je pose une demi-journée »…), utilise proposer_demande_conge — c'est le seul outil d'écriture qui lui est ouvert, et la demande sera soumise pour approbation à un responsable, jamais acceptée automatiquement. ` +
+      `Pour toute autre demande de modification du planning (la sienne ou celle d'un collègue), explique que ce n'est pas possible avec ses droits actuels et qu'il faut passer par un responsable planning. `;
 
   const system =
     `Tu es l'assistant intégré de Liria Gestion Pro, un logiciel de gestion pour entreprises du BTP, pour l'entreprise "${entrepriseNom}". ` +
@@ -163,11 +179,8 @@ export async function* demanderAssistantIAStream(
     `Réponds en français, de façon concise et directe, comme un collègue qui connaît bien l'activité. ` +
     `Utilise systématiquement les outils à ta disposition pour aller chercher les données réelles avant de répondre — ne devine et n'invente jamais un chiffre ou un nom. ` +
     `Si aucun outil ne permet de répondre à la question, dis-le clairement plutôt que d'inventer une réponse. ` +
-    `Pour TOUTE demande qui occupe du temps d'un employé un jour donné — chantier, bureau, dépôt, visite médicale, formation, repas d'affaires, rendez-vous, réunion externe, chantier pas encore enregistré, ou n'importe quoi d'autre — utilise proposer_affectation. ` +
-    `N'invente jamais de procédure manuelle et ne dis jamais que tu ne peux pas le faire : cet outil est prévu pour tous les cas, prends le cas le plus proche (type_activite="autre" par défaut si aucun des autres types ne convient) plutôt que de refuser. ` +
-    `Utilise chercher_employe (et chercher_chantier_planning si un chantier existant est cité) puis verifier_disponibilite_employe avant de conclure avec proposer_affectation — tu ne crées jamais d'affectation toi-même, tu ne fais que la proposer ; l'utilisateur valide ou non. ` +
-    `Dès que type_activite n'est pas "chantier", mets dans lieu_activite exactement ce que l'utilisateur a dit sur le lieu/contexte (adresse, nom de lieu, avec qui) : un lien d'itinéraire est généré automatiquement à partir de ce texte, inutile de le reformuler ou de le structurer. ` +
-    `Pour toute demande d'absence/congé de l'utilisateur sur lui-même (« mets-moi absent », « je pose une demi-journée »…), utilise proposer_demande_conge — jamais proposer_affectation. Ne redirige jamais vers un menu que tu n'as pas vérifié : cette demande sera soumise pour approbation, pas automatiquement acceptée. ` +
+    consigneAffectation +
+    `Ne redirige jamais vers un menu que tu n'as pas vérifié. ` +
     `Formate tes réponses avec des tirets courts, pas de tableaux markdown, pas de titres.`;
 
   const conversation: MessageIA[] = historique.map((m) =>
@@ -194,11 +207,13 @@ export async function* demanderAssistantIAStream(
 
     const appelAffectation = resultat.appelsOutils.find((a) => a.nom === "proposer_affectation");
     if (appelAffectation) {
-      const proposition = await resoudrePropositionAffectation(supabase, entrepriseId, appelAffectation.entree);
+      const proposition = await resoudrePropositionAffectation(supabase, entrepriseId, peutGererPlanning, appelAffectation.entree);
       if (proposition) {
         yield { type: "proposition", proposition };
       } else {
-        const message = "\n\nJe n'ai pas pu identifier précisément l'employé ou le chantier, peux-tu préciser ?";
+        const message = peutGererPlanning
+          ? "\n\nJe n'ai pas pu identifier précisément l'employé ou le chantier, peux-tu préciser ?"
+          : "\n\nTon poste n'a pas le droit de modifier le planning. Pour une absence te concernant, dis-le-moi directement (je peux soumettre une demande de congé pour approbation) ; sinon, il faut passer par un responsable planning.";
         yield { type: "texte", delta: message };
       }
       return;

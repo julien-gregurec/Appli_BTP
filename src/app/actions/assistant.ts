@@ -8,7 +8,7 @@ import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 // La conversation avec l'assistant passe par /api/assistant/chat (streaming SSE),
 // pas par une server action — voir src/app/api/assistant/chat/route.ts.
 
-const TYPES_ACTIVITE_AUTORISES = ["chantier", "bureau", "depot", "visite_medicale", "formation", "autre"];
+const TYPES_ACTIVITE_AUTORISES = ["chantier", "bureau", "depot", "visite_medicale", "formation", "conge", "autre"];
 
 export async function creerAffectationDepuisPropositionAction(proposition: {
   employeId: string;
@@ -21,7 +21,11 @@ export async function creerAffectationDepuisPropositionAction(proposition: {
 }): Promise<{ error: string } | { ok: true }> {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
+  const permissions = await permissionsUtilisateur(ctx);
+  if (!aAccesIA(permissions)) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
+  // Defense en profondeur : la RLS sur `affectations` impose deja gerer_planning, mais un
+  // message clair ici vaut mieux que l'erreur Postgres brute remontee telle quelle.
+  if (!(permissions === null || permissions.includes("gerer_planning"))) return { error: "Ton poste n'a pas le droit de modifier le planning." };
   if (!TYPES_ACTIVITE_AUTORISES.includes(proposition.typeActivite)) return { error: "Type d'activité invalide." };
   if (!proposition.heures || proposition.heures <= 0) return { error: "Nombre d'heures invalide." };
 

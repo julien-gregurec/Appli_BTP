@@ -10,9 +10,11 @@ const TAILLE_MAX_PIECE_JOINTE_BASE64 = 8_000_000; // ~6 Mo de fichier une fois d
 export async function POST(request: Request) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  if (!aAccesIA(await permissionsUtilisateur(ctx))) {
+  const permissions = await permissionsUtilisateur(ctx);
+  if (!aAccesIA(permissions)) {
     return Response.json({ error: "Ton poste n'a pas accès aux fonctionnalités IA." }, { status: 403 });
   }
+  const peutGererPlanning = permissions === null || permissions.includes("gerer_planning");
 
   const body = (await request.json().catch(() => null)) as { historique?: MessageChat[] } | null;
   const historique = body?.historique;
@@ -42,7 +44,7 @@ export async function POST(request: Request) {
     async start(controller) {
       const envoyer = (evenement: unknown) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(evenement)}\n\n`));
       try {
-        for await (const evenement of demanderAssistantIAStream(supabase, ctx.entrepriseId, ctx.entrepriseNom, ctx.userId, ctx.prenom, historique)) {
+        for await (const evenement of demanderAssistantIAStream(supabase, ctx.entrepriseId, ctx.entrepriseNom, ctx.userId, ctx.prenom, peutGererPlanning, historique)) {
           envoyer(evenement);
         }
         envoyer({ type: "fin" });
