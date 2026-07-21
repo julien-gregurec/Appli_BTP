@@ -18,6 +18,12 @@ export function AssistantIA() {
     finRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, ouvert]);
 
+  useEffect(() => {
+    const ouvrir = () => setOuvert(true);
+    window.addEventListener("liria:ouvrir-assistant", ouvrir);
+    return () => window.removeEventListener("liria:ouvrir-assistant", ouvrir);
+  }, []);
+
   function envoyer() {
     const question = saisie.trim();
     if (!question) return;

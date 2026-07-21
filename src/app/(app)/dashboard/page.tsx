@@ -7,6 +7,7 @@ import { PointageArriveeDepart } from "@/components/PointageArriveeDepart";
 import { MobileModuleGrid, type MobileModuleLink } from "@/components/MobileModuleGrid";
 import { DashboardAnalytics } from "@/components/DashboardAnalytics";
 import { DashboardWidget, DashboardWidgetFirstConnection } from "@/components/DashboardWidgets";
+import { BriefingMatin, type LigneBriefing } from "@/components/BriefingMatin";
 import { Lien as Link } from "@/components/Lien";
 
 function un<T>(valeur: T | T[] | null): T | null {
@@ -32,6 +33,7 @@ export default async function DashboardPage() {
   // En mode prototype aucune identité individuelle n'est fiable : les chiffres globaux
   // restent masqués. En authentification réelle, ils exigent un droit dédié.
   const voirIndicateursFinanciers = permissions !== null && permissions.includes("voir_indicateurs_financiers");
+  const peutVoirBriefing = permissions === null || voirIndicateursFinanciers;
   const peutPointer = permissions !== null && permissions.includes("saisir_son_pointage");
   const peutGererPlanning = permissions === null || permissions.includes("gerer_planning");
   const auMoinsUnModule = permissions === null || permissions.some((cle) => cle.startsWith("acces_"));
@@ -69,10 +71,10 @@ export default async function DashboardPage() {
   let requeteAffectations = supabase.from("affectations").select("id, date, heures, tache, chantier:chantiers(nom), employe:employes(prenom, nom)").eq("entreprise_id", ctx.entrepriseId).gte("date", aujourdhui).order("date").limit(6);
   if (permissions !== null && !peutGererPlanning) requeteAffectations = requeteAffectations.eq("employe_id", employeCompte?.id ?? "00000000-0000-0000-0000-000000000000");
 
-  const [devisResult, facturesResult, chantiersResult, affectationsResult, articlesResult, vehiculesResult, outilsResult, commandesResult, chantiersPointageResult, sessionsPointageResult] = await Promise.all([
+  const [devisResult, facturesResult, chantiersResult, affectationsResult, articlesResult, vehiculesResult, outilsResult, commandesResult, chantiersPointageResult, sessionsPointageResult, employesActifsResult, congesAujourdhuiResult] = await Promise.all([
     voir.devis ? supabase.from("devis").select("id, numero, statut, montant_ttc, date_emission, date_validite, client:clients(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }) : null,
     voir.factures ? supabase.from("factures").select("id, numero, statut, date_emission, date_echeance, montant_ttc, montant_paye, client:clients(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId) : null,
-    voir.chantiers ? supabase.from("chantiers").select("id, nom, statut").eq("entreprise_id", ctx.entrepriseId).order("updated_at", { ascending: false }) : null,
+    voir.chantiers ? supabase.from("chantiers").select("id, nom, statut, date_fin_prevue").eq("entreprise_id", ctx.entrepriseId).order("updated_at", { ascending: false }) : null,
     voir.planning ? requeteAffectations : null,
     voir.stock ? supabase.from("articles_stock").select("id, reference, designation, quantite_stock, seuil_alerte, unite").eq("entreprise_id", ctx.entrepriseId).eq("actif", true) : null,
     voir.flotte ? supabase.from("vehicules").select("id, immatriculation, marque, modele, kilometrage, controle_technique_echeance, assurance_echeance, prochain_entretien_date, prochain_entretien_km").eq("entreprise_id", ctx.entrepriseId).in("statut", ["actif", "maintenance"]) : null,
@@ -80,11 +82,14 @@ export default async function DashboardPage() {
     voir.achats ? supabase.from("commandes_fournisseurs").select("id, numero, statut, date_livraison_prevue, fournisseur:fournisseurs(nom)").eq("entreprise_id", ctx.entrepriseId).in("statut", ["envoyee", "confirmee", "recue_partiel"]) : null,
     peutPointer && employeCompte ? supabase.from("chantiers").select("id,nom").eq("entreprise_id",ctx.entrepriseId).not("statut","in",'(archive,annule)').order("nom") : null,
     peutPointer && employeCompte ? supabase.from("sessions_pointage").select("id,arrivee_at,tache,employe:employes(id,prenom,nom),chantier:chantiers(id,nom)").eq("entreprise_id",ctx.entrepriseId).eq("employe_id",employeCompte.id).is("depart_at",null).order("arrivee_at",{ascending:false}) : null,
+    peutVoirBriefing ? supabase.from("employes").select("id").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif") : null,
+    peutVoirBriefing ? supabase.from("demandes_conges").select("employe_id").eq("entreprise_id", ctx.entrepriseId).eq("statut", "approuvee").lte("date_debut", aujourdhui).gte("date_fin", aujourdhui) : null,
   ]);
   const devis = devisResult?.data ?? [], factures = facturesResult?.data ?? [], chantiers = chantiersResult?.data ?? [];
   const affectations = affectationsResult?.data ?? [], articles = articlesResult?.data ?? [], vehicules = vehiculesResult?.data ?? [];
   const outils = outilsResult?.data ?? [], commandes = commandesResult?.data ?? [];
   const chantiersPointage = chantiersPointageResult?.data ?? [], sessionsPointage = sessionsPointageResult?.data ?? [];
+  const employesActifs = employesActifsResult?.data ?? [], congesAujourdhui = congesAujourdhuiResult?.data ?? [];
   const {data:notifications}=permissions!==null?await supabase.from("notifications_utilisateurs").select("id,titre,message,lien,niveau,created_at").eq("entreprise_id",ctx.entrepriseId).is("lue_at",null).order("created_at",{ascending:false}).limit(8):{data:[]};
 
   const totalFacture = (factures ?? []).filter((f) => f.statut !== "annulee").reduce((s, f) => s + Number(f.montant_ttc ?? 0), 0);
@@ -136,6 +141,42 @@ export default async function DashboardPage() {
   const nbCritiques = alertes.filter((a) => a.niveau === "critique").length;
   const domainesAlertes = [...new Set(alertes.map((a) => a.domaine))];
   const prenomAffiche = ctx.prenom && ctx.prenom.toLocaleLowerCase("fr") !== "prototype" ? ctx.prenom : null;
+
+  const lignesBriefing: LigneBriefing[] = [];
+  if (peutVoirBriefing) {
+    const absentsAujourdhui = new Set(congesAujourdhui.map((c) => c.employe_id)).size;
+    const presentsAujourdhui = Math.max(0, employesActifs.length - absentsAujourdhui);
+    if (employesActifs.length > 0) {
+      lignesBriefing.push({
+        niveau: absentsAujourdhui > 0 ? "attention" : "bon",
+        texte: `${presentsAujourdhui} salarié${presentsAujourdhui > 1 ? "s" : ""} présent${presentsAujourdhui > 1 ? "s" : ""}${absentsAujourdhui > 0 ? `, ${absentsAujourdhui} absent${absentsAujourdhui > 1 ? "s" : ""}` : ""}`,
+      });
+    }
+    const chantiersEnRetard = (chantiers ?? [])
+      .filter((c): c is typeof c & { date_fin_prevue: string } => statutsActifs.includes(c.statut) && !!c.date_fin_prevue && c.date_fin_prevue < aujourdhui);
+    for (const c of chantiersEnRetard.slice(0, 2)) {
+      const jours = Math.round((Date.parse(`${aujourdhui}T12:00:00`) - Date.parse(`${c.date_fin_prevue}T12:00:00`)) / 86_400_000);
+      lignesBriefing.push({ niveau: "critique", texte: `Chantier ${c.nom} : retard estimé ${jours} j` });
+    }
+    if (voirIndicateursFinanciers && resteAEncaisser > 0) {
+      lignesBriefing.push({ niveau: "bon", texte: `${euros(resteAEncaisser)} à encaisser` });
+    }
+    const facturesEnRetard = alertes.filter((a) => a.domaine === "Facturation" && a.niveau === "critique").length;
+    if (facturesEnRetard > 0) {
+      lignesBriefing.push({ niveau: "critique", texte: `${facturesEnRetard} facture${facturesEnRetard > 1 ? "s" : ""} impayée${facturesEnRetard > 1 ? "s" : ""}` });
+    }
+    const stockAlertes = alertes.filter((a) => a.domaine === "Stock");
+    if (stockAlertes.length > 0) {
+      lignesBriefing.push({ niveau: "attention", texte: `Stock faible : ${stockAlertes.slice(0, 2).map((a) => a.titre.split(" · ")[1] ?? a.titre).join(", ")}` });
+    }
+    const flotteAlertes = alertes.filter((a) => a.domaine === "Flotte");
+    if (flotteAlertes.length > 0) {
+      lignesBriefing.push({ niveau: flotteAlertes.some((a) => a.niveau === "critique") ? "critique" : "attention", texte: flotteAlertes[0].titre });
+    }
+    if (lignesBriefing.length === 0) {
+      lignesBriefing.push({ niveau: "bon", texte: "Rien à signaler, tout est sous contrôle." });
+    }
+  }
   const chantierGraphique = voir.chantiers ? [...new Set((chantiers ?? []).map((chantier) => chantier.statut))].map((statut) => {
     const presentation = statutChantier(statut);
     return { label: presentation.libelle, value: (chantiers ?? []).filter((chantier) => chantier.statut === statut).length, color: presentation.couleur };
@@ -160,10 +201,14 @@ export default async function DashboardPage() {
   return (
     <main className="p-8">
       <div className="mx-auto max-w-6xl space-y-6">
-        <div>
-          <h1 className="text-xl font-semibold">Bonjour{prenomAffiche ? ` ${prenomAffiche}` : ""}</h1>
-          <p className="text-sm text-neutral-500">{ctx.entrepriseNom}</p>
-        </div>
+        {peutVoirBriefing ? (
+          <BriefingMatin prenom={prenomAffiche} lignes={lignesBriefing} />
+        ) : (
+          <div>
+            <h1 className="text-xl font-semibold">Bonjour{prenomAffiche ? ` ${prenomAffiche}` : ""}</h1>
+            <p className="text-sm text-neutral-500">{ctx.entrepriseNom}</p>
+          </div>
+        )}
         <DashboardWidgetFirstConnection options={optionsWidgets}/>
 
         {(notifications??[]).length>0&&<DashboardWidget id="notifications"><section className="rounded-xl border border-blue-200 bg-blue-50 p-4"><div className="mb-3 flex items-center justify-between"><div><h2 className="font-semibold">Mes notifications</h2><p className="text-xs text-neutral-500">Décisions, demandes et vérifications qui vous concernent.</p></div><span className="rounded-full bg-blue-700 px-2.5 py-1 text-xs font-semibold text-white">{notifications?.length}</span></div><div className="grid gap-2 sm:grid-cols-2">{notifications?.map(notification=><Link key={notification.id} href={notification.lien??"/dashboard"} className={`rounded-lg border bg-white p-3 text-sm ${notification.niveau==="critique"?"border-red-400":notification.niveau==="attention"?"border-amber-300":"border-blue-200"}`}><strong>{notification.titre}</strong>{notification.message&&<p className="mt-1 text-xs text-neutral-600">{notification.message}</p>}</Link>)}</div></section></DashboardWidget>}
