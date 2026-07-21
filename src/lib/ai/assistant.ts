@@ -48,12 +48,7 @@ async function resoudrePropositionAffectation(
   };
 }
 
-/**
- * Boucle agentique streamée : émet les morceaux de texte au fil de l'eau, exécute les
- * outils de lecture, et s'arrête dès que l'IA appelle `proposer_affectation` (jamais
- * d'écriture en base directe — la proposition est renvoyée pour validation manuelle).
- */
-async function decrireUtilisateurCourant(supabase: SupabaseClient, entrepriseId: string, utilisateurId: string): Promise<string> {
+async function decrireUtilisateurCourant(supabase: SupabaseClient, entrepriseId: string, utilisateurId: string, prenomCompte: string | null): Promise<string> {
   const { data: employe } = await supabase
     .from("employes")
     .select("nom, prenom, poste")
@@ -63,22 +58,40 @@ async function decrireUtilisateurCourant(supabase: SupabaseClient, entrepriseId:
   if (employe) {
     return `Tu parles avec ${employe.prenom} ${employe.nom} (poste : ${employe.poste}). ` + `Cette personne EST cet employé : ne lui demande jamais son identité, tu la connais déjà. `;
   }
+
+  // Pas de fiche employe (planning/pointage) liee, mais le compte lui-meme a un nom et un
+  // poste d'acces connus : autant s'en servir plutot que de pretendre ne rien savoir.
+  const [{ data: profil }, { data: appartenance }] = await Promise.all([
+    supabase.from("utilisateurs").select("nom").eq("id", utilisateurId).maybeSingle(),
+    supabase.from("utilisateurs_entreprises").select("poste:postes(nom)").eq("utilisateur_id", utilisateurId).eq("entreprise_id", entrepriseId).eq("statut", "actif").maybeSingle(),
+  ]);
+  const poste = appartenance?.poste as { nom: string } | { nom: string }[] | null;
+  const nomPoste = Array.isArray(poste) ? poste[0]?.nom : poste?.nom;
+  const nomComplet = [prenomCompte, profil?.nom].filter(Boolean).join(" ");
+
   return (
-    `La personne à qui tu parles n'a pas encore de fiche employé liée à son compte. ` +
-    `Si la question porte sur son propre planning, pointage, congés ou notes de frais, indique-lui d'aller dans "Mon espace" puis de cliquer sur "Créer ma fiche employé". `
+    (nomComplet ? `Tu parles avec ${nomComplet}${nomPoste ? ` (poste : ${nomPoste})` : ""}. Ne lui demande jamais son identite, tu la connais deja. ` : "") +
+    `Cette personne n'a pas encore de fiche employe liee a son compte (distincte de son identite de connexion). ` +
+    `Si la question porte sur son propre planning, pointage, conges ou notes de frais, indique-lui d'aller dans "Mon espace" puis de cliquer sur "Creer ma fiche employe". `
   );
 }
 
+/**
+ * Boucle agentique streamée : émet les morceaux de texte au fil de l'eau, exécute les
+ * outils de lecture, et s'arrête dès que l'IA appelle `proposer_affectation` (jamais
+ * d'écriture en base directe — la proposition est renvoyée pour validation manuelle).
+ */
 export async function* demanderAssistantIAStream(
   supabase: SupabaseClient,
   entrepriseId: string,
   entrepriseNom: string,
   utilisateurId: string,
+  prenomCompte: string | null,
   historique: MessageChat[],
 ): AsyncGenerator<EvenementAssistant, void, unknown> {
   const provider = obtenirProviderIA();
   const aujourdhui = new Intl.DateTimeFormat("fr-FR", { dateStyle: "full", timeZone: "Europe/Paris" }).format(new Date());
-  const descriptionUtilisateur = await decrireUtilisateurCourant(supabase, entrepriseId, utilisateurId);
+  const descriptionUtilisateur = await decrireUtilisateurCourant(supabase, entrepriseId, utilisateurId, prenomCompte);
 
   const system =
     `Tu es l'assistant intégré de Liria Gestion Pro, un logiciel de gestion pour entreprises du BTP, pour l'entreprise "${entrepriseNom}". ` +
