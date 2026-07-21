@@ -47,6 +47,42 @@ export async function creerAffectationAction(formData: FormData) {
   redirect(destination);
 }
 
+// Meme validation que creerAffectationAction, mais pour une affectation existante :
+// permet de corriger un doublon ou une erreur de saisie sans avoir a supprimer/recréer.
+export async function modifierAffectationAction(affectationId: string, formData: FormData) {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+
+  const typeActivite = champ(formData, "type_activite") ?? "chantier";
+  const typesAutorises = ["chantier", "bureau", "depot", "visite_medicale", "formation", "conge", "autre"];
+  const chantierId = typeActivite === "chantier" ? champ(formData, "chantier_id") : null;
+  const date = champ(formData, "date");
+  const heures = Number(formData.get("heures"));
+
+  const retour = champ(formData, "retour");
+  const destination = retour ? `/planning?semaine=${encodeURIComponent(retour)}` : "/planning";
+  if (!typesAutorises.includes(typeActivite) || (typeActivite === "chantier" && !chantierId) || !date) {
+    redirect(`${destination}${destination.includes("?") ? "&" : "?"}error=${encodeURIComponent("Activité et date obligatoires")}`);
+  }
+  if (!heures || heures <= 0) {
+    redirect(`${destination}${destination.includes("?") ? "&" : "?"}error=${encodeURIComponent("Nombre d'heures invalide")}`);
+  }
+  if (chantierId) {
+    const { data: chantier } = await supabase.from("chantiers").select("id").eq("id", chantierId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+    if (!chantier) redirect(`${destination}${destination.includes("?") ? "&" : "?"}error=${encodeURIComponent("Chantier invalide")}`);
+  }
+  const tache = champ(formData, "tache");
+  const lieuActivite = typeActivite === "chantier" ? null : champ(formData, "lieu_activite");
+  const { error } = await supabase.from("affectations").update({ chantier_id: chantierId, date, heures, tache, type_activite: typeActivite, lieu_activite: lieuActivite }).eq("id", affectationId).eq("entreprise_id", ctx.entrepriseId);
+
+  if (error) {
+    redirect(`${destination}${destination.includes("?") ? "&" : "?"}error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/planning");
+  redirect(destination);
+}
+
 export async function supprimerAffectationAction(affectationId: string) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();

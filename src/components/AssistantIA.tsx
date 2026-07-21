@@ -173,10 +173,15 @@ export function AssistantIA() {
     reco.interimResults = true;
     let dernierTexte = "";
     reco.onresult = (event) => {
-      let texte = "";
+      // En continuous=true, chaque segment reconnu (final ou en cours) doit être joint avec
+      // un espace explicite : certains navigateurs ne mettent pas d'espace de bord, ce qui
+      // collait les mots entre deux segments ("LaurentPourEntretien").
+      const morceaux: string[] = [];
       for (let i = 0; i < event.results.length; i++) {
-        texte += event.results[i][0].transcript;
+        const morceau = event.results[i][0].transcript.trim();
+        if (morceau) morceaux.push(morceau);
       }
+      const texte = morceaux.join(" ");
       dernierTexte = texte;
       setSaisie(texte);
     };

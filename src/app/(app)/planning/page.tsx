@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
-import { creerAffectationAction, supprimerGroupeAffectationsAction } from "@/app/actions/planning";
+import { creerAffectationAction, modifierAffectationAction, supprimerGroupeAffectationsAction } from "@/app/actions/planning";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { PlanningAffectationForm } from "@/components/PlanningAffectationForm";
 import { Lien as Link } from "@/components/Lien";
@@ -39,6 +39,31 @@ const couleurs = [
 ];
 const activites: Record<string, string> = { chantier: "Chantier", bureau: "Bureau", depot: "Dépôt", visite_medicale: "Visite médicale", formation: "Formation", conge: "Congé / absence", autre: "Autre activité" };
 const libelleAffectation = (affectation: A) => un(affectation.chantier)?.nom ?? activites[affectation.type_activite] ?? "Activité interne";
+const champInput = "mt-1 w-full rounded border px-2 py-1 text-xs dark:bg-neutral-900";
+
+// Formulaire d'edition compact : les deux champs "Chantier" et "Lieu / précision" restent
+// toujours visibles (pas de JS pour les basculer selon le type) — le serveur ne retient que
+// celui qui correspond au type_activite soumis. Permet de corriger une saisie ou un doublon
+// sans passer par supprimer + recréer.
+function FormulaireModifierAffectation({ a, chantiers, retour }: { a: A; chantiers: { id: string; nom: string }[]; retour: string }) {
+  const ch = un(a.chantier);
+  const modifier = modifierAffectationAction.bind(null, a.id);
+  return (
+    <details className="mt-1">
+      <summary className="cursor-pointer text-[11px] font-medium text-blue-700">Modifier</summary>
+      <form action={modifier} className="mt-1 grid gap-1.5 rounded border bg-white p-2 dark:bg-neutral-950">
+        <input type="hidden" name="retour" value={retour} />
+        <label className="text-[10px] text-neutral-500">Type<select name="type_activite" defaultValue={a.type_activite} className={champInput}>{Object.entries(activites).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+        <label className="text-[10px] text-neutral-500">Chantier (si type = Chantier)<select name="chantier_id" defaultValue={ch?.id ?? ""} className={champInput}><option value="">—</option>{chantiers.map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}</select></label>
+        <label className="text-[10px] text-neutral-500">Lieu / précision (sinon)<input name="lieu_activite" defaultValue={a.lieu_activite ?? ""} className={champInput} /></label>
+        <label className="text-[10px] text-neutral-500">Date<input name="date" type="date" defaultValue={a.date} required className={champInput} /></label>
+        <label className="text-[10px] text-neutral-500">Heures<input name="heures" type="number" min="0.5" max="24" step="0.5" defaultValue={a.heures} required className={champInput} /></label>
+        <label className="text-[10px] text-neutral-500">Tâche / motif<input name="tache" defaultValue={a.tache ?? ""} className={champInput} /></label>
+        <button className="mt-1 rounded bg-neutral-900 px-2 py-1 text-xs font-medium text-white dark:bg-white dark:text-neutral-900">Enregistrer</button>
+      </form>
+    </details>
+  );
+}
 
 export default async function PlanningPage({ searchParams }: { searchParams: Promise<{ semaine?: string; error?: string }> }) {
   const p = await searchParams;
@@ -130,6 +155,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
                   {a.lieu_activite&&<p className="mt-1 text-xs text-neutral-600">Lieu : {a.lieu_activite} · <a href={lienMaps(a.lieu_activite)} target="_blank" rel="noopener" className="text-blue-700 hover:underline">Itinéraire</a></p>}
                   {a.tache&&<p className="mt-1 text-xs text-neutral-600">Tâche : {a.tache}</p>}
                   <p className="mt-2 font-mono text-xs text-neutral-700">Prévu {a.heures} h{realise>0&&<span className="ml-2 font-semibold text-green-700">· Validé {realise} h</span>}</p>
+                  <FormulaireModifierAffectation a={a} chantiers={chantiers ?? []} retour={iso(debut)} />
                   <form action={supprimerGroupeAffectationsAction} className="absolute right-2 top-2"><input type="hidden" name="retour" value={iso(debut)}/><input type="hidden" name="ids" value={a.id}/><ConfirmSubmitButton message="Retirer cette affectation ?" className="flex h-7 w-7 items-center justify-center rounded-full bg-white/80 text-neutral-500 shadow-sm hover:text-red-600">×</ConfirmSubmitButton></form>
                 </article>})}
                 {!cellules.length&&<p className="py-4 text-center text-sm text-neutral-500">Aucune activité planifiée.</p>}
@@ -172,6 +198,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
                                 {a.lieu_activite && <div className="text-[11px] text-neutral-600">{a.lieu_activite} · <a href={lienMaps(a.lieu_activite)} target="_blank" rel="noopener" className="text-blue-700 hover:underline">Itinéraire</a></div>}
                                 {a.tache && <div className="text-[11px] text-neutral-600">{a.tache}</div>}
                                 <div className="font-mono text-[11px] text-neutral-700">Prévu {a.heures} h{heuresRealisees(e.id,a.date,ch?.id)>0&&<span className="ml-1 font-semibold text-green-700">· validé {heuresRealisees(e.id,a.date,ch?.id)} h</span>}</div>
+                                <FormulaireModifierAffectation a={a} chantiers={chantiers ?? []} retour={iso(debut)} />
                                 <form action={supprimerGroupeAffectationsAction} className="absolute right-0.5 top-0.5">
                                   <input type="hidden" name="retour" value={iso(debut)} />
                                   <input type="hidden" name="ids" value={a.id} />

@@ -17,6 +17,9 @@ import { CoordonneesBancairesForm } from "@/components/CoordonneesBancairesForm"
 import { statutNoteFrais } from "@/lib/notes-frais";
 import { euros } from "@/lib/devis";
 import { SignatureEmploye } from "@/components/SignatureEmploye";
+import { lienMaps } from "@/lib/maps";
+
+const LIBELLES_TYPE_ACTIVITE: Record<string, string> = { chantier: "Chantier", bureau: "Bureau", depot: "Dépôt", visite_medicale: "Visite médicale", formation: "Formation", conge: "Congé / absence", autre: "Autre activité" };
 
 export default async function EmployeDetailPage({ params,searchParams }: { params: Promise<{ id: string }>;searchParams:Promise<{error?:string;success?:string}> }) {
   const { id } = await params;
@@ -54,6 +57,18 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
     .eq("employe_id", id)
     .is("date_fin", null)
     .order("date_debut", { ascending: false });
+
+  // Planning jour par jour (distinct des equipes_chantiers ci-dessus, qui est une affectation
+  // d'equipe longue duree) : toute affectation saisie manuellement ou via l'assistant IA
+  // apparait ici automatiquement, puisque les deux ecritures visent la meme table.
+  const { data: planningAVenir } = await supabase
+    .from("affectations")
+    .select("id,date,heures,tache,type_activite,lieu_activite,chantier:chantiers(id,nom)")
+    .eq("entreprise_id", ctx.entrepriseId)
+    .eq("employe_id", id)
+    .gte("date", new Date().toISOString().slice(0, 10))
+    .order("date")
+    .limit(15);
 
   const statut = statutEmploye(employe.statut);
   const importerCarte=importerCarteBtpAction.bind(null,id),supprimerCarte=supprimerCarteBtpAction.bind(null,id);
@@ -164,6 +179,27 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
                   )})}
                 </tbody>
               </table>
+            </div>
+          )}
+        </section>
+
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold">Planning à venir</h2><Link href="/planning" className="text-xs font-medium text-blue-700 hover:underline">Ouvrir le planning →</Link></div>
+          {!planningAVenir || planningAVenir.length === 0 ? (
+            <p className="text-sm text-neutral-500">Aucune affectation à venir.</p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {planningAVenir.map((ligne) => {
+                const chantier = Array.isArray(ligne.chantier) ? ligne.chantier[0] : ligne.chantier;
+                return (
+                  <article key={ligne.id} className="rounded-md border p-3 text-sm">
+                    <p className="text-xs text-neutral-500">{formatDateFr(ligne.date)} · {Number(ligne.heures)} h</p>
+                    <p className="font-medium">{chantier?.nom ?? LIBELLES_TYPE_ACTIVITE[ligne.type_activite] ?? "Activité interne"}</p>
+                    {ligne.lieu_activite && <p className="text-neutral-600 dark:text-neutral-400">{ligne.lieu_activite} · <a href={lienMaps(ligne.lieu_activite)} target="_blank" rel="noopener" className="text-blue-700 hover:underline">Itinéraire</a></p>}
+                    {ligne.tache && <p className="text-neutral-600 dark:text-neutral-400">{ligne.tache}</p>}
+                  </article>
+                );
+              })}
             </div>
           )}
         </section>
