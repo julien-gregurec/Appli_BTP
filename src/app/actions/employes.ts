@@ -219,3 +219,52 @@ export async function supprimerSignatureEmployeAction(employeId: string) {
   await supabase.from("employes").update({ signature_storage_path: null, signature_at: null }).eq("id", employeId).eq("entreprise_id", ctx.entrepriseId);
   revalidatePath(`/employes/${employeId}`);
 }
+
+// Auto-service : n'importe quel membre (y compris l'administrateur, qui n'a pas de
+// fiche employé créée automatiquement) peut se relier sa propre fiche pour apparaître
+// au planning, pointer, poser des congés et des notes de frais — sans passer par
+// gerer_employes. Les droits eux-mêmes restent entièrement définis par le poste
+// dans Paramètres > Accès ; ceci ne fait que créer l'identité "employé" liée au compte.
+export async function creerMaFicheEmployeAction(formData: FormData) {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+
+  const { data: dejaLiee } = await supabase
+    .from("employes")
+    .select("id")
+    .eq("entreprise_id", ctx.entrepriseId)
+    .eq("utilisateur_id", ctx.userId)
+    .maybeSingle();
+  if (dejaLiee) redirect("/mon-espace");
+
+  const prenom = champ(formData, "prenom");
+  const nom = champ(formData, "nom");
+  const poste = champ(formData, "poste");
+  if (!prenom || !nom) {
+    redirect(`/mon-espace?error=${encodeURIComponent("Prénom et nom obligatoires")}`);
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { error } = await supabase.from("employes").insert({
+    entreprise_id: ctx.entrepriseId,
+    utilisateur_id: ctx.userId,
+    prenom,
+    nom,
+    email: user?.email ?? null,
+    poste,
+    statut: "actif",
+    type_contrat: "cdi",
+  });
+
+  if (error) {
+    redirect(`/mon-espace?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/mon-espace");
+  revalidatePath("/planning");
+  revalidatePath("/employes");
+  redirect(`/mon-espace?succes=${encodeURIComponent("Fiche créée : tu apparais maintenant au planning et peux pointer, poser des congés et des notes de frais selon les droits de ton poste.")}`);
+}

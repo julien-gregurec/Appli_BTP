@@ -5,6 +5,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { formatDateFr, nomEmploye } from "@/lib/employes";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { definirMotDePasseStockPersonnelAction } from "@/app/actions/stock";
+import { creerMaFicheEmployeAction } from "@/app/actions/employes";
 
 const relation=<T,>(valeur:T|T[]|null):T|null=>Array.isArray(valeur)?valeur[0]??null:valeur;
 
@@ -12,7 +13,23 @@ export default async function MonEspacePage({searchParams}:{searchParams:Promise
   const messages=await searchParams;
   const ctx=await getContexteEntreprise(),supabase=await createClient();
   const{data:employe}=await supabase.from("employes").select("id,prenom,nom,email,telephone,poste,identifiant_interne,numero_inscription,code_stock_active,code_stock_modifie_at,carte_btp_storage_path,carte_btp_numero,carte_btp_expiration,utilisateur_id,profil_acces:postes(nom)").eq("entreprise_id",ctx.entrepriseId).eq("utilisateur_id",ctx.userId).maybeSingle();
-  if(!employe)return <main className="p-8"><div className="mx-auto max-w-3xl space-y-5"><div><h1 className="text-xl font-semibold">Mon espace</h1><p className="text-sm text-neutral-500">Votre fiche personnelle, votre carte BTP et vos affectations.</p></div><div className="rounded-md border border-dashed p-6 text-sm text-neutral-600">{isEmailLoginDisabled()?"Le mode prototype partage encore le compte administrateur. Cet espace affichera la fiche personnelle de chaque collaborateur après l’activation des connexions individuelles.":"Aucune fiche employé n’est encore liée à votre compte. Demandez à votre administrateur de vérifier votre numéro d’inscription."}</div></div></main>;
+  if(!employe){
+    if(isEmailLoginDisabled())return <main className="p-8"><div className="mx-auto max-w-3xl space-y-5"><div><h1 className="text-xl font-semibold">Mon espace</h1><p className="text-sm text-neutral-500">Votre fiche personnelle, votre carte BTP et vos affectations.</p></div><div className="rounded-md border border-dashed p-6 text-sm text-neutral-600">Le mode prototype partage encore le compte administrateur. Cet espace affichera la fiche personnelle de chaque collaborateur après l’activation des connexions individuelles.</div></div></main>;
+    const{data:profil}=await supabase.from("utilisateurs").select("nom").eq("id",ctx.userId).maybeSingle();
+    return <main className="p-8"><div className="mx-auto max-w-3xl space-y-5">
+      <div><h1 className="text-xl font-semibold">Mon espace</h1><p className="text-sm text-neutral-500">Votre fiche personnelle, votre carte BTP et vos affectations.</p></div>
+      {messages.error&&<p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{messages.error}</p>}
+      <div className="space-y-4 rounded-md border-2 border-[#c9a24a]/60 bg-[#c9a24a]/5 p-5">
+        <div><h2 className="font-semibold">Créer ma fiche employé</h2><p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">Aucune fiche n’est encore liée à ton compte. Crée la tienne pour apparaître au planning et pouvoir pointer, poser des congés ou des notes de frais — toujours selon les droits déjà définis pour ton poste dans Paramètres &gt; Accès.</p></div>
+        <form action={creerMaFicheEmployeAction} className="grid gap-3 sm:grid-cols-2">
+          <input name="prenom" required defaultValue={ctx.prenom??""} placeholder="Prénom" className="rounded-md border px-3 py-2 text-sm"/>
+          <input name="nom" required defaultValue={profil?.nom??""} placeholder="Nom" className="rounded-md border px-3 py-2 text-sm"/>
+          <input name="poste" placeholder="Fonction (ex. Dirigeant, Chef de chantier…)" className="rounded-md border px-3 py-2 text-sm sm:col-span-2"/>
+          <button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white sm:col-span-2">Créer ma fiche</button>
+        </form>
+      </div>
+    </div></main>;
+  }
   const[{data:vehicules},{data:outils},{data:planning}]=await Promise.all([
     supabase.from("vehicules").select("id,immatriculation,marque,modele").eq("entreprise_id",ctx.entrepriseId).eq("employe_id",employe.id).order("immatriculation"),
     supabase.from("outils").select("id,reference_interne,designation,etat").eq("entreprise_id",ctx.entrepriseId).eq("employe_id",employe.id).order("designation"),
