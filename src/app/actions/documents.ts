@@ -10,6 +10,7 @@ import {
   DOCUMENT_TAILLE_MAX,
   nomFichierSecurise,
 } from "@/lib/documents";
+import { analyserDocumentIA, MIME_ANALYSABLES_IA } from "@/lib/ai/documents";
 
 const BUCKET = "chantier-documents";
 
@@ -85,4 +86,33 @@ export async function supprimerDocumentChantierAction(chantierId: string, docume
   revalidatePath(`/chantiers/${chantierId}`);
   revalidatePath(`/chantiers/${chantierId}/documents`);
   retour(chantierId, "success", "Document supprimé");
+}
+
+export async function analyserDocumentIAAction(documentId: string) {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+
+  const { data: document } = await supabase
+    .from("documents_chantier")
+    .select("storage_path, mime_type")
+    .eq("id", documentId)
+    .eq("entreprise_id", ctx.entrepriseId)
+    .maybeSingle();
+  if (!document) return { error: "Document introuvable." };
+  if (!MIME_ANALYSABLES_IA.includes(document.mime_type)) {
+    return { error: "Ce format n'est pas pris en charge par l'analyse IA (images JPEG/PNG/WebP ou PDF)." };
+  }
+
+  const { data: fichier, error: telechargementError } = await supabase.storage
+    .from("chantier-documents")
+    .download(document.storage_path);
+  if (telechargementError || !fichier) return { error: "Impossible de récupérer le fichier." };
+
+  try {
+    const octets = Buffer.from(await fichier.arrayBuffer());
+    const analyse = await analyserDocumentIA(octets, document.mime_type);
+    return { analyse };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Erreur lors de l'analyse IA." };
+  }
 }
