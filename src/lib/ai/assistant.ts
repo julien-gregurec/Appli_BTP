@@ -53,18 +53,37 @@ async function resoudrePropositionAffectation(
  * outils de lecture, et s'arrête dès que l'IA appelle `proposer_affectation` (jamais
  * d'écriture en base directe — la proposition est renvoyée pour validation manuelle).
  */
+async function decrireUtilisateurCourant(supabase: SupabaseClient, entrepriseId: string, utilisateurId: string): Promise<string> {
+  const { data: employe } = await supabase
+    .from("employes")
+    .select("nom, prenom, poste")
+    .eq("entreprise_id", entrepriseId)
+    .eq("utilisateur_id", utilisateurId)
+    .maybeSingle();
+  if (employe) {
+    return `Tu parles avec ${employe.prenom} ${employe.nom} (poste : ${employe.poste}). ` + `Cette personne EST cet employé : ne lui demande jamais son identité, tu la connais déjà. `;
+  }
+  return (
+    `La personne à qui tu parles n'a pas encore de fiche employé liée à son compte. ` +
+    `Si la question porte sur son propre planning, pointage, congés ou notes de frais, indique-lui d'aller dans "Mon espace" puis de cliquer sur "Créer ma fiche employé". `
+  );
+}
+
 export async function* demanderAssistantIAStream(
   supabase: SupabaseClient,
   entrepriseId: string,
   entrepriseNom: string,
+  utilisateurId: string,
   historique: MessageChat[],
 ): AsyncGenerator<EvenementAssistant, void, unknown> {
   const provider = obtenirProviderIA();
   const aujourdhui = new Intl.DateTimeFormat("fr-FR", { dateStyle: "full", timeZone: "Europe/Paris" }).format(new Date());
+  const descriptionUtilisateur = await decrireUtilisateurCourant(supabase, entrepriseId, utilisateurId);
 
   const system =
     `Tu es l'assistant intégré de Liria Gestion Pro, un logiciel de gestion pour entreprises du BTP, pour l'entreprise "${entrepriseNom}". ` +
-    `Nous sommes le ${aujourdhui}. Réponds en français, de façon concise et directe, comme un collègue qui connaît bien l'activité. ` +
+    `Nous sommes le ${aujourdhui}. ${descriptionUtilisateur}` +
+    `Réponds en français, de façon concise et directe, comme un collègue qui connaît bien l'activité. ` +
     `Utilise systématiquement les outils à ta disposition pour aller chercher les données réelles avant de répondre — ne devine et n'invente jamais un chiffre ou un nom. ` +
     `Si aucun outil ne permet de répondre à la question, dis-le clairement plutôt que d'inventer une réponse. ` +
     `Pour toute demande d'affectation planning, utilise chercher_employe, chercher_chantier_planning puis verifier_disponibilite_employe avant de conclure avec proposer_affectation — ` +

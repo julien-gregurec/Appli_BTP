@@ -4,19 +4,39 @@ import { calculerRentabiliteChantiers } from "@/lib/rentabilite";
 
 type Supabase = SupabaseClient;
 
+// Recherche insensible aux accents/majuscules et robuste aux noms multi-mots
+// ("Lucas Morel" doit matcher prenom="Lucas" nom="Morel" meme si aucun des deux
+// champs pris seul ne contient la chaine complete). Filtrage des marques
+// diacritiques par point de code (768-879 = plage Unicode "Combining Diacritical
+// Marks") plutot que par regex accentuee, pour eviter tout risque d'encodage.
+function normaliser(valeur: string): string {
+  const decompose = valeur.normalize("NFD");
+  let resultat = "";
+  for (const caractere of decompose) {
+    const code = caractere.codePointAt(0) ?? 0;
+    if (code < 768 || code > 879) resultat += caractere;
+  }
+  return resultat.toLowerCase().trim();
+}
+
+function correspondTousLesMots(texte: string, terme: string): boolean {
+  const mots = normaliser(terme).split(/\s+/).filter(Boolean);
+  const cible = normaliser(texte);
+  return mots.length > 0 && mots.every((mot) => cible.includes(mot));
+}
+
 async function rechercher(supabase: Supabase, entrepriseId: string, input: { terme: string }) {
-  const terme = `%${input.terme.trim()}%`;
-  const [clients, chantiers, devis, factures] = await Promise.all([
-    supabase.from("clients").select("id, nom, prenom, societe").eq("entreprise_id", entrepriseId).or(`nom.ilike.${terme},prenom.ilike.${terme},societe.ilike.${terme}`).limit(5),
-    supabase.from("chantiers").select("id, nom, ville, statut").eq("entreprise_id", entrepriseId).ilike("nom", terme).limit(5),
-    supabase.from("devis").select("id, numero, statut, montant_ttc, client_id, clients(nom, societe)").eq("entreprise_id", entrepriseId).ilike("numero", terme).limit(5),
-    supabase.from("factures").select("id, numero, statut, montant_ttc, client_id, clients(nom, societe)").eq("entreprise_id", entrepriseId).ilike("numero", terme).limit(5),
+  const [{ data: clients }, { data: chantiers }, { data: devis }, { data: factures }] = await Promise.all([
+    supabase.from("clients").select("id, nom, prenom, societe").eq("entreprise_id", entrepriseId).limit(300),
+    supabase.from("chantiers").select("id, nom, ville, statut").eq("entreprise_id", entrepriseId).limit(300),
+    supabase.from("devis").select("id, numero, statut, montant_ttc, client_id, clients(nom, societe)").eq("entreprise_id", entrepriseId).ilike("numero", `%${input.terme.trim()}%`).limit(5),
+    supabase.from("factures").select("id, numero, statut, montant_ttc, client_id, clients(nom, societe)").eq("entreprise_id", entrepriseId).ilike("numero", `%${input.terme.trim()}%`).limit(5),
   ]);
   return {
-    clients: clients.data ?? [],
-    chantiers: chantiers.data ?? [],
-    devis: devis.data ?? [],
-    factures: factures.data ?? [],
+    clients: (clients ?? []).filter((c) => correspondTousLesMots(`${c.prenom ?? ""} ${c.nom ?? ""} ${c.societe ?? ""}`, input.terme)).slice(0, 5),
+    chantiers: (chantiers ?? []).filter((c) => correspondTousLesMots(c.nom, input.terme)).slice(0, 5),
+    devis: devis ?? [],
+    factures: factures ?? [],
   };
 }
 
@@ -129,9 +149,8 @@ async function chercherEmploye(supabase: Supabase, entrepriseId: string, input: 
     .select("id, nom, prenom, poste")
     .eq("entreprise_id", entrepriseId)
     .eq("statut", "actif")
-    .or(`nom.ilike.%${input.terme}%,prenom.ilike.%${input.terme}%`)
-    .limit(5);
-  return data ?? [];
+    .limit(300);
+  return (data ?? []).filter((e) => correspondTousLesMots(`${e.prenom ?? ""} ${e.nom ?? ""}`, input.terme)).slice(0, 5);
 }
 
 async function chercherChantierParNom(supabase: Supabase, entrepriseId: string, input: { terme: string }) {
@@ -139,9 +158,8 @@ async function chercherChantierParNom(supabase: Supabase, entrepriseId: string, 
     .from("chantiers")
     .select("id, nom, ville, statut")
     .eq("entreprise_id", entrepriseId)
-    .ilike("nom", `%${input.terme}%`)
-    .limit(5);
-  return data ?? [];
+    .limit(300);
+  return (data ?? []).filter((c) => correspondTousLesMots(c.nom, input.terme)).slice(0, 5);
 }
 
 async function verifierDisponibiliteEmploye(supabase: Supabase, entrepriseId: string, input: { employe_id: string; date: string }) {
