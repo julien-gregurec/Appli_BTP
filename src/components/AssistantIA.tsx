@@ -6,13 +6,29 @@ import type { MessageChat, PropositionAffectation } from "@/lib/ai/assistant";
 
 type MessageAffiche = MessageChat & { proposition?: PropositionAffectation; propositionStatut?: "en_attente" | "creee" | "refusee" };
 
+type ReconnaissanceVocale = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start: () => void;
+  stop: () => void;
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }> }) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+};
+
 export function AssistantIA() {
   const [ouvert, setOuvert] = useState(false);
   const [messages, setMessages] = useState<MessageAffiche[]>([]);
   const [saisie, setSaisie] = useState("");
   const [erreur, setErreur] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [ecoute, setEcoute] = useState(false);
+  const [micSupporte, setMicSupporte] = useState(true);
+  const [voixActive, setVoixActive] = useState(true);
   const finRef = useRef<HTMLDivElement>(null);
+  const reconnaissanceRef = useRef<ReconnaissanceVocale | null>(null);
+  const envoyerRef = useRef<(texte: string) => void>(() => {});
 
   useEffect(() => {
     finRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -24,8 +40,8 @@ export function AssistantIA() {
     return () => window.removeEventListener("liria:ouvrir-assistant", ouvrir);
   }, []);
 
-  function envoyer() {
-    const question = saisie.trim();
+  function envoyer(texte?: string) {
+    const question = (texte ?? saisie).trim();
     if (!question) return;
     setErreur(null);
     const historique = [...messages, { role: "user" as const, contenu: question }];
@@ -46,7 +62,57 @@ export function AssistantIA() {
           propositionStatut: res.proposition ? "en_attente" : undefined,
         },
       ]);
+      if (voixActive && res.texte && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+        const parole = new SpeechSynthesisUtterance(res.texte);
+        parole.lang = "fr-FR";
+        window.speechSynthesis.speak(parole);
+      }
     });
+  }
+  envoyerRef.current = envoyer;
+
+  useEffect(() => {
+    type FenetreAvecReco = Window & {
+      SpeechRecognition?: new () => ReconnaissanceVocale;
+      webkitSpeechRecognition?: new () => ReconnaissanceVocale;
+    };
+    const fenetre = window as FenetreAvecReco;
+    const Ctor = fenetre.SpeechRecognition ?? fenetre.webkitSpeechRecognition;
+    if (!Ctor) {
+      setMicSupporte(false);
+      return;
+    }
+    const reco = new Ctor();
+    reco.lang = "fr-FR";
+    reco.continuous = false;
+    reco.interimResults = true;
+    reco.onresult = (event) => {
+      let texte = "";
+      let final = false;
+      for (let i = 0; i < event.results.length; i++) {
+        texte += event.results[i][0].transcript;
+        if (event.results[i].isFinal) final = true;
+      }
+      setSaisie(texte);
+      if (final) envoyerRef.current(texte);
+    };
+    reco.onerror = () => setEcoute(false);
+    reco.onend = () => setEcoute(false);
+    reconnaissanceRef.current = reco;
+  }, []);
+
+  function basculerEcoute() {
+    if (!reconnaissanceRef.current) return;
+    if (ecoute) {
+      reconnaissanceRef.current.stop();
+      setEcoute(false);
+    } else {
+      setErreur(null);
+      window.speechSynthesis?.cancel();
+      reconnaissanceRef.current.start();
+      setEcoute(true);
+    }
   }
 
   function validerProposition(index: number) {
@@ -75,16 +141,27 @@ export function AssistantIA() {
         <div className="fixed bottom-4 right-4 z-50 flex h-[32rem] max-h-[70vh] w-96 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-2xl dark:border-neutral-700 dark:bg-neutral-900">
           <div className="flex items-center justify-between border-b border-neutral-200 bg-liria-navy px-4 py-3 dark:border-neutral-700">
             <span className="text-sm font-semibold text-white">✨ Assistant Liria</span>
-            <button type="button" onClick={() => setOuvert(false)} aria-label="Fermer" className="text-white/80 hover:text-white">
-              ×
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => { setVoixActive((v) => !v); window.speechSynthesis?.cancel(); }}
+                aria-label={voixActive ? "Couper la voix" : "Activer la voix"}
+                title={voixActive ? "Couper la voix" : "Activer la voix"}
+                className="text-white/80 hover:text-white"
+              >
+                {voixActive ? "🔊" : "🔇"}
+              </button>
+              <button type="button" onClick={() => setOuvert(false)} aria-label="Fermer" className="text-white/80 hover:text-white">
+                ×
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 space-y-3 overflow-y-auto p-4">
             {messages.length === 0 && (
               <p className="text-sm text-neutral-500">
-                Pose une question sur ton activité : « quels chantiers sont en retard ? », « qui est absent aujourd'hui ? »,
-                « programme Julien sur le chantier Dupont demain »…
+                Pose une question sur ton activité (à l'écrit ou au micro 🎙️) : « quels chantiers sont en retard ? »,
+                « qui est absent aujourd'hui ? », « programme Julien sur le chantier Dupont demain »…
               </p>
             )}
             {messages.map((m, i) => (
@@ -120,11 +197,23 @@ export function AssistantIA() {
               </div>
             ))}
             {pending && <p className="text-sm text-neutral-400">…</p>}
+            {ecoute && <p className="text-sm text-liria-navy dark:text-liria-gold">🎙️ Je t'écoute…</p>}
             {erreur && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erreur}</p>}
             <div ref={finRef} />
           </div>
 
           <div className="flex items-center gap-2 border-t border-neutral-200 p-3 dark:border-neutral-700">
+            {micSupporte && (
+              <button
+                type="button"
+                onClick={basculerEcoute}
+                aria-label={ecoute ? "Arrêter le micro" : "Parler à l'assistant"}
+                title={ecoute ? "Arrêter le micro" : "Parler à l'assistant"}
+                className={`rounded-md px-3 py-2 text-sm ${ecoute ? "bg-red-600 text-white" : "border border-neutral-300 dark:border-neutral-700"}`}
+              >
+                🎙️
+              </button>
+            )}
             <input
               value={saisie}
               onChange={(e) => setSaisie(e.target.value)}
@@ -134,12 +223,12 @@ export function AssistantIA() {
                   envoyer();
                 }
               }}
-              placeholder="Écris ta question…"
+              placeholder="Écris ou parle…"
               className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
             />
             <button
               type="button"
-              onClick={envoyer}
+              onClick={() => envoyer()}
               disabled={pending || !saisie.trim()}
               className="rounded-md bg-liria-navy px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
