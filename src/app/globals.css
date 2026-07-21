@@ -4,7 +4,10 @@
   --background: #ffffff;
   --foreground: #0d1b2a;
   --liria-navy: #0d1b2a;
+  --liria-anthracite: #1f2328;
   --liria-gold: #c9a24a;
+  --liria-white: #ffffff;
+  --liria-gray-clair: #e6e6e6;
 }
 
 @theme inline {
@@ -12,6 +15,32 @@
   --color-foreground: var(--foreground);
   --font-sans: Arial, Helvetica, sans-serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
+  /* Palette de marque Liria — utilisable directement (bg-liria-navy, text-liria-gold…). */
+  --color-liria-navy: var(--liria-navy);
+  --color-liria-anthracite: var(--liria-anthracite);
+  --color-liria-gold: var(--liria-gold);
+  --color-liria-white: var(--liria-white);
+  --color-liria-gray-clair: var(--liria-gray-clair);
+}
+
+@theme {
+  /* Remplace l'échelle grise neutre de Tailwind par une rampe cohérente avec
+     la marque, ancrée sur Gris clair (#E6E6E6 → 200) et Anthracite (#1F2328
+     → 900). Toutes les classes neutral-* déjà utilisées dans l'application
+     (fonds, bordures, textes secondaires) héritent donc automatiquement de
+     la palette de marque, sans modifier un seul composant. */
+  --color-neutral-50: #f8f8f9;
+  --color-neutral-100: #ededee;
+  --color-neutral-200: #e6e6e6;
+  --color-neutral-300: #cacacb;
+  --color-neutral-400: #adaeb0;
+  --color-neutral-500: #919295;
+  --color-neutral-600: #747779;
+  --color-neutral-700: #585b5e;
+  --color-neutral-800: #3b3f43;
+  --color-neutral-900: #1f2328;
+  --color-neutral-950: #141619;
 }
 
 @media (prefers-color-scheme: dark) {
