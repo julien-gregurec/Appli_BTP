@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { analyserRentabilite } from "@/lib/ai/rentabilite";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
 
@@ -11,6 +12,7 @@ const un = <T,>(valeur: T | T[] | null): T | null => (Array.isArray(valeur) ? (v
 export async function analyserRentabiliteIAAction(chantierId: string): Promise<{ analyse: string } | { error: string }> {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
 
   const [{ data: chantier }, { data: factures }, { data: devis }, { data: donneesPointages }, { data: depenses }] = await Promise.all([
     supabase.from("chantiers").select("id, nom").eq("id", chantierId).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),

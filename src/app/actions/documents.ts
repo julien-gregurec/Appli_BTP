@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import {
   DOCUMENT_CATEGORIES,
   DOCUMENT_MIME_TYPES,
@@ -92,6 +93,7 @@ export async function supprimerDocumentChantierAction(chantierId: string, docume
 export async function analyserDocumentIAAction(documentId: string) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
 
   const { data: document } = await supabase
     .from("documents_chantier")

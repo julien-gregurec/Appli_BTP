@@ -28,7 +28,7 @@ function ctorReconnaissance(): (new () => ReconnaissanceVocale) | undefined {
   return fenetre.SpeechRecognition ?? fenetre.webkitSpeechRecognition;
 }
 
-export function DicteeCompteRendu({ chantierId }: { chantierId: string }) {
+export function DicteeCompteRendu({ chantierId, peutUtiliserIA = true }: { chantierId: string; peutUtiliserIA?: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [ecoute, setEcoute] = useState(false);
@@ -124,9 +124,16 @@ export function DicteeCompteRendu({ chantierId }: { chantierId: string }) {
           placeholder="Aujourd'hui nous avons terminé les cloisons du bureau 2, il manque encore les prises électriques…"
           className={input}
         />
-        <button type="button" onClick={structurer} disabled={pending || !transcription.trim()} className="rounded-md bg-liria-navy px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">
-          {pending ? "…" : "✨ Structurer avec l'IA"}
-        </button>
+        <div className="flex items-center gap-3">
+          {peutUtiliserIA && (
+            <button type="button" onClick={structurer} disabled={pending || !transcription.trim()} className="rounded-md bg-liria-navy px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">
+              {pending ? "…" : "✨ Structurer avec l'IA"}
+            </button>
+          )}
+          <button type="button" onClick={() => { setTitre(""); setContenu(transcription); }} disabled={!transcription.trim()} className="text-sm text-neutral-600 hover:underline disabled:opacity-40 dark:text-neutral-400">
+            Rédiger sans IA
+          </button>
+        </div>
       </div>
 
       {(titre || contenu) && (

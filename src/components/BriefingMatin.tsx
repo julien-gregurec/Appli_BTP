@@ -4,7 +4,7 @@ export type LigneBriefing = { niveau: "bon" | "attention" | "critique"; texte: s
 
 const PUCE = { bon: "🟢", attention: "🟡", critique: "🔴" } as const;
 
-export function BriefingMatin({ prenom, lignes }: { prenom: string | null; lignes: LigneBriefing[] }) {
+export function BriefingMatin({ prenom, lignes, peutUtiliserIA = true }: { prenom: string | null; lignes: LigneBriefing[]; peutUtiliserIA?: boolean }) {
   function ouvrirAssistant() {
     window.dispatchEvent(new CustomEvent("liria:ouvrir-assistant"));
   }
@@ -21,13 +21,15 @@ export function BriefingMatin({ prenom, lignes }: { prenom: string | null; ligne
           </li>
         ))}
       </ul>
-      <button
-        type="button"
-        onClick={ouvrirAssistant}
-        className="mt-4 rounded-md bg-liria-gold px-4 py-2 text-sm font-semibold text-liria-navy hover:brightness-95"
-      >
-        ✨ Que souhaites-tu faire ?
-      </button>
+      {peutUtiliserIA && (
+        <button
+          type="button"
+          onClick={ouvrirAssistant}
+          className="mt-4 rounded-md bg-liria-gold px-4 py-2 text-sm font-semibold text-liria-navy hover:brightness-95"
+        >
+          ✨ Que souhaites-tu faire ?
+        </button>
+      )}
     </section>
   );
 }

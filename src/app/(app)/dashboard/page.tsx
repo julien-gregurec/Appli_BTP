@@ -2,7 +2,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { euros, statutDevis } from "@/lib/devis";
 import { statutChantier } from "@/lib/chantier-statuts";
-import { permissionsUtilisateur } from "@/lib/permissions";
+import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { PointageArriveeDepart } from "@/components/PointageArriveeDepart";
 import { MobileModuleGrid, type MobileModuleLink } from "@/components/MobileModuleGrid";
 import { DashboardAnalytics } from "@/components/DashboardAnalytics";
@@ -202,7 +202,7 @@ export default async function DashboardPage() {
     <main className="p-8">
       <div className="mx-auto max-w-6xl space-y-6">
         {peutVoirBriefing ? (
-          <BriefingMatin prenom={prenomAffiche} lignes={lignesBriefing} />
+          <BriefingMatin prenom={prenomAffiche} lignes={lignesBriefing} peutUtiliserIA={aAccesIA(permissions)} />
         ) : (
           <div>
             <h1 className="text-xl font-semibold">Bonjour{prenomAffiche ? ` ${prenomAffiche}` : ""}</h1>

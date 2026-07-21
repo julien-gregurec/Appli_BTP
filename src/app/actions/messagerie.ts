@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { suggererReponse, type MessageThread } from "@/lib/ai/messagerie";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
 
@@ -86,6 +87,7 @@ export async function envoyerMessageInterneAction(conversationId: string, formDa
 export async function suggererReponseIAAction(conversationId: string): Promise<{ brouillon: string } | { error: string }> {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
 
   const { data: conversation } = await supabase
     .from("conversations_internes")

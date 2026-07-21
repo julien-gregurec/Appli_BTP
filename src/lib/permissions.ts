@@ -26,3 +26,8 @@ export const permissionsUtilisateur = cache(async function permissionsUtilisateu
   }
   return [...droits];
 });
+
+// null = accès complet (prototype ou support). Sinon, droit explicite requis.
+export function aAccesIA(permissions: string[] | null): boolean {
+  return permissions === null || permissions.includes("acces_ia");
+}

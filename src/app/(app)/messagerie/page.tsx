@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
+import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { creerConversationInterneAction, envoyerMessageInterneAction } from "@/app/actions/messagerie";
 import { ZoneReponseMessagerie } from "@/components/ZoneReponseMessagerie";
@@ -15,6 +16,7 @@ export default async function MessageriePage({ searchParams }: { searchParams: P
   if (isEmailLoginDisabled()) return <main className="p-8"><div className="mx-auto max-w-4xl"><h1 className="text-xl font-semibold">Messagerie interne</h1><p className="mt-4 rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">La messagerie privée exige des comptes individuels. Elle est fermée en mode prototype.</p></div></main>;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  const peutUtiliserIA = aAccesIA(await permissionsUtilisateur(ctx));
   const [{ data: moi }, { data: employes }, { data: chantiers }, { data: conversations }] = await Promise.all([
     supabase.from("employes").select("id,prenom,nom").eq("entreprise_id",ctx.entrepriseId).eq("utilisateur_id",ctx.userId).maybeSingle(),
     supabase.rpc("contacts_messagerie",{p_entreprise_id:ctx.entrepriseId}),
@@ -43,7 +45,7 @@ export default async function MessageriePage({ searchParams }: { searchParams: P
     </div></section>
     <div className="grid min-h-[520px] overflow-hidden rounded-lg border md:grid-cols-[280px_1fr]">
       <aside className="border-b bg-neutral-50 p-2 dark:bg-neutral-950 md:border-b-0 md:border-r"><p className="px-2 py-2 text-xs font-semibold uppercase text-neutral-500">Conversations</p>{(conversations??[]).map((conversation)=><Link key={conversation.id} href={`/messagerie?conversation=${conversation.id}`} className={`mb-1 block rounded p-3 text-sm ${conversation.id===conversationId?"bg-[#0d1b2a] text-white":"hover:bg-neutral-100 dark:hover:bg-neutral-900"}`}><strong className="block truncate">{titreConversation(conversation)}</strong><span className={`text-xs ${conversation.id===conversationId?"text-white/70":"text-neutral-500"}`}>{new Date(conversation.derniere_activite_at).toLocaleString("fr-FR")}</span></Link>)}{!(conversations??[]).length&&<p className="p-3 text-sm text-neutral-500">Aucune conversation.</p>}</aside>
-      <section className="flex min-w-0 flex-col"><div className="border-b p-4"><h2 className="font-semibold">{selected?titreConversation(selected):"Sélectionnez une conversation"}</h2></div><div className="flex-1 space-y-3 overflow-y-auto p-4">{(messages??[]).map((message)=>{const auteur=un(message.auteur);const personnel=auteur?.id===moi?.id;return <div key={message.id} className={`flex ${personnel?"justify-end":"justify-start"}`}><article className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${personnel?"bg-[#0d1b2a] text-white":"bg-neutral-100 dark:bg-neutral-900"}`}><p className="mb-1 text-xs font-semibold opacity-70">{auteur?`${auteur.prenom} ${auteur.nom}`:"Collaborateur"}</p><p className="whitespace-pre-wrap">{message.contenu}</p><p className="mt-1 text-[10px] opacity-60">{new Date(message.created_at).toLocaleString("fr-FR")}</p></article></div>})}{selected&&!(messages??[]).length&&<p className="text-center text-sm text-neutral-500">Aucun message.</p>}</div>{selected&&<ZoneReponseMessagerie conversationId={selected.id} actionEnvoyer={envoyerMessageInterneAction.bind(null,selected.id)} />}</section>
+      <section className="flex min-w-0 flex-col"><div className="border-b p-4"><h2 className="font-semibold">{selected?titreConversation(selected):"Sélectionnez une conversation"}</h2></div><div className="flex-1 space-y-3 overflow-y-auto p-4">{(messages??[]).map((message)=>{const auteur=un(message.auteur);const personnel=auteur?.id===moi?.id;return <div key={message.id} className={`flex ${personnel?"justify-end":"justify-start"}`}><article className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${personnel?"bg-[#0d1b2a] text-white":"bg-neutral-100 dark:bg-neutral-900"}`}><p className="mb-1 text-xs font-semibold opacity-70">{auteur?`${auteur.prenom} ${auteur.nom}`:"Collaborateur"}</p><p className="whitespace-pre-wrap">{message.contenu}</p><p className="mt-1 text-[10px] opacity-60">{new Date(message.created_at).toLocaleString("fr-FR")}</p></article></div>})}{selected&&!(messages??[]).length&&<p className="text-center text-sm text-neutral-500">Aucun message.</p>}</div>{selected&&<ZoneReponseMessagerie conversationId={selected.id} actionEnvoyer={envoyerMessageInterneAction.bind(null,selected.id)} peutUtiliserIA={peutUtiliserIA} />}</section>
     </div>
   </div></main>;
 }

@@ -3,12 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { structurerCompteRendu } from "@/lib/ai/compteRendu";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
 
 export async function structurerCompteRenduIAAction(transcription: string) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
   const texte = transcription.trim();
   if (!texte) return { error: "Rien à structurer : dicte ou écris d'abord un texte." };
   if (texte.length > 8000) return { error: "Texte trop long (8000 caractères max)." };

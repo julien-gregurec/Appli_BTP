@@ -1,11 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { demanderAssistantIAStream, type MessageChat } from "@/lib/ai/assistant";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
 
 export async function POST(request: Request) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  if (!aAccesIA(await permissionsUtilisateur(ctx))) {
+    return Response.json({ error: "Ton poste n'a pas accès aux fonctionnalités IA." }, { status: 403 });
+  }
 
   const body = (await request.json().catch(() => null)) as { historique?: MessageChat[] } | null;
   const historique = body?.historique;

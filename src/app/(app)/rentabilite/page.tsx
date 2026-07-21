@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { euros } from "@/lib/devis";
 import { Lien as Link } from "@/components/Lien";
 import { AnalyseRentabiliteIA } from "@/components/AnalyseRentabiliteIA";
@@ -10,6 +11,7 @@ const un = <T,>(valeur: T | T[] | null): T | null => Array.isArray(valeur) ? val
 export default async function RentabilitePage() {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  const peutUtiliserIA = aAccesIA(await permissionsUtilisateur(ctx));
   const [{ data: chantiers }, { data: factures }, { data: devis }, { data: donneesPointages }, { data: depenses }] = await Promise.all([
     supabase.from("chantiers").select("id, reference_interne, nom, statut, client:clients(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
     supabase.from("factures").select("chantier_id, montant_ht, statut, type").eq("entreprise_id", ctx.entrepriseId),
@@ -45,7 +47,7 @@ export default async function RentabilitePage() {
     <div><h1 className="text-xl font-semibold">Rentabilité des chantiers</h1><p className="text-sm text-neutral-500">Chiffre d’affaires moins main-d’œuvre pointée et dépenses fournisseurs réelles.</p></div>
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6"><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">CA HT</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalFacture)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Main-d’œuvre</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalCoutMo)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Achats / charges</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalAchats)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Sous-traitance</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalSousTraitance)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Marge</div><div className={`mt-1 font-mono text-lg font-semibold ${totalMarge>=0?"text-green-700":"text-red-700"}`}>{euros(totalMarge)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Taux</div><div className="mt-1 font-mono text-lg font-semibold">{tauxGlobal.toFixed(1)} %</div></div></div>
     <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">La marge inclut désormais les factures fournisseurs rattachées au chantier. Les frais généraux non affectés restent hors marge chantier.</div>
-    <AnalyseRentabiliteIA chantiers={lignes.map((l) => ({ id: l.id, nom: l.nom }))} />
+    {peutUtiliserIA && <AnalyseRentabiliteIA chantiers={lignes.map((l) => ({ id: l.id, nom: l.nom }))} />}
     <div className="overflow-x-auto rounded-md border"><table className="w-full min-w-[1000px] text-sm"><thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500"><tr><th className="px-3 py-2">Chantier</th><th>Client</th><th className="text-right">Facturé HT</th><th className="text-right">Heures</th><th className="text-right">Coût MO</th><th className="text-right">Achats</th><th className="text-right">Sous-traitance</th><th className="text-right">Marge</th><th className="px-3 text-right">Taux</th></tr></thead><tbody>{lignes.map(ligne=><tr key={ligne.id} className="border-t"><td className="px-3 py-2"><Link href={`/chantiers/${ligne.id}`} className="font-medium hover:underline">{ligne.nom}</Link><div className="font-mono text-xs text-neutral-400">{ligne.reference_interne}</div></td><td>{ligne.clientNom}</td><td className="text-right">{euros(ligne.factureHt)}</td><td className="text-right">{ligne.heures} h</td><td className="text-right">{euros(ligne.coutMainOeuvre)}</td><td className="text-right">{euros(ligne.coutAchats)}</td><td className="text-right">{euros(ligne.coutSousTraitance)}</td><td className={`text-right font-medium ${ligne.marge>=0?"text-green-700":"text-red-700"}`}>{euros(ligne.marge)}</td><td className="px-3 text-right">{ligne.taux===null?"—":`${ligne.taux.toFixed(1)} %`}</td></tr>)}</tbody></table></div>
   </div></main>;
 }

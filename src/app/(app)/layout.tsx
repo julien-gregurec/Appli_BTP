@@ -1,7 +1,7 @@
 import { Sidebar } from "@/components/Sidebar";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
-import { permissionsUtilisateur } from "@/lib/permissions";
+import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { estPlateformeAdmin } from "@/lib/plateforme";
 import { ModuleAccessBoundary } from "@/components/ModuleAccessBoundary";
 import { MobileBack } from "@/components/MobileBack";
@@ -57,7 +57,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </div>
       <MobileBack />
       <AideButton />
-      <AssistantIA />
+      {aAccesIA(permissions) && <AssistantIA />}
     </div>
   );
 }

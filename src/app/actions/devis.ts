@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
-import { permissionsUtilisateur } from "@/lib/permissions";
+import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import type { LigneDevis } from "@/lib/devis";
 import { TRANSITIONS_DEVIS } from "@/lib/devis";
 import { genererLignesDevisIA } from "@/lib/ai/devis";
@@ -231,6 +231,7 @@ export async function dupliquerDevisAction(devisId: string) {
 export async function genererDevisIAAction(description: string) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
 
   const texte = description.trim();
   if (!texte) return { error: "Décris le chantier à chiffrer." };

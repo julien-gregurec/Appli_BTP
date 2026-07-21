@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { DevisEditor } from "@/components/DevisEditor";
 import { nomClient } from "@/lib/chantier-statuts";
 
@@ -12,6 +13,7 @@ export default async function NouveauDevisPage({
   const { client: clientPreselect, chantier: chantierPreselect } = await searchParams;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  const peutUtiliserIA = aAccesIA(await permissionsUtilisateur(ctx));
 
   const { data: clients } = await supabase
     .from("clients")
@@ -49,6 +51,7 @@ export default async function NouveauDevisPage({
           prestations={prestations ?? []}
           clientPreselect={clientPreselect}
           chantierPreselect={chantierPreselect}
+          peutUtiliserIA={peutUtiliserIA}
         />
       </div>
     </main>

@@ -2,12 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { DicteeCompteRendu } from "@/components/DicteeCompteRendu";
 
 export default async function ComptesRendusChantierPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  const peutUtiliserIA = aAccesIA(await permissionsUtilisateur(ctx));
 
   const [{ data: chantier }, { data: comptesRendus }] = await Promise.all([
     supabase.from("chantiers").select("id, nom").eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),
@@ -28,7 +30,7 @@ export default async function ComptesRendusChantierPage({ params }: { params: Pr
           <h1 className="mt-1 text-xl font-semibold">Comptes-rendus</h1>
         </div>
 
-        <DicteeCompteRendu chantierId={id} />
+        <DicteeCompteRendu chantierId={id} peutUtiliserIA={peutUtiliserIA} />
 
         <div className="space-y-3">
           {(comptesRendus ?? []).map((cr) => {

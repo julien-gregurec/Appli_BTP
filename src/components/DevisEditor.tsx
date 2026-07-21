@@ -43,6 +43,7 @@ export function DevisEditor({
   clientPreselect,
   chantierPreselect,
   devisInitial,
+  peutUtiliserIA = true,
 }: {
   clients: Option[];
   chantiers: { id: string; label: string; client_id: string }[];
@@ -50,6 +51,7 @@ export function DevisEditor({
   clientPreselect?: string;
   chantierPreselect?: string;
   devisInitial?: DevisInitial;
+  peutUtiliserIA?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -336,7 +338,7 @@ export function DevisEditor({
         </div>
       </div>
 
-      <div className="rounded-md border border-dashed border-liria-gold/50 bg-liria-gold/5 p-4">
+      {peutUtiliserIA && <div className="rounded-md border border-dashed border-liria-gold/50 bg-liria-gold/5 p-4">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium">✨ Assistant IA</span>
           <button type="button" onClick={() => { setAssistantIAOuvert((v) => !v); setErreurIA(null); }} className="text-sm text-neutral-600 hover:underline dark:text-neutral-400">
@@ -364,7 +366,7 @@ export function DevisEditor({
             <p className="text-xs text-neutral-500">Les lignes générées s’ajoutent à celles déjà présentes. Relis toujours les prix et quantités avant d’envoyer le devis.</p>
           </div>
         )}
-      </div>
+      </div>}
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">

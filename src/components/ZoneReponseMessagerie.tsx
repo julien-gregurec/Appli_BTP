@@ -6,9 +6,11 @@ import { suggererReponseIAAction } from "@/app/actions/messagerie";
 export function ZoneReponseMessagerie({
   conversationId,
   actionEnvoyer,
+  peutUtiliserIA = true,
 }: {
   conversationId: string;
   actionEnvoyer: (formData: FormData) => void;
+  peutUtiliserIA?: boolean;
 }) {
   const [contenu, setContenu] = useState("");
   const [pending, startTransition] = useTransition();
@@ -41,9 +43,11 @@ export function ZoneReponseMessagerie({
           className="min-w-0 flex-1 rounded border px-3 py-2 text-sm"
         />
         <div className="flex flex-col gap-2 self-end">
-          <button type="button" onClick={suggerer} disabled={pending} className="rounded border px-3 py-2 text-xs font-medium text-[#9a7625] disabled:opacity-50">
-            {pending ? "…" : "✨ Suggérer"}
-          </button>
+          {peutUtiliserIA && (
+            <button type="button" onClick={suggerer} disabled={pending} className="rounded border px-3 py-2 text-xs font-medium text-[#9a7625] disabled:opacity-50">
+              {pending ? "…" : "✨ Suggérer"}
+            </button>
+          )}
           <button className="rounded bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Envoyer</button>
         </div>
       </div>

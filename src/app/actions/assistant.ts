@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 
 // La conversation avec l'assistant passe par /api/assistant/chat (streaming SSE),
 // pas par une server action — voir src/app/api/assistant/chat/route.ts.
@@ -16,6 +17,7 @@ export async function creerAffectationDepuisPropositionAction(proposition: {
 }): Promise<{ error: string } | { ok: true }> {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
 
   const [{ data: employe }, { data: chantier }] = await Promise.all([
     supabase.from("employes").select("id").eq("id", proposition.employeId).eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif").maybeSingle(),

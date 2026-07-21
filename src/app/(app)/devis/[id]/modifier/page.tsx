@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { nomClient } from "@/lib/chantier-statuts";
 import { DevisEditor } from "@/components/DevisEditor";
 
@@ -9,6 +10,7 @@ export default async function ModifierDevisPage({ params }: { params: Promise<{ 
   const { id } = await params;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  const peutUtiliserIA = aAccesIA(await permissionsUtilisateur(ctx));
 
   const [{ data: devis }, { data: lignes }, { data: clients }, { data: chantiers }, { data: prestations }] = await Promise.all([
     supabase.from("devis").select("id, client_id, chantier_id, date_validite, remise_globale, notes_client, statut").eq("id", id).eq("entreprise_id", ctx.entrepriseId).single(),
@@ -38,6 +40,7 @@ export default async function ModifierDevisPage({ params }: { params: Promise<{ 
             notes_client: devis.notes_client,
             lignes: (lignes ?? []).map((ligne) => ({ ...ligne, quantite: Number(ligne.quantite), prix_unitaire_ht: Number(ligne.prix_unitaire_ht), remise_ligne: Number(ligne.remise_ligne), taux_tva: Number(ligne.taux_tva) })),
           }}
+          peutUtiliserIA={peutUtiliserIA}
         />
       </div>
     </main>

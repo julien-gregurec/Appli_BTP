@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { ajouterDocumentChantierAction, supprimerDocumentChantierAction } from "@/app/actions/documents";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { AnalyseDocumentIA } from "@/components/AnalyseDocumentIA";
@@ -19,6 +20,7 @@ export default async function DocumentsChantierPage({
   const messages = await searchParams;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  const peutUtiliserIA = aAccesIA(await permissionsUtilisateur(ctx));
   const [{ data: chantier }, { data: documents }] = await Promise.all([
     supabase.from("chantiers").select("id, nom, reference_interne")
       .eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),
@@ -99,7 +101,7 @@ export default async function DocumentsChantierPage({
                       <p className="mt-0.5 text-xs text-neutral-500">{libelleCategorie(document.categorie)} · {tailleLisible(Number(document.taille_octets))}</p><p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-[#9a7625]">{document.audience==="tous_affectes"?"Équipe affectée":document.audience==="encadrement"?"Encadrement":"Gestionnaires"}</p>
                     </div>
                     {document.note && <p className="line-clamp-2 text-sm text-neutral-600 dark:text-neutral-400">{document.note}</p>}
-                    {MIME_ANALYSABLES_IA.includes(document.mime_type) && <AnalyseDocumentIA documentId={document.id} />}
+                    {peutUtiliserIA && MIME_ANALYSABLES_IA.includes(document.mime_type) && <AnalyseDocumentIA documentId={document.id} />}
                     <div className="flex items-center justify-between border-t border-neutral-100 pt-3 text-sm dark:border-neutral-800">
                       <a href={`/api/documents/${document.id}?download=1`} className="font-medium hover:underline">Télécharger</a>
                       <form action={supprimer}>
