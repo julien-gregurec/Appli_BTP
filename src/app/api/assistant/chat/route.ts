@@ -1,0 +1,52 @@
+import { createClient } from "@/lib/supabase/server";
+import { getContexteEntreprise } from "@/lib/entreprise";
+import { demanderAssistantIAStream, type MessageChat } from "@/lib/ai/assistant";
+import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
+
+export async function POST(request: Request) {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+
+  const body = (await request.json().catch(() => null)) as { historique?: MessageChat[] } | null;
+  const historique = body?.historique;
+  const dernierMessage = historique?.at(-1);
+  if (!Array.isArray(historique) || !dernierMessage || dernierMessage.role !== "user" || !dernierMessage.contenu.trim()) {
+    return Response.json({ error: "Écris une question." }, { status: 400 });
+  }
+  if (historique.length > 30) {
+    return Response.json({ error: "Conversation trop longue, démarre une nouvelle discussion." }, { status: 400 });
+  }
+
+  const depassement = await verifierPlafondIA(supabase, ctx.entrepriseId);
+  if (depassement) {
+    return Response.json({ error: depassement }, { status: 429 });
+  }
+
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const envoyer = (evenement: unknown) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(evenement)}\n\n`));
+      try {
+        for await (const evenement of demanderAssistantIAStream(supabase, ctx.entrepriseId, ctx.entrepriseNom, historique)) {
+          envoyer(evenement);
+        }
+        envoyer({ type: "fin" });
+        journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "assistant_chat", statut: "succes" });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Erreur de l'assistant IA.";
+        envoyer({ type: "erreur", message });
+        journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "assistant_chat", statut: "erreur", messageErreur: message });
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+    },
+  });
+}

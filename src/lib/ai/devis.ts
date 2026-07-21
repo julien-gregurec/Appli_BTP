@@ -1,13 +1,13 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { obtenirProviderIA } from "@/lib/ai/provider";
 import { UNITES, TAUX_TVA, LIGNE_TYPES, type LigneDevis } from "@/lib/devis";
 import type { PrestationCatalogue } from "@/lib/prestations";
 
 const TYPES_CLES: readonly string[] = LIGNE_TYPES.map((t) => t.cle);
 
 const OUTIL_PROPOSER_LIGNES = {
-  name: "proposer_lignes_devis",
+  nom: "proposer_lignes_devis",
   description: "Propose les lignes structurées d'un devis BTP à partir d'une description en langage naturel.",
-  input_schema: {
+  parametres: {
     type: "object" as const,
     properties: {
       lignes: {
@@ -38,7 +38,7 @@ export async function genererLignesDevisIA(
   description: string,
   catalogue: PrestationCatalogue[],
 ): Promise<LigneDevis[]> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const provider = obtenirProviderIA();
 
   const catalogueTexte = catalogue.length
     ? catalogue
@@ -46,9 +46,7 @@ export async function genererLignesDevisIA(
         .join("\n")
     : "(catalogue vide)";
 
-  const message = await client.messages.create({
-    model: "claude-sonnet-5",
-    max_tokens: 4096,
+  const { appelsOutils } = await provider.completer({
     system:
       "Tu es un assistant de chiffrage pour une entreprise du BTP en France. " +
       "À partir de la description d'un chantier, tu proposes une liste de lignes de devis réalistes et détaillées " +
@@ -57,22 +55,23 @@ export async function genererLignesDevisIA(
       "Pour les prestations absentes du catalogue, estime un prix HT réaliste au tarif du marché français du bâtiment. " +
       "Utilise des quantités et unités cohérentes avec la description. Taux de TVA : 20% par défaut (construction neuve), " +
       "10% pour rénovation d'un logement de plus de 2 ans, 5,5% pour travaux d'amélioration énergétique si le client le précise explicitement.",
-    tools: [OUTIL_PROPOSER_LIGNES],
-    tool_choice: { type: "tool", name: "proposer_lignes_devis" },
-    messages: [
+    outils: [OUTIL_PROPOSER_LIGNES],
+    forcerOutil: OUTIL_PROPOSER_LIGNES.nom,
+    historique: [
       {
         role: "user",
-        content: `Catalogue de prestations existant :\n${catalogueTexte}\n\nDescription du chantier à chiffrer :\n${description}`,
+        contenu: `Catalogue de prestations existant :\n${catalogueTexte}\n\nDescription du chantier à chiffrer :\n${description}`,
       },
     ],
+    maxTokens: 4096,
   });
 
-  const toolUse = message.content.find((bloc) => bloc.type === "tool_use");
-  if (!toolUse || toolUse.type !== "tool_use") {
+  const appel = appelsOutils.find((a) => a.nom === OUTIL_PROPOSER_LIGNES.nom);
+  if (!appel) {
     throw new Error("L'IA n'a pas retourné de lignes de devis exploitables.");
   }
 
-  const input = toolUse.input as { lignes: Array<Partial<LigneDevis>> };
+  const input = appel.entree as { lignes: Array<Partial<LigneDevis>> };
   if (!Array.isArray(input.lignes) || input.lignes.length === 0) {
     throw new Error("L'IA n'a proposé aucune ligne. Précise davantage la description du chantier.");
   }

@@ -12,7 +12,7 @@ export function BriefingMatin({ prenom, lignes }: { prenom: string | null; ligne
   return (
     <section className="rounded-xl border-2 border-liria-navy/20 bg-liria-navy p-5 text-white">
       <h1 className="text-lg font-semibold">Bonjour{prenom ? ` ${prenom}` : ""} 👋</h1>
-      <p className="mt-0.5 text-sm text-white/70">Aujourd'hui :</p>
+      <p className="mt-0.5 text-sm text-white/70">Aujourd&apos;hui :</p>
       <ul className="mt-3 space-y-1.5 text-sm">
         {lignes.map((ligne, i) => (
           <li key={i} className="flex items-start gap-2">

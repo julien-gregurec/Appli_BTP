@@ -8,6 +8,7 @@ import { permissionsUtilisateur } from "@/lib/permissions";
 import type { LigneDevis } from "@/lib/devis";
 import { TRANSITIONS_DEVIS } from "@/lib/devis";
 import { genererLignesDevisIA } from "@/lib/ai/devis";
+import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
 
 type DevisPayload = {
   client_id: string;
@@ -243,10 +244,16 @@ export async function genererDevisIAAction(description: string) {
     .order("designation")
     .limit(200);
 
+  const depassement = await verifierPlafondIA(supabase, ctx.entrepriseId);
+  if (depassement) return { error: depassement };
+
   try {
     const lignes = await genererLignesDevisIA(texte, prestations ?? []);
+    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "devis", statut: "succes" });
     return { lignes };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Erreur lors de la génération IA du devis." };
+    const message = err instanceof Error ? err.message : "Erreur lors de la génération IA du devis.";
+    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "devis", statut: "erreur", messageErreur: message });
+    return { error: message };
   }
 }

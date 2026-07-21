@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { suggererReponse, type MessageThread } from "@/lib/ai/messagerie";
+import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
 
 function retour(type: "error" | "success", message: string, conversationId?: string): never {
   const query = new URLSearchParams({ [type]: message });
@@ -124,10 +125,16 @@ export async function suggererReponseIAAction(conversationId: string): Promise<{
 
   if (fil.at(-1)?.propre) return { error: "Le dernier message est déjà le vôtre." };
 
+  const depassement = await verifierPlafondIA(supabase, ctx.entrepriseId);
+  if (depassement) return { error: depassement };
+
   try {
     const brouillon = await suggererReponse(fil);
+    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "messagerie", statut: "succes" });
     return { brouillon };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Erreur lors de la suggestion IA." };
+    const message = err instanceof Error ? err.message : "Erreur lors de la suggestion IA.";
+    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "messagerie", statut: "erreur", messageErreur: message });
+    return { error: message };
   }
 }

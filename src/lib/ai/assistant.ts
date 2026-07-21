@@ -1,5 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { obtenirProviderIA, type MessageIA, type ReponseCompletion } from "@/lib/ai/provider";
 import { OUTILS_COPILOTE, executerOutilCopilote } from "@/lib/ai/copilote";
 
 export type MessageChat = { role: "user" | "assistant"; contenu: string };
@@ -14,10 +14,9 @@ export type PropositionAffectation = {
   tache: string | null;
 };
 
-export type ReponseAssistant = {
-  texte: string;
-  proposition?: PropositionAffectation;
-};
+export type EvenementAssistant =
+  | { type: "texte"; delta: string }
+  | { type: "proposition"; proposition: PropositionAffectation };
 
 const MAX_TOURS_OUTILS = 5;
 
@@ -49,13 +48,18 @@ async function resoudrePropositionAffectation(
   };
 }
 
-export async function demanderAssistantIA(
+/**
+ * Boucle agentique streamée : émet les morceaux de texte au fil de l'eau, exécute les
+ * outils de lecture, et s'arrête dès que l'IA appelle `proposer_affectation` (jamais
+ * d'écriture en base directe — la proposition est renvoyée pour validation manuelle).
+ */
+export async function* demanderAssistantIAStream(
   supabase: SupabaseClient,
   entrepriseId: string,
   entrepriseNom: string,
   historique: MessageChat[],
-): Promise<ReponseAssistant> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+): AsyncGenerator<EvenementAssistant, void, unknown> {
+  const provider = obtenirProviderIA();
   const aujourdhui = new Intl.DateTimeFormat("fr-FR", { dateStyle: "full", timeZone: "Europe/Paris" }).format(new Date());
 
   const system =
@@ -67,41 +71,44 @@ export async function demanderAssistantIA(
     `tu ne crées jamais d'affectation toi-même, tu ne fais que la proposer ; l'utilisateur valide ou non. ` +
     `Formate tes réponses avec des tirets courts, pas de tableaux markdown, pas de titres.`;
 
-  const messages: Anthropic.MessageParam[] = historique.map((m) => ({ role: m.role, content: m.contenu }));
+  const conversation: MessageIA[] = historique.map((m) => ({ role: m.role, contenu: m.contenu }));
 
   for (let tour = 0; tour < MAX_TOURS_OUTILS; tour++) {
-    const reponse = await client.messages.create({
-      model: "claude-sonnet-5",
-      max_tokens: 1500,
-      system,
-      tools: OUTILS_COPILOTE,
-      messages,
-    });
-
-    const appelsOutils = reponse.content.filter((b) => b.type === "tool_use");
-    const texteReponse = reponse.content.find((b) => b.type === "text");
-    const texte = texteReponse && texteReponse.type === "text" ? texteReponse.text : "";
-
-    const appelProposition = appelsOutils.find((a) => a.name === "proposer_affectation");
-    if (appelProposition) {
-      const proposition = await resoudrePropositionAffectation(supabase, entrepriseId, appelProposition.input as Record<string, unknown>);
-      const commentaire = typeof (appelProposition.input as Record<string, unknown>).commentaire === "string" ? ((appelProposition.input as Record<string, unknown>).commentaire as string) : texte;
-      if (proposition) return { texte: commentaire || "Voici ce que je te propose :", proposition };
-      return { texte: "Je n'ai pas pu identifier précisément l'employé ou le chantier, peux-tu préciser ?" };
+    const flux = provider.streamer({ system, historique: conversation, outils: OUTILS_COPILOTE, maxTokens: 1500 });
+    let texteTour = "";
+    let resultat: ReponseCompletion = { texte: "", appelsOutils: [] };
+    while (true) {
+      const { value, done } = await flux.next();
+      if (done) {
+        resultat = value;
+        break;
+      }
+      if (value.type === "texte") {
+        texteTour += value.delta;
+        yield { type: "texte", delta: value.delta };
+      }
     }
 
-    if (appelsOutils.length === 0) {
-      return { texte: texte || "Je n'ai pas de réponse à te proposer." };
+    if (resultat.appelsOutils.length === 0) return;
+
+    const appelFinal = resultat.appelsOutils.find((a) => a.nom === "proposer_affectation");
+    if (appelFinal) {
+      const proposition = await resoudrePropositionAffectation(supabase, entrepriseId, appelFinal.entree);
+      if (proposition) {
+        yield { type: "proposition", proposition };
+      } else {
+        const message = "\n\nJe n'ai pas pu identifier précisément l'employé ou le chantier, peux-tu préciser ?";
+        yield { type: "texte", delta: message };
+      }
+      return;
     }
 
-    messages.push({ role: "assistant", content: reponse.content });
-    const resultats: Anthropic.ToolResultBlockParam[] = [];
-    for (const appel of appelsOutils) {
-      const resultat = await executerOutilCopilote(supabase, entrepriseId, appel.name, appel.input as Record<string, unknown>);
-      resultats.push({ type: "tool_result", tool_use_id: appel.id, content: JSON.stringify(resultat) });
+    conversation.push({ role: "assistant", contenu: texteTour, appelsOutils: resultat.appelsOutils });
+    for (const appel of resultat.appelsOutils) {
+      const resultatOutil = await executerOutilCopilote(supabase, entrepriseId, appel.nom, appel.entree);
+      conversation.push({ role: "outil", appelId: appel.id, resultat: JSON.stringify(resultatOutil) });
     }
-    messages.push({ role: "user", content: resultats });
   }
 
-  return { texte: "Je n'arrive pas à te répondre pour l'instant : reformule ta question plus précisément." };
+  yield { type: "texte", delta: "\n\nJe n'arrive pas à te répondre pour l'instant : reformule ta question plus précisément." };
 }

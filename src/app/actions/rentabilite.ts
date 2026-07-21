@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { analyserRentabilite } from "@/lib/ai/rentabilite";
+import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
 
 type PointageRentabilite = { heures_normales: number; heures_supplementaires: number; employe: { cout_horaire: number | null } | { cout_horaire: number | null }[] | null };
 const un = <T,>(valeur: T | T[] | null): T | null => (Array.isArray(valeur) ? (valeur[0] ?? null) : valeur);
@@ -40,6 +41,9 @@ export async function analyserRentabiliteIAAction(chantierId: string): Promise<{
   const marge = factureHt - coutMainOeuvre - coutAchats - coutSousTraitance;
   const taux = factureHt > 0 ? (marge / factureHt) * 100 : null;
 
+  const depassement = await verifierPlafondIA(supabase, ctx.entrepriseId);
+  if (depassement) return { error: depassement };
+
   try {
     const analyse = await analyserRentabilite({
       chantierNom: chantier.nom,
@@ -52,8 +56,11 @@ export async function analyserRentabiliteIAAction(chantierId: string): Promise<{
       marge,
       taux,
     });
+    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "rentabilite", statut: "succes" });
     return { analyse };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Erreur lors de l'analyse IA." };
+    const message = err instanceof Error ? err.message : "Erreur lors de l'analyse IA.";
+    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "rentabilite", statut: "erreur", messageErreur: message });
+    return { error: message };
   }
 }

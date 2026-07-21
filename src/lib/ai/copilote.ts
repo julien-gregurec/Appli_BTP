@@ -1,5 +1,5 @@
-import type Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { OutilIA } from "@/lib/ai/provider";
 
 type Supabase = SupabaseClient;
 
@@ -149,73 +149,73 @@ async function verifierDisponibiliteEmploye(supabase: Supabase, entrepriseId: st
   };
 }
 
-export const OUTILS_COPILOTE: Anthropic.Tool[] = [
+export const OUTILS_COPILOTE: OutilIA[] = [
   {
-    name: "rechercher",
+    nom: "rechercher",
     description: "Recherche un client, chantier, devis ou facture par nom/numéro approximatif.",
-    input_schema: {
+    parametres: {
       type: "object",
       properties: { terme: { type: "string", description: "Nom, société ou numéro à rechercher" } },
       required: ["terme"],
     },
   },
   {
-    name: "chantiers_en_retard",
+    nom: "chantiers_en_retard",
     description: "Liste les chantiers actifs dont la date de fin prévue est dépassée.",
-    input_schema: { type: "object", properties: {} },
+    parametres: { type: "object", properties: {} },
   },
   {
-    name: "absences_du_jour",
+    nom: "absences_du_jour",
     description: "Liste les employés en congé approuvé aujourd'hui.",
-    input_schema: { type: "object", properties: {} },
+    parametres: { type: "object", properties: {} },
   },
   {
-    name: "factures_impayees",
+    nom: "factures_impayees",
     description: "Liste les factures envoyées ou en retard de paiement.",
-    input_schema: { type: "object", properties: {} },
+    parametres: { type: "object", properties: {} },
   },
   {
-    name: "devis_en_attente",
+    nom: "devis_en_attente",
     description: "Liste les devis envoyés depuis plus de 7 jours sans réponse du client.",
-    input_schema: { type: "object", properties: {} },
+    parametres: { type: "object", properties: {} },
   },
   {
-    name: "stock_faible",
+    nom: "stock_faible",
     description: "Liste les articles de stock dont la quantité est sous le seuil d'alerte.",
-    input_schema: { type: "object", properties: {} },
+    parametres: { type: "object", properties: {} },
   },
   {
-    name: "vehicules_entretien",
+    nom: "vehicules_entretien",
     description: "Liste les véhicules dont le contrôle technique, l'assurance ou l'entretien arrive à échéance sous 30 jours.",
-    input_schema: { type: "object", properties: {} },
+    parametres: { type: "object", properties: {} },
   },
   {
-    name: "heures_supplementaires_semaine",
+    nom: "heures_supplementaires_semaine",
     description: "Liste les employés ayant fait des heures supplémentaires cette semaine, du plus au moins.",
-    input_schema: { type: "object", properties: {} },
+    parametres: { type: "object", properties: {} },
   },
   {
-    name: "chercher_employe",
+    nom: "chercher_employe",
     description: "Recherche un employé actif par nom ou prénom approximatif, pour obtenir son identifiant.",
-    input_schema: {
+    parametres: {
       type: "object",
       properties: { terme: { type: "string" } },
       required: ["terme"],
     },
   },
   {
-    name: "chercher_chantier_planning",
+    nom: "chercher_chantier_planning",
     description: "Recherche un chantier par nom approximatif, pour obtenir son identifiant.",
-    input_schema: {
+    parametres: {
       type: "object",
       properties: { terme: { type: "string" } },
       required: ["terme"],
     },
   },
   {
-    name: "verifier_disponibilite_employe",
+    nom: "verifier_disponibilite_employe",
     description: "Vérifie si un employé est déjà affecté, en congé, et liste ses habilitations, pour une date donnée (AAAA-MM-JJ). À utiliser avant toute proposition d'affectation.",
-    input_schema: {
+    parametres: {
       type: "object",
       properties: {
         employe_id: { type: "string" },
@@ -225,12 +225,12 @@ export const OUTILS_COPILOTE: Anthropic.Tool[] = [
     },
   },
   {
-    name: "proposer_affectation",
+    nom: "proposer_affectation",
     description:
       "Termine la conversation en proposant à l'utilisateur une affectation précise, pour validation manuelle. " +
       "N'écrit rien en base : c'est une proposition seulement. À utiliser uniquement après avoir identifié l'employé et le chantier " +
       "(via chercher_employe / chercher_chantier_planning) et vérifié la disponibilité (verifier_disponibilite_employe).",
-    input_schema: {
+    parametres: {
       type: "object",
       properties: {
         employe_id: { type: "string" },

@@ -4,18 +4,26 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { structurerCompteRendu } from "@/lib/ai/compteRendu";
+import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
 
 export async function structurerCompteRenduIAAction(transcription: string) {
-  await getContexteEntreprise();
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
   const texte = transcription.trim();
   if (!texte) return { error: "Rien à structurer : dicte ou écris d'abord un texte." };
   if (texte.length > 8000) return { error: "Texte trop long (8000 caractères max)." };
 
+  const depassement = await verifierPlafondIA(supabase, ctx.entrepriseId);
+  if (depassement) return { error: depassement };
+
   try {
     const { titre, contenu } = await structurerCompteRendu(texte);
+    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "compte_rendu", statut: "succes" });
     return { titre, contenu };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Erreur lors de la structuration IA." };
+    const message = err instanceof Error ? err.message : "Erreur lors de la structuration IA.";
+    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "compte_rendu", statut: "erreur", messageErreur: message });
+    return { error: message };
   }
 }
 

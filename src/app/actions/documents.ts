@@ -11,6 +11,7 @@ import {
   nomFichierSecurise,
 } from "@/lib/documents";
 import { analyserDocumentIA, MIME_ANALYSABLES_IA } from "@/lib/ai/documents";
+import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
 
 const BUCKET = "chantier-documents";
 
@@ -108,11 +109,17 @@ export async function analyserDocumentIAAction(documentId: string) {
     .download(document.storage_path);
   if (telechargementError || !fichier) return { error: "Impossible de récupérer le fichier." };
 
+  const depassement = await verifierPlafondIA(supabase, ctx.entrepriseId);
+  if (depassement) return { error: depassement };
+
   try {
     const octets = Buffer.from(await fichier.arrayBuffer());
     const analyse = await analyserDocumentIA(octets, document.mime_type);
+    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "documents", statut: "succes" });
     return { analyse };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Erreur lors de l'analyse IA." };
+    const message = err instanceof Error ? err.message : "Erreur lors de l'analyse IA.";
+    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "documents", statut: "erreur", messageErreur: message });
+    return { error: message };
   }
 }

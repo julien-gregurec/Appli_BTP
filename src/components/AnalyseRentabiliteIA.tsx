@@ -26,7 +26,7 @@ export function AnalyseRentabiliteIA({ chantiers }: { chantiers: { id: string; n
   return (
     <div className="space-y-2 rounded-md border-2 border-liria-gold/60 bg-liria-gold/5 p-4">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-semibold">✨ Analyse IA d'un chantier</span>
+        <span className="text-sm font-semibold">✨ Analyse IA d&apos;un chantier</span>
         <select
           value={chantierId}
           onChange={(e) => { setChantierId(e.target.value); setAnalyse(null); setErreur(null); }}

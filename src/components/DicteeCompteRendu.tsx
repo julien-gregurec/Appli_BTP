@@ -17,11 +17,22 @@ type ReconnaissanceVocale = {
 
 const input = "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
+type FenetreAvecReco = Window & {
+  SpeechRecognition?: new () => ReconnaissanceVocale;
+  webkitSpeechRecognition?: new () => ReconnaissanceVocale;
+};
+
+function ctorReconnaissance(): (new () => ReconnaissanceVocale) | undefined {
+  if (typeof window === "undefined") return undefined;
+  const fenetre = window as FenetreAvecReco;
+  return fenetre.SpeechRecognition ?? fenetre.webkitSpeechRecognition;
+}
+
 export function DicteeCompteRendu({ chantierId }: { chantierId: string }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [ecoute, setEcoute] = useState(false);
-  const [supporte, setSupporte] = useState(true);
+  const [supporte] = useState(() => !!ctorReconnaissance());
   const [transcription, setTranscription] = useState("");
   const [titre, setTitre] = useState("");
   const [contenu, setContenu] = useState("");
@@ -29,16 +40,8 @@ export function DicteeCompteRendu({ chantierId }: { chantierId: string }) {
   const reconnaissanceRef = useRef<ReconnaissanceVocale | null>(null);
 
   useEffect(() => {
-    type FenetreAvecReco = Window & {
-      SpeechRecognition?: new () => ReconnaissanceVocale;
-      webkitSpeechRecognition?: new () => ReconnaissanceVocale;
-    };
-    const fenetre = window as FenetreAvecReco;
-    const Ctor = fenetre.SpeechRecognition ?? fenetre.webkitSpeechRecognition;
-    if (!Ctor) {
-      setSupporte(false);
-      return;
-    }
+    const Ctor = ctorReconnaissance();
+    if (!Ctor) return;
     const reco = new Ctor();
     reco.lang = "fr-FR";
     reco.continuous = true;

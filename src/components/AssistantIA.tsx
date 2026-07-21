@@ -1,10 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { demanderAssistantIAAction, creerAffectationDepuisPropositionAction } from "@/app/actions/assistant";
+import { creerAffectationDepuisPropositionAction } from "@/app/actions/assistant";
 import type { MessageChat, PropositionAffectation } from "@/lib/ai/assistant";
 
 type MessageAffiche = MessageChat & { proposition?: PropositionAffectation; propositionStatut?: "en_attente" | "creee" | "refusee" };
+type EvenementSSE =
+  | { type: "texte"; delta: string }
+  | { type: "proposition"; proposition: PropositionAffectation }
+  | { type: "fin" }
+  | { type: "erreur"; message: string };
 
 type ReconnaissanceVocale = {
   lang: string;
@@ -17,6 +22,17 @@ type ReconnaissanceVocale = {
   onend: (() => void) | null;
 };
 
+type FenetreAvecReco = Window & {
+  SpeechRecognition?: new () => ReconnaissanceVocale;
+  webkitSpeechRecognition?: new () => ReconnaissanceVocale;
+};
+
+function ctorReconnaissance(): (new () => ReconnaissanceVocale) | undefined {
+  if (typeof window === "undefined") return undefined;
+  const fenetre = window as FenetreAvecReco;
+  return fenetre.SpeechRecognition ?? fenetre.webkitSpeechRecognition;
+}
+
 export function AssistantIA() {
   const [ouvert, setOuvert] = useState(false);
   const [messages, setMessages] = useState<MessageAffiche[]>([]);
@@ -24,7 +40,7 @@ export function AssistantIA() {
   const [erreur, setErreur] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [ecoute, setEcoute] = useState(false);
-  const [micSupporte, setMicSupporte] = useState(true);
+  const [micSupporte] = useState(() => !!ctorReconnaissance());
   const [voixActive, setVoixActive] = useState(true);
   const finRef = useRef<HTMLDivElement>(null);
   const reconnaissanceRef = useRef<ReconnaissanceVocale | null>(null);
@@ -44,45 +60,69 @@ export function AssistantIA() {
     const question = (texte ?? saisie).trim();
     if (!question) return;
     setErreur(null);
-    const historique = [...messages, { role: "user" as const, contenu: question }];
-    setMessages(historique);
+    const historiqueEnvoye = [...messages, { role: "user" as const, contenu: question }];
+    setMessages([...historiqueEnvoye, { role: "assistant", contenu: "" }]);
     setSaisie("");
+
     startTransition(async () => {
-      const res = await demanderAssistantIAAction(historique.map((m) => ({ role: m.role, contenu: m.contenu })));
-      if ("error" in res) {
-        setErreur(res.error);
-        return;
+      let texteAccumule = "";
+      try {
+        const res = await fetch("/api/assistant/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ historique: historiqueEnvoye.map((m) => ({ role: m.role, contenu: m.contenu })) }),
+        });
+        if (!res.ok || !res.body) {
+          const data = await res.json().catch(() => null);
+          setErreur(data?.error ?? "Erreur de l'assistant IA.");
+          setMessages((prev) => prev.slice(0, -1));
+          return;
+        }
+
+        const lecteur = res.body.getReader();
+        const decodeur = new TextDecoder();
+        let tampon = "";
+        while (true) {
+          const { value, done } = await lecteur.read();
+          if (done) break;
+          tampon += decodeur.decode(value, { stream: true });
+          const morceaux = tampon.split("\n\n");
+          tampon = morceaux.pop() ?? "";
+          for (const morceau of morceaux) {
+            const ligne = morceau.trim();
+            if (!ligne.startsWith("data:")) continue;
+            const evenement = JSON.parse(ligne.slice(5).trim()) as EvenementSSE;
+            if (evenement.type === "texte") {
+              texteAccumule += evenement.delta;
+              const texteFinal = texteAccumule;
+              setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, contenu: texteFinal } : m)));
+            } else if (evenement.type === "proposition") {
+              setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, proposition: evenement.proposition, propositionStatut: "en_attente" } : m)));
+            } else if (evenement.type === "erreur") {
+              setErreur(evenement.message);
+            }
+          }
+        }
+      } catch {
+        setErreur("Erreur de connexion à l'assistant.");
       }
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          contenu: res.texte ?? "",
-          proposition: res.proposition,
-          propositionStatut: res.proposition ? "en_attente" : undefined,
-        },
-      ]);
-      if (voixActive && res.texte && "speechSynthesis" in window) {
+
+      if (voixActive && texteAccumule && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
-        const parole = new SpeechSynthesisUtterance(res.texte);
+        const parole = new SpeechSynthesisUtterance(texteAccumule);
         parole.lang = "fr-FR";
         window.speechSynthesis.speak(parole);
       }
     });
   }
-  envoyerRef.current = envoyer;
 
   useEffect(() => {
-    type FenetreAvecReco = Window & {
-      SpeechRecognition?: new () => ReconnaissanceVocale;
-      webkitSpeechRecognition?: new () => ReconnaissanceVocale;
-    };
-    const fenetre = window as FenetreAvecReco;
-    const Ctor = fenetre.SpeechRecognition ?? fenetre.webkitSpeechRecognition;
-    if (!Ctor) {
-      setMicSupporte(false);
-      return;
-    }
+    envoyerRef.current = envoyer;
+  });
+
+  useEffect(() => {
+    const Ctor = ctorReconnaissance();
+    if (!Ctor) return;
     const reco = new Ctor();
     reco.lang = "fr-FR";
     reco.continuous = false;
@@ -160,8 +200,8 @@ export function AssistantIA() {
           <div className="flex-1 space-y-3 overflow-y-auto p-4">
             {messages.length === 0 && (
               <p className="text-sm text-neutral-500">
-                Pose une question sur ton activité (à l'écrit ou au micro 🎙️) : « quels chantiers sont en retard ? »,
-                « qui est absent aujourd'hui ? », « programme Julien sur le chantier Dupont demain »…
+                Pose une question sur ton activité (à l&apos;écrit ou au micro 🎙️) : « quels chantiers sont en retard ? »,
+                « qui est absent aujourd&apos;hui ? », « programme Julien sur le chantier Dupont demain »…
               </p>
             )}
             {messages.map((m, i) => (
@@ -174,7 +214,7 @@ export function AssistantIA() {
                       : "bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100")
                   }
                 >
-                  {m.contenu}
+                  {m.contenu || (m.role === "assistant" && i === messages.length - 1 && pending ? "…" : "")}
                 </span>
                 {m.proposition && (
                   <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-liria-gold/60 bg-liria-gold/10 p-3 text-left text-sm">
@@ -196,8 +236,7 @@ export function AssistantIA() {
                 )}
               </div>
             ))}
-            {pending && <p className="text-sm text-neutral-400">…</p>}
-            {ecoute && <p className="text-sm text-liria-navy dark:text-liria-gold">🎙️ Je t'écoute…</p>}
+            {ecoute && <p className="text-sm text-liria-navy dark:text-liria-gold">🎙️ Je t&apos;écoute…</p>}
             {erreur && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erreur}</p>}
             <div ref={finRef} />
           </div>

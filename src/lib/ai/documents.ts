@@ -1,7 +1,6 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { obtenirProviderIA } from "@/lib/ai/provider";
 
 const TYPES_IMAGE_SUPPORTES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
-type TypeImageSupporte = (typeof TYPES_IMAGE_SUPPORTES)[number];
 
 export const MIME_ANALYSABLES_IA: readonly string[] = [...TYPES_IMAGE_SUPPORTES, "application/pdf"];
 
@@ -19,32 +18,19 @@ const PROMPT_DOCUMENT =
   "Réponds en français, va à l'essentiel, pas de titre.";
 
 export async function analyserDocumentIA(donnees: Buffer, mimeType: string): Promise<string> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const base64 = donnees.toString("base64");
-
   const estImage = (TYPES_IMAGE_SUPPORTES as readonly string[]).includes(mimeType);
   const estPdf = mimeType === "application/pdf";
   if (!estImage && !estPdf) {
     throw new Error("Ce format de fichier n'est pas pris en charge par l'analyse IA (images JPEG/PNG/WebP ou PDF uniquement).");
   }
 
-  const message = await client.messages.create({
-    model: "claude-sonnet-5",
-    max_tokens: 1000,
-    messages: [
-      {
-        role: "user",
-        content: [
-          estImage
-            ? { type: "image", source: { type: "base64", media_type: mimeType as TypeImageSupporte, data: base64 } }
-            : { type: "document", source: { type: "base64", media_type: "application/pdf", data: base64 } },
-          { type: "text", text: estImage ? PROMPT_PHOTO : PROMPT_DOCUMENT },
-        ],
-      },
-    ],
+  const provider = obtenirProviderIA();
+  const texte = await provider.completerAvecFichier({
+    texte: estImage ? PROMPT_PHOTO : PROMPT_DOCUMENT,
+    fichier: { base64: donnees.toString("base64"), mimeType },
+    maxTokens: 1000,
   });
 
-  const texte = message.content.find((b) => b.type === "text");
-  if (!texte || texte.type !== "text") throw new Error("L'IA n'a pas retourné d'analyse exploitable.");
-  return texte.text;
+  if (!texte.trim()) throw new Error("L'IA n'a pas retourné d'analyse exploitable.");
+  return texte;
 }
