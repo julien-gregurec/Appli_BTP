@@ -7,6 +7,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import type { LigneDevis } from "@/lib/devis";
 import { TRANSITIONS_DEVIS } from "@/lib/devis";
+import { genererLignesDevisIA } from "@/lib/ai/devis";
 
 type DevisPayload = {
   client_id: string;
@@ -224,4 +225,28 @@ export async function dupliquerDevisAction(devisId: string) {
 
   revalidatePath("/devis");
   redirect(`/devis/${data}/modifier`);
+}
+
+export async function genererDevisIAAction(description: string) {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+
+  const texte = description.trim();
+  if (!texte) return { error: "Décris le chantier à chiffrer." };
+  if (texte.length > 4000) return { error: "Description trop longue (4000 caractères max)." };
+
+  const { data: prestations } = await supabase
+    .from("prestations_catalogue")
+    .select("id, designation, description, type, unite, prix_unitaire_ht, taux_tva")
+    .eq("entreprise_id", ctx.entrepriseId)
+    .eq("actif", true)
+    .order("designation")
+    .limit(200);
+
+  try {
+    const lignes = await genererLignesDevisIA(texte, prestations ?? []);
+    return { lignes };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Erreur lors de la génération IA du devis." };
+  }
 }

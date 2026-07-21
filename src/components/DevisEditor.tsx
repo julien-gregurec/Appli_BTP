@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { LIGNE_TYPES, UNITES, TAUX_TVA, euros, calcTotaux, type LigneDevis } from "@/lib/devis";
 import { prestationVersLigne, type PrestationCatalogue } from "@/lib/prestations";
-import { creerDevisAction, modifierDevisAction } from "@/app/actions/devis";
+import { creerDevisAction, modifierDevisAction, genererDevisIAAction } from "@/app/actions/devis";
 import { creerPrestationDepuisLigneAction } from "@/app/actions/prestations";
 import { creerClientRapideAction } from "@/app/actions/clients";
 import { creerChantierRapideAction } from "@/app/actions/chantiers";
@@ -72,6 +72,9 @@ export function DevisEditor({
   const [lignes, setLignes] = useState<LigneDevis[]>(devisInitial?.lignes.length ? devisInitial.lignes : [ligneVide()]);
   const [prestations, setPrestations] = useState(prestationsInitiales);
   const [messageCatalogue, setMessageCatalogue] = useState<string | null>(null);
+  const [assistantIAOuvert, setAssistantIAOuvert] = useState(false);
+  const [descriptionIA, setDescriptionIA] = useState("");
+  const [erreurIA, setErreurIA] = useState<string | null>(null);
 
   const chantiersFiltres = chantiersListe
     .filter((c) => c.client_id === clientId)
@@ -130,6 +133,26 @@ export function DevisEditor({
       prestationVersLigne(prestation),
     ]);
     setMessageCatalogue(null);
+  }
+
+  function genererAvecIA() {
+    setErreurIA(null);
+    if (!descriptionIA.trim()) {
+      setErreurIA("Décris le chantier à chiffrer.");
+      return;
+    }
+    startTransition(async () => {
+      const res = await genererDevisIAAction(descriptionIA);
+      if ("error" in res && res.error) {
+        setErreurIA(res.error);
+        return;
+      }
+      if (res.lignes) {
+        setLignes((prev) => [...prev.filter((l) => l.designation.trim() !== ""), ...res.lignes!]);
+        setDescriptionIA("");
+        setAssistantIAOuvert(false);
+      }
+    });
   }
 
   function enregistrerPrestation(i: number) {
@@ -311,6 +334,36 @@ export function DevisEditor({
           <label className={label}>Remise globale (%)</label>
           <input type="number" min={0} max={100} step={0.5} value={remiseGlobale} onChange={(e) => setRemiseGlobale(Number(e.target.value))} className={input + " w-full"} />
         </div>
+      </div>
+
+      <div className="rounded-md border border-dashed border-liria-gold/50 bg-liria-gold/5 p-4">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium">✨ Assistant IA</span>
+          <button type="button" onClick={() => { setAssistantIAOuvert((v) => !v); setErreurIA(null); }} className="text-sm text-neutral-600 hover:underline dark:text-neutral-400">
+            {assistantIAOuvert ? "Fermer" : "Décrire le chantier"}
+          </button>
+        </div>
+        {assistantIAOuvert && (
+          <div className="mt-3 space-y-2">
+            {erreurIA && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erreurIA}</p>}
+            <textarea
+              rows={3}
+              placeholder="Ex : Rénovation d'une salle de bain de 6 m², dépose de l'ancien carrelage, pose de faïence murale, remplacement de la baignoire par une douche à l'italienne, peinture du plafond."
+              value={descriptionIA}
+              onChange={(e) => setDescriptionIA(e.target.value)}
+              className={input + " w-full"}
+            />
+            <button
+              type="button"
+              onClick={genererAvecIA}
+              disabled={pending || !descriptionIA.trim()}
+              className="rounded-md bg-liria-navy px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {pending ? "Génération…" : "Générer les lignes"}
+            </button>
+            <p className="text-xs text-neutral-500">Les lignes générées s’ajoutent à celles déjà présentes. Relis toujours les prix et quantités avant d’envoyer le devis.</p>
+          </div>
+        )}
       </div>
 
       <div className="space-y-2">

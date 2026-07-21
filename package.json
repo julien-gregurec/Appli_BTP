@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.112.4",
     "@excel.js/exceljs": "^0.9.0",
     "@sentry/nextjs": "^10.66.0",
     "@supabase/ssr": "^0.12.0",
