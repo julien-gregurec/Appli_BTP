@@ -1,13 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { creerAffectationDepuisPropositionAction, creerDemandeCongeDepuisPropositionAction } from "@/app/actions/assistant";
-import type { MessageChat, PropositionAffectation, PropositionConge } from "@/lib/ai/assistant";
+import {
+  creerAffectationDepuisPropositionAction,
+  creerDemandeCongeDepuisPropositionAction,
+  envoyerMessageInterneDepuisPropositionAction,
+  envoyerMessageSupportDepuisPropositionAction,
+} from "@/app/actions/assistant";
+import type { MessageChat, PropositionAffectation, PropositionConge, PropositionMessageInterne, PropositionMessageSupport } from "@/lib/ai/assistant";
 import { lienMaps } from "@/lib/maps";
 
 type MessageAffiche = MessageChat & {
   proposition?: PropositionAffectation;
   propositionConge?: PropositionConge;
+  propositionMessageInterne?: PropositionMessageInterne;
+  propositionMessageSupport?: PropositionMessageSupport;
   propositionStatut?: "en_attente" | "creee" | "refusee";
   fichierNom?: string;
 };
@@ -21,6 +28,8 @@ type EvenementSSE =
   | { type: "texte"; delta: string }
   | { type: "proposition"; proposition: PropositionAffectation }
   | { type: "proposition_conge"; proposition: PropositionConge }
+  | { type: "proposition_message_interne"; proposition: PropositionMessageInterne }
+  | { type: "proposition_message_support"; proposition: PropositionMessageSupport }
   | { type: "fin" }
   | { type: "erreur"; message: string };
 
@@ -139,6 +148,10 @@ export function AssistantIA() {
               setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, proposition: evenement.proposition, propositionStatut: "en_attente" } : m)));
             } else if (evenement.type === "proposition_conge") {
               setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, propositionConge: evenement.proposition, propositionStatut: "en_attente" } : m)));
+            } else if (evenement.type === "proposition_message_interne") {
+              setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, propositionMessageInterne: evenement.proposition, propositionStatut: "en_attente" } : m)));
+            } else if (evenement.type === "proposition_message_support") {
+              setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, propositionMessageSupport: evenement.proposition, propositionStatut: "en_attente" } : m)));
             } else if (evenement.type === "erreur") {
               setErreur(evenement.message);
             }
@@ -242,6 +255,30 @@ export function AssistantIA() {
     });
   }
 
+  function validerPropositionMessageInterne(index: number) {
+    const message = messages[index];
+    if (!message.propositionMessageInterne) return;
+    startTransition(async () => {
+      const res = await envoyerMessageInterneDepuisPropositionAction({
+        destinataireEmployeId: message.propositionMessageInterne!.destinataireEmployeId,
+        chantierId: message.propositionMessageInterne!.chantierId,
+        contenu: message.propositionMessageInterne!.contenu,
+      });
+      setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, propositionStatut: "error" in res ? "en_attente" : "creee" } : m)));
+      if ("error" in res) setErreur(res.error);
+    });
+  }
+
+  function validerPropositionMessageSupport(index: number) {
+    const message = messages[index];
+    if (!message.propositionMessageSupport) return;
+    startTransition(async () => {
+      const res = await envoyerMessageSupportDepuisPropositionAction({ contenu: message.propositionMessageSupport!.contenu });
+      setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, propositionStatut: "error" in res ? "en_attente" : "creee" } : m)));
+      if ("error" in res) setErreur(res.error);
+    });
+  }
+
   function refuserProposition(index: number) {
     setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, propositionStatut: "refusee" } : m)));
   }
@@ -329,6 +366,42 @@ export function AssistantIA() {
                     )}
                     {m.propositionStatut === "creee" && <p className="mt-2 text-xs font-medium text-green-700">✓ Demande envoyée au responsable</p>}
                     {m.propositionStatut === "refusee" && <p className="mt-2 text-xs text-neutral-500">Ignorée</p>}
+                  </div>
+                )}
+                {m.propositionMessageInterne && (
+                  <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-liria-gold/60 bg-liria-gold/10 p-3 text-left text-sm">
+                    <p>→ <strong>{m.propositionMessageInterne.destinataireEmployeNom ?? `Fil chantier · ${m.propositionMessageInterne.chantierNom}`}</strong></p>
+                    <p className="whitespace-pre-wrap text-neutral-600 dark:text-neutral-300">{m.propositionMessageInterne.contenu}</p>
+                    {m.propositionStatut === "en_attente" && (
+                      <div className="mt-2 flex gap-2">
+                        <button type="button" onClick={() => validerPropositionMessageInterne(i)} disabled={pending} className="rounded-md bg-green-700 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">
+                          Valider et envoyer
+                        </button>
+                        <button type="button" onClick={() => refuserProposition(i)} className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium">
+                          Ignorer
+                        </button>
+                      </div>
+                    )}
+                    {m.propositionStatut === "creee" && <p className="mt-2 text-xs font-medium text-green-700">✓ Message envoyé</p>}
+                    {m.propositionStatut === "refusee" && <p className="mt-2 text-xs text-neutral-500">Ignoré</p>}
+                  </div>
+                )}
+                {m.propositionMessageSupport && (
+                  <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-liria-gold/60 bg-liria-gold/10 p-3 text-left text-sm">
+                    <p><strong>Message au support Liria</strong></p>
+                    <p className="whitespace-pre-wrap text-neutral-600 dark:text-neutral-300">{m.propositionMessageSupport.contenu}</p>
+                    {m.propositionStatut === "en_attente" && (
+                      <div className="mt-2 flex gap-2">
+                        <button type="button" onClick={() => validerPropositionMessageSupport(i)} disabled={pending} className="rounded-md bg-green-700 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">
+                          Valider et envoyer
+                        </button>
+                        <button type="button" onClick={() => refuserProposition(i)} className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium">
+                          Ignorer
+                        </button>
+                      </div>
+                    )}
+                    {m.propositionStatut === "creee" && <p className="mt-2 text-xs font-medium text-green-700">✓ Message envoyé au support</p>}
+                    {m.propositionStatut === "refusee" && <p className="mt-2 text-xs text-neutral-500">Ignoré</p>}
                   </div>
                 )}
               </div>

@@ -306,6 +306,36 @@ export const OUTILS_COPILOTE: OutilIA[] = [
       required: ["date_debut", "date_fin"],
     },
   },
+  {
+    nom: "proposer_message_interne",
+    description:
+      "Termine la conversation en proposant d'envoyer un message interne, pour validation manuelle. N'écrit rien en base tant que l'utilisateur n'a pas validé. " +
+      "Deux destinations possibles, exactement une des deux : destinataire_employe_id pour un message direct à un collègue nommé (identifié via chercher_employe), " +
+      "ou chantier_id pour poster sur le fil de discussion partagé d'un chantier (identifié via chercher_chantier_planning), visible par toute l'équipe du chantier. " +
+      "Réservé aux messages professionnels internes à l'entreprise — pas pour contacter le support Liria (utilise proposer_message_support pour ça).",
+    parametres: {
+      type: "object",
+      properties: {
+        destinataire_employe_id: { type: "string", description: "Pour un message direct à un collègue précis" },
+        chantier_id: { type: "string", description: "Pour poster sur le fil du chantier, visible par toute l'équipe" },
+        contenu: { type: "string", description: "Le texte du message" },
+      },
+      required: ["contenu"],
+    },
+  },
+  {
+    nom: "proposer_message_support",
+    description:
+      "Termine la conversation en proposant d'envoyer un message au support Liria (l'éditeur du logiciel), pour validation manuelle. N'écrit rien en base tant que l'utilisateur n'a pas validé. " +
+      "Uniquement pour un problème technique, une question sur le fonctionnement de l'application, la facturation de l'abonnement Liria, etc. — jamais pour une question métier BTP ou une communication avec un client/collègue.",
+    parametres: {
+      type: "object",
+      properties: {
+        contenu: { type: "string", description: "Le texte du message au support" },
+      },
+      required: ["contenu"],
+    },
+  },
 ];
 
 export async function executerOutilCopilote(

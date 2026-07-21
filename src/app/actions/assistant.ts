@@ -105,3 +105,71 @@ export async function creerDemandeCongeDepuisPropositionAction(proposition: {
   revalidatePath("/conges");
   return { ok: true };
 }
+
+// Meme logique de recherche/creation de conversation que creerConversationInterneAction
+// (saisie manuelle depuis /messagerie) : conversation directe unique par paire d'employes,
+// un seul fil partage par chantier. L'auteur n'est jamais fourni par le client : on ne
+// resout que la fiche employe liee au compte qui parle (RLS l'exige de toute facon).
+export async function envoyerMessageInterneDepuisPropositionAction(proposition: {
+  destinataireEmployeId: string | null;
+  chantierId: string | null;
+  contenu: string;
+}): Promise<{ error: string } | { ok: true }> {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
+  if (!proposition.contenu.trim()) return { error: "Message vide." };
+  if (Boolean(proposition.destinataireEmployeId) === Boolean(proposition.chantierId)) return { error: "Destinataire invalide." };
+
+  const { data: employe } = await supabase.from("employes").select("id").eq("entreprise_id", ctx.entrepriseId).eq("utilisateur_id", ctx.userId).maybeSingle();
+  if (!employe) return { error: "Ton compte n'est pas lié à une fiche employé." };
+
+  let conversationId: string | null = null;
+  if (proposition.chantierId) {
+    const { data: existante } = await supabase.from("conversations_internes").select("id").eq("entreprise_id", ctx.entrepriseId).eq("type", "chantier").eq("chantier_id", proposition.chantierId).maybeSingle();
+    conversationId = existante?.id ?? null;
+    if (!conversationId) {
+      const { data, error } = await supabase.from("conversations_internes").insert({ entreprise_id: ctx.entrepriseId, type: "chantier", chantier_id: proposition.chantierId, cree_par_employe_id: employe.id }).select("id").single();
+      if (error || !data) return { error: error?.message ?? "Conversation impossible à créer." };
+      conversationId = data.id;
+    }
+  } else {
+    const { data: conversations } = await supabase.from("conversations_internes").select("id,cree_par_employe_id,destinataire_employe_id").eq("entreprise_id", ctx.entrepriseId).eq("type", "directe");
+    const existante = (conversations ?? []).find(
+      (c) => (c.cree_par_employe_id === employe.id && c.destinataire_employe_id === proposition.destinataireEmployeId) || (c.cree_par_employe_id === proposition.destinataireEmployeId && c.destinataire_employe_id === employe.id),
+    );
+    conversationId = existante?.id ?? null;
+    if (!conversationId) {
+      const { data, error } = await supabase.from("conversations_internes").insert({ entreprise_id: ctx.entrepriseId, type: "directe", destinataire_employe_id: proposition.destinataireEmployeId, cree_par_employe_id: employe.id }).select("id").single();
+      if (error || !data) return { error: error?.message ?? "Conversation impossible à créer." };
+      conversationId = data.id;
+    }
+  }
+
+  const { error } = await supabase.from("messages_internes").insert({ entreprise_id: ctx.entrepriseId, conversation_id: conversationId, auteur_employe_id: employe.id, contenu: proposition.contenu });
+  if (error) return { error: error.message };
+
+  revalidatePath("/messagerie");
+  return { ok: true };
+}
+
+// Meme insertion que envoyerMessageSupportAction (saisie manuelle depuis /aide) — pas de
+// lien avec une fiche employe, un compte suffit.
+export async function envoyerMessageSupportDepuisPropositionAction(proposition: { contenu: string }): Promise<{ error: string } | { ok: true }> {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
+  if (!proposition.contenu.trim()) return { error: "Message vide." };
+
+  const { error } = await supabase.from("support_messages").insert({
+    entreprise_id: ctx.entrepriseId,
+    cote: "entreprise",
+    auteur_id: ctx.userId,
+    auteur_nom: [ctx.prenom, ctx.entrepriseNom].filter(Boolean).join(" · ") || "Entreprise",
+    contenu: proposition.contenu,
+  });
+  if (error) return { error: error.message };
+
+  revalidatePath("/aide");
+  return { ok: true };
+}

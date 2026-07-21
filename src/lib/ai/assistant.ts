@@ -43,10 +43,24 @@ export type PropositionConge = {
   commentaire: string | null;
 };
 
+export type PropositionMessageInterne = {
+  destinataireEmployeId: string | null;
+  destinataireEmployeNom: string | null;
+  chantierId: string | null;
+  chantierNom: string | null;
+  contenu: string;
+};
+
+export type PropositionMessageSupport = {
+  contenu: string;
+};
+
 export type EvenementAssistant =
   | { type: "texte"; delta: string }
   | { type: "proposition"; proposition: PropositionAffectation }
-  | { type: "proposition_conge"; proposition: PropositionConge };
+  | { type: "proposition_conge"; proposition: PropositionConge }
+  | { type: "proposition_message_interne"; proposition: PropositionMessageInterne }
+  | { type: "proposition_message_support"; proposition: PropositionMessageSupport };
 
 const MAX_TOURS_OUTILS = 5;
 
@@ -120,6 +134,36 @@ async function resoudrePropositionConge(
   };
 }
 
+// Exactement une destination (collegue OU chantier) : l'ecriture reelle est de toute facon
+// protegee par la RLS de conversations_internes/messages_internes (appartenance a la
+// conversation, ou gerer_messagerie/equipe du chantier pour un fil chantier).
+async function resoudrePropositionMessageInterne(
+  supabase: SupabaseClient,
+  entrepriseId: string,
+  input: Record<string, unknown>,
+): Promise<PropositionMessageInterne | null> {
+  const contenu = typeof input.contenu === "string" ? input.contenu.trim() : "";
+  const destinataireEmployeId = typeof input.destinataire_employe_id === "string" && input.destinataire_employe_id ? input.destinataire_employe_id : null;
+  const chantierId = typeof input.chantier_id === "string" && input.chantier_id ? input.chantier_id : null;
+  if (!contenu || !(Boolean(destinataireEmployeId) !== Boolean(chantierId))) return null;
+
+  if (destinataireEmployeId) {
+    const { data: employe } = await supabase.from("employes").select("nom, prenom").eq("id", destinataireEmployeId).eq("entreprise_id", entrepriseId).maybeSingle();
+    if (!employe) return null;
+    return { destinataireEmployeId, destinataireEmployeNom: `${employe.prenom} ${employe.nom}`, chantierId: null, chantierNom: null, contenu };
+  }
+
+  const { data: chantier } = await supabase.from("chantiers").select("nom").eq("id", chantierId as string).eq("entreprise_id", entrepriseId).maybeSingle();
+  if (!chantier) return null;
+  return { destinataireEmployeId: null, destinataireEmployeNom: null, chantierId, chantierNom: chantier.nom, contenu };
+}
+
+function resoudrePropositionMessageSupport(input: Record<string, unknown>): PropositionMessageSupport | null {
+  const contenu = typeof input.contenu === "string" ? input.contenu.trim() : "";
+  if (!contenu) return null;
+  return { contenu };
+}
+
 async function decrireUtilisateurCourant(supabase: SupabaseClient, entrepriseId: string, utilisateurId: string, prenomCompte: string | null): Promise<string> {
   const { data: employe } = await supabase
     .from("employes")
@@ -187,6 +231,7 @@ export async function* demanderAssistantIAStream(
     `Si aucun outil ne permet de répondre à la question, dis-le clairement plutôt que d'inventer une réponse. ` +
     consigneAffectation +
     `Tu n'as accès à aucun outil de recherche de lieu réel (pas de carte, pas d'annuaire) : si l'utilisateur cite un lieu vague ou qui peut désigner plusieurs endroits (ex. un nom de restaurant courant, sans ville ni quartier), ne devine pas et ne l'invente pas — propose 2-3 hypothèses plausibles à partir de ta connaissance générale et demande laquelle est la bonne avant de conclure la proposition ; si le lieu est déjà précis (adresse, ville, quartier, nom distinctif), pas besoin de demander. ` +
+    `Pour envoyer un message à un collègue nommé ou sur le fil d'un chantier, utilise proposer_message_interne (cherche d'abord le destinataire ou le chantier via chercher_employe / chercher_chantier_planning). Pour contacter le support Liria au sujet de l'application elle-même (bug, question technique, facturation de l'abonnement), utilise proposer_message_support — jamais pour une question métier BTP. Dans les deux cas, rien n'est envoyé sans validation manuelle. ` +
     `Ne redirige jamais vers un menu que tu n'as pas vérifié. ` +
     `Formate tes réponses avec des tirets courts, pas de tableaux markdown, pas de titres.`;
 
@@ -233,6 +278,30 @@ export async function* demanderAssistantIAStream(
         yield { type: "proposition_conge", proposition };
       } else {
         const message = "\n\nJe n'ai pas pu préparer cette demande : vérifie les dates, et que tu as bien une fiche employé liée à ton compte (sinon, va dans « Mon espace » → « Créer ma fiche employé »).";
+        yield { type: "texte", delta: message };
+      }
+      return;
+    }
+
+    const appelMessageInterne = resultat.appelsOutils.find((a) => a.nom === "proposer_message_interne");
+    if (appelMessageInterne) {
+      const proposition = await resoudrePropositionMessageInterne(supabase, entrepriseId, appelMessageInterne.entree);
+      if (proposition) {
+        yield { type: "proposition_message_interne", proposition };
+      } else {
+        const message = "\n\nJe n'ai pas pu préparer ce message : précise soit un collègue, soit un chantier (jamais les deux), et un texte à envoyer.";
+        yield { type: "texte", delta: message };
+      }
+      return;
+    }
+
+    const appelMessageSupport = resultat.appelsOutils.find((a) => a.nom === "proposer_message_support");
+    if (appelMessageSupport) {
+      const proposition = resoudrePropositionMessageSupport(appelMessageSupport.entree);
+      if (proposition) {
+        yield { type: "proposition_message_support", proposition };
+      } else {
+        const message = "\n\nJe n'ai pas pu préparer ce message : quel est le texte à envoyer au support ?";
         yield { type: "texte", delta: message };
       }
       return;
