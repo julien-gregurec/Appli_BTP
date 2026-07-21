@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "btp-platform-dev",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": ["-lc", "PATH=\"$HOME/.nvm/versions/node/v24.18.0/bin:$PATH\" npm run dev"],
+      "port": 3000
+    }
+  ]
+}

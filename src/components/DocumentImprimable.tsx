@@ -121,7 +121,7 @@ export function DocumentImprimable({
       <div style={{ display: "flex", flexDirection: positionLogo==="droite"?"row-reverse":"row", justifyContent: positionLogo==="centre"?"center":"space-between", alignItems: "flex-start", gap:"20px", marginBottom: "8px", padding:moderne?"18px":"0", background:moderne?couleur:"transparent", color:moderne?"#fff":couleur, textAlign:positionLogo==="centre"?"center":"left" }}>
         <div style={{ display: "flex", flexDirection:positionLogo==="centre"?"column":"row", alignItems: positionLogo==="centre"?"center":"flex-start", gap: "14px", maxWidth: positionLogo==="centre"?"72%":"62%" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          {afficherLogo&&<img src={entreprise.logo_url || "/liria-gestion-pro-logo-v3.png"} alt="Logo de l’entreprise" style={{ width: `${entreprise.logo_largeur_documents??105}px`, height: "64px", objectFit: "contain", background:moderne?"#fff":"transparent", borderRadius:moderne?"4px":"0", padding:moderne?"4px":"0" }} />}
+          {afficherLogo&&<img src={entreprise.logo_url || "/liria-gestion-pro-logo-v5.png"} alt="Logo de l’entreprise" style={{ width: `${entreprise.logo_largeur_documents??105}px`, height: "64px", objectFit: "contain", background:moderne?"#fff":"transparent", borderRadius:moderne?"4px":"0", padding:moderne?"4px":"0" }} />}
           <div>
           <div style={{ fontSize: "18px", fontWeight: 700, letterSpacing: "0.04em" }}>{entreprise.nom}</div>
           {entreprise.raison_sociale && entreprise.raison_sociale !== entreprise.nom && <div style={{ color: moderne?"#fff":"#555" }}>{entreprise.raison_sociale}</div>}

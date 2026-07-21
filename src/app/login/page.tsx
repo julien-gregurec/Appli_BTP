@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { loginAction } from "@/app/actions/auth";
@@ -18,9 +19,9 @@ export default async function LoginPage({
   return (
     <main className="flex flex-1 items-center justify-center p-6">
       <div className="w-full max-w-sm space-y-6">
-        <div>
+        <div className="flex flex-col items-center gap-3 text-center">
+          <Image src="/liria-gestion-pro-logo-v5.png" alt="Liria Gestion Pro" width={220} height={246} priority className="h-32 w-auto" />
           <h1 className="text-xl font-semibold">Connexion</h1>
-          <p className="text-sm font-medium tracking-widest text-[#c9a24a]">LIRIA GESTION PRO</p>
         </div>
 
         {message && (

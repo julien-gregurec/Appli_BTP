@@ -25,7 +25,7 @@ from reportlab.platypus.tableofcontents import TableOfContents
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "output/pdf/Guide_utilisation_detaille_Liria_Gestion_Pro.pdf"
 PUBLIC = ROOT / "public/guides/Guide_utilisation_Liria_Gestion_Pro.pdf"
-LOGO = ROOT / "public/liria-gestion-pro-logo-v3.png"
+LOGO = ROOT / "public/liria-gestion-pro-logo-v5.png"
 AUDIT = ROOT / "output/audit"
 
 NAVY = HexColor("#0D1B2A")

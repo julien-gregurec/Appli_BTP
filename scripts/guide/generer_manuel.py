@@ -28,7 +28,7 @@ from reportlab.platypus import (BaseDocTemplate, CondPageBreak, Frame, Image, Ke
 RACINE = Path(__file__).resolve().parents[2]
 CAPTURES = RACINE / "output/audit"
 SORTIE = RACINE / "output/guide/Manuel_Liria_Gestion_Pro.pdf"
-LOGO = RACINE / "public/liria-gestion-pro-logo-v3.png"
+LOGO = RACINE / "public/liria-gestion-pro-logo-v5.png"
 
 MARINE = colors.HexColor("#0d1b2a")
 OR = colors.HexColor("#c9a24a")
