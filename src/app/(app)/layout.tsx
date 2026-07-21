@@ -57,6 +57,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </div>
       <MobileBack />
       <AideButton />
+      <AssistantIA />
     </div>
   );
 }
