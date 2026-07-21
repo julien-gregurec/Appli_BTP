@@ -3,26 +3,39 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { nomClient, CLIENT_TYPES, CLIENT_STATUTS } from "@/lib/chantier-statuts";
 import { Lien as Link } from "@/components/Lien";
 
-export default async function ClientsPage({ searchParams }: { searchParams: Promise<{ q?: string; type?: string; statut?: string }> }) {
-  const { q = "", type = "", statut = "" } = await searchParams;
+const TAILLE_PAGE = 25;
+
+type LigneClient = {
+  id: string; reference_interne: string | null; type: string; nom: string | null; prenom: string | null;
+  societe: string | null; ville: string | null; statut: string;
+};
+
+export default async function ClientsPage({ searchParams }: { searchParams: Promise<{ q?: string; type?: string; statut?: string; page?: string }> }) {
+  const { q = "", type = "", statut = "", page: pageParam } = await searchParams;
+  const page = Math.max(1, Number(pageParam) || 1);
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
 
-  const { data: clients } = await supabase
-    .from("clients")
-    .select("id, reference_interne, type, nom, prenom, societe, ville, statut")
-    .eq("entreprise_id", ctx.entrepriseId)
-    .order("created_at", { ascending: false });
+  const { data } = await supabase.rpc("clients_liste_paginee", {
+    p_entreprise_id: ctx.entrepriseId, p_recherche: q, p_type: type, p_statut: statut, p_page: page, p_taille: TAILLE_PAGE,
+  });
+  const resultat = (data ?? {}) as { lignes?: LigneClient[]; total?: number; pages?: number };
+  const clientsFiltres = resultat.lignes ?? [];
+  const total = resultat.total ?? 0;
+  const nbPages = resultat.pages ?? 1;
 
   const typeLabel = (c: string) => CLIENT_TYPES.find((t) => t.cle === c)?.libelle ?? c;
   const statutLabel = (s: string) => CLIENT_STATUTS.find((t) => t.cle === s)?.libelle ?? s;
-  const recherche = q.trim().toLocaleLowerCase("fr");
-  const clientsFiltres = (clients ?? []).filter((client) => {
-    if (type && client.type !== type) return false;
-    if (statut && client.statut !== statut) return false;
-    if (!recherche) return true;
-    return [client.reference_interne, nomClient(client), client.ville].filter(Boolean).some((valeur) => String(valeur).toLocaleLowerCase("fr").includes(recherche));
-  });
+
+  const parametresPage = (p: number) => {
+    const sp = new URLSearchParams();
+    if (q) sp.set("q", q);
+    if (type) sp.set("type", type);
+    if (statut) sp.set("statut", statut);
+    if (p > 1) sp.set("page", String(p));
+    const s = sp.toString();
+    return s ? `/clients?${s}` : "/clients";
+  };
 
   return (
     <main className="p-8">
@@ -30,7 +43,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold">Clients</h1>
-            <p className="text-sm text-neutral-500">{clientsFiltres.length} client(s) affiché(s) sur {clients?.length ?? 0}</p>
+            <p className="text-sm text-neutral-500">{total} client(s) correspondant(s){nbPages > 1 ? ` — page ${page}/${nbPages}` : ""}</p>
           </div>
           <Link href="/clients/nouveau" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">
             + Nouveau client
@@ -47,7 +60,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
 
         {clientsFiltres.length === 0 ? (
           <div className="rounded-md border border-dashed border-neutral-300 p-8 text-center text-sm text-neutral-500 dark:border-neutral-700">
-            {clients?.length ? "Aucun client ne correspond aux filtres." : "Aucun client pour l’instant. Crée ton premier client."}
+            {total === 0 && !q && !type && !statut ? "Aucun client pour l’instant. Crée ton premier client." : "Aucun client ne correspond aux filtres."}
           </div>
         ) : (
           <>
@@ -104,6 +117,18 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
             </table>
           </div>
           </>
+        )}
+
+        {nbPages > 1 && (
+          <div className="flex items-center justify-between text-sm">
+            {page > 1 ? (
+              <Link href={parametresPage(page - 1)} className="rounded-md border border-neutral-300 px-3 py-2 dark:border-neutral-700">← Page précédente</Link>
+            ) : <span />}
+            <span className="text-neutral-500">Page {page} sur {nbPages}</span>
+            {page < nbPages ? (
+              <Link href={parametresPage(page + 1)} className="rounded-md border border-neutral-300 px-3 py-2 dark:border-neutral-700">Page suivante →</Link>
+            ) : <span />}
+          </div>
         )}
       </div>
     </main>

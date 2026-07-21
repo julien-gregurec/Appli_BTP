@@ -15,6 +15,8 @@ export function SignatureEmploye({ employeId, aDejaSignature }: { employeId: str
   const [enCours, demarrer] = useTransition();
   const [message, setMessage] = useState<{ type: "ok" | "err"; texte: string } | null>(null);
   const [remplacer, setRemplacer] = useState(!aDejaSignature);
+  const [mode, setMode] = useState<"dessiner" | "importer">("dessiner");
+  const [apercuImport, setApercuImport] = useState<string | null>(null);
 
   useEffect(() => {
     const c = canvas.current;
@@ -59,14 +61,38 @@ export function SignatureEmploye({ employeId, aDejaSignature }: { employeId: str
     vide.current = true; setMessage(null);
   };
 
+  // Le serveur attend un PNG (même contrat que le dessin) : toute image importée
+  // (JPEG, WebP…) est donc reconvertie en PNG via un canvas caché avant l'envoi.
+  const importerFichier = (fichier: File) => {
+    setMessage(null);
+    const lecteur = new FileReader();
+    lecteur.onload = () => {
+      const image = new Image();
+      image.onload = () => {
+        const c = document.createElement("canvas");
+        c.width = image.naturalWidth; c.height = image.naturalHeight;
+        const ctx = c.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(image, 0, 0);
+        setApercuImport(c.toDataURL("image/png"));
+      };
+      image.onerror = () => setMessage({ type: "err", texte: "Fichier image illisible." });
+      image.src = String(lecteur.result);
+    };
+    lecteur.readAsDataURL(fichier);
+  };
+
   const enregistrer = () => {
-    if (vide.current) { setMessage({ type: "err", texte: "Dessinez la signature avant d'enregistrer." }); return; }
-    const dataUrl = canvas.current!.toDataURL("image/png");
+    const dataUrl = mode === "importer" ? apercuImport : (vide.current ? null : canvas.current!.toDataURL("image/png"));
+    if (!dataUrl) {
+      setMessage({ type: "err", texte: mode === "importer" ? "Choisissez une image de signature." : "Dessinez la signature avant d'enregistrer." });
+      return;
+    }
     demarrer(async () => {
       const r = await enregistrerSignatureEmployeAction(employeId, dataUrl);
       if (!r.ok) { setMessage({ type: "err", texte: r.erreur }); return; }
       setMessage({ type: "ok", texte: "Signature enregistrée." });
-      setRemplacer(false);
+      setRemplacer(false); setApercuImport(null);
     });
   };
 
@@ -88,15 +114,37 @@ export function SignatureEmploye({ employeId, aDejaSignature }: { employeId: str
         </div>
       ) : (
         <>
-          <canvas ref={canvas}
-            onPointerDown={debut} onPointerMove={trace} onPointerUp={fin} onPointerLeave={fin}
-            className="h-36 w-full max-w-md touch-none rounded-md border border-dashed border-neutral-400 bg-white dark:bg-white"
-            style={{ touchAction: "none" }} />
+          <div className="flex gap-1 rounded-md border border-neutral-200 p-1 text-sm dark:border-neutral-800" role="tablist">
+            <button type="button" role="tab" aria-selected={mode === "dessiner"} onClick={() => { setMode("dessiner"); setMessage(null); }}
+              className={`rounded px-3 py-1.5 ${mode === "dessiner" ? "bg-[#0d1b2a] text-white" : "text-neutral-600 dark:text-neutral-400"}`}>Dessiner</button>
+            <button type="button" role="tab" aria-selected={mode === "importer"} onClick={() => { setMode("importer"); setMessage(null); }}
+              className={`rounded px-3 py-1.5 ${mode === "importer" ? "bg-[#0d1b2a] text-white" : "text-neutral-600 dark:text-neutral-400"}`}>Importer une image</button>
+          </div>
+
+          {mode === "dessiner" ? (
+            <canvas ref={canvas}
+              onPointerDown={debut} onPointerMove={trace} onPointerUp={fin} onPointerLeave={fin}
+              className="h-36 w-full max-w-md touch-none rounded-md border border-dashed border-neutral-400 bg-white dark:bg-white"
+              style={{ touchAction: "none" }} />
+          ) : (
+            <div className="space-y-2">
+              <label className="block w-full max-w-md rounded-md border border-dashed border-neutral-400 bg-white p-3 text-center text-sm text-neutral-500 dark:bg-white">
+                {apercuImport ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- aperçu local d'un fichier choisi, jamais servi par Next
+                  <img src={apercuImport} alt="Aperçu de la signature importée" className="mx-auto h-24 object-contain" />
+                ) : "Choisir une image de signature (PNG, JPG ou WebP)"}
+                <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) importerFichier(f); }} />
+              </label>
+            </div>
+          )}
+
           <div className="flex flex-wrap gap-2">
             <button onClick={enregistrer} disabled={enCours} className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
               {enCours ? "Enregistrement…" : "Enregistrer la signature"}
             </button>
-            <button onClick={effacer} className="rounded-md border px-4 py-2 text-sm">Effacer</button>
+            {mode === "dessiner" && <button onClick={effacer} className="rounded-md border px-4 py-2 text-sm">Effacer</button>}
+            {mode === "importer" && apercuImport && <button onClick={() => setApercuImport(null)} className="rounded-md border px-4 py-2 text-sm">Effacer</button>}
             {aDejaSignature && <button onClick={() => setRemplacer(false)} className="rounded-md px-4 py-2 text-sm text-neutral-500">Annuler</button>}
           </div>
         </>

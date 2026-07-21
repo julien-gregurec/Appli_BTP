@@ -4,8 +4,16 @@ import { CHANTIER_STATUTS, statutChantier, nomClient } from "@/lib/chantier-stat
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { Lien as Link } from "@/components/Lien";
 
-export default async function ChantiersPage({ searchParams }: { searchParams: Promise<{ q?: string; statut?: string; error?: string }> }) {
-  const { q = "", statut = "", error } = await searchParams;
+const TAILLE_PAGE = 25;
+
+type LigneChantier = {
+  id: string; reference_interne: string | null; nom: string; ville: string | null; statut: string;
+  client_nom: string | null; client_prenom: string | null; client_societe: string | null;
+};
+
+export default async function ChantiersPage({ searchParams }: { searchParams: Promise<{ q?: string; statut?: string; error?: string; page?: string }> }) {
+  const { q = "", statut = "", error, page: pageParam } = await searchParams;
+  const page = Math.max(1, Number(pageParam) || 1);
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const permissions = await permissionsUtilisateur(ctx);
@@ -14,19 +22,22 @@ export default async function ChantiersPage({ searchParams }: { searchParams: Pr
     && !permissions.includes("acces_chantiers")
     && permissions.includes("voir_chantiers_assignes");
 
-  const { data: chantiers } = await supabase
-    .from("chantiers")
-    .select("id, reference_interne, nom, ville, statut, client:clients(nom, prenom, societe)")
-    .eq("entreprise_id", ctx.entrepriseId)
-    .order("created_at", { ascending: false });
-
-  const recherche = q.trim().toLocaleLowerCase("fr");
-  const chantiersFiltres = (chantiers ?? []).filter((chantier) => {
-    if (statut && chantier.statut !== statut) return false;
-    if (!recherche) return true;
-    const client = Array.isArray(chantier.client) ? chantier.client[0] : chantier.client;
-    return [chantier.reference_interne, chantier.nom, chantier.ville, client ? nomClient(client) : ""].filter(Boolean).some((valeur) => String(valeur).toLocaleLowerCase("fr").includes(recherche));
+  const { data } = await supabase.rpc("chantiers_liste_paginee", {
+    p_entreprise_id: ctx.entrepriseId, p_recherche: q, p_statut: statut, p_page: page, p_taille: TAILLE_PAGE,
   });
+  const resultat = (data ?? {}) as { lignes?: LigneChantier[]; total?: number; pages?: number };
+  const chantiersFiltres = resultat.lignes ?? [];
+  const total = resultat.total ?? 0;
+  const nbPages = resultat.pages ?? 1;
+
+  const parametresPage = (p: number) => {
+    const sp = new URLSearchParams();
+    if (q) sp.set("q", q);
+    if (statut) sp.set("statut", statut);
+    if (p > 1) sp.set("page", String(p));
+    const s = sp.toString();
+    return s ? `/chantiers?${s}` : "/chantiers";
+  };
 
   return (
     <main className="p-8">
@@ -34,7 +45,7 @@ export default async function ChantiersPage({ searchParams }: { searchParams: Pr
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold">Chantiers</h1>
-            <p className="text-sm text-neutral-500">{chantiersFiltres.length} chantier(s) affiché(s) sur {chantiers?.length ?? 0}</p>
+            <p className="text-sm text-neutral-500">{total} chantier(s) correspondant(s){nbPages > 1 ? ` — page ${page}/${nbPages}` : ""}</p>
           </div>
           {peutGerer&&<Link href="/chantiers/nouveau" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">
             + Nouveau chantier
@@ -53,14 +64,14 @@ export default async function ChantiersPage({ searchParams }: { searchParams: Pr
 
         {chantiersFiltres.length === 0 ? (
           <div className="rounded-md border border-dashed border-neutral-300 p-8 text-center text-sm text-neutral-500 dark:border-neutral-700">
-            {chantiers?.length ? "Aucun chantier ne correspond aux filtres." : "Aucun chantier pour l’instant."}
+            {total === 0 && !q && !statut ? "Aucun chantier pour l’instant." : "Aucun chantier ne correspond aux filtres."}
           </div>
         ) : (
           <>
           <div className="grid gap-3 md:hidden">
             {chantiersFiltres.map((chantier) => {
               const st = statutChantier(chantier.statut);
-              const client = Array.isArray(chantier.client) ? chantier.client[0] : chantier.client;
+              const client = { nom: chantier.client_nom, prenom: chantier.client_prenom, societe: chantier.client_societe };
               return (
                 <article key={chantier.id} className="space-y-3 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
                   <div className="flex items-start justify-between gap-3">
@@ -73,7 +84,7 @@ export default async function ChantiersPage({ searchParams }: { searchParams: Pr
                     </span>
                   </div>
                   <dl className="grid grid-cols-2 gap-3 text-sm">
-                    <div><dt className="text-xs text-neutral-500">Client</dt><dd className="font-medium">{client ? nomClient(client) : "—"}</dd></div>
+                    <div><dt className="text-xs text-neutral-500">Client</dt><dd className="font-medium">{chantier.client_nom || chantier.client_societe ? nomClient(client) : "—"}</dd></div>
                     <div><dt className="text-xs text-neutral-500">Ville</dt><dd>{chantier.ville ?? "—"}</dd></div>
                   </dl>
                   <Link href={`/chantiers/${chantier.id}`} className="inline-flex w-full items-center justify-center rounded-md border px-3 py-2 text-sm font-medium">
@@ -96,7 +107,7 @@ export default async function ChantiersPage({ searchParams }: { searchParams: Pr
               <tbody>
                 {chantiersFiltres.map((ch) => {
                   const st = statutChantier(ch.statut);
-                  const client = Array.isArray(ch.client) ? ch.client[0] : ch.client;
+                  const client = { nom: ch.client_nom, prenom: ch.client_prenom, societe: ch.client_societe };
                   return (
                     <tr key={ch.id} className="border-t border-neutral-100 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900">
                       <td className="px-4 py-2 font-mono text-xs text-neutral-500">{ch.reference_interne}</td>
@@ -104,7 +115,7 @@ export default async function ChantiersPage({ searchParams }: { searchParams: Pr
                         <Link href={`/chantiers/${ch.id}`} className="font-medium hover:underline">{ch.nom}</Link>
                         {ch.ville && <span className="ml-2 text-xs text-neutral-500">{ch.ville}</span>}
                       </td>
-                      <td className="px-4 py-2 text-neutral-600 dark:text-neutral-400">{client ? nomClient(client) : "—"}</td>
+                      <td className="px-4 py-2 text-neutral-600 dark:text-neutral-400">{ch.client_nom || ch.client_societe ? nomClient(client) : "—"}</td>
                       <td className="px-4 py-2">
                         <span className="inline-flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400">
                           <span className="h-2 w-2 rounded-full" style={{ background: st.couleur }} />
@@ -118,6 +129,18 @@ export default async function ChantiersPage({ searchParams }: { searchParams: Pr
             </table>
           </div>
           </>
+        )}
+
+        {nbPages > 1 && (
+          <div className="flex items-center justify-between text-sm">
+            {page > 1 ? (
+              <Link href={parametresPage(page - 1)} className="rounded-md border border-neutral-300 px-3 py-2 dark:border-neutral-700">← Page précédente</Link>
+            ) : <span />}
+            <span className="text-neutral-500">Page {page} sur {nbPages}</span>
+            {page < nbPages ? (
+              <Link href={parametresPage(page + 1)} className="rounded-md border border-neutral-300 px-3 py-2 dark:border-neutral-700">Page suivante →</Link>
+            ) : <span />}
+          </div>
         )}
       </div>
     </main>

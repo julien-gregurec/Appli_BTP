@@ -4,29 +4,44 @@ import { DEVIS_STATUTS, statutDevis, euros } from "@/lib/devis";
 import { nomClient } from "@/lib/chantier-statuts";
 import { Lien as Link } from "@/components/Lien";
 
-export default async function DevisPage({ searchParams }: { searchParams: Promise<{ q?: string; statut?: string }> }) {
-  const { q = "", statut = "" } = await searchParams;
+type LigneDevis = {
+  id: string; numero: string | null; statut: string; date_emission: string; montant_ttc: number;
+  client_nom: string | null; client_prenom: string | null; client_societe: string | null;
+  chantier_nom: string | null;
+};
+
+const TAILLE_PAGE = 25;
+
+export default async function DevisPage({ searchParams }: { searchParams: Promise<{ q?: string; statut?: string; page?: string }> }) {
+  const { q = "", statut = "", page: pageParam } = await searchParams;
+  const page = Math.max(1, Number(pageParam) || 1);
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
 
-  const { data: devis } = await supabase
-    .from("devis")
-    .select("id, numero, statut, date_emission, montant_ttc, client:clients(nom, prenom, societe), chantier:chantiers!devis_chantier_id_fkey(nom)")
-    .eq("entreprise_id", ctx.entrepriseId)
-    .order("created_at", { ascending: false });
-
-  const recherche = q.trim().toLocaleLowerCase("fr");
-  const devisFiltres = (devis ?? []).filter((item) => {
-    if (statut && item.statut !== statut) return false;
-    if (!recherche) return true;
-    const client = Array.isArray(item.client) ? item.client[0] : item.client;
-    const chantier = Array.isArray(item.chantier) ? item.chantier[0] : item.chantier;
-    return [item.numero, client ? nomClient(client) : "", chantier?.nom]
-      .filter(Boolean)
-      .some((valeur) => String(valeur).toLocaleLowerCase("fr").includes(recherche));
+  const { data } = await supabase.rpc("devis_liste_paginee", {
+    p_entreprise_id: ctx.entrepriseId,
+    p_recherche: q,
+    p_statut: statut,
+    p_page: page,
+    p_taille: TAILLE_PAGE,
   });
-  const montantFiltre = devisFiltres.reduce((total, item) => total + Number(item.montant_ttc ?? 0), 0);
-  const montantAccepte = (devis ?? []).filter((item) => item.statut === "accepte").reduce((total, item) => total + Number(item.montant_ttc ?? 0), 0);
+  const resultat = (data ?? {}) as {
+    lignes?: LigneDevis[]; total?: number; montant_filtre?: number; montant_accepte?: number; pages?: number;
+  };
+  const devisFiltres = resultat.lignes ?? [];
+  const total = resultat.total ?? 0;
+  const montantFiltre = resultat.montant_filtre ?? 0;
+  const montantAccepte = resultat.montant_accepte ?? 0;
+  const nbPages = resultat.pages ?? 1;
+
+  const parametresPage = (p: number) => {
+    const sp = new URLSearchParams();
+    if (q) sp.set("q", q);
+    if (statut) sp.set("statut", statut);
+    if (p > 1) sp.set("page", String(p));
+    const s = sp.toString();
+    return s ? `/devis?${s}` : "/devis";
+  };
 
   return (
     <main className="p-8">
@@ -34,7 +49,7 @@ export default async function DevisPage({ searchParams }: { searchParams: Promis
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold">Devis</h1>
-            <p className="text-sm text-neutral-500">{devisFiltres.length} devis affiché(s) sur {devis?.length ?? 0}</p>
+            <p className="text-sm text-neutral-500">{total} devis correspondant(s){nbPages > 1 ? ` — page ${page}/${nbPages}` : ""}</p>
           </div>
           <Link href="/devis/nouveau" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">
             + Nouveau devis
@@ -42,8 +57,8 @@ export default async function DevisPage({ searchParams }: { searchParams: Promis
         </div>
 
         <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800"><div className="text-xs text-neutral-500">Devis affichés</div><div className="mt-1 text-xl font-semibold">{devisFiltres.length}</div></div>
-          <div className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800"><div className="text-xs text-neutral-500">Montant affiché</div><div className="mt-1 font-mono text-xl font-semibold">{euros(montantFiltre)}</div></div>
+          <div className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800"><div className="text-xs text-neutral-500">Devis correspondants</div><div className="mt-1 text-xl font-semibold">{total}</div></div>
+          <div className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800"><div className="text-xs text-neutral-500">Montant filtré</div><div className="mt-1 font-mono text-xl font-semibold">{euros(montantFiltre)}</div></div>
           <div className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800"><div className="text-xs text-neutral-500">Devis acceptés</div><div className="mt-1 font-mono text-xl font-semibold">{euros(montantAccepte)}</div></div>
         </div>
 
@@ -59,15 +74,14 @@ export default async function DevisPage({ searchParams }: { searchParams: Promis
 
         {devisFiltres.length === 0 ? (
           <div className="rounded-md border border-dashed border-neutral-300 p-8 text-center text-sm text-neutral-500 dark:border-neutral-700">
-            {devis?.length ? "Aucun devis ne correspond aux filtres." : "Aucun devis pour l’instant."}
+            {total === 0 && !q && !statut ? "Aucun devis pour l’instant." : "Aucun devis ne correspond aux filtres."}
           </div>
         ) : (
           <>
           <div className="grid gap-3 md:hidden">
             {devisFiltres.map((item) => {
               const st = statutDevis(item.statut);
-              const client = Array.isArray(item.client) ? item.client[0] : item.client;
-              const chantier = Array.isArray(item.chantier) ? item.chantier[0] : item.chantier;
+              const client = { nom: item.client_nom, prenom: item.client_prenom, societe: item.client_societe };
               return (
                 <article key={item.id} className="space-y-3 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
                   <div className="flex items-start justify-between gap-3">
@@ -75,7 +89,7 @@ export default async function DevisPage({ searchParams }: { searchParams: Promis
                       <Link href={`/devis/${item.id}`} className="block truncate font-mono text-sm font-semibold hover:underline">
                         {item.numero ?? "— brouillon —"}
                       </Link>
-                      <p className="mt-1 truncate text-sm font-medium">{client ? nomClient(client) : "Client non renseigné"}</p>
+                      <p className="mt-1 truncate text-sm font-medium">{item.client_nom || item.client_societe ? nomClient(client) : "Client non renseigné"}</p>
                     </div>
                     <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-neutral-100 px-2 py-1 text-xs font-medium dark:bg-neutral-800">
                       <span className="h-2 w-2 rounded-full" style={{ background: st.couleur }} />{st.libelle}
@@ -84,7 +98,7 @@ export default async function DevisPage({ searchParams }: { searchParams: Promis
                   <dl className="grid grid-cols-2 gap-3 text-sm">
                     <div><dt className="text-xs text-neutral-500">Date d’émission</dt><dd>{item.date_emission}</dd></div>
                     <div><dt className="text-xs text-neutral-500">Montant TTC</dt><dd className="font-mono font-semibold">{euros(item.montant_ttc)}</dd></div>
-                    <div className="col-span-2"><dt className="text-xs text-neutral-500">Chantier</dt><dd>{chantier?.nom ?? "Sans chantier"}</dd></div>
+                    <div className="col-span-2"><dt className="text-xs text-neutral-500">Chantier</dt><dd>{item.chantier_nom ?? "Sans chantier"}</dd></div>
                   </dl>
                   <Link href={`/devis/${item.id}`} className="inline-flex w-full items-center justify-center rounded-md border px-3 py-2 text-sm font-medium">
                     Ouvrir, envoyer ou télécharger le devis
@@ -107,7 +121,7 @@ export default async function DevisPage({ searchParams }: { searchParams: Promis
               <tbody>
                 {devisFiltres.map((d) => {
                   const st = statutDevis(d.statut);
-                  const client = Array.isArray(d.client) ? d.client[0] : d.client;
+                  const client = { nom: d.client_nom, prenom: d.client_prenom, societe: d.client_societe };
                   return (
                     <tr key={d.id} className="border-t border-neutral-100 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900">
                       <td className="px-4 py-2">
@@ -115,7 +129,7 @@ export default async function DevisPage({ searchParams }: { searchParams: Promis
                           {d.numero ?? "— brouillon —"}
                         </Link>
                       </td>
-                      <td className="px-4 py-2 text-neutral-600 dark:text-neutral-400">{client ? nomClient(client) : "—"}</td>
+                      <td className="px-4 py-2 text-neutral-600 dark:text-neutral-400">{d.client_nom || d.client_societe ? nomClient(client) : "—"}</td>
                       <td className="px-4 py-2 text-neutral-600 dark:text-neutral-400">{d.date_emission}</td>
                       <td className="px-4 py-2">
                         <span className="inline-flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400">
@@ -131,6 +145,18 @@ export default async function DevisPage({ searchParams }: { searchParams: Promis
             </table>
           </div>
           </>
+        )}
+
+        {nbPages > 1 && (
+          <div className="flex items-center justify-between text-sm">
+            {page > 1 ? (
+              <Link href={parametresPage(page - 1)} className="rounded-md border border-neutral-300 px-3 py-2 dark:border-neutral-700">← Page précédente</Link>
+            ) : <span />}
+            <span className="text-neutral-500">Page {page} sur {nbPages}</span>
+            {page < nbPages ? (
+              <Link href={parametresPage(page + 1)} className="rounded-md border border-neutral-300 px-3 py-2 dark:border-neutral-700">Page suivante →</Link>
+            ) : <span />}
+          </div>
         )}
       </div>
     </main>
