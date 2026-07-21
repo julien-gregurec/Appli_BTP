@@ -280,6 +280,25 @@ export const OUTILS_COPILOTE: OutilIA[] = [
       required: ["employe_id", "date", "heures"],
     },
   },
+  {
+    nom: "proposer_demande_conge",
+    description:
+      "Termine la conversation en proposant une demande d'absence/congé pour L'UTILISATEUR ACTUEL (jamais pour quelqu'un d'autre — les demandes de congé sont toujours personnelles). " +
+      "N'écrit rien en base tant que l'utilisateur n'a pas validé : à ce moment-là, la demande est créée ET soumise pour approbation par le responsable, exactement comme via la page Congés — elle n'est PAS automatiquement acceptée. " +
+      "Le modèle ne connaît que des demi-journées (matin / après-midi / journée entière), pas d'heures précises : si l'utilisateur donne des horaires (ex. \"de 13h à 17h\"), déduis la demi-journée la plus proche (avant ~13h = matin, après ~13h = après-midi) et reporte les horaires exacts donnés dans commentaire pour que le responsable les voie.",
+    parametres: {
+      type: "object",
+      properties: {
+        type_conge: { type: "string", enum: ["conges_payes", "rtt", "sans_solde", "maladie", "evenement_familial", "recuperation", "autre"], description: "\"conges_payes\" par défaut si non précisé par l'utilisateur." },
+        date_debut: { type: "string", description: "Date au format AAAA-MM-JJ" },
+        date_fin: { type: "string", description: "Date au format AAAA-MM-JJ, égale à date_debut pour une absence d'un seul jour" },
+        demi_jour_debut: { type: "string", enum: ["journee", "matin", "apres_midi"], description: "\"journee\" par défaut" },
+        demi_jour_fin: { type: "string", enum: ["journee", "matin", "apres_midi"], description: "\"journee\" par défaut" },
+        commentaire: { type: "string", description: "Précisions utiles au responsable (motif, horaires exacts cités par l'utilisateur, etc.)" },
+      },
+      required: ["date_debut", "date_fin"],
+    },
+  },
 ];
 
 export async function executerOutilCopilote(

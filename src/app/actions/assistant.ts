@@ -49,3 +49,52 @@ export async function creerAffectationDepuisPropositionAction(proposition: {
   revalidatePath("/planning");
   return { ok: true };
 }
+
+const TYPES_CONGE_AUTORISES = ["conges_payes", "rtt", "sans_solde", "maladie", "evenement_familial", "recuperation", "autre"];
+const DEMI_JOURNEES_AUTORISEES = ["journee", "matin", "apres_midi"];
+
+// Meme comportement que creerDemandeCongeAction (saisie manuelle depuis /conges) : brouillon
+// puis soumission immediate via la RPC dediee, jamais d'approbation automatique. employeId
+// n'est jamais fourni par le client ici : on ne cree que pour SA PROPRE fiche.
+export async function creerDemandeCongeDepuisPropositionAction(proposition: {
+  typeConge: string;
+  dateDebut: string;
+  dateFin: string;
+  demiJourDebut: string;
+  demiJourFin: string;
+  commentaire: string | null;
+}): Promise<{ error: string } | { ok: true }> {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
+  if (!TYPES_CONGE_AUTORISES.includes(proposition.typeConge)) return { error: "Type de congé invalide." };
+  if (!DEMI_JOURNEES_AUTORISEES.includes(proposition.demiJourDebut) || !DEMI_JOURNEES_AUTORISEES.includes(proposition.demiJourFin)) return { error: "Demi-journée invalide." };
+  if (!proposition.dateDebut || !proposition.dateFin || proposition.dateFin < proposition.dateDebut) return { error: "Période invalide." };
+
+  const { data: employe } = await supabase.from("employes").select("id").eq("entreprise_id", ctx.entrepriseId).eq("utilisateur_id", ctx.userId).maybeSingle();
+  if (!employe) return { error: "Ton compte n'est pas lié à une fiche employé." };
+
+  const { data, error } = await supabase
+    .from("demandes_conges")
+    .insert({
+      entreprise_id: ctx.entrepriseId,
+      employe_id: employe.id,
+      type_conge: proposition.typeConge,
+      date_debut: proposition.dateDebut,
+      date_fin: proposition.dateFin,
+      demi_jour_debut: proposition.demiJourDebut,
+      demi_jour_fin: proposition.demiJourFin,
+      commentaire: proposition.commentaire,
+      created_by: ctx.userId,
+      statut: "brouillon",
+    })
+    .select("id")
+    .single();
+  if (error || !data?.id) return { error: error?.message ?? "Création impossible." };
+
+  const { error: erreurSoumission } = await supabase.rpc("transition_demande_conge", { p_demande_id: data.id, p_action: "soumettre", p_message: null });
+  if (erreurSoumission) return { error: erreurSoumission.message };
+
+  revalidatePath("/conges");
+  return { ok: true };
+}

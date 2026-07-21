@@ -1,17 +1,25 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { creerAffectationDepuisPropositionAction } from "@/app/actions/assistant";
-import type { MessageChat, PropositionAffectation } from "@/lib/ai/assistant";
+import { creerAffectationDepuisPropositionAction, creerDemandeCongeDepuisPropositionAction } from "@/app/actions/assistant";
+import type { MessageChat, PropositionAffectation, PropositionConge } from "@/lib/ai/assistant";
 
-type MessageAffiche = MessageChat & { proposition?: PropositionAffectation; propositionStatut?: "en_attente" | "creee" | "refusee"; fichierNom?: string };
+type MessageAffiche = MessageChat & {
+  proposition?: PropositionAffectation;
+  propositionConge?: PropositionConge;
+  propositionStatut?: "en_attente" | "creee" | "refusee";
+  fichierNom?: string;
+};
 const LIBELLES_TYPE_ACTIVITE: Record<string, string> = { chantier: "Chantier", bureau: "Bureau", depot: "Dépôt", visite_medicale: "Visite médicale", formation: "Formation", autre: "Autre" };
+const LIBELLES_TYPE_CONGE: Record<string, string> = { conges_payes: "Congés payés", rtt: "RTT", sans_solde: "Sans solde", maladie: "Maladie", evenement_familial: "Événement familial", recuperation: "Récupération", autre: "Autre" };
+const LIBELLES_DEMI_JOURNEE: Record<string, string> = { journee: "journée entière", matin: "matin", apres_midi: "après-midi" };
 type FichierJoint = { base64: string; mimeType: string; nom: string };
 const MIME_PIECES_JOINTES_ACCEPTEES = "image/jpeg,image/png,image/webp,application/pdf";
 const TAILLE_MAX_PIECE_JOINTE = 6 * 1024 * 1024;
 type EvenementSSE =
   | { type: "texte"; delta: string }
   | { type: "proposition"; proposition: PropositionAffectation }
+  | { type: "proposition_conge"; proposition: PropositionConge }
   | { type: "fin" }
   | { type: "erreur"; message: string };
 
@@ -128,6 +136,8 @@ export function AssistantIA() {
               setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, contenu: texteFinal } : m)));
             } else if (evenement.type === "proposition") {
               setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, proposition: evenement.proposition, propositionStatut: "en_attente" } : m)));
+            } else if (evenement.type === "proposition_conge") {
+              setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, propositionConge: evenement.proposition, propositionStatut: "en_attente" } : m)));
             } else if (evenement.type === "erreur") {
               setErreur(evenement.message);
             }
@@ -203,6 +213,23 @@ export function AssistantIA() {
     });
   }
 
+  function validerPropositionConge(index: number) {
+    const message = messages[index];
+    if (!message.propositionConge) return;
+    startTransition(async () => {
+      const res = await creerDemandeCongeDepuisPropositionAction({
+        typeConge: message.propositionConge!.typeConge,
+        dateDebut: message.propositionConge!.dateDebut,
+        dateFin: message.propositionConge!.dateFin,
+        demiJourDebut: message.propositionConge!.demiJourDebut,
+        demiJourFin: message.propositionConge!.demiJourFin,
+        commentaire: message.propositionConge!.commentaire,
+      });
+      setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, propositionStatut: "error" in res ? "en_attente" : "creee" } : m)));
+      if ("error" in res) setErreur(res.error);
+    });
+  }
+
   function refuserProposition(index: number) {
     setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, propositionStatut: "refusee" } : m)));
   }
@@ -264,6 +291,28 @@ export function AssistantIA() {
                       </div>
                     )}
                     {m.propositionStatut === "creee" && <p className="mt-2 text-xs font-medium text-green-700">✓ Affectation créée</p>}
+                    {m.propositionStatut === "refusee" && <p className="mt-2 text-xs text-neutral-500">Ignorée</p>}
+                  </div>
+                )}
+                {m.propositionConge && (
+                  <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-liria-gold/60 bg-liria-gold/10 p-3 text-left text-sm">
+                    <p><strong>{LIBELLES_TYPE_CONGE[m.propositionConge.typeConge]}</strong> · {m.propositionConge.dateDebut}{m.propositionConge.dateFin !== m.propositionConge.dateDebut ? ` → ${m.propositionConge.dateFin}` : ""}</p>
+                    <p className="text-neutral-600 dark:text-neutral-300">
+                      {m.propositionConge.demiJourDebut === m.propositionConge.demiJourFin ? LIBELLES_DEMI_JOURNEE[m.propositionConge.demiJourDebut] : `${LIBELLES_DEMI_JOURNEE[m.propositionConge.demiJourDebut]} → ${LIBELLES_DEMI_JOURNEE[m.propositionConge.demiJourFin]}`}
+                      {m.propositionConge.commentaire ? ` · ${m.propositionConge.commentaire}` : ""}
+                    </p>
+                    <p className="mt-1 text-xs text-neutral-500">Sera soumise pour approbation, comme depuis la page Congés.</p>
+                    {m.propositionStatut === "en_attente" && (
+                      <div className="mt-2 flex gap-2">
+                        <button type="button" onClick={() => validerPropositionConge(i)} disabled={pending} className="rounded-md bg-green-700 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">
+                          Valider et soumettre
+                        </button>
+                        <button type="button" onClick={() => refuserProposition(i)} className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium">
+                          Ignorer
+                        </button>
+                      </div>
+                    )}
+                    {m.propositionStatut === "creee" && <p className="mt-2 text-xs font-medium text-green-700">✓ Demande envoyée au responsable</p>}
                     {m.propositionStatut === "refusee" && <p className="mt-2 text-xs text-neutral-500">Ignorée</p>}
                   </div>
                 )}

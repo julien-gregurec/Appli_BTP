@@ -22,9 +22,28 @@ export type PropositionAffectation = {
   tache: string | null;
 };
 
+// Doit rester synchronise avec `types` dans src/app/(app)/conges/page.tsx et le check
+// constraint de demandes_conges.type_conge.
+export const TYPES_CONGE = ["conges_payes", "rtt", "sans_solde", "maladie", "evenement_familial", "recuperation", "autre"] as const;
+export type TypeConge = (typeof TYPES_CONGE)[number];
+const DEMI_JOURNEES = ["journee", "matin", "apres_midi"] as const;
+export type DemiJournee = (typeof DEMI_JOURNEES)[number];
+
+export type PropositionConge = {
+  employeId: string;
+  employeNom: string;
+  typeConge: TypeConge;
+  dateDebut: string;
+  dateFin: string;
+  demiJourDebut: DemiJournee;
+  demiJourFin: DemiJournee;
+  commentaire: string | null;
+};
+
 export type EvenementAssistant =
   | { type: "texte"; delta: string }
-  | { type: "proposition"; proposition: PropositionAffectation };
+  | { type: "proposition"; proposition: PropositionAffectation }
+  | { type: "proposition_conge"; proposition: PropositionConge };
 
 const MAX_TOURS_OUTILS = 5;
 
@@ -58,6 +77,40 @@ async function resoudrePropositionAffectation(
   return { employeId, employeNom: `${employe.prenom} ${employe.nom}`, typeActivite, chantierId: null, chantierNom: null, lieuActivite, date, heures, tache };
 }
 
+// Les demandes de conge sont toujours personnelles : contrairement a proposer_affectation,
+// on ne prend jamais un employe_id fourni par le modele, on resout systematiquement la fiche
+// liee a l'utilisateur qui parle (memes regles que creerDemandeCongeAction en saisie manuelle).
+async function resoudrePropositionConge(
+  supabase: SupabaseClient,
+  entrepriseId: string,
+  utilisateurId: string,
+  input: Record<string, unknown>,
+): Promise<PropositionConge | null> {
+  const dateDebut = String(input.date_debut ?? "");
+  const dateFin = String(input.date_fin ?? "");
+  if (!dateDebut || !dateFin || dateFin < dateDebut) return null;
+
+  const typeCongeBrut = typeof input.type_conge === "string" && input.type_conge ? input.type_conge : "conges_payes";
+  if (!(TYPES_CONGE as readonly string[]).includes(typeCongeBrut)) return null;
+  const demiJourDebutBrut = typeof input.demi_jour_debut === "string" && input.demi_jour_debut ? input.demi_jour_debut : "journee";
+  const demiJourFinBrut = typeof input.demi_jour_fin === "string" && input.demi_jour_fin ? input.demi_jour_fin : "journee";
+  if (!(DEMI_JOURNEES as readonly string[]).includes(demiJourDebutBrut) || !(DEMI_JOURNEES as readonly string[]).includes(demiJourFinBrut)) return null;
+
+  const { data: employe } = await supabase.from("employes").select("id, nom, prenom").eq("entreprise_id", entrepriseId).eq("utilisateur_id", utilisateurId).maybeSingle();
+  if (!employe) return null;
+
+  return {
+    employeId: employe.id,
+    employeNom: `${employe.prenom} ${employe.nom}`,
+    typeConge: typeCongeBrut as TypeConge,
+    dateDebut,
+    dateFin,
+    demiJourDebut: demiJourDebutBrut as DemiJournee,
+    demiJourFin: demiJourFinBrut as DemiJournee,
+    commentaire: typeof input.commentaire === "string" && input.commentaire.trim() ? input.commentaire.trim() : null,
+  };
+}
+
 async function decrireUtilisateurCourant(supabase: SupabaseClient, entrepriseId: string, utilisateurId: string, prenomCompte: string | null): Promise<string> {
   const { data: employe } = await supabase
     .from("employes")
@@ -88,8 +141,9 @@ async function decrireUtilisateurCourant(supabase: SupabaseClient, entrepriseId:
 
 /**
  * Boucle agentique streamée : émet les morceaux de texte au fil de l'eau, exécute les
- * outils de lecture, et s'arrête dès que l'IA appelle `proposer_affectation` (jamais
- * d'écriture en base directe — la proposition est renvoyée pour validation manuelle).
+ * outils de lecture, et s'arrête dès que l'IA appelle un outil terminal (`proposer_affectation`
+ * ou `proposer_demande_conge`) — jamais d'écriture en base directe, la proposition est
+ * renvoyée pour validation manuelle.
  */
 export async function* demanderAssistantIAStream(
   supabase: SupabaseClient,
@@ -113,6 +167,7 @@ export async function* demanderAssistantIAStream(
     `tu ne crées jamais d'affectation toi-même, tu ne fais que la proposer ; l'utilisateur valide ou non. ` +
     `proposer_affectation gère aussi les heures hors chantier : pour du temps au bureau ou au dépôt, appelle-le avec type_activite="bureau" ou "depot" (sans chantier_id), et précise lieu_activite si utile. ` +
     `Si on te parle d'un chantier qui n'est pas encore enregistré dans Liria (chercher_chantier_planning ne le trouve pas), ne bloque pas : propose l'affectation avec type_activite="autre" et lieu_activite décrivant le chantier (ex. "Chantier non enregistré : nom cité"), et signale à l'utilisateur qu'il faudra créer la fiche chantier pour la relier plus tard. ` +
+    `Pour toute demande d'absence/congé de l'utilisateur sur lui-même (« mets-moi absent », « je pose une demi-journée »…), utilise proposer_demande_conge — jamais proposer_affectation. Ne redirige jamais vers un menu que tu n'as pas vérifié : cette demande sera soumise pour approbation, pas automatiquement acceptée. ` +
     `Formate tes réponses avec des tirets courts, pas de tableaux markdown, pas de titres.`;
 
   const conversation: MessageIA[] = historique.map((m) =>
@@ -137,13 +192,25 @@ export async function* demanderAssistantIAStream(
 
     if (resultat.appelsOutils.length === 0) return;
 
-    const appelFinal = resultat.appelsOutils.find((a) => a.nom === "proposer_affectation");
-    if (appelFinal) {
-      const proposition = await resoudrePropositionAffectation(supabase, entrepriseId, appelFinal.entree);
+    const appelAffectation = resultat.appelsOutils.find((a) => a.nom === "proposer_affectation");
+    if (appelAffectation) {
+      const proposition = await resoudrePropositionAffectation(supabase, entrepriseId, appelAffectation.entree);
       if (proposition) {
         yield { type: "proposition", proposition };
       } else {
         const message = "\n\nJe n'ai pas pu identifier précisément l'employé ou le chantier, peux-tu préciser ?";
+        yield { type: "texte", delta: message };
+      }
+      return;
+    }
+
+    const appelConge = resultat.appelsOutils.find((a) => a.nom === "proposer_demande_conge");
+    if (appelConge) {
+      const proposition = await resoudrePropositionConge(supabase, entrepriseId, utilisateurId, appelConge.entree);
+      if (proposition) {
+        yield { type: "proposition_conge", proposition };
+      } else {
+        const message = "\n\nJe n'ai pas pu préparer cette demande : vérifie les dates, et que tu as bien une fiche employé liée à ton compte (sinon, va dans « Mon espace » → « Créer ma fiche employé »).";
         yield { type: "texte", delta: message };
       }
       return;
