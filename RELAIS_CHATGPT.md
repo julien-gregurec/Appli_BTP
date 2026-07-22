@@ -1,3 +1,43 @@
+# REPRISE — 22 juillet 2026, remises plateforme, notifications push, Option IA à paliers, suivi de zone chantier (Claude)
+
+**Six migrations appliquées et vérifiées directement en base ce jour, toutes confirmées par Julien ("sql ok") puis recontrôlées via appels RPC directs (permission denied ≠ PGRST202 = la fonction existe). Tout est poussé sur `gh/main`, dernier commit `1e2855d`. TypeScript, ESLint (2 alertes historiques connues sans rapport), Vitest (78 tests) et build Next verts après chaque lot.**
+
+## 1. Remises/avoirs plateforme — `20260723000132_remises_plateforme.sql` APPLIQUÉE
+- `/plateforme` : geste commercial par entreprise (montant HT ou pourcentage, durée une fois/N mois/à vie) via coupon Stripe appliqué sur l'abonnement de base uniquement (pas encore de ciblage fin "options"/"employés" séparément — limitation connue, à faire si demandé).
+- RPC `plateforme_appliquer_remise`/`plateforme_retirer_remise`, colonnes `entreprises.remise_stripe_coupon_id/remise_description/remise_appliquee_at`.
+
+## 2. Notifications push — `20260723000131_notifications_push.sql` APPLIQUÉE, entièrement opérationnelle en production
+- Web Push (VAPID) + Database Webhook Supabase (créé manuellement en SQL, pas via le Dashboard — voir trigger `notifications_push_webhook` sur `notifications_utilisateurs`, appelant `supabase_functions.http_request`) + cron de secours quotidien `/api/cron/notifications-push` (Vercel Hobby = 1 seule exécution/jour, fenêtre de rattrapage élargie à 25h en conséquence).
+- 4 variables Vercel Production posées via CLI : `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `NOTIFICATIONS_WEBHOOK_SECRET`.
+- Testé de bout en bout par Julien sur son téléphone (demande de congé → notification reçue) : **confirmé fonctionnel**.
+- Nouveaux types de notifications ajoutés au passage (registre `src/lib/notifications-registre.ts`) : `planning_modifie` (changement d'affectation, migration `20260723000135_notifications_planning.sql` APPLIQUÉE, RPC `notifier_utilisateur`) et `sortie_zone_chantier` (voir point 5).
+
+## 3. Option IA payante à 3 paliers — `20260723000134` + `20260723000136` APPLIQUÉES
+- Comptes existants (avant ce jour) : accès IA **gratuit et permanent** (grandfather, `option_ia_statut='gratuit'`).
+- Nouvelles entreprises : essai **15 jours gratuit** (financé par Liria, aucune ligne Stripe pendant l'essai) démarré automatiquement à la création (trigger SQL sur `entreprises`).
+- 3 paliers au choix de l'entreprise (`option_ia_palier` : `100`/`300`/`illimite`) = plafond d'appels IA/jour, réutilise le compteur existant `journal_ia` (PAS un comptage de tokens réels — choix explicite de Julien pour rester simple/rapide).
+- **Reste à faire par Julien avant que la facturation réelle fonctionne** : créer 6 prix Stripe récurrents (100/300/illimité × mensuel/annuel) et les donner en variables d'env `STRIPE_PRICE_OPTION_IA_100_MENSUEL/ANNUEL`, `..._300_...`, `..._ILLIMITE_...` (voir `.env.local.example`). Sans ça, le cron `/api/cron/abonnements` échouera silencieusement à la fin d'un essai (l'IA se coupe simplement, rien n'est facturé).
+- UI self-service sur `/abonnement` (badge statut + choix palier + désactiver/réactiver). Badge visible aussi sur `/plateforme`.
+- Gate d'accès centralisé dans `src/lib/permissions.ts` (`permissionsUtilisateur`) — retire `acces_ia` du poste si l'entreprise n'a pas l'option accordée, quel que soit le droit du poste.
+
+## 4. Palette de couleurs des statuts chantier — 4 couleurs strictes (bleu/rouge/vert/jaune, PAS de noir)
+- `src/lib/chantier-statuts.ts` (source unique, utilisée partout : liste, kanban, donut dashboard) + `src/components/DashboardAnalytics.tsx` (barres "Devis émis"/"Facturé" du dashboard, qui avaient des couleurs codées en dur séparées — bien vérifier qu'aucun autre composant n'a ses propres couleurs codées en dur si Julien signale encore une zone non recolorée).
+- Julien n'a **pas encore confirmé visuellement** le rendu final après la dernière correction (retrait du noir) — à vérifier avec lui.
+
+## 5. Suivi de zone chantier (transparent) — `20260723000137_suivi_zone_chantier.sql` APPLIQUÉE
+- Demande initiale de Julien : géolocalisation **secrète**. **Refusé et expliqué** (illégal en droit du travail français/CNIL sans information du salarié) ; Julien a validé la version transparente à la place.
+- Vérifie périodiquement (fréquence réglable par l'entreprise : 15/30/60/120 min, Paramètres) que le salarié pointé reste dans le rayon GPS du chantier, **uniquement entre arrivée et départ** de sa session de pointage. Bandeau visible côté salarié pendant que ça tourne (`src/components/SuiviZoneChantier.tsx`) — jamais caché.
+- Alerte le responsable pointage (`notifier_permission`, permission `valider_pointages`) uniquement sur la transition dans-zone → hors-zone (pas de spam répété).
+- Limite technique assumée et expliquée à Julien : fonctionne seulement pendant que la page reste ouverte (PWA web, pas d'app native) — pas de vrai suivi en tâche de fond app fermée, surtout iOS Safari.
+- Position + rayon par chantier : bouton "Utiliser ma position actuelle" (`src/components/LocaliserGPSButton.tsx`) sur `/chantiers/nouveau` (création) et nouvelle page `/chantiers/[id]/localisation` (édition) reliée depuis la liste `/chantiers`. **`src/app/(app)/chantiers/[id]/page.tsx` n'a volontairement pas été touché** (montré modifié/non commité tout au long de la session, réservé à un autre chantier de travail en cours — probablement toi, ChatGPT, ou un autre agent).
+- **Reste à faire par Julien** : activer le suivi dans Paramètres, renseigner la position d'au moins un chantier, tester en conditions réelles (pas encore testé de bout en bout par Julien contrairement aux notifications push).
+
+## 6. Autre pendant la session
+- Corrigé un bug pré-existant sans rapport : le mode prototype local (`DISABLE_EMAIL_LOGIN=true`) pointait vers la prod, dont l'accès anonyme a été fermé intentionnellement le 14/07 (migration 78, voir plus bas dans ce fichier) — RPC `dev_contexte_entreprise` supprimée en prod. **Ne surtout pas la recréer en prod** (régression de sécurité volontaire). Correctif appliqué : `.env.local` local de Julien passé à `DISABLE_EMAIL_LOGIN=false` (connexion réelle requise pour tester en local désormais).
+- Grand déplacement (budget manuel + notes de frais **ou** barème BTP automatique, au choix de l'entreprise dans Paramètres) : **NON COMMENCÉ**, c'est la tâche suivante que Julien veut te confier.
+
+---
+
 # REPRISE — 17 juillet 2026, facturation des comptes utilisant plus de deux appareils (MIGRATION 90 APPLIQUÉE)
 
 ## 18 juillet 2026 — Réception groupée sécurisée sur le compte dépôt (MIGRATION 112 APPLIQUÉE)
@@ -1002,3 +1042,9 @@ git diff --check                   # OK (aucun conflit whitespace)
 - La table commune des tiers distingue désormais `fournisseur` et `sous_traitant`. Les listes fournisseurs ordinaires restent filtrées, et un gestionnaire sous-traitants ne peut pas modifier un fournisseur ordinaire.
 - Migration `20260718000111_sous_traitants.sql` appliquée et vérifiée dans Supabase. Les politiques restrictives de lecture et de gestion renvoient `true`.
 - Contrôles verts : 80 tests Vitest, TypeScript, ESLint, `git diff --check` et build Next webpack complet de 96 pages. L’avertissement historique `SignatureEmploye.tsx` et celui d’`unpdf/import.meta` restent non bloquants et hors lot.
+# Lot 113 — lecture des modules selon les autorisations (18 juillet 2026)
+
+- Ajout de politiques RLS restrictives de lecture pour les clients, chantiers, tâches, devis, factures, paiements, achats et charges.
+- Les anciennes politiques générales de membre ne peuvent plus contourner les droits de consultation du poste.
+- Les ouvriers ne voient que leurs chantiers affectés et leurs tâches ; les données commerciales et financières nécessitent désormais leur permission explicite.
+- Le budget prévisionnel est masqué sur la fiche chantier lorsque le compte ne dispose pas des droits financiers.
