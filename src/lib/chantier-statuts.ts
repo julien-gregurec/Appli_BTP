@@ -1,9 +1,9 @@
 // Statuts de chantier (Clients & Chantiers §3) : libellé, couleur, ordre du workflow.
-// Palette volontairement limitée a 5 couleurs (bleu/rouge/vert/noir/jaune) : noir = pas
-// encore demarre ou archive, bleu = etape administrative/informative, jaune = en cours ou
-// en attente d'action, vert = positif/termine, rouge = arrete ou annule.
+// Palette volontairement limitée a 4 couleurs (bleu/rouge/vert/jaune) : bleu = etape
+// administrative/informative (ou inactif/archive), jaune = en cours ou en attente
+// d'action, vert = positif/termine, rouge = arrete ou annule.
 export const CHANTIER_STATUTS = [
-  { cle: "prospect", libelle: "Prospect", couleur: "#111827" },
+  { cle: "prospect", libelle: "Prospect", couleur: "#2563eb" },
   { cle: "devis_envoye", libelle: "Devis envoyé", couleur: "#2563eb" },
   { cle: "accepte", libelle: "Accepté", couleur: "#16a34a" },
   { cle: "a_preparer", libelle: "À préparer", couleur: "#b8792e" },
@@ -13,7 +13,7 @@ export const CHANTIER_STATUTS = [
   { cle: "en_pause", libelle: "En pause", couleur: "#dc2626" },
   { cle: "termine", libelle: "Terminé", couleur: "#16a34a" },
   { cle: "facture", libelle: "Facturé", couleur: "#2563eb" },
-  { cle: "archive", libelle: "Archivé", couleur: "#111827" },
+  { cle: "archive", libelle: "Archivé", couleur: "#2563eb" },
   { cle: "annule", libelle: "Annulé", couleur: "#dc2626" },
 ] as const;
 
