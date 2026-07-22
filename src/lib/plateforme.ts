@@ -47,6 +47,7 @@ export type EntrepriseAbonnement = {
   remise_appliquee_at?: string | null;
   option_ia_statut?: string | null;
   option_ia_essai_fin?: string | null;
+  option_ia_palier?: string | null;
   nb_membres: number;
   nb_membres_actifs: number;
   nb_fiches_employes?: number;

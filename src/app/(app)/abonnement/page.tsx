@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { demarrerAbonnementAction, desactiverOptionIAAction, ouvrirPortailAbonnementAction, reactiverOptionIAAction } from "@/app/actions/abonnement";
+import { choisirPalierOptionIAAction, demarrerAbonnementAction, desactiverOptionIAAction, ouvrirPortailAbonnementAction, reactiverOptionIAAction } from "@/app/actions/abonnement";
 import { AlerteDepassementAppareils } from "@/components/AlerteDepassementAppareils";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
@@ -13,7 +13,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
   const [{ error, succes }, ctx] = await Promise.all([searchParams, getContexteEntreprise()]);
   const supabase = await createClient();
   const [{ data: entreprise }, { data: utilisationStockage }, { data: employesFacturables }, { data: postes }, { data: appareils }] = await Promise.all([
-    supabase.from("entreprises").select("abonnement_statut,abonnement_echeance,abonnement_offre,abonnement_periodicite,abonnement_essai_fin,abonnement_annulation_prevue_at,stripe_customer_id,stripe_subscription_id,derniere_facture_url,derniere_facture_pdf,derniere_facture_statut,derniere_facture_at,option_ia_statut,option_ia_essai_fin").eq("id",ctx.entrepriseId).single(),
+    supabase.from("entreprises").select("abonnement_statut,abonnement_echeance,abonnement_offre,abonnement_periodicite,abonnement_essai_fin,abonnement_annulation_prevue_at,stripe_customer_id,stripe_subscription_id,derniere_facture_url,derniere_facture_pdf,derniere_facture_statut,derniere_facture_at,option_ia_statut,option_ia_essai_fin,option_ia_palier").eq("id",ctx.entrepriseId).single(),
     supabase.rpc("utilisation_stockage_entreprise", { p_entreprise_id: ctx.entrepriseId }),
     supabase.from("employes").select("utilisateur_id,prenom,nom,poste_id,compte_application_statut").eq("entreprise_id", ctx.entrepriseId).in("compte_application_statut", ["actif", "pause"]),
     supabase.from("postes").select("id,nom,tarif_compte_mensuel").eq("entreprise_id", ctx.entrepriseId),
@@ -106,8 +106,19 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
         {entreprise?.option_ia_statut==="annule"&&<span className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">Désactivée</span>}
         {entreprise?.option_ia_statut==="indisponible"&&<span className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">Indisponible</span>}
       </div>
-      {entreprise?.option_ia_statut==="essai"&&<p className="mt-3 text-xs text-neutral-500">Essai offert par Liria. Passé ce délai, si vous ne désactivez pas l’option, elle est facturée automatiquement sur votre abonnement.</p>}
-      {(entreprise?.option_ia_statut==="essai"||entreprise?.option_ia_statut==="actif")&&<form action={desactiverOptionIAAction} className="mt-4"><button className="rounded-md border border-red-200 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50">Désactiver l’option IA</button></form>}
+      {entreprise?.option_ia_statut==="essai"&&<p className="mt-3 text-xs text-neutral-500">Essai offert par Liria. Passé ce délai, si vous ne désactivez pas l’option, le palier choisi ci-dessous est facturé automatiquement sur votre abonnement.</p>}
+      {(entreprise?.option_ia_statut==="essai"||entreprise?.option_ia_statut==="actif")&&<form action={choisirPalierOptionIAAction} className="mt-4 flex flex-wrap items-end gap-2">
+        <label className="space-y-1 text-sm">
+          <span className="block text-xs text-neutral-500">Palier ({entreprise.option_ia_statut==="essai"?"appliqué à la fin de l’essai":"appliqué immédiatement"})</span>
+          <select name="palier" defaultValue={entreprise?.option_ia_palier??"300"} className={input}>
+            <option value="100">100 appels IA / jour</option>
+            <option value="300">300 appels IA / jour</option>
+            <option value="illimite">Illimité</option>
+          </select>
+        </label>
+        <button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Enregistrer le palier</button>
+      </form>}
+      {(entreprise?.option_ia_statut==="essai"||entreprise?.option_ia_statut==="actif")&&<form action={desactiverOptionIAAction} className="mt-3"><button className="rounded-md border border-red-200 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50">Désactiver l’option IA</button></form>}
       {entreprise?.option_ia_statut==="annule"&&(souscrit
         ? <form action={reactiverOptionIAAction} className="mt-4"><button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Réactiver l’option IA</button></form>
         : <p className="mt-3 text-xs text-neutral-500">Souscrivez à un abonnement ci-dessous pour pouvoir réactiver l’option IA.</p>)}

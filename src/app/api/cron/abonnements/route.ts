@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ajouterOptionIAAbonnement, estPeriodiciteAbonnement, reconcilierAbonnementStripe } from "@/lib/stripe-abonnement";
+import { ajouterOptionIAAbonnement, estPalierOptionIA, estPeriodiciteAbonnement, reconcilierAbonnementStripe } from "@/lib/stripe-abonnement";
 
 // Bascule les essais Option IA expires vers la facturation reelle. Regroupe avec le cron
 // des abonnements (et non un cron dedie) car le plan Vercel Hobby limite le nombre de
@@ -8,7 +8,7 @@ import { ajouterOptionIAAbonnement, estPeriodiciteAbonnement, reconcilierAbonnem
 async function convertirEssaisOptionIAExpires(admin: ReturnType<typeof createAdminClient>) {
   const { data: essaisExpires, error } = await admin
     .from("entreprises")
-    .select("id,stripe_subscription_id,abonnement_periodicite")
+    .select("id,stripe_subscription_id,abonnement_periodicite,option_ia_palier")
     .eq("option_ia_statut", "essai")
     .lt("option_ia_essai_fin", new Date().toISOString());
   if (error) return [{ entrepriseId: "-", ok: false, raison: error.message }];
@@ -17,6 +17,8 @@ async function convertirEssaisOptionIAExpires(admin: ReturnType<typeof createAdm
   for (const entreprise of essaisExpires ?? []) {
     const periodiciteBrute = String(entreprise.abonnement_periodicite ?? "mensuel");
     const periodicite = estPeriodiciteAbonnement(periodiciteBrute) ? periodiciteBrute : "mensuel";
+    const palierBrute = String(entreprise.option_ia_palier ?? "300");
+    const palier = estPalierOptionIA(palierBrute) ? palierBrute : "300";
     if (!entreprise.stripe_subscription_id) {
       // Essai termine sans abonnement de base souscrit : l'IA se coupe, sans facturation.
       await admin.from("entreprises").update({ option_ia_statut: "indisponible" }).eq("id", entreprise.id);
@@ -24,7 +26,7 @@ async function convertirEssaisOptionIAExpires(admin: ReturnType<typeof createAdm
       continue;
     }
     try {
-      const item = await ajouterOptionIAAbonnement(entreprise.stripe_subscription_id, periodicite);
+      const item = await ajouterOptionIAAbonnement(entreprise.stripe_subscription_id, palier, periodicite);
       await admin.from("entreprises").update({ option_ia_statut: "actif", option_ia_stripe_item_id: item.id }).eq("id", entreprise.id);
       resultats.push({ entrepriseId: entreprise.id, ok: true });
     } catch (erreur) {

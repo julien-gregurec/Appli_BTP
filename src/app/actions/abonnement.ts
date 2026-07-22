@@ -11,6 +11,7 @@ import {
   creerSessionAbonnementStripe,
   creerSessionPortailStripe,
   estOffreAbonnement,
+  estPalierOptionIA,
   estPeriodiciteAbonnement,
   retirerOptionIAAbonnement,
 } from "@/lib/stripe-abonnement";
@@ -118,7 +119,7 @@ export async function reactiverOptionIAAction() {
   const supabase = await createClient();
   const { data: entreprise } = await supabase
     .from("entreprises")
-    .select("option_ia_statut,stripe_subscription_id,abonnement_periodicite")
+    .select("option_ia_statut,option_ia_palier,stripe_subscription_id,abonnement_periodicite")
     .eq("id", ctx.entrepriseId)
     .maybeSingle();
   if (!entreprise || entreprise.option_ia_statut !== "annule") {
@@ -129,11 +130,57 @@ export async function reactiverOptionIAAction() {
   }
   const periodiciteBrute = String(entreprise.abonnement_periodicite ?? "mensuel");
   const periodicite = estPeriodiciteAbonnement(periodiciteBrute) ? periodiciteBrute : "mensuel";
+  const palierBrute = String(entreprise.option_ia_palier ?? "300");
+  const palier = estPalierOptionIA(palierBrute) ? palierBrute : "300";
   try {
-    const item = await ajouterOptionIAAbonnement(entreprise.stripe_subscription_id, periodicite);
+    const item = await ajouterOptionIAAbonnement(entreprise.stripe_subscription_id, palier, periodicite);
     await supabase.from("entreprises").update({ option_ia_statut: "actif", option_ia_stripe_item_id: item.id }).eq("id", ctx.entrepriseId);
   } catch (error) {
     redirect(`/abonnement?error=${encodeURIComponent(error instanceof Error ? error.message : "Réactivation impossible")}`);
+  }
+  revalidatePath("/abonnement");
+  redirect(`/abonnement?succes=1`);
+}
+
+// Choix du palier IA (100/300/illimité). Pendant l'essai : simple mise à jour locale (rien
+// n'est facturé avant la fin de l'essai). Une fois actif : bascule Stripe (retrait de
+// l'ancienne ligne, ajout de la nouvelle) avec proration.
+export async function choisirPalierOptionIAAction(formData: FormData) {
+  const ctx = await verifierDroitAbonnement();
+  const palierBrut = String(formData.get("palier") ?? "");
+  if (!estPalierOptionIA(palierBrut)) {
+    redirect(`/abonnement?error=${encodeURIComponent("Palier invalide")}`);
+  }
+  const supabase = await createClient();
+  const { data: entreprise } = await supabase
+    .from("entreprises")
+    .select("option_ia_statut,option_ia_palier,option_ia_stripe_item_id,stripe_subscription_id,abonnement_periodicite")
+    .eq("id", ctx.entrepriseId)
+    .maybeSingle();
+  if (!entreprise || (entreprise.option_ia_statut !== "essai" && entreprise.option_ia_statut !== "actif")) {
+    redirect(`/abonnement?error=${encodeURIComponent("L’option IA doit être active ou en essai pour choisir un palier")}`);
+  }
+  if (entreprise.option_ia_palier === palierBrut) {
+    redirect(`/abonnement?succes=1`);
+  }
+
+  if (entreprise.option_ia_statut === "essai") {
+    await supabase.from("entreprises").update({ option_ia_palier: palierBrut }).eq("id", ctx.entrepriseId);
+    revalidatePath("/abonnement");
+    redirect(`/abonnement?succes=1`);
+  }
+
+  if (!entreprise.stripe_subscription_id) {
+    redirect(`/abonnement?error=${encodeURIComponent("Aucun abonnement Stripe associé")}`);
+  }
+  const periodiciteBrute = String(entreprise.abonnement_periodicite ?? "mensuel");
+  const periodicite = estPeriodiciteAbonnement(periodiciteBrute) ? periodiciteBrute : "mensuel";
+  try {
+    if (entreprise.option_ia_stripe_item_id) await retirerOptionIAAbonnement(entreprise.option_ia_stripe_item_id);
+    const item = await ajouterOptionIAAbonnement(entreprise.stripe_subscription_id, palierBrut, periodicite);
+    await supabase.from("entreprises").update({ option_ia_palier: palierBrut, option_ia_stripe_item_id: item.id }).eq("id", ctx.entrepriseId);
+  } catch (error) {
+    redirect(`/abonnement?error=${encodeURIComponent(error instanceof Error ? error.message : "Changement de palier impossible")}`);
   }
   revalidatePath("/abonnement");
   redirect(`/abonnement?succes=1`);

@@ -60,13 +60,20 @@ const VARIABLES_PRIX_COMPTE_SUP: Record<OffreAbonnement, Record<PeriodiciteAbonn
   premium: { mensuel: "STRIPE_PRICE_COMPTE_SUP_PREMIUM_MENSUEL", annuel: "STRIPE_PRICE_COMPTE_SUP_PREMIUM_ANNUEL" },
 };
 
-const VARIABLES_PRIX_OPTION_IA: Record<PeriodiciteAbonnement, string> = {
-  mensuel: "STRIPE_PRICE_OPTION_IA_MENSUEL",
-  annuel: "STRIPE_PRICE_OPTION_IA_ANNUEL",
+export const PALIERS_OPTION_IA = ["100", "300", "illimite"] as const;
+export type PalierOptionIA = (typeof PALIERS_OPTION_IA)[number];
+export function estPalierOptionIA(valeur: string): valeur is PalierOptionIA {
+  return (PALIERS_OPTION_IA as readonly string[]).includes(valeur);
+}
+
+const VARIABLES_PRIX_OPTION_IA: Record<PalierOptionIA, Record<PeriodiciteAbonnement, string>> = {
+  "100": { mensuel: "STRIPE_PRICE_OPTION_IA_100_MENSUEL", annuel: "STRIPE_PRICE_OPTION_IA_100_ANNUEL" },
+  "300": { mensuel: "STRIPE_PRICE_OPTION_IA_300_MENSUEL", annuel: "STRIPE_PRICE_OPTION_IA_300_ANNUEL" },
+  illimite: { mensuel: "STRIPE_PRICE_OPTION_IA_ILLIMITE_MENSUEL", annuel: "STRIPE_PRICE_OPTION_IA_ILLIMITE_ANNUEL" },
 };
 
-export function prixOptionIAStripePour(periodicite: PeriodiciteAbonnement, environnement: NodeJS.ProcessEnv = process.env) {
-  return environnement[VARIABLES_PRIX_OPTION_IA[periodicite]] || null;
+export function prixOptionIAStripePour(palier: PalierOptionIA, periodicite: PeriodiciteAbonnement, environnement: NodeJS.ProcessEnv = process.env) {
+  return environnement[VARIABLES_PRIX_OPTION_IA[palier][periodicite]] || null;
 }
 
 export function estOffreAbonnement(valeur: string): valeur is OffreAbonnement {
@@ -306,12 +313,12 @@ export async function reconcilierAbonnementStripe(entrepriseId: string) {
 // intervalle de facturation (mensuel/annuel) que l'offre de base, en suivant le meme
 // principe que le supplement de comptes (VARIABLES_PRIX_COMPTE_SUP) : plusieurs prix sur
 // un seul abonnement Stripe, tant qu'ils partagent le meme intervalle de facturation.
-export async function ajouterOptionIAAbonnement(subscriptionId: string, periodicite: PeriodiciteAbonnement) {
-  const prix = prixOptionIAStripePour(periodicite);
-  if (!prix) throw new Error("Le tarif Stripe de l'option IA n'est pas configuré");
+export async function ajouterOptionIAAbonnement(subscriptionId: string, palier: PalierOptionIA, periodicite: PeriodiciteAbonnement) {
+  const prix = prixOptionIAStripePour(palier, periodicite);
+  if (!prix) throw new Error("Le tarif Stripe de l'option IA n'est pas configuré pour ce palier");
   const item = await requeteStripe<{ id: string }>("subscription_items", {
     corps: new URLSearchParams({ subscription: subscriptionId, price: prix, quantity: "1", proration_behavior: "create_prorations" }),
-    idempotence: `option-ia-ajout-${subscriptionId}`,
+    idempotence: `option-ia-ajout-${subscriptionId}-${palier}-${Date.now()}`,
   });
   return item;
 }

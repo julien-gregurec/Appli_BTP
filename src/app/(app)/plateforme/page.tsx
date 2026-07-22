@@ -22,7 +22,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
   if (isEmailLoginDisabled()) {
     const { data: ents } = await supabase
       .from("entreprises")
-      .select("id, nom, code_adhesion, reference_interne, abonnement_statut, abonnement_echeance, abonnement_note, impaye_signale_at, suspension_prevue_at, impaye_message, dernier_reglement_at, remise_stripe_coupon_id, remise_description, remise_appliquee_at, option_ia_statut, option_ia_essai_fin, created_at")
+      .select("id, nom, code_adhesion, reference_interne, abonnement_statut, abonnement_echeance, abonnement_note, impaye_signale_at, suspension_prevue_at, impaye_message, dernier_reglement_at, remise_stripe_coupon_id, remise_description, remise_appliquee_at, option_ia_statut, option_ia_essai_fin, option_ia_palier, created_at")
       .order("created_at", { ascending: false });
     const { data: membres } = await supabase.from("utilisateurs_entreprises").select("entreprise_id, statut");
     const { data: employes } = await supabase.from("employes").select("entreprise_id, poste_id, statut, compte_application_statut, utilisateur_id, invitation_envoyee_at, application_installee_at, derniere_connexion_at");
@@ -166,7 +166,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-2 py-0.5 text-xs dark:bg-neutral-800">
                         <span className="h-2 w-2 rounded-full" style={{ background: st.couleur }} />{st.libelle}
                       </span>
-                      {e.option_ia_statut&&e.option_ia_statut!=="indisponible"&&<span className="rounded-full bg-[#c9a24a]/10 px-2 py-0.5 text-xs font-medium text-[#8a6a1f] dark:text-[#c9a24a]">IA {e.option_ia_statut}</span>}
+                      {e.option_ia_statut&&e.option_ia_statut!=="indisponible"&&<span className="rounded-full bg-[#c9a24a]/10 px-2 py-0.5 text-xs font-medium text-[#8a6a1f] dark:text-[#c9a24a]">IA {e.option_ia_statut}{e.option_ia_palier&&e.option_ia_statut!=="gratuit"?` · ${e.option_ia_palier}${e.option_ia_palier==="illimite"?"":"/j"}`:""}</span>}
                     </div>
                     <p className="mt-1 text-xs text-neutral-500">
                       Code <span className="font-mono tracking-widest">{e.code_adhesion ?? "—"}</span>
