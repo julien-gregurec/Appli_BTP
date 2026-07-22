@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { creerChantierAction } from "@/app/actions/chantiers";
 import { nomClient, CHANTIER_STATUTS } from "@/lib/chantier-statuts";
+import { LocaliserGPSButton } from "@/components/LocaliserGPSButton";
 
 const inputClass =
   "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
@@ -113,6 +114,12 @@ export default async function NouveauChantierPage({
             <div className="space-y-1">
               <label className={labelClass} htmlFor="budget_previsionnel">Budget prévisionnel (€)</label>
               <input id="budget_previsionnel" name="budget_previsionnel" type="number" step="0.01" className={inputClass} />
+            </div>
+
+            <div className="space-y-1">
+              <label className={labelClass}>Position GPS (pour le suivi de zone pendant le pointage)</label>
+              <p className="text-xs text-neutral-500">Facultatif. Renseignez-la une fois sur place, ou plus tard depuis la fiche du chantier.</p>
+              <LocaliserGPSButton />
             </div>
 
             <button type="submit" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">

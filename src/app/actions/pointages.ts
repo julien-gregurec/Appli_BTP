@@ -21,6 +21,24 @@ function positionTerrain(formData: FormData): { latitude: number | null; longitu
   return { latitude: null, longitude: null, precision: null, motifSansGps };
 }
 
+// Vérification périodique de zone (suivi de zone chantier) : appelée en tâche de fond par
+// le client pendant qu'une session de pointage est ouverte, jamais via un <form>. Ne fait
+// rien (et ne lève pas d'erreur) si le suivi est désactivé côté entreprise ou le chantier
+// sans coordonnées : c'est le rôle de la fonction RPC de trancher.
+export async function verifierZonePointageAction(sessionId: string, latitude: number, longitude: number, precision: number | null) {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("verifier_zone_pointage", {
+    p_entreprise_id: ctx.entrepriseId,
+    p_session_id: sessionId,
+    p_latitude: latitude,
+    p_longitude: longitude,
+    p_precision: precision,
+  });
+  if (error) return { ok: false as const, erreur: error.message };
+  return { ok: true as const, dansZone: data as boolean | null };
+}
+
 export async function enregistrerArriveeAction(formData: FormData) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();

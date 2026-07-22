@@ -120,6 +120,9 @@ export async function modifierEntrepriseAction(formData: FormData) {
   const horaires=Object.fromEntries(Array.from({length:7},(_,index)=>{const valeur=Number(champ(formData,`heures_jour_${index+1}`)?.replace(",",".")??0);if(!Number.isFinite(valeur)||valeur<0||valeur>24)redirect(`/parametres?error=${encodeURIComponent("Les horaires journaliers doivent être compris entre 0 et 24 heures")}`);return[String(index+1),valeur];}));
   const seuilEcart=Number(champ(formData,"seuil_ecart_pointage")?.replace(",",".")??0.25);
   if(!Number.isFinite(seuilEcart)||seuilEcart<0||seuilEcart>8)redirect(`/parametres?error=${encodeURIComponent("Seuil d’écart de pointage invalide")}`);
+  const suiviZoneActif=formData.get("suivi_zone_actif")==="on";
+  const suiviZoneFrequence=Number(champ(formData,"suivi_zone_frequence_minutes")??30);
+  if(![15,30,60,120].includes(suiviZoneFrequence))redirect(`/parametres?error=${encodeURIComponent("Fréquence de suivi de zone invalide")}`);
   const modeleDocument = champ(formData,"mise_en_page_documents") ?? "classique";
   if(!["classique","compacte","epuree","moderne","elegante","technique"].includes(modeleDocument)) redirect(`/parametres?error=${encodeURIComponent("Modèle de document invalide")}`);
   const positionLogo = champ(formData,"position_logo_documents") ?? "gauche";
@@ -158,6 +161,8 @@ export async function modifierEntrepriseAction(formData: FormData) {
     afficher_tva_lignes_documents: formData.get("afficher_tva_lignes_documents") === "on",
     horaires_journaliers: horaires,
     seuil_ecart_pointage: seuilEcart,
+    suivi_zone_actif: suiviZoneActif,
+    suivi_zone_frequence_minutes: suiviZoneFrequence,
     updated_at: new Date().toISOString(),
   }).eq("id", ctx.entrepriseId);
 

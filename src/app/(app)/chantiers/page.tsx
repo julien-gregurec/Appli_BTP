@@ -87,9 +87,12 @@ export default async function ChantiersPage({ searchParams }: { searchParams: Pr
                     <div><dt className="text-xs text-neutral-500">Client</dt><dd className="font-medium">{chantier.client_nom || chantier.client_societe ? nomClient(client) : "—"}</dd></div>
                     <div><dt className="text-xs text-neutral-500">Ville</dt><dd>{chantier.ville ?? "—"}</dd></div>
                   </dl>
-                  <Link href={`/chantiers/${chantier.id}`} className="inline-flex w-full items-center justify-center rounded-md border px-3 py-2 text-sm font-medium">
-                    Voir le chantier et son suivi
-                  </Link>
+                  <div className="flex gap-2">
+                    <Link href={`/chantiers/${chantier.id}`} className="inline-flex flex-1 items-center justify-center rounded-md border px-3 py-2 text-sm font-medium">
+                      Voir le chantier et son suivi
+                    </Link>
+                    {peutGerer && <Link href={`/chantiers/${chantier.id}/localisation`} className="inline-flex items-center justify-center rounded-md border px-3 py-2 text-sm font-medium" title="Position GPS (suivi de zone)">📍</Link>}
+                  </div>
                 </article>
               );
             })}
@@ -102,6 +105,7 @@ export default async function ChantiersPage({ searchParams }: { searchParams: Pr
                   <th className="px-4 py-2 font-medium">Chantier</th>
                   <th className="px-4 py-2 font-medium">Client</th>
                   <th className="px-4 py-2 font-medium">Statut</th>
+                  {peutGerer && <th className="px-4 py-2 font-medium">GPS</th>}
                 </tr>
               </thead>
               <tbody>
@@ -122,6 +126,7 @@ export default async function ChantiersPage({ searchParams }: { searchParams: Pr
                           {st.libelle}
                         </span>
                       </td>
+                      {peutGerer && <td className="px-4 py-2"><Link href={`/chantiers/${ch.id}/localisation`} className="text-xs text-blue-700 hover:underline">📍 Position</Link></td>}
                     </tr>
                   );
                 })}

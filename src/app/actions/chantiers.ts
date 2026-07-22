@@ -30,6 +30,10 @@ export async function creerChantierAction(formData: FormData) {
     redirect(`/chantiers/nouveau?error=${encodeURIComponent("Client obligatoire")}`);
   }
 
+  const latitudeBrute = champ(formData, "latitude");
+  const longitudeBrute = champ(formData, "longitude");
+  const rayonBrut = Number(champ(formData, "rayon_metres") ?? 300);
+
   const { data, error } = await supabase
     .from("chantiers")
     .insert({
@@ -44,6 +48,9 @@ export async function creerChantierAction(formData: FormData) {
       date_debut_prevue: champ(formData, "date_debut_prevue"),
       date_fin_prevue: champ(formData, "date_fin_prevue"),
       budget_previsionnel: champ(formData, "budget_previsionnel"),
+      latitude: latitudeBrute ? Number(latitudeBrute) : null,
+      longitude: longitudeBrute ? Number(longitudeBrute) : null,
+      rayon_metres: Number.isFinite(rayonBrut) && rayonBrut > 0 ? rayonBrut : 300,
     })
     .select("id")
     .single();
@@ -54,6 +61,38 @@ export async function creerChantierAction(formData: FormData) {
 
   revalidatePath("/chantiers");
   redirect(`/chantiers/${data.id}`);
+}
+
+// Position GPS + rayon du chantier, utilisés par le suivi de zone pendant le pointage.
+export async function modifierLocalisationChantierAction(chantierId: string, formData: FormData) {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+
+  if (!(await peutGererChantiers(ctx))) {
+    redirect(`/chantiers/${chantierId}/localisation?error=${encodeURIComponent("Votre poste ne permet pas de modifier les chantiers")}`);
+  }
+
+  const latitudeBrute = champ(formData, "latitude");
+  const longitudeBrute = champ(formData, "longitude");
+  const rayonBrut = Number(champ(formData, "rayon_metres") ?? 300);
+  if (!Number.isFinite(rayonBrut) || rayonBrut <= 0 || rayonBrut > 5000) {
+    redirect(`/chantiers/${chantierId}/localisation?error=${encodeURIComponent("Rayon invalide (entre 10 et 5000 m)")}`);
+  }
+
+  const { error } = await supabase
+    .from("chantiers")
+    .update({
+      latitude: latitudeBrute ? Number(latitudeBrute) : null,
+      longitude: longitudeBrute ? Number(longitudeBrute) : null,
+      rayon_metres: rayonBrut,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", chantierId)
+    .eq("entreprise_id", ctx.entrepriseId);
+  if (error) redirect(`/chantiers/${chantierId}/localisation?error=${encodeURIComponent(error.message)}`);
+
+  revalidatePath(`/chantiers/${chantierId}/localisation`);
+  redirect(`/chantiers/${chantierId}/localisation?succes=1`);
 }
 
 // Création rapide d'un chantier depuis l'éditeur de devis (retourne du JSON, pas de redirect).
