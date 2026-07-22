@@ -2,6 +2,7 @@ import { cache } from "react";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { createClient } from "@/lib/supabase/server";
 import type { ContexteEntreprise } from "@/lib/entreprise";
+import { filtrerPermissionsSelonOffre } from "@/lib/tarification";
 
 // null signifie « accès complet » (prototype sans connexion).
 /**
@@ -20,7 +21,7 @@ export const permissionsUtilisateur = cache(async function permissionsUtilisateu
   const [{data:accesSupport},{data:appartenance},{data:entreprise}]=await Promise.all([
     sb.rpc("est_acces_support_actif",{p_entreprise_id:ctx.entrepriseId}),
     sb.from("utilisateurs_entreprises").select("poste_id,pointage_personnel_actif").eq("utilisateur_id",ctx.userId).eq("entreprise_id",ctx.entrepriseId).eq("statut","actif").maybeSingle(),
-    sb.from("entreprises").select("option_ia_statut,option_ia_essai_fin").eq("id",ctx.entrepriseId).maybeSingle(),
+    sb.from("entreprises").select("option_ia_statut,option_ia_essai_fin,abonnement_offre").eq("id",ctx.entrepriseId).maybeSingle(),
   ]);
   if(accesSupport===true)return null;
   if(!appartenance?.poste_id)return [];
@@ -37,7 +38,7 @@ export const permissionsUtilisateur = cache(async function permissionsUtilisateu
   const statutOptionIA=entreprise?.option_ia_statut;
   const optionIAAccordee=statutOptionIA==="gratuit"||statutOptionIA==="actif"||(statutOptionIA==="essai"&&Boolean(entreprise?.option_ia_essai_fin)&&new Date(entreprise!.option_ia_essai_fin!).getTime()>Date.now());
   if(!optionIAAccordee)droits.delete("acces_ia");
-  return [...droits];
+  return filtrerPermissionsSelonOffre(droits, entreprise?.abonnement_offre);
 });
 
 // null = accès complet (prototype ou support). Sinon, droit explicite requis.

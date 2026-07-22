@@ -1,23 +1,27 @@
 import Link from "next/link";
-import { choisirPalierOptionIAAction, demarrerAbonnementAction, desactiverOptionIAAction, ouvrirPortailAbonnementAction, reactiverOptionIAAction } from "@/app/actions/abonnement";
+import { choisirPalierOptionIAAction, configurerPolitiqueIAAction, demarrerAbonnementAction, desactiverOptionIAAction, ouvrirPortailAbonnementAction, reactiverOptionIAAction } from "@/app/actions/abonnement";
 import { AlerteDepassementAppareils } from "@/components/AlerteDepassementAppareils";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { calculerDepassementsAppareilsFacturables } from "@/lib/facturation-appareils";
-import { offreParCle, OFFRES, prixAbonnementMensuel, REDUCTION_ANNUELLE, statutAbonnement } from "@/lib/plateforme";
+import { offreParCle, OFFRES, prixAbonnementMensuel, statutAbonnement } from "@/lib/plateforme";
 import { calculerFacturationStockage, OCTETS_PAR_GO, stripeBillingEstConfigure, TARIF_STOCKAGE_SUPPLEMENTAIRE_HT_PAR_GO } from "@/lib/stripe-abonnement";
+import { consommationIAMensuelle } from "@/lib/ai/journal";
 
 const input = "rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
 export default async function AbonnementPage({ searchParams }: { searchParams: Promise<{ error?: string; succes?: string }> }) {
   const [{ error, succes }, ctx] = await Promise.all([searchParams, getContexteEntreprise()]);
   const supabase = await createClient();
-  const [{ data: entreprise }, { data: utilisationStockage }, { data: employesFacturables }, { data: postes }, { data: appareils }] = await Promise.all([
-    supabase.from("entreprises").select("abonnement_statut,abonnement_echeance,abonnement_offre,abonnement_periodicite,abonnement_essai_fin,abonnement_annulation_prevue_at,stripe_customer_id,stripe_subscription_id,derniere_facture_url,derniere_facture_pdf,derniere_facture_statut,derniere_facture_at,option_ia_statut,option_ia_essai_fin,option_ia_palier").eq("id",ctx.entrepriseId).single(),
+  const [{ data: entreprise }, { data: utilisationStockage }, { data: employesFacturables }, { data: postes }, { data: appareils }, consommationIA, { data: facturesAbonnement }, { data: historique }] = await Promise.all([
+    supabase.from("entreprises").select("abonnement_statut,abonnement_echeance,abonnement_offre,abonnement_periodicite,abonnement_essai_fin,abonnement_annulation_prevue_at,stripe_customer_id,stripe_subscription_id,derniere_facture_url,derniere_facture_pdf,derniere_facture_statut,derniere_facture_at,option_ia_statut,option_ia_essai_fin,option_ia_palier,ia_active,ia_politique_quota,ia_plafond_cout_mensuel_ht").eq("id",ctx.entrepriseId).single(),
     supabase.rpc("utilisation_stockage_entreprise", { p_entreprise_id: ctx.entrepriseId }),
     supabase.from("employes").select("utilisateur_id,prenom,nom,poste_id,compte_application_statut").eq("entreprise_id", ctx.entrepriseId).in("compte_application_statut", ["actif", "pause"]),
     supabase.from("postes").select("id,nom,tarif_compte_mensuel").eq("entreprise_id", ctx.entrepriseId),
     supabase.from("appareils_comptes").select("utilisateur_id").eq("entreprise_id", ctx.entrepriseId).is("revoque_at", null),
+    consommationIAMensuelle(supabase, ctx.entrepriseId),
+    supabase.from("factures_abonnement").select("id,numero,periode_debut,periode_fin,montant_ttc,devise,statut,url_facture,url_pdf,created_at").eq("entreprise_id",ctx.entrepriseId).order("created_at",{ascending:false}).limit(24),
+    supabase.from("historique_tarification").select("id,action,motif,created_at,nouveau").eq("entreprise_id",ctx.entrepriseId).order("created_at",{ascending:false}).limit(20),
   ]);
   const statut = statutAbonnement(entreprise?.abonnement_statut ?? "essai");
   const configure = stripeBillingEstConfigure();
@@ -43,10 +47,11 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
   });
   const annuel = entreprise?.abonnement_periodicite === "annuel";
   const abonnementAvantRemiseMensuel = prixComptes.total + supplementAppareilsMensuel;
-  const coutMensuelEstime = annuel
-    ? abonnementAvantRemiseMensuel * (1 - REDUCTION_ANNUELLE) + stockageMensuel.montantHt
+  const coutPeriodeEstime = annuel
+    ? prixComptes.totalAnnuel + supplementAppareilsMensuel * 12 + stockageMensuel.montantHt * 12
     : abonnementAvantRemiseMensuel + stockageMensuel.montantHt;
-  const coutPeriodeEstime = annuel ? coutMensuelEstime * 12 : coutMensuelEstime;
+  const coutMensuelEstime = annuel ? coutPeriodeEstime / 12 : coutPeriodeEstime;
+  const nouvelleGrille = ["mini", "pro", "business", "entreprise", "sur_mesure"].includes(String(entreprise?.abonnement_offre ?? ""));
   const euros = (montant: number) => montant.toLocaleString("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
 
   return <main className="p-4 sm:p-8"><div className="mx-auto max-w-5xl space-y-6">
@@ -77,7 +82,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
         <div className="rounded-lg bg-neutral-50 p-3 dark:bg-neutral-900"><dt className="text-xs uppercase text-neutral-500">Appareils supplémentaires</dt><dd className="mt-1 font-semibold">{euros(supplementAppareilsMensuel)} HT/mois</dd><p className="text-xs text-neutral-500">Deux appareils actifs sont inclus par salarié</p></div>
         <div className="rounded-lg bg-neutral-50 p-3 dark:bg-neutral-900"><dt className="text-xs uppercase text-neutral-500">Stockage supplémentaire</dt><dd className="mt-1 font-semibold">{euros(stockageMensuel.montantHt)} HT/mois</dd><p className="text-xs text-neutral-500">{stockageMensuel.depassementGo > 0 ? `${stockageMensuel.depassementGo.toLocaleString("fr-FR")} Go au-delà du quota` : "Aucun dépassement"}</p></div>
       </dl>
-      <p className="mt-3 text-xs text-neutral-500">Les comptes actifs et en pause restent facturables. {annuel ? `La réduction annuelle de ${Math.round(REDUCTION_ANNUELLE * 100)} % est appliquée à l’offre, aux comptes et aux appareils supplémentaires ; le dépassement de stockage reste facturé à l’usage.` : "Le montant définitif peut varier en cas de prorata ou de changement en cours de période."}</p>
+      <p className="mt-3 text-xs text-neutral-500">Les comptes actifs et en pause restent facturables. {annuel ? "Le prix annuel contractuel de l’offre est appliqué ; les options et dépassements restent détaillés séparément." : "Le montant définitif peut varier en cas de prorata ou de changement en cours de période."}</p>
     </section>
 
     <AlerteDepassementAppareils lignes={depassementsAppareils}/>
@@ -95,6 +100,19 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
     </section>
 
     <section className="rounded-xl border p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold">Consommation IA</h2><p className="mt-1 text-sm text-neutral-500">Le compteur est mensuel et les coûts internes ne sont jamais affichés aux utilisateurs standards.</p></div><strong>{consommationIA.utilise.toLocaleString("fr-FR")} / {consommationIA.quota.toLocaleString("fr-FR")}</strong></div>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800"><div className={`h-full ${consommationIA.seuilAlerte >= 100 ? "bg-red-600" : consommationIA.seuilAlerte >= 90 ? "bg-orange-500" : consommationIA.seuilAlerte >= 70 ? "bg-amber-500" : "bg-green-600"}`} style={{width:`${consommationIA.pourcentage}%`}}/></div>
+      {consommationIA.seuilAlerte > 0 ? <p className="mt-2 text-xs text-amber-800 dark:text-amber-300">{consommationIA.seuilAlerte === 100 ? "Quota atteint selon la politique choisie ci-dessous." : `Alerte : ${consommationIA.pourcentage} % du quota mensuel est utilisé.`}</p> : null}
+      <form action={configurerPolitiqueIAAction} className="mt-4 flex flex-wrap items-end gap-3 rounded-lg bg-neutral-50 p-3 dark:bg-neutral-900">
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="ia_active" defaultChecked={entreprise?.ia_active !== false}/> Autoriser l’IA</label>
+        <label className="space-y-1 text-sm"><span className="block text-xs text-neutral-500">À l’épuisement du quota</span><select name="ia_politique_quota" defaultValue={entreprise?.ia_politique_quota??"blocage"} className={input}><option value="blocage">Bloquer jusqu’au mois suivant</option><option value="achat_pack">Demander l’achat d’un pack</option><option value="depassement_facture">Autoriser un dépassement facturé</option></select></label>
+        <label className="space-y-1 text-sm"><span className="block text-xs text-neutral-500">Plafond de sécurité HT / mois</span><input type="number" min="0.01" max="100000" step="0.01" name="ia_plafond_cout_mensuel_ht" defaultValue={entreprise?.ia_plafond_cout_mensuel_ht??""} placeholder="Facultatif" className={input}/></label>
+        <button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Enregistrer</button>
+      </form>
+      <p className="mt-2 text-xs text-neutral-500">Tout dépassement payant doit être activé volontairement. Les opérations déjà comprises dans l’offre restent incluses.</p>
+    </section>
+
+    <section className="rounded-xl border p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-semibold">Option IA</h2>
@@ -107,7 +125,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
         {entreprise?.option_ia_statut==="indisponible"&&<span className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">Indisponible</span>}
       </div>
       {entreprise?.option_ia_statut==="essai"&&<p className="mt-3 text-xs text-neutral-500">Essai offert par Liria. Passé ce délai, si vous ne désactivez pas l’option, le palier choisi ci-dessous est facturé automatiquement sur votre abonnement.</p>}
-      {(entreprise?.option_ia_statut==="essai"||entreprise?.option_ia_statut==="actif")&&<form action={choisirPalierOptionIAAction} className="mt-4 flex flex-wrap items-end gap-2">
+      {!nouvelleGrille&&(entreprise?.option_ia_statut==="essai"||entreprise?.option_ia_statut==="actif")&&<form action={choisirPalierOptionIAAction} className="mt-4 flex flex-wrap items-end gap-2">
         <label className="space-y-1 text-sm">
           <span className="block text-xs text-neutral-500">Palier ({entreprise.option_ia_statut==="essai"?"appliqué à la fin de l’essai":"appliqué immédiatement"})</span>
           <select name="palier" defaultValue={entreprise?.option_ia_palier??"300"} className={input}>
@@ -126,6 +144,8 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
     </section>
 
     {souscrit ? <section className="rounded-xl border p-5"><h2 className="font-semibold">Gérer l’abonnement</h2><p className="mt-1 text-sm text-neutral-500">Le portail sécurisé Stripe permet de changer de carte, télécharger les factures et gérer la résiliation.</p><div className="mt-4 flex flex-wrap gap-2"><form action={ouvrirPortailAbonnementAction}><button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Gérer mon abonnement</button></form>{entreprise?.derniere_facture_url&&<Link href={entreprise.derniere_facture_url} target="_blank" rel="noreferrer" className="rounded-md border px-4 py-2 text-sm font-medium">Voir la dernière facture</Link>}{entreprise?.derniere_facture_pdf&&<Link href={entreprise.derniere_facture_pdf} target="_blank" rel="noreferrer" className="rounded-md border px-4 py-2 text-sm font-medium">Télécharger le PDF</Link>}</div>{entreprise?.derniere_facture_at&&<p className="mt-3 text-xs text-neutral-500">Dernière facture : {entreprise.derniere_facture_statut??"—"} · {new Date(entreprise.derniere_facture_at).toLocaleString("fr-FR")}</p>}</section>
-    : <section className="space-y-4"><div><h2 className="font-semibold">Choisir une offre</h2><p className="text-sm text-neutral-500">Carte enregistrée à l’inscription, aucun débit pendant l’essai de 30 jours, puis prélèvement automatique.</p></div>{!configure&&<p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">Le paiement des abonnements est en cours de configuration par Liria. Votre accès actuel reste inchangé.</p>}<div className="grid gap-4 md:grid-cols-3">{OFFRES.map(offre=>{const prix=prixAbonnementMensuel(offre.comptesInclus,offre);return <article key={offre.cle} className="rounded-xl border p-5"><h3 className="text-lg font-semibold">{offre.nom}</h3><p className="mt-1 min-h-12 text-sm text-neutral-500">{offre.resume}</p><p className="mt-4 text-2xl font-bold">{prix.total} € <span className="text-xs font-normal text-neutral-500">HT/mois</span></p><form action={demarrerAbonnementAction} className="mt-4 space-y-3"><input type="hidden" name="offre" value={offre.cle}/><input type="hidden" name="retour_erreur" value="/abonnement"/><select name="periodicite" defaultValue="annuel" className={`${input} w-full`}><option value="mensuel">Mensuel</option><option value="annuel">Annuel · −{Math.round(REDUCTION_ANNUELLE*100)} %</option></select><button disabled={!configure} className="w-full rounded-md bg-[#0d1b2a] px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Démarrer l’essai</button></form></article>})}</div></section>}
+    : <section className="space-y-4"><div><h2 className="font-semibold">Choisir une offre</h2><p className="text-sm text-neutral-500">Carte enregistrée à l’inscription, aucun débit pendant l’essai de 30 jours, puis prélèvement automatique au montant affiché.</p></div>{!configure&&<p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">Le paiement des abonnements est en cours de configuration par Liria. Votre accès actuel reste inchangé.</p>}<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">{OFFRES.map(offre=>{const prix=prixAbonnementMensuel(offre.comptesInclus,offre);return <article key={offre.cle} className="rounded-xl border p-5"><h3 className="text-lg font-semibold">{offre.nom}</h3><p className="mt-1 min-h-20 text-sm text-neutral-500">{offre.resume}</p><p className="mt-4 text-2xl font-bold">{prix.total} € <span className="text-xs font-normal text-neutral-500">HT/mois</span></p>{offre.devisObligatoire?<Link href="mailto:contact@liria-gestion-pro.fr?subject=Offre%20sur%20mesure" className="mt-4 block rounded-md border px-3 py-2 text-center text-sm font-semibold">Demander un devis</Link>:<form action={demarrerAbonnementAction} className="mt-4 space-y-3"><input type="hidden" name="offre" value={offre.cle}/><input type="hidden" name="retour_erreur" value="/abonnement"/><select name="periodicite" defaultValue="mensuel" className={`${input} w-full`}><option value="mensuel">Mensuel</option><option value="annuel">Annuel · prix affiché avant validation</option></select><button disabled={!configure} className="w-full rounded-md bg-[#0d1b2a] px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Démarrer l’essai</button></form>}</article>})}</div></section>}
+
+    <section className="rounded-xl border p-5"><h2 className="font-semibold">Factures et historique</h2><p className="mt-1 text-sm text-neutral-500">Documents Stripe et changements contractuels enregistrés pour votre entreprise.</p><div className="mt-4 overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead><tr className="border-b text-xs uppercase text-neutral-500"><th className="py-2 pr-3">Date</th><th className="py-2 pr-3">Référence</th><th className="py-2 pr-3">Montant TTC</th><th className="py-2 pr-3">Statut</th><th className="py-2">Document</th></tr></thead><tbody>{(facturesAbonnement??[]).map(facture=><tr key={facture.id} className="border-b"><td className="py-3 pr-3">{new Date(facture.created_at).toLocaleDateString("fr-FR")}</td><td className="py-3 pr-3">{facture.numero??"—"}</td><td className="py-3 pr-3">{Number(facture.montant_ttc).toLocaleString("fr-FR",{style:"currency",currency:String(facture.devise??"EUR")})}</td><td className="py-3 pr-3">{facture.statut}</td><td className="py-3">{facture.url_pdf?<Link href={facture.url_pdf} target="_blank" rel="noreferrer" className="underline">PDF</Link>:facture.url_facture?<Link href={facture.url_facture} target="_blank" rel="noreferrer" className="underline">Voir</Link>:"—"}</td></tr>)}</tbody></table>{!facturesAbonnement?.length?<p className="py-4 text-sm text-neutral-500">Aucune facture d’abonnement enregistrée.</p>:null}</div>{historique?.length?<details className="mt-4"><summary className="cursor-pointer text-sm font-semibold">Afficher les changements de tarif ({historique.length})</summary><ul className="mt-2 space-y-2 text-sm">{historique.map(event=><li key={event.id} className="rounded bg-neutral-50 p-2 dark:bg-neutral-900">{new Date(event.created_at).toLocaleString("fr-FR")} · {event.action}{event.motif?` — ${event.motif}`:""}</li>)}</ul></details>:null}</section>
   </div></main>;
 }

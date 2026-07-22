@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { GESTION_PERMISSION_PAR_CHEMIN, MODULE_PERMISSION_PAR_CHEMIN, PERMISSIONS_ACCES_ALTERNATIVES, PERMISSIONS_MUTATION_ALTERNATIVES } from "@/lib/module-permissions";
+import { permissionIncluseDansOffre } from "@/lib/tarification";
 
 const PUBLIC_PATHS = ["/login", "/signup", "/tarifs", "/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/confidentialite", "/cookies", "/auth", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu", "/guides", "/videos", "/paiement", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/cron/abonnements", "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import"];
 
@@ -102,6 +103,20 @@ export async function updateSession(request: NextRequest) {
   // Une session de support ouverte donne acces sans verifier les permissions,
   // exactement comme auparavant.
   if (!isPublic && ctx.entreprise_id && ctx.acces_support !== true) {
+    if (droitRequis) {
+      const { data: entreprise } = await supabase
+        .from("entreprises")
+        .select("abonnement_offre")
+        .eq("id", ctx.entreprise_id)
+        .maybeSingle();
+      const droitsInclus = droitsAcces.some((droit) => permissionIncluseDansOffre(droit, entreprise?.abonnement_offre));
+      if (!droitsInclus) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/abonnement/module-non-inclus";
+        url.searchParams.set("module", droitRequis);
+        return NextResponse.redirect(url);
+      }
+    }
     if (droitRequis && ctx.droit_acces !== true) {
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard";

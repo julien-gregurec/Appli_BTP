@@ -39,6 +39,9 @@ export async function demarrerAbonnementAction(formData: FormData) {
   if (!estOffreAbonnement(offre) || !estPeriodiciteAbonnement(periodicite)) {
     redirect(`${retourErreur}?error=${encodeURIComponent("Offre ou périodicité invalide")}`);
   }
+  if (offre === "sur_mesure") {
+    redirect(`${retourErreur}?error=${encodeURIComponent("L’offre Sur mesure nécessite un devis validé avant activation")}`);
+  }
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user?.email) redirect("/login");
@@ -87,6 +90,28 @@ export async function ouvrirPortailAbonnementAction() {
     redirect(`/abonnement?error=${encodeURIComponent(error instanceof Error ? error.message : "Portail indisponible")}`);
   }
   redirect(destination);
+}
+
+export async function configurerPolitiqueIAAction(formData: FormData) {
+  const ctx = await verifierDroitAbonnement();
+  const active = formData.get("ia_active") === "on";
+  const politique = String(formData.get("ia_politique_quota") ?? "blocage");
+  if (!["blocage", "depassement_facture", "achat_pack"].includes(politique)) {
+    redirect(`/abonnement?error=${encodeURIComponent("Politique IA invalide")}`);
+  }
+  const plafondSaisi = String(formData.get("ia_plafond_cout_mensuel_ht") ?? "").replace(",", ".").trim();
+  const plafond = plafondSaisi === "" ? null : Number(plafondSaisi);
+  if (plafond !== null && (!Number.isFinite(plafond) || plafond <= 0 || plafond > 100_000)) {
+    redirect(`/abonnement?error=${encodeURIComponent("Le plafond budgétaire IA doit être compris entre 0,01 € et 100 000 € HT")}`);
+  }
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("entreprises")
+    .update({ ia_active: active, ia_politique_quota: politique, ia_plafond_cout_mensuel_ht: plafond })
+    .eq("id", ctx.entrepriseId);
+  if (error) redirect(`/abonnement?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/abonnement");
+  redirect("/abonnement?succes=1");
 }
 
 // Option IA payante : desactivation en libre-service (annule l'essai en cours ou retire

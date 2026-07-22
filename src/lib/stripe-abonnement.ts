@@ -2,7 +2,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { calculerDepassementsAppareilsFacturables } from "@/lib/facturation-appareils";
 import { DUREE_ESSAI_JOURS, offreParCle, REDUCTION_ANNUELLE } from "@/lib/plateforme";
 
-export const OFFRES_ABONNEMENT = ["essentiel", "pro", "premium"] as const;
+export const OFFRES_ABONNEMENT = ["essentiel", "premium", "mini", "pro", "business", "entreprise", "sur_mesure"] as const;
+export const OFFRES_ABONNEMENT_COMMERCIALISEES = ["mini", "pro", "business", "entreprise"] as const;
 export const PERIODICITES_ABONNEMENT = ["mensuel", "annuel"] as const;
 export type OffreAbonnement = (typeof OFFRES_ABONNEMENT)[number];
 export type PeriodiciteAbonnement = (typeof PERIODICITES_ABONNEMENT)[number];
@@ -31,6 +32,7 @@ export type StripeSubscription = {
   id: string;
   customer: string | { id: string };
   status: string;
+  current_period_start?: number;
   current_period_end?: number;
   trial_end?: number | null;
   cancel_at?: number | null;
@@ -39,7 +41,7 @@ export type StripeSubscription = {
   items?: { data?: Array<{ id: string; quantity?: number; price?: { id?: string } }> };
 };
 
-const VARIABLES_PRIX: Record<OffreAbonnement, Record<PeriodiciteAbonnement, string>> = {
+const VARIABLES_PRIX: Partial<Record<OffreAbonnement, Record<PeriodiciteAbonnement, string>>> = {
   essentiel: {
     mensuel: "STRIPE_PRICE_ESSENTIEL_MENSUEL",
     annuel: "STRIPE_PRICE_ESSENTIEL_ANNUEL",
@@ -52,12 +54,18 @@ const VARIABLES_PRIX: Record<OffreAbonnement, Record<PeriodiciteAbonnement, stri
     mensuel: "STRIPE_PRICE_PREMIUM_MENSUEL",
     annuel: "STRIPE_PRICE_PREMIUM_ANNUEL",
   },
+  mini: { mensuel: "STRIPE_PRICE_MINI_MENSUEL", annuel: "STRIPE_PRICE_MINI_ANNUEL" },
+  business: { mensuel: "STRIPE_PRICE_BUSINESS_MENSUEL", annuel: "STRIPE_PRICE_BUSINESS_ANNUEL" },
+  entreprise: { mensuel: "STRIPE_PRICE_ENTREPRISE_MENSUEL", annuel: "STRIPE_PRICE_ENTREPRISE_ANNUEL" },
 };
 
-const VARIABLES_PRIX_COMPTE_SUP: Record<OffreAbonnement, Record<PeriodiciteAbonnement, string>> = {
+const VARIABLES_PRIX_COMPTE_SUP: Partial<Record<OffreAbonnement, Record<PeriodiciteAbonnement, string>>> = {
   essentiel: { mensuel: "STRIPE_PRICE_COMPTE_SUP_ESSENTIEL_MENSUEL", annuel: "STRIPE_PRICE_COMPTE_SUP_ESSENTIEL_ANNUEL" },
   pro: { mensuel: "STRIPE_PRICE_COMPTE_SUP_PRO_MENSUEL", annuel: "STRIPE_PRICE_COMPTE_SUP_PRO_ANNUEL" },
   premium: { mensuel: "STRIPE_PRICE_COMPTE_SUP_PREMIUM_MENSUEL", annuel: "STRIPE_PRICE_COMPTE_SUP_PREMIUM_ANNUEL" },
+  mini: { mensuel: "STRIPE_PRICE_COMPTE_SUP_MINI_MENSUEL", annuel: "STRIPE_PRICE_COMPTE_SUP_MINI_ANNUEL" },
+  business: { mensuel: "STRIPE_PRICE_COMPTE_SUP_BUSINESS_MENSUEL", annuel: "STRIPE_PRICE_COMPTE_SUP_BUSINESS_ANNUEL" },
+  entreprise: { mensuel: "STRIPE_PRICE_COMPTE_SUP_ENTREPRISE_MENSUEL", annuel: "STRIPE_PRICE_COMPTE_SUP_ENTREPRISE_ANNUEL" },
 };
 
 export const PALIERS_OPTION_IA = ["100", "300", "illimite"] as const;
@@ -89,7 +97,8 @@ export function prixStripePour(
   periodicite: PeriodiciteAbonnement,
   environnement: NodeJS.ProcessEnv = process.env,
 ) {
-  return environnement[VARIABLES_PRIX[offre][periodicite]] || null;
+  const variable = VARIABLES_PRIX[offre]?.[periodicite];
+  return variable ? environnement[variable] || null : null;
 }
 
 export function variablesStripeBillingManquantes(environnement: NodeJS.ProcessEnv = process.env) {
@@ -97,7 +106,7 @@ export function variablesStripeBillingManquantes(environnement: NodeJS.ProcessEn
     "STRIPE_SECRET_KEY",
     "STRIPE_WEBHOOK_ABONNEMENT_SECRET",
     "NEXT_PUBLIC_APP_URL",
-    ...Object.values(VARIABLES_PRIX).flatMap((prix) => Object.values(prix)),
+    ...OFFRES_ABONNEMENT_COMMERCIALISEES.flatMap((offre) => Object.values(VARIABLES_PRIX[offre] ?? {})),
   ];
   return variables.filter((nom) => !environnement[nom]);
 }
@@ -293,7 +302,8 @@ export async function reconcilierAbonnementStripe(entrepriseId: string) {
   if (!entreprise?.stripe_subscription_id || !estOffreAbonnement(offre) || !estPeriodiciteAbonnement(periodicite)) {
     return { synchronise: false, raison: "abonnement_absent" } as const;
   }
-  const prixSupplement = process.env[VARIABLES_PRIX_COMPTE_SUP[offre][periodicite]];
+  const variablePrixSupplement = VARIABLES_PRIX_COMPTE_SUP[offre]?.[periodicite];
+  const prixSupplement = variablePrixSupplement ? process.env[variablePrixSupplement] : undefined;
   if (!prixSupplement) return { synchronise: false, raison: "prix_supplement_absent" } as const;
   const { count } = await admin.from("employes").select("id", { count: "exact", head: true }).eq("entreprise_id", entrepriseId).in("compte_application_statut", ["actif", "pause"]);
   const quantite = Math.max(0, Number(count ?? 0) - offreParCle(offre).comptesInclus);

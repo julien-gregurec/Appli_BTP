@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
+import { OFFRES_TARIFAIRES, offreTarifaireParCle, type OffreTarifaire } from "@/lib/tarification";
 
 // L'espace plateforme est réservé au propriétaire (identifié par son email, table plateforme_admins).
 // En mode prototype (sans connexion), on l'autorise pour la démo mono-entreprise.
@@ -65,9 +66,9 @@ export type EntrepriseAbonnement = {
   created_at: string;
 };
 
-// Essai gratuit à l'inscription, et réduction du paiement annuel.
+// Essai gratuit à l'inscription. Chaque offre porte son propre prix annuel.
 export const DUREE_ESSAI_JOURS = 30;
-export const REDUCTION_ANNUELLE = 0.2; // -20 % en paiement annuel
+export const REDUCTION_ANNUELLE = 0;
 
 // Prix mensuel = base de l'offre (incluant N comptes) + comptes supplémentaires
 // au tarif de l'offre + éventuels dépassements d'appareils. Les montants sont
@@ -80,6 +81,7 @@ export function prixAbonnementMensuel(
   const sup = Math.max(0, nbComptesFacturables - offre.comptesInclus);
   const supAppareils = Number.isFinite(supplementAppareils) ? Math.max(0, supplementAppareils) : 0;
   const total = offre.base + sup * offre.parCompteSup + supAppareils;
+  const prixAnnuelFixe = offre.prixAnnuelCentimes / 100;
   return {
     total,
     base: offre.base,
@@ -88,8 +90,8 @@ export function prixAbonnementMensuel(
     parEmployeSup: offre.parCompteSup,
     supplementAppareils: supAppareils,
     // Équivalent en paiement annuel (remise appliquée).
-    mensuelSiAnnuel: Math.round(total * (1 - REDUCTION_ANNUELLE)),
-    totalAnnuel: Math.round(total * 12 * (1 - REDUCTION_ANNUELLE)),
+    mensuelSiAnnuel: Math.round((prixAnnuelFixe / 12 + sup * offre.parCompteSup + supAppareils) * 100) / 100,
+    totalAnnuel: Math.round((prixAnnuelFixe + (sup * offre.parCompteSup + supAppareils) * 12) * 100) / 100,
   };
 }
 
@@ -104,11 +106,11 @@ export const BESOINS_OPTIONS = [
   { cle: "clients_chantiers", libelle: "Clients & chantiers", palier: 1 },
   { cle: "planning", libelle: "Planning des équipes", palier: 2 },
   { cle: "pointage", libelle: "Pointage des heures", palier: 2 },
-  { cle: "stock", libelle: "Gestion du stock", palier: 2 },
-  { cle: "flotte", libelle: "Flotte & véhicules", palier: 2 },
-  { cle: "outillage", libelle: "Outillage", palier: 2 },
-  { cle: "notes_frais", libelle: "Notes de frais & justificatifs", palier: 3 },
-  { cle: "portail_client", libelle: "Portail client & signature", palier: 3 },
+  { cle: "stock", libelle: "Gestion du stock", palier: 3 },
+  { cle: "flotte", libelle: "Flotte & véhicules", palier: 3 },
+  { cle: "outillage", libelle: "Outillage", palier: 3 },
+  { cle: "notes_frais", libelle: "Notes de frais & justificatifs", palier: 2 },
+  { cle: "portail_client", libelle: "Portail client & signature", palier: 4 },
   { cle: "exports_compta", libelle: "Exports comptables", palier: 3 },
   { cle: "qr_codes", libelle: "QR codes & borne stock", palier: 3 },
 ] as const;
@@ -126,19 +128,12 @@ export const ATTENTES_OPTIONS = [
 // compte au-delà est facturé `parCompteSup`. Positionnement ERP BTP complet
 // (au-dessus des outils devis-factures simples). Ajuster ici après validation
 // auprès de prospects réels.
-export const OFFRES = [
-  { cle: "essentiel", palier: 1, nom: "Essentiel", base: 59, comptesInclus: 2, parCompteSup: 15, stockageGoInclus: 5,
-    resume: "Devis, factures, clients & chantiers. Pour l'artisan seul ou une petite équipe." },
-  { cle: "pro", palier: 2, nom: "Pro", base: 129, comptesInclus: 5, parCompteSup: 15, stockageGoInclus: 25,
-    resume: "Essentiel + planning, pointage GPS, stock, flotte & outillage. Pour 3 à 15 salariés." },
-  { cle: "premium", palier: 3, nom: "Premium", base: 249, comptesInclus: 10, parCompteSup: 12, stockageGoInclus: 100,
-    resume: "Pro + notes de frais probantes, portail client, exports comptables & QR codes. Au-delà de 15 salariés." },
-] as const;
+export const OFFRES = OFFRES_TARIFAIRES;
 
-export type Offre = (typeof OFFRES)[number];
+export type Offre = OffreTarifaire;
 
 export function offreParCle(cle: string): Offre {
-  return OFFRES.find((o) => o.cle === cle) ?? OFFRES[0];
+  return offreTarifaireParCle(cle);
 }
 
 export function recommanderOffre(besoins: string[], nbEmployes: number) {

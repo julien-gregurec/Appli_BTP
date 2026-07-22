@@ -20,10 +20,18 @@ describe("tarifs Stripe Billing", () => {
       STRIPE_PRICE_PRO_ANNUEL: "price_pa",
       STRIPE_PRICE_PREMIUM_MENSUEL: "price_xm",
       STRIPE_PRICE_PREMIUM_ANNUEL: "price_xa",
+      STRIPE_PRICE_MINI_MENSUEL: "price_mm",
+      STRIPE_PRICE_MINI_ANNUEL: "price_ma",
+      STRIPE_PRICE_BUSINESS_MENSUEL: "price_bm",
+      STRIPE_PRICE_BUSINESS_ANNUEL: "price_ba",
+      STRIPE_PRICE_ENTREPRISE_MENSUEL: "price_xxm",
+      STRIPE_PRICE_ENTREPRISE_ANNUEL: "price_xxa",
     } as NodeJS.ProcessEnv;
     expect(prixStripePour("essentiel", "mensuel", env)).toBe("price_em");
     expect(prixStripePour("pro", "annuel", env)).toBe("price_pa");
     expect(prixStripePour("premium", "mensuel", env)).toBe("price_xm");
+    expect(prixStripePour("mini", "mensuel", env)).toBe("price_mm");
+    expect(prixStripePour("business", "annuel", env)).toBe("price_ba");
   });
 
   it("associe chaque palier IA à son prix et à sa périodicité", () => {
@@ -42,7 +50,7 @@ describe("tarifs Stripe Billing", () => {
   it("signale précisément les variables absentes", () => {
     const manquantes = variablesStripeBillingManquantes({} as NodeJS.ProcessEnv);
     expect(manquantes).toContain("STRIPE_SECRET_KEY");
-    expect(manquantes).toContain("STRIPE_PRICE_PREMIUM_ANNUEL");
+    expect(manquantes).toContain("STRIPE_PRICE_ENTREPRISE_ANNUEL");
     expect(stripeBillingEstConfigure({} as NodeJS.ProcessEnv)).toBe(false);
   });
 });
