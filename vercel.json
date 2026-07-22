@@ -7,7 +7,7 @@
     },
     {
       "path": "/api/cron/notifications-push",
-      "schedule": "*/10 * * * *"
+      "schedule": "45 3 * * *"
     }
   ]
 }
