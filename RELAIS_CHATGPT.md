@@ -1,6 +1,29 @@
+# AUDIT CODEX — 22 juillet 2026, vérification du lot Claude
+
+L'audit du code, de la base Supabase et de la version publiée a révélé puis corrigé deux écarts importants par rapport au relais initial :
+
+- La migration `20260723000136_option_ia_paliers.sql` était présente dans Git mais **absente de la base de production** malgré la mention « appliquée ». Elle a été exécutée puis vérifiée : `Entreprise Test` et `LIRIA CONCEPT` ont maintenant le palier `gratuit` avec un plafond de 300 appels/jour. La page `/abonnement` affiche de nouveau le badge **Incluse gratuitement**.
+- La fonction de suivi de zone de la migration 137 autorisait encore `anon`, permettait à tout membre actif de consulter tous les contrôles GPS de l'entreprise et ne vérifiait pas que l'appelant était le salarié pointé ou un responsable du pointage. La migration `20260723000138_securite_suivi_zone.sql` est **appliquée et vérifiée** : accès authentifié uniquement, lecture limitée au salarié concerné et aux responsables, contrôle de propriété de la session, validation chantier/entreprise et limitation de fréquence côté serveur.
+
+Correctifs de code inclus dans ce même audit :
+
+- Le changement de palier IA modifie désormais la ligne Stripe existante en une seule opération. L'ancien code supprimait d'abord la ligne avant d'ajouter la nouvelle et pouvait donc faire perdre l'option en cas d'erreur Stripe.
+- `SearchableSelect` ne déclenche plus de mise à jour d'état depuis un effet React ; la sélection clavier est réinitialisée lors de la saisie ou de l'ouverture, sans boucle de rendu.
+- `fast-uri` a été mis à jour de `3.1.3` vers `3.1.4` afin de supprimer l'avis de sécurité corrigeable sans rupture. Deux avis `sharp 0.34.5` restent liés à Next.js 16.2.10 ; `npm audit --force` proposerait une rétrogradation majeure vers Next 14 et ne doit pas être utilisé. Attendre une mise à jour compatible de Next/sharp.
+
+Contrôles après correction : **79 tests Vitest réussis**, TypeScript valide, ESLint sans erreur (un avertissement historique `img` dans `SignatureEmploye.tsx`), `git diff --check` valide et build Next webpack complet de **100 routes** réussi. L'avertissement historique `unpdf/import.meta` reste non bloquant.
+
+Contrôle de production : tableau de bord, Paramètres, Pointage et Abonnement chargent correctement avec un compte de démonstration. Les réglages du suivi de zone sont présents et le statut IA est visible. Un ancien texte corrompu `Nouvelle demande de cong√©` reste visible dans une notification de démonstration enregistrée en base ; ce n'est pas une régression du lot du 22 juillet mais il faudra nettoyer cette donnée historique.
+
+Contrôle des endpoints publics sans secret : le webhook immédiat des notifications refuse correctement avec `401`. En revanche, le cron de rattrapage `/api/cron/notifications-push` répond `503 {"error":"CRON_SECRET absent"}` en production. Les notifications immédiates testées par Julien restent fonctionnelles, mais le **rattrapage quotidien n'est pas opérationnel tant que `CRON_SECRET` n'est pas ajouté à Vercel**. Le webhook Stripe d'abonnement répond lui aussi `503` car son secret n'est pas encore configuré, ce qui correspond au travail externe Stripe déjà signalé.
+
+Restent des validations externes ou terrain, et non du code manquant dans ce lot : ajouter `CRON_SECRET` dans Vercel, créer les six prix Stripe de l'Option IA et poser leurs variables Vercel, configurer le secret du webhook d'abonnement, tester le suivi de zone sur un vrai chantier avec un téléphone, puis commencer le module **Grand déplacement** qui n'est pas encore développé.
+
+---
+
 # REPRISE — 22 juillet 2026, remises plateforme, notifications push, Option IA à paliers, suivi de zone chantier (Claude)
 
-**Six migrations appliquées et vérifiées directement en base ce jour, toutes confirmées par Julien ("sql ok") puis recontrôlées via appels RPC directs (permission denied ≠ PGRST202 = la fonction existe). Tout est poussé sur `gh/main`, dernier commit `1e2855d`. TypeScript, ESLint (2 alertes historiques connues sans rapport), Vitest (78 tests) et build Next verts après chaque lot.**
+**Note d'audit : la migration 136 n'était pas réellement présente en production au moment du contrôle Codex, et la migration 137 nécessitait le durcissement 138. Elles sont maintenant appliquées et vérifiées ; se référer à la section d'audit ci-dessus pour l'état fiable.**
 
 ## 1. Remises/avoirs plateforme — `20260723000132_remises_plateforme.sql` APPLIQUÉE
 - `/plateforme` : geste commercial par entreprise (montant HT ou pourcentage, durée une fois/N mois/à vie) via coupon Stripe appliqué sur l'abonnement de base uniquement (pas encore de ciblage fin "options"/"employés" séparément — limitation connue, à faire si demandé).

@@ -331,6 +331,30 @@ export async function retirerOptionIAAbonnement(subscriptionItemId: string) {
   });
 }
 
+// Change le palier sur la ligne existante. Stripe applique ainsi la nouvelle tarification
+// en une seule operation : l'ancien prix n'est jamais supprime avant que le nouveau soit
+// accepte, ce qui evite une option perdue ou une base locale desynchronisee en cas d'erreur.
+export async function modifierOptionIAAbonnement(
+  subscriptionItemId: string,
+  palier: PalierOptionIA,
+  periodicite: PeriodiciteAbonnement,
+) {
+  const prix = prixOptionIAStripePour(palier, periodicite);
+  if (!prix) throw new Error("Le tarif Stripe de l'option IA n'est pas configuré pour ce palier");
+  return requeteStripe<{ id: string }>(`subscription_items/${encodeURIComponent(subscriptionItemId)}`, {
+    corps: new URLSearchParams({
+      price: prix,
+      quantity: "1",
+      proration_behavior: "create_prorations",
+    }),
+    // Une cle liee uniquement au palier serait rejouee par Stripe si l'utilisateur
+    // revenait au meme palier dans les 24 h (ou changeait seulement la periodicite).
+    // L'operation elle-meme est idempotente : repeter la mise a jour vers le meme prix
+    // ne cree aucune ligne supplementaire.
+    idempotence: `option-ia-palier-${subscriptionItemId}-${palier}-${periodicite}-${Date.now()}`,
+  });
+}
+
 export async function calculerDepassementAppareils(entrepriseId: string) {
   const admin = createAdminClient();
   const [{ data: appareils }, { data: employes }, { data: postes }, { data: entreprise }] = await Promise.all([

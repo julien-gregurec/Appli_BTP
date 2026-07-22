@@ -13,6 +13,7 @@ import {
   estOffreAbonnement,
   estPalierOptionIA,
   estPeriodiciteAbonnement,
+  modifierOptionIAAbonnement,
   retirerOptionIAAbonnement,
 } from "@/lib/stripe-abonnement";
 
@@ -176,8 +177,9 @@ export async function choisirPalierOptionIAAction(formData: FormData) {
   const periodiciteBrute = String(entreprise.abonnement_periodicite ?? "mensuel");
   const periodicite = estPeriodiciteAbonnement(periodiciteBrute) ? periodiciteBrute : "mensuel";
   try {
-    if (entreprise.option_ia_stripe_item_id) await retirerOptionIAAbonnement(entreprise.option_ia_stripe_item_id);
-    const item = await ajouterOptionIAAbonnement(entreprise.stripe_subscription_id, palierBrut, periodicite);
+    const item = entreprise.option_ia_stripe_item_id
+      ? await modifierOptionIAAbonnement(entreprise.option_ia_stripe_item_id, palierBrut, periodicite)
+      : await ajouterOptionIAAbonnement(entreprise.stripe_subscription_id, palierBrut, periodicite);
     await supabase.from("entreprises").update({ option_ia_palier: palierBrut, option_ia_stripe_item_id: item.id }).eq("id", ctx.entrepriseId);
   } catch (error) {
     redirect(`/abonnement?error=${encodeURIComponent(error instanceof Error ? error.message : "Changement de palier impossible")}`);

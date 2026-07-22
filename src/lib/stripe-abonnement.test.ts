@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   calculerFacturationStockage,
+  prixOptionIAStripePour,
   prixStripePour,
   statutAbonnementDepuisStripe,
   stripeBillingEstConfigure,
@@ -23,6 +24,19 @@ describe("tarifs Stripe Billing", () => {
     expect(prixStripePour("essentiel", "mensuel", env)).toBe("price_em");
     expect(prixStripePour("pro", "annuel", env)).toBe("price_pa");
     expect(prixStripePour("premium", "mensuel", env)).toBe("price_xm");
+  });
+
+  it("associe chaque palier IA à son prix et à sa périodicité", () => {
+    const env = {
+      NODE_ENV: "test",
+      STRIPE_PRICE_OPTION_IA_100_MENSUEL: "price_ia_100_m",
+      STRIPE_PRICE_OPTION_IA_300_ANNUEL: "price_ia_300_a",
+      STRIPE_PRICE_OPTION_IA_ILLIMITE_MENSUEL: "price_ia_infini_m",
+    } as NodeJS.ProcessEnv;
+    expect(prixOptionIAStripePour("100", "mensuel", env)).toBe("price_ia_100_m");
+    expect(prixOptionIAStripePour("300", "annuel", env)).toBe("price_ia_300_a");
+    expect(prixOptionIAStripePour("illimite", "mensuel", env)).toBe("price_ia_infini_m");
+    expect(prixOptionIAStripePour("100", "annuel", env)).toBeNull();
   });
 
   it("signale précisément les variables absentes", () => {

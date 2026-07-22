@@ -70,9 +70,6 @@ export function SearchableSelect({
     [emptyLabel, filtres],
   );
 
-  // La saisie ou l'ouverture repositionne la sélection en tête de liste.
-  useEffect(() => { setActif(0); }, [recherche, ouvert]);
-
   // Garde l'option active visible quand on parcourt une longue liste.
   useEffect(() => {
     if (!ouvert) return;
@@ -119,8 +116,12 @@ export function SearchableSelect({
         value={recherche}
         placeholder={options.length ? placeholder : "Aucun élément accessible"}
         onKeyDown={surTouche}
-        onFocus={() => setOuvert(true)}
+        onFocus={() => {
+          setActif(0);
+          setOuvert(true);
+        }}
         onChange={(event) => {
+          setActif(0);
           setRecherche(event.target.value);
           if (valeur) {
             if (!controle) setValeurInterne("");
@@ -130,7 +131,10 @@ export function SearchableSelect({
         }}
         className="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 pr-9 text-sm dark:border-neutral-700 dark:bg-neutral-900"
       />
-      <button type="button" disabled={disabled} onClick={() => setOuvert((etat) => !etat)} aria-label="Ouvrir la liste" className="absolute inset-y-0 right-0 px-3 text-neutral-500">⌄</button>
+      <button type="button" disabled={disabled} onClick={() => setOuvert((etat) => {
+        if (!etat) setActif(0);
+        return !etat;
+      })} aria-label="Ouvrir la liste" className="absolute inset-y-0 right-0 px-3 text-neutral-500">⌄</button>
     </div>
     {ouvert && !disabled && <div ref={liste} id={listboxId} role="listbox" className="absolute z-50 mt-1 max-h-64 w-full overflow-auto rounded-md border bg-white p-1 shadow-xl dark:border-neutral-700 dark:bg-neutral-950">
       {navigables.map((option, index) => {
