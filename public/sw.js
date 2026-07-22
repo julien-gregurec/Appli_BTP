@@ -4,7 +4,7 @@
    - Navigation : réseau d'abord, page « /offline » en secours si pas de réseau.
    - Tout le reste (API, Supabase, Stripe, données privées) : réseau uniquement, aucun cache. */
 
-const VERSION = "liria-v2";
+const VERSION = "liria-v3";
 const STATIC_CACHE = `${VERSION}-static`;
 const PRECACHE = [
   "/offline",
@@ -69,4 +69,32 @@ self.addEventListener("fetch", (event) => {
   }
 
   // Tout le reste (routes de données, API) : réseau uniquement.
+});
+
+// Notifications push : le payload JSON vient de src/lib/push.ts (envoyerNotificationPush).
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+  let payload;
+  try { payload = event.data.json(); } catch { return; }
+  const options = {
+    body: payload.message || "",
+    icon: "/icons/liria-gestion-pro-v3-192.png",
+    badge: "/icons/liria-gestion-pro-v3-192.png",
+    data: { lien: payload.lien || "/dashboard" },
+    tag: payload.lien || undefined,
+  };
+  event.waitUntil(self.registration.showNotification(payload.titre || "Liria Gestion Pro", options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const lien = event.notification.data?.lien || "/dashboard";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientsList) => {
+      for (const client of clientsList) {
+        if (client.url.includes(lien) && "focus" in client) return client.focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(lien);
+    })
+  );
 });

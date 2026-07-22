@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/abonnements",
       "schedule": "15 3 * * *"
+    },
+    {
+      "path": "/api/cron/notifications-push",
+      "schedule": "*/10 * * * *"
     }
   ]
 }
