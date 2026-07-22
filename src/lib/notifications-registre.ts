@@ -9,6 +9,7 @@ export const TYPES_NOTIFICATIONS: { cle: string; libelle: string; permission: st
   { cle: "decision_conge", libelle: "Décision sur ma demande de congé", permission: null },
   { cle: "note_frais_a_verifier", libelle: "Note de frais à vérifier", permission: "verifier_notes_frais" },
   { cle: "decision_note_frais", libelle: "Décision sur ma note de frais", permission: null },
+  { cle: "planning_modifie", libelle: "Changement de mon planning", permission: null },
 ];
 
 export function typesNotificationsDisponibles(permissions: string[] | null): typeof TYPES_NOTIFICATIONS {

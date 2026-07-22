@@ -1,17 +1,20 @@
 // Statuts de chantier (Clients & Chantiers §3) : libellé, couleur, ordre du workflow.
+// Palette volontairement limitée a 5 couleurs (bleu/rouge/vert/noir/jaune) : noir = pas
+// encore demarre ou archive, bleu = etape administrative/informative, jaune = en cours ou
+// en attente d'action, vert = positif/termine, rouge = arrete ou annule.
 export const CHANTIER_STATUTS = [
-  { cle: "prospect", libelle: "Prospect", couleur: "#8b8f96" },
-  { cle: "devis_envoye", libelle: "Devis envoyé", couleur: "#2c5a8c" },
-  { cle: "accepte", libelle: "Accepté", couleur: "#3e7c5a" },
-  { cle: "a_preparer", libelle: "À préparer", couleur: "#8b8f96" },
+  { cle: "prospect", libelle: "Prospect", couleur: "#111827" },
+  { cle: "devis_envoye", libelle: "Devis envoyé", couleur: "#2563eb" },
+  { cle: "accepte", libelle: "Accepté", couleur: "#16a34a" },
+  { cle: "a_preparer", libelle: "À préparer", couleur: "#b8792e" },
   { cle: "en_attente_validation", libelle: "En attente validation", couleur: "#b8792e" },
-  { cle: "en_commande_materiel", libelle: "En commande matériel", couleur: "#1f6f6f" },
+  { cle: "en_commande_materiel", libelle: "En commande matériel", couleur: "#2563eb" },
   { cle: "en_cours", libelle: "En cours", couleur: "#b8792e" },
-  { cle: "en_pause", libelle: "En pause", couleur: "#a64b45" },
-  { cle: "termine", libelle: "Terminé", couleur: "#2f6b47" },
-  { cle: "facture", libelle: "Facturé", couleur: "#6b4e8c" },
-  { cle: "archive", libelle: "Archivé", couleur: "#8b8f96" },
-  { cle: "annule", libelle: "Annulé", couleur: "#a64b45" },
+  { cle: "en_pause", libelle: "En pause", couleur: "#dc2626" },
+  { cle: "termine", libelle: "Terminé", couleur: "#16a34a" },
+  { cle: "facture", libelle: "Facturé", couleur: "#2563eb" },
+  { cle: "archive", libelle: "Archivé", couleur: "#111827" },
+  { cle: "annule", libelle: "Annulé", couleur: "#dc2626" },
 ] as const;
 
 export type ChantierStatut = (typeof CHANTIER_STATUTS)[number]["cle"];
