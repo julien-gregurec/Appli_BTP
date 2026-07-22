@@ -17,9 +17,10 @@ export const permissionsUtilisateur = cache(async function permissionsUtilisateu
   // lancer en parallele economise un aller-retour reseau sur le chemin le plus frequent
   // (compte sans acces support), au prix d'une requete inutilisee dans le cas rare ou
   // l'acces support est actif.
-  const [{data:accesSupport},{data:appartenance}]=await Promise.all([
+  const [{data:accesSupport},{data:appartenance},{data:entreprise}]=await Promise.all([
     sb.rpc("est_acces_support_actif",{p_entreprise_id:ctx.entrepriseId}),
     sb.from("utilisateurs_entreprises").select("poste_id,pointage_personnel_actif").eq("utilisateur_id",ctx.userId).eq("entreprise_id",ctx.entrepriseId).eq("statut","actif").maybeSingle(),
+    sb.from("entreprises").select("option_ia_statut,option_ia_essai_fin").eq("id",ctx.entrepriseId).maybeSingle(),
   ]);
   if(accesSupport===true)return null;
   if(!appartenance?.poste_id)return [];
@@ -30,6 +31,12 @@ export const permissionsUtilisateur = cache(async function permissionsUtilisateu
     droits.add("acces_pointage");
     droits.add("saisir_son_pointage");
   }
+  // Option IA payante : au-dela de l'acces par poste, l'entreprise elle-meme doit avoir
+  // l'option active (gratuite historique, essai en cours, ou facturee) pour que l'IA reste
+  // disponible. Voir option_ia_statut sur entreprises.
+  const statutOptionIA=entreprise?.option_ia_statut;
+  const optionIAAccordee=statutOptionIA==="gratuit"||statutOptionIA==="actif"||(statutOptionIA==="essai"&&Boolean(entreprise?.option_ia_essai_fin)&&new Date(entreprise!.option_ia_essai_fin!).getTime()>Date.now());
+  if(!optionIAAccordee)droits.delete("acces_ia");
   return [...droits];
 });
 

@@ -45,6 +45,8 @@ export type EntrepriseAbonnement = {
   remise_stripe_coupon_id?: string | null;
   remise_description?: string | null;
   remise_appliquee_at?: string | null;
+  option_ia_statut?: string | null;
+  option_ia_essai_fin?: string | null;
   nb_membres: number;
   nb_membres_actifs: number;
   nb_fiches_employes?: number;

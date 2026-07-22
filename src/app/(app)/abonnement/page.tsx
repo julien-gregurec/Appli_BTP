@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { demarrerAbonnementAction, ouvrirPortailAbonnementAction } from "@/app/actions/abonnement";
+import { demarrerAbonnementAction, desactiverOptionIAAction, ouvrirPortailAbonnementAction, reactiverOptionIAAction } from "@/app/actions/abonnement";
 import { AlerteDepassementAppareils } from "@/components/AlerteDepassementAppareils";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
@@ -13,7 +13,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
   const [{ error, succes }, ctx] = await Promise.all([searchParams, getContexteEntreprise()]);
   const supabase = await createClient();
   const [{ data: entreprise }, { data: utilisationStockage }, { data: employesFacturables }, { data: postes }, { data: appareils }] = await Promise.all([
-    supabase.from("entreprises").select("abonnement_statut,abonnement_echeance,abonnement_offre,abonnement_periodicite,abonnement_essai_fin,abonnement_annulation_prevue_at,stripe_customer_id,stripe_subscription_id,derniere_facture_url,derniere_facture_pdf,derniere_facture_statut,derniere_facture_at").eq("id",ctx.entrepriseId).single(),
+    supabase.from("entreprises").select("abonnement_statut,abonnement_echeance,abonnement_offre,abonnement_periodicite,abonnement_essai_fin,abonnement_annulation_prevue_at,stripe_customer_id,stripe_subscription_id,derniere_facture_url,derniere_facture_pdf,derniere_facture_statut,derniere_facture_at,option_ia_statut,option_ia_essai_fin").eq("id",ctx.entrepriseId).single(),
     supabase.rpc("utilisation_stockage_entreprise", { p_entreprise_id: ctx.entrepriseId }),
     supabase.from("employes").select("utilisateur_id,prenom,nom,poste_id,compte_application_statut").eq("entreprise_id", ctx.entrepriseId).in("compte_application_statut", ["actif", "pause"]),
     supabase.from("postes").select("id,nom,tarif_compte_mensuel").eq("entreprise_id", ctx.entrepriseId),
@@ -92,6 +92,26 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
       </div>
       <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-neutral-500"><span>{Number(stockage?.fichiers ?? 0).toLocaleString("fr-FR")} fichier(s)</span><span>Au-delà : {TARIF_STOCKAGE_SUPPLEMENTAIRE_HT_PAR_GO.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} € HT / Go / mois</span></div>
       {stockageAlerte&&<p className={`mt-3 rounded-md p-3 text-sm ${stockageDepasse ? "bg-red-50 text-red-800" : "bg-amber-50 text-amber-900"}`}>{stockageDepasse ? `Le quota est dépassé de ${(stockageGo-offre.stockageGoInclus).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} Go. Le dépassement apparaîtra séparément sur la prochaine facture.` : "Vous avez utilisé au moins 80 % du stockage inclus dans votre offre."}</p>}
+    </section>
+
+    <section className="rounded-xl border p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-semibold">Option IA</h2>
+          <p className="mt-1 text-sm text-neutral-500">Assistant IA, génération de devis, analyse de documents/photos, dictée vocale, suggestions.</p>
+        </div>
+        {entreprise?.option_ia_statut==="gratuit"&&<span className="rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-800">Incluse gratuitement</span>}
+        {entreprise?.option_ia_statut==="essai"&&<span className="rounded-full bg-[#c9a24a]/10 px-3 py-1 text-xs font-semibold text-[#8a6a1f] dark:text-[#c9a24a]">Essai gratuit{entreprise.option_ia_essai_fin?` · jusqu’au ${new Date(entreprise.option_ia_essai_fin).toLocaleDateString("fr-FR")}`:""}</span>}
+        {entreprise?.option_ia_statut==="actif"&&<span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-800">Active</span>}
+        {entreprise?.option_ia_statut==="annule"&&<span className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-semibold text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">Désactivée</span>}
+        {entreprise?.option_ia_statut==="indisponible"&&<span className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">Indisponible</span>}
+      </div>
+      {entreprise?.option_ia_statut==="essai"&&<p className="mt-3 text-xs text-neutral-500">Essai offert par Liria. Passé ce délai, si vous ne désactivez pas l’option, elle est facturée automatiquement sur votre abonnement.</p>}
+      {(entreprise?.option_ia_statut==="essai"||entreprise?.option_ia_statut==="actif")&&<form action={desactiverOptionIAAction} className="mt-4"><button className="rounded-md border border-red-200 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50">Désactiver l’option IA</button></form>}
+      {entreprise?.option_ia_statut==="annule"&&(souscrit
+        ? <form action={reactiverOptionIAAction} className="mt-4"><button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Réactiver l’option IA</button></form>
+        : <p className="mt-3 text-xs text-neutral-500">Souscrivez à un abonnement ci-dessous pour pouvoir réactiver l’option IA.</p>)}
+      {entreprise?.option_ia_statut==="indisponible"&&<p className="mt-3 text-xs text-neutral-500">L’essai gratuit est terminé. Souscrivez à un abonnement pour réactiver l’IA.</p>}
     </section>
 
     {souscrit ? <section className="rounded-xl border p-5"><h2 className="font-semibold">Gérer l’abonnement</h2><p className="mt-1 text-sm text-neutral-500">Le portail sécurisé Stripe permet de changer de carte, télécharger les factures et gérer la résiliation.</p><div className="mt-4 flex flex-wrap gap-2"><form action={ouvrirPortailAbonnementAction}><button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Gérer mon abonnement</button></form>{entreprise?.derniere_facture_url&&<Link href={entreprise.derniere_facture_url} target="_blank" rel="noreferrer" className="rounded-md border px-4 py-2 text-sm font-medium">Voir la dernière facture</Link>}{entreprise?.derniere_facture_pdf&&<Link href={entreprise.derniere_facture_pdf} target="_blank" rel="noreferrer" className="rounded-md border px-4 py-2 text-sm font-medium">Télécharger le PDF</Link>}</div>{entreprise?.derniere_facture_at&&<p className="mt-3 text-xs text-neutral-500">Dernière facture : {entreprise.derniere_facture_statut??"—"} · {new Date(entreprise.derniere_facture_at).toLocaleString("fr-FR")}</p>}</section>
