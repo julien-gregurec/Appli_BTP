@@ -27,9 +27,9 @@ function Donut({ items }: { items: DonutItem[] }) {
 function MonthlyBars({ months }: { months: MonthItem[] }) {
   const maximum = Math.max(1, ...months.flatMap((mois) => [mois.devis, mois.factures]));
   return <div>
-    <div className="flex h-36 items-end gap-3 border-b border-neutral-200 px-1 dark:border-neutral-800">{months.map((mois)=><div key={mois.label} className="flex h-full min-w-0 flex-1 items-end justify-center gap-1"><div title={`Devis : ${eurosCompact(mois.devis)}`} className="w-[38%] max-w-5 rounded-t bg-[#c9a24a]" style={{height:`${Math.max(mois.devis?6:0,mois.devis/maximum*100)}%`}}/><div title={`Factures : ${eurosCompact(mois.factures)}`} className="w-[38%] max-w-5 rounded-t bg-[#0d1b2a] dark:bg-blue-400" style={{height:`${Math.max(mois.factures?6:0,mois.factures/maximum*100)}%`}}/></div>)}</div>
+    <div className="flex h-36 items-end gap-3 border-b border-neutral-200 px-1 dark:border-neutral-800">{months.map((mois)=><div key={mois.label} className="flex h-full min-w-0 flex-1 items-end justify-center gap-1"><div title={`Devis : ${eurosCompact(mois.devis)}`} className="w-[38%] max-w-5 rounded-t bg-[#b8792e]" style={{height:`${Math.max(mois.devis?6:0,mois.devis/maximum*100)}%`}}/><div title={`Factures : ${eurosCompact(mois.factures)}`} className="w-[38%] max-w-5 rounded-t bg-[#2563eb]" style={{height:`${Math.max(mois.factures?6:0,mois.factures/maximum*100)}%`}}/></div>)}</div>
     <div className="mt-2 flex gap-3 px-1">{months.map((mois)=><span key={mois.label} className="min-w-0 flex-1 text-center text-[10px] text-neutral-500">{mois.label}</span>)}</div>
-    <div className="mt-3 flex justify-center gap-4 text-xs"><span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-[#c9a24a]"/>Devis émis</span><span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-[#0d1b2a] dark:bg-blue-400"/>Facturé</span></div>
+    <div className="mt-3 flex justify-center gap-4 text-xs"><span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-[#b8792e]"/>Devis émis</span><span className="flex items-center gap-1.5"><i className="h-2.5 w-2.5 rounded-sm bg-[#2563eb]"/>Facturé</span></div>
   </div>;
 }
 
