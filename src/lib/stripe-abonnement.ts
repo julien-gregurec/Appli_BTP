@@ -202,6 +202,46 @@ export async function creerSessionPortailStripe(customerId: string, returnUrl: s
   });
 }
 
+export const DUREES_REMISE = ["once", "repeating", "forever"] as const;
+export type DureeRemise = (typeof DUREES_REMISE)[number];
+export const TYPES_REMISE = ["montant", "pourcentage"] as const;
+export type TypeRemise = (typeof TYPES_REMISE)[number];
+
+type StripeCoupon = { id: string; name?: string | null };
+
+// Geste commercial ponctuel (avoir en euros ou pourcentage, avec duree) applique sur
+// l'abonnement de base d'une entreprise cliente. Un coupon par entreprise a la fois :
+// en appliquer un nouveau remplace l'ancien cote Stripe (comportement natif de
+// `subscriptions.update` avec le parametre coupon).
+export async function creerCouponRemise(params: { type: TypeRemise; valeur: number; duree: DureeRemise; dureeMois?: number; nom: string }) {
+  const corps = new URLSearchParams({ name: params.nom, duration: params.duree });
+  if (params.type === "montant") {
+    corps.set("amount_off", String(Math.round(params.valeur * 100)));
+    corps.set("currency", "eur");
+  } else {
+    corps.set("percent_off", String(params.valeur));
+  }
+  if (params.duree === "repeating") {
+    if (!params.dureeMois || params.dureeMois < 1) throw new Error("Le nombre de mois est obligatoire pour une remise limitée dans le temps");
+    corps.set("duration_in_months", String(params.dureeMois));
+  }
+  return requeteStripe<StripeCoupon>("coupons", { corps, idempotence: `remise-coupon-${Date.now()}-${Math.random().toString(36).slice(2)}` });
+}
+
+export async function appliquerCouponAbonnement(subscriptionId: string, couponId: string) {
+  return requeteStripe<StripeSubscription>(`subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    corps: new URLSearchParams({ coupon: couponId }),
+    idempotence: `remise-application-${subscriptionId}-${couponId}`,
+  });
+}
+
+export async function retirerCouponAbonnement(subscriptionId: string) {
+  return requeteStripe<StripeSubscription>(`subscriptions/${encodeURIComponent(subscriptionId)}/discount`, {
+    methode: "DELETE",
+    idempotence: `remise-suppression-${subscriptionId}-${Date.now()}`,
+  });
+}
+
 export async function recupererAbonnementStripe(subscriptionId: string) {
   return requeteStripe<StripeSubscription>(`subscriptions/${encodeURIComponent(subscriptionId)}`, {
     methode: "GET",

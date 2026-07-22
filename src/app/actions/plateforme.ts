@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { estPlateformeAdmin } from "@/lib/plateforme";
+import { appliquerCouponAbonnement, creerCouponRemise, retirerCouponAbonnement, TYPES_REMISE, DUREES_REMISE, type DureeRemise, type TypeRemise } from "@/lib/stripe-abonnement";
 
 export async function modifierAbonnementAction(entrepriseId: string, formData: FormData) {
   if (!(await estPlateformeAdmin())) {
@@ -173,4 +174,68 @@ export async function enregistrerReglementPlateformeAction(entrepriseId:string,f
     if(error)redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
   }
   revalidatePath("/plateforme");redirect(`/plateforme?succes=${encodeURIComponent("Règlement enregistré et accès rétabli")}`);
+}
+
+function descriptionRemise(type: TypeRemise, valeur: number, duree: DureeRemise, dureeMois?: number) {
+  const montant = type === "montant" ? `${valeur.toLocaleString("fr-FR")} € HT` : `${valeur} %`;
+  const periode = duree === "repeating" ? `pendant ${dureeMois} mois` : duree === "forever" ? "à vie" : "une fois";
+  return `${montant} ${periode}`;
+}
+
+// Geste commercial : coupon Stripe créé et appliqué sur l'abonnement de base de l'entreprise.
+// Un seul à la fois (Stripe remplace automatiquement la remise précédente d'une même
+// subscription). L'entreprise doit déjà avoir un abonnement Stripe Billing actif.
+export async function appliquerRemiseAction(entrepriseId: string, formData: FormData) {
+  if (!(await estPlateformeAdmin())) redirect("/dashboard");
+  const type = String(formData.get("type") ?? "");
+  const valeur = Number(formData.get("valeur"));
+  const duree = String(formData.get("duree") ?? "");
+  const dureeMoisBrut = Math.round(Number(formData.get("duree_mois")));
+  if (!(TYPES_REMISE as readonly string[]).includes(type) || !(DUREES_REMISE as readonly string[]).includes(duree) || !valeur || valeur <= 0) {
+    redirect(`/plateforme?error=${encodeURIComponent("Remise invalide")}`);
+  }
+  if (type === "pourcentage" && valeur > 100) redirect(`/plateforme?error=${encodeURIComponent("Un pourcentage ne peut pas dépasser 100")}`);
+  const dureeMois = duree === "repeating" ? dureeMoisBrut : undefined;
+
+  const supabase = await createClient();
+  const { data: entreprise } = await supabase.from("entreprises").select("nom, stripe_subscription_id").eq("id", entrepriseId).maybeSingle();
+  if (!entreprise?.stripe_subscription_id) redirect(`/plateforme?error=${encodeURIComponent("Cette entreprise n’a pas d’abonnement Stripe actif")}`);
+
+  const description = descriptionRemise(type as TypeRemise, valeur, duree as DureeRemise, dureeMois);
+  try {
+    const coupon = await creerCouponRemise({ type: type as TypeRemise, valeur, duree: duree as DureeRemise, dureeMois, nom: `${entreprise.nom} — ${description}` });
+    await appliquerCouponAbonnement(entreprise.stripe_subscription_id, coupon.id);
+    if (isEmailLoginDisabled()) {
+      await supabase.from("entreprises").update({ remise_stripe_coupon_id: coupon.id, remise_description: description, remise_appliquee_at: new Date().toISOString() }).eq("id", entrepriseId);
+    } else {
+      const { error } = await supabase.rpc("plateforme_appliquer_remise", { p_entreprise_id: entrepriseId, p_coupon_id: coupon.id, p_description: description });
+      if (error) throw new Error(error.message);
+    }
+  } catch (err) {
+    redirect(`/plateforme?error=${encodeURIComponent(err instanceof Error ? err.message : "Remise impossible")}`);
+  }
+
+  revalidatePath("/plateforme");
+  redirect(`/plateforme?succes=${encodeURIComponent(`Remise appliquée : ${description}`)}`);
+}
+
+export async function retirerRemiseAction(entrepriseId: string) {
+  if (!(await estPlateformeAdmin())) redirect("/dashboard");
+  const supabase = await createClient();
+  const { data: entreprise } = await supabase.from("entreprises").select("stripe_subscription_id").eq("id", entrepriseId).maybeSingle();
+  if (entreprise?.stripe_subscription_id) {
+    try {
+      await retirerCouponAbonnement(entreprise.stripe_subscription_id);
+    } catch (err) {
+      redirect(`/plateforme?error=${encodeURIComponent(err instanceof Error ? err.message : "Suppression impossible")}`);
+    }
+  }
+  if (isEmailLoginDisabled()) {
+    await supabase.from("entreprises").update({ remise_stripe_coupon_id: null, remise_description: null, remise_appliquee_at: null }).eq("id", entrepriseId);
+  } else {
+    const { error } = await supabase.rpc("plateforme_retirer_remise", { p_entreprise_id: entrepriseId });
+    if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
+  }
+  revalidatePath("/plateforme");
+  redirect(`/plateforme?succes=${encodeURIComponent("Remise retirée")}`);
 }

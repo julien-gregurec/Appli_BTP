@@ -42,6 +42,9 @@ export type EntrepriseAbonnement = {
   derniere_facture_url?: string | null;
   derniere_facture_pdf?: string | null;
   derniere_facture_statut?: string | null;
+  remise_stripe_coupon_id?: string | null;
+  remise_description?: string | null;
+  remise_appliquee_at?: string | null;
   nb_membres: number;
   nb_membres_actifs: number;
   nb_fiches_employes?: number;

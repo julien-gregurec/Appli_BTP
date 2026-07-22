@@ -3,7 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { estPlateformeAdmin, statutAbonnement, prixAbonnementMensuel, offreParCle, REDUCTION_ANNUELLE, type EntrepriseAbonnement } from "@/lib/plateforme";
-import { ajouterAdminPlateformeAction, creerEntreprisePlateformeAction, entrerEntreprisePlateformeAction, enregistrerReglementPlateformeAction, genererSnapshotFacturationAction, modifierAbonnementAction, modifierTarifPostePlateformeAction, retirerAdminPlateformeAction, signalerImpayePlateformeAction } from "@/app/actions/plateforme";
+import { ajouterAdminPlateformeAction, appliquerRemiseAction, creerEntreprisePlateformeAction, entrerEntreprisePlateformeAction, enregistrerReglementPlateformeAction, genererSnapshotFacturationAction, modifierAbonnementAction, modifierTarifPostePlateformeAction, retirerAdminPlateformeAction, retirerRemiseAction, signalerImpayePlateformeAction } from "@/app/actions/plateforme";
 import { AbonnementCountdown } from "@/components/AbonnementCountdown";
 
 type MembrePlateforme = { email: string; role: string; nom: string | null; ajoute_par: string | null; created_at: string };
@@ -22,7 +22,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
   if (isEmailLoginDisabled()) {
     const { data: ents } = await supabase
       .from("entreprises")
-      .select("id, nom, code_adhesion, reference_interne, abonnement_statut, abonnement_echeance, abonnement_note, impaye_signale_at, suspension_prevue_at, impaye_message, dernier_reglement_at, created_at")
+      .select("id, nom, code_adhesion, reference_interne, abonnement_statut, abonnement_echeance, abonnement_note, impaye_signale_at, suspension_prevue_at, impaye_message, dernier_reglement_at, remise_stripe_coupon_id, remise_description, remise_appliquee_at, created_at")
       .order("created_at", { ascending: false });
     const { data: membres } = await supabase.from("utilisateurs_entreprises").select("entreprise_id, statut");
     const { data: employes } = await supabase.from("employes").select("entreprise_id, poste_id, statut, compte_application_statut, utilisateur_id, invitation_envoyee_at, application_installee_at, derniere_connexion_at");
@@ -190,6 +190,46 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                     <div className={`mt-2 rounded-md border p-3 text-sm ${usageAppareils.nb_comptes_plus_de_deux>0?"border-red-300 bg-red-50 text-red-900":"border-green-200 bg-green-50 text-green-900"}`}><strong>{usageAppareils.nb_appareils_actifs} appareil(s) actif(s)</strong><span className="ml-2 text-xs">2 appareils inclus par compte</span>{usageAppareils.nb_comptes_plus_de_deux>0&&<p className="mt-1 font-semibold">⚠ {usageAppareils.nb_comptes_plus_de_deux} compte(s) dépassent la limite · {usageAppareils.montant_depassements_ht.toLocaleString("fr-FR",{style:"currency",currency:"EUR"})} HT/mois ajouté(s) au tarif de leur poste · maximum observé : {usageAppareils.maximum_appareils_compte}</p>}</div>
                     <p className="mt-2 text-sm font-semibold">Prix automatique mensuel : {prix.total.toLocaleString("fr-FR",{style:"currency",currency:"EUR"})} HT</p>
                     {e.stripe_subscription_id&&<div className="mt-2 flex flex-wrap items-center gap-2 text-xs"><span className="rounded bg-green-50 px-2 py-1 font-medium text-green-800">Stripe Billing relié · {e.abonnement_periodicite??"périodicité inconnue"}</span>{e.derniere_facture_url&&<Link href={e.derniere_facture_url} target="_blank" rel="noreferrer" className="underline">Dernière facture ({e.derniere_facture_statut??"statut inconnu"})</Link>}{e.abonnement_essai_fin&&<span>fin d’essai {new Date(e.abonnement_essai_fin).toLocaleDateString("fr-FR")}</span>}</div>}
+                    {e.stripe_subscription_id&&(e.remise_stripe_coupon_id?(
+                      <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-[#c9a24a]/40 bg-[#c9a24a]/10 p-2 text-xs">
+                        <span className="font-medium text-[#8a6a1f] dark:text-[#c9a24a]">Remise active · {e.remise_description}</span>
+                        {e.remise_appliquee_at && <span className="text-neutral-500">depuis le {new Date(e.remise_appliquee_at).toLocaleDateString("fr-FR")}</span>}
+                        <form action={retirerRemiseAction.bind(null, e.id)}>
+                          <button className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50">Retirer la remise</button>
+                        </form>
+                      </div>
+                    ):(
+                      <details className="mt-2 rounded-md border border-neutral-200 p-2 text-xs dark:border-neutral-800">
+                        <summary className="cursor-pointer font-medium text-neutral-600 dark:text-neutral-300">Faire une remise commerciale (geste client)</summary>
+                        <form action={appliquerRemiseAction.bind(null, e.id)} className="mt-2 grid items-end gap-2 sm:grid-cols-[110px_100px_130px_100px_auto]">
+                          <label className="space-y-1">
+                            <span className="block text-neutral-500">Type</span>
+                            <select name="type" defaultValue="pourcentage" className={input}>
+                              <option value="pourcentage">Pourcentage</option>
+                              <option value="montant">Montant (€ HT)</option>
+                            </select>
+                          </label>
+                          <label className="space-y-1">
+                            <span className="block text-neutral-500">Valeur</span>
+                            <input name="valeur" type="number" min="0" step="0.01" required className={input} />
+                          </label>
+                          <label className="space-y-1">
+                            <span className="block text-neutral-500">Durée</span>
+                            <select name="duree" defaultValue="once" className={input}>
+                              <option value="once">Une fois</option>
+                              <option value="repeating">Pendant N mois</option>
+                              <option value="forever">À vie</option>
+                            </select>
+                          </label>
+                          <label className="space-y-1">
+                            <span className="block text-neutral-500">Nb mois</span>
+                            <input name="duree_mois" type="number" min="1" placeholder="—" className={input} />
+                          </label>
+                          <button className="rounded border px-3 py-2 font-semibold">Appliquer</button>
+                          <p className="col-span-full text-[11px] text-neutral-500">S&apos;applique sur l&apos;abonnement de base (Stripe Coupon). &quot;Nb mois&quot; requis uniquement pour &quot;Pendant N mois&quot;.</p>
+                        </form>
+                      </details>
+                    ))}
                     <details className="mt-3 rounded border bg-neutral-50 p-3 dark:bg-neutral-900"><summary className="cursor-pointer text-sm font-semibold">Tarifs par poste</summary><div className="mt-3 space-y-2">{tarifsPostes.filter((poste) => poste.entreprise_id === e.id).map((poste) => <form key={poste.poste_id} action={modifierTarifPostePlateformeAction.bind(null, poste.poste_id)} className="grid items-end gap-2 text-sm sm:grid-cols-[1fr_130px_130px_auto]"><div><strong>{poste.nom}</strong><p className="text-xs text-neutral-500">{poste.nb_comptes_facturables} compte(s) facturable(s)</p></div><label className="text-xs text-neutral-500">Offre<input name="code_offre" defaultValue={poste.code_offre} className={`${input} mt-1 w-full`}/></label><label className="text-xs text-neutral-500">€/compte/mois<input name="tarif" type="number" min="0" step="0.01" defaultValue={poste.tarif_compte_mensuel} className={`${input} mt-1 w-full`}/></label><button className="rounded border px-3 py-2">Enregistrer</button></form>)}</div></details>
                   </div>
                 </div>
