@@ -22,7 +22,7 @@ export default async function AidePage({ searchParams }: { searchParams: Promise
 
   return (
     <main className="p-6">
-      <div className="mx-auto flex max-w-2xl flex-col gap-4">
+      <div className="mx-auto flex max-w-4xl flex-col gap-4">
         <div>
           <h1 className="text-xl font-semibold">Aide & support</h1>
           <p className="text-sm text-neutral-500">Une question, un souci ? Écrivez à l&apos;équipe Liria Gestion Pro, nous vous répondons ici.</p>
@@ -31,7 +31,11 @@ export default async function AidePage({ searchParams }: { searchParams: Promise
         <section className="flex flex-col gap-3 rounded-lg border border-[#c9a24a]/50 bg-[#c9a24a]/10 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="font-semibold">Guide complet d&apos;utilisation</h2>
-            <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">24 pages : comptes, droits, planning, pointage GPS, devis, factures, achats, stock, compte dépôt, notes de frais et dépannage.</p>
+            <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">
+              101 pages, édition juillet 2026 : première connexion, rôles et droits, clients, devis,
+              facturation avancée, chantiers, équipes, achats, stock, paie, banque, pilotage,
+              abonnement, IA, sécurité et dépannage.
+            </p>
           </div>
           <a href="/guides/Guide_utilisation_Liria_Gestion_Pro.pdf" target="_blank" rel="noopener" className="flex-none rounded-md bg-[#0d1b2a] px-4 py-2 text-center text-sm font-semibold text-white">
             Ouvrir le guide PDF

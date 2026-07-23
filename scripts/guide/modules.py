@@ -1131,3 +1131,395 @@ EXPORTS = {
         ["Le comptable ne peut pas lire le fichier", "Le séparateur ou l'encodage attendu diffère.", "Le CSV est produit en UTF-8 : précisez-le à l'ouverture dans son logiciel."],
     ],
 }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Modules ajoutés après la première édition du manuel (juillet 2026)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+MESSAGERIE = {
+    "titre": "La messagerie interne",
+    "chapo": "La messagerie conserve les échanges professionnels dans l’entreprise : discussion privée "
+             "avec un collaborateur ou fil partagé avec l’équipe d’un chantier. Elle évite que les "
+             "consignes importantes restent dispersées dans des messageries personnelles.",
+    "droits": [("acces_messagerie", "Lire et écrire dans les conversations auxquelles le compte participe.")],
+    "titre_creer": "Créer une conversation",
+    "etapes": [
+        ("Choisir le type", "« Personne ou direction » crée un échange privé ; « Chantier » crée un fil "
+         "visible par l’équipe autorisée sur ce chantier."),
+        ("Rechercher le destinataire", "Tapez quelques lettres du nom, du poste ou du chantier. La liste "
+         "se réduit automatiquement, sans tenir compte des accents."),
+        ("Écrire le premier message", "Expliquez le contexte et l’action attendue. Ne transmettez jamais "
+         "de mot de passe, de numéro de carte bancaire complet ou de secret technique."),
+        ("Envoyer", "La conversation apparaît dans la colonne de gauche. Les réponses sont datées et "
+         "attribuées à leur auteur."),
+    ],
+    "note": ("Des comptes individuels sont obligatoires",
+             "Une conversation doit toujours avoir un auteur identifiable. La messagerie est donc "
+             "désactivée en mode prototype et ne doit pas être utilisée depuis le compte partagé du dépôt."),
+    "liens": [
+        ["Employés", "Le carnet des destinataires provient des fiches employé disposant d’un compte."],
+        ["Chantiers", "Un fil chantier suit les droits et l’équipe affectée au chantier."],
+        ["IA", "Si l’option est active et autorisée, l’assistant peut proposer une réponse ; l’utilisateur reste responsable de l’envoi."],
+    ],
+    "erreurs": [
+        ["Aucun destinataire n’est proposé", "La fiche n’a pas de compte actif ou votre périmètre ne permet pas cet échange.", "Vérifiez la fiche employé et les droits."],
+        ["Impossible de publier sur un chantier", "Vous ne voyez pas ce chantier.", "Demandez une affectation ou un droit de consultation plus large."],
+    ],
+}
+
+FACTURATION_AVANCEE = {
+    "titre": "Situations, acomptes, avoirs, solde et DGD",
+    "chapo": "La facturation avancée couvre les chantiers facturés progressivement. Elle calcule une "
+             "situation à partir de l’avancement cumulé, prépare les acomptes et factures finales, "
+             "gère les avoirs, la retenue de garantie et le décompte général définitif.",
+    "droits": [
+        ("acces_facturation_avancee", "Consulter les situations, documents avancés et remises en banque."),
+        ("gerer_facturation_avancee", "Calculer une situation et créer un acompte, un avoir, un solde ou un DGD."),
+    ],
+    "titre_creer": "Créer une situation de travaux",
+    "etapes": [
+        ("Vérifier le devis", "Le devis doit être accepté et rattaché à un chantier. Sinon il ne peut pas "
+         "servir de marché de référence."),
+        ("Choisir le devis accepté", "La liste affiche le numéro, le client, le chantier et le montant HT."),
+        ("Saisir l’avancement cumulé", "Indiquez le pourcentage total atteint depuis le début, et non le "
+         "pourcentage de la seule période."),
+        ("Saisir la retenue de garantie", "Si le marché en prévoit une, indiquez son taux. Vérifiez le contrat "
+         "avant d’utiliser cette retenue."),
+        ("Calculer", "Le logiciel déduit les situations antérieures et affiche le montant de la période."),
+        ("Créer la facture", "Contrôlez les montants, puis générez la facture liée à la situation."),
+    ],
+    "statuts": [
+        ["<b>Brouillon</b>", "Calcul en préparation.", "Modifiable avant émission."],
+        ["<b>Émise</b>", "Situation communiquée au client.", "Peut être transformée en facture selon le circuit."],
+        ["<b>Facturée</b>", "Une facture a été créée.", "Le lien vers la facture devient disponible."],
+    ],
+    "note": ("Pourquoi la liste peut être vide",
+             "La liste ne contient que les devis acceptés. Pour une situation, le devis doit en plus être "
+             "rattaché à un chantier. Acceptez d’abord le devis et vérifiez sa liaison au chantier."),
+    "liens": [
+        ["Devis", "Le montant du marché et les lignes viennent du devis accepté."],
+        ["Chantiers", "Chaque situation est rattachée au chantier du devis."],
+        ["Factures", "Une situation, un acompte, un avoir ou un solde produit un document de facturation."],
+        ["Trésorerie", "Les échéances et règlements des factures alimentent les prévisions."],
+    ],
+    "erreurs": [
+        ["La liste des devis est vide", "Aucun devis accepté ne correspond au type de document.", "Acceptez le devis et rattachez-le à un chantier."],
+        ["Le montant de période semble trop élevé", "Un avancement de période a été saisi à la place du cumul.", "Saisissez le pourcentage total atteint depuis le début."],
+    ],
+}
+
+CRM = {
+    "titre": "Le CRM, les communications et les relances",
+    "chapo": "Le CRM mémorise les appels, e-mails, SMS, courriers et rendez-vous. Il programme les rappels "
+             "et conserve l’historique des relances d’impayés afin qu’aucune action commerciale ne soit oubliée.",
+    "droits": [
+        ("acces_crm", "Consulter les communications et relances autorisées."),
+        ("gerer_crm", "Journaliser une communication, programmer un rappel et traiter une relance."),
+    ],
+    "titre_creer": "Journaliser une communication",
+    "etapes": [
+        ("Choisir le client", "Sélectionnez le client concerné ou laissez « Contact général » si l’échange "
+         "n’est pas encore rattachable."),
+        ("Choisir le canal et le sens", "Appel, e-mail, SMS, courrier ou rendez-vous ; entrant ou sortant."),
+        ("Renseigner l’objet", "Un objet court facilite la recherche ultérieure."),
+        ("Écrire le compte rendu", "Notez la décision, l’engagement pris et la prochaine action."),
+        ("Programmer un rappel", "Ajoutez une date et une heure si une relance est nécessaire."),
+    ],
+    "note": ("Une relance doit rester traçable",
+             "Préparez l’envoi depuis la facture impayée, vérifiez le destinataire puis conservez son état "
+             "dans l’historique. Une relance n’efface jamais le solde : seul un règlement confirmé le fait."),
+    "liens": [
+        ["Clients", "Chaque communication complète l’historique de la relation client."],
+        ["Factures", "Les impayés fournissent le montant, l’échéance et le chantier aux relances."],
+        ["Tableau de bord", "Les rappels et retards autorisés peuvent alimenter le centre d’alertes."],
+    ],
+    "erreurs": [
+        ["Impossible de préparer l’e-mail", "Le client n’a pas d’adresse e-mail.", "Complétez la fiche client."],
+        ["La facture n’est pas proposée", "Elle est soldée ou hors de votre périmètre.", "Vérifiez son reste dû et vos droits."],
+    ],
+}
+
+APPELS_OFFRES = {
+    "titre": "Les appels d’offres",
+    "chapo": "Ce module suit une consultation depuis sa détection jusqu’à la décision : référence, client, "
+             "chantier, échéance de dépôt, montant estimé, source et notes de préparation.",
+    "droits": [
+        ("acces_appels_offres", "Consulter le portefeuille des appels d’offres."),
+        ("gerer_appels_offres", "Créer une consultation et faire évoluer son statut."),
+    ],
+    "titre_creer": "Ajouter une consultation",
+    "etapes": [
+        ("Saisir le marché", "Donnez un intitulé explicite ; la référence peut être générée automatiquement."),
+        ("Rattacher le contexte", "Associez le client et le chantier s’ils existent déjà."),
+        ("Fixer la date limite", "Saisissez la date et l’heure exactes de dépôt, puis anticipez votre délai interne."),
+        ("Ajouter la source", "Conservez le lien vers la plateforme acheteur et les pièces attendues."),
+        ("Suivre le statut", "Faites évoluer la consultation à chaque étape jusqu’au résultat."),
+    ],
+    "note": ("Droit recommandé",
+             "Ce module est destiné à la direction, au commercial et aux profils qui préparent réellement "
+             "les réponses. Il n’est généralement pas utile à un chef d’équipe ou à un ouvrier."),
+    "liens": [
+        ["Clients", "Le donneur d’ordre peut être rattaché à la consultation."],
+        ["Chantiers", "Un projet déjà qualifié peut être rattaché au futur chantier."],
+        ["Devis", "Après attribution, le chiffrage détaillé est réalisé dans le module Devis."],
+    ],
+    "erreurs": [
+        ["La consultation n’est pas visible", "Votre poste ne possède pas le droit d’accès.", "Demandez à l’administrateur uniquement si votre fonction l’exige."],
+        ["L’échéance est dépassée sans alerte", "La date limite n’a pas été saisie.", "Complétez la date et l’heure de dépôt."],
+    ],
+}
+
+OUVRAGES = {
+    "titre": "Les ouvrages, modèles et métrés",
+    "chapo": "La bibliothèque d’ouvrages enregistre des ensembles chiffrés réutilisables. Le métré assisté "
+             "calcule surfaces, longueurs, volumes ou quantités et conserve la formule utilisée.",
+    "droits": [
+        ("acces_ouvrages", "Consulter les modèles et métrés."),
+        ("gerer_ouvrages", "Créer des modèles chiffrés et enregistrer des métrés."),
+    ],
+    "titre_creer": "Créer un métré",
+    "etapes": [
+        ("Nommer le relevé", "Utilisez un nom qui précise la zone : étage, pièce ou lot."),
+        ("Rattacher chantier et devis", "Facultatif mais recommandé pour retrouver le calcul depuis le dossier."),
+        ("Saisir les dimensions", "Longueur, largeur, hauteur, nombre et éventuelle déduction."),
+        ("Choisir l’unité", "m², mètre linéaire, m³ ou unité."),
+        ("Contrôler la formule", "Le résultat et la formule sont conservés afin de pouvoir justifier le calcul."),
+    ],
+    "note": ("Le métré reste un calcul à vérifier",
+             "Contrôlez les unités, les ouvertures déduites et les hypothèses de pose. Le logiciel assiste "
+             "le calcul mais ne remplace ni le relevé terrain ni les règles professionnelles."),
+    "liens": [
+        ["Prestations", "Une ligne d’ouvrage peut reprendre les types, unités, prix et TVA de votre bibliothèque."],
+        ["Devis", "Les modèles accélèrent le chiffrage ; le métré peut être rattaché au devis."],
+        ["Chantiers", "Le relevé reste consultable dans le contexte du chantier."],
+    ],
+    "erreurs": [
+        ["Le résultat est à zéro", "Une dimension obligatoire ou le nombre manque.", "Vérifiez les valeurs et l’unité."],
+        ["Le calcul est incohérent", "Une déduction dépasse la quantité brute.", "Corrigez les dimensions ou la déduction."],
+    ],
+}
+
+INTERVENTIONS = {
+    "titre": "Les interventions et bons de travail",
+    "chapo": "Les interventions couvrent le dépannage, la maintenance et les bons de travail. Elles "
+             "centralisent le client, le site, l’équipe, les horaires, le compte rendu et les pièces utilisées.",
+    "droits": [
+        ("acces_interventions", "Consulter les interventions de son périmètre."),
+        ("gerer_interventions", "Créer, planifier, affecter et clôturer une intervention."),
+    ],
+    "titre_creer": "Préparer une intervention",
+    "etapes": [
+        ("Choisir le client et le site", "Vérifiez l’adresse et le contact présent sur place."),
+        ("Décrire la demande", "Notez le symptôme, la priorité et les consignes d’accès."),
+        ("Planifier et affecter", "Choisissez la date, la durée prévue et les intervenants."),
+        ("Réaliser le bon", "Sur place, renseignez le temps, les travaux, les pièces et les photos."),
+        ("Faire valider", "Recueillez la validation ou la signature prévue par votre procédure."),
+        ("Clôturer", "Une intervention terminée reste dans l’historique et peut alimenter la facturation."),
+    ],
+    "liens": [
+        ["Clients", "Le contact, le site et l’historique sont rattachés au client."],
+        ["Planning", "Les intervenants et la durée occupent le planning."],
+        ["Stock", "Les pièces réellement utilisées peuvent être sorties du stock."],
+        ["Factures", "Les éléments validés servent à préparer la facturation."],
+    ],
+    "erreurs": [
+        ["L’intervention n’apparaît pas au technicien", "Il n’est pas affecté ou n’a pas le droit d’accès.", "Vérifiez l’affectation et son poste."],
+        ["Impossible de clôturer", "Le compte rendu ou une validation obligatoire manque.", "Complétez les champs signalés."],
+    ],
+}
+
+SOUS_TRAITANTS = {
+    "titre": "Les sous-traitants",
+    "chapo": "La fiche sous-traitant centralise l’identité de l’entreprise, les documents administratifs, "
+             "les coordonnées bancaires, les chantiers confiés, les coûts et les règlements.",
+    "droits": [
+        ("acces_sous_traitants", "Consulter les sous-traitants autorisés."),
+        ("gerer_sous_traitants", "Créer les fiches, contrôler les pièces et les rattacher aux chantiers."),
+    ],
+    "titre_creer": "Créer et qualifier un sous-traitant",
+    "etapes": [
+        ("Identifier l’entreprise", "Raison sociale, SIRET, contacts et spécialité."),
+        ("Contrôler les documents", "Ajoutez les attestations, assurances et dates de validité requises."),
+        ("Enregistrer le RIB", "Le RIB est chiffré et doit être vérifié avant toute préparation de virement."),
+        ("Rattacher les chantiers", "Indiquez le périmètre confié et le coût prévu."),
+        ("Enregistrer les factures", "Classez chaque facture sur le chantier concerné pour une marge exacte."),
+    ],
+    "note": ("Un sous-traitant n’est pas un salarié",
+             "Ses heures et coûts doivent être classés en sous-traitance. Vérifiez les obligations "
+             "contractuelles et sociales avec votre conseil avant le démarrage."),
+    "liens": [
+        ["Chantiers", "Les prestations et coûts pèsent sur la rentabilité du chantier."],
+        ["Factures fournisseurs", "Les factures du sous-traitant se traitent comme des sorties d’argent."],
+        ["Banque & paie", "Un RIB vérifié permet de préparer son règlement dans un lot bancaire."],
+    ],
+    "erreurs": [
+        ["Le règlement ne peut pas être préparé", "Le RIB n’est pas vérifié ou la facture n’est pas validée.", "Contrôlez le coffre RIB et la source."],
+        ["Le coût n’apparaît pas au chantier", "La facture n’est pas classée sur ce chantier.", "Rattachez-la depuis la facture ou la fiche chantier."],
+    ],
+}
+
+GRANDS_DEPLACEMENTS = {
+    "titre": "Les grands déplacements",
+    "chapo": "Le module regroupe les frais et indemnités liés aux missions éloignées : période, chantier, "
+             "salarié, hébergement, repas, transport et justificatifs. Il prépare le contrôle avant la paie.",
+    "droits": [
+        ("saisir_ses_notes_frais", "Déclarer ses propres éléments de déplacement."),
+        ("gerer_notes_frais", "Contrôler et valider les déplacements de l’équipe."),
+    ],
+    "titre_creer": "Déclarer un grand déplacement",
+    "etapes": [
+        ("Choisir la période", "Indiquez les dates réelles de départ et de retour."),
+        ("Rattacher le chantier", "Le chantier explique l’origine du déplacement et permet son imputation."),
+        ("Renseigner les postes", "Hébergement, repas, transport et autres frais selon la politique de l’entreprise."),
+        ("Ajouter les justificatifs", "Conservez les originaux et joignez les fichiers lisibles."),
+        ("Soumettre", "Le responsable contrôle avant transmission aux éléments variables de paie."),
+    ],
+    "note": ("Les règles sociales doivent être paramétrées",
+             "Les plafonds, exonérations et justificatifs dépendent de la situation et de la réglementation. "
+             "Faites valider votre politique par le cabinet de paie ou l’expert-comptable."),
+    "liens": [
+        ["Chantiers", "Le déplacement est imputé au chantier concerné."],
+        ["Notes de frais", "Les justificatifs et remboursements restent traçables."],
+        ["Paie", "Les éléments validés peuvent préparer les variables du mois."],
+    ],
+    "erreurs": [
+        ["La mission n’apparaît pas en paie", "Elle n’est pas validée ou n’est pas dans la période.", "Vérifiez le statut et les dates."],
+        ["Le montant n’est pas remboursable", "Un justificatif obligatoire manque.", "Ajoutez la pièce ou demandez la règle à l’administrateur."],
+    ],
+}
+
+PAIE = {
+    "titre": "La préparation de la paie",
+    "chapo": "Liria prépare les variables à transmettre au cabinet de paie : heures validées, absences, "
+             "congés, déplacements et remboursements. Il ne remplace pas le logiciel légal de paie de l’expert-comptable.",
+    "droits": [
+        ("consulter_sa_paie", "Consulter ses propres documents disponibles."),
+        ("saisir_variables_paie", "Préparer les variables autorisées."),
+        ("controler_variables_paie", "Contrôler les données avant clôture."),
+        ("gerer_paie", "Gérer les périodes et documents de paie."),
+        ("exporter_paie", "Produire l’export transmis au cabinet."),
+        ("parametrer_paie", "Configurer les règles et profils."),
+        ("voir_paie_confidentielle", "Consulter les informations confidentielles de paie."),
+    ],
+    "titre_creer": "Préparer une période",
+    "etapes": [
+        ("Ouvrir le mois", "Créez ou sélectionnez la période de paie."),
+        ("Contrôler les profils", "Vérifiez contrat, horaire, coût et coordonnées du salarié."),
+        ("Importer les données terrain", "Heures validées, absences, congés et déplacements alimentent la préparation."),
+        ("Corriger avec justification", "Toute correction doit être motivée et conservée dans l’historique."),
+        ("Contrôler puis verrouiller", "Un second contrôle réduit les erreurs avant transmission."),
+        ("Exporter au cabinet", "Transmettez le fichier et les pièces par le canal convenu avec l’expert-comptable."),
+        ("Importer les bulletins", "Conservez les PDF privés reçus du cabinet et rendez chaque bulletin au seul salarié concerné."),
+    ],
+    "note": ("La paie légale reste produite par le prestataire",
+             "Liria consolide et transmet des variables. Le bulletin officiel, les cotisations et la DSN "
+             "restent produits et contrôlés par le cabinet ou le logiciel de paie agréé."),
+    "liens": [
+        ["Pointage", "Seules les heures validées doivent alimenter les variables."],
+        ["Congés", "Les absences validées sont reprises dans la période."],
+        ["Grands déplacements", "Les éléments contrôlés complètent les variables."],
+        ["Banque & paie", "Les bulletins contrôlés peuvent préparer un lot de salaires, jamais un débit automatique."],
+    ],
+    "erreurs": [
+        ["Une heure manque", "Le pointage n’est pas validé ou se trouve hors période.", "Contrôlez la date et le statut."],
+        ["Un salarié voit un autre bulletin", "Anomalie d’autorisation critique.", "Coupez l’accès et contactez immédiatement le support."],
+    ],
+}
+
+PAIEMENTS_BANCAIRES = {
+    "titre": "Banque, RIB et virements",
+    "chapo": "Le coffre bancaire protège les RIB des employés, fournisseurs et sous-traitants. Les lots "
+             "séparent préparation, validation, transmission au prestataire bancaire et confirmation finale.",
+    "droits": [
+        ("acces_paiements_bancaires", "Consulter le module bancaire autorisé."),
+        ("gerer_coordonnees_bancaires", "Enregistrer et vérifier les RIB."),
+        ("gerer_paie", "Préparer les sources liées aux salaires."),
+        ("preparer_virements", "Créer un lot sans envoyer d’argent."),
+        ("valider_virements", "Valider le lot préparé."),
+        ("executer_virements", "Transmettre au prestataire et ouvrir l’authentification bancaire."),
+    ],
+    "titre_creer": "Préparer un lot de virements",
+    "etapes": [
+        ("Vérifier les bénéficiaires", "Chaque RIB est validé, chiffré et affiché uniquement par ses quatre derniers caractères."),
+        ("Choisir la source", "Bulletins contrôlés, notes de frais validées ou factures fournisseurs à payer."),
+        ("Créer le lot", "Vérifiez la date d’exécution, le montant et le libellé de chaque ordre."),
+        ("Faire valider", "La personne ayant préparé ne doit pas être la seule à autoriser l’envoi."),
+        ("Transmettre", "Le prestataire bancaire ouvre une authentification forte ; Liria ne connaît pas vos identifiants bancaires."),
+        ("Rapprocher", "Actualisez le statut jusqu’à confirmation ou rejet. La source n’est marquée payée qu’après confirmation."),
+    ],
+    "note": ("Aucun virement réel sans prestataire réglementé",
+             "Sans contrat, clés et consentement bancaire valides, Liria prépare seulement le lot. "
+             "Ne marquez jamais une facture ou un salaire payé avant la confirmation de la banque."),
+    "liens": [
+        ["Employés", "Le RIB salarié sert aux salaires et remboursements de notes de frais."],
+        ["Fournisseurs / Sous-traitants", "Le RIB vérifié sert au règlement de leurs factures."],
+        ["Paie", "Un bulletin contrôlé fournit la source du virement de salaire."],
+        ["Notes de frais", "Une note validée fournit la source du remboursement."],
+    ],
+    "erreurs": [
+        ["Une source est grisée", "RIB non vérifié ou document non validé.", "Contrôlez le bénéficiaire et le statut de la source."],
+        ["La banque ne s’ouvre pas", "Le prestataire n’est pas configuré ou le consentement a expiré.", "Vérifiez le connecteur et recommencez la transmission."],
+    ],
+}
+
+ABONNEMENT = {
+    "titre": "L’abonnement, le stockage et l’option IA",
+    "chapo": "L’administrateur de l’entreprise consulte son offre, son coût estimé, ses comptes facturables, "
+             "son stockage, sa consommation IA, ses factures et son moyen de paiement.",
+    "droits": [
+        ("acces_parametres", "Consulter les informations d’abonnement autorisées."),
+        ("gerer_parametres", "Souscrire, gérer le portail de paiement et paramétrer l’option IA."),
+    ],
+    "titre_creer": "Gérer l’abonnement",
+    "etapes": [
+        ("Contrôler le coût actuel", "Vérifiez l’offre, les comptes actifs ou en pause, les options et les éventuels dépassements."),
+        ("Surveiller le stockage", "Plans, photos, factures et justificatifs consomment le quota affiché."),
+        ("Choisir la politique IA", "Blocage au quota, demande de pack ou dépassement facturé, avec plafond de sécurité."),
+        ("Ouvrir le portail sécurisé", "Stripe permet de changer de carte, récupérer les factures et gérer la résiliation."),
+        ("Traiter un avertissement", "Un compte utilisant plus de deux appareils pendant le mois peut produire le supplément annoncé dans l’abonnement."),
+    ],
+    "note": ("Les deux premiers appareils sont inclus par compte",
+             "L’avertissement apparaît dans la rubrique Abonnement, pas dans le tableau de bord opérationnel. "
+             "Révoquez les appareils inutilisés depuis la fiche employé avant un nouveau mois."),
+    "liens": [
+        ["Employés", "Les comptes actifs et en pause restent facturables selon l’offre."],
+        ["Stockage", "Les fichiers privés de l’entreprise alimentent le compteur."],
+        ["IA", "Le palier, le quota et la politique de dépassement sont gérés ici."],
+        ["Stripe Billing", "Le portail externe sécurisé gère carte, prélèvements et factures d’abonnement."],
+    ],
+    "erreurs": [
+        ["Le montant semble trop élevé", "Compte en pause, option ou appareil supplémentaire.", "Ouvrez le détail du coût puis la fiche du compte concerné."],
+        ["Le portail ne s’ouvre pas", "L’abonnement Stripe n’est pas encore rattaché ou la configuration externe manque.", "Contactez le support plateforme."],
+    ],
+}
+
+IA_NOTIFICATIONS = {
+    "titre": "L’assistant IA et les notifications",
+    "chapo": "L’assistant aide à rédiger, résumer et retrouver des informations. Il ne voit que les données "
+             "que l’utilisateur peut lui-même consulter. Les notifications signalent les actions autorisées "
+             "qui nécessitent une attention.",
+    "droits": [
+        ("option IA active", "Permet d’utiliser l’assistant dans les écrans qui le proposent, dans la limite du quota."),
+        ("droits du poste", "Limitent strictement les documents et données utilisables par l’assistant."),
+    ],
+    "titre_creer": "Utiliser l’assistant sans risque",
+    "etapes": [
+        ("Ouvrir l’assistant depuis l’écran concerné", "Le contexte utile est limité à la page et aux droits du compte."),
+        ("Formuler une demande précise", "Indiquez l’objectif, le destinataire et les contraintes."),
+        ("Relire la proposition", "Vérifiez les montants, dates, noms, références et obligations juridiques."),
+        ("Corriger avant d’agir", "Une proposition IA n’envoie pas automatiquement un document et ne remplace pas une validation humaine."),
+        ("Respecter le quota", "L’administrateur suit la consommation et choisit la politique appliquée au plafond."),
+    ],
+    "note": ("L’IA ne décide jamais à votre place",
+             "Ne lui confiez pas de secret, mot de passe ou donnée bancaire complète. Contrôlez toute réponse "
+             "avant envoi, paiement, signature, décision RH ou engagement contractuel."),
+    "liens": [
+        ["Abonnement", "Le palier, la consommation et la politique de quota sont configurés par l’administrateur."],
+        ["Messagerie", "L’assistant peut proposer une réponse sans l’envoyer seul."],
+        ["Notifications", "Planning, pointage, validations et échéances peuvent générer des alertes selon les droits."],
+    ],
+    "erreurs": [
+        ["L’assistant refuse une question", "Le module n’est pas autorisé ou le quota est atteint.", "Vérifiez vos droits et l’écran Abonnement."],
+        ["Une réponse contient une erreur", "L’IA produit une suggestion, pas une preuve.", "Revenez au document source et corrigez avant utilisation."],
+    ],
+}

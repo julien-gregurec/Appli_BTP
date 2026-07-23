@@ -293,9 +293,13 @@ def _sommaire_imprime(entrees, decalage):
         points = '<font color="#c9d0d9"> ' + "." * 60 + "</font>"
         lignes.append(Table(
             [[Paragraph(f"{titre}{points}", ST[style]), Paragraph(str(page + decalage), ST[style])]],
-            colWidths=[15.4 * cm, 1 * cm],
+            # La colonne de pagination doit accueillir sans retour les numéros
+            # à trois chiffres du manuel complet.
+            colWidths=[15.1 * cm, 1.3 * cm],
             style=TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"),
                               ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                              ("LEFTPADDING", (1, 0), (1, -1), 0),
+                              ("RIGHTPADDING", (1, 0), (1, -1), 0),
                               ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
                               ("TOPPADDING", (0, 0), (-1, -1), 1)])))
     return [Paragraph("Sommaire", ST["h1"]), Spacer(1, 10), *lignes, PageBreak()]
