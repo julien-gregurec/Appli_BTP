@@ -18,6 +18,7 @@ from generer_manuel import saut_de_chapitre
 from generer_manuel import Titre, capture, encadre, etapes, p, section, tableau
 from trame import chapitre
 import modules
+import procedures
 
 RACINE = Path(__file__).resolve().parents[2]
 
@@ -41,7 +42,10 @@ def introduction():
         p("Chaque module a son chapitre, toujours construit de la même façon : à quoi il sert, qui y a "
           "accès, l'écran principal détaillé, la création pas à pas, la fiche, les statuts, la version "
           "mobile, les liens avec les autres modules et les erreurs fréquentes. Vous pouvez donc lire "
-          "le manuel en entier ou n'ouvrir que le chapitre qui vous concerne."),
+          "le manuel en entier ou n'ouvrir que le chapitre qui vous concerne. Après les chapitres par "
+          "module, la partie « Modes opératoires complets » décrit les enchaînements réels de bout en "
+          "bout : depuis la préparation jusqu'au contrôle final, en indiquant les rôles, les données "
+          "synchronisées et la conduite à tenir lorsqu'une étape est bloquée."),
         *encadre("Toutes les captures sont réelles",
                  "Les images de ce manuel sont des captures du logiciel, prises sur une entreprise de "
                  "démonstration appelée « Entreprise Test ». Les noms, adresses et montants qui y "
@@ -241,11 +245,79 @@ def chapitres():
         chapitre(modules.ACCES),
         chapitre(modules.IMPORT),
         chapitre(modules.AIDE),
+        modes_operatoires_complets(),
         parcours_par_role(),
         securite(),
         depannage(),
         annexe_droits(),
     ]
+
+
+# ═══════════════════════════════════════════════════════════════════
+def modes_operatoires_complets():
+    blocs = [
+        Titre("Modes opératoires complets", 1),
+        p("Cette partie ne décrit plus un écran isolé. Elle explique comment accomplir les opérations "
+          "réelles de l'entreprise lorsqu'elles traversent plusieurs modules. Suivez les étapes dans "
+          "l'ordre, puis effectuez les contrôles indiqués avant de considérer l'opération comme terminée.",
+          "chapo"),
+        *encadre(
+            "Une validation n'est jamais une simple formalité",
+            "Valider un pointage, une note de frais, une paie, un paiement ou un inventaire peut modifier "
+            "les coûts, la trésorerie, le stock et l'historique. Vérifiez toujours l'identité, la période, "
+            "le chantier, les montants et les pièces jointes avant de confirmer.",
+        ),
+        *tableau(
+            ["Parcours documenté", "Résultat attendu"],
+            [[procedure["titre"], procedure["objectif"]] for procedure in procedures.PROCEDURES],
+            [6.2 * cm, 10.2 * cm],
+        ),
+        saut_de_chapitre(),
+    ]
+
+    for procedure in procedures.PROCEDURES:
+        blocs.extend([
+            Titre(procedure["titre"], 1),
+            p(procedure["objectif"], "chapo"),
+            *encadre("Qui réalise cette procédure", procedure["roles"]),
+            Titre("Avant de commencer", 2),
+            *tableau(
+                ["N°", "Prérequis"],
+                [[str(index), prerequisite] for index, prerequisite in enumerate(procedure["prerequis"], 1)],
+                [1.2 * cm, 15.2 * cm],
+            ),
+            Titre("Procédure détaillée", 2),
+            *etapes(procedure["etapes"]),
+            Titre("Contrôles avant validation", 2),
+            *tableau(
+                ["Point à contrôler", "Résultat attendu"],
+                procedure["controles"],
+                [5.1 * cm, 11.3 * cm],
+            ),
+            Titre("Synchronisations automatiques", 2),
+            p("Les effets ci-dessous sont produits par l'opération. Ils expliquent pourquoi une donnée "
+              "saisie dans un module réapparaît ailleurs et pourquoi il faut éviter les doubles saisies."),
+            *tableau(
+                ["Module ou service", "Effet produit"],
+                procedure["synchronisations"],
+                [4.8 * cm, 11.6 * cm],
+            ),
+            Titre("Cas particuliers et corrections", 2),
+            *tableau(
+                ["Situation", "Conduite à tenir"],
+                procedure["exceptions"],
+                [5.2 * cm, 11.2 * cm],
+            ),
+            *encadre(
+                "Fin de procédure",
+                "L'opération est terminée seulement lorsque les contrôles sont satisfaits, que les "
+                "pièces nécessaires sont présentes et que les statuts affichés correspondent à la "
+                "réalité. En cas de doute, laissez l'élément à vérifier plutôt que de forcer une validation.",
+            ),
+            saut_de_chapitre(),
+        ])
+
+    return blocs
 
 
 # ═══════════════════════════════════════════════════════════════════
