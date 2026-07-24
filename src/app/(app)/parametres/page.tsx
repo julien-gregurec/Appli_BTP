@@ -49,6 +49,18 @@ export default async function ParametresPage({ searchParams }: { searchParams: P
           </section>
           <section className="space-y-4 rounded-md border border-neutral-200 p-4 dark:border-neutral-800"><div><h2 className="text-sm font-semibold">Horaires de travail et contrôle des pointages</h2><p className="text-xs text-neutral-500">Ces durées servent à distinguer les heures normales, les écarts et les heures supplémentaires. Chaque pointage reste soumis à validation.</p></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"].map((jour,index)=><label key={jour} className="text-xs text-neutral-500">{jour}<input name={`heures_jour_${index+1}`} type="number" min="0" max="24" step="0.25" defaultValue={entreprise?.horaires_journaliers?.[String(index+1)]??(index<4?8:index===4?7:0)} className={`${input} mt-1`}/></label>)}</div><label className="block text-xs text-neutral-500">Alerter à partir d’un écart de<input name="seuil_ecart_pointage" type="number" min="0" max="8" step="0.25" defaultValue={entreprise?.seuil_ecart_pointage??0.25} className={`${input} mt-1 max-w-xs`}/><span className="mt-1 block">Toute durée supérieure à 12 h passe en vérification renforcée ; à partir de 15 h, l’alerte devient critique.</span></label></section>
 
+          <section id="grands-deplacements" className="space-y-4 rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
+            <div><h2 className="text-sm font-semibold">Grands déplacements</h2><p className="text-xs text-neutral-500">Choisissez la méthode utilisée pour préparer les budgets de mission. Chaque dépense reste justifiée et validée dans les notes de frais.</p></div>
+            <label className="block text-xs text-neutral-500">Mode de calcul
+              <select name="mode_grand_deplacement" defaultValue={entreprise?.mode_grand_deplacement??"frais_reels"} className={`${input} mt-1`}>
+                <option value="frais_reels">Frais réels — justificatifs et budget manuel</option>
+                <option value="forfait_urssaf">Forfait indicatif URSSAF 2026</option>
+              </select>
+            </label>
+            <div className="rounded-md bg-neutral-50 p-3 text-xs text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300"><strong>Barème intégré 2026 :</strong> pendant les trois premiers mois, 21,40 € par repas ; hébergement et petit-déjeuner 76,60 € à Paris/92/93/94 ou 56,80 € ailleurs. Les taux réduits des mois 4 à 24 puis 25 à 72 sont appliqués automatiquement selon la date initiale de la mission.</div>
+            <p className="text-xs text-amber-800">Ce calcul est une aide de gestion et ne constitue pas une validation sociale ou fiscale. Les conditions du grand déplacement et les justificatifs doivent être contrôlés avec le conseil comptable de l’entreprise.</p>
+          </section>
+
           <section className="space-y-3 rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
             <div>
               <h2 className="text-sm font-semibold">Suivi de zone chantier</h2>

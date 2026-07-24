@@ -95,9 +95,7 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
             </p>
             </div>
           </div>
-          {peutGerer&&<Link href={`/employes/${id}/modifier`} className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700">
-            Modifier
-          </Link>}
+          {peutGerer&&<div className="flex flex-wrap gap-2"><Link href={`/paie/profils/${id}`} className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700">Profil de paie</Link><Link href={`/employes/${id}/modifier`} className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700">Modifier</Link></div>}
         </div>
 
         {messages.error&&<p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{messages.error}</p>}{messages.success&&<p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{messages.success}</p>}

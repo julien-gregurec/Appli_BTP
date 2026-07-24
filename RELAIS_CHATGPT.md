@@ -1,3 +1,29 @@
+# LIVRAISON CODEX — 22 juillet 2026, préparation complète de la paie (MIGRATION 141 APPLIQUÉE)
+
+Le module **Préparation de la paie** est maintenant implémenté de bout en bout et relié aux données métier existantes. Il prépare, contrôle, valide et exporte les éléments variables destinés à l'expert-comptable ; il ne génère pas un bulletin officiel et ne remplace ni le logiciel de paie ni la validation du cabinet comptable.
+
+- Nouvelles routes protégées : `/paie`, `/paie/[periode]`, `/paie/[periode]/[dossier]`, `/paie/parametres`, `/paie/profils/[employe]`, impression `/imprimer/paie/[periode]` et API privées d'import, téléchargement et export.
+- Réglages permanents entreprise et salarié : convention, durée collective, horaires, zones et barèmes, contrat, classification, taux, périodicité, coordonnées bancaires déjà masquées, documents permanents et données nécessaires au contrôle.
+- Périodes mensuelles avec une ligne par salarié, recherche, filtres, dossiers individuels, workflow `brouillon → en préparation → à contrôler → validé → exporté → verrouillé`, historique de validation et journal d'audit append-only.
+- Synchronisation serveur des pointages validés, congés approuvés, notes de frais validées et grands déplacements ; heures, absences, primes, indemnités, retenues et régularisations peuvent être complétées manuellement avec distinction des éléments récurrents.
+- Détection d'anomalies bloquantes ou informatives : heures manquantes ou supérieures à 24 h/jour, données contractuelles/RIB/NIR absentes, salarié sorti, période d'essai ou habilitation arrivant à échéance et déplacement incohérent.
+- Export CSV, classeur XLSX, PDF imprimable et ZIP comptable. Le ZIP réunit les tableaux, pièces privées, manifeste JSON, empreintes SHA-256 et avertissement de portée juridique.
+- Stockage privé `documents-paie`, chemins cloisonnés par entreprise, URL temporaires, contrôle d'intégrité au téléchargement et séparation des pièces permanentes salarié / pièces mensuelles.
+- Droits dédiés : consulter sa paie, saisir ou contrôler les variables, gérer, exporter, paramétrer et voir les données confidentielles. Un salarié n'accède qu'à son dossier ; les gestionnaires n'accèdent qu'aux entreprises autorisées.
+- Migration `20260723000141_preparation_paie.sql` **appliquée dans Supabase et vérifiée** : tables périodes/dossiers/pièces présentes, bucket privé présent, fonctions `synchroniser_periode_paie(uuid)` et `transition_periode_paie(uuid,text,text)` présentes (six contrôles `true`).
+- Contrôles locaux : **85 tests Vitest réussis**, TypeScript valide, ESLint sans erreur (un avertissement historique `img` dans `SignatureEmploye.tsx`) et build Next webpack complet de **104 routes** réussi.
+
+Les seules limites restantes sont externes : les données et règles sociales doivent être validées par l'expert-comptable ; la transmission automatisée à son logiciel dépendra de son format/API. Aucun calcul de bulletin officiel, DSN ou virement bancaire n'est simulé dans ce module.
+
+## Lot préalable livré avec la paie — grands déplacements et encodage
+
+- Le module `/grands-deplacements` est maintenant développé : frais réels ou forfait URSSAF selon le réglage entreprise, mission liée à l'employé et au chantier, instantané du barème, phases de dégressivité, critères d'éligibilité, soumission et validation par les responsables des notes de frais.
+- Les notes de frais peuvent être rattachées à une mission et le module paie ne reprend que les grands déplacements validés.
+- La migration `20260723000139_grands_deplacements.sql` est appliquée et mise à niveau en production. Les quatre contrôles table, critères d'éligibilité, liaison note de frais et workflow reviennent `true`.
+- La migration `20260723000140_nettoyage_mojibake_global.sql` fournit la fonction stable `corriger_mojibake(text)` et nettoie les anciennes séquences d'accents corrompus dans toutes les colonnes texte du schéma public.
+
+---
+
 # AUDIT CODEX — 22 juillet 2026, vérification du lot Claude
 
 L'audit du code, de la base Supabase et de la version publiée a révélé puis corrigé deux écarts importants par rapport au relais initial :

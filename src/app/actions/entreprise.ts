@@ -123,6 +123,8 @@ export async function modifierEntrepriseAction(formData: FormData) {
   const suiviZoneActif=formData.get("suivi_zone_actif")==="on";
   const suiviZoneFrequence=Number(champ(formData,"suivi_zone_frequence_minutes")??30);
   if(![15,30,60,120].includes(suiviZoneFrequence))redirect(`/parametres?error=${encodeURIComponent("Fréquence de suivi de zone invalide")}`);
+  const modeGrandDeplacement=champ(formData,"mode_grand_deplacement")??"frais_reels";
+  if(!["frais_reels","forfait_urssaf"].includes(modeGrandDeplacement))redirect(`/parametres?error=${encodeURIComponent("Mode de grand déplacement invalide")}`);
   const modeleDocument = champ(formData,"mise_en_page_documents") ?? "classique";
   if(!["classique","compacte","epuree","moderne","elegante","technique"].includes(modeleDocument)) redirect(`/parametres?error=${encodeURIComponent("Modèle de document invalide")}`);
   const positionLogo = champ(formData,"position_logo_documents") ?? "gauche";
@@ -163,6 +165,7 @@ export async function modifierEntrepriseAction(formData: FormData) {
     seuil_ecart_pointage: seuilEcart,
     suivi_zone_actif: suiviZoneActif,
     suivi_zone_frequence_minutes: suiviZoneFrequence,
+    mode_grand_deplacement: modeGrandDeplacement,
     updated_at: new Date().toISOString(),
   }).eq("id", ctx.entrepriseId);
 

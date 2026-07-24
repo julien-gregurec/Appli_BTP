@@ -16,13 +16,14 @@
     "@supabase/supabase-js": "^2.110.2",
     "@zxing/browser": "^0.2.1",
     "fflate": "^0.8.3",
-    "next": "16.2.10",
+    "next": "^16.2.11",
     "openai": "^6.48.0",
     "qrcode": "^1.5.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
+    "sharp": "^0.35.3",
     "unpdf": "^1.6.2",
     "web-push": "^3.6.7"
   },
@@ -34,13 +35,14 @@
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
     "eslint": "^9",
-    "eslint-config-next": "16.2.10",
+    "eslint-config-next": "16.2.11",
     "supabase": "^2.109.1",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.10"
   },
   "overrides": {
+    "sharp": "$sharp",
     "next": {
       "postcss": "8.5.10"
     }

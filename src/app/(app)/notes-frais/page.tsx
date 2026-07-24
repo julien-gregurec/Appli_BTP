@@ -23,10 +23,11 @@ export default async function NotesFraisPage({ searchParams }: { searchParams: P
   const peutGererEquipe = permissions === null || permissions.includes("gerer_notes_frais") || permissions.includes("verifier_notes_frais") || permissions.includes("comptabiliser_notes_frais");
   if (prototype) return <main className="p-8"><div className="mx-auto max-w-4xl space-y-4"><h1 className="text-xl font-semibold">Notes de frais et justificatifs</h1><p className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"><strong>Module sécurisé fermé en mode prototype.</strong><br />Les justificatifs personnels exigent une identité individuelle. Ils deviendront accessibles après l’activation des comptes sécurisés et de la RLS de production.</p></div></main>;
 
-  const [{ data: employe }, { data: categories }, { data: chantiers }] = await Promise.all([
+  const [{ data: employe }, { data: categories }, { data: chantiers }, { data: grandsDeplacements }] = await Promise.all([
     supabase.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("utilisateur_id", ctx.userId).maybeSingle(),
     supabase.from("categories_notes_frais").select("code,libelle").eq("entreprise_id", ctx.entrepriseId).eq("actif", true).order("ordre"),
     supabase.from("chantiers").select("id,nom").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(archive,annule)").order("nom"),
+    supabase.from("grands_deplacements").select("id,destination,date_debut,date_fin").eq("entreprise_id", ctx.entrepriseId).in("statut", ["brouillon","soumis","valide"]).order("date_debut", { ascending: false }).limit(100),
   ]);
   let requete = supabase.from("notes_frais").select("id,reference,date_frais,montant_ttc,devise,categorie,fournisseur,statut,statut_export,verrouille_at,lieu_hors_chantier,employe:employes(id,prenom,nom),chantier:chantiers!notes_frais_chantier_entreprise_fkey(nom)")
     .eq("entreprise_id", ctx.entrepriseId).order("date_frais", { ascending: false }).limit(300);
@@ -53,6 +54,7 @@ export default async function NotesFraisPage({ searchParams }: { searchParams: P
         <label className="text-xs text-neutral-500">Type de justificatif<select name="type_document_principal" className={`${input} mt-1`}>{TYPES_JUSTIFICATIF.map((t) => <option key={t.cle} value={t.cle}>{t.libelle}</option>)}</select></label>
         <ExpenseAmountFields />
         <label className="text-xs text-neutral-500">Affectation<SearchableSelect name="chantier_id" defaultValue={(chantiers??[]).some((c)=>c.id===filtres.chantier)?filtres.chantier:"hors:sans_chantier"} options={[...LIEUX_HORS_CHANTIER.map((lieu) => ({ value: lieu.valeur, label: lieu.libelle, search: "hors chantier frais généraux" })), ...(chantiers ?? []).map((c) => ({ value: c.id, label: c.nom }))]} placeholder="Chantier, dépôt ou bureau…" required className="mt-1" /></label>
+        <label className="text-xs text-neutral-500">Grand déplacement<select name="grand_deplacement_id" className={`${input} mt-1`}><option value="">Aucun</option>{(grandsDeplacements??[]).map((mission)=><option key={mission.id} value={mission.id}>{mission.destination} · {mission.date_debut} → {mission.date_fin}</option>)}</select></label>
         <label className="text-xs text-neutral-500">Moyen de paiement<select name="moyen_paiement" className={`${input} mt-1`}><option value="">Non renseigné</option><option value="carte_entreprise">Carte entreprise</option><option value="carte_personnelle">Carte personnelle</option><option value="especes">Espèces</option><option value="virement">Virement</option><option value="autre">Autre</option></select></label>
         <label className="text-xs text-neutral-500">Devise<select name="devise" className={`${input} mt-1`}><option value="EUR">EUR</option><option value="CHF">CHF</option><option value="GBP">GBP</option><option value="USD">USD</option></select></label>
         <label className="text-xs text-neutral-500 sm:col-span-2 lg:col-span-4">Commentaire<textarea name="commentaire_salarie" rows={2} className={`${input} mt-1`} /></label>

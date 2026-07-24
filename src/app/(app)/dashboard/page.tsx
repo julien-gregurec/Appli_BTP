@@ -57,6 +57,7 @@ export default async function DashboardPage() {
     { permission: "acces_flotte", href: "/flotte", label: "Flotte", icon: "flotte" },
     { permission: "acces_outillage", href: "/outillage", label: "Outillage", icon: "outillage" },
     { permission: "saisir_ses_notes_frais", href: "/notes-frais", label: "Notes de frais", icon: "frais" },
+    { permission: "saisir_ses_notes_frais", href: "/grands-deplacements", label: "Grands déplacements", icon: "frais" },
     { permission: "demander_ses_conges", href: "/conges", label: "Congés", icon: "conges" },
     { permission: "acces_rentabilite", href: "/rentabilite", label: "Rentabilité", icon: "rentabilite" },
     { permission: "acces_exports", href: "/exports", label: "Exports", icon: "exports" },

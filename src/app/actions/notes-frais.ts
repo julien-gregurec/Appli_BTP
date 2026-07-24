@@ -70,10 +70,18 @@ export async function creerNoteFraisAction(formData: FormData) {
   if (typeDocument && !TYPES_DOCUMENT.has(typeDocument)) erreur("Type de justificatif invalide");
   const dateFrais = texte(formData, "date_frais") ?? new Date().toISOString().slice(0, 10);
   if (dateFrais > new Date().toISOString().slice(0, 10)) erreur("La date du justificatif ne peut pas être dans le futur");
+  const grandDeplacementId = texte(formData, "grand_deplacement_id");
+  if (grandDeplacementId) {
+    const { data: mission } = await supabase.from("grands_deplacements").select("id")
+      .eq("id", grandDeplacementId).eq("entreprise_id", ctx.entrepriseId).eq("employe_id", employeId)
+      .not("statut", "in", "(refuse,archive)").maybeSingle();
+    if (!mission) erreur("Grand déplacement invalide ou inaccessible");
+  }
   const { data, error: insertError } = await supabase.from("notes_frais").insert({
     entreprise_id: ctx.entrepriseId,
     employe_id: employeId,
     chantier_id: chantierId,
+    grand_deplacement_id: grandDeplacementId,
     lieu_hors_chantier: lieuHorsChantier,
     date_frais: dateFrais,
     montant_ht: montantHt,
@@ -116,7 +124,7 @@ export async function modifierNoteFraisAction(noteId: string, formData: FormData
   if (erreursTotaux.length) erreur(erreursTotaux.join(" · "), noteId);
   const typeDocument = texte(formData, "type_document_principal");
   if (typeDocument && !TYPES_DOCUMENT.has(typeDocument)) erreur("Type de justificatif invalide", noteId);
-  const { data: avant } = await supabase.from("notes_frais").select("id,statut,chantier_id").eq("id", noteId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+  const { data: avant } = await supabase.from("notes_frais").select("id,statut,chantier_id,employe_id,grand_deplacement_id").eq("id", noteId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
   if (!avant) erreur("Dépense inaccessible", noteId);
   let nouvelleAffectation;
   try {
@@ -129,8 +137,19 @@ export async function modifierNoteFraisAction(noteId: string, formData: FormData
     const { data: chantier } = await supabase.from("chantiers").select("id").eq("id", nouveauChantierId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
     if (!chantier) erreur("Chantier invalide ou inaccessible", noteId);
   }
+  let grandDeplacementId = avant.grand_deplacement_id;
+  if (formData.has("grand_deplacement_id")) {
+    grandDeplacementId = texte(formData, "grand_deplacement_id");
+    if (grandDeplacementId) {
+      const { data: mission } = await supabase.from("grands_deplacements").select("id")
+        .eq("id", grandDeplacementId).eq("entreprise_id", ctx.entrepriseId).eq("employe_id", avant.employe_id)
+        .not("statut", "in", "(refuse,archive)").maybeSingle();
+      if (!mission) erreur("Grand déplacement invalide ou inaccessible", noteId);
+    }
+  }
   const { error: updateError } = await supabase.from("notes_frais").update({
     chantier_id: nouveauChantierId,
+    grand_deplacement_id: grandDeplacementId,
     lieu_hors_chantier: lieuHorsChantier,
     date_frais: texte(formData, "date_frais"),
     montant_ht: montantHt,
