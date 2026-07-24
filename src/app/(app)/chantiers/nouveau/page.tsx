@@ -117,6 +117,11 @@ export default async function NouveauChantierPage({
             </div>
 
             <div className="space-y-1">
+              <label className={labelClass} htmlFor="distance_siege_km">Distance au siège (km, pour les frais de route)</label>
+              <input id="distance_siege_km" name="distance_siege_km" type="number" min="0" step="0.1" className={inputClass} />
+            </div>
+
+            <div className="space-y-1">
               <label className={labelClass}>Position GPS (pour le suivi de zone pendant le pointage)</label>
               <p className="text-xs text-neutral-500">Facultatif. Renseignez-la une fois sur place, ou plus tard depuis la fiche du chantier.</p>
               <LocaliserGPSButton />

@@ -33,6 +33,7 @@ export async function creerChantierAction(formData: FormData) {
   const latitudeBrute = champ(formData, "latitude");
   const longitudeBrute = champ(formData, "longitude");
   const rayonBrut = Number(champ(formData, "rayon_metres") ?? 300);
+  const distanceSiegeBrute = champ(formData, "distance_siege_km");
 
   const { data, error } = await supabase
     .from("chantiers")
@@ -51,6 +52,7 @@ export async function creerChantierAction(formData: FormData) {
       latitude: latitudeBrute ? Number(latitudeBrute) : null,
       longitude: longitudeBrute ? Number(longitudeBrute) : null,
       rayon_metres: Number.isFinite(rayonBrut) && rayonBrut > 0 ? rayonBrut : 300,
+      distance_siege_km: distanceSiegeBrute ? Number(distanceSiegeBrute) : null,
     })
     .select("id")
     .single();
@@ -78,6 +80,11 @@ export async function modifierLocalisationChantierAction(chantierId: string, for
   if (!Number.isFinite(rayonBrut) || rayonBrut <= 0 || rayonBrut > 5000) {
     redirect(`/chantiers/${chantierId}/localisation?error=${encodeURIComponent("Rayon invalide (entre 10 et 5000 m)")}`);
   }
+  const distanceSiegeBrute = champ(formData, "distance_siege_km");
+  const distanceSiege = distanceSiegeBrute ? Number(distanceSiegeBrute) : null;
+  if (distanceSiege !== null && (!Number.isFinite(distanceSiege) || distanceSiege < 0)) {
+    redirect(`/chantiers/${chantierId}/localisation?error=${encodeURIComponent("Distance au siège invalide")}`);
+  }
 
   const { error } = await supabase
     .from("chantiers")
@@ -85,6 +92,7 @@ export async function modifierLocalisationChantierAction(chantierId: string, for
       latitude: latitudeBrute ? Number(latitudeBrute) : null,
       longitude: longitudeBrute ? Number(longitudeBrute) : null,
       rayon_metres: rayonBrut,
+      distance_siege_km: distanceSiege,
       updated_at: new Date().toISOString(),
     })
     .eq("id", chantierId)

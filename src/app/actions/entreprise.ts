@@ -166,6 +166,7 @@ export async function modifierEntrepriseAction(formData: FormData) {
     suivi_zone_actif: suiviZoneActif,
     suivi_zone_frequence_minutes: suiviZoneFrequence,
     mode_grand_deplacement: modeGrandDeplacement,
+    petit_deplacement_automatique: formData.get("petit_deplacement_automatique") === "on",
     updated_at: new Date().toISOString(),
   }).eq("id", ctx.entrepriseId);
 

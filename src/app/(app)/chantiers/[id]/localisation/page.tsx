@@ -18,7 +18,7 @@ export default async function LocalisationChantierPage({
   const supabase = await createClient();
   const { data: chantier } = await supabase
     .from("chantiers")
-    .select("id, nom, latitude, longitude, rayon_metres")
+    .select("id, nom, latitude, longitude, rayon_metres, distance_siege_km")
     .eq("id", id)
     .eq("entreprise_id", ctx.entrepriseId)
     .maybeSingle();
@@ -45,6 +45,11 @@ export default async function LocalisationChantierPage({
             rayonDefaut={chantier.rayon_metres ?? 300}
           />
           <p className="text-xs text-neutral-500">Le mieux est de se rendre sur place et de cliquer sur « Utiliser ma position actuelle ». Laissez vide pour désactiver le suivi de zone sur ce chantier.</p>
+          <div className="space-y-1 border-t pt-4">
+            <label className="text-xs text-neutral-500" htmlFor="distance_siege_km">Distance au siège (km, pour les frais de route)</label>
+            <input id="distance_siege_km" name="distance_siege_km" type="number" min="0" step="0.1" defaultValue={chantier.distance_siege_km ?? ""} className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900" />
+            <p className="text-xs text-neutral-500">Utilisée pour calculer automatiquement panier/trajet/transport si activé dans Paramètres. Laissez vide pour désactiver le calcul automatique sur ce chantier.</p>
+          </div>
           <button type="submit" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">
             Enregistrer
           </button>

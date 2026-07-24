@@ -61,6 +61,15 @@ export default async function ParametresPage({ searchParams }: { searchParams: P
             <p className="text-xs text-amber-800">Ce calcul est une aide de gestion et ne constitue pas une validation sociale ou fiscale. Les conditions du grand déplacement et les justificatifs doivent être contrôlés avec le conseil comptable de l’entreprise.</p>
           </section>
 
+          <section className="space-y-4 rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
+            <div><h2 className="text-sm font-semibold">Frais de route (petit déplacement)</h2><p className="text-xs text-neutral-500">Calcule automatiquement panier/trajet/transport selon la zone de distance du chantier (barèmes définis dans Paie → Paramètres → Zones BTP), pour chaque jour pointé et validé.</p></div>
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="petit_deplacement_automatique" defaultChecked={entreprise?.petit_deplacement_automatique===true} />
+              Activer le calcul automatique
+            </label>
+            <p className="text-xs text-neutral-500">Nécessite que chaque chantier concerné ait sa distance au siège renseignée (fiche chantier → Position GPS).</p>
+          </section>
+
           <section className="space-y-3 rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
             <div>
               <h2 className="text-sm font-semibold">Suivi de zone chantier</h2>
