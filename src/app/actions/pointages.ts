@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
+import { permissionsUtilisateur } from "@/lib/permissions";
 
 const texte = (formData: FormData, nom: string) => String(formData.get(nom) ?? "").trim() || null;
 // Le GPS reste la preuve par defaut, mais un poste de bureau (pas de puce GPS) ou un
@@ -95,6 +96,11 @@ export async function declarerPointageOublieAction(formData:FormData){
 export async function supprimerPointageAction(pointageId: string, mois: string) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  // Défense en profondeur : la policy RLS role_gestion_delete applique déjà cette même
+  // règle (gerer_pointage) ; la vérifier ici aussi évite un delete RLS-bloqué (0 ligne
+  // affectée, sans erreur) pris pour un succès silencieux.
+  const permissions = await permissionsUtilisateur(ctx);
+  if (!(permissions === null || permissions.includes("gerer_pointage"))) redirect(`/pointage?mois=${mois}&error=${encodeURIComponent("Suppression non autorisée")}`);
   const{data:p}=await supabase.from("pointages").select("photo_storage_path").eq("id",pointageId).eq("entreprise_id",ctx.entrepriseId).maybeSingle();
   const{error}=await supabase.from("pointages").delete().eq("id", pointageId).eq("entreprise_id", ctx.entrepriseId);
   if(error)redirect(`/pointage?mois=${mois}&error=${encodeURIComponent(error.message)}`);

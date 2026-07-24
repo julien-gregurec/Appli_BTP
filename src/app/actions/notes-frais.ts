@@ -124,8 +124,18 @@ export async function modifierNoteFraisAction(noteId: string, formData: FormData
   if (erreursTotaux.length) erreur(erreursTotaux.join(" · "), noteId);
   const typeDocument = texte(formData, "type_document_principal");
   if (typeDocument && !TYPES_DOCUMENT.has(typeDocument)) erreur("Type de justificatif invalide", noteId);
-  const { data: avant } = await supabase.from("notes_frais").select("id,statut,chantier_id,employe_id,grand_deplacement_id").eq("id", noteId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+  const { data: avant } = await supabase.from("notes_frais").select("id,statut,chantier_id,employe_id,grand_deplacement_id,verrouille_at").eq("id", noteId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
   if (!avant) erreur("Dépense inaccessible", noteId);
+  // Défense en profondeur : la policy RLS peut_modifier_note_frais_personnelle applique déjà
+  // cette même règle (propre dépense, brouillon/à compléter/correction demandée, non verrouillée) ;
+  // la vérifier ici aussi évite un update RLS-bloqué silencieusement pris pour un succès.
+  const permissions = await permissionsUtilisateur(ctx);
+  const employeId = await employeDuCompte(ctx.entrepriseId, ctx.userId);
+  const modifiable = (permissions === null || permissions.includes("saisir_ses_notes_frais"))
+    && avant.employe_id === employeId
+    && ["brouillon", "a_completer", "correction_demandee"].includes(avant.statut)
+    && !avant.verrouille_at;
+  if (!modifiable) erreur("Modification non autorisée pour cette dépense", noteId);
   let nouvelleAffectation;
   try {
     nouvelleAffectation = analyserAffectationDepense(texte(formData, "chantier_id"));
@@ -238,8 +248,11 @@ export async function supprimerNoteFraisAction(id: string) {
   verifierAuthentification();
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  const { data: note } = await supabase.from("notes_frais").select("statut,chantier_id").eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+  const { data: note } = await supabase.from("notes_frais").select("statut,chantier_id,employe_id").eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
   if (!note || note.statut !== "brouillon") erreur("Seul un brouillon sans archive peut être supprimé", id);
+  const permissions = await permissionsUtilisateur(ctx);
+  const employeId = await employeDuCompte(ctx.entrepriseId, ctx.userId);
+  if (!(permissions === null || permissions.includes("saisir_ses_notes_frais")) || note.employe_id !== employeId) erreur("Suppression non autorisée pour cette dépense", id);
   const { count } = await supabase.from("documents_notes_frais").select("id", { count: "exact", head: true }).eq("note_frais_id", id);
   if (count) erreur("Retirez ce brouillon de la liste sans supprimer son historique documentaire", id);
   const { error: deleteError } = await supabase.from("notes_frais").delete().eq("id", id).eq("entreprise_id", ctx.entrepriseId);
