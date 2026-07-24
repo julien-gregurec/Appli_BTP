@@ -128,7 +128,7 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
           {ligne("Code postal / Ville", [chantier.code_postal, chantier.ville].filter(Boolean).join(" "))}
           {ligne("Début prévu", chantier.date_debut_prevue)}
           {ligne("Fin prévue", chantier.date_fin_prevue)}
-          {ligne("Budget prévisionnel", chantier.budget_previsionnel ? `${chantier.budget_previsionnel} €` : null)}
+          {peutVoirFinances && ligne("Budget prévisionnel", chantier.budget_previsionnel ? `${chantier.budget_previsionnel} €` : null)}
         </section>
 
         {(documents??[]).length>0&&<section className="space-y-3 rounded-md border border-blue-200 bg-blue-50/40 p-4"><div className="flex items-center justify-between gap-3"><div><h2 className="font-semibold">Plans et pièces jointes autorisées</h2><p className="text-sm text-neutral-500">Seuls les documents autorisés pour votre rôle sont affichés.</p></div><Link href={`/chantiers/${id}/documents`} className="text-sm font-medium text-blue-800 hover:underline">Tout consulter</Link></div><div className="grid gap-2 sm:grid-cols-2">{(documents??[]).slice().sort((a,b)=>(a.categorie==="plan"?0:1)-(b.categorie==="plan"?0:1)).slice(0,6).map(document=><a key={document.id} href={`/api/documents/${document.id}`} target="_blank" rel="noopener" className="rounded-md border bg-white p-3 text-sm hover:border-blue-400"><strong className="block truncate">{document.categorie==="plan"?"📐 Plan · ":"📎 "}{document.nom}</strong>{document.note&&<span className="mt-1 block text-xs text-neutral-500">{document.note}</span>}</a>)}</div></section>}
