@@ -36,6 +36,25 @@ async function convertirEssaisOptionIAExpires(admin: ReturnType<typeof createAdm
   return resultats;
 }
 
+// Rattrapage quotidien du module paie : re-synchronise (pointages/congés/notes de frais/
+// grands déplacements) toute période encore ouverte, sans attendre un clic manuel. Greffé
+// ici plutôt que sur un cron dédié, pour la même raison que convertirEssaisOptionIAExpires
+// ci-dessus (plan Vercel Hobby, nombre de crons limité).
+async function synchroniserPeriodesPaieOuvertes(admin: ReturnType<typeof createAdminClient>) {
+  const { data: periodes, error } = await admin
+    .from("periodes_paie")
+    .select("id, entreprise_id")
+    .in("statut", ["brouillon", "saisie_en_cours", "a_controler"]);
+  if (error) return [{ periodeId: "-", ok: false, raison: error.message }];
+
+  const resultats: Array<{ periodeId: string; ok: boolean; raison?: string }> = [];
+  for (const periode of periodes ?? []) {
+    const { error: syncError } = await admin.rpc("synchroniser_periode_paie_service", { p_periode_id: periode.id });
+    resultats.push({ periodeId: periode.id, ok: !syncError, raison: syncError?.message });
+  }
+  return resultats;
+}
+
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return NextResponse.json({ error: "CRON_SECRET absent" }, { status: 503 });
@@ -53,5 +72,6 @@ export async function GET(request: Request) {
     }
   }
   const optionIA = await convertirEssaisOptionIAExpires(admin);
-  return NextResponse.json({ traitees: resultats.length, resultats, optionIA });
+  const paiePeriodes = await synchroniserPeriodesPaieOuvertes(admin);
+  return NextResponse.json({ traitees: resultats.length, resultats, optionIA, paiePeriodes });
 }

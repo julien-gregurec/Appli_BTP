@@ -14,12 +14,13 @@ export async function analyserRentabiliteIAAction(chantierId: string): Promise<{
   const supabase = await createClient();
   if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
 
-  const [{ data: chantier }, { data: factures }, { data: devis }, { data: donneesPointages }, { data: depenses }] = await Promise.all([
+  const [{ data: chantier }, { data: factures }, { data: devis }, { data: donneesPointages }, { data: depenses }, { data: donneesIndemnites }] = await Promise.all([
     supabase.from("chantiers").select("id, nom").eq("id", chantierId).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),
     supabase.from("factures").select("montant_ht, statut, type").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId),
     supabase.from("devis").select("montant_ht").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId).eq("statut", "accepte"),
     supabase.from("pointages").select("heures_normales, heures_supplementaires, employe:employes(cout_horaire)").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId),
     supabase.from("depenses_fournisseurs").select("montant_ht, statut, categorie").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId),
+    supabase.rpc("couts_indemnites_paie_par_chantier", { p_entreprise_id: ctx.entrepriseId, p_chantier_id: chantierId }),
   ]);
   if (!chantier) return { error: "Chantier introuvable." };
 
@@ -40,7 +41,8 @@ export async function analyserRentabiliteIAAction(chantierId: string): Promise<{
   const depensesChantier = (depenses ?? []).filter((item) => item.statut !== "annulee");
   const coutSousTraitance = depensesChantier.filter((item) => item.categorie === "sous_traitance").reduce((s, item) => s + Number(item.montant_ht), 0);
   const coutAchats = depensesChantier.filter((item) => item.categorie !== "sous_traitance").reduce((s, item) => s + Number(item.montant_ht), 0);
-  const marge = factureHt - coutMainOeuvre - coutAchats - coutSousTraitance;
+  const coutIndemnitesPaie = Number((donneesIndemnites ?? [])[0]?.total ?? 0);
+  const marge = factureHt - coutMainOeuvre - coutAchats - coutSousTraitance - coutIndemnitesPaie;
   const taux = factureHt > 0 ? (marge / factureHt) * 100 : null;
 
   const depassement = await verifierPlafondIA(supabase, ctx.entrepriseId);
@@ -55,6 +57,7 @@ export async function analyserRentabiliteIAAction(chantierId: string): Promise<{
       coutMainOeuvre,
       coutAchats,
       coutSousTraitance,
+      coutIndemnitesPaie,
       marge,
       taux,
     });

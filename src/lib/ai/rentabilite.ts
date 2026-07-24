@@ -8,6 +8,7 @@ export type DonneesRentabiliteChantier = {
   coutMainOeuvre: number;
   coutAchats: number;
   coutSousTraitance: number;
+  coutIndemnitesPaie: number;
   marge: number;
   taux: number | null;
 };
@@ -31,6 +32,7 @@ Heures pointées : ${donnees.heures} h
 Coût main-d'œuvre : ${donnees.coutMainOeuvre} €
 Achats/charges : ${donnees.coutAchats} €
 Sous-traitance : ${donnees.coutSousTraitance} €
+Indemnités de paie (trajet/panier/grand déplacement) : ${donnees.coutIndemnitesPaie} €
 Marge : ${donnees.marge} €
 Taux de marge : ${donnees.taux === null ? "non calculable (pas de facturation)" : `${donnees.taux.toFixed(1)} %`}`,
       },
