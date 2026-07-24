@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { headers } from "next/headers";
 
-async function origineApplication() {
+export async function origineApplication() {
   const entetes = await headers();
   return entetes.get("origin") ?? `${entetes.get("x-forwarded-proto") ?? "https"}://${entetes.get("x-forwarded-host") ?? entetes.get("host")}`;
 }
