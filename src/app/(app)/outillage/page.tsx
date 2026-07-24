@@ -70,7 +70,7 @@ export default async function OutillagePage({
         {messages.error && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{messages.error}</p>}
         {messages.success && <p className="rounded bg-green-50 p-3 text-sm text-green-700">{messages.success}</p>}
 
-        <form action={importerOutilsAction} encType="multipart/form-data" className="flex flex-wrap items-end gap-3 rounded-md border border-[#c9a24a]/40 bg-[#c9a24a]/5 p-4">
+        <form action={importerOutilsAction} className="flex flex-wrap items-end gap-3 rounded-md border border-[#c9a24a]/40 bg-[#c9a24a]/5 p-4">
           <div className="min-w-64 flex-1">
             <h2 className="font-semibold">Importer une liste d’outillage</h2>
             <p className="text-xs text-neutral-500">Excel, CSV ou PDF : référence, désignation, catégorie, marque, modèle, série, état et prix.</p>
