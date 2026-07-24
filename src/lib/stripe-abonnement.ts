@@ -128,7 +128,7 @@ function secretStripe() {
   return secret;
 }
 
-async function requeteStripe<T>(
+export async function requeteStripe<T>(
   chemin: string,
   options: { methode?: "GET" | "POST" | "DELETE"; corps?: URLSearchParams; idempotence?: string } = {},
 ) {

@@ -13,12 +13,16 @@ export const MODULE_PERMISSION_PAR_CHEMIN: [string,string][] = [
   ["/messagerie","acces_messagerie"],["/appels-offres","acces_appels_offres"],
   ["/commandes","acces_achats"],["/fournisseurs","acces_achats"],["/depenses","acces_achats"],["/charges","acces_achats"],
   ["/api/notes-frais","saisir_ses_notes_frais"],["/notes-frais","saisir_ses_notes_frais"],
+  ["/grands-deplacements","saisir_ses_notes_frais"],
   ["/conges","demander_ses_conges"],
   ["/planning","acces_planning"],["/employes","acces_employes"],["/pointage","acces_pointage"],
   ["/rentabilite","acces_rentabilite"],["/tresorerie","acces_rentabilite"],
   ["/stock/borne","utiliser_borne_stock"],["/stock","acces_stock"],["/depot","acces_stock"],["/inventaires","acces_stock"],
+  ["/boutique","acces_boutique"],
   ["/flotte","acces_flotte"],["/outillage","acces_outillage"],["/exports","acces_exports"],
   ["/paiements-bancaires","acces_paiements_bancaires"],
+  ["/api/paie/periodes","exporter_paie"],["/api/paie/documents","consulter_sa_paie"],
+  ["/imprimer/paie","exporter_paie"],["/paie","consulter_sa_paie"],
 ];
 
 export const GESTION_PERMISSION_PAR_CHEMIN: [string,string][] = [
@@ -33,20 +37,27 @@ export const GESTION_PERMISSION_PAR_CHEMIN: [string,string][] = [
   ["/messagerie","acces_messagerie"],["/appels-offres","gerer_appels_offres"],
   ["/commandes","gerer_achats"],["/fournisseurs","gerer_achats"],["/depenses","gerer_achats"],["/charges","gerer_achats"],
   ["/notes-frais","gerer_notes_frais"],
+  ["/grands-deplacements","gerer_notes_frais"],
   ["/conges","gerer_conges"],
   ["/planning","gerer_planning"],["/employes","gerer_employes"],["/pointage","gerer_pointage"],
   ["/stock/borne","utiliser_borne_stock"],["/stock","gerer_stock"],["/depot","gerer_stock"],["/inventaires","gerer_stock"],
+  ["/boutique","gerer_boutique"],
   ["/flotte","gerer_flotte"],["/outillage","gerer_outillage"],
   ["/paiements-bancaires","preparer_virements"],
+  ["/api/paie/documents","gerer_paie"],["/paie","saisir_variables_paie"],
 ];
 
 export const PERMISSIONS_MUTATION_ALTERNATIVES: Record<string,string[]> = {
   "/pointage": ["gerer_pointage", "saisir_son_pointage"],
   "/notes-frais": ["gerer_notes_frais", "saisir_ses_notes_frais"],
+  "/grands-deplacements": ["gerer_notes_frais", "saisir_ses_notes_frais"],
   "/conges": ["gerer_conges", "demander_ses_conges"],
   "/paiements-bancaires": ["gerer_coordonnees_bancaires", "gerer_paie", "preparer_virements", "valider_virements", "executer_virements"],
+  "/paie": ["saisir_variables_paie", "controler_variables_paie", "gerer_paie", "exporter_paie", "parametrer_paie"],
 };
 
 export const PERMISSIONS_ACCES_ALTERNATIVES: Record<string,string[]> = {
   "/chantiers": ["acces_chantiers", "voir_chantiers_assignes"],
+  "/grands-deplacements": ["gerer_notes_frais", "saisir_ses_notes_frais"],
+  "/paie": ["consulter_sa_paie", "saisir_variables_paie", "controler_variables_paie", "gerer_paie", "exporter_paie", "parametrer_paie", "voir_paie_confidentielle"],
 };
