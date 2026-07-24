@@ -42,6 +42,47 @@ Le script :
 | Contrats d’entretien | 12 |
 | Interventions | 120 |
 
+## Complément « tous les onglets » — vérifié le 24 juillet 2026
+
+Le fichier
+`supabase/production/seed_entreprise_test_tous_onglets.sql` complète le jeu
+cinq ans dans les modules qui ne contenaient pas encore assez de données pour
+une recette fonctionnelle complète. Il est idempotent : deux exécutions
+successives conservent exactement les mêmes volumes.
+
+| Domaine complémentaire | Données disponibles |
+|---|---:|
+| RIB fictifs actifs (salariés, fournisseurs et sous-traitants) | 32 |
+| Bulletins de paie PDF fictifs en stockage privé | 12 |
+| Lots de virements préparés | 24 |
+| Ordres de virement de démonstration | 24 |
+| Écritures du journal bancaire | 24 |
+| Tâches chantier | 996 |
+| Modèles de devis | 7 |
+| Ouvrages et métrés | 30 |
+| Situations de travaux | 80 |
+| Bons de livraison | 60 |
+| Éléments CRM | 181 |
+| Relances | 40 |
+| Appels d’offres | 24 |
+| Conversations internes | 35 |
+| Messages internes | 89 |
+| Comptes rendus de chantier | 120 |
+| Éléments de DOE | 61 |
+| E-mails classés | 80 |
+| Remises en banque | 12 |
+| Plans et documents chantier privés | 12 |
+| Fiches techniques produit privées | 30 |
+| Champs personnalisés | 5 |
+| Connecteurs externes présentés | 6 |
+
+Les PDF de paie, plans et fiches techniques sont des documents entièrement
+fictifs. Ils sont conservés dans des buckets privés et accessibles uniquement
+par des URL temporaires signées. Les coordonnées bancaires sont également
+fictives. Les connecteurs bancaires, fournisseurs, e-mail et comptables sont
+présentés dans l’interface mais restent volontairement inactifs : aucun échange
+réel, paiement ou message externe ne peut être déclenché par ce jeu de recette.
+
 ## Scénarios de test couverts
 
 - cycle devis envoyé, accepté, refusé, expiré puis facturé ;
@@ -67,6 +108,9 @@ officiels et ne doivent pas être transmis à des salariés.
 - périodes de paie : d’août 2021 à juillet 2026 ;
 - 12 salariés présents dans les notes de frais et les dossiers de paie ;
 - second passage du script : volumes inchangés ;
+- second passage du complément « tous les onglets » : volumes inchangés ;
+- 12 documents chantier et 30 fiches techniques téléchargeables au moyen
+  d’URL temporaires signées ;
 - marqueur `[RECETTE 5A]` présent dans une seule entreprise pour les devis,
   notes de frais et pointages.
 
