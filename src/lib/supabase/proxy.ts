@@ -32,14 +32,17 @@ export async function updateSession(request: NextRequest) {
     },
   );
 
-  const isPublic = PUBLIC_PATHS.some((path) => request.nextUrl.pathname.startsWith(path));
+  // Comparaison stricte pour l'accueil : "/" en préfixe matcherait tous les chemins.
+  const estAccueil = request.nextUrl.pathname === "/";
+  const isPublic = estAccueil || PUBLIC_PATHS.some((path) => request.nextUrl.pathname.startsWith(path));
 
   // Les chemins purement statiques n'ont aucune règle d'accès : inutile de
   // vérifier le jeton auprès de Supabase, ce qui coûtait un aller-retour
-  // réseau pour servir un PDF ou une vidéo.
+  // réseau pour servir un PDF ou une vidéo. La page d'accueil vérifie elle-même
+  // la session pour rediriger un utilisateur déjà connecté vers /dashboard.
   const CHEMINS_SANS_SESSION = ["/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/confidentialite", "/cookies", "/guides", "/videos", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements",
                                 "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import"];
-  if (CHEMINS_SANS_SESSION.some((c) => request.nextUrl.pathname.startsWith(c))) {
+  if (estAccueil || CHEMINS_SANS_SESSION.some((c) => request.nextUrl.pathname.startsWith(c))) {
     return response;
   }
 
