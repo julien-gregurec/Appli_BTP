@@ -55,6 +55,14 @@ async function synchroniserPeriodesPaieOuvertes(admin: ReturnType<typeof createA
   return resultats;
 }
 
+// Alertes pointage : salarié qui n'a pas pointé un jour attendu, et rappel quotidien
+// aux valideurs tant que des heures restent non validées. Greffé ici pour la même
+// raison que les fonctions ci-dessus (limite de crons du plan Vercel Hobby).
+async function notifierPointagesManquantsEtAValider(admin: ReturnType<typeof createAdminClient>) {
+  const { error } = await admin.rpc("notifier_pointages_manquants_et_a_valider");
+  return { ok: !error, raison: error?.message };
+}
+
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return NextResponse.json({ error: "CRON_SECRET absent" }, { status: 503 });
@@ -73,5 +81,6 @@ export async function GET(request: Request) {
   }
   const optionIA = await convertirEssaisOptionIAExpires(admin);
   const paiePeriodes = await synchroniserPeriodesPaieOuvertes(admin);
-  return NextResponse.json({ traitees: resultats.length, resultats, optionIA, paiePeriodes });
+  const alertesPointage = await notifierPointagesManquantsEtAValider(admin);
+  return NextResponse.json({ traitees: resultats.length, resultats, optionIA, paiePeriodes, alertesPointage });
 }
