@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   if (type === "ventes") {
     const { data, error } = await supabase.from("factures").select("numero,date_emission,date_echeance,type,statut,montant_ht,montant_tva,montant_ttc,montant_paye,client:clients(reference_interne,nom,prenom,societe)").eq("entreprise_id", ctx.entrepriseId).not("numero", "is", null).gte("date_emission", periode.debut).lte("date_emission", periode.fin).order("date_emission").order("numero");
     if (error) return Response.json({ error: error.message }, { status: 503 }); const lignes: unknown[][] = [["Date", "N° facture", "Type", "Statut", "Réf. client", "Client", "HT", "TVA", "TTC", "Encaissé", "Reste dû", "Échéance"]];
-    for (const facture of data ?? []) { const client = un(facture.client); const signe = facture.type === "avoir" ? -1 : 1; lignes.push([facture.date_emission, facture.numero, facture.type, facture.statut, client?.reference_interne ?? "", nomClient(client), signe * Number(facture.montant_ht), signe * Number(facture.montant_tva), signe * Number(facture.montant_ttc), signe * Number(facture.montant_paye), signe * Math.max(0, Number(facture.montant_ttc) - Number(facture.montant_paye)), facture.date_echeance ?? ""]); }
+    for (const facture of data ?? []) { const client = un(facture.client); const ttc = Number(facture.montant_ttc), paye = Number(facture.montant_paye); lignes.push([facture.date_emission, facture.numero, facture.type, facture.statut, client?.reference_interne ?? "", nomClient(client), Number(facture.montant_ht), Number(facture.montant_tva), ttc, paye, Math.max(0, ttc - paye), facture.date_echeance ?? ""]); }
     return reponseExport(lignes, `journal-ventes-${periode.debut}-${periode.fin}`, "Journal des ventes", format);
   }
   if (type === "reglements") {
@@ -53,8 +53,8 @@ export async function GET(request: Request) {
   const details = new Map<string, { date: string; numero: string; taux: number; ht: number; tva: number }>();
   for (const ligne of data ?? []) {
     const facture = un(ligne.facture); if (!facture) continue;
-    const signe = facture.type === "avoir" ? -1 : 1; const taux = Number(ligne.taux_tva);
-    const ht = signe * Number(ligne.quantite) * Number(ligne.prix_unitaire_ht) * (1 - Number(ligne.remise_ligne) / 100); const tva = ht * taux / 100;
+    const taux = Number(ligne.taux_tva);
+    const ht = Number(ligne.quantite) * Number(ligne.prix_unitaire_ht) * (1 - Number(ligne.remise_ligne) / 100); const tva = ht * taux / 100;
     const cle = `${facture.numero}|${taux}`; const detail = details.get(cle) ?? { date: facture.date_emission, numero: facture.numero ?? "", taux, ht: 0, tva: 0 };
     detail.ht += ht; detail.tva += tva; details.set(cle, detail);
   }
