@@ -16,7 +16,7 @@ export default async function RentabilitePage() {
     supabase.from("chantiers").select("id, reference_interne, nom, statut, client:clients(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
     supabase.from("factures").select("chantier_id, montant_ht, statut, type").eq("entreprise_id", ctx.entrepriseId),
     supabase.from("devis").select("chantier_id, montant_ht, statut").eq("entreprise_id", ctx.entrepriseId).eq("statut", "accepte"),
-    supabase.from("pointages").select("chantier_id, heures_normales, heures_supplementaires, employe:employes(cout_horaire)").eq("entreprise_id", ctx.entrepriseId),
+    supabase.from("pointages").select("chantier_id, heures_normales, heures_supplementaires, employe:employes(cout_horaire)").eq("entreprise_id", ctx.entrepriseId).eq("verification_statut", "valide"),
     supabase.from("depenses_fournisseurs").select("chantier_id, montant_ht, statut, categorie").eq("entreprise_id", ctx.entrepriseId),
     supabase.rpc("couts_indemnites_paie_par_chantier", { p_entreprise_id: ctx.entrepriseId }),
   ]);

@@ -18,7 +18,7 @@ export async function analyserRentabiliteIAAction(chantierId: string): Promise<{
     supabase.from("chantiers").select("id, nom").eq("id", chantierId).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),
     supabase.from("factures").select("montant_ht, statut, type").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId),
     supabase.from("devis").select("montant_ht").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId).eq("statut", "accepte"),
-    supabase.from("pointages").select("heures_normales, heures_supplementaires, employe:employes(cout_horaire)").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId),
+    supabase.from("pointages").select("heures_normales, heures_supplementaires, employe:employes(cout_horaire)").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId).eq("verification_statut", "valide"),
     supabase.from("depenses_fournisseurs").select("montant_ht, statut, categorie").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId),
     supabase.rpc("couts_indemnites_paie_par_chantier", { p_entreprise_id: ctx.entrepriseId, p_chantier_id: chantierId }),
   ]);
