@@ -26,7 +26,7 @@ export async function analyserRentabiliteIAAction(chantierId: string): Promise<{
 
   const budgetHt = (devis ?? []).reduce((s, item) => s + Number(item.montant_ht), 0);
   const factureHt = (factures ?? [])
-    .filter((item) => !["annulee", "avoir_emis"].includes(item.statut) && item.type !== "avoir")
+    .filter((item) => !["annulee", "avoir_emis"].includes(item.statut))
     .reduce((s, item) => s + Number(item.montant_ht), 0);
 
   let heures = 0;
