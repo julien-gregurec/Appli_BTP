@@ -7,6 +7,8 @@ export type DonneesRentabiliteChantier = {
   heures: number;
   coutMainOeuvre: number;
   coutAchats: number;
+  coutStock: number;
+  coutNotesFrais: number;
   coutSousTraitance: number;
   coutIndemnitesPaie: number;
   marge: number;
@@ -31,6 +33,8 @@ Facturé HT : ${donnees.factureHt} €
 Heures pointées : ${donnees.heures} h
 Coût main-d'œuvre : ${donnees.coutMainOeuvre} €
 Achats/charges : ${donnees.coutAchats} €
+Stock consommé : ${donnees.coutStock} €
+Notes de frais rattachées au chantier : ${donnees.coutNotesFrais} €
 Sous-traitance : ${donnees.coutSousTraitance} €
 Indemnités de paie (trajet/panier/grand déplacement) : ${donnees.coutIndemnitesPaie} €
 Marge : ${donnees.marge} €
