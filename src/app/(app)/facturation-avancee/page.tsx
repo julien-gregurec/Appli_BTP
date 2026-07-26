@@ -12,14 +12,16 @@ export default async function FacturationAvanceePage({ searchParams }: { searchP
   const message = await searchParams;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  const [devisResult, situationsResult, remisesResult] = await Promise.all([
+  const [devisResult, situationsResult, remisesResult, facturesCreditablesResult] = await Promise.all([
     supabase.from("devis").select("id,numero,montant_ht,chantier_id,client:clients(nom,prenom,societe),chantier:chantiers!devis_chantier_id_fkey(nom)").eq("entreprise_id", ctx.entrepriseId).eq("statut", "accepte").order("date_emission", { ascending: false }),
     supabase.from("situations_travaux").select("id,numero,date_situation,statut,montant_marche_ht,montant_cumule_ht,montant_periode_ht,montant_retenue,facture_id,devis:devis(numero,client:clients(nom,prenom,societe)),chantier:chantiers(nom)").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
     supabase.from("remises_banque").select("id,numero,date_remise,mode,statut,montant").eq("entreprise_id", ctx.entrepriseId).order("date_remise", { ascending: false }).limit(12),
+    supabase.from("factures").select("id,numero,montant_ttc,devis_origine_id,client:clients(nom,prenom,societe)").eq("entreprise_id", ctx.entrepriseId).neq("type", "avoir").not("devis_origine_id", "is", null).order("date_emission", { ascending: false }),
   ]);
   const devis = devisResult.data ?? [];
   const situations = situationsResult.data ?? [];
   const remises = remisesResult.data ?? [];
+  const facturesCreditables = facturesCreditablesResult.data ?? [];
   const devisAvecChantier = devis.filter((item) => item.chantier_id);
   const erreursChargement = [
     devisResult.error && "les devis acceptés",
@@ -42,6 +44,7 @@ export default async function FacturationAvanceePage({ searchParams }: { searchP
         <label className="block text-xs">Devis accepté<select required name="devis_id" className={champ} disabled={devis.length === 0}><option value="">Choisir…</option>{devis.map(d => { const ch=un(d.chantier); return <option key={d.id} value={d.id}>{d.numero} · {libelleClient(un(d.client))} · {ch?.nom ?? "Sans chantier"} · {euros(d.montant_ht)}</option>; })}</select></label>
         {!devisResult.error && devis.length === 0 && <p className="rounded-md bg-amber-50 p-3 text-xs text-amber-800">Aucun devis accepté n’est disponible. <Link href="/devis" className="font-semibold underline">Ouvrir les devis</Link> pour en accepter un.</p>}
         <div className="grid grid-cols-2 gap-3"><label className="text-xs">Type<select name="type" className={champ}><option value="acompte">Acompte</option><option value="finale">Facture finale</option><option value="avoir">Avoir</option></select></label><label className="text-xs">Pourcentage du devis<input required name="pourcentage" type="number" min="0.01" max="100" step="0.01" defaultValue="30" className={champ}/></label></div>
+        <label className="block text-xs">Facture créditée (uniquement pour un avoir)<select name="facture_origine_id" className={champ} disabled={facturesCreditables.length === 0}><option value="">Aucune facture précise (avoir général)</option>{facturesCreditables.map(f => <option key={f.id} value={f.id}>{f.numero} · {libelleClient(un(f.client))} · {euros(f.montant_ttc)}</option>)}</select><span className="mt-1 block text-neutral-500">Réduit automatiquement le reste à payer de cette facture précise en trésorerie. Sans facture choisie, l’avoir reste un simple document sans effet sur une facture existante.</span></label>
         <label className="flex items-center gap-2 rounded-md bg-neutral-50 p-3 text-sm dark:bg-neutral-900"><input type="checkbox" name="est_dgd" value="true"/> Marquer comme décompte général définitif (DGD)</label><button disabled={devis.length === 0} className="w-full rounded-md bg-neutral-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 dark:bg-white dark:text-neutral-900">Créer le brouillon</button>
       </form>
     </div>

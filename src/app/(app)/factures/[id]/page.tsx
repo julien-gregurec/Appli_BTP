@@ -42,13 +42,16 @@ export default async function FactureDetailPage({
     .from("lignes_factures").select("*").eq("facture_id", id).order("ordre");
   const { data: paiements } = await supabase
     .from("paiements").select("*").eq("facture_id", id).order("date");
+  const { data: avoirsLies } = await supabase
+    .from("factures").select("id, numero, montant_ttc").eq("entreprise_id", ctx.entrepriseId).eq("facture_origine_id", id).eq("type", "avoir").neq("statut", "annulee");
 
   const client = Array.isArray(facture.client) ? facture.client[0] : facture.client;
   const chantier = Array.isArray(facture.chantier) ? facture.chantier[0] : facture.chantier;
   const devis = Array.isArray(facture.devis) ? facture.devis[0] : facture.devis;
   const typeLigne = (t: string) => LIGNE_TYPES.find((x) => x.cle === t)?.libelle ?? t;
   const modeLabel = (m: string) => MODES_PAIEMENT.find((x) => x.cle === m)?.libelle ?? m;
-  const resteAPayer = Number(facture.montant_ttc) - Number(facture.montant_paye);
+  const totalAvoirsLies = (avoirsLies ?? []).reduce((s, a) => s + Number(a.montant_ttc), 0);
+  const resteAPayer = Number(facture.montant_ttc) - Number(facture.montant_paye) + totalAvoirsLies;
   const lienPaiement = lienPaiementStripeEstActif(facture.stripe_checkout_url, facture.lien_paiement_expire_at)
     ? facture.stripe_checkout_url
     : null;
@@ -158,8 +161,9 @@ export default async function FactureDetailPage({
               <span>Total TTC</span><span className="font-mono">{euros(facture.montant_ttc)}</span>
             </div>
             <div className="flex justify-between text-neutral-500"><span>Payé</span><span className="font-mono">{euros(facture.montant_paye)}</span></div>
+            {totalAvoirsLies !== 0 && <div className="flex justify-between text-neutral-500"><span>Avoir{(avoirsLies?.length ?? 0) > 1 ? "s" : ""} ({(avoirsLies ?? []).map((a) => a.numero).join(", ")})</span><span className="font-mono">{euros(totalAvoirsLies)}</span></div>}
             <div className="flex justify-between font-medium" style={{ color: resteAPayer > 0 ? "#a64b45" : "#2f6b47" }}>
-              <span>Reste à payer</span><span className="font-mono">{euros(resteAPayer)}</span>
+              <span>{resteAPayer < 0 ? "Avoir en faveur du client" : "Reste à payer"}</span><span className="font-mono">{euros(Math.abs(resteAPayer))}</span>
             </div>
           </div>
         </div>

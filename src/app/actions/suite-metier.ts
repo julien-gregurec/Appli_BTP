@@ -53,6 +53,7 @@ export async function creerFactureAvanceeAction(formData: FormData) {
     p_type: type,
     p_pourcentage: nombre(formData, "pourcentage", 100),
     p_est_dgd: texte(formData, "est_dgd") === "true",
+    p_facture_origine_id: type === "avoir" ? texte(formData, "facture_origine_id") || null : null,
   });
   if (error || !data) retourErreur("/facturation-avancee", error?.message ?? "Création impossible");
   revalidatePath("/factures");
