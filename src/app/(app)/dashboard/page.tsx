@@ -9,6 +9,7 @@ import { DashboardAnalytics } from "@/components/DashboardAnalytics";
 import { DashboardWidget, DashboardWidgetFirstConnection } from "@/components/DashboardWidgets";
 import { BriefingMatin, type LigneBriefing } from "@/components/BriefingMatin";
 import { Lien as Link } from "@/components/Lien";
+import { CentreAlertesOperationnelles, type AlerteOperationnelle } from "@/components/CentreAlertesOperationnelles";
 import { activeFeaturesForCompany } from "@/lib/feature-flags";
 import { featureForPath } from "@/lib/feature-catalogue";
 import { estPlateformeAdmin } from "@/lib/plateforme";
@@ -147,8 +148,21 @@ export default async function DashboardPage() {
   }
   const ordreNiveau = { critique: 0, attention: 1 };
   alertes.sort((a, b) => ordreNiveau[a.niveau] - ordreNiveau[b.niveau] || (a.date ?? "9999").localeCompare(b.date ?? "9999"));
-  const nbCritiques = alertes.filter((a) => a.niveau === "critique").length;
-  const domainesAlertes = [...new Set(alertes.map((a) => a.domaine))];
+  const alertesAvecSignature: AlerteOperationnelle[] = alertes.map((alerte) => ({
+    ...alerte,
+    signature: [alerte.niveau, alerte.date ?? "", alerte.titre, alerte.detail].join("|"),
+  }));
+  const { data: masquagesAlertes } = permissions !== null && alertesAvecSignature.length > 0
+    ? await supabase
+      .from("alertes_operationnelles_ignorees")
+      .select("alerte_cle,signature")
+      .eq("entreprise_id", ctx.entrepriseId)
+      .eq("utilisateur_id", ctx.userId)
+      .in("alerte_cle", alertesAvecSignature.map((alerte) => alerte.id))
+    : { data: [] as Array<{ alerte_cle: string; signature: string }> };
+  const signaturesIgnorees = new Map((masquagesAlertes ?? []).map((masquage) => [masquage.alerte_cle, masquage.signature]));
+  const alertesIgnorees = alertesAvecSignature.filter((alerte) => signaturesIgnorees.get(alerte.id) === alerte.signature);
+  const alertesActives = alertesAvecSignature.filter((alerte) => signaturesIgnorees.get(alerte.id) !== alerte.signature);
   const prenomAffiche = ctx.prenom && ctx.prenom.toLocaleLowerCase("fr") !== "prototype" ? ctx.prenom : null;
 
   const lignesBriefing: LigneBriefing[] = [];
@@ -170,15 +184,15 @@ export default async function DashboardPage() {
     if (voirIndicateursFinanciers && resteAEncaisser > 0) {
       lignesBriefing.push({ niveau: "bon", texte: `${euros(resteAEncaisser)} à encaisser` });
     }
-    const facturesEnRetard = alertes.filter((a) => a.domaine === "Facturation" && a.niveau === "critique").length;
+    const facturesEnRetard = alertesActives.filter((a) => a.domaine === "Facturation" && a.niveau === "critique").length;
     if (facturesEnRetard > 0) {
       lignesBriefing.push({ niveau: "critique", texte: `${facturesEnRetard} facture${facturesEnRetard > 1 ? "s" : ""} impayée${facturesEnRetard > 1 ? "s" : ""}` });
     }
-    const stockAlertes = alertes.filter((a) => a.domaine === "Stock");
+    const stockAlertes = alertesActives.filter((a) => a.domaine === "Stock");
     if (stockAlertes.length > 0) {
       lignesBriefing.push({ niveau: "attention", texte: `Stock faible : ${stockAlertes.slice(0, 2).map((a) => a.titre.split(" · ")[1] ?? a.titre).join(", ")}` });
     }
-    const flotteAlertes = alertes.filter((a) => a.domaine === "Flotte");
+    const flotteAlertes = alertesActives.filter((a) => a.domaine === "Flotte");
     if (flotteAlertes.length > 0) {
       lignesBriefing.push({ niveau: flotteAlertes.some((a) => a.niveau === "critique") ? "critique" : "attention", texte: flotteAlertes[0].titre });
     }
@@ -253,14 +267,14 @@ export default async function DashboardPage() {
           </section>}
         </div></DashboardWidget>}
 
-        {(voir.factures || voir.devis || voir.achats || voir.stock || voir.flotte || voir.outillage) && <DashboardWidget id="alertes"><section className={`rounded-md border p-4 ${alertes.length ? "border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30" : "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30"}`}>
-          <div className="flex items-start justify-between gap-4">
-            <div><h2 className="text-sm font-semibold">Centre d’alertes opérationnelles</h2><p className="mt-0.5 text-xs text-neutral-600 dark:text-neutral-400">Uniquement les domaines autorisés pour votre poste.</p></div>
-            <div className="flex gap-2 text-xs"><span className="rounded-full bg-red-100 px-2 py-1 text-red-700 dark:bg-red-950 dark:text-red-300">{nbCritiques} critique{nbCritiques > 1 ? "s" : ""}</span><span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700 dark:bg-amber-950 dark:text-amber-300">{alertes.length - nbCritiques} à anticiper</span></div>
-          </div>
-          {alertes.length ? <div className="mt-3 grid grid-cols-2 gap-2">{alertes.slice(0, 12).map((alerte) => <Link key={alerte.id} href={alerte.href} className="flex items-start gap-3 rounded-md border border-black/5 bg-white/70 p-3 text-sm transition hover:bg-white dark:border-white/10 dark:bg-black/20 dark:hover:bg-black/30"><span className={`mt-1 h-2.5 w-2.5 flex-none rounded-full ${alerte.niveau === "critique" ? "bg-red-600" : "bg-amber-500"}`} /><span className="min-w-0 flex-1"><span className="flex items-center justify-between gap-2"><strong className="truncate">{alerte.titre}</strong><span className="flex-none text-[10px] uppercase tracking-wide text-neutral-500">{alerte.domaine}</span></span><span className="mt-0.5 block text-xs text-neutral-600 dark:text-neutral-400">{alerte.detail}{alerte.date ? ` · ${alerte.date}` : ""}</span></span></Link>)}</div> : <p className="mt-3 text-sm text-green-800 dark:text-green-300">Aucune alerte active. Toutes les échéances suivies sont sous contrôle.</p>}
-          {domainesAlertes.length > 0 && <p className="mt-3 text-xs text-neutral-500">Domaines concernés : {domainesAlertes.join(" · ")}</p>}
-        </section></DashboardWidget>}
+        {(voir.factures || voir.devis || voir.achats || voir.stock || voir.flotte || voir.outillage) && (
+          <DashboardWidget id="alertes">
+            <CentreAlertesOperationnelles
+              alertes={alertesActives}
+              alertesIgnorees={alertesIgnorees}
+            />
+          </DashboardWidget>
+        )}
 
         {peutPointer && employeCompte && chantiersPointage.length > 0 && <DashboardWidget id="pointage"><PointageArriveeDepart employes={[{id:employeCompte.id,nom:`${employeCompte.prenom ?? ""} ${employeCompte.nom}`.trim()}]} chantiers={chantiersPointage.map((chantier)=>({id:chantier.id,nom:chantier.nom}))} sessions={sessionsPointage.map((session)=>{const employe=un(session.employe),chantier=un(session.chantier);return{id:session.id,arrivee_at:session.arrivee_at,tache:session.tache,employe:employe?{id:employe.id,nom:`${employe.prenom ?? ""} ${employe.nom}`.trim()}:null,chantier:chantier?{id:chantier.id,nom:chantier.nom}:null};})} /></DashboardWidget>}
 

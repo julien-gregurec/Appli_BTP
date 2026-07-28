@@ -1,3 +1,15 @@
+# LIVRAISON CODEX — 28 juillet 2026, centre d’alertes opérationnelles interactif
+
+- Chaque alerte du tableau de bord dispose maintenant de deux actions distinctes : **Ouvrir et traiter** pour accéder à la facture, au devis, au stock, au véhicule, à l’outil ou à la commande concernée, et **Ignorer** lorsqu’elle ne concerne pas l’utilisateur.
+- Le masquage est strictement personnel : ignorer une alerte ne la masque pas aux autres collaborateurs et ne supprime aucune donnée métier, échéance ou document.
+- Les alertes ignorées restent consultables depuis le centre via **Afficher les alertes ignorées** et peuvent être réactivées avec **Rétablir**.
+- Une alerte ignorée réapparaît automatiquement si son niveau, sa date, son détail ou son contenu évolue ; une aggravation ne reste donc pas silencieusement masquée.
+- Le briefing du matin et les compteurs ne reprennent plus les alertes personnellement ignorées.
+- Migration `20260728000182_alertes_operationnelles_ignorees.sql` appliquée en production : table isolée par entreprise et utilisateur, politiques RLS authentifiées sans accès anonyme.
+- Contrôles : **99 tests Vitest**, **53 tests pgTAP**, TypeScript, ESLint, cohérence des **177 migrations**, `git diff --check` et build Next complet de **115 routes** réussis.
+
+---
+
 # LIVRAISON CODEX — 28 juillet 2026, photos et vidéos dans la messagerie
 
 - La messagerie accepte désormais jusqu’à **5 photos ou vidéos courtes par message**, avec une limite de **20 Mo par fichier**.
