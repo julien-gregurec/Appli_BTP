@@ -9,6 +9,13 @@ import { ZoneReponseMessagerie } from "@/components/ZoneReponseMessagerie";
 
 type Relation<T> = T | T[] | null;
 type ContactMessagerie = { id: string; prenom: string; nom: string; poste: string | null };
+type PieceJointeMessage = {
+  id: string;
+  nom_original: string;
+  mime_type: string;
+  type_media: "image" | "video";
+  taille_octets: number;
+};
 const un = <T,>(value: Relation<T>): T | null => Array.isArray(value) ? value[0] ?? null : value;
 
 export default async function MessageriePage({ searchParams }: { searchParams: Promise<{ conversation?: string; error?: string; success?: string }> }) {
@@ -24,7 +31,7 @@ export default async function MessageriePage({ searchParams }: { searchParams: P
     supabase.from("conversations_internes").select("id,type,titre,chantier:chantiers(id,nom),createur:employes!conversations_createur_fkey(id,prenom,nom),destinataire:employes!conversations_destinataire_fkey(id,prenom,nom),derniere_activite_at").eq("entreprise_id",ctx.entrepriseId).order("derniere_activite_at",{ascending:false}),
   ]);
   const conversationId = query.conversation && (conversations ?? []).some((c)=>c.id===query.conversation) ? query.conversation : conversations?.[0]?.id;
-  const { data: messages } = conversationId ? await supabase.from("messages_internes").select("id,contenu,created_at,auteur:employes(id,prenom,nom)").eq("conversation_id",conversationId).order("created_at") : { data: [] };
+  const { data: messages } = conversationId ? await supabase.from("messages_internes").select("id,contenu,created_at,auteur:employes(id,prenom,nom),pieces:pieces_jointes_messages(id,nom_original,mime_type,type_media,taille_octets)").eq("conversation_id",conversationId).order("created_at") : { data: [] };
   const selected = (conversations ?? []).find((conversation)=>conversation.id===conversationId);
   const titreConversation = (conversation: NonNullable<typeof conversations>[number]) => {
     if (conversation.type === "chantier") return `# ${un(conversation.chantier)?.nom ?? "Chantier"}`;
@@ -45,7 +52,10 @@ export default async function MessageriePage({ searchParams }: { searchParams: P
     </div></section>
     <div className="grid min-h-[520px] overflow-hidden rounded-lg border md:grid-cols-[280px_1fr]">
       <aside className="border-b bg-neutral-50 p-2 dark:bg-neutral-950 md:border-b-0 md:border-r"><p className="px-2 py-2 text-xs font-semibold uppercase text-neutral-500">Conversations</p>{(conversations??[]).map((conversation)=><Link key={conversation.id} href={`/messagerie?conversation=${conversation.id}`} className={`mb-1 block rounded p-3 text-sm ${conversation.id===conversationId?"bg-[#0d1b2a] text-white":"hover:bg-neutral-100 dark:hover:bg-neutral-900"}`}><strong className="block truncate">{titreConversation(conversation)}</strong><span className={`text-xs ${conversation.id===conversationId?"text-white/70":"text-neutral-500"}`}>{new Date(conversation.derniere_activite_at).toLocaleString("fr-FR")}</span></Link>)}{!(conversations??[]).length&&<p className="p-3 text-sm text-neutral-500">Aucune conversation.</p>}</aside>
-      <section className="flex min-w-0 flex-col"><div className="border-b p-4"><h2 className="font-semibold">{selected?titreConversation(selected):"Sélectionnez une conversation"}</h2></div><div className="flex-1 space-y-3 overflow-y-auto p-4">{(messages??[]).map((message)=>{const auteur=un(message.auteur);const personnel=auteur?.id===moi?.id;return <div key={message.id} className={`flex ${personnel?"justify-end":"justify-start"}`}><article className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${personnel?"bg-[#0d1b2a] text-white":"bg-neutral-100 dark:bg-neutral-900"}`}><p className="mb-1 text-xs font-semibold opacity-70">{auteur?`${auteur.prenom} ${auteur.nom}`:"Collaborateur"}</p><p className="whitespace-pre-wrap">{message.contenu}</p><p className="mt-1 text-[10px] opacity-60">{new Date(message.created_at).toLocaleString("fr-FR")}</p></article></div>})}{selected&&!(messages??[]).length&&<p className="text-center text-sm text-neutral-500">Aucun message.</p>}</div>{selected&&<ZoneReponseMessagerie conversationId={selected.id} actionEnvoyer={envoyerMessageInterneAction.bind(null,selected.id)} peutUtiliserIA={peutUtiliserIA} />}</section>
+      <section className="flex min-w-0 flex-col"><div className="border-b p-4"><h2 className="font-semibold">{selected?titreConversation(selected):"Sélectionnez une conversation"}</h2></div><div className="flex-1 space-y-3 overflow-y-auto p-4">{(messages??[]).map((message)=>{const auteur=un(message.auteur);const personnel=auteur?.id===moi?.id;const pieces=(message.pieces??[]) as PieceJointeMessage[];return <div key={message.id} className={`flex ${personnel?"justify-end":"justify-start"}`}><article className={`max-w-[92%] rounded-2xl px-4 py-3 text-sm sm:max-w-[85%] ${personnel?"bg-[#0d1b2a] text-white":"bg-neutral-100 dark:bg-neutral-900"}`}><p className="mb-1 text-xs font-semibold opacity-70">{auteur?`${auteur.prenom} ${auteur.nom}`:"Collaborateur"}</p>{message.contenu!=="[Pièce jointe]"&&<p className="whitespace-pre-wrap">{message.contenu}</p>}{pieces.length>0&&<div className={`grid gap-2 ${message.contenu!=="[Pièce jointe]"?"mt-2":""}`}>{pieces.map((piece)=><figure key={piece.id} className={`overflow-hidden rounded-lg border ${personnel?"border-white/20":"border-neutral-200 dark:border-neutral-700"}`}>{piece.type_media==="image"?
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={`/api/messagerie/pieces-jointes/${piece.id}`} alt={piece.nom_original} className="max-h-80 w-full bg-black/5 object-contain"/>:
+            <video src={`/api/messagerie/pieces-jointes/${piece.id}`} controls preload="metadata" playsInline className="max-h-80 w-full bg-black"/>}<figcaption className="flex items-center justify-between gap-3 px-2 py-1.5 text-[11px]"><span className="min-w-0 truncate">{piece.nom_original}</span><a href={`/api/messagerie/pieces-jointes/${piece.id}?download=1`} className="shrink-0 font-semibold underline">Télécharger</a></figcaption></figure>)}</div>}<p className="mt-1 text-[10px] opacity-60">{new Date(message.created_at).toLocaleString("fr-FR")}</p></article></div>})}{selected&&!(messages??[]).length&&<p className="text-center text-sm text-neutral-500">Aucun message.</p>}</div>{selected&&<ZoneReponseMessagerie conversationId={selected.id} actionEnvoyer={envoyerMessageInterneAction.bind(null,selected.id)} peutUtiliserIA={peutUtiliserIA} />}</section>
     </div>
   </div></main>;
 }

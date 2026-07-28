@@ -21,11 +21,15 @@ export default async function DocumentsChantierPage({
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const peutUtiliserIA = aAccesIA(await permissionsUtilisateur(ctx));
-  const [{ data: chantier }, { data: documents }] = await Promise.all([
+  const [{ data: chantier }, { data: documents }, { data: mediasConversation }] = await Promise.all([
     supabase.from("chantiers").select("id, nom, reference_interne")
       .eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),
     supabase.from("documents_chantier")
       .select("id, nom, categorie, storage_path, mime_type, taille_octets, note, audience, created_at")
+      .eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId)
+      .order("created_at", { ascending: false }),
+    supabase.from("pieces_jointes_messages")
+      .select("id,nom_original,mime_type,type_media,taille_octets,created_at")
       .eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId)
       .order("created_at", { ascending: false }),
   ]);
@@ -49,7 +53,7 @@ export default async function DocumentsChantierPage({
             <p className="text-sm text-neutral-500">Plans, photos de suivi, livraisons et pièces techniques.</p>
             <Link href={`/chantiers/${id}/comptes-rendus`} className="mt-1 inline-block text-sm font-medium text-[#9a7625] hover:underline">✨ Comptes-rendus par dictée →</Link>
           </div>
-          <span className="rounded-full bg-neutral-100 px-3 py-1 text-sm dark:bg-neutral-800">{avecUrls.length} document{avecUrls.length > 1 ? "s" : ""}</span>
+          <span className="rounded-full bg-neutral-100 px-3 py-1 text-sm dark:bg-neutral-800">{avecUrls.length + (mediasConversation?.length ?? 0)} élément{avecUrls.length + (mediasConversation?.length ?? 0) > 1 ? "s" : ""}</span>
         </div>
 
         {messages.error && <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">{messages.error}</p>}
@@ -83,6 +87,32 @@ export default async function DocumentsChantierPage({
           </div>
         </form>
 
+        {(mediasConversation?.length ?? 0) > 0 && (
+          <section className="space-y-3">
+            <div>
+              <h2 className="font-semibold">Photos et vidéos de la conversation chantier</h2>
+              <p className="text-xs text-neutral-500">Ces médias sont ajoutés automatiquement depuis le fil de discussion du chantier.</p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {(mediasConversation ?? []).map((media) => (
+                <article key={media.id} className="overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-800">
+                  {media.type_media === "image" ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={`/api/messagerie/pieces-jointes/${media.id}`} alt={media.nom_original} className="h-44 w-full bg-neutral-100 object-cover dark:bg-neutral-900" />
+                  ) : (
+                    <video src={`/api/messagerie/pieces-jointes/${media.id}`} controls preload="metadata" playsInline className="h-44 w-full bg-black object-contain" />
+                  )}
+                  <div className="space-y-2 p-3">
+                    <p className="truncate text-sm font-medium" title={media.nom_original}>{media.nom_original}</p>
+                    <p className="text-xs text-neutral-500">{media.type_media === "image" ? "Photo" : "Vidéo"} · {tailleLisible(Number(media.taille_octets))} · {new Date(media.created_at).toLocaleDateString("fr-FR")}</p>
+                    <a href={`/api/messagerie/pieces-jointes/${media.id}?download=1`} className="inline-block text-sm font-medium hover:underline">Télécharger</a>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+
         {avecUrls.length > 0 ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {avecUrls.map((document) => {
@@ -113,12 +143,12 @@ export default async function DocumentsChantierPage({
               );
             })}
           </div>
-        ) : (
+        ) : (mediasConversation?.length ?? 0) === 0 ? (
           <div className="rounded-md border border-dashed border-neutral-300 px-6 py-12 text-center dark:border-neutral-700">
             <p className="font-medium">Aucun document pour ce chantier</p>
             <p className="mt-1 text-sm text-neutral-500">Ajoutez une photo, un plan ou une pièce technique ci-dessus.</p>
           </div>
-        )}
+        ) : null}
       </div>
     </main>
   );

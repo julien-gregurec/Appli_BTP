@@ -1,3 +1,15 @@
+# LIVRAISON CODEX — 28 juillet 2026, photos et vidéos dans la messagerie
+
+- La messagerie accepte désormais jusqu’à **5 photos ou vidéos courtes par message**, avec une limite de **20 Mo par fichier**.
+- Formats acceptés : JPEG, PNG, WebP, HEIC/HEIF, MP4, MOV et WebM. Le type réel du fichier est vérifié côté serveur ; les fichiers vides, trop volumineux ou déguisés sont refusés.
+- Les médias sont téléversés directement dans le bucket privé `messagerie-medias`, sans rendre les fichiers publics ni faire transiter leur contenu dans une Server Action.
+- Un média envoyé dans une conversation liée à un chantier est automatiquement rattaché à ce chantier. Il réapparaît dans **Chantier → Photos et documents**, sans duplication du fichier de stockage.
+- La consultation et le téléchargement utilisent des URL signées temporaires et restent soumis aux droits d’accès à la conversation et à l’entreprise.
+- Migration : `20260728000181_medias_messagerie_chantiers.sql`.
+- Contrôles locaux : migration rejouée sur une base Supabase reconstruite, **46 tests pgTAP**, **5 tests Vitest dédiés**, TypeScript valide, ESLint sans erreur nouvelle et build Next complet de **115 routes** réussi.
+
+---
+
 # CORRECTIF CODEX — 28 juillet 2026, accès administrateur Entreprise Test
 
 - Le compte de démonstration administrateur était redirigé vers la borne dépôt parce que le script de remplissage sur cinq ans avait accordé par erreur le droit réservé `mode_compte_depot` à l’administrateur en même temps que tous les autres droits.
