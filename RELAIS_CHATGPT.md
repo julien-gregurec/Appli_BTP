@@ -1,3 +1,16 @@
+# LIVRAISON CODEX — 28 juillet 2026, pointage personnel et contrôle GPS
+
+- La page `/pointage` est désormais strictement personnelle : chaque collaborateur voit et enregistre uniquement ses propres arrivées, départs, oublis et historiques, y compris lorsqu’il possède des droits d’encadrement.
+- Les personnes disposant des droits `voir_pointages_equipe`, `gerer_pointage` ou `valider_pointages` disposent d’un bouton distinct **Gérer et vérifier** vers `/pointage/gestion`.
+- La nouvelle page de gestion regroupe les pointages de l’équipe, les validations/rejets/suppressions autorisés et les contrôles GPS périodiques enregistrés dans `verifications_zone_pointage`.
+- Pour chaque session, le responsable peut consulter l’heure du contrôle, la présence dans ou hors de la zone, la distance au chantier, la précision GPS et ouvrir la position sur OpenStreetMap.
+- La fréquence reste réglable dans **Paramètres → Suivi de zone chantier** (30 minutes par défaut). Le contrôle périodique fonctionne uniquement tant que la session est ouverte et que la page de pointage reste active ; la PWA ne prétend pas assurer un suivi permanent lorsque l’application est fermée.
+- La FAQ a été mise à jour pour expliquer la séparation entre pointage personnel et contrôle d’équipe.
+- Aucune migration supplémentaire n’est nécessaire : les tables et politiques RLS sécurisées des migrations 137/138 sont réutilisées.
+- Contrôles locaux : TypeScript valide, ESLint sans erreur (trois avertissements historiques `img`), **94 tests Vitest réussis** et build Next webpack complet de **113 routes** réussi.
+
+---
+
 # LIVRAISON CODEX — 28 juillet 2026, Lot 3 produit commercial V3
 
 - L'application visible est désormais recentrée sur les parcours cœur commercialisables. Un catalogue central distingue `active`, `beta`, `experimental` et `disabled`, indépendamment des permissions utilisateur.

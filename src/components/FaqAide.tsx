@@ -140,7 +140,11 @@ const categories: Categorie[] = [
       },
       {
         question: "Qui voit les pointages de l’équipe ?",
-        reponse: "Un salarié voit ses propres pointages. Seuls les postes auxquels l’administrateur a accordé la gestion ou la validation voient et traitent ceux des autres.",
+        reponse: "Un salarié ouvre « Mon pointage » et voit uniquement ses propres heures. Les postes autorisés disposent d’un bouton séparé « Gérer et vérifier » pour consulter l’équipe, contrôler les positions périodiques et valider ou rejeter les anomalies.",
+      },
+      {
+        question: "Où consulter les localisations enregistrées toutes les 30 minutes ?",
+        reponse: "Un responsable autorisé ouvre Pointage puis « Gérer et vérifier ». Chaque session affiche un volet « Contrôles de zone » avec la date, l’heure, la distance au chantier, la précision GPS et un lien vers la position. Le suivi doit être activé dans Paramètres et fonctionne uniquement pendant une session ouverte, tant que la page Liria reste ouverte.",
       },
       {
         question: "Comment demander un congé ?",
