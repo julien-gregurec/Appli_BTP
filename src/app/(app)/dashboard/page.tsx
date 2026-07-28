@@ -9,6 +9,9 @@ import { DashboardAnalytics } from "@/components/DashboardAnalytics";
 import { DashboardWidget, DashboardWidgetFirstConnection } from "@/components/DashboardWidgets";
 import { BriefingMatin, type LigneBriefing } from "@/components/BriefingMatin";
 import { Lien as Link } from "@/components/Lien";
+import { activeFeaturesForCompany } from "@/lib/feature-flags";
+import { featureForPath } from "@/lib/feature-catalogue";
+import { estPlateformeAdmin } from "@/lib/plateforme";
 
 function un<T>(valeur: T | T[] | null): T | null {
   if (!valeur) return null;
@@ -17,7 +20,8 @@ function un<T>(valeur: T | T[] | null): T | null {
 
 export default async function DashboardPage() {
   const ctx = await getContexteEntreprise();
-  const permissions = await permissionsUtilisateur(ctx);
+  const [permissions, plateformeAdmin] = await Promise.all([permissionsUtilisateur(ctx), estPlateformeAdmin()]);
+  const activeFeatures = await activeFeaturesForCompany(ctx, permissions, plateformeAdmin);
   const supabase = await createClient();
   const aujourdhui = new Date().toISOString().slice(0, 10);
   const autorise = (cle: string) => permissions === null || permissions.includes(cle);
@@ -64,7 +68,10 @@ export default async function DashboardPage() {
     { permission: "acces_paiements_bancaires", href: "/paiements-bancaires", label: "Banque & paie", icon: "banque" },
     { permission: "acces_connecteurs", href: "/connecteurs", label: "Connecteurs", icon: "connecteurs" },
     { permission: "acces_parametres", href: "/parametres", label: "Paramètres", icon: "parametres" },
-  ] as Array<MobileModuleLink & { permission: string | null }>).filter((module) => module.permission === null || autorise(module.permission));
+  ] as Array<MobileModuleLink & { permission: string | null }>).filter((module) => {
+    const feature = featureForPath(module.href);
+    return (!feature || activeFeatures.includes(feature)) && (module.permission === null || autorise(module.permission));
+  });
 
   const { data: employeCompte } = permissions !== null && (peutPointer || voir.planning)
     ? await supabase.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("utilisateur_id", ctx.userId).eq("statut", "actif").maybeSingle()

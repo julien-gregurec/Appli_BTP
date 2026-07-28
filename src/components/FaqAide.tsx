@@ -76,20 +76,8 @@ const categories: Categorie[] = [
   },
   {
     id: "facturation",
-    titre: "Facturation, situations et encaissements",
+    titre: "Facturation et encaissements",
     questions: [
-      {
-        question: "Pourquoi aucun devis n’apparaît dans Situation ou Acompte ?",
-        reponse: "Ces listes proposent uniquement les devis acceptés. Une situation exige aussi un chantier rattaché. Acceptez le devis, associez-le au chantier puis rechargez la page.",
-      },
-      {
-        question: "Quelle différence entre acompte, situation, solde, avoir et DGD ?",
-        reponse: "L’acompte finance le démarrage ; la situation facture l’avancement cumulé ; le solde clôture le montant restant ; l’avoir corrige une facture sans la supprimer ; le DGD formalise le décompte final. Faites valider votre méthode par le comptable.",
-      },
-      {
-        question: "Comment fonctionne l’avancement cumulé ?",
-        reponse: "Saisissez le pourcentage total atteint depuis le début du marché. Liria déduit les situations précédentes pour calculer la période. Ne saisissez pas seulement le pourcentage réalisé depuis la dernière situation.",
-      },
       {
         question: "Comment un client paie-t-il en ligne ?",
         reponse: "Depuis la facture client, une personne autorisée génère un lien de paiement et l’envoie au client. Le paiement arrive sur le compte Stripe connecté de l’entreprise. Le dirigeant ne doit pas payer lui-même une facture destinée à son client.",
@@ -126,7 +114,7 @@ const categories: Categorie[] = [
       },
       {
         question: "Comment suivre les coûts réels du chantier ?",
-        reponse: "Validez les heures, classez les factures fournisseurs, notes de frais, sous-traitants, déplacements et sorties de stock sur le chantier. La rentabilité dépend de ce classement.",
+        reponse: "Validez les heures, classez les factures fournisseurs, notes de frais et sorties de stock sur le chantier. La rentabilité dépend de ce classement.",
       },
       {
         question: "Peut-on planifier du bureau, du dépôt ou une visite médicale ?",
@@ -158,15 +146,11 @@ const categories: Categorie[] = [
         question: "Comment demander un congé ?",
         reponse: "Dans Congés, choisissez le type et les dates puis créez la demande. Elle est transmise au responsable. Après validation, l’absence apparaît au planning et n’est pas une journée à pointer.",
       },
-      {
-        question: "Comment déclarer un grand déplacement ?",
-        reponse: "Choisissez la période et le chantier, renseignez hébergement, repas et transport, ajoutez les justificatifs puis soumettez. Les éléments validés peuvent être repris dans la préparation de la paie.",
-      },
     ],
   },
   {
     id: "achats",
-    titre: "Achats, fournisseurs et sous-traitants",
+    titre: "Achats et fournisseurs",
     questions: [
       {
         question: "Comment réceptionner une commande partiellement ?",
@@ -178,19 +162,15 @@ const categories: Categorie[] = [
       },
       {
         question: "Comment classer une facture fournisseur ?",
-        reponse: "Dans Factures fournisseurs, saisissez ou importez la pièce, associez le fournisseur, la commande et le chantier. Ajoutez si nécessaire le véhicule, l’outil ou le sous-traitant concerné.",
+        reponse: "Dans Factures fournisseurs, saisissez ou importez la pièce, associez le fournisseur, la commande et le chantier. Ajoutez si nécessaire le véhicule ou l’outil concerné.",
       },
       {
         question: "Comment la TVA d’un achat est-elle calculée ?",
         reponse: "Saisissez le HT puis choisissez le taux applicable parmi les taux prévus. La TVA et le TTC sont recalculés dans l’interface et côté serveur. Vérifiez toujours le taux figurant sur la facture.",
       },
       {
-        question: "Où enregistrer le RIB d’un fournisseur ou sous-traitant ?",
-        reponse: "Depuis sa fiche, utilisez la section Coordonnées bancaires. Le RIB complet est chiffré ; seules ses dernières positions restent visibles. Il doit être vérifié avant une préparation de virement.",
-      },
-      {
-        question: "Peut-on connecter n’importe quel fournisseur ?",
-        reponse: "Tout fournisseur peut être référencé et ses tarifs peuvent être importés. Une synchronisation automatique exige toutefois un accès officiel API, EDI, PunchOut ou OAuth fourni par le partenaire ; Liria ne stocke jamais son mot de passe portail.",
+        question: "Comment importer un tarif fournisseur ?",
+        reponse: "Utilisez l’import de catalogue depuis le module fournisseur, contrôlez les colonnes, les références, les unités et les taux de TVA, puis validez l’aperçu avant d’enregistrer les articles.",
       },
     ],
   },
@@ -225,8 +205,8 @@ const categories: Categorie[] = [
     ],
   },
   {
-    id: "frais-paie",
-    titre: "Notes de frais, paie et banque",
+    id: "frais",
+    titre: "Notes de frais",
     questions: [
       {
         question: "Comment envoyer une note de frais ?",
@@ -240,43 +220,19 @@ const categories: Categorie[] = [
         question: "Comment les notes de frais sont-elles regroupées ?",
         reponse: "Le responsable peut les consulter par employé et période avant validation. L’historique personnel reste accessible depuis la fiche employé selon les droits.",
       },
-      {
-        question: "Liria produit-il les bulletins de paie officiels ?",
-        reponse: "Non. Liria prépare les variables issues des heures, congés et déplacements, puis les transmet au cabinet. Le bulletin légal et la DSN restent produits par le prestataire de paie.",
-      },
-      {
-        question: "Où enregistrer le RIB d’un employé ?",
-        reponse: "Depuis sa fiche Employés, dans la section bancaire réservée. Le RIB est chiffré et doit être vérifié avant de préparer un salaire ou un remboursement.",
-      },
-      {
-        question: "Un bulletin reçu déclenche-t-il automatiquement le salaire ?",
-        reponse: "Non. Le bulletin contrôlé permet de préparer une source. Un lot doit ensuite être validé puis transmis au prestataire bancaire avec authentification forte. Aucun argent ne part sans ces étapes.",
-      },
     ],
   },
   {
-    id: "crm",
-    titre: "CRM, messagerie, appels d’offres et interventions",
+    id: "collaboration",
+    titre: "Messagerie et collaboration",
     questions: [
       {
-        question: "Comment conserver l’historique d’un appel ou rendez-vous ?",
-        reponse: "Dans CRM et relances, choisissez le client, le canal, le sens, l’objet et le compte rendu. Programmez un rappel si une nouvelle action est attendue.",
+        question: "Comment écrire à un collaborateur ?",
+        reponse: "Dans Messagerie, choisissez le destinataire autorisé, rédigez le message puis envoyez-le. Les échanges restent rattachés à l’entreprise et visibles uniquement par leurs participants.",
       },
       {
         question: "Comment envoyer une consigne à toute l’équipe d’un chantier ?",
         reponse: "Dans Messagerie, créez une conversation de type chantier. Seules les personnes autorisées sur ce chantier doivent accéder au fil.",
-      },
-      {
-        question: "Qui doit voir les appels d’offres ?",
-        reponse: "En général la direction, le commercial et les personnes chargées de préparer les réponses. L’administrateur peut retirer ce module aux chefs d’équipe et profils terrain.",
-      },
-      {
-        question: "À quoi servent les ouvrages et métrés ?",
-        reponse: "Les ouvrages sont des modèles chiffrés réutilisables. Les métrés enregistrent dimensions, déductions, unité, formule et résultat afin d’accélérer un devis tout en gardant le calcul justifiable.",
-      },
-      {
-        question: "Comment créer un bon d’intervention ?",
-        reponse: "Créez l’intervention avec client, site, problème, priorité, date et intervenants. Sur place, renseignez travaux, temps, pièces et photos, puis recueillez la validation prévue avant clôture.",
       },
     ],
   },
@@ -286,7 +242,7 @@ const categories: Categorie[] = [
     questions: [
       {
         question: "Pourquoi la rentabilité d’un chantier est-elle incomplète ?",
-        reponse: "Vérifiez qu’un devis accepté est lié, que les heures sont validées, que les coûts horaires existent et que factures, notes de frais, sous-traitants, déplacements et sorties de stock sont classés sur ce chantier.",
+        reponse: "Vérifiez qu’un devis accepté est lié, que les heures sont validées, que les coûts horaires existent et que factures, notes de frais et sorties de stock sont classés sur ce chantier.",
       },
       {
         question: "Comment voir le détail d’une échéance de trésorerie ?",
@@ -294,7 +250,7 @@ const categories: Categorie[] = [
       },
       {
         question: "Comment transmettre les données au comptable ?",
-        reponse: "Dans Exports comptables, choisissez la période et le journal. Préférez le classeur Excel mis en forme pour la lecture ou le CSV UTF-8 si son logiciel l’exige. Les justificatifs peuvent être exportés avec leur manifeste.",
+        reponse: "Dans Exports comptables, choisissez la période et le journal. Préférez le classeur Excel mis en forme pour la lecture ou le CSV UTF-8 si le logiciel du comptable l’exige.",
       },
       {
         question: "Pourquoi les accents sont-ils incorrects dans un CSV ?",
@@ -308,7 +264,7 @@ const categories: Categorie[] = [
   },
   {
     id: "abonnement-ia",
-    titre: "Abonnement, stockage, IA et notifications",
+    titre: "Abonnement, stockage et notifications",
     questions: [
       {
         question: "Où voir le coût de Liria Gestion Pro ?",
@@ -323,14 +279,6 @@ const categories: Categorie[] = [
         reponse: "Les photos, plans, justificatifs, factures et autres documents privés occupent le stockage de l’entreprise. L’écran Abonnement affiche la consommation et le quota de l’offre.",
       },
       {
-        question: "L’assistant IA peut-il voir toutes les données ?",
-        reponse: "Non. Il est limité par les mêmes droits et le même périmètre que l’utilisateur. Une personne qui ne voit pas les prix ou un chantier ne doit pas pouvoir les obtenir par l’IA.",
-      },
-      {
-        question: "Une réponse IA est-elle automatiquement appliquée ?",
-        reponse: "Non. Elle reste une proposition à relire. Contrôlez toujours montants, dates, références, obligations juridiques et destinataire avant envoi ou décision.",
-      },
-      {
         question: "Comment activer les notifications ?",
         reponse: "Autorisez-les sur l’appareil lorsque Liria le propose. Les alertes restent filtrées par les droits : planning, pointages, validations, échéances et autres événements autorisés.",
       },
@@ -338,16 +286,8 @@ const categories: Categorie[] = [
   },
   {
     id: "securite",
-    titre: "Sécurité, imports et dépannage",
+    titre: "Sécurité et dépannage",
     questions: [
-      {
-        question: "Puis-je importer les données d’un autre logiciel ?",
-        reponse: "Oui, via Paramètres > Import, avec les exports disponibles de Batappli, Batigest ou d’autres logiciels. Commencez dans une entreprise de test, contrôlez la correspondance des colonnes et conservez l’export source.",
-      },
-      {
-        question: "Liria stocke-t-il mes mots de passe fournisseur ou bancaire ?",
-        reponse: "Non. Les connecteurs doivent utiliser des accès officiels API, EDI, PunchOut ou OAuth. L’authentification bancaire forte se déroule chez le prestataire réglementé.",
-      },
       {
         question: "Que faire si un module affiche une page vide ou une erreur d’autorisation ?",
         reponse: "Notez la page, l’heure, le compte et l’action effectuée. Actualisez une fois, puis vérifiez les droits et le statut de la fiche. Si le problème persiste, envoyez ces éléments au support sans joindre de secret.",

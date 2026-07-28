@@ -51,7 +51,7 @@ export default async function BesoinsPage({
                 <option value="mensuel">Mensuel</option>
               </select>
               <button className="w-full rounded-md bg-[#0d1b2a] px-3 py-2 text-center text-sm font-semibold text-white">Enregistrer ma carte et démarrer l’essai</button>
-            </form> : <><p className="rounded-md bg-amber-50 p-3 text-xs text-amber-900">La souscription en ligne est en cours d’activation. Vous pouvez continuer votre configuration sans blocage.</p><Link href="/dashboard" className="w-full rounded-md bg-[#0d1b2a] px-3 py-2 text-center text-sm font-semibold text-white">Accéder à mon espace</Link></>}
+            </form> : <Link href="/onboarding/demarrage" className="w-full rounded-md bg-[#0d1b2a] px-3 py-2 text-center text-sm font-semibold text-white">Configurer mon espace</Link>}
             <Link href="/onboarding/besoins" className="w-full rounded-md border px-3 py-2 text-center text-sm">
               Revoir mes réponses
             </Link>
@@ -113,7 +113,7 @@ export default async function BesoinsPage({
             <button type="submit" className="w-full rounded-md bg-[#0d1b2a] px-3 py-2 text-sm font-semibold text-white">
               Voir ma recommandation
             </button>
-            {!paiementConfigure&&<Link href="/dashboard" className="text-center text-xs text-neutral-500 underline">Passer cette étape</Link>}
+            {!paiementConfigure&&<Link href="/onboarding/demarrage" className="text-center text-xs text-neutral-500 underline">Configurer d’abord mon espace</Link>}
           </div>
         </form>
       </div>

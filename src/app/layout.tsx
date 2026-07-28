@@ -2,9 +2,9 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Liria Gestion Pro",
-  description: "Liria Gestion Pro — Gestion complète des entreprises du BTP",
-  applicationName: "Liria Gestion Pro",
+  title: "Liria Gestion Pro V3",
+  description: "Liria Gestion Pro V3 — Gestion quotidienne des entreprises du BTP",
+  applicationName: "Liria Gestion Pro V3",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: "/icons/liria-gestion-pro-v3-apple-touch.png", sizes: "180x180", type: "image/png" }],
   },
-  appleWebApp: { capable: true, title: "Liria Gestion Pro", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: "Liria Gestion Pro V3", statusBarStyle: "black-translucent" },
   formatDetection: { telephone: false },
 };
 

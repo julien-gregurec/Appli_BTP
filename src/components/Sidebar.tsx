@@ -6,6 +6,7 @@ import { logoutAction } from "@/app/actions/auth";
 import { PwaInstallButton } from "@/components/PwaInstallButton";
 import { NAVIGATION_APPLICATION, NAVIGATION_GROUPES, navigationAutorisee } from "@/lib/navigation";
 import { Lien as Link } from "@/components/Lien";
+import { featureForPath, type FeatureKey } from "@/lib/feature-catalogue";
 
 export function Sidebar({
   entrepriseNom,
@@ -13,12 +14,14 @@ export function Sidebar({
   authDisabled = false,
   permissions = null,
   plateformeAdmin = false,
+  activeFeatures,
 }: {
   entrepriseNom: string;
   logoUrl?: string | null;
   authDisabled?: boolean;
   permissions?: string[] | null;
   plateformeAdmin?: boolean;
+  activeFeatures: FeatureKey[];
 }) {
   const pathname = usePathname();
   const [ouvert, setOuvert] = useState(false);
@@ -26,7 +29,10 @@ export function Sidebar({
   const navigationBrute = compteDepot
     ? NAVIGATION_APPLICATION.filter((item) => ["/stock", "/stock/borne", "/depot"].includes(item.href))
     : NAVIGATION_APPLICATION;
-  const navigation = navigationBrute.filter((item) => navigationAutorisee(item.permission, permissions));
+  const navigation = navigationBrute.filter((item) => {
+    const feature = featureForPath(item.href);
+    return (!feature || activeFeatures.includes(feature)) && item.actif && navigationAutorisee(item.permission, permissions);
+  });
 
   return (
     <>
@@ -46,7 +52,7 @@ export function Sidebar({
           <img src="/liria-gestion-pro-logo-v5.png" alt="Liria Gestion Pro" width={58} height={40} className="h-10 w-[58px] rounded bg-white object-contain p-1" />
           <div className="min-w-0">
             <div className="text-sm font-semibold tracking-[0.14em]">LIRIA</div>
-            <div className="text-[10px] tracking-[0.16em] text-[#c9a24a]">GESTION PRO</div>
+            <div className="text-[10px] tracking-[0.16em] text-[#c9a24a]">GESTION PRO <span className="rounded border border-[#c9a24a]/50 px-1">V3</span></div>
           </div>
           <button type="button" onClick={() => setOuvert(false)} className="ml-auto rounded px-2 py-1 text-2xl text-white/70 md:hidden" aria-label="Fermer le menu">×</button>
         </div>
@@ -69,7 +75,7 @@ export function Sidebar({
             <div className="ml-2 border-l border-white/10 pl-1">
               {items.map((item) => {
                 const active = pathname === item.href || pathname.startsWith(item.href + "/");
-                return item.actif ? <Link key={item.href} href={item.href} onClick={() => setOuvert(false)} className={`block rounded-md px-3 py-2 text-sm ${active?"bg-[#c9a24a] font-medium text-[#0d1b2a]":"text-white/80 hover:bg-white/10 hover:text-white"}`}>{item.label}</Link> : <span key={item.href} className="block cursor-default rounded-md px-3 py-2 text-sm text-neutral-400" title="Module à venir">{item.label}</span>;
+                return <Link key={item.href} href={item.href} onClick={() => setOuvert(false)} className={`block rounded-md px-3 py-2 text-sm ${active?"bg-[#c9a24a] font-medium text-[#0d1b2a]":"text-white/80 hover:bg-white/10 hover:text-white"}`}>{item.label}</Link>;
               })}
             </div>
           </details>;

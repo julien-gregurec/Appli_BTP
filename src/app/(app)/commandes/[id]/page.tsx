@@ -83,7 +83,7 @@ export default async function CommandeDetailPage({
             <div className="text-xs uppercase text-neutral-500">Dates</div>
             <div className="mt-1">Commande : {commande.date_commande}</div>
             <div>Livraison prévue : {commande.date_livraison_prevue ?? "—"}</div>
-            <div>Créée par : {auteur ? `${auteur.prenom ?? ""} ${auteur.nom ?? ""}`.trim() || "Compte utilisateur" : "Ancienne commande / prototype"}</div>
+            <div>Créée par : {auteur ? `${auteur.prenom ?? ""} ${auteur.nom ?? ""}`.trim() || "Compte utilisateur" : "Auteur non renseigné"}</div>
           </div>
         </div>
 

@@ -32,10 +32,9 @@ export default async function AidePage({ searchParams }: { searchParams: Promise
           <div>
             <h2 className="font-semibold">Guide complet d&apos;utilisation</h2>
             <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">
-              138 pages, édition juillet 2026 : chaque écran, chaque champ et 17 modes opératoires
-              complets couvrant clients, devis, facturation, chantiers, équipes, fournisseurs,
-              stock, notes de frais, paie, banque, sous-traitance, clôture, abonnement, IA,
-              sécurité, synchronisations et dépannage.
+              Édition V3 : les parcours commercialisés sont expliqués pas à pas, notamment les
+              clients, devis, factures, chantiers, équipes, planning, pointage, fournisseurs,
+              stock, notes de frais, pilotage, abonnement, sécurité et dépannage.
             </p>
           </div>
           <a href="/guides/Guide_utilisation_Liria_Gestion_Pro.pdf" target="_blank" rel="noopener" className="flex-none rounded-md bg-[#0d1b2a] px-4 py-2 text-center text-sm font-semibold text-white">

@@ -1,3 +1,15 @@
+# LIVRAISON CODEX — 28 juillet 2026, Lot 3 produit commercial V3
+
+- L'application visible est désormais recentrée sur les parcours cœur commercialisables. Un catalogue central distingue `active`, `beta`, `experimental` et `disabled`, indépendamment des permissions utilisateur.
+- Menu, raccourcis du tableau de bord et accès directs utilisent le même périmètre. Les modules bêta restent dans le code et la base mais sont masqués par défaut ; les intégrations post-V3 sont désactivées.
+- Modules bêta masqués : facturation avancée, ouvrages, interventions, sous-traitants, grands déplacements, paie et CRM.
+- Modules désactivés : appels d'offres, boutique, paiements bancaires et connecteurs.
+- Migration `20260728000180_feature_flags_v3.sql` **appliquée en production le 28 juillet 2026** : table de surcharges par entreprise avec RLS.
+- Le produit est identifié comme **Liria Gestion Pro V3**. L'inscription mène à un démarrage guidé fondé sur les vraies données de l'entreprise ; la FAQ, l'aide et la page publique sont alignées sur le périmètre visible.
+- Rapport détaillé : `docs/RAPPORT_LOT_3_COMMERCIALISATION.md`.
+
+---
+
 # LIVRAISON CODEX — 22 juillet 2026, préparation complète de la paie (MIGRATION 141 APPLIQUÉE)
 
 Le module **Préparation de la paie** est maintenant implémenté de bout en bout et relié aux données métier existantes. Il prépare, contrôle, valide et exporte les éléments variables destinés à l'expert-comptable ; il ne génère pas un bulletin officiel et ne remplace ni le logiciel de paie ni la validation du cabinet comptable.

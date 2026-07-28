@@ -13,7 +13,7 @@ export default async function FacturationPlateformePage({ searchParams }: { sear
   if (!(await estPlateformeAdmin())) notFound();
   const params = await searchParams;
   const mois = /^\d{4}-\d{2}$/.test(params.mois ?? "") ? params.mois as string : new Date().toISOString().slice(0, 7);
-  if (isEmailLoginDisabled()) return <main className="p-3 sm:p-8"><div className="mx-auto max-w-6xl space-y-4"><Link href="/plateforme" className="text-sm text-neutral-500">← Plateforme</Link><h1 className="text-xl font-semibold">Relevés mensuels des comptes</h1><p className="rounded bg-amber-50 p-4 text-sm text-amber-900">Les relevés nominatifs sont fermés en mode prototype. Ils seront disponibles avec le compte propriétaire authentifié.</p></div></main>;
+  if (isEmailLoginDisabled()) return <main className="p-3 sm:p-8"><div className="mx-auto max-w-6xl space-y-4"><Link href="/plateforme" className="text-sm text-neutral-500">← Plateforme</Link><h1 className="text-xl font-semibold">Relevés mensuels des comptes</h1><p className="rounded bg-amber-50 p-4 text-sm text-amber-900">Les relevés nominatifs nécessitent un compte propriétaire authentifié.</p></div></main>;
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("plateforme_releve_facturation", { p_mois: `${mois}-01` });
   const releves = (data ?? []) as Releve[];

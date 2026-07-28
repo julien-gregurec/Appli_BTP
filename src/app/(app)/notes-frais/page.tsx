@@ -21,7 +21,7 @@ export default async function NotesFraisPage({ searchParams }: { searchParams: P
   const peutExporter = permissions?.includes("exporter_notes_frais") ?? false;
   const peutAdministrer = permissions?.includes("administrer_archivage_notes_frais") ?? false;
   const peutGererEquipe = permissions === null || permissions.includes("gerer_notes_frais") || permissions.includes("verifier_notes_frais") || permissions.includes("comptabiliser_notes_frais");
-  if (prototype) return <main className="p-8"><div className="mx-auto max-w-4xl space-y-4"><h1 className="text-xl font-semibold">Notes de frais et justificatifs</h1><p className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"><strong>Module sécurisé fermé en mode prototype.</strong><br />Les justificatifs personnels exigent une identité individuelle. Ils deviendront accessibles après l’activation des comptes sécurisés et de la RLS de production.</p></div></main>;
+  if (prototype) return <main className="p-8"><div className="mx-auto max-w-4xl space-y-4"><h1 className="text-xl font-semibold">Notes de frais et justificatifs</h1><p className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"><strong>Compte collaborateur requis.</strong><br />Les justificatifs personnels nécessitent une identité individuelle et ne sont pas disponibles depuis un accès partagé.</p></div></main>;
 
   const [{ data: employe }, { data: categories }, { data: chantiers }, { data: grandsDeplacements }] = await Promise.all([
     supabase.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("utilisateur_id", ctx.userId).maybeSingle(),

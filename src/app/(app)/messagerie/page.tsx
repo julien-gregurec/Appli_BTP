@@ -13,7 +13,7 @@ const un = <T,>(value: Relation<T>): T | null => Array.isArray(value) ? value[0]
 
 export default async function MessageriePage({ searchParams }: { searchParams: Promise<{ conversation?: string; error?: string; success?: string }> }) {
   const query = await searchParams;
-  if (isEmailLoginDisabled()) return <main className="p-8"><div className="mx-auto max-w-4xl"><h1 className="text-xl font-semibold">Messagerie interne</h1><p className="mt-4 rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">La messagerie privée exige des comptes individuels. Elle est fermée en mode prototype.</p></div></main>;
+  if (isEmailLoginDisabled()) return <main className="p-8"><div className="mx-auto max-w-4xl"><h1 className="text-xl font-semibold">Messagerie interne</h1><p className="mt-4 rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">La messagerie privée nécessite des comptes collaborateurs individuels.</p></div></main>;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const peutUtiliserIA = aAccesIA(await permissionsUtilisateur(ctx));

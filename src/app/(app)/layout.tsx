@@ -10,6 +10,7 @@ import { AssistantIA } from "@/components/AssistantIA";
 import { AppPresenceTracker } from "@/components/AppPresenceTracker";
 import { AbonnementBanner } from "@/components/AbonnementBanner";
 import { SupportAccessBanner } from "@/components/SupportAccessBanner";
+import { activeFeaturesForCompany } from "@/lib/feature-flags";
 
 // Layout des pages authentifiées avec navigation latérale.
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -17,6 +18,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Independants l'un de l'autre (aucun n'attend le resultat de l'autre) : les lancer en
   // parallele evite un aller-retour reseau supplementaire sur chaque navigation.
   const [permissions, plateformeAdmin] = await Promise.all([permissionsUtilisateur(ctx), estPlateformeAdmin()]);
+  const activeFeatures = await activeFeaturesForCompany(ctx, permissions, plateformeAdmin);
   const peutVoirAlerteAbonnement = permissions === null || permissions.includes("gerer_utilisateurs") || permissions.includes("gerer_parametres");
 
   return (
@@ -50,11 +52,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         .lecture-seule main form[method="get"]{display:flex!important}
         .lecture-seule main form[method="get"] button{display:inline-flex!important}
       `}</style>
-      <Sidebar entrepriseNom={ctx.entrepriseNom} logoUrl={ctx.logoUrl} authDisabled={isEmailLoginDisabled()} permissions={permissions} plateformeAdmin={plateformeAdmin} />
+      <Sidebar entrepriseNom={ctx.entrepriseNom} logoUrl={ctx.logoUrl} authDisabled={isEmailLoginDisabled()} permissions={permissions} plateformeAdmin={plateformeAdmin} activeFeatures={activeFeatures} />
       <div className="min-w-0 flex-1">
         {ctx.accesSupportPlateforme&&<SupportAccessBanner entrepriseNom={ctx.entrepriseNom}/>}
         {!ctx.accesSupportPlateforme&&ctx.suspensionPrevueAt&&peutVoirAlerteAbonnement&&<AbonnementBanner echeance={ctx.suspensionPrevueAt} message={ctx.impayeMessage}/>}
-        <ModuleAccessBoundary permissions={permissions}>{children}</ModuleAccessBoundary>
+        <ModuleAccessBoundary permissions={permissions} activeFeatures={activeFeatures}>{children}</ModuleAccessBoundary>
       </div>
       <MobileBack />
       <AideButton />
