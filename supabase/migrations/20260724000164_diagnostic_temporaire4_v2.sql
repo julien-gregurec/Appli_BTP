@@ -22,5 +22,5 @@ begin
   join public.utilisateurs_entreprises ue on ue.utilisateur_id=e.utilisateur_id and ue.entreprise_id=e.entreprise_id
   where e.id = 'e0086c07-2b1d-4bf7-ae3c-aec968d7b63e';
 end;$$;
-revoke all on function public.debug_pointage_manquant() from public,anon,authenticated;
-grant execute on function public.debug_pointage_manquant() to service_role;
+revoke all on function public.debug_pointage_manquant(date) from public,anon,authenticated;
+grant execute on function public.debug_pointage_manquant(date) to service_role;

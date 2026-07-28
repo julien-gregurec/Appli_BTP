@@ -13,7 +13,7 @@ select function_returns('public','plateforme_quitter_entreprise',array[]::text[]
 select function_returns('public','plateforme_signaler_impaye',array['uuid','text'],'timestamp with time zone','Un impayé produit une échéance précise');
 select function_returns('public','plateforme_enregistrer_reglement',array['uuid','text'],'void','Le règlement rétablit le compte');
 select function_returns('public','appliquer_suspensions_impayes',array[]::text[],'integer','Les échéances sont matérialisables en statut suspendu');
-select function_returns('public','contexte_abonnement_courant',array[]::text[],'record','Le statut reste lisible avant la barrière RLS');
+select function_returns('public','contexte_abonnement_courant',array[]::text[],'setof record','Le statut reste lisible avant la barrière RLS');
 
 select * from finish();
 rollback;

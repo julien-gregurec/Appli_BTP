@@ -38,3 +38,20 @@ Si Docker n’est pas disponible, utiliser un projet Supabase de test séparé,
 sans données clientes, avec des clés dédiées et une vérification explicite de
 l’identifiant du projet avant d’appliquer les migrations. La production n’est
 jamais une solution de remplacement.
+
+## Dernier contrôle exécuté
+
+Contrôle local du 28 juillet 2026 :
+
+- reconstruction complète de la base locale depuis une base vierge : réussie ;
+- application de toutes les migrations jusqu’à `20260724000179` : réussie ;
+- `actions_nom_propre.test.sql` : réussi ;
+- `archivage_notes_frais_rls.test.sql` : réussi ;
+- `borne_stock_securisee.test.sql` : réussi ;
+- `plateforme_impayes.test.sql` : réussi ;
+- résultat pgTAP : 4 fichiers, 38 tests, 38 réussis.
+
+Ce contrôle a détecté puis permis de corriger la signature de la fonction
+temporaire `debug_pointage_manquant(date)` dans la migration 164. Les assertions
+pgTAP ont également été alignées sur les politiques de lecture ajoutées pour le
+créateur d’une note de frais et la préparation des virements.

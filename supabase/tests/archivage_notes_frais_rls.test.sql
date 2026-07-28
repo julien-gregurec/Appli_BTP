@@ -5,7 +5,19 @@ select plan(9);
 select has_table('public','documents_notes_frais','La table des documents existe');
 select has_table('public','journal_audit_notes_frais','Le journal append-only existe');
 select has_table('public','legal_holds_notes_frais','Le gel juridique existe');
-select policies_are('public','notes_frais',array['notes_frais_delete_authenticated','notes_frais_insert_authenticated','notes_frais_select_authenticated','notes_frais_update_authenticated'],'Les notes ont uniquement les politiques strictes attendues');
+select policies_are(
+  'public',
+  'notes_frais',
+  array[
+    'notes_frais_createur_lecture',
+    'notes_frais_delete_authenticated',
+    'notes_frais_insert_authenticated',
+    'notes_frais_select_authenticated',
+    'notes_frais_sources_bancaires',
+    'notes_frais_update_authenticated'
+  ],
+  'Les notes ont uniquement les politiques strictes attendues'
+);
 select policies_are('public','journal_audit_notes_frais',array['audit_notes_frais_select'],'Le journal ne possède aucune politique de mutation');
 
 select ok((select relrowsecurity from pg_class where oid='public.notes_frais'::regclass),'RLS est active sur les dépenses');
