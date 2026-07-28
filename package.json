@@ -4,19 +4,27 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "clean": "node scripts/clean-build.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit --incremental false",
+    "verify:migrations": "node scripts/verify-migrations.mjs",
+    "verify:secrets": "node scripts/verify-secrets.mjs",
+    "verify": "npm run clean && npm run typecheck && npm run lint && npm run test && npm run verify:migrations && npm run verify:secrets && npm run build",
+    "db:start": "supabase start",
+    "db:reset": "supabase db reset",
+    "test:db": "supabase test db"
   },
   "dependencies": {
     "@excel.js/exceljs": "^0.9.0",
-    "@sentry/nextjs": "^10.66.0",
+    "@sentry/nextjs": "^10.68.0",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.2",
     "@zxing/browser": "^0.2.1",
     "fflate": "^0.8.3",
-    "next": "^16.2.11",
+    "next": "^16.2.12",
     "openai": "^6.48.0",
     "qrcode": "^1.5.4",
     "react": "19.2.4",
@@ -35,7 +43,7 @@
     "@types/react-dom": "^19",
     "@types/web-push": "^3.6.4",
     "eslint": "^9",
-    "eslint-config-next": "16.2.11",
+    "eslint-config-next": "16.2.12",
     "supabase": "^2.109.1",
     "tailwindcss": "^4",
     "typescript": "^5",
@@ -44,7 +52,7 @@
   "overrides": {
     "sharp": "$sharp",
     "next": {
-      "postcss": "8.5.10"
+      "postcss": "8.5.24"
     }
   }
 }

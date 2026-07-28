@@ -8,6 +8,6 @@ Sentry.init({
   enabled: process.env.NODE_ENV === "production",
   sendDefaultPii: false,
   tracesSampleRate: 0.1,
-  // Attache la valeur des variables locales aux traces pour un débogage plus précis.
-  includeLocalVariables: true,
+  // Les variables locales peuvent contenir des données métier ou des secrets.
+  includeLocalVariables: false,
 });
