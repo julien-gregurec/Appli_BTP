@@ -1,3 +1,12 @@
+# CORRECTIF CODEX — 28 juillet 2026, accès administrateur Entreprise Test
+
+- Le compte de démonstration administrateur était redirigé vers la borne dépôt parce que le script de remplissage sur cinq ans avait accordé par erreur le droit réservé `mode_compte_depot` à l’administrateur en même temps que tous les autres droits.
+- La production a été réparée : tous les postes de l’Entreprise Test ont `mode_compte_depot = false`, sauf le poste dédié **Compte dépôt**, qui reste à `true`.
+- Les deux scripts de démonstration (`seed_entreprise_test_5_ans.sql` et `creer_entreprise_demo_18_mois.sql`) excluent désormais explicitement ce droit lorsqu’ils attribuent « tous les droits » à un administrateur.
+- Accès administrateur de recette : `demo@entreprise-test.fr` avec le mot de passe de démonstration déjà communiqué. Une déconnexion complète puis une reconnexion suffit pour sortir d’une session de borne éventuellement conservée dans le navigateur.
+
+---
+
 # LIVRAISON CODEX — 28 juillet 2026, pointage personnel et contrôle GPS
 
 - La page `/pointage` est désormais strictement personnelle : chaque collaborateur voit et enregistre uniquement ses propres arrivées, départs, oublis et historiques, y compris lorsqu’il possède des droits d’encadrement.

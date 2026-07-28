@@ -50,8 +50,8 @@ begin
     select id into v_poste from public.postes where entreprise_id=v_entreprise and nom=v_roles[v_i][1];
     if v_roles[v_i][2]='tous' then
       insert into public.permissions_poste(entreprise_id,poste_id,cle_permission,autorise)
-      select v_entreprise,v_poste,cle,true from public.permissions_disponibles
-      on conflict(entreprise_id,poste_id,cle_permission) do update set autorise=true;
+      select v_entreprise,v_poste,cle,cle <> 'mode_compte_depot' from public.permissions_disponibles
+      on conflict(entreprise_id,poste_id,cle_permission) do update set autorise=excluded.autorise;
     else
       insert into public.permissions_poste(entreprise_id,poste_id,cle_permission,autorise)
       select v_entreprise,v_poste,p.cle,p.cle=any(string_to_array(v_roles[v_i][2],','))

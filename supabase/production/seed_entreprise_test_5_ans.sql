@@ -129,10 +129,10 @@ begin
 
   if v_admin_poste is not null then
     insert into public.permissions_poste(entreprise_id,poste_id,cle_permission,autorise)
-    select v_entreprise,v_admin_poste,d.cle,true
+    select v_entreprise,v_admin_poste,d.cle,d.cle <> 'mode_compte_depot'
     from public.permissions_disponibles d
     on conflict(entreprise_id,poste_id,cle_permission)
-    do update set autorise = true;
+    do update set autorise = excluded.autorise;
   end if;
 
   -- Portefeuille de cinq années, sans toucher aux données déjà présentes.
