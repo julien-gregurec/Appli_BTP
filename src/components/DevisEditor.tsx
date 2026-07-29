@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { LIGNE_TYPES, UNITES, TAUX_TVA, euros, calcTotaux, type LigneDevis } from "@/lib/devis";
 import { prestationVersLigne, type PrestationCatalogue } from "@/lib/prestations";
@@ -8,6 +8,14 @@ import { creerDevisAction, modifierDevisAction, genererDevisIAAction } from "@/a
 import { creerPrestationDepuisLigneAction } from "@/app/actions/prestations";
 import { creerClientRapideAction } from "@/app/actions/clients";
 import { creerChantierRapideAction } from "@/app/actions/chantiers";
+import {
+  DEVIS_MEDIA_MIME_TYPES,
+  DEVIS_MEDIA_NOMBRE_MAX,
+  DEVIS_MEDIA_TAILLE_MAX,
+  estMimeMediaDevis,
+  resoudreMimeMediaDevis,
+} from "@/lib/devis-medias";
+import { createClient } from "@/lib/supabase/client";
 
 type Option = { id: string; label: string };
 type DevisInitial = {
@@ -77,6 +85,17 @@ export function DevisEditor({
   const [assistantIAOuvert, setAssistantIAOuvert] = useState(false);
   const [descriptionIA, setDescriptionIA] = useState("");
   const [erreurIA, setErreurIA] = useState<string | null>(null);
+  const [medias, setMedias] = useState<File[]>([]);
+  const [enregistrementVocal, setEnregistrementVocal] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const fluxAudioRef = useRef<MediaStream | null>(null);
+  const morceauxAudioRef = useRef<Blob[]>([]);
+
+  useEffect(() => () => {
+    const recorder = mediaRecorderRef.current;
+    if (recorder?.state === "recording") recorder.stop();
+    fluxAudioRef.current?.getTracks().forEach((track) => track.stop());
+  }, []);
 
   const chantiersFiltres = chantiersListe
     .filter((c) => c.client_id === clientId)
@@ -196,6 +215,116 @@ export function DevisEditor({
     });
   }
 
+  function ajouterMedias(fichiers: File[]) {
+    setErreur(null);
+    const valides: File[] = [];
+    for (const fichier of fichiers) {
+      const mime = resoudreMimeMediaDevis(fichier.name, fichier.type);
+      if (!estMimeMediaDevis(mime)) {
+        setErreur(`Le format de « ${fichier.name} » n’est pas pris en charge.`);
+        continue;
+      }
+      if (fichier.size > DEVIS_MEDIA_TAILLE_MAX) {
+        setErreur(`« ${fichier.name} » dépasse 20 Mo.`);
+        continue;
+      }
+      valides.push(new File([fichier], fichier.name, { type: mime }));
+    }
+    setMedias((actuels) => [...actuels, ...valides].slice(0, DEVIS_MEDIA_NOMBRE_MAX));
+  }
+
+  async function basculerEnregistrementVocal() {
+    if (enregistrementVocal) {
+      mediaRecorderRef.current?.stop();
+      return;
+    }
+    setErreur(null);
+    try {
+      const flux = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const type = MediaRecorder.isTypeSupported("audio/mp4") ? "audio/mp4" : "audio/webm";
+      const recorder = new MediaRecorder(flux, { mimeType: type });
+      morceauxAudioRef.current = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) morceauxAudioRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(morceauxAudioRef.current, { type });
+        const extension = type === "audio/mp4" ? "m4a" : "webm";
+        ajouterMedias([new File([blob], `explication-vocale-${Date.now()}.${extension}`, { type })]);
+        flux.getTracks().forEach((track) => track.stop());
+        fluxAudioRef.current = null;
+        mediaRecorderRef.current = null;
+        setEnregistrementVocal(false);
+      };
+      recorder.start();
+      fluxAudioRef.current = flux;
+      mediaRecorderRef.current = recorder;
+      setEnregistrementVocal(true);
+    } catch {
+      setErreur("Le microphone n’est pas accessible. Autorisez-le ou importez un fichier audio.");
+    }
+  }
+
+  async function televerserMedias(devisId: string) {
+    if (!medias.length) return null;
+    const supabase = createClient();
+    const prepares: Array<{
+      path: string;
+      nom: string;
+      mime: string;
+      type: "image" | "audio";
+      taille: number;
+    }> = [];
+    try {
+      for (const fichier of medias) {
+        const reponse = await fetch(`/api/devis/${devisId}/pieces-jointes/preparer`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ nom: fichier.name, mime: fichier.type, taille: fichier.size }),
+        });
+        const preparation = await reponse.json() as {
+          path?: string;
+          token?: string;
+          type?: "image" | "audio";
+          error?: string;
+        };
+        if (!reponse.ok || !preparation.path || !preparation.token || !preparation.type) {
+          throw new Error(preparation.error ?? "Préparation impossible");
+        }
+        const { error } = await supabase.storage
+          .from("devis-medias")
+          .uploadToSignedUrl(preparation.path, preparation.token, fichier, {
+            contentType: fichier.type,
+          });
+        if (error) throw error;
+        prepares.push({
+          path: preparation.path,
+          nom: fichier.name,
+          mime: fichier.type,
+          type: preparation.type,
+          taille: fichier.size,
+        });
+      }
+      const finalisation = await fetch(`/api/devis/${devisId}/pieces-jointes/finaliser`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ pieces: prepares }),
+      });
+      const resultat = await finalisation.json() as { error?: string };
+      if (!finalisation.ok) throw new Error(resultat.error ?? "Finalisation impossible");
+      return null;
+    } catch (error) {
+      if (prepares.length) {
+        await fetch(`/api/devis/${devisId}/pieces-jointes/preparer`, {
+          method: "DELETE",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ paths: prepares.map((piece) => piece.path) }),
+        });
+      }
+      return error instanceof Error ? error.message : "Les pièces jointes n’ont pas pu être ajoutées";
+    }
+  }
+
   function soumettre() {
     setErreur(null);
     if (!clientId) {
@@ -220,6 +349,11 @@ export function DevisEditor({
       if (res.error) {
         setErreur(res.error);
       } else if (res.id) {
+        const erreurMedia = await televerserMedias(res.id);
+        if (erreurMedia) {
+          setErreur(`Le devis est enregistré, mais ses pièces jointes ont échoué : ${erreurMedia}`);
+          return;
+        }
         router.push(`/devis/${res.id}`);
       }
     });
@@ -441,8 +575,54 @@ export function DevisEditor({
       </div>
 
       <div className="space-y-1">
-        <label className={label}>Conditions / notes visibles client</label>
+        <label className={label}>Explication écrite / conditions visibles par le client</label>
         <textarea rows={2} value={notesClient} onChange={(e) => setNotesClient(e.target.value)} className={input + " w-full"} />
+      </div>
+
+      <div className="space-y-3 rounded-md border border-dashed border-neutral-300 p-4 dark:border-neutral-700">
+        <div>
+          <p className={label}>Photos et explication vocale</p>
+          <p className="text-xs text-neutral-500">
+            Ajoutez jusqu’à six photos ou fichiers audio (20 Mo maximum chacun). Ils restent privés et liés au devis.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <label className="cursor-pointer rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900">
+            Ajouter des photos ou un audio
+            <input
+              type="file"
+              multiple
+              accept={DEVIS_MEDIA_MIME_TYPES.join(",")}
+              className="sr-only"
+              onChange={(event) => {
+                ajouterMedias(Array.from(event.target.files ?? []));
+                event.target.value = "";
+              }}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={basculerEnregistrementVocal}
+            className={`rounded-md px-3 py-2 text-sm font-medium text-white ${enregistrementVocal ? "bg-red-600" : "bg-liria-navy"}`}
+          >
+            {enregistrementVocal ? "Arrêter l’enregistrement" : "Enregistrer une explication vocale"}
+          </button>
+        </div>
+        {enregistrementVocal && (
+          <p className="text-sm font-medium text-red-600">● Enregistrement en cours…</p>
+        )}
+        {medias.length > 0 && (
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {medias.map((fichier, index) => (
+              <li key={`${fichier.name}-${index}`} className="flex items-center justify-between rounded-md bg-neutral-50 px-3 py-2 text-sm dark:bg-neutral-900">
+                <span className="min-w-0 truncate">{fichier.type.startsWith("image/") ? "Photo" : "Audio"} · {fichier.name}</span>
+                <button type="button" onClick={() => setMedias((liste) => liste.filter((_, i) => i !== index))} className="ml-2 text-red-600">
+                  Retirer
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div className="flex items-center justify-between rounded-md border border-neutral-200 p-4 dark:border-neutral-800">

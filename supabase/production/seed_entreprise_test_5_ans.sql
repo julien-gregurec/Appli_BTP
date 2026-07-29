@@ -187,9 +187,35 @@ begin
   delete from public.pointages where entreprise_id=v_entreprise and tache like '[RECETTE 5A]%';
   delete from public.affectations where entreprise_id=v_entreprise and tache like '[RECETTE 5A]%';
   delete from public.demandes_conges where entreprise_id=v_entreprise and commentaire like '[RECETTE 5A]%';
+  delete from public.ordres_virements
+  where entreprise_id=v_entreprise
+    and (
+      note_frais_id in (
+        select id from public.notes_frais
+        where entreprise_id=v_entreprise and description like '[RECETTE 5A]%'
+      )
+      or depense_fournisseur_id in (
+        select id from public.depenses_fournisseurs
+        where entreprise_id=v_entreprise and notes like '[RECETTE 5A]%'
+      )
+    );
   delete from public.notes_frais where entreprise_id=v_entreprise and description like '[RECETTE 5A]%';
   delete from public.depenses_fournisseurs where entreprise_id=v_entreprise and notes like '[RECETTE 5A]%';
   delete from public.commandes_fournisseurs where entreprise_id=v_entreprise and notes like '[RECETTE 5A]%';
+  delete from public.remises_banque_paiements rbp
+  using public.paiements p, public.factures f
+  where rbp.paiement_id = p.id
+    and p.facture_id = f.id
+    and f.entreprise_id = v_entreprise
+    and f.notes_internes like '[RECETTE 5A]%';
+  delete from public.situations_travaux
+  where entreprise_id = v_entreprise
+    and devis_id in (
+      select id
+      from public.devis
+      where entreprise_id = v_entreprise
+        and notes_internes like '[RECETTE 5A]%'
+    );
   delete from public.factures where entreprise_id=v_entreprise and notes_internes like '[RECETTE 5A]%';
   delete from public.devis where entreprise_id=v_entreprise and notes_internes like '[RECETTE 5A]%';
   delete from public.mouvements_stock where entreprise_id=v_entreprise and motif like '[RECETTE 5A]%';

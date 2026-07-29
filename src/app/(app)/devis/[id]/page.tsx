@@ -31,11 +31,15 @@ export default async function DevisDetailPage({ params, searchParams }: { params
 
   if (!devis) notFound();
 
-  const { data: lignes } = await supabase
-    .from("lignes_devis")
-    .select("*")
-    .eq("devis_id", id)
-    .order("ordre");
+  const [{ data: lignes }, { data: piecesJointes }] = await Promise.all([
+    supabase.from("lignes_devis").select("*").eq("devis_id", id).order("ordre"),
+    supabase
+      .from("pieces_jointes_devis")
+      .select("id,nom_original,type_media,mime_type,taille_octets,legende,created_at")
+      .eq("devis_id", id)
+      .eq("entreprise_id", ctx.entrepriseId)
+      .order("created_at"),
+  ]);
 
   const chantiersClient = peutGererDevis
     ? (await supabase.from("chantiers").select("id,nom,ville,statut").eq("entreprise_id", ctx.entrepriseId).eq("client_id", devis.client_id).not("statut", "in", "(archive,annule)").order("nom")).data ?? []
@@ -159,6 +163,41 @@ export default async function DevisDetailPage({ params, searchParams }: { params
             <div className="text-xs uppercase text-neutral-500">Notes client</div>
             <p className="mt-1 whitespace-pre-wrap">{devis.notes_client}</p>
           </div>
+        )}
+
+        {(piecesJointes?.length ?? 0) > 0 && (
+          <section className="space-y-3 rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
+            <div>
+              <h2 className="font-semibold">Photos et explications vocales</h2>
+              <p className="text-xs text-neutral-500">Fichiers privés associés à ce devis.</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {piecesJointes?.map((piece) => (
+                <article key={piece.id} className="overflow-hidden rounded-md border border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
+                  {piece.type_media === "image" ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={`/api/devis/pieces-jointes/${piece.id}`}
+                      alt={piece.legende || piece.nom_original}
+                      className="h-48 w-full object-cover"
+                    />
+                  ) : (
+                    <div className="p-3">
+                      <audio controls preload="metadata" className="w-full">
+                        <source src={`/api/devis/pieces-jointes/${piece.id}`} type={piece.mime_type} />
+                      </audio>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between gap-2 border-t border-neutral-200 px-3 py-2 text-xs dark:border-neutral-800">
+                    <span className="min-w-0 truncate">{piece.legende || piece.nom_original}</span>
+                    <a href={`/api/devis/pieces-jointes/${piece.id}?download=1`} className="shrink-0 font-medium text-blue-700 hover:underline dark:text-blue-300">
+                      Télécharger
+                    </a>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
         )}
 
         <SignatureDocumentMetier type="devis" documentId={id} />

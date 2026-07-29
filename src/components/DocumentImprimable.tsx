@@ -68,6 +68,7 @@ export function DocumentImprimable({
   notesClient,
   estFacture,
   signatures = [],
+  photos = [],
 }: {
   typeDoc: string;
   numero: string;
@@ -82,6 +83,7 @@ export function DocumentImprimable({
   notesClient?: string | null;
   estFacture: boolean;
   signatures?: SignatureImprimable[];
+  photos?: Array<{ id: string; nom: string; legende?: string | null }>;
 }) {
   const polices={arial:"Arial, Helvetica, sans-serif",georgia:"Georgia, 'Times New Roman', serif",trebuchet:"'Trebuchet MS', Arial, sans-serif",verdana:"Verdana, Geneva, sans-serif"};
   const police=polices[entreprise.police_documents??"arial"]??polices.arial;
@@ -205,6 +207,21 @@ export function DocumentImprimable({
         <div style={{ marginTop: "24px", padding: "12px", background: "#f9f9f9", borderRadius: "4px" }}>
           <div style={{ fontSize: "10px", textTransform: "uppercase", color: "#888" }}>Notes</div>
           <div style={{ whiteSpace: "pre-wrap" }}>{notesClient}</div>
+        </div>
+      )}
+
+      {photos.length > 0 && (
+        <div style={{ marginTop: "24px", breakInside: "avoid" }}>
+          <div style={{ marginBottom: "8px", fontSize: "10px", textTransform: "uppercase", color: "#777" }}>Photos jointes au devis</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px" }}>
+            {photos.map((photo) => (
+              <figure key={photo.id} style={{ margin: 0, border: "1px solid #ddd", padding: "6px", borderRadius: "4px" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`/api/devis/pieces-jointes/${photo.id}`} alt={photo.legende || photo.nom} style={{ width: "100%", height: "160px", objectFit: "cover" }} />
+                <figcaption style={{ marginTop: "4px", color: "#666", fontSize: "9px" }}>{photo.legende || photo.nom}</figcaption>
+              </figure>
+            ))}
+          </div>
         </div>
       )}
 

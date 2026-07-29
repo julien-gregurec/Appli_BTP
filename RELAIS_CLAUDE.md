@@ -27,6 +27,17 @@
 
 ---
 
+## REPRISE — 29 juillet 2026, devis photo/audio, pilotage mobile et données terrain
+
+- Migration `20260729000183_medias_devis.sql` appliquée : bucket privé `devis-medias`, table `pieces_jointes_devis`, RLS selon droits du devis et RPC de finalisation.
+- `DevisEditor` accepte une explication écrite, jusqu’à six photos/audios et un enregistrement vocal. La fiche devis les restitue ; les images sont intégrées au document imprimable.
+- Les abonnements ont été audités : l’offre limite les modules et le rôle limite ensuite les actions. Un abonnement ne contourne jamais les autorisations.
+- Trésorerie 90 jours et rentabilité sont désormais horizontales sur mobile, avec graphiques CA/coûts, couleurs de marge et colonnes stabilisées.
+- Le suivi GPS pendant un pointage utilise `watchPosition`, un échantillonnage selon la fréquence configurée, une reprise au retour au premier plan et Wake Lock si disponible. Une PWA ne garantit pas le suivi lorsque le système suspend ou ferme le navigateur.
+- Entreprise Test rechargée : 408 devis, 253 factures, 10 140 pointages, 300 notes de frais, 996 tâches, 35 conversations, 89 messages, 80 situations, 60 BL, 181 événements CRM, 120 comptes rendus et 61 DOE. Complément terrain : 240 sessions, 3 600 positions, 756 tâches issues des devis acceptés et huit prestations.
+- Scripts : `seed_entreprise_test_5_ans.sql`, `seed_entreprise_test_tous_onglets.sql`, `seed_entreprise_test_suivi_terrain.sql`.
+- Contrôles locaux : 104/104 tests, TypeScript et ESLint verts. Migration 183 présente sur le projet Supabase distant.
+
 # REPRISE — 18 juillet 2026, identifiants dépôt par entreprise (MIGRATION 105 APPLIQUÉE)
 
 - Les identifiants salariés de la borne dépôt utilisent désormais par défaut les trois premières lettres utiles du nom de l’entreprise suivies de quatre chiffres : `Liria Concept` → `LIR-0001`.

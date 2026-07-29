@@ -18,10 +18,11 @@ export default async function ImprimerDevisPage({ params }: { params: Promise<{ 
 
   if (!devis) notFound();
 
-  const [{ data: lignes }, { data: entreprise }, { data: signatures }] = await Promise.all([
+  const [{ data: lignes }, { data: entreprise }, { data: signatures }, { data: photos }] = await Promise.all([
     supabase.from("lignes_devis").select("*").eq("devis_id", id).order("ordre"),
     supabase.from("entreprises").select("*").eq("id", ctx.entrepriseId).single(),
     supabase.from("signatures_documents").select("id,employe_id,nom_signataire,fonction_signataire,signed_at,document_sha256").eq("entreprise_id", ctx.entrepriseId).eq("type_document", "devis").eq("document_id", id).order("signed_at"),
+    supabase.from("pieces_jointes_devis").select("id,nom_original,legende").eq("entreprise_id", ctx.entrepriseId).eq("devis_id", id).eq("type_media", "image").order("created_at"),
   ]);
 
   const client = Array.isArray(devis.client) ? devis.client[0] : devis.client;
@@ -57,6 +58,7 @@ export default async function ImprimerDevisPage({ params }: { params: Promise<{ 
         notesClient={devis.notes_client}
         estFacture={false}
         signatures={signatures ?? []}
+        photos={(photos ?? []).map((photo) => ({ id: photo.id, nom: photo.nom_original, legende: photo.legende }))}
       />
     </>
   );

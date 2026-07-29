@@ -55,4 +55,28 @@ describe("droits liés à l'offre", () => {
     expect(permissionIncluseDansOffre("acces_stock", "essentiel")).toBe(true);
     expect(permissionIncluseDansOffre("gerer_devis", "mini")).toBe(true);
   });
+
+  it("déverrouille les familles de modules palier par palier sans élargir les droits du rôle", () => {
+    const matrice = [
+      ["mini", true, false, false, false],
+      ["pro", true, true, false, false],
+      ["business", true, true, true, false],
+      ["entreprise", true, true, true, true],
+      ["sur_mesure", true, true, true, true],
+    ] as const;
+
+    for (const [offre, devis, achats, stock, banque] of matrice) {
+      expect(permissionIncluseDansOffre("acces_devis", offre)).toBe(devis);
+      expect(permissionIncluseDansOffre("acces_achats", offre)).toBe(achats);
+      expect(permissionIncluseDansOffre("acces_stock", offre)).toBe(stock);
+      expect(permissionIncluseDansOffre("acces_paiements_bancaires", offre)).toBe(banque);
+    }
+  });
+
+  it("laisse toujours accessibles les réglages nécessaires à l'administrateur", () => {
+    for (const offre of OFFRES_TARIFAIRES) {
+      expect(permissionIncluseDansOffre("acces_parametres", offre.cle)).toBe(true);
+      expect(permissionIncluseDansOffre("gerer_utilisateurs", offre.cle)).toBe(true);
+    }
+  });
 });

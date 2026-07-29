@@ -10,6 +10,19 @@
 
 ---
 
+## 183. Médias de devis, tableaux de pilotage et démonstration terrain — 29 juillet 2026
+
+- Un devis peut désormais contenir une explication écrite, jusqu’à six photos ou fichiers audio et un enregistrement vocal réalisé directement depuis le navigateur. Les médias sont conservés dans le bucket privé `devis-medias`, limités à 20 Mo par fichier et accessibles uniquement selon les droits du devis.
+- Les photos et audios sont visibles dans la fiche devis et les photos sont reprises dans l’impression/PDF. Les collaborateurs affectés au chantier conservent une lecture sans prix selon `voir_devis_chantier_sans_prix`.
+- Migration `20260729000183_medias_devis.sql` appliquée dans Supabase : table, bucket privé, RPC atomique et politiques RLS/storage présents.
+- Les offres déverrouillent bien les modules par abonnement, sans élargir les droits du rôle. Les états suspendu/annulé/essai expiré restent bloqués par le contexte entreprise et le proxy.
+- La trésorerie à 90 jours et la rentabilité chantier ont été rendues lisibles horizontalement sur mobile. La rentabilité ajoute une comparaison graphique CA/coûts et un tableau coloré à colonnes fixes.
+- Le suivi GPS d’une session pointée utilise une surveillance continue, enregistre au maximum un contrôle selon la fréquence configurée (30 minutes dans l’entreprise de démonstration), reprend au retour au premier plan et tente de conserver l’écran actif. Limite PWA explicite : iOS/Android peuvent suspendre le navigateur en arrière-plan ; une garantie absolue exige une application native avec autorisation de localisation en arrière-plan.
+- L’Entreprise Test a été rechargée avec cinq ans d’activité et les onglets complémentaires. Contrôles après seed : 408 devis, 253 factures, 10 140 pointages, 300 notes de frais, 996 tâches, 35 conversations, 89 messages, 80 situations, 60 bons de livraison, 181 événements CRM, 120 comptes rendus et 61 dossiers DOE.
+- Le complément terrain ajoute 240 sessions de suivi, 3 600 contrôles GPS, 756 tâches issues des lignes de devis acceptés et huit prestations catalogue. Les salariés affectés retrouvent ces tâches dans « Mes travaux », sans montant.
+- Scripts de reprise : `supabase/production/seed_entreprise_test_5_ans.sql`, `supabase/production/seed_entreprise_test_tous_onglets.sql` et `supabase/production/seed_entreprise_test_suivi_terrain.sql`.
+- Validation locale : 104 tests Vitest sur 104, TypeScript et ESLint verts. Les trois avertissements `<img>` historiques restent non bloquants.
+
 # LIVRAISON CODEX — 28 juillet 2026, photos et vidéos dans la messagerie
 
 - La messagerie accepte désormais jusqu’à **5 photos ou vidéos courtes par message**, avec une limite de **20 Mo par fichier**.
