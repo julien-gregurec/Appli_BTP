@@ -1,6 +1,6 @@
 # Phase 1 — Rapport final isolation multi-entreprises et RLS
 
-Date de clôture locale : 29 juillet 2026
+Date de clôture locale : 30 juillet 2026
 Branche : `release/commercialisation-v1`
 Périmètre : dépôt local et Supabase local uniquement. La production n’a été ni lue, ni modifiée.
 
@@ -18,12 +18,14 @@ Périmètre : dépôt local et Supabase local uniquement. La production n’a é
 | Tables `public` | 143 |
 | Tables avec RLS après correction | 143 / 143 |
 | Policies `public` | 426 |
+| Policies `public` par opération | `ALL` 62, `SELECT` 144, `INSERT` 82, `UPDATE` 74, `DELETE` 64 |
 | Fonctions/RPC `public` | 260 |
 | Fonctions `SECURITY DEFINER` | 228 |
 | Fonctions `SECURITY DEFINER` avec `search_path` explicite | 228 / 228 |
 | Fonctions métier `SECURITY DEFINER` exécutables par `anon` | 0 |
 | Événements de triggers recensés | 151 |
 | Policies Storage | 29 |
+| Policies Storage par opération | `ALL` 5, `SELECT` 9, `INSERT` 8, `UPDATE` 2, `DELETE` 5 |
 | Buckets Storage | 12 |
 | Routes API | 35 |
 | Modules Server Actions | 50 |
@@ -56,6 +58,15 @@ Les défauts suivants ont été démontrés par les tests avant correction :
 6. `TRUNCATE`, `TRIGGER` et `REFERENCES`, qui ne sont pas protégés par la RLS comme les opérations ligne à ligne, devaient être explicitement révoqués pour `anon` et `authenticated`.
 
 Les migrations 185 à 190 corrigent ces défauts sans modifier les migrations historiques et sans ouvrir d’accès à `anon`.
+
+### Preuve avant/après sur la migration 185
+
+Le test de surface original, non modifié pendant la comparaison, contient **8 contrôles** (et non 7 comme indiqué dans le cadrage initial). Il a été exécuté dans deux reconstructions locales isolées :
+
+- **avant 185**, sur le commit `d59d4c6` : échec immédiat attendu, car `public.compteurs_reference` n’avait pas la RLS active ;
+- **après 185 à 190**, sur la branche de release : **8/8 contrôles réussis**.
+
+Les huit contrôles portent sur la RLS du compteur, la révocation des privilèges DDL hors RLS, le `search_path` du bootstrap, l’absence de contrôle anonyme des documents et tarifs, l’absence de RPC métier `SECURITY DEFINER` anonyme, le `search_path` de tous les definers et l’exécution authentifiée des helpers RLS.
 
 ## 5. Fonctions `SECURITY DEFINER`
 
@@ -98,10 +109,22 @@ Les usages de la clé service-role dans les routes Stripe, rapprochement bancair
 | Chemin d’une autre entreprise | Refusé |
 | Document d’un autre salarié | Refusé sans permission |
 | Policies paie | Réécrites avec les fonctions tenant/permission |
+| URL signée de son entreprise | Autorisée |
+| URL signée d’une autre entreprise | Refusée |
+| URL signée expirée | Refusée après expiration |
+| Nouvelle URL après suspension du compte | Refusée |
+| URL émise avant suspension | Reste utilisable jusqu’à son expiration |
 
 `entreprise-assets` doit rester réservé aux logos et ressources de marque destinés à être publics. Aucun document métier ne doit y être importé.
 
-Les durées des URL signées utilisées par l’application sont bornées entre 60 et 900 secondes. Leur création est précédée d’une lecture tenant/RLS ou d’un contrôle serveur. L’expiration réelle d’un jeton dans deux sessions de navigateur n’a pas été simulée de bout en bout dans cette phase locale ; ce contrôle reste un test E2E de défense en profondeur, pas une vulnérabilité P0/P1 connue.
+Un test d’intégration local dédié exécute **87 assertions** sur les 11 buckets privés :
+
+- création d’une URL pour une ressource A ;
+- refus d’une URL, d’une liste, d’un remplacement et d’une suppression sur une ressource B ;
+- utilisation d’une URL sans session avant expiration puis refus après expiration ;
+- suspension du compte A, refus de toute nouvelle URL et vérification de la sémantique « jeton porteur » d’une URL déjà émise.
+
+Les durées des URL signées utilisées par l’application sont bornées entre 60 et 900 secondes. Une URL déjà signée ne peut pas être révoquée individuellement par Supabase Storage : elle reste valable jusqu’à son échéance. Cette limite est explicitement testée et impose de conserver des TTL courts pour les documents sensibles.
 
 ## 8. Rôles testés
 
@@ -140,6 +163,8 @@ L’audit statique couvre en plus les 143 tables, 260 fonctions/RPC, 151 événe
 - 88 assertions SQL supplémentaires, portant le total de 53 à 141 ;
 - 1 fichier Vitest ;
 - 2 assertions applicatives supplémentaires, portant le total de 104 à 106.
+- 1 script d’intégration Storage local ;
+- 87 assertions Storage supplémentaires sur tous les buckets privés.
 
 ### Tests positifs
 
@@ -191,6 +216,9 @@ Un test a volontairement échoué avant la migration 190 : l’administrateur pl
 | Build Next.js | Réussi, compilation et génération de 115 pages statiques |
 | `git diff --check` | Réussi |
 | Diff schéma `public,storage` | Aucun écart : `No schema changes found` |
+| Intégration Storage privé | 11 buckets privés, 87 assertions réussies |
+| `npm audit --omit=dev` | 1 avis `high` transitif dans `brace-expansion` via Sentry |
+| `npm audit` complet | 9 avis `high`, majoritairement chaîne ESLint ; correction automatique complète proposée avec rupture majeure |
 
 La différence entre « 185 migrations valides » et « migrations 1 à 190 » vient des numéros volontairement non contigus de l’historique ; aucun doublon ni ordre invalide n’a été détecté.
 
@@ -202,7 +230,9 @@ Les commits sont atomiques et locaux. Aucun n’a été poussé :
 2. `7a2a4c0` — `fix(db): renforcer isolation multitenant et fonctions` ;
 3. `87bf61c` — `fix(storage): isoler les documents de paie` ;
 4. `bede72e` — `fix(authz): proteger export comptable` ;
-5. documentation et inventaires — hash communiqué dans le compte rendu final.
+5. `5b3c25a` — `docs(security): documenter isolation et permissions` ;
+6. `f76205d` — `test(storage): verifier isolation des URL signees` ;
+7. mise à jour finale du présent rapport — hash communiqué dans le compte rendu final.
 
 Le hash du commit documentaire contenant ce rapport est communiqué dans le compte rendu final afin d’éviter une référence circulaire au hash de son propre contenu.
 
@@ -229,6 +259,7 @@ Le hash du commit documentaire contenant ce rapport est communiqué dans le comp
 - `supabase/tests/isolation_multitenant_comportement.test.sql`
 - `supabase/tests/isolation_multitenant_roles.test.sql`
 - `supabase/tests/isolation_multitenant_surface.test.sql`
+- `scripts/security/test-storage-signed-urls-local.mjs`
 
 ### Documentation et outillage
 
@@ -253,21 +284,26 @@ Le hash du commit documentaire contenant ce rapport est communiqué dans le comp
 - `npm run test`
 - `npm run build`
 - `npx supabase db diff --local --schema public,storage`
+- chargement de `supabase/tests/fixtures/isolation_multitenant.inc` dans Supabase local ;
+- `node scripts/security/test-storage-signed-urls-local.mjs` avec les clés locales ;
+- `npm audit --omit=dev`
+- `npm audit`
 - requêtes `psql` locales de comptage des tables, policies, fonctions, triggers, privilèges et buckets
 - `git diff --check`
 
 ## 16. Risques restant ouverts
 
-Aucune vulnérabilité P0 ou P1 connue ne reste ouverte dans le périmètre local audité.
+Aucune vulnérabilité P0 ou P1 d’isolation multi-entreprises ou d’autorisation n’est connue dans le périmètre local audité.
 
 Risques résiduels :
 
-1. **Moyen** — les URL signées et retraits d’adhésion doivent encore être testés dans deux sessions navigateur réelles avec attente d’expiration ;
-2. **Moyen** — les webhooks et fournisseurs externes utilisant le service-role nécessitent des tests d’intégration dédiés avec leurs signatures réelles ;
-3. **Moyen** — l’inventaire statique doit être régénéré à chaque nouvelle migration, route ou bucket ;
-4. **Faible** — le bucket public `entreprise-assets` doit rester strictement limité aux ressources de marque ;
-5. **Faible** — trois avertissements `<img>` de performance subsistent volontairement hors périmètre ;
-6. **Opérationnel** — les migrations 185 à 190 n’ont volontairement pas été appliquées en production. Leur déploiement devra suivre la procédure validée après revue.
+1. **Haute, dépendance** — `npm audit --omit=dev` signale `brace-expansion <= 5.0.7`, transitif via `@sentry/nextjs`. L’avis concerne un déni de service par expansion non bornée. Aucun chemin utilisateur Liria alimentant directement ce glob n’a été identifié, mais la dépendance doit être mise à niveau dans un commit séparé avec tests complets. Le correctif forcé proposé par npm touche aussi ESLint avec une rupture majeure et n’a donc pas été appliqué automatiquement dans cette phase.
+2. **Moyen** — une URL signée émise avant suspension reste utilisable jusqu’à son expiration ; ce comportement de jeton porteur est confirmé par le test local et doit être compensé par un TTL court.
+3. **Moyen** — les webhooks et fournisseurs externes utilisant le service-role nécessitent des tests d’intégration dédiés avec leurs signatures réelles ;
+4. **Moyen** — l’inventaire statique doit être régénéré à chaque nouvelle migration, route ou bucket ;
+5. **Faible** — le bucket public `entreprise-assets` doit rester strictement limité aux ressources de marque ;
+6. **Faible** — trois avertissements `<img>` de performance subsistent volontairement hors périmètre ;
+7. **Opérationnel** — les migrations 185 à 190 n’ont volontairement pas été appliquées en production. Leur déploiement devra suivre la procédure validée après revue.
 
 ## 17. Recalcul de l’avancement
 
@@ -290,6 +326,7 @@ La phase 1 est **terminée pour son périmètre local** :
 - les entreprises A et B restent isolées dans la matrice automatisée ;
 - les actions personnelles et données financières critiques sont testées ;
 - les documents Storage testés sont isolés ;
+- les 11 buckets privés passent 87 assertions d’isolation et d’expiration ;
 - l’administrateur plateforme n’accède plus par défaut au journal IA client ;
 - TypeScript, lint, Vitest, pgTAP, build, reset et diff de schéma sont verts ;
 - aucun P0/P1 connu ne reste ouvert dans ce périmètre.
