@@ -21,11 +21,10 @@ Ce dossier contient la refonte du manuel utilisateur de Liria Gestion Pro, const
 | `06-achats-fournisseurs-stock-materiel.md` | Chapitre 6 — Fournisseurs, commandes, stock et matériel | Rédigé |
 | `07-pilotage-rentabilite-tresorerie-exports.md` | Chapitre 7 — Pilotage, rentabilité, trésorerie et exports | Rédigé |
 | `08-assistant-ia-abonnement-parametres.md` | Chapitre 8 — Assistant IA, abonnement et paramètres | Rédigé |
-| `09-messagerie-notifications.md` | Chapitre 9 — Messagerie et notifications | À rédiger |
-| `10-fonctions-beta-limitees.md` | Fonctions en bêta, limitées ou en préparation | À rédiger |
-| `11-annexes.md` | Annexes (FAQ, glossaire, aide) | À rédiger |
+| `09-messagerie-notifications-aide.md` | Chapitre 9 — Messagerie, notifications et aide | Rédigé |
+| `10-annexes-faq-glossaire.md` | Chapitre 10 — Annexes : FAQ, glossaire et aide | Rédigé |
 
-*Les chapitres 3 à 8 regroupent plusieurs domaines proches (validé les 31 juillet 2026 : ventes complètes ; chantiers/planning/pointage ; équipe/RH/congés/notes de frais ; achats/fournisseurs/stock/matériel ; pilotage/rentabilité/trésorerie/exports ; assistant IA/abonnement/paramètres) plutôt que d'être éclatés en un fichier par module, pour limiter le nombre de fichiers à maintenir sur un périmètre cohérent. La numérotation ci-dessous a été ajustée en conséquence par rapport à la première version de ce tableau.*
+*Les chapitres 3 à 8 regroupent plusieurs domaines proches (validé les 31 juillet 2026 : ventes complètes ; chantiers/planning/pointage ; équipe/RH/congés/notes de frais ; achats/fournisseurs/stock/matériel ; pilotage/rentabilité/trésorerie/exports ; assistant IA/abonnement/paramètres) plutôt que d'être éclatés en un fichier par module, pour limiter le nombre de fichiers à maintenir sur un périmètre cohérent. Le chapitre 9 regroupe de la même façon messagerie et notifications ; le chapitre 10 regroupe FAQ, glossaire, aide et la liste des fonctions bêta/limitées dans une seule annexe, remplaçant les trois fichiers initialement prévus (9 à 11) par deux fichiers. La numérotation ci-dessous a été ajustée en conséquence par rapport à la première version de ce tableau.*
 
 ## Périmètre
 
