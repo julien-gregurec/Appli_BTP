@@ -17,22 +17,17 @@ Ce dossier contient la refonte du manuel utilisateur de Liria Gestion Pro, const
 | `02-prise-en-main.md` | Chapitre 2 — Prise en main (connexion, tableau de bord) | Rédigé |
 | `03-ventes-clients-devis-factures.md` | Chapitre 3 — Clients, devis, prestations et factures standard | Rédigé |
 | `04-chantiers-planning-pointage.md` | Chapitre 4 — Chantiers, planning et pointage (dont suivi de zone) | Rédigé |
-| `05-employes.md` | Chapitre 5 — Employés | À rédiger |
-| `06-conges.md` | Chapitre 6 — Congés | À rédiger |
-| `07-notes-de-frais.md` | Chapitre 7 — Notes de frais | À rédiger |
-| `08-fournisseurs.md` | Chapitre 8 — Fournisseurs | À rédiger |
-| `09-commandes-receptions.md` | Chapitre 9 — Commandes et réceptions | À rédiger |
-| `10-stock-inventaires.md` | Chapitre 10 — Stock et inventaires | À rédiger |
-| `11-outillage-flotte.md` | Chapitre 11 — Outillage et flotte | À rédiger |
-| `12-rentabilite-exports.md` | Chapitre 12 — Rentabilité et exports | À rédiger |
-| `13-messagerie-notifications.md` | Chapitre 13 — Messagerie et notifications | À rédiger |
-| `14-assistant-ia.md` | Chapitre 14 — Assistant IA (usages validés) | À rédiger |
-| `15-abonnement.md` | Chapitre 15 — Abonnement | À rédiger |
-| `16-parametres-permissions.md` | Chapitre 16 — Paramètres et permissions | À rédiger |
-| `17-fonctions-beta-limitees.md` | Fonctions en bêta, limitées ou en préparation | À rédiger |
-| `18-annexes.md` | Annexes (FAQ, glossaire, aide) | À rédiger |
+| `05-equipe-rh-conges-notes-de-frais.md` | Chapitre 5 — Employés, congés et notes de frais | Rédigé |
+| `06-achats-fournisseurs-stock-materiel.md` | Chapitre 6 — Fournisseurs, commandes, stock et matériel | Rédigé |
+| `07-rentabilite-exports.md` | Chapitre 7 — Rentabilité et exports | À rédiger |
+| `08-messagerie-notifications.md` | Chapitre 8 — Messagerie et notifications | À rédiger |
+| `09-assistant-ia.md` | Chapitre 9 — Assistant IA (usages validés) | À rédiger |
+| `10-abonnement.md` | Chapitre 10 — Abonnement | À rédiger |
+| `11-parametres-permissions.md` | Chapitre 11 — Paramètres et permissions | À rédiger |
+| `12-fonctions-beta-limitees.md` | Fonctions en bêta, limitées ou en préparation | À rédiger |
+| `13-annexes.md` | Annexes (FAQ, glossaire, aide) | À rédiger |
 
-*Les chapitres 3 et 4 regroupent plusieurs domaines proches (validé le 31 juillet 2026 : ventes complètes dans un seul chapitre, chantiers/planning/pointage dans un seul chapitre) plutôt que d'être éclatés en un fichier par module, pour limiter le nombre de fichiers à maintenir sur un périmètre cohérent. La numérotation ci-dessous a été ajustée en conséquence par rapport à la première version de ce tableau.*
+*Les chapitres 3 à 6 regroupent plusieurs domaines proches (validé les 31 juillet 2026 : ventes complètes ; chantiers/planning/pointage ; équipe/RH/congés/notes de frais ; achats/fournisseurs/stock/matériel) plutôt que d'être éclatés en un fichier par module, pour limiter le nombre de fichiers à maintenir sur un périmètre cohérent. La numérotation ci-dessous a été ajustée en conséquence par rapport à la première version de ce tableau.*
 
 ## Périmètre
 
@@ -47,7 +42,7 @@ Voir `PERIMETRE-V1.md` pour la liste précise des modules inclus en V1, des modu
 
 ## Ce que ce dossier ne contient pas encore
 
-- Les chapitres 5 à 18 (texte complet).
+- Les chapitres 7 à 13 (texte complet).
 - Les captures d'écran elles-mêmes (liste préparée dans `PLAN-CAPTURES.md`, aucune image encore réalisée).
 - Le PDF final.
 - Toute information sur les modules en bêta/limités présentés comme des procédures pas-à-pas — ils font l'objet d'un traitement à part, jamais d'un mode d'emploi détaillé tant qu'ils ne sont pas validés (voir `PERIMETRE-V1.md`).
