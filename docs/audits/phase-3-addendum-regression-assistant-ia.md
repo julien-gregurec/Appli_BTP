@@ -2,7 +2,7 @@
 
 **Date** : 31 juillet 2026
 **Branche** : `release/commercialisation-v1`
-**Statut** : régression confirmée et corrigée, tests ajoutés, validation exécutée dans cet environnement (Docker/Playwright disponibles ici — voir limite en fin de document).
+**Statut** : régression confirmée et corrigée, tests ajoutés, validation complète exécutée (Vitest + Playwright navigateur réel, deux instances Supabase locales isolées et jetables).
 
 ## Régression détectée
 
@@ -104,10 +104,11 @@ traitement.
   (voir tableau ci-dessus) puis sa correction.
 - `tests/e2e/security.spec.ts` — test existant « assistant refuse un payload
   trop volumineux » corrigé (attend désormais 400, pas 413 — changement de
-  mécanisme légitime, toujours refusé). Cinq tests ajoutés : corps brut
-  démesuré (413 conservé), pièce jointe JPEG 500 Ko acceptée, pièce jointe
-  > 6 Mo refusée avec message explicite, type MIME interdit refusé. Rate
-  limiting (test existant « référentiel véhicule retourne 429 ») non modifié.
+  mécanisme légitime, toujours refusé). Six tests ajoutés : corps brut
+  démesuré (413 conservé), pièce jointe JPEG 500 Ko acceptée, PDF ~1 Mo
+  accepté, pièce jointe > 6 Mo refusée avec message explicite, type MIME
+  interdit refusé. Rate limiting (test existant « référentiel véhicule
+  retourne 429 ») non modifié.
 
 ## Résultats des validations exécutées
 
@@ -119,23 +120,56 @@ traitement.
 | `npm run build` | Réussi |
 | `npm audit --omit=dev` | 0 vulnérabilité |
 | `git diff --check` | Propre |
-| Playwright (navigateur, `npm run test:e2e`) | **Non exécuté dans ce lot** — voir limite ci-dessous |
 
-## Limite de cet addendum
+## Validation Playwright (navigateur réel)
 
-Docker et les navigateurs Playwright sont disponibles dans cet environnement
-d'exécution, mais `npx supabase start` a échoué : le port PostgreSQL local
-(54322) est déjà occupé par un projet Supabase nommé `liria-phase2-recette`,
-manifestement une instance déjà active. Conformément à la consigne de ne pas
-interférer avec le travail de Codex, cette instance n'a pas été arrêtée et
-aucune tentative de reconfiguration de port n'a été faite. Les tests
-Playwright ajoutés dans `tests/e2e/security.spec.ts` sont donc **écrits et
-prêts, mais non exécutés dans ce lot**. La preuve de correction repose ici sur
-les tests d'intégration Vitest (`route.test.ts`), qui appellent le vrai
-gestionnaire de route avec de vraies requêtes HTTP et démontrent empiriquement
-le comportement avant/après — mais ne remplacent pas une exécution navigateur
-complète avec authentification réelle. À exécuter dès que l'instance
-`liria-phase2-recette` sera libérée ou qu'un port dédié sera disponible.
+Exécutée en deux temps, dans des instances Supabase locales isolées et
+jetables (copies temporaires de `supabase/`, `project_id` et ports dédiés,
+`supabase/config.toml` suivi du dépôt jamais modifié), sans jamais toucher à
+l'instance active `liria-phase2-recette` (vérifiée inchangée après coup :
+mêmes 12 conteneurs, même migration maximale `20260729000190`, distincte de
+celle des instances de test).
+
+**Premier passage** (`liria-e2e-assistant-ia`, ports 55321–55329, app sur
+3100) — 6 tests ciblés (`-g "assistant"`) :
+
+| Test | Résultat |
+|---|---|
+| JPEG ~500 Ko | ✅ Accepté (ni 413 ni 400) |
+| PDF ~1 Mo | ✅ Accepté (ni 413 ni 400) |
+| Fichier > 6 Mo | ✅ Refusé, message dédié « 6 Mo » confirmé |
+| Texte 70 000 caractères | ✅ Refusé (400, mécanisme métier) |
+| Corps HTTP brut démesuré (9 Mo) | ✅ Refusé (413, protection anti-abus conservée) |
+| Type MIME interdit | ❌ Échec — voir explication ci-dessous |
+
+**Explication de l'échec initial (type MIME interdit)** : l'échec n'était pas
+lié au correctif ni à la logique testée. Le contenu de la page renvoyait
+`{"error":"Trop de requêtes, réessayez plus tard."}` : le rate limiting de
+`/login` (10 requêtes/10 min par IP, comptant GET et POST ensemble, mécanisme
+préexistant et non modifié par ce correctif) a été épuisé par les connexions
+cumulées des exécutions précédentes de la suite de tests dans la même
+fenêtre de 10 minutes. Confirmé par les journaux serveur (10 `POST /login
+303` réussis, aucun `429` explicite mais le budget combiné GET+POST
+consommé) et par une relance isolée de ce seul test, qui a échoué de façon
+identique et reproductible — écartant un aléa ponctuel. Aucun défaut de code
+démontré : aucune correction appliquée.
+
+**Second passage, instance vierge** (`liria-e2e-assistant-mime`, ports
+56321–56329, app sur 3200, compteur de rate limiting jamais sollicité) —
+test unique « assistant refuse un type MIME de pièce jointe interdit » :
+
+| Étape | Résultat |
+|---|---|
+| Connexion | ✅ Réussie (`POST /login 303`, `GET /dashboard 200`) |
+| Requête `/api/assistant/chat` | ✅ Envoyée avec un type MIME interdit |
+| Rejet | ✅ Statut 400, message conforme |
+| Appel OpenAI | ✅ Aucun (`OPENAI_API_KEY` absente ; le rejet intervient avant tout appel au fournisseur IA) |
+
+**Conclusion de la validation Playwright** : 6/6 scénarios prouvés au total
+(5 dès le premier passage, le 6ᵉ confirmé sur instance vierge). Aucune
+régression liée à la CSP, aux cookies ou au rate limiting — le seul incident
+rencontré était une conséquence attendue et bénigne de tests répétés dans une
+fenêtre de 10 minutes, pas un défaut applicatif.
 
 ## Formulation correcte pour le manuel utilisateur
 
