@@ -1,6 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
+// La CSP à nonce exige un rendu par requête pour que Next transmette le nonce
+// aux scripts générés. Cette décision privilégie la sécurité au cache statique.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Liria Gestion Pro V3",
   description: "Liria Gestion Pro V3 — Gestion quotidienne des entreprises du BTP",

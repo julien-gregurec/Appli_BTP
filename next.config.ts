@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 import { execFileSync } from "node:child_process";
 import packageJson from "./package.json";
+import { headersSecurite } from "./src/lib/security/headers";
 
 function gitCommitCourant() {
   if (process.env.VERCEL_GIT_COMMIT_SHA) return process.env.VERCEL_GIT_COMMIT_SHA;
@@ -45,6 +46,10 @@ const FICHIERS_EXCELJS = [
 ];
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
+  async headers() {
+    return [{ source: "/:path*", headers: headersSecurite(process.env.NODE_ENV === "production") }];
+  },
   env: {
     LIRIA_APP_VERSION: packageJson.version,
     LIRIA_BUILD_COMMIT: gitCommitCourant(),
@@ -62,7 +67,7 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     serverActions: {
-      bodySizeLimit: "15mb",
+      bodySizeLimit: "2mb",
     },
   },
 };
