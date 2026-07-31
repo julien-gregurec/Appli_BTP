@@ -5,6 +5,7 @@ import { GESTION_PERMISSION_PAR_CHEMIN, MODULE_PERMISSION_PAR_CHEMIN, PERMISSION
 import { permissionIncluseDansOffre } from "@/lib/tarification";
 import { appliquerRateLimit, politiquesRateLimitPour } from "@/lib/security/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { optionsCookieAuth } from "@/lib/security/cookies";
 
 const PUBLIC_PATHS = ["/login", "/signup", "/tarifs", "/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/confidentialite", "/cookies", "/auth", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu", "/guides", "/videos", "/paiement", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements", "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import"];
 
@@ -48,7 +49,7 @@ export async function updateSession(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
           response = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options),
+            response.cookies.set(name, value, { ...options, ...optionsCookieAuth() }),
           );
         },
       },

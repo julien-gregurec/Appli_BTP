@@ -31,7 +31,10 @@ export async function POST(request: Request) {
 
   if (commandeId && ["checkout.session.completed", "checkout.session.async_payment_succeeded"].includes(evenement.type) && objet.payment_status !== "unpaid") {
     const { error } = await admin.rpc("boutique_finaliser_commande_payee", { p_commande_id: commandeId, p_checkout_id: objet.id });
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      console.error("Échec de synchronisation du webhook boutique", error);
+      return NextResponse.json({ error: "Synchronisation impossible" }, { status: 500 });
+    }
   }
   if (commandeId && evenement.type === "checkout.session.expired") {
     await admin.from("boutique_commandes").update({ statut: "expiree", updated_at: new Date().toISOString() })

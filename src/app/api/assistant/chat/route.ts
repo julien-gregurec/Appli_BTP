@@ -4,10 +4,45 @@ import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { demanderAssistantIAStream, type MessageChat } from "@/lib/ai/assistant";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
 import { MIME_ANALYSABLES_IA } from "@/lib/ai/documents";
+import { erreurPublique, verifierTailleRequete } from "@/lib/security/validation";
 
 const TAILLE_MAX_PIECE_JOINTE_BASE64 = 8_000_000; // ~6 Mo de fichier une fois décodé
+const TAILLE_MAX_REQUETE = 64 * 1024;
+
+async function lireJsonBorne(request: Request) {
+  if (!verifierTailleRequete(request.headers, TAILLE_MAX_REQUETE)) return { tropVolumineux: true as const };
+  const lecteur = request.body?.getReader();
+  if (!lecteur) return { valeur: null, tropVolumineux: false as const };
+  const morceaux: Uint8Array[] = [];
+  let taille = 0;
+  while (true) {
+    const { done, value } = await lecteur.read();
+    if (done) break;
+    taille += value.byteLength;
+    if (taille > TAILLE_MAX_REQUETE) {
+      await lecteur.cancel();
+      return { tropVolumineux: true as const };
+    }
+    morceaux.push(value);
+  }
+  const corps = new Uint8Array(taille);
+  let position = 0;
+  for (const morceau of morceaux) {
+    corps.set(morceau, position);
+    position += morceau.byteLength;
+  }
+  try {
+    return { valeur: JSON.parse(new TextDecoder().decode(corps)), tropVolumineux: false as const };
+  } catch {
+    return { valeur: null, tropVolumineux: false as const };
+  }
+}
 
 export async function POST(request: Request) {
+  const corps = await lireJsonBorne(request);
+  if (corps.tropVolumineux) {
+    return Response.json({ error: "Requête trop volumineuse." }, { status: 413 });
+  }
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const permissions = await permissionsUtilisateur(ctx);
@@ -16,7 +51,7 @@ export async function POST(request: Request) {
   }
   const peutGererPlanning = permissions === null || permissions.includes("gerer_planning");
 
-  const body = (await request.json().catch(() => null)) as { historique?: MessageChat[] } | null;
+  const body = corps.valeur as { historique?: MessageChat[] } | null;
   const historique = body?.historique;
   const dernierMessage = historique?.at(-1);
   if (!Array.isArray(historique) || !dernierMessage || dernierMessage.role !== "user" || !dernierMessage.contenu.trim()) {
@@ -50,9 +85,9 @@ export async function POST(request: Request) {
         envoyer({ type: "fin" });
         journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "assistant_chat", statut: "succes" });
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Erreur de l'assistant IA.";
-        envoyer({ type: "erreur", message });
-        journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "assistant_chat", statut: "erreur", messageErreur: message });
+        const messageInterne = err instanceof Error ? err.message : "Erreur de l'assistant IA.";
+        envoyer({ type: "erreur", message: erreurPublique(err, "L'assistant est temporairement indisponible.") });
+        journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "assistant_chat", statut: "erreur", messageErreur: messageInterne });
       } finally {
         controller.close();
       }

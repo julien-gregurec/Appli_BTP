@@ -69,7 +69,10 @@ export async function GET(request: Request) {
   if (request.headers.get("authorization") !== `Bearer ${secret}`) return NextResponse.json({ error: "Accès refusé" }, { status: 401 });
   const admin = createAdminClient();
   const { data: entreprises, error } = await admin.from("entreprises").select("id").not("stripe_subscription_id", "is", null).in("abonnement_statut", ["essai", "actif"]);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("Échec du traitement périodique des abonnements", error);
+    return NextResponse.json({ error: "Traitement impossible" }, { status: 500 });
+  }
   const resultats: Array<{ entrepriseId: string; synchronise: boolean; raison?: string }> = [];
   for (const entreprise of entreprises ?? []) {
     try {

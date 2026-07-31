@@ -18,7 +18,7 @@ export async function GET() {
   });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 403 });
+    return NextResponse.json({ error: "Export non autorisé" }, { status: 403 });
   }
 
   const horodatage = new Date().toISOString().slice(0, 10);
