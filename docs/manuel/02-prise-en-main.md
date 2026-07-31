@@ -4,7 +4,7 @@
 
 ### Objectif
 
-Permettre à un nouvel utilisateur de se connecter à Liria Gestion Pro et de comprendre les premiers éléments du tableau de bord.
+Permettre à un nouvel utilisateur de se connecter à l'application et de comprendre les premiers éléments du tableau de bord.
 
 ### Personnes concernées
 
@@ -31,6 +31,7 @@ L'utilisateur accède au tableau de bord de son entreprise, avec les modules et 
 
 - Identifiants incorrects : message d'erreur affiché directement sur `/login`, pas de procédure de contournement à documenter.
 - Compte non encore activé ou en attente de validation : redirection possible vers un écran d'attente (`/en-attente`) — comportement exact non vérifié en exécution réelle dans ce lot, à confirmer avant publication.
+- Trop de tentatives de connexion en peu de temps : après plusieurs essais rapprochés, l'application peut temporairement refuser les nouvelles tentatives. Message à afficher à l'utilisateur : *« Trop de tentatives ont été effectuées en peu de temps. Patientez quelques minutes avant de réessayer. »* Ne pas conseiller à l'utilisateur de multiplier les essais, et ne pas détailler de mécanisme technique dans le texte qui lui est destiné.
 
 ### Limites connues
 
@@ -38,7 +39,7 @@ Le contenu exact du tableau de bord (widgets affichés, indicateurs) varie selon
 
 ### Source de validation
 
-Inventaire statique (`docs/developpement/inventaire-fonctionnalites.md`) et lecture ciblée de `src/app/login/page.tsx`. Le comportement de l'écran `/en-attente` n'a pas été lu en détail dans ce lot — vérification manuelle requise avant publication.
+Inventaire statique (`docs/developpement/inventaire-fonctionnalites.md`) et lecture ciblée de `src/app/login/page.tsx`. La limite de connexion (10 tentatives/10 minutes) est confirmée par lecture directe de `release/commercialisation-v1` (`src/lib/security/rate-limit.ts`), comparaison documentée le 31 juillet 2026. Le comportement de l'écran `/en-attente` reste non lu en détail — vérification manuelle requise avant publication.
 
 ### Date de vérification
 
@@ -50,4 +51,4 @@ Inventaire statique (`docs/developpement/inventaire-fonctionnalites.md`) et lect
 
 ### Statut de validation
 
-Rédigé, non vérifié en exécution réelle. Le point sur `/en-attente` nécessite une vérification manuelle avant publication.
+Rédigé, non vérifié en exécution réelle. Point sur la limite de connexion : confirmé par la branche de commercialisation. Point sur `/en-attente` : validation manuelle encore requise.

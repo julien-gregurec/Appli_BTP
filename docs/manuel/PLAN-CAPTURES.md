@@ -22,6 +22,16 @@ Aucune capture ne doit être réalisée sur un compte client réel, en aucune ci
 - **Aucun secret** — pas de clé API, token, URL signée en clair, panneau développeur ouvert.
 - **Aucun montant commercial non validé** — en particulier, ne jamais capturer de prix pour l'Option IA tant qu'ils ne sont pas fixés (voir `PERIMETRE-V1.md`).
 
+## Mise en garde — protections anti-abus (rate limiting)
+
+La branche de commercialisation (`release/commercialisation-v1`) applique des limites de fréquence sur plusieurs routes, confirmées par lecture directe de `src/lib/security/rate-limit.ts` le 31 juillet 2026. À respecter pendant toute campagne de captures, même en environnement de démonstration :
+
+- **Ne pas automatiser ni répéter trop rapidement les connexions** à `/login` (limite observée : 10 tentatives / 10 minutes par origine).
+- **Espacer les appels à l'assistant IA** plutôt que de les enchaîner en rafale.
+- **Éviter les séries rapides d'exports et de téléversements** (notes de frais, documents, imports).
+- **En cas de réponse HTTP 429**, attendre le délai indiqué (`Retry-After`) avant de reprendre la capture — ne pas relancer immédiatement.
+- **Ne jamais chercher à contourner cette protection** (rotation d'adresse IP, scripts d'automatisation agressifs, etc.) pour accélérer la campagne de captures.
+
 ## Format des captures
 
 - Une passe **ordinateur** (résolution desktop standard) et une passe **mobile** (format smartphone) par module inclus en V1.

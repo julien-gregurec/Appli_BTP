@@ -59,6 +59,10 @@ Ces modules seront regroupés dans une section unique du manuel intitulée **« 
 - CGU / CGV / confidentialité / cookies / mentions légales (pages légales autonomes, pas du contenu de manuel)
 - `docs/audits/*` (travail de sécurité Codex sur `release/commercialisation-v1`, non consulté et non recopié)
 
+## Note transversale — protections anti-abus
+
+La branche de commercialisation (`release/commercialisation-v1`) intègre des protections contre les abus et les appels excessifs (limites de fréquence sur certaines routes, dont la connexion). Ceci ne change aucun statut de module dans la matrice ci-dessus ; à prendre en compte uniquement pour la rédaction des chapitres concernés (voir `02-prise-en-main.md`) et lors des campagnes de captures (voir `PLAN-CAPTURES.md`).
+
 ## Rappel méthodologique
 
 Aucun élément de cette matrice n'affirme qu'une fonction listée « Inclus V1 » a été testée en exécution réelle. Le statut « Inclus V1 » signifie uniquement : dans le périmètre commercial défini par Julien Gregurec, à documenter en priorité. Chaque chapitre correspondant doit préciser sa propre source de validation (voir `MODELE-CHAPITRE.md`).
