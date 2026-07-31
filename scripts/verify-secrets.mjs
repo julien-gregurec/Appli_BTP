@@ -14,6 +14,10 @@ const signatures = [
   { nom: "clé OpenAI", motif: /\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b/ },
   { nom: "jeton GitHub", motif: /\bgh[opusr]_[A-Za-z0-9]{30,}\b/ },
   { nom: "JWT Supabase", motif: /\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\b/ },
+  {
+    nom: "secret déclaré NEXT_PUBLIC",
+    motif: /\bNEXT_PUBLIC_(?:[A-Z0-9_]*(?:SECRET|PRIVATE|SERVICE_ROLE)[A-Z0-9_]*|OPENAI_API_KEY|STRIPE_SECRET_KEY)\s*=/,
+  },
 ];
 
 const alertes = [];
