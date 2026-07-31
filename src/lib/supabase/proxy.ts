@@ -3,11 +3,34 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { GESTION_PERMISSION_PAR_CHEMIN, MODULE_PERMISSION_PAR_CHEMIN, PERMISSIONS_ACCES_ALTERNATIVES, PERMISSIONS_MUTATION_ALTERNATIVES } from "@/lib/module-permissions";
 import { permissionIncluseDansOffre } from "@/lib/tarification";
+import { appliquerRateLimit, politiquesRateLimitPour } from "@/lib/security/rate-limit";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const PUBLIC_PATHS = ["/login", "/signup", "/tarifs", "/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/confidentialite", "/cookies", "/auth", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu", "/guides", "/videos", "/paiement", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements", "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
+
+  const verifierLimite = async (authentifie: boolean, contexte: { utilisateurId?: string | null; entrepriseId?: string | null } = {}) => {
+    const politiques = politiquesRateLimitPour(request.nextUrl.pathname, request.method, authentifie);
+    if (!politiques.length) return null;
+    try {
+      const resultat = await appliquerRateLimit(request, createAdminClient(), politiques, contexte);
+      if (resultat.autorise) return null;
+      return NextResponse.json(
+        { error: resultat.statut === 429 ? "Trop de requêtes, réessayez plus tard." : "Protection anti-abus indisponible." },
+        { status: resultat.statut, headers: { "Retry-After": String(resultat.reessayerApres), "Cache-Control": "private, no-store" } },
+      );
+    } catch {
+      return NextResponse.json(
+        { error: "Protection anti-abus indisponible." },
+        { status: 503, headers: { "Retry-After": "60", "Cache-Control": "private, no-store" } },
+      );
+    }
+  };
+
+  const limitePublique = await verifierLimite(false);
+  if (limitePublique) return limitePublique;
 
   if (isEmailLoginDisabled()) {
     return response;
@@ -86,6 +109,12 @@ export async function updateSession(request: NextRequest) {
     compte_depot?: boolean; entreprise_id?: string | null;
     acces_support?: boolean; droit_acces?: boolean; droit_gestion?: boolean;
   };
+
+  const limiteAuthentifiee = await verifierLimite(true, {
+    utilisateurId: user.id,
+    entrepriseId: ctx.entreprise_id,
+  });
+  if (limiteAuthentifiee) return limiteAuthentifiee;
 
   {
     const compteDepot = ctx.compte_depot === true;
