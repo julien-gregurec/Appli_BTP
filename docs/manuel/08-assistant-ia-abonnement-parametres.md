@@ -26,7 +26,7 @@ Permettre d'utiliser l'assistant IA dans ses usages validés avec un regard crit
 **A. Assistant IA**
 1. Ouvrir l'assistant IA depuis l'écran où il est proposé (il est intégré à plusieurs endroits de l'application : devis, documents, rentabilité, messagerie, dictée vocale — pas dans un module unique séparé).
 2. Saisir sa demande en langage naturel.
-3. Un fichier peut être joint dans certains contextes (document, photo) pour que l'assistant l'analyse.
+3. Vous pouvez joindre une photo ou un document PDF jusqu'à 6 Mo à votre demande. Formats acceptés : JPEG, PNG, GIF, WebP, PDF.
 4. L'assistant répond ou propose une action ; **toute action ayant un effet réel sur les données (créer, modifier, envoyer) doit être validée explicitement par l'utilisateur** — l'assistant ne doit jamais agir seul sur les données métier sans confirmation humaine.
 5. L'usage de l'assistant est soumis à une limite quotidienne d'appels par entreprise, propre à l'offre souscrite (voir « Limites connues »).
 
@@ -93,4 +93,6 @@ Inventaire statique (`docs/developpement/inventaire-fonctionnalites.md`) et lect
 
 ### Statut de validation
 
-Rédigé, vérifié par inventaire statique et lecture ciblée du code. Validation manuelle encore requise, en particulier pour : le comportement réel des quotas IA et de l'affichage d'un blocage 429 côté utilisateur, le statut réel de la configuration Stripe en production, les prix et offres définitifs, le comportement exact en cas d'impayé, les permissions précises de chaque paramètre sensible. Point à vérifier en priorité : la limite de taille de requête ajoutée sur `release/commercialisation-v1` (64 Ko) semble nettement inférieure à la limite de pièce jointe déjà en place sur `main` (jusqu'à 8 Mo encodés) — cette apparente incohérence doit être clarifiée avant de documenter précisément les pièces jointes à l'assistant IA sur la branche de commercialisation.
+Rédigé, vérifié par inventaire statique et lecture ciblée du code. Validation manuelle encore requise, en particulier pour : le statut réel de la configuration Stripe en production, les prix et offres définitifs, le comportement exact en cas d'impayé, les permissions précises de chaque paramètre sensible.
+
+**Pièces jointes de l'assistant IA — vérifiées et validées** sur `release/commercialisation-v1` : la formulation et les formats acceptés documentés ci-dessus sont confirmés par tests unitaires (`src/lib/ai/validation.test.ts`), tests d'intégration (`src/app/api/assistant/chat/route.test.ts`) et tests Playwright en navigateur réel (`tests/e2e/security.spec.ts`, exécutés en environnement isolé). Le point précédemment signalé (incohérence entre le plafond générique de requête et la limite de pièce jointe) est résolu — voir `docs/audits/phase-3-addendum-regression-assistant-ia.md`.
