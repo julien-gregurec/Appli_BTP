@@ -67,6 +67,19 @@ test("assistant accepte une pièce jointe JPEG réaliste de 500 Ko", async ({ pa
   expect(response.status()).not.toBe(400);
 });
 
+test("assistant accepte un PDF réaliste d'environ 1 Mo", async ({ page }) => {
+  await login(page, USERS.adminA);
+  const base64 = Buffer.alloc(1024 * 1024, 1).toString("base64");
+  const response = await page.request.post("/api/assistant/chat", {
+    headers: { "Content-Type": "application/json" },
+    data: { historique: [{ role: "user", contenu: "Relis ce devis", fichier: { mimeType: "application/pdf", base64 } }] },
+    maxRedirects: 0,
+    timeout: 30_000,
+  });
+  expect(response.status()).not.toBe(413);
+  expect(response.status()).not.toBe(400);
+});
+
 test("assistant refuse une pièce jointe supérieure à 6 Mo", async ({ page }) => {
   await login(page, USERS.adminA);
   const base64 = Buffer.alloc(6_050_000, 1).toString("base64");
