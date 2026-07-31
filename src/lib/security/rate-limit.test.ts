@@ -25,10 +25,22 @@ describe("politiques de rate limiting", () => {
   });
 
   it("applique un plafond par défaut à toute API authentifiée", () => {
-    expect(politiquesRateLimitPour("/api/documents/123", "GET", true)[0]).toMatchObject({
+    expect(politiquesRateLimitPour("/api/identification/123/qr", "GET", true)[0]).toMatchObject({
       cle: "api:authenticated",
       maximum: 120,
       portee: "utilisateur",
+    });
+  });
+
+  it("protège les intégrations publiques et téléchargements signés", () => {
+    expect(politiquesRateLimitPour("/api/paie/import", "POST", false)[0]).toMatchObject({
+      cle: "api:payroll-import",
+      portee: "ip",
+    });
+    expect(politiquesRateLimitPour("/api/cron/notifications-push", "POST", false)[0]?.maximum).toBe(60);
+    expect(politiquesRateLimitPour("/api/documents/123", "GET", true)[0]).toMatchObject({
+      cle: "api:signed-downloads",
+      maximum: 60,
     });
   });
 });

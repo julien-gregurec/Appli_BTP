@@ -33,6 +33,9 @@ export function politiquesRateLimitPour(chemin: string, methode: string, authent
     if (chemin === "/nouveau-mot-de-passe") return [{ cle: "auth:new-password", maximum: 5, fenetreSecondes: 3600, portee: "ip" }];
   }
   if (chemin.startsWith("/auth/")) return [{ cle: "auth:callback", maximum: 30, fenetreSecondes: 600, portee: "ip" }];
+  if (chemin.startsWith("/api/cron/")) return [{ cle: "api:cron", maximum: 60, fenetreSecondes: 60, portee: "ip" }];
+  if (chemin === "/api/paie/import") return [{ cle: "api:payroll-import", maximum: 30, fenetreSecondes: 300, portee: "ip" }];
+  if (chemin.startsWith("/api/paiements-bancaires/powens/")) return [{ cle: "api:powens-callback", maximum: 60, fenetreSecondes: 60, portee: "ip" }];
   if (!authentifie && !(chemin.startsWith("/api/stripe/") || chemin.startsWith("/api/webhooks/"))) return [];
   if (chemin === "/api/referentiels/vehicules") return [{ cle: "reference:vehicles", maximum: 10, fenetreSecondes: 60, portee: authentifie ? "utilisateur" : "ip" }];
   if (chemin === "/api/assistant/chat") return [
@@ -41,6 +44,10 @@ export function politiquesRateLimitPour(chemin: string, methode: string, authent
   ];
   if (chemin.startsWith("/api/exports/")) return [{ cle: "api:exports", maximum: 10, fenetreSecondes: 60, portee: "utilisateur" }];
   if (chemin.includes("/upload")) return [{ cle: "api:uploads", maximum: 20, fenetreSecondes: 300, portee: "utilisateur" }];
+  if (/\/(?:documents|pieces-jointes|photo|signature|carte-btp)(?:\/|$)/.test(chemin)) {
+    return [{ cle: "api:signed-downloads", maximum: 60, fenetreSecondes: 60, portee: "utilisateur" }];
+  }
+  if (chemin.startsWith("/imprimer/")) return [{ cle: "pages:print", maximum: 30, fenetreSecondes: 60, portee: "utilisateur" }];
   if (chemin.startsWith("/api/stripe/") || chemin.startsWith("/api/webhooks/")) {
     return [{ cle: "api:webhooks", maximum: 300, fenetreSecondes: 60, portee: "ip" }];
   }
