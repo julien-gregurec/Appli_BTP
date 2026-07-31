@@ -3,14 +3,14 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { demanderAssistantIAStream, type MessageChat } from "@/lib/ai/assistant";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
-import { MIME_ANALYSABLES_IA } from "@/lib/ai/documents";
+import { TAILLE_MAX_CORPS_ASSISTANT, validerRequeteAssistant } from "@/lib/ai/validation";
 import { erreurPublique, verifierTailleRequete } from "@/lib/security/validation";
 
-const TAILLE_MAX_PIECE_JOINTE_BASE64 = 8_000_000; // ~6 Mo de fichier une fois décodé
-const TAILLE_MAX_REQUETE = 64 * 1024;
-
+// Plafond dedie a cette route : ne pas reutiliser un plafond generique de petite route
+// JSON, la piece jointe encodee en base64 (jusqu'a 6 Mo reels) ne rentrerait pas dedans.
+// Voir src/lib/ai/validation.ts pour le detail du calcul.
 async function lireJsonBorne(request: Request) {
-  if (!verifierTailleRequete(request.headers, TAILLE_MAX_REQUETE)) return { tropVolumineux: true as const };
+  if (!verifierTailleRequete(request.headers, TAILLE_MAX_CORPS_ASSISTANT)) return { tropVolumineux: true as const };
   const lecteur = request.body?.getReader();
   if (!lecteur) return { valeur: null, tropVolumineux: false as const };
   const morceaux: Uint8Array[] = [];
@@ -19,7 +19,7 @@ async function lireJsonBorne(request: Request) {
     const { done, value } = await lecteur.read();
     if (done) break;
     taille += value.byteLength;
-    if (taille > TAILLE_MAX_REQUETE) {
+    if (taille > TAILLE_MAX_CORPS_ASSISTANT) {
       await lecteur.cancel();
       return { tropVolumineux: true as const };
     }
@@ -53,21 +53,12 @@ export async function POST(request: Request) {
 
   const body = corps.valeur as { historique?: MessageChat[] } | null;
   const historique = body?.historique;
-  const dernierMessage = historique?.at(-1);
-  if (!Array.isArray(historique) || !dernierMessage || dernierMessage.role !== "user" || !dernierMessage.contenu.trim()) {
-    return Response.json({ error: "Écris une question." }, { status: 400 });
+  const validation = validerRequeteAssistant(historique);
+  if (!validation.ok) {
+    return Response.json({ error: validation.message }, { status: validation.statut });
   }
-  if (historique.length > 30) {
-    return Response.json({ error: "Conversation trop longue, démarre une nouvelle discussion." }, { status: 400 });
-  }
-  if (dernierMessage.fichier) {
-    if (!MIME_ANALYSABLES_IA.includes(dernierMessage.fichier.mimeType)) {
-      return Response.json({ error: "Format de pièce jointe non pris en charge (images JPEG/PNG/WebP ou PDF)." }, { status: 400 });
-    }
-    if (dernierMessage.fichier.base64.length > TAILLE_MAX_PIECE_JOINTE_BASE64) {
-      return Response.json({ error: "Pièce jointe trop volumineuse (6 Mo maximum)." }, { status: 400 });
-    }
-  }
+  // validerRequeteAssistant a deja verifie qu'il s'agit d'un tableau de MessageChat valide.
+  const historiqueValide = historique as MessageChat[];
 
   const depassement = await verifierPlafondIA(supabase, ctx.entrepriseId);
   if (depassement) {
@@ -79,7 +70,7 @@ export async function POST(request: Request) {
     async start(controller) {
       const envoyer = (evenement: unknown) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(evenement)}\n\n`));
       try {
-        for await (const evenement of demanderAssistantIAStream(supabase, ctx.entrepriseId, ctx.entrepriseNom, ctx.userId, ctx.prenom, peutGererPlanning, historique)) {
+        for await (const evenement of demanderAssistantIAStream(supabase, ctx.entrepriseId, ctx.entrepriseNom, ctx.userId, ctx.prenom, peutGererPlanning, historiqueValide)) {
           envoyer(evenement);
         }
         envoyer({ type: "fin" });
