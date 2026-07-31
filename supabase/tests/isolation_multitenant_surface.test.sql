@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(8);
+select plan(10);
 
 select ok(
   (select relrowsecurity from pg_class where oid = 'public.compteurs_reference'::regclass),
@@ -17,6 +17,20 @@ select is(
   ),
   0,
   'Les rôles applicatifs ne possèdent aucun privilège DDL ou TRUNCATE'
+);
+
+select ok(
+  has_table_privilege('authenticated', 'public.entreprises', 'SELECT,INSERT,UPDATE')
+    and has_table_privilege('authenticated', 'public.utilisateurs', 'SELECT,INSERT,UPDATE')
+    and has_table_privilege('authenticated', 'public.utilisateurs_entreprises', 'SELECT,INSERT,UPDATE'),
+  'Le rôle authenticated peut utiliser le socle comptes sous contrôle RLS'
+);
+
+select ok(
+  not has_table_privilege('anon', 'public.entreprises', 'SELECT,INSERT,UPDATE,DELETE')
+    and not has_table_privilege('anon', 'public.utilisateurs', 'SELECT,INSERT,UPDATE,DELETE')
+    and not has_table_privilege('anon', 'public.utilisateurs_entreprises', 'SELECT,INSERT,UPDATE,DELETE'),
+  'Le rôle anonyme ne possède aucun privilège sur le socle comptes'
 );
 
 select ok(
