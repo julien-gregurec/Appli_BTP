@@ -1,10 +1,11 @@
 import type { MetadataRoute } from "next";
+import { BRAND } from "@/lib/brand";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Liria Gestion Pro",
-    short_name: "Liria Pro",
-    description: "Gestion des chantiers, équipes, devis, factures, stock et matériel pour les entreprises du BTP.",
+    name: BRAND.nomApplication,
+    short_name: BRAND.nomCourtPwa,
+    description: BRAND.description,
     start_url: "/dashboard",
     scope: "/",
     display: "standalone",
@@ -12,10 +13,5 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#0d1b2a",
     lang: "fr",
     categories: ["business", "productivity"],
-    icons: [
-      { src: "/icons/liria-gestion-pro-v3-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: "/icons/liria-gestion-pro-v3-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-      { src: "/icons/liria-gestion-pro-v3-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
-    ],
   };
 }

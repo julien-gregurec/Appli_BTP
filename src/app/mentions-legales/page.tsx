@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { DocumentLegal } from "@/components/DocumentLegal";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 export const dynamic = "force-static";
 
-export const metadata: Metadata = { title: "Mentions légales — Liria Gestion Pro" };
+export const metadata: Metadata = { title: `Mentions légales — ${PRODUCT_NAME}` };
 
 export default function Page() {
   return <DocumentLegal fichier="mentions-legales.md" />;
