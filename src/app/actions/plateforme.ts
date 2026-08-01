@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { estPlateformeAdmin } from "@/lib/plateforme";
-import { origineApplication } from "@/app/actions/auth";
+import { ERREUR_CONFIGURATION_URL_AUTH, urlCallbackReinitialisation } from "@/lib/auth-redirects";
 import { appliquerCouponAbonnement, creerCouponRemise, retirerCouponAbonnement, TYPES_REMISE, DUREES_REMISE, type DureeRemise, type TypeRemise } from "@/lib/stripe-abonnement";
 
 export async function modifierAbonnementAction(entrepriseId: string, formData: FormData) {
@@ -156,11 +156,12 @@ export async function reinitialiserMotDePassePlateformeAction(entrepriseId:strin
   const email=String(formData.get("email")??"").trim().toLowerCase();
   const motif=String(formData.get("motif")??"").trim();
   if(!email)redirect(`/plateforme?error=${encodeURIComponent("Adresse e-mail obligatoire")}`);
+  const redirectTo=urlCallbackReinitialisation();
+  if(!redirectTo)redirect(`/plateforme?error=${encodeURIComponent(ERREUR_CONFIGURATION_URL_AUTH)}`);
   const supabase=await createClient();
   const{error:erreurVerification}=await supabase.rpc("plateforme_verifier_et_journaliser_reinitialisation",{p_entreprise_id:entrepriseId,p_email:email,p_motif:motif});
   if(erreurVerification)redirect(`/plateforme?error=${encodeURIComponent(erreurVerification.message)}`);
-  const origine=await origineApplication();
-  const{error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:`${origine}/auth/callback?next=${encodeURIComponent("/nouveau-mot-de-passe")}`});
+  const{error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo});
   if(error)redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
   redirect(`/plateforme?succes=${encodeURIComponent(`Lien de réinitialisation envoyé à ${email}`)}`);
 }
