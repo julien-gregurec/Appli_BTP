@@ -1,3 +1,5 @@
+import { BRAND_NAME } from "@/lib/brand";
+
 export type NavigationApplication = {
   href: string;
   label: string;
@@ -58,7 +60,7 @@ export const NAVIGATION_APPLICATION: NavigationApplication[] = [
   { href: "/inventaires", label: "Inventaires", actif: true, permission: "acces_stock", groupe: "achats_stock" },
   { href: "/stock/borne", label: "Borne stock", actif: true, permission: "utiliser_borne_stock", groupe: "achats_stock" },
   { href: "/depot", label: "Dépôt", actif: true, permission: "acces_stock", groupe: "achats_stock" },
-  { href: "/boutique", label: "Boutique Liria", actif: true, permission: "acces_boutique", groupe: "achats_stock" },
+  { href: "/boutique", label: `Boutique ${BRAND_NAME}`, actif: true, permission: "acces_boutique", groupe: "achats_stock" },
   { href: "/flotte", label: "Flotte automobile", actif: true, permission: "acces_flotte", groupe: "materiel" },
   { href: "/outillage", label: "Outillage", actif: true, permission: "acces_outillage", groupe: "materiel" },
   { href: "/rentabilite", label: "Rentabilité", actif: true, permission: "acces_rentabilite", groupe: "pilotage" },

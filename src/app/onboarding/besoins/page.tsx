@@ -3,6 +3,7 @@ import { enregistrerBesoinsAction } from "@/app/actions/besoins";
 import { demarrerAbonnementAction } from "@/app/actions/abonnement";
 import { ATTENTES_OPTIONS, BESOINS_OPTIONS, DUREE_ESSAI_JOURS, offreParCle, prixAbonnementMensuel } from "@/lib/plateforme";
 import { stripeBillingEstConfigure } from "@/lib/stripe-abonnement";
+import { BRAND_NAME } from "@/lib/brand";
 
 export default async function BesoinsPage({
   searchParams,
@@ -39,7 +40,7 @@ export default async function BesoinsPage({
               Essai gratuit {DUREE_ESSAI_JOURS} jours. Carte enregistrée de façon sécurisée par Stripe, sans débit pendant l’essai.
             </p>
             <p className="mt-2 text-xs text-neutral-500">
-              Estimation indicative. La tarification définitive vous sera confirmée par LIRIA.
+              Estimation indicative. La tarification définitive vous sera confirmée par {BRAND_NAME}.
             </p>
           </div>
           <div className="flex flex-col gap-2">

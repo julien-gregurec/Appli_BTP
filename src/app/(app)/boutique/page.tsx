@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { euros } from "@/lib/devis";
+import { BRAND_NAME } from "@/lib/brand";
 
 type Produit = { id: string; sku: string; nom: string; description: string | null; categorie: string; prix_ht: number; taux_tva: number; image_url: string | null; stock_disponible: number };
 
@@ -27,7 +28,7 @@ export default async function BoutiquePage({ searchParams }: { searchParams: Pro
 
   return <main className="p-3 sm:p-8"><div className="mx-auto max-w-6xl space-y-6">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><h1 className="text-xl font-semibold">Boutique Liria</h1><p className="text-sm text-neutral-500">Imprimantes codes-barres/QR, plastifieuses et étiquettes aimantées, livrées par Liria.</p></div>
+      <div><h1 className="text-xl font-semibold">Boutique {BRAND_NAME}</h1><p className="text-sm text-neutral-500">Imprimantes codes-barres/QR, plastifieuses et étiquettes aimantées, livrées par {BRAND_NAME}.</p></div>
       <Link href="/boutique/panier" className="rounded-md border px-4 py-2 text-sm font-medium">Voir mon panier</Link>
     </div>
     {params.error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{params.error}</p>}

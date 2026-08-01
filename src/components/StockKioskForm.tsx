@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { IScannerControls } from "@zxing/browser";
 import { mouvementStockBorneAction } from "@/app/actions/stock";
 import { classifierCodeScanne, libelleTypeQr, type CibleScanQr } from "@/lib/qr-identification";
+import { BRAND_NAME } from "@/lib/brand";
 
 type OptionDestination = { id: string; label: string; code?: string | null };
 const input = "w-full rounded-lg border border-neutral-300 bg-white px-3 py-3 text-base dark:border-neutral-700 dark:bg-neutral-900";
@@ -162,7 +163,7 @@ export function StockKioskForm({ chantiers, vehicules, outils, identifiantExempl
 
       {cible && <div role="dialog" aria-modal="true" className="fixed inset-0 z-[90] flex items-center justify-center bg-black/85 p-3">
         <div className="w-full max-w-lg overflow-hidden rounded-xl bg-neutral-950 text-white">
-          <div className="flex items-center justify-between p-4"><div><h3 className="font-semibold">{cible === "auto" ? "Scanner un QR ou code-barres" : `Scanner ${libelleTypeQr(cible)}`}</h3><p className="text-xs text-neutral-400">Le type de ressource est reconnu grâce au préfixe sécurisé du QR Liria.</p></div><button type="button" onClick={fermer} className="rounded border border-white/30 px-3 py-2">Fermer</button></div>
+          <div className="flex items-center justify-between p-4"><div><h3 className="font-semibold">{cible === "auto" ? "Scanner un QR ou code-barres" : `Scanner ${libelleTypeQr(cible)}`}</h3><p className="text-xs text-neutral-400">Le type de ressource est reconnu grâce au préfixe sécurisé du QR {BRAND_NAME}.</p></div><button type="button" onClick={fermer} className="rounded border border-white/30 px-3 py-2">Fermer</button></div>
           <div className="relative aspect-[4/3] bg-black"><video ref={videoRef} muted playsInline className="h-full w-full object-cover" />{!erreurCamera && <div className="pointer-events-none absolute inset-[18%_8%] rounded-xl border-2 border-[#c9a24a] shadow-[0_0_0_999px_rgba(0,0,0,.3)]" />}{!cameraPrete && !erreurCamera && <div className="absolute inset-0 flex items-center justify-center bg-black/40">Ouverture de la caméra…</div>}{erreurCamera && <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-red-200">{erreurCamera}</div>}</div>
         </div>
       </div>}

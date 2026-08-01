@@ -5,6 +5,7 @@ import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { estPlateformeAdmin, statutAbonnement, prixAbonnementMensuel, offreParCle, REDUCTION_ANNUELLE, type EntrepriseAbonnement } from "@/lib/plateforme";
 import { ajouterAdminPlateformeAction, appliquerRemiseAction, creerEntreprisePlateformeAction, entrerEntreprisePlateformeAction, enregistrerReglementPlateformeAction, genererSnapshotFacturationAction, modifierAbonnementAction, modifierTarifPostePlateformeAction, reinitialiserMotDePassePlateformeAction, retirerAdminPlateformeAction, retirerRemiseAction, signalerImpayePlateformeAction } from "@/app/actions/plateforme";
 import { AbonnementCountdown } from "@/components/AbonnementCountdown";
+import { BRAND_NAME } from "@/lib/brand";
 
 type MembrePlateforme = { email: string; role: string; nom: string | null; ajoute_par: string | null; created_at: string };
 const ROLE_LABEL: Record<string, string> = { total: "Accès total", support: "Support", facturation: "Facturation", lecture: "Lecture seule" };
@@ -119,7 +120,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
 
         <section className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
           <h2 className="font-semibold">Équipe plateforme</h2>
-          <p className="text-xs text-neutral-500">Les collaborateurs LIRIA qui peuvent assister toutes les entreprises. Accès total pour l&apos;instant ; les niveaux d&apos;accès seront affinés ensuite.</p>
+          <p className="text-xs text-neutral-500">Les collaborateurs {BRAND_NAME} qui peuvent assister toutes les entreprises. Accès total pour l&apos;instant ; les niveaux d&apos;accès seront affinés ensuite.</p>
           <ul className="mt-3 space-y-2">
             {membresPlateforme.map((m) => (
               <li key={m.email} className="flex flex-wrap items-center justify-between gap-2 rounded border border-neutral-100 p-2 text-sm dark:border-neutral-800">
@@ -137,7 +138,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
             {membresPlateforme.length === 0 && <li className="text-sm text-neutral-500">Aucun membre listé.</li>}
           </ul>
           <form action={ajouterAdminPlateformeAction} className="mt-3 grid gap-2 border-t border-neutral-100 pt-3 dark:border-neutral-800 sm:grid-cols-[1.5fr_1fr_1fr_auto]">
-            <input name="email" type="email" required placeholder="email@liria.fr" className={input} />
+            <input name="email" type="email" required placeholder="collaborateur@exemple.fr" className={input} />
             <input name="nom" placeholder="Nom (optionnel)" className={input} />
             <select name="role" className={input} defaultValue="total">
               <option value="total">Accès total</option>

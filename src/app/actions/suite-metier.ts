@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { construireLienMailto } from "@/lib/email";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 const texte = (formData: FormData, cle: string) => String(formData.get(cle) ?? "").trim();
 const nombre = (formData: FormData, cle: string, defaut = 0) => {
@@ -315,7 +316,7 @@ export async function preparerConnecteurFournisseurLibreAction(formData: FormDat
     activation_demandee_at: new Date().toISOString(),
     configuration: { portail_url: portailUrl, fournisseur_libre: true, aucun_secret_stocke: true },
     dernier_message: mode === "portail"
-      ? "Compte fournisseur référencé. Le portail peut être ouvert depuis Liria Gestion Pro et les tarifs peuvent être importés."
+      ? `Compte fournisseur référencé. Le portail peut être ouvert depuis ${PRODUCT_NAME} et les tarifs peuvent être importés.`
       : "Connexion préparée. Demandez au fournisseur ses paramètres officiels ou son fichier de tarifs négociés.",
     updated_at: new Date().toISOString(),
   }, { onConflict: "entreprise_id,domaine,nom" });

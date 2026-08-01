@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { estPlateformeAdmin } from "@/lib/plateforme";
 import { repondreSupportPlateformeAction } from "@/app/actions/support";
+import { BRAND_NAME } from "@/lib/brand";
 
 type Fil = { entreprise_id: string; entreprise_nom: string; dernier_contenu: string | null; dernier_cote: string | null; dernier_at: string | null; non_lus: number; total: number };
 type Message = { id: string; cote: string; auteur_nom: string | null; contenu: string; created_at: string };
@@ -64,7 +65,7 @@ export default async function PlateformeSupportPage({ searchParams }: { searchPa
                     return (
                       <div key={m.id} className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm ${plateforme ? "self-end bg-[#0d1b2a] text-white" : "self-start bg-neutral-100 dark:bg-neutral-800"}`}>
                         <div className={`mb-0.5 text-[10px] uppercase tracking-wide ${plateforme ? "text-white/60" : "text-neutral-500"}`}>
-                          {plateforme ? "Support LIRIA" : m.auteur_nom || "Entreprise"}
+                          {plateforme ? `Support ${BRAND_NAME}` : m.auteur_nom || "Entreprise"}
                         </div>
                         <div className="whitespace-pre-wrap">{m.contenu}</div>
                         <div className={`mt-1 text-[10px] ${plateforme ? "text-white/50" : "text-neutral-400"}`}>

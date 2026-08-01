@@ -1,9 +1,10 @@
-import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { loginAction } from "@/app/actions/auth";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { PiedLegal } from "@/components/PiedLegal";
+import { BrandWordmark } from "@/components/BrandWordmark";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 export default async function LoginPage({
   searchParams,
@@ -20,7 +21,8 @@ export default async function LoginPage({
     <main className="flex flex-1 items-center justify-center p-6">
       <div className="w-full max-w-sm space-y-6">
         <div className="flex flex-col items-center gap-3 text-center">
-          <Image src="/liria-gestion-pro-logo-v5.png" alt="Liria Gestion Pro" width={220} height={246} priority className="h-32 w-auto" />
+          <BrandWordmark className="text-2xl text-[#0d1b2a]" />
+          <p className="text-sm text-neutral-500">{PRODUCT_NAME}</p>
           <h1 className="text-xl font-semibold">Connexion</h1>
         </div>
 

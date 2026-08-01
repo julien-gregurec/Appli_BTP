@@ -2,6 +2,8 @@ export const MARQUE = "ELSATIA";
 export const NOM_APPLICATION = "ELSATIA Gestion Pro";
 export const NOM_COURT_PWA = "ELSATIA Gestion Pro";
 export const DESCRIPTION_APPLICATION = "ELSATIA Gestion Pro — La gestion BTP simplifiée";
+export const BRAND_NAME = MARQUE;
+export const PRODUCT_NAME = NOM_APPLICATION;
 
 type EnvironnementMarquePublic = Record<string, string | undefined> & {
   NEXT_PUBLIC_APP_URL?: string;

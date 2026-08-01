@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 const LIENS = [
   { href: "/mentions-legales", libelle: "Mentions légales" },
@@ -16,7 +17,7 @@ export function PiedLegal() {
           <Link key={l.href} href={l.href} className="hover:text-[#0d1b2a] hover:underline dark:hover:text-white">{l.libelle}</Link>
         ))}
       </nav>
-      <p className="mt-3 text-xs text-neutral-400">© {new Date().getFullYear()} Liria Gestion Pro</p>
+      <p className="mt-3 text-xs text-neutral-400">© {new Date().getFullYear()} {PRODUCT_NAME}</p>
     </footer>
   );
 }

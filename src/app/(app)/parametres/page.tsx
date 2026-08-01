@@ -7,6 +7,8 @@ import { permissionsUtilisateur } from "@/lib/permissions";
 import { DocumentTemplatePreview } from "@/components/DocumentTemplatePreview";
 import { prefixeIdentifiantEntreprise } from "@/lib/identifiants";
 import { DashboardWidgetPreferences } from "@/components/DashboardWidgets";
+import { BrandWordmark } from "@/components/BrandWordmark";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 const input = "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -25,7 +27,7 @@ export default async function ParametresPage({ searchParams }: { searchParams: P
         {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         {succes && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Paramètres enregistrés.</p>}
         <DashboardWidgetPreferences />
-        <section className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800"><h2 className="text-sm font-semibold">Logo de l’entreprise</h2><div className="mt-3 flex items-center gap-5"><Image src={entreprise?.logo_url||"/liria-gestion-pro-logo-v5.png"} alt="Logo actuel" width={144} height={80} unoptimized className="h-20 w-36 rounded border bg-white object-contain p-2"/><form action={modifierLogoEntrepriseAction} className="flex-1"><label className="block text-xs text-neutral-500">Nouveau logo (PNG, JPG ou WebP · 5 Mo max.)<input name="logo" type="file" accept="image/png,image/jpeg,image/webp" required className="mt-2 block w-full rounded-md border px-3 py-2 text-sm"/></label><button className="mt-3 rounded-md border px-3 py-2 text-sm font-medium hover:bg-neutral-50">Importer ce logo</button></form></div><p className="mt-2 text-xs text-neutral-500">Le logo de votre entreprise apparaît dans son encart, sur les devis et sur les factures. L’identité du logiciel reste toujours Liria Gestion Pro.</p></section>
+        <section className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800"><h2 className="text-sm font-semibold">Logo de l’entreprise</h2><div className="mt-3 flex items-center gap-5">{entreprise?.logo_url?<Image src={entreprise.logo_url} alt="Logo actuel" width={144} height={80} unoptimized className="h-20 w-36 rounded border bg-white object-contain p-2"/>:<div className="flex h-20 w-36 items-center justify-center rounded border bg-white p-2"><BrandWordmark className="text-sm text-[#0d1b2a]"/></div>}<form action={modifierLogoEntrepriseAction} className="flex-1"><label className="block text-xs text-neutral-500">Nouveau logo (PNG, JPG ou WebP · 5 Mo max.)<input name="logo" type="file" accept="image/png,image/jpeg,image/webp" required className="mt-2 block w-full rounded-md border px-3 py-2 text-sm"/></label><button className="mt-3 rounded-md border px-3 py-2 text-sm font-medium hover:bg-neutral-50">Importer ce logo</button></form></div><p className="mt-2 text-xs text-neutral-500">Le logo de votre entreprise apparaît dans son encart, sur les devis et sur les factures. L’identité du logiciel reste toujours {PRODUCT_NAME}.</p></section>
         <form action={modifierEntrepriseAction} className="space-y-6">
           <section className="space-y-4 rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
             <h2 className="text-sm font-semibold">Identité et adresse</h2>

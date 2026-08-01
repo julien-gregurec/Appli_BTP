@@ -1,14 +1,15 @@
 import Link from "next/link";
-import Image from "next/image";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { PiedLegal } from "@/components/PiedLegal";
 import { DUREE_ESSAI_JOURS } from "@/lib/plateforme";
+import { BrandWordmark } from "@/components/BrandWordmark";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Liria Gestion Pro V3 — Le logiciel de gestion pour les entreprises du BTP",
+  title: `${PRODUCT_NAME} — Le logiciel de gestion pour les entreprises du BTP`,
   description: "Clients, devis, factures, chantiers, planning, pointage, stock et rentabilité : un seul outil pour piloter votre entreprise du bâtiment.",
 };
 
@@ -51,8 +52,7 @@ export default async function AccueilPage() {
       <header className="border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-4">
           <div className="flex min-w-0 items-center gap-2">
-            <Image src="/liria-gestion-pro-logo-v5.png" alt="Liria Gestion Pro" width={32} height={32} className="shrink-0 rounded" />
-            <span className="truncate text-base font-bold text-[#0d1b2a] dark:text-white sm:text-lg">Liria Gestion Pro <span className="text-[#c9a24a]">V3</span></span>
+            <BrandWordmark className="text-base text-[#0d1b2a] dark:text-white sm:text-lg" />
           </div>
           <nav className="flex shrink-0 items-center gap-2 text-xs font-medium sm:gap-4 sm:text-sm">
             <Link href="/tarifs" className="hidden text-neutral-600 hover:text-[#0d1b2a] dark:text-neutral-300 dark:hover:text-white sm:inline">Tarifs</Link>
@@ -68,7 +68,7 @@ export default async function AccueilPage() {
           Toute la gestion de votre entreprise BTP, dans un seul outil
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-neutral-600 dark:text-neutral-300">
-          Clients, devis, factures, chantiers, planning, pointage, stock et rentabilité. Liria Gestion Pro V3
+          Clients, devis, factures, chantiers, planning, pointage, stock et rentabilité. {PRODUCT_NAME}
           centralise ce qui aujourd’hui est éparpillé entre Excel, papier et plusieurs logiciels.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">

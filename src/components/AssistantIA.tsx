@@ -9,6 +9,7 @@ import {
 } from "@/app/actions/assistant";
 import type { MessageChat, PropositionAffectation, PropositionConge, PropositionMessageInterne, PropositionMessageSupport } from "@/lib/ai/assistant";
 import { lienMaps } from "@/lib/maps";
+import { BRAND_NAME, PRODUCT_NAME } from "@/lib/brand";
 
 type MessageAffiche = MessageChat & {
   proposition?: PropositionAffectation;
@@ -297,7 +298,7 @@ export function AssistantIA() {
       {ouvert && (
         <div className="fixed bottom-4 right-4 z-50 flex h-[32rem] max-h-[70vh] w-96 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-2xl dark:border-neutral-700 dark:bg-neutral-900">
           <div className="flex items-center justify-between border-b border-neutral-200 bg-liria-navy px-4 py-3 dark:border-neutral-700">
-            <span className="text-sm font-semibold text-white">✨ Assistant Liria</span>
+            <span className="text-sm font-semibold text-white">✨ Assistant {PRODUCT_NAME}</span>
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -399,7 +400,7 @@ export function AssistantIA() {
                 )}
                 {m.propositionMessageSupport && (
                   <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-liria-gold/60 bg-liria-gold/10 p-3 text-left text-sm">
-                    <p><strong>Message au support Liria</strong></p>
+                    <p><strong>Message au support {BRAND_NAME}</strong></p>
                     <p className="whitespace-pre-wrap text-neutral-600 dark:text-neutral-300">{m.propositionMessageSupport.contenu}</p>
                     {m.propositionStatut === "en_attente" && (
                       <div className="mt-2 flex gap-2">
@@ -480,7 +481,7 @@ export function AssistantIA() {
         <button
           type="button"
           onClick={() => setOuvert(true)}
-          aria-label="Assistant Liria"
+          aria-label={`Assistant ${PRODUCT_NAME}`}
           className="fixed bottom-20 right-4 z-40 flex items-center gap-2 rounded-full bg-liria-gold px-4 py-3 text-sm font-semibold text-liria-navy shadow-lg hover:brightness-95"
         >
           <span aria-hidden="true">✨</span>

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { verifierZonePointageAction } from "@/app/actions/pointages";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 export function SuiviZoneChantier({ sessionId, frequenceMinutes }: { sessionId: string; frequenceMinutes: number }) {
   const [dernierStatut, setDernierStatut] = useState<"dans_zone" | "hors_zone" | null>(null);
@@ -97,7 +98,7 @@ export function SuiviZoneChantier({ sessionId, frequenceMinutes }: { sessionId: 
       📍 Suivi de zone actif — votre position est vérifiée toutes les {frequenceMinutes} minutes pendant que vous êtes pointé.
       {dernierStatut === "hors_zone" && " Vous semblez hors de la zone du chantier."}
       {suiviSuspendu && " Autorisez la localisation précise pour poursuivre le suivi."}
-      {" Gardez Liria ouverte en arrière-plan : le téléphone peut suspendre le suivi si l’application est fermée ou forcée à quitter."}
+      {` Gardez ${PRODUCT_NAME} ouverte en arrière-plan : le téléphone peut suspendre le suivi si l’application est fermée ou forcée à quitter.`}
     </p>
   );
 }

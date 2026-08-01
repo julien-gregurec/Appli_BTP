@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { envoyerMessageSupportAction } from "@/app/actions/support";
 import { FaqAide } from "@/components/FaqAide";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 type Message = { id: string; cote: string; auteur_nom: string | null; contenu: string; created_at: string };
 
@@ -25,51 +26,18 @@ export default async function AidePage({ searchParams }: { searchParams: Promise
       <div className="mx-auto flex max-w-4xl flex-col gap-4">
         <div>
           <h1 className="text-xl font-semibold">Aide & support</h1>
-          <p className="text-sm text-neutral-500">Une question, un souci ? Écrivez à l&apos;équipe Liria Gestion Pro, nous vous répondons ici.</p>
+          <p className="text-sm text-neutral-500">Une question, un souci ? Écrivez à l&apos;équipe {PRODUCT_NAME}, nous vous répondons ici.</p>
         </div>
 
         <section className="flex flex-col gap-3 rounded-lg border border-[#c9a24a]/50 bg-[#c9a24a]/10 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="font-semibold">Guide complet d&apos;utilisation</h2>
+            <h2 className="font-semibold">Ressources d&apos;utilisation</h2>
             <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-300">
-              Édition V3 : les parcours commercialisés sont expliqués pas à pas, notamment les
-              clients, devis, factures, chantiers, équipes, planning, pointage, fournisseurs,
-              stock, notes de frais, pilotage, abonnement, sécurité et dépannage.
+              Les guides et vidéos {PRODUCT_NAME} sont en cours de mise à jour. La foire aux
+              questions ci-dessous et la messagerie du support restent disponibles.
             </p>
           </div>
-          <a href="/guides/Guide_utilisation_Liria_Gestion_Pro.pdf" target="_blank" rel="noopener" className="flex-none rounded-md bg-[#0d1b2a] px-4 py-2 text-center text-sm font-semibold text-white">
-            Ouvrir le guide PDF
-          </a>
-        </section>
-
-        <section className="overflow-hidden rounded-lg border border-blue-200 bg-white dark:border-blue-900 dark:bg-neutral-950">
-          <div className="space-y-1 p-4">
-            <h2 className="font-semibold">Guide vidéo complet</h2>
-            <p className="text-sm text-neutral-600 dark:text-neutral-300">8 min 23 avec voix française et sous-titres : accès, planning, pointage GPS, devis, factures, achats, justificatifs, stock, employés, flotte, pilotage et paramètres.</p>
-          </div>
-          <video controls preload="metadata" poster="/videos/Liria_Gestion_Pro_Guide_Poster.jpg" className="aspect-video w-full bg-[#0b1f35]">
-            <source src="/videos/Liria_Gestion_Pro_Guide_Video_Complet.mp4" type="video/mp4" />
-            <track kind="captions" src="/videos/Liria_Gestion_Pro_Guide_Video_Complet.vtt" srcLang="fr" label="Français" default />
-            Votre navigateur ne peut pas lire cette vidéo.
-          </video>
-          <div className="flex justify-end p-3">
-            <a href="/videos/Liria_Gestion_Pro_Guide_Video_Complet.mp4" download className="rounded-md border border-blue-200 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950">Télécharger la vidéo</a>
-          </div>
-        </section>
-
-        <section className="overflow-hidden rounded-lg border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
-          <div className="space-y-1 p-4">
-            <h2 className="font-semibold">Présentation commerciale</h2>
-            <p className="text-sm text-neutral-600 dark:text-neutral-300">Vidéo de 59 secondes avec présentatrice, voix française, démonstrations animées et sous-titres.</p>
-          </div>
-          <video controls preload="metadata" className="aspect-video w-full bg-[#0b1f35]">
-            <source src="/videos/Liria_Gestion_Pro_Publicite_60s.mp4" type="video/mp4" />
-            <track kind="captions" src="/videos/Liria_Gestion_Pro_Publicite_60s.vtt" srcLang="fr" label="Français" default />
-            Votre navigateur ne peut pas lire cette vidéo.
-          </video>
-          <div className="flex justify-end p-3">
-            <a href="/videos/Liria_Gestion_Pro_Publicite_60s.mp4" download className="rounded-md border px-3 py-2 text-sm font-medium">Télécharger la publicité</a>
-          </div>
+          <span className="flex-none rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#0d1b2a] dark:bg-neutral-900 dark:text-white">Mise à jour en cours</span>
         </section>
 
         <FaqAide />
@@ -84,7 +52,7 @@ export default async function AidePage({ searchParams }: { searchParams: Promise
             return (
               <div key={m.id} className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm ${plateforme ? "self-start bg-neutral-100 dark:bg-neutral-800" : "self-end bg-[#0d1b2a] text-white"}`}>
                 <div className={`mb-0.5 text-[10px] uppercase tracking-wide ${plateforme ? "text-neutral-500" : "text-white/60"}`}>
-                  {plateforme ? "Support Liria Gestion Pro" : m.auteur_nom || "Vous"}
+                  {plateforme ? `Support ${PRODUCT_NAME}` : m.auteur_nom || "Vous"}
                 </div>
                 <div className="whitespace-pre-wrap">{m.contenu}</div>
                 <div className={`mt-1 text-[10px] ${plateforme ? "text-neutral-400" : "text-white/50"}`}>

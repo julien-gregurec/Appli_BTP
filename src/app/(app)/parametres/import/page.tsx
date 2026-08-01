@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { ImportWizard } from "@/components/ImportWizard";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 export default async function ImportPage() {
   const ctx = await getContexteEntreprise();
@@ -21,7 +22,7 @@ export default async function ImportPage() {
             Exportez vos données en CSV ou Excel depuis votre ancien logiciel, puis déposez le fichier ici.
           </p>
         </div>
-        <section className="grid gap-3 sm:grid-cols-3"><div className="rounded border p-4"><strong>1. Export sécurisé</strong><p className="mt-1 text-xs text-neutral-500">Depuis Batigest, Batappli, EBP ou le logiciel source, exportez chaque famille en CSV/XLSX sans transmettre de mot de passe.</p></div><div className="rounded border p-4"><strong>2. Profil et correspondance</strong><p className="mt-1 text-xs text-neutral-500">Choisissez le logiciel d’origine : Liria reconnaît les intitulés courants, puis vous laisse tout vérifier.</p></div><div className="rounded border p-4"><strong>3. Entreprise pilote isolée</strong><p className="mt-1 text-xs text-neutral-500">Créez l’entreprise de test depuis Plateforme, importez ses données, puis attribuez ses postes et permissions.</p></div></section>
+        <section className="grid gap-3 sm:grid-cols-3"><div className="rounded border p-4"><strong>1. Export sécurisé</strong><p className="mt-1 text-xs text-neutral-500">Depuis Batigest, Batappli, EBP ou le logiciel source, exportez chaque famille en CSV/XLSX sans transmettre de mot de passe.</p></div><div className="rounded border p-4"><strong>2. Profil et correspondance</strong><p className="mt-1 text-xs text-neutral-500">Choisissez le logiciel d’origine : {PRODUCT_NAME} reconnaît les intitulés courants, puis vous laisse tout vérifier.</p></div><div className="rounded border p-4"><strong>3. Entreprise pilote isolée</strong><p className="mt-1 text-xs text-neutral-500">Créez l’entreprise de test depuis Plateforme, importez ses données, puis attribuez ses postes et permissions.</p></div></section>
         <ImportWizard />
         <p className="text-xs text-neutral-500">
           Astuce : depuis Batigest, Batappli, EBP Bâtiment ou un autre logiciel, utilisez « Exporter » ou « Enregistrer sous » au format Excel (.xlsx) ou CSV.

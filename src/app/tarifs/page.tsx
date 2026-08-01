@@ -4,9 +4,11 @@ import { PiedLegal } from "@/components/PiedLegal";
 import { DUREE_ESSAI_JOURS } from "@/lib/plateforme";
 import { formatMontantCentimes, OFFRES_TARIFAIRES, OPTIONS_TARIFAIRES, SERVICES_MISE_EN_SERVICE } from "@/lib/tarification";
 import { stripeBillingEstConfigure } from "@/lib/stripe-abonnement";
+import { PRODUCT_NAME } from "@/lib/brand";
+import { BRAND_SERVER } from "@/lib/brand-server";
 
 export const metadata: Metadata = {
-  title: "Tarifs — Liria Gestion Pro",
+  title: `Tarifs — ${PRODUCT_NAME}`,
   description: "Des offres BTP transparentes avec utilisateurs, stockage et opérations IA inclus.",
 };
 
@@ -20,11 +22,14 @@ const BENEFICES: Record<string, string[]> = {
 
 export default function TarifsPage() {
   const paiementConfigure = stripeBillingEstConfigure();
+  const contactCommercial = BRAND_SERVER.supportEmail
+    ? `mailto:${BRAND_SERVER.supportEmail}?subject=${encodeURIComponent(`Demande ${PRODUCT_NAME}`)}`
+    : "/aide";
   return (
     <main className="min-h-screen bg-neutral-50 px-4 py-12 dark:bg-neutral-950">
       <div className="mx-auto max-w-7xl">
         <div className="text-center">
-          <p className="text-sm font-semibold uppercase tracking-wide text-[#c9a24a]">Liria Gestion Pro</p>
+          <p className="text-sm font-semibold uppercase tracking-wide text-[#c9a24a]">{PRODUCT_NAME}</p>
           <h1 className="mt-2 text-4xl font-bold text-[#0d1b2a] dark:text-white">Une tarification lisible, sans surprise</h1>
           <p className="mx-auto mt-4 max-w-3xl text-neutral-600 dark:text-neutral-300">
             Chaque offre indique le nombre de comptes, le stockage et le quota IA inclus. Essai de {DUREE_ESSAI_JOURS} jours ;
@@ -49,7 +54,7 @@ export default function TarifsPage() {
                 <li>✓ {offre.stockageGoInclus} Go de stockage</li>
                 {BENEFICES[offre.cle].map((point) => <li key={point}>✓ {point}</li>)}
               </ul>
-              <Link href={offre.devisObligatoire || !paiementConfigure ? "mailto:contact@liria-gestion-pro.fr?subject=Demande%20Liria%20Gestion%20Pro" : `/signup?offre=${offre.cle}`} className={`mt-6 rounded-lg px-4 py-2.5 text-center text-sm font-semibold ${offre.populaire ? "bg-[#0d1b2a] text-white" : "border border-[#0d1b2a] text-[#0d1b2a] dark:border-white dark:text-white"}`}>
+              <Link href={offre.devisObligatoire || !paiementConfigure ? contactCommercial : `/signup?offre=${offre.cle}`} className={`mt-6 rounded-lg px-4 py-2.5 text-center text-sm font-semibold ${offre.populaire ? "bg-[#0d1b2a] text-white" : "border border-[#0d1b2a] text-[#0d1b2a] dark:border-white dark:text-white"}`}>
                 {offre.devisObligatoire ? "Demander un devis" : paiementConfigure ? "Démarrer l’essai" : "Demander une démonstration"}
               </Link>
             </article>
@@ -67,7 +72,7 @@ export default function TarifsPage() {
             ))}
           </div>
           <p className="mt-4 text-xs text-neutral-500">Un crédit IA correspond à une opération assistée (analyse, génération ou extraction). Les opérations comprises dans l’offre sont remises à zéro chaque mois ; un pack additionnel n’est activé qu’après accord explicite.</p>
-          <p className="mt-2 text-xs text-neutral-500">Toute option payante et tout dépassement sont présentés avant activation. Aucun numéro de carte n’est stocké par Liria Gestion Pro.</p>
+          <p className="mt-2 text-xs text-neutral-500">Toute option payante et tout dépassement sont présentés avant activation. Aucun numéro de carte n’est stocké par {PRODUCT_NAME}.</p>
         </section>
 
         <section className="mt-10 overflow-hidden rounded-2xl border bg-white dark:border-neutral-800 dark:bg-neutral-900">
