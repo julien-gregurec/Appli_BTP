@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { verifierZonePointageAction } from "@/app/actions/pointages";
 import { PRODUCT_NAME } from "@/lib/brand";
+import { lireEtMigrerCleStockage } from "@/lib/browser-storage";
 
 export function SuiviZoneChantier({ sessionId, frequenceMinutes }: { sessionId: string; frequenceMinutes: number }) {
   const [dernierStatut, setDernierStatut] = useState<"dans_zone" | "hors_zone" | null>(null);
@@ -11,7 +12,8 @@ export function SuiviZoneChantier({ sessionId, frequenceMinutes }: { sessionId: 
 
   useEffect(() => {
     let annule = false;
-    let dernierEnvoi = Number(localStorage.getItem(`liria:gps:${sessionId}`) ?? 0);
+    const cleGps=`elsatia:gps:${sessionId}`,cleGpsHistorique=`liria:gps:${sessionId}`;
+    let dernierEnvoi = Number(lireEtMigrerCleStockage(localStorage,cleGps,cleGpsHistorique) ?? 0);
     const frequenceMs = Math.max(1, frequenceMinutes) * 60 * 1000;
     let verrou: { release: () => Promise<void> } | null = null;
 
@@ -29,7 +31,7 @@ export function SuiviZoneChantier({ sessionId, frequenceMinutes }: { sessionId: 
           if (annule) return;
           if (resultat.ok) {
             dernierEnvoi = maintenant;
-            localStorage.setItem(`liria:gps:${sessionId}`, String(maintenant));
+            localStorage.setItem(cleGps, String(maintenant));
             if (resultat.dansZone !== null) {
               setDernierStatut(resultat.dansZone ? "dans_zone" : "hors_zone");
             }
