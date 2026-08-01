@@ -1,4 +1,5 @@
 import { requeteStripe } from "@/lib/stripe-abonnement";
+import { BRAND_NAME } from "@/lib/brand";
 
 type StripeSession = { id: string; url: string | null };
 
@@ -6,7 +7,7 @@ export function stripeBoutiqueEstConfigure(environnement: NodeJS.ProcessEnv = pr
   return Boolean(environnement.STRIPE_SECRET_KEY && environnement.NEXT_PUBLIC_APP_URL);
 }
 
-// Paiement one-off Liria -> entreprise cliente (compte Stripe de la plateforme),
+// Paiement unique de la marque vers l'entreprise cliente (compte Stripe de la plateforme),
 // distinct du Stripe Connect utilisé pour les factures des entreprises à leurs propres clients.
 export async function creerSessionCheckoutBoutique(params: {
   commandeId: string;
@@ -15,7 +16,7 @@ export async function creerSessionCheckoutBoutique(params: {
   lignes: { nom: string; quantite: number; prixUnitaireCentimes: number }[];
 }) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
-  if (!baseUrl) throw new Error("La boutique Liria n’est pas encore configurée");
+  if (!baseUrl) throw new Error(`La boutique ${BRAND_NAME} n’est pas encore configurée`);
   if (!params.lignes.length) throw new Error("Le panier est vide");
 
   const corps = new URLSearchParams({

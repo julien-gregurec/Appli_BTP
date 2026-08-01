@@ -1,7 +1,7 @@
 # Accord de traitement des données (DPA)
 
 _Annexe aux Conditions Générales de Vente — Article 28 du RGPD_
-_Entre l'entreprise cliente (« le Responsable de traitement ») et [Julien GREGUREC], entrepreneur individuel, éditeur de Liria Gestion Pro (« le Sous-traitant »)._
+_Entre l'entreprise cliente (« le Responsable de traitement ») et [Julien GREGUREC], entrepreneur individuel, éditeur de ELSATIA Gestion Pro (« le Sous-traitant »)._
 _Dernière mise à jour : [JJ/MM/AAAA]_
 
 ## 1. Objet

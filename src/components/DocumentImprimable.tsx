@@ -1,4 +1,5 @@
 import { euros } from "@/lib/devis";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 export type EntrepriseEntete = {
   nom: string;
@@ -123,7 +124,7 @@ export function DocumentImprimable({
       <div style={{ display: "flex", flexDirection: positionLogo==="droite"?"row-reverse":"row", justifyContent: positionLogo==="centre"?"center":"space-between", alignItems: "flex-start", gap:"20px", marginBottom: "8px", padding:moderne?"18px":"0", background:moderne?couleur:"transparent", color:moderne?"#fff":couleur, textAlign:positionLogo==="centre"?"center":"left" }}>
         <div style={{ display: "flex", flexDirection:positionLogo==="centre"?"column":"row", alignItems: positionLogo==="centre"?"center":"flex-start", gap: "14px", maxWidth: positionLogo==="centre"?"72%":"62%" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          {afficherLogo&&<img src={entreprise.logo_url || "/liria-gestion-pro-logo-v5.png"} alt="Logo de l’entreprise" style={{ width: `${entreprise.logo_largeur_documents??105}px`, height: "64px", objectFit: "contain", background:moderne?"#fff":"transparent", borderRadius:moderne?"4px":"0", padding:moderne?"4px":"0" }} />}
+          {afficherLogo&&entreprise.logo_url&&<img src={entreprise.logo_url} alt="Logo de l’entreprise" style={{ width: `${entreprise.logo_largeur_documents??105}px`, height: "64px", objectFit: "contain", background:moderne?"#fff":"transparent", borderRadius:moderne?"4px":"0", padding:moderne?"4px":"0" }} />}
           <div>
           <div style={{ fontSize: "18px", fontWeight: 700, letterSpacing: "0.04em" }}>{entreprise.nom}</div>
           {entreprise.raison_sociale && entreprise.raison_sociale !== entreprise.nom && <div style={{ color: moderne?"#fff":"#555" }}>{entreprise.raison_sociale}</div>}
@@ -256,6 +257,7 @@ export function DocumentImprimable({
           </div>
         )}
         {entreprise.texte_pied_page && <div style={{ marginTop: "4px" }}>{entreprise.texte_pied_page}</div>}
+        <div style={{ marginTop: "4px" }}>Document généré par {PRODUCT_NAME}</div>
       </div>
     </div>
   );

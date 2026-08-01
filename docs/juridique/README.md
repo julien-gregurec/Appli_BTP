@@ -1,4 +1,4 @@
-# Pack juridique & RGPD — Liria Gestion Pro
+# Pack juridique & RGPD — ELSATIA Gestion Pro
 
 Documents rédigés pour un lancement en **micro-entreprise (entrepreneur individuel)**.
 

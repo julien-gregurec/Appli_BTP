@@ -41,7 +41,7 @@ export default async function ImprimerDoePage({ params }: { params: Promise<{ id
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "20px", marginBottom: "8px" }}>
           <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={entreprise?.logo_url || "/liria-gestion-pro-logo-v5.png"} alt="Logo de l'entreprise" style={{ width: "105px", height: "64px", objectFit: "contain" }} />
+            {entreprise?.logo_url&&<img src={entreprise.logo_url} alt="Logo de l'entreprise" style={{ width: "105px", height: "64px", objectFit: "contain" }} />}
             <div style={{ fontSize: "18px", fontWeight: 700, letterSpacing: "0.04em" }}>{entreprise?.nom ?? ctx.entrepriseNom}</div>
           </div>
           <div style={{ textAlign: "right" }}>

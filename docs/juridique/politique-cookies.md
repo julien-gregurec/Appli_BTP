@@ -6,7 +6,7 @@ _Dernière mise à jour : [JJ/MM/AAAA]_
 
 Un cookie est un petit fichier déposé sur votre appareil lors de la consultation d'un service en ligne. Il permet notamment de vous reconnaître d'une page à l'autre et de maintenir votre session.
 
-## 2. Cookies utilisés par Liria Gestion Pro
+## 2. Cookies utilisés par ELSATIA Gestion Pro
 
 Le Service utilise **uniquement des cookies strictement nécessaires** à son fonctionnement. Ceux-ci ne requièrent pas votre consentement préalable (article 82 de la loi Informatique et Libertés).
 
@@ -27,4 +27,4 @@ Vous pouvez configurer votre navigateur pour refuser ou supprimer les cookies. L
 
 ## 5. Contact
 
-Pour toute question : **[contact@liria… — À COMPLÉTER]**.
+Pour toute question : **[EMAIL_SUPPORT]**.

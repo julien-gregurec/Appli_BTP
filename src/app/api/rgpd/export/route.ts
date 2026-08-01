@@ -26,7 +26,7 @@ export async function GET() {
     status: 200,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
-      "Content-Disposition": `attachment; filename="export-donnees-liria-${horodatage}.json"`,
+      "Content-Disposition": `attachment; filename="export-donnees-elsatia-gestion-pro-${horodatage}.json"`,
       "Cache-Control": "no-store",
     },
   });

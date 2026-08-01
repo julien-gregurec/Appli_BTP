@@ -4,13 +4,13 @@ _Dernière mise à jour : [JJ/MM/AAAA]_
 
 ## Éditeur du service
 
-Le service **Liria Gestion Pro** (ci-après « le Service »), accessible à l'adresse [https://liria-concept-gestion-btp.vercel.app] (et tout domaine associé), est édité par :
+Le service **ELSATIA Gestion Pro** (ci-après « le Service »), accessible à l'adresse **[URL_APPLICATION]** (et tout domaine associé), est édité par :
 
 - **[Julien GREGUREC]**, entrepreneur individuel (micro-entreprise)
 - Adresse : **[À COMPLÉTER — adresse de la micro-entreprise]**
 - SIRET : **[À COMPLÉTER]**
 - Numéro de TVA intracommunautaire : **Non applicable** — TVA non applicable, article 293 B du Code général des impôts
-- E-mail : **[contact@liria… — À COMPLÉTER]**
+- E-mail : **[EMAIL_SUPPORT]**
 - Directeur de la publication : **[Julien GREGUREC]**
 
 ## Hébergement
@@ -27,7 +27,7 @@ Stripe Payments Europe, Ltd. — 1 Grand Canal Street Lower, Grand Canal Dock, D
 
 ## Propriété intellectuelle
 
-L'ensemble des éléments du Service (marque « Liria Gestion Pro », logo, textes, interfaces, code, bases de données, éléments graphiques) est protégé par le droit de la propriété intellectuelle et demeure la propriété exclusive de l'éditeur, sauf mention contraire. Toute reproduction, représentation, modification ou exploitation non autorisée est interdite.
+L'ensemble des éléments du Service (marque « ELSATIA », nom du logiciel « ELSATIA Gestion Pro », logo, textes, interfaces, code, bases de données, éléments graphiques) est protégé par le droit de la propriété intellectuelle et demeure la propriété exclusive de l'éditeur, sauf mention contraire. Toute reproduction, représentation, modification ou exploitation non autorisée est interdite.
 
 Les données saisies par les entreprises utilisatrices (clients, chantiers, documents, photos) restent leur propriété. L'éditeur ne dispose d'aucun droit de propriété sur ces données et ne les exploite que pour fournir le Service (voir la Politique de confidentialité).
 
@@ -37,4 +37,4 @@ L'éditeur s'efforce d'assurer l'exactitude et la disponibilité du Service, san
 
 ## Contact
 
-Pour toute question : **[contact@liria… — À COMPLÉTER]**.
+Pour toute question : **[EMAIL_SUPPORT]**.

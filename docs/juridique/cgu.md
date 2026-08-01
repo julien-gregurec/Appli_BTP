@@ -4,7 +4,7 @@ _Dernière mise à jour : [JJ/MM/AAAA] — Version 1.0_
 
 ## Article 1 — Objet
 
-Les présentes Conditions Générales d'Utilisation (« CGU ») définissent les règles d'accès et d'usage du service **Liria Gestion Pro** (« le Service »). Elles complètent les Conditions Générales de Vente et la Politique de confidentialité.
+Les présentes Conditions Générales d'Utilisation (« CGU ») définissent les règles d'accès et d'usage du service **ELSATIA Gestion Pro** (« le Service »). Elles complètent les Conditions Générales de Vente et la Politique de confidentialité.
 
 ## Article 2 — Accès au Service
 

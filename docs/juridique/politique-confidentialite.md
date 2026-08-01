@@ -2,7 +2,7 @@
 
 _Dernière mise à jour : [JJ/MM/AAAA]_
 
-La présente politique explique comment **Liria Gestion Pro** (« le Service »), édité par **[Julien GREGUREC], entrepreneur individuel** (« nous »), traite les données personnelles, conformément au Règlement (UE) 2016/679 (« RGPD ») et à la loi Informatique et Libertés.
+La présente politique explique comment **ELSATIA Gestion Pro** (« le Service »), édité par **[Julien GREGUREC], entrepreneur individuel** (« nous »), traite les données personnelles, conformément au Règlement (UE) 2016/679 (« RGPD ») et à la loi Informatique et Libertés.
 
 ## 1. Deux rôles distincts
 
@@ -61,7 +61,7 @@ Certains sous-traitants sont des sociétés établies aux États-Unis. Lorsqu'un
 
 Vous disposez des droits d'**accès, de rectification, d'effacement, de limitation, d'opposition et de portabilité**, ainsi que du droit de définir des directives post-mortem.
 
-**Pour les exercer** : écrivez à **[contact@liria… — À COMPLÉTER]**. Nous répondons dans un délai d'un mois. Une pièce d'identité peut être demandée en cas de doute raisonnable sur votre identité. Le Service met également à disposition des fonctions d'**export** et de **suppression** de vos données depuis votre espace.
+**Pour les exercer** : écrivez à **[EMAIL_SUPPORT]**. Nous répondons dans un délai d'un mois. Une pièce d'identité peut être demandée en cas de doute raisonnable sur votre identité. Le Service met également à disposition des fonctions d'**export** et de **suppression** de vos données depuis votre espace.
 
 Vous pouvez introduire une réclamation auprès de la **CNIL** (www.cnil.fr).
 
@@ -75,4 +75,4 @@ Nous mettons en œuvre des mesures techniques et organisationnelles adaptées : 
 
 ## 10. Contact
 
-Responsable de traitement : **[Julien GREGUREC]** — **[contact@liria… — À COMPLÉTER]**.
+Responsable de traitement : **[Julien GREGUREC]** — **[EMAIL_SUPPORT]**.
