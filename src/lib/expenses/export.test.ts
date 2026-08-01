@@ -13,7 +13,7 @@ describe("export comptable", () => {
 
   it("associe chaque fichier à son empreinte dans le manifeste", () => {
     const fichiers = [{ chemin: "justificatifs/a.pdf", sha256: "a".repeat(64), taille: 10, noteReference: "EXP-1", documentVersionId: "v1" }];
-    const manifeste = creerManifeste({ entrepriseId: "e1", entrepriseNom: "Liria", periodeDebut: "2026-07-01", periodeFin: "2026-07-31", genereAt: "2026-08-01T00:00:00Z", fichiers });
+    const manifeste = creerManifeste({ entrepriseId: "e1", entrepriseNom: "Entreprise Démo", periodeDebut: "2026-07-01", periodeFin: "2026-07-31", genereAt: "2026-08-01T00:00:00Z", fichiers });
     expect(manifeste.fichiers).toEqual(fichiers);
     expect(manifeste.schema).toBe("liria-gestion-pro/expense-export/v1");
   });

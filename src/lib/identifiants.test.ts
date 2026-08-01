@@ -3,7 +3,7 @@ import { prefixeIdentifiantEntreprise } from "./identifiants";
 
 describe("prefixeIdentifiantEntreprise", () => {
   it("prend les trois premières lettres utiles du nom", () => {
-    expect(prefixeIdentifiantEntreprise("Liria Concept")).toBe("LIR");
+    expect(prefixeIdentifiantEntreprise("Entreprise Exemple")).toBe("ENT");
   });
 
   it("retire les accents et les séparateurs", () => {

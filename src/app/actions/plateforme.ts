@@ -148,7 +148,7 @@ export async function quitterEntreprisePlateformeAction(){
   revalidatePath("/plateforme");redirect("/plateforme");
 }
 
-// Reserve a l'admin plateforme (Liria) : un gerant d'entreprise cliente n'a pas
+// Réservé à l'administration de la plateforme : un gérant d'entreprise cliente n'a pas
 // cette option, seulement le flux d'auto-service /mot-de-passe-oublie.
 export async function reinitialiserMotDePassePlateformeAction(entrepriseId:string,formData:FormData){
   if(!(await estPlateformeAdmin()))redirect("/dashboard");

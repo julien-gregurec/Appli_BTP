@@ -3,8 +3,8 @@ import { sha256, verifierEmpreinte } from "./integrity";
 
 describe("intégrité SHA-256", () => {
   it("calcule une empreinte stable", () => {
-    const data = new TextEncoder().encode("Liria Gestion Pro");
-    expect(sha256(data)).toBe("8b34c97dd9d3d83f2480d75fab2c9d4c4dd198cec84840537fcdbe50014cf7e3");
+    const data = new TextEncoder().encode("document de test");
+    expect(sha256(data)).toBe("f2cc56295c4707f6c159afc5b9bbc82270498d15f9eb4d8a0118db2b924cf5f1");
     expect(verifierEmpreinte(data, sha256(data))).toBe(true);
   });
 
