@@ -2,7 +2,7 @@
 
 ## Principe de sécurité
 
-Liria Gestion Pro prépare les virements mais ne contourne jamais la banque. Le circuit est volontairement séparé en cinq étapes :
+ELSATIA Gestion Pro prépare les virements mais ne contourne jamais la banque. Le circuit est volontairement séparé en cinq étapes :
 
 1. réception d’une facture fournisseur, d’une note de frais validée ou d’un bulletin de paie ;
 2. présence d’un RIB actif et vérifié ;
