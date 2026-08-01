@@ -23,7 +23,7 @@ Appliquée et contrôlée dans le projet Supabase de production le 22 juillet 20
 
 ## Configuration Stripe requise pour l'encaissement réel
 
-Les variables suivantes doivent être créées dans Vercel avec des valeurs Stripe de production, jamais dans Git :
+Les variables suivantes doivent être créées dans Vercel avec des valeurs Stripe live en production, jamais dans Git. Le développement et la preview doivent utiliser exclusivement des Price IDs de test :
 
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_ABONNEMENT_SECRET`
@@ -31,7 +31,13 @@ Les variables suivantes doivent être créées dans Vercel avec des valeurs Stri
 - `STRIPE_PRICE_PRO_MENSUEL` et `STRIPE_PRICE_PRO_ANNUEL`
 - `STRIPE_PRICE_BUSINESS_MENSUEL` et `STRIPE_PRICE_BUSINESS_ANNUEL`
 - `STRIPE_PRICE_ENTREPRISE_MENSUEL` et `STRIPE_PRICE_ENTREPRISE_ANNUEL`
+- `STRIPE_PRICE_COMPTE_SUP_MINI_MENSUEL` et `STRIPE_PRICE_COMPTE_SUP_MINI_ANNUEL`
+- `STRIPE_PRICE_COMPTE_SUP_PRO_MENSUEL` et `STRIPE_PRICE_COMPTE_SUP_PRO_ANNUEL`
+- `STRIPE_PRICE_COMPTE_SUP_BUSINESS_MENSUEL` et `STRIPE_PRICE_COMPTE_SUP_BUSINESS_ANNUEL`
+- `STRIPE_PRICE_COMPTE_SUP_ENTREPRISE_MENSUEL` et `STRIPE_PRICE_COMPTE_SUP_ENTREPRISE_ANNUEL`
 - les prix d'options réellement commercialisées.
+
+Les variables Essentiel et Premium restent prises en charge uniquement pour la compatibilité avec les abonnements historiques ; elles ne décrivent pas les offres commercialisées actuellement. Aucun Price ID réel ni aucune clé Stripe ne doit être versionné.
 
 Le webhook abonnement doit viser `/api/stripe/abonnement/webhook`. Ne pas réutiliser le webhook Connect.
 
