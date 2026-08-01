@@ -5,12 +5,13 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { nomClient } from "@/lib/chantier-statuts";
 import { DevisEditor } from "@/components/DevisEditor";
+import { iaEstActive } from "@/lib/preview-features";
 
 export default async function ModifierDevisPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  const peutUtiliserIA = aAccesIA(await permissionsUtilisateur(ctx));
+  const peutUtiliserIA = iaEstActive() && aAccesIA(await permissionsUtilisateur(ctx));
 
   const [{ data: devis }, { data: lignes }, { data: clients }, { data: chantiers }, { data: prestations }] = await Promise.all([
     supabase.from("devis").select("id, client_id, chantier_id, date_validite, remise_globale, notes_client, statut").eq("id", id).eq("entreprise_id", ctx.entrepriseId).single(),

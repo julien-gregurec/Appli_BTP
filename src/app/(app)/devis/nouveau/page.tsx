@@ -4,6 +4,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { DevisEditor } from "@/components/DevisEditor";
 import { nomClient } from "@/lib/chantier-statuts";
+import { iaEstActive } from "@/lib/preview-features";
 
 export default async function NouveauDevisPage({
   searchParams,
@@ -13,7 +14,7 @@ export default async function NouveauDevisPage({
   const { client: clientPreselect, chantier: chantierPreselect } = await searchParams;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  const peutUtiliserIA = aAccesIA(await permissionsUtilisateur(ctx));
+  const peutUtiliserIA = iaEstActive() && aAccesIA(await permissionsUtilisateur(ctx));
 
   const { data: clients } = await supabase
     .from("clients")

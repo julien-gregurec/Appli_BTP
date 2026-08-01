@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifierSignatureStripe } from "@/lib/stripe";
+import { boutiqueEstActive } from "@/lib/preview-features";
 
 type StripeEvent = { id: string; type: string; livemode: boolean; data: { object: {
   id: string; payment_status?: string; metadata?: { commande_id?: string };
 } } };
 
 export async function POST(request: Request) {
+  if (!boutiqueEstActive()) return NextResponse.json({ error: "Fonctionnalité indisponible" }, { status: 404 });
   const secret = process.env.STRIPE_WEBHOOK_BOUTIQUE_SECRET;
   if (!secret) return NextResponse.json({ error: "Webhook boutique non configuré" }, { status: 503 });
   const brut = await request.text();

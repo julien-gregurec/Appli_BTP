@@ -7,6 +7,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { suggererReponse, type MessageThread } from "@/lib/ai/messagerie";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
+import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
 
 function retour(type: "error" | "success", message: string, conversationId?: string): never {
   const query = new URLSearchParams({ [type]: message });
@@ -85,6 +86,7 @@ export async function envoyerMessageInterneAction(conversationId: string, formDa
 }
 
 export async function suggererReponseIAAction(conversationId: string): Promise<{ brouillon: string } | { error: string }> {
+  if (!iaEstActive()) return { error: MESSAGE_IA_INDISPONIBLE };
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };

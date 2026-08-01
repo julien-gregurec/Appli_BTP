@@ -11,6 +11,7 @@ import { AppPresenceTracker } from "@/components/AppPresenceTracker";
 import { AbonnementBanner } from "@/components/AbonnementBanner";
 import { SupportAccessBanner } from "@/components/SupportAccessBanner";
 import { activeFeaturesForCompany } from "@/lib/feature-flags";
+import { boutiqueEstActive, iaEstActive } from "@/lib/preview-features";
 
 // Layout des pages authentifiées avec navigation latérale.
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -52,7 +53,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         .lecture-seule main form[method="get"]{display:flex!important}
         .lecture-seule main form[method="get"] button{display:inline-flex!important}
       `}</style>
-      <Sidebar entrepriseNom={ctx.entrepriseNom} logoUrl={ctx.logoUrl} authDisabled={isEmailLoginDisabled()} permissions={permissions} plateformeAdmin={plateformeAdmin} activeFeatures={activeFeatures} />
+      <Sidebar entrepriseNom={ctx.entrepriseNom} logoUrl={ctx.logoUrl} authDisabled={isEmailLoginDisabled()} permissions={permissions} plateformeAdmin={plateformeAdmin} boutiqueActive={boutiqueEstActive()} activeFeatures={activeFeatures} />
       <div className="min-w-0 flex-1">
         {ctx.accesSupportPlateforme&&<SupportAccessBanner entrepriseNom={ctx.entrepriseNom}/>}
         {!ctx.accesSupportPlateforme&&ctx.suspensionPrevueAt&&peutVoirAlerteAbonnement&&<AbonnementBanner echeance={ctx.suspensionPrevueAt} message={ctx.impayeMessage}/>}
@@ -60,7 +61,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </div>
       <MobileBack />
       <AideButton />
-      {aAccesIA(permissions) && <AssistantIA />}
+      {iaEstActive() && aAccesIA(permissions) && <AssistantIA />}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { DashboardAnalytics } from "@/components/DashboardAnalytics";
 import { DashboardWidget, DashboardWidgetFirstConnection } from "@/components/DashboardWidgets";
 import { BriefingMatin, type LigneBriefing } from "@/components/BriefingMatin";
 import { Lien as Link } from "@/components/Lien";
+import { iaEstActive } from "@/lib/preview-features";
 import { CentreAlertesOperationnelles, type AlerteOperationnelle } from "@/components/CentreAlertesOperationnelles";
 import { activeFeaturesForCompany } from "@/lib/feature-flags";
 import { featureForPath } from "@/lib/feature-catalogue";
@@ -225,7 +226,7 @@ export default async function DashboardPage() {
     <main className="p-8">
       <div className="mx-auto max-w-6xl space-y-6">
         {peutVoirBriefing ? (
-          <BriefingMatin prenom={prenomAffiche} lignes={lignesBriefing} peutUtiliserIA={aAccesIA(permissions)} />
+          <BriefingMatin prenom={prenomAffiche} lignes={lignesBriefing} peutUtiliserIA={iaEstActive() && aAccesIA(permissions)} />
         ) : (
           <div>
             <h1 className="text-xl font-semibold">Bonjour{prenomAffiche ? ` ${prenomAffiche}` : ""}</h1>

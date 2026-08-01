@@ -8,6 +8,7 @@ import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { AnalyseDocumentIA } from "@/components/AnalyseDocumentIA";
 import { DOCUMENT_CATEGORIES, libelleCategorie, tailleLisible } from "@/lib/documents";
 import { MIME_ANALYSABLES_IA } from "@/lib/ai/documents";
+import { iaEstActive } from "@/lib/preview-features";
 
 export default async function DocumentsChantierPage({
   params,
@@ -20,7 +21,7 @@ export default async function DocumentsChantierPage({
   const messages = await searchParams;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  const peutUtiliserIA = aAccesIA(await permissionsUtilisateur(ctx));
+  const peutUtiliserIA = iaEstActive() && aAccesIA(await permissionsUtilisateur(ctx));
   const [{ data: chantier }, { data: documents }, { data: mediasConversation }] = await Promise.all([
     supabase.from("chantiers").select("id, nom, reference_interne")
       .eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),

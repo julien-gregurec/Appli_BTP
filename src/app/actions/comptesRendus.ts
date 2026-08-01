@@ -6,8 +6,10 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { structurerCompteRendu } from "@/lib/ai/compteRendu";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
+import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
 
 export async function structurerCompteRenduIAAction(transcription: string) {
+  if (!iaEstActive()) return { error: MESSAGE_IA_INDISPONIBLE };
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };

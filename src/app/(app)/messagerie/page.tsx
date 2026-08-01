@@ -6,6 +6,7 @@ import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { creerConversationInterneAction, envoyerMessageInterneAction } from "@/app/actions/messagerie";
 import { ZoneReponseMessagerie } from "@/components/ZoneReponseMessagerie";
+import { iaEstActive } from "@/lib/preview-features";
 
 type Relation<T> = T | T[] | null;
 type ContactMessagerie = { id: string; prenom: string; nom: string; poste: string | null };
@@ -23,7 +24,7 @@ export default async function MessageriePage({ searchParams }: { searchParams: P
   if (isEmailLoginDisabled()) return <main className="p-8"><div className="mx-auto max-w-4xl"><h1 className="text-xl font-semibold">Messagerie interne</h1><p className="mt-4 rounded border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">La messagerie privée nécessite des comptes collaborateurs individuels.</p></div></main>;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  const peutUtiliserIA = aAccesIA(await permissionsUtilisateur(ctx));
+  const peutUtiliserIA = iaEstActive() && aAccesIA(await permissionsUtilisateur(ctx));
   const [{ data: moi }, { data: employes }, { data: chantiers }, { data: conversations }] = await Promise.all([
     supabase.from("employes").select("id,prenom,nom").eq("entreprise_id",ctx.entrepriseId).eq("utilisateur_id",ctx.userId).maybeSingle(),
     supabase.rpc("contacts_messagerie",{p_entreprise_id:ctx.entrepriseId}),

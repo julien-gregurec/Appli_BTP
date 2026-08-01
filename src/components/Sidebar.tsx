@@ -16,6 +16,7 @@ export function Sidebar({
   authDisabled = false,
   permissions = null,
   plateformeAdmin = false,
+  boutiqueActive = true,
   activeFeatures,
 }: {
   entrepriseNom: string;
@@ -23,6 +24,7 @@ export function Sidebar({
   authDisabled?: boolean;
   permissions?: string[] | null;
   plateformeAdmin?: boolean;
+  boutiqueActive?: boolean;
   activeFeatures: FeatureKey[];
 }) {
   const pathname = usePathname();
@@ -32,6 +34,7 @@ export function Sidebar({
     ? NAVIGATION_APPLICATION.filter((item) => ["/stock", "/stock/borne", "/depot"].includes(item.href))
     : NAVIGATION_APPLICATION;
   const navigation = navigationBrute.filter((item) => {
+    if (!boutiqueActive && item.href === "/boutique") return false;
     const feature = featureForPath(item.href);
     return (!feature || activeFeatures.includes(feature)) && item.actif && navigationAutorisee(item.permission, permissions);
   });

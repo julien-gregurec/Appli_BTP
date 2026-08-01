@@ -9,6 +9,7 @@ import type { LigneDevis } from "@/lib/devis";
 import { TRANSITIONS_DEVIS } from "@/lib/devis";
 import { genererLignesDevisIA } from "@/lib/ai/devis";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
+import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
 
 type DevisPayload = {
   client_id: string;
@@ -229,6 +230,7 @@ export async function dupliquerDevisAction(devisId: string) {
 }
 
 export async function genererDevisIAAction(description: string) {
+  if (!iaEstActive()) return { error: MESSAGE_IA_INDISPONIBLE };
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };

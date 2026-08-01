@@ -1,4 +1,5 @@
 import { creerProviderOpenAI } from "@/lib/ai/providers/openai";
+import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
 
 export type FichierIA = { base64: string; mimeType: string };
 
@@ -47,5 +48,6 @@ export interface ProviderIA {
 // Point d'extension unique : un futur providers/anthropic.ts ou providers/gemini.ts
 // n'implique aucun changement dans lib/ai/*.ts, seulement ce switch.
 export function obtenirProviderIA(): ProviderIA {
+  if (!iaEstActive()) throw new Error(MESSAGE_IA_INDISPONIBLE);
   return creerProviderOpenAI();
 }

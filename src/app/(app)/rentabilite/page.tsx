@@ -4,6 +4,7 @@ import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { euros } from "@/lib/devis";
 import { Lien as Link } from "@/components/Lien";
 import { AnalyseRentabiliteIA } from "@/components/AnalyseRentabiliteIA";
+import { iaEstActive } from "@/lib/preview-features";
 
 type PointageRentabilite = { chantier_id: string; heures_normales: number; heures_supplementaires: number; employe: { cout_horaire: number | null } | { cout_horaire: number | null }[] | null };
 type MouvementStockRentabilite = { chantier_id: string; quantite: number; article: { prix_achat_ht: number } | { prix_achat_ht: number }[] | null };
@@ -12,7 +13,7 @@ const un = <T,>(valeur: T | T[] | null): T | null => Array.isArray(valeur) ? val
 export default async function RentabilitePage() {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  const peutUtiliserIA = aAccesIA(await permissionsUtilisateur(ctx));
+  const peutUtiliserIA = iaEstActive() && aAccesIA(await permissionsUtilisateur(ctx));
   const [{ data: chantiers }, { data: factures }, { data: devis }, { data: donneesPointages }, { data: depenses }, { data: donneesIndemnites }, { data: donneesMouvementsStock }, { data: donneesNotesFrais }] = await Promise.all([
     supabase.from("chantiers").select("id, reference_interne, nom, statut, client:clients(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
     supabase.from("factures").select("chantier_id, montant_ht, statut, type").eq("entreprise_id", ctx.entrepriseId),

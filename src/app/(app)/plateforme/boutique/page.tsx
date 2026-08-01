@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { estPlateformeAdmin } from "@/lib/plateforme";
 import { creerProduitBoutiqueAction, modifierProduitBoutiqueAction } from "@/app/actions/boutique";
 import { BRAND_NAME } from "@/lib/brand";
+import { boutiqueEstActive } from "@/lib/preview-features";
 
 const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 const CATEGORIES = [
@@ -15,6 +16,7 @@ const CATEGORIES = [
 type Produit = { id: string; sku: string; nom: string; categorie: string; prix_ht: number; stock_disponible: number; seuil_alerte_stock: number; actif: boolean };
 
 export default async function PlateformeBoutiquePage({ searchParams }: { searchParams: Promise<{ error?: string; success?: string }> }) {
+  if (!boutiqueEstActive()) notFound();
   if (!(await estPlateformeAdmin())) notFound();
   const params = await searchParams;
   const supabase = await createClient();

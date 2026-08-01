@@ -5,12 +5,14 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { analyserRentabilite } from "@/lib/ai/rentabilite";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
+import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
 
 type PointageRentabilite = { heures_normales: number; heures_supplementaires: number; employe: { cout_horaire: number | null } | { cout_horaire: number | null }[] | null };
 type MouvementStockRentabilite = { quantite: number; article: { prix_achat_ht: number } | { prix_achat_ht: number }[] | null };
 const un = <T,>(valeur: T | T[] | null): T | null => (Array.isArray(valeur) ? (valeur[0] ?? null) : valeur);
 
 export async function analyserRentabiliteIAAction(chantierId: string): Promise<{ analyse: string } | { error: string }> {
+  if (!iaEstActive()) return { error: MESSAGE_IA_INDISPONIBLE };
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };

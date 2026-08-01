@@ -13,6 +13,7 @@ import {
 } from "@/lib/documents";
 import { analyserDocumentIA, MIME_ANALYSABLES_IA } from "@/lib/ai/documents";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
+import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
 
 const BUCKET = "chantier-documents";
 
@@ -91,6 +92,7 @@ export async function supprimerDocumentChantierAction(chantierId: string, docume
 }
 
 export async function analyserDocumentIAAction(documentId: string) {
+  if (!iaEstActive()) return { error: MESSAGE_IA_INDISPONIBLE };
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };

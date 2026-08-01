@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
+import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
 
 // La conversation avec l'assistant passe par /api/assistant/chat (streaming SSE),
 // pas par une server action — voir src/app/api/assistant/chat/route.ts.
@@ -20,6 +21,7 @@ export async function creerAffectationDepuisPropositionAction(proposition: {
   heures: number;
   tache: string | null;
 }): Promise<{ error: string } | { ok: true }> {
+  if (!iaEstActive()) return { error: MESSAGE_IA_INDISPONIBLE };
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const permissions = await permissionsUtilisateur(ctx);
@@ -77,6 +79,7 @@ export async function creerDemandeCongeDepuisPropositionAction(proposition: {
   demiJourFin: string;
   commentaire: string | null;
 }): Promise<{ error: string } | { ok: true }> {
+  if (!iaEstActive()) return { error: MESSAGE_IA_INDISPONIBLE };
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
@@ -121,6 +124,7 @@ export async function envoyerMessageInterneDepuisPropositionAction(proposition: 
   chantierId: string | null;
   contenu: string;
 }): Promise<{ error: string } | { ok: true }> {
+  if (!iaEstActive()) return { error: MESSAGE_IA_INDISPONIBLE };
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
@@ -162,6 +166,7 @@ export async function envoyerMessageInterneDepuisPropositionAction(proposition: 
 // Meme insertion que envoyerMessageSupportAction (saisie manuelle depuis /aide) — pas de
 // lien avec une fiche employe, un compte suffit.
 export async function envoyerMessageSupportDepuisPropositionAction(proposition: { contenu: string }): Promise<{ error: string } | { ok: true }> {
+  if (!iaEstActive()) return { error: MESSAGE_IA_INDISPONIBLE };
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };

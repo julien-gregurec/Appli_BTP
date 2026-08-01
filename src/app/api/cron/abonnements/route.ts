@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ajouterOptionIAAbonnement, estPalierOptionIA, estPeriodiciteAbonnement, reconcilierAbonnementStripe } from "@/lib/stripe-abonnement";
+import { cronsSontActifs } from "@/lib/preview-features";
 
 // Bascule les essais Option IA expires vers la facturation reelle. Regroupe avec le cron
 // des abonnements (et non un cron dedie) car le plan Vercel Hobby limite le nombre de
@@ -64,6 +65,7 @@ async function notifierPointagesManquantsEtAValider(admin: ReturnType<typeof cre
 }
 
 export async function GET(request: Request) {
+  if (!cronsSontActifs()) return NextResponse.json({ error: "Tâches planifiées désactivées" }, { status: 404 });
   const secret = process.env.CRON_SECRET;
   if (!secret) return NextResponse.json({ error: "CRON_SECRET absent" }, { status: 503 });
   if (request.headers.get("authorization") !== `Bearer ${secret}`) return NextResponse.json({ error: "Accès refusé" }, { status: 401 });

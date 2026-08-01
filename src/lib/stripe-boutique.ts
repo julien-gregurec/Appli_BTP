@@ -1,10 +1,11 @@
 import { requeteStripe } from "@/lib/stripe-abonnement";
 import { BRAND_NAME } from "@/lib/brand";
+import { boutiqueEstActive, MESSAGE_BOUTIQUE_INDISPONIBLE } from "@/lib/preview-features";
 
 type StripeSession = { id: string; url: string | null };
 
 export function stripeBoutiqueEstConfigure(environnement: NodeJS.ProcessEnv = process.env) {
-  return Boolean(environnement.STRIPE_SECRET_KEY && environnement.NEXT_PUBLIC_APP_URL);
+  return boutiqueEstActive(environnement) && Boolean(environnement.STRIPE_SECRET_KEY && environnement.NEXT_PUBLIC_APP_URL);
 }
 
 // Paiement unique de la marque vers l'entreprise cliente (compte Stripe de la plateforme),
@@ -15,6 +16,7 @@ export async function creerSessionCheckoutBoutique(params: {
   email?: string | null;
   lignes: { nom: string; quantite: number; prixUnitaireCentimes: number }[];
 }) {
+  if (!boutiqueEstActive()) throw new Error(MESSAGE_BOUTIQUE_INDISPONIBLE);
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
   if (!baseUrl) throw new Error(`La boutique ${BRAND_NAME} n’est pas encore configurée`);
   if (!params.lignes.length) throw new Error("Le panier est vide");

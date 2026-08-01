@@ -4,12 +4,13 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { DicteeCompteRendu } from "@/components/DicteeCompteRendu";
+import { iaEstActive } from "@/lib/preview-features";
 
 export default async function ComptesRendusChantierPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  const peutUtiliserIA = aAccesIA(await permissionsUtilisateur(ctx));
+  const peutUtiliserIA = iaEstActive() && aAccesIA(await permissionsUtilisateur(ctx));
 
   const [{ data: chantier }, { data: comptesRendus }] = await Promise.all([
     supabase.from("chantiers").select("id, nom").eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),

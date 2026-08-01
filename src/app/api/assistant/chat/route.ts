@@ -5,6 +5,7 @@ import { demanderAssistantIAStream, type MessageChat } from "@/lib/ai/assistant"
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
 import { TAILLE_MAX_CORPS_ASSISTANT, validerRequeteAssistant } from "@/lib/ai/validation";
 import { erreurPublique, verifierTailleRequete } from "@/lib/security/validation";
+import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
 
 // Plafond dedie a cette route : ne pas reutiliser un plafond generique de petite route
 // JSON, la piece jointe encodee en base64 (jusqu'a 6 Mo reels) ne rentrerait pas dedans.
@@ -39,6 +40,7 @@ async function lireJsonBorne(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (!iaEstActive()) return Response.json({ error: MESSAGE_IA_INDISPONIBLE }, { status: 404 });
   const corps = await lireJsonBorne(request);
   if (corps.tropVolumineux) {
     return Response.json({ error: "Requête trop volumineuse." }, { status: 413 });

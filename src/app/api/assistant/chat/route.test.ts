@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Test d'integration de la route reelle (pas seulement de la validation isolee) : construit
 // de vraies Request avec un corps ReadableStream, pour verifier que le lecteur de flux
@@ -34,6 +34,16 @@ vi.mock("@/lib/ai/assistant", async (importActual) => {
 });
 
 const { POST } = await import("./route");
+const assistant = await import("@/lib/ai/assistant");
+const entreprise = await import("@/lib/entreprise");
+const permissions = await import("@/lib/permissions");
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(permissions.aAccesIA).mockReturnValue(true);
+});
+
+afterEach(() => vi.unstubAllEnvs());
 
 function base64DeTaille(octets: number): string {
   return Buffer.alloc(octets, 1).toString("base64");
@@ -57,6 +67,22 @@ async function lireStatutEtCorps(reponse: Response) {
 }
 
 describe("POST /api/assistant/chat — regression pieces jointes", () => {
+  it("refuse avant tout contexte ou provider lorsque l'IA globale est désactivée", async () => {
+    vi.stubEnv("FEATURE_AI_ENABLED", "false");
+    const reponse = await POST(requeteJson({ historique: [{ role: "user", contenu: "Bonjour" }] }));
+    expect(reponse.status).toBe(404);
+    expect(entreprise.getContexteEntreprise).not.toHaveBeenCalled();
+    expect(assistant.demanderAssistantIAStream).not.toHaveBeenCalled();
+  });
+
+  it("conserve le contrôle des permissions lorsque l'IA globale est active", async () => {
+    vi.stubEnv("FEATURE_AI_ENABLED", "true");
+    vi.mocked(permissions.aAccesIA).mockReturnValue(false);
+    const reponse = await POST(requeteJson({ historique: [{ role: "user", contenu: "Bonjour" }] }));
+    expect(reponse.status).toBe(403);
+    expect(assistant.demanderAssistantIAStream).not.toHaveBeenCalled();
+  });
+
   it("accepte un message texte normal sans fichier", async () => {
     const reponse = await POST(requeteJson({ historique: [{ role: "user", contenu: "Bonjour" }] }));
     expect(reponse.status).toBe(200);
