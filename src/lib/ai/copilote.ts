@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { OutilIA } from "@/lib/ai/provider";
+import { BRAND_NAME, PRODUCT_NAME } from "@/lib/brand";
 import { calculerRentabiliteChantiers } from "@/lib/rentabilite";
 
 type Supabase = SupabaseClient;
@@ -279,7 +280,7 @@ export const OUTILS_COPILOTE: OutilIA[] = [
       type: "object",
       properties: {
         employe_ids: { type: "array", items: { type: "string" }, description: "Un ou plusieurs identifiants d'employé (obtenus via chercher_employe). Une même affectation est créée pour chacun." },
-        type_activite: { type: "string", enum: ["chantier", "bureau", "depot", "visite_medicale", "formation", "conge", "autre"], description: "\"chantier\" par défaut. \"conge\" pose une absence directement (sans passer par une demande à approuver). \"autre\" couvre tout le reste (repas, rendez-vous, réunion externe, chantier pas encore créé dans Liria...)." },
+        type_activite: { type: "string", enum: ["chantier", "bureau", "depot", "visite_medicale", "formation", "conge", "autre"], description: `"chantier" par défaut. "conge" pose une absence directement (sans passer par une demande à approuver). "autre" couvre tout le reste (repas, rendez-vous, réunion externe, chantier pas encore créé dans ${PRODUCT_NAME}...).` },
         chantier_id: { type: "string", description: "Obligatoire uniquement si type_activite=\"chantier\"" },
         lieu_activite: { type: "string", description: "Quand type_activite n'est pas \"chantier\" : reprends fidèlement ce que l'utilisateur a dit sur le lieu/contexte (ex. \"Restaurant avec le président du RCSA\", \"Dépôt principal\", \"Chantier non enregistré : nom cité\")" },
         date: { type: "string", description: "Date au format AAAA-MM-JJ" },
@@ -338,7 +339,7 @@ export const OUTILS_COPILOTE: OutilIA[] = [
       "Termine la conversation en proposant d'envoyer un message interne, pour validation manuelle. N'écrit rien en base tant que l'utilisateur n'a pas validé. " +
       "Deux destinations possibles, exactement une des deux : destinataire_employe_id pour un message direct à un collègue nommé (identifié via chercher_employe), " +
       "ou chantier_id pour poster sur le fil de discussion partagé d'un chantier (identifié via chercher_chantier_planning), visible par toute l'équipe du chantier. " +
-      "Réservé aux messages professionnels internes à l'entreprise — pas pour contacter le support Liria (utilise proposer_message_support pour ça).",
+      `Réservé aux messages professionnels internes à l'entreprise — pas pour contacter le support ${BRAND_NAME} (utilise proposer_message_support pour ça).`,
     parametres: {
       type: "object",
       properties: {
@@ -352,8 +353,8 @@ export const OUTILS_COPILOTE: OutilIA[] = [
   {
     nom: "proposer_message_support",
     description:
-      "Termine la conversation en proposant d'envoyer un message au support Liria (l'éditeur du logiciel), pour validation manuelle. N'écrit rien en base tant que l'utilisateur n'a pas validé. " +
-      "Uniquement pour un problème technique, une question sur le fonctionnement de l'application, la facturation de l'abonnement Liria, etc. — jamais pour une question métier BTP ou une communication avec un client/collègue.",
+      `Termine la conversation en proposant d'envoyer un message au support ${BRAND_NAME} (l'éditeur du logiciel), pour validation manuelle. N'écrit rien en base tant que l'utilisateur n'a pas validé. ` +
+      `Uniquement pour un problème technique, une question sur le fonctionnement de l'application, la facturation de l'abonnement ${PRODUCT_NAME}, etc. — jamais pour une question métier BTP ou une communication avec un client/collègue.`,
     parametres: {
       type: "object",
       properties: {
