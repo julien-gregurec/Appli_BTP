@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { construirePromptSystemeAssistant } from "@/lib/ai/assistant";
 import { BRAND_NAME, PRODUCT_NAME } from "@/lib/brand";
 import { OUTILS_COPILOTE } from "@/lib/ai/copilote";
 
@@ -11,5 +12,19 @@ describe("identite de l'assistant IA", () => {
     expect(descriptions).toContain(BRAND_NAME);
     expect(descriptions).toContain(PRODUCT_NAME);
     expect(descriptions).not.toMatch(ANCIENNES_MENTIONS);
+  });
+
+  it("construit le prompt systeme avec le produit et la marque centralises", () => {
+    const prompt = construirePromptSystemeAssistant({
+      entrepriseNom: "Entreprise Exemple",
+      aujourdhui: "1 août 2026",
+      descriptionUtilisateur: "Tu parles avec Camille. ",
+      consigneAffectation: "Vérifie les droits de planning. ",
+    });
+
+    expect(prompt).toContain(`assistant intégré de ${PRODUCT_NAME}`);
+    expect(prompt).toContain(`support ${BRAND_NAME}`);
+    expect(prompt).toContain(`abonnement ${PRODUCT_NAME}`);
+    expect(prompt).not.toMatch(ANCIENNES_MENTIONS);
   });
 });
