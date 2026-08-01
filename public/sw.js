@@ -4,7 +4,7 @@
    - Navigation : réseau d'abord, page « /offline » en secours si pas de réseau.
    - Tout le reste (API, Supabase, Stripe, données privées) : réseau uniquement, aucun cache. */
 
-const VERSION = "liria-v3";
+const VERSION = "elsatia-v4";
 const STATIC_CACHE = `${VERSION}-static`;
 const PRECACHE = [
   "/offline",

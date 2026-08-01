@@ -93,7 +93,7 @@ export function PushNotificationsSettings({ clePubliqueVapid, types, preferences
           {statut === "actif" ? (
             <button type="button" onClick={desactiver} disabled={enCours} className="rounded-md border px-3 py-2 text-sm font-medium disabled:opacity-50">Désactiver</button>
           ) : (
-            <button type="button" onClick={activer} disabled={enCours || statut === "verification"} className="rounded-md bg-liria-navy px-3 py-2 text-sm font-medium text-white disabled:opacity-50">Activer sur cet appareil</button>
+            <button type="button" onClick={activer} disabled={enCours || statut === "verification"} className="rounded-md bg-elsatia-navy px-3 py-2 text-sm font-medium text-white disabled:opacity-50">Activer sur cet appareil</button>
           )}
         </div>
         {erreur && <p className="mt-2 text-xs text-red-600">{erreur}</p>}

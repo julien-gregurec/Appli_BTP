@@ -472,7 +472,7 @@ export function DevisEditor({
         </div>
       </div>
 
-      {peutUtiliserIA && <div className="rounded-md border border-dashed border-liria-gold/50 bg-liria-gold/5 p-4">
+      {peutUtiliserIA && <div className="rounded-md border border-dashed border-elsatia-gold/50 bg-elsatia-gold/5 p-4">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium">✨ Assistant IA</span>
           <button type="button" onClick={() => { setAssistantIAOuvert((v) => !v); setErreurIA(null); }} className="text-sm text-neutral-600 hover:underline dark:text-neutral-400">
@@ -493,7 +493,7 @@ export function DevisEditor({
               type="button"
               onClick={genererAvecIA}
               disabled={pending || !descriptionIA.trim()}
-              className="rounded-md bg-liria-navy px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+              className="rounded-md bg-elsatia-navy px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
             >
               {pending ? "Génération…" : "Générer les lignes"}
             </button>
@@ -603,7 +603,7 @@ export function DevisEditor({
           <button
             type="button"
             onClick={basculerEnregistrementVocal}
-            className={`rounded-md px-3 py-2 text-sm font-medium text-white ${enregistrementVocal ? "bg-red-600" : "bg-liria-navy"}`}
+            className={`rounded-md px-3 py-2 text-sm font-medium text-white ${enregistrementVocal ? "bg-red-600" : "bg-elsatia-navy"}`}
           >
             {enregistrementVocal ? "Arrêter l’enregistrement" : "Enregistrer une explication vocale"}
           </button>

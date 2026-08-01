@@ -97,8 +97,8 @@ export function AssistantIA() {
 
   useEffect(() => {
     const ouvrir = () => setOuvert(true);
-    window.addEventListener("liria:ouvrir-assistant", ouvrir);
-    return () => window.removeEventListener("liria:ouvrir-assistant", ouvrir);
+    window.addEventListener("elsatia:ouvrir-assistant", ouvrir);
+    return () => window.removeEventListener("elsatia:ouvrir-assistant", ouvrir);
   }, []);
 
   function envoyer(texte?: string) {
@@ -297,7 +297,7 @@ export function AssistantIA() {
     <>
       {ouvert && (
         <div className="fixed bottom-4 right-4 z-50 flex h-[32rem] max-h-[70vh] w-96 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-2xl dark:border-neutral-700 dark:bg-neutral-900">
-          <div className="flex items-center justify-between border-b border-neutral-200 bg-liria-navy px-4 py-3 dark:border-neutral-700">
+          <div className="flex items-center justify-between border-b border-neutral-200 bg-elsatia-navy px-4 py-3 dark:border-neutral-700">
             <span className="text-sm font-semibold text-white">✨ Assistant {PRODUCT_NAME}</span>
             <div className="flex items-center gap-3">
               <button
@@ -328,7 +328,7 @@ export function AssistantIA() {
                   className={
                     "inline-block max-w-[85%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm " +
                     (m.role === "user"
-                      ? "bg-liria-navy text-white"
+                      ? "bg-elsatia-navy text-white"
                       : "bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100")
                   }
                 >
@@ -336,7 +336,7 @@ export function AssistantIA() {
                   {m.contenu || (m.role === "assistant" && i === messages.length - 1 && pending ? "…" : "")}
                 </span>
                 {m.proposition && (
-                  <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-liria-gold/60 bg-liria-gold/10 p-3 text-left text-sm">
+                  <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-elsatia-gold/60 bg-elsatia-gold/10 p-3 text-left text-sm">
                     {m.proposition.affectationId && <p className="text-[11px] font-medium uppercase tracking-wide text-blue-700">Modification</p>}
                     <p><strong>{m.proposition.employeNoms.join(", ")}</strong> → {m.proposition.typeActivite === "chantier" ? m.proposition.chantierNom : LIBELLES_TYPE_ACTIVITE[m.proposition.typeActivite]}</p>
                     {m.proposition.typeActivite !== "chantier" && m.proposition.lieuActivite && (
@@ -359,7 +359,7 @@ export function AssistantIA() {
                   </div>
                 )}
                 {m.propositionConge && (
-                  <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-liria-gold/60 bg-liria-gold/10 p-3 text-left text-sm">
+                  <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-elsatia-gold/60 bg-elsatia-gold/10 p-3 text-left text-sm">
                     <p><strong>{LIBELLES_TYPE_CONGE[m.propositionConge.typeConge]}</strong> · {m.propositionConge.dateDebut}{m.propositionConge.dateFin !== m.propositionConge.dateDebut ? ` → ${m.propositionConge.dateFin}` : ""}</p>
                     <p className="text-neutral-600 dark:text-neutral-300">
                       {m.propositionConge.demiJourDebut === m.propositionConge.demiJourFin ? LIBELLES_DEMI_JOURNEE[m.propositionConge.demiJourDebut] : `${LIBELLES_DEMI_JOURNEE[m.propositionConge.demiJourDebut]} → ${LIBELLES_DEMI_JOURNEE[m.propositionConge.demiJourFin]}`}
@@ -381,7 +381,7 @@ export function AssistantIA() {
                   </div>
                 )}
                 {m.propositionMessageInterne && (
-                  <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-liria-gold/60 bg-liria-gold/10 p-3 text-left text-sm">
+                  <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-elsatia-gold/60 bg-elsatia-gold/10 p-3 text-left text-sm">
                     <p>→ <strong>{m.propositionMessageInterne.destinataireEmployeNom ?? `Fil chantier · ${m.propositionMessageInterne.chantierNom}`}</strong></p>
                     <p className="whitespace-pre-wrap text-neutral-600 dark:text-neutral-300">{m.propositionMessageInterne.contenu}</p>
                     {m.propositionStatut === "en_attente" && (
@@ -399,7 +399,7 @@ export function AssistantIA() {
                   </div>
                 )}
                 {m.propositionMessageSupport && (
-                  <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-liria-gold/60 bg-liria-gold/10 p-3 text-left text-sm">
+                  <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-elsatia-gold/60 bg-elsatia-gold/10 p-3 text-left text-sm">
                     <p><strong>Message au support {BRAND_NAME}</strong></p>
                     <p className="whitespace-pre-wrap text-neutral-600 dark:text-neutral-300">{m.propositionMessageSupport.contenu}</p>
                     {m.propositionStatut === "en_attente" && (
@@ -418,14 +418,14 @@ export function AssistantIA() {
                 )}
               </div>
             ))}
-            {ecoute && <p className="text-sm text-liria-navy dark:text-liria-gold">🎙️ Je t&apos;écoute…</p>}
+            {ecoute && <p className="text-sm text-elsatia-navy dark:text-elsatia-gold">🎙️ Je t&apos;écoute…</p>}
             {erreur && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erreur}</p>}
             <div ref={finRef} />
           </div>
 
           <div className="border-t border-neutral-200 p-3 dark:border-neutral-700">
             {fichierJoint && (
-              <div className="mb-2 flex items-center gap-2 rounded-md bg-liria-gold/10 px-2 py-1 text-xs">
+              <div className="mb-2 flex items-center gap-2 rounded-md bg-elsatia-gold/10 px-2 py-1 text-xs">
                 <span className="min-w-0 flex-1 truncate">📎 {fichierJoint.nom}</span>
                 <button type="button" onClick={() => setFichierJoint(null)} aria-label="Retirer la pièce jointe" className="text-neutral-500 hover:text-red-600">×</button>
               </div>
@@ -468,7 +468,7 @@ export function AssistantIA() {
                 type="button"
                 onClick={() => envoyer()}
                 disabled={pending || (!saisie.trim() && !fichierJoint)}
-                className="rounded-md bg-liria-navy px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                className="rounded-md bg-elsatia-navy px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
               >
                 Envoyer
               </button>
@@ -482,7 +482,7 @@ export function AssistantIA() {
           type="button"
           onClick={() => setOuvert(true)}
           aria-label={`Assistant ${PRODUCT_NAME}`}
-          className="fixed bottom-20 right-4 z-40 flex items-center gap-2 rounded-full bg-liria-gold px-4 py-3 text-sm font-semibold text-liria-navy shadow-lg hover:brightness-95"
+          className="fixed bottom-20 right-4 z-40 flex items-center gap-2 rounded-full bg-elsatia-gold px-4 py-3 text-sm font-semibold text-elsatia-navy shadow-lg hover:brightness-95"
         >
           <span aria-hidden="true">✨</span>
           <span className="hidden sm:inline">Assistant</span>

@@ -97,7 +97,7 @@ export function DicteeCompteRendu({ chantierId, peutUtiliserIA = true }: { chant
   }
 
   return (
-    <div className="space-y-3 rounded-lg border-2 border-liria-gold/60 bg-liria-gold/5 p-4">
+    <div className="space-y-3 rounded-lg border-2 border-elsatia-gold/60 bg-elsatia-gold/5 p-4">
       <div>
         <h2 className="font-semibold">✨ Compte-rendu par dictée</h2>
         <p className="text-sm text-neutral-500">
@@ -112,7 +112,7 @@ export function DicteeCompteRendu({ chantierId, peutUtiliserIA = true }: { chant
           <button
             type="button"
             onClick={basculerEcoute}
-            className={`rounded-md px-4 py-2 text-sm font-medium text-white ${ecoute ? "bg-red-600" : "bg-liria-navy"}`}
+            className={`rounded-md px-4 py-2 text-sm font-medium text-white ${ecoute ? "bg-red-600" : "bg-elsatia-navy"}`}
           >
             {ecoute ? "⏹ Arrêter la dictée" : "🎙️ Dicter"}
           </button>
@@ -126,7 +126,7 @@ export function DicteeCompteRendu({ chantierId, peutUtiliserIA = true }: { chant
         />
         <div className="flex items-center gap-3">
           {peutUtiliserIA && (
-            <button type="button" onClick={structurer} disabled={pending || !transcription.trim()} className="rounded-md bg-liria-navy px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">
+            <button type="button" onClick={structurer} disabled={pending || !transcription.trim()} className="rounded-md bg-elsatia-navy px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">
               {pending ? "…" : "✨ Structurer avec l'IA"}
             </button>
           )}
@@ -137,7 +137,7 @@ export function DicteeCompteRendu({ chantierId, peutUtiliserIA = true }: { chant
       </div>
 
       {(titre || contenu) && (
-        <div className="space-y-2 border-t border-liria-gold/40 pt-3">
+        <div className="space-y-2 border-t border-elsatia-gold/40 pt-3">
           <label className="block text-xs text-neutral-500">
             Titre
             <input value={titre} onChange={(e) => setTitre(e.target.value)} className={`${input} mt-1`} />

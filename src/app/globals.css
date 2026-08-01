@@ -3,11 +3,11 @@
 :root {
   --background: #ffffff;
   --foreground: #0d1b2a;
-  --liria-navy: #0d1b2a;
-  --liria-anthracite: #1f2328;
-  --liria-gold: #c9a24a;
-  --liria-white: #ffffff;
-  --liria-gray-clair: #e6e6e6;
+  --elsatia-navy: #0d1b2a;
+  --elsatia-anthracite: #1f2328;
+  --elsatia-gold: #c9a24a;
+  --elsatia-white: #ffffff;
+  --elsatia-gray-clair: #e6e6e6;
 }
 
 @theme inline {
@@ -16,12 +16,12 @@
   --font-sans: Arial, Helvetica, sans-serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 
-  /* Palette de marque Liria — utilisable directement (bg-liria-navy, text-liria-gold…). */
-  --color-liria-navy: var(--liria-navy);
-  --color-liria-anthracite: var(--liria-anthracite);
-  --color-liria-gold: var(--liria-gold);
-  --color-liria-white: var(--liria-white);
-  --color-liria-gray-clair: var(--liria-gray-clair);
+  /* Palette de marque ELSATIA — utilisable directement (bg-elsatia-navy, text-elsatia-gold…). */
+  --color-elsatia-navy: var(--elsatia-navy);
+  --color-elsatia-anthracite: var(--elsatia-anthracite);
+  --color-elsatia-gold: var(--elsatia-gold);
+  --color-elsatia-white: var(--elsatia-white);
+  --color-elsatia-gray-clair: var(--elsatia-gray-clair);
 }
 
 @theme {
@@ -57,6 +57,6 @@ body {
 }
 
 ::selection {
-  background: var(--liria-gold);
-  color: var(--liria-navy);
+  background: var(--elsatia-gold);
+  color: var(--elsatia-navy);
 }

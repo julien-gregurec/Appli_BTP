@@ -24,7 +24,7 @@ export function AnalyseRentabiliteIA({ chantiers }: { chantiers: { id: string; n
   }
 
   return (
-    <div className="space-y-2 rounded-md border-2 border-liria-gold/60 bg-liria-gold/5 p-4">
+    <div className="space-y-2 rounded-md border-2 border-elsatia-gold/60 bg-elsatia-gold/5 p-4">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold">✨ Analyse IA d&apos;un chantier</span>
         <select
@@ -35,7 +35,7 @@ export function AnalyseRentabiliteIA({ chantiers }: { chantiers: { id: string; n
           <option value="">— Choisir un chantier —</option>
           {chantiers.map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
         </select>
-        <button type="button" onClick={analyser} disabled={pending || !chantierId} className="rounded-md bg-liria-navy px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">
+        <button type="button" onClick={analyser} disabled={pending || !chantierId} className="rounded-md bg-elsatia-navy px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">
           {pending ? "Analyse…" : "Analyser"}
         </button>
       </div>

@@ -15,6 +15,6 @@ describe("export comptable", () => {
     const fichiers = [{ chemin: "justificatifs/a.pdf", sha256: "a".repeat(64), taille: 10, noteReference: "EXP-1", documentVersionId: "v1" }];
     const manifeste = creerManifeste({ entrepriseId: "e1", entrepriseNom: "Entreprise Démo", periodeDebut: "2026-07-01", periodeFin: "2026-07-31", genereAt: "2026-08-01T00:00:00Z", fichiers });
     expect(manifeste.fichiers).toEqual(fichiers);
-    expect(manifeste.schema).toBe("liria-gestion-pro/expense-export/v1");
+    expect(manifeste.schema).toBe("elsatia-gestion-pro/expense-export/v2");
   });
 });

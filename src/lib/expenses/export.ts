@@ -30,7 +30,7 @@ export function creerManifeste(params: {
   fichiers: EntreeManifeste[];
 }) {
   return {
-    schema: "liria-gestion-pro/expense-export/v1",
+    schema: "elsatia-gestion-pro/expense-export/v2",
     ...params,
     avertissement: "Les empreintes permettent un contrôle d’intégrité technique. Cet export n’est pas présenté comme un archivage qualifié.",
   };

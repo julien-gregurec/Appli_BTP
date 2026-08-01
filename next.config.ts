@@ -6,7 +6,7 @@ import { headersSecurite } from "./src/lib/security/headers";
 
 function gitCommitCourant() {
   if (process.env.VERCEL_GIT_COMMIT_SHA) return process.env.VERCEL_GIT_COMMIT_SHA;
-  if (process.env.LIRIA_BUILD_COMMIT) return process.env.LIRIA_BUILD_COMMIT;
+  if (process.env.ELSATIA_BUILD_COMMIT) return process.env.ELSATIA_BUILD_COMMIT;
   try {
     return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
   } catch {
@@ -14,7 +14,7 @@ function gitCommitCourant() {
   }
 }
 
-const dateBuild = process.env.LIRIA_BUILD_DATE || new Date().toISOString();
+const dateBuild = process.env.ELSATIA_BUILD_DATE || new Date().toISOString();
 
 // ExcelJS charge ses dépendances par des require dynamiques dans des .mjs, que
 // le traçage de Next ne détecte pas : elles manquaient dans la fonction déployée
@@ -51,12 +51,12 @@ const nextConfig: NextConfig = {
     return [{ source: "/:path*", headers: headersSecurite(process.env.NODE_ENV === "production") }];
   },
   env: {
-    LIRIA_APP_VERSION: packageJson.version,
-    LIRIA_BUILD_COMMIT: gitCommitCourant(),
-    LIRIA_BUILD_DATE: dateBuild,
-    LIRIA_BUILD_ENVIRONMENT: process.env.VERCEL_ENV || process.env.NODE_ENV || "development",
-    LIRIA_DEPLOYMENT_DATE: process.env.LIRIA_DEPLOYMENT_DATE || dateBuild,
-    LIRIA_DEPLOYMENT_URL: process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL || "",
+    ELSATIA_APP_VERSION: packageJson.version,
+    ELSATIA_BUILD_COMMIT: gitCommitCourant(),
+    ELSATIA_BUILD_DATE: dateBuild,
+    ELSATIA_BUILD_ENVIRONMENT: process.env.VERCEL_ENV || process.env.NODE_ENV || "development",
+    ELSATIA_DEPLOYMENT_DATE: process.env.ELSATIA_DEPLOYMENT_DATE || dateBuild,
+    ELSATIA_DEPLOYMENT_URL: process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL || "",
   },
   // Chargé depuis node_modules à l'exécution plutôt que bundlé : c'est ce qui
   // permet aux require dynamiques d'ExcelJS de se résoudre.
