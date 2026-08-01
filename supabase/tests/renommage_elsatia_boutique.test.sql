@@ -1,6 +1,10 @@
 begin;
 create extension if not exists pgtap with schema extensions;
+\if :{?migration_194_replay}
+select plan(39);
+\else
 select plan(18);
+\endif
 
 select has_function(
   'public',
@@ -32,6 +36,202 @@ select ok(
   position('Liria' in pg_get_functiondef('public.boutique_finaliser_commande_payee(uuid,text)'::regprocedure)) = 0,
   'la finalisation ne recrée pas l ancien nom'
 );
+
+\if :{?migration_194_replay}
+-- Rejoue la migration sur des données historiques préparées après le reset afin de
+-- vérifier le renommage et la fusion, pas seulement les fonctions finales.
+insert into public.entreprises(id, reference_interne, nom, raison_sociale)
+values
+  ('19400000-0000-0000-0000-000000000201', 'TEST-LEGACY-194', ' LIRIA CONCEPT ', 'Liria Concept'),
+  ('19400000-0000-0000-0000-000000000301', 'TEST-DEMO-194', 'Liria Gestion Pro - Entreprise Demo', null),
+  ('19400000-0000-0000-0000-000000000401', 'TEST-FUSION-194', 'Entreprise fusion 194', null),
+  ('19400000-0000-0000-0000-000000000501', 'TEST-MIGREE-194', 'Entreprise déjà migrée', null);
+
+insert into public.fournisseurs(id, entreprise_id, reference, nom, contact_nom, email, notes)
+values
+  (
+    '19400000-0000-0000-0000-000000000202',
+    '19400000-0000-0000-0000-000000000201',
+    'FRN-LEGACY-194',
+    'Liria (boutique)',
+    'Contact historique',
+    'historique@example.test',
+    'Fiche créée automatiquement pour rattacher les achats de la boutique Liria (imprimantes, plastifieuses, étiquettes) à la trésorerie.'
+  ),
+  (
+    '19400000-0000-0000-0000-000000000203',
+    '19400000-0000-0000-0000-000000000201',
+    'FRN-SANS-RAPPORT-194',
+    'Liria Services',
+    null,
+    null,
+    'Fournisseur utilisateur sans rapport avec la boutique'
+  ),
+  (
+    '19400000-0000-0000-0000-000000000402',
+    '19400000-0000-0000-0000-000000000401',
+    'FRN-SOURCE-194',
+    'Liria (boutique)',
+    null,
+    'source@example.test',
+    'Note utilisateur conservée'
+  ),
+  (
+    '19400000-0000-0000-0000-000000000403',
+    '19400000-0000-0000-0000-000000000401',
+    'FRN-CIBLE-FUSION-194',
+    'ELSATIA (boutique)',
+    'Contact cible',
+    null,
+    null
+  ),
+  (
+    '19400000-0000-0000-0000-000000000502',
+    '19400000-0000-0000-0000-000000000501',
+    'FRN-DEJA-MIGRE-194',
+    'ELSATIA (boutique)',
+    null,
+    'deja-migre@example.test',
+    'Donnée déjà conforme'
+  );
+
+insert into public.zones_depot(id, entreprise_id, code, nom, type, description)
+values(
+  '19400000-0000-0000-0000-000000000204',
+  '19400000-0000-0000-0000-000000000201',
+  'DEPOT-MIG-194',
+  'Dépôt principal LIRIA',
+  'depot',
+  'Description à conserver'
+);
+
+insert into public.depenses_fournisseurs(
+  id, entreprise_id, fournisseur_id, numero_piece, montant_ht, montant_tva, notes
+) values (
+  '19400000-0000-0000-0000-000000000404',
+  '19400000-0000-0000-0000-000000000401',
+  '19400000-0000-0000-0000-000000000402',
+  'PIECE-MIG-194',
+  42,
+  8.40,
+  'Commande boutique Liria réglée par carte (Stripe).'
+);
+
+\ir :migration_194_path
+
+select is(
+  (select nom from public.entreprises where id = '19400000-0000-0000-0000-000000000201'),
+  'ELSATIA',
+  'le nom historique exact de l éditeur est remplacé'
+);
+select is(
+  (select raison_sociale from public.entreprises where id = '19400000-0000-0000-0000-000000000201'),
+  'ELSATIA',
+  'la raison sociale historique exacte est remplacée'
+);
+select is(
+  (select nom from public.entreprises where id = '19400000-0000-0000-0000-000000000301'),
+  'ELSATIA Gestion Pro - Entreprise Demo',
+  'l entreprise de démonstration utilise le nom du logiciel'
+);
+select is(
+  (select nom from public.zones_depot where id = '19400000-0000-0000-0000-000000000204'),
+  'Dépôt principal ELSATIA',
+  'le dépôt historique utilise la marque'
+);
+select is(
+  (select nom from public.fournisseurs where id = '19400000-0000-0000-0000-000000000202'),
+  'ELSATIA (boutique)',
+  'la fiche historique sans doublon est renommée sur place'
+);
+select is(
+  (select reference from public.fournisseurs where id = '19400000-0000-0000-0000-000000000202'),
+  'FRN-LEGACY-194',
+  'la référence fournisseur historique est conservée'
+);
+select is(
+  (select email from public.fournisseurs where id = '19400000-0000-0000-0000-000000000202'),
+  'historique@example.test',
+  'les coordonnées de la fiche renommée sont conservées'
+);
+select is(
+  (select notes from public.fournisseurs where id = '19400000-0000-0000-0000-000000000202'),
+  'Fiche créée automatiquement pour rattacher les achats de la boutique ELSATIA (imprimantes, plastifieuses, étiquettes) à la trésorerie.',
+  'la note automatique historique est renommée'
+);
+select is(
+  (select nom from public.fournisseurs where id = '19400000-0000-0000-0000-000000000203'),
+  'Liria Services',
+  'un fournisseur utilisateur sans rapport reste inchangé'
+);
+select is(
+  (select count(*)::integer from public.fournisseurs
+    where entreprise_id = '19400000-0000-0000-0000-000000000401'
+      and nom in ('Liria (boutique)', 'ELSATIA (boutique)')),
+  1,
+  'la coexistence ancien et nouveau est fusionnée en une fiche'
+);
+select is(
+  (select email from public.fournisseurs where id = '19400000-0000-0000-0000-000000000403'),
+  'source@example.test',
+  'les données manquantes de la cible sont reprises depuis la source'
+);
+select is(
+  (select contact_nom from public.fournisseurs where id = '19400000-0000-0000-0000-000000000403'),
+  'Contact cible',
+  'les données déjà présentes sur la cible sont conservées'
+);
+select is(
+  (select fournisseur_id from public.depenses_fournisseurs where id = '19400000-0000-0000-0000-000000000404'),
+  '19400000-0000-0000-0000-000000000403'::uuid,
+  'la dépense historique est rattachée à la cible avant suppression'
+);
+select is(
+  (select notes from public.depenses_fournisseurs where id = '19400000-0000-0000-0000-000000000404'),
+  'Commande boutique ELSATIA réglée par carte (Stripe).',
+  'la note de dépense historique utilise la nouvelle marque'
+);
+select is(
+  (select montant_ht from public.depenses_fournisseurs where id = '19400000-0000-0000-0000-000000000404'),
+  42.00::numeric,
+  'le montant de la dépense rattachée est conservé'
+);
+select is(
+  (select id from public.fournisseurs where entreprise_id = '19400000-0000-0000-0000-000000000501'),
+  '19400000-0000-0000-0000-000000000502'::uuid,
+  'une fiche déjà migrée est conservée'
+);
+
+\ir :migration_194_path
+
+select is(
+  (select count(*)::integer from public.fournisseurs
+    where entreprise_id = '19400000-0000-0000-0000-000000000201'),
+  2,
+  'un second passage ne crée ni ne supprime de fiche supplémentaire'
+);
+select is(
+  (select count(*)::integer from public.fournisseurs
+    where entreprise_id = '19400000-0000-0000-0000-000000000401'),
+  1,
+  'la fusion reste stable après un second passage'
+);
+select is(
+  (select fournisseur_id from public.depenses_fournisseurs where id = '19400000-0000-0000-0000-000000000404'),
+  '19400000-0000-0000-0000-000000000403'::uuid,
+  'le rattachement reste stable après un second passage'
+);
+select is(
+  (select nom from public.fournisseurs where id = '19400000-0000-0000-0000-000000000203'),
+  'Liria Services',
+  'le rejeu laisse toujours intact le fournisseur sans rapport'
+);
+select is(
+  (select id from public.fournisseurs where entreprise_id = '19400000-0000-0000-0000-000000000501'),
+  '19400000-0000-0000-0000-000000000502'::uuid,
+  'le rejeu conserve encore la fiche déjà migrée'
+);
+\endif
 
 insert into public.entreprises(id, reference_interne, nom)
 values('19400000-0000-0000-0000-000000000001', 'TEST-MIG-194', 'Entreprise migration 194');
