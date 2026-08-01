@@ -1,10 +1,10 @@
-# Passage en production — LIRIA CONCEPT
+# Passage en production — ELSATIA Gestion Pro
 
 > Le script manuel de sortie du prototype est prêt mais **non appliqué**. Il est volontairement rangé hors des migrations automatiques, car son application coupe immédiatement le mode prototype anonyme.
 
 ## Préconditions déjà vérifiées le 12 juillet 2026
 
-- L’entreprise `ENT-001` est bien `LIRIA CONCEPT`.
+- L’entreprise `ENT-001` est bien `ELSATIA`.
 - Elle possède un membre actif et un poste Admin/Gérant.
 - Le profil public du propriétaire existe et pointe sur `ENT-001` comme entreprise active.
 - Le compte Supabase Auth correspondant existe, a un mot de passe, un email confirmé et a déjà réussi une connexion.
@@ -16,7 +16,7 @@
 
 1. Choisir l’URL de production et l’hébergement (Vercel recommandé pour ce projet Next.js).
 2. Créer ou vérifier une sauvegarde Supabase restaurable avant la bascule.
-3. Dans Supabase Auth, renseigner le `Site URL` de production et autoriser les redirections `https://liria-concept-gestion-btp.vercel.app/auth/callback` et `http://localhost:3000/auth/callback`.
+3. Dans Supabase Auth, renseigner le `Site URL` à partir de `NEXT_PUBLIC_APP_URL` et autoriser `${NEXT_PUBLIC_APP_URL}/auth/callback` ainsi que `http://localhost:3000/auth/callback` pour le développement local. Ne pas figer de domaine tant que l’adresse officielle n’est pas validée.
 4. Dans **Authentication → Email Templates**, utiliser les liens SSR suivants :
    - confirmation d’inscription : `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/onboarding`
    - récupération de mot de passe : `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/nouveau-mot-de-passe`
