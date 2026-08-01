@@ -1,5 +1,5 @@
 /**
- * Vérification automatisée de Liria Gestion Pro.
+ * Vérification automatisée d'ELSATIA Gestion Pro.
  *
  * Deux modes :
  *   - LECTURE (défaut)   : parcourt toutes les pages, signale erreurs console,
@@ -14,8 +14,8 @@
  *   npm install --no-save playwright && npx playwright install chromium
  *
  * Utilisation :
- *   LIRIA_AUDIT_URL=https://mon-app.vercel.app \
- *   LIRIA_AUDIT_EMAIL=... LIRIA_AUDIT_PASSWORD=... \
+ *   ELSATIA_AUDIT_URL=https://mon-app.vercel.app \
+ *   ELSATIA_AUDIT_EMAIL=... ELSATIA_AUDIT_PASSWORD=... \
  *   node scripts/verification-parcours.mjs [--ecriture]
  *
  * Sort en code 1 si un problème est détecté (utilisable en automatisation).
@@ -27,14 +27,14 @@ import path from "node:path";
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
 
-const baseUrl = process.env.LIRIA_AUDIT_URL ?? "http://127.0.0.1:3000";
-const email = process.env.LIRIA_AUDIT_EMAIL;
-const password = process.env.LIRIA_AUDIT_PASSWORD;
+const baseUrl = process.env.ELSATIA_AUDIT_URL ?? "http://127.0.0.1:3000";
+const email = process.env.ELSATIA_AUDIT_EMAIL;
+const password = process.env.ELSATIA_AUDIT_PASSWORD;
 const avecEcriture = process.argv.includes("--ecriture");
-const outputDir = path.resolve(process.env.LIRIA_AUDIT_OUTPUT ?? "output/verification");
+const outputDir = path.resolve(process.env.ELSATIA_AUDIT_OUTPUT ?? "output/verification");
 
 if (!email || !password) {
-  throw new Error("LIRIA_AUDIT_EMAIL et LIRIA_AUDIT_PASSWORD sont obligatoires.");
+  throw new Error("ELSATIA_AUDIT_EMAIL et ELSATIA_AUDIT_PASSWORD sont obligatoires.");
 }
 
 const ROUTES = [
@@ -50,7 +50,7 @@ const ROUTES = [
   "/parametres/import", "/parametres/acces",
 ];
 
-// Contrôle de sécurité : l'espace plateforme est réservé à l'équipe Liria.
+// Contrôle de sécurité : l'espace plateforme est réservé à l'équipe ELSATIA.
 // Avec un compte d'entreprise ordinaire il DOIT rester inaccessible (404, qui
 // ne révèle même pas son existence). Un accès réussi ici serait une faille.
 const ROUTES_INTERDITES = [

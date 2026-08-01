@@ -5,13 +5,13 @@ import path from "node:path";
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
 
-const baseUrl = process.env.LIRIA_AUDIT_URL ?? "http://127.0.0.1:3000";
-const email = process.env.LIRIA_AUDIT_EMAIL;
-const password = process.env.LIRIA_AUDIT_PASSWORD;
-const outputDir = path.resolve(process.env.LIRIA_AUDIT_OUTPUT ?? "output/audit");
+const baseUrl = process.env.ELSATIA_AUDIT_URL ?? "http://127.0.0.1:3000";
+const email = process.env.ELSATIA_AUDIT_EMAIL;
+const password = process.env.ELSATIA_AUDIT_PASSWORD;
+const outputDir = path.resolve(process.env.ELSATIA_AUDIT_OUTPUT ?? "output/audit");
 
 if (!email || !password) {
-  throw new Error("LIRIA_AUDIT_EMAIL et LIRIA_AUDIT_PASSWORD sont obligatoires.");
+  throw new Error("ELSATIA_AUDIT_EMAIL et ELSATIA_AUDIT_PASSWORD sont obligatoires.");
 }
 
 const routes = [

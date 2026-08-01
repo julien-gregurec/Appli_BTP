@@ -214,7 +214,7 @@ PROCEDURES = [
             ("Créer le connecteur", "Choisissez le fournisseur, indiquez le numéro client non secret et sélectionnez le mode réellement disponible."),
             ("Télécharger le catalogue officiel", "Utilisez le portail fournisseur. Ne transformez pas un PDF en catalogue si un fichier structuré existe."),
             ("Préparer les colonnes", "Conservez au minimum référence, désignation, unité et prix d’achat. Ajoutez code-barres, marque, famille, TVA et conditionnement si disponibles."),
-            ("Importer en aperçu", "Choisissez le fichier puis associez chaque colonne source au champ Liria correspondant."),
+            ("Importer en aperçu", "Choisissez le fichier puis associez chaque colonne source au champ ELSATIA correspondant."),
             ("Contrôler les exemples", "Vérifiez accents, décimales, devise, unité, taux de TVA et quelques références connues."),
             ("Choisir création ou mise à jour", "Une référence identique met à jour l’article prévu ; une nouvelle référence crée un nouvel article selon les options."),
             ("Valider l’import", "Lisez le compte rendu : créés, mis à jour, ignorés et erreurs. Ne relancez pas sans comprendre les erreurs."),
@@ -235,7 +235,7 @@ PROCEDURES = [
         ],
         "exceptions": [
             ["PDF uniquement", "Importez le document comme pièce de référence ou utilisez une extraction contrôlée ; validez chaque donnée avant usage."],
-            ["Pas d’API officielle", "Restez en portail ou import. Ne fournissez jamais votre mot de passe à Liria."],
+            ["Pas d’API officielle", "Restez en portail ou import. Ne fournissez jamais votre mot de passe à ELSATIA."],
             ["Référence remplacée", "Créez la correspondance avec la nouvelle référence sans effacer l’historique des anciennes commandes."],
         ],
     },
@@ -438,7 +438,7 @@ PROCEDURES = [
         "exceptions": [
             ["Changement communiqué par e-mail", "Confirmez par un canal indépendant avant de modifier le RIB : risque de fraude au faux fournisseur."],
             ["RIB non vérifié", "Le paiement reste préparatoire et ne doit pas être transmis."],
-            ["Erreur après transmission", "Contactez immédiatement la banque ; Liria ne peut pas annuler seule un virement exécuté."],
+            ["Erreur après transmission", "Contactez immédiatement la banque ; ELSATIA ne peut pas annuler seule un virement exécuté."],
         ],
     },
     {
@@ -571,7 +571,7 @@ PROCEDURES = [
             ("Inventorier les sources", "Listez modules, périodes, volumes, formats, pièces jointes, codes-barres et relations entre fichiers."),
             ("Définir le périmètre", "Décidez ce qui doit être repris, archivé séparément ou laissé dans l’ancien outil."),
             ("Nettoyer sans détruire", "Corrigez encodage, colonnes et doublons dans une copie ; conservez l’original."),
-            ("Mapper les colonnes", "Associez chaque champ source au champ Liria, y compris identifiants externes pour garder la traçabilité."),
+            ("Mapper les colonnes", "Associez chaque champ source au champ ELSATIA, y compris identifiants externes pour garder la traçabilité."),
             ("Importer les référentiels", "Commencez par clients, fournisseurs, employés et articles avant les documents qui les référencent."),
             ("Importer les affaires", "Chargez chantiers, devis, factures, règlements et pièces dans l’ordre chronologique nécessaire."),
             ("Rapprocher les documents", "Vérifiez que devis, chantier, facture, fournisseur et règlement pointent vers les bonnes fiches."),
@@ -663,7 +663,7 @@ PROCEDURES = [
             ["Secrets", "Aucune clé, mot de passe ou jeton n’est copié dans une conversation ou un champ non sécurisé."],
         ],
         "synchronisations": [
-            ["Stripe Billing", "Gère l’abonnement Liria, distinct de Stripe Connect pour les paiements des clients de l’entreprise."],
+            ["Stripe Billing", "Gère l’abonnement ELSATIA, distinct de Stripe Connect pour les paiements des clients de l’entreprise."],
             ["Stockage", "Les documents privés alimentent le quota de l’entreprise."],
             ["IA", "La consommation est suivie par palier et compte autorisé."],
         ],

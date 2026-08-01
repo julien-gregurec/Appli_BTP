@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Manuel utilisateur Liria Gestion Pro.
+"""Manuel utilisateur ELSATIA Gestion Pro.
 
 Chaque chapitre de module suit la même trame : à quoi ça sert, qui y a accès,
 l'écran principal, la création pas à pas, la fiche, les statuts, le mobile,
@@ -27,8 +27,8 @@ from reportlab.platypus import (BaseDocTemplate, CondPageBreak, Frame, Image, Ke
 
 RACINE = Path(__file__).resolve().parents[2]
 CAPTURES = RACINE / "output/audit"
-SORTIE = RACINE / "output/guide/Manuel_Liria_Gestion_Pro.pdf"
-LOGO = RACINE / "public/liria-gestion-pro-logo-v5.png"
+SORTIE = RACINE / "output/guide/Manuel_ELSATIA_Gestion_Pro.pdf"
+LOGO = RACINE / "public/elsatia-logo-officiel.png"
 
 MARINE = colors.HexColor("#0d1b2a")
 OR = colors.HexColor("#c9a24a")
@@ -237,7 +237,7 @@ def page_courante(canvas, doc):
     canvas.saveState()
     canvas.setFont("L", 7.5)
     canvas.setFillColor(GRIS)
-    canvas.drawString(2 * cm, 1.4 * cm, "Liria Gestion Pro — Manuel d'utilisation")
+    canvas.drawString(2 * cm, 1.4 * cm, "ELSATIA Gestion Pro — Manuel d'utilisation")
     canvas.drawRightString(19 * cm, 1.4 * cm, str(canvas.getPageNumber()))
     canvas.setStrokeColor(colors.HexColor("#e3e7ee"))
     canvas.setLineWidth(0.5)
@@ -259,7 +259,7 @@ def page_couverture(canvas, doc):
     canvas.drawString(2 * cm, A4[1] - 10 * cm, "Manuel d'utilisation")
     canvas.setFont("L", 15)
     canvas.setFillColor(OR)
-    canvas.drawString(2 * cm, A4[1] - 11.2 * cm, "Liria Gestion Pro")
+    canvas.drawString(2 * cm, A4[1] - 11.2 * cm, "ELSATIA Gestion Pro")
     canvas.setFillColor(colors.HexColor("#b9c2ce"))
     canvas.setFont("L", 10)
     canvas.drawString(2 * cm, 3.2 * cm, "Logiciel de gestion pour les entreprises du bâtiment")
@@ -268,8 +268,8 @@ def page_couverture(canvas, doc):
 
 
 def _document():
-    doc = BaseDocTemplate(str(SORTIE), pagesize=A4, title="Manuel d'utilisation — Liria Gestion Pro",
-                          author="Liria Gestion Pro", leftMargin=2 * cm, rightMargin=2 * cm,
+    doc = BaseDocTemplate(str(SORTIE), pagesize=A4, title="Manuel d'utilisation — ELSATIA Gestion Pro",
+                          author="ELSATIA Gestion Pro", leftMargin=2 * cm, rightMargin=2 * cm,
                           topMargin=2 * cm, bottomMargin=2.2 * cm)
     # Marges intérieures annulées : sinon la hauteur utile réelle (710 pt) ne
     # correspond plus à HAUTEUR_CADRE et le saut de chapitre se déclencherait

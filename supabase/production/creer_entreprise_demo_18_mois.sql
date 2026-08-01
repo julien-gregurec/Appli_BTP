@@ -1,4 +1,4 @@
--- Entreprise de demonstration Liria Gestion Pro - 18 mois d'activite.
+-- Entreprise de démonstration ELSATIA Gestion Pro - 18 mois d'activité.
 -- Script idempotent reserve au projet de demonstration. Ne modifie aucune entreprise cliente.
 -- Les cartes BTP sont des references fictives et l'interface rappelle qu'elles ne remplacent pas l'original CIBTP.
 
@@ -31,7 +31,7 @@ begin
       reference_interne,nom,raison_sociale,siret,adresse,code_postal,ville,abonnement_statut,
       abonnement_echeance,abonnement_note,created_at,updated_at
     ) values(
-      'DEMO-18M','Liria Gestion Pro - Entreprise Demo','LGP Demonstration SAS','99999999999999',
+      'DEMO-18M','ELSATIA Gestion Pro - Entreprise Démo','ELSATIA Démonstration SAS','99999999999999',
       '18 avenue des Artisans','69000','Lyon','actif',current_date+365,
       'Entreprise fictive - 18 mois d historique pour tester tous les roles',now()-interval '18 months',now()
     ) returning id into v_entreprise;

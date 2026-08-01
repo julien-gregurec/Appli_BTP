@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 
-const MARKER = "HISTORIQUE_DEMO_LIRIA_2026";
+const MARKER = "HISTORIQUE_DEMO_ELSATIA_2026";
+const LEGACY_MARKER = "HISTORIQUE_DEMO_LIRIA_2026";
 const env = Object.fromEntries(
   fs.readFileSync(new URL("../.env.local", import.meta.url), "utf8")
     .split(/\r?\n/)
@@ -24,6 +25,17 @@ async function one(table, filters, columns = "*") {
   let query = supabase.from(table).select(columns);
   for (const [key, value] of Object.entries(filters)) query = query.eq(key, value);
   const { data, error } = await query.maybeSingle();
+  fail(error, `Lecture ${table}`);
+  return data;
+}
+
+async function oneWithMarker(table, filters, markerColumn, suffix = "", columns = "*") {
+  let query = supabase.from(table).select(columns);
+  for (const [key, value] of Object.entries(filters)) query = query.eq(key, value);
+  const { data, error } = await query
+    .in(markerColumn, [`${MARKER}${suffix}`, `${LEGACY_MARKER}${suffix}`])
+    .limit(1)
+    .maybeSingle();
   fail(error, `Lecture ${table}`);
   return data;
 }
@@ -204,7 +216,7 @@ const quoteRows = [
 const quotes = {};
 for (const [key, chantierRef, statut, date_emission, date_validite, lines] of quoteRows) {
   const marker = `${MARKER}:${key}`;
-  let quote = await one("devis", { entreprise_id: entrepriseId, notes_internes: marker });
+  let quote = await oneWithMarker("devis", { entreprise_id: entrepriseId }, "notes_internes", `:${key}`);
   if (!quote) {
     const id = await rpc("creer_devis_brouillon", {
       p_entreprise_id: entrepriseId,
@@ -248,7 +260,7 @@ for (const [quoteKey, type, date_emission, date_echeance, target, paymentDate] o
   }
   if (paymentDate) {
     const reference = `${MARKER}:PAY-${quoteKey}`;
-    if (!(await one("paiements", { facture_id: invoice.id, reference }))) {
+    if (!(await oneWithMarker("paiements", { facture_id: invoice.id }, "reference", `:PAY-${quoteKey}`))) {
       const amount = target === "payee" ? Number(invoice.montant_ttc) : Math.round(Number(invoice.montant_ttc) * 0.3 * 100) / 100;
       await insert("paiements", { facture_id: invoice.id, montant: amount, date: paymentDate, mode: "virement", reference });
     }
@@ -257,7 +269,7 @@ for (const [quoteKey, type, date_emission, date_echeance, target, paymentDate] o
 }
 
 // Un devis récent encore en brouillon, utile pour tester la reprise d'édition.
-if (!(await one("devis", { entreprise_id: entrepriseId, notes_internes: `${MARKER}:BROUILLON` }))) {
+if (!(await oneWithMarker("devis", { entreprise_id: entrepriseId }, "notes_internes", ":BROUILLON"))) {
   await rpc("creer_devis_brouillon", {
     p_entreprise_id: entrepriseId,
     p_devis: {
@@ -309,7 +321,7 @@ const timeRows = [
 ];
 for (const [date, chantierRef, employeeRef, heures_normales, heures_supplementaires, tache] of timeRows) {
   const commentaire = `${MARKER}:${date}:${employeeRef}:${chantierRef}`;
-  if (!(await one("pointages", { entreprise_id: entrepriseId, commentaire }))) {
+  if (!(await oneWithMarker("pointages", { entreprise_id: entrepriseId }, "commentaire", `:${date}:${employeeRef}:${chantierRef}`))) {
     await insert("pointages", {
       entreprise_id: entrepriseId,
       employe_id: employees[employeeRef].id,
@@ -354,7 +366,7 @@ const articles = {};
 for (const [reference, designation, unite, initialQty, seuil_alerte, prix_achat_ht, emplacement, marque, code_barres] of stockRows) {
   articles[reference] = await upsert("articles_stock", { entreprise_id: entrepriseId, reference, designation, unite, seuil_alerte, prix_achat_ht, emplacement, marque, code_barres, actif: true }, "entreprise_id,reference");
   const motif = `${MARKER}:INITIAL:${reference}`;
-  if (!(await one("mouvements_stock", { entreprise_id: entrepriseId, article_id: articles[reference].id, motif }))) {
+  if (!(await oneWithMarker("mouvements_stock", { entreprise_id: entrepriseId, article_id: articles[reference].id }, "motif", `:INITIAL:${reference}`))) {
     await insert("mouvements_stock", { entreprise_id: entrepriseId, article_id: articles[reference].id, type: "entree", quantite: initialQty, date: "2026-02-02", motif });
   }
 }
@@ -366,7 +378,7 @@ const stockOutRows = [
 ];
 for (const [articleRef, chantierRef, quantite, date] of stockOutRows) {
   const motif = `${MARKER}:SORTIE:${articleRef}:${chantierRef}`;
-  if (!(await one("mouvements_stock", { entreprise_id: entrepriseId, article_id: articles[articleRef].id, motif }))) {
+  if (!(await oneWithMarker("mouvements_stock", { entreprise_id: entrepriseId, article_id: articles[articleRef].id }, "motif", `:SORTIE:${articleRef}:${chantierRef}`))) {
     await insert("mouvements_stock", { entreprise_id: entrepriseId, article_id: articles[articleRef].id, chantier_id: chantiers[chantierRef].id, type: "sortie", quantite, date, motif });
   }
 }
@@ -374,14 +386,14 @@ for (const [articleRef, nom, reference, code_hex] of [["PAN-CHENE", "Chêne natu
   await upsert("article_teintes", { entreprise_id: entrepriseId, article_id: articles[articleRef].id, nom, reference, code_hex, actif: true }, "article_id,nom");
 }
 
-const depot = await upsert("zones_depot", { entreprise_id: entrepriseId, code: "DEPOT-PRINCIPAL", nom: "Dépôt principal LIRIA", type: "depot", description: `${MARKER} — Stock central, racks et zone consommables`, actif: true }, "entreprise_id,code");
+const depot = await upsert("zones_depot", { entreprise_id: entrepriseId, code: "DEPOT-PRINCIPAL", nom: "Dépôt principal ELSATIA", type: "depot", description: `${MARKER} — Stock central, racks et zone consommables`, actif: true }, "entreprise_id,code");
 const rackPlaques = await upsert("zones_depot", { entreprise_id: entrepriseId, code: "RACK-PLAQUES", nom: "Rack plaques et ossatures", type: "rayonnage", description: MARKER, actif: true }, "entreprise_id,code");
 const rackFinitions = await upsert("zones_depot", { entreprise_id: entrepriseId, code: "ARMOIRE-FINITIONS", nom: "Armoire peintures et finitions", type: "armoire", description: MARKER, actif: true }, "entreprise_id,code");
 for (const reference of Object.keys(articles)) {
   const zone_id = ["BA13-STD", "BA13-HYDRO", "RAIL-R48", "MONTANT-M48", "LAINE-45"].includes(reference) ? rackPlaques.id : ["PEINT-BLANC", "ENDUIT-BANDE", "SILICONE-BLANC"].includes(reference) ? rackFinitions.id : depot.id;
   articles[reference] = await update("articles_stock", articles[reference].id, { zone_id });
 }
-let inventory = await one("inventaires", { entreprise_id: entrepriseId, commentaire: `${MARKER}:INVENTAIRE-JUIN` });
+let inventory = await oneWithMarker("inventaires", { entreprise_id: entrepriseId }, "commentaire", ":INVENTAIRE-JUIN");
 if (!inventory) {
   const inventoryId = await rpc("creer_inventaire_stock", { p_entreprise_id: entrepriseId, p_zone_id: null, p_commentaire: `${MARKER}:INVENTAIRE-JUIN` });
   const { data: inventoryLines, error: inventoryLinesError } = await supabase.from("lignes_inventaire").select("id,quantite_theorique").eq("inventaire_id", inventoryId);
@@ -446,7 +458,7 @@ const orderRows = [
 const orders = {};
 for (const [key, supplierRef, chantierRef, date_commande, targetStatus, lines] of orderRows) {
   const marker = `${MARKER}:${key}`;
-  let order = await one("commandes_fournisseurs", { entreprise_id: entrepriseId, notes: marker });
+  let order = await oneWithMarker("commandes_fournisseurs", { entreprise_id: entrepriseId }, "notes", `:${key}`);
   if (!order) {
     const id = await rpc("creer_commande_fournisseur", {
       p_entreprise_id: entrepriseId,
@@ -484,7 +496,7 @@ for (const [numero_piece, supplierRef, chantierRef, vehicleRef, toolRef, categor
   }
   if (target !== "a_payer") {
     const reference = `${MARKER}:REG:${numero_piece}`;
-    if (!(await one("reglements_fournisseurs", { depense_id: expense.id, reference }))) {
+    if (!(await oneWithMarker("reglements_fournisseurs", { depense_id: expense.id }, "reference", `:REG:${numero_piece}`))) {
       const amount = target === "payee" ? Number(expense.montant_ttc) : Math.round(Number(expense.montant_ttc) * 0.5 * 100) / 100;
       await insert("reglements_fournisseurs", { entreprise_id: entrepriseId, depense_id: expense.id, montant: amount, date: date_piece, mode: "virement", reference });
     }

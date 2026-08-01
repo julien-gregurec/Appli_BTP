@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create the Liria Gestion Pro tutorial and advertising videos.
+"""Create the ELSATIA Gestion Pro tutorial and advertising videos.
 
 The script renders animated 1080p interface demonstrations, produces a native
 French neural female voice, burns readable subtitles and normalizes the mix.
@@ -26,10 +26,10 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "output" / "video"
 TMP = OUT / "tmp"
 ASSETS = OUT / "assets"
-LOGO_PATH = ASSETS / "liria-gestion-pro-logo.png"
-PRESENTER_PATH = ASSETS / "presentatrice-liria.png"
-FFMPEG = Path("/tmp/liria-video-tools/node_modules/@ffmpeg-installer/darwin-x64/ffmpeg")
-EDGE_TTS = Path(os.environ.get("EDGE_TTS_BIN", "/tmp/liria-edge-tts/bin/edge-tts"))
+LOGO_PATH = ASSETS / "elsatia-logo-officiel.png"
+PRESENTER_PATH = ASSETS / "presentatrice-elsatia.png"
+FFMPEG = Path("/tmp/elsatia-video-tools/node_modules/@ffmpeg-installer/darwin-x64/ffmpeg")
+EDGE_TTS = Path(os.environ.get("EDGE_TTS_BIN", "/tmp/elsatia-edge-tts/bin/edge-tts"))
 VOICE = "fr-FR-DeniseNeural"
 FPS = 30
 SIZE = (1920, 1080)
@@ -64,10 +64,10 @@ class Scene:
 TUTORIAL = (
     Scene(
         "01-intro",
-        "Bienvenue dans Liria Gestion Pro",
+        "Bienvenue dans ELSATIA Gestion Pro",
         "Gérer. Suivre. Piloter.",
         ("Une seule application pour l'entreprise et le terrain", "Des accès adaptés à chaque poste", "Disponible sur ordinateur et smartphone"),
-        "Bonjour et bienvenue dans Liria Gestion Pro. Dans cette présentation, nous allons parcourir l'ensemble du logiciel, depuis la création des accès jusqu'au pilotage de l'entreprise. L'application centralise les clients, les chantiers, les devis, les factures, les équipes, le planning, le pointage, les achats, le stock et le matériel. Chaque collaborateur dispose d'un espace adapté à son poste.",
+        "Bonjour et bienvenue dans ELSATIA Gestion Pro. Dans cette présentation, nous allons parcourir l'ensemble du logiciel, depuis la création des accès jusqu'au pilotage de l'entreprise. L'application centralise les clients, les chantiers, les devis, les factures, les équipes, le planning, le pointage, les achats, le stock et le matériel. Chaque collaborateur dispose d'un espace adapté à son poste.",
         "presenter",
     ),
     Scene(
@@ -75,7 +75,7 @@ TUTORIAL = (
         "Connexion et installation",
         "Un compte personnel, sur ordinateur comme sur téléphone",
         ("Créer une entreprise ou rejoindre avec une invitation", "Installer l'application depuis le navigateur", "Rester connecté jusqu'à déconnexion ou révocation"),
-        "Pour commencer, ouvrez l'adresse de Liria Gestion Pro dans Chrome, Safari ou Edge. Un dirigeant peut créer son entreprise. Un collaborateur rejoint l'entreprise avec l'invitation préparée par son administrateur. Sur téléphone, ajoutez ensuite l'application à l'écran d'accueil. Le compte reste normalement connecté. Autorisez la localisation pour le pointage et la caméra pour les scans lorsque le téléphone le demande.",
+        "Pour commencer, ouvrez l'adresse d'ELSATIA Gestion Pro dans Chrome, Safari ou Edge. Un dirigeant peut créer son entreprise. Un collaborateur rejoint l'entreprise avec l'invitation préparée par son administrateur. Sur téléphone, ajoutez ensuite l'application à l'écran d'accueil. Le compte reste normalement connecté. Autorisez la localisation pour le pointage et la caméra pour les scans lorsque le téléphone le demande.",
         "login",
     ),
     Scene(
@@ -139,7 +139,7 @@ TUTORIAL = (
         "Fournisseurs et commandes",
         "Suivre aussi les réceptions partielles",
         ("Rattacher une commande à un chantier", "Indiquer reçu, partiel ou non reçu par ligne", "Associer facture, règlement et justificatif"),
-        "Le module Fournisseurs conserve les contacts, commandes, dépenses et règlements. Une commande peut être rattachée au chantier concerné puis envoyée en PDF. À la livraison, contrôlez chaque ligne. En cas de réception partielle, saisissez la quantité réellement reçue : Liria Gestion Pro affiche ce qui est reçu et ce qui manque. Ajoutez ensuite la facture fournisseur et son règlement.",
+        "Le module Fournisseurs conserve les contacts, commandes, dépenses et règlements. Une commande peut être rattachée au chantier concerné puis envoyée en PDF. À la livraison, contrôlez chaque ligne. En cas de réception partielle, saisissez la quantité réellement reçue : ELSATIA Gestion Pro affiche ce qui est reçu et ce qui manque. Ajoutez ensuite la facture fournisseur et son règlement.",
         "orders",
     ),
     Scene(
@@ -200,10 +200,10 @@ TUTORIAL = (
     ),
     Scene(
         "18-fin",
-        "Liria Gestion Pro",
+        "ELSATIA Gestion Pro",
         "Toute l'activité BTP, du bureau au chantier",
         ("Gérer", "Suivre", "Piloter"),
-        "Vous connaissez maintenant les principaux parcours de Liria Gestion Pro. Commencez par configurer les postes et les droits, puis créez vos équipes, clients et chantiers. Utilisez ensuite le planning, le pointage et les rattachements pour obtenir un suivi fiable. Retrouvez le guide complet directement dans le menu Aide. Liria Gestion Pro : gérer, suivre, piloter.",
+        "Vous connaissez maintenant les principaux parcours d'ELSATIA Gestion Pro. Commencez par configurer les postes et les droits, puis créez vos équipes, clients et chantiers. Utilisez ensuite le planning, le pointage et les rattachements pour obtenir un suivi fiable. Retrouvez le guide complet directement dans le menu Aide. ELSATIA Gestion Pro : gérer, suivre, piloter.",
         "presenter",
     ),
 )
@@ -211,13 +211,13 @@ TUTORIAL = (
 
 PROMO = (
     Scene("p01", "Votre entreprise avance.", "Vos informations aussi.", ("Bureau", "Chantiers", "Équipes"), "Entre le bureau, les chantiers et les équipes, les informations se dispersent vite.", "presenter"),
-    Scene("p02", "Tout réunir.", "Dans une seule application.", ("Clients et chantiers", "Devis et factures", "Planning et pointage GPS"), "Avec Liria Gestion Pro, centralisez clients, chantiers, devis, factures, planning et pointage GPS.", "dashboard"),
+    Scene("p02", "Tout réunir.", "Dans une seule application.", ("Clients et chantiers", "Devis et factures", "Planning et pointage GPS"), "Avec ELSATIA Gestion Pro, centralisez clients, chantiers, devis, factures, planning et pointage GPS.", "dashboard"),
     Scene("p03", "Chaque poste voit l'essentiel.", "Sans exposer les données sensibles.", ("Ouvrier", "Chef d'équipe", "Administratif", "Direction"), "Chaque collaborateur voit uniquement les modules et les actions autorisés pour son poste.", "permissions"),
     Scene("p04", "Du devis à l'encaissement.", "Des statuts qui suivent vos actions.", ("Prestations préenregistrées", "PDF prêt à envoyer", "Paiements synchronisés"), "Créez vos devis plus vite, transformez-les en factures et suivez les encaissements sans ressaisie.", "devis"),
     Scene("p05", "Le terrain reste connecté.", "Planning mobile, GPS et consignes.", ("Arrivée et départ", "Heures par chantier", "Travaux sans affichage des prix"), "Sur le terrain, chacun consulte son planning, ses consignes et pointe personnellement son arrivée et son départ.", "pointage"),
     Scene("p06", "Stock et matériel sous contrôle.", "QR, scans, affectations et alertes.", ("Borne dépôt", "Véhicules et outils", "Inventaires"), "Au dépôt, les QR, les scans et l'identification personnelle sécurisent les mouvements de stock et le matériel.", "stock"),
     Scene("p07", "Décidez avec une vision claire.", "Rentabilité, trésorerie et exports.", ("Suivi par chantier", "Alertes opérationnelles", "Exports comptables"), "Et les personnes autorisées pilotent la rentabilité, la trésorerie et les exports comptables depuis un seul espace.", "finance"),
-    Scene("p08", "Liria Gestion Pro", "Gérer. Suivre. Piloter.", ("Simple au bureau", "Pratique sur le terrain", "Conçu pour le BTP"), "Liria Gestion Pro. Toute votre activité BTP, du bureau au chantier. Gérer, suivre, piloter.", "presenter"),
+    Scene("p08", "ELSATIA Gestion Pro", "Gérer. Suivre. Piloter.", ("Simple au bureau", "Pratique sur le terrain", "Conçu pour le BTP"), "ELSATIA Gestion Pro. Toute votre activité BTP, du bureau au chantier. Gérer, suivre, piloter.", "presenter"),
 )
 
 
@@ -314,7 +314,7 @@ def header(canvas, title, subtitle, compact=False):
     draw = ImageDraw.Draw(canvas)
     draw.rectangle((0, 0, 1920, 92), fill=NAVY)
     paste_mark(canvas, 48, 8, 76)
-    draw.text((255, 28), "LIRIA GESTION PRO", font=font(30, True), fill=WHITE)
+    draw.text((255, 28), "ELSATIA GESTION PRO", font=font(30, True), fill=WHITE)
     draw.text((1518, 34), "GÉRER  •  SUIVRE  •  PILOTER", font=font(18), fill="#b9d7ff")
     if not compact:
         draw.text((92, 136), title, font=font(54, True), fill=TEXT)
@@ -505,7 +505,7 @@ def render_scene(scene: Scene) -> Image.Image:
         draw.text((1170, 881), "3 631,20 €", font=font(28, True), fill=BLUE)
     elif scene.kind == "document":
         rounded(draw, (490, 315, 960, 965), 12, WHITE, LINE, 2)
-        draw.text((535, 355), "LIRIA GESTION PRO", font=font(24, True), fill=NAVY)
+        draw.text((535, 355), "ELSATIA GESTION PRO", font=font(24, True), fill=NAVY)
         draw.text((760, 410), "FACTURE", font=font(31, True), fill=BLUE)
         draw.line((535, 465, 915, 465), fill=BLUE, width=4)
         for i in range(5):
@@ -799,7 +799,7 @@ def create_video(name: str, scenes: tuple[Scene, ...], promo=False):
     run([FFMPEG, "-y", "-f", "concat", "-safe", "0", "-i", concat_file, "-c", "copy", raw])
     music = work / "music.wav"
     music_bed(music, cursor + 1, promo)
-    final = OUT / ("Liria_Gestion_Pro_Publicite_60s.mp4" if promo else "Liria_Gestion_Pro_Guide_Video_Complet.mp4")
+    final = OUT / ("ELSATIA_Gestion_Pro_Publicite_60s.mp4" if promo else "ELSATIA_Gestion_Pro_Guide_Video_Complet.mp4")
     srt = final.with_suffix(".srt")
     vtt = final.with_suffix(".vtt")
     write_subtitles(srt, subtitles)
@@ -827,7 +827,7 @@ def main():
         raise SystemExit(f"Missing ffmpeg: {FFMPEG}")
     if not EDGE_TTS.exists():
         raise SystemExit(f"Missing native French neural voice tool: {EDGE_TTS}")
-    target = os.environ.get("LIRIA_VIDEO_TARGET", "all")
+    target = os.environ.get("ELSATIA_VIDEO_TARGET", "all")
     if target in ("all", "tutorial"):
         tutorial, tutorial_duration = create_video("tutoriel", TUTORIAL, promo=False)
         print(f"TUTORIAL={tutorial} DURATION={tutorial_duration:.1f}s")

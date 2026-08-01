@@ -1,14 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
 import { createHmac } from "node:crypto";
 
-const url = process.env.LIRIA_LOCAL_URL;
-const anonKey = process.env.LIRIA_LOCAL_ANON_KEY;
-const serviceRoleKey = process.env.LIRIA_LOCAL_SERVICE_ROLE_KEY;
-const jwtSecret = process.env.LIRIA_LOCAL_JWT_SECRET;
+const url = process.env.ELSATIA_LOCAL_URL;
+const anonKey = process.env.ELSATIA_LOCAL_ANON_KEY;
+const serviceRoleKey = process.env.ELSATIA_LOCAL_SERVICE_ROLE_KEY;
+const jwtSecret = process.env.ELSATIA_LOCAL_JWT_SECRET;
 
 if (!url || !anonKey || !serviceRoleKey || !jwtSecret) {
   throw new Error(
-    "Variables requises: LIRIA_LOCAL_URL, LIRIA_LOCAL_ANON_KEY, LIRIA_LOCAL_SERVICE_ROLE_KEY, LIRIA_LOCAL_JWT_SECRET",
+    "Variables requises: ELSATIA_LOCAL_URL, ELSATIA_LOCAL_ANON_KEY, ELSATIA_LOCAL_SERVICE_ROLE_KEY, ELSATIA_LOCAL_JWT_SECRET",
   );
 }
 

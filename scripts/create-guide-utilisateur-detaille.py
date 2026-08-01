@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Génère le manuel illustré complet de Liria Gestion Pro."""
+"""Génère le manuel illustré complet d'ELSATIA Gestion Pro."""
 
 from __future__ import annotations
 
@@ -23,9 +23,9 @@ from reportlab.platypus import (
 from reportlab.platypus.tableofcontents import TableOfContents
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "output/pdf/Guide_utilisation_detaille_Liria_Gestion_Pro.pdf"
-PUBLIC = ROOT / "public/guides/Guide_utilisation_Liria_Gestion_Pro.pdf"
-LOGO = ROOT / "public/liria-gestion-pro-logo-v5.png"
+OUT = ROOT / "output/pdf/Guide_utilisation_detaille_ELSATIA_Gestion_Pro.pdf"
+PUBLIC = ROOT / "public/guides/Guide_utilisation_ELSATIA_Gestion_Pro.pdf"
+LOGO = ROOT / "public/elsatia-logo-officiel.png"
 AUDIT = ROOT / "output/audit"
 
 NAVY = HexColor("#0D1B2A")
@@ -42,9 +42,9 @@ RED = HexColor("#B42318")
 FONT_REG = "/System/Library/Fonts/Supplemental/Arial.ttf"
 FONT_BOLD = "/System/Library/Fonts/Supplemental/Arial Bold.ttf"
 if Path(FONT_REG).exists():
-    pdfmetrics.registerFont(TTFont("Liria", FONT_REG))
-    pdfmetrics.registerFont(TTFont("Liria-Bold", FONT_BOLD))
-    BASE_FONT, BOLD_FONT = "Liria", "Liria-Bold"
+    pdfmetrics.registerFont(TTFont("ELSATIA", FONT_REG))
+    pdfmetrics.registerFont(TTFont("ELSATIA-Bold", FONT_BOLD))
+    BASE_FONT, BOLD_FONT = "ELSATIA", "ELSATIA-Bold"
 else:
     BASE_FONT, BOLD_FONT = "Helvetica", "Helvetica-Bold"
 
@@ -53,8 +53,8 @@ class GuideDoc(BaseDocTemplate):
     def __init__(self, filename: str):
         super().__init__(filename, pagesize=A4, rightMargin=1.6*cm, leftMargin=1.6*cm,
                          topMargin=1.7*cm, bottomMargin=1.6*cm,
-                         title="Guide détaillé d'utilisation - Liria Gestion Pro",
-                         author="Liria Gestion Pro", subject="Manuel complet du logiciel")
+                         title="Guide détaillé d'utilisation - ELSATIA Gestion Pro",
+                         author="ELSATIA Gestion Pro", subject="Manuel complet du logiciel")
         frame = Frame(self.leftMargin, self.bottomMargin, self.width, self.height, id="normal")
         self.addPageTemplates(PageTemplate(id="guide", frames=frame, onPage=self.header_footer))
         self._bookmark = 0
@@ -67,7 +67,7 @@ class GuideDoc(BaseDocTemplate):
         canvas.line(self.leftMargin, A4[1]-1.15*cm, A4[0]-self.rightMargin, A4[1]-1.15*cm)
         canvas.setFont(BASE_FONT, 8)
         canvas.setFillColor(MUTED)
-        canvas.drawString(self.leftMargin, A4[1]-0.82*cm, "Liria Gestion Pro - Guide utilisateur détaillé")
+        canvas.drawString(self.leftMargin, A4[1]-0.82*cm, "ELSATIA Gestion Pro - Guide utilisateur détaillé")
         canvas.drawRightString(A4[0]-self.rightMargin, 0.75*cm, f"Page {doc.page}")
         canvas.setStrokeColor(GOLD)
         canvas.line(self.leftMargin, 1.02*cm, A4[0]-self.rightMargin, 1.02*cm)
@@ -77,11 +77,11 @@ class GuideDoc(BaseDocTemplate):
         if isinstance(flowable, Paragraph) and flowable.style.name in ("Chapitre", "Section"):
             level = 0 if flowable.style.name == "Chapitre" else 1
             text = flowable.getPlainText()
-            key = getattr(flowable, "_liria_bookmark", None)
+            key = getattr(flowable, "_elsatia_bookmark", None)
             if key is None:
                 self._bookmark += 1
                 key = f"titre-{self._bookmark}"
-                flowable._liria_bookmark = key
+                flowable._elsatia_bookmark = key
             self.canv.bookmarkPage(key)
             self.canv.addOutlineEntry(text, key, level=level, closed=False)
             self.notify("TOCEntry", (level, text, self.page, key))
@@ -94,7 +94,7 @@ styles.add(ParagraphStyle(name="Section", parent=styles["Heading2"], fontName=BO
     fontSize=14, leading=18, textColor=BLUE, spaceBefore=12, spaceAfter=7, keepWithNext=True))
 styles.add(ParagraphStyle(name="SousSection", parent=styles["Heading3"], fontName=BOLD_FONT,
     fontSize=11.5, leading=15, textColor=NAVY, spaceBefore=9, spaceAfter=5, keepWithNext=True))
-styles.add(ParagraphStyle(name="CorpsLiria", parent=styles["BodyText"], fontName=BASE_FONT,
+styles.add(ParagraphStyle(name="CorpsELSATIA", parent=styles["BodyText"], fontName=BASE_FONT,
     fontSize=9.3, leading=13.3, textColor=TEXT, spaceAfter=6))
 styles.add(ParagraphStyle(name="Petit", parent=styles["BodyText"], fontName=BASE_FONT,
     fontSize=7.8, leading=10.5, textColor=MUTED))
@@ -106,11 +106,11 @@ styles.add(ParagraphStyle(name="Callout", parent=styles["BodyText"], fontName=BA
     fontSize=8.8, leading=12.5, textColor=TEXT))
 
 
-def p(text: str, style="CorpsLiria"):
+def p(text: str, style="CorpsELSATIA"):
     return Paragraph(escape(text).replace("\n", "<br/>"), styles[style])
 
 
-def rich(text: str, style="CorpsLiria"):
+def rich(text: str, style="CorpsELSATIA"):
     return Paragraph(text, styles[style])
 
 
@@ -178,9 +178,9 @@ def table(data, widths, header=True, font=7.5):
 CHAPTERS = [
     ("1. Démarrage, installation et connexion", "mobile-mon-espace.png", [
         ("Installer l'application sur téléphone ou ordinateur", [
-            "Ouvrez l'adresse sécurisée de Liria Gestion Pro dans Safari, Chrome ou Edge.",
+            "Ouvrez l'adresse sécurisée d'ELSATIA Gestion Pro dans Safari, Chrome ou Edge.",
             "Sur iPhone, utilisez Partager puis Sur l'écran d'accueil. Sur Android ou ordinateur, choisissez Installer l'application.",
-            "Ouvrez ensuite l'icône Liria Gestion Pro. La session reste connectée jusqu'à déconnexion, révocation ou expiration de sécurité.",
+            "Ouvrez ensuite l'icône ELSATIA Gestion Pro. La session reste connectée jusqu'à déconnexion, révocation ou expiration de sécurité.",
             "N'utilisez jamais un compte partagé hors du compte Dépôt prévu pour la borne de stock.",
         ]),
         ("Créer ou rejoindre une entreprise", [
@@ -341,7 +341,7 @@ CHAPTERS = [
             "Choisissez un fournisseur connu ou la zone Ajouter n'importe quel fournisseur.",
             "Sélectionnez une fiche existante ou saisissez le nom pour la créer automatiquement.",
             "Ajoutez le numéro de compte client, l'adresse HTTPS du portail et le mode d'échange proposé.",
-            "N'entrez jamais le mot de passe du portail dans Liria Gestion Pro.",
+            "N'entrez jamais le mot de passe du portail dans ELSATIA Gestion Pro.",
         ]),
         ("Importer ou synchroniser les prix", [
             "Pour un CSV, Excel ou FAB-DIS, ouvrez Importer un tarif négocié et sélectionnez le fournisseur.",
@@ -629,7 +629,7 @@ def build_story():
         story.append(Image(str(LOGO), width=6.8*cm, height=6.8*cm))
     story += [Spacer(1, 0.6*cm), Paragraph("GUIDE UTILISATEUR DÉTAILLÉ", ParagraphStyle(
         "CoverTitle", fontName=BOLD_FONT, fontSize=25, leading=30, textColor=NAVY, alignment=TA_CENTER)),
-        Spacer(1, 0.35*cm), Paragraph("Liria Gestion Pro", ParagraphStyle(
+        Spacer(1, 0.35*cm), Paragraph("ELSATIA Gestion Pro", ParagraphStyle(
         "CoverBrand", fontName=BOLD_FONT, fontSize=28, leading=32, textColor=BLUE, alignment=TA_CENTER)),
         Spacer(1, 0.35*cm), Paragraph("Gérer - Suivre - Piloter", ParagraphStyle(
         "CoverTag", fontName=BASE_FONT, fontSize=12, leading=16, textColor=GOLD, alignment=TA_CENTER)),
@@ -653,7 +653,7 @@ def build_story():
         story.append(Paragraph(title, styles["Chapitre"]))
         story.append(p("Chemin de menu et boutons disponibles selon les autorisations du poste. Les libellés peuvent être absents lorsqu'un administrateur a retiré l'accès au module."))
         if image_name:
-            story.extend(screenshot(image_name, f"Exemple réel dans Liria Gestion Pro - {title.split('. ',1)[-1]}"))
+            story.extend(screenshot(image_name, f"Exemple réel dans ELSATIA Gestion Pro - {title.split('. ',1)[-1]}"))
         for section_title, section_steps in sections:
             story.append(Paragraph(section_title, styles["Section"]))
             story.append(steps(section_steps))

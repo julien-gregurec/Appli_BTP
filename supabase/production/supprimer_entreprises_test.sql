@@ -1,21 +1,21 @@
 -- Nettoyage production demandé le 14 juillet 2026.
--- Conserve exclusivement LIRIA CONCEPT et supprime les deux sociétés de test juju.
+-- Conserve exclusivement ELSATIA et supprime les deux sociétés de test juju.
 -- Le contrôle par ID + nom évite toute suppression accidentelle.
 
 begin;
 
 do $$
 declare
-  v_liria_count integer;
+  v_elsatia_count integer;
   v_other_count integer;
 begin
-  select count(*) into v_liria_count
+  select count(*) into v_elsatia_count
   from public.entreprises
   where id = 'cc90ee48-7c9a-4983-a143-0df72ca0c937'
-    and upper(btrim(nom)) = 'LIRIA CONCEPT';
+    and upper(btrim(nom)) = 'ELSATIA';
 
-  if v_liria_count <> 1 then
-    raise exception 'Sécurité : entreprise LIRIA CONCEPT attendue introuvable';
+  if v_elsatia_count <> 1 then
+    raise exception 'Sécurité : entreprise ELSATIA attendue introuvable';
   end if;
 
   select count(*) into v_other_count
