@@ -2,6 +2,7 @@ import { importerVehiculesAction } from "@/app/actions/flotte";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { Lien as Link } from "@/components/Lien";
+import { STATUTS_VEHICULE } from "@/lib/flotte";
 
 type EmployeLie = { prenom: string; nom: string };
 
@@ -23,13 +24,6 @@ const dateFr = (date: string | null) => date
   : "—";
 
 const un = <T,>(value: T | T[] | null): T | null => Array.isArray(value) ? value[0] ?? null : value;
-
-const STATUTS_VEHICULE: Record<string, { label: string; classes: string }> = {
-  actif: { label: "Actif", classes: "bg-green-100 text-green-800" },
-  maintenance: { label: "Maintenance", classes: "bg-amber-100 text-amber-800" },
-  vendu: { label: "Vendu", classes: "bg-neutral-100 text-neutral-700" },
-  hors_service: { label: "Hors service", classes: "bg-red-100 text-red-800" },
-};
 
 export default async function FlottePage({
   searchParams,

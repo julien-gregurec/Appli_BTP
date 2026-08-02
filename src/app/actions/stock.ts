@@ -6,7 +6,9 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { lireImportStock } from "@/lib/import-stock";
 import { nomFichierSecurise } from "@/lib/documents";
 import { permissionsUtilisateur } from "@/lib/permissions";
+import { classifierCodeScanne, normaliserCodeIdentification } from "@/lib/qr-identification";
 const champ = (fd: FormData, nom: string) => String(fd.get(nom) ?? "").trim() || null;
+const champNormalise = (fd: FormData, nom: string) => { const valeur = champ(fd, nom); return valeur ? normaliserCodeIdentification(valeur) : null; };
 
 async function peutGererPrixStock(ctx: Awaited<ReturnType<typeof getContexteEntreprise>>) {
   const permissions = await permissionsUtilisateur(ctx);
@@ -63,24 +65,32 @@ export async function mouvementStockBorneAction(fd: FormData) {
   if (!identifiantEmploye || !motDePasse || !codeArticle || !Number.isFinite(quantite) || quantite <= 0) {
     redirect(`/stock/borne?error=${encodeURIComponent("Identifiant salarié, mot de passe, article et quantité sont obligatoires")}`);
   }
-  if(identifiantEmploye.toUpperCase().startsWith("LGP-EMP-")){
-    const{data,error}=await supabase.rpc("identifiant_employe_depuis_qr_borne",{p_entreprise_id:ctx.entrepriseId,p_code:identifiantEmploye});
+  // Reconnaît aussi bien une ancienne étiquette LGP-EMP- qu'une étiquette ELS-EMP- actuelle :
+  // les deux formes doivent continuer à déclencher la résolution du badge QR salarié.
+  if (classifierCodeScanne(identifiantEmploye) === "employe") {
+    const{data,error}=await supabase.rpc("identifiant_employe_depuis_qr_borne",{p_entreprise_id:ctx.entrepriseId,p_code:normaliserCodeIdentification(identifiantEmploye)});
     if(error||!data)redirect(`/stock/borne?error=${encodeURIComponent("QR salarié inconnu ou inactif")}`);
     identifiantEmploye=data;
   }
+  // p_code_article est aussi ce que enregistrer_mouvement_stock_borne_v4 recopie tel quel
+  // dans mouvements_stock.code_scan_utilise (colonne d'audit, jamais relue par l'application
+  // — cf. investigation ELS-REC-004). La normaliser ici est nécessaire pour que la recherche
+  // SQL retrouve l'article (codes_identification ne stocke plus que des codes ELS-* après la
+  // migration) ; elle a pour conséquence assumée qu'un ancien code LGP-* scanné sera journalisé
+  // sous sa forme ELS-* équivalente plutôt que sous la forme brute scannée.
   const { error } = await supabase.rpc("enregistrer_mouvement_stock_borne_v4", {
     p_entreprise_id: ctx.entrepriseId,
     p_identifiant_employe: identifiantEmploye,
     p_mot_de_passe: motDePasse,
-    p_code_article: codeArticle,
+    p_code_article: normaliserCodeIdentification(codeArticle),
     p_type: type,
     p_quantite: quantite,
     p_chantier_id: champ(fd, "chantier_id"),
-    p_code_chantier: champ(fd, "code_chantier"),
+    p_code_chantier: champNormalise(fd, "code_chantier"),
     p_vehicule_id: champ(fd, "vehicule_id"),
-    p_code_vehicule: champ(fd, "code_vehicule"),
+    p_code_vehicule: champNormalise(fd, "code_vehicule"),
     p_outil_id: champ(fd, "outil_id"),
-    p_code_outil: champ(fd, "code_outil"),
+    p_code_outil: champNormalise(fd, "code_outil"),
     p_teinte_id: null,
     p_motif: champ(fd, "motif"),
   });

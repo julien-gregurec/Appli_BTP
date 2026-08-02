@@ -6,6 +6,7 @@ import { permissionsUtilisateur } from "@/lib/permissions";
 import { modifierFournisseurAction } from "@/app/actions/commandes";
 import { CoordonneesBancairesForm } from "@/components/CoordonneesBancairesForm";
 import { DELAIS_PAIEMENT_FOURNISSEUR, libelleDelaiPaiementFournisseur } from "@/lib/echeances-fournisseurs";
+import { DEPENSE_STATUTS } from "@/lib/depenses";
 
 const champ = "w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -41,6 +42,6 @@ export default async function FournisseurDetailPage({ params, searchParams }: { 
     {peutGererRib && (
       <CoordonneesBancairesForm type="fournisseur" beneficiaireId={id} retour={`/fournisseurs/${id}`} rib={rib}/>
     )}
-    <section className="rounded-md border p-4"><div className="flex items-center justify-between gap-3"><h2 className="font-semibold">Dernières factures</h2><Link href={`/depenses`} className="text-sm text-blue-700">Toutes les factures →</Link></div><div className="mt-3 divide-y">{(factures ?? []).map((facture) => <Link key={facture.id} href={`/depenses/${facture.id}`} className="flex flex-wrap justify-between gap-2 py-2 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900"><span><strong>{facture.numero_piece}</strong><small className="block text-neutral-500">Pièce du {facture.date_piece} · échéance {facture.date_echeance ?? "non renseignée"}</small></span><span className="text-right">{Number(facture.montant_ttc).toLocaleString("fr-FR",{style:"currency",currency:"EUR"})}<small className="block text-neutral-500">{facture.statut.replaceAll("_"," ")}</small></span></Link>)}{!factures?.length && <p className="py-4 text-sm text-neutral-500">Aucune facture enregistrée.</p>}</div></section>
+    <section className="rounded-md border p-4"><div className="flex items-center justify-between gap-3"><h2 className="font-semibold">Dernières factures</h2><Link href={`/depenses`} className="text-sm text-blue-700">Toutes les factures →</Link></div><div className="mt-3 divide-y">{(factures ?? []).map((facture) => { const statut = DEPENSE_STATUTS[facture.statut]; return <Link key={facture.id} href={`/depenses/${facture.id}`} className="flex flex-wrap justify-between gap-2 py-2 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900"><span><strong>{facture.numero_piece}</strong><small className="block text-neutral-500">Pièce du {facture.date_piece} · échéance {facture.date_echeance ?? "non renseignée"}</small></span><span className="text-right">{Number(facture.montant_ttc).toLocaleString("fr-FR",{style:"currency",currency:"EUR"})}<small className="block text-neutral-500" style={{ color: statut?.couleur }}>{statut?.label ?? facture.statut.replaceAll("_"," ")}</small></span></Link>; })}{!factures?.length && <p className="py-4 text-sm text-neutral-500">Aucune facture enregistrée.</p>}</div></section>
   </div></main>;
 }
