@@ -1,6 +1,6 @@
 # Registre central ELSATIA
 
-Dernière consolidation : 1er août 2026.
+Dernière consolidation : 5 août 2026.
 
 ## Projet de référence
 
@@ -38,16 +38,18 @@ La numérotation ci-dessous est la numérotation actuelle et fait foi. Les ancie
 
 ## État des autres sujets
 
-| Sujet | État au 1er août 2026 | Emplacement ou prochaine action |
+| Sujet | État au 5 août 2026 | Emplacement ou prochaine action |
 | --- | --- | --- |
 | Application ELSATIA Gestion Pro | Projet principal actif | Racine du dépôt |
+| Recette fonctionnelle Preview (R1-R7C) | Prestations, Fournisseurs, Clients et Devis validés en conditions réelles sur `elsatia-preview` | Suite prévue : authentification, isolation multi-entreprises, Storage privé, Factures, Stripe test, Mobile/PWA — voir `docs/organisation/CHECKLIST_LANCEMENT.md` |
+| Checklist de lancement commercial | Document de suivi unique créé le 5 août 2026 | `docs/organisation/CHECKLIST_LANCEMENT.md` — source de référence pour l'avancement pré-lancement, à consulter avant ce registre pour tout sujet de commercialisation |
 | Sécurité multi-entreprises et RLS | Phase 1 terminée localement | Rapport enregistré par le commit `e9a996c` sur `release/commercialisation-v1` |
 | Intégrations fournisseurs PunchOut / EDI | Architecture prête, développement non commencé | `docs/architecture/integrations-fournisseurs.md` |
 | Outil de recherche de nom et de marque | Centralisé, autonome | `tools/naming-studio/` |
 | Problème IA avec Anthropic | Idée/problème enregistré, diagnostic à faire | Créer une tâche avec l’erreur exacte et le scénario de reproduction |
 | Documentation officielle | À structurer progressivement | Master Plan, documentation développeur/API/IA, manuels, installation et changelog |
 | Vidéo officielle | En attente des variantes de production validées | Ne pas régénérer les anciens médias pendant le lot 6 |
-| Vision et business | Backlog | Stratégie, modèle économique, marketing, structure juridique et feuille de route |
+| Vision et business | Marque « Elsatia » déposée à l'INPI le 01-08-2026 (n° 5284384) ; structure juridique toujours en backlog | Voir `docs/organisation/CHECKLIST_LANCEMENT.md` section 3 et 3bis |
 | ELSATIA Colors | Backlog produit séparé | Fonctionnalités, développement et stratégie à cadrer avant implémentation |
 
 ## Règles simples pour la suite

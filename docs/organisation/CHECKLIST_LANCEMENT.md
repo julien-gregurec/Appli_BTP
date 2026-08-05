@@ -2,7 +2,7 @@
 
 Document unique de suivi avant ouverture à de vrais clients. Chaque section correspond à un chantier obligatoire. Ne pas lancer tant qu'une case du chantier 8 (bascule de lancement) n'est pas explicitement cochée après validation des chantiers 1 à 7.
 
-Dernière mise à jour : 2026-08-05, après validation de R7C (recette Devis), clôture du chantier technique ci-dessous, et confirmation du dépôt de la marque ELSATIA n° 5284384 (section 3bis).
+Dernière mise à jour : 2026-08-05, après validation de R7C (recette Devis), clôture du chantier technique ci-dessous, confirmation du dépôt de la marque ELSATIA n° 5284384 (section 3bis), et nettoyage des documents de suivi (statut des commits, `REGISTRE_CENTRAL.md`).
 
 ## État déjà validé (ne pas revalider sans raison)
 
@@ -24,7 +24,7 @@ Dernière mise à jour : 2026-08-05, après validation de R7C (recette Devis), c
 - [x] Build, typecheck, lint et tests entièrement rejoués après correction — tous au vert.
 - [x] Scripts de recette (`scripts/seed-elsatia-preview-year.mjs` et son test) intégrés à Git avec leur propre suite de tests (37/37, `node --test`).
 - [x] `docs/exploitation/PREVIEW_ELSATIA_CHECKLIST.md` corrigée (188 → 189 migrations, nom du dernier fichier).
-- [ ] Pousser les deux commits locaux (`fix(security): corriger fast-uri et brace-expansion`, `chore(recette): versionner le script de peuplement Preview 5 ans`) vers le dépôt distant — **non fait, en attente d'autorisation explicite**.
+- [x] Commits poussés vers le dépôt distant, branche synchronisée jusqu'à `ff63e6d` inclus (sécurité, scripts de recette, checklist, dépôt de marque).
 
 ## 1. Sécurité des dépendances
 
@@ -111,7 +111,7 @@ Ne cocher qu'au moment réel du lancement, pas avant :
 
 - [x] Scripts de recette non suivis réglés (versionnés dans Git avec tests).
 - [x] `PREVIEW_ELSATIA_CHECKLIST.md` mise à jour (nombre de migrations).
-- [ ] Revue complète de `docs/organisation/REGISTRE_CENTRAL.md` pour vérifier qu'aucune autre section n'est obsolète.
+- [x] Revue de `docs/organisation/REGISTRE_CENTRAL.md` : date de consolidation et tableau « État des autres sujets » actualisés (recette Preview R1-R7C, checklist de lancement, dépôt de marque). Le tableau des lots 1-7 (rebranding) reste inchangé — vérifié encore exact (lot 6 toujours non fusionné sur `lot6/nettoyage-final-elsatia`, lot 7 toujours non commencé).
 
 ## Condition d'arrêt
 
