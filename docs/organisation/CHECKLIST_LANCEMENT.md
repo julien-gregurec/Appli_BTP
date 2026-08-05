@@ -29,7 +29,7 @@ Dernière mise à jour : 2026-08-05, après validation de R7C (recette Devis), c
 ## 1. Sécurité des dépendances
 
 - [x] `fast-uri` corrigé.
-- [ ] Mettre en place une vérification récurrente (`npm audit` en CI, ou Dependabot/Renovate) pour éviter la réapparition de vulnérabilités hautes non détectées.
+- [x] Vérification récurrente ajoutée à la CI : `npm audit --audit-level=high` sur les pull requests, les poussées `main` / `release/commercialisation-v1`, en lancement manuel et chaque lundi.
 
 ## 2. Recette fonctionnelle complète
 
