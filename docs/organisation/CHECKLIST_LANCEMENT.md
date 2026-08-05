@@ -2,7 +2,7 @@
 
 Document unique de suivi avant ouverture à de vrais clients. Chaque section correspond à un chantier obligatoire. Ne pas lancer tant qu'une case du chantier 8 (bascule de lancement) n'est pas explicitement cochée après validation des chantiers 1 à 7.
 
-Dernière mise à jour : 2026-08-05, après validation de R7C (recette Devis) et clôture du chantier technique ci-dessous.
+Dernière mise à jour : 2026-08-05, après validation de R7C (recette Devis), clôture du chantier technique ci-dessous, et identification du point bloquant marque ELSATIA (section 3bis).
 
 ## État déjà validé (ne pas revalider sans raison)
 
@@ -47,6 +47,20 @@ Dernière mise à jour : 2026-08-05, après validation de R7C (recette Devis) et
 - [ ] Adresse professionnelle.
 - [ ] SIRET.
 - [ ] E-mail professionnel (`@elsatia.fr` ou équivalent).
+
+### 3bis. Marque ELSATIA — point bloquant avant commercialisation (2026-08-05)
+
+Recherche du 2026-08-05 sur `data.inpi.fr` (bases Marques France/UE/International, mise à jour au 31/07/2026) : **aucune marque « ELSATIA » trouvée**, exacte ou approchante, sous ce nom. Les seuls résultats proches (« ELSAYA », déposés par un tiers sans lien) ne correspondent pas. Le dépôt annoncé par ailleurs n'est donc pas confirmé dans la base publique à cette date.
+
+Domaines `.fr` et `.com` déjà acquis (déclaré, non vérifié techniquement).
+
+Tant que le point ci-dessous n'est pas levé, éviter toute ouverture publique ou dépense marketing importante sous le nom ELSATIA :
+
+- [ ] Confirmer dans l'espace personnel INPI que la démarche est bien « déposée » et non restée à l'état de « brouillon ».
+- [ ] Récupérer le numéro national de dépôt, la date de dépôt et les classes de produits/services choisies.
+- [ ] Télécharger et conserver l'accusé de réception du dépôt.
+- [ ] Contrôler que l'identité exacte du déposant correspond à la structure prévue pour ELSATIA.
+- [ ] Faire réaliser une recherche de similitudes phonétiques et visuelles (pré-diagnostic INPI ou conseil en propriété industrielle) — la simple recherche par nom exact ne suffit pas.
 
 ## 4. Documents légaux définitifs
 
