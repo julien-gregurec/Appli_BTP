@@ -82,8 +82,8 @@ export default async function DashboardPage() {
   if (permissions !== null && !peutGererPlanning) requeteAffectations = requeteAffectations.eq("employe_id", employeCompte?.id ?? "00000000-0000-0000-0000-000000000000");
 
   const [devisResult, facturesResult, chantiersResult, affectationsResult, articlesResult, vehiculesResult, outilsResult, commandesResult, chantiersPointageResult, sessionsPointageResult, employesActifsResult, congesAujourdhuiResult, notificationsResult] = await Promise.all([
-    voir.devis ? supabase.from("devis").select("id, numero, statut, montant_ttc, date_emission, date_validite, client:clients(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }) : null,
-    voir.factures ? supabase.from("factures").select("id, numero, statut, date_emission, date_echeance, montant_ttc, montant_paye, client:clients(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId) : null,
+    voir.devis ? supabase.from("devis").select("id, numero, statut, montant_ttc, date_emission, date_validite, client:clients!devis_client_id_fkey(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }) : null,
+    voir.factures ? supabase.from("factures").select("id, numero, statut, date_emission, date_echeance, montant_ttc, montant_paye, client:clients!factures_client_id_fkey(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId) : null,
     voir.chantiers ? supabase.from("chantiers").select("id, nom, statut, date_fin_prevue").eq("entreprise_id", ctx.entrepriseId).order("updated_at", { ascending: false }) : null,
     voir.planning ? requeteAffectations : null,
     voir.stock ? supabase.from("articles_stock").select("id, reference, designation, quantite_stock, seuil_alerte, unite").eq("entreprise_id", ctx.entrepriseId).eq("actif", true) : null,

@@ -14,7 +14,7 @@ export async function creerLienPaiementStripeAction(factureId: string) {
   }
   const supabase = await createClient();
   const { data: facture } = await supabase.from("factures")
-    .select("id,numero,statut,montant_ttc,montant_paye,stripe_checkout_url,lien_paiement_expire_at,client:clients(email)")
+    .select("id,numero,statut,montant_ttc,montant_paye,stripe_checkout_url,lien_paiement_expire_at,client:clients!factures_client_id_fkey(email)")
     .eq("id",factureId).eq("entreprise_id",ctx.entrepriseId).single();
   if (!facture || !["envoyee","payee_partiel","en_retard"].includes(facture.statut)) redirect(`/factures/${factureId}?error=${encodeURIComponent("La facture doit être émise avant le paiement en ligne")}`);
   const reste = Math.round((Number(facture.montant_ttc)-Number(facture.montant_paye))*100);

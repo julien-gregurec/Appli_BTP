@@ -31,7 +31,7 @@ export default async function FactureDetailPage({
 
   const { data: facture } = await supabase
     .from("factures")
-    .select("*, client:clients(id, nom, prenom, societe, email), chantier:chantiers!factures_chantier_id_fkey(id, nom), devis:devis(id, numero)")
+    .select("*, client:clients!factures_client_id_fkey(id, nom, prenom, societe, email), chantier:chantiers!factures_chantier_id_fkey(id, nom), devis:devis!factures_devis_origine_id_fkey(id, numero)")
     .eq("id", id)
     .eq("entreprise_id", ctx.entrepriseId)
     .single();

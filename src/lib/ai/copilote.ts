@@ -30,8 +30,8 @@ async function rechercher(supabase: Supabase, entrepriseId: string, input: { ter
   const [{ data: clients }, { data: chantiers }, { data: devis }, { data: factures }] = await Promise.all([
     supabase.from("clients").select("id, nom, prenom, societe").eq("entreprise_id", entrepriseId).limit(300),
     supabase.from("chantiers").select("id, nom, ville, statut").eq("entreprise_id", entrepriseId).limit(300),
-    supabase.from("devis").select("id, numero, statut, montant_ttc, client_id, clients(nom, societe)").eq("entreprise_id", entrepriseId).ilike("numero", `%${input.terme.trim()}%`).limit(5),
-    supabase.from("factures").select("id, numero, statut, montant_ttc, client_id, clients(nom, societe)").eq("entreprise_id", entrepriseId).ilike("numero", `%${input.terme.trim()}%`).limit(5),
+    supabase.from("devis").select("id, numero, statut, montant_ttc, client_id, clients!devis_client_id_fkey(nom, societe)").eq("entreprise_id", entrepriseId).ilike("numero", `%${input.terme.trim()}%`).limit(5),
+    supabase.from("factures").select("id, numero, statut, montant_ttc, client_id, clients!factures_client_id_fkey(nom, societe)").eq("entreprise_id", entrepriseId).ilike("numero", `%${input.terme.trim()}%`).limit(5),
   ]);
   return {
     clients: (clients ?? []).filter((c) => correspondTousLesMots(`${c.prenom ?? ""} ${c.nom ?? ""} ${c.societe ?? ""}`, input.terme)).slice(0, 5),
@@ -68,7 +68,7 @@ async function absencesDuJour(supabase: Supabase, entrepriseId: string) {
 async function facturesImpayees(supabase: Supabase, entrepriseId: string) {
   const { data } = await supabase
     .from("factures")
-    .select("id, numero, statut, montant_ttc, montant_paye, date_echeance, clients(nom, societe)")
+    .select("id, numero, statut, montant_ttc, montant_paye, date_echeance, clients!factures_client_id_fkey(nom, societe)")
     .eq("entreprise_id", entrepriseId)
     .in("statut", ["envoyee", "en_retard"])
     .order("date_echeance")
@@ -80,7 +80,7 @@ async function devisEnAttente(supabase: Supabase, entrepriseId: string) {
   const seuil = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const { data } = await supabase
     .from("devis")
-    .select("id, numero, montant_ttc, date_emission, clients(nom, societe)")
+    .select("id, numero, montant_ttc, date_emission, clients!devis_client_id_fkey(nom, societe)")
     .eq("entreprise_id", entrepriseId)
     .eq("statut", "envoye")
     .lt("date_emission", seuil)

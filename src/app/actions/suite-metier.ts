@@ -139,7 +139,7 @@ export async function creerRelanceAction(formData: FormData) {
   const factureId = texte(formData, "facture_id");
   const canal = texte(formData, "canal") || "email";
   const { data: facture, error: factureError } = await supabase.from("factures")
-    .select("id,numero,montant_ttc,montant_paye,date_echeance,client:clients(nom,prenom,societe,email),chantier:chantiers(nom)")
+    .select("id,numero,montant_ttc,montant_paye,date_echeance,client:clients!factures_client_id_fkey(nom,prenom,societe,email),chantier:chantiers(nom)")
     .eq("id", factureId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
   if (factureError || !facture) return { error: "Facture introuvable ou inaccessible" };
   if (Number(facture.montant_ttc) <= Number(facture.montant_paye)) return { error: "Cette facture est déjà entièrement réglée" };

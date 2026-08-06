@@ -12,7 +12,7 @@ export default async function ImprimerDevisPage({ params }: { params: Promise<{ 
 
   const { data: devis } = await supabase
     .from("devis")
-    .select("*, client:clients(nom, prenom, societe, adresse_facturation, code_postal, ville, siret)")
+    .select("*, client:clients!devis_client_id_fkey(nom, prenom, societe, adresse_facturation, code_postal, ville, siret)")
     .eq("id", id)
     .single();
 
