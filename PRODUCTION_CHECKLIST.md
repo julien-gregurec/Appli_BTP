@@ -1,54 +1,109 @@
 # Passage en production — ELSATIA Gestion Pro
 
-> Le script manuel de sortie du prototype est prêt mais **non appliqué**. Il est volontairement rangé hors des migrations automatiques, car son application coupe immédiatement le mode prototype anonyme.
+> Ce document remplace intégralement la version précédente (datée du 12-13 juillet 2026), devenue obsolète : elle décrivait une « sortie de mode prototype » (accès `anon` étendu sur les tables métier, script `supabase/production/sortie_mode_prototype.sql`) qui **n'existe plus dans le schéma actuel**. Vérifié directement sur `elsatia-preview` le 07-08-2026 : 0 table publique avec RLS désactivé, seules 4 tables ont un grant `anon` — `catalogue_options_abonnement`, `catalogue_services_mise_en_service`, `modeles_roles_predefinis`, `plans_abonnement` — toutes en `SELECT` seul, sur des catalogues publics de tarification, sans aucune donnée métier. Le script `sortie_mode_prototype.sql` et les références aux migrations « 30-37 »/« 43-44 » de l'ancienne version sont sans objet aujourd'hui (199 migrations appliquées, architecture RLS complètement différente) ; ils ne doivent plus être suivis.
+>
+> Ce document distingue explicitement ce qui est **validé sur Preview** de ce qui reste **à faire avant une vraie ouverture Production**. Une case « validée sur Preview » ne signifie jamais « prêt en Production ».
 
-## Préconditions déjà vérifiées le 12 juillet 2026
+## A. Déjà validé sur Preview (`elsatia-preview`, réf. `pgvvpqyjziyapbbkydmc`)
 
-- L’entreprise `ENT-001` est bien `ELSATIA`.
-- Elle possède un membre actif et un poste Admin/Gérant.
-- Le profil public du propriétaire existe et pointe sur `ENT-001` comme entreprise active.
-- Le compte Supabase Auth correspondant existe, a un mot de passe, un email confirmé et a déjà réussi une connexion.
-- Le script de production passe en transaction de test puis peut être annulé sans modifier la base. Nouveau dry-run après migrations 30–37 réussi ; rollback contrôlé (fonction prototype + accès anon + 46 policies anon toujours présents).
-- **Correctif 2026-07-12 :** le script réaccorde désormais toutes les RPC appelées par l’application après les migrations 30 à 37 : accès/postes, rattachement par code, import stock, validation des pointages, justificatifs fournisseurs et espace propriétaire.
-- **Renforcement 2026-07-13 validé :** les migrations 43 et 44 sont appliquées. La 43 impose les droits `gerer_*` au niveau RLS, stockage et wrappers RPC ; la 44 prépare les comptes depuis les fiches employés. Le script de production réaccorde `a_permission` après avoir retiré les droits anonymes.
+Ces éléments ont été vérifiés en conditions réelles ou par inspection directe sur l'environnement Preview. Ils constituent une base technique saine, mais **doivent être revérifiés une fois l'environnement Production réellement provisionné** — rien n'est transposé automatiquement d'un projet Supabase/Vercel à un autre.
 
-## Décisions et actions avant la coupure
+| Sujet | Statut | Référence |
+| --- | --- | --- |
+| TypeScript (`npm run typecheck`) | `VALIDÉ SUR PREVIEW` — 0 erreur | Audit du 07-08-2026 |
+| Lint (`npm run lint`) | `VALIDÉ SUR PREVIEW` — 0 erreur, 3 warnings mineurs non bloquants (`<img>` non optimisé) | Audit du 07-08-2026 |
+| Tests Vitest | `VALIDÉ SUR PREVIEW` — 238/238 | Lot B3-B5, `REGISTRE_CENTRAL.md` |
+| Tests pgTAP | `VALIDÉ SUR PREVIEW` — 241/241 (local, schéma identique à Preview) | Lot B3-B5 |
+| Build (`npm run build`) | `VALIDÉ SUR PREVIEW` — réussi sans erreur | Audit du 07-08-2026 |
+| `npm audit --audit-level=high` | `VALIDÉ SUR PREVIEW` — 0 vulnérabilité (correctif `js-yaml` intégré) | Lot B3-B5 |
+| Authentification (inscription, confirmation, connexion, déconnexion) | `VALIDÉ SUR PREVIEW` — phases 0 à 4 en conditions réelles | `REGISTRE_CENTRAL.md`, recette Auth |
+| Authentification — mot de passe oublié | `VALIDÉ SUR PREVIEW` — phase 5 partiellement testée ; quota d'envoi d'e-mails Supabase atteint pendant la recette (voir section Email ci-dessous) | `REGISTRE_CENTRAL.md` |
+| Changement de mot de passe (utilisateur connecté) | `VALIDÉ SUR PREVIEW` — accès ajouté dans Mon espace, mécanisme existant réutilisé, 5 tests unitaires | Lot B3-B5 |
+| Isolation multi-entreprises — lecture (A↔B) | `VALIDÉ SUR PREVIEW` — sans anomalie | `REGISTRE_CENTRAL.md`, recette isolation |
+| Isolation multi-entreprises — écriture (INSERT/UPDATE/DELETE/Server Actions/RPC) | `VALIDÉ SUR PREVIEW` — sans anomalie, hors Storage et relances (couverts séparément) | `REGISTRE_CENTRAL.md`, recette isolation |
+| Correctifs RLS / clés étrangères composites (chantiers, factures, devis.client_id, relances_impayes) | `VALIDÉ SUR PREVIEW` — migrations `20260806000196` à `199` appliquées et vérifiées vivantes | `REGISTRE_CENTRAL.md` |
+| Isolation Storage — HTTP réel A↔B (upload/download/URL signée/routes/manipulation de chemin) | `VALIDÉ SUR PREVIEW` — sessions authentiques, sans fuite | `REGISTRE_CENTRAL.md`, recette Storage |
+| Rebranding ELSATIA | `VALIDÉ SUR PREVIEW` — aucune occurrence active de l'ancienne marque dans le code exécuté | Audit du 07-08-2026 |
+| Documents commerciaux (devis, factures, PDF, numérotation, TVA) | `VALIDÉ SUR PREVIEW` — recettes fonctionnelles R7A-C | `REGISTRE_CENTRAL.md` |
+| PWA — aspects techniques (manifest, service worker, icônes, notifications push VAPID) | `VALIDÉ SUR PREVIEW` — icônes ajoutées lot B3-B5 ; installation réelle sur appareil non testée | Audit du 07-08-2026, lot B3-B5 |
+| Sécurité RLS générale | `VALIDÉ SUR PREVIEW` — 0 table publique avec RLS désactivé, 229 fonctions `SECURITY DEFINER` toutes avec `search_path` explicite, 0 grant `anon` sur donnée métier | Audit du 07-08-2026 |
 
-1. Utiliser `https://elsatia.fr` comme domaine principal et canonique. Le domaine secondaire `https://elsatia.com` devra rediriger de façon permanente vers `https://elsatia.fr`. La valeur publique de production attendue est `NEXT_PUBLIC_APP_URL=https://elsatia.fr` ; elle devra être configurée ultérieurement dans Vercel et n'est pas un secret.
-2. Créer ou vérifier une sauvegarde Supabase restaurable avant la bascule.
-3. Dans Supabase Auth, renseigner `https://elsatia.fr` comme `Site URL` et autoriser `https://elsatia.fr/auth/callback` ainsi que `http://localhost:3000/auth/callback` pour le développement local.
-4. Dans **Authentication → Email Templates**, utiliser les liens SSR suivants :
-   - confirmation d’inscription : `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email&next=/onboarding`
-   - récupération de mot de passe : `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/nouveau-mot-de-passe`
-   Ces liens évitent de dépendre du navigateur ayant initié la demande et créent correctement la session en cookie.
-5. Configurer sur l’hébergement :
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` (clé publiable)
-   - `DISABLE_EMAIL_LOGIN=false`
-6. Tester la connexion du propriétaire, la confirmation d’un compte test et « Mot de passe oublié » sur un environnement de préproduction avec `DISABLE_EMAIL_LOGIN=false`.
-7. Appliquer manuellement `supabase/production/sortie_mode_prototype.sql` dans Supabase.
-8. Vérifier qu’un appel REST anonyme aux tables métier est refusé, puis tester en session authentifiée : dashboard, création devis, facture, paiement, document privé, commande, dépense et inventaire.
-9. Déployer la production et conserver le mode prototype uniquement sur une base locale/de démonstration séparée.
+## B. Prérequis Production encore absents
 
-## Domaine et intégrations à configurer ultérieurement
+Aucun de ces points n'est traité par ce document. Tous restent à faire, dans un ordre à déterminer séparément (voir section C).
 
-Aucune de ces opérations n'est réalisée par ce document. Une fois la configuration de production autorisée :
+| Sujet | Statut |
+| --- | --- |
+| Structure juridique (SIRET, adresse professionnelle, entité pouvant encaisser) | `BLOQUÉ PAR STRUCTURE JURIDIQUE` |
+| Mentions légales finalisées | `BLOQUÉ PAR STRUCTURE JURIDIQUE` — placeholders `[À COMPLÉTER]` présents |
+| CGV / CGU / politique de confidentialité / politique cookies finalisées | `BLOQUÉ PAR STRUCTURE JURIDIQUE` — dates et champs provisoires non remplis, relecture juridique recommandée avant publication réelle |
+| Projet Supabase Production (distinct de `elsatia-preview`) | `ENVIRONNEMENT PRODUCTION À PROVISIONNER` |
+| Projet Vercel Production (distinct de `elsatia-preview`) | `ENVIRONNEMENT PRODUCTION À PROVISIONNER` |
+| Domaine `elsatia.fr` configuré et pointé | `À FAIRE AVANT PRODUCTION` |
+| Variables d'environnement Production (aucune valeur Preview réutilisée) | `À FAIRE AVANT PRODUCTION` |
+| Migrations appliquées sur la base Production | `À VALIDER EN PRODUCTION` une fois le projet créé |
+| Configuration Auth Production (Site URL, redirections, templates email) | `À FAIRE AVANT PRODUCTION` |
+| URLs de redirection Stripe/Powens/notifications push déclarées sur le domaine final | `À FAIRE AVANT PRODUCTION` |
+| Storage Production (buckets, policies — à recréer, pas à copier depuis Preview) | `À FAIRE AVANT PRODUCTION` |
+| Fournisseur email transactionnel | `FOURNISSEUR EMAIL TRANSACTIONNEL À CHOISIR` (voir détail ci-dessous) |
+| Stripe en mode live | `STRIPE LIVE NON CONFIGURÉ` (voir détail ci-dessous) |
+| Sentry branché sur l'environnement Production | `À VALIDER EN PRODUCTION` — le code n'active Sentry que si `NODE_ENV=production` et un DSN Production est fourni |
+| Sauvegardes Supabase testées et restaurables | `À FAIRE AVANT PRODUCTION` |
+| Monitoring/alerting Production | `À FAIRE AVANT PRODUCTION` |
+| Vérification des tâches planifiées (crons) en Production | `À VALIDER EN PRODUCTION` |
+| Tests de fumée (smoke tests) sur l'environnement Production réel | `À VALIDER EN PRODUCTION` |
 
-- rattacher `elsatia.fr` à Vercel et créer la redirection permanente de `elsatia.com` vers `https://elsatia.fr` ;
-- utiliser `https://elsatia.fr` pour les redirections Stripe Checkout et portail ;
-- déclarer `https://elsatia.fr/api/stripe/oauth/callback` pour Stripe Connect ;
-- exposer sur le domaine principal les webhooks `/api/stripe/webhook`, `/api/stripe/abonnement/webhook` et `/api/stripe/boutique/webhook` ;
-- déclarer `https://elsatia.fr/api/paiements-bancaires/powens/callback` auprès de Powens ;
-- configurer le webhook de notifications sur `https://elsatia.fr/api/webhooks/notifications-push` ;
-- vérifier les métadonnées absolues et décider séparément de l'ajout éventuel d'un canonical explicite ;
-- vérifier le manifeste, le service worker et l'installation PWA sous HTTPS.
+### Email transactionnel — détail
 
-## Services externes encore optionnels
+- Le code applicatif n'envoie aucun email serveur : `src/lib/email.ts` ne construit que des liens `mailto:` côté client, ouverts par l'utilisateur.
+- Les seuls emails automatiques existants (confirmation d'inscription, mot de passe oublié) passent par le service natif de Supabase Auth, **insuffisant pour la commercialisation réelle** : son quota d'envoi a déjà été atteint pendant la recette Auth sur Preview (`REGISTRE_CENTRAL.md`), ce qui aurait bloqué un vrai client cherchant à réinitialiser son mot de passe.
+- Devis, factures et relances ne sont donc pas envoyés automatiquement côté serveur à ce jour.
+- Aucun fournisseur n'est choisi dans ce document.
 
-- Envoi automatique des devis/factures par email avec pièce jointe : choisir un fournisseur SMTP/Resend et fournir sa clé.
-- Adresse d’envoi professionnelle sur le domaine validé.
-- Sauvegardes/PITR selon le plan Supabase choisi.
+```
+FOURNISSEUR EMAIL TRANSACTIONNEL À CHOISIR
+```
 
-## Retour arrière d’urgence
+### Stripe / paiement — détail
 
-Ne pas remettre `DISABLE_EMAIL_LOGIN=true` sur une base durcie : la fonction prototype aura été supprimée. Restaurer la sauvegarde pré-migration ou réappliquer explicitement la migration 08 sur une base de démonstration isolée.
+- Le code Stripe est présent et mature (Checkout, portail client, abonnement, Stripe Connect, webhooks avec vérification de signature HMAC et déduplication en base).
+- Aucune configuration live n'est réalisée : toutes les variables `STRIPE_*` sont vides.
+- La mise en mode live dépend de deux prérequis qui ne sont pas encore réunis : la structure juridique (section B) et un environnement Production distinct où déclarer les vraies clés et les vrais webhooks.
+- Aucune activation live ne doit avoir lieu avant ces prérequis.
+
+```
+STRIPE LIVE NON CONFIGURÉ
+```
+
+### Environnement Production — état actuel
+
+```
+ENVIRONNEMENT PRODUCTION À PROVISIONNER
+```
+
+Aucun projet Supabase ni Vercel de Production n'existe à ce jour ; `elsatia-preview` reste l'unique environnement. Rien dans ce document n'autorise à en créer un — cela fera l'objet d'un lot séparé, explicitement autorisé.
+
+## C. Séquence de provisionnement proposée (non exécutée)
+
+Ordre proposé pour le futur lot de provisionnement, à valider et autoriser séparément avant toute exécution :
+
+1. Structure juridique disponible (SIRET, adresse, entité pouvant encaisser).
+2. Création du projet Supabase Production.
+3. Création du projet Vercel Production.
+4. Configuration du domaine `elsatia.fr` (DNS, certificat, redirection depuis `elsatia.com`).
+5. Saisie des variables d'environnement Production (aucune valeur Preview réutilisée).
+6. Application des migrations sur la base Production.
+7. Configuration Auth Production (Site URL, redirections, templates email).
+8. Configuration Storage Production (buckets et policies recréés).
+9. Mise en place du fournisseur email transactionnel.
+10. Configuration Stripe en mode live.
+11. Branchement du monitoring (Sentry Production, alerting).
+12. Données initiales strictement nécessaires (pas de données de recette/démonstration).
+13. Tests de fumée (smoke tests) en conditions Production réelles.
+14. Validation finale avant ouverture à de vrais clients.
+
+Cette séquence est une proposition de structure, pas une autorisation d'exécution. Chaque étape nécessitera sa propre autorisation explicite le moment venu.
+
+## Retour arrière d'urgence
+
+En l'absence d'environnement Production à ce jour, cette section ne s'applique pas encore. Elle sera réécrite avec la procédure réelle une fois l'environnement Production provisionné (restauration depuis une sauvegarde testée, procédure de rollback documentée).
