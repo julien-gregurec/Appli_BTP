@@ -1,3 +1,32 @@
+-- ============================================================================
+-- ARCHIVÉ LE 07-08-2026 — NE JAMAIS EXÉCUTER CE SCRIPT.
+-- ============================================================================
+-- Audit de préparation Production (07-08-2026) : ce script est à la fois CASSÉ
+-- et DANGEREUSEMENT OBSOLÈTE sur le schéma actuel.
+--
+--   1. CASSÉ : la ligne « drop function public.dev_contexte_entreprise(); »
+--      (sans IF EXISTS) échouera — cette fonction n'existe déjà plus dans le
+--      schéma courant, cette instruction lèvera une erreur et interrompra le
+--      script.
+--   2. REDONDANT pour la partie durcissement : 0 fonction SECURITY DEFINER
+--      sur 229 n'a d'EXECUTE accordé à PUBLIC aujourd'hui — ce durcissement
+--      est déjà en place, sans avoir besoin de ce script.
+--   3. DANGEREUX pour la liste blanche de RPC : ce script ne réaccorde
+--      explicitement EXECUTE qu'à 63 fonctions à `authenticated`, alors que
+--      168 fonctions SECURITY DEFINER en ont aujourd'hui besoin (ajoutées par
+--      les migrations postérieures à la rédaction de ce script). L'exécuter
+--      révoquerait tout puis ne réaccorderait que 63 fonctions sur 168
+--      nécessaires — cassant environ 105 fonctionnalités de l'application
+--      (pièces jointes, RGPD, relances, etc.).
+--
+-- Une base Production créée directement à partir des migrations actuelles de
+-- supabase/migrations/ est DÉJÀ dans l'état que ce script visait à atteindre.
+-- Il n'a plus lieu d'être exécuté, ni sur Preview ni sur une future Production.
+-- Conservé uniquement à titre d'archive historique.
+-- ============================================================================
+--
+-- Contenu original ci-dessous, inchangé :
+--
 -- PRODUCTION UNIQUEMENT — SCRIPT MANUEL, HORS MIGRATIONS AUTOMATIQUES.
 -- NE PAS APPLIQUER tant que DISABLE_EMAIL_LOGIN=true.
 -- Retire toutes les policies et permissions anonymes ajoutées pour le prototype.
