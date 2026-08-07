@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import manifest from "@/app/manifest";
@@ -35,6 +35,24 @@ describe("identité visible", () => {
       expect(source).toMatch(/BRAND|PRODUCT_NAME/);
       expect(source).not.toContain(ancienNom);
     }
+  });
+
+  it("déclare des icônes PWA dont chaque fichier existe réellement dans public/", () => {
+    const { icons } = manifest();
+    expect(icons).toBeDefined();
+    expect(icons!.length).toBeGreaterThanOrEqual(4);
+    expect(icons!.some((icone) => icone.purpose === "any")).toBe(true);
+    expect(icons!.some((icone) => icone.purpose === "maskable")).toBe(true);
+
+    for (const icone of icons!) {
+      expect(typeof icone.src).toBe("string");
+      const cheminDisque = join(process.cwd(), "public", (icone.src as string).replace(/^\//, ""));
+      expect(existsSync(cheminDisque), `Icône PWA manquante sur le disque : ${icone.src}`).toBe(true);
+    }
+
+    const serviceWorker = lire("public/sw.js");
+    expect(serviceWorker).toContain("/icons/");
+    expect(serviceWorker).not.toContain(ancienNom);
   });
 
   it("utilise un nom ELSATIA pour l'export RGPD téléchargé", () => {
