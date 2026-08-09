@@ -1,9 +1,11 @@
 "use server";
 
+import type { EmailOtpType } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { construireUrlCallbackAuth, ERREUR_CONFIGURATION_URL_AUTH, urlCallbackReinitialisation } from "@/lib/auth-redirects";
+import { destinationInterneSure } from "@/lib/security/redirects";
 
 export async function signupAction(formData: FormData) {
   if (isEmailLoginDisabled()) {
@@ -139,4 +141,26 @@ export async function modifierMotDePasseAction(formData: FormData) {
   if (error) redirect(`/nouveau-mot-de-passe?error=${encodeURIComponent(error.message)}`);
   await supabase.auth.signOut();
   redirect(`/login?message=${encodeURIComponent("Mot de passe modifié. Vous pouvez maintenant vous connecter.")}`);
+}
+
+const MESSAGE_LIEN_INVALIDE = "Lien de confirmation invalide ou expiré.";
+
+/**
+ * Ne vérifie le token qu'au clic explicite (formulaire, pas GET) : un lien de
+ * confirmation à usage unique consommé par un simple chargement de page (pré-
+ * chargement de client mail, scanner de sécurité) invaliderait le vrai clic.
+ */
+export async function confirmerCompteAction(formData: FormData) {
+  const tokenHash = String(formData.get("token_hash") ?? "");
+  const type = String(formData.get("type") ?? "") as EmailOtpType;
+  const next = formData.get("next");
+
+  if (!tokenHash || !type) redirect(`/login?error=${encodeURIComponent(MESSAGE_LIEN_INVALIDE)}`);
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
+  if (error) redirect(`/login?error=${encodeURIComponent(MESSAGE_LIEN_INVALIDE)}`);
+
+  const repli = type === "recovery" ? "/nouveau-mot-de-passe" : "/onboarding";
+  redirect(destinationInterneSure(typeof next === "string" ? next : null, repli));
 }
