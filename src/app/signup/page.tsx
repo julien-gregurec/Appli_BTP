@@ -3,17 +3,19 @@ import { redirect } from "next/navigation";
 import { signupAction } from "@/app/actions/auth";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { PwaInstallButton } from "@/components/PwaInstallButton";
+import { estCodeOffreTarifaire, offreTarifaireParCle } from "@/lib/tarification";
 
 export default async function SignupPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; code?: string; numero?: string }>;
+  searchParams: Promise<{ error?: string; code?: string; numero?: string; offre?: string }>;
 }) {
   if (isEmailLoginDisabled()) {
     redirect("/dashboard");
   }
 
-  const { error, code, numero } = await searchParams;
+  const { error, code, numero, offre: offreBrute } = await searchParams;
+  const offre = estCodeOffreTarifaire(offreBrute) ? offreBrute : null;
 
   return (
     <main className="flex flex-1 items-center justify-center p-6">
@@ -25,6 +27,7 @@ export default async function SignupPage({
           </p>
           {numero && <p className="mt-2 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800">Fiche employé détectée · numéro <span className="font-mono font-semibold">{numero.toUpperCase()}</span></p>}
           {!numero && code && <p className="mt-2 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800">Invitation détectée · code <span className="font-mono font-semibold">{code.toUpperCase()}</span></p>}
+          {!numero && !code && offre && <p className="mt-2 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800">Offre présélectionnée : <span className="font-semibold">{offreTarifaireParCle(offre).nom}</span></p>}
         </div>
 
         {error && (
@@ -34,6 +37,7 @@ export default async function SignupPage({
         <form action={signupAction} className="space-y-4">
           {code && <input type="hidden" name="code_entreprise" value={code.toUpperCase()} />}
           {numero && <input type="hidden" name="numero_employe" value={numero.toUpperCase()} />}
+          {offre && <input type="hidden" name="offre" value={offre} />}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <label htmlFor="prenom" className="text-sm font-medium">

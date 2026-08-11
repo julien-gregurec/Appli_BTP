@@ -6,6 +6,7 @@ import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { revalidatePath } from "next/cache";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { prefixeIdentifiantEntreprise } from "@/lib/identifiants";
+import { estCodeOffreTarifaire } from "@/lib/tarification";
 
 function champ(formData: FormData, nom: string) {
   const valeur = String(formData.get(nom) ?? "").trim();
@@ -18,6 +19,10 @@ export async function createEntrepriseAction(formData: FormData) {
   const adresse = String(formData.get("adresse") ?? "") || null;
   const codePostal = String(formData.get("code_postal") ?? "") || null;
   const ville = String(formData.get("ville") ?? "") || null;
+  const offreBrute = String(formData.get("offre") ?? "").trim().toLowerCase();
+  // L'offre choisie sur /tarifs saute le questionnaire "besoins" et va droit à sa recommandation :
+  // l'utilisateur a déjà fait son choix, inutile de le lui redemander.
+  const destinationApresCreation = estCodeOffreTarifaire(offreBrute) ? `/onboarding/besoins?recommande=${offreBrute}&nb=1` : "/onboarding/besoins";
 
   const supabase = await createClient();
 
@@ -56,8 +61,8 @@ export async function createEntrepriseAction(formData: FormData) {
     redirect(`/onboarding?error=${encodeURIComponent(error.message)}`);
   }
 
-  // Nouveau dirigeant : on l'oriente vers le questionnaire de besoins → recommandation d'offre.
-  redirect("/onboarding/besoins");
+  // Nouveau dirigeant : offre déjà choisie sur /tarifs → recommandation directe ; sinon questionnaire de besoins.
+  redirect(destinationApresCreation);
 }
 
 // Rejoindre une entreprise existante via son code d'adhésion (réservé au mode auth réelle).

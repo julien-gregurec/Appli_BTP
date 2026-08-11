@@ -72,6 +72,42 @@ describe("actions Auth et URL canonique", () => {
       }),
     }));
   });
+
+  it("conserve l’offre choisie sur /tarifs jusqu’au lien de confirmation", async () => {
+    const formData = new FormData();
+    formData.set("email", "recette@example.invalid");
+    formData.set("password", "mot-de-passe-test");
+    formData.set("nom", "Recette");
+    formData.set("prenom", "Elsatia");
+    formData.set("offre", "mini");
+
+    await expect(signupAction(formData)).rejects.toThrow("REDIRECT:");
+
+    expect(mocks.signUp).toHaveBeenCalledWith(expect.objectContaining({
+      options: expect.objectContaining({
+        data: expect.objectContaining({ offre: "mini" }),
+        emailRedirectTo: `${mocks.urlCanonique}/auth/callback?next=%2Fonboarding%3Foffre%3Dmini`,
+      }),
+    }));
+  });
+
+  it("ignore une offre inconnue plutôt que de la transmettre telle quelle", async () => {
+    const formData = new FormData();
+    formData.set("email", "recette@example.invalid");
+    formData.set("password", "mot-de-passe-test");
+    formData.set("nom", "Recette");
+    formData.set("prenom", "Elsatia");
+    formData.set("offre", "offre-inexistante");
+
+    await expect(signupAction(formData)).rejects.toThrow("REDIRECT:");
+
+    expect(mocks.signUp).toHaveBeenCalledWith(expect.objectContaining({
+      options: expect.objectContaining({
+        data: expect.objectContaining({ offre: null }),
+        emailRedirectTo: `${mocks.urlCanonique}/auth/callback?next=%2Fonboarding`,
+      }),
+    }));
+  });
 });
 
 describe("modifierMotDePasseAction — changement de mot de passe (utilisateur connecté ou lien de récupération)", () => {
