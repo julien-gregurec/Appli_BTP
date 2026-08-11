@@ -243,6 +243,16 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
+# Templates français ELSATIA — mécanisme de lien (token_hash + type explicite vers /auth/confirm)
+# volontairement identique à celui validé en P5 ; seul le texte/l'habillage change ici.
+[auth.email.template.confirmation]
+subject = "Confirmez votre adresse email"
+content_path = "./supabase/templates/confirm_signup.html"
+
+[auth.email.template.recovery]
+subject = "Réinitialisez votre mot de passe"
+content_path = "./supabase/templates/reset_password.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"
