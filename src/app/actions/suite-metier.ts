@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { construireLienMailto } from "@/lib/email";
+import { brevoEstConfigure, envoyerEmailBrevo } from "@/lib/brevo";
 import { PRODUCT_NAME } from "@/lib/brand";
 
 const texte = (formData: FormData, cle: string) => String(formData.get(cle) ?? "").trim();
@@ -178,6 +179,34 @@ export async function marquerRelanceEnvoyeeAction(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("relances_impayes").update({ statut: "envoyee", date_envoi: new Date().toISOString() }).eq("id", id).eq("entreprise_id", ctx.entrepriseId);
   if (error) retourErreur("/crm", error.message);
+  revalidatePath("/crm");
+}
+
+// Envoi réel via l'API Brevo (pas le relais SMTP utilisé par Supabase Auth : nécessite sa propre
+// clé BREVO_API_KEY, jamais exposée côté client). Non bloquant : un échec redirige avec un message
+// clair mais ne touche pas au statut existant de la relance, qui reste "à renvoyer".
+export async function envoyerRelanceEmailAction(id: string) {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const { data: relance, error: chargementErreur } = await supabase
+    .from("relances_impayes")
+    .select("id,canal,statut,destinataire,sujet,message")
+    .eq("id", id)
+    .eq("entreprise_id", ctx.entrepriseId)
+    .maybeSingle();
+  if (chargementErreur || !relance) retourErreur("/crm", "Relance introuvable");
+  if (relance!.canal !== "email" || !relance!.destinataire) retourErreur("/crm", "Cette relance n'a pas d'adresse e-mail associée");
+  if (!["a_envoyer", "preparee"].includes(relance!.statut)) retourErreur("/crm", "Cette relance a déjà été traitée");
+  if (!brevoEstConfigure()) retourErreur("/crm", "L'envoi automatique par e-mail n'est pas encore configuré");
+
+  try {
+    await envoyerEmailBrevo({ to: relance!.destinataire!, sujet: relance!.sujet || "Rappel de facture", texte: relance!.message || "" });
+  } catch (cause) {
+    retourErreur("/crm", cause instanceof Error ? cause.message : "Envoi de la relance impossible");
+  }
+
+  const { error: majErreur } = await supabase.from("relances_impayes").update({ statut: "envoyee", date_envoi: new Date().toISOString() }).eq("id", id).eq("entreprise_id", ctx.entrepriseId);
+  if (majErreur) retourErreur("/crm", majErreur.message);
   revalidatePath("/crm");
 }
 
