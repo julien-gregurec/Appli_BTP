@@ -18,6 +18,7 @@ export default async function BesoinsPage({
     const offre = offreParCle(recommande);
     const nbEmployes = Math.max(1, Number(nb ?? "1") || 1);
     const prix = prixAbonnementMensuel(nbEmployes, offre);
+    const remisePourcent = Math.round((1 - offre.prixAnnuelCentimes / (offre.prixMensuelCentimes * 12)) * 100);
     return (
       <main className="flex flex-1 items-center justify-center p-6">
         <div className="w-full max-w-md space-y-6">
@@ -33,9 +34,9 @@ export default async function BesoinsPage({
               {prix.employesSupplementaires > 0 && <> + {prix.employesSupplementaires} compte(s) × {prix.parEmployeSup} €</>}
               {" "}· pour {nbEmployes} salarié(s)
             </p>
-            <p className="mt-2 text-sm font-medium text-green-700 dark:text-green-400">
-              ou {prix.mensuelSiAnnuel} € / mois en paiement annuel <span className="text-xs font-normal">(−20 %)</span>
-            </p>
+            {remisePourcent > 0 && <p className="mt-2 text-sm font-medium text-green-700 dark:text-green-400">
+              ou {prix.mensuelSiAnnuel} € / mois en paiement annuel <span className="text-xs font-normal">(−{remisePourcent} %)</span>
+            </p>}
             <p className="mt-3 rounded-md bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800 dark:bg-blue-950/30 dark:text-blue-200">
               Essai gratuit {DUREE_ESSAI_JOURS} jours. Carte enregistrée de façon sécurisée par Stripe, sans débit pendant l’essai.
             </p>
@@ -48,7 +49,7 @@ export default async function BesoinsPage({
               <input type="hidden" name="offre" value={offre.cle}/>
               <input type="hidden" name="retour_erreur" value={`/onboarding/besoins?recommande=${offre.cle}&nb=${nbEmployes}`}/>
               <select name="periodicite" defaultValue="annuel" className="w-full rounded-md border px-3 py-2 text-sm dark:bg-neutral-900">
-                <option value="annuel">Annuel · −20 %</option>
+                <option value="annuel">{remisePourcent > 0 ? `Annuel · −${remisePourcent} %` : "Annuel"}</option>
                 <option value="mensuel">Mensuel</option>
               </select>
               <button className="w-full rounded-md bg-[#0d1b2a] px-3 py-2 text-center text-sm font-semibold text-white">Enregistrer ma carte et démarrer l’essai</button>
@@ -68,7 +69,7 @@ export default async function BesoinsPage({
       <div className="w-full max-w-lg space-y-6">
         <div>
           <h1 className="text-xl font-semibold">Trouvons l&apos;abonnement adapté</h1>
-          <p className="text-sm text-neutral-500">Quelques questions pour vous recommander la formule la plus adaptée à votre entreprise.</p>
+          <p className="text-sm text-neutral-500">Quelques questions pour vous recommander l’offre la plus adaptée à votre entreprise.</p>
         </div>
         {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
