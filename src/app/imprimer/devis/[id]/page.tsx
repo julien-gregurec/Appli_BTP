@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
-import { nomClient } from "@/lib/chantier-statuts";
+import { chargerDonneesDevisImprimable } from "@/lib/documents-commerciaux";
 import { DocumentImprimable } from "@/components/DocumentImprimable";
 import { AutoPrint } from "@/components/AutoPrint";
 
@@ -10,55 +10,27 @@ export default async function ImprimerDevisPage({ params }: { params: Promise<{ 
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
 
-  const { data: devis } = await supabase
-    .from("devis")
-    .select("*, client:clients!devis_client_id_fkey(nom, prenom, societe, adresse_facturation, code_postal, ville, siret)")
-    .eq("id", id)
-    .single();
-
-  if (!devis) notFound();
-
-  const [{ data: lignes }, { data: entreprise }, { data: signatures }, { data: photos }] = await Promise.all([
-    supabase.from("lignes_devis").select("*").eq("devis_id", id).order("ordre"),
-    supabase.from("entreprises").select("*").eq("id", ctx.entrepriseId).single(),
-    supabase.from("signatures_documents").select("id,employe_id,nom_signataire,fonction_signataire,signed_at,document_sha256").eq("entreprise_id", ctx.entrepriseId).eq("type_document", "devis").eq("document_id", id).order("signed_at"),
-    supabase.from("pieces_jointes_devis").select("id,nom_original,legende").eq("entreprise_id", ctx.entrepriseId).eq("devis_id", id).eq("type_media", "image").order("created_at"),
-  ]);
-
-  const client = Array.isArray(devis.client) ? devis.client[0] : devis.client;
+  const donnees = await chargerDonneesDevisImprimable(supabase, { id, entrepriseId: ctx.entrepriseId });
+  if (!donnees) notFound();
 
   return (
     <>
       <AutoPrint />
       <DocumentImprimable
-        typeDoc="Devis"
-        numero={devis.numero ?? "BROUILLON"}
-        dateEmission={devis.date_emission}
-        dateSecondaire={devis.date_validite ? { label: "Valable jusqu'au", valeur: devis.date_validite } : null}
-        entreprise={entreprise ?? { nom: ctx.entrepriseNom }}
-        client={{
-          nom_affiche: client ? nomClient(client) : "—",
-          adresse_facturation: client?.adresse_facturation,
-          code_postal: client?.code_postal,
-          ville: client?.ville,
-          siret: client?.siret,
-        }}
-        lignes={(lignes ?? []).map((l) => ({
-          designation: l.designation,
-          description: l.description,
-          quantite: l.quantite,
-          unite: l.unite,
-          prix_unitaire_ht: l.prix_unitaire_ht,
-          remise_ligne: l.remise_ligne,
-          taux_tva: l.taux_tva,
-        }))}
-        montantHt={devis.montant_ht}
-        montantTva={devis.montant_tva}
-        montantTtc={devis.montant_ttc}
-        notesClient={devis.notes_client}
+        typeDoc={donnees.typeDoc}
+        numero={donnees.numero}
+        dateEmission={donnees.dateEmission}
+        dateSecondaire={donnees.dateSecondaire}
+        entreprise={donnees.entreprise}
+        client={donnees.client}
+        lignes={donnees.lignes}
+        montantHt={donnees.montantHt}
+        montantTva={donnees.montantTva}
+        montantTtc={donnees.montantTtc}
+        notesClient={donnees.notesClient}
         estFacture={false}
-        signatures={signatures ?? []}
-        photos={(photos ?? []).map((photo) => ({ id: photo.id, nom: photo.nom_original, legende: photo.legende }))}
+        signatures={donnees.signatures}
+        photos={donnees.photos}
       />
     </>
   );
