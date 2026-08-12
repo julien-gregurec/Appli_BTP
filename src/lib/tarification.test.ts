@@ -79,4 +79,10 @@ describe("droits liés à l'offre", () => {
       expect(permissionIncluseDansOffre("gerer_utilisateurs", offre.cle)).toBe(true);
     }
   });
+
+  it("reste ouvert (fail-open) pour un code d'offre inconnu ou vide plutôt que de bloquer l'accès", () => {
+    expect(permissionIncluseDansOffre("acces_stock", "code_offre_inexistant")).toBe(true);
+    expect(permissionIncluseDansOffre("acces_paiements_bancaires", null)).toBe(true);
+    expect(permissionIncluseDansOffre("acces_paiements_bancaires", undefined)).toBe(true);
+  });
 });
