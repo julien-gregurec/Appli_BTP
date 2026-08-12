@@ -60,10 +60,14 @@ const nextConfig: NextConfig = {
   },
   // Chargé depuis node_modules à l'exécution plutôt que bundlé : c'est ce qui
   // permet aux require dynamiques d'ExcelJS de se résoudre.
-  serverExternalPackages: ["@excel.js/exceljs"],
+  // @sparticuz/chromium et puppeteer-core suivent le même besoin : ils chargent
+  // un binaire Chromium compressé (.br) via fs au runtime, non détecté par le
+  // traçage webpack/turbopack standard.
+  serverExternalPackages: ["@excel.js/exceljs", "@sparticuz/chromium", "puppeteer-core"],
   outputFileTracingIncludes: {
     "/api/exports/*": FICHIERS_EXCELJS,
     "/api/inventaires/*/cloture": FICHIERS_EXCELJS,
+    "/api/documents/**/pdf": ["./node_modules/@sparticuz/chromium/**/*"],
   },
   experimental: {
     serverActions: {
