@@ -103,7 +103,7 @@ export default async function SignupPage({
 
         <p className="text-sm text-neutral-500">
           Déjà un compte ?{" "}
-          <Link href="/login" className="font-medium text-neutral-900 underline">
+          <Link href="/login" className="font-medium text-neutral-900 underline dark:text-white">
             Se connecter
           </Link>
         </p>

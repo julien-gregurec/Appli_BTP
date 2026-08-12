@@ -21,7 +21,7 @@ export default async function LoginPage({
     <main className="flex flex-1 items-center justify-center p-6">
       <div className="w-full max-w-sm space-y-6">
         <div className="flex flex-col items-center gap-3 text-center">
-          <BrandWordmark className="text-2xl text-[#0d1b2a]" />
+          <BrandWordmark className="text-2xl text-[#0d1b2a] dark:text-white" />
           <p className="text-sm text-neutral-500">{PRODUCT_NAME}</p>
           <h1 className="text-xl font-semibold">Connexion</h1>
         </div>
@@ -75,7 +75,7 @@ export default async function LoginPage({
 
         <p className="text-sm text-neutral-500">
           Pas encore de compte ?{" "}
-          <Link href="/signup" className="font-medium text-neutral-900 underline">
+          <Link href="/signup" className="font-medium text-neutral-900 underline dark:text-white">
             Créer un compte
           </Link>
         </p>
