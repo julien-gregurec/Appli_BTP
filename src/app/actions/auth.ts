@@ -7,6 +7,7 @@ import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { construireUrlCallbackAuth, ERREUR_CONFIGURATION_URL_AUTH, urlCallbackReinitialisation } from "@/lib/auth-redirects";
 import { destinationInterneSure } from "@/lib/security/redirects";
 import { estCodeOffreTarifaire } from "@/lib/tarification";
+import { traduireErreurAuth } from "@/lib/auth-erreurs";
 
 function destinationOnboarding(params: { numero?: string; code?: string; offre?: string }) {
   const query = new URLSearchParams();
@@ -47,7 +48,7 @@ export async function signupAction(formData: FormData) {
     },
   });
   if (error) {
-    redirect(`/signup?error=${encodeURIComponent(error.message)}`);
+    redirect(`/signup?error=${encodeURIComponent(traduireErreurAuth(error.message))}`);
   }
   if (!data.user) {
     redirect(`/signup?error=${encodeURIComponent("Compte non créé.")}`);
@@ -72,7 +73,7 @@ export async function loginAction(formData: FormData) {
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
-    redirect(`/login?error=${encodeURIComponent(error.message)}`);
+    redirect(`/login?error=${encodeURIComponent(traduireErreurAuth(error.message))}`);
   }
 
   redirect("/dashboard");
@@ -136,7 +137,7 @@ export async function demanderReinitialisationAction(formData: FormData) {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo,
   });
-  if (error) redirect(`/mot-de-passe-oublie?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/mot-de-passe-oublie?error=${encodeURIComponent(traduireErreurAuth(error.message))}`);
   redirect(`/mot-de-passe-oublie?message=${encodeURIComponent("Si ce compte existe, un lien de réinitialisation vient d’être envoyé.")}`);
 }
 
@@ -150,7 +151,7 @@ export async function modifierMotDePasseAction(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(`/mot-de-passe-oublie?error=${encodeURIComponent("Le lien a expiré. Demandez un nouveau lien.")}`);
   const { error } = await supabase.auth.updateUser({ password: motDePasse });
-  if (error) redirect(`/nouveau-mot-de-passe?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/nouveau-mot-de-passe?error=${encodeURIComponent(traduireErreurAuth(error.message))}`);
   await supabase.auth.signOut();
   redirect(`/login?message=${encodeURIComponent("Mot de passe modifié. Vous pouvez maintenant vous connecter.")}`);
 }

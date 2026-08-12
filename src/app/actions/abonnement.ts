@@ -62,9 +62,9 @@ export async function demarrerAbonnementAction(formData: FormData) {
     if (!session.url) throw new Error("Stripe n’a pas retourné de page de paiement");
     destination = session.url;
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Souscription impossible";
+    console.error("demarrerAbonnementAction", error);
     const separateur = retourErreur.includes("?") ? "&" : "?";
-    redirect(`${retourErreur}${separateur}error=${encodeURIComponent(message)}`);
+    redirect(`${retourErreur}${separateur}error=${encodeURIComponent("Souscription impossible pour le moment. Réessayez ou contactez-nous.")}`);
   }
   redirect(destination);
 }
@@ -88,7 +88,8 @@ export async function ouvrirPortailAbonnementAction() {
     if (!session.url) throw new Error("Stripe n’a pas retourné le portail client");
     destination = session.url;
   } catch (error) {
-    redirect(`/abonnement?error=${encodeURIComponent(error instanceof Error ? error.message : "Portail indisponible")}`);
+    console.error("ouvrirPortailAbonnementAction", error);
+    redirect(`/abonnement?error=${encodeURIComponent("Le portail de facturation est momentanément indisponible.")}`);
   }
   redirect(destination);
 }
@@ -110,7 +111,10 @@ export async function configurerPolitiqueIAAction(formData: FormData) {
     .from("entreprises")
     .update({ ia_active: active, ia_politique_quota: politique, ia_plafond_cout_mensuel_ht: plafond })
     .eq("id", ctx.entrepriseId);
-  if (error) redirect(`/abonnement?error=${encodeURIComponent(error.message)}`);
+  if (error) {
+    console.error("configurerPolitiqueIAAction", error);
+    redirect(`/abonnement?error=${encodeURIComponent("Enregistrement impossible pour le moment.")}`);
+  }
   revalidatePath("/abonnement");
   redirect("/abonnement?succes=1");
 }
@@ -133,7 +137,8 @@ export async function desactiverOptionIAAction() {
     try {
       await retirerOptionIAAbonnement(entreprise.option_ia_stripe_item_id);
     } catch (error) {
-      redirect(`/abonnement?error=${encodeURIComponent(error instanceof Error ? error.message : "Désactivation impossible")}`);
+      console.error("desactiverOptionIAAction", error);
+      redirect(`/abonnement?error=${encodeURIComponent("Désactivation impossible pour le moment.")}`);
     }
   }
   await supabase.from("entreprises").update({ option_ia_statut: "annule", option_ia_stripe_item_id: null }).eq("id", ctx.entrepriseId);
@@ -163,7 +168,8 @@ export async function reactiverOptionIAAction() {
     const item = await ajouterOptionIAAbonnement(entreprise.stripe_subscription_id, palier, periodicite);
     await supabase.from("entreprises").update({ option_ia_statut: "actif", option_ia_stripe_item_id: item.id }).eq("id", ctx.entrepriseId);
   } catch (error) {
-    redirect(`/abonnement?error=${encodeURIComponent(error instanceof Error ? error.message : "Réactivation impossible")}`);
+    console.error("reactiverOptionIAAction", error);
+    redirect(`/abonnement?error=${encodeURIComponent("Réactivation impossible pour le moment.")}`);
   }
   revalidatePath("/abonnement");
   redirect(`/abonnement?succes=1`);
@@ -208,7 +214,8 @@ export async function choisirPalierOptionIAAction(formData: FormData) {
       : await ajouterOptionIAAbonnement(entreprise.stripe_subscription_id, palierBrut, periodicite);
     await supabase.from("entreprises").update({ option_ia_palier: palierBrut, option_ia_stripe_item_id: item.id }).eq("id", ctx.entrepriseId);
   } catch (error) {
-    redirect(`/abonnement?error=${encodeURIComponent(error instanceof Error ? error.message : "Changement de palier impossible")}`);
+    console.error("choisirPalierOptionIAAction", error);
+    redirect(`/abonnement?error=${encodeURIComponent("Changement de palier impossible pour le moment.")}`);
   }
   revalidatePath("/abonnement");
   redirect(`/abonnement?succes=1`);
@@ -236,7 +243,8 @@ export async function ouvrirPortailAbonnementSuspenduAction() {
     if (!session.url) throw new Error("Stripe n’a pas retourné le portail client");
     destination = session.url;
   } catch (error) {
-    redirect(`/abonnement-suspendu?error=${encodeURIComponent(error instanceof Error ? error.message : "Portail indisponible")}`);
+    console.error("ouvrirPortailAbonnementSuspenduAction", error);
+    redirect(`/abonnement-suspendu?error=${encodeURIComponent("Le portail de facturation est momentanément indisponible.")}`);
   }
   redirect(destination);
 }

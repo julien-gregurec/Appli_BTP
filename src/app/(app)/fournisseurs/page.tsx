@@ -26,7 +26,7 @@ export default async function FournisseursPage({ searchParams }: { searchParams:
             <h1 className="text-xl font-semibold">Fournisseurs</h1>
             <p className="text-sm text-neutral-500">Carnet des fournisseurs de matériaux, services et équipements.</p>
           </div>
-          <div className="flex items-center gap-2"><Link href="/connecteurs" className="rounded-md border px-3 py-2 text-sm font-medium">Connecter mes comptes</Link><Link href="/commandes" className="text-sm text-neutral-500 hover:underline">Commandes →</Link></div>
+          <div className="flex items-center gap-2"><Link href="/commandes" className="text-sm text-neutral-500 hover:underline">Commandes →</Link></div>
         </div>
 
         {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
