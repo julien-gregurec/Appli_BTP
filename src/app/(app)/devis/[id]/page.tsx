@@ -5,10 +5,11 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { euros, LIGNE_TYPES } from "@/lib/devis";
 import { nomClient } from "@/lib/chantier-statuts";
 import { StatutDevisSelect } from "@/components/StatutDevisSelect";
-import { associerDevisChantierAction, dupliquerDevisAction, supprimerDevisAction } from "@/app/actions/devis";
+import { associerDevisChantierAction, dupliquerDevisAction, supprimerDevisAction, envoyerDevisEmailAction } from "@/app/actions/devis";
 import { creerFactureDepuisDevisAction } from "@/app/actions/factures";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { contenuEmailDocument } from "@/lib/email";
+import { brevoEstConfigure } from "@/lib/brevo";
 import { EmailDocumentButton } from "@/components/EmailDocumentButton";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { SearchableSelect } from "@/components/SearchableSelect";
@@ -87,7 +88,7 @@ export default async function DevisDetailPage({ params, searchParams }: { params
               </Link>
             )}
             <a
-              href={`/imprimer/devis/${id}`}
+              href={`/api/documents/devis/${id}/pdf`}
               target="_blank"
               rel="noopener"
               className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700"
@@ -95,7 +96,18 @@ export default async function DevisDetailPage({ params, searchParams }: { params
               Télécharger PDF
             </a>
             {email ? (
-              <EmailDocumentButton type="devis" id={id} statut={devis.statut} to={email.to} sujet={email.sujet} corps={email.corps} pdfUrl={`/imprimer/devis/${id}`} />
+              <EmailDocumentButton
+                type="devis"
+                id={id}
+                statut={devis.statut}
+                to={email.to}
+                sujet={email.sujet}
+                corps={email.corps}
+                pdfUrl={`/api/documents/devis/${id}/pdf`}
+                envoiAutomatiqueDisponible={brevoEstConfigure()}
+                envoyerAutomatiquementAction={envoyerDevisEmailAction}
+                emailEnvoyeLe={devis.email_envoye_le}
+              />
             ) : (
               <span className="cursor-default rounded-md border border-neutral-200 px-3 py-1.5 text-sm text-neutral-400 dark:border-neutral-800" title="Aucun email renseigné pour ce client">
                 Envoyer par email

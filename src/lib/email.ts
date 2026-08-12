@@ -48,6 +48,20 @@ export function contenuEmailDocument(opts: {
   return {to,sujet,corps};
 }
 
+// Version HTML du même message texte que contenuEmailDocument(), avec un
+// bouton d'accès au document. Le texte source reste la référence : cette
+// fonction ne fait qu'y ajouter une mise en forme minimale + le lien.
+export function corpsHtmlEmailDocument(corpsTexte: string, lienDocument: string | null): string {
+  const paragraphes = corpsTexte
+    .split("\n\n")
+    .map((bloc) => `<p style="margin:0 0 12px;">${bloc.split("\n").join("<br>")}</p>`)
+    .join("");
+  const bouton = lienDocument
+    ? `<p style="margin:20px 0;"><a href="${lienDocument}" style="display:inline-block;background:#0d1b2a;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;">Consulter le document</a></p>`
+    : "";
+  return `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1a1a1a;max-width:560px;">${paragraphes}${bouton}</div>`;
+}
+
 export function contenuEmailCommande(opts: { numero: string; fournisseurNom: string; fournisseurEmail: string | null; montantTtc: number; entrepriseNom: string; dateLivraison?: string | null }) {
   const to = opts.fournisseurEmail?.trim();
   if (!to) return null;

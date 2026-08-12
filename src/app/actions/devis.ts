@@ -10,6 +10,7 @@ import { TRANSITIONS_DEVIS } from "@/lib/devis";
 import { genererLignesDevisIA } from "@/lib/ai/devis";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
 import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
+import { envoyerDocumentCommercialParEmail } from "@/lib/documents-envoi";
 
 type DevisPayload = {
   client_id: string;
@@ -227,6 +228,29 @@ export async function dupliquerDevisAction(devisId: string) {
 
   revalidatePath("/devis");
   redirect(`/devis/${data}/modifier`);
+}
+
+export async function envoyerDevisEmailAction(devisId: string): Promise<{ error: string } | { ok: true }> {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const permissions = await permissionsUtilisateur(ctx);
+  if (permissions !== null && !permissions.includes("gerer_devis")) {
+    return { error: "Votre poste ne permet pas d'envoyer de devis par e-mail." };
+  }
+
+  const resultat = await envoyerDocumentCommercialParEmail(supabase, {
+    entrepriseId: ctx.entrepriseId,
+    entrepriseNom: ctx.entrepriseNom,
+    prenomEmetteur: ctx.prenom,
+    userId: ctx.userId,
+    typeDocument: "devis",
+    documentId: devisId,
+  });
+  if ("error" in resultat) return resultat;
+
+  revalidatePath(`/devis/${devisId}`);
+  revalidatePath("/devis");
+  return { ok: true };
 }
 
 export async function genererDevisIAAction(description: string) {

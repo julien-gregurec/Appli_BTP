@@ -6,6 +6,10 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { TRANSITIONS_FACTURES } from "@/lib/factures";
 import type { LigneDevis } from "@/lib/devis";
+import { permissionsUtilisateur } from "@/lib/permissions";
+import { envoyerDocumentCommercialParEmail } from "@/lib/documents-envoi";
+import { construireSnapshotEntreprise } from "@/lib/documents-commerciaux";
+import { lienPaiementStripeEstActif } from "@/lib/stripe";
 
 type FacturePayload = {
   client_id: string;
@@ -82,15 +86,25 @@ export async function changerStatutFactureAction(factureId: string, statut: stri
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
 
-  const { data: facture } = await supabase.from("factures").select("statut, chantier_id").eq("id", factureId).eq("entreprise_id", ctx.entrepriseId).single();
+  const { data: facture } = await supabase.from("factures").select("statut, chantier_id, entreprise_snapshot").eq("id", factureId).eq("entreprise_id", ctx.entrepriseId).single();
   if (!facture || (statut !== facture.statut && !(TRANSITIONS_FACTURES[facture.statut] ?? []).includes(statut))) {
     revalidatePath(`/factures/${factureId}`);
     return;
   }
 
+  // Une facture émise garde à vie l'identité légale de l'entreprise telle
+  // qu'elle était à l'émission (adresse, SIRET, logo, assurances, mentions) :
+  // capturée une seule fois ici, à la sortie du statut brouillon, jamais
+  // réécrite ensuite. Voir src/lib/documents-commerciaux.ts.
+  let entrepriseSnapshot: Record<string, unknown> | undefined;
+  if (facture.statut === "brouillon" && statut !== "brouillon" && !facture.entreprise_snapshot) {
+    const { data: entreprise } = await supabase.from("entreprises").select("*").eq("id", ctx.entrepriseId).single();
+    if (entreprise) entrepriseSnapshot = construireSnapshotEntreprise(entreprise);
+  }
+
   const { error } = await supabase
     .from("factures")
-    .update({ statut, updated_at: new Date().toISOString() })
+    .update({ statut, updated_at: new Date().toISOString(), ...(entrepriseSnapshot ? { entreprise_snapshot: entrepriseSnapshot } : {}) })
     .eq("id", factureId)
     .eq("entreprise_id", ctx.entrepriseId);
 
@@ -101,6 +115,40 @@ export async function changerStatutFactureAction(factureId: string, statut: stri
     revalidatePath("/chantiers");
     if (facture.chantier_id) revalidatePath(`/chantiers/${facture.chantier_id}`);
   }
+}
+
+export async function envoyerFactureEmailAction(factureId: string): Promise<{ error: string } | { ok: true }> {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const permissions = await permissionsUtilisateur(ctx);
+  if (permissions !== null && !permissions.includes("gerer_factures")) {
+    return { error: "Votre poste ne permet pas d'envoyer de factures par e-mail." };
+  }
+
+  const { data: facturePaiement } = await supabase
+    .from("factures")
+    .select("stripe_checkout_url, lien_paiement_expire_at")
+    .eq("id", factureId)
+    .eq("entreprise_id", ctx.entrepriseId)
+    .maybeSingle();
+  const lienPaiement = facturePaiement && lienPaiementStripeEstActif(facturePaiement.stripe_checkout_url, facturePaiement.lien_paiement_expire_at)
+    ? facturePaiement.stripe_checkout_url
+    : null;
+
+  const resultat = await envoyerDocumentCommercialParEmail(supabase, {
+    entrepriseId: ctx.entrepriseId,
+    entrepriseNom: ctx.entrepriseNom,
+    prenomEmetteur: ctx.prenom,
+    userId: ctx.userId,
+    typeDocument: "facture",
+    documentId: factureId,
+    complementCorps: lienPaiement ? `Vous pouvez régler cette facture en ligne de façon sécurisée :\n${lienPaiement}` : undefined,
+  });
+  if ("error" in resultat) return resultat;
+
+  revalidatePath(`/factures/${factureId}`);
+  revalidatePath("/factures");
+  return { ok: true };
 }
 
 export async function enregistrerPaiementAction(factureId: string, formData: FormData) {

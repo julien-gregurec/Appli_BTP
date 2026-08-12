@@ -4,12 +4,16 @@ export function brevoEstConfigure(environnement: NodeJS.ProcessEnv = process.env
   return Boolean(environnement.BREVO_API_KEY && environnement.EMAIL_FROM_ADDRESS);
 }
 
+export type PieceJointeBrevo = { nom: string; contenuBase64: string };
+
 export async function envoyerEmailBrevo(params: {
   to: string;
   toName?: string | null;
   sujet: string;
   texte: string;
+  html?: string;
   replyTo?: string | null;
+  piecesJointes?: PieceJointeBrevo[];
 }) {
   const apiKey = process.env.BREVO_API_KEY;
   const fromAddress = process.env.EMAIL_FROM_ADDRESS;
@@ -25,6 +29,10 @@ export async function envoyerEmailBrevo(params: {
       replyTo: params.replyTo ? { email: params.replyTo } : undefined,
       subject: params.sujet,
       textContent: params.texte,
+      htmlContent: params.html || undefined,
+      attachment: params.piecesJointes?.length
+        ? params.piecesJointes.map((p) => ({ name: p.nom, content: p.contenuBase64 }))
+        : undefined,
     }),
   });
 

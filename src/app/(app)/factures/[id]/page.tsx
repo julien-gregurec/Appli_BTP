@@ -6,9 +6,10 @@ import { euros, LIGNE_TYPES } from "@/lib/devis";
 import { nomClient } from "@/lib/chantier-statuts";
 import { typeFactureLabel, MODES_PAIEMENT } from "@/lib/factures";
 import { StatutFactureSelect } from "@/components/StatutFactureSelect";
-import { enregistrerPaiementAction, modifierEcheanceFactureAction, supprimerPaiementAction } from "@/app/actions/factures";
+import { enregistrerPaiementAction, modifierEcheanceFactureAction, supprimerPaiementAction, envoyerFactureEmailAction } from "@/app/actions/factures";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { contenuEmailDocument } from "@/lib/email";
+import { brevoEstConfigure } from "@/lib/brevo";
 import { EmailDocumentButton } from "@/components/EmailDocumentButton";
 import { creerLienPaiementStripeAction } from "@/app/actions/paiements-en-ligne";
 import { lienPaiementStripeEstActif, stripeEstConfigure } from "@/lib/stripe";
@@ -85,7 +86,7 @@ export default async function FactureDetailPage({
           <div className="flex items-center gap-3">
             {facture.statut === "brouillon" && <Link href={`/factures/${id}/modifier`} className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700">Modifier</Link>}
             <a
-              href={`/imprimer/factures/${id}`}
+              href={`/api/documents/factures/${id}/pdf`}
               target="_blank"
               rel="noopener"
               className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700"
@@ -100,7 +101,10 @@ export default async function FactureDetailPage({
                 to={email.to}
                 sujet={email.sujet}
                 corps={lienPaiement ? `${email.corps}\n\nVous pouvez régler cette facture en ligne de façon sécurisée :\n${lienPaiement}` : email.corps}
-                pdfUrl={`/imprimer/factures/${id}`}
+                pdfUrl={`/api/documents/factures/${id}/pdf`}
+                envoiAutomatiqueDisponible={brevoEstConfigure()}
+                envoyerAutomatiquementAction={envoyerFactureEmailAction}
+                emailEnvoyeLe={facture.email_envoye_le}
               />
             ) : (
               <span className="cursor-default rounded-md border border-neutral-200 px-3 py-1.5 text-sm text-neutral-400 dark:border-neutral-800" title="Aucun email renseigné pour ce client">

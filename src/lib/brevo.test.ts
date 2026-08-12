@@ -55,6 +55,38 @@ describe("envoyerEmailBrevo", () => {
     });
   });
 
+  it("inclut htmlContent et attachment quand ils sont fournis", async () => {
+    vi.stubEnv("BREVO_API_KEY", "clé-test");
+    vi.stubEnv("EMAIL_FROM_ADDRESS", "no-reply@elsatia.fr");
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ messageId: "msg-456" }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await envoyerEmailBrevo({
+      to: "client@example.invalid",
+      sujet: "Devis DEV-2026-0001",
+      texte: "Bonjour",
+      html: "<p>Bonjour</p>",
+      piecesJointes: [{ nom: "devis-DEV-2026-0001.pdf", contenuBase64: "JVBERi0=" }],
+    });
+
+    const corps = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(corps.htmlContent).toBe("<p>Bonjour</p>");
+    expect(corps.attachment).toEqual([{ name: "devis-DEV-2026-0001.pdf", content: "JVBERi0=" }]);
+  });
+
+  it("omet htmlContent et attachment quand ils ne sont pas fournis", async () => {
+    vi.stubEnv("BREVO_API_KEY", "clé-test");
+    vi.stubEnv("EMAIL_FROM_ADDRESS", "no-reply@elsatia.fr");
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ messageId: "msg-789" }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await envoyerEmailBrevo({ to: "client@example.invalid", sujet: "Rappel", texte: "Bonjour" });
+
+    const corps = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(corps.htmlContent).toBeUndefined();
+    expect(corps.attachment).toBeUndefined();
+  });
+
   it("lève une erreur générique sans exposer le corps de la réponse Brevo en cas d'échec", async () => {
     vi.stubEnv("BREVO_API_KEY", "clé-test");
     vi.stubEnv("EMAIL_FROM_ADDRESS", "no-reply@elsatia.fr");
