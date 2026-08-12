@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { ROLES_CHANTIER, type RoleChantier } from "@/lib/chantier-statuts";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 function champ(formData: FormData, nom: string): string | null {
   const v = String(formData.get(nom) ?? "").trim();
@@ -58,7 +59,7 @@ export async function creerChantierAction(formData: FormData) {
     .single();
 
   if (error || !data) {
-    redirect(`/chantiers/nouveau?error=${encodeURIComponent(error?.message ?? "Erreur")}`);
+    redirect(`/chantiers/nouveau?error=${encodeURIComponent(messageErreurUtilisateur("creerChantierAction", error, "Impossible de créer ce chantier. Vérifiez les informations saisies."))}`);
   }
 
   revalidatePath("/chantiers");
@@ -97,7 +98,7 @@ export async function modifierLocalisationChantierAction(chantierId: string, for
     })
     .eq("id", chantierId)
     .eq("entreprise_id", ctx.entrepriseId);
-  if (error) redirect(`/chantiers/${chantierId}/localisation?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/chantiers/${chantierId}/localisation?error=${encodeURIComponent(messageErreurUtilisateur("modifierLocalisationChantierAction", error, "Impossible d’enregistrer ces modifications."))}`);
 
   revalidatePath(`/chantiers/${chantierId}/localisation`);
   redirect(`/chantiers/${chantierId}/localisation?succes=1`);
@@ -138,7 +139,7 @@ export async function creerChantierRapideAction(
     .select("id, nom")
     .single();
 
-  if (error || !cree) return { error: error?.message ?? "Impossible de créer le chantier." };
+  if (error || !cree) return { error: messageErreurUtilisateur("creerChantierRapideAction", error, "Impossible de créer le chantier.") };
   revalidatePath("/chantiers");
   return { id: cree.id, label: cree.nom };
 }
@@ -249,11 +250,11 @@ export async function affecterEmployeChantierAction(chantierId: string, formData
       });
 
   if (resultat.error) {
-    redirect(`/chantiers/${chantierId}?error=${encodeURIComponent(resultat.error.message)}`);
+    redirect(`/chantiers/${chantierId}?error=${encodeURIComponent(messageErreurUtilisateur("affecterEmployeChantierAction", resultat.error, "Impossible d’affecter cet employé au chantier."))}`);
   }
   revalidatePath(`/chantiers/${chantierId}`);
   revalidatePath("/mes-travaux");
-  redirect(`/chantiers/${chantierId}?success=${encodeURIComponent("Collaborateur affecté au chantier.")}`);
+  redirect(`/chantiers/${chantierId}?success=${encodeURIComponent("Employé affecté au chantier.")}`);
 }
 
 export async function retirerEmployeChantierAction(chantierId: string, affectationId: string) {
@@ -269,7 +270,7 @@ export async function retirerEmployeChantierAction(chantierId: string, affectati
     .eq("entreprise_id", ctx.entrepriseId)
     .is("date_fin", null);
   if (error) {
-    redirect(`/chantiers/${chantierId}?error=${encodeURIComponent(error.message)}`);
+    redirect(`/chantiers/${chantierId}?error=${encodeURIComponent(messageErreurUtilisateur("retirerEmployeChantierAction", error, "Impossible de retirer cet employé de l’équipe."))}`);
   }
   revalidatePath(`/chantiers/${chantierId}`);
   revalidatePath("/mes-travaux");

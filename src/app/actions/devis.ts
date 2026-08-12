@@ -11,6 +11,7 @@ import { genererLignesDevisIA } from "@/lib/ai/devis";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
 import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
 import { envoyerDocumentCommercialParEmail } from "@/lib/documents-envoi";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 type DevisPayload = {
   client_id: string;
@@ -61,7 +62,7 @@ export async function creerDevisAction(payload: DevisPayload) {
   });
 
   if (error || !devisId) {
-    return { error: error?.message ?? "Erreur à la création du devis" };
+    return { error: messageErreurUtilisateur("creerDevisAction", error, "Impossible de créer ce devis. Vérifiez les informations saisies.") };
   }
 
   revalidatePath("/devis");
@@ -99,7 +100,7 @@ export async function modifierDevisAction(devisId: string, payload: DevisPayload
     p_lignes: lignes,
   });
 
-  if (error) return { error: error.message };
+  if (error) return { error: messageErreurUtilisateur("modifierDevisAction", error, "Impossible d’enregistrer ces modifications. Vérifiez les informations saisies.") };
 
   revalidatePath("/devis");
   revalidatePath(`/devis/${devisId}`);
@@ -151,7 +152,7 @@ export async function associerDevisChantierAction(devisId: string, retour: strin
     .update({ chantier_id: chantierId, updated_at: new Date().toISOString() })
     .eq("id", devisId)
     .eq("entreprise_id", ctx.entrepriseId);
-  if (error) redirect(avecMessage("error", error.message));
+  if (error) redirect(avecMessage("error", messageErreurUtilisateur("associerDevisChantierAction", error, "Impossible d’associer ce devis au chantier.")));
 
   revalidatePath("/devis");
   revalidatePath(`/devis/${devisId}`);
@@ -223,7 +224,7 @@ export async function dupliquerDevisAction(devisId: string) {
   const { data, error } = await supabase.rpc("dupliquer_devis", { p_devis_id: devisId });
 
   if (error || !data) {
-    redirect(`/devis/${devisId}?error=${encodeURIComponent(error?.message ?? "Impossible de dupliquer le devis")}`);
+    redirect(`/devis/${devisId}?error=${encodeURIComponent(messageErreurUtilisateur("dupliquerDevisAction", error, "Impossible de dupliquer le devis."))}`);
   }
 
   revalidatePath("/devis");

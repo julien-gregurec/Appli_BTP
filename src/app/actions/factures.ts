@@ -10,6 +10,7 @@ import { permissionsUtilisateur } from "@/lib/permissions";
 import { envoyerDocumentCommercialParEmail } from "@/lib/documents-envoi";
 import { construireSnapshotEntreprise } from "@/lib/documents-commerciaux";
 import { lienPaiementStripeEstActif } from "@/lib/stripe";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 type FacturePayload = {
   client_id: string;
@@ -54,7 +55,7 @@ export async function modifierFactureAction(factureId: string, payload: FactureP
     },
     p_lignes: lignes,
   });
-  if (error) return { error: error.message };
+  if (error) return { error: messageErreurUtilisateur("creerFactureAction", error, "Impossible de créer cette facture. Vérifiez les informations saisies.") };
   revalidatePath("/factures");
   revalidatePath(`/factures/${factureId}`);
   revalidatePath(`/imprimer/factures/${factureId}`);
@@ -75,7 +76,7 @@ export async function creerFactureDepuisDevisAction(devisId: string, type: strin
   });
 
   if (error || !data) {
-    redirect(`/devis/${devisId}?error=${encodeURIComponent(error?.message ?? "Erreur")}`);
+    redirect(`/devis/${devisId}?error=${encodeURIComponent(messageErreurUtilisateur("creerFactureDepuisDevisAction", error, "Impossible de créer la facture depuis ce devis."))}`);
   }
 
   revalidatePath("/factures");
@@ -186,7 +187,7 @@ export async function enregistrerPaiementAction(factureId: string, formData: For
   });
 
   if (error) {
-    redirect(`/factures/${factureId}?error=${encodeURIComponent(error.message)}`);
+    redirect(`/factures/${factureId}?error=${encodeURIComponent(messageErreurUtilisateur("enregistrerPaiementAction", error, "Impossible d’enregistrer ce paiement."))}`);
   }
 
   revalidatePath(`/factures/${factureId}`);
@@ -214,7 +215,7 @@ export async function modifierEcheanceFactureAction(factureId: string, formData:
     .eq("id", factureId)
     .eq("entreprise_id", ctx.entrepriseId);
 
-  if (error) redirect(`/factures/${factureId}?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/factures/${factureId}?error=${encodeURIComponent(messageErreurUtilisateur("modifierEcheanceFactureAction", error, "Impossible d’enregistrer cette échéance."))}`);
   revalidatePath(`/factures/${factureId}`);
   revalidatePath("/factures");
   revalidatePath("/dashboard");
