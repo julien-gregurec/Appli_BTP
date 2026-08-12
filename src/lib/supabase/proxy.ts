@@ -7,7 +7,7 @@ import { appliquerRateLimit, politiquesRateLimitPour } from "@/lib/security/rate
 import { createAdminClient } from "@/lib/supabase/admin";
 import { optionsCookieAuth } from "@/lib/security/cookies";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/tarifs", "/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/confidentialite", "/cookies", "/auth", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu", "/guides", "/videos", "/paiement", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements", "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import"];
+const PUBLIC_PATHS = ["/login", "/signup", "/tarifs", "/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/confidentialite", "/cookies", "/auth", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu", "/guides", "/videos", "/paiement", "/document", "/imprimer/partage", "/api/documents/partage", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements", "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -64,7 +64,7 @@ export async function updateSession(request: NextRequest) {
   // vérifier le jeton auprès de Supabase, ce qui coûtait un aller-retour
   // réseau pour servir un PDF ou une vidéo. La page d'accueil vérifie elle-même
   // la session pour rediriger un utilisateur déjà connecté vers /dashboard.
-  const CHEMINS_SANS_SESSION = ["/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/confidentialite", "/cookies", "/guides", "/videos", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements",
+  const CHEMINS_SANS_SESSION = ["/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/confidentialite", "/cookies", "/guides", "/videos", "/document", "/imprimer/partage", "/api/documents/partage", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements",
                                 "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import"];
   if (estAccueil || CHEMINS_SANS_SESSION.some((c) => request.nextUrl.pathname.startsWith(c))) {
     return response;
