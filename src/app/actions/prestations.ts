@@ -6,6 +6,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import type { LigneDevis } from "@/lib/devis";
 import type { PrestationCatalogue } from "@/lib/prestations";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 function champ(formData: FormData, nom: string) {
   return String(formData.get(nom) ?? "").trim();
@@ -66,7 +67,7 @@ export async function creerPrestationAction(formData: FormData) {
   });
 
   if (error) {
-    const message = error.code === "23505" ? "Une prestation porte déjà ce nom" : error.message;
+    const message = error.code === "23505" ? "Une prestation porte déjà ce nom" : messageErreurUtilisateur("creerPrestationAction", error, "Impossible de créer cette prestation.");
     redirect(`/prestations/nouveau?error=${encodeURIComponent(message)}`);
   }
 
@@ -88,7 +89,7 @@ export async function modifierPrestationAction(id: string, formData: FormData) {
     .eq("id", id)
     .eq("entreprise_id", ctx.entrepriseId);
 
-  if (error) redirect(`/prestations/${id}/modifier?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/prestations/${id}/modifier?error=${encodeURIComponent(messageErreurUtilisateur("modifierPrestationAction", error, "Impossible d’enregistrer cette prestation."))}`);
 
   revalidatePath("/prestations");
   revalidatePath("/devis/nouveau");

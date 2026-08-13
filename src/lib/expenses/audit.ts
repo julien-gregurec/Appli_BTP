@@ -2,6 +2,7 @@ import "server-only";
 import { isIP } from "node:net";
 import { headers } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 function ipDepuisEntetes(value: string | null): string | null {
   const candidat = value?.split(",")[0]?.trim() ?? "";
@@ -42,7 +43,7 @@ export async function ajouterAudit(
     p_adresse_ip: http.adresseIp,
     p_user_agent: http.userAgent,
   });
-  if (error) throw new Error(`Journal d’audit indisponible : ${error.message}`);
+  if (error) throw new Error(messageErreurUtilisateur("ajouterAudit", error, "Journal d’audit indisponible."));
 }
 
 export async function journaliserAccesRefuse(

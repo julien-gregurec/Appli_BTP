@@ -8,6 +8,7 @@ import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { suggererReponse, type MessageThread } from "@/lib/ai/messagerie";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
 import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 function retour(type: "error" | "success", message: string, conversationId?: string): never {
   const query = new URLSearchParams({ [type]: message });
@@ -63,7 +64,7 @@ export async function creerConversationInterneAction(formData: FormData) {
     entreprise_id: ctx.entrepriseId, conversation_id: conversationId,
     auteur_employe_id: employe.id, contenu,
   });
-  if (error) retour("error", error.message);
+  if (error) retour("error", messageErreurUtilisateur("envoyerMessageAction", error, "Impossible d’envoyer ce message."));
   revalidatePath("/messagerie");
   retour("success", "Message envoyé", conversationId ?? undefined);
 }
@@ -80,7 +81,7 @@ export async function envoyerMessageInterneAction(conversationId: string, formDa
     entreprise_id: ctx.entrepriseId, conversation_id: conversationId,
     auteur_employe_id: employe.id, contenu,
   });
-  if (error) retour("error", error.message, conversationId);
+  if (error) retour("error", messageErreurUtilisateur("envoyerReponseSuggereeAction", error, "Impossible d’envoyer ce message."), conversationId);
   revalidatePath("/messagerie");
   retour("success", "Message envoyé", conversationId);
 }

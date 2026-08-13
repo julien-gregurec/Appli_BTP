@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 const PAGE = "/parametres/donnees";
 
@@ -20,7 +21,7 @@ export async function demanderSuppressionAction(formData: FormData) {
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("demander_suppression_entreprise", { p_entreprise_id: entrepriseId });
-  if (error) redirect(`${PAGE}?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`${PAGE}?error=${encodeURIComponent(messageErreurUtilisateur("demanderSuppressionAction", error, "Impossible d’enregistrer cette demande de suppression."))}`);
 
   revalidatePath(PAGE);
   redirect(`${PAGE}?message=${encodeURIComponent("Demande de suppression enregistrée.")}`);
@@ -32,7 +33,7 @@ export async function annulerSuppressionAction() {
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("annuler_suppression_entreprise", { p_entreprise_id: entrepriseId });
-  if (error) redirect(`${PAGE}?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`${PAGE}?error=${encodeURIComponent(messageErreurUtilisateur("annulerSuppressionAction", error, "Impossible d’annuler cette demande de suppression."))}`);
 
   revalidatePath(PAGE);
   redirect(`${PAGE}?message=${encodeURIComponent("Demande de suppression annulée.")}`);
@@ -51,7 +52,7 @@ export async function anonymiserEmployeAction(formData: FormData) {
     p_entreprise_id: entrepriseId,
     p_employe_id: employeId,
   });
-  if (error) redirect(`/employes/${employeId}?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("anonymiserEmployeAction", error, "Impossible d’anonymiser cet employé."))}`);
 
   revalidatePath(`/employes/${employeId}`);
   revalidatePath("/employes");
