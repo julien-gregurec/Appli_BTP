@@ -16,6 +16,7 @@ import {
   resoudreMimeMediaDevis,
 } from "@/lib/devis-medias";
 import { createClient } from "@/lib/supabase/client";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 type Option = { id: string; label: string };
 type DevisInitial = {
@@ -296,7 +297,7 @@ export function DevisEditor({
           .uploadToSignedUrl(preparation.path, preparation.token, fichier, {
             contentType: fichier.type,
           });
-        if (error) throw error;
+        if (error) throw new Error(messageErreurUtilisateur("DevisEditor:uploadPieceJointe", error, "Impossible d’envoyer la pièce jointe. Réessayez dans un instant."));
         prepares.push({
           path: preparation.path,
           nom: fichier.name,

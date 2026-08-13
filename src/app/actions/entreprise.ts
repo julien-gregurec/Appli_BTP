@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { prefixeIdentifiantEntreprise } from "@/lib/identifiants";
 import { estCodeOffreTarifaire } from "@/lib/tarification";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 function champ(formData: FormData, nom: string) {
   const valeur = String(formData.get(nom) ?? "").trim();
@@ -36,7 +37,7 @@ export async function createEntrepriseAction(formData: FormData) {
     });
 
     if (error) {
-      redirect(`/onboarding?error=${encodeURIComponent(error.message)}`);
+      redirect(`/onboarding?error=${encodeURIComponent(messageErreurUtilisateur("createEntrepriseAction:insert", error, "Impossible de créer l’entreprise. Vérifiez les informations saisies."))}`);
     }
 
     redirect("/dashboard");
@@ -58,7 +59,7 @@ export async function createEntrepriseAction(formData: FormData) {
     p_ville: ville,
   });
   if (error) {
-    redirect(`/onboarding?error=${encodeURIComponent(error.message)}`);
+    redirect(`/onboarding?error=${encodeURIComponent(messageErreurUtilisateur("createEntrepriseAction:bootstrap", error, "Impossible de créer l’entreprise. Vérifiez les informations saisies."))}`);
   }
 
   // Nouveau dirigeant : offre déjà choisie sur /tarifs → recommandation directe ; sinon questionnaire de besoins.
@@ -83,7 +84,7 @@ export async function rejoindreEntrepriseAction(formData: FormData) {
 
   const { error } = await supabase.rpc("rejoindre_entreprise_par_code", { p_code: code });
   if (error) {
-    redirect(`/onboarding?error=${encodeURIComponent(error.message)}`);
+    redirect(`/onboarding?error=${encodeURIComponent(messageErreurUtilisateur("rejoindreEntrepriseAction", error, "Ce code d’entreprise est invalide ou a expiré."))}`);
   }
   // Le membre arrive "en attente" : getContexteEntreprise le redirige vers /en-attente
   // tant que l'admin ne l'a pas activé en lui affectant un poste.
@@ -98,7 +99,7 @@ export async function activerCompteEmployeAction(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(`/signup?numero=${encodeURIComponent(numero)}`);
   const { error } = await supabase.rpc("activer_compte_employe", { p_numero: numero });
-  if (error) redirect(`/onboarding?numero=${encodeURIComponent(numero)}&error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/onboarding?numero=${encodeURIComponent(numero)}&error=${encodeURIComponent(messageErreurUtilisateur("activerCompteEmployeAction", error, "Numéro d’inscription invalide ou déjà utilisé."))}`);
   redirect("/dashboard");
 }
 
@@ -140,7 +141,7 @@ export async function modifierEntrepriseAction(formData: FormData) {
     p_mode: modeIdentifiant,
     p_prefixe: prefixeIdentifiant,
   });
-  if (identifiantsError) redirect(`/parametres?error=${encodeURIComponent(identifiantsError.message)}`);
+  if (identifiantsError) redirect(`/parametres?error=${encodeURIComponent(messageErreurUtilisateur("modifierEntrepriseAction:identifiants", identifiantsError, "Impossible de mettre à jour le format d’identifiant salarié."))}`);
 
   const { error } = await supabase.from("entreprises").update({
     nom,
@@ -175,7 +176,7 @@ export async function modifierEntrepriseAction(formData: FormData) {
     updated_at: new Date().toISOString(),
   }).eq("id", ctx.entrepriseId);
 
-  if (error) redirect(`/parametres?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/parametres?error=${encodeURIComponent(messageErreurUtilisateur("modifierEntrepriseAction:update", error, "Impossible d’enregistrer les paramètres de l’entreprise."))}`);
   revalidatePath("/", "layout");
   revalidatePath("/parametres");
   redirect("/parametres?succes=1");
@@ -189,9 +190,9 @@ export async function modifierLogoEntrepriseAction(formData:FormData){
   if(fichier.size>5*1024*1024)redirect(`/parametres?error=${encodeURIComponent("Le logo dépasse 5 Mo")}`);
   const{data:ancienne}=await supabase.from("entreprises").select("logo_url").eq("id",ctx.entrepriseId).maybeSingle(),path=`${ctx.entrepriseId}/logo-${crypto.randomUUID()}.${ext}`;
   const{error:uploadError}=await supabase.storage.from("entreprise-assets").upload(path,fichier,{contentType:fichier.type,cacheControl:"3600",upsert:false});
-  if(uploadError)redirect(`/parametres?error=${encodeURIComponent(uploadError.message)}`);
+  if(uploadError)redirect(`/parametres?error=${encodeURIComponent(messageErreurUtilisateur("modifierLogoEntrepriseAction:upload",uploadError,"Impossible d’envoyer le logo. Réessayez dans un instant."))}`);
   const{data:publicData}=supabase.storage.from("entreprise-assets").getPublicUrl(path),{error}=await supabase.from("entreprises").update({logo_url:publicData.publicUrl,updated_at:new Date().toISOString()}).eq("id",ctx.entrepriseId);
-  if(error){await supabase.storage.from("entreprise-assets").remove([path]);redirect(`/parametres?error=${encodeURIComponent(error.message)}`)}
+  if(error){await supabase.storage.from("entreprise-assets").remove([path]);redirect(`/parametres?error=${encodeURIComponent(messageErreurUtilisateur("modifierLogoEntrepriseAction:update",error,"Impossible d’enregistrer le nouveau logo."))}`)}
   const marqueur="/storage/v1/object/public/entreprise-assets/",ancien=ancienne?.logo_url?.includes(marqueur)?ancienne.logo_url.split(marqueur)[1]:null;if(ancien)await supabase.storage.from("entreprise-assets").remove([decodeURIComponent(ancien)]);
   revalidatePath("/","layout");revalidatePath("/parametres");revalidatePath("/imprimer","layout");redirect("/parametres?succes=logo");
 }
