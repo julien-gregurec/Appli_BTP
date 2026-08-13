@@ -136,10 +136,14 @@ begin
           (v_devis,'Fournitures chantier','Profiles, panneaux, fixations','fourniture',12+(v_index%12),'u',115,0,20,2),
           (v_devis,'Protection et nettoyage','Forfait chantier','forfait',1,'forfait',350,0,20,3);
         if v_statut='accepte' then
+          -- Créée en brouillon d'abord : le trigger trg_lignes_factures_brouillon_only
+          -- interdit d'insérer des lignes sur une facture déjà émise (garde-fou
+          -- d'intégrité réel, pas un bug) ; on émet seulement après avoir posé les lignes.
           insert into public.factures(entreprise_id,numero,client_id,chantier_id,devis_origine_id,type,statut,date_emission,date_echeance,notes_client,notes_internes,created_at)
-          select v_entreprise,'FAC-DEMO-'||to_char(v_date+7,'YYYYMM')||'-'||lpad(v_index::text,3,'0'),d.client_id,d.chantier_id,d.id,case when v_index%6=0 then 'acompte' else 'simple' end,'envoyee',v_date+7,v_date+37,'Paiement par virement ou carte en ligne.','[DEMO 18M] Facture fictive',(v_date+7)::timestamptz+interval '10 hours' from public.devis d where d.id=v_devis returning id into v_facture;
+          select v_entreprise,'FAC-DEMO-'||to_char(v_date+7,'YYYYMM')||'-'||lpad(v_index::text,3,'0'),d.client_id,d.chantier_id,d.id,case when v_index%6=0 then 'acompte' else 'simple' end,'brouillon',v_date+7,v_date+37,'Paiement par virement ou carte en ligne.','[DEMO 18M] Facture fictive',(v_date+7)::timestamptz+interval '10 hours' from public.devis d where d.id=v_devis returning id into v_facture;
           insert into public.lignes_factures(facture_id,designation,description,type,quantite,unite,prix_unitaire_ht,remise_ligne,taux_tva,ordre)
           select v_facture,designation,description,type,quantite,unite,prix_unitaire_ht,remise_ligne,taux_tva,ordre from public.lignes_devis where devis_id=v_devis;
+          update public.factures set statut='envoyee' where id=v_facture;
           select montant_ttc into v_total from public.factures where id=v_facture;
           if v_index%5<>0 then insert into public.paiements(facture_id,montant,date,mode,reference,created_at) values(v_facture,case when v_index%7=0 then round(v_total*.4,2) else v_total end,v_date+18,case when v_index%4=0 then 'carte_en_ligne' when v_index%4=1 then 'cb' else 'virement' end,'DEMO-REG-'||lpad(v_index::text,4,'0'),(v_date+18)::timestamptz+interval '12 hours');end if;
         end if;
