@@ -13,7 +13,6 @@ Le Service utilise **uniquement des cookies strictement nécessaires** à son fo
 | Cookie | Finalité | Durée | Type |
 |---|---|---|---|
 | Cookie de session / d'authentification (Supabase Auth) | Vous maintenir connecté et sécuriser l'accès | Durée de la session / jusqu'à déconnexion | Strictement nécessaire |
-| Préférences d'affichage (ex. thème clair/sombre) | Mémoriser vos choix d'interface | Persistant | Strictement nécessaire / confort |
 
 ## 3. Absence de cookies publicitaires ou de traçage
 
