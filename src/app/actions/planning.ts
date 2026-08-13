@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 function champ(formData: FormData, nom: string): string | null {
   const v = String(formData.get(nom) ?? "").trim();
@@ -40,7 +41,7 @@ export async function creerAffectationAction(formData: FormData) {
   const { error } = await supabase.from("affectations").insert(employeIds.map((employeId) => ({ entreprise_id:ctx.entrepriseId,chantier_id:chantierId,employe_id:employeId,date,heures,tache,type_activite:typeActivite,lieu_activite:lieuActivite })));
 
   if (error) {
-    redirect(`${destination}${destination.includes("?") ? "&" : "?"}error=${encodeURIComponent(error.message)}`);
+    redirect(`${destination}${destination.includes("?") ? "&" : "?"}error=${encodeURIComponent(messageErreurUtilisateur("creerAffectationAction", error, "Impossible de créer cette affectation."))}`);
   }
 
   revalidatePath("/planning");
@@ -86,7 +87,7 @@ export async function modifierAffectationAction(affectationId: string, formData:
     .in("id", idsACorriger);
 
   if (error) {
-    redirect(`${destination}${destination.includes("?") ? "&" : "?"}error=${encodeURIComponent(error.message)}`);
+    redirect(`${destination}${destination.includes("?") ? "&" : "?"}error=${encodeURIComponent(messageErreurUtilisateur("modifierAffectationAction", error, "Impossible de modifier cette affectation."))}`);
   }
 
   revalidatePath("/planning");

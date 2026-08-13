@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { reconcilierAbonnementStripe } from "@/lib/stripe-abonnement";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 function champ(formData: FormData, nom: string): string | null {
   const v = String(formData.get(nom) ?? "").trim();
@@ -98,7 +99,7 @@ export async function modifierEmployeAction(employeId: string, formData: FormDat
     .eq("entreprise_id", ctx.entrepriseId);
 
   if (error) {
-    redirect(`/employes/${employeId}/modifier?error=${encodeURIComponent(error.message)}`);
+    redirect(`/employes/${employeId}/modifier?error=${encodeURIComponent(messageErreurUtilisateur("modifierEmployeAction", error, "Impossible d’enregistrer les modifications de l’employé."))}`);
   }
 
   revalidatePath("/employes");
@@ -123,7 +124,7 @@ export async function changerStatutEmployeAction(employeId: string, statut: stri
   }
 }
 
-export async function changerStatutCompteApplicationAction(employeId:string,statut:string){const ctx=await getContexteEntreprise();await exigerGestionEmployes(ctx,`/employes/${employeId}`);const supabase=await createClient();const{error}=await supabase.rpc("changer_statut_compte_application",{p_entreprise_id:ctx.entrepriseId,p_employe_id:employeId,p_statut:statut});if(error)redirect(`/employes/${employeId}?error=${encodeURIComponent(error.message)}`);await reconcilierAbonnementStripe(ctx.entrepriseId).catch(()=>undefined);revalidatePath("/employes");revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent(statut==="pause"?"Compte mis en pause — il reste facturable pour le mois":"Statut du compte mis à jour")}`);}
+export async function changerStatutCompteApplicationAction(employeId:string,statut:string){const ctx=await getContexteEntreprise();await exigerGestionEmployes(ctx,`/employes/${employeId}`);const supabase=await createClient();const{error}=await supabase.rpc("changer_statut_compte_application",{p_entreprise_id:ctx.entrepriseId,p_employe_id:employeId,p_statut:statut});if(error)redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("changerStatutCompteApplicationAction",error,"Impossible de modifier le statut du compte."))}`);await reconcilierAbonnementStripe(ctx.entrepriseId).catch(()=>undefined);revalidatePath("/employes");revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent(statut==="pause"?"Compte mis en pause — il reste facturable pour le mois":"Statut du compte mis à jour")}`);}
 
 export async function reinitialiserMotDePasseStockEmployeAction(employeId: string) {
   const ctx = await getContexteEntreprise();
@@ -133,7 +134,7 @@ export async function reinitialiserMotDePasseStockEmployeAction(employeId: strin
     p_entreprise_id: ctx.entrepriseId,
     p_employe_id: employeId,
   });
-  if (error) redirect(`/employes/${employeId}?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("reinitialiserMotDePasseStockEmployeAction", error, "Impossible de réinitialiser le mot de passe."))}`);
   revalidatePath(`/employes/${employeId}`);
   redirect(`/employes/${employeId}?success=${encodeURIComponent("Accès stock réinitialisé. L’employé doit créer un nouveau mot de passe depuis Mon espace")}`);
 }
@@ -149,9 +150,9 @@ export async function importerCarteBtpAction(employeId:string,formData:FormData)
   if(!(fichier instanceof File)||!fichier.size||!formats[fichier.type]||fichier.size>10*1024*1024)redirect(`/employes/${employeId}?error=${encodeURIComponent("Ajoutez une carte en PDF, PNG, JPG ou WebP de moins de 10 Mo")}`);
   const path=`${ctx.entrepriseId}/${employeId}/carte-btp-${crypto.randomUUID()}.${formats[fichier.type]}`;
   const{error:uploadError}=await supabase.storage.from("documents-employes").upload(path,fichier,{contentType:fichier.type,upsert:false});
-  if(uploadError)redirect(`/employes/${employeId}?error=${encodeURIComponent(uploadError.message)}`);
+  if(uploadError)redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("modifierCarteBtpEmployeAction:upload",uploadError,"Impossible d’envoyer la carte BTP."))}`);
   const{error}=await supabase.from("employes").update({carte_btp_storage_path:path,carte_btp_nom:fichier.name,carte_btp_mime_type:fichier.type,carte_btp_taille_octets:fichier.size,carte_btp_numero:numero,carte_btp_expiration:expiration,updated_at:new Date().toISOString()}).eq("id",employeId).eq("entreprise_id",ctx.entrepriseId);
-  if(error){await supabase.storage.from("documents-employes").remove([path]);redirect(`/employes/${employeId}?error=${encodeURIComponent(error.message)}`);}
+  if(error){await supabase.storage.from("documents-employes").remove([path]);redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("modifierCarteBtpEmployeAction:update",error,"Impossible d’enregistrer la carte BTP."))}`);}
   if(employe.carte_btp_storage_path)await supabase.storage.from("documents-employes").remove([employe.carte_btp_storage_path]);
   revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent("Carte BTP enregistrée")}`);
 }
@@ -167,9 +168,9 @@ export async function importerPhotoEmployeAction(employeId:string,formData:FormD
   if(!(fichier instanceof File)||!fichier.size||!formats[fichier.type]||fichier.size>10*1024*1024)redirect(`/employes/${employeId}?error=${encodeURIComponent("Ajoutez une photo JPG, PNG ou WebP de moins de 10 Mo")}`);
   const path=`${ctx.entrepriseId}/${employeId}/portrait-${crypto.randomUUID()}.${formats[fichier.type]}`;
   const{error:upload}=await supabase.storage.from("documents-employes").upload(path,fichier,{contentType:fichier.type,upsert:false});
-  if(upload)redirect(`/employes/${employeId}?error=${encodeURIComponent(upload.message)}`);
+  if(upload)redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("modifierPhotoEmployeAction:upload",upload,"Impossible d’envoyer la photo."))}`);
   const{error}=await supabase.from("employes").update({photo_storage_path:path,photo_url:null,photo_nom:fichier.name,photo_mime_type:fichier.type,photo_taille_octets:fichier.size,updated_at:new Date().toISOString()}).eq("id",employeId).eq("entreprise_id",ctx.entrepriseId);
-  if(error){await supabase.storage.from("documents-employes").remove([path]);redirect(`/employes/${employeId}?error=${encodeURIComponent(error.message)}`);}
+  if(error){await supabase.storage.from("documents-employes").remove([path]);redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("modifierPhotoEmployeAction:update",error,"Impossible d’enregistrer la photo."))}`);}
   if(employe.photo_storage_path)await supabase.storage.from("documents-employes").remove([employe.photo_storage_path]);
   revalidatePath("/employes");revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent("Photo de l’employé enregistrée")}`);
 }
@@ -185,7 +186,7 @@ export async function supprimerPhotoEmployeAction(employeId:string){
 export async function revoquerAppareilEmployeAction(employeId:string,appareilId:string){
   const ctx=await getContexteEntreprise();await exigerGestionEmployes(ctx,`/employes/${employeId}`);const supabase=await createClient();
   const{error}=await supabase.rpc("revoquer_appareil_compte",{p_entreprise_id:ctx.entrepriseId,p_appareil_id:appareilId});
-  if(error)redirect(`/employes/${employeId}?error=${encodeURIComponent(error.message)}`);
+  if(error)redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("revoquerAppareilEmployeAction",error,"Impossible de révoquer cet appareil."))}`);
   revalidatePath(`/employes/${employeId}`);revalidatePath("/plateforme");redirect(`/employes/${employeId}?success=${encodeURIComponent("Appareil révoqué")}`);
 }
 
@@ -202,9 +203,9 @@ export async function enregistrerSignatureEmployeAction(employeId: string, dataU
   if (!employe) return { ok: false as const, erreur: "Employé introuvable." };
   const path = `${ctx.entrepriseId}/${employeId}/signature-${crypto.randomUUID()}.png`;
   const { error: upload } = await supabase.storage.from("documents-employes").upload(path, buffer, { contentType: "image/png", upsert: false });
-  if (upload) return { ok: false as const, erreur: upload.message };
+  if (upload) return { ok: false as const, erreur: messageErreurUtilisateur("enregistrerSignatureEmployeAction:upload", upload, "Impossible d’enregistrer la signature.") };
   const { error } = await supabase.from("employes").update({ signature_storage_path: path, signature_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", employeId).eq("entreprise_id", ctx.entrepriseId);
-  if (error) { await supabase.storage.from("documents-employes").remove([path]); return { ok: false as const, erreur: error.message }; }
+  if (error) { await supabase.storage.from("documents-employes").remove([path]); return { ok: false as const, erreur: messageErreurUtilisateur("enregistrerSignatureEmployeAction:update", error, "Impossible d’enregistrer la signature.") }; }
   if (employe.signature_storage_path) await supabase.storage.from("documents-employes").remove([employe.signature_storage_path]);
   revalidatePath(`/employes/${employeId}`);
   return { ok: true as const };
@@ -260,7 +261,7 @@ export async function creerMaFicheEmployeAction(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/mon-espace?error=${encodeURIComponent(error.message)}`);
+    redirect(`/mon-espace?error=${encodeURIComponent(messageErreurUtilisateur("declarerContratEmployeAction", error, "Impossible d’enregistrer ces informations."))}`);
   }
 
   revalidatePath("/mon-espace");
