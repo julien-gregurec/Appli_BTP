@@ -31,7 +31,10 @@ Toutes les notes internes portent le préfixe `[DEMO 18M]` ; toutes les référe
 
 ## Compte de connexion
 
-Compte Auth dédié, créé et contrôlé par l'utilisateur via `/signup` (jamais le compte administrateur réel `elsatia`, jamais de mot de passe géré ou vu par un assistant). Voir avec Julien pour l'adresse actuellement rattachée.
+- **Email** : `julien.gregurec+demo-elsatia@gmail.com` (alias Gmail dédié, distinct du compte administrateur réel, adresse contrôlée par Julien)
+- **Entreprise rattachée** : `Atelier Bâtiment Lyonnais` (`DEMO-18M`) uniquement, poste **Administrateur**, statut `actif`
+- **Mot de passe** : généré aléatoirement à la création, jamais affiché ni consigné nulle part (ni ici, ni dans un log, ni dans le dépôt). Pour se connecter, utiliser la fonction « mot de passe oublié » sur `/login` avec l'adresse ci-dessus si le mot de passe n'est pas connu.
+- **Confirmation email** : requise par la configuration Auth Production. Un email de confirmation a été envoyé à l'adresse ci-dessus lors de la création ; le lien doit être ouvert une fois avant la première connexion.
 
 ## Parcours de démonstration recommandé (10–15 min)
 
