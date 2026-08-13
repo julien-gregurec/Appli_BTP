@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 type LigneLot = { article_id: string; quantite: number };
 type Attribution = { ligne_commande_id: string; quantite: number };
@@ -37,7 +38,7 @@ export async function receptionLotAction(
     } : {}),
   };
   const { data, error } = await supabase.rpc(rpc, params);
-  if (error) return { ok: false, erreur: error.message };
+  if (error) return { ok: false, erreur: messageErreurUtilisateur("receptionLotAction", error, "Impossible d’enregistrer cette réception.") };
   revalidatePath("/stock");
   revalidatePath("/commandes");
   const res = data as { entrees: number; commandes: Array<{ commande_id: string; statut: string }> };
@@ -69,7 +70,7 @@ export async function sortieLotAction(
     } : {}),
   };
   const { data, error } = await supabase.rpc(rpc, params);
-  if (error) return { ok: false, erreur: error.message };
+  if (error) return { ok: false, erreur: messageErreurUtilisateur("sortieLotAction", error, "Impossible d’enregistrer cette sortie de stock.") };
   revalidatePath("/stock");
   return { ok: true, sorties: (data as { sorties: number }).sorties };
 }

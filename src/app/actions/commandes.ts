@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 import { TRANSITIONS_COMMANDES, type LigneCommande } from "@/lib/commandes";
 import { delaiPaiementFournisseurValide } from "@/lib/echeances-fournisseurs";
 
@@ -35,7 +36,7 @@ export async function creerFournisseurAction(formData: FormData) {
     delai_paiement_jours: delaiPaiement,
   });
 
-  if (error) redirect(`/fournisseurs?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/fournisseurs?error=${encodeURIComponent(messageErreurUtilisateur("creerFournisseurAction", error, "Impossible de créer ce fournisseur."))}`);
   revalidatePath("/fournisseurs");
   revalidatePath("/commandes/nouveau");
   redirect("/fournisseurs");
@@ -61,7 +62,7 @@ export async function modifierFournisseurAction(id: string, formData: FormData) 
     delai_paiement_jours: delaiPaiement,
     updated_at: new Date().toISOString(),
   }).eq("id", id).eq("entreprise_id", ctx.entrepriseId);
-  if (error) redirect(`/fournisseurs/${id}?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/fournisseurs/${id}?error=${encodeURIComponent(messageErreurUtilisateur("modifierFournisseurAction", error, "Impossible d’enregistrer ce fournisseur."))}`);
   revalidatePath("/fournisseurs");
   revalidatePath(`/fournisseurs/${id}`);
   revalidatePath("/depenses");
@@ -173,7 +174,7 @@ export async function changerStatutCommandeAction(id: string, statut: string) {
   const { error } = await supabase.rpc("changer_statut_commande", {
     p_entreprise_id: ctx.entrepriseId, p_commande_id: id, p_statut: statut,
   });
-  if (error) redirect(`/commandes/${id}?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/commandes/${id}?error=${encodeURIComponent(messageErreurUtilisateur("changerStatutCommandeAction", error, "Impossible de modifier le statut de la commande."))}`);
 
   revalidatePath(`/commandes/${id}`);
   revalidatePath("/commandes");
@@ -209,7 +210,7 @@ export async function enregistrerReceptionCommandeAction(id: string, formData: F
   const { error } = await supabase.rpc("enregistrer_reception_commande", {
     p_entreprise_id: ctx.entrepriseId, p_commande_id: id, p_lignes: receptions,
   });
-  if (error) redirect(`/commandes/${id}?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/commandes/${id}?error=${encodeURIComponent(messageErreurUtilisateur("enregistrerReceptionCommandeAction", error, "Impossible d’enregistrer la réception."))}`);
   revalidatePath(`/commandes/${id}`);
   revalidatePath("/commandes");
   revalidatePath("/dashboard");
