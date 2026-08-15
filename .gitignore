@@ -56,3 +56,7 @@ output/video/plans/
 
 # Rapports de vérification automatisée
 output/verification/
+
+# Livrables commerciaux C2 générés (conservés localement)
+/output/c2b-captures/
+/output/c2c-presentation/
