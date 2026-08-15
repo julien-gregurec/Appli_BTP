@@ -2,21 +2,22 @@
 
 ## 1. Objet et limites
 
-Ce lot transforme C5-A, C5-B et C5-C en un dispositif directement utilisable pour préparer la campagne pilote de 30 entreprises alsaciennes. Il ne contient aucun prospect réel et n'autorise encore aucune recherche, collecte, importation, sollicitation ou activation d'essai.
+Ce lot transforme C5-A, C5-B et C5-C en un dispositif directement utilisable pour préparer la campagne pilote de 30 entreprises alsaciennes. Il ne contient aucun prospect réel et n'exécute aucune recherche, collecte, importation, sollicitation ou activation d'essai.
 
-Les décisions ci-dessous sont des règles opérationnelles de pilote. Elles ne remplacent pas la validation juridique du responsable de traitement, de la notice complète et des durées de conservation.
+Les décisions opérationnelles nécessaires à la collecte pilote sont désormais arrêtées. La collecte pourra commencer dans un lot séparé, sous réserve des contrôles par lot prévus dans la checklist. Aucun contact ne doit être envoyé avant les contrôles d'exécution correspondants.
 
 ## 2. Décisions opérationnelles retenues
 
 | Sujet | Décision C5-D | Limite ou condition |
 |---|---|---|
 | Outil | Classeur Excel dédié, distinct d'ELSATIA | Le CRM interne reste BETA |
-| Emplacement | Dossier Google Drive professionnel ELSATIA, accès **Restreint** | Aucun téléversement effectué dans C5-D |
-| Zone initiale | Rayon de **50 km autour de Strasbourg** | Extension à l'Alsace entière seulement si moins de 30 P1/P2 vérifiables |
-| Entreprises individuelles | Admissibles sur les mêmes critères métier, sans priorité automatique | Aucun domicile ni canal personnel collecté |
-| Canal initial | Envoi manuel, unitaire et personnalisé depuis la boîte professionnelle `contact@elsatia.fr` | Boîte d'envoi et réception des réponses à valider avant GO |
+| Emplacement | `ELSATIA / Commercial / Prospection / Campagne pilote` sur le Google Drive professionnel ELSATIA, accès **Restreint** | Accès initial réservé à Julien GREGUREC ; aucun téléversement effectué dans C5-D |
+| Responsable | Julien GREGUREC | Propriétaire du classeur, responsable de campagne et expéditeur initial |
+| Zone initiale | Rayon de **50 km autour de Strasbourg** | Dépassement ponctuel seulement pour un profil au score C5-A particulièrement élevé |
+| Entreprises individuelles | Admissibles sans être prioritaires, si le besoin structuré est démontré | Plusieurs utilisateurs, équipes ou chantiers ; aucun domicile ni canal personnel collecté |
+| Canal initial | Envoi manuel, unitaire et personnalisé via Google Workspace depuis `contact@elsatia.fr` | Aucun envoi automatisé |
 | Automatisation | Aucune pour les trois lots | Brevo non utilisé pour une séquence froide pilote |
-| Conservation | Politique prudente définie en section 10 | Validation juridique finale obligatoire avant collecte |
+| Conservation | Politique définitive du pilote définie en section 10 | Suppression anticipée dès que la donnée n'est plus utile |
 | Opposition | Onglet séparé et contrôle avant chaque lot/action | Accès restreint et données minimales |
 
 ## 3. Outil de suivi définitif du pilote
@@ -41,20 +42,22 @@ Le classeur reste séparé de l'application ELSATIA : le catalogue applicatif ma
 
 ### Décision unique
 
-Créer, après validation GO, un dossier :
+Utiliser, lors du lot de collecte, le dossier suivant :
 
 ```text
-Google Drive professionnel ELSATIA/
+ELSATIA/
 └── Commercial/
-    └── Prospection pilote 2026/
-        └── C5D_MODELE_SUIVI_CAMPAGNE_PILOTE_ELSATIA.xlsx
+    └── Prospection/
+        └── Campagne pilote/
+            └── C5D_MODELE_SUIVI_CAMPAGNE_PILOTE_ELSATIA.xlsx
 ```
 
 Paramètres obligatoires :
 
-- compte propriétaire professionnel ELSATIA identifié ;
+- propriétaire et responsable : **Julien GREGUREC** ;
 - accès général **Restreint**, jamais « toute personne disposant du lien » ;
-- droits accordés nominativement aux seules personnes chargées de la campagne ;
+- accès initial accordé uniquement à Julien GREGUREC ;
+- tout accès supplémentaire devra être accordé nominativement et justifié ;
 - éditeurs empêchés de modifier les autorisations ou de repartager lorsque l'option est disponible ;
 - une seule version de référence, sans copies envoyées par e-mail ;
 - accès depuis le Finder du Mac via Google Drive pour ordinateur ;
@@ -148,7 +151,7 @@ Une action conserve un résumé factuel, pas une copie intégrale de l'échange.
 
 ### Onglet `OPPOSITIONS`
 
-`ID_OPPOSITION`, `IDENTIFIANT_PROFESSIONNEL_MINIMAL`, `TYPE_IDENTIFIANT`, `CANAL`, `DATE_OPPOSITION`, `SOURCE_INTERNE`, `STATUT`, `TRAITEE_PAR`.
+`ID_OPPOSITION`, `IDENTIFIANT_PROFESSIONNEL_MINIMAL`, `TYPE_IDENTIFIANT`, `CANAL`, `DATE_OPPOSITION`, `SOURCE_INTERNE`, `STATUT`, `ENTREPRISE_SI_UTILE`.
 
 ### Onglet `TABLEAU_DE_BORD`
 
@@ -204,20 +207,14 @@ Une donnée manquante reste vide ou porte la mention `non trouvé` lorsqu'une v�
 
 Commencer par **50 km autour de Strasbourg**, distance appréciée par trajet ou localisation de l'établissement ciblé. La qualité C5-A prime sur la distance : ne pas abaisser le score pour remplir la liste.
 
-Si la recherche complète et vérifiée produit moins de 30 P1/P2, étendre dans cet ordre :
-
-1. 50 à 75 km ;
-2. reste de l'Alsace ;
-3. jamais au-delà de l'Alsace dans le pilote sans nouvelle validation.
-
-Chaque extension est notée dans le compte rendu de lot.
+Un prospect légèrement au-delà de 50 km peut être retenu uniquement si son score C5-A est particulièrement élevé et si la raison est documentée. Il n'y a pas d'extension automatique de la zone : toute extension plus large exige une nouvelle validation.
 
 ## 8. Entreprises individuelles et micro-entreprises
 
-Le statut juridique n'est pas un motif d'exclusion automatique. Une entreprise individuelle peut entrer si :
+Le statut juridique n'est pas un motif d'exclusion automatique, mais les entreprises individuelles et micro-entreprises ne sont pas prioritaires. Elles peuvent entrer si :
 
 - elle exerce un métier prioritaire ;
-- elle gère plusieurs chantiers ou équipes ;
+- elle présente un besoin structuré lié à plusieurs utilisateurs, équipes ou chantiers ;
 - elle peut utiliser utilement les 3 comptes de l'offre Mini à 79 € HT/mois ;
 - son score C5-A atteint P1 ou P2 ;
 - un canal strictement professionnel est public ;
@@ -229,7 +226,7 @@ Les structures d'une ou deux personnes restent hors priorité initiale, conform�
 
 ### Formulation courte pour chaque premier e-mail
 
-> Je vous contacte au nom d'ELSATIA au sujet de l'organisation entre le bureau et les chantiers, dans le cadre de votre activité professionnelle. Vos coordonnées professionnelles ont été trouvées sur [source exacte]. Si vous préférez ne plus recevoir de message de ma part, répondez simplement « stop » : votre demande sera prise en compte sur tous nos canaux de prospection.
+> Je vous contacte au nom d'ELSATIA dans un cadre strictement professionnel, au sujet de l'organisation entre le bureau et les chantiers. Vos coordonnées professionnelles ont été trouvées sur [source publique exacte]. Si vous préférez ne plus recevoir de message de ma part concernant ELSATIA, répondez simplement à cet e-mail et je retirerai vos coordonnées de ma liste de prospection.
 
 ### Présentation orale au téléphone
 
@@ -237,7 +234,7 @@ Les structures d'une ou deux personnes restent hors priorité initiale, conform�
 
 La CNIL indique que la prospection électronique vers des professionnels peut s'appuyer sur l'intérêt légitime lorsque la sollicitation est liée à leur profession, avec information et opposition simple et gratuite. Chaque message doit identifier l'organisation et permettre un refus simple : [CNIL — prospection électronique](https://www.cnil.fr/fr/la-prospection-commerciale-par-courrier-electronique-sms-mms-et-automate-dappel).
 
-**DÉCISION À VALIDER AVANT LANCEMENT :** identité juridique exacte du responsable de traitement, notice complète accessible, coordonnées d'exercice des droits et validation du fondement retenu pour chaque canal.
+Cette formulation courte doit apparaître dès le premier e-mail. Elle identifie ELSATIA, précise la finalité B2B et la source professionnelle publique, et offre une opposition simple.
 
 ## 10. Opposition et conservation
 
@@ -246,7 +243,7 @@ La CNIL indique que la prospection électronique vers des professionnels peut s'
 1. à toute opposition, arrêter immédiatement e-mail, téléphone et LinkedIn ;
 2. supprimer les prochaines actions de la fiche ;
 3. ajouter le minimum permettant d'empêcher un nouveau contact ;
-4. marquer `Ne plus contacter` ;
+4. marquer `NE PLUS CONTACTER` ;
 5. contrôler l'onglet avant chaque ajout, chaque gel de lot et chaque action ;
 6. ne jamais réintroduire l'identifiant depuis une autre source.
 
@@ -258,40 +255,39 @@ Identifiant minimal pratique :
 
 Ne pas créer de mécanisme de hachage improvisé dans le classeur. Si une empreinte est retenue ultérieurement, elle doit faire l'objet d'un mécanisme validé et reproductible.
 
-### Politique prudente proposée
+### Politique retenue
 
 | Catégorie | Règle opérationnelle proposée | Sortie |
 |---|---|---|
-| Jamais répondu | 3 mois après la fin de la séquence | Supprimer les coordonnées nominatives ; conserver seulement les métriques anonymisées du lot |
-| Perdu | 12 mois après la décision si aucune reprise n'est prévue | Supprimer ou anonymiser la fiche |
-| À reprendre plus tard | Jusqu'à la date convenue + 30 jours, avec un maximum opérationnel de 12 mois sans nouveau contact entrant | Reprendre une seule fois ou supprimer/anonymiser |
-| Opposition | Minimum 3 ans dans la liste repoussoir ; aucune réactivation automatique à l'échéance | Réexaminer juridiquement la durée sans recontacter |
+| Prospect | Maximum 3 ans à compter de la collecte ou du dernier contact pertinent | Supprimer plus tôt dès que les données ne sont plus utiles ; conserver seulement les métriques anonymisées nécessaires |
+| Perdu | Uniquement pendant la durée nécessaire au suivi commercial | Revue périodique et suppression ou anonymisation dès que la conservation n'est plus utile |
+| À reprendre plus tard | Jusqu'à une date de reprise explicite et documentée | Aucune relance indéfinie ; supprimer ou anonymiser si la reprise n'est plus pertinente |
+| Opposition | Minimum 3 ans dans la liste repoussoir, avec les seules données nécessaires | Usage exclusif : empêcher toute nouvelle prospection ; aucune réactivation automatique |
 
 La CNIL indique comme repère que les données de prospects peuvent être conservées trois ans à compter de la collecte ou du dernier contact émanant du prospect, et recommande au moins trois ans pour les informations nécessaires à l'opposition : [CNIL — durées des données commerciales](https://www.cnil.fr/fr/questions-reponses-sur-les-referentiels-relatifs-la-gestion-des-activites-commerciales-et-des).
 
-Les délais plus courts ci-dessus sont un choix de minimisation pour le pilote, pas une obligation juridique générale.
+La liste d'opposition conserve au minimum : l'identifiant professionnel utile, l'entreprise si nécessaire, le canal, la date, la source interne et le statut `NE PLUS CONTACTER`. Elle ne sert à aucune autre finalité.
 
-**DÉCISION À VALIDER AVANT LANCEMENT :** durées définitives, point de départ, procédure de suppression/anonymisation et durée de la liste repoussoir.
+Ces règles devront être reprises dans la documentation RGPD et le registre de traitement lorsque le dispositif commercial sera formalisé.
 
 ## 11. Signature commerciale
 
-Version sans titre juridique ni téléphone non validé :
+Signature retenue :
 
 ```text
 Julien GREGUREC
-Contact commercial — ELSATIA
-Solutions numériques pour le BTP
+ELSATIA
 contact@elsatia.fr
-https://elsatia.fr
+elsatia.fr
 ```
 
-Un numéro est ajouté uniquement après validation de son caractère professionnel, de l'affichage sortant et du traitement des rappels. Ne pas utiliser `CEO`, `PDG`, `Directeur commercial` ou une qualité juridique non établie.
+Ne pas ajouter de titre ni de numéro de téléphone à cette signature pilote.
 
 ## 12. Canal d'envoi retenu
 
 ### Décision
 
-Envoyer manuellement, un par un, depuis la boîte professionnelle qui reçoit et envoie réellement pour `contact@elsatia.fr`.
+Envoyer manuellement, un par un, via Google Workspace depuis la boîte professionnelle `contact@elsatia.fr`.
 
 - personnalisation humaine obligatoire ;
 - aucun publipostage ou séquence automatique ;
@@ -300,7 +296,7 @@ Envoyer manuellement, un par un, depuis la boîte professionnelle qui reçoit et
 - journalisation manuelle dans `ACTIONS` ;
 - contrôle de l'onglet `OPPOSITIONS` avant chaque envoi.
 
-Si `contact@elsatia.fr` est gérée par Google Workspace, utiliser Gmail manuellement. Sinon, utiliser l'interface réelle de son fournisseur. **Brevo n'est pas retenu** pour les premiers contacts froids : sa configuration transactionnelle du formulaire du site ne prouve pas que la boîte commerciale ni un processus de campagne sont prêts.
+**Brevo n'est pas retenu** pour les premiers contacts froids. La campagne pilote reste entièrement manuelle.
 
 **GO obligatoire :** envoyer un message interne de test depuis `contact@elsatia.fr`, vérifier l'expéditeur, la réception, la réponse et l'absence de redirection défaillante. Ce test ne vise aucun prospect.
 
@@ -321,7 +317,7 @@ Les 30 fiches doivent d'abord être recherchées, vérifiées, scorées puis gel
 | Lundi avant démarrage | Contrôle du lot, liste repoussoir, sources, messages et responsables |
 | Mardi — J0 | Premier e-mail manuel aux 10 entreprises, étalé dans la journée |
 | Vendredi — J3 | Appel professionnel, uniquement lorsque le canal et le rôle sont appropriés |
-| Lundi — J6 | Relance e-mail prévue à J5, décalée pour éviter le week-end |
+| J5, ou prochain jour ouvré | Relance e-mail ; décalage uniquement pour éviter week-end et jour férié |
 | Mercredi — J8 | LinkedIn uniquement si pertinent et conforme à C5-B |
 | Lundi suivant — J13 | Dernière relance et clôture propre |
 | Lundi après-midi | Revue de lot de 25 à 30 minutes et décision GO/NO-GO pour le suivant |
@@ -375,6 +371,8 @@ Le passage est **GO** seulement si :
 
 Quelques entreprises de 3 à 10 ou 25 à 35 salariés peuvent être retenues si leur besoin potentiel est particulièrement cohérent et si le score reste P1/P2. Ne pas abaisser le score pour atteindre 30.
 
+La classification **P3 (45–59)** correspond à l'ancienne catégorie C5-A « À enrichir ». Elle facilite le suivi des candidats incomplets, mais un P3 ne peut pas entrer dans un lot de contact tant qu'il n'a pas été enrichi et reclassé P1 ou P2.
+
 Répartition de travail héritée de C5-A : 15 entreprises de 10 à 20 salariés, 8 de 20 à 25 salariés et 7 structures de 3 à 10 salariés suffisamment structurées, à ajuster seulement si les données publiques ne permettent pas de documenter les critères.
 
 ## 16. Vérification avant ajout futur
@@ -411,7 +409,7 @@ La checklist détaillée se trouve dans `C5D_CHECKLIST_GO_NO_GO.md`.
 
 - classeur vierge vérifié et emplacement professionnel validé ;
 - accès nominatifs et sauvegarde définis ;
-- notice courte et notice complète validées ;
+- notice courte opérationnelle validée ;
 - mécanisme d'opposition opérationnel ;
 - conservation validée ;
 - signature et boîte `contact@elsatia.fr` testées ;
@@ -420,20 +418,13 @@ La checklist détaillée se trouve dans `C5D_CHECKLIST_GO_NO_GO.md`.
 - pipeline C5-C et calendrier approuvés ;
 - responsable de campagne identifié.
 
-Un seul point manquant produit un **NO-GO** pour toute collecte ou tout contact réel.
+Une décision C5-D manquante produit un **NO-GO** pour la collecte. Un contrôle d'exécution manquant dans les sections G ou H de la checklist bloque le contact ou le passage de lot concerné.
 
-## 19. Points encore bloquants avant collecte réelle
+## 19. État de préparation
 
-1. confirmer le compte Google Drive professionnel propriétaire et les personnes autorisées ;
-2. valider l'identité juridique du responsable de traitement et la notice complète ;
-3. valider les durées définitives et la procédure d'effacement ;
-4. confirmer que `contact@elsatia.fr` est une boîte professionnelle bidirectionnelle utilisable manuellement ;
-5. valider la signature commerciale et, éventuellement, un numéro professionnel ;
-6. nommer le responsable du classeur et le suppléant ;
-7. effectuer le test interne de la boîte ;
-8. reconfirmer que la présentation C2, la démo C4 et DEMO-18M sont disponibles le jour du lancement.
+Les décisions de gouvernance, de ciblage, de minimisation, de conservation, d'opposition, d'identité, de canal et de calendrier sont arrêtées. C5-D est prêt pour le lot suivant consacré à la collecte pilote.
 
-Tant que ces points ne sont pas cochés dans la checklist, C5-D prépare l'exécution mais n'autorise pas la collecte.
+Avant chaque contact réel, les contrôles d'exécution de la checklist restent obligatoires : source et qualification de la fiche, opposition, personnalisation, dates, responsable, disponibilité des supports et bon fonctionnement de la boîte.
 
 ## 20. Contrôle de périmètre
 
