@@ -60,3 +60,6 @@ output/verification/
 # Livrables commerciaux C2 générés (conservés localement)
 /output/c2b-captures/
 /output/c2c-presentation/
+
+# Données réelles de prospection C5-E (conservées localement, jamais versionnées)
+/outputs/c5e-private/
