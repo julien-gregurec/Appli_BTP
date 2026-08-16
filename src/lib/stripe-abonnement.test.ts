@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   calculerFacturationStockage,
+  prixStripeCompteSupplementairePour,
   prixOptionIAStripePour,
   prixStripePour,
   statutAbonnementDepuisStripe,
@@ -32,6 +33,11 @@ describe("tarifs Stripe Billing", () => {
     expect(prixStripePour("premium", "mensuel", env)).toBe("price_xm");
     expect(prixStripePour("mini", "mensuel", env)).toBe("price_mm");
     expect(prixStripePour("business", "annuel", env)).toBe("price_ba");
+    expect(prixStripeCompteSupplementairePour("mini", "mensuel", {
+      NODE_ENV: "test",
+      STRIPE_PRICE_COMPTE_SUP_MINI_MENSUEL: "price_sup_mm",
+    } as NodeJS.ProcessEnv)).toBe("price_sup_mm");
+    expect(prixStripeCompteSupplementairePour("entreprise", "annuel", env)).toBeNull();
   });
 
   it("associe chaque palier IA à son prix et à sa périodicité", () => {
@@ -51,6 +57,9 @@ describe("tarifs Stripe Billing", () => {
     const manquantes = variablesStripeBillingManquantes({} as NodeJS.ProcessEnv);
     expect(manquantes).toContain("STRIPE_SECRET_KEY");
     expect(manquantes).toContain("STRIPE_PRICE_ENTREPRISE_ANNUEL");
+    expect(manquantes).toContain("STRIPE_PRICE_COMPTE_SUP_MINI_MENSUEL");
+    expect(manquantes).toContain("STRIPE_PRICE_COMPTE_SUP_PRO_ANNUEL");
+    expect(manquantes).toContain("STRIPE_PRICE_COMPTE_SUP_BUSINESS_MENSUEL");
     expect(stripeBillingEstConfigure({} as NodeJS.ProcessEnv)).toBe(false);
   });
 });

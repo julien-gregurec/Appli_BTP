@@ -47,7 +47,7 @@ Chaque preuve doit comporter une date, l’environnement, le responsable et un l
 - [ ] Mini : 69 € HT/mois ou 690 € HT/an, 3 comptes.
 - [ ] Pro : 199 € HT/mois ou 1 990 € HT/an, 15 comptes.
 - [ ] Business : 399 € HT/mois ou 3 990 € HT/an, 30 comptes.
-- [ ] Entreprise : 599 € HT/mois ou 5 990 € HT/an, 40 salariés + 10 administrateurs.
+- [ ] Entreprise : 599 € HT/mois ou 5 990 € HT/an, 40 salariés + 10 administrateurs inclus.
 - [ ] Sur mesure : sur devis, sans prix public ni Checkout automatique.
 - [ ] La mention **30 jours d’essai** est identique sur tous les supports.
 - [ ] Le paiement annuel est présenté uniquement comme 2 mois offerts.

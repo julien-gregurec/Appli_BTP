@@ -67,7 +67,7 @@ Règles permanentes :
   périmètre d’usage différent. Nous devons partir de votre équipe et des modules
   utiles pour comparer le bon niveau. »
 - **Réponse développée** : Pro comprend 15 comptes, Business 30 comptes et
-  Entreprise 40 salariés plus 10 administrateurs. Le choix ne doit pas être
+  Entreprise 40 salariés plus 10 administrateurs inclus. Le choix ne doit pas être
   justifié par une liste théorique de fonctions, mais par les profils à équiper
   et le parcours réellement utilisé.
 - **Question de relance** : « Combien de personnes utiliseraient ELSATIA au
@@ -519,7 +519,7 @@ ne faut pas en déduire qu’un mode hors ligne complet est disponible.
 - Mini : 3 comptes ;
 - Pro : 15 comptes ;
 - Business : 30 comptes ;
-- Entreprise : 40 salariés et 10 administrateurs ;
+- Entreprise : 40 salariés et 10 administrateurs inclus ;
 - Sur mesure : capacité définie après cadrage.
 
 ### 11.2 Peut-on ajouter des utilisateurs ?
@@ -686,7 +686,7 @@ documents juridiques applicables.
 | Mini | 69 € HT/mois | 690 € HT | 3 comptes |
 | Pro | 199 € HT/mois | 1 990 € HT | 15 comptes |
 | Business | 399 € HT/mois | 3 990 € HT | 30 comptes |
-| Entreprise | 599 € HT/mois | 5 990 € HT | 40 salariés + 10 administrateurs |
+| Entreprise | 599 € HT/mois | 5 990 € HT | 40 salariés + 10 administrateurs inclus |
 | Sur mesure | Sur devis | Sur devis | selon contrat |
 
 Le paiement annuel correspond à **12 mois d’utilisation facturés au prix de 10 mois**, soit **2 mois offerts**.

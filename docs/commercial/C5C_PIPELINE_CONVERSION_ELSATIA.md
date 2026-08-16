@@ -260,7 +260,7 @@ Si ces conditions ne sont pas réunies, la fiche reste en **Démo réalisée**, 
 | **Mini** | 69 € HT/mois | 690 € HT/an | 3 comptes |
 | **Pro** | 199 € HT/mois | 1 990 € HT/an | 15 comptes |
 | **Business** | 399 € HT/mois | 3 990 € HT/an | 30 comptes |
-| **Entreprise** | 599 € HT/mois | 5 990 € HT/an | 40 salariés + 10 administrateurs |
+| **Entreprise** | 599 € HT/mois | 5 990 € HT/an | 40 salariés + 10 administrateurs inclus |
 | **Sur mesure** | Sur devis | Sur devis | selon contrat |
 
 Mentions commerciales obligatoires : **30 jours d'essai** et **2 mois offerts en paiement annuel**.

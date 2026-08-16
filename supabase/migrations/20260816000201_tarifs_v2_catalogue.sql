@@ -5,25 +5,6 @@ alter table public.plans_abonnement
   alter column prix_mensuel_ht drop not null,
   alter column prix_annuel_ht drop not null;
 
-alter table public.plans_abonnement
-  drop constraint if exists plans_abonnement_tarif_public_coherent;
-alter table public.plans_abonnement
-  add constraint plans_abonnement_tarif_public_coherent check (
-    not actif
-    or (
-      devis_obligatoire
-      and prix_mensuel_ht is null
-      and prix_annuel_ht is null
-    )
-    or (
-      not devis_obligatoire
-      and prix_mensuel_ht is not null
-      and prix_annuel_ht is not null
-      and prix_mensuel_ht >= 0
-      and prix_annuel_ht >= 0
-    )
-  );
-
 do $$
 declare
   v_valide_du date := date '2026-08-16';
@@ -70,6 +51,28 @@ begin
     limit 1
   ) precedent on true;
 end $$;
+
+-- Ajouter la contrainte après la création de la nouvelle grille : l'ancienne
+-- version active de Sur mesure porte encore son prix historique et ne doit pas
+-- faire échouer la migration avant d'avoir été désactivée.
+alter table public.plans_abonnement
+  drop constraint if exists plans_abonnement_tarif_public_coherent;
+alter table public.plans_abonnement
+  add constraint plans_abonnement_tarif_public_coherent check (
+    not actif
+    or (
+      devis_obligatoire
+      and prix_mensuel_ht is null
+      and prix_annuel_ht is null
+    )
+    or (
+      not devis_obligatoire
+      and prix_mensuel_ht is not null
+      and prix_annuel_ht is not null
+      and prix_mensuel_ht >= 0
+      and prix_annuel_ht >= 0
+    )
+  );
 
 create or replace function public.plateforme_creer_version_tarif(
   p_code text,

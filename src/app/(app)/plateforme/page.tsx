@@ -180,7 +180,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                     <div className="mt-2 inline-flex items-baseline gap-2 rounded-md bg-[#c9a24a]/10 px-3 py-1.5">
                       <span className="text-lg font-semibold text-[#0d1b2a] dark:text-[#c9a24a]">{prix.total === null ? "Sur devis" : <>{prix.total} €<span className="text-xs font-normal">/mois</span></>}</span>
                       <span className="text-[11px] text-neutral-500">
-                        offre {offre.nom}{prix.base === null ? " · conditions contractuelles" : ` ${prix.base} € (jusqu’à ${prix.employesInclus} comptes)`}{prix.base !== null&&prix.employesSupplementaires > 0 ? ` + ${prix.employesSupplementaires} × ${prix.parEmployeSup} €` : ""}{prix.base !== null&&prix.supplementAppareils > 0 ? ` + ${prix.supplementAppareils.toLocaleString("fr-FR")} € appareils` : ""}
+                        offre {offre.nom}{prix.base === null ? " · conditions contractuelles" : ` ${prix.base} € (${offre.cle === "entreprise" ? "40 salariés + 10 administrateurs inclus" : `${prix.employesInclus} comptes inclus`})`}{prix.base !== null&&prix.employesSupplementaires > 0 ? ` + ${prix.employesSupplementaires} × ${prix.parEmployeSup} €` : ""}{prix.base !== null&&prix.supplementAppareils > 0 ? ` + ${prix.supplementAppareils.toLocaleString("fr-FR")} € appareils` : ""}
                       </span>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">

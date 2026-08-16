@@ -11,7 +11,29 @@
 | Mini | 69 € | 690 € | 3 comptes | Checkout mensuel ou annuel |
 | Pro | 199 € | 1 990 € | 15 comptes | Checkout mensuel ou annuel |
 | Business | 399 € | 3 990 € | 30 comptes | Checkout mensuel ou annuel |
-| Entreprise | 599 € | 5 990 € | 40 salariés + 10 administrateurs | Checkout mensuel ou annuel |
+| Entreprise | 599 € | 5 990 € | 40 salariés + 10 administrateurs inclus | Checkout mensuel ou annuel |
+
+Les volumes Mini, Pro et Business désignent des comptes inclus et non des
+plafonds techniques. Les comptes au-delà de ce volume sont calculés en
+supplément. Pour Entreprise, la base commerciale distingue 40 salariés et
+10 administrateurs inclus ; la tarification d'un dépassement par type de compte
+reste une décision humaine obligatoire avant le premier client.
+
+| Offre | Comptes inclus | Supplément calculé | Tarif HT / mois | Price Stripe dédié | État |
+| --- | ---: | --- | ---: | --- | --- |
+| Mini | 3 | Oui, par compte au-delà du 3e | 15 € | Variable prévue | À configurer et valider |
+| Pro | 15 | Oui, par compte au-delà du 15e | 12 € | Variable prévue | À configurer et valider |
+| Business | 30 | Oui, par compte au-delà du 30e | 9 € | Variable prévue | À configurer et valider |
+| Entreprise | 40 salariés + 10 administrateurs inclus | Calcul générique au-delà de 50, sans distinction de type | 9 € générique dans le code historique | Variable prévue | **DÉCISION HUMAINE REQUISE AVANT PREMIER CLIENT** |
+| Sur mesure | Selon contrat | Non automatisé | Sur devis | Aucun checkout | Conforme |
+
+Attention : le catalogue contient aussi des options historiques typées par rôle
+(terrain 5 €, chef d'équipe 9 €, administratif 15 € HT/mois). Elles alimentent
+le calculateur d'options mais pas la réconciliation Stripe par offre. Elles ne
+doivent pas être confondues avec les suppléments génériques 15 €/12 €/9 € de la
+matrice ci-dessus. Le choix entre ces deux modèles doit être validé humainement
+avant de publier des Price Stripe de suppléments ou de facturer un premier
+client.
 | Sur mesure | Sur devis | Sur devis | Selon contrat | Aucun checkout automatique |
 
 La règle annuelle unique est : **12 mois d'utilisation facturés au prix de 10 mois**, présentée comme **2 mois offerts en paiement annuel**. L'essai reste fixé à **30 jours**.

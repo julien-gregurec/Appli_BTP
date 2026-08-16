@@ -3,6 +3,8 @@ import { OFFRES, prixAbonnementMensuel, recommanderOffre } from "@/lib/plateform
 
 const mini = OFFRES[0];
 const pro = OFFRES[1];
+const business = OFFRES[2];
+const entreprise = OFFRES[3];
 
 describe("prixAbonnementMensuel", () => {
   it("conserve le prix de base jusqu'au nombre de comptes inclus", () => {
@@ -16,6 +18,18 @@ describe("prixAbonnementMensuel", () => {
       employesSupplementaires: 1,
     });
     expect(prixAbonnementMensuel(16, pro).total).toBe(199 + pro.parCompteSup);
+    expect(prixAbonnementMensuel(31, business)).toMatchObject({
+      total: 399 + business.parCompteSup,
+      employesSupplementaires: 1,
+    });
+  });
+
+  it("ne prétend pas distinguer les salariés et administrateurs supplémentaires d’Entreprise", () => {
+    expect(entreprise).toMatchObject({ comptesInclus: 50, administrateursInclus: 10 });
+    expect(prixAbonnementMensuel(51, entreprise)).toMatchObject({
+      total: 599 + entreprise.parCompteSup,
+      employesSupplementaires: 1,
+    });
   });
 
   it("ajoute le dépassement d'appareils", () => {

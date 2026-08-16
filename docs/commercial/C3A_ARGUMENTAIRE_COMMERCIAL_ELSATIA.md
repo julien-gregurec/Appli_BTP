@@ -301,7 +301,7 @@ final doit être confirmé à partir des besoins et des modules activés.
 | **Mini** | **69 € HT/mois** | **690 € HT** | **3 comptes** | Pour démarrer avec le socle clients, chantiers, devis, factures et planning. |
 | **Pro** | **199 € HT/mois** | **1 990 € HT** | **15 comptes** | Pour relier la gestion quotidienne du bureau et des équipes terrain. |
 | **Business** | **399 € HT/mois** | **3 990 € HT** | **30 comptes** | Pour étendre le suivi aux besoins de pilotage et de gestion des ressources. |
-| **Entreprise** | **599 € HT/mois** | **5 990 € HT** | **40 salariés + 10 administrateurs** | Pour une organisation plus large avec des rôles et besoins avancés. |
+| **Entreprise** | **599 € HT/mois** | **5 990 € HT** | **40 salariés + 10 administrateurs inclus** | Pour une organisation plus large avec des rôles et besoins avancés. |
 | **Sur mesure** | **Sur devis** | **Sur devis** | Selon contrat | Pour une volumétrie, des intégrations ou un accompagnement spécifiques. |
 
 Mentions communes : **30 jours d’essai** et **2 mois offerts en paiement annuel**.

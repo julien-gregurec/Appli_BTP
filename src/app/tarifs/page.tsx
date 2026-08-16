@@ -61,7 +61,7 @@ export default function TarifsPage() {
                 <p className="mt-1 text-xs font-medium text-green-700">{formatMontantCentimes(offre.prixAnnuelCentimes)} HT/an · {MOIS_OFFERTS_EN_ANNUEL} mois offerts</p>
               </> : <p className="mt-1 text-xs text-neutral-500">Tarif défini selon votre besoin</p>}
               <ul className="mt-5 flex-1 space-y-2 text-sm">
-                <li>✓ {offre.cle === "entreprise" ? "40 salariés + 10 administrateurs" : offre.devisObligatoire ? "Nombre de comptes selon contrat" : `${offre.comptesInclus} comptes inclus`}</li>
+                <li>✓ {offre.cle === "entreprise" ? "40 salariés + 10 administrateurs inclus" : offre.devisObligatoire ? "Nombre de comptes selon contrat" : `${offre.comptesInclus} comptes inclus`}</li>
                 {iaVisible && <li>✓ {offre.operationsIAIncluses.toLocaleString("fr-FR")} opérations IA / mois</li>}
                 <li>✓ {offre.stockageGoInclus} Go de stockage</li>
                 {beneficesAffiches(offre.cle).map((point) => <li key={point}>✓ {point}</li>)}

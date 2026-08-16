@@ -69,6 +69,8 @@ const VARIABLES_PRIX_COMPTE_SUP: Partial<Record<OffreAbonnement, Record<Periodic
   entreprise: { mensuel: "STRIPE_PRICE_COMPTE_SUP_ENTREPRISE_MENSUEL", annuel: "STRIPE_PRICE_COMPTE_SUP_ENTREPRISE_ANNUEL" },
 };
 
+const OFFRES_SUPPLEMENT_COMPTE_AUTOMATISE = ["mini", "pro", "business"] as const;
+
 export const PALIERS_OPTION_IA = ["100", "300", "illimite"] as const;
 export type PalierOptionIA = (typeof PALIERS_OPTION_IA)[number];
 export function estPalierOptionIA(valeur: string): valeur is PalierOptionIA {
@@ -102,12 +104,22 @@ export function prixStripePour(
   return variable ? environnement[variable] || null : null;
 }
 
+export function prixStripeCompteSupplementairePour(
+  offre: OffreAbonnement,
+  periodicite: PeriodiciteAbonnement,
+  environnement: NodeJS.ProcessEnv = process.env,
+) {
+  const variable = VARIABLES_PRIX_COMPTE_SUP[offre]?.[periodicite];
+  return variable ? environnement[variable] || null : null;
+}
+
 export function variablesStripeBillingManquantes(environnement: NodeJS.ProcessEnv = process.env) {
   const variables = [
     "STRIPE_SECRET_KEY",
     "STRIPE_WEBHOOK_ABONNEMENT_SECRET",
     "NEXT_PUBLIC_APP_URL",
     ...OFFRES_ABONNEMENT_COMMERCIALISEES.flatMap((offre) => Object.values(VARIABLES_PRIX[offre] ?? {})),
+    ...OFFRES_SUPPLEMENT_COMPTE_AUTOMATISE.flatMap((offre) => Object.values(VARIABLES_PRIX_COMPTE_SUP[offre] ?? {})),
   ];
   return variables.filter((nom) => !environnement[nom]);
 }
@@ -303,8 +315,7 @@ export async function reconcilierAbonnementStripe(entrepriseId: string) {
   if (!entreprise?.stripe_subscription_id || !estOffreAbonnement(offre) || !estPeriodiciteAbonnement(periodicite)) {
     return { synchronise: false, raison: "abonnement_absent" } as const;
   }
-  const variablePrixSupplement = VARIABLES_PRIX_COMPTE_SUP[offre]?.[periodicite];
-  const prixSupplement = variablePrixSupplement ? process.env[variablePrixSupplement] : undefined;
+  const prixSupplement = prixStripeCompteSupplementairePour(offre, periodicite);
   if (!prixSupplement) return { synchronise: false, raison: "prix_supplement_absent" } as const;
   const { count } = await admin.from("employes").select("id", { count: "exact", head: true }).eq("entreprise_id", entrepriseId).in("compte_application_statut", ["actif", "pause"]);
   const quantite = Math.max(0, Number(count ?? 0) - offreParCle(offre).comptesInclus);
