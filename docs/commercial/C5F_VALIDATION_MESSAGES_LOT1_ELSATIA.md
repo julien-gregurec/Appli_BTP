@@ -4,7 +4,7 @@
 
 Ce document prépare les dix premiers contacts du pilote ELSATIA. Il ne constitue ni une autorisation d’envoi ni une preuve de contact. Chaque message doit être relu, contrôlé contre la liste d’opposition, puis envoyé manuellement depuis `contact@elsatia.fr` uniquement après validation humaine.
 
-Le test aller-retour de `contact@elsatia.fr` a été validé humainement le 16 août 2026. Aucun message prospect n’a été envoyé pendant C5-F.
+Le test aller-retour de `contact@elsatia.fr` a été validé humainement le 16 août 2026. La première relecture humaine des dix messages a été intégrée dans C5-F3. Aucun message prospect n’a été envoyé.
 
 Règles communes : un fait public vérifiable, une douleur éventuelle formulée en question, un seul appel à l’action, signature pilote sans titre ni téléphone, et possibilité d’opposition simple dans chaque premier e-mail.
 
@@ -16,12 +16,14 @@ Règles communes : un fait public vérifiable, une douleur éventuelle formulée
 | 2 | CARRELAGE DENNI | Éric Denni, gérant | `contact@carrelage-denni.fr` | Confirmé | B — terrain/mobile | E-mail puis téléphone | Confirmé |
 | 3 | CRÉPI STYLE | Serkan Kocyigit, gérant | `contact@crepi-style.fr` | Confirmé | A — centralisation | E-mail puis téléphone | Confirmé |
 | 4 | ENNESSER ET FILS | Nicolas Ennesser, direction de l’entreprise familiale | `n.ennesser@peinture-ennesser.com` | Confirmé | A — centralisation | E-mail puis téléphone | Confirmé |
-| 5 | CARRELAGE NUSS | Olivier Nuss, président | `nussolivier@aol.com` | Confirmé | A — centralisation | E-mail puis téléphone | Confirmé |
+| 5 | CARRELAGE NUSS | Olivier Nuss, président | `nussolivier@aol.com` | Confirmé avec prudence | A — centralisation | Téléphone puis e-mail | Confirmé |
 | 6 | ÉTABLISSEMENTS GÉRARD ET FILS | Philippe ou Daniel Gérard, co-gérants | `gerardetfils@gerardetfils.fr` | Confirmé | A — centralisation | E-mail puis téléphone | Confirmé |
 | 7 | MAYART | David Bacharyar, gérant | `info@mayart.fr` | Confirmé | A — centralisation | E-mail puis relance e-mail | Non trouvé |
 | 8 | AKPRO | Safet Kucuk ou Sevket Alptekin, co-gérants | `akpro.contact@gmail.com` | Confirmé | B — terrain/mobile | E-mail puis téléphone | Confirmé |
 | 9 | CF PARQUET | Yannick Cabrol ou Nicolas Fleck, co-gérants | Aucune adresse professionnelle confirmée | Non confirmé | B — terrain/mobile | Téléphone en premier | Confirmé |
 | 10 | SCE CARRELAGE | Yahya Eren, gérant | `contact@scecarrelage.fr` | Confirmé | B — terrain/mobile | E-mail puis téléphone | Confirmé |
+
+Ordre proposé pour un premier test humain limité, sans autorisation d’envoi à ce stade : CARRELAGE DENNI, CRÉPI STYLE, puis STRASOL. CF PARQUET reste séparé et limité au téléphone.
 
 ## 3. Messages soumis à validation
 
@@ -35,9 +37,9 @@ Règles communes : un fait public vérifiable, une douleur éventuelle formulée
 
 > Bonjour Madame Fillatre,
 >
-> Le site de STRASOL présente une organisation réunissant une équipe bureau, deux conducteurs de travaux et seize poseurs spécialisés sur des projets tertiaires, industriels et de rénovation.
+> J’ai vu que STRASOL réunit une équipe bureau, des conducteurs de travaux et des équipes de pose.
 >
-> Comment partagez-vous aujourd’hui les informations de chantier entre ces différentes fonctions ? ELSATIA réunit dans un même environnement les chantiers, le planning, les équipes, les documents et les remontées terrain, accessibles au bureau comme en mobilité. L’objectif est de donner à chacun une information commune, sans présumer des outils que vous utilisez déjà.
+> Comment partagez-vous aujourd’hui les informations de chantier entre ces différentes fonctions ? ELSATIA réunit dans un même environnement les chantiers, le planning, les équipes, les documents et les remontées terrain, accessibles au bureau comme en mobilité. L’objectif est de donner à chacun une information commune.
 >
 > Seriez-vous disponible pour un échange de 10 à 15 minutes afin de voir si cette approche correspond à votre organisation ?
 >
@@ -49,14 +51,14 @@ Règles communes : un fait public vérifiable, une douleur éventuelle formulée
 >
 > elsatia.fr
 >
-> Je vous contacte au nom d’ELSATIA dans un cadre strictement professionnel, au sujet de l’organisation entre le bureau et les chantiers. Vos coordonnées professionnelles ont été trouvées sur le site officiel de STRASOL. Si vous préférez ne plus recevoir de message de ma part concernant ELSATIA, répondez simplement à cet e-mail et je retirerai vos coordonnées de ma liste de prospection.
+> Si vous préférez ne plus recevoir de messages de ma part concernant ELSATIA, répondez simplement à cet e-mail et je n’effectuerai plus de relance.
 
 - **Fait public :** le site distingue une équipe bureau, deux conducteurs de travaux et seize poseurs spécialisés.
 - **Source :** https://www.strasol.fr/
 - **Hypothèse à qualifier :** continuité de l’information entre bureau, conducteurs et poseurs.
 - **CTA unique :** échange de 10 à 15 minutes.
-- **Opposition :** réponse simple à l’e-mail, avec retrait de la liste.
-- **Ouverture téléphonique :** « Bonjour Madame Fillatre, Julien GREGUREC à l’appareil, pour ELSATIA. Votre site présente une équipe bureau, deux conducteurs de travaux et seize poseurs ; je vous appelle pour comprendre comment les informations circulent entre ces fonctions. Est-ce que je peux vous expliquer notre approche en trente secondes ? Si vous ne souhaitez pas être rappelée, je le note immédiatement. »
+- **Opposition :** réponse simple à l’e-mail ; aucune nouvelle relance.
+- **Ouverture téléphonique :** « Bonjour Madame Fillatre, Julien GREGUREC à l’appareil, pour ELSATIA. J’ai vu que STRASOL réunit une équipe bureau, des conducteurs de travaux et des équipes de pose ; je vous appelle au sujet du partage des informations entre ces fonctions. Est-ce que je peux vous expliquer notre approche en trente secondes ? Si vous ne souhaitez pas être rappelée, je le note immédiatement. »
 
 ### 3.2 CARRELAGE DENNI
 
@@ -70,7 +72,7 @@ Règles communes : un fait public vérifiable, une douleur éventuelle formulée
 >
 > Votre site présente une équipe de 23 collaborateurs, des chefs de chantier, un showroom et plusieurs corps de métier réalisés en interne.
 >
-> Comment les informations remontent-elles aujourd’hui des équipes de pose vers le bureau et le showroom ? ELSATIA réunit les chantiers, le planning, les équipes, les documents et les informations terrain dans un même environnement, utilisable au bureau comme en mobilité. L’objectif est de faciliter un suivi partagé, sans présumer de votre organisation ou des outils déjà en place.
+> Comment les informations remontent-elles aujourd’hui des équipes de pose vers le bureau et le showroom ? ELSATIA réunit les chantiers, le planning, les équipes, les documents et les informations terrain dans un même environnement, utilisable au bureau comme en mobilité. L’objectif est de faciliter un suivi partagé.
 >
 > Seriez-vous disponible pour un échange de 10 à 15 minutes afin de voir si cette approche peut correspondre à votre fonctionnement ?
 >
@@ -82,13 +84,13 @@ Règles communes : un fait public vérifiable, une douleur éventuelle formulée
 >
 > elsatia.fr
 >
-> Je vous contacte au nom d’ELSATIA dans un cadre strictement professionnel, au sujet de l’organisation entre le bureau et les chantiers. Vos coordonnées professionnelles ont été trouvées sur le site officiel de CARRELAGE DENNI. Si vous préférez ne plus recevoir de message de ma part concernant ELSATIA, répondez simplement à cet e-mail et je retirerai vos coordonnées de ma liste de prospection.
+> Si vous préférez ne plus recevoir de messages de ma part concernant ELSATIA, répondez simplement à cet e-mail et je n’effectuerai plus de relance.
 
 - **Fait public :** 23 collaborateurs, chefs de chantier, showroom et plusieurs métiers réalisés en interne.
 - **Source :** https://carrelage-denni.fr/qui-sommes-nous/
 - **Hypothèse à qualifier :** circulation des informations entre pose, chantier, bureau et showroom.
 - **CTA unique :** échange de 10 à 15 minutes.
-- **Opposition :** réponse simple à l’e-mail, avec retrait de la liste.
+- **Opposition :** réponse simple à l’e-mail ; aucune nouvelle relance.
 - **Ouverture téléphonique :** « Bonjour Monsieur Denni, Julien GREGUREC à l’appareil, pour ELSATIA. Votre site présente un showroom, des chefs de chantier et plusieurs métiers réalisés en interne ; je vous appelle au sujet du lien entre les équipes de pose et le bureau. Est-ce que je peux vous expliquer notre approche en trente secondes ? Si vous ne souhaitez pas être rappelé, je le note immédiatement. »
 
 ### 3.3 CRÉPI STYLE
@@ -103,9 +105,9 @@ Règles communes : un fait public vérifiable, une douleur éventuelle formulée
 >
 > CRÉPI STYLE réunit plusieurs pôles, de la façade et l’isolation à la couverture, l’échafaudage et la rénovation intérieure, avec un parcours présenté de la découverte du projet au suivi du chantier.
 >
-> Comment regroupez-vous aujourd’hui le planning et les informations de ces différents pôles ? ELSATIA rassemble dans un même environnement les clients, devis, chantiers, équipes, documents et informations terrain. L’objectif est d’offrir une vue commune du dossier au bureau et sur chantier, sans supposer de difficulté ni de changement d’outil de votre côté.
+> Comment regroupez-vous aujourd’hui le planning et les informations de ces différents pôles ? ELSATIA rassemble dans un même environnement les clients, devis, chantiers, équipes, documents et informations terrain. L’objectif est d’offrir une vue commune du dossier au bureau et sur chantier.
 >
-> Seriez-vous disponible pour un échange de 10 à 15 minutes afin d’évaluer la pertinence de cette approche pour votre organisation ?
+> Seriez-vous disponible pour un échange de 10 à 15 minutes afin de voir si cela pourrait être utile dans votre organisation ?
 >
 > Julien GREGUREC
 >
@@ -115,13 +117,13 @@ Règles communes : un fait public vérifiable, une douleur éventuelle formulée
 >
 > elsatia.fr
 >
-> Je vous contacte au nom d’ELSATIA dans un cadre strictement professionnel, au sujet de l’organisation entre le bureau et les chantiers. Vos coordonnées professionnelles ont été trouvées sur le site officiel de CRÉPI STYLE. Si vous préférez ne plus recevoir de message de ma part concernant ELSATIA, répondez simplement à cet e-mail et je retirerai vos coordonnées de ma liste de prospection.
+> Si vous préférez ne plus recevoir de messages de ma part concernant ELSATIA, répondez simplement à cet e-mail et je n’effectuerai plus de relance.
 
 - **Fait public :** plusieurs pôles métiers et un processus allant de la découverte du projet au suivi du chantier.
 - **Source :** https://www.crepi-style.fr/qui-sommes-nous/
 - **Hypothèse à qualifier :** centralisation du planning et des informations entre les pôles.
 - **CTA unique :** échange de 10 à 15 minutes.
-- **Opposition :** réponse simple à l’e-mail, avec retrait de la liste.
+- **Opposition :** réponse simple à l’e-mail ; aucune nouvelle relance.
 - **Ouverture téléphonique :** « Bonjour Monsieur Kocyigit, Julien GREGUREC à l’appareil, pour ELSATIA. Votre activité réunit façade, isolation, couverture, échafaudage et rénovation intérieure ; je vous appelle au sujet de la centralisation du suivi entre ces pôles. Est-ce que je peux vous expliquer notre approche en trente secondes ? Si vous ne souhaitez pas être rappelé, je le note immédiatement. »
 
 ### 3.4 ENNESSER ET FILS
@@ -136,7 +138,7 @@ Règles communes : un fait public vérifiable, une douleur éventuelle formulée
 >
 > Votre entreprise familiale annonce une trentaine de salariés et intervient sur des projets allant du pavillon à la grande copropriété, dans plusieurs métiers de finition.
 >
-> Comment centralisez-vous aujourd’hui le suivi de ces différents types de chantiers ? ELSATIA réunit dans un même environnement les clients, devis, chantiers, planning, équipes, documents et informations terrain. L’objectif est de proposer une vue commune au bureau et aux équipes, sans présumer des outils ni des méthodes que vous employez actuellement.
+> Comment centralisez-vous aujourd’hui le suivi de ces différents types de chantiers ? ELSATIA réunit dans un même environnement les clients, devis, chantiers, planning, équipes, documents et informations terrain. L’objectif est de proposer une vue commune au bureau et aux équipes.
 >
 > Seriez-vous disponible pour un échange de 10 à 15 minutes afin de déterminer si cette approche est pertinente pour votre organisation ?
 >
@@ -148,19 +150,19 @@ Règles communes : un fait public vérifiable, une douleur éventuelle formulée
 >
 > elsatia.fr
 >
-> Je vous contacte au nom d’ELSATIA dans un cadre strictement professionnel, au sujet de l’organisation entre le bureau et les chantiers. Vos coordonnées professionnelles ont été trouvées sur le site officiel d’ENNESSER ET FILS. Si vous préférez ne plus recevoir de message de ma part concernant ELSATIA, répondez simplement à cet e-mail et je retirerai vos coordonnées de ma liste de prospection.
+> Si vous préférez ne plus recevoir de messages de ma part concernant ELSATIA, répondez simplement à cet e-mail et je n’effectuerai plus de relance.
 
 - **Fait public :** environ 30 salariés et des projets allant du pavillon à la grande copropriété.
 - **Source :** https://www.peinture-ennesser.com/
 - **Hypothèse à qualifier :** centralisation du suivi de chantiers et de prestations variés.
 - **CTA unique :** échange de 10 à 15 minutes.
-- **Opposition :** réponse simple à l’e-mail, avec retrait de la liste.
-- **Ouverture téléphonique :** « Bonjour Monsieur Ennesser, Julien GREGUREC à l’appareil, pour ELSATIA. Votre entreprise intervient du pavillon à la grande copropriété avec plusieurs métiers de finition ; je vous appelle au sujet de la vision commune de ces différents chantiers. Est-ce que je peux vous expliquer notre approche en trente secondes ? Si vous ne souhaitez pas être rappelé, je le note immédiatement. »
+- **Opposition :** réponse simple à l’e-mail ; aucune nouvelle relance.
+- **Ouverture téléphonique :** « Bonjour Monsieur Ennesser, Julien GREGUREC à l’appareil, pour ELSATIA. Je vous appelle au sujet de la manière dont vous centralisez le suivi de vos différents chantiers. Est-ce que je peux vous expliquer notre approche en trente secondes ? Si vous ne souhaitez pas être rappelé, je le note immédiatement. »
 
 ### 3.5 CARRELAGE NUSS
 
 - **Décideur ciblé :** Olivier Nuss, président.
-- **Adresse prévue :** `nussolivier@aol.com` — e-mail confirmé.
+- **Adresse prévue :** `nussolivier@aol.com` — e-mail public confirmé, à utiliser avec prudence.
 - **Variante :** A — centralisation.
 - **Objet :** Centraliser chaque projet de salle de bains
 - **Message :**
@@ -169,7 +171,7 @@ Règles communes : un fait public vérifiable, une douleur éventuelle formulée
 >
 > Votre entreprise prend en charge la rénovation complète de salles de bains, de la conception à la plomberie, aux sanitaires, aux revêtements et aux faux plafonds.
 >
-> Comment centralisez-vous aujourd’hui les étapes et les informations de chaque projet ? ELSATIA réunit dans un même environnement les clients, devis, chantiers, planning, équipes, documents et informations terrain. L’objectif est de conserver une vue commune du dossier à mesure que les différents métiers interviennent, sans présumer de votre fonctionnement actuel.
+> Comment centralisez-vous aujourd’hui les étapes et les informations de chaque projet ? ELSATIA réunit dans un même environnement les clients, devis, chantiers, planning, équipes, documents et informations terrain. L’objectif est de conserver une vue commune du dossier à mesure que les différents métiers interviennent.
 >
 > Seriez-vous disponible pour un échange de 10 à 15 minutes afin de voir si cette approche peut correspondre à votre organisation ?
 >
@@ -181,14 +183,15 @@ Règles communes : un fait public vérifiable, une douleur éventuelle formulée
 >
 > elsatia.fr
 >
-> Je vous contacte au nom d’ELSATIA dans un cadre strictement professionnel, au sujet de l’organisation entre le bureau et les chantiers. Vos coordonnées professionnelles ont été trouvées sur le site officiel de CARRELAGE NUSS. Si vous préférez ne plus recevoir de message de ma part concernant ELSATIA, répondez simplement à cet e-mail et je retirerai vos coordonnées de ma liste de prospection.
+> Si vous préférez ne plus recevoir de messages de ma part concernant ELSATIA, répondez simplement à cet e-mail et je n’effectuerai plus de relance.
 
 - **Fait public :** prise en charge complète de salles de bains, de la conception aux différents corps de métier.
 - **Source :** https://www.nussentreprise.com/
 - **Hypothèse à qualifier :** continuité du dossier entre les étapes et intervenants.
 - **CTA unique :** échange de 10 à 15 minutes.
-- **Opposition :** réponse simple à l’e-mail, avec retrait de la liste.
+- **Opposition :** réponse simple à l’e-mail ; aucune nouvelle relance.
 - **Ouverture téléphonique :** « Bonjour Monsieur Nuss, Julien GREGUREC à l’appareil, pour ELSATIA. Vous prenez en charge une salle de bains de la conception jusqu’aux différents corps de métier ; je vous appelle au sujet de la centralisation de chaque dossier. Est-ce que je peux vous expliquer notre approche en trente secondes ? Si vous ne souhaitez pas être rappelé, je le note immédiatement. »
+- **Précaution :** privilégier le téléphone en premier ; ne préparer l’e-mail qu’après une validation humaine explicite de l’adresse publique `@aol.com`.
 
 ### 3.6 ÉTABLISSEMENTS GÉRARD ET FILS
 
@@ -202,7 +205,7 @@ Règles communes : un fait public vérifiable, une douleur éventuelle formulée
 >
 > Votre entreprise familiale combine peinture, isolation thermique et échafaudage, notamment pour des syndics et des acteurs immobiliers, avec un effectif public d’une trentaine de professionnels.
 >
-> Comment regroupez-vous aujourd’hui le suivi administratif et opérationnel de ces différents chantiers ? ELSATIA rassemble dans un même environnement les clients, devis, chantiers, planning, équipes, documents et informations terrain. L’objectif est de proposer une vue partagée entre le bureau et les équipes, sans présumer de votre organisation ni de vos outils actuels.
+> Comment regroupez-vous aujourd’hui le suivi administratif et opérationnel de ces différents chantiers ? ELSATIA rassemble dans un même environnement les clients, devis, chantiers, planning, équipes, documents et informations terrain. L’objectif est de proposer une vue partagée entre le bureau et les équipes.
 >
 > Seriez-vous disponible pour un échange de 10 à 15 minutes afin d’évaluer si cette approche correspond à vos besoins ?
 >
@@ -214,13 +217,13 @@ Règles communes : un fait public vérifiable, une douleur éventuelle formulée
 >
 > elsatia.fr
 >
-> Je vous contacte au nom d’ELSATIA dans un cadre strictement professionnel, au sujet de l’organisation entre le bureau et les chantiers. Vos coordonnées professionnelles ont été trouvées sur le site officiel des ÉTABLISSEMENTS GÉRARD ET FILS. Si vous préférez ne plus recevoir de message de ma part concernant ELSATIA, répondez simplement à cet e-mail et je retirerai vos coordonnées de ma liste de prospection.
+> Si vous préférez ne plus recevoir de messages de ma part concernant ELSATIA, répondez simplement à cet e-mail et je n’effectuerai plus de relance.
 
 - **Fait public :** trois domaines d’expertise, des clients syndics et immobiliers, et un effectif public d’une trentaine de professionnels.
 - **Source :** https://www.gerardetfils.fr/ ; certificat Qualibat public : https://www.qualibat.com/get-pdf?file=2024%5CD67-Certificat-27103-E27103-3-20250428-RGEAnnexe.pdf
 - **Hypothèse à qualifier :** centralisation du suivi administratif et opérationnel entre métiers et chantiers.
 - **CTA unique :** échange de 10 à 15 minutes.
-- **Opposition :** réponse simple à l’e-mail, avec retrait de la liste.
+- **Opposition :** réponse simple à l’e-mail ; aucune nouvelle relance.
 - **Ouverture téléphonique :** « Bonjour, Julien GREGUREC à l’appareil, pour ELSATIA. Votre entreprise combine peinture, isolation thermique et échafaudage pour plusieurs types de donneurs d’ordre ; je vous appelle au sujet du suivi partagé de ces chantiers. Est-ce que je peux vous expliquer notre approche en trente secondes ? Si vous ne souhaitez pas être rappelé, je le note immédiatement. »
 
 ### 3.7 MAYART
@@ -235,7 +238,7 @@ Règles communes : un fait public vérifiable, une douleur éventuelle formulée
 >
 > MAYART intervient en peinture, isolation extérieure, cloisons, sols et résine, notamment dans l’aménagement et la décoration de bâtiments tertiaires.
 >
-> Comment centralisez-vous aujourd’hui le suivi de ces différents lots et phases de chantier ? ELSATIA réunit dans un même environnement les clients, devis, chantiers, planning, équipes, documents et informations terrain. L’objectif est de donner une vue commune du dossier au bureau et sur chantier, sans présumer des outils ou des méthodes que vous utilisez actuellement.
+> Comment centralisez-vous aujourd’hui le suivi de ces différents lots et phases de chantier ? ELSATIA réunit dans un même environnement les clients, devis, chantiers, planning, équipes, documents et informations terrain. L’objectif est de donner une vue commune du dossier au bureau et sur chantier.
 >
 > Seriez-vous disponible pour un échange de 10 à 15 minutes afin de voir si cette approche est pertinente pour votre organisation ?
 >
@@ -247,13 +250,13 @@ Règles communes : un fait public vérifiable, une douleur éventuelle formulée
 >
 > elsatia.fr
 >
-> Je vous contacte au nom d’ELSATIA dans un cadre strictement professionnel, au sujet de l’organisation entre le bureau et les chantiers. Vos coordonnées professionnelles ont été trouvées sur le site officiel de MAYART. Si vous préférez ne plus recevoir de message de ma part concernant ELSATIA, répondez simplement à cet e-mail et je retirerai vos coordonnées de ma liste de prospection.
+> Si vous préférez ne plus recevoir de messages de ma part concernant ELSATIA, répondez simplement à cet e-mail et je n’effectuerai plus de relance.
 
 - **Fait public :** plusieurs spécialités de second œuvre et interventions dans l’aménagement et la décoration de bâtiments tertiaires.
 - **Source :** https://www.mayart.fr/
 - **Hypothèse à qualifier :** centralisation du suivi entre lots et phases de chantier.
 - **CTA unique :** échange de 10 à 15 minutes.
-- **Opposition :** réponse simple à l’e-mail, avec retrait de la liste.
+- **Opposition :** réponse simple à l’e-mail ; aucune nouvelle relance.
 - **Canal complémentaire :** relance e-mail uniquement ; aucun téléphone inventé et aucun profil LinkedIn public suffisamment pertinent n’a été retenu.
 
 ### 3.8 AKPRO
@@ -266,9 +269,9 @@ Règles communes : un fait public vérifiable, une douleur éventuelle formulée
 
 > Bonjour,
 >
-> AKPRO intervient dans le Bas-Rhin en plâtrerie, cloisons, faux plafonds et isolation intérieure, avec une tranche publique de 20 à 49 salariés et une qualification RGE pour les plaques de plâtre.
+> J’ai vu qu’AKPRO intervient dans le Bas-Rhin en plâtrerie, cloisons, faux plafonds et isolation intérieure.
 >
-> Comment partagez-vous aujourd’hui le planning, les consignes et les documents avec les équipes sur chantier ? ELSATIA réunit les chantiers, le planning, les équipes, les documents et les informations terrain dans un même environnement accessible au bureau comme en mobilité, sans présumer des outils déjà utilisés.
+> Comment partagez-vous aujourd’hui le planning, les consignes et les documents avec vos équipes sur les différents chantiers ? ELSATIA réunit les chantiers, le planning, les équipes, les documents et les informations terrain dans un même environnement accessible au bureau comme en mobilité. L’objectif est de faciliter un suivi commun.
 >
 > Seriez-vous disponible pour un échange de 10 à 15 minutes afin d’évaluer si cette approche correspond à votre organisation ?
 >
@@ -280,13 +283,13 @@ Règles communes : un fait public vérifiable, une douleur éventuelle formulée
 >
 > elsatia.fr
 >
-> Je vous contacte au nom d’ELSATIA dans un cadre strictement professionnel, au sujet de l’organisation entre le bureau et les chantiers. Vos coordonnées professionnelles ont été trouvées dans l’annuaire public RGE France Artisan. Si vous préférez ne plus recevoir de message de ma part concernant ELSATIA, répondez simplement à cet e-mail et je retirerai vos coordonnées de ma liste de prospection.
+> Si vous préférez ne plus recevoir de messages de ma part concernant ELSATIA, répondez simplement à cet e-mail et je n’effectuerai plus de relance.
 
 - **Fait public :** activité de plâtrerie et isolation, qualification RGE plaques de plâtre et tranche de 20 à 49 salariés.
 - **Source :** https://www.france-artisan.fr/annuaire-rge/entreprise/48462838300040
 - **Hypothèse à qualifier :** partage du planning, des consignes et des documents avec les équipes terrain.
 - **CTA unique :** échange de 10 à 15 minutes.
-- **Opposition :** réponse simple à l’e-mail, avec retrait de la liste.
+- **Opposition :** réponse simple à l’e-mail ; aucune nouvelle relance.
 - **Ouverture téléphonique :** « Bonjour, Julien GREGUREC à l’appareil, pour ELSATIA. AKPRO intervient en plâtrerie, cloisons, faux plafonds et isolation avec une équipe terrain significative ; je vous appelle au sujet du partage des plannings, consignes et documents avec les chantiers. Est-ce que je peux vous expliquer notre approche en trente secondes ? Si vous ne souhaitez pas être rappelé, je le note immédiatement. »
 
 ### 3.9 CF PARQUET
@@ -303,7 +306,7 @@ Règles communes : un fait public vérifiable, une douleur éventuelle formulée
 >
 > CF PARQUET réunit un showroom à Mundolsheim, une équipe de pose et une clientèle composée notamment de promoteurs, cabinets d’architecture et entreprises dans le Bas-Rhin.
 >
-> Comment les informations d’un dossier sont-elles aujourd’hui transmises du showroom ou du bureau aux poseurs ? ELSATIA réunit les chantiers, le planning, les équipes, les documents et les informations terrain dans un même environnement accessible au bureau comme en mobilité. L’objectif est de faciliter une information commune, sans présumer de votre organisation actuelle.
+> Comment les informations d’un dossier sont-elles aujourd’hui transmises du showroom ou du bureau aux poseurs ? ELSATIA réunit les chantiers, le planning, les équipes, les documents et les informations terrain dans un même environnement accessible au bureau comme en mobilité. L’objectif est de faciliter une information commune.
 >
 > Seriez-vous disponible pour un échange de 10 à 15 minutes afin de voir si cette approche correspond à votre fonctionnement ?
 >
@@ -315,13 +318,13 @@ Règles communes : un fait public vérifiable, une douleur éventuelle formulée
 >
 > elsatia.fr
 >
-> Je vous contacte au nom d’ELSATIA dans un cadre strictement professionnel, au sujet de l’organisation entre le bureau et les chantiers. Vos coordonnées professionnelles ont été trouvées sur le site officiel de CF PARQUET. Si vous préférez ne plus recevoir de message de ma part concernant ELSATIA, répondez simplement à cet e-mail et je retirerai vos coordonnées de ma liste de prospection.
+> Si vous préférez ne plus recevoir de messages de ma part concernant ELSATIA, répondez simplement à cet e-mail et je n’effectuerai plus de relance.
 
 - **Fait public :** showroom, équipe de pose et clientèle professionnelle sur une zone régionale.
 - **Source :** https://www.cfparquet.fr/ ; page de contact revérifiée : https://www.cfparquet.fr/contact
 - **Hypothèse à qualifier :** transmission des informations du showroom et du bureau aux poseurs.
 - **CTA unique :** échange de 10 à 15 minutes.
-- **Opposition :** réponse simple à l’e-mail si une adresse est ultérieurement confirmée ; refus oral enregistré immédiatement au téléphone.
+- **Opposition :** si une adresse est ultérieurement confirmée, réponse simple à l’e-mail et aucune nouvelle relance ; refus oral enregistré immédiatement au téléphone.
 - **Canal recommandé :** téléphone en premier ; n’utiliser l’e-mail qu’après confirmation indépendante d’une adresse professionnelle.
 - **Ouverture téléphonique :** « Bonjour, Julien GREGUREC à l’appareil, pour ELSATIA. Votre site présente un showroom, une clientèle professionnelle et une équipe de pose dans le Bas-Rhin ; je vous appelle au sujet de la transmission des informations du bureau aux poseurs. Est-ce que je peux vous expliquer notre approche en trente secondes ? Si vous ne souhaitez pas être rappelé, je le note immédiatement. »
 
@@ -335,9 +338,9 @@ Règles communes : un fait public vérifiable, une douleur éventuelle formulée
 
 > Bonjour Monsieur Eren,
 >
-> SCE CARRELAGE est active à Strasbourg sur les revêtements de sols et murs et apparaît comme attributaire d’un lot de carrelage dans un marché public récent.
+> J’ai vu que SCE CARRELAGE intervient sur des chantiers de revêtements de sols et murs à Strasbourg.
 >
-> Comment suivez-vous aujourd’hui les interventions et les informations remontées par les équipes terrain ? ELSATIA réunit les chantiers, le planning, les équipes, les documents et les informations terrain dans un même environnement, accessible au bureau comme en mobilité. L’objectif est de proposer une vue partagée, sans présumer de vos méthodes ou de vos outils actuels.
+> Comment suivez-vous aujourd’hui les interventions et les informations remontées par les équipes terrain ? ELSATIA réunit les chantiers, le planning, les équipes, les documents et les informations terrain dans un même environnement, accessible au bureau comme en mobilité. L’objectif est de proposer une vue partagée.
 >
 > Seriez-vous disponible pour un échange de 10 à 15 minutes afin de voir si cette approche correspond à votre organisation ?
 >
@@ -349,14 +352,14 @@ Règles communes : un fait public vérifiable, une douleur éventuelle formulée
 >
 > elsatia.fr
 >
-> Je vous contacte au nom d’ELSATIA dans un cadre strictement professionnel, au sujet de l’organisation entre le bureau et les chantiers. Vos coordonnées professionnelles ont été trouvées dans un avis de marché public BOAMP. Si vous préférez ne plus recevoir de message de ma part concernant ELSATIA, répondez simplement à cet e-mail et je retirerai vos coordonnées de ma liste de prospection.
+> Si vous préférez ne plus recevoir de messages de ma part concernant ELSATIA, répondez simplement à cet e-mail et je n’effectuerai plus de relance.
 
 - **Fait public :** activité à Strasbourg et attribution récente d’un lot public de carrelage.
 - **Source :** https://www.boamp.fr/telechargements/FILES/PDF/2026/03/26-26863.pdf
 - **Hypothèse à qualifier :** suivi des interventions et remontées d’informations terrain.
 - **CTA unique :** échange de 10 à 15 minutes.
-- **Opposition :** réponse simple à l’e-mail, avec retrait de la liste.
-- **Ouverture téléphonique :** « Bonjour Monsieur Eren, Julien GREGUREC à l’appareil, pour ELSATIA. SCE CARRELAGE apparaît sur un lot public récent à Strasbourg ; je vous appelle au sujet du suivi des interventions et des informations remontées par les équipes terrain. Est-ce que je peux vous expliquer notre approche en trente secondes ? Si vous ne souhaitez pas être rappelé, je le note immédiatement. »
+- **Opposition :** réponse simple à l’e-mail ; aucune nouvelle relance.
+- **Ouverture téléphonique :** « Bonjour Monsieur Eren, Julien GREGUREC à l’appareil, pour ELSATIA. J’ai vu que SCE CARRELAGE intervient sur des chantiers de revêtements de sols et murs à Strasbourg ; je vous appelle au sujet du suivi des interventions et des informations remontées par les équipes terrain. Est-ce que je peux vous expliquer notre approche en trente secondes ? Si vous ne souhaitez pas être rappelé, je le note immédiatement. »
 
 ## 4. Contrôle humain obligatoire avant tout envoi
 
