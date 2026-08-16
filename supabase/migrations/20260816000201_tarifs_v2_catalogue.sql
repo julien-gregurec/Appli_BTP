@@ -5,6 +5,12 @@ alter table public.plans_abonnement
   alter column prix_mensuel_ht drop not null,
   alter column prix_annuel_ht drop not null;
 
+-- La contrainte historique imposait encore l'ancienne relation entre prix
+-- mensuel et annuel. La retirer avant l'insertion rend la migration
+-- reproductible sur une base neuve ; la contrainte V2 est recréée plus bas.
+alter table public.plans_abonnement
+  drop constraint if exists plans_abonnement_check;
+
 do $$
 declare
   v_valide_du date := date '2026-08-16';

@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { logoutAction } from "@/app/actions/auth";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { BRAND_NAME } from "@/lib/brand";
-import { plateformeRoleCourant } from "@/lib/plateforme";
+import { plateformeRoleCourant, rolePlateformeAPermission } from "@/lib/plateforme";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function PlateformeLayout({ children }: { children: React.ReactNode }) {
@@ -29,6 +29,7 @@ export default async function PlateformeLayout({ children }: { children: React.R
           <nav className="flex flex-wrap items-center gap-2 text-sm">
             <Link href="/plateforme" className="rounded-md border px-3 py-2">Entreprises</Link>
             <Link href="/plateforme/tarification" className="rounded-md border px-3 py-2">Tarification</Link>
+            {(rolePlateformeAPermission(role,"consulter_facturation")||rolePlateformeAPermission(role,"gerer_remises"))&&<Link href="/plateforme/promotions" className="rounded-md border px-3 py-2">Promotions</Link>}
             <form action={logoutAction}>
               <button className="rounded-md bg-[#0d1b2a] px-3 py-2 font-medium text-white">Se déconnecter</button>
             </form>

@@ -264,6 +264,14 @@ export const TYPES_REMISE = ["montant", "pourcentage"] as const;
 export type TypeRemise = (typeof TYPES_REMISE)[number];
 
 type StripeCoupon = { id: string; name?: string | null };
+type StripePromotionCode = { id: string; code: string; active: boolean; livemode: boolean };
+
+export function exigerStripeTest(environnement: NodeJS.ProcessEnv = process.env) {
+  const secret = environnement.STRIPE_SECRET_KEY ?? "";
+  if (!secret.startsWith("sk_test_")) {
+    throw new Error("PROMO-V1 est limité à Stripe Test");
+  }
+}
 
 // Geste commercial ponctuel (avoir en euros ou pourcentage, avec duree) applique sur
 // l'abonnement de base d'une entreprise cliente. Un coupon par entreprise a la fois :
@@ -295,6 +303,38 @@ export async function retirerCouponAbonnement(subscriptionId: string) {
   return requeteStripe<StripeSubscription>(`subscriptions/${encodeURIComponent(subscriptionId)}/discount`, {
     methode: "DELETE",
     idempotence: `remise-suppression-${subscriptionId}-${Date.now()}`,
+  });
+}
+
+export async function creerCodePromotionnelTest(params: {
+  couponId: string;
+  code: string;
+  expiration?: string | null;
+  limiteUtilisations?: number | null;
+}) {
+  exigerStripeTest();
+  const corps = new URLSearchParams({
+    code: params.code,
+    active: "true",
+    "promotion[type]": "coupon",
+    "promotion[coupon]": params.couponId,
+  });
+  if (params.expiration) {
+    const expiration = Math.floor(new Date(`${params.expiration}T23:59:59Z`).getTime() / 1000);
+    corps.set("expires_at", String(expiration));
+  }
+  if (params.limiteUtilisations) corps.set("max_redemptions", String(params.limiteUtilisations));
+  return requeteStripe<StripePromotionCode>("promotion_codes", {
+    corps,
+    idempotence: `promotion-code-${params.code}`,
+  });
+}
+
+export async function desactiverCodePromotionnelTest(promotionCodeId: string) {
+  exigerStripeTest();
+  return requeteStripe<StripePromotionCode>(`promotion_codes/${encodeURIComponent(promotionCodeId)}`, {
+    corps: new URLSearchParams({ active: "false" }),
+    idempotence: `promotion-code-desactivation-${promotionCodeId}`,
   });
 }
 
