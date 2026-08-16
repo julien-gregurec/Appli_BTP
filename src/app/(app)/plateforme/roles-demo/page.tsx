@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { estPlateformeAdmin } from "@/lib/plateforme";
+import { aPermissionPlateforme } from "@/lib/plateforme";
 import { entrerEntreprisePlateformeAction } from "@/app/actions/plateforme";
 import { ApercuPoste } from "@/components/ApercuPoste";
 import { estPermissionConfigurable } from "@/lib/roles-predefinis";
@@ -11,7 +11,7 @@ type RoleDemo={poste_id:string;poste_nom:string;nb_employes:number;permissions:s
 type PermissionDetail={cle:string;module:string;description:string};
 
 export default async function RolesDemoPage({searchParams}:{searchParams:Promise<{poste?:string}>}){
-  if(!(await estPlateformeAdmin()))notFound();
+  if(!(await aPermissionPlateforme("intervenir_tenant")))notFound();
   const{poste}=await searchParams,supabase=await createClient();
   const[{data:entreprises},{data:catalogue}]=await Promise.all([
     supabase.rpc("plateforme_entreprises"),

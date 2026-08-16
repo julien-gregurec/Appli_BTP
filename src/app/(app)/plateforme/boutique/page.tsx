@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { estPlateformeAdmin } from "@/lib/plateforme";
+import { aPermissionPlateforme } from "@/lib/plateforme";
 import { creerProduitBoutiqueAction, modifierProduitBoutiqueAction } from "@/app/actions/boutique";
 import { BRAND_NAME } from "@/lib/brand";
 import { boutiqueEstActive } from "@/lib/preview-features";
@@ -17,7 +17,7 @@ type Produit = { id: string; sku: string; nom: string; categorie: string; prix_h
 
 export default async function PlateformeBoutiquePage({ searchParams }: { searchParams: Promise<{ error?: string; success?: string }> }) {
   if (!boutiqueEstActive()) notFound();
-  if (!(await estPlateformeAdmin())) notFound();
+  if (!(await aPermissionPlateforme("gerer_boutique"))) notFound();
   const params = await searchParams;
   const supabase = await createClient();
   const { data } = await supabase.from("boutique_produits")

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { aPermissionPlateforme } from "@/lib/plateforme";
 
 // Côté entreprise : envoyer un message au support plateforme.
 export async function envoyerMessageSupportAction(formData: FormData) {
@@ -29,6 +30,7 @@ export async function envoyerMessageSupportAction(formData: FormData) {
 
 // Côté plateforme : répondre à une entreprise.
 export async function repondreSupportPlateformeAction(entrepriseId: string, formData: FormData) {
+  if (!(await aPermissionPlateforme("repondre_support"))) redirect("/dashboard");
   const contenu = String(formData.get("contenu") ?? "").trim();
   if (!entrepriseId || !contenu) redirect("/plateforme/support");
   const supabase = await createClient();

@@ -72,6 +72,9 @@ select is(
       and p.prosecdef
       and has_function_privilege('anon', p.oid, 'EXECUTE')
       and p.prorettype <> 'trigger'::regtype
+      -- Exception publique volontaire : résolution d'une empreinte de lien
+      -- commercial externe, sans donnée métier et sans token en clair.
+      and p.oid <> 'public.document_commercial_par_token(text)'::regprocedure
   ),
   0,
   'Aucune fonction SECURITY DEFINER métier n’est exécutable par anon'

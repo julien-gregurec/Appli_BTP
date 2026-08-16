@@ -7,12 +7,13 @@ const mocks = vi.hoisted(() => ({
   }),
   rpc: vi.fn(),
   resetPasswordForEmail: vi.fn(),
+  aPermissionPlateforme: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/auth-mode", () => ({ isEmailLoginDisabled: () => false }));
-vi.mock("@/lib/plateforme", () => ({ estPlateformeAdmin: vi.fn(async () => true) }));
+vi.mock("@/lib/plateforme", () => ({ aPermissionPlateforme: mocks.aPermissionPlateforme }));
 vi.mock("@/lib/brand", () => ({ BRAND: { urlPublique: mocks.urlCanonique } }));
 vi.mock("@/lib/stripe-abonnement", () => ({
   appliquerCouponAbonnement: vi.fn(),
@@ -35,6 +36,7 @@ describe("réinitialisation administrateur", () => {
     vi.clearAllMocks();
     mocks.rpc.mockResolvedValue({ error: null });
     mocks.resetPasswordForEmail.mockResolvedValue({ error: null });
+    mocks.aPermissionPlateforme.mockResolvedValue(true);
   });
 
   it("utilise l’URL canonique sans envoyer de véritable e-mail", async () => {
@@ -47,5 +49,17 @@ describe("réinitialisation administrateur", () => {
     expect(mocks.resetPasswordForEmail).toHaveBeenCalledWith("recette@example.invalid", {
       redirectTo: `${mocks.urlCanonique}/auth/callback?next=%2Fnouveau-mot-de-passe`,
     });
+  });
+
+  it("refuse l’action serveur avant tout appel Supabase sans permission support", async () => {
+    mocks.aPermissionPlateforme.mockResolvedValue(false);
+    const formData = new FormData();
+    formData.set("email", "recette@example.invalid");
+    formData.set("motif", "Test automatisé");
+
+    await expect(reinitialiserMotDePassePlateformeAction("entreprise-test", formData)).rejects.toThrow("REDIRECT:/dashboard");
+
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(mocks.resetPasswordForEmail).not.toHaveBeenCalled();
   });
 });

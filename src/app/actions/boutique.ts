@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { permissionsUtilisateur } from "@/lib/permissions";
-import { estPlateformeAdmin } from "@/lib/plateforme";
+import { aPermissionPlateforme } from "@/lib/plateforme";
 import { creerSessionCheckoutBoutique } from "@/lib/stripe-boutique";
 import { boutiqueEstActive, MESSAGE_BOUTIQUE_INDISPONIBLE } from "@/lib/preview-features";
 
@@ -132,7 +132,7 @@ export async function annulerCommandeAction(commandeId: string) {
 
 export async function creerProduitBoutiqueAction(formData: FormData) {
   if (!boutiqueEstActive()) redirect(`/plateforme?error=${encodeURIComponent(MESSAGE_BOUTIQUE_INDISPONIBLE)}`);
-  if (!(await estPlateformeAdmin())) redirect("/dashboard");
+  if (!(await aPermissionPlateforme("gerer_boutique"))) redirect("/dashboard");
   const sku = String(formData.get("sku") ?? "").trim();
   const nom = String(formData.get("nom") ?? "").trim();
   const categorie = String(formData.get("categorie") ?? "");
@@ -158,7 +158,7 @@ export async function creerProduitBoutiqueAction(formData: FormData) {
 
 export async function modifierProduitBoutiqueAction(produitId: string, formData: FormData) {
   if (!boutiqueEstActive()) redirect(`/plateforme?error=${encodeURIComponent(MESSAGE_BOUTIQUE_INDISPONIBLE)}`);
-  if (!(await estPlateformeAdmin())) redirect("/dashboard");
+  if (!(await aPermissionPlateforme("gerer_boutique"))) redirect("/dashboard");
   const supabase = await createClient();
   const { error } = await supabase.from("boutique_produits").update({
     prix_ht: Number(formData.get("prix_ht") ?? 0),

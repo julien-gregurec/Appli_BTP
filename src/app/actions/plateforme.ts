@@ -4,13 +4,13 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
-import { estPlateformeAdmin } from "@/lib/plateforme";
+import { aPermissionPlateforme } from "@/lib/plateforme";
 import { ERREUR_CONFIGURATION_URL_AUTH, urlCallbackReinitialisation } from "@/lib/auth-redirects";
 import { appliquerCouponAbonnement, creerCouponRemise, reconcilierAbonnementStripe, retirerCouponAbonnement, TYPES_REMISE, DUREES_REMISE, type DureeRemise, type TypeRemise } from "@/lib/stripe-abonnement";
 import { TARIFS_COMPTES_SUPPLEMENTAIRES, type TypeCompteTarifaire } from "@/lib/facturation-comptes";
 
 export async function modifierAbonnementAction(entrepriseId: string, formData: FormData) {
-  if (!(await estPlateformeAdmin())) {
+  if (!(await aPermissionPlateforme("gerer_facturation"))) {
     redirect("/dashboard");
   }
   const statut = String(formData.get("statut") ?? "essai");
@@ -39,7 +39,7 @@ export async function modifierAbonnementAction(entrepriseId: string, formData: F
 }
 
 export async function creerEntreprisePlateformeAction(formData:FormData){
-  if(!(await estPlateformeAdmin()))redirect("/dashboard");
+  if(!(await aPermissionPlateforme("creer_entreprise")))redirect("/dashboard");
   const nom=String(formData.get("nom")??"").trim(),siret=String(formData.get("siret")??"").trim()||null,ville=String(formData.get("ville")??"").trim()||null;
   if(!nom)redirect(`/plateforme?error=${encodeURIComponent("Nom obligatoire")}`);
   const supabase=await createClient();
@@ -66,7 +66,7 @@ export async function creerEntreprisePlateformeAction(formData:FormData){
 }
 
 export async function ajouterAdminPlateformeAction(formData: FormData) {
-  if (!(await estPlateformeAdmin())) redirect("/dashboard");
+  if (!(await aPermissionPlateforme("gerer_equipe"))) redirect("/dashboard");
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const nom = String(formData.get("nom") ?? "").trim() || null;
   const role = String(formData.get("role") ?? "total").trim() || "total";
@@ -84,7 +84,7 @@ export async function ajouterAdminPlateformeAction(formData: FormData) {
 }
 
 export async function retirerAdminPlateformeAction(formData: FormData) {
-  if (!(await estPlateformeAdmin())) redirect("/dashboard");
+  if (!(await aPermissionPlateforme("gerer_equipe"))) redirect("/dashboard");
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   if (!email) redirect(`/plateforme?error=${encodeURIComponent("Email manquant")}`);
   const supabase = await createClient();
@@ -100,7 +100,7 @@ export async function retirerAdminPlateformeAction(formData: FormData) {
 }
 
 export async function modifierTarifPostePlateformeAction(posteId: string, formData: FormData) {
-  if (!(await estPlateformeAdmin())) redirect("/dashboard");
+  if (!(await aPermissionPlateforme("gerer_facturation"))) redirect("/dashboard");
   const codeOffre = String(formData.get("code_offre") ?? "").trim();
   const type = codeOffre.replace(/^compte_/, "") as TypeCompteTarifaire;
   if (!(type in TARIFS_COMPTES_SUPPLEMENTAIRES)) redirect(`/plateforme?error=${encodeURIComponent("Type de compte invalide")}`);
@@ -120,7 +120,7 @@ export async function modifierTarifPostePlateformeAction(posteId: string, formDa
 }
 
 export async function genererSnapshotFacturationAction(formData: FormData) {
-  if (!(await estPlateformeAdmin())) redirect("/dashboard");
+  if (!(await aPermissionPlateforme("gerer_facturation"))) redirect("/dashboard");
   const retourBrut = String(formData.get("retour") ?? "/plateforme");
   const retour = retourBrut.startsWith("/plateforme") && !retourBrut.startsWith("//") ? retourBrut : "/plateforme";
   if (isEmailLoginDisabled()) redirect(`${retour}${retour.includes("?") ? "&" : "?"}error=${encodeURIComponent("Le relevé mensuel sécurisé sera disponible après activation des comptes personnels")}`);
@@ -135,7 +135,7 @@ export async function genererSnapshotFacturationAction(formData: FormData) {
 }
 
 export async function entrerEntreprisePlateformeAction(entrepriseId:string,formData:FormData){
-  if(!(await estPlateformeAdmin()))redirect("/dashboard");
+  if(!(await aPermissionPlateforme("intervenir_tenant")))redirect("/dashboard");
   if(isEmailLoginDisabled())redirect(`/plateforme?error=${encodeURIComponent("L’accès support nécessite un compte plateforme authentifié")}`);
   const motif=String(formData.get("motif")??"").trim();
   if(motif.length<5)redirect(`/plateforme?error=${encodeURIComponent("Indiquez un motif d’intervention d’au moins 5 caractères")}`);
@@ -155,7 +155,7 @@ export async function quitterEntreprisePlateformeAction(){
 // Réservé à l'administration de la plateforme : un gérant d'entreprise cliente n'a pas
 // cette option, seulement le flux d'auto-service /mot-de-passe-oublie.
 export async function reinitialiserMotDePassePlateformeAction(entrepriseId:string,formData:FormData){
-  if(!(await estPlateformeAdmin()))redirect("/dashboard");
+  if(!(await aPermissionPlateforme("reinitialiser_compte")))redirect("/dashboard");
   if(isEmailLoginDisabled())redirect(`/plateforme?error=${encodeURIComponent("Réinitialisation indisponible en mode prototype")}`);
   const email=String(formData.get("email")??"").trim().toLowerCase();
   const motif=String(formData.get("motif")??"").trim();
@@ -171,7 +171,7 @@ export async function reinitialiserMotDePassePlateformeAction(entrepriseId:strin
 }
 
 export async function signalerImpayePlateformeAction(entrepriseId:string,formData:FormData){
-  if(!(await estPlateformeAdmin()))redirect("/dashboard");
+  if(!(await aPermissionPlateforme("gerer_facturation")))redirect("/dashboard");
   const message=String(formData.get("message")??"").trim()||"Règlement mensuel non reçu";
   const supabase=await createClient();
   if(isEmailLoginDisabled()){
@@ -186,7 +186,7 @@ export async function signalerImpayePlateformeAction(entrepriseId:string,formDat
 }
 
 export async function enregistrerReglementPlateformeAction(entrepriseId:string,formData:FormData){
-  if(!(await estPlateformeAdmin()))redirect("/dashboard");
+  if(!(await aPermissionPlateforme("gerer_facturation")))redirect("/dashboard");
   const note=String(formData.get("note")??"").trim()||"Règlement reçu";
   const supabase=await createClient();
   if(isEmailLoginDisabled()){
@@ -209,7 +209,7 @@ function descriptionRemise(type: TypeRemise, valeur: number, duree: DureeRemise,
 // Un seul à la fois (Stripe remplace automatiquement la remise précédente d'une même
 // subscription). L'entreprise doit déjà avoir un abonnement Stripe Billing actif.
 export async function appliquerRemiseAction(entrepriseId: string, formData: FormData) {
-  if (!(await estPlateformeAdmin())) redirect("/dashboard");
+  if (!(await aPermissionPlateforme("gerer_remises"))) redirect("/dashboard");
   const type = String(formData.get("type") ?? "");
   const valeur = Number(formData.get("valeur"));
   const duree = String(formData.get("duree") ?? "");
@@ -243,7 +243,7 @@ export async function appliquerRemiseAction(entrepriseId: string, formData: Form
 }
 
 export async function retirerRemiseAction(entrepriseId: string) {
-  if (!(await estPlateformeAdmin())) redirect("/dashboard");
+  if (!(await aPermissionPlateforme("gerer_remises"))) redirect("/dashboard");
   const supabase = await createClient();
   const { data: entreprise } = await supabase.from("entreprises").select("stripe_subscription_id").eq("id", entrepriseId).maybeSingle();
   if (entreprise?.stripe_subscription_id) {

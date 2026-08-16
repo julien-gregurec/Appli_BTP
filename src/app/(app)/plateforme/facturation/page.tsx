@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { estPlateformeAdmin } from "@/lib/plateforme";
+import { aPermissionPlateforme } from "@/lib/plateforme";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { genererSnapshotFacturationAction } from "@/app/actions/plateforme";
 
@@ -10,7 +10,7 @@ type Releve = { entreprise_id: string; entreprise_nom: string; mois: string; nom
 const euros = (montant: number) => Number(montant).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 
 export default async function FacturationPlateformePage({ searchParams }: { searchParams: Promise<{ mois?: string; employe?: string; error?: string; succes?: string }> }) {
-  if (!(await estPlateformeAdmin())) notFound();
+  if (!(await aPermissionPlateforme("consulter_facturation"))) notFound();
   const params = await searchParams;
   const mois = /^\d{4}-\d{2}$/.test(params.mois ?? "") ? params.mois as string : new Date().toISOString().slice(0, 7);
   if (isEmailLoginDisabled()) return <main className="p-3 sm:p-8"><div className="mx-auto max-w-6xl space-y-4"><Link href="/plateforme" className="text-sm text-neutral-500">← Plateforme</Link><h1 className="text-xl font-semibold">Relevés mensuels des comptes</h1><p className="rounded bg-amber-50 p-4 text-sm text-amber-900">Les relevés nominatifs nécessitent un compte propriétaire authentifié.</p></div></main>;

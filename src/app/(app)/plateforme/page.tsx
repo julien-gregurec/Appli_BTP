@@ -2,19 +2,27 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
-import { estPlateformeAdmin, statutAbonnement, prixAbonnementMensuel, offreParCle, type EntrepriseAbonnement } from "@/lib/plateforme";
+import { plateformeRoleCourant, rolePlateformeAPermission, statutAbonnement, prixAbonnementMensuel, offreParCle, type EntrepriseAbonnement } from "@/lib/plateforme";
 import { ajouterAdminPlateformeAction, appliquerRemiseAction, creerEntreprisePlateformeAction, entrerEntreprisePlateformeAction, enregistrerReglementPlateformeAction, genererSnapshotFacturationAction, modifierAbonnementAction, modifierTarifPostePlateformeAction, reinitialiserMotDePassePlateformeAction, retirerAdminPlateformeAction, retirerRemiseAction, signalerImpayePlateformeAction } from "@/app/actions/plateforme";
 import { AbonnementCountdown } from "@/components/AbonnementCountdown";
 import { BRAND_NAME } from "@/lib/brand";
 import { typeCompteTarifaireDepuisPoste } from "@/lib/facturation-comptes";
 
-type MembrePlateforme = { email: string; role: string; nom: string | null; ajoute_par: string | null; created_at: string };
+type MembrePlateforme = { email: string; role: string; nom: string | null; ajoute_par: string | null; actif: boolean; created_at: string };
 const ROLE_LABEL: Record<string, string> = { total: "Accès total", support: "Support", facturation: "Facturation", lecture: "Lecture seule" };
 
 const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
 export default async function PlateformePage({ searchParams }: { searchParams: Promise<{ succes?: string; error?: string }> }) {
-  if (!(await estPlateformeAdmin())) notFound();
+  const role = await plateformeRoleCourant();
+  if (!role) notFound();
+  const peutFacturation = rolePlateformeAPermission(role, "consulter_facturation");
+  const peutGererFacturation = rolePlateformeAPermission(role, "gerer_facturation");
+  const peutSupport = rolePlateformeAPermission(role, "consulter_support");
+  const peutReinitialiser = rolePlateformeAPermission(role, "reinitialiser_compte");
+  const peutIntervenir = rolePlateformeAPermission(role, "intervenir_tenant");
+  const peutGererEquipe = rolePlateformeAPermission(role, "gerer_equipe");
+  const peutGererRemises = rolePlateformeAPermission(role, "gerer_remises");
   const msg = await searchParams;
   const supabase = await createClient();
 
@@ -50,7 +58,13 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
     const{data:appareils}=await supabase.from("appareils_comptes").select("entreprise_id,utilisateur_id,revoque_at").is("revoque_at",null);
     for(const entreprise of entreprises){const actifs=(appareils??[]).filter(a=>a.entreprise_id===entreprise.id),comptes=new Map<string,number>();for(const appareil of actifs)comptes.set(appareil.utilisateur_id,(comptes.get(appareil.utilisateur_id)??0)+1);const utilisateursDepasses=[...comptes.entries()].filter(([,nombre])=>nombre>2).map(([utilisateurId])=>utilisateurId);const montantDepassements=utilisateursDepasses.reduce((total,utilisateurId)=>{const employe=(employes??[]).find(item=>item.entreprise_id===entreprise.id&&item.utilisateur_id===utilisateurId);const poste=(postes??[]).find(item=>item.id===employe?.poste_id);return total+Number(poste?.tarif_compte_mensuel??0);},0);appareilsParEntreprise.set(entreprise.id,{nb_appareils_actifs:actifs.length,nb_comptes_plus_de_deux:utilisateursDepasses.length,maximum_appareils_compte:Math.max(0,...comptes.values()),montant_depassements_ht:montantDepassements});}
   } else {
-    const [{ data }, { data: usages }, { data: tarifs }, { data: besoins },{data:usageAppareils}] = await Promise.all([supabase.rpc("plateforme_entreprises"), supabase.rpc("plateforme_usage_entreprises"), supabase.rpc("plateforme_postes_tarifs"), supabase.rpc("plateforme_besoins"),supabase.rpc("plateforme_usage_appareils")]);
+    const [{ data }, { data: usages }, { data: tarifs }, { data: besoins },{data:usageAppareils}] = await Promise.all([
+      supabase.rpc("plateforme_entreprises"),
+      supabase.rpc("plateforme_usage_entreprises"),
+      peutFacturation ? supabase.rpc("plateforme_postes_tarifs") : Promise.resolve({ data: [] }),
+      peutFacturation ? supabase.rpc("plateforme_besoins") : Promise.resolve({ data: [] }),
+      peutFacturation ? supabase.rpc("plateforme_usage_appareils") : Promise.resolve({ data: [] }),
+    ]);
     const usageParEntreprise = new Map<string, Partial<EntrepriseAbonnement>>(((usages ?? []) as Array<Partial<EntrepriseAbonnement> & { entreprise_id: string }>).map((usage) => [usage.entreprise_id, usage]));
     const offreParEntreprise = new Map<string, string>(((besoins ?? []) as Array<{entreprise_id:string;offre_recommandee:string|null}>).map((besoin) => [besoin.entreprise_id, besoin.offre_recommandee ?? "essentiel"]));
     entreprises = ((data ?? []) as EntrepriseAbonnement[]).map((entreprise) => ({ ...entreprise, ...(usageParEntreprise.get(entreprise.id) ?? {}), offre_recommandee: offreParEntreprise.get(entreprise.id) ?? "essentiel" }));
@@ -59,7 +73,9 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
   }
 
   let membresPlateforme: MembrePlateforme[] = [];
-  if (isEmailLoginDisabled()) {
+  if (!peutGererEquipe) {
+    membresPlateforme = [];
+  } else if (isEmailLoginDisabled()) {
     const { data } = await supabase.from("plateforme_admins").select("email, role, nom, ajoute_par, created_at").order("created_at");
     membresPlateforme = (data ?? []) as MembrePlateforme[];
   } else {
@@ -86,14 +102,14 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
           <div>
           <h1 className="text-xl font-semibold">Plateforme — entreprises clientes</h1>
           <p className="text-sm text-neutral-500">
-            Vue réservée au propriétaire. Chaque entreprise possède un code et un statut d&apos;abonnement à gérer.
+            Vue plateforme sécurisée · rôle actuel : {ROLE_LABEL[role] ?? role}.
           </p>
           </div>
           <div className="flex gap-2">
             <Link href="/plateforme/tarification" className="rounded-md border px-3 py-2 text-sm font-medium">Tarification</Link>
-            <Link href="/plateforme/roles-demo" className="rounded-md border px-3 py-2 text-sm font-medium">Rôles de démonstration</Link>
-            <Link href="/plateforme/support" className="rounded-md border px-3 py-2 text-sm font-medium">Support</Link>
-            <Link href="/plateforme/facturation" className="rounded-md border px-3 py-2 text-sm font-medium">Relevés de facturation</Link>
+            {peutIntervenir && <Link href="/plateforme/roles-demo" className="rounded-md border px-3 py-2 text-sm font-medium">Rôles de démonstration</Link>}
+            {peutSupport && <Link href="/plateforme/support" className="rounded-md border px-3 py-2 text-sm font-medium">Support</Link>}
+            {peutFacturation && <Link href="/plateforme/facturation" className="rounded-md border px-3 py-2 text-sm font-medium">Relevés de facturation</Link>}
           </div>
         </div>
 
@@ -108,8 +124,10 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
             { label: "Suspendues", valeur: parStatut("suspendu") },
             { label: "Impayés à suivre", valeur: impayes },
             { label: "Alertes appareils", valeur: alertesAppareils },
-            { label: "MRR HT", valeur: `${revenuMensuelRecurrent.toLocaleString("fr-FR",{maximumFractionDigits:0})} €` },
-            { label: "ARR HT", valeur: `${(revenuMensuelRecurrent*12).toLocaleString("fr-FR",{maximumFractionDigits:0})} €` },
+            ...(peutFacturation ? [
+              { label: "MRR HT", valeur: `${revenuMensuelRecurrent.toLocaleString("fr-FR",{maximumFractionDigits:0})} €` },
+              { label: "ARR HT", valeur: `${(revenuMensuelRecurrent*12).toLocaleString("fr-FR",{maximumFractionDigits:0})} €` },
+            ] : []),
           ].map((s) => (
             <div key={s.label} className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
               <div className="text-xs uppercase text-neutral-500">{s.label}</div>
@@ -117,12 +135,12 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
             </div>
           ))}
         </div>
-        <form action={creerEntreprisePlateformeAction} className="grid gap-2 rounded-md border p-4 sm:grid-cols-[2fr_1fr_1fr_auto]"><div className="sm:col-span-4"><h2 className="font-semibold">Ajouter une entreprise cliente</h2><p className="text-xs text-neutral-500">L’entreprise est créée en essai avec ses postes de départ. Son administrateur pourra ensuite être invité.</p></div><input name="nom" required placeholder="Nom de l’entreprise" className={input}/><input name="siret" placeholder="SIRET" className={input}/><input name="ville" placeholder="Ville" className={input}/><button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Créer</button></form>
-        <form action={genererSnapshotFacturationAction} className="flex flex-wrap items-end gap-3 rounded-md border border-blue-200 bg-blue-50/50 p-4"><div className="flex-1"><h2 className="font-semibold">Relevé mensuel des comptes facturables</h2><p className="text-xs text-neutral-500">Les comptes actifs et en pause sont figés avec le tarif de leur poste pour le mois choisi.</p></div><label className="text-xs text-neutral-500">Mois<input name="mois" type="month" defaultValue={new Date().toISOString().slice(0,7)} className={`${input} mt-1 block`}/></label><button className="rounded-md bg-blue-800 px-4 py-2 text-sm font-semibold text-white">Générer le relevé</button></form>
+        {peutGererEquipe && <form action={creerEntreprisePlateformeAction} className="grid gap-2 rounded-md border p-4 sm:grid-cols-[2fr_1fr_1fr_auto]"><div className="sm:col-span-4"><h2 className="font-semibold">Ajouter une entreprise cliente</h2><p className="text-xs text-neutral-500">L’entreprise est créée en essai avec ses postes de départ. Son administrateur pourra ensuite être invité.</p></div><input name="nom" required placeholder="Nom de l’entreprise" className={input}/><input name="siret" placeholder="SIRET" className={input}/><input name="ville" placeholder="Ville" className={input}/><button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Créer</button></form>}
+        {peutGererFacturation && <form action={genererSnapshotFacturationAction} className="flex flex-wrap items-end gap-3 rounded-md border border-blue-200 bg-blue-50/50 p-4"><div className="flex-1"><h2 className="font-semibold">Relevé mensuel des comptes facturables</h2><p className="text-xs text-neutral-500">Les comptes actifs et en pause sont figés avec le tarif de leur poste pour le mois choisi.</p></div><label className="text-xs text-neutral-500">Mois<input name="mois" type="month" defaultValue={new Date().toISOString().slice(0,7)} className={`${input} mt-1 block`}/></label><button className="rounded-md bg-blue-800 px-4 py-2 text-sm font-semibold text-white">Générer le relevé</button></form>}
 
-        <section className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
+        {peutGererEquipe && <section className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
           <h2 className="font-semibold">Équipe plateforme</h2>
-          <p className="text-xs text-neutral-500">Les collaborateurs {BRAND_NAME} qui peuvent assister toutes les entreprises. Accès total pour l&apos;instant ; les niveaux d&apos;accès seront affinés ensuite.</p>
+          <p className="text-xs text-neutral-500">Les collaborateurs {BRAND_NAME} autorisés, avec un rôle plateforme distinct des rôles d’entreprise.</p>
           <ul className="mt-3 space-y-2">
             {membresPlateforme.map((m) => (
               <li key={m.email} className="flex flex-wrap items-center justify-between gap-2 rounded border border-neutral-100 p-2 text-sm dark:border-neutral-800">
@@ -133,7 +151,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                 </div>
                 <form action={retirerAdminPlateformeAction}>
                   <input type="hidden" name="email" value={m.email} />
-                  <button className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50">Retirer</button>
+                  <button className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50">Désactiver</button>
                 </form>
               </li>
             ))}
@@ -150,8 +168,8 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
             </select>
             <button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Ajouter</button>
           </form>
-          <p className="mt-2 text-xs text-neutral-500">Après ajout : créez le compte de connexion dans Supabase (Authentication → Add user) avec le même email, puis communiquez le mot de passe au collaborateur.</p>
-        </section>
+          <p className="mt-2 text-xs text-neutral-500">Le compte Auth doit être créé et son e-mail validé avant l’attribution du rôle plateforme.</p>
+        </section>}
 
         <div className="space-y-3">
           {entreprises.map((e) => {
@@ -173,17 +191,17 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                       {e.option_ia_statut&&e.option_ia_statut!=="indisponible"&&<span className="rounded-full bg-[#c9a24a]/10 px-2 py-0.5 text-xs font-medium text-[#8a6a1f] dark:text-[#c9a24a]">IA {e.option_ia_statut}{e.option_ia_palier&&e.option_ia_statut!=="gratuit"?` · ${e.option_ia_palier}${e.option_ia_palier==="illimite"?"":"/j"}`:""}</span>}
                     </div>
                     <p className="mt-1 text-xs text-neutral-500">
-                      Code <span className="font-mono tracking-widest">{e.code_adhesion ?? "—"}</span>
-                      {e.reference_interne && <> · {e.reference_interne}</>}
+                      {e.code_adhesion && <>Code <span className="font-mono tracking-widest">{e.code_adhesion}</span> · </>}
+                      {e.reference_interne && <>{e.reference_interne} · </>}
                       {" · "}{e.nb_membres_actifs}/{e.nb_membres} membre(s) actif(s)
                       {" · créée le "}{new Date(e.created_at).toLocaleDateString("fr-FR")}
                     </p>
-                    <div className="mt-2 inline-flex items-baseline gap-2 rounded-md bg-[#c9a24a]/10 px-3 py-1.5">
+                    {peutFacturation && <div className="mt-2 inline-flex items-baseline gap-2 rounded-md bg-[#c9a24a]/10 px-3 py-1.5">
                       <span className="text-lg font-semibold text-[#0d1b2a] dark:text-[#c9a24a]">{prix.total === null ? "Sur devis" : <>{prix.total} €<span className="text-xs font-normal">/mois</span></>}</span>
                       <span className="text-[11px] text-neutral-500">
                         offre {offre.nom}{prix.base === null ? " · conditions contractuelles" : ` ${prix.base} € (${offre.cle === "entreprise" ? "40 salariés + 10 administrateurs inclus" : `${prix.employesInclus} comptes inclus`})`}{prix.base !== null&&prix.supplementComptes > 0 ? ` + ${prix.supplementComptes} € comptes supplémentaires` : ""}{prix.base !== null&&prix.supplementAppareils > 0 ? ` + ${prix.supplementAppareils.toLocaleString("fr-FR")} € appareils` : ""}
                       </span>
-                    </div>
+                    </div>}
                     <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
                       <p className="rounded bg-neutral-50 px-2 py-1.5 dark:bg-neutral-900"><strong className="block text-base">{e.nb_fiches_employes ?? 0}</strong> employés facturables</p>
                       <p className="rounded bg-blue-50 px-2 py-1.5 text-blue-900 dark:bg-blue-950/30 dark:text-blue-200"><strong className="block text-base">{e.nb_comptes_facturables ?? e.nb_comptes_actives ?? 0}</strong> comptes facturables{e.nb_comptes_pause ? ` · ${e.nb_comptes_pause} en pause` : ""}</p>
@@ -192,10 +210,10 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                       <p className="rounded bg-violet-50 px-2 py-1.5 text-violet-900 dark:bg-violet-950/30 dark:text-violet-200"><strong className="block text-base">{e.nb_applications_installees ?? 0}</strong> installations</p>
                     </div>
                     <p className="mt-2 text-xs text-neutral-500">Options utilisées : {e.options_actives?.length ? e.options_actives.join(", ") : "aucune"}{e.derniere_connexion ? ` · dernière connexion ${new Date(e.derniere_connexion).toLocaleString("fr-FR")}` : ""}</p>
-                    <div className={`mt-2 rounded-md border p-3 text-sm ${usageAppareils.nb_comptes_plus_de_deux>0?"border-red-300 bg-red-50 text-red-900":"border-green-200 bg-green-50 text-green-900"}`}><strong>{usageAppareils.nb_appareils_actifs} appareil(s) actif(s)</strong><span className="ml-2 text-xs">2 appareils inclus par compte</span>{usageAppareils.nb_comptes_plus_de_deux>0&&<p className="mt-1 font-semibold">⚠ {usageAppareils.nb_comptes_plus_de_deux} compte(s) dépassent la limite · {usageAppareils.montant_depassements_ht.toLocaleString("fr-FR",{style:"currency",currency:"EUR"})} HT/mois ajouté(s) au tarif de leur poste · maximum observé : {usageAppareils.maximum_appareils_compte}</p>}</div>
+                    {peutFacturation && <><div className={`mt-2 rounded-md border p-3 text-sm ${usageAppareils.nb_comptes_plus_de_deux>0?"border-red-300 bg-red-50 text-red-900":"border-green-200 bg-green-50 text-green-900"}`}><strong>{usageAppareils.nb_appareils_actifs} appareil(s) actif(s)</strong><span className="ml-2 text-xs">2 appareils inclus par compte</span>{usageAppareils.nb_comptes_plus_de_deux>0&&<p className="mt-1 font-semibold">⚠ {usageAppareils.nb_comptes_plus_de_deux} compte(s) dépassent la limite · {usageAppareils.montant_depassements_ht.toLocaleString("fr-FR",{style:"currency",currency:"EUR"})} HT/mois ajouté(s) au tarif de leur poste · maximum observé : {usageAppareils.maximum_appareils_compte}</p>}</div>
                     <p className="mt-2 text-sm font-semibold">{prix.total === null ? "Tarif défini au contrat — aucun prix automatique" : `Prix automatique mensuel : ${prix.total.toLocaleString("fr-FR",{style:"currency",currency:"EUR"})} HT`}</p>
-                    {e.stripe_subscription_id&&<div className="mt-2 flex flex-wrap items-center gap-2 text-xs"><span className="rounded bg-green-50 px-2 py-1 font-medium text-green-800">Stripe Billing relié · {e.abonnement_periodicite??"périodicité inconnue"}</span>{e.derniere_facture_url&&<Link href={e.derniere_facture_url} target="_blank" rel="noreferrer" className="underline">Dernière facture ({e.derniere_facture_statut??"statut inconnu"})</Link>}{e.abonnement_essai_fin&&<span>fin d’essai {new Date(e.abonnement_essai_fin).toLocaleDateString("fr-FR")}</span>}</div>}
-                    {e.stripe_subscription_id&&(e.remise_stripe_coupon_id?(
+                    {e.stripe_subscription_id&&<div className="mt-2 flex flex-wrap items-center gap-2 text-xs"><span className="rounded bg-green-50 px-2 py-1 font-medium text-green-800">Stripe Billing relié · {e.abonnement_periodicite??"périodicité inconnue"}</span>{e.derniere_facture_url&&<Link href={e.derniere_facture_url} target="_blank" rel="noreferrer" className="underline">Dernière facture ({e.derniere_facture_statut??"statut inconnu"})</Link>}{e.abonnement_essai_fin&&<span>fin d’essai {new Date(e.abonnement_essai_fin).toLocaleDateString("fr-FR")}</span>}</div>}</>}
+                    {peutGererRemises && e.stripe_subscription_id&&(e.remise_stripe_coupon_id?(
                       <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-[#c9a24a]/40 bg-[#c9a24a]/10 p-2 text-xs">
                         <span className="font-medium text-[#8a6a1f] dark:text-[#c9a24a]">Remise active · {e.remise_description}</span>
                         {e.remise_appliquee_at && <span className="text-neutral-500">depuis le {new Date(e.remise_appliquee_at).toLocaleDateString("fr-FR")}</span>}
@@ -235,17 +253,17 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                         </form>
                       </details>
                     ))}
-                    <details className="mt-3 rounded border bg-neutral-50 p-3 dark:bg-neutral-900"><summary className="cursor-pointer text-sm font-semibold">Types de comptes par poste</summary><div className="mt-3 space-y-2">{tarifsPostes.filter((poste) => poste.entreprise_id === e.id).map((poste) => <form key={poste.poste_id} action={modifierTarifPostePlateformeAction.bind(null, poste.poste_id)} className="grid items-end gap-2 text-sm sm:grid-cols-[1fr_220px_auto]"><div><strong>{poste.nom}</strong><p className="text-xs text-neutral-500">{poste.nb_comptes_facturables} compte(s) facturable(s)</p></div><label className="text-xs text-neutral-500">Type de compte<select name="code_offre" defaultValue={`compte_${typeCompteTarifaireDepuisPoste(poste)}`} className={`${input} mt-1 w-full`}><option value="compte_administratif">Administratif · 15 € HT/mois</option><option value="compte_chef_equipe">Chef d’équipe · 9 € HT/mois</option><option value="compte_terrain">Terrain · 5 € HT/mois</option></select></label><button className="rounded border px-3 py-2">Enregistrer</button></form>)}</div></details>
+                    {peutGererFacturation && <details className="mt-3 rounded border bg-neutral-50 p-3 dark:bg-neutral-900"><summary className="cursor-pointer text-sm font-semibold">Types de comptes par poste</summary><div className="mt-3 space-y-2">{tarifsPostes.filter((poste) => poste.entreprise_id === e.id).map((poste) => <form key={poste.poste_id} action={modifierTarifPostePlateformeAction.bind(null, poste.poste_id)} className="grid items-end gap-2 text-sm sm:grid-cols-[1fr_220px_auto]"><div><strong>{poste.nom}</strong><p className="text-xs text-neutral-500">{poste.nb_comptes_facturables} compte(s) facturable(s)</p></div><label className="text-xs text-neutral-500">Type de compte<select name="code_offre" defaultValue={`compte_${typeCompteTarifaireDepuisPoste(poste)}`} className={`${input} mt-1 w-full`}><option value="compte_administratif">Administratif · 15 € HT/mois</option><option value="compte_chef_equipe">Chef d’équipe · 9 € HT/mois</option><option value="compte_terrain">Terrain · 5 € HT/mois</option></select></label><button className="rounded border px-3 py-2">Enregistrer</button></form>)}</div></details>}
                   </div>
                 </div>
 
-                {e.suspension_prevue_at?<section className="mt-4 rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-950 dark:border-red-900 dark:bg-red-950/30 dark:text-red-100"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">Règlement non reçu — suspension automatique dans <AbonnementCountdown echeance={e.suspension_prevue_at}/></p><p className="mt-1 text-xs">Échéance : {new Date(e.suspension_prevue_at).toLocaleString("fr-FR")}{e.impaye_message?` · ${e.impaye_message}`:""}</p></div><form action={enregistrerReglementPlateformeAction.bind(null,e.id)} className="flex gap-2"><input name="note" placeholder="Référence du règlement" className={input}/><button className="rounded-md bg-green-700 px-3 py-2 text-xs font-semibold text-white">Règlement reçu</button></form></div></section>:<form action={signalerImpayePlateformeAction.bind(null,e.id)} className="mt-4 flex flex-wrap items-end gap-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-900 dark:bg-amber-950/20"><label className="min-w-[240px] flex-1 text-xs text-neutral-600">Message destiné à l’administrateur<input name="message" defaultValue="Règlement mensuel non reçu" className={`${input} mt-1 w-full`}/></label><button className="rounded-md border border-amber-700 px-3 py-2 text-xs font-semibold text-amber-900 dark:text-amber-200">Signaler l’impayé · délai 10 jours</button></form>}
+                {peutGererFacturation && (e.suspension_prevue_at?<section className="mt-4 rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-950 dark:border-red-900 dark:bg-red-950/30 dark:text-red-100"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">Règlement non reçu — suspension automatique dans <AbonnementCountdown echeance={e.suspension_prevue_at}/></p><p className="mt-1 text-xs">Échéance : {new Date(e.suspension_prevue_at).toLocaleString("fr-FR")}{e.impaye_message?` · ${e.impaye_message}`:""}</p></div><form action={enregistrerReglementPlateformeAction.bind(null,e.id)} className="flex gap-2"><input name="note" placeholder="Référence du règlement" className={input}/><button className="rounded-md bg-green-700 px-3 py-2 text-xs font-semibold text-white">Règlement reçu</button></form></div></section>:<form action={signalerImpayePlateformeAction.bind(null,e.id)} className="mt-4 flex flex-wrap items-end gap-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3 dark:border-amber-900 dark:bg-amber-950/20"><label className="min-w-[240px] flex-1 text-xs text-neutral-600">Message destiné à l’administrateur<input name="message" defaultValue="Règlement mensuel non reçu" className={`${input} mt-1 w-full`}/></label><button className="rounded-md border border-amber-700 px-3 py-2 text-xs font-semibold text-amber-900 dark:text-amber-200">Signaler l’impayé · délai 10 jours</button></form>)}
 
-                <form action={entrerEntreprisePlateformeAction.bind(null,e.id)} className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-900 dark:bg-blue-950/20"><label className="min-w-[240px] flex-1 text-xs text-neutral-600 dark:text-neutral-300">Motif obligatoire de l’intervention<input name="motif" required minLength={5} placeholder="Ex. Assistance au paramétrage demandée par le client" className={`${input} mt-1 w-full`}/></label><button className="rounded-md bg-blue-900 px-3 py-2 text-xs font-semibold text-white">Accéder comme administrateur</button><p className="w-full text-[11px] text-neutral-500">L’entrée et la sortie sont journalisées. Ce compte plateforme n’est pas ajouté aux salariés facturables.</p></form>
+                {peutIntervenir && <form action={entrerEntreprisePlateformeAction.bind(null,e.id)} className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-900 dark:bg-blue-950/20"><label className="min-w-[240px] flex-1 text-xs text-neutral-600 dark:text-neutral-300">Motif obligatoire de l’intervention<input name="motif" required minLength={5} placeholder="Ex. Assistance au paramétrage demandée par le client" className={`${input} mt-1 w-full`}/></label><button className="rounded-md bg-blue-900 px-3 py-2 text-xs font-semibold text-white">Accéder comme administrateur</button><p className="w-full text-[11px] text-neutral-500">L’entrée et la sortie sont journalisées. Ce compte plateforme n’est pas ajouté aux salariés facturables.</p></form>}
 
-                <form action={reinitialiserMotDePassePlateformeAction.bind(null,e.id)} className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-900"><label className="min-w-[220px] flex-1 text-xs text-neutral-600 dark:text-neutral-300">E-mail du salarié<input name="email" type="email" required placeholder="salarie@exemple.fr" className={`${input} mt-1 w-full`}/></label><label className="min-w-[240px] flex-1 text-xs text-neutral-600 dark:text-neutral-300">Motif obligatoire<input name="motif" required minLength={5} placeholder="Ex. Salarié n’a plus accès à sa boîte mail" className={`${input} mt-1 w-full`}/></label><button className="rounded-md border border-neutral-400 px-3 py-2 text-xs font-semibold dark:border-neutral-600">Envoyer un lien de réinitialisation</button><p className="w-full text-[11px] text-neutral-500">Réservé à la plateforme : le gérant de l’entreprise n’a pas cette option, seulement le lien « mot de passe oublié » classique.</p></form>
+                {peutReinitialiser && <form action={reinitialiserMotDePassePlateformeAction.bind(null,e.id)} className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-900"><label className="min-w-[220px] flex-1 text-xs text-neutral-600 dark:text-neutral-300">E-mail du salarié<input name="email" type="email" required placeholder="salarie@exemple.fr" className={`${input} mt-1 w-full`}/></label><label className="min-w-[240px] flex-1 text-xs text-neutral-600 dark:text-neutral-300">Motif obligatoire<input name="motif" required minLength={5} placeholder="Ex. Salarié n’a plus accès à sa boîte mail" className={`${input} mt-1 w-full`}/></label><button className="rounded-md border border-neutral-400 px-3 py-2 text-xs font-semibold dark:border-neutral-600">Envoyer un lien de réinitialisation</button><p className="w-full text-[11px] text-neutral-500">Action ciblée et journalisée ; elle ne donne aucun accès aux mots de passe existants.</p></form>}
 
-                <form action={action} className="mt-3 flex flex-wrap items-end gap-2 border-t border-neutral-100 pt-3 dark:border-neutral-800">
+                {peutGererFacturation && <form action={action} className="mt-3 flex flex-wrap items-end gap-2 border-t border-neutral-100 pt-3 dark:border-neutral-800">
                   <div className="space-y-1">
                     <label className="text-xs text-neutral-500">Statut</label>
                     <select name="statut" defaultValue={e.abonnement_statut} className={input}>
@@ -266,7 +284,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                   <button type="submit" className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">
                     Enregistrer
                   </button>
-                </form>
+                </form>}
               </article>
             );
           })}

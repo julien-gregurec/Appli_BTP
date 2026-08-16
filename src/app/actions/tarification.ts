@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { estPlateformeAdmin } from "@/lib/plateforme";
+import { aPermissionPlateforme } from "@/lib/plateforme";
 import { estCodeOffreTarifaire } from "@/lib/tarification";
 
 const nombre = (formData: FormData, cle: string) => Number(String(formData.get(cle) ?? "").replace(",", "."));
@@ -13,7 +13,7 @@ const nombreOptionnel = (formData: FormData, cle: string) => {
 };
 
 export async function creerVersionTarifaireAction(formData: FormData) {
-  if (!(await estPlateformeAdmin())) redirect("/dashboard");
+  if (!(await aPermissionPlateforme("gerer_tarification"))) redirect("/dashboard");
   const code = String(formData.get("code") ?? "");
   const nom = String(formData.get("nom") ?? "").trim();
   const motif = String(formData.get("motif") ?? "").trim();

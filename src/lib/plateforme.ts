@@ -3,13 +3,56 @@ import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { calculerSupplementsComptes, type RepartitionComptesTarifaires } from "@/lib/facturation-comptes";
 import { DUREE_ESSAI_JOURS, MOIS_FACTURES_EN_ANNUEL, OFFRES_TARIFAIRES, offreAPrixPublic, offreTarifaireParCle, type OffreTarifaire } from "@/lib/tarification";
 
-// L'espace plateforme est réservé au propriétaire (identifié par son email, table plateforme_admins).
-// En mode prototype (sans connexion), on l'autorise pour la démo mono-entreprise.
-export async function estPlateformeAdmin(): Promise<boolean> {
-  if (isEmailLoginDisabled()) return true;
+export const ROLES_PLATEFORME = ["lecture", "support", "facturation", "total"] as const;
+export type RolePlateforme = (typeof ROLES_PLATEFORME)[number];
+
+export const PERMISSIONS_PLATEFORME = [
+  "consulter_plateforme",
+  "consulter_support",
+  "repondre_support",
+  "reinitialiser_compte",
+  "consulter_facturation",
+  "gerer_facturation",
+  "consulter_tarification",
+  "gerer_tarification",
+  "gerer_equipe",
+  "creer_entreprise",
+  "intervenir_tenant",
+  "gerer_remises",
+  "gerer_boutique",
+] as const;
+export type PermissionPlateforme = (typeof PERMISSIONS_PLATEFORME)[number];
+
+const PERMISSIONS_PAR_ROLE: Record<RolePlateforme, ReadonlySet<PermissionPlateforme>> = {
+  lecture: new Set(["consulter_plateforme", "consulter_tarification"]),
+  support: new Set(["consulter_plateforme", "consulter_support", "repondre_support", "reinitialiser_compte"]),
+  facturation: new Set(["consulter_plateforme", "consulter_facturation", "gerer_facturation", "consulter_tarification"]),
+  total: new Set(PERMISSIONS_PLATEFORME),
+};
+
+export function rolePlateformeValide(role: unknown): role is RolePlateforme {
+  return typeof role === "string" && (ROLES_PLATEFORME as readonly string[]).includes(role);
+}
+
+export function rolePlateformeAPermission(role: RolePlateforme | null, permission: PermissionPlateforme) {
+  return role !== null && PERMISSIONS_PAR_ROLE[role].has(permission);
+}
+
+// L'autorité est le rôle explicite lié à l'UUID Auth dans plateforme_admins.
+// En mode prototype, total reste disponible pour la démonstration mono-entreprise.
+export async function plateformeRoleCourant(): Promise<RolePlateforme | null> {
+  if (isEmailLoginDisabled()) return "total";
   const supabase = await createClient();
-  const { data } = await supabase.rpc("est_plateforme_admin");
-  return data === true;
+  const { data } = await supabase.rpc("plateforme_role_courant");
+  return rolePlateformeValide(data) ? data : null;
+}
+
+export async function estPlateformeAdmin(): Promise<boolean> {
+  return (await plateformeRoleCourant()) !== null;
+}
+
+export async function aPermissionPlateforme(permission: PermissionPlateforme): Promise<boolean> {
+  return rolePlateformeAPermission(await plateformeRoleCourant(), permission);
 }
 
 export const ABONNEMENT_STATUTS = [

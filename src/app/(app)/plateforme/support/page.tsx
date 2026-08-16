@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { estPlateformeAdmin } from "@/lib/plateforme";
+import { aPermissionPlateforme } from "@/lib/plateforme";
 import { repondreSupportPlateformeAction } from "@/app/actions/support";
 import { BRAND_NAME } from "@/lib/brand";
 
@@ -9,7 +9,7 @@ type Fil = { entreprise_id: string; entreprise_nom: string; dernier_contenu: str
 type Message = { id: string; cote: string; auteur_nom: string | null; contenu: string; created_at: string };
 
 export default async function PlateformeSupportPage({ searchParams }: { searchParams: Promise<{ entreprise?: string; envoye?: string; error?: string }> }) {
-  if (!(await estPlateformeAdmin())) notFound();
+  if (!(await aPermissionPlateforme("consulter_support"))) notFound();
   const { entreprise, envoye, error } = await searchParams;
   const supabase = await createClient();
 
