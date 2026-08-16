@@ -76,7 +76,8 @@ export async function loginAction(formData: FormData) {
     redirect(`/login?error=${encodeURIComponent(traduireErreurAuth(error.message))}`);
   }
 
-  redirect("/dashboard");
+  const { data: rolePlateforme } = await supabase.rpc("plateforme_role_courant");
+  redirect(typeof rolePlateforme === "string" ? "/plateforme" : "/dashboard");
 }
 
 export async function logoutAction() {

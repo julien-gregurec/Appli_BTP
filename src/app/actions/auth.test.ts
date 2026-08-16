@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   }),
   headers: vi.fn(),
   signUp: vi.fn(),
+  signInWithPassword: vi.fn(),
+  rpc: vi.fn(),
   resetPasswordForEmail: vi.fn(),
   getUser: vi.fn(),
   updateUser: vi.fn(),
@@ -22,16 +24,18 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({
     auth: {
       signUp: mocks.signUp,
+      signInWithPassword: mocks.signInWithPassword,
       resetPasswordForEmail: mocks.resetPasswordForEmail,
       getUser: mocks.getUser,
       updateUser: mocks.updateUser,
       signOut: mocks.signOut,
       verifyOtp: mocks.verifyOtp,
     },
+    rpc: mocks.rpc,
   })),
 }));
 
-import { confirmerCompteAction, demanderReinitialisationAction, modifierMotDePasseAction, signupAction } from "./auth";
+import { confirmerCompteAction, demanderReinitialisationAction, loginAction, modifierMotDePasseAction, signupAction } from "./auth";
 
 describe("actions Auth et URL canonique", () => {
   beforeEach(() => {
@@ -107,6 +111,32 @@ describe("actions Auth et URL canonique", () => {
         emailRedirectTo: `${mocks.urlCanonique}/auth/callback?next=%2Fonboarding`,
       }),
     }));
+  });
+});
+
+describe("loginAction — destination adaptée au type de compte", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.signInWithPassword.mockResolvedValue({ error: null });
+    mocks.rpc.mockResolvedValue({ data: null, error: null });
+  });
+
+  const formulaire = () => {
+    const formData = new FormData();
+    formData.set("email", "admin@example.invalid");
+    formData.set("password", "mot-de-passe-test");
+    return formData;
+  };
+
+  it("redirige un administrateur plateforme vers /plateforme", async () => {
+    mocks.rpc.mockResolvedValueOnce({ data: "total", error: null });
+
+    await expect(loginAction(formulaire())).rejects.toThrow("REDIRECT:/plateforme");
+    expect(mocks.rpc).toHaveBeenCalledWith("plateforme_role_courant");
+  });
+
+  it("conserve /dashboard pour un utilisateur d’entreprise", async () => {
+    await expect(loginAction(formulaire())).rejects.toThrow("REDIRECT:/dashboard");
   });
 });
 

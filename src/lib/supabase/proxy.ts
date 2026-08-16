@@ -128,7 +128,8 @@ export async function updateSession(request: NextRequest) {
       return NextResponse.redirect(url);
     }
     if ((request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/signup") && !compteDepot) {
-      const url=request.nextUrl.clone();url.pathname="/dashboard";url.search="";
+      const { data: rolePlateforme } = await supabase.rpc("plateforme_role_courant");
+      const url=request.nextUrl.clone();url.pathname=typeof rolePlateforme === "string"?"/plateforme":"/dashboard";url.search="";
       return NextResponse.redirect(url);
     }
   }
