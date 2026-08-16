@@ -6,7 +6,8 @@ import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { estPlateformeAdmin } from "@/lib/plateforme";
 import { ERREUR_CONFIGURATION_URL_AUTH, urlCallbackReinitialisation } from "@/lib/auth-redirects";
-import { appliquerCouponAbonnement, creerCouponRemise, retirerCouponAbonnement, TYPES_REMISE, DUREES_REMISE, type DureeRemise, type TypeRemise } from "@/lib/stripe-abonnement";
+import { appliquerCouponAbonnement, creerCouponRemise, reconcilierAbonnementStripe, retirerCouponAbonnement, TYPES_REMISE, DUREES_REMISE, type DureeRemise, type TypeRemise } from "@/lib/stripe-abonnement";
+import { TARIFS_COMPTES_SUPPLEMENTAIRES, type TypeCompteTarifaire } from "@/lib/facturation-comptes";
 
 export async function modifierAbonnementAction(entrepriseId: string, formData: FormData) {
   if (!(await estPlateformeAdmin())) {
@@ -100,10 +101,12 @@ export async function retirerAdminPlateformeAction(formData: FormData) {
 
 export async function modifierTarifPostePlateformeAction(posteId: string, formData: FormData) {
   if (!(await estPlateformeAdmin())) redirect("/dashboard");
-  const codeOffre = String(formData.get("code_offre") ?? "standard").trim() || "standard";
-  const tarif = Number(String(formData.get("tarif") ?? "0").replace(",", "."));
-  if (!Number.isFinite(tarif) || tarif < 0) redirect(`/plateforme?error=${encodeURIComponent("Tarif invalide")}`);
+  const codeOffre = String(formData.get("code_offre") ?? "").trim();
+  const type = codeOffre.replace(/^compte_/, "") as TypeCompteTarifaire;
+  if (!(type in TARIFS_COMPTES_SUPPLEMENTAIRES)) redirect(`/plateforme?error=${encodeURIComponent("Type de compte invalide")}`);
+  const tarif = TARIFS_COMPTES_SUPPLEMENTAIRES[type].prixMensuelHt;
   const supabase = await createClient();
+  const { data: poste } = await supabase.from("postes").select("entreprise_id").eq("id", posteId).maybeSingle();
   if (isEmailLoginDisabled()) {
     const { error } = await supabase.from("postes").update({ code_offre: codeOffre, tarif_compte_mensuel: tarif }).eq("id", posteId);
     if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
@@ -111,6 +114,7 @@ export async function modifierTarifPostePlateformeAction(posteId: string, formDa
     const { error } = await supabase.rpc("plateforme_modifier_tarif_poste", { p_poste_id: posteId, p_code_offre: codeOffre, p_tarif: tarif });
     if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
   }
+  if (poste?.entreprise_id) await reconcilierAbonnementStripe(poste.entreprise_id);
   revalidatePath("/plateforme");
   redirect(`/plateforme?succes=${encodeURIComponent("Tarif du poste mis à jour")}`);
 }

@@ -1,3 +1,5 @@
+import { TARIFS_COMPTES_SUPPLEMENTAIRES, typeCompteTarifaireDepuisPoste } from "@/lib/facturation-comptes";
+
 export type AppareilCompteActif = {
   utilisateur_id: string;
 };
@@ -13,6 +15,7 @@ export type EmployeCompteFacturable = {
 export type PosteCompteTarife = {
   id: string;
   nom: string;
+  code_offre?: string | null;
   tarif_compte_mensuel: number | string | null;
 };
 
@@ -55,12 +58,13 @@ export function calculerDepassementsAppareilsFacturables(params: {
     .map(([utilisateurId, nbAppareils]) => {
       const employe = employesFacturables.get(utilisateurId)!;
       const poste = employe.poste_id ? postes.get(employe.poste_id) : undefined;
+      const typeCompte = typeCompteTarifaireDepuisPoste(poste);
       return {
         utilisateurId,
         nom: [employe.prenom, employe.nom].filter(Boolean).join(" ") || "Salarié",
         posteNom: poste?.nom ?? "Poste non renseigné",
         nbAppareils,
-        supplementMensuelHt: Math.max(0, Number(poste?.tarif_compte_mensuel ?? 0)),
+        supplementMensuelHt: TARIFS_COMPTES_SUPPLEMENTAIRES[typeCompte].prixMensuelHt,
       };
     })
     .sort((a, b) => a.nom.localeCompare(b.nom, "fr"));

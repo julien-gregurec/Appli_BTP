@@ -14,20 +14,32 @@ describe("prixAbonnementMensuel", () => {
 
   it("facture chaque compte au-delà des comptes inclus", () => {
     expect(prixAbonnementMensuel(4)).toMatchObject({
-      total: 69 + mini.parCompteSup,
+      total: 69 + 5,
       employesSupplementaires: 1,
     });
-    expect(prixAbonnementMensuel(16, pro).total).toBe(199 + pro.parCompteSup);
+    expect(prixAbonnementMensuel({ administratif: 16 }, pro).total).toBe(199 + 15);
     expect(prixAbonnementMensuel(31, business)).toMatchObject({
-      total: 399 + business.parCompteSup,
+      total: 399 + 5,
       employesSupplementaires: 1,
     });
   });
 
-  it("ne prétend pas distinguer les salariés et administrateurs supplémentaires d’Entreprise", () => {
+  it("applique l’exemple Mini validé avec priorité aux comptes les plus chers", () => {
+    expect(prixAbonnementMensuel({ administratif: 1, chef_equipe: 1, terrain: 3 }, mini)).toMatchObject({
+      total: 79,
+      employesSupplementaires: 2,
+      supplementComptes: 10,
+    });
+  });
+
+  it("distingue les quotas salariés et administrateurs d’Entreprise", () => {
     expect(entreprise).toMatchObject({ comptesInclus: 50, administrateursInclus: 10 });
-    expect(prixAbonnementMensuel(51, entreprise)).toMatchObject({
-      total: 599 + entreprise.parCompteSup,
+    expect(prixAbonnementMensuel({ administratif: 11, terrain: 40 }, entreprise)).toMatchObject({
+      total: 599 + 15,
+      employesSupplementaires: 1,
+    });
+    expect(prixAbonnementMensuel({ administratif: 10, terrain: 41 }, entreprise)).toMatchObject({
+      total: 599 + 5,
       employesSupplementaires: 1,
     });
   });
@@ -37,9 +49,9 @@ describe("prixAbonnementMensuel", () => {
   });
 
   it("utilise le prix annuel propre à l'offre", () => {
-    const p = prixAbonnementMensuel(3, mini);
-    expect(p.mensuelSiAnnuel).toBe(57.5);
-    expect(p.totalAnnuel).toBe(690);
+    const p = prixAbonnementMensuel({ administratif: 1, chef_equipe: 1, terrain: 3 }, mini);
+    expect(p.mensuelSiAnnuel).toBeCloseTo(65.83, 2);
+    expect(p.totalAnnuel).toBe(790);
   });
 
   it("ne calcule aucun prix public pour l'offre Sur mesure", () => {

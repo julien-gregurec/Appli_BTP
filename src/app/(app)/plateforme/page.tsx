@@ -6,6 +6,7 @@ import { estPlateformeAdmin, statutAbonnement, prixAbonnementMensuel, offreParCl
 import { ajouterAdminPlateformeAction, appliquerRemiseAction, creerEntreprisePlateformeAction, entrerEntreprisePlateformeAction, enregistrerReglementPlateformeAction, genererSnapshotFacturationAction, modifierAbonnementAction, modifierTarifPostePlateformeAction, reinitialiserMotDePassePlateformeAction, retirerAdminPlateformeAction, retirerRemiseAction, signalerImpayePlateformeAction } from "@/app/actions/plateforme";
 import { AbonnementCountdown } from "@/components/AbonnementCountdown";
 import { BRAND_NAME } from "@/lib/brand";
+import { typeCompteTarifaireDepuisPoste } from "@/lib/facturation-comptes";
 
 type MembrePlateforme = { email: string; role: string; nom: string | null; ajoute_par: string | null; created_at: string };
 const ROLE_LABEL: Record<string, string> = { total: "Accès total", support: "Support", facturation: "Facturation", lecture: "Lecture seule" };
@@ -70,8 +71,8 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
   const impayes = entreprises.filter((e) => Boolean(e.suspension_prevue_at)).length;
   const alertesAppareils=[...appareilsParEntreprise.values()].reduce((total,usage)=>total+usage.nb_comptes_plus_de_deux,0);
   const revenuMensuelRecurrent = entreprises.filter((e)=>e.abonnement_statut==="actif").reduce((total,e)=>{
-    const comptes=e.nb_comptes_facturables??e.nb_comptes_actives??e.nb_membres_actifs;
     const offre=offreParCle(e.abonnement_offre??e.offre_recommandee??"essentiel");
+    const comptes=tarifsPostes.filter((poste)=>poste.entreprise_id===e.id).reduce((repartition,poste)=>{const type=typeCompteTarifaireDepuisPoste(poste);repartition[type]+=poste.nb_comptes_facturables;return repartition;},{administratif:0,chef_equipe:0,terrain:0});
     const appareils=appareilsParEntreprise.get(e.id)?.montant_depassements_ht??0;
     const prix=prixAbonnementMensuel(comptes,offre,appareils);
     const mensuel=e.abonnement_periodicite==="annuel"&&prix.totalAnnuel!==null?prix.totalAnnuel/12:prix.total;
@@ -156,8 +157,8 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
           {entreprises.map((e) => {
             const st = statutAbonnement(e.abonnement_statut);
             const action = modifierAbonnementAction.bind(null, e.id);
-            const comptesFacturables = e.nb_comptes_facturables ?? e.nb_comptes_actives ?? e.nb_membres_actifs;
             const offre = offreParCle(e.abonnement_offre ?? e.offre_recommandee ?? "essentiel");
+            const comptesFacturables=tarifsPostes.filter((poste)=>poste.entreprise_id===e.id).reduce((repartition,poste)=>{const type=typeCompteTarifaireDepuisPoste(poste);repartition[type]+=poste.nb_comptes_facturables;return repartition;},{administratif:0,chef_equipe:0,terrain:0});
             const usageAppareils=appareilsParEntreprise.get(e.id)??{nb_appareils_actifs:0,nb_comptes_plus_de_deux:0,maximum_appareils_compte:0,montant_depassements_ht:0};
             const prix = prixAbonnementMensuel(comptesFacturables, offre, usageAppareils.montant_depassements_ht);
             return (
@@ -180,7 +181,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                     <div className="mt-2 inline-flex items-baseline gap-2 rounded-md bg-[#c9a24a]/10 px-3 py-1.5">
                       <span className="text-lg font-semibold text-[#0d1b2a] dark:text-[#c9a24a]">{prix.total === null ? "Sur devis" : <>{prix.total} €<span className="text-xs font-normal">/mois</span></>}</span>
                       <span className="text-[11px] text-neutral-500">
-                        offre {offre.nom}{prix.base === null ? " · conditions contractuelles" : ` ${prix.base} € (${offre.cle === "entreprise" ? "40 salariés + 10 administrateurs inclus" : `${prix.employesInclus} comptes inclus`})`}{prix.base !== null&&prix.employesSupplementaires > 0 ? ` + ${prix.employesSupplementaires} × ${prix.parEmployeSup} €` : ""}{prix.base !== null&&prix.supplementAppareils > 0 ? ` + ${prix.supplementAppareils.toLocaleString("fr-FR")} € appareils` : ""}
+                        offre {offre.nom}{prix.base === null ? " · conditions contractuelles" : ` ${prix.base} € (${offre.cle === "entreprise" ? "40 salariés + 10 administrateurs inclus" : `${prix.employesInclus} comptes inclus`})`}{prix.base !== null&&prix.supplementComptes > 0 ? ` + ${prix.supplementComptes} € comptes supplémentaires` : ""}{prix.base !== null&&prix.supplementAppareils > 0 ? ` + ${prix.supplementAppareils.toLocaleString("fr-FR")} € appareils` : ""}
                       </span>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
@@ -234,7 +235,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                         </form>
                       </details>
                     ))}
-                    <details className="mt-3 rounded border bg-neutral-50 p-3 dark:bg-neutral-900"><summary className="cursor-pointer text-sm font-semibold">Tarifs par poste</summary><div className="mt-3 space-y-2">{tarifsPostes.filter((poste) => poste.entreprise_id === e.id).map((poste) => <form key={poste.poste_id} action={modifierTarifPostePlateformeAction.bind(null, poste.poste_id)} className="grid items-end gap-2 text-sm sm:grid-cols-[1fr_130px_130px_auto]"><div><strong>{poste.nom}</strong><p className="text-xs text-neutral-500">{poste.nb_comptes_facturables} compte(s) facturable(s)</p></div><label className="text-xs text-neutral-500">Offre<input name="code_offre" defaultValue={poste.code_offre} className={`${input} mt-1 w-full`}/></label><label className="text-xs text-neutral-500">€/compte/mois<input name="tarif" type="number" min="0" step="0.01" defaultValue={poste.tarif_compte_mensuel} className={`${input} mt-1 w-full`}/></label><button className="rounded border px-3 py-2">Enregistrer</button></form>)}</div></details>
+                    <details className="mt-3 rounded border bg-neutral-50 p-3 dark:bg-neutral-900"><summary className="cursor-pointer text-sm font-semibold">Types de comptes par poste</summary><div className="mt-3 space-y-2">{tarifsPostes.filter((poste) => poste.entreprise_id === e.id).map((poste) => <form key={poste.poste_id} action={modifierTarifPostePlateformeAction.bind(null, poste.poste_id)} className="grid items-end gap-2 text-sm sm:grid-cols-[1fr_220px_auto]"><div><strong>{poste.nom}</strong><p className="text-xs text-neutral-500">{poste.nb_comptes_facturables} compte(s) facturable(s)</p></div><label className="text-xs text-neutral-500">Type de compte<select name="code_offre" defaultValue={`compte_${typeCompteTarifaireDepuisPoste(poste)}`} className={`${input} mt-1 w-full`}><option value="compte_administratif">Administratif · 15 € HT/mois</option><option value="compte_chef_equipe">Chef d’équipe · 9 € HT/mois</option><option value="compte_terrain">Terrain · 5 € HT/mois</option></select></label><button className="rounded border px-3 py-2">Enregistrer</button></form>)}</div></details>
                   </div>
                 </div>
 

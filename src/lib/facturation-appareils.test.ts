@@ -3,8 +3,8 @@ import { calculerDepassementsAppareilsFacturables } from "./facturation-appareil
 
 describe("facturation des appareils par compte salarié", () => {
   const postes = [
-    { id: "poste-ouvrier", nom: "Ouvrier", tarif_compte_mensuel: 15 },
-    { id: "poste-conducteur", nom: "Conducteur", tarif_compte_mensuel: "25" },
+    { id: "poste-ouvrier", nom: "Ouvrier", code_offre: "compte_terrain", tarif_compte_mensuel: 5 },
+    { id: "poste-conducteur", nom: "Conducteur", code_offre: "compte_chef_equipe", tarif_compte_mensuel: "9" },
   ];
 
   it("n'affiche rien jusqu'à deux appareils actifs", () => {
@@ -21,7 +21,7 @@ describe("facturation des appareils par compte salarié", () => {
       employes: [{ utilisateur_id: "u1", prenom: "Jean", nom: "Martin", poste_id: "poste-ouvrier", compte_application_statut: "actif" }],
       postes,
     });
-    expect(resultat).toEqual([expect.objectContaining({ nom: "Jean Martin", nbAppareils: 5, supplementMensuelHt: 15 })]);
+    expect(resultat).toEqual([expect.objectContaining({ nom: "Jean Martin", nbAppareils: 5, supplementMensuelHt: 5 })]);
   });
 
   it("ignore les appareils orphelins et les comptes fermés", () => {
@@ -41,6 +41,6 @@ describe("facturation des appareils par compte salarié", () => {
       employes: [{ utilisateur_id: "pause", prenom: "Léa", nom: "Durand", poste_id: "poste-conducteur", compte_application_statut: "pause" }],
       postes,
     });
-    expect(resultat[0]).toMatchObject({ nom: "Léa Durand", supplementMensuelHt: 25 });
+    expect(resultat[0]).toMatchObject({ nom: "Léa Durand", supplementMensuelHt: 9 });
   });
 });

@@ -33,11 +33,14 @@ describe("tarifs Stripe Billing", () => {
     expect(prixStripePour("premium", "mensuel", env)).toBe("price_xm");
     expect(prixStripePour("mini", "mensuel", env)).toBe("price_mm");
     expect(prixStripePour("business", "annuel", env)).toBe("price_ba");
-    expect(prixStripeCompteSupplementairePour("mini", "mensuel", {
+    expect(prixStripeCompteSupplementairePour("terrain", "mensuel", {
       NODE_ENV: "test",
-      STRIPE_PRICE_COMPTE_SUP_MINI_MENSUEL: "price_sup_mm",
-    } as NodeJS.ProcessEnv)).toBe("price_sup_mm");
-    expect(prixStripeCompteSupplementairePour("entreprise", "annuel", env)).toBeNull();
+      STRIPE_PRICE_COMPTE_SUP_TERRAIN_MENSUEL: "price_sup_tm",
+    } as NodeJS.ProcessEnv)).toBe("price_sup_tm");
+    expect(prixStripeCompteSupplementairePour("administratif", "annuel", {
+      NODE_ENV: "test",
+      STRIPE_PRICE_COMPTE_SUP_ADMINISTRATIF_ANNUEL: "price_sup_aa",
+    } as NodeJS.ProcessEnv)).toBe("price_sup_aa");
   });
 
   it("associe chaque palier IA à son prix et à sa périodicité", () => {
@@ -57,9 +60,9 @@ describe("tarifs Stripe Billing", () => {
     const manquantes = variablesStripeBillingManquantes({} as NodeJS.ProcessEnv);
     expect(manquantes).toContain("STRIPE_SECRET_KEY");
     expect(manquantes).toContain("STRIPE_PRICE_ENTREPRISE_ANNUEL");
-    expect(manquantes).toContain("STRIPE_PRICE_COMPTE_SUP_MINI_MENSUEL");
-    expect(manquantes).toContain("STRIPE_PRICE_COMPTE_SUP_PRO_ANNUEL");
-    expect(manquantes).toContain("STRIPE_PRICE_COMPTE_SUP_BUSINESS_MENSUEL");
+    expect(manquantes).toContain("STRIPE_PRICE_COMPTE_SUP_TERRAIN_MENSUEL");
+    expect(manquantes).toContain("STRIPE_PRICE_COMPTE_SUP_CHEF_EQUIPE_ANNUEL");
+    expect(manquantes).toContain("STRIPE_PRICE_COMPTE_SUP_ADMINISTRATIF_MENSUEL");
     expect(stripeBillingEstConfigure({} as NodeJS.ProcessEnv)).toBe(false);
   });
 });

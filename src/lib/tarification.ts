@@ -22,7 +22,6 @@ export type OffreTarifaire = {
   modePaiement: ModePaiementOffre;
   comptesInclus: number;
   administrateursInclus: number | null;
-  parCompteSup: number;
   operationsIAIncluses: number;
   stockageGoInclus: number;
   resume: string;
@@ -91,7 +90,6 @@ export const OFFRES_TARIFAIRES: readonly OffreTarifaire[] = [
     modePaiement: "abonnement",
     comptesInclus: 3,
     administrateursInclus: 1,
-    parCompteSup: 15,
     operationsIAIncluses: 100,
     stockageGoInclus: 10,
     resume: "Le socle commercial et chantier pour démarrer avec une petite équipe.",
@@ -107,7 +105,6 @@ export const OFFRES_TARIFAIRES: readonly OffreTarifaire[] = [
     modePaiement: "abonnement",
     comptesInclus: 15,
     administrateursInclus: 3,
-    parCompteSup: 12,
     operationsIAIncluses: 500,
     stockageGoInclus: 50,
     resume: "Toute la gestion quotidienne des équipes, du matériel et des achats.",
@@ -123,7 +120,6 @@ export const OFFRES_TARIFAIRES: readonly OffreTarifaire[] = [
     modePaiement: "abonnement",
     comptesInclus: 30,
     administrateursInclus: 6,
-    parCompteSup: 9,
     operationsIAIncluses: 1_500,
     stockageGoInclus: 150,
     resume: "Pilotage complet, connecteurs, comptabilité et automatisations avancées.",
@@ -139,7 +135,6 @@ export const OFFRES_TARIFAIRES: readonly OffreTarifaire[] = [
     modePaiement: "abonnement",
     comptesInclus: 50,
     administrateursInclus: 10,
-    parCompteSup: 9,
     operationsIAIncluses: 3_000,
     stockageGoInclus: 300,
     resume: "40 salariés et 10 administrateurs inclus, avec accompagnement prioritaire.",
@@ -156,7 +151,6 @@ export const OFFRES_TARIFAIRES: readonly OffreTarifaire[] = [
     modePaiement: "sur_devis",
     comptesInclus: 50,
     administrateursInclus: null,
-    parCompteSup: 0,
     operationsIAIncluses: 3_000,
     stockageGoInclus: 500,
     resume: "Volumétrie, intégrations et accompagnement adaptés après cadrage.",

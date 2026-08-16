@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
+import { calculerSupplementsComptes, type RepartitionComptesTarifaires } from "@/lib/facturation-comptes";
 import { DUREE_ESSAI_JOURS, MOIS_FACTURES_EN_ANNUEL, OFFRES_TARIFAIRES, offreAPrixPublic, offreTarifaireParCle, type OffreTarifaire } from "@/lib/tarification";
 
 // L'espace plateforme est réservé au propriétaire (identifié par son email, table plateforme_admins).
@@ -69,29 +70,32 @@ export type EntrepriseAbonnement = {
 // Essai gratuit à l'inscription. Chaque offre porte son propre prix annuel.
 export { DUREE_ESSAI_JOURS };
 
-// Prix mensuel = base de l'offre (incluant N comptes) + comptes supplémentaires
-// au tarif de l'offre + éventuels dépassements d'appareils. Les montants sont
-// portés par chaque offre (voir OFFRES ci-dessous).
+// Prix mensuel = base de l'offre + comptes supplémentaires par type + éventuels
+// dépassements d'appareils. Pour Mini, Pro et Business, les comptes inclus sont
+// imputés du plus cher au moins cher. Entreprise conserve ses quotas séparés.
 export function prixAbonnementMensuel(
-  nbComptesFacturables: number,
+  comptes: number | Partial<RepartitionComptesTarifaires>,
   offre: Offre = OFFRES[0],
   supplementAppareils: number = 0,
 ) {
-  const sup = Math.max(0, nbComptesFacturables - offre.comptesInclus);
+  const repartition = typeof comptes === "number" ? { terrain: comptes } : comptes;
+  const calculComptes = calculerSupplementsComptes(repartition, offre);
   const supAppareils = Number.isFinite(supplementAppareils) ? Math.max(0, supplementAppareils) : 0;
   const base = offreAPrixPublic(offre) ? offre.prixMensuelCentimes / 100 : null;
   const prixAnnuelFixe = offreAPrixPublic(offre) ? offre.prixAnnuelCentimes / 100 : null;
-  const total = base === null ? null : base + sup * offre.parCompteSup + supAppareils;
+  const supplementComptes = calculComptes.montantMensuelHt;
+  const total = base === null ? null : base + supplementComptes + supAppareils;
   return {
     total,
     base,
     employesInclus: offre.comptesInclus,
-    employesSupplementaires: sup,
-    parEmployeSup: offre.parCompteSup,
+    employesSupplementaires: calculComptes.totalSupplementaires,
+    supplementComptes,
+    detailComptes: calculComptes,
     supplementAppareils: supAppareils,
     // Équivalent en paiement annuel (remise appliquée).
-    mensuelSiAnnuel: prixAnnuelFixe === null ? null : Math.round(((prixAnnuelFixe + (sup * offre.parCompteSup + supAppareils) * MOIS_FACTURES_EN_ANNUEL) / 12) * 100) / 100,
-    totalAnnuel: prixAnnuelFixe === null ? null : Math.round((prixAnnuelFixe + (sup * offre.parCompteSup + supAppareils) * MOIS_FACTURES_EN_ANNUEL) * 100) / 100,
+    mensuelSiAnnuel: prixAnnuelFixe === null ? null : Math.round(((prixAnnuelFixe + (supplementComptes + supAppareils) * MOIS_FACTURES_EN_ANNUEL) / 12) * 100) / 100,
+    totalAnnuel: prixAnnuelFixe === null ? null : Math.round((prixAnnuelFixe + (supplementComptes + supAppareils) * MOIS_FACTURES_EN_ANNUEL) * 100) / 100,
   };
 }
 
@@ -124,10 +128,8 @@ export const ATTENTES_OPTIONS = [
   { cle: "centraliser", libelle: "Tout centraliser au même endroit" },
 ] as const;
 
-// Grille tarifaire publique. `base` inclut `comptesInclus` comptes ; chaque
-// compte au-delà est facturé `parCompteSup`. Positionnement ERP BTP complet
-// (au-dessus des outils devis-factures simples). Ajuster ici après validation
-// auprès de prospects réels.
+// Grille tarifaire publique. `base` inclut `comptesInclus` comptes ; les comptes
+// supplémentaires sont facturés selon leur type dans facturation-comptes.ts.
 export const OFFRES = OFFRES_TARIFAIRES;
 
 export type Offre = OffreTarifaire;
