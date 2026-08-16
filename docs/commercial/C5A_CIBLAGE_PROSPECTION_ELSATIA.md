@@ -86,7 +86,7 @@ Prospection distante seulement après validation du ciblage et des messages. La 
 - **Douleurs** : planning non synchronisé, heures/frais difficiles à récupérer, documents dispersés, ressaisies, manque de visibilité sur l’avancement ou la rentabilité.
 - **Maturité numérique** : utilise déjà certains outils, mais n’a pas centralisé ses flux ; l’équipe accepte le smartphone ou le navigateur.
 - **Décisionnaire** : dirigeant, gérant ou directeur opérationnel accessible ; l’administratif et le responsable travaux peuvent être prescripteurs.
-- **Budget logiciel à qualifier** : capacité et volonté à examiner **Pro à 249 € HT/mois** ou **Business à 449 € HT/mois**, uniquement après validation du nombre de comptes et du périmètre. Ce n’est pas une présomption de solvabilité.
+- **Budget logiciel à qualifier** : capacité et volonté à examiner **Pro à 199 € HT/mois** ou **Business à 399 € HT/mois**, uniquement après validation du nombre de comptes et du périmètre. Ce n’est pas une présomption de solvabilité.
 - **Déclencheurs** : croissance des équipes, nouveau conducteur/assistante, multiplication des chantiers, changement d’outil, réorganisation, difficultés récurrentes de planning ou remontée terrain.
 
 ### Résumé ICP en une phrase

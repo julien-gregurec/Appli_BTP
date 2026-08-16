@@ -1,6 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { calculerDepassementsAppareilsFacturables } from "@/lib/facturation-appareils";
-import { DUREE_ESSAI_JOURS, offreParCle, REDUCTION_ANNUELLE } from "@/lib/plateforme";
+import { DUREE_ESSAI_JOURS, offreParCle } from "@/lib/plateforme";
+import { MOIS_FACTURES_EN_ANNUEL } from "@/lib/tarification";
 
 export const OFFRES_ABONNEMENT = ["essentiel", "premium", "mini", "pro", "business", "entreprise", "sur_mesure"] as const;
 export const OFFRES_ABONNEMENT_COMMERCIALISEES = ["mini", "pro", "business", "entreprise"] as const;
@@ -20,7 +21,7 @@ export function calculerFacturationStockage(params: {
   const utilisationGo = Math.max(0, params.octetsUtilises) / OCTETS_PAR_GO;
   const depassementExact = Math.max(0, utilisationGo - Math.max(0, params.quotaGo));
   const depassementGo = Math.ceil(depassementExact * 100) / 100;
-  const nombreMois = params.periodicite === "annuel" ? 12 : 1;
+  const nombreMois = params.periodicite === "annuel" ? MOIS_FACTURES_EN_ANNUEL : 1;
   const montantHt = Math.round(depassementGo * TARIF_STOCKAGE_SUPPLEMENTAIRE_HT_PAR_GO * nombreMois * 100) / 100;
   return { utilisationGo, depassementGo, nombreMois, montantHt };
 }
@@ -378,7 +379,7 @@ export async function calculerDepassementAppareils(entrepriseId: string) {
     employes: employes ?? [],
     postes: postes ?? [],
   }).reduce((total, ligne) => total + ligne.supplementMensuelHt, 0);
-  return entreprise?.abonnement_periodicite === "annuel" ? Math.round(mensuel * 12 * (1 - REDUCTION_ANNUELLE) * 100) / 100 : mensuel;
+  return entreprise?.abonnement_periodicite === "annuel" ? Math.round(mensuel * MOIS_FACTURES_EN_ANNUEL * 100) / 100 : mensuel;
 }
 
 export async function ajouterDepassementAppareilsFacture(params: { entrepriseId: string; customerId: string; invoiceId: string; montantHt: number }) {

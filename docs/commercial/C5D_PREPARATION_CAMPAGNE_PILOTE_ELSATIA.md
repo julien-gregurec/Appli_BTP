@@ -215,7 +215,7 @@ Le statut juridique n'est pas un motif d'exclusion automatique, mais les entrepr
 
 - elle exerce un métier prioritaire ;
 - elle présente un besoin structuré lié à plusieurs utilisateurs, équipes ou chantiers ;
-- elle peut utiliser utilement les 3 comptes de l'offre Mini à 79 € HT/mois ;
+- elle peut utiliser utilement les 3 comptes de l'offre Mini à 69 € HT/mois ;
 - son score C5-A atteint P1 ou P2 ;
 - un canal strictement professionnel est public ;
 - son domicile n'est pas enregistré si celui-ci correspond à l'adresse professionnelle.

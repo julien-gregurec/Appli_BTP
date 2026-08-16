@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
-import { estPlateformeAdmin, statutAbonnement, prixAbonnementMensuel, offreParCle, REDUCTION_ANNUELLE, type EntrepriseAbonnement } from "@/lib/plateforme";
+import { estPlateformeAdmin, statutAbonnement, prixAbonnementMensuel, offreParCle, type EntrepriseAbonnement } from "@/lib/plateforme";
 import { ajouterAdminPlateformeAction, appliquerRemiseAction, creerEntreprisePlateformeAction, entrerEntreprisePlateformeAction, enregistrerReglementPlateformeAction, genererSnapshotFacturationAction, modifierAbonnementAction, modifierTarifPostePlateformeAction, reinitialiserMotDePassePlateformeAction, retirerAdminPlateformeAction, retirerRemiseAction, signalerImpayePlateformeAction } from "@/app/actions/plateforme";
 import { AbonnementCountdown } from "@/components/AbonnementCountdown";
 import { BRAND_NAME } from "@/lib/brand";
@@ -73,8 +73,9 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
     const comptes=e.nb_comptes_facturables??e.nb_comptes_actives??e.nb_membres_actifs;
     const offre=offreParCle(e.abonnement_offre??e.offre_recommandee??"essentiel");
     const appareils=appareilsParEntreprise.get(e.id)?.montant_depassements_ht??0;
-    const mensuel=prixAbonnementMensuel(comptes,offre,appareils).total;
-    return total+mensuel*(e.abonnement_periodicite==="annuel"?1-REDUCTION_ANNUELLE:1);
+    const prix=prixAbonnementMensuel(comptes,offre,appareils);
+    const mensuel=e.abonnement_periodicite==="annuel"&&prix.totalAnnuel!==null?prix.totalAnnuel/12:prix.total;
+    return total+(mensuel??0);
   },0);
 
   return (
@@ -177,9 +178,9 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                       {" · créée le "}{new Date(e.created_at).toLocaleDateString("fr-FR")}
                     </p>
                     <div className="mt-2 inline-flex items-baseline gap-2 rounded-md bg-[#c9a24a]/10 px-3 py-1.5">
-                      <span className="text-lg font-semibold text-[#0d1b2a] dark:text-[#c9a24a]">{prix.total} €<span className="text-xs font-normal">/mois</span></span>
+                      <span className="text-lg font-semibold text-[#0d1b2a] dark:text-[#c9a24a]">{prix.total === null ? "Sur devis" : <>{prix.total} €<span className="text-xs font-normal">/mois</span></>}</span>
                       <span className="text-[11px] text-neutral-500">
-                        offre {offre.nom} {prix.base} € (jusqu&apos;à {prix.employesInclus} comptes){prix.employesSupplementaires > 0 ? ` + ${prix.employesSupplementaires} × ${prix.parEmployeSup} €` : ""}{prix.supplementAppareils > 0 ? ` + ${prix.supplementAppareils.toLocaleString("fr-FR")} € appareils` : ""}
+                        offre {offre.nom}{prix.base === null ? " · conditions contractuelles" : ` ${prix.base} € (jusqu’à ${prix.employesInclus} comptes)`}{prix.base !== null&&prix.employesSupplementaires > 0 ? ` + ${prix.employesSupplementaires} × ${prix.parEmployeSup} €` : ""}{prix.base !== null&&prix.supplementAppareils > 0 ? ` + ${prix.supplementAppareils.toLocaleString("fr-FR")} € appareils` : ""}
                       </span>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-5">
@@ -191,7 +192,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                     </div>
                     <p className="mt-2 text-xs text-neutral-500">Options utilisées : {e.options_actives?.length ? e.options_actives.join(", ") : "aucune"}{e.derniere_connexion ? ` · dernière connexion ${new Date(e.derniere_connexion).toLocaleString("fr-FR")}` : ""}</p>
                     <div className={`mt-2 rounded-md border p-3 text-sm ${usageAppareils.nb_comptes_plus_de_deux>0?"border-red-300 bg-red-50 text-red-900":"border-green-200 bg-green-50 text-green-900"}`}><strong>{usageAppareils.nb_appareils_actifs} appareil(s) actif(s)</strong><span className="ml-2 text-xs">2 appareils inclus par compte</span>{usageAppareils.nb_comptes_plus_de_deux>0&&<p className="mt-1 font-semibold">⚠ {usageAppareils.nb_comptes_plus_de_deux} compte(s) dépassent la limite · {usageAppareils.montant_depassements_ht.toLocaleString("fr-FR",{style:"currency",currency:"EUR"})} HT/mois ajouté(s) au tarif de leur poste · maximum observé : {usageAppareils.maximum_appareils_compte}</p>}</div>
-                    <p className="mt-2 text-sm font-semibold">Prix automatique mensuel : {prix.total.toLocaleString("fr-FR",{style:"currency",currency:"EUR"})} HT</p>
+                    <p className="mt-2 text-sm font-semibold">{prix.total === null ? "Tarif défini au contrat — aucun prix automatique" : `Prix automatique mensuel : ${prix.total.toLocaleString("fr-FR",{style:"currency",currency:"EUR"})} HT`}</p>
                     {e.stripe_subscription_id&&<div className="mt-2 flex flex-wrap items-center gap-2 text-xs"><span className="rounded bg-green-50 px-2 py-1 font-medium text-green-800">Stripe Billing relié · {e.abonnement_periodicite??"périodicité inconnue"}</span>{e.derniere_facture_url&&<Link href={e.derniere_facture_url} target="_blank" rel="noreferrer" className="underline">Dernière facture ({e.derniere_facture_statut??"statut inconnu"})</Link>}{e.abonnement_essai_fin&&<span>fin d’essai {new Date(e.abonnement_essai_fin).toLocaleDateString("fr-FR")}</span>}</div>}
                     {e.stripe_subscription_id&&(e.remise_stripe_coupon_id?(
                       <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-[#c9a24a]/40 bg-[#c9a24a]/10 p-2 text-xs">

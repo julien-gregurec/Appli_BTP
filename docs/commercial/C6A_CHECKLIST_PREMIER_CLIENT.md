@@ -44,13 +44,13 @@ Chaque preuve doit comporter une date, l’environnement, le responsable et un l
 
 ### Offres
 
-- [ ] Mini : 79 € HT/mois ou 948 € HT/an, 3 comptes.
-- [ ] Pro : 249 € HT/mois ou 2 988 € HT/an, 15 comptes.
-- [ ] Business : 449 € HT/mois ou 5 388 € HT/an, 30 comptes.
-- [ ] Entreprise : 599 € HT/mois ou 6 468 € HT/an, 40 salariés + 10 administrateurs.
-- [ ] Sur mesure : dès 699 € HT/mois ou dès 8 388 € HT/an, sur devis.
+- [ ] Mini : 69 € HT/mois ou 690 € HT/an, 3 comptes.
+- [ ] Pro : 199 € HT/mois ou 1 990 € HT/an, 15 comptes.
+- [ ] Business : 399 € HT/mois ou 3 990 € HT/an, 30 comptes.
+- [ ] Entreprise : 599 € HT/mois ou 5 990 € HT/an, 40 salariés + 10 administrateurs.
+- [ ] Sur mesure : sur devis, sans prix public ni Checkout automatique.
 - [ ] La mention **30 jours d’essai** est identique sur tous les supports.
-- [ ] Aucune remise annuelle non validée n’est affichée.
+- [ ] Le paiement annuel est présenté uniquement comme 2 mois offerts.
 - [ ] Les fonctions affichées pour chaque offre correspondent à Production.
 - [ ] L’IA n’est pas vendue comme disponible tant qu’elle reste désactivée en Production.
 

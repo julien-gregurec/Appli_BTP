@@ -257,13 +257,13 @@ Si ces conditions ne sont pas réunies, la fiche reste en **Démo réalisée**, 
 
 | Offre | Mensuel | Annuel | Capacité incluse |
 |---|---:|---:|---|
-| **Mini** | 79 € HT/mois | 948 € HT/an | 3 comptes |
-| **Pro** | 249 € HT/mois | 2 988 € HT/an | 15 comptes |
-| **Business** | 449 € HT/mois | 5 388 € HT/an | 30 comptes |
-| **Entreprise** | 599 € HT/mois | 6 468 € HT/an | 40 salariés + 10 administrateurs |
-| **Sur mesure** | dès 699 € HT/mois | dès 8 388 € HT/an | après cadrage |
+| **Mini** | 69 € HT/mois | 690 € HT/an | 3 comptes |
+| **Pro** | 199 € HT/mois | 1 990 € HT/an | 15 comptes |
+| **Business** | 399 € HT/mois | 3 990 € HT/an | 30 comptes |
+| **Entreprise** | 599 € HT/mois | 5 990 € HT/an | 40 salariés + 10 administrateurs |
+| **Sur mesure** | Sur devis | Sur devis | selon contrat |
 
-Mention commerciale obligatoire : **30 jours d'essai**.
+Mentions commerciales obligatoires : **30 jours d'essai** et **2 mois offerts en paiement annuel**.
 
 Ne pas présenter l'annuel comme une remise : les montants fournis correspondent à douze mensualités. Ne pas inventer de frais, d'engagement, de réduction ou de condition non validée.
 

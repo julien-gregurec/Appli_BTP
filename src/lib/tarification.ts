@@ -6,14 +6,20 @@ export type CodeOffreTarifaire =
   | "sur_mesure";
 
 export type PeriodiciteAbonnement = "mensuel" | "annuel";
+export type ModePaiementOffre = "abonnement" | "sur_devis";
+
+export const VERSION_GRILLE_TARIFAIRE = "TARIFS-V2";
+export const DUREE_ESSAI_JOURS = 30;
+export const MOIS_FACTURES_EN_ANNUEL = 10;
+export const MOIS_OFFERTS_EN_ANNUEL = 2;
 
 export type OffreTarifaire = {
   cle: CodeOffreTarifaire;
   palier: number;
   nom: string;
-  base: number;
-  prixMensuelCentimes: number;
-  prixAnnuelCentimes: number;
+  prixMensuelCentimes: number | null;
+  prixAnnuelCentimes: number | null;
+  modePaiement: ModePaiementOffre;
   comptesInclus: number;
   administrateursInclus: number | null;
   parCompteSup: number;
@@ -22,7 +28,7 @@ export type OffreTarifaire = {
   resume: string;
   fonctionnalites: readonly string[];
   populaire?: boolean;
-  devisObligatoire?: boolean;
+  devisObligatoire: boolean;
 };
 
 const SOCLE = [
@@ -80,9 +86,9 @@ export const OFFRES_TARIFAIRES: readonly OffreTarifaire[] = [
     cle: "mini",
     palier: 1,
     nom: "Mini",
-    base: 79,
-    prixMensuelCentimes: 7_900,
-    prixAnnuelCentimes: 94_800,
+    prixMensuelCentimes: 6_900,
+    prixAnnuelCentimes: 69_000,
+    modePaiement: "abonnement",
     comptesInclus: 3,
     administrateursInclus: 1,
     parCompteSup: 15,
@@ -90,14 +96,15 @@ export const OFFRES_TARIFAIRES: readonly OffreTarifaire[] = [
     stockageGoInclus: 10,
     resume: "Le socle commercial et chantier pour démarrer avec une petite équipe.",
     fonctionnalites: SOCLE,
+    devisObligatoire: false,
   },
   {
     cle: "pro",
     palier: 2,
     nom: "Pro",
-    base: 249,
-    prixMensuelCentimes: 24_900,
-    prixAnnuelCentimes: 298_800,
+    prixMensuelCentimes: 19_900,
+    prixAnnuelCentimes: 199_000,
+    modePaiement: "abonnement",
     comptesInclus: 15,
     administrateursInclus: 3,
     parCompteSup: 12,
@@ -105,14 +112,15 @@ export const OFFRES_TARIFAIRES: readonly OffreTarifaire[] = [
     stockageGoInclus: 50,
     resume: "Toute la gestion quotidienne des équipes, du matériel et des achats.",
     fonctionnalites: [...SOCLE, ...TERRAIN, ...GESTION],
+    devisObligatoire: false,
   },
   {
     cle: "business",
     palier: 3,
     nom: "Business",
-    base: 449,
-    prixMensuelCentimes: 44_900,
-    prixAnnuelCentimes: 538_800,
+    prixMensuelCentimes: 39_900,
+    prixAnnuelCentimes: 399_000,
+    modePaiement: "abonnement",
     comptesInclus: 30,
     administrateursInclus: 6,
     parCompteSup: 9,
@@ -120,14 +128,15 @@ export const OFFRES_TARIFAIRES: readonly OffreTarifaire[] = [
     stockageGoInclus: 150,
     resume: "Pilotage complet, connecteurs, comptabilité et automatisations avancées.",
     fonctionnalites: [...SOCLE, ...TERRAIN, ...GESTION, ...PILOTAGE],
+    devisObligatoire: false,
   },
   {
     cle: "entreprise",
     palier: 4,
     nom: "Entreprise",
-    base: 599,
     prixMensuelCentimes: 59_900,
-    prixAnnuelCentimes: 646_800,
+    prixAnnuelCentimes: 599_000,
+    modePaiement: "abonnement",
     comptesInclus: 50,
     administrateursInclus: 10,
     parCompteSup: 9,
@@ -136,14 +145,15 @@ export const OFFRES_TARIFAIRES: readonly OffreTarifaire[] = [
     resume: "40 collaborateurs et 10 administrateurs, avec accompagnement prioritaire.",
     fonctionnalites: [...SOCLE, ...TERRAIN, ...GESTION, ...PILOTAGE, ...AVANCE],
     populaire: true,
+    devisObligatoire: false,
   },
   {
     cle: "sur_mesure",
     palier: 5,
     nom: "Sur mesure",
-    base: 699,
-    prixMensuelCentimes: 69_900,
-    prixAnnuelCentimes: 838_800,
+    prixMensuelCentimes: null,
+    prixAnnuelCentimes: null,
+    modePaiement: "sur_devis",
     comptesInclus: 50,
     administrateursInclus: null,
     parCompteSup: 0,
@@ -187,8 +197,17 @@ export function prixOffreCentimes(offre: OffreTarifaire, periodicite: Periodicit
   return periodicite === "annuel" ? offre.prixAnnuelCentimes : offre.prixMensuelCentimes;
 }
 
-export function formatMontantCentimes(centimes: number) {
+export function formatMontantCentimes(centimes: number | null) {
+  if (centimes === null) return "Sur devis";
   return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(centimes / 100);
+}
+
+export function offreAPrixPublic(offre: OffreTarifaire): offre is OffreTarifaire & {
+  prixMensuelCentimes: number;
+  prixAnnuelCentimes: number;
+  modePaiement: "abonnement";
+} {
+  return offre.modePaiement === "abonnement" && offre.prixMensuelCentimes !== null && offre.prixAnnuelCentimes !== null;
 }
 
 export function calculerTarifAbonnement(params: {
@@ -202,6 +221,9 @@ export function calculerTarifAbonnement(params: {
   creditsIA?: boolean;
   iaIntensive?: boolean;
 }) {
+  if (!offreAPrixPublic(params.offre)) {
+    throw new Error("L’offre Sur mesure nécessite un devis avant tout calcul tarifaire");
+  }
   const periodicite = params.periodicite ?? "mensuel";
   const baseMensuelle = params.offre.prixMensuelCentimes;
   const optionsMensuelles =
@@ -213,7 +235,7 @@ export function calculerTarifAbonnement(params: {
     (params.creditsIA ? 2_900 : 0) +
     (params.iaIntensive ? 7_900 : 0);
   const basePeriode = periodicite === "annuel" ? params.offre.prixAnnuelCentimes : baseMensuelle;
-  const optionsPeriode = optionsMensuelles * (periodicite === "annuel" ? 12 : 1);
+  const optionsPeriode = optionsMensuelles * (periodicite === "annuel" ? MOIS_FACTURES_EN_ANNUEL : 1);
   return {
     baseCentimes: basePeriode,
     optionsCentimes: optionsPeriode,

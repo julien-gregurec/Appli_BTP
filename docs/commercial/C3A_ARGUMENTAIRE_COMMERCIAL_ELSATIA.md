@@ -298,13 +298,13 @@ final doit être confirmé à partir des besoins et des modules activés.
 
 | Offre | Tarif mensuel | Tarif annuel | Capacité annoncée | Positionnement commercial |
 |---|---:|---:|---|---|
-| **Mini** | **79 € HT/mois** | **948 € HT** | **3 comptes** | Pour démarrer avec le socle clients, chantiers, devis, factures et planning. |
-| **Pro** | **249 € HT/mois** | **2 988 € HT** | **15 comptes** | Pour relier la gestion quotidienne du bureau et des équipes terrain. |
-| **Business** | **449 € HT/mois** | **5 388 € HT** | **30 comptes** | Pour étendre le suivi aux besoins de pilotage et de gestion des ressources. |
-| **Entreprise** | **599 € HT/mois** | **6 468 € HT** | **40 salariés + 10 administrateurs** | Pour une organisation plus large avec des rôles et besoins avancés. |
-| **Sur mesure** | **dès 699 € HT/mois** | **dès 8 388 € HT** | Après cadrage | Pour une volumétrie, des intégrations ou un accompagnement spécifiques. |
+| **Mini** | **69 € HT/mois** | **690 € HT** | **3 comptes** | Pour démarrer avec le socle clients, chantiers, devis, factures et planning. |
+| **Pro** | **199 € HT/mois** | **1 990 € HT** | **15 comptes** | Pour relier la gestion quotidienne du bureau et des équipes terrain. |
+| **Business** | **399 € HT/mois** | **3 990 € HT** | **30 comptes** | Pour étendre le suivi aux besoins de pilotage et de gestion des ressources. |
+| **Entreprise** | **599 € HT/mois** | **5 990 € HT** | **40 salariés + 10 administrateurs** | Pour une organisation plus large avec des rôles et besoins avancés. |
+| **Sur mesure** | **Sur devis** | **Sur devis** | Selon contrat | Pour une volumétrie, des intégrations ou un accompagnement spécifiques. |
 
-Mention commune : **30 jours d’essai**.
+Mentions communes : **30 jours d’essai** et **2 mois offerts en paiement annuel**.
 
 ### Formulation recommandée
 
@@ -329,7 +329,7 @@ Mention commune : **30 jours d’essai**.
 > Vous souhaitez équiper le bureau, les responsables de chantier et les équipes
 > terrain, avec le planning, les pointages et le suivi administratif. Au regard
 > du nombre de comptes évoqué, l’offre à examiner en priorité est Pro, à
-> 249 € HT par mois, ou 2 988 € HT en annuel. Nous validerons ensemble que son
+> 199 € HT par mois, ou 1 990 € HT en annuel avec 2 mois offerts. Nous validerons ensemble que son
 > périmètre correspond à votre organisation. Vous disposez de **30 jours
 > d’essai** pour l’évaluer dans votre contexte.
 

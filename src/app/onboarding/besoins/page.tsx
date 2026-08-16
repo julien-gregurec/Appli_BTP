@@ -4,6 +4,7 @@ import { demarrerAbonnementAction } from "@/app/actions/abonnement";
 import { ATTENTES_OPTIONS, BESOINS_OPTIONS, DUREE_ESSAI_JOURS, offreParCle, prixAbonnementMensuel } from "@/lib/plateforme";
 import { stripeBillingEstConfigure } from "@/lib/stripe-abonnement";
 import { BRAND_NAME } from "@/lib/brand";
+import { MOIS_OFFERTS_EN_ANNUEL, offreAPrixPublic } from "@/lib/tarification";
 
 export default async function BesoinsPage({
   searchParams,
@@ -18,7 +19,9 @@ export default async function BesoinsPage({
     const offre = offreParCle(recommande);
     const nbEmployes = Math.max(1, Number(nb ?? "1") || 1);
     const prix = prixAbonnementMensuel(nbEmployes, offre);
-    const remisePourcent = Math.round((1 - offre.prixAnnuelCentimes / (offre.prixMensuelCentimes * 12)) * 100);
+    if (!offreAPrixPublic(offre) || prix.total === null || prix.mensuelSiAnnuel === null) {
+      return <main className="flex flex-1 items-center justify-center p-6"><div className="w-full max-w-md space-y-4 rounded-xl border p-6 text-center"><h1 className="text-2xl font-semibold">Offre Sur mesure</h1><p className="text-sm text-neutral-500">Cette configuration nécessite un cadrage et un devis personnalisé.</p><Link href="/aide" className="block rounded-md bg-[#0d1b2a] px-3 py-2 text-sm font-semibold text-white">Nous contacter</Link></div></main>;
+    }
     return (
       <main className="flex flex-1 items-center justify-center p-6">
         <div className="w-full max-w-md space-y-6">
@@ -34,9 +37,9 @@ export default async function BesoinsPage({
               {prix.employesSupplementaires > 0 && <> + {prix.employesSupplementaires} compte(s) × {prix.parEmployeSup} €</>}
               {" "}· pour {nbEmployes} salarié(s)
             </p>
-            {remisePourcent > 0 && <p className="mt-2 text-sm font-medium text-green-700 dark:text-green-400">
-              ou {prix.mensuelSiAnnuel} € / mois en paiement annuel <span className="text-xs font-normal">(−{remisePourcent} %)</span>
-            </p>}
+            <p className="mt-2 text-sm font-medium text-green-700 dark:text-green-400">
+              ou {prix.mensuelSiAnnuel} € / mois en paiement annuel <span className="text-xs font-normal">({MOIS_OFFERTS_EN_ANNUEL} mois offerts)</span>
+            </p>
             <p className="mt-3 rounded-md bg-blue-50 px-3 py-2 text-xs font-medium text-blue-800 dark:bg-blue-950/30 dark:text-blue-200">
               Essai gratuit {DUREE_ESSAI_JOURS} jours. Carte enregistrée de façon sécurisée par Stripe, sans débit pendant l’essai.
             </p>
@@ -49,7 +52,7 @@ export default async function BesoinsPage({
               <input type="hidden" name="offre" value={offre.cle}/>
               <input type="hidden" name="retour_erreur" value={`/onboarding/besoins?recommande=${offre.cle}&nb=${nbEmployes}`}/>
               <select name="periodicite" defaultValue="annuel" className="w-full rounded-md border px-3 py-2 text-sm dark:bg-neutral-900">
-                <option value="annuel">{remisePourcent > 0 ? `Annuel · −${remisePourcent} %` : "Annuel"}</option>
+                <option value="annuel">Annuel · {MOIS_OFFERTS_EN_ANNUEL} mois offerts</option>
                 <option value="mensuel">Mensuel</option>
               </select>
               <button className="w-full rounded-md bg-[#0d1b2a] px-3 py-2 text-center text-sm font-semibold text-white">Enregistrer ma carte et démarrer l’essai</button>

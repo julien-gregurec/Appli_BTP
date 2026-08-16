@@ -61,7 +61,7 @@ Règles permanentes :
 - **Question de relance** : « Quels outils utilisez-vous, et quelles données
   ressaisissez-vous entre eux ? »
 
-### 2.3 « Pourquoi 249 € / 449 € / 599 € par mois ? »
+### 2.3 « Pourquoi 199 € / 399 € / 599 € par mois ? »
 
 - **Réponse courte** : « Chaque palier correspond à un nombre de comptes et à un
   périmètre d’usage différent. Nous devons partir de votre équipe et des modules
@@ -683,11 +683,13 @@ documents juridiques applicables.
 
 | Offre | Mensuel | Annuel | Comptes inclus |
 |---|---:|---:|---|
-| Mini | 79 € HT/mois | 948 € HT | 3 comptes |
-| Pro | 249 € HT/mois | 2 988 € HT | 15 comptes |
-| Business | 449 € HT/mois | 5 388 € HT | 30 comptes |
-| Entreprise | 599 € HT/mois | 6 468 € HT | 40 salariés + 10 administrateurs |
-| Sur mesure | dès 699 € HT/mois | dès 8 388 € HT | après cadrage |
+| Mini | 69 € HT/mois | 690 € HT | 3 comptes |
+| Pro | 199 € HT/mois | 1 990 € HT | 15 comptes |
+| Business | 399 € HT/mois | 3 990 € HT | 30 comptes |
+| Entreprise | 599 € HT/mois | 5 990 € HT | 40 salariés + 10 administrateurs |
+| Sur mesure | Sur devis | Sur devis | selon contrat |
+
+Le paiement annuel correspond à **12 mois d’utilisation facturés au prix de 10 mois**, soit **2 mois offerts**.
 
 ### 15.1 Y a-t-il une période d’essai ?
 

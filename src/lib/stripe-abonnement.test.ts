@@ -87,11 +87,11 @@ describe("facturation du stockage", () => {
     })).toMatchObject({ depassementGo: 1.01, montantHt: 0.51 });
   });
 
-  it("applique douze mois sur une facture annuelle", () => {
+  it("applique la règle de dix mois facturés sur une facture annuelle", () => {
     expect(calculerFacturationStockage({
       octetsUtilises: 27_000_000_000,
       quotaGo: 25,
       periodicite: "annuel",
-    })).toMatchObject({ depassementGo: 2, montantHt: 12, nombreMois: 12 });
+    })).toMatchObject({ depassementGo: 2, montantHt: 10, nombreMois: 10 });
   });
 });

@@ -59,7 +59,8 @@ Cette checklist accompagne `C5C_PIPELINE_CONVERSION_ELSATIA.md`. Elle s'utilise 
 - [ ] Objections traitées ou explicitement ouvertes.
 - [ ] Calendrier et date de décision convenus.
 - [ ] Limites et points « à confirmer » visibles.
-- [ ] Tarif conforme : Mini 79 €, Pro 249 €, Business 449 €, Entreprise 599 €, Sur mesure dès 699 € HT/mois.
+- [ ] Tarif conforme : Mini 69 €, Pro 199 €, Business 399 €, Entreprise 599 €, Sur mesure sur devis.
+- [ ] Paiement annuel présenté comme 2 mois offerts, sans autre remise annuelle.
 - [ ] Mention **30 jours d'essai** présente.
 
 ## Contrôle avant le lot suivant

@@ -1,5 +1,7 @@
 # Relais — Tarification, abonnements et quotas IA
 
+> **TARIFS-V1 — HISTORIQUE.** Ce document décrit l'ancienne grille et ne doit pas être utilisé pour une proposition commerciale après TARIFS-V2.
+
 ## Livré dans ce lot
 
 - cinq offres versionnées : Mini, Pro, Business, Entreprise et Sur mesure ;

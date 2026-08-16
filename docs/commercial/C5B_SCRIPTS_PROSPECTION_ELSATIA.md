@@ -191,7 +191,7 @@ Je comprends. Je m’arrête ici. Préférez-vous que je vous rappelle à une da
 ### « Combien ça coûte ? »
 
 ```text
-Les offres commencent à 79 € HT par mois pour 3 comptes. Pour une PME avec plusieurs utilisateurs, il faut surtout vérifier le nombre de comptes et le périmètre avant de comparer Pro ou Business.
+Les offres commencent à 69 € HT par mois pour 3 comptes. Pour une PME avec plusieurs utilisateurs, il faut surtout vérifier le nombre de comptes et le périmètre avant de comparer Pro ou Business. Le paiement annuel comprend 2 mois offerts.
 ```
 
 ### « Ce n’est pas moi qui m’en occupe »

@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { PiedLegal } from "@/components/PiedLegal";
 import { DUREE_ESSAI_JOURS } from "@/lib/plateforme";
-import { formatMontantCentimes, OFFRES_TARIFAIRES, OPTIONS_TARIFAIRES, SERVICES_MISE_EN_SERVICE } from "@/lib/tarification";
+import { formatMontantCentimes, MOIS_OFFERTS_EN_ANNUEL, OFFRES_TARIFAIRES, offreAPrixPublic, OPTIONS_TARIFAIRES, SERVICES_MISE_EN_SERVICE } from "@/lib/tarification";
 import { stripeBillingEstConfigure } from "@/lib/stripe-abonnement";
 import { iaEstActive } from "@/lib/preview-features";
 import { powensEstConfigure } from "@/lib/banking";
@@ -54,12 +54,14 @@ export default function TarifsPage() {
               <h2 className="text-xl font-bold text-[#0d1b2a] dark:text-white">{offre.nom}</h2>
               <p className="mt-2 min-h-20 text-sm text-neutral-500">{offre.resume}</p>
               <p className="mt-4 text-3xl font-bold text-[#0d1b2a] dark:text-white">
-                {offre.devisObligatoire ? "Dès " : ""}{formatMontantCentimes(offre.prixMensuelCentimes)}
+                {formatMontantCentimes(offre.prixMensuelCentimes)}
               </p>
-              <p className="text-xs text-neutral-500">HT / mois</p>
-              {offre.cle === "entreprise" ? <p className="mt-1 text-xs font-medium text-green-700">539 € HT/mois en annuel (6 468 € HT/an)</p> : <p className="mt-1 text-xs text-neutral-500">{formatMontantCentimes(offre.prixAnnuelCentimes)} HT/an</p>}
+              {offreAPrixPublic(offre) ? <>
+                <p className="text-xs text-neutral-500">HT / mois</p>
+                <p className="mt-1 text-xs font-medium text-green-700">{formatMontantCentimes(offre.prixAnnuelCentimes)} HT/an · {MOIS_OFFERTS_EN_ANNUEL} mois offerts</p>
+              </> : <p className="mt-1 text-xs text-neutral-500">Tarif défini selon votre besoin</p>}
               <ul className="mt-5 flex-1 space-y-2 text-sm">
-                <li>✓ {offre.cle === "entreprise" ? "40 salariés + 10 administrateurs" : `${offre.comptesInclus} comptes inclus`}</li>
+                <li>✓ {offre.cle === "entreprise" ? "40 salariés + 10 administrateurs" : offre.devisObligatoire ? "Nombre de comptes selon contrat" : `${offre.comptesInclus} comptes inclus`}</li>
                 {iaVisible && <li>✓ {offre.operationsIAIncluses.toLocaleString("fr-FR")} opérations IA / mois</li>}
                 <li>✓ {offre.stockageGoInclus} Go de stockage</li>
                 {beneficesAffiches(offre.cle).map((point) => <li key={point}>✓ {point}</li>)}
@@ -88,7 +90,7 @@ export default function TarifsPage() {
         <section className="mt-10 overflow-hidden rounded-2xl border bg-white dark:border-neutral-800 dark:bg-neutral-900">
           <div className="p-6"><h2 className="text-xl font-bold">Comparer les offres</h2><p className="mt-1 text-sm text-neutral-500">Un droit individuel reste toujours contrôlé par le rôle défini par l’administrateur de l’entreprise.</p></div>
           <div className="overflow-x-auto"><table className="w-full min-w-[850px] text-center text-sm"><thead className="bg-neutral-50 dark:bg-neutral-950"><tr><th className="px-4 py-3 text-left">Capacité</th>{OFFRES_TARIFAIRES.map(offre=><th key={offre.cle} className="px-4 py-3">{offre.nom}</th>)}</tr></thead><tbody>{[
-            ["Comptes inclus",...(OFFRES_TARIFAIRES.map(o=>String(o.comptesInclus)))],
+            ["Comptes inclus",...(OFFRES_TARIFAIRES.map(o=>o.devisObligatoire?"Selon contrat":String(o.comptesInclus)))],
             ["Administrateurs inclus",...(OFFRES_TARIFAIRES.map(o=>o.administrateursInclus===null?"Sur devis":String(o.administrateursInclus)))],
             ...(iaVisible ? [["Opérations IA / mois",...(OFFRES_TARIFAIRES.map(o=>o.operationsIAIncluses.toLocaleString("fr-FR")))]] : []),
             ["Stockage inclus",...(OFFRES_TARIFAIRES.map(o=>`${o.stockageGoInclus} Go`))],

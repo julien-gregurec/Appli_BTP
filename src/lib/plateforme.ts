@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
-import { OFFRES_TARIFAIRES, offreTarifaireParCle, type OffreTarifaire } from "@/lib/tarification";
+import { DUREE_ESSAI_JOURS, MOIS_FACTURES_EN_ANNUEL, OFFRES_TARIFAIRES, offreAPrixPublic, offreTarifaireParCle, type OffreTarifaire } from "@/lib/tarification";
 
 // L'espace plateforme est réservé au propriétaire (identifié par son email, table plateforme_admins).
 // En mode prototype (sans connexion), on l'autorise pour la démo mono-entreprise.
@@ -67,8 +67,7 @@ export type EntrepriseAbonnement = {
 };
 
 // Essai gratuit à l'inscription. Chaque offre porte son propre prix annuel.
-export const DUREE_ESSAI_JOURS = 30;
-export const REDUCTION_ANNUELLE = 0;
+export { DUREE_ESSAI_JOURS };
 
 // Prix mensuel = base de l'offre (incluant N comptes) + comptes supplémentaires
 // au tarif de l'offre + éventuels dépassements d'appareils. Les montants sont
@@ -80,18 +79,19 @@ export function prixAbonnementMensuel(
 ) {
   const sup = Math.max(0, nbComptesFacturables - offre.comptesInclus);
   const supAppareils = Number.isFinite(supplementAppareils) ? Math.max(0, supplementAppareils) : 0;
-  const total = offre.base + sup * offre.parCompteSup + supAppareils;
-  const prixAnnuelFixe = offre.prixAnnuelCentimes / 100;
+  const base = offreAPrixPublic(offre) ? offre.prixMensuelCentimes / 100 : null;
+  const prixAnnuelFixe = offreAPrixPublic(offre) ? offre.prixAnnuelCentimes / 100 : null;
+  const total = base === null ? null : base + sup * offre.parCompteSup + supAppareils;
   return {
     total,
-    base: offre.base,
+    base,
     employesInclus: offre.comptesInclus,
     employesSupplementaires: sup,
     parEmployeSup: offre.parCompteSup,
     supplementAppareils: supAppareils,
     // Équivalent en paiement annuel (remise appliquée).
-    mensuelSiAnnuel: Math.round((prixAnnuelFixe / 12 + sup * offre.parCompteSup + supAppareils) * 100) / 100,
-    totalAnnuel: Math.round((prixAnnuelFixe + (sup * offre.parCompteSup + supAppareils) * 12) * 100) / 100,
+    mensuelSiAnnuel: prixAnnuelFixe === null ? null : Math.round(((prixAnnuelFixe + (sup * offre.parCompteSup + supAppareils) * MOIS_FACTURES_EN_ANNUEL) / 12) * 100) / 100,
+    totalAnnuel: prixAnnuelFixe === null ? null : Math.round((prixAnnuelFixe + (sup * offre.parCompteSup + supAppareils) * MOIS_FACTURES_EN_ANNUEL) * 100) / 100,
   };
 }
 
@@ -104,7 +104,7 @@ export function prixAbonnementMensuel(
 export const BESOINS_OPTIONS = [
   { cle: "devis_factures", libelle: "Devis & factures", palier: 1 },
   { cle: "clients_chantiers", libelle: "Clients & chantiers", palier: 1 },
-  { cle: "planning", libelle: "Planning des équipes", palier: 2 },
+  { cle: "planning", libelle: "Planning des équipes", palier: 1 },
   { cle: "pointage", libelle: "Pointage des heures", palier: 2 },
   { cle: "stock", libelle: "Gestion du stock", palier: 3 },
   { cle: "flotte", libelle: "Flotte & véhicules", palier: 3 },

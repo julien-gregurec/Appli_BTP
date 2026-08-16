@@ -148,13 +148,13 @@ Le produit et les documents commerciaux doivent employer exactement la même rè
 
 | Offre | Commercial | Application | Écart |
 |---|---|---|---|
-| Mini | 79 € HT/mois ; 948 € HT/an ; 3 comptes | 3 comptes, 1 administrateur, 10 Go, 100 opérations IA ; socle dashboard, messagerie, clients, chantiers, devis, factures, planning et accès IA ; Checkout prévu | IA indisponible en Production ; cohérence du planning à corriger dans le questionnaire |
-| Pro | 249 € HT/mois ; 2 988 € HT/an ; 15 comptes | 15 comptes, 3 administrateurs, 50 Go, 500 opérations IA ; socle + terrain + gestion ; Checkout prévu | IA indisponible en Production ; supplément de comptes non configuré en Preview |
-| Business | 449 € HT/mois ; 5 388 € HT/an ; 30 comptes | 30 comptes, 6 administrateurs, 150 Go, 1 500 opérations IA ; Pro + pilotage ; Checkout prévu | IA indisponible en Production ; supplément de comptes non configuré en Preview |
-| Entreprise | 599 € HT/mois ; 6 468 € HT/an ; 40 salariés + 10 administrateurs | 50 comptes dont plafond annoncé de 10 administrateurs, 300 Go, 3 000 opérations IA ; tous les paliers ; Checkout prévu | La séparation 40 + 10 est textuelle, son contrôle doit être vérifié ; IA indisponible en Production |
-| Sur mesure | dès 699 € HT/mois ; dès 8 388 € HT/an ; selon besoin | Base technique de 50 comptes, administrateurs à cadrer, 500 Go, 3 000 opérations IA ; tous les paliers ; devis obligatoire | Nécessite vente, contrat et configuration manuels ; ne doit pas être présenté comme achat autonome |
+| Mini | 69 € HT/mois ; 690 € HT/an ; 3 comptes | 3 comptes, 1 administrateur, 10 Go, 100 opérations IA ; socle dashboard, messagerie, clients, chantiers, devis, factures, planning et accès IA ; Checkout prévu | IA indisponible en Production ; planning aligné sur Mini par TARIFS-V2 |
+| Pro | 199 € HT/mois ; 1 990 € HT/an ; 15 comptes | 15 comptes, 3 administrateurs, 50 Go, 500 opérations IA ; socle + terrain + gestion ; Checkout prévu | IA indisponible en Production ; supplément de comptes non configuré en Preview |
+| Business | 399 € HT/mois ; 3 990 € HT/an ; 30 comptes | 30 comptes, 6 administrateurs, 150 Go, 1 500 opérations IA ; Pro + pilotage ; Checkout prévu | IA indisponible en Production ; supplément de comptes non configuré en Preview |
+| Entreprise | 599 € HT/mois ; 5 990 € HT/an ; 40 salariés + 10 administrateurs | 50 comptes dont plafond annoncé de 10 administrateurs, 300 Go, 3 000 opérations IA ; tous les paliers ; Checkout prévu | La séparation 40 + 10 est textuelle, son contrôle doit être vérifié ; IA indisponible en Production |
+| Sur mesure | Sur devis ; selon contrat | Base technique de 50 comptes, administrateurs à cadrer, 500 Go, 3 000 opérations IA ; tous les paliers ; devis obligatoire | Nécessite vente, contrat et configuration manuels ; aucun Checkout autonome |
 
-Les montants correspondent aux documents commerciaux C3. La présentation annuelle correspond actuellement à douze mensualités, sans remise générique. Toute ancienne mention d’une remise annuelle en pourcentage doit être supprimée.
+Les montants correspondent à TARIFS-V2. Le paiement annuel correspond à douze mois d'utilisation facturés au prix de dix mois, soit deux mois offerts.
 
 ### Périmètre fonctionnel
 
