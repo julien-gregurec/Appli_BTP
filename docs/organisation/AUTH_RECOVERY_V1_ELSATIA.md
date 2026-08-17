@@ -125,3 +125,41 @@ Les scénarios déjà couverts par les tests existants (non régressés) : deman
 ## Rollback
 
 Si un problème est constaté après application du template en Preview : recopier l'ancien template Supabase par défaut (ou tout autre template précédent) dans Dashboard → Authentication → Email Templates → Reset Password. Aucune migration de base de données, aucun changement de schéma n'est impliqué dans ce lot — le rollback est une simple restauration de texte de template, immédiate et sans risque de perte de données.
+
+## Déploiement Preview et test humain réel
+
+### Action manuelle Supabase effectuée (par l'utilisateur, 17/08/2026)
+
+- Projet `elsatia-preview` : le template « Reset Password » utilisait encore le template par défaut anglais Supabase (confirmé visuellement avant modification), confirmant la cause racine ci-dessus.
+- Éditer un template nécessite un SMTP personnalisé (limite Supabase, découverte pendant ce lot) : une clé SMTP Brevo dédiée (`elsatia-preview-supabase-auth`) a été créée et configurée dans Dashboard → Authentication → SMTP Settings (hôte `smtp-relay.brevo.com`, port 587, expéditeur `contact@elsatia.fr`), en réutilisant le compte Brevo déjà utilisé par l'application pour les emails devis/factures.
+- Le contenu de `supabase/templates/reset_password.html` a été collé tel quel dans Dashboard → Authentication → Emails → Reset Password, sujet réglé sur « Réinitialisez votre mot de passe ELSATIA ». Sauvegarde confirmée par Supabase (« Successfully updated email template »).
+
+### Déploiement Preview
+
+- Push de la branche `codex/auth-recovery-v1` sur GitHub, puis `npx vercel deploy` depuis le worktree — déploiement `Ready` en ~2 min.
+- URL Preview testée : `https://elsatia-preview-9v522rxaa-julien-gregurec1.vercel.app`
+
+### Parcours humain réel testé (Safari macOS)
+
+1. Compte de test : `julien.gregurec+authelsatia@gmail.com` (existant dans `elsatia-preview`).
+2. Formulaire « Mot de passe oublié » soumis depuis la Preview → email reçu avec le nouveau template ELSATIA (fond bleu marine, bouton « Réinitialiser mon mot de passe »), confirmant que le SMTP et le template sont bien pris en compte.
+3. Clic sur le lien de l'email → atterrissage sur `/auth/confirm` (page « Confirmation », bouton « Confirmer ») — **pas** de « Lien de connexion invalide ou expiré » : le symptôme d'origine ne se reproduit plus.
+4. Clic sur « Confirmer » → redirection correcte vers `/nouveau-mot-de-passe`.
+5. Nouveau mot de passe saisi et enregistré → redirection vers `/login` avec message « Mot de passe modifié. Vous pouvez maintenant vous connecter. »
+6. Connexion avec le nouveau mot de passe → réussie (redirection vers `/onboarding`, normal pour ce compte de test non rattaché à une entreprise — sans rapport avec ce lot).
+
+**Portée exacte de ce test humain, sans exagération** : le chemin nominal complet (email → lien → confirmation → nouveau mot de passe → connexion) a été vérifié en conditions réelles sur Safari macOS. Sur décision explicite de l'utilisateur, les scénarios suivants n'ont **pas** été rejoués manuellement en Preview après ce test réussi (ils restent couverts uniquement par la vérification de code et les tests automatisés déjà documentés plus haut) :
+- Ancien mot de passe refusé après rotation.
+- Lien expiré / double ouverture réels.
+- Chrome et vue mobile.
+- Protection session croisée (A connecté, lien de B) en conditions réelles — garantie par la lecture de `src/lib/supabase/server.ts` (remplacement direct des cookies, jamais fusion), non par un test d'intégration live.
+
+### Incident d'infrastructure rencontré pendant ce lot (sans rapport avec le code applicatif)
+
+Le `git push` et `vercel deploy` sont restés bloqués pendant une longue durée (réseau, SSH, proxy, iCloud Drive et antivirus tous exclus tour à tour). La cause réelle : **une corruption du système de fichiers locale** sur le volume de données du Mac, détectée et réparée par Utilitaire de disque → Premiers secours (« Le volume … s'avère être endommagé et doit être réparé » → réparations différées → « semble en bon état », code de sortie 0). Après réparation et redémarrage, `git push` et `vercel deploy` ont fonctionné normalement. Aucun impact sur le code ni sur les données de l'application — mentionné ici uniquement pour traçabilité, en cas de nouvelle lenteur anormale à l'avenir sur ce Mac.
+
+## Verdict
+
+**AUTH-RECOVERY-V1 PREVIEW VALIDÉ — PRÊT POUR PRODUCTION**
+
+Le parcours nominal de récupération de mot de passe fonctionne de bout en bout en Preview, avec le template et le SMTP désormais correctement configurés. Avant d'appliquer le même changement en Production : voir « Procédure Production » ci-dessus — action manuelle Dashboard Production requise (template + SMTP), jamais exécutée automatiquement. Conformément à la consigne reçue, **aucun déploiement Production n'a été effectué** dans le cadre de ce lot.
