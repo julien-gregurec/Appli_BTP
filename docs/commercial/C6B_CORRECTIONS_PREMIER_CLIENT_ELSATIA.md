@@ -120,3 +120,14 @@ Restent hors C6-B :
 - migration Production de TARIFS-V2 / ADMIN-V1 / PROMO-V1 / C6-B après autorisation dédiée ;
 - décisions documentaires, juridiques et communications d’onboarding de C6-C/C6-D ;
 - contrôles complets mobile, planning, rentabilité et note de frais au-delà des non-régressions ciblées.
+
+## 9. Vérification humaine finale — Preview (17 août 2026, reprise pilotée par Claude)
+
+Point resté ouvert en section 7 (« la création interactive d'un compte fictif n'a pas été finalisée dans le navigateur ») : complété ici.
+
+- Branche `codex/c6b-corrections-premier-client` (`a600155`) poussée sur le remote GitHub (absente jusqu'ici — aucune sauvegarde distante).
+- Nouveau déploiement Vercel Preview du même commit : `dpl_9njkEWa9GcC59wUnyxPcq2nMgAd1`, `https://elsatia-preview-e4fmzmj6f-julien-gregurec1.vercel.app`, statut `READY` (`target: null`, confirmé Preview — précédent déploiement `dpl_E7GHhbR6vVnkfGt4pJdo8nCW6hj5` mentionné en §1 restait valable mais non repoussé sur le remote).
+- Vérification humaine réelle par l'utilisateur sur `/abonnement` de ce déploiement, pour un tenant réel côté Supabase Preview (`pgvvpqyjziyapbbkydmc`) : **Statut = Essai**, **Offre = Mini · mensuel**, prochaine échéance **16/09/2026**, tarif **69,00 € HT/mois**, **3 comptes inclus**, **0 compte supplémentaire facturable**, quotas stockage/IA affichés normalement, aucun état « À choisir », aucune erreur visible.
+- Ces valeurs correspondent exactement à la grille officielle TARIFS-V2 (Mini = 69 €/mois, 3 comptes inclus) et à la logique d'essai décrite en §3 (échéance = date de début + 30 jours, autoritaire côté base) — cohérence UI ↔ Supabase Preview confirmée.
+
+**Verdict : C6-B PREVIEW VALIDÉ — BLOCANTS PREMIER CLIENT CORRIGÉS**
