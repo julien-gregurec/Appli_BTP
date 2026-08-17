@@ -6,11 +6,6 @@ select plan(19);
 
 \ir fixtures/isolation_multitenant.inc
 
--- Contournement local uniquement : sur cette instance de développement, le rôle
--- authenticated n'a pas les grants sur lignes_devis (a l'inverse de elsatia-preview, ou ils
--- sont presents) ; sans effet hors de cette transaction, annulee par le rollback final.
-grant insert, select, update, delete on public.lignes_devis to authenticated;
-
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000001', true);
 select set_config('request.jwt.claim.email', 'admin-a@invalid.local', true);

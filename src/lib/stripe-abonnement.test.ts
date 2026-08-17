@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   calculerFacturationStockage,
+  finEssaiStripeUnix,
   prixStripeCompteSupplementairePour,
   prixOptionIAStripePour,
   prixStripePour,
@@ -79,6 +80,21 @@ describe("statuts Stripe Billing", () => {
     ["incomplete_expired", "annule"],
   ])("convertit %s en %s", (stripe, attendu) => {
     expect(statutAbonnementDepuisStripe(stripe)).toBe(attendu);
+  });
+});
+
+describe("échéance d'essai Stripe", () => {
+  it("reprend l'échéance absolue ELSATIA sans ajouter 30 jours", () => {
+    expect(finEssaiStripeUnix("2026-09-15", Date.parse("2026-08-26T12:00:00Z")))
+      .toBe(Math.floor(Date.parse("2026-09-15T23:59:59Z") / 1000));
+  });
+
+  it("ne crée aucun nouvel essai après expiration", () => {
+    expect(finEssaiStripeUnix("2026-08-20", Date.parse("2026-08-21T00:00:00Z"))).toBeNull();
+  });
+
+  it("respecte le minimum Stripe de 48 heures sans prolonger l'échéance", () => {
+    expect(finEssaiStripeUnix("2026-08-22", Date.parse("2026-08-21T12:00:00Z"))).toBeNull();
   });
 });
 

@@ -46,6 +46,11 @@ export async function demarrerAbonnementAction(formData: FormData) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user?.email) redirect("/login");
+  const { data: entreprise } = await supabase
+    .from("entreprises")
+    .select("abonnement_essai_fin")
+    .eq("id", ctx.entrepriseId)
+    .single();
 
   let destination: string;
   try {
@@ -58,6 +63,7 @@ export async function demarrerAbonnementAction(formData: FormData) {
       customerId,
       offre,
       periodicite,
+      essaiFin: entreprise?.abonnement_essai_fin ?? null,
     });
     if (!session.url) throw new Error("Stripe n’a pas retourné de page de paiement");
     destination = session.url;
@@ -67,6 +73,43 @@ export async function demarrerAbonnementAction(formData: FormData) {
     redirect(`${retourErreur}${separateur}error=${encodeURIComponent("Souscription impossible pour le moment. Réessayez ou contactez-nous.")}`);
   }
   redirect(destination);
+}
+
+export async function demarrerAbonnementSuspenduAction(formData: FormData) {
+  const offre = String(formData.get("offre") ?? "");
+  const periodicite = String(formData.get("periodicite") ?? "mensuel");
+  if (!estOffreAbonnement(offre) || offre === "sur_mesure" || !estPeriodiciteAbonnement(periodicite)) {
+    redirect(`/abonnement-suspendu?error=${encodeURIComponent("Offre ou périodicité invalide")}`);
+  }
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user?.email) redirect("/login");
+  const { data: profil } = await supabase.from("utilisateurs").select("entreprise_active_id").eq("id", user.id).maybeSingle();
+  if (!profil?.entreprise_active_id) redirect("/onboarding");
+  const [{ data: appartenance }, { data: entreprise }] = await Promise.all([
+    supabase.from("utilisateurs_entreprises").select("poste_id").eq("utilisateur_id", user.id).eq("entreprise_id", profil.entreprise_active_id).eq("statut", "actif").maybeSingle(),
+    supabase.from("entreprises").select("abonnement_essai_fin").eq("id", profil.entreprise_active_id).maybeSingle(),
+  ]);
+  const { data: permission } = appartenance?.poste_id
+    ? await supabase.from("permissions_poste").select("autorise").eq("entreprise_id", profil.entreprise_active_id).eq("poste_id", appartenance.poste_id).eq("cle_permission", "gerer_parametres").eq("autorise", true).maybeSingle()
+    : { data: null };
+  if (!permission) redirect(`/abonnement-suspendu?error=${encodeURIComponent("Seul un administrateur peut souscrire un abonnement")}`);
+  try {
+    const customerId = await creerOuRecupererClientStripe({ entrepriseId: profil.entreprise_active_id, email: user.email });
+    const session = await creerSessionAbonnementStripe({
+      entrepriseId: profil.entreprise_active_id,
+      customerId,
+      offre,
+      periodicite,
+      essaiFin: entreprise?.abonnement_essai_fin ?? null,
+    });
+    if (!session.url) throw new Error("Stripe n’a pas retourné de page de paiement");
+    redirect(session.url);
+  } catch (error) {
+    if (error && typeof error === "object" && "digest" in error) throw error;
+    console.error("demarrerAbonnementSuspenduAction", error);
+    redirect(`/abonnement-suspendu?error=${encodeURIComponent("Souscription impossible pour le moment. Réessayez ou contactez-nous.")}`);
+  }
 }
 
 export async function ouvrirPortailAbonnementAction() {

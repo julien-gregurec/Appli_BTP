@@ -71,7 +71,9 @@ async function synchroniserAbonnement(entrepriseId: string, abonnement: StripeSu
     stripe_customer_id: identifiant(abonnement.customer),
     abonnement_statut: statut,
     abonnement_echeance: dateDepuisUnix(abonnement.current_period_end),
-    abonnement_essai_fin: dateDepuisUnix(abonnement.trial_end),
+    // La période d'essai ELSATIA est créée avec l'entreprise et reste l'autorité.
+    // Le webhook synchronise le statut Stripe, mais ne peut jamais recréer ou
+    // prolonger les 30 jours à partir d'un Checkout tardif.
     abonnement_annulation_prevue_at: abonnement.cancel_at_period_end ? instantDepuisUnix(abonnement.cancel_at || abonnement.current_period_end) : null,
     updated_at: new Date().toISOString(),
   };

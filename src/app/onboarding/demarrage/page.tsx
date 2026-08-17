@@ -22,7 +22,7 @@ export default async function DemarragePage() {
     { title: "Créer un premier client", description: "Une fiche client centralise ses coordonnées, chantiers, devis et factures.", href: "/clients/nouveau", action: "Créer un client", done: (clients.count ?? 0) > 0 },
     { title: "Établir un premier devis", description: "Ajoutez les prestations, contrôlez les totaux puis envoyez le document au client.", href: "/devis/nouveau", action: "Créer un devis", done: (quotes.count ?? 0) > 0 },
     { title: "Ouvrir un chantier", description: "Associez le client, le devis accepté et les membres de l’équipe chargés des travaux.", href: "/chantiers/nouveau", action: "Créer un chantier", done: (jobs.count ?? 0) > 0 },
-    { title: "Tester le suivi du temps", description: "Vérifiez le pointage personnel, le chantier sélectionné et le circuit de validation.", href: "/pointage", action: "Ouvrir le pointage", done: (timeEntries.count ?? 0) > 0 },
+    { title: "Activer et tester mon pointage", description: "Le dirigeant choisit explicitement d’activer sa fiche personnelle, puis pointe uniquement en son nom sur un chantier.", href: "/pointage", action: "Configurer mon pointage", done: (timeEntries.count ?? 0) > 0 },
   ];
   const completed = steps.filter((step) => step.done).length;
 

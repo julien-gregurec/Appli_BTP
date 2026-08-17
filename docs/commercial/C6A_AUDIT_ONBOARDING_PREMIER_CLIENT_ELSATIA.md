@@ -8,6 +8,16 @@ Nature de l’audit : lecture du code et de la configuration, contrôles locaux 
 
 Exclusions : aucune correction applicative, aucun paiement réel, aucune écriture Production, aucun contact prospect
 
+## Addendum C6-B — 17 août 2026
+
+Les trois blocants fonctionnels repris par C6-B ont été corrigés et validés en Local, puis la migration dédiée `20260816000204_c6b_corrections_premier_client.sql` a été appliquée isolément au projet Supabase Preview :
+
+- les privilèges SQL manquants sur `lignes_devis` ont été ajoutés sans desserrer les politiques RLS ; le même défaut indépendant sur `lignes_factures`, nécessaire au parcours devis → facture, a été corrigé dans le même périmètre ;
+- l’essai possède désormais une date de début serveur et une date de fin autoritaire fixée à 30 jours, indépendamment de la finalisation de Stripe Checkout ; un utilisateur de l’entreprise ne peut modifier ni prolonger ces données ;
+- le dirigeant peut choisir explicitement d’activer son propre pointage depuis l’onboarding ; cette action crée ou rattache uniquement sa fiche salarié, sans création silencieuse lors du bootstrap.
+
+Les tests locaux C6-B, devis/factures, abonnement, pointage, isolation multi-tenant, ADMIN-V1 et PROMO-V1 sont réussis. Le déploiement Vercel Preview `dpl_E7GHhbR6vVnkfGt4pJdo8nCW6hj5` est `Ready`. Cet addendum ne vaut pas validation Production : aucune migration, variable, donnée ou ressource Stripe Live n’a été modifiée.
+
 ## 1. Verdict exécutif
 
 ELSATIA dispose déjà d’un parcours d’accueil structuré, d’une séparation multi-entreprise robuste, d’un système de rôles, d’imports utiles et d’une base d’abonnement Stripe cohérente. Un dirigeant peut créer un compte, créer son entreprise, choisir une offre, compléter un parcours de démarrage, ajouter des collaborateurs et saisir une partie des premières données.

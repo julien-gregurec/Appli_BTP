@@ -14,28 +14,28 @@ Chaque preuve doit comporter une date, l’environnement, le responsable et un l
 
 ### Produit
 
-- [ ] Le correctif des privilèges `lignes_devis` est appliqué dans l’environnement cible.
-- [ ] Un dirigeant neuf peut créer un devis avec au moins une ligne.
-- [ ] Le devis peut être transformé ou repris pour produire une première facture.
-- [ ] Le scénario client → devis → facture → chantier est couvert par un test automatique.
-- [ ] Le premier administrateur peut pointer ou reçoit une étape explicite pour activer son profil de pointage.
-- [ ] Les tests TypeScript, lint, applicatifs et base de données sont réussis sur le commit candidat.
+- [x] Le correctif des privilèges `lignes_devis` est appliqué dans l’environnement cible. Preuve : migration C6-B appliquée isolément en Supabase Preview le 17/08/2026.
+- [x] Un dirigeant neuf peut créer un devis avec au moins une ligne. Preuve : test DB C6-B sur tenant neuf, 17/08/2026.
+- [x] Le devis peut être transformé ou repris pour produire une première facture. Preuve : test DB C6-B, y compris reprise de lignes et absence de doublon, 17/08/2026.
+- [x] Le scénario client → devis → facture → chantier est couvert par un test automatique. Preuve : tests C6-B et isolation devis/factures, 17/08/2026.
+- [x] Le premier administrateur peut pointer ou reçoit une étape explicite pour activer son profil de pointage. Preuve : RPC et tests C6-B dirigeant pointable/non pointable, 17/08/2026.
+- [x] Les tests TypeScript, lint, applicatifs et base de données sont réussis sur le commit candidat. Preuve : 311 tests applicatifs, 335 assertions DB, TypeScript, lint et build, 17/08/2026.
 
 ### Essai
 
-- [ ] La date exacte de début de l’essai est définie.
-- [ ] La date de fin est fixée automatiquement à 30 jours.
-- [ ] Un utilisateur ne peut pas contourner l’échéance en évitant Stripe.
-- [ ] Le comportement au jour 30 est testé.
+- [x] La date exacte de début de l’essai est définie. Preuve : trigger serveur C6-B et test tenant neuf, 17/08/2026.
+- [x] La date de fin est fixée automatiquement à 30 jours. Preuve : contrainte et test DB C6-B, 17/08/2026.
+- [x] Un utilisateur ne peut pas contourner l’échéance en évitant Stripe. Preuve : date créée avant Checkout et protection serveur contre la modification client, 17/08/2026.
+- [x] Le comportement au jour 30 est testé. Preuve : test d’expiration sans création d’un nouvel essai Stripe et écran de souscription après suspension, 17/08/2026.
 - [ ] Le comportement après activation d’un abonnement est testé.
 - [ ] Le discours commercial, l’interface et les CGV décrivent la même règle.
 
 ### Environnement
 
 - [ ] Le commit candidat est identifié et approuvé.
-- [ ] Toutes les migrations attendues sont présentes dans l’environnement cible.
+- [x] Toutes les migrations C6-B attendues sont présentes dans l’environnement cible. Preuve : `20260816000204` appliquée isolément en Preview ; `20260812000200` demeure volontairement absente et hors périmètre.
 - [ ] La migration `20260812000200` a été revue puis appliquée si requise.
-- [ ] Aucun secret n’est présent dans Git, les captures ou les rapports.
+- [x] Aucun secret n’est présent dans Git, les captures ou les rapports. Preuve : contrôle `verify:secrets`, 17/08/2026.
 - [ ] La sauvegarde, la restauration et la procédure de retour arrière ont été contrôlées.
 
 **Décision :** si une case de cette section reste non vérifiée, **NO GO CLIENT**.

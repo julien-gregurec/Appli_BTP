@@ -6,7 +6,7 @@ import {
   TYPES_COMPTES_TARIFAIRES,
   type TypeCompteTarifaire,
 } from "@/lib/facturation-comptes";
-import { DUREE_ESSAI_JOURS, offreParCle } from "@/lib/plateforme";
+import { offreParCle } from "@/lib/plateforme";
 import { MOIS_FACTURES_EN_ANNUEL } from "@/lib/tarification";
 
 export const OFFRES_ABONNEMENT = ["essentiel", "premium", "mini", "pro", "business", "entreprise", "sur_mesure"] as const;
@@ -15,6 +15,18 @@ export const PERIODICITES_ABONNEMENT = ["mensuel", "annuel"] as const;
 export type OffreAbonnement = (typeof OFFRES_ABONNEMENT)[number];
 export type PeriodiciteAbonnement = (typeof PERIODICITES_ABONNEMENT)[number];
 export type StatutAbonnement = "essai" | "actif" | "suspendu" | "annule";
+
+const DELAI_MINIMUM_ESSAI_STRIPE_MS = 48 * 60 * 60 * 1000;
+
+// La base ELSATIA est l'autorité de la période d'essai. Stripe ne reçoit cette
+// échéance que lorsqu'elle respecte son minimum de 48 heures ; jamais une nouvelle
+// durée relative qui pourrait prolonger l'essai après un Checkout abandonné.
+export function finEssaiStripeUnix(dateFin: string | null, maintenantMs = Date.now()) {
+  if (!dateFin || !/^\d{4}-\d{2}-\d{2}$/.test(dateFin)) return null;
+  const finMs = Date.parse(`${dateFin}T23:59:59.000Z`);
+  if (!Number.isFinite(finMs) || finMs < maintenantMs + DELAI_MINIMUM_ESSAI_STRIPE_MS) return null;
+  return Math.floor(finMs / 1000);
+}
 
 export const OCTETS_PAR_GO = 1_000_000_000;
 export const TARIF_STOCKAGE_SUPPLEMENTAIRE_HT_PAR_GO = 0.5;
@@ -220,6 +232,7 @@ export async function creerSessionAbonnementStripe(params: {
   customerId: string;
   offre: OffreAbonnement;
   periodicite: PeriodiciteAbonnement;
+  essaiFin: string | null;
 }) {
   const prix = prixStripePour(params.offre, params.periodicite);
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
@@ -237,11 +250,12 @@ export async function creerSessionAbonnementStripe(params: {
     "metadata[entreprise_id]": params.entrepriseId,
     "metadata[offre]": params.offre,
     "metadata[periodicite]": params.periodicite,
-    "subscription_data[trial_period_days]": String(DUREE_ESSAI_JOURS),
     "subscription_data[metadata][entreprise_id]": params.entrepriseId,
     "subscription_data[metadata][offre]": params.offre,
     "subscription_data[metadata][periodicite]": params.periodicite,
   });
+  const trialEnd = finEssaiStripeUnix(params.essaiFin);
+  if (trialEnd !== null) corps.set("subscription_data[trial_end]", String(trialEnd));
   if (process.env.STRIPE_AUTOMATIC_TAX_ENABLED === "true") {
     corps.set("automatic_tax[enabled]", "true");
   }
