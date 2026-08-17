@@ -4,6 +4,7 @@ import { loginAction } from "@/app/actions/auth";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { PiedLegal } from "@/components/PiedLegal";
 import { BrandWordmark } from "@/components/BrandWordmark";
+import { ChampMotDePasse } from "@/components/ChampMotDePasse";
 import { PRODUCT_NAME } from "@/lib/brand";
 
 export default async function LoginPage({
@@ -52,14 +53,7 @@ export default async function LoginPage({
               <label htmlFor="password" className="text-sm font-medium">Mot de passe</label>
               <Link href="/mot-de-passe-oublie" className="text-xs text-neutral-500 underline">Mot de passe oublié ?</Link>
             </div>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              required
-              autoComplete="current-password"
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
-            />
+            <ChampMotDePasse id="password" name="password" required autoComplete="current-password" />
           </div>
           <button
             type="submit"
