@@ -1,6 +1,6 @@
 # RENTABILITÉ-V1 — Checklist des écarts
 
-Référence : `docs/commercial/RENTABILITE_V1_AUDIT_ELSATIA.md`. Les 3 écarts P0 ont été corrigés dans RENTABILITÉ-V1B (voir `docs/commercial/RENTABILITE_V1B_CORRECTIONS_P0_ELSATIA.md`) ; P1/P2/P3 restent non traités, à dessein.
+Référence : `docs/commercial/RENTABILITE_V1_AUDIT_ELSATIA.md`. Les 3 écarts P0 ont été corrigés dans RENTABILITÉ-V1B (voir `docs/commercial/RENTABILITE_V1B_CORRECTIONS_P0_ELSATIA.md`). RENTABILITÉ-V1C (voir `docs/commercial/RENTABILITE_V1C_PREVISIONNEL_ELSATIA.md`) a corrigé 2 des P1 (prévu/réalisé CA+heures, sous-traitance prévisionnelle consommée) ; les P1 restants et P2/P3 restent non traités, à dessein.
 
 ## P0 — Bloquant commercialisation
 
@@ -10,12 +10,12 @@ Référence : `docs/commercial/RENTABILITE_V1_AUDIT_ELSATIA.md`. Les 3 écarts P
 
 ## P1 — Important avant premier client
 
-- [ ] Relier `chantiers.budget_previsionnel` aux devis acceptés, ou supprimer ce champ au profit de la seule source réellement utilisée.
-- [ ] Décider d'un vrai concept d'avenant (au minimum un lien de parenté entre devis), ou documenter officiellement que « nouveau devis sur le même chantier » est la méthode voulue.
+- [ ] Relier `chantiers.budget_previsionnel` aux devis acceptés, ou supprimer ce champ au profit de la seule source réellement utilisée. **Non corrigé V1C** — décision : les deux notions restent distinctes (`caPrevuHt`, basé sur les devis, est désormais exposé séparément à côté du champ manuel).
+- [ ] Décider d'un vrai concept d'avenant (au minimum un lien de parenté entre devis), ou documenter officiellement que « nouveau devis sur le même chantier » est la méthode voulue. Reste pour AVENANTS-V1.
 - [ ] Ajouter une policy RLS restrictive sur `mouvements_stock` (actuellement lisible par tout membre actif sans permission).
-- [ ] Corriger le garde-fou de surfacturation pour qu'il tienne compte de `situations_travaux` (aujourd'hui contournable en combinant les deux mécanismes).
-- [ ] Décider si achats engagés (commandes non facturées) et sous-traitance prévisionnelle doivent entrer dans un futur calcul de « coûts prévus ».
-- [ ] Ajouter une comparaison prévu/réalisé (CA et marge) sur l'écran `/rentabilite` — actuellement seul le réalisé est affiché.
+- [ ] Corriger le garde-fou de surfacturation pour qu'il tienne compte de `situations_travaux` (aujourd'hui contournable en combinant les deux mécanismes). Reste pour Facturation BTP.
+- [x] Sous-traitance prévisionnelle consommée dans un calcul de coûts prévus. **Corrigé RENTABILITÉ-V1C** : `sous_traitants_chantiers.montant_previsionnel_ht` exposé comme `coutSousTraitancePrevu`. Achats engagés (commandes non facturées) restent non consommés — hors périmètre V1C (futur COMMANDES-V1).
+- [x] Ajouter une comparaison prévu/réalisé sur l'écran `/rentabilite`. **Corrigé RENTABILITÉ-V1C** pour CA et heures (sources fiables) ; coût MO/achats/marge prévus restent affichés « Non renseigné », faute de source de coût fiable dans le modèle de données actuel (voir §2 du document V1C).
 - [ ] Uniformiser `coutNotesFrais` en HT (actuellement seul poste en TTC dans la formule de marge).
 
 ## P2 — Amélioration post-lancement
@@ -36,3 +36,4 @@ Référence : `docs/commercial/RENTABILITE_V1_AUDIT_ELSATIA.md`. Les 3 écarts P
 ## Non exécuté dans ce lot (à faire en suivi immédiat recommandé)
 
 - [x] Chantier fictif Local/Preview avec injection progressive de données réelles (devis 8 000 € HT, facturation, MO, achats, sous-traitance, stock, notes de frais, facture annulée, pointage rejeté) pour valider empiriquement les constats ci-dessus. **Fait RENTABILITÉ-V1B** : chantier « Audit Rentabilité P0 » construit en Local (vérifié programmatiquement contre `calculerRentabiliteChantiers` réelle) et en Preview (entreprise ELSATIA — Recette Preview, pour vérification visuelle humaine).
+- [x] Chantier fictif prévu/réalisé (devis 10 000 € HT avec lignes typées, dérive heures/achats, devis refusé exclu). **Fait RENTABILITÉ-V1C** : chantier « Prevu Realise V1C » construit et vérifié en Local contre `calculerPrevuRealiseChantiers` réelle, reconstruit en Preview pour vérification visuelle humaine.
