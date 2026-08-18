@@ -40,10 +40,21 @@ function payloadEmploye(formData: FormData) {
     date_entree: champ(formData, "date_entree"),
     date_sortie: statut === "sorti" ? champ(formData, "date_sortie") : null,
     taux_horaire: nombre(formData, "taux_horaire"),
-    cout_horaire: nombre(formData, "cout_horaire"),
     statut,
     notes: champ(formData, "notes"),
   };
+}
+
+// Coût interne isolé dans sa propre table protégée (RLS restrictive par
+// permission voir_cout_interne_employe/acces_rentabilite) : voir
+// 20260818000205_securiser_cout_horaire_employe.sql. L'écriture reste
+// gérée ici (gerer_employes déjà vérifié par exigerGestionEmployes), en
+// upsert séparé plutôt que dans le payload de la table employes.
+async function enregistrerCoutHoraire(supabase: Awaited<ReturnType<typeof createClient>>, entrepriseId: string, employeId: string, formData: FormData) {
+  const { error } = await supabase
+    .from("employes_cout_horaire")
+    .upsert({ employe_id: employeId, entreprise_id: entrepriseId, cout_horaire: nombre(formData, "cout_horaire"), updated_at: new Date().toISOString() }, { onConflict: "employe_id" });
+  return error;
 }
 
 export async function creerEmployeAction(formData: FormData) {
@@ -70,6 +81,11 @@ export async function creerEmployeAction(formData: FormData) {
 
   if (error || !data) {
     redirect(`/employes/nouveau?error=${encodeURIComponent(error?.message ?? "Erreur")}`);
+  }
+
+  const erreurCout = await enregistrerCoutHoraire(supabase, ctx.entrepriseId, data.id, formData);
+  if (erreurCout) {
+    redirect(`/employes/${data.id}?error=${encodeURIComponent(messageErreurUtilisateur("creerEmployeAction", erreurCout, "Employé créé, mais le coût horaire n’a pas pu être enregistré."))}`);
   }
 
   revalidatePath("/employes");
@@ -100,6 +116,11 @@ export async function modifierEmployeAction(employeId: string, formData: FormDat
 
   if (error) {
     redirect(`/employes/${employeId}/modifier?error=${encodeURIComponent(messageErreurUtilisateur("modifierEmployeAction", error, "Impossible d’enregistrer les modifications de l’employé."))}`);
+  }
+
+  const erreurCout = await enregistrerCoutHoraire(supabase, ctx.entrepriseId, employeId, formData);
+  if (erreurCout) {
+    redirect(`/employes/${employeId}/modifier?error=${encodeURIComponent(messageErreurUtilisateur("modifierEmployeAction", erreurCout, "Le reste de la fiche est enregistré, mais le coût horaire n’a pas pu être mis à jour."))}`);
   }
 
   revalidatePath("/employes");

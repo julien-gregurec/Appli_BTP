@@ -225,7 +225,8 @@ export const OUTILS_COPILOTE: OutilIA[] = [
   {
     nom: "rentabilite_chantiers",
     description:
-      "Liste la rentabilité de chaque chantier (facturé HT, coût main-d'œuvre, achats, sous-traitance, marge, taux de marge), " +
+      "Liste la rentabilité de chaque chantier (facturé HT, coût main-d'œuvre pointé et validé, achats, sous-traitance, " +
+      "indemnités de paie, stock consommé, notes de frais, marge, taux de marge) — mêmes chiffres que la page Rentabilité, " +
       "du moins rentable au plus rentable. Utilise cet outil pour toute question sur la marge, le résultat, les coûts ou la rentabilité d'un ou plusieurs chantiers.",
     parametres: { type: "object", properties: {} },
   },

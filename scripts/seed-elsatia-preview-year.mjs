@@ -124,9 +124,13 @@ function buildPlan() {
     prenom, nom, email: key === "GERANT" ? MANAGER_EMAIL : `${prenom.toLowerCase()}.${nom.toLowerCase()}@example.invalid`,
     telephone: `+33 0 00 00 ${String(index).padStart(2, "0")} ${String(index + 10).padStart(2, "0")}`,
     poste: role, type_contrat: type, date_entree: entry, date_sortie: exit, statut: status,
-    taux_horaire: round(13.5 + index * 0.85), cout_horaire: round(22 + index * 1.25),
+    taux_horaire: round(13.5 + index * 0.85),
     notes: marker(key === "GERANT" ? "fiche Gérant reliée au compte existant" : "salarié fictif sans compte Auth"),
     __key: key, __role: role,
+  }));
+  // Table dédiée (RLS restrictive), hors mécanisme générique id-based: écrite via writeEmployeeCosts.
+  const employeeCosts = employees.map((employee, index) => ({
+    employe_id: employee.id, entreprise_id: COMPANY_ID, cout_horaire: round(22 + index * 1.25),
   }));
 
   const clients = Array.from({ length: 23 }, (_, index) => {
@@ -384,7 +388,7 @@ function buildPlan() {
   }));
 
   return {
-    employees, clients, contacts, chantiers, prestations, devis, lignesDevis, factures, lignesFactures, paiements,
+    employees, employeeCosts, clients, contacts, chantiers, prestations, devis, lignesDevis, factures, lignesFactures, paiements,
     suppliers, commandes, lignesCommande, supplierExpenses, articles, stockMovements,
     affectations, pointages, absences, vehicles, vehicleHistory, tools, toolMovements, expenses, tasks, notifications, documents,
   };
@@ -392,7 +396,7 @@ function buildPlan() {
 
 function validatePlan(plan) {
   const expected = {
-    employees: 12, clients: 23, contacts: 25, chantiers: 20, prestations: 24, devis: 35,
+    employees: 12, employeeCosts: 12, clients: 23, contacts: 25, chantiers: 20, prestations: 24, devis: 35,
     factures: 25, paiements: 20, suppliers: 9, commandes: 18, supplierExpenses: 30,
     articles: 30, stockMovements: 100, affectations: 780, pointages: 1500, absences: 30,
     vehicles: 6, vehicleHistory: 45, tools: 50, toolMovements: 75, expenses: 80, tasks: 60,
@@ -762,6 +766,29 @@ async function writeOwned(client, table, rows, { insertOnly = false } = {}) {
   abort(`écriture non insert-only interdite pour ${table}`);
 }
 
+// employes_cout_horaire est clé par employe_id (pas d'id propre): hors mécanisme générique id-based ci-dessus.
+async function writeEmployeeCosts(client, rows) {
+  const clean = cleanRows(rows);
+  if (!clean.length) return;
+  const employeeIds = clean.map((row) => row.employe_id);
+  if (new Set(employeeIds).size !== employeeIds.length) abort("employe_id déterministe dupliqué dans employes_cout_horaire");
+  const { data: existing, error } = await client
+    .from("employes_cout_horaire")
+    .select("employe_id,entreprise_id,cout_horaire")
+    .eq("entreprise_id", COMPANY_ID)
+    .in("employe_id", employeeIds);
+  if (error) abort(`lecture de reprise employes_cout_horaire: ${error.message}`);
+  const plannedByEmployeeId = new Map(clean.map((row) => [row.employe_id, row]));
+  for (const row of existing ?? []) {
+    if (row.entreprise_id !== COMPANY_ID) abort("ligne employes_cout_horaire retournée pour une autre entreprise");
+    assertStoredRowMatches(row, plannedByEmployeeId.get(row.employe_id), ["cout_horaire"], "coût horaire déterministe existant incompatible");
+  }
+  const existingIds = new Set((existing ?? []).map((row) => row.employe_id));
+  const missing = clean.filter((row) => !existingIds.has(row.employe_id));
+  if (!missing.length) return;
+  await insertRowsInBatches(client, "employes_cout_horaire", missing);
+}
+
 function executionSteps(plan, context) {
   validateSupplierExpenses(plan);
   const managerEmployee = plan.employees.find((row) => row.__key === "GERANT");
@@ -838,6 +865,7 @@ async function executePlan(client, plan, context) {
     if (step.operation === "emit") await emitSeedInvoices(client, step.rows);
     else await writeOwned(client, step.table, step.rows, { insertOnly: true });
   }
+  await writeEmployeeCosts(client, plan.employeeCosts);
 }
 
 async function readRowsByIds(client, table, ids, columns) {

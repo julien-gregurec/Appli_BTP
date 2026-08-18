@@ -5,50 +5,39 @@ import { euros } from "@/lib/devis";
 import { Lien as Link } from "@/components/Lien";
 import { AnalyseRentabiliteIA } from "@/components/AnalyseRentabiliteIA";
 import { iaEstActive } from "@/lib/preview-features";
+import { calculerRentabiliteChantiers } from "@/lib/rentabilite";
 
-type PointageRentabilite = { chantier_id: string; heures_normales: number; heures_supplementaires: number; employe: { cout_horaire: number | null } | { cout_horaire: number | null }[] | null };
-type MouvementStockRentabilite = { chantier_id: string; quantite: number; article: { prix_achat_ht: number } | { prix_achat_ht: number }[] | null };
 const un = <T,>(valeur: T | T[] | null): T | null => Array.isArray(valeur) ? valeur[0] ?? null : valeur;
 
 export default async function RentabilitePage() {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const peutUtiliserIA = iaEstActive() && aAccesIA(await permissionsUtilisateur(ctx));
-  const [{ data: chantiers }, { data: factures }, { data: devis }, { data: donneesPointages }, { data: depenses }, { data: donneesIndemnites }, { data: donneesMouvementsStock }, { data: donneesNotesFrais }] = await Promise.all([
+  const [{ data: chantiers }, calculs] = await Promise.all([
     supabase.from("chantiers").select("id, reference_interne, nom, statut, client:clients(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
-    supabase.from("factures").select("chantier_id, montant_ht, statut, type").eq("entreprise_id", ctx.entrepriseId),
-    supabase.from("devis").select("chantier_id, montant_ht, statut").eq("entreprise_id", ctx.entrepriseId).eq("statut", "accepte"),
-    supabase.from("pointages").select("chantier_id, heures_normales, heures_supplementaires, employe:employes(cout_horaire)").eq("entreprise_id", ctx.entrepriseId).eq("verification_statut", "valide"),
-    supabase.from("depenses_fournisseurs").select("chantier_id, montant_ht, statut, categorie").eq("entreprise_id", ctx.entrepriseId),
-    supabase.rpc("couts_indemnites_paie_par_chantier", { p_entreprise_id: ctx.entrepriseId }),
-    supabase.from("mouvements_stock").select("chantier_id, quantite, article:articles_stock(prix_achat_ht)").eq("entreprise_id", ctx.entrepriseId).eq("type", "sortie").not("chantier_id", "is", null),
-    supabase.from("notes_frais").select("chantier_id, montant_ttc, statut").eq("entreprise_id", ctx.entrepriseId).not("chantier_id", "is", null).in("statut", ["valide", "exporte_comptabilite", "verrouille", "archive", "validee", "remboursee"]),
+    calculerRentabiliteChantiers(supabase, ctx.entrepriseId),
   ]);
-  const pointages = (donneesPointages ?? []) as PointageRentabilite[];
-  const indemnitesPaie = (donneesIndemnites ?? []) as { chantier_id: string; total: number }[];
-  const mouvementsStock = (donneesMouvementsStock ?? []) as MouvementStockRentabilite[];
-  const notesFrais = (donneesNotesFrais ?? []) as { chantier_id: string; montant_ttc: number }[];
+  const calculsParId = new Map(calculs.map((c) => [c.chantierId, c]));
   const lignes = (chantiers ?? []).map((chantier) => {
-    const budgetHt = (devis ?? []).filter((item) => item.chantier_id === chantier.id).reduce((s, item) => s + Number(item.montant_ht), 0);
-    const factureHt = (factures ?? []).filter((item) => item.chantier_id === chantier.id && !["annulee", "avoir_emis"].includes(item.statut)).reduce((s, item) => s + Number(item.montant_ht), 0);
-    let heures = 0; let coutMainOeuvre = 0; let coutHoraireManquant = false;
-    for (const pointage of pointages.filter((item) => item.chantier_id === chantier.id)) {
-      const total = Number(pointage.heures_normales) + Number(pointage.heures_supplementaires);
-      const coutHoraire = un(pointage.employe)?.cout_horaire;
-      if (!coutHoraire && total > 0) coutHoraireManquant = true;
-      heures += total; coutMainOeuvre += total * Number(coutHoraire ?? 0);
-    }
-    const depensesChantier = (depenses ?? []).filter((item) => item.chantier_id === chantier.id && item.statut !== "annulee");
-    const coutSousTraitance = depensesChantier.filter((item) => item.categorie === "sous_traitance").reduce((s, item) => s + Number(item.montant_ht), 0);
-    const coutAchats = depensesChantier.filter((item) => item.categorie !== "sous_traitance").reduce((s, item) => s + Number(item.montant_ht), 0);
-    const coutIndemnitesPaie = Number(indemnitesPaie.find((item) => item.chantier_id === chantier.id)?.total ?? 0);
-    const coutStock = mouvementsStock.filter((item) => item.chantier_id === chantier.id).reduce((s, item) => s + Number(item.quantite) * Number(un(item.article)?.prix_achat_ht ?? 0), 0);
-    const coutNotesFrais = notesFrais.filter((item) => item.chantier_id === chantier.id).reduce((s, item) => s + Number(item.montant_ttc), 0);
-    const marge = factureHt - coutMainOeuvre - coutAchats - coutSousTraitance - coutIndemnitesPaie - coutStock - coutNotesFrais;
-    const taux = factureHt > 0 ? (marge / factureHt) * 100 : null;
+    const calcul = calculsParId.get(chantier.id);
     const client = un(chantier.client);
     const clientNom = client ? client.societe || [client.prenom, client.nom].filter(Boolean).join(" ") : "—";
-    return { ...chantier, clientNom, budgetHt, factureHt, heures, coutMainOeuvre, coutHoraireManquant, coutAchats, coutSousTraitance, coutIndemnitesPaie, coutStock, coutNotesFrais, marge, taux };
+    return {
+      ...chantier,
+      clientNom,
+      budgetHt: calcul?.budgetHt ?? 0,
+      factureHt: calcul?.factureHt ?? 0,
+      heures: calcul?.heures ?? 0,
+      coutMainOeuvre: calcul?.coutMainOeuvre ?? 0,
+      coutHoraireManquant: calcul?.coutHoraireManquant ?? false,
+      coutAchats: calcul?.coutAchats ?? 0,
+      coutSousTraitance: calcul?.coutSousTraitance ?? 0,
+      coutIndemnitesPaie: calcul?.coutIndemnitesPaie ?? 0,
+      coutStock: calcul?.coutStock ?? 0,
+      coutNotesFrais: calcul?.coutNotesFrais ?? 0,
+      marge: calcul?.marge ?? 0,
+      taux: calcul?.taux ?? null,
+    };
   });
   const chantiersCoutHoraireManquant = lignes.filter((l) => l.coutHoraireManquant).length;
   const totalFacture = lignes.reduce((s, ligne) => s + ligne.factureHt, 0);

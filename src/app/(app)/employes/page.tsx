@@ -19,7 +19,7 @@ type EmployeListe = {
   statut: string;
   telephone: string | null;
   email: string | null;
-  cout_horaire: number;
+  cout_horaire: number | null;
   date_entree: string | null;
   date_sortie: string | null;
   invitation_envoyee_at: string | null;
@@ -97,18 +97,23 @@ export default async function EmployesPage() {
   const supabase = await createClient();
   const permissions = await permissionsUtilisateur(ctx);
   const peutGerer = permissions === null || permissions.includes("gerer_employes");
-  const peutVoirFinances = permissions === null || permissions.includes("voir_indicateurs_financiers");
+  const peutVoirFinances = permissions === null || permissions.includes("voir_cout_interne_employe");
 
-  const [{ data: employes }, { data: postes }, { data: droits }, { data: catalogue }] = await Promise.all([
+  const [{ data: employes }, { data: postes }, { data: droits }, { data: catalogue }, { data: coutsHoraires }] = await Promise.all([
     supabase
       .from("employes")
-      .select("id, reference_interne, identifiant_interne, numero_inscription, utilisateur_id, poste_id, prenom, nom, poste, type_contrat, statut, telephone, email, cout_horaire, date_entree, date_sortie, invitation_envoyee_at, application_installee_at, premiere_connexion_at, derniere_connexion_at, photo_storage_path, photo_url")
+      .select("id, reference_interne, identifiant_interne, numero_inscription, utilisateur_id, poste_id, prenom, nom, poste, type_contrat, statut, telephone, email, date_entree, date_sortie, invitation_envoyee_at, application_installee_at, premiere_connexion_at, derniere_connexion_at, photo_storage_path, photo_url")
       .eq("entreprise_id", ctx.entrepriseId)
       .order("nom", { ascending: true }),
     supabase.from("postes").select("id, nom").eq("entreprise_id", ctx.entrepriseId),
     supabase.from("permissions_poste").select("poste_id, cle_permission, autorise").eq("entreprise_id", ctx.entrepriseId).eq("autorise", true),
     supabase.from("permissions_disponibles").select("cle, description"),
+    // Table protégée par sa propre RLS (voir_cout_interne_employe) : ne
+    // renvoie des lignes que si le poste courant y a droit — pas besoin de
+    // revérifier peutVoirFinances ici, la base fait déjà le filtrage.
+    supabase.from("employes_cout_horaire").select("employe_id, cout_horaire").eq("entreprise_id", ctx.entrepriseId),
   ]);
+  const coutHoraireParEmploye = new Map((coutsHoraires ?? []).map((item) => [item.employe_id as string, item.cout_horaire as number | null]));
   const postesParId = new Map((postes ?? []).map((poste) => [poste.id, poste.nom]));
   const descriptions = new Map((catalogue ?? []).map((permission) => [permission.cle, permission.description]));
   const droitsParPoste = new Map<string, string[]>();
@@ -120,6 +125,7 @@ export default async function EmployesPage() {
     const autorisations = employe.poste_id ? (droitsParPoste.get(employe.poste_id) ?? []) : [];
     return {
       ...employe,
+      cout_horaire: coutHoraireParEmploye.get(employe.id) ?? null,
       posteAcces: employe.poste_id ? (postesParId.get(employe.poste_id) ?? null) : null,
       autorisations,
       consultations: autorisations.filter((cle) => cle.startsWith("acces_")).length,

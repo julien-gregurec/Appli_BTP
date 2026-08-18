@@ -223,7 +223,7 @@ describe("migration ELS-REC-004 : conversion des préfixes QR LGP-* vers ELS-* (
   it("les scripts de seed ELSATIA Preview restent strictement inchangés (empreintes déjà vérifiées)", () => {
     const empreinte = (chemin: string) => createHash("sha256").update(readFileSync(resolve(racine, chemin))).digest("hex");
     expect(empreinte("scripts/seed-elsatia-preview-year.mjs")).toBe(
-      "6ebc261878f0243289c52d4e0382d1bb77e39eec578617812bd9342149fd2803",
+      "5d859736fb43d616ce855a54a6364dbc14fa463441b5ef19bd3d42597ae87b33",
     );
     expect(empreinte("scripts/seed-elsatia-preview-year.test.mjs")).toBe(
       "e0ca3867c25ac2447342075999905783e29f54f1a8136312b4df328813227738",

@@ -40,6 +40,14 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
     .single();
 
   if (!employe) notFound();
+
+  // Coût interne isolé dans sa propre table protégée par permission (RLS) :
+  // ne renvoie une ligne que si le poste courant a voir_cout_interne_employe
+  // ou acces_rentabilite — peutVoirCoutInterne ci-dessous ne fait plus que
+  // conditionner l'affichage, la base impose déjà la vraie restriction.
+  const { data: coutHoraire } = peutVoirCoutInterne
+    ? await supabase.from("employes_cout_horaire").select("cout_horaire").eq("employe_id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle()
+    : { data: null };
   const peutVoirHistoriqueFrais = employe.utilisateur_id === ctx.userId || permissions === null || permissions.includes("gerer_notes_frais") || permissions.includes("verifier_notes_frais") || permissions.includes("comptabiliser_notes_frais");
 
   const { data: rib } = peutGererRib ? await supabase.from("coordonnees_bancaires")
@@ -117,7 +125,7 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
           {ligne("Ancienneté", ancienneteEmploye(employe.date_entree, employe.statut === "sorti" ? employe.date_sortie : null))}
           {employe.statut === "sorti" && ligne("Date de sortie", employe.date_sortie ? formatDateFr(employe.date_sortie) : null)}
           {peutVoirTauxFacture&&ligne("Taux facturé", formatEuro(employe.taux_horaire))}
-          {peutVoirCoutInterne&&ligne("Coût interne", formatEuro(employe.cout_horaire))}
+          {peutVoirCoutInterne&&ligne("Coût interne", formatEuro(coutHoraire?.cout_horaire))}
           {ligne("Notes", employe.notes)}
         </section>
 

@@ -107,13 +107,19 @@ for (let i = 0; i < employeeRows.length; i += 1) {
       type_contrat,
       date_entree,
       taux_horaire,
-      cout_horaire,
       telephone: `06 80 24 1${i} ${20 + i}`,
       email: `demo.${prenom.toLowerCase()}.${nom.toLowerCase()}@example.fr`,
       statut: "actif",
       notes: `${MARKER} — Équipe de démonstration`,
     },
     "entreprise_id,reference_interne",
+  );
+  // cout_horaire vit désormais dans sa propre table protégée (RLS par
+  // permission) — voir 20260818000205_securiser_cout_horaire_employe.sql.
+  await upsert(
+    "employes_cout_horaire",
+    { employe_id: employees[reference_interne].id, entreprise_id: entrepriseId, cout_horaire },
+    "employe_id",
   );
 }
 
