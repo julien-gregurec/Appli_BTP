@@ -62,14 +62,15 @@ select lives_ok(
   '7. Un devis A avec client A et chantier A reste valide'
 );
 
--- 9-11. Updates interdites (sur le devis existant de la fixture, cote A)
+-- 9-11. Updates interdites (sur un devis brouillon cote A : a9000000-...-001 du fixture est
+-- deja 'accepte', donc verrouille depuis DEVIS-LOCK-V1 — ce n'est pas ce que ce fichier teste).
 select throws_like(
-  $$update public.devis set client_id = 'b3000000-0000-0000-0000-000000000001' where id = 'a9000000-0000-0000-0000-000000000001'$$,
+  $$update public.devis set client_id = 'b3000000-0000-0000-0000-000000000001' where id = 'd9000000-0000-0000-0000-000000000003'$$,
   '%violates%', '9. A ne peut pas modifier un devis A pour lui affecter un client B'
 );
 
 select throws_like(
-  $$update public.devis set entreprise_id = 'b0000000-0000-0000-0000-000000000001' where id = 'a9000000-0000-0000-0000-000000000001'$$,
+  $$update public.devis set entreprise_id = 'b0000000-0000-0000-0000-000000000001' where id = 'd9000000-0000-0000-0000-000000000003'$$,
   '%violates%', '11. Un devis ne peut pas changer d''entreprise en conservant un client devenu incompatible (refus RLS ou FK)'
 );
 
@@ -79,7 +80,7 @@ select set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000001
 select set_config('request.jwt.claim.email', 'admin-b@invalid.local', true);
 
 select throws_like(
-  $$update public.devis set client_id = 'a3000000-0000-0000-0000-000000000001' where id = 'b9000000-0000-0000-0000-000000000001'$$,
+  $$update public.devis set client_id = 'a3000000-0000-0000-0000-000000000001' where id = 'd9000000-0000-0000-0000-000000000001'$$,
   '%violates%', '10. B ne peut pas modifier un devis B pour lui affecter un client A'
 );
 

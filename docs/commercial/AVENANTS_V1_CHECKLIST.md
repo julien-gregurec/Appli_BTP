@@ -12,6 +12,7 @@ Référence : `docs/commercial/AVENANTS_V1_AUDIT_ELSATIA.md`. Ce lot est un audi
 
 - [x] Vérification empirique en Local : un devis `accepte` reste modifiable en écriture directe (UPDATE/DELETE sur `devis`/`lignes_devis`) par un utilisateur `gerer_devis` légitime — le verrou `modifier_devis_brouillon` n'est appliqué qu'au niveau RPC, pas au niveau table/RLS (§8).
 - [x] Classée **P1** — à corriger avant ou avec un futur lot AVENANTS-V1, pas un blocage de commercialisation immédiat (§38).
+- [x] **Corrigée — DEVIS-LOCK-V1** (voir `docs/commercial/DEVIS_LOCK_V1_ELSATIA.md`) : deux triggers `BEFORE` sur `devis`/`lignes_devis` rendent un devis accepté réellement immuable au niveau base (montant, client, chantier, lignes, statut, remise, conditions), tout en laissant modifiables les champs non contractuels (notes internes, traçabilité d'envoi email). Duplication et facturation depuis un devis accepté verrouillé restent fonctionnelles. 28 assertions pgTAP + vérification empirique Local et Preview. La source de vérité contractuelle envisagée en §21 peut désormais s'appuyer sur un devis initial réellement figé.
 
 ## Points d'intégration audités
 

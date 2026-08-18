@@ -5,6 +5,13 @@ select plan(34);
 
 \ir fixtures/isolation_multitenant.inc
 
+-- Devis brouillon dédié : a9000000-...-001 est déjà 'accepte' dans le fixture partagé, donc
+-- verrouillé depuis DEVIS-LOCK-V1. Les tests 5-8 ci-dessous exercent les permissions RLS
+-- brutes sur lignes_devis (sans rapport avec l'acceptation), ils doivent porter sur un devis
+-- encore modifiable.
+insert into public.devis (id, entreprise_id, numero, client_id, chantier_id, statut, montant_ht, montant_tva, montant_ttc) values
+  ('a9000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', 'TEST_A_DEV_003', 'a3000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000001', 'brouillon', 0, 0, 0);
+
 select ok(has_table_privilege('authenticated','public.lignes_devis','SELECT'), '1. authenticated peut lire les lignes de devis');
 select ok(has_table_privilege('authenticated','public.lignes_devis','INSERT'), '2. authenticated peut ajouter une ligne de devis');
 select ok(has_table_privilege('authenticated','public.lignes_devis','UPDATE'), '3. authenticated peut modifier une ligne de devis');
@@ -17,11 +24,11 @@ select set_config('request.jwt.claim.role', 'authenticated', true);
 
 select lives_ok(
   $$insert into public.lignes_devis(devis_id,designation,quantite,prix_unitaire_ht,taux_tva,ordre)
-    values('a9000000-0000-0000-0000-000000000001','Ligne C6-B',2,50,20,0)$$,
+    values('a9000000-0000-0000-0000-000000000003','Ligne C6-B',2,50,20,0)$$,
   '5. un gestionnaire ajoute une ligne à son devis'
 );
 select lives_ok(
-  $$update public.lignes_devis set quantite=3 where devis_id='a9000000-0000-0000-0000-000000000001' and designation='Ligne C6-B'$$,
+  $$update public.lignes_devis set quantite=3 where devis_id='a9000000-0000-0000-0000-000000000003' and designation='Ligne C6-B'$$,
   '6. un gestionnaire modifie sa ligne'
 );
 
@@ -32,7 +39,7 @@ select set_config('request.jwt.claim.email', 'admin-b@invalid.local', true);
 select set_config('request.jwt.claim.role', 'authenticated', true);
 select throws_like(
   $$insert into public.lignes_devis(devis_id,designation,quantite,prix_unitaire_ht,taux_tva,ordre)
-    values('a9000000-0000-0000-0000-000000000001','Intrusion B',1,1,20,9)$$,
+    values('a9000000-0000-0000-0000-000000000003','Intrusion B',1,1,20,9)$$,
   '%row-level security%', '7. le tenant B ne peut jamais écrire dans le devis A'
 );
 
@@ -42,7 +49,7 @@ select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000001
 select set_config('request.jwt.claim.email', 'admin-a@invalid.local', true);
 select set_config('request.jwt.claim.role', 'authenticated', true);
 select lives_ok(
-  $$delete from public.lignes_devis where devis_id='a9000000-0000-0000-0000-000000000001' and designation='Ligne C6-B'$$,
+  $$delete from public.lignes_devis where devis_id='a9000000-0000-0000-0000-000000000003' and designation='Ligne C6-B'$$,
   '8. un gestionnaire supprime sa ligne'
 );
 select lives_ok(

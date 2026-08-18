@@ -129,8 +129,8 @@ export async function associerDevisChantierAction(devisId: string, retour: strin
     .maybeSingle();
 
   if (!devis) redirect(avecMessage("error", "Devis introuvable dans cette entreprise."));
-  if (!chantierId && devis.statut === "accepte") {
-    redirect(avecMessage("error", "Un devis accepté doit rester associé à un chantier afin de conserver ses tâches."));
+  if (devis.statut === "accepte") {
+    redirect(avecMessage("error", "Ce devis est accepté et ne peut plus changer de chantier."));
   }
 
   if (chantierId) {

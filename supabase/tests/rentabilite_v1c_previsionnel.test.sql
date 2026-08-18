@@ -9,11 +9,16 @@ select plan(8);
 
 \ir fixtures/isolation_multitenant.inc
 
--- Lignes de devis "main d'œuvre en heures" (source du prévisionnel d'heures).
+-- Lignes de devis "main d'œuvre en heures" (source du prévisionnel d'heures). a9000000/b9000000
+-- sont déjà 'accepte' dans le fixture partagé, donc verrouillés depuis DEVIS-LOCK-V1 : cette
+-- insertion est un enrichissement de fixture (pas une action utilisateur simulée), elle
+-- contourne donc volontairement les triggers ordinaires, comme le ferait un vrai seed de données.
+set session_replication_role = replica;
 insert into public.lignes_devis (devis_id, designation, type, quantite, unite, prix_unitaire_ht, ordre) values
   ('a9000000-0000-0000-0000-000000000001', 'TEST_A_Pose', 'main_oeuvre', 40, 'h', 35, 1),
   ('b9000000-0000-0000-0000-000000000001', 'TEST_B_Pose', 'main_oeuvre', 60, 'h', 35, 1)
 on conflict do nothing;
+set session_replication_role = origin;
 
 update public.fournisseurs set type_tiers = 'sous_traitant' where id in ('ab000000-0000-0000-0000-000000000001', 'bb000000-0000-0000-0000-000000000001');
 
