@@ -7,7 +7,7 @@ import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { construireUrlCallbackAuth, ERREUR_CONFIGURATION_URL_AUTH, urlCallbackReinitialisation } from "@/lib/auth-redirects";
 import { destinationInterneSure } from "@/lib/security/redirects";
 import { estCodeOffreTarifaire } from "@/lib/tarification";
-import { traduireErreurAuth } from "@/lib/auth-erreurs";
+import { traduireErreurAuth, MESSAGE_GENERIQUE as MESSAGE_TECHNIQUE_AUTH } from "@/lib/auth-erreurs";
 
 function destinationOnboarding(params: { numero?: string; code?: string; offre?: string }) {
   const query = new URLSearchParams();
@@ -167,12 +167,26 @@ export async function confirmerCompteAction(formData: FormData) {
   const tokenHash = String(formData.get("token_hash") ?? "");
   const type = String(formData.get("type") ?? "") as EmailOtpType;
   const next = formData.get("next");
+  // Page d'atterrissage en cas d'échec : pour une récupération de mot de passe,
+  // ramener vers le formulaire "mot de passe oublié" (qui permet de redemander
+  // un lien) plutôt que vers /login, qui n'offre pas ce choix directement.
+  const pageErreur = type === "recovery" ? "/mot-de-passe-oublie" : "/login";
 
-  if (!tokenHash || !type) redirect(`/login?error=${encodeURIComponent(MESSAGE_LIEN_INVALIDE)}`);
+  if (!tokenHash || !type) redirect(`${pageErreur}?error=${encodeURIComponent(MESSAGE_LIEN_INVALIDE)}`);
 
   const supabase = await createClient();
   const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
-  if (error) redirect(`/login?error=${encodeURIComponent(MESSAGE_LIEN_INVALIDE)}`);
+  if (error) {
+    // Un jeton à usage unique déjà consommé (double ouverture, préchargement
+    // par un client mail) et un jeton expiré remontent souvent la même erreur
+    // technique côté Supabase : traduireErreurAuth distingue l'expiration
+    // explicite quand elle est identifiable, sinon on retombe sur un message
+    // "lien invalide" — jamais le message générique "erreur technique", qui
+    // suggère à tort une panne plutôt qu'un lien simplement inutilisable.
+    const traduit = traduireErreurAuth(error.message);
+    const message = traduit === MESSAGE_TECHNIQUE_AUTH ? MESSAGE_LIEN_INVALIDE : traduit;
+    redirect(`${pageErreur}?error=${encodeURIComponent(message)}`);
+  }
 
   const repli = type === "recovery" ? "/nouveau-mot-de-passe" : "/onboarding";
   redirect(destinationInterneSure(typeof next === "string" ? next : null, repli));

@@ -217,10 +217,43 @@ describe("confirmerCompteAction — vérification uniquement sur clic explicite"
     );
   });
 
-  it("redirige vers /login avec une erreur générique si verifyOtp échoue (token déjà consommé)", async () => {
+  it("redirige vers /login avec un message \"lien invalide\" si verifyOtp échoue (token déjà consommé)", async () => {
     mocks.verifyOtp.mockResolvedValueOnce({ error: { message: "Token already used" } });
     await expect(confirmerCompteAction(formulaire("token-test", "signup"))).rejects.toThrow(
       "REDIRECT:/login?error=Lien%20de%20confirmation%20invalide%20ou%20expir%C3%A9.",
     );
+  });
+
+  it("distingue un lien réellement expiré (message spécifique, pas le message générique)", async () => {
+    mocks.verifyOtp.mockResolvedValueOnce({ error: { message: "Token has expired" } });
+    await expect(confirmerCompteAction(formulaire("token-test", "signup"))).rejects.toThrow(
+      "REDIRECT:/login?error=Le%20lien%20a%20expir%C3%A9.%20Demandez-en%20un%20nouveau.",
+    );
+  });
+
+  it("ne renvoie jamais le message technique générique pour un jeton invalide (toujours un message \"lien\")", async () => {
+    mocks.verifyOtp.mockResolvedValueOnce({ error: { message: "invalid token: signature is invalid" } });
+    let destination = "";
+    try {
+      await confirmerCompteAction(formulaire("token-test", "signup"));
+    } catch (erreur) {
+      destination = (erreur as Error).message;
+    }
+    expect(destination).not.toContain("Une%20erreur%20est%20survenue");
+    expect(destination).toContain("REDIRECT:/login?error=");
+  });
+
+  it("renvoie vers /mot-de-passe-oublie (pas /login) si une récupération échoue, pour permettre de redemander un lien", async () => {
+    mocks.verifyOtp.mockResolvedValueOnce({ error: { message: "Token has expired" } });
+    await expect(confirmerCompteAction(formulaire("token-test", "recovery"))).rejects.toThrow(
+      "REDIRECT:/mot-de-passe-oublie?error=",
+    );
+  });
+
+  it("renvoie vers /mot-de-passe-oublie si le lien de récupération est malformé (token_hash absent)", async () => {
+    await expect(confirmerCompteAction(formulaire("", "recovery"))).rejects.toThrow(
+      "REDIRECT:/mot-de-passe-oublie?error=",
+    );
+    expect(mocks.verifyOtp).not.toHaveBeenCalled();
   });
 });

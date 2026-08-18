@@ -1,4 +1,4 @@
-const MESSAGE_GENERIQUE = "Une erreur est survenue. Réessayez dans un instant.";
+export const MESSAGE_GENERIQUE = "Une erreur est survenue. Réessayez dans un instant.";
 
 const CORRESPONDANCES: Array<[RegExp, string]> = [
   [/user already registered/i, "Un compte existe déjà avec cette adresse email."],
