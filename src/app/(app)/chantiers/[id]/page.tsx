@@ -19,6 +19,7 @@ import { associerDevisDepuisChantierAction } from "@/app/actions/devis";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { statutNoteFrais } from "@/lib/notes-frais";
 import { activeFeaturesForCompany } from "@/lib/feature-flags";
+import { calculerRentabiliteChantiers } from "@/lib/rentabilite";
 
 export default async function ChantierDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; success?: string }> }) {
   const { id } = await params;
@@ -35,6 +36,7 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
   const featuresActives = await activeFeaturesForCompany(ctx, permissions, false);
   const peutVoirSousTraitants = (permissions === null || permissions.includes("acces_sous_traitants")) && featuresActives.includes("subcontractors");
   const peutVoirNotesEquipe = permissions === null || (permissions.includes("gerer_notes_frais") && permissions.includes("voir_indicateurs_financiers"));
+  const peutVoirRentabilite = permissions === null || permissions.includes("acces_rentabilite");
 
   const { data: chantier } = await supabase
     .from("chantiers")
@@ -68,6 +70,7 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
   const devisDuClient = peutCreerDevis
     ? (await supabase.from("devis").select("id,numero,statut,chantier_id,chantier:chantiers!devis_chantier_id_fkey(nom)").eq("entreprise_id",ctx.entrepriseId).eq("client_id",chantier.client_id).order("created_at",{ascending:false})).data ?? []
     : [];
+  const [rentabilite] = peutVoirRentabilite ? await calculerRentabiliteChantiers(supabase, ctx.entrepriseId, { chantierId: id }) : [];
   const totalDevisAccepte = (devis ?? []).filter((item) => item.statut === "accepte").reduce((total, item) => total + Number(item.montant_ttc ?? 0), 0);
   const totalFacture = (factures ?? []).filter((item) => item.statut !== "annulee").reduce((total, item) => total + Number(item.montant_ttc ?? 0), 0);
   const totalPaye = (factures ?? []).reduce((total, item) => total + Number(item.montant_paye ?? 0), 0);
@@ -164,7 +167,10 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
             <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Heures planifiées / validées</div><div className="mt-1 font-mono font-semibold">{totalHeures} h / {totalHeuresRealisees} h</div></div>
             {(peutVoirAchats||peutVoirNotesEquipe)&&<div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Dépenses chantier validées</div><div className="mt-1 font-mono font-semibold text-amber-700 dark:text-amber-400">{euros(totalDepensesValidees)}</div></div>}
             {budgetPrevisionnel>0&&(peutVoirAchats||peutVoirNotesEquipe)&&<div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Budget restant après dépenses</div><div className={`mt-1 font-mono font-semibold ${budgetPrevisionnel-totalDepensesValidees<0?"text-red-700 dark:text-red-400":"text-green-700 dark:text-green-400"}`}>{euros(budgetPrevisionnel-totalDepensesValidees)}</div></div>}
+            {peutVoirRentabilite&&rentabilite&&<div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Marge réalisée</div><div className={`mt-1 font-mono font-semibold ${rentabilite.marge<0?"text-red-700 dark:text-red-400":"text-green-700 dark:text-green-400"}`}>{euros(rentabilite.marge)}</div></div>}
+            {peutVoirRentabilite&&rentabilite&&rentabilite.taux!==null&&<div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Taux de marge{rentabilite.coutHoraireManquant?" ⚠":""}</div><div className={`mt-1 font-mono font-semibold ${rentabilite.taux<0?"text-red-700 dark:text-red-400":"text-green-700 dark:text-green-400"}`}>{rentabilite.taux.toFixed(1)} %</div>{rentabilite.coutHoraireManquant&&<p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">Coût horaire manquant sur au moins un pointage : marge sous-estimée.</p>}</div>}
           </div>
+          {peutVoirRentabilite&&<p className="text-xs text-neutral-500"><Link href="/rentabilite" className="hover:underline">Voir le détail de la rentabilité de tous les chantiers →</Link></p>}
           <div className="grid gap-3 md:grid-cols-2">
             <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="mb-2 text-xs font-semibold uppercase text-neutral-500">Devis</div>{devis?.length ? devis.slice(0, 5).map((item) => { const st = statutDevis(item.statut); return <Link key={item.id} href={`/devis/${item.id}`} className="flex justify-between rounded px-1 py-1 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900"><span>{item.numero ?? "Brouillon"}</span><span className="font-mono">{euros(item.montant_ttc)}</span><span className="text-xs" style={{ color: st.couleur }}>{st.libelle}</span></Link>; }) : <p className="text-sm text-neutral-500">Aucun devis.</p>}</div>
             <div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="mb-2 text-xs font-semibold uppercase text-neutral-500">Factures</div>{factures?.length ? factures.slice(0, 5).map((item) => { const st = statutFacture(item.statut); return <Link key={item.id} href={`/factures/${item.id}`} className="flex justify-between rounded px-1 py-1 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-900"><span>{item.numero ?? "Brouillon"}</span><span className="font-mono">{euros(item.montant_ttc)}</span><span className="text-xs" style={{ color: st.couleur }}>{st.libelle}</span></Link>; }) : <p className="text-sm text-neutral-500">Aucune facture.</p>}</div>
