@@ -1,12 +1,12 @@
 # RENTABILITÉ-V1 — Checklist des écarts
 
-Référence : `docs/commercial/RENTABILITE_V1_AUDIT_ELSATIA.md`. Rien n'a été corrigé dans ce lot — audit uniquement.
+Référence : `docs/commercial/RENTABILITE_V1_AUDIT_ELSATIA.md`. Les 3 écarts P0 ont été corrigés dans RENTABILITÉ-V1B (voir `docs/commercial/RENTABILITE_V1B_CORRECTIONS_P0_ELSATIA.md`) ; P1/P2/P3 restent non traités, à dessein.
 
 ## P0 — Bloquant commercialisation
 
-- [ ] Unifier les 3 implémentations de la formule de marge (`src/lib/rentabilite.ts`, `src/app/actions/rentabilite.ts`, `src/app/(app)/rentabilite/page.tsx`) — le copilote IA omet aujourd'hui 3 postes de coût et n'exclut pas les pointages non validés/rejetés.
-- [ ] Ajouter une policy RLS restrictive sur `employes` pour le SELECT de `cout_horaire`, conditionnée à une permission (aujourd'hui lisible par tout salarié authentifié via appel API direct, contournant le masquage UI).
-- [ ] Décider et implémenter le traitement du coût horaire dans le temps (snapshot au pointage vs recalcul rétroactif assumé) — aujourd'hui, changer le coût d'un salarié modifie silencieusement la rentabilité de tous ses chantiers passés.
+- [x] Unifier les 3 implémentations de la formule de marge (`src/lib/rentabilite.ts`, `src/app/actions/rentabilite.ts`, `src/app/(app)/rentabilite/page.tsx`) — le copilote IA omet aujourd'hui 3 postes de coût et n'exclut pas les pointages non validés/rejetés. **Corrigé RENTABILITÉ-V1B** : source unique `calculerRentabiliteChantiers`, les 3 consommateurs délèguent désormais à cette fonction.
+- [x] Ajouter une policy RLS restrictive sur `employes` pour le SELECT de `cout_horaire`, conditionnée à une permission (aujourd'hui lisible par tout salarié authentifié via appel API direct, contournant le masquage UI). **Corrigé RENTABILITÉ-V1B** : colonne isolée dans `employes_cout_horaire`, RLS restrictive par permission (`voir_cout_interne_employe` ou `acces_rentabilite`).
+- [x] Décider et implémenter le traitement du coût horaire dans le temps (snapshot au pointage vs recalcul rétroactif assumé) — aujourd'hui, changer le coût d'un salarié modifie silencieusement la rentabilité de tous ses chantiers passés. **Corrigé RENTABILITÉ-V1B** : `pointages.cout_horaire_applique`, figé à la validation par `valider_preuve_pointage()`.
 
 ## P1 — Important avant premier client
 
@@ -35,4 +35,4 @@ Référence : `docs/commercial/RENTABILITE_V1_AUDIT_ELSATIA.md`. Rien n'a été 
 
 ## Non exécuté dans ce lot (à faire en suivi immédiat recommandé)
 
-- [ ] Chantier fictif Local/Preview avec injection progressive de données réelles (devis 10 000 € HT, dérive MO/achats, facturation partielle, suppression/correction) pour valider empiriquement les constats ci-dessus.
+- [x] Chantier fictif Local/Preview avec injection progressive de données réelles (devis 8 000 € HT, facturation, MO, achats, sous-traitance, stock, notes de frais, facture annulée, pointage rejeté) pour valider empiriquement les constats ci-dessus. **Fait RENTABILITÉ-V1B** : chantier « Audit Rentabilité P0 » construit en Local (vérifié programmatiquement contre `calculerRentabiliteChantiers` réelle) et en Preview (entreprise ELSATIA — Recette Preview, pour vérification visuelle humaine).
