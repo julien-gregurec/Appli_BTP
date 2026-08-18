@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
-import { calculerRentabiliteChantiers } from "@/lib/rentabilite";
+import { calculerPrevuRealiseChantiers } from "@/lib/rentabilite";
 import { analyserRentabilite } from "@/lib/ai/rentabilite";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
 import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
@@ -14,9 +14,9 @@ export async function analyserRentabiliteIAAction(chantierId: string): Promise<{
   const supabase = await createClient();
   if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
 
-  const [ligne] = await calculerRentabiliteChantiers(supabase, ctx.entrepriseId, { chantierId });
+  const [ligne] = await calculerPrevuRealiseChantiers(supabase, ctx.entrepriseId, { chantierId });
   if (!ligne) return { error: "Chantier introuvable." };
-  const { chantierNom, budgetHt, factureHt, heures, coutMainOeuvre, coutAchats, coutStock, coutNotesFrais, coutSousTraitance, coutIndemnitesPaie, marge, taux } = ligne;
+  const { chantierNom, budgetHt, factureHt, heures, coutMainOeuvre, coutAchats, coutStock, coutNotesFrais, coutSousTraitance, coutIndemnitesPaie, marge, taux, heuresPrevues, ecarts } = ligne;
 
   const depassement = await verifierPlafondIA(supabase, ctx.entrepriseId);
   if (depassement) return { error: depassement };
@@ -35,6 +35,8 @@ export async function analyserRentabiliteIAAction(chantierId: string): Promise<{
       coutIndemnitesPaie,
       marge,
       taux,
+      heuresPrevues,
+      ecartHeures: ecarts.heures.ecart,
     });
     journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "rentabilite", statut: "succes" });
     return { analyse };

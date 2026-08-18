@@ -19,7 +19,7 @@ import { associerDevisDepuisChantierAction } from "@/app/actions/devis";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { statutNoteFrais } from "@/lib/notes-frais";
 import { activeFeaturesForCompany } from "@/lib/feature-flags";
-import { calculerRentabiliteChantiers } from "@/lib/rentabilite";
+import { calculerPrevuRealiseChantiers } from "@/lib/rentabilite";
 
 export default async function ChantierDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; success?: string }> }) {
   const { id } = await params;
@@ -70,7 +70,7 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
   const devisDuClient = peutCreerDevis
     ? (await supabase.from("devis").select("id,numero,statut,chantier_id,chantier:chantiers!devis_chantier_id_fkey(nom)").eq("entreprise_id",ctx.entrepriseId).eq("client_id",chantier.client_id).order("created_at",{ascending:false})).data ?? []
     : [];
-  const [rentabilite] = peutVoirRentabilite ? await calculerRentabiliteChantiers(supabase, ctx.entrepriseId, { chantierId: id }) : [];
+  const [rentabilite] = peutVoirRentabilite ? await calculerPrevuRealiseChantiers(supabase, ctx.entrepriseId, { chantierId: id }) : [];
   const totalDevisAccepte = (devis ?? []).filter((item) => item.statut === "accepte").reduce((total, item) => total + Number(item.montant_ttc ?? 0), 0);
   const totalFacture = (factures ?? []).filter((item) => item.statut !== "annulee").reduce((total, item) => total + Number(item.montant_ttc ?? 0), 0);
   const totalPaye = (factures ?? []).reduce((total, item) => total + Number(item.montant_paye ?? 0), 0);
@@ -169,6 +169,7 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
             {budgetPrevisionnel>0&&(peutVoirAchats||peutVoirNotesEquipe)&&<div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Budget restant après dépenses</div><div className={`mt-1 font-mono font-semibold ${budgetPrevisionnel-totalDepensesValidees<0?"text-red-700 dark:text-red-400":"text-green-700 dark:text-green-400"}`}>{euros(budgetPrevisionnel-totalDepensesValidees)}</div></div>}
             {peutVoirRentabilite&&rentabilite&&<div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Marge réalisée</div><div className={`mt-1 font-mono font-semibold ${rentabilite.marge<0?"text-red-700 dark:text-red-400":"text-green-700 dark:text-green-400"}`}>{euros(rentabilite.marge)}</div></div>}
             {peutVoirRentabilite&&rentabilite&&rentabilite.taux!==null&&<div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Taux de marge{rentabilite.coutHoraireManquant?" ⚠":""}</div><div className={`mt-1 font-mono font-semibold ${rentabilite.taux<0?"text-red-700 dark:text-red-400":"text-green-700 dark:text-green-400"}`}>{rentabilite.taux.toFixed(1)} %</div>{rentabilite.coutHoraireManquant&&<p className="mt-1 text-[11px] text-amber-700 dark:text-amber-400">Coût horaire manquant sur au moins un pointage : marge sous-estimée.</p>}</div>}
+            {peutVoirRentabilite&&rentabilite&&rentabilite.heuresPrevues!==null&&<div className="rounded-md border border-neutral-200 p-3 dark:border-neutral-800"><div className="text-xs text-neutral-500">Heures prévues (devis)</div><div className="mt-1 font-mono font-semibold">{rentabilite.heuresPrevues} h</div><p className={`mt-1 text-[11px] ${rentabilite.ecarts.heures.ecart&&rentabilite.ecarts.heures.ecart>0?"text-amber-700 dark:text-amber-400":"text-neutral-500"}`}>Réalisé : {rentabilite.heures} h ({rentabilite.ecarts.heures.ecart!==null&&rentabilite.ecarts.heures.ecart>=0?"+":""}{rentabilite.ecarts.heures.ecart} h)</p></div>}
           </div>
           {peutVoirRentabilite&&<p className="text-xs text-neutral-500"><Link href="/rentabilite" className="hover:underline">Voir le détail de la rentabilité de tous les chantiers →</Link></p>}
           <div className="grid gap-3 md:grid-cols-2">

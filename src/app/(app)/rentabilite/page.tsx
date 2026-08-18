@@ -5,7 +5,7 @@ import { euros } from "@/lib/devis";
 import { Lien as Link } from "@/components/Lien";
 import { AnalyseRentabiliteIA } from "@/components/AnalyseRentabiliteIA";
 import { iaEstActive } from "@/lib/preview-features";
-import { calculerRentabiliteChantiers } from "@/lib/rentabilite";
+import { calculerPrevuRealiseChantiers } from "@/lib/rentabilite";
 
 const un = <T,>(valeur: T | T[] | null): T | null => Array.isArray(valeur) ? valeur[0] ?? null : valeur;
 
@@ -15,7 +15,7 @@ export default async function RentabilitePage() {
   const peutUtiliserIA = iaEstActive() && aAccesIA(await permissionsUtilisateur(ctx));
   const [{ data: chantiers }, calculs] = await Promise.all([
     supabase.from("chantiers").select("id, reference_interne, nom, statut, client:clients(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
-    calculerRentabiliteChantiers(supabase, ctx.entrepriseId),
+    calculerPrevuRealiseChantiers(supabase, ctx.entrepriseId),
   ]);
   const calculsParId = new Map(calculs.map((c) => [c.chantierId, c]));
   const lignes = (chantiers ?? []).map((chantier) => {
@@ -37,8 +37,16 @@ export default async function RentabilitePage() {
       coutNotesFrais: calcul?.coutNotesFrais ?? 0,
       marge: calcul?.marge ?? 0,
       taux: calcul?.taux ?? null,
+      caPrevuHt: calcul?.caPrevuHt ?? 0,
+      heuresPrevues: calcul?.heuresPrevues ?? null,
+      ecarts: calcul?.ecarts ?? null,
     };
   });
+  const lignesAvecHeuresPrevues = lignes.filter((l) => l.heuresPrevues !== null);
+  const totalHeuresPrevues = lignesAvecHeuresPrevues.reduce((s, l) => s + (l.heuresPrevues ?? 0), 0);
+  const totalHeuresRealiseesPourPrevu = lignesAvecHeuresPrevues.reduce((s, l) => s + l.heures, 0);
+  const totalCaPrevu = lignes.reduce((s, l) => s + l.caPrevuHt, 0);
+  const chantiersSansHeuresPrevues = lignes.filter((l) => l.heuresPrevues === null && l.caPrevuHt > 0).length;
   const chantiersCoutHoraireManquant = lignes.filter((l) => l.coutHoraireManquant).length;
   const totalFacture = lignes.reduce((s, ligne) => s + ligne.factureHt, 0);
   const totalCoutMo = lignes.reduce((s, ligne) => s + ligne.coutMainOeuvre, 0); const totalAchats = lignes.reduce((s, ligne) => s + ligne.coutAchats, 0); const totalSousTraitance = lignes.reduce((s, ligne) => s + ligne.coutSousTraitance, 0); const totalIndemnitesPaie = lignes.reduce((s, ligne) => s + ligne.coutIndemnitesPaie, 0); const totalStock = lignes.reduce((s, ligne) => s + ligne.coutStock, 0); const totalNotesFrais = lignes.reduce((s, ligne) => s + ligne.coutNotesFrais, 0); const totalCout = totalCoutMo + totalAchats + totalSousTraitance + totalIndemnitesPaie + totalStock + totalNotesFrais;
@@ -53,6 +61,19 @@ export default async function RentabilitePage() {
     <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-9"><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">CA HT</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalFacture)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Main-d’œuvre</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalCoutMo)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Achats / charges</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalAchats)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Stock consommé</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalStock)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Sous-traitance</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalSousTraitance)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Notes de frais</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalNotesFrais)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Indemnités paie</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalIndemnitesPaie)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Marge</div><div className={`mt-1 font-mono text-lg font-semibold ${totalMarge>=0?"text-green-700":"text-red-700"}`}>{euros(totalMarge)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Taux</div><div className="mt-1 font-mono text-lg font-semibold">{tauxGlobal.toFixed(1)} %</div></div></div>
     <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">La marge inclut désormais les factures fournisseurs rattachées au chantier, le stock sorti vers le chantier, les notes de frais validées, ainsi que les indemnités de trajet, panier et grand déplacement issues de la paie. Les frais généraux non affectés restent hors marge chantier.</div>
     {chantiersCoutHoraireManquant > 0 && <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">⚠ {chantiersCoutHoraireManquant} chantier(s) ont des heures pointées par un salarié sans coût horaire renseigné : leur coût de main-d’œuvre est sous-estimé (compté à 0 €/h). <Link href="/employes" className="font-semibold underline">Renseigner le coût horaire</Link> dans la fiche du salarié concerné.</div>}
+
+    <section className="rounded-md border p-4 dark:border-neutral-800">
+      <h2 className="mb-1 font-semibold">Prévu / Réalisé (toute l’entreprise)</h2>
+      <p className="mb-3 text-xs text-neutral-500">Prévu = devis acceptés et leurs lignes de main-d’œuvre facturées à l’heure. Écart = réalisé − prévu.</p>
+      <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-xs uppercase text-neutral-500"><tr><th className="py-1 pr-3">Indicateur</th><th className="px-3 text-right">Prévu</th><th className="px-3 text-right">Réalisé</th><th className="px-3 text-right">Écart</th></tr></thead><tbody>
+        <tr className="border-t dark:border-neutral-800"><td className="py-2 pr-3">Chiffre d’affaires</td><td className="px-3 text-right font-mono">{euros(totalCaPrevu)}</td><td className="px-3 text-right font-mono">{euros(totalFacture)}</td><td className={`px-3 text-right font-mono ${totalFacture-totalCaPrevu>=0?"text-green-700":"text-red-700"}`}>{euros(totalFacture-totalCaPrevu)}</td></tr>
+        <tr className="border-t dark:border-neutral-800"><td className="py-2 pr-3">Heures{chantiersSansHeuresPrevues>0 && <span className="ml-1 text-amber-600" title={`${chantiersSansHeuresPrevues} chantier(s) facturé(s) sans ligne de devis en main-d'œuvre à l'heure : exclu(s) de ce total`}>⚠</span>}</td><td className="px-3 text-right font-mono">{totalHeuresPrevues} h</td><td className="px-3 text-right font-mono">{totalHeuresRealiseesPourPrevu} h</td><td className={`px-3 text-right font-mono ${totalHeuresRealiseesPourPrevu-totalHeuresPrevues>=0?"text-amber-700":"text-neutral-600"}`}>{totalHeuresRealiseesPourPrevu-totalHeuresPrevues>=0?"+":""}{totalHeuresRealiseesPourPrevu-totalHeuresPrevues} h</td></tr>
+        <tr className="border-t dark:border-neutral-800 text-neutral-400"><td className="py-2 pr-3">Coût main-d’œuvre</td><td className="px-3 text-right italic">Non renseigné</td><td className="px-3 text-right font-mono text-neutral-700 dark:text-neutral-300">{euros(totalCoutMo)}</td><td className="px-3 text-right">—</td></tr>
+        <tr className="border-t dark:border-neutral-800 text-neutral-400"><td className="py-2 pr-3">Achats</td><td className="px-3 text-right italic">Non renseigné</td><td className="px-3 text-right font-mono text-neutral-700 dark:text-neutral-300">{euros(totalAchats)}</td><td className="px-3 text-right">—</td></tr>
+        <tr className="border-t dark:border-neutral-800 text-neutral-400"><td className="py-2 pr-3">Marge</td><td className="px-3 text-right italic">Non renseigné</td><td className={`px-3 text-right font-mono ${totalMarge>=0?"text-green-700":"text-red-700"}`}>{euros(totalMarge)}</td><td className="px-3 text-right">—</td></tr>
+      </tbody></table></div>
+      <p className="mt-2 text-xs text-neutral-500">Le coût de main-d’œuvre prévu, les achats prévus et la marge prévue ne peuvent pas encore être calculés de façon fiable : une ligne de devis porte un prix de vente au client, jamais un coût interne. Seuls le chiffre d’affaires prévu et les heures prévues le sont.</p>
+    </section>
     {peutUtiliserIA && <AnalyseRentabiliteIA chantiers={lignes.map((l) => ({ id: l.id, nom: l.nom }))} />}
     <section className="rounded-md border p-4 dark:border-neutral-800">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-2"><div><h2 className="font-semibold">Lecture rapide des chantiers</h2><p className="text-xs text-neutral-500">Les huit chantiers ayant le plus de marge. Bleu : chiffre d’affaires, orange : coûts engagés.</p></div><div className="flex gap-3 text-xs text-neutral-500"><span><i className="mr-1 inline-block h-2 w-2 bg-blue-500"/>CA HT</span><span><i className="mr-1 inline-block h-2 w-2 bg-orange-400"/>Coûts</span></div></div>

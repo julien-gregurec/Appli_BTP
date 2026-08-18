@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { OutilIA } from "@/lib/ai/provider";
 import { BRAND_NAME, PRODUCT_NAME } from "@/lib/brand";
-import { calculerRentabiliteChantiers } from "@/lib/rentabilite";
+import { calculerPrevuRealiseChantiers } from "@/lib/rentabilite";
 
 type Supabase = SupabaseClient;
 
@@ -137,7 +137,7 @@ async function heuresSupplementairesSemaine(supabase: Supabase, entrepriseId: st
 }
 
 async function rentabiliteChantiers(supabase: Supabase, entrepriseId: string) {
-  const lignes = await calculerRentabiliteChantiers(supabase, entrepriseId);
+  const lignes = await calculerPrevuRealiseChantiers(supabase, entrepriseId);
   return lignes
     .filter((l) => l.factureHt > 0 || l.coutMainOeuvre > 0 || l.coutAchats > 0 || l.coutSousTraitance > 0)
     .sort((a, b) => a.marge - b.marge)
@@ -227,7 +227,11 @@ export const OUTILS_COPILOTE: OutilIA[] = [
     description:
       "Liste la rentabilité de chaque chantier (facturé HT, coût main-d'œuvre pointé et validé, achats, sous-traitance, " +
       "indemnités de paie, stock consommé, notes de frais, marge, taux de marge) — mêmes chiffres que la page Rentabilité, " +
-      "du moins rentable au plus rentable. Utilise cet outil pour toute question sur la marge, le résultat, les coûts ou la rentabilité d'un ou plusieurs chantiers.",
+      "du moins rentable au plus rentable. Inclut aussi le prévisionnel connu (caPrevuHt : CA des devis acceptés ; heuresPrevues : " +
+      "heures de main-d'œuvre facturées à l'heure au devis, `null` si non renseigné) et les écarts prévu/réalisé associés (`ecarts.ca`, " +
+      "`ecarts.heures`). Le coût de main-d'œuvre prévu, les achats prévus et la marge prévue ne sont PAS disponibles (toujours `null`) : " +
+      "ne les invente jamais, dis explicitement qu'ils ne sont pas renseignés dans ELSATIA si on te les demande. " +
+      "Utilise cet outil pour toute question sur la marge, le résultat, les coûts, la rentabilité ou l'écart prévu/réalisé d'un ou plusieurs chantiers.",
     parametres: { type: "object", properties: {} },
   },
   {
