@@ -33,7 +33,9 @@ Audit réalisé en lecture seule, worktree `liria-codex`, branche `claude/comman
 
 ## Le seul gap réel trouvé
 
-**Aucun test automatisé n'existe pour ce module** — ni Vitest (`src/app/actions/commandes.ts`, `src/lib/commandes.ts`), ni pgTAP (transitions de statut, réception, RLS cross-tenant sur `commandes_fournisseurs`/`lignes_commande`). Le module fonctionne (logique lue et vérifiée par lecture de code, cohérente avec le reste de l'application testée), mais sa correction n'est vérifiée par aucune suite automatisée — contrairement à la quasi-totalité des autres modules commerciaux de l'application. C'est un gap de qualité, pas un gap fonctionnel.
+**Corrigé — COMMANDES-FOURNISSEURS-V1B** (voir `docs/commercial/COMMANDES_FOURNISSEURS_V1B_TESTS_ELSATIA.md`) : 43 assertions pgTAP + 9 tests Vitest ajoutés, aucune modification fonctionnelle. Le module fonctionnait déjà correctement (confirmé, aucun bug réel trouvé) ; il dispose désormais aussi d'un filet de sécurité automatisé contre une régression future.
+
+~~Aucun test automatisé n'existe pour ce module~~ — ni Vitest (`src/app/actions/commandes.ts`, `src/lib/commandes.ts`), ni pgTAP (transitions de statut, réception, RLS cross-tenant sur `commandes_fournisseurs`/`lignes_commande`). Le module fonctionne (logique lue et vérifiée par lecture de code, cohérente avec le reste de l'application testée), mais sa correction n'est vérifiée par aucune suite automatisée — contrairement à la quasi-totalité des autres modules commerciaux de l'application. C'était un gap de qualité, pas un gap fonctionnel.
 
 ## Point d'attention non bloquant
 
