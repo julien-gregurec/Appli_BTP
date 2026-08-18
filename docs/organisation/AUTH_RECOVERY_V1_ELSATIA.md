@@ -158,8 +158,39 @@ Si un problème est constaté après application du template en Preview : recopi
 
 Le `git push` et `vercel deploy` sont restés bloqués pendant une longue durée (réseau, SSH, proxy, iCloud Drive et antivirus tous exclus tour à tour). La cause réelle : **une corruption du système de fichiers locale** sur le volume de données du Mac, détectée et réparée par Utilitaire de disque → Premiers secours (« Le volume … s'avère être endommagé et doit être réparé » → réparations différées → « semble en bon état », code de sortie 0). Après réparation et redémarrage, `git push` et `vercel deploy` ont fonctionné normalement. Aucun impact sur le code ni sur les données de l'application — mentionné ici uniquement pour traçabilité, en cas de nouvelle lenteur anormale à l'avenir sur ce Mac.
 
+## Déploiement Production et test humain réel (18/08/2026)
+
+### Intégration code, délibérément restreinte
+
+`AUTH-RECOVERY-V1` a été construit sur `edf0442` (sommet d'ADMIN-V1), qui n'est pas encore intégré en Production. Une fusion automatique aurait donc entraîné ADMIN-V1/TARIFS-V2 en Production sans autorisation. Réintégration manuelle et vérifiée à la place : les 7 fichiers de ce lot (`auth.ts`, `auth.test.ts`, `auth-erreurs.ts`, `login/page.tsx`, `nouveau-mot-de-passe/page.tsx`, `ChampMotDePasse.tsx`, cette documentation) ont été appliqués tels quels sur `release/commercialisation-v1`, en préservant explicitement la ligne `loginAction` propre à ADMIN-V1 (absente de Production). Diff vérifié : aucune autre différence que cette ligne entre la version Production et la version finale de ce lot. QA complète repassée sur la branche d'intégration : typecheck 0 erreur, lint 0 erreur, 293/293 tests, build réussi. Fast-forward pur vers `release/commercialisation-v1` (commit `255ba1c`), poussé sur le remote.
+
+### Action manuelle Supabase Production effectuée (par l'utilisateur)
+
+Même procédure qu'en Preview : clé SMTP Brevo dédiée (`elsatia-production-supabase-auth`) configurée dans Dashboard `elsatia-production` → Authentication → SMTP Settings, puis template `reset_password.html` collé dans Emails → Reset Password.
+
+### Anomalie trouvée et corrigée en cours de test (sans rapport avec le code de ce lot)
+
+Premier test réel : le lien de l'email a atterri sur `https://elsatia.fr` (site vitrine, projet Vercel `elsatia-site`) → 404, au lieu de `https://app.elsatia.fr/auth/confirm`. Cause : **Site URL** dans Supabase Production → Authentication → URL Configuration était réglé sur `https://elsatia.fr` au lieu de `https://app.elsatia.fr` (l'application) — une erreur de configuration préexistante, non introduite par ce lot, seulement révélée par le premier lien `{{ .SiteURL }}` correctement construit. Corrigée par l'utilisateur (Site URL → `https://app.elsatia.fr`, Redirect URLs déjà correctes). Après correction, nouveau lien demandé et testé avec succès.
+
+### Déploiement Production
+
+- Déploiement Vercel : `dpl_3yfpn1a4N84F5jfDvuEJqUiv2qCw`, statut `READY`, `target: production`, aliasé automatiquement sur `https://app.elsatia.fr`.
+- Rollback disponible : déploiement Production précédent `dpl_B4y9pjQsahEM89Nnz8J6XLT5GCoE` (`elsatia-production-1vvm1jc4b`), conservé, jamais supprimé.
+
+### Parcours humain réel testé en Production
+
+Compte utilisé : `julien.gregurec+demo-elsatia@gmail.com` (compte démo commercial P11, tenant `DEMO-18M`, aucune donnée réelle).
+
+1. `/login` vérifié en premier (garde-fou demandé) : chargement propre, aucune erreur console, composant Afficher/Masquer présent.
+2. Formulaire « Mot de passe oublié » soumis depuis `https://app.elsatia.fr` → message de confirmation affiché.
+3. Email reçu, lien cliqué → atterrissage correct sur `/auth/confirm` après correction du Site URL (voir anomalie ci-dessus).
+4. Confirmation → redirection vers `/nouveau-mot-de-passe`.
+5. Nouveau mot de passe enregistré → redirection `/login` avec message de succès.
+6. Connexion avec le nouveau mot de passe → **réussie**, confirmée par l'utilisateur.
+7. Ancien mot de passe : **non retesté** — le mot de passe original de ce compte n'a jamais été conservé (bonne pratique appliquée à sa création en P11, cf. `DEMO_COMMERCIALE.md`), donc l'utilisateur ne le connaît plus pour le retester manuellement. Son rejet est garanti structurellement par `supabase.auth.updateUser()`, qui remplace le hash de mot de passe stocké côté Supabase — propriété du service Supabase Auth lui-même, non spécifique au code de ce lot, déjà couverte par les tests automatisés (mocks) en Local/Preview.
+
 ## Verdict
 
-**AUTH-RECOVERY-V1 PREVIEW VALIDÉ — PRÊT POUR PRODUCTION**
+**AUTH-RECOVERY-V1 VALIDÉ PRODUCTION**
 
-Le parcours nominal de récupération de mot de passe fonctionne de bout en bout en Preview, avec le template et le SMTP désormais correctement configurés. Avant d'appliquer le même changement en Production : voir « Procédure Production » ci-dessus — action manuelle Dashboard Production requise (template + SMTP), jamais exécutée automatiquement. Conformément à la consigne reçue, **aucun déploiement Production n'a été effectué** dans le cadre de ce lot.
+Le parcours de récupération de mot de passe fonctionne de bout en bout en Production réelle (`https://app.elsatia.fr`), après correction d'une erreur de configuration Supabase préexistante (Site URL) découverte pendant le test. Code intégré sans ADMIN-V1/TARIFS-V2/PROMO-V1/C6-B. Rollback vers `dpl_B4y9pjQsahEM89Nnz8J6XLT5GCoE` disponible si nécessaire.
