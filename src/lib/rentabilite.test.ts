@@ -27,6 +27,8 @@ type Fixtures = {
   coutsHoraires?: unknown[];
   lignesDevis?: unknown[];
   sousTraitance?: unknown[];
+  avenants?: unknown[];
+  lignesAvenants?: unknown[];
 };
 
 function creerSupabaseMock(fixtures: Fixtures) {
@@ -41,6 +43,8 @@ function creerSupabaseMock(fixtures: Fixtures) {
     employes_cout_horaire: fixtures.coutsHoraires ?? [],
     lignes_devis: fixtures.lignesDevis ?? [],
     sous_traitants_chantiers: fixtures.sousTraitance ?? [],
+    avenants: fixtures.avenants ?? [],
+    lignes_avenants: fixtures.lignesAvenants ?? [],
   };
   return {
     from: vi.fn((table: string) => creerRequeteMock(tables[table] ?? [])),
@@ -313,5 +317,66 @@ describe("calculerPrevuRealiseChantiers — prévisionnel et écarts (RENTABILIT
     expect(prevuRealise.marge).toBe(directe.marge);
     expect(prevuRealise.factureHt).toBe(directe.factureHt);
     expect(prevuRealise.coutAchats).toBe(directe.coutAchats);
+  });
+});
+
+describe("calculerRentabiliteChantiers / calculerPrevuRealiseChantiers — avenants (AVENANTS-V1)", () => {
+  it("le budget/CA prévu intègre les avenants acceptés en plus du devis initial accepté", async () => {
+    const supabase = creerSupabaseMock({
+      chantiers: [CHANTIER],
+      devis: [{ chantier_id: "chantier-1", montant_ht: 10000 }],
+      avenants: [{ chantier_id: "chantier-1", montant_ht: 2000, statut: "accepte" }],
+    });
+    const [resultat] = await calculerRentabiliteChantiers(supabase, "entreprise-1");
+    expect(resultat.budgetHt).toBe(12000);
+  });
+
+  it("un avenant brouillon/envoyé/refusé/annulé ne doit jamais gonfler le budget (fixture déjà filtrée statut='accepte' côté requête)", async () => {
+    const supabase = creerSupabaseMock({
+      chantiers: [CHANTIER],
+      devis: [{ chantier_id: "chantier-1", montant_ht: 10000 }],
+      avenants: [],
+    });
+    const [resultat] = await calculerRentabiliteChantiers(supabase, "entreprise-1");
+    expect(resultat.budgetHt).toBe(10000);
+  });
+
+  it("une moins-value acceptée (montant négatif) réduit correctement le budget", async () => {
+    const supabase = creerSupabaseMock({
+      chantiers: [CHANTIER],
+      devis: [{ chantier_id: "chantier-1", montant_ht: 10000 }],
+      avenants: [
+        { chantier_id: "chantier-1", montant_ht: 2000, statut: "accepte" },
+        { chantier_id: "chantier-1", montant_ht: -500, statut: "accepte" },
+      ],
+    });
+    const [resultat] = await calculerRentabiliteChantiers(supabase, "entreprise-1");
+    expect(resultat.budgetHt).toBe(11500);
+  });
+
+  it("les heures prévues intègrent les lignes d'avenant main_oeuvre/h des avenants acceptés", async () => {
+    const supabase = creerSupabaseMock({
+      chantiers: [CHANTIER],
+      lignesDevis: [{ quantite: 100, type: "main_oeuvre", unite: "h", devis: { chantier_id: "chantier-1" } }],
+      lignesAvenants: [
+        { quantite: 20, type: "main_oeuvre", unite: "h", avenant: { chantier_id: "chantier-1" } },
+        { quantite: 1, type: "forfait", unite: "forfait", avenant: { chantier_id: "chantier-1" } },
+      ],
+    });
+    const [resultat] = await calculerPrevuRealiseChantiers(supabase, "entreprise-1");
+    expect(resultat.heuresPrevues).toBe(120);
+  });
+
+  it("scénario contractuel de référence : devis 10000 + AV01 accepté +2000 + AV02 accepté -500 = CA prévu 11500", async () => {
+    const supabase = creerSupabaseMock({
+      chantiers: [CHANTIER],
+      devis: [{ chantier_id: "chantier-1", montant_ht: 10000 }],
+      avenants: [
+        { chantier_id: "chantier-1", montant_ht: 2000, statut: "accepte" },
+        { chantier_id: "chantier-1", montant_ht: -500, statut: "accepte" },
+      ],
+    });
+    const [resultat] = await calculerPrevuRealiseChantiers(supabase, "entreprise-1");
+    expect(resultat.caPrevuHt).toBe(11500);
   });
 });

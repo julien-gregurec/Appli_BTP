@@ -111,6 +111,7 @@ export async function calculerRentabiliteChantiers(
     { data: chantiersData },
     { data: factures },
     { data: devis },
+    { data: avenants },
     { data: donneesPointages },
     { data: depenses },
     { data: donneesIndemnites },
@@ -121,6 +122,11 @@ export async function calculerRentabiliteChantiers(
     chantiersQuery,
     supabase.from("factures").select("chantier_id, montant_ht, statut, type").eq("entreprise_id", entrepriseId),
     supabase.from("devis").select("chantier_id, montant_ht").eq("entreprise_id", entrepriseId).eq("statut", "accepte"),
+    // AVENANTS-V1 : le montant contractuel d'un chantier est le devis initial
+    // accepté + ses avenants acceptés (montant_contractuel_devis côté base,
+    // même principe ici pour ne pas dupliquer la logique). Un avenant
+    // brouillon/envoyé/refusé/annulé ne doit jamais gonfler le budget affiché.
+    supabase.from("avenants").select("chantier_id, montant_ht, statut").eq("entreprise_id", entrepriseId).eq("statut", "accepte"),
     pointagesQuery,
     supabase.from("depenses_fournisseurs").select("chantier_id, montant_ht, statut, categorie").eq("entreprise_id", entrepriseId),
     indemnitesQuery,
@@ -136,7 +142,9 @@ export async function calculerRentabiliteChantiers(
   const coutsHorairesParEmploye = new Map((donneesCoutsHoraires ?? []).map((item) => [item.employe_id as string, Number(item.cout_horaire ?? 0)]));
 
   return (chantiersData ?? []).map((chantier) => {
-    const budgetHt = (devis ?? []).filter((item) => item.chantier_id === chantier.id).reduce((s, item) => s + Number(item.montant_ht), 0);
+    const budgetHt =
+      (devis ?? []).filter((item) => item.chantier_id === chantier.id).reduce((s, item) => s + Number(item.montant_ht), 0) +
+      (avenants ?? []).filter((item) => item.chantier_id === chantier.id).reduce((s, item) => s + Number(item.montant_ht), 0);
     const factureHt = (factures ?? [])
       .filter((item) => item.chantier_id === chantier.id && !["annulee", "avoir_emis"].includes(item.statut))
       .reduce((s, item) => s + Number(item.montant_ht), 0);
@@ -228,10 +236,27 @@ export async function calculerPrevuRealiseChantiers(
     .neq("statut", "annulee");
   if (chantierId) sousTraitanceQuery = sousTraitanceQuery.eq("chantier_id", chantierId);
 
-  const [{ data: donneesLignes }, { data: donneesSousTraitance }] = await Promise.all([lignesQuery, sousTraitanceQuery]);
+  // AVENANTS-V1 : mêmes lignes main-d'œuvre/heures que pour un devis (même
+  // convention type='main_oeuvre'+unite='h'), mais seulement pour les avenants
+  // acceptés — un avenant brouillon/envoyé/refusé/annulé ne doit jamais
+  // apparaître dans les heures prévues.
+  let lignesAvenantsQuery = supabase
+    .from("lignes_avenants")
+    .select("quantite, type, unite, avenant:avenants!inner(chantier_id, statut, entreprise_id)")
+    .eq("avenant.entreprise_id", entrepriseId)
+    .eq("avenant.statut", "accepte");
+  if (chantierId) lignesAvenantsQuery = lignesAvenantsQuery.eq("avenant.chantier_id", chantierId);
+
+  const [{ data: donneesLignes }, { data: donneesSousTraitance }, { data: donneesLignesAvenants }] = await Promise.all([
+    lignesQuery,
+    sousTraitanceQuery,
+    lignesAvenantsQuery,
+  ]);
 
   type LigneDevisPrevue = { quantite: number; type: string; unite: string; devis: { chantier_id: string | null } | { chantier_id: string | null }[] | null };
+  type LigneAvenantPrevue = { quantite: number; type: string; unite: string; avenant: { chantier_id: string | null } | { chantier_id: string | null }[] | null };
   const lignes = (donneesLignes ?? []) as LigneDevisPrevue[];
+  const lignesAvenants = (donneesLignesAvenants ?? []) as LigneAvenantPrevue[];
   const sousTraitanceParChantier = new Map<string, number>();
   for (const item of (donneesSousTraitance ?? []) as { chantier_id: string; montant_previsionnel_ht: number }[]) {
     sousTraitanceParChantier.set(item.chantier_id, (sousTraitanceParChantier.get(item.chantier_id) ?? 0) + Number(item.montant_previsionnel_ht));
@@ -241,6 +266,13 @@ export async function calculerPrevuRealiseChantiers(
     if (ligne.type !== "main_oeuvre" || ligne.unite !== "h") continue;
     const devisLie = un(ligne.devis);
     const cid = devisLie?.chantier_id;
+    if (!cid) continue;
+    heuresPrevuesParChantier.set(cid, (heuresPrevuesParChantier.get(cid) ?? 0) + Number(ligne.quantite));
+  }
+  for (const ligne of lignesAvenants) {
+    if (ligne.type !== "main_oeuvre" || ligne.unite !== "h") continue;
+    const avenantLie = un(ligne.avenant);
+    const cid = avenantLie?.chantier_id;
     if (!cid) continue;
     heuresPrevuesParChantier.set(cid, (heuresPrevuesParChantier.get(cid) ?? 0) + Number(ligne.quantite));
   }

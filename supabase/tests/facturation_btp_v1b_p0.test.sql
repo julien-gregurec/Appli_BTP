@@ -109,7 +109,7 @@ select is((select montant_ht from public.factures where id = :'facture_situation
 -- nouvelle période (5000) = 12000€ > 10000€.
 select throws_like(
   $$select public.creer_situation_travaux('a0000000-0000-0000-0000-000000000001', 'fb000000-0000-0000-0000-000000000001', 100, 0, 'Situation excédentaire')$$,
-  '%dépasserait le montant total autorisé%',
+  '%dépasserait le montant contractuel autorisé%',
   '13. une situation qui, combinée à l''acompte déjà facturé, dépasserait le devis est refusée'
 );
 
@@ -133,7 +133,7 @@ select is(
 -- 16. Une facture finale par-dessus (déjà 10000€ facturés) est refusée.
 select throws_like(
   $$select public.creer_facture_avancee('a0000000-0000-0000-0000-000000000001', 'fb000000-0000-0000-0000-000000000001', 'finale', 1, false)$$,
-  '%dépasserait le montant du devis%',
+  '%dépasserait le montant contractuel du devis%',
   '16. une facture finale par-dessus un devis déjà entièrement facturé est refusée'
 );
 
