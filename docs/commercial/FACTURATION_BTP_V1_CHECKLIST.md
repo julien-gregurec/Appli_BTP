@@ -10,12 +10,16 @@ Référence : `docs/commercial/FACTURATION_BTP_V1_AUDIT_ELSATIA.md`. Ce lot est 
 ## Failles P0 confirmées et quantifiées
 
 - [x] **Facture classique dupliquable sans garde-fou** : `creer_facture_depuis_devis` appelable plusieurs fois sur le même devis, reproduit empiriquement (§4).
+- [x] **Corrigée — FACTURATION-BTP-V1B** (voir `docs/commercial/FACTURATION_BTP_V1B_CORRECTIONS_P0_ELSATIA.md`) : un second appel sur un devis déjà (même partiellement) facturé est désormais refusé ; sécurité en profondeur restaurée (`security definer` + vérification de tenance, grant `anon` retiré).
 - [x] **Sur-facturation acompte + situations** : reproduite avec des montants exacts — 12 000 € facturés sur un devis de 10 000 € HT (+20 %) (§11-13).
+- [x] **Corrigée — FACTURATION-BTP-V1B** : source canonique unique (`montant_facture_devis`) utilisée par `creer_situation_travaux` et `creer_facture_avancee`, verrouillage `for update` des devis pour la concurrence.
 - [x] **Enregistrement de paiement cassé** : `paiements` sans `GRANT` pour `authenticated`/`service_role`, cause racine identifiée (migration `20260729000189` incomplète), reproduit empiriquement (§23).
+- [x] **Corrigée — FACTURATION-BTP-V1B** : `GRANT SELECT/INSERT/UPDATE/DELETE` restauré pour `authenticated`, RLS déjà correcte désormais atteignable.
 
 ## Failles P1 identifiées
 
 - [x] Facture émise modifiable en écriture directe (montant, client) — même classe que la faille devis pré-DEVIS-LOCK-V1 (§40-41).
+- [x] **Corrigée — FACTURATION-BTP-V1B** : trigger FACTURE-LOCK sur le modèle de DEVIS-LOCK-V1, suppression désormais explicitement refusée (plus un effet de bord accidentel).
 - [x] `entreprise_snapshot` capturé uniquement côté application, contournable (§32′).
 - [x] Factures brouillon comptées dans le CA réel de RENTABILITÉ-V1B (§21, §36).
 - [x] PDF de situation sans numéro/avancement/retenue de garantie/cumul (§33).

@@ -108,45 +108,50 @@ select lives_ok(
   '12. A peut créer une facture A avec un devis A'
 );
 
--- 6.3 Updates interdites (18-22, sens A -> B, sur la facture existante de la fixture)
+-- 6.3 Updates interdites (18-22, sens A -> B, sur une facture BROUILLON de A :
+-- aa000000-...-001 est deja 'envoyee' dans le fixture, donc verrouillee depuis
+-- FACTURATION-BTP-V1B (FACTURE-LOCK) -- ce n'est pas ce que ce fichier teste,
+-- qui vise la contrainte FK composite, pas le nouveau verrou d'emission.
 select throws_like(
-  $$update public.factures set client_id = 'b3000000-0000-0000-0000-000000000001' where id = 'aa000000-0000-0000-0000-000000000001'$$,
+  $$update public.factures set client_id = 'b3000000-0000-0000-0000-000000000001' where id = 'c9000000-0000-0000-0000-000000000007'$$,
   '%violates%', '18. Facture A ne peut pas être modifiée pour pointer vers un client B'
 );
 
 select throws_like(
-  $$update public.factures set devis_origine_id = 'b9000000-0000-0000-0000-000000000001' where id = 'aa000000-0000-0000-0000-000000000001'$$,
+  $$update public.factures set devis_origine_id = 'b9000000-0000-0000-0000-000000000001' where id = 'c9000000-0000-0000-0000-000000000007'$$,
   '%violates%', '19. Facture A ne peut pas être modifiée pour pointer vers un devis B'
 );
 
 select throws_like(
-  $$update public.factures set facture_origine_id = 'ba000000-0000-0000-0000-000000000001' where id = 'aa000000-0000-0000-0000-000000000001'$$,
+  $$update public.factures set facture_origine_id = 'ba000000-0000-0000-0000-000000000001' where id = 'c9000000-0000-0000-0000-000000000007'$$,
   '%violates%', '20. Facture A ne peut pas être modifiée pour pointer vers une facture d''origine B'
 );
 
 select throws_like(
-  $$update public.factures set facture_parente_id = 'ba000000-0000-0000-0000-000000000001' where id = 'aa000000-0000-0000-0000-000000000001'$$,
+  $$update public.factures set facture_parente_id = 'ba000000-0000-0000-0000-000000000001' where id = 'c9000000-0000-0000-0000-000000000007'$$,
   '%violates%', '21. Facture A ne peut pas être modifiée pour pointer vers une facture parente B'
 );
 
 select throws_like(
-  $$update public.factures set entreprise_id = 'b0000000-0000-0000-0000-000000000001' where id = 'aa000000-0000-0000-0000-000000000001'$$,
+  $$update public.factures set entreprise_id = 'b0000000-0000-0000-0000-000000000001' where id = 'c9000000-0000-0000-0000-000000000007'$$,
   '%violates%', '22. Facture ne peut pas changer d''entreprise en conservant des relations devenues incompatibles (refus RLS ou FK)'
 );
 
--- Contrôle miroir essentiel B -> A
 reset role;
+insert into public.factures (id, entreprise_id, client_id) values ('c9000000-0000-0000-0000-000000000011','b0000000-0000-0000-0000-000000000001','b3000000-0000-0000-0000-000000000001');
+
+-- Contrôle miroir essentiel B -> A
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000001', true);
 select set_config('request.jwt.claim.email', 'admin-b@invalid.local', true);
 
 select throws_like(
-  $$update public.factures set client_id = 'a3000000-0000-0000-0000-000000000001' where id = 'ba000000-0000-0000-0000-000000000001'$$,
+  $$update public.factures set client_id = 'a3000000-0000-0000-0000-000000000001' where id = 'c9000000-0000-0000-0000-000000000011'$$,
   '%violates%', 'Contrôle miroir B->A : facture B ne peut pas pointer vers un client A'
 );
 
 select throws_like(
-  $$update public.factures set devis_origine_id = 'a9000000-0000-0000-0000-000000000001' where id = 'ba000000-0000-0000-0000-000000000001'$$,
+  $$update public.factures set devis_origine_id = 'a9000000-0000-0000-0000-000000000001' where id = 'c9000000-0000-0000-0000-000000000011'$$,
   '%violates%', 'Contrôle miroir B->A : facture B ne peut pas pointer vers un devis A'
 );
 
