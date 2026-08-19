@@ -80,11 +80,19 @@ En testant le P0 n°1 de bout en bout, la visibilité d'un document fraîchement
 
 `ModuleAccessBoundary` masque les formulaires de mutation en lecture seule via `.lecture-seule main form[method="post"]{display:none!important}`. Or les formulaires de Server Actions Next.js rendus par cette version du framework ne portent **aucun** attribut `method` dans le DOM — le sélecteur ne matche donc jamais, et **tout** formulaire de mutation reste visible sur **toute** page en mode consultation, dans l'ensemble de l'application (pas seulement sous `/chantiers`). La barrière réelle reste RLS/middleware (confirmé non compromise), mais l'affordance visuelle est trompeuse : un utilisateur en lecture seule voit des boutons d'action qui produiront une erreur générique s'il clique dessus, au lieu d'être proprement masqués. Ce défaut est **préexistant** à ce lot (le bouton Supprimer documents en est un symptôme, corrigé ponctuellement en §1) et touche potentiellement de nombreuses pages hors du périmètre terrain (clients, devis, planning, etc.). **Non corrigé ici** — hors périmètre d'un lot strictement correctif sur 2 P0 + 1 P1 ; recommandé comme lot minimal séparé (`LECTURE-SEULE-UX-V1`), par exemple en faisant porter explicitement `method="post"` dans le JSX de chaque formulaire concerné, ou en remplaçant le sélecteur CSS par un attribut `data-*` positionné explicitement.
 
-## 5. Hors périmètre respecté
+## 5. Validation Preview (`elsatia-preview`)
+
+- **Confirmation préalable du bug pgcrypto** : `pgcrypto` est également installé dans le schéma `extensions` sur Preview (`select extnamespace::regnamespace from pg_extension where extname='pgcrypto'` → `extensions`) — le P0 n°2 aurait donc bien bloqué toute création de note de frais sur Preview avant correction, comme anticipé.
+- **Migrations appliquées isolément** (`supabase db query --linked -f <migration>`, pas de `db push` global) pour ne pas toucher au gap historique `20260812000200` (P9 documents commerciaux, hors périmètre, absent de Preview) — même précaution que DEVIS-LOCK-V1/FACTURATION-BTP-V1B. Vérifié après coup : `ajouter_documents_chantier` présent dans `permissions_disponibles`, `ajouter_audit_note_frais` qualifie bien `extensions.digest`.
+- **Déploiement Vercel** : ce lot modifie du code applicatif (middleware, composant, page) — déploiement explicite (`vercel deploy`) nécessaire, contrairement aux lots migrations-seules précédents. URL de la révision testée : `elsatia-preview-2rp4611kb-julien-gregurec1.vercel.app`.
+- **Contrôle visuel réel sur Preview**, entreprise fictive dédiée (« Entreprise Terrain V1B Preview »), profil Terrain, mobile 390×844 : ajout de photo/document accessible (formulaire visible, page « 0 élément » sans erreur), création d'une note de frais réussie de bout en bout (`EXP-2026-000001`, 7,30 €, brouillon créé sans erreur) — les deux P0 confirmés résolus en conditions réelles, pas seulement en Local.
+- **Nettoyage** : chantiers, documents, équipe de chantier et client de test supprimés après validation. L'entreprise fictive, son unique poste/salarié/utilisateur et la note de frais de test **n'ont pas pu être supprimés** — `journal_audit_notes_frais` est volontairement immuable (`trg_refuser_mutation_archive`, suppression et modification interdites par trigger), ce qui bloque en cascade la suppression de la note de frais, de l'employé et de l'entreprise qui la référencent. Comportement attendu d'une chaîne d'audit inaltérable, pas une omission de nettoyage : le résidu (une entreprise nommée explicitement « ... V1B Preview », un compte `@invalid.local`, aucun chantier ni document) est négligeable et sans donnée réelle.
+
+## 6. Hors périmètre respecté
 
 Aucune refonte de l'interface terrain, aucune modification de la navigation mobile, aucun mode offline, aucune notification push, aucun changement fonctionnel sur planning/pointage, aucune modification de PLATFORM-V2, aucun contact Stripe, aucune Production.
 
-## 6. QA
+## 7. QA
 
 - `npm run typecheck` : 0 erreur.
 - `npm run lint` : 0 erreur, 3 avertissements `<img>` préexistants et sans rapport avec ce lot.
@@ -93,10 +101,10 @@ Aucune refonte de l'interface terrain, aucune modification de la navigation mobi
 - `npm run test:db` (pgTAP), après `supabase db reset` complet depuis zéro (les deux nouvelles migrations s'appliquent proprement) : 518/518 — 496 préexistants + 22 nouveaux (`terrain_mobile_v1b_permission_documents.test.sql`).
 - `npm run verify:secrets` : 890 fichiers suivis contrôlés, aucun secret reconnu.
 
-## 7. Documents
+## 8. Documents
 
 Ce document et `docs/commercial/TERRAIN_MOBILE_V1_CHECKLIST.md` (mis à jour).
 
-## 8. Git
+## 9. Git
 
-Branche `claude/terrain-mobile-v1b-fixes`, depuis `claude/terrain-mobile-v1-audit` (`fef8e0e`).
+Branche `claude/terrain-mobile-v1b-fixes`, depuis `claude/terrain-mobile-v1-audit` (`fef8e0e`). Commits : `935d60c` (permissions terrain), `fe205dd` (fix pgcrypto), `ad3ab51` (tests + docs). Poussée sur `gh`. Migrations et déploiement Preview vérifiés (`elsatia-preview-2rp4611kb-julien-gregurec1.vercel.app`), données de test nettoyées (résidu minimal inévitable, cf. §5). Aucun merge Production.
