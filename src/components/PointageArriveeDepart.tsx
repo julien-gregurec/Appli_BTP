@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { enregistrerArriveeAction, enregistrerDepartAction } from "@/app/actions/pointages";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { PointageChrono } from "@/components/PointageChrono";
+import { messageErreurGps } from "@/lib/gps";
 type Option={id:string;nom:string;priorite?:"jour"|"affecte"|"autre"};
 type Session={id:string;arrivee_at:string;tache:string|null;employe:Option|null;chantier:Option|null};
 type Position={lat:number;lng:number;precision:number};
@@ -17,7 +18,7 @@ function usePositionTerrain(){
     if(!navigator.geolocation){queueMicrotask(()=>{setErreur("La géolocalisation n’est pas disponible sur cet appareil.");setCharge(false);});return;}
     const suivi=navigator.geolocation.watchPosition(
       p=>{setPosition({lat:p.coords.latitude,lng:p.coords.longitude,precision:p.coords.accuracy});setErreur("");setCharge(false);},
-      e=>{setErreur(e.message||"Position impossible à obtenir. Autorisez la localisation dans les réglages du navigateur.");setCharge(false);},
+      e=>{setErreur(messageErreurGps(e.code));setCharge(false);},
       {enableHighAccuracy:true,timeout:15000,maximumAge:10000},
     );
     return()=>navigator.geolocation.clearWatch(suivi);
@@ -74,7 +75,7 @@ function CarteDepart({session}:{session:Session}){
     <ChampsGpsCaches position={gps.position} motifSansGps={gps.motifSansGps}/>
     <button disabled={!gps.peutContinuer} className="w-full rounded-md bg-red-700 px-4 py-4 text-lg font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">{gps.charge?"Localisation en cours…":"Pointer le départ"}</button>
     <StatutGps gps={gps}/>
-    <details className="text-sm"><summary className="cursor-pointer text-neutral-500">Options avancées</summary><label className="mt-2 block text-xs text-neutral-500">Pause (minutes)<input name="pause_minutes" type="number" min="0" max="1440" step="5" defaultValue="45" className="mt-1 w-28 rounded border px-2 py-1"/></label></details>
+    <details open className="text-sm"><summary className="cursor-pointer text-neutral-500">Options avancées</summary><label className="mt-2 block text-xs text-neutral-500">Pause (minutes)<input name="pause_minutes" type="number" min="0" max="1440" step="5" defaultValue="45" className="mt-1 w-28 rounded border px-2 py-1"/></label></details>
   </form>;
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { structurerCompteRenduIAAction, enregistrerCompteRenduAction } from "@/app/actions/comptesRendus";
 
@@ -28,11 +28,22 @@ function ctorReconnaissance(): (new () => ReconnaissanceVocale) | undefined {
   return fenetre.SpeechRecognition ?? fenetre.webkitSpeechRecognition;
 }
 
+// La disponibilité de l'API ne change jamais après le chargement de la page :
+// aucun abonnement réel n'est nécessaire, seul le rendu serveur (toujours
+// "non supporté", window n'existe pas) doit rester distinct du rendu client
+// une fois monté — exactement le cas d'usage visé par useSyncExternalStore.
+const abonnementNoOp = () => () => {};
+const supporteDicteeVocale = () => !!ctorReconnaissance();
+const supporteDicteeVocaleServeur = () => false;
+
 export function DicteeCompteRendu({ chantierId, peutUtiliserIA = true }: { chantierId: string; peutUtiliserIA?: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [ecoute, setEcoute] = useState(false);
-  const [supporte] = useState(() => !!ctorReconnaissance());
+  // Le rendu serveur ne peut jamais détecter l'API (window n'existe pas) : évaluer la
+  // disponibilité directement au rendu produisait un mismatch d'hydratation sur les
+  // navigateurs qui la supportent réellement.
+  const supporte = useSyncExternalStore(abonnementNoOp, supporteDicteeVocale, supporteDicteeVocaleServeur);
   const [transcription, setTranscription] = useState("");
   const [titre, setTitre] = useState("");
   const [contenu, setContenu] = useState("");
