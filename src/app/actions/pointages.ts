@@ -79,7 +79,10 @@ export async function enregistrerDepartAction(sessionId: string, formData: FormD
     p_longitude: preuve.longitude, p_precision: preuve.precision, p_photo_path: null,
     p_motif_sans_gps: preuve.motifSansGps,
   });
-  if (error) redirect(`/pointage?error=${encodeURIComponent(messageErreurUtilisateur("enregistrerDepartAction", error, "Impossible d’enregistrer le départ."))}`);
+  if (error) {
+    const dureeInvalide = error.message?.includes("Durée travaillée invalide");
+    redirect(`/pointage?error=${encodeURIComponent(dureeInvalide ? "Cette journée dure moins de 15 minutes ou plus de 24 h : vérifiez l’heure d’arrivée avant de pointer le départ." : messageErreurUtilisateur("enregistrerDepartAction", error, "Impossible d’enregistrer le départ."))}`);
+  }
   revalidatePath("/pointage");
   revalidatePath("/dashboard");
   redirect("/pointage?succes=depart");
