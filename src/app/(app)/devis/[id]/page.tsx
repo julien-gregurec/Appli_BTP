@@ -87,6 +87,11 @@ export default async function DevisDetailPage({ params, searchParams }: { params
                 Modifier
               </Link>
             )}
+            {devis.statut === "accepte" && (
+              <Link href={`/avenants/nouveau?devis=${id}`} className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700">
+                Créer un avenant
+              </Link>
+            )}
             <a
               href={`/api/documents/devis/${id}/pdf`}
               target="_blank"

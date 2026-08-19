@@ -20,6 +20,7 @@ import { SearchableSelect } from "@/components/SearchableSelect";
 import { statutNoteFrais } from "@/lib/notes-frais";
 import { activeFeaturesForCompany } from "@/lib/feature-flags";
 import { calculerPrevuRealiseChantiers } from "@/lib/rentabilite";
+import { statutAvenant, numeroAvenant, variationLabel } from "@/lib/avenants";
 
 export default async function ChantierDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; success?: string }> }) {
   const { id } = await params;
@@ -53,7 +54,7 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
     .eq("chantier_id", id)
     .order("created_at");
 
-  const [{ data: devis }, { data: factures }, { data: affectations }, {data:pointages}, {data:documents}, {data:codeIdentification}, {data:equipe}, {data:employes}, {data:facturesFournisseurs}, {data:facturesSansChantier}, {data:notesFrais}, {data:sousTraitants}] = await Promise.all([
+  const [{ data: devis }, { data: factures }, { data: affectations }, {data:pointages}, {data:documents}, {data:codeIdentification}, {data:equipe}, {data:employes}, {data:facturesFournisseurs}, {data:facturesSansChantier}, {data:notesFrais}, {data:sousTraitants}, {data:avenants}] = await Promise.all([
     supabase.from("devis").select("id, numero, statut, montant_ttc").eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
     supabase.from("factures").select("id, numero, statut, montant_ttc, montant_paye").eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
     supabase.from("affectations").select("heures").eq("chantier_id", id).eq("entreprise_id", ctx.entrepriseId),
@@ -66,6 +67,7 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
     peutGererAchats?supabase.from("depenses_fournisseurs").select("id,numero_piece,date_piece,montant_ttc,fournisseur:fournisseurs(nom)").eq("entreprise_id",ctx.entrepriseId).is("chantier_id",null).neq("statut","annulee").order("date_piece",{ascending:false}).limit(100):Promise.resolve({data:[]}),
     peutVoirNotesEquipe?supabase.from("notes_frais").select("id,reference,date_frais,fournisseur,categorie,statut,montant_ttc,employe:employes(prenom,nom)").eq("entreprise_id",ctx.entrepriseId).eq("chantier_id",id).order("date_frais",{ascending:false}):Promise.resolve({data:[]}),
     peutVoirSousTraitants?supabase.from("sous_traitants_chantiers").select("id,mission,date_debut,date_fin,montant_previsionnel_ht,statut,fournisseur:fournisseurs(id,nom,specialite)").eq("entreprise_id",ctx.entrepriseId).eq("chantier_id",id).order("created_at",{ascending:false}):Promise.resolve({data:[]}),
+    peutCreerDevis?supabase.from("avenants").select("id,ordre,statut,montant_ht,created_at,devis:devis!avenants_devis_origine_id_fkey(id,numero,montant_ht)").eq("entreprise_id",ctx.entrepriseId).eq("chantier_id",id).order("created_at",{ascending:false}):Promise.resolve({data:[]}),
   ]);
   const devisDuClient = peutCreerDevis
     ? (await supabase.from("devis").select("id,numero,statut,chantier_id,chantier:chantiers!devis_chantier_id_fkey(nom)").eq("entreprise_id",ctx.entrepriseId).eq("client_id",chantier.client_id).order("created_at",{ascending:false})).data ?? []
@@ -157,6 +159,71 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
         {peutVoirSousTraitants&&<section className="space-y-3 rounded-md border p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold">Sous-traitants du chantier</h2><p className="text-sm text-neutral-500">Missions confiées et budget prévisionnel hors taxes.</p></div><Link href="/sous-traitants" className="text-sm font-medium text-blue-700 hover:underline">Gérer les sous-traitants →</Link></div><div className="grid gap-3 sm:grid-cols-2">{(sousTraitants??[]).map(item=>{const tiers=relation(item.fournisseur as {id:string;nom:string;specialite:string|null}|{id:string;nom:string;specialite:string|null}[]|null);return <article key={item.id} className="rounded-md border p-3"><div className="flex items-start justify-between gap-3"><div><Link href={`/sous-traitants/${tiers?.id}`} className="font-semibold hover:underline">{tiers?.nom??"Sous-traitant"}</Link><p className="text-sm">{item.mission}</p><p className="text-xs text-neutral-500">{tiers?.specialite??"Spécialité non renseignée"} · {item.statut.replaceAll("_"," ")}</p></div><strong>{euros(Number(item.montant_previsionnel_ht))} HT</strong></div></article>})}{!sousTraitants?.length&&<p className="rounded border border-dashed p-4 text-sm text-neutral-500 sm:col-span-2">Aucun sous-traitant affecté à ce chantier.</p>}</div></section>}
 
         {peutCreerDevis&&<section className="space-y-3 rounded-md border border-blue-200 bg-blue-50/40 p-4 dark:border-blue-900 dark:bg-blue-950/20"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold">Devis associés au chantier</h2><p className="text-sm text-neutral-500">Choisissez un devis du même client. L’association sera également visible et modifiable depuis la fiche du devis.</p></div><Link href={`/devis/nouveau?client=${chantier.client_id}&chantier=${id}`} className="text-sm font-medium text-blue-700 hover:underline dark:text-blue-300">+ Nouveau devis pour ce chantier</Link></div>{(devis??[]).length>0&&<div className="flex flex-wrap gap-2">{(devis??[]).map(item=><Link key={item.id} href={`/devis/${item.id}`} className="rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-medium hover:border-blue-500 dark:bg-neutral-950">{item.numero??"Devis brouillon"} · {statutDevis(item.statut).libelle}</Link>)}</div>}{devisDuClient.some(item=>item.chantier_id!==id&&item.statut!=="accepte")?<form action={associerDevisDepuisChantierAction.bind(null,id)} className="flex flex-col gap-2 border-t border-blue-100 pt-3 sm:flex-row sm:items-end"><label className="flex-1 text-xs text-neutral-500">Associer un devis existant<SearchableSelect name="devis_id" required options={devisDuClient.filter(item=>item.chantier_id!==id&&item.statut!=="accepte").map(item=>{const chantierActuel=relation(item.chantier as {nom:string}|{nom:string}[]|null);return{value:item.id,label:`${item.numero??"Devis brouillon"} · ${statutDevis(item.statut).libelle}${chantierActuel?` · actuellement sur ${chantierActuel.nom}`:" · sans chantier"}`,search:chantierActuel?.nom??""};})} placeholder="Écrire le numéro du devis…" className="mt-1" /></label><button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Associer à ce chantier</button></form>:<p className="rounded border border-dashed border-blue-200 p-3 text-sm text-neutral-500">Tous les devis disponibles de ce client sont déjà associés à ce chantier (un devis accepté ne peut plus changer de chantier).</p>}</section>}
+
+        {peutCreerDevis && (() => {
+          const devisAcceptes = (devis ?? []).filter((item) => item.statut === "accepte");
+          const avenantsListe = (avenants ?? []) as {
+            id: string; ordre: number; statut: string; montant_ht: number; created_at: string;
+            devis: { id: string; numero: string | null; montant_ht: number } | { id: string; numero: string | null; montant_ht: number }[] | null;
+          }[];
+          const contractuelParDevisHt = new Map<string, number>();
+          for (const item of devisAcceptes) contractuelParDevisHt.set(item.id, 0);
+          for (const av of avenantsListe) {
+            const d = relation(av.devis);
+            if (!d) continue;
+            if (av.statut === "accepte") {
+              contractuelParDevisHt.set(d.id, (contractuelParDevisHt.get(d.id) ?? Number(d.montant_ht)) + Number(av.montant_ht));
+            }
+          }
+          return (
+            <section className="space-y-3 rounded-md border border-blue-200 bg-blue-50/40 p-4 dark:border-blue-900 dark:bg-blue-950/20">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="font-semibold">Avenants</h2>
+                  <p className="text-sm text-neutral-500">Modifications contractuelles successives d’un devis déjà accepté, sans jamais le modifier lui-même.</p>
+                </div>
+              </div>
+              {avenantsListe.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-blue-100 text-left text-xs text-neutral-500">
+                        <th className="py-1 pr-3">Numéro</th>
+                        <th className="py-1 pr-3">Devis d’origine</th>
+                        <th className="py-1 pr-3">Statut</th>
+                        <th className="py-1 pr-3">Variation HT</th>
+                        <th className="py-1 pr-3">Montant contractuel courant</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {avenantsListe.map((av) => {
+                        const d = relation(av.devis);
+                        const st = statutAvenant(av.statut);
+                        const contractuel = d ? (contractuelParDevisHt.get(d.id) ?? Number(d.montant_ht)) : null;
+                        return (
+                          <tr key={av.id} className="border-b border-blue-50 dark:border-blue-950/40">
+                            <td className="py-1.5 pr-3"><Link href={`/avenants/${av.id}`} className="font-medium text-blue-700 hover:underline dark:text-blue-300">{numeroAvenant(d?.numero ?? null, av.ordre)}</Link></td>
+                            <td className="py-1.5 pr-3">{d ? <Link href={`/devis/${d.id}`} className="hover:underline">{d.numero ?? "—"}</Link> : "—"}</td>
+                            <td className="py-1.5 pr-3"><span className="rounded-full px-2 py-0.5 text-xs" style={{ background: `${st.couleur}22`, color: st.couleur }}>{st.libelle}</span></td>
+                            <td className={`py-1.5 pr-3 font-mono ${av.montant_ht < 0 ? "text-red-700 dark:text-red-400" : "text-green-700 dark:text-green-400"}`}>{variationLabel(av.montant_ht)}</td>
+                            <td className="py-1.5 pr-3 font-mono">{contractuel !== null ? euros(contractuel) : "—"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-sm text-neutral-500">Aucun avenant sur ce chantier.</p>
+              )}
+              {devisAcceptes.length > 0 ? (
+                <p className="text-sm text-neutral-500">Pour créer un avenant, ouvrez le devis accepté concerné et utilisez « Créer un avenant ».</p>
+              ) : (
+                <p className="text-sm text-neutral-500">Aucun devis accepté sur ce chantier : un avenant ne peut être créé que sur un devis déjà accepté.</p>
+              )}
+            </section>
+          );
+        })()}
 
         {peutVoirFinances&&<section className="space-y-3">
           <div className="flex items-center justify-between"><h2 className="text-sm font-semibold">Pilotage financier</h2>{peutCreerDevis&&<Link href={`/devis/nouveau?client=${chantier.client_id}&chantier=${id}`} className="text-sm text-neutral-600 hover:underline dark:text-neutral-400">+ Nouveau devis</Link>}</div>

@@ -1,6 +1,18 @@
 # AVENANTS-V1 — Checklist
 
-Référence : `docs/commercial/AVENANTS_V1_AUDIT_ELSATIA.md`. Ce lot est un audit — aucune ligne de code applicatif n'est modifiée. Cette checklist trace les constats et l'état de préparation pour un futur lot de développement.
+Référence : `docs/commercial/AVENANTS_V1_AUDIT_ELSATIA.md` (audit) et `docs/commercial/AVENANTS_V1_IMPLEMENTATION_ELSATIA.md` (implémentation minimale, terminée et validée en Preview). Les sections ci-dessous tracent l'audit d'origine ; voir le document d'implémentation pour le détail de ce qui a été construit.
+
+## Implémentation (AVENANTS-V1, terminée)
+
+- [x] Modèle de données : table `avenants` + `lignes_avenants` dédiée (option C, sans polymorphisme sur `lignes_devis`).
+- [x] Statuts et transitions minimales, immutabilité après acceptation (DB-lock, même principe que DEVIS-LOCK-V1).
+- [x] Capture automatique (date + auteur) de l'acceptation.
+- [x] Montant contractuel canonique (`montant_contractuel_devis`) intégré au plafond de facturation (acompte/finale/situations) et à RENTABILITÉ-V1C (budget/heures prévues).
+- [x] Deux bugs découverts et corrigés pendant l'implémentation, avant tout déploiement : calcul de période des situations non robuste à un changement de montant contractuel en cours de route ; `facturer_situation_travaux` ignorait le montant déjà correctement ajusté.
+- [x] UI minimale (fiche chantier, fiche devis, pages avenant), PDF réutilisant le gabarit existant.
+- [x] 25 assertions pgTAP + 18 tests Vitest dédiés, suite complète verte (496 pgTAP / 360 Vitest).
+- [x] Déployé et vérifié empiriquement sur Preview (migrations + scénario contractuel complet rejoué directement en base).
+- [ ] Contrôle visuel navigateur sur Preview : **non effectué**, faute d'identifiants de connexion disponibles dans cette session — décision explicite de l'utilisateur de s'appuyer sur la vérification base de données + build à la place.
 
 ## Constat
 
