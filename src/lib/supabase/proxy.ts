@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
-import { GESTION_PERMISSION_PAR_CHEMIN, MODULE_PERMISSION_PAR_CHEMIN, PERMISSIONS_ACCES_ALTERNATIVES, PERMISSIONS_MUTATION_ALTERNATIVES } from "@/lib/module-permissions";
+import { MODULE_PERMISSION_PAR_CHEMIN, PERMISSIONS_ACCES_ALTERNATIVES, droitsGestionPour } from "@/lib/module-permissions";
 import { permissionIncluseDansOffre } from "@/lib/tarification";
 import { appliquerRateLimit, politiquesRateLimitPour } from "@/lib/security/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -91,15 +91,10 @@ export async function updateSession(request: NextRequest) {
 
   const droitRequis = isPublic ? undefined : MODULE_PERMISSION_PAR_CHEMIN.find(([c]) => correspond(c))?.[1];
   const estMutation = !["GET", "HEAD", "OPTIONS"].includes(request.method);
-  const droitGestion = !isPublic && estMutation
-    ? GESTION_PERMISSION_PAR_CHEMIN.find(([c]) => correspond(c))?.[1]
-    : undefined;
+  const droitsGestion = !isPublic && estMutation ? droitsGestionPour(chemin) : [];
 
   const droitsAcces = droitRequis
     ? PERMISSIONS_ACCES_ALTERNATIVES[Object.keys(PERMISSIONS_ACCES_ALTERNATIVES).find((c) => correspond(c)) ?? ""] ?? [droitRequis]
-    : [];
-  const droitsGestion = droitGestion
-    ? PERMISSIONS_MUTATION_ALTERNATIVES[Object.keys(PERMISSIONS_MUTATION_ALTERNATIVES).find((c) => correspond(c)) ?? ""] ?? [droitGestion]
     : [];
 
   const { data: acces } = await supabase.rpc("contexte_acces_proxy", {
@@ -156,7 +151,7 @@ export async function updateSession(request: NextRequest) {
       url.searchParams.set("acces", "refuse");
       return NextResponse.redirect(url);
     }
-    if (droitGestion && ctx.droit_gestion !== true) {
+    if (droitsGestion.length > 0 && ctx.droit_gestion !== true) {
       const url = request.nextUrl.clone();
       url.searchParams.set("lecture", "seule");
       return NextResponse.redirect(url, 303);
