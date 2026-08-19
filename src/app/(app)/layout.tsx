@@ -46,7 +46,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         .app-shell main .fixed[role="dialog"]>div{max-height:calc(100dvh - 2rem);overflow-y:auto;padding:1rem}
       }`}</style>
       <style>{`
-        .lecture-seule main form[method="post"],
+        .lecture-seule main form:not([method="get"]),
         .lecture-seule main a[href$="/nouveau"],
         .lecture-seule main a[href*="/modifier"],
         .lecture-seule main button[type="button"]{display:none!important}
