@@ -1,10 +1,33 @@
 # TERRAIN-MOBILE-V1 — Checklist
 
-Référence : `docs/commercial/TERRAIN_MOBILE_V1_AUDIT_ELSATIA.md` (audit initial)
-et `docs/commercial/TERRAIN_MOBILE_V1B_CORRECTIONS_ELSATIA.md` (correctifs des
-2 P0 + 1 P1, branche `claude/terrain-mobile-v1b-fixes`). Les sections
-ci-dessous tracent l'audit d'origine ; voir le document de correctifs pour le
-détail de ce qui a été corrigé.
+Référence : `docs/commercial/TERRAIN_MOBILE_V1_AUDIT_ELSATIA.md` (audit initial),
+`docs/commercial/TERRAIN_MOBILE_V1B_CORRECTIONS_ELSATIA.md` (correctifs des
+2 P0 + 1 P1, branche `claude/terrain-mobile-v1b-fixes`) et
+`docs/commercial/TERRAIN_MOBILE_V1C_READONLY_P1P2_ELSATIA.md` (lecture seule
+réelle + clôture P1/P2, branche `claude/terrain-mobile-v1c-readonly-p1p2`).
+Les sections ci-dessous tracent l'audit d'origine ; voir les documents de
+correctifs pour le détail de ce qui a été corrigé.
+
+## Correctifs (TERRAIN-MOBILE-V1C, terminés)
+
+- [x] Masquage CSS « lecture seule » rendu réellement opérant : sélecteur
+      universel `form:not([method="get"])`, plus garde explicite au niveau
+      composant pour le seul cas structurel qui y échappait (`<details>`
+      « Modifier » du planning, gardé par `gerer_planning`).
+- [x] Vérifié qu'aucune Server Action terrain n'est contournable en
+      l'appelant directement (sans passer par l'UI) : soit un contrôle
+      applicatif explicite existe (`chantiers.ts`, RPC pointage), soit RLS
+      seule tient la barrière et le tient correctement (`planning.ts`,
+      `documents.ts`, `comptesRendus.ts`) — 13 assertions pgTAP dédiées.
+- [x] P1 « branches `auth.role()='anon'` vestigiales » (PLANNING-POINTAGE-V1)
+      corrigé pour les 4 fonctions de pointage concernées.
+- [x] P2 clos : message GPS traduit, lien GPS `mlat=0&mlon=0` corrigé,
+      message d'erreur durée minimale explicite, champ pause ouvert par
+      défaut, mismatch d'hydratation comptes-rendus corrigé.
+- [x] Suite complète verte après `db reset` complet : 531/531 pgTAP,
+      360/360 Vitest.
+- [x] Validé en Preview réel (migration appliquée isolément + déploiement
+      Vercel + recette authentifiée).
 
 ## Correctifs (TERRAIN-MOBILE-V1B, terminés)
 
@@ -98,25 +121,28 @@ détail de ce qui a été corrigé.
 
 ## P2
 
-- [x] Message d'erreur GPS non traduit (« User denied Geolocation »).
-- [x] Lien GPS vers `mlat=0&mlon=0` quand la position n'a pas été capturée.
-- [x] Planning mobile montre toute l'équipe, pas seulement « mes
-      affectations » — à confirmer si assumé.
-- [x] Champ pause replié par défaut sous « Options avancées ».
+- [x] Message d'erreur GPS non traduit (« User denied Geolocation ») —
+      **CORRIGÉ V1C**.
+- [x] Lien GPS vers `mlat=0&mlon=0` quand la position n'a pas été capturée —
+      **CORRIGÉ V1C**.
+- [ ] Planning mobile montre toute l'équipe, pas seulement « mes
+      affectations » — choix de conception produit à trancher explicitement,
+      pas un défaut technique, volontairement non modifié en V1C.
+- [x] Champ pause replié par défaut sous « Options avancées » — **CORRIGÉ V1C**.
 - [x] Mismatch d'hydratation React sur la page comptes-rendus (détection
-      dictée vocale serveur/client).
+      dictée vocale serveur/client) — **CORRIGÉ V1C** (`useSyncExternalStore`).
 - [x] Message d'erreur générique à l'échec de clôture de pointage (durée
-      minimale non expliquée).
+      minimale non expliquée) — **CORRIGÉ V1C**.
 - [x] Lien « Modifier » visible sur une affectation en mode consultation, sans
-      action utile pour ce profil.
-- [x] **Découverte V1B** : le masquage CSS « mode consultation »
-      (`ModuleAccessBoundary`, sélecteur `form[method="post"]`) ne correspond
-      jamais aux formulaires de Server Actions Next.js (aucun attribut
-      `method` dans le DOM rendu) — tout formulaire de mutation reste visible
-      en lecture seule, sur l'ensemble de l'application, pas seulement sous
-      `/chantiers`. La barrière réelle (RLS/middleware) n'est pas compromise.
-      Non corrigé (hors périmètre V1B), recommandé comme lot séparé. Cf.
-      `docs/commercial/TERRAIN_MOBILE_V1B_CORRECTIONS_ELSATIA.md` §4.
+      action utile pour ce profil — **CORRIGÉ V1C**.
+- [x] **Masquage CSS « mode consultation » inopérant — CORRIGÉ V1C.**
+      Sélecteur `form[method="post"]` → `form:not([method="get"])` (universel,
+      site entier) + garde explicite pour le `<details>` « Modifier » du
+      planning. Vérifié qu'aucune Server Action terrain n'était contournable
+      malgré ce défaut (RLS/contrôle applicatif déjà suffisants partout).
+      Cf. `docs/commercial/TERRAIN_MOBILE_V1C_READONLY_P1P2_ELSATIA.md`.
+- [x] **P1 PLANNING-POINTAGE-V1 : branches `auth.role()='anon'` vestigiales
+      (pointage) — CORRIGÉ V1C** pour les 4 fonctions concernées.
 
 ## P3
 
@@ -157,11 +183,22 @@ détail de ce qui a été corrigé.
 - [x] Aucune touche à PLATFORM-V2 ni à Stripe.
 - [x] Aucune Production.
 
+## Hors périmètre respecté (TERRAIN-MOBILE-V1C)
+
+- [x] Aucune nouvelle fonctionnalité métier ajoutée.
+- [x] Aucune touche à Stripe, Auth Supabase, Sentry, Brevo, site vitrine,
+      tarifs, modules BETA.
+- [x] Aucun seed Production.
+- [x] Portée du nettoyage anon strictement limitée aux 4 fonctions de
+      pointage concernées par le P1 d'origine.
+
 ## Livrables
 
 - [x] `docs/commercial/TERRAIN_MOBILE_V1_AUDIT_ELSATIA.md`.
 - [x] `docs/commercial/TERRAIN_MOBILE_V1_CHECKLIST.md` (ce fichier).
 - [x] `docs/commercial/TERRAIN_MOBILE_V1B_CORRECTIONS_ELSATIA.md`.
+- [x] `docs/commercial/TERRAIN_MOBILE_V1C_READONLY_P1P2_ELSATIA.md`.
 - [x] Commit `docs(commercial): auditer experience terrain mobile ELSATIA`
       (`fef8e0e`).
-- [ ] Commits dédiés TERRAIN-MOBILE-V1B (permissions + fix pgcrypto + docs).
+- [x] Commits TERRAIN-MOBILE-V1B (`935d60c`, `fe205dd`, `ad3ab51`, `67e1773`).
+- [x] Commits TERRAIN-MOBILE-V1C (`00dd490`, `e141a1a`, `60d0790`).
