@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { permissionsUtilisateur } from "@/lib/permissions";
 import { creerAffectationAction, modifierAffectationAction, supprimerGroupeAffectationsAction } from "@/app/actions/planning";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { PlanningAffectationForm } from "@/components/PlanningAffectationForm";
@@ -45,7 +46,8 @@ const champInput = "mt-1 w-full rounded border px-2 py-1 text-xs dark:bg-neutral
 // toujours visibles (pas de JS pour les basculer selon le type) — le serveur ne retient que
 // celui qui correspond au type_activite soumis. Permet de corriger une saisie ou un doublon
 // sans passer par supprimer + recréer.
-function FormulaireModifierAffectation({ a, chantiers, retour, autresMemeLot }: { a: A; chantiers: { id: string; nom: string }[]; retour: string; autresMemeLot: A[] }) {
+function FormulaireModifierAffectation({ a, chantiers, retour, autresMemeLot, peutGererPlanning }: { a: A; chantiers: { id: string; nom: string }[]; retour: string; autresMemeLot: A[]; peutGererPlanning: boolean }) {
+  if (!peutGererPlanning) return null;
   const ch = un(a.chantier);
   const modifier = modifierAffectationAction.bind(null, a.id);
   return (
@@ -90,6 +92,8 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
   const suivant = new Date(debut.getTime() + 7 * 86400000);
   const ctx = await getContexteEntreprise();
   const sb = await createClient();
+  const permissions = await permissionsUtilisateur(ctx);
+  const peutGererPlanning = permissions === null || permissions.includes("gerer_planning");
 
   const [{ data: chantiers }, { data: employes }, { data: affectationsData }, {data:pointagesData}] = await Promise.all([
     sb.from("chantiers").select("id,nom").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(archive,annule)").order("nom"),
@@ -176,7 +180,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
                   {a.lieu_activite&&<p className="mt-1 text-xs text-neutral-600">Lieu : {a.lieu_activite} · <a href={lienMaps(a.lieu_activite)} target="_blank" rel="noopener" className="text-blue-700 hover:underline">Itinéraire</a></p>}
                   {a.tache&&<p className="mt-1 text-xs text-neutral-600">Tâche : {a.tache}</p>}
                   <p className="mt-2 font-mono text-xs text-neutral-700">Prévu {a.heures} h{realise>0&&<span className="ml-2 font-semibold text-green-700">· Validé {realise} h</span>}</p>
-                  <FormulaireModifierAffectation a={a} chantiers={chantiers ?? []} retour={iso(debut)} autresMemeLot={autresMemeLot(a)} />
+                  <FormulaireModifierAffectation a={a} chantiers={chantiers ?? []} retour={iso(debut)} autresMemeLot={autresMemeLot(a)} peutGererPlanning={peutGererPlanning} />
                   <form action={supprimerGroupeAffectationsAction} className="absolute right-2 top-2"><input type="hidden" name="retour" value={iso(debut)}/><input type="hidden" name="ids" value={a.id}/><ConfirmSubmitButton message="Retirer cette affectation ?" className="flex h-7 w-7 items-center justify-center rounded-full bg-white/80 text-neutral-500 shadow-sm hover:text-red-600">×</ConfirmSubmitButton></form>
                 </article>})}
                 {!cellules.length&&<p className="py-4 text-center text-sm text-neutral-500">Aucune activité planifiée.</p>}
@@ -219,7 +223,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
                                 {a.lieu_activite && <div className="text-[11px] text-neutral-600">{a.lieu_activite} · <a href={lienMaps(a.lieu_activite)} target="_blank" rel="noopener" className="text-blue-700 hover:underline">Itinéraire</a></div>}
                                 {a.tache && <div className="text-[11px] text-neutral-600">{a.tache}</div>}
                                 <div className="font-mono text-[11px] text-neutral-700">Prévu {a.heures} h{heuresRealisees(e.id,a.date,ch?.id)>0&&<span className="ml-1 font-semibold text-green-700">· validé {heuresRealisees(e.id,a.date,ch?.id)} h</span>}</div>
-                                <FormulaireModifierAffectation a={a} chantiers={chantiers ?? []} retour={iso(debut)} autresMemeLot={autresMemeLot(a)} />
+                                <FormulaireModifierAffectation a={a} chantiers={chantiers ?? []} retour={iso(debut)} autresMemeLot={autresMemeLot(a)} peutGererPlanning={peutGererPlanning} />
                                 <form action={supprimerGroupeAffectationsAction} className="absolute right-0.5 top-0.5">
                                   <input type="hidden" name="retour" value={iso(debut)} />
                                   <input type="hidden" name="ids" value={a.id} />
