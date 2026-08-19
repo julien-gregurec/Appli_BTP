@@ -56,6 +56,33 @@ export const PERMISSIONS_MUTATION_ALTERNATIVES: Record<string,string[]> = {
   "/paie": ["saisir_variables_paie", "controler_variables_paie", "gerer_paie", "exporter_paie", "parametrer_paie"],
 };
 
+// Sous-ressources d'un chantier ouvertes à la contribution terrain (ajout de
+// photos/documents/comptes-rendus) sans exiger gerer_chantiers, qui reste
+// requis pour tout le reste sous /chantiers/[id]/... (modification, suppression,
+// budget, client, planning). Vérifiées avant la règle générique du préfixe
+// /chantiers ci-dessus car un identifiant de chantier dynamique empêche de les
+// exprimer comme un simple préfixe littéral.
+const SOUS_RESSOURCES_CHANTIER_TERRAIN: [RegExp, string[]][] = [
+  [/^\/chantiers\/[^/]+\/documents(\/|$)/, ["gerer_chantiers", "ajouter_documents_chantier"]],
+  [/^\/chantiers\/[^/]+\/comptes-rendus(\/|$)/, ["gerer_chantiers", "ajouter_documents_chantier"]],
+];
+
+/**
+ * Résout les droits de gestion (mutation) applicables à un chemin, en
+ * centralisant la logique partagée par le proxy serveur (`updateSession`) et
+ * `ModuleAccessBoundary` (masquage client des formulaires). Un tableau vide
+ * signifie qu'aucune permission de gestion n'est exigée pour ce chemin.
+ */
+export function droitsGestionPour(pathname: string): string[] {
+  const sousRessource = SOUS_RESSOURCES_CHANTIER_TERRAIN.find(([regex]) => regex.test(pathname));
+  if (sousRessource) return sousRessource[1];
+  const correspond = (base: string) => pathname === base || pathname.startsWith(`${base}/`);
+  const droitGestion = GESTION_PERMISSION_PAR_CHEMIN.find(([chemin]) => correspond(chemin))?.[1];
+  if (!droitGestion) return [];
+  const cheminAlternatif = Object.keys(PERMISSIONS_MUTATION_ALTERNATIVES).find(correspond);
+  return cheminAlternatif ? PERMISSIONS_MUTATION_ALTERNATIVES[cheminAlternatif] : [droitGestion];
+}
+
 export const PERMISSIONS_ACCES_ALTERNATIVES: Record<string,string[]> = {
   "/chantiers": ["acces_chantiers", "voir_chantiers_assignes"],
   "/grands-deplacements": ["gerer_notes_frais", "saisir_ses_notes_frais"],

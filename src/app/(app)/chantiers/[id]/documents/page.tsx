@@ -21,7 +21,9 @@ export default async function DocumentsChantierPage({
   const messages = await searchParams;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  const peutUtiliserIA = iaEstActive() && aAccesIA(await permissionsUtilisateur(ctx));
+  const permissions = await permissionsUtilisateur(ctx);
+  const peutUtiliserIA = iaEstActive() && aAccesIA(permissions);
+  const peutSupprimer = permissions === null || permissions.includes("gerer_chantiers");
   const [{ data: chantier }, { data: documents }, { data: mediasConversation }] = await Promise.all([
     supabase.from("chantiers").select("id, nom, reference_interne")
       .eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),
@@ -135,9 +137,11 @@ export default async function DocumentsChantierPage({
                     {peutUtiliserIA && MIME_ANALYSABLES_IA.includes(document.mime_type) && <AnalyseDocumentIA documentId={document.id} />}
                     <div className="flex items-center justify-between border-t border-neutral-100 pt-3 text-sm dark:border-neutral-800">
                       <a href={`/api/documents/${document.id}?download=1`} className="font-medium hover:underline">Télécharger</a>
-                      <form action={supprimer}>
-                        <ConfirmSubmitButton message={`Supprimer « ${document.nom} » ?`} className="text-red-600 hover:underline dark:text-red-400">Supprimer</ConfirmSubmitButton>
-                      </form>
+                      {peutSupprimer && (
+                        <form action={supprimer}>
+                          <ConfirmSubmitButton message={`Supprimer « ${document.nom} » ?`} className="text-red-600 hover:underline dark:text-red-400">Supprimer</ConfirmSubmitButton>
+                        </form>
+                      )}
                     </div>
                   </div>
                 </article>
