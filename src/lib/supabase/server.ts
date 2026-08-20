@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { optionsCookieAuth } from "@/lib/security/cookies";
+import { clePubliqueSupabase } from "@/lib/supabase/keys";
 
 // Next.js 16 : cookies() est asynchrone.
 export async function createClient() {
@@ -8,7 +9,7 @@ export async function createClient() {
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    clePubliqueSupabase(),
     {
       cookies: {
         getAll() {

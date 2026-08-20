@@ -5,6 +5,7 @@ import { MODULE_PERMISSION_PAR_CHEMIN, PERMISSIONS_ACCES_ALTERNATIVES, droitsGes
 import { permissionIncluseDansOffre } from "@/lib/tarification";
 import { appliquerRateLimit, politiquesRateLimitPour } from "@/lib/security/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { clePubliqueSupabase } from "@/lib/supabase/keys";
 import { optionsCookieAuth } from "@/lib/security/cookies";
 
 const PUBLIC_PATHS = ["/login", "/signup", "/tarifs", "/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/confidentialite", "/cookies", "/auth", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu", "/guides", "/videos", "/paiement", "/document", "/imprimer/partage", "/api/documents/partage", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements", "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import"];
@@ -39,7 +40,7 @@ export async function updateSession(request: NextRequest) {
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    clePubliqueSupabase(),
     {
       cookies: {
         getAll() {
