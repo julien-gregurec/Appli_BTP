@@ -1,26 +1,20 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { clePubliqueSupabase } from "./keys";
 
-const anciennesValeurs = {
-  publishable: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-  anon: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-};
+const ancienneValeur = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 afterEach(() => {
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = anciennesValeurs.publishable;
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = anciennesValeurs.anon;
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = ancienneValeur;
 });
 
 describe("clePubliqueSupabase", () => {
-  it("utilise NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY quand elle est définie", () => {
+  it("retourne NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY quand elle est définie", () => {
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_test";
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "legacy-anon-test";
     expect(clePubliqueSupabase()).toBe("sb_publishable_test");
   });
 
-  it("retombe sur NEXT_PUBLIC_SUPABASE_ANON_KEY si la publishable est absente (environnements non migrés)", () => {
+  it("échoue explicitement si NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY est absente, sans repli silencieux", () => {
     delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "legacy-anon-test";
-    expect(clePubliqueSupabase()).toBe("legacy-anon-test");
+    expect(() => clePubliqueSupabase()).toThrowError(/NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY/);
   });
 });
