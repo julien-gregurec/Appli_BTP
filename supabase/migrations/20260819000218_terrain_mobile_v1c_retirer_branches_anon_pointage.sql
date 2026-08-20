@@ -63,19 +63,10 @@ end;$function$;
 
 create or replace function public.valider_preuve_pointage(p_entreprise_id uuid, p_pointage_id uuid, p_statut text, p_commentaire text default null::text)
 returns void language plpgsql security definer set search_path to 'public' as $function$
-declare v_employe_id uuid; v_cout numeric;
 begin
  if p_statut not in('valide','rejete') then raise exception 'Statut invalide';end if;
  if not public.a_permission(p_entreprise_id,'valider_pointages') then raise exception 'Accès refusé';end if;
  if p_statut='rejete' and nullif(btrim(p_commentaire),'') is null then raise exception 'Le motif du rejet est obligatoire';end if;
- select employe_id into v_employe_id from public.pointages where id=p_pointage_id and entreprise_id=p_entreprise_id;
- if v_employe_id is null then raise exception 'Pointage introuvable';end if;
- v_cout := case when p_statut='valide' then (select cout_horaire from public.employes_cout_horaire where employe_id=v_employe_id) else null end;
- update public.pointages
-   set verification_statut=p_statut,
-       verification_at=now(),
-       verification_par=auth.uid(),
-       commentaire_verification=nullif(btrim(p_commentaire),''),
-       cout_horaire_applique=case when p_statut='valide' then v_cout else cout_horaire_applique end
-   where id=p_pointage_id and entreprise_id=p_entreprise_id;
+ update public.pointages set verification_statut=p_statut,verification_at=now(),verification_par=auth.uid(),commentaire_verification=nullif(btrim(p_commentaire),'') where id=p_pointage_id and entreprise_id=p_entreprise_id;
+ if not found then raise exception 'Pointage introuvable';end if;
 end;$function$;
