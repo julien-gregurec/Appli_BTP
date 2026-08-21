@@ -2,11 +2,11 @@
 
 **Document purement administratif. Aucun dossier n'a été déposé. Rien n'a été décidé à la place de Julien.** Cette checklist liste ce qu'il faudra rassembler/décider, pas comment le faire à sa place.
 
-## Activité déclarée (proposition à valider, pas une décision)
+## Activité déclarée (validée comme base P14 — 21-08-2026, pas une formulation administrative définitive)
 
-Une formulation cohérente avec l'activité réelle du projet ELSATIA (édition et exploitation d'un logiciel SaaS de gestion pour le BTP), à titre de proposition uniquement :
+> Édition et exploitation de logiciels en mode SaaS et prestations de services numériques associées.
 
-> Édition et exploitation d'un logiciel en ligne (SaaS) de gestion d'entreprise, et prestations de services numériques associées.
+Validée par Julien comme base de travail pour les préparatifs et checklists. **Ne pas la présenter comme la formulation administrative définitive tant que l'immatriculation n'a pas été déposée et que le code APE/NAF n'a pas été attribué** — le Guichet unique peut la reformuler ou l'ajuster.
 
 Points à trancher par Julien avant le dépôt, pas par ce document :
 - Le code APE/NAF pertinent (probablement dans la famille édition de logiciels / programmation informatique — à confirmer sur le Guichet unique, qui l'attribue généralement automatiquement selon l'activité déclarée).

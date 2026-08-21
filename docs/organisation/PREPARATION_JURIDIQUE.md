@@ -30,24 +30,27 @@ Les 5 documents publics sont servis via `src/components/DocumentLegal.tsx` (rend
 
 ## Emplacements exacts à compléter après immatriculation (aucune valeur inventée)
 
-| Champ | Fichiers concernés | Bloquant |
+Mise à jour P14 (21-08-2026) : les champs non bloquants ont été tranchés par Julien et reportés dans les 8 documents juridiques + `elsatia-site/src/content/legal.ts`. Seuls les champs liés à l'immatriculation elle-même restent en attente.
+
+| Champ | Fichiers concernés | État |
 |---|---|---|
-| Nom/prénom exploitant (actuellement « Julien GREGUREC » par défaut) | mentions-legales, cgv, politique-confidentialite, rgpd-registre-des-traitements, dpa-entreprises-clientes | Non bloquant pour la structure (déjà le bon format micro-entreprise), bloquant seulement si le nom exact diffère |
-| Nom commercial ELSATIA (à confirmer comme nom commercial de la micro-entreprise) | mentions-legales | Non bloquant — décision simple, pas une contrainte d'immatriculation |
-| Adresse du siège | mentions-legales | Oui — attend l'immatriculation |
+| Nom/prénom exploitant | mentions-legales, cgv, politique-confidentialite, rgpd-registre-des-traitements, dpa-entreprises-clientes, legal.ts (site vitrine) | **Décidé (P14)** : Julien GREGUREC — reporté partout. Vérification finale contre l'avis SIRENE prévue avant publication définitive. |
+| Nom commercial | mentions-legales, legal.ts | **Décidé (P14)** : ELSATIA, distinct de « ELSATIA Gestion Pro » (nom de l'application) — reporté partout. |
+| Adresse du siège | mentions-legales, legal.ts | **En attente** — Julien doit encore choisir entre domicile personnel, domiciliation commerciale ou autre adresse avant le dépôt. Aucune adresse fictive ou personnelle non confirmée n'a été publiée. |
 | SIREN / SIRET | mentions-legales | Oui — attend l'immatriculation |
-| RCS (si applicable — les micro-entrepreneurs exerçant une activité commerciale sont désormais inscrits via le registre national unique tenu par l'INPI, pas systématiquement un RCS classique) | mentions-legales | Oui — dépend du régime exact retenu au dépôt |
+| RCS (si applicable) | mentions-legales | Oui — dépend du régime exact retenu au dépôt |
 | Régime de TVA (actuellement rédigé « non applicable, art. 293 B » — plausible en franchise en base au démarrage, mais **à confirmer**, pas à supposer) | mentions-legales | Oui — dépend du choix fiscal fait au dépôt (voir `CREATION_MICRO_CHECKLIST.md`) |
 | Numéro de TVA intracommunautaire (si assujettissement) | mentions-legales | Oui, uniquement si le régime de TVA choisi le requiert |
-| Email professionnel (`[EMAIL_SUPPORT]`) | les 5 documents publics + rgpd-registre-des-traitements, dpa-entreprises-clientes | Non bloquant — peut être choisi dès maintenant |
-| Téléphone (absent des documents actuels, pas obligatoire en mentions légales pour ce type de service) | — | Non bloquant |
+| Email professionnel (`[EMAIL_SUPPORT]`) | les 5 documents publics + rgpd-registre-des-traitements, dpa-entreprises-clientes | **Décidé (P14)** : `support@elsatia.fr`. Non publié comme fonctionnel tant que la boîte n'est pas confirmée opérationnelle — `SUPPORT_EMAIL` non configurée en Production à ce jour (rendu actuel : « — »). |
+| Téléphone | — | **Décidé (P14)** : pas de numéro public pour l'instant, contact par formulaires/e-mails uniquement. |
 | Domaine final | mentions-legales | Non bloquant si `app.elsatia.fr` reste l'adresse de lancement |
-| Hébergeur | mentions-legales | Déjà renseigné (Vercel + Supabase), non bloquant |
-| Médiateur de la consommation | Aucun document actuel n'en mentionne — **non requis** : `cgv.md` §Objet exclut déjà explicitement le droit de la consommation (service réservé aux professionnels), donc pas d'obligation de médiateur consommation | Non bloquant, confirmé non applicable tant que le service reste B2B |
-| Responsable de publication | mentions-legales | Déjà l'exploitant par défaut, non bloquant |
-| Responsable de traitement / contact RGPD | politique-confidentialite, rgpd-registre-des-traitements | Déjà l'exploitant par défaut, non bloquant |
+| Hébergeur | mentions-legales | Déjà renseigné (Vercel + Supabase) ; adresse Vercel corrigée en P14 (`440 N Barranca Avenue #4133, Covina, CA 91723`, vérifiée sur `vercel.com/legal/terms` et `vercel.com/legal/privacy-policy` — l'ancienne adresse `340 S Lemon Ave, Walnut` était obsolète). |
+| Médiateur de la consommation | Non requis, service B2B exclu du droit de la consommation | Non bloquant |
+| Responsable de publication | mentions-legales | Décidé (Julien GREGUREC) |
+| Responsable de traitement / contact RGPD | politique-confidentialite, rgpd-registre-des-traitements | Décidé (Julien GREGUREC) |
 | Dates « Dernière mise à jour » | les 8 fichiers | Non bloquant — à dater à la publication finale |
-| Région d'hébergement Supabase (« à confirmer ») | mentions-legales | Non bloquant — déjà `eu-west-3` (Paris) en Production, il suffit de lever la mention |
+| Région d'hébergement Supabase | mentions-legales, politique-confidentialite, dpa-entreprises-clientes | **Résolu (P14)** : `eu-west-3` (Paris, France), confirmé via `supabase projects list` sur le projet Production — mention « à confirmer » levée. |
+| Prestataire e-mail listé comme « Resend » / SMS / OCR spéculatifs | politique-confidentialite, dpa-entreprises-clientes | **Corrigé (P14)** : incohérence trouvée — la correction P13 (Brevo, retrait SMS/OCR) n'avait été appliquée qu'à `rgpd-sous-traitants.md`, pas aux deux autres documents qui répétaient l'information. Harmonisé. |
 
 ## Positionnement B2B et droit de rétractation (vérifié, RAS)
 

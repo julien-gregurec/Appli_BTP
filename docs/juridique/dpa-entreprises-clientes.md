@@ -1,7 +1,7 @@
 # Accord de traitement des données (DPA)
 
 _Annexe aux Conditions Générales de Vente — Article 28 du RGPD_
-_Entre l'entreprise cliente (« le Responsable de traitement ») et [Julien GREGUREC], entrepreneur individuel, éditeur de ELSATIA Gestion Pro (« le Sous-traitant »)._
+_Entre l'entreprise cliente (« le Responsable de traitement ») et Julien GREGUREC, entrepreneur individuel exerçant sous le nom commercial ELSATIA, éditeur de ELSATIA Gestion Pro (« le Sous-traitant »)._
 _Dernière mise à jour : [JJ/MM/AAAA]_
 
 ## 1. Objet
@@ -46,11 +46,11 @@ Le Responsable :
 
 ## 7. Localisation et transferts
 
-Les données sont hébergées dans l'Union européenne (**région à confirmer**). Tout transfert hors UE par un sous-traitant ultérieur est encadré par des clauses contractuelles types ou un mécanisme équivalent.
+Les données sont hébergées dans l'Union européenne — Supabase `eu-west-3` (Paris, France) ; les fonctions Vercel s'exécutent en `fra1` (Francfort, Allemagne). Tout transfert hors UE par un sous-traitant ultérieur est encadré par des clauses contractuelles types ou un mécanisme équivalent.
 
 ## 8. Sous-traitants ultérieurs autorisés
 
-Le Responsable autorise le recours aux sous-traitants listés dans `rgpd-sous-traitants.md` (Supabase, Vercel, Stripe, et le cas échéant prestataire e-mail/SMS/OCR). Toute modification est notifiée.
+Le Responsable autorise le recours aux sous-traitants listés dans `rgpd-sous-traitants.md` (Supabase, Vercel, Stripe, Brevo). Toute modification est notifiée.
 
 ## 9. Audit
 

@@ -6,21 +6,21 @@ _Dernière mise à jour : [JJ/MM/AAAA]_
 
 Le service **ELSATIA Gestion Pro** (ci-après « le Service »), accessible à l'adresse **[URL_APPLICATION]** (et tout domaine associé), est édité par :
 
-- **[Julien GREGUREC]**, entrepreneur individuel (micro-entreprise)
-- Adresse : **[À COMPLÉTER — adresse de la micro-entreprise]**
+- **Julien GREGUREC**, entrepreneur individuel (micro-entreprise), exerçant sous le nom commercial **ELSATIA** _(identité déclarée le 20-08-2026 ; à revérifier contre l'avis de situation SIRENE une fois l'immatriculation reçue, avant toute publication juridique définitive)_
+- Adresse : **[À COMPLÉTER — adresse de la micro-entreprise, en attente de décision]**
 - SIRET : **[À COMPLÉTER]**
 - Numéro de TVA intracommunautaire : **Non applicable** — TVA non applicable, article 293 B du Code général des impôts
 - E-mail : **[EMAIL_SUPPORT]**
-- Directeur de la publication : **[Julien GREGUREC]**
+- Directeur de la publication : **Julien GREGUREC**
 
 ## Hébergement
 
 **Hébergement de l'application (front-end et exécution)**
-Vercel Inc. — 340 S Lemon Ave #4133, Walnut, CA 91789, États-Unis — https://vercel.com
+Vercel Inc. — 440 N Barranca Avenue #4133, Covina, CA 91723, États-Unis — https://vercel.com
 
 **Hébergement de la base de données et des fichiers (photos, documents)**
 Supabase, Inc. — 970 Toa Payoh North #07-04, Singapore 318992 — https://supabase.com
-Région d'hébergement des données : **[à confirmer — Union européenne visée]**.
+Région d'hébergement des données : **Union européenne — `eu-west-3` (Paris, France)**, confirmé sur le projet Production.
 
 **Prestataire de paiement**
 Stripe Payments Europe, Ltd. — 1 Grand Canal Street Lower, Grand Canal Dock, Dublin, Irlande — https://stripe.com

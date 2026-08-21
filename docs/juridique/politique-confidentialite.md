@@ -2,7 +2,7 @@
 
 _Dernière mise à jour : [JJ/MM/AAAA]_
 
-La présente politique explique comment **ELSATIA Gestion Pro** (« le Service »), édité par **[Julien GREGUREC], entrepreneur individuel** (« nous »), traite les données personnelles, conformément au Règlement (UE) 2016/679 (« RGPD ») et à la loi Informatique et Libertés.
+La présente politique explique comment **ELSATIA Gestion Pro** (« le Service »), édité par **Julien GREGUREC, entrepreneur individuel, exerçant sous le nom commercial ELSATIA** (« nous »), traite les données personnelles, conformément au Règlement (UE) 2016/679 (« RGPD ») et à la loi Informatique et Libertés.
 
 ## 1. Deux rôles distincts
 
@@ -46,16 +46,16 @@ Vos données sont accessibles à l'Éditeur et à ses sous-traitants techniques,
 
 | Sous-traitant | Rôle | Localisation | Garanties |
 |---|---|---|---|
-| Supabase, Inc. | Base de données, stockage, authentification | UE visée (**à confirmer**) | Clauses contractuelles types (CCT) |
-| Vercel, Inc. | Hébergement de l'application | UE / États-Unis | CCT / Data Privacy Framework |
+| Supabase, Inc. | Base de données, stockage, authentification | Union européenne — `eu-west-3` (Paris, France) | Clauses contractuelles types (CCT) |
+| Vercel, Inc. | Hébergement de l'application | UE / États-Unis (fonctions exécutées en `fra1`, Francfort) | CCT / Data Privacy Framework |
 | Stripe Payments Europe, Ltd. | Paiement et facturation | Irlande (UE) | Conforme RGPD |
-| [Prestataire e-mail — ex. Resend] | Envoi d'e-mails transactionnels | UE / États-Unis | CCT |
+| Brevo (Sendinblue SAS) | Envoi d'e-mails transactionnels | France (UE) | Conforme RGPD |
 
 La liste détaillée est tenue dans notre `rgpd-sous-traitants.md`.
 
 ## 6. Transferts hors Union européenne
 
-Certains sous-traitants sont des sociétés établies aux États-Unis. Lorsqu'un transfert hors UE a lieu, il est encadré par des **clauses contractuelles types** de la Commission européenne et/ou l'adhésion au **Data Privacy Framework**. Nous privilégions un hébergement des données dans l'Union européenne (**région d'hébergement à confirmer**).
+Certains sous-traitants sont des sociétés établies aux États-Unis. Lorsqu'un transfert hors UE a lieu, il est encadré par des **clauses contractuelles types** de la Commission européenne et/ou l'adhésion au **Data Privacy Framework**. Les données métier sont hébergées dans l'Union européenne (Supabase `eu-west-3`, Paris) ; l'exécution applicative Vercel a lieu en `fra1` (Francfort, UE).
 
 ## 7. Vos droits
 
@@ -75,4 +75,4 @@ Nous mettons en œuvre des mesures techniques et organisationnelles adaptées : 
 
 ## 10. Contact
 
-Responsable de traitement : **[Julien GREGUREC]** — **[EMAIL_SUPPORT]**.
+Responsable de traitement : **Julien GREGUREC** — **[EMAIL_SUPPORT]**.

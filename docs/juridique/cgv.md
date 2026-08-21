@@ -4,7 +4,7 @@ _Applicables aux professionnels — Dernière mise à jour : [JJ/MM/AAAA] — Ve
 
 ## Article 1 — Objet et champ d'application
 
-Les présentes Conditions Générales de Vente (« CGV ») régissent la souscription et l'utilisation du service logiciel **ELSATIA Gestion Pro** (« le Service »), édité par **[Julien GREGUREC], entrepreneur individuel** (« l'Éditeur »), par toute entreprise ou professionnel (« le Client »).
+Les présentes Conditions Générales de Vente (« CGV ») régissent la souscription et l'utilisation du service logiciel **ELSATIA Gestion Pro** (« le Service »), édité par **Julien GREGUREC, entrepreneur individuel, exerçant sous le nom commercial ELSATIA** (« l'Éditeur »), par toute entreprise ou professionnel (« le Client »).
 
 Le Service est un logiciel de gestion en ligne (SaaS) destiné aux entreprises du bâtiment : devis, factures, clients, chantiers, planning, pointage, stock, et modules associés.
 
