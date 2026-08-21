@@ -64,6 +64,33 @@ partiel/incohérent.
 - Détails complets : voir
   [TERRAIN_MOBILE_V1D_PRODUCTION_ELSATIA.md](TERRAIN_MOBILE_V1D_PRODUCTION_ELSATIA.md).
 
+## V1E — Recette Production réelle
+
+- [x] Preview validé (V1B, V1C — pgTAP + recette manuelle antérieure).
+- [x] Production structurelle validée (V1D/V1D2 — définitions/policies
+      vérifiées octet pour octet, migrations effectives confirmées).
+- [x] **Production fonctionnelle réelle validée** : comptes Terrain et Chef
+      d'équipe réels (`RECETTE-TERRAIN-V1E`, entreprise fictive dédiée),
+      connexion, planning (lecture seule + refus serveur direct), pointage
+      (arrivée/départ réels), documents (formulaire accessible ; upload
+      fichier non testable avec l'outillage de ce lot), compte-rendu (créé
+      réellement), notes de frais (brouillon réel + hash d'audit SHA-256
+      confirmé), restrictions financières (devis/factures/rentabilité
+      refusés à la navigation et au niveau serveur), isolation cross-tenant
+      (zéro fuite), et surtout : **validation réelle d'un pointage par Chef
+      d'équipe en cliquant dans l'interface, confirmant définitivement le
+      correctif V1D2** (`verification_statut='valide'`, `verification_par`
+      correct, aucune erreur).
+- [x] Nettoyage : résidu minimal et volontaire (1 entreprise + 1 compte,
+      ancrés par le trigger d'immutabilité de l'audit des notes de frais —
+      non désactivé, comme prévu). Tout le reste vérifié à zéro. `elsatia`
+      confirmée intacte.
+- Point non tranché, documenté sans impact sécurité : anomalie isolée sur un
+  test SQL direct d'INSERT `documents_chantier` (probable artefact d'outil,
+  contredit par pgTAP + structure + UI + table sœur).
+- Détails complets : voir
+  [TERRAIN_MOBILE_V1E_RECETTE_PRODUCTION_ELSATIA.md](TERRAIN_MOBILE_V1E_RECETTE_PRODUCTION_ELSATIA.md).
+
 ## Écart connu, hors périmètre (non corrigé, documenté)
 
 - `document_commercial_par_token` (P9, migration `20260812000200`) reste
@@ -79,6 +106,6 @@ partiel/incohérent.
 
 ## Bloc Terrain — état
 
-Les trois lots (V1B, V1C, V1D/V1D2) sont clos et déployés en Production. Le
-statut de fermeture définitive du bloc Terrain (vs. un mini-lot ciblé
-supplémentaire) reste une décision à confirmer après revue de ce rapport.
+Les quatre lots (V1B, V1C, V1D/V1D2, V1E) sont clos, déployés en Production
+et validés fonctionnellement en conditions réelles. Bloc Terrain
+définitivement clos, sous réserve d'un retour réel d'un premier client.
