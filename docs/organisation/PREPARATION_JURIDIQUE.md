@@ -41,7 +41,7 @@ Mise à jour P14 (21-08-2026) : les champs non bloquants ont été tranchés par
 | RCS (si applicable) | mentions-legales | Oui — dépend du régime exact retenu au dépôt |
 | Régime de TVA (actuellement rédigé « non applicable, art. 293 B » — plausible en franchise en base au démarrage, mais **à confirmer**, pas à supposer) | mentions-legales | Oui — dépend du choix fiscal fait au dépôt (voir `CREATION_MICRO_CHECKLIST.md`) |
 | Numéro de TVA intracommunautaire (si assujettissement) | mentions-legales | Oui, uniquement si le régime de TVA choisi le requiert |
-| Email professionnel (`[EMAIL_SUPPORT]`) | les 5 documents publics + rgpd-registre-des-traitements, dpa-entreprises-clientes | **Décidé (P14)** : `support@elsatia.fr`. Non publié comme fonctionnel tant que la boîte n'est pas confirmée opérationnelle — `SUPPORT_EMAIL` non configurée en Production à ce jour (rendu actuel : « — »). |
+| Email professionnel (`[EMAIL_SUPPORT]`) | les 5 documents publics + rgpd-registre-des-traitements, dpa-entreprises-clientes | **Résolu (P14)** : `support@elsatia.fr`, confirmée opérationnelle par Julien (boîte secondaire testée en réception). `SUPPORT_EMAIL` configurée en Production, redéployé, vérifié en direct. |
 | Téléphone | — | **Décidé (P14)** : pas de numéro public pour l'instant, contact par formulaires/e-mails uniquement. |
 | Domaine final | mentions-legales | Non bloquant si `app.elsatia.fr` reste l'adresse de lancement |
 | Hébergeur | mentions-legales | Déjà renseigné (Vercel + Supabase) ; adresse Vercel corrigée en P14 (`440 N Barranca Avenue #4133, Covina, CA 91723`, vérifiée sur `vercel.com/legal/terms` et `vercel.com/legal/privacy-policy` — l'ancienne adresse `340 S Lemon Ave, Walnut` était obsolète). |

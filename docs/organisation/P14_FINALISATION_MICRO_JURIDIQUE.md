@@ -112,6 +112,16 @@ Vérifié : les informations légales apparaissent uniquement via
 `PiedLegal.tsx` (liens de pied de page). Aucun mélange avec l'identité des
 entreprises clientes.
 
+**Correction en cours de lot** : `docs/juridique/*.md` sont des fichiers de
+contenu lus par `fs.readFileSync` à la requête, mais depuis l'instantané du
+**dernier build déployé** — pas en direct depuis GitHub. Un redéploiement
+était donc nécessaire pour que les corrections de ce lot (identité, adresse
+Vercel, région, Brevo) et la variable `SUPPORT_EMAIL` prennent effet, malgré
+l'absence de changement de code applicatif. Redéployé (`elsatia-production`,
+`READY`, région `fra1` confirmée) et vérifié en direct sur `/mentions-legales`
+et `/confidentialite` : identité correcte, `support@elsatia.fr` actif,
+`SIRET`/adresse toujours correctement en attente.
+
 ## Relecture avocat — dossier de synthèse
 
 Les 8 documents (`docs/juridique/*.md`) sont prêts pour relecture
@@ -157,22 +167,20 @@ présenté comme validé juridiquement**.
 - Aucune adresse, SIREN, SIRET, RCS ou numéro de TVA inventé ou renseigné.
 - Aucune indexation des pages juridiques activée (aucun placeholder bloquant
   n'a été levé).
-- Aucune valeur `SUPPORT_EMAIL` déployée en Production — action manuelle
-  requise ci-dessous.
 - Aucune donnée administrative fictive créée nulle part.
 
 ## Action manuelle requise
 
-**Email professionnel** : confirmez que la boîte `support@elsatia.fr` est
-créée et opérationnelle (réception effective). Une fois confirmé, je peux
-ajouter la variable `SUPPORT_EMAIL=support@elsatia.fr` dans Vercel
-`elsatia-production` (variable non sensible, action simple) — ou vous
-pouvez le faire vous-même dans Vercel → `elsatia-production` → Settings →
-Environment Variables.
+**Email professionnel — résolu.** Julien a confirmé `support@elsatia.fr`
+opérationnelle et déjà testée en réception (boîte secondaire Google
+Workspace). `SUPPORT_EMAIL=support@elsatia.fr` ajoutée dans Vercel
+`elsatia-production` (scope Production uniquement), Production redéployée,
+vérifié en direct sur `/mentions-legales` et `/confidentialite`. Aucune
+autre adresse ni configuration Google Workspace modifiée.
 
 **Adresse du siège** : à trancher entre domicile personnel, domiciliation
 commerciale ou autre adresse avant le dépôt — décision qui vous appartient
-entièrement.
+entièrement, seul point non technique encore ouvert avant l'immatriculation.
 
 ## QA
 
