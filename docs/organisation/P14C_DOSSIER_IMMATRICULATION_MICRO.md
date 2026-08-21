@@ -1,6 +1,8 @@
 # P14C — Dossier de préparation à l'immatriculation micro-entreprise ELSATIA
 
-**Aucun dossier n'a été déposé. Aucune entreprise n'a été créée. Aucun choix fiscal ou social n'a été fait à la place de Julien.** Ce document rassemble ce qui est déjà décidé, ce qui reste à trancher, et prépare le parcours de dépôt sur le Guichet unique — sans l'effectuer.
+**Aucune entreprise n'a été créée par ce dépôt. Aucun choix fiscal ou social n'a été fait à la place de Julien.** Ce document rassemble ce qui est déjà décidé, ce qui reste à trancher, et a préparé le parcours de dépôt sur le Guichet unique.
+
+**Mise à jour statut (21-08-2026)** : Julien a déposé lui-même la formalité sur le Guichet unique (signée et payée, hors de ce dépôt de code — je n'y ai pas participé). Le dossier est **en attente du retour INPI/INSEE** (attribution SIREN/SIRET). **Consigne explicite de Julien : ne pas toucher à la formalité pendant l'attente.** Dès réception du SIRET, reprendre au §15.
 
 ## 1. Informations déjà confirmées
 
@@ -110,9 +112,10 @@ Pour information, non décisionnel : le seuil de franchise en base de TVA pour l
 
 ## 11. Compte bancaire
 
-- Un compte bancaire **dédié à l'activité** est recommandé dès le démarrage, même s'il n'est légalement obligatoire qu'au-delà d'un certain seuil de chiffre d'affaires cumulé sur deux années consécutives en micro-entreprise (seuil réglementaire, à vérifier au moment venu — il a évolué par le passé).
+- Un compte bancaire **dédié à l'activité** est recommandé dès le démarrage, même s'il n'est légalement obligatoire qu'au-delà de 10 000 € de chiffre d'affaires cumulé sur deux années consécutives en micro-entreprise (seuil réglementaire, voir `RDV_BANCAIRE_PREPARATION.md` §2).
 - Un **IBAN** sera nécessaire pour configurer Stripe (encaissement des abonnements) — préparation à faire dans le lot P15, pas maintenant.
 - Le compte doit être au nom du titulaire de la micro-entreprise (Julien GREGUREC) ou de son nom commercial selon les offres bancaires professionnelles disponibles.
+- **Rendez-vous bancaire préparé pour le 27-08-2026** — voir `RDV_BANCAIRE_PREPARATION.md` (documents à apporter, questions à poser, mise en garde sur les produits annexes).
 - **Aucun identifiant bancaire n'est demandé ni ne doit être communiqué dans ce rapport ou ailleurs dans le chat.**
 
 ## 12. Assurance RC Pro

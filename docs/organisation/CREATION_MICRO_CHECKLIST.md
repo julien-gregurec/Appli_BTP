@@ -14,6 +14,12 @@ versement libératoire de l'impôt sur le revenu reste ouvert, en attente
 d'une décision de Julien avec un professionnel (dépend de données
 personnelles — revenu fiscal de référence — non demandées ni stockées ici).
 
+Mise à jour statut formalité (21-08-2026) : Julien a déposé lui-même la
+formalité sur le Guichet unique (signée et payée). Dossier en attente du
+retour INPI/INSEE (SIREN/SIRET) — ne pas y toucher pendant l'attente.
+Rendez-vous bancaire préparé pour le 27-08-2026, voir
+[`RDV_BANCAIRE_PREPARATION.md`](RDV_BANCAIRE_PREPARATION.md).
+
 ## Activité déclarée (validée comme base P14 — 21-08-2026, pas une formulation administrative définitive)
 
 > Édition et exploitation de logiciels en mode SaaS et prestations de services numériques associées.
@@ -35,7 +41,7 @@ Points à trancher par Julien avant le dépôt, pas par ce document :
 - [x] **Franchise en base de TVA au démarrage** — retenue (décidée 21-08-2026, seuils 2026 : 37 500 € HT / tolérance 41 250 € — voir arbre de décision dans `P14C_DOSSIER_IMMATRICULATION_MICRO.md`).
 - [ ] **Versement libératoire de l'impôt sur le revenu** — en attente. Éligibilité conditionnée par le revenu fiscal de référence 2024 par part fiscale du foyer ; à trancher directement par Julien, avec un professionnel si besoin (donnée personnelle non demandée ni stockée dans ce dépôt).
 - [ ] **ACRE** (exonération de charges sociales la première année) — à vérifier si éligible.
-- [x] **Compte bancaire** — dédié à ouvrir avant Stripe Live (décidé 21-08-2026).
+- [ ] **Compte bancaire** — dédié à ouvrir avant Stripe Live (décidé 21-08-2026) ; rendez-vous bancaire préparé pour le 27-08-2026, voir [`RDV_BANCAIRE_PREPARATION.md`](RDV_BANCAIRE_PREPARATION.md).
 - [x] **Assurance RC Pro** — recommandée, non bloquante pour le dépôt (décidé 21-08-2026) ; souscription à faire au rythme de Julien.
 
 ## Après réception du SIRET — actions techniques (côté produit, pas administratif)
