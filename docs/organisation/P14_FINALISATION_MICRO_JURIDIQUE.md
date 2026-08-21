@@ -102,6 +102,24 @@ reportés dans les sections « Éditeur du site », « Identité du prestataire 
 bloqué par l'immatriculation (adresse, SIRET, TVA) reste explicitement
 « à finaliser avant publication commerciale ».
 
+**P14B (21-08-2026) — publié.** `support@elsatia.fr` ajoutée (email non
+inclus dans la première passe P14, ajoutée une fois confirmée opérationnelle
+par Julien). Diff revérifié propre avant merge (un seul fichier,
+`src/content/legal.ts`, uniquement les champs autorisés). Fast-forward de
+`docs/p14-identite-legale` dans `main`, poussé sur
+`julien-gregurec/elsatia-site`. QA verte (typecheck, lint, build — les 5
+pages juridiques confirmées dans la sortie de build en tant que routes SSG).
+Redéployé sur `elsatia-site` (Production, `READY`, région `fra1`, domaine
+`https://elsatia.fr` inchangé). Vérifié en direct sur les 5 pages
+(`/mentions-legales`, `/cgv`, `/cgu`, `/confidentialite`, `/cookies`) :
+identité et email corrects, adresse/SIRET/TVA toujours explicitement « à
+finaliser », `noindex, nofollow, nocache` inchangé (aucune indexation
+activée), aucune erreur console, logs Vercel propres.
+
+Le site vitrine et l'application sont désormais alignés sur la même
+identité juridique. Plus rien de juridique à faire côté produit tant que
+l'adresse du siège et le SIRET ne sont pas connus.
+
 Ne modifie aucun DNS — non touché dans ce lot.
 
 ## Application
