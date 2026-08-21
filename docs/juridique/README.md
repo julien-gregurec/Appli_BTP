@@ -20,12 +20,13 @@ Documents rédigés pour un lancement en **micro-entreprise (entrepreneur indivi
 
 ## À COMPLÉTER avant publication (seul toi peux le fournir)
 
-- [ ] **Nom exact** de l'entrepreneur individuel (par défaut : Julien GREGUREC)
-- [ ] **Adresse** de la micro-entreprise
+- [x] **Nom exact** de l'entrepreneur individuel — Julien GREGUREC (à revérifier contre l'avis SIRENE une fois l'immatriculation reçue)
+- [x] **Adresse** de la micro-entreprise — 9 rue du Maréchal Leclerc, 67860 Rhinau, France (retenue pour l'immatriculation, même remarque de revérification)
 - [ ] **SIRET** (obtenu à l'immatriculation sur autoentrepreneur.urssaf.fr)
-- [ ] **E-mail de contact pro** (recommandé : `contact@` sur ton domaine plutôt que le Gmail)
-- [ ] **Domaine final** (le `.fr` prévu, sinon on garde l'URL Vercel)
-- [ ] **Région d'hébergement Supabase** — à vérifier qu'elle est en Europe (voir politique de confidentialité §Transferts)
+- [ ] **RCS** si applicable, **code APE/NAF**, **régime de TVA définitif**, **numéro de TVA intracommunautaire** si applicable — tous en attente de l'immatriculation
+- [x] **E-mail de contact pro** — `support@elsatia.fr`, opérationnelle, configurée en Production
+- [x] **Domaine final** — `app.elsatia.fr` (application), `elsatia.fr` (site vitrine)
+- [x] **Région d'hébergement Supabase** — `eu-west-3` (Paris, France), confirmée
 
 ## Concept clé RGPD à comprendre
 

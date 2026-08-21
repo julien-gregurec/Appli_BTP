@@ -36,7 +36,7 @@ Mise à jour P14 (21-08-2026) : les champs non bloquants ont été tranchés par
 |---|---|---|
 | Nom/prénom exploitant | mentions-legales, cgv, politique-confidentialite, rgpd-registre-des-traitements, dpa-entreprises-clientes, legal.ts (site vitrine) | **Décidé (P14)** : Julien GREGUREC — reporté partout. Vérification finale contre l'avis SIRENE prévue avant publication définitive. |
 | Nom commercial | mentions-legales, legal.ts | **Décidé (P14)** : ELSATIA, distinct de « ELSATIA Gestion Pro » (nom de l'application) — reporté partout. |
-| Adresse du siège | mentions-legales, legal.ts | **En attente** — Julien doit encore choisir entre domicile personnel, domiciliation commerciale ou autre adresse avant le dépôt. Aucune adresse fictive ou personnelle non confirmée n'a été publiée. |
+| Adresse du siège | mentions-legales, legal.ts, README.md | **Résolu (P14C, 21-08-2026)** : 9 rue du Maréchal Leclerc, 67860 Rhinau, France — retenue par Julien pour l'immatriculation, reportée partout, vérifiée orthographe/casse identique dans les 5 occurrences. À revérifier contre l'avis SIRENE une fois reçu. |
 | SIREN / SIRET | mentions-legales | Oui — attend l'immatriculation |
 | RCS (si applicable) | mentions-legales | Oui — dépend du régime exact retenu au dépôt |
 | Régime de TVA (actuellement rédigé « non applicable, art. 293 B » — plausible en franchise en base au démarrage, mais **à confirmer**, pas à supposer) | mentions-legales | Oui — dépend du choix fiscal fait au dépôt (voir `CREATION_MICRO_CHECKLIST.md`) |
