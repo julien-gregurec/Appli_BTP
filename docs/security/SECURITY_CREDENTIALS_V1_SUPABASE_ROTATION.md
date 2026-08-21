@@ -113,11 +113,58 @@ service observée à aucune étape.
   contrairement au système legacy où seule une désactivation groupée était
   possible.
 
+## Nettoyage définitif — V1C
+
+Une fois Production et Preview toutes deux prouvées fonctionnelles sur la
+`publishable key` (V1B), la dette technique restante a été retirée :
+
+- **Preview migré** : `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` ajoutée dans
+  Vercel `elsatia-preview` (scope Preview), valeur saisie par l'utilisateur.
+  Le secret serveur Preview (`SUPABASE_SERVICE_ROLE_KEY`, projet Supabase
+  Preview distinct de Production) était déjà correct et n'a pas été touché.
+- **Repli supprimé** : `clePubliqueSupabase()` exige désormais
+  `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` et échoue explicitement si absente
+  (`Configuration Supabase incomplète`), au lieu de retomber silencieusement
+  sur l'ancienne clé `anon` legacy.
+- **Local** : le CLI Supabase local (2.109.1) émet lui aussi une
+  `PUBLISHABLE_KEY` (`supabase status`) — Local, Preview et Production
+  utilisent désormais tous la même variable, sans exception.
+- **Variables legacy supprimées** : `NEXT_PUBLIC_SUPABASE_ANON_KEY` retirée
+  de Vercel `elsatia-production` et `elsatia-preview` (vérifié par nom
+  uniquement, aucune valeur lue), une fois le code confirmé ne plus y faire
+  aucune référence.
+- **Recherche globale finale** : 0 occurrence runtime (`src/`, `scripts/`
+  actifs). Les mentions restantes sont exclusivement dans des documents
+  d'audit datés (`REGISTRE_CENTRAL.md`, comptes-rendus de phase) qui
+  décrivent un état passé révolu — volontairement non modifiés, pour ne pas
+  falsifier un historique d'audit.
+- **Legacy Production** : toujours désactivées (V1B), non retouchées.
+  **Legacy Preview** : non désactivées dans ce lot — hors périmètre
+  volontaire, V1C nettoie les consommateurs applicatifs, pas la
+  configuration du projet Preview lui-même.
+- **JWT signing secret** : jamais interrogé, jamais touché, à aucun moment
+  des trois lots (V1, V1B, V1C).
+
+### Architecture finale
+
+| Environnement | Client (navigateur) | Serveur privilégié |
+|---|---|---|
+| Local | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (CLI local) | secret local (CLI) |
+| Preview | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (projet Preview) | `SUPABASE_SERVICE_ROLE_KEY` (secret propre à Preview) |
+| Production | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (projet Production) | `SUPABASE_SERVICE_ROLE_KEY` (secret propre à Production) |
+
+Plus aucune trace de clé legacy `anon`/`service_role` dans le code ni dans
+la configuration active d'aucun environnement.
+
 ## Git
 
 - `fix/security-publishable-key-migration` (créée depuis `release/
   commercialisation-v1` à `8efad78`) : commit `2647d4e` — migration du
   client public, helper de repli, test ciblé.
-- Fast-forward dans `release/commercialisation-v1`, poussé.
+- `chore/security-remove-supabase-legacy-env` (créée depuis `413366b`) :
+  commits `2630442` (env examples) et `9608f70` (suppression du repli +
+  tests).
+- Les deux branches fast-forwardées dans `release/commercialisation-v1`,
+  poussées. Aucun merge opaque, aucun force push.
 - Aucun secret dans aucun des commits (vérifié `verify:secrets` + recherche
-  d'historique par motif).
+  d'historique par motif à chaque lot).
