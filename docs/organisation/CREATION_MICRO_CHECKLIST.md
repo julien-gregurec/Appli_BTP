@@ -2,6 +2,12 @@
 
 **Document purement administratif. Aucun dossier n'a été déposé. Rien n'a été décidé à la place de Julien.** Cette checklist liste ce qu'il faudra rassembler/décider, pas comment le faire à sa place.
 
+Mise à jour P14C (21-08-2026) : voir le dossier détaillé
+[`P14C_DOSSIER_IMMATRICULATION_MICRO.md`](P14C_DOSSIER_IMMATRICULATION_MICRO.md)
+pour la checklist pas-à-pas du Guichet unique, l'arbre de décision TVA et
+les checklists après-dépôt/après-SIRET. Ce document-ci reste la synthèse
+rapide.
+
 ## Activité déclarée (validée comme base P14 — 21-08-2026, pas une formulation administrative définitive)
 
 > Édition et exploitation de logiciels en mode SaaS et prestations de services numériques associées.
@@ -14,14 +20,14 @@ Points à trancher par Julien avant le dépôt, pas par ce document :
 
 ## Éléments à rassembler avant le dépôt
 
-- [ ] **Nom/prénom exploitant** — état civil exact tel qu'il apparaîtra sur le SIRET.
-- [ ] **Nom commercial** — confirmer si « ELSATIA » est utilisé comme nom commercial de la micro-entreprise (distinct du nom légal de l'exploitant, voir `docs/juridique/mentions-legales.md`).
-- [ ] **Adresse du siège** — peut être l'adresse personnelle de Julien (domiciliation par défaut d'une micro-entreprise) ou une autre adresse de domiciliation.
+- [x] **Nom/prénom exploitant** — Julien GREGUREC (décidé P14, à revérifier contre l'avis SIRENE une fois reçu).
+- [x] **Nom commercial** — ELSATIA (décidé P14), distinct du nom légal de l'exploitant et du nom du produit « ELSATIA Gestion Pro ».
+- [x] **Adresse du siège** — 9 rue du Maréchal Leclerc, 67860 Rhinau, France (décidée P14).
 - [ ] **Justificatif de domicile** — généralement demandé pour l'immatriculation.
 - [ ] **Pièce d'identité** — généralement demandée pour l'immatriculation.
 - [ ] **Choix fiscaux à vérifier avec un professionnel ou l'URSSAF avant de cocher quoi que ce soit sur le formulaire** :
   - régime micro-fiscal classique vs versement libératoire de l'impôt sur le revenu ;
-  - franchise en base de TVA (probable au démarrage, seuils à vérifier) vs option pour la TVA dès le départ ;
+  - franchise en base de TVA (seuil 2026 pour les prestations de services : 37 500 € HT, tolérance 41 250 € — voir arbre de décision dans `P14C_DOSSIER_IMMATRICULATION_MICRO.md`) vs option pour la TVA dès le départ ;
   - ACRE (exonération de charges sociales la première année) si éligible.
 - [ ] **Compte bancaire** — un compte dédié à l'activité est recommandé dès le départ, même s'il n'est obligatoire qu'au-delà d'un certain seuil de chiffre d'affaires en micro-entreprise (seuil à vérifier au moment venu, il évolue).
 - [ ] **Assurances éventuelles** — la RC Pro n'est pas obligatoire pour l'édition de logiciels au sens strict (contrairement au BTP), mais reste recommandée ; à évaluer avec un assureur une fois l'activité précisément déclarée.
