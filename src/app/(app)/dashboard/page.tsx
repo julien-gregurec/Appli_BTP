@@ -11,6 +11,7 @@ import { BriefingMatin, type LigneBriefing } from "@/components/BriefingMatin";
 import { Lien as Link } from "@/components/Lien";
 import { iaEstActive } from "@/lib/preview-features";
 import { CentreAlertesOperationnelles, type AlerteOperationnelle } from "@/components/CentreAlertesOperationnelles";
+import { DOMAINE_VERS_PERMISSION_DELEGATION, type DelegationAlerte, type EmployeDelegable } from "@/lib/alertes-delegation";
 import { activeFeaturesForCompany } from "@/lib/feature-flags";
 import { featureForPath } from "@/lib/feature-catalogue";
 import { estPlateformeAdmin } from "@/lib/plateforme";
@@ -75,7 +76,7 @@ export default async function DashboardPage() {
     return (!feature || activeFeatures.includes(feature)) && (module.permission === null || autorise(module.permission));
   });
 
-  const { data: employeCompte } = permissions !== null && (peutPointer || voir.planning)
+  const { data: employeCompte } = permissions !== null && (peutPointer || voir.planning || voir.factures || voir.devis || voir.stock || voir.flotte || voir.outillage || voir.achats)
     ? await supabase.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("utilisateur_id", ctx.userId).eq("statut", "actif").maybeSingle()
     : { data: null };
   let requeteAffectations = supabase.from("affectations").select("id, date, heures, tache, chantier:chantiers(nom), employe:employes(prenom, nom)").eq("entreprise_id", ctx.entrepriseId).gte("date", aujourdhui).order("date").limit(6);
@@ -165,6 +166,45 @@ export default async function DashboardPage() {
   const alertesIgnorees = alertesAvecSignature.filter((alerte) => signaturesIgnorees.get(alerte.id) === alerte.signature);
   const alertesActives = alertesAvecSignature.filter((alerte) => signaturesIgnorees.get(alerte.id) !== alerte.signature);
   const prenomAffiche = ctx.prenom && ctx.prenom.toLocaleLowerCase("fr") !== "prototype" ? ctx.prenom : null;
+
+  // Délégation d'alertes (ALERTES-DELEGATION-V1) : le bouton n'est proposé
+  // que pour les domaines reliés à un droit de gestion existant, et jamais
+  // affiché seul comme contrôle d'accès — la fonction SQL revalide tout.
+  const domainesAlertesActives = [...new Set(alertesActives.map((alerte) => alerte.domaine))];
+  const domainesDelegables = domainesAlertesActives.filter((domaine) => DOMAINE_VERS_PERMISSION_DELEGATION[domaine]);
+  const domainesAutorisesDelegation = domainesDelegables.filter((domaine) => autorise(DOMAINE_VERS_PERMISSION_DELEGATION[domaine]));
+  const [{ data: employesDelegablesData }, { data: delegationsData }] = await Promise.all([
+    permissions !== null && domainesAutorisesDelegation.length > 0
+      ? supabase.rpc("employes_delegables_alertes", { p_entreprise_id: ctx.entrepriseId })
+      : Promise.resolve({ data: [] as Array<{ employe_id: string; prenom: string; nom: string; permissions: string[] }> }),
+    permissions !== null && alertesActives.length > 0
+      ? supabase
+        .from("alertes_operationnelles_delegations")
+        .select("alerte_cle,employe_id,delegue_par_user_id,delegue_at,commentaire,employe:employes(prenom,nom),delegue_par:utilisateurs!alertes_operationnelles_delegations_delegue_par_user_id_fkey(prenom,nom)")
+        .eq("entreprise_id", ctx.entrepriseId)
+        .in("alerte_cle", alertesActives.map((alerte) => alerte.id))
+      : Promise.resolve({ data: [] as Array<{ alerte_cle: string; employe_id: string; delegue_par_user_id: string; delegue_at: string; commentaire: string | null; employe: { prenom: string; nom: string } | { prenom: string; nom: string }[] | null; delegue_par: { prenom: string; nom: string } | { prenom: string; nom: string }[] | null }> }),
+  ]);
+  const employesDelegables: EmployeDelegable[] = (
+    (employesDelegablesData ?? []) as Array<{ employe_id: string; prenom: string; nom: string; permissions: string[] }>
+  ).map((employe) => ({
+    employeId: employe.employe_id, prenom: employe.prenom, nom: employe.nom, permissions: employe.permissions,
+  }));
+  const delegations: Record<string, DelegationAlerte> = Object.fromEntries(
+    (delegationsData ?? []).map((delegation) => {
+      const employe = un(delegation.employe);
+      const delegueParUtilisateur = un(delegation.delegue_par);
+      return [delegation.alerte_cle, {
+        employeId: delegation.employe_id,
+        employePrenom: employe?.prenom ?? "",
+        employeNom: employe?.nom ?? "",
+        deleguePar: delegueParUtilisateur ? `${delegueParUtilisateur.prenom ?? ""} ${delegueParUtilisateur.nom ?? ""}`.trim() : "",
+        delegueParUserId: delegation.delegue_par_user_id,
+        delegueAt: delegation.delegue_at,
+        commentaire: delegation.commentaire,
+      } satisfies DelegationAlerte];
+    }),
+  );
 
   const lignesBriefing: LigneBriefing[] = [];
   if (peutVoirBriefing) {
@@ -273,6 +313,11 @@ export default async function DashboardPage() {
             <CentreAlertesOperationnelles
               alertes={alertesActives}
               alertesIgnorees={alertesIgnorees}
+              domainesAutorisesDelegation={domainesAutorisesDelegation}
+              employesDelegables={employesDelegables}
+              delegations={delegations}
+              employeCourantId={employeCompte?.id ?? null}
+              utilisateurCourantId={ctx.userId}
             />
           </DashboardWidget>
         )}
