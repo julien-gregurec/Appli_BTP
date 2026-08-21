@@ -15,17 +15,19 @@
 | Application | https://app.elsatia.fr |
 | Activité envisagée (base de travail, pas une formulation administrative définitive) | « Édition et exploitation de logiciels en mode SaaS et prestations de services numériques associées » |
 
-## 2. Informations encore à confirmer (décisions de Julien, non tranchées ici)
+## 2. Décisions
 
-- **Date souhaitée de début d'activité** — impacte le premier exercice fiscal et social.
-- **Activité principale exacte à déclarer** — voir §3, formulation à valider par Julien avant saisie.
-- **Activité secondaire éventuelle** — aucune identifiée à ce stade ; ne pas ajouter d'activité BTP personnelle sans décision explicite (déjà signalé en P13/P14 : régimes et plafonds de CA distincts, plafond de micro-entreprise partagé entre toutes les activités déclarées).
-- **Choix fiscal micro-BNC / micro-BIC** — dépend de la classification finale de l'activité (voir §6).
-- **Versement libératoire de l'impôt sur le revenu** — oui/non, si éligible (dépend du revenu fiscal de référence du foyer).
-- **Régime de TVA au démarrage** — franchise en base ou autre régime (voir arbre de décision §10).
-- **Compte bancaire dédié** — à ouvrir ou non dès le départ (voir §11).
-- **Assurance RC Pro** — à souscrire ou non (voir §12).
-- **Numéro de téléphone public ou non** — déjà tranché en P14 : pas de numéro public pour l'instant, contact par formulaires/e-mails uniquement. Rappelé ici au cas où la décision évoluerait avant le dépôt.
+Mise à jour 21-08-2026 — décisions 1 et 2 tranchées par Julien, décision 3 en attente.
+
+- [x] **Date souhaitée de début d'activité** — **1er octobre 2026**. Cohérent avec le calendrier de commercialisation (lancement prévu courant octobre) ; le dépôt peut être effectué jusqu'à 1 mois avant le début d'activité et au plus tard 15 jours après, donc à partir de début septembre 2026 selon cette date.
+- [x] **Régime de TVA au démarrage** — **franchise en base de TVA**, sous les seuils 2026 pour les prestations de services (37 500 € HT, seuil majoré 41 250 € — voir §9/§10). Confirme la mention déjà présente dans `mentions-legales.md` (« TVA non applicable, article 293 B »), qui n'était jusqu'ici qu'une hypothèse de travail et devient une décision retenue — toujours à revérifier au moment du dépôt effectif, et non un fait administratif définitif tant que l'immatriculation n'est pas faite. Rester en franchise et être micro-entrepreneur sont deux statuts distincts : redevenir redevable de TVA plus tard ne changerait pas le régime micro lui-même.
+- [x] **Activité secondaire éventuelle** — aucune retenue pour l'instant.
+- [x] **Assurance RC Pro** — recommandée, non bloquante ; décision de souscription (et choix d'assureur) laissée ouverte, à faire au rythme de Julien, sans urgence pour le dépôt lui-même.
+- [x] **Compte bancaire dédié** — oui, à ouvrir avant le lot P15 (Stripe Live a besoin d'un IBAN professionnel).
+- [ ] **Versement libératoire de l'impôt sur le revenu** — **en attente**. Éligibilité conditionnée par le revenu fiscal de référence (RFR) 2024 par part fiscale du foyer (seuil 2026 autour de 29 315 €/part selon la réglementation en vigueur, à reconfirmer au moment de la décision). **Cette information est personnelle et sensible : je ne la demande pas et ne la stocke pas dans ce dépôt.** Si Julien souhaite trancher ce point avec mon aide, il peut me communiquer directement son éligibilité (oui/non) plutôt que le RFR chiffré lui-même — sinon la décision peut être prise directement avec un expert-comptable ou l'URSSAF.
+- **Activité principale exacte à déclarer** — voir §3, formulation à valider par Julien avant saisie (inchangé).
+- **Choix fiscal micro-BNC / micro-BIC** — dépend de la classification finale de l'activité (voir §6, inchangé).
+- **Numéro de téléphone public ou non** — déjà tranché en P14 : pas de numéro public pour l'instant, contact par formulaires/e-mails uniquement.
 
 ## 3. Activité — formulation et classification
 

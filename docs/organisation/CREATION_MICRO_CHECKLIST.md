@@ -8,6 +8,12 @@ pour la checklist pas-à-pas du Guichet unique, l'arbre de décision TVA et
 les checklists après-dépôt/après-SIRET. Ce document-ci reste la synthèse
 rapide.
 
+Mise à jour décisions (21-08-2026) : date de début d'activité et régime de
+TVA au démarrage tranchés par Julien (voir §2 du dossier P14C). Seul le
+versement libératoire de l'impôt sur le revenu reste ouvert, en attente
+d'une décision de Julien avec un professionnel (dépend de données
+personnelles — revenu fiscal de référence — non demandées ni stockées ici).
+
 ## Activité déclarée (validée comme base P14 — 21-08-2026, pas une formulation administrative définitive)
 
 > Édition et exploitation de logiciels en mode SaaS et prestations de services numériques associées.
@@ -25,12 +31,12 @@ Points à trancher par Julien avant le dépôt, pas par ce document :
 - [x] **Adresse du siège** — 9 rue du Maréchal Leclerc, 67860 Rhinau, France (décidée P14).
 - [ ] **Justificatif de domicile** — généralement demandé pour l'immatriculation.
 - [ ] **Pièce d'identité** — généralement demandée pour l'immatriculation.
-- [ ] **Choix fiscaux à vérifier avec un professionnel ou l'URSSAF avant de cocher quoi que ce soit sur le formulaire** :
-  - régime micro-fiscal classique vs versement libératoire de l'impôt sur le revenu ;
-  - franchise en base de TVA (seuil 2026 pour les prestations de services : 37 500 € HT, tolérance 41 250 € — voir arbre de décision dans `P14C_DOSSIER_IMMATRICULATION_MICRO.md`) vs option pour la TVA dès le départ ;
-  - ACRE (exonération de charges sociales la première année) si éligible.
-- [ ] **Compte bancaire** — un compte dédié à l'activité est recommandé dès le départ, même s'il n'est obligatoire qu'au-delà d'un certain seuil de chiffre d'affaires en micro-entreprise (seuil à vérifier au moment venu, il évolue).
-- [ ] **Assurances éventuelles** — la RC Pro n'est pas obligatoire pour l'édition de logiciels au sens strict (contrairement au BTP), mais reste recommandée ; à évaluer avec un assureur une fois l'activité précisément déclarée.
+- [x] **Date de début d'activité** — 1er octobre 2026 (décidée 21-08-2026, voir dossier P14C §2). Dépôt possible à partir de début septembre 2026 (jusqu'à 1 mois avant, au plus tard 15 jours après).
+- [x] **Franchise en base de TVA au démarrage** — retenue (décidée 21-08-2026, seuils 2026 : 37 500 € HT / tolérance 41 250 € — voir arbre de décision dans `P14C_DOSSIER_IMMATRICULATION_MICRO.md`).
+- [ ] **Versement libératoire de l'impôt sur le revenu** — en attente. Éligibilité conditionnée par le revenu fiscal de référence 2024 par part fiscale du foyer ; à trancher directement par Julien, avec un professionnel si besoin (donnée personnelle non demandée ni stockée dans ce dépôt).
+- [ ] **ACRE** (exonération de charges sociales la première année) — à vérifier si éligible.
+- [x] **Compte bancaire** — dédié à ouvrir avant Stripe Live (décidé 21-08-2026).
+- [x] **Assurance RC Pro** — recommandée, non bloquante pour le dépôt (décidé 21-08-2026) ; souscription à faire au rythme de Julien.
 
 ## Après réception du SIRET — actions techniques (côté produit, pas administratif)
 
