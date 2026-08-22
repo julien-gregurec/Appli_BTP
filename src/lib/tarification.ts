@@ -133,7 +133,7 @@ export const OFFRES_TARIFAIRES: readonly OffreTarifaire[] = [
     parCompteSup: 9,
     operationsIAIncluses: 3_000,
     stockageGoInclus: 300,
-    resume: "40 collaborateurs et 10 administrateurs, avec accompagnement prioritaire.",
+    resume: "50 comptes inclus, dont 10 administrateurs, avec accompagnement prioritaire.",
     fonctionnalites: [...SOCLE, ...TERRAIN, ...GESTION, ...PILOTAGE, ...AVANCE],
     populaire: true,
   },
