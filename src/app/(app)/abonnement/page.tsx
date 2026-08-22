@@ -13,6 +13,27 @@ import { BRAND_SERVER } from "@/lib/brand-server";
 
 const input = "rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
+// Mêmes libellés que la navigation du tableau de bord (src/app/(app)/dashboard/page.tsx),
+// limités aux permissions utiles pour expliquer un passage à l'offre supérieure — pas une
+// nouvelle source de vérité, juste une traduction des clés de permission déjà réelles.
+const LIBELLES_GAIN_OFFRE: Partial<Record<string, string>> = {
+  acces_employes: "Employés", acces_facturation_avancee: "Situations de travaux", acces_ouvrages: "Ouvrages",
+  acces_interventions: "Interventions", acces_sous_traitants: "Sous-traitants", acces_crm: "CRM",
+  acces_achats: "Achats fournisseurs", acces_stock: "Gestion du stock", acces_flotte: "Flotte de véhicules",
+  acces_outillage: "Outillage", acces_rentabilite: "Rentabilité par chantier", acces_exports: "Exports comptables",
+  acces_paiements_bancaires: "Paiements bancaires", acces_connecteurs: "Connecteurs", gerer_paie: "Gestion de la paie",
+  utiliser_borne_stock: "Borne stock", consulter_sa_paie: "Consultation de sa paie",
+};
+
+const FAQ_ABONNEMENT: Array<{ question: string; reponse: string }> = [
+  { question: "Puis-je changer d'offre en cours d'abonnement ?", reponse: "Pas encore en libre-service : ni le portail Stripe, ni l'application ne proposent aujourd'hui de changement de plan autonome. Contactez-nous, le changement est fait manuellement." },
+  { question: "Que se passe-t-il à la fin de l'essai de 30 jours ?", reponse: "La carte enregistrée à l'inscription est débitée automatiquement au tarif de l'offre choisie, sans action de votre part. Vous pouvez annuler avant la fin de l'essai sans frais." },
+  { question: "Puis-je ajouter des comptes au-delà du nombre inclus ?", reponse: "Oui, chaque compte supplémentaire est facturé en plus selon le tarif de votre offre, visible dans la section « Coût actuel de l'application » ci-dessus." },
+  { question: "Où trouver mes factures d'abonnement ?", reponse: "Dans la section « Factures et historique » ci-dessous, ou via « Gérer mon abonnement » (portail Stripe) une fois souscrit." },
+  { question: "Puis-je annuler mon abonnement ?", reponse: "Oui, depuis le portail Stripe (« Gérer mon abonnement ») : la résiliation prend effet à la fin de la période en cours, pas immédiatement." },
+  { question: "Mes données sont-elles supprimées si j'annule ?", reponse: "Non, pas automatiquement. La suppression suit la procédure RGPD dédiée (menu Paramètres → Données), avec un délai de 30 jours avant purge définitive." },
+];
+
 export default async function AbonnementPage({ searchParams }: { searchParams: Promise<{ error?: string; succes?: string }> }) {
   const [{ error, succes }, ctx] = await Promise.all([searchParams, getContexteEntreprise()]);
   const supabase = await createClient();
@@ -55,6 +76,10 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
     : abonnementAvantRemiseMensuel + stockageMensuel.montantHt;
   const coutMensuelEstime = annuel ? coutPeriodeEstime / 12 : coutPeriodeEstime;
   const nouvelleGrille = ["mini", "pro", "business", "entreprise", "sur_mesure"].includes(String(entreprise?.abonnement_offre ?? ""));
+  const offreSuivante = nouvelleGrille ? OFFRES.find((o) => o.palier === offre.palier + 1) ?? null : null;
+  const gainsOffreSuivante = offreSuivante
+    ? offreSuivante.fonctionnalites.filter((f) => !offre.fonctionnalites.includes(f)).map((f) => LIBELLES_GAIN_OFFRE[f]).filter((v): v is string => Boolean(v))
+    : [];
   const euros = (montant: number) => montant.toLocaleString("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
   const contactCommercial = BRAND_SERVER.supportEmail
     ? `mailto:${BRAND_SERVER.supportEmail}?subject=${encodeURIComponent(`Offre ${PRODUCT_NAME}`)}`
@@ -153,6 +178,27 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
 
     {souscrit ? <section className="rounded-xl border p-5"><h2 className="font-semibold">Gérer l’abonnement</h2><p className="mt-1 text-sm text-neutral-500">Le portail sécurisé Stripe permet de changer de carte, télécharger les factures et gérer la résiliation.</p><div className="mt-4 flex flex-wrap gap-2"><form action={ouvrirPortailAbonnementAction}><button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Gérer mon abonnement</button></form>{entreprise?.derniere_facture_url&&<Link href={entreprise.derniere_facture_url} target="_blank" rel="noreferrer" className="rounded-md border px-4 py-2 text-sm font-medium">Voir la dernière facture</Link>}{entreprise?.derniere_facture_pdf&&<Link href={entreprise.derniere_facture_pdf} target="_blank" rel="noreferrer" className="rounded-md border px-4 py-2 text-sm font-medium">Télécharger le PDF</Link>}</div>{entreprise?.derniere_facture_at&&<p className="mt-3 text-xs text-neutral-500">Dernière facture : {entreprise.derniere_facture_statut??"—"} · {new Date(entreprise.derniere_facture_at).toLocaleString("fr-FR")}</p>}</section>
     : <section className="space-y-4"><div><h2 className="font-semibold">Choisir une offre</h2><p className="text-sm text-neutral-500">Carte enregistrée à l’inscription, aucun débit pendant l’essai de 30 jours, puis prélèvement automatique au montant affiché.</p></div>{!configure&&<p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">Le paiement des abonnements est en cours de configuration par {BRAND_NAME}. Votre accès actuel reste inchangé.</p>}<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">{OFFRES.map(offre=>{const prix=prixAbonnementMensuel(offre.comptesInclus,offre);return <article key={offre.cle} className="rounded-xl border p-5"><h3 className="text-lg font-semibold">{offre.nom}</h3><p className="mt-1 min-h-20 text-sm text-neutral-500">{offre.resume}</p><p className="mt-4 text-2xl font-bold">{prix.total} € <span className="text-xs font-normal text-neutral-500">HT/mois</span></p>{offre.devisObligatoire?<Link href={contactCommercial} className="mt-4 block rounded-md border px-3 py-2 text-center text-sm font-semibold">Demander un devis</Link>:<form action={demarrerAbonnementAction} className="mt-4 space-y-3"><input type="hidden" name="offre" value={offre.cle}/><input type="hidden" name="retour_erreur" value="/abonnement"/><select name="periodicite" defaultValue="mensuel" className={`${input} w-full`}><option value="mensuel">Mensuel</option><option value="annuel">Annuel · prix affiché avant validation</option></select><button disabled={!configure} className="w-full rounded-md bg-[#0d1b2a] px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Démarrer l’essai</button></form>}</article>})}</div></section>}
+
+    {souscrit && offreSuivante && <section className="rounded-xl border p-5">
+      <h2 className="font-semibold">Passer à l’offre {offreSuivante.nom}</h2>
+      <p className="mt-1 text-sm text-neutral-500">{offreSuivante.devisObligatoire ? "Sur devis, après échange avec notre équipe." : `${offreSuivante.comptesInclus} comptes inclus, à partir de ${euros(offreSuivante.base)} HT/mois.`}</p>
+      {gainsOffreSuivante.length > 0 && <div className="mt-3">
+        <p className="text-xs uppercase text-neutral-500">Vous gagneriez notamment</p>
+        <ul className="mt-2 flex flex-wrap gap-2">{gainsOffreSuivante.map((g) => <li key={g} className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium dark:bg-neutral-800">{g}</li>)}</ul>
+      </div>}
+      <p className="mt-4 text-xs text-neutral-500">Le changement d’offre n’est pas encore en libre-service (ni depuis cette page, ni depuis le portail Stripe) : contactez-nous, nous l’appliquons manuellement.</p>
+      <Link href={contactCommercial} className="mt-3 inline-block rounded-md border px-4 py-2 text-sm font-semibold">Demander le changement d’offre</Link>
+    </section>}
+
+    <section className="rounded-xl border p-5">
+      <h2 className="font-semibold">Questions fréquentes</h2>
+      <dl className="mt-3 divide-y divide-neutral-200 dark:divide-neutral-800">
+        {FAQ_ABONNEMENT.map((item) => <details key={item.question} className="py-3 first:pt-0 last:pb-0">
+          <summary className="cursor-pointer text-sm font-medium">{item.question}</summary>
+          <dd className="mt-2 text-sm text-neutral-500">{item.reponse}</dd>
+        </details>)}
+      </dl>
+    </section>
 
     <section className="rounded-xl border p-5"><h2 className="font-semibold">Factures et historique</h2><p className="mt-1 text-sm text-neutral-500">Documents Stripe et changements contractuels enregistrés pour votre entreprise.</p><div className="mt-4 overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead><tr className="border-b text-xs uppercase text-neutral-500"><th className="py-2 pr-3">Date</th><th className="py-2 pr-3">Référence</th><th className="py-2 pr-3">Montant TTC</th><th className="py-2 pr-3">Statut</th><th className="py-2">Document</th></tr></thead><tbody>{(facturesAbonnement??[]).map(facture=><tr key={facture.id} className="border-b"><td className="py-3 pr-3">{new Date(facture.created_at).toLocaleDateString("fr-FR")}</td><td className="py-3 pr-3">{facture.numero??"—"}</td><td className="py-3 pr-3">{Number(facture.montant_ttc).toLocaleString("fr-FR",{style:"currency",currency:String(facture.devise??"EUR")})}</td><td className="py-3 pr-3">{facture.statut}</td><td className="py-3">{facture.url_pdf?<Link href={facture.url_pdf} target="_blank" rel="noreferrer" className="underline">PDF</Link>:facture.url_facture?<Link href={facture.url_facture} target="_blank" rel="noreferrer" className="underline">Voir</Link>:"—"}</td></tr>)}</tbody></table>{!facturesAbonnement?.length?<p className="py-4 text-sm text-neutral-500">Aucune facture d’abonnement enregistrée.</p>:null}</div>{historique?.length?<details className="mt-4"><summary className="cursor-pointer text-sm font-semibold">Afficher les changements de tarif ({historique.length})</summary><ul className="mt-2 space-y-2 text-sm">{historique.map(event=><li key={event.id} className="rounded bg-neutral-50 p-2 dark:bg-neutral-900">{new Date(event.created_at).toLocaleString("fr-FR")} · {event.action}{event.motif?` — ${event.motif}`:""}</li>)}</ul></details>:null}</section>
   </div></main>;
