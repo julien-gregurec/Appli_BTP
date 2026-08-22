@@ -2,6 +2,8 @@
 
 Date : 22-08-2026. Audit en lecture seule — aucune correction appliquée. Réalisé sur le worktree `elsatia-production-bootstrap`, branche `release/commercialisation-v1`, HEAD `fc61bd8` (confirmé identique au HEAD distant `gh/release/commercialisation-v1`).
 
+**Mise à jour 22-08-2026 (FINAL-FIX-P1-V1)** : les 5 P1 listés ci-dessous ont été traités. Voir `docs/organisation/FINAL_FIX_P1_V1.md` pour le détail complet (investigation, décisions, migrations, tests, déploiement).
+
 ## Résumé exécutif
 
 L'application est **fonctionnellement solide et commercialement cohérente** : Auth, multi-tenant, Terrain, documents, alertes/délégation, RGPD et infrastructure (Sentry, Storage, migrations) sont sains. Aucune faille de sécurité **actuellement exploitable** n'a été trouvée : RLS activée sur les 147 tables, aucun grant `anon` sur donnée tenant, aucune fonction `SECURITY DEFINER` sans `search_path`. Le dépôt garde en revanche une trace de **plusieurs vraies failles multi-tenant réelles, déjà trouvées et corrigées début août** (documentées ci-dessous, à titre de vigilance) et porte **du code mort à motif de contournement anonyme** dans 18 fonctions, inerte aujourd'hui mais à nettoyer avant l'ouverture commerciale.
@@ -252,12 +254,12 @@ Aucun.
 - Compte bancaire dédié non ouvert (administratif, hors code).
 - Ces deux points bloquent uniquement P15 (Stripe Live), pas l'usage de l'application elle-même.
 
-### P1 AVANT PREMIERS CLIENTS
-1. Fuite d'erreur brute sur `besoins.ts` (onboarding) et sur les autres fichiers CORE listés dans la section « Erreurs utilisateur brutes ».
-2. Divergence d'affichage tarifs Entreprise (« 40 » vs « 50 ») sur `app.elsatia.fr/tarifs`.
-3. Nettoyage du motif de contournement `anon` vestigial dans les 18 fonctions listées (inerte aujourd'hui, mais recommandé avant exposition commerciale plus large).
-4. Décision explicite sur le schema drift `verrouiller_facture_emise` (Preview vs Production) avant de considérer Preview comme fiable pour de futures recettes de suppression de factures.
-5. Confirmation par Julien que `SUPABASE_SERVICE_ROLE_KEY` fonctionne toujours (notifications push) — non testé dans cet audit par prudence.
+### P1 AVANT PREMIERS CLIENTS — **CLOS (FINAL-FIX-P1-V1, 22-08-2026)**
+1. ~~Fuite d'erreur brute sur `besoins.ts` (onboarding) et sur les autres fichiers CORE~~ **CORRIGÉ** — 17 fichiers routés via `messageErreurUtilisateur`, garde-fou anti-régression ajouté.
+2. ~~Divergence d'affichage tarifs Entreprise (« 40 » vs « 50 »)~~ **CORRIGÉ** — libellé harmonisé sur `comptesInclus`/`administrateursInclus`, aucun prix modifié.
+3. ~~Motif de contournement `anon` vestigial dans les 18 fonctions listées~~ **CORRIGÉ** (16/18 — 2 déjà mortes/révoquées, non touchées) — migration versionnée, testé fonctionnellement et cross-tenant.
+4. ~~Schema drift `verrouiller_facture_emise`~~ **CORRIGÉ (Option A)** — versionné et appliqué à Production ; découverte séparée (Preview manque toute la migration 200) documentée, non traitée (hors périmètre).
+5. ~~Confirmation que `SUPABASE_SERVICE_ROLE_KEY` fonctionne toujours~~ **CONFIRMÉ** sans jamais afficher la valeur (preuve fonctionnelle indirecte via le rate-limit des routes `/login`/`/signup`).
 
 ### NON BLOQUANT
 - Fuites d'erreurs brutes sur modules BETA/DISABLED (boutique, paiements bancaires, paie, CRM, interventions, etc.) — à traiter avant l'ouverture commerciale de chacun de ces modules, pas avant.
