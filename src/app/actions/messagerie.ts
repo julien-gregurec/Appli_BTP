@@ -39,7 +39,7 @@ export async function creerConversationInterneAction(formData: FormData) {
         entreprise_id: ctx.entrepriseId, type: "chantier", chantier_id: cibleId,
         cree_par_employe_id: employe.id,
       }).select("id").single();
-      if (error || !data) retour("error", error?.message ?? "Conversation impossible à créer");
+      if (error || !data) retour("error", messageErreurUtilisateur("creerConversationInterneAction", error, "Conversation impossible à créer."));
       conversationId = data.id;
     }
   } else {
@@ -55,7 +55,7 @@ export async function creerConversationInterneAction(formData: FormData) {
         entreprise_id: ctx.entrepriseId, type: "directe", destinataire_employe_id: cibleId,
         cree_par_employe_id: employe.id,
       }).select("id").single();
-      if (error || !data) retour("error", error?.message ?? "Conversation impossible à créer");
+      if (error || !data) retour("error", messageErreurUtilisateur("creerConversationInterneAction", error, "Conversation impossible à créer."));
       conversationId = data.id;
     }
   }
@@ -138,8 +138,8 @@ export async function suggererReponseIAAction(conversationId: string): Promise<{
     journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "messagerie", statut: "succes" });
     return { brouillon };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Erreur lors de la suggestion IA.";
-    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "messagerie", statut: "erreur", messageErreur: message });
-    return { error: message };
+    const messageBrut = err instanceof Error ? err.message : "Erreur lors de la suggestion IA.";
+    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "messagerie", statut: "erreur", messageErreur: messageBrut });
+    return { error: messageErreurUtilisateur("suggererReponseMessagerieAction", err, "La suggestion IA n’est pas disponible pour le moment.") };
   }
 }

@@ -20,7 +20,7 @@ export async function creerInventaireAction(formData: FormData) {
     p_article_ids: articles,
     p_commentaire: champ(formData, "commentaire") || null,
   });
-  if (error || !data) redirect(`/inventaires?error=${encodeURIComponent(error?.message ?? "Erreur")}`);
+  if (error || !data) redirect(`/inventaires?error=${encodeURIComponent(messageErreurUtilisateur("creerInventaireAction", error, "Impossible de créer l’inventaire."))}`);
   revalidatePath("/inventaires");
   redirect(`/inventaires/${data}`);
 }

@@ -99,7 +99,7 @@ export async function creerNoteFraisAction(formData: FormData) {
     statut: "brouillon",
     cree_par_utilisateur_id: ctx.userId,
   }).select("id").single();
-  if (insertError || !data) erreur(insertError?.message ?? "Création impossible");
+  if (insertError || !data) erreur(messageErreurUtilisateur("creerNoteFraisAction", insertError, "Création de la note de frais impossible."));
   await ajouterAudit(supabase, {
     entrepriseId: ctx.entrepriseId,
     action: "document_cree",

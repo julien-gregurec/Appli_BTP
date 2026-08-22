@@ -6,6 +6,7 @@ import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { analyserRentabilite } from "@/lib/ai/rentabilite";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
 import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 type PointageRentabilite = { heures_normales: number; heures_supplementaires: number; employe: { cout_horaire: number | null } | { cout_horaire: number | null }[] | null };
 type MouvementStockRentabilite = { quantite: number; article: { prix_achat_ht: number } | { prix_achat_ht: number }[] | null };
@@ -73,8 +74,8 @@ export async function analyserRentabiliteIAAction(chantierId: string): Promise<{
     journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "rentabilite", statut: "succes" });
     return { analyse };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Erreur lors de l'analyse IA.";
-    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "rentabilite", statut: "erreur", messageErreur: message });
-    return { error: message };
+    const messageBrut = err instanceof Error ? err.message : "Erreur lors de l'analyse IA.";
+    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "rentabilite", statut: "erreur", messageErreur: messageBrut });
+    return { error: messageErreurUtilisateur("analyserRentabiliteIAAction", err, "L’analyse assistée de rentabilité n’est pas disponible pour le moment.") };
   }
 }

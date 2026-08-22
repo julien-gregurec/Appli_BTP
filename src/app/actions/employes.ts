@@ -69,7 +69,7 @@ export async function creerEmployeAction(formData: FormData) {
     .single();
 
   if (error || !data) {
-    redirect(`/employes/nouveau?error=${encodeURIComponent(error?.message ?? "Erreur")}`);
+    redirect(`/employes/nouveau?error=${encodeURIComponent(messageErreurUtilisateur("creerEmployeAction", error, "Impossible de créer l’employé."))}`);
   }
 
   revalidatePath("/employes");

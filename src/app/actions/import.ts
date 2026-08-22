@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { analyserFichier, type FichierAnalyse } from "@/lib/import/parse";
 import { logicielSource, typeImport } from "@/lib/import/config";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 const MAX_LIGNES = 5000;
 
@@ -17,7 +18,7 @@ export async function analyserFichierImport(formData: FormData): Promise<Fichier
     const res = await analyserFichier(file);
     return { ...res, lignes: res.lignes.slice(0, MAX_LIGNES) };
   } catch (e) {
-    return { entete: [], lignes: [], total: 0, erreur: `Lecture impossible : ${(e as Error).message}` };
+    return { entete: [], lignes: [], total: 0, erreur: messageErreurUtilisateur("analyserFichierImport", e, "Lecture du fichier impossible. Vérifiez le format et réessayez.") };
   }
 }
 
@@ -158,7 +159,7 @@ export async function importerDonneesAction(payload: {
           .select("id")
           .single();
         if (error || !nouveau) {
-          erreurs.push(`Fournisseur « ${nomFournisseur} » : ${error?.message ?? "création impossible"}`);
+          erreurs.push(`Fournisseur « ${nomFournisseur} » : ${messageErreurUtilisateur("importerDonneesAction:fournisseur", error, "création impossible")}`);
           ignores++;
           continue;
         }
@@ -199,7 +200,7 @@ export async function importerDonneesAction(payload: {
         const { data: nouveau, error } = await supabase.from("clients")
           .insert({ entreprise_id: entrepriseId, type: "particulier", nom: clientNom, statut: "actif" })
           .select("id").single();
-        if (error || !nouveau) { erreurs.push(`Client « ${clientNom} » : ${error?.message ?? "création impossible"}`); ignores++; continue; }
+        if (error || !nouveau) { erreurs.push(`Client « ${clientNom} » : ${messageErreurUtilisateur("importerDonneesAction:client", error, "création impossible")}`); ignores++; continue; }
         clientId = nouveau.id;
         indexClient.set(clientNom.toLowerCase(), clientId!);
       }
@@ -223,7 +224,7 @@ export async function importerDonneesAction(payload: {
         ? supabase.from(conf.table).upsert(lot, { onConflict: "entreprise_id,reference", count: "exact" })
         : supabase.from(conf.table).insert(lot, { count: "exact" });
     const { error, count } = await requete;
-    if (error) erreurs.push(`Lot ${i / 200 + 1} : ${error.message}`);
+    if (error) erreurs.push(`Lot ${i / 200 + 1} : ${messageErreurUtilisateur("importerDonneesAction:lot", error, "insertion impossible")}`);
     else inseres += count ?? lot.length;
   }
 

@@ -109,7 +109,7 @@ export async function creerFournisseurRapideAction(
     .select("id, nom")
     .single();
 
-  if (error || !cree) return { error: error?.message ?? "Impossible de créer le fournisseur." };
+  if (error || !cree) return { error: messageErreurUtilisateur("creerFournisseurRapideAction", error, "Impossible de créer le fournisseur.") };
   revalidatePath("/fournisseurs");
   return { id: cree.id, label: cree.nom };
 }
@@ -149,7 +149,7 @@ export async function creerCommandeAction(
       prix_unitaire_ht: Number(l.prix_unitaire_ht), taux_tva: Number(l.taux_tva), ordre: i,
     })),
   });
-  if (error || !commandeId) return { error: error?.message ?? "Impossible de créer la commande." };
+  if (error || !commandeId) return { error: messageErreurUtilisateur("creerCommandeAction", error, "Impossible de créer la commande.") };
   revalidatePath("/commandes");
   return { id: commandeId as string };
 }
