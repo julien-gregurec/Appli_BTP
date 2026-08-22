@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { obtenirProviderIA, type FichierIA, type MessageIA, type ReponseCompletion } from "@/lib/ai/provider";
-import { OUTILS_COPILOTE, executerOutilCopilote } from "@/lib/ai/copilote";
+import { outilsAutorisesCopilote, executerOutilCopilote } from "@/lib/ai/copilote";
 import { BRAND_NAME, PRODUCT_NAME } from "@/lib/brand";
 
 export type MessageChat = { role: "user" | "assistant"; contenu: string; fichier?: FichierIA };
@@ -347,9 +347,11 @@ export async function* demanderAssistantIAStream(
   utilisateurId: string,
   prenomCompte: string | null,
   peutGererPlanning: boolean,
+  permissions: string[] | null,
   historique: MessageChat[],
 ): AsyncGenerator<EvenementAssistant, void, unknown> {
   const provider = obtenirProviderIA();
+  const outilsDisponibles = outilsAutorisesCopilote(permissions);
   const aujourdhui = new Intl.DateTimeFormat("fr-FR", { dateStyle: "full", timeZone: "Europe/Paris" }).format(new Date());
   const descriptionUtilisateur = await decrireUtilisateurCourant(supabase, entrepriseId, utilisateurId, prenomCompte);
 
@@ -378,7 +380,7 @@ export async function* demanderAssistantIAStream(
   );
 
   for (let tour = 0; tour < MAX_TOURS_OUTILS; tour++) {
-    const flux = provider.streamer({ system, historique: conversation, outils: OUTILS_COPILOTE, maxTokens: 1500 });
+    const flux = provider.streamer({ system, historique: conversation, outils: outilsDisponibles, maxTokens: 1500 });
     let texteTour = "";
     let resultat: ReponseCompletion = { texte: "", appelsOutils: [] };
     while (true) {
@@ -461,7 +463,7 @@ export async function* demanderAssistantIAStream(
 
     conversation.push({ role: "assistant", contenu: texteTour, appelsOutils: resultat.appelsOutils });
     for (const appel of resultat.appelsOutils) {
-      const resultatOutil = await executerOutilCopilote(supabase, entrepriseId, appel.nom, appel.entree);
+      const resultatOutil = await executerOutilCopilote(supabase, entrepriseId, permissions, appel.nom, appel.entree);
       conversation.push({ role: "outil", appelId: appel.id, resultat: JSON.stringify(resultatOutil) });
     }
   }

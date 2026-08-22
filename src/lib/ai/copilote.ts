@@ -26,18 +26,24 @@ function correspondTousLesMots(texte: string, terme: string): boolean {
   return mots.length > 0 && mots.every((mot) => cible.includes(mot));
 }
 
-async function rechercher(supabase: Supabase, entrepriseId: string, input: { terme: string }) {
-  const [{ data: clients }, { data: chantiers }, { data: devis }, { data: factures }] = await Promise.all([
+async function rechercher(supabase: Supabase, entrepriseId: string, permissions: string[] | null, input: { terme: string }) {
+  const chercherDevis = permissions === null || permissions.includes("acces_devis");
+  const chercherFactures = permissions === null || permissions.includes("acces_factures");
+  const [{ data: clients }, { data: chantiers }, devisResultat, facturesResultat] = await Promise.all([
     supabase.from("clients").select("id, nom, prenom, societe").eq("entreprise_id", entrepriseId).limit(300),
     supabase.from("chantiers").select("id, nom, ville, statut").eq("entreprise_id", entrepriseId).limit(300),
-    supabase.from("devis").select("id, numero, statut, montant_ttc, client_id, clients!devis_client_id_fkey(nom, societe)").eq("entreprise_id", entrepriseId).ilike("numero", `%${input.terme.trim()}%`).limit(5),
-    supabase.from("factures").select("id, numero, statut, montant_ttc, client_id, clients!factures_client_id_fkey(nom, societe)").eq("entreprise_id", entrepriseId).ilike("numero", `%${input.terme.trim()}%`).limit(5),
+    chercherDevis
+      ? supabase.from("devis").select("id, numero, statut, montant_ttc, client_id, clients!devis_client_id_fkey(nom, societe)").eq("entreprise_id", entrepriseId).ilike("numero", `%${input.terme.trim()}%`).limit(5)
+      : Promise.resolve({ data: null }),
+    chercherFactures
+      ? supabase.from("factures").select("id, numero, statut, montant_ttc, client_id, clients!factures_client_id_fkey(nom, societe)").eq("entreprise_id", entrepriseId).ilike("numero", `%${input.terme.trim()}%`).limit(5)
+      : Promise.resolve({ data: null }),
   ]);
   return {
     clients: (clients ?? []).filter((c) => correspondTousLesMots(`${c.prenom ?? ""} ${c.nom ?? ""} ${c.societe ?? ""}`, input.terme)).slice(0, 5),
     chantiers: (chantiers ?? []).filter((c) => correspondTousLesMots(c.nom, input.terme)).slice(0, 5),
-    devis: devis ?? [],
-    factures: factures ?? [],
+    devis: devisResultat.data ?? [],
+    factures: facturesResultat.data ?? [],
   };
 }
 
@@ -175,6 +181,35 @@ async function verifierDisponibiliteEmploye(supabase: Supabase, entrepriseId: st
     en_conge_ce_jour: conge ? conge.type_conge : null,
     habilitations: habilitations ?? [],
   };
+}
+
+// Certains outils exposent des données couvertes par un droit de menu spécifique
+// (rentabilité, flotte, stock, factures, devis, heures de l'équipe) : la RLS Postgres
+// sur ces tables reste large (accès par simple appartenance à l'entreprise, cf. les
+// politiques "membres ..."), l'application du droit fin se fait normalement au niveau
+// page/action. Le copilote doit reproduire cette même restriction explicitement, sinon
+// il devient un contournement en langage naturel des droits de menu (ex. un poste
+// Terrain sans acces_rentabilite ne doit jamais obtenir la marge d'un chantier via l'IA).
+const PERMISSION_REQUISE_OUTIL: Partial<Record<string, readonly string[]>> = {
+  rentabilite_chantiers: ["acces_rentabilite"],
+  vehicules_entretien: ["acces_flotte"],
+  stock_faible: ["acces_stock"],
+  factures_impayees: ["acces_factures"],
+  devis_en_attente: ["acces_devis"],
+  heures_supplementaires_semaine: ["voir_pointages_equipe", "gerer_pointage"],
+};
+
+// null = accès complet (prototype ou compte support), comme partout ailleurs dans
+// src/lib/permissions.ts.
+export function autoriseOutilCopilote(nom: string, permissions: string[] | null): boolean {
+  if (permissions === null) return true;
+  const requises = PERMISSION_REQUISE_OUTIL[nom];
+  if (!requises) return true;
+  return requises.some((cle) => permissions.includes(cle));
+}
+
+export function outilsAutorisesCopilote(permissions: string[] | null): OutilIA[] {
+  return OUTILS_COPILOTE.filter((outil) => autoriseOutilCopilote(outil.nom, permissions));
 }
 
 export const OUTILS_COPILOTE: OutilIA[] = [
@@ -368,12 +403,20 @@ export const OUTILS_COPILOTE: OutilIA[] = [
 export async function executerOutilCopilote(
   supabase: Supabase,
   entrepriseId: string,
+  permissions: string[] | null,
   nom: string,
   input: Record<string, unknown>,
 ): Promise<unknown> {
+  // Deuxieme barriere en profondeur : outilsAutorisesCopilote() retire deja ces outils
+  // de la liste proposee au modele, mais on ne fait jamais confiance uniquement a ce que
+  // le modele choisit d'appeler (cf. AI-LAUNCH-V1 §2 — l'IA n'a aucun droit que
+  // l'utilisateur n'a pas deja).
+  if (!autoriseOutilCopilote(nom, permissions)) {
+    return { error: "Ton poste n'a pas accès à cette information." };
+  }
   switch (nom) {
     case "rechercher":
-      return rechercher(supabase, entrepriseId, input as { terme: string });
+      return rechercher(supabase, entrepriseId, permissions, input as { terme: string });
     case "chantiers_en_retard":
       return chantiersEnRetard(supabase, entrepriseId);
     case "absences_du_jour":
