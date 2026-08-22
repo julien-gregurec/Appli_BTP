@@ -1,6 +1,6 @@
 # ALERTES-DELEGATION-V1 — Délégation d'une alerte opérationnelle
 
-Statut : **implémenté et validé sur Preview**. Non déployé en Production — arrêt volontaire dans l'attente d'une autorisation explicite (voir §12).
+Statut : **implémenté, validé et déployé en Production** (ALERTES-DELEGATION-V1B, 22-08-2026). Voir §15 à §18 pour la clôture Preview et la mise en Production.
 
 ## 1. Architecture
 
@@ -111,9 +111,47 @@ Nettoyés : la ligne de délégation et la notification de test (suppression dir
 - Aucune nouvelle fonctionnalité au-delà de la délégation elle-même.
 - **Aucun déploiement Production.**
 
-## 14. Recommandation avant Production
+## 14. Recommandation avant Production (lot V1, historique)
 
-Le lot est prêt techniquement (QA verte, 22 scénarios serveur validés en conditions réelles sur Preview, UX vérifiée desktop/mobile/tablette). Avant toute autorisation Production :
-1. Réparer l'environnement Docker local et faire tourner `npm run test:db` pour confirmer le fichier pgTAP dans le harnais standard (actuellement validé par exécution directe équivalente sur Preview, pas par le runner officiel).
-2. Décider si le résidu de test sur Preview (§12) doit être traité avant ou après la mise en Production (il n'affecte pas Production, qui n'a pas cette entreprise).
-3. Autorisation explicite de Julien pour le déploiement Production.
+Le lot était prêt techniquement (QA verte, 22 scénarios serveur validés en conditions réelles sur Preview, UX vérifiée desktop/mobile/tablette). Le lot V1B ci-dessous a traité les trois points restants et procédé à la mise en Production.
+
+## 15. Clôture Preview (V1B, 22-08-2026)
+
+**Découverte importante** : le déclencheur `verrouiller_facture_emise` qui bloquait le nettoyage complet de la fixture Preview (§12) **n'existe que sur Preview, pas sur Production**, et n'est référencé dans aucune migration versionnée du dépôt (créé hors du flux de migrations normal, à une date indéterminée). C'est une dérive de schéma Preview/Production réelle, sans lien avec ce lot — signalée ici, non corrigée (hors périmètre : ni Stripe, ni Auth, ni un nouveau trigger n'ont été touchés).
+
+Nettoyage effectué sur Preview : la ligne de délégation, la notification, la fiche employé, le rattachement `utilisateurs_entreprises`, les postes/permissions et le compte Auth de test (`julien.gregurec+alertes-v1-test@gmail.com`) ont tous été supprimés — plus aucun compte actif ni utilisable ne subsiste. Seuls l'entreprise, le client, le chantier et la facture restent, bloqués en cascade par le déclencheur (toute tentative d'UPDATE/DELETE sur la facture, y compris indirecte via `ON DELETE SET NULL` du chantier, est refusée). Le déclencheur n'a pas été contourné. Le résidu a été relabellisé sans ambiguïté : entreprise renommée `RECETTE-ALERTES-DELEGATION-V1-IMMUTABLE`, `abonnement_statut` passé à `annule` (aucun accès possible), client et chantier renommés de façon cohérente.
+
+**Docker local** : nouvelle tentative unique (arrêt, nettoyage des conteneurs, redémarrage) — toujours en échec (`analytics`/`vector`/`storage` unhealthy). Panne d'environnement confirmée sur deux lots consécutifs (V1 et V1B), sans rapport avec le code de ce lot. Les 22 assertions pgTAP ont été rejouées directement sur Preview après nettoyage (transaction `rollback`, aucune trace laissée) : toujours vertes.
+
+QA finale Preview rejouée après nettoyage : pgTAP 22/22, Vitest 297/297, typecheck OK, lint 0 erreur (3 warnings préexistants), build OK, `verify:secrets` 839 fichiers / 0 secret.
+
+## 16. Intégration et migration Production
+
+Branche `release/alertes-delegation-v1-production` créée depuis `release/commercialisation-v1`, fast-forward des 6 commits validés (aucun cherry-pick nécessaire). Diff vérifié : exactement 8 fichiers, tous dans le périmètre du lot (migration, permissions/server action, UI, tests, documentation) — aucun fichier hors sujet.
+
+Pré-check Production (lecture seule) : table, fonctions et déclencheurs de la migration 220 absents, migration `20260821000220` absente du relevé (`remote:""`), application saine (`app.elsatia.fr` 200), logs propres.
+
+Rollback préparé et non exécuté : `docs/commercial/ALERTES_DELEGATION_V1_ROLLBACK.sql`.
+
+Migration appliquée uniquement via la méthode isolée (`supabase db query --linked -f`, jamais `db push`, pour ne rejouer aucune migration historique). Vérification post-migration : table présente, contrainte unique présente, RLS active, 1 politique, 2 fonctions présentes, `anon` sans aucun accès (ni lecture ni exécution).
+
+`release/commercialisation-v1` mis à jour en fast-forward et poussé. Déploiement `vercel deploy --prod` depuis `elsatia-production-bootstrap` : `READY`, région `fra1` (Europe), aliasé sur `app.elsatia.fr`.
+
+## 17. Recette Production réelle
+
+Entreprise de recette dédiée créée via le vrai parcours `/signup` → `/onboarding` sur `app.elsatia.fr` (`RECETTE ALERTES DELEGATION V1B PRODUCTION`, `ENT-011`, email confirmé par SQL, jamais le compte réel de Julien, jamais `elsatia` ni la démo commerciale `Atelier Bâtiment Lyonnais`). Une vraie facture en retard de paiement a produit une alerte « Facturation » réelle.
+
+Vérifié en conditions réelles sur `app.elsatia.fr` :
+- Bouton `Déléguer` entre `Ouvrir et traiter` et `Ignorer`, modal filtrée correctement, délégation réussie (`Déléguée à : Recette AlertesDelegation · par Recette AlertesDelegation · 22 août, 10:18`), bouton devenu `Réassigner`.
+- Notification réelle dans « Mes notifications ».
+- Filtres `Toutes` / `Mes alertes` / `Déléguées par moi` fonctionnels.
+- Mobile 390 px : aucun débordement, les trois boutons et le bandeau de filtres restent lisibles et utilisables (thème clair, complémentaire du thème sombre déjà vérifié sur Preview).
+- Logs Vercel Production propres pendant toute la recette : aucune erreur, aucun 4xx/5xx.
+
+**Cross-tenant (réel, sur Production)** : une entreprise B minimale et temporaire (aucune facture, donc aucun verrou d'intégrité) a permis de prouver, via appel direct de `deleguer_alerte_operationnelle` sous impersonation du rôle réel : (1) un employé d'une autre entreprise est refusé comme destinataire (« Employé invalide ») ; (2) un compte non membre d'une entreprise ne peut pas y déléguer (« Accès refusé ») ; (3) une délégation de l'entreprise B est invisible en lecture pour un compte non membre de B (RLS). Entreprise B entièrement supprimée immédiatement après (aucun résidu, contrairement à Preview — la facture bloquante n'existe pas dans ce scénario B).
+
+**Portée** : comme sur Preview, testé via auto-délégation pour la partie UI (délégateur = destinataire), la correction des permissions destinataire différent étant déjà prouvée par les 22 scénarios pgTAP et par les 3 tests cross-tenant ci-dessus, exécutés avec le code désormais identique en Production.
+
+## 18. Nettoyage Production
+
+Fixture de recette entièrement supprimée : délégation, notification, facture, chantier, client, fiche employé, rattachement entreprise, poste, permissions, compte Auth et profil utilisateur — **zéro résidu**, contrairement à Preview (la facture de test sur Production n'était pas verrouillée, ce déclencheur n'existant pas sur cet environnement). Confirmé par requête finale : 0 entreprise résiduelle, 0 compte Auth résiduel, table `alertes_operationnelles_delegations` vide et prête pour un usage réel. `elsatia` (entreprise réelle) revérifiée intacte tout du long, jamais touchée.
