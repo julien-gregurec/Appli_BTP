@@ -10,19 +10,17 @@ import { consommationIAMensuelle } from "@/lib/ai/journal";
 import { iaEstActive } from "@/lib/preview-features";
 import { BRAND_NAME, PRODUCT_NAME } from "@/lib/brand";
 import { BRAND_SERVER } from "@/lib/brand-server";
+import { calculerGainsOffreSuivante, calculerReductionRemise, CATEGORIES_COMPARATIF, etatLigneComparatif, LIBELLE_ETAT_COMMERCIAL, type EtatCommercial } from "@/lib/comparatif-offres";
+import { estCodeOffreTarifaire } from "@/lib/tarification";
 
 const input = "rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
-// Mêmes libellés que la navigation du tableau de bord (src/app/(app)/dashboard/page.tsx),
-// limités aux permissions utiles pour expliquer un passage à l'offre supérieure — pas une
-// nouvelle source de vérité, juste une traduction des clés de permission déjà réelles.
-const LIBELLES_GAIN_OFFRE: Partial<Record<string, string>> = {
-  acces_employes: "Employés", acces_facturation_avancee: "Situations de travaux", acces_ouvrages: "Ouvrages",
-  acces_interventions: "Interventions", acces_sous_traitants: "Sous-traitants", acces_crm: "CRM",
-  acces_achats: "Achats fournisseurs", acces_stock: "Gestion du stock", acces_flotte: "Flotte de véhicules",
-  acces_outillage: "Outillage", acces_rentabilite: "Rentabilité par chantier", acces_exports: "Exports comptables",
-  acces_paiements_bancaires: "Paiements bancaires", acces_connecteurs: "Connecteurs", gerer_paie: "Gestion de la paie",
-  utiliser_borne_stock: "Borne stock", consulter_sa_paie: "Consultation de sa paie",
+const COULEUR_ETAT: Record<EtatCommercial, string> = {
+  inclus: "bg-green-50 text-green-800 dark:bg-green-950/30 dark:text-green-300",
+  limite: "bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300",
+  non_inclus: "bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400",
+  beta: "bg-blue-50 text-blue-800 dark:bg-blue-950/30 dark:text-blue-300",
+  desactive: "bg-neutral-100 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500",
 };
 
 const FAQ_ABONNEMENT: Array<{ question: string; reponse: string }> = [
@@ -32,6 +30,9 @@ const FAQ_ABONNEMENT: Array<{ question: string; reponse: string }> = [
   { question: "Où trouver mes factures d'abonnement ?", reponse: "Dans la section « Factures et historique » ci-dessous, ou via « Gérer mon abonnement » (portail Stripe) une fois souscrit." },
   { question: "Puis-je annuler mon abonnement ?", reponse: "Oui, depuis le portail Stripe (« Gérer mon abonnement ») : la résiliation prend effet à la fin de la période en cours, pas immédiatement." },
   { question: "Mes données sont-elles supprimées si j'annule ?", reponse: "Non, pas automatiquement. La suppression suit la procédure RGPD dédiée (menu Paramètres → Données), avec un délai de 30 jours avant purge définitive." },
+  { question: "Puis-je descendre vers une offre inférieure (downgrade) ?", reponse: "Pas encore en libre-service. Contactez-nous pour modifier votre offre : nous vérifions d'abord que votre usage actuel (comptes, modules utilisés) reste compatible avec l'offre visée." },
+  { question: "Une remise commerciale a-t-elle un impact sur ma facture Stripe ?", reponse: "Oui : la remise est appliquée directement sur votre abonnement Stripe et se répartit au prorata sur l'ensemble de la facture (abonnement de base et comptes supplémentaires inclus). Le montant que vous voyez ici correspond exactement à celui facturé." },
+  { question: "L'assistant IA est-il disponible dès maintenant ?", reponse: "Pas encore en Production : la fonctionnalité est prête techniquement mais son activation commerciale n'a pas encore eu lieu. Le quota indicatif par offre est affiché ci-dessus." },
 ];
 
 export default async function AbonnementPage({ searchParams }: { searchParams: Promise<{ error?: string; succes?: string }> }) {
@@ -77,16 +78,16 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
   const coutMensuelEstime = annuel ? coutPeriodeEstime / 12 : coutPeriodeEstime;
   const nouvelleGrille = ["mini", "pro", "business", "entreprise", "sur_mesure"].includes(String(entreprise?.abonnement_offre ?? ""));
   const offreSuivante = nouvelleGrille ? OFFRES.find((o) => o.palier === offre.palier + 1) ?? null : null;
-  const gainsOffreSuivante = offreSuivante
-    ? offreSuivante.fonctionnalites.filter((f) => !offre.fonctionnalites.includes(f)).map((f) => LIBELLES_GAIN_OFFRE[f]).filter((v): v is string => Boolean(v))
+  // Calculé depuis le mapping unique (comparatif-offres.ts), pas une liste à part.
+  const gainsOffreSuivante = offreSuivante && estCodeOffreTarifaire(offre.cle) && estCodeOffreTarifaire(offreSuivante.cle)
+    ? calculerGainsOffreSuivante(offre.cle, offreSuivante.cle)
     : [];
   const remiseActive = Boolean(entreprise?.remise_description);
   const remiseReductionMensuelle = remiseActive
-    ? entreprise?.remise_type === "montant"
-      ? Number(entreprise?.remise_valeur ?? 0)
-      : (abonnementAvantRemiseMensuel * Number(entreprise?.remise_valeur ?? 0)) / 100
+    ? calculerReductionRemise({ type: entreprise?.remise_type as "montant" | "pourcentage" | null, valeur: entreprise?.remise_valeur, sousTotal: abonnementAvantRemiseMensuel })
     : 0;
   const abonnementApresRemiseMensuel = Math.max(0, abonnementAvantRemiseMensuel - remiseReductionMensuelle);
+  const paiementEnEchec = entreprise?.abonnement_statut === "suspendu" && souscrit;
   const euros = (montant: number) => montant.toLocaleString("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
   const contactCommercial = BRAND_SERVER.supportEmail
     ? `mailto:${BRAND_SERVER.supportEmail}?subject=${encodeURIComponent(`Offre ${PRODUCT_NAME}`)}`
@@ -96,6 +97,11 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
     <header><h1 className="text-xl font-semibold">Mon abonnement {PRODUCT_NAME}</h1><p className="text-sm text-neutral-500">Offre, moyen de paiement, échéances et factures de votre entreprise.</p></header>
     {error&&<p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
     {succes&&<p className="rounded-md bg-green-50 p-3 text-sm text-green-700">Votre abonnement a été mis à jour.</p>}
+    {paiementEnEchec&&<div className="rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200">
+      <p className="font-semibold">Le dernier prélèvement de votre abonnement a échoué.</p>
+      <p className="mt-1">L’accès peut être limité tant que le moyen de paiement n’est pas mis à jour.</p>
+      <form action={ouvrirPortailAbonnementAction} className="mt-3"><button className="rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800">Mettre à jour mon moyen de paiement</button></form>
+    </div>}
     <section className="grid gap-3 rounded-xl border p-5 sm:grid-cols-3">
       <div><p className="text-xs uppercase text-neutral-500">Statut</p><p className="mt-1 font-semibold" style={{color:statut.couleur}}>{statut.libelle}</p></div>
       <div><p className="text-xs uppercase text-neutral-500">Offre</p><p className="mt-1 font-semibold">{entreprise?.abonnement_offre ? entreprise.abonnement_offre[0].toUpperCase()+entreprise.abonnement_offre.slice(1) : "À choisir"}{entreprise?.abonnement_periodicite ? ` · ${entreprise.abonnement_periodicite}` : ""}</p></div>
@@ -145,6 +151,17 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
       <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs text-neutral-500"><span>{Number(stockage?.fichiers ?? 0).toLocaleString("fr-FR")} fichier(s)</span><span>Au-delà : {TARIF_STOCKAGE_SUPPLEMENTAIRE_HT_PAR_GO.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} € HT / Go / mois</span></div>
       {stockageAlerte&&<p className={`mt-3 rounded-md p-3 text-sm ${stockageDepasse ? "bg-red-50 text-red-800" : "bg-amber-50 text-amber-900"}`}>{stockageDepasse ? `Le quota est dépassé de ${(stockageGo-offre.stockageGoInclus).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} Go. Le dépassement apparaîtra séparément sur la prochaine facture.` : "Vous avez utilisé au moins 80 % du stockage inclus dans votre offre."}</p>}
     </section>
+
+    {!iaEstActive() && <section className="rounded-xl border border-[#c9a24a]/40 bg-[#c9a24a]/5 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-semibold">Assistant IA</h2>
+          <p className="mt-1 text-sm text-neutral-500">Assistant conversationnel, génération de devis, analyse de documents/photos, dictée vocale, proposition de créneaux planning.</p>
+        </div>
+        <span className="rounded-full bg-[#c9a24a]/10 px-3 py-1 text-xs font-semibold text-[#8a6a1f] dark:text-[#c9a24a]">IA — activation au lancement</span>
+      </div>
+      <p className="mt-3 text-xs text-neutral-500">Non disponible pour le moment. Quota indicatif prévu pour l’offre {offre.nom} une fois activée : {offre.operationsIAIncluses.toLocaleString("fr-FR")} opérations IA / mois.</p>
+    </section>}
 
     {iaEstActive() && <>
     <section className="rounded-xl border p-5">
@@ -207,6 +224,30 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
     </section>}
 
     <section className="rounded-xl border p-5">
+      <h2 className="font-semibold">Comparatif détaillé des offres</h2>
+      <p className="mt-1 text-sm text-neutral-500">Différences réelles entre Mini, Pro, Business et Entreprise, par catégorie. « BETA » signifie une fonction disponible mais pas encore considérée comme stable commercialement ; « Bientôt disponible » signifie une fonction non encore activée dans le produit, quelle que soit l’offre.</p>
+      <div className="mt-4 grid grid-cols-4 gap-2 text-center text-xs font-semibold text-neutral-500">
+        <span></span>{OFFRES.filter((o)=>!o.devisObligatoire).map((o)=><span key={o.cle}>{o.nom}</span>)}
+      </div>
+      <div className="mt-2 space-y-2">
+        {CATEGORIES_COMPARATIF.map((categorie)=><details key={categorie.cle} className="rounded-lg border border-neutral-200 dark:border-neutral-800">
+          <summary className="cursor-pointer px-3 py-2 text-sm font-semibold">{categorie.titre}</summary>
+          <div className="space-y-1.5 border-t border-neutral-200 p-3 dark:border-neutral-800">
+            {categorie.lignes.map((ligne)=><div key={ligne.cle} className="grid grid-cols-[1fr_repeat(4,4.5rem)] items-center gap-2 text-xs sm:grid-cols-[1fr_repeat(4,5.5rem)] sm:text-sm">
+              <span className="text-neutral-700 dark:text-neutral-300">{ligne.label}</span>
+              {OFFRES.filter((o)=>!o.devisObligatoire).map((o)=>{
+                if (!estCodeOffreTarifaire(o.cle)) return null;
+                const etat = etatLigneComparatif(ligne, o.cle);
+                return <span key={o.cle} className={`rounded-full px-2 py-1 text-center text-[11px] font-medium ${COULEUR_ETAT[etat]}`}>{LIBELLE_ETAT_COMMERCIAL[etat]}</span>;
+              })}
+            </div>)}
+          </div>
+        </details>)}
+      </div>
+      <p className="mt-3 text-xs text-neutral-500">L’offre Sur mesure reprend l’intégralité du palier Entreprise, complétée après cadrage — <Link href={contactCommercial} className="underline">contactez-nous</Link>.</p>
+    </section>
+
+    <section className="rounded-xl border p-5">
       <h2 className="font-semibold">Questions fréquentes</h2>
       <dl className="mt-3 divide-y divide-neutral-200 dark:divide-neutral-800">
         {FAQ_ABONNEMENT.map((item) => <details key={item.question} className="py-3 first:pt-0 last:pb-0">
@@ -216,6 +257,6 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
       </dl>
     </section>
 
-    <section className="rounded-xl border p-5"><h2 className="font-semibold">Factures et historique</h2><p className="mt-1 text-sm text-neutral-500">Documents Stripe et changements contractuels enregistrés pour votre entreprise.</p><div className="mt-4 overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead><tr className="border-b text-xs uppercase text-neutral-500"><th className="py-2 pr-3">Date</th><th className="py-2 pr-3">Référence</th><th className="py-2 pr-3">Montant TTC</th><th className="py-2 pr-3">Statut</th><th className="py-2">Document</th></tr></thead><tbody>{(facturesAbonnement??[]).map(facture=><tr key={facture.id} className="border-b"><td className="py-3 pr-3">{new Date(facture.created_at).toLocaleDateString("fr-FR")}</td><td className="py-3 pr-3">{facture.numero??"—"}</td><td className="py-3 pr-3">{Number(facture.montant_ttc).toLocaleString("fr-FR",{style:"currency",currency:String(facture.devise??"EUR")})}</td><td className="py-3 pr-3">{facture.statut}</td><td className="py-3">{facture.url_pdf?<Link href={facture.url_pdf} target="_blank" rel="noreferrer" className="underline">PDF</Link>:facture.url_facture?<Link href={facture.url_facture} target="_blank" rel="noreferrer" className="underline">Voir</Link>:"—"}</td></tr>)}</tbody></table>{!facturesAbonnement?.length?<p className="py-4 text-sm text-neutral-500">Aucune facture d’abonnement enregistrée.</p>:null}</div>{historique?.length?<details className="mt-4"><summary className="cursor-pointer text-sm font-semibold">Afficher les changements de tarif ({historique.length})</summary><ul className="mt-2 space-y-2 text-sm">{historique.map(event=><li key={event.id} className="rounded bg-neutral-50 p-2 dark:bg-neutral-900">{new Date(event.created_at).toLocaleString("fr-FR")} · {event.action}{event.motif?` — ${event.motif}`:""}</li>)}</ul></details>:null}</section>
+    <section className="rounded-xl border p-5"><h2 className="font-semibold">Factures de votre abonnement {BRAND_NAME}</h2><p className="mt-1 text-sm text-neutral-500">Uniquement les factures d’abonnement (Stripe) et les changements contractuels de votre entreprise — jamais vos factures clients.</p><div className="mt-4 overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead><tr className="border-b text-xs uppercase text-neutral-500"><th className="py-2 pr-3">Date</th><th className="py-2 pr-3">Référence</th><th className="py-2 pr-3">Montant TTC</th><th className="py-2 pr-3">Statut</th><th className="py-2">Document</th></tr></thead><tbody>{(facturesAbonnement??[]).map(facture=><tr key={facture.id} className="border-b"><td className="py-3 pr-3">{new Date(facture.created_at).toLocaleDateString("fr-FR")}</td><td className="py-3 pr-3">{facture.numero??"—"}</td><td className="py-3 pr-3">{Number(facture.montant_ttc).toLocaleString("fr-FR",{style:"currency",currency:String(facture.devise??"EUR")})}</td><td className="py-3 pr-3">{facture.statut}</td><td className="py-3">{facture.url_pdf?<Link href={facture.url_pdf} target="_blank" rel="noreferrer" className="underline">PDF</Link>:facture.url_facture?<Link href={facture.url_facture} target="_blank" rel="noreferrer" className="underline">Voir</Link>:"—"}</td></tr>)}</tbody></table>{!facturesAbonnement?.length?<p className="py-4 text-sm text-neutral-500">Aucune facture d’abonnement enregistrée.</p>:null}</div>{historique?.length?<details className="mt-4"><summary className="cursor-pointer text-sm font-semibold">Afficher les changements de tarif ({historique.length})</summary><ul className="mt-2 space-y-2 text-sm">{historique.map(event=><li key={event.id} className="rounded bg-neutral-50 p-2 dark:bg-neutral-900">{new Date(event.created_at).toLocaleString("fr-FR")} · {event.action}{event.motif?` — ${event.motif}`:""}</li>)}</ul></details>:null}</section>
   </div></main>;
 }
