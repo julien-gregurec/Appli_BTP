@@ -467,7 +467,7 @@ export function AssistantIA() {
                   }
                 }}
                 placeholder="Écris ou parle…"
-                className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+                className="min-w-0 flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
               />
               <button
                 type="button"
