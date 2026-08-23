@@ -46,6 +46,11 @@ export type EntrepriseAbonnement = {
   remise_stripe_coupon_id?: string | null;
   remise_description?: string | null;
   remise_appliquee_at?: string | null;
+  remise_motif_interne?: string | null;
+  remise_duree_mois?: number | null;
+  remise_cree_par?: string | null;
+  remise_type?: string | null;
+  remise_valeur?: number | null;
   option_ia_statut?: string | null;
   option_ia_essai_fin?: string | null;
   option_ia_palier?: string | null;

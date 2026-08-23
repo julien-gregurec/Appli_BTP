@@ -5,6 +5,8 @@ import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { estPlateformeAdmin, statutAbonnement, prixAbonnementMensuel, offreParCle, REDUCTION_ANNUELLE, type EntrepriseAbonnement } from "@/lib/plateforme";
 import { ajouterAdminPlateformeAction, appliquerRemiseAction, creerEntreprisePlateformeAction, entrerEntreprisePlateformeAction, enregistrerReglementPlateformeAction, genererSnapshotFacturationAction, modifierAbonnementAction, modifierTarifPostePlateformeAction, reinitialiserMotDePassePlateformeAction, retirerAdminPlateformeAction, retirerRemiseAction, signalerImpayePlateformeAction } from "@/app/actions/plateforme";
 import { AbonnementCountdown } from "@/components/AbonnementCountdown";
+import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
+import { RemiseConfirmButton } from "@/components/RemiseConfirmButton";
 import { BRAND_NAME } from "@/lib/brand";
 
 type MembrePlateforme = { email: string; role: string; nom: string | null; ajoute_par: string | null; created_at: string };
@@ -23,7 +25,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
   if (isEmailLoginDisabled()) {
     const { data: ents } = await supabase
       .from("entreprises")
-      .select("id, nom, code_adhesion, reference_interne, abonnement_statut, abonnement_echeance, abonnement_note, impaye_signale_at, suspension_prevue_at, impaye_message, dernier_reglement_at, remise_stripe_coupon_id, remise_description, remise_appliquee_at, option_ia_statut, option_ia_essai_fin, option_ia_palier, created_at")
+      .select("id, nom, code_adhesion, reference_interne, abonnement_statut, abonnement_echeance, abonnement_note, impaye_signale_at, suspension_prevue_at, impaye_message, dernier_reglement_at, remise_stripe_coupon_id, remise_description, remise_appliquee_at, remise_motif_interne, remise_duree_mois, remise_cree_par, remise_type, remise_valeur, option_ia_statut, option_ia_essai_fin, option_ia_palier, created_at")
       .order("created_at", { ascending: false });
     const { data: membres } = await supabase.from("utilisateurs_entreprises").select("entreprise_id, statut");
     const { data: employes } = await supabase.from("employes").select("entreprise_id, poste_id, statut, compte_application_statut, utilisateur_id, invitation_envoyee_at, application_installee_at, derniere_connexion_at");
@@ -197,14 +199,21 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                       <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-[#c9a24a]/40 bg-[#c9a24a]/10 p-2 text-xs">
                         <span className="font-medium text-[#8a6a1f] dark:text-[#c9a24a]">Remise active · {e.remise_description}</span>
                         {e.remise_appliquee_at && <span className="text-neutral-500">depuis le {new Date(e.remise_appliquee_at).toLocaleDateString("fr-FR")}</span>}
+                        {e.remise_duree_mois && <span className="text-neutral-500">· {e.remise_duree_mois} mois</span>}
+                        {e.remise_motif_interne && <span className="text-neutral-500" title={e.remise_motif_interne}>· motif interne enregistré</span>}
                         <form action={retirerRemiseAction.bind(null, e.id)}>
-                          <button className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50">Retirer la remise</button>
+                          <ConfirmSubmitButton
+                            className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                            message={`Retirer la remise "${e.remise_description}" de ${e.nom} ? L'entreprise repassera immédiatement au tarif catalogue de ${prix.total.toLocaleString("fr-FR")} € HT/mois.`}
+                          >
+                            Retirer la remise
+                          </ConfirmSubmitButton>
                         </form>
                       </div>
                     ):(
                       <details className="mt-2 rounded-md border border-neutral-200 p-2 text-xs dark:border-neutral-800">
                         <summary className="cursor-pointer font-medium text-neutral-600 dark:text-neutral-300">Faire une remise commerciale (geste client)</summary>
-                        <form action={appliquerRemiseAction.bind(null, e.id)} className="mt-2 grid items-end gap-2 sm:grid-cols-[110px_100px_130px_100px_auto]">
+                        <form action={appliquerRemiseAction.bind(null, e.id)} className="mt-2 grid items-end gap-2 sm:grid-cols-[110px_100px_130px_100px_1fr]">
                           <label className="space-y-1">
                             <span className="block text-neutral-500">Type</span>
                             <select name="type" defaultValue="pourcentage" className={input}>
@@ -228,8 +237,18 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                             <span className="block text-neutral-500">Nb mois</span>
                             <input name="duree_mois" type="number" min="1" placeholder="—" className={input} />
                           </label>
-                          <button className="rounded border px-3 py-2 font-semibold">Appliquer</button>
-                          <p className="col-span-full text-[11px] text-neutral-500">S&apos;applique sur l&apos;abonnement de base (Stripe Coupon). &quot;Nb mois&quot; requis uniquement pour &quot;Pendant N mois&quot;.</p>
+                          <label className="space-y-1 sm:col-span-2">
+                            <span className="block text-neutral-500">Motif interne (jamais montré au client)</span>
+                            <input name="motif_interne" type="text" required placeholder="Ex. client pilote, geste commercial, contrat négocié…" className={`${input} w-full`} />
+                          </label>
+                          <div className="sm:col-span-full">
+                            <RemiseConfirmButton
+                              entrepriseNom={e.nom}
+                              prixCatalogueMensuel={prix.total}
+                              className="rounded border px-3 py-2 font-semibold"
+                            />
+                          </div>
+                          <p className="col-span-full text-[11px] text-neutral-500">S&apos;applique au prorata sur le total de la facture Stripe (abonnement de base et comptes supplémentaires inclus), pas seulement sur le prix catalogue de l&apos;offre. &quot;Nb mois&quot; requis uniquement pour &quot;Pendant N mois&quot;.</p>
                         </form>
                       </details>
                     ))}

@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { estPlateformeAdmin } from "@/lib/plateforme";
 import { ERREUR_CONFIGURATION_URL_AUTH, urlCallbackReinitialisation } from "@/lib/auth-redirects";
@@ -201,23 +202,33 @@ function descriptionRemise(type: TypeRemise, valeur: number, duree: DureeRemise,
   return `${montant} ${periode}`;
 }
 
-// Geste commercial : coupon Stripe créé et appliqué sur l'abonnement de base de l'entreprise.
-// Un seul à la fois (Stripe remplace automatiquement la remise précédente d'une même
-// subscription). L'entreprise doit déjà avoir un abonnement Stripe Billing actif.
+// Geste commercial : coupon Stripe créé et appliqué sur l'abonnement de l'entreprise (base
+// + comptes supplémentaires, au prorata — vérifié empiriquement, REMISES-CLIENTS-V1, voir
+// docs/commercial/REMISES_CLIENTS_V1.md). Un seul à la fois (Stripe remplace automatiquement
+// la remise précédente d'une même subscription). L'entreprise doit déjà avoir un abonnement
+// Stripe Billing actif. Le motif interne n'est jamais transmis au client (cf. migration
+// 20260823000223_remises_clients_v1.sql).
 export async function appliquerRemiseAction(entrepriseId: string, formData: FormData) {
   if (!(await estPlateformeAdmin())) redirect("/dashboard");
   const type = String(formData.get("type") ?? "");
   const valeur = Number(formData.get("valeur"));
   const duree = String(formData.get("duree") ?? "");
   const dureeMoisBrut = Math.round(Number(formData.get("duree_mois")));
+  const motifInterne = String(formData.get("motif_interne") ?? "").trim();
   if (!(TYPES_REMISE as readonly string[]).includes(type) || !(DUREES_REMISE as readonly string[]).includes(duree) || !valeur || valeur <= 0) {
     redirect(`/plateforme?error=${encodeURIComponent("Remise invalide")}`);
   }
   if (type === "pourcentage" && valeur > 100) redirect(`/plateforme?error=${encodeURIComponent("Un pourcentage ne peut pas dépasser 100")}`);
+  if (!motifInterne) redirect(`/plateforme?error=${encodeURIComponent("Le motif interne est obligatoire")}`);
   const dureeMois = duree === "repeating" ? dureeMoisBrut : undefined;
 
   const supabase = await createClient();
-  const { data: entreprise } = await supabase.from("entreprises").select("nom, stripe_subscription_id").eq("id", entrepriseId).maybeSingle();
+  // Lecture via le client admin : un administrateur plateforme n'est pas forcément membre de
+  // l'entreprise cliente, et la RLS "membres voient leur entreprise" (est_membre_actif) bloque
+  // sinon cette lecture pour toute entreprise autre que la sienne (bug réel découvert en
+  // testant REMISES-CLIENTS-V1 avec un compte admin distinct du propriétaire de la fiche
+  // cliente — le contrôle d'autorisation est déjà fait juste au-dessus via estPlateformeAdmin()).
+  const { data: entreprise } = await createAdminClient().from("entreprises").select("nom, stripe_subscription_id").eq("id", entrepriseId).maybeSingle();
   if (!entreprise?.stripe_subscription_id) redirect(`/plateforme?error=${encodeURIComponent("Cette entreprise n’a pas d’abonnement Stripe actif")}`);
 
   const description = descriptionRemise(type as TypeRemise, valeur, duree as DureeRemise, dureeMois);
@@ -225,9 +236,9 @@ export async function appliquerRemiseAction(entrepriseId: string, formData: Form
     const coupon = await creerCouponRemise({ type: type as TypeRemise, valeur, duree: duree as DureeRemise, dureeMois, nom: `${entreprise.nom} — ${description}` });
     await appliquerCouponAbonnement(entreprise.stripe_subscription_id, coupon.id);
     if (isEmailLoginDisabled()) {
-      await supabase.from("entreprises").update({ remise_stripe_coupon_id: coupon.id, remise_description: description, remise_appliquee_at: new Date().toISOString() }).eq("id", entrepriseId);
+      await supabase.from("entreprises").update({ remise_stripe_coupon_id: coupon.id, remise_description: description, remise_motif_interne: motifInterne, remise_duree_mois: dureeMois ?? null, remise_type: type, remise_valeur: valeur, remise_appliquee_at: new Date().toISOString() }).eq("id", entrepriseId);
     } else {
-      const { error } = await supabase.rpc("plateforme_appliquer_remise", { p_entreprise_id: entrepriseId, p_coupon_id: coupon.id, p_description: description });
+      const { error } = await supabase.rpc("plateforme_appliquer_remise", { p_entreprise_id: entrepriseId, p_coupon_id: coupon.id, p_description: description, p_motif_interne: motifInterne, p_duree_mois: dureeMois ?? null, p_type: type, p_valeur: valeur });
       if (error) throw new Error(error.message);
     }
   } catch (err) {
@@ -241,7 +252,7 @@ export async function appliquerRemiseAction(entrepriseId: string, formData: Form
 export async function retirerRemiseAction(entrepriseId: string) {
   if (!(await estPlateformeAdmin())) redirect("/dashboard");
   const supabase = await createClient();
-  const { data: entreprise } = await supabase.from("entreprises").select("stripe_subscription_id").eq("id", entrepriseId).maybeSingle();
+  const { data: entreprise } = await createAdminClient().from("entreprises").select("stripe_subscription_id").eq("id", entrepriseId).maybeSingle();
   if (entreprise?.stripe_subscription_id) {
     try {
       await retirerCouponAbonnement(entreprise.stripe_subscription_id);
@@ -250,7 +261,7 @@ export async function retirerRemiseAction(entrepriseId: string) {
     }
   }
   if (isEmailLoginDisabled()) {
-    await supabase.from("entreprises").update({ remise_stripe_coupon_id: null, remise_description: null, remise_appliquee_at: null }).eq("id", entrepriseId);
+    await supabase.from("entreprises").update({ remise_stripe_coupon_id: null, remise_description: null, remise_motif_interne: null, remise_duree_mois: null, remise_type: null, remise_valeur: null, remise_appliquee_at: null }).eq("id", entrepriseId);
   } else {
     const { error } = await supabase.rpc("plateforme_retirer_remise", { p_entreprise_id: entrepriseId });
     if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ajouterDepassementAppareilsFacture, ajouterDepassementStockageFacture, calculerDepassementAppareils, reconcilierAbonnementStripe, recupererAbonnementStripe, statutAbonnementDepuisStripe, type StripeSubscription } from "@/lib/stripe-abonnement";
+import { ajouterDepassementAppareilsFacture, ajouterDepassementStockageFacture, calculerDepassementAppareils, reconcilierAbonnementStripe, recupererAbonnementStripe, statutAbonnementDepuisStripe, synchroniserExpirationRemise, type StripeSubscription } from "@/lib/stripe-abonnement";
 import { verifierSignatureStripe } from "@/lib/stripe";
 
 type StripeReference = string | { id?: string } | null | undefined;
@@ -24,6 +24,7 @@ type StripeObjet = {
   cancel_at?: number | null;
   cancel_at_period_end?: boolean;
   metadata?: Record<string, string>;
+  discounts?: Array<string | { id?: string }> | null;
   number?: string | null;
   currency?: string;
   subtotal_excluding_tax?: number | null;
@@ -63,6 +64,7 @@ async function entreprisePour(objet: StripeObjet) {
 
 async function synchroniserAbonnement(entrepriseId: string, abonnement: StripeSubscription) {
   const admin = createAdminClient();
+  await synchroniserExpirationRemise(entrepriseId, abonnement);
   const offre = abonnement.metadata?.offre;
   const periodicite = abonnement.metadata?.periodicite;
   const statut = statutAbonnementDepuisStripe(abonnement.status);

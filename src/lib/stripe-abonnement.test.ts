@@ -4,12 +4,16 @@ const createAdminClient = vi.fn();
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient }));
 
 const {
+  appliquerCouponAbonnement,
   calculerFacturationStockage,
+  creerCouponRemise,
   prixOptionIAStripePour,
   prixStripePour,
   reconcilierAbonnementStripe,
+  retirerCouponAbonnement,
   statutAbonnementDepuisStripe,
   stripeBillingEstConfigure,
+  synchroniserExpirationRemise,
   variablesStripeBillingManquantes,
 } = await import("./stripe-abonnement");
 
@@ -259,5 +263,129 @@ describe("réconciliation des comptes supplémentaires (COMPTES-SUPPLEMENTAIRES-
     expect(resultat).toEqual({ synchronise: true, quantite: 0 });
     const suppression = appels.find((a) => a.url.endsWith("/subscription_items/si_existant") && a.methode === "DELETE");
     expect(suppression).toBeDefined();
+  });
+});
+
+describe("expiration naturelle d'une remise Stripe (REMISES-CLIENTS-V1)", () => {
+  function supabaseFakePourExpiration(params: { entreprise: Record<string, unknown> | null }) {
+    const appels: Array<{ table: string; methode: string; donnees?: Record<string, unknown> }> = [];
+    return {
+      appels,
+      from(table: string) {
+        const requete: Record<string, unknown> = {};
+        requete.select = () => requete;
+        requete.eq = () => requete;
+        requete.maybeSingle = async () => ({ data: params.entreprise, error: null });
+        requete.update = (donnees: Record<string, unknown>) => {
+          appels.push({ table, methode: "update", donnees });
+          return requete;
+        };
+        requete.insert = (donnees: Record<string, unknown>) => {
+          appels.push({ table, methode: "insert", donnees });
+          return Promise.resolve({ data: null, error: null });
+        };
+        return requete;
+      },
+    };
+  }
+
+  it("ne fait rien si le champ discounts est absent (payload sans cette info)", async () => {
+    const fake = supabaseFakePourExpiration({ entreprise: { remise_stripe_coupon_id: "c1", remise_description: "10 %" } });
+    createAdminClient.mockReturnValue(fake);
+    await synchroniserExpirationRemise("entreprise-1", { id: "sub", customer: "cus", status: "active" });
+    expect(fake.appels).toHaveLength(0);
+  });
+
+  it("ne fait rien si un discount Stripe est toujours actif", async () => {
+    const fake = supabaseFakePourExpiration({ entreprise: { remise_stripe_coupon_id: "c1", remise_description: "10 %" } });
+    createAdminClient.mockReturnValue(fake);
+    await synchroniserExpirationRemise("entreprise-1", { id: "sub", customer: "cus", status: "active", discounts: ["di_actif"] });
+    expect(fake.appels).toHaveLength(0);
+  });
+
+  it("ne fait rien si la fiche entreprise n'a déjà aucune remise enregistrée", async () => {
+    const fake = supabaseFakePourExpiration({ entreprise: { remise_stripe_coupon_id: null, remise_description: null } });
+    createAdminClient.mockReturnValue(fake);
+    await synchroniserExpirationRemise("entreprise-1", { id: "sub", customer: "cus", status: "active", discounts: [] });
+    expect(fake.appels).toHaveLength(0);
+  });
+
+  it("efface la remise et journalise 'remise_expiree' quand Stripe n'a plus de discount actif", async () => {
+    const fake = supabaseFakePourExpiration({ entreprise: { remise_stripe_coupon_id: "c1", remise_description: "10 % une fois" } });
+    createAdminClient.mockReturnValue(fake);
+    await synchroniserExpirationRemise("entreprise-1", { id: "sub", customer: "cus", status: "active", discounts: [] });
+
+    const maj = fake.appels.find((a) => a.table === "entreprises" && a.methode === "update");
+    expect(maj?.donnees).toMatchObject({ remise_stripe_coupon_id: null, remise_description: null, remise_motif_interne: null });
+
+    const journal = fake.appels.find((a) => a.table === "historique_tarification" && a.methode === "insert");
+    expect(journal?.donnees).toMatchObject({
+      entreprise_id: "entreprise-1",
+      utilisateur_id: null,
+      action: "remise_expiree",
+      motif: null,
+      ancien: { remise_stripe_coupon_id: "c1", remise_description: "10 % une fois" },
+    });
+  });
+});
+
+describe("remises commerciales (REMISES-CLIENTS-V1)", () => {
+  it("crée un coupon pourcentage avec la bonne durée", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_fake");
+    const { fauxFetch, appels } = fetchFakeStripe({});
+    vi.stubGlobal("fetch", fauxFetch);
+
+    await creerCouponRemise({ type: "pourcentage", valeur: 15, duree: "once", nom: "Test — 15 %" });
+
+    const appel = appels[0];
+    expect(appel.url).toContain("/coupons");
+    expect(appel.corps).toContain("percent_off=15");
+    expect(appel.corps).toContain("duration=once");
+    expect(appel.corps).not.toContain("amount_off");
+  });
+
+  it("crée un coupon montant fixe en centimes, devise EUR", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_fake");
+    const { fauxFetch, appels } = fetchFakeStripe({});
+    vi.stubGlobal("fetch", fauxFetch);
+
+    await creerCouponRemise({ type: "montant", valeur: 20, duree: "forever", nom: "Test — 20 € à vie" });
+
+    const appel = appels[0];
+    expect(appel.corps).toContain("amount_off=2000");
+    expect(appel.corps).toContain("currency=eur");
+    expect(appel.corps).toContain("duration=forever");
+  });
+
+  it("exige un nombre de mois pour une remise 'repeating'", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_fake");
+    await expect(
+      creerCouponRemise({ type: "pourcentage", valeur: 10, duree: "repeating", nom: "Test" }),
+    ).rejects.toThrow(/mois/);
+  });
+
+  it("applique le coupon via discounts[0][coupon] (billing_mode flexible, cf. audit REMISES-CLIENTS-V1) et non via le paramètre coupon= classique", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_fake");
+    const { fauxFetch, appels } = fetchFakeStripe({});
+    vi.stubGlobal("fetch", fauxFetch);
+
+    await appliquerCouponAbonnement("sub_test", "coupon_abc");
+
+    const appel = appels[0];
+    expect(appel.url).toContain("/subscriptions/sub_test");
+    expect(appel.corps).toContain("discounts%5B0%5D%5Bcoupon%5D=coupon_abc");
+    expect(appel.corps).not.toMatch(/^coupon=|&coupon=/);
+  });
+
+  it("retire la remise via l'endpoint discount de l'abonnement", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_fake");
+    const { fauxFetch, appels } = fetchFakeStripe({});
+    vi.stubGlobal("fetch", fauxFetch);
+
+    await retirerCouponAbonnement("sub_test");
+
+    const appel = appels[0];
+    expect(appel.url).toContain("/subscriptions/sub_test/discount");
+    expect(appel.methode).toBe("DELETE");
   });
 });
