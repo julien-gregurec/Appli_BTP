@@ -38,7 +38,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
   const [{ error, succes }, ctx] = await Promise.all([searchParams, getContexteEntreprise()]);
   const supabase = await createClient();
   const [{ data: entreprise }, { data: utilisationStockage }, { data: employesFacturables }, { data: postes }, { data: appareils }, consommationIA, { data: facturesAbonnement }, { data: historique }] = await Promise.all([
-    supabase.from("entreprises").select("abonnement_statut,abonnement_echeance,abonnement_offre,abonnement_periodicite,abonnement_essai_fin,abonnement_annulation_prevue_at,stripe_customer_id,stripe_subscription_id,derniere_facture_url,derniere_facture_pdf,derniere_facture_statut,derniere_facture_at,option_ia_statut,option_ia_essai_fin,option_ia_palier,ia_active,ia_politique_quota,ia_plafond_cout_mensuel_ht").eq("id",ctx.entrepriseId).single(),
+    supabase.from("entreprises").select("abonnement_statut,abonnement_echeance,abonnement_offre,abonnement_periodicite,abonnement_essai_fin,abonnement_annulation_prevue_at,stripe_customer_id,stripe_subscription_id,derniere_facture_url,derniere_facture_pdf,derniere_facture_statut,derniere_facture_at,option_ia_statut,option_ia_essai_fin,option_ia_palier,ia_active,ia_politique_quota,ia_plafond_cout_mensuel_ht,remise_description,remise_appliquee_at,remise_duree_mois,remise_type,remise_valeur").eq("id",ctx.entrepriseId).single(),
     supabase.rpc("utilisation_stockage_entreprise", { p_entreprise_id: ctx.entrepriseId }),
     supabase.from("employes").select("utilisateur_id,prenom,nom,poste_id,compte_application_statut").eq("entreprise_id", ctx.entrepriseId).in("compte_application_statut", ["actif", "pause"]),
     supabase.from("postes").select("id,nom,tarif_compte_mensuel").eq("entreprise_id", ctx.entrepriseId),
@@ -80,6 +80,13 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
   const gainsOffreSuivante = offreSuivante
     ? offreSuivante.fonctionnalites.filter((f) => !offre.fonctionnalites.includes(f)).map((f) => LIBELLES_GAIN_OFFRE[f]).filter((v): v is string => Boolean(v))
     : [];
+  const remiseActive = Boolean(entreprise?.remise_description);
+  const remiseReductionMensuelle = remiseActive
+    ? entreprise?.remise_type === "montant"
+      ? Number(entreprise?.remise_valeur ?? 0)
+      : (abonnementAvantRemiseMensuel * Number(entreprise?.remise_valeur ?? 0)) / 100
+    : 0;
+  const abonnementApresRemiseMensuel = Math.max(0, abonnementAvantRemiseMensuel - remiseReductionMensuelle);
   const euros = (montant: number) => montant.toLocaleString("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
   const contactCommercial = BRAND_SERVER.supportEmail
     ? `mailto:${BRAND_SERVER.supportEmail}?subject=${encodeURIComponent(`Offre ${PRODUCT_NAME}`)}`
@@ -107,6 +114,15 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
           {annuel&&<p className="text-xs text-neutral-500">soit {euros(coutMensuelEstime)} HT/mois en moyenne</p>}
         </div>
       </div>
+      {remiseActive && <div className="mt-4 rounded-lg border border-[#c9a24a]/40 bg-[#c9a24a]/10 p-3 text-sm">
+        <p className="font-medium text-[#8a6a1f] dark:text-[#c9a24a]">Remise commerciale active · {entreprise?.remise_description}</p>
+        <dl className="mt-2 grid grid-cols-3 gap-2 text-xs">
+          <div><dt className="text-neutral-500">Prix catalogue</dt><dd className="font-semibold">{euros(abonnementAvantRemiseMensuel)} HT/mois</dd></div>
+          <div><dt className="text-neutral-500">Remise</dt><dd className="font-semibold">− {euros(remiseReductionMensuelle)} HT/mois</dd></div>
+          <div><dt className="text-neutral-500">Prix remisé</dt><dd className="font-semibold">{euros(abonnementApresRemiseMensuel)} HT/mois</dd></div>
+        </dl>
+        <p className="mt-2 text-[11px] text-neutral-500">Estimation sur l’abonnement de base et les comptes supplémentaires. Les dépassements d’appareils et de stockage, facturés séparément, n’y sont pas inclus ; le montant exact figure sur votre facture Stripe.</p>
+      </div>}
       <dl className="mt-5 grid gap-3 sm:grid-cols-2">
         <div className="rounded-lg bg-neutral-50 p-3 dark:bg-neutral-900"><dt className="text-xs uppercase text-neutral-500">Offre {offre.nom}</dt><dd className="mt-1 font-semibold">{euros(offre.base)} HT/mois</dd><p className="text-xs text-neutral-500">{offre.comptesInclus} compte(s) inclus</p></div>
         <div className="rounded-lg bg-neutral-50 p-3 dark:bg-neutral-900"><dt className="text-xs uppercase text-neutral-500">Comptes de l’entreprise</dt><dd className="mt-1 font-semibold">{nbComptesFacturables} compte(s) facturable(s)</dd><p className="text-xs text-neutral-500">{prixComptes.employesSupplementaires > 0 ? `${prixComptes.employesSupplementaires} supplémentaire(s) × ${euros(prixComptes.parEmployeSup)} HT/mois` : "Aucun compte supplémentaire"}</p></div>

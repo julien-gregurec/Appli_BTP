@@ -39,6 +39,7 @@ export type StripeSubscription = {
   cancel_at_period_end?: boolean;
   metadata?: Record<string, string>;
   items?: { data?: Array<{ id: string; quantity?: number; price?: { id?: string } }> };
+  discounts?: Array<string | { id?: string }> | null;
 };
 
 const VARIABLES_PRIX: Partial<Record<OffreAbonnement, Record<PeriodiciteAbonnement, string>>> = {
@@ -253,9 +254,16 @@ export async function creerCouponRemise(params: { type: TypeRemise; valeur: numb
   return requeteStripe<StripeCoupon>("coupons", { corps, idempotence: `remise-coupon-${Date.now()}-${Math.random().toString(36).slice(2)}` });
 }
 
+// Le compte Stripe de la plateforme fonctionne en billing_mode "flexible" : le paramètre
+// classique `coupon` est rejeté (invalid_request_error) sur ce type d'abonnement. Il faut
+// passer par `discounts[0][coupon]`, qui remplace automatiquement toute remise déjà posée
+// sur l'abonnement (vérifié empiriquement, REMISES-CLIENTS-V1) — un seul geste commercial
+// actif à la fois, comme avec l'ancien paramètre `coupon`. La remise ainsi posée s'applique
+// au prorata sur TOUTES les lignes de la facture (abonnement de base + éventuelle ligne
+// "comptes supplémentaires"), pas seulement sur le prix catalogue de l'offre.
 export async function appliquerCouponAbonnement(subscriptionId: string, couponId: string) {
   return requeteStripe<StripeSubscription>(`subscriptions/${encodeURIComponent(subscriptionId)}`, {
-    corps: new URLSearchParams({ coupon: couponId }),
+    corps: new URLSearchParams({ "discounts[0][coupon]": couponId }),
     idempotence: `remise-application-${subscriptionId}-${couponId}`,
   });
 }
@@ -264,6 +272,30 @@ export async function retirerCouponAbonnement(subscriptionId: string) {
   return requeteStripe<StripeSubscription>(`subscriptions/${encodeURIComponent(subscriptionId)}/discount`, {
     methode: "DELETE",
     idempotence: `remise-suppression-${subscriptionId}-${Date.now()}`,
+  });
+}
+
+// La remise commerciale (coupon Stripe) peut expirer naturellement côté Stripe (durée "once"
+// consommée, "repeating" arrivée à échéance) sans qu'aucune action ELSATIA ne soit passée par
+// retirerRemiseAction. Stripe reste la source de vérité : si l'abonnement Stripe n'a plus de
+// discount actif mais que la fiche entreprise en montre encore un, on aligne la fiche plutôt
+// que de laisser un badge "remise active" obsolète (REMISES-CLIENTS-V1, §14). Appelé depuis le
+// webhook customer.subscription.* à chaque synchronisation d'abonnement.
+export async function synchroniserExpirationRemise(entrepriseId: string, abonnement: StripeSubscription) {
+  if (abonnement.discounts === undefined) return;
+  if ((abonnement.discounts?.length ?? 0) > 0) return;
+  const admin = createAdminClient();
+  const { data: entreprise } = await admin.from("entreprises").select("remise_stripe_coupon_id, remise_description").eq("id", entrepriseId).maybeSingle();
+  if (!entreprise?.remise_stripe_coupon_id) return;
+  await admin.from("entreprises").update({
+    remise_stripe_coupon_id: null, remise_description: null, remise_motif_interne: null,
+    remise_duree_mois: null, remise_type: null, remise_valeur: null,
+    remise_cree_par: null, remise_appliquee_at: null, updated_at: new Date().toISOString(),
+  }).eq("id", entrepriseId);
+  await admin.from("historique_tarification").insert({
+    entreprise_id: entrepriseId, utilisateur_id: null, action: "remise_expiree",
+    ancien: { remise_stripe_coupon_id: entreprise.remise_stripe_coupon_id, remise_description: entreprise.remise_description },
+    nouveau: null, motif: null,
   });
 }
 
