@@ -226,19 +226,19 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
     <section className="rounded-xl border p-5">
       <h2 className="font-semibold">Comparatif détaillé des offres</h2>
       <p className="mt-1 text-sm text-neutral-500">Différences réelles entre Mini, Pro, Business et Entreprise, par catégorie. « BETA » signifie une fonction disponible mais pas encore considérée comme stable commercialement ; « Bientôt disponible » signifie une fonction non encore activée dans le produit, quelle que soit l’offre.</p>
-      <div className="mt-4 grid grid-cols-4 gap-2 text-center text-xs font-semibold text-neutral-500">
-        <span></span>{OFFRES.filter((o)=>!o.devisObligatoire).map((o)=><span key={o.cle}>{o.nom}</span>)}
+      <div className="mt-4 flex items-end gap-1.5 text-center text-[10px] font-semibold text-neutral-500 sm:gap-2 sm:text-xs">
+        <span className="min-w-0 flex-1"></span>{OFFRES.filter((o)=>!o.devisObligatoire).map((o)=><span key={o.cle} className="w-12 shrink-0 sm:w-20">{o.nom}</span>)}
       </div>
       <div className="mt-2 space-y-2">
         {CATEGORIES_COMPARATIF.map((categorie)=><details key={categorie.cle} className="rounded-lg border border-neutral-200 dark:border-neutral-800">
           <summary className="cursor-pointer px-3 py-2 text-sm font-semibold">{categorie.titre}</summary>
           <div className="space-y-1.5 border-t border-neutral-200 p-3 dark:border-neutral-800">
-            {categorie.lignes.map((ligne)=><div key={ligne.cle} className="grid grid-cols-[1fr_repeat(4,4.5rem)] items-center gap-2 text-xs sm:grid-cols-[1fr_repeat(4,5.5rem)] sm:text-sm">
-              <span className="text-neutral-700 dark:text-neutral-300">{ligne.label}</span>
+            {categorie.lignes.map((ligne)=><div key={ligne.cle} className="flex items-center gap-1.5 text-xs sm:gap-2 sm:text-sm">
+              <span className="min-w-0 flex-1 text-neutral-700 dark:text-neutral-300">{ligne.label}</span>
               {OFFRES.filter((o)=>!o.devisObligatoire).map((o)=>{
                 if (!estCodeOffreTarifaire(o.cle)) return null;
                 const etat = etatLigneComparatif(ligne, o.cle);
-                return <span key={o.cle} className={`rounded-full px-2 py-1 text-center text-[11px] font-medium ${COULEUR_ETAT[etat]}`}>{LIBELLE_ETAT_COMMERCIAL[etat]}</span>;
+                return <span key={o.cle} className={`w-12 shrink-0 rounded-full px-1 py-1 text-center text-[9px] font-medium leading-tight sm:w-20 sm:px-2 sm:text-[11px] ${COULEUR_ETAT[etat]}`}>{LIBELLE_ETAT_COMMERCIAL[etat]}</span>;
               })}
             </div>)}
           </div>
