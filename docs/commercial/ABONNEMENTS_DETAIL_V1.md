@@ -1,5 +1,7 @@
 # ABONNEMENTS-DETAIL-V1 — Page abonnement détaillée
 
+**Suite (23-08-2026)** : le mapping tarification ↔ feature-catalogue annoncé comme reporté ci-dessous (§ Source de vérité) a été construit dans **ABONNEMENTS-DETAIL-V1B** (`src/lib/comparatif-offres.ts`) — voir `ABONNEMENTS_DETAIL_V1B.md`. Ce document reste la référence pour tout ce qu'il couvrait déjà (audit initial, historique, limites V1 hors mapping).
+
 **Constat de départ (22-08-2026) : la page `/abonnement` était déjà nettement plus détaillée que ne le laissait supposer le cahier des charges** — statut/offre/échéance, coût actuel réel (comptes + appareils + stockage), utilisation stockage avec barre de progression, consommation IA avec quota et politique configurable, portail Stripe, dernière facture, historique de facturation et de changements de tarif. Ce lot a audité l'existant, comblé deux lacunes réelles (aucune piste d'upgrade pour un abonné déjà souscrit, aucune FAQ), et documenté le reste comme roadmap plutôt que de le construire à la hâte.
 
 ## Source de vérité (§3 du cahier des charges)
