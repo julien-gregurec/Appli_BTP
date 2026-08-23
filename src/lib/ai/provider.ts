@@ -35,7 +35,7 @@ export interface ProviderIA {
     texte: string;
     fichier: FichierIA;
     maxTokens?: number;
-  }): Promise<string>;
+  }): Promise<{ texte: string; usage?: UsageIA }>;
 
   /** Variante streamée de `completer`, pour affichage progressif dans le chat. */
   streamer(params: {

@@ -134,8 +134,11 @@ export async function suggererReponseIAAction(conversationId: string): Promise<{
   if (depassement) return { error: depassement };
 
   try {
-    const brouillon = await suggererReponse(fil);
-    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "messagerie", statut: "succes" });
+    const { texte: brouillon, usage } = await suggererReponse(fil);
+    journaliserAppelIA(supabase, {
+      entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "messagerie", statut: "succes",
+      jetonsEntree: usage?.jetonsEntree, jetonsSortie: usage?.jetonsSortie, jetonsTotal: usage?.jetonsTotal, coutEstimeHT: usage?.coutEstimeHT,
+    });
     return { brouillon };
   } catch (err) {
     const messageBrut = err instanceof Error ? err.message : "Erreur lors de la suggestion IA.";

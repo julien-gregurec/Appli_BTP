@@ -57,7 +57,7 @@ export async function analyserRentabiliteIAAction(chantierId: string): Promise<{
   if (depassement) return { error: depassement };
 
   try {
-    const analyse = await analyserRentabilite({
+    const { texte: analyse, usage } = await analyserRentabilite({
       chantierNom: chantier.nom,
       budgetHt,
       factureHt,
@@ -71,7 +71,10 @@ export async function analyserRentabiliteIAAction(chantierId: string): Promise<{
       marge,
       taux,
     });
-    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "rentabilite", statut: "succes" });
+    journaliserAppelIA(supabase, {
+      entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "rentabilite", statut: "succes",
+      jetonsEntree: usage?.jetonsEntree, jetonsSortie: usage?.jetonsSortie, jetonsTotal: usage?.jetonsTotal, coutEstimeHT: usage?.coutEstimeHT,
+    });
     return { analyse };
   } catch (err) {
     const messageBrut = err instanceof Error ? err.message : "Erreur lors de l'analyse IA.";

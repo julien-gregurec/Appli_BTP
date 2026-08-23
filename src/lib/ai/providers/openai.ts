@@ -107,14 +107,14 @@ export function creerProviderOpenAI(): ProviderIA {
       return { texte: response.output_text ?? "", appelsOutils: extraireAppelsOutils(response.output), usage: extraireUsage(modele, response.usage) };
     },
 
-    async completerAvecFichier({ system, texte, fichier, maxTokens }): Promise<string> {
+    async completerAvecFichier({ system, texte, fichier, maxTokens }) {
       const response = await client.responses.create({
         model: modele,
         instructions: system,
         input: [{ role: "user", content: [construireContenuFichier(fichier), { type: "input_text", text: texte }] }],
         max_output_tokens: maxTokens,
       }, { timeout: TIMEOUT_MS });
-      return response.output_text ?? "";
+      return { texte: response.output_text ?? "", usage: extraireUsage(modele, response.usage) };
     },
 
     async *streamer({ system, historique, outils, maxTokens }): AsyncGenerator<EvenementStreamIA, ReponseCompletion> {

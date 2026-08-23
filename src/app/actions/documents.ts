@@ -119,8 +119,11 @@ export async function analyserDocumentIAAction(documentId: string) {
 
   try {
     const octets = Buffer.from(await fichier.arrayBuffer());
-    const analyse = await analyserDocumentIA(octets, document.mime_type);
-    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "documents", statut: "succes" });
+    const { texte: analyse, usage } = await analyserDocumentIA(octets, document.mime_type);
+    journaliserAppelIA(supabase, {
+      entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "documents", statut: "succes",
+      jetonsEntree: usage?.jetonsEntree, jetonsSortie: usage?.jetonsSortie, jetonsTotal: usage?.jetonsTotal, coutEstimeHT: usage?.coutEstimeHT,
+    });
     return { analyse };
   } catch (err) {
     const messageBrut = err instanceof Error ? err.message : "Erreur lors de l'analyse IA.";

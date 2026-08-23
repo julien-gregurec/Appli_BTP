@@ -1,4 +1,4 @@
-import { obtenirProviderIA } from "@/lib/ai/provider";
+import { obtenirProviderIA, type UsageIA } from "@/lib/ai/provider";
 import { UNITES, TAUX_TVA, LIGNE_TYPES, type LigneDevis } from "@/lib/devis";
 import type { PrestationCatalogue } from "@/lib/prestations";
 
@@ -37,7 +37,7 @@ const OUTIL_PROPOSER_LIGNES = {
 export async function genererLignesDevisIA(
   description: string,
   catalogue: PrestationCatalogue[],
-): Promise<LigneDevis[]> {
+): Promise<{ lignes: LigneDevis[]; usage?: UsageIA }> {
   const provider = obtenirProviderIA();
 
   const catalogueTexte = catalogue.length
@@ -46,7 +46,7 @@ export async function genererLignesDevisIA(
         .join("\n")
     : "(catalogue vide)";
 
-  const { appelsOutils } = await provider.completer({
+  const { appelsOutils, usage } = await provider.completer({
     system:
       "Tu es un assistant de chiffrage pour une entreprise du BTP en France. " +
       "À partir de la description d'un chantier, tu proposes une liste de lignes de devis réalistes et détaillées " +
@@ -76,7 +76,7 @@ export async function genererLignesDevisIA(
     throw new Error("L'IA n'a proposé aucune ligne. Précise davantage la description du chantier.");
   }
 
-  return input.lignes.map((l) => ({
+  const lignes = input.lignes.map((l) => ({
     designation: String(l.designation ?? "").slice(0, 200),
     description: l.description ? String(l.description) : null,
     type: TYPES_CLES.includes(l.type as string) ? (l.type as string) : "forfait",
@@ -86,4 +86,5 @@ export async function genererLignesDevisIA(
     remise_ligne: 0,
     taux_tva: (TAUX_TVA as readonly number[]).includes(Number(l.taux_tva)) ? Number(l.taux_tva) : 20,
   }));
+  return { lignes, usage };
 }

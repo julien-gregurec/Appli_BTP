@@ -276,8 +276,11 @@ export async function genererDevisIAAction(description: string) {
   if (depassement) return { error: depassement };
 
   try {
-    const lignes = await genererLignesDevisIA(texte, prestations ?? []);
-    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "devis", statut: "succes" });
+    const { lignes, usage } = await genererLignesDevisIA(texte, prestations ?? []);
+    journaliserAppelIA(supabase, {
+      entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "devis", statut: "succes",
+      jetonsEntree: usage?.jetonsEntree, jetonsSortie: usage?.jetonsSortie, jetonsTotal: usage?.jetonsTotal, coutEstimeHT: usage?.coutEstimeHT,
+    });
     return { lignes };
   } catch (err) {
     const messageBrut = err instanceof Error ? err.message : "Erreur lors de la génération IA du devis.";
