@@ -58,8 +58,35 @@ export async function creerAffectationDepuisPropositionAction(proposition: {
     return { ok: true };
   }
 
-  const { error } = await supabase.from("affectations").insert(proposition.employeIds.map((employeId) => ({ entreprise_id: ctx.entrepriseId, employe_id: employeId, ...valeurs })));
-  if (error) return { error: error.message };
+  // Idempotence double-clic (AI-LAUNCH-V1B §37) : le bouton Confirmer est desactive cote
+  // client pendant la transition (disabled={pending} dans AssistantIA.tsx), mais ce n'est
+  // qu'une premiere ligne de defense (deux onglets, un rejeu reseau... contournent un simple
+  // etat client). Une affectation identique (meme entreprise/employe/date/heures/activite/
+  // chantier) creee dans les 10 dernieres secondes est traitee comme le resultat du meme clic,
+  // pas recreee.
+  const ilYA10Secondes = new Date(Date.now() - 10_000).toISOString();
+  let requeteRecentes = supabase
+    .from("affectations")
+    .select("employe_id")
+    .eq("entreprise_id", ctx.entrepriseId)
+    .in("employe_id", proposition.employeIds)
+    .eq("date", proposition.date)
+    .eq("heures", proposition.heures)
+    .eq("type_activite", proposition.typeActivite)
+    .gte("created_at", ilYA10Secondes);
+  requeteRecentes = estChantier
+    ? requeteRecentes.eq("chantier_id", proposition.chantierId as string)
+    : valeurs.lieu_activite
+      ? requeteRecentes.eq("lieu_activite", valeurs.lieu_activite)
+      : requeteRecentes.is("lieu_activite", null);
+  const { data: recentes } = await requeteRecentes;
+  const dejaCrees = new Set((recentes ?? []).map((r) => r.employe_id));
+  const aCreer = proposition.employeIds.filter((id) => !dejaCrees.has(id));
+
+  if (aCreer.length > 0) {
+    const { error } = await supabase.from("affectations").insert(aCreer.map((employeId) => ({ entreprise_id: ctx.entrepriseId, employe_id: employeId, ...valeurs })));
+    if (error) return { error: error.message };
+  }
 
   revalidatePath("/planning");
   return { ok: true };

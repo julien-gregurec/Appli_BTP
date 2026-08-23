@@ -315,7 +315,12 @@ export function AssistantIA() {
             </div>
           </div>
 
-          <div className="flex-1 space-y-3 overflow-y-auto p-4">
+          {/* AI-LAUNCH-V1B §35 : role="log" est le role ARIA prevu pour une suite de messages
+              (contrairement a un simple aria-live="polite" generique). Combine a
+              aria-relevant="additions", seule l'ajout d'une NOUVELLE bulle de message est
+              annonce — pas chaque delta de streaming qui modifie le texte d'une bulle deja
+              presente — pour eviter une lecture d'ecran insupportable pendant la reponse. */}
+          <div role="log" aria-live="polite" aria-relevant="additions" className="flex-1 space-y-3 overflow-y-auto p-4">
             {messages.length === 0 && (
               <p className="text-sm text-neutral-500">
                 Pose une question sur ton activité (à l&apos;écrit ou au micro 🎙️) : « quels chantiers sont en retard ? »,

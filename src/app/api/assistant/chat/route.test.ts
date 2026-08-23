@@ -41,6 +41,9 @@ const permissions = await import("@/lib/permissions");
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(permissions.aAccesIA).mockReturnValue(true);
+  // AI-LAUNCH-V1B : FEATURE_AI_ENABLED est fail-closed (variable absente = IA désactivée),
+  // donc chaque test doit explicitement activer l'IA sauf ceux qui testent justement ce garde-fou.
+  vi.stubEnv("FEATURE_AI_ENABLED", "true");
 });
 
 afterEach(() => vi.unstubAllEnvs());

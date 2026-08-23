@@ -169,6 +169,84 @@ async function chercherChantierParNom(supabase: Supabase, entrepriseId: string, 
   return (data ?? []).filter((c) => correspondTousLesMots(c.nom, input.terme)).slice(0, 5);
 }
 
+// AI-LAUNCH-V1B, outil manquant depuis V1 (§17). Contrainte de modele de donnees decouverte en
+// l'implementant : la table `affectations` a ete deliberement redessinee (migration
+// 20260710000011, "Refonte Planning : modele 'affectation heures'... Remplace l'agenda
+// debut/fin par : un ouvrier affecte a un chantier, une date, un nombre d'heures") pour NE PLUS
+// avoir d'heure de debut/fin, uniquement une date et une duree en heures. Un "creneau" au sens
+// de ce produit est donc une DATE ou chaque employe demande a assez de marge restante ce jour-la
+// pour la duree demandee, jamais un horaire precis (ex. "10h-11h") : proposer une heure precise
+// serait une donnee inventee (§13, ne jamais halluciner). Convention documentee ici en l'absence
+// de toute regle de disponibilite existante (aucune table horaires_entreprise/horaires_salaries
+// dans le schema) : capacite journaliere = 7h, reprise du defaut deja utilise par la colonne
+// `affectations.heures` (default 7) plutot qu'un chiffre invente.
+const CAPACITE_JOURNALIERE_HEURES = 7;
+const MAX_CRENEAUX_PROPOSES = 3;
+const MAX_JOURS_BALAYES = 31;
+
+async function proposerCreneauxPlanning(
+  supabase: Supabase,
+  entrepriseId: string,
+  input: { employe_ids?: unknown; duree_heures?: unknown; date_debut?: unknown; date_fin?: unknown },
+) {
+  const employeIds = [...new Set((Array.isArray(input.employe_ids) ? input.employe_ids : []).map((v) => String(v)).filter(Boolean))];
+  const dureeHeures = Number(input.duree_heures);
+  const dateDebut = String(input.date_debut ?? "");
+  const dateFin = String(input.date_fin ?? "");
+  if (!employeIds.length || !dureeHeures || dureeHeures <= 0 || dureeHeures > CAPACITE_JOURNALIERE_HEURES) {
+    return { error: "Paramètres invalides : au moins un employé, une durée entre 0 et 7 h, une période de dates." };
+  }
+  if (!dateDebut || !dateFin || dateFin < dateDebut) {
+    return { error: "Période invalide." };
+  }
+
+  const { data: employes } = await supabase.from("employes").select("id, nom, prenom").in("id", employeIds).eq("entreprise_id", entrepriseId).eq("statut", "actif");
+  if (!employes || employes.length !== employeIds.length) {
+    return { error: "Un ou plusieurs employés sont introuvables ou inactifs." };
+  }
+  const nomsParId = new Map(employes.map((e) => [e.id, `${e.prenom} ${e.nom}`]));
+
+  const [{ data: affectations }, { data: conges }] = await Promise.all([
+    supabase.from("affectations").select("employe_id, date, heures").in("employe_id", employeIds).eq("entreprise_id", entrepriseId).gte("date", dateDebut).lte("date", dateFin),
+    supabase.from("demandes_conges").select("employe_id, date_debut, date_fin").in("employe_id", employeIds).eq("entreprise_id", entrepriseId).eq("statut", "approuvee").lte("date_debut", dateFin).gte("date_fin", dateDebut),
+  ]);
+
+  const heuresParEmployeEtJour = new Map<string, number>();
+  for (const a of affectations ?? []) {
+    const cle = `${a.employe_id}|${a.date}`;
+    heuresParEmployeEtJour.set(cle, (heuresParEmployeEtJour.get(cle) ?? 0) + Number(a.heures));
+  }
+  const congesParEmploye = new Map<string, Array<{ debut: string; fin: string }>>();
+  for (const c of conges ?? []) {
+    const liste = congesParEmploye.get(c.employe_id) ?? [];
+    liste.push({ debut: c.date_debut, fin: c.date_fin });
+    congesParEmploye.set(c.employe_id, liste);
+  }
+  const enConge = (employeId: string, date: string) => (congesParEmploye.get(employeId) ?? []).some((c) => c.debut <= date && date <= c.fin);
+
+  const creneaux: Array<{ date: string; employes: Array<{ id: string; nom: string; heures_deja_prevues: number; marge_restante: number }> }> = [];
+  const debut = new Date(`${dateDebut}T00:00:00Z`);
+  const fin = new Date(`${dateFin}T00:00:00Z`);
+  for (let jour = new Date(debut), compteur = 0; jour <= fin && compteur < MAX_JOURS_BALAYES && creneaux.length < MAX_CRENEAUX_PROPOSES; jour.setUTCDate(jour.getUTCDate() + 1), compteur++) {
+    const date = jour.toISOString().slice(0, 10);
+    if (employeIds.some((id) => enConge(id, date))) continue;
+    const disponibilites = employeIds.map((id) => {
+      const dejaPrevues = heuresParEmployeEtJour.get(`${id}|${date}`) ?? 0;
+      return { id, nom: nomsParId.get(id)!, heures_deja_prevues: dejaPrevues, marge_restante: Math.max(0, CAPACITE_JOURNALIERE_HEURES - dejaPrevues) };
+    });
+    if (disponibilites.every((d) => d.marge_restante >= dureeHeures)) {
+      creneaux.push({ date, employes: disponibilites });
+    }
+  }
+
+  return {
+    duree_demandee_heures: dureeHeures,
+    capacite_journaliere_heures: CAPACITE_JOURNALIERE_HEURES,
+    creneaux,
+    note: creneaux.length === 0 ? "Aucun jour disponible pour tous les employés demandés sur cette période." : null,
+  };
+}
+
 async function verifierDisponibiliteEmploye(supabase: Supabase, entrepriseId: string, input: { employe_id: string; date: string }) {
   const [{ data: affectations }, { data: conge }, { data: habilitations }] = await Promise.all([
     supabase.from("affectations").select("id, heures, tache, chantier_id, chantier:chantiers(nom), lieu_activite, type_activite").eq("entreprise_id", entrepriseId).eq("employe_id", input.employe_id).eq("date", input.date),
@@ -292,6 +370,24 @@ export const OUTILS_COPILOTE: OutilIA[] = [
         date: { type: "string", description: "Date au format AAAA-MM-JJ" },
       },
       required: ["employe_id", "date"],
+    },
+  },
+  {
+    nom: "proposer_creneaux_planning",
+    description:
+      "Cherche jusqu'à 3 dates où TOUS les employés demandés ont assez de marge dans leur journée pour une durée donnée, sur une période. " +
+      "N'écrit rien en base et ne propose aucun horaire précis (ce produit ne gère pas d'heure de début/fin, seulement une date et un nombre d'heures par jour) : " +
+      "utilise cet outil pour répondre à une demande du type « trouve un créneau/un moment libre avec X et Y », avant de proposer une affectation avec proposer_affectation. " +
+      "Cherche d'abord chaque employé cité via chercher_employe. Une fois qu'une date convient à l'utilisateur, termine avec proposer_affectation (ou proposer_modification_affectation) pour cette date, pas avant.",
+    parametres: {
+      type: "object",
+      properties: {
+        employe_ids: { type: "array", items: { type: "string" }, description: "Identifiants des employés concernés (obtenus via chercher_employe)" },
+        duree_heures: { type: "number", description: "Durée recherchée en heures (ex. 1 pour une heure), maximum 7" },
+        date_debut: { type: "string", description: "Début de la période de recherche, format AAAA-MM-JJ" },
+        date_fin: { type: "string", description: "Fin de la période de recherche, format AAAA-MM-JJ (ex. fin de semaine si l'utilisateur dit \"cette semaine\")" },
+      },
+      required: ["employe_ids", "duree_heures", "date_debut", "date_fin"],
     },
   },
   {
@@ -439,6 +535,8 @@ export async function executerOutilCopilote(
       return chercherChantierParNom(supabase, entrepriseId, input as { terme: string });
     case "verifier_disponibilite_employe":
       return verifierDisponibiliteEmploye(supabase, entrepriseId, input as { employe_id: string; date: string });
+    case "proposer_creneaux_planning":
+      return proposerCreneauxPlanning(supabase, entrepriseId, input);
     default:
       return { error: `Outil inconnu : ${nom}` };
   }

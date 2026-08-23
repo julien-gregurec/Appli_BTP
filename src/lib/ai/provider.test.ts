@@ -16,4 +16,9 @@ describe("garde-fou IA global", () => {
     expect(() => obtenirProviderIA()).toThrow(/désactivées/);
     expect(creerProviderOpenAI).not.toHaveBeenCalled();
   });
+
+  it("bloque aussi quand la variable est absente (fail-closed, AI-LAUNCH-V1B)", () => {
+    expect(() => obtenirProviderIA()).toThrow(/désactivées/);
+    expect(creerProviderOpenAI).not.toHaveBeenCalled();
+  });
 });

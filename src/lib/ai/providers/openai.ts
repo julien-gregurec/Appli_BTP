@@ -7,9 +7,40 @@ import type {
   OutilIA,
   ProviderIA,
   ReponseCompletion,
+  UsageIA,
 } from "@/lib/ai/provider";
 
 const MODELE_PAR_DEFAUT = "gpt-5.1";
+
+// AI-LAUNCH-V1B : aucun timeout dedie n'existait avant ce lot (limite documentee dans
+// AI_LAUNCH_V1.md). Pas de convention projet existante pour un appel externe de ce type
+// (aucun autre appel HTTP sortant du code n'utilisait de timeout explicite non plus) ; valeur
+// choisie dans la fourchette suggeree (15-30s) pour laisser le temps a une reponse avec
+// plusieurs outils tout en bornant l'attente utilisateur sur une route streamee.
+const TIMEOUT_MS = 25_000;
+
+// Tarifs indicatifs (a confirmer avant activation Production reelle avec la grille tarifaire
+// officielle du fournisseur pour le modele configure) : sert a estimer un cout HT par appel
+// pour le journal_ia et le plafond budgetaire IA, pas a facturer directement le client.
+const TARIF_PAR_MILLION_JETONS: Record<string, { entree: number; sortie: number }> = {
+  "gpt-5.1": { entree: 1.25, sortie: 10 },
+};
+const TARIF_PAR_DEFAUT = { entree: 1.25, sortie: 10 };
+
+function calculerCoutEstimeHT(modele: string, jetonsEntree: number, jetonsSortie: number): number {
+  const tarif = TARIF_PAR_MILLION_JETONS[modele] ?? TARIF_PAR_DEFAUT;
+  return (jetonsEntree * tarif.entree + jetonsSortie * tarif.sortie) / 1_000_000;
+}
+
+function extraireUsage(modele: string, usage: OpenAI.Responses.ResponseUsage | null | undefined): UsageIA | undefined {
+  if (!usage) return undefined;
+  return {
+    jetonsEntree: usage.input_tokens,
+    jetonsSortie: usage.output_tokens,
+    jetonsTotal: usage.total_tokens,
+    coutEstimeHT: calculerCoutEstimeHT(modele, usage.input_tokens, usage.output_tokens),
+  };
+}
 
 function construireContenuFichier(fichier: FichierIA): OpenAI.Responses.ResponseInputContent {
   const estImage = fichier.mimeType.startsWith("image/");
@@ -72,8 +103,8 @@ export function creerProviderOpenAI(): ProviderIA {
         tools: outils?.map(convertirOutil),
         tool_choice: forcerOutil ? { type: "function", name: forcerOutil } : undefined,
         max_output_tokens: maxTokens,
-      });
-      return { texte: response.output_text ?? "", appelsOutils: extraireAppelsOutils(response.output) };
+      }, { timeout: TIMEOUT_MS });
+      return { texte: response.output_text ?? "", appelsOutils: extraireAppelsOutils(response.output), usage: extraireUsage(modele, response.usage) };
     },
 
     async completerAvecFichier({ system, texte, fichier, maxTokens }): Promise<string> {
@@ -82,7 +113,7 @@ export function creerProviderOpenAI(): ProviderIA {
         instructions: system,
         input: [{ role: "user", content: [construireContenuFichier(fichier), { type: "input_text", text: texte }] }],
         max_output_tokens: maxTokens,
-      });
+      }, { timeout: TIMEOUT_MS });
       return response.output_text ?? "";
     },
 
@@ -94,10 +125,11 @@ export function creerProviderOpenAI(): ProviderIA {
         tools: outils?.map(convertirOutil),
         max_output_tokens: maxTokens,
         stream: true,
-      });
+      }, { timeout: TIMEOUT_MS });
 
       const appelsOutils: AppelOutilIA[] = [];
       let texteFinal = "";
+      let usage: UsageIA | undefined;
       for await (const event of stream) {
         if (event.type === "response.output_text.delta") {
           yield { type: "texte", delta: event.delta };
@@ -113,9 +145,10 @@ export function creerProviderOpenAI(): ProviderIA {
           yield { type: "appel_outil", appel };
         } else if (event.type === "response.completed") {
           texteFinal = event.response.output_text ?? "";
+          usage = extraireUsage(modele, event.response.usage);
         }
       }
-      return { texte: texteFinal, appelsOutils };
+      return { texte: texteFinal, appelsOutils, usage };
     },
   };
 }

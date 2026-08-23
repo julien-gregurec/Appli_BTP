@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { obtenirProviderIA, type FichierIA, type MessageIA, type ReponseCompletion } from "@/lib/ai/provider";
+import { obtenirProviderIA, type FichierIA, type MessageIA, type ReponseCompletion, type UsageIA } from "@/lib/ai/provider";
 import { outilsAutorisesCopilote, executerOutilCopilote } from "@/lib/ai/copilote";
 import { BRAND_NAME, PRODUCT_NAME } from "@/lib/brand";
 
@@ -349,9 +349,20 @@ export async function* demanderAssistantIAStream(
   peutGererPlanning: boolean,
   permissions: string[] | null,
   historique: MessageChat[],
-): AsyncGenerator<EvenementAssistant, void, unknown> {
+): AsyncGenerator<EvenementAssistant, UsageIA | undefined, unknown> {
   const provider = obtenirProviderIA();
   const outilsDisponibles = outilsAutorisesCopilote(permissions);
+  // Cumule l'usage de chaque tour d'outils (jusqu'a MAX_TOURS_OUTILS appels au provider) :
+  // AI-LAUNCH-V1B, cf. journal_ia — avant ce lot, aucun appel a journaliserAppelIA ne
+  // transmettait de donnees de jetons/cout, malgre la documentation qui le laissait entendre.
+  const usageCumule: UsageIA = { jetonsEntree: 0, jetonsSortie: 0, jetonsTotal: 0, coutEstimeHT: 0 };
+  function cumuler(usage: UsageIA | undefined) {
+    if (!usage) return;
+    usageCumule.jetonsEntree += usage.jetonsEntree;
+    usageCumule.jetonsSortie += usage.jetonsSortie;
+    usageCumule.jetonsTotal += usage.jetonsTotal;
+    usageCumule.coutEstimeHT += usage.coutEstimeHT;
+  }
   const aujourdhui = new Intl.DateTimeFormat("fr-FR", { dateStyle: "full", timeZone: "Europe/Paris" }).format(new Date());
   const descriptionUtilisateur = await decrireUtilisateurCourant(supabase, entrepriseId, utilisateurId, prenomCompte);
 
@@ -363,7 +374,8 @@ export async function* demanderAssistantIAStream(
       `Pour une absence/congé, tu peux utiliser proposer_affectation (type_activite="conge", effet immédiat) OU proposer_demande_conge (passe par une approbation) — préfère proposer_affectation puisque cette personne peut déjà valider elle-même ce genre de demande, sauf si elle précise vouloir la soumettre formellement. ` +
       `Pour un rendez-vous ou un entretien entre l'utilisateur et un employé nommé (ex. « place-moi un rendez-vous avec l'employé X »), l'affectation se place sur la fiche de l'employé nommé (X), jamais sur celle de l'utilisateur qui fait la demande. ` +
       `Si PLUSIEURS employés sont concernés par la même affectation (ex. « X et Y sont sur le chantier Dupont », une réunion à trois, une équipe entière) — cherche chaque employé cité puis fais UN SEUL appel à proposer_affectation avec tous leurs identifiants dans employe_ids ; ne fais jamais un appel séparé par personne. ` +
-      `Corriger, déplacer ou remplacer une affectation qui existe déjà (visible via verifier_disponibilite_employe) : utilise proposer_modification_affectation, jamais proposer_affectation — sinon l'ancienne affectation reste active en même temps que la nouvelle et la personne se retrouve sur deux activités en même temps. `
+      `Corriger, déplacer ou remplacer une affectation qui existe déjà (visible via verifier_disponibilite_employe) : utilise proposer_modification_affectation, jamais proposer_affectation — sinon l'ancienne affectation reste active en même temps que la nouvelle et la personne se retrouve sur deux activités en même temps. ` +
+      `Quand l'utilisateur demande de TROUVER un moment/créneau libre pour une ou plusieurs personnes (sans date précise déjà donnée), utilise d'abord proposer_creneaux_planning (après avoir cherché chaque employé cité) — ce produit ne gère pas d'heure précise, uniquement des dates avec un nombre d'heures disponibles ce jour-là, donc présente les résultats comme des JOURS (ex. "mercredi tu as de la marge avec les deux"), jamais un horaire inventé. Une fois qu'une date convient à l'utilisateur, termine avec proposer_affectation pour cette date. `
     : `Cette personne n'a pas le droit de modifier le planning (droit réservé à certains postes) : n'utilise jamais proposer_affectation, tu n'as accès à aucun outil d'écriture sur le planning des autres. ` +
       `Pour une absence/congé sur elle-même (« mets-moi absent », « je pose une demi-journée »…), utilise proposer_demande_conge — c'est le seul outil d'écriture qui lui est ouvert, et la demande sera soumise pour approbation à un responsable, jamais acceptée automatiquement. ` +
       `Pour toute autre demande de modification du planning (la sienne ou celle d'un collègue), explique que ce n'est pas possible avec ses droits actuels et qu'il faut passer par un responsable planning. `;
@@ -394,8 +406,9 @@ export async function* demanderAssistantIAStream(
         yield { type: "texte", delta: value.delta };
       }
     }
+    cumuler(resultat.usage);
 
-    if (resultat.appelsOutils.length === 0) return;
+    if (resultat.appelsOutils.length === 0) return usageCumule;
 
     const appelAffectation = resultat.appelsOutils.find((a) => a.nom === "proposer_affectation");
     if (appelAffectation) {
@@ -408,7 +421,7 @@ export async function* demanderAssistantIAStream(
           : "\n\nTon poste n'a pas le droit de modifier le planning. Pour une absence te concernant, dis-le-moi directement (je peux soumettre une demande de congé pour approbation) ; sinon, il faut passer par un responsable planning.";
         yield { type: "texte", delta: message };
       }
-      return;
+      return usageCumule;
     }
 
     const appelModificationAffectation = resultat.appelsOutils.find((a) => a.nom === "proposer_modification_affectation");
@@ -422,7 +435,7 @@ export async function* demanderAssistantIAStream(
           : "\n\nTon poste n'a pas le droit de modifier le planning.";
         yield { type: "texte", delta: message };
       }
-      return;
+      return usageCumule;
     }
 
     const appelConge = resultat.appelsOutils.find((a) => a.nom === "proposer_demande_conge");
@@ -434,7 +447,7 @@ export async function* demanderAssistantIAStream(
         const message = "\n\nJe n'ai pas pu préparer cette demande : vérifie les dates, et que tu as bien une fiche employé liée à ton compte (sinon, va dans « Mon espace » → « Créer ma fiche employé »).";
         yield { type: "texte", delta: message };
       }
-      return;
+      return usageCumule;
     }
 
     const appelMessageInterne = resultat.appelsOutils.find((a) => a.nom === "proposer_message_interne");
@@ -446,7 +459,7 @@ export async function* demanderAssistantIAStream(
         const message = "\n\nJe n'ai pas pu préparer ce message : précise soit un collègue, soit un chantier (jamais les deux), et un texte à envoyer.";
         yield { type: "texte", delta: message };
       }
-      return;
+      return usageCumule;
     }
 
     const appelMessageSupport = resultat.appelsOutils.find((a) => a.nom === "proposer_message_support");
@@ -458,7 +471,7 @@ export async function* demanderAssistantIAStream(
         const message = "\n\nJe n'ai pas pu préparer ce message : quel est le texte à envoyer au support ?";
         yield { type: "texte", delta: message };
       }
-      return;
+      return usageCumule;
     }
 
     conversation.push({ role: "assistant", contenu: texteTour, appelsOutils: resultat.appelsOutils });
@@ -469,4 +482,5 @@ export async function* demanderAssistantIAStream(
   }
 
   yield { type: "texte", delta: "\n\nJe n'arrive pas à te répondre pour l'instant : reformule ta question plus précisément." };
+  return usageCumule;
 }

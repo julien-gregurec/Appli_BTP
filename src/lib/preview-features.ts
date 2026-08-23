@@ -10,8 +10,11 @@ export function boutiqueEstActive(environnement: FeatureEnvironment = serverEnvi
   return estActive(environnement.FEATURE_BOUTIQUE_ENABLED);
 }
 
+// Fail-closed, contrairement a estActive() ci-dessus : une fonctionnalite commerciale
+// desactivable ne doit jamais s'activer par defaut si la variable est absente (ex. variable
+// oubliee lors d'un deploiement). AI-LAUNCH-V1B — variable absente = IA indisponible.
 export function iaEstActive(environnement: FeatureEnvironment = serverEnvironment): boolean {
-  return estActive(environnement.FEATURE_AI_ENABLED);
+  return environnement.FEATURE_AI_ENABLED?.trim().toLowerCase() === "true";
 }
 
 export function cronsSontActifs(environnement: FeatureEnvironment = serverEnvironment): boolean {

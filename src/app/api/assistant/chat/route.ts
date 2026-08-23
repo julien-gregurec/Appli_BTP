@@ -71,12 +71,21 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       const envoyer = (evenement: unknown) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(evenement)}\n\n`));
+      // Iteration manuelle (pas for-await) pour recuperer la valeur de retour du generateur
+      // (usage jetons/cout cumule sur tous les tours d'outils) : for-await l'ignorerait.
+      const generateur = demanderAssistantIAStream(supabase, ctx.entrepriseId, ctx.entrepriseNom, ctx.userId, ctx.prenom, peutGererPlanning, permissions, historiqueValide);
       try {
-        for await (const evenement of demanderAssistantIAStream(supabase, ctx.entrepriseId, ctx.entrepriseNom, ctx.userId, ctx.prenom, peutGererPlanning, permissions, historiqueValide)) {
-          envoyer(evenement);
+        let usage: Awaited<ReturnType<typeof generateur.next>>["value"] | undefined;
+        while (true) {
+          const { value, done } = await generateur.next();
+          if (done) { usage = value; break; }
+          envoyer(value);
         }
         envoyer({ type: "fin" });
-        journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "assistant_chat", statut: "succes" });
+        journaliserAppelIA(supabase, {
+          entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "assistant_chat", statut: "succes",
+          jetonsEntree: usage?.jetonsEntree, jetonsSortie: usage?.jetonsSortie, jetonsTotal: usage?.jetonsTotal, coutEstimeHT: usage?.coutEstimeHT,
+        });
       } catch (err) {
         const messageInterne = err instanceof Error ? err.message : "Erreur de l'assistant IA.";
         envoyer({ type: "erreur", message: erreurPublique(err, "L'assistant est temporairement indisponible.") });

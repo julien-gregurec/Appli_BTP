@@ -12,7 +12,8 @@ export type AppelOutilIA = { id: string; nom: string; entree: Record<string, unk
 
 export type OutilIA = { nom: string; description: string; parametres: Record<string, unknown> };
 
-export type ReponseCompletion = { texte: string; appelsOutils: AppelOutilIA[] };
+export type UsageIA = { jetonsEntree: number; jetonsSortie: number; jetonsTotal: number; coutEstimeHT: number };
+export type ReponseCompletion = { texte: string; appelsOutils: AppelOutilIA[]; usage?: UsageIA };
 
 export type EvenementStreamIA =
   | { type: "texte"; delta: string }
