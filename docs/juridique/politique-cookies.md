@@ -1,6 +1,6 @@
 # Politique de cookies
 
-_Dernière mise à jour : [JJ/MM/AAAA]_
+_Dernière mise à jour : 13/08/2026_
 
 ## 1. Qu'est-ce qu'un cookie ?
 

@@ -1,6 +1,6 @@
 # Conditions Générales d'Utilisation (CGU)
 
-_Dernière mise à jour : [JJ/MM/AAAA] — Version 1.0_
+_Dernière mise à jour : 01/08/2026 — Version 1.0_
 
 ## Article 1 — Objet
 

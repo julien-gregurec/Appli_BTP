@@ -2,7 +2,7 @@
 
 _Annexe aux Conditions Générales de Vente — Article 28 du RGPD_
 _Entre l'entreprise cliente (« le Responsable de traitement ») et Julien GREGUREC, entrepreneur individuel exerçant sous le nom commercial ELSATIA, éditeur de ELSATIA Gestion Pro (« le Sous-traitant »)._
-_Dernière mise à jour : [JJ/MM/AAAA]_
+_Dernière mise à jour : 24/08/2026_
 
 ## 1. Objet
 
@@ -50,7 +50,7 @@ Les données sont hébergées dans l'Union européenne — Supabase `eu-west-3` 
 
 ## 8. Sous-traitants ultérieurs autorisés
 
-Le Responsable autorise le recours aux sous-traitants listés dans `rgpd-sous-traitants.md` (Supabase, Vercel, Stripe, Brevo). Toute modification est notifiée.
+Le Responsable autorise le recours aux sous-traitants listés dans `rgpd-sous-traitants.md` (Supabase, Vercel, Stripe, Brevo, Sentry, OpenAI). Toute modification est notifiée.
 
 ## 9. Audit
 

@@ -1,6 +1,6 @@
 # Conditions Générales de Vente (CGV)
 
-_Applicables aux professionnels — Dernière mise à jour : [JJ/MM/AAAA] — Version 1.0_
+_Applicables aux professionnels — Dernière mise à jour : 21/08/2026 — Version 1.0_
 
 ## Article 1 — Objet et champ d'application
 

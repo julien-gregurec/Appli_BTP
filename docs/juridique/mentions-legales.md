@@ -1,6 +1,6 @@
 # Mentions légales
 
-_Dernière mise à jour : [JJ/MM/AAAA]_
+_Dernière mise à jour : 21/08/2026_
 
 ## Éditeur du service
 

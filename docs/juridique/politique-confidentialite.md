@@ -1,6 +1,6 @@
 # Politique de confidentialité
 
-_Dernière mise à jour : [JJ/MM/AAAA]_
+_Dernière mise à jour : 21/08/2026_
 
 La présente politique explique comment **ELSATIA Gestion Pro** (« le Service »), édité par **Julien GREGUREC, entrepreneur individuel, exerçant sous le nom commercial ELSATIA** (« nous »), traite les données personnelles, conformément au Règlement (UE) 2016/679 (« RGPD ») et à la loi Informatique et Libertés.
 
