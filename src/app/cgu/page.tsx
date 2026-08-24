@@ -4,7 +4,7 @@ import { PRODUCT_NAME } from "@/lib/brand";
 
 export const dynamic = "force-static";
 
-export const metadata: Metadata = { title: `Conditions Générales d'Utilisation — ${PRODUCT_NAME}` };
+export const metadata: Metadata = { title: `Conditions Générales d'Utilisation — ${PRODUCT_NAME}`, robots: { index: false, follow: false } };
 
 export default function Page() {
   return <DocumentLegal fichier="cgu.md" />;
