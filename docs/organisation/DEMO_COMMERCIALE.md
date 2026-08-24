@@ -6,7 +6,7 @@ Document opérationnel pour présenter ELSATIA à un prospect avec un compte de 
 
 - **Nom affiché** : Atelier Bâtiment Lyonnais (entreprise BTP fictive, aménagement intérieur — cohérente avec les adresses Lyon des données)
 - **Marqueur technique unique** : `entreprises.reference_interne = 'DEMO-18M'`
-- **Offre** : Entreprise (annuel) — expose l'ensemble des modules commercialisables listés en P10, hors IA/Boutique/Powens (désactivés partout, y compris en démo — voir « Ce qu'il ne faut jamais faire »)
+- **Offre** : Entreprise (annuel) — expose l'ensemble des modules commercialisables listés en P10, y compris l'assistant IA et l'IA devis (actifs en Production depuis AI-PROD-ACTIVATION-V1/IA-DEVIS-PROD-ACTIVATION-V1), hors Boutique/Powens (toujours désactivés partout, y compris en démo — voir « Ce qu'il ne faut jamais faire »)
 - **Historique** : 18 mois d'activité simulée (permet des graphiques de rentabilité et un planning déjà remplis, plus crédible qu'une entreprise vide)
 
 Cette entreprise préexistait à P11 sous une forme différente (créée par un script `creer_entreprise_demo_18_mois.sql` déjà présent dans le dépôt, référencé par l'outil interne `/plateforme/roles-demo`). P11 a corrigé un bug bloquant du script (voir plus bas), l'a exécuté réellement en Production, renommé et associé à l'offre Entreprise.
@@ -65,12 +65,14 @@ L'entreprise démo est strictement isolée de l'entreprise réelle `elsatia` (RL
 Script : `supabase/production/reset_entreprise_demo_18_mois.sql`
 
 ```bash
-cd /Users/juliengregurec/Projects/elsatia-production-bootstrap
-npx supabase db query --file /Users/juliengregurec/Projects/liria-codex/supabase/production/reset_entreprise_demo_18_mois.sql --linked
-npx supabase db query --file /Users/juliengregurec/Projects/liria-codex/supabase/production/creer_entreprise_demo_18_mois.sql --linked
+cd /Users/juliengregurec/Projects/elsatia-main
+# relier explicitement le workspace au projet Supabase Production avant d'exécuter :
+# supabase/.temp/project-ref doit contenir exhvuzegsefmoguxoiak (jamais le projet Preview)
+npx supabase db query --file supabase/production/reset_entreprise_demo_18_mois.sql --linked
+npx supabase db query --file supabase/production/creer_entreprise_demo_18_mois.sql --linked
 ```
 
-Le premier script vide intégralement les données métier de l'entreprise `DEMO-18M` (clients, chantiers, devis, factures, pointages, stock, véhicules, outillage...) sans jamais toucher `elsatia`. Le second recrée le jeu de données de référence à l'identique (script idempotent). Toujours exécuter les deux dans cet ordre, depuis le worktree `elsatia-production-bootstrap` (lié au projet Supabase Production `exhvuzegsefmoguxoiak`).
+Le premier script vide intégralement les données métier de l'entreprise `DEMO-18M` (clients, chantiers, devis, factures, pointages, stock, véhicules, outillage...) sans jamais toucher `elsatia`. Le second recrée le jeu de données de référence à l'identique (script idempotent). Toujours exécuter les deux dans cet ordre, depuis le workspace `elsatia-main` (relié au projet Supabase Production `exhvuzegsefmoguxoiak` — les anciens chemins `liria-codex`/`elsatia-production-bootstrap` référencés ici par le passé n'existent plus, ROADMAP-CLEANUP-V1).
 
 ### Garde-fous intégrés au script de reset
 
@@ -81,7 +83,7 @@ Le premier script vide intégralement les données métier de l'entreprise `DEMO
 
 ## Limites connues
 
-- Le compte démo est sur l'offre Entreprise : les modules IA, Boutique et Powens restent invisibles (désactivés partout en Production, y compris en démo — représente fidèlement ce qu'un client peut réellement acheter au lancement).
+- Le compte démo est sur l'offre Entreprise : les modules Boutique et Powens restent invisibles (toujours désactivés partout en Production). L'IA (assistant + IA devis) est active en Production depuis AI-PROD-ACTIVATION-V1/IA-DEVIS-PROD-ACTIVATION-V1 et donc disponible sur le compte démo comme sur tout compte réel — représente fidèlement ce qu'un client peut réellement acheter au lancement.
 - Recette mobile/tablette/desktop réalisée en P11 (voir REGISTRE_CENTRAL.md) — signaler tout écart visuel constaté lors d'une future démo réelle.
 - Les 18 mois de données sont figés au moment du (re)seed ; après plusieurs mois d'usage réel de l'application, cet historique cessera de paraître « récent » (les dates sont relatives à `current_date` au moment de l'exécution du script, donc un reset les recale automatiquement).
 

@@ -33,7 +33,10 @@ Ces modules existent dans le code mais ne sont pas commercialisés en V3 (source
 
 - **Désactivés** (hors périmètre commercial) : Boutique, Powens (paiements bancaires), Appels d'offres, Connecteurs.
 - **Bêta** (retirés du produit tant que non validés en conditions réelles) : facturation avancée, ouvrages, interventions, sous-traitants, grands déplacements, paie, CRM.
-- **IA** : désactivée en Production (`FEATURE_AI_ENABLED=false`) — ne pas l'activer pour « impressionner », ce n'est pas ce que le client achète au lancement.
+- **IA** : activée en Production (`FEATURE_AI_ENABLED=true`, `FEATURE_AI_DEVIS_ENABLED=true` —
+  voir `docs/ia/AI_PROD_ACTIVATION_V1.md`/`IA_DEVIS_PROD_ACTIVATION_V1.md`) — peut être
+  montrée en démo (assistant + préparation assistée de devis), sans en faire l'argument
+  central de vente.
 
 Ne jamais présenter un de ces modules comme disponible aujourd'hui, même s'il est visible dans le code ou en base.
 
