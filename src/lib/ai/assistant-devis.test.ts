@@ -190,6 +190,14 @@ describe("resoudrePropositionDevis", () => {
     expect(res!.lignes[0].type).toBe("forfait");
   });
 
+  it("21. type de ligne dans une casse differente -> reconnu, pas de repli inutile sur 'forfait' (regression recette reelle)", async () => {
+    const res = await resoudrePropositionDevis(supabaseAvecClient(CLIENT), ENTREPRISE_ID, true, {
+      ...inputBase,
+      lignes: [{ ...inputBase.lignes[0], type: "Fourniture" }],
+    });
+    expect(res!.lignes[0].type).toBe("fourniture");
+  });
+
   it("20. commentaire du modele -> transmis comme avertissement", async () => {
     const res = await resoudrePropositionDevis(supabaseAvecClient(CLIENT), ENTREPRISE_ID, true, { ...inputBase, commentaire: "Vérifie la surface exacte du plafond." });
     expect(res!.avertissement).toBe("Vérifie la surface exacte du plafond.");

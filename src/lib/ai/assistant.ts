@@ -344,6 +344,18 @@ function resoudrePropositionMessageSupport(input: Record<string, unknown>): Prop
 }
 
 const TYPES_LIGNE_CLES: readonly string[] = LIGNE_TYPES.map((t) => t.cle);
+
+// Découvert en recette réelle : avec `strict: false` côté provider (src/lib/ai/providers/
+// openai.ts), l'enum du paramètre `type` n'est qu'indicatif, pas imposé par l'API — le modèle
+// a renvoyé une casse différente ("Fourniture" au lieu de "fourniture") sur TOUTES les lignes
+// d'une même proposition, faisant tomber silencieusement les trois dans le repli "forfait"
+// (correspondance exacte sensible à la casse). Une comparaison insensible à la casse/espaces
+// suffit à couvrir ce cas sans risquer d'accepter une valeur réellement hors-liste.
+function cleLigneNormalisee(valeur: unknown): string | null {
+  if (typeof valeur !== "string") return null;
+  const normalisee = valeur.trim().toLowerCase();
+  return TYPES_LIGNE_CLES.find((cle) => cle === normalisee) ?? null;
+}
 const MAX_LIGNES_PROPOSITION_DEVIS = 40;
 
 // IA-DEVIS-V1 : construit la proposition de devis à partir de l'appel outil du modèle.
@@ -392,7 +404,7 @@ export async function resoudrePropositionDevis(
     lignes.push({
       designation,
       description: typeof l.description === "string" && l.description.trim() ? l.description.trim() : null,
-      type: TYPES_LIGNE_CLES.includes(l.type as string) ? (l.type as string) : "forfait",
+      type: cleLigneNormalisee(l.type) ?? "forfait",
       quantite,
       unite: (UNITES as readonly string[]).includes(l.unite as string) ? (l.unite as string) : "u",
       // Aucun prix trouvable ne doit jamais se retrouver marqué "catalogue"/"historique" sans

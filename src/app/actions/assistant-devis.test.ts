@@ -5,7 +5,11 @@ const mocks = vi.hoisted(() => ({
   permissions: ["acces_ia", "gerer_devis"] as string[] | null,
   client: { id: "client-1" } as Record<string, unknown> | null,
   devisRecent: null as { id: string } | null,
-  rpc: vi.fn(async (_nom?: string, _params?: Record<string, unknown>): Promise<{ data: string | null; error: { message: string } | null }> => ({ data: "devis-nouveau", error: null })),
+  rpc: vi.fn(async (nom: string, params: Record<string, unknown>): Promise<{ data: string | null; error: { message: string } | null }> => {
+    void nom;
+    void params;
+    return { data: "devis-nouveau", error: null };
+  }),
   iaActive: true,
   iaDevisActive: true,
 }));
