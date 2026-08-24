@@ -5,7 +5,7 @@ import { demanderAssistantIAStream, type MessageChat } from "@/lib/ai/assistant"
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
 import { TAILLE_MAX_CORPS_ASSISTANT, validerRequeteAssistant } from "@/lib/ai/validation";
 import { erreurPublique, verifierTailleRequete } from "@/lib/security/validation";
-import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
+import { iaEstActive, iaDevisEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
 
 // Plafond dedie a cette route : ne pas reutiliser un plafond generique de petite route
 // JSON, la piece jointe encodee en base64 (jusqu'a 6 Mo reels) ne rentrerait pas dedans.
@@ -52,6 +52,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Ton poste n'a pas accès aux fonctionnalités IA." }, { status: 403 });
   }
   const peutGererPlanning = permissions === null || permissions.includes("gerer_planning");
+  const peutGererDevis = permissions === null || permissions.includes("gerer_devis");
 
   const body = corps.valeur as { historique?: MessageChat[] } | null;
   const historique = body?.historique;
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
       const envoyer = (evenement: unknown) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(evenement)}\n\n`));
       // Iteration manuelle (pas for-await) pour recuperer la valeur de retour du generateur
       // (usage jetons/cout cumule sur tous les tours d'outils) : for-await l'ignorerait.
-      const generateur = demanderAssistantIAStream(supabase, ctx.entrepriseId, ctx.entrepriseNom, ctx.userId, ctx.prenom, peutGererPlanning, permissions, historiqueValide);
+      const generateur = demanderAssistantIAStream(supabase, ctx.entrepriseId, ctx.entrepriseNom, ctx.userId, ctx.prenom, peutGererPlanning, peutGererDevis, iaDevisEstActive(), permissions, historiqueValide);
       try {
         let usage: Awaited<ReturnType<typeof generateur.next>>["value"] | undefined;
         while (true) {

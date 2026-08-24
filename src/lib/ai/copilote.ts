@@ -247,6 +247,47 @@ async function proposerCreneauxPlanning(
   };
 }
 
+// IA-DEVIS-V1 §5 : source de prix "fiable" — catalogue de prestations de l'entreprise.
+async function rechercherPrestationsDevis(supabase: Supabase, entrepriseId: string, input: { terme: string }) {
+  const { data } = await supabase
+    .from("prestations_catalogue")
+    .select("id, designation, description, type, unite, prix_unitaire_ht, taux_tva")
+    .eq("entreprise_id", entrepriseId)
+    .eq("actif", true)
+    .limit(300);
+  return (data ?? [])
+    .filter((p) => correspondTousLesMots(`${p.designation ?? ""} ${p.description ?? ""}`, input.terme))
+    .slice(0, 10);
+}
+
+// IA-DEVIS-V1 §5/§7 : source de prix "historique" — dernières lignes de devis de
+// l'entreprise correspondant à la désignation, sans exposer le devis complet ni le nom du
+// client (§38, confidentialité) : uniquement prix/unité/TVA/numéro/date, le strict
+// nécessaire pour que le modèle propose un prix et le signale comme "basé sur un devis
+// précédent" plutôt que comme un tarif enregistré certain.
+async function rechercherPrixHistoriqueDevis(supabase: Supabase, entrepriseId: string, input: { designation: string }) {
+  const terme = input.designation.trim();
+  if (!terme) return [];
+  const { data } = await supabase
+    .from("lignes_devis")
+    .select("designation, prix_unitaire_ht, unite, taux_tva, devis:devis_id(numero, date_emission, entreprise_id)")
+    .ilike("designation", `%${terme}%`)
+    .limit(200);
+  return (data ?? [])
+    .map((l) => ({ ...l, devis: Array.isArray(l.devis) ? l.devis[0] : l.devis }))
+    .filter((l): l is typeof l & { devis: { numero: string | null; date_emission: string; entreprise_id: string } } => l.devis?.entreprise_id === entrepriseId)
+    .sort((a, b) => (b.devis.date_emission ?? "").localeCompare(a.devis.date_emission ?? ""))
+    .slice(0, 5)
+    .map((l) => ({
+      designation: l.designation,
+      prix_unitaire_ht: l.prix_unitaire_ht,
+      unite: l.unite,
+      taux_tva: l.taux_tva,
+      devis_numero: l.devis.numero,
+      date: l.devis.date_emission,
+    }));
+}
+
 async function verifierDisponibiliteEmploye(supabase: Supabase, entrepriseId: string, input: { employe_id: string; date: string }) {
   const [{ data: affectations }, { data: conge }, { data: habilitations }] = await Promise.all([
     supabase.from("affectations").select("id, heures, tache, chantier_id, chantier:chantiers(nom), lieu_activite, type_activite").eq("entreprise_id", entrepriseId).eq("employe_id", input.employe_id).eq("date", input.date),
@@ -275,6 +316,11 @@ const PERMISSION_REQUISE_OUTIL: Partial<Record<string, readonly string[]>> = {
   factures_impayees: ["acces_factures"],
   devis_en_attente: ["acces_devis"],
   heures_supplementaires_semaine: ["voir_pointages_equipe", "gerer_pointage"],
+  rechercher_prestations_devis: ["acces_devis"],
+  rechercher_prix_historique_devis: ["acces_devis"],
+  // proposer_devis (écriture) n'est pas filtré ici : comme proposer_affectation, il reste
+  // visible du modèle mais est gardé par le droit gerer_devis directement dans son résolveur
+  // (src/lib/ai/assistant.ts) et par la consigne du prompt système — voir IA_DEVIS_V1.md.
 };
 
 // null = accès complet (prototype ou compte support), comme partout ailleurs dans
@@ -341,6 +387,28 @@ export const OUTILS_COPILOTE: OutilIA[] = [
       "Liste la rentabilité de chaque chantier (facturé HT, coût main-d'œuvre, achats, sous-traitance, marge, taux de marge), " +
       "du moins rentable au plus rentable. Utilise cet outil pour toute question sur la marge, le résultat, les coûts ou la rentabilité d'un ou plusieurs chantiers.",
     parametres: { type: "object", properties: {} },
+  },
+  {
+    nom: "rechercher_prestations_devis",
+    description:
+      "Recherche dans le catalogue de prestations de l'entreprise (source de prix FIABLE, un tarif réellement enregistré) par mot-clé. " +
+      "À utiliser en priorité pour chiffrer une ligne de devis avant d'estimer un prix.",
+    parametres: {
+      type: "object",
+      properties: { terme: { type: "string", description: "Mots-clés de la prestation recherchée (ex. \"cloison placo\")" } },
+      required: ["terme"],
+    },
+  },
+  {
+    nom: "rechercher_prix_historique_devis",
+    description:
+      "Cherche, parmi les devis déjà émis par l'entreprise, le prix unitaire utilisé pour une désignation proche (source de prix HISTORIQUE, pas un tarif catalogue). " +
+      "À utiliser seulement si rechercher_prestations_devis n'a rien trouvé. Si tu utilises ce prix dans ta proposition, indique-le comme basé sur un devis précédent, jamais comme un tarif certain.",
+    parametres: {
+      type: "object",
+      properties: { designation: { type: "string", description: "Désignation de la prestation à rechercher dans l'historique" } },
+      required: ["designation"],
+    },
   },
   {
     nom: "chercher_employe",
@@ -494,6 +562,47 @@ export const OUTILS_COPILOTE: OutilIA[] = [
       required: ["contenu"],
     },
   },
+  {
+    nom: "proposer_devis",
+    description:
+      "Termine la conversation en proposant un BROUILLON de devis structuré, pour validation manuelle. N'écrit rien en base. " +
+      "Réservé aux postes qui ont le droit de gérer les devis — voir le contexte au début de cette conversation pour savoir si c'est le cas ; si non, ne l'utilise pas. " +
+      "Cherche d'abord le client via rechercher (si plusieurs correspondances, demande lequel avant de continuer ; si aucune, dis-le et ne propose pas de devis). " +
+      "Pour chaque prestation distincte de la demande, crée une ligne séparée (ne fusionne jamais deux prestations différentes dans une seule ligne). " +
+      "Pour le prix de chaque ligne : cherche d'abord rechercher_prestations_devis (source \"catalogue\"), puis rechercher_prix_historique_devis si rien trouvé (source \"historique\", à signaler comme basé sur un devis précédent) ; " +
+      "si aucune des deux ne donne de prix exploitable, laisse prix_unitaire_ht à null (source \"absent\") — n'invente JAMAIS un prix au marché, ce produit ne le permet pas. " +
+      "Toute hypothèse que tu ajoutes toi-même (finition, épaisseur, méthode non précisée par l'utilisateur) doit être listée dans hypotheses, jamais présentée comme une information fournie par l'utilisateur. " +
+      "Si la demande est trop vague pour être chiffrée (ex. juste \"fais-moi un devis\"), pose au maximum 2 à 4 questions prioritaires avant de proposer, plutôt que de deviner.",
+    parametres: {
+      type: "object",
+      properties: {
+        client_id: { type: "string", description: "Identifiant du client (obtenu via rechercher), obligatoire pour créer le brouillon" },
+        objet: { type: "string", description: "Titre court du devis (ex. \"Cloisons bureaux Strasbourg\")" },
+        lignes: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              designation: { type: "string" },
+              description: { type: "string", description: "Détail visible sur le devis, chaîne vide si inutile" },
+              type: { type: "string", enum: ["main_oeuvre", "fourniture", "sous_traitance", "deplacement", "forfait"] },
+              quantite: { type: "number" },
+              unite: { type: "string", enum: ["u", "m²", "ml", "h", "forfait", "kg", "L"] },
+              prix_unitaire_ht: { type: ["number", "null"], description: "Prix HT en euros, ou null si aucune source fiable/historique — jamais une estimation inventée" },
+              source_prix: { type: "string", enum: ["catalogue", "historique", "absent"] },
+              taux_tva: { type: "number", enum: [20, 10, 5.5, 0] },
+              remise_ligne: { type: "number", description: "Remise en % sur cette ligne, 0 par défaut. Uniquement si l'utilisateur l'a explicitement demandée." },
+            },
+            required: ["designation", "type", "quantite", "unite", "source_prix", "taux_tva"],
+          },
+        },
+        hypotheses: { type: "array", items: { type: "string" }, description: "Hypothèses que TU as ajoutées (non fournies explicitement par l'utilisateur)" },
+        notes_client: { type: "string", description: "Notes additionnelles visibles sur le devis, chaîne vide si inutile" },
+        commentaire: { type: "string", description: "Ce que tu veux dire à l'utilisateur avant de lui proposer ce brouillon" },
+      },
+      required: ["objet", "lignes"],
+    },
+  },
 ];
 
 export async function executerOutilCopilote(
@@ -529,6 +638,10 @@ export async function executerOutilCopilote(
       return heuresSupplementairesSemaine(supabase, entrepriseId);
     case "rentabilite_chantiers":
       return rentabiliteChantiers(supabase, entrepriseId);
+    case "rechercher_prestations_devis":
+      return rechercherPrestationsDevis(supabase, entrepriseId, input as { terme: string });
+    case "rechercher_prix_historique_devis":
+      return rechercherPrixHistoriqueDevis(supabase, entrepriseId, input as { designation: string });
     case "chercher_employe":
       return chercherEmploye(supabase, entrepriseId, input as { terme: string });
     case "chercher_chantier_planning":

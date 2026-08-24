@@ -21,5 +21,13 @@ export function cronsSontActifs(environnement: FeatureEnvironment = serverEnviro
   return estActive(environnement.FEATURE_CRONS_ENABLED);
 }
 
+// Sous-flag de FEATURE_AI_ENABLED (IA-DEVIS-V1) : fail-closed comme iaEstActive() ci-dessus,
+// pour permettre de couper uniquement la génération assistée de devis sans désactiver le
+// reste de l'assistant IA (rollback isolé). Les deux flags sont vérifiés indépendamment à
+// chaque couche qui peut écrire — voir docs/ia/IA_DEVIS_V1.md.
+export function iaDevisEstActive(environnement: FeatureEnvironment = serverEnvironment): boolean {
+  return environnement.FEATURE_AI_DEVIS_ENABLED?.trim().toLowerCase() === "true";
+}
+
 export const MESSAGE_BOUTIQUE_INDISPONIBLE = "La boutique est indisponible dans cet environnement.";
 export const MESSAGE_IA_INDISPONIBLE = "Les fonctionnalités IA sont désactivées dans cet environnement.";

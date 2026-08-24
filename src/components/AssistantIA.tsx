@@ -6,9 +6,11 @@ import {
   creerDemandeCongeDepuisPropositionAction,
   envoyerMessageInterneDepuisPropositionAction,
   envoyerMessageSupportDepuisPropositionAction,
+  creerDevisDepuisPropositionAction,
 } from "@/app/actions/assistant";
-import type { MessageChat, PropositionAffectation, PropositionConge, PropositionMessageInterne, PropositionMessageSupport } from "@/lib/ai/assistant";
+import type { MessageChat, PropositionAffectation, PropositionConge, PropositionMessageInterne, PropositionMessageSupport, PropositionDevis } from "@/lib/ai/assistant";
 import { lienMaps } from "@/lib/maps";
+import { euros } from "@/lib/devis";
 import { BRAND_NAME, PRODUCT_NAME } from "@/lib/brand";
 
 type MessageAffiche = MessageChat & {
@@ -16,7 +18,9 @@ type MessageAffiche = MessageChat & {
   propositionConge?: PropositionConge;
   propositionMessageInterne?: PropositionMessageInterne;
   propositionMessageSupport?: PropositionMessageSupport;
+  propositionDevis?: PropositionDevis;
   propositionStatut?: "en_attente" | "creee" | "refusee";
+  devisIdCree?: string;
   fichierNom?: string;
 };
 const LIBELLES_TYPE_ACTIVITE: Record<string, string> = { chantier: "Chantier", bureau: "Bureau", depot: "Dépôt", visite_medicale: "Visite médicale", formation: "Formation", conge: "Congé / absence", autre: "Autre" };
@@ -31,6 +35,7 @@ type EvenementSSE =
   | { type: "proposition_conge"; proposition: PropositionConge }
   | { type: "proposition_message_interne"; proposition: PropositionMessageInterne }
   | { type: "proposition_message_support"; proposition: PropositionMessageSupport }
+  | { type: "proposition_devis"; proposition: PropositionDevis }
   | { type: "fin" }
   | { type: "erreur"; message: string };
 
@@ -161,6 +166,8 @@ export function AssistantIA() {
               setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, propositionMessageInterne: evenement.proposition, propositionStatut: "en_attente" } : m)));
             } else if (evenement.type === "proposition_message_support") {
               setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, propositionMessageSupport: evenement.proposition, propositionStatut: "en_attente" } : m)));
+            } else if (evenement.type === "proposition_devis") {
+              setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, propositionDevis: evenement.proposition, propositionStatut: "en_attente" } : m)));
             } else if (evenement.type === "erreur") {
               setErreur(evenement.message);
             }
@@ -285,6 +292,30 @@ export function AssistantIA() {
     startTransition(async () => {
       const res = await envoyerMessageSupportDepuisPropositionAction({ contenu: message.propositionMessageSupport!.contenu });
       setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, propositionStatut: "error" in res ? "en_attente" : "creee" } : m)));
+      if ("error" in res) setErreur(res.error);
+    });
+  }
+
+  function validerPropositionDevis(index: number) {
+    const message = messages[index];
+    if (!message.propositionDevis) return;
+    startTransition(async () => {
+      const res = await creerDevisDepuisPropositionAction({
+        clientId: message.propositionDevis!.clientId,
+        objet: message.propositionDevis!.objet,
+        lignes: message.propositionDevis!.lignes.map((l) => ({
+          designation: l.designation,
+          description: l.description,
+          type: l.type,
+          quantite: l.quantite,
+          unite: l.unite,
+          prixUnitaireHt: l.prixUnitaireHt,
+          tauxTva: l.tauxTva,
+          remiseLigne: l.remiseLigne,
+        })),
+        notesClient: message.propositionDevis!.notesClient,
+      });
+      setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, propositionStatut: "error" in res ? "en_attente" : "creee", devisIdCree: "error" in res ? undefined : res.devisId } : m)));
       if ("error" in res) setErreur(res.error);
     });
   }
@@ -418,6 +449,61 @@ export function AssistantIA() {
                       </div>
                     )}
                     {m.propositionStatut === "creee" && <p className="mt-2 text-xs font-medium text-green-700">✓ Message envoyé au support</p>}
+                    {m.propositionStatut === "refusee" && <p className="mt-2 text-xs text-neutral-500">Ignoré</p>}
+                  </div>
+                )}
+                {m.propositionDevis && (
+                  <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-elsatia-gold/60 bg-elsatia-gold/10 p-3 text-left text-sm">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500">Devis proposé (brouillon)</p>
+                    <p><strong>{m.propositionDevis.clientNom}</strong> · {m.propositionDevis.objet}</p>
+                    {/* Lignes empilées (pas de tableau) : la fenêtre de l'assistant reste étroite
+                        quelle que soit la largeur d'écran — voir AI-DEVIS-V1 §51. */}
+                    <div className="mt-2 space-y-1.5">
+                      {m.propositionDevis.lignes.map((l, li) => (
+                        <div key={li} className="rounded border border-neutral-200 bg-white/60 px-2 py-1.5 dark:border-neutral-700 dark:bg-neutral-900/40">
+                          <p className="font-medium">{l.designation}</p>
+                          <p className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-neutral-600 dark:text-neutral-300">
+                            <span>{l.quantite} {l.unite}</span>
+                            <span>· {l.prixUnitaireHt !== null ? `${euros(l.prixUnitaireHt)} HT/${l.unite}` : "Prix à renseigner"}</span>
+                            {l.prixUnitaireHt !== null && l.sourcePrix === "historique" && <span className="text-amber-700 dark:text-amber-400">(basé sur un devis précédent)</span>}
+                            <span>· TVA {l.tauxTva}%</span>
+                            {l.remiseLigne > 0 && <span>· remise {l.remiseLigne}%</span>}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    {m.propositionDevis.hypotheses.length > 0 && (
+                      <div className="mt-2 rounded bg-amber-100 px-2 py-1.5 text-xs text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
+                        <p className="font-medium">Hypothèses :</p>
+                        <ul className="list-disc pl-4">
+                          {m.propositionDevis.hypotheses.map((h, hi) => (
+                            <li key={hi}>{h}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {m.propositionDevis.avertissement && <p className="mt-1 text-neutral-600 dark:text-neutral-300">{m.propositionDevis.avertissement}</p>}
+                    {m.propositionStatut === "en_attente" && (
+                      <div className="mt-2 flex gap-2">
+                        <button type="button" onClick={() => validerPropositionDevis(i)} disabled={pending} className="rounded-md bg-green-700 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">
+                          Créer le brouillon
+                        </button>
+                        <button type="button" onClick={() => refuserProposition(i)} className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium">
+                          Ignorer
+                        </button>
+                      </div>
+                    )}
+                    {m.propositionStatut === "creee" && (
+                      <p className="mt-2 text-xs font-medium text-green-700">
+                        ✓ Brouillon de devis créé
+                        {m.devisIdCree && (
+                          <>
+                            {" · "}
+                            <a href={`/devis/${m.devisIdCree}`} className="underline">Ouvrir le devis</a>
+                          </>
+                        )}
+                      </p>
+                    )}
                     {m.propositionStatut === "refusee" && <p className="mt-2 text-xs text-neutral-500">Ignoré</p>}
                   </div>
                 )}

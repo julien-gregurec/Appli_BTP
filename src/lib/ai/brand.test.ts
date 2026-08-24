@@ -20,6 +20,7 @@ describe("identite de l'assistant IA", () => {
       aujourdhui: "1 août 2026",
       descriptionUtilisateur: "Tu parles avec Camille. ",
       consigneAffectation: "Vérifie les droits de planning. ",
+      consigneDevis: "Vérifie les droits de devis. ",
     });
 
     expect(prompt).toContain(`assistant intégré de ${PRODUCT_NAME}`);
