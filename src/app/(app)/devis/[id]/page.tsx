@@ -46,6 +46,10 @@ export default async function DevisDetailPage({ params, searchParams }: { params
     ? (await supabase.from("chantiers").select("id,nom,ville,statut").eq("entreprise_id", ctx.entrepriseId).eq("client_id", devis.client_id).not("statut", "in", "(archive,annule)").order("nom")).data ?? []
     : [];
 
+  const { data: chantierIssuDuDevis } = peutGererDevis && devis.statut === "accepte"
+    ? await supabase.from("chantiers").select("id, nom").eq("devis_source_id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle()
+    : { data: null };
+
   const client = Array.isArray(devis.client) ? devis.client[0] : devis.client;
   const chantier = Array.isArray(devis.chantier) ? devis.chantier[0] : devis.chantier;
   const typeLabel = (t: string) => LIGNE_TYPES.find((x) => x.cle === t)?.libelle ?? t;
@@ -225,6 +229,23 @@ export default async function DevisDetailPage({ params, searchParams }: { params
         )}
 
         <SignatureDocumentMetier type="devis" documentId={id} />
+
+        {peutGererDevis && devis.statut === "accepte" && (
+          <div className="flex flex-wrap items-center gap-3 border-t border-neutral-100 pt-4 dark:border-neutral-800">
+            {chantierIssuDuDevis ? (
+              <>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">Un chantier existe déjà pour ce devis.</p>
+                <Link href={`/chantiers/${chantierIssuDuDevis.id}`} className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium dark:border-neutral-700">
+                  Ouvrir le chantier
+                </Link>
+              </>
+            ) : (
+              <Link href={`/devis/${id}/creer-chantier`} className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium dark:border-neutral-700">
+                Créer un chantier à partir de ce devis
+              </Link>
+            )}
+          </div>
+        )}
 
         <div className="flex items-center justify-between border-t border-neutral-100 pt-4 dark:border-neutral-800">
           {devis.statut === "accepte" ? (

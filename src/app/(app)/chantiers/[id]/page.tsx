@@ -45,6 +45,10 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
 
   if (!chantier) notFound();
 
+  const { data: devisSource } = chantier.devis_source_id
+    ? await supabase.from("devis").select("id, numero").eq("id", chantier.devis_source_id).eq("entreprise_id", ctx.entrepriseId).maybeSingle()
+    : { data: null };
+
   const { data: taches } = await supabase
     .from("taches")
     .select("id, libelle, description, statut, echeance, devis_id")
@@ -128,9 +132,16 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
           {ligne("Type", type?.nom)}
           {ligne("Adresse", chantier.adresse)}
           {ligne("Code postal / Ville", [chantier.code_postal, chantier.ville].filter(Boolean).join(" "))}
+          {ligne("Description", chantier.description)}
           {ligne("Début prévu", chantier.date_debut_prevue)}
           {ligne("Fin prévue", chantier.date_fin_prevue)}
           {peutVoirFinances && ligne("Budget prévisionnel", chantier.budget_previsionnel ? `${chantier.budget_previsionnel} €` : null)}
+          {devisSource && (
+            <div className="flex gap-2 text-sm">
+              <span className="w-40 flex-none text-neutral-500">Devis source</span>
+              <Link href={`/devis/${devisSource.id}`} className="hover:underline">Voir le devis d’origine{devisSource.numero ? ` (${devisSource.numero})` : ""}</Link>
+            </div>
+          )}
         </section>
 
         {(documents??[]).length>0&&<section className="space-y-3 rounded-md border border-blue-200 bg-blue-50/40 p-4"><div className="flex items-center justify-between gap-3"><div><h2 className="font-semibold">Plans et pièces jointes autorisées</h2><p className="text-sm text-neutral-500">Seuls les documents autorisés pour votre rôle sont affichés.</p></div><Link href={`/chantiers/${id}/documents`} className="text-sm font-medium text-blue-800 hover:underline">Tout consulter</Link></div><div className="grid gap-2 sm:grid-cols-2">{(documents??[]).slice().sort((a,b)=>(a.categorie==="plan"?0:1)-(b.categorie==="plan"?0:1)).slice(0,6).map(document=><a key={document.id} href={`/api/documents/${document.id}`} target="_blank" rel="noopener" className="rounded-md border bg-white p-3 text-sm hover:border-blue-400"><strong className="block truncate">{document.categorie==="plan"?"📐 Plan · ":"📎 "}{document.nom}</strong>{document.note&&<span className="mt-1 block text-xs text-neutral-500">{document.note}</span>}</a>)}</div></section>}
