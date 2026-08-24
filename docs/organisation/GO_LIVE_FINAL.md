@@ -364,6 +364,26 @@ externes (INPI/INSEE, banque, KYC) — aucun blocage technique.
 9. Premier paiement réel de test, vérification, remboursement de recette.
 10. GO commercial payant.
 
+## PRE-LIVE-CLEANUP-V1 (2026-08-24)
+
+Voir `docs/organisation/PRE_LIVE_CLEANUP_V1.md` pour le détail complet. Résumé :
+
+- **Corrigé** : profil professionnel Stripe (nom/URL, Test uniquement — plus de branding
+  Liria), placeholders de date `[JJ/MM/AAAA]` sur 8 documents juridiques (dates réelles
+  vérifiées par git log), sous-traitant OpenAI ajouté au registre RGPD et au DPA client
+  (manquant depuis l'activation de l'IA), `noindex`/`nofollow` ajouté aux 5 pages légales de
+  l'application (absent, contrairement au site vitrine), résidu Auth de recette
+  (`RECETTE-RELANCES-PROD-V1`) supprimé proprement (données métier résiduelles conservées,
+  bloquées par le trigger d'immutabilité comme documenté), test explicite du quota IA
+  dépassé ajouté (7 tests), correctif `aria-live` trivial sur le retour de statut des
+  relances manuelles.
+- **En attente externe (non touché)** : token Vercel Protection Bypass Preview (rotation
+  nécessite une action manuelle utilisateur — Vercel ne permet aucun mode « caché » pour
+  cette régénération, contrairement aux variables d'environnement), SIRET/RCS/APE/TVA
+  définitifs (INPI/INSEE), assurance RC Pro.
+- **Roadmap (non bloquant)** : accessibilité au-delà du correctif trivial (audit WCAG
+  complet), produit Stripe Test orphelin `myproduct` (nettoyage cosmétique différé).
+
 ## 55-56. Documentation / Git
 
 Ce document créé (`docs/organisation/GO_LIVE_FINAL.md`). `P15_GO_LIVE_CHECKLIST.md` non

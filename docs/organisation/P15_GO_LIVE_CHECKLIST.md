@@ -2,6 +2,11 @@
 
 Checklist courte de bascule Stripe Test → Live. Ne rien cocher tant que l'élément n'est pas réellement vérifié. Référence complète : `P15_STRIPE_LIVE_PREPARATION.md` et `STRIPE_LIVE_CHECKLIST.md` (P13).
 
+**État au 24/08/2026** : aucune case ci-dessous n'est cochée, et c'est l'état réel — rien de ce
+qui suit n'a été fait (voir `GO_LIVE_FINAL.md` et `PRE_LIVE_CLEANUP_V1.md`). Le nettoyage
+technique/documentaire pré-Live (PRE-LIVE-CLEANUP-V1) est terminé ; les seuls blocages
+restants avant de pouvoir cocher la première case sont externes (INPI/INSEE, banque, TVA).
+
 ## Administratif (bloquant, externe)
 
 - [ ] INPI/INSEE finalisé (SIREN/SIRET confirmés par écrit)
