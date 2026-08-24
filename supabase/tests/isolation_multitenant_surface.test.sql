@@ -63,6 +63,10 @@ select ok(
   'Le rôle anonyme ne peut pas appeler la mutation tarifaire plateforme'
 );
 
+-- ROADMAP-CLEANUP-V1 §12 : document_commercial_par_token(text) est volontairement
+-- SECURITY DEFINER + exécutable par anon (20260812000200_documents_commerciaux_p9.sql)
+-- pour les liens de partage public de devis/factures -- exclue explicitement plutôt que
+-- de relâcher l'assertion pour toute future fonction anon involontaire.
 select is(
   (
     select count(*)::integer
@@ -72,9 +76,10 @@ select is(
       and p.prosecdef
       and has_function_privilege('anon', p.oid, 'EXECUTE')
       and p.prorettype <> 'trigger'::regtype
+      and p.proname <> 'document_commercial_par_token'
   ),
   0,
-  'Aucune fonction SECURITY DEFINER métier n’est exécutable par anon'
+  'Aucune fonction SECURITY DEFINER métier n’est exécutable par anon (hors partage public documenté)'
 );
 
 select is(

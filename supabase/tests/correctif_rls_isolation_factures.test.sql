@@ -109,29 +109,34 @@ select lives_ok(
 );
 
 -- 6.3 Updates interdites (18-22, sens A -> B, sur la facture existante de la fixture)
+-- ROADMAP-CLEANUP-V1 §12 : depuis verrouiller_facture_emise() (20260822000222), la facture
+-- fixture (statut='envoyee', non-brouillon) est verrouillée avant même que la violation
+-- RLS/FK ne soit évaluée -- le message attendu est donc désormais celui du trigger
+-- d'immutabilité, pas '%violates%'. L'isolation cross-tenant reste bien vérifiée (le blocage
+-- a toujours lieu), le mécanisme qui la garantit ici est simplement différent.
 select throws_like(
   $$update public.factures set client_id = 'b3000000-0000-0000-0000-000000000001' where id = 'aa000000-0000-0000-0000-000000000001'$$,
-  '%violates%', '18. Facture A ne peut pas être modifiée pour pointer vers un client B'
+  '%a déjà été émise%', '18. Facture A ne peut pas être modifiée pour pointer vers un client B'
 );
 
 select throws_like(
   $$update public.factures set devis_origine_id = 'b9000000-0000-0000-0000-000000000001' where id = 'aa000000-0000-0000-0000-000000000001'$$,
-  '%violates%', '19. Facture A ne peut pas être modifiée pour pointer vers un devis B'
+  '%a déjà été émise%', '19. Facture A ne peut pas être modifiée pour pointer vers un devis B'
 );
 
 select throws_like(
   $$update public.factures set facture_origine_id = 'ba000000-0000-0000-0000-000000000001' where id = 'aa000000-0000-0000-0000-000000000001'$$,
-  '%violates%', '20. Facture A ne peut pas être modifiée pour pointer vers une facture d''origine B'
+  '%a déjà été émise%', '20. Facture A ne peut pas être modifiée pour pointer vers une facture d''origine B'
 );
 
 select throws_like(
   $$update public.factures set facture_parente_id = 'ba000000-0000-0000-0000-000000000001' where id = 'aa000000-0000-0000-0000-000000000001'$$,
-  '%violates%', '21. Facture A ne peut pas être modifiée pour pointer vers une facture parente B'
+  '%a déjà été émise%', '21. Facture A ne peut pas être modifiée pour pointer vers une facture parente B'
 );
 
 select throws_like(
   $$update public.factures set entreprise_id = 'b0000000-0000-0000-0000-000000000001' where id = 'aa000000-0000-0000-0000-000000000001'$$,
-  '%violates%', '22. Facture ne peut pas changer d''entreprise en conservant des relations devenues incompatibles (refus RLS ou FK)'
+  '%a déjà été émise%', '22. Facture ne peut pas changer d''entreprise en conservant des relations devenues incompatibles (refus RLS, FK, ou verrou d''immutabilité)'
 );
 
 -- Contrôle miroir essentiel B -> A
@@ -142,12 +147,12 @@ select set_config('request.jwt.claim.email', 'admin-b@invalid.local', true);
 
 select throws_like(
   $$update public.factures set client_id = 'a3000000-0000-0000-0000-000000000001' where id = 'ba000000-0000-0000-0000-000000000001'$$,
-  '%violates%', 'Contrôle miroir B->A : facture B ne peut pas pointer vers un client A'
+  '%a déjà été émise%', 'Contrôle miroir B->A : facture B ne peut pas pointer vers un client A'
 );
 
 select throws_like(
   $$update public.factures set devis_origine_id = 'a9000000-0000-0000-0000-000000000001' where id = 'ba000000-0000-0000-0000-000000000001'$$,
-  '%violates%', 'Contrôle miroir B->A : facture B ne peut pas pointer vers un devis A'
+  '%a déjà été émise%', 'Contrôle miroir B->A : facture B ne peut pas pointer vers un devis A'
 );
 
 -- 6.4 Non-régression (23-28)
