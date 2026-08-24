@@ -1,5 +1,13 @@
 # RELANCES-AUTO-V1 — Relances automatiques et manuelles contrôlées (devis, factures)
 
+## Statut Production
+
+Activé en Production réelle par
+[RELANCES_AUTO_PROD_ACTIVATION_V1.md](./RELANCES_AUTO_PROD_ACTIVATION_V1.md) :
+`FEATURE_RELANCES_AUTO_ENABLED=true` sur `elsatia-production`, cron découplé de
+`FEATURE_CRONS_ENABLED` (jamais activé pour ce lot, reste `false`), `CRON_SECRET` — absent
+avant ce lot d'activation, découverte réelle documentée là-bas — désormais présent.
+
 ## Découvertes réelles en cours de lot
 
 1. **Un système de relance existait déjà partiellement, mais pour un besoin différent** :
