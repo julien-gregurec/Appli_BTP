@@ -22,7 +22,29 @@ type MessageAffiche = MessageChat & {
   propositionStatut?: "en_attente" | "creee" | "refusee";
   devisIdCree?: string;
   fichierNom?: string;
+  // Contenu textuel à renvoyer au modèle pour CE message dans l'historique de la prochaine
+  // requête, différent de ce qui est affiché dans la bulle (`contenu`). Sans ça, le modèle
+  // n'a plus aucune trace de la proposition qu'il vient de faire dès le tour suivant — il ne
+  // peut donc pas appliquer une correction ("passe la cloison à 130 m²") sur la proposition
+  // précédente, et en régénère une différente. Découvert en recette réelle IA-DEVIS-V1.
+  contenuPourModele?: string;
 };
+
+function resumeDevisPourModele(p: PropositionDevis): string {
+  const lignes = p.lignes
+    .map((l) => {
+      const prix = l.prixUnitaireHt !== null ? `${l.prixUnitaireHt} €HT/${l.unite} (source: ${l.sourcePrix})` : "prix non renseigné (source: absent)";
+      const remise = l.remiseLigne > 0 ? `, remise ${l.remiseLigne}%` : "";
+      return `- ${l.designation} | type ${l.type} | ${l.quantite} ${l.unite} | ${prix} | TVA ${l.tauxTva}%${remise}`;
+    })
+    .join("\n");
+  const hypotheses = p.hypotheses.length ? `\nHypothèses : ${p.hypotheses.join(" ; ")}` : "";
+  return (
+    `[Proposition de devis déjà faite à l'utilisateur, PAS ENCORE confirmée. Si l'utilisateur demande une modification, ` +
+    `rappelle proposer_devis avec CES MÊMES lignes en appliquant uniquement le changement demandé — ne régénère pas le reste depuis zéro.]\n` +
+    `client_id: ${p.clientId} (${p.clientNom})\nObjet: ${p.objet}\nLignes:\n${lignes}${hypotheses}`
+  );
+}
 const LIBELLES_TYPE_ACTIVITE: Record<string, string> = { chantier: "Chantier", bureau: "Bureau", depot: "Dépôt", visite_medicale: "Visite médicale", formation: "Formation", conge: "Congé / absence", autre: "Autre" };
 const LIBELLES_TYPE_CONGE: Record<string, string> = { conges_payes: "Congés payés", rtt: "RTT", sans_solde: "Sans solde", maladie: "Maladie", evenement_familial: "Événement familial", recuperation: "Récupération", autre: "Autre" };
 const LIBELLES_DEMI_JOURNEE: Record<string, string> = { journee: "journée entière", matin: "matin", apres_midi: "après-midi" };
@@ -131,7 +153,7 @@ export function AssistantIA() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            historique: historiqueEnvoye.map((m) => ({ role: m.role, contenu: m.contenu, fichier: m.fichier })),
+            historique: historiqueEnvoye.map((m) => ({ role: m.role, contenu: m.contenuPourModele ?? m.contenu, fichier: m.fichier })),
           }),
         });
         if (!res.ok || !res.body) {
@@ -167,7 +189,8 @@ export function AssistantIA() {
             } else if (evenement.type === "proposition_message_support") {
               setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, propositionMessageSupport: evenement.proposition, propositionStatut: "en_attente" } : m)));
             } else if (evenement.type === "proposition_devis") {
-              setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, propositionDevis: evenement.proposition, propositionStatut: "en_attente" } : m)));
+              const resume = resumeDevisPourModele(evenement.proposition);
+              setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, propositionDevis: evenement.proposition, propositionStatut: "en_attente", contenuPourModele: resume } : m)));
             } else if (evenement.type === "erreur") {
               setErreur(evenement.message);
             }
