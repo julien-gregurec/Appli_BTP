@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { boutiqueEstActive, cronsSontActifs, iaEstActive } from "./preview-features";
+import { boutiqueEstActive, cronsSontActifs, iaEstActive, iaDevisEstActive } from "./preview-features";
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -40,5 +40,33 @@ describe("FEATURE_AI_ENABLED — fail-closed", () => {
     expect(iaEstActive({ FEATURE_AI_ENABLED: "1" })).toBe(false);
     expect(iaEstActive({ FEATURE_AI_ENABLED: "vrai" })).toBe(false);
     expect(iaEstActive({ FEATURE_AI_ENABLED: "" })).toBe(false);
+  });
+});
+
+// IA-DEVIS-PROD-ACTIVATION-V1 §6 : sous-flag de FEATURE_AI_ENABLED, même exigence fail-closed
+// — une variable absente ou mal orthographiée ne doit jamais exposer les outils IA devis.
+describe("FEATURE_AI_DEVIS_ENABLED — fail-closed", () => {
+  it("désactive l'IA devis quand la variable est absente", () => {
+    expect(iaDevisEstActive({})).toBe(false);
+  });
+
+  it("désactive l'IA devis quand la variable vaut explicitement 'false'", () => {
+    expect(iaDevisEstActive({ FEATURE_AI_DEVIS_ENABLED: "false" })).toBe(false);
+  });
+
+  it("active l'IA devis uniquement quand la variable vaut exactement 'true'", () => {
+    expect(iaDevisEstActive({ FEATURE_AI_DEVIS_ENABLED: "true" })).toBe(true);
+    expect(iaDevisEstActive({ FEATURE_AI_DEVIS_ENABLED: "TRUE" })).toBe(true);
+    expect(iaDevisEstActive({ FEATURE_AI_DEVIS_ENABLED: " true " })).toBe(true);
+  });
+
+  it("désactive l'IA devis pour toute autre valeur, y compris une faute de frappe", () => {
+    expect(iaDevisEstActive({ FEATURE_AI_DEVIS_ENABLED: "1" })).toBe(false);
+    expect(iaDevisEstActive({ FEATURE_AI_DEVIS_ENABLED: "vrai" })).toBe(false);
+    expect(iaDevisEstActive({ FEATURE_AI_DEVIS_ENABLED: "" })).toBe(false);
+  });
+
+  it("reste indépendant de FEATURE_AI_ENABLED : l'IA générale active seule n'expose pas l'IA devis", () => {
+    expect(iaDevisEstActive({ FEATURE_AI_ENABLED: "true" })).toBe(false);
   });
 });
