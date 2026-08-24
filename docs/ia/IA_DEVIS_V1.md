@@ -1,5 +1,46 @@
 # IA-DEVIS-V1 — Génération assistée d'un brouillon de devis
 
+## Bugs réels découverts et corrigés en recette live
+
+Trois défauts réels ont été découverts en testant le flux complet contre un
+vrai appel OpenAI (pas seulement via les tests unitaires) — tous corrigés et
+reconfirmés avant la clôture du lot :
+
+1. **Aucune mémoire de la proposition entre deux tours** — `proposer_devis`
+   étant un outil terminal, la boucle agentique retourne immédiatement sans
+   jamais ajouter la proposition à l'historique renvoyé au modèle au tour
+   suivant (seul le texte qui précède l'appel outil, souvent vide, était
+   conservé côté client). Constat concret : « passe la cloison à 130 m² et
+   mets les portes à 280 € » ne modifiait rien, le modèle régénérait une
+   proposition différente à partir de zéro. Corrigé en faisant porter au
+   client un résumé textuel fidèle de la proposition (client, objet, lignes
+   avec prix/source, hypothèses), distinct de ce qui est affiché dans la
+   bulle, renvoyé comme contenu de ce message dans l'historique de la
+   requête suivante. Le même défaut affecte probablement aussi les 4 autres
+   propositions terminales existantes de l'assistant (affectation, congé,
+   messages) — non corrigé pour elles, hors périmètre de ce lot, à traiter
+   séparément.
+2. **Recherche de prix historique/catalogue non symétrique** — un `ILIKE
+   "%terme%"` directionnel ne matche que si la désignation enregistrée
+   *contient* le terme cherché, jamais l'inverse. Constat concret : le
+   modèle a cherché « Faux plafond fourni et posé » (reformulation
+   naturelle), la ligne enregistrée s'appelait « Faux plafond » (plus
+   courte) — aucun résultat alors que la donnée existait, le prix est
+   ressorti "à renseigner" au lieu de "historique". Corrigé pour les deux
+   outils de recherche de prix (`rechercher_prestations_devis` utilisait le
+   même défaut avec `correspondTousLesMots`, qui exige que tous les mots du
+   terme cherché soient présents) par un rapprochement par chevauchement
+   d'au moins un mot significatif, dans un sens comme dans l'autre.
+3. **Type de ligne sensible à la casse** — le paramètre `type` de l'outil
+   n'est qu'indicatif côté API (`strict: false`, même limitation que pour
+   tous les outils existants de l'assistant) : rien n'empêche le modèle de
+   renvoyer une casse différente. Constat concret : le modèle a renvoyé
+   « Fourniture » (majuscule) sur les trois lignes d'une même proposition,
+   la comparaison stricte les a toutes fait retomber silencieusement sur le
+   repli `"forfait"` — lui-même une valeur valide, donc invisible sans
+   inspecter les données réellement créées. Corrigé par une comparaison
+   insensible à la casse/aux espaces.
+
 ## Objectif
 
 Permettre de demander à l'assistant IA (chat intégré) de préparer un devis à
@@ -269,15 +310,16 @@ Production dans le cadre de ce lot (§69).
 
 ## Tests
 
-- 20 tests Vitest (`src/lib/ai/assistant-devis.test.ts`) sur
+- 24 tests Vitest (`src/lib/ai/assistant-devis.test.ts`) sur
   `resoudrePropositionDevis` (exporté pour ce test, seul résolveur du
   fichier à l'être — les autres suivent la convention existante de
   vérification par recette live plutôt que par export) : demande simple,
   multi-lignes, client trouvé/absent/autre-tenant, prix
   fiable/historique/absent, source incohérente requalifiée, unité/type/TVA
-  hors liste, quantité invalide (ligne rejetée, puis proposition entière),
-  remise hors bornes, hypothèses filtrées, objet vide, troncature à 40
-  lignes, prix négatif rejeté, commentaire transmis.
+  hors liste (dont une régression réelle : type dans une casse différente),
+  quantité invalide (ligne rejetée, puis proposition entière), remise hors
+  bornes, hypothèses filtrées, objet vide, troncature à 40 lignes, prix
+  négatif rejeté, commentaire transmis.
 - 11 tests Vitest (`src/app/actions/assistant-devis.test.ts`) sur
   `creerDevisDepuisPropositionAction` : création valide, permission absente,
   sous-flag désactivé, flag global désactivé, objet vide, aucune ligne
@@ -289,15 +331,43 @@ Production dans le cadre de ce lot (§69).
 
 ## Recette Preview
 
-`FEATURE_AI_DEVIS_ENABLED=true` activé temporairement sur `elsatia-preview`
-pour la recette manuelle réelle (fixture `RECETTE-IA-DEVIS-V1`) : demande en
-langage naturel avec prestations catalogue + historique + absentes,
-modification conversationnelle avant confirmation, annulation (0 écriture),
-confirmation (exactement 1 brouillon), double-clic (idempotence), test
-cross-tenant réel (entreprise A ne peut pas exploiter client/prestation/prix
-d'une entreprise B via les outils IA-devis), tentatives d'injection de
-prompt (prix à 0 forcé, statut accepté direct, contournement des droits) —
-toutes refusées par l'architecture capability-based existante.
+`FEATURE_AI_DEVIS_ENABLED=true` activé sur `elsatia-preview` (reste activé
+après ce lot, Preview uniquement) pour une recette manuelle réelle contre un
+vrai appel OpenAI, fixture créée dans l'entreprise de test existante
+`RECETTE-WORKFLOW-DEVIS-V1` (client `RECETTE-IA-DEVIS-V1`, une prestation
+catalogue, une ligne de devis historique jetable) :
+
+- Demande en langage naturel avec les trois sources de prix simultanément
+  (« 120 m² de cloison 72/48 avec isolation, 3 portes et 80 m² de faux
+  plafond ») → proposition correcte : cloison en catalogue (45 €), portes
+  en absent (« Prix à renseigner », aucun prix inventé), faux plafond en
+  historique (28 €, signalé « basé sur un devis précédent »).
+- Modification conversationnelle avant confirmation (« passe la cloison à
+  130 m² et mets les portes à 280 € ») → proposition correctement mise à
+  jour, seules les deux valeurs demandées changent (bug réel trouvé et
+  corrigé pour ce test, voir plus haut).
+- Confirmation → exactement un devis brouillon créé, lignes/totaux/notes
+  conformes, vérifié directement en base.
+- Triple-clic sur « Créer le brouillon » → exactement un seul devis créé
+  (idempotence, vérifié en base).
+- Tentative d'injection de prompt réelle (devis accepté directement sans
+  confirmation, prix de marché inventé, contournement explicite des
+  instructions) → refusée intégralement par le modèle lui-même, aucun outil
+  appelé, message clair expliquant les limites (brouillon uniquement, prix
+  jamais inventé, validation manuelle requise).
+- Nettoyage complet des fixtures après recette (client, prestation,
+  devis de test) : aucun résidu permanent pour ce lot, tous les devis créés
+  étant restés à l'état brouillon (jamais acceptés, donc jamais bloqués par
+  `verrouiller_devis_accepte()`).
+
+**Non testé en live, couvert par les tests unitaires + l'architecture RLS
+déjà éprouvée dans les lots précédents** : cross-tenant réel (couvert par le
+test unitaire « client d'une autre entreprise » + la policy restrictive
+`gerer_devis` déjà vérifiée en conditions réelles lors de
+WORKFLOW-DEVIS-V1) et un compte Terrain réel (aucun poste sans `gerer_devis`
+disponible dans l'entreprise de test existante ; couvert par les tests
+unitaires sur `peutGererDevis=false` et par le filtrage des outils de
+lecture par `acces_devis`).
 
 ## Limites V1
 
