@@ -288,3 +288,24 @@ export async function genererDevisIAAction(description: string) {
     return { error: messageErreurUtilisateur("genererDevisIAAction", err, "La génération assistée du devis n’est pas disponible pour le moment.") };
   }
 }
+
+export async function retirerPieceJointeDevisAction(devisId: string, pieceId: string) {
+  const supabase = await createClient();
+  const { data: path, error } = await supabase.rpc("retirer_piece_jointe_devis", { p_piece_id: pieceId });
+  if (error || !path) {
+    redirect(`/devis/${devisId}?error=${encodeURIComponent(messageErreurUtilisateur("retirerPieceJointeDevisAction", error, "Cette pièce jointe n’a pas pu être retirée."))}`);
+  }
+  await supabase.storage.from("devis-medias").remove([path]);
+  revalidatePath(`/devis/${devisId}`);
+  redirect(`/devis/${devisId}?success=${encodeURIComponent("Pièce jointe retirée")}`);
+}
+
+export async function retirerPieceJointeDevisEnEditionAction(pieceId: string): Promise<{ ok: true } | { error: string }> {
+  const supabase = await createClient();
+  const { data: path, error } = await supabase.rpc("retirer_piece_jointe_devis", { p_piece_id: pieceId });
+  if (error || !path) {
+    return { error: messageErreurUtilisateur("retirerPieceJointeDevisEnEditionAction", error, "Cette pièce jointe n’a pas pu être retirée.") };
+  }
+  await supabase.storage.from("devis-medias").remove([path]);
+  return { ok: true };
+}

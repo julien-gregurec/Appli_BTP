@@ -5,7 +5,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { euros, LIGNE_TYPES } from "@/lib/devis";
 import { nomClient } from "@/lib/chantier-statuts";
 import { StatutDevisSelect } from "@/components/StatutDevisSelect";
-import { associerDevisChantierAction, dupliquerDevisAction, supprimerDevisAction, envoyerDevisEmailAction } from "@/app/actions/devis";
+import { associerDevisChantierAction, dupliquerDevisAction, supprimerDevisAction, envoyerDevisEmailAction, retirerPieceJointeDevisAction } from "@/app/actions/devis";
 import { creerFactureDepuisDevisAction } from "@/app/actions/factures";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { contenuEmailDocument } from "@/lib/email";
@@ -202,9 +202,21 @@ export default async function DevisDetailPage({ params, searchParams }: { params
                   )}
                   <div className="flex items-center justify-between gap-2 border-t border-neutral-200 px-3 py-2 text-xs dark:border-neutral-800">
                     <span className="min-w-0 truncate">{piece.legende || piece.nom_original}</span>
-                    <a href={`/api/devis/pieces-jointes/${piece.id}?download=1`} className="shrink-0 font-medium text-blue-700 hover:underline dark:text-blue-300">
-                      Télécharger
-                    </a>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <a href={`/api/devis/pieces-jointes/${piece.id}?download=1`} className="font-medium text-blue-700 hover:underline dark:text-blue-300">
+                        Télécharger
+                      </a>
+                      {peutGererDevis && (
+                        <form action={retirerPieceJointeDevisAction.bind(null, id, piece.id)}>
+                          <ConfirmSubmitButton
+                            message={`Retirer « ${piece.legende || piece.nom_original} » de ce devis ?`}
+                            className="font-medium text-red-700 hover:underline dark:text-red-400"
+                          >
+                            Retirer
+                          </ConfirmSubmitButton>
+                        </form>
+                      )}
+                    </div>
                   </div>
                 </article>
               ))}

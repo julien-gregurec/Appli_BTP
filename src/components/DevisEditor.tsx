@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { LIGNE_TYPES, UNITES, TAUX_TVA, euros, calcTotaux, type LigneDevis } from "@/lib/devis";
 import { prestationVersLigne, type PrestationCatalogue } from "@/lib/prestations";
-import { creerDevisAction, modifierDevisAction, genererDevisIAAction } from "@/app/actions/devis";
+import { creerDevisAction, modifierDevisAction, genererDevisIAAction, retirerPieceJointeDevisEnEditionAction } from "@/app/actions/devis";
 import { creerPrestationDepuisLigneAction } from "@/app/actions/prestations";
 import { creerClientRapideAction } from "@/app/actions/clients";
 import { creerChantierRapideAction } from "@/app/actions/chantiers";
@@ -27,6 +27,7 @@ type DevisInitial = {
   remise_globale: number;
   notes_client: string | null;
   lignes: LigneDevis[];
+  pieces?: { id: string; nom_original: string; legende: string | null; type_media: "image" | "audio" }[];
 };
 
 const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
@@ -87,6 +88,8 @@ export function DevisEditor({
   const [descriptionIA, setDescriptionIA] = useState("");
   const [erreurIA, setErreurIA] = useState<string | null>(null);
   const [medias, setMedias] = useState<File[]>([]);
+  const [piecesExistantes, setPiecesExistantes] = useState(devisInitial?.pieces ?? []);
+  const [retraitEnCours, setRetraitEnCours] = useState<string | null>(null);
   const [enregistrementVocal, setEnregistrementVocal] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const fluxAudioRef = useRef<MediaStream | null>(null);
@@ -231,7 +234,19 @@ export function DevisEditor({
       }
       valides.push(new File([fichier], fichier.name, { type: mime }));
     }
-    setMedias((actuels) => [...actuels, ...valides].slice(0, DEVIS_MEDIA_NOMBRE_MAX));
+    const place = Math.max(0, DEVIS_MEDIA_NOMBRE_MAX - piecesExistantes.length);
+    setMedias((actuels) => [...actuels, ...valides].slice(0, place));
+  }
+
+  async function retirerPieceExistante(pieceId: string) {
+    setRetraitEnCours(pieceId);
+    const resultat = await retirerPieceJointeDevisEnEditionAction(pieceId);
+    if ("error" in resultat) {
+      setErreur(resultat.error);
+    } else {
+      setPiecesExistantes((liste) => liste.filter((p) => p.id !== pieceId));
+    }
+    setRetraitEnCours(null);
   }
 
   async function basculerEnregistrementVocal() {
@@ -587,11 +602,34 @@ export function DevisEditor({
             Ajoutez jusqu’à six photos ou fichiers audio (20 Mo maximum chacun). Ils restent privés et liés au devis.
           </p>
         </div>
+        {piecesExistantes.length > 0 && (
+          <ul className="grid gap-2 sm:grid-cols-2">
+            {piecesExistantes.map((piece) => (
+              <li key={piece.id} className="flex items-center justify-between rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm dark:border-neutral-800 dark:bg-neutral-900">
+                <span className="min-w-0 truncate">{piece.type_media === "image" ? "Photo" : "Audio"} · {piece.legende || piece.nom_original} (déjà enregistré)</span>
+                <button
+                  type="button"
+                  disabled={retraitEnCours === piece.id}
+                  onClick={() => retirerPieceExistante(piece.id)}
+                  className="ml-2 shrink-0 text-red-600 disabled:opacity-50"
+                >
+                  {retraitEnCours === piece.id ? "Retrait…" : "Retirer"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {piecesExistantes.length + medias.length >= DEVIS_MEDIA_NOMBRE_MAX && (
+          <p className="text-xs text-amber-700 dark:text-amber-400">
+            Limite de {DEVIS_MEDIA_NOMBRE_MAX} pièces atteinte — retirez-en une pour en ajouter une autre.
+          </p>
+        )}
         <div className="flex flex-wrap gap-2">
-          <label className="cursor-pointer rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900">
+          <label className={`rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium dark:border-neutral-700 ${piecesExistantes.length + medias.length >= DEVIS_MEDIA_NOMBRE_MAX ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-900"}`}>
             Ajouter des photos ou un audio
             <input
               type="file"
+              disabled={piecesExistantes.length + medias.length >= DEVIS_MEDIA_NOMBRE_MAX}
               multiple
               accept={DEVIS_MEDIA_MIME_TYPES.join(",")}
               className="sr-only"
