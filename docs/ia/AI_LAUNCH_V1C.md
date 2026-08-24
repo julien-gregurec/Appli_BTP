@@ -1,5 +1,7 @@
 # AI-LAUNCH-V1C — Clôture : coûts IA restants + recette interactive réelle
 
+**Production activée le 24-08-2026** (`AI-PROD-ACTIVATION-V1`, `FEATURE_AI_ENABLED=true` sur `app.elsatia.fr`) — voir `AI_PROD_ACTIVATION_V1.md`.
+
 Mini-lot de clôture demandé après AI-LAUNCH-V1B (rapport initial `PARTIEL`), pour lever les deux réserves explicitement formulées : le suivi coûts/jetons incomplet en dehors de l'assistant, et l'absence de recette interactive réelle (mobile, clavier, annulation/modification, double confirmation).
 
 ## 1. Coûts/jetons — 5 fonctionnalités IA restantes corrigées
