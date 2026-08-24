@@ -123,7 +123,7 @@ describe("appliquerRemiseAction — permissions et validation", () => {
 
     await expect(appliquerRemiseAction("entreprise-1", formData)).rejects.toThrow(/REDIRECT:\/plateforme\?succes=/);
 
-    const appel = mocks.creerCouponRemise.mock.calls[0][0] as { nom: string };
+    const appel = mocks.creerCouponRemise.mock.calls[0][0] as unknown as { nom: string };
     expect(appel.nom.length).toBeLessThanOrEqual(40);
     expect(appel.nom.endsWith("— 10 % à vie")).toBe(true);
   });
@@ -134,7 +134,7 @@ describe("appliquerRemiseAction — permissions et validation", () => {
 
     await expect(appliquerRemiseAction("entreprise-1", formData)).rejects.toThrow(/REDIRECT:\/plateforme\?succes=/);
 
-    const appel = mocks.creerCouponRemise.mock.calls[0][0] as { nom: string };
+    const appel = mocks.creerCouponRemise.mock.calls[0][0] as unknown as { nom: string };
     expect(appel.nom).toBe("Entreprise Test — 10 % une fois");
   });
 
