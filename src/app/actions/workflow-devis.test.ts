@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   chantierExistant: null as Record<string, unknown> | null,
   client: null as Record<string, unknown> | null,
   chantierLie: null as Record<string, unknown> | null,
-  rpc: vi.fn(async () => ({ data: "chantier-nouveau", error: null })),
+  rpc: vi.fn(async (): Promise<{ data: string | null; error: { message: string } | null }> => ({ data: "chantier-nouveau", error: null })),
 }));
 
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
