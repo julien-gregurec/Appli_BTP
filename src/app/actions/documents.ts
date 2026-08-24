@@ -72,6 +72,68 @@ export async function ajouterDocumentChantierAction(chantierId: string, formData
   retour(chantierId, "success", "Document ajouté");
 }
 
+// Une photo de compte-rendu est un document de chantier ordinaire (mêmes règles de
+// stockage/permission que documents_chantier), simplement rattaché à un compte-rendu via
+// compte_rendu_id — pas de bucket ni de logique dédiés (PIECES-JOINTES-V1).
+export async function ajouterPhotoCompteRenduAction(chantierId: string, compteRenduId: string, formData: FormData): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const fichier = formData.get("fichier");
+
+  const { data: compteRendu } = await supabase.from("comptes_rendus_chantier").select("id")
+    .eq("id", compteRenduId).eq("chantier_id", chantierId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+  if (!compteRendu) return { error: "Compte-rendu introuvable" };
+  if (!(fichier instanceof File) || fichier.size === 0) return { error: "Choisissez une photo" };
+  if (fichier.size > DOCUMENT_TAILLE_MAX) return { error: "La photo dépasse la limite de 15 Mo" };
+  if (!DOCUMENT_MIME_TYPES.includes(fichier.type as (typeof DOCUMENT_MIME_TYPES)[number])) {
+    return { error: "Format de fichier non pris en charge" };
+  }
+
+  const path = `${ctx.entrepriseId}/${chantierId}/${crypto.randomUUID()}-${nomFichierSecurise(fichier.name)}`;
+  const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, fichier, {
+    contentType: fichier.type,
+    cacheControl: "3600",
+    upsert: false,
+  });
+  if (uploadError) return { error: messageErreurUtilisateur("ajouterPhotoCompteRenduAction:upload", uploadError, "Impossible d’envoyer la photo. Réessayez dans un instant.") };
+
+  const { error: insertError } = await supabase.from("documents_chantier").insert({
+    entreprise_id: ctx.entrepriseId,
+    chantier_id: chantierId,
+    compte_rendu_id: compteRenduId,
+    nom: fichier.name,
+    categorie: "photo_pendant",
+    storage_path: path,
+    mime_type: fichier.type,
+    taille_octets: fichier.size,
+    audience: "tous_affectes",
+  });
+  if (insertError) {
+    await supabase.storage.from(BUCKET).remove([path]);
+    return { error: messageErreurUtilisateur("ajouterPhotoCompteRenduAction:insert", insertError, "Impossible d’enregistrer la photo.") };
+  }
+
+  revalidatePath(`/chantiers/${chantierId}/comptes-rendus`);
+  return { ok: true };
+}
+
+export async function supprimerPhotoCompteRenduAction(chantierId: string, documentId: string) {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const { data: document } = await supabase.from("documents_chantier")
+    .select("storage_path").eq("id", documentId).eq("chantier_id", chantierId)
+    .eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+  if (!document) redirect(`/chantiers/${chantierId}/comptes-rendus?error=${encodeURIComponent("Photo introuvable")}`);
+
+  await supabase.storage.from(BUCKET).remove([document.storage_path]);
+  const { error } = await supabase.from("documents_chantier").delete()
+    .eq("id", documentId).eq("chantier_id", chantierId).eq("entreprise_id", ctx.entrepriseId);
+  if (error) redirect(`/chantiers/${chantierId}/comptes-rendus?error=${encodeURIComponent(messageErreurUtilisateur("supprimerPhotoCompteRenduAction:delete", error, "Impossible de supprimer la photo."))}`);
+
+  revalidatePath(`/chantiers/${chantierId}/comptes-rendus`);
+  redirect(`/chantiers/${chantierId}/comptes-rendus?success=${encodeURIComponent("Photo retirée")}`);
+}
+
 export async function supprimerDocumentChantierAction(chantierId: string, documentId: string) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();

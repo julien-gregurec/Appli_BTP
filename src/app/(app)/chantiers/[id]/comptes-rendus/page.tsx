@@ -4,15 +4,17 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { DicteeCompteRendu } from "@/components/DicteeCompteRendu";
+import { PhotosCompteRendu } from "@/components/PhotosCompteRendu";
 import { iaEstActive } from "@/lib/preview-features";
 
-export default async function ComptesRendusChantierPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ComptesRendusChantierPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; success?: string }> }) {
   const { id } = await params;
+  const { error: erreurAction, success: succesAction } = await searchParams;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const peutUtiliserIA = iaEstActive() && aAccesIA(await permissionsUtilisateur(ctx));
 
-  const [{ data: chantier }, { data: comptesRendus }] = await Promise.all([
+  const [{ data: chantier }, { data: comptesRendus }, { data: photos }] = await Promise.all([
     supabase.from("chantiers").select("id, nom").eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),
     supabase
       .from("comptes_rendus_chantier")
@@ -20,8 +22,21 @@ export default async function ComptesRendusChantierPage({ params }: { params: Pr
       .eq("chantier_id", id)
       .eq("entreprise_id", ctx.entrepriseId)
       .order("created_at", { ascending: false }),
+    supabase
+      .from("documents_chantier")
+      .select("id, compte_rendu_id, storage_path, nom")
+      .eq("chantier_id", id)
+      .eq("entreprise_id", ctx.entrepriseId)
+      .not("compte_rendu_id", "is", null),
   ]);
   if (!chantier) notFound();
+  const photosParCompteRendu = new Map<string, { id: string; nom: string }[]>();
+  for (const photo of photos ?? []) {
+    if (!photo.compte_rendu_id) continue;
+    const liste = photosParCompteRendu.get(photo.compte_rendu_id) ?? [];
+    liste.push({ id: photo.id, nom: photo.nom });
+    photosParCompteRendu.set(photo.compte_rendu_id, liste);
+  }
 
   return (
     <main className="p-8">
@@ -30,6 +45,9 @@ export default async function ComptesRendusChantierPage({ params }: { params: Pr
           <Link href={`/chantiers/${id}`} className="text-sm text-neutral-500 hover:underline">← {chantier.nom}</Link>
           <h1 className="mt-1 text-xl font-semibold">Comptes-rendus</h1>
         </div>
+
+        {erreurAction && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erreurAction}</p>}
+        {succesAction && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{succesAction}</p>}
 
         <DicteeCompteRendu chantierId={id} peutUtiliserIA={peutUtiliserIA} />
 
@@ -45,6 +63,7 @@ export default async function ComptesRendusChantierPage({ params }: { params: Pr
                   </span>
                 </div>
                 <p className="mt-2 whitespace-pre-wrap text-sm text-neutral-700 dark:text-neutral-300">{cr.contenu}</p>
+                <PhotosCompteRendu chantierId={id} compteRenduId={cr.id} photos={photosParCompteRendu.get(cr.id) ?? []} />
               </article>
             );
           })}
