@@ -275,3 +275,137 @@ export async function retirerEmployeChantierAction(chantierId: string, affectati
   revalidatePath(`/chantiers/${chantierId}`);
   revalidatePath("/mes-travaux");
 }
+
+// WORKFLOW-DEVIS-V1 : préparer/créer un chantier depuis un devis accepté. Le préremplissage
+// est un simple calcul de lecture (aucune écriture) — la création réelle passe par le RPC
+// creer_chantier_depuis_devis (security definer), qui revérifie tout côté serveur
+// (permission, éligibilité, cross-tenant, idempotence) indépendamment de ce préremplissage.
+export type PrevisualisationChantierDepuisDevis =
+  | {
+      eligible: true;
+      devisId: string;
+      devisNumero: string | null;
+      clientId: string;
+      clientNom: string;
+      nomSuggere: string;
+      adresseSuggeree: string;
+      codePostalSuggere: string;
+      villeSuggeree: string;
+      descriptionSuggeree: string;
+      montantHt: number;
+      chantierExistantId: string | null;
+    }
+  | { eligible: false; motif: string };
+
+export async function previsualiserChantierDepuisDevis(devisId: string): Promise<PrevisualisationChantierDepuisDevis> {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+
+  const { data: devis } = await supabase
+    .from("devis")
+    .select("id, numero, statut, montant_ht, notes_client, client_id, chantier_id")
+    .eq("id", devisId)
+    .eq("entreprise_id", ctx.entrepriseId)
+    .maybeSingle();
+  if (!devis) return { eligible: false, motif: "Devis introuvable" };
+
+  const { data: chantierExistant } = await supabase
+    .from("chantiers")
+    .select("id")
+    .eq("devis_source_id", devisId)
+    .eq("entreprise_id", ctx.entrepriseId)
+    .maybeSingle();
+
+  if (devis.statut !== "accepte") {
+    return { eligible: false, motif: "Ce devis doit être accepté avant de créer un chantier." };
+  }
+
+  const { data: client } = await supabase
+    .from("clients")
+    .select("id, nom, prenom, societe, adresse_chantier_defaut, code_postal, ville")
+    .eq("id", devis.client_id)
+    .eq("entreprise_id", ctx.entrepriseId)
+    .maybeSingle();
+  if (!client) return { eligible: false, motif: "Le client de ce devis est introuvable." };
+
+  // Adresse : (1) le devis lui-même ne porte pas d'adresse propre — n'existe pas dans le
+  // modèle actuel, non inventée ; (2) le chantier déjà lié au devis (cas d'un devis de
+  // travaux complémentaires sur un chantier existant) ; (3) l'adresse chantier par défaut
+  // du client ; (4) vide.
+  let adresseSuggeree = "";
+  let codePostalSuggere = "";
+  let villeSuggeree = "";
+  if (devis.chantier_id) {
+    const { data: chantierLie } = await supabase
+      .from("chantiers")
+      .select("adresse, code_postal, ville")
+      .eq("id", devis.chantier_id)
+      .eq("entreprise_id", ctx.entrepriseId)
+      .maybeSingle();
+    if (chantierLie?.adresse) {
+      adresseSuggeree = chantierLie.adresse ?? "";
+      codePostalSuggere = chantierLie.code_postal ?? "";
+      villeSuggeree = chantierLie.ville ?? "";
+    }
+  }
+  if (!adresseSuggeree && client.adresse_chantier_defaut) {
+    adresseSuggeree = client.adresse_chantier_defaut;
+    codePostalSuggere = client.code_postal ?? "";
+    villeSuggeree = client.ville ?? "";
+  }
+
+  const nomClient = client.societe || [client.prenom, client.nom].filter(Boolean).join(" ") || "Client";
+  const nomSuggere = devis.numero ? `${nomClient} — ${devis.numero}` : nomClient;
+
+  return {
+    eligible: true,
+    devisId,
+    devisNumero: devis.numero,
+    clientId: client.id,
+    clientNom: nomClient,
+    nomSuggere,
+    adresseSuggeree,
+    codePostalSuggere,
+    villeSuggeree,
+    descriptionSuggeree: devis.notes_client?.trim() || "",
+    montantHt: Number(devis.montant_ht),
+    chantierExistantId: chantierExistant?.id ?? null,
+  };
+}
+
+export async function creerChantierDepuisDevisAction(devisId: string, formData: FormData) {
+  const supabase = await createClient();
+  const nom = champ(formData, "nom");
+  const adresse = champ(formData, "adresse");
+  const codePostal = champ(formData, "code_postal");
+  const ville = champ(formData, "ville");
+  const description = champ(formData, "description");
+
+  if (!nom) redirect(`/devis/${devisId}/creer-chantier?error=${encodeURIComponent("Donnez un nom au chantier.")}`);
+
+  const { data, error } = await supabase.rpc("creer_chantier_depuis_devis", {
+    p_devis_id: devisId,
+    p_nom: nom,
+    p_adresse: adresse,
+    p_code_postal: codePostal,
+    p_ville: ville,
+    p_description: description,
+  });
+
+  if (error || !data) {
+    const brut = error?.message ?? "";
+    const dejaExistant = brut.match(/chantier_existant:([0-9a-f-]{36})/i);
+    if (dejaExistant) redirect(`/chantiers/${dejaExistant[1]}?success=${encodeURIComponent("Ce chantier existait déjà pour ce devis.")}`);
+    if (brut.includes("Accès refusé")) {
+      redirect(`/devis/${devisId}?error=${encodeURIComponent("Votre poste ne permet pas de créer un chantier.")}`);
+    }
+    if (brut.includes("doit être accepté")) {
+      redirect(`/devis/${devisId}?error=${encodeURIComponent("Ce devis doit être accepté avant de créer un chantier.")}`);
+    }
+    redirect(`/devis/${devisId}/creer-chantier?error=${encodeURIComponent(messageErreurUtilisateur("creerChantierDepuisDevisAction", error, "Impossible de créer le chantier depuis ce devis."))}`);
+  }
+
+  revalidatePath("/chantiers");
+  revalidatePath(`/devis/${devisId}`);
+  redirect(`/chantiers/${data}?success=${encodeURIComponent("Chantier créé avec succès")}`);
+}
