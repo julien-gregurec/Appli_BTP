@@ -132,6 +132,38 @@ export async function simulerRelancesAction(): Promise<{ error: string } | { ok:
   return { ok: true, lignes };
 }
 
+export type PrevisualisationRelance = { destinataire: string; objet: string; contenu: string; montant: number };
+
+// RELANCES-AUTO-PROD-ACTIVATION-V1 §20 : avant tout envoi manuel réel, l'utilisateur doit
+// pouvoir vérifier destinataire/objet/contenu/montant — pas seulement une question générique
+// "envoyer maintenant ?". Lecture seule, aucune écriture, réutilise le même moteur
+// d'éligibilité que l'envoi réel (donc jamais de décalage entre ce qui est prévisualisé et
+// ce qui serait effectivement envoyé).
+export async function previsualiserRelanceManuelleAction(
+  typeDocument: TypeDocumentRelance,
+  documentId: string,
+): Promise<{ error: string } | ({ ok: true } & PrevisualisationRelance)> {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const permissions = await permissionsUtilisateur(ctx);
+  if (!verifierPermissionDocument(permissions, typeDocument)) return { error: "Votre poste ne permet pas d'envoyer de relance." };
+
+  const config = await chargerParametresRelances(supabase, ctx.entrepriseId);
+  const resultat =
+    typeDocument === "devis"
+      ? await evaluerEligibiliteDevis(supabase, ctx.entrepriseId, documentId, config, { pourAuto: false })
+      : await evaluerEligibiliteFacture(supabase, ctx.entrepriseId, documentId, config, { pourAuto: false });
+  if (!resultat.eligible) return { error: resultat.motif };
+
+  const contenu =
+    typeDocument === "devis"
+      ? contenuEmailRelanceDevis({ numero: resultat.candidat.numero, client: { nom: null, prenom: null, societe: resultat.candidat.clientNom, email: resultat.candidat.clientEmail }, montantTtc: resultat.candidat.montant, dateEmission: resultat.candidat.dateReference, entrepriseNom: ctx.entrepriseNom, prenomEmetteur: ctx.prenom, niveau: resultat.candidat.niveau, nombreMax: config.devisNombreMaxRelances })
+      : contenuEmailRelanceFacture({ numero: resultat.candidat.numero, client: { nom: null, prenom: null, societe: resultat.candidat.clientNom, email: resultat.candidat.clientEmail }, resteAPayer: resultat.candidat.montant, dateEcheance: resultat.candidat.dateReference, entrepriseNom: ctx.entrepriseNom, prenomEmetteur: ctx.prenom, niveau: resultat.candidat.niveau, nombreMax: config.facturesNombreMaxRelances });
+  if (!contenu) return { error: "Adresse e-mail invalide." };
+
+  return { ok: true, destinataire: contenu.to, objet: contenu.sujet, contenu: contenu.corps, montant: resultat.candidat.montant };
+}
+
 // Relance manuelle, déclenchée depuis la fiche devis/facture. Passe par exactement le même
 // moteur (evaluerEligibilite*/executerRelance) que le cron — seule différence : automatique:false
 // et declenchePar renseigné, et l'exclusion auto-only (relance_auto_exclue) n'est pas

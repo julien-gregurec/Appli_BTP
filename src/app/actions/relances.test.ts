@@ -43,7 +43,7 @@ vi.mock("@/lib/supabase/server", () => ({
   })),
 }));
 
-const { relancerDocumentManuellementAction } = await import("./relances");
+const { relancerDocumentManuellementAction, previsualiserRelanceManuelleAction } = await import("./relances");
 
 describe("relancerDocumentManuellementAction — permissions", () => {
   beforeEach(() => {
@@ -89,6 +89,38 @@ describe("relancerDocumentManuellementAction — permissions", () => {
     mocks.permissions = ["gerer_devis"];
     mocks.devis = { ...mocks.devis!, statut: "accepte" };
     const res = await relancerDocumentManuellementAction("devis", "devis-1");
+    expect(res).toHaveProperty("error");
+  });
+});
+
+describe("previsualiserRelanceManuelleAction — RELANCES-AUTO-PROD-ACTIVATION-V1 §20", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.permissions = null;
+    mocks.devis = {
+      id: "devis-1", entreprise_id: "ent-a", numero: "DEV-001", statut: "envoye", date_emission: "2026-08-01", montant_ttc: 1000, relance_auto_exclue: false, client_id: "cli-1",
+      client: { nom: "Dupont", prenom: "Jean", societe: null, email: "client@example.com", relance_auto_exclue: false },
+    };
+  });
+
+  it("retourne destinataire/objet/contenu/montant réels avant tout envoi, sans écrire ni appeler Brevo", async () => {
+    const { envoyerEmailBrevo } = await import("@/lib/brevo");
+    const res = await previsualiserRelanceManuelleAction("devis", "devis-1");
+    expect(res).toMatchObject({ ok: true, destinataire: "client@example.com", montant: 1000 });
+    if ("objet" in res) expect(res.objet).toMatch(/DEV-001/);
+    if ("contenu" in res) expect(res.contenu.length).toBeGreaterThan(0);
+    expect(envoyerEmailBrevo).not.toHaveBeenCalled();
+  });
+
+  it("document non éligible -> erreur, aucun aperçu", async () => {
+    mocks.devis = { ...mocks.devis!, statut: "accepte" };
+    const res = await previsualiserRelanceManuelleAction("devis", "devis-1");
+    expect(res).toHaveProperty("error");
+  });
+
+  it("permission manquante -> erreur avant même de lire le document", async () => {
+    mocks.permissions = ["acces_devis"];
+    const res = await previsualiserRelanceManuelleAction("devis", "devis-1");
     expect(res).toHaveProperty("error");
   });
 });
