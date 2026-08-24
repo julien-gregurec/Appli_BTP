@@ -1,5 +1,7 @@
 # IA-DEVIS-V1 — Génération assistée d'un brouillon de devis
 
+**Statut Production : activé le 24-08-2026 (`FEATURE_AI_DEVIS_ENABLED=true` sur `app.elsatia.fr`) — voir [IA_DEVIS_PROD_ACTIVATION_V1.md](IA_DEVIS_PROD_ACTIVATION_V1.md) pour le détail de l'activation, la recette Production réelle et le schéma WORKFLOW-DEVIS-V1 rattrapé au passage.**
+
 ## Bugs réels découverts et corrigés en recette live
 
 Trois défauts réels ont été découverts en testant le flux complet contre un
