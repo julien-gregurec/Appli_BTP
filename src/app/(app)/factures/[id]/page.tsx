@@ -15,6 +15,8 @@ import { creerLienPaiementStripeAction } from "@/app/actions/paiements-en-ligne"
 import { lienPaiementStripeEstActif, stripeEstConfigure } from "@/lib/stripe";
 import { CopierLienPaiement } from "@/components/CopierLienPaiement";
 import { SignatureDocumentMetier } from "@/components/SignatureDocumentMetier";
+import { RelanceDocumentSection } from "@/components/RelanceDocumentSection";
+import { permissionsUtilisateur } from "@/lib/permissions";
 
 const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -45,6 +47,11 @@ export default async function FactureDetailPage({
     .from("paiements").select("*").eq("facture_id", id).order("date");
   const { data: avoirsLies } = await supabase
     .from("factures").select("id, numero, montant_ttc").eq("entreprise_id", ctx.entrepriseId).eq("facture_origine_id", id).eq("type", "avoir").neq("statut", "annulee");
+  const permissions = await permissionsUtilisateur(ctx);
+  const peutGererFactures = permissions === null || permissions.includes("gerer_factures");
+  const { data: relances } = peutGererFactures
+    ? await supabase.from("relances_documents").select("id,niveau,statut,automatique,date_envoi,created_at").eq("type_document", "facture").eq("document_id", id).order("created_at", { ascending: false })
+    : { data: null };
 
   const client = Array.isArray(facture.client) ? facture.client[0] : facture.client;
   const chantier = Array.isArray(facture.chantier) ? facture.chantier[0] : facture.chantier;
@@ -224,6 +231,15 @@ export default async function FactureDetailPage({
             </button>
           </form> : <p className="border-t border-neutral-100 pt-3 text-sm text-neutral-500 dark:border-neutral-800">{resteAPayer <= 0 ? "Cette facture est entièrement réglée." : "Les paiements ne sont pas disponibles pour ce statut."}</p>}
         </section>
+        {peutGererFactures && !['brouillon', 'annulee', 'avoir_emis', 'payee'].includes(facture.statut) && resteAPayer > 0 && (
+          <RelanceDocumentSection
+            type="facture"
+            documentId={id}
+            autoExclue={Boolean(facture.relance_auto_exclue)}
+            peutGerer={peutGererFactures}
+            historique={(relances ?? []).map((r) => ({ id: r.id, niveau: r.niveau, statut: r.statut, automatique: r.automatique, dateEnvoi: r.date_envoi, createdAt: r.created_at }))}
+          />
+        )}
         {!['brouillon', 'annulee', 'avoir_emis', 'payee'].includes(facture.statut) && resteAPayer > 0 && (
           <section className="rounded-md border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/30">
             <h2 className="text-sm font-semibold">Lien de paiement à envoyer au client</h2>

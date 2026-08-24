@@ -27,6 +27,7 @@ export default async function DashboardPage() {
   const activeFeatures = await activeFeaturesForCompany(ctx, permissions, plateformeAdmin);
   const supabase = await createClient();
   const aujourdhui = new Date().toISOString().slice(0, 10);
+  const septJoursAvantIso = new Date(new Date(aujourdhui).getTime() - 7 * 24 * 3600 * 1000).toISOString();
   const autorise = (cle: string) => permissions === null || permissions.includes(cle);
   // La base filtre elle-même les chantiers selon le choix de l'administrateur :
   // vue globale (`acces_chantiers`) ou uniquement les chantiers affectés.
@@ -82,7 +83,7 @@ export default async function DashboardPage() {
   let requeteAffectations = supabase.from("affectations").select("id, date, heures, tache, chantier:chantiers(nom), employe:employes(prenom, nom)").eq("entreprise_id", ctx.entrepriseId).gte("date", aujourdhui).order("date").limit(6);
   if (permissions !== null && !peutGererPlanning) requeteAffectations = requeteAffectations.eq("employe_id", employeCompte?.id ?? "00000000-0000-0000-0000-000000000000");
 
-  const [devisResult, facturesResult, chantiersResult, affectationsResult, articlesResult, vehiculesResult, outilsResult, commandesResult, chantiersPointageResult, sessionsPointageResult, employesActifsResult, congesAujourdhuiResult, notificationsResult] = await Promise.all([
+  const [devisResult, facturesResult, chantiersResult, affectationsResult, articlesResult, vehiculesResult, outilsResult, commandesResult, chantiersPointageResult, sessionsPointageResult, employesActifsResult, congesAujourdhuiResult, notificationsResult, relancesEchecResult] = await Promise.all([
     voir.devis ? supabase.from("devis").select("id, numero, statut, montant_ttc, date_emission, date_validite, client:clients!devis_client_id_fkey(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }) : null,
     voir.factures ? supabase.from("factures").select("id, numero, statut, date_emission, date_echeance, montant_ttc, montant_paye, client:clients!factures_client_id_fkey(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId) : null,
     voir.chantiers ? supabase.from("chantiers").select("id, nom, statut, date_fin_prevue").eq("entreprise_id", ctx.entrepriseId).order("updated_at", { ascending: false }) : null,
@@ -96,6 +97,7 @@ export default async function DashboardPage() {
     peutVoirBriefing ? supabase.from("employes").select("id").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif") : null,
     peutVoirBriefing ? supabase.from("demandes_conges").select("employe_id").eq("entreprise_id", ctx.entrepriseId).eq("statut", "approuvee").lte("date_debut", aujourdhui).gte("date_fin", aujourdhui) : null,
     permissions !== null ? supabase.from("notifications_utilisateurs").select("id,titre,message,lien,niveau,created_at").eq("entreprise_id", ctx.entrepriseId).is("lue_at", null).order("created_at", { ascending: false }).limit(8) : null,
+    voir.devis || voir.factures ? supabase.from("relances_documents").select("id,type_document,document_id,niveau,erreur_public_safe,created_at").eq("entreprise_id", ctx.entrepriseId).eq("statut", "echec").gte("created_at", septJoursAvantIso).order("created_at", { ascending: false }).limit(20) : null,
   ]);
   const devis = devisResult?.data ?? [], factures = facturesResult?.data ?? [], chantiers = chantiersResult?.data ?? [];
   const affectations = affectationsResult?.data ?? [], articles = articlesResult?.data ?? [], vehicules = vehiculesResult?.data ?? [];
@@ -103,6 +105,7 @@ export default async function DashboardPage() {
   const chantiersPointage = chantiersPointageResult?.data ?? [], sessionsPointage = sessionsPointageResult?.data ?? [];
   const employesActifs = employesActifsResult?.data ?? [], congesAujourdhui = congesAujourdhuiResult?.data ?? [];
   const notifications = notificationsResult?.data ?? [];
+  const relancesEnEchec = relancesEchecResult?.data ?? [];
 
   const totalFacture = (factures ?? []).filter((f) => f.statut !== "annulee").reduce((s, f) => s + Number(f.montant_ttc ?? 0), 0);
   const totalEncaisse = (factures ?? []).reduce((s, f) => s + Number(f.montant_paye ?? 0), 0);
@@ -127,6 +130,19 @@ export default async function DashboardPage() {
   }
   for (const itemDevis of devis ?? []) {
     if (itemDevis.date_validite && itemDevis.statut === "envoye") ajouterEcheance({ id: `devis-${itemDevis.id}`, domaine: "Commercial", titre: `${itemDevis.numero ?? "Devis"} arrive à expiration`, detail: voirIndicateursFinanciers ? `Montant ${euros(itemDevis.montant_ttc)}` : "Validité à contrôler", href: `/devis/${itemDevis.id}` }, itemDevis.date_validite, 7);
+  }
+  // RELANCES-AUTO-V1 §51 : uniquement les échecs (7 derniers jours) — pas une alerte "à
+  // relancer" en doublon des échéances devis/facture déjà remontées ci-dessus.
+  for (const relance of relancesEnEchec) {
+    const estDevis = relance.type_document === "devis";
+    alertes.push({
+      id: `relance-echec-${relance.id}`,
+      domaine: estDevis ? "Commercial" : "Facturation",
+      niveau: "attention",
+      titre: `Échec d'envoi d'une relance ${estDevis ? "devis" : "facture"}`,
+      detail: relance.erreur_public_safe ?? "Vérifier la configuration d'envoi d'e-mail",
+      href: estDevis ? `/devis/${relance.document_id}` : `/factures/${relance.document_id}`,
+    });
   }
   for (const article of articles ?? []) {
     const stock = Number(article.quantite_stock), seuil = Number(article.seuil_alerte);

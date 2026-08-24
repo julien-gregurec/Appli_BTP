@@ -14,6 +14,7 @@ import { EmailDocumentButton } from "@/components/EmailDocumentButton";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { SignatureDocumentMetier } from "@/components/SignatureDocumentMetier";
+import { RelanceDocumentSection } from "@/components/RelanceDocumentSection";
 
 export default async function DevisDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; success?: string }> }) {
   const { id } = await params;
@@ -32,7 +33,7 @@ export default async function DevisDetailPage({ params, searchParams }: { params
 
   if (!devis) notFound();
 
-  const [{ data: lignes }, { data: piecesJointes }] = await Promise.all([
+  const [{ data: lignes }, { data: piecesJointes }, { data: relances }] = await Promise.all([
     supabase.from("lignes_devis").select("*").eq("devis_id", id).order("ordre"),
     supabase
       .from("pieces_jointes_devis")
@@ -40,6 +41,9 @@ export default async function DevisDetailPage({ params, searchParams }: { params
       .eq("devis_id", id)
       .eq("entreprise_id", ctx.entrepriseId)
       .order("created_at"),
+    peutGererDevis
+      ? supabase.from("relances_documents").select("id,niveau,statut,automatique,date_envoi,created_at").eq("type_document", "devis").eq("document_id", id).order("created_at", { ascending: false })
+      : Promise.resolve({ data: null }),
   ]);
 
   const chantiersClient = peutGererDevis
@@ -226,6 +230,16 @@ export default async function DevisDetailPage({ params, searchParams }: { params
               ))}
             </div>
           </section>
+        )}
+
+        {peutGererDevis && devis.statut === "envoye" && (
+          <RelanceDocumentSection
+            type="devis"
+            documentId={id}
+            autoExclue={Boolean(devis.relance_auto_exclue)}
+            peutGerer={peutGererDevis}
+            historique={(relances ?? []).map((r) => ({ id: r.id, niveau: r.niveau, statut: r.statut, automatique: r.automatique, dateEnvoi: r.date_envoi, createdAt: r.created_at }))}
+          />
         )}
 
         <SignatureDocumentMetier type="devis" documentId={id} />

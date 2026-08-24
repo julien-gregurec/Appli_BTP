@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ajouterOptionIAAbonnement, estPalierOptionIA, estPeriodiciteAbonnement, reconcilierAbonnementStripe } from "@/lib/stripe-abonnement";
 import { cronsSontActifs } from "@/lib/preview-features";
+import { traiterRelancesAutomatiques } from "@/lib/relances-cron";
 
 // Bascule les essais Option IA expires vers la facturation reelle. Regroupe avec le cron
 // des abonnements (et non un cron dedie) car le plan Vercel Hobby limite le nombre de
@@ -87,5 +88,6 @@ export async function GET(request: Request) {
   const optionIA = await convertirEssaisOptionIAExpires(admin);
   const paiePeriodes = await synchroniserPeriodesPaieOuvertes(admin);
   const alertesPointage = await notifierPointagesManquantsEtAValider(admin);
-  return NextResponse.json({ traitees: resultats.length, resultats, optionIA, paiePeriodes, alertesPointage });
+  const relances = await traiterRelancesAutomatiques(admin);
+  return NextResponse.json({ traitees: resultats.length, resultats, optionIA, paiePeriodes, alertesPointage, relances });
 }

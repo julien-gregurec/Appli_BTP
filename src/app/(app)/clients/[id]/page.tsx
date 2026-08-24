@@ -5,6 +5,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { nomClient, statutChantier, CLIENT_TYPES, CLIENT_STATUTS } from "@/lib/chantier-statuts";
 import { euros, statutDevis } from "@/lib/devis";
 import { statutFacture } from "@/lib/factures";
+import { ExclusionRelanceClient } from "@/components/ExclusionRelanceClient";
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -72,6 +73,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           {ligne("Conditions de paiement", client.conditions_paiement)}
           {ligne("Délai de paiement", `${client.delai_paiement_jours ?? 30} jours`)}
           {ligne("Notes", client.notes)}
+          <div className="border-t border-neutral-100 pt-2 dark:border-neutral-800">
+            <ExclusionRelanceClient clientId={id} exclueInitial={Boolean(client.relance_auto_exclue)} />
+          </div>
         </section>
 
         <section className="space-y-3">
