@@ -117,6 +117,27 @@ describe("appliquerRemiseAction — permissions et validation", () => {
     });
   });
 
+  it("tronque le nom du coupon Stripe à 40 caractères max (bug réel ABONNEMENTS-DETAIL-V1C : nom d'entreprise 31 caractères + description dépassait la limite Stripe et faisait échouer toute la remise)", async () => {
+    mocks.entreprise = { nom: "RECETTE-ABONNEMENTS-V1C-CLIENT", stripe_subscription_id: "sub_test" };
+    const formData = formulaireRemise({ type: "pourcentage", valeur: "10", duree: "forever", motif_interne: "RECETTE ABONNEMENTS V1C" });
+
+    await expect(appliquerRemiseAction("entreprise-1", formData)).rejects.toThrow(/REDIRECT:\/plateforme\?succes=/);
+
+    const appel = mocks.creerCouponRemise.mock.calls[0][0] as { nom: string };
+    expect(appel.nom.length).toBeLessThanOrEqual(40);
+    expect(appel.nom.endsWith("— 10 % à vie")).toBe(true);
+  });
+
+  it("conserve le nom entier quand il tient déjà dans la limite de 40 caractères", async () => {
+    mocks.entreprise = { nom: "Entreprise Test", stripe_subscription_id: "sub_test" };
+    const formData = formulaireRemise({ type: "pourcentage", valeur: "10", duree: "once", motif_interne: "Test" });
+
+    await expect(appliquerRemiseAction("entreprise-1", formData)).rejects.toThrow(/REDIRECT:\/plateforme\?succes=/);
+
+    const appel = mocks.creerCouponRemise.mock.calls[0][0] as { nom: string };
+    expect(appel.nom).toBe("Entreprise Test — 10 % une fois");
+  });
+
   it("exige un nombre de mois pour une remise 'repeating' avant même d'appeler Stripe", async () => {
     const formData = formulaireRemise({ type: "pourcentage", valeur: "10", duree: "repeating", motif_interne: "Test" });
 

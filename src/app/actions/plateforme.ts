@@ -202,6 +202,20 @@ function descriptionRemise(type: TypeRemise, valeur: number, duree: DureeRemise,
   return `${montant} ${periode}`;
 }
 
+// Le champ `name` d'un coupon Stripe est plafonné à 40 caractères par l'API (rejet en erreur
+// sinon, pas de troncature silencieuse côté Stripe — bug réel découvert en testant
+// ABONNEMENTS-DETAIL-V1C avec un nom d'entreprise de 31 caractères : "RECETTE-ABONNEMENTS-V1C-CLIENT
+// — 10 % à vie" fait 44 caractères et faisait échouer toute la création de coupon). La
+// description (courte, porte l'information commerciale utile) est toujours conservée entière ;
+// c'est le nom d'entreprise qui est tronqué si besoin.
+function nomCouponRemise(nomEntreprise: string, description: string): string {
+  const suffixe = ` — ${description}`;
+  const maxNomEntreprise = 40 - suffixe.length;
+  if (maxNomEntreprise <= 0) return description.slice(0, 40);
+  const nomTronque = nomEntreprise.length > maxNomEntreprise ? `${nomEntreprise.slice(0, Math.max(0, maxNomEntreprise - 1))}…` : nomEntreprise;
+  return `${nomTronque}${suffixe}`;
+}
+
 // Geste commercial : coupon Stripe créé et appliqué sur l'abonnement de l'entreprise (base
 // + comptes supplémentaires, au prorata — vérifié empiriquement, REMISES-CLIENTS-V1, voir
 // docs/commercial/REMISES_CLIENTS_V1.md). Un seul à la fois (Stripe remplace automatiquement
@@ -233,7 +247,7 @@ export async function appliquerRemiseAction(entrepriseId: string, formData: Form
 
   const description = descriptionRemise(type as TypeRemise, valeur, duree as DureeRemise, dureeMois);
   try {
-    const coupon = await creerCouponRemise({ type: type as TypeRemise, valeur, duree: duree as DureeRemise, dureeMois, nom: `${entreprise.nom} — ${description}` });
+    const coupon = await creerCouponRemise({ type: type as TypeRemise, valeur, duree: duree as DureeRemise, dureeMois, nom: nomCouponRemise(entreprise.nom, description) });
     await appliquerCouponAbonnement(entreprise.stripe_subscription_id, coupon.id);
     if (isEmailLoginDisabled()) {
       await supabase.from("entreprises").update({ remise_stripe_coupon_id: coupon.id, remise_description: description, remise_motif_interne: motifInterne, remise_duree_mois: dureeMois ?? null, remise_type: type, remise_valeur: valeur, remise_appliquee_at: new Date().toISOString() }).eq("id", entrepriseId);
