@@ -110,7 +110,7 @@ export function RelanceDocumentSection({
       )}
 
       {message && (
-        <p className={`rounded-md px-3 py-2 text-xs ${message.type === "erreur" ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>{message.texte}</p>
+        <p role="status" aria-live="polite" className={`rounded-md px-3 py-2 text-xs ${message.type === "erreur" ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>{message.texte}</p>
       )}
 
       {historique.length > 0 && (
