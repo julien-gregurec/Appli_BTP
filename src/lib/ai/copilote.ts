@@ -255,9 +255,39 @@ async function rechercherPrestationsDevis(supabase: Supabase, entrepriseId: stri
     .eq("entreprise_id", entrepriseId)
     .eq("actif", true)
     .limit(300);
+  // Chevauchement (designationsProches), pas correspondTousLesMots : le terme recherché par
+  // le modèle est souvent plus long/descriptif que la désignation catalogue elle-même (ex.
+  // "Cloison 72/48 avec isolation laine de verre 45mm" contre une prestation enregistrée
+  // "Cloison 72/48 avec isolation") — exiger que TOUS les mots du terme soient présents dans
+  // la désignation aurait échoué sur ce cas précis, comme observé en recette réelle pour la
+  // recherche de prix historique (voir designationsProches ci-dessous).
   return (data ?? [])
-    .filter((p) => correspondTousLesMots(`${p.designation ?? ""} ${p.description ?? ""}`, input.terme))
+    .filter((p) => designationsProches(`${p.designation ?? ""} ${p.description ?? ""}`, input.terme))
     .slice(0, 10);
+}
+
+// Mots trop génériques pour être significatifs dans un rapprochement de désignations BTP
+// (articles, prépositions, et les participes "fourni(e)(s)"/"posé(e)(s)" quasi systématiques
+// dans les libellés de prestation, qui matcheraient presque tout sans discriminer).
+const MOTS_VIDES_DESIGNATION = new Set([
+  "de", "du", "des", "le", "la", "les", "un", "une", "et", "à", "a", "au", "aux",
+  "avec", "pour", "sur", "en", "fourni", "fournie", "fournis", "fournies",
+  "pose", "posee", "poses", "posees",
+]);
+
+function motsSignificatifs(valeur: string): Set<string> {
+  return new Set(normaliser(valeur).split(/\s+/).filter((mot) => mot.length >= 3 && !MOTS_VIDES_DESIGNATION.has(mot)));
+}
+
+// Chevauchement plutôt qu'inclusion stricte dans un sens ou l'autre : une désignation de
+// catalogue/historique ("Faux plafond") est souvent plus courte que ce que demande
+// l'utilisateur ou reformule le modèle ("Faux plafond fourni et posé, dalles 600x600"), donc
+// ni `A contient B` ni `B contient A` ne matchent de façon fiable — un ILIKE directionnel
+// avait échoué exactement sur ce cas en recette réelle IA-DEVIS-V1.
+function designationsProches(a: string, b: string): boolean {
+  const motsA = motsSignificatifs(a);
+  for (const mot of motsSignificatifs(b)) if (motsA.has(mot)) return true;
+  return false;
 }
 
 // IA-DEVIS-V1 §5/§7 : source de prix "historique" — dernières lignes de devis de
@@ -271,11 +301,11 @@ async function rechercherPrixHistoriqueDevis(supabase: Supabase, entrepriseId: s
   const { data } = await supabase
     .from("lignes_devis")
     .select("designation, prix_unitaire_ht, unite, taux_tva, devis:devis_id(numero, date_emission, entreprise_id)")
-    .ilike("designation", `%${terme}%`)
-    .limit(200);
+    .limit(1000);
   return (data ?? [])
     .map((l) => ({ ...l, devis: Array.isArray(l.devis) ? l.devis[0] : l.devis }))
     .filter((l): l is typeof l & { devis: { numero: string | null; date_emission: string; entreprise_id: string } } => l.devis?.entreprise_id === entrepriseId)
+    .filter((l) => designationsProches(l.designation, terme))
     .sort((a, b) => (b.devis.date_emission ?? "").localeCompare(a.devis.date_emission ?? ""))
     .slice(0, 5)
     .map((l) => ({
