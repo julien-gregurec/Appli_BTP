@@ -2,6 +2,12 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
+import { estPlateformeAdmin } from "@/lib/plateforme";
+
+// Sentinel utilisé quand aucune entreprise réelle n'est rattachée (même convention
+// que compteurs_reference : aucune entreprise n'a jamais cet id, donc les requêtes
+// scopées par entrepriseId ne remontent rien plutôt que de fuiter des données réelles.
+const ENTREPRISE_ID_ADMIN_PLATEFORME = "00000000-0000-0000-0000-000000000000";
 
 export type ContexteEntreprise = {
   userId: string;
@@ -102,6 +108,25 @@ export const getContexteEntreprise = cache(async function getContexteEntreprise(
   ]);
 
   if (!profil?.entreprise_active_id) {
+    // Un admin plateforme n'est rattaché à aucune entreprise cliente par nature :
+    // on ne le rattache jamais artificiellement à l'une d'elles, on lui donne un
+    // contexte neutre plutôt que de le renvoyer vers l'onboarding entreprise.
+    if (await estPlateformeAdmin()) {
+      return {
+        userId: user.id,
+        prenom: profil?.prenom ?? null,
+        entrepriseId: ENTREPRISE_ID_ADMIN_PLATEFORME,
+        entrepriseNom: "Administration ELSATIA",
+        entrepriseReference: null,
+        logoUrl: null,
+        abonnementStatut: "actif",
+        abonnementEcheance: null,
+        abonnementEssaiFin: null,
+        suspensionPrevueAt: null,
+        impayeMessage: null,
+        accesSupportPlateforme: false,
+      };
+    }
     redirect("/onboarding");
   }
 

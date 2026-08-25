@@ -8,6 +8,7 @@ import { construireUrlCallbackAuth, ERREUR_CONFIGURATION_URL_AUTH, urlCallbackRe
 import { destinationInterneSure } from "@/lib/security/redirects";
 import { estCodeOffreTarifaire } from "@/lib/tarification";
 import { traduireErreurAuth, MESSAGE_GENERIQUE as MESSAGE_TECHNIQUE_AUTH } from "@/lib/auth-erreurs";
+import { estPlateformeAdmin } from "@/lib/plateforme";
 
 function destinationOnboarding(params: { numero?: string; code?: string; offre?: string }) {
   const query = new URLSearchParams();
@@ -76,6 +77,9 @@ export async function loginAction(formData: FormData) {
     redirect(`/login?error=${encodeURIComponent(traduireErreurAuth(error.message))}`);
   }
 
+  // Un admin plateforme n'est rattaché à aucune entreprise cliente : l'envoyer
+  // vers le tableau de bord entreprise n'aurait aucun sens pour lui.
+  if (await estPlateformeAdmin()) redirect("/plateforme");
   redirect("/dashboard");
 }
 

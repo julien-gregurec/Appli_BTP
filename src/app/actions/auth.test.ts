@@ -7,21 +7,25 @@ const mocks = vi.hoisted(() => ({
   }),
   headers: vi.fn(),
   signUp: vi.fn(),
+  signInWithPassword: vi.fn(),
   resetPasswordForEmail: vi.fn(),
   getUser: vi.fn(),
   updateUser: vi.fn(),
   signOut: vi.fn(),
   verifyOtp: vi.fn(),
+  estPlateformeAdmin: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("next/headers", () => ({ headers: mocks.headers }));
 vi.mock("@/lib/auth-mode", () => ({ isEmailLoginDisabled: () => false }));
 vi.mock("@/lib/brand", () => ({ BRAND: { urlPublique: mocks.urlCanonique } }));
+vi.mock("@/lib/plateforme", () => ({ estPlateformeAdmin: mocks.estPlateformeAdmin }));
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({
     auth: {
       signUp: mocks.signUp,
+      signInWithPassword: mocks.signInWithPassword,
       resetPasswordForEmail: mocks.resetPasswordForEmail,
       getUser: mocks.getUser,
       updateUser: mocks.updateUser,
@@ -31,7 +35,7 @@ vi.mock("@/lib/supabase/server", () => ({
   })),
 }));
 
-import { confirmerCompteAction, demanderReinitialisationAction, modifierMotDePasseAction, signupAction } from "./auth";
+import { confirmerCompteAction, demanderReinitialisationAction, loginAction, modifierMotDePasseAction, signupAction } from "./auth";
 
 describe("actions Auth et URL canonique", () => {
   beforeEach(() => {
@@ -107,6 +111,43 @@ describe("actions Auth et URL canonique", () => {
         emailRedirectTo: `${mocks.urlCanonique}/auth/callback?next=%2Fonboarding`,
       }),
     }));
+  });
+});
+
+describe("loginAction — routage post-connexion selon le statut admin plateforme", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.signInWithPassword.mockResolvedValue({ error: null });
+  });
+
+  const formulaire = (email: string, password: string) => {
+    const formData = new FormData();
+    formData.set("email", email);
+    formData.set("password", password);
+    return formData;
+  };
+
+  it("redirige un admin plateforme directement vers /plateforme, jamais vers l'onboarding entreprise", async () => {
+    mocks.estPlateformeAdmin.mockResolvedValue(true);
+    await expect(loginAction(formulaire("julien@elsatia.fr", "motdepasse"))).rejects.toThrow(
+      "REDIRECT:/plateforme",
+    );
+    expect(mocks.estPlateformeAdmin).toHaveBeenCalled();
+  });
+
+  it("redirige un utilisateur normal vers /dashboard (comportement inchangé)", async () => {
+    mocks.estPlateformeAdmin.mockResolvedValue(false);
+    await expect(loginAction(formulaire("employe@example.invalid", "motdepasse"))).rejects.toThrow(
+      "REDIRECT:/dashboard",
+    );
+  });
+
+  it("ne vérifie jamais le statut admin plateforme si les identifiants sont invalides", async () => {
+    mocks.signInWithPassword.mockResolvedValueOnce({ error: { message: "Invalid login credentials" } });
+    await expect(loginAction(formulaire("julien@elsatia.fr", "mauvais-mot-de-passe"))).rejects.toThrow(
+      "REDIRECT:/login?error=",
+    );
+    expect(mocks.estPlateformeAdmin).not.toHaveBeenCalled();
   });
 });
 
