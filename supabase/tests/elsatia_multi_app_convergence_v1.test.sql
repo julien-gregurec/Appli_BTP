@@ -74,10 +74,15 @@ select is(
 -- 8. Self-grant impossible par écriture directe.
 select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000002', true);
 select set_config('request.jwt.claim.email', 'ouvrier-a@invalid.local', true);
-select throws_like(
+-- SQLSTATE 42501 (insufficient_privilege) couvre à la fois un refus au niveau du GRANT
+-- ("permission denied") et un refus RLS ("new row violates row-level security policy") :
+-- le message exact varie selon que le rôle authenticated a ou non un GRANT INSERT de base
+-- sur la table (différence observée entre l'environnement local et Preview), mais dans les
+-- deux cas l'écriture est refusée — c'est la seule garantie qui compte ici.
+select throws_ok(
   $$insert into public.habilitations_applications_utilisateurs(entreprise_id,utilisateur_id,application_code,role_code)
     values('a0000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000002','colors','colors_admin_organisation')$$,
-  '%permission denied%', 'ouvrier A ne peut pas s''auto-attribuer un rôle Colors supérieur par écriture directe'
+  '42501', null, 'ouvrier A ne peut pas s''auto-attribuer un rôle Colors supérieur par écriture directe'
 );
 
 -- 9. FK anti-habilitation dans une organisation étrangère (admin B n'est pas membre de l'entreprise A).
