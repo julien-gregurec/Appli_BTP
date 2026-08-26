@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ajouterDepassementAppareilsFacture, ajouterDepassementStockageFacture, calculerDepassementAppareils, reconcilierAbonnementStripe, recupererAbonnementStripe, statutAbonnementDepuisStripe, synchroniserExpirationRemise, type StripeSubscription } from "@/lib/stripe-abonnement";
 import { verifierSignatureStripe } from "@/lib/stripe";
+import { categoriserErreurSupabase, empreinteEvenementStripe, identifiantUuidValide, resoudreModeStripeWebhook } from "@/lib/stripe-webhook-environment";
 
 type StripeReference = string | { id?: string } | null | undefined;
 type StripeObjet = {
@@ -32,6 +33,11 @@ type StripeObjet = {
   total_tax_amounts?: Array<{ amount?: number }>;
 };
 type StripeEvent = { id: string; type: string; livemode: boolean; account?: string; data: { object: StripeObjet } };
+type SupabaseAdmin = ReturnType<typeof createAdminClient>;
+type EntrepriseStripe = { id: string; stripe_customer_id?: string | null; stripe_subscription_id?: string | null };
+type ResolutionEntreprise =
+  | { ok: true; entrepriseId: string }
+  | { ok: false; categorie: "metadata_absente" | "format_identifiant_invalide" | "entreprise_inconnue" | "rattachement_stripe_incoherent" | ReturnType<typeof categoriserErreurSupabase> };
 
 function identifiant(reference: StripeReference) {
   return typeof reference === "string" ? reference : reference?.id || null;
@@ -45,21 +51,50 @@ function instantDepuisUnix(valeur?: number | null) {
   return valeur ? new Date(valeur * 1000).toISOString() : null;
 }
 
-async function entreprisePour(objet: StripeObjet) {
-  const admin = createAdminClient();
-  const entrepriseId = objet.metadata?.entreprise_id;
-  if (entrepriseId) return entrepriseId;
-  const subscriptionId = objet.object === "subscription" ? objet.id : identifiant(objet.subscription);
-  if (subscriptionId) {
-    const { data } = await admin.from("entreprises").select("id").eq("stripe_subscription_id", subscriptionId).maybeSingle();
-    if (data?.id) return data.id as string;
-  }
+async function lireEntreprise(requete: PromiseLike<{ data: EntrepriseStripe | null; error: { code?: string; message?: string } | null }>): Promise<ResolutionEntreprise | EntrepriseStripe | null> {
+  const { data, error } = await requete;
+  if (error) return { ok: false, categorie: categoriserErreurSupabase(error) };
+  return data;
+}
+
+async function entreprisePour(admin: SupabaseAdmin, objet: StripeObjet): Promise<ResolutionEntreprise> {
+  const entrepriseId = objet.metadata?.entreprise_id?.trim();
   const customerId = identifiant(objet.customer);
-  if (customerId) {
-    const { data } = await admin.from("entreprises").select("id").eq("stripe_customer_id", customerId).maybeSingle();
-    if (data?.id) return data.id as string;
+  const subscriptionId = objet.object === "subscription" ? objet.id : identifiant(objet.subscription);
+  if (entrepriseId) {
+    if (!identifiantUuidValide(entrepriseId)) return { ok: false, categorie: "format_identifiant_invalide" };
+    const entreprise = await lireEntreprise(admin.from("entreprises").select("id,stripe_customer_id,stripe_subscription_id").eq("id", entrepriseId).maybeSingle());
+    if (entreprise && "ok" in entreprise) return entreprise;
+    if (!entreprise) return { ok: false, categorie: "entreprise_inconnue" };
+    if (customerId && entreprise.stripe_customer_id && customerId !== entreprise.stripe_customer_id) {
+      return { ok: false, categorie: "rattachement_stripe_incoherent" };
+    }
+    if (subscriptionId && entreprise.stripe_subscription_id && subscriptionId !== entreprise.stripe_subscription_id) {
+      return { ok: false, categorie: "rattachement_stripe_incoherent" };
+    }
+    return { ok: true, entrepriseId: entreprise.id };
   }
-  return null;
+  if (subscriptionId) {
+    const entreprise = await lireEntreprise(admin.from("entreprises").select("id,stripe_customer_id,stripe_subscription_id").eq("stripe_subscription_id", subscriptionId).maybeSingle());
+    if (entreprise && "ok" in entreprise) return entreprise;
+    if (entreprise) return { ok: true, entrepriseId: entreprise.id };
+  }
+  if (customerId) {
+    const entreprise = await lireEntreprise(admin.from("entreprises").select("id,stripe_customer_id,stripe_subscription_id").eq("stripe_customer_id", customerId).maybeSingle());
+    if (entreprise && "ok" in entreprise) return entreprise;
+    if (entreprise) return { ok: true, entrepriseId: entreprise.id };
+  }
+  return { ok: false, categorie: subscriptionId || customerId ? "entreprise_inconnue" : "metadata_absente" };
+}
+
+function diagnosticWebhook(niveau: "warn" | "error", evenement: Pick<StripeEvent, "id" | "type" | "livemode">, categorie: string, attendu?: "test" | "live") {
+  console[niveau]("Webhook abonnement non traité", {
+    categorie,
+    type_evenement: evenement.type,
+    empreinte_evenement: empreinteEvenementStripe(evenement.id),
+    mode_recu: evenement.livemode ? "live" : "test",
+    ...(attendu ? { mode_attendu: attendu } : {}),
+  });
 }
 
 async function synchroniserAbonnement(entrepriseId: string, abonnement: StripeSubscription) {
@@ -154,24 +189,64 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ error: "JSON invalide" }, { status: 400 });
   }
+  const configurationMode = resoudreModeStripeWebhook();
+  if (!configurationMode.valide) {
+    diagnosticWebhook("error", evenement, `configuration_${configurationMode.motif}`);
+    return NextResponse.json({ error: "Webhook temporairement indisponible" }, { status: 503 });
+  }
+  if (evenement.livemode !== configurationMode.livemode) {
+    diagnosticWebhook("warn", evenement, "mode_stripe_incorrect", configurationMode.mode);
+    if (!evenement.livemode && configurationMode.mode === "live") {
+      return NextResponse.json({ received: true, ignored: true });
+    }
+    return NextResponse.json({ error: "Webhook temporairement indisponible" }, { status: 503 });
+  }
   if (evenement.account) return NextResponse.json({ error: "Événement Connect refusé sur le webhook abonnement" }, { status: 400 });
 
-  const admin = createAdminClient();
+  let admin: SupabaseAdmin;
+  try {
+    admin = createAdminClient();
+  } catch {
+    diagnosticWebhook("error", evenement, "configuration_supabase_invalide", configurationMode.mode);
+    return NextResponse.json({ error: "Webhook temporairement indisponible" }, { status: 503 });
+  }
   const objet = evenement.data.object;
-  const entrepriseId = await entreprisePour(objet);
-  const { error: reservation } = await admin.from("abonnement_evenements").insert({
-    stripe_event_id: evenement.id,
-    entreprise_id: entrepriseId,
-    type: evenement.type,
-    payload: {
-      livemode: evenement.livemode,
-      object_id: objet.id,
-      customer_id: identifiant(objet.customer),
-      subscription_id: objet.object === "subscription" ? objet.id : identifiant(objet.subscription),
-    },
-  });
+  let resolutionEntreprise: ResolutionEntreprise;
+  try {
+    resolutionEntreprise = await entreprisePour(admin, objet);
+  } catch {
+    diagnosticWebhook("error", evenement, "connexion_supabase", configurationMode.mode);
+    return NextResponse.json({ error: "Webhook temporairement indisponible" }, { status: 503 });
+  }
+  if (!resolutionEntreprise.ok) {
+    diagnosticWebhook("error", evenement, resolutionEntreprise.categorie, configurationMode.mode);
+    const statut = ["format_identifiant_invalide", "metadata_absente", "rattachement_stripe_incoherent"].includes(resolutionEntreprise.categorie) ? 422 : 503;
+    return NextResponse.json({ error: "Événement Stripe non traitable" }, { status: statut });
+  }
+  const entrepriseId = resolutionEntreprise.entrepriseId;
+  let reservation: { code?: string; message?: string } | null;
+  try {
+    const resultatReservation = await admin.from("abonnement_evenements").insert({
+      stripe_event_id: evenement.id,
+      entreprise_id: entrepriseId,
+      type: evenement.type,
+      payload: {
+        livemode: evenement.livemode,
+        object_id: objet.id,
+        customer_id: identifiant(objet.customer),
+        subscription_id: objet.object === "subscription" ? objet.id : identifiant(objet.subscription),
+      },
+    });
+    reservation = resultatReservation.error;
+  } catch {
+    diagnosticWebhook("error", evenement, "connexion_supabase", configurationMode.mode);
+    return NextResponse.json({ error: "Journal indisponible" }, { status: 503 });
+  }
   if (reservation?.code === "23505") return NextResponse.json({ received: true, duplicate: true });
-  if (reservation) return NextResponse.json({ error: "Journal indisponible" }, { status: 500 });
+  if (reservation) {
+    diagnosticWebhook("error", evenement, categoriserErreurSupabase(reservation), configurationMode.mode);
+    return NextResponse.json({ error: "Journal indisponible" }, { status: 503 });
+  }
 
   let statutResultant: string | null = null;
   try {
@@ -209,9 +284,9 @@ export async function POST(request: Request) {
     }
     await admin.from("abonnement_evenements").update({ statut_resultant: statutResultant }).eq("stripe_event_id", evenement.id);
     return NextResponse.json({ received: true });
-  } catch (error) {
+  } catch {
     await admin.from("abonnement_evenements").delete().eq("stripe_event_id", evenement.id);
-    console.error("Échec de synchronisation du webhook abonnement", error);
+    diagnosticWebhook("error", evenement, "echec_metier_apres_journalisation", configurationMode.mode);
     return NextResponse.json({ error: "Synchronisation impossible" }, { status: 500 });
   }
 }
