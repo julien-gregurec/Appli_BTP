@@ -59,6 +59,16 @@ identité explicitement active, rôle `total`/`support`, session ciblée et expi
 heures sont désormais tous obligatoires. Le scénario historique « bon email, UID absent,
 actif=false » est couvert par un test de régression et ne crée plus de session.
 
+La migration append-only `20260826000237_platform_aal2_role_integrity_v1.sql` complète ce
+socle avec : AAL2 de la session appelante lu uniquement via `auth.jwt()`, rôle `total` pour les
+mutations d'entitlements, ouverture support AAL2 réservée à `total`/`support`, UID et email
+immuables pendant l'état actif, cycle révocation/détachement/rattachement/activation, verrou
+advisory transactionnel du dernier total et état révoqué daté/attribué. Les opérations support
+et de facturation mutatives ont également été classées par rôle et exigent AAL2 ; une
+consultation `lecture` n'exécute plus la suspension automatique des impayés. Le préflight
+versionné et `docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql` contrôlent les données avant
+tout environnement distant.
+
 ## Tests (`supabase/tests/elsatia_multi_app_convergence_v1.test.sql`)
 
 27 assertions pgTAP, réutilisant le fixture partagé `fixtures/isolation_multitenant.inc` :
@@ -73,9 +83,10 @@ avec audit (4 actions journalisées), admin d'entreprise ne pouvant pas activer 
 lui-même, et vérification structurelle qu'aucune fonction n'accepte de `utilisateur_id` cible
 arbitraire (signatures `a_acces_application(uuid,text)` / `applications_autorisees(uuid)`).
 
-Confirmé via un reset Supabase local complet puis `npm run test:db` : les 29 fichiers et
-436 assertions pgTAP passent, dont les 38 assertions du correctif support UID, les 27 assertions multi-app et les 13 assertions du modèle
-administrateur par UID. Trois tests historiques fragiles ont été corrigés sans changer le
+Confirmé via un reset Supabase local complet puis `npm run test:db` : les 30 fichiers et
+508 assertions pgTAP passent, dont les 72 assertions AAL2/rôles/intégrité, les 38 assertions du
+correctif support UID, les 27 assertions multi-app et les 13 assertions du modèle administrateur
+par UID. Trois tests historiques fragiles ont été corrigés sans changer le
 comportement métier : refus d'écriture Alertes vérifié par SQLSTATE, devis brouillon utilisés
 pour atteindre réellement les contraintes cross-tenant, et lecture de vérification Remises
 effectuée hors session plateforme afin de préserver l'absence de bypass RLS cross-tenant.
@@ -97,10 +108,10 @@ backend. Cinq tests Vitest dédiés couvrent son contrat.
 
 ## QA
 
-`supabase db reset` ✓ (214 migrations sur base vierge), `npm run test:db` ✓
-(29 fichiers, 436 assertions), `npm run typecheck` ✓, `npm run lint` ✓
+`supabase db reset` ✓ (215 migrations sur base vierge), `npm run test:db` ✓
+(30 fichiers, 508 assertions), `npm run typecheck` ✓, `npm run lint` ✓
 (3 warnings `<img>` préexistants), `npm run test` ✓ (529/529), `npm run build` ✓,
-`npm run verify:secrets` ✓, `npm run verify:migrations` ✓ (214 migrations),
+`npm run verify:secrets` ✓, `npm run verify:migrations` ✓ (215 migrations),
 `npm audit --audit-level=high` ✓ (0 vulnérabilité), `git diff --check` ✓.
 
 ## Hors scope de cette passe (itération suivante)

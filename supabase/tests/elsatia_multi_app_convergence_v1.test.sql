@@ -164,6 +164,7 @@ insert into public.roles_applications_elsatia(application_code, code, nom) value
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000001', true);
 select set_config('request.jwt.claim.email', 'plateforme@invalid.local', true);
+select set_config('request.jwt.claims', '{"aal":"aal2"}', true);
 select lives_ok(
   $$select public.plateforme_activer_application_entreprise('a0000000-0000-0000-0000-000000000001','cycle_app')$$,
   'admin plateforme peut activer une application pour une entreprise'
