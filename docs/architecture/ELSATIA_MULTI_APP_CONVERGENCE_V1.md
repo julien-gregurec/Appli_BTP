@@ -69,7 +69,7 @@ consultation `lecture` n'exécute plus la suspension automatique des impayés. L
 versionné et `docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql` contrôlent les données avant
 tout environnement distant.
 
-La migration append-only `20260826000238_platform_support_isolation_audit_v1.sql` ferme les
+La migration append-only `20260826000239_platform_support_isolation_audit_v1.sql` ferme les
 deux effets résiduels découverts en revue : le catalogue global des fils ne contient plus aucun
 texte de message et `plateforme_support_messages()` n'effectue plus d'UPDATE implicite. Une
 session support AAL2 ciblée est obligatoire avant toute lecture de contenu ; l'acquittement est
@@ -96,7 +96,7 @@ avec audit (4 actions journalisées), admin d'entreprise ne pouvant pas activer 
 lui-même, et vérification structurelle qu'aucune fonction n'accepte de `utilisateur_id` cible
 arbitraire (signatures `a_acces_application(uuid,text)` / `applications_autorisees(uuid)`).
 
-La migration `00238` ajoute 60 assertions ciblées couvrant la liste support sans contenu,
+La migration `00239` ajoute 60 assertions ciblées couvrant la liste support sans contenu,
 l'isolation A/B, la lecture pure, l'acquittement explicite et idempotent, les sessions absentes,
 étrangères, expirées ou fermées, l'historique multi-app sur changement réel, les cibles de
 facturation et l'audit UID. Les suites `00234` à `00237` restent rejouées cumulativement. Trois

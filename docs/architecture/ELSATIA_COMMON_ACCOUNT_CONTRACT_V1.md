@@ -163,7 +163,7 @@ son ouverture exige aussi une session appelante AAL2. La fermeture de sa propre 
 possible sans nouvelle élévation afin de toujours permettre la fin de l'accès. Aucun email ne
 participe à cette décision. Ne jamais construire de bypass RLS silencieux.
 
-Depuis `20260826000238_platform_support_isolation_audit_v1.sql`, la liste globale des fils
+Depuis `20260826000239_platform_support_isolation_audit_v1.sql`, la liste globale des fils
 support est volontairement limitée à `entreprise_id`, nom d'entreprise, dernière date
 d'activité, nombre de non-lus et nombre total de messages. Elle ne retourne ni contenu, ni
 extrait, ni côté du dernier message, ni pièce jointe. Le contenu d'un fil n'est accessible
