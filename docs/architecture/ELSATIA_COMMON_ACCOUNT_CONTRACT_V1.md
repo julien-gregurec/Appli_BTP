@@ -107,15 +107,20 @@ correspondance initiale lors de l'ajout d'un admin) — **ce n'est plus la racin
 d'autorisation**. Une ligne avec un email correct mais un `utilisateur_id` incorrect, absent ou
 `actif = false` n'accorde aucun droit. `plateforme_admins.email` reste la clé primaire de la
 table (aucune refonte de clé primaire dans ce lot — jugée inutilement risquée avant
-commercialisation) ; `utilisateur_id` porte une contrainte `UNIQUE NOT NULL` et une FK vers
-`auth.users(id) on delete restrict`. `role`/`nom`/`ajoute_par`/`created_at` inchangés.
+commercialisation) ; `utilisateur_id` porte une contrainte `UNIQUE` et une FK vers
+`auth.users(id) on delete restrict`. Une identité administrative peut être enregistrée avant
+la création de son compte Auth uniquement avec `utilisateur_id = NULL` et `actif = false` ;
+la contrainte `plateforme_admins_actif_requiert_utilisateur_id` interdit tout administrateur
+actif sans UID. `role`/`nom`/`ajoute_par`/`created_at` inchangés.
 `plateforme_role_courant()` (utilisé par 6 RPC de gestion — abonnements, tarifs, impayés,
 règlements, support, création d'entreprise — via `plateforme_exiger_role()`) suit la même
 logique : `select role from plateforme_admins where utilisateur_id = auth.uid() and actif`.
 
-`julien@elsatia.fr` et `julien.gregurec@gmail.com` ont tous les deux leur `utilisateur_id`
-renseigné et `actif = true`, et ont accès à toutes les applications actives automatiquement, y
-compris Colors, sans ligne d'habilitation explicite.
+`julien@elsatia.fr` est l'identité administrative officielle prévue. Elle ne devient
+administrateur effectif qu'une fois son compte Auth vérifié, son `utilisateur_id` renseigné et
+`actif = true`. `julien.gregurec@gmail.com` reste provisoirement actif jusqu'à validation
+complète du compte professionnel. Un administrateur plateforme actif accède aux applications
+actives sans ligne d'habilitation explicite.
 
 Un admin d'une entreprise cliente (gérant) **n'est pas** admin plateforme global : il ne peut
 pas activer Colors pour sa propre entreprise ni s'auto-habiliter. Ces actions sont centralisées
@@ -172,3 +177,18 @@ avant toute implémentation.
 
 En cas de doute ou de divergence constatée avec ce document : **s'arrêter et remonter le point**
 plutôt que de faire un choix unilatéral côté Colors.
+
+## Package partagé `@elsatia/application-access`
+
+Le package privé `packages/application-access` expose uniquement le contrat TypeScript commun :
+
+- codes d'application et rôles Colors stables ;
+- types des lignes renvoyées par `applications_autorisees(uuid)` ;
+- contrôle serveur via `a_acces_application(uuid,text)` ;
+- exigence d'accès et erreur métier contrôlée ;
+- normalisation défensive du sélecteur d'applications.
+
+Il n'accorde jamais d'accès, n'accepte aucun identifiant d'utilisateur cible et n'utilise aucune
+permission métier Gestion Pro telle que `/stock`. Chaque application lui injecte son propre
+client Supabase serveur, construit avec la session Auth courante. Les erreurs techniques du
+backend ne sont pas propagées dans ses messages publics.

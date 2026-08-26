@@ -21,17 +21,13 @@ from auth.users u
 where lower(u.email) = lower(pa.email)
   and pa.utilisateur_id is null;
 
--- Garde-fou explicite : aucune ligne admin ne doit rester sans utilisateur Auth correspondant
--- avant de verrouiller la colonne. Échec net de la migration plutôt qu'un admin fantôme.
-do $$
-declare v_manquants text;
-begin
-  select string_agg(email, ', ') into v_manquants
-  from public.plateforme_admins where utilisateur_id is null;
-  if v_manquants is not null then
-    raise exception 'Convergence admin plateforme impossible : aucun utilisateur Auth trouvé pour %', v_manquants;
-  end if;
-end $$;
+-- Une identité déclarée avant la création/validation de son compte Auth reste une ligne
+-- d'administration en attente : elle est explicitement inactive et n'accorde aucun droit.
+-- Cela permet un reset local propre sans créer de faux utilisateurs Auth et correspond au
+-- parcours réel de julien@elsatia.fr, qui ne doit devenir effectif qu'après vérification.
+update public.plateforme_admins
+set actif = false, updated_at = now()
+where utilisateur_id is null;
 
 -- Garde-fou explicite : aucun utilisateur_id ne doit être partagé par deux lignes admin
 -- avant de poser la contrainte d'unicité.
@@ -41,6 +37,7 @@ begin
   select string_agg(utilisateur_id::text, ', ') into v_doublons
   from (
     select utilisateur_id from public.plateforme_admins
+    where utilisateur_id is not null
     group by utilisateur_id having count(*) > 1
   ) d;
   if v_doublons is not null then
@@ -48,14 +45,23 @@ begin
   end if;
 end $$;
 
-alter table public.plateforme_admins
-  alter column utilisateur_id set not null;
-
 do $$
 begin
   if not exists (select 1 from pg_constraint where conname = 'plateforme_admins_utilisateur_id_key') then
     alter table public.plateforme_admins
       add constraint plateforme_admins_utilisateur_id_key unique (utilisateur_id);
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'plateforme_admins_actif_requiert_utilisateur_id'
+  ) then
+    alter table public.plateforme_admins
+      add constraint plateforme_admins_actif_requiert_utilisateur_id
+      check (not actif or utilisateur_id is not null);
   end if;
 end $$;
 
