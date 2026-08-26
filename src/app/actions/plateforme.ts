@@ -73,14 +73,17 @@ export async function ajouterAdminPlateformeAction(formData: FormData) {
   if (!email || !email.includes("@")) redirect(`/plateforme?error=${encodeURIComponent("Email invalide")}`);
   const supabase = await createClient();
   if (isEmailLoginDisabled()) {
-    const { error } = await supabase.from("plateforme_admins").upsert({ email, nom, role }, { onConflict: "email" });
+    const { error } = await supabase.from("plateforme_admins").upsert(
+      { email, nom, role, utilisateur_id: null, actif: false, statut_identite: "en_attente" },
+      { onConflict: "email" },
+    );
     if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
   } else {
     const { error } = await supabase.rpc("plateforme_ajouter_admin", { p_email: email, p_nom: nom, p_role: role });
     if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
   }
   revalidatePath("/plateforme");
-  redirect(`/plateforme?succes=${encodeURIComponent(`Accès plateforme accordé à ${email}. Créez son compte de connexion dans Supabase (Authentication → Add user) avec ce même email.`)}`);
+  redirect(`/plateforme?succes=${encodeURIComponent(`Identité ${email} enregistrée en attente. Le rattachement UID, la vérification MFA et l’activation explicite restent obligatoires.`)}`);
 }
 
 export async function retirerAdminPlateformeAction(formData: FormData) {
@@ -96,7 +99,7 @@ export async function retirerAdminPlateformeAction(formData: FormData) {
     if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
   }
   revalidatePath("/plateforme");
-  redirect(`/plateforme?succes=${encodeURIComponent(`${email} retiré de l'équipe plateforme`)}`);
+  redirect(`/plateforme?succes=${encodeURIComponent(`${email} révoqué de l'équipe plateforme`)}`);
 }
 
 export async function modifierTarifPostePlateformeAction(posteId: string, formData: FormData) {

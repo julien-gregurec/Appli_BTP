@@ -15,15 +15,17 @@ insert into auth.users (
   ('00000000-0000-0000-0000-000000000000', 'aa900000-0000-4000-8000-000000000006', 'authenticated', 'authenticated', 'pa-admin-lecture@invalid.local', crypt('test', gen_salt('bf')), now(), now(), now())
 on conflict (id) do nothing;
 
-insert into public.plateforme_admins (email, role, utilisateur_id, actif) values
-  ('pa-admin-total@invalid.local', 'total', 'aa900000-0000-4000-8000-000000000001', true),
-  ('pa-admin-inactif@invalid.local', 'total', 'aa900000-0000-4000-8000-000000000002', false),
-  ('pa-admin-support@invalid.local', 'support', 'aa900000-0000-4000-8000-000000000004', true),
-  ('pa-admin-facturation@invalid.local', 'facturation', 'aa900000-0000-4000-8000-000000000005', true),
-  ('pa-admin-lecture@invalid.local', 'lecture', 'aa900000-0000-4000-8000-000000000006', true);
+insert into public.plateforme_admins (
+  email, role, utilisateur_id, actif, statut_identite, activation_at
+) values
+  ('pa-admin-total@invalid.local', 'total', 'aa900000-0000-4000-8000-000000000001', true, 'active', now()),
+  ('pa-admin-inactif@invalid.local', 'total', 'aa900000-0000-4000-8000-000000000002', false, 'revoquee', null),
+  ('pa-admin-support@invalid.local', 'support', 'aa900000-0000-4000-8000-000000000004', true, 'active', now()),
+  ('pa-admin-facturation@invalid.local', 'facturation', 'aa900000-0000-4000-8000-000000000005', true, 'active', now()),
+  ('pa-admin-lecture@invalid.local', 'lecture', 'aa900000-0000-4000-8000-000000000006', true, 'active', now());
 
-insert into public.plateforme_admins (email, role, utilisateur_id, actif)
-values ('pa-admin-en-attente@invalid.local', 'total', null, false);
+insert into public.plateforme_admins (email, role, utilisateur_id, actif, statut_identite)
+values ('pa-admin-en-attente@invalid.local', 'total', null, false, 'en_attente');
 
 select ok(
   exists(
