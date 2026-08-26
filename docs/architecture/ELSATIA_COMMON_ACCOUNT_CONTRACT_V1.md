@@ -86,13 +86,36 @@ de sonder l'accès d'un tiers sans revérifier son autorisation à administrer c
 
 ## Admin plateforme global
 
-`public.plateforme_admins` (email) + `public.est_plateforme_admin()` — mécanisme déjà existant
-côté Gestion Pro (utilisé dans ~40 endroits). **Ne créez pas de second mécanisme d'admin
-global** (une fonction `est_administrateur_plateforme_global()` avait été introduite côté
-Colors avant la convergence — elle est abandonnée au profit de `est_plateforme_admin()`, seule
-fonction canonique désormais). `julien@elsatia.fr` et `julien.gregurec@gmail.com` y figurent
-tous les deux et ont accès à toutes les applications actives automatiquement, y compris Colors,
-sans ligne d'habilitation explicite.
+`public.plateforme_admins` + `public.est_plateforme_admin()` — mécanisme déjà existant côté
+Gestion Pro (utilisé dans ~40 endroits). **Ne créez pas de second mécanisme d'admin global**
+(une fonction `est_administrateur_plateforme_global()` avait été introduite côté Colors avant
+la convergence — elle est abandonnée au profit de `est_plateforme_admin()`, seule fonction
+canonique désormais).
+
+**Identité et autorisation (depuis `20260826000235_platform_admin_uid_canonical_v1.sql`)** :
+l'autorisation repose sur `auth.uid()`, pas sur l'email :
+
+```sql
+select coalesce(
+  exists(select 1 from public.plateforme_admins where utilisateur_id = auth.uid() and actif),
+  false
+);
+```
+
+`plateforme_admins.email` reste une donnée d'identité/audit/bootstrap (affichage, recherche,
+correspondance initiale lors de l'ajout d'un admin) — **ce n'est plus la racine
+d'autorisation**. Une ligne avec un email correct mais un `utilisateur_id` incorrect, absent ou
+`actif = false` n'accorde aucun droit. `plateforme_admins.email` reste la clé primaire de la
+table (aucune refonte de clé primaire dans ce lot — jugée inutilement risquée avant
+commercialisation) ; `utilisateur_id` porte une contrainte `UNIQUE NOT NULL` et une FK vers
+`auth.users(id) on delete restrict`. `role`/`nom`/`ajoute_par`/`created_at` inchangés.
+`plateforme_role_courant()` (utilisé par 6 RPC de gestion — abonnements, tarifs, impayés,
+règlements, support, création d'entreprise — via `plateforme_exiger_role()`) suit la même
+logique : `select role from plateforme_admins where utilisateur_id = auth.uid() and actif`.
+
+`julien@elsatia.fr` et `julien.gregurec@gmail.com` ont tous les deux leur `utilisateur_id`
+renseigné et `actif = true`, et ont accès à toutes les applications actives automatiquement, y
+compris Colors, sans ligne d'habilitation explicite.
 
 Un admin d'une entreprise cliente (gérant) **n'est pas** admin plateforme global : il ne peut
 pas activer Colors pour sa propre entreprise ni s'auto-habiliter. Ces actions sont centralisées
