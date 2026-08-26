@@ -1,3 +1,5 @@
+import { resoudreUrlContactCommercial } from "./brand";
+
 /**
  * Verrou temporaire de commercialisation.
  *
@@ -7,6 +9,24 @@
  */
 export function abonnementsPublicsOuverts() {
   return process.env.ABONNEMENTS_PUBLICS_OUVERTS === "true";
+}
+
+export function destinationCtaOffreTarifaire({
+  cleOffre,
+  devisObligatoire,
+  paiementConfigure,
+  abonnementsOuverts,
+}: {
+  cleOffre: string;
+  devisObligatoire?: boolean;
+  paiementConfigure: boolean;
+  abonnementsOuverts: boolean;
+}) {
+  if (devisObligatoire || !paiementConfigure || !abonnementsOuverts) {
+    return resoudreUrlContactCommercial();
+  }
+
+  return `/signup?offre=${encodeURIComponent(cleOffre)}`;
 }
 
 export const MESSAGE_OUVERTURE_PROCHAINE =

@@ -8,8 +8,7 @@ import { offreParCle, OFFRES, prixAbonnementMensuel, statutAbonnement } from "@/
 import { calculerFacturationStockage, OCTETS_PAR_GO, stripeBillingEstConfigure, TARIF_STOCKAGE_SUPPLEMENTAIRE_HT_PAR_GO } from "@/lib/stripe-abonnement";
 import { consommationIAMensuelle } from "@/lib/ai/journal";
 import { iaEstActive } from "@/lib/preview-features";
-import { BRAND_NAME, PRODUCT_NAME, URL_CONTACT_COMMERCIAL } from "@/lib/brand";
-import { BRAND_SERVER } from "@/lib/brand-server";
+import { BRAND_NAME, PRODUCT_NAME, resoudreUrlContactCommercial } from "@/lib/brand";
 import { calculerGainsOffreSuivante, calculerReductionRemise, CATEGORIES_COMPARATIF, etatLigneComparatif, LIBELLE_ETAT_COMMERCIAL, type EtatCommercial } from "@/lib/comparatif-offres";
 import { estCodeOffreTarifaire } from "@/lib/tarification";
 import { abonnementsPublicsOuverts } from "@/lib/commercialisation-abonnements";
@@ -91,9 +90,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
   const abonnementApresRemiseMensuel = Math.max(0, abonnementAvantRemiseMensuel - remiseReductionMensuelle);
   const paiementEnEchec = entreprise?.abonnement_statut === "suspendu" && souscrit;
   const euros = (montant: number) => montant.toLocaleString("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
-  const contactCommercial = BRAND_SERVER.supportEmail
-    ? `mailto:${BRAND_SERVER.supportEmail}?subject=${encodeURIComponent(`Offre ${PRODUCT_NAME}`)}`
-    : URL_CONTACT_COMMERCIAL;
+  const contactCommercial = resoudreUrlContactCommercial();
 
   return <main className="p-4 sm:p-8"><div className="mx-auto max-w-5xl space-y-6">
     <header><h1 className="text-xl font-semibold">Mon abonnement {PRODUCT_NAME}</h1><p className="text-sm text-neutral-500">Offre, moyen de paiement, échéances et factures de votre entreprise.</p></header>

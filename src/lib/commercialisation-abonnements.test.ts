@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { abonnementsPublicsOuverts, MESSAGE_OUVERTURE_PROCHAINE } from "./commercialisation-abonnements";
+import { OFFRES_TARIFAIRES } from "./tarification";
+import { URL_CONTACT_COMMERCIAL } from "./brand";
+import { abonnementsPublicsOuverts, destinationCtaOffreTarifaire, MESSAGE_OUVERTURE_PROCHAINE } from "./commercialisation-abonnements";
 
 const valeurInitiale = process.env.ABONNEMENTS_PUBLICS_OUVERTS;
 
@@ -20,5 +22,34 @@ describe("verrou de commercialisation des abonnements", () => {
     expect(abonnementsPublicsOuverts()).toBe(false);
     process.env.ABONNEMENTS_PUBLICS_OUVERTS = "true";
     expect(abonnementsPublicsOuverts()).toBe(true);
+  });
+
+  it("dirige les cinq CTA tarifaires vers le contact commercial quand les souscriptions sont fermées", () => {
+    const destinations = OFFRES_TARIFAIRES.map((offre) => destinationCtaOffreTarifaire({
+      cleOffre: offre.cle,
+      devisObligatoire: offre.devisObligatoire,
+      paiementConfigure: true,
+      abonnementsOuverts: false,
+    }));
+
+    expect(destinations).toHaveLength(5);
+    expect(destinations).toEqual(Array(5).fill(URL_CONTACT_COMMERCIAL));
+    expect(destinations.every((destination) => !destination.startsWith("mailto:"))).toBe(true);
+  });
+
+  it("ne rend une inscription possible qu’après ouverture explicite", () => {
+    expect(destinationCtaOffreTarifaire({
+      cleOffre: "mini",
+      devisObligatoire: false,
+      paiementConfigure: true,
+      abonnementsOuverts: true,
+    })).toBe("/signup?offre=mini");
+
+    expect(destinationCtaOffreTarifaire({
+      cleOffre: "sur_mesure",
+      devisObligatoire: true,
+      paiementConfigure: true,
+      abonnementsOuverts: true,
+    })).toBe(URL_CONTACT_COMMERCIAL);
   });
 });

@@ -21,6 +21,22 @@ function valeurOptionnelle(valeur: string | undefined) {
   return nettoyee || null;
 }
 
+export function resoudreUrlContactCommercial(
+  candidate: string | null | undefined = URL_CONTACT_COMMERCIAL,
+) {
+  const valeur = candidate?.trim();
+  if (!valeur) return URL_CONTACT_COMMERCIAL;
+
+  try {
+    const url = new URL(valeur);
+    return ["http:", "https:"].includes(url.protocol)
+      ? url.toString()
+      : URL_CONTACT_COMMERCIAL;
+  } catch {
+    return URL_CONTACT_COMMERCIAL;
+  }
+}
+
 function urlPublique(valeur: string | undefined) {
   const candidate = valeurOptionnelle(valeur);
   if (!candidate) return null;

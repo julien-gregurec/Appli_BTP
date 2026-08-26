@@ -6,9 +6,8 @@ import { formatMontantCentimes, OFFRES_TARIFAIRES, OPTIONS_TARIFAIRES, SERVICES_
 import { stripeBillingEstConfigure } from "@/lib/stripe-abonnement";
 import { iaEstActive } from "@/lib/preview-features";
 import { powensEstConfigure } from "@/lib/banking";
-import { PRODUCT_NAME, URL_CONTACT_COMMERCIAL } from "@/lib/brand";
-import { BRAND_SERVER } from "@/lib/brand-server";
-import { abonnementsPublicsOuverts } from "@/lib/commercialisation-abonnements";
+import { PRODUCT_NAME } from "@/lib/brand";
+import { abonnementsPublicsOuverts, destinationCtaOffreTarifaire } from "@/lib/commercialisation-abonnements";
 
 export const metadata: Metadata = {
   title: `Tarifs — ${PRODUCT_NAME}`,
@@ -34,9 +33,6 @@ export default function TarifsPage() {
     if (!banqueVisible && option.cle === "synchronisation_bancaire") return false;
     return true;
   });
-  const contactCommercial = BRAND_SERVER.supportEmail
-    ? `mailto:${BRAND_SERVER.supportEmail}?subject=${encodeURIComponent(`Demande ${PRODUCT_NAME}`)}`
-    : URL_CONTACT_COMMERCIAL;
   return (
     <main className="min-h-screen bg-neutral-50 px-4 py-12 dark:bg-neutral-950">
       <div className="mx-auto max-w-7xl">
@@ -66,7 +62,7 @@ export default function TarifsPage() {
                 <li>✓ {offre.stockageGoInclus} Go de stockage</li>
                 {beneficesAffiches(offre.cle).map((point) => <li key={point}>✓ {point}</li>)}
               </ul>
-              <Link href={offre.devisObligatoire || !paiementConfigure || !abonnementsOuverts ? contactCommercial : `/signup?offre=${offre.cle}`} className={`mt-6 rounded-lg px-4 py-2.5 text-center text-sm font-semibold ${offre.populaire ? "bg-[#0d1b2a] text-white" : "border border-[#0d1b2a] text-[#0d1b2a] dark:border-white dark:text-white"}`}>
+              <Link href={destinationCtaOffreTarifaire({ cleOffre: offre.cle, devisObligatoire: offre.devisObligatoire, paiementConfigure, abonnementsOuverts })} className={`mt-6 rounded-lg px-4 py-2.5 text-center text-sm font-semibold ${offre.populaire ? "bg-[#0d1b2a] text-white" : "border border-[#0d1b2a] text-[#0d1b2a] dark:border-white dark:text-white"}`}>
                 {offre.devisObligatoire ? "Demander un devis" : abonnementsOuverts && paiementConfigure ? "Démarrer l’essai" : "Ouverture prochaine"}
               </Link>
             </article>

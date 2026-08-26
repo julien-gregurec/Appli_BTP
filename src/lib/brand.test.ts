@@ -5,8 +5,10 @@ import {
   MARQUE,
   NOM_APPLICATION,
   NOM_COURT_PWA,
+  URL_CONTACT_COMMERCIAL,
   creerConfigurationMarquePublique,
   creerConfigurationMarqueServeur,
+  resoudreUrlContactCommercial,
 } from "./brand";
 
 describe("configuration de marque ELSATIA", () => {
@@ -47,5 +49,30 @@ describe("configuration de marque ELSATIA", () => {
       emailFromName: "ELSATIA",
       emailFromAddress: "no-reply@example.com",
     });
+  });
+
+  it("sépare toujours le contact commercial de l’adresse d’assistance", () => {
+    const supportInitial = process.env.SUPPORT_EMAIL;
+    try {
+      process.env.SUPPORT_EMAIL = "support@elsatia.fr";
+      expect(resoudreUrlContactCommercial(URL_CONTACT_COMMERCIAL)).toBe(URL_CONTACT_COMMERCIAL);
+
+      delete process.env.SUPPORT_EMAIL;
+      expect(resoudreUrlContactCommercial(URL_CONTACT_COMMERCIAL)).toBe(URL_CONTACT_COMMERCIAL);
+
+      process.env.SUPPORT_EMAIL = "support@elsatia.fr";
+      expect(resoudreUrlContactCommercial(undefined)).toBe(URL_CONTACT_COMMERCIAL);
+
+      delete process.env.SUPPORT_EMAIL;
+      expect(resoudreUrlContactCommercial()).toBe(URL_CONTACT_COMMERCIAL);
+
+      process.env.SUPPORT_EMAIL = "support@elsatia.fr";
+      expect(resoudreUrlContactCommercial(" ")).toBe(URL_CONTACT_COMMERCIAL);
+      expect(resoudreUrlContactCommercial("mailto:support@elsatia.fr")).toBe(URL_CONTACT_COMMERCIAL);
+      expect(resoudreUrlContactCommercial("javascript:alert(1)")).toBe(URL_CONTACT_COMMERCIAL);
+    } finally {
+      if (supportInitial === undefined) delete process.env.SUPPORT_EMAIL;
+      else process.env.SUPPORT_EMAIL = supportInitial;
+    }
   });
 });
