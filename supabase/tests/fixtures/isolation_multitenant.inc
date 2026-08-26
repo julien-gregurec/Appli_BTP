@@ -222,7 +222,8 @@ values (
   true, 'active', now()
 )
 on conflict (email) do update
-set utilisateur_id = excluded.utilisateur_id,
+set role = excluded.role,
+    utilisateur_id = excluded.utilisateur_id,
     actif = excluded.actif,
     statut_identite = excluded.statut_identite,
     activation_at = excluded.activation_at;

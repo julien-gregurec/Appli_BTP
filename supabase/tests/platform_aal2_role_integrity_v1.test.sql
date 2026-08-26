@@ -159,6 +159,12 @@ select is(
 );
 
 -- G. Support : session AAL2 seulement, aucune administration ni mutation multi-app.
+insert into public.support_messages(entreprise_id,cote,auteur_id,auteur_nom,contenu)
+values(
+  'a0000000-0000-0000-0000-000000000001','entreprise',
+  '10000000-0000-0000-0000-000000000001','Admin A','Message support de test AAL2'
+);
+set local role authenticated;
 select set_config('request.jwt.claim.sub','ee900000-0000-4000-8000-000000000002',true);
 select set_config('request.jwt.claim.email','support-aal2@invalid.local',true);
 select set_config('request.jwt.claims','{"sub":"ee900000-0000-4000-8000-000000000002","email":"support-aal2@invalid.local","role":"authenticated","aal":"aal2"}',true);
