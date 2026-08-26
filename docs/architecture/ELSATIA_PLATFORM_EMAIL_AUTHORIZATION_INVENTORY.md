@@ -28,9 +28,14 @@ Ces fichiers historiques restent immuables. Leur définition n'est plus celle du
 
 ## Mode prototype
 
-Le mode local sans connexion conserve ses accès de démonstration déjà existants. Toute ligne
-administrateur qu'il écrit est désormais explicitement `en_attente`, sans UID et inactive. Ce
-mode ne doit jamais être activé dans un environnement commercial.
+Le mode local sans connexion conserve ses accès de démonstration déjà existants, mais
+`DISABLE_EMAIL_LOGIN=true` ne suffit plus à l'activer. Il exige cumulativement
+`ELSATIA_LOCAL_DEMO=true`, `NODE_ENV` différent de Production, l'absence de `VERCEL` et
+`VERCEL_ENV`, et une URL Supabase dont l'hôte est `localhost`, `127.0.0.1` ou `::1`. Une
+Production, une Preview/Vercel ou un Supabase distant reste donc en authentification réelle
+même si la variable historique est mal configurée. Toute ligne administrateur écrite dans la
+seule démonstration locale reste `en_attente`, sans UID et inactive ; aucun bypass SQL/RLS n'est
+introduit.
 
 ## Renforcement AAL2 et rôles (migration 237)
 
@@ -52,3 +57,13 @@ Le schéma final ne contient aucun `SECURITY DEFINER` sans `search_path` fixé d
 inventorié. Les tables d'accès multi-app n'accordent aux rôles applicatifs que la lecture ; les
 écritures passent par les RPC `total` + AAL2. Le préflight n'est exécutable que par
 `service_role`, et les helpers AAL2/verrou ne sont pas exécutables par `authenticated`.
+
+## Isolation support et traçabilité (migration 238)
+
+`plateforme_support_fils()` ne retourne plus aucun texte, extrait ou côté de message.
+`plateforme_support_messages()` exige rôle `total`/`support`, AAL2 et session ciblée, mais reste
+une lecture pure. L'acquittement explicite et les mutations multi-app/facturation utilisent
+`auth.uid()` comme auteur d'audit ; `auth.email()` éventuellement conservé n'est qu'un libellé.
+Les cibles inexistantes ne produisent ni succès ni historique. Les appels sans changement réel
+retournent zéro/`false` sans événement, sauf le snapshot mensuel volontairement tracé comme
+événement périodique.

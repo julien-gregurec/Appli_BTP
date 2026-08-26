@@ -163,6 +163,16 @@ son ouverture exige aussi une session appelante AAL2. La fermeture de sa propre 
 possible sans nouvelle élévation afin de toujours permettre la fin de l'accès. Aucun email ne
 participe à cette décision. Ne jamais construire de bypass RLS silencieux.
 
+Depuis `20260826000238_platform_support_isolation_audit_v1.sql`, la liste globale des fils
+support est volontairement limitée à `entreprise_id`, nom d'entreprise, dernière date
+d'activité, nombre de non-lus et nombre total de messages. Elle ne retourne ni contenu, ni
+extrait, ni côté du dernier message, ni pièce jointe. Le contenu d'un fil n'est accessible
+qu'après ouverture d'une session support AAL2 visant exactement son entreprise.
+`plateforme_support_messages()` est une lecture pure : elle n'acquitte rien, ne prolonge aucune
+session et ne crée aucun historique. L'acquittement est une mutation séparée,
+`plateforme_support_marquer_messages_lus(entreprise_id)`, auditée avec l'UID réel uniquement
+quand au moins un message non lu est effectivement modifié.
+
 ### Matrice des rôles plateforme
 
 | Rôle | Consultation | Administrateurs | Entitlements multi-app | Support | Facturation |
@@ -174,7 +184,10 @@ participe à cette décision. Ne jamais construire de bypass RLS silencieux.
 
 Les quatre RPC de mutation des accès applications exigent cumulativement une identité active,
 le rôle `total` et AAL2. Un administrateur Gestion Pro ne reçoit aucun rôle plateforme ni accès
-Colors implicitement.
+Colors implicitement. Elles retournent désormais un booléen de changement : répéter exactement
+une activation, désactivation, habilitation ou révocation déjà obtenue retourne `false` et ne
+crée aucun historique. Un changement de rôle applicatif ou de période reste un vrai changement
+et journalise les états avant/après avec l'UID de l'auteur.
 
 Les mutations d'abonnement, tarif, impayé, règlement, remise et snapshot de facturation
 exigent `total` ou `facturation` et AAL2. La création d'entreprise et la création d'une version
@@ -183,6 +196,16 @@ du catalogue tarifaire exigent `total` et AAL2. La réinitialisation assistée e
 `lecture` restent sans effet de bord : en particulier, lister les entreprises ne déclenche plus
 la suspension automatique d'un abonnement. La fermeture de sa propre session support est la
 seule mutation de ce périmètre autorisée sans nouvelle élévation, afin de garantir la sortie.
+Les mutations de facturation vérifient explicitement leur cible et refusent une entreprise ou
+un poste inexistant. Les changements réels sont tracés avec UID, entreprise, objet et états
+avant/après dans `historique_mutations_plateforme` ou, pour les remises et versions tarifaires,
+dans `historique_tarification`. Le snapshot mensuel est l'exception documentée : chaque
+exécution constitue un événement périodique explicite, même si aucune ligne n'a changé.
+
+Le bypass `DISABLE_EMAIL_LOGIN` ne peut ouvrir le mode démonstration que si toutes les conditions
+locales sont réunies : `ELSATIA_LOCAL_DEMO=true`, environnement non Production, absence totale
+de contexte Vercel et URL Supabase sur loopback. `DISABLE_EMAIL_LOGIN=true` seul, une Preview,
+un build Vercel ou une URL Supabase distante ne confèrent aucun droit plateforme.
 
 Un administrateur révoqué ayant un historique support peut être détaché de son identité
 plateforme, mais la FK d'audit peut interdire sa suppression Auth. Le compte technique reste
@@ -199,7 +222,8 @@ La procédure opérationnelle, y compris le cas du premier administrateur, est d
 - `plateforme_habiliter_utilisateur_application(utilisateur_id, entreprise_id, application_code, role_code, valide_du?, valide_jusqu_au?)`
 - `plateforme_retirer_habilitation_application(utilisateur_id, entreprise_id, application_code)`
 
-Toutes réservées à `est_plateforme_admin()`, journalisées dans `historique_acces_applications`.
+Toutes réservées à une identité plateforme `total` active en session AAL2, journalisées dans
+`historique_acces_applications` uniquement lors d'un changement métier réel.
 
 ## Sécurité — pas d'écriture directe
 
