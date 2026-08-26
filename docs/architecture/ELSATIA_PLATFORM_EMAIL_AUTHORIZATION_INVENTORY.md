@@ -31,3 +31,24 @@ Ces fichiers historiques restent immuables. Leur définition n'est plus celle du
 Le mode local sans connexion conserve ses accès de démonstration déjà existants. Toute ligne
 administrateur qu'il écrit est désormais explicitement `en_attente`, sans UID et inactive. Ce
 mode ne doit jamais être activé dans un environnement commercial.
+
+## Renforcement AAL2 et rôles (migration 237)
+
+L'email ne participe jamais à la preuve d'authentification forte. Les mutations administrateur,
+support et multi-app sensibles utilisent le claim `aal` de `auth.jwt()` et exigent `aal2`.
+Les mutations d'entitlements exigent en plus le rôle plateforme `total`; les rôles `lecture`,
+`support` et `facturation` ne peuvent pas les appeler. `auth.email()` reste limité à l'audit,
+l'affichage et la vérification de cohérence entre l'identité déclarée et le compte Auth cible.
+
+L'inventaire global de la migration 237 classe également les opérations suivantes comme
+sensibles et AAL2 : facturation mutative, création d'entreprise, catalogue tarifaire, remise,
+réinitialisation assistée, fils/messages support et mutations d'identité. Les occurrences
+résiduelles de `auth.email()` dans ces RPC ne prennent aucune décision d'autorisation : elles
+alimentent uniquement les champs d'audit/affichage. `plateforme_quitter_entreprise()` est
+l'exception documentée : elle ne peut que fermer la session support ouverte de `auth.uid()` et
+restaurer son entreprise précédente, sans ouvrir ni étendre un accès.
+
+Le schéma final ne contient aucun `SECURITY DEFINER` sans `search_path` fixé dans le périmètre
+inventorié. Les tables d'accès multi-app n'accordent aux rôles applicatifs que la lecture ; les
+écritures passent par les RPC `total` + AAL2. Le préflight n'est exécutable que par
+`service_role`, et les helpers AAL2/verrou ne sont pas exécutables par `authenticated`.

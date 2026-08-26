@@ -16,13 +16,14 @@ insert into auth.users (
 on conflict (id) do nothing;
 
 insert into public.plateforme_admins (
-  email, role, utilisateur_id, actif, statut_identite, activation_at
+  email, role, utilisateur_id, actif, statut_identite, activation_at,
+  revocation_at, revocation_origine
 ) values
-  ('pa-admin-total@invalid.local', 'total', 'aa900000-0000-4000-8000-000000000001', true, 'active', now()),
-  ('pa-admin-inactif@invalid.local', 'total', 'aa900000-0000-4000-8000-000000000002', false, 'revoquee', null),
-  ('pa-admin-support@invalid.local', 'support', 'aa900000-0000-4000-8000-000000000004', true, 'active', now()),
-  ('pa-admin-facturation@invalid.local', 'facturation', 'aa900000-0000-4000-8000-000000000005', true, 'active', now()),
-  ('pa-admin-lecture@invalid.local', 'lecture', 'aa900000-0000-4000-8000-000000000006', true, 'active', now());
+  ('pa-admin-total@invalid.local', 'total', 'aa900000-0000-4000-8000-000000000001', true, 'active', now(), null, null),
+  ('pa-admin-inactif@invalid.local', 'total', 'aa900000-0000-4000-8000-000000000002', false, 'revoquee', null, now(), 'migration_technique'),
+  ('pa-admin-support@invalid.local', 'support', 'aa900000-0000-4000-8000-000000000004', true, 'active', now(), null, null),
+  ('pa-admin-facturation@invalid.local', 'facturation', 'aa900000-0000-4000-8000-000000000005', true, 'active', now(), null, null),
+  ('pa-admin-lecture@invalid.local', 'lecture', 'aa900000-0000-4000-8000-000000000006', true, 'active', now(), null, null);
 
 insert into public.plateforme_admins (email, role, utilisateur_id, actif, statut_identite)
 values ('pa-admin-en-attente@invalid.local', 'total', null, false, 'en_attente');

@@ -123,11 +123,19 @@ cycle explicite suivant :
 
 Une activation nécessite deux opérations séparées, effectuées par un autre administrateur
 `total` actif : `plateforme_rattacher_admin(email, uid)` puis
-`plateforme_activer_admin(email)`. Le compte Auth cible doit avoir un email vérifié, identique
-à l'identité déclarée, et un facteur MFA vérifié. L'auto-rattachement et l'auto-activation sont
-interdits. `activation_at`/`activation_par` et `revocation_at`/`revocation_par` conservent la
-date et l'UID de l'auteur. Une révocation ferme les sessions support ouvertes ; le détachement
-de l'UID révoqué précède toute suppression éventuelle du compte Auth.
+`plateforme_activer_admin(email)`. Depuis la migration
+`20260826000237_platform_aal2_role_integrity_v1.sql`, ces appels exigent une **session appelante
+AAL2**, lue exclusivement dans le claim canonique `aal` de `auth.jwt()`. Un paramètre, un header
+libre, une metadata utilisateur ou la seule présence d'un facteur MFA ne remplacent jamais
+cette preuve de session. Séparément, le compte Auth **cible** doit avoir un email vérifié,
+identique à l'identité déclarée, et un facteur MFA vérifié. L'AAL2 de l'appelant et le MFA
+configuré sur la cible sont deux contrôles distincts et cumulatifs.
+
+L'auto-rattachement et l'auto-activation sont interdits. `activation_at`/`activation_par` et
+`revocation_at`/`revocation_par` conservent la date et l'UID de l'auteur. L'email d'identité est
+immuable et l'UID actif ne peut être remplacé : le cycle obligatoire est `active → revoquee →
+détachement → rattachee_non_confirmee → active`. Un verrou advisory transactionnel commun
+sérialise les mutations du cycle avant le recomptage du dernier administrateur `total`.
 `plateforme_role_courant()` (utilisé par 6 RPC de gestion — abonnements, tarifs, impayés,
 règlements, support, création d'entreprise — via `plateforme_exiger_role()`) suit la même
 logique : `select role from plateforme_admins where utilisateur_id = auth.uid() and actif`.
@@ -151,7 +159,35 @@ réutiliser le mode support Gestion Pro (`plateforme_acces_entreprises` +
 `est_acces_support_actif(entreprise_id)`). Une session support est explicite, liée à l'UID de
 l'administrateur, limitée à une entreprise, fermable, révocable et automatiquement expirée
 après quatre heures. La fonction exige une identité `active` et un rôle `total` ou `support` ;
-aucun email ne participe à cette décision. Ne jamais construire de bypass RLS silencieux.
+son ouverture exige aussi une session appelante AAL2. La fermeture de sa propre session reste
+possible sans nouvelle élévation afin de toujours permettre la fin de l'accès. Aucun email ne
+participe à cette décision. Ne jamais construire de bypass RLS silencieux.
+
+### Matrice des rôles plateforme
+
+| Rôle | Consultation | Administrateurs | Entitlements multi-app | Support | Facturation |
+|---|---|---|---|---|---|
+| `total` | oui | AAL2 | AAL2 | AAL2 | RPC prévues, AAL2 |
+| `support` | périmètre support | non | non | AAL2 et session ciblée | non |
+| `facturation` | périmètre facturation | non | non | non | RPC prévues, AAL2 |
+| `lecture` | oui | non | non | non | non |
+
+Les quatre RPC de mutation des accès applications exigent cumulativement une identité active,
+le rôle `total` et AAL2. Un administrateur Gestion Pro ne reçoit aucun rôle plateforme ni accès
+Colors implicitement.
+
+Les mutations d'abonnement, tarif, impayé, règlement, remise et snapshot de facturation
+exigent `total` ou `facturation` et AAL2. La création d'entreprise et la création d'une version
+du catalogue tarifaire exigent `total` et AAL2. La réinitialisation assistée exige `total` ou
+`support`, AAL2 et une session support active sur l'entreprise ciblée. Les consultations du rôle
+`lecture` restent sans effet de bord : en particulier, lister les entreprises ne déclenche plus
+la suspension automatique d'un abonnement. La fermeture de sa propre session support est la
+seule mutation de ce périmètre autorisée sans nouvelle élévation, afin de garantir la sortie.
+
+Un administrateur révoqué ayant un historique support peut être détaché de son identité
+plateforme, mais la FK d'audit peut interdire sa suppression Auth. Le compte technique reste
+alors désactivé jusqu'à un futur lot d'anonymisation/archivage ; aucune cascade ne doit effacer
+l'historique.
 
 La procédure opérationnelle, y compris le cas du premier administrateur, est décrite dans
 [`PLATFORM_ADMIN_ACTIVATION_RUNBOOK.md`](../operations/PLATFORM_ADMIN_ACTIVATION_RUNBOOK.md).

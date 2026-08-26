@@ -23,6 +23,11 @@ where email = 'plateforme@invalid.local';
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000001', true);
 select set_config('request.jwt.claim.email', 'plateforme@invalid.local', true);
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"30000000-0000-0000-0000-000000000001","email":"plateforme@invalid.local","role":"authenticated","aal":"aal2"}',
+  true
+);
 select public.plateforme_appliquer_remise(
   'a0000000-0000-0000-0000-000000000001',
   'coupon-test-initial',
@@ -51,6 +56,11 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000001', true);
 select set_config('request.jwt.claim.email', 'plateforme@invalid.local', true);
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"30000000-0000-0000-0000-000000000001","email":"plateforme@invalid.local","role":"authenticated","aal":"aal2"}',
+  true
+);
 
 select lives_ok(
   $$select public.plateforme_appliquer_remise(

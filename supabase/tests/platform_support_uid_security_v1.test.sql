@@ -16,12 +16,13 @@ insert into auth.users(
 on conflict(id) do nothing;
 
 insert into public.plateforme_admins(
-  email,role,utilisateur_id,actif,statut_identite,activation_at
+  email,role,utilisateur_id,actif,statut_identite,activation_at,
+  revocation_at,revocation_origine
 ) values
-  ('support-pending@invalid.local','total',null,false,'en_attente',null),
-  ('support-owner@invalid.local','support','cc900000-0000-4000-8000-000000000002',true,'active',now()),
-  ('support-inactif@invalid.local','support','cc900000-0000-4000-8000-000000000004',false,'revoquee',null),
-  ('support-lecture@invalid.local','lecture','cc900000-0000-4000-8000-000000000006',true,'active',now())
+  ('support-pending@invalid.local','total',null,false,'en_attente',null,null,null),
+  ('support-owner@invalid.local','support','cc900000-0000-4000-8000-000000000002',true,'active',now(),null,null),
+  ('support-inactif@invalid.local','support','cc900000-0000-4000-8000-000000000004',false,'revoquee',null,now(),'migration_technique'),
+  ('support-lecture@invalid.local','lecture','cc900000-0000-4000-8000-000000000006',true,'active',now(),null,null)
 on conflict(email) do nothing;
 
 insert into public.acces_applications_entreprises(
@@ -47,7 +48,7 @@ select set_config('request.jwt.claim.email','support-pending@invalid.local',true
 select ok(not public.est_plateforme_admin(), '1. identité en attente : pas admin plateforme');
 select throws_like(
   $$select public.plateforme_entrer_entreprise('a0000000-0000-0000-0000-000000000001','audit support pending')$$,
-  '%non autorisé%', '2. le bon email seul ne permet pas une entrée support'
+  '%réserv%', '2. le bon email seul ne permet pas une entrée support'
 );
 reset role;
 select is(
@@ -68,7 +69,7 @@ select set_config('request.jwt.claim.email','support-owner@invalid.local',true);
 select ok(not public.est_plateforme_admin(), '5. UID différent : pas admin malgré email usurpé');
 select throws_like(
   $$select public.plateforme_entrer_entreprise('a0000000-0000-0000-0000-000000000001','audit mauvais uid')$$,
-  '%non autorisé%', '6. UID différent : entrée support refusée'
+  '%réserv%', '6. UID différent : entrée support refusée'
 );
 reset role;
 select is(
@@ -83,7 +84,7 @@ select set_config('request.jwt.claim.email','support-inactif@invalid.local',true
 select ok(not public.est_plateforme_admin(), '8. UID correct mais actif=false : refusé');
 select throws_like(
   $$select public.plateforme_entrer_entreprise('a0000000-0000-0000-0000-000000000001','audit compte inactif')$$,
-  '%non autorisé%', '9. compte inactif : entrée support refusée'
+  '%réserv%', '9. compte inactif : entrée support refusée'
 );
 
 -- Un rôle plateforme actif mais non habilité au support reste refusé.
@@ -91,7 +92,7 @@ select set_config('request.jwt.claim.sub','cc900000-0000-4000-8000-000000000006'
 select set_config('request.jwt.claim.email','support-lecture@invalid.local',true);
 select throws_like(
   $$select public.plateforme_entrer_entreprise('a0000000-0000-0000-0000-000000000001','audit role lecture')$$,
-  '%non autorisé%', 'rôle lecture : entrée support refusée'
+  '%réserv%', 'rôle lecture : entrée support refusée'
 );
 
 -- Une session non authentifiée et une entreprise inexistante sont refusées.
@@ -99,10 +100,11 @@ select set_config('request.jwt.claim.sub','',true);
 select set_config('request.jwt.claim.email','',true);
 select throws_like(
   $$select public.plateforme_entrer_entreprise('a0000000-0000-0000-0000-000000000001','audit sans session')$$,
-  '%non autorisé%', 'session non authentifiée : entrée support refusée'
+  '%réserv%', 'session non authentifiée : entrée support refusée'
 );
 select set_config('request.jwt.claim.sub','30000000-0000-0000-0000-000000000001',true);
 select set_config('request.jwt.claim.email','plateforme@invalid.local',true);
+select set_config('request.jwt.claims','{"aal":"aal2"}',true);
 select throws_like(
   $$select public.plateforme_entrer_entreprise('ffffffff-ffff-4fff-8fff-ffffffffffff','audit entreprise absente')$$,
   '%introuvable%', 'entreprise inexistante : entrée support refusée'
