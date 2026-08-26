@@ -2,8 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { createHash, randomUUID } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { estPlateformeAdmin } from "@/lib/plateforme";
 import { ERREUR_CONFIGURATION_URL_AUTH, urlCallbackReinitialisation } from "@/lib/auth-redirects";
@@ -219,6 +219,51 @@ function nomCouponRemise(nomEntreprise: string, description: string): string {
   return `${nomTronque}${suffixe}`;
 }
 
+type CibleRemisePreautorisee = {
+  entreprise_id: string;
+  entreprise_nom: string;
+  stripe_subscription_id: string | null;
+  remise_stripe_coupon_id: string | null;
+};
+
+function cleIdempotenceRemise(prefixe: string, valeurs: Array<string | number | null | undefined>) {
+  const empreinte = createHash("sha256").update(valeurs.map((valeur) => String(valeur ?? "")).join("\u001f")).digest("hex").slice(0, 40);
+  return `${prefixe}-${empreinte}`;
+}
+
+async function preautoriserRemise(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  entrepriseId: string,
+  operation: "remise_appliquer" | "remise_retirer",
+) {
+  const { data, error } = await supabase.rpc("plateforme_preautoriser_effet_externe", {
+    p_entreprise_id: entrepriseId,
+    p_operation: operation,
+  });
+  if (error) throw new Error(error.message);
+  const cible = (Array.isArray(data) ? data[0] : data) as CibleRemisePreautorisee | null;
+  if (!cible?.entreprise_id) throw new Error("Préautorisation de la remise refusée");
+  return cible;
+}
+
+async function journaliserEchecSynchronisationRemise(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  entrepriseId: string,
+  operation: "remise_appliquer" | "remise_retirer",
+  compensationReussie: boolean,
+) {
+  try {
+    const { error } = await supabase.rpc("plateforme_journaliser_echec_synchronisation_remise", {
+      p_entreprise_id: entrepriseId,
+      p_operation: operation,
+      p_compensation_reussie: compensationReussie,
+    });
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
 // Geste commercial : coupon Stripe créé et appliqué sur l'abonnement de l'entreprise (base
 // + comptes supplémentaires, au prorata — vérifié empiriquement, REMISES-CLIENTS-V1, voir
 // docs/commercial/REMISES_CLIENTS_V1.md). Un seul à la fois (Stripe remplace automatiquement
@@ -240,23 +285,31 @@ export async function appliquerRemiseAction(entrepriseId: string, formData: Form
   const dureeMois = duree === "repeating" ? dureeMoisBrut : undefined;
 
   const supabase = await createClient();
-  // Lecture via le client admin : un administrateur plateforme n'est pas forcément membre de
-  // l'entreprise cliente, et la RLS "membres voient leur entreprise" (est_membre_actif) bloque
-  // sinon cette lecture pour toute entreprise autre que la sienne (bug réel découvert en
-  // testant REMISES-CLIENTS-V1 avec un compte admin distinct du propriétaire de la fiche
-  // cliente — le contrôle d'autorisation est déjà fait juste au-dessus via estPlateformeAdmin()).
-  const { data: entreprise } = await createAdminClient().from("entreprises").select("nom, stripe_subscription_id").eq("id", entrepriseId).maybeSingle();
-  if (!entreprise?.stripe_subscription_id) redirect(`/plateforme?error=${encodeURIComponent("Cette entreprise n’a pas d’abonnement Stripe actif")}`);
+  if (isEmailLoginDisabled()) redirect(`/plateforme?error=${encodeURIComponent("Les remises Stripe exigent une session plateforme personnelle AAL2")}`);
 
   const description = descriptionRemise(type as TypeRemise, valeur, duree as DureeRemise, dureeMois);
   try {
-    const coupon = await creerCouponRemise({ type: type as TypeRemise, valeur, duree: duree as DureeRemise, dureeMois, nom: nomCouponRemise(entreprise.nom, description) });
-    await appliquerCouponAbonnement(entreprise.stripe_subscription_id, coupon.id);
-    if (isEmailLoginDisabled()) {
-      await supabase.from("entreprises").update({ remise_stripe_coupon_id: coupon.id, remise_description: description, remise_motif_interne: motifInterne, remise_duree_mois: dureeMois ?? null, remise_type: type, remise_valeur: valeur, remise_appliquee_at: new Date().toISOString() }).eq("id", entrepriseId);
-    } else {
-      const { error } = await supabase.rpc("plateforme_appliquer_remise", { p_entreprise_id: entrepriseId, p_coupon_id: coupon.id, p_description: description, p_motif_interne: motifInterne, p_duree_mois: dureeMois ?? null, p_type: type, p_valeur: valeur });
-      if (error) throw new Error(error.message);
+    const cible = await preautoriserRemise(supabase, entrepriseId, "remise_appliquer");
+    if (!cible.stripe_subscription_id) throw new Error("Cette entreprise n’a pas d’abonnement Stripe actif");
+    const tentativeId = randomUUID();
+    const operationId = cleIdempotenceRemise("remise-coupon", [tentativeId, entrepriseId, type, valeur, duree, dureeMois, description, cible.remise_stripe_coupon_id]);
+    const coupon = await creerCouponRemise({ type: type as TypeRemise, valeur, duree: duree as DureeRemise, dureeMois, nom: nomCouponRemise(cible.entreprise_nom, description), idempotence: operationId });
+    await appliquerCouponAbonnement(cible.stripe_subscription_id, coupon.id);
+    const { error } = await supabase.rpc("plateforme_appliquer_remise", { p_entreprise_id: entrepriseId, p_coupon_id: coupon.id, p_description: description, p_motif_interne: motifInterne, p_duree_mois: dureeMois ?? null, p_type: type, p_valeur: valeur });
+    if (error) {
+      let compensationReussie = false;
+      try {
+        if (cible.remise_stripe_coupon_id) {
+          await appliquerCouponAbonnement(cible.stripe_subscription_id, cible.remise_stripe_coupon_id);
+        } else {
+          await retirerCouponAbonnement(cible.stripe_subscription_id, cleIdempotenceRemise("remise-compensation", [tentativeId, entrepriseId, coupon.id]));
+        }
+        compensationReussie = true;
+      } catch {
+        compensationReussie = false;
+      }
+      const journalisationReussie = await journaliserEchecSynchronisationRemise(supabase, entrepriseId, "remise_appliquer", compensationReussie);
+      throw new Error(`${error.message}. Synchronisation Stripe compensée : ${compensationReussie ? "oui" : "non"}. Journal de réconciliation : ${journalisationReussie ? "créé" : "à créer manuellement"}`);
     }
   } catch (err) {
     redirect(`/plateforme?error=${encodeURIComponent(err instanceof Error ? err.message : "Remise impossible")}`);
@@ -269,19 +322,29 @@ export async function appliquerRemiseAction(entrepriseId: string, formData: Form
 export async function retirerRemiseAction(entrepriseId: string) {
   if (!(await estPlateformeAdmin())) redirect("/dashboard");
   const supabase = await createClient();
-  const { data: entreprise } = await createAdminClient().from("entreprises").select("stripe_subscription_id").eq("id", entrepriseId).maybeSingle();
-  if (entreprise?.stripe_subscription_id) {
-    try {
-      await retirerCouponAbonnement(entreprise.stripe_subscription_id);
-    } catch (err) {
-      redirect(`/plateforme?error=${encodeURIComponent(err instanceof Error ? err.message : "Suppression impossible")}`);
+  if (isEmailLoginDisabled()) redirect(`/plateforme?error=${encodeURIComponent("Les remises Stripe exigent une session plateforme personnelle AAL2")}`);
+  try {
+    const cible = await preautoriserRemise(supabase, entrepriseId, "remise_retirer");
+    const tentativeId = randomUUID();
+    if (cible.stripe_subscription_id && cible.remise_stripe_coupon_id) {
+      await retirerCouponAbonnement(cible.stripe_subscription_id, cleIdempotenceRemise("remise-suppression", [tentativeId, entrepriseId, cible.remise_stripe_coupon_id]));
     }
-  }
-  if (isEmailLoginDisabled()) {
-    await supabase.from("entreprises").update({ remise_stripe_coupon_id: null, remise_description: null, remise_motif_interne: null, remise_duree_mois: null, remise_type: null, remise_valeur: null, remise_appliquee_at: null }).eq("id", entrepriseId);
-  } else {
     const { error } = await supabase.rpc("plateforme_retirer_remise", { p_entreprise_id: entrepriseId });
-    if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
+    if (error) {
+      let compensationReussie = !cible.stripe_subscription_id || !cible.remise_stripe_coupon_id;
+      try {
+        if (cible.stripe_subscription_id && cible.remise_stripe_coupon_id) {
+          await appliquerCouponAbonnement(cible.stripe_subscription_id, cible.remise_stripe_coupon_id);
+          compensationReussie = true;
+        }
+      } catch {
+        compensationReussie = false;
+      }
+      const journalisationReussie = await journaliserEchecSynchronisationRemise(supabase, entrepriseId, "remise_retirer", compensationReussie);
+      throw new Error(`${error.message}. Synchronisation Stripe compensée : ${compensationReussie ? "oui" : "non"}. Journal de réconciliation : ${journalisationReussie ? "créé" : "à créer manuellement"}`);
+    }
+  } catch (err) {
+    redirect(`/plateforme?error=${encodeURIComponent(err instanceof Error ? err.message : "Suppression impossible")}`);
   }
   revalidatePath("/plateforme");
   redirect(`/plateforme?succes=${encodeURIComponent("Remise retirée")}`);
