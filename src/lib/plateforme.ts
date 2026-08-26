@@ -2,7 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { OFFRES_TARIFAIRES, offreTarifaireParCle, type OffreTarifaire } from "@/lib/tarification";
 
-// L'espace plateforme est réservé au propriétaire (identifié par son email, table plateforme_admins).
+// L'espace plateforme est réservé à une identité active reliée par auth.uid() à
+// plateforme_admins.utilisateur_id. L'email n'est jamais une preuve d'autorisation.
 // En mode prototype (sans connexion), on l'autorise pour la démo mono-entreprise.
 export async function estPlateformeAdmin(): Promise<boolean> {
   if (isEmailLoginDisabled()) return true;

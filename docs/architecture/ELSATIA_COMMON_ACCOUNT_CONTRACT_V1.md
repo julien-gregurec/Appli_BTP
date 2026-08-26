@@ -102,23 +102,41 @@ select coalesce(
 );
 ```
 
-`plateforme_admins.email` reste une donnée d'identité/audit/bootstrap (affichage, recherche,
-correspondance initiale lors de l'ajout d'un admin) — **ce n'est plus la racine
-d'autorisation**. Une ligne avec un email correct mais un `utilisateur_id` incorrect, absent ou
-`actif = false` n'accorde aucun droit. `plateforme_admins.email` reste la clé primaire de la
+`plateforme_admins.email` reste une donnée d'identité/audit/bootstrap (affichage et recherche)
+— **ce n'est jamais une racine d'autorisation et aucune correspondance automatique par email
+n'est permise**. Une ligne avec un email correct mais un `utilisateur_id` incorrect, absent ou
+inactive n'accorde aucun droit. `plateforme_admins.email` reste la clé primaire de la
 table (aucune refonte de clé primaire dans ce lot — jugée inutilement risquée avant
 commercialisation) ; `utilisateur_id` porte une contrainte `UNIQUE` et une FK vers
 `auth.users(id) on delete restrict`. Une identité administrative peut être enregistrée avant
 la création de son compte Auth uniquement avec `utilisateur_id = NULL` et `actif = false` ;
 la contrainte `plateforme_admins_actif_requiert_utilisateur_id` interdit tout administrateur
-actif sans UID. `role`/`nom`/`ajoute_par`/`created_at` inchangés.
+actif sans UID. La migration `20260826000236_platform_support_uid_security_v1.sql` ajoute le
+cycle explicite suivant :
+
+| `statut_identite` | UID | `actif` | Droits |
+|---|---:|---:|---|
+| `en_attente` | absent | false | aucun |
+| `rattachee_non_confirmee` | présent | false | aucun |
+| `active` | présent | true | selon le rôle plateforme |
+| `revoquee` | facultatif jusqu'au détachement | false | aucun |
+
+Une activation nécessite deux opérations séparées, effectuées par un autre administrateur
+`total` actif : `plateforme_rattacher_admin(email, uid)` puis
+`plateforme_activer_admin(email)`. Le compte Auth cible doit avoir un email vérifié, identique
+à l'identité déclarée, et un facteur MFA vérifié. L'auto-rattachement et l'auto-activation sont
+interdits. `activation_at`/`activation_par` et `revocation_at`/`revocation_par` conservent la
+date et l'UID de l'auteur. Une révocation ferme les sessions support ouvertes ; le détachement
+de l'UID révoqué précède toute suppression éventuelle du compte Auth.
 `plateforme_role_courant()` (utilisé par 6 RPC de gestion — abonnements, tarifs, impayés,
 règlements, support, création d'entreprise — via `plateforme_exiger_role()`) suit la même
 logique : `select role from plateforme_admins where utilisateur_id = auth.uid() and actif`.
 
-`julien@elsatia.fr` est l'identité administrative officielle prévue. Elle ne devient
-administrateur effectif qu'une fois son compte Auth vérifié, son `utilisateur_id` renseigné et
-`actif = true`. `julien.gregurec@gmail.com` reste provisoirement actif jusqu'à validation
+`julien@elsatia.fr` est l'identité administrative officielle prévue. La migration corrective la
+maintient explicitement `en_attente` ou `rattachee_non_confirmee`, toujours inactive. Elle ne
+devient administrateur effectif qu'une fois son compte Auth vérifié, son UID rattaché, son MFA
+vérifié et son activation effectuée dans un lot séparé. `julien.gregurec@gmail.com` reste
+provisoirement actif jusqu'à validation
 complète du compte professionnel. Un administrateur plateforme actif accède aux applications
 actives sans ligne d'habilitation explicite.
 
@@ -129,9 +147,14 @@ côté plateforme (RPC ci-dessous) — pas de RPC équivalente à créer côté 
 L'auto-accès de l'admin plateforme global au catalogue **ne donne aucun accès SQL cross-tenant
 aux données métier** : les tables métier de chaque application restent gouvernées par leurs
 propres RLS, inchangées. Pour une intervention réelle dans les données d'une entreprise cliente,
-réutiliser le mode support déjà existant côté Gestion Pro (`plateforme_acces_entreprises` +
-`est_acces_support_actif(entreprise_id)`), traçable et à durée limitée — ne jamais construire de
-bypass RLS silencieux.
+réutiliser le mode support Gestion Pro (`plateforme_acces_entreprises` +
+`est_acces_support_actif(entreprise_id)`). Une session support est explicite, liée à l'UID de
+l'administrateur, limitée à une entreprise, fermable, révocable et automatiquement expirée
+après quatre heures. La fonction exige une identité `active` et un rôle `total` ou `support` ;
+aucun email ne participe à cette décision. Ne jamais construire de bypass RLS silencieux.
+
+La procédure opérationnelle, y compris le cas du premier administrateur, est décrite dans
+[`PLATFORM_ADMIN_ACTIVATION_RUNBOOK.md`](../operations/PLATFORM_ADMIN_ACTIVATION_RUNBOOK.md).
 
 ## RPC d'administration (plateforme uniquement)
 
