@@ -230,13 +230,13 @@ select is(
 set local role authenticated;
 select set_config('request.jwt.claim.sub','30000000-0000-0000-0000-000000000001',true);
 select set_config('request.jwt.claim.email','plateforme@invalid.local',true);
-select throws_like(
-  $$select public.plateforme_desactiver_application_entreprise('b0000000-0000-0000-0000-000000000001','colors')$$,
-  '%Aucun accès actif%', '32. désactivation inexistante refusée sans journalisation'
+select is(
+  public.plateforme_desactiver_application_entreprise('b0000000-0000-0000-0000-000000000001','colors'),
+  false, '32. désactivation inexistante retourne explicitement aucune modification'
 );
-select throws_like(
-  $$select public.plateforme_retirer_habilitation_application('20000000-0000-0000-0000-000000000001','b0000000-0000-0000-0000-000000000001','colors')$$,
-  '%Aucune habilitation active%', '33. retrait inexistant refusé sans journalisation'
+select is(
+  public.plateforme_retirer_habilitation_application('20000000-0000-0000-0000-000000000001','b0000000-0000-0000-0000-000000000001','colors'),
+  false, '33. retrait inexistant retourne explicitement aucune modification'
 );
 
 reset role;

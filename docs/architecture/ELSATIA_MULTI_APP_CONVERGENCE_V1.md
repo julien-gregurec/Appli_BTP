@@ -69,6 +69,19 @@ consultation `lecture` n'exécute plus la suspension automatique des impayés. L
 versionné et `docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql` contrôlent les données avant
 tout environnement distant.
 
+La migration append-only `20260826000238_platform_support_isolation_audit_v1.sql` ferme les
+deux effets résiduels découverts en revue : le catalogue global des fils ne contient plus aucun
+texte de message et `plateforme_support_messages()` n'effectue plus d'UPDATE implicite. Une
+session support AAL2 ciblée est obligatoire avant toute lecture de contenu ; l'acquittement est
+une RPC séparée, ciblée et auditée. La même migration rend les mutations multi-app idempotentes,
+ajoute les états avant/après, refuse les cibles de facturation inexistantes et centralise la
+traçabilité UID des mutations plateforme. Le snapshot mensuel est explicitement classé comme
+événement périodique, distinct d'un faux historique de changement.
+
+Le mode sans connexion TypeScript n'est plus activable par `DISABLE_EMAIL_LOGIN=true` seul : il
+exige également `ELSATIA_LOCAL_DEMO=true`, une URL Supabase locale, un environnement non
+Production et l'absence de tout contexte Vercel. Il ne modifie aucune règle SQL ou RLS.
+
 ## Tests (`supabase/tests/elsatia_multi_app_convergence_v1.test.sql`)
 
 27 assertions pgTAP, réutilisant le fixture partagé `fixtures/isolation_multitenant.inc` :
@@ -83,10 +96,11 @@ avec audit (4 actions journalisées), admin d'entreprise ne pouvant pas activer 
 lui-même, et vérification structurelle qu'aucune fonction n'accepte de `utilisateur_id` cible
 arbitraire (signatures `a_acces_application(uuid,text)` / `applications_autorisees(uuid)`).
 
-Confirmé via un reset Supabase local complet puis `npm run test:db` : les 30 fichiers et
-508 assertions pgTAP passent, dont les 72 assertions AAL2/rôles/intégrité, les 38 assertions du
-correctif support UID, les 27 assertions multi-app et les 13 assertions du modèle administrateur
-par UID. Trois tests historiques fragiles ont été corrigés sans changer le
+La migration `00238` ajoute 60 assertions ciblées couvrant la liste support sans contenu,
+l'isolation A/B, la lecture pure, l'acquittement explicite et idempotent, les sessions absentes,
+étrangères, expirées ou fermées, l'historique multi-app sur changement réel, les cibles de
+facturation et l'audit UID. Les suites `00234` à `00237` restent rejouées cumulativement. Trois
+tests historiques fragiles avaient déjà été corrigés sans changer le
 comportement métier : refus d'écriture Alertes vérifié par SQLSTATE, devis brouillon utilisés
 pour atteindre réellement les contraintes cross-tenant, et lecture de vérification Remises
 effectuée hors session plateforme afin de préserver l'absence de bypass RLS cross-tenant.
@@ -108,11 +122,9 @@ backend. Cinq tests Vitest dédiés couvrent son contrat.
 
 ## QA
 
-`supabase db reset` ✓ (215 migrations sur base vierge), `npm run test:db` ✓
-(30 fichiers, 508 assertions), `npm run typecheck` ✓, `npm run lint` ✓
-(3 warnings `<img>` préexistants), `npm run test` ✓ (529/529), `npm run build` ✓,
-`npm run verify:secrets` ✓, `npm run verify:migrations` ✓ (215 migrations),
-`npm audit --audit-level=high` ✓ (0 vulnérabilité), `git diff --check` ✓.
+Le détail chiffré de la QA cumulative `00234 → 00238` est consigné dans le rapport du commit de
+correction. Aucun test distant, déploiement Preview ou migration distante ne fait partie de
+cette validation locale.
 
 ## Hors scope de cette passe (itération suivante)
 

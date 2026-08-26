@@ -41,3 +41,17 @@ export async function repondreSupportPlateformeAction(entrepriseId: string, form
   revalidatePath("/plateforme/support");
   redirect(`/plateforme/support?entreprise=${entrepriseId}&envoye=1`);
 }
+
+// Mutation explicite : consulter un fil ne modifie jamais son état de lecture.
+export async function marquerMessagesSupportLusAction(entrepriseId: string) {
+  if (!entrepriseId) redirect("/plateforme/support");
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("plateforme_support_marquer_messages_lus", {
+    p_entreprise_id: entrepriseId,
+  });
+  if (error) {
+    redirect(`/plateforme/support?entreprise=${entrepriseId}&error=${encodeURIComponent(messageErreurUtilisateur("marquerMessagesSupportLusAction", error, "Impossible de marquer les messages comme lus."))}`);
+  }
+  revalidatePath("/plateforme/support");
+  redirect(`/plateforme/support?entreprise=${entrepriseId}&lus=${encodeURIComponent(String(data ?? 0))}`);
+}

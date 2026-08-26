@@ -68,16 +68,27 @@ Les fils et messages support sont réservés à `total`/`support` en AAL2. Lire 
 le marquer comme lu, répondre ou lancer une réinitialisation assistée exige en plus une session
 support active sur l'entreprise explicitement ciblée.
 
+La liste globale des fils ne contient que des métadonnées minimales : identifiant/nom de
+l'entreprise, dates et compteurs. Elle ne doit jamais servir d'aperçu du contenu. Sélectionner
+ou afficher un fil n'acquitte rien. Après lecture, l'opérateur choisit explicitement « Marquer
+comme lus », qui appelle `plateforme_support_marquer_messages_lus()` ; un second appel sans
+nouveau message retourne zéro et ne crée pas de faux audit. Tout changement de cible impose une
+nouvelle ouverture de session support avec motif.
+
 ## Facturation et opérations globales
 
 Les mutations d'abonnement, tarif, impayé, règlement, remise et snapshot de facturation sont
 réservées à `total`/`facturation` en AAL2. Créer une entreprise ou une version du catalogue
 tarifaire est réservé à `total` en AAL2. Le rôle `lecture` ne provoque aucune écriture lors de ses
 consultations ; les suspensions automatiques doivent être exécutées par les mécanismes dédiés.
+Une cible inexistante doit produire une erreur explicite. Les appels idempotents retournent
+`false` sans journalisation ; l'audit d'un vrai changement conserve toujours l'UID appelant,
+l'entreprise et l'objet. Le snapshot mensuel est volontairement audité comme événement
+périodique même lorsque son nombre de lignes modifiées vaut zéro.
 
 ## Préflight avant environnement distant
 
-Exécuter en lecture seule `PLATFORM_SECURITY_PREFLIGHT.sql` avant les migrations 234 à 237.
+Exécuter en lecture seule `PLATFORM_SECURITY_PREFLIGHT.sql` avant les migrations 234 à 238.
 Toute anomalie bloquante interdit la migration. Le contrôle détecte les applications inconnues
 dans l'historique, états incohérents, UID dupliqués, sessions orphelines et l'absence d'un
 administrateur `total` actif.
@@ -87,3 +98,7 @@ administrateur `total` actif.
 `julien@elsatia.fr` est l'identité officielle à terme, mais reste sans droit jusqu'à un lot
 d'activation séparé ayant validé connexion, récupération, email, MFA et absence de dépendance
 à l'ancienne adresse. `julien.gregurec@gmail.com` n'est pas supprimé par ce correctif.
+
+`DISABLE_EMAIL_LOGIN` n'est jamais une procédure d'administration. Le mode démonstration exige
+en plus `ELSATIA_LOCAL_DEMO=true`, une base Supabase locale, un environnement non Production et
+l'absence de Vercel. Ces variables ne doivent figurer dans aucun environnement distant.

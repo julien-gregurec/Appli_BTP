@@ -215,14 +215,15 @@ insert into storage.objects (id, bucket_id, name, metadata) values
 on conflict (id) do nothing;
 
 insert into public.plateforme_admins (
-  email, utilisateur_id, actif, statut_identite, activation_at
+  email, role, utilisateur_id, actif, statut_identite, activation_at
 )
 values (
-  'plateforme@invalid.local', '30000000-0000-0000-0000-000000000001',
+  'plateforme@invalid.local', 'total', '30000000-0000-0000-0000-000000000001',
   true, 'active', now()
 )
 on conflict (email) do update
-set utilisateur_id = excluded.utilisateur_id,
+set role = excluded.role,
+    utilisateur_id = excluded.utilisateur_id,
     actif = excluded.actif,
     statut_identite = excluded.statut_identite,
     activation_at = excluded.activation_at;
