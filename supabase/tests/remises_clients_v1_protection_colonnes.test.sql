@@ -17,14 +17,17 @@ select plan(4);
 update public.plateforme_admins set utilisateur_id = '30000000-0000-0000-0000-000000000001', actif = true, role = coalesce(role, 'total')
 where email = 'plateforme@invalid.local';
 
--- Valeur de depart connue. Le trigger proteger_colonnes_remise s'applique a TOUT UPDATE,
--- y compris celui-ci : il faut donc seeder sous contexte admin plateforme (comme pour le
--- test 3/4 plus bas), pas en connexion brute service_role (auth.uid() y est null, donc
--- est_plateforme_admin() y est faux et le trigger réinitialiserait silencieusement le seed).
+-- Valeur de départ connue via le chemin officiel. Un admin plateforme n'a volontairement
+-- aucun bypass RLS direct sur les données d'une entreprise cliente : la fonction security
+-- definer contrôlée est le seul chemin autorisé pour accorder une remise.
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000001', true);
 select set_config('request.jwt.claim.email', 'plateforme@invalid.local', true);
-update public.entreprises set remise_description = 'valeur initiale' where id = 'a0000000-0000-0000-0000-000000000001';
+select public.plateforme_appliquer_remise(
+  'a0000000-0000-0000-0000-000000000001',
+  'coupon-test-initial',
+  'valeur initiale'
+);
 
 -- ===== Admin A (membre actif, PAS admin plateforme) =====
 reset role;
@@ -50,10 +53,18 @@ select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000001
 select set_config('request.jwt.claim.email', 'plateforme@invalid.local', true);
 
 select lives_ok(
-  $$update public.entreprises set remise_description = 'remise accordée par la plateforme' where id = 'a0000000-0000-0000-0000-000000000001'$$,
-  '3. Un admin plateforme peut modifier remise_description'
+  $$select public.plateforme_appliquer_remise(
+      'a0000000-0000-0000-0000-000000000001',
+      'coupon-test-final',
+      'remise accordée par la plateforme'
+    )$$,
+  '3. Un admin plateforme peut modifier remise_description via la RPC officielle'
 );
 
+-- La session admin plateforme n'a volontairement aucune policy SELECT cross-tenant sur
+-- entreprises. La vérification de persistance est donc effectuée par le rôle de test, pas
+-- en ajoutant un bypass de lecture silencieux au compte plateforme.
+reset role;
 select is(
   (select remise_description from public.entreprises where id = 'a0000000-0000-0000-0000-000000000001'),
   'remise accordée par la plateforme',

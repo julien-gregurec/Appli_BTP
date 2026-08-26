@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(11);
+select plan(13);
 
 -- Fixture isolée à ce test (préfixe pa9, sans rapport avec les autres fixtures partagées).
 insert into auth.users (
@@ -21,6 +21,26 @@ insert into public.plateforme_admins (email, role, utilisateur_id, actif) values
   ('pa-admin-support@invalid.local', 'support', 'aa900000-0000-4000-8000-000000000004', true),
   ('pa-admin-facturation@invalid.local', 'facturation', 'aa900000-0000-4000-8000-000000000005', true),
   ('pa-admin-lecture@invalid.local', 'lecture', 'aa900000-0000-4000-8000-000000000006', true);
+
+insert into public.plateforme_admins (email, role, utilisateur_id, actif)
+values ('pa-admin-en-attente@invalid.local', 'total', null, false);
+
+select ok(
+  exists(
+    select 1 from public.plateforme_admins
+    where email = 'pa-admin-en-attente@invalid.local'
+      and utilisateur_id is null
+      and not actif
+  ),
+  '11. une identité sans compte Auth peut rester enregistrée uniquement en attente inactive'
+);
+
+select throws_like(
+  $$insert into public.plateforme_admins(email, role, utilisateur_id, actif)
+    values('pa-admin-fantome@invalid.local', 'total', null, true)$$,
+  '%plateforme_admins_actif_requiert_utilisateur_id%',
+  '12. une identité sans UID ne peut jamais devenir administrateur actif'
+);
 
 set local role authenticated;
 

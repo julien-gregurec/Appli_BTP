@@ -66,16 +66,32 @@ avec audit (4 actions journalisées), admin d'entreprise ne pouvant pas activer 
 lui-même, et vérification structurelle qu'aucune fonction n'accepte de `utilisateur_id` cible
 arbitraire (signatures `a_acces_application(uuid,text)` / `applications_autorisees(uuid)`).
 
-Confirmé via `npm run test:db` : les 27 nouvelles assertions passent, les 3 échecs pgTAP
-préexistants (`alertes_operationnelles_delegations`, `correctif_isolation_devis_client`,
-`remises_clients_v1_protection_colonnes`) sont identiques à la baseline — non liés à ce lot.
+Confirmé via un reset Supabase local complet puis `npm run test:db` : les 28 fichiers et
+398 assertions pgTAP passent, dont les 27 assertions multi-app et les 13 assertions du modèle
+administrateur par UID. Trois tests historiques fragiles ont été corrigés sans changer le
+comportement métier : refus d'écriture Alertes vérifié par SQLSTATE, devis brouillon utilisés
+pour atteindre réellement les contraintes cross-tenant, et lecture de vérification Remises
+effectuée hors session plateforme afin de préserver l'absence de bypass RLS cross-tenant.
+
+La migration administrateur `20260826000235` accepte aussi les identités déclarées avant leur
+compte Auth sous forme strictement inactive (`utilisateur_id = NULL`, `actif = false`). Une
+contrainte interdit qu'une telle ligne soit activée ; aucune autorisation ne repose sur l'email.
+
+## Package TypeScript partagé
+
+`packages/application-access` fournit le package privé
+`@elsatia/application-access` : constantes d'applications/rôles, types de contexte et wrappers
+défensifs des RPC `a_acces_application` et `applications_autorisees`. Il ne contient aucune
+mutation, aucune permission métier `/stock` et ne propage pas les messages techniques du
+backend. Cinq tests Vitest dédiés couvrent son contrat.
 
 ## QA
 
-`npm run typecheck` ✓, `npm run lint` ✓ (3 warnings `<img>` préexistants), `npx vitest run` ✓
-(519/519, aucun code TS applicatif modifié), `npm run build` ✓ (exit 0), `npm run verify:secrets`
-✓ (910 fichiers, aucun secret), `npm run verify:migrations` ✓ (212 migrations), `npm audit
---audit-level=high` ✓ (0 vulnérabilité).
+`supabase db reset` ✓ (213 migrations sur base vierge), `npm run test:db` ✓
+(28 fichiers, 398 assertions), `npm run typecheck` ✓, `npm run lint` ✓
+(3 warnings `<img>` préexistants), `npm run test` ✓ (529/529), `npm run build` ✓,
+`npm run verify:secrets` ✓, `npm run verify:migrations` ✓ (213 migrations),
+`npm audit --audit-level=high` ✓ (0 vulnérabilité), `git diff --check` ✓.
 
 ## Hors scope de cette passe (itération suivante)
 
