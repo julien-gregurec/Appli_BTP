@@ -11,13 +11,23 @@ import {
 describe("grille tarifaire", () => {
   it("expose les cinq offres validées avec des montants en centimes", () => {
     expect(OFFRES_TARIFAIRES.map((offre) => [offre.cle, offre.prixMensuelCentimes])).toEqual([
-      ["mini", 7_900],
-      ["pro", 24_900],
-      ["business", 44_900],
+      ["mini", 6_900],
+      ["pro", 19_900],
+      ["business", 39_900],
       ["entreprise", 59_900],
-      ["sur_mesure", 69_900],
+      ["sur_mesure", 0],
     ]);
-    expect(offreTarifaireParCle("entreprise").prixAnnuelCentimes).toBe(646_800);
+    expect(OFFRES_TARIFAIRES.slice(0, 4).map((offre) => offre.prixAnnuelCentimes)).toEqual([
+      69_000,
+      199_000,
+      399_000,
+      599_000,
+    ]);
+    for (const offre of OFFRES_TARIFAIRES.filter((item) => !item.devisObligatoire)) {
+      expect(offre.prixAnnuelCentimes).toBe(offre.prixMensuelCentimes * 10);
+    }
+    expect(offreTarifaireParCle("entreprise").libelleComptesInclus).toBe("40 salariés + 10 administrateurs");
+    expect(offreTarifaireParCle("sur_mesure")).toMatchObject({ devisObligatoire: true, prixMensuelCentimes: 0, prixAnnuelCentimes: 0 });
     expect(offreTarifaireParCle("entreprise").populaire).toBe(true);
     expect(SERVICES_MISE_EN_SERVICE.map((service) => service.prixMinCentimes)).toEqual([
       199_000,
@@ -39,7 +49,7 @@ describe("grille tarifaire", () => {
       synchronisationBancaire: "avancee",
       creditsIA: true,
     });
-    expect(total).toMatchObject({ baseCentimes: 24_900, optionsCentimes: 14_100, totalCentimes: 39_000 });
+    expect(total).toMatchObject({ baseCentimes: 19_900, optionsCentimes: 14_100, totalCentimes: 34_000 });
   });
 });
 

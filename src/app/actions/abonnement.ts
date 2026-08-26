@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { PRODUCT_NAME } from "@/lib/brand";
+import { abonnementsPublicsOuverts, MESSAGE_OUVERTURE_PROCHAINE } from "@/lib/commercialisation-abonnements";
 import {
   ajouterOptionIAAbonnement,
   creerOuRecupererClientStripe,
@@ -33,6 +34,10 @@ function retourErreurAutorise(valeur: FormDataEntryValue | null) {
 }
 
 export async function demarrerAbonnementAction(formData: FormData) {
+  if (!abonnementsPublicsOuverts()) {
+    const retourErreur = retourErreurAutorise(formData.get("retour_erreur"));
+    redirect(`${retourErreur}?error=${encodeURIComponent(MESSAGE_OUVERTURE_PROCHAINE)}`);
+  }
   const ctx = await verifierDroitAbonnement();
   const offre = String(formData.get("offre") ?? "");
   const periodicite = String(formData.get("periodicite") ?? "mensuel");

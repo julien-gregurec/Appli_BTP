@@ -8,10 +8,11 @@ import { offreParCle, OFFRES, prixAbonnementMensuel, statutAbonnement } from "@/
 import { calculerFacturationStockage, OCTETS_PAR_GO, stripeBillingEstConfigure, TARIF_STOCKAGE_SUPPLEMENTAIRE_HT_PAR_GO } from "@/lib/stripe-abonnement";
 import { consommationIAMensuelle } from "@/lib/ai/journal";
 import { iaEstActive } from "@/lib/preview-features";
-import { BRAND_NAME, PRODUCT_NAME } from "@/lib/brand";
+import { BRAND_NAME, PRODUCT_NAME, URL_CONTACT_COMMERCIAL } from "@/lib/brand";
 import { BRAND_SERVER } from "@/lib/brand-server";
 import { calculerGainsOffreSuivante, calculerReductionRemise, CATEGORIES_COMPARATIF, etatLigneComparatif, LIBELLE_ETAT_COMMERCIAL, type EtatCommercial } from "@/lib/comparatif-offres";
 import { estCodeOffreTarifaire } from "@/lib/tarification";
+import { abonnementsPublicsOuverts } from "@/lib/commercialisation-abonnements";
 
 const input = "rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -25,7 +26,7 @@ const COULEUR_ETAT: Record<EtatCommercial, string> = {
 
 const FAQ_ABONNEMENT: Array<{ question: string; reponse: string }> = [
   { question: "Puis-je changer d'offre en cours d'abonnement ?", reponse: "Pas encore en libre-service : ni le portail Stripe, ni l'application ne proposent aujourd'hui de changement de plan autonome. Contactez-nous, le changement est fait manuellement." },
-  { question: "Que se passe-t-il à la fin de l'essai de 30 jours ?", reponse: "La carte enregistrée à l'inscription est débitée automatiquement au tarif de l'offre choisie, sans action de votre part. Vous pouvez annuler avant la fin de l'essai sans frais." },
+  { question: "Que se passe-t-il à la fin de l'essai de 30 jours ?", reponse: "Les nouvelles souscriptions sont temporairement fermées. Avant leur ouverture, les conditions de fin d'essai, la première échéance et le montant seront présentés pour validation. Les abonnements existants continuent selon leurs conditions contractuelles." },
   { question: "Puis-je ajouter des comptes au-delà du nombre inclus ?", reponse: "Oui, chaque compte supplémentaire est facturé en plus selon le tarif de votre offre, visible dans la section « Coût actuel de l'application » ci-dessus." },
   { question: "Où trouver mes factures d'abonnement ?", reponse: "Dans la section « Factures et historique » ci-dessous, ou via « Gérer mon abonnement » (portail Stripe) une fois souscrit." },
   { question: "Puis-je annuler mon abonnement ?", reponse: "Oui, depuis le portail Stripe (« Gérer mon abonnement ») : la résiliation prend effet à la fin de la période en cours, pas immédiatement." },
@@ -50,6 +51,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
   ]);
   const statut = statutAbonnement(entreprise?.abonnement_statut ?? "essai");
   const configure = stripeBillingEstConfigure();
+  const abonnementsOuverts = abonnementsPublicsOuverts();
   const souscrit = Boolean(entreprise?.stripe_subscription_id);
   const offre = offreParCle(entreprise?.abonnement_offre ?? "essentiel");
   const stockage = Array.isArray(utilisationStockage) ? utilisationStockage[0] : utilisationStockage;
@@ -91,7 +93,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
   const euros = (montant: number) => montant.toLocaleString("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
   const contactCommercial = BRAND_SERVER.supportEmail
     ? `mailto:${BRAND_SERVER.supportEmail}?subject=${encodeURIComponent(`Offre ${PRODUCT_NAME}`)}`
-    : "/aide";
+    : URL_CONTACT_COMMERCIAL;
 
   return <main className="p-4 sm:p-8"><div className="mx-auto max-w-5xl space-y-6">
     <header><h1 className="text-xl font-semibold">Mon abonnement {PRODUCT_NAME}</h1><p className="text-sm text-neutral-500">Offre, moyen de paiement, échéances et factures de votre entreprise.</p></header>
@@ -210,7 +212,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
     </>}
 
     {souscrit ? <section className="rounded-xl border p-5"><h2 className="font-semibold">Gérer l’abonnement</h2><p className="mt-1 text-sm text-neutral-500">Le portail sécurisé Stripe permet de changer de carte, télécharger les factures et gérer la résiliation.</p><div className="mt-4 flex flex-wrap gap-2"><form action={ouvrirPortailAbonnementAction}><button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Gérer mon abonnement</button></form>{entreprise?.derniere_facture_url&&<Link href={entreprise.derniere_facture_url} target="_blank" rel="noreferrer" className="rounded-md border px-4 py-2 text-sm font-medium">Voir la dernière facture</Link>}{entreprise?.derniere_facture_pdf&&<Link href={entreprise.derniere_facture_pdf} target="_blank" rel="noreferrer" className="rounded-md border px-4 py-2 text-sm font-medium">Télécharger le PDF</Link>}</div>{entreprise?.derniere_facture_at&&<p className="mt-3 text-xs text-neutral-500">Dernière facture : {entreprise.derniere_facture_statut??"—"} · {new Date(entreprise.derniere_facture_at).toLocaleString("fr-FR")}</p>}</section>
-    : <section className="space-y-4"><div><h2 className="font-semibold">Choisir une offre</h2><p className="text-sm text-neutral-500">Carte enregistrée à l’inscription, aucun débit pendant l’essai de 30 jours, puis prélèvement automatique au montant affiché.</p></div>{!configure&&<p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">Le paiement des abonnements est en cours de configuration par {BRAND_NAME}. Votre accès actuel reste inchangé.</p>}<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">{OFFRES.map(offre=>{const prix=prixAbonnementMensuel(offre.comptesInclus,offre);return <article key={offre.cle} className="rounded-xl border p-5"><h3 className="text-lg font-semibold">{offre.nom}</h3><p className="mt-1 min-h-20 text-sm text-neutral-500">{offre.resume}</p><p className="mt-4 text-2xl font-bold">{prix.total} € <span className="text-xs font-normal text-neutral-500">HT/mois</span></p>{offre.devisObligatoire?<Link href={contactCommercial} className="mt-4 block rounded-md border px-3 py-2 text-center text-sm font-semibold">Demander un devis</Link>:<form action={demarrerAbonnementAction} className="mt-4 space-y-3"><input type="hidden" name="offre" value={offre.cle}/><input type="hidden" name="retour_erreur" value="/abonnement"/><select name="periodicite" defaultValue="mensuel" className={`${input} w-full`}><option value="mensuel">Mensuel</option><option value="annuel">Annuel · prix affiché avant validation</option></select><button disabled={!configure} className="w-full rounded-md bg-[#0d1b2a] px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Démarrer l’essai</button></form>}</article>})}</div></section>}
+    : <section className="space-y-4"><div><h2 className="font-semibold">Choisir une offre</h2><p className="text-sm text-neutral-500">Essai gratuit de 30 jours. Les abonnements en ligne ouvriront prochainement.</p></div>{(!configure||!abonnementsOuverts)&&<p className="rounded-md bg-amber-50 p-3 text-sm text-amber-900">La souscription en ligne est temporairement fermée. Contactez {BRAND_NAME} pour préparer votre accès ; aucun paiement ne sera déclenché depuis cette page.</p>}<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">{OFFRES.map(offre=>{const prix=prixAbonnementMensuel(offre.comptesInclus,offre);return <article key={offre.cle} className="rounded-xl border p-5"><h3 className="text-lg font-semibold">{offre.nom}</h3><p className="mt-1 min-h-20 text-sm text-neutral-500">{offre.resume}</p><p className="mt-4 text-2xl font-bold">{offre.devisObligatoire?"Sur devis":`${prix.total} €`} {!offre.devisObligatoire&&<span className="text-xs font-normal text-neutral-500">HT/mois</span>}</p>{offre.devisObligatoire||!configure||!abonnementsOuverts?<Link href={contactCommercial} className="mt-4 block rounded-md border px-3 py-2 text-center text-sm font-semibold">{offre.devisObligatoire?"Demander un devis":"Ouverture prochaine"}</Link>:<form action={demarrerAbonnementAction} className="mt-4 space-y-3"><input type="hidden" name="offre" value={offre.cle}/><input type="hidden" name="retour_erreur" value="/abonnement"/><select name="periodicite" defaultValue="mensuel" className={`${input} w-full`}><option value="mensuel">Mensuel</option><option value="annuel">Annuel · prix affiché avant validation</option></select><button className="w-full rounded-md bg-[#0d1b2a] px-3 py-2 text-sm font-semibold text-white">Démarrer l’essai</button></form>}</article>})}</div></section>}
 
     {souscrit && offreSuivante && <section className="rounded-xl border p-5">
       <h2 className="font-semibold">Passer à l’offre {offreSuivante.nom}</h2>

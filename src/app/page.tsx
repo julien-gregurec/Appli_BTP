@@ -57,7 +57,7 @@ export default async function AccueilPage() {
           <nav className="flex shrink-0 items-center gap-2 text-xs font-medium sm:gap-4 sm:text-sm">
             <Link href="/tarifs" className="hidden text-neutral-600 hover:text-[#0d1b2a] dark:text-neutral-300 dark:hover:text-white sm:inline">Tarifs</Link>
             <Link href="/login" className="text-neutral-600 hover:text-[#0d1b2a] dark:text-neutral-300 dark:hover:text-white">Se connecter</Link>
-            <Link href="/signup" className="rounded-lg bg-[#0d1b2a] px-3 py-2 whitespace-nowrap text-white hover:bg-[#0d1b2a]/90 dark:bg-white dark:text-[#0d1b2a] sm:px-4">Essai gratuit</Link>
+            <Link href="/tarifs" className="rounded-lg bg-[#0d1b2a] px-3 py-2 whitespace-nowrap text-white hover:bg-[#0d1b2a]/90 dark:bg-white dark:text-[#0d1b2a] sm:px-4">Ouverture prochaine</Link>
           </nav>
         </div>
       </header>
@@ -72,14 +72,14 @@ export default async function AccueilPage() {
           centralise ce qui aujourd’hui est éparpillé entre Excel, papier et plusieurs logiciels.
         </p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <Link href="/signup" className="rounded-lg bg-[#0d1b2a] px-6 py-3 text-sm font-semibold text-white hover:bg-[#0d1b2a]/90 dark:bg-white dark:text-[#0d1b2a]">
-            Démarrer l’essai de {DUREE_ESSAI_JOURS} jours
+          <Link href="/tarifs" className="rounded-lg bg-[#0d1b2a] px-6 py-3 text-sm font-semibold text-white hover:bg-[#0d1b2a]/90 dark:bg-white dark:text-[#0d1b2a]">
+            Préparer mon essai de {DUREE_ESSAI_JOURS} jours
           </Link>
           <Link href="/tarifs" className="rounded-lg border border-[#0d1b2a] px-6 py-3 text-sm font-semibold text-[#0d1b2a] hover:bg-neutral-100 dark:border-white dark:text-white dark:hover:bg-neutral-800">
             Voir les tarifs
           </Link>
         </div>
-        <p className="mt-4 text-xs text-neutral-500">Sans engagement et sans débit pendant la période d’essai.</p>
+        <p className="mt-4 text-xs text-neutral-500">Ouverture prochaine des abonnements en ligne.</p>
       </section>
 
       <section className="mx-auto max-w-7xl px-4 pb-20">
@@ -102,12 +102,12 @@ export default async function AccueilPage() {
 
       <section className="mx-auto max-w-4xl px-4 pb-20 text-center">
         <div className="rounded-2xl border border-[#c9a24a]/40 bg-[#c9a24a]/5 p-10">
-          <h2 className="text-2xl font-bold text-[#0d1b2a] dark:text-white">Prêt à essayer ?</h2>
+          <h2 className="text-2xl font-bold text-[#0d1b2a] dark:text-white">Préparez votre essai</h2>
           <p className="mt-3 text-neutral-600 dark:text-neutral-300">
             Chaque droit d’accès reste contrôlé par le rôle défini par l’administrateur de votre entreprise.
           </p>
-          <Link href="/signup" className="mt-6 inline-block rounded-lg bg-[#0d1b2a] px-6 py-3 text-sm font-semibold text-white hover:bg-[#0d1b2a]/90 dark:bg-white dark:text-[#0d1b2a]">
-            Créer mon compte
+          <Link href="/tarifs" className="mt-6 inline-block rounded-lg bg-[#0d1b2a] px-6 py-3 text-sm font-semibold text-white hover:bg-[#0d1b2a]/90 dark:bg-white dark:text-[#0d1b2a]">
+            Découvrir les offres
           </Link>
         </div>
       </section>
