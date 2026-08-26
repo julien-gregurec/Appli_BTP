@@ -13,7 +13,11 @@ const mocks = vi.hoisted(() => ({
   }),
   appliquerCouponAbonnement: vi.fn(async () => ({})),
   retirerCouponAbonnement: vi.fn(async () => ({})),
-  rpc: vi.fn(async () => ({ error: null })),
+  rpc: vi.fn(async (fonction: string, parametres?: Record<string, unknown>) => {
+    void fonction;
+    void parametres;
+    return { error: null as { message: string } | null };
+  }),
   entreprise: { nom: "Entreprise Test", stripe_subscription_id: "sub_test" } as Record<string, unknown> | null,
 }));
 
@@ -74,6 +78,27 @@ describe("appliquerRemiseAction — permissions et validation", () => {
     expect(mocks.appliquerCouponAbonnement).not.toHaveBeenCalled();
   });
 
+  it.each([
+    "session aal1",
+    "rôle lecture",
+    "rôle insuffisant",
+    "UID absent ou inactif",
+    "rôle invalide",
+  ])("refuse %s avant tout appel Stripe", async () => {
+    mocks.rpc.mockImplementation(async (fonction: string) => ({
+      error: fonction === "plateforme_autoriser_effet_externe"
+        ? { message: "Autorisation refusée" }
+        : null,
+    }));
+    const formData = formulaireRemise({ type: "pourcentage", valeur: "10", duree: "once", motif_interne: "Test" });
+
+    await expect(appliquerRemiseAction("entreprise-1", formData)).rejects.toThrow(/REDIRECT:\/plateforme\?error=/);
+
+    expect(mocks.rpc).toHaveBeenCalledWith("plateforme_autoriser_effet_externe", { p_action: "remise_abonnement" });
+    expect(mocks.creerCouponRemise).not.toHaveBeenCalled();
+    expect(mocks.appliquerCouponAbonnement).not.toHaveBeenCalled();
+  });
+
   it("refuse un pourcentage supérieur à 100", async () => {
     const formData = formulaireRemise({ type: "pourcentage", valeur: "150", duree: "once", motif_interne: "Test" });
 
@@ -106,6 +131,8 @@ describe("appliquerRemiseAction — permissions et validation", () => {
 
     expect(mocks.creerCouponRemise).toHaveBeenCalledWith(expect.objectContaining({ type: "pourcentage", valeur: 10, duree: "repeating", dureeMois: 3 }));
     expect(mocks.appliquerCouponAbonnement).toHaveBeenCalledWith("sub_test", "coupon_test");
+    expect(mocks.rpc).toHaveBeenCalledWith("plateforme_autoriser_effet_externe", { p_action: "remise_abonnement" });
+    expect(mocks.rpc.mock.invocationCallOrder[0]).toBeLessThan(mocks.creerCouponRemise.mock.invocationCallOrder[0]);
     expect(mocks.rpc).toHaveBeenCalledWith("plateforme_appliquer_remise", {
       p_entreprise_id: "entreprise-1",
       p_coupon_id: "coupon_test",
@@ -163,10 +190,25 @@ describe("retirerRemiseAction — permissions", () => {
     expect(mocks.retirerCouponAbonnement).not.toHaveBeenCalled();
   });
 
+  it("refuse une autorisation forte insuffisante avant tout retrait Stripe", async () => {
+    mocks.rpc.mockImplementation(async (fonction: string) => ({
+      error: fonction === "plateforme_autoriser_effet_externe"
+        ? { message: "Autorisation refusée" }
+        : null,
+    }));
+
+    await expect(retirerRemiseAction("entreprise-1")).rejects.toThrow(/REDIRECT:\/plateforme\?error=/);
+
+    expect(mocks.rpc).toHaveBeenCalledWith("plateforme_autoriser_effet_externe", { p_action: "remise_abonnement" });
+    expect(mocks.retirerCouponAbonnement).not.toHaveBeenCalled();
+  });
+
   it("retire le coupon Stripe puis le RPC plateforme_retirer_remise", async () => {
     await expect(retirerRemiseAction("entreprise-1")).rejects.toThrow(/REDIRECT:\/plateforme\?succes=/);
 
     expect(mocks.retirerCouponAbonnement).toHaveBeenCalledWith("sub_test");
+    expect(mocks.rpc).toHaveBeenCalledWith("plateforme_autoriser_effet_externe", { p_action: "remise_abonnement" });
+    expect(mocks.rpc.mock.invocationCallOrder[0]).toBeLessThan(mocks.retirerCouponAbonnement.mock.invocationCallOrder[0]);
     expect(mocks.rpc).toHaveBeenCalledWith("plateforme_retirer_remise", { p_entreprise_id: "entreprise-1" });
   });
 });

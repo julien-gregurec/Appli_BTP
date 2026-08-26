@@ -240,6 +240,12 @@ export async function appliquerRemiseAction(entrepriseId: string, formData: Form
   const dureeMois = duree === "repeating" ? dureeMoisBrut : undefined;
 
   const supabase = await createClient();
+  const { error: erreurAutorisation } = await supabase.rpc("plateforme_autoriser_effet_externe", {
+    p_action: "remise_abonnement",
+  });
+  if (erreurAutorisation) {
+    redirect(`/plateforme?error=${encodeURIComponent("Action non autorisée.")}`);
+  }
   // Lecture via le client admin : un administrateur plateforme n'est pas forcément membre de
   // l'entreprise cliente, et la RLS "membres voient leur entreprise" (est_membre_actif) bloque
   // sinon cette lecture pour toute entreprise autre que la sienne (bug réel découvert en
@@ -269,6 +275,12 @@ export async function appliquerRemiseAction(entrepriseId: string, formData: Form
 export async function retirerRemiseAction(entrepriseId: string) {
   if (!(await estPlateformeAdmin())) redirect("/dashboard");
   const supabase = await createClient();
+  const { error: erreurAutorisation } = await supabase.rpc("plateforme_autoriser_effet_externe", {
+    p_action: "remise_abonnement",
+  });
+  if (erreurAutorisation) {
+    redirect(`/plateforme?error=${encodeURIComponent("Action non autorisée.")}`);
+  }
   const { data: entreprise } = await createAdminClient().from("entreprises").select("stripe_subscription_id").eq("id", entrepriseId).maybeSingle();
   if (entreprise?.stripe_subscription_id) {
     try {
