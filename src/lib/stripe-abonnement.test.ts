@@ -335,7 +335,7 @@ describe("remises commerciales (REMISES-CLIENTS-V1)", () => {
     const { fauxFetch, appels } = fetchFakeStripe({});
     vi.stubGlobal("fetch", fauxFetch);
 
-    await creerCouponRemise({ type: "pourcentage", valeur: 15, duree: "once", nom: "Test — 15 %" });
+    await creerCouponRemise({ type: "pourcentage", valeur: 15, duree: "once", nom: "Test — 15 %", idempotence: "coupon-test-pourcentage" });
 
     const appel = appels[0];
     expect(appel.url).toContain("/coupons");
@@ -349,7 +349,7 @@ describe("remises commerciales (REMISES-CLIENTS-V1)", () => {
     const { fauxFetch, appels } = fetchFakeStripe({});
     vi.stubGlobal("fetch", fauxFetch);
 
-    await creerCouponRemise({ type: "montant", valeur: 20, duree: "forever", nom: "Test — 20 € à vie" });
+    await creerCouponRemise({ type: "montant", valeur: 20, duree: "forever", nom: "Test — 20 € à vie", idempotence: "coupon-test-montant" });
 
     const appel = appels[0];
     expect(appel.corps).toContain("amount_off=2000");
@@ -360,7 +360,7 @@ describe("remises commerciales (REMISES-CLIENTS-V1)", () => {
   it("exige un nombre de mois pour une remise 'repeating'", async () => {
     vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_fake");
     await expect(
-      creerCouponRemise({ type: "pourcentage", valeur: 10, duree: "repeating", nom: "Test" }),
+      creerCouponRemise({ type: "pourcentage", valeur: 10, duree: "repeating", nom: "Test", idempotence: "coupon-test-repeating" }),
     ).rejects.toThrow(/mois/);
   });
 

@@ -171,7 +171,9 @@ qu'après ouverture d'une session support AAL2 visant exactement son entreprise.
 `plateforme_support_messages()` est une lecture pure : elle n'acquitte rien, ne prolonge aucune
 session et ne crée aucun historique. L'acquittement est une mutation séparée,
 `plateforme_support_marquer_messages_lus(entreprise_id)`, auditée avec l'UID réel uniquement
-quand au moins un message non lu est effectivement modifié.
+quand au moins un message non lu est effectivement modifié. Depuis la migration `00239`, une
+réponse plateforme exige aussi au moins un message client antérieur dans le fil ciblé ; elle ne
+peut plus créer implicitement un fil.
 
 ### Matrice des rôles plateforme
 
@@ -198,9 +200,20 @@ la suspension automatique d'un abonnement. La fermeture de sa propre session sup
 seule mutation de ce périmètre autorisée sans nouvelle élévation, afin de garantir la sortie.
 Les mutations de facturation vérifient explicitement leur cible et refusent une entreprise ou
 un poste inexistant. Les changements réels sont tracés avec UID, entreprise, objet et états
-avant/après dans `historique_mutations_plateforme` ou, pour les remises et versions tarifaires,
-dans `historique_tarification`. Le snapshot mensuel est l'exception documentée : chaque
-exécution constitue un événement périodique explicite, même si aucune ligne n'a changé.
+avant/après. Les détails plateforme des remises sont dans `historique_mutations_plateforme`
+(domaine `tarification`) ; `historique_tarification` conserve seulement le résumé client, sans
+motif interne. L'historique global exige AAL2 : `total` voit tous les domaines, `support`
+seulement `support`, `facturation` seulement `facturation`/`tarification`, et `lecture` aucun
+événement sensible. Le snapshot possède une clé `(entreprise_id, mois)` : un appel identique
+n'ajoute aucun audit et une source réellement modifiée incrémente une version sérialisée.
+
+Avant toute remise Stripe, l'action appelle `plateforme_preautoriser_effet_externe()` avec la
+session Supabase réelle. Cette lecture sans effet valide UID, identité active, rôle
+`total`/`facturation`, AAL2 canonique, opération fermée et cible. L'ordre obligatoire est
+préautorisation → Stripe → mutation SQL → audit. SQL et Stripe ne forment jamais une transaction
+atomique ; les clés d'idempotence sont stables et un échec SQL déclenche une compensation puis
+un événement de réconciliation sans secret. Voir le
+[`PLATFORM_STRIPE_REMISE_RUNBOOK.md`](../operations/PLATFORM_STRIPE_REMISE_RUNBOOK.md).
 
 Le bypass `DISABLE_EMAIL_LOGIN` ne peut ouvrir le mode démonstration que si toutes les conditions
 locales sont réunies : `ELSATIA_LOCAL_DEMO=true`, environnement non Production, absence totale

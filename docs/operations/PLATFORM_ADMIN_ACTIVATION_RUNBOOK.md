@@ -59,7 +59,8 @@ le recomptage du dernier `total`.
 
 - ouvrir ou changer une session exige le rôle `total` ou `support` et AAL2 ;
 - la session vise une entreprise unique et expire après quatre heures ;
-- répondre exige une session explicite active sur la même entreprise ;
+- répondre exige une session explicite active sur la même entreprise et un message client
+  antérieur dans le fil ;
 - `lecture` et `facturation` ne peuvent pas ouvrir de session ;
 - fermer sa propre session reste possible sans nouvelle élévation ;
 - la révocation ferme immédiatement toutes les sessions ouvertes de la cible.
@@ -83,15 +84,17 @@ tarifaire est réservé à `total` en AAL2. Le rôle `lecture` ne provoque aucun
 consultations ; les suspensions automatiques doivent être exécutées par les mécanismes dédiés.
 Une cible inexistante doit produire une erreur explicite. Les appels idempotents retournent
 `false` sans journalisation ; l'audit d'un vrai changement conserve toujours l'UID appelant,
-l'entreprise et l'objet. Le snapshot mensuel est volontairement audité comme événement
-périodique même lorsque son nombre de lignes modifiées vaut zéro.
+l'entreprise et l'objet. Une remise Stripe exige d'abord la RPC de préautorisation sans effet ;
+aucun appel externe ne doit la précéder. Le snapshot est unique par entreprise/mois : un appel
+sur une source identique ne crée aucun audit, et une source modifiée incrémente sa version.
 
 ## Préflight avant environnement distant
 
-Exécuter en lecture seule `PLATFORM_SECURITY_PREFLIGHT.sql` avant les migrations 234 à 238.
+Exécuter en lecture seule `PLATFORM_SECURITY_PREFLIGHT.sql` avant les migrations 234 à 239.
 Toute anomalie bloquante interdit la migration. Le contrôle détecte les applications inconnues
-dans l'historique, états incohérents, UID dupliqués, sessions orphelines et l'absence d'un
-administrateur `total` actif.
+dans l'historique, états incohérents, UID dupliqués, sessions orphelines, domaines d'audit
+inconnus, incohérences locales de remise, snapshots dupliqués, réponses support orphelines et
+l'absence d'un administrateur `total` actif.
 
 ## Compte professionnel ELSATIA
 

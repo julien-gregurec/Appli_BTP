@@ -239,7 +239,7 @@ type StripeCoupon = { id: string; name?: string | null };
 // l'abonnement de base d'une entreprise cliente. Un coupon par entreprise a la fois :
 // en appliquer un nouveau remplace l'ancien cote Stripe (comportement natif de
 // `subscriptions.update` avec le parametre coupon).
-export async function creerCouponRemise(params: { type: TypeRemise; valeur: number; duree: DureeRemise; dureeMois?: number; nom: string }) {
+export async function creerCouponRemise(params: { type: TypeRemise; valeur: number; duree: DureeRemise; dureeMois?: number; nom: string; idempotence: string }) {
   const corps = new URLSearchParams({ name: params.nom, duration: params.duree });
   if (params.type === "montant") {
     corps.set("amount_off", String(Math.round(params.valeur * 100)));
@@ -251,7 +251,7 @@ export async function creerCouponRemise(params: { type: TypeRemise; valeur: numb
     if (!params.dureeMois || params.dureeMois < 1) throw new Error("Le nombre de mois est obligatoire pour une remise limitée dans le temps");
     corps.set("duration_in_months", String(params.dureeMois));
   }
-  return requeteStripe<StripeCoupon>("coupons", { corps, idempotence: `remise-coupon-${Date.now()}-${Math.random().toString(36).slice(2)}` });
+  return requeteStripe<StripeCoupon>("coupons", { corps, idempotence: params.idempotence });
 }
 
 // Le compte Stripe de la plateforme fonctionne en billing_mode "flexible" : le paramètre
@@ -268,10 +268,10 @@ export async function appliquerCouponAbonnement(subscriptionId: string, couponId
   });
 }
 
-export async function retirerCouponAbonnement(subscriptionId: string) {
+export async function retirerCouponAbonnement(subscriptionId: string, idempotence = `remise-suppression-${subscriptionId}`) {
   return requeteStripe<StripeSubscription>(`subscriptions/${encodeURIComponent(subscriptionId)}/discount`, {
     methode: "DELETE",
-    idempotence: `remise-suppression-${subscriptionId}-${Date.now()}`,
+    idempotence,
   });
 }
 

@@ -1,5 +1,5 @@
 -- Préflight ELSATIA plateforme — lecture seule, sans secret.
--- À exécuter avant les migrations multi-app 234 à 238 sur Preview/Production.
+-- À exécuter avant les migrations multi-app 234 à 239 sur Preview/Production.
 -- Toute ligne `bloquant = true` avec `anomalies > 0` interdit la migration distante.
 
 begin transaction read only;
@@ -151,6 +151,58 @@ begin
         'detail','Fermer toute session ouverte sans identité plateforme active.'
       ));
     end if;
+  end if;
+
+  if to_regclass('public.historique_mutations_plateforme') is not null then
+    execute $q$
+      select count(*) from public.historique_mutations_plateforme
+      where domaine not in ('support','facturation','tarification','multi_app','administrateur','entreprise','securite')
+    $q$ into v_count;
+    v_resultats := v_resultats || jsonb_build_array(jsonb_build_object(
+      'controle','historique_domaine_inconnu','anomalies',v_count,'bloquant',true,
+      'detail','Toute ligne non classable doit rester réservée au rôle total avant 239.'
+    ));
+  end if;
+
+  if to_regclass('public.plateforme_snapshots_facturation') is not null then
+    execute $q$
+      select count(*) from (
+        select entreprise_id,mois from public.plateforme_snapshots_facturation
+        group by entreprise_id,mois having count(*)>1
+      ) d
+    $q$ into v_count;
+    v_resultats := v_resultats || jsonb_build_array(jsonb_build_object(
+      'controle','snapshots_cle_dupliquee','anomalies',v_count,'bloquant',true,
+      'detail','Une seule ligne structurelle entreprise/mois est autorisée.'
+    ));
+  end if;
+
+  if to_regclass('public.entreprises') is not null
+     and exists(select 1 from information_schema.columns where table_schema='public' and table_name='entreprises' and column_name='remise_stripe_coupon_id') then
+    execute $q$
+      select count(*) from public.entreprises
+      where (remise_stripe_coupon_id is null) <> (remise_description is null)
+         or remise_stripe_coupon_id is null
+            and (remise_type is not null or remise_valeur is not null or remise_appliquee_at is not null)
+    $q$ into v_count;
+    v_resultats := v_resultats || jsonb_build_array(jsonb_build_object(
+      'controle','remises_locales_incoherentes','anomalies',v_count,'bloquant',true,
+      'detail','État local de remise incomplet; réconcilier sans appel Stripe dans ce préflight.'
+    ));
+  end if;
+
+  if to_regclass('public.support_messages') is not null then
+    execute $q$
+      select count(*) from public.support_messages p
+      where p.cote='plateforme' and not exists(
+        select 1 from public.support_messages c
+        where c.entreprise_id=p.entreprise_id and c.cote='entreprise' and c.created_at<=p.created_at
+      )
+    $q$ into v_count;
+    v_resultats := v_resultats || jsonb_build_array(jsonb_build_object(
+      'controle','reponses_support_orphelines','anomalies',v_count,'bloquant',true,
+      'detail','Une réponse plateforme historique précède tout message client.'
+    ));
   end if;
 
   for v_ligne in
