@@ -44,7 +44,7 @@ function environnement(initiale: OperationRemise, couponStripe: string | null = 
       historique.push("stripe_in_progress");
       return structuredClone(operation);
     },
-    async finaliser(_id: string, etat: { coupon_id: string | null }) {
+    async finaliser(_operation: OperationRemise, etat: { coupon_id: string | null }) {
       if (echecFinalisation) { echecFinalisation = false; throw new Error("sql indisponible"); }
       remiseMetier = etat.coupon_id;
       operation = { ...operation, statut: "completed" };

@@ -36,7 +36,7 @@ export type StockageSagaRemise = {
   transition: (operationId: string, statut: StatutOperationRemise, etat: EtatStripeRemise | null, couponId?: string | null, erreur?: string | null) => Promise<OperationRemise>;
   enregistrerCoupon: (operationId: string, couponId: string) => Promise<OperationRemise>;
   preparerApplication: (operationId: string, etat: EtatStripeRemise) => Promise<OperationRemise>;
-  finaliser: (operationId: string, etat: EtatStripeRemise) => Promise<OperationRemise>;
+  finaliser: (operation: OperationRemise, etat: EtatStripeRemise) => Promise<OperationRemise>;
 };
 
 export type PasserelleStripeRemise = {
@@ -74,12 +74,14 @@ export async function reconcilierOperationRemise(
 ): Promise<OperationRemise> {
   let operation = operationInitiale;
   if (operation.statut === "completed") return operation;
-  if (operation.statut === "stripe_in_progress") throw new OperationRemiseAReconcilier();
   let etape = "lecture_stripe";
   let executionAcquise = false;
   try {
     let observe = etatStripe(await stripe.lire(operation.stripe_subscription_id), stripe);
 
+    if (operation.statut === "stripe_in_progress") {
+      operation = await stockage.transition(operation.id, "reconciliation_required", observe, operation.coupon_stripe_id);
+    }
     if (["pending", "reconciliation_required", "database_finalization_pending"].includes(operation.statut)) {
       operation = await stockage.transition(operation.id, "stripe_in_progress", observe);
       executionAcquise = true;
@@ -129,11 +131,8 @@ export async function reconcilierOperationRemise(
       }
     }
 
-    if (operation.statut === "stripe_applied" || operation.statut === "stripe_removed") {
-      operation = await stockage.transition(operation.id, "database_finalization_pending", observe, operation.coupon_stripe_id);
-    }
     etape = "finalisation_sql";
-    return await stockage.finaliser(operation.id, observe);
+    return await stockage.finaliser(operation, observe);
   } catch (erreurInitiale) {
     try {
       if (executionAcquise && !["completed", "failed_before_stripe", "cancelled", "reconciliation_required"].includes(operation.statut)) {

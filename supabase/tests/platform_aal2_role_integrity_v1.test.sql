@@ -368,6 +368,7 @@ select is(
      and p.proname like 'plateforme_%'
      and p.proname <> 'plateforme_quitter_entreprise'
      and p.prosrc ~* '\m(insert|update|delete)\M'
+     and has_function_privilege('authenticated',p.oid,'EXECUTE')
      and p.prosrc not like '%plateforme_exiger_session_aal2%'),
   0::bigint,
   'inventaire global : aucune mutation plateforme exposée sans AAL2 hors fermeture propre'

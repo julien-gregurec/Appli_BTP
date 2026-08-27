@@ -42,38 +42,38 @@ select throws_like(
 );
 select throws_like(
   $$select public.plateforme_transition_operation_remise(current_setting('test.operation_remise_id')::uuid,'completed','{"coupon_id":"coupon-saga"}'::jsonb,'coupon-saga',null)$$,
-  '%Transition%interdite%','passage arbitraire pending vers completed refusé'
-);
-select lives_ok(
-  $$select public.plateforme_transition_operation_remise(current_setting('test.operation_remise_id')::uuid,'stripe_in_progress','{"coupon_id":null}'::jsonb,null,null)$$,
-  'transition pending vers stripe_in_progress autorisée'
-);
-select lives_ok(
-  $$select public.plateforme_enregistrer_coupon_operation_remise(current_setting('test.operation_remise_id')::uuid,'coupon-saga')$$,
-  'checkpoint coupon conserve la même intention'
-);
-select lives_ok(
-  $$select public.plateforme_transition_operation_remise(current_setting('test.operation_remise_id')::uuid,'stripe_applied','{"coupon_id":"coupon-saga"}'::jsonb,'coupon-saga',null)$$,
-  'effet Stripe confirmé'
-);
-select lives_ok(
-  $$select public.plateforme_transition_operation_remise(current_setting('test.operation_remise_id')::uuid,'database_finalization_pending','{"coupon_id":"coupon-saga"}'::jsonb,'coupon-saga',null)$$,
-  'finalisation SQL explicitement en attente'
-);
-select lives_ok(
-  $$select public.plateforme_finaliser_operation_remise(current_setting('test.operation_remise_id')::uuid,'{"coupon_id":"coupon-saga"}'::jsonb)$$,
-  'finalisation atomique autorisée après confirmation Stripe'
+  '%permission denied%','ancien moteur de transition retiré aux sessions utilisateur'
 );
 select throws_like(
-  $$select public.plateforme_transition_operation_remise(current_setting('test.operation_remise_id')::uuid,'stripe_in_progress',null,null,null)$$,
-  '%terminée immuable%','opération terminée immuable'
+  $$select public.plateforme_enregistrer_coupon_operation_remise(current_setting('test.operation_remise_id')::uuid,'coupon-saga')$$,
+  '%permission denied%','ancien checkpoint coupon retiré aux sessions utilisateur'
+);
+select throws_like(
+  $$select public.plateforme_finaliser_operation_remise(current_setting('test.operation_remise_id')::uuid,'{"coupon_id":"coupon-saga"}'::jsonb)$$,
+  '%permission denied%','ancien finaliseur retiré aux sessions utilisateur'
+);
+select throws_like(
+  $$select public.plateforme_transition_operation_remise_serveur(current_setting('test.operation_remise_id')::uuid,'00000000-0000-0000-0000-000000000001','stripe_in_progress',null)$$,
+  '%permission denied%','transition serveur inaccessible à authenticated'
+);
+select throws_like(
+  $$select public.plateforme_enregistrer_preuve_stripe_serveur(current_setting('test.operation_remise_id')::uuid,'00000000-0000-0000-0000-000000000001',1,'{"coupon_id":"coupon-saga"}'::jsonb)$$,
+  '%permission denied%','preuve Stripe serveur inaccessible à authenticated'
+);
+select throws_like(
+  $$select public.plateforme_finaliser_operation_remise_serveur(current_setting('test.operation_remise_id')::uuid,'00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002')$$,
+  '%permission denied%','finaliseur serveur inaccessible à authenticated'
+);
+select lives_ok(
+  $$select public.plateforme_demander_reprise_operation_remise(current_setting('test.operation_remise_id')::uuid)$$,
+  'utilisateur autorisé à demander une reprise sans fournir de preuve'
 );
 reset role;
 
-select is((select statut from public.plateforme_operations_remise where stripe_subscription_id='sub-saga-a'),'completed','opération marquée terminée');
-select is((select remise_stripe_coupon_id from public.entreprises where id='a0000000-0000-0000-0000-000000000001'),'coupon-saga','état métier finalisé avec le coupon confirmé');
+select isnt((select statut from public.plateforme_operations_remise where stripe_subscription_id='sub-saga-a'),'completed','aucune finalisation sans preuve serveur');
+select is((select remise_stripe_coupon_id from public.entreprises where id='a0000000-0000-0000-0000-000000000001'),null,'état métier inchangé après tentative forgée');
 
-select ok((select count(*)>=5 from public.plateforme_operations_remise_historique h join public.plateforme_operations_remise o on o.id=h.operation_id where o.stripe_subscription_id='sub-saga-a'),'transitions importantes journalisées');
+select ok((select count(*)>=1 from public.plateforme_operations_remise_historique h join public.plateforme_operations_remise o on o.id=h.operation_id where o.stripe_subscription_id='sub-saga-a'),'création de l’intention journalisée');
 select throws_like(
   $$update public.plateforme_operations_remise_historique set statut_apres='cancelled' where operation_id=(select id from public.plateforme_operations_remise where stripe_subscription_id='sub-saga-a')$$,
   '%immuable%','historique append-only'

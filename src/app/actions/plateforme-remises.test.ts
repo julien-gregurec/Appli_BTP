@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   recupererAbonnementStripe: vi.fn(async () => ({ id: "sub_test", customer: "cus_test", status: "active", discounts: [] as Array<{ source?: { coupon?: { id?: string } } }> })),
   couponActifDepuisAbonnement: vi.fn((abonnement: { discounts?: Array<{ source?: { coupon?: { id?: string } } }> }) => abonnement.discounts?.[0]?.source?.coupon?.id ?? null),
   retirerCouponAbonnement: vi.fn(async () => ({})),
+  reconcilierOperationRemiseServeur: vi.fn(async () => ({})),
   rpc: vi.fn(async (fonction: string, parametres?: Record<string, unknown>) => {
     void fonction;
     void parametres;
@@ -35,6 +36,10 @@ vi.mock("@/lib/stripe-abonnement", () => ({
   couponActifDepuisAbonnement: mocks.couponActifDepuisAbonnement,
   TYPES_REMISE: ["montant", "pourcentage"],
   DUREES_REMISE: ["once", "repeating", "forever"],
+}));
+vi.mock("@/lib/stripe-discount-server", () => ({
+  reconcilierOperationRemiseServeur: mocks.reconcilierOperationRemiseServeur,
+  resoudreAbonnementOperationRemiseServeur: vi.fn(async () => "sub_test"),
 }));
 function fabriquerClientEntreprises() {
   return {
@@ -108,6 +113,7 @@ describe("appliquerRemiseAction — permissions et validation", () => {
       mocks.recupererAbonnementStripe.mockResolvedValue({ id: "sub_test", customer: "cus_test", status: "active", discounts: [{ source: { coupon: { id: "coupon_test" } } }] });
       return {};
     });
+    mocks.reconcilierOperationRemiseServeur.mockResolvedValue({});
   });
 
   it("refuse un utilisateur non plateforme-admin sans jamais appeler Stripe", async () => {
@@ -171,12 +177,13 @@ describe("appliquerRemiseAction — permissions et validation", () => {
 
     await expect(appliquerRemiseAction("entreprise-1", formData)).rejects.toThrow(/REDIRECT:\/plateforme\?succes=/);
 
-    expect(mocks.creerCouponRemise).toHaveBeenCalledWith(expect.objectContaining({ type: "pourcentage", valeur: 10, duree: "repeating", dureeMois: 3 }));
-    expect(mocks.appliquerCouponAbonnement).toHaveBeenCalledWith("sub_test", "coupon_test", "apply-key");
+    expect(mocks.reconcilierOperationRemiseServeur).toHaveBeenCalledWith("operation-test", "sub_test", "action:operation-test", expect.any(Object));
     expect(mocks.rpc).toHaveBeenCalledWith("plateforme_autoriser_effet_externe", { p_action: "remise_abonnement" });
-    expect(mocks.rpc.mock.invocationCallOrder[0]).toBeLessThan(mocks.creerCouponRemise.mock.invocationCallOrder[0]);
-    expect(mocks.rpc).toHaveBeenCalledWith("plateforme_commencer_operation_remise", expect.objectContaining({ p_entreprise_id: "entreprise-1", p_type_operation: "application" }));
-    expect(mocks.rpc).toHaveBeenCalledWith("plateforme_finaliser_operation_remise", expect.objectContaining({ p_operation_id: "operation-test" }));
+    expect(mocks.rpc).toHaveBeenCalledWith("plateforme_commencer_operation_remise", expect.objectContaining({
+      p_entreprise_id: "entreprise-1",
+      p_type_operation: "application",
+      p_etat_souhaite: expect.objectContaining({ type: "pourcentage", valeur: 10, duree: "repeating", duree_mois: 3 }),
+    }));
   });
 
   it("tronque le nom du coupon Stripe à 40 caractères max (bug réel ABONNEMENTS-DETAIL-V1C : nom d'entreprise 31 caractères + description dépassait la limite Stripe et faisait échouer toute la remise)", async () => {
@@ -185,9 +192,9 @@ describe("appliquerRemiseAction — permissions et validation", () => {
 
     await expect(appliquerRemiseAction("entreprise-1", formData)).rejects.toThrow(/REDIRECT:\/plateforme\?succes=/);
 
-    const appel = mocks.creerCouponRemise.mock.calls[0][0] as unknown as { nom: string };
-    expect(appel.nom.length).toBeLessThanOrEqual(40);
-    expect(appel.nom.endsWith("— 10 % à vie")).toBe(true);
+    const appel = mocks.rpc.mock.calls.find(([nom]) => nom === "plateforme_commencer_operation_remise")?.[1] as { p_etat_souhaite: { nom_coupon: string } };
+    expect(appel.p_etat_souhaite.nom_coupon.length).toBeLessThanOrEqual(40);
+    expect(appel.p_etat_souhaite.nom_coupon.endsWith("— 10 % à vie")).toBe(true);
   });
 
   it("conserve le nom entier quand il tient déjà dans la limite de 40 caractères", async () => {
@@ -196,8 +203,8 @@ describe("appliquerRemiseAction — permissions et validation", () => {
 
     await expect(appliquerRemiseAction("entreprise-1", formData)).rejects.toThrow(/REDIRECT:\/plateforme\?succes=/);
 
-    const appel = mocks.creerCouponRemise.mock.calls[0][0] as unknown as { nom: string };
-    expect(appel.nom).toBe("Entreprise Test — 10 % une fois");
+    const appel = mocks.rpc.mock.calls.find(([nom]) => nom === "plateforme_commencer_operation_remise")?.[1] as { p_etat_souhaite: { nom_coupon: string } };
+    expect(appel.p_etat_souhaite.nom_coupon).toBe("Entreprise Test — 10 % une fois");
   });
 
   it("exige un nombre de mois pour une remise 'repeating' avant même d'appeler Stripe", async () => {
@@ -221,6 +228,7 @@ describe("retirerRemiseAction — permissions", () => {
       mocks.recupererAbonnementStripe.mockResolvedValue({ id: "sub_test", customer: "cus_test", status: "active", discounts: [] });
       return {};
     });
+    mocks.reconcilierOperationRemiseServeur.mockResolvedValue({});
   });
 
   it("refuse un utilisateur non plateforme-admin sans jamais appeler Stripe", async () => {
@@ -247,10 +255,8 @@ describe("retirerRemiseAction — permissions", () => {
   it("relit Stripe, retire le coupon puis finalise la saga", async () => {
     await expect(retirerRemiseAction("entreprise-1")).rejects.toThrow(/REDIRECT:\/plateforme\?succes=/);
 
-    expect(mocks.retirerCouponAbonnement).toHaveBeenCalledWith("sub_test");
+    expect(mocks.reconcilierOperationRemiseServeur).toHaveBeenCalledWith("operation-test", "sub_test", "action:operation-test", expect.any(Object));
     expect(mocks.rpc).toHaveBeenCalledWith("plateforme_autoriser_effet_externe", { p_action: "remise_abonnement" });
-    expect(mocks.rpc.mock.invocationCallOrder[0]).toBeLessThan(mocks.retirerCouponAbonnement.mock.invocationCallOrder[0]);
     expect(mocks.rpc).toHaveBeenCalledWith("plateforme_commencer_operation_remise", expect.objectContaining({ p_entreprise_id: "entreprise-1", p_type_operation: "retrait" }));
-    expect(mocks.rpc).toHaveBeenCalledWith("plateforme_finaliser_operation_remise", expect.objectContaining({ p_operation_id: "operation-test" }));
   });
 });

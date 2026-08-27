@@ -8,8 +8,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { estPlateformeAdmin } from "@/lib/plateforme";
 import { ERREUR_CONFIGURATION_URL_AUTH, urlCallbackReinitialisation } from "@/lib/auth-redirects";
-import { appliquerCouponAbonnement, couponActifDepuisAbonnement, creerCouponRemise, recupererAbonnementStripe, retirerCouponAbonnement, TYPES_REMISE, DUREES_REMISE, type DureeRemise, type TypeRemise } from "@/lib/stripe-abonnement";
-import { OperationRemiseAReconcilier, reconcilierOperationRemise, type EtatSouhaiteRemise, type OperationRemise, type StatutOperationRemise } from "@/lib/stripe-discount-consistency";
+import { TYPES_REMISE, DUREES_REMISE, type DureeRemise, type TypeRemise } from "@/lib/stripe-abonnement";
+import { OperationRemiseAReconcilier, type EtatSouhaiteRemise, type OperationRemise } from "@/lib/stripe-discount-consistency";
+import { reconcilierOperationRemiseServeur, resoudreAbonnementOperationRemiseServeur } from "@/lib/stripe-discount-server";
+import { passerelleStripeRemise } from "@/lib/stripe-discount-gateway";
 
 export async function modifierAbonnementAction(entrepriseId: string, formData: FormData) {
   if (!(await estPlateformeAdmin())) {
@@ -229,57 +231,6 @@ function erreurRemisePublique(erreur: unknown) {
     : "L’opération de remise doit être vérifiée et finalisée.";
 }
 
-function stockageSagaRemise(supabase: ClientRpcRemise) {
-  return {
-    async transition(operationId: string, statut: StatutOperationRemise, etat: { coupon_id: string | null } | null, couponId?: string | null, erreur?: string | null) {
-      const { data, error } = await supabase.rpc("plateforme_transition_operation_remise", {
-        p_operation_id: operationId,
-        p_nouveau_statut: statut,
-        p_etat_observe: etat,
-        p_coupon_stripe_id: couponId ?? null,
-        p_empreinte_erreur: erreur ?? null,
-      });
-      if (error || !data) throw new Error("Checkpoint de remise indisponible");
-      return data as unknown as OperationRemise;
-    },
-    async preparerApplication(operationId: string, etat: { coupon_id: string | null }) {
-      const { data, error } = await supabase.rpc("plateforme_preparer_post_application_remise", {
-        p_operation_id: operationId,
-        p_etat_observe: etat,
-      });
-      if (error || !data) throw new Error("Préparation Stripe indisponible");
-      return data as unknown as OperationRemise;
-    },
-    async enregistrerCoupon(operationId: string, couponId: string) {
-      const { data, error } = await supabase.rpc("plateforme_enregistrer_coupon_operation_remise", {
-        p_operation_id: operationId,
-        p_coupon_stripe_id: couponId,
-      });
-      if (error || !data) throw new Error("Checkpoint coupon indisponible");
-      return data as unknown as OperationRemise;
-    },
-    async finaliser(operationId: string, etat: { coupon_id: string | null }) {
-      const { data, error } = await supabase.rpc("plateforme_finaliser_operation_remise", {
-        p_operation_id: operationId,
-        p_etat_observe_apres: etat,
-      });
-      if (error || !data) throw new Error("Finalisation de remise indisponible");
-      return data as unknown as OperationRemise;
-    },
-  };
-}
-
-const passerelleStripeRemise = {
-  lire: recupererAbonnementStripe,
-  couponActif: couponActifDepuisAbonnement,
-  creerCoupon: (souhait: EtatSouhaiteRemise, cleIdempotence: string) => creerCouponRemise({
-    type: souhait.type!, valeur: souhait.valeur!, duree: souhait.duree!,
-    dureeMois: souhait.duree_mois ?? undefined, nom: souhait.nom_coupon!, cleIdempotence,
-  }),
-  appliquerCoupon: appliquerCouponAbonnement,
-  retirerCoupon: retirerCouponAbonnement,
-};
-
 async function commencerSagaRemise(
   supabase: ClientRpcRemise,
   entrepriseId: string,
@@ -351,7 +302,7 @@ export async function appliquerRemiseAction(entrepriseId: string, formData: Form
   };
   try {
     const operation = await commencerSagaRemise(supabase, entrepriseId, intentionRemise(formData), entreprise.stripe_subscription_id, "application", etatSouhaite);
-    await reconcilierOperationRemise(operation, stockageSagaRemise(supabase), passerelleStripeRemise);
+    await reconcilierOperationRemiseServeur(operation.id, entreprise.stripe_subscription_id, `action:${operation.id}`, passerelleStripeRemise);
   } catch (err) {
     redirect(`/plateforme?error=${encodeURIComponent(erreurRemisePublique(err))}`);
   }
@@ -374,7 +325,7 @@ export async function retirerRemiseAction(entrepriseId: string, formData?: FormD
   if (!entreprise?.stripe_subscription_id) redirect(`/plateforme?error=${encodeURIComponent("Cette entreprise n’a pas d’abonnement Stripe actif")}`);
   try {
     const operation = await commencerSagaRemise(supabase, entrepriseId, intentionRemise(formData), entreprise.stripe_subscription_id, "retrait", { active: false });
-    await reconcilierOperationRemise(operation, stockageSagaRemise(supabase), passerelleStripeRemise);
+    await reconcilierOperationRemiseServeur(operation.id, entreprise.stripe_subscription_id, `action:${operation.id}`, passerelleStripeRemise);
   } catch (err) {
     redirect(`/plateforme?error=${encodeURIComponent(erreurRemisePublique(err))}`);
   }
@@ -388,10 +339,11 @@ export async function reprendreOperationRemiseAction(operationId: string) {
   if (isEmailLoginDisabled()) redirect(`/plateforme?error=${encodeURIComponent("Réconciliation indisponible en mode prototype")}`);
   const { error: erreurAutorisation } = await supabase.rpc("plateforme_autoriser_effet_externe", { p_action: "remise_abonnement" });
   if (erreurAutorisation) redirect(`/plateforme?error=${encodeURIComponent("Action non autorisée.")}`);
-  const { data, error } = await supabase.rpc("plateforme_lire_operation_remise", { p_operation_id: operationId });
+  const { data, error } = await supabase.rpc("plateforme_demander_reprise_operation_remise", { p_operation_id: operationId });
   if (error || !data) redirect(`/plateforme?error=${encodeURIComponent("Opération de remise introuvable")}`);
   try {
-    await reconcilierOperationRemise(data as unknown as OperationRemise, stockageSagaRemise(supabase), passerelleStripeRemise);
+    const subscriptionId = await resoudreAbonnementOperationRemiseServeur(operationId);
+    await reconcilierOperationRemiseServeur(operationId, subscriptionId, `reprise:${operationId}`, passerelleStripeRemise);
   } catch (err) {
     redirect(`/plateforme?error=${encodeURIComponent(erreurRemisePublique(err))}`);
   }
