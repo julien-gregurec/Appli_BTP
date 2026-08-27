@@ -81,11 +81,33 @@ reset role;
 select is((select statut from public.plateforme_operations_remise where id=current_setting('test.f4_operation')::uuid),'completed','saga finalisée seulement après preuve serveur');
 select is((select remise_stripe_coupon_id from public.entreprises where id='a0000000-0000-0000-0000-000000000001'),'coupon-f4','état métier correspond au checkpoint serveur');
 select ok((select preuve_intention_id=intention_id and preuve_stripe_subscription_id=stripe_subscription_id and preuve_numero_tentative=nombre_tentatives from public.plateforme_operations_remise where id=current_setting('test.f4_operation')::uuid),'preuve liée à intention, abonnement et tentative');
+
+set local role service_role;
+select set_config('request.jwt.claims','{"role":"service_role"}',true);
+select set_config('test.f4_exp_lock',public.plateforme_acquerir_verrou_remise_serveur('sub-f4-a','test:expiration')::text,true);
+select set_config('test.f4_exp_operation',(
+  public.plateforme_commencer_expiration_remise_serveur(
+    'a0000000-0000-0000-0000-000000000001','sub-f4-a',current_setting('test.f4_exp_lock')::uuid
+  )->>'id'
+),true);
+select ok(current_setting('test.f4_exp_operation')::uuid is not null,'expiration Stripe crée une intention de retrait F4');
+select lives_ok(format($$select public.plateforme_transition_operation_remise_serveur('%s','%s','stripe_in_progress',null)$$,current_setting('test.f4_exp_operation'),current_setting('test.f4_exp_lock')),'expiration démarre sous le verrou existant');
+select set_config('test.f4_exp_proof',(
+  public.plateforme_enregistrer_preuve_stripe_serveur(
+    current_setting('test.f4_exp_operation')::uuid,current_setting('test.f4_exp_lock')::uuid,1,'{"coupon_id":null}'::jsonb
+  )->>'preuve_serveur_id'
+),true);
+select lives_ok(format($$select public.plateforme_finaliser_operation_remise_serveur('%s','%s','%s')$$,current_setting('test.f4_exp_operation'),current_setting('test.f4_exp_lock'),current_setting('test.f4_exp_proof')),'expiration prouvée passe par le finaliseur F4');
+select ok(public.plateforme_relacher_verrou_remise_serveur('sub-f4-a',current_setting('test.f4_exp_lock')::uuid),'verrou expiration libéré');
+reset role;
+select is((select remise_stripe_coupon_id from public.entreprises where id='a0000000-0000-0000-0000-000000000001'),null,'expiration F4 efface la remise locale');
+select is((select count(*) from public.historique_tarification where entreprise_id='a0000000-0000-0000-0000-000000000001' and action='remise_expiree'),1::bigint,'expiration F4 journalisée exactement une fois');
 select throws_like(
   $$delete from public.plateforme_operations_remise_historique where operation_id=current_setting('test.f4_operation')::uuid$$,
   '%immuable%','historique reste append-only'
 );
-select is((select count(*) from pg_policies where schemaname='public' and tablename in ('plateforme_operations_remise','plateforme_operations_remise_historique','plateforme_verrous_remise_stripe')),0::bigint,'aucune policy applicative sur les registres privés');
+select is((select count(*) from pg_policies where schemaname='public' and tablename in ('plateforme_operations_remise','plateforme_operations_remise_historique','plateforme_verrous_remise_stripe')),3::bigint,'seules les trois policies du rôle interne F4 existent sur les registres privés');
+select is((select count(*) from pg_policies where schemaname='public' and tablename in ('plateforme_operations_remise','plateforme_operations_remise_historique','plateforme_verrous_remise_stripe') and not (roles && array['elsatia_discount_f4_writer']::name[])),0::bigint,'aucune policy de registre exposée à un rôle API');
 
 select * from finish();
 rollback;

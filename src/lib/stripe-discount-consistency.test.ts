@@ -172,4 +172,19 @@ describe("saga persistante des remises Stripe", () => {
     env.stockage.transition = async () => { throw new Error("diagnostic-interne-sensible sql détail privé"); };
     await expect(reconcilierOperationRemise(operationApplication(), env.stockage, env.stripe)).rejects.toThrow("doit être vérifiée et finalisée");
   });
+  it("23. une expiration confirmée finalise sans DELETE Stripe", async () => {
+    const expiration = { ...operationRetrait(), etat_souhaite: { active: false, mode: "expiration_stripe" as const } };
+    env = environnement(expiration, null);
+    await reconcilierOperationRemise(expiration, env.stockage, env.stripe);
+    expect(env.effets.retrait).toBe(0);
+    expect(env.operation().statut).toBe("completed");
+  });
+  it("24. une remise réapparue annule l'expiration sans mutation Stripe", async () => {
+    const expiration = { ...operationRetrait(), etat_souhaite: { active: false, mode: "expiration_stripe" as const } };
+    env = environnement(expiration, "coupon-nouveau");
+    const resultat = await reconcilierOperationRemise(expiration, env.stockage, env.stripe);
+    expect(resultat.statut).toBe("cancelled");
+    expect(env.effets.retrait).toBe(0);
+    expect(env.stripeActuel()).toBe("coupon-nouveau");
+  });
 });

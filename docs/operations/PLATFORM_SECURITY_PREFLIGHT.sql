@@ -153,6 +153,85 @@ begin
     end if;
   end if;
 
+  -- R7.1 : intégrité de la frontière d'écriture des remises.
+  select case when exists(
+    select 1 from pg_roles
+    where rolname='elsatia_discount_f4_writer' and not rolcanlogin and not rolbypassrls
+  ) and not exists(
+    select 1 from pg_auth_members m
+    join pg_roles r on r.oid=m.roleid join pg_roles u on u.oid=m.member
+    where r.rolname='elsatia_discount_f4_writer' and u.rolname<>'postgres'
+  ) then 0 else 1 end into v_count;
+  v_resultats := v_resultats || jsonb_build_array(jsonb_build_object(
+    'controle','role_interne_f4_invalide','anomalies',v_count,'bloquant',true,
+    'detail','Le rôle F4 doit être NOLOGIN, NOBYPASSRLS et sans membre applicatif.'
+  ));
+
+  if to_regclass('public.entreprises') is not null then
+    execute $q$
+      select count(*) from public.entreprises
+      where (remise_stripe_coupon_id is null) is distinct from
+        (remise_description is null and remise_motif_interne is null
+         and remise_duree_mois is null and remise_type is null and remise_valeur is null
+         and remise_cree_par is null and remise_appliquee_at is null)
+    $q$ into v_count;
+    v_resultats := v_resultats || jsonb_build_array(jsonb_build_object(
+      'controle','remises_etat_partiel','anomalies',v_count,'bloquant',true,
+      'detail','Une remise doit être entièrement active ou entièrement absente.'
+    ));
+
+    select count(*) into v_count
+    from information_schema.role_column_grants
+    where table_schema='public' and table_name='entreprises'
+      and grantee in ('anon','authenticated','service_role')
+      and privilege_type in ('INSERT','UPDATE') and column_name in (
+        'remise_stripe_coupon_id','remise_description','remise_motif_interne','remise_duree_mois',
+        'remise_type','remise_valeur','remise_cree_par','remise_appliquee_at'
+      );
+    v_resultats := v_resultats || jsonb_build_array(jsonb_build_object(
+      'controle','privileges_directs_colonnes_remise','anomalies',v_count,'bloquant',true,
+      'detail','Aucun rôle API ne doit posséder INSERT/UPDATE sur une colonne de remise.'
+    ));
+
+    select case when exists(
+      select 1 from pg_trigger t
+      where t.tgrelid='public.entreprises'::regclass and t.tgname='proteger_colonnes_remise'
+        and not t.tgisinternal
+    ) then 0 else 1 end into v_count;
+    v_resultats := v_resultats || jsonb_build_array(jsonb_build_object(
+      'controle','trigger_remise_f4_absent','anomalies',v_count,'bloquant',true,
+      'detail','Le trigger structurel R7.1 doit protéger INSERT et UPDATE.'
+    ));
+  end if;
+
+  if to_regclass('public.plateforme_operations_remise') is not null then
+    execute $q$
+      select count(*) from public.entreprises e
+      where e.remise_stripe_coupon_id is not null and not exists (
+        select 1 from public.plateforme_operations_remise o
+        where o.entreprise_id=e.id and o.statut='completed'
+          and o.type_operation='application'
+          and o.coupon_stripe_id=e.remise_stripe_coupon_id
+          and o.preuve_serveur_id is not null
+          and o.preuve_intention_id=o.intention_id
+          and o.preuve_stripe_subscription_id=o.stripe_subscription_id
+      )
+    $q$ into v_count;
+    v_resultats := v_resultats || jsonb_build_array(jsonb_build_object(
+      'controle','remises_actives_sans_preuve_f4','anomalies',v_count,'bloquant',true,
+      'detail','Toute remise active doit correspondre à une saga F4 completed et prouvée.'
+    ));
+  end if;
+
+  select case when to_regprocedure('public.plateforme_finaliser_operation_remise_serveur(uuid,uuid,uuid)') is not null
+    and (select pg_get_userbyid(proowner)='elsatia_discount_f4_writer'
+         from pg_proc where oid='public.plateforme_finaliser_operation_remise_serveur(uuid,uuid,uuid)'::regprocedure)
+    then 0 else 1 end into v_count;
+  v_resultats := v_resultats || jsonb_build_array(jsonb_build_object(
+    'controle','proprietaire_finaliseur_f4_invalide','anomalies',v_count,'bloquant',true,
+    'detail','Le seul finaliseur F4 doit être détenu par le rôle interne dédié.'
+  ));
+
   for v_ligne in
     select value
     from jsonb_array_elements(v_resultats)
