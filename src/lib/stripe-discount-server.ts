@@ -6,6 +6,7 @@ import {
   type PasserelleStripeRemise,
   type StatutOperationRemise,
 } from "@/lib/stripe-discount-consistency";
+import type { StripeSubscription } from "@/lib/stripe-abonnement";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -118,6 +119,24 @@ export async function reconcilierOperationRemiseSousVerrou(
   stripe: PasserelleStripeRemise,
 ) {
   return reconcilierOperationRemise(operation, stockageServeur(admin, verrouToken), stripe);
+}
+
+export async function synchroniserExpirationRemiseSousVerrou(
+  admin: Admin,
+  entrepriseId: string,
+  abonnement: StripeSubscription,
+  verrouToken: string,
+  stripe: PasserelleStripeRemise,
+) {
+  if (abonnement.discounts === undefined || (abonnement.discounts?.length ?? 0) > 0) return null;
+  const { data, error } = await admin.rpc("plateforme_commencer_expiration_remise_serveur", {
+    p_entreprise_id: entrepriseId,
+    p_stripe_subscription_id: abonnement.id,
+    p_verrou_token: verrouToken,
+  });
+  if (error) throw new Error("Intention d’expiration de remise indisponible");
+  if (!data) return null;
+  return reconcilierOperationRemiseSousVerrou(admin, data as unknown as OperationRemise, verrouToken, stripe);
 }
 
 export async function reconcilierOperationRemiseServeur(

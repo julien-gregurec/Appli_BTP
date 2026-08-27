@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ajouterDepassementAppareilsFacture, ajouterDepassementStockageFacture, calculerDepassementAppareils, reconcilierAbonnementStripe, recupererAbonnementStripe, statutAbonnementDepuisStripe, synchroniserExpirationRemise, type StripeSubscription } from "@/lib/stripe-abonnement";
+import { ajouterDepassementAppareilsFacture, ajouterDepassementStockageFacture, calculerDepassementAppareils, reconcilierAbonnementStripe, recupererAbonnementStripe, statutAbonnementDepuisStripe, type StripeSubscription } from "@/lib/stripe-abonnement";
 import { verifierSignatureStripe } from "@/lib/stripe";
 import { categoriserErreurSupabase, empreinteEvenementStripe, identifiantUuidValide, resoudreModeStripeWebhook } from "@/lib/stripe-webhook-environment";
 import { passerelleStripeRemise } from "@/lib/stripe-discount-gateway";
-import { acquerirVerrouRemise, libererVerrouRemise, lireOperationActiveRemiseServeur, reconcilierOperationRemiseSousVerrou } from "@/lib/stripe-discount-server";
+import { acquerirVerrouRemise, libererVerrouRemise, lireOperationActiveRemiseServeur, reconcilierOperationRemiseSousVerrou, synchroniserExpirationRemiseSousVerrou } from "@/lib/stripe-discount-server";
 
 type StripeReference = string | { id?: string } | null | undefined;
 type StripeObjet = {
@@ -107,7 +107,6 @@ function diagnosticWebhook(niveau: "warn" | "error", evenement: Pick<StripeEvent
 }
 
 async function synchroniserAbonnement(admin: SupabaseAdmin, entrepriseId: string, abonnement: StripeSubscription) {
-  await synchroniserExpirationRemise(entrepriseId, abonnement);
   const offre = abonnement.metadata?.offre;
   const periodicite = abonnement.metadata?.periodicite;
   const statut = statutAbonnementDepuisStripe(abonnement.status);
@@ -199,6 +198,10 @@ export async function synchroniserAbonnementCoordonne(
       await reconcilierOperationRemiseSousVerrou(admin, operation, verrou, passerelleStripeRemise);
       abonnementActuel = await recupererAbonnementStripe(subscriptionId);
     }
+    const expiration = await synchroniserExpirationRemiseSousVerrou(
+      admin, entrepriseId, abonnementActuel, verrou, passerelleStripeRemise,
+    );
+    if (expiration) abonnementActuel = await recupererAbonnementStripe(subscriptionId);
     return await synchroniserAbonnement(admin, entrepriseId, abonnementActuel);
   } finally {
     await libererVerrouRemise(admin, subscriptionId, verrou);

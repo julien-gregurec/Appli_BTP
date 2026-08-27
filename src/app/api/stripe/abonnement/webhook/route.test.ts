@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const deps = vi.hoisted(() => ({
   createAdminClient: vi.fn(),
   recupererAbonnementStripe: vi.fn(),
-  synchroniserExpirationRemise: vi.fn(),
+  synchroniserExpirationRemiseSousVerrou: vi.fn(async () => null),
   statutAbonnementDepuisStripe: vi.fn(() => "actif"),
   reconcilierAbonnementStripe: vi.fn(),
   ajouterDepassementAppareilsFacture: vi.fn(),
@@ -19,7 +19,6 @@ const deps = vi.hoisted(() => ({
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: deps.createAdminClient }));
 vi.mock("@/lib/stripe-abonnement", () => ({
   recupererAbonnementStripe: deps.recupererAbonnementStripe,
-  synchroniserExpirationRemise: deps.synchroniserExpirationRemise,
   statutAbonnementDepuisStripe: deps.statutAbonnementDepuisStripe,
   reconcilierAbonnementStripe: deps.reconcilierAbonnementStripe,
   ajouterDepassementAppareilsFacture: deps.ajouterDepassementAppareilsFacture,
@@ -32,6 +31,7 @@ vi.mock("@/lib/stripe-discount-server", () => ({
   libererVerrouRemise: deps.libererVerrouRemise,
   lireOperationActiveRemiseServeur: deps.lireOperationActiveRemiseServeur,
   reconcilierOperationRemiseSousVerrou: deps.reconcilierOperationRemiseSousVerrou,
+  synchroniserExpirationRemiseSousVerrou: deps.synchroniserExpirationRemiseSousVerrou,
 }));
 
 const { POST, synchroniserAbonnementCoordonne } = await import("./route");
@@ -128,7 +128,7 @@ describe("coordination webhook et saga", () => {
     const actuel = { id:"sub_test",customer:"cus_test",status:"active",discounts:[{source:{coupon:{id:"coupon-actuel"}}}],metadata:{} };
     deps.recupererAbonnementStripe.mockResolvedValue(actuel);
     await synchroniserAbonnementCoordonne(admin as never,ENTREPRISE,"sub_test","evt_ancien");
-    expect(deps.synchroniserExpirationRemise).toHaveBeenCalledWith(ENTREPRISE,actuel);
+    expect(deps.synchroniserExpirationRemiseSousVerrou).toHaveBeenCalledWith(admin,ENTREPRISE,actuel,"verrou-test",expect.any(Object));
     expect(deps.acquerirVerrouRemise).toHaveBeenCalledWith(admin,"sub_test",expect.stringMatching(/^webhook:/));
     expect(deps.libererVerrouRemise).toHaveBeenCalledWith(admin,"sub_test","verrou-test");
   });
@@ -157,8 +157,8 @@ describe("coordination webhook et saga", () => {
     await synchroniserAbonnementCoordonne(admin as never, ENTREPRISE, "sub_test", "evt_recent");
     await synchroniserAbonnementCoordonne(admin as never, ENTREPRISE, "sub_test", "evt_ancien_livre_apres");
     expect(deps.recupererAbonnementStripe).toHaveBeenCalledTimes(2);
-    expect(deps.synchroniserExpirationRemise).toHaveBeenNthCalledWith(1, ENTREPRISE, actuel);
-    expect(deps.synchroniserExpirationRemise).toHaveBeenNthCalledWith(2, ENTREPRISE, actuel);
+    expect(deps.synchroniserExpirationRemiseSousVerrou).toHaveBeenNthCalledWith(1, admin, ENTREPRISE, actuel, "verrou-test", expect.any(Object));
+    expect(deps.synchroniserExpirationRemiseSousVerrou).toHaveBeenNthCalledWith(2, admin, ENTREPRISE, actuel, "verrou-test", expect.any(Object));
   });
   it("verrouille l'abonnement réellement ciblé, sans interférence avec un autre", async () => {
     const admin = adminFake();

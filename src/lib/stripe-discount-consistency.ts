@@ -7,6 +7,7 @@ export type StatutOperationRemise =
 
 export type EtatSouhaiteRemise = {
   active: boolean;
+  mode?: "expiration_stripe";
   description?: string;
   motif_interne?: string;
   duree_mois?: number | null;
@@ -78,6 +79,18 @@ export async function reconcilierOperationRemise(
   let executionAcquise = false;
   try {
     let observe = etatStripe(await stripe.lire(operation.stripe_subscription_id), stripe);
+
+    // Une expiration naturelle ne doit jamais retirer une remise apparue entre
+    // le webhook et la relecture Stripe. Une intention encore pending est alors
+    // annulée ; un checkpoint plus avancé est laissé à la reprise sans mutation.
+    if (operation.type_operation === "retrait"
+        && operation.etat_souhaite.mode === "expiration_stripe"
+        && observe.coupon_id !== null) {
+      if (operation.statut === "pending") {
+        return await stockage.transition(operation.id, "cancelled", observe);
+      }
+      throw new Error("Expiration Stripe non confirmée");
+    }
 
     if (operation.statut === "stripe_in_progress") {
       operation = await stockage.transition(operation.id, "reconciliation_required", observe, operation.coupon_stripe_id);
