@@ -1,5 +1,5 @@
 -- Préflight ELSATIA plateforme — lecture seule, sans secret.
--- À exécuter avant les migrations multi-app 234 à 239 sur Preview/Production.
+-- À exécuter avant les migrations multi-app 234 à 240 sur Preview/Production.
 -- Toute ligne `bloquant = true` avec `anomalies > 0` interdit la migration distante.
 
 begin transaction read only;

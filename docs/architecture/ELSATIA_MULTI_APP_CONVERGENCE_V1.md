@@ -69,7 +69,31 @@ consultation `lecture` n'exécute plus la suspension automatique des impayés. L
 versionné et `docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql` contrôlent les données avant
 tout environnement distant.
 
-La migration append-only `20260826000238_platform_support_isolation_audit_v1.sql` ferme les
+## Adaptation sur release/commercialisation-v1 (branche `claude/multi-app-secure-release-adaptation-v1`)
+
+Cette branche porte l'intégralité du socle ci-dessus (jusqu'à la migration `00240` ci-dessous)
+sur `release/commercialisation-v1` (`fcdd4e7`), qui ne contenait aucune de ces migrations. Elle
+ajoute une migration supplémentaire, absente de la chaîne d'origine :
+
+`20260826000238_platform_write_surface_hardening_v1.sql` — adaptée depuis
+`codex/multi-app-aal2-role-fix-v2` (`38c0109`) / `codex/admin-global-v1-consolidation`
+(`2e7849c`), deux branches parallèles non fusionnées dans la chaîne auditée. Ferme les dernières
+policies d'écriture (`boutique_produits`, `entreprise_feature_flags`) qui reposaient uniquement
+sur `est_plateforme_admin()` sans exiger AAL2 ni rôle exact, et supprime le rôle par défaut de
+`plateforme_admins` (toute création doit désormais nommer explicitement son rôle). La fonction
+`plateforme_autoriser_effet_externe(p_action text)` de la version d'origine n'est **pas** reprise :
+son unique usage (préautoriser une remise Stripe) est strictement mieux couvert par
+`plateforme_preautoriser_effet_externe(entreprise_id, operation)` de la migration `00240`
+(vérifie l'existence de l'entreprise, restreint l'opération à une liste fermée, retourne la
+cible) — la conserver aurait dupliqué la même intention avec une garantie plus faible.
+
+Les migrations `20260826000238_platform_support_isolation_audit_v1.sql` et
+`20260826000239_platform_stripe_audit_integrity_v1.sql` de la chaîne auditée sont renumérotées
+`00239` et `00240` sur cette branche pour laisser la place à `00238` ci-dessus ; leur contenu SQL
+est inchangé. Voir le rapport d'adaptation pour la table de correspondance complète et
+l'inventaire des éléments de `codex/admin-global-v1-consolidation` examinés et exclus.
+
+La migration append-only `20260826000239_platform_support_isolation_audit_v1.sql` ferme les
 deux effets résiduels découverts en revue : le catalogue global des fils ne contient plus aucun
 texte de message et `plateforme_support_messages()` n'effectue plus d'UPDATE implicite. Une
 session support AAL2 ciblée est obligatoire avant toute lecture de contenu ; l'acquittement est

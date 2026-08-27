@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { estPlateformeAdmin } from "@/lib/plateforme";
@@ -226,6 +226,13 @@ type CibleRemisePreautorisee = {
   remise_stripe_coupon_id: string | null;
 };
 
+// Clé déterministe : dérivée uniquement de l'intention métier (opération, entreprise, cible
+// Stripe, paramètres normalisés de la remise, état attendu avant l'action), jamais d'un aléa
+// généré à chaque soumission. Deux soumissions dupliquées de la même intention (double-clic,
+// retry réseau du même Server Action, nouvelle tentative après timeout) produisent ainsi la
+// même clé et sont dédupliquées par Stripe ; deux remises réellement différentes (entreprise,
+// type, valeur, durée ou état antérieur distincts) produisent des clés distinctes. Ne jamais
+// réintroduire ici Date.now(), Math.random() ou un randomUUID() recréé à chaque appel.
 function cleIdempotenceRemise(prefixe: string, valeurs: Array<string | number | null | undefined>) {
   const empreinte = createHash("sha256").update(valeurs.map((valeur) => String(valeur ?? "")).join("\u001f")).digest("hex").slice(0, 40);
   return `${prefixe}-${empreinte}`;
@@ -291,8 +298,16 @@ export async function appliquerRemiseAction(entrepriseId: string, formData: Form
   try {
     const cible = await preautoriserRemise(supabase, entrepriseId, "remise_appliquer");
     if (!cible.stripe_subscription_id) throw new Error("Cette entreprise n’a pas d’abonnement Stripe actif");
-    const tentativeId = randomUUID();
-    const operationId = cleIdempotenceRemise("remise-coupon", [tentativeId, entrepriseId, type, valeur, duree, dureeMois, description, cible.remise_stripe_coupon_id]);
+    // Intention métier : opération + entreprise + abonnement ciblé + remise normalisée + état
+    // attendu (coupon actif avant l'action, lu par la préautorisation). Stable pour toute
+    // nouvelle tentative de la même action (double-clic, retry réseau, nouvelle soumission après
+    // timeout) ; distincte dès que l'entreprise, la remise ou l'état antérieur diffère
+    // réellement — y compris entre une première application et une réapplication après retrait
+    // (remise_stripe_coupon_id redevient alors non-null puis null, changeant l'état attendu).
+    const operationId = cleIdempotenceRemise("remise-coupon", [
+      entrepriseId, cible.stripe_subscription_id, type, valeur.toFixed(2), duree, dureeMois ?? "", description,
+      cible.remise_stripe_coupon_id,
+    ]);
     const coupon = await creerCouponRemise({ type: type as TypeRemise, valeur, duree: duree as DureeRemise, dureeMois, nom: nomCouponRemise(cible.entreprise_nom, description), idempotence: operationId });
     await appliquerCouponAbonnement(cible.stripe_subscription_id, coupon.id);
     const { error } = await supabase.rpc("plateforme_appliquer_remise", { p_entreprise_id: entrepriseId, p_coupon_id: coupon.id, p_description: description, p_motif_interne: motifInterne, p_duree_mois: dureeMois ?? null, p_type: type, p_valeur: valeur });
@@ -302,7 +317,10 @@ export async function appliquerRemiseAction(entrepriseId: string, formData: Form
         if (cible.remise_stripe_coupon_id) {
           await appliquerCouponAbonnement(cible.stripe_subscription_id, cible.remise_stripe_coupon_id);
         } else {
-          await retirerCouponAbonnement(cible.stripe_subscription_id, cleIdempotenceRemise("remise-compensation", [tentativeId, entrepriseId, coupon.id]));
+          // coupon.id est l'identifiant Stripe stable de CE coupon (déjà créé de façon
+          // déterministe ci-dessus) : la clé de compensation reste donc déterministe elle aussi,
+          // sans dépendre d'un aléa par tentative.
+          await retirerCouponAbonnement(cible.stripe_subscription_id, cleIdempotenceRemise("remise-compensation", [entrepriseId, cible.stripe_subscription_id, coupon.id]));
         }
         compensationReussie = true;
       } catch {
@@ -325,9 +343,11 @@ export async function retirerRemiseAction(entrepriseId: string) {
   if (isEmailLoginDisabled()) redirect(`/plateforme?error=${encodeURIComponent("Les remises Stripe exigent une session plateforme personnelle AAL2")}`);
   try {
     const cible = await preautoriserRemise(supabase, entrepriseId, "remise_retirer");
-    const tentativeId = randomUUID();
     if (cible.stripe_subscription_id && cible.remise_stripe_coupon_id) {
-      await retirerCouponAbonnement(cible.stripe_subscription_id, cleIdempotenceRemise("remise-suppression", [tentativeId, entrepriseId, cible.remise_stripe_coupon_id]));
+      // Intention métier : retirer précisément CE coupon de CET abonnement. Stable pour toute
+      // nouvelle tentative de la même action ; une remise différente (coupon différent) produit
+      // une clé différente.
+      await retirerCouponAbonnement(cible.stripe_subscription_id, cleIdempotenceRemise("remise-suppression", [entrepriseId, cible.stripe_subscription_id, cible.remise_stripe_coupon_id]));
     }
     const { error } = await supabase.rpc("plateforme_retirer_remise", { p_entreprise_id: entrepriseId });
     if (error) {

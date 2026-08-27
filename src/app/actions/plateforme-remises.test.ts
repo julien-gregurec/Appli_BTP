@@ -183,6 +183,95 @@ describe("appliquerRemiseAction — permissions et validation", () => {
   });
 });
 
+describe("idempotence déterministe des remises Stripe (adaptation release, réserve corrigée)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.estPlateformeAdmin.mockResolvedValue(true);
+    mocks.erreurPreautorisation = null;
+    mocks.erreurMutation = null;
+    mocks.preautorisation = { entreprise_id: "entreprise-1", entreprise_nom: "Entreprise Test", stripe_subscription_id: "sub_test", remise_stripe_coupon_id: null };
+    mocks.rpc.mockImplementation(async (nom: string) => {
+      if (nom === "plateforme_preautoriser_effet_externe") {
+        return mocks.erreurPreautorisation
+          ? { data: null, error: { message: mocks.erreurPreautorisation } }
+          : { data: [mocks.preautorisation], error: null };
+      }
+      if (nom === "plateforme_appliquer_remise" || nom === "plateforme_retirer_remise") {
+        return mocks.erreurMutation ? { data: null, error: { message: mocks.erreurMutation } } : { data: true, error: null };
+      }
+      return { data: null, error: null };
+    });
+  });
+
+  async function idempotenceApplication(entrepriseId: string, champs: Record<string, string>) {
+    const formData = formulaireRemise(champs);
+    await appliquerRemiseAction(entrepriseId, formData).catch(() => {});
+    const dernierAppel = mocks.creerCouponRemise.mock.calls.at(-1)?.[0] as { idempotence: string };
+    return dernierAppel.idempotence;
+  }
+
+  it("double-clic / retry réseau du même Server Action : même intention → même clé, un seul objet Stripe attendu", async () => {
+    const champs = { type: "pourcentage", valeur: "10", duree: "once", motif_interne: "Test" };
+    const cle1 = await idempotenceApplication("entreprise-1", champs);
+    const cle2 = await idempotenceApplication("entreprise-1", champs);
+    expect(cle1).toBe(cle2);
+  });
+
+  it("nouvelle tentative après un timeout client : la clé ne dépend d'aucune horloge, donc reste identique", async () => {
+    const champs = { type: "pourcentage", valeur: "10", duree: "once", motif_interne: "Test" };
+    const cle1 = await idempotenceApplication("entreprise-1", champs);
+    vi.useFakeTimers();
+    vi.advanceTimersByTime(60 * 60 * 1000);
+    const cle2 = await idempotenceApplication("entreprise-1", champs);
+    vi.useRealTimers();
+    expect(cle1).toBe(cle2);
+  });
+
+  it("même remise sur deux entreprises différentes : clés distinctes", async () => {
+    const champs = { type: "pourcentage", valeur: "10", duree: "once", motif_interne: "Test" };
+    const cleA = await idempotenceApplication("entreprise-1", champs);
+    mocks.preautorisation = { entreprise_id: "entreprise-2", entreprise_nom: "Entreprise Deux", stripe_subscription_id: "sub_deux", remise_stripe_coupon_id: null };
+    const cleB = await idempotenceApplication("entreprise-2", champs);
+    expect(cleA).not.toBe(cleB);
+  });
+
+  it("deux remises réellement différentes sur la même entreprise (valeur) : clés distinctes", async () => {
+    const cle10 = await idempotenceApplication("entreprise-1", { type: "pourcentage", valeur: "10", duree: "once", motif_interne: "Test" });
+    const cle20 = await idempotenceApplication("entreprise-1", { type: "pourcentage", valeur: "20", duree: "once", motif_interne: "Test" });
+    expect(cle10).not.toBe(cle20);
+  });
+
+  it("application puis retrait : la clé de retrait ne réutilise jamais celle de l'application", async () => {
+    const champs = { type: "pourcentage", valeur: "10", duree: "once", motif_interne: "Test" };
+    const cleApplication = await idempotenceApplication("entreprise-1", champs);
+    mocks.preautorisation = { entreprise_id: "entreprise-1", entreprise_nom: "Entreprise Test", stripe_subscription_id: "sub_test", remise_stripe_coupon_id: "coupon_test" };
+    await retirerRemiseAction("entreprise-1").catch(() => {});
+    const cleRetrait = mocks.retirerCouponAbonnement.mock.calls.at(-1)?.[1] as string;
+    expect(cleRetrait).not.toBe(cleApplication);
+    expect(cleRetrait.startsWith("remise-suppression-")).toBe(true);
+    expect(cleApplication.startsWith("remise-coupon-")).toBe(true);
+  });
+
+  it("une remise déjà active change l'état attendu : reappliquer sur une remise existante ne réutilise pas la clé de la toute première application", async () => {
+    const champs = { type: "pourcentage", valeur: "10", duree: "once", motif_interne: "Test" };
+    const clePremiere = await idempotenceApplication("entreprise-1", champs);
+    mocks.preautorisation = { entreprise_id: "entreprise-1", entreprise_nom: "Entreprise Test", stripe_subscription_id: "sub_test", remise_stripe_coupon_id: "coupon_test" };
+    const cleSeconde = await idempotenceApplication("entreprise-1", champs);
+    expect(clePremiere).not.toBe(cleSeconde);
+  });
+
+  it("nouvelle tentative après une compensation réussie : reprend la même clé plutôt que d'en générer une nouvelle", async () => {
+    const champs = { type: "pourcentage", valeur: "10", duree: "once", motif_interne: "Test" };
+    mocks.erreurMutation = "Écriture locale refusée";
+    const cleEchouee = await idempotenceApplication("entreprise-1", champs);
+    expect(mocks.retirerCouponAbonnement).toHaveBeenCalled();
+
+    mocks.erreurMutation = null;
+    const cleRetentee = await idempotenceApplication("entreprise-1", champs);
+    expect(cleRetentee).toBe(cleEchouee);
+  });
+});
+
 describe("retirerRemiseAction — permissions", () => {
   beforeEach(() => {
     vi.clearAllMocks();

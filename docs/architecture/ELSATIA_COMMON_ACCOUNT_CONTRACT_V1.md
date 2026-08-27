@@ -163,7 +163,7 @@ son ouverture exige aussi une session appelante AAL2. La fermeture de sa propre 
 possible sans nouvelle élévation afin de toujours permettre la fin de l'accès. Aucun email ne
 participe à cette décision. Ne jamais construire de bypass RLS silencieux.
 
-Depuis `20260826000238_platform_support_isolation_audit_v1.sql`, la liste globale des fils
+Depuis `20260826000239_platform_support_isolation_audit_v1.sql`, la liste globale des fils
 support est volontairement limitée à `entreprise_id`, nom d'entreprise, dernière date
 d'activité, nombre de non-lus et nombre total de messages. Elle ne retourne ni contenu, ni
 extrait, ni côté du dernier message, ni pièce jointe. Le contenu d'un fil n'est accessible
@@ -171,7 +171,7 @@ qu'après ouverture d'une session support AAL2 visant exactement son entreprise.
 `plateforme_support_messages()` est une lecture pure : elle n'acquitte rien, ne prolonge aucune
 session et ne crée aucun historique. L'acquittement est une mutation séparée,
 `plateforme_support_marquer_messages_lus(entreprise_id)`, auditée avec l'UID réel uniquement
-quand au moins un message non lu est effectivement modifié. Depuis la migration `00239`, une
+quand au moins un message non lu est effectivement modifié. Depuis la migration `00240`, une
 réponse plateforme exige aussi au moins un message client antérieur dans le fil ciblé ; elle ne
 peut plus créer implicitement un fil.
 

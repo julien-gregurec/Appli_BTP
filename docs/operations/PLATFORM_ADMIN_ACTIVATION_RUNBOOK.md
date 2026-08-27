@@ -90,7 +90,7 @@ sur une source identique ne crée aucun audit, et une source modifiée incrémen
 
 ## Préflight avant environnement distant
 
-Exécuter en lecture seule `PLATFORM_SECURITY_PREFLIGHT.sql` avant les migrations 234 à 239.
+Exécuter en lecture seule `PLATFORM_SECURITY_PREFLIGHT.sql` avant les migrations 234 à 240.
 Toute anomalie bloquante interdit la migration. Le contrôle détecte les applications inconnues
 dans l'historique, états incohérents, UID dupliqués, sessions orphelines, domaines d'audit
 inconnus, incohérences locales de remise, snapshots dupliqués, réponses support orphelines et
