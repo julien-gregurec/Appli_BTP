@@ -1,5 +1,7 @@
 "use client";
 
+import { useFormStatus } from "react-dom";
+
 export function RemiseConfirmButton({
   entrepriseNom,
   prixCatalogueMensuel,
@@ -9,10 +11,12 @@ export function RemiseConfirmButton({
   prixCatalogueMensuel: number;
   className?: string;
 }) {
+  const { pending } = useFormStatus();
   return (
     <button
       type="submit"
       className={className}
+      disabled={pending}
       onClick={(event) => {
         const form = event.currentTarget.form;
         if (!form) return;
@@ -44,7 +48,7 @@ export function RemiseConfirmButton({
         if (!window.confirm(message)) event.preventDefault();
       }}
     >
-      Appliquer
+      {pending ? "Application en cours…" : "Appliquer"}
     </button>
   );
 }

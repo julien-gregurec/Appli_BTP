@@ -1,12 +1,13 @@
 import { notFound } from "next/navigation";
+import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { estPlateformeAdmin, statutAbonnement, prixAbonnementMensuel, offreParCle, REDUCTION_ANNUELLE, type EntrepriseAbonnement } from "@/lib/plateforme";
 import { ajouterAdminPlateformeAction, appliquerRemiseAction, creerEntreprisePlateformeAction, entrerEntreprisePlateformeAction, enregistrerReglementPlateformeAction, genererSnapshotFacturationAction, modifierAbonnementAction, modifierTarifPostePlateformeAction, reinitialiserMotDePassePlateformeAction, retirerAdminPlateformeAction, retirerRemiseAction, signalerImpayePlateformeAction } from "@/app/actions/plateforme";
 import { AbonnementCountdown } from "@/components/AbonnementCountdown";
-import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { RemiseConfirmButton } from "@/components/RemiseConfirmButton";
+import { RemiseRetraitButton } from "@/components/RemiseRetraitButton";
 import { BRAND_NAME } from "@/lib/brand";
 
 type MembrePlateforme = { email: string; role: string; nom: string | null; ajoute_par: string | null; created_at: string };
@@ -161,6 +162,8 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
             const offre = offreParCle(e.abonnement_offre ?? e.offre_recommandee ?? "essentiel");
             const usageAppareils=appareilsParEntreprise.get(e.id)??{nb_appareils_actifs:0,nb_comptes_plus_de_deux:0,maximum_appareils_compte:0,montant_depassements_ht:0};
             const prix = prixAbonnementMensuel(comptesFacturables, offre, usageAppareils.montant_depassements_ht);
+            const operationApplicationId = randomUUID();
+            const operationRetraitId = randomUUID();
             return (
               <article key={e.id} className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -202,18 +205,18 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                         {e.remise_duree_mois && <span className="text-neutral-500">· {e.remise_duree_mois} mois</span>}
                         {e.remise_motif_interne && <span className="text-neutral-500" title={e.remise_motif_interne}>· motif interne enregistré</span>}
                         <form action={retirerRemiseAction.bind(null, e.id)}>
-                          <ConfirmSubmitButton
+                          <input type="hidden" name="operation_id" value={operationRetraitId} />
+                          <RemiseRetraitButton
                             className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
                             message={`Retirer la remise "${e.remise_description}" de ${e.nom} ? L'entreprise repassera immédiatement au tarif catalogue de ${prix.total.toLocaleString("fr-FR")} € HT/mois.`}
-                          >
-                            Retirer la remise
-                          </ConfirmSubmitButton>
+                          />
                         </form>
                       </div>
                     ):(
                       <details className="mt-2 rounded-md border border-neutral-200 p-2 text-xs dark:border-neutral-800">
                         <summary className="cursor-pointer font-medium text-neutral-600 dark:text-neutral-300">Faire une remise commerciale (geste client)</summary>
                         <form action={appliquerRemiseAction.bind(null, e.id)} className="mt-2 grid items-end gap-2 sm:grid-cols-[110px_100px_130px_100px_1fr]">
+                          <input type="hidden" name="operation_id" value={operationApplicationId} />
                           <label className="space-y-1">
                             <span className="block text-neutral-500">Type</span>
                             <select name="type" defaultValue="pourcentage" className={input}>

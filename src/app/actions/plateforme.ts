@@ -272,6 +272,7 @@ type EtatTentative =
 
 type TentativeEffetExterne = {
   tentative_id: string;
+  operation_id: string;
   generation: number;
   cle_principale: string;
   cle_compensation: string | null;
@@ -289,16 +290,33 @@ async function preparerTentative(
   entrepriseId: string,
   operation: "remise_appliquer" | "remise_retirer",
   empreinte: string,
+  operationId: string,
 ): Promise<TentativeEffetExterne> {
   const { data, error } = await supabase.rpc("plateforme_preparer_tentative_effet_externe", {
     p_entreprise_id: entrepriseId,
     p_operation: operation,
     p_empreinte: empreinte,
+    p_operation_id: operationId,
   });
   if (error) throw new Error(error.message);
   const tentative = (Array.isArray(data) ? data[0] : data) as TentativeEffetExterne | null;
   if (!tentative?.tentative_id) throw new Error("Préparation de la tentative refusée");
   return tentative;
+}
+
+const UUID_OPERATION = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const REPLAY_OPERATION_REUSSIE = Symbol("replay-operation-reussie");
+
+function lireOperationId(formData: FormData) {
+  const operationId = String(formData.get("operation_id") ?? "").trim();
+  if (!UUID_OPERATION.test(operationId)) redirect(`/plateforme?error=${encodeURIComponent("Identifiant d’opération invalide")}`);
+  return operationId;
+}
+
+function estSuccesTerminal(tentative: TentativeEffetExterne) {
+  if (tentative.etat === "sql_reussie") return true;
+  if (tentative.etat === "preparee" || tentative.etat === "stripe_reussie") return false;
+  throw new Error(`L’opération ${tentative.operation_id} est terminée en état ${tentative.etat} et ne peut pas être rejouée automatiquement`);
 }
 
 async function marquerStripeReussie(supabase: Awaited<ReturnType<typeof createClient>>, tentativeId: string, stripeObjectId: string) {
@@ -312,10 +330,12 @@ async function marquerSqlReussie(supabase: Awaited<ReturnType<typeof createClien
 }
 
 async function marquerReconciliationRequise(supabase: Awaited<ReturnType<typeof createClient>>, tentativeId: string) {
-  await supabase.rpc("plateforme_marquer_tentative_reconciliation_requise", { p_tentative_id: tentativeId }).then(
-    () => {},
-    () => {},
-  );
+  try {
+    const { error } = await supabase.rpc("plateforme_marquer_tentative_reconciliation_requise", { p_tentative_id: tentativeId });
+    return !error;
+  } catch {
+    return false;
+  }
 }
 
 async function marquerCompensationRequise(supabase: Awaited<ReturnType<typeof createClient>>, tentativeId: string): Promise<string> {
@@ -357,6 +377,7 @@ function messageEchecSynchronisation(messageSql: string, tentative: TentativeEff
 // documenté sur empreinteIntentionRemise ci-dessus).
 export async function appliquerRemiseAction(entrepriseId: string, formData: FormData) {
   if (!(await estPlateformeAdmin())) redirect("/dashboard");
+  const operationId = lireOperationId(formData);
   const type = String(formData.get("type") ?? "");
   const valeur = Number(formData.get("valeur"));
   const duree = String(formData.get("duree") ?? "");
@@ -384,21 +405,17 @@ export async function appliquerRemiseAction(entrepriseId: string, formData: Form
     const cible = await preautoriserRemise(supabase, entrepriseId, "remise_appliquer");
     if (!cible.stripe_subscription_id) throw new Error("Cette entreprise n’a pas d’abonnement Stripe actif");
 
-    // Intention métier : opération + entreprise + abonnement ciblé + remise normalisée + état
-    // attendu (coupon actif avant l'action, lu par la préautorisation). Sert uniquement à
-    // décider si une nouvelle soumission est la même tentative technique (double-clic, retry
-    // réseau, nouvelle soumission après timeout) ou une intention réellement nouvelle — jamais à
-    // dériver directement la clé Stripe (cf. empreinteIntentionRemise).
+    // L'empreinte valide que le même operation_id conserve ses paramètres immuables. L'ancien
+    // coupon est volontairement exclu : il change après le succès et casserait le replay exact.
     const empreinte = empreinteIntentionRemise([
       entrepriseId, cible.stripe_subscription_id, type, valeur.toFixed(2), duree, dureeMois ?? "", description,
-      cible.remise_stripe_coupon_id,
+      motifInterne,
     ]);
-    const tentative = await preparerTentative(supabase, entrepriseId, "remise_appliquer", empreinte);
+    const tentative = await preparerTentative(supabase, entrepriseId, "remise_appliquer", empreinte, operationId);
 
-    if (tentative.etat === "sql_reussie") {
-      // Tentative déjà pleinement convergée (retry pur après un succès complet) : rien à rejouer.
-      revalidatePath("/plateforme");
-      redirect(`/plateforme?succes=${encodeURIComponent(`Remise appliquée : ${description}`)}`);
+    if (estSuccesTerminal(tentative)) throw REPLAY_OPERATION_REUSSIE;
+    if (tentative.reutilisee && tentative.etat === "preparee") {
+      throw new Error(`L’opération ${operationId} est déjà en cours ; aucun nouvel appel Stripe n’a été émis`);
     }
 
     let couponId: string;
@@ -444,25 +461,32 @@ export async function appliquerRemiseAction(entrepriseId: string, formData: Form
     }
     await marquerSqlReussie(supabase, tentative.tentative_id);
   } catch (err) {
+    if (err === REPLAY_OPERATION_REUSSIE) {
+      revalidatePath("/plateforme");
+    } else {
     redirect(`/plateforme?error=${encodeURIComponent(err instanceof Error ? err.message : "Remise impossible")}`);
+    }
   }
 
   revalidatePath("/plateforme");
-  redirect(`/plateforme?succes=${encodeURIComponent(`Remise appliquée : ${description}`)}`);
+  redirect(`/plateforme?succes=${encodeURIComponent(`Remise appliquée : ${description} · Réf. opération ${operationId}`)}`);
 }
 
-export async function retirerRemiseAction(entrepriseId: string) {
+export async function retirerRemiseAction(entrepriseId: string, formData: FormData) {
   if (!(await estPlateformeAdmin())) redirect("/dashboard");
+  const operationId = lireOperationId(formData);
   const supabase = await createClient();
   if (isEmailLoginDisabled()) redirect(`/plateforme?error=${encodeURIComponent("Les remises Stripe exigent une session plateforme personnelle AAL2")}`);
   try {
     const cible = await preautoriserRemise(supabase, entrepriseId, "remise_retirer");
-    const empreinte = empreinteIntentionRemise([entrepriseId, cible.stripe_subscription_id, cible.remise_stripe_coupon_id]);
-    const tentative = await preparerTentative(supabase, entrepriseId, "remise_retirer", empreinte);
+    // Le coupon courant disparaît précisément lors du succès et ne fait donc pas partie de
+    // l'identité immuable de l'intention de retrait.
+    const empreinte = empreinteIntentionRemise([entrepriseId, cible.stripe_subscription_id]);
+    const tentative = await preparerTentative(supabase, entrepriseId, "remise_retirer", empreinte, operationId);
 
-    if (tentative.etat === "sql_reussie") {
-      revalidatePath("/plateforme");
-      redirect(`/plateforme?succes=${encodeURIComponent("Remise retirée")}`);
+    if (estSuccesTerminal(tentative)) throw REPLAY_OPERATION_REUSSIE;
+    if (tentative.reutilisee && tentative.etat === "preparee") {
+      throw new Error(`L’opération ${operationId} est déjà en cours ; aucun nouvel appel Stripe n’a été émis`);
     }
 
     if (!(tentative.reutilisee && tentative.etat === "stripe_reussie")) {
@@ -508,8 +532,12 @@ export async function retirerRemiseAction(entrepriseId: string) {
     }
     await marquerSqlReussie(supabase, tentative.tentative_id);
   } catch (err) {
+    if (err === REPLAY_OPERATION_REUSSIE) {
+      revalidatePath("/plateforme");
+    } else {
     redirect(`/plateforme?error=${encodeURIComponent(err instanceof Error ? err.message : "Suppression impossible")}`);
+    }
   }
   revalidatePath("/plateforme");
-  redirect(`/plateforme?succes=${encodeURIComponent("Remise retirée")}`);
+  redirect(`/plateforme?succes=${encodeURIComponent(`Remise retirée · Réf. opération ${operationId}`)}`);
 }

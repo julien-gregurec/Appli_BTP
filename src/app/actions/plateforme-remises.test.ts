@@ -9,6 +9,7 @@ function creerStripeStateful() {
   const cache = new Map<string, unknown>();
   const abonnements = new Map<string, { couponId: string | null }>();
   let compteurCoupons = 0;
+  let mutations = 0;
 
   function etatAbonnement(subscriptionId: string) {
     return abonnements.get(subscriptionId) ?? { couponId: null };
@@ -21,28 +22,38 @@ function creerStripeStateful() {
       }
       if (cache.has(params.idempotence)) return cache.get(params.idempotence);
       const resultat = { id: `coupon_${++compteurCoupons}` };
+      mutations += 1;
       cache.set(params.idempotence, resultat);
       return resultat;
     }),
     appliquerCouponAbonnement: vi.fn(async (subscriptionId: string, couponId: string, idempotence: string) => {
       if (cache.has(idempotence)) return cache.get(idempotence); // réponse mémorisée : PAS de mutation rejouée
       abonnements.set(subscriptionId, { couponId });
+      mutations += 1;
       const resultat = {};
       cache.set(idempotence, resultat);
       return resultat;
     }),
     retirerCouponAbonnement: vi.fn(async (subscriptionId: string, idempotence: string) => {
-      if (cache.has(idempotence)) return cache.get(idempotence);
+      // Stripe ne garantit pas l'idempotence des DELETE : le fake ne les met donc jamais
+      // en cache, même si le helper applicatif transmet une clé à titre documentaire.
+      void idempotence;
       abonnements.set(subscriptionId, { couponId: null });
-      const resultat = {};
-      cache.set(idempotence, resultat);
-      return resultat;
+      mutations += 1;
+      return {};
     }),
     recupererAbonnementStripe: vi.fn(async (subscriptionId: string) => {
       const etat = etatAbonnement(subscriptionId);
       return { id: subscriptionId, status: "active", discounts: etat.couponId ? [{ id: `di_${etat.couponId}` }] : [] };
     }),
     _etatAbonnement: etatAbonnement,
+    _nombreMutations: () => mutations,
+    _reset() {
+      cache.clear();
+      abonnements.clear();
+      compteurCoupons = 0;
+      mutations = 0;
+    },
   };
 }
 
@@ -53,7 +64,7 @@ function creerStripeStateful() {
 // refuse toute nouvelle tentative automatique.
 type EtatTentative = "preparee" | "stripe_reussie" | "sql_reussie" | "compensation_requise" | "compensee" | "compensation_echouee" | "reconciliation_requise";
 type TentativeInterne = {
-  id: string; entrepriseId: string; operation: string; empreinte: string; generation: number;
+  id: string; entrepriseId: string; operationId: string; operation: string; empreinte: string; generation: number;
   etat: EtatTentative; clePrincipale: string; cleCompensation: string | null; stripeObjectId: string | null;
 };
 
@@ -66,33 +77,41 @@ function creerRegistreTentatives() {
   }
 
   return {
-    preparer(entrepriseId: string, operation: string, empreinte: string) {
+    preparer(entrepriseId: string, operation: string, empreinte: string, operationId: string) {
+      const memeOperation = tentatives.find((t) => t.entrepriseId === entrepriseId && t.operationId === operationId);
+      if (memeOperation) {
+        if (memeOperation.operation !== operation || memeOperation.empreinte !== empreinte) {
+          throw new Error("Identifiant d'opération déjà utilisé pour une autre intention");
+        }
+        return { tentative_id: memeOperation.id, operation_id: memeOperation.operationId, generation: memeOperation.generation, cle_principale: memeOperation.clePrincipale, cle_compensation: memeOperation.cleCompensation, etat: memeOperation.etat, stripe_object_id: memeOperation.stripeObjectId, reutilisee: true };
+      }
       const existante = active(entrepriseId, operation);
       if (existante) {
         if (existante.etat === "compensation_echouee" || existante.etat === "reconciliation_requise") {
           throw new Error("Réconciliation manuelle requise avant toute nouvelle tentative sur cette entreprise");
         }
-        if (existante.empreinte !== empreinte) {
-          throw new Error("Une tentative différente est déjà en cours pour cette entreprise");
-        }
-        return { tentative_id: existante.id, generation: existante.generation, cle_principale: existante.clePrincipale, cle_compensation: existante.cleCompensation, etat: existante.etat, stripe_object_id: existante.stripeObjectId, reutilisee: true };
+        throw new Error("Une autre opération est déjà en cours pour cette entreprise");
       }
       const generation = Math.max(0, ...tentatives.filter((t) => t.entrepriseId === entrepriseId && t.operation === operation).map((t) => t.generation)) + 1;
       const id = `tentative_${++compteur}`;
       const suffixe = operation === "remise_appliquer" ? "apply" : "retire";
-      const clePrincipale = `remise:${id}:g${generation}:${suffixe}`;
-      tentatives.push({ id, entrepriseId, operation, empreinte, generation, etat: "preparee", clePrincipale, cleCompensation: null, stripeObjectId: null });
-      return { tentative_id: id, generation, cle_principale: clePrincipale, cle_compensation: null, etat: "preparee", stripe_object_id: null, reutilisee: false };
+      const clePrincipale = `remise:${operationId}:g${generation}:${suffixe}`;
+      tentatives.push({ id, entrepriseId, operationId, operation, empreinte, generation, etat: "preparee", clePrincipale, cleCompensation: null, stripeObjectId: null });
+      return { tentative_id: id, operation_id: operationId, generation, cle_principale: clePrincipale, cle_compensation: null, etat: "preparee", stripe_object_id: null, reutilisee: false };
     },
     marquerStripeReussie(id: string, stripeObjectId: string) {
       const t = tentatives.find((t) => t.id === id);
-      if (!t || t.etat !== "preparee") throw new Error("Tentative introuvable ou état incompatible");
+      if (!t) throw new Error("Tentative introuvable ou état incompatible");
+      if ((t.etat === "stripe_reussie" || t.etat === "sql_reussie") && t.stripeObjectId === stripeObjectId) return;
+      if (t.etat !== "preparee") throw new Error("Tentative introuvable ou état incompatible");
       t.etat = "stripe_reussie";
       t.stripeObjectId = stripeObjectId;
     },
     marquerSqlReussie(id: string) {
       const t = tentatives.find((t) => t.id === id);
-      if (!t || t.etat !== "stripe_reussie") throw new Error("Tentative introuvable ou état incompatible");
+      if (!t) throw new Error("Tentative introuvable ou état incompatible");
+      if (t.etat === "sql_reussie") return;
+      if (t.etat !== "stripe_reussie") throw new Error("Tentative introuvable ou état incompatible");
       t.etat = "sql_reussie";
     },
     marquerCompensationRequise(id: string) {
@@ -113,6 +132,10 @@ function creerRegistreTentatives() {
       t.etat = "reconciliation_requise";
     },
     _tentatives: tentatives,
+    _reset() {
+      tentatives.length = 0;
+      compteur = 0;
+    },
   };
 }
 
@@ -146,15 +169,28 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({ rpc
 
 const { appliquerRemiseAction, retirerRemiseAction } = await import("./plateforme");
 
-function formulaireRemise(champs: Record<string, string>) {
+let compteurOperations = 0;
+function nouvelOperationId() {
+  compteurOperations += 1;
+  return `10000000-0000-4000-8000-${String(compteurOperations).padStart(12, "0")}`;
+}
+
+function formulaireRemise(champs: Record<string, string>, operationId = nouvelOperationId()) {
   const formData = new FormData();
+  formData.set("operation_id", operationId);
   for (const [cle, valeur] of Object.entries(champs)) formData.set(cle, valeur);
   return formData;
 }
 
+function formulaireOperation(operationId = nouvelOperationId()) {
+  return formulaireRemise({}, operationId);
+}
+
 function reinitialiser() {
   vi.clearAllMocks();
-  registre._tentatives.length = 0;
+  stripe._reset();
+  registre._reset();
+  compteurOperations = 0;
   mocks.estPlateformeAdmin.mockResolvedValue(true);
   mocks.erreurPreautorisation = null;
   mocks.erreurMutation = null;
@@ -167,7 +203,7 @@ function reinitialiser() {
             ? { data: null, error: { message: mocks.erreurPreautorisation } }
             : { data: [mocks.preautorisation], error: null };
         case "plateforme_preparer_tentative_effet_externe":
-          return { data: [registre.preparer(parametres!.p_entreprise_id as string, parametres!.p_operation as string, parametres!.p_empreinte as string)], error: null };
+          return { data: [registre.preparer(parametres!.p_entreprise_id as string, parametres!.p_operation as string, parametres!.p_empreinte as string, parametres!.p_operation_id as string)], error: null };
         case "plateforme_marquer_tentative_stripe_reussie":
           registre.marquerStripeReussie(parametres!.p_tentative_id as string, parametres!.p_stripe_object_id as string);
           return { data: null, error: null };
@@ -201,6 +237,16 @@ function reinitialiser() {
 
 describe("appliquerRemiseAction — permissions et validation", () => {
   beforeEach(reinitialiser);
+
+  it("refuse un formulaire sans operation_id stable avant tout appel Stripe", async () => {
+    const formData = new FormData();
+    formData.set("type", "pourcentage");
+    formData.set("valeur", "10");
+    formData.set("duree", "once");
+    formData.set("motif_interne", "Test");
+    await expect(appliquerRemiseAction("entreprise-1", formData)).rejects.toThrow(/REDIRECT:\/plateforme\?error=/);
+    expect(stripe.creerCouponRemise).not.toHaveBeenCalled();
+  });
 
   it("refuse un utilisateur non plateforme-admin sans jamais appeler Stripe", async () => {
     mocks.estPlateformeAdmin.mockResolvedValue(false);
@@ -255,8 +301,8 @@ describe("appliquerRemiseAction — flux nominal", () => {
     const formData = formulaireRemise({ type: "pourcentage", valeur: "10", duree: "repeating", duree_mois: "3", motif_interne: "Client pilote" });
     await expect(appliquerRemiseAction("entreprise-1", formData)).rejects.toThrow(/REDIRECT:\/plateforme\?succes=/);
 
-    expect(stripe.creerCouponRemise).toHaveBeenCalledWith(expect.objectContaining({ type: "pourcentage", valeur: 10, duree: "repeating", dureeMois: 3, idempotence: expect.stringMatching(/^remise:tentative_\d+:g1:apply:coupon$/) }));
-    expect(stripe.appliquerCouponAbonnement).toHaveBeenCalledWith("sub_test", "coupon_1", expect.stringMatching(/^remise:tentative_\d+:g1:apply:abonnement$/));
+    expect(stripe.creerCouponRemise).toHaveBeenCalledWith(expect.objectContaining({ type: "pourcentage", valeur: 10, duree: "repeating", dureeMois: 3, idempotence: expect.stringMatching(/^remise:[0-9a-f-]+:g1:apply:coupon$/) }));
+    expect(stripe.appliquerCouponAbonnement).toHaveBeenCalledWith("sub_test", "coupon_1", expect.stringMatching(/^remise:[0-9a-f-]+:g1:apply:abonnement$/));
     expect(mocks.rpc).toHaveBeenCalledWith("plateforme_appliquer_remise", {
       p_entreprise_id: "entreprise-1", p_coupon_id: "coupon_1", p_description: "10 % pendant 3 mois",
       p_motif_interne: "Client pilote", p_duree_mois: 3, p_type: "pourcentage", p_valeur: 10,
@@ -285,21 +331,111 @@ describe("appliquerRemiseAction — flux nominal", () => {
   });
 });
 
+describe("idempotence métier de bout en bout", () => {
+  beforeEach(reinitialiser);
+
+  const champsOnce = { type: "pourcentage", valeur: "10", duree: "once", motif_interne: "Geste unique" };
+
+  it("succès complet puis réponse HTTP perdue : le même operation_id retrouve sql_reussie sans aucun second effet", async () => {
+    const operationId = nouvelOperationId();
+    const formData = formulaireRemise(champsOnce, operationId);
+
+    await expect(appliquerRemiseAction("entreprise-1", formData)).rejects.toThrow(/REDIRECT:\/plateforme\?succes=/);
+    const premiereDestination = mocks.redirect.mock.calls.at(-1)?.[0];
+    const appelsCoupon = stripe.creerCouponRemise.mock.calls.length;
+    const appelsApplication = stripe.appliquerCouponAbonnement.mock.calls.length;
+    const appelsSql = mocks.rpc.mock.calls.filter(([nom]) => nom === "plateforme_appliquer_remise").length;
+    const mutationsStripe = stripe._nombreMutations();
+
+    // La première réponse est réputée perdue : le navigateur renvoie le même FormData.
+    await expect(appliquerRemiseAction("entreprise-1", formData)).rejects.toThrow(/REDIRECT:\/plateforme\?succes=/);
+
+    expect(mocks.redirect.mock.calls.at(-1)?.[0]).toBe(premiereDestination);
+    expect(registre._tentatives).toHaveLength(1);
+    expect(registre._tentatives[0]).toMatchObject({ operationId, generation: 1, etat: "sql_reussie", stripeObjectId: "coupon_1" });
+    expect(stripe.creerCouponRemise).toHaveBeenCalledTimes(appelsCoupon);
+    expect(stripe.appliquerCouponAbonnement).toHaveBeenCalledTimes(appelsApplication);
+    expect(stripe._nombreMutations()).toBe(mutationsStripe);
+    expect(mocks.rpc.mock.calls.filter(([nom]) => nom === "plateforme_appliquer_remise")).toHaveLength(appelsSql);
+    expect(stripe._etatAbonnement("sub_test").couponId).toBe("coupon_1");
+  });
+
+  it("mêmes paramètres mais nouvel operation_id : crée une nouvelle intention légitime et une nouvelle génération", async () => {
+    await appliquerRemiseAction("entreprise-1", formulaireRemise(champsOnce, nouvelOperationId())).catch(() => {});
+    await appliquerRemiseAction("entreprise-1", formulaireRemise(champsOnce, nouvelOperationId())).catch(() => {});
+
+    expect(registre._tentatives).toHaveLength(2);
+    expect(registre._tentatives.map((t) => t.generation)).toEqual([1, 2]);
+    expect(stripe.creerCouponRemise).toHaveBeenCalledTimes(2);
+    expect(stripe._etatAbonnement("sub_test").couponId).toBe("coupon_2");
+  });
+
+  it("deux requêtes concurrentes avec le même operation_id produisent une ligne et une seule mutation Stripe logique", async () => {
+    const operationId = nouvelOperationId();
+    const formData = formulaireRemise(champsOnce, operationId);
+    const resultats = await Promise.allSettled([
+      appliquerRemiseAction("entreprise-1", formData),
+      appliquerRemiseAction("entreprise-1", formData),
+    ]);
+
+    expect(resultats).toHaveLength(2);
+    expect(registre._tentatives).toHaveLength(1);
+    expect(registre._tentatives[0]).toMatchObject({ operationId, generation: 1, etat: "sql_reussie" });
+    expect(stripe._nombreMutations()).toBe(2); // création POST + application POST, chacune dédupliquée
+    expect(stripe.creerCouponRemise).toHaveBeenCalledTimes(1);
+    expect(stripe.appliquerCouponAbonnement).toHaveBeenCalledTimes(1);
+    expect(stripe._etatAbonnement("sub_test").couponId).toBe("coupon_1");
+  });
+
+  it("un retry explicite d'une tentative déjà sql_reussie ne crée aucune génération", async () => {
+    const operationId = nouvelOperationId();
+    const formData = formulaireRemise(champsOnce, operationId);
+    await appliquerRemiseAction("entreprise-1", formData).catch(() => {});
+    expect(registre._tentatives[0].etat).toBe("sql_reussie");
+    await appliquerRemiseAction("entreprise-1", formData).catch(() => {});
+    expect(registre._tentatives.map((t) => t.generation)).toEqual([1]);
+  });
+
+  it("un retry du même operation_id après compensation reste terminal et exige une nouvelle opération", async () => {
+    const operationId = nouvelOperationId();
+    const formData = formulaireRemise(champsOnce, operationId);
+    mocks.erreurMutation = "Écriture locale refusée";
+    await appliquerRemiseAction("entreprise-1", formData).catch(() => {});
+    expect(registre._tentatives[0].etat).toBe("compensee");
+    const mutations = stripe._nombreMutations();
+
+    mocks.erreurMutation = null;
+    await expect(appliquerRemiseAction("entreprise-1", formData)).rejects.toThrow(/REDIRECT:\/plateforme\?error=/);
+    expect(registre._tentatives).toHaveLength(1);
+    expect(stripe._nombreMutations()).toBe(mutations);
+  });
+
+  it("le fake DELETE ne mémorise jamais une clé d'idempotence", async () => {
+    await stripe.appliquerCouponAbonnement("sub_test", "coupon_test", "setup-post");
+    await stripe.retirerCouponAbonnement("sub_test", "meme-cle-delete");
+    await stripe.appliquerCouponAbonnement("sub_test", "coupon_test", "nouveau-post");
+    await stripe.retirerCouponAbonnement("sub_test", "meme-cle-delete");
+    expect(stripe._etatAbonnement("sub_test").couponId).toBeNull();
+    expect(stripe.retirerCouponAbonnement).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("clés Stripe : ancrées sur la tentative durable, jamais sur les seuls paramètres métier", () => {
   beforeEach(reinitialiser);
 
-  async function idempotenceApplication(entrepriseId: string, champs: Record<string, string>) {
-    await appliquerRemiseAction(entrepriseId, formulaireRemise(champs)).catch(() => {});
+  async function idempotenceApplication(entrepriseId: string, champs: Record<string, string>, operationId?: string) {
+    await appliquerRemiseAction(entrepriseId, formulaireRemise(champs, operationId)).catch(() => {});
     const dernierAppel = stripe.creerCouponRemise.mock.calls.at(-1)?.[0] as { idempotence: string };
     return dernierAppel.idempotence;
   }
 
   it("double soumission de la même intention avant toute réponse Stripe confirmée : même tentative, même clé", async () => {
     const champs = { type: "pourcentage", valeur: "10", duree: "once", motif_interne: "Test" };
+    const operationId = nouvelOperationId();
     mocks.erreurMutation = "Écriture locale refusée"; // empêche sql_reussie : la tentative reste réutilisable
-    const cle1 = await idempotenceApplication("entreprise-1", champs);
+    const cle1 = await idempotenceApplication("entreprise-1", champs, operationId);
     registre._tentatives[0].etat = "preparee"; // simule un retry avant toute confirmation Stripe (réseau coupé avant coupon créé)
-    const cle2 = await idempotenceApplication("entreprise-1", champs);
+    const cle2 = await idempotenceApplication("entreprise-1", champs, operationId);
     expect(cle1).toBe(cle2);
   });
 
@@ -323,7 +459,7 @@ describe("clés Stripe : ancrées sur la tentative durable, jamais sur les seuls
     const champs = { type: "pourcentage", valeur: "10", duree: "once", motif_interne: "Test" };
     const cleApplication = await idempotenceApplication("entreprise-1", champs);
     mocks.preautorisation = { ...mocks.preautorisation, remise_stripe_coupon_id: "coupon_1" };
-    await retirerRemiseAction("entreprise-1").catch(() => {});
+    await retirerRemiseAction("entreprise-1", formulaireOperation()).catch(() => {});
     const cleRetrait = stripe.retirerCouponAbonnement.mock.calls.at(-1)?.[1] as string;
     expect(cleRetrait).not.toBe(cleApplication);
     expect(cleRetrait).toMatch(/:retire:retrait$/);
@@ -380,7 +516,7 @@ describe("RÉGRESSION (revue indépendante Codex sur 83466b2) — plus de désyn
     mocks.preautorisation = { entreprise_id: "entreprise-1", entreprise_nom: "Entreprise Test", stripe_subscription_id: "sub_test", remise_stripe_coupon_id: "coupon_ancien" };
 
     mocks.erreurMutation = "Écriture locale refusée";
-    await retirerRemiseAction("entreprise-1").catch(() => {});
+    await retirerRemiseAction("entreprise-1", formulaireOperation()).catch(() => {});
 
     // Sous 83466b2, la compensation appelait `appliquerCouponAbonnement(sub, couponAncien)` avec
     // la clé STATIQUE `remise-application-sub_test-coupon_ancien` — exactement celle qui avait
@@ -409,25 +545,36 @@ describe("retirerRemiseAction — permissions et flux nominal", () => {
 
   it("refuse un utilisateur non plateforme-admin sans jamais appeler Stripe", async () => {
     mocks.estPlateformeAdmin.mockResolvedValue(false);
-    await expect(retirerRemiseAction("entreprise-1")).rejects.toThrow("REDIRECT:/dashboard");
+    await expect(retirerRemiseAction("entreprise-1", formulaireOperation())).rejects.toThrow("REDIRECT:/dashboard");
     expect(stripe.retirerCouponAbonnement).not.toHaveBeenCalled();
   });
 
   it("retire le coupon Stripe puis appelle le RPC plateforme_retirer_remise", async () => {
-    await expect(retirerRemiseAction("entreprise-1")).rejects.toThrow(/REDIRECT:\/plateforme\?succes=/);
+    await expect(retirerRemiseAction("entreprise-1", formulaireOperation())).rejects.toThrow(/REDIRECT:\/plateforme\?succes=/);
     expect(stripe.retirerCouponAbonnement).toHaveBeenCalledWith("sub_test", expect.stringMatching(/:retire:retrait$/));
     expect(mocks.rpc).toHaveBeenCalledWith("plateforme_retirer_remise", { p_entreprise_id: "entreprise-1" });
   });
 
+  it("deux retraits concurrents du même operation_id n'émettent qu'un DELETE Stripe", async () => {
+    const formData = formulaireOperation(nouvelOperationId());
+    await Promise.allSettled([
+      retirerRemiseAction("entreprise-1", formData),
+      retirerRemiseAction("entreprise-1", formData),
+    ]);
+    expect(stripe.retirerCouponAbonnement).toHaveBeenCalledTimes(1);
+    expect(registre._tentatives).toHaveLength(1);
+    expect(registre._tentatives[0].etat).toBe("sql_reussie");
+  });
+
   it("n'appelle jamais Stripe quand la préautorisation de retrait est refusée", async () => {
     mocks.erreurPreautorisation = "AAL2 requis";
-    await expect(retirerRemiseAction("entreprise-1")).rejects.toThrow(/REDIRECT:\/plateforme\?error=/);
+    await expect(retirerRemiseAction("entreprise-1", formulaireOperation())).rejects.toThrow(/REDIRECT:\/plateforme\?error=/);
     expect(stripe.retirerCouponAbonnement).not.toHaveBeenCalled();
   });
 
   it("restaure la remise Stripe précédente si le retrait local échoue, et confirme la restauration par lecture réelle", async () => {
     mocks.erreurMutation = "Écriture locale refusée";
-    await expect(retirerRemiseAction("entreprise-1")).rejects.toThrow(/Synchronisation%20Stripe/);
+    await expect(retirerRemiseAction("entreprise-1", formulaireOperation())).rejects.toThrow(/Synchronisation%20Stripe/);
     expect(stripe.appliquerCouponAbonnement).toHaveBeenCalledWith("sub_test", "coupon_test", expect.stringMatching(/:compensate$/));
     expect(stripe.recupererAbonnementStripe).toHaveBeenCalledWith("sub_test");
     expect(registre._tentatives.at(-1)?.etat).toBe("compensee");
@@ -436,7 +583,7 @@ describe("retirerRemiseAction — permissions et flux nominal", () => {
   it("rien à compenser côté Stripe quand il n'y avait pas de coupon actif avant le retrait", async () => {
     mocks.preautorisation = { entreprise_id: "entreprise-1", entreprise_nom: "Entreprise Test", stripe_subscription_id: "sub_test", remise_stripe_coupon_id: null };
     mocks.erreurMutation = "Écriture locale refusée";
-    await expect(retirerRemiseAction("entreprise-1")).rejects.toThrow(/Synchronisation%20Stripe/);
+    await expect(retirerRemiseAction("entreprise-1", formulaireOperation())).rejects.toThrow(/Synchronisation%20Stripe/);
     expect(stripe.retirerCouponAbonnement).not.toHaveBeenCalled();
     expect(stripe.appliquerCouponAbonnement).not.toHaveBeenCalled();
     expect(registre._tentatives.at(-1)?.etat).toBe("compensee");
