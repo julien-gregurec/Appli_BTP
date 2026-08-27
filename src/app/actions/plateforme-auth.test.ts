@@ -16,7 +16,9 @@ vi.mock("@/lib/plateforme", () => ({ estPlateformeAdmin: vi.fn(async () => true)
 vi.mock("@/lib/brand", () => ({ BRAND: { urlPublique: mocks.urlCanonique } }));
 vi.mock("@/lib/stripe-abonnement", () => ({
   appliquerCouponAbonnement: vi.fn(),
+  couponActifDepuisAbonnement: vi.fn(),
   creerCouponRemise: vi.fn(),
+  recupererAbonnementStripe: vi.fn(),
   retirerCouponAbonnement: vi.fn(),
   TYPES_REMISE: [],
   DUREES_REMISE: [],

@@ -39,7 +39,7 @@ export type StripeSubscription = {
   cancel_at_period_end?: boolean;
   metadata?: Record<string, string>;
   items?: { data?: Array<{ id: string; quantity?: number; price?: { id?: string } }> };
-  discounts?: Array<string | { id?: string }> | null;
+  discounts?: Array<string | { id?: string; coupon?: string | { id?: string }; source?: { coupon?: string | { id?: string } } }> | null;
 };
 
 const VARIABLES_PRIX: Partial<Record<OffreAbonnement, Record<PeriodiciteAbonnement, string>>> = {
@@ -239,7 +239,7 @@ type StripeCoupon = { id: string; name?: string | null };
 // l'abonnement de base d'une entreprise cliente. Un coupon par entreprise a la fois :
 // en appliquer un nouveau remplace l'ancien cote Stripe (comportement natif de
 // `subscriptions.update` avec le parametre coupon).
-export async function creerCouponRemise(params: { type: TypeRemise; valeur: number; duree: DureeRemise; dureeMois?: number; nom: string }) {
+export async function creerCouponRemise(params: { type: TypeRemise; valeur: number; duree: DureeRemise; dureeMois?: number; nom: string; cleIdempotence?: string }) {
   const corps = new URLSearchParams({ name: params.nom, duration: params.duree });
   if (params.type === "montant") {
     corps.set("amount_off", String(Math.round(params.valeur * 100)));
@@ -251,7 +251,7 @@ export async function creerCouponRemise(params: { type: TypeRemise; valeur: numb
     if (!params.dureeMois || params.dureeMois < 1) throw new Error("Le nombre de mois est obligatoire pour une remise limitée dans le temps");
     corps.set("duration_in_months", String(params.dureeMois));
   }
-  return requeteStripe<StripeCoupon>("coupons", { corps, idempotence: `remise-coupon-${Date.now()}-${Math.random().toString(36).slice(2)}` });
+  return requeteStripe<StripeCoupon>("coupons", { corps, idempotence: params.cleIdempotence ?? `remise-coupon-${Date.now()}-${Math.random().toString(36).slice(2)}` });
 }
 
 // Le compte Stripe de la plateforme fonctionne en billing_mode "flexible" : le paramètre
@@ -261,18 +261,25 @@ export async function creerCouponRemise(params: { type: TypeRemise; valeur: numb
 // actif à la fois, comme avec l'ancien paramètre `coupon`. La remise ainsi posée s'applique
 // au prorata sur TOUTES les lignes de la facture (abonnement de base + éventuelle ligne
 // "comptes supplémentaires"), pas seulement sur le prix catalogue de l'offre.
-export async function appliquerCouponAbonnement(subscriptionId: string, couponId: string) {
+export async function appliquerCouponAbonnement(subscriptionId: string, couponId: string, cleIdempotence?: string) {
   return requeteStripe<StripeSubscription>(`subscriptions/${encodeURIComponent(subscriptionId)}`, {
     corps: new URLSearchParams({ "discounts[0][coupon]": couponId }),
-    idempotence: `remise-application-${subscriptionId}-${couponId}`,
+    idempotence: cleIdempotence ?? `remise-application-${subscriptionId}-${couponId}`,
   });
 }
 
 export async function retirerCouponAbonnement(subscriptionId: string) {
   return requeteStripe<StripeSubscription>(`subscriptions/${encodeURIComponent(subscriptionId)}/discount`, {
     methode: "DELETE",
-    idempotence: `remise-suppression-${subscriptionId}-${Date.now()}`,
   });
+}
+
+export function couponActifDepuisAbonnement(abonnement: StripeSubscription): string | null {
+  const remise = abonnement.discounts?.[0];
+  if (!remise || typeof remise === "string") return null;
+  const source = remise.source?.coupon ?? remise.coupon;
+  if (typeof source === "string") return source;
+  return source?.id ?? null;
 }
 
 // La remise commerciale (coupon Stripe) peut expirer naturellement côté Stripe (durée "once"

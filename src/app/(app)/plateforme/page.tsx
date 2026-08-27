@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
@@ -202,6 +203,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                         {e.remise_duree_mois && <span className="text-neutral-500">· {e.remise_duree_mois} mois</span>}
                         {e.remise_motif_interne && <span className="text-neutral-500" title={e.remise_motif_interne}>· motif interne enregistré</span>}
                         <form action={retirerRemiseAction.bind(null, e.id)}>
+                          <input type="hidden" name="intention_id" value={randomUUID()} />
                           <ConfirmSubmitButton
                             className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
                             message={`Retirer la remise "${e.remise_description}" de ${e.nom} ? L'entreprise repassera immédiatement au tarif catalogue de ${prix.total.toLocaleString("fr-FR")} € HT/mois.`}
@@ -214,6 +216,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                       <details className="mt-2 rounded-md border border-neutral-200 p-2 text-xs dark:border-neutral-800">
                         <summary className="cursor-pointer font-medium text-neutral-600 dark:text-neutral-300">Faire une remise commerciale (geste client)</summary>
                         <form action={appliquerRemiseAction.bind(null, e.id)} className="mt-2 grid items-end gap-2 sm:grid-cols-[110px_100px_130px_100px_1fr]">
+                          <input type="hidden" name="intention_id" value={randomUUID()} />
                           <label className="space-y-1">
                             <span className="block text-neutral-500">Type</span>
                             <select name="type" defaultValue="pourcentage" className={input}>
