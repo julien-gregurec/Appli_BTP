@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@elsatia/application-access": ["./packages/application-access/src/index.ts"]
     }
   },
   "include": [
