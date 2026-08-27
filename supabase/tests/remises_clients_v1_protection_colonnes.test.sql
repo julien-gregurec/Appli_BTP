@@ -17,25 +17,7 @@ select plan(4);
 update public.plateforme_admins set utilisateur_id = '30000000-0000-0000-0000-000000000001', actif = true, role = coalesce(role, 'total')
 where email = 'plateforme@invalid.local';
 
--- Valeur de départ connue via le chemin officiel. Un admin plateforme n'a volontairement
--- aucun bypass RLS direct sur les données d'une entreprise cliente : la fonction security
--- definer contrôlée est le seul chemin autorisé pour accorder une remise.
-set local role authenticated;
-select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000001', true);
-select set_config('request.jwt.claim.email', 'plateforme@invalid.local', true);
-select set_config(
-  'request.jwt.claims',
-  '{"sub":"30000000-0000-0000-0000-000000000001","email":"plateforme@invalid.local","role":"authenticated","aal":"aal2"}',
-  true
-);
-select public.plateforme_appliquer_remise(
-  'a0000000-0000-0000-0000-000000000001',
-  'coupon-test-initial',
-  'valeur initiale'
-);
-
 -- ===== Admin A (membre actif, PAS admin plateforme) =====
-reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000001', true);
 select set_config('request.jwt.claim.email', 'admin-a@invalid.local', true);
@@ -47,11 +29,11 @@ select lives_ok(
 
 select is(
   (select remise_description from public.entreprises where id = 'a0000000-0000-0000-0000-000000000001'),
-  'valeur initiale',
+  null,
   '2. ...mais la colonne remise_description reste inchangée (silencieusement réinitialisée par le trigger)'
 );
 
--- ===== Admin plateforme =====
+-- ===== Admin plateforme : le raccourci historique est fermé =====
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000001', true);
@@ -62,13 +44,14 @@ select set_config(
   true
 );
 
-select lives_ok(
+select throws_like(
   $$select public.plateforme_appliquer_remise(
       'a0000000-0000-0000-0000-000000000001',
       'coupon-test-final',
       'remise accordée par la plateforme'
     )$$,
-  '3. Un admin plateforme peut modifier remise_description via la RPC officielle'
+  '%permission denied%',
+  '3. Même un admin plateforme AAL2 ne peut plus contourner la saga'
 );
 
 -- La session admin plateforme n'a volontairement aucune policy SELECT cross-tenant sur
@@ -77,8 +60,8 @@ select lives_ok(
 reset role;
 select is(
   (select remise_description from public.entreprises where id = 'a0000000-0000-0000-0000-000000000001'),
-  'remise accordée par la plateforme',
-  '4. La modification par un admin plateforme est bien appliquée'
+  null,
+  '4. La tentative legacy refusée ne modifie aucune remise'
 );
 
 select * from finish();

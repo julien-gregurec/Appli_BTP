@@ -277,13 +277,13 @@ select throws_like(
 );
 select throws_like(
   $$select public.plateforme_appliquer_remise('ffffffff-ffff-4fff-8fff-ffffffffffff','coupon-test','Test',null,null,null,null)$$,
-  '%Entreprise introuvable%',
-  'facturation : remise sur entreprise inexistante refusée'
+  '%permission denied%',
+  'facturation : raccourci legacy d’application fermé'
 );
 select throws_like(
   $$select public.plateforme_retirer_remise('ffffffff-ffff-4fff-8fff-ffffffffffff')$$,
-  '%Entreprise introuvable%',
-  'facturation : retrait de remise sur entreprise inexistante refusé'
+  '%permission denied%',
+  'facturation : raccourci legacy de retrait fermé'
 );
 select is((select count(*) from public.historique_mutations_plateforme where domaine='facturation'),0::bigint,'cibles inexistantes : aucun faux historique facturation');
 select is(public.plateforme_modifier_abonnement('a0000000-0000-0000-0000-000000000001','actif',current_date,'Audit facturation'),true,'abonnement réel : modification appliquée');
