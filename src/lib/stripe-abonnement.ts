@@ -261,10 +261,14 @@ export async function creerCouponRemise(params: { type: TypeRemise; valeur: numb
 // actif à la fois, comme avec l'ancien paramètre `coupon`. La remise ainsi posée s'applique
 // au prorata sur TOUTES les lignes de la facture (abonnement de base + éventuelle ligne
 // "comptes supplémentaires"), pas seulement sur le prix catalogue de l'offre.
-export async function appliquerCouponAbonnement(subscriptionId: string, couponId: string) {
+export async function appliquerCouponAbonnement(
+  subscriptionId: string,
+  couponId: string,
+  idempotence = `remise-application-${subscriptionId}-${couponId}`,
+) {
   return requeteStripe<StripeSubscription>(`subscriptions/${encodeURIComponent(subscriptionId)}`, {
     corps: new URLSearchParams({ "discounts[0][coupon]": couponId }),
-    idempotence: `remise-application-${subscriptionId}-${couponId}`,
+    idempotence,
   });
 }
 

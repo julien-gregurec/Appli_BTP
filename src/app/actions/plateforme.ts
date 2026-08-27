@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { estPlateformeAdmin } from "@/lib/plateforme";
 import { ERREUR_CONFIGURATION_URL_AUTH, urlCallbackReinitialisation } from "@/lib/auth-redirects";
-import { appliquerCouponAbonnement, creerCouponRemise, retirerCouponAbonnement, TYPES_REMISE, DUREES_REMISE, type DureeRemise, type TypeRemise } from "@/lib/stripe-abonnement";
+import { appliquerCouponAbonnement, creerCouponRemise, recupererAbonnementStripe, retirerCouponAbonnement, TYPES_REMISE, DUREES_REMISE, type DureeRemise, type TypeRemise } from "@/lib/stripe-abonnement";
 
 export async function modifierAbonnementAction(entrepriseId: string, formData: FormData) {
   if (!(await estPlateformeAdmin())) {
@@ -226,16 +226,24 @@ type CibleRemisePreautorisee = {
   remise_stripe_coupon_id: string | null;
 };
 
-// Clé déterministe : dérivée uniquement de l'intention métier (opération, entreprise, cible
-// Stripe, paramètres normalisés de la remise, état attendu avant l'action), jamais d'un aléa
-// généré à chaque soumission. Deux soumissions dupliquées de la même intention (double-clic,
-// retry réseau du même Server Action, nouvelle tentative après timeout) produisent ainsi la
-// même clé et sont dédupliquées par Stripe ; deux remises réellement différentes (entreprise,
-// type, valeur, durée ou état antérieur distincts) produisent des clés distinctes. Ne jamais
-// réintroduire ici Date.now(), Math.random() ou un randomUUID() recréé à chaque appel.
-function cleIdempotenceRemise(prefixe: string, valeurs: Array<string | number | null | undefined>) {
-  const empreinte = createHash("sha256").update(valeurs.map((valeur) => String(valeur ?? "")).join("\u001f")).digest("hex").slice(0, 40);
-  return `${prefixe}-${empreinte}`;
+// Empreinte de l'INTENTION métier (opération, entreprise, abonnement ciblé, remise normalisée,
+// état attendu avant l'action) — jamais d'un aléa par soumission (Date.now(), Math.random(),
+// randomUUID() recréé à chaque appel).
+//
+// CORRECTIF (revue indépendante Codex sur 83466b2) : cette empreinte servait auparavant
+// DIRECTEMENT de clé Stripe. Un même couple (abonnement, coupon) pouvant légitimement
+// réapparaître deux fois dans la même fenêtre de 24h avec des issues différentes (application
+// réelle, puis restauration par compensation après un échec SQL ultérieur, ou nouvelle
+// application après compensation complète), Stripe pouvait renvoyer la réponse mémorisée de la
+// PREMIÈRE occurrence sans rejouer la mutation réelle de la seconde — désynchronisant Stripe et
+// Postgres. L'empreinte ne sert plus qu'à décider, côté Postgres
+// (plateforme_preparer_tentative_effet_externe), si une nouvelle soumission est la même
+// tentative technique qu'une tentative déjà en cours, ou une intention réellement nouvelle. La
+// clé Stripe réelle est toujours dérivée d'une tentative durable (identifiant Postgres +
+// génération), jamais recalculée depuis ces seuls paramètres.
+function empreinteIntentionRemise(valeurs: Array<string | number | null | undefined>) {
+  const separateur = String.fromCharCode(31);
+  return createHash("sha256").update(valeurs.map((valeur) => String(valeur ?? "")).join(separateur)).digest("hex").slice(0, 40);
 }
 
 async function preautoriserRemise(
@@ -253,22 +261,87 @@ async function preautoriserRemise(
   return cible;
 }
 
-async function journaliserEchecSynchronisationRemise(
+type EtatTentative =
+  | "preparee"
+  | "stripe_reussie"
+  | "sql_reussie"
+  | "compensation_requise"
+  | "compensee"
+  | "compensation_echouee"
+  | "reconciliation_requise";
+
+type TentativeEffetExterne = {
+  tentative_id: string;
+  generation: number;
+  cle_principale: string;
+  cle_compensation: string | null;
+  etat: EtatTentative;
+  stripe_object_id: string | null;
+  reutilisee: boolean;
+};
+
+// Seule source des clés Stripe : crée une tentative durable ou renvoie la tentative active
+// existante pour cette entreprise+opération (même empreinte = même tentative technique, donc
+// même clé — une intention différente ou une tentative précédente déjà pleinement convergée
+// obtient une génération, donc une clé, nouvelle).
+async function preparerTentative(
   supabase: Awaited<ReturnType<typeof createClient>>,
   entrepriseId: string,
   operation: "remise_appliquer" | "remise_retirer",
-  compensationReussie: boolean,
-) {
-  try {
-    const { error } = await supabase.rpc("plateforme_journaliser_echec_synchronisation_remise", {
-      p_entreprise_id: entrepriseId,
-      p_operation: operation,
-      p_compensation_reussie: compensationReussie,
-    });
-    return !error;
-  } catch {
-    return false;
-  }
+  empreinte: string,
+): Promise<TentativeEffetExterne> {
+  const { data, error } = await supabase.rpc("plateforme_preparer_tentative_effet_externe", {
+    p_entreprise_id: entrepriseId,
+    p_operation: operation,
+    p_empreinte: empreinte,
+  });
+  if (error) throw new Error(error.message);
+  const tentative = (Array.isArray(data) ? data[0] : data) as TentativeEffetExterne | null;
+  if (!tentative?.tentative_id) throw new Error("Préparation de la tentative refusée");
+  return tentative;
+}
+
+async function marquerStripeReussie(supabase: Awaited<ReturnType<typeof createClient>>, tentativeId: string, stripeObjectId: string) {
+  const { error } = await supabase.rpc("plateforme_marquer_tentative_stripe_reussie", { p_tentative_id: tentativeId, p_stripe_object_id: stripeObjectId });
+  if (error) throw new Error(error.message);
+}
+
+async function marquerSqlReussie(supabase: Awaited<ReturnType<typeof createClient>>, tentativeId: string) {
+  const { error } = await supabase.rpc("plateforme_marquer_tentative_sql_reussie", { p_tentative_id: tentativeId });
+  if (error) throw new Error(error.message);
+}
+
+async function marquerReconciliationRequise(supabase: Awaited<ReturnType<typeof createClient>>, tentativeId: string) {
+  await supabase.rpc("plateforme_marquer_tentative_reconciliation_requise", { p_tentative_id: tentativeId }).then(
+    () => {},
+    () => {},
+  );
+}
+
+async function marquerCompensationRequise(supabase: Awaited<ReturnType<typeof createClient>>, tentativeId: string): Promise<string> {
+  const { data, error } = await supabase.rpc("plateforme_marquer_tentative_compensation_requise", { p_tentative_id: tentativeId });
+  if (error) throw new Error(error.message);
+  return data as string;
+}
+
+async function marquerCompensationResolue(supabase: Awaited<ReturnType<typeof createClient>>, tentativeId: string, confirmee: boolean) {
+  const { error } = await supabase.rpc("plateforme_marquer_tentative_compensation_resolue", { p_tentative_id: tentativeId, p_confirmee: confirmee });
+  return !error;
+}
+
+// Confirmation par lecture réelle de l'abonnement plutôt que par la seule absence d'exception
+// HTTP. Limite assumée : `discounts` (StripeSubscription) n'expose l'identifiant du coupon
+// qu'après expansion Stripe, non vérifiable sans appel réel dans cette passe ; la confirmation
+// porte donc sur la PRÉSENCE/ABSENCE d'une remise active, pas sur l'identité exacte du coupon.
+async function confirmerPresenceRemise(subscriptionId: string, attendueActive: boolean): Promise<boolean> {
+  const abonnement = await recupererAbonnementStripe(subscriptionId);
+  const active = (abonnement.discounts?.length ?? 0) > 0;
+  return active === attendueActive;
+}
+
+function messageEchecSynchronisation(messageSql: string, tentative: TentativeEffetExterne, confirmee: boolean | null) {
+  const etatCompensation = confirmee === null ? "impossible à confirmer (réconciliation manuelle requise)" : confirmee ? "confirmée" : "échouée (réconciliation manuelle requise)";
+  return `${messageSql}. Synchronisation Stripe : compensation ${etatCompensation}. Réf. tentative : ${tentative.tentative_id}.`;
 }
 
 // Geste commercial : coupon Stripe créé et appliqué sur l'abonnement de l'entreprise (base
@@ -277,6 +350,11 @@ async function journaliserEchecSynchronisationRemise(
 // la remise précédente d'une même subscription). L'entreprise doit déjà avoir un abonnement
 // Stripe Billing actif. Le motif interne n'est jamais transmis au client (cf. migration
 // 20260823000223_remises_clients_v1.sql).
+//
+// Chaque appel Stripe (création du coupon, application sur l'abonnement, compensation) est
+// ancré sur une tentative durable (plateforme_preparer_tentative_effet_externe) : la clé qui
+// part vers Stripe n'est jamais recalculée depuis les seuls paramètres métier (cf. correctif
+// documenté sur empreinteIntentionRemise ci-dessus).
 export async function appliquerRemiseAction(entrepriseId: string, formData: FormData) {
   if (!(await estPlateformeAdmin())) redirect("/dashboard");
   const type = String(formData.get("type") ?? "");
@@ -289,6 +367,13 @@ export async function appliquerRemiseAction(entrepriseId: string, formData: Form
   }
   if (type === "pourcentage" && valeur > 100) redirect(`/plateforme?error=${encodeURIComponent("Un pourcentage ne peut pas dépasser 100")}`);
   if (!motifInterne) redirect(`/plateforme?error=${encodeURIComponent("Le motif interne est obligatoire")}`);
+  // Validée ici (avant toute tentative Stripe) plutôt que de laisser `creerCouponRemise` la
+  // lever après coup : un échec de validation pure ne doit jamais atterrir dans la phase
+  // Stripe de la tentative, qui traite désormais toute exception comme une incertitude exigeant
+  // une réconciliation manuelle (cf. marquerReconciliationRequise ci-dessous).
+  if (duree === "repeating" && (!dureeMoisBrut || dureeMoisBrut < 1)) {
+    redirect(`/plateforme?error=${encodeURIComponent("Le nombre de mois est obligatoire pour une remise limitée dans le temps")}`);
+  }
   const dureeMois = duree === "repeating" ? dureeMoisBrut : undefined;
 
   const supabase = await createClient();
@@ -298,37 +383,66 @@ export async function appliquerRemiseAction(entrepriseId: string, formData: Form
   try {
     const cible = await preautoriserRemise(supabase, entrepriseId, "remise_appliquer");
     if (!cible.stripe_subscription_id) throw new Error("Cette entreprise n’a pas d’abonnement Stripe actif");
+
     // Intention métier : opération + entreprise + abonnement ciblé + remise normalisée + état
-    // attendu (coupon actif avant l'action, lu par la préautorisation). Stable pour toute
-    // nouvelle tentative de la même action (double-clic, retry réseau, nouvelle soumission après
-    // timeout) ; distincte dès que l'entreprise, la remise ou l'état antérieur diffère
-    // réellement — y compris entre une première application et une réapplication après retrait
-    // (remise_stripe_coupon_id redevient alors non-null puis null, changeant l'état attendu).
-    const operationId = cleIdempotenceRemise("remise-coupon", [
+    // attendu (coupon actif avant l'action, lu par la préautorisation). Sert uniquement à
+    // décider si une nouvelle soumission est la même tentative technique (double-clic, retry
+    // réseau, nouvelle soumission après timeout) ou une intention réellement nouvelle — jamais à
+    // dériver directement la clé Stripe (cf. empreinteIntentionRemise).
+    const empreinte = empreinteIntentionRemise([
       entrepriseId, cible.stripe_subscription_id, type, valeur.toFixed(2), duree, dureeMois ?? "", description,
       cible.remise_stripe_coupon_id,
     ]);
-    const coupon = await creerCouponRemise({ type: type as TypeRemise, valeur, duree: duree as DureeRemise, dureeMois, nom: nomCouponRemise(cible.entreprise_nom, description), idempotence: operationId });
-    await appliquerCouponAbonnement(cible.stripe_subscription_id, coupon.id);
-    const { error } = await supabase.rpc("plateforme_appliquer_remise", { p_entreprise_id: entrepriseId, p_coupon_id: coupon.id, p_description: description, p_motif_interne: motifInterne, p_duree_mois: dureeMois ?? null, p_type: type, p_valeur: valeur });
+    const tentative = await preparerTentative(supabase, entrepriseId, "remise_appliquer", empreinte);
+
+    if (tentative.etat === "sql_reussie") {
+      // Tentative déjà pleinement convergée (retry pur après un succès complet) : rien à rejouer.
+      revalidatePath("/plateforme");
+      redirect(`/plateforme?succes=${encodeURIComponent(`Remise appliquée : ${description}`)}`);
+    }
+
+    let couponId: string;
+    if (tentative.reutilisee && tentative.etat === "stripe_reussie" && tentative.stripe_object_id) {
+      // Stripe avait déjà confirmé cette tentative lors d'un essai précédent (seule la
+      // mutation SQL restait à rejouer) : ne pas ré-émettre d'appel Stripe.
+      couponId = tentative.stripe_object_id;
+    } else {
+      try {
+        const coupon = await creerCouponRemise({
+          type: type as TypeRemise, valeur, duree: duree as DureeRemise, dureeMois,
+          nom: nomCouponRemise(cible.entreprise_nom, description),
+          idempotence: `${tentative.cle_principale}:coupon`,
+        });
+        await appliquerCouponAbonnement(cible.stripe_subscription_id, coupon.id, `${tentative.cle_principale}:abonnement`);
+        couponId = coupon.id;
+        await marquerStripeReussie(supabase, tentative.tentative_id, couponId);
+      } catch (err) {
+        await marquerReconciliationRequise(supabase, tentative.tentative_id);
+        throw err instanceof Error ? err : new Error("Remise Stripe impossible");
+      }
+    }
+
+    const { error } = await supabase.rpc("plateforme_appliquer_remise", { p_entreprise_id: entrepriseId, p_coupon_id: couponId, p_description: description, p_motif_interne: motifInterne, p_duree_mois: dureeMois ?? null, p_type: type, p_valeur: valeur });
     if (error) {
-      let compensationReussie = false;
+      const cleCompensation = await marquerCompensationRequise(supabase, tentative.tentative_id);
+      let confirmee: boolean | null = null;
       try {
         if (cible.remise_stripe_coupon_id) {
-          await appliquerCouponAbonnement(cible.stripe_subscription_id, cible.remise_stripe_coupon_id);
+          // Restaure l'ancien coupon (antérieur à cette tentative) — clé de compensation
+          // propre à CETTE tentative, jamais celle, statique, de l'application d'origine.
+          await appliquerCouponAbonnement(cible.stripe_subscription_id, cible.remise_stripe_coupon_id, cleCompensation);
         } else {
-          // coupon.id est l'identifiant Stripe stable de CE coupon (déjà créé de façon
-          // déterministe ci-dessus) : la clé de compensation reste donc déterministe elle aussi,
-          // sans dépendre d'un aléa par tentative.
-          await retirerCouponAbonnement(cible.stripe_subscription_id, cleIdempotenceRemise("remise-compensation", [entrepriseId, cible.stripe_subscription_id, coupon.id]));
+          await retirerCouponAbonnement(cible.stripe_subscription_id, cleCompensation);
         }
-        compensationReussie = true;
+        confirmee = await confirmerPresenceRemise(cible.stripe_subscription_id, Boolean(cible.remise_stripe_coupon_id));
       } catch {
-        compensationReussie = false;
+        confirmee = null;
       }
-      const journalisationReussie = await journaliserEchecSynchronisationRemise(supabase, entrepriseId, "remise_appliquer", compensationReussie);
-      throw new Error(`${error.message}. Synchronisation Stripe compensée : ${compensationReussie ? "oui" : "non"}. Journal de réconciliation : ${journalisationReussie ? "créé" : "à créer manuellement"}`);
+      const resolue = confirmee !== null && (await marquerCompensationResolue(supabase, tentative.tentative_id, confirmee));
+      if (!resolue) await marquerReconciliationRequise(supabase, tentative.tentative_id);
+      throw new Error(messageEchecSynchronisation(error.message, tentative, confirmee));
     }
+    await marquerSqlReussie(supabase, tentative.tentative_id);
   } catch (err) {
     redirect(`/plateforme?error=${encodeURIComponent(err instanceof Error ? err.message : "Remise impossible")}`);
   }
@@ -343,26 +457,56 @@ export async function retirerRemiseAction(entrepriseId: string) {
   if (isEmailLoginDisabled()) redirect(`/plateforme?error=${encodeURIComponent("Les remises Stripe exigent une session plateforme personnelle AAL2")}`);
   try {
     const cible = await preautoriserRemise(supabase, entrepriseId, "remise_retirer");
-    if (cible.stripe_subscription_id && cible.remise_stripe_coupon_id) {
-      // Intention métier : retirer précisément CE coupon de CET abonnement. Stable pour toute
-      // nouvelle tentative de la même action ; une remise différente (coupon différent) produit
-      // une clé différente.
-      await retirerCouponAbonnement(cible.stripe_subscription_id, cleIdempotenceRemise("remise-suppression", [entrepriseId, cible.stripe_subscription_id, cible.remise_stripe_coupon_id]));
+    const empreinte = empreinteIntentionRemise([entrepriseId, cible.stripe_subscription_id, cible.remise_stripe_coupon_id]);
+    const tentative = await preparerTentative(supabase, entrepriseId, "remise_retirer", empreinte);
+
+    if (tentative.etat === "sql_reussie") {
+      revalidatePath("/plateforme");
+      redirect(`/plateforme?succes=${encodeURIComponent("Remise retirée")}`);
     }
+
+    if (!(tentative.reutilisee && tentative.etat === "stripe_reussie")) {
+      if (cible.stripe_subscription_id && cible.remise_stripe_coupon_id) {
+        try {
+          await retirerCouponAbonnement(cible.stripe_subscription_id, `${tentative.cle_principale}:retrait`);
+          await marquerStripeReussie(supabase, tentative.tentative_id, cible.remise_stripe_coupon_id);
+        } catch (err) {
+          await marquerReconciliationRequise(supabase, tentative.tentative_id);
+          throw err instanceof Error ? err : new Error("Retrait Stripe impossible");
+        }
+      } else {
+        // Rien à retirer côté Stripe (déjà vide) : la tentative avance directement vers la
+        // mutation SQL, sans appel Stripe ni risque de désynchronisation possible.
+        await marquerStripeReussie(supabase, tentative.tentative_id, "");
+      }
+    }
+
     const { error } = await supabase.rpc("plateforme_retirer_remise", { p_entreprise_id: entrepriseId });
     if (error) {
-      let compensationReussie = !cible.stripe_subscription_id || !cible.remise_stripe_coupon_id;
-      try {
-        if (cible.stripe_subscription_id && cible.remise_stripe_coupon_id) {
-          await appliquerCouponAbonnement(cible.stripe_subscription_id, cible.remise_stripe_coupon_id);
-          compensationReussie = true;
-        }
-      } catch {
-        compensationReussie = false;
+      if (!cible.stripe_subscription_id || !cible.remise_stripe_coupon_id) {
+        // Rien n'a été retiré côté Stripe avant l'échec SQL : aucune compensation Stripe à
+        // effectuer, la tentative est trivialement convergée.
+        await marquerCompensationRequise(supabase, tentative.tentative_id);
+        await marquerCompensationResolue(supabase, tentative.tentative_id, true);
+        throw new Error(messageEchecSynchronisation(error.message, tentative, true));
       }
-      const journalisationReussie = await journaliserEchecSynchronisationRemise(supabase, entrepriseId, "remise_retirer", compensationReussie);
-      throw new Error(`${error.message}. Synchronisation Stripe compensée : ${compensationReussie ? "oui" : "non"}. Journal de réconciliation : ${journalisationReussie ? "créé" : "à créer manuellement"}`);
+      const cleCompensation = await marquerCompensationRequise(supabase, tentative.tentative_id);
+      let confirmee: boolean | null = null;
+      try {
+        // Restaure le coupon retiré — clé de compensation propre à CETTE tentative, jamais la
+        // clé statique (subscription, coupon) qui a servi à l'application d'origine du coupon :
+        // sa réutilisation ici renverrait la réponse mémorisée de cette application d'origine
+        // sans rejouer la restauration (c'est précisément le scénario B signalé par la revue).
+        await appliquerCouponAbonnement(cible.stripe_subscription_id, cible.remise_stripe_coupon_id, cleCompensation);
+        confirmee = await confirmerPresenceRemise(cible.stripe_subscription_id, true);
+      } catch {
+        confirmee = null;
+      }
+      const resolue = confirmee !== null && (await marquerCompensationResolue(supabase, tentative.tentative_id, confirmee));
+      if (!resolue) await marquerReconciliationRequise(supabase, tentative.tentative_id);
+      throw new Error(messageEchecSynchronisation(error.message, tentative, confirmee));
     }
+    await marquerSqlReussie(supabase, tentative.tentative_id);
   } catch (err) {
     redirect(`/plateforme?error=${encodeURIComponent(err instanceof Error ? err.message : "Suppression impossible")}`);
   }
