@@ -15,12 +15,9 @@ export async function envoyerMessageSupportAction(formData: FormData) {
   if (!contenu) redirect("/aide");
 
   const supabase = await createClient();
-  const { error } = await supabase.from("support_messages").insert({
-    entreprise_id: entrepriseId,
-    cote: "entreprise",
-    auteur_id: ctx.userId,
-    auteur_nom: [ctx.prenom, ctx.entrepriseNom].filter(Boolean).join(" · ") || "Entreprise",
-    contenu,
+  const { error } = await supabase.rpc("support_envoyer_message_entreprise", {
+    p_entreprise_id: entrepriseId,
+    p_contenu: contenu,
   });
   if (error) redirect(`/aide?error=${encodeURIComponent(messageErreurUtilisateur("envoyerMessageSupportAction", error, "Impossible d’envoyer votre message pour le moment."))}`);
 

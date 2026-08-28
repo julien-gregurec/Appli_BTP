@@ -201,12 +201,9 @@ export async function envoyerMessageSupportDepuisPropositionAction(proposition: 
   if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
   if (!proposition.contenu.trim()) return { error: "Message vide." };
 
-  const { error } = await supabase.from("support_messages").insert({
-    entreprise_id: ctx.entrepriseId,
-    cote: "entreprise",
-    auteur_id: ctx.userId,
-    auteur_nom: [ctx.prenom, ctx.entrepriseNom].filter(Boolean).join(" · ") || "Entreprise",
-    contenu: proposition.contenu,
+  const { error } = await supabase.rpc("support_envoyer_message_entreprise", {
+    p_entreprise_id: ctx.entrepriseId,
+    p_contenu: proposition.contenu,
   });
   if (error) return { error: error.message };
 

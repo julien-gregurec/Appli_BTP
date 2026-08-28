@@ -121,8 +121,8 @@ select ok(
   not has_table_privilege('authenticated','public.support_messages','SELECT')
   and not has_table_privilege('authenticated','public.support_messages','UPDATE')
   and not has_table_privilege('authenticated','public.support_messages','DELETE')
-  and has_table_privilege('authenticated','public.support_messages','INSERT'),
-  'support_messages : lecture/mutations brutes fermées, envoi métier RLS conservé'
+  and not has_table_privilege('authenticated','public.support_messages','INSERT'),
+  'support_messages : toute la surface CRUD directe authenticated est fermée'
 );
 select ok(
   has_function_privilege('authenticated','public.support_messages_entreprise(uuid)','EXECUTE')
@@ -161,9 +161,9 @@ select throws_ok(
   $$select * from public.support_messages_entreprise('b0000000-0000-0000-0000-000000000001')$$,
   '42501',null,'utilisateur A : lecture cross-tenant refusée'
 );
-select lives_ok(
-  $$insert into public.support_messages(entreprise_id,cote,auteur_id,auteur_nom,contenu) values('a0000000-0000-0000-0000-000000000001','entreprise','10000000-0000-0000-0000-000000000001','Admin A','Envoi R7.4')$$,
-  'utilisateur A : envoi support légitime conservé'
+select throws_ok(
+  $$insert into public.support_messages(entreprise_id,cote,auteur_id,auteur_nom,contenu) values('a0000000-0000-0000-0000-000000000001','entreprise','10000000-0000-0000-0000-000000000001','Admin A','Envoi direct interdit')$$,
+  '42501',null,'utilisateur A : INSERT support direct refusé après R7.5'
 );
 select set_config('request.jwt.claim.sub','30000000-0000-0000-0000-000000000001',true);
 select set_config('request.jwt.claim.email','plateforme@invalid.local',true);

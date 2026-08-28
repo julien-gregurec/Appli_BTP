@@ -77,11 +77,7 @@ export async function ajouterAdminPlateformeAction(formData: FormData) {
   if (!email || !email.includes("@")) redirect(`/plateforme?error=${encodeURIComponent("Email invalide")}`);
   const supabase = await createClient();
   if (isEmailLoginDisabled()) {
-    const { error } = await supabase.from("plateforme_admins").upsert(
-      { email, nom, role, utilisateur_id: null, actif: false, statut_identite: "en_attente" },
-      { onConflict: "email" },
-    );
-    if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
+    redirect(`/plateforme?error=${encodeURIComponent("La gestion des administrateurs plateforme est désactivée en mode démonstration")}`);
   } else {
     const { error } = await supabase.rpc("plateforme_ajouter_admin", { p_email: email, p_nom: nom, p_role: role });
     if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
@@ -96,8 +92,7 @@ export async function retirerAdminPlateformeAction(formData: FormData) {
   if (!email) redirect(`/plateforme?error=${encodeURIComponent("Email manquant")}`);
   const supabase = await createClient();
   if (isEmailLoginDisabled()) {
-    const { error } = await supabase.from("plateforme_admins").delete().eq("email", email);
-    if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
+    redirect(`/plateforme?error=${encodeURIComponent("La gestion des administrateurs plateforme est désactivée en mode démonstration")}`);
   } else {
     const { error } = await supabase.rpc("plateforme_retirer_admin", { p_email: email });
     if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
