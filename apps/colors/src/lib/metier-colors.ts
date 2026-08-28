@@ -22,7 +22,7 @@ export async function listerSeauxColors(entrepriseId: string, filtres: FiltresSe
   if (!filtres.archives && filtres.etat !== "archive") requete = requete.neq("etat","archive");
   if (filtres.etat && filtres.etat !== "tous") requete = requete.eq("etat",filtres.etat);
   if (filtres.emplacement) requete = requete.eq("emplacement_id",filtres.emplacement);
-  if (filtres.faible) requete = requete.lte("pourcentage_restant",seuil).neq("etat","archive");
+  if (filtres.faible) requete = requete.lte("pourcentage_restant",seuil).not("etat","in",'(archive,vide)');
   if (filtres.sansPhoto) requete = requete.is("photo_principale_path",null);
   const q = (filtres.q ?? "").replace(/[%(),]/g," ").trim();
   if (q) requete = requete.ilike("recherche_text",`%${q}%`);

@@ -41,6 +41,7 @@ export type SeauColors = {
   created_at: string;
   updated_at: string;
   archived_at: string | null;
+  etat_avant_archivage: Exclude<EtatSeau,"archive"> | null;
   colors_emplacements?: Pick<EmplacementColors, "id" | "nom" | "type"> | null;
 };
 

@@ -116,3 +116,24 @@ La migration append-only `20260828000247_colors_integrity_v11.sql` ferme les qua
 - **Mobile et accessibilité** : menu, fermeture, avatar et liens essentiels atteignent au moins 44 px sous 760 px. Le bouton de fermeture porte le nom accessible « Fermer la navigation ».
 
 Les deux reconstructions locales ont été vérifiées : ledger Colors `00246 → 00247`, puis ledger canonique de 226 migrations `00245 → 00246 → 00247`. Les dettes restantes sont la pagination de l’inventaire, la compression/les miniatures, un job périodique de reprise des orphelins, l’offline métier, les catalogues licenciés et l’intégration future d’un fournisseur OCR autorisé.
+
+## V1.2 — levée des réserves de revue
+
+La migration append-only `20260828000248_colors_correctifs_v12.sql` complète `00246` et `00247` sans modifier les migrations centrales.
+
+- **OCR et photos** : `colors_photo_stockage_valide` mutualise la validation du bucket, du chemin exact `entreprise/seau/fichier`, de l’existence, du MIME et de la taille. La création OCR refuse désormais tout objet absent, étranger ou non canonique. La route serveur inspecte aussi la signature binaire JPEG, PNG, WebP, HEIC ou HEIF avant l’envoi. Une policy restrictive interdit l’upload ou la suppression directe dans le bucket Colors avec un JWT utilisateur ; le client Storage serveur n’intervient qu’après authentification, habilitation Colors, contrôle du seau et validation des octets. `SUPABASE_SERVICE_ROLE_KEY` reste une variable serveur existante et aucun secret n’est versionné.
+- **Archivage** : `etat_avant_archivage` conserve l’état actif précédent. Archiver un seau déjà archivé ou restaurer un seau déjà actif retourne la ligne sans ajouter de mouvement. Une restauration retrouve `ferme`, `ouvert` ou `vide` selon l’état mémorisé.
+- **Stock faible** : la définition unique exclut `archive` et `vide`, aussi bien dans la requête serveur, le filtre local, le badge que les statistiques. Le tableau de bord affiche le seuil réel du tenant.
+- **Workflow** : la fiche expose la transition `ouvert → ferme`, masque les transitions impossibles et rend le motif d’ajustement obligatoire côté formulaire, en complément du contrôle SQL.
+- **Nettoyage photo** : `colors_nettoyages_photos` conserve une dette unique et idempotente par chemin, le nombre de tentatives et la dernière erreur. La route planifie avant suppression, résout après confirmation Storage et affiche explicitement `nettoyageRequis`. Un futur worker pourra reprendre les lignes `a_nettoyer` sans perdre l’information.
+- **Navigation mobile** : le tiroir n’est monté que lorsqu’il est ouvert, reçoit le focus, piège Tab/Maj+Tab, se ferme avec Échap ou l’overlay et restitue le focus au bouton déclencheur.
+
+Validation locale du lot :
+
+- ledger de la branche : 216 migrations, suite pgTAP complète de 32 fichiers et 501 tests ;
+- ledger canonique depuis `24c944da09664d9aa1523af6e047f9b84437b97e` : 227 migrations, chaîne `00245 → 00246 → 00247 → 00248`, 42 fichiers pgTAP et 832 tests ;
+- Colors : 59 tests Vitest, TypeScript et ESLint réussis, build Webpack de 21 pages réussi ;
+- racine : 529 tests Vitest, TypeScript réussi, ESLint sans erreur avec trois avertissements `<img>` préexistants, build réussi ;
+- vérification des migrations : 216 noms et horodatages uniques ; vérification des secrets : 1 007 fichiers suivis, aucun secret reconnu ; audits npm Colors et racine : zéro vulnérabilité.
+
+Le contrôle navigateur à 390 px a confirmé l’accès à l’application locale mais a été arrêté sur la page de connexion faute de session de recette dédiée. Le focus du tiroir est donc couvert par le composant et les tests statiques, pas encore par un parcours authentifié réel. Aucun déploiement, aucune Preview, aucune migration distante, aucun appel OCR réel et aucune modification Stripe n’ont été réalisés.

@@ -2,6 +2,8 @@ import type { EtatSeau, SeauColors } from "@/lib/colors-types";
 
 export type FiltresInventaire = { q?: string; marque?: string; emplacementId?: string; etat?: EtatSeau | "tous"; stockFaible?: boolean; sansPhoto?: boolean };
 const normaliser = (valeur: string | null | undefined) => (valeur ?? "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+export const estStockFaible = (seau: Pick<SeauColors,"etat"|"pourcentage_restant">,seuil:number) =>
+  seau.etat !== "archive" && seau.etat !== "vide" && seau.pourcentage_restant <= seuil;
 
 export function filtrerInventaire(seaux: SeauColors[], filtres: FiltresInventaire, seuil = 20) {
   const q = normaliser(filtres.q);
@@ -10,7 +12,7 @@ export function filtrerInventaire(seaux: SeauColors[], filtres: FiltresInventair
     if (filtres.marque && seau.marque !== filtres.marque) return false;
     if (filtres.emplacementId && seau.emplacement_id !== filtres.emplacementId) return false;
     if (filtres.etat && filtres.etat !== "tous" && seau.etat !== filtres.etat) return false;
-    if (filtres.stockFaible && !(seau.pourcentage_restant <= seuil && seau.etat !== "archive")) return false;
+    if (filtres.stockFaible && !estStockFaible(seau,seuil)) return false;
     if (filtres.sansPhoto && seau.photo_principale_path) return false;
     return true;
   });

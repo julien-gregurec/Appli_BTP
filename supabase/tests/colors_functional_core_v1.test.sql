@@ -67,7 +67,16 @@ select throws_ok($$select public.colors_ajuster_quantite('c0200000-0000-0000-000
 select throws_ok($$select public.colors_ajuster_quantite('c0200000-0000-0000-0000-000000000001',11,'ajustement','Correction inventaire')$$,'P0001','Quantité supérieure au nominal','dépassement nominal refusé');
 select throws_ok($$insert into public.colors_seaux(entreprise_id,marque,produit,mode_quantite,unite,created_by) values('a0000000-0000-0000-0000-000000000001','X','Sans pourcentage','pourcentage','pourcent','10000000-0000-0000-0000-000000000002')$$,'23514',null,'pourcentage NULL refusé');
 select throws_ok($$insert into public.colors_seaux(entreprise_id,marque,produit,mode_quantite,quantite_nominale,unite,created_by) values('a0000000-0000-0000-0000-000000000001','X','Sans restant','volume',10,'l','10000000-0000-0000-0000-000000000002')$$,'23514',null,'quantité restante NULL refusée');
-select lives_ok($$select public.colors_creer_analyse_ocr('a0000000-0000-0000-0000-000000000001','c0200000-0000-0000-0000-000000000001','a0000000-0000-0000-0000-000000000001/c0200000-0000-0000-0000-000000000001/ocr.jpg')$$,'proposition OCR A créée à confirmer');
+reset role;
+insert into storage.objects(id,bucket_id,name,metadata) values(
+  'c0300000-0000-0000-0000-000000000099','colors-seaux',
+  'a0000000-0000-0000-0000-000000000001/c0200000-0000-0000-0000-000000000001/ocr.jpg',
+  '{"mimetype":"image/jpeg","size":1024}'
+);
+set local role authenticated;
+select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000002',true);
+select set_config('request.jwt.claim.email','ouvrier-a@invalid.local',true);
+select lives_ok($$select public.colors_creer_analyse_ocr('a0000000-0000-0000-0000-000000000001','c0200000-0000-0000-0000-000000000001','a0000000-0000-0000-0000-000000000001/c0200000-0000-0000-0000-000000000001/ocr.jpg')$$,'proposition OCR A créée à confirmer avec photo existante');
 select throws_ok($$select public.colors_creer_analyse_ocr('a0000000-0000-0000-0000-000000000001','d0200000-0000-0000-0000-000000000001','a0000000-0000-0000-0000-000000000001/d0200000-0000-0000-0000-000000000001/ocr.jpg')$$,'P0001','Seau OCR Colors invalide','OCR cross-tenant par UUID refusé');
 
 reset role; set local role authenticated;
@@ -97,8 +106,13 @@ select is((select count(*) from public.colors_seaux),0::bigint,'utilisateur sans
 reset role; set local role authenticated;
 select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000002',true);
 select set_config('request.jwt.claim.email','ouvrier-a@invalid.local',true);
-select lives_ok($$insert into storage.objects(id,bucket_id,name,metadata) values('c0300000-0000-0000-0000-000000000001','colors-seaux','a0000000-0000-0000-0000-000000000001/c0200000-0000-0000-0000-000000000001/photo.jpg','{"mimetype":"image/jpeg","size":1024}')$$,'photo privée A ajoutée');
-select is((select count(*) from storage.objects where bucket_id='colors-seaux'),1::bigint,'A voit sa photo');
+select throws_ok($$insert into storage.objects(id,bucket_id,name,metadata) values('c0300000-0000-0000-0000-000000000001','colors-seaux','a0000000-0000-0000-0000-000000000001/c0200000-0000-0000-0000-000000000001/photo.jpg','{"mimetype":"image/jpeg","size":1024}')$$,'42501',null,'upload direct fermé avant validation serveur de signature');
+reset role;
+insert into storage.objects(id,bucket_id,name,metadata) values('c0300000-0000-0000-0000-000000000001','colors-seaux','a0000000-0000-0000-0000-000000000001/c0200000-0000-0000-0000-000000000001/photo.jpg','{"mimetype":"image/jpeg","size":1024}');
+set local role authenticated;
+select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000002',true);
+select set_config('request.jwt.claim.email','ouvrier-a@invalid.local',true);
+select is((select count(*) from storage.objects where bucket_id='colors-seaux'),2::bigint,'A voit ses photos OCR et principale');
 select lives_ok($$select public.colors_definir_photo('c0200000-0000-0000-0000-000000000001','a0000000-0000-0000-0000-000000000001/c0200000-0000-0000-0000-000000000001/photo.jpg')$$,'photo associée par action métier');
 select is((select photo_principale_path from public.colors_seaux where id='c0200000-0000-0000-0000-000000000001'),'a0000000-0000-0000-0000-000000000001/c0200000-0000-0000-0000-000000000001/photo.jpg','chemin photo privé conservé');
 
@@ -116,7 +130,7 @@ select lives_ok($$select public.colors_archiver_seau('c0200000-0000-0000-0000-00
 select is((select etat from public.colors_seaux where id='c0200000-0000-0000-0000-000000000001'),'archive','seau archivé conservé');
 select is((select count(*) from public.colors_mouvements where seau_id='c0200000-0000-0000-0000-000000000001'),5::bigint,'historique conservé après archivage');
 select lives_ok($$select public.colors_archiver_seau('c0200000-0000-0000-0000-000000000001',false,'Retour stock')$$,'gestionnaire restaure');
-select is((select etat from public.colors_seaux where id='c0200000-0000-0000-0000-000000000001'),'ferme','seau restauré actif');
+select is((select etat from public.colors_seaux where id='c0200000-0000-0000-0000-000000000001'),'ouvert','seau restauré dans son état actif antérieur');
 
 reset role;
 select * from finish();

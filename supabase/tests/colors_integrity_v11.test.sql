@@ -32,6 +32,14 @@ select throws_ok($$update public.colors_seaux set photo_principale_path='aa00000
 select throws_ok($$select public.colors_definir_photo('aa300000-0000-0000-0000-000000000011','aa000000-0000-0000-0000-000000000011/aa300000-0000-0000-0000-000000000011/inexistante.jpg')$$,'P0001','Photo Colors invalide','photo inexistante refusée');
 select lives_ok($$select public.colors_modifier_seau('aa300000-0000-0000-0000-000000000011','V11','RPC',null,null,null,null,'ok')$$,'métadonnées via RPC');
 select throws_ok($$insert into public.colors_analyses_ocr(entreprise_id,photo_path,created_by) values('aa000000-0000-0000-0000-000000000011','aa000000-0000-0000-0000-000000000011/x/y.jpg','31000000-0000-0000-0000-000000000001')$$,'42501',null,'OCR direct fermé');
+reset role;
+insert into storage.objects(id,bucket_id,name,metadata) values(
+  'aa400000-0000-0000-0000-000000000011','colors-seaux',
+  'aa000000-0000-0000-0000-000000000011/aa300000-0000-0000-0000-000000000011/ocr.jpg',
+  '{"mimetype":"image/jpeg","size":1024}'
+);
+set local role authenticated;
+select set_config('request.jwt.claim.sub','31000000-0000-0000-0000-000000000001',true);
 select lives_ok($$select public.colors_creer_analyse_ocr('aa000000-0000-0000-0000-000000000011','aa300000-0000-0000-0000-000000000011','aa000000-0000-0000-0000-000000000011/aa300000-0000-0000-0000-000000000011/ocr.jpg','{"marque":"V11"}',90)$$,'OCR proposé via RPC');
 select is((select statut from public.colors_analyses_ocr where entreprise_id='aa000000-0000-0000-0000-000000000011'),'a_confirmer','OCR impose confirmation');
 select throws_ok($$update public.colors_analyses_ocr set statut='confirmee',confirme_par='32000000-0000-0000-0000-000000000001',confirme_at=now() where entreprise_id='aa000000-0000-0000-0000-000000000011'$$,'42501',null,'statut et confirme_par directs fermés');

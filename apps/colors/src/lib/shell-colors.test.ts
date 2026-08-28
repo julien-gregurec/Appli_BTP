@@ -85,6 +85,34 @@ describe("shell autonome ELSATIA Colors", () => {
     expect(menu).toContain('aria-label="Applications accessibles"');
   });
 
+  it("piège le focus dans le tiroir mobile et le rend au déclencheur", () => {
+    const navigation = readFileSync(join(process.cwd(), "src/components/Navigation.tsx"), "utf8");
+    expect(navigation).toContain('event.key === "Escape"');
+    expect(navigation).toContain('event.key !== "Tab"');
+    expect(navigation).toContain("declencheur.current?.focus()");
+    expect(navigation).toContain('role="dialog"');
+    expect(navigation).toContain('aria-modal="true"');
+    expect(navigation).toContain("{ouvert && <aside");
+  });
+
+  it("rend la fermeture du seau et le motif d’ajustement explicites", () => {
+    const fiche = readFileSync(join(process.cwd(), "src/app/(colors)/inventaire/[id]/page.tsx"), "utf8");
+    expect(fiche).toContain('value="ferme"');
+    expect(fiche).toContain("Marquer fermé");
+    expect(fiche).toContain('<input name="motif" required/>');
+  });
+
+  it("affiche et suit explicitement la dette de nettoyage photo", () => {
+    const route = readFileSync(join(process.cwd(), "src/app/api/photos/route.ts"), "utf8");
+    const composant = readFileSync(join(process.cwd(), "src/components/PhotoUploader.tsx"), "utf8");
+    expect(route).toContain('rpc("colors_signaler_nettoyage_photo"');
+    expect(route).toContain('rpc("colors_resoudre_nettoyage_photo"');
+    expect(route).toContain("validerSignaturePhotoColors");
+    expect(route).toContain("createAdminStorageClient");
+    expect(composant).toContain("resultat.nettoyageRequis");
+    expect(composant).toContain("sera nettoyée automatiquement");
+  });
+
   it("ne dépend d’aucune permission ni route du stock Gestion Pro", () => {
     const racine = join(process.cwd(), "src");
     const contenu = fichiersSource(racine)
