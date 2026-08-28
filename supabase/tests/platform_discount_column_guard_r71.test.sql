@@ -8,7 +8,9 @@ select ok(exists(select 1 from pg_roles where rolname='elsatia_discount_f4_write
 select is((select count(*) from pg_auth_members m join pg_roles r on r.oid=m.roleid join pg_roles u on u.oid=m.member where r.rolname='elsatia_discount_f4_writer' and u.rolname<>'postgres'),0::bigint,'aucun membre applicatif du rôle interne F4');
 select is((select pg_get_userbyid(proowner) from pg_proc where oid='public.plateforme_finaliser_operation_remise_serveur(uuid,uuid,uuid)'::regprocedure),'elsatia_discount_f4_writer','seul finaliseur F4 propriétaire du rôle interne');
 select ok(not has_function_privilege('authenticated','public.plateforme_finaliser_operation_remise_serveur(uuid,uuid,uuid)','EXECUTE'),'finaliseur F4 inaccessible au client');
-select ok(has_function_privilege('service_role','public.plateforme_finaliser_operation_remise_serveur(uuid,uuid,uuid)','EXECUTE'),'orchestrateur service peut appeler F4');
+select ok(not has_function_privilege('service_role','public.plateforme_finaliser_operation_remise_serveur(uuid,uuid,uuid)','EXECUTE'),'ancien F4 R7.1 retiré à service_role par R7.2');
+select is((select pg_get_userbyid(proowner) from pg_proc where oid='public.plateforme_finaliser_operation_remise_attestee_serveur(uuid,uuid,jsonb,text)'::regprocedure),'elsatia_discount_f4_writer','nouveau F4 attesté propriétaire du rôle interne');
+select ok(has_function_privilege('service_role','public.plateforme_finaliser_operation_remise_attestee_serveur(uuid,uuid,jsonb,text)','EXECUTE'),'orchestrateur service peut appeler uniquement F4 attesté');
 
 select ok(not has_column_privilege('authenticated','public.entreprises','remise_stripe_coupon_id','UPDATE'),'authenticated sans UPDATE coupon');
 select ok(not has_column_privilege('authenticated','public.entreprises','remise_description','INSERT'),'authenticated sans INSERT description');
@@ -55,7 +57,7 @@ select is((select remise_description from public.entreprises where id='a0000000-
 select is((select count(*) from public.historique_tarification where entreprise_id='a0000000-0000-0000-0000-000000000001'),0::bigint,'aucun audit mensonger après refus');
 select is((select count(*) from public.plateforme_operations_remise where entreprise_id='a0000000-0000-0000-0000-000000000001'),0::bigint,'aucune saga créée par une écriture directe');
 select is((select count(*) from information_schema.role_column_grants where table_schema='public' and table_name='entreprises' and grantee in ('anon','authenticated','service_role') and privilege_type in ('INSERT','UPDATE') and column_name like 'remise_%'),0::bigint,'aucun rôle API ne possède de privilège de colonne remise');
-select is((select count(*) from pg_proc p where p.pronamespace='public'::regnamespace and p.prosecdef and p.proowner='elsatia_discount_f4_writer'::regrole and p.oid<>'public.plateforme_finaliser_operation_remise_serveur(uuid,uuid,uuid)'::regprocedure),0::bigint,'aucun autre SECURITY DEFINER détenu par le rôle F4');
+select is((select count(*) from pg_proc p where p.pronamespace='public'::regnamespace and p.prosecdef and p.proowner='elsatia_discount_f4_writer'::regrole and p.oid not in ('public.plateforme_finaliser_operation_remise_serveur(uuid,uuid,uuid)'::regprocedure,'public.plateforme_finaliser_operation_remise_attestee_serveur(uuid,uuid,jsonb,text)'::regprocedure)),0::bigint,'aucun autre SECURITY DEFINER détenu par le rôle F4');
 
 select * from finish();
 rollback;

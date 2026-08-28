@@ -79,7 +79,7 @@ select throws_like(
   '%immuable%','historique append-only'
 );
 select is((select count(*) from pg_policies where schemaname='public' and tablename in ('plateforme_operations_remise','plateforme_operations_remise_historique') and roles && array['anon']::name[]),0::bigint,'aucune policy anon');
-select is((select count(*) from pg_proc p where p.proname like 'plateforme_%operation_remise%' and p.prosecdef and not ('search_path=public'=any(coalesce(p.proconfig,array[]::text[])))),0::bigint,'SECURITY DEFINER avec search_path sûr');
+select is((select count(*) from pg_proc p where p.proname like 'plateforme_%operation_remise%' and p.prosecdef and not exists(select 1 from unnest(coalesce(p.proconfig,array[]::text[])) c where c like 'search_path=public%')),0::bigint,'SECURITY DEFINER avec search_path sûr');
 
 select * from finish();
 rollback;
