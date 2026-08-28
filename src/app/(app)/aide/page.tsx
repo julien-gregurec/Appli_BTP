@@ -11,11 +11,9 @@ export default async function AidePage({ searchParams }: { searchParams: Promise
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("support_messages")
-    .select("id, cote, auteur_nom, contenu, created_at")
-    .eq("entreprise_id", ctx.entrepriseId)
-    .order("created_at");
+  const { data } = await supabase.rpc("support_messages_entreprise", {
+    p_entreprise_id: ctx.entrepriseId,
+  });
   const messages = (data ?? []) as Message[];
 
   // Marquer les réponses plateforme comme lues.
