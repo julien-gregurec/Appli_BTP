@@ -121,7 +121,9 @@ export async function synchroniserExpirationRemiseSousVerrou(
   verrouToken: string,
   stripe: PasserelleStripeRemise,
 ) {
-  if (abonnement.discounts === undefined || (abonnement.discounts?.length ?? 0) > 0) return null;
+  // Le webhook ne déduit jamais l'expiration depuis la simple forme JSON : il
+  // partage le même parseur strict que les sagas APPLY/REMOVE.
+  if (stripe.observer(abonnement).status !== "absent") return null;
   const { data, error } = await admin.rpc("plateforme_commencer_expiration_remise_serveur", {
     p_entreprise_id: entrepriseId,
     p_stripe_subscription_id: abonnement.id,

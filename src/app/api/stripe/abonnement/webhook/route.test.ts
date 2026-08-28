@@ -14,6 +14,14 @@ const deps = vi.hoisted(() => ({
   libererVerrouRemise: vi.fn(),
   lireOperationActiveRemiseServeur: vi.fn(async () => null),
   reconcilierOperationRemiseSousVerrou: vi.fn(),
+  observerRemiseDepuisAbonnement: vi.fn((abonnement: { discounts?: unknown[] }) => {
+    if (!Array.isArray(abonnement.discounts)) throw new Error("observation incomplète");
+    if (abonnement.discounts.length === 0) return { status: "absent", count: 0, discount_id: null, source_type: null, source_id: null, coupon_id: null };
+    if (abonnement.discounts.length !== 1 || typeof abonnement.discounts[0] !== "object") throw new Error("observation incomplète");
+    const discount = abonnement.discounts[0] as { id?: string; source?: { type?: string; coupon?: { id?: string } } };
+    if (!discount.id || discount.source?.type !== "coupon" || !discount.source.coupon?.id) throw new Error("observation incomplète");
+    return { status: "present", count: 1, discount_id: discount.id, source_type: "coupon", source_id: discount.source.coupon.id, coupon_id: discount.source.coupon.id };
+  }),
 }));
 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: deps.createAdminClient }));
@@ -25,6 +33,7 @@ vi.mock("@/lib/stripe-abonnement", () => ({
   ajouterDepassementStockageFacture: deps.ajouterDepassementStockageFacture,
   calculerDepassementAppareils: deps.calculerDepassementAppareils,
   appliquerCouponAbonnement: vi.fn(), couponActifDepuisAbonnement: vi.fn(), creerCouponRemise: vi.fn(), retirerCouponAbonnement: vi.fn(),
+  observerRemiseDepuisAbonnement: deps.observerRemiseDepuisAbonnement,
 }));
 vi.mock("@/lib/stripe-discount-server", () => ({
   acquerirVerrouRemise: deps.acquerirVerrouRemise,
@@ -35,6 +44,7 @@ vi.mock("@/lib/stripe-discount-server", () => ({
 }));
 
 const { POST, synchroniserAbonnementCoordonne } = await import("./route");
+const { passerelleStripeRemise } = await import("@/lib/stripe-discount-gateway");
 const SECRET = "whsec_test_uniquement";
 const ENTREPRISE = "11111111-1111-4111-8111-111111111111";
 
@@ -125,10 +135,11 @@ describe("barrière environnement avant Supabase", () => {
 describe("coordination webhook et saga", () => {
   it("relit Stripe et ignore le payload ancien", async () => {
     const admin = adminFake();
-    const actuel = { id:"sub_test",customer:"cus_test",status:"active",discounts:[{source:{coupon:{id:"coupon-actuel"}}}],metadata:{} };
+    const actuel = { id:"sub_test",customer:"cus_test",status:"active",discounts:[{id:"di_actuel",source:{type:"coupon",coupon:{id:"coupon-actuel"}}}],metadata:{} };
     deps.recupererAbonnementStripe.mockResolvedValue(actuel);
     await synchroniserAbonnementCoordonne(admin as never,ENTREPRISE,"sub_test","evt_ancien");
     expect(deps.synchroniserExpirationRemiseSousVerrou).toHaveBeenCalledWith(admin,ENTREPRISE,actuel,"verrou-test",expect.any(Object));
+    expect(passerelleStripeRemise.observer(actuel)).toMatchObject({ status: "present", discount_id: "di_actuel" });
     expect(deps.acquerirVerrouRemise).toHaveBeenCalledWith(admin,"sub_test",expect.stringMatching(/^webhook:/));
     expect(deps.libererVerrouRemise).toHaveBeenCalledWith(admin,"sub_test","verrou-test");
   });

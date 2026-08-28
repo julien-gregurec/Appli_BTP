@@ -1,4 +1,5 @@
 import { createPrivateKey, randomUUID, sign } from "node:crypto";
+import type { ObservationRemiseStripe } from "@/lib/stripe-abonnement";
 import type { OperationRemise } from "@/lib/stripe-discount-consistency";
 
 export const ACTIONS_ATTESTATION_STRIPE = [
@@ -13,14 +14,13 @@ export type ActionAttestationStripe = (typeof ACTIONS_ATTESTATION_STRIPE)[number
 export type EnvironnementAttestationStripe = "test" | "live";
 export type VariablesAttestationStripe = Readonly<Record<string, string | undefined>>;
 
-export type ObservationAttestationStripe = {
+export type ObservationAttestationStripe = ObservationRemiseStripe & {
   stripe_subscription_id: string;
   stripe_customer_id: string;
-  coupon_id: string | null;
 };
 
 export type PayloadAttestationStripe = {
-  version: 1;
+  version: 2;
   key_id: string;
   environment: EnvironnementAttestationStripe;
   action: ActionAttestationStripe;
@@ -32,6 +32,11 @@ export type PayloadAttestationStripe = {
   stripe_customer_id: string;
   tentative: number;
   generation: number;
+  discount_presence: "absent" | "present";
+  discount_count: 0 | 1;
+  discount_id: string | null;
+  discount_source_type: "coupon" | "promotion_code" | null;
+  discount_source_id: string | null;
   coupon_id: string | null;
   discount_type: string | null;
   discount_value: number | null;
@@ -54,6 +59,11 @@ const CHAMPS_CANONIQUES: ReadonlyArray<keyof PayloadAttestationStripe> = [
   "stripe_customer_id",
   "tentative",
   "generation",
+  "discount_presence",
+  "discount_count",
+  "discount_id",
+  "discount_source_type",
+  "discount_source_id",
   "coupon_id",
   "discount_type",
   "discount_value",
@@ -66,7 +76,7 @@ const CHAMPS_CANONIQUES: ReadonlyArray<keyof PayloadAttestationStripe> = [
 
 export function canonicaliserAttestationStripe(payload: PayloadAttestationStripe) {
   return [
-    "elsatia.stripe-state-attestation.v1",
+    "elsatia.stripe-state-attestation.v2",
     ...CHAMPS_CANONIQUES.map((champ) => `${champ}=${payload[champ] === null ? "~" : String(payload[champ])}`),
   ].join("\n");
 }
@@ -83,6 +93,30 @@ function actionOperation(operation: OperationRemise): ActionAttestationStripe {
   return operation.etat_souhaite.mode === "expiration_stripe" ? "EXPIRATION_SYNC" : "REMOVE";
 }
 
+function validerObservationAttestationStripe(observation: ObservationAttestationStripe) {
+  if (!/^sub_[A-Za-z0-9_]{1,120}$/.test(observation.stripe_subscription_id)
+      || !/^cus_[A-Za-z0-9_]{1,120}$/.test(observation.stripe_customer_id)) {
+    throw new Error("Identité Stripe impossible à attester");
+  }
+  if (observation.status === "absent") {
+    if (observation.count !== 0 || observation.discount_id !== null
+        || observation.source_type !== null || observation.source_id !== null
+        || observation.coupon_id !== null) {
+      throw new Error("Absence Stripe incohérente");
+    }
+    return;
+  }
+  if (observation.status !== "present" || observation.count !== 1
+      || !/^di_[A-Za-z0-9_:-]{1,125}$/.test(observation.discount_id)
+      || !/^[A-Za-z0-9_:-]{1,128}$/.test(observation.coupon_id)
+      || !/^[A-Za-z0-9_:-]{1,128}$/.test(observation.source_id)
+      || !["coupon", "promotion_code"].includes(observation.source_type)
+      || (observation.source_type === "coupon" && observation.source_id !== observation.coupon_id)
+      || (observation.source_type === "promotion_code" && !/^promo_[A-Za-z0-9_:-]{1,122}$/.test(observation.source_id))) {
+    throw new Error("Présence Stripe incohérente");
+  }
+}
+
 export function construirePayloadAttestationStripe(params: {
   operation: OperationRemise;
   observation: ObservationAttestationStripe;
@@ -91,11 +125,12 @@ export function construirePayloadAttestationStripe(params: {
   observedAt?: Date;
   jti?: string;
 }): PayloadAttestationStripe {
+  validerObservationAttestationStripe(params.observation);
   const observedAt = params.observedAt ?? new Date();
   const expiresAt = new Date(observedAt.getTime() + 60_000);
   const application = params.operation.type_operation === "application";
   return {
-    version: 1,
+    version: 2,
     key_id: params.keyId,
     environment: params.environment,
     action: actionOperation(params.operation),
@@ -107,6 +142,11 @@ export function construirePayloadAttestationStripe(params: {
     stripe_customer_id: params.observation.stripe_customer_id,
     tentative: params.operation.nombre_tentatives,
     generation: params.operation.numero_posts_application ?? 0,
+    discount_presence: params.observation.status,
+    discount_count: params.observation.count,
+    discount_id: params.observation.discount_id,
+    discount_source_type: params.observation.source_type,
+    discount_source_id: params.observation.source_id,
     coupon_id: params.observation.coupon_id,
     discount_type: application ? params.operation.etat_souhaite.type ?? null : null,
     discount_value: application ? params.operation.etat_souhaite.valeur ?? null : null,
