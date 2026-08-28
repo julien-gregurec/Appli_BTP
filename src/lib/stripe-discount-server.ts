@@ -7,6 +7,7 @@ import {
   type StatutOperationRemise,
 } from "@/lib/stripe-discount-consistency";
 import type { StripeSubscription } from "@/lib/stripe-abonnement";
+import { creerAttestationStripe, type ObservationAttestationStripe } from "@/lib/stripe-state-attestation";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -90,21 +91,13 @@ function stockageServeur(admin: Admin, verrouToken: string) {
       if (error || !data) throw new Error("Checkpoint coupon indisponible");
       return data as unknown as OperationRemise;
     },
-    async finaliser(operation: OperationRemise, etat: EtatStripeRemise) {
-      const { data: checkpoint, error: erreurCheckpoint } = await admin.rpc("plateforme_enregistrer_preuve_stripe_serveur", {
+    async finaliser(operation: OperationRemise, observation: ObservationAttestationStripe) {
+      const attestation = creerAttestationStripe({ operation, observation });
+      const { data, error } = await admin.rpc("plateforme_finaliser_operation_remise_attestee_serveur", {
         p_operation_id: operation.id,
         p_verrou_token: verrouToken,
-        p_numero_tentative: operation.nombre_tentatives,
-        p_etat_observe: etat,
-      });
-      const preuve = checkpoint && typeof checkpoint === "object" && "preuve_serveur_id" in checkpoint
-        ? String((checkpoint as { preuve_serveur_id: unknown }).preuve_serveur_id)
-        : "";
-      if (erreurCheckpoint || !preuve) throw new Error("Preuve Stripe serveur indisponible");
-      const { data, error } = await admin.rpc("plateforme_finaliser_operation_remise_serveur", {
-        p_operation_id: operation.id,
-        p_verrou_token: verrouToken,
-        p_preuve_serveur_id: preuve,
+        p_attestation: attestation.payload,
+        p_signature: attestation.signature,
       });
       if (error || !data) throw new Error("Finalisation serveur indisponible");
       return data as unknown as OperationRemise;

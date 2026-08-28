@@ -19,7 +19,9 @@ export type EtatSouhaiteRemise = {
 
 export type OperationRemise = {
   id: string;
+  intention_id: string;
   entreprise_id: string;
+  abonnement_entreprise_id: string | null;
   stripe_subscription_id: string;
   type_operation: "application" | "retrait";
   etat_souhaite: EtatSouhaiteRemise;
@@ -32,12 +34,16 @@ export type OperationRemise = {
 };
 
 export type EtatStripeRemise = { coupon_id: string | null };
+export type ObservationStripeRemise = EtatStripeRemise & {
+  stripe_subscription_id: string;
+  stripe_customer_id: string;
+};
 
 export type StockageSagaRemise = {
   transition: (operationId: string, statut: StatutOperationRemise, etat: EtatStripeRemise | null, couponId?: string | null, erreur?: string | null) => Promise<OperationRemise>;
   enregistrerCoupon: (operationId: string, couponId: string) => Promise<OperationRemise>;
   preparerApplication: (operationId: string, etat: EtatStripeRemise) => Promise<OperationRemise>;
-  finaliser: (operation: OperationRemise, etat: EtatStripeRemise) => Promise<OperationRemise>;
+  finaliser: (operation: OperationRemise, observation: ObservationStripeRemise) => Promise<OperationRemise>;
 };
 
 export type PasserelleStripeRemise = {
@@ -57,6 +63,15 @@ export class OperationRemiseAReconcilier extends Error {
 
 function etatStripe(abonnement: StripeSubscription, stripe: PasserelleStripeRemise): EtatStripeRemise {
   return { coupon_id: stripe.couponActif(abonnement) };
+}
+
+function observationStripe(abonnement: StripeSubscription, stripe: PasserelleStripeRemise): ObservationStripeRemise {
+  const customer = typeof abonnement.customer === "string" ? abonnement.customer : abonnement.customer.id;
+  return {
+    stripe_subscription_id: abonnement.id,
+    stripe_customer_id: customer,
+    coupon_id: stripe.couponActif(abonnement),
+  };
 }
 
 function empreinteErreur(etape: string) {
@@ -144,8 +159,21 @@ export async function reconcilierOperationRemise(
       }
     }
 
+    // L'attestation n'est jamais signée depuis la réponse d'une mutation. Une
+    // dernière relecture GET Stripe, distincte et stateful, fournit seule l'état
+    // transmis à l'autorité de signature.
+    etape = "relecture_stripe_attestation";
+    const observationFinale = observationStripe(
+      await stripe.lire(operation.stripe_subscription_id),
+      stripe,
+    );
+    if (operation.type_operation === "application"
+      ? observationFinale.coupon_id !== operation.coupon_stripe_id
+      : observationFinale.coupon_id !== null) {
+      throw new Error("État Stripe final non confirmé");
+    }
     etape = "finalisation_sql";
-    return await stockage.finaliser(operation, observe);
+    return await stockage.finaliser(operation, observationFinale);
   } catch (erreurInitiale) {
     try {
       if (executionAcquise && !["completed", "failed_before_stripe", "cancelled", "reconciliation_required"].includes(operation.statut)) {

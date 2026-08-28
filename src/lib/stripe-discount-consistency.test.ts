@@ -4,7 +4,11 @@ import type { StripeSubscription } from "./stripe-abonnement";
 
 function operationApplication(): OperationRemise {
   return {
-    id: "op-1", entreprise_id: "entreprise-1", stripe_subscription_id: "sub-1",
+    id: "00000000-0000-4000-8000-000000000001",
+    intention_id: "00000000-0000-4000-8000-000000000002",
+    entreprise_id: "00000000-0000-4000-8000-000000000003",
+    abonnement_entreprise_id: "00000000-0000-4000-8000-000000000004",
+    stripe_subscription_id: "sub_test_1",
     type_operation: "application", statut: "pending", coupon_stripe_id: null,
     cle_idempotence_coupon: "coupon-op-1", cle_idempotence_application: "apply-op-1",
     nombre_tentatives: 0,
@@ -44,7 +48,7 @@ function environnement(initiale: OperationRemise, couponStripe: string | null = 
       historique.push("stripe_in_progress");
       return structuredClone(operation);
     },
-    async finaliser(_operation: OperationRemise, etat: { coupon_id: string | null }) {
+    async finaliser(_operation: OperationRemise, etat: { coupon_id: string | null; stripe_subscription_id: string; stripe_customer_id: string }) {
       if (echecFinalisation) { echecFinalisation = false; throw new Error("sql indisponible"); }
       remiseMetier = etat.coupon_id;
       operation = { ...operation, statut: "completed" };
@@ -55,7 +59,7 @@ function environnement(initiale: OperationRemise, couponStripe: string | null = 
   const stripe = {
     async lire(): Promise<StripeSubscription> {
       effets.lecture++;
-      return { id: "sub-1", customer: "cus-1", status: "active", discounts: couponActif ? [{ source: { coupon: { id: couponActif } } }] : [] };
+      return { id: "sub_test_1", customer: "cus_test_1", status: "active", discounts: couponActif ? [{ source: { coupon: { id: couponActif } } }] : [] };
     },
     couponActif(abonnement: StripeSubscription) {
       const source = typeof abonnement.discounts?.[0] === "object" ? abonnement.discounts[0].source?.coupon : null;
@@ -186,5 +190,9 @@ describe("saga persistante des remises Stripe", () => {
     expect(resultat.statut).toBe("cancelled");
     expect(env.effets.retrait).toBe(0);
     expect(env.stripeActuel()).toBe("coupon-nouveau");
+  });
+  it("25. la finalisation est précédée d'une relecture Stripe dédiée", async () => {
+    await reconcilierOperationRemise(operationApplication(), env.stockage, env.stripe);
+    expect(env.effets.lecture).toBeGreaterThanOrEqual(3);
   });
 });
