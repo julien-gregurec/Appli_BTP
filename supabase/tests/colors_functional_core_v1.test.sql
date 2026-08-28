@@ -59,16 +59,16 @@ select is((select couleur_hex from public.colors_seaux where id='c0200000-0000-0
 select is((select count(*) from public.colors_mouvements where seau_id='c0200000-0000-0000-0000-000000000001'),1::bigint,'création historisée');
 select is((select count(*) from public.colors_seaux),1::bigint,'gestionnaire A ne voit pas le seau B');
 select throws_ok($$insert into public.colors_seaux(entreprise_id,marque,produit,mode_quantite,pourcentage_saisi,unite,created_by) values('b0000000-0000-0000-0000-000000000001','X','X','pourcentage',50,'pourcent','10000000-0000-0000-0000-000000000002')$$,'42501',null,'insert cross-tenant refusé');
-select throws_ok($$update public.colors_seaux set quantite_restante=2 where id='c0200000-0000-0000-0000-000000000001'$$,'P0001','Utilisez une action métier Colors pour cette modification','ajustement direct refusé');
+select throws_ok($$update public.colors_seaux set quantite_restante=2 where id='c0200000-0000-0000-0000-000000000001'$$,'42501',null,'ajustement direct refusé');
 select lives_ok($$select public.colors_ajuster_quantite('c0200000-0000-0000-0000-000000000001',1.5,'consommation','Chantier test')$$,'ajustement via RPC autorisé');
 select is((select pourcentage_restant from public.colors_seaux where id='c0200000-0000-0000-0000-000000000001'),15.00::numeric,'quantité litres recalculée');
 select is((select count(*) from public.colors_mouvements where seau_id='c0200000-0000-0000-0000-000000000001'),2::bigint,'consommation historisée');
 select throws_ok($$select public.colors_ajuster_quantite('c0200000-0000-0000-0000-000000000001',-1,'ajustement',null)$$,'P0001','La quantité restante ne peut pas être négative','quantité négative refusée');
-select throws_ok($$select public.colors_ajuster_quantite('c0200000-0000-0000-0000-000000000001',11,'ajustement',null)$$,'P0001','Quantité supérieure au nominal','dépassement nominal refusé');
+select throws_ok($$select public.colors_ajuster_quantite('c0200000-0000-0000-0000-000000000001',11,'ajustement','Correction inventaire')$$,'P0001','Quantité supérieure au nominal','dépassement nominal refusé');
 select throws_ok($$insert into public.colors_seaux(entreprise_id,marque,produit,mode_quantite,unite,created_by) values('a0000000-0000-0000-0000-000000000001','X','Sans pourcentage','pourcentage','pourcent','10000000-0000-0000-0000-000000000002')$$,'23514',null,'pourcentage NULL refusé');
 select throws_ok($$insert into public.colors_seaux(entreprise_id,marque,produit,mode_quantite,quantite_nominale,unite,created_by) values('a0000000-0000-0000-0000-000000000001','X','Sans restant','volume',10,'l','10000000-0000-0000-0000-000000000002')$$,'23514',null,'quantité restante NULL refusée');
-select lives_ok($$insert into public.colors_analyses_ocr(entreprise_id,seau_id,photo_path,created_by) values('a0000000-0000-0000-0000-000000000001','c0200000-0000-0000-0000-000000000001','a0000000-0000-0000-0000-000000000001/c0200000-0000-0000-0000-000000000001/ocr.jpg','10000000-0000-0000-0000-000000000002')$$,'proposition OCR A créée à confirmer');
-select throws_ok($$insert into public.colors_analyses_ocr(entreprise_id,seau_id,photo_path,created_by) values('a0000000-0000-0000-0000-000000000001','d0200000-0000-0000-0000-000000000001','a0000000-0000-0000-0000-000000000001/d0200000-0000-0000-0000-000000000001/ocr.jpg','10000000-0000-0000-0000-000000000002')$$,'P0001','Seau OCR Colors invalide','OCR cross-tenant par UUID refusé');
+select lives_ok($$select public.colors_creer_analyse_ocr('a0000000-0000-0000-0000-000000000001','c0200000-0000-0000-0000-000000000001','a0000000-0000-0000-0000-000000000001/c0200000-0000-0000-0000-000000000001/ocr.jpg')$$,'proposition OCR A créée à confirmer');
+select throws_ok($$select public.colors_creer_analyse_ocr('a0000000-0000-0000-0000-000000000001','d0200000-0000-0000-0000-000000000001','a0000000-0000-0000-0000-000000000001/d0200000-0000-0000-0000-000000000001/ocr.jpg')$$,'P0001','Seau OCR Colors invalide','OCR cross-tenant par UUID refusé');
 
 reset role; set local role authenticated;
 select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000003',true);
@@ -79,7 +79,7 @@ select is((select emplacement_id from public.colors_seaux where id='c0200000-000
 select lives_ok($$select public.colors_changer_etat('c0200000-0000-0000-0000-000000000001','ouvert','Première utilisation')$$,'utilisateur dépôt ouvre le seau');
 select ok((select date_ouverture is not null from public.colors_seaux where id='c0200000-0000-0000-0000-000000000001'),'date ouverture renseignée');
 select is((select count(*) from public.colors_mouvements where seau_id='c0200000-0000-0000-0000-000000000001'),4::bigint,'déplacement et ouverture historisés');
-select lives_ok($$update public.colors_seaux set notes='Tentative dépôt' where id='c0200000-0000-0000-0000-000000000001'$$,'update dépôt ne lève pas mais ne cible aucune ligne');
+select throws_ok($$update public.colors_seaux set notes='Tentative dépôt' where id='c0200000-0000-0000-0000-000000000001'$$,'42501',null,'update direct dépôt refusé');
 select isnt((select notes from public.colors_seaux where id='c0200000-0000-0000-0000-000000000001'),'Tentative dépôt','dépôt ne modifie pas les métadonnées');
 
 reset role; set local role authenticated;
@@ -97,7 +97,7 @@ select is((select count(*) from public.colors_seaux),0::bigint,'utilisateur sans
 reset role; set local role authenticated;
 select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000002',true);
 select set_config('request.jwt.claim.email','ouvrier-a@invalid.local',true);
-select lives_ok($$insert into storage.objects(id,bucket_id,name,metadata) values('c0300000-0000-0000-0000-000000000001','colors-seaux','a0000000-0000-0000-0000-000000000001/c0200000-0000-0000-0000-000000000001/photo.jpg','{"mimetype":"image/jpeg"}')$$,'photo privée A ajoutée');
+select lives_ok($$insert into storage.objects(id,bucket_id,name,metadata) values('c0300000-0000-0000-0000-000000000001','colors-seaux','a0000000-0000-0000-0000-000000000001/c0200000-0000-0000-0000-000000000001/photo.jpg','{"mimetype":"image/jpeg","size":1024}')$$,'photo privée A ajoutée');
 select is((select count(*) from storage.objects where bucket_id='colors-seaux'),1::bigint,'A voit sa photo');
 select lives_ok($$select public.colors_definir_photo('c0200000-0000-0000-0000-000000000001','a0000000-0000-0000-0000-000000000001/c0200000-0000-0000-0000-000000000001/photo.jpg')$$,'photo associée par action métier');
 select is((select photo_principale_path from public.colors_seaux where id='c0200000-0000-0000-0000-000000000001'),'a0000000-0000-0000-0000-000000000001/c0200000-0000-0000-0000-000000000001/photo.jpg','chemin photo privé conservé');

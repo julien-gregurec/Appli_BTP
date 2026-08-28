@@ -4,8 +4,7 @@ import { exigerAccesApplication } from "@/lib/applications-elsatia";
 import { resoudreRoleColors } from "@/lib/acces-colors";
 import { peutEffectuerColors } from "@/lib/permissions-colors";
 import { createClient } from "@/lib/supabase/server";
-
-const csv = (valeur: unknown) => `"${String(valeur ?? "").replaceAll('"','""')}"`;
+import { celluleCsvColors as csv } from "@/lib/csv-colors";
 
 export async function GET() {
   const contexte = await getContexteColors();

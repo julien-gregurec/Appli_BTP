@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   if (erreurPhoto) return NextResponse.json({erreur:erreurPhoto},{status:400});
 
   const supabase = await createClient();
-  const { data: seau } = await supabase.from("colors_seaux").select("id").eq("entreprise_id",contexte.entrepriseId).eq("id",seauId).maybeSingle();
+  const { data: seau } = await supabase.from("colors_seaux").select("id,photo_principale_path").eq("entreprise_id",contexte.entrepriseId).eq("id",seauId).maybeSingle();
   if (!seau) return NextResponse.json({erreur:"Seau introuvable"},{status:404});
   const chemin = cheminPhotoColors(contexte.entrepriseId,seauId,photo.name);
   const contenu = new Uint8Array(await photo.arrayBuffer());
@@ -34,5 +34,10 @@ export async function POST(request: Request) {
     await supabase.storage.from("colors-seaux").remove([chemin]);
     return NextResponse.json({erreur:"Association de la photo impossible"},{status:400});
   }
-  return NextResponse.json({ok:true});
+  let nettoyageRequis=false;
+  if(seau.photo_principale_path&&seau.photo_principale_path!==chemin){
+    const {error}=await supabase.storage.from("colors-seaux").remove([seau.photo_principale_path]);
+    nettoyageRequis=Boolean(error);
+  }
+  return NextResponse.json({ok:true,nettoyageRequis});
 }

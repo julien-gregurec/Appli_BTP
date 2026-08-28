@@ -37,7 +37,7 @@ export async function creerSeauAction(formData:FormData){
     marque:texte(formData,"marque",120),produit:texte(formData,"produit",180),reference_produit:nullable(formData,"reference_produit",120),
     teinte_nom:nullable(formData,"teinte_nom",180),teinte_reference:nullable(formData,"teinte_reference",120),couleur_hex:nullable(formData,"couleur_hex",7)?.toUpperCase(),
     mode_quantite:mode,unite,quantite_nominale:mode==="pourcentage"?null:saisie.nominale,quantite_restante:mode==="pourcentage"?null:saisie.restante,
-    pourcentage_saisi:mode==="pourcentage"?saisie.pourcentage:null,etat:texte(formData,"etat")||"ferme",notes:nullable(formData,"notes",4000),created_by:contexte.userId,
+    pourcentage_saisi:mode==="pourcentage"?saisie.pourcentage:null,etat:texte(formData,"etat")||"ferme",notes:nullable(formData,"notes",4000),
   }).select("id").single();
   if(erreurDb||!data)retour("/inventaire",erreurDb?.message??"Création impossible","erreur");
   const seauId=(data as {id:string}).id;
@@ -46,7 +46,7 @@ export async function creerSeauAction(formData:FormData){
 
 export async function creerEmplacementAction(formData:FormData){
   const contexte=await contexteAction("gerer_emplacements");const supabase=await createClient();
-  const {error}=await supabase.from("colors_emplacements").insert({entreprise_id:contexte.entrepriseId,nom:texte(formData,"nom",120),type:texte(formData,"type"),description:nullable(formData,"description",1000),parent_id:nullable(formData,"parent_id"),created_by:contexte.userId});
+  const {error}=await supabase.from("colors_emplacements").insert({entreprise_id:contexte.entrepriseId,nom:texte(formData,"nom",120),type:texte(formData,"type"),description:nullable(formData,"description",1000),parent_id:nullable(formData,"parent_id")});
   if(error)retour("/depots",error.message,"erreur");revalidatePath("/depots");revalidatePath("/inventaire");retour("/depots","Emplacement ajouté");
 }
 
@@ -75,14 +75,14 @@ export async function archiverSeauAction(seauId:string,archiver:boolean){
 }
 
 export async function modifierSeauAction(seauId:string,formData:FormData){
-  const contexte=await contexteAction("modifier_seau");const supabase=await createClient();
-  const {error}=await supabase.from("colors_seaux").update({marque:texte(formData,"marque",120),produit:texte(formData,"produit",180),reference_produit:nullable(formData,"reference_produit",120),teinte_nom:nullable(formData,"teinte_nom",180),teinte_reference:nullable(formData,"teinte_reference",120),couleur_hex:nullable(formData,"couleur_hex",7)?.toUpperCase(),notes:nullable(formData,"notes",4000)}).eq("entreprise_id",contexte.entrepriseId).eq("id",seauId);
+  await contexteAction("modifier_seau");const supabase=await createClient();
+  const {error}=await supabase.rpc("colors_modifier_seau",{p_seau_id:seauId,p_marque:texte(formData,"marque",120),p_produit:texte(formData,"produit",180),p_reference_produit:nullable(formData,"reference_produit",120),p_teinte_nom:nullable(formData,"teinte_nom",180),p_teinte_reference:nullable(formData,"teinte_reference",120),p_couleur_hex:nullable(formData,"couleur_hex",7)?.toUpperCase()??null,p_notes:nullable(formData,"notes",4000)});
   if(error)retour(`/inventaire/${seauId}`,error.message,"erreur");revalidatePath(`/inventaire/${seauId}`);retour(`/inventaire/${seauId}`,"Informations mises à jour");
 }
 
 export async function enregistrerParametresAction(formData:FormData){
   const contexte=await contexteAction("gerer_parametres");const supabase=await createClient();const seuil=nombre(formData,"seuil");
   if(seuil==null||seuil<0||seuil>100)retour("/parametres","Seuil invalide","erreur");
-  const {error}=await supabase.from("colors_parametres").upsert({entreprise_id:contexte.entrepriseId,seuil_stock_faible_pourcent:seuil});
+  const {error}=await supabase.rpc("colors_enregistrer_parametres",{p_entreprise_id:contexte.entrepriseId,p_seuil:seuil});
   if(error)retour("/parametres",error.message,"erreur");revalidatePath("/parametres");retour("/parametres","Paramètres enregistrés");
 }

@@ -100,3 +100,19 @@ Les listes joignent l’emplacement dans la requête, les statistiques sont dér
 - intégrer un sélecteur commun Gestion Pro ↔ Colors dans toutes les futures applications ELSATIA, sur ordinateur et mobile, n’affichant que les applications autorisées et revalidant les droits dans chaque application cible.
 
 Cette livraison ne réalise aucun déploiement, aucune migration distante, aucun appel Stripe et aucune modification de compte réel.
+
+## V1.1 — intégrité métier
+
+La migration append-only `20260828000247_colors_integrity_v11.sql` ferme les quatre réserves P1 de la V1 sans modifier `00246` ni le socle central.
+
+- **Auteurs canoniques** : les créations utilisateur imposent `auth.uid()` même si le client fournit un autre `created_by`. L’entreprise et l’auteur initial sont immuables. Les mouvements, confirmations OCR et paramètres enregistrent l’UID serveur de l’action.
+- **Écritures officielles** : l’UPDATE direct des seaux, des analyses OCR et des paramètres est révoqué. Les métadonnées utilisent `colors_modifier_seau`, les paramètres `colors_enregistrer_parametres`, et les colonnes opérationnelles conservent leurs RPC verrouillées.
+- **Machine OCR** : une analyse naît uniquement en `a_confirmer` via `colors_creer_analyse_ocr`. `colors_confirmer_analyse_ocr` exige une sélection non vide et fixe `confirme_par/confirme_at`; `colors_rejeter_analyse_ocr` clôt la proposition. Une analyse traitée ne peut pas l’être une seconde fois. Aucun fournisseur réel n’est appelé.
+- **Photos** : `colors_definir_photo` valide l’objet exact dans le bucket privé, le chemin canonique `entreprise/seau/fichier`, le tenant, le MIME et la taille de 1 octet à 10 Mo. Storage interdit les renommages/déplacements. Le remplacement associe d’abord le nouvel objet, puis supprime l’ancien; un échec renvoie `nettoyageRequis: true`. Les objets non référencés restent supprimables par un rôle OCR autorisé et pourront être repris par un futur job idempotent.
+- **CSV** : `celluleCsvColors` neutralise `=`, `+`, `-` et `@` après espaces de tête pour toute valeur textuelle, puis encode guillemets et retours ligne. Les nombres réellement typés, dont les négatifs, restent des valeurs métier.
+- **Mouvements** : les états avant/après proviennent des lignes verrouillées. Le passage à vide conserve donc réellement `ferme` ou `ouvert`. Les consommations/sorties diminuent, les retours augmentent, les ajustements exigent un motif, les déplacements changent d’emplacement et les transitions ouverture/fermeture sont strictes. Des contraintes SQL protègent aussi les nouvelles lignes du journal.
+- **Stock faible et statistiques** : le seuil par tenant est utilisé par le filtre, le badge et la RPC d’agrégation. La valeur par défaut reste 20 % en l’absence de paramètre; 0 et 100 sont valides. Les statistiques agrègent toutes les lignes du tenant et ne dépendent plus de la liste d’inventaire limitée à 60.
+- **Recherche** : une colonne normalisée générée et un index GIN trigramme remplacent l’ancien index tsvector non utilisé par l’application. La requête serveur cible désormais directement `recherche_text`.
+- **Mobile et accessibilité** : menu, fermeture, avatar et liens essentiels atteignent au moins 44 px sous 760 px. Le bouton de fermeture porte le nom accessible « Fermer la navigation ».
+
+Les deux reconstructions locales ont été vérifiées : ledger Colors `00246 → 00247`, puis ledger canonique de 226 migrations `00245 → 00246 → 00247`. Les dettes restantes sont la pagination de l’inventaire, la compression/les miniatures, un job périodique de reprise des orphelins, l’offline métier, les catalogues licenciés et l’intégration future d’un fournisseur OCR autorisé.

@@ -13,6 +13,7 @@ export async function listerEmplacementsColors(entrepriseId: string) {
 
 export async function listerSeauxColors(entrepriseId: string, filtres: FiltresServeurColors = {}) {
   const supabase = await createClient();
+  const seuil = filtres.faible ? (await obtenirParametresColors(entrepriseId)).seuil_stock_faible_pourcent : 20;
   let requete = supabase.from("colors_seaux")
     .select("*,colors_emplacements(id,nom,type)")
     .eq("entreprise_id",entrepriseId)
@@ -21,10 +22,10 @@ export async function listerSeauxColors(entrepriseId: string, filtres: FiltresSe
   if (!filtres.archives && filtres.etat !== "archive") requete = requete.neq("etat","archive");
   if (filtres.etat && filtres.etat !== "tous") requete = requete.eq("etat",filtres.etat);
   if (filtres.emplacement) requete = requete.eq("emplacement_id",filtres.emplacement);
-  if (filtres.faible) requete = requete.lte("pourcentage_restant",20).neq("etat","archive");
+  if (filtres.faible) requete = requete.lte("pourcentage_restant",seuil).neq("etat","archive");
   if (filtres.sansPhoto) requete = requete.is("photo_principale_path",null);
   const q = (filtres.q ?? "").replace(/[%(),]/g," ").trim();
-  if (q) requete = requete.or(`marque.ilike.%${q}%,produit.ilike.%${q}%,reference_produit.ilike.%${q}%,teinte_nom.ilike.%${q}%,teinte_reference.ilike.%${q}%,couleur_hex.ilike.%${q}%,ral_approxime.ilike.%${q}%`);
+  if (q) requete = requete.ilike("recherche_text",`%${q}%`);
   const { data, error } = await requete;
   if (error) throw new Error("Impossible de charger l’inventaire Colors");
   return (data ?? []) as SeauColors[];
@@ -46,13 +47,11 @@ export async function obtenirSeauColors(entrepriseId: string, seauId: string) {
 }
 
 export async function statistiquesColors(entrepriseId: string) {
-  const seaux = await listerSeauxColors(entrepriseId,{archives:true});
-  return {
-    actifs: seaux.filter((s)=>s.etat!=="archive").length,
-    ouverts: seaux.filter((s)=>s.etat==="ouvert").length,
-    faibles: seaux.filter((s)=>s.etat!=="archive"&&s.pourcentage_restant<=20).length,
-    vides: seaux.filter((s)=>s.etat==="vide").length,
-  };
+  const supabase=await createClient();
+  const {data,error}=await supabase.rpc("colors_statistiques",{p_entreprise_id:entrepriseId}).single();
+  if(error)throw new Error("Impossible de charger les statistiques Colors");
+  const statistiques=data as {actifs:number|string;ouverts:number|string;faibles:number|string;vides:number|string;seuil_stock_faible_pourcent:number|string};
+  return {actifs:Number(statistiques.actifs),ouverts:Number(statistiques.ouverts),faibles:Number(statistiques.faibles),vides:Number(statistiques.vides),seuil_stock_faible_pourcent:Number(statistiques.seuil_stock_faible_pourcent)};
 }
 
 export async function listerMouvementsColors(entrepriseId: string) {

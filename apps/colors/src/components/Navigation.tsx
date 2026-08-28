@@ -41,7 +41,7 @@ export function MobileNavigation() {
       <aside className={`mobile-drawer ${ouvert ? "open" : ""}`} aria-hidden={!ouvert}>
         <div className="mobile-drawer-head">
           <Brand />
-          <button type="button" onClick={() => setOuvert(false)} aria-label="Fermer">×</button>
+          <button type="button" onClick={() => setOuvert(false)} aria-label="Fermer la navigation">×</button>
         </div>
         <LiensNavigation fermer={() => setOuvert(false)} />
       </aside>
