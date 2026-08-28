@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import type { EmplacementColors, MouvementColors, SeauColors } from "@/lib/colors-types";
+import type { EmplacementColors, MouvementColors, NettoyagePhotoColors, SeauColors } from "@/lib/colors-types";
 
 export type FiltresServeurColors = { q?: string; etat?: string; emplacement?: string; faible?: boolean; sansPhoto?: boolean; archives?: boolean };
 
@@ -31,11 +31,22 @@ export async function listerSeauxColors(entrepriseId: string, filtres: FiltresSe
   return (data ?? []) as SeauColors[];
 }
 
+export async function obtenirNettoyagesPhotoSeau(seauId: string) {
+  const supabase = await createClient();
+  // Surface de consultation persistante et cloisonnée (RPC SECURITY DEFINER,
+  // filtrage tenant + habilitation côté serveur). Ne jamais lire la table
+  // colors_nettoyages_photos directement : aucun rôle API n'y a accès.
+  const { data, error } = await supabase.rpc("colors_nettoyages_photos_seau", { p_seau_id: seauId });
+  if (error) return [] as NettoyagePhotoColors[];
+  return (data ?? []) as NettoyagePhotoColors[];
+}
+
 export async function obtenirSeauColors(entrepriseId: string, seauId: string) {
   const supabase = await createClient();
-  const [{data:seau,error},{data:mouvements}] = await Promise.all([
+  const [{data:seau,error},{data:mouvements},nettoyages] = await Promise.all([
     supabase.from("colors_seaux").select("*,colors_emplacements(id,nom,type)").eq("entreprise_id",entrepriseId).eq("id",seauId).maybeSingle(),
     supabase.from("colors_mouvements").select("*").eq("entreprise_id",entrepriseId).eq("seau_id",seauId).order("created_at",{ascending:false}).limit(100),
+    obtenirNettoyagesPhotoSeau(seauId),
   ]);
   if (error || !seau) return null;
   let photoUrl: string | null = null;
@@ -43,7 +54,13 @@ export async function obtenirSeauColors(entrepriseId: string, seauId: string) {
     const { data } = await supabase.storage.from("colors-seaux").createSignedUrl(seau.photo_principale_path,300,{transform:{width:900,height:900,resize:"contain"}});
     photoUrl = data?.signedUrl ?? null;
   }
-  return { seau: seau as SeauColors, mouvements: (mouvements ?? []) as MouvementColors[], photoUrl };
+  return {
+    seau: seau as SeauColors,
+    mouvements: (mouvements ?? []) as MouvementColors[],
+    photoUrl,
+    nettoyages,
+    nettoyageRequis: nettoyages.some((n) => n.nettoyage_requis),
+  };
 }
 
 export async function statistiquesColors(entrepriseId: string) {

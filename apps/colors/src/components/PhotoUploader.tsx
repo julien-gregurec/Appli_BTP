@@ -10,9 +10,7 @@ export function PhotoUploader({seauId}:{seauId:string}) {
     const reponse=await fetch("/api/photos",{method:"POST",body:donnees});const resultat=await reponse.json();
     setCharge(false);setMessage(reponse.ok
       ? resultat.nettoyageRequis
-        ? resultat.nettoyageSuivi
-          ? "Photo enregistrée. L’ancienne photo sera nettoyée automatiquement."
-          : "Photo enregistrée, mais l’ancienne photo nécessite un nettoyage manuel."
+        ? "Photo enregistrée. L’ancienne photo n’a pas pu être supprimée : le suivi de nettoyage reste affiché ci-dessous jusqu’à sa reprise."
         : "Photo enregistrée."
       : resultat.erreur??"Échec du téléversement");
     if(reponse.ok){formulaire.current?.reset();routeur.refresh();}

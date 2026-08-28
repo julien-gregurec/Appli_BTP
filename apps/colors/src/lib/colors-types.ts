@@ -45,6 +45,17 @@ export type SeauColors = {
   colors_emplacements?: Pick<EmplacementColors, "id" | "nom" | "type"> | null;
 };
 
+export type NettoyagePhotoColors = {
+  seau_id: string;
+  statut: "a_nettoyer" | "resolu";
+  nettoyage_requis: boolean;
+  tentatives: number;
+  created_at: string;
+  derniere_tentative_at: string;
+  resolved_at: string | null;
+  derniere_erreur: string | null;
+};
+
 export type MouvementColors = {
   id: string;
   seau_id: string;

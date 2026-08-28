@@ -110,7 +110,32 @@ describe("shell autonome ELSATIA Colors", () => {
     expect(route).toContain("validerSignaturePhotoColors");
     expect(route).toContain("createAdminStorageClient");
     expect(composant).toContain("resultat.nettoyageRequis");
-    expect(composant).toContain("sera nettoyée automatiquement");
+  });
+
+  it("consulte une surface persistante et cloisonnée pour la dette de nettoyage (V1.3)", () => {
+    const metier = readFileSync(join(process.cwd(), "src/lib/metier-colors.ts"), "utf8");
+    const fiche = readFileSync(join(process.cwd(), "src/app/(colors)/inventaire/[id]/page.tsx"), "utf8");
+    // lecture via la RPC SECURITY DEFINER dédiée, jamais la table directement
+    expect(metier).toContain('rpc("colors_nettoyages_photos_seau"');
+    expect(metier).not.toMatch(/\.from\(\s*["'`]colors_nettoyages_photos["'`]\s*\)/);
+    expect(metier).toContain("obtenirNettoyagesPhotoSeau");
+    // la fiche affiche l'état persistant au chargement (pas seulement la réponse d'upload)
+    expect(fiche).toContain("nettoyageRequis");
+    expect(fiche).toContain("cleanup-notice");
+    expect(fiche).toContain("Nettoyage photo en attente");
+  });
+
+  it("ferme explicitement le DML direct anon/service_role sur les tables colors_* (migration V1.3)", () => {
+    const migration = readFileSync(
+      join(process.cwd(), "..", "..", "supabase", "migrations", "20260828000249_colors_security_cleanup_v13.sql"),
+      "utf8",
+    );
+    expect(migration).toMatch(/revoke\s+insert,\s*update,\s*delete,\s*truncate[\s\S]*from\s+public,\s*anon,\s*service_role/i);
+    expect(migration).toContain("create or replace function public.colors_nettoyages_photos_seau");
+    expect(migration).toContain("security definer");
+    expect(migration).toContain("set search_path = public");
+    expect(migration).toContain("grant execute on function public.colors_nettoyages_photos_seau(uuid) to authenticated");
+    expect(migration).not.toMatch(/grant\s+(insert|update|delete)[\s\S]*to\s+(anon|service_role)/i);
   });
 
   it("ne dépend d’aucune permission ni route du stock Gestion Pro", () => {
