@@ -17,6 +17,7 @@ vi.mock("@/lib/brand", () => ({ BRAND: { urlPublique: mocks.urlCanonique } }));
 vi.mock("@/lib/stripe-abonnement", () => ({
   appliquerCouponAbonnement: vi.fn(),
   couponActifDepuisAbonnement: vi.fn(),
+  observerRemiseDepuisAbonnement: vi.fn(),
   creerCouponRemise: vi.fn(),
   recupererAbonnementStripe: vi.fn(),
   retirerCouponAbonnement: vi.fn(),

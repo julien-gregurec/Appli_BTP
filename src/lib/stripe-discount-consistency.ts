@@ -1,4 +1,4 @@
-import type { DureeRemise, StripeSubscription, TypeRemise } from "@/lib/stripe-abonnement";
+import type { DureeRemise, ObservationRemiseStripe, StripeSubscription, TypeRemise } from "@/lib/stripe-abonnement";
 
 export type StatutOperationRemise =
   | "pending" | "stripe_in_progress" | "stripe_applied" | "stripe_removed"
@@ -33,8 +33,8 @@ export type OperationRemise = {
   nombre_tentatives: number;
 };
 
-export type EtatStripeRemise = { coupon_id: string | null };
-export type ObservationStripeRemise = EtatStripeRemise & {
+export type EtatStripeRemise = ObservationRemiseStripe;
+export type ObservationStripeRemise = ObservationRemiseStripe & {
   stripe_subscription_id: string;
   stripe_customer_id: string;
 };
@@ -48,7 +48,7 @@ export type StockageSagaRemise = {
 
 export type PasserelleStripeRemise = {
   lire: (subscriptionId: string) => Promise<StripeSubscription>;
-  couponActif: (abonnement: StripeSubscription) => string | null;
+  observer: (abonnement: StripeSubscription) => ObservationRemiseStripe;
   creerCoupon: (souhait: EtatSouhaiteRemise, cleIdempotence: string) => Promise<{ id: string }>;
   appliquerCoupon: (subscriptionId: string, couponId: string, cleIdempotence: string) => Promise<unknown>;
   retirerCoupon: (subscriptionId: string) => Promise<unknown>;
@@ -62,15 +62,26 @@ export class OperationRemiseAReconcilier extends Error {
 }
 
 function etatStripe(abonnement: StripeSubscription, stripe: PasserelleStripeRemise): EtatStripeRemise {
-  return { coupon_id: stripe.couponActif(abonnement) };
+  return stripe.observer(abonnement);
 }
 
 function observationStripe(abonnement: StripeSubscription, stripe: PasserelleStripeRemise): ObservationStripeRemise {
   const customer = typeof abonnement.customer === "string" ? abonnement.customer : abonnement.customer.id;
+  if (!/^sub_[A-Za-z0-9_]{1,120}$/.test(abonnement.id)
+      || !/^cus_[A-Za-z0-9_]{1,120}$/.test(customer)) {
+    throw new Error("Identité abonnement/client Stripe non résolue");
+  }
+  const remise = stripe.observer(abonnement);
+  console.info("Observation Stripe de remise résolue", {
+    statut: remise.status,
+    count: remise.count,
+    discount_id: remise.discount_id,
+    source_type: remise.source_type,
+  });
   return {
+    ...remise,
     stripe_subscription_id: abonnement.id,
     stripe_customer_id: customer,
-    coupon_id: stripe.couponActif(abonnement),
   };
 }
 
@@ -100,7 +111,7 @@ export async function reconcilierOperationRemise(
     // annulée ; un checkpoint plus avancé est laissé à la reprise sans mutation.
     if (operation.type_operation === "retrait"
         && operation.etat_souhaite.mode === "expiration_stripe"
-        && observe.coupon_id !== null) {
+        && observe.status === "present") {
       if (operation.statut === "pending") {
         return await stockage.transition(operation.id, "cancelled", observe);
       }
@@ -142,7 +153,7 @@ export async function reconcilierOperationRemise(
         operation = await stockage.transition(operation.id, "stripe_applied", observe, couponId);
       }
     } else {
-      if (observe.coupon_id !== null) {
+      if (observe.status === "present") {
         if (!executionAcquise) {
           operation = await stockage.transition(operation.id, "reconciliation_required", observe);
           operation = await stockage.transition(operation.id, "stripe_in_progress", observe);
@@ -153,7 +164,7 @@ export async function reconcilierOperationRemise(
         etape = "verification_retrait";
         observe = etatStripe(await stripe.lire(operation.stripe_subscription_id), stripe);
       }
-      if (observe.coupon_id !== null) throw new Error("Retrait Stripe non confirmé");
+      if (observe.status !== "absent") throw new Error("Retrait Stripe non confirmé");
       if (operation.statut === "stripe_in_progress") {
         operation = await stockage.transition(operation.id, "stripe_removed", observe);
       }
@@ -169,7 +180,7 @@ export async function reconcilierOperationRemise(
     );
     if (operation.type_operation === "application"
       ? observationFinale.coupon_id !== operation.coupon_stripe_id
-      : observationFinale.coupon_id !== null) {
+      : observationFinale.status !== "absent") {
       throw new Error("État Stripe final non confirmé");
     }
     etape = "finalisation_sql";

@@ -32,11 +32,16 @@ begin
   select * into strict o from public.plateforme_operations_remise where id=p_operation;
   select * into strict e from public.entreprises where id=o.entreprise_id;
   return jsonb_build_object(
-    'version',1,'key_id','test-r72-v1','environment','test','action',p_action,
+    'version',2,'key_id','test-r72-v1','environment','test','action',p_action,
     'operation_id',o.id,'intention_id',o.intention_id,'entreprise_id',o.entreprise_id,
     'abonnement_entreprise_id',o.abonnement_entreprise_id,
     'stripe_subscription_id',o.stripe_subscription_id,'stripe_customer_id',e.stripe_customer_id,
     'tentative',o.nombre_tentatives,'generation',o.numero_posts_application,
+    'discount_presence',case when p_coupon is null then 'absent' else 'present' end,
+    'discount_count',case when p_coupon is null then 0 else 1 end,
+    'discount_id',case when p_coupon is null then null else 'di_'||p_coupon end,
+    'discount_source_type',case when p_coupon is null then null else 'coupon' end,
+    'discount_source_id',p_coupon,
     'coupon_id',p_coupon,
     'discount_type',case when o.type_operation='application' then o.etat_souhaite->>'type' end,
     'discount_value',case when o.type_operation='application' then (o.etat_souhaite->>'valeur')::numeric end,
@@ -97,6 +102,13 @@ select set_config('test.r72_apply_payload',pg_temp.r72_payload(
   '72000000-0000-4000-8000-000000000011'
 )::text,true);
 select set_config('test.r72_apply_signature',pg_temp.r72_signature(current_setting('test.r72_apply_payload')::jsonb),true);
+select set_config('test.r73_false_absence_payload',(
+  current_setting('test.r72_apply_payload')::jsonb || jsonb_build_object(
+    'discount_presence','absent','discount_count',0,'discount_id',null,
+    'discount_source_type',null,'discount_source_id',null,'coupon_id',null
+  )
+)::text,true);
+select set_config('test.r73_false_absence_signature',pg_temp.r72_signature(current_setting('test.r73_false_absence_payload')::jsonb),true);
 
 set local role service_role;
 select set_config('request.jwt.claims','{"role":"service_role"}',true);
@@ -104,6 +116,11 @@ select throws_like(format(
   'select public.plateforme_finaliser_operation_remise_attestee_serveur(%L::uuid,%L::uuid,%L::jsonb,%L)',
   current_setting('test.r72_apply_op'),current_setting('test.r72_apply_lock'),current_setting('test.r72_apply_payload'),'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=='
 ),'%Signature Stripe invalide%','signature forgée refusée');
+select throws_like(format(
+  'select public.plateforme_finaliser_operation_remise_attestee_serveur(%L::uuid,%L::uuid,%L::jsonb,%L)',
+  current_setting('test.r72_apply_op'),current_setting('test.r72_apply_lock'),
+  current_setting('test.r73_false_absence_payload'),current_setting('test.r73_false_absence_signature')
+),'%Remise Stripe attestée incohérente%','APPLY refuse une fausse absence même correctement signée');
 select throws_like(format(
   'select public.plateforme_finaliser_operation_remise_attestee_serveur(%L::uuid,%L::uuid,%L::jsonb,%L)',
   current_setting('test.r72_apply_op'),current_setting('test.r72_apply_lock'),
@@ -187,8 +204,17 @@ select set_config('test.r72_remove_payload',pg_temp.r72_payload(
   current_setting('test.r72_remove_op')::uuid,'REMOVE',null,'72000000-0000-4000-8000-000000000021'
 )::text,true);
 select set_config('test.r72_remove_signature',pg_temp.r72_signature(current_setting('test.r72_remove_payload')::jsonb),true);
+select set_config('test.r73_remove_present_payload',pg_temp.r72_payload(
+  current_setting('test.r72_remove_op')::uuid,'REMOVE','coupon_still_active','72000000-0000-4000-8000-000000000022'
+)::text,true);
+select set_config('test.r73_remove_present_signature',pg_temp.r72_signature(current_setting('test.r73_remove_present_payload')::jsonb),true);
 set local role service_role;
 select set_config('request.jwt.claims','{"role":"service_role"}',true);
+select throws_like(format(
+  'select public.plateforme_finaliser_operation_remise_attestee_serveur(%L::uuid,%L::uuid,%L::jsonb,%L)',
+  current_setting('test.r72_remove_op'),current_setting('test.r72_remove_lock'),
+  current_setting('test.r73_remove_present_payload'),current_setting('test.r73_remove_present_signature')
+),'%Retrait Stripe attesté incohérent%','REMOVE refuse une présence Stripe même correctement signée');
 select lives_ok(format(
   'select public.plateforme_finaliser_operation_remise_attestee_serveur(%L::uuid,%L::uuid,%L::jsonb,%L)',
   current_setting('test.r72_remove_op'),current_setting('test.r72_remove_lock'),current_setting('test.r72_remove_payload'),current_setting('test.r72_remove_signature')

@@ -39,8 +39,39 @@ export type StripeSubscription = {
   cancel_at_period_end?: boolean;
   metadata?: Record<string, string>;
   items?: { data?: Array<{ id: string; quantity?: number; price?: { id?: string } }> };
-  discounts?: Array<string | { id?: string; coupon?: string | { id?: string }; source?: { coupon?: string | { id?: string } } }> | null;
+  discounts?: Array<string | {
+    id?: string;
+    object?: string;
+    coupon?: string | { id?: string };
+    promotion_code?: string | { id?: string } | null;
+    source?: { type?: string; coupon?: string | { id?: string } | null };
+  }> | null;
 };
+
+export type ObservationRemiseStripe =
+  | {
+    status: "absent";
+    count: 0;
+    discount_id: null;
+    source_type: null;
+    source_id: null;
+    coupon_id: null;
+  }
+  | {
+    status: "present";
+    count: 1;
+    discount_id: string;
+    source_type: "coupon" | "promotion_code";
+    source_id: string;
+    coupon_id: string;
+  };
+
+export class ObservationRemiseStripeInexploitable extends Error {
+  constructor(public readonly raison: string, public readonly count: number, public readonly discountId: string | null = null) {
+    super("Observation Stripe de remise incomplète");
+    this.name = "ObservationRemiseStripeInexploitable";
+  }
+}
 
 const VARIABLES_PRIX: Partial<Record<OffreAbonnement, Record<PeriodiciteAbonnement, string>>> = {
   essentiel: {
@@ -274,16 +305,90 @@ export async function retirerCouponAbonnement(subscriptionId: string) {
   });
 }
 
+function identifiantStripeDeveloppe(valeur: unknown): string | null {
+  if (typeof valeur === "string") return valeur.trim() || null;
+  if (!valeur || typeof valeur !== "object") return null;
+  const id = (valeur as { id?: unknown }).id;
+  return typeof id === "string" && id.trim() ? id : null;
+}
+
+function observationInexploitable(raison: string, count: number, discountId: string | null = null): never {
+  console.warn("Observation Stripe de remise refusée", {
+    statut: "unresolved",
+    count,
+    discount_id: discountId,
+    raison,
+  });
+  throw new ObservationRemiseStripeInexploitable(raison, count, discountId);
+}
+
+/**
+ * Convertit exclusivement une réponse Stripe suffisamment développée en état
+ * signable. Une référence `di_…`, un objet partiel ou une source inconnue ne
+ * signifient jamais « aucune remise » : ces formes échouent fermées.
+ */
+export function observerRemiseDepuisAbonnement(abonnement: StripeSubscription): ObservationRemiseStripe {
+  if (!Array.isArray(abonnement.discounts)) {
+    return observationInexploitable("discounts_absent_ou_invalide", -1);
+  }
+  const count = abonnement.discounts.length;
+  if (count === 0) {
+    return { status: "absent", count: 0, discount_id: null, source_type: null, source_id: null, coupon_id: null };
+  }
+  if (count !== 1) return observationInexploitable("cardinalite_non_supportee", count);
+
+  const remise = abonnement.discounts[0];
+  if (typeof remise === "string") return observationInexploitable("discount_non_developpe", count, remise);
+  if (!remise || typeof remise !== "object") return observationInexploitable("discount_invalide", count);
+
+  const discountId = identifiantStripeDeveloppe(remise.id);
+  if (!discountId || !/^di_[A-Za-z0-9_:-]{1,125}$/.test(discountId)) {
+    return observationInexploitable("discount_id_invalide", count, discountId);
+  }
+
+  let couponId: string | null = null;
+  if (remise.source !== undefined) {
+    if (!remise.source || remise.source.type !== "coupon") {
+      return observationInexploitable("source_inconnue", count, discountId);
+    }
+    couponId = identifiantStripeDeveloppe(remise.source.coupon);
+  } else if (remise.coupon !== undefined) {
+    // Compatibilité stricte avec les versions Stripe où le coupon développé
+    // était directement porté par Discount.
+    couponId = identifiantStripeDeveloppe(remise.coupon);
+  }
+  if (!couponId || !/^[A-Za-z0-9_:-]{1,128}$/.test(couponId)) {
+    return observationInexploitable("coupon_non_resolu", count, discountId);
+  }
+
+  if (remise.promotion_code !== undefined && remise.promotion_code !== null) {
+    const promotionCodeId = identifiantStripeDeveloppe(remise.promotion_code);
+    if (!promotionCodeId || !/^promo_[A-Za-z0-9_:-]{1,122}$/.test(promotionCodeId)) {
+      return observationInexploitable("promotion_code_non_resolu", count, discountId);
+    }
+    return {
+      status: "present", count: 1, discount_id: discountId,
+      source_type: "promotion_code", source_id: promotionCodeId, coupon_id: couponId,
+    };
+  }
+  return {
+    status: "present", count: 1, discount_id: discountId,
+    source_type: "coupon", source_id: couponId, coupon_id: couponId,
+  };
+}
+
 export function couponActifDepuisAbonnement(abonnement: StripeSubscription): string | null {
-  const remise = abonnement.discounts?.[0];
-  if (!remise || typeof remise === "string") return null;
-  const source = remise.source?.coupon ?? remise.coupon;
-  if (typeof source === "string") return source;
-  return source?.id ?? null;
+  const observation = observerRemiseDepuisAbonnement(abonnement);
+  return observation.status === "present" ? observation.coupon_id : null;
 }
 
 export async function recupererAbonnementStripe(subscriptionId: string) {
-  return requeteStripe<StripeSubscription>(`subscriptions/${encodeURIComponent(subscriptionId)}`, {
+  const expansions = new URLSearchParams();
+  // Stripe documente `expand[]=discounts` comme le moyen de remplacer chaque
+  // référence `di_…` par le Discount complet. L'identifiant `source.coupon`
+  // est ensuite une identité suffisante et reste accepté sous forme string.
+  expansions.append("expand[]", "discounts");
+  return requeteStripe<StripeSubscription>(`subscriptions/${encodeURIComponent(subscriptionId)}?${expansions}`, {
     methode: "GET",
   });
 }

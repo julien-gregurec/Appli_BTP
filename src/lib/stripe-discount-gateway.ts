@@ -1,7 +1,7 @@
 import {
   appliquerCouponAbonnement,
-  couponActifDepuisAbonnement,
   creerCouponRemise,
+  observerRemiseDepuisAbonnement,
   recupererAbonnementStripe,
   retirerCouponAbonnement,
 } from "@/lib/stripe-abonnement";
@@ -9,7 +9,7 @@ import type { EtatSouhaiteRemise, PasserelleStripeRemise } from "@/lib/stripe-di
 
 export const passerelleStripeRemise: PasserelleStripeRemise = {
   lire: recupererAbonnementStripe,
-  couponActif: couponActifDepuisAbonnement,
+  observer: observerRemiseDepuisAbonnement,
   creerCoupon: (souhait: EtatSouhaiteRemise, cleIdempotence: string) => creerCouponRemise({
     type: souhait.type!,
     valeur: souhait.valeur!,

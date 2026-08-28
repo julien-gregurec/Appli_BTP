@@ -45,13 +45,31 @@ function environnement(overrides: VariablesAttestationStripe = {}): VariablesAtt
   };
 }
 
+const observationPresente = {
+  status: "present" as const,
+  count: 1 as const,
+  discount_id: "di_test_73",
+  source_type: "coupon" as const,
+  source_id: "coupon_test_73",
+  coupon_id: "coupon_test_73",
+};
+
+const observationAbsente = {
+  status: "absent" as const,
+  count: 0 as const,
+  discount_id: null,
+  source_type: null,
+  source_id: null,
+  coupon_id: null,
+};
+
 function payload() {
   return construirePayloadAttestationStripe({
     operation: operation(),
     observation: {
       stripe_subscription_id: "sub_test_attestation",
       stripe_customer_id: "cus_test_attestation",
-      coupon_id: "coupon_test_73",
+      ...observationPresente,
     },
     environment: "test",
     keyId: "test-r72-v1",
@@ -84,6 +102,11 @@ describe("attestation asymétrique de l'état Stripe", () => {
 
   it.each([
     ["coupon_id", "coupon_forge"],
+    ["discount_id", "di_forge"],
+    ["discount_presence", "absent"],
+    ["discount_count", 0],
+    ["discount_source_type", "promotion_code"],
+    ["discount_source_id", "promo_forge"],
     ["discount_value", 74],
     ["discount_type", "montant"],
     ["stripe_subscription_id", "sub_autre"],
@@ -100,12 +123,12 @@ describe("attestation asymétrique de l'état Stripe", () => {
   it("lie REMOVE et EXPIRATION_SYNC à des actions distinctes", () => {
     const retrait = construirePayloadAttestationStripe({
       operation: operation("retrait"),
-      observation: { stripe_subscription_id: "sub_test_attestation", stripe_customer_id: "cus_test_attestation", coupon_id: null },
+      observation: { stripe_subscription_id: "sub_test_attestation", stripe_customer_id: "cus_test_attestation", ...observationAbsente },
       environment: "test", keyId: "test-r72-v1",
     });
     const expiration = construirePayloadAttestationStripe({
       operation: { ...operation("retrait"), etat_souhaite: { active: false, mode: "expiration_stripe" } },
-      observation: { stripe_subscription_id: "sub_test_attestation", stripe_customer_id: "cus_test_attestation", coupon_id: null },
+      observation: { stripe_subscription_id: "sub_test_attestation", stripe_customer_id: "cus_test_attestation", ...observationAbsente },
       environment: "test", keyId: "test-r72-v1",
     });
     expect(retrait.action).toBe("REMOVE");
@@ -129,8 +152,21 @@ describe("attestation asymétrique de l'état Stripe", () => {
   it("échoue sans clé privée distincte du service_role", () => {
     expect(() => creerAttestationStripe({
       operation: operation(),
-      observation: { stripe_subscription_id: "sub_test_attestation", stripe_customer_id: "cus_test_attestation", coupon_id: "coupon_test_73" },
+      observation: { stripe_subscription_id: "sub_test_attestation", stripe_customer_id: "cus_test_attestation", ...observationPresente },
       environnement: environnement({ STRIPE_STATE_ATTESTATION_PRIVATE_KEY_B64: undefined }),
     })).toThrow("Clé privée");
+  });
+
+  it("refuse de signer une absence portant encore une identité Discount", () => {
+    expect(() => creerAttestationStripe({
+      operation: operation("retrait"),
+      observation: {
+        stripe_subscription_id: "sub_test_attestation",
+        stripe_customer_id: "cus_test_attestation",
+        status: "absent", count: 0, discount_id: "di_still_active",
+        source_type: null, source_id: null, coupon_id: null,
+      } as never,
+      environnement: environnement(),
+    })).toThrow("Absence Stripe incohérente");
   });
 });

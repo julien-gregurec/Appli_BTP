@@ -7,9 +7,11 @@ const {
   appliquerCouponAbonnement,
   calculerFacturationStockage,
   creerCouponRemise,
+  observerRemiseDepuisAbonnement,
   prixOptionIAStripePour,
   prixStripePour,
   reconcilierAbonnementStripe,
+  recupererAbonnementStripe,
   retirerCouponAbonnement,
   statutAbonnementDepuisStripe,
   stripeBillingEstConfigure,
@@ -68,6 +70,58 @@ function fetchFakeStripe(params: { itemExistant?: { id: string; price: { id: str
   });
   return { fauxFetch, appels };
 }
+
+describe("observation non-lossy des remises Stripe", () => {
+  const abonnement = (discounts: NonNullable<Parameters<typeof observerRemiseDepuisAbonnement>[0]["discounts"]>) => ({
+    id: "sub_test", customer: "cus_test", status: "active", discounts,
+  });
+
+  it("distingue explicitement l'absence confirmée", () => {
+    expect(observerRemiseDepuisAbonnement(abonnement([]))).toEqual({
+      status: "absent", count: 0, discount_id: null,
+      source_type: null, source_id: null, coupon_id: null,
+    });
+  });
+
+  it("résout un discount coupon complètement développé", () => {
+    expect(observerRemiseDepuisAbonnement(abonnement([{
+      id: "di_active", object: "discount", source: { type: "coupon", coupon: "coupon_active" },
+    }]))).toEqual({
+      status: "present", count: 1, discount_id: "di_active",
+      source_type: "coupon", source_id: "coupon_active", coupon_id: "coupon_active",
+    });
+  });
+
+  it("atteste séparément un promotion code et son coupon", () => {
+    expect(observerRemiseDepuisAbonnement(abonnement([{
+      id: "di_promo", source: { type: "coupon", coupon: { id: "coupon_promo" } },
+      promotion_code: { id: "promo_active" },
+    }]))).toEqual({
+      status: "present", count: 1, discount_id: "di_promo",
+      source_type: "promotion_code", source_id: "promo_active", coupon_id: "coupon_promo",
+    });
+  });
+
+  it.each([
+    ["référence string", ["di_unexpanded_active"]],
+    ["objet minimal", [{ id: "di_active" }]],
+    ["source inconnue", [{ id: "di_active", source: { type: "future_source", coupon: "coupon_active" } }]],
+    ["plusieurs discounts", [
+      { id: "di_a", source: { type: "coupon", coupon: "coupon_a" } },
+      { id: "di_b", source: { type: "coupon", coupon: "coupon_b" } },
+    ]],
+  ])("échoue fermé pour %s", (_nom, discounts) => {
+    expect(() => observerRemiseDepuisAbonnement(abonnement(discounts))).toThrow("incomplète");
+  });
+
+  it("demande explicitement les expansions nécessaires au GET Stripe", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_fake");
+    const { fauxFetch, appels } = fetchFakeStripe({});
+    vi.stubGlobal("fetch", fauxFetch);
+    await recupererAbonnementStripe("sub_test");
+    expect(appels[0].url).toContain("expand%5B%5D=discounts");
+  });
+});
 
 describe("tarifs Stripe Billing", () => {
   it("associe chaque offre et périodicité au bon prix", () => {

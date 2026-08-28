@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OperationRemise } from "./stripe-discount-consistency";
-import { reconcilierOperationRemiseSousVerrou } from "./stripe-discount-server";
-import type { StripeSubscription } from "./stripe-abonnement";
+import { reconcilierOperationRemiseSousVerrou, synchroniserExpirationRemiseSousVerrou } from "./stripe-discount-server";
+import { observerRemiseDepuisAbonnement, type StripeSubscription } from "./stripe-abonnement";
 
 const CLE_PRIVEE_TEST_B64 = "MC4CAQAwBQYDK2VwBCIEIBREYG+YWvbZZDoV/UNDGaB8WQTMiUy27PQ4rQEicZlo";
 
@@ -69,6 +69,11 @@ describe("frontière serveur d'attestation Stripe", () => {
           stripe_subscription_id: "sub_r72_server",
           stripe_customer_id: "cus_r72_server",
           coupon_id: "coupon_r72_server",
+          discount_presence: "present",
+          discount_count: 1,
+          discount_id: "di_r72_server",
+          discount_source_type: "coupon",
+          discount_source_id: "coupon_r72_server",
           tentative: 1,
           generation: 1,
         });
@@ -84,13 +89,10 @@ describe("frontière serveur d'attestation Stripe", () => {
         lectures++;
         return {
           id: "sub_r72_server", customer: "cus_r72_server", status: "active",
-          discounts: coupon ? [{ source: { coupon: { id: coupon } } }] : [],
+          discounts: coupon ? [{ id: "di_r72_server", source: { type: "coupon", coupon: { id: coupon } } }] : [],
         };
       },
-      couponActif(abonnement: StripeSubscription) {
-        const source = typeof abonnement.discounts?.[0] === "object" ? abonnement.discounts[0].source?.coupon : null;
-        return source && typeof source === "object" ? source.id ?? null : null;
-      },
+      observer: observerRemiseDepuisAbonnement,
       async creerCoupon() { return { id: "coupon_r72_server" }; },
       async appliquerCoupon() { coupon = "coupon_r72_server"; },
       async retirerCoupon() { coupon = null; },
@@ -104,5 +106,21 @@ describe("frontière serveur d'attestation Stripe", () => {
     expect(fonctions).toContain("plateforme_finaliser_operation_remise_attestee_serveur");
     expect(fonctions).not.toContain("plateforme_enregistrer_preuve_stripe_serveur");
     expect(fonctions).not.toContain("plateforme_finaliser_operation_remise_serveur");
+  });
+
+  it("le chemin webhook/expiration refuse un discount non développé avant SQL", async () => {
+    const rpc = vi.fn();
+    const abonnement: StripeSubscription = {
+      id: "sub_r72_server", customer: "cus_r72_server", status: "active",
+      discounts: ["di_unexpanded_active"],
+    };
+    await expect(synchroniserExpirationRemiseSousVerrou(
+      { rpc } as never,
+      "81000000-0000-4000-8000-000000000003",
+      abonnement,
+      "82000000-0000-4000-8000-000000000001",
+      { observer: observerRemiseDepuisAbonnement } as never,
+    )).rejects.toThrow("incomplète");
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

@@ -34,6 +34,7 @@ vi.mock("@/lib/stripe-abonnement", () => ({
   retirerCouponAbonnement: mocks.retirerCouponAbonnement,
   recupererAbonnementStripe: mocks.recupererAbonnementStripe,
   couponActifDepuisAbonnement: mocks.couponActifDepuisAbonnement,
+  observerRemiseDepuisAbonnement: vi.fn(),
   TYPES_REMISE: ["montant", "pourcentage"],
   DUREES_REMISE: ["once", "repeating", "forever"],
 }));

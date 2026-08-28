@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { OperationRemiseAReconcilier, reconcilierOperationRemise, type EtatSouhaiteRemise, type OperationRemise, type StatutOperationRemise } from "./stripe-discount-consistency";
-import type { StripeSubscription } from "./stripe-abonnement";
+import { OperationRemiseAReconcilier, reconcilierOperationRemise, type EtatSouhaiteRemise, type EtatStripeRemise, type ObservationStripeRemise, type OperationRemise, type StatutOperationRemise } from "./stripe-discount-consistency";
+import { observerRemiseDepuisAbonnement, type StripeSubscription } from "./stripe-abonnement";
 
 function operationApplication(): OperationRemise {
   return {
@@ -31,7 +31,7 @@ function environnement(initiale: OperationRemise, couponStripe: string | null = 
   const couponsParCle = new Map<string, string>();
   const applicationsParCle = new Map<string, string>();
   const stockage = {
-    async transition(_id: string, statut: StatutOperationRemise, _etat: { coupon_id: string | null } | null, couponId?: string | null) {
+    async transition(_id: string, statut: StatutOperationRemise, _etat: EtatStripeRemise | null, couponId?: string | null) {
       if (statut === "stripe_in_progress" && operation.statut === "stripe_in_progress") throw new Error("déjà en cours");
       operation = { ...operation, statut, coupon_stripe_id: couponId ?? operation.coupon_stripe_id, nombre_tentatives: operation.nombre_tentatives + (statut === "stripe_in_progress" ? 1 : 0) };
       historique.push(statut);
@@ -48,7 +48,7 @@ function environnement(initiale: OperationRemise, couponStripe: string | null = 
       historique.push("stripe_in_progress");
       return structuredClone(operation);
     },
-    async finaliser(_operation: OperationRemise, etat: { coupon_id: string | null; stripe_subscription_id: string; stripe_customer_id: string }) {
+    async finaliser(_operation: OperationRemise, etat: ObservationStripeRemise) {
       if (echecFinalisation) { echecFinalisation = false; throw new Error("sql indisponible"); }
       remiseMetier = etat.coupon_id;
       operation = { ...operation, statut: "completed" };
@@ -59,12 +59,9 @@ function environnement(initiale: OperationRemise, couponStripe: string | null = 
   const stripe = {
     async lire(): Promise<StripeSubscription> {
       effets.lecture++;
-      return { id: "sub_test_1", customer: "cus_test_1", status: "active", discounts: couponActif ? [{ source: { coupon: { id: couponActif } } }] : [] };
+      return { id: "sub_test_1", customer: "cus_test_1", status: "active", discounts: couponActif ? [{ id: `di_${couponActif}`, source: { type: "coupon", coupon: { id: couponActif } } }] : [] };
     },
-    couponActif(abonnement: StripeSubscription) {
-      const source = typeof abonnement.discounts?.[0] === "object" ? abonnement.discounts[0].source?.coupon : null;
-      return source && typeof source === "object" ? source.id ?? null : typeof source === "string" ? source : null;
-    },
+    observer: observerRemiseDepuisAbonnement,
     async creerCoupon(_souhait: EtatSouhaiteRemise, cle: string) {
       if (!couponsParCle.has(cle)) { effets.creation++; couponsParCle.set(cle, `coupon-${effets.creation}`); }
       return { id: couponsParCle.get(cle)! };
@@ -194,5 +191,58 @@ describe("saga persistante des remises Stripe", () => {
   it("25. la finalisation est précédée d'une relecture Stripe dédiée", async () => {
     await reconcilierOperationRemise(operationApplication(), env.stockage, env.stripe);
     expect(env.effets.lecture).toBeGreaterThanOrEqual(3);
+  });
+
+  it("26. le P1 di_unexpanded_active échoue fermé sans DELETE ni finalisation", async () => {
+    env = environnement(operationRetrait(), "coupon-ancien");
+    const stripe = {
+      ...env.stripe,
+      async lire(): Promise<StripeSubscription> {
+        env.effets.lecture++;
+        return { id: "sub_test_1", customer: "cus_test_1", status: "active", discounts: ["di_unexpanded_active"] };
+      },
+    };
+    await expect(reconcilierOperationRemise(operationRetrait(), env.stockage, stripe))
+      .rejects.toBeInstanceOf(OperationRemiseAReconcilier);
+    expect(env.effets.retrait).toBe(0);
+    expect(env.metierActuel()).toBe("coupon-ancien");
+    expect(env.operation().statut).not.toBe("completed");
+  });
+
+  it("27. APPLY refuse aussi une observation initiale non développée sans mutation", async () => {
+    const stripe = {
+      ...env.stripe,
+      async lire(): Promise<StripeSubscription> {
+        env.effets.lecture++;
+        return { id: "sub_test_1", customer: "cus_test_1", status: "active", discounts: ["di_unexpanded_active"] };
+      },
+    };
+    await expect(reconcilierOperationRemise(operationApplication(), env.stockage, stripe))
+      .rejects.toBeInstanceOf(OperationRemiseAReconcilier);
+    expect(env.effets.creation + env.effets.application).toBe(0);
+    expect(env.operation().statut).toBe("pending");
+  });
+
+  it("28. REMOVE ne finalise pas si le GET post-DELETE reste non résolu", async () => {
+    env = environnement(operationRetrait(), "coupon-ancien");
+    let deleteEffectue = false;
+    const stripe = {
+      ...env.stripe,
+      async lire(): Promise<StripeSubscription> {
+        env.effets.lecture++;
+        return deleteEffectue
+          ? { id: "sub_test_1", customer: "cus_test_1", status: "active", discounts: ["di_still_unresolved"] }
+          : { id: "sub_test_1", customer: "cus_test_1", status: "active", discounts: [{ id: "di_active", source: { type: "coupon", coupon: "coupon-ancien" } }] };
+      },
+      async retirerCoupon() {
+        env.effets.retrait++;
+        deleteEffectue = true;
+      },
+    };
+    await expect(reconcilierOperationRemise(operationRetrait(), env.stockage, stripe))
+      .rejects.toBeInstanceOf(OperationRemiseAReconcilier);
+    expect(env.effets.retrait).toBe(1);
+    expect(env.metierActuel()).toBe("coupon-ancien");
+    expect(env.operation().statut).toBe("reconciliation_required");
   });
 });
