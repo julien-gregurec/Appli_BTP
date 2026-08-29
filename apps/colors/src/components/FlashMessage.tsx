@@ -1,0 +1,1 @@
+export function FlashMessage({ok,erreur}:{ok?:string;erreur?:string}){const message=erreur||ok;if(!message)return null;return <p className={`flash ${erreur?"error":"success"}`} role="status">{message}</p>;}

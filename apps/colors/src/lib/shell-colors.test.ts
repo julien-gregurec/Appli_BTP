@@ -1,0 +1,149 @@
+import { describe, expect, it } from "vitest";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+import manifest from "@/app/manifest";
+import { NAVIGATION_COLORS } from "@/lib/navigation";
+
+function fichiersSource(repertoire: string): string[] {
+  return readdirSync(repertoire).flatMap((nom) => {
+    const chemin = join(repertoire, nom);
+    return statSync(chemin).isDirectory() ? fichiersSource(chemin) : [chemin];
+  });
+}
+
+describe("shell autonome ELSATIA Colors", () => {
+  it("prépare toutes les sections annoncées", () => {
+    expect(NAVIGATION_COLORS.map((item) => item.label)).toEqual([
+      "Tableau de bord",
+      "Inventaire",
+      "Ajout par photo",
+      "Dépôts et emplacements",
+      "Mouvements",
+      "Nuanciers",
+      "Catalogues produits",
+      "Imports",
+      "Utilisateurs et habilitations",
+      "Paramètres",
+    ]);
+  });
+
+  it("possède un manifeste PWA Colors indépendant", () => {
+    const resultat = manifest();
+    expect(resultat.name).toBe("ELSATIA Colors");
+    expect(resultat.short_name).toBe("Colors");
+    expect(resultat.start_url).toBe("/dashboard");
+    expect(resultat.theme_color).toBe("#44264d");
+    expect(resultat.icons?.every((icone) => icone.src.includes("colors"))).toBe(true);
+
+    const serviceWorker = readFileSync(join(process.cwd(), "public/sw-colors.js"), "utf8");
+    expect(serviceWorker).toContain("elsatia-colors-");
+    expect(serviceWorker).not.toMatch(/cache\.put|\/api\//);
+  });
+
+  it("résout le contexte commun sans dépendre de l’abonnement Gestion Pro", () => {
+    const contexte = readFileSync(join(process.cwd(), "src/lib/contexte.ts"), "utf8");
+    expect(contexte).toContain('rpc("contexte_application_courant")');
+    expect(contexte).not.toMatch(/contexte_abonnement_courant|abonnement_statut/);
+  });
+
+  it("rend le sélecteur identifiable et conserve les décisions côté serveur", () => {
+    const selecteur = readFileSync(join(process.cwd(), "src/components/ApplicationSwitcher.tsx"), "utf8");
+    const menu = readFileSync(join(process.cwd(), "src/components/ApplicationSwitcherMenu.tsx"), "utf8");
+    const acces = readFileSync(join(process.cwd(), "src/lib/acces-colors.ts"), "utf8");
+    expect(menu).toContain('aria-label="Applications ELSATIA"');
+    expect(menu).toContain("aria-expanded={ouvert}");
+    expect(acces).toContain("verifierAccesApplication");
+    expect(acces).toContain("exigerAccesApplication");
+    expect(selecteur).not.toMatch(/julien@elsatia\.fr/);
+    expect(menu).not.toMatch(/julien@elsatia\.fr/);
+  });
+
+  it("ne transmet jamais une erreur Supabase brute au login", () => {
+    const actions = readFileSync(join(process.cwd(), "src/app/actions.ts"), "utf8");
+    expect(actions).toContain("Identifiants incorrects.");
+    expect(actions).toContain("Votre compte ELSATIA ne dispose pas d’un accès actif à Colors.");
+    expect(actions).toContain('rpc("contexte_application_courant")');
+    expect(actions).toContain('rpc("a_acces_application"');
+    expect(actions).not.toMatch(/error\.message/);
+  });
+
+  it("résout et affiche un rôle Colors canonique", () => {
+    const acces = readFileSync(join(process.cwd(), "src/lib/acces-colors.ts"), "utf8");
+    const shell = readFileSync(join(process.cwd(), "src/components/Shell.tsx"), "utf8");
+    expect(acces).toContain("resoudreRoleColors");
+    expect(acces).toContain("estRoleColors");
+    expect(shell).toContain("colors_admin_organisation");
+    expect(shell).toContain("colors_gestionnaire_stock");
+    expect(shell).toContain("colors_utilisateur_depot");
+    expect(shell).toContain("colors_consultation");
+  });
+
+  it("ferme le sélecteur avec Échap et rend le focus au déclencheur", () => {
+    const menu = readFileSync(join(process.cwd(), "src/components/ApplicationSwitcherMenu.tsx"), "utf8");
+    expect(menu).toContain('event.key === "Escape"');
+    expect(menu).toContain("declencheur.current?.focus()");
+    expect(menu).toContain('aria-label="Applications accessibles"');
+  });
+
+  it("piège le focus dans le tiroir mobile et le rend au déclencheur", () => {
+    const navigation = readFileSync(join(process.cwd(), "src/components/Navigation.tsx"), "utf8");
+    expect(navigation).toContain('event.key === "Escape"');
+    expect(navigation).toContain('event.key !== "Tab"');
+    expect(navigation).toContain("declencheur.current?.focus()");
+    expect(navigation).toContain('role="dialog"');
+    expect(navigation).toContain('aria-modal="true"');
+    expect(navigation).toContain("{ouvert && <aside");
+  });
+
+  it("rend la fermeture du seau et le motif d’ajustement explicites", () => {
+    const fiche = readFileSync(join(process.cwd(), "src/app/(colors)/inventaire/[id]/page.tsx"), "utf8");
+    expect(fiche).toContain('value="ferme"');
+    expect(fiche).toContain("Marquer fermé");
+    expect(fiche).toContain('<input name="motif" required/>');
+  });
+
+  it("affiche et suit explicitement la dette de nettoyage photo", () => {
+    const route = readFileSync(join(process.cwd(), "src/app/api/photos/route.ts"), "utf8");
+    const composant = readFileSync(join(process.cwd(), "src/components/PhotoUploader.tsx"), "utf8");
+    expect(route).toContain('rpc("colors_signaler_nettoyage_photo"');
+    expect(route).toContain('rpc("colors_resoudre_nettoyage_photo"');
+    expect(route).toContain("validerSignaturePhotoColors");
+    expect(route).toContain("createAdminStorageClient");
+    expect(composant).toContain("resultat.nettoyageRequis");
+  });
+
+  it("consulte une surface persistante et cloisonnée pour la dette de nettoyage (V1.3)", () => {
+    const metier = readFileSync(join(process.cwd(), "src/lib/metier-colors.ts"), "utf8");
+    const fiche = readFileSync(join(process.cwd(), "src/app/(colors)/inventaire/[id]/page.tsx"), "utf8");
+    // lecture via la RPC SECURITY DEFINER dédiée, jamais la table directement
+    expect(metier).toContain('rpc("colors_nettoyages_photos_seau"');
+    expect(metier).not.toMatch(/\.from\(\s*["'`]colors_nettoyages_photos["'`]\s*\)/);
+    expect(metier).toContain("obtenirNettoyagesPhotoSeau");
+    // la fiche affiche l'état persistant au chargement (pas seulement la réponse d'upload)
+    expect(fiche).toContain("nettoyageRequis");
+    expect(fiche).toContain("cleanup-notice");
+    expect(fiche).toContain("Nettoyage photo en attente");
+  });
+
+  it("ferme explicitement le DML direct anon/service_role sur les tables colors_* (migration V1.3)", () => {
+    const migration = readFileSync(
+      join(process.cwd(), "..", "..", "supabase", "migrations", "20260828000249_colors_security_cleanup_v13.sql"),
+      "utf8",
+    );
+    expect(migration).toMatch(/revoke\s+insert,\s*update,\s*delete,\s*truncate[\s\S]*from\s+public,\s*anon,\s*service_role/i);
+    expect(migration).toContain("create or replace function public.colors_nettoyages_photos_seau");
+    expect(migration).toContain("security definer");
+    expect(migration).toContain("set search_path = public");
+    expect(migration).toContain("grant execute on function public.colors_nettoyages_photos_seau(uuid) to authenticated");
+    expect(migration).not.toMatch(/grant\s+(insert|update|delete)[\s\S]*to\s+(anon|service_role)/i);
+  });
+
+  it("ne dépend d’aucune permission ni route du stock Gestion Pro", () => {
+    const racine = join(process.cwd(), "src");
+    const contenu = fichiersSource(racine)
+      .filter((fichier) => !fichier.endsWith("shell-colors.test.ts"))
+      .map((fichier) => readFileSync(fichier, "utf8"))
+      .join("\n");
+    expect(contenu).not.toMatch(/acces_stock|gerer_stock|["'`]\/stock(?:[\/"'`?]|$)/);
+  });
+});
