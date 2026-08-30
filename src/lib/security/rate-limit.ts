@@ -32,6 +32,12 @@ export function politiquesRateLimitPour(chemin: string, methode: string, authent
     if (chemin === "/mot-de-passe-oublie") return [{ cle: "auth:password-reset", maximum: 5, fenetreSecondes: 3600, portee: "ip" }];
     if (chemin === "/nouveau-mot-de-passe") return [{ cle: "auth:new-password", maximum: 5, fenetreSecondes: 3600, portee: "ip" }];
   }
+  // Second facteur : couvre le chargement de page et la soumission du code.
+  // La vérification du code applique en plus une limite dédiée plus stricte
+  // (clé auth:mfa:tentative) directement dans l'action serveur.
+  if (chemin === "/login/mfa") {
+    return [{ cle: "auth:mfa", maximum: 10, fenetreSecondes: 600, portee: authentifie ? "utilisateur" : "ip" }];
+  }
   if (chemin.startsWith("/auth/")) return [{ cle: "auth:callback", maximum: 30, fenetreSecondes: 600, portee: "ip" }];
   if (chemin.startsWith("/api/cron/")) return [{ cle: "api:cron", maximum: 60, fenetreSecondes: 60, portee: "ip" }];
   if (chemin === "/api/paie/import") return [{ cle: "api:payroll-import", maximum: 30, fenetreSecondes: 300, portee: "ip" }];

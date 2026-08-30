@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { destinationInterneSure } from "@/lib/securite/redirections";
 
 const MESSAGE_SANS_COLORS = "Votre compte ELSATIA ne dispose pas d’un accès actif à Colors.";
 
@@ -16,12 +17,19 @@ function texte(formData: FormData, cle: string) {
 export async function connexionAction(formData: FormData) {
   const email = texte(formData, "email");
   const password = texte(formData, "password");
-  const suivant = texte(formData, "next");
-  const destination = suivant.startsWith("/") && !suivant.startsWith("//") ? suivant : "/dashboard";
+  const destination = destinationInterneSure(texte(formData, "next"));
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) redirect(`/login?error=${encodeURIComponent("Identifiants incorrects.")}`);
+
+  // Si le compte possède un facteur MFA vérifié, la session est encore en aal1 :
+  // exiger le second facteur avant d'ouvrir Colors. Le facteur MFA Supabase est
+  // commun au compte même si les sessions restent cloisonnées par domaine.
+  const { data: niveau } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (niveau?.currentLevel === "aal1" && niveau?.nextLevel === "aal2") {
+    redirect(`/login/mfa?next=${encodeURIComponent(destination)}`);
+  }
 
   const { data: contexte, error: erreurContexte } = await supabase
     .rpc("contexte_application_courant")

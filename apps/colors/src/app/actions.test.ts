@@ -26,10 +26,12 @@ function client({
   authError = null,
   autorise = true,
   contexte = { entreprise_id: "entreprise-a" },
+  niveauMfa = { currentLevel: "aal1", nextLevel: "aal1" },
 }: {
   authError?: { message: string } | null;
   autorise?: boolean;
   contexte?: { entreprise_id: string | null } | null;
+  niveauMfa?: { currentLevel: string; nextLevel: string };
 } = {}) {
   const signOut = vi.fn().mockResolvedValue({ error: null });
   const rpc = vi.fn((fonction: string) => {
@@ -45,6 +47,9 @@ function client({
     auth: {
       signInWithPassword: vi.fn().mockResolvedValue({ error: authError }),
       signOut,
+      mfa: {
+        getAuthenticatorAssuranceLevel: vi.fn().mockResolvedValue({ data: niveauMfa, error: null }),
+      },
     },
     rpc,
   };
@@ -91,5 +96,23 @@ describe("connexion Colors", () => {
 
     await expect(connexionAction(formulaire("personne@example.test", "secret", "//evil.example")))
       .rejects.toMatchObject({ destination: "/dashboard" });
+  });
+
+  it("exige le second facteur quand la session peut passer à aal2", async () => {
+    const supabase = client({ niveauMfa: { currentLevel: "aal1", nextLevel: "aal2" } });
+    mocks.createClient.mockResolvedValue(supabase);
+
+    await expect(connexionAction(formulaire("personne@example.test", "secret", "/inventaire")))
+      .rejects.toMatchObject({ destination: "/login/mfa?next=%2Finventaire" });
+    // Aucune décision d'accès Colors avant l'élévation AAL2.
+    expect(supabase.rpc).not.toHaveBeenCalled();
+  });
+
+  it("ignore une destination externe lors de la redirection second facteur", async () => {
+    const supabase = client({ niveauMfa: { currentLevel: "aal1", nextLevel: "aal2" } });
+    mocks.createClient.mockResolvedValue(supabase);
+
+    await expect(connexionAction(formulaire("personne@example.test", "secret", "//evil.example")))
+      .rejects.toMatchObject({ destination: "/login/mfa?next=%2Fdashboard" });
   });
 });
