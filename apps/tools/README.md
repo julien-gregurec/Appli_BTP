@@ -1,6 +1,6 @@
 # ELSATIA Tools
 
-Application chantier autonome et freemium destinée au domaine `tools.elsatia.fr`, à iOS/iPadOS et à Android. Les seize outils essentiels restent intégralement utilisables gratuitement, hors connexion et sans compte. Dix outils Tools Pro ajoutent la conception géométrique, les plans cotés et les méthodes de traçage reproductibles.
+Application chantier autonome et freemium destinée au domaine `tools.elsatia.fr`, à iOS/iPadOS et à Android. Les seize outils essentiels restent intégralement utilisables gratuitement, hors connexion et sans compte. Dix outils Tools Pro ajoutent la conception géométrique, les plans cotés, les projets locaux et les exports chantier reproductibles.
 
 ## Développement local
 
@@ -42,6 +42,8 @@ Voir [docs/native.md](docs/native.md) pour l’architecture, les prérequis, l�
 - `src/lib/promotions.ts` : promotions croisées ELSATIA centralisées ;
 - `src/lib/storage.ts` : clés locales canoniques et migration depuis l’ancien namespace ;
 - `src/lib/platform.ts` : détection Web/iOS/Android et validation des deep links ;
+- `src/lib/projects/` : modèle versionné, migrations, dépôt IndexedDB et services CRUD des projets locaux ;
+- `src/lib/exports/` : reconstruction canonique et sorties SVG, PDF A4, impression et partage ;
 - `src/components/NativeRuntimeBridge.tsx` : retour Android et routage natif ;
 - `capacitor.config.ts` : configuration partagée des wrappers locaux ;
 - `android/` et `ios/` : projets natifs sans duplication du moteur métier ;
@@ -61,7 +63,7 @@ Les composants ne contiennent pas de conditions commerciales dispersées. `acces
 
 Chaque outil déclare `access` et ses `capabilities` dans le catalogue. Tous les outils R3 sont `free`. Sans droit Pro, les pages avancées montrent un aperçu descriptif qui ne calcule ni fausse cote ni fausse forme. Pour la validation locale uniquement, `NEXT_PUBLIC_TOOLS_INTERNAL_PRO=1` accorde un entitlement de source `internal` au build ou au serveur de développement.
 
-Les conventions complètes du moteur de traçage figurent dans [docs/tracing-engine.md](docs/tracing-engine.md).
+Les conventions complètes du moteur de traçage figurent dans [docs/tracing-engine.md](docs/tracing-engine.md). Le stockage et les documents chantier sont détaillés dans [docs/projects-exports.md](docs/projects-exports.md).
 
 ## Promotions ELSATIA
 
@@ -69,7 +71,7 @@ Les promotions déclarent application, contenu, URL, placement, contexte, état 
 
 ## PWA et migration du stockage
 
-La PWA s’appelle **ELSATIA Tools**, utilise le short name **Tools**, le service worker `/sw-tools.js` et le cache `elsatia-tools-v5`. Le service worker reste réservé au Web ; iOS et Android utilisent les ressources statiques incluses dans le paquet.
+La PWA s’appelle **ELSATIA Tools**, utilise le short name **Tools**, le service worker `/sw-tools.js` et le cache `elsatia-tools-v6`. Le service worker reste réservé au Web ; iOS et Android utilisent les ressources statiques incluses dans le paquet.
 
 Au premier lancement, `storage.ts` migre sans perte :
 
@@ -78,7 +80,7 @@ Au premier lancement, `storage.ts` migre sans perte :
 
 Une valeur déjà présente dans le nouveau namespace n’est jamais écrasée. Les anciennes clés sont ensuite supprimées et la migration devient idempotente.
 
-Sur iOS et Android, les favoris et récents sont conservés avec Capacitor Preferences derrière la même abstraction et les mêmes namespaces `elsatia.tools.*`.
+Sur iOS et Android, les favoris et récents sont conservés avec Capacitor Preferences derrière la même abstraction et les mêmes namespaces `elsatia.tools.*`. Les projets structurés utilisent IndexedDB dans la WebView, sans synchronisation distante ; l’utilisateur peut les transférer explicitement au format `.elsatiatools`.
 
 ## Ajouter un outil
 

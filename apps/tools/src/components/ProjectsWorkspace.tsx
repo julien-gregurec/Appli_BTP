@@ -1,0 +1,45 @@
+"use client";
+
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getLocalAccess, hasCapability } from "@/lib/access";
+import { getTool } from "@/lib/catalog";
+import { buildProjectDocument, projectFileName } from "@/lib/exports/document";
+import { exportProjectPdf } from "@/lib/exports/pdf";
+import { downloadBlob, shareBlob } from "@/lib/exports/share";
+import { exportProjectSvg } from "@/lib/exports/svg";
+import { PROJECT_FILE_EXTENSION, serializeProject, type ToolProject } from "@/lib/projects/model";
+import { createProjectRepository } from "@/lib/projects/repository";
+import { ProjectService } from "@/lib/projects/service";
+import { Brand } from "./HomeDashboard";
+import { ProFeaturePreview } from "./ProFeaturePreview";
+import { ToolIcon } from "./ToolIcon";
+
+type Filter = "active" | "archived" | "all"; type Sort = "updated" | "name";
+
+export function ProjectsWorkspace() {
+  const access = getLocalAccess();
+  if (!hasCapability(access, "saved-projects")) return <LockedProjects />;
+  return <UnlockedProjects />;
+}
+
+function LockedProjects() {
+  return <main className="projects-page"><header className="calculator-header shell"><Brand /><Link href="/" className="all-tools">Accueil <span>×</span></Link></header><section className="tool-hero"><div className="shell"><p className="eyebrow">TOOLS PRO</p><h1 className="projects-title">Mes projets</h1><p>Conservez localement vos tracés, sans compte ni cloud.</p></div></section><section className="shell locked-projects"><ProFeaturePreview name="Projets locaux" description="Enregistrez vos paramètres, retrouvez-les hors ligne et reconstruisez toujours la géométrie depuis sa source métier." capability="saved-projects" preview="Aucune donnée envoyée à ELSATIA" /><ProFeaturePreview name="Exports chantier" description="Produisez des documents PDF, SVG et des vues d’impression à partir du plan coté." capability="export-pdf" preview="Fonction Tools Pro" /></section></main>;
+}
+
+function UnlockedProjects() {
+  const service = useMemo(() => typeof indexedDB === "undefined" ? null : new ProjectService(createProjectRepository()), []); const [projects, setProjects] = useState<ToolProject[]>([]); const [query, setQuery] = useState(""); const [filter, setFilter] = useState<Filter>("active"); const [sort, setSort] = useState<Sort>("updated"); const [feedback, setFeedback] = useState(""); const importRef = useRef<HTMLInputElement>(null);
+  const refresh = useCallback(async () => { if (service) setProjects(await service.list()); }, [service]);
+  useEffect(() => { if (service) void service.list().then(setProjects).catch((error: unknown) => setFeedback(error instanceof Error ? error.message : "Stockage local indisponible.")); }, [service]);
+  const visible = projects.filter((project) => filter === "all" || project.archived === (filter === "archived")).filter((project) => !query.trim() || [project.name, project.siteName, getTool(project.toolId)?.name].filter(Boolean).join(" ").toLocaleLowerCase("fr").includes(query.toLocaleLowerCase("fr").trim())).sort((a, b) => sort === "name" ? a.name.localeCompare(b.name, "fr") : b.updatedAt.localeCompare(a.updatedAt));
+  async function mutate(action: () => Promise<unknown>, message: string) { if (!service) return; try { await action(); await refresh(); setFeedback(message); } catch (error) { setFeedback(error instanceof Error ? error.message : "Action impossible."); } }
+  async function rename(project: ToolProject) { if (!service) return; const name = window.prompt("Nouveau nom du projet", project.name); if (name && name.trim() !== project.name) await mutate(() => service.rename(project, name), "Projet renommé."); }
+  async function remove(project: ToolProject) { if (!service) return; if (window.confirm(`Supprimer définitivement « ${project.name} » ? Cette action est irréversible.`)) await mutate(() => service.delete(project), "Projet supprimé."); }
+  function documentOf(project: ToolProject) { return buildProjectDocument(project); }
+  function downloadSvg(project: ToolProject) { const document = documentOf(project); downloadBlob(new Blob([exportProjectSvg(document)], { type: "image/svg+xml;charset=utf-8" }), projectFileName(document, "svg")); setFeedback("SVG généré localement."); }
+  function downloadPdf(project: ToolProject) { const document = documentOf(project); downloadBlob(new Blob([exportProjectPdf(document)], { type: "application/pdf" }), projectFileName(document, "pdf")); setFeedback("PDF généré localement."); }
+  async function share(project: ToolProject) { const document = documentOf(project); const name = projectFileName(document, "pdf"); const outcome = await shareBlob(new Blob([exportProjectPdf(document)], { type: "application/pdf" }), name, `Plan ELSATIA Tools - ${project.name}`, `${getTool(project.toolId)?.name}${project.siteName ? ` - ${project.siteName}` : ""}`); setFeedback(outcome === "download" ? "Partage indisponible : le PDF a été téléchargé." : "Feuille de partage ouverte."); }
+  function exportPortable(project: ToolProject) { const document = documentOf(project); downloadBlob(new Blob([serializeProject(project)], { type: "application/vnd.elsatia.tools+json" }), projectFileName(document, "elsatiatools")); setFeedback("Projet portable exporté."); }
+  async function importPortable(file: File) { if (!service) return; await mutate(async () => { await service.import(await file.text()); }, "Projet importé et validé."); if (importRef.current) importRef.current.value = ""; }
+  return <main className="projects-page"><header className="calculator-header shell"><Brand /><Link href="/" className="all-tools">Accueil <span>×</span></Link></header><section className="tool-hero"><div className="shell projects-hero"><div><p className="eyebrow">TOOLS PRO · STOCKAGE LOCAL</p><h1 className="projects-title">Mes projets</h1><p>Vos projets restent dans cet appareil et sont recalculés à chaque ouverture.</p></div><label className="import-project">Importer un projet<input ref={importRef} type="file" accept={PROJECT_FILE_EXTENSION + ",application/json"} onChange={(event) => { const file = event.target.files?.[0]; if (file) void importPortable(file); }} /></label></div></section><section className="shell project-controls"><label className="project-search"><span>Rechercher</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nom, chantier ou outil" /></label><label><span>Afficher</span><select value={filter} onChange={(event) => setFilter(event.target.value as Filter)}><option value="active">Actifs</option><option value="archived">Archivés</option><option value="all">Tous</option></select></label><label><span>Trier</span><select value={sort} onChange={(event) => setSort(event.target.value as Sort)}><option value="updated">Dernière modification</option><option value="name">Nom</option></select></label></section><p className="shell project-feedback" role="status" aria-live="polite">{feedback}</p><section className="shell project-list">{visible.length === 0 ? <div className="empty-projects"><span>◇</span><h2>Aucun projet dans cette vue</h2><p>Ouvrez un outil Pro puis choisissez « Enregistrer le projet ».</p><Link href="/#tools-pro">Découvrir les outils Pro</Link></div> : visible.map((project) => { const tool = getTool(project.toolId)!; return <article className="project-card" key={project.id}><div className="project-card-main"><span className="tool-icon"><ToolIcon id={project.toolId} /></span><div><small>{tool.name}{project.archived ? " · ARCHIVÉ" : ""}</small><h2>{project.name}</h2>{project.siteName && <p>Chantier : {project.siteName}</p>}<time dateTime={project.updatedAt}>Modifié le {new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(project.updatedAt))}</time></div></div><div className="project-primary-actions"><Link href={`/outils/${tool.slug}?project=${encodeURIComponent(project.id)}`}>Ouvrir</Link><button onClick={() => downloadPdf(project)}>PDF</button><button onClick={() => downloadSvg(project)}>SVG</button><button onClick={() => void share(project)}>Partager</button></div><details className="project-more"><summary>Autres actions</summary><div><button onClick={() => void rename(project)}>Renommer</button><button onClick={() => void mutate(() => service?.duplicate(project) ?? Promise.resolve(), "Projet dupliqué.")}>Dupliquer</button><button onClick={() => void mutate(() => service?.setArchived(project, !project.archived) ?? Promise.resolve(), project.archived ? "Projet restauré." : "Projet archivé.")}>{project.archived ? "Restaurer" : "Archiver"}</button><button onClick={() => exportPortable(project)}>Exporter le projet</button><button className="danger" onClick={() => void remove(project)}>Supprimer</button></div></details></article>; })}</section></main>;
+}

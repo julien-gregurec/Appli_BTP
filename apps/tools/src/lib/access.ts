@@ -6,6 +6,7 @@ export const CAPABILITIES = [
   "dimensioned-plan", "export-pdf", "export-svg", "saved-projects",
   "advanced-tracing", "promotion-free",
   "advanced-geometry", "construction-points", "design-shapes", "derived-quantities",
+  "print-plan", "native-share", "project-duplicate", "project-archive",
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 export const ENTITLEMENT_SOURCES = ["free-default", "web", "apple", "google", "elsatia", "internal"] as const;

@@ -12,6 +12,10 @@ describe("entitlements Free / Pro", () => {
     const access = resolveAccess([{ tier: "pro", source }]);
     expect(access.tier).toBe("pro");
     expect(hasCapability(access, "export-svg")).toBe(true);
+    expect(hasCapability(access, "print-plan")).toBe(true);
+    expect(hasCapability(access, "native-share")).toBe(true);
+    expect(hasCapability(access, "project-duplicate")).toBe(true);
+    expect(hasCapability(access, "project-archive")).toBe(true);
   });
 
   it("ignore un droit expiré", () => {

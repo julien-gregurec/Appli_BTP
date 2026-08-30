@@ -45,7 +45,7 @@ export function HomeDashboard() {
   return (
     <main>
       <section className="hero shell">
-        <div className="topline"><Brand /><span className="free-pill">Free · sans compte</span></div>
+        <div className="topline"><Brand /><div className="home-actions"><Link href="/projets">Mes projets</Link><span className="free-pill">Free · sans compte</span></div></div>
         <div className="hero-copy">
           <p className="eyebrow">LA BOÎTE À OUTILS NUMÉRIQUE DU CHANTIER</p>
           <h1>Que voulez-vous<br /><em>faire aujourd’hui&nbsp;?</em></h1>
@@ -72,10 +72,10 @@ export function HomeDashboard() {
         <ToolSection eyebrow="LES INCONTOURNABLES" title="Outils populaires" toolsToShow={activeTools.filter((tool) => tool.popular)} favorites={favorites} toggleFavorite={toggleFavorite} />
       </>}
 
-      <section className="shell content-section pro-preview-section"><div className="section-title"><div><p className="eyebrow">BIENTÔT AVEC TOOLS PRO</p><h2>Allez plus loin sur vos ouvrages</h2></div><span className="pro-section-note">Les outils essentiels restent gratuits</span></div><div className="pro-preview-grid">
+      <section id="tools-pro" className="shell content-section pro-preview-section"><div className="section-title"><div><p className="eyebrow">BIENTÔT AVEC TOOLS PRO</p><h2>Allez plus loin sur vos ouvrages</h2></div><span className="pro-section-note">Les outils essentiels restent gratuits</span></div><div className="pro-preview-grid">
         <ProFeaturePreview name="Plans cotés avancés" description="Composez plusieurs formes et retrouvez toutes les cotes de construction." capability="dimensioned-plan" preview="Aperçu sans engagement" />
         <ProFeaturePreview name="Exports PDF & SVG" description="Emportez vos plans à l’atelier ou partagez-les avec votre équipe." capability="export-pdf" preview="Prévu dans une prochaine version" />
-        <ProFeaturePreview name="Projets sauvegardés" description="Retrouvez vos tracés et mesures sur plusieurs appareils." capability="saved-projects" preview="Compte optionnel uniquement" />
+        <ProFeaturePreview name="Projets locaux" description="Retrouvez vos tracés et mesures hors ligne sur cet appareil." capability="saved-projects" preview="Sans compte ni cloud" />
       </div></section>
 
       <section className="shell guided-card">

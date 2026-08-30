@@ -22,7 +22,7 @@ export function resolveToolsDeepLink(rawUrl: string, canonicalOrigin = SITE.defa
     const url = new URL(rawUrl);
     const origin = new URL(canonicalOrigin);
     if (url.protocol !== "https:" || url.hostname !== origin.hostname) return null;
-    if (url.pathname === "/" || /^\/outils\/[a-z0-9-]+\/?$/.test(url.pathname)) return `${url.pathname}${url.search}${url.hash}`;
+    if (url.pathname === "/" || url.pathname === "/projets" || url.pathname === "/projets/" || /^\/outils\/[a-z0-9-]+\/?$/.test(url.pathname)) return `${url.pathname}${url.search}${url.hash}`;
     return null;
   } catch {
     return null;

@@ -1,4 +1,4 @@
-const CACHE = "elsatia-tools-v5";
+const CACHE = "elsatia-tools-v6";
 const SHELL = [
   "/", "/offline", "/icon.svg", "/outils/diagonale-rectangle", "/outils/angle-droit-3-4-5",
   "/outils/pythagore", "/outils/pente", "/outils/surface-rectangle", "/outils/cercle",
@@ -9,7 +9,7 @@ const SHELL = [
   "/outils/arche-avancee", "/outils/niche-cintree", "/outils/plafond-circulaire",
   "/outils/ovale-ellipse", "/outils/double-cercle-couronne", "/outils/fleur-4-petales",
   "/outils/fleur-5-petales", "/outils/fleur-6-petales", "/outils/fleur-8-petales",
-  "/outils/rosace-radiale-simple",
+  "/outils/rosace-radiale-simple", "/projets",
 ];
 
 self.addEventListener("install", (event) => {
@@ -27,5 +27,5 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(fetch(event.request).then((response) => {
     if (response.ok) caches.open(CACHE).then((cache) => cache.put(event.request, response.clone()));
     return response;
-  }).catch(async () => (await caches.match(event.request)) || (event.request.mode === "navigate" ? caches.match("/offline") : Response.error())));
+  }).catch(async () => (await caches.match(event.request, { ignoreSearch: true })) || (event.request.mode === "navigate" ? caches.match("/offline") : Response.error())));
 });

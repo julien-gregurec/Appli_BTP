@@ -12,6 +12,7 @@ describe("plateformes et liens applicatifs", () => {
   it("accepte uniquement les routes Tools sûres du domaine canonique", () => {
     expect(resolveToolsDeepLink("https://tools.elsatia.fr/outils/pythagore")).toBe("/outils/pythagore");
     expect(resolveToolsDeepLink("https://tools.elsatia.fr/outils/pente/?mode=2")).toBe("/outils/pente/?mode=2");
+    expect(resolveToolsDeepLink("https://tools.elsatia.fr/projets")).toBe("/projets");
     expect(resolveToolsDeepLink("https://example.com/outils/pente")).toBeNull();
     expect(resolveToolsDeepLink("https://tools.elsatia.fr/admin")).toBeNull();
   });
