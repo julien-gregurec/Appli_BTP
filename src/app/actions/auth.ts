@@ -79,8 +79,18 @@ export async function loginAction(formData: FormData) {
 
   // Un admin plateforme n'est rattaché à aucune entreprise cliente : l'envoyer
   // vers le tableau de bord entreprise n'aurait aucun sens pour lui.
-  if (await estPlateformeAdmin()) redirect("/plateforme");
-  redirect("/dashboard");
+  const destination = (await estPlateformeAdmin()) ? "/plateforme" : "/dashboard";
+
+  // Un compte qui possède un facteur MFA vérifié ouvre une session encore en
+  // aal1 après le mot de passe : exiger le second facteur avant toute
+  // navigation. getAuthenticatorAssuranceLevel repose sur auth.uid() et
+  // fonctionne dès l'aal1.
+  const { data: niveau } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (niveau?.currentLevel === "aal1" && niveau?.nextLevel === "aal2") {
+    redirect(`/login/mfa?next=${encodeURIComponent(destination)}`);
+  }
+
+  redirect(destination);
 }
 
 export async function logoutAction() {

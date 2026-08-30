@@ -53,6 +53,25 @@ export async function determinerAccesColors(
 
 export async function exigerShellColors(): Promise<ContexteColors> {
   const contexte = await getContexteColors();
+
+  // Un administrateur plateforme n'obtient un accès opérationnel à Colors que
+  // via une session support explicite ouverte depuis Gestion Pro. Sans elle, on
+  // redirige vers un écran dédié AVANT tout appel colors_* : ces RPC lèvent
+  // « Accès Colors refusé » et retomberaient sinon en erreur 500. Sans
+  // entreprise résolue, l'admin global n'a de toute façon aucun accès
+  // opérationnel implicite : même motif explicite, sans appel RPC inutile.
+  if (contexte.estAdminPlateforme) {
+    let supportActif = false;
+    if (contexte.entrepriseId) {
+      const supabase = await createClient();
+      const { data } = await supabase.rpc("est_acces_support_actif", {
+        p_entreprise_id: contexte.entrepriseId,
+      });
+      supportActif = data === true;
+    }
+    if (!supportActif) redirect("/acces-refuse?motif=support");
+  }
+
   const decision = await determinerAccesColors(contexte);
   if (decision === "abonnement_requis") redirect("/abonnement-requis");
   if (decision === "habilitation_requise") redirect("/acces-refuse");

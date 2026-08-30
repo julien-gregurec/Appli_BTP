@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   updateUser: vi.fn(),
   signOut: vi.fn(),
   verifyOtp: vi.fn(),
+  getAuthenticatorAssuranceLevel: vi.fn(),
   estPlateformeAdmin: vi.fn(),
 }));
 
@@ -31,6 +32,7 @@ vi.mock("@/lib/supabase/server", () => ({
       updateUser: mocks.updateUser,
       signOut: mocks.signOut,
       verifyOtp: mocks.verifyOtp,
+      mfa: { getAuthenticatorAssuranceLevel: mocks.getAuthenticatorAssuranceLevel },
     },
   })),
 }));
@@ -118,6 +120,11 @@ describe("loginAction — routage post-connexion selon le statut admin plateform
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.signInWithPassword.mockResolvedValue({ error: null });
+    // Par défaut : compte sans facteur MFA vérifié → session aal1 sans élévation possible.
+    mocks.getAuthenticatorAssuranceLevel.mockResolvedValue({
+      data: { currentLevel: "aal1", nextLevel: "aal1" },
+      error: null,
+    });
   });
 
   const formulaire = (email: string, password: string) => {
@@ -139,6 +146,28 @@ describe("loginAction — routage post-connexion selon le statut admin plateform
     mocks.estPlateformeAdmin.mockResolvedValue(false);
     await expect(loginAction(formulaire("employe@example.invalid", "motdepasse"))).rejects.toThrow(
       "REDIRECT:/dashboard",
+    );
+  });
+
+  it("exige le second facteur quand la session est aal1 mais peut passer à aal2", async () => {
+    mocks.estPlateformeAdmin.mockResolvedValue(false);
+    mocks.getAuthenticatorAssuranceLevel.mockResolvedValue({
+      data: { currentLevel: "aal1", nextLevel: "aal2" },
+      error: null,
+    });
+    await expect(loginAction(formulaire("employe@example.invalid", "motdepasse"))).rejects.toThrow(
+      "REDIRECT:/login/mfa?next=%2Fdashboard",
+    );
+  });
+
+  it("préserve la destination admin lors de la redirection vers le second facteur", async () => {
+    mocks.estPlateformeAdmin.mockResolvedValue(true);
+    mocks.getAuthenticatorAssuranceLevel.mockResolvedValue({
+      data: { currentLevel: "aal1", nextLevel: "aal2" },
+      error: null,
+    });
+    await expect(loginAction(formulaire("julien@elsatia.fr", "motdepasse"))).rejects.toThrow(
+      "REDIRECT:/login/mfa?next=%2Fplateforme",
     );
   });
 

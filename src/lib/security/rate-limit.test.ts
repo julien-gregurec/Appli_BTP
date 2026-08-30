@@ -10,6 +10,20 @@ describe("politiques de rate limiting", () => {
     expect(politiquesRateLimitPour("/mot-de-passe-oublie", "POST", false)[0]?.maximum).toBe(5);
   });
 
+  it("plafonne le challenge du second facteur, connecté comme anonyme", () => {
+    expect(politiquesRateLimitPour("/login/mfa", "POST", true)[0]).toMatchObject({
+      cle: "auth:mfa",
+      maximum: 10,
+      fenetreSecondes: 600,
+      portee: "utilisateur",
+    });
+    expect(politiquesRateLimitPour("/login/mfa", "POST", false)[0]).toMatchObject({
+      cle: "auth:mfa",
+      portee: "ip",
+    });
+    expect(politiquesRateLimitPour("/login/mfa", "GET", true)[0]?.cle).toBe("auth:mfa");
+  });
+
   it("limite le référentiel véhicule, l'assistant et les exports", () => {
     expect(politiquesRateLimitPour("/api/referentiels/vehicules", "GET", true)[0]?.maximum).toBe(10);
     expect(politiquesRateLimitPour("/api/assistant/chat", "POST", true)).toEqual(

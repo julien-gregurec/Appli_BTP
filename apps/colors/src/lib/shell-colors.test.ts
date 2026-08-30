@@ -138,6 +138,33 @@ describe("shell autonome ELSATIA Colors", () => {
     expect(migration).not.toMatch(/grant\s+(insert|update|delete)[\s\S]*to\s+(anon|service_role)/i);
   });
 
+  it("fournit un filet de sécurité error.tsx à la racine et dans le shell (colors)", () => {
+    for (const chemin of ["src/app/error.tsx", "src/app/(colors)/error.tsx"]) {
+      const contenu = readFileSync(join(process.cwd(), chemin), "utf8");
+      expect(contenu.startsWith('"use client"')).toBe(true);
+      expect(contenu).toContain("ErreurColors");
+      expect(contenu).not.toMatch(/error\.message/);
+    }
+    const composant = readFileSync(join(process.cwd(), "src/components/ErreurColors.tsx"), "utf8");
+    expect(composant.startsWith('"use client"')).toBe(true);
+    expect(composant).not.toMatch(/console\.|error\.message/);
+  });
+
+  it("redirige l’admin plateforme sans session support avant tout appel colors_*", () => {
+    const acces = readFileSync(join(process.cwd(), "src/lib/acces-colors.ts"), "utf8");
+    expect(acces).toContain('rpc("est_acces_support_actif"');
+    expect(acces).toContain('redirect("/acces-refuse?motif=support")');
+  });
+
+  it("exige le second facteur après le mot de passe sans exposer d’erreur brute", () => {
+    const actions = readFileSync(join(process.cwd(), "src/app/actions.ts"), "utf8");
+    expect(actions).toContain("getAuthenticatorAssuranceLevel");
+    expect(actions).toContain("/login/mfa?next=");
+    expect(actions).not.toMatch(/error\.message/);
+    const mfa = readFileSync(join(process.cwd(), "src/app/actions-mfa.ts"), "utf8");
+    expect(mfa).not.toMatch(/console\.|error\.message/);
+  });
+
   it("ne dépend d’aucune permission ni route du stock Gestion Pro", () => {
     const racine = join(process.cwd(), "src");
     const contenu = fichiersSource(racine)
