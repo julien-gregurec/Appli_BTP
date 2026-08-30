@@ -5,6 +5,7 @@ export const CAPABILITIES = [
   "basic-calculation", "basic-tracing", "site-instructions", "advanced-layout",
   "dimensioned-plan", "export-pdf", "export-svg", "saved-projects",
   "advanced-tracing", "promotion-free",
+  "advanced-geometry", "construction-points", "design-shapes", "derived-quantities",
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 export const ENTITLEMENT_SOURCES = ["free-default", "web", "apple", "google", "elsatia", "internal"] as const;
@@ -29,3 +30,9 @@ export function resolveAccess(grants: readonly AccessGrant[] = []): AccessContex
 
 export function hasCapability(access: AccessContext, capability: Capability) { return access.capabilities.has(capability); }
 export function canAccessTier(access: AccessContext, required: AccessTier) { return required === "free" || access.tier === "pro"; }
+
+export function getLocalAccess(): AccessContext {
+  return process.env.NEXT_PUBLIC_TOOLS_INTERNAL_PRO === "1"
+    ? resolveAccess([{ tier: "pro", source: "internal" }])
+    : FREE_ACCESS;
+}

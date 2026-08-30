@@ -6,7 +6,7 @@ export type ResultLine = { label: string; value: string; primary?: boolean };
 export type SiteInstructions = { steps: string[]; controls: string[]; warnings: string[] };
 export type ToolExecution = { results: ResultLine[]; note: string; instructions: SiteInstructions };
 
-export const toolFields: Record<ToolId, InputDefinition[]> = {
+export const toolFields: Partial<Record<ToolId, InputDefinition[]>> = {
   "diagonale-rectangle": [{ key: "length", label: "Longueur", unit: "mm" }, { key: "width", label: "Largeur", unit: "mm" }],
   "angle-droit-345": [{ key: "referenceA", label: "Longueur disponible sur le premier côté", unit: "mm", hint: "Correspond au côté 3 du ratio 3:4:5" }],
   pythagore: [{ key: "a", label: "Côté A", unit: "mm" }, { key: "b", label: "Côté B", unit: "mm" }],
@@ -35,7 +35,7 @@ export const toolFields: Record<ToolId, InputDefinition[]> = {
   arche: [{ key: "width", label: "Largeur de l’ouverture", unit: "mm" }, { key: "rise", label: "Hauteur de l’arrondi", unit: "mm", hint: "Du départ de l’arc jusqu’au sommet" }],
 };
 
-export const toolDefaults: Record<ToolId, Record<string, string>> = {
+export const toolDefaults: Partial<Record<ToolId, Record<string, string>>> = {
   "diagonale-rectangle": { length: "4000", width: "3000" }, "angle-droit-345": { referenceA: "1500" }, pythagore: { a: "3000", b: "4000" },
   pente: { mode: "percent-from-run", run: "4000", percent: "2", rise: "80", degrees: "1.15" }, "surface-rectangle": { length: "4.8", width: "2.5" },
   cercle: { diameter: "1600" }, "arc-corde-fleche": { chord: "1600", rise: "400" },

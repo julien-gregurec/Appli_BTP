@@ -1,4 +1,4 @@
-const CACHE = "elsatia-tools-v4";
+const CACHE = "elsatia-tools-v5";
 const SHELL = [
   "/", "/offline", "/icon.svg", "/outils/diagonale-rectangle", "/outils/angle-droit-3-4-5",
   "/outils/pythagore", "/outils/pente", "/outils/surface-rectangle", "/outils/cercle",
@@ -6,6 +6,10 @@ const SHELL = [
   "/outils/repartition-vitrages", "/outils/poids-vitrage", "/outils/calcul-plaques-panneaux",
   "/outils/quantite-peinture", "/outils/calcul-isolation-resistance-thermique",
   "/outils/calcul-fixations", "/outils/arche",
+  "/outils/arche-avancee", "/outils/niche-cintree", "/outils/plafond-circulaire",
+  "/outils/ovale-ellipse", "/outils/double-cercle-couronne", "/outils/fleur-4-petales",
+  "/outils/fleur-5-petales", "/outils/fleur-6-petales", "/outils/fleur-8-petales",
+  "/outils/rosace-radiale-simple",
 ];
 
 self.addEventListener("install", (event) => {

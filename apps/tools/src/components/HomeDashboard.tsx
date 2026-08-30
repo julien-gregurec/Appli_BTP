@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { activeTools, type ToolDefinition, type ToolId } from "@/lib/catalog";
 import { categories, getCategory, type CategoryId } from "@/lib/categories";
-import { canAccessTier, FREE_ACCESS } from "@/lib/access";
 import { createPersistentStorage, migratePersistentStorage, readPersistentIds, STORAGE_KEYS } from "@/lib/storage";
 import { ToolIcon } from "./ToolIcon";
 import { ProFeaturePreview } from "./ProFeaturePreview";
@@ -29,7 +28,7 @@ export function HomeDashboard() {
 
   const filtered = useMemo(() => {
     const needle = query.toLocaleLowerCase("fr").trim();
-    return activeTools.filter((tool) => canAccessTier(FREE_ACCESS, tool.access) && (!activeCategory || tool.categoryId === activeCategory) && (!needle || [tool.name, tool.description, ...tool.keywords].join(" ").toLocaleLowerCase("fr").includes(needle)));
+    return activeTools.filter((tool) => (!activeCategory || tool.categoryId === activeCategory) && (!needle || [tool.name, tool.description, ...tool.keywords].join(" ").toLocaleLowerCase("fr").includes(needle)));
   }, [query, activeCategory]);
 
   function toggleFavorite(id: ToolId) {
@@ -89,7 +88,7 @@ export function HomeDashboard() {
 }
 
 function ToolSection({ eyebrow, title, toolsToShow, favorites, toggleFavorite }: { eyebrow?: string; title: string; toolsToShow: readonly ToolDefinition[]; favorites: ToolId[]; toggleFavorite: (id: ToolId) => void }) {
-  return <section className="shell content-section"><div className="section-title"><div>{eyebrow && <p className="eyebrow">{eyebrow}</p>}<h2>{title}</h2></div></div><div className="tool-grid">{toolsToShow.map((tool) => <article className="tool-card" key={tool.id}><Link href={`/outils/${tool.slug}`} className="tool-card-main"><span className="tool-icon"><ToolIcon id={tool.id} /></span><span><small>{getCategory(tool.categoryId).name}</small><strong>{tool.name}</strong><p>{tool.description}</p></span></Link><button className={`favorite ${favorites.includes(tool.id) ? "selected" : ""}`} onClick={() => toggleFavorite(tool.id)} aria-label={favorites.includes(tool.id) ? `Retirer ${tool.name} des favoris` : `Ajouter ${tool.name} aux favoris`}>☆</button><Link href={`/outils/${tool.slug}`} className="open-tool" aria-label={`Ouvrir ${tool.name}`}>→</Link></article>)}</div></section>;
+  return <section className="shell content-section"><div className="section-title"><div>{eyebrow && <p className="eyebrow">{eyebrow}</p>}<h2>{title}</h2></div></div><div className="tool-grid">{toolsToShow.map((tool) => <article className={`tool-card ${tool.access === "pro" ? "pro-tool-card" : ""}`} key={tool.id}><Link href={`/outils/${tool.slug}`} className="tool-card-main"><span className="tool-icon"><ToolIcon id={tool.id} /></span><span><small>{getCategory(tool.categoryId).name}{tool.access === "pro" ? " · PRO" : ""}</small><strong>{tool.name}</strong><p>{tool.description}</p></span></Link><button className={`favorite ${favorites.includes(tool.id) ? "selected" : ""}`} onClick={() => toggleFavorite(tool.id)} aria-label={favorites.includes(tool.id) ? `Retirer ${tool.name} des favoris` : `Ajouter ${tool.name} aux favoris`}>☆</button><Link href={`/outils/${tool.slug}`} className="open-tool" aria-label={`Ouvrir ${tool.name}`}>→</Link></article>)}</div></section>;
 }
 
 export function Brand() { return <Link className="brand" href="/"><span className="brand-mark">E</span><span><b>ELSATIA</b><small>TOOLS</small></span></Link>; }

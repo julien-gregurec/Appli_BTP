@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { ACCESS_TIERS } from "./access";
 import { CATEGORY_IDS } from "./categories";
-import { activeTools, TOOL_IDS, tools } from "./catalog";
+import { activeTools, freeTools, proTools, TOOL_IDS, tools } from "./catalog";
 
 describe("catalogue canonique", () => {
-  it("déclare seize outils actifs avec ids et slugs uniques", () => {
-    expect(activeTools).toHaveLength(16);
+  it("déclare seize outils Free et dix outils Pro avec ids et slugs uniques", () => {
+    expect(activeTools).toHaveLength(26);
+    expect(freeTools).toHaveLength(16);
+    expect(proTools).toHaveLength(10);
     expect(tools.map((tool) => tool.id)).toEqual([...TOOL_IDS]);
     expect(new Set(tools.map((tool) => tool.id)).size).toBe(tools.length);
     expect(new Set(tools.map((tool) => tool.slug)).size).toBe(tools.length);
@@ -24,7 +26,9 @@ describe("catalogue canonique", () => {
   });
 
   it("préserve gratuitement tout le catalogue chantier R3", () => {
-    expect(tools.every((tool) => tool.access === "free")).toBe(true);
+    expect(freeTools.every((tool) => tool.access === "free")).toBe(true);
+    expect(proTools.every((tool) => tool.access === "pro")).toBe(true);
+    expect(proTools.every((tool) => tool.capabilities.includes("advanced-tracing"))).toBe(true);
   });
 
   it("active les schémas seulement pour les outils qui possèdent un modèle", () => {

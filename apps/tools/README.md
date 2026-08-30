@@ -1,6 +1,6 @@
 # ELSATIA Tools
 
-Application chantier autonome et freemium destinée au domaine `tools.elsatia.fr`, à iOS/iPadOS et à Android. Les seize outils restent intégralement utilisables gratuitement, hors connexion et sans compte depuis une base métier commune.
+Application chantier autonome et freemium destinée au domaine `tools.elsatia.fr`, à iOS/iPadOS et à Android. Les seize outils essentiels restent intégralement utilisables gratuitement, hors connexion et sans compte. Dix outils Tools Pro ajoutent la conception géométrique, les plans cotés et les méthodes de traçage reproductibles.
 
 ## Développement local
 
@@ -31,9 +31,14 @@ Voir [docs/native.md](docs/native.md) pour l’architecture, les prérequis, l�
 - `src/lib/tool-engine.ts` : saisies, exécution, résultats et instructions chantier structurées ;
 - `src/lib/calculations.ts` : primitives mathématiques pures et partagées (pente, espacement, quantitatifs, vitrage, thermique) ;
 - `src/lib/units.ts` : conversions centralisées ;
-- `src/lib/geometry/models.ts` : modèles géométriques exacts ;
+- `src/lib/geometry/primitives.ts` : primitives et intersections géométriques en millimètres ;
+- `src/lib/geometry/shape-model.ts` : modèle métier exportable des formes, cotes, contrôles et étapes ;
+- `src/lib/geometry/shapes.ts` : arches, niche, cercle en pièce, ellipse, couronne et moteur radial ;
+- `src/lib/geometry/plan-model.ts` : transformation exclusive millimètres vers espace SVG ;
+- `src/lib/geometry/models.ts` : modèles géométriques historiques des outils Free ;
 - `src/lib/geometry/diagram-model.ts` : projection des modèles vers primitives et annotations de plans ;
-- `src/components/ToolDiagram.tsx` : renderer SVG sans formule métier ;
+- `src/components/ToolDiagram.tsx` : renderer SVG des outils Free sans formule métier ;
+- `src/components/AdvancedPlan.tsx` : renderer Pro par couches, zoom et pan ;
 - `src/lib/promotions.ts` : promotions croisées ELSATIA centralisées ;
 - `src/lib/storage.ts` : clés locales canoniques et migration depuis l’ancien namespace ;
 - `src/lib/platform.ts` : détection Web/iOS/Android et validation des deep links ;
@@ -45,7 +50,7 @@ Voir [docs/native.md](docs/native.md) pour l’architecture, les prérequis, l�
 La chaîne d’un tracé technique est obligatoirement :
 
 ```text
-GEOMETRY MODEL → DIAGRAM MODEL + ANNOTATIONS → SVG RENDERER
+GEOMETRY MODEL → DIMENSIONED PLAN + ANNOTATIONS → SVG RENDERER
 ```
 
 Une cote technique ne doit jamais être inventée dans un composant graphique.
@@ -54,7 +59,9 @@ Une cote technique ne doit jamais être inventée dans un composant graphique.
 
 Les composants ne contiennent pas de conditions commerciales dispersées. `access.ts` résout un `AccessContext` central à partir de grants abstraits pouvant venir du Web, d’Apple, de Google, de l’écosystème ELSATIA ou d’un droit interne.
 
-Chaque outil déclare `access` et ses `capabilities` dans le catalogue. Tous les outils R3 sont `free`. Les aperçus Pro sont informatifs et ne bloquent aucun calcul existant.
+Chaque outil déclare `access` et ses `capabilities` dans le catalogue. Tous les outils R3 sont `free`. Sans droit Pro, les pages avancées montrent un aperçu descriptif qui ne calcule ni fausse cote ni fausse forme. Pour la validation locale uniquement, `NEXT_PUBLIC_TOOLS_INTERNAL_PRO=1` accorde un entitlement de source `internal` au build ou au serveur de développement.
+
+Les conventions complètes du moteur de traçage figurent dans [docs/tracing-engine.md](docs/tracing-engine.md).
 
 ## Promotions ELSATIA
 
@@ -62,7 +69,7 @@ Les promotions déclarent application, contenu, URL, placement, contexte, état 
 
 ## PWA et migration du stockage
 
-La PWA s’appelle **ELSATIA Tools**, utilise le short name **Tools**, le service worker `/sw-tools.js` et le cache `elsatia-tools-v4`. Le service worker reste réservé au Web ; iOS et Android utilisent les ressources statiques incluses dans le paquet.
+La PWA s’appelle **ELSATIA Tools**, utilise le short name **Tools**, le service worker `/sw-tools.js` et le cache `elsatia-tools-v5`. Le service worker reste réservé au Web ; iOS et Android utilisent les ressources statiques incluses dans le paquet.
 
 Au premier lancement, `storage.ts` migre sans perte :
 
@@ -77,9 +84,9 @@ Sur iOS et Android, les favoris et récents sont conservés avec Capacitor Prefe
 
 1. Ajouter l’id typé et une entrée complète dans `catalog.ts`.
 2. Associer une catégorie canonique et un moteur.
-3. Déclarer ses champs et son exécution dans `tool-engine.ts`.
-4. Ajouter le modèle géométrique puis le diagram model si un plan est nécessaire.
-5. Faire consommer uniquement le diagram model au renderer SVG.
+3. Déclarer ses champs et son exécution dans `tool-engine.ts` (Free) ou `pro-engine.ts` (Pro).
+4. Ajouter la forme au modèle géométrique pur, puis ses dimensions, contrôles et étapes.
+5. Faire consommer uniquement le modèle plan au renderer SVG.
 6. Ajouter les tests mathématiques, catalogue, instructions et géométrie.
 
 L’accueil, la recherche, les routes statiques, les catégories, le SEO, les favoris et les contrôles d’accès sont alimentés par le catalogue.
