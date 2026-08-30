@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type Ref } from "react";
 import { activeTools, type ToolDefinition, type ToolId } from "@/lib/catalog";
 import { categories, getCategory, type CategoryId } from "@/lib/categories";
+import { revealFilteredTools, toggleCategoryFilter } from "@/lib/home-navigation";
 import { createPersistentStorage, migratePersistentStorage, readPersistentIds, STORAGE_KEYS } from "@/lib/storage";
 import { ToolIcon } from "./ToolIcon";
 import { ProFeaturePreview } from "./ProFeaturePreview";
@@ -15,6 +16,7 @@ export function HomeDashboard() {
   const [activeCategory, setActiveCategory] = useState<CategoryId | null>(null);
   const [favorites, setFavorites] = useState<ToolId[]>([]);
   const [recent, setRecent] = useState<ToolId[]>([]);
+  const filteredToolsRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -30,6 +32,12 @@ export function HomeDashboard() {
     const needle = query.toLocaleLowerCase("fr").trim();
     return activeTools.filter((tool) => (!activeCategory || tool.categoryId === activeCategory) && (!needle || [tool.name, tool.description, ...tool.keywords].join(" ").toLocaleLowerCase("fr").includes(needle)));
   }, [query, activeCategory]);
+
+  useEffect(() => {
+    if (!activeCategory && !query.trim()) return;
+    const frame = window.requestAnimationFrame(() => revealFilteredTools(filteredToolsRef.current));
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeCategory, query]);
 
   function toggleFavorite(id: ToolId) {
     setFavorites((current) => {
@@ -61,11 +69,11 @@ export function HomeDashboard() {
       <section className="shell content-section">
         <div className="section-title"><div><p className="eyebrow">ACCÈS RAPIDE</p><h2>Choisissez votre besoin</h2></div><button className="text-button" onClick={() => { setActiveCategory(null); setQuery(""); }}>Tout voir <span>→</span></button></div>
         <div className="category-grid">
-          {visibleCategories.map((category) => <button key={category.id} className={`category-card ${activeCategory === category.id ? "active" : ""}`} onClick={() => setActiveCategory(activeCategory === category.id ? null : category.id)}><span className="category-glyph">{category.icon}</span><span>{category.name}</span><small>Explorer <b>→</b></small></button>)}
+          {visibleCategories.map((category) => <button key={category.id} className={`category-card ${activeCategory === category.id ? "active" : ""}`} aria-pressed={activeCategory === category.id} onClick={() => setActiveCategory(toggleCategoryFilter(activeCategory, category.id))}><span className="category-glyph">{category.icon}</span><span>{category.name}</span><small>Explorer <b>→</b></small></button>)}
         </div>
       </section>
 
-      {(query || activeCategory) && <ToolSection title={`${filtered.length} outil${filtered.length > 1 ? "s" : ""} trouvé${filtered.length > 1 ? "s" : ""}`} toolsToShow={filtered} favorites={favorites} toggleFavorite={toggleFavorite} />}
+      {(query || activeCategory) && <ToolSection id="filtered-tools" sectionRef={filteredToolsRef} title={`${filtered.length} outil${filtered.length > 1 ? "s" : ""} trouvé${filtered.length > 1 ? "s" : ""}`} toolsToShow={filtered} favorites={favorites} toggleFavorite={toggleFavorite} />}
       {!query && !activeCategory && <>
         {favoriteTools.length > 0 && <ToolSection eyebrow="VOS RACCOURCIS" title="Favoris" toolsToShow={favoriteTools} favorites={favorites} toggleFavorite={toggleFavorite} />}
         {recentTools.length > 0 && <ToolSection eyebrow="REPRENDRE" title="Utilisés récemment" toolsToShow={recentTools} favorites={favorites} toggleFavorite={toggleFavorite} />}
@@ -87,8 +95,8 @@ export function HomeDashboard() {
   );
 }
 
-function ToolSection({ eyebrow, title, toolsToShow, favorites, toggleFavorite }: { eyebrow?: string; title: string; toolsToShow: readonly ToolDefinition[]; favorites: ToolId[]; toggleFavorite: (id: ToolId) => void }) {
-  return <section className="shell content-section"><div className="section-title"><div>{eyebrow && <p className="eyebrow">{eyebrow}</p>}<h2>{title}</h2></div></div><div className="tool-grid">{toolsToShow.map((tool) => <article className={`tool-card ${tool.access === "pro" ? "pro-tool-card" : ""}`} key={tool.id}><Link href={`/outils/${tool.slug}`} className="tool-card-main"><span className="tool-icon"><ToolIcon id={tool.id} /></span><span><small>{getCategory(tool.categoryId).name}{tool.access === "pro" ? " · PRO" : ""}</small><strong>{tool.name}</strong><p>{tool.description}</p></span></Link><button className={`favorite ${favorites.includes(tool.id) ? "selected" : ""}`} onClick={() => toggleFavorite(tool.id)} aria-label={favorites.includes(tool.id) ? `Retirer ${tool.name} des favoris` : `Ajouter ${tool.name} aux favoris`}>☆</button><Link href={`/outils/${tool.slug}`} className="open-tool" aria-label={`Ouvrir ${tool.name}`}>→</Link></article>)}</div></section>;
+function ToolSection({ eyebrow, id, sectionRef, title, toolsToShow, favorites, toggleFavorite }: { eyebrow?: string; id?: string; sectionRef?: Ref<HTMLElement>; title: string; toolsToShow: readonly ToolDefinition[]; favorites: ToolId[]; toggleFavorite: (id: ToolId) => void }) {
+  return <section className="shell content-section" id={id} ref={sectionRef}><div className="section-title"><div>{eyebrow && <p className="eyebrow">{eyebrow}</p>}<h2>{title}</h2></div></div><div className="tool-grid">{toolsToShow.map((tool) => <article className={`tool-card ${tool.access === "pro" ? "pro-tool-card" : ""}`} key={tool.id}><Link href={`/outils/${tool.slug}`} className="tool-card-main"><span className="tool-icon"><ToolIcon id={tool.id} /></span><span><small>{getCategory(tool.categoryId).name}{tool.access === "pro" ? " · PRO" : ""}</small><strong>{tool.name}</strong><p>{tool.description}</p></span></Link><button className={`favorite ${favorites.includes(tool.id) ? "selected" : ""}`} onClick={() => toggleFavorite(tool.id)} aria-label={favorites.includes(tool.id) ? `Retirer ${tool.name} des favoris` : `Ajouter ${tool.name} aux favoris`}>☆</button><Link href={`/outils/${tool.slug}`} className="open-tool" aria-label={`Ouvrir ${tool.name}`}>→</Link></article>)}</div></section>;
 }
 
 export function Brand() { return <Link className="brand" href="/"><span className="brand-mark">E</span><span><b>ELSATIA</b><small>TOOLS</small></span></Link>; }

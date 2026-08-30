@@ -15,7 +15,6 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: false,
     captureInput: false,
-    webContentsDebuggingEnabled: false,
   },
   ios: {
     contentInset: "never",

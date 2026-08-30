@@ -2,12 +2,17 @@
 
 import { App } from "@capacitor/app";
 import type { PluginListenerHandle } from "@capacitor/core";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { getRuntimePlatform, resolveToolsDeepLink } from "@/lib/platform";
 
 export function NativeRuntimeBridge() {
+  const pathname = usePathname();
   const router = useRouter();
+
+  useEffect(() => {
+    if (getRuntimePlatform() !== "web") window.scrollTo(0, 0);
+  }, [pathname]);
 
   useEffect(() => {
     const platform = getRuntimePlatform();

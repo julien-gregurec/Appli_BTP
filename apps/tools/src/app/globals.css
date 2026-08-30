@@ -342,6 +342,7 @@ footer { background: #e9e8e3; }
   .project-toolbar > div:last-child, .export-toolbar > div:last-child { display: grid; grid-template-columns: 1fr 1fr; }
   .save-project-panel { grid-template-columns: 1fr; }
   .save-project-panel > div { display: grid; grid-template-columns: 1fr 1fr; }
+  .save-project-panel input, .save-project-panel textarea, .project-controls input, .project-controls select { font-size: 16px; }
   .project-controls { grid-template-columns: 1fr 1fr; }
   .project-search { grid-column: 1 / -1; }
   .project-card { grid-template-columns: 1fr; padding: 16px; }
