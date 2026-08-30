@@ -1,4 +1,4 @@
-export const CODES_APPLICATIONS_ELSATIA = ["gestion_pro", "colors"] as const;
+export const CODES_APPLICATIONS_ELSATIA = ["gestion_pro", "colors", "tools"] as const;
 export type CodeApplicationElsatia = string;
 
 export const ROLES_COLORS = [

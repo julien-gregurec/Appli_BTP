@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { NativeRuntimeBridge } from "@/components/NativeRuntimeBridge";
+import { AccountProvider } from "@/components/AccountProvider";
 import { getPublicUrl, SITE } from "@/lib/site";
 import "./globals.css";
 
@@ -20,5 +21,5 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: "#f5aa22", colorScheme: "light", viewportFit: "cover" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="fr"><body>{children}<NativeRuntimeBridge /><ServiceWorkerRegister /></body></html>;
+  return <html lang="fr"><body><AccountProvider>{children}</AccountProvider><NativeRuntimeBridge /><ServiceWorkerRegister /></body></html>;
 }

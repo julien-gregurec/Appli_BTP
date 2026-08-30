@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Local Supabase is HTTP only. This exception is compiled into debug builds, never release. -->
+    <application android:usesCleartextTraffic="true" />
+</manifest>

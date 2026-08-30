@@ -219,6 +219,26 @@ footer { background: #e9e8e3; }
 .step-actions button:last-child { background: var(--navy); color: white; }
 .step-actions button:disabled { opacity: .35; }
 
+.account-page { min-height: 100vh; background: var(--paper, #f3f2ed); }
+.account-card { max-width: 720px; margin-top: 42px; padding: 28px; border: 1px solid var(--line); border-radius: 14px; background: white; box-shadow: 0 12px 35px rgba(18, 39, 47, .07); }
+.account-card form { display: grid; gap: 18px; max-width: 460px; }
+.account-card h2 { margin: 0; font-family: Georgia, serif; font-size: 30px; font-weight: 500; }
+.account-card form > p { margin: 0; color: var(--ink-soft); }
+.account-card label { display: grid; gap: 7px; color: var(--navy); font-size: 12px; font-weight: 800; }
+.account-card input { min-height: 46px; padding: 0 13px; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+.account-card button { min-height: 44px; padding: 0 18px; border: 0; border-radius: 8px; background: var(--navy); color: white; cursor: pointer; font-weight: 800; }
+.account-card button:disabled { opacity: .45; cursor: default; }
+.account-identity { display: flex; gap: 18px; align-items: center; }
+.account-identity > span { display: grid; width: 54px; height: 54px; place-items: center; border-radius: 50%; background: var(--amber); color: var(--navy); font-size: 22px; font-weight: 900; }
+.account-identity div { display: grid; gap: 5px; }
+.account-identity small { color: var(--ink-soft); font-weight: 900; }
+.account-identity strong { font-size: 18px; }
+.account-identity p { margin: 0; color: var(--ink-soft); font-size: 12px; }
+.account-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+.account-actions .secondary { border: 1px solid var(--navy); background: white; color: var(--navy); }
+.account-warning, .account-error { padding: 12px; border-radius: 7px; background: #fff4d8; color: #704900 !important; font-size: 12px; }
+.account-error { background: #fff0ef; color: #8a2922 !important; }
+
 /* Projects, local persistence and exports */
 .calculator-nav { display: flex; align-items: center; gap: 22px; color: #697980; font-size: 12px; font-weight: 700; }
 .project-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-top: 26px; padding: 18px 20px; border: 1px solid #d8dbd8; border-radius: 12px; background: var(--white); }

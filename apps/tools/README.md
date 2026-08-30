@@ -61,7 +61,9 @@ Une cote technique ne doit jamais être inventée dans un composant graphique.
 
 Les composants ne contiennent pas de conditions commerciales dispersées. `access.ts` résout un `AccessContext` central à partir de grants abstraits pouvant venir du Web, d’Apple, de Google, de l’écosystème ELSATIA ou d’un droit interne.
 
-Chaque outil déclare `access` et ses `capabilities` dans le catalogue. Tous les outils R3 sont `free`. Sans droit Pro, les pages avancées montrent un aperçu descriptif qui ne calcule ni fausse cote ni fausse forme. Pour la validation locale uniquement, `NEXT_PUBLIC_TOOLS_INTERNAL_PRO=1` accorde un entitlement de source `internal` au build ou au serveur de développement.
+Chaque outil déclare `access` et ses `capabilities` dans le catalogue. Tous les outils R3 sont `free`. Sans droit Pro, les pages avancées montrent un aperçu descriptif qui ne calcule ni fausse cote ni fausse forme. R8 résout les droits côté serveur via `tools_resoudre_entitlements` ; aucun e-mail ni drapeau d’environnement ne peut auto-attribuer Pro.
+
+Le compte facultatif utilise `NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Les refresh tokens sont stockés dans Keychain sur iOS, Android Keystore sur Android, et chiffrés AES-GCM avec une clé Web Crypto non exportable sur le Web. Le cache de droits est lié à l’utilisateur, protégé contre l’altération et valable au maximum sept jours hors ligne.
 
 Les conventions complètes du moteur de traçage figurent dans [docs/tracing-engine.md](docs/tracing-engine.md). Le stockage et les documents chantier sont détaillés dans [docs/projects-exports.md](docs/projects-exports.md).
 
@@ -80,7 +82,9 @@ Au premier lancement, `storage.ts` migre sans perte :
 
 Une valeur déjà présente dans le nouveau namespace n’est jamais écrasée. Les anciennes clés sont ensuite supprimées et la migration devient idempotente.
 
-Sur iOS et Android, les favoris et récents sont conservés avec Capacitor Preferences derrière la même abstraction et les mêmes namespaces `elsatia.tools.*`. Les projets structurés utilisent IndexedDB dans la WebView, sans synchronisation distante ; l’utilisateur peut les transférer explicitement au format `.elsatiatools`.
+Sur iOS et Android, les favoris et récents sont conservés avec Capacitor Preferences derrière la même abstraction et les mêmes namespaces `elsatia.tools.*`. Les projets structurés restent dans IndexedDB et sont synchronisés en arrière-plan pour un compte Pro vérifié. La file offline, les révisions optimistes, les tombstones et la duplication des conflits empêchent la perte silencieuse. Un fichier `.elsatiatools` importé reste strictement local jusqu’à l’action explicite « Autoriser la synchronisation ».
+
+L’architecture et la matrice de validation R8 sont détaillées dans [docs/r8-architecture-validation.md](docs/r8-architecture-validation.md).
 
 ## Ajouter un outil
 

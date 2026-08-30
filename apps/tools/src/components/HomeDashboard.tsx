@@ -8,10 +8,12 @@ import { revealFilteredTools, toggleCategoryFilter } from "@/lib/home-navigation
 import { createPersistentStorage, migratePersistentStorage, readPersistentIds, STORAGE_KEYS } from "@/lib/storage";
 import { ToolIcon } from "./ToolIcon";
 import { ProFeaturePreview } from "./ProFeaturePreview";
+import { useAccount } from "./AccountProvider";
 
 const visibleCategories = categories.filter((category) => activeTools.some((tool) => tool.categoryId === category.id)).sort((a, b) => a.order - b.order);
 
 export function HomeDashboard() {
+  const account = useAccount();
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<CategoryId | null>(null);
   const [favorites, setFavorites] = useState<ToolId[]>([]);
@@ -53,7 +55,7 @@ export function HomeDashboard() {
   return (
     <main>
       <section className="hero shell">
-        <div className="topline"><Brand /><div className="home-actions"><Link href="/projets">Mes projets</Link><span className="free-pill">Free · sans compte</span></div></div>
+        <div className="topline"><Brand /><div className="home-actions"><Link href="/projets">Mes projets</Link><Link href="/compte">{account.user ? "Mon compte" : "Se connecter"}</Link><span className="free-pill">{account.access.tier === "pro" ? "Tools Pro" : "Free · sans compte"}</span></div></div>
         <div className="hero-copy">
           <p className="eyebrow">LA BOÎTE À OUTILS NUMÉRIQUE DU CHANTIER</p>
           <h1>Que voulez-vous<br /><em>faire aujourd’hui&nbsp;?</em></h1>

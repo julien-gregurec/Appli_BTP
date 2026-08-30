@@ -11,7 +11,7 @@ import {
 
 describe("application-access", () => {
   it("expose les codes et rôles canoniques", () => {
-    expect(CODES_APPLICATIONS_ELSATIA).toEqual(["gestion_pro", "colors"]);
+    expect(CODES_APPLICATIONS_ELSATIA).toEqual(["gestion_pro", "colors", "tools"]);
     expect(ROLES_COLORS).toContain("colors_admin_organisation");
     expect(estCodeApplicationElsatia("future_app")).toBe(true);
     expect(estCodeApplicationElsatia("Future App")).toBe(false);
