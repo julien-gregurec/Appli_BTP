@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { NativeRuntimeBridge } from "@/components/NativeRuntimeBridge";
 import { getPublicUrl, SITE } from "@/lib/site";
 import "./globals.css";
 
@@ -16,8 +17,8 @@ export const metadata: Metadata = {
   openGraph: { title: SITE.productName, description: SITE.tagline, type: "website", locale: "fr_FR" },
 };
 
-export const viewport: Viewport = { themeColor: "#f5aa22", colorScheme: "light" };
+export const viewport: Viewport = { themeColor: "#f5aa22", colorScheme: "light", viewportFit: "cover" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="fr"><body>{children}<ServiceWorkerRegister /></body></html>;
+  return <html lang="fr"><body>{children}<NativeRuntimeBridge /><ServiceWorkerRegister /></body></html>;
 }

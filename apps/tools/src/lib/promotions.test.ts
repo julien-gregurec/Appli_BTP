@@ -20,6 +20,6 @@ describe("promotions ELSATIA", () => {
 
   it("désactive centralement les promotions pour la capability Pro dédiée", () => {
     expect(getPromotionForAccess("gestion-pro-quantitatifs", FREE_ACCESS)).toBeDefined();
-    expect(getPromotionForAccess("gestion-pro-quantitatifs", resolveAccess([{ tier: "pro", source: "tools-subscription" }]))).toBeUndefined();
+    expect(getPromotionForAccess("gestion-pro-quantitatifs", resolveAccess([{ tier: "pro", source: "web" }]))).toBeUndefined();
   });
 });

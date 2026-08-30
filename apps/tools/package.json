@@ -6,17 +6,30 @@
   "scripts": {
     "dev": "next dev -p 3020",
     "build": "next build",
+    "build:native": "ELSATIA_TOOLS_NATIVE=1 NEXT_PUBLIC_TOOLS_RUNTIME=native next build",
     "start": "next start -p 3020",
-    "lint": "eslint src next.config.ts",
+    "native:sync": "npm run build:native && cap sync",
+    "native:android": "npm run native:sync && cap open android",
+    "native:ios": "npm run native:sync && cap open ios",
+    "build:android:debug": "npm run native:sync && cap build android --androidreleasetype APK",
+    "build:ios:debug": "npm run native:sync && cap build ios",
+    "lint": "eslint src next.config.ts capacitor.config.ts",
     "typecheck": "tsc --noEmit --incremental false",
     "test": "vitest run"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/browser": "^8.0.4",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/ios": "^8.5.0",
+    "@capacitor/preferences": "^8.0.1",
     "next": "16.2.12",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -27,6 +40,7 @@
   },
   "overrides": {
     "postcss": "8.5.24",
-    "sharp": "0.35.3"
+    "sharp": "0.35.3",
+    "uuid": "11.1.1"
   }
 }

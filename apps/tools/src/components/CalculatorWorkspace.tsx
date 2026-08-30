@@ -7,7 +7,7 @@ import { activeTools } from "@/lib/catalog";
 import { FREE_ACCESS } from "@/lib/access";
 import { getCategory } from "@/lib/categories";
 import { getPromotionForAccess } from "@/lib/promotions";
-import { migrateLegacyStorage, readStoredIds, STORAGE_KEYS } from "@/lib/storage";
+import { createPersistentStorage, migratePersistentStorage, readPersistentIds, STORAGE_KEYS } from "@/lib/storage";
 import { executeTool, toolDefaults, toolFields } from "@/lib/tool-engine";
 import { Brand } from "./HomeDashboard";
 import { PromotionCard } from "./PromotionCard";
@@ -20,9 +20,11 @@ export function CalculatorWorkspace({ tool }: { tool: ToolDefinition }) {
   const evaluation = useMemo(() => { try { return { value: executeTool(tool.id, values), error: "" }; } catch (error) { return { value: null, error: error instanceof Error ? error.message : "Valeurs invalides." }; } }, [tool.id, values]);
 
   useEffect(() => {
-    migrateLegacyStorage(localStorage);
-    const current = readStoredIds<ToolId>(localStorage, STORAGE_KEYS.recent);
-    localStorage.setItem(STORAGE_KEYS.recent, JSON.stringify([tool.id, ...current.filter((id) => id !== tool.id)].slice(0, 4)));
+    const storage = createPersistentStorage(localStorage);
+    void migratePersistentStorage(storage, localStorage).then(async () => {
+      const current = await readPersistentIds<ToolId>(storage, STORAGE_KEYS.recent);
+      await storage.setItem(STORAGE_KEYS.recent, JSON.stringify([tool.id, ...current.filter((id) => id !== tool.id)].slice(0, 4)));
+    });
   }, [tool.id]);
 
   const promotion = getPromotionForAccess(tool.promotionId, FREE_ACCESS);
@@ -31,7 +33,7 @@ export function CalculatorWorkspace({ tool }: { tool: ToolDefinition }) {
     <header className="calculator-header shell"><Brand /><Link className="all-tools" href="/">Tous les outils <span>×</span></Link></header>
     <div className="tool-hero"><div className="shell"><Link href="/" className="breadcrumb">← Accueil</Link><div className="tool-heading"><span className="tool-icon large"><ToolIcon id={tool.id} size={36} /></span><div><p className="eyebrow">{getCategory(tool.categoryId).name} · {tool.access === "free" ? "GRATUIT" : "PRO"}</p><h1>{tool.name}</h1><p>{tool.description}</p></div></div></div></div>
     <div className="shell calculator-grid">
-      <section className="input-panel"><div className="panel-heading"><span>1</span><div><p className="eyebrow">VOS MESURES</p><h2>Renseignez les dimensions</h2></div></div><div className="fields">{toolFields[tool.id].filter((field) => !field.showWhen || field.showWhen.values.includes(values[field.showWhen.key])).map((field) => <label className="field" key={field.key}><span>{field.label}</span><div>{field.inputType === "select" ? <select value={values[field.key]} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}>{field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select> : <input inputMode="decimal" type="number" min="0" step={field.step ?? "any"} value={values[field.key]} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))} />}{field.unit && <b>{field.unit}</b>}</div>{field.hint && <small>{field.hint}</small>}</label>)}</div><button className="reset-button" onClick={() => setValues(toolDefaults[tool.id])}>↺ Réinitialiser l’exemple</button></section>
+      <section className="input-panel"><div className="panel-heading"><span>1</span><div><p className="eyebrow">VOS MESURES</p><h2>Renseignez les dimensions</h2></div></div><div className="fields">{toolFields[tool.id].filter((field) => !field.showWhen || field.showWhen.values.includes(values[field.showWhen.key])).map((field, index, visibleFields) => <label className="field" key={field.key}><span>{field.label}</span><div>{field.inputType === "select" ? <select value={values[field.key]} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}>{field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select> : <input inputMode="decimal" enterKeyHint={index === visibleFields.length - 1 ? "done" : "next"} type="number" min="0" step={field.step ?? "any"} value={values[field.key]} onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))} />}{field.unit && <b>{field.unit}</b>}</div>{field.hint && <small>{field.hint}</small>}</label>)}</div><button className="reset-button" onClick={() => setValues(toolDefaults[tool.id])}>↺ Réinitialiser l’exemple</button></section>
       <section className="output-panel"><div className={`result-tabs ${!tool.hasSvg || !tool.hasSiteMode ? "reduced" : ""}`}><button className={tab === "result" ? "active" : ""} onClick={() => setTab("result")}>Résultat</button>{tool.hasSvg && <button className={tab === "plan" ? "active" : ""} onClick={() => setTab("plan")}>Schéma</button>}{tool.hasSiteMode && <button className={tab === "steps" ? "active" : ""} onClick={() => setTab("steps")}>Tracer sur chantier</button>}</div>
         {evaluation.error && <div className="calculation-error"><strong>Vérifiez les mesures</strong><p>{evaluation.error}</p></div>}
         {evaluation.value && tab === "result" && <div className="result-content"><p className="eyebrow">RÉSULTAT CALCULÉ</p><div className="result-lines">{evaluation.value.results.map((line) => <div key={line.label} className={line.primary ? "primary" : ""}><span>{line.label}</span><strong>{line.value}</strong></div>)}</div><p className="result-note">ⓘ {evaluation.value.note}</p>{tool.hasSvg ? <button className="next-tab" onClick={() => setTab("plan")}>Voir le schéma <span>→</span></button> : tool.hasSiteMode ? <button className="next-tab" onClick={() => setTab("steps")}>Voir les instructions <span>→</span></button> : null}</div>}

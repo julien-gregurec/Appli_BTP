@@ -1,6 +1,6 @@
 # ELSATIA Tools
 
-Application chantier autonome et freemium destinée au futur domaine `tools.elsatia.fr`. Les seize outils du catalogue R3 restent intégralement utilisables gratuitement, hors connexion et sans compte.
+Application chantier autonome et freemium destinée au domaine `tools.elsatia.fr`, à iOS/iPadOS et à Android. Les seize outils restent intégralement utilisables gratuitement, hors connexion et sans compte depuis une base métier commune.
 
 ## Développement local
 
@@ -10,6 +10,18 @@ npm run dev --prefix apps/tools
 ```
 
 L’application écoute sur `http://localhost:3020`. Aucun changement d’infrastructure ou de production n’est inclus dans ce lot.
+
+## Développement natif
+
+La fondation native utilise Capacitor 8.5 avec l’identifiant commun `fr.elsatia.tools`. Le build natif est un export statique Next.js embarqué localement : les apps ne chargent pas le domaine Web pour afficher les outils.
+
+```bash
+npm run native:sync --prefix apps/tools
+npm run native:android --prefix apps/tools
+npm run native:ios --prefix apps/tools
+```
+
+Voir [docs/native.md](docs/native.md) pour l’architecture, les prérequis, l’offline, le stockage, les environnements, le versioning, les futurs achats et les deep links. Les actions personnelles nécessaires aux Stores sont isolées dans [docs/store-manual-checklist.md](docs/store-manual-checklist.md).
 
 ## Architecture
 
@@ -24,6 +36,10 @@ L’application écoute sur `http://localhost:3020`. Aucun changement d’infras
 - `src/components/ToolDiagram.tsx` : renderer SVG sans formule métier ;
 - `src/lib/promotions.ts` : promotions croisées ELSATIA centralisées ;
 - `src/lib/storage.ts` : clés locales canoniques et migration depuis l’ancien namespace ;
+- `src/lib/platform.ts` : détection Web/iOS/Android et validation des deep links ;
+- `src/components/NativeRuntimeBridge.tsx` : retour Android et routage natif ;
+- `capacitor.config.ts` : configuration partagée des wrappers locaux ;
+- `android/` et `ios/` : projets natifs sans duplication du moteur métier ;
 - `public/sw-tools.js` : cache PWA indépendant de Gestion Pro et Colors.
 
 La chaîne d’un tracé technique est obligatoirement :
@@ -36,7 +52,7 @@ Une cote technique ne doit jamais être inventée dans un composant graphique.
 
 ## Free / Pro
 
-Les composants ne contiennent pas de conditions commerciales dispersées. `access.ts` résout un `AccessContext` central à partir de droits pouvant venir d’un achat direct, d’un abonnement Tools, d’un abonnement ELSATIA éligible ou d’un droit interne.
+Les composants ne contiennent pas de conditions commerciales dispersées. `access.ts` résout un `AccessContext` central à partir de grants abstraits pouvant venir du Web, d’Apple, de Google, de l’écosystème ELSATIA ou d’un droit interne.
 
 Chaque outil déclare `access` et ses `capabilities` dans le catalogue. Tous les outils R3 sont `free`. Les aperçus Pro sont informatifs et ne bloquent aucun calcul existant.
 
@@ -46,7 +62,7 @@ Les promotions déclarent application, contenu, URL, placement, contexte, état 
 
 ## PWA et migration du stockage
 
-La PWA s’appelle **ELSATIA Tools**, utilise le short name **Tools**, le service worker `/sw-tools.js` et le cache `elsatia-tools-v3`.
+La PWA s’appelle **ELSATIA Tools**, utilise le short name **Tools**, le service worker `/sw-tools.js` et le cache `elsatia-tools-v4`. Le service worker reste réservé au Web ; iOS et Android utilisent les ressources statiques incluses dans le paquet.
 
 Au premier lancement, `storage.ts` migre sans perte :
 
@@ -54,6 +70,8 @@ Au premier lancement, `storage.ts` migre sans perte :
 - `elsatia-calculs-recent` → `elsatia.tools.recent`.
 
 Une valeur déjà présente dans le nouveau namespace n’est jamais écrasée. Les anciennes clés sont ensuite supprimées et la migration devient idempotente.
+
+Sur iOS et Android, les favoris et récents sont conservés avec Capacitor Preferences derrière la même abstraction et les mêmes namespaces `elsatia.tools.*`.
 
 ## Ajouter un outil
 
@@ -73,4 +91,5 @@ npm run test --prefix apps/tools
 npm run typecheck --prefix apps/tools
 npm run lint --prefix apps/tools
 npm run build --prefix apps/tools
+npm run build:native --prefix apps/tools
 ```

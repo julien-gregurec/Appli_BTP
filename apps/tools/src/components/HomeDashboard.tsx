@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { activeTools, type ToolDefinition, type ToolId } from "@/lib/catalog";
 import { categories, getCategory, type CategoryId } from "@/lib/categories";
 import { canAccessTier, FREE_ACCESS } from "@/lib/access";
-import { migrateLegacyStorage, readStoredIds, STORAGE_KEYS } from "@/lib/storage";
+import { createPersistentStorage, migratePersistentStorage, readPersistentIds, STORAGE_KEYS } from "@/lib/storage";
 import { ToolIcon } from "./ToolIcon";
 import { ProFeaturePreview } from "./ProFeaturePreview";
 
@@ -18,11 +18,13 @@ export function HomeDashboard() {
   const [recent, setRecent] = useState<ToolId[]>([]);
 
   useEffect(() => {
-    migrateLegacyStorage(localStorage);
-    // Browser-only preferences are intentionally loaded after hydration.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setFavorites(readStoredIds<ToolId>(localStorage, STORAGE_KEYS.favorites));
-    setRecent(readStoredIds<ToolId>(localStorage, STORAGE_KEYS.recent));
+    let active = true;
+    const storage = createPersistentStorage(localStorage);
+    void migratePersistentStorage(storage, localStorage).then(async () => {
+      const [storedFavorites, storedRecent] = await Promise.all([readPersistentIds<ToolId>(storage, STORAGE_KEYS.favorites), readPersistentIds<ToolId>(storage, STORAGE_KEYS.recent)]);
+      if (active) { setFavorites(storedFavorites); setRecent(storedRecent); }
+    });
+    return () => { active = false; };
   }, []);
 
   const filtered = useMemo(() => {
@@ -33,7 +35,7 @@ export function HomeDashboard() {
   function toggleFavorite(id: ToolId) {
     setFavorites((current) => {
       const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
-      localStorage.setItem(STORAGE_KEYS.favorites, JSON.stringify(next));
+      void createPersistentStorage(localStorage).setItem(STORAGE_KEYS.favorites, JSON.stringify(next));
       return next;
     });
   }

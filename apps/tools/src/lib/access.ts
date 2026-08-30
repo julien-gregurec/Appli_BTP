@@ -7,7 +7,8 @@ export const CAPABILITIES = [
   "advanced-tracing", "promotion-free",
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
-export type EntitlementSource = "free-default" | "direct-purchase" | "tools-subscription" | "elsatia-ecosystem" | "internal";
+export const ENTITLEMENT_SOURCES = ["free-default", "web", "apple", "google", "elsatia", "internal"] as const;
+export type EntitlementSource = (typeof ENTITLEMENT_SOURCES)[number];
 export type AccessGrant = { tier: AccessTier; source: EntitlementSource; expiresAt?: string };
 export type AccessContext = { tier: AccessTier; capabilities: ReadonlySet<Capability>; source: EntitlementSource };
 

@@ -1,4 +1,4 @@
-const CACHE = "elsatia-tools-v3";
+const CACHE = "elsatia-tools-v4";
 const SHELL = [
   "/", "/offline", "/icon.svg", "/outils/diagonale-rectangle", "/outils/angle-droit-3-4-5",
   "/outils/pythagore", "/outils/pente", "/outils/surface-rectangle", "/outils/cercle",
