@@ -5,6 +5,7 @@ import type { PluginListenerHandle } from "@capacitor/core";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { getRuntimePlatform, resolveToolsDeepLink } from "@/lib/platform";
+import { getElsatiaClient } from "@/lib/auth/client";
 
 export function NativeRuntimeBridge() {
   const pathname = usePathname();
@@ -24,7 +25,10 @@ export function NativeRuntimeBridge() {
     void Promise.all([
       App.addListener("appUrlOpen", ({ url }) => {
         const route = resolveToolsDeepLink(url);
-        if (route) router.push(route);
+        if (!route) return;
+        const code = new URL(url).searchParams.get("code");
+        if (code) void getElsatiaClient().auth.exchangeCodeForSession(code).finally(() => router.push("/compte?recovery=1"));
+        else router.push(route);
       }),
       App.addListener("backButton", ({ canGoBack }) => {
         if (canGoBack && window.location.pathname !== "/") window.history.back();

@@ -9,7 +9,7 @@ import { exportProjectPdf } from "@/lib/exports/pdf";
 import { downloadBlob, shareBlob } from "@/lib/exports/share";
 import { exportProjectSvg } from "@/lib/exports/svg";
 import { PROJECT_FILE_EXTENSION, serializeProject, type ToolProject } from "@/lib/projects/model";
-import { createProjectRepository } from "@/lib/projects/repository";
+import { createProjectRepository, projectStorageScope } from "@/lib/projects/repository";
 import { ProjectService } from "@/lib/projects/service";
 import { Brand } from "./HomeDashboard";
 import { ProFeaturePreview } from "./ProFeaturePreview";
@@ -19,17 +19,17 @@ import { useAccount } from "./AccountProvider";
 type Filter = "active" | "archived" | "all"; type Sort = "updated" | "name";
 
 export function ProjectsWorkspace() {
-  const { access, projectMutations } = useAccount();
+  const { access, projectMutations, activeCompany } = useAccount();
   if (!hasCapability(access, "saved-projects")) return <LockedProjects />;
-  return <UnlockedProjects projectMutations={projectMutations} />;
+  return <UnlockedProjects projectMutations={projectMutations} companyId={activeCompany?.id ?? null} />;
 }
 
 function LockedProjects() {
   return <main className="projects-page"><header className="calculator-header shell"><Brand /><Link href="/" className="all-tools">Accueil <span>×</span></Link></header><section className="tool-hero"><div className="shell"><p className="eyebrow">TOOLS PRO</p><h1 className="projects-title">Mes projets</h1><p>Conservez localement vos tracés, sans compte ni cloud.</p></div></section><section className="shell locked-projects"><ProFeaturePreview name="Projets locaux" description="Enregistrez vos paramètres, retrouvez-les hors ligne et reconstruisez toujours la géométrie depuis sa source métier." capability="saved-projects" preview="Aucune donnée envoyée à ELSATIA" /><ProFeaturePreview name="Exports chantier" description="Produisez des documents PDF, SVG et des vues d’impression à partir du plan coté." capability="export-pdf" preview="Fonction Tools Pro" /></section></main>;
 }
 
-function UnlockedProjects({ projectMutations }: { projectMutations: import("@/lib/projects/service").ProjectMutationSink }) {
-  const service = useMemo(() => typeof indexedDB === "undefined" ? null : new ProjectService(createProjectRepository(), undefined, undefined, projectMutations), [projectMutations]); const [projects, setProjects] = useState<ToolProject[]>([]); const [query, setQuery] = useState(""); const [filter, setFilter] = useState<Filter>("active"); const [sort, setSort] = useState<Sort>("updated"); const [feedback, setFeedback] = useState(""); const importRef = useRef<HTMLInputElement>(null);
+function UnlockedProjects({ projectMutations, companyId }: { projectMutations: import("@/lib/projects/service").ProjectMutationSink; companyId: string | null }) {
+  const service = useMemo(() => typeof indexedDB === "undefined" ? null : new ProjectService(createProjectRepository(projectStorageScope(companyId)), undefined, undefined, projectMutations), [companyId, projectMutations]); const [projects, setProjects] = useState<ToolProject[]>([]); const [query, setQuery] = useState(""); const [filter, setFilter] = useState<Filter>("active"); const [sort, setSort] = useState<Sort>("updated"); const [feedback, setFeedback] = useState(""); const importRef = useRef<HTMLInputElement>(null);
   const refresh = useCallback(async () => { if (service) setProjects(await service.list()); }, [service]);
   useEffect(() => { if (service) void service.list().then(setProjects).catch((error: unknown) => setFeedback(error instanceof Error ? error.message : "Stockage local indisponible.")); }, [service]);
   const visible = projects.filter((project) => filter === "all" || project.archived === (filter === "archived")).filter((project) => !query.trim() || [project.name, project.siteName, getTool(project.toolId)?.name].filter(Boolean).join(" ").toLocaleLowerCase("fr").includes(query.toLocaleLowerCase("fr").trim())).sort((a, b) => sort === "name" ? a.name.localeCompare(b.name, "fr") : b.updatedAt.localeCompare(a.updatedAt));

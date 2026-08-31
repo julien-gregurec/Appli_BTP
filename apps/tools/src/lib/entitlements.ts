@@ -17,7 +17,7 @@ export type ServerEntitlement = {
   grace_seconds: number;
 };
 
-type CachedEntitlement = { userId: string; entitlement: ServerEntitlement; signature: string };
+type CachedEntitlement = { userId: string; companyId: string | null; entitlement: ServerEntitlement; signature: string };
 export type EntitlementCacheResult = { access: AccessContext; state: "verified" | "offline-grace" | "expired" | "tampered" | "missing"; entitlement?: ServerEntitlement };
 export type AsyncKeyValueStore = { getItem(key: string): Promise<string | null>; setItem(key: string, value: string): Promise<unknown>; removeItem(key: string): Promise<unknown> };
 
@@ -26,7 +26,8 @@ function base64(bytes: Uint8Array) {
   return Buffer.from(bytes).toString("base64");
 }
 
-function stablePayload(userId: string, entitlement: ServerEntitlement) { return JSON.stringify({ userId, entitlement }); }
+function stablePayload(userId: string, companyId: string | null, entitlement: ServerEntitlement) { return JSON.stringify({ userId, companyId, entitlement }); }
+function cacheKey(companyId: string | null) { return `${CACHE_KEY}:${companyId ?? "local"}`; }
 async function importHmacKey(bytes: Uint8Array) { return crypto.subtle.importKey("raw", bytes.slice().buffer as ArrayBuffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]); }
 
 async function integrityKey(secureStore: AsyncKeyValueStore) {
@@ -50,21 +51,21 @@ export function entitlementToAccess(entitlement: ServerEntitlement): AccessConte
   return { tier: "pro", capabilities: new Set(capabilities), source: entitlement.source };
 }
 
-export async function writeEntitlementCache(userId: string, entitlement: ServerEntitlement, cacheStore: AsyncKeyValueStore, secureStore: AsyncKeyValueStore) {
-  const value = stablePayload(userId, entitlement);
-  const envelope: CachedEntitlement = { userId, entitlement, signature: await signature(value, secureStore) };
-  await cacheStore.setItem(CACHE_KEY, JSON.stringify(envelope));
+export async function writeEntitlementCache(userId: string, entitlement: ServerEntitlement, cacheStore: AsyncKeyValueStore, secureStore: AsyncKeyValueStore, companyId: string | null = null) {
+  const value = stablePayload(userId, companyId, entitlement);
+  const envelope: CachedEntitlement = { userId, companyId, entitlement, signature: await signature(value, secureStore) };
+  await cacheStore.setItem(cacheKey(companyId), JSON.stringify(envelope));
 }
 
-export async function clearEntitlementCache(cacheStore: AsyncKeyValueStore) { await cacheStore.removeItem(CACHE_KEY); }
+export async function clearEntitlementCache(cacheStore: AsyncKeyValueStore, companyIds: Array<string | null> = [null]) { await Promise.all(companyIds.map((companyId) => cacheStore.removeItem(cacheKey(companyId)))); }
 
-export async function readEntitlementCache(userId: string, cacheStore: AsyncKeyValueStore, secureStore: AsyncKeyValueStore, now = Date.now()): Promise<EntitlementCacheResult> {
-  const raw = await cacheStore.getItem(CACHE_KEY);
+export async function readEntitlementCache(userId: string, cacheStore: AsyncKeyValueStore, secureStore: AsyncKeyValueStore, now = Date.now(), companyId: string | null = null): Promise<EntitlementCacheResult> {
+  const raw = await cacheStore.getItem(cacheKey(companyId));
   if (!raw) return { access: FREE_ACCESS, state: "missing" };
   try {
     const cached = JSON.parse(raw) as CachedEntitlement;
-    if (cached.userId !== userId || cached.entitlement.cache_version !== ENTITLEMENT_CACHE_VERSION) throw new Error("cache incompatible");
-    const expected = await signature(stablePayload(cached.userId, cached.entitlement), secureStore);
+    if (cached.userId !== userId || cached.companyId !== companyId || cached.entitlement.cache_version !== ENTITLEMENT_CACHE_VERSION) throw new Error("cache incompatible");
+    const expected = await signature(stablePayload(cached.userId, cached.companyId, cached.entitlement), secureStore);
     if (cached.signature !== expected) return { access: FREE_ACCESS, state: "tampered" };
     const validatedAt = Date.parse(cached.entitlement.validated_at);
     const graceMs = Math.max(0, cached.entitlement.grace_seconds) * 1000;

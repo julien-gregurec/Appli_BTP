@@ -4,6 +4,16 @@ select plan(26);
 
 \ir fixtures/isolation_multitenant.inc
 
+-- Depuis R10, le cloud Tools est obligatoirement rattaché à une entreprise autorisée.
+update public.utilisateurs set entreprise_active_id='a0000000-0000-0000-0000-000000000001' where id::text like '10000000-%';
+update public.utilisateurs set entreprise_active_id='b0000000-0000-0000-0000-000000000001' where id::text like '20000000-%';
+insert into public.acces_applications_entreprises(entreprise_id,application_code,autorise,source) values
+ ('a0000000-0000-0000-0000-000000000001','tools',true,'test'),
+ ('b0000000-0000-0000-0000-000000000001','tools',true,'test') on conflict(entreprise_id,application_code) do update set autorise=true;
+insert into public.habilitations_applications_utilisateurs(entreprise_id,utilisateur_id,application_code,role_code,autorise)
+select ue.entreprise_id,ue.utilisateur_id,'tools','tools_pro',true from public.utilisateurs_entreprises ue
+on conflict(entreprise_id,utilisateur_id,application_code) do update set autorise=true,role_code='tools_pro';
+
 select is((select nom from public.applications_elsatia where code = 'tools'), 'ELSATIA Tools', 'Tools est enregistré dans le catalogue commun');
 select is((select application_code from public.roles_applications_elsatia where code = 'tools_pro'), 'tools', 'le rôle Tools Pro appartient au catalogue commun');
 

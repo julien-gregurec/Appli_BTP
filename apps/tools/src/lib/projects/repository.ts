@@ -9,11 +9,21 @@ export interface ProjectRepository {
 
 const DATABASE_NAME = "elsatia-tools"; const STORE_NAME = "projects"; const DATABASE_VERSION = 1;
 
+export type ProjectStorageScope = `company:${string}` | "local";
+
+export function projectStorageScope(companyId?: string | null): ProjectStorageScope {
+  return companyId ? `company:${companyId}` : "local";
+}
+
+export function projectDatabaseName(scope: ProjectStorageScope) {
+  return scope === "local" ? DATABASE_NAME : `${DATABASE_NAME}-${scope}`;
+}
+
 export class IndexedDbProjectRepository implements ProjectRepository {
-  constructor(private readonly indexedDb: IDBFactory = indexedDB) {}
+  constructor(private readonly indexedDb: IDBFactory = indexedDB, private readonly scope: ProjectStorageScope = "local") {}
   private open() {
     return new Promise<IDBDatabase>((resolve, reject) => {
-      const request = this.indexedDb.open(DATABASE_NAME, DATABASE_VERSION);
+      const request = this.indexedDb.open(projectDatabaseName(this.scope), DATABASE_VERSION);
       request.onupgradeneeded = () => { const database = request.result; if (!database.objectStoreNames.contains(STORE_NAME)) { const store = database.createObjectStore(STORE_NAME, { keyPath: "id" }); store.createIndex("updatedAt", "updatedAt"); store.createIndex("archived", "archived"); } };
       request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error ?? new Error("IndexedDB indisponible."));
     });
@@ -36,7 +46,7 @@ export class MemoryProjectRepository implements ProjectRepository {
   async delete(id: string) { this.values.delete(id); }
 }
 
-export function createProjectRepository(): ProjectRepository {
+export function createProjectRepository(scope: ProjectStorageScope = "local"): ProjectRepository {
   if (typeof indexedDB === "undefined") throw new Error("Le stockage de projets n’est pas disponible sur cette plateforme.");
-  return new IndexedDbProjectRepository(indexedDB);
+  return new IndexedDbProjectRepository(indexedDB, scope);
 }

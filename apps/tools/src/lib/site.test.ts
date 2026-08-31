@@ -14,5 +14,8 @@ describe("identité canonique", () => {
     expect(getAppEnvironment("inconnu")).toBe("production");
     expect(isNativeBuild("native")).toBe(true);
     expect(EXTERNAL_URLS.colors).toBe("https://colors.elsatia.fr");
+    expect(EXTERNAL_URLS.privacy).toBe("https://elsatia.fr/confidentialite");
+    expect(EXTERNAL_URLS.terms).toBe("https://elsatia.fr/cgu");
+    expect(EXTERNAL_URLS.accountDeletion).toBe("https://tools.elsatia.fr/suppression-compte");
   });
 });

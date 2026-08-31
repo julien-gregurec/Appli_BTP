@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createProjectId, migrateProject, type ToolProject } from "./model";
-import type { ProjectRepository } from "./repository";
+import type { ProjectRepository, ProjectStorageScope } from "./repository";
 
 export type ProjectSyncStatus = "local-only" | "pending" | "synced" | "conflict" | "error";
 export type ProjectSyncRecord = {
@@ -17,9 +17,10 @@ export interface SyncStateRepository {
 export interface CloudProjectStore { push(record: ProjectSyncRecord, deviceId: string): Promise<CloudPushResult>; pull(since?: string): Promise<CloudProject[]>; }
 
 const DATABASE = "elsatia-tools-sync"; const STORE = "queue";
+export function syncDatabaseName(scope: ProjectStorageScope) { return scope === "local" ? DATABASE : `${DATABASE}-${scope}`; }
 export class IndexedDbSyncStateRepository implements SyncStateRepository {
-  constructor(private readonly indexedDb: IDBFactory = indexedDB) {}
-  private open() { return new Promise<IDBDatabase>((resolve, reject) => { const request = this.indexedDb.open(DATABASE, 1); request.onupgradeneeded = () => { if (!request.result.objectStoreNames.contains(STORE)) request.result.createObjectStore(STORE, { keyPath: "projectId" }); }; request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); }); }
+  constructor(private readonly indexedDb: IDBFactory = indexedDB, private readonly scope: ProjectStorageScope = "local") {}
+  private open() { return new Promise<IDBDatabase>((resolve, reject) => { const request = this.indexedDb.open(syncDatabaseName(this.scope), 1); request.onupgradeneeded = () => { if (!request.result.objectStoreNames.contains(STORE)) request.result.createObjectStore(STORE, { keyPath: "projectId" }); }; request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); }); }
   private async request<T>(mode: IDBTransactionMode, action: (store: IDBObjectStore) => IDBRequest<T>) { const database = await this.open(); return new Promise<T>((resolve, reject) => { const transaction = database.transaction(STORE, mode); const request = action(transaction.objectStore(STORE)); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); transaction.oncomplete = () => database.close(); transaction.onerror = () => reject(transaction.error); }); }
   async list() { return this.request<ProjectSyncRecord[]>("readonly", (store) => store.getAll()); }
   async get(projectId: string) { return (await this.request<ProjectSyncRecord | undefined>("readonly", (store) => store.get(projectId))) ?? null; }
@@ -35,16 +36,16 @@ export class MemorySyncStateRepository implements SyncStateRepository {
 }
 
 export class SupabaseCloudProjectStore implements CloudProjectStore {
-  constructor(private readonly client: SupabaseClient) {}
+  constructor(private readonly client: SupabaseClient, private readonly companyId: string) {}
   async push(record: ProjectSyncRecord, deviceId: string) {
     const payload = { ...record.project, ...(record.deletedAt ? { deletedAt: record.deletedAt } : {}) };
-    const { data, error } = await this.client.rpc("tools_sync_project", { p_project: payload, p_expected_revision: record.revision, p_device_id: deviceId });
+    const { data, error } = await this.client.rpc("tools_sync_project_entreprise", { p_entreprise_id: this.companyId, p_project: payload, p_expected_revision: record.revision, p_device_id: deviceId });
     if (error) throw new Error("Synchronisation cloud impossible.");
     const value = data as { status: "applied" | "conflict"; revision: number; project: unknown; cloud_updated_at: string };
     return { status: value.status, revision: value.revision, project: migrateProject(value.project), cloudUpdatedAt: value.cloud_updated_at };
   }
   async pull(since?: string) {
-    let query = this.client.from("tools_projects").select("project_payload,revision,deleted_at,cloud_updated_at").order("cloud_updated_at", { ascending: true });
+    let query = this.client.from("tools_projects").select("project_payload,revision,deleted_at,cloud_updated_at").eq("organization_id", this.companyId).order("cloud_updated_at", { ascending: true });
     if (since) query = query.gt("cloud_updated_at", since);
     const { data, error } = await query;
     if (error) throw new Error("Téléchargement des projets impossible.");

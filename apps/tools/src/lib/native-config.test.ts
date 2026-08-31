@@ -7,6 +7,8 @@ const iosInfoPlist = readFileSync(
   resolve(__dirname, "../../ios/App/App/Info.plist"),
   "utf8",
 );
+const androidManifest = readFileSync(resolve(__dirname, "../../android/app/src/main/AndroidManifest.xml"), "utf8");
+const androidPaths = readFileSync(resolve(__dirname, "../../android/app/src/main/res/xml/file_paths.xml"), "utf8");
 
 describe("configuration native canonique", () => {
   it("embarque l’export statique sous le même identifiant iOS et Android", () => {
@@ -26,6 +28,17 @@ describe("configuration native canonique", () => {
     expect(capacitorConfig.ios?.contentInset).toBe("never");
     expect(capacitorConfig.ios?.preferredContentMode).toBe("mobile");
     expect(capacitorConfig.zoomEnabled).toBe(false);
+    expect(capacitorConfig.loggingBehavior).toBe("none");
+    expect(androidManifest.match(/uses-permission/g)).toHaveLength(1);
+    expect(androidManifest).toContain("android.permission.INTERNET");
+    expect(androidManifest).toContain('android:allowBackup="false"');
+    expect(androidPaths).not.toContain("external-path");
+  });
+  it("déclare uniquement le deep link de récupération contrôlé", () => {
+    expect(iosInfoPlist).toContain("fr.elsatia.tools.auth");
+    expect(androidManifest).toContain('android:scheme="fr.elsatia.tools"');
+    expect(androidManifest).toContain('android:pathPrefix="/recovery"');
+    expect(iosInfoPlist).not.toContain("armv7");
   });
 
   it("déclare le format de projet portable dans le sélecteur de documents iOS", () => {

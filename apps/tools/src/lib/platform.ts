@@ -21,6 +21,7 @@ export function resolveToolsDeepLink(rawUrl: string, canonicalOrigin = SITE.defa
   try {
     const url = new URL(rawUrl);
     const origin = new URL(canonicalOrigin);
+    if (url.protocol === "fr.elsatia.tools:" && url.hostname === "auth" && url.pathname === "/recovery") return `/compte?recovery=1${url.search ? `&${url.search.slice(1)}` : ""}`;
     if (url.protocol !== "https:" || url.hostname !== origin.hostname) return null;
     if (url.pathname === "/" || url.pathname === "/projets" || url.pathname === "/projets/" || /^\/outils\/[a-z0-9-]+\/?$/.test(url.pathname)) return `${url.pathname}${url.search}${url.hash}`;
     return null;

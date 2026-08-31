@@ -15,5 +15,6 @@ describe("plateformes et liens applicatifs", () => {
     expect(resolveToolsDeepLink("https://tools.elsatia.fr/projets")).toBe("/projets");
     expect(resolveToolsDeepLink("https://example.com/outils/pente")).toBeNull();
     expect(resolveToolsDeepLink("https://tools.elsatia.fr/admin")).toBeNull();
+    expect(resolveToolsDeepLink("fr.elsatia.tools://auth/recovery?code=test")).toBe("/compte?recovery=1&code=test");
   });
 });

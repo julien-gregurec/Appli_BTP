@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: "ELSATIA Tools",
   webDir: "out",
   backgroundColor: "#f3f2ed",
-  loggingBehavior: "debug",
+  loggingBehavior: "none",
   zoomEnabled: false,
   server: {
     hostname: "localhost",

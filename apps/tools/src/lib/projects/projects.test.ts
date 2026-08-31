@@ -1,12 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { createToolProject, parseProjectFile, PROJECT_SCHEMA_VERSION, serializeProject } from "./model";
-import { MemoryProjectRepository } from "./repository";
+import { MemoryProjectRepository, projectDatabaseName, projectStorageScope } from "./repository";
+import { syncDatabaseName } from "./sync";
 import { ProjectService } from "./service";
 import { proToolDefaults } from "../pro-engine";
 
 const input = { name: "Plafond salle réunion", siteName: "Lidl Strasbourg", toolId: "fleur-6" as const, inputParameters: proToolDefaults["fleur-6"], notes: "Axe depuis mur façade." };
 
 describe("projets locaux versionnés", () => {
+  it("cloisonne les projets et conflits locaux par entreprise", () => {
+    const a = projectStorageScope("a0000000-0000-0000-0000-000000000001");
+    const b = projectStorageScope("b0000000-0000-0000-0000-000000000001");
+    expect(projectDatabaseName(a)).not.toBe(projectDatabaseName(b));
+    expect(syncDatabaseName(a)).not.toBe(syncDatabaseName(b));
+    expect(projectDatabaseName(projectStorageScope(null))).toBe("elsatia-tools");
+  });
   it("crée un projet recalculable sans stocker de SVG ou de résultat", () => {
     const project = createToolProject(input, new Date("2026-08-30T10:00:00Z"), "12345678-1234-1234-1234-123456789012");
     expect(project).toMatchObject({ schemaVersion: PROJECT_SCHEMA_VERSION, toolId: "fleur-6", units: "mm", archived: false });

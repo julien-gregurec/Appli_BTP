@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "next dev -p 3020",
-    "build": "next build",
-    "build:native": "ELSATIA_TOOLS_NATIVE=1 NEXT_PUBLIC_TOOLS_RUNTIME=native next build",
+    "build": "next build --webpack",
+    "build:native": "ELSATIA_TOOLS_NATIVE=1 NEXT_PUBLIC_TOOLS_RUNTIME=native next build --webpack",
     "start": "next start -p 3020",
     "native:sync": "npm run build:native && cap sync",
     "native:android": "npm run native:sync && cap open android",

@@ -13,7 +13,7 @@ import { downloadBlob, shareBlob } from "@/lib/exports/share";
 import { exportProjectSvg } from "@/lib/exports/svg";
 import type { ShapeGeometry } from "@/lib/geometry/shape-model";
 import { createToolProject, type ToolProject } from "@/lib/projects/model";
-import { createProjectRepository } from "@/lib/projects/repository";
+import { createProjectRepository, projectStorageScope } from "@/lib/projects/repository";
 import { ProjectService } from "@/lib/projects/service";
 import { executeProTool, proToolDefaults, proToolFields, type ProToolId } from "@/lib/pro-engine";
 import { AdvancedPlan } from "./AdvancedPlan";
@@ -26,19 +26,19 @@ type Tab = "result" | "plan" | "points" | "steps";
 type SaveDraft = { name: string; siteName: string; notes: string };
 
 export function ProCalculatorWorkspace({ tool }: { tool: ToolDefinition }) {
-  const { access, projectMutations } = useAccount();
+  const { access, projectMutations, activeCompany } = useAccount();
   if (!hasCapability(access, "advanced-tracing")) return <LockedProWorkspace tool={tool} />;
-  return <UnlockedProWorkspace tool={tool} access={access} projectMutations={projectMutations} />;
+  return <UnlockedProWorkspace tool={tool} access={access} projectMutations={projectMutations} companyId={activeCompany?.id ?? null} />;
 }
 
 function LockedProWorkspace({ tool }: { tool: ToolDefinition }) {
   return <main className="calculator-page"><header className="calculator-header shell"><Brand /><Link className="all-tools" href="/">Tous les outils <span>×</span></Link></header><div className="tool-hero"><div className="shell"><Link href="/" className="breadcrumb">← Accueil</Link><div className="tool-heading"><span className="tool-icon large"><ToolIcon id={tool.id} size={36} /></span><div><p className="eyebrow">{getCategory(tool.categoryId).name} · PRO</p><h1>{tool.name}</h1><p>{tool.description}</p></div></div></div></div><section className="shell locked-pro"><div className="locked-pro-copy"><span className="pro-badge">TOOLS PRO</span><h2>Concevez et reproduisez cette forme sur chantier</h2><p>L’outil complet fournit la géométrie exacte, les centres, rayons, axes, points de construction, plan coté et étapes de traçage. Cet aperçu ne lance aucun calcul et n’affiche aucune fausse cote.</p><ul><li>Calcul local et hors ligne</li><li>Plan fondé sur les mesures saisies</li><li>Droits Pro vérifiés par le compte ELSATIA</li></ul><Link href="/compte">Se connecter ou vérifier les droits</Link></div><div className="locked-pro-preview" aria-label="Aperçu non calculé"><ToolIcon id={tool.id} size={100} /><strong>{tool.name}</strong><small>Exemple visuel non coté - aucune géométrie calculée</small></div></section><section className="shell pro-preview-section locked-export-previews"><ProFeaturePreview name="Enregistrer ce projet" description="Conservez localement les paramètres pour recalculer le plan plus tard." capability="saved-projects" preview="TOOLS PRO · compte facultatif pour Free" /><ProFeaturePreview name="Exporter PDF ou SVG" description="Créez une fiche chantier et un plan vectoriel sans service distant." capability="export-pdf" preview="PRO · génération hors ligne" /></section></main>;
 }
 
-function UnlockedProWorkspace({ tool, access, projectMutations }: { tool: ToolDefinition; access: AccessContext; projectMutations: import("@/lib/projects/service").ProjectMutationSink }) {
+function UnlockedProWorkspace({ tool, access, projectMutations, companyId }: { tool: ToolDefinition; access: AccessContext; projectMutations: import("@/lib/projects/service").ProjectMutationSink; companyId: string | null }) {
   const id = tool.id as ProToolId;
   const [values, setValues] = useState(proToolDefaults[id]); const [tab, setTab] = useState<Tab>("result"); const [stepIndex, setStepIndex] = useState(0);
-  const service = useMemo(() => typeof indexedDB === "undefined" ? null : new ProjectService(createProjectRepository(), undefined, undefined, projectMutations), [projectMutations]); const [project, setProject] = useState<ToolProject | null>(null); const [feedback, setFeedback] = useState(""); const [showSave, setShowSave] = useState(false);
+  const service = useMemo(() => typeof indexedDB === "undefined" ? null : new ProjectService(createProjectRepository(projectStorageScope(companyId)), undefined, undefined, projectMutations), [companyId, projectMutations]); const [project, setProject] = useState<ToolProject | null>(null); const [feedback, setFeedback] = useState(""); const [showSave, setShowSave] = useState(false);
   const [draft, setDraft] = useState<SaveDraft>({ name: tool.name, siteName: "", notes: "" }); const [baseline, setBaseline] = useState(JSON.stringify(proToolDefaults[id]));
   useEffect(() => {
     if (!service) return; const projectId = new URLSearchParams(window.location.search).get("project"); if (!projectId) return;

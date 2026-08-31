@@ -30,4 +30,10 @@ describe("cache local des entitlements", () => {
     await writeEntitlementCache("user-a", { ...entitlement, expires_at: "2026-08-31T00:00:00Z" }, cache, secure);
     expect((await readEntitlementCache("user-a", cache, secure, Date.parse("2026-09-01T00:00:00Z"))).state).toBe("expired");
   });
+  it("ne restaure jamais l'entitlement d'une autre entreprise", async () => {
+    const cache = new MemoryStore(); const secure = new MemoryStore();
+    await writeEntitlementCache("user-a", entitlement, cache, secure, "entreprise-a");
+    expect((await readEntitlementCache("user-a", cache, secure, Date.parse("2026-08-31T10:00:00Z"), "entreprise-a")).access.tier).toBe("pro");
+    expect((await readEntitlementCache("user-a", cache, secure, Date.parse("2026-08-31T10:00:00Z"), "entreprise-b")).access.tier).toBe("free");
+  });
 });

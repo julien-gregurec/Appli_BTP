@@ -14,8 +14,10 @@ export const EXTERNAL_URLS = {
   gestionPro: "https://app.elsatia.fr",
   colors: "https://colors.elsatia.fr",
   privacy: "https://elsatia.fr/confidentialite",
-  terms: "https://elsatia.fr/conditions",
+  terms: "https://elsatia.fr/cgu",
   support: "https://elsatia.fr/contact",
+  accountCreation: "https://app.elsatia.fr/signup",
+  accountDeletion: "https://tools.elsatia.fr/suppression-compte",
 } as const;
 
 export function getPublicUrl() {
