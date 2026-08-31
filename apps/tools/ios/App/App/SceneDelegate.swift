@@ -47,7 +47,10 @@ public class SecureSessionPlugin: CAPPlugin, CAPBridgedPlugin {
 }
 
 final class ToolsBridgeViewController: CAPBridgeViewController {
-    override func capacitorDidLoad() { bridge?.registerPluginInstance(SecureSessionPlugin()) }
+    override func capacitorDidLoad() {
+        bridge?.registerPluginInstance(SecureSessionPlugin())
+        bridge?.registerPluginInstance(NativeBillingPlugin())
+    }
 }
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {

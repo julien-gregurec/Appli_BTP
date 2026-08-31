@@ -11,12 +11,17 @@ import type { ProjectMutationSink } from "@/lib/projects/service";
 import { IndexedDbSyncStateRepository, SupabaseCloudProjectStore, SyncService } from "@/lib/projects/sync";
 import type { ToolProject } from "@/lib/projects/model";
 import { Capacitor } from "@capacitor/core";
+import type { EntitlementSource } from "@/lib/access";
+import type { ToolsProductSku } from "@/lib/monetization";
+import { manageToolsSubscription, restoreToolsPurchases, startToolsPurchase } from "@/lib/monetization-client";
 
 export type AccountStatus = "anonymous" | "loading" | "verified" | "offline-grace" | "expired" | "error";
 type AccountContextValue = {
   configured: boolean; user: User | null; access: AccessContext; status: AccountStatus; message: string;
+  activeSources: Array<{ source: EntitlementSource; status: string; expires_at: string | null; renews_at: string | null }>;
   syncStatus: "idle" | "syncing" | "synced" | "error"; projectMutations: ProjectMutationSink;
   signIn(email: string, password: string): Promise<void>; signOut(): Promise<void>; refresh(): Promise<void>; syncNow(): Promise<void>;
+  startPurchase(sku: ToolsProductSku): Promise<void>; restorePurchases(): Promise<void>; manageSubscription(source: "web" | "apple" | "google"): Promise<void>;
 };
 
 const AccountContext = createContext<AccountContextValue | null>(null);
@@ -33,6 +38,7 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<AccountStatus>(configured ? "loading" : "anonymous");
   const [message, setMessage] = useState(configured ? "Vérification du compte…" : "Compte cloud indisponible dans cet environnement.");
   const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "synced" | "error">("idle");
+  const [activeSources, setActiveSources] = useState<AccountContextValue["activeSources"]>([]);
 
   const projectMutations = useMemo<ProjectMutationSink>(() => ({
     async changed(project: ToolProject) { const state = new IndexedDbSyncStateRepository(); const current = await state.get(project.id); await state.put({ projectId: project.id, project, revision: current?.revision ?? 0, dirty: true, status: "pending" }); },
@@ -40,17 +46,18 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
   }), []);
 
   const resolve = useCallback(async (activeSession: Session | null) => {
-    if (!configured || !activeSession) { setAccess(FREE_ACCESS); setStatus("anonymous"); setMessage("Tools Free · sans compte"); return; }
+    if (!configured || !activeSession) { setAccess(FREE_ACCESS); setActiveSources([]); setStatus("anonymous"); setMessage("Tools Free · sans compte"); return; }
     const client = getElsatiaClient();
     try {
       const { data, error } = await client.rpc("tools_resoudre_entitlements");
       if (error) throw error;
       const entitlement = data as ServerEntitlement;
       await writeEntitlementCache(activeSession.user.id, entitlement, cacheStore, secureSessionStorage);
-      setAccess(entitlementToAccess(entitlement)); setStatus("verified"); setMessage("Droits vérifiés · projets prêts à synchroniser");
+      setAccess(entitlementToAccess(entitlement)); setActiveSources(entitlement.sources ?? []); setStatus("verified"); setMessage("Droits vérifiés · projets prêts à synchroniser");
     } catch {
       const cached = await readEntitlementCache(activeSession.user.id, cacheStore, secureSessionStorage);
       setAccess(cached.access);
+      setActiveSources(cached.state === "offline-grace" ? cached.entitlement?.sources ?? [] : []);
       if (cached.state === "offline-grace") { setStatus("offline-grace"); setMessage("Hors ligne · droits Pro temporairement validés"); }
       else { setStatus(cached.state === "expired" ? "expired" : "error"); setMessage(cached.state === "expired" ? "Droits non vérifiables : accès Free jusqu’à la prochaine connexion." : "Compte non vérifiable. Tools Free reste disponible."); }
     }
@@ -104,10 +111,28 @@ export function AccountProvider({ children }: { children: React.ReactNode }) {
 
   async function signOut() {
     if (configured) await getElsatiaClient().auth.signOut({ scope: "local" });
-    await clearEntitlementCache(cacheStore); setSession(null); setAccess(FREE_ACCESS); setStatus("anonymous"); setMessage("Déconnecté · Tools Free reste disponible");
+    await clearEntitlementCache(cacheStore); setSession(null); setAccess(FREE_ACCESS); setActiveSources([]); setStatus("anonymous"); setMessage("Déconnecté · Tools Free reste disponible");
   }
 
-  const value: AccountContextValue = { configured, user: session?.user ?? null, access, status, message, syncStatus, projectMutations, signIn, signOut, refresh, syncNow };
+  async function startPurchase(sku: ToolsProductSku) {
+    if (!session) throw new Error("Connectez votre compte ELSATIA avant l’achat.");
+    if (access.tier === "pro" || activeSources.length) throw new Error("Tools Pro est déjà actif sur votre compte.");
+    setMessage("Ouverture du paiement sécurisé…");
+    const outcome = await startToolsPurchase(sku, session.user.id, session.access_token);
+    if (outcome !== "redirect") await resolve(session);
+  }
+
+  async function restorePurchases() {
+    if (!session) throw new Error("Connectez votre compte ELSATIA avant la restauration.");
+    setMessage("Vérification des achats…"); await restoreToolsPurchases(session.access_token); await resolve(session);
+  }
+
+  async function manageSubscription(source: "web" | "apple" | "google") {
+    if (!session) throw new Error("Connectez votre compte ELSATIA.");
+    await manageToolsSubscription(session.access_token, source);
+  }
+
+  const value: AccountContextValue = { configured, user: session?.user ?? null, access, status, message, activeSources, syncStatus, projectMutations, signIn, signOut, refresh, syncNow, startPurchase, restorePurchases, manageSubscription };
   return <AccountContext.Provider value={value}>{children}</AccountContext.Provider>;
 }
 

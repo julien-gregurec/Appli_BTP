@@ -238,6 +238,24 @@ footer { background: #e9e8e3; }
 .account-actions .secondary { border: 1px solid var(--navy); background: white; color: var(--navy); }
 .account-warning, .account-error { padding: 12px; border-radius: 7px; background: #fff4d8; color: #704900 !important; font-size: 12px; }
 .account-error { background: #fff0ef; color: #8a2922 !important; }
+.monetization-panel { margin-block: 26px 80px; padding: 28px; border: 1px solid var(--line); border-radius: 14px; background: white; }
+.monetization-panel h2 { margin: 7px 0 9px; font-family: Georgia, serif; font-size: 30px; font-weight: 500; }
+.monetization-panel > p:not(.eyebrow) { color: var(--ink-soft); line-height: 1.6; }
+.pricing-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 24px; }
+.pricing-grid article { padding: 22px; border: 1px solid var(--line); border-radius: 12px; }
+.pricing-grid small { color: #9a6400; font-weight: 900; letter-spacing: .1em; }
+.pricing-grid h3 { margin: 8px 0; font-size: 20px; }
+.pricing-grid strong { font-family: Georgia, serif; font-size: 25px; font-weight: 500; }
+.pricing-grid > article > span { color: var(--ink-soft); font-size: 12px; }
+.pricing-grid ul { min-height: 76px; padding-left: 18px; color: var(--ink-soft); font-size: 12px; line-height: 1.7; }
+.pricing-grid button, .restore-purchases { min-height: 44px; padding: 0 16px; border: 0; border-radius: 8px; background: var(--navy); color: white; cursor: pointer; font-weight: 800; }
+.pricing-grid button:disabled, .restore-purchases:disabled { opacity: .45; cursor: default; }
+.restore-purchases { margin-top: 16px; border: 1px solid var(--navy); background: white; color: var(--navy); }
+.active-sources { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.active-sources span { padding: 8px 11px; border-radius: 999px; background: #eef4ef; color: #31573c; font-size: 11px; font-weight: 800; }
+.double-source-note, .monetization-feedback { font-size: 11px; }
+.legal-links { display: flex; flex-wrap: wrap; gap: 15px; margin-top: 18px; font-size: 11px; }
+.legal-links a { color: #81550b; text-decoration: underline; }
 
 /* Projects, local persistence and exports */
 .calculator-nav { display: flex; align-items: center; gap: 22px; color: #697980; font-size: 12px; font-weight: 700; }
@@ -370,6 +388,8 @@ footer { background: #e9e8e3; }
   .project-primary-actions > * { width: 100%; }
   .project-more { grid-column: auto; }
   .locked-projects { grid-template-columns: 1fr; }
+  .pricing-grid { grid-template-columns: 1fr; }
+  .monetization-panel { padding: 22px 18px; }
 }
 
 @media print {

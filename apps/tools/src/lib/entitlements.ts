@@ -10,6 +10,7 @@ export type ServerEntitlement = {
   tier: "free" | "pro";
   capabilities: string[];
   source: EntitlementSource;
+  sources?: Array<{ source: EntitlementSource; status: string; expires_at: string | null; renews_at: string | null }>;
   expires_at: string | null;
   validated_at: string;
   cache_version: number;
@@ -17,7 +18,7 @@ export type ServerEntitlement = {
 };
 
 type CachedEntitlement = { userId: string; entitlement: ServerEntitlement; signature: string };
-export type EntitlementCacheResult = { access: AccessContext; state: "verified" | "offline-grace" | "expired" | "tampered" | "missing" };
+export type EntitlementCacheResult = { access: AccessContext; state: "verified" | "offline-grace" | "expired" | "tampered" | "missing"; entitlement?: ServerEntitlement };
 export type AsyncKeyValueStore = { getItem(key: string): Promise<string | null>; setItem(key: string, value: string): Promise<unknown>; removeItem(key: string): Promise<unknown> };
 
 function base64(bytes: Uint8Array) {
@@ -69,6 +70,6 @@ export async function readEntitlementCache(userId: string, cacheStore: AsyncKeyV
     const graceMs = Math.max(0, cached.entitlement.grace_seconds) * 1000;
     const expiresAt = cached.entitlement.expires_at ? Date.parse(cached.entitlement.expires_at) : Number.POSITIVE_INFINITY;
     if (!Number.isFinite(validatedAt) || now > validatedAt + graceMs || now >= expiresAt) return { access: FREE_ACCESS, state: "expired" };
-    return { access: entitlementToAccess(cached.entitlement), state: "offline-grace" };
+    return { access: entitlementToAccess(cached.entitlement), state: "offline-grace", entitlement: cached.entitlement };
   } catch { return { access: FREE_ACCESS, state: "tampered" }; }
 }
