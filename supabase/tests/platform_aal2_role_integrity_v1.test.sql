@@ -138,11 +138,15 @@ select throws_like(
 select set_config('request.jwt.claim.sub','ee900000-0000-4000-8000-000000000004',true);
 select set_config('request.jwt.claim.email','lecture-aal2@invalid.local',true);
 select set_config('request.jwt.claims','{"sub":"ee900000-0000-4000-8000-000000000004","email":"lecture-aal2@invalid.local","role":"authenticated","aal":"aal2"}',true);
-select throws_like($$select public.plateforme_ajouter_admin('lecture-interdit@invalid.local',null,'support')$$,'%Action réservée%','lecture : gestion administrateur refusée');
-select throws_like($$select public.plateforme_activer_application_entreprise('a0000000-0000-0000-0000-000000000001','colors')$$,'%Action réservée%','lecture : mutation multi-app refusée');
-select throws_like($$select public.plateforme_entrer_entreprise('a0000000-0000-0000-0000-000000000001','support lecture')$$,'%Action réservée%','lecture : support refusé');
-select throws_like($$select * from public.plateforme_support_fils()$$,'%Action réservée%','lecture : fils support refusés');
+select throws_ok($$select public.plateforme_ajouter_admin('lecture-interdit@invalid.local',null,'support')$$,'42501','Rôle plateforme insuffisant','lecture : gestion administrateur refusée');
+select throws_ok($$select public.plateforme_activer_application_entreprise('a0000000-0000-0000-0000-000000000001','colors')$$,'42501','Rôle plateforme insuffisant','lecture : mutation multi-app refusée');
+select throws_ok($$select public.plateforme_entrer_entreprise('a0000000-0000-0000-0000-000000000001','support lecture')$$,'42501','Rôle plateforme insuffisant','lecture : support refusé');
+select throws_ok($$select * from public.plateforme_support_fils()$$,'42501','Rôle plateforme insuffisant','lecture : fils support refusés');
 reset role;
+-- Simule une écriture hors-session (webhook/maintenance) : auth.uid() nul, seul
+-- chemin exempté par le trigger proteger_facturation_entreprise().
+select set_config('request.jwt.claims','',true);
+select set_config('request.jwt.claim.sub','',true);
 update public.entreprises
 set abonnement_statut='actif', impaye_signale_at=now()-interval '20 days',
     suspension_prevue_at=now()-interval '1 day'
@@ -178,8 +182,8 @@ select lives_ok(
   $$select public.plateforme_verifier_et_journaliser_reinitialisation('a0000000-0000-0000-0000-000000000001','admin-a@invalid.local','Assistance autorisée')$$,
   'support AAL2 : réinitialisation journalisée dans la session ciblée'
 );
-select throws_like($$select public.plateforme_activer_application_entreprise('a0000000-0000-0000-0000-000000000001','colors')$$,'%Action réservée%','support : mutation multi-app refusée');
-select throws_like($$select public.plateforme_ajouter_admin('support-interdit@invalid.local',null,'support')$$,'%Action réservée%','support : gestion administrateur refusée');
+select throws_ok($$select public.plateforme_activer_application_entreprise('a0000000-0000-0000-0000-000000000001','colors')$$,'42501','Rôle plateforme insuffisant','support : mutation multi-app refusée');
+select throws_ok($$select public.plateforme_ajouter_admin('support-interdit@invalid.local',null,'support')$$,'42501','Rôle plateforme insuffisant','support : gestion administrateur refusée');
 
 -- H. Facturation : aucun support, entitlement ou administrateur.
 select set_config('request.jwt.claim.sub','ee900000-0000-4000-8000-000000000003',true);
@@ -194,9 +198,9 @@ select lives_ok(
   $$select public.plateforme_modifier_abonnement('a0000000-0000-0000-0000-000000000001','actif',current_date,null)$$,
   'facturation AAL2 : fonction de facturation prévue autorisée'
 );
-select throws_like($$select public.plateforme_activer_application_entreprise('a0000000-0000-0000-0000-000000000001','colors')$$,'%Action réservée%','facturation : mutation multi-app refusée');
-select throws_like($$select public.plateforme_entrer_entreprise('a0000000-0000-0000-0000-000000000001','support facturation')$$,'%Action réservée%','facturation : support refusé');
-select throws_like($$select public.plateforme_ajouter_admin('facturation-interdit@invalid.local',null,'support')$$,'%Action réservée%','facturation : gestion administrateur refusée');
+select throws_ok($$select public.plateforme_activer_application_entreprise('a0000000-0000-0000-0000-000000000001','colors')$$,'42501','Rôle plateforme insuffisant','facturation : mutation multi-app refusée');
+select throws_ok($$select public.plateforme_entrer_entreprise('a0000000-0000-0000-0000-000000000001','support facturation')$$,'42501','Rôle plateforme insuffisant','facturation : support refusé');
+select throws_ok($$select public.plateforme_ajouter_admin('facturation-interdit@invalid.local',null,'support')$$,'42501','Rôle plateforme insuffisant','facturation : gestion administrateur refusée');
 
 -- J. L'UID et l'email d'une identité active sont structurellement immuables.
 reset role;
@@ -321,9 +325,9 @@ select set_config('request.jwt.claim.sub','ee900000-0000-4000-8000-000000000009'
 select set_config('request.jwt.claim.email','email-seul-aal2@invalid.local',true);
 select set_config('request.jwt.claims','{"sub":"ee900000-0000-4000-8000-000000000009","email":"email-seul-aal2@invalid.local","role":"authenticated","aal":"aal2"}',true);
 select ok(not public.est_plateforme_admin(),'bon email sans UID : aucun droit plateforme');
-select throws_like(
+select throws_ok(
   $$select public.plateforme_entrer_entreprise('a0000000-0000-0000-0000-000000000001','email seul aal2')$$,
-  '%réservé à la plateforme%', 'bon email et AAL2 sans UID : support refusé'
+  '42501', 'Rôle plateforme insuffisant', 'bon email et AAL2 sans UID : support refusé'
 );
 
 -- Les helpers internes et le préflight ne sont pas exposés aux comptes ordinaires.

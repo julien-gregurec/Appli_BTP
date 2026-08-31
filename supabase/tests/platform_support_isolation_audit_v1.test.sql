@@ -300,14 +300,14 @@ select ok(
   'facturation réelle : UID, entreprise, objet et états avant/après audités'
 );
 select is((select count(*) from public.historique_mutations_plateforme where domaine='facturation'),1::bigint,'abonnement identique : un seul historique réel');
-select throws_like(
+select throws_ok(
   $$select public.plateforme_entrer_entreprise('a0000000-0000-0000-0000-000000000001','Facturation interdite')$$,
-  '%Action réservée%',
+  '42501', 'Rôle plateforme insuffisant',
   'facturation : support refusé'
 );
-select throws_like(
+select throws_ok(
   $$select public.plateforme_activer_application_entreprise('a0000000-0000-0000-0000-000000000001','colors')$$,
-  '%Action réservée%',
+  '42501', 'Rôle plateforme insuffisant',
   'facturation : mutation multi-app refusée'
 );
 
@@ -321,9 +321,9 @@ select throws_like(
 select set_config('request.jwt.claim.sub','ee980000-0000-4000-8000-000000000003',true);
 select set_config('request.jwt.claim.email','lecture-audit@invalid.local',true);
 select set_config('request.jwt.claims','{"sub":"ee980000-0000-4000-8000-000000000003","email":"lecture-audit@invalid.local","role":"authenticated","aal":"aal2"}',true);
-select throws_like(
+select throws_ok(
   $$select public.plateforme_support_marquer_messages_lus('a0000000-0000-0000-0000-000000000001')$$,
-  '%Action réservée%',
+  '42501', 'Rôle plateforme insuffisant',
   'lecture : acquittement support refusé'
 );
 select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000001',true);

@@ -483,6 +483,11 @@ end;
 $$;
 
 -- Le catalogue des fils est une vue support, non une consultation générale.
+-- La 202 a défini cette fonction avec non_lus/total en bigint ; le passage à
+-- integer change le type des colonnes OUT, ce que CREATE OR REPLACE refuse
+-- (ERROR 42P13). On la supprime d'abord, comme le fait déjà la migration 239.
+-- Aucun objet dépendant : DROP simple, jamais CASCADE.
+drop function if exists public.plateforme_support_fils();
 create or replace function public.plateforme_support_fils()
 returns table(
   entreprise_id uuid,

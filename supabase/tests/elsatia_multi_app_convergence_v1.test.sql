@@ -206,9 +206,9 @@ select ok(not public.a_acces_application('a0000000-0000-0000-0000-000000000001',
 -- 17. Un admin d'entreprise (pas admin plateforme) ne peut pas activer d'application lui-même.
 select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000001', true);
 select set_config('request.jwt.claim.email', 'admin-a@invalid.local', true);
-select throws_like(
+select throws_ok(
   $$select public.plateforme_activer_application_entreprise('a0000000-0000-0000-0000-000000000001','colors')$$,
-  '%réservé à la plateforme%', 'un admin d''entreprise ne peut pas activer une application (réservé à l''admin plateforme)'
+  '42501', 'Rôle plateforme insuffisant', 'un admin d''entreprise ne peut pas activer une application (réservé à l''admin plateforme ; message durci par 236/239)'
 );
 
 -- 18. Sécurité tiers : a_acces_application/applications_autorisees n'acceptent aucun utilisateur_id

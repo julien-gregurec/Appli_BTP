@@ -46,9 +46,9 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub','cc900000-0000-4000-8000-000000000001',true);
 select set_config('request.jwt.claim.email','support-pending@invalid.local',true);
 select ok(not public.est_plateforme_admin(), '1. identité en attente : pas admin plateforme');
-select throws_like(
+select throws_ok(
   $$select public.plateforme_entrer_entreprise('a0000000-0000-0000-0000-000000000001','audit support pending')$$,
-  '%réserv%', '2. le bon email seul ne permet pas une entrée support'
+  '42501', 'Rôle plateforme insuffisant', '2. le bon email seul ne permet pas une entrée support'
 );
 reset role;
 select is(
@@ -67,9 +67,9 @@ select is(
 select set_config('request.jwt.claim.sub','cc900000-0000-4000-8000-000000000003',true);
 select set_config('request.jwt.claim.email','support-owner@invalid.local',true);
 select ok(not public.est_plateforme_admin(), '5. UID différent : pas admin malgré email usurpé');
-select throws_like(
+select throws_ok(
   $$select public.plateforme_entrer_entreprise('a0000000-0000-0000-0000-000000000001','audit mauvais uid')$$,
-  '%réserv%', '6. UID différent : entrée support refusée'
+  '42501', 'Rôle plateforme insuffisant', '6. UID différent : entrée support refusée'
 );
 reset role;
 select is(
@@ -82,25 +82,25 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub','cc900000-0000-4000-8000-000000000004',true);
 select set_config('request.jwt.claim.email','support-inactif@invalid.local',true);
 select ok(not public.est_plateforme_admin(), '8. UID correct mais actif=false : refusé');
-select throws_like(
+select throws_ok(
   $$select public.plateforme_entrer_entreprise('a0000000-0000-0000-0000-000000000001','audit compte inactif')$$,
-  '%réserv%', '9. compte inactif : entrée support refusée'
+  '42501', 'Rôle plateforme insuffisant', '9. compte inactif : entrée support refusée'
 );
 
 -- Un rôle plateforme actif mais non habilité au support reste refusé.
 select set_config('request.jwt.claim.sub','cc900000-0000-4000-8000-000000000006',true);
 select set_config('request.jwt.claim.email','support-lecture@invalid.local',true);
-select throws_like(
+select throws_ok(
   $$select public.plateforme_entrer_entreprise('a0000000-0000-0000-0000-000000000001','audit role lecture')$$,
-  '%réserv%', 'rôle lecture : entrée support refusée'
+  '42501', 'Rôle plateforme insuffisant', 'rôle lecture : entrée support refusée'
 );
 
 -- Une session non authentifiée et une entreprise inexistante sont refusées.
 select set_config('request.jwt.claim.sub','',true);
 select set_config('request.jwt.claim.email','',true);
-select throws_like(
+select throws_ok(
   $$select public.plateforme_entrer_entreprise('a0000000-0000-0000-0000-000000000001','audit sans session')$$,
-  '%réserv%', 'session non authentifiée : entrée support refusée'
+  '42501', 'Rôle plateforme insuffisant', 'session non authentifiée : entrée support refusée'
 );
 select set_config('request.jwt.claim.sub','30000000-0000-0000-0000-000000000001',true);
 select set_config('request.jwt.claim.email','plateforme@invalid.local',true);
@@ -202,9 +202,9 @@ select lives_ok(
 select set_config('request.jwt.claim.sub','cc900000-0000-4000-8000-000000000005',true);
 select set_config('request.jwt.claim.email','support-a-activer@invalid.local',true);
 select ok(not public.est_plateforme_admin(), '28. UID rattaché mais non confirmé : aucun droit');
-select throws_like(
+select throws_ok(
   $$select public.plateforme_activer_admin('support-a-activer@invalid.local')$$,
-  '%réservé à la plateforme%', 'identité rattachée inactive : auto-activation refusée'
+  '42501', 'Rôle plateforme insuffisant', 'identité rattachée inactive : auto-activation refusée'
 );
 
 reset role;

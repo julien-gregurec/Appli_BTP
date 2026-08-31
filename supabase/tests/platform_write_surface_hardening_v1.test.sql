@@ -101,22 +101,22 @@ select throws_ok(
 -- Support, UID inactif, email seul et métadonnées falsifiées restent fermés.
 select set_config('request.jwt.claim.sub','ee930000-0000-4000-8000-000000000002',true);
 select set_config('request.jwt.claims','{"sub":"ee930000-0000-4000-8000-000000000002","role":"authenticated","aal":"aal2"}',true);
-select throws_like(
+select throws_ok(
   $$select public.plateforme_autoriser_effet_externe('remise_abonnement')$$,
-  '%Action réservée%', 'support : remise refusée'
+  '42501', 'Rôle plateforme insuffisant', 'support : remise refusée'
 );
 select set_config('request.jwt.claim.sub','ee930000-0000-4000-8000-000000000005',true);
 select set_config('request.jwt.claims','{"sub":"ee930000-0000-4000-8000-000000000005","role":"authenticated","aal":"aal2"}',true);
-select throws_like(
+select throws_ok(
   $$select public.plateforme_autoriser_effet_externe('remise_abonnement')$$,
-  '%réservé à la plateforme%', 'UID inactif : effet externe refusé'
+  '42501', 'Rôle plateforme insuffisant', 'UID inactif : effet externe refusé'
 );
 select set_config('request.jwt.claim.sub','ee930000-0000-4000-8000-000000000004',true);
 select set_config('request.jwt.claim.email','metadata-write@invalid.local',true);
 select set_config('request.jwt.claims','{"sub":"ee930000-0000-4000-8000-000000000004","email":"metadata-write@invalid.local","role":"authenticated","aal":"aal2","user_metadata":{"plateforme_role":"total"},"app_metadata":{"plateforme_admin":true}}',true);
-select throws_like(
+select throws_ok(
   $$select public.plateforme_autoriser_effet_externe('remise_abonnement')$$,
-  '%réservé à la plateforme%', 'email et métadonnées falsifiées : effet externe refusé'
+  '42501', 'Rôle plateforme insuffisant', 'email et métadonnées falsifiées : effet externe refusé'
 );
 
 reset role;
