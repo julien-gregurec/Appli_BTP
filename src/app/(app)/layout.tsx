@@ -1,5 +1,7 @@
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
-import { getContexteEntreprise } from "@/lib/entreprise";
+import { getContexteEntreprise, ENTREPRISE_ID_ADMIN_PLATEFORME, cheminAutoriseAdminPlateformeSansEntreprise } from "@/lib/entreprise";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { estPlateformeAdmin } from "@/lib/plateforme";
@@ -17,6 +19,19 @@ import { listerApplicationsPourSwitcher } from "@/lib/multi-app-server";
 // Layout des pages authentifiées avec navigation latérale.
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await getContexteEntreprise();
+  const adminPlateformeSansEntreprise = ctx.entrepriseId === ENTREPRISE_ID_ADMIN_PLATEFORME;
+  if (adminPlateformeSansEntreprise) {
+    // Une identité plateforme active sans entreprise cliente n'a de sens que sur
+    // ses propres écrans (administration plateforme, sécurité de son compte).
+    // Toute autre route (racine, tableau de bord, mon-espace, page métier
+    // d'entreprise) la renvoie vers /plateforme. Fail-open si l'en-tête est
+    // absent (pas de boucle possible) : ceci n'est qu'un confort de routage, la
+    // sécurité réelle reste portée par les permissions/RLS/AAL2 existants.
+    const pathname = (await headers()).get("x-pathname");
+    if (pathname && !cheminAutoriseAdminPlateformeSansEntreprise(pathname)) {
+      redirect("/plateforme");
+    }
+  }
   // Independants l'un de l'autre (aucun n'attend le resultat de l'autre) : les lancer en
   // parallele evite un aller-retour reseau supplementaire sur chaque navigation.
   const [permissions, plateformeAdmin, applications] = await Promise.all([
@@ -58,7 +73,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         .lecture-seule main form[method="get"]{display:flex!important}
         .lecture-seule main form[method="get"] button{display:inline-flex!important}
       `}</style>
-      <Sidebar entrepriseNom={ctx.entrepriseNom} logoUrl={ctx.logoUrl} authDisabled={isEmailLoginDisabled()} permissions={permissions} plateformeAdmin={plateformeAdmin} boutiqueActive={boutiqueEstActive()} activeFeatures={activeFeatures} applications={applications} />
+      <Sidebar entrepriseNom={ctx.entrepriseNom} logoUrl={ctx.logoUrl} authDisabled={isEmailLoginDisabled()} permissions={permissions} plateformeAdmin={plateformeAdmin} adminPlateformeSansEntreprise={adminPlateformeSansEntreprise} boutiqueActive={boutiqueEstActive()} activeFeatures={activeFeatures} applications={applications} />
       <div className="min-w-0 flex-1">
         {ctx.accesSupportPlateforme&&<SupportAccessBanner entrepriseNom={ctx.entrepriseNom}/>}
         {!ctx.accesSupportPlateforme&&ctx.suspensionPrevueAt&&peutVoirAlerteAbonnement&&<AbonnementBanner echeance={ctx.suspensionPrevueAt} message={ctx.impayeMessage}/>}

@@ -14,6 +14,10 @@ export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("content-security-policy", csp);
   requestHeaders.set("x-nonce", nonce);
+  // Transmis aux Server Components (via next/headers) pour un routage ponctuel
+  // fondé sur le chemin courant (ex. admin plateforme sans entreprise cliente) ;
+  // ne remplace aucun contrôle d'accès existant, purement indicatif.
+  requestHeaders.set("x-pathname", request.nextUrl.pathname);
   const requeteSecurisee = new NextRequest(request, { headers: requestHeaders });
   const response: NextResponse = await updateSession(requeteSecurisee);
   response.headers.set("Content-Security-Policy", csp);

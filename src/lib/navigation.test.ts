@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NAVIGATION_APPLICATION, NAVIGATION_GROUPES } from "./navigation";
+import { NAVIGATION_APPLICATION, NAVIGATION_GROUPES, navigationPourContexte } from "./navigation";
 
 describe("navigation regroupée", () => {
   it("range chaque module dans un dossier déclaré", () => {
@@ -14,5 +14,15 @@ describe("navigation regroupée", () => {
     expect(NAVIGATION_APPLICATION.find((item) => item.href === "/connecteurs")?.permission).toBe("acces_connecteurs");
     expect(NAVIGATION_APPLICATION.find((item) => item.href === "/rentabilite")?.permission).toBe("acces_rentabilite");
     expect(NAVIGATION_APPLICATION.find((item) => item.href === "/sous-traitants")?.permission).toBe("acces_sous_traitants");
+  });
+});
+
+describe("navigationPourContexte", () => {
+  it("vide le menu principal pour un admin plateforme sans entreprise cliente (pas de Tableau de bord ni Mon espace)", () => {
+    expect(navigationPourContexte(true, NAVIGATION_APPLICATION)).toEqual([]);
+  });
+
+  it("laisse le menu inchangé pour un utilisateur ou admin d'entreprise cliente", () => {
+    expect(navigationPourContexte(false, NAVIGATION_APPLICATION)).toBe(NAVIGATION_APPLICATION);
   });
 });

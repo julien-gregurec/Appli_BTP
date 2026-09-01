@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { logoutAction } from "@/app/actions/auth";
 import { PwaInstallButton } from "@/components/PwaInstallButton";
-import { NAVIGATION_APPLICATION, NAVIGATION_GROUPES, navigationAutorisee } from "@/lib/navigation";
+import { NAVIGATION_APPLICATION, NAVIGATION_GROUPES, navigationAutorisee, navigationPourContexte } from "@/lib/navigation";
 import { Lien as Link } from "@/components/Lien";
 import { featureForPath, type FeatureKey } from "@/lib/feature-catalogue";
 import { BrandWordmark } from "@/components/BrandWordmark";
@@ -18,6 +18,7 @@ export function Sidebar({
   authDisabled = false,
   permissions = null,
   plateformeAdmin = false,
+  adminPlateformeSansEntreprise = false,
   boutiqueActive = true,
   activeFeatures,
   applications = [],
@@ -27,6 +28,7 @@ export function Sidebar({
   authDisabled?: boolean;
   permissions?: string[] | null;
   plateformeAdmin?: boolean;
+  adminPlateformeSansEntreprise?: boolean;
   boutiqueActive?: boolean;
   activeFeatures: FeatureKey[];
   applications?: DestinationApplication[];
@@ -37,11 +39,14 @@ export function Sidebar({
   const navigationBrute = compteDepot
     ? NAVIGATION_APPLICATION.filter((item) => ["/stock", "/stock/borne", "/depot"].includes(item.href))
     : NAVIGATION_APPLICATION;
-  const navigation = navigationBrute.filter((item) => {
-    if (!boutiqueActive && item.href === "/boutique") return false;
-    const feature = featureForPath(item.href);
-    return (!feature || activeFeatures.includes(feature)) && item.actif && navigationAutorisee(item.permission, permissions);
-  });
+  const navigation = navigationPourContexte(
+    adminPlateformeSansEntreprise,
+    navigationBrute.filter((item) => {
+      if (!boutiqueActive && item.href === "/boutique") return false;
+      const feature = featureForPath(item.href);
+      return (!feature || activeFeatures.includes(feature)) && item.actif && navigationAutorisee(item.permission, permissions);
+    }),
+  );
 
   return (
     <>
@@ -101,12 +106,25 @@ export function Sidebar({
             >
               ★ Plateforme
             </Link>
+            {adminPlateformeSansEntreprise && (
+              <Link
+                href="/mon-espace/securite"
+                onClick={() => setOuvert(false)}
+                className={`block rounded-md px-3 py-2 text-sm ${
+                  pathname === "/mon-espace/securite" || pathname.startsWith("/mon-espace/securite/")
+                    ? "bg-[#c9a24a] font-medium text-[#0d1b2a]"
+                    : "text-white/70 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                Sécurité du compte
+              </Link>
+            )}
           </>
         )}
       </nav>
 
       {compteDepot&&<div className="border-t border-white/10 px-4 py-3 text-xs text-white/65"><strong className="block text-[#c9a24a]">Compte dépôt prioritaire</strong>Les salariés s’identifient dans la borne pour chaque mouvement.</div>}
-      {!compteDepot&&<div className="border-t border-white/10 p-2">
+      {!compteDepot&&!adminPlateformeSansEntreprise&&<div className="border-t border-white/10 p-2">
         <Link
           href="/aide"
           onClick={() => setOuvert(false)}

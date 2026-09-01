@@ -34,7 +34,28 @@ vi.mock("@/lib/supabase/server", () => ({
   })),
 }));
 
-import { getContexteEntreprise } from "./entreprise";
+import { cheminAutoriseAdminPlateformeSansEntreprise, ENTREPRISE_ID_ADMIN_PLATEFORME, getContexteEntreprise } from "./entreprise";
+
+describe("cheminAutoriseAdminPlateformeSansEntreprise", () => {
+  it.each(["/plateforme", "/plateforme/applications", "/plateforme/facturation", "/mon-espace/securite"])(
+    "%s reste accessible sans entreprise cliente",
+    (chemin) => {
+      expect(cheminAutoriseAdminPlateformeSansEntreprise(chemin)).toBe(true);
+    },
+  );
+
+  it.each(["/", "/dashboard", "/mon-espace", "/clients", "/devis", "/parametres"])(
+    "%s renvoie vers /plateforme (aucun contexte entreprise explicite)",
+    (chemin) => {
+      expect(cheminAutoriseAdminPlateformeSansEntreprise(chemin)).toBe(false);
+    },
+  );
+
+  it("ne confond pas /plateforme avec un chemin qui le contient seulement en préfixe", () => {
+    expect(cheminAutoriseAdminPlateformeSansEntreprise("/plateforme-autre-chose")).toBe(false);
+    expect(cheminAutoriseAdminPlateformeSansEntreprise("/mon-espace/securite-autre-chose")).toBe(false);
+  });
+});
 
 describe("getContexteEntreprise — routage admin plateforme vs onboarding entreprise", () => {
   beforeEach(() => {
@@ -56,7 +77,7 @@ describe("getContexteEntreprise — routage admin plateforme vs onboarding entre
 
     expect(mocks.redirect).not.toHaveBeenCalled();
     expect(ctx.entrepriseNom).toBe("Administration ELSATIA");
-    expect(ctx.entrepriseId).toBe("00000000-0000-0000-0000-000000000000");
+    expect(ctx.entrepriseId).toBe(ENTREPRISE_ID_ADMIN_PLATEFORME);
     expect(ctx.prenom).toBe("Julien");
   });
 

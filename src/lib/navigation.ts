@@ -77,3 +77,14 @@ export function navigationAutorisee(permission: string | string[] | undefined, a
   const attendues = Array.isArray(permission) ? permission : [permission];
   return attendues.some((droit) => autorisations.includes(droit));
 }
+
+// Une identité plateforme active sans entreprise cliente rattachée n'a aucune
+// rubrique métier à afficher (ni "Tableau de bord", ni "Mon espace", ni les
+// modules d'une entreprise) : le menu principal reste vide, seul le bloc
+// plateforme (rendu séparément) a du sens pour elle.
+export function navigationPourContexte(
+  adminPlateformeSansEntreprise: boolean,
+  navigation: NavigationApplication[],
+): NavigationApplication[] {
+  return adminPlateformeSansEntreprise ? [] : navigation;
+}

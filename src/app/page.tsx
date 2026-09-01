@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { PiedLegal } from "@/components/PiedLegal";
-import { DUREE_ESSAI_JOURS } from "@/lib/plateforme";
+import { DUREE_ESSAI_JOURS, estPlateformeAdmin } from "@/lib/plateforme";
 import { BrandWordmark } from "@/components/BrandWordmark";
 import { PRODUCT_NAME } from "@/lib/brand";
 
@@ -44,7 +44,10 @@ export default async function AccueilPage() {
   if (!isEmailLoginDisabled()) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (user) redirect("/dashboard");
+    // Une identité plateforme active n'a aucune entreprise cliente : l'envoyer
+    // vers le tableau de bord n'a pas de sens pour elle (même règle qu'à la
+    // connexion, voir loginAction).
+    if (user) redirect((await estPlateformeAdmin()) ? "/plateforme" : "/dashboard");
   }
 
   return (

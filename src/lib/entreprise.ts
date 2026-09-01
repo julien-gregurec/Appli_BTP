@@ -7,7 +7,23 @@ import { estPlateformeAdmin, statutIdentitePlateforme } from "@/lib/plateforme";
 // Sentinel utilisé quand aucune entreprise réelle n'est rattachée (même convention
 // que compteurs_reference : aucune entreprise n'a jamais cet id, donc les requêtes
 // scopées par entrepriseId ne remontent rien plutôt que de fuiter des données réelles.
-const ENTREPRISE_ID_ADMIN_PLATEFORME = "00000000-0000-0000-0000-000000000000";
+// Exporté : sert de marqueur "admin plateforme sans entreprise" pour le layout
+// (redirection) et le menu (masquage des rubriques métier).
+export const ENTREPRISE_ID_ADMIN_PLATEFORME = "00000000-0000-0000-0000-000000000000";
+
+// Chemins que peut ouvrir une identité plateforme active SANS entreprise cliente
+// (contexte neutre) sans être renvoyée vers /plateforme : les fonctions
+// d'administration plateforme elles-mêmes, et la sécurité de son propre compte
+// (MFA/AAL2). Tout le reste (racine, tableau de bord, mon-espace, routes
+// métier d'entreprise) n'a pas de sens sans entreprise cliente rattachée.
+export function cheminAutoriseAdminPlateformeSansEntreprise(pathname: string): boolean {
+  return (
+    pathname === "/plateforme" ||
+    pathname.startsWith("/plateforme/") ||
+    pathname === "/mon-espace/securite" ||
+    pathname.startsWith("/mon-espace/securite/")
+  );
+}
 
 export type ContexteEntreprise = {
   userId: string;
