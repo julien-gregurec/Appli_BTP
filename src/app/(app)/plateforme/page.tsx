@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
-import { estPlateformeAdmin, statutAbonnement, prixAbonnementMensuel, offreParCle, REDUCTION_ANNUELLE, STATUT_IDENTITE_LABEL, type StatutIdentitePlateforme, type EntrepriseAbonnement } from "@/lib/plateforme";
+import { estPlateformeAdmin, statutAbonnement, prixAbonnementMensuel, offreParCle, REDUCTION_ANNUELLE, STATUT_IDENTITE_LABEL, actionsLigneAdminPlateforme, emailAdminCourantNormalise, type StatutIdentitePlateforme, type EntrepriseAbonnement } from "@/lib/plateforme";
 import { activerAdminPlateformeAction, ajouterAdminPlateformeAction, appliquerRemiseAction, creerEntreprisePlateformeAction, entrerEntreprisePlateformeAction, enregistrerReglementPlateformeAction, genererSnapshotFacturationAction, modifierAbonnementAction, modifierTarifPostePlateformeAction, reinitialiserMotDePassePlateformeAction, retirerAdminPlateformeAction, retirerRemiseAction, signalerImpayePlateformeAction } from "@/app/actions/plateforme";
 import { AbonnementCountdown } from "@/components/AbonnementCountdown";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
@@ -33,6 +33,12 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
   if (!(await estPlateformeAdmin())) notFound();
   const msg = await searchParams;
   const supabase = await createClient();
+
+  // Identité de la session courante : sert uniquement à masquer le bouton « Retirer »
+  // sur sa propre ligne dans « Équipe plateforme ». Le refus effectif de l'auto-révocation
+  // reste côté serveur (plateforme_retirer_admin compare auth.uid()).
+  const { data: { user: utilisateurCourant } } = await supabase.auth.getUser();
+  const emailAdminCourant = emailAdminCourantNormalise(utilisateurCourant?.email);
 
   let entreprises: EntrepriseAbonnement[] = [];
   let appareilsParEntreprise = new Map<string,{nb_appareils_actifs:number;nb_comptes_plus_de_deux:number;maximum_appareils_compte:number;montant_depassements_ht:number}>();
@@ -142,6 +148,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
           <ul className="mt-3 space-y-2">
             {membresPlateforme.map((m) => {
               const statut = libelleStatutIdentite(m);
+              const actions = actionsLigneAdminPlateforme(m, emailAdminCourant);
               return (
               <li key={m.email} className="flex flex-wrap items-center justify-between gap-2 rounded border border-neutral-100 p-2 text-sm dark:border-neutral-800">
                 <div>
@@ -162,10 +169,18 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                       </ConfirmSubmitButton>
                     </form>
                   )}
-                  <form action={retirerAdminPlateformeAction}>
-                    <input type="hidden" name="email" value={m.email} />
-                    <button className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50">Retirer</button>
-                  </form>
+                  {actions.peutAfficherRetrait ? (
+                    <form action={retirerAdminPlateformeAction}>
+                      <input type="hidden" name="email" value={m.email} />
+                      <button className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50">Retirer</button>
+                    </form>
+                  ) : actions.estUtilisateurCourant ? (
+                    <span className="px-2 py-1 text-xs text-neutral-500 dark:text-neutral-400">Votre compte</span>
+                  ) : actions.estRevoque ? (
+                    <span className="px-2 py-1 text-xs text-neutral-500 dark:text-neutral-400">Déjà révoqué</span>
+                  ) : actions.retraitIndisponible ? (
+                    <span className="px-2 py-1 text-xs text-neutral-500 dark:text-neutral-400">Action indisponible</span>
+                  ) : null}
                 </div>
               </li>
               );

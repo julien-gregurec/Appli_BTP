@@ -23,6 +23,57 @@ export const STATUT_IDENTITE_LABEL: Record<StatutIdentitePlateforme, string> = {
   revoquee: "Révoqué",
 };
 
+// « Équipe plateforme » : quelles actions afficher pour une ligne d'administrateur.
+// L'autorité reste le serveur — plateforme_retirer_admin compare auth.uid() et
+// refuse l'auto-révocation, un compte déjà révoqué et le dernier administrateur
+// total (gardes AAL2 incluses). Cette fonction ne fait que masquer les boutons
+// qui ne mèneraient à rien, pour lever l'incohérence d'affichage.
+//
+// plateforme_lister_admins() n'expose pas utilisateur_id (l'ajouter imposerait une
+// migration, hors périmètre) : la reconnaissance du compte courant se fait donc sur
+// l'email. C'est la clé primaire de plateforme_admins, toujours normalisée
+// (lower(trim())) par les RPC d'écriture — un identifiant stable, pas une heuristique.
+export type LigneAdminPlateforme = {
+  email: string;
+  actif: boolean | null;
+  statut_identite: string | null;
+};
+
+export function actionsLigneAdminPlateforme(
+  ligne: LigneAdminPlateforme,
+  emailCourantNormalise: string | null,
+): {
+  estUtilisateurCourant: boolean;
+  estRevoque: boolean;
+  peutAfficherRetrait: boolean;
+  retraitIndisponible: boolean;
+} {
+  // Sans identité de session vérifiée, on ne peut pas garantir qu'une ligne n'est
+  // pas le compte courant : aucun formulaire de retrait n'est alors rendu.
+  const identiteCouranteConnue = emailCourantNormalise !== null;
+  const emailLigne = (ligne.email ?? "").trim().toLowerCase();
+  const estUtilisateurCourant =
+    identiteCouranteConnue && emailLigne !== "" && emailLigne === emailCourantNormalise;
+  const estRevoque =
+    ligne.statut_identite === "revoquee" ||
+    // Repli pour une liste antérieure à l'exposition de statut_identite.
+    (ligne.statut_identite == null && ligne.actif === false);
+  // Mode sûr : l'action destructrice n'apparaît que sur une ligne dont l'état est
+  // explicitement exploitable (actif booléen connu) ; toute incohérence => aucune action.
+  const etatExploitable = typeof ligne.actif === "boolean";
+  const peutAfficherRetrait =
+    identiteCouranteConnue && etatExploitable && !estUtilisateurCourant && !estRevoque;
+  // Ligne qui serait retirable si la session courante était identifiée : on l'indique
+  // explicitement (« Action indisponible ») plutôt que de laisser croire à un bouton.
+  const retraitIndisponible = !identiteCouranteConnue && etatExploitable && !estRevoque;
+  return { estUtilisateurCourant, estRevoque, peutAfficherRetrait, retraitIndisponible };
+}
+
+// Normalise l'email de la session courante pour la comparaison ci-dessus.
+export function emailAdminCourantNormalise(email: string | null | undefined): string | null {
+  return (email ?? "").trim().toLowerCase() || null;
+}
+
 // Statut d'identité plateforme de l'utilisateur courant, ou null s'il n'a aucune
 // ligne plateforme_admins rattachée à son UID. Ne confère aucun droit : sert au
 // routage (une identité plateforme non active ne doit pas voir l'onboarding).
