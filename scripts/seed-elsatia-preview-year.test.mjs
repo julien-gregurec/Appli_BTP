@@ -4,6 +4,9 @@ import test from "node:test";
 
 import {
   INSERT_BATCH_SIZE,
+  MANAGER_EMAIL,
+  MANAGER_EMAIL_DEFAUT,
+  MANAGER_EMAIL_SURCHARGE_VAR,
   READ_BATCH_SIZE,
   buildPlan,
   chunks,
@@ -11,6 +14,7 @@ import {
   executionSteps,
   parseArgs,
   readRowsByIds,
+  resolveManagerEmail,
   safeEnvironment,
   simulateInvoiceLifecycle,
   stableId,
@@ -200,7 +204,7 @@ function managerClient({ authPages, publicUsers, memberships }) {
 }
 
 function validManager(overrides = {}) {
-  const authUser = { id: "auth-manager", email: "  JULIEN.GREGUREC@GMAIL.COM " };
+  const authUser = { id: "auth-manager", email: "  JULIEN@ELSATIA.FR " };
   return managerClient({
     authPages: [[authUser]],
     publicUsers: [{ id: authUser.id, nom: "Gregurec" }],
@@ -266,9 +270,83 @@ test("le plan est déterministe et respecte tous les volumes validés", () => {
   assert.deepEqual(first, second);
   assert.equal(volumes.pointages, 1500);
   assert.equal(volumes.affectations, 780);
-  assert.equal(first.employees.filter((row) => row.email === "julien.gregurec@gmail.com").length, 1);
+  assert.equal(first.employees.filter((row) => row.email === MANAGER_EMAIL).length, 1);
+  assert.equal(MANAGER_EMAIL, "julien@elsatia.fr");
+  assert.equal(first.employees.filter((row) => row.email === "julien.gregurec@gmail.com").length, 0);
   assert.equal(first.employees.filter((row) => row.__role === "Compte dépôt").length, 0);
   assert.equal(new Set(first.pointages.map((row) => row.id)).size, 1500);
+});
+
+test("resolveManagerEmail : adresse officielle par défaut quand la surcharge est absente", () => {
+  assert.equal(MANAGER_EMAIL_DEFAUT, "julien@elsatia.fr");
+  assert.equal(MANAGER_EMAIL_SURCHARGE_VAR, "ELSATIA_PREVIEW_MANAGER_EMAIL");
+  assert.equal(resolveManagerEmail({}), "julien@elsatia.fr");
+  assert.equal(resolveManagerEmail({ AUTRE: "x" }), MANAGER_EMAIL_DEFAUT);
+  // La constante figée du module reflète bien le défaut officiel.
+  assert.equal(MANAGER_EMAIL, MANAGER_EMAIL_DEFAUT);
+});
+
+test("resolveManagerEmail : surcharge valide honorée et normalisée (espaces + majuscules)", () => {
+  assert.equal(
+    resolveManagerEmail({ [MANAGER_EMAIL_SURCHARGE_VAR]: "recette@elsatia.fr" }),
+    "recette@elsatia.fr",
+  );
+  assert.equal(
+    resolveManagerEmail({ [MANAGER_EMAIL_SURCHARGE_VAR]: "  Recette.Preview@ELSATIA.FR  " }),
+    "recette.preview@elsatia.fr",
+  );
+});
+
+test("resolveManagerEmail : refus d'une valeur vide ou uniquement des espaces", () => {
+  for (const brut of ["", "   ", "\t", "\n"]) {
+    assert.throws(
+      () => resolveManagerEmail({ [MANAGER_EMAIL_SURCHARGE_VAR]: brut }),
+      /ARRÊT SÛR: ELSATIA_PREVIEW_MANAGER_EMAIL est défini mais vide/,
+    );
+  }
+});
+
+test("resolveManagerEmail : refus d'une adresse invalide, sans exposer la valeur reçue", () => {
+  for (const brut of ["pas-un-email", "a@b", "a@b@c.fr", "x@y.", "@elsatia.fr", "secret sk_live_ABC@x"]) {
+    assert.throws(() => resolveManagerEmail({ [MANAGER_EMAIL_SURCHARGE_VAR]: brut }), (error) => {
+      assert.match(error.message, /ARRÊT SÛR: ELSATIA_PREVIEW_MANAGER_EMAIL n'est pas une adresse e-mail valide/);
+      assert.doesNotMatch(error.message, /sk_live|pas-un-email|@b@c/);
+      return true;
+    });
+  }
+});
+
+test("resolveManagerEmail : aucun retour implicite vers l'ancienne adresse", () => {
+  assert.notEqual(resolveManagerEmail({}), "julien.gregurec@gmail.com");
+  assert.throws(
+    () => resolveManagerEmail({ [MANAGER_EMAIL_SURCHARGE_VAR]: "" }),
+    /est défini mais vide/,
+  );
+  // Une surcharge invalide s'arrête, elle ne retombe jamais sur un défaut caché.
+  assert.throws(
+    () => resolveManagerEmail({ [MANAGER_EMAIL_SURCHARGE_VAR]: "invalide" }),
+    /n'est pas une adresse e-mail valide/,
+  );
+  const source = fs.readFileSync(new URL("./seed-elsatia-preview-year.mjs", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /julien\.gregurec@gmail\.com/);
+});
+
+test("la garde Production reste indépendante de la surcharge du Gérant", () => {
+  const previewEnv = {
+    NEXT_PUBLIC_SUPABASE_URL: "https://pgvvpqyjziyapbbkydmc.supabase.co",
+    SUPABASE_PROJECT_REF: "pgvvpqyjziyapbbkydmc",
+    ELSATIA_SUPABASE_PROJECT_NAME: "elsatia-preview",
+    FEATURE_BOUTIQUE_ENABLED: "false",
+    FEATURE_AI_ENABLED: "false",
+    FEATURE_CRONS_ENABLED: "false",
+    NEXT_PUBLIC_APP_URL: "https://elsatia-preview.example.invalid",
+    [MANAGER_EMAIL_SURCHARGE_VAR]: "recette@elsatia.fr",
+  };
+  assert.throws(
+    () => safeEnvironment({ ...previewEnv, NEXT_PUBLIC_SUPABASE_URL: "https://exhvuzegsefmoguxoiak.supabase.co" }),
+    /hors cible Preview/,
+  );
+  assert.throws(() => safeEnvironment({ ...previewEnv, VERCEL_ENV: "production" }), /Production/);
 });
 
 test("le découpage couvre les frontières 0, 1, 50, 51, 810 et 1 500 sans lot vide", () => {
@@ -765,15 +843,15 @@ test("zéro ou plusieurs correspondances Auth provoquent un arrêt sûr", async 
   await assert.rejects(() => verifyManagerIdentity(validManager({ authPages: [[]] }), MANAGER_ROLE_ID), /Auth Gérant absent/);
   await assert.rejects(() => verifyManagerIdentity(validManager({
     authPages: [[
-      { id: "auth-1", email: "julien.gregurec@gmail.com" },
-      { id: "auth-2", email: "JULIEN.GREGUREC@GMAIL.COM" },
+      { id: "auth-1", email: "julien@elsatia.fr" },
+      { id: "auth-2", email: "JULIEN@ELSATIA.FR" },
     ]],
   }), MANAGER_ROLE_ID), /Auth Gérant dupliqué/);
 });
 
 test("la pagination Auth est parcourue jusqu'à la correspondance unique", async () => {
   const fillers = Array.from({ length: 1000 }, (_, index) => ({ id: `filler-${index}`, email: `filler${index}@example.invalid` }));
-  const client = validManager({ authPages: [fillers, [{ id: "auth-manager", email: "julien.gregurec@gmail.com" }]] });
+  const client = validManager({ authPages: [fillers, [{ id: "auth-manager", email: "julien@elsatia.fr" }]] });
   const result = await verifyManagerIdentity(client, MANAGER_ROLE_ID);
   assert.equal(result.userId, "auth-manager");
   assert.deepEqual(client.queries.filter((query) => query.source === "auth").map((query) => query.page), [1, 2]);

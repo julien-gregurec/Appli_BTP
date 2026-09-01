@@ -10,7 +10,13 @@ const PROJECT_REF = "pgvvpqyjziyapbbkydmc";
 const PROJECT_NAME = "elsatia-preview";
 const COMPANY_ID = "1bfc5dc6-1979-408c-babc-ee15841f3d21";
 const COMPANY_NAME = "ELSATIA — Recette Preview";
-const MANAGER_EMAIL = "julien.gregurec@gmail.com";
+// Identité du Gérant rattaché au jeu de recette Preview. Par défaut l'adresse
+// officielle de la plateforme ; surchargeable explicitement, uniquement pour
+// Preview, via ELSATIA_PREVIEW_MANAGER_EMAIL (normalisée et validée plus bas).
+// Aucun retour implicite vers une ancienne adresse : la valeur par défaut est
+// figée ici et toute surcharge vide ou invalide provoque un arrêt sûr.
+const MANAGER_EMAIL_DEFAUT = "julien@elsatia.fr";
+const MANAGER_EMAIL_SURCHARGE_VAR = "ELSATIA_PREVIEW_MANAGER_EMAIL";
 const PERIOD_START = "2025-08-01";
 const PERIOD_END = "2026-07-31";
 const MARKER = "RECETTE_ELSATIA_PREVIEW_2025_2026";
@@ -47,6 +53,24 @@ const REQUIRED_TABLES = [
 function abort(message) {
   throw new Error(`ARRÊT SÛR: ${message}`);
 }
+
+// Résolution pure et sans effet de bord de l'adresse du Gérant du seed Preview.
+// - défaut : MANAGER_EMAIL_DEFAUT (adresse officielle) quand la variable est absente ;
+// - surcharge : ELSATIA_PREVIEW_MANAGER_EMAIL, espaces retirés et passage en minuscules ;
+// - refus (arrêt sûr) d'une valeur vide ou d'une adresse invalide, sans jamais
+//   afficher la valeur reçue ni retomber silencieusement sur une ancienne adresse.
+function resolveManagerEmail(env = process.env) {
+  const brut = env[MANAGER_EMAIL_SURCHARGE_VAR];
+  if (brut === undefined || brut === null) return MANAGER_EMAIL_DEFAUT;
+  const normalise = String(brut).trim().toLowerCase();
+  if (!normalise) abort(`${MANAGER_EMAIL_SURCHARGE_VAR} est défini mais vide`);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalise)) {
+    abort(`${MANAGER_EMAIL_SURCHARGE_VAR} n'est pas une adresse e-mail valide`);
+  }
+  return normalise;
+}
+
+const MANAGER_EMAIL = resolveManagerEmail();
 
 function parseArgs(argv) {
   const args = new Map();
@@ -1070,6 +1094,9 @@ function summary(plan, expected, liveReadonly = false, resume = null) {
 
 export {
   INSERT_BATCH_SIZE,
+  MANAGER_EMAIL,
+  MANAGER_EMAIL_DEFAUT,
+  MANAGER_EMAIL_SURCHARGE_VAR,
   READ_BATCH_SIZE,
   buildPlan,
   chunks,
@@ -1080,6 +1107,7 @@ export {
   listAuthUsersByEmail,
   parseArgs,
   readRowsByIds,
+  resolveManagerEmail,
   safeEnvironment,
   stableId,
   summary,
