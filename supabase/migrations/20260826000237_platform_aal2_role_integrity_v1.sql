@@ -16,9 +16,7 @@ begin
   end if;
 end;
 $$;
-
 revoke all on function public.plateforme_exiger_session_aal2() from public, anon, authenticated;
-
 -- Toutes les mutations du cycle administrateur partagent ce verrou transactionnel.
 -- Les deux clés sont des constantes réservées au domaine ELSATIA/administrateurs.
 create or replace function public.plateforme_verrouiller_mutations_admin()
@@ -30,14 +28,11 @@ set search_path = public
 as $$
   select pg_advisory_xact_lock(21453, 1001);
 $$;
-
 revoke all on function public.plateforme_verrouiller_mutations_admin() from public, anon, authenticated;
-
 alter table public.plateforme_admins
   add column if not exists revocation_origine text,
   add column if not exists role_updated_at timestamptz,
   add column if not exists role_updated_by uuid references auth.users(id) on delete set null;
-
 -- Les identités déjà classées révoquées par la migration 236 sont des reprises
 -- techniques : elles reçoivent une date, sans inventer d'auteur humain.
 update public.plateforme_admins
@@ -48,14 +43,11 @@ set revocation_at = coalesce(revocation_at, updated_at, created_at, now()),
     end,
     updated_at = now()
 where statut_identite = 'revoquee';
-
 update public.plateforme_admins
 set revocation_origine = null
 where statut_identite <> 'revoquee';
-
 alter table public.plateforme_admins
   drop constraint if exists plateforme_admins_statut_coherent_check;
-
 alter table public.plateforme_admins
   add constraint plateforme_admins_statut_coherent_check
   check (
@@ -97,7 +89,6 @@ alter table public.plateforme_admins
       )
     )
   );
-
 -- L'email déclaré est immuable. Une identité active garde son UID jusqu'à sa
 -- révocation. Les retours d'état contournant le cycle officiel sont refusés.
 create or replace function public.plateforme_verifier_transition_admin()
@@ -133,14 +124,11 @@ begin
   return new;
 end;
 $$;
-
 drop trigger if exists plateforme_admins_transition_integre on public.plateforme_admins;
 create trigger plateforme_admins_transition_integre
 before update on public.plateforme_admins
 for each row execute function public.plateforme_verifier_transition_admin();
-
 revoke all on function public.plateforme_verifier_transition_admin() from public, anon, authenticated;
-
 -- Ajout ou mise à jour d'une identité non active uniquement. Le changement de rôle
 -- d'une identité rattachée/active passe par la RPC dédiée ci-dessous.
 create or replace function public.plateforme_ajouter_admin(
@@ -191,7 +179,6 @@ begin
   end if;
 end;
 $$;
-
 create or replace function public.plateforme_modifier_role_admin(
   p_email text,
   p_role text
@@ -234,7 +221,6 @@ begin
   where email = v_email;
 end;
 $$;
-
 create or replace function public.plateforme_rattacher_admin(
   p_email text,
   p_utilisateur_id uuid
@@ -277,7 +263,6 @@ begin
   if not found then raise exception 'Identité administrateur absente ou état incompatible'; end if;
 end;
 $$;
-
 create or replace function public.plateforme_activer_admin(p_email text)
 returns void
 language plpgsql
@@ -325,7 +310,6 @@ begin
   where email = v_email;
 end;
 $$;
-
 create or replace function public.plateforme_retirer_admin(p_email text)
 returns void
 language plpgsql
@@ -372,7 +356,6 @@ begin
   where plateforme_user_id = v_utilisateur_id and termine_at is null;
 end;
 $$;
-
 create or replace function public.plateforme_detacher_admin_revoque(p_email text)
 returns void
 language plpgsql
@@ -405,7 +388,6 @@ begin
   where email = v_email;
 end;
 $$;
-
 -- L'ouverture support exige un rôle total/support actif et une session AAL2.
 create or replace function public.plateforme_entrer_entreprise(
   p_entreprise_id uuid,
@@ -455,7 +437,6 @@ begin
   where id = auth.uid();
 end;
 $$;
-
 -- Répondre au support est une action support : AAL2 et session explicite sur la
 -- même entreprise sont tous deux requis.
 create or replace function public.plateforme_support_repondre(
@@ -481,8 +462,12 @@ begin
   );
 end;
 $$;
-
 -- Le catalogue des fils est une vue support, non une consultation générale.
+-- La 202 a défini cette fonction avec non_lus/total en bigint ; le passage à
+-- integer change le type des colonnes OUT, ce que CREATE OR REPLACE refuse
+-- (ERROR 42P13). On la supprime d'abord, comme le fait déjà la migration 239.
+-- Aucun objet dépendant : DROP simple, jamais CASCADE.
+drop function if exists public.plateforme_support_fils();
 create or replace function public.plateforme_support_fils()
 returns table(
   entreprise_id uuid,
@@ -517,7 +502,6 @@ begin
             where m.entreprise_id=e.id) desc;
 end;
 $$;
-
 -- Lire un fil et le marquer comme lu exige une session support sur l'entreprise.
 create or replace function public.plateforme_support_messages(p_entreprise_id uuid)
 returns table(id uuid,cote text,auteur_nom text,contenu text,created_at timestamptz)
@@ -543,7 +527,6 @@ begin
   order by m.created_at;
 end;
 $$;
-
 -- Les mutations de facturation restent accessibles aux rôles total/facturation,
 -- mais requièrent désormais AAL2. Une session total AAL1 ne doit pas contourner
 -- la politique simplement parce qu'une fonction est également ouverte au rôle
@@ -575,7 +558,6 @@ begin
   where id = p_entreprise_id;
 end;
 $$;
-
 create or replace function public.plateforme_modifier_tarif_poste(
   p_poste_id uuid,
   p_code_offre text,
@@ -596,7 +578,6 @@ begin
   if not found then raise exception 'Poste introuvable'; end if;
 end;
 $$;
-
 create or replace function public.plateforme_signaler_impaye(
   p_entreprise_id uuid,
   p_message text default null
@@ -621,7 +602,6 @@ begin
   return v_echeance;
 end;
 $$;
-
 create or replace function public.plateforme_enregistrer_reglement(
   p_entreprise_id uuid,
   p_note text default null
@@ -645,7 +625,6 @@ begin
   if not found then raise exception 'Entreprise introuvable'; end if;
 end;
 $$;
-
 create or replace function public.plateforme_appliquer_remise(
   p_entreprise_id uuid,
   p_coupon_id text,
@@ -696,7 +675,6 @@ begin
   );
 end;
 $$;
-
 create or replace function public.plateforme_retirer_remise(p_entreprise_id uuid)
 returns void
 language plpgsql
@@ -736,7 +714,6 @@ begin
   );
 end;
 $$;
-
 -- Une version tarifaire modifie le catalogue global : total + AAL2 uniquement.
 create or replace function public.plateforme_creer_version_tarif(
   p_code text,
@@ -794,7 +771,6 @@ begin
   return v_id;
 end;
 $$;
-
 create or replace function public.plateforme_snapshot_facturation(
   p_mois date default date_trunc('month',current_date)::date
 ) returns integer
@@ -850,7 +826,6 @@ begin
   return v_nb;
 end;
 $$;
-
 -- La création d'une entreprise est une mutation plateforme globale.
 create or replace function public.plateforme_creer_entreprise(
   p_nom text,
@@ -882,7 +857,6 @@ begin
   return v_id;
 end;
 $$;
-
 -- La réinitialisation assistée est réservée à total/support, en AAL2 et dans
 -- une session support active ciblant explicitement l'entreprise concernée.
 create or replace function public.plateforme_verifier_et_journaliser_reinitialisation(
@@ -924,7 +898,6 @@ begin
   return v_id;
 end;
 $$;
-
 -- Une consultation par le rôle lecture ne doit déclencher aucune suspension.
 -- Les suspensions restent pilotées par les mécanismes dédiés existants.
 create or replace function public.plateforme_entreprises()
@@ -969,7 +942,6 @@ begin
   order by e.created_at desc;
 end;
 $$;
-
 -- Les quatre mutations multi-app sont strictement total + AAL2.
 create or replace function public.plateforme_activer_application_entreprise(
   p_entreprise_id uuid,
@@ -1002,7 +974,6 @@ begin
   );
 end;
 $$;
-
 create or replace function public.plateforme_desactiver_application_entreprise(
   p_entreprise_id uuid,
   p_application_code text
@@ -1025,7 +996,6 @@ begin
   );
 end;
 $$;
-
 create or replace function public.plateforme_habiliter_utilisateur_application(
   p_utilisateur_id uuid,
   p_entreprise_id uuid,
@@ -1059,7 +1029,6 @@ begin
   );
 end;
 $$;
-
 create or replace function public.plateforme_retirer_habilitation_application(
   p_utilisateur_id uuid,
   p_entreprise_id uuid,
@@ -1087,7 +1056,6 @@ begin
   );
 end;
 $$;
-
 -- Préflight versionné, en lecture seule, réservé à la maintenance. Le fichier
 -- docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql contient la variante exécutable
 -- avant l'application des migrations 236/237 sur un environnement distant.
@@ -1139,15 +1107,12 @@ as $$
          ) then 0 else 1 end,
          true;
 $$;
-
 revoke all on function public.plateforme_preflight_integrite() from public, anon, authenticated;
 grant execute on function public.plateforme_preflight_integrite() to service_role;
-
 -- Exposition des seules RPC applicatives nécessaires. Les helpers internes et le
 -- préflight ne sont jamais exécutables par un utilisateur authentifié ordinaire.
 revoke all on function public.plateforme_modifier_role_admin(text,text) from public, anon;
 grant execute on function public.plateforme_modifier_role_admin(text,text) to authenticated;
-
 revoke all on function public.plateforme_ajouter_admin(text,text,text) from public, anon;
 revoke all on function public.plateforme_rattacher_admin(text,uuid) from public, anon;
 revoke all on function public.plateforme_activer_admin(text) from public, anon;
@@ -1188,5 +1153,4 @@ grant execute on function public.plateforme_snapshot_facturation(date) to authen
 grant execute on function public.plateforme_creer_entreprise(text,text,text) to authenticated;
 grant execute on function public.plateforme_verifier_et_journaliser_reinitialisation(uuid,text,text) to authenticated;
 grant execute on function public.plateforme_entreprises() to authenticated;
-
 notify pgrst, 'reload schema';

@@ -143,6 +143,9 @@ select throws_like($$select public.plateforme_activer_application_entreprise('a0
 select throws_like($$select public.plateforme_entrer_entreprise('a0000000-0000-0000-0000-000000000001','support lecture')$$,'%Action réservée%','lecture : support refusé');
 select throws_like($$select * from public.plateforme_support_fils()$$,'%Action réservée%','lecture : fils support refusés');
 reset role;
+select set_config('request.jwt.claim.sub','',true);
+select set_config('request.jwt.claim.email','',true);
+select set_config('request.jwt.claims','{}',true);
 update public.entreprises
 set abonnement_statut='actif', impaye_signale_at=now()-interval '20 days',
     suspension_prevue_at=now()-interval '1 day'

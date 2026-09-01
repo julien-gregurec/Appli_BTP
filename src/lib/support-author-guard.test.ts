@@ -26,7 +26,7 @@ describe("R7.5 — frontière d’écriture support", () => {
   });
 
   it("révoque l’INSERT et dérive les champs serveur dans la migration append-only", () => {
-    const migration = lire("../supabase/migrations/20260828000247_support_message_author_guard_r75.sql");
+    const migration = lire("../supabase/migrations/20260901000253_support_message_author_guard_r75.sql");
     expect(migration).toContain("revoke insert on table public.support_messages");
     expect(migration).toContain("v_uid uuid := auth.uid()");
     expect(migration).toContain("'entreprise'");
