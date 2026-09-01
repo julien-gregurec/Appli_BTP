@@ -106,6 +106,27 @@ export async function retirerAdminPlateformeAction(formData: FormData) {
   redirect(`/plateforme?succes=${encodeURIComponent(`${email} révoqué de l'équipe plateforme`)}`);
 }
 
+// Active une identité `rattachee_non_confirmee` en passant EXCLUSIVEMENT par la
+// RPC plateforme_activer_admin, avec le client Supabase authentifié de la
+// session courante. La RPC (migration 20260826000237) exige à elle seule :
+// rôle plateforme `total` déjà actif, session AAL2, MFA vérifié sur la cible,
+// interdiction de l'auto-activation. Aucun service_role, aucune écriture directe
+// de plateforme_admins, aucun contournement MFA/AAL2 : les échecs remontent tels
+// quels à l'opérateur.
+export async function activerAdminPlateformeAction(formData: FormData) {
+  if (!(await estPlateformeAdmin())) redirect("/dashboard");
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!email || !email.includes("@")) redirect(`/plateforme?error=${encodeURIComponent("Email manquant")}`);
+  if (isEmailLoginDisabled()) {
+    redirect(`/plateforme?error=${encodeURIComponent("Activation d'administrateur indisponible en mode prototype")}`);
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("plateforme_activer_admin", { p_email: email });
+  if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/plateforme");
+  redirect(`/plateforme?succes=${encodeURIComponent(`${email} activé — accès plateforme effectif`)}`);
+}
+
 export async function modifierTarifPostePlateformeAction(posteId: string, formData: FormData) {
   if (!(await estPlateformeAdmin())) redirect("/dashboard");
   const codeOffre = String(formData.get("code_offre") ?? "standard").trim() || "standard";

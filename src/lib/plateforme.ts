@@ -12,6 +12,29 @@ export async function estPlateformeAdmin(): Promise<boolean> {
   return data === true;
 }
 
+// Statuts possibles d'une identité dans plateforme_admins (migrations 236/237).
+export const STATUTS_IDENTITE_PLATEFORME = ["en_attente", "rattachee_non_confirmee", "active", "revoquee"] as const;
+export type StatutIdentitePlateforme = (typeof STATUTS_IDENTITE_PLATEFORME)[number];
+
+export const STATUT_IDENTITE_LABEL: Record<StatutIdentitePlateforme, string> = {
+  en_attente: "En attente (compte à créer)",
+  rattachee_non_confirmee: "En attente de confirmation",
+  active: "Actif",
+  revoquee: "Révoqué",
+};
+
+// Statut d'identité plateforme de l'utilisateur courant, ou null s'il n'a aucune
+// ligne plateforme_admins rattachée à son UID. Ne confère aucun droit : sert au
+// routage (une identité plateforme non active ne doit pas voir l'onboarding).
+export async function statutIdentitePlateforme(): Promise<StatutIdentitePlateforme | null> {
+  if (isEmailLoginDisabled()) return null;
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("plateforme_statut_identite_courant");
+  return typeof data === "string" && (STATUTS_IDENTITE_PLATEFORME as readonly string[]).includes(data)
+    ? (data as StatutIdentitePlateforme)
+    : null;
+}
+
 export const ABONNEMENT_STATUTS = [
   { cle: "essai", libelle: "Essai", couleur: "#b8792e" },
   { cle: "actif", libelle: "Actif", couleur: "#2f6b47" },

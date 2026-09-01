@@ -3,15 +3,29 @@ import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
-import { estPlateformeAdmin, statutAbonnement, prixAbonnementMensuel, offreParCle, REDUCTION_ANNUELLE, type EntrepriseAbonnement } from "@/lib/plateforme";
-import { ajouterAdminPlateformeAction, appliquerRemiseAction, creerEntreprisePlateformeAction, entrerEntreprisePlateformeAction, enregistrerReglementPlateformeAction, genererSnapshotFacturationAction, modifierAbonnementAction, modifierTarifPostePlateformeAction, reinitialiserMotDePassePlateformeAction, retirerAdminPlateformeAction, retirerRemiseAction, signalerImpayePlateformeAction } from "@/app/actions/plateforme";
+import { estPlateformeAdmin, statutAbonnement, prixAbonnementMensuel, offreParCle, REDUCTION_ANNUELLE, STATUT_IDENTITE_LABEL, type StatutIdentitePlateforme, type EntrepriseAbonnement } from "@/lib/plateforme";
+import { activerAdminPlateformeAction, ajouterAdminPlateformeAction, appliquerRemiseAction, creerEntreprisePlateformeAction, entrerEntreprisePlateformeAction, enregistrerReglementPlateformeAction, genererSnapshotFacturationAction, modifierAbonnementAction, modifierTarifPostePlateformeAction, reinitialiserMotDePassePlateformeAction, retirerAdminPlateformeAction, retirerRemiseAction, signalerImpayePlateformeAction } from "@/app/actions/plateforme";
 import { AbonnementCountdown } from "@/components/AbonnementCountdown";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { RemiseConfirmButton } from "@/components/RemiseConfirmButton";
 import { BRAND_NAME } from "@/lib/brand";
 
-type MembrePlateforme = { email: string; role: string; nom: string | null; ajoute_par: string | null; created_at: string };
+type MembrePlateforme = { email: string; role: string; nom: string | null; ajoute_par: string | null; actif: boolean | null; statut_identite: string | null; created_at: string };
 const ROLE_LABEL: Record<string, string> = { total: "Accès total", support: "Support", facturation: "Facturation", lecture: "Lecture seule" };
+const STATUT_IDENTITE_STYLE: Record<StatutIdentitePlateforme, string> = {
+  active: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
+  rattachee_non_confirmee: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+  en_attente: "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300",
+  revoquee: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
+};
+function libelleStatutIdentite(m: MembrePlateforme): { texte: string; style: string } {
+  const s = m.statut_identite as StatutIdentitePlateforme | null;
+  if (s && s in STATUT_IDENTITE_LABEL) return { texte: STATUT_IDENTITE_LABEL[s], style: STATUT_IDENTITE_STYLE[s] };
+  // Repli si la RPC ne renvoie pas encore statut_identite (migration antérieure).
+  return m.actif
+    ? { texte: "Actif", style: STATUT_IDENTITE_STYLE.active }
+    : { texte: "Inactif", style: STATUT_IDENTITE_STYLE.en_attente };
+}
 
 const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -62,7 +76,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
 
   let membresPlateforme: MembrePlateforme[] = [];
   if (isEmailLoginDisabled()) {
-    const { data } = await supabase.from("plateforme_admins").select("email, role, nom, ajoute_par, created_at").order("created_at");
+    const { data } = await supabase.from("plateforme_admins").select("email, role, nom, ajoute_par, actif, statut_identite, created_at").order("created_at");
     membresPlateforme = (data ?? []) as MembrePlateforme[];
   } else {
     const { data } = await supabase.rpc("plateforme_lister_admins");
@@ -126,19 +140,36 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
           <h2 className="font-semibold">Équipe plateforme</h2>
           <p className="text-xs text-neutral-500">Les collaborateurs {BRAND_NAME} qui peuvent assister toutes les entreprises. Accès total pour l&apos;instant ; les niveaux d&apos;accès seront affinés ensuite.</p>
           <ul className="mt-3 space-y-2">
-            {membresPlateforme.map((m) => (
+            {membresPlateforme.map((m) => {
+              const statut = libelleStatutIdentite(m);
+              return (
               <li key={m.email} className="flex flex-wrap items-center justify-between gap-2 rounded border border-neutral-100 p-2 text-sm dark:border-neutral-800">
                 <div>
                   <strong>{m.nom || m.email}</strong>
                   {m.nom && <span className="ml-2 text-neutral-500">{m.email}</span>}
                   <span className="ml-2 rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">{ROLE_LABEL[m.role] ?? m.role}</span>
+                  <span className={`ml-2 rounded px-2 py-0.5 text-xs font-medium ${statut.style}`}>{statut.texte}</span>
                 </div>
-                <form action={retirerAdminPlateformeAction}>
-                  <input type="hidden" name="email" value={m.email} />
-                  <button className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50">Retirer</button>
-                </form>
+                <div className="flex items-center gap-2">
+                  {m.statut_identite === "rattachee_non_confirmee" && (
+                    <form action={activerAdminPlateformeAction}>
+                      <input type="hidden" name="email" value={m.email} />
+                      <ConfirmSubmitButton
+                        message={`Activer l'accès plateforme de ${m.email} ? Cela requiert votre session sécurisée (MFA) et un facteur MFA vérifié sur le compte cible.`}
+                        className="rounded border border-green-300 px-2 py-1 text-xs font-medium text-green-800 hover:bg-green-50 dark:border-green-800 dark:text-green-300"
+                      >
+                        Activer l&apos;administrateur
+                      </ConfirmSubmitButton>
+                    </form>
+                  )}
+                  <form action={retirerAdminPlateformeAction}>
+                    <input type="hidden" name="email" value={m.email} />
+                    <button className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50">Retirer</button>
+                  </form>
+                </div>
               </li>
-            ))}
+              );
+            })}
             {membresPlateforme.length === 0 && <li className="text-sm text-neutral-500">Aucun membre listé.</li>}
           </ul>
           <form action={ajouterAdminPlateformeAction} className="mt-3 grid gap-2 border-t border-neutral-100 pt-3 dark:border-neutral-800 sm:grid-cols-[1.5fr_1fr_1fr_auto]">

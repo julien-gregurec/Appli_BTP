@@ -2,7 +2,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
-import { estPlateformeAdmin } from "@/lib/plateforme";
+import { estPlateformeAdmin, statutIdentitePlateforme } from "@/lib/plateforme";
 
 // Sentinel utilisé quand aucune entreprise réelle n'est rattachée (même convention
 // que compteurs_reference : aucune entreprise n'a jamais cet id, donc les requêtes
@@ -108,10 +108,14 @@ export const getContexteEntreprise = cache(async function getContexteEntreprise(
   ]);
 
   if (!profil?.entreprise_active_id) {
+    const [estAdminPlateforme, statutIdentite] = await Promise.all([
+      estPlateformeAdmin(),
+      statutIdentitePlateforme(),
+    ]);
     // Un admin plateforme n'est rattaché à aucune entreprise cliente par nature :
     // on ne le rattache jamais artificiellement à l'une d'elles, on lui donne un
     // contexte neutre plutôt que de le renvoyer vers l'onboarding entreprise.
-    if (await estPlateformeAdmin()) {
+    if (estAdminPlateforme) {
       return {
         userId: user.id,
         prenom: profil?.prenom ?? null,
@@ -126,6 +130,14 @@ export const getContexteEntreprise = cache(async function getContexteEntreprise(
         impayeMessage: null,
         accesSupportPlateforme: false,
       };
+    }
+    // Voie B : une identité plateforme connue mais NON active (en attente,
+    // rattachée non confirmée, révoquée) n'est pas un prospect. On ne lui propose
+    // jamais l'onboarding entreprise (elle ne doit créer aucune entreprise) : on
+    // renvoie un refus sécurisé. Seule une activation explicite (AAL2, par un
+    // admin actif) lui ouvrira /plateforme.
+    if (statutIdentite && statutIdentite !== "active") {
+      redirect("/acces-refuse?motif=identite_plateforme_en_attente");
     }
     redirect("/onboarding");
   }
