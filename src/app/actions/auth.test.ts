@@ -186,6 +186,11 @@ describe("modifierMotDePasseAction — changement de mot de passe (utilisateur c
     mocks.getUser.mockResolvedValue({ data: { user: { id: "user-test" } } });
     mocks.updateUser.mockResolvedValue({ error: null });
     mocks.signOut.mockResolvedValue({ error: null });
+    // Par défaut : session au niveau requis (compte sans MFA, ou déjà aal2).
+    mocks.getAuthenticatorAssuranceLevel.mockResolvedValue({
+      data: { currentLevel: "aal2", nextLevel: "aal2" },
+      error: null,
+    });
   });
 
   const formulaire = (mdp: string, confirmation: string) => {
@@ -238,6 +243,42 @@ describe("modifierMotDePasseAction — changement de mot de passe (utilisateur c
     expect(destination).toContain("REDIRECT:/nouveau-mot-de-passe?error=");
     expect(destination).not.toContain(motDePasseSecret);
     expect(mocks.signOut).not.toHaveBeenCalled();
+  });
+
+  it("compte MFA en session recovery aal1 : exige le second facteur avant updateUser", async () => {
+    mocks.getAuthenticatorAssuranceLevel.mockResolvedValue({
+      data: { currentLevel: "aal1", nextLevel: "aal2" },
+      error: null,
+    });
+    await expect(modifierMotDePasseAction(formulaire("motdepasse1", "motdepasse1"))).rejects.toThrow(
+      "REDIRECT:/login/mfa?next=%2Fnouveau-mot-de-passe",
+    );
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+    expect(mocks.signOut).not.toHaveBeenCalled();
+  });
+
+  it("compte sans MFA (aal1/aal1) : le changement de mot de passe passe normalement", async () => {
+    mocks.getAuthenticatorAssuranceLevel.mockResolvedValue({
+      data: { currentLevel: "aal1", nextLevel: "aal1" },
+      error: null,
+    });
+    await expect(modifierMotDePasseAction(formulaire("motdepasse1", "motdepasse1"))).rejects.toThrow(
+      "REDIRECT:/login?message=",
+    );
+    expect(mocks.updateUser).toHaveBeenCalledWith({ password: "motdepasse1" });
+  });
+
+  it("journalise le message technique de updateUser sans exposer le mot de passe", async () => {
+    const espion = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.updateUser.mockResolvedValueOnce({ error: { message: "AAL2 required to change password" } });
+    try {
+      await modifierMotDePasseAction(formulaire("motdepasse-secret-2", "motdepasse-secret-2"));
+    } catch {
+      /* redirect attendu */
+    }
+    expect(espion).toHaveBeenCalledWith("modifierMotDePasseAction:updateUser", "AAL2 required to change password");
+    expect(espion.mock.calls.flat().join(" ")).not.toContain("motdepasse-secret-2");
+    espion.mockRestore();
   });
 });
 

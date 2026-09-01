@@ -10,6 +10,16 @@ export default async function NouveauMotDePassePage({ searchParams }: { searchPa
   const { error } = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    // Un compte avec un facteur MFA vérifié ouvre une session recovery en aal1 :
+    // Supabase refuse alors le changement de mot de passe. On exige d'abord le
+    // second facteur (parcours identique à la connexion), sans jamais le
+    // contourner ni l'affaiblir.
+    const { data: niveau } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (niveau?.currentLevel === "aal1" && niveau?.nextLevel === "aal2") {
+      redirect(`/login/mfa?next=${encodeURIComponent("/nouveau-mot-de-passe")}`);
+    }
+  }
   return (
     <main className="flex flex-1 items-center justify-center p-6">
       <div className="w-full max-w-sm space-y-6">

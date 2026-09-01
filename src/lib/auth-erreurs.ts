@@ -8,6 +8,7 @@ const CORRESPONDANCES: Array<[RegExp, string]> = [
   [/signup requires a valid password/i, "Le mot de passe saisi n’est pas valide."],
   [/unable to validate email address/i, "L’adresse email n’est pas valide."],
   [/new password should be different/i, "Le nouveau mot de passe doit être différent de l’ancien."],
+  [/aal2 required|insufficient_aal|reauthentication|requires? (mfa|two.?factor|reauthentication)|mfa.*(required|verification)/i, "Vérification en deux étapes requise pour changer le mot de passe."],
   [/for security purposes, you can only request this after/i, "Trop de tentatives. Réessayez dans quelques instants."],
   [/email rate limit exceeded/i, "Trop de tentatives. Réessayez dans quelques instants."],
   [/token has expired|otp_expired/i, "Le lien a expiré. Demandez-en un nouveau."],

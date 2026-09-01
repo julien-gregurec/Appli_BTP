@@ -8,6 +8,18 @@ describe("traduireErreurAuth", () => {
     expect(traduireErreurAuth("Email not confirmed")).toBe("Confirmez votre adresse email avant de vous connecter.");
   });
 
+  it("traduit le refus de changement de mot de passe lié au second facteur (MFA/AAL2)", () => {
+    const attendu = "Vérification en deux étapes requise pour changer le mot de passe.";
+    for (const brut of [
+      "AAL2 required to change password",
+      "insufficient_aal",
+      "A reauthentication is needed to update the user's password",
+      "Password update requires MFA verification",
+    ]) {
+      expect(traduireErreurAuth(brut)).toBe(attendu);
+    }
+  });
+
   it("ne renvoie jamais le texte technique brut pour un message inconnu", () => {
     const brut = "duplicate key value violates unique constraint \"utilisateurs_pkey\"";
     expect(traduireErreurAuth(brut)).not.toContain("constraint");

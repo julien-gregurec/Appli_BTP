@@ -164,8 +164,23 @@ export async function modifierMotDePasseAction(formData: FormData) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(`/mot-de-passe-oublie?error=${encodeURIComponent("Le lien a expiré. Demandez un nouveau lien.")}`);
+
+  // Défense en profondeur : un compte MFA doit élever sa session en aal2 avant
+  // que Supabase n'autorise updateUser({ password }). La page /nouveau-mot-de-passe
+  // fait déjà cette redirection ; on la refait ici car l'action est une requête
+  // POST distincte. Le second facteur est réclamé, jamais contourné.
+  const { data: niveau } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (niveau?.currentLevel === "aal1" && niveau?.nextLevel === "aal2") {
+    redirect(`/login/mfa?next=${encodeURIComponent("/nouveau-mot-de-passe")}`);
+  }
+
   const { error } = await supabase.auth.updateUser({ password: motDePasse });
-  if (error) redirect(`/nouveau-mot-de-passe?error=${encodeURIComponent(traduireErreurAuth(error.message))}`);
+  if (error) {
+    // Détail technique journalisé côté serveur (le message GoTrue ne contient ni
+    // jeton ni mot de passe) ; l'utilisateur ne voit qu'un message traduit.
+    console.error("modifierMotDePasseAction:updateUser", error.message);
+    redirect(`/nouveau-mot-de-passe?error=${encodeURIComponent(traduireErreurAuth(error.message))}`);
+  }
   await supabase.auth.signOut();
   redirect(`/login?message=${encodeURIComponent("Mot de passe modifié. Vous pouvez maintenant vous connecter.")}`);
 }
