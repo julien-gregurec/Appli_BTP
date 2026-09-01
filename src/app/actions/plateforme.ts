@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -7,7 +8,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { estPlateformeAdmin } from "@/lib/plateforme";
 import { ERREUR_CONFIGURATION_URL_AUTH, urlCallbackReinitialisation } from "@/lib/auth-redirects";
-import { appliquerCouponAbonnement, creerCouponRemise, retirerCouponAbonnement, TYPES_REMISE, DUREES_REMISE, type DureeRemise, type TypeRemise } from "@/lib/stripe-abonnement";
+import { TYPES_REMISE, DUREES_REMISE, type DureeRemise, type TypeRemise } from "@/lib/stripe-abonnement";
+import { OperationRemiseAReconcilier, type EtatSouhaiteRemise, type OperationRemise } from "@/lib/stripe-discount-consistency";
+import { reconcilierOperationRemiseServeur, resoudreAbonnementOperationRemiseServeur } from "@/lib/stripe-discount-server";
+import { passerelleStripeRemise } from "@/lib/stripe-discount-gateway";
 
 export async function modifierAbonnementAction(entrepriseId: string, formData: FormData) {
   if (!(await estPlateformeAdmin())) {
@@ -73,14 +77,13 @@ export async function ajouterAdminPlateformeAction(formData: FormData) {
   if (!email || !email.includes("@")) redirect(`/plateforme?error=${encodeURIComponent("Email invalide")}`);
   const supabase = await createClient();
   if (isEmailLoginDisabled()) {
-    const { error } = await supabase.from("plateforme_admins").upsert({ email, nom, role }, { onConflict: "email" });
-    if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
+    redirect(`/plateforme?error=${encodeURIComponent("La gestion des administrateurs plateforme est désactivée en mode démonstration")}`);
   } else {
     const { error } = await supabase.rpc("plateforme_ajouter_admin", { p_email: email, p_nom: nom, p_role: role });
     if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
   }
   revalidatePath("/plateforme");
-  redirect(`/plateforme?succes=${encodeURIComponent(`Accès plateforme accordé à ${email}. Créez son compte de connexion dans Supabase (Authentication → Add user) avec ce même email.`)}`);
+  redirect(`/plateforme?succes=${encodeURIComponent(`Identité ${email} enregistrée en attente. Le rattachement UID, la vérification MFA et l’activation explicite restent obligatoires.`)}`);
 }
 
 export async function retirerAdminPlateformeAction(formData: FormData) {
@@ -89,14 +92,13 @@ export async function retirerAdminPlateformeAction(formData: FormData) {
   if (!email) redirect(`/plateforme?error=${encodeURIComponent("Email manquant")}`);
   const supabase = await createClient();
   if (isEmailLoginDisabled()) {
-    const { error } = await supabase.from("plateforme_admins").delete().eq("email", email);
-    if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
+    redirect(`/plateforme?error=${encodeURIComponent("La gestion des administrateurs plateforme est désactivée en mode démonstration")}`);
   } else {
     const { error } = await supabase.rpc("plateforme_retirer_admin", { p_email: email });
     if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
   }
   revalidatePath("/plateforme");
-  redirect(`/plateforme?succes=${encodeURIComponent(`${email} retiré de l'équipe plateforme`)}`);
+  redirect(`/plateforme?succes=${encodeURIComponent(`${email} révoqué de l'équipe plateforme`)}`);
 }
 
 export async function modifierTarifPostePlateformeAction(posteId: string, formData: FormData) {
@@ -216,6 +218,38 @@ function nomCouponRemise(nomEntreprise: string, description: string): string {
   return `${nomTronque}${suffixe}`;
 }
 
+type ClientRpcRemise = Awaited<ReturnType<typeof createClient>>;
+
+function erreurRemisePublique(erreur: unknown) {
+  return erreur instanceof OperationRemiseAReconcilier
+    ? erreur.message
+    : "L’opération de remise doit être vérifiée et finalisée.";
+}
+
+async function commencerSagaRemise(
+  supabase: ClientRpcRemise,
+  entrepriseId: string,
+  intentionId: string,
+  stripeSubscriptionId: string,
+  typeOperation: "application" | "retrait",
+  etatSouhaite: EtatSouhaiteRemise,
+) {
+  const { data, error } = await supabase.rpc("plateforme_commencer_operation_remise", {
+    p_entreprise_id: entrepriseId,
+    p_intention_id: intentionId,
+    p_stripe_subscription_id: stripeSubscriptionId,
+    p_type_operation: typeOperation,
+    p_etat_souhaite: etatSouhaite,
+  });
+  if (error || !data) throw new Error("Impossible de préparer l’opération de remise");
+  return data as unknown as OperationRemise;
+}
+
+function intentionRemise(formData?: FormData) {
+  const valeur = String(formData?.get("intention_id") ?? "");
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(valeur) ? valeur : randomUUID();
+}
+
 // Geste commercial : coupon Stripe créé et appliqué sur l'abonnement de l'entreprise (base
 // + comptes supplémentaires, au prorata — vérifié empiriquement, REMISES-CLIENTS-V1, voir
 // docs/commercial/REMISES_CLIENTS_V1.md). Un seul à la fois (Stripe remplace automatiquement
@@ -234,9 +268,19 @@ export async function appliquerRemiseAction(entrepriseId: string, formData: Form
   }
   if (type === "pourcentage" && valeur > 100) redirect(`/plateforme?error=${encodeURIComponent("Un pourcentage ne peut pas dépasser 100")}`);
   if (!motifInterne) redirect(`/plateforme?error=${encodeURIComponent("Le motif interne est obligatoire")}`);
+  if (duree === "repeating" && (!Number.isFinite(dureeMoisBrut) || dureeMoisBrut < 1)) {
+    redirect(`/plateforme?error=${encodeURIComponent("Le nombre de mois est obligatoire pour une remise limitée dans le temps")}`);
+  }
   const dureeMois = duree === "repeating" ? dureeMoisBrut : undefined;
 
   const supabase = await createClient();
+  if (isEmailLoginDisabled()) redirect(`/plateforme?error=${encodeURIComponent("Les remises Stripe sécurisées nécessitent un compte plateforme authentifié")}`);
+  const { error: erreurAutorisation } = await supabase.rpc("plateforme_autoriser_effet_externe", {
+    p_action: "remise_abonnement",
+  });
+  if (erreurAutorisation) {
+    redirect(`/plateforme?error=${encodeURIComponent("Action non autorisée.")}`);
+  }
   // Lecture via le client admin : un administrateur plateforme n'est pas forcément membre de
   // l'entreprise cliente, et la RLS "membres voient leur entreprise" (est_membre_actif) bloque
   // sinon cette lecture pour toute entreprise autre que la sienne (bug réel découvert en
@@ -246,40 +290,58 @@ export async function appliquerRemiseAction(entrepriseId: string, formData: Form
   if (!entreprise?.stripe_subscription_id) redirect(`/plateforme?error=${encodeURIComponent("Cette entreprise n’a pas d’abonnement Stripe actif")}`);
 
   const description = descriptionRemise(type as TypeRemise, valeur, duree as DureeRemise, dureeMois);
+  const etatSouhaite: EtatSouhaiteRemise = {
+    active: true, description, motif_interne: motifInterne, duree_mois: dureeMois ?? null,
+    type: type as TypeRemise, valeur, duree: duree as DureeRemise,
+    nom_coupon: nomCouponRemise(entreprise.nom, description),
+  };
   try {
-    const coupon = await creerCouponRemise({ type: type as TypeRemise, valeur, duree: duree as DureeRemise, dureeMois, nom: nomCouponRemise(entreprise.nom, description) });
-    await appliquerCouponAbonnement(entreprise.stripe_subscription_id, coupon.id);
-    if (isEmailLoginDisabled()) {
-      await supabase.from("entreprises").update({ remise_stripe_coupon_id: coupon.id, remise_description: description, remise_motif_interne: motifInterne, remise_duree_mois: dureeMois ?? null, remise_type: type, remise_valeur: valeur, remise_appliquee_at: new Date().toISOString() }).eq("id", entrepriseId);
-    } else {
-      const { error } = await supabase.rpc("plateforme_appliquer_remise", { p_entreprise_id: entrepriseId, p_coupon_id: coupon.id, p_description: description, p_motif_interne: motifInterne, p_duree_mois: dureeMois ?? null, p_type: type, p_valeur: valeur });
-      if (error) throw new Error(error.message);
-    }
+    const operation = await commencerSagaRemise(supabase, entrepriseId, intentionRemise(formData), entreprise.stripe_subscription_id, "application", etatSouhaite);
+    await reconcilierOperationRemiseServeur(operation.id, entreprise.stripe_subscription_id, `action:${operation.id}`, passerelleStripeRemise);
   } catch (err) {
-    redirect(`/plateforme?error=${encodeURIComponent(err instanceof Error ? err.message : "Remise impossible")}`);
+    redirect(`/plateforme?error=${encodeURIComponent(erreurRemisePublique(err))}`);
   }
 
   revalidatePath("/plateforme");
   redirect(`/plateforme?succes=${encodeURIComponent(`Remise appliquée : ${description}`)}`);
 }
 
-export async function retirerRemiseAction(entrepriseId: string) {
+export async function retirerRemiseAction(entrepriseId: string, formData?: FormData) {
   if (!(await estPlateformeAdmin())) redirect("/dashboard");
   const supabase = await createClient();
-  const { data: entreprise } = await createAdminClient().from("entreprises").select("stripe_subscription_id").eq("id", entrepriseId).maybeSingle();
-  if (entreprise?.stripe_subscription_id) {
-    try {
-      await retirerCouponAbonnement(entreprise.stripe_subscription_id);
-    } catch (err) {
-      redirect(`/plateforme?error=${encodeURIComponent(err instanceof Error ? err.message : "Suppression impossible")}`);
-    }
+  if (isEmailLoginDisabled()) redirect(`/plateforme?error=${encodeURIComponent("Les remises Stripe sécurisées nécessitent un compte plateforme authentifié")}`);
+  const { error: erreurAutorisation } = await supabase.rpc("plateforme_autoriser_effet_externe", {
+    p_action: "remise_abonnement",
+  });
+  if (erreurAutorisation) {
+    redirect(`/plateforme?error=${encodeURIComponent("Action non autorisée.")}`);
   }
-  if (isEmailLoginDisabled()) {
-    await supabase.from("entreprises").update({ remise_stripe_coupon_id: null, remise_description: null, remise_motif_interne: null, remise_duree_mois: null, remise_type: null, remise_valeur: null, remise_appliquee_at: null }).eq("id", entrepriseId);
-  } else {
-    const { error } = await supabase.rpc("plateforme_retirer_remise", { p_entreprise_id: entrepriseId });
-    if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
+  const { data: entreprise } = await createAdminClient().from("entreprises").select("stripe_subscription_id").eq("id", entrepriseId).maybeSingle();
+  if (!entreprise?.stripe_subscription_id) redirect(`/plateforme?error=${encodeURIComponent("Cette entreprise n’a pas d’abonnement Stripe actif")}`);
+  try {
+    const operation = await commencerSagaRemise(supabase, entrepriseId, intentionRemise(formData), entreprise.stripe_subscription_id, "retrait", { active: false });
+    await reconcilierOperationRemiseServeur(operation.id, entreprise.stripe_subscription_id, `action:${operation.id}`, passerelleStripeRemise);
+  } catch (err) {
+    redirect(`/plateforme?error=${encodeURIComponent(erreurRemisePublique(err))}`);
   }
   revalidatePath("/plateforme");
   redirect(`/plateforme?succes=${encodeURIComponent("Remise retirée")}`);
+}
+
+export async function reprendreOperationRemiseAction(operationId: string) {
+  if (!(await estPlateformeAdmin())) redirect("/dashboard");
+  const supabase = await createClient();
+  if (isEmailLoginDisabled()) redirect(`/plateforme?error=${encodeURIComponent("Réconciliation indisponible en mode prototype")}`);
+  const { error: erreurAutorisation } = await supabase.rpc("plateforme_autoriser_effet_externe", { p_action: "remise_abonnement" });
+  if (erreurAutorisation) redirect(`/plateforme?error=${encodeURIComponent("Action non autorisée.")}`);
+  const { data, error } = await supabase.rpc("plateforme_demander_reprise_operation_remise", { p_operation_id: operationId });
+  if (error || !data) redirect(`/plateforme?error=${encodeURIComponent("Opération de remise introuvable")}`);
+  try {
+    const subscriptionId = await resoudreAbonnementOperationRemiseServeur(operationId);
+    await reconcilierOperationRemiseServeur(operationId, subscriptionId, `reprise:${operationId}`, passerelleStripeRemise);
+  } catch (err) {
+    redirect(`/plateforme?error=${encodeURIComponent(erreurRemisePublique(err))}`);
+  }
+  revalidatePath("/plateforme");
+  redirect(`/plateforme?succes=${encodeURIComponent("Opération de remise vérifiée et finalisée")}`);
 }

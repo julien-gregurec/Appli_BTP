@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(26);
+select plan(28);
 
 \ir fixtures/isolation_multitenant.inc
 
@@ -35,6 +35,13 @@ select throws_like(
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000001', true);
+select set_config('request.jwt.claims', '{"sub":"30000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal1"}', true);
+select throws_like(
+  $$select public.plateforme_attribuer_entitlement_utilisateur(
+    '10000000-0000-0000-0000-000000000002','tools','pro',array['saved-projects'],'internal')$$,
+  '%AAL2%', 'l''administrateur plateforme AAL1 ne peut pas attribuer Tools Pro'
+);
+select set_config('request.jwt.claims', '{"sub":"30000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal2"}', true);
 select lives_ok(
   $$select public.plateforme_attribuer_entitlement_utilisateur(
     '10000000-0000-0000-0000-000000000002','tools','pro',
@@ -119,6 +126,14 @@ select throws_like(
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000001', true);
+select set_config('request.jwt.claims', '{"sub":"30000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal1"}', true);
+select throws_like(
+  $$select public.plateforme_revoquer_entitlement_utilisateur(
+    (select id from public.entitlements_utilisateurs_elsatia where utilisateur_id='10000000-0000-0000-0000-000000000002' and source='internal'),
+    'tentative AAL1')$$,
+  '%AAL2%', 'l''administrateur plateforme AAL1 ne peut pas révoquer Tools Pro'
+);
+select set_config('request.jwt.claims', '{"sub":"30000000-0000-0000-0000-000000000001","role":"authenticated","aal":"aal2"}', true);
 select lives_ok(
   $$select public.plateforme_revoquer_entitlement_utilisateur(
     (select id from public.entitlements_utilisateurs_elsatia where utilisateur_id='10000000-0000-0000-0000-000000000002' and source='internal'),

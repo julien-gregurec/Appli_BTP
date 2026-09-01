@@ -39,8 +39,39 @@ export type StripeSubscription = {
   cancel_at_period_end?: boolean;
   metadata?: Record<string, string>;
   items?: { data?: Array<{ id: string; quantity?: number; price?: { id?: string } }> };
-  discounts?: Array<string | { id?: string }> | null;
+  discounts?: Array<string | {
+    id?: string;
+    object?: string;
+    coupon?: string | { id?: string };
+    promotion_code?: string | { id?: string } | null;
+    source?: { type?: string; coupon?: string | { id?: string } | null };
+  }> | null;
 };
+
+export type ObservationRemiseStripe =
+  | {
+    status: "absent";
+    count: 0;
+    discount_id: null;
+    source_type: null;
+    source_id: null;
+    coupon_id: null;
+  }
+  | {
+    status: "present";
+    count: 1;
+    discount_id: string;
+    source_type: "coupon" | "promotion_code";
+    source_id: string;
+    coupon_id: string;
+  };
+
+export class ObservationRemiseStripeInexploitable extends Error {
+  constructor(public readonly raison: string, public readonly count: number, public readonly discountId: string | null = null) {
+    super("Observation Stripe de remise incomplète");
+    this.name = "ObservationRemiseStripeInexploitable";
+  }
+}
 
 const VARIABLES_PRIX: Partial<Record<OffreAbonnement, Record<PeriodiciteAbonnement, string>>> = {
   essentiel: {
@@ -239,7 +270,7 @@ type StripeCoupon = { id: string; name?: string | null };
 // l'abonnement de base d'une entreprise cliente. Un coupon par entreprise a la fois :
 // en appliquer un nouveau remplace l'ancien cote Stripe (comportement natif de
 // `subscriptions.update` avec le parametre coupon).
-export async function creerCouponRemise(params: { type: TypeRemise; valeur: number; duree: DureeRemise; dureeMois?: number; nom: string }) {
+export async function creerCouponRemise(params: { type: TypeRemise; valeur: number; duree: DureeRemise; dureeMois?: number; nom: string; cleIdempotence?: string }) {
   const corps = new URLSearchParams({ name: params.nom, duration: params.duree });
   if (params.type === "montant") {
     corps.set("amount_off", String(Math.round(params.valeur * 100)));
@@ -251,7 +282,7 @@ export async function creerCouponRemise(params: { type: TypeRemise; valeur: numb
     if (!params.dureeMois || params.dureeMois < 1) throw new Error("Le nombre de mois est obligatoire pour une remise limitée dans le temps");
     corps.set("duration_in_months", String(params.dureeMois));
   }
-  return requeteStripe<StripeCoupon>("coupons", { corps, idempotence: `remise-coupon-${Date.now()}-${Math.random().toString(36).slice(2)}` });
+  return requeteStripe<StripeCoupon>("coupons", { corps, idempotence: params.cleIdempotence ?? `remise-coupon-${Date.now()}-${Math.random().toString(36).slice(2)}` });
 }
 
 // Le compte Stripe de la plateforme fonctionne en billing_mode "flexible" : le paramètre
@@ -261,46 +292,103 @@ export async function creerCouponRemise(params: { type: TypeRemise; valeur: numb
 // actif à la fois, comme avec l'ancien paramètre `coupon`. La remise ainsi posée s'applique
 // au prorata sur TOUTES les lignes de la facture (abonnement de base + éventuelle ligne
 // "comptes supplémentaires"), pas seulement sur le prix catalogue de l'offre.
-export async function appliquerCouponAbonnement(subscriptionId: string, couponId: string) {
+export async function appliquerCouponAbonnement(subscriptionId: string, couponId: string, cleIdempotence?: string) {
   return requeteStripe<StripeSubscription>(`subscriptions/${encodeURIComponent(subscriptionId)}`, {
     corps: new URLSearchParams({ "discounts[0][coupon]": couponId }),
-    idempotence: `remise-application-${subscriptionId}-${couponId}`,
+    idempotence: cleIdempotence ?? `remise-application-${subscriptionId}-${couponId}`,
   });
 }
 
 export async function retirerCouponAbonnement(subscriptionId: string) {
   return requeteStripe<StripeSubscription>(`subscriptions/${encodeURIComponent(subscriptionId)}/discount`, {
     methode: "DELETE",
-    idempotence: `remise-suppression-${subscriptionId}-${Date.now()}`,
   });
 }
 
-// La remise commerciale (coupon Stripe) peut expirer naturellement côté Stripe (durée "once"
-// consommée, "repeating" arrivée à échéance) sans qu'aucune action ELSATIA ne soit passée par
-// retirerRemiseAction. Stripe reste la source de vérité : si l'abonnement Stripe n'a plus de
-// discount actif mais que la fiche entreprise en montre encore un, on aligne la fiche plutôt
-// que de laisser un badge "remise active" obsolète (REMISES-CLIENTS-V1, §14). Appelé depuis le
-// webhook customer.subscription.* à chaque synchronisation d'abonnement.
-export async function synchroniserExpirationRemise(entrepriseId: string, abonnement: StripeSubscription) {
-  if (abonnement.discounts === undefined) return;
-  if ((abonnement.discounts?.length ?? 0) > 0) return;
-  const admin = createAdminClient();
-  const { data: entreprise } = await admin.from("entreprises").select("remise_stripe_coupon_id, remise_description").eq("id", entrepriseId).maybeSingle();
-  if (!entreprise?.remise_stripe_coupon_id) return;
-  await admin.from("entreprises").update({
-    remise_stripe_coupon_id: null, remise_description: null, remise_motif_interne: null,
-    remise_duree_mois: null, remise_type: null, remise_valeur: null,
-    remise_cree_par: null, remise_appliquee_at: null, updated_at: new Date().toISOString(),
-  }).eq("id", entrepriseId);
-  await admin.from("historique_tarification").insert({
-    entreprise_id: entrepriseId, utilisateur_id: null, action: "remise_expiree",
-    ancien: { remise_stripe_coupon_id: entreprise.remise_stripe_coupon_id, remise_description: entreprise.remise_description },
-    nouveau: null, motif: null,
+function identifiantStripeDeveloppe(valeur: unknown): string | null {
+  if (typeof valeur === "string") return valeur.trim() || null;
+  if (!valeur || typeof valeur !== "object") return null;
+  const id = (valeur as { id?: unknown }).id;
+  return typeof id === "string" && id.trim() ? id : null;
+}
+
+function observationInexploitable(raison: string, count: number, discountId: string | null = null): never {
+  console.warn("Observation Stripe de remise refusée", {
+    statut: "unresolved",
+    count,
+    discount_id: discountId,
+    raison,
   });
+  throw new ObservationRemiseStripeInexploitable(raison, count, discountId);
+}
+
+/**
+ * Convertit exclusivement une réponse Stripe suffisamment développée en état
+ * signable. Une référence `di_…`, un objet partiel ou une source inconnue ne
+ * signifient jamais « aucune remise » : ces formes échouent fermées.
+ */
+export function observerRemiseDepuisAbonnement(abonnement: StripeSubscription): ObservationRemiseStripe {
+  if (!Array.isArray(abonnement.discounts)) {
+    return observationInexploitable("discounts_absent_ou_invalide", -1);
+  }
+  const count = abonnement.discounts.length;
+  if (count === 0) {
+    return { status: "absent", count: 0, discount_id: null, source_type: null, source_id: null, coupon_id: null };
+  }
+  if (count !== 1) return observationInexploitable("cardinalite_non_supportee", count);
+
+  const remise = abonnement.discounts[0];
+  if (typeof remise === "string") return observationInexploitable("discount_non_developpe", count, remise);
+  if (!remise || typeof remise !== "object") return observationInexploitable("discount_invalide", count);
+
+  const discountId = identifiantStripeDeveloppe(remise.id);
+  if (!discountId || !/^di_[A-Za-z0-9_:-]{1,125}$/.test(discountId)) {
+    return observationInexploitable("discount_id_invalide", count, discountId);
+  }
+
+  let couponId: string | null = null;
+  if (remise.source !== undefined) {
+    if (!remise.source || remise.source.type !== "coupon") {
+      return observationInexploitable("source_inconnue", count, discountId);
+    }
+    couponId = identifiantStripeDeveloppe(remise.source.coupon);
+  } else if (remise.coupon !== undefined) {
+    // Compatibilité stricte avec les versions Stripe où le coupon développé
+    // était directement porté par Discount.
+    couponId = identifiantStripeDeveloppe(remise.coupon);
+  }
+  if (!couponId || !/^[A-Za-z0-9_:-]{1,128}$/.test(couponId)) {
+    return observationInexploitable("coupon_non_resolu", count, discountId);
+  }
+
+  if (remise.promotion_code !== undefined && remise.promotion_code !== null) {
+    const promotionCodeId = identifiantStripeDeveloppe(remise.promotion_code);
+    if (!promotionCodeId || !/^promo_[A-Za-z0-9_:-]{1,122}$/.test(promotionCodeId)) {
+      return observationInexploitable("promotion_code_non_resolu", count, discountId);
+    }
+    return {
+      status: "present", count: 1, discount_id: discountId,
+      source_type: "promotion_code", source_id: promotionCodeId, coupon_id: couponId,
+    };
+  }
+  return {
+    status: "present", count: 1, discount_id: discountId,
+    source_type: "coupon", source_id: couponId, coupon_id: couponId,
+  };
+}
+
+export function couponActifDepuisAbonnement(abonnement: StripeSubscription): string | null {
+  const observation = observerRemiseDepuisAbonnement(abonnement);
+  return observation.status === "present" ? observation.coupon_id : null;
 }
 
 export async function recupererAbonnementStripe(subscriptionId: string) {
-  return requeteStripe<StripeSubscription>(`subscriptions/${encodeURIComponent(subscriptionId)}`, {
+  const expansions = new URLSearchParams();
+  // Stripe documente `expand[]=discounts` comme le moyen de remplacer chaque
+  // référence `di_…` par le Discount complet. L'identifiant `source.coupon`
+  // est ensuite une identité suffisante et reste accepté sous forme string.
+  expansions.append("expand[]", "discounts");
+  return requeteStripe<StripeSubscription>(`subscriptions/${encodeURIComponent(subscriptionId)}?${expansions}`, {
     methode: "GET",
   });
 }

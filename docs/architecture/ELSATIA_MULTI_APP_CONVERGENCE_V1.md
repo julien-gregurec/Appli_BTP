@@ -1,6 +1,6 @@
 # ELSATIA multi-app convergence V1
 
-Statut : **socle backend convergé et testé** (schéma, RLS, RPC, pgTAP). L'UI Gestion Pro
+Statut : **socle backend convergé, corrigé UID et testé** (schéma, RLS, RPC, pgTAP). L'UI Gestion Pro
 (sélecteur d'applications, page `/plateforme/applications`, sections entreprise/utilisateur,
 mobile/accessibilité) est **hors scope de cette passe** — voir "Hors scope" ci-dessous.
 
@@ -49,8 +49,38 @@ L'auto-accès de l'admin plateforme au catalogue d'applications ne donne aucun a
 données métier d'un tenant. Pour toute intervention réelle dans les données d'une entreprise
 cliente, le mécanisme existant `plateforme_acces_entreprises` +
 `est_acces_support_actif(entreprise_id)` (déjà utilisé en production pour le suivi des impayés)
-reste le modèle à réutiliser — traçable, à durée limitée, un seul actif par admin. Non modifié
-par cette migration.
+reste le modèle à réutiliser — traçable, à durée limitée, un seul actif par admin.
+
+La revue indépendante a découvert que les anciennes définitions de
+`est_acces_support_actif()` et `plateforme_entrer_entreprise()` autorisaient encore par email
+malgré la conversion de `est_plateforme_admin()` vers l'UID. La migration corrective
+`20260826000236_platform_support_uid_security_v1.sql` remplace ces fonctions : UID identique,
+identité explicitement active, rôle `total`/`support`, session ciblée et expiration quatre
+heures sont désormais tous obligatoires. Le scénario historique « bon email, UID absent,
+actif=false » est couvert par un test de régression et ne crée plus de session.
+
+La migration append-only `20260826000237_platform_aal2_role_integrity_v1.sql` complète ce
+socle avec : AAL2 de la session appelante lu uniquement via `auth.jwt()`, rôle `total` pour les
+mutations d'entitlements, ouverture support AAL2 réservée à `total`/`support`, UID et email
+immuables pendant l'état actif, cycle révocation/détachement/rattachement/activation, verrou
+advisory transactionnel du dernier total et état révoqué daté/attribué. Les opérations support
+et de facturation mutatives ont également été classées par rôle et exigent AAL2 ; une
+consultation `lecture` n'exécute plus la suspension automatique des impayés. Le préflight
+versionné et `docs/operations/PLATFORM_SECURITY_PREFLIGHT.sql` contrôlent les données avant
+tout environnement distant.
+
+La migration append-only `20260826000239_platform_support_isolation_audit_v1.sql` ferme les
+deux effets résiduels découverts en revue : le catalogue global des fils ne contient plus aucun
+texte de message et `plateforme_support_messages()` n'effectue plus d'UPDATE implicite. Une
+session support AAL2 ciblée est obligatoire avant toute lecture de contenu ; l'acquittement est
+une RPC séparée, ciblée et auditée. La même migration rend les mutations multi-app idempotentes,
+ajoute les états avant/après, refuse les cibles de facturation inexistantes et centralise la
+traçabilité UID des mutations plateforme. Le snapshot mensuel est explicitement classé comme
+événement périodique, distinct d'un faux historique de changement.
+
+Le mode sans connexion TypeScript n'est plus activable par `DISABLE_EMAIL_LOGIN=true` seul : il
+exige également `ELSATIA_LOCAL_DEMO=true`, une URL Supabase locale, un environnement non
+Production et l'absence de tout contexte Vercel. Il ne modifie aucune règle SQL ou RLS.
 
 ## Tests (`supabase/tests/elsatia_multi_app_convergence_v1.test.sql`)
 
@@ -66,16 +96,21 @@ avec audit (4 actions journalisées), admin d'entreprise ne pouvant pas activer 
 lui-même, et vérification structurelle qu'aucune fonction n'accepte de `utilisateur_id` cible
 arbitraire (signatures `a_acces_application(uuid,text)` / `applications_autorisees(uuid)`).
 
-Confirmé via un reset Supabase local complet puis `npm run test:db` : les 28 fichiers et
-398 assertions pgTAP passent, dont les 27 assertions multi-app et les 13 assertions du modèle
-administrateur par UID. Trois tests historiques fragiles ont été corrigés sans changer le
+La migration `00239` ajoute 60 assertions ciblées couvrant la liste support sans contenu,
+l'isolation A/B, la lecture pure, l'acquittement explicite et idempotent, les sessions absentes,
+étrangères, expirées ou fermées, l'historique multi-app sur changement réel, les cibles de
+facturation et l'audit UID. Les suites `00234` à `00237` restent rejouées cumulativement. Trois
+tests historiques fragiles avaient déjà été corrigés sans changer le
 comportement métier : refus d'écriture Alertes vérifié par SQLSTATE, devis brouillon utilisés
 pour atteindre réellement les contraintes cross-tenant, et lecture de vérification Remises
 effectuée hors session plateforme afin de préserver l'absence de bypass RLS cross-tenant.
 
 La migration administrateur `20260826000235` accepte aussi les identités déclarées avant leur
 compte Auth sous forme strictement inactive (`utilisateur_id = NULL`, `actif = false`). Une
-contrainte interdit qu'une telle ligne soit activée ; aucune autorisation ne repose sur l'email.
+contrainte interdit qu'une telle ligne soit activée. `20260826000236` ajoute les états explicites
+`en_attente`, `rattachee_non_confirmee`, `active`, `revoquee`, le MFA obligatoire pour une
+activation normale, l'interdiction de l'auto-activation et la révocation des sessions support.
+Aucune autorisation du schéma final ne repose sur l'email.
 
 ## Package TypeScript partagé
 
@@ -87,11 +122,9 @@ backend. Cinq tests Vitest dédiés couvrent son contrat.
 
 ## QA
 
-`supabase db reset` ✓ (213 migrations sur base vierge), `npm run test:db` ✓
-(28 fichiers, 398 assertions), `npm run typecheck` ✓, `npm run lint` ✓
-(3 warnings `<img>` préexistants), `npm run test` ✓ (529/529), `npm run build` ✓,
-`npm run verify:secrets` ✓, `npm run verify:migrations` ✓ (213 migrations),
-`npm audit --audit-level=high` ✓ (0 vulnérabilité), `git diff --check` ✓.
+Le détail chiffré de la QA cumulative `00234 → 00238` est consigné dans le rapport du commit de
+correction. Aucun test distant, déploiement Preview ou migration distante ne fait partie de
+cette validation locale.
 
 ## Hors scope de cette passe (itération suivante)
 

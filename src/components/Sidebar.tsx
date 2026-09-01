@@ -9,6 +9,8 @@ import { Lien as Link } from "@/components/Lien";
 import { featureForPath, type FeatureKey } from "@/lib/feature-catalogue";
 import { BrandWordmark } from "@/components/BrandWordmark";
 import { PRODUCT_NAME } from "@/lib/brand";
+import { ApplicationSwitcherGestionPro } from "@/components/ApplicationSwitcherGestionPro";
+import type { DestinationApplication } from "@/lib/multi-app";
 
 export function Sidebar({
   entrepriseNom,
@@ -18,6 +20,7 @@ export function Sidebar({
   plateformeAdmin = false,
   boutiqueActive = true,
   activeFeatures,
+  applications = [],
 }: {
   entrepriseNom: string;
   logoUrl?: string | null;
@@ -26,6 +29,7 @@ export function Sidebar({
   plateformeAdmin?: boolean;
   boutiqueActive?: boolean;
   activeFeatures: FeatureKey[];
+  applications?: DestinationApplication[];
 }) {
   const pathname = usePathname();
   const [ouvert, setOuvert] = useState(false);
@@ -62,6 +66,7 @@ export function Sidebar({
           {logoUrl&&<img src={logoUrl} alt={`Logo de ${entrepriseNom}`} className="h-7 w-9 rounded bg-white object-contain p-0.5"/>}
           <div className="min-w-0"><div className="text-[9px] uppercase tracking-wider text-white/40">Entreprise active</div><div className="truncate text-xs text-white/75">{entrepriseNom}</div></div>
         </div>
+        <ApplicationSwitcherGestionPro applications={applications} />
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2">
