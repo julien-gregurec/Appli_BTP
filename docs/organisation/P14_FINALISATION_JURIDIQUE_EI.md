@@ -1,4 +1,11 @@
-# P14 — Finalisation juridique de la micro-entreprise ELSATIA
+# P14 — Finalisation juridique de l'entreprise individuelle ELSATIA
+
+> ⚠️ **Document historique (lot du 21-08-2026) — ne plus utiliser comme procédure.**
+> Correction de pilotage 2026-09-01 : la forme juridique confirmée est l'**entreprise
+> individuelle (EI)** ; le **régime fiscal/social (micro-entrepreneur ou réel) n'est pas
+> arbitré**. Les mentions « micro-entreprise » ci-dessous décrivent l'état du travail à
+> l'époque du lot, pas une décision de régime. Procédure et checklist juridiques à jour :
+> `CHECKLIST_LANCEMENT.md` § 3 et `GEL_PRE_LANCEMENT.md`.
 
 Lot exécuté le 21-08-2026. Objectif : avancer sur tout ce qui ne dépend pas
 de l'immatriculation, sans rien inventer sur ce qui en dépend.
@@ -32,7 +39,7 @@ aujourd'hui) — rien à retirer sur ce point.
 ## Activité
 
 Formulation validée par Julien comme base de travail dans
-`CREATION_MICRO_CHECKLIST.md`. Non présentée comme définitive : le code
+`CREATION_EI_CHECKLIST.md`. Non présentée comme définitive : le code
 APE/NAF attribué par le Guichet unique pourra différer légèrement.
 
 ## TVA
@@ -210,6 +217,6 @@ du contenu texte pur, sans logique associée à tester.
 ## Documentation
 
 - `PREPARATION_JURIDIQUE.md` mis à jour (tableau des champs, état P14).
-- `CREATION_MICRO_CHECKLIST.md` mis à jour (activité validée).
+- `CREATION_EI_CHECKLIST.md` mis à jour (activité validée).
 - `REGISTRE_CENTRAL.md` à mettre à jour (voir commit).
 - Ce document créé.

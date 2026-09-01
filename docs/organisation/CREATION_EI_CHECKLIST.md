@@ -1,18 +1,27 @@
-# Checklist de création de la micro-entreprise ELSATIA
+# Checklist de création de l'entreprise individuelle ELSATIA
+
+> ⚠️ **Correction de pilotage 2026-09-01.** Forme juridique confirmée : **entreprise
+> individuelle (EI)**. Le **régime fiscal et social (micro-entrepreneur ou réel) n'est PAS
+> arbitré** — décision explicite de Julien requise, idéalement avec un expert-comptable,
+> **avant** l'immatriculation et **avant** Stripe Live. Aucune ligne de cette checklist ne
+> vaut sélection du régime micro. Ne pas confondre forme EI et régime micro. Référence à
+> jour : `CHECKLIST_LANCEMENT.md` § 3.
 
 **Document purement administratif. Aucun dossier n'a été déposé. Rien n'a été décidé à la place de Julien.** Cette checklist liste ce qu'il faudra rassembler/décider, pas comment le faire à sa place.
 
 Mise à jour P14C (21-08-2026) : voir le dossier détaillé
-[`P14C_DOSSIER_IMMATRICULATION_MICRO.md`](P14C_DOSSIER_IMMATRICULATION_MICRO.md)
+[`P14C_DOSSIER_IMMATRICULATION_EI.md`](P14C_DOSSIER_IMMATRICULATION_EI.md)
 pour la checklist pas-à-pas du Guichet unique, l'arbre de décision TVA et
 les checklists après-dépôt/après-SIRET. Ce document-ci reste la synthèse
 rapide.
 
-Mise à jour décisions (21-08-2026) : date de début d'activité et régime de
-TVA au démarrage tranchés par Julien (voir §2 du dossier P14C). Seul le
-versement libératoire de l'impôt sur le revenu reste ouvert, en attente
-d'une décision de Julien avec un professionnel (dépend de données
-personnelles — revenu fiscal de référence — non demandées ni stockées ici).
+Mise à jour décisions (21-08-2026) : date de début d'activité tranchée par
+Julien (voir §2 du dossier P14C). **Correction 2026-09-01** : le **régime
+fiscal/social (micro ou réel)** et, par conséquent, le régime de TVA au
+démarrage **ne sont PAS arbitrés** — arbitrage explicite de Julien requis,
+idéalement avec un expert-comptable. Le versement libératoire de l'impôt sur
+le revenu reste également ouvert (dépend de données personnelles — revenu
+fiscal de référence — non demandées ni stockées ici).
 
 Mise à jour statut formalité (21-08-2026) : Julien a déposé lui-même la
 formalité sur le Guichet unique (signée et payée). Dossier en attente du
@@ -28,7 +37,7 @@ Validée par Julien comme base de travail pour les préparatifs et checklists. *
 
 Points à trancher par Julien avant le dépôt, pas par ce document :
 - Le code APE/NAF pertinent (probablement dans la famille édition de logiciels / programmation informatique — à confirmer sur le Guichet unique, qui l'attribue généralement automatiquement selon l'activité déclarée).
-- **Ne pas mélanger avec une éventuelle activité BTP personnelle** sauf décision explicite contraire de Julien — les deux activités relèvent de régimes et de risques différents, et une micro-entreprise a un plafond de chiffre d'affaires unique partagé entre toutes ses activités déclarées.
+- **Ne pas mélanger avec une éventuelle activité BTP personnelle** sauf décision explicite contraire de Julien — les deux activités relèvent de régimes et de risques différents (et, **en régime micro**, un plafond de chiffre d'affaires unique est partagé entre toutes les activités déclarées).
 
 ## Éléments à rassembler avant le dépôt
 
@@ -38,7 +47,8 @@ Points à trancher par Julien avant le dépôt, pas par ce document :
 - [ ] **Justificatif de domicile** — généralement demandé pour l'immatriculation.
 - [ ] **Pièce d'identité** — généralement demandée pour l'immatriculation.
 - [x] **Date de début d'activité** — 1er octobre 2026 (décidée 21-08-2026, voir dossier P14C §2). Dépôt possible à partir de début septembre 2026 (jusqu'à 1 mois avant, au plus tard 15 jours après).
-- [x] **Franchise en base de TVA au démarrage** — retenue (décidée 21-08-2026, seuils 2026 : 37 500 € HT / tolérance 41 250 € — voir arbre de décision dans `P14C_DOSSIER_IMMATRICULATION_MICRO.md`).
+- [ ] 🔴 **Régime fiscal et social de l'EI — micro *ou* réel** : à **arbitrer explicitement par Julien avec un expert-comptable**, avant l'immatriculation et avant l'activation de Stripe Live. **Point bloquant.** Aucune préférence n'est exprimée ici.
+- [ ] **Régime de TVA au démarrage** — *hypothèse de travail* : franchise en base (art. 293 B, seuils 2026 : 37 500 € HT / tolérance 41 250 € — voir `P14C_DOSSIER_IMMATRICULATION_EI.md`). **Non retenu** tant que le régime fiscal/social n'est pas arbitré.
 - [ ] **Versement libératoire de l'impôt sur le revenu** — en attente. Éligibilité conditionnée par le revenu fiscal de référence 2024 par part fiscale du foyer ; à trancher directement par Julien, avec un professionnel si besoin (donnée personnelle non demandée ni stockée dans ce dépôt).
 - [ ] **ACRE** (exonération de charges sociales la première année) — à vérifier si éligible.
 - [ ] **Compte bancaire** — dédié à ouvrir avant Stripe Live (décidé 21-08-2026) ; rendez-vous bancaire préparé pour le 27-08-2026, voir [`RDV_BANCAIRE_PREPARATION.md`](RDV_BANCAIRE_PREPARATION.md).

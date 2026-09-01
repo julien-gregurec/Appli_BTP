@@ -254,9 +254,10 @@ non soumis pour éviter un email inutile — déjà validé lot C1-E), 404 réel
 
 ## 38. Administratif
 
-INPI/INSEE : déposé, en attente de retour SIREN/SIRET. Micro-entreprise confirmée comme
-structure de lancement. TVA : franchise en base pressentie, bloquée tant que le régime
-n'est pas confirmé par l'immatriculation. Banque/IBAN : compte non ouvert, RDV bancaire
+INPI/INSEE : déposé, en attente de retour SIREN/SIRET. Forme de lancement = **entreprise
+individuelle (EI)** (mise à jour 2026-09-01 ; le **régime micro-entrepreneur n'est pas
+confirmé** — ne pas confondre forme EI et régime micro). TVA : franchise en base pressentie,
+bloquée tant que le régime n'est pas confirmé par l'immatriculation. Banque/IBAN : compte non ouvert, RDV bancaire
 prévu le 27 août 2026. Assurance RC Pro : recommandée, non bloquante, pas encore souscrite.
 Stripe KYC : non lancé (dépend des prérequis ci-dessus).
 

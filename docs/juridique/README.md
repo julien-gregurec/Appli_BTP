@@ -1,6 +1,6 @@
 # Pack juridique & RGPD — ELSATIA Gestion Pro
 
-Documents rédigés pour un lancement en **micro-entreprise (entrepreneur individuel)**.
+Documents rédigés pour un lancement en **entreprise individuelle (EI)** (mise à jour 2026-09-01 ; le régime micro-entrepreneur n'est pas confirmé — ne pas confondre forme EI et régime micro).
 
 > ⚠️ **Statut : brouillons solides, à faire relire par un avocat (~300–500 €) avant mise en ligne.**
 > Ils remplacent la rédaction complète (poste « 3–8 k€ ») par une simple relecture. Ils ne constituent pas un conseil juridique.
@@ -21,7 +21,7 @@ Documents rédigés pour un lancement en **micro-entreprise (entrepreneur indivi
 ## À COMPLÉTER avant publication (seul toi peux le fournir)
 
 - [x] **Nom exact** de l'entrepreneur individuel — Julien GREGUREC (à revérifier contre l'avis SIRENE une fois l'immatriculation reçue)
-- [x] **Adresse** de la micro-entreprise — 9 rue du Maréchal Leclerc, 67860 Rhinau, France (retenue pour l'immatriculation, même remarque de revérification)
+- [x] **Adresse** de l'entreprise individuelle — 9 rue du Maréchal Leclerc, 67860 Rhinau, France (retenue pour l'immatriculation, même remarque de revérification)
 - [ ] **SIRET** (obtenu à l'immatriculation sur autoentrepreneur.urssaf.fr)
 - [ ] **RCS** si applicable, **code APE/NAF**, **régime de TVA définitif**, **numéro de TVA intracommunautaire** si applicable — tous en attente de l'immatriculation
 - [x] **E-mail de contact pro** — `support@elsatia.fr`, opérationnelle, configurée en Production

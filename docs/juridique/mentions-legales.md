@@ -6,10 +6,11 @@ _Dernière mise à jour : 21/08/2026_
 
 Le service **ELSATIA Gestion Pro** (ci-après « le Service »), accessible à l'adresse **[URL_APPLICATION]** (et tout domaine associé), est édité par :
 
-- **Julien GREGUREC**, entrepreneur individuel (micro-entreprise), exerçant sous le nom commercial **ELSATIA** _(identité déclarée le 20-08-2026 ; à revérifier contre l'avis de situation SIRENE une fois l'immatriculation reçue, avant toute publication juridique définitive)_
+- **Julien GREGUREC**, entrepreneur individuel (entreprise individuelle — EI), exerçant sous le nom commercial **ELSATIA** _(identité déclarée le 20-08-2026 ; à revérifier contre l'avis de situation SIRENE une fois l'immatriculation reçue, avant toute publication juridique définitive)_
 - Adresse : **9 rue du Maréchal Leclerc, 67860 Rhinau, France** _(adresse retenue pour l'immatriculation — à revérifier contre l'avis SIRENE une fois reçu, avant toute publication juridique définitive)_
 - SIRET : **[À COMPLÉTER]**
-- Numéro de TVA intracommunautaire : **Non applicable** — TVA non applicable, article 293 B du Code général des impôts
+- Régime fiscal / social : **[À COMPLÉTER AVANT PUBLICATION — marqueur INTERNE BLOQUANT : régime de l'EI (micro ou réel) à arbitrer avec un expert-comptable ; ne pas publier tant que non tranché et non immatriculé]**
+- Numéro de TVA intracommunautaire : **[À COMPLÉTER AVANT PUBLICATION — marqueur INTERNE BLOQUANT : mention de TVA selon le régime arbitré — franchise en base (art. 293 B du CGI) ou assujettissement]**
 - E-mail : **[EMAIL_SUPPORT]**
 - Directeur de la publication : **Julien GREGUREC**
 

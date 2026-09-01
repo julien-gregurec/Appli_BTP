@@ -4,11 +4,11 @@ Rendez-vous prévu : **jeudi 27 août 2026**. Document de préparation uniquemen
 
 ## 1. Objectif
 
-Ouvrir un **compte dédié** aux flux ELSATIA (micro-entreprise / entreprise individuelle), propre et compatible Stripe, sans souscrire à des services inutiles. Objectif concret du rendez-vous : obtenir un **IBAN propre pour ELSATIA**, pas acheter un pack bancaire complet.
+Ouvrir un **compte dédié** aux flux ELSATIA (**entreprise individuelle — EI** ; le régime fiscal/social micro ou réel n'est pas encore arbitré), propre et compatible Stripe, sans souscrire à des services inutiles. Objectif concret du rendez-vous : obtenir un **IBAN propre pour ELSATIA**, pas acheter un pack bancaire complet.
 
 ## 2. Contexte réglementaire (pour information)
 
-Pour une micro-entreprise, le compte bancaire dédié n'est légalement obligatoire qu'au-delà de **10 000 € de chiffre d'affaires pendant deux années consécutives** ([economie.gouv.fr](https://www.economie.gouv.fr/entreprises/gerer-sa-micro-entreprise/micro-entrepreneur-auto-entrepreneur-quelles-sont-vos-obligations)). Ouverture recommandée dès le départ pour séparer clairement les flux ELSATIA des flux personnels. Le compte doit pouvoir porter la mention **EI / Entrepreneur individuel**, éventuellement complétée du nom commercial **ELSATIA**.
+L'obligation légale d'un compte bancaire dédié au-delà de **10 000 € de chiffre d'affaires pendant deux années consécutives** est une règle propre au **régime micro-entrepreneur** ([economie.gouv.fr](https://www.economie.gouv.fr/entreprises/gerer-sa-micro-entreprise/micro-entrepreneur-auto-entrepreneur-quelles-sont-vos-obligations)) ; son applicabilité dépendra du régime arbitré. Ouverture recommandée dès le départ dans tous les cas, pour séparer clairement les flux ELSATIA des flux personnels. Le compte doit pouvoir porter la mention **EI / Entrepreneur individuel**, éventuellement complétée du nom commercial **ELSATIA**.
 
 Stripe exige un compte bancaire associé pour les virements, et peut vérifier que le nom du titulaire du compte correspond au nom légal, au nom commercial ou au représentant du compte Stripe ([support Stripe](https://support.stripe.com/questions/verify-your-bank-account-ownership)). D'où l'importance de valider avec la banque, avant signature, la possibilité d'un intitulé de compte cohérent avec ELSATIA.
 
@@ -27,7 +27,7 @@ Stripe exige un compte bancaire associé pour les virements, et peut vérifier q
 
 ## 4. Ce qu'il faut demander
 
-Compte bancaire **dédié** à l'entreprise individuelle / micro-entreprise, destiné à recevoir :
+Compte bancaire **dédié** à l'entreprise individuelle (EI), destiné à recevoir :
 - les virements Stripe ;
 - les paiements clients ;
 - les prélèvements/frais professionnels ;
@@ -62,4 +62,4 @@ Ne pas souscrire sur place à une assurance, un terminal de paiement, un crédit
 ## 7. Suite
 
 - Une fois le compte ouvert (ou l'IBAN obtenu), cette information sera nécessaire pour la configuration Stripe Live (lot P15 — pas avant SIRET reçu et P14 entièrement validé).
-- Voir `P14C_DOSSIER_IMMATRICULATION_MICRO.md` §11 pour le contexte plus large du compte bancaire dans le dossier d'immatriculation.
+- Voir `P14C_DOSSIER_IMMATRICULATION_EI.md` §11 pour le contexte plus large du compte bancaire dans le dossier d'immatriculation.

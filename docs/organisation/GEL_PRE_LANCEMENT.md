@@ -90,7 +90,7 @@ Le reset et le seed ne doivent pas être lancés pendant le gel. Voir `docs/orga
 
 ## Juridique et RGPD
 
-La structure de lancement retenue est la **micro-entreprise**, non encore immatriculée. Les documents juridiques actifs sont structurellement compatibles avec ce choix, mais les champs réels restent à compléter après immatriculation.
+La forme de lancement retenue est l'**entreprise individuelle (EI)**, non encore immatriculée (mise à jour 2026-09-01 ; le **régime micro-entrepreneur n'est pas confirmé** — ne pas confondre forme EI et régime micro). Les documents juridiques actifs sont structurellement compatibles avec une entreprise individuelle, mais les champs réels restent à compléter après immatriculation.
 
 Restent interdits avant obtention des informations officielles :
 
@@ -105,7 +105,7 @@ Documents de référence :
 - `docs/organisation/PREPARATION_JURIDIQUE.md` ;
 - `docs/organisation/REGISTRE_TRAITEMENTS_RGPD.md` ;
 - `docs/organisation/STRIPE_LIVE_CHECKLIST.md` ;
-- `docs/organisation/CREATION_MICRO_CHECKLIST.md`.
+- `docs/organisation/CREATION_EI_CHECKLIST.md`.
 
 ## Résidus acceptés
 
@@ -130,8 +130,8 @@ Les styles, dépendances, abstractions, dossiers et composants ne doivent pas ê
 
 ## Reste avant lancement
 
-1. Immatriculer la micro-entreprise et obtenir les identifiants officiels.
-2. Confirmer le nom commercial, l'adresse, le régime de TVA et les coordonnées professionnelles.
+1. Immatriculer l'entreprise individuelle (EI) et obtenir les identifiants officiels.
+2. Confirmer le nom commercial, l'adresse, le régime fiscal (micro ou réel), le régime de TVA et les coordonnées professionnelles.
 3. Compléter les documents juridiques et faire réaliser la relecture juridique prévue.
 4. Ouvrir ou confirmer le compte bancaire dédié et l'IBAN de règlement.
 5. Après SIRET seulement, ouvrir un lot Stripe Live séparé : KYC, produits/prix Live recréés, webhook Live, décision Automatic Tax et test réel contrôlé.

@@ -154,7 +154,7 @@ Config Live cible : identique, à recréer manuellement en mode Live (les config
 
 - `STRIPE_AUTOMATIC_TAX_ENABLED` reste `false` partout (Preview et Production) — confirmé.
 - Stripe Tax settings actuels : `defaults.tax_behavior = exclusive`, `head_office.address.country = FR` (adresse incomplète — ville/code postal/ligne 1 non renseignés).
-- **BLOQUÉ — régime TVA officiel à confirmer** avant toute activation de `automatic_tax` : dépend du régime fiscal réel une fois la micro-entreprise immatriculée (franchise en base ou assujettissement), cf. `STRIPE_LIVE_CHECKLIST.md §Taxes`. Aucune configuration fiscale Stripe modifiée dans ce lot.
+- **BLOQUÉ — régime fiscal et TVA officiels à confirmer** avant toute activation de `automatic_tax` : dépend de l'arbitrage du régime fiscal/social de l'EI (micro *ou* réel) puis de la situation réelle une fois immatriculée (franchise en base ou assujettissement), cf. `STRIPE_LIVE_CHECKLIST.md §Taxes` et `CHECKLIST_LANCEMENT.md` § 3. Aucune configuration fiscale Stripe modifiée dans ce lot.
 
 ## 15. Facturation Stripe — distinction confirmée
 
@@ -190,7 +190,7 @@ Base actuelle (cohérente avec les documents juridiques préparés) : *« Éditi
 
 - Emplacement futur : Dashboard Stripe → Paramètres → Comptes bancaires et planification, une fois le KYC validé.
 - Stripe vérifie le compte par un dépôt de vérification (micro-dépôts) ou une vérification instantanée selon la banque.
-- Titulaire attendu : le nom de l'exploitant individuel (micro-entreprise) ou de la structure, cohérent avec le nom déclaré au KYC — pas un nom commercial seul si celui-ci diffère de la raison sociale légale.
+- Titulaire attendu : le nom de l'exploitant individuel (entreprise individuelle — EI), cohérent avec le nom déclaré au KYC — pas un nom commercial seul si celui-ci diffère de la raison sociale légale.
 - Délai de vérification : variable (instantané à quelques jours ouvrés selon la banque).
 - Les virements Stripe (payouts) sont actuellement à `debit_negative_balances: true`, planification quotidienne (`schedule.interval: daily`, `delay_days: 7`) — paramètres par défaut, à revalider une fois le compte bancaire réel en place.
 

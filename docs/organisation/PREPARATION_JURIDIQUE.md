@@ -1,10 +1,17 @@
 # Préparation juridique — ELSATIA Gestion Pro
 
-Audit de lecture seule réalisé en P12 (13-08-2026) et corrigé en P13 (13-08-2026) suite à la décision de structure : **micro-entreprise au lancement, SASU abandonnée**. Aucune donnée juridique n'a été inventée ni renseignée : ce document liste les emplacements exacts à compléter une fois la micro-entreprise immatriculée, avec leur source et leur caractère bloquant ou non.
+> ⚠️ **Audit historique P12/P13 (13-08-2026) — ne plus utiliser comme procédure.**
+> Correction de pilotage 2026-09-01 : la forme juridique confirmée est l'**entreprise
+> individuelle (EI)** ; le **régime fiscal/social (micro-entrepreneur ou réel) n'est pas
+> arbitré**. Les mentions « micro-entreprise » ci-dessous décrivent l'état du travail lors
+> de P13, pas une décision de régime. Procédure et checklist à jour : `CHECKLIST_LANCEMENT.md`
+> § 3 et `GEL_PRE_LANCEMENT.md`.
+
+Audit de lecture seule réalisé en P12 (13-08-2026) et corrigé en P13 (13-08-2026). Aucune donnée juridique n'a été inventée ni renseignée : ce document liste les emplacements exacts à compléter une fois l'entreprise individuelle immatriculée, avec leur source et leur caractère bloquant ou non.
 
 ## Correction par rapport au constat P12
 
-Le rapport P12 signalait que les documents juridiques supposaient une micro-entreprise alors que la structure prévue était une SASU, et concluait à une réécriture réelle nécessaire. **Ce constat est caduc** : la structure de lancement est désormais officiellement la micro-entreprise, ce qui est exactement ce que les documents décrivent déjà. Un inventaire complet (P13) confirme qu'aucun des 8 documents ne mentionne SASU, société, capital social, président ou actionnaire pour décrire la structure d'ELSATIA elle-même (la seule occurrence de « société » dans `cgv.md` §14.1 est une clause de cession future vers une personne morale à constituer, volontairement conservée — elle protège la possibilité d'évoluer plus tard sans obliger à rien maintenant). Le travail restant est donc un **simple remplissage de champs**, pas une réécriture structurelle.
+Le rapport P12 signalait que les documents juridiques supposaient une micro-entreprise alors que la structure prévue était une SASU, et concluait à une réécriture réelle nécessaire. **Ce constat est caduc** : la SASU a été abandonnée et la forme de lancement retenue est une **entreprise individuelle (EI)**, ce que les 8 documents décrivent déjà (aucun ne mentionne SASU, société, capital social, président ou actionnaire pour décrire ELSATIA — la seule occurrence de « société » dans `cgv.md` §14.1 est une clause de cession future vers une personne morale à constituer, volontairement conservée). Le travail restant est un **remplissage de champs** après immatriculation, une fois le **régime fiscal/social (micro ou réel) arbitré** — non pas une réécriture structurelle.
 
 ## Où vivent les documents juridiques
 
@@ -39,7 +46,7 @@ Mise à jour P14 (21-08-2026) : les champs non bloquants ont été tranchés par
 | Adresse du siège | mentions-legales, legal.ts, README.md | **Résolu (P14C, 21-08-2026)** : 9 rue du Maréchal Leclerc, 67860 Rhinau, France — retenue par Julien pour l'immatriculation, reportée partout, vérifiée orthographe/casse identique dans les 5 occurrences. À revérifier contre l'avis SIRENE une fois reçu. |
 | SIREN / SIRET | mentions-legales | Oui — attend l'immatriculation |
 | RCS (si applicable) | mentions-legales | Oui — dépend du régime exact retenu au dépôt |
-| Régime de TVA (actuellement rédigé « non applicable, art. 293 B » — plausible en franchise en base au démarrage, mais **à confirmer**, pas à supposer) | mentions-legales | Oui — dépend du choix fiscal fait au dépôt (voir `CREATION_MICRO_CHECKLIST.md`) |
+| Régime de TVA (actuellement rédigé « non applicable, art. 293 B » — plausible en franchise en base au démarrage, mais **à confirmer**, pas à supposer) | mentions-legales | Oui — dépend du choix fiscal fait au dépôt (voir `CREATION_EI_CHECKLIST.md`) |
 | Numéro de TVA intracommunautaire (si assujettissement) | mentions-legales | Oui, uniquement si le régime de TVA choisi le requiert |
 | Email professionnel (`[EMAIL_SUPPORT]`) | les 5 documents publics + rgpd-registre-des-traitements, dpa-entreprises-clientes | **Résolu (P14)** : `support@elsatia.fr`, confirmée opérationnelle par Julien (boîte secondaire testée en réception). `SUPPORT_EMAIL` configurée en Production, redéployé, vérifié en direct. |
 | Téléphone | — | **Décidé (P14)** : pas de numéro public pour l'instant, contact par formulaires/e-mails uniquement. |
@@ -76,7 +83,7 @@ La promesse de `politique-confidentialite.md` est donc exacte. Aucune constructi
 
 - `docs/organisation/REGISTRE_TRAITEMENTS_RGPD.md` — vue opérationnelle tabulaire, distincte du registre juridique détaillé.
 - `docs/organisation/STRIPE_LIVE_CHECKLIST.md` — bascule Test → Live, 14 étapes.
-- `docs/organisation/CREATION_MICRO_CHECKLIST.md` — checklist administrative d'immatriculation.
+- `docs/organisation/CREATION_EI_CHECKLIST.md` — checklist administrative d'immatriculation.
 
 ## Action après réception du SIRET
 

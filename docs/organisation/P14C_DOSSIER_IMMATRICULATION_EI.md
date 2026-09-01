@@ -1,4 +1,12 @@
-# P14C — Dossier de préparation à l'immatriculation micro-entreprise ELSATIA
+# P14C — Dossier de préparation à l'immatriculation de l'entreprise individuelle ELSATIA
+
+> ⚠️ **Correction de pilotage 2026-09-01.** La **forme juridique confirmée est l'entreprise
+> individuelle (EI)**. Le **régime fiscal et social (micro-entrepreneur ou réel) n'est PAS
+> arbitré** : il doit faire l'objet d'une décision explicite de Julien, idéalement avec un
+> expert-comptable, **avant** toute option d'immatriculation et **avant** l'activation de
+> Stripe Live. Ne suivre **aucune** étape de ce document qui reviendrait à sélectionner le
+> régime micro-entrepreneur tant que cet arbitrage n'a pas eu lieu (voir § 13, étape 3, et
+> `CHECKLIST_LANCEMENT.md` § 3). Ne pas confondre forme EI et régime micro.
 
 **Aucune entreprise n'a été créée par ce dépôt. Aucun choix fiscal ou social n'a été fait à la place de Julien.** Ce document rassemble ce qui est déjà décidé, ce qui reste à trancher, et a préparé le parcours de dépôt sur le Guichet unique.
 
@@ -8,7 +16,8 @@
 
 | Champ | Valeur |
 |---|---|
-| Structure | Micro-entreprise (entrepreneur individuel) |
+| Forme juridique | **Entreprise individuelle (EI)** — confirmée |
+| Régime fiscal et social | **Non arbitré** (micro-entrepreneur *ou* réel) — décision explicite de Julien requise, idéalement avec un expert-comptable, avant l'immatriculation et avant Stripe Live |
 | Exploitant | Julien GREGUREC — à revérifier contre l'avis de situation SIRENE une fois l'immatriculation reçue, avant toute publication juridique définitive |
 | Nom commercial | ELSATIA — distinct du nom légal de l'exploitant et du nom du produit « ELSATIA Gestion Pro » |
 | Adresse du siège | 9 rue du Maréchal Leclerc, 67860 Rhinau, France |
@@ -22,7 +31,7 @@
 Mise à jour 21-08-2026 — décisions 1 et 2 tranchées par Julien, décision 3 en attente.
 
 - [x] **Date souhaitée de début d'activité** — **1er octobre 2026**. Cohérent avec le calendrier de commercialisation (lancement prévu courant octobre) ; le dépôt peut être effectué jusqu'à 1 mois avant le début d'activité et au plus tard 15 jours après, donc à partir de début septembre 2026 selon cette date.
-- [x] **Régime de TVA au démarrage** — **franchise en base de TVA**, sous les seuils 2026 pour les prestations de services (37 500 € HT, seuil majoré 41 250 € — voir §9/§10). Confirme la mention déjà présente dans `mentions-legales.md` (« TVA non applicable, article 293 B »), qui n'était jusqu'ici qu'une hypothèse de travail et devient une décision retenue — toujours à revérifier au moment du dépôt effectif, et non un fait administratif définitif tant que l'immatriculation n'est pas faite. Rester en franchise et être micro-entrepreneur sont deux statuts distincts : redevenir redevable de TVA plus tard ne changerait pas le régime micro lui-même.
+- [ ] **Régime de TVA au démarrage** — **hypothèse de travail : franchise en base de TVA** (art. 293 B), sous les seuils 2026 pour les prestations de services (37 500 € HT, seuil majoré 41 250 € — voir §9/§10). **Non arbitré** : dépend du régime fiscal/social retenu lors de l'arbitrage avec un expert-comptable (voir § 2). À revérifier au moment du dépôt effectif ; ce n'est pas un fait administratif définitif tant que l'arbitrage et l'immatriculation ne sont pas faits. La mention correspondante de `mentions-legales.md` est passée en marqueur interne bloquant avant publication.
 - [x] **Activité secondaire éventuelle** — aucune retenue pour l'instant.
 - [x] **Assurance RC Pro** — recommandée, non bloquante ; décision de souscription (et choix d'assureur) laissée ouverte, à faire au rythme de Julien, sans urgence pour le dépôt lui-même.
 - [x] **Compte bancaire dédié** — oui, à ouvrir avant le lot P15 (Stripe Live a besoin d'un IBAN professionnel).
@@ -65,7 +74,8 @@ Une activité d'édition et d'exploitation de logiciel (vente d'un service SaaS,
 
 ## 6. Décisions à confirmer — récapitulatif rapide
 
-Voir §2 pour la liste complète. Les deux décisions structurantes à trancher en priorité, idéalement avec un expert-comptable ou l'URSSAF avant tout dépôt :
+Voir §2 pour la liste complète. Décisions structurantes à trancher en priorité, **avec un expert-comptable**, avant tout dépôt :
+0. **Régime fiscal et social de l'EI : micro-entrepreneur *ou* réel.** ⛔ Préalable bloquant, non arbitré (voir l'encadré en tête de document et `CHECKLIST_LANCEMENT.md` § 3). Les points 1 et 2 ci-dessous ne s'appliquent que **si** le régime micro est retenu à l'issue de cet arbitrage.
 1. **Régime micro-fiscal classique vs versement libératoire de l'impôt sur le revenu.**
 2. **Régime de TVA au démarrage** (voir arbre de décision détaillé §10).
 
@@ -74,7 +84,7 @@ Voir §2 pour la liste complète. Les deux décisions structurantes à trancher 
 | Niveau | Nom |
 |---|---|
 | Identité juridique (exploitant) | Julien GREGUREC |
-| Nom commercial (micro-entreprise) | ELSATIA |
+| Nom commercial (EI) | ELSATIA |
 | Produit / application | ELSATIA Gestion Pro |
 
 Cette distinction est déjà reflétée dans les documents juridiques de l'application (`docs/juridique/*.md`) et du site vitrine (`elsatia-site/src/content/legal.ts`), harmonisée en P14/P14B.
@@ -112,9 +122,9 @@ Pour information, non décisionnel : le seuil de franchise en base de TVA pour l
 
 ## 11. Compte bancaire
 
-- Un compte bancaire **dédié à l'activité** est recommandé dès le démarrage, même s'il n'est légalement obligatoire qu'au-delà de 10 000 € de chiffre d'affaires cumulé sur deux années consécutives en micro-entreprise (seuil réglementaire, voir `RDV_BANCAIRE_PREPARATION.md` §2).
+- Un compte bancaire **dédié à l'activité** est recommandé dès le démarrage. L'obligation légale d'un compte dédié (au-delà de 10 000 € de chiffre d'affaires cumulé sur deux années consécutives) est une règle propre au **régime micro** ; son applicabilité dépendra du régime arbitré (voir `RDV_BANCAIRE_PREPARATION.md` §2).
 - Un **IBAN** sera nécessaire pour configurer Stripe (encaissement des abonnements) — préparation à faire dans le lot P15, pas maintenant.
-- Le compte doit être au nom du titulaire de la micro-entreprise (Julien GREGUREC) ou de son nom commercial selon les offres bancaires professionnelles disponibles.
+- Le compte doit être au nom du titulaire de l'entreprise individuelle (Julien GREGUREC) ou de son nom commercial selon les offres bancaires professionnelles disponibles.
 - **Rendez-vous bancaire préparé pour le 27-08-2026** — voir `RDV_BANCAIRE_PREPARATION.md` (documents à apporter, questions à poser, mise en garde sur les produits annexes).
 - **Aucun identifiant bancaire n'est demandé ni ne doit être communiqué dans ce rapport ou ailleurs dans le chat.**
 
@@ -128,12 +138,12 @@ Plateforme officielle unique depuis le 1er janvier 2023, opérée par l'INPI (re
 
 1. **Connexion** — se rendre sur `formalites.entreprises.gouv.fr`, se connecter via FranceConnect+ (ou créer un compte si nécessaire).
 2. **Création de la formalité** — choisir « Créer une entreprise ».
-3. **Forme juridique** — sélectionner « Entrepreneur individuel », puis répondre « Oui » à l'option régime micro-entrepreneur (micro-fiscal/micro-social).
+3. **Forme juridique** — sélectionner « Entrepreneur individuel » (forme confirmée). ⛔ **POINT BLOQUANT** : l'option **régime micro-entrepreneur (micro-fiscal / micro-social)** ne doit **PAS** être sélectionnée « Oui » par défaut. Le choix entre **régime micro** et **régime réel** doit d'abord être arbitré explicitement par Julien, idéalement avec un expert-comptable (voir § 2 et `CHECKLIST_LANCEMENT.md` § 3). Ne renseigner cette option qu'après cet arbitrage écrit.
 4. **Activité** — saisir la formulation retenue (§3), après validation finale de Julien.
 5. **Établissement** — renseigner l'adresse du siège : 9 rue du Maréchal Leclerc, 67860 Rhinau, France.
 6. **Nom commercial** — indiquer ELSATIA comme nom commercial, distinct du nom de l'exploitant.
 7. **Adresse** — confirmer l'adresse de correspondance si différente de l'établissement (à décider par Julien, sinon identique).
-8. **Options fiscales/sociales** — cocher les choix tranchés au §2/§6/§10 (régime micro-fiscal, versement libératoire, TVA, ACRE le cas échéant) — **uniquement une fois ces décisions confirmées par Julien**.
+8. **Options fiscales/sociales** — cocher les choix tranchés au §2/§6/§10 (régime fiscal/social micro *ou* réel, versement libératoire, TVA, ACRE le cas échéant) — **uniquement après l'arbitrage explicite du régime (micro/réel) par Julien avec un expert-comptable**. Tant que cet arbitrage n'a pas eu lieu, cette étape est **bloquée**.
 9. **Justificatifs** — téléverser les pièces du §5.
 10. **Vérification** — relire l'ensemble du dossier avant validation (le portail affiche généralement un récapitulatif complet).
 11. **Signature** — signature électronique du dossier (selon le mécanisme proposé par le portail au moment du dépôt).
@@ -160,7 +170,7 @@ Cette section documente ce qui pourra être fait une fois le SIRET connu — **a
 2. Compléter CGV, CGU, confidentialité si des mentions dépendent du SIRET (actuellement, seul `mentions-legales.md` porte le champ SIRET directement).
 3. Renseigner RCS (si applicable) et code APE/NAF dans les mêmes documents.
 4. Confirmer le régime de TVA définitif retenu et mettre à jour la mention actuelle (« non applicable, article 293 B ») si elle diffère du choix réel fait au dépôt.
-5. Faire relire l'ensemble des 8 documents juridiques par un avocat (dossier de synthèse déjà préparé : voir `P14_FINALISATION_MICRO_JURIDIQUE.md` §« Relecture avocat »).
+5. Faire relire l'ensemble des 8 documents juridiques par un avocat (dossier de synthèse déjà préparé : voir `P14_FINALISATION_JURIDIQUE_EI.md` §« Relecture avocat »).
 6. Mettre à jour les informations légales du compte Stripe (prérequis KYC Live).
 7. Lancer le KYC Stripe Live (lot P15, pas avant).
 8. Préparer les produits et prix Live sur Stripe (lot P15).

@@ -17,10 +17,11 @@ Checkout et portail client Stripe testés et validés en mode Test (P7). Webhook
 
 ## Ordre exact de bascule (ne pas permuter)
 
-1. **Micro immatriculée** — SIREN/SIRET obtenus sur le Guichet unique (INPI) ou via l'URSSAF.
+0. **Régime fiscal/social arbitré** — forme = entreprise individuelle (EI) confirmée ; choix **micro *ou* réel** tranché explicitement par Julien, idéalement avec un expert-comptable. **Préalable bloquant** (voir `CHECKLIST_LANCEMENT.md` § 3).
+1. **EI immatriculée** — SIREN/SIRET obtenus sur le Guichet unique (INPI) ou via l'URSSAF.
 2. **SIRET reçu** — confirmé par écrit (Insee/URSSAF), pas seulement le récépissé de dépôt.
-3. **Compte bancaire défini** — compte dédié à l'activité (recommandé, pas obligatoire en micro-entreprise en deçà d'un certain seuil de CA, à vérifier au moment venu).
-4. **Informations légales complètes** — nom/prénom exploitant, adresse, SIRET, régime de TVA réel, email professionnel : reportées dans les 8 documents juridiques (`docs/juridique/*.md`) et dans le compte Stripe (Paramètres → Informations sur l'entreprise).
+3. **Compte bancaire défini** — compte dédié à l'activité (recommandé ; l'obligation légale au-delà d'un seuil de CA est propre au régime micro — applicabilité selon le régime arbitré).
+4. **Informations légales complètes** — nom/prénom exploitant, adresse, SIRET, régime fiscal et de TVA réels, email professionnel : reportées dans les 8 documents juridiques (`docs/juridique/*.md`) et dans le compte Stripe (Paramètres → Informations sur l'entreprise).
 5. **KYC Stripe** — vérification d'identité et de l'entreprise par Stripe (peut prendre plusieurs jours ; ne pas sous-estimer ce délai dans le planning de lancement).
 6. **Produits Live** — recréer chaque offre dans le compte Stripe Live (Mini/Pro/Business/Entreprise, comptes supplémentaires). Ne pas copier les IDs Test : les objets Live sont entièrement nouveaux.
 7. **Prix Live** — un Price ID Live par offre × périodicité, à reporter dans 24 nouvelles variables d'environnement (mêmes noms `STRIPE_PRICE_*`, nouvelles valeurs).
@@ -45,7 +46,7 @@ Rappel explicite, car c'est l'erreur la plus fréquente lors d'une bascule Strip
 
 `STRIPE_AUTOMATIC_TAX_ENABLED` reste `false`. Avant de l'activer, déterminer :
 
-- si ELSATIA facture la TVA française sur ses abonnements (dépend du régime fiscal réel une fois la micro-entreprise immatriculée — franchise en base ou assujettissement) ;
+- si ELSATIA facture la TVA française sur ses abonnements (dépend du régime fiscal arbitré et de la situation réelle une fois l'entreprise individuelle immatriculée — franchise en base ou assujettissement) ;
 - si des clients de l'UE hors France sont visés (auto-liquidation, règles OSS le cas échéant) ;
 - si des clients hors UE sont visés (généralement hors champ de la TVA française, mais à vérifier selon la nature du service).
 
