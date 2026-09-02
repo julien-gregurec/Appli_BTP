@@ -1,0 +1,12 @@
+{
+  "version": "CANONICAL-V3-2026-09",
+  "decision": "ELSATIA-TARIFICATION-CANONICAL-ALIGNMENT-V1",
+  "regleAnnuelle": "annuel = 10 x mensuel (2 mois offerts)",
+  "devise": "eur",
+  "offres": [
+    { "cle": "mini",       "nom": "Mini",       "mensuelCentimes": 7900,  "annuelCentimes": 79000,  "comptesInclus": 3,  "parCompteSupEuros": 15 },
+    { "cle": "pro",        "nom": "Pro",        "mensuelCentimes": 24900, "annuelCentimes": 249000, "comptesInclus": 15, "parCompteSupEuros": 12 },
+    { "cle": "business",   "nom": "Business",   "mensuelCentimes": 44900, "annuelCentimes": 449000, "comptesInclus": 30, "parCompteSupEuros": 9 },
+    { "cle": "entreprise", "nom": "Entreprise", "mensuelCentimes": 59900, "annuelCentimes": 599000, "comptesInclus": 50, "parCompteSupEuros": 9 }
+  ]
+}

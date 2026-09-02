@@ -164,7 +164,7 @@ STRIPE LIVE NON CONFIGURÉ
 `BLOQUÉ PAR STRUCTURE JURIDIQUE` — le code Stripe est présent et mature (Checkout, portail client, abonnement, Connect, webhooks avec vérification de signature et déduplication en base), mais la mise en mode live dépend de la structure juridique (section 3) et d'un environnement Production (section 5). Aucune activation live avant ces deux prérequis.
 
 - [ ] Compte Stripe validé (KYC terminé).
-- [ ] Tarifs réels configurés (Mini/Pro/Business/Entreprise, mensuel/annuel).
+- [ ] Tarifs réels configurés (Mini/Pro/Business/Entreprise, mensuel/annuel) conformes à `docs/organisation/TARIFICATION_CANONIQUE.md` (79/249/449/599, annuel = 10 × mensuel) ; `npm run verify:stripe-prices --strict` vert en Test puis en Live.
 - [ ] TVA configurée correctement.
 - [ ] Portail client activé.
 - [ ] Webhooks de production configurés et testés.

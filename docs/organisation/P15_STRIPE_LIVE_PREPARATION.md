@@ -2,6 +2,14 @@
 
 **Statut à la rédaction (22-08-2026) : Stripe reste en mode Test. Aucune clé `sk_live_`, aucun produit/price/webhook Live n'existe. Ce document audite et prépare — il n'active rien.**
 
+> **Mise à jour ELSATIA-TARIFICATION-CANONICAL-ALIGNMENT-V1 (2026-09)** — la grille validée est
+> désormais **79 / 249 / 449 / 599 € HT/mois, annuel = 10 × mensuel (2 mois offerts)** : voir
+> `docs/organisation/TARIFICATION_CANONIQUE.md`, qui remplace les montants annuels de ce document.
+> Les Prices annuels Test câblés ci-dessous (× 12) sont **obsolètes** ; les Prices annuels alignés
+> (× 10) sont `price_1UBJ9l0…` (Mini 79 000), `price_1UBJ9m0…FjSr` (Pro 249 000),
+> `price_1UBJ9m0…TxUD` (Business 449 000), `price_1UBJ9n0…` (Entreprise 599 000). Reste à
+> repointer les 4 variables `STRIPE_PRICE_*_ANNUEL` (Vercel). Les 4 `_MENSUEL` sont déjà corrects.
+
 Ce document complète (sans le remplacer) `STRIPE_LIVE_CHECKLIST.md` (P13), qui reste la référence pour l'ordre exact de bascule Test → Live. P15 apporte : l'audit à jour du compte Stripe réel, le mapping app↔Stripe complet, l'état exact des variables Vercel par environnement, et les checklists KYC/sécurité/dépendances administratives.
 
 ## 1. Compte Stripe existant — à conserver
@@ -44,7 +52,11 @@ Prices actifs correspondants (utilisés réellement par l'app Production, confir
 | Business | `price_1Tzi6u0bT5C0WG2aECItemQO` | `price_1Tzi6y0bT5C0WG2aVr2mQB3Q` | 449,00 € | 5 388,00 € |
 | Entreprise | `price_1Tzi710bT5C0WG2avUpZ3q0o` | `price_1Tzi750bT5C0WG2a89nRQ4Mb` | 599,00 € | 6 468,00 € |
 
-Cohérence confirmée avec `src/lib/tarification.ts` (source de vérité applicative) et avec le Checkout réel observé pendant le smoke test (Mini annuel affiché à 948,00 €).
+> _Constat au moment du smoke test (22-08-2026), avant l'alignement V3._ Cohérence confirmée
+> alors avec `src/lib/tarification.ts` et le Checkout (Mini annuel 948,00 €). **Depuis
+> ELSATIA-TARIFICATION-CANONICAL-ALIGNMENT-V1, la colonne « Price annuel Test » ci-dessus est
+> remplacée** par les Prices `elsatia_offre_*_annuel_v3` (× 10) — voir bandeau en tête et
+> `TARIFICATION_CANONIQUE.md`.
 
 Autres objets Test présents dans le compte, **hors périmètre app Production** :
 - 3 produits `ELSATIA PREVIEW TEST — Compte supplémentaire {Administratif|Chef d'équipe|Terrain}` (utilisés par Preview uniquement, cf. §7).
@@ -58,7 +70,11 @@ Mini 79 €, Pro 249 €, Business 449 €, Entreprise 599 € HT/mois — cohé
 
 ## 6. Tarifs annuels — confirmés
 
-Mini 948 €, Pro 2 988 €, Business 5 388 €, Entreprise 6 468 € HT/an. Logique observée : annuel ≈ 12× mensuel, sans remise supplémentaire (pas de `duration`/coupon appliqué par défaut sur ces 8 prices — remise annuelle nulle, cohérent avec l'absence de logique de remise dans `calculerTarifAbonnement`).
+**Grille annuelle validée (CANONICAL-V3-2026-09)** : Mini 790 €, Pro 2 490 €, Business 4 490 €,
+Entreprise 5 990 € HT/an — soit **10 × mensuel (2 mois offerts)**. Prices Test alignés créés le
+2026-09 (`elsatia_offre_*_annuel_v3`). Les anciens Prices annuels à × 12 (Mini 948 €, Pro
+2 988 €, Business 5 388 €, Entreprise 6 468 €) sont conservés inactifs le temps du repointage
+des variables d'environnement, puis à archiver.
 
 ## 7. Mapping application ↔ Stripe
 

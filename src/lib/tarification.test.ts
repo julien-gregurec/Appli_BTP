@@ -7,20 +7,22 @@ import {
   offreTarifaireParCle,
   permissionIncluseDansOffre,
 } from "./tarification";
+import canonique from "./tarification.canonical.json";
 
 describe("grille tarifaire", () => {
   it("expose les cinq offres validées avec des montants en centimes", () => {
+    // Grille canonique validée (ELSATIA-TARIFICATION-CANONICAL-ALIGNMENT-V1, 2026-09).
     expect(OFFRES_TARIFAIRES.map((offre) => [offre.cle, offre.prixMensuelCentimes])).toEqual([
-      ["mini", 6_900],
-      ["pro", 19_900],
-      ["business", 39_900],
+      ["mini", 7_900],
+      ["pro", 24_900],
+      ["business", 44_900],
       ["entreprise", 59_900],
       ["sur_mesure", 0],
     ]);
     expect(OFFRES_TARIFAIRES.slice(0, 4).map((offre) => offre.prixAnnuelCentimes)).toEqual([
-      69_000,
-      199_000,
-      399_000,
+      79_000,
+      249_000,
+      449_000,
       599_000,
     ]);
     for (const offre of OFFRES_TARIFAIRES.filter((item) => !item.devisObligatoire)) {
@@ -49,7 +51,36 @@ describe("grille tarifaire", () => {
       synchronisationBancaire: "avancee",
       creditsIA: true,
     });
-    expect(total).toMatchObject({ baseCentimes: 19_900, optionsCentimes: 14_100, totalCentimes: 34_000 });
+    expect(total).toMatchObject({ baseCentimes: 24_900, optionsCentimes: 14_100, totalCentimes: 39_000 });
+  });
+
+  it("reste synchronisée avec tarification.canonical.json (source de vérité partagée site ↔ app ↔ Stripe)", () => {
+    const depuisCode = OFFRES_TARIFAIRES.filter((o) => !o.devisObligatoire).map((o) => ({
+      cle: o.cle,
+      nom: o.nom,
+      mensuelCentimes: o.prixMensuelCentimes,
+      annuelCentimes: o.prixAnnuelCentimes,
+      comptesInclus: o.comptesInclus,
+      parCompteSupEuros: o.parCompteSup,
+    }));
+    expect(depuisCode).toEqual(canonique.offres);
+    for (const offre of canonique.offres) {
+      expect(offre.annuelCentimes).toBe(offre.mensuelCentimes * 10);
+    }
+  });
+
+  it("applique la règle annuelle officielle : annuel = 10 × mensuel (2 mois offerts) pour chaque offre payante", () => {
+    const attendues: Record<string, [number, number]> = {
+      mini: [7_900, 79_000],
+      pro: [24_900, 249_000],
+      business: [44_900, 449_000],
+      entreprise: [59_900, 599_000],
+    };
+    for (const [cle, [mensuel, annuel]] of Object.entries(attendues)) {
+      const offre = offreTarifaireParCle(cle);
+      expect([offre.prixMensuelCentimes, offre.prixAnnuelCentimes]).toEqual([mensuel, annuel]);
+      expect(offre.prixAnnuelCentimes).toBe(offre.prixMensuelCentimes * 10);
+    }
   });
 });
 

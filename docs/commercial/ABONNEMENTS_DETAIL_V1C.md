@@ -1,5 +1,11 @@
 # ABONNEMENTS-DETAIL-V1C — Clôture : cohérence plateforme/client et cycle de vie de la remise
 
+> **Rapport historique.** Les montants annuels cités (Mini `prixAnnuelCentimes: 94_800` = 948 €,
+> etc., annuel × 12) reflètent l'état de l'époque. Depuis
+> ELSATIA-TARIFICATION-CANONICAL-ALIGNMENT-V1 (2026-09) : **annuel = 10 × mensuel** (Mini 790 €…),
+> voir `docs/organisation/TARIFICATION_CANONIQUE.md`. Les montants mensuels (79 €…) et la
+> mécanique de remise décrite restent valables.
+
 **Constat de départ** : ABONNEMENTS-DETAIL-V1B avait tout construit (mapping, comparatif, comptes-sup, remise) mais laissait une réserve principale — la cohérence directe entre `/plateforme` (admin) et `/abonnement` (client) n'avait pas été re-testée en conditions réelles, faute d'avoir pu monter un compte admin plateforme jetable fonctionnel dans le temps imparti. Ce mini-lot ferme exactement ce point, avec un vrai cycle de vie de remise (appliquer → modifier → retirer) sur une fixture Stripe Test réelle.
 
 ## 1-2. Git

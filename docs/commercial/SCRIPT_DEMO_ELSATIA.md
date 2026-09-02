@@ -46,9 +46,9 @@ Grille tarifaire réelle (source : `src/lib/tarification.ts`, prix HT/mois) :
 
 | Offre | Prix HT/mois | Comptes inclus | Administrateurs inclus | Ce qui s'ajoute par rapport au palier précédent |
 |---|---|---|---|---|
-| **Mini** | 69 € | 3 | 1 | Socle : dashboard, messagerie, clients, chantiers, devis, factures, planning |
-| **Pro** | 199 € | 15 | 3 | + Terrain (pointage, employés, congés, notes de frais) et Gestion (achats, prestations, CRM*) |
-| **Business** | 399 € | 30 | 6 | + Pilotage (stock, outillage, flotte*, rentabilité, exports, paie*) |
+| **Mini** | 79 € | 3 | 1 | Socle : dashboard, messagerie, clients, chantiers, devis, factures, planning |
+| **Pro** | 249 € | 15 | 3 | + Terrain (pointage, employés, congés, notes de frais) et Gestion (achats, prestations, CRM*) |
+| **Business** | 449 € | 30 | 6 | + Pilotage (stock, outillage, flotte*, rentabilité, exports, paie*) |
 | **Entreprise** | 599 € | 40 salariés + 10 administrateurs | 10 | + Avancé (connecteurs*, sous-traitants*, paiements bancaires*, paie complète*) |
 
 `*` = fonctionnalité incluse dans la permission du palier mais **non commercialisée en V3** (BETA/désactivée — voir section précédente). Ne jamais promettre ces modules comme actifs pour vendre un palier supérieur.

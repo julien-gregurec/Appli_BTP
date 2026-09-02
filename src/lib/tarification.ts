@@ -76,14 +76,20 @@ const AVANCE = [
   "parametrer_paie",
 ] as const;
 
+// Grille commerciale canonique — décision validée ELSATIA-TARIFICATION-CANONICAL-ALIGNMENT-V1
+// (2026-09). Source de vérité unique consommée par la page /tarifs, l'onboarding, la page
+// abonnement et le mapping Stripe. Règle annuelle officielle : ANNUEL = 10 × MENSUEL
+// (deux mois offerts), figée par tarification.test.ts. Toute nouvelle grille est une décision
+// explicite, historisée (`historique_tarification`), sans effet rétroactif sur les contrats
+// en cours (cf. CGV art. 4.4). Voir docs/organisation/TARIFICATION_CANONIQUE.md.
 export const OFFRES_TARIFAIRES: readonly OffreTarifaire[] = [
   {
     cle: "mini",
     palier: 1,
     nom: "Mini",
-    base: 69,
-    prixMensuelCentimes: 6_900,
-    prixAnnuelCentimes: 69_000,
+    base: 79,
+    prixMensuelCentimes: 7_900,
+    prixAnnuelCentimes: 79_000,
     comptesInclus: 3,
     administrateursInclus: 1,
     parCompteSup: 15,
@@ -100,9 +106,9 @@ export const OFFRES_TARIFAIRES: readonly OffreTarifaire[] = [
     cle: "pro",
     palier: 2,
     nom: "Pro",
-    base: 199,
-    prixMensuelCentimes: 19_900,
-    prixAnnuelCentimes: 199_000,
+    base: 249,
+    prixMensuelCentimes: 24_900,
+    prixAnnuelCentimes: 249_000,
     comptesInclus: 15,
     administrateursInclus: 3,
     parCompteSup: 12,
@@ -115,9 +121,9 @@ export const OFFRES_TARIFAIRES: readonly OffreTarifaire[] = [
     cle: "business",
     palier: 3,
     nom: "Business",
-    base: 399,
-    prixMensuelCentimes: 39_900,
-    prixAnnuelCentimes: 399_000,
+    base: 449,
+    prixMensuelCentimes: 44_900,
+    prixAnnuelCentimes: 449_000,
     comptesInclus: 30,
     administrateursInclus: 6,
     parCompteSup: 9,
