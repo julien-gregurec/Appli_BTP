@@ -10,9 +10,14 @@ function origineHttps(valeur?: string) {
   }
 }
 
-function origineWebSocket(valeur?: string) {
-  const origine = origineHttps(valeur);
-  return origine ? origine.replace(/^https:/, "wss:") : null;
+function origineSupabaseLocale(valeur: string | undefined, isDevelopment: boolean) {
+  if (!isDevelopment || !valeur) return null;
+  try {
+    const url = new URL(valeur);
+    return url.protocol === "http:" && ["localhost", "127.0.0.1", "::1"].includes(url.hostname) ? url.origin : null;
+  } catch {
+    return null;
+  }
 }
 
 export function construireContentSecurityPolicy({
@@ -26,8 +31,8 @@ export function construireContentSecurityPolicy({
   supabaseUrl?: string;
   sentryDsn?: string;
 }) {
-  const supabase = origineHttps(supabaseUrl);
-  const supabaseWs = origineWebSocket(supabaseUrl);
+  const supabase = origineHttps(supabaseUrl) ?? origineSupabaseLocale(supabaseUrl, isDevelopment);
+  const supabaseWs = supabase?.replace(/^https:/, "wss:").replace(/^http:/, "ws:") ?? null;
   const sentry = origineHttps(sentryDsn);
   const connectSrc = ["'self'", supabase, supabaseWs, sentry].filter(Boolean).join(" ");
   const scriptSrc = ["'self'", `'nonce-${nonce}'`, "'strict-dynamic'", isDevelopment ? "'unsafe-eval'" : null]

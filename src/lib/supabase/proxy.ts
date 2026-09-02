@@ -7,8 +7,10 @@ import { appliquerRateLimit, politiquesRateLimitPour } from "@/lib/security/rate
 import { createAdminClient } from "@/lib/supabase/admin";
 import { clePubliqueSupabase } from "@/lib/supabase/keys";
 import { optionsCookieAuth } from "@/lib/security/cookies";
+import { decisionGardeMfa } from "@/lib/auth/mfa";
+import { destinationInterneSure } from "@/lib/security/redirects";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/tarifs", "/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/confidentialite", "/cookies", "/auth", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu", "/guides", "/videos", "/paiement", "/document", "/imprimer/partage", "/api/documents/partage", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements", "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import"];
+const PUBLIC_PATHS = ["/login", "/signup", "/tarifs", "/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/confidentialite", "/cookies", "/auth", "/mfa", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu", "/guides", "/videos", "/paiement", "/document", "/imprimer/partage", "/api/documents/partage", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements", "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -59,7 +61,7 @@ export async function updateSession(request: NextRequest) {
 
   // Comparaison stricte pour l'accueil : "/" en préfixe matcherait tous les chemins.
   const estAccueil = request.nextUrl.pathname === "/";
-  const isPublic = estAccueil || PUBLIC_PATHS.some((path) => request.nextUrl.pathname.startsWith(path));
+  const isPublic = estAccueil || PUBLIC_PATHS.some((path) => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith(path + "/"));
 
   // Les chemins purement statiques n'ont aucune règle d'accès : inutile de
   // vérifier le jeton auprès de Supabase, ce qui coûtait un aller-retour
@@ -89,6 +91,24 @@ export async function updateSession(request: NextRequest) {
   // retours sequentiels par requete, soit environ 1 seconde payee par page.
   const chemin = request.nextUrl.pathname;
   const correspond = (base: string) => chemin === base || chemin.startsWith(base + "/");
+
+  if (correspond("/plateforme")) {
+    const { data: admin, error: erreurAdmin } = await supabase.rpc("est_plateforme_admin");
+    if (!erreurAdmin && admin === true) {
+      const { data: aal, error: erreurAal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      const decision = decisionGardeMfa(aal, Boolean(erreurAal));
+      if (decision !== "autoriser") {
+        const destination = destinationInterneSure(`${chemin}${request.nextUrl.search}`, "/plateforme");
+        const url = request.nextUrl.clone();
+        url.pathname = decision === "enroler" ? "/parametres/securite" : "/mfa/challenge";
+        url.search = "";
+        url.searchParams.set("next", destination);
+        if (decision === "enroler") url.searchParams.set("requis", "plateforme");
+        if (decision === "refuser") url.searchParams.set("controle", "indisponible");
+        return NextResponse.redirect(url);
+      }
+    }
+  }
 
   const droitRequis = isPublic ? undefined : MODULE_PERMISSION_PAR_CHEMIN.find(([c]) => correspond(c))?.[1];
   const estMutation = !["GET", "HEAD", "OPTIONS"].includes(request.method);
