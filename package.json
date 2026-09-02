@@ -5,13 +5,13 @@
   "scripts": {
     "dev": "next dev",
     "clean": "node scripts/clean-build.mjs",
-    "build": "next build",
+    "build": "next build && npm --prefix apps/tools run build",
     "start": "next start",
-    "lint": "eslint",
-    "test": "vitest run",
+    "lint": "eslint && npm --prefix apps/tools run lint",
+    "test": "vitest run && npm --prefix apps/tools run test",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
-    "typecheck": "tsc --noEmit --incremental false",
+    "typecheck": "tsc --noEmit --incremental false && npm --prefix apps/tools run typecheck",
     "verify:migrations": "node scripts/verify-migrations.mjs",
     "verify:secrets": "node scripts/verify-secrets.mjs",
     "audit:security": "npm audit --audit-level=high",
@@ -59,6 +59,8 @@
     "vitest": "^4.1.10"
   },
   "overrides": {
+    "browserslist": "4.28.7",
+    "fast-uri": "3.1.6",
     "sharp": "$sharp",
     "minimatch@^10.0.0": "10.2.6",
     "next": {

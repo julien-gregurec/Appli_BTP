@@ -25,11 +25,22 @@
   },
   "include": [
     "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
+    "next.config.ts",
+    "playwright.config.ts",
+    "sentry.edge.config.ts",
+    "sentry.server.config.ts",
+    "vitest.config.ts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "packages/**/*.ts",
+    "packages/**/*.tsx",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    "src/**/*.mts",
+    "packages/**/*.mts",
+    "tests/**/*.mts"
   ],
-  "exclude": ["node_modules", "apps/colors", "tools"]
+  "exclude": ["node_modules"]
 }

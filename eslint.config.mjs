@@ -14,6 +14,10 @@ const eslintConfig = defineConfig([
     "output/**",
     "playwright-report/**",
     "test-results/**",
+    // Application autonome : vérifiée par son propre lint via le script racine.
+    "apps/tools/**",
+    // Archive documentaire non exécutable et explicitement non reproductible.
+    "docs/archive/naming-studio-recovery/**",
     "next-env.d.ts",
   ]),
 ]);
