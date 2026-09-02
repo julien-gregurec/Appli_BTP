@@ -19,11 +19,9 @@ for (const item of cases) {
       await expect(page.locator("body")).not.toContainText("RECETTE_B_");
     }
     for (const route of item.denied) {
-      await page.goto(route);
+      const response = await page.goto(route);
       if (new URL(page.url()).pathname === route) {
-        await expect(page.locator("body")).toContainText(
-          /404|fonctionnalité non disponible|accès refusé|non autorisé/i,
-        );
+        expect(response?.status()).toBe(404);
       }
       await expect(page.locator("body")).not.toContainText("RECETTE_B_");
     }
@@ -48,9 +46,9 @@ test("UUID B manipulés ne divulguent aucune donnée à A", async ({ page }) => 
 });
 
 test("administrateur plateforme reste hors données privées par défaut", async ({ page }) => {
-  await login(page, USERS.platform);
+  await login(page, USERS.platform, /\/parametres\/securite\?.*requis=plateforme/);
   await page.goto("/plateforme");
-  await expect(page).toHaveURL(/\/plateforme/);
+  await expect(page).toHaveURL(/\/parametres\/securite\?.*requis=plateforme/);
   const body = await page.locator("body").innerText();
   expect(body).not.toContain("TEST_A_FAC_001");
   expect(body).not.toContain("NDF-ISO-A");

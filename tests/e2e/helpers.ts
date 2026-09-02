@@ -36,7 +36,7 @@ export async function login(
 ) {
   await page.goto("/login");
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Mot de passe").fill("test");
+  await page.getByLabel("Mot de passe", { exact: true }).fill("test");
   await page.getByRole("button", { name: "Se connecter" }).click();
   await expect(page).toHaveURL(destination);
 }

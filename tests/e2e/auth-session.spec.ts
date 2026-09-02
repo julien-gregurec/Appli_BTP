@@ -13,13 +13,13 @@ test("connexion, conservation de session et déconnexion", async ({ page }) => {
 test("mauvais mot de passe et utilisateur inexistant sont refusés", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel("Email").fill(USERS.adminA);
-  await page.getByLabel("Mot de passe").fill("incorrect");
+  await page.getByLabel("Mot de passe", { exact: true }).fill("incorrect");
   await page.getByRole("button", { name: "Se connecter" }).click();
   await expect(page).toHaveURL(/\/login/);
   await expect(page.locator("body")).toContainText(/incorrect|invalide|connexion/i);
 
   await page.getByLabel("Email").fill("absent@invalid.local");
-  await page.getByLabel("Mot de passe").fill("incorrect");
+  await page.getByLabel("Mot de passe", { exact: true }).fill("incorrect");
   await page.getByRole("button", { name: "Se connecter" }).click();
   await expect(page).toHaveURL(/\/login/);
 });
