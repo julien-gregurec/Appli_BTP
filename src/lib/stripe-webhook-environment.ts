@@ -5,7 +5,7 @@ export type ConfigurationModeStripeWebhook =
   | { valide: true; mode: ModeStripeWebhook; livemode: boolean }
   | { valide: false; motif: "absente" | "vide" | "invalide" };
 
-export function resoudreModeStripeWebhook(env: NodeJS.ProcessEnv = process.env): ConfigurationModeStripeWebhook {
+export function resoudreModeStripeWebhook(env: Record<string, string | undefined> = process.env): ConfigurationModeStripeWebhook {
   const valeur = env.STRIPE_WEBHOOK_EXPECTED_MODE;
   if (valeur === undefined) return { valide: false, motif: "absente" };
   const mode = valeur.trim().toLowerCase();
@@ -37,8 +37,6 @@ export function categoriserErreurSupabase(erreur: ErreurSupabaseMinimale): Categ
   if (code === "23503") return "violation_cle_etrangere";
   if (code === "42P01" || code === "PGRST205") return "table_ou_migration_absente";
   if (code === "42501" || code === "PGRST301") return "autorisation_supabase";
-  if (code.startsWith("08") || code === "PGRST000" || code === "PGRST001" || /fetch|network|connexion/i.test(erreur?.message ?? "")) {
-    return "connexion_supabase";
-  }
+  if (code.startsWith("08") || code === "PGRST000" || code === "PGRST001" || /fetch|network|connexion/i.test(erreur?.message ?? "")) return "connexion_supabase";
   return "erreur_supabase";
 }

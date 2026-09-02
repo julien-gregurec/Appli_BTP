@@ -89,11 +89,12 @@ plateforme — un affichage trompeur, sans risque financier direct (Stripe reste
 vérité pour la facturation réelle) mais une violation du principe « seul un admin plateforme
 accorde une remise ».
 
-Corrigé par un trigger `BEFORE UPDATE` (`proteger_colonnes_remise_entreprise`) qui fige les
-colonnes `remise_*` à leur valeur précédente pour toute UPDATE qui n'émane pas d'un administrateur
-plateforme (`est_plateforme_admin()`), quelle que soit la policy RLS qui a autorisé la ligne.
-Vérifié empiriquement : une UPDATE simulée sous le JWT du propriétaire de l'entreprise, tentant
-d'écrire une fausse remise, retourne bien les valeurs réelles inchangées.
+Depuis R7.1 (`00243`), la protection est structurelle : les rôles API ne possèdent plus
+`INSERT`/`UPDATE` sur les huit colonnes `remise_*`, et un trigger explicite refuse aussi les
+contournements par wrapper, `SECURITY DEFINER` générique ou `service_role` direct. Aucun rôle
+plateforme, même `total` avec AAL2, n'est exempté. Le seul écrivain est le finaliseur F4, détenu
+par le rôle interne `elsatia_discount_f4_writer` (`NOLOGIN`, `NOBYPASSRLS`, sans membre API), après
+validation d'une preuve Stripe persistée et liée à l'intention, l'abonnement et la tentative.
 
 **Hors périmètre** : la même policy expose de la même façon toutes les autres colonnes
 « admin uniquement » de `entreprises` (`abonnement_statut`, `impaye_signale_at`,
@@ -120,7 +121,7 @@ sans le remplacer :
   'remise_expiree'`, `motif` toujours `null` (le motif interne n'est **jamais** écrit dans cette
   table, car elle est déjà lue par `/abonnement` pour la section « changements de tarif » — y
   écrire le motif interne l'aurait exposé au client).
-- Trigger `proteger_colonnes_remise_entreprise` (§5).
+- Trigger `proteger_colonnes_remise` et privilèges de colonnes R7.1 (§5).
 
 Aucune table dédiée `remises_abonnement` n'a été créée : les colonnes ajoutées sur `entreprises`
 suffisaient à représenter l'état courant (une seule remise active à la fois, cohérent avec la

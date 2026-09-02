@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+**/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -17,6 +18,7 @@
 
 # next.js
 /.next/
+**/.next/
 /out/
 
 # production
@@ -56,3 +58,16 @@ output/video/plans/
 
 # Rapports de vérification automatisée
 output/verification/
+
+# ELSATIA Tools generated export fixtures
+/output/pdf/elsatia-tools-r6-*.pdf
+/output/svg/elsatia-tools-r6-*.svg
+
+# Generated video pipeline artifacts
+/output/video/1_Punchy_45s.mp4
+/output/video/2_Journee_Chantier.mp4
+/output/video/3_Avant_Apres.mp4
+/output/video/fond.wav
+/output/video/orchestre.wav
+/output/video/bornes.json
+/output/video/points.json

@@ -3,31 +3,28 @@ import { categoriserErreurSupabase, empreinteEvenementStripe, identifiantUuidVal
 
 describe("configuration explicite du mode webhook Stripe", () => {
   it("autorise uniquement test et live", () => {
-    expect(resoudreModeStripeWebhook({ NODE_ENV: "test", STRIPE_WEBHOOK_EXPECTED_MODE: "test" })).toEqual({ valide: true, mode: "test", livemode: false });
-    expect(resoudreModeStripeWebhook({ NODE_ENV: "test", STRIPE_WEBHOOK_EXPECTED_MODE: "LIVE" })).toEqual({ valide: true, mode: "live", livemode: true });
+    expect(resoudreModeStripeWebhook({ STRIPE_WEBHOOK_EXPECTED_MODE: "test" })).toEqual({ valide: true, mode: "test", livemode: false });
+    expect(resoudreModeStripeWebhook({ STRIPE_WEBHOOK_EXPECTED_MODE: "LIVE" })).toEqual({ valide: true, mode: "live", livemode: true });
   });
-
   it("reste fermé si la configuration est absente, vide ou invalide", () => {
-    expect(resoudreModeStripeWebhook({ NODE_ENV: "test" })).toEqual({ valide: false, motif: "absente" });
-    expect(resoudreModeStripeWebhook({ NODE_ENV: "test", STRIPE_WEBHOOK_EXPECTED_MODE: "  " })).toEqual({ valide: false, motif: "vide" });
-    expect(resoudreModeStripeWebhook({ NODE_ENV: "test", STRIPE_WEBHOOK_EXPECTED_MODE: "preview" })).toEqual({ valide: false, motif: "invalide" });
+    expect(resoudreModeStripeWebhook({})).toEqual({ valide: false, motif: "absente" });
+    expect(resoudreModeStripeWebhook({ STRIPE_WEBHOOK_EXPECTED_MODE: "  " })).toEqual({ valide: false, motif: "vide" });
+    expect(resoudreModeStripeWebhook({ STRIPE_WEBHOOK_EXPECTED_MODE: "preview" })).toEqual({ valide: false, motif: "invalide" });
   });
 });
 
 describe("diagnostic webhook sans donnée sensible", () => {
-  it("produit une empreinte stable et non réversible à la place de l'identifiant Stripe", () => {
-    const identifiant = "evt_secret_a_ne_pas_journaliser";
-    const empreinte = empreinteEvenementStripe(identifiant);
+  it("produit une empreinte stable et non réversible", () => {
+    const id = "evt_confidentiel";
+    const empreinte = empreinteEvenementStripe(id);
     expect(empreinte).toHaveLength(16);
-    expect(empreinte).not.toContain(identifiant);
-    expect(empreinte).toBe(empreinteEvenementStripe(identifiant));
+    expect(empreinte).not.toContain(id);
+    expect(empreinte).toBe(empreinteEvenementStripe(id));
   });
-
-  it("valide uniquement un UUID exploitable comme clé étrangère", () => {
+  it("valide les UUID", () => {
     expect(identifiantUuidValide("11111111-1111-4111-8111-111111111111")).toBe(true);
     expect(identifiantUuidValide("entreprise-preview")).toBe(false);
   });
-
   it.each([
     ["23503", "violation_cle_etrangere"],
     ["42P01", "table_ou_migration_absente"],

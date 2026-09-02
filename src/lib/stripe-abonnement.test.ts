@@ -7,13 +7,14 @@ const {
   appliquerCouponAbonnement,
   calculerFacturationStockage,
   creerCouponRemise,
+  observerRemiseDepuisAbonnement,
   prixOptionIAStripePour,
   prixStripePour,
   reconcilierAbonnementStripe,
+  recupererAbonnementStripe,
   retirerCouponAbonnement,
   statutAbonnementDepuisStripe,
   stripeBillingEstConfigure,
-  synchroniserExpirationRemise,
   variablesStripeBillingManquantes,
 } = await import("./stripe-abonnement");
 
@@ -69,6 +70,58 @@ function fetchFakeStripe(params: { itemExistant?: { id: string; price: { id: str
   });
   return { fauxFetch, appels };
 }
+
+describe("observation non-lossy des remises Stripe", () => {
+  const abonnement = (discounts: NonNullable<Parameters<typeof observerRemiseDepuisAbonnement>[0]["discounts"]>) => ({
+    id: "sub_test", customer: "cus_test", status: "active", discounts,
+  });
+
+  it("distingue explicitement l'absence confirmée", () => {
+    expect(observerRemiseDepuisAbonnement(abonnement([]))).toEqual({
+      status: "absent", count: 0, discount_id: null,
+      source_type: null, source_id: null, coupon_id: null,
+    });
+  });
+
+  it("résout un discount coupon complètement développé", () => {
+    expect(observerRemiseDepuisAbonnement(abonnement([{
+      id: "di_active", object: "discount", source: { type: "coupon", coupon: "coupon_active" },
+    }]))).toEqual({
+      status: "present", count: 1, discount_id: "di_active",
+      source_type: "coupon", source_id: "coupon_active", coupon_id: "coupon_active",
+    });
+  });
+
+  it("atteste séparément un promotion code et son coupon", () => {
+    expect(observerRemiseDepuisAbonnement(abonnement([{
+      id: "di_promo", source: { type: "coupon", coupon: { id: "coupon_promo" } },
+      promotion_code: { id: "promo_active" },
+    }]))).toEqual({
+      status: "present", count: 1, discount_id: "di_promo",
+      source_type: "promotion_code", source_id: "promo_active", coupon_id: "coupon_promo",
+    });
+  });
+
+  it.each([
+    ["référence string", ["di_unexpanded_active"]],
+    ["objet minimal", [{ id: "di_active" }]],
+    ["source inconnue", [{ id: "di_active", source: { type: "future_source", coupon: "coupon_active" } }]],
+    ["plusieurs discounts", [
+      { id: "di_a", source: { type: "coupon", coupon: "coupon_a" } },
+      { id: "di_b", source: { type: "coupon", coupon: "coupon_b" } },
+    ]],
+  ])("échoue fermé pour %s", (_nom, discounts) => {
+    expect(() => observerRemiseDepuisAbonnement(abonnement(discounts))).toThrow("incomplète");
+  });
+
+  it("demande explicitement les expansions nécessaires au GET Stripe", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_fake");
+    const { fauxFetch, appels } = fetchFakeStripe({});
+    vi.stubGlobal("fetch", fauxFetch);
+    await recupererAbonnementStripe("sub_test");
+    expect(appels[0].url).toContain("expand%5B%5D=discounts");
+  });
+});
 
 describe("tarifs Stripe Billing", () => {
   it("associe chaque offre et périodicité au bon prix", () => {
@@ -263,69 +316,6 @@ describe("réconciliation des comptes supplémentaires (COMPTES-SUPPLEMENTAIRES-
     expect(resultat).toEqual({ synchronise: true, quantite: 0 });
     const suppression = appels.find((a) => a.url.endsWith("/subscription_items/si_existant") && a.methode === "DELETE");
     expect(suppression).toBeDefined();
-  });
-});
-
-describe("expiration naturelle d'une remise Stripe (REMISES-CLIENTS-V1)", () => {
-  function supabaseFakePourExpiration(params: { entreprise: Record<string, unknown> | null }) {
-    const appels: Array<{ table: string; methode: string; donnees?: Record<string, unknown> }> = [];
-    return {
-      appels,
-      from(table: string) {
-        const requete: Record<string, unknown> = {};
-        requete.select = () => requete;
-        requete.eq = () => requete;
-        requete.maybeSingle = async () => ({ data: params.entreprise, error: null });
-        requete.update = (donnees: Record<string, unknown>) => {
-          appels.push({ table, methode: "update", donnees });
-          return requete;
-        };
-        requete.insert = (donnees: Record<string, unknown>) => {
-          appels.push({ table, methode: "insert", donnees });
-          return Promise.resolve({ data: null, error: null });
-        };
-        return requete;
-      },
-    };
-  }
-
-  it("ne fait rien si le champ discounts est absent (payload sans cette info)", async () => {
-    const fake = supabaseFakePourExpiration({ entreprise: { remise_stripe_coupon_id: "c1", remise_description: "10 %" } });
-    createAdminClient.mockReturnValue(fake);
-    await synchroniserExpirationRemise("entreprise-1", { id: "sub", customer: "cus", status: "active" });
-    expect(fake.appels).toHaveLength(0);
-  });
-
-  it("ne fait rien si un discount Stripe est toujours actif", async () => {
-    const fake = supabaseFakePourExpiration({ entreprise: { remise_stripe_coupon_id: "c1", remise_description: "10 %" } });
-    createAdminClient.mockReturnValue(fake);
-    await synchroniserExpirationRemise("entreprise-1", { id: "sub", customer: "cus", status: "active", discounts: ["di_actif"] });
-    expect(fake.appels).toHaveLength(0);
-  });
-
-  it("ne fait rien si la fiche entreprise n'a déjà aucune remise enregistrée", async () => {
-    const fake = supabaseFakePourExpiration({ entreprise: { remise_stripe_coupon_id: null, remise_description: null } });
-    createAdminClient.mockReturnValue(fake);
-    await synchroniserExpirationRemise("entreprise-1", { id: "sub", customer: "cus", status: "active", discounts: [] });
-    expect(fake.appels).toHaveLength(0);
-  });
-
-  it("efface la remise et journalise 'remise_expiree' quand Stripe n'a plus de discount actif", async () => {
-    const fake = supabaseFakePourExpiration({ entreprise: { remise_stripe_coupon_id: "c1", remise_description: "10 % une fois" } });
-    createAdminClient.mockReturnValue(fake);
-    await synchroniserExpirationRemise("entreprise-1", { id: "sub", customer: "cus", status: "active", discounts: [] });
-
-    const maj = fake.appels.find((a) => a.table === "entreprises" && a.methode === "update");
-    expect(maj?.donnees).toMatchObject({ remise_stripe_coupon_id: null, remise_description: null, remise_motif_interne: null });
-
-    const journal = fake.appels.find((a) => a.table === "historique_tarification" && a.methode === "insert");
-    expect(journal?.donnees).toMatchObject({
-      entreprise_id: "entreprise-1",
-      utilisateur_id: null,
-      action: "remise_expiree",
-      motif: null,
-      ancien: { remise_stripe_coupon_id: "c1", remise_description: "10 % une fois" },
-    });
   });
 });
 

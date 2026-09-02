@@ -214,9 +214,19 @@ insert into storage.objects (id, bucket_id, name, metadata) values
   ('b8000000-0000-0000-0000-000000000001', 'chantier-documents', 'b0000000-0000-0000-0000-000000000001/b4000000-0000-0000-0000-000000000001/plan.pdf', '{"mimetype":"application/pdf"}')
 on conflict (id) do nothing;
 
-insert into public.plateforme_admins (email)
-values ('plateforme@invalid.local')
-on conflict (email) do nothing;
+insert into public.plateforme_admins (
+  email, role, utilisateur_id, actif, statut_identite, activation_at
+)
+values (
+  'plateforme@invalid.local', 'total', '30000000-0000-0000-0000-000000000001',
+  true, 'active', now()
+)
+on conflict (email) do update
+set role = excluded.role,
+    utilisateur_id = excluded.utilisateur_id,
+    actif = excluded.actif,
+    statut_identite = excluded.statut_identite,
+    activation_at = excluded.activation_at;
 
 insert into public.devis (
   id, entreprise_id, numero, client_id, chantier_id, statut,
