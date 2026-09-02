@@ -6,6 +6,9 @@ import { Lien as Link } from "@/components/Lien";
 
 export function ModuleAccessBoundary({permissions,activeFeatures,children}:{permissions:string[]|null;activeFeatures:FeatureKey[];children:React.ReactNode}) {
   const pathname=usePathname();
+  // La sécurité de l'identité n'est pas un module commercial et doit rester
+  // accessible même à un administrateur plateforme sans entreprise active.
+  if(pathname==="/parametres/securite")return <div className="min-w-0 flex-1 overflow-y-auto pt-16 md:pt-0">{children}</div>;
   const feature=featureForPath(pathname);
   if(feature&&!activeFeatures.includes(feature))return <main className="flex min-h-[70vh] flex-1 items-center justify-center p-6"><div className="max-w-lg rounded-xl border bg-white p-8 text-center shadow-sm dark:bg-neutral-950"><h1 className="text-xl font-semibold">Fonctionnalité non disponible</h1><p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">Cette fonctionnalité n’est pas incluse dans l’espace actuel de votre entreprise.</p><Link href="/dashboard" className="mt-5 inline-flex rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Revenir au tableau de bord</Link></div></main>;
   const droitsMutation=droitsGestionPour(pathname);

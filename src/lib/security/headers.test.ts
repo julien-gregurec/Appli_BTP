@@ -24,6 +24,13 @@ describe("headers HTTP de sécurité", () => {
     expect(csp).toMatch(/script-src[^;]*'unsafe-eval'/);
   });
 
+  it("autorise Supabase HTTP local uniquement en développement", () => {
+    const dev = construireContentSecurityPolicy({ nonce: "n", isDevelopment: true, supabaseUrl: "http://127.0.0.1:54321" });
+    expect(dev).toContain("connect-src 'self' http://127.0.0.1:54321 ws://127.0.0.1:54321");
+    const production = construireContentSecurityPolicy({ nonce: "n", isDevelopment: false, supabaseUrl: "http://127.0.0.1:54321" });
+    expect(production).not.toContain("127.0.0.1");
+  });
+
   it("active les protections de transport et d'isolation utiles", () => {
     const headers = new Map(headersSecurite(true).map(({ key, value }) => [key, value]));
     expect(headers.get("Strict-Transport-Security")).toContain("max-age=63072000");
