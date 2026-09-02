@@ -257,7 +257,20 @@ select set_config('request.jwt.claim.email','plateforme@invalid.local',true);
 select set_config('request.jwt.claims','{"sub":"30000000-0000-0000-0000-000000000001","email":"plateforme@invalid.local","role":"authenticated","aal":"aal2"}',true);
 select lives_ok($$select public.plateforme_retirer_admin('second-total-aal2@invalid.local')$$,'première révocation total autorisée quand deux totaux sont actifs');
 reset role;
-select is((select count(*) from public.plateforme_admins where role='total' and actif and statut_identite='active'),1::bigint,'au moins un administrateur total reste actif');
+select ok(
+  not exists (
+    select 1 from public.plateforme_admins
+    where email='second-total-aal2@invalid.local' and actif
+  ),
+  'le total synthétique ciblé est révoqué'
+);
+select ok(
+  exists (
+    select 1 from public.plateforme_admins
+    where email='plateforme@invalid.local' and role='total' and actif and statut_identite='active'
+  ),
+  'le total fixture reste actif indépendamment des administrateurs réels préexistants'
+);
 set local role authenticated;
 select set_config('request.jwt.claim.sub','30000000-0000-0000-0000-000000000001',true);
 select set_config('request.jwt.claim.email','plateforme@invalid.local',true);
