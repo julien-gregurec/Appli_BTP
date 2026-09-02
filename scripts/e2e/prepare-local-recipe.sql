@@ -48,48 +48,15 @@ where id in (
   'b0000000-0000-0000-0000-000000000001'::uuid
 );
 
--- Le layout authentifié exige toujours une entreprise active, y compris pour
--- l'espace plateforme. On donne donc au compte plateforme une entreprise
--- technique dédiée, sans jamais le rattacher aux entreprises clientes A/B.
-insert into public.entreprises (
-  id, nom, code_adhesion, abonnement_statut, abonnement_offre,
-  abonnement_echeance
-) values (
-  'c0000000-0000-0000-0000-000000000001'::uuid,
-  'RECETTE_PLATEFORME_INTERNE',
-  'ISOC0001',
-  'actif',
-  'entreprise',
-  current_date + 365
-)
-on conflict (id) do update
-set nom = excluded.nom,
-    abonnement_statut = excluded.abonnement_statut,
-    abonnement_offre = excluded.abonnement_offre,
-    abonnement_echeance = excluded.abonnement_echeance;
-
-insert into public.postes (id, entreprise_id, nom)
-values (
-  'c1000000-0000-0000-0000-000000000001'::uuid,
-  'c0000000-0000-0000-0000-000000000001'::uuid,
-  'Plateforme interne'
-)
-on conflict (id) do nothing;
-
-insert into public.utilisateurs_entreprises (
-  utilisateur_id, entreprise_id, poste_id, statut
-) values (
-  '30000000-0000-0000-0000-000000000001'::uuid,
-  'c0000000-0000-0000-0000-000000000001'::uuid,
-  'c1000000-0000-0000-0000-000000000001'::uuid,
-  'actif'
-)
-on conflict (utilisateur_id, entreprise_id) do update
-set poste_id = excluded.poste_id,
-    statut = excluded.statut;
+-- Un administrateur plateforme n'appartient à aucune entreprise cliente. Le
+-- contexte neutre est désormais pris en charge nativement par l'application ;
+-- conserver ici une entreprise technique ferait appliquer à tort les ACL
+-- métier à la page d'enrôlement MFA.
+delete from public.utilisateurs_entreprises
+where utilisateur_id = '30000000-0000-0000-0000-000000000001'::uuid;
 
 update public.utilisateurs
-set entreprise_active_id = 'c0000000-0000-0000-0000-000000000001'::uuid
+set entreprise_active_id = null
 where id = '30000000-0000-0000-0000-000000000001'::uuid;
 
 -- Le fixture pgTAP n'a pas besoin de l'entreprise active, contrairement à
