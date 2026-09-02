@@ -25,8 +25,11 @@ describe("prixAbonnementMensuel", () => {
   it("utilise le prix annuel propre à l'offre", () => {
     const p = prixAbonnementMensuel(3, mini);
     expect(REDUCTION_ANNUELLE).toBe(0);
-    expect(p.mensuelSiAnnuel).toBe(mini.prixAnnuelCentimes / 100 / 12);
+    // mensuelSiAnnuel est un équivalent mensuel arrondi au centime (790 € / 12 = 65,83 €).
+    expect(p.mensuelSiAnnuel).toBe(Math.round((mini.prixAnnuelCentimes / 100 / 12) * 100) / 100);
     expect(p.totalAnnuel).toBe(mini.prixAnnuelCentimes / 100);
+    // Règle annuelle officielle : le prix annuel vaut 10 mensualités (2 mois offerts).
+    expect(mini.prixAnnuelCentimes).toBe(mini.prixMensuelCentimes * 10);
   });
 });
 

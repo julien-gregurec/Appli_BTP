@@ -2,6 +2,12 @@
 
 **Clôture (24-08-2026)** : la réserve principale de ce document (§32, cohérence admin plateforme non re-testée en direct) est levée par **ABONNEMENTS-DETAIL-V1C** — voir `ABONNEMENTS_DETAIL_V1C.md`, qui a aussi trouvé et corrigé un bug réel bloquant (nom de coupon Stripe dépassant 40 caractères) et documenté une dérive de schéma sur `est_plateforme_admin()`.
 
+> **Montants annuels obsolètes.** Ce rapport décrit un état où l'annuel valait × 12 (Mini 948 €…).
+> Depuis ELSATIA-TARIFICATION-CANONICAL-ALIGNMENT-V1 (2026-09), la règle est **annuel = 10 ×
+> mensuel (2 mois offerts)** : Mini 790 €, Pro 2 490 €, Business 4 490 €, Entreprise 5 990 €.
+> Les montants **mensuels** (79/249/449/599) et les comptes inclus/supplémentaires restent
+> valables. Référence : `docs/organisation/TARIFICATION_CANONIQUE.md`.
+
 **Constat de départ** : ABONNEMENTS-DETAIL-V1 avait délibérément reporté la construction du mapping tarification ↔ feature-catalogue (« arrêt documenté plutôt que deviné »). Ce lot construit ce mapping, l'utilise pour un comparatif complet par catégories, et intègre proprement les comptes supplémentaires et remises commerciales validés depuis (COMPTES-SUPPLEMENTAIRES-V1C, REMISES-CLIENTS-V1).
 
 ## 1-2. Git

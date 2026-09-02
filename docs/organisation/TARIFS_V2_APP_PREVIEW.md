@@ -1,18 +1,32 @@
 # TARIFS-V2-APP — synchronisation Preview
 
-## Source canonique appliquée
+> **⚠️ OBSOLÈTE — remplacé par `docs/organisation/TARIFICATION_CANONIQUE.md`.** La grille
+> « TARIFS-V2 » (69/199/399) décrite ci-dessous a été rejetée par la décision humaine du lot
+> ELSATIA-TARIFICATION-CANONICAL-ALIGNMENT-V1 (2026-09). Ce document est conservé comme trace
+> historique du lot Preview.
+
+## Grille canonique en vigueur (CANONICAL-V3-2026-09)
 
 | Offre | Mensuel HT | Annuel HT | Capacité incluse |
 | --- | ---: | ---: | --- |
-| Mini | 69 € | 690 € | 3 comptes |
-| Pro | 199 € | 1 990 € | 15 comptes |
-| Business | 399 € | 3 990 € | 30 comptes |
+| Mini | 79 € | 790 € | 3 comptes |
+| Pro | 249 € | 2 490 € | 15 comptes |
+| Business | 449 € | 4 490 € | 30 comptes |
 | Entreprise | 599 € | 5 990 € | 40 salariés + 10 administrateurs |
 | Sur mesure | Sur devis | Sur devis | Définie après cadrage |
 
 La période d’essai reste fixée à 30 jours. Le paiement annuel correspond à dix
 mensualités, soit deux mois offerts. Cette grille est centralisée dans
-`src/lib/tarification.ts`.
+`src/lib/tarification.ts` et `src/lib/tarification.canonical.json`.
+
+## Grille TARIFS-V2 initialement décrite dans ce lot (obsolète, pour mémoire)
+
+| Offre | Mensuel HT | Annuel HT |
+| --- | ---: | ---: |
+| Mini | 69 € | 690 € |
+| Pro | 199 € | 1 990 € |
+| Business | 399 € | 3 990 € |
+| Entreprise | 599 € | 5 990 € |
 
 ## Verrou commercial temporaire
 

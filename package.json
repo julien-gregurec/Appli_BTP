@@ -14,8 +14,9 @@
     "typecheck": "tsc --noEmit --incremental false && npm --prefix apps/tools run typecheck",
     "verify:migrations": "node scripts/verify-migrations.mjs",
     "verify:secrets": "node scripts/verify-secrets.mjs",
+    "verify:stripe-prices": "node scripts/verify-stripe-prices.mjs",
     "audit:security": "npm audit --audit-level=high",
-    "verify": "npm run clean && npm run typecheck && npm run lint && npm run test && npm run verify:migrations && npm run verify:secrets && npm run build",
+    "verify": "npm run clean && npm run typecheck && npm run lint && npm run test && npm run verify:migrations && npm run verify:secrets && npm run verify:stripe-prices && npm run build",
     "db:start": "supabase start",
     "db:reset": "supabase db reset",
     "test:db": "supabase test db"

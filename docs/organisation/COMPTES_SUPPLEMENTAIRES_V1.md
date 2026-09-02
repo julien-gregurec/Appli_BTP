@@ -1,5 +1,11 @@
 # COMPTES-SUPPLEMENTAIRES-V1 — Facturation des comptes supplémentaires
 
+> **Note tarifaire (2026-09).** Le passage « Écart 1 » plus bas décrit une confusion Preview
+> entre la grille 69 € (« TARIFS-V2 ») et la grille 79 €. La grille validée définitive est
+> **79 / 249 / 449 / 599 € mensuel, annuel = 10 × mensuel** (`docs/organisation/TARIFICATION_CANONIQUE.md`,
+> lot ELSATIA-TARIFICATION-CANONICAL-ALIGNMENT-V1). Les montants de comptes supplémentaires
+> (15 / 12 / 9 / 9 € mensuel) décrits ici sont conformes à cette grille.
+
 **Cause exacte confirmée (23-08-2026)** : `reconcilierAbonnementStripe` (`src/lib/stripe-abonnement.ts:297-320`) lit les variables d'environnement `STRIPE_PRICE_COMPTE_SUP_{ESSENTIEL,PRO,PREMIUM,MINI,BUSINESS,ENTREPRISE}_{MENSUEL,ANNUEL}` (`VARIABLES_PRIX_COMPTE_SUP`, lignes 62-69) — **aucune de ces variables n'existait, ni en Preview ni en Production**, et aucun objet Price Stripe correspondant n'existait dans le compte Test. La fonction échouait donc silencieusement (`{synchronise:false, raison:"prix_supplement_absent"}`) dans les deux environnements, pas seulement en Production comme documenté initialement dans l'audit P15 (corrigé, voir `docs/organisation/P15_STRIPE_LIVE_PREPARATION.md`).
 
 **Point de méthode important** : une confusion initiale a attribué la cause à 6 variables `STRIPE_PRICE_COMPTE_SUP_{ADMINISTRATIF,CHEF_EQUIPE,TERRAIN}_{ANNUEL,MENSUEL}` présentes en Preview — ce sont en réalité les Price Stripe d'un mécanisme totalement différent (`OPTIONS_TARIFAIRES` dans `tarification.ts`, des compléments par type de poste), jamais câblé à aucun appel Stripe dans le code actuel. Cette confusion a été détectée et corrigée par vérification croisée entre deux sessions de travail avant toute correction, conformément à la consigne « audit d'abord, ne modifie rien tant que la cause exacte n'est pas confirmée ».

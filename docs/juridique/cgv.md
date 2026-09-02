@@ -24,11 +24,11 @@ Le Service peut être proposé avec une **période d'essai gratuite de 30 jours*
 
 ## Article 4 — Offres et prix
 
-4.1 Le Service est proposé selon plusieurs offres (à titre indicatif : Essentiel, Pro, Premium), dont le contenu et les tarifs sont présentés sur la page Tarifs du Service. Chaque offre inclut un nombre de comptes ; les comptes supplémentaires et certains dépassements d'usage (espace de stockage, nombre d'appareils) sont facturés en sus selon la grille en vigueur.
+4.1 Le Service est proposé selon plusieurs offres : Mini, Pro, Business et Entreprise, ainsi qu'une offre Sur mesure. Le contenu et les tarifs de chaque offre sont présentés sur la page Tarifs du Service. Chaque offre inclut un nombre de comptes ; les comptes supplémentaires et certains dépassements d'usage (espace de stockage, nombre d'appareils) sont facturés en sus selon la grille en vigueur.
 
-4.2 Les prix sont indiqués en euros. **TVA non applicable, article 293 B du Code général des impôts** (l'Éditeur bénéficie de la franchise en base). En cas de dépassement des seuils applicables ou de changement de régime, la TVA sera appliquée de plein droit et les prix indiqués s'entendront alors hors taxes.
+4.2 Les prix sont indiqués en euros hors taxes. **[À VALIDER AVANT PUBLICATION — mention de TVA selon le régime fiscal de l'entreprise individuelle, non encore arbitré : franchise en base (art. 293 B du CGI) ou assujettissement. Voir `docs/juridique/mentions-legales.md`.]** En cas d'assujettissement ou de changement de régime, la TVA sera appliquée de plein droit aux prix indiqués.
 
-4.3 Le paiement annuel ouvre droit à une remise (à titre indicatif : −20 %) par rapport au paiement mensuel.
+4.3 Le paiement annuel correspond à dix mensualités, soit deux mois offerts par rapport au paiement mensuel.
 
 4.4 L'Éditeur peut modifier ses tarifs. Toute modification est notifiée au Client au moins **30 jours** avant sa prise d'effet ; elle s'applique au renouvellement suivant. À défaut d'acceptation, le Client peut résilier avant l'échéance.
 

@@ -134,7 +134,7 @@ Structure courte, ne pas réciter un argumentaire long :
 
 | Objection | Réponse courte et factuelle |
 |---|---|
-| « C'est trop cher » | Le prix dépend de la taille d'équipe (à partir de 69 €/mois pour 3 comptes) — l'essai de 30 jours permet de mesurer le temps réellement gagné avant de décider. |
+| « C'est trop cher » | Le prix dépend de la taille d'équipe (à partir de 79 €/mois pour 3 comptes, ou 790 €/an avec deux mois offerts) — l'essai de 30 jours permet de mesurer le temps réellement gagné avant de décider. |
 | « J'ai déjà Excel » | Excel ne relie pas devis, planning, pointage et facturation entre eux — ELSATIA évite la ressaisie et centralise l'historique client/chantier. |
 | « J'ai déjà un logiciel » | L'essai de 30 jours permet de comparer concrètement sans engagement, sur vos propres chantiers. |
 | « Je n'ai pas le temps de changer » | L'onboarding express permet de démarrer avec une entreprise, un client et un chantier en quelques minutes — pas besoin de tout migrer d'un coup. |
