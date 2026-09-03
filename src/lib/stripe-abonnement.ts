@@ -38,7 +38,7 @@ export type StripeSubscription = {
   cancel_at?: number | null;
   cancel_at_period_end?: boolean;
   metadata?: Record<string, string>;
-  items?: { data?: Array<{ id: string; quantity?: number; price?: { id?: string } }> };
+  items?: { data?: Array<{ id: string; quantity?: number; price?: { id?: string }; current_period_start?: number; current_period_end?: number }> };
   discounts?: Array<string | {
     id?: string;
     object?: string;

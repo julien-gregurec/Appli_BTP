@@ -96,6 +96,24 @@ type LigneEntreprise = {
   capacite_stripe_sync_evenement_at: string | null;
 };
 
+/**
+ * Résout le début/fin de période de facturation d'une subscription. Les versions
+ * récentes de l'API Stripe ne renvoient plus `current_period_start` /
+ * `current_period_end` au niveau de la subscription : ils sont portés par chaque
+ * `items.data[]`. On lit le niveau subscription (API anciennes) puis on se rabat
+ * sur le niveau item — même stratégie que `tools-monetization.ts`. Sans cette
+ * résolution, une baisse de capacité serait appliquée immédiatement au lieu
+ * d'être planifiée à la fin de période (contrat commercial figé).
+ */
+function periodeSubscription(sub: StripeSubscription): { start: number | null; end: number | null } {
+  const items = sub.items?.data ?? [];
+  const itemAvecPeriode = items.find((i) => i.current_period_end != null || i.current_period_start != null);
+  return {
+    start: sub.current_period_start ?? itemAvecPeriode?.current_period_start ?? null,
+    end: sub.current_period_end ?? itemAvecPeriode?.current_period_end ?? null,
+  };
+}
+
 function resumeStripe(sub: StripeSubscription, itemCapacite: { id: string; quantity?: number; price?: { id?: string } } | null) {
   return {
     subscription: sub.id,
@@ -123,6 +141,13 @@ export async function reconcilierCapacitePersonnesStripe(params: {
    * DB `capacite_personnes_supplementaire` reste l'autorité.
    */
   cibleExplicite?: number | null;
+  /**
+   * Cron post-échéance : une baisse planifiée dont l'entitlement DB a déjà été
+   * appliqué (`appliquer_baisse_capacite_planifiee_service`) doit être répercutée
+   * IMMÉDIATEMENT sur la quantité Stripe (avec avoir de prorata), pas re-planifiée
+   * — sans quoi Stripe resterait facturé à l'ancienne quantité indéfiniment.
+   */
+  appliquerImmediatement?: boolean;
   deps?: Partial<DepsReconcileCapacite>;
 }): Promise<ResultatReconcileCapacite> {
   const deps = resoudreDeps(params.deps);
@@ -197,26 +222,29 @@ export async function reconcilierCapacitePersonnesStripe(params: {
 
   if (action === "aucune") {
     if (params.evenementCreatedAt != null) {
-      await admin
-        .from("entreprises")
-        .update({ capacite_stripe_sync_evenement_at: new Date(params.evenementCreatedAt * 1000).toISOString() })
-        .eq("id", params.entrepriseId);
+      // RPC SECURITY DEFINER : le client service_role n'a pas forcément l'UPDATE
+      // direct sur public.entreprises (droits colonne-par-colonne).
+      await admin.rpc("capacite_stripe_avancer_marqueur_evenement", {
+        p_entreprise_id: params.entrepriseId,
+        p_evenement_at: new Date(params.evenementCreatedAt * 1000).toISOString(),
+      });
     }
     return { synchronise: true, action, quantiteAvant: quantiteStripe, quantiteApres: quantiteStripe, operationId: null, stripeItemId: itemCapacite?.id ?? null };
   }
 
+  const periode = periodeSubscription(sub);
   const idempotencyKey = construireIdempotencyKey({
     entrepriseId: params.entrepriseId,
     type: typeOperation === "synchronisation" ? "synchronisation" : typeOperation,
     cible,
     subscriptionId: ent.stripe_subscription_id,
-    periodeReference: sub.current_period_start ?? null,
+    periodeReference: periode.start,
   });
 
   // ── Baisse : effet fin de période (aucune mutation Stripe immédiate ici) ────
-  const estBaisse = typeOperation === "baisse" && cible < quantiteStripe;
+  const estBaisse = typeOperation === "baisse" && cible < quantiteStripe && !params.appliquerImmediatement;
   if (estBaisse) {
-    const finPeriode = sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null;
+    const finPeriode = periode.end ? new Date(periode.end * 1000).toISOString() : null;
     const op = await deps.admin.rpc("synchroniser_capacite_stripe_service", {
       p_entreprise_id: params.entrepriseId,
       p_type_operation: "baisse",
@@ -262,9 +290,12 @@ export async function reconcilierCapacitePersonnesStripe(params: {
       const p = payloadSwapPrixCapacite({ itemId: itemCapacite!.id, nouveauPrixId: prixCapaciteAttendu!, quantite: cible, proration: "create_prorations" });
       await deps.requete(p.path, { corps: new URLSearchParams(p.body), idempotence: `capacite-swap-${idempotencyKey}` });
     } else {
-      // mise_a_jour (hausse de quantité)
+      // mise_a_jour : hausse → always_invoice (jamais de capacité non payée) ;
+      // baisse répercutée immédiatement (cron post-échéance) → create_prorations
+      // (avoir de prorata, pas de facture immédiate).
+      const prorationMaj = cible >= quantiteStripe ? "always_invoice" : "create_prorations";
       await deps.requete(`subscription_items/${encodeURIComponent(itemCapacite!.id)}`, {
-        corps: new URLSearchParams({ quantity: String(cible), proration_behavior: "always_invoice" }),
+        corps: new URLSearchParams({ quantity: String(cible), proration_behavior: prorationMaj }),
         idempotence: `capacite-maj-${idempotencyKey}`,
       });
     }
@@ -356,12 +387,26 @@ export async function reprendreOperationsCapaciteStripe(params?: {
   if (error || !Array.isArray(data)) return { traitees: 0, details: [] };
 
   const details: Array<{ entrepriseId: string; type: string; resultat: string }> = [];
-  for (const ligne of data as Array<{ entreprise_id: string; type_operation: string; statut: string }>) {
+  for (const ligne of data as Array<{ operation_id?: string; entreprise_id: string; type_operation: string; statut: string }>) {
     if (ligne.statut === "scheduled") {
       const r = await deps.admin.rpc("appliquer_baisse_capacite_planifiee_service", { p_entreprise_id: ligne.entreprise_id });
-      details.push({ entrepriseId: ligne.entreprise_id, type: "baisse_planifiee", resultat: r.error ? "erreur" : r.data ? "appliquee" : "pas_a_echeance" });
+      // Entitlement DB abaissé : répercuter tout de suite la quantité sur Stripe
+      // (avec avoir de prorata), sinon la facturation resterait à l'ancienne quantité.
+      let alignement = "";
+      if (!r.error && r.data) {
+        const a = await reconcilierCapacitePersonnesStripe({ entrepriseId: ligne.entreprise_id, source: "cron", appliquerImmediatement: true, deps: params?.deps });
+        alignement = a.synchronise ? `+stripe:${a.action}` : `+stripe_ko:${a.raison}`;
+      }
+      details.push({ entrepriseId: ligne.entreprise_id, type: "baisse_planifiee", resultat: (r.error ? "erreur" : r.data ? "appliquee" : "pas_a_echeance") + alignement });
     } else {
       const r = await reconcilierCapacitePersonnesStripe({ entrepriseId: ligne.entreprise_id, source: "cron", deps: params?.deps });
+      // Convergence déjà atteinte entre-temps (ex. webhook concurrent) : la
+      // réconciliation renvoie « aucune » sans appeler la RPC de service, donc
+      // l'opération orpheline resterait « needs_reconcile » indéfiniment. On la
+      // ferme explicitement.
+      if (r.synchronise && r.action === "aucune" && ligne.operation_id) {
+        await deps.admin.rpc("capacite_stripe_finaliser_op_convergente", { p_operation_id: ligne.operation_id });
+      }
       details.push({ entrepriseId: ligne.entreprise_id, type: "needs_reconcile", resultat: r.synchronise ? `ok:${r.action}` : `ko:${r.raison}` });
     }
   }

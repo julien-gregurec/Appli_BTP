@@ -54,7 +54,7 @@ function fakeAdmin(entreprise: Record<string, unknown>, rpcImpl?: (fn: string, a
   return { admin: admin as unknown as DepsReconcileCapacite["admin"], state };
 }
 
-function sub(items: Array<{ id: string; quantity?: number; price?: { id?: string } }>, extra: Partial<StripeSubscription> = {}): StripeSubscription {
+function sub(items: Array<{ id: string; quantity?: number; price?: { id?: string }; current_period_start?: number; current_period_end?: number }>, extra: Partial<StripeSubscription> = {}): StripeSubscription {
   return {
     id: "sub_A",
     customer: "cus_A",
@@ -239,6 +239,26 @@ describe("reconcilierCapacitePersonnesStripe", () => {
     expect(call?.args.p_date_effet_souhaitee).toBe(new Date(9_999 * 1000).toISOString());
   });
 
+  it("13b. baisse : période portée par l'item (API Stripe récente, pas de current_period_* sur la subscription) → toujours planifiée", async () => {
+    const { admin, state } = fakeAdmin({ ...ENTREPRISE_BASE, capacite_personnes_supplementaire: 3 });
+    const requete = vi.fn<RequeteStripeMinimal>();
+    // subscription SANS current_period_* au niveau racine ; la période est sur l'item.
+    const rec = vi.fn(async () => {
+      const s = sub([{ id: "si_cap", quantity: 10, price: { id: "price_cap_mini_m" }, current_period_start: 5_000, current_period_end: 8_888 }]);
+      delete (s as { current_period_start?: number }).current_period_start;
+      delete (s as { current_period_end?: number }).current_period_end;
+      return s;
+    });
+    const r = await reconcilierCapacitePersonnesStripe({ entrepriseId: "e1", deps: deps({ admin, requete, recupererAbonnement: rec }) });
+    expect(r).toMatchObject({ synchronise: true, action: "mise_a_jour", quantiteApres: 3 });
+    expect(requete).not.toHaveBeenCalled();
+    const call = state.rpcCalls.find((c) => c.fn === "synchroniser_capacite_stripe_service");
+    expect(call?.args.p_type_operation).toBe("baisse");
+    // date d'effet = fin de période DE L'ITEM, pas null → 259 planifie au lieu d'appliquer tout de suite
+    expect(call?.args.p_date_effet_souhaitee).toBe(new Date(8_888 * 1000).toISOString());
+    expect(call?.args.p_idempotency_key).toBe("capacite:baisse:e1:sub_A:3:5000");
+  });
+
   it("16-17. événement Stripe périmé → ignoré", async () => {
     const { admin } = fakeAdmin({ ...ENTREPRISE_BASE, capacite_personnes_supplementaire: 5, capacite_stripe_sync_evenement_at: new Date(500 * 1000).toISOString() });
     const requete = vi.fn<RequeteStripeMinimal>();
@@ -255,7 +275,11 @@ describe("reconcilierCapacitePersonnesStripe", () => {
     const r = await reconcilierCapacitePersonnesStripe({ entrepriseId: "e1", evenementCreatedAt: 900, deps: deps({ admin, requete, recupererAbonnement: rec }) });
     expect(r).toMatchObject({ synchronise: true, action: "aucune" });
     expect(requete).not.toHaveBeenCalled();
-    expect(state.updates.at(-1)).toMatchObject({ capacite_stripe_sync_evenement_at: new Date(900 * 1000).toISOString() });
+    // marqueur avancé via RPC SECURITY DEFINER (pas d'UPDATE direct sur entreprises)
+    expect(state.rpcCalls.at(-1)).toMatchObject({
+      fn: "capacite_stripe_avancer_marqueur_evenement",
+      args: { p_entreprise_id: "e1", p_evenement_at: new Date(900 * 1000).toISOString() },
+    });
   });
 
   it("19. abonnement absent → non synchronisé", async () => {
@@ -320,7 +344,9 @@ describe("reprendreOperationsCapaciteStripe (cron)", () => {
     });
     expect(out.traitees).toBe(2);
     expect(rpcCalls).toContain("appliquer_baisse_capacite_planifiee_service");
-    expect(out.details[0]).toMatchObject({ type: "baisse_planifiee", resultat: "appliquee" });
+    // après application DB, le cron aligne aussi la quantité Stripe (ici déjà cohérente → « aucune »)
+    expect(out.details[0]).toMatchObject({ type: "baisse_planifiee" });
+    expect(String(out.details[0].resultat)).toMatch(/^appliquee\+stripe:/);
   });
 
   it("liste vide → 0 traitée", async () => {
