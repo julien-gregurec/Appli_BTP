@@ -7,6 +7,13 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { reconcilierAbonnementStripe } from "@/lib/stripe-abonnement";
 import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
+import { verifierCapacitePersonnes } from "@/lib/capacite-personnes";
+
+// Une fiche compte dans le plafond de personnes actives dès qu'elle n'est ni
+// "sortie" ni "fermée" (contrat aligné sur compter_personnes_actives_entreprise).
+function ficheComptePourCapacite(statut: string | null | undefined, compteStatut?: string | null): boolean {
+  return statut !== "sorti" && compteStatut !== "ferme";
+}
 
 function champ(formData: FormData, nom: string): string | null {
   const v = String(formData.get(nom) ?? "").trim();
@@ -59,6 +66,13 @@ export async function creerEmployeAction(formData: FormData) {
     redirect(`/employes/nouveau?error=${encodeURIComponent("La date de sortie est obligatoire pour un salarié sorti")}`);
   }
 
+  if (ficheComptePourCapacite(payload.statut)) {
+    const capacite = await verifierCapacitePersonnes(ctx.entrepriseId, 1);
+    if (!capacite.ok) {
+      redirect(`/employes/nouveau?error=${encodeURIComponent(capacite.message)}`);
+    }
+  }
+
   const { data, error } = await supabase
     .from("employes")
     .insert({
@@ -89,6 +103,25 @@ export async function modifierEmployeAction(employeId: string, formData: FormDat
     redirect(`/employes/${employeId}/modifier?error=${encodeURIComponent("La date de sortie est obligatoire pour un salarié sorti")}`);
   }
 
+  // Réactivation (sorti → actif) : pré-contrôle du plafond de personnes actives.
+  if (ficheComptePourCapacite(payload.statut)) {
+    const { data: actuel } = await supabase
+      .from("employes")
+      .select("statut, compte_application_statut")
+      .eq("id", employeId)
+      .eq("entreprise_id", ctx.entrepriseId)
+      .maybeSingle();
+    const comptaitAvant = actuel
+      ? ficheComptePourCapacite(actuel.statut, actuel.compte_application_statut)
+      : true;
+    if (!comptaitAvant) {
+      const capacite = await verifierCapacitePersonnes(ctx.entrepriseId, 1);
+      if (!capacite.ok) {
+        redirect(`/employes/${employeId}/modifier?error=${encodeURIComponent(capacite.message)}`);
+      }
+    }
+  }
+
   const { error } = await supabase
     .from("employes")
     .update({
@@ -112,16 +145,33 @@ export async function changerStatutEmployeAction(employeId: string, statut: stri
   await exigerGestionEmployes(ctx, `/employes/${employeId}`);
   const supabase = await createClient();
 
+  // Réactivation (sorti → actif / en_conge / suspendu) : pré-contrôle du plafond.
+  if (ficheComptePourCapacite(statut)) {
+    const { data: actuel } = await supabase
+      .from("employes")
+      .select("statut, compte_application_statut")
+      .eq("id", employeId)
+      .eq("entreprise_id", ctx.entrepriseId)
+      .maybeSingle();
+    if (actuel && !ficheComptePourCapacite(actuel.statut, actuel.compte_application_statut)) {
+      const capacite = await verifierCapacitePersonnes(ctx.entrepriseId, 1);
+      if (!capacite.ok) {
+        redirect(`/employes/${employeId}?error=${encodeURIComponent(capacite.message)}`);
+      }
+    }
+  }
+
   const { error } = await supabase
     .from("employes")
     .update({ statut, date_sortie: statut === "sorti" ? new Date().toISOString().slice(0, 10) : null, updated_at: new Date().toISOString() })
     .eq("id", employeId)
     .eq("entreprise_id", ctx.entrepriseId);
 
-  if (!error) {
-    revalidatePath("/employes");
-    revalidatePath(`/employes/${employeId}`);
+  if (error) {
+    redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("changerStatutEmployeAction", error, "Impossible de modifier le statut de l’employé."))}`);
   }
+  revalidatePath("/employes");
+  revalidatePath(`/employes/${employeId}`);
 }
 
 export async function changerStatutCompteApplicationAction(employeId:string,statut:string){const ctx=await getContexteEntreprise();await exigerGestionEmployes(ctx,`/employes/${employeId}`);const supabase=await createClient();const{error}=await supabase.rpc("changer_statut_compte_application",{p_entreprise_id:ctx.entrepriseId,p_employe_id:employeId,p_statut:statut});if(error)redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("changerStatutCompteApplicationAction",error,"Impossible de modifier le statut du compte."))}`);await reconcilierAbonnementStripe(ctx.entrepriseId).catch(()=>undefined);revalidatePath("/employes");revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent(statut==="pause"?"Compte mis en pause — il reste facturable pour le mois":"Statut du compte mis à jour")}`);}
@@ -248,6 +298,11 @@ export async function creerMaFicheEmployeAction(formData: FormData) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  const capacite = await verifierCapacitePersonnes(ctx.entrepriseId, 1);
+  if (!capacite.ok) {
+    redirect(`/mon-espace?error=${encodeURIComponent(capacite.message)}`);
+  }
 
   const { error } = await supabase.from("employes").insert({
     entreprise_id: ctx.entrepriseId,

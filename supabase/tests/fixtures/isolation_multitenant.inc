@@ -1,5 +1,12 @@
 -- Jeu de données strictement local pour les tests d'isolation multitenant.
 -- Les UUID fixes rendent les diagnostics reproductibles.
+
+-- Le chargement de fixtures n'est pas soumis au plafond de personnes actives
+-- (ELSATIA-ACTIVE-PERSON-CAPACITY-R1). L'échappatoire n'a d'effet que sous une
+-- session superutilisateur (cas pgTAP) ; un test dédié au plafond peut la
+-- désactiver avec `reset elsatia.capacite_personnes_bypass`.
+set local elsatia.capacite_personnes_bypass = 'on';
+
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, created_at, updated_at

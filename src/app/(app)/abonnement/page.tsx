@@ -38,7 +38,7 @@ const FAQ_ABONNEMENT: Array<{ question: string; reponse: string }> = [
 export default async function AbonnementPage({ searchParams }: { searchParams: Promise<{ error?: string; succes?: string }> }) {
   const [{ error, succes }, ctx] = await Promise.all([searchParams, getContexteEntreprise()]);
   const supabase = await createClient();
-  const [{ data: entreprise }, { data: utilisationStockage }, { data: employesFacturables }, { data: postes }, { data: appareils }, consommationIA, { data: facturesAbonnement }, { data: historique }] = await Promise.all([
+  const [{ data: entreprise }, { data: utilisationStockage }, { data: employesFacturables }, { data: postes }, { data: appareils }, consommationIA, { data: facturesAbonnement }, { data: historique }, { data: capacitePersonnes }] = await Promise.all([
     supabase.from("entreprises").select("abonnement_statut,abonnement_echeance,abonnement_offre,abonnement_periodicite,abonnement_essai_fin,abonnement_annulation_prevue_at,stripe_customer_id,stripe_subscription_id,derniere_facture_url,derniere_facture_pdf,derniere_facture_statut,derniere_facture_at,option_ia_statut,option_ia_essai_fin,option_ia_palier,ia_active,ia_politique_quota,ia_plafond_cout_mensuel_ht,remise_description,remise_appliquee_at,remise_duree_mois,remise_type,remise_valeur").eq("id",ctx.entrepriseId).single(),
     supabase.rpc("utilisation_stockage_entreprise", { p_entreprise_id: ctx.entrepriseId }),
     supabase.from("employes").select("utilisateur_id,prenom,nom,poste_id,compte_application_statut").eq("entreprise_id", ctx.entrepriseId).in("compte_application_statut", ["actif", "pause"]),
@@ -47,6 +47,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
     consommationIAMensuelle(supabase, ctx.entrepriseId),
     supabase.from("factures_abonnement").select("id,numero,periode_debut,periode_fin,montant_ttc,devise,statut,url_facture,url_pdf,created_at").eq("entreprise_id",ctx.entrepriseId).order("created_at",{ascending:false}).limit(24),
     supabase.from("historique_tarification").select("id,action,motif,created_at,nouveau").eq("entreprise_id",ctx.entrepriseId).order("created_at",{ascending:false}).limit(20),
+    supabase.rpc("capacite_personnes_entreprise", { p_entreprise_id: ctx.entrepriseId }).maybeSingle(),
   ]);
   const statut = statutAbonnement(entreprise?.abonnement_statut ?? "essai");
   const configure = stripeBillingEstConfigure();
@@ -91,6 +92,19 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
   const paiementEnEchec = entreprise?.abonnement_statut === "suspendu" && souscrit;
   const euros = (montant: number) => montant.toLocaleString("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
   const contactCommercial = resoudreUrlContactCommercial();
+  const capRow = (capacitePersonnes ?? null) as {
+    personnes_actives?: number; capacite_base?: number; capacite_supplementaire?: number;
+    capacite_totale?: number; etat?: string;
+  } | null;
+  const cap = capRow
+    ? {
+        actives: Number(capRow.personnes_actives ?? 0),
+        base: Number(capRow.capacite_base ?? 0),
+        sup: Number(capRow.capacite_supplementaire ?? 0),
+        totale: Number(capRow.capacite_totale ?? 0),
+        etat: String(capRow.etat ?? "ok"),
+      }
+    : null;
 
   return <main className="p-4 sm:p-8"><div className="mx-auto max-w-5xl space-y-6">
     <header><h1 className="text-xl font-semibold">Mon abonnement {PRODUCT_NAME}</h1><p className="text-sm text-neutral-500">Offre, moyen de paiement, échéances et factures de votre entreprise.</p></header>
@@ -107,6 +121,19 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
       <div><p className="text-xs uppercase text-neutral-500">Prochaine échéance</p><p className="mt-1 font-semibold">{entreprise?.abonnement_echeance ? new Date(entreprise.abonnement_echeance).toLocaleDateString("fr-FR") : entreprise?.abonnement_essai_fin ? new Date(entreprise.abonnement_essai_fin).toLocaleDateString("fr-FR") : "—"}</p></div>
       {entreprise?.abonnement_annulation_prevue_at&&<p className="sm:col-span-3 rounded bg-amber-50 p-3 text-sm text-amber-900">Résiliation programmée le {new Date(entreprise.abonnement_annulation_prevue_at).toLocaleDateString("fr-FR")}.</p>}
     </section>
+
+    {cap&&<section className="rounded-xl border p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-semibold">Personnes actives</h2>
+          <p className="mt-1 text-sm text-neutral-500">Personnes enregistrées dans {PRODUCT_NAME} (les salariés sortis et les comptes fermés ne sont pas comptés). C’est la limite prévue par votre abonnement.</p>
+        </div>
+        <strong className={cap.etat==="ok" ? "text-lg" : "text-lg text-red-700"}>{cap.actives} / {cap.totale}</strong>
+      </div>
+      {cap.sup>0&&<p className="mt-2 text-xs text-neutral-500">{cap.base} incluses dans l’offre + {cap.sup} de capacité supplémentaire.</p>}
+      {cap.etat==="limite_atteinte"&&<p className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-900">Vous avez atteint la limite de personnes actives de votre abonnement. Pour en enregistrer une de plus : archivez une personne, ajoutez de la capacité ou changez d’offre. Aucune donnée n’est supprimée.</p>}
+      {cap.etat==="over_capacity"&&<p className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-800">Votre abonnement autorise {cap.totale} personnes actives et vous en avez actuellement {cap.actives}. Aucune nouvelle personne ne peut être activée tant que ce dépassement dure : archivez {Math.max(1,cap.actives-cap.totale)} personne(s), ajoutez de la capacité ou changez d’offre. Aucune donnée n’est supprimée.</p>}
+    </section>}
 
     <section className="rounded-xl border p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">

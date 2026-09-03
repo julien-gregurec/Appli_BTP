@@ -214,6 +214,36 @@ export async function importerDonneesAction(payload: {
     }
   }
 
+  // Plafond de personnes actives : contrôle AVANT toute écriture, jamais d'import
+  // partiel silencieux. Les fiches importées sont toutes créées "actif".
+  if (payload.type === "employes" && enregistrements.length > 0) {
+    const { data: capaciteBrut } = await supabase
+      .rpc("capacite_personnes_entreprise", { p_entreprise_id: entrepriseId })
+      .maybeSingle();
+    const capacite = capaciteBrut as {
+      personnes_actives?: number | null;
+      capacite_totale?: number | null;
+    } | null;
+    if (capacite) {
+      const restant = Math.max(
+        0,
+        Number(capacite.capacite_totale ?? 0) - Number(capacite.personnes_actives ?? 0),
+      );
+      if (enregistrements.length > restant) {
+        return {
+          inseres: 0,
+          ignores: ignores + enregistrements.length,
+          erreurs: [
+            `Import annulé : votre abonnement autorise ${capacite.capacite_totale} personnes actives ` +
+              `(${capacite.personnes_actives} déjà enregistrées, ${restant} place(s) disponible(s)) et le ` +
+              `fichier contient ${enregistrements.length} personne(s) à créer. Ajoutez de la capacité, ` +
+              `changez d’offre ou réduisez le fichier avant de réessayer.`,
+          ],
+        };
+      }
+    }
+  }
+
   // Insertion par lots.
   let inseres = 0;
   for (let i = 0; i < enregistrements.length; i += 200) {
