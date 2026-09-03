@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { choisirPalierOptionIAAction, configurerPolitiqueIAAction, demarrerAbonnementAction, desactiverOptionIAAction, ouvrirPortailAbonnementAction, reactiverOptionIAAction } from "@/app/actions/abonnement";
+import { appliquerCapacitePersonnesAction, choisirPalierOptionIAAction, configurerPolitiqueIAAction, demarrerAbonnementAction, desactiverOptionIAAction, ouvrirPortailAbonnementAction, previsualiserCapacitePersonnesAction, reactiverOptionIAAction } from "@/app/actions/abonnement";
 import { AlerteDepassementAppareils } from "@/components/AlerteDepassementAppareils";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
@@ -12,6 +12,9 @@ import { BRAND_NAME, PRODUCT_NAME, resoudreUrlContactCommercial } from "@/lib/br
 import { calculerGainsOffreSuivante, calculerReductionRemise, CATEGORIES_COMPARATIF, etatLigneComparatif, LIBELLE_ETAT_COMMERCIAL, type EtatCommercial } from "@/lib/comparatif-offres";
 import { estCodeOffreTarifaire } from "@/lib/tarification";
 import { abonnementsPublicsOuverts } from "@/lib/commercialisation-abonnements";
+import { OFFRES_ABONNEMENT_COMMERCIALISEES } from "@/lib/stripe-abonnement";
+import { RACCOURCIS_CAPACITE, resoudreCibleCapacite, resumeChangementCapacite } from "@/lib/stripe-capacite-personnes";
+import { BoutonEnvoi } from "@/components/BoutonEnvoi";
 
 const input = "rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -35,10 +38,10 @@ const FAQ_ABONNEMENT: Array<{ question: string; reponse: string }> = [
   { question: "L'assistant IA est-il disponible dès maintenant ?", reponse: "Pas encore en Production : la fonctionnalité est prête techniquement mais son activation commerciale n'a pas encore eu lieu. Le quota indicatif par offre est affiché ci-dessus." },
 ];
 
-export default async function AbonnementPage({ searchParams }: { searchParams: Promise<{ error?: string; succes?: string }> }) {
-  const [{ error, succes }, ctx] = await Promise.all([searchParams, getContexteEntreprise()]);
+export default async function AbonnementPage({ searchParams }: { searchParams: Promise<{ error?: string; succes?: string; capacite_cible?: string }> }) {
+  const [{ error, succes, capacite_cible }, ctx] = await Promise.all([searchParams, getContexteEntreprise()]);
   const supabase = await createClient();
-  const [{ data: entreprise }, { data: utilisationStockage }, { data: employesFacturables }, { data: postes }, { data: appareils }, consommationIA, { data: facturesAbonnement }, { data: historique }, { data: capacitePersonnes }] = await Promise.all([
+  const [{ data: entreprise }, { data: utilisationStockage }, { data: employesFacturables }, { data: postes }, { data: appareils }, consommationIA, { data: facturesAbonnement }, { data: historique }, { data: capacitePersonnes }, { data: capaciteStripeEtat }] = await Promise.all([
     supabase.from("entreprises").select("abonnement_statut,abonnement_echeance,abonnement_offre,abonnement_periodicite,abonnement_essai_fin,abonnement_annulation_prevue_at,stripe_customer_id,stripe_subscription_id,derniere_facture_url,derniere_facture_pdf,derniere_facture_statut,derniere_facture_at,option_ia_statut,option_ia_essai_fin,option_ia_palier,ia_active,ia_politique_quota,ia_plafond_cout_mensuel_ht,remise_description,remise_appliquee_at,remise_duree_mois,remise_type,remise_valeur").eq("id",ctx.entrepriseId).single(),
     supabase.rpc("utilisation_stockage_entreprise", { p_entreprise_id: ctx.entrepriseId }),
     supabase.from("employes").select("utilisateur_id,prenom,nom,poste_id,compte_application_statut").eq("entreprise_id", ctx.entrepriseId).in("compte_application_statut", ["actif", "pause"]),
@@ -48,6 +51,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
     supabase.from("factures_abonnement").select("id,numero,periode_debut,periode_fin,montant_ttc,devise,statut,url_facture,url_pdf,created_at").eq("entreprise_id",ctx.entrepriseId).order("created_at",{ascending:false}).limit(24),
     supabase.from("historique_tarification").select("id,action,motif,created_at,nouveau").eq("entreprise_id",ctx.entrepriseId).order("created_at",{ascending:false}).limit(20),
     supabase.rpc("capacite_personnes_entreprise", { p_entreprise_id: ctx.entrepriseId }).maybeSingle(),
+    supabase.rpc("capacite_stripe_etat_entreprise", { p_entreprise_id: ctx.entrepriseId }).maybeSingle(),
   ]);
   const statut = statutAbonnement(entreprise?.abonnement_statut ?? "essai");
   const configure = stripeBillingEstConfigure();
@@ -106,6 +110,43 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
       }
     : null;
 
+  // ── Capacité supplémentaire : gestion en libre-service (R2-C) ──────────────
+  const capStripe = (capaciteStripeEtat ?? null) as {
+    capacite_supplementaire_planifiee?: number | null;
+    planifiee_effet_at?: string | null;
+    operation_en_cours?: string | null;
+    operation_en_cours_type?: string | null;
+  } | null;
+  const capaciteOffreEligible = (OFFRES_ABONNEMENT_COMMERCIALISEES as readonly string[]).includes(String(entreprise?.abonnement_offre ?? ""));
+  const capaciteMensuel = entreprise?.abonnement_periodicite === "mensuel";
+  const capaciteGerable = Boolean(cap) && souscrit && capaciteOffreEligible && capaciteMensuel;
+  const operationCapaciteEnCours = String(capStripe?.operation_en_cours ?? "");
+  const capaciteFigee = ["pending", "stripe_applied", "db_applied", "needs_reconcile"].includes(operationCapaciteEnCours);
+  const LIBELLE_OPERATION_CAPACITE: Record<string, { texte: string; classe: string }> = {
+    pending: { texte: "Mise à jour en cours", classe: "bg-blue-50 text-blue-800 dark:bg-blue-950/30 dark:text-blue-300" },
+    stripe_applied: { texte: "Mise à jour en cours", classe: "bg-blue-50 text-blue-800 dark:bg-blue-950/30 dark:text-blue-300" },
+    db_applied: { texte: "Mise à jour en cours", classe: "bg-blue-50 text-blue-800 dark:bg-blue-950/30 dark:text-blue-300" },
+    needs_reconcile: { texte: "Vérification nécessaire", classe: "bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-300" },
+    scheduled: { texte: "Modification planifiée", classe: "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300" },
+    failed: { texte: "Échec", classe: "bg-red-50 text-red-800 dark:bg-red-950/30 dark:text-red-300" },
+  };
+  const baissePlanifiee = capStripe?.planifiee_effet_at != null && capStripe?.capacite_supplementaire_planifiee != null
+    ? { cible: Number(capStripe.capacite_supplementaire_planifiee), effetAt: String(capStripe.planifiee_effet_at) }
+    : null;
+  // Écran de confirmation (étape 2) : cible transmise par la prévisualisation, bornée serveur.
+  const capaciteCibleDemande = capaciteGerable && !capaciteFigee && capacite_cible != null
+    ? resoudreCibleCapacite({ actuel: cap?.sup ?? 0, cibleAbsolue: Number(capacite_cible) })
+    : null;
+  const resumeCapacite = capaciteCibleDemande != null && capaciteCibleDemande !== (cap?.sup ?? 0)
+    ? resumeChangementCapacite({
+        plan: entreprise?.abonnement_offre ?? null,
+        capaciteBase: cap?.base ?? 0,
+        personnesActives: cap?.actives ?? 0,
+        supplementActuel: cap?.sup ?? 0,
+        supplementCible: capaciteCibleDemande,
+      })
+    : null;
+
   return <main className="p-4 sm:p-8"><div className="mx-auto max-w-5xl space-y-6">
     <header><h1 className="text-xl font-semibold">Mon abonnement {PRODUCT_NAME}</h1><p className="text-sm text-neutral-500">Offre, moyen de paiement, échéances et factures de votre entreprise.</p></header>
     {error&&<p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
@@ -122,7 +163,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
       {entreprise?.abonnement_annulation_prevue_at&&<p className="sm:col-span-3 rounded bg-amber-50 p-3 text-sm text-amber-900">Résiliation programmée le {new Date(entreprise.abonnement_annulation_prevue_at).toLocaleDateString("fr-FR")}.</p>}
     </section>
 
-    {cap&&<section className="rounded-xl border p-5">
+    {cap&&<section id="capacite" className="rounded-xl border p-5 scroll-mt-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-semibold">Personnes actives</h2>
@@ -133,6 +174,78 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
       {cap.sup>0&&<p className="mt-2 text-xs text-neutral-500">{cap.base} incluses dans l’offre + {cap.sup} de capacité supplémentaire.</p>}
       {cap.etat==="limite_atteinte"&&<p className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-900">Vous avez atteint la limite de personnes actives de votre abonnement. Pour en enregistrer une de plus : archivez une personne, ajoutez de la capacité ou changez d’offre. Aucune donnée n’est supprimée.</p>}
       {cap.etat==="over_capacity"&&<p className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-800">Votre abonnement autorise {cap.totale} personnes actives et vous en avez actuellement {cap.actives}. Aucune nouvelle personne ne peut être activée tant que ce dépassement dure : archivez {Math.max(1,cap.actives-cap.totale)} personne(s), ajoutez de la capacité ou changez d’offre. Aucune donnée n’est supprimée.</p>}
+
+      {capaciteGerable && <div className="mt-4 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h3 className="text-sm font-semibold">Capacité supplémentaire</h3>
+            <p className="mt-1 text-xs text-neutral-500">Personnes actives au-delà des {cap.base} incluses. {euros(offre.parCompteSup)} HT/mois par personne, facturé sur votre abonnement. Hausse : effet immédiat, facture proratisée. Baisse : effet à la fin de la période, sans suppression de personne.</p>
+          </div>
+          {capaciteFigee && <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${LIBELLE_OPERATION_CAPACITE[operationCapaciteEnCours]?.classe ?? ""}`}>{LIBELLE_OPERATION_CAPACITE[operationCapaciteEnCours]?.texte ?? "Mise à jour en cours"}</span>}
+        </div>
+
+        <p className="mt-3 text-sm">Aujourd’hui : <strong>{cap.sup}</strong> personne(s) supplémentaire(s) — {euros(cap.sup * offre.parCompteSup)} HT/mois.</p>
+
+        {baissePlanifiee && <div className="mt-2 rounded-md bg-neutral-100 p-3 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+          <p>Modification planifiée : passage à {baissePlanifiee.cible} personne(s) supplémentaire(s) le {new Date(baissePlanifiee.effetAt).toLocaleDateString("fr-FR")}. Aucune personne ne sera supprimée.</p>
+          {cap.actives > cap.base + baissePlanifiee.cible && <p className="mt-1 font-medium text-amber-800 dark:text-amber-300">Votre entreprise sera au-dessus de sa capacité à cette date : aucune personne ne sera supprimée, mais toute nouvelle activation sera bloquée.</p>}
+        </div>}
+
+        {capaciteFigee
+          ? <p className="mt-3 text-xs text-neutral-500">Les ajustements de capacité sont indisponibles tant qu’une opération est en cours.</p>
+          : !resumeCapacite && <div className="mt-3 space-y-3">
+              <div>
+                <p className="text-xs font-medium text-neutral-500">Ajouter</p>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {RACCOURCIS_CAPACITE.map((n) => <form key={`h${n}`} action={previsualiserCapacitePersonnesAction}>
+                    <input type="hidden" name="raccourci" value={n} /><input type="hidden" name="sens" value="hausse" />
+                    <BoutonEnvoi className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-900" libelleEnCours="…">
+                      <span aria-label={`Ajouter ${n} personne${n>1?"s":""} supplémentaire${n>1?"s":""}`}>+{n}</span>
+                    </BoutonEnvoi>
+                  </form>)}
+                </div>
+              </div>
+              {cap.sup > 0 && <div>
+                <p className="text-xs font-medium text-neutral-500">Réduire (effet fin de période)</p>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {RACCOURCIS_CAPACITE.filter((n) => n <= cap.sup).map((n) => <form key={`b${n}`} action={previsualiserCapacitePersonnesAction}>
+                    <input type="hidden" name="raccourci" value={n} /><input type="hidden" name="sens" value="baisse" />
+                    <BoutonEnvoi className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-900" libelleEnCours="…">
+                      <span aria-label={`Retirer ${n} personne${n>1?"s":""} supplémentaire${n>1?"s":""}`}>−{n}</span>
+                    </BoutonEnvoi>
+                  </form>)}
+                </div>
+              </div>}
+            </div>}
+
+        {resumeCapacite && <div role="alertdialog" aria-labelledby="capacite-confirm-titre" className="mt-3 rounded-lg border-2 border-[#0d1b2a] p-4 dark:border-neutral-200">
+          <h4 id="capacite-confirm-titre" className="text-sm font-semibold">Confirmer le changement de capacité</h4>
+          {resumeCapacite.sens === "hausse"
+            ? <div className="mt-2 space-y-1 text-sm">
+                <p>Vous ajoutez <strong>{resumeCapacite.deltaPersonnes}</strong> personne(s) supplémentaire(s) à {euros(resumeCapacite.prixUnitaireMensuelHt)} HT/mois/personne.</p>
+                <p>Nouveau supplément mensuel : <strong>{euros(resumeCapacite.coutMensuelCibleHt)} HT</strong> (soit +{euros(resumeCapacite.coutMensuelDeltaHt)} HT/mois).</p>
+                <p>Capacité totale : {cap.totale} → <strong>{resumeCapacite.capaciteTotaleProjetee}</strong> personnes actives.</p>
+                <p className="text-xs text-neutral-500">Une facturation proratisée peut être générée immédiatement.</p>
+              </div>
+            : <div className="mt-2 space-y-1 text-sm">
+                <p>Vous réduisez de <strong>{Math.abs(resumeCapacite.deltaPersonnes)}</strong> personne(s) supplémentaire(s).</p>
+                <p>Capacité actuelle : {cap.totale} → future : <strong>{resumeCapacite.capaciteTotaleProjetee}</strong> personnes actives.</p>
+                <p>Effet : fin de la période en cours{entreprise?.abonnement_echeance ? ` (le ${new Date(entreprise.abonnement_echeance).toLocaleDateString("fr-FR")})` : ""}. Aucune personne ne sera supprimée.</p>
+                {resumeCapacite.depasseraCapacite && <p className="font-medium text-amber-800 dark:text-amber-300">Votre entreprise sera au-dessus de sa capacité à la date d’effet. Aucune personne ne sera supprimée, mais toute nouvelle activation sera bloquée.</p>}
+              </div>}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <form action={appliquerCapacitePersonnesAction}>
+              <input type="hidden" name="cible" value={resumeCapacite.supplementCible} />
+              <BoutonEnvoi className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60" libelleEnCours="Application en cours…">Confirmer</BoutonEnvoi>
+            </form>
+            <Link href="/abonnement#capacite" className="rounded-md border px-4 py-2 text-sm font-medium">Annuler</Link>
+          </div>
+        </div>}
+
+        <p className="mt-3 text-[11px] text-neutral-500">La capacité se gère ici, pas depuis le portail Stripe. Pour annuler une baisse déjà planifiée avant son échéance, contactez-nous.</p>
+      </div>}
+
+      {cap && !capaciteGerable && souscrit && (cap.sup > 0 || cap.etat !== "ok") && <p className="mt-3 text-xs text-neutral-500">La gestion en libre-service de la capacité supplémentaire n’est pas disponible pour votre offre ou votre périodicité. <Link href={contactCommercial} className="underline">Contactez-nous</Link> pour l’ajuster.</p>}
     </section>}
 
     <section className="rounded-xl border p-5">

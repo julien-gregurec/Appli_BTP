@@ -11,7 +11,10 @@ import {
   prixCapacitePersonnePour,
   prochaineTransitionSaga,
   QuantiteCapaciteInvalideError,
+  RACCOURCIS_CAPACITE,
+  resoudreCibleCapacite,
   resoudrePlanPeriodicite,
+  resumeChangementCapacite,
   sagaEstTerminale,
   SEMANTIQUE_CAPACITE,
   validerQuantiteCapacite,
@@ -290,5 +293,79 @@ describe("résolution plan/périodicité sûre", () => {
     expect(resoudrePlanPeriodicite("pro", "hebdo")).toBeNull();
     expect(resoudrePlanPeriodicite(null, "mensuel")).toBeNull();
     expect(resoudrePlanPeriodicite("pro", undefined)).toBeNull();
+  });
+});
+
+describe("résolution serveur de la cible de capacité (R2-C)", () => {
+  it("raccourci +5 depuis 2 → 7", () => {
+    expect(resoudreCibleCapacite({ actuel: 2, delta: 5 })).toBe(7);
+  });
+  it("raccourci +10 depuis 0 → 10", () => {
+    expect(resoudreCibleCapacite({ actuel: 0, delta: 10 })).toBe(10);
+  });
+  it("raccourci −5 depuis 8 → 3", () => {
+    expect(resoudreCibleCapacite({ actuel: 8, delta: -5 })).toBe(3);
+  });
+  it("baisse bornée à 0 (jamais négative)", () => {
+    expect(resoudreCibleCapacite({ actuel: 3, delta: -10 })).toBe(0);
+  });
+  it("cible absolue prime sur delta", () => {
+    expect(resoudreCibleCapacite({ actuel: 2, delta: 5, cibleAbsolue: 12 })).toBe(12);
+  });
+  it("cible absolue négative → 0, au-delà du max → max", () => {
+    expect(resoudreCibleCapacite({ actuel: 4, cibleAbsolue: -3 })).toBe(0);
+    expect(resoudreCibleCapacite({ actuel: 4, cibleAbsolue: CAPACITE_SUPPLEMENTAIRE_MAX + 50 })).toBe(CAPACITE_SUPPLEMENTAIRE_MAX);
+  });
+  it("valeur non finie ou fractionnaire → normalisée", () => {
+    expect(resoudreCibleCapacite({ actuel: 5, delta: Number.NaN })).toBe(5);
+    expect(resoudreCibleCapacite({ actuel: 5, cibleAbsolue: 7.9 })).toBe(7);
+  });
+  it("raccourcis figés = 1 / 5 / 10", () => {
+    expect([...RACCOURCIS_CAPACITE]).toEqual([1, 5, 10]);
+  });
+});
+
+describe("résumé chiffré d'un changement de capacité (écran de confirmation R2-C)", () => {
+  it("Mini : prix unitaire 15 € HT/mois, hausse +1", () => {
+    const r = resumeChangementCapacite({ plan: "mini", capaciteBase: 3, personnesActives: 3, supplementActuel: 0, supplementCible: 1 });
+    expect(r).toMatchObject({ sens: "hausse", prixUnitaireMensuelHt: 15, deltaPersonnes: 1, coutMensuelCibleHt: 15, coutMensuelDeltaHt: 15 });
+  });
+  it("Pro : prix unitaire 12 €, 2 → 7 personnes supplémentaires", () => {
+    const r = resumeChangementCapacite({ plan: "pro", capaciteBase: 15, personnesActives: 10, supplementActuel: 2, supplementCible: 7 });
+    expect(r).toMatchObject({
+      sens: "hausse",
+      prixUnitaireMensuelHt: 12,
+      deltaPersonnes: 5,
+      coutMensuelActuelHt: 24,
+      coutMensuelCibleHt: 84,
+      coutMensuelDeltaHt: 60,
+      capaciteTotaleProjetee: 22,
+    });
+  });
+  it("Business et Entreprise : prix unitaire 9 €", () => {
+    expect(resumeChangementCapacite({ plan: "business", capaciteBase: 30, personnesActives: 0, supplementActuel: 0, supplementCible: 4 })?.prixUnitaireMensuelHt).toBe(9);
+    expect(resumeChangementCapacite({ plan: "entreprise", capaciteBase: 50, personnesActives: 0, supplementActuel: 0, supplementCible: 4 })?.prixUnitaireMensuelHt).toBe(9);
+  });
+  it("baisse : delta et coût mensuel négatifs, capacité projetée réduite", () => {
+    const r = resumeChangementCapacite({ plan: "mini", capaciteBase: 3, personnesActives: 4, supplementActuel: 10, supplementCible: 5 });
+    expect(r).toMatchObject({ sens: "baisse", deltaPersonnes: -5, coutMensuelDeltaHt: -75, capaciteTotaleProjetee: 8 });
+  });
+  it("cible identique → sens « aucun »", () => {
+    expect(resumeChangementCapacite({ plan: "pro", capaciteBase: 15, personnesActives: 5, supplementActuel: 7, supplementCible: 7 })?.sens).toBe("aucun");
+  });
+  it("baisse mettant l'entreprise au-dessus de sa capacité → depasseraCapacite = true", () => {
+    const r = resumeChangementCapacite({ plan: "pro", capaciteBase: 15, personnesActives: 20, supplementActuel: 10, supplementCible: 3 });
+    expect(r?.capaciteTotaleProjetee).toBe(18);
+    expect(r?.depasseraCapacite).toBe(true);
+  });
+  it("baisse restant dans la capacité → depasseraCapacite = false", () => {
+    const r = resumeChangementCapacite({ plan: "pro", capaciteBase: 15, personnesActives: 16, supplementActuel: 10, supplementCible: 3 });
+    expect(r?.depasseraCapacite).toBe(false);
+  });
+  it("offre non commercialisée ou inconnue → null (capacité à la carte indisponible)", () => {
+    expect(resumeChangementCapacite({ plan: "essentiel", capaciteBase: 2, personnesActives: 0, supplementActuel: 0, supplementCible: 3 })).toBeNull();
+    expect(resumeChangementCapacite({ plan: "sur_mesure", capaciteBase: 50, personnesActives: 0, supplementActuel: 0, supplementCible: 3 })).toBeNull();
+    expect(resumeChangementCapacite({ plan: "gold", capaciteBase: 0, personnesActives: 0, supplementActuel: 0, supplementCible: 3 })).toBeNull();
+    expect(resumeChangementCapacite({ plan: null, capaciteBase: 0, personnesActives: 0, supplementActuel: 0, supplementCible: 3 })).toBeNull();
   });
 });

@@ -16,8 +16,15 @@ import {
   estPalierOptionIA,
   estPeriodiciteAbonnement,
   modifierOptionIAAbonnement,
+  OFFRES_ABONNEMENT_COMMERCIALISEES,
   retirerOptionIAAbonnement,
 } from "@/lib/stripe-abonnement";
+import {
+  CAPACITE_SUPPLEMENTAIRE_MAX,
+  RACCOURCIS_CAPACITE,
+  resoudreCibleCapacite,
+} from "@/lib/stripe-capacite-personnes";
+import { reconcilierCapacitePersonnesStripe } from "@/lib/stripe-capacite-reconcile";
 
 async function verifierDroitAbonnement() {
   const ctx = await getContexteEntreprise();
@@ -224,6 +231,125 @@ export async function choisirPalierOptionIAAction(formData: FormData) {
   }
   revalidatePath("/abonnement");
   redirect(`/abonnement?succes=1`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Capacité personnes actives supplémentaires (R2-C)
+//
+// Contrat commercial figé : capacité supplémentaire = PERSONNE ACTIVE
+// supplémentaire ; un seul Price unitaire par offre × quantity ; hausse = effet
+// immédiat + prorata ; baisse = effet fin de période ; aucune suppression de
+// personne ; gestion depuis ELSATIA, jamais le portail Stripe. Le serveur résout
+// entièrement la cible : aucun Price ID, item id, ni quantité hors bornes fourni
+// par le client n'est utilisé.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CHEMIN_CAPACITE = "/abonnement#capacite";
+
+function offreCapaciteEligible(offre: string | null | undefined): boolean {
+  return (OFFRES_ABONNEMENT_COMMERCIALISEES as readonly string[]).includes(String(offre ?? ""));
+}
+
+/**
+ * Étape 1 — prévisualisation. Ne mute RIEN : calcule la cible serveur à partir
+ * d'un raccourci (+1/+5/+10, hausse ou baisse) et renvoie l'utilisateur vers
+ * l'écran de confirmation (`?capacite_cible=`).
+ */
+export async function previsualiserCapacitePersonnesAction(formData: FormData) {
+  const ctx = await verifierDroitAbonnement();
+  const raccourci = Number(formData.get("raccourci"));
+  const sens = String(formData.get("sens") ?? "hausse");
+  if (!RACCOURCIS_CAPACITE.includes(raccourci as (typeof RACCOURCIS_CAPACITE)[number]) || (sens !== "hausse" && sens !== "baisse")) {
+    redirect(`/abonnement?error=${encodeURIComponent("Choix de capacité invalide")}`);
+  }
+  const supabase = await createClient();
+  const { data: entreprise } = await supabase
+    .from("entreprises")
+    .select("stripe_subscription_id,abonnement_offre,abonnement_periodicite,capacite_personnes_supplementaire")
+    .eq("id", ctx.entrepriseId)
+    .maybeSingle();
+  if (!entreprise?.stripe_subscription_id) {
+    redirect(`/abonnement?error=${encodeURIComponent("Aucun abonnement actif : souscrivez avant d’ajuster la capacité.")}`);
+  }
+  if (!offreCapaciteEligible(entreprise?.abonnement_offre)) {
+    redirect(`/abonnement?error=${encodeURIComponent("La capacité à la carte n’est pas disponible pour votre offre. Contactez-nous.")}`);
+  }
+  if (entreprise?.abonnement_periodicite !== "mensuel") {
+    redirect(`/abonnement?error=${encodeURIComponent("La gestion en libre-service de la capacité n’est pas encore disponible pour les abonnements annuels. Contactez-nous.")}`);
+  }
+  const actuel = Number(entreprise?.capacite_personnes_supplementaire ?? 0);
+  const delta = sens === "baisse" ? -raccourci : raccourci;
+  const cible = resoudreCibleCapacite({ actuel, delta });
+  if (cible === actuel) {
+    redirect(CHEMIN_CAPACITE);
+  }
+  redirect(`/abonnement?capacite_cible=${cible}#capacite`);
+}
+
+/**
+ * Étape 2 — application, après confirmation explicite. Déclenche l'opération
+ * R2-B (`reconcilierCapacitePersonnesStripe`, source « systeme ») : hausse
+ * appliquée immédiatement après confirmation Stripe, baisse planifiée à la fin
+ * de la période. Idempotent (clé dérivée de l'intention).
+ */
+export async function appliquerCapacitePersonnesAction(formData: FormData) {
+  const ctx = await verifierDroitAbonnement();
+  const cibleNum = Number(formData.get("cible"));
+  if (!Number.isInteger(cibleNum) || cibleNum < 0 || cibleNum > CAPACITE_SUPPLEMENTAIRE_MAX) {
+    redirect(`/abonnement?error=${encodeURIComponent("Capacité cible invalide")}`);
+  }
+  const supabase = await createClient();
+  const [{ data: entreprise }, { data: etatCapacite }] = await Promise.all([
+    supabase
+      .from("entreprises")
+      .select("stripe_subscription_id,abonnement_offre,abonnement_periodicite,capacite_personnes_supplementaire")
+      .eq("id", ctx.entrepriseId)
+      .maybeSingle(),
+    supabase.rpc("capacite_stripe_etat_entreprise", { p_entreprise_id: ctx.entrepriseId }).maybeSingle(),
+  ]);
+  if (!entreprise?.stripe_subscription_id) {
+    redirect(`/abonnement?error=${encodeURIComponent("Aucun abonnement actif : souscrivez avant d’ajuster la capacité.")}`);
+  }
+  if (!offreCapaciteEligible(entreprise?.abonnement_offre)) {
+    redirect(`/abonnement?error=${encodeURIComponent("La capacité à la carte n’est pas disponible pour votre offre. Contactez-nous.")}`);
+  }
+  if (entreprise?.abonnement_periodicite !== "mensuel") {
+    redirect(`/abonnement?error=${encodeURIComponent("La gestion en libre-service de la capacité n’est pas encore disponible pour les abonnements annuels. Contactez-nous.")}`);
+  }
+  const operationEnCours = String((etatCapacite as { operation_en_cours?: string | null } | null)?.operation_en_cours ?? "");
+  if (["pending", "stripe_applied", "db_applied", "needs_reconcile"].includes(operationEnCours)) {
+    redirect(`/abonnement?error=${encodeURIComponent("Une mise à jour de capacité est déjà en cours. Réessayez dans quelques minutes.")}`);
+  }
+  const actuel = Number(entreprise?.capacite_personnes_supplementaire ?? 0);
+  if (cibleNum === actuel) {
+    redirect(CHEMIN_CAPACITE);
+  }
+
+  let chemin = "/abonnement?succes=1";
+  try {
+    const resultat = await reconcilierCapacitePersonnesStripe({
+      entrepriseId: ctx.entrepriseId,
+      cibleExplicite: cibleNum,
+      source: "systeme",
+    });
+    if (!resultat.synchronise) {
+      const messages: Record<string, string> = {
+        stripe_erreur: "La facturation a refusé l’opération. Aucun changement n’a été appliqué. Réessayez ou contactez-nous.",
+        db_needs_reconcile: "La mise à jour a été envoyée mais nécessite une vérification. Elle se terminera automatiquement sous peu ; rien n’est facturé en double.",
+        classification_non_fiable: "Votre abonnement présente une configuration inattendue. Contactez-nous, aucun changement n’a été appliqué.",
+        prix_capacite_absent: "La capacité à la carte n’est pas encore configurée pour votre offre. Contactez-nous.",
+        abonnement_absent: "Aucun abonnement actif : souscrivez avant d’ajuster la capacité.",
+        plan_invalide: "Changement impossible pour le moment.",
+        evenement_perime: "Changement impossible pour le moment.",
+      };
+      chemin = `/abonnement?error=${encodeURIComponent(messages[resultat.raison] ?? "Changement impossible pour le moment.")}`;
+    }
+  } catch (error) {
+    console.error("appliquerCapacitePersonnesAction", error);
+    chemin = `/abonnement?error=${encodeURIComponent("Changement impossible pour le moment. Réessayez ou contactez-nous.")}`;
+  }
+  revalidatePath("/abonnement");
+  redirect(chemin);
 }
 
 export async function ouvrirPortailAbonnementSuspenduAction() {

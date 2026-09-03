@@ -1,10 +1,12 @@
 import {
   estOffreAbonnement,
   estPeriodiciteAbonnement,
+  OFFRES_ABONNEMENT_COMMERCIALISEES,
   type OffreAbonnement,
   type PeriodiciteAbonnement,
   type StripeSubscription,
 } from "@/lib/stripe-abonnement";
+import { offreTarifaireParCle } from "@/lib/tarification";
 
 /**
  * ELSATIA-CAPACITY-STRIPE-R2 — logique pure (slice 1 : DB + lib + tests).
@@ -417,4 +419,101 @@ export function resoudrePlanPeriodicite(
   if (!offre || !periodicite) return null;
   if (!estOffreAbonnement(offre) || !estPeriodiciteAbonnement(periodicite)) return null;
   return { plan: offre, periodicite };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 10. Présentation d'un changement de capacité (UI abonnement — R2-C)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Raccourcis UX. Ce ne sont PAS des Prices distincts : un raccourci n'est qu'un
+ * incrément appliqué à `quantity` sur l'unique Price capacité du plan.
+ */
+export const RACCOURCIS_CAPACITE = [1, 5, 10] as const;
+
+export type SensChangementCapacite = "hausse" | "baisse" | "aucun";
+
+export type ResumeChangementCapacite = {
+  plan: OffreAbonnement;
+  sens: SensChangementCapacite;
+  /** Prix unitaire mensuel HT d'une personne active supplémentaire pour ce plan
+   *  (grille tarifaire canonique serveur : `OffreTarifaire.parCompteSup`). */
+  prixUnitaireMensuelHt: number;
+  supplementActuel: number;
+  supplementCible: number;
+  /** `supplementCible - supplementActuel`, signé. */
+  deltaPersonnes: number;
+  coutMensuelActuelHt: number;
+  coutMensuelCibleHt: number;
+  /** Différence signée de coût mensuel HT (positive = hausse). */
+  coutMensuelDeltaHt: number;
+  /** Capacité totale projetée (base du forfait + supplément cible). */
+  capaciteTotaleProjetee: number;
+  /** true si une baisse laisserait l'entreprise au-dessus de sa capacité. */
+  depasseraCapacite: boolean;
+};
+
+/**
+ * Résout la quantité cible côté serveur à partir d'un incrément (raccourci
+ * +1/+5/+10, positif ou négatif) OU d'une valeur absolue. Le résultat est
+ * toujours un entier borné à `[0, CAPACITE_SUPPLEMENTAIRE_MAX]` : aucune valeur
+ * client n'est utilisée telle quelle.
+ */
+export function resoudreCibleCapacite(params: {
+  actuel: number;
+  delta?: number | null;
+  cibleAbsolue?: number | null;
+}): number {
+  const actuel = Number.isFinite(params.actuel) ? Math.trunc(params.actuel) : 0;
+  let cible: number;
+  if (params.cibleAbsolue != null && Number.isFinite(Number(params.cibleAbsolue))) {
+    cible = Number(params.cibleAbsolue);
+  } else if (params.delta != null && Number.isFinite(Number(params.delta))) {
+    cible = actuel + Number(params.delta);
+  } else {
+    cible = actuel;
+  }
+  cible = Math.trunc(cible);
+  if (cible < 0) cible = 0;
+  if (cible > CAPACITE_SUPPLEMENTAIRE_MAX) cible = CAPACITE_SUPPLEMENTAIRE_MAX;
+  return cible;
+}
+
+/**
+ * Construit le résumé chiffré d'un passage de `supplementActuel` →
+ * `supplementCible` personnes actives supplémentaires, pour l'écran de
+ * confirmation. Retourne `null` si le plan n'est pas une offre commercialisée
+ * (Mini/Pro/Business/Entreprise) : la capacité à la carte n'y est pas proposée.
+ */
+export function resumeChangementCapacite(params: {
+  plan: string | null | undefined;
+  capaciteBase: number;
+  personnesActives: number;
+  supplementActuel: number;
+  supplementCible: number;
+}): ResumeChangementCapacite | null {
+  const plan = params.plan ?? "";
+  if (!estOffreAbonnement(plan)) return null;
+  if (!(OFFRES_ABONNEMENT_COMMERCIALISEES as readonly string[]).includes(plan)) return null;
+
+  const prixUnitaire = offreTarifaireParCle(plan).parCompteSup;
+  const actuel = Math.max(0, Math.trunc(params.supplementActuel));
+  const cible = Math.max(0, Math.trunc(params.supplementCible));
+  const delta = cible - actuel;
+  const sens: SensChangementCapacite = delta === 0 ? "aucun" : delta > 0 ? "hausse" : "baisse";
+  const capaciteTotaleProjetee = Math.max(0, Math.trunc(params.capaciteBase)) + cible;
+
+  return {
+    plan: plan as OffreAbonnement,
+    sens,
+    prixUnitaireMensuelHt: prixUnitaire,
+    supplementActuel: actuel,
+    supplementCible: cible,
+    deltaPersonnes: delta,
+    coutMensuelActuelHt: actuel * prixUnitaire,
+    coutMensuelCibleHt: cible * prixUnitaire,
+    coutMensuelDeltaHt: delta * prixUnitaire,
+    capaciteTotaleProjetee,
+    depasseraCapacite: Math.trunc(params.personnesActives) > capaciteTotaleProjetee,
+  };
 }

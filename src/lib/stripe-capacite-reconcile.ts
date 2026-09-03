@@ -115,6 +115,14 @@ export async function reconcilierCapacitePersonnesStripe(params: {
   /** Horodatage `event.created` (epoch secondes) quand appelé depuis un webhook. */
   evenementCreatedAt?: number | null;
   source?: "webhook" | "cron" | "systeme";
+  /**
+   * Chemin action serveur (R2-C) : quantité cible décidée par l'utilisateur, déjà
+   * bornée serveur. Quand fournie, elle prime sur la valeur DB courante — la DB
+   * effective n'est écrite qu'après confirmation Stripe (hausse) ou reste
+   * inchangée jusqu'à l'échéance (baisse planifiée). Absente (webhook/cron), la
+   * DB `capacite_personnes_supplementaire` reste l'autorité.
+   */
+  cibleExplicite?: number | null;
   deps?: Partial<DepsReconcileCapacite>;
 }): Promise<ResultatReconcileCapacite> {
   const deps = resoudreDeps(params.deps);
@@ -145,7 +153,9 @@ export async function reconcilierCapacitePersonnesStripe(params: {
     }
   }
 
-  const cible = validerQuantiteCapacite(ent.capacite_personnes_supplementaire ?? 0);
+  const cible = validerQuantiteCapacite(
+    params.cibleExplicite != null ? params.cibleExplicite : (ent.capacite_personnes_supplementaire ?? 0),
+  );
   const prixCapaciteAttendu = prixCapacitePersonnePour(pp.plan, pp.periodicite, deps.env);
   if (!prixCapaciteAttendu && cible > 0) {
     return { synchronise: false, raison: "prix_capacite_absent" };

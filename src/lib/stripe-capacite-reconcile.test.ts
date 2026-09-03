@@ -329,3 +329,80 @@ describe("reprendreOperationsCapaciteStripe (cron)", () => {
     expect(out.traitees).toBe(0);
   });
 });
+
+describe("chemin action serveur — cibleExplicite (R2-C)", () => {
+  it("hausse explicite : crée l'item même si la DB effective est encore à 0", async () => {
+    const { admin, state } = fakeAdmin({ ...ENTREPRISE_BASE, capacite_personnes_supplementaire: 0 });
+    const requete = vi.fn<RequeteStripeMinimal>();
+    const rec = vi.fn<(id: string) => Promise<StripeSubscription>>()
+      .mockResolvedValueOnce(sub([{ id: "si_base", quantity: 1, price: { id: "price_base_mini_m" } }]))
+      .mockResolvedValueOnce(sub([
+        { id: "si_base", quantity: 1, price: { id: "price_base_mini_m" } },
+        { id: "si_cap", quantity: 5, price: { id: "price_cap_mini_m" } },
+      ]));
+    const r = await reconcilierCapacitePersonnesStripe({
+      entrepriseId: "e1",
+      cibleExplicite: 5,
+      source: "systeme",
+      deps: deps({ admin, requete, recupererAbonnement: rec }),
+    });
+    expect(r).toMatchObject({ synchronise: true, action: "creation", quantiteApres: 5 });
+    expect((requete.mock.calls[0][1] as { corps: URLSearchParams }).corps.get("quantity")).toBe("5");
+    expect(state.rpcCalls.at(-1)?.args.p_statut_final).toBe("completed");
+    expect(state.rpcCalls.at(-1)?.args.p_source).toBe("systeme");
+  });
+
+  it("cibleExplicite prime sur la valeur DB courante (0 en DB, item Stripe à 2 → cible 5)", async () => {
+    const { admin } = fakeAdmin({ ...ENTREPRISE_BASE, capacite_personnes_supplementaire: 0 });
+    const requete = vi.fn<RequeteStripeMinimal>();
+    const rec = vi.fn<(id: string) => Promise<StripeSubscription>>()
+      .mockResolvedValueOnce(sub([{ id: "si_cap", quantity: 2, price: { id: "price_cap_mini_m" } }]))
+      .mockResolvedValueOnce(sub([{ id: "si_cap", quantity: 5, price: { id: "price_cap_mini_m" } }]));
+    const r = await reconcilierCapacitePersonnesStripe({
+      entrepriseId: "e1",
+      cibleExplicite: 5,
+      deps: deps({ admin, requete, recupererAbonnement: rec }),
+    });
+    expect(r).toMatchObject({ synchronise: true, action: "mise_a_jour", quantiteAvant: 2, quantiteApres: 5 });
+  });
+
+  it("baisse explicite : planifiée fin de période, aucune mutation Stripe immédiate", async () => {
+    const { admin, state } = fakeAdmin({ ...ENTREPRISE_BASE, capacite_personnes_supplementaire: 10 });
+    const requete = vi.fn<RequeteStripeMinimal>();
+    const rec = vi.fn(async () => sub([{ id: "si_cap", quantity: 10, price: { id: "price_cap_mini_m" } }], { current_period_end: 9_999 }));
+    const r = await reconcilierCapacitePersonnesStripe({
+      entrepriseId: "e1",
+      cibleExplicite: 5,
+      source: "systeme",
+      deps: deps({ admin, requete, recupererAbonnement: rec }),
+    });
+    expect(r).toMatchObject({ synchronise: true, action: "mise_a_jour", quantiteAvant: 10, quantiteApres: 5 });
+    expect(requete).not.toHaveBeenCalled();
+    const call = state.rpcCalls.find((c) => c.fn === "synchroniser_capacite_stripe_service");
+    expect(call?.args.p_type_operation).toBe("baisse");
+    expect(call?.args.p_date_effet_souhaitee).toBe(new Date(9_999 * 1000).toISOString());
+  });
+
+  it("cibleExplicite déjà atteinte côté Stripe → no-op, aucune mutation ni RPC", async () => {
+    const { admin, state } = fakeAdmin({ ...ENTREPRISE_BASE, capacite_personnes_supplementaire: 3 });
+    const requete = vi.fn<RequeteStripeMinimal>();
+    const rec = vi.fn(async () => sub([{ id: "si_cap", quantity: 3, price: { id: "price_cap_mini_m" } }]));
+    const r = await reconcilierCapacitePersonnesStripe({
+      entrepriseId: "e1",
+      cibleExplicite: 3,
+      deps: deps({ admin, requete, recupererAbonnement: rec }),
+    });
+    expect(r).toMatchObject({ synchronise: true, action: "aucune" });
+    expect(requete).not.toHaveBeenCalled();
+    expect(state.rpcCalls).toHaveLength(0);
+  });
+
+  it("clé d'idempotence dérivée de la cible explicite (double soumission → même clé)", async () => {
+    const { admin, state } = fakeAdmin({ ...ENTREPRISE_BASE, capacite_personnes_supplementaire: 0 });
+    const rec = vi.fn<(id: string) => Promise<StripeSubscription>>()
+      .mockResolvedValue(sub([{ id: "si_cap", quantity: 2, price: { id: "price_cap_mini_m" } }], { current_period_start: 42 }));
+    await reconcilierCapacitePersonnesStripe({ entrepriseId: "e1", cibleExplicite: 5, deps: deps({ admin, requete: vi.fn<RequeteStripeMinimal>(), recupererAbonnement: rec }) });
+    const idem = state.rpcCalls.at(-1)?.args.p_idempotency_key as string;
+    expect(idem).toBe("capacite:hausse:e1:sub_A:5:42");
+  });
+});
