@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ajouterDepassementAppareilsFacture, ajouterDepassementStockageFacture, calculerDepassementAppareils, reconcilierAbonnementStripe, recupererAbonnementStripe, statutAbonnementDepuisStripe, type StripeSubscription } from "@/lib/stripe-abonnement";
 import { verifierSignatureStripe } from "@/lib/stripe";
 import { categoriserErreurSupabase, empreinteEvenementStripe, identifiantUuidValide, resoudreModeStripeWebhook } from "@/lib/stripe-webhook-environment";
+import { reconcilierCapacitePersonnesStripe } from "@/lib/stripe-capacite-reconcile";
 import { passerelleStripeRemise } from "@/lib/stripe-discount-gateway";
 import { acquerirVerrouRemise, libererVerrouRemise, lireOperationActiveRemiseServeur, reconcilierOperationRemiseSousVerrou, synchroniserExpirationRemiseSousVerrou } from "@/lib/stripe-discount-server";
 
@@ -34,7 +35,7 @@ type StripeObjet = {
   total?: number;
   total_tax_amounts?: Array<{ amount?: number }>;
 };
-type StripeEvent = { id: string; type: string; livemode: boolean; account?: string; data: { object: StripeObjet } };
+type StripeEvent = { id: string; type: string; livemode: boolean; created?: number; account?: string; data: { object: StripeObjet } };
 type SupabaseAdmin = ReturnType<typeof createAdminClient>;
 type EntrepriseStripe = { id: string; stripe_customer_id?: string | null; stripe_subscription_id?: string | null };
 type ResolutionEntreprise =
@@ -291,10 +292,15 @@ export async function POST(request: Request) {
       if (!subscriptionId) throw new Error("Abonnement absent de la session Stripe");
       statutResultant = await synchroniserAbonnementCoordonne(admin, entrepriseId, subscriptionId, evenement.id);
       await reconcilierAbonnementStripe(entrepriseId);
+      // R2-B : capacité personnes = DB → Stripe (autorité DB, out-of-order safe).
+      await reconcilierCapacitePersonnesStripe({ entrepriseId, evenementCreatedAt: evenement.created, source: "webhook" }).catch(() => undefined);
     } else if (["customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"].includes(evenement.type)) {
       const subscriptionId = objet.object === "subscription" ? objet.id : identifiant(objet.subscription);
       if (!subscriptionId) throw new Error("Abonnement Stripe introuvable");
       statutResultant = await synchroniserAbonnementCoordonne(admin, entrepriseId, subscriptionId, evenement.id);
+      if (entrepriseId) {
+        await reconcilierCapacitePersonnesStripe({ entrepriseId, evenementCreatedAt: evenement.created, source: "webhook" }).catch(() => undefined);
+      }
     } else if (evenement.type === "invoice.created" && objet.billing_reason !== "subscription_create") {
       if (!entrepriseId) throw new Error("Entreprise de la facture Stripe introuvable");
       const customerId = identifiant(objet.customer);

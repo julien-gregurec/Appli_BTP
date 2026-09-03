@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ajouterOptionIAAbonnement, estPalierOptionIA, estPeriodiciteAbonnement, reconcilierAbonnementStripe } from "@/lib/stripe-abonnement";
 import { cronsSontActifs, relancesAutoEstActive } from "@/lib/preview-features";
 import { traiterRelancesAutomatiques } from "@/lib/relances-cron";
+import { reprendreOperationsCapaciteStripe } from "@/lib/stripe-capacite-reconcile";
 
 // Bascule les essais Option IA expires vers la facturation reelle. Regroupe avec le cron
 // des abonnements (et non un cron dedie) car le plan Vercel Hobby limite le nombre de
@@ -90,7 +91,15 @@ async function executerJobsHistoriques(admin: ReturnType<typeof createAdminClien
   const optionIA = await convertirEssaisOptionIAExpires(admin);
   const paiePeriodes = await synchroniserPeriodesPaieOuvertes(admin);
   const alertesPointage = await notifierPointagesManquantsEtAValider(admin);
-  return { traitees: resultats.length, resultats, optionIA, paiePeriodes, alertesPointage };
+  // R2-B : reprise des opérations de capacité `needs_reconcile` et application
+  // des baisses de capacité programmées arrivées à échéance (fin de période).
+  let capacite: Awaited<ReturnType<typeof reprendreOperationsCapaciteStripe>> | { erreur: string } = { traitees: 0, details: [] };
+  try {
+    capacite = await reprendreOperationsCapaciteStripe();
+  } catch (erreur) {
+    capacite = { erreur: erreur instanceof Error ? erreur.message : "Reprise capacité impossible" };
+  }
+  return { traitees: resultats.length, resultats, optionIA, paiePeriodes, alertesPointage, capacite };
 }
 
 export async function GET(request: Request) {

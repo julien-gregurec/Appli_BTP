@@ -133,6 +133,30 @@ export function prixStripePour(
   return variable ? environnement[variable] || null : null;
 }
 
+/** Ensemble de tous les Price IDs de forfait de base configurés (toutes offres × périodicités). */
+export function allowlistPrixBase(environnement: Record<string, string | undefined> = process.env): Set<string> {
+  const ids = new Set<string>();
+  for (const parPeriode of Object.values(VARIABLES_PRIX)) {
+    for (const variable of Object.values(parPeriode)) {
+      const valeur = environnement[variable];
+      if (valeur) ids.add(valeur);
+    }
+  }
+  return ids;
+}
+
+/** Ensemble de tous les Price IDs d'option IA configurés (tous paliers × périodicités). */
+export function allowlistPrixOptionIA(environnement: Record<string, string | undefined> = process.env): Set<string> {
+  const ids = new Set<string>();
+  for (const parPeriode of Object.values(VARIABLES_PRIX_OPTION_IA)) {
+    for (const variable of Object.values(parPeriode)) {
+      const valeur = environnement[variable];
+      if (valeur) ids.add(valeur);
+    }
+  }
+  return ids;
+}
+
 export function variablesStripeBillingManquantes(environnement: NodeJS.ProcessEnv = process.env) {
   const variables = [
     "STRIPE_SECRET_KEY",
