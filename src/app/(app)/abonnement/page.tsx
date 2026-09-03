@@ -42,7 +42,7 @@ const FAQ_ABONNEMENT: Array<{ question: string; reponse: string }> = [
 export default async function AbonnementPage({ searchParams }: { searchParams: Promise<{ error?: string; succes?: string; capacite_cible?: string }> }) {
   const [{ error, succes, capacite_cible }, ctx] = await Promise.all([searchParams, getContexteEntreprise()]);
   const supabase = await createClient();
-  const [{ data: entreprise }, { data: utilisationStockage }, { data: employesFacturables }, { data: postes }, { data: appareils }, consommationIA, { data: facturesAbonnement }, { data: historique }, { data: capacitePersonnes }, { data: capaciteStripeEtat }] = await Promise.all([
+  const [{ data: entreprise }, { data: utilisationStockage }, { data: employesFacturables }, { data: postes }, { data: appareils }, consommationIA, { data: facturesAbonnement }, { data: historique }, { data: capacitePersonnes }, { data: capaciteStripeEtat }, { data: modulesEtat }] = await Promise.all([
     supabase.from("entreprises").select("abonnement_statut,abonnement_echeance,abonnement_offre,abonnement_periodicite,abonnement_essai_fin,abonnement_annulation_prevue_at,stripe_customer_id,stripe_subscription_id,derniere_facture_url,derniere_facture_pdf,derniere_facture_statut,derniere_facture_at,option_ia_statut,option_ia_essai_fin,option_ia_palier,ia_active,ia_politique_quota,ia_plafond_cout_mensuel_ht,remise_description,remise_appliquee_at,remise_duree_mois,remise_type,remise_valeur").eq("id",ctx.entrepriseId).single(),
     supabase.rpc("utilisation_stockage_entreprise", { p_entreprise_id: ctx.entrepriseId }),
     supabase.from("employes").select("utilisateur_id,prenom,nom,poste_id,compte_application_statut").eq("entreprise_id", ctx.entrepriseId).in("compte_application_statut", ["actif", "pause"]),
@@ -53,6 +53,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
     supabase.from("historique_tarification").select("id,action,motif,created_at,nouveau").eq("entreprise_id",ctx.entrepriseId).order("created_at",{ascending:false}).limit(20),
     supabase.rpc("capacite_personnes_entreprise", { p_entreprise_id: ctx.entrepriseId }).maybeSingle(),
     supabase.rpc("capacite_stripe_etat_entreprise", { p_entreprise_id: ctx.entrepriseId }).maybeSingle(),
+    supabase.rpc("modules_entreprise_etat", { p_entreprise_id: ctx.entrepriseId }),
   ]);
   const statut = statutAbonnement(entreprise?.abonnement_statut ?? "essai");
   const configure = stripeBillingEstConfigure();
@@ -97,6 +98,17 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
   const paiementEnEchec = entreprise?.abonnement_statut === "suspendu" && souscrit;
   const euros = (montant: number) => montant.toLocaleString("fr-FR", { style: "currency", currency: "EUR", minimumFractionDigits: 2 });
   const contactCommercial = resoudreUrlContactCommercial();
+  type ModuleEtatRow = {
+    module_code: string; nom: string; description: string | null; categorie: string;
+    statut_catalogue: string; inclus_plan: boolean; entitlement_actif: boolean;
+    origine: string | null; valide_jusqu: string | null;
+  };
+  const modules = ((modulesEtat ?? []) as ModuleEtatRow[]);
+  const modulesInclus = modules.filter((m) => m.inclus_plan);
+  const modulesActifs = modules.filter((m) => m.entitlement_actif && !m.inclus_plan);
+  const modulesDisponibles = modules.filter(
+    (m) => !m.inclus_plan && !m.entitlement_actif && (m.statut_catalogue === "actif" || m.statut_catalogue === "bientot"),
+  );
   const capRow = (capacitePersonnes ?? null) as {
     personnes_actives?: number; capacite_base?: number; capacite_supplementaire?: number;
     capacite_totale?: number; etat?: string;
@@ -250,6 +262,29 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
       </div>}
 
       {cap && !capaciteGerable && souscrit && (cap.sup > 0 || cap.etat !== "ok") && <p className="mt-3 text-xs text-neutral-500">La gestion en libre-service de la capacité supplémentaire n’est pas disponible pour votre offre ou votre périodicité. <Link href={contactCommercial} className="underline">Contactez-nous</Link> pour l’ajuster.</p>}
+    </section>}
+
+    {modules.length>0&&<section className="rounded-xl border p-5">
+      <div><h2 className="font-semibold">Modules</h2><p className="mt-1 text-sm text-neutral-500">Les modules optionnels s’ajoutent à n’importe quel forfait. La désactivation d’un module ne supprime jamais vos données.</p></div>
+      <div className="mt-4 space-y-4 text-sm">
+        <div>
+          <p className="text-xs font-semibold uppercase text-neutral-500">Inclus dans votre offre</p>
+          {modulesInclus.length
+            ? <ul className="mt-2 flex flex-wrap gap-2">{modulesInclus.map(m=><li key={m.module_code} className="rounded-full border border-green-300 bg-green-50 px-3 py-1 text-green-800 dark:bg-green-950/30 dark:text-green-200">{m.nom}</li>)}</ul>
+            : <p className="mt-1 text-neutral-500">Aucun module inclus.</p>}
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase text-neutral-500">Modules ajoutés</p>
+          {modulesActifs.length
+            ? <ul className="mt-2 space-y-1">{modulesActifs.map(m=><li key={m.module_code} className="flex flex-wrap items-center gap-2"><span className="rounded-full border border-blue-300 bg-blue-50 px-3 py-1 text-blue-800 dark:bg-blue-950/30 dark:text-blue-200">{m.nom}</span><span className="text-xs text-neutral-500">{m.origine==="essai"?"essai":m.origine==="offert"?"offert":m.origine==="achat"?"acheté":"actif"}{m.valide_jusqu?` · jusqu’au ${new Date(m.valide_jusqu).toLocaleDateString("fr-FR")}`:""}</span></li>)}</ul>
+            : <p className="mt-1 text-neutral-500">Aucun module ajouté pour l’instant.</p>}
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase text-neutral-500">Disponibles</p>
+          <ul className="mt-2 space-y-1">{modulesDisponibles.map(m=><li key={m.module_code} className="flex flex-wrap items-center gap-2 text-neutral-600 dark:text-neutral-400"><span className="font-medium text-neutral-800 dark:text-neutral-200">{m.nom}</span><span className="text-xs">{m.statut_catalogue==="actif"?"Nous contacter":"Bientôt disponible"}</span></li>)}</ul>
+          <p className="mt-2 text-xs text-neutral-500">Les tarifs des modules seront communiqués à l’ouverture de la souscription en ligne.</p>
+        </div>
+      </div>
     </section>}
 
     <section className="rounded-xl border p-5">
