@@ -158,7 +158,17 @@ export async function updateSession(request: NextRequest) {
         .select("abonnement_offre")
         .eq("id", ctx.entreprise_id)
         .maybeSingle();
-      const droitsInclus = droitsAcces.some((droit) => permissionIncluseDansOffre(droit, entreprise?.abonnement_offre));
+      let droitsInclus = droitsAcces.some((droit) => permissionIncluseDansOffre(droit, entreprise?.abonnement_offre));
+      if (!droitsInclus) {
+        // R3 : un module optionnel explicitement acquis par l'entreprise (achat,
+        // offert, essai, geste plateforme) débloque sa permission porte-d'entrée,
+        // quel que soit le forfait. Contrôle en OU : n'enlève jamais un accès plan.
+        const { data: parModule } = await supabase.rpc("acces_module_pour_permission", {
+          p_entreprise_id: ctx.entreprise_id,
+          p_permissions: droitsAcces,
+        });
+        droitsInclus = parModule === true;
+      }
       if (!droitsInclus) {
         const url = request.nextUrl.clone();
         url.pathname = "/abonnement/module-non-inclus";

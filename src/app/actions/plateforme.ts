@@ -42,6 +42,39 @@ export async function modifierAbonnementAction(entrepriseId: string, formData: F
   redirect("/plateforme?succes=1");
 }
 
+// R3 : activation/désactivation d'un module optionnel pour une entreprise cliente.
+// La RPC exige déjà plateforme + AAL2 ; ici on ne fait que router l'appel.
+export async function definirModuleEntrepriseAction(entrepriseId: string, formData: FormData) {
+  if (!(await estPlateformeAdmin())) {
+    redirect("/dashboard");
+  }
+  const moduleCode = String(formData.get("module_code") ?? "").trim();
+  const actif = String(formData.get("actif") ?? "") === "true";
+  const origine = String(formData.get("origine") ?? "admin").trim() || "admin";
+  const valideDu = String(formData.get("valide_du") ?? "").trim() || null;
+  const valideJusqu = String(formData.get("valide_jusqu") ?? "").trim() || null;
+  const referenceExterne = String(formData.get("reference_externe") ?? "").trim() || null;
+  const motif = String(formData.get("motif") ?? "").trim() || null;
+  if (!moduleCode) redirect(`/plateforme?error=${encodeURIComponent("Module manquant")}`);
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("plateforme_definir_module_entreprise", {
+    p_entreprise_id: entrepriseId,
+    p_module_code: moduleCode,
+    p_actif: actif,
+    p_origine: origine,
+    p_valide_du: valideDu,
+    p_valide_jusqu: valideJusqu,
+    p_reference_externe: referenceExterne,
+    p_motif: motif,
+    p_source: "admin_plateforme",
+  });
+  if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/plateforme");
+  revalidatePath("/abonnement");
+  redirect("/plateforme?succes=1");
+}
+
 export async function creerEntreprisePlateformeAction(formData:FormData){
   if(!(await estPlateformeAdmin()))redirect("/dashboard");
   const nom=String(formData.get("nom")??"").trim(),siret=String(formData.get("siret")??"").trim()||null,ville=String(formData.get("ville")??"").trim()||null;
