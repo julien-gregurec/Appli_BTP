@@ -352,6 +352,32 @@ export async function appliquerCapacitePersonnesAction(formData: FormData) {
   redirect(chemin);
 }
 
+/**
+ * Annule une baisse de capacité planifiée (« scheduled ») avant son échéance.
+ * La capacité effective ne change pas ; l'opération planifiée est fermée. Sans
+ * effet (renvoi métier `false`) si aucune baisse n'est planifiée ou si son
+ * échéance est déjà atteinte (le cron l'appliquera).
+ */
+export async function annulerBaisseCapacitePlanifieeAction() {
+  const ctx = await verifierDroitAbonnement();
+  const supabase = await createClient();
+  let chemin = "/abonnement?succes=1";
+  try {
+    const { data, error } = await supabase.rpc("annuler_baisse_capacite_planifiee", { p_entreprise_id: ctx.entrepriseId });
+    if (error) {
+      console.error("annulerBaisseCapacitePlanifieeAction", error);
+      chemin = `/abonnement?error=${encodeURIComponent("Annulation impossible pour le moment. Réessayez ou contactez-nous.")}`;
+    } else if (data !== true) {
+      chemin = `/abonnement?error=${encodeURIComponent("Aucune modification planifiée à annuler, ou son échéance est déjà atteinte.")}`;
+    }
+  } catch (error) {
+    console.error("annulerBaisseCapacitePlanifieeAction", error);
+    chemin = `/abonnement?error=${encodeURIComponent("Annulation impossible pour le moment. Réessayez ou contactez-nous.")}`;
+  }
+  revalidatePath("/abonnement");
+  redirect(chemin);
+}
+
 export async function ouvrirPortailAbonnementSuspenduAction() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

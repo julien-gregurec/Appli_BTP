@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { appliquerCapacitePersonnesAction, choisirPalierOptionIAAction, configurerPolitiqueIAAction, demarrerAbonnementAction, desactiverOptionIAAction, ouvrirPortailAbonnementAction, previsualiserCapacitePersonnesAction, reactiverOptionIAAction } from "@/app/actions/abonnement";
+import { annulerBaisseCapacitePlanifieeAction, appliquerCapacitePersonnesAction, choisirPalierOptionIAAction, configurerPolitiqueIAAction, demarrerAbonnementAction, desactiverOptionIAAction, ouvrirPortailAbonnementAction, previsualiserCapacitePersonnesAction, reactiverOptionIAAction } from "@/app/actions/abonnement";
+import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { AlerteDepassementAppareils } from "@/components/AlerteDepassementAppareils";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
@@ -189,6 +190,9 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
         {baissePlanifiee && <div className="mt-2 rounded-md bg-neutral-100 p-3 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
           <p>Modification planifiée : passage à {baissePlanifiee.cible} personne(s) supplémentaire(s) le {new Date(baissePlanifiee.effetAt).toLocaleDateString("fr-FR")}. Aucune personne ne sera supprimée.</p>
           {cap.actives > cap.base + baissePlanifiee.cible && <p className="mt-1 font-medium text-amber-800 dark:text-amber-300">Votre entreprise sera au-dessus de sa capacité à cette date : aucune personne ne sera supprimée, mais toute nouvelle activation sera bloquée.</p>}
+          <form action={annulerBaisseCapacitePlanifieeAction} className="mt-2">
+            <ConfirmSubmitButton message="Annuler la modification planifiée ? Votre capacité supplémentaire actuelle est conservée." className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium hover:bg-neutral-50 dark:border-neutral-600 dark:hover:bg-neutral-900">Annuler la modification planifiée</ConfirmSubmitButton>
+          </form>
         </div>}
 
         {capaciteFigee
