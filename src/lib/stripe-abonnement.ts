@@ -1,5 +1,4 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { calculerDepassementsAppareilsFacturables } from "@/lib/facturation-appareils";
 import { DUREE_ESSAI_JOURS, offreParCle, REDUCTION_ANNUELLE } from "@/lib/plateforme";
 
 export const OFFRES_ABONNEMENT = ["essentiel", "premium", "mini", "pro", "business", "entreprise", "sur_mesure"] as const;
@@ -511,17 +510,15 @@ export async function modifierOptionIAAbonnement(
 
 export async function calculerDepassementAppareils(entrepriseId: string) {
   const admin = createAdminClient();
-  const [{ data: appareils }, { data: employes }, { data: postes }, { data: entreprise }] = await Promise.all([
-    admin.from("appareils_comptes").select("utilisateur_id").eq("entreprise_id", entrepriseId).is("revoque_at", null),
-    admin.from("employes").select("utilisateur_id,prenom,nom,poste_id,compte_application_statut").eq("entreprise_id", entrepriseId).in("compte_application_statut", ["actif", "pause"]),
-    admin.from("postes").select("id,nom,tarif_compte_mensuel").eq("entreprise_id", entrepriseId),
+  // ACL canonique (migration 255) : `service_role` n'a plus SELECT sur
+  // `appareils_comptes` / `employes` / `postes`. Le calcul du dépassement passe
+  // par une RPC SECURITY DEFINER en lecture seule.
+  const [{ data: mensuelBrut, error }, { data: entreprise }] = await Promise.all([
+    admin.rpc("calculer_depassement_appareils_service", { p_entreprise_id: entrepriseId }),
     admin.from("entreprises").select("abonnement_periodicite").eq("id", entrepriseId).maybeSingle(),
   ]);
-  const mensuel = calculerDepassementsAppareilsFacturables({
-    appareils: appareils ?? [],
-    employes: employes ?? [],
-    postes: postes ?? [],
-  }).reduce((total, ligne) => total + ligne.supplementMensuelHt, 0);
+  if (error) throw new Error(error.message);
+  const mensuel = Math.max(0, Number(mensuelBrut ?? 0));
   return entreprise?.abonnement_periodicite === "annuel" ? Math.round(mensuel * 12 * (1 - REDUCTION_ANNUELLE) * 100) / 100 : mensuel;
 }
 
@@ -539,15 +536,10 @@ export async function ajouterDepassementStockageFacture(params: {
   invoiceId: string;
 }) {
   const admin = createAdminClient();
-  const { data: releveExistant } = await admin
-    .from("abonnement_stockage_releves")
-    .select("stripe_invoice_item_id,montant_ht")
-    .eq("stripe_invoice_id", params.invoiceId)
-    .maybeSingle();
-  if (releveExistant?.stripe_invoice_item_id || Number(releveExistant?.montant_ht ?? 0) === 0 && releveExistant) {
-    return releveExistant;
-  }
-
+  // ACL canonique (migration 255) : `service_role` n'a plus SELECT/INSERT/UPDATE
+  // sur `abonnement_stockage_releves`. Lecture offre (colonnes autorisées) +
+  // utilisation (RPC existante) restent directes ; l'enregistrement du relevé et
+  // sa finalisation passent par des RPC de service.
   const [{ data: entreprise, error: entrepriseErreur }, { data: utilisation, error: utilisationErreur }] = await Promise.all([
     admin
       .from("entreprises")
@@ -569,21 +561,24 @@ export async function ajouterDepassementStockageFacture(params: {
   const quotaGo = offreParCle(offre).stockageGoInclus;
   const calcul = calculerFacturationStockage({ octetsUtilises, quotaGo, periodicite });
 
-  const { error: releveErreur } = await admin.from("abonnement_stockage_releves").upsert({
-    entreprise_id: params.entrepriseId,
-    stripe_invoice_id: params.invoiceId,
-    offre,
-    periodicite,
-    octets_utilises: octetsUtilises,
-    fichiers,
-    quota_go: quotaGo,
-    depassement_go: calcul.depassementGo,
-    tarif_go_ht: TARIF_STOCKAGE_SUPPLEMENTAIRE_HT_PAR_GO,
-    nombre_mois: calcul.nombreMois,
-    montant_ht: calcul.montantHt,
-    updated_at: new Date().toISOString(),
-  }, { onConflict: "stripe_invoice_id" });
+  const { data: enregistrement, error: releveErreur } = await admin.rpc("enregistrer_releve_stockage_service", {
+    p_entreprise_id: params.entrepriseId,
+    p_stripe_invoice_id: params.invoiceId,
+    p_offre: offre,
+    p_periodicite: periodicite,
+    p_octets: octetsUtilises,
+    p_fichiers: fichiers,
+    p_quota_go: quotaGo,
+    p_depassement_go: calcul.depassementGo,
+    p_tarif_go_ht: TARIF_STOCKAGE_SUPPLEMENTAIRE_HT_PAR_GO,
+    p_nombre_mois: calcul.nombreMois,
+    p_montant_ht: calcul.montantHt,
+  });
   if (releveErreur) throw new Error(releveErreur.message);
+  // Invoice déjà facturé (item Stripe posé) ou dépassement nul : pas de re-facturation.
+  if ((enregistrement as { deja_traite?: boolean } | null)?.deja_traite) {
+    return { montant_ht: Number((enregistrement as { montant_ht?: number }).montant_ht ?? 0), stripe_invoice_item_id: null };
+  }
   if (calcul.montantHt <= 0) return { montant_ht: 0, stripe_invoice_item_id: null };
 
   const suffixePeriode = calcul.nombreMois === 12 ? " · période annuelle de 12 mois" : "";
@@ -601,10 +596,10 @@ export async function ajouterDepassementStockageFacture(params: {
     }),
     idempotence: `abonnement-stockage-${params.invoiceId}`,
   });
-  const { error: miseAJourErreur } = await admin
-    .from("abonnement_stockage_releves")
-    .update({ stripe_invoice_item_id: ligne.id, updated_at: new Date().toISOString() })
-    .eq("stripe_invoice_id", params.invoiceId);
+  const { error: miseAJourErreur } = await admin.rpc("finaliser_releve_stockage_service", {
+    p_stripe_invoice_id: params.invoiceId,
+    p_stripe_invoice_item_id: ligne.id,
+  });
   if (miseAJourErreur) throw new Error(miseAJourErreur.message);
   return ligne;
 }

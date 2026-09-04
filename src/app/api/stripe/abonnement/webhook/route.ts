@@ -5,7 +5,23 @@ import { verifierSignatureStripe } from "@/lib/stripe";
 import { categoriserErreurSupabase, empreinteEvenementStripe, identifiantUuidValide, resoudreModeStripeWebhook } from "@/lib/stripe-webhook-environment";
 import { reconcilierCapacitePersonnesStripe } from "@/lib/stripe-capacite-reconcile";
 import { passerelleStripeRemise } from "@/lib/stripe-discount-gateway";
-import { acquerirVerrouRemise, libererVerrouRemise, lireOperationActiveRemiseServeur, reconcilierOperationRemiseSousVerrou, synchroniserExpirationRemiseSousVerrou } from "@/lib/stripe-discount-server";
+import { acquerirVerrouRemise, libererVerrouRemise, lireOperationActiveRemiseServeur, reconcilierOperationRemiseSousVerrou, synchroniserExpirationRemiseSousVerrou, VerrouRemiseOccupe } from "@/lib/stripe-discount-server";
+
+// B1 — un verrou remise occupé est un état transitoire (un autre évènement de la
+// MÊME subscription est en cours de traitement), pas une panne. On tente une
+// courte reprise en place ; si le verrou reste occupé, l'appelant renvoie un
+// code HTTP « rejouable » (503) pour que Stripe re-livre — jamais un 500.
+async function acquerirVerrouRemiseAvecReprise(admin: SupabaseAdmin, subscriptionId: string, proprietaire: string) {
+  const attentesMs = [150, 300, 600];
+  for (let i = 0; ; i++) {
+    try {
+      return await acquerirVerrouRemise(admin, subscriptionId, proprietaire);
+    } catch (e) {
+      if (!(e instanceof VerrouRemiseOccupe) || i >= attentesMs.length) throw e;
+      await new Promise((r) => setTimeout(r, attentesMs[i]));
+    }
+  }
+}
 
 type StripeReference = string | { id?: string } | null | undefined;
 type StripeObjet = {
@@ -160,11 +176,20 @@ export async function synchroniserAbonnementCoordonne(
   subscriptionId: string,
   evenementId: string,
 ) {
-  const verrou = await acquerirVerrouRemise(admin, subscriptionId, `webhook:${empreinteEvenementStripe(evenementId)}`);
+  const verrou = await acquerirVerrouRemiseAvecReprise(admin, subscriptionId, `webhook:${empreinteEvenementStripe(evenementId)}`);
   try {
     // Le payload peut être ancien ou désordonné : seule cette relecture est une
     // observation Stripe utilisable pour la remise et la saga active.
     let abonnementActuel = await recupererAbonnementStripe(subscriptionId);
+    // B3 — première liaison : la chaîne remise ci-dessous exige que la
+    // subscription soit déjà rattachée à l'entreprise. On lie ici (CAS sur NULL,
+    // fail-closed si déjà liée à une autre subscription).
+    const lien = await admin.rpc("lier_subscription_entreprise_service", {
+      p_entreprise_id: entrepriseId,
+      p_stripe_subscription_id: subscriptionId,
+      p_stripe_customer_id: identifiant(abonnementActuel.customer),
+    });
+    if (lien.error) throw new Error(lien.error.message);
     const operation = await lireOperationActiveRemiseServeur(admin, subscriptionId, verrou);
     if (operation) {
       await reconcilierOperationRemiseSousVerrou(admin, operation, verrou, passerelleStripeRemise);
@@ -304,8 +329,16 @@ export async function POST(request: Request) {
       p_statut_resultant: statutResultant,
     });
     return NextResponse.json({ received: true });
-  } catch {
+  } catch (e) {
+    // Rollback de la réservation : l'évènement redeviendra rejouable.
     await admin.rpc("annuler_evenement_abonnement_service", { p_stripe_event_id: evenement.id });
+    // B1 — verrou remise toujours occupé après reprise : état transitoire, pas
+    // une panne. On demande une re-livraison (503 + Retry-After), sans alarme
+    // « error » ni corps d'erreur métier.
+    if (e instanceof VerrouRemiseOccupe) {
+      diagnosticWebhook("warn", evenement, "verrou_remise_occupe", configurationMode.mode);
+      return NextResponse.json({ received: false, deferred: true }, { status: 503, headers: { "Retry-After": "5" } });
+    }
     diagnosticWebhook("error", evenement, "echec_metier_apres_journalisation", configurationMode.mode);
     return NextResponse.json({ error: "Synchronisation impossible" }, { status: 500 });
   }

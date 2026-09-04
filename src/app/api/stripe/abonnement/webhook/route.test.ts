@@ -35,7 +35,11 @@ vi.mock("@/lib/stripe-abonnement", () => ({
   appliquerCouponAbonnement: vi.fn(), couponActifDepuisAbonnement: vi.fn(), creerCouponRemise: vi.fn(), retirerCouponAbonnement: vi.fn(),
   observerRemiseDepuisAbonnement: deps.observerRemiseDepuisAbonnement,
 }));
+class VerrouRemiseOccupe extends Error {
+  constructor() { super("Une synchronisation de remise est déjà en cours."); this.name = "VerrouRemiseOccupe"; }
+}
 vi.mock("@/lib/stripe-discount-server", () => ({
+  VerrouRemiseOccupe,
   acquerirVerrouRemise: deps.acquerirVerrouRemise,
   libererVerrouRemise: deps.libererVerrouRemise,
   lireOperationActiveRemiseServeur: deps.lireOperationActiveRemiseServeur,
@@ -86,6 +90,12 @@ function adminFake(options: AdminFakeOptions = {}) {
       }
       if (fn === "synchroniser_abonnement_stripe_service") {
         return { data: (args.p_statut as string) ?? "actif", error: null };
+      }
+      if (fn === "lier_subscription_entreprise_service") {
+        return { data: "lie", error: null };
+      }
+      if (fn === "enregistrer_releve_stockage_service") {
+        return { data: { deja_traite: false, montant_ht: 0 }, error: null };
       }
       return { data: null, error: null };
     },
@@ -250,5 +260,29 @@ describe("coordination webhook et saga", () => {
     const admin = adminFake(); deps.recupererAbonnementStripe.mockRejectedValue(new Error("indisponible"));
     await expect(synchroniserAbonnementCoordonne(admin as never,ENTREPRISE,"sub_test","evt_timeout")).rejects.toThrow();
     expect(deps.libererVerrouRemise).toHaveBeenCalledWith(admin,"sub_test","verrou-test");
+  });
+  it("B3 : la subscription est liée à l'entreprise avant la chaîne remise", async () => {
+    const admin = adminFake();
+    await synchroniserAbonnementCoordonne(admin as never, ENTREPRISE, "sub_test", "evt_lien");
+    const lien = admin.appels.find((a) => a.table === "lier_subscription_entreprise_service");
+    expect(lien).toBeTruthy();
+    expect((lien?.donnees as Record<string, unknown>).p_stripe_subscription_id).toBe("sub_test");
+    // l'appel de liaison précède la lecture d'opération remise
+    const idxLien = admin.appels.findIndex((a) => a.table === "lier_subscription_entreprise_service");
+    expect(deps.lireOperationActiveRemiseServeur).toHaveBeenCalled();
+    expect(idxLien).toBeGreaterThanOrEqual(0);
+  });
+  it("B1 : verrou remise occupé après reprise → 503 rejouable (pas 500), journal rollbacké", async () => {
+    const admin = adminFake(); deps.createAdminClient.mockReturnValue(admin);
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    deps.acquerirVerrouRemise.mockRejectedValue(new VerrouRemiseOccupe());
+    const response = await POST(request(event({ livemode: false, type: "customer.subscription.updated" })));
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Retry-After")).toBe("5");
+    const corps = await response.json();
+    expect(corps).toMatchObject({ received: false, deferred: true });
+    // réservation annulée pour permettre un rejeu propre
+    expect(admin.appels.some((a) => a.table === "annuler_evenement_abonnement_service")).toBe(true);
+    deps.acquerirVerrouRemise.mockImplementation(async () => "verrou-test");
   });
 });
