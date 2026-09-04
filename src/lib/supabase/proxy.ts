@@ -9,6 +9,13 @@ import { clePubliqueSupabase } from "@/lib/supabase/keys";
 import { optionsCookieAuth } from "@/lib/security/cookies";
 import { decisionGardeMfa } from "@/lib/auth/mfa";
 import { destinationInterneSure } from "@/lib/security/redirects";
+import {
+  PERMISSION_BORNE,
+  cheminAutorisePourCompteDepot,
+  decisionRoutageAuthentifieSurPagePublique,
+  decisionRoutageCompteDepot,
+  estCulDeSacInformatif,
+} from "@/lib/supabase/routage-proxy";
 
 const PUBLIC_PATHS = ["/login", "/signup", "/tarifs", "/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/confidentialite", "/cookies", "/auth", "/mfa", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu", "/guides", "/videos", "/paiement", "/document", "/imprimer/partage", "/api/documents/partage", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements", "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import"];
 
@@ -133,18 +140,57 @@ export async function updateSession(request: NextRequest) {
   });
   if (limiteAuthentifiee) return limiteAuthentifiee;
 
+  // « Module non inclus » est un cul-de-sac informatif : il explique à
+  // l'utilisateur ce que l'offre de l'entreprise ne couvre pas. Il ne porte
+  // aucune donnée sensible et ne doit JAMAIS être renvoyé vers une route
+  // protégée, sous peine de boucle (garde module ↔ priorité compte dépôt).
+  if (estCulDeSacInformatif(request.nextUrl.pathname)) {
+    return response;
+  }
+
+  // Évalue si une permission « porte d'entrée » est réellement ouverte pour
+  // l'entreprise (offre souscrite OU module optionnel acquis — R3). Sert à ne
+  // jamais forcer une redirection vers une route que la garde refusera ensuite.
+  const permissionOuvertePourEntreprise = async (permission: string) => {
+    if (!ctx.entreprise_id || ctx.acces_support === true) return true;
+    const { data: ent } = await supabase
+      .from("entreprises")
+      .select("abonnement_offre")
+      .eq("id", ctx.entreprise_id)
+      .maybeSingle();
+    if (permissionIncluseDansOffre(permission, ent?.abonnement_offre)) return true;
+    const { data: parModule } = await supabase.rpc("acces_module_pour_permission", {
+      p_entreprise_id: ctx.entreprise_id,
+      p_permissions: [permission],
+    });
+    return parModule === true;
+  };
+
   {
     const compteDepot = ctx.compte_depot === true;
-    const cheminDepotAutorise = request.nextUrl.pathname === "/depot" || request.nextUrl.pathname === "/stock" || request.nextUrl.pathname.startsWith("/stock/");
+    const pathname = request.nextUrl.pathname;
 
     // Tant que le compte partagé est connecté, il reste prioritaire : aucune
     // page de connexion ni aucun autre module n'est accessible sans déconnexion.
-    if (compteDepot && !cheminDepotAutorise) {
-      const url=request.nextUrl.clone();url.pathname="/stock/borne";url.search="";
-      return NextResponse.redirect(url);
+    // §2 : on ne vise /stock/borne que si l'entreprise y a réellement droit,
+    // sinon on va droit au cul-de-sac informatif (pas de rebond via la garde).
+    if (compteDepot && !cheminAutorisePourCompteDepot(pathname)) {
+      const borneAccessible = await permissionOuvertePourEntreprise(PERMISSION_BORNE);
+      const decision = decisionRoutageCompteDepot({ compteDepot, pathname, borneAccessible });
+      if (decision.type === "rediriger") {
+        const url = request.nextUrl.clone();
+        url.search = "";
+        url.pathname = decision.pathname;
+        if (decision.module) url.searchParams.set("module", decision.module);
+        return NextResponse.redirect(url);
+      }
     }
-    if ((request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/signup") && !compteDepot) {
-      const url=request.nextUrl.clone();url.pathname="/dashboard";url.search="";
+
+    const decisionPublique = decisionRoutageAuthentifieSurPagePublique({ compteDepot, pathname });
+    if (decisionPublique.type === "rediriger") {
+      const url = request.nextUrl.clone();
+      url.pathname = decisionPublique.pathname;
+      url.search = "";
       return NextResponse.redirect(url);
     }
   }
