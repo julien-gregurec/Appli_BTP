@@ -20,6 +20,9 @@ runbook de bascule/rollback existant :
   `ELSATIA-PRODUCTION-CUTOVER-WINDOW-PREPARATION-V1`, 2026-09-04).
 - **Checklist opérateur imprimable** :
   `docs/runbooks/ELSATIA_PRODUCTION_CUTOVER_OPERATOR_CHECKLIST_V1.md`.
+- **Provisioning attestation Ed25519** (formats, migration créatrice, couple généré, commandes
+  Vercel/SQL exactes) : `docs/runbooks/ELSATIA_ED25519_ATTESTATION_PROVISIONING_V1.md` (lot
+  `ELSATIA-ED25519-PRODUCTION-PREPARATION-V1`, 2026-09-04) — §18bis de ce document.
 
 ---
 
@@ -208,7 +211,12 @@ Valeurs jamais affichées. Présence/état à cocher sur la fiche Vercel (runboo
 
 **Attestation Ed25519 (Stripe state proof) :** `STRIPE_STATE_ATTESTATION_KEY_ID` (non secret,
 doit correspondre entre Vercel et la registry en base), `STRIPE_STATE_ATTESTATION_PRIVATE_KEY_B64`
-(**Vercel uniquement**, jamais dans doc/dump/log).
+(**Vercel uniquement**, jamais dans doc/dump/log). Les deux étaient absentes sur
+`elsatia-production` au 2026-09-04 ; couple Ed25519 (`test`) généré, auto-vérifié et prêt à
+provisionner — procédure complète, formats exacts, migration créatrice (`…244`/`…245`) et
+commandes Vercel/SQL : `ELSATIA_ED25519_ATTESTATION_PROVISIONING_V1.md`. Le registry DB
+(`stripe_attestation.public_keys`/`.configuration`) ne peut être rempli qu'**après** que le
+ledger a atteint `…245` — jamais avant.
 
 **Feature flags / gel commercial :** `ABONNEMENTS_PUBLICS_OUVERTS` (= `false`),
 `FEATURE_AI_ENABLED`, `FEATURE_BOUTIQUE_ENABLED`, `FEATURE_CRONS_ENABLED`,
@@ -777,8 +785,9 @@ backup non testé n'est pas un backup valide au sens de ce runbook.
 - [ ] Mode Stripe = **TEST**
 - [ ] Mode webhook = **TEST** (`STRIPE_WEBHOOK_EXPECTED_MODE=test`)
 - [ ] Aucun secret manquant (fiche §5 complète)
-- [ ] Registry Ed25519 prête (clé publique + `key_id` cohérents Vercel ↔ base) si l'attestation
-      est active
+- [ ] Variables Vercel `STRIPE_STATE_ATTESTATION_KEY_ID`/`_PRIVATE_KEY_B64` provisionnées (§3.1
+      de `ELSATIA_ED25519_ATTESTATION_PROVISIONING_V1.md`) — **le registry DB, lui, se remplit
+      après T0** (§18bis), pas ici
 - [ ] Second admin `total` (**E**) disponible et confirmé joignable
 - [ ] Aucun incident Production en cours (monitoring vérifié avant de lancer)
 
@@ -821,6 +830,20 @@ Exécutée par **A**, sous supervision de **B**.
 - **Après** cette migration : le rollback **coordonné DB + app** est **obligatoire** (§26) — un
   rollback app seul ne suffit plus, quelle que soit la migration atteinte au-delà (256–263
   inclus, qui n'ajoutent aucune régression ACL supplémentaire mais ne changent pas ce constat).
+
+### 18bis. Registry Ed25519 (dès `…244`/`…245` confirmées présentes, avant T+45 Stripe TEST)
+
+Provisioning détaillé, formats et commandes exactes : `ELSATIA_ED25519_ATTESTATION_PROVISIONING_V1.md`.
+
+- [ ] Ledger confirme `20260828000244_stripe_state_attestation_r72` et
+      `20260828000245_stripe_discount_observation_r73` présentes.
+- [ ] `insert into stripe_attestation.configuration(singleton,environment) values(true,'test')`
+      exécuté (connexion privilégiée directe, hors surface PostgREST).
+- [ ] `insert into stripe_attestation.public_keys(key_id,environment,public_key,active_from)`
+      exécuté avec le couple préparé (§2 du document Ed25519).
+- [ ] Correspondance `key_id` ↔ clé publique relue et confirmée identique à celle provisionnée
+      dans Vercel (§3.3 du document Ed25519).
+- [ ] Fichier local contenant la clé privée supprimé (§3.4 du document Ed25519).
 
 ---
 

@@ -60,7 +60,7 @@ Date : ______________  Heure de début (UTC) : ______________
 ☐ SHA app `c1930ab` prêt à déployer ☐ Production Branch = branche canonique (**≠ `main`**)
 ☐ Variables Production présentes (fiche §5 du préflight) ☐ `ABONNEMENTS_PUBLICS_OUVERTS=false`
 ☐ Stripe mode = TEST ☐ Webhook mode = TEST ☐ Aucun secret manquant
-☐ Registry Ed25519 cohérente (si attestation active) ☐ Second admin MFA (E) joignable
+☐ Variables Vercel Ed25519 provisionnées (registry DB = après T0, voir §18bis) ☐ Second admin MFA (E) joignable
 ☐ Aucun incident Production en cours (monitoring vérifié)
 
 **Un seul ☐ non coché → NO-GO, ne pas migrer.**
