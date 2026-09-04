@@ -111,75 +111,46 @@ async function synchroniserAbonnement(admin: SupabaseAdmin, entrepriseId: string
   const offre = abonnement.metadata?.offre;
   const periodicite = abonnement.metadata?.periodicite;
   const statut = statutAbonnementDepuisStripe(abonnement.status);
-  const miseAJour: Record<string, unknown> = {
-    stripe_subscription_id: abonnement.id,
-    stripe_customer_id: identifiant(abonnement.customer),
-    abonnement_statut: statut,
-    abonnement_echeance: dateDepuisUnix(abonnement.current_period_end),
-    abonnement_essai_fin: dateDepuisUnix(abonnement.trial_end),
-    abonnement_annulation_prevue_at: abonnement.cancel_at_period_end ? instantDepuisUnix(abonnement.cancel_at || abonnement.current_period_end) : null,
-    updated_at: new Date().toISOString(),
-  };
-  if (["essentiel", "premium", "mini", "pro", "business", "entreprise", "sur_mesure"].includes(offre || "")) miseAJour.abonnement_offre = offre;
-  if (["mensuel", "annuel"].includes(periodicite || "")) miseAJour.abonnement_periodicite = periodicite;
-  const { error } = await admin.from("entreprises").update(miseAJour).eq("id", entrepriseId);
+  // ACL canonique (migration 255) : `service_role` n'a plus d'écriture directe sur
+  // `entreprises` (hors colonnes abonnement/stripe), `plans_abonnement`,
+  // `abonnements_entreprises`. La synchronisation passe par une RPC SECURITY
+  // DEFINER bornée qui vérifie le lien subscription ↔ entreprise (fail-closed).
+  const { data, error } = await admin.rpc("synchroniser_abonnement_stripe_service", {
+    p_entreprise_id: entrepriseId,
+    p_stripe_subscription_id: abonnement.id,
+    p_stripe_customer_id: identifiant(abonnement.customer),
+    p_statut: statut,
+    p_offre: ["essentiel", "premium", "mini", "pro", "business", "entreprise", "sur_mesure"].includes(offre || "") ? offre : null,
+    p_periodicite: ["mensuel", "annuel"].includes(periodicite || "") ? periodicite : null,
+    p_echeance: dateDepuisUnix(abonnement.current_period_end),
+    p_essai_fin: dateDepuisUnix(abonnement.trial_end),
+    p_annulation_prevue_at: abonnement.cancel_at_period_end ? instantDepuisUnix(abonnement.cancel_at || abonnement.current_period_end) : null,
+    p_debut_periode: instantDepuisUnix(abonnement.current_period_start),
+    p_fin_periode: instantDepuisUnix(abonnement.current_period_end),
+  });
   if (error) throw new Error(error.message);
-  if (offre && periodicite && ["mensuel", "annuel"].includes(periodicite)) {
-    const { data: plan } = await admin
-      .from("plans_abonnement")
-      .select("id,version,prix_mensuel_ht,prix_annuel_ht")
-      .eq("code", offre)
-      .eq("actif", true)
-      .maybeSingle();
-    const { data: contrat } = await admin
-      .from("abonnements_entreprises")
-      .select("id,code_offre,prix_contractuel_ht,version_tarif")
-      .eq("entreprise_id", entrepriseId)
-      .maybeSingle();
-    const memeOffre = contrat?.code_offre === offre;
-    const prixContractuel = memeOffre && contrat?.prix_contractuel_ht != null
-      ? contrat.prix_contractuel_ht
-      : (periodicite === "annuel" ? plan?.prix_annuel_ht : plan?.prix_mensuel_ht);
-    if (plan && prixContractuel != null) {
-      const { error: contratErreur } = await admin.from("abonnements_entreprises").upsert({
-        entreprise_id: entrepriseId,
-        plan_id: plan.id,
-        code_offre: offre,
-        version_tarif: memeOffre ? contrat?.version_tarif ?? plan.version : plan.version,
-        periodicite,
-        prix_contractuel_ht: prixContractuel,
-        statut: statut === "actif" ? "actif" : statut === "suspendu" ? "suspendu" : statut === "annule" ? "annule" : "essai",
-        debut_periode: instantDepuisUnix(abonnement.current_period_start),
-        fin_periode: instantDepuisUnix(abonnement.current_period_end),
-        stripe_subscription_id: abonnement.id,
-        stripe_customer_id: identifiant(abonnement.customer),
-        updated_at: new Date().toISOString(),
-      }, { onConflict: "entreprise_id" });
-      if (contratErreur) throw new Error(contratErreur.message);
-    }
-  }
-  return statut;
+  return (data as string) ?? statut;
 }
 
 async function synchroniserFactureAbonnement(admin: SupabaseAdmin, entrepriseId: string, objet: StripeObjet, statut: string) {
   const taxes = (objet.total_tax_amounts ?? []).reduce((total, taxe) => total + Number(taxe.amount ?? 0), 0);
   const totalCentimes = Number(objet.total ?? 0);
   const htCentimes = objet.subtotal_excluding_tax == null ? Math.max(0, totalCentimes - taxes) : Number(objet.subtotal_excluding_tax);
-  const { error } = await admin.from("factures_abonnement").upsert({
-    entreprise_id: entrepriseId,
-    stripe_invoice_id: objet.id,
-    numero: objet.number ?? null,
-    periode_debut: instantDepuisUnix(objet.period_start),
-    periode_fin: instantDepuisUnix(objet.period_end),
-    montant_ht: htCentimes / 100,
-    montant_tva: taxes / 100,
-    montant_ttc: totalCentimes / 100,
-    devise: (objet.currency ?? "eur").toUpperCase(),
-    statut,
-    url_facture: objet.hosted_invoice_url ?? null,
-    url_pdf: objet.invoice_pdf ?? null,
-    payee_at: statut === "paid" ? new Date().toISOString() : null,
-  }, { onConflict: "stripe_invoice_id" });
+  // ACL canonique : `factures_abonnement` n'est plus écrite en direct par `service_role`.
+  const { error } = await admin.rpc("synchroniser_facture_abonnement_service", {
+    p_entreprise_id: entrepriseId,
+    p_stripe_invoice_id: objet.id,
+    p_numero: objet.number ?? null,
+    p_periode_debut: instantDepuisUnix(objet.period_start),
+    p_periode_fin: instantDepuisUnix(objet.period_end),
+    p_montant_ht: htCentimes / 100,
+    p_montant_tva: taxes / 100,
+    p_montant_ttc: totalCentimes / 100,
+    p_devise: (objet.currency ?? "eur").toUpperCase(),
+    p_statut: statut,
+    p_url_facture: objet.hosted_invoice_url ?? null,
+    p_url_pdf: objet.invoice_pdf ?? null,
+  });
   if (error) throw new Error(error.message);
 }
 
@@ -260,13 +231,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Événement Stripe non traitable" }, { status: statut });
   }
   const entrepriseId = resolutionEntreprise.entrepriseId;
-  let reservation: { code?: string; message?: string } | null;
+  // ACL canonique : le journal d'idempotence passe par une RPC de service dédiée
+  // (`service_role` n'a plus d'accès direct à `abonnement_evenements`).
+  let reservation: { code?: string; message?: string } | null = null;
+  let reservationEtat: string | null = null;
   try {
-    const resultat = await admin.from("abonnement_evenements").insert({
-      stripe_event_id: evenement.id,
-      entreprise_id: entrepriseId,
-      type: evenement.type,
-      payload: {
+    const resultat = await admin.rpc("reserver_evenement_abonnement_service", {
+      p_stripe_event_id: evenement.id,
+      p_entreprise_id: entrepriseId,
+      p_type: evenement.type,
+      p_payload: {
         livemode: evenement.livemode,
         object_id: objet.id,
         customer_id: identifiant(objet.customer),
@@ -274,11 +248,12 @@ export async function POST(request: Request) {
       },
     });
     reservation = resultat.error;
+    reservationEtat = (resultat.data as string) ?? null;
   } catch {
     diagnosticWebhook("error", evenement, "connexion_supabase", configurationMode.mode);
     return NextResponse.json({ error: "Journal indisponible" }, { status: 503 });
   }
-  if (reservation?.code === "23505") return NextResponse.json({ received: true, duplicate: true });
+  if (reservationEtat === "duplicate") return NextResponse.json({ received: true, duplicate: true });
   if (reservation) {
     diagnosticWebhook("error", evenement, categoriserErreurSupabase(reservation), configurationMode.mode);
     return NextResponse.json({ error: "Journal indisponible" }, { status: 503 });
@@ -324,10 +299,13 @@ export async function POST(request: Request) {
       if (error) throw new Error(error.message);
       await synchroniserFactureAbonnement(admin, entrepriseId, objet, objet.status || evenement.type.replace("invoice.", ""));
     }
-    await admin.from("abonnement_evenements").update({ statut_resultant: statutResultant }).eq("stripe_event_id", evenement.id);
+    await admin.rpc("finaliser_evenement_abonnement_service", {
+      p_stripe_event_id: evenement.id,
+      p_statut_resultant: statutResultant,
+    });
     return NextResponse.json({ received: true });
   } catch {
-    await admin.from("abonnement_evenements").delete().eq("stripe_event_id", evenement.id);
+    await admin.rpc("annuler_evenement_abonnement_service", { p_stripe_event_id: evenement.id });
     diagnosticWebhook("error", evenement, "echec_metier_apres_journalisation", configurationMode.mode);
     return NextResponse.json({ error: "Synchronisation impossible" }, { status: 500 });
   }

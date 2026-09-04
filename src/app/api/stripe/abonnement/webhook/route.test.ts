@@ -70,12 +70,24 @@ function adminFake(options: AdminFakeOptions = {}) {
       q.maybeSingle = async () => ({ data: entreprise, error: options.erreurLecture ?? null });
       q.insert = async (donnees: unknown) => {
         appels.push({ table, methode: "insert", donnees });
-        return { error: options.duplicate ? { code: "23505" } : options.erreurReservation ?? null };
+        return { error: options.erreurReservation ?? null };
       };
       q.update = (donnees: unknown) => { methode = "update"; appels.push({ table, methode, donnees }); return q; };
       q.delete = () => { methode = "delete"; appels.push({ table, methode }); return q; };
       q.upsert = async (donnees: unknown) => { appels.push({ table, methode: "upsert", donnees }); return { error: null }; };
       return q;
+    },
+    // ACL canonique : les écritures du chemin webhook passent par des RPC de service.
+    async rpc(fn: string, args: Record<string, unknown>) {
+      appels.push({ table: fn, methode: "rpc", donnees: args });
+      if (fn === "reserver_evenement_abonnement_service") {
+        if (options.erreurReservation) return { data: null, error: options.erreurReservation };
+        return { data: options.duplicate ? "duplicate" : "reserve", error: null };
+      }
+      if (fn === "synchroniser_abonnement_stripe_service") {
+        return { data: (args.p_statut as string) ?? "actif", error: null };
+      }
+      return { data: null, error: null };
     },
   };
   return admin;
