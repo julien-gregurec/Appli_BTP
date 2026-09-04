@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { MODULE_PERMISSION_PAR_CHEMIN, PERMISSIONS_ACCES_ALTERNATIVES, droitsGestionPour } from "@/lib/module-permissions";
-import { permissionIncluseDansOffre } from "@/lib/tarification";
+import { permissionEstPorteDEntreeModule, permissionIncluseDansOffre } from "@/lib/tarification";
 import { appliquerRateLimit, politiquesRateLimitPour } from "@/lib/security/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { clePubliqueSupabase } from "@/lib/supabase/keys";
@@ -20,7 +20,14 @@ import {
 const PUBLIC_PATHS = ["/login", "/signup", "/tarifs", "/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/confidentialite", "/cookies", "/auth", "/mfa", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu", "/guides", "/videos", "/paiement", "/document", "/imprimer/partage", "/api/documents/partage", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements", "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import"];
 
 export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  // Transmet le chemin demandé aux Server Components (layout ET page appellent
+  // chacun getContexteEntreprise() — voir ELSATIA-TRIAL-MODULES-POLICY-CLOSURE-V1) :
+  // seule la page /abonnement doit rester accessible pendant un essai expiré
+  // sans offre, et un Server Component n'a pas accès au chemin autrement.
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-elsatia-pathname", request.nextUrl.pathname);
+  const nextRequestInit = { request: { headers: requestHeaders } };
+  let response = NextResponse.next(nextRequestInit);
 
   const verifierLimite = async (authentifie: boolean, contexte: { utilisateurId?: string | null; entrepriseId?: string | null } = {}) => {
     const politiques = politiquesRateLimitPour(request.nextUrl.pathname, request.method, authentifie);
@@ -57,7 +64,7 @@ export async function updateSession(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
+          response = NextResponse.next(nextRequestInit);
           cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, { ...options, ...optionsCookieAuth() }),
           );
@@ -158,7 +165,14 @@ export async function updateSession(request: NextRequest) {
       .select("abonnement_offre")
       .eq("id", ctx.entreprise_id)
       .maybeSingle();
-    if (permissionIncluseDansOffre(permission, ent?.abonnement_offre)) return true;
+    // Sans offre choisie, le plan ne peut jamais ouvrir lui-même une porte de
+    // MODULE (ELSATIA-TRIAL-MODULES-POLICY-CLOSURE-V1) : seul l'entitlement
+    // module (achat, offert, ou essai actif sur un module catalogue "actif")
+    // le peut. Les permissions administratives (paramètres, utilisateurs)
+    // restent ouvertes offre ou pas, exactement comme avant.
+    const offreCouvrePermission = (!ent?.abonnement_offre && !permissionEstPorteDEntreeModule(permission))
+      || Boolean(ent?.abonnement_offre);
+    if (offreCouvrePermission && permissionIncluseDansOffre(permission, ent?.abonnement_offre)) return true;
     const { data: parModule } = await supabase.rpc("acces_module_pour_permission", {
       p_entreprise_id: ctx.entreprise_id,
       p_permissions: [permission],
@@ -204,7 +218,14 @@ export async function updateSession(request: NextRequest) {
         .select("abonnement_offre")
         .eq("id", ctx.entreprise_id)
         .maybeSingle();
-      let droitsInclus = droitsAcces.some((droit) => permissionIncluseDansOffre(droit, entreprise?.abonnement_offre));
+      // Sans offre choisie, le plan ne peut jamais ouvrir lui-même une porte de
+      // MODULE (ELSATIA-TRIAL-MODULES-POLICY-CLOSURE-V1) : seul l'entitlement
+      // module (achat, offert, ou essai actif sur un module catalogue "actif")
+      // le peut. Les permissions administratives (paramètres, utilisateurs)
+      // restent ouvertes offre ou pas, exactement comme avant.
+      let droitsInclus = droitsAcces.some((droit) =>
+        ((!entreprise?.abonnement_offre && !permissionEstPorteDEntreeModule(droit)) || Boolean(entreprise?.abonnement_offre))
+        && permissionIncluseDansOffre(droit, entreprise?.abonnement_offre));
       if (!droitsInclus) {
         // R3 : un module optionnel explicitement acquis par l'entreprise (achat,
         // offert, essai, geste plateforme) débloque sa permission porte-d'entrée,

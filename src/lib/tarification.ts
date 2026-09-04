@@ -255,6 +255,21 @@ export function permissionIncluseDansOffre(permission: string, codeOffre: string
   return offre.fonctionnalites.includes(permission);
 }
 
+/**
+ * Vrai si cette permission est réellement une porte d'entrée de module/offre
+ * (donc concernée par ELSATIA-TRIAL-MODULES-POLICY-CLOSURE-V1 : sans offre
+ * choisie, seul l'entitlement module — achat ou essai actif — peut l'ouvrir).
+ * Les permissions administratives de base (paramètres, utilisateurs) et toute
+ * permission hors grille tarifaire restent hors périmètre : `permissionIncluseDansOffre`
+ * les laisse déjà toujours ouvertes, offre choisie ou non, et ça ne change pas ici.
+ */
+export function permissionEstPorteDEntreeModule(permission: string): boolean {
+  return permission !== "acces_parametres"
+    && permission !== "gerer_parametres"
+    && permission !== "gerer_utilisateurs"
+    && PERMISSIONS_MODULES_LIMITEES.has(permission);
+}
+
 export function filtrerPermissionsSelonOffre(permissions: Iterable<string>, codeOffre: string | null | undefined) {
   return [...permissions].filter((permission) => permissionIncluseDansOffre(permission, codeOffre));
 }

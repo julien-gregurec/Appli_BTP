@@ -1,8 +1,15 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { estPlateformeAdmin } from "@/lib/plateforme";
+
+// Seule page où un essai expiré sans offre doit rester accessible (choisir une
+// offre) au lieu de rediriger vers /abonnement-suspendu — voir le middleware
+// (src/lib/supabase/proxy.ts) qui transmet le chemin via cet en-tête, un
+// Server Component n'y ayant pas accès autrement.
+const CHEMIN_EXEMPTE_ESSAI_EXPIRE = "/abonnement";
 
 // Sentinel utilisé quand aucune entreprise réelle n'est rattachée (même convention
 // que compteurs_reference : aucune entreprise n'a jamais cet id, donc les requêtes
@@ -18,11 +25,24 @@ export type ContexteEntreprise = {
   logoUrl: string | null;
   abonnementStatut: string;
   abonnementEcheance: string | null;
+  abonnementEssaiDebut: string | null;
   abonnementEssaiFin: string | null;
   suspensionPrevueAt: string | null;
   impayeMessage: string | null;
   accesSupportPlateforme: boolean;
+  // Essai (30 jours) expiré sans offre active. N'est jamais `true` que sur
+  // /abonnement (seule page exemptée de la redirection) : tout autre appelant
+  // est redirigé vers /abonnement-suspendu avant de recevoir ce contexte, pour
+  // que les pages métier restent bloquées proprement.
+  essaiExpireSansOffre: boolean;
 };
+
+/** Ajoute `jours` jours calendaires à une date ISO (YYYY-MM-DD), en UTC. */
+function ajouterJoursIso(dateIso: string, jours: number): string {
+  const date = new Date(`${dateIso}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + jours);
+  return date.toISOString().slice(0, 10);
+}
 
 type DevContexteEntreprise = {
   user_id: string;
@@ -39,6 +59,7 @@ type ContexteAbonnementCourant = {
   logo_url: string | null;
   abonnement_statut: string;
   abonnement_echeance: string | null;
+  abonnement_essai_debut: string | null;
   abonnement_essai_fin: string | null;
   suspension_prevue_at: string | null;
   impaye_message: string | null;
@@ -70,10 +91,12 @@ async function getContexteEntrepriseSansConnexion(): Promise<ContexteEntreprise>
     logoUrl: entreprise?.logo_url ?? null,
     abonnementStatut: "actif",
     abonnementEcheance: null,
+    abonnementEssaiDebut: null,
     abonnementEssaiFin: null,
     suspensionPrevueAt: null,
     impayeMessage: null,
     accesSupportPlateforme: false,
+    essaiExpireSansOffre: false,
   };
 }
 
@@ -121,10 +144,12 @@ export const getContexteEntreprise = cache(async function getContexteEntreprise(
         logoUrl: null,
         abonnementStatut: "actif",
         abonnementEcheance: null,
+        abonnementEssaiDebut: null,
         abonnementEssaiFin: null,
         suspensionPrevueAt: null,
         impayeMessage: null,
         accesSupportPlateforme: false,
+        essaiExpireSansOffre: false,
       };
     }
     redirect("/onboarding");
@@ -133,10 +158,32 @@ export const getContexteEntreprise = cache(async function getContexteEntreprise(
   const abonnement = abonnementData as ContexteAbonnementCourant | null;
   if (!abonnement?.entreprise_id) redirect("/onboarding");
   const suspensionAt = abonnement.suspension_prevue_at ? new Date(abonnement.suspension_prevue_at).getTime() : null;
-  const essaiFin = abonnement.abonnement_essai_fin ? new Date(`${abonnement.abonnement_essai_fin}T23:59:59.999Z`).getTime() : null;
   const accesSupport = abonnement.acces_support === true;
-  if (!accesSupport && (["suspendu", "annule"].includes(abonnement.abonnement_statut) || (suspensionAt !== null && suspensionAt <= Date.now()) || (abonnement.abonnement_statut === "essai" && essaiFin !== null && essaiFin < Date.now()))) {
+
+  // Fenêtre d'essai bornée à 30 jours (ELSATIA-TRIAL-MODULES-POLICY-CLOSURE-V1) :
+  // abonnement_essai_fin fait autorité ; si historiquement absente, on retombe
+  // sur abonnement_essai_debut + 30 jours, jamais sur une fenêtre illimitée.
+  const essaiFinEffective = abonnement.abonnement_essai_fin
+    ?? (abonnement.abonnement_essai_debut ? ajouterJoursIso(abonnement.abonnement_essai_debut, 30) : null);
+  const essaiFin = essaiFinEffective ? new Date(`${essaiFinEffective}T23:59:59.999Z`).getTime() : null;
+
+  const suspenduPourImpaye = !accesSupport && (
+    ["suspendu", "annule"].includes(abonnement.abonnement_statut)
+    || (suspensionAt !== null && suspensionAt <= Date.now())
+  );
+  const essaiExpireSansOffre = !accesSupport
+    && abonnement.abonnement_statut === "essai"
+    && essaiFin !== null
+    && essaiFin < Date.now();
+
+  if (suspenduPourImpaye) {
     redirect("/abonnement-suspendu");
+  }
+  if (essaiExpireSansOffre) {
+    const cheminActuel = (await headers()).get("x-elsatia-pathname");
+    if (cheminActuel !== CHEMIN_EXEMPTE_ESSAI_EXPIRE) {
+      redirect("/abonnement-suspendu?motif=essai_expire");
+    }
   }
 
   // Un membre qui a rejoint par code reste "en attente" tant que l'admin ne l'a pas
@@ -160,9 +207,11 @@ export const getContexteEntreprise = cache(async function getContexteEntreprise(
     logoUrl: abonnement.logo_url ?? null,
     abonnementStatut: abonnement.abonnement_statut,
     abonnementEcheance: abonnement.abonnement_echeance ?? null,
+    abonnementEssaiDebut: abonnement.abonnement_essai_debut ?? null,
     abonnementEssaiFin: abonnement.abonnement_essai_fin ?? null,
     suspensionPrevueAt: abonnement.suspension_prevue_at ?? null,
     impayeMessage: abonnement.impaye_message ?? null,
     accesSupportPlateforme: accesSupport,
+    essaiExpireSansOffre,
   };
 });
