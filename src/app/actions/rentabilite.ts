@@ -8,7 +8,7 @@ import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
 import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
 import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
-type PointageRentabilite = { heures_normales: number; heures_supplementaires: number; employe: { cout_horaire: number | null } | { cout_horaire: number | null }[] | null };
+type PointageRentabilite = { employe_id: string; heures_normales: number; heures_supplementaires: number };
 type MouvementStockRentabilite = { quantite: number; article: { prix_achat_ht: number } | { prix_achat_ht: number }[] | null };
 const un = <T,>(valeur: T | T[] | null): T | null => (Array.isArray(valeur) ? (valeur[0] ?? null) : valeur);
 
@@ -18,18 +18,20 @@ export async function analyserRentabiliteIAAction(chantierId: string): Promise<{
   const supabase = await createClient();
   if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
 
-  const [{ data: chantier }, { data: factures }, { data: devis }, { data: donneesPointages }, { data: depenses }, { data: donneesIndemnites }, { data: donneesMouvementsStock }, { data: donneesNotesFrais }] = await Promise.all([
+  const [{ data: chantier }, { data: factures }, { data: devis }, { data: donneesPointages }, { data: depenses }, { data: donneesIndemnites }, { data: donneesMouvementsStock }, { data: donneesNotesFrais }, { data: couts }] = await Promise.all([
     supabase.from("chantiers").select("id, nom").eq("id", chantierId).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),
     supabase.from("factures").select("montant_ht, statut, type").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId),
     supabase.from("devis").select("montant_ht").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId).eq("statut", "accepte"),
-    supabase.from("pointages").select("heures_normales, heures_supplementaires, employe:employes(cout_horaire)").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId).eq("verification_statut", "valide"),
+    supabase.from("pointages").select("employe_id, heures_normales, heures_supplementaires").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId).eq("verification_statut", "valide"),
     supabase.from("depenses_fournisseurs").select("montant_ht, statut, categorie").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId),
     supabase.rpc("couts_indemnites_paie_par_chantier", { p_entreprise_id: ctx.entrepriseId, p_chantier_id: chantierId }),
     supabase.from("mouvements_stock").select("quantite, article:articles_stock(prix_achat_ht)").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId).eq("type", "sortie"),
     supabase.from("notes_frais").select("montant_ttc").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId).in("statut", ["valide", "exporte_comptabilite", "verrouille", "archive", "validee", "remboursee"]),
+    supabase.from("employes_cout_horaire").select("employe_id, cout_horaire").eq("entreprise_id", ctx.entrepriseId),
   ]);
   if (!chantier) return { error: "Chantier introuvable." };
 
+  const coutHoraireParEmploye = new Map((couts ?? []).map((cout) => [cout.employe_id, cout.cout_horaire]));
   const budgetHt = (devis ?? []).reduce((s, item) => s + Number(item.montant_ht), 0);
   const factureHt = (factures ?? [])
     .filter((item) => !["annulee", "avoir_emis"].includes(item.statut))
@@ -39,7 +41,7 @@ export async function analyserRentabiliteIAAction(chantierId: string): Promise<{
   let coutMainOeuvre = 0;
   for (const pointage of (donneesPointages ?? []) as PointageRentabilite[]) {
     const total = Number(pointage.heures_normales) + Number(pointage.heures_supplementaires);
-    const cout = Number(un(pointage.employe)?.cout_horaire ?? 0);
+    const cout = Number(coutHoraireParEmploye.get(pointage.employe_id) ?? 0);
     heures += total;
     coutMainOeuvre += total * cout;
   }

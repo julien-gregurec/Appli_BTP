@@ -47,10 +47,28 @@ function payloadEmploye(formData: FormData) {
     date_entree: champ(formData, "date_entree"),
     date_sortie: statut === "sorti" ? champ(formData, "date_sortie") : null,
     taux_horaire: nombre(formData, "taux_horaire"),
-    cout_horaire: nombre(formData, "cout_horaire"),
     statut,
     notes: champ(formData, "notes"),
   };
+}
+
+// Le coût horaire interne vit dans `employes_cout_horaire`, une table dédiée
+// et restreinte en lecture (permission `voir_cout_interne_employe` ou
+// `acces_rentabilite`) — jamais sur `employes` elle-même (colonne supprimée
+// par 20260818000205_securiser_cout_horaire_employe.sql).
+async function enregistrerCoutHoraireEmploye(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  entrepriseId: string,
+  employeId: string,
+  coutHoraire: number | null,
+) {
+  const { error } = await supabase
+    .from("employes_cout_horaire")
+    .upsert(
+      { employe_id: employeId, entreprise_id: entrepriseId, cout_horaire: coutHoraire, updated_at: new Date().toISOString() },
+      { onConflict: "employe_id" },
+    );
+  return error;
 }
 
 export async function creerEmployeAction(formData: FormData) {
@@ -84,6 +102,15 @@ export async function creerEmployeAction(formData: FormData) {
 
   if (error || !data) {
     redirect(`/employes/nouveau?error=${encodeURIComponent(messageErreurUtilisateur("creerEmployeAction", error, "Impossible de créer l’employé."))}`);
+  }
+
+  const coutHoraire = nombre(formData, "cout_horaire");
+  if (coutHoraire !== null) {
+    const coutError = await enregistrerCoutHoraireEmploye(supabase, ctx.entrepriseId, data.id, coutHoraire);
+    if (coutError) {
+      revalidatePath("/employes");
+      redirect(`/employes/${data.id}?error=${encodeURIComponent(messageErreurUtilisateur("creerEmployeAction:cout_horaire", coutError, "Employé créé, mais le coût horaire interne n’a pas pu être enregistré."))}`);
+    }
   }
 
   revalidatePath("/employes");
@@ -133,6 +160,20 @@ export async function modifierEmployeAction(employeId: string, formData: FormDat
 
   if (error) {
     redirect(`/employes/${employeId}/modifier?error=${encodeURIComponent(messageErreurUtilisateur("modifierEmployeAction", error, "Impossible d’enregistrer les modifications de l’employé."))}`);
+  }
+
+  // Le formulaire ne préremplit ce champ que pour les postes autorisés à voir
+  // le coût interne : ne jamais écrire ici pour les autres, sous peine
+  // d'effacer silencieusement une valeur que le formulaire n'a pas pu afficher.
+  const permissions = await permissionsUtilisateur(ctx);
+  const peutVoirCoutInterne = permissions === null || permissions.includes("voir_cout_interne_employe") || permissions.includes("acces_rentabilite");
+  if (peutVoirCoutInterne) {
+    const coutError = await enregistrerCoutHoraireEmploye(supabase, ctx.entrepriseId, employeId, nombre(formData, "cout_horaire"));
+    if (coutError) {
+      revalidatePath("/employes");
+      revalidatePath(`/employes/${employeId}`);
+      redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("modifierEmployeAction:cout_horaire", coutError, "Modifications enregistrées, mais le coût horaire interne n’a pas pu être mis à jour."))}`);
+    }
   }
 
   revalidatePath("/employes");

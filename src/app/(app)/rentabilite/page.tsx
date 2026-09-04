@@ -6,7 +6,7 @@ import { Lien as Link } from "@/components/Lien";
 import { AnalyseRentabiliteIA } from "@/components/AnalyseRentabiliteIA";
 import { iaEstActive } from "@/lib/preview-features";
 
-type PointageRentabilite = { chantier_id: string; heures_normales: number; heures_supplementaires: number; employe: { cout_horaire: number | null } | { cout_horaire: number | null }[] | null };
+type PointageRentabilite = { chantier_id: string; employe_id: string; heures_normales: number; heures_supplementaires: number };
 type MouvementStockRentabilite = { chantier_id: string; quantite: number; article: { prix_achat_ht: number } | { prix_achat_ht: number }[] | null };
 const un = <T,>(valeur: T | T[] | null): T | null => Array.isArray(valeur) ? valeur[0] ?? null : valeur;
 
@@ -14,17 +14,19 @@ export default async function RentabilitePage() {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const peutUtiliserIA = iaEstActive() && aAccesIA(await permissionsUtilisateur(ctx));
-  const [{ data: chantiers }, { data: factures }, { data: devis }, { data: donneesPointages }, { data: depenses }, { data: donneesIndemnites }, { data: donneesMouvementsStock }, { data: donneesNotesFrais }] = await Promise.all([
+  const [{ data: chantiers }, { data: factures }, { data: devis }, { data: donneesPointages }, { data: depenses }, { data: donneesIndemnites }, { data: donneesMouvementsStock }, { data: donneesNotesFrais }, { data: couts }] = await Promise.all([
     supabase.from("chantiers").select("id, reference_interne, nom, statut, client:clients(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
     supabase.from("factures").select("chantier_id, montant_ht, statut, type").eq("entreprise_id", ctx.entrepriseId),
     supabase.from("devis").select("chantier_id, montant_ht, statut").eq("entreprise_id", ctx.entrepriseId).eq("statut", "accepte"),
-    supabase.from("pointages").select("chantier_id, heures_normales, heures_supplementaires, employe:employes(cout_horaire)").eq("entreprise_id", ctx.entrepriseId).eq("verification_statut", "valide"),
+    supabase.from("pointages").select("chantier_id, employe_id, heures_normales, heures_supplementaires").eq("entreprise_id", ctx.entrepriseId).eq("verification_statut", "valide"),
     supabase.from("depenses_fournisseurs").select("chantier_id, montant_ht, statut, categorie").eq("entreprise_id", ctx.entrepriseId),
     supabase.rpc("couts_indemnites_paie_par_chantier", { p_entreprise_id: ctx.entrepriseId }),
     supabase.from("mouvements_stock").select("chantier_id, quantite, article:articles_stock(prix_achat_ht)").eq("entreprise_id", ctx.entrepriseId).eq("type", "sortie").not("chantier_id", "is", null),
     supabase.from("notes_frais").select("chantier_id, montant_ttc, statut").eq("entreprise_id", ctx.entrepriseId).not("chantier_id", "is", null).in("statut", ["valide", "exporte_comptabilite", "verrouille", "archive", "validee", "remboursee"]),
+    supabase.from("employes_cout_horaire").select("employe_id, cout_horaire").eq("entreprise_id", ctx.entrepriseId),
   ]);
   const pointages = (donneesPointages ?? []) as PointageRentabilite[];
+  const coutHoraireParEmploye = new Map((couts ?? []).map((cout) => [cout.employe_id, cout.cout_horaire]));
   const indemnitesPaie = (donneesIndemnites ?? []) as { chantier_id: string; total: number }[];
   const mouvementsStock = (donneesMouvementsStock ?? []) as MouvementStockRentabilite[];
   const notesFrais = (donneesNotesFrais ?? []) as { chantier_id: string; montant_ttc: number }[];
@@ -34,7 +36,7 @@ export default async function RentabilitePage() {
     let heures = 0; let coutMainOeuvre = 0; let coutHoraireManquant = false;
     for (const pointage of pointages.filter((item) => item.chantier_id === chantier.id)) {
       const total = Number(pointage.heures_normales) + Number(pointage.heures_supplementaires);
-      const coutHoraire = un(pointage.employe)?.cout_horaire;
+      const coutHoraire = coutHoraireParEmploye.get(pointage.employe_id);
       if (!coutHoraire && total > 0) coutHoraireManquant = true;
       heures += total; coutMainOeuvre += total * Number(coutHoraire ?? 0);
     }
