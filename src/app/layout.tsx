@@ -12,6 +12,13 @@ export const metadata: Metadata = {
   description: BRAND.description,
   applicationName: BRAND.nomApplication,
   manifest: "/manifest.webmanifest",
+  // Application privée/authentifiée : jamais indexée par défaut. Le site
+  // marketing public (elsatia.fr) porte le référencement de la marque et des
+  // tarifs ; app.elsatia.fr reste hors des résultats de recherche, y compris
+  // ses pages non authentifiées (connexion, tarifs, mentions légales…) pour
+  // éviter tout contenu dupliqué. Une page individuelle peut redéfinir
+  // `robots` si elle doit un jour être indexée — aucune ne le fait ici.
+  robots: { index: false, follow: false, nocache: true },
   openGraph: {
     type: "website",
     locale: "fr_FR",
