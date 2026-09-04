@@ -1,8 +1,10 @@
 # ELSATIA — Préflight final de cutover Production V1
 
-Version 1.1 — 2026-09-04 (mise à jour : clôture offline P0-2/P0-4). **Documentation opérateur —
-lecture / préparation, plus preuves d'exécution offline au §13.** Aucune migration Production,
-aucun déploiement Production, aucune mutation Stripe Live, aucun secret affiché.
+Version 1.2 — 2026-09-04 (mise à jour : préparation opérationnelle de la fenêtre réelle,
+P0-5). **Documentation opérateur — lecture / préparation, plus preuves d'exécution offline au
+§13 et pack opérationnel de fenêtre aux §14–§27.** Aucune migration Production, aucun
+déploiement Production, aucune mutation Stripe Live, aucun secret affiché, aucune modification
+de code ou de migration dans ce lot.
 
 Il **met à jour** la cible du cutover avec le vrai HEAD commercial canonique et se superpose au
 runbook de bascule/rollback existant :
@@ -13,6 +15,11 @@ runbook de bascule/rollback existant :
 - Revue indépendante préprod : `docs/audits/ELSATIA_PREPROD_INDEPENDENT_REVIEW_V1_R2.md`.
 - **Preuves d'exécution offline au SHA `c1930ab` (Fresh 261, Restore→261, rollback, drift ACL)** :
   §13 de ce document (lot `ELSATIA-CUTOVER-OFFLINE-P0-CLOSURE-V1`, 2026-09-04).
+- **Pack opérationnel de fenêtre réelle** (rôles, P0-1/P0-3/T0/MFA/multitenant/Colors-Tools/
+  Stripe/GO/rollback) : §14–§27 de ce document (lot
+  `ELSATIA-PRODUCTION-CUTOVER-WINDOW-PREPARATION-V1`, 2026-09-04).
+- **Checklist opérateur imprimable** :
+  `docs/runbooks/ELSATIA_PRODUCTION_CUTOVER_OPERATOR_CHECKLIST_V1.md`.
 
 ---
 
@@ -396,7 +403,7 @@ extraction de la clé privée Ed25519 hors Vercel, `DELETE FROM auth.mfa_factors
 | P0-2 | ~~Répétition Fresh 261 + Restore 261 + pgTAP + rollback `211 → 261 → 211`~~ | **FERMÉ 2026-09-04** — drill offline complet au SHA `c1930ab`, preuves §13.1–§13.3 | — |
 | P0-3 | **PITR/snapshot + dump chiffré + backup Storage + test de restauration** au `backup_id` du **cutover réel** | non créés (interdits hors fenêtre Production) — le T0-snapshot §13.2 est un drill offline, pas la sauvegarde Production | T-30, opérateur + CODEX |
 | P0-4 | ~~Diff ACL applicatif Fresh↔Restore rejoué au SHA `c1930ab`~~ | **FERMÉ 2026-09-04** — `application_acl_drift = 0` (6 294 lignes normalisées, 0 diff), preuve §13.4 | — |
-| P0-5 | **Fenêtre de maintenance décidée + responsable de rollback désigné et joignable** (P12/P13) | à confirmer | Julien |
+| P0-5 | ~~Préparation opérationnelle de la fenêtre (rôles, planning, checklists P0-1/P0-3/T0, GO/rollback)~~ | **PRÉPARATION FERMÉE 2026-09-04** — pack complet §14–§27 + checklist imprimable ; **reste à faire par Julien** : fixer la date/heure réelle et les noms (§14.3, §27) | Julien renseigne date + noms sur la checklist |
 
 ### Blockers P1 (à traiter, non bloquants pour figer la date)
 
@@ -427,16 +434,24 @@ extraction de la clé privée Ed25519 hors Vercel, `DELETE FROM auth.mfa_factors
 
 ### Verdict
 
-**NOT READY** au sens « exécutable maintenant » : **P0-1, P0-3, P0-5 restent ouverts**
-(relecture Production live, sauvegardes datées du cutover réel, fenêtre + responsable désigné).
-**P0-2 et P0-4 sont fermés** (2026-09-04, preuves §13) : le drill Fresh 261 / Restore→261 /
-rollback / drift ACL au bon SHA (`c1930ab`) est fait et vert, rejoué sur le schéma historique
-exact de `fcdd4e7c` (211 migrations, commit git de référence Production selon le runbook V1) —
-mais **sans lire la Production réelle** : le ledger live et ses éventuelles données de production
-restent à confirmer au P0-1. La **cible technique est prête et figée** : SHA `c1930ab`, ledger
-261, 50 migrations additives ordonnées depuis `fcdd4e7c`, aucune migration historique modifiée,
-runbook et rollback définis, socle commercial + correctif boucle post-login validés en local
-**et** via un upgrade réel 211→261 rejoué sur ce schéma historique.
+**NOT READY** au sens « exécutable maintenant » : **P0-1 et P0-3 restent ouverts** (relecture
+Production live, sauvegardes datées du cutover réel — les deux nécessitent un accès Production
+que ce lot n'a pas). **P0-2, P0-4 et la préparation opérationnelle de P0-5 sont fermés**
+(2026-09-04) :
+- P0-2/P0-4 (preuves §13) : drill Fresh 261 / Restore→261 / rollback / drift ACL au bon SHA
+  (`c1930ab`) fait et vert, rejoué sur le schéma historique exact de `fcdd4e7c` (211 migrations,
+  commit git de référence Production selon le runbook V1) — sans lire la Production réelle : le
+  ledger live reste à confirmer au P0-1.
+- P0-5 (pack §14–§27 + checklist imprimable) : rôles définis, planning horaire relatif figé,
+  checklists P0-1/P0-3/GO-T0/MFA/multitenant/Colors-Tools/Stripe/GO/rollback complètes et
+  exécutables. **Il manque uniquement une date/heure réelle et des noms**, volontairement non
+  inventés (décision de Julien).
+
+La **cible technique est prête et figée** : SHA `c1930ab`, ledger 261, 50 migrations additives
+ordonnées depuis `fcdd4e7c`, aucune migration historique modifiée, runbook et rollback définis,
+socle commercial + correctif boucle post-login validés en local **et** via un upgrade réel
+211→261 rejoué sur ce schéma historique. **Le prochain geste technique attendu est l'exécution
+réelle** (P0-1 → P0-3 → migrations → déploiement), pas un nouveau lot de préparation.
 
 ---
 
@@ -608,6 +623,382 @@ concernées par ce lot n'ont pas été touchées.
 P0-2 (Fresh/Restore/rollback au SHA c1930ab) : FERMÉ
 P0-4 (drift ACL applicatif Fresh↔Restore)     : FERMÉ — application_acl_drift = 0
 ```
+
+---
+
+## 14. Fenêtre de maintenance réelle — modèle et rôles
+
+Lot `ELSATIA-PRODUCTION-CUTOVER-WINDOW-PREPARATION-V1` (2026-09-04). Objectif : fermer la
+**préparation opérationnelle** de P0-5. **Aucune date n'est fixée ici** — le modèle ci-dessous est
+horodaté en relatif (T-x/T+x) et doit être recopié avec une date/heure réelle par Julien avant
+exécution (fichier imprimable : `ELSATIA_PRODUCTION_CUTOVER_OPERATOR_CHECKLIST_V1.md`).
+
+### 14.1 Durée cible (2 h)
+
+| Phase | Durée cible | Bloc horaire relatif |
+|---|---|---|
+| Préparation + P0-1 | ~30 min | T-60 → T-30 |
+| Sauvegardes (P0-3) | 30–45 min | T-30 → T0 (déborde sur T+10/T+15 si nécessaire — **ne jamais compresser la vérification pour tenir l'horaire**) |
+| Migrations | 10–25 min | T0 → T+20 |
+| Déploiement + contrôles | 30–45 min | T+20 → T+60 |
+| Marge de décision/rollback | incluse | T+60 → T+90 |
+| Surveillance / clôture | — | T+90 → T+120 |
+
+### 14.2 Repères horaires détaillés
+
+| Repère | Contenu | Gate |
+|---|---|---|
+| **T-60** | Gel des changements, rôles présents, accès rollback vérifiés (Vercel, PITR, volume DR chiffré monté). **Lancement immédiat de P0-1** (§15). | — |
+| **T-45** | **Gate P0-1** : baseline Production conforme, gap réel figé (50 ou 51). Un seul item KO → **STOP**, fenêtre annulée, rien touché. | GO/STOP |
+| **T-30** | Démarrage **P0-3** (§16) : PITR/snapshot, dump chiffré, backup Storage, manifestes. | — |
+| **T-15** | Test de restauration exécuté sur base probe jetable ; sentinelles + ACL/RLS de contrôle vérifiés. | — |
+| **T0** | **Gate P0-3** + **checklist GO-T0** complète (§17). Un seul item KO → **NO-GO**, aucune migration. Si PASS intégral : démarrage immédiat des migrations (§18). | GO/NO-GO |
+| **T+10** | Ledger vérifié = 261, `…000255` et `…000263` présentes, second `migration up` = rien à appliquer. | — |
+| **T+20** | pgTAP critique + smoke SQL sentinelles inchangées. **Point de décision migration** : continuer vers déploiement, ou STOP + rollback DB (§13 runbook V1, scénario T0) si ledger incohérent. | GO/ROLLBACK |
+| **T+30** | Déploiement app `c1930ab` (§19) démarré + premiers contrôles (login, absence 5xx critique, absence boucle de redirection, `/abonnement`, dashboard, chantier, stock, module inclus/non inclus). | — |
+| **T+45** | MFA admin 1 + admin 2 (§20), multitenant A/B (§21), Colors/Tools (§22), Stripe TEST (§23). | — |
+| **T+60** | **Décision GO/NO-GO globale** (§24/§25). GO → ouverture du service (fin de maintenance active). Un seul critère rollback → §26 engagé immédiatement. | GO/ROLLBACK |
+| **T+90** | Si GO : surveillance rapprochée (Sentry, 5xx, login/MFA réels, webhooks Stripe Test, upload/download, RLS). Si rollback engagé : suivi de la procédure §26 en cours. | — |
+| **T+120** | Fin de fenêtre officielle : bilan écrit, décision de lever le gel de développement (si GO) ou plan de reprise (si rollback), compte-rendu aux parties prenantes. | — |
+
+Ces repères sont des **cibles d'ordre**, pas des engagements de durée (même principe que le
+runbook V1 §12) : si un palier déborde, les paliers suivants glissent d'autant plutôt que de
+sauter une vérification.
+
+### 14.3 Rôles et responsabilités
+
+| Rôle | Responsabilité exacte | Autorité de décision |
+|---|---|---|
+| **A — Opérateur technique principal** | Exécute les commandes techniques : lecture ledger (§15), backups (§16), CLI de migration (§18), déploiement Vercel (§19). Rapporte PASS/FAIL à chaque étape. | Aucune — exécute, ne tranche pas GO/NO-GO seul. |
+| **B — Responsable GO/NO-GO** | Tranche à chaque gate (T-45, T0, T+20, T+60) : continuer, STOP, ou déclencher le rollback. Autorité finale pendant toute la fenêtre. | Décisionnelle, seule habilitée à dire GO. |
+| **C — Responsable rollback** | Pilote la procédure de rollback (§26) si elle est déclenchée : restauration, redéploiement coordonné, vérifications post-restauration. **Doit être identifié nommément et joignable avant T0**, même s'il s'agit de la même personne que B. | Exécute le rollback une fois déclenché par B. |
+| **D — Observateur / vérification métier** | Exécute les smokes fonctionnels (multitenant §21, `/abonnement` R1/R3, Colors/Tools §22, Stripe TEST §23) et rapporte objectivement PASS/FAIL, sans corriger ni décider. | Aucune. |
+| **E — Second admin `total` (MFA)** | Porteur d'un accès admin `total` **indépendant** de l'admin principal, disponible/joignable pendant la fenêtre pour prouver l'accès de secours (§20, point 6). N'est pas nécessairement présent en continu. | Aucune. |
+
+**Cumul de rôles** : une seule personne peut porter plusieurs rôles (typiquement A+D, ou B+C sur
+une petite équipe) — le document l'autorise explicitement. La seule contrainte non négociable :
+**le rôle C (rollback) doit être identifié nommément avant T0**, même cumulé avec B, afin qu'il
+n'y ait aucune ambiguïté sur « qui restaure » si l'incident survient pendant que B est occupé à
+autre chose.
+
+**Point ouvert à trancher par Julien avant la fenêtre réelle** : le rôle **E** exige un second
+porteur humain d'un accès admin `total` indépendant de `julien@elsatia.fr` — le compte technique
+`plateforme@invalid.local` n'est **pas** un chemin valable (non connectable, aucune identité
+Auth). Si aucun second admin `total` humain n'existe à ce jour, c'est un **prérequis à combler**
+avant de fixer la fenêtre, distinct des P0 techniques.
+
+---
+
+## 15. P0-1 — Procédure baseline Production live (à T-60)
+
+Exécutée par **A**, lecture seule, **aucune commande ne doit imprimer de secret** (jeton d'accès,
+mot de passe DB, clé API). Commandes de référence : §1 de ce document.
+
+### 15.1 Checklist binaire
+
+- [ ] Ref Supabase Production confirmée = `exhvuzegsefmoguxoiak`
+- [ ] Ledger réel lu : `count(*)` et `max(version)` sur `supabase_migrations.schema_migrations`
+- [ ] Nombre de migrations compté (attendu 210 ou 211 — **la lecture tranche définitivement**)
+- [ ] Dernière migration appliquée identifiée (version exacte)
+- [ ] Présence/absence de `20260902000255_acl_reconciliation_v1` confirmée (**absente** attendue —
+      si présente, le point de non-retour est déjà franchi : STOP, traiter comme un cas hors
+      procédure standard, ne pas réappliquer 255)
+- [ ] Gap réel vers 261 calculé (`261 − ledger observé`, attendu **50** si 211, **51** si 210) et
+      **liste exacte des versions absentes** matérialisée (diff avec `supabase/migrations/` @
+      `c1930ab`)
+- [ ] Écart 210 vs 211 tranché — noter la valeur observée, ne pas supposer
+- [ ] Sentinelles métier lues (`count` sur entreprises/utilisateurs/clients/chantiers/devis/
+      factures) et rapprochées du dernier snapshot DR connu (6/6/31/30/108/73 au 2026-09-02) —
+      un écart n'est pas nécessairement un défaut (activité réelle depuis), mais doit être noté
+- [ ] Admins plateforme listés (email, rôle, `actif`, `statut_identite`) — au moins un `total`
+      actif attendu
+- [ ] État MFA des admins vérifié (facteurs TOTP enrôlés/vérifiés) — **sans lire seed/QR/code**
+- [ ] Aucune anomalie inattendue détectée (schéma, rôle, extension, table absente du jeu attendu)
+
+### 15.2 Résultat
+
+**Résultat = PASS** uniquement si les 10 cases sont cochées ET le gap est cohérent avec les
+migrations `supabase/migrations/*.sql` @ `c1930ab` (aucune version canonique manquante de la
+liste calculée, aucune version inattendue côté Production qui ne serait pas dans l'historique
+canonique). Sinon **FAIL**.
+
+**Si FAIL : STOP avant toute migration.** Ne pas passer à T-30. Documenter l'écart et le
+soumettre à B avant toute nouvelle tentative de fenêtre.
+
+---
+
+## 16. P0-3 — Procédure de sauvegardes (à T-30)
+
+Exécutée par **A**, supervisée par **B**. Référence détaillée : §4 de ce document, runbook V1
+§2–§4.
+
+### 16.1 Checklist binaire
+
+- [ ] PITR/snapshot managé Production déclenché
+- [ ] Identifiant du snapshot noté
+- [ ] Horodatage UTC noté
+- [ ] `pg_dump` chiffré réalisé (format custom, `--compress=9`)
+- [ ] SHA-256 du dump calculé
+- [ ] SHA-256 **relu** (vérification, pas seulement calculé une fois)
+- [ ] Backup Storage réalisé (13 buckets, `verify-storage-backup` PASS)
+- [ ] Manifestes DB **et** Storage produits (taille, SHA-256, TOC count)
+- [ ] `backup_id` commun (horodatage UTC) attribué aux deux manifestes
+- [ ] Test de restauration exécuté sur une **base probe jetable** (jamais Preview/Production)
+- [ ] Sentinelles restaurées vérifiées **identiques** à l'état pré-sauvegarde
+- [ ] ACL/RLS de contrôle vérifiés cohérents sur la restauration (échantillon minimal : quelques
+      tables sensibles + `pg_policies` + RLS activée) — l'inventaire complet §13.4 sert de
+      référence de méthode si le temps le permet
+
+### 16.2 Résultat
+
+**Résultat = PASS** uniquement si les 12 cases sont cochées, **y compris la preuve de
+restauration**. Sinon **FAIL**.
+
+**Critère non négociable : aucune migration tant que la restauration n'a pas été prouvée.** Un
+backup non testé n'est pas un backup valide au sens de ce runbook.
+
+---
+
+## 17. Checklist GO-T0 (avant toute migration)
+
+Évaluée par **B**, avec **A** comme exécutant des vérifications techniques.
+
+- [ ] Baseline Production confirmée (§15, PASS)
+- [ ] Gap exact confirmé (liste figée, §15)
+- [ ] Backup vérifié (§16, PASS, restauration prouvée)
+- [ ] Responsable rollback (**C**) présent et joignable
+- [ ] SHA app `c1930ab366109a990c1d89a1a38401f5e1c4b2c5` disponible et prêt à déployer (build
+      Vercel préparé)
+- [ ] Branche Vercel « Production Branch » correcte (branche canonique de release)
+- [ ] Production Branch **≠ `main`** (cf. `NE_PAS_DEPLOYER_MAIN.md`)
+- [ ] Variables d'environnement Production validées (présence uniquement, cf. §5 — jamais les
+      valeurs)
+- [ ] `ABONNEMENTS_PUBLICS_OUVERTS = false`
+- [ ] Mode Stripe = **TEST**
+- [ ] Mode webhook = **TEST** (`STRIPE_WEBHOOK_EXPECTED_MODE=test`)
+- [ ] Aucun secret manquant (fiche §5 complète)
+- [ ] Registry Ed25519 prête (clé publique + `key_id` cohérents Vercel ↔ base) si l'attestation
+      est active
+- [ ] Second admin `total` (**E**) disponible et confirmé joignable
+- [ ] Aucun incident Production en cours (monitoring vérifié avant de lancer)
+
+**Un seul item non coché → NO-GO.** Ne pas migrer. Revenir à B pour statuer (reporter la
+fenêtre, ou lever le blocage puis réévaluer intégralement la checklist — pas seulement l'item
+corrigé).
+
+---
+
+## 18. Application des migrations (T0 → T+20)
+
+Exécutée par **A**, sous supervision de **B**.
+
+1. Appliquer **uniquement** la liste calculée à l'étape 15 (diff canonique − Production réel),
+   jamais un jeu de migrations deviné ou approximatif.
+2. **Ordre lexical strict** du nom de fichier (= ordre d'application canonique, §2).
+3. Utiliser la CLI Supabase officielle (`supabase migration up --linked --include-all`) — le
+   flag `--include-all` est **requis** : plusieurs migrations du gap portent un horodatage
+   antérieur au `max(version)` déjà présent sur Production (migrations historiques réintégrées
+   par la canonicalisation), la CLI les rejette sinon avec une erreur explicite plutôt que d'agir
+   silencieusement — comportement confirmé pendant le drill offline (§13.2, `--include-all`
+   nécessaire dans l'exact même scénario).
+4. Ne **jamais** appliquer une migration hors de cette liste, dans le désordre, ou par édition
+   manuelle du ledger.
+5. Après chaque lot (ou en une passe si le runbook d'exécution CODEX le prévoit en transaction
+   unique), **vérifier que chaque version est bien enregistrée** dans
+   `supabase_migrations.schema_migrations`.
+6. Vérifier le **ledger final = 261**.
+7. Vérifier que `20260902000255_acl_reconciliation_v1` est présente.
+8. Vérifier que `20260904000263_stripe_subscription_lifecycle_closure_v1` est présente.
+9. Rejouer `supabase migration up` une seconde fois : **doit répondre qu'il n'y a rien à
+   appliquer** (`applied: []`). Un résultat non vide = incident (§25).
+
+### Point de non-retour
+
+**`20260902000255_acl_reconciliation_v1`** reste le point de non-retour exact (§3).
+
+- **Avant** cette migration : un rollback applicatif (redéploiement de l'ancien binaire seul)
+  suffit.
+- **Après** cette migration : le rollback **coordonné DB + app** est **obligatoire** (§26) — un
+  rollback app seul ne suffit plus, quelle que soit la migration atteinte au-delà (256–263
+  inclus, qui n'ajoutent aucune régression ACL supplémentaire mais ne changent pas ce constat).
+
+---
+
+## 19. Déploiement application (après DB verte, T+20 → T+30)
+
+Déployer **uniquement** `c1930ab366109a990c1d89a1a38401f5e1c4b2c5` sur la Production Branch
+correcte.
+
+Vérifications (exécutant **A**, contrôle **D**) :
+
+- [ ] `app.elsatia.fr` répond (pas de 5xx à l'accueil)
+- [ ] Login fonctionnel (formulaire + redirection post-login)
+- [ ] Aucun 5xx critique sur les routes clés
+- [ ] Aucune boucle de redirection (le correctif `c1930ab` couvre le cas compte dépôt sans
+      module borne → `/abonnement/module-non-inclus` terminal, cf. mission
+      `ELSATIA-POSTLOGIN-MODULE-ROUTING-CLOSURE-V1`)
+- [ ] `/abonnement` : statut, offre, capacité X/Y, section Modules rendue
+- [ ] `/dashboard` accessible
+- [ ] `/chantiers` (ou route chantier équivalente) accessible
+- [ ] `/stock` accessible selon habilitation
+- [ ] Une route « module inclus » et une route « module non inclus » testées (terminal, pas de
+      rebond)
+
+---
+
+## 20. MFA — checklist d'exécution fenêtre (T+45)
+
+Aucun QR, seed ou code n'est **jamais** affiché, transmis, demandé par un outil, ou consigné
+dans ce document ou ailleurs. Aucune manipulation manuelle de `auth.mfa_factors`.
+
+**Admin 1 (principal, ex. `julien@elsatia.fr`)**
+1. [ ] Login → session **AAL1**
+2. [ ] Enrollment TOTP si nécessaire (l'admin scanne son propre QR, hors canal partagé)
+3. [ ] Challenge **AAL2** réussi
+4. [ ] `/plateforme` accessible en AAL2
+
+**Admin 2 (second admin `total`, rôle E)**
+5. [ ] Login **indépendant** (session distincte, pas un partage de session admin 1)
+6. [ ] MFA réussi **ou** flux de récupération e-mail Supabase validé
+7. [ ] Accès `total` confirmé (mêmes contrôles que l'admin 1)
+
+Un échec sur **l'un ou l'autre** admin déclenche l'examen du critère rollback « MFA total
+impossible » (§25) — pas seulement si les deux échouent : le but est de prouver qu'**au moins
+un** admin `total` est opérationnel en continu, donc chaque échec doit être compris avant de
+poursuivre.
+
+---
+
+## 21. Multitenant — smoke obligatoire (T+45)
+
+Exécuté par **D**, sur deux entreprises de recette distinctes (A et B) :
+
+- [ ] Entreprise A voit uniquement ses propres clients ; B ne voit rien de A sur les clients
+- [ ] Idem chantiers
+- [ ] Idem devis/factures
+- [ ] Idem documents (Storage)
+- [ ] Idem modules (R3 : `modules_entreprises` propre à chaque entreprise)
+- [ ] Idem abonnement (R1/R2 : capacité, offre, factures d'abonnement)
+
+**Aucune fuite inter-tenant n'est acceptable, sur aucun des six points.** Un seul point en échec
+= critère rollback (§25, « fuite multitenant »).
+
+---
+
+## 22. Colors / Tools — vérifications post-migration (T+45)
+
+**Colors**
+- [ ] Login avec le compte partagé
+- [ ] Contrat multi-app respecté (redirection cohérente)
+- [ ] Accès entreprise correct (catalogue d'accès)
+- [ ] Callback fonctionnel
+- [ ] Seules les données autorisées sont visibles
+
+**Tools**
+- [ ] Login
+- [ ] Compte partagé fonctionnel
+- [ ] Contrat multi-app respecté
+- [ ] Callback fonctionnel
+- [ ] Accès autorisé conforme au catalogue
+
+**Ne pas ouvrir la facturation Tools** si elle est encore désactivée par décision commerciale —
+ce cutover ne change aucune décision commerciale (cf. INTERDIT, §7 de la mission).
+
+---
+
+## 23. Stripe TEST — vérifications post-migration (T+45)
+
+Production technique **reste en TEST** pendant tout le cutover (§8).
+
+- [ ] `ABONNEMENTS_PUBLICS_OUVERTS = false`
+- [ ] Mode observé = `test` (`STRIPE_WEBHOOK_EXPECTED_MODE`, clé `sk_test_…`)
+- [ ] Aucun objet Live détecté (aucune clé `sk_live_`, aucun Price Live câblé)
+- [ ] Prices conformes à la grille canonique (`verify:stripe-prices --strict`, 8/8 une fois les
+      4 `_ANNUEL` alignés — P1-1)
+- [ ] 1 webhook abonnement **TEST** signé traité correctement
+- [ ] 1 prévisualisation de capacité (`+1`) fonctionnelle (pas de « Confirmer » hors recette
+      dédiée)
+- [ ] Aucun secret loggé (clé, secret webhook, JWT)
+
+**Ne pas activer Stripe Live** — hors périmètre de ce cutover (lot P15 distinct).
+
+---
+
+## 24. Critères GO (fenêtre réelle)
+
+GO uniquement si **tous** les points suivants sont vrais à T+60 :
+
+- [ ] Ledger = 261
+- [ ] Migrations = PASS (§18)
+- [ ] pgTAP critique Production = PASS
+- [ ] Login = PASS
+- [ ] MFA admin 1 = PASS
+- [ ] MFA admin 2 = PASS
+- [ ] Multitenant = PASS (§21, les 6 points)
+- [ ] `/abonnement` = PASS
+- [ ] R1 (capacité personnes actives) = PASS
+- [ ] R3 (modules à la carte) = PASS
+- [ ] Colors = PASS
+- [ ] Tools = PASS
+- [ ] Stripe TEST = PASS (§23)
+- [ ] Storage = PASS (upload/download privé, isolation A/B, aucun bucket privé public)
+- [ ] Aucun 5xx critique
+- [ ] Monitoring stable (Sentry, logs Vercel sans alerte)
+
+---
+
+## 25. Critères Rollback (fenêtre réelle)
+
+Rollback immédiat si **un seul** des points suivants survient :
+
+- Migration en échec
+- Ledger incohérent (≠ 261 propre, ou collision)
+- MFA `total` impossible (aucun admin n'atteint `/plateforme` en AAL2 après login + challenge
+  réels)
+- Login cassé (5xx généralisés, page blanche persistante)
+- Fuite multitenant (un seul des 6 points de §21)
+- 5xx critique persistant (non résolu par forward-fix rapide)
+- Webhook abonnement critique cassé (mauvais mode, rejet à tort, risque de double-facturation)
+- App incompatible avec la DB (erreurs `42501`/fonctions absentes révélant un décalage
+  schéma/binaire)
+- Corruption de données détectée
+- Storage incohérent (référence orpheline, bucket privé exposé)
+- Chemin de rollback lui-même indisponible (PITR/snapshot inaccessible, volume DR non monté)
+
+---
+
+## 26. Procédure Rollback (fenêtre réelle)
+
+Pilotée par **C**, déclenchée par **B**.
+
+1. Maintenir la fenêtre de maintenance active (ne pas rouvrir prématurément).
+2. Stopper les écritures.
+3. Figer l'état de l'incident (captures d'écran, logs, ledger au moment de l'incident).
+4. Conserver logs et ledger de l'incident (horodatage, contenu).
+5. Restaurer le snapshot/PITR pris à T-30 (stratégie B, runbook V1 §5).
+6. Restaurer le Storage si nécessaire (backup validé §16, restauration après la DB).
+7. Vérifier les sentinelles (identiques à l'état pré-cutover).
+8. Redéployer le frontend correspondant à l'état DB restauré (`fcdd4e7c` pour un retour complet
+   pré-cutover).
+9. Vérifier Auth (login/session/logout).
+10. Vérifier ACL/RLS (cohérentes avec l'état restauré, pas un mélange ancien/nouveau).
+11. Vérifier l'isolation multitenant sur l'état restauré.
+12. Rouvrir le service **uniquement** sur GO explicite de **B**.
+
+**Interdit, sans exception :**
+- Down migrations improvisées.
+- `GRANT`/`REVOKE` permissif improvisé en Production sous pression.
+- Suppression manuelle de facteurs MFA (`DELETE FROM auth.mfa_factors`).
+- Rollback frontend **seul** une fois `…000255` appliquée (cf. §3, §6) — toujours coordonné
+  DB + app au-delà de ce point.
+
+---
+
+## 27. Checklist opérateur imprimable
+
+Document séparé, court, format case à cocher / heure / opérateur / résultat / GO-STOP :
+`docs/runbooks/ELSATIA_PRODUCTION_CUTOVER_OPERATOR_CHECKLIST_V1.md`. À imprimer ou dupliquer par
+fenêtre réelle (une copie par exécution, jamais réutilisée telle quelle d'une fenêtre à l'autre).
 
 ---
 
