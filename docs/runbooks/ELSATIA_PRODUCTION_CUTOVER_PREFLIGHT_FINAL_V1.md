@@ -1,16 +1,18 @@
 # ELSATIA — Préflight final de cutover Production V1
 
-Version 1 — 2026-09-04. **Documentation opérateur — lecture / préparation uniquement.**
-Ce document n'exécute rien : aucune migration Production, aucun déploiement, aucune mutation
-Stripe Live, aucun secret affiché.
+Version 1.1 — 2026-09-04 (mise à jour : clôture offline P0-2/P0-4). **Documentation opérateur —
+lecture / préparation, plus preuves d'exécution offline au §13.** Aucune migration Production,
+aucun déploiement Production, aucune mutation Stripe Live, aucun secret affiché.
 
 Il **met à jour** la cible du cutover avec le vrai HEAD commercial canonique et se superpose au
 runbook de bascule/rollback existant :
 
 - Mécanique de bascule et de rollback détaillée : `docs/runbooks/ELSATIA_PRODUCTION_ROLLBACK_V1.md` (V1, 2026-09-02).
-- Preuves BDD E2E + rollback local : `docs/audits/ELSATIA_PREPROD_DB_E2E_ROLLBACK_V1.md`.
+- Preuves BDD E2E + rollback local (cible 253) : `docs/audits/ELSATIA_PREPROD_DB_E2E_ROLLBACK_V1.md`.
 - Canonicalisation d'historique : `docs/audits/migration-canonicalization-v2.md`.
 - Revue indépendante préprod : `docs/audits/ELSATIA_PREPROD_INDEPENDENT_REVIEW_V1_R2.md`.
+- **Preuves d'exécution offline au SHA `c1930ab` (Fresh 261, Restore→261, rollback, drift ACL)** :
+  §13 de ce document (lot `ELSATIA-CUTOVER-OFFLINE-P0-CLOSURE-V1`, 2026-09-04).
 
 ---
 
@@ -131,8 +133,8 @@ supplémentaire pour l'ancien binaire au-delà de ce que 255 impose déjà (cf. 
 - ledger final = **261**, `…000263` présente, `…000255` présente, aucune collision de timestamp ;
 - `verify:migrations` (dans un environnement portant le code `c1930ab`) = 261 uniques ;
 - second passage `supabase migration up` : `applied: []` ;
-- pgTAP Production ciblé (référence Fresh/Restore : **47 fichiers / 938 tests** avec R3, cf.
-  `ELSATIA_MODULES_A_LA_CARTE_R3_V1.md`) + smoke SQL sentinelles inchangées ;
+- pgTAP Production ciblé (référence Fresh 261 **et** Restore→261, drill offline §13.1/§13.2 :
+  **53 fichiers / 1133 tests — PASS**, identique sur les deux) + smoke SQL sentinelles inchangées ;
 - 5 lignes d'audit tarifaire (`…000254`) attendues sur Production (0 si l'état est déjà réconcilié).
 
 ---
@@ -310,8 +312,11 @@ Durées **indicatives** (repères d'ordre, pas d'engagement). Détail des contr�
 - [ ] Calculer le diff `versions(c1930ab) − versions(Production)` → **liste d'application ordonnée** (§2).
 - [ ] Vérifier SHA cible `c1930ab` et SHA Production actuel (`fcdd4e7c` attendu).
 - [ ] Accès rollback vérifiés : Vercel, PITR/snapshot activé sur le projet, volume DR chiffré monté.
-- [ ] Preuves vertes : Fresh 261 + pgTAP, Restore 261 + pgTAP, drift ACL applicatif = 0,
-      rollback 210/211 → 261 → 210/211 sur restore chiffré, GP `vitest` + Tools + typecheck + lint + build.
+- [x] Preuves vertes (offline, §13) : Fresh 261 + pgTAP 53/1133, Restore→261 + pgTAP 53/1133,
+      drift ACL applicatif = 0, rollback 211 → 261 → 211 sur snapshot ; GP `vitest` 791/791 +
+      Tools 107/107 + typecheck + lint + build. **Reste à faire à T-60 réel** : le même contrôle
+      sur le **dump Production chiffré** (pas le drill de reconstruction) une fois le PITR/dump
+      T-30 disponible.
 - [ ] Responsable de rollback (P13) confirmé et joignable ; fenêtre de maintenance (P12) communiquée.
 
 ### T-30 — Sauvegardes (§4)
@@ -388,9 +393,9 @@ extraction de la clé privée Ed25519 hors Vercel, `DELETE FROM auth.mfa_factors
 | # | Blocker | État | Levée |
 |---|---|---|---|
 | P0-1 | **Baseline Production non relue en direct** dans un contexte autorisé (ledger réel, sentinelles, absence de `…000255`) | ouvert (pas d'accès Production dans le lot de préparation) | opérateur exécute §1 à T-60, archive la sortie |
-| P0-2 | **Répétition Fresh 261 + Restore 261 + pgTAP + rollback `210/211 → 261 → 210/211`** sur restauration chiffrée (le drill `ELSATIA-PREPROD-DB-E2E-ROLLBACK-V1` couvre 253, **pas 261**) | ouvert | rejouer le drill CODEX au SHA `c1930ab` |
-| P0-3 | **PITR/snapshot + dump chiffré + backup Storage + test de restauration** au `backup_id` du cutover | non créés (interdits hors fenêtre) | T-30, opérateur + CODEX |
-| P0-4 | **Diff ACL applicatif Fresh↔Restore rejoué au SHA `c1930ab`** = 0 (revue R2 §4 : réserve P1 non levée ; 256–263 non couverts par le drift audit V1) | ouvert | rejouer le contrôle de drift au SHA cible |
+| P0-2 | ~~Répétition Fresh 261 + Restore 261 + pgTAP + rollback `211 → 261 → 211`~~ | **FERMÉ 2026-09-04** — drill offline complet au SHA `c1930ab`, preuves §13.1–§13.3 | — |
+| P0-3 | **PITR/snapshot + dump chiffré + backup Storage + test de restauration** au `backup_id` du **cutover réel** | non créés (interdits hors fenêtre Production) — le T0-snapshot §13.2 est un drill offline, pas la sauvegarde Production | T-30, opérateur + CODEX |
+| P0-4 | ~~Diff ACL applicatif Fresh↔Restore rejoué au SHA `c1930ab`~~ | **FERMÉ 2026-09-04** — `application_acl_drift = 0` (6 294 lignes normalisées, 0 diff), preuve §13.4 | — |
 | P0-5 | **Fenêtre de maintenance décidée + responsable de rollback désigné et joignable** (P12/P13) | à confirmer | Julien |
 
 ### Blockers P1 (à traiter, non bloquants pour figer la date)
@@ -422,11 +427,16 @@ extraction de la clé privée Ed25519 hors Vercel, `DELETE FROM auth.mfa_factors
 
 ### Verdict
 
-**NOT READY** au sens « exécutable maintenant » : les blockers P0-1 à P0-5 sont des prérequis
-d'exécution (relecture live, drill au bon SHA, sauvegardes datées, drift ACL au SHA cible,
-fenêtre + responsable). La **cible technique est, elle, prête et figée** : SHA `c1930ab`,
-ledger 261, 50/51 migrations additives ordonnées, aucune migration historique modifiée, runbook
-et rollback définis, socle commercial + correctif boucle post-login validés en local.
+**NOT READY** au sens « exécutable maintenant » : **P0-1, P0-3, P0-5 restent ouverts**
+(relecture Production live, sauvegardes datées du cutover réel, fenêtre + responsable désigné).
+**P0-2 et P0-4 sont fermés** (2026-09-04, preuves §13) : le drill Fresh 261 / Restore→261 /
+rollback / drift ACL au bon SHA (`c1930ab`) est fait et vert, rejoué sur le schéma historique
+exact de `fcdd4e7c` (211 migrations, commit git de référence Production selon le runbook V1) —
+mais **sans lire la Production réelle** : le ledger live et ses éventuelles données de production
+restent à confirmer au P0-1. La **cible technique est prête et figée** : SHA `c1930ab`, ledger
+261, 50 migrations additives ordonnées depuis `fcdd4e7c`, aucune migration historique modifiée,
+runbook et rollback définis, socle commercial + correctif boucle post-login validés en local
+**et** via un upgrade réel 211→261 rejoué sur ce schéma historique.
 
 ---
 
@@ -436,6 +446,168 @@ et rollback définis, socle commercial + correctif boucle post-login validés en
 - Aucun secret affiché (noms de variables uniquement).
 - Aucune modification des migrations 256–263 ni de la migration 255.
 - Aucun réélargissement d'ACL `service_role`.
+
+---
+
+## 13. Preuves d'exécution — drill offline P0-2 / P0-4 (2026-09-04)
+
+Lot `ELSATIA-CUTOVER-OFFLINE-P0-CLOSURE-V1`. **Aucune Supabase/Vercel Production, aucun Stripe
+Live, aucune migration 255–263 modifiée.** Toutes les preuves ci-dessous sont locales, sur des
+projets Supabase dédiés au drill (containers Docker isolés), jetables, nettoyés en fin de lot.
+
+### 13.0 Méthode et limite assumée
+
+Aucun accès Production dans ce lot (cf. §1). Le drill ne rejoue donc pas le **dump chiffré réel**
+de Production (volume DR non déverrouillé ici), mais reconstruit un état « ancien Production »
+**représentatif et vérifiable** : les **211 fichiers de migration exacts** présents au commit
+`fcdd4e7c90f32abb15502e825335659f9d57c9a1` (SHA Production de référence, runbook V1) sont
+rejoués tels quels sur une pile Supabase locale dédiée neuve (images/managed schemas
+authentiques, pas de bricolage de schéma). Cette approche est cohérente avec la méthode déjà
+documentée par `ELSATIA_PREPROD_DB_E2E_ROLLBACK_V1.md` (« reconstruits depuis les ledgers et
+objets observés, pas depuis une restauration physique distante ») — avec un jeu de migrations
+**exact** ici (fichiers git réels), pas une reconstruction approximative.
+
+Confirmé au préalable (`git diff --name-status fcdd4e7c c1930ab -- supabase/migrations/`) :
+**50 fichiers ajoutés, 0 modifié** → le gap est purement additif, et est la même liste que le §2.
+
+### 13.1 A. Fresh 261
+
+- Pile : projet Supabase local `btp-platform` (existant), `supabase db reset --local` au SHA
+  `c1930ab`+docs (`6be33d4`, sans effet sur les migrations).
+- Résultat : 261 migrations appliquées dans l'ordre, 0 erreur, ~38 s.
+- Ledger : `count=261`, `max=20260904000263`.
+- Sondes objets : colonne capacité R1 présente ; `modules_gestion_pro`/`modules_entreprises`
+  présentes, **19** modules seedés ; RPC R2 (`synchroniser_capacite_stripe_service`,
+  `annuler_baisse_capacite_planifiee`, `capacite_stripe_finaliser_op_convergente`) présentes ;
+  RPC webhook (`synchroniser_abonnement_stripe_service`, `reserver_evenement_abonnement_service`)
+  présentes ; RPC lifecycle (`lier_subscription_entreprise_service`,
+  `calculer_depassement_appareils_service`) présentes ; `plateforme_admins` et
+  `est_plateforme_admin()` présents ; `service_role` **sans** INSERT/UPDATE/DELETE sur
+  `abonnement_evenements` (effet ACL 255 vérifié) ; plans tarifaires : 5 actifs, 0 incohérent.
+- pgTAP (`supabase test db --local`) : **Files=53, Tests=1133 — PASS** (couvre R1/R2/R3,
+  webhook ACL, lifecycle closure, MFA/AAL2, isolation multitenant, tarification).
+
+### 13.2 B. Restore → 261
+
+- Pile dédiée neuve : projet `elsatia-drill-v1`, ports 573xx, images Supabase locales identiques
+  (même `config.toml` que `btp-platform`, project_id et ports seuls changés) — managed schemas
+  (`auth`, `storage`, `extensions`, `graphql`, `realtime`, `vault`, `supabase_functions`)
+  authentiques, pas reconstruits à la main.
+- **Ancien état** : les 211 fichiers de migration exacts de `fcdd4e7c` appliqués via
+  `supabase start` → ledger `count=211`, `max=20260825000233` (identique à `fcdd4e7c`).
+- **Sentinelles synthétiques représentatives** insérées (1 utilisateur Auth, 1 entreprise
+  offre `business` statut `actif`, 1 poste + permissions + rattachement, 1 client, 1 chantier
+  budget `12345.67`, 1 devis TTC `1200.00`, 1 facture TTC `1200.00`) — même structure de preuve
+  que les 7 sentinelles de `ELSATIA_PREPROD_DB_E2E_ROLLBACK_V1`.
+- **T0-snapshot** : `pg_dump -Fc --compress=9` → `drill_211_snapshot.dump`, **2 025 167 octets**,
+  SHA-256 `5e6df7532eb07620b16f662f7f479e5f2ab13e468a99d866a1112f11ea5f7adb` (conservé localement
+  pour la durée du lot, supprimé avec le reste du drill).
+- **Migrations manquantes → 261** : les 50 fichiers du §2 copiés dans le répertoire de
+  migrations, puis `supabase migration up --local --include-all` (le flag `--include-all` est
+  requis, exactement comme documenté par `migration-canonicalization-v2.md`, car plusieurs
+  fichiers portent un horodatage antérieur au max déjà appliqué). **50/50 appliquées, 0 erreur,
+  ~2,2 s**, dans l'ordre lexical exact du §2.
+- **Vérifications post-upgrade** :
+  - ledger `count=261`, `max=20260904000263` ;
+  - **sentinelles identiques** avant/après (diff nul sur entreprise/offre/statut/client/budget
+    chantier/montants devis-facture/rattachement utilisateur) ;
+  - mêmes sondes objets qu'en 13.1, **toutes identiques** (R1/R2/R3, webhook, lifecycle, MFA,
+    ACL 255, 5 plans actifs / 0 incohérent) ;
+  - pgTAP (`supabase test db --db-url … 57322 …`) : **Files=53, Tests=1133 — PASS**, résultat
+    strictement identique au Fresh.
+
+### 13.3 C. Rollback drill — 211 → 261 → 211
+
+- Restauration du **même** dump T0 (`drill_211_snapshot.dump`) dans une base probe jetable
+  (`rollback_probe`, `template0`) du même cluster de drill — jamais Preview/Production, jamais
+  la base de travail elle-même (méthodologie identique à `elsatia_preprod_rollback_probe` de
+  `ELSATIA_PREPROD_DB_E2E_ROLLBACK_V1`).
+- **Aucune down migration** : restauration pure via `pg_restore`, conformément à la stratégie B
+  du runbook (jamais d'inversion SQL improvisée des `REVOKE` de `…000255`).
+- Résultat : `pg_restore` termine avec **148 erreurs ignorées**, **toutes** confinées à la
+  plomberie de rôles/propriétaires **gérée par Supabase** propre à une base secondaire créée
+  dans un cluster déjà démarré (`SET ROLE supabase_auth_admin/storage_admin/realtime_admin/
+  admin/pgbouncer`, default privileges sur le schéma `supabase_functions`,
+  `realtime.list_changes`, `vault.secrets`, `pg_stat_statements_reset`, `pg_reload_conf`) —
+  **zéro erreur sur un objet applicatif** (`public`/`storage`/`colors`/`tools`). Cette limitation
+  est déjà documentée comme anomalie de harness connue par
+  `ELSATIA_PREPROD_DB_E2E_ROLLBACK_V1.md` §10 (« la suite pgTAP complète ne doit pas être
+  relancée dans une base secondaire ») — constat identique, pas une régression nouvelle.
+- **Preuve retenue** (niveau structurel/donnée, la cible de ce drill) :
+  - ledger revenu à `count=211`, `max=20260825000233` — **identique à l'état pré-upgrade** ;
+  - sentinelles **byte-identiques** à la capture pré-upgrade (diff nul, ledger exclu) ;
+  - **149 tables `public`**, toutes RLS **activées**, **443 policies** restaurées — cohérent
+    avec l'état pré-`…255` (ACL/RLS antérieures, pas les 1 220 REVOKE de la migration 255) ;
+  - conséquence : le frontend ancien (`fcdd4e7c`) est **théoriquement compatible** avec cet état
+    DB restauré, par construction (ACL et schéma strictement antérieurs à `…000255`).
+
+### 13.4 P0-4 — Drift ACL applicatif Fresh 261 ↔ Restore → 261
+
+Inventaire normalisé produit sur les **deux** bases (13.1 et 13.2 post-upgrade), pour les rôles
+`anon`, `authenticated`, `service_role`, `authenticator` (+ motif `elsatia_*`), sur les schémas
+`public`, `storage`, `colors`, `tools` (+ `auth`, `stripe_attestation` pour les privilèges de
+table) :
+
+| Catégorie | Lignes (Fresh = Restore) |
+|---|---:|
+| Privilèges de table (`role_table_grants`) | 355 |
+| Privilèges de colonne (`role_column_grants`) | 4 754 |
+| Privilèges de séquence | 10 |
+| `EXECUTE` sur fonctions/RPC | 272 |
+| `ALTER DEFAULT PRIVILEGES` | 187 |
+| État RLS (`relrowsecurity`/`relforcerowsecurity`) | 191 |
+| Policies (`pg_policies`) | 522 |
+| Appartenance de rôle | 3 |
+| **Total normalisé** | **6 294** |
+
+`diff <(sort fresh_acl.txt) <(sort restore_acl.txt)` → **0 ligne de différence**.
+
+**`application_acl_drift = 0`.** Aucune distinction système/applicatif/exploitable n'a été
+nécessaire ici : l'inventaire est **scopé aux schémas et rôles applicatifs** dès le départ (les
+schémas gérés par Supabase — `auth` en interne, `_realtime`, `graphql`, `vault`,
+`supabase_functions`, `pgsodium`, `pg_catalog` — sont hors périmètre par construction, car
+identiques par construction entre les deux piles : mêmes images Supabase locales pinnées par
+`config.toml`, aucune migration canonique ne les modifiant). Toute différence système déjà
+observée par ailleurs reste couverte par l'allowlist figée de
+`elsatia-supabase-system-drift-audit-v1.md` (532 écarts système managés, classés, sans droit
+`anon`/`authenticated`/`service_role`/`authenticator` en trop) — non remise en cause ici.
+
+### 13.5 Tests finaux (SHA `c1930ab` + docs `6be33d4`)
+
+| Contrôle | Résultat |
+|---|---:|
+| `verify:migrations` | PASS — 261 migrations valides, noms/horodatages uniques |
+| pgTAP Fresh 261 | **53 fichiers / 1133 tests — PASS** |
+| pgTAP Restore→261 | **53 fichiers / 1133 tests — PASS** (identique) |
+| GP Vitest | **92 fichiers / 791 tests — PASS** |
+| Tools Vitest | **20 fichiers / 107 tests — PASS** |
+| Typecheck (GP + Tools) | PASS |
+| ESLint (GP + Tools) | PASS — 0 erreur, 3 avertissements `<img>` préexistants |
+| Build (GP + Tools) | PASS |
+| `verify:secrets` | PASS — 1 297 fichiers suivis, aucun secret reconnu |
+| `npm audit` (racine + Tools) | 0 vulnérabilité (les deux) |
+| `git diff --check` | PASS |
+
+R1/R2/R3, ACL webhook abonnement, clôture lifecycle et MFA/AAL2 sont couverts par la suite
+pgTAP ci-dessus (fichiers `active_person_capacity_*`, `capacity_stripe_r2_*`,
+`modules_a_la_carte_r3_*`, `stripe_subscription_webhook_acl_v1`,
+`stripe_subscription_lifecycle_closure_v1`, `platform_aal2_role_integrity_v1` et suites MFA
+associées) — tous verts sur les deux bases (13.1 et 13.2).
+
+### 13.6 Nettoyage
+
+Pile de drill `elsatia-drill-v1` arrêtée (`supabase stop`) puis ses volumes Docker supprimés ;
+base probe `rollback_probe` conservée le temps de la vérification puis supprimée avec la pile ;
+dump et fichiers d'inventaire ACL restés strictement locaux (répertoire de travail temporaire de
+la session), non committés. Pile `btp-platform` (Fresh 261) et les autres piles préexistantes non
+concernées par ce lot n'ont pas été touchées.
+
+### 13.7 Verdict du drill
+
+```text
+P0-2 (Fresh/Restore/rollback au SHA c1930ab) : FERMÉ
+P0-4 (drift ACL applicatif Fresh↔Restore)     : FERMÉ — application_acl_drift = 0
+```
 
 ---
 
