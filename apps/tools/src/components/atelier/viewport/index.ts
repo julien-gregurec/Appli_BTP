@@ -20,6 +20,36 @@ export { AtelierViewportWorkspace, type AtelierViewportWorkspaceProps } from "./
 export { ResolvedModelViewport, type ResolvedModelViewportProps } from "./ResolvedModelViewport";
 export { atelierViewKey, planSceneForStep, resolvedPlanScene, stepAt } from "./resolved-scene";
 export { usePlanViewport, type PlanViewportController } from "./use-plan-viewport";
+export {
+  HIT_PRIORITY,
+  hitTest,
+  hitTestAll,
+  hitTestCandidates,
+  type HitEntityKind,
+  type HitTestResult,
+  type HitTestScene,
+} from "@/lib/geometry/hit-test";
+export {
+  SNAP_PRIORITY,
+  geometrySnapCandidates,
+  snap,
+  snapCandidates,
+  snapToGrid,
+  type SnapCandidate,
+  type SnapKind,
+  type SnapOptions,
+} from "@/lib/geometry/snap";
+export {
+  POINTER_TOLERANCE_PX,
+  SNAP_TOLERANCE_PX,
+  TOUCH_SNAP_TOLERANCE_PX,
+  TOUCH_TOLERANCE_PX,
+  pointerPrecisionOf,
+  selectionTolerancePx,
+  snapTolerancePx,
+  toleranceWorldFor,
+  type PointerPrecision,
+} from "@/lib/viewport/pointer-targeting";
 export { useViewportGestures, DRAG_THRESHOLD_PX } from "./use-viewport-gestures";
 export {
   buildToolbarModel,

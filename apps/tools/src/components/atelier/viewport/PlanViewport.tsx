@@ -16,9 +16,10 @@
  * chaque redimensionnement : aucune déformation entre mobile, tablette et desktop.
  */
 
-import { useCallback, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import { chooseGridStep, formatGridStep } from "@/lib/viewport/grid";
-import type { ViewportSize, ViewportState } from "@/lib/viewport/viewport-math";
+import { pointerPrecisionOf, type PointerPrecision } from "@/lib/viewport/pointer-targeting";
+import type { ScreenPoint, ViewportSize, ViewportState } from "@/lib/viewport/viewport-math";
 import { GridOverlay } from "./GridOverlay";
 import type { PlanViewportController } from "./use-plan-viewport";
 import { useViewportGestures } from "./use-viewport-gestures";
@@ -37,8 +38,19 @@ export type PlanViewportProps = {
   gridVisible?: boolean;
   /** Le mode courant ne change que le curseur ; le pan à un doigt reste toujours accessible. */
   tool?: "select" | "pan";
-  /** Clic sur le fond (hors entité) — sert à désélectionner. Ignoré après un glissement. */
-  onBackgroundClick?: () => void;
+  /**
+   * Clic sur la toile, en coordonnées ÉCRAN locales au viewport, avec la finesse du pointeur
+   * (ATELIER-HITTEST-SNAP-FOUNDATION-V1 §7/§8). Le viewport ne sait pas ce qu'il y a sous ce
+   * point : c'est l'appelant qui décide, par hit-test, s'il faut sélectionner ou désélectionner.
+   * Ignoré après un glissement.
+   */
+  onCanvasClick?: (localPoint: ScreenPoint, precision: PointerPrecision) => void;
+  /**
+   * Survol de la toile — `null` à la sortie du pointeur (§9). Émis à la cadence de l'écran
+   * (une seule notification par trame, §10) pour qu'un hit-test de survol ne coûte jamais plus
+   * d'un calcul par image affichée.
+   */
+  onCanvasHover?: (localPoint: ScreenPoint | null, precision: PointerPrecision) => void;
   children: (args: PlanViewportRenderArgs) => ReactNode;
   /** Ligne d'état complémentaire (nombre d'entités, sélection…). */
   status?: ReactNode;
@@ -53,18 +65,69 @@ export function PlanViewport({
   label,
   gridVisible = true,
   tool = "pan",
-  onBackgroundClick,
+  onCanvasClick,
+  onCanvasHover,
   children,
   status,
 }: PlanViewportProps) {
   const { containerRef, element, size, view, ready, percent, pan, zoomAtPoint, zoomIn, zoomOut, recenter } = controller;
   const { handlers, consumeDrag } = useViewportGestures(element, { pan, zoomAtPoint });
 
-  const onClick = useCallback(() => {
-    // Un clic qui conclut un pan ne doit pas désélectionner (§11).
-    if (consumeDrag()) return;
-    onBackgroundClick?.();
-  }, [consumeDrag, onBackgroundClick]);
+  // Finesse du dernier pointeur vu. `onClick` ne reçoit qu'un `MouseEvent`, qui ne dit pas si
+  // le geste venait d'un doigt : on la retient au `pointerdown`, qui le sait (§8).
+  const precision = useRef<PointerPrecision>("fine");
+  /** Trame de survol en attente — garantit un seul hit-test par image (§10). */
+  const hoverFrame = useRef<number | null>(null);
+
+  const localPointOf = useCallback((event: { clientX: number; clientY: number; currentTarget: Element }): ScreenPoint => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  }, []);
+
+  const onClick = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      // Un clic qui conclut un pan ne doit ni sélectionner ni désélectionner (§11).
+      if (consumeDrag()) return;
+      onCanvasClick?.(localPointOf(event), precision.current);
+    },
+    [consumeDrag, localPointOf, onCanvasClick],
+  );
+
+  const onPointerDownCapture = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    precision.current = pointerPrecisionOf(event.pointerType);
+  }, []);
+
+  const onPointerMove = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      handlers.onPointerMove(event);
+      if (!onCanvasHover) return;
+      // Le survol au doigt n'a pas de sens : le contact EST déjà un geste de pan ou de clic.
+      if (event.pointerType === "touch") return;
+      const point = localPointOf(event);
+      if (hoverFrame.current !== null) cancelAnimationFrame(hoverFrame.current);
+      hoverFrame.current = requestAnimationFrame(() => {
+        hoverFrame.current = null;
+        onCanvasHover(point, "fine");
+      });
+    },
+    [handlers, localPointOf, onCanvasHover],
+  );
+
+  const onPointerLeave = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      handlers.onPointerLeave(event);
+      if (hoverFrame.current !== null) {
+        cancelAnimationFrame(hoverFrame.current);
+        hoverFrame.current = null;
+      }
+      onCanvasHover?.(null, precision.current);
+    },
+    [handlers, onCanvasHover],
+  );
+
+  useEffect(() => () => {
+    if (hoverFrame.current !== null) cancelAnimationFrame(hoverFrame.current);
+  }, []);
 
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -114,6 +177,9 @@ export function PlanViewport({
         onKeyDown={onKeyDown}
         onClick={onClick}
         {...handlers}
+        onPointerDownCapture={onPointerDownCapture}
+        onPointerMove={onPointerMove}
+        onPointerLeave={onPointerLeave}
       >
         <svg className={styles.svg} width={size.width || undefined} height={size.height || undefined} aria-hidden="true">
           {ready && gridVisible && <GridOverlay view={view} size={size} />}

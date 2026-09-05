@@ -119,12 +119,34 @@
   stroke-width: 3.4;
 }
 
-.hitArea {
-  fill: none;
-  stroke: transparent;
-  stroke-width: 18;
-  cursor: pointer;
+/*
+  ATELIER-HITTEST-SNAP-FOUNDATION-V1 §9 — survol : un simple épaississement, pas un changement
+  de couleur. Le survol dit « ce clic prendra ceci » ; il ne doit jamais être confondu avec la
+  sélection (ambre), ni faire croire à un état enregistré.
+*/
+.hovered {
+  stroke: var(--navy);
+  stroke-width: 3;
+  opacity: 1;
 }
+
+/* Point d'accrochage proposé : croix fine, ambre, non interactive. */
+.snapMark line {
+  stroke: var(--amber);
+  stroke-width: 1.2;
+}
+
+.snapMark circle {
+  fill: none;
+  stroke: var(--amber);
+  stroke-width: 1.4;
+}
+
+/*
+  Les anciennes zones de clic invisibles (`.hitArea`) ont disparu avec la désignation par
+  évènement SVG : le hit-test géométrique travaille sur le point monde du clic, il n'a besoin
+  d'aucune cible DOM. Le curseur de désignation reste porté par la toile en mode Sélection.
+*/
 
 /* ---- Bandeau d'état ------------------------------------------------------ */
 

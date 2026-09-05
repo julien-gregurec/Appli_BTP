@@ -8,9 +8,12 @@
  * `createPolylinePath`, `createPolygonPath`), la transformation du viewport ayant volontairement
  * la même forme que `createPlanTransform`.
  *
- * La sélection se limite ici à désigner une entité déjà rendue (événement natif SVG) : le
- * hit-testing géométrique complet — tolérance, priorité, points les plus proches — reste hors lot
- * (§11).
+ * ATELIER-HITTEST-SNAP-FOUNDATION-V1 §7/§9 : la désignation ne passe plus par des zones de clic
+ * SVG invisibles mais par le hit-test géométrique, mené au niveau du viewport sur le point monde
+ * du clic. Ce composant n'a donc plus de gestionnaire d'évènement du tout — il ne fait que
+ * DESSINER, y compris l'état de survol, de sélection et le point d'accrochage proposé, qui lui
+ * arrivent en props. Une zone de clic invisible par entité ne saurait de toute façon pas
+ * appliquer une tolérance en pixels ni une priorité entre entités superposées.
  */
 
 import { createArcPath, createPolygonPath, createPolylinePath } from "@/lib/geometry/plan-model";
@@ -24,30 +27,39 @@ export type PlanSceneLayerProps = {
   view: ViewportState;
   size: ViewportSize;
   selectedEntityId?: string | null;
-  /** Actif seulement en mode Sélection ; sinon le fond garde la priorité au pan. */
-  onPickEntity?: (entityId: string) => void;
+  /** Entité survolée, désignée par le hit-test géométrique (§9). Desktop uniquement. */
+  hoveredEntityId?: string | null;
+  /** Point d'accrochage proposé sous le pointeur, en coordonnées monde (§9). */
+  snapPoint?: { x: number; y: number } | null;
   showPoints?: boolean;
 };
 
-export function PlanSceneLayer({ scene, view, size, selectedEntityId = null, onPickEntity, showPoints = true }: PlanSceneLayerProps) {
+export function PlanSceneLayer({
+  scene,
+  view,
+  size,
+  selectedEntityId = null,
+  hoveredEntityId = null,
+  snapPoint = null,
+  showPoints = true,
+}: PlanSceneLayerProps) {
   const transform = createViewportTransform(view, size);
   const project = transform.point;
-  const selectable = Boolean(onPickEntity);
 
   const strokeClass = (role: string | undefined, id: string) => {
     const base = role === "construction" ? styles.construction : role === "axis" ? styles.axis : styles.shape;
-    return id === selectedEntityId ? `${base} ${styles.selected}` : base;
+    // La sélection l'emporte sur le survol : survoler l'entité déjà retenue ne doit pas la
+    // faire changer d'apparence, sans quoi on croirait avoir perdu la sélection.
+    if (id === selectedEntityId) return `${base} ${styles.selected}`;
+    if (id === hoveredEntityId) return `${base} ${styles.hovered}`;
+    return base;
   };
 
-  // `stopPropagation` : sans cela, le clic remonterait au fond du viewport et désélectionnerait
-  // aussitôt l'entité qui vient d'être désignée.
-  const pick = (id: string) =>
-    onPickEntity
-      ? (event: React.MouseEvent) => {
-          event.stopPropagation();
-          onPickEntity(id);
-        }
-      : undefined;
+  const markClass = (id: string, base: string) => {
+    if (id === selectedEntityId) return `${base} ${styles.selected}`;
+    if (id === hoveredEntityId) return `${base} ${styles.hovered}`;
+    return base;
+  };
 
   return (
     <g>
@@ -56,7 +68,6 @@ export function PlanSceneLayer({ scene, view, size, selectedEntityId = null, onP
         return (
           <g key={polygon.id}>
             <path className={strokeClass(polygon.role, polygon.id)} d={d} />
-            {selectable && <path className={styles.hitArea} d={d} onClick={pick(polygon.id)} />}
           </g>
         );
       })}
@@ -66,7 +77,6 @@ export function PlanSceneLayer({ scene, view, size, selectedEntityId = null, onP
         return (
           <g key={polyline.id}>
             <path className={strokeClass(polyline.role, polyline.id)} d={d} />
-            {selectable && <path className={styles.hitArea} d={d} onClick={pick(polyline.id)} />}
           </g>
         );
       })}
@@ -81,9 +91,6 @@ export function PlanSceneLayer({ scene, view, size, selectedEntityId = null, onP
         return (
           <g key={segment.id}>
             <line className={strokeClass(role, segment.id)} x1={start.x} y1={start.y} x2={end.x} y2={end.y} />
-            {selectable && (
-              <line className={styles.hitArea} x1={start.x} y1={start.y} x2={end.x} y2={end.y} onClick={pick(segment.id)} />
-            )}
           </g>
         );
       })}
@@ -93,7 +100,6 @@ export function PlanSceneLayer({ scene, view, size, selectedEntityId = null, onP
         return (
           <g key={arc.id}>
             <path className={strokeClass(arc.role, arc.id)} d={d} />
-            {selectable && <path className={styles.hitArea} d={d} onClick={pick(arc.id)} />}
           </g>
         );
       })}
@@ -104,7 +110,6 @@ export function PlanSceneLayer({ scene, view, size, selectedEntityId = null, onP
         return (
           <g key={circle.id}>
             <circle className={strokeClass(circle.role, circle.id)} cx={centre.x} cy={centre.y} r={radius} />
-            {selectable && <circle className={styles.hitArea} cx={centre.x} cy={centre.y} r={radius} onClick={pick(circle.id)} />}
           </g>
         );
       })}
@@ -121,16 +126,6 @@ export function PlanSceneLayer({ scene, view, size, selectedEntityId = null, onP
               rx={transform.radius(ellipse.radiusX)}
               ry={transform.radius(ellipse.radiusY)}
             />
-            {selectable && (
-              <ellipse
-                className={styles.hitArea}
-                cx={centre.x}
-                cy={centre.y}
-                rx={transform.radius(ellipse.radiusX)}
-                ry={transform.radius(ellipse.radiusY)}
-                onClick={pick(ellipse.id)}
-              />
-            )}
           </g>
         );
       })}
@@ -139,34 +134,40 @@ export function PlanSceneLayer({ scene, view, size, selectedEntityId = null, onP
         (scene.points ?? []).map((item) => {
           const position = project(item);
           const isCenter = item.role === "center";
-          const isSelected = item.id === selectedEntityId;
           return (
             <g key={`point-${item.id}`}>
               {isCenter ? (
                 <rect
-                  className={isSelected ? `${styles.centerMark} ${styles.selected}` : styles.centerMark}
+                  className={markClass(item.id, styles.centerMark)}
                   x={position.x - 5}
                   y={position.y - 5}
                   width={10}
                   height={10}
                 />
               ) : (
-                <circle
-                  className={isSelected ? `${styles.pointMark} ${styles.selected}` : styles.pointMark}
-                  cx={position.x}
-                  cy={position.y}
-                  r={4}
-                />
+                <circle className={markClass(item.id, styles.pointMark)} cx={position.x} cy={position.y} r={4} />
               )}
               {item.label && (
                 <text className={styles.pointLabel} x={position.x + 8} y={position.y - 8}>
                   {item.label}
                 </text>
               )}
-              {selectable && <circle className={styles.hitArea} cx={position.x} cy={position.y} r={2} onClick={pick(item.id)} />}
             </g>
           );
         })}
+
+      {/* Point d'accrochage proposé (§9) : une croix légère, jamais une entité de la scène. */}
+      {snapPoint &&
+        (() => {
+          const marker = project(snapPoint);
+          return (
+            <g className={styles.snapMark} aria-hidden="true">
+              <line x1={marker.x - 7} y1={marker.y} x2={marker.x + 7} y2={marker.y} />
+              <line x1={marker.x} y1={marker.y - 7} x2={marker.x} y2={marker.y + 7} />
+              <circle cx={marker.x} cy={marker.y} r={3.5} />
+            </g>
+          );
+        })()}
     </g>
   );
 }

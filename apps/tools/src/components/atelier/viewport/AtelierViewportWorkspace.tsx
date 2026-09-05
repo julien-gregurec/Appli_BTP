@@ -8,11 +8,24 @@
  * le jour où le hit-testing géométrique complet arrivera, il remplacera la source des
  * sélections sans toucher à cette composition.
  *
- * Limites assumées de ce lot : aucune modification de forme, aucun sommet éditable, aucun snap,
- * aucun undo/redo, aucun import photo, aucun appel au moteur géométrique.
+ * ATELIER-HITTEST-SNAP-FOUNDATION-V1 §7 — la sélection vient désormais du hit-test géométrique :
+ * le clic est converti en point MONDE, puis `hitTest` désigne l'entité la plus pertinente dans
+ * la tolérance. Le clic à vide désélectionne. La couche de rendu ne porte plus aucune zone de
+ * clic : elle dessine, elle n'écoute plus.
+ *
+ * Le point d'accrochage est CALCULÉ et AFFICHÉ, jamais appliqué (§11) : ce lot pose la fondation,
+ * il n'édite pas la géométrie.
+ *
+ * Limites assumées : aucune modification de forme, aucun sommet éditable, aucun undo/redo,
+ * aucun import photo, aucun appel au moteur géométrique.
  */
 
 import { useCallback, useMemo, useState } from "react";
+import { hitTest } from "@/lib/geometry/hit-test";
+import { snap } from "@/lib/geometry/snap";
+import { chooseGridStep } from "@/lib/viewport/grid";
+import { screenToWorld, type ScreenPoint } from "@/lib/viewport/viewport-math";
+import { selectionTolerancePx, snapTolerancePx, toleranceWorldFor, type PointerPrecision } from "@/lib/viewport/pointer-targeting";
 import { usePlanViewport } from "./use-plan-viewport";
 import { PlanViewport } from "./PlanViewport";
 import { PlanSceneLayer } from "./PlanSceneLayer";
@@ -44,10 +57,26 @@ export function AtelierViewportWorkspace({
   viewKey,
 }: AtelierViewportWorkspaceProps) {
   const [toolbar, setToolbar] = useState<ToolbarState>(initialToolbarState);
+  const [hoveredEntityId, setHoveredEntityId] = useState<string | null>(null);
+  const [snapPoint, setSnapPoint] = useState<{ x: number; y: number } | null>(null);
   const controller = usePlanViewport({ bounds: scene.bounds, viewKey });
 
   const details = useMemo(() => describeSceneEntity(scene, selectedEntityId), [scene, selectedEntityId]);
   const entityCount = useMemo(() => countSceneEntities(scene), [scene]);
+
+  // Dérivé du mode courant plutôt que remis à zéro par un effet : passer en « Déplacer » éteint
+  // aussitôt le survol et l'accrochage, sans état résiduel à nettoyer.
+  const feedbackVisible = canSelectEntities(toolbar);
+
+  // Le hit-test a besoin de la vue courante pour convertir un pixel en millimètres. Ces
+  // gestionnaires sont donc reconstruits à chaque changement de vue — c'est sans coût : pendant
+  // un pan, la couche SVG se redessine de toute façon à chaque trame, et rien ici n'est mémoïsé
+  // plus haut. Lire la vue dans une ref pour l'éviter serait un accès de ref pendant le rendu,
+  // c'est-à-dire un moyen fiable de désigner l'entité d'après un zoom périmé.
+  const { view, size } = controller;
+
+  /** Point monde d'un point écran local, à la vue courante. */
+  const worldOf = useCallback((local: ScreenPoint) => screenToWorld(local, view, size), [view, size]);
 
   const onSelectTool = useCallback((tool: AtelierTool) => {
     setToolbar((current) => selectTool(current, tool));
@@ -74,6 +103,44 @@ export function AtelierViewportWorkspace({
     [onSelectEntity],
   );
 
+  /**
+   * §7 — un clic désigne l'entité la plus pertinente sous le pointeur, ou désélectionne si
+   * rien n'est assez proche. La tolérance est convertie depuis les pixels à la vue courante,
+   * donc identique à l'œil quel que soit le zoom (§2).
+   */
+  const onCanvasClick = useCallback(
+    (local: ScreenPoint, precision: PointerPrecision) => {
+      const tolerance = toleranceWorldFor(selectionTolerancePx(precision), view);
+      const found = hitTest(scene, worldOf(local), tolerance);
+      if (found) pickEntity(found.entityId);
+      else onSelectEntity(null);
+    },
+    [onSelectEntity, pickEntity, scene, view, worldOf],
+  );
+
+  /**
+   * §9 — survol : l'entité qu'un clic prendrait, et le point d'accrochage qu'un futur outil
+   * d'édition proposerait. Purement visuel — rien n'est appliqué, rien n'est enregistré (§11).
+   */
+  const onCanvasHover = useCallback(
+    (local: ScreenPoint | null, precision: PointerPrecision) => {
+      if (!local) {
+        setHoveredEntityId(null);
+        setSnapPoint(null);
+        return;
+      }
+      const world = worldOf(local);
+      const found = hitTest(scene, world, toleranceWorldFor(selectionTolerancePx(precision), view));
+      setHoveredEntityId(found?.entityId ?? null);
+      const candidate = snap(scene, world, {
+        toleranceWorld: toleranceWorldFor(snapTolerancePx(precision), view),
+        gridStepMm: chooseGridStep(view.scale),
+      });
+      setSnapPoint(candidate ? candidate.position : null);
+    },
+    [scene, view, worldOf],
+  );
+
   return (
     <div className={styles.workspace} data-properties={toolbar.propertiesOpen ? "open" : "closed"}>
       <AtelierToolbar
@@ -88,7 +155,8 @@ export function AtelierViewportWorkspace({
         label={`Plan interactif — ${scene.name}`}
         gridVisible={toolbar.gridVisible}
         tool={toolbar.tool}
-        onBackgroundClick={() => onSelectEntity(null)}
+        onCanvasClick={canSelectEntities(toolbar) ? onCanvasClick : undefined}
+        onCanvasHover={canSelectEntities(toolbar) ? onCanvasHover : undefined}
         status={
           <>
             <span>{entityCount} entités</span>
@@ -96,20 +164,14 @@ export function AtelierViewportWorkspace({
           </>
         }
       >
-        {({ view, size, consumeDrag }) => (
+        {({ view: frameView, size: frameSize }) => (
           <PlanSceneLayer
             scene={scene}
-            view={view}
-            size={size}
+            view={frameView}
+            size={frameSize}
             selectedEntityId={selectedEntityId}
-            onPickEntity={
-              canSelectEntities(toolbar)
-                ? (entityId) => {
-                    if (consumeDrag()) return;
-                    pickEntity(entityId);
-                  }
-                : undefined
-            }
+            hoveredEntityId={feedbackVisible ? hoveredEntityId : null}
+            snapPoint={feedbackVisible ? snapPoint : null}
           />
         )}
       </PlanViewport>
