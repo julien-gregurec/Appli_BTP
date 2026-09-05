@@ -1,6 +1,6 @@
 // Modèle fondamental (FUNDAMENTAL-MODELS-V1 §5) : fiche pédagogique dédiée à la méthode des
 // foyers, centrée sur la construction elle-même (grand axe/petit axe/foyers/distance focale),
-// SANS positionnement dans une pièce (contrairement à createEllipse de shapes.ts, couplé à
+// SANS positionnement dans une pièce (contrairement à createRoomEllipse de shapes.ts, couplé à
 // positionInRoom : un fichier différent, pas une seconde implémentation concurrente de la même
 // formule).
 //

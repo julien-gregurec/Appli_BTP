@@ -1,5 +1,10 @@
 # Moteur géométrique paramétrique (`src/lib/geometry/engine/`)
 
+> **Engine B.** La frontière avec le moteur Pro historique (Engine A —
+> `primitives.ts`/`shapes.ts`, toujours vivant pour `pro-engine.ts`) est décrite dans
+> [`GEOMETRY_ENGINES_BOUNDARY_V1.md`](./GEOMETRY_ENGINES_BOUNDARY_V1.md). À lire avant
+> d'ajouter un calcul géométrique dans `apps/tools`.
+
 ## Périmètre et positionnement
 
 Ce module est **additif** : il ne modifie aucun fichier existant de `src/lib/geometry/`

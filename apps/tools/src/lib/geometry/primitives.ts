@@ -1,3 +1,12 @@
+// ENGINE A — briques de calcul du moteur Pro historique.
+//
+// NE PAS confondre avec `geometry/engine/` (Engine B), source de vérité géométrique de la
+// bibliothèque de tracés / de l'Atelier. Ici les points portent un `id` (`Point`) ; côté
+// Engine B non (`Point2D`). Plusieurs noms sont homonymes entre les deux (`distance`,
+// `midpoint`, `boundsFromPoints`, `arcLength`, `chordLength`, `sagitta`, `vectorLength`,
+// `divideCircle`, `assertFinitePositive`) : le chemin d'import est ce qui les discrimine.
+// Le seul pont autorisé entre les deux moteurs est `geometry/adapters/`.
+// Frontière complète : `apps/tools/docs/GEOMETRY_ENGINES_BOUNDARY_V1.md`.
 // "center" ajouté de façon additive (FIRST-FUNCTIONAL-LOT-V1) pour permettre à un renderer de
 // distinguer un centre de construction (O, centres secondaires...) des autres points de
 // référence/contrôle, sans changer le comportement des rôles déjà utilisés.
@@ -119,7 +128,7 @@ export function sagitta(radius: number, chord: number) {
   return radius - Math.sqrt(radius ** 2 - (chord / 2) ** 2);
 }
 // Division régulière d'un cercle en `count` points équidistants, extraite de la logique déjà
-// utilisée (en ligne) par createRadialPattern (shapes.ts) : même formule, même sens de rotation
+// utilisée (en ligne) par createRadialMotif (shapes.ts) : même formule, même sens de rotation
 // (trigonométrique standard), généralisée en primitive réutilisable. Angles en radians (convention
 // déjà en vigueur dans ce fichier — polar/rotate/angleBetween). Ordre stable : le point d'indice i
 // est toujours à l'angle startAngle + i * (2π / count), jamais réordonné.

@@ -2,13 +2,15 @@
 //
 // C4-LOT3-ROSETTES-V1 — Migré vers Engine B, selon le même principe que flower-4 (§ voir ce
 // fichier) : géométrie via `engine/rosettes.ts::createRosette({elementType:"circle"})` en mode
-// "classique", cercle directeur extérieur + cercle central ajoutés au niveau du modèle (propres à
-// cette famille, pas génériques à toute rosace).
+// "classique".
+//
+// C5-CLEANUP-V1 §2 — Cercle central décoratif et son étape produits par Engine B
+// (`centralCircleRatio`) ; plus aucun `SiteStep` recomposé localement. Seul le cercle directeur
+// extérieur reste ajouté au niveau du modèle, sans étape dédiée.
 import { createAngleDimension, createDiameterDimension, createRadiusDimension } from "../engine/dimensions";
 import { createRosette } from "../engine/rosettes";
-import { dimensionResultToDimension, parametricShapeToTraceModel, validateTraceModel, type TraceModelMetadata } from "../adapters";
+import { dimensionResultToDimension, parametricShapeToTraceModel, type TraceModelMetadata } from "../adapters";
 import type { Dimension } from "../primitives";
-import type { SiteStep } from "../shape-model";
 import type { TraceExplanation, TraceModel, TraceParameter } from "../trace-model";
 
 export type Flower5Input = { diameter: number; rotation?: number };
@@ -20,6 +22,10 @@ export const flower5Parameters: readonly TraceParameter[] = [
 
 const DEFAULT_INPUT: Flower5Input = { diameter: 1200, rotation: -90 };
 const PETALS = 5;
+// Proportion décorative du cercle central, en fraction du rayon de pétale (= rayon directeur
+// Engine B). Choix produit propre à la famille "fleur" ; la géométrie et l'étape qui en
+// découlent sont produites par Engine B (`centralCircleRatio`), jamais ici.
+const CENTRAL_CIRCLE_RATIO = 0.35;
 
 export const flower5Explanation: TraceExplanation = {
   objective: "Tracer une fleur à 5 pétales selon une division régulière du cercle en 5 (72° par secteur).",
@@ -54,15 +60,15 @@ export function createFlower5Geometry(input: Flower5Input = DEFAULT_INPUT): Trac
   // 2. Géométrie : exclusivement Engine B, mode "classique" (voir flower-4 pour la justification
   //    du diamètre moitié transmis à Engine B).
   const outerRadius = diameter / 2;
-  const shape = createRosette({ outerDiameter: outerRadius, count: PETALS, elementType: "circle", rotationDegrees });
+  const shape = createRosette({ outerDiameter: outerRadius, count: PETALS, elementType: "circle", rotationDegrees, centralCircleRatio: CENTRAL_CIRCLE_RATIO });
   const petalRadius = shape.metadata.directorRadius as number;
   const O = shape.primitives.points.O;
   const C1 = shape.primitives.points.C1;
   const C2 = shape.primitives.points.C2;
 
-  const centralRadius = petalRadius * 0.35;
+  // Cercle directeur extérieur : propre à ce modèle (voir flower-4). Le cercle central décoratif
+  // et son étape viennent d'Engine B via `centralCircleRatio` (C5-CLEANUP-V1 §2).
   shape.primitives.circles.push({ centre: O, radius: outerRadius, role: "construction" });
-  shape.primitives.circles.push({ centre: O, radius: centralRadius, role: "shape" });
 
   // 3. Cotations : moteur de cotation Engine B, valeurs jamais réécrites à la main.
   const dimensions: Dimension[] = [
@@ -84,18 +90,6 @@ export function createFlower5Geometry(input: Flower5Input = DEFAULT_INPUT): Trac
     explanation: flower5Explanation,
   };
 
-  const model = parametricShapeToTraceModel(shape, metadata, { dimensions });
-
-  const centralCircleId = model.circles.find((c) => Math.abs(c.radius - centralRadius) < 1e-6)?.id;
-  const centralStep: SiteStep = {
-    id: "step-central-circle",
-    title: "Tracer le cercle central",
-    instruction: `Terminez avec un petit cercle central de rayon ${Math.round(centralRadius)} mm.`,
-    measurements: [`${Math.round(centralRadius)} mm`],
-    pointIds: ["O"],
-    visibleEntityIds: centralCircleId ? [centralCircleId] : undefined,
-  };
-  const steps = [...model.steps.slice(0, -1), centralStep, model.steps.at(-1)!];
-
-  return validateTraceModel({ ...model, steps });
+  // Toutes les étapes proviennent d'Engine B, cercle central inclus (C5-CLEANUP-V1 §2).
+  return parametricShapeToTraceModel(shape, metadata, { dimensions });
 }

@@ -1,3 +1,12 @@
+// ENGINE A — générateurs de formes du moteur Pro historique (`ShapeGeometry`).
+//
+// Vivant et non remplaçable : consommé par `pro-engine.ts` (arche avancée, niche cintrée,
+// plafond circulaire, ellipse en pièce, couronne, motif radial). Sa spécificité est le
+// positionnement dans une pièce (`positionInRoom`), absent d'Engine B.
+//
+// Un NOUVEAU tracé de la bibliothèque / de l'Atelier ne s'ajoute PAS ici : il s'écrit dans
+// `geometry/engine/` (Engine B) puis se projette via `geometry/adapters/`.
+// Frontière complète : `apps/tools/docs/GEOMETRY_ENGINES_BOUNDARY_V1.md`.
 import { arcLength, assertFinitePositive, boundsFromPoints, distance, point, polar, sagitta, type Arc, type Axis, type Circle, type Dimension, type Ellipse, type Point, type Segment } from "./primitives";
 import { validateShapeGeometry, type Quantity, type ShapeGeometry, type SiteControl, type SiteStep } from "./shape-model";
 
@@ -95,7 +104,7 @@ export function createRoomCircle(input: Omit<RoomPositionInput, "shapeWidth" | "
   return validateShapeGeometry(model);
 }
 
-export function createEllipse(input: Omit<RoomPositionInput, "shapeWidth" | "shapeHeight"> & { width: number; height: number }): ShapeGeometry {
+export function createRoomEllipse(input: Omit<RoomPositionInput, "shapeWidth" | "shapeHeight"> & { width: number; height: number }): ShapeGeometry {
   const width = assertFinitePositive(input.width, "La largeur"); const height = assertFinitePositive(input.height, "La hauteur");
   if (height > width) throw new Error("La largeur du grand axe doit être supérieure ou égale à la hauteur du petit axe.");
   const placement = positionInRoom({ ...input, shapeWidth: width, shapeHeight: height }); const O = placement.centre; const a = width / 2; const b = height / 2;
@@ -127,7 +136,7 @@ export function createRing(outerDiameter: number, innerDiameter?: number, bandWi
   return validateShapeGeometry(model);
 }
 
-export function createRadialPattern(input: { diameter: number; centralDiameter: number; sectors: 4 | 5 | 6 | 8; rotationDegrees?: number; kind?: "flower" | "rosette" }): ShapeGeometry {
+export function createRadialMotif(input: { diameter: number; centralDiameter: number; sectors: 4 | 5 | 6 | 8; rotationDegrees?: number; kind?: "flower" | "rosette" }): ShapeGeometry {
   const diameter = assertFinitePositive(input.diameter, "Le diamètre général"); const centralDiameter = assertFinitePositive(input.centralDiameter, "Le diamètre central");
   if (centralDiameter >= diameter) throw new Error("Le diamètre central doit être inférieur au diamètre général.");
   const outerRadius = diameter / 2; const petalRadius = outerRadius / 2; const centreRadius = outerRadius - petalRadius; const rotation = (input.rotationDegrees ?? -90) * Math.PI / 180; const O = point("O", 0, 0, "Centre O", "construction");

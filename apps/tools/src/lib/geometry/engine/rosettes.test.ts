@@ -58,4 +58,32 @@ describe("rosaces génériques", () => {
     expect(rosette.primitives.points.T1).toBeUndefined();
     expect(rosette.metadata.tipDistance).toBeUndefined();
   });
+
+  it("C5-CLEANUP-V1 §2 : centralCircleRatio produit le cercle central ET son étape dédiée, avant l'étape de contrôle", () => {
+    const rosette = createRosette({ outerDiameter: 1200, count: 4, elementType: "circle", rotationDegrees: 0, centralCircleRatio: 0.35 });
+    expect(rosette.metadata.centralCircleRadius).toBeCloseTo(600 * 0.35, 9);
+    const central = rosette.primitives.circles.filter((c) => Math.abs(c.radius - 210) < 1e-9);
+    expect(central).toHaveLength(1);
+    expect(central[0].centre).toEqual({ x: 0, y: 0 });
+    expect(central[0].role).toBe("shape");
+    const ids = rosette.constructionSteps.map((step) => step.id);
+    expect(ids).toEqual(["step-centre", "step-director-circle", "step-divide", "step-elements", "step-centre-circle", "step-check"]);
+    const step = rosette.constructionSteps.find((item) => item.id === "step-centre-circle")!;
+    expect(step.instruction).toContain("210.0 mm");
+    expect(step.geometry).toContainEqual({ kind: "circle", circle: { centre: { x: 0, y: 0 }, radius: 210 } });
+  });
+
+  it("C5-CLEANUP-V1 §2 : sans centralCircleRatio, ni cercle central ni étape (comportement historique inchangé)", () => {
+    const rosette = createRosette({ outerDiameter: 1200, count: 4, elementType: "circle", rotationDegrees: 0 });
+    expect(rosette.metadata.centralCircleRadius).toBeUndefined();
+    expect(rosette.primitives.circles).toHaveLength(4);
+    expect(rosette.constructionSteps.map((step) => step.id)).not.toContain("step-centre-circle");
+  });
+
+  it("C5-CLEANUP-V1 §2 : centralCircleRatio refusé en mode anneau (le diamètre intérieur EST déjà le cercle central) et hors ]0;1[", () => {
+    expect(() => createRosette({ outerDiameter: 2400, innerDiameter: 800, count: 6, centralCircleRatio: 0.35 })).toThrow(/diamètre intérieur/);
+    for (const ratio of [0, 1, 1.5, -0.2, Number.NaN]) {
+      expect(() => createRosette({ outerDiameter: 1200, count: 4, centralCircleRatio: ratio })).toThrow(/entre 0 et 1/);
+    }
+  });
 });

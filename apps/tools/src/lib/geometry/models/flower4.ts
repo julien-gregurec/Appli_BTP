@@ -4,15 +4,18 @@
 // cercles de pétales) provient de `engine/rosettes.ts::createRosette({elementType:"circle"})` en
 // mode "classique" (diamètre intérieur omis). Chaque pétale est un cercle qui passe par O — pas
 // un pétale en amande (`elementType:"petal"`, qui produirait une forme pointue différente de
-// l'historique). Le cercle directeur extérieur (bornage visuel, = le diamètre saisi) et le petit
-// cercle central décoratif sont propres à ce modèle (pas un concept générique de rosace) : ajoutés
-// ici, jamais dans Engine B. Aucune formule géométrique locale active après migration — ces deux
-// cercles ont un rayon directement dérivé du paramètre utilisateur, sans autre calcul.
+// l'historique). Aucune formule géométrique locale active après migration.
+//
+// C5-CLEANUP-V1 §2 — Le petit cercle central décoratif est devenu une option générique d'Engine B
+// (`RosetteParameters.centralCircleRatio`) : il produit désormais lui-même le cercle ET son étape
+// de construction. Ce modèle ne recompose donc plus aucun `SiteStep` à la main — toutes les étapes
+// viennent du générateur. Seul reste ajouté ici le cercle directeur EXTÉRIEUR (bornage visuel,
+// = le diamètre saisi), propre à cette famille et sans étape dédiée : son rayon dérive
+// directement du paramètre utilisateur, sans autre calcul.
 import { createAngleDimension, createDiameterDimension, createRadiusDimension } from "../engine/dimensions";
 import { createRosette } from "../engine/rosettes";
-import { dimensionResultToDimension, parametricShapeToTraceModel, validateTraceModel, type TraceModelMetadata } from "../adapters";
+import { dimensionResultToDimension, parametricShapeToTraceModel, type TraceModelMetadata } from "../adapters";
 import type { Dimension } from "../primitives";
-import type { SiteStep } from "../shape-model";
 import type { TraceExplanation, TraceModel, TraceParameter } from "../trace-model";
 
 export type Flower4Input = { diameter: number; rotation?: number };
@@ -24,6 +27,10 @@ export const flower4Parameters: readonly TraceParameter[] = [
 
 const DEFAULT_INPUT: Flower4Input = { diameter: 1200, rotation: 0 };
 const PETALS = 4;
+// Proportion décorative du cercle central, en fraction du rayon de pétale (= rayon directeur
+// Engine B). Choix produit propre à la famille "fleur" ; la géométrie et l'étape qui en
+// découlent sont produites par Engine B (`centralCircleRatio`), jamais ici.
+const CENTRAL_CIRCLE_RATIO = 0.35;
 
 export const flower4Explanation: TraceExplanation = {
   objective: "Tracer une fleur à 4 pétales symétriques à partir d'un seul cercle directeur.",
@@ -63,18 +70,17 @@ export function createFlower4Geometry(input: Flower4Input = DEFAULT_INPUT): Trac
   //    diamètre moitié, pour que directorRadius/elementRadius (= le rayon renvoyé) valent
   //    exactement outerRadius/2 = petalRadius, la relation historique de ce modèle.
   const outerRadius = diameter / 2;
-  const shape = createRosette({ outerDiameter: outerRadius, count: PETALS, elementType: "circle", rotationDegrees });
+  const shape = createRosette({ outerDiameter: outerRadius, count: PETALS, elementType: "circle", rotationDegrees, centralCircleRatio: CENTRAL_CIRCLE_RATIO });
   const petalRadius = shape.metadata.directorRadius as number;
   const O = shape.primitives.points.O;
   const C1 = shape.primitives.points.C1;
   const C2 = shape.primitives.points.C2;
 
-  // Cercle directeur extérieur (bornage, = diamètre saisi) et petit cercle central décoratif :
-  // propres à ce modèle, ajoutés à la géométrie Engine B avant adaptation (jamais une seconde
-  // formule — leurs rayons dérivent directement des valeurs déjà calculées par Engine B).
-  const centralRadius = petalRadius * 0.35;
+  // Cercle directeur EXTÉRIEUR (bornage visuel, = le diamètre saisi) : propre à ce modèle, ajouté
+  // à la géométrie Engine B avant adaptation (jamais une seconde formule — son rayon dérive
+  // directement du paramètre utilisateur). Le cercle central décoratif, lui, vient désormais
+  // d'Engine B via `centralCircleRatio`, avec son étape de construction (C5-CLEANUP-V1 §2).
   shape.primitives.circles.push({ centre: O, radius: outerRadius, role: "construction" });
-  shape.primitives.circles.push({ centre: O, radius: centralRadius, role: "shape" });
 
   // 3. Cotations : moteur de cotation Engine B, valeurs jamais réécrites à la main.
   const dimensions: Dimension[] = [
@@ -96,21 +102,7 @@ export function createFlower4Geometry(input: Flower4Input = DEFAULT_INPUT): Trac
     explanation: flower4Explanation,
   };
 
-  const model = parametricShapeToTraceModel(shape, metadata, { dimensions });
-
-  // Enrichissement pédagogique (§7) : une étape dédiée pour le cercle central décoratif, propre à
-  // ce modèle — insérée avant le contrôle final fourni par Engine B, sans dupliquer sa géométrie
-  // (référence l'entité déjà adaptée par son id réel).
-  const centralCircleId = model.circles.find((c) => Math.abs(c.radius - centralRadius) < 1e-6)?.id;
-  const centralStep: SiteStep = {
-    id: "step-central-circle",
-    title: "Tracer le cercle central",
-    instruction: `Terminez avec un petit cercle central de rayon ${Math.round(centralRadius)} mm.`,
-    measurements: [`${Math.round(centralRadius)} mm`],
-    pointIds: ["O"],
-    visibleEntityIds: centralCircleId ? [centralCircleId] : undefined,
-  };
-  const steps = [...model.steps.slice(0, -1), centralStep, model.steps.at(-1)!];
-
-  return validateTraceModel({ ...model, steps });
+  // Toutes les étapes proviennent d'Engine B — y compris celle du cercle central décoratif.
+  // `parametricShapeToTraceModel` valide déjà le modèle produit (C5-CLEANUP-V1 §2).
+  return parametricShapeToTraceModel(shape, metadata, { dimensions });
 }

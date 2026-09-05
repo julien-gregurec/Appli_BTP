@@ -31,6 +31,17 @@ export type RosetteParameters = {
    * signification pédagogique connue de l'utilisateur.
    */
   computeTips?: boolean;
+  /**
+   * Cercle central décoratif, exprimé en fraction du rayon directeur (0 < ratio < 1). Optionnel,
+   * mode classique uniquement (C5-CLEANUP-V1 §2) : en mode anneau, le cercle central EST déjà le
+   * diamètre intérieur et possède son étape dédiée. Fourni, `createRosette` produit à la fois le
+   * cercle (primitive de rôle "shape") ET son étape de construction, insérée juste avant l'étape
+   * de contrôle — un modèle n'a donc jamais à recomposer un `SiteStep` à la main après coup.
+   * Exprimé en ratio et non en valeur absolue pour que l'appelant n'ait pas à redériver
+   * lui-même le rayon directeur (ce serait une seconde formule géométrique hors moteur) ; le
+   * rayon résolu est republié dans `metadata.centralCircleRadius`.
+   */
+  centralCircleRatio?: number;
 };
 
 /** Générateur générique de rosace : N éléments répartis régulièrement autour d'un centre. */
@@ -44,6 +55,7 @@ export function createRosette(params: RosetteParameters): ParametricShape<Rosett
   const rotation = degToRad(params.rotationDegrees ?? -90);
   const elementType = params.elementType ?? "circle";
   const directorRadius = hasInner ? (outerRadius + innerRadius) / 2 : outerRadius;
+  const centralCircleRadius = resolveCentralCircleRadius(params.centralCircleRatio, directorRadius, hasInner);
   const sectorDegrees = 360 / params.count;
   const primitives = emptyPrimitives();
   primitives.points.O = centre;
@@ -100,6 +112,10 @@ export function createRosette(params: RosetteParameters): ParametricShape<Rosett
     bounds = mergeBounds(bounds, pattern.boundingBox);
     elementSummary = { kind: "petal", width, height };
   }
+  // Cercle central décoratif (mode classique) : primitive finale du motif, poussée avant la
+  // construction des étapes pour que l'étape dédiée ci-dessous la résolve par valeur plutôt que
+  // de la matérialiser une seconde fois côté adaptateur.
+  if (centralCircleRadius !== undefined) primitives.circles.push({ centre, radius: centralCircleRadius, role: "shape" });
   const directorCircle: Circle2D = { centre, radius: directorRadius };
   const steps: ConstructionStep[] = [
     { id: "step-centre", title: "Repérer le centre", instruction: "Matérialiser le centre O.", geometry: [{ kind: "point", id: "O" }] },
@@ -110,6 +126,14 @@ export function createRosette(params: RosetteParameters): ParametricShape<Rosett
   if (hasInner) {
     steps.push({ id: "step-centre-circle", title: "Tracer le cercle central", instruction: `Tracer le cercle central de rayon ${innerRadius.toFixed(1)} mm.`, geometry: [{ kind: "circle", circle: { centre, radius: innerRadius } }] });
   } else {
+    if (centralCircleRadius !== undefined) {
+      steps.push({
+        id: "step-centre-circle",
+        title: "Tracer le cercle central",
+        instruction: `Tracer le cercle central de rayon ${centralCircleRadius.toFixed(1)} mm.`,
+        geometry: [{ kind: "point", id: "O" }, { kind: "circle", circle: { centre, radius: centralCircleRadius } }],
+      });
+    }
     const hasTips = tipDistance !== undefined;
     steps.push({
       id: "step-check",
@@ -130,10 +154,22 @@ export function createRosette(params: RosetteParameters): ParametricShape<Rosett
     width: bounds.maxX - bounds.minX,
     height: bounds.maxY - bounds.minY,
     rotation,
-    metadata: { count: params.count, element: elementSummary, directorRadius, tipDistance },
+    metadata: { count: params.count, element: elementSummary, directorRadius, tipDistance, centralCircleRadius },
     constructionSteps: steps,
     quality: "exact",
   };
+}
+
+/**
+ * Résout `centralCircleRatio` en rayon absolu. Mode classique uniquement : en mode anneau le
+ * cercle central est déjà porté par `innerDiameter`, deux sources concurrentes pour la même
+ * entité seraient une ambiguïté, pas une option.
+ */
+function resolveCentralCircleRadius(ratio: number | undefined, directorRadius: number, hasInner: boolean): number | undefined {
+  if (ratio === undefined) return undefined;
+  if (hasInner) throw new Error("Le cercle central décoratif est incompatible avec un diamètre intérieur : ce dernier définit déjà le cercle central.");
+  if (!Number.isFinite(ratio) || ratio <= 0 || ratio >= 1) throw new Error("La fraction du cercle central doit être strictement comprise entre 0 et 1.");
+  return directorRadius * ratio;
 }
 
 function buildLocalPetalArcs(width: number, height: number, elementCentre: Point2D, rotationDegrees: number) {

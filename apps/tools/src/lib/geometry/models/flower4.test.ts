@@ -70,6 +70,18 @@ describe("createFlower4Geometry — C4-LOT3 (Engine B)", () => {
     expect(/NaN|Infinity/.test(JSON.stringify(model))).toBe(false);
   });
 
+  it("C5-CLEANUP-V1 §2 : toutes les étapes viennent d'Engine B — ids et ordre du générateur `createRosette`, aucun SiteStep recomposé localement", () => {
+    const model = createFlower4Geometry({ diameter: 1200 });
+    expect(model.steps.map((s) => s.id)).toEqual(["step-centre", "step-director-circle", "step-divide", "step-elements", "step-centre-circle", "step-check"]);
+    // L'étape du cercle central référence l'entité "shape" réellement produite par Engine B
+    // (résolue par valeur), jamais une géométrie matérialisée une seconde fois.
+    const step = model.steps.find((s) => s.id === "step-centre-circle")!;
+    const central = model.circles.find((c) => Math.abs(c.radius - 105) < 1e-6)!;
+    expect(central.role).toBe("shape");
+    expect(step.visibleEntityIds).toEqual([central.id]);
+    expect(step.pointIds).toEqual(["O"]);
+  });
+
   it("pas-à-pas : une étape dédiée au cercle central, avant le contrôle final", () => {
     const model = createFlower4Geometry({ diameter: 1200 });
     const titles = model.steps.map((s) => s.title);

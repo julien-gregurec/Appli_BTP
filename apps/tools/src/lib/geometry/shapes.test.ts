@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createAdvancedArch, createArchedNiche, createEllipse, createRadialPattern, createRing, createRoomCircle, positionInRoom } from "./shapes";
+import { createAdvancedArch, createArchedNiche, createRoomEllipse, createRadialMotif, createRing, createRoomCircle, positionInRoom } from "./shapes";
 import { createArcPath, createPlanTransform } from "./plan-model";
 
 describe("formes Pro reproductibles", () => {
@@ -29,13 +29,13 @@ describe("formes Pro reproductibles", () => {
   });
 
   it("calcule les foyers d’une ellipse et respecte les symétries", () => {
-    const ellipse = createEllipse({ roomLength: 5000, roomWidth: 4000, width: 3000, height: 1800, mode: "centred" });
+    const ellipse = createRoomEllipse({ roomLength: 5000, roomWidth: 4000, width: 3000, height: 1800, mode: "centred" });
     const centre = ellipse.points.find((p) => p.id === "O")!; const f1 = ellipse.points.find((p) => p.id === "F1")!; const f2 = ellipse.points.find((p) => p.id === "F2")!;
     expect(f1.x + f2.x).toBeCloseTo(centre.x * 2, 8);
     expect(f1.y).toBe(centre.y); expect(f2.y).toBe(centre.y);
     expect(ellipse.controls.find((c) => c.id === "control-string")?.value).toBe(3000);
-    expect(() => createEllipse({ roomLength: 5000, roomWidth: 4000, width: 0, height: 1800, mode: "centred" })).toThrow(/supérieur/);
-    expect(() => createEllipse({ roomLength: 5000, roomWidth: 4000, width: 1800, height: 3000, mode: "centred" })).toThrow(/grand axe/);
+    expect(() => createRoomEllipse({ roomLength: 5000, roomWidth: 4000, width: 0, height: 1800, mode: "centred" })).toThrow(/supérieur/);
+    expect(() => createRoomEllipse({ roomLength: 5000, roomWidth: 4000, width: 1800, height: 3000, mode: "centred" })).toThrow(/grand axe/);
   });
 
   it("distingue la face et la coupe exacte d’une niche cintrée", () => {
@@ -47,7 +47,7 @@ describe("formes Pro reproductibles", () => {
   });
 
   it.each([4, 5, 6, 8] as const)("génère un moteur radial à %i secteurs", (sectors) => {
-    const pattern = createRadialPattern({ diameter: 2400, centralDiameter: 500, sectors, rotationDegrees: 17 });
+    const pattern = createRadialMotif({ diameter: 2400, centralDiameter: 500, sectors, rotationDegrees: 17 });
     expect(pattern.circles.filter((circle) => circle.id.startsWith("petal-"))).toHaveLength(sectors);
     expect(pattern.quantities.find((q) => q.id === "q-sector")?.value).toBeCloseTo(360 / sectors, 10);
     expect((pattern.quantities.find((q) => q.id === "q-sector")?.value ?? 0) * sectors).toBeCloseTo(360, 10);
