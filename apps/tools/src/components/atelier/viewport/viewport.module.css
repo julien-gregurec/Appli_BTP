@@ -1,0 +1,375 @@
+/*
+ * Viewport Atelier — styles scopés (CSS Module), aucune modification de globals.css.
+ * Mobile first (§13) : la barre d'outils passe sous le plan en colonne étroite, le panneau
+ * propriétés devient une feuille basse, et rien ne déborde horizontalement.
+ */
+
+.workspace {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* ---- Zone de dessin ------------------------------------------------------ */
+
+.stage {
+  position: relative;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--white);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.canvas {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: clamp(320px, 58vh, 620px);
+  /* Le navigateur ne doit jamais préempter le geste : pan et pinch sont gérés en JS (§4). */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  cursor: grab;
+  outline: none;
+}
+
+.canvas[data-tool="select"] {
+  cursor: default;
+}
+
+.canvas:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--amber);
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---- Grille (§7) --------------------------------------------------------- */
+
+.gridMinor {
+  stroke: var(--line);
+  stroke-width: 1;
+  opacity: 0.55;
+}
+
+.gridMajor {
+  stroke: var(--line);
+  stroke-width: 1.4;
+  opacity: 1;
+}
+
+.gridOrigin {
+  stroke: var(--amber);
+  stroke-width: 1.4;
+  opacity: 0.85;
+}
+
+/* ---- Géométrie ----------------------------------------------------------- */
+
+.shape {
+  fill: none;
+  stroke: var(--navy);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.construction {
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 1;
+  stroke-dasharray: 5 4;
+  opacity: 0.75;
+}
+
+.axis {
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 1;
+  stroke-dasharray: 12 5 3 5;
+  opacity: 0.6;
+}
+
+.pointMark {
+  fill: var(--white);
+  stroke: var(--navy);
+  stroke-width: 1.5;
+}
+
+.centerMark {
+  fill: none;
+  stroke: var(--amber);
+  stroke-width: 1.6;
+}
+
+.pointLabel {
+  fill: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.selected {
+  stroke: var(--amber);
+  stroke-width: 3.4;
+}
+
+.hitArea {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 18;
+  cursor: pointer;
+}
+
+/* ---- Bandeau d'état ------------------------------------------------------ */
+
+.statusBar {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--white) 88%, transparent);
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.zoomCluster {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.zoomButton {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--navy);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.zoomButton:hover {
+  border-color: var(--amber);
+}
+
+.zoomButton:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+/* ---- Barre d'outils (§9) ------------------------------------------------- */
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--white);
+  box-shadow: var(--shadow);
+}
+
+.toolButton {
+  flex: 1 1 auto;
+  min-width: 88px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toolButton:hover:not(:disabled) {
+  border-color: var(--amber);
+}
+
+.toolButton:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+.toolButton[aria-pressed="true"] {
+  border-color: var(--amber);
+  background: var(--amber-soft);
+  color: var(--navy);
+}
+
+.toolButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---- Panneau propriétés (§10) ------------------------------------------- */
+
+.sheet {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--white);
+  box-shadow: var(--shadow);
+}
+
+.sheetHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px 8px;
+}
+
+.sheetTitle {
+  margin: 0;
+  font-family: Georgia, serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.sheetKind {
+  color: var(--ink-soft);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sheetClose {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sheetClose:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+.sheetRows {
+  margin: 0;
+  padding: 0 16px 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.sheetRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.sheetRow:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.sheetRowLabel {
+  color: var(--ink-soft);
+}
+
+.sheetRowValue {
+  font-weight: 700;
+  color: var(--navy);
+  font-variant-numeric: tabular-nums;
+}
+
+.sheetEmpty {
+  margin: 0;
+  padding: 0 16px 16px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.sheetNotice {
+  margin: 0 16px 16px;
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+/* Mobile : feuille basse fixée, sans jamais provoquer de débordement horizontal (§13). */
+@media (max-width: 767px) {
+  .sheetFloating {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    max-height: 62vh;
+    overflow-y: auto;
+    border-radius: 16px 16px 0 0;
+    border-bottom: none;
+    box-shadow: 0 -12px 40px rgba(28, 44, 52, 0.16);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .toolButton {
+    min-width: 0;
+    flex-basis: calc(33.333% - 6px);
+    font-size: 12px;
+    padding: 8px 6px;
+  }
+}
+
+/* Desktop / tablette large : plan et panneau côte à côte (§10). */
+@media (min-width: 900px) {
+  .workspace[data-properties="open"] {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-areas:
+      "toolbar toolbar"
+      "stage   sheet";
+    align-items: start;
+  }
+
+  .workspace[data-properties="open"] .toolbar {
+    grid-area: toolbar;
+  }
+
+  .workspace[data-properties="open"] .stage {
+    grid-area: stage;
+  }
+
+  .workspace[data-properties="open"] .sheet {
+    grid-area: sheet;
+    position: sticky;
+    top: 16px;
+  }
+}
