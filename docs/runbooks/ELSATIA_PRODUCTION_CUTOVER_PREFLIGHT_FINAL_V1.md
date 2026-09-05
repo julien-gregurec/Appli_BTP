@@ -1,12 +1,15 @@
 # ELSATIA — Préflight final de cutover Production V1
 
-Version 1.4 — 2026-09-05 (**rebasage de cible + QA applicative rejouée**, lot
-`ELSATIA-GP-CUTOVER-RUNBOOK-AND-QA-REBASE-V1` ; version 1.3 = `ELSATIA-CUTOVER-FINAL-TARGET-REBASE-V1`).
+Version 1.5 — 2026-09-05 (**fiche variables réalignée sur le runtime réel**, lot
+`ELSATIA-GP-CUTOVER-ENV-DOC-DELTA-CLOSURE-V1`, sur la base de l'audit
+`ELSATIA-GP-CUTOVER-ENV-PREFLIGHT-AUDIT-V1` ; version 1.4 = `ELSATIA-GP-CUTOVER-RUNBOOK-AND-QA-REBASE-V1` ;
+version 1.3 = `ELSATIA-CUTOVER-FINAL-TARGET-REBASE-V1`).
 **Documentation opérateur — lecture / préparation, plus preuves d'exécution offline au §13 et
 pack opérationnel de fenêtre aux §14–§27.** Aucune migration Production, aucun déploiement
 Production, aucune mutation Stripe Live, aucun secret affiché, aucune migration modifiée.
-Le lot 1.4 ajoute **uniquement des fichiers de test** et de la documentation : aucun fichier de
-production n'est modifié, l'artefact déployable reste `996be15` inchangé.
+Le lot 1.4 ajoutait **uniquement des fichiers de test** et de la documentation ; **le lot 1.5 ne
+touche que de la documentation** (§5 réécrite, §8, §11, §17, §23) : aucun fichier de production
+modifié, l'artefact déployable reste `996be15` inchangé.
 
 > **Cible cutover figée sur `996be15` / ledger 263.** `996be15` est le HEAD de la branche
 > canonique `feat/elsatia-commercial-canonical-r1-r2-r3-v1` et remplace, comme cible applicative,
@@ -228,66 +231,215 @@ Aucun secret n'apparaît dans les manifestes, dumps, tickets ou logs. Le rôle d
 
 ## 5. Variables / secrets requis avant cutover — **noms uniquement**
 
-Valeurs jamais affichées. Présence/état à cocher sur la fiche Vercel (runbook V1 §10).
+Valeurs de secrets jamais affichées. Fiche **alignée sur le runtime réel** lu au SHA cible
+`996be15` (lot `ELSATIA-GP-CUTOVER-ENV-PREFLIGHT-AUDIT-V1`, 2026-09-05) : plus aucune variante
+« selon convention », et séparation explicite entre ce qui est **consommé par le code**, ce qui est
+**réservé aux scripts d'ops**, et ce qui possède un **défaut dans le code**.
 
-**Supabase (Production) :** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-(ou `NEXT_PUBLIC_SUPABASE_ANON_KEY` selon convention), `SUPABASE_SERVICE_ROLE_KEY`.
+### 5.0 Type Vercel `sensitive` — ce qui ne peut PAS être relu pendant la fenêtre
 
-**Stripe (TEST — recette Production fermée) :** `STRIPE_SECRET_KEY` (clé `sk_test_…`),
-`STRIPE_WEBHOOK_EXPECTED_MODE` (= `test`), `STRIPE_WEBHOOK_ABONNEMENT_SECRET`,
-`STRIPE_WEBHOOK_SECRET`, `STRIPE_WEBHOOK_BOUTIQUE_SECRET`,
-`STRIPE_PRICE_{MINI,PRO,BUSINESS,ENTREPRISE}_{MENSUEL,ANNUEL}`,
-`STRIPE_PRICE_COMPTE_SUP_{…}_{MENSUEL,ANNUEL}`, `STRIPE_PRICE_OPTION_IA_{100,300,ILLIMITE}_{MENSUEL,ANNUEL}`,
-`STRIPE_AUTOMATIC_TAX_ENABLED`, `STRIPE_CONNECT_CLIENT_ID` (si Connect utilisé).
+Sur `elsatia-production`, **27 des 46 variables sont de type Vercel `sensitive`** : leur valeur est
+**irrécupérable**, y compris par le propriétaire du projet et y compris via `vercel env pull`.
+`vercel env ls` n'affiche que le **nom** et le type.
 
-**Attestation Ed25519 (Stripe state proof) :** `STRIPE_STATE_ATTESTATION_KEY_ID` (non secret,
-doit correspondre entre Vercel et la registry en base), `STRIPE_STATE_ATTESTATION_PRIVATE_KEY_B64`
-(**Vercel uniquement**, jamais dans doc/dump/log). Les deux étaient absentes sur
-`elsatia-production` au 2026-09-04 ; couple Ed25519 (`test`) généré, auto-vérifié et prêt à
-provisionner — procédure complète, formats exacts, migration créatrice (`…244`/`…245`) et
-commandes Vercel/SQL : `ELSATIA_ED25519_ATTESTATION_PROVISIONING_V1.md`. Le registry DB
-(`stripe_attestation.public_keys`/`.configuration`) ne peut être rempli qu'**après** que le
-ledger a atteint `…245` — jamais avant.
+Sont concernées, au-delà des vrais secrets :
 
-**Feature flags / gel commercial :** `ABONNEMENTS_PUBLICS_OUVERTS` (= `false`),
-`FEATURE_AI_ENABLED`, `FEATURE_BOUTIQUE_ENABLED`, `FEATURE_CRONS_ENABLED`,
-`DISABLE_EMAIL_LOGIN` (= `false` en Production), `ELSATIA_APPLICATION_ENV`.
+`FEATURE_AI_ENABLED`, `FEATURE_AI_DEVIS_ENABLED`, `FEATURE_RELANCES_AUTO_ENABLED`,
+`STRIPE_SECRET_KEY`, **tous** les `STRIPE_PRICE_*`, `SUPPORT_EMAIL`, `EMAIL_FROM_ADDRESS`.
 
-**URLs app :** `NEXT_PUBLIC_APP_URL` (= `https://app.elsatia.fr`), `SUPPORT_EMAIL`
-(= `support@elsatia.fr`), `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME`.
+**Conséquence opératoire, à ne pas contourner** : pour ces variables, « vérifier la valeur » est
+**impossible**. Aucune case de ce runbook ne doit être cochée sur la foi d'une lecture de valeur, et
+aucun secret ne doit être affiché pour « contrôler ». Les deux seules actions légitimes sont :
 
-**Mentions légales de l'éditeur (introduites par `36642e3`, absentes de la fiche jusqu'à la
-version 1.4) :** `NEXT_PUBLIC_LEGAL_SIRET`, `NEXT_PUBLIC_LEGAL_TVA`. Lues par
-`src/components/DocumentLegal.tsx` pour substituer les jetons `[EDITEUR_SIRET]` et
-`[EDITEUR_MENTION_TVA]` de `docs/juridique/mentions-legales.md` et `cgv.md`.
-- `NEXT_PUBLIC_LEGAL_SIRET` = `850 559 873 00011` (SIRET connu de l'éditeur).
-- `NEXT_PUBLIC_LEGAL_TVA` : **régime non confirmé à ce jour — laisser vide**. Ne pas inventer de
-  régime ni de numéro.
-- **Comportement fail-open, non bloquant pour le cutover** : variable absente ou vide → repli
-  neutre affiché (« en cours de finalisation » / « à confirmer »), jamais de jeton brut ni de
-  valeur supposée (garde couverte par `src/components/DocumentLegal.test.ts`, §13.5bis). Les
-  mentions légales publiques restent toutefois **incomplètes** tant que le SIRET n'est pas
-  provisionné : à traiter avant ouverture commerciale (P1-6).
+1. la **réaffirmation explicite** — réécrire la variable avec la valeur voulue (§5.5) ;
+2. un **smoke de comportement** — observer ce que fait l'application, sans lire la clé (§5.6).
 
-**Colors / Tools (multi-app) :** `NEXT_PUBLIC_TOOLS_BILLING_API_URL`, `TOOLS_APP_URL`,
-`TOOLS_ALLOWED_ORIGINS`, `STRIPE_TOOLS_SECRET_KEY`, `STRIPE_TOOLS_WEBHOOK_SECRET`,
-`STRIPE_TOOLS_PRICE_{MONTHLY,ANNUAL}`.
+### 5.1 Supabase (Production) — obligatoires
 
-**Crons / webhooks / intégrations :** `CRON_SECRET`, `NOTIFICATIONS_WEBHOOK_SECRET`,
-`PAYROLL_IMPORT_SECRET`, `RATE_LIMIT_HMAC_KEY`, `BANK_DATA_ENCRYPTION_KEY`,
-`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`,
-`POWENS_CLIENT_ID`, `POWENS_CLIENT_SECRET`, `POWENS_API_BASE_URL`, `POWENS_WEBVIEW_BASE_URL`,
-`OPENAI_API_KEY`, `OPENAI_MODEL`, `BREVO_API_KEY`,
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — **seule** clé publique Supabase lue par l'application.
+  `src/lib/supabase/keys.ts` **jette** (`Configuration Supabase incomplète :
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY absente`) si elle manque : sans elle, l'application ne
+  fonctionne pas.
+  **`NEXT_PUBLIC_SUPABASE_ANON_KEY` n'est lue nulle part au SHA `996be15`.** Ne pas la créer, ne pas
+  la chercher, ne pas la considérer comme un équivalent acceptable. Les versions antérieures de
+  cette fiche proposaient les deux « ou selon convention » : **ambiguïté supprimée**.
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+### 5.2 Variables d'ops (scripts et gardes) — ne sont pas des clés applicatives
+
+`SUPABASE_PROJECT_REF` et `ELSATIA_SUPABASE_PROJECT_NAME` ne sont **jamais lues par le runtime
+applicatif** : aucune occurrence dans `src/` au SHA `996be15`. Elles sont consommées par les
+**scripts et gardes d'ops** — `scripts/garde-scripts-production.mjs` (qui refuse d'agir si
+`SUPABASE_PROJECT_REF` est absente ou incohérente avec l'hôte de `NEXT_PUBLIC_SUPABASE_URL`) et
+`scripts/seed-elsatia-preview-year.mjs`.
+
+Ce ne sont **pas** des clés client, elles ne transitent pas dans le bundle, et elles **doivent
+correspondre au projet Production ciblé**. Valeurs Production, non secrètes, vérifiables :
+
+```
+SUPABASE_PROJECT_REF=exhvuzegsefmoguxoiak
+ELSATIA_SUPABASE_PROJECT_NAME=elsatia-production
+```
+
+Contrôle à faire : l'hôte de `NEXT_PUBLIC_SUPABASE_URL` (`exhvuzegsefmoguxoiak.supabase.co`) et
+`SUPABASE_PROJECT_REF` désignent bien le **même** projet. Une divergence fait échouer la garde d'ops
+en refus explicite — c'est le comportement voulu, pas un incident.
+
+### 5.3 Stripe — abonnements (TEST, recette Production fermée)
+
+Requises par `variablesStripeBillingManquantes()` (`src/lib/stripe-abonnement.ts`) :
+`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_ABONNEMENT_SECRET`, `NEXT_PUBLIC_APP_URL`, et les **8**
+`STRIPE_PRICE_{MINI,PRO,BUSINESS,ENTREPRISE}_{MENSUEL,ANNUEL}`. S'y ajoutent les 8
+`STRIPE_PRICE_COMPTE_SUP_{MINI,PRO,BUSINESS,ENTREPRISE}_{MENSUEL,ANNUEL}` pour les comptes
+supplémentaires, et `STRIPE_WEBHOOK_EXPECTED_MODE` (= `test`).
+
+Non provisionnées et **non requises** pour ce cutover, chacune gardée fail-closed dans le code :
+`STRIPE_WEBHOOK_SECRET` (porte de `stripeEstConfigure()` — sans elle le paiement de facture par
+Stripe Connect est simplement masqué), `STRIPE_WEBHOOK_BOUTIQUE_SECRET` (boutique désactivée),
+`STRIPE_CONNECT_CLIENT_ID` (Connect non ouvert). **P1, hors fenêtre.**
+
+### 5.4 Attestation Ed25519 (Stripe state proof)
+
+`STRIPE_STATE_ATTESTATION_KEY_ID` (non secret, doit correspondre entre Vercel et la registry en
+base) et `STRIPE_STATE_ATTESTATION_PRIVATE_KEY_B64` (**Vercel uniquement**, jamais dans doc/dump/log).
+
+Les deux étaient absentes sur `elsatia-production` au 2026-09-04, **et le sont toujours au
+2026-09-05** (revérifié en lecture seule) : c'est **attendu**. Couple Ed25519 (`test`) généré,
+auto-vérifié et prêt à provisionner — procédure complète, formats exacts, migration créatrice
+(`…244`/`…245`) et commandes Vercel/SQL : `ELSATIA_ED25519_ATTESTATION_PROVISIONING_V1.md`. Le
+registry DB (`stripe_attestation.public_keys`/`.configuration`) ne peut être rempli qu'**après** que
+le ledger a atteint `…245` — jamais avant.
+
+Surface d'impact réelle avant provisioning : un seul appelant,
+`finaliser()` dans `src/lib/stripe-discount-server.ts`, atteint par les sagas de remise plateforme
+et par le webhook abonnement. Abonnements gelés ⇒ chemin non exercé.
+
+**→ P0 pendant fenêtre, item A (§11).**
+
+### 5.5 Feature flags / gel commercial
+
+| Variable | Comportement code | Valeur voulue | Relisible ? |
+|---|---|---|---|
+| `ABONNEMENTS_PUBLICS_OUVERTS` | `=== "true"` requis pour ouvrir | `false` | oui |
+| `FEATURE_BOUTIQUE_ENABLED` | fail-**open** (absente ⇒ active) | `false` | oui |
+| `FEATURE_CRONS_ENABLED` | fail-**open** (absente ⇒ actif) | `false` | oui |
+| `DISABLE_EMAIL_LOGIN` | `=== "true"` requis pour couper | `false` | oui |
+| `ELSATIA_APPLICATION_ENV` | `preview`/`production`, sinon `local` | `production` | oui |
+| `FEATURE_AI_ENABLED` | fail-**closed** | `false` | **NON — `sensitive`** |
+| `FEATURE_AI_DEVIS_ENABLED` | fail-**closed** | `false` | **NON — `sensitive`** |
+| `FEATURE_RELANCES_AUTO_ENABLED` | fail-**closed** | `false` | **NON — `sensitive`** |
+
+Le fail-closed protège contre l'**absence**, pas contre un `true` posé par erreur — et la valeur
+réelle de ces trois flags n'est plus lisible. Ils doivent donc être **réaffirmés explicitement
+pendant la fenêtre** (`FEATURE_AI_ENABLED=false`, `FEATURE_AI_DEVIS_ENABLED=false`,
+`FEATURE_RELANCES_AUTO_ENABLED=false`), sans jamais tenter de les « vérifier » par lecture.
+
+**→ P0 pendant fenêtre, item B (§11).**
+
+### 5.6 Mode Stripe — documenté, mais partiellement non lisible
+
+- `STRIPE_WEBHOOK_EXPECTED_MODE = test` — **lisible en clair**, non ambigu.
+  `resoudreModeStripeWebhook()` rejette fermé tout événement `livemode=true`.
+- **Le mode réel de `STRIPE_SECRET_KEY` reste NON LISIBLE** (type `sensitive`) : le préfixe
+  `sk_test_` / `sk_live_` ne peut être ni lu ni déduit sans réécrire la variable. Les 16
+  `STRIPE_PRICE_*` sont dans le même cas.
+- **Ne jamais afficher la clé pour trancher.** Le mode se confirme par le **smoke contrôlé** de §23,
+  qui observe le comportement de l'application sans révéler aucune valeur.
+- **Aucune activation Live.** Passage Live = lot P15 distinct, hors de ce cutover.
+
+**→ P0 pendant fenêtre, item C (§11).**
+
+### 5.7 URLs app et e-mail
+
+`NEXT_PUBLIC_APP_URL` (= `https://app.elsatia.fr`, vérifiée), `SUPPORT_EMAIL`, `EMAIL_FROM_ADDRESS`,
+`BREVO_API_KEY`.
+
+### 5.8 Mentions légales de l'éditeur
+
+`NEXT_PUBLIC_LEGAL_SIRET`, `NEXT_PUBLIC_LEGAL_TVA`, lues par `src/components/DocumentLegal.tsx` pour
+substituer les jetons `[EDITEUR_SIRET]` et `[EDITEUR_MENTION_TVA]` de
+`docs/juridique/mentions-legales.md` et `cgv.md`.
+
+- `NEXT_PUBLIC_LEGAL_SIRET` = `850 559 873 00011` — **provisionnée et vérifiée conforme** sur
+  `elsatia-production` (valeur non secrète, relue en direct le 2026-09-05).
+- `NEXT_PUBLIC_LEGAL_TVA` : **régime non confirmé à ce jour — laisser vide**. Absente sur
+  Production, ce qui est le comportement voulu. Ne pas inventer de régime ni de numéro.
+- **Comportement fail-open, non bloquant pour le cutover** : variable absente ou vide → repli neutre
+  affiché (« en cours de finalisation » / « à confirmer »), jamais de jeton brut ni de valeur
+  supposée (garde couverte par `src/components/DocumentLegal.test.ts`, §13.5bis). Les mentions
+  légales publiques restent **incomplètes** tant que le régime de TVA n'est pas renseigné : à traiter
+  avant ouverture commerciale (P1-6).
+
+### 5.9 Billing Tools — hébergé par GP, non provisionné (P1 hors cutover)
+
+`STRIPE_TOOLS_SECRET_KEY`, `STRIPE_TOOLS_WEBHOOK_SECRET`, `STRIPE_TOOLS_PRICE_MONTHLY`,
+`STRIPE_TOOLS_PRICE_ANNUAL`, `TOOLS_APP_URL` sont consommées par **l'API billing Tools hébergée dans
+GP** (`src/lib/tools-monetization.ts`, `toolsStripeConfiguration()`) — et non par le projet Vercel
+`elsatia-tools`, contrairement à ce que suggérait le classement « Colors / Tools (multi-app) » des
+versions antérieures de cette fiche.
+
+**État constaté** : les 5 sont **non provisionnées** sur `elsatia-production` ⇒ `ready = false` ⇒ le
+checkout Tools est indisponible en Production. **Classement : P1, hors cutover — ne pas les traiter
+comme P0**, ne pas les provisionner pendant la fenêtre.
+
+`NEXT_PUBLIC_TOOLS_BILLING_API_URL` : **n'est consommée nulle part dans GP au SHA `996be15`** (aucune
+occurrence dans `src/`). Elle figurait dans les versions antérieures de cette fiche : **ne pas la
+présenter comme requise**, ne pas la provisionner.
+
+### 5.10 Variables à défaut code — explicitement NON bloquantes
+
+Leur absence est sans effet : le code fournit un défaut. Ne pas les provisionner « par sécurité »,
+ne pas les compter comme secret manquant.
+
+| Variable | Défaut appliqué par le code |
+|---|---|
+| `EMAIL_FROM_NAME` | `"ELSATIA"` (`src/lib/brevo.ts`) |
+| `OPENAI_MODEL` | modèle par défaut (`src/lib/ai/providers/openai.ts`, `src/lib/ai/journal.ts`) |
+| `STRIPE_AUTOMATIC_TAX_ENABLED` | absente ⇒ `false` (`src/lib/stripe-abonnement.ts`) |
+| `TOOLS_ALLOWED_ORIGINS` | `https://tools.elsatia.fr` déjà en dur dans l'allowlist (`src/lib/tools-monetization.ts`) |
+
+### 5.11 Prices legacy — non commercialisés, provisioning NON demandé
+
+`STRIPE_PRICE_ESSENTIEL_{MENSUEL,ANNUEL}`, `STRIPE_PRICE_PREMIUM_{MENSUEL,ANNUEL}` et les comptes
+supplémentaires associés (`STRIPE_PRICE_COMPTE_SUP_{ESSENTIEL,PREMIUM}_{MENSUEL,ANNUEL}`)
+correspondent à des offres **absentes de `OFFRES_ABONNEMENT_COMMERCIALISEES`** : elles restent
+déclarées dans les tables de correspondance du code (aucune modification de code dans ce lot) mais
+**ne sont pas commercialisées**. Elles figurent encore dans `.env.example` — legacy.
+
+Idem pour `STRIPE_PRICE_OPTION_IA_{100,300,ILLIMITE}_{MENSUEL,ANNUEL}` : l'option IA est fermée.
+
+**Ne pas provisionner ces variables, ne pas les compter comme manquantes.**
+
+### 5.12 Crons / webhooks / intégrations
+
+`CRON_SECRET`, `RATE_LIMIT_HMAC_KEY` (son absence en Production fait échouer en `503` **toute**
+requête de mutation, dont `POST /login` — obligatoire), `BANK_DATA_ENCRYPTION_KEY`.
+
+Features désactivées, absences **normales et fail-closed** : `NOTIFICATIONS_WEBHOOK_SECRET`,
+`PAYROLL_IMPORT_SECRET`, `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`,
+`POWENS_CLIENT_ID`/`POWENS_CLIENT_SECRET`/`POWENS_API_BASE_URL`/`POWENS_WEBVIEW_BASE_URL`,
 `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`, `GOOGLE_PLAY_RTDN_SERVICE_ACCOUNT_EMAIL`,
-`GOOGLE_PLAY_RTDN_AUDIENCE`, `APPLE_ROOT_CA_BASE64`.
+`GOOGLE_PLAY_RTDN_AUDIENCE`, `APPLE_ROOT_CA_BASE64`. `OPENAI_API_KEY` est présente mais inerte tant
+que `FEATURE_AI_ENABLED` n'est pas `true`.
 
-**Observabilité :** `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`,
-`SENTRY_PROJECT`.
+Cohérence crons : `FEATURE_CRONS_ENABLED=false` **et** `CRON_SECRET` présent — plus sûr que le
+minimum requis. Nuance : `/api/cron/abonnements` ne sort en 404 que si `FEATURE_CRONS_ENABLED` **et**
+`FEATURE_RELANCES_AUTO_ENABLED` sont faux ; `CRON_SECRET` étant présent, aucune combinaison ne
+produit de `503`.
 
-**Écart connu (P1) :** les 4 `STRIPE_PRICE_*_ANNUEL` peuvent encore pointer sur des Prices ×12
-au lieu des Prices « 10 × mensuel » de la grille canonique — lot
-`ELSATIA-STRIPE-TEST-ANNUAL-ENV-ALIGNMENT-V1`. `verify:stripe-prices --strict` doit être
-**8/8** dans un environnement portant réellement les variables.
+### 5.13 Observabilité
+
+`SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` —
+présentes.
+
+### 5.14 Écart connu (P1)
+
+Les 4 `STRIPE_PRICE_*_ANNUEL` peuvent encore pointer sur des Prices ×12 au lieu des Prices
+« 10 × mensuel » de la grille canonique — lot `ELSATIA-STRIPE-TEST-ANNUAL-ENV-ALIGNMENT-V1`.
+`verify:stripe-prices --strict` doit être **8/8** dans un environnement portant réellement les
+variables. **Ces variables étant `sensitive`, cet écart n'est pas vérifiable par lecture** : il ne
+peut être tranché que par l'exécution du script dans un environnement qui les porte.
 
 ---
 
@@ -346,8 +498,11 @@ ré-enrôlement TOTP. **Jamais** de `DELETE FROM auth.mfa_factors` manuel comme 
   aucun Price Live, aucun webhook Live créé, lu ou modifié.
 - `ABONNEMENTS_PUBLICS_OUVERTS = false` : la souscription publique en ligne reste **fermée**
   (changement d'offre et ajout de capacité = opérations internes / contactez-nous).
-- `STRIPE_WEBHOOK_EXPECTED_MODE = test` — `resoudreModeStripeWebhook` rejette fermé tout
-  événement `livemode=true`.
+- `STRIPE_WEBHOOK_EXPECTED_MODE = test` — **valeur lisible et vérifiée** ;
+  `resoudreModeStripeWebhook` rejette fermé tout événement `livemode=true`.
+- **Limite à assumer** : `STRIPE_SECRET_KEY` est de type Vercel `sensitive` (§5.0), donc son mode
+  réel (`sk_test_` / `sk_live_`) **n'est pas lisible**. Il est confirmé par le **smoke contrôlé de
+  §23**, jamais par affichage de la clé. Idem pour les 16 `STRIPE_PRICE_*`.
 - **Recette minimale post-cutover — Stripe TEST uniquement** :
   - `verify:stripe-prices --strict` = 8/8 (après alignement des 4 `_ANNUEL`) ;
   - 8 parcours Checkout Test aux bons montants (79/790, 249/2 490, 449/4 490, 599/5 990),
@@ -463,13 +618,53 @@ extraction de la clé privée Ed25519 hors Vercel, `DELETE FROM auth.mfa_factors
 | P0-6 | ~~QA applicative jamais re-mesurée depuis `c1930ab` (3 commits runtime non couverts : `36642e3`, `b371641`, `1d15289`)~~ | **FERMÉ 2026-09-05** — suite complète rejouée au SHA cible `996be15` : Vitest GP 93/815, Tools 20/107, typecheck, ESLint (0 erreur), build GP+Tools, `verify:migrations` 263, `verify:secrets` 1 304, `npm audit` 0/0, `git diff --check` — preuves §13.5 ; les 3 correctifs runtime sont couverts par des tests dédiés (§13.5bis) | — |
 | P0-5 | ~~Préparation opérationnelle de la fenêtre (rôles, planning, checklists P0-1/P0-3/T0, GO/rollback)~~ | **PRÉPARATION FERMÉE 2026-09-04** — pack complet §14–§27 + checklist imprimable ; **reste à faire par Julien** : fixer la date/heure réelle et les noms (§14.3, §27) | Julien renseigne date + noms sur la checklist |
 
+### P0 pendant fenêtre — environnement (lot `ELSATIA-GP-CUTOVER-ENV-DOC-DELTA-CLOSURE-V1`)
+
+Distincts des blockers P0 ci-dessus : ceux-ci **ne bloquent pas l'ouverture de la fenêtre**, ils
+doivent être exécutés **dans** la fenêtre, au moment indiqué. **Il y en a exactement trois.**
+
+**A. Provisionner les variables Ed25519**
+
+`STRIPE_STATE_ATTESTATION_KEY_ID` et `STRIPE_STATE_ATTESTATION_PRIVATE_KEY_B64` sur Vercel
+Production, **au bon moment du runbook** : variables Vercel au plus tard à la checklist GO-T0
+(§17) ; **registry DB seulement après** que le ledger a confirmé `…244`/`…245` (§18bis). Jamais
+l'inverse. Procédure : `ELSATIA_ED25519_ATTESTATION_PROVISIONING_V1.md`. Détail : §5.4.
+
+**B. Réaffirmer explicitement les trois flags non relisibles**
+
+```
+FEATURE_AI_ENABLED=false
+FEATURE_AI_DEVIS_ENABLED=false
+FEATURE_RELANCES_AUTO_ENABLED=false
+```
+
+Type Vercel `sensitive` ⇒ valeur **non lisible** (§5.0). Le fail-closed du code protège contre
+l'absence, pas contre un `true` posé par erreur. **Réécrire, ne pas « vérifier ».** Détail : §5.5.
+
+**C. Confirmer le mode Stripe par smoke contrôlé**
+
+`STRIPE_SECRET_KEY` est `sensitive` : son mode réel n'est pas lisible. Le confirmer par le smoke
+de **§23**, qui observe le comportement de l'application sans révéler aucune valeur. **Aucune
+activation Live.** Détail : §5.6.
+
 ### Blockers P1 (à traiter, non bloquants pour figer la date)
 
-> **P1-6 (nouveau, 2026-09-05)** — `NEXT_PUBLIC_LEGAL_SIRET` / `NEXT_PUBLIC_LEGAL_TVA` non
-> provisionnées sur Vercel Production. Sans elles les mentions légales et les CGV publient un
-> repli neutre au lieu du SIRET et du régime de TVA. Fail-open, donc non bloquant pour le
-> cutover technique ; **bloquant pour l'ouverture commerciale**. SIRET connu :
-> `850 559 873 00011`. Régime de TVA : à confirmer par Julien avant de renseigner la variable.
+> **P1-7 (nouveau, 2026-09-05)** — Billing Tools non provisionné sur `elsatia-production`
+> (`STRIPE_TOOLS_SECRET_KEY`, `STRIPE_TOOLS_WEBHOOK_SECRET`, `STRIPE_TOOLS_PRICE_{MONTHLY,ANNUAL}`,
+> `TOOLS_APP_URL`) ⇒ `toolsStripeConfiguration().ready = false`, checkout Tools indisponible en
+> Production. L'API billing Tools est hébergée **dans GP** (§5.9). **P1, hors cutover — ne pas
+> provisionner pendant la fenêtre.**
+
+> **P1-8 (nouveau, 2026-09-05)** — `STRIPE_WEBHOOK_SECRET` absente ⇒ `stripeEstConfigure()` faux ⇒
+> le paiement de facture par Stripe Connect est masqué en Production. Fail-closed, non bloquant
+> sous gel commercial ; à traiter avant ouverture commerciale (§5.3).
+
+> **P1-6 (2026-09-05, mis à jour)** — `NEXT_PUBLIC_LEGAL_SIRET` est désormais **provisionnée et
+> vérifiée conforme** sur `elsatia-production` (`850 559 873 00011`, valeur non secrète relue en
+> direct). **Reste ouvert : `NEXT_PUBLIC_LEGAL_TVA`**, absente — régime non confirmé, à laisser vide
+> jusqu'à confirmation par Julien. Tant qu'elle l'est, les mentions légales et les CGV publient un
+> repli neutre au lieu du régime de TVA : fail-open, non bloquant pour le cutover technique,
+> **bloquant pour l'ouverture commerciale**. Ne pas inventer de régime ni de numéro.
 
 | # | Blocker | État |
 |---|---|---|
@@ -895,15 +1090,28 @@ backup non testé n'est pas un backup valide au sens de ce runbook.
       `release/commercialisation-v1`**, build Vercel préparé
 - [ ] Branche Vercel « Production Branch » correcte (branche canonique de release)
 - [ ] Production Branch **≠ `main`** (cf. `NE_PAS_DEPLOYER_MAIN.md`)
-- [ ] Variables d'environnement Production validées (présence uniquement, cf. §5 — jamais les
-      valeurs)
-- [ ] `ABONNEMENTS_PUBLICS_OUVERTS = false`
-- [ ] Mode Stripe = **TEST**
-- [ ] Mode webhook = **TEST** (`STRIPE_WEBHOOK_EXPECTED_MODE=test`)
-- [ ] Aucun secret manquant (fiche §5 complète)
+- [ ] Variables d'environnement Production validées **par présence de nom uniquement** (cf. §5 —
+      jamais les valeurs). Rappel §5.0 : 27 variables sont de type `sensitive` et **ne peuvent pas
+      être relues** — ne cocher aucun item sur la foi d'une lecture de valeur
+- [ ] `ABONNEMENTS_PUBLICS_OUVERTS = false` (valeur lisible, vérifiée)
+- [ ] `ELSATIA_APPLICATION_ENV = production` · `NEXT_PUBLIC_APP_URL = https://app.elsatia.fr`
+      (valeurs lisibles)
+- [ ] `SUPABASE_PROJECT_REF = exhvuzegsefmoguxoiak` cohérent avec l'hôte de
+      `NEXT_PUBLIC_SUPABASE_URL` ; `ELSATIA_SUPABASE_PROJECT_NAME = elsatia-production` (§5.2 —
+      variables d'ops, pas des clés applicatives)
+- [ ] `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` présente (**seule** clé publique lue ; l'app jette sans
+      elle). **Ne pas chercher `NEXT_PUBLIC_SUPABASE_ANON_KEY`** : non consommée au SHA `996be15`
+- [ ] Mode webhook = **TEST** (`STRIPE_WEBHOOK_EXPECTED_MODE=test`, valeur lisible)
+- [ ] Mode Stripe : **non vérifiable ici** — `STRIPE_SECRET_KEY` est `sensitive`. Confirmation
+      reportée au smoke contrôlé de §23 (**P0 pendant fenêtre, item C**). Ne pas afficher la clé
+- [ ] Trois flags `sensitive` **réaffirmés explicitement** (pas « vérifiés ») :
+      `FEATURE_AI_ENABLED=false`, `FEATURE_AI_DEVIS_ENABLED=false`,
+      `FEATURE_RELANCES_AUTO_ENABLED=false` (**P0 pendant fenêtre, item B** — §5.5)
+- [ ] Aucun secret manquant parmi les **obligatoires** de la fiche §5 — les absences listées §5.3,
+      §5.9, §5.10, §5.11 et §5.12 sont **normales et attendues**, ne pas les traiter comme manquantes
 - [ ] Variables Vercel `STRIPE_STATE_ATTESTATION_KEY_ID`/`_PRIVATE_KEY_B64` provisionnées (§3.1
       de `ELSATIA_ED25519_ATTESTATION_PROVISIONING_V1.md`) — **le registry DB, lui, se remplit
-      après T0** (§18bis), pas ici
+      après T0** (§18bis), pas ici (**P0 pendant fenêtre, item A**)
 - [ ] Second admin `total` (**E**) disponible et confirmé joignable
 - [ ] Aucun incident Production en cours (monitoring vérifié avant de lancer)
 
@@ -1089,7 +1297,26 @@ ce cutover ne change aucune décision commerciale (cf. INTERDIT, §7 de la missi
 Production technique **reste en TEST** pendant tout le cutover (§8).
 
 - [ ] `ABONNEMENTS_PUBLICS_OUVERTS = false`
-- [ ] Mode observé = `test` (`STRIPE_WEBHOOK_EXPECTED_MODE`, clé `sk_test_…`)
+- [ ] `STRIPE_WEBHOOK_EXPECTED_MODE = test` (valeur lisible, vérifiée par lecture)
+
+**Smoke contrôlé de confirmation du mode `STRIPE_SECRET_KEY` — P0 pendant fenêtre, item C**
+
+`STRIPE_SECRET_KEY` est de type Vercel `sensitive` : son préfixe (`sk_test_` / `sk_live_`) **n'est
+pas lisible** (§5.0, §5.6). Le mode se confirme donc **par comportement**, sans jamais afficher ni
+journaliser la clé. Deux observations concordantes suffisent :
+
+- [ ] **Observation 1 — objets Stripe renvoyés.** Sur un parcours Checkout de recette (§8), la
+      session créée revient avec `livemode = false`. Un `livemode = true` = **STOP immédiat**,
+      rollback de la posture Stripe, escalade à **B**.
+- [ ] **Observation 2 — attestation.** `environnementAttestationStripe()`
+      (`src/lib/stripe-state-attestation.ts`) dérive `test`/`live` du seul préfixe de la clé et
+      **jette** sur tout autre format. Une fois le registry Ed25519 rempli (§18bis, configuré en
+      `environment = 'test'`), une saga de remise attestée qui aboutit prouve la cohérence
+      `clé ↔ registry` : une clé `sk_live_` produirait un `environment = live` et un rejet.
+- [ ] Mode conclu = **`test`** sur les deux observations, **concordantes**. Discordance ou doute →
+      **NO-GO Stripe**, ne pas poursuivre le §23.
+- [ ] **Aucune valeur de clé affichée, copiée, journalisée ou écrite dans ce runbook.**
+
 - [ ] Aucun objet Live détecté (aucune clé `sk_live_`, aucun Price Live câblé)
 - [ ] Prices conformes à la grille canonique (`verify:stripe-prices --strict`, 8/8 une fois les
       4 `_ANNUEL` alignés — P1-1)
