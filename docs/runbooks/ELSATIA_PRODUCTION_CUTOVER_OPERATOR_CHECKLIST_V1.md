@@ -51,6 +51,7 @@ Date : ______________  Heure de début (UTC) : ______________
 | T+20 | pgTAP critique + smoke SQL sentinelles inchangées → **point de décision migration** | | | ☐ PASS ☐ FAIL | ☐ GO ☐ ROLLBACK |
 | T+30 | Promotion `996be15` → `release/commercialisation-v1`, déploiement, puis login, `/abonnement`, dashboard, chantier, stock, pas de 5xx/boucle | | | ☐ PASS ☐ FAIL | |
 | T+45 | **À EXÉCUTER PENDANT LE CUTOVER** (aucun de ces smokes n'a été exécuté à `996be15`) : MFA admin 1 + admin 2, multitenant A/B, Colors, Tools, Stripe TEST | | | ☐ PASS ☐ FAIL | |
+| T+45 | **Carte P0 fenêtre — environnement** : A Ed25519, B réaffirmation des 3 flags, C smoke mode Stripe (voir carte P0 fenêtre ↓) | | | ☐ PASS ☐ FAIL | |
 | T+60 | **Décision GO/NO-GO globale** (toutes cases PASS ci-dessus) | | | | ☐ GO — ouverture ☐ ROLLBACK |
 | T+90 | Si GO : surveillance rapprochée. Si ROLLBACK : suivi procédure §26 | | | ☐ PASS ☐ FAIL | |
 | T+120 | Fin de fenêtre : bilan écrit, gel levé ou plan de reprise | | | | |
@@ -78,14 +79,52 @@ Date : ______________  Heure de début (UTC) : ______________
 ☐ ⚠ La branche **locale** `release/commercialisation-v1` peut avoir divergé (constaté à `8fe737e` le 2026-09-05, non descendant de `fcdd4e7c`) — promouvoir depuis `origin`, pas depuis un local non resynchronisé
 ☐ SHA app `996be15` promu dans `release/commercialisation-v1` et prêt à déployer
 ☐ Production Branch Vercel = `release/commercialisation-v1`, **inchangée** (**≠ `main`**, **≠ `feat/…`**)
-☐ Variables Production présentes (fiche §5 du préflight) ☐ `ABONNEMENTS_PUBLICS_OUVERTS=false`
-☐ `NEXT_PUBLIC_LEGAL_SIRET` renseignée (`850 559 873 00011`) — sinon mentions légales incomplètes (P1-6, non bloquant technique)
-☐ `NEXT_PUBLIC_LEGAL_TVA` : laisser **vide** tant que le régime n'est pas confirmé (repli neutre)
-☐ Stripe mode = TEST ☐ Webhook mode = TEST ☐ Aucun secret manquant
+☐ Variables Production présentes **par nom** (fiche §5 du préflight) ☐ `ABONNEMENTS_PUBLICS_OUVERTS=false`
+☐ `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` présente — **seule** clé publique lue, l'app jette sans elle. **Ne pas chercher `NEXT_PUBLIC_SUPABASE_ANON_KEY`** (non consommée au SHA `996be15`)
+☐ `SUPABASE_PROJECT_REF=exhvuzegsefmoguxoiak` cohérent avec l'hôte de `NEXT_PUBLIC_SUPABASE_URL` ☐ `ELSATIA_SUPABASE_PROJECT_NAME=elsatia-production` (variables d'**ops**, pas des clés applicatives)
+☐ `NEXT_PUBLIC_LEGAL_SIRET` renseignée (`850 559 873 00011` — **déjà provisionnée et vérifiée**)
+☐ `NEXT_PUBLIC_LEGAL_TVA` : laisser **vide** tant que le régime n'est pas confirmé (repli neutre, P1-6)
+☐ Webhook mode = TEST (`STRIPE_WEBHOOK_EXPECTED_MODE=test`, valeur lisible)
+☐ Stripe mode clé : **non vérifiable ici** — reporté au smoke contrôlé T+45 (carte P0 fenêtre, item C)
+☐ Aucun secret **obligatoire** manquant (les absences §5.3/§5.9/§5.10/§5.11/§5.12 sont normales)
 ☐ Variables Vercel Ed25519 provisionnées (registry DB = après T0, voir §18bis) ☐ Second admin MFA (E) joignable
 ☐ Aucun incident Production en cours (monitoring vérifié)
 
 **Un seul ☐ non coché → NO-GO, ne pas migrer.**
+
+---
+
+## Carte P0 fenêtre — environnement (exactement 3 items)
+
+> ⚠ **Variables Vercel de type `sensitive`.** 27 des 46 variables de `elsatia-production` sont de
+> type `sensitive` : leur valeur est **irrécupérable**, y compris via `vercel env pull`. Cela couvre
+> les vrais secrets **et** `FEATURE_AI_ENABLED`, `FEATURE_AI_DEVIS_ENABLED`,
+> `FEATURE_RELANCES_AUTO_ENABLED`, `STRIPE_SECRET_KEY`, tous les `STRIPE_PRICE_*`, `SUPPORT_EMAIL`,
+> `EMAIL_FROM_ADDRESS`.
+> **Ne jamais prétendre les « vérifier » par lecture, et ne jamais afficher un secret pour
+> contrôler.** Les seules actions légitimes : réaffirmation explicite, ou smoke de comportement.
+
+**A — Provisionner les variables Ed25519** *(au plus tard à la carte T0 ; registry DB après)*
+
+☐ `STRIPE_STATE_ATTESTATION_KEY_ID` provisionnée sur Vercel Production
+☐ `STRIPE_STATE_ATTESTATION_PRIVATE_KEY_B64` provisionnée sur Vercel Production (**Vercel uniquement**, jamais dans doc/dump/log)
+☐ Registry DB rempli **seulement après** confirmation de `…244`/`…245` au ledger (préflight §18bis)
+☐ Fichier local de clé privée supprimé
+
+**B — Réaffirmer explicitement les 3 flags non relisibles** *(réécrire, ne pas « vérifier »)*
+
+☐ `FEATURE_AI_ENABLED=false`
+☐ `FEATURE_AI_DEVIS_ENABLED=false`
+☐ `FEATURE_RELANCES_AUTO_ENABLED=false`
+
+**C — Confirmer le mode Stripe par smoke contrôlé** *(à T+45, préflight §23)*
+
+☐ Observation 1 : session Checkout de recette → `livemode = false`
+☐ Observation 2 : saga de remise attestée cohérente avec le registry `environment = 'test'`
+☐ Mode conclu = `test`, les deux observations **concordantes**
+☐ Aucune valeur de clé affichée, copiée ou journalisée
+
+**Un seul ☐ non coché sur A, B ou C → NO-GO à T+60.** Aucune activation Stripe Live, en aucun cas.
 
 ---
 

@@ -228,23 +228,36 @@ reste `false`, mode webhook reste `test`.
 
 **Noms, environnement, présence et état attendu uniquement — aucune valeur secrète.**
 
+> ⚠ **Type Vercel `sensitive` — l'« état attendu » de ce tableau n'est pas vérifiable par lecture.**
+> Sur `elsatia-production`, 27 des 46 variables sont de type `sensitive` : leur valeur est
+> irrécupérable, y compris via `vercel env pull` (préflight §5.0). Pour ces lignes, la colonne
+> « État attendu » énonce **la cible voulue, pas un constat**. Ne jamais cocher sur la foi d'une
+> lecture de valeur, ne jamais afficher un secret pour contrôler.
+
 | Variable | Environnement | Présence attendue | État attendu |
 |---|---|---|---|
-| `STRIPE_WEBHOOK_EXPECTED_MODE` | Production, Preview | présente | `test` |
-| `STRIPE_SECRET_KEY` | Production, Preview | présente | clé **Test** (`sk_test_…`) — non affichée |
+| `STRIPE_WEBHOOK_EXPECTED_MODE` | Production, Preview | présente | `test` — **valeur lisible, vérifiée** |
+| `STRIPE_SECRET_KEY` | Production, Preview | présente | clé **Test** attendue — **mode NON lisible** (`sensitive`), confirmé par smoke contrôlé (préflight §23), jamais par affichage |
 | `STRIPE_WEBHOOK_ABONNEMENT_SECRET` | Production, Preview | présente | secret du webhook **Test** — non affiché |
 | `STRIPE_PRICE_{MINI,PRO,BUSINESS,ENTREPRISE}_MENSUEL` | Production, Preview | présentes | `price_1Tzi6A0…/6j0…/6u0…/710…` (7 900 / 24 900 / 44 900 / 59 900) |
 | `STRIPE_PRICE_{MINI,PRO,BUSINESS,ENTREPRISE}_ANNUEL` | Production, Preview | présentes | **cible** : `price_1UBJ9l0…/9m0…FjSr/9m0…TxUD/9n0…` (79 000 / 249 000 / 449 000 / 599 000). **Écart connu** : encore les Prices ×12 → lot CODEX `ELSATIA-STRIPE-TEST-ANNUAL-ENV-ALIGNMENT-V1` |
-| `STRIPE_STATE_ATTESTATION_KEY_ID` | Production, Preview | présente | identifiant de clé — non secret |
-| `STRIPE_STATE_ATTESTATION_PRIVATE_KEY_B64` | Production, Preview | présente | clé privée Ed25519 base64 — **Vercel uniquement**, jamais dans une doc/dump |
-| `ABONNEMENTS_PUBLICS_OUVERTS` | Production, Preview | présente | `false` |
-| `SUPPORT_EMAIL`, `NEXT_PUBLIC_APP_URL` | Production | présentes | `support@elsatia.fr`, `https://app.elsatia.fr` (sinon les pages légales rendent « — ») |
-| `NEXT_PUBLIC_LEGAL_SIRET` | Production, Preview | **à provisionner** | `850 559 873 00011` — absente/vide → repli neutre « en cours de finalisation » dans les mentions légales (fail-open, non bloquant technique) |
-| `NEXT_PUBLIC_LEGAL_TVA` | Production, Preview | **laisser vide** | régime de TVA **non confirmé** — ne rien inventer ; absente/vide → repli neutre « à confirmer » dans les mentions légales et les CGV |
-| `NEXT_PUBLIC_SUPABASE_URL`, clés Supabase | Production | présentes | projet Production, non affichées |
+| `STRIPE_STATE_ATTESTATION_KEY_ID` | Production, Preview | **ABSENTE sur Production** (constaté 2026-09-05) — **à provisionner pendant la fenêtre** | identifiant de clé — non secret. **P0 pendant fenêtre, item A** (préflight §5.4/§11) |
+| `STRIPE_STATE_ATTESTATION_PRIVATE_KEY_B64` | Production, Preview | **ABSENTE sur Production** (constaté 2026-09-05) — **à provisionner pendant la fenêtre** | clé privée Ed25519 base64 — **Vercel uniquement**, jamais dans une doc/dump. **P0 pendant fenêtre, item A** |
+| `ABONNEMENTS_PUBLICS_OUVERTS` | Production, Preview | présente | `false` — **valeur lisible, vérifiée** |
+| `FEATURE_AI_ENABLED`, `FEATURE_AI_DEVIS_ENABLED`, `FEATURE_RELANCES_AUTO_ENABLED` | Production | présentes | `false` attendu — **valeurs NON lisibles** (`sensitive`) : à **réaffirmer explicitement** pendant la fenêtre, jamais à « vérifier ». **P0 pendant fenêtre, item B** |
+| `NEXT_PUBLIC_APP_URL` | Production | présente | `https://app.elsatia.fr` — **valeur lisible, vérifiée** |
+| `SUPPORT_EMAIL` | Production | présente | `support@elsatia.fr` attendu — **valeur NON lisible** (`sensitive`) ; sinon les pages légales rendent « — » |
+| `SUPABASE_PROJECT_REF`, `ELSATIA_SUPABASE_PROJECT_NAME` | Production | présentes | `exhvuzegsefmoguxoiak` / `elsatia-production` — **valeurs lisibles, vérifiées**. Variables d'**ops** (scripts et gardes), **pas** des clés applicatives (préflight §5.2) |
+| `NEXT_PUBLIC_LEGAL_SIRET` | Production, Preview | **présente sur Production** (provisionnée 2026-09-05) | `850 559 873 00011` — **valeur lisible, vérifiée conforme** |
+| `NEXT_PUBLIC_LEGAL_TVA` | Production, Preview | **absente — laisser vide** | régime de TVA **non confirmé** — ne rien inventer ; absente/vide → repli neutre « à confirmer » dans les mentions légales et les CGV |
+| `NEXT_PUBLIC_SUPABASE_URL` | Production | présente | hôte du projet Production — **valeur lisible, vérifiée** |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Production | présente | **seule** clé publique Supabase lue par l'app, qui **jette** sans elle. **`NEXT_PUBLIC_SUPABASE_ANON_KEY` n'est pas consommée** au SHA `996be15` — ne pas la chercher ni la créer |
+| `SUPABASE_SERVICE_ROLE_KEY` | Production | présente | non affichée (`sensitive`) |
 
 Contrôle : `npm run verify:stripe-prices --strict` doit passer **8/8** dans un environnement
-portant réellement ces variables (après repointage des 4 `_ANNUEL`).
+portant réellement ces variables (après repointage des 4 `_ANNUEL`). Les `STRIPE_PRICE_*` étant de
+type `sensitive`, **cet écart n'est pas vérifiable par lecture** : seule l'exécution du script dans
+un environnement qui les porte peut le trancher.
 
 ---
 
