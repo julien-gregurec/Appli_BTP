@@ -9,7 +9,8 @@ import { POLITIQUE_RESSOURCES_PUBLIQUES, construireCspColors } from "@/lib/secur
  * par ailleurs aucune session à rafraîchir, ce qui évite un aller-retour
  * Supabase par icône.
  */
-const RESSOURCES_PUBLIQUES = /^\/(?:icons\/|sw-colors\.js$|favicon\.ico$|manifest\.webmanifest$)/;
+const RESSOURCES_PUBLIQUES =
+  /^\/(?:icons\/|sw-colors\.js$|favicon\.ico$|manifest\.webmanifest$|robots\.txt$)/;
 
 /**
  * Nonce de 128 bits, régénéré à chaque requête.

@@ -66,6 +66,14 @@ describe("proxy — CSP et nonce", () => {
     }
   });
 
+  it("sert /robots.txt sans ouvrir de session", async () => {
+    // Un robot n'a pas de session : lui en rafraîchir une coûterait un
+    // aller-retour Supabase par passage de crawler.
+    const reponse = await proxy(requete("/robots.txt"));
+    expect(reponse_csp(reponse)).toContain("default-src 'self'");
+    expect(mocks.createServerClient).not.toHaveBeenCalled();
+  });
+
   it("rafraîchit la session sur les routes applicatives", async () => {
     await proxy(requete("/dashboard"));
     expect(mocks.getUser).toHaveBeenCalledTimes(1);

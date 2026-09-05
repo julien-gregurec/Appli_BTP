@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import { fileURLToPath } from "node:url";
 import { headersSecuriteColors } from "./src/lib/security/en-tetes";
+import { headersIndexationColors } from "./src/lib/seo/indexation";
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@elsatia/application-access"],
@@ -11,7 +12,12 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/:path*",
-        headers: headersSecuriteColors(process.env.NODE_ENV === "production"),
+        headers: [
+          ...headersSecuriteColors(process.env.NODE_ENV === "production"),
+          // Fermeture de l'indexation précommerciale : couvre aussi les
+          // réponses sans document HTML (API, exports, fichiers publics).
+          ...headersIndexationColors(),
+        ],
       },
     ];
   },
