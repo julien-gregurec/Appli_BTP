@@ -99,4 +99,24 @@ describe("createFlower4Geometry — C4-LOT3 (Engine B)", () => {
     expect(() => createFlower4Geometry({ diameter: 0 })).toThrow();
     expect(() => createFlower4Geometry({ diameter: -10 })).toThrow();
   });
+
+  it("ENGINE-B-STEP-MEASUREMENTS-V1 §4 : le cercle central publie sa mesure chantier, dérivée du diamètre saisi", () => {
+    const model = createFlower4Geometry({ diameter: 1200 });
+    // R pétale = 1200/4 = 300 ; cercle central = 300 × 0,35 = 105 mm — la mesure historique.
+    expect(model.steps.find((s) => s.id === "step-centre-circle")?.measurements).toEqual(["105.0 mm"]);
+    // Dérivée, jamais écrite en dur : elle suit le paramètre utilisateur.
+    expect(createFlower4Geometry({ diameter: 2400 }).steps.find((s) => s.id === "step-centre-circle")?.measurements).toEqual(["210.0 mm"]);
+  });
+
+  it("les mesures chantier restent celles d'Engine B : une par étape mesurable, aucune duplication, aucune sur les étapes non mesurables", () => {
+    const model = createFlower4Geometry({ diameter: 1200 });
+    expect(model.steps.map((s) => [s.id, s.measurements])).toEqual([
+      ["step-centre", []],
+      ["step-director-circle", ["300.0 mm"]],
+      ["step-divide", ["90.00°"]],
+      ["step-elements", ["300.0 mm"]],
+      ["step-centre-circle", ["105.0 mm"]],
+      ["step-check", []],
+    ]);
+  });
 });

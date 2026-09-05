@@ -1,4 +1,5 @@
 import { degToRad, radToDeg } from "./angles";
+import { formatDegrees, formatMillimetres } from "./format";
 import { circleCircleIntersection } from "./intersections";
 import { createLeaf } from "./petals";
 import { createRadialPattern } from "./radial-pattern";
@@ -117,20 +118,30 @@ export function createRosette(params: RosetteParameters): ParametricShape<Rosett
   // de la matérialiser une seconde fois côté adaptateur.
   if (centralCircleRadius !== undefined) primitives.circles.push({ centre, radius: centralCircleRadius, role: "shape" });
   const directorCircle: Circle2D = { centre, radius: directorRadius };
+  // Mesures chantier (ENGINE-B-STEP-MEASUREMENTS-V1 §5) : uniquement des grandeurs déjà calculées
+  // ci-dessus pour la rosace elle-même (rayon directeur, secteur, taille d'élément, cercle
+  // central, encombrement pointe à pointe) — aucune formule supplémentaire, aucune valeur en dur.
+  const elementMeasurements =
+    elementSummary.kind === "circle"
+      ? [formatMillimetres(elementSummary.radius)]
+      : [formatMillimetres(elementSummary.width), formatMillimetres(elementSummary.height)];
   const steps: ConstructionStep[] = [
     { id: "step-centre", title: "Repérer le centre", instruction: "Matérialiser le centre O.", geometry: [{ kind: "point", id: "O" }] },
-    { id: "step-director-circle", title: "Tracer le cercle directeur", instruction: `Tracer le cercle directeur de rayon ${directorRadius.toFixed(1)} mm.`, geometry: [{ kind: "circle", circle: directorCircle }] },
-    { id: "step-divide", title: `Diviser en ${params.count}`, instruction: `Diviser en ${params.count} secteurs de ${sectorDegrees.toFixed(2)}°.`, geometry: elementType === "circle" ? centreIds.map((id) => ({ kind: "point" as const, id })) : [] },
-    { id: "step-elements", title: "Tracer les éléments", instruction: `Tracer un élément (${elementType}) sur chaque division.`, geometry: elementStepGeometry },
+    { id: "step-director-circle", title: "Tracer le cercle directeur", instruction: `Tracer le cercle directeur de rayon ${formatMillimetres(directorRadius)}.`, measurements: [formatMillimetres(directorRadius)], geometry: [{ kind: "circle", circle: directorCircle }] },
+    { id: "step-divide", title: `Diviser en ${params.count}`, instruction: `Diviser en ${params.count} secteurs de ${formatDegrees(sectorDegrees)}.`, measurements: [formatDegrees(sectorDegrees)], geometry: elementType === "circle" ? centreIds.map((id) => ({ kind: "point" as const, id })) : [] },
+    { id: "step-elements", title: "Tracer les éléments", instruction: `Tracer un élément (${elementType}) sur chaque division.`, measurements: elementMeasurements, geometry: elementStepGeometry },
   ];
   if (hasInner) {
-    steps.push({ id: "step-centre-circle", title: "Tracer le cercle central", instruction: `Tracer le cercle central de rayon ${innerRadius.toFixed(1)} mm.`, geometry: [{ kind: "circle", circle: { centre, radius: innerRadius } }] });
+    steps.push({ id: "step-centre-circle", title: "Tracer le cercle central", instruction: `Tracer le cercle central de rayon ${formatMillimetres(innerRadius)}.`, measurements: [formatMillimetres(innerRadius)], geometry: [{ kind: "circle", circle: { centre, radius: innerRadius } }] });
   } else {
     if (centralCircleRadius !== undefined) {
       steps.push({
         id: "step-centre-circle",
         title: "Tracer le cercle central",
-        instruction: `Tracer le cercle central de rayon ${centralCircleRadius.toFixed(1)} mm.`,
+        instruction: `Tracer le cercle central de rayon ${formatMillimetres(centralCircleRadius)}.`,
+        // Mesure chantier du cercle central : le rayon résolu par `resolveCentralCircleRatio`,
+        // c'est-à-dire la valeur qu'un traceur reporte au compas (ex. fleurs 4/5 pétales).
+        measurements: [formatMillimetres(centralCircleRadius)],
         geometry: [{ kind: "point", id: "O" }, { kind: "circle", circle: { centre, radius: centralCircleRadius } }],
       });
     }
@@ -141,6 +152,9 @@ export function createRosette(params: RosetteParameters): ParametricShape<Rosett
       instruction: hasTips
         ? "Contrôler que chaque élément passe exactement par le centre O, et que les pointes du motif sont à égale distance de O."
         : "Contrôler que chaque élément passe exactement par le centre O.",
+      // L'encombrement pointe à pointe est la seule grandeur contrôlable de cette étape, et elle
+      // n'existe que lorsque les pointes ont été calculées (`computeTips`).
+      measurements: tipDistance !== undefined ? [formatMillimetres(tipDistance)] : undefined,
       geometry: [{ kind: "point", id: "O" }, ...(hasTips ? tipIds.map((id) => ({ kind: "point" as const, id })) : [])],
     });
   }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { TraceModelMetadata } from "./parametric-to-trace-model";
 import { dimensionResultToDimension, parametricShapeToTraceModel, validateParametricShape } from "./parametric-to-trace-model";
 import { validateTraceModel } from "../trace-model";
+import type { ParametricShape } from "../engine/model";
 import { createCircle } from "../engine/basic-shapes";
 import { createRegularPolygon } from "../engine/polygons";
 import { createStar } from "../engine/stars";
@@ -236,5 +237,53 @@ describe("validation du résultat de l'adaptateur", () => {
     const model = parametricShapeToTraceModel(pattern, baseMetadata({ name: "Rosace 8", slug: "pilot-rosace-8" }));
     const allIds = [...model.points, ...model.segments, ...model.arcs, ...model.circles, ...model.ellipses, ...model.constructionLines, ...model.dimensions, ...model.controls, ...model.steps].map((e) => e.id);
     expect(new Set(allIds).size).toBe(allIds.length);
+  });
+});
+
+/**
+ * ENGINE-B-STEP-MEASUREMENTS-V1 §7 — `ConstructionStep.measurements` (champ additif optionnel)
+ * traverse le pont vers `SiteStep.measurements`, consommé tel quel par `TraceSteps`/`SiteMode`.
+ */
+describe("mesures chantier des étapes de construction", () => {
+  const shapeWithSteps = (steps: ParametricShape["constructionSteps"]): ParametricShape => {
+    const shape = createCircle({ radius: 500 }) as ParametricShape;
+    return { ...shape, constructionSteps: steps };
+  };
+
+  it("une étape sans measurements produit un SiteStep à measurements vide (comportement historique)", () => {
+    const shape = shapeWithSteps([{ id: "s1", title: "Sans mesure", instruction: "Tracer.", geometry: [] }]);
+    const model = parametricShapeToTraceModel(shape, baseMetadata({ name: "Sans mesure", slug: "pilot-no-measure" }));
+    expect(model.steps[0].measurements).toEqual([]);
+  });
+
+  it("une étape avec measurements les transmet telles quelles, sans reformatage ni duplication", () => {
+    const shape = shapeWithSteps([
+      { id: "s1", title: "Compas", instruction: "Régler le compas.", measurements: ["500.0 mm"], geometry: [] },
+      { id: "s2", title: "Secteurs", instruction: "Diviser.", measurements: ["72.00°", "150.0 mm"], geometry: [] },
+      { id: "s3", title: "Contrôle", instruction: "Contrôler.", geometry: [] },
+    ]);
+    const model = parametricShapeToTraceModel(shape, baseMetadata({ name: "Mesures", slug: "pilot-measures" }));
+    expect(model.steps.map((s) => s.id)).toEqual(["s1", "s2", "s3"]); // ordre inchangé
+    expect(model.steps[0].measurements).toEqual(["500.0 mm"]);
+    expect(model.steps[1].measurements).toEqual(["72.00°", "150.0 mm"]);
+    expect(model.steps[2].measurements).toEqual([]);
+  });
+
+  it("les mesures ne sont jamais dupliquées d'une étape à l'autre", () => {
+    const shape = shapeWithSteps([
+      { id: "s1", title: "A", instruction: "A.", measurements: ["100.0 mm"], geometry: [] },
+      { id: "s2", title: "B", instruction: "B.", geometry: [] },
+    ]);
+    const model = parametricShapeToTraceModel(shape, baseMetadata({ name: "Non dupliquées", slug: "pilot-measures-unique" }));
+    expect(model.steps.flatMap((s) => s.measurements)).toEqual(["100.0 mm"]);
+  });
+
+  it("rosace Engine B : chaque mesure publiée correspond à une grandeur réellement calculée", () => {
+    const shape = createRosette({ outerDiameter: 600, count: 6, elementType: "circle", rotationDegrees: 0, centralCircleRatio: 0.35 });
+    const model = parametricShapeToTraceModel(shape, baseMetadata({ name: "Rosace mesurée", slug: "pilot-rosette-measures" }));
+    expect(model.steps.find((s) => s.id === "step-director-circle")?.measurements).toEqual(["300.0 mm"]);
+    expect(model.steps.find((s) => s.id === "step-divide")?.measurements).toEqual(["60.00°"]);
+    expect(model.steps.find((s) => s.id === "step-centre-circle")?.measurements).toEqual(["105.0 mm"]); // 300 × 0.35
+    expect(model.steps.find((s) => s.id === "step-centre")?.measurements).toEqual([]);
   });
 });

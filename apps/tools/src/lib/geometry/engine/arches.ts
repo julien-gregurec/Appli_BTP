@@ -1,3 +1,4 @@
+import { formatMillimetres } from "./format";
 import { distance } from "./measure";
 import { emptyPrimitives, registerShapeGenerator, type ConstructionStep, type ParametricShape } from "./model";
 import { assertFinitePositive, type Circle2D, type Point2D, type Segment2D } from "./types";
@@ -28,10 +29,13 @@ function jambsAndSteps(A: Point2D, B: Point2D, springHeight: number, radius: num
   const L: Point2D = { x: A.x, y: 0 };
   const R: Point2D = { x: B.x, y: 0 };
   const steps: ConstructionStep[] = [
-    { id: "step-jambs", title: "Implanter les jambages", instruction: `Implanter les pieds de jambage L et R, distants de ${distance(A, B).toFixed(1)} mm.`, geometry: [{ kind: "point", id: "L" }, { kind: "point", id: "R" }, { kind: "segment", segment: { start: L, end: A } }, { kind: "segment", segment: { start: R, end: B } }] },
-    { id: "step-spring", title: "Tracer la ligne de naissance", instruction: springHeight > 0 ? `Tracer la ligne de départ A-B à ${springHeight.toFixed(1)} mm au-dessus des pieds.` : "Tracer la ligne de départ A-B.", geometry: [{ kind: "point", id: "A" }, { kind: "point", id: "B" }, { kind: "segment", segment: { start: A, end: B } }] },
+    // Mesures chantier (ENGINE-B-STEP-MEASUREMENTS-V1 §5) : uniquement les grandeurs déjà
+    // calculées et déjà énoncées par l'instruction de l'étape — écart des jambages, hauteur de
+    // naissance, ouverture de compas. Rien de recalculé ici.
+    { id: "step-jambs", title: "Implanter les jambages", instruction: `Implanter les pieds de jambage L et R, distants de ${formatMillimetres(distance(A, B))}.`, measurements: [formatMillimetres(distance(A, B))], geometry: [{ kind: "point", id: "L" }, { kind: "point", id: "R" }, { kind: "segment", segment: { start: L, end: A } }, { kind: "segment", segment: { start: R, end: B } }] },
+    { id: "step-spring", title: "Tracer la ligne de naissance", instruction: springHeight > 0 ? `Tracer la ligne de départ A-B à ${formatMillimetres(springHeight)} au-dessus des pieds.` : "Tracer la ligne de départ A-B.", measurements: springHeight > 0 ? [formatMillimetres(springHeight)] : undefined, geometry: [{ kind: "point", id: "A" }, { kind: "point", id: "B" }, { kind: "segment", segment: { start: A, end: B } }] },
     ...extra,
-    { id: "step-radius", title: "Régler le compas", instruction: `Régler le rayon de traçage à ${radius.toFixed(1)} mm.`, geometry: [] },
+    { id: "step-radius", title: "Régler le compas", instruction: `Régler le rayon de traçage à ${formatMillimetres(radius)}.`, measurements: [formatMillimetres(radius)], geometry: [] },
   ];
   return { L, R, steps };
 }
@@ -101,11 +105,11 @@ function createSemicircularOrSegmentalArch(params: Extract<ArchParameters, { typ
   const { radius, centre, A, B, S, startAngle, endAngle } = buildFromRadiusAndRise(width, rise, springHeight);
   if (thickness >= radius) throw new Error("L'épaisseur supprime la géométrie intérieure de l'arche.");
   const { L, R, steps } = jambsAndSteps(A, B, springHeight, radius, [
-    { id: "step-centre", title: "Repérer le centre", instruction: `Placer le centre O sur l'axe, à ${Math.abs(radius - rise).toFixed(1)} mm ${radius - rise >= 0 ? "sous" : "au-dessus de"} la ligne de départ.`, geometry: [{ kind: "point", id: "O" }] },
+    { id: "step-centre", title: "Repérer le centre", instruction: `Placer le centre O sur l'axe, à ${formatMillimetres(Math.abs(radius - rise))} ${radius - rise >= 0 ? "sous" : "au-dessus de"} la ligne de départ.`, measurements: Math.abs(radius - rise) > 1e-9 ? [formatMillimetres(Math.abs(radius - rise))] : undefined, geometry: [{ kind: "point", id: "O" }] },
   ]);
   steps.push(
     { id: "step-trace", title: "Tracer le demi-cercle", instruction: "Piquer en O et tracer l'arc de A à B en passant par le sommet S.", geometry: [{ kind: "arc", arc: { centre, radius, startAngle, endAngle, counterClockwise: false } }] },
-    { id: "step-control", title: "Contrôler", instruction: `Contrôler que O est exactement à ${radius.toFixed(1)} mm de A et de B, et que le sommet S est au bon niveau.`, geometry: [{ kind: "point", id: "O" }, { kind: "point", id: "A" }, { kind: "point", id: "B" }, { kind: "point", id: "S" }] },
+    { id: "step-control", title: "Contrôler", instruction: `Contrôler que O est exactement à ${formatMillimetres(radius)} de A et de B, et que le sommet S est au bon niveau.`, measurements: [formatMillimetres(radius)], geometry: [{ kind: "point", id: "O" }, { kind: "point", id: "A" }, { kind: "point", id: "B" }, { kind: "point", id: "S" }] },
   );
   // Guides de construction additifs (C4-LOT2-V1 §10) : ligne de naissance (masquée par défaut,
   // couche Construction), jambages (tracé final, uniquement si non dégénérés — un springHeight
@@ -150,9 +154,9 @@ function createLancetArch(params: Extract<ArchParameters, { type: "lancet" }>): 
   // pas à la pédagogie de l'ogive (aucun jambage, les centres sont le cœur de la construction) —
   // séquence dédiée : naissance / centres / rayon / arc gauche / arc droit / sommet.
   const steps: ConstructionStep[] = [
-    { id: "step-baseline", title: "Tracer la ligne de naissance", instruction: `Positionner A et B à ${width.toFixed(1)} mm l'un de l'autre.`, geometry: [{ kind: "point", id: "A" }, { kind: "point", id: "B" }, { kind: "segment", segment: { start: A, end: B } }] },
-    { id: "step-centres", title: "Placer les deux centres", instruction: `Placer les deux centres CG et CD sur la ligne de naissance, symétriques par rapport à l'axe, distants de ${(2 * offset).toFixed(1)} mm.`, geometry: [{ kind: "point", id: "CG" }, { kind: "point", id: "CD" }] },
-    { id: "step-radius", title: "Régler le rayon", instruction: `Régler le compas au rayon ${radius.toFixed(1)} mm — la même ouverture sert aux deux arcs.`, geometry: [] },
+    { id: "step-baseline", title: "Tracer la ligne de naissance", instruction: `Positionner A et B à ${formatMillimetres(width)} l'un de l'autre.`, measurements: [formatMillimetres(width)], geometry: [{ kind: "point", id: "A" }, { kind: "point", id: "B" }, { kind: "segment", segment: { start: A, end: B } }] },
+    { id: "step-centres", title: "Placer les deux centres", instruction: `Placer les deux centres CG et CD sur la ligne de naissance, symétriques par rapport à l'axe, distants de ${formatMillimetres(2 * offset)}.`, measurements: [formatMillimetres(2 * offset)], geometry: [{ kind: "point", id: "CG" }, { kind: "point", id: "CD" }] },
+    { id: "step-radius", title: "Régler le rayon", instruction: `Régler le compas au rayon ${formatMillimetres(radius)} — la même ouverture sert aux deux arcs.`, measurements: [formatMillimetres(radius)], geometry: [] },
     { id: "step-arc-left", title: "Tracer l'arc gauche", instruction: "Depuis CD, tracer l'arc de A jusqu'au sommet S.", geometry: [{ kind: "arc", arc: { ...leftArc, counterClockwise: false } }] },
     { id: "step-arc-right", title: "Tracer l'arc droit", instruction: "Sans changer l'ouverture, depuis CG, tracer l'arc de S jusqu'à B.", geometry: [{ kind: "arc", arc: { ...rightArc, counterClockwise: false } }] },
     { id: "step-apex", title: "Vérifier le sommet", instruction: "Contrôler que les deux arcs se rejoignent en un point unique S, sur l'axe médian.", geometry: [{ kind: "point", id: "S" }] },
@@ -207,8 +211,8 @@ function createCompoundArch(params: Extract<ArchParameters, { type: "compound" }
   const crownRightArc = { centre: crownCentre, radius: crownRadius, startAngle: Math.atan2(S.y - crownCentre.y, S.x - crownCentre.x), endAngle: Math.atan2(tangentRight.y - crownCentre.y, tangentRight.x - crownCentre.x) };
   const haunchRightArc = { centre: haunchCentreLeft, radius: haunchRadius, startAngle: Math.atan2(tangentRight.y - haunchCentreLeft.y, tangentRight.x - haunchCentreLeft.x), endAngle: Math.atan2(B.y - haunchCentreLeft.y, B.x - haunchCentreLeft.x) };
   const { steps } = jambsAndSteps(A, B, springHeight, haunchRadius, [
-    { id: "step-haunch-centres", instruction: `Placer les centres de naissance à ${haunchRadius.toFixed(1)} mm de A et de B sur la ligne de départ.`, geometry: [{ kind: "point", id: "CH1" }, { kind: "point", id: "CH2" }] },
-    { id: "step-crown-centre", instruction: `Placer le centre de clé C sur l'axe, permettant la tangence avec un rayon de ${crownRadius.toFixed(1)} mm.`, geometry: [{ kind: "point", id: "C" }] },
+    { id: "step-haunch-centres", instruction: `Placer les centres de naissance à ${formatMillimetres(haunchRadius)} de A et de B sur la ligne de départ.`, measurements: [formatMillimetres(haunchRadius)], geometry: [{ kind: "point", id: "CH1" }, { kind: "point", id: "CH2" }] },
+    { id: "step-crown-centre", instruction: `Placer le centre de clé C sur l'axe, permettant la tangence avec un rayon de ${formatMillimetres(crownRadius)}.`, measurements: [formatMillimetres(crownRadius)], geometry: [{ kind: "point", id: "C" }] },
   ]);
   steps.push({ id: "step-trace", instruction: "Tracer les quatre arcs successifs, tangents deux à deux, des retombées jusqu'au sommet.", geometry: [haunchLeftArc, crownLeftArc, crownRightArc, haunchRightArc].map((arc) => ({ kind: "arc" as const, arc: { ...arc, counterClockwise: false } })) });
   return archResult("compound", width, thickness, [haunchLeftArc, crownLeftArc, crownRightArc, haunchRightArc], { A, B, S, L, R, CH1: haunchCentreRight, CH2: haunchCentreLeft, C: crownCentre }, steps, params);

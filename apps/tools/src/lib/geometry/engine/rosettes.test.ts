@@ -86,4 +86,34 @@ describe("rosaces génériques", () => {
       expect(() => createRosette({ outerDiameter: 1200, count: 4, centralCircleRatio: ratio })).toThrow(/entre 0 et 1/);
     }
   });
+
+  it("ENGINE-B-STEP-MEASUREMENTS-V1 §5 : chaque étape mesurable publie la grandeur déjà calculée par le générateur", () => {
+    const shape = createRosette({ outerDiameter: 800, count: 8, elementType: "circle", rotationDegrees: 0, centralCircleRatio: 0.25 });
+    const byId = new Map(shape.constructionSteps.map((s) => [s.id, s.measurements]));
+    expect(byId.get("step-centre")).toBeUndefined(); // aucune grandeur à reporter
+    expect(byId.get("step-director-circle")).toEqual(["400.0 mm"]);
+    expect(byId.get("step-divide")).toEqual(["45.00°"]);
+    expect(byId.get("step-elements")).toEqual(["400.0 mm"]);
+    expect(byId.get("step-centre-circle")).toEqual(["100.0 mm"]); // 400 × 0,25
+  });
+
+  it("mode anneau : la mesure du cercle central est le rayon intérieur réellement utilisé", () => {
+    const shape = createRosette({ outerDiameter: 1000, innerDiameter: 400, count: 6, elementType: "circle" });
+    const step = shape.constructionSteps.find((s) => s.id === "step-centre-circle")!;
+    expect(step.measurements).toEqual(["200.0 mm"]);
+  });
+
+  it("mode pétale : la mesure de l'étape des éléments décrit la largeur et la hauteur du pétale", () => {
+    const shape = createRosette({ outerDiameter: 1000, innerDiameter: 400, count: 6, elementType: "petal", elementWidth: 120 });
+    const step = shape.constructionSteps.find((s) => s.id === "step-elements")!;
+    expect(step.measurements).toEqual(["120.0 mm", "300.0 mm"]);
+  });
+
+  it("pointes calculées : l'étape de contrôle publie l'encombrement pointe à pointe", () => {
+    const shape = createRosette({ outerDiameter: 600, count: 6, elementType: "circle", computeTips: true });
+    const withTips = shape.constructionSteps.find((s) => s.id === "step-check")!;
+    expect(withTips.measurements).toHaveLength(1);
+    const withoutTips = createRosette({ outerDiameter: 600, count: 6, elementType: "circle" }).constructionSteps.find((s) => s.id === "step-check")!;
+    expect(withoutTips.measurements).toBeUndefined();
+  });
 });

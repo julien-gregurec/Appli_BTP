@@ -227,7 +227,11 @@ export function parametricShapeToTraceModel(shape: ParametricShape, metadata: Tr
       // qui n'existe pas côté source (§8).
       title: step.title ?? step.instruction,
       instruction: step.instruction,
-      measurements: [],
+      // Mesures chantier : reprises telles quelles du générateur Engine B quand il en publie
+      // (`ConstructionStep.measurements`, champ additif) — jamais reformatées, jamais recalculées
+      // ici. Absentes, on retombe sur `[]`, la valeur historique attendue par `SiteStep`
+      // (ENGINE-B-STEP-MEASUREMENTS-V1 §3).
+      measurements: step.measurements ?? [],
       pointIds: referencedPointIds,
       visibleEntityIds: visibleEntityIds.length ? visibleEntityIds : undefined,
     };

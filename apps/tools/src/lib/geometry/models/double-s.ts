@@ -63,6 +63,9 @@ function prefixSteps(steps: ConstructionStep[], titlePrefix: string, idPrefix: s
     id: `${idPrefix}-${step.id}`,
     title: step.title ? `${titlePrefix} — ${step.title}` : step.title,
     instruction: step.instruction,
+    // Mesures chantier conservées telles quelles : le préfixe est une mise en page d'assemblage,
+    // il ne change aucune grandeur (ENGINE-B-STEP-MEASUREMENTS-V1 §3).
+    measurements: step.measurements,
     geometry: step.geometry.map((g) => (g.kind === "point" ? { ...g, id: `${pointPrefix}${g.id}` } : g)),
   }));
 }
