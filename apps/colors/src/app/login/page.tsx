@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { Brand } from "@/components/Brand";
 import { connexionAction } from "@/app/actions";
 import { createClient } from "@/lib/supabase/server";
+import { cheminInterneSur } from "@/lib/redirection-sure";
+import { messageConfirmationConnexion, messageErreurConnexion } from "@/lib/messages-auth";
 
 export const metadata: Metadata = { title: "Connexion" };
 
@@ -11,9 +13,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (user) redirect("/dashboard");
-  const error = typeof params.error === "string" ? params.error : null;
-  const message = typeof params.message === "string" ? params.message : null;
-  const suivant = typeof params.next === "string" ? params.next : "/dashboard";
+  // Aucun texte reçu par l’URL n’est rendu : seuls des codes connus le sont.
+  const error = messageErreurConnexion(params.error);
+  const message = messageConfirmationConnexion(params.message);
+  const suivant = cheminInterneSur(params.next);
 
   return (
     <div className="public-page">

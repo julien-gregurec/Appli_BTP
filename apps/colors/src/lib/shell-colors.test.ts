@@ -60,11 +60,34 @@ describe("shell autonome ELSATIA Colors", () => {
 
   it("ne transmet jamais une erreur Supabase brute au login", () => {
     const actions = readFileSync(join(process.cwd(), "src/app/actions.ts"), "utf8");
-    expect(actions).toContain("Identifiants incorrects.");
-    expect(actions).toContain("Votre compte ELSATIA ne dispose pas d’un accès actif à Colors.");
+    const messages = readFileSync(join(process.cwd(), "src/lib/messages-auth.ts"), "utf8");
+    // Les libellés vivent désormais dans le jeu fermé : `/login` ne reçoit que des codes.
+    expect(messages).toContain("Identifiants incorrects.");
+    expect(messages).toContain("Votre compte ELSATIA ne dispose pas d’un accès actif à Colors.");
+    expect(actions).toContain("CODE_IDENTIFIANTS_INVALIDES");
+    expect(actions).toContain("CODE_ACCES_COLORS_ABSENT");
     expect(actions).toContain('rpc("contexte_application_courant")');
     expect(actions).toContain('rpc("a_acces_application"');
     expect(actions).not.toMatch(/error\.message/);
+  });
+
+  it("valide toute redirection interne par le seul helper central", () => {
+    const centralise = ["src/app/actions.ts", "src/app/login/page.tsx", "src/app/auth/callback/route.ts"];
+    for (const fichier of centralise) {
+      const source = readFileSync(join(process.cwd(), fichier), "utf8");
+      expect(source).toContain("cheminInterneSur");
+      // Aucun validateur local concurrent ne doit subsister.
+      expect(source).not.toMatch(/startsWith\("\/"\)/);
+      expect(source).not.toMatch(/startsWith\("\/\/"\)/);
+    }
+  });
+
+  it("n’affiche sur /login que des libellés issus du jeu fermé", () => {
+    const login = readFileSync(join(process.cwd(), "src/app/login/page.tsx"), "utf8");
+    expect(login).toContain("messageErreurConnexion(params.error)");
+    expect(login).toContain("messageConfirmationConnexion(params.message)");
+    expect(login).not.toMatch(/params\.error === "string"/);
+    expect(login).not.toMatch(/params\.message === "string"/);
   });
 
   it("résout et affiche un rôle Colors canonique", () => {
