@@ -52,6 +52,16 @@ Champs à renseigner pour tout bug réel remonté par un client :
 - **Correctif** : référence du commit ou de la mise en Production ayant résolu le problème, une fois traité.
 - **Validation** : confirmation par le client (ou en interne) que le correctif résout bien le problème signalé.
 
+## Procédures spécialisées
+
+Trois cas sortent du traitement générique ci-dessus et ont leur propre procédure :
+
+- **Perte totale d'accès** (mot de passe, MFA, boîte mail, administrateur bloqué) → `docs/commercial/SUPPORT_PERTE_ACCES_V1.md`
+- **Demande de suppression de données (RGPD)** → `docs/commercial/SUPPORT_SUPPRESSION_RGPD_V1.md`
+- **Incident de paiement / abonnement Stripe** → `docs/operations/DIAGNOSTIC_STRIPE_WEBHOOKS_V1.md`
+
+Références utiles : `docs/operations/MATRICE_EMAILS_V1.md` (quel e-mail part, quand, et lesquels n'existent pas) et `docs/operations/AUDIT_LOG_OPERATEUR_V1.md` (où trouver une trace).
+
 ## Ce que cette procédure ne fait pas
 
 - Elle ne crée aucun outil de ticketing — c'est une procédure manuelle pour un usage aux tout premiers clients.

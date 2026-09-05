@@ -14,6 +14,7 @@ const deps = vi.hoisted(() => ({
   libererVerrouRemise: vi.fn(),
   lireOperationActiveRemiseServeur: vi.fn(async () => null),
   reconcilierOperationRemiseSousVerrou: vi.fn(),
+  notifierPaiementAbonnementEchoue: vi.fn(async () => ({ envoye: true as const })),
   observerRemiseDepuisAbonnement: vi.fn((abonnement: { discounts?: unknown[] }) => {
     if (!Array.isArray(abonnement.discounts)) throw new Error("observation incomplète");
     if (abonnement.discounts.length === 0) return { status: "absent", count: 0, discount_id: null, source_type: null, source_id: null, coupon_id: null };
@@ -25,6 +26,7 @@ const deps = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: deps.createAdminClient }));
+vi.mock("@/lib/abonnement-notifications", () => ({ notifierPaiementAbonnementEchoue: deps.notifierPaiementAbonnementEchoue }));
 vi.mock("@/lib/stripe-abonnement", () => ({
   recupererAbonnementStripe: deps.recupererAbonnementStripe,
   statutAbonnementDepuisStripe: deps.statutAbonnementDepuisStripe,
@@ -54,7 +56,7 @@ const ENTREPRISE = "11111111-1111-4111-8111-111111111111";
 
 type AdminFakeOptions = {
   duplicate?: boolean;
-  entreprise?: { id: string; stripe_customer_id: string | null; stripe_subscription_id: string | null } | null;
+  entreprise?: { id: string; nom?: string; abonnement_offre?: string | null; abonnement_periodicite?: string | null; stripe_customer_id: string | null; stripe_subscription_id: string | null } | null;
   erreurLecture?: { code: string; message?: string } | null;
   erreurReservation?: { code: string; message?: string } | null;
 };
@@ -62,7 +64,7 @@ type AdminFakeOptions = {
 function adminFake(options: AdminFakeOptions = {}) {
   const appels: Array<{ table: string; methode: string; donnees?: unknown }> = [];
   const entreprise = options.entreprise === undefined
-    ? { id: ENTREPRISE, stripe_customer_id: "cus_test", stripe_subscription_id: "sub_test" }
+    ? { id: ENTREPRISE, nom: "SARL Test", abonnement_offre: "pro", abonnement_periodicite: "mensuel", stripe_customer_id: "cus_test", stripe_subscription_id: "sub_test" }
     : options.entreprise;
   const admin = {
     appels,
@@ -284,5 +286,70 @@ describe("coordination webhook et saga", () => {
     // réservation annulée pour permettre un rejeu propre
     expect(admin.appels.some((a) => a.table === "annuler_evenement_abonnement_service")).toBe(true);
     deps.acquerirVerrouRemise.mockImplementation(async () => "verrou-test");
+  });
+});
+
+// ── P1 — notification client d'un paiement d'abonnement échoué ───────────────
+function evenementFacture(type: string, objet: Record<string, unknown> = {}) {
+  return {
+    id: `evt_${type.replace(/\./g, "_")}`,
+    type,
+    livemode: false,
+    created: 1_757_060_000,
+    data: {
+      object: {
+        id: "in_test",
+        object: "invoice",
+        customer: "cus_test",
+        subscription: "sub_test",
+        status: type === "invoice.paid" ? "paid" : "open",
+        number: "ELS-0042",
+        customer_email: "gerant@exemple.test",
+        currency: "eur",
+        total: 11_880,
+        hosted_invoice_url: "https://invoice.stripe.com/i/acct_x/test_y",
+        metadata: { entreprise_id: ENTREPRISE },
+        ...objet,
+      },
+    },
+  };
+}
+
+describe("email de paiement échoué", () => {
+  it("notifie le client sur invoice.payment_failed avec le contexte facturation", async () => {
+    const response = await POST(request(evenementFacture("invoice.payment_failed")));
+    expect(response.status).toBe(200);
+    expect(deps.notifierPaiementAbonnementEchoue).toHaveBeenCalledTimes(1);
+    expect(deps.notifierPaiementAbonnementEchoue).toHaveBeenCalledWith(expect.objectContaining({
+      destinataire: "gerant@exemple.test",
+      entrepriseNom: "SARL Test",
+      offre: "pro",
+      periodicite: "mensuel",
+      montantTtc: 118.8,
+      devise: "eur",
+      numeroFacture: "ELS-0042",
+      lienFacture: "https://invoice.stripe.com/i/acct_x/test_y",
+    }));
+  });
+
+  it.each(["invoice.paid", "invoice.payment_action_required"])("ne notifie pas sur %s", async (type) => {
+    const response = await POST(request(evenementFacture(type)));
+    expect(response.status).toBe(200);
+    expect(deps.notifierPaiementAbonnementEchoue).not.toHaveBeenCalled();
+  });
+
+  it("ne notifie pas deux fois un évènement déjà traité (idempotence)", async () => {
+    deps.createAdminClient.mockReturnValue(adminFake({ duplicate: true }));
+    const response = await POST(request(evenementFacture("invoice.payment_failed")));
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ duplicate: true });
+    expect(deps.notifierPaiementAbonnementEchoue).not.toHaveBeenCalled();
+  });
+
+  it("répond 200 même si la notification échoue (jamais de rejeu Stripe pour un email)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    deps.notifierPaiementAbonnementEchoue.mockRejectedValueOnce(new Error("Brevo indisponible"));
+    const response = await POST(request(evenementFacture("invoice.payment_failed")));
+    expect(response.status).toBe(200);
   });
 });
