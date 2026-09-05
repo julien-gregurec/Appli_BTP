@@ -1,13 +1,17 @@
-// Famille décorative (DECORATIVE-FAMILIES-V1 §6) : rosace tournante / turbine — un polygone
-// fermé à sommets alternés (cercle extérieur + cercle intérieur), exactement le même schéma que
-// star.ts (FIRST-FUNCTIONAL-LOT-V1), mais où les points intérieurs sont décalés d'un angle
-// "twist" ARBITRAIRE au lieu d'être fixés à un demi-secteur — c'est ce décalage progressif qui
-// donne l'effet de rotation. "twist" est une grandeur géométrique explicite (un décalage
-// angulaire, en degrés, reportable directement au rapporteur sur chantier), jamais un paramètre
-// visuel arbitraire. Composition de divideCircle + Polygon, aucune primitive nouvelle.
-import { assertFinitePositive, boundsFromPoints, divideCircle, point } from "../primitives";
-import type { SiteStep } from "../shape-model";
-import { validateTraceModel, type TraceExplanation, type TraceModel, type TraceParameter } from "../trace-model";
+// Famille décorative (DECORATIVE-FAMILIES-V1 §6) : rosace tournante / turbine.
+//
+// C4-LOT1-V1 — Migré vers Engine B : la géométrie provient exclusivement de
+// `engine/stars.ts::createStar`, généralisé pour ce lot avec le paramètre additif
+// `innerAngleOffsetDegrees` (§2) — c'est exactement le "twist" : le décalage angulaire, au
+// centre, entre chaque sommet extérieur et son sommet intérieur apparié. Absent, `createStar`
+// place ce sommet à un demi-secteur (étoile régulière, comportement star-5 inchangé) ; renseigné,
+// il produit le motif vrillé de la turbine. Aucune formule géométrique locale : une seule
+// implémentation mathématique active du motif « pointes + creux alternés ».
+import { createAngleDimension, createDiameterDimension, createRadiusDimension } from "../engine/dimensions";
+import { createStar } from "../engine/stars";
+import { dimensionResultToDimension, parametricShapeToTraceModel, type TraceModelMetadata } from "../adapters";
+import type { Dimension } from "../primitives";
+import type { TraceExplanation, TraceModel, TraceParameter } from "../trace-model";
 
 export type TurbineInput = { diameter: number; branches: number; twist: number; rotation?: number };
 
@@ -41,68 +45,45 @@ export const turbineExplanation: TraceExplanation = {
 };
 
 export function createTurbineGeometry(input: TurbineInput = DEFAULT_INPUT): TraceModel {
-  const diameter = assertFinitePositive(input.diameter, "Le diamètre");
+  // 1. Traduction des paramètres UI vers Engine B — aucune géométrie ici, seulement les gardes
+  //    de contrat déjà exposées côté produit.
+  const diameter = input.diameter;
+  if (!Number.isFinite(diameter) || diameter <= 0) throw new Error("Le diamètre doit être supérieur à 0.");
   const branches = input.branches;
   if (!Number.isInteger(branches) || branches < 3 || branches > 12) throw new Error("Le nombre de branches doit être un entier entre 3 et 12.");
-  const twistDegrees = input.twist;
-  if (!Number.isFinite(twistDegrees) || twistDegrees <= 0) throw new Error("Le décalage angulaire (twist) doit être strictement positif.");
+  const twist = input.twist;
+  if (!Number.isFinite(twist) || twist <= 0) throw new Error("Le décalage angulaire (twist) doit être strictement positif.");
   const rotationDegrees = input.rotation ?? 0;
   if (!Number.isFinite(rotationDegrees)) throw new Error("L'orientation initiale doit être une valeur finie.");
 
-  const rotationRadians = (rotationDegrees * Math.PI) / 180;
-  const twistRadians = (twistDegrees * Math.PI) / 180;
   const outerRadius = diameter / 2;
   const innerRadius = outerRadius * INNER_RATIO;
-  const O = point("O", 0, 0, "Centre O", "center");
 
-  const outerPoints = divideCircle(O, outerRadius, branches, rotationRadians, "P");
-  const innerPoints = divideCircle(O, innerRadius, branches, rotationRadians + twistRadians, "Q");
-  const bladePoints = outerPoints.flatMap((item, index) => [item, innerPoints[index]]);
+  // 2. Géométrie : exclusivement Engine B (étoile généralisée avec décalage explicite).
+  const shape = createStar({ points: branches, outerRadius, innerRadius, rotationDegrees, innerAngleOffsetDegrees: twist });
 
-  const points = [O, ...outerPoints, ...innerPoints];
-  const sectorAngle = 360 / branches;
-  const axisHalfExtent = Math.max(60, outerRadius * 0.15);
-
-  const steps: SiteStep[] = [
-    { id: "step-outer", title: "Tracer le cercle extérieur", instruction: `Tracez le cercle extérieur de rayon ${outerRadius} mm.`, measurements: [`${outerRadius} mm`], pointIds: ["O"], visibleEntityIds: ["circle-outer"] },
-    { id: "step-divide-outer", title: "Diviser le cercle extérieur", instruction: `Reportez ${branches} points réguliers, espacés de ${sectorAngle}°.`, measurements: [`${sectorAngle}°`], pointIds: outerPoints.map((p) => p.id), controlId: "control-sector", visibleEntityIds: ["circle-outer"] },
-    { id: "step-inner", title: "Tracer le cercle intérieur", instruction: `Tracez le cercle intérieur de rayon ${Math.round(innerRadius)} mm, concentrique.`, measurements: [`${Math.round(innerRadius)} mm`], pointIds: ["O"], visibleEntityIds: ["circle-outer", "circle-inner"] },
-    { id: "step-twist", title: "Reporter le décalage", instruction: `Depuis chaque point extérieur, reportez le point intérieur correspondant en décalant de ${twistDegrees}°.`, measurements: [`${twistDegrees}°`], pointIds: innerPoints.map((p) => p.id), controlId: "control-twist", visibleEntityIds: ["circle-outer", "circle-inner"] },
-    { id: "step-link", title: "Relier les points", instruction: "Reliez chaque point extérieur au point intérieur décalé, puis au point extérieur suivant, dans l'ordre.", measurements: [], pointIds: bladePoints.map((p) => p.id), visibleEntityIds: ["turbine-polygon"] },
+  // 3. Cotations : moteur de cotation Engine B, valeurs jamais réécrites à la main.
+  const [outerCircle] = shape.primitives.circles;
+  const O = shape.primitives.points.O;
+  const dimensions: Dimension[] = [
+    dimensionResultToDimension("dim-outer-diameter", `Ø ext. ${diameter} mm`, createDiameterDimension(outerCircle)),
+    dimensionResultToDimension("dim-outer-radius", `R ext. ${outerRadius} mm`, createRadiusDimension(outerCircle)),
+    dimensionResultToDimension("dim-sector", `${Number((360 / branches).toFixed(2))}°`, createAngleDimension(O, shape.primitives.points.T1, shape.primitives.points.T2)),
+    dimensionResultToDimension("dim-twist", `Twist ${twist}°`, createAngleDimension(O, shape.primitives.points.T1, shape.primitives.points.V1)),
   ];
 
-  const model: TraceModel = {
-    id: "turbine", name: "Rosace tournante (turbine)", slug: "turbine", categoryId: "forms-design", difficulty: "advanced",
-    tags: ["turbine", "rotation", "radial", "décalage", "décoratif"], status: "preview",
-    parameters: turbineParameters, explanation: turbineExplanation,
-    bounds: boundsFromPoints(points, axisHalfExtent),
-    referenceFrame: { unit: "mm", origin: O, xLabel: "X", yLabel: "Y", yOrientation: "up" },
-    axes: [],
-    points,
-    segments: [],
-    arcs: [],
-    circles: [
-      { id: "circle-outer", centre: O, radius: outerRadius, role: "construction" },
-      { id: "circle-inner", centre: O, radius: innerRadius, role: "construction" },
-    ],
-    ellipses: [],
-    constructionLines: [],
-    dimensions: [
-      { id: "dim-outer", kind: "radius", from: O, to: outerPoints[0], label: `R ext. ${outerRadius} mm`, value: outerRadius, unit: "mm" },
-      { id: "dim-twist", kind: "angle", from: outerPoints[0], to: innerPoints[0], label: `Twist ${twistDegrees}°`, value: twistDegrees, unit: "°" },
-    ],
-    controls: [
-      { id: "control-sector", label: "Angle entre deux points extérieurs", value: sectorAngle, unit: "°", pointIds: [outerPoints[0].id, outerPoints[1].id] },
-      { id: "control-twist", label: "Décalage angulaire extérieur → intérieur", value: twistDegrees, unit: "°", pointIds: [outerPoints[0].id, innerPoints[0].id] },
-    ],
-    quantities: [
-      { id: "q-outer-radius", label: "Rayon extérieur", value: outerRadius, unit: "mm", quality: "exact" },
-      { id: "q-inner-radius", label: "Rayon intérieur", value: innerRadius, unit: "mm", quality: "exact" },
-      { id: "q-sector", label: "Angle entre branches", value: sectorAngle, unit: "°", quality: "exact" },
-      { id: "q-twist", label: "Décalage angulaire (twist)", value: twistDegrees, unit: "°", quality: "exact" },
-    ],
-    steps,
-    polygons: [{ id: "turbine-polygon", points: bladePoints, role: "shape" }],
+  // 4. Métadonnées pédagogiques — couche UI uniquement, jamais poussées dans Engine B.
+  const metadata: TraceModelMetadata = {
+    id: "turbine",
+    name: "Rosace tournante (turbine)",
+    slug: "turbine",
+    categoryId: "forms-design",
+    difficulty: "advanced",
+    tags: ["turbine", "rotation", "radial", "décalage", "décoratif"],
+    status: "preview",
+    parameters: turbineParameters,
+    explanation: turbineExplanation,
   };
-  return validateTraceModel(model);
+
+  return parametricShapeToTraceModel(shape, metadata, { dimensions });
 }

@@ -78,6 +78,28 @@ describe("pilotes de convergence ParametricShape → TraceModel", () => {
     expect(model.arcs).toHaveLength(2);
     expect(model.segments).toHaveLength(2);
   });
+
+  it("pilote 5b bis — les cercles de construction et l'axe du cœur sont classés hors du tracé final (C4-LOT1-V1 §8)", () => {
+    const shape = createHeart({ width: 400, height: 500 });
+    const model = parametricShapeToTraceModel(shape, baseMetadata({ name: "Cœur rôles", slug: "pilot-heart-roles" }));
+    expect(model.circles).toHaveLength(2);
+    expect(model.circles.every((c) => c.role === "construction")).toBe(true);
+    // Un segment "axis" ne doit jamais atterrir dans `segments` (tracé final) : uniquement 2
+    // tangentes (role "shape" implicite) doivent s'y trouver.
+    expect(model.segments).toHaveLength(2);
+    expect(model.constructionLines.some((l) => l.role === "axis")).toBe(true);
+  });
+
+  it("pilote 5b ter — les bounds couvrent toute la géométrie (arcs/cercles), pas seulement les points nommés (C4-LOT1-V1 §27)", () => {
+    const shape = createHeart({ width: 400, height: 500 });
+    const model = parametricShapeToTraceModel(shape, baseMetadata({ name: "Cœur bounds", slug: "pilot-heart-bounds" }));
+    // Le sommet des lobes (centre + rayon) doit être visible : avant le correctif, les bounds
+    // n'étaient calculés qu'à partir des points nommés (centres, jamais du bord des cercles).
+    for (const arc of model.arcs) {
+      expect(arc.centre.y + arc.radius).toBeLessThanOrEqual(model.bounds.maxY + 1e-6);
+      expect(arc.centre.y - arc.radius).toBeGreaterThanOrEqual(model.bounds.minY - 1e-6);
+    }
+  });
 });
 
 /**

@@ -22,6 +22,7 @@ export * from "./report";
 
 export * from "./basic-shapes";
 export * from "./polygons";
+export * from "./circle-division";
 export * from "./stars";
 export * from "./arches";
 export * from "./radial-pattern";

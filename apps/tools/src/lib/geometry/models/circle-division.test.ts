@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import { distance } from "../primitives";
 import { createCircleDivisionGeometry } from "./circle-division";
 
-describe("createCircleDivisionGeometry — FIRST-FUNCTIONAL-LOT-V1 §16", () => {
+// C4-LOT1-V1 : mêmes invariants qu'en FIRST-FUNCTIONAL-LOT-V1 §16, contrôlés sur la sortie
+// produite via Engine B (`createCircleDivision`) puis le pont `parametricShapeToTraceModel`.
+// Schéma d'identifiants Engine B inchangé pour ce modèle : centre "O", points "P1..PN".
+describe("createCircleDivisionGeometry — C4-LOT1 (Engine B)", () => {
   it("diamètre 2000 mm / 6 divisions -> rayon 1000 mm, 6 points, 60° entre chaque point consécutif", () => {
     const model = createCircleDivisionGeometry({ diameter: 2000, divisions: 6 });
     const [centre, ...dividedPoints] = model.points;
@@ -22,8 +25,9 @@ describe("createCircleDivisionGeometry — FIRST-FUNCTIONAL-LOT-V1 §16", () => 
     const ids = dividedPoints.map((item) => item.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(/NaN|Infinity/.test(JSON.stringify(model))).toBe(false);
-    expect(model.quantities.find((q) => q.id === "q-sector")?.value).toBeCloseTo(60, 8);
+    expect(model.dimensions.find((d) => d.id === "dim-sector")?.value).toBeCloseTo(60, 6);
     expect(model.dimensions.find((d) => d.id === "dim-radius")?.value).toBeCloseTo(1000, 8);
+    expect(model.dimensions.find((d) => d.id === "dim-diameter")?.value).toBeCloseTo(2000, 8);
   });
 
   it("diamètre 2400 mm / 8 divisions -> rayon 1200 mm, angle 45°", () => {
@@ -31,7 +35,7 @@ describe("createCircleDivisionGeometry — FIRST-FUNCTIONAL-LOT-V1 §16", () => 
     const [centre, ...dividedPoints] = model.points;
     expect(dividedPoints).toHaveLength(8);
     for (const item of dividedPoints) expect(distance(centre, item)).toBeCloseTo(1200, 8);
-    expect(model.quantities.find((q) => q.id === "q-sector")?.value).toBeCloseTo(45, 8);
+    expect(model.dimensions.find((d) => d.id === "dim-sector")?.value).toBeCloseTo(45, 6);
     expect(model.dimensions.find((d) => d.id === "dim-radius")?.value).toBeCloseTo(1200, 8);
   });
 
@@ -39,6 +43,15 @@ describe("createCircleDivisionGeometry — FIRST-FUNCTIONAL-LOT-V1 §16", () => 
     const model = createCircleDivisionGeometry({ diameter: 2000, divisions });
     expect(model.points).toHaveLength(divisions + 1);
     expect(/NaN|Infinity/.test(JSON.stringify(model))).toBe(false);
+    expect(model.dimensions.find((d) => d.id === "dim-sector")?.value).toBeCloseTo(360 / divisions, 4);
+  });
+
+  it("le cercle directeur reste géométriquement un cercle : aucun segment de contour, aucun polygone", () => {
+    const model = createCircleDivisionGeometry({ diameter: 2000, divisions: 8 });
+    expect(model.segments).toHaveLength(0);
+    expect(model.polygons ?? []).toHaveLength(0);
+    expect(model.circles).toHaveLength(1);
+    expect(model.circles[0].role).not.toBe("construction");
   });
 
   it("ordre stable d'un appel à l'autre pour les mêmes paramètres", () => {
@@ -57,7 +70,7 @@ describe("createCircleDivisionGeometry — FIRST-FUNCTIONAL-LOT-V1 §16", () => 
     const [centre, first] = rotated.points;
     const angle = (Math.atan2(first.y - centre.y, first.x - centre.x) * 180) / Math.PI;
     expect(angle).toBeCloseTo(30, 6);
-    expect(rotated.quantities.find((q) => q.id === "q-sector")?.value).toBeCloseTo(60, 8);
+    expect(rotated.dimensions.find((d) => d.id === "dim-sector")?.value).toBeCloseTo(60, 6);
   });
 
   it("explication réellement renseignée (pas de structure vide)", () => {
@@ -71,6 +84,7 @@ describe("createCircleDivisionGeometry — FIRST-FUNCTIONAL-LOT-V1 §16", () => 
     const model = createCircleDivisionGeometry({ diameter: 2000, divisions: 1 });
     expect(model.points).toHaveLength(2);
     expect(/NaN|Infinity/.test(JSON.stringify(model))).toBe(false);
+    expect(model.dimensions.find((d) => d.id === "dim-sector")).toBeUndefined();
   });
 
   it("refuse un diamètre invalide", () => {

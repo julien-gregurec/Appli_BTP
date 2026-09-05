@@ -5,7 +5,7 @@ import { boundsFromPoints, polarAngle } from "./measure";
 import { emptyPrimitives, registerShapeGenerator, type ConstructionStepGeometry, type ParametricShape } from "./model";
 import { applyTransform, compose, rotationAround, scaleAround, translation } from "./transform";
 import { transformGeometry } from "./geometry-ops";
-import { assertFinitePositive, type Arc2D, type Point2D, type Segment2D } from "./types";
+import { assertFinitePositive, type Arc2D, type Circle2D, type Point2D, type Segment2D } from "./types";
 
 export type HeartParameters = { width: number; height: number; centre?: Point2D; rotationDegrees?: number; innerBandRatio?: number; centralCrease?: boolean };
 
@@ -47,12 +47,22 @@ export function createHeart(params: HeartParameters): ParametricShape<HeartParam
   const rightTangentWorld = applyTransform(transform, rightTangent);
   const leftSegment: Segment2D = { start: leftTangentWorld, end: cusp };
   const rightSegment: Segment2D = { start: rightTangentWorld, end: cusp };
+  // Lobes de construction (C4-LOT1-V1 §8) : les deux cercles complets dont les arcs ne sont
+  // qu'une portion — aide de tracé au compas, jamais le tracé final (rôle "construction").
+  const leftCircle: Circle2D = { centre: worldLeftCentre, radius: lobeRadius, role: "construction" };
+  const rightCircle: Circle2D = { centre: worldRightCentre, radius: lobeRadius, role: "construction" };
+  // Axe vertical de symétrie (repère de construction, rôle "axis") : couvre la hauteur totale
+  // du cœur (du sommet des lobes à la pointe), avec une marge identique de part et d'autre.
+  const axisTop = applyTransform(transform, { x: 0, y: lobeRadius * 1.3 });
+  const axisBottom = applyTransform(transform, { x: 0, y: -(height - lobeRadius) - lobeRadius * 1.3 });
+  const axisSegment: Segment2D = { start: axisBottom, end: axisTop, role: "axis" };
   const primitives = emptyPrimitives();
   primitives.points.cusp = cusp;
   primitives.points.leftLobe = worldLeftCentre;
   primitives.points.rightLobe = worldRightCentre;
   primitives.arcs.push(leftArc, rightArc);
-  primitives.segments.push(leftSegment, rightSegment);
+  primitives.segments.push(axisSegment, leftSegment, rightSegment);
+  primitives.circles.push(leftCircle, rightCircle);
   const creaseGeometry: ConstructionStepGeometry[] = [];
   if (params.centralCrease) {
     const top = applyTransform(transform, { x: 0, y: 0 });
@@ -80,10 +90,12 @@ export function createHeart(params: HeartParameters): ParametricShape<HeartParam
     rotation,
     metadata: { shouldBeClosed: true, lobeRadius },
     constructionSteps: [
-      { id: "step-lobes", instruction: `Tracer les deux lobes tangents, cercles de rayon ${lobeRadius.toFixed(1)} mm.`, geometry: [{ kind: "arc", arc: leftArc }, { kind: "arc", arc: rightArc }] },
-      { id: "step-cusp", instruction: `Placer la pointe à ${(height - lobeRadius).toFixed(1)} mm sous le point de tangence des lobes.`, geometry: [{ kind: "point", id: "cusp" }] },
-      { id: "step-sides", instruction: "Tracer les deux tangentes des lobes vers la pointe.", geometry: [{ kind: "segment", segment: leftSegment }, { kind: "segment", segment: rightSegment }] },
-      ...(creaseGeometry.length ? [{ id: "step-crease", instruction: "Tracer la ligne centrale de pliure.", geometry: creaseGeometry }] : []),
+      { id: "step-axis", title: "Tracer l'axe vertical", instruction: "Tracez l'axe vertical de symétrie du cœur.", geometry: [{ kind: "segment", segment: axisSegment }] },
+      { id: "step-centres", title: "Placer les centres des lobes", instruction: `Placez les deux centres à ${lobeRadius.toFixed(1)} mm de part et d'autre de l'axe.`, geometry: [{ kind: "point", id: "leftLobe" }, { kind: "point", id: "rightLobe" }] },
+      { id: "step-lobes", title: "Tracer les deux lobes", instruction: `Réglez le compas au rayon ${lobeRadius.toFixed(1)} mm et tracez les deux cercles : ils se touchent sur l'axe.`, geometry: [{ kind: "circle", circle: leftCircle }, { kind: "circle", circle: rightCircle }] },
+      { id: "step-cusp", title: "Placer la pointe", instruction: `Sur l'axe, placez la pointe à ${(height - lobeRadius).toFixed(1)} mm sous le point de tangence des lobes.`, geometry: [{ kind: "point", id: "cusp" }] },
+      { id: "step-sides", title: "Tracer les deux tangentes", instruction: "Depuis la pointe, tracez les deux droites tangentes aux cercles pour fermer le contour.", geometry: [{ kind: "arc", arc: leftArc }, { kind: "arc", arc: rightArc }, { kind: "segment", segment: leftSegment }, { kind: "segment", segment: rightSegment }] },
+      ...(creaseGeometry.length ? [{ id: "step-crease", title: "Tracer la pliure centrale", instruction: "Tracez la ligne centrale de pliure.", geometry: creaseGeometry }] : []),
     ],
     quality: "exact",
   };

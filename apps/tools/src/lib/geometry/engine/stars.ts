@@ -9,6 +9,14 @@ export type StarParameters = {
   outerRadius: number;
   innerRadius: number;
   rotationDegrees?: number;
+  /**
+   * Décalage angulaire (au centre, en degrés) de chaque sommet intérieur par rapport à son
+   * sommet extérieur apparié. Absent = demi-secteur (180/points) : étoile régulière classique,
+   * comportement historique inchangé au flottant près. Renseigné : motif "vrillé" (turbine) —
+   * la valeur est directement l'angle à reporter au rapporteur depuis le sommet extérieur,
+   * jamais un paramètre visuel arbitraire (C4-LOT1-V1 §2).
+   */
+  innerAngleOffsetDegrees?: number;
 };
 
 /** Étoile simple à N branches, alternant sommets extérieurs et intérieurs (polygone étoilé {N/2} implicite). */
@@ -21,8 +29,15 @@ export function createStar(params: StarParameters): ParametricShape<StarParamete
   const rotation = degToRad(params.rotationDegrees ?? -90);
   const vertexCount = params.points * 2;
   const vertices: Point2D[] = Array.from({ length: vertexCount }, (_, i) => {
-    const radius = i % 2 === 0 ? outerRadius : innerRadius;
-    return pointAtPolar(centre, radius, rotation + (i * Math.PI) / params.points);
+    // Sommet extérieur, ou sommet intérieur par défaut (demi-secteur) : formule historique
+    // inchangée au flottant près, aucune dérive numérique introduite par l'extension ci-dessous.
+    if (i % 2 === 0 || params.innerAngleOffsetDegrees === undefined) {
+      const radius = i % 2 === 0 ? outerRadius : innerRadius;
+      return pointAtPolar(centre, radius, rotation + (i * Math.PI) / params.points);
+    }
+    // Sommet intérieur décalé explicitement : rapporté à l'angle du sommet extérieur apparié.
+    const pairedOuterAngle = rotation + ((i - 1) * Math.PI) / params.points;
+    return pointAtPolar(centre, innerRadius, pairedOuterAngle + degToRad(params.innerAngleOffsetDegrees));
   });
   const primitives = emptyPrimitives();
   primitives.points.O = centre;

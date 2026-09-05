@@ -1,10 +1,14 @@
-// Modèle réel n°1 (FIRST-FUNCTIONAL-LOT-V1) : division régulière d'un cercle. Remplace le
-// démonstrateur purement technique du lot précédent (ENGINE-FOUNDATION-V1 §14) par un modèle
-// complet (paramètres, cotes, étapes, explication). Construction mathématique générique —
-// aucune référence tierce. Non référencé par catalog.ts : reste interne/preview.
-import { assertFinitePositive, boundsFromPoints, divideCircle, point, type Dimension } from "../primitives";
-import type { SiteStep } from "../shape-model";
-import { validateTraceModel, type TraceExplanation, type TraceModel, type TraceParameter } from "../trace-model";
+// Modèle réel n°1 (FIRST-FUNCTIONAL-LOT-V1) : division régulière d'un cercle.
+//
+// C4-LOT1-V1 — Migré vers Engine B : la géométrie (centre, cercle directeur, axes, points de
+// division, étapes) provient exclusivement de `engine/circle-division.ts::createCircleDivision`.
+// Reste géométriquement un cercle marqué de points — jamais un polygone (§3) : aucun segment de
+// contour, aucun polygone dans les primitives Engine B de ce générateur.
+import { createAngleDimension, createDiameterDimension, createRadiusDimension } from "../engine/dimensions";
+import { createCircleDivision } from "../engine/circle-division";
+import { dimensionResultToDimension, parametricShapeToTraceModel, type TraceModelMetadata } from "../adapters";
+import type { Dimension } from "../primitives";
+import type { TraceExplanation, TraceModel, TraceParameter } from "../trace-model";
 
 export type CircleDivisionInput = { diameter: number; divisions: number; startAngle?: number };
 
@@ -34,46 +38,34 @@ export const circleDivisionExplanation: TraceExplanation = {
 };
 
 export function createCircleDivisionGeometry(input: CircleDivisionInput = DEFAULT_INPUT): TraceModel {
-  const diameter = assertFinitePositive(input.diameter, "Le diamètre");
+  // 1. Traduction des paramètres UI vers Engine B.
+  const diameter = input.diameter;
+  if (!Number.isFinite(diameter) || diameter <= 0) throw new Error("Le diamètre doit être supérieur à 0.");
   const divisions = input.divisions;
   if (!Number.isInteger(divisions) || divisions < 1 || divisions > 24) throw new Error("Le nombre de divisions doit être un entier entre 1 et 24.");
   const startAngleDegrees = input.startAngle ?? 0;
   if (!Number.isFinite(startAngleDegrees)) throw new Error("L'angle de départ doit être une valeur finie.");
-  const startAngleRadians = (startAngleDegrees * Math.PI) / 180;
 
   const radius = diameter / 2;
-  const O = point("O", 0, 0, "Centre O", "center");
-  const dividedPoints = divideCircle(O, radius, divisions, startAngleRadians);
-  const points = [O, ...dividedPoints];
-  const sectorAngle = divisions >= 2 ? 360 / divisions : 0;
 
+  // 2. Géométrie : exclusivement Engine B.
+  const shape = createCircleDivision({ divisions, radius, startAngleDegrees });
+
+  // 3. Cotations : moteur de cotation Engine B.
+  const directorCircle = shape.primitives.circles[0];
+  const O = shape.primitives.points.O;
   const dimensions: Dimension[] = [
-    { id: "dim-radius", kind: "radius", from: O, to: dividedPoints[0], label: `R ${radius} mm`, value: radius, unit: "mm" },
+    dimensionResultToDimension("dim-diameter", `Ø ${diameter} mm`, createDiameterDimension(directorCircle)),
+    dimensionResultToDimension("dim-radius", `R ${radius} mm`, createRadiusDimension(directorCircle)),
   ];
   if (divisions >= 2) {
-    dimensions.push({ id: "dim-sector", kind: "angle", from: dividedPoints[0], to: dividedPoints[1], label: `${sectorAngle}°`, value: sectorAngle, unit: "°" });
+    dimensions.push(
+      dimensionResultToDimension("dim-sector", `${Number((360 / divisions).toFixed(2))}°`, createAngleDimension(O, shape.primitives.points.P1, shape.primitives.points.P2)),
+    );
   }
 
-  const axisHalfExtent = Math.max(50, radius * 1.15);
-  const constructionLines = [
-    { id: "axis-x", start: point("axis-x-", -axisHalfExtent, 0), end: point("axis-x+", axisHalfExtent, 0), role: "axis" as const },
-    { id: "axis-y", start: point("axis-y-", 0, -axisHalfExtent), end: point("axis-y+", 0, axisHalfExtent), role: "axis" as const },
-  ];
-
-  const steps: SiteStep[] = [
-    { id: "step-centre", title: "Matérialiser le centre", instruction: "Tracez deux axes perpendiculaires et marquez leur intersection O.", measurements: [], pointIds: ["O"], visibleEntityIds: ["axis-x", "axis-y"] },
-    { id: "step-circle", title: "Tracer le cercle directeur", instruction: `Réglez le compas au rayon ${radius} mm et tracez le cercle depuis O.`, measurements: [`${radius} mm`], pointIds: ["O", dividedPoints[0].id], controlId: "control-1", visibleEntityIds: ["axis-x", "axis-y", "circle-main"] },
-    {
-      id: "step-divide",
-      title: "Diviser régulièrement",
-      instruction: divisions >= 2 ? `Reportez ${divisions} divisions de ${sectorAngle}° chacune autour de O.` : "Un seul point suffit ici, aucune division angulaire à reporter.",
-      measurements: divisions >= 2 ? [`${sectorAngle}°`] : [],
-      pointIds: dividedPoints.map((p) => p.id),
-      visibleEntityIds: ["axis-x", "axis-y", "circle-main"],
-    },
-  ];
-
-  const model: TraceModel = {
+  // 4. Métadonnées pédagogiques — couche UI uniquement.
+  const metadata: TraceModelMetadata = {
     id: "circle-division",
     name: "Cercle divisé",
     slug: "circle-division",
@@ -83,19 +75,7 @@ export function createCircleDivisionGeometry(input: CircleDivisionInput = DEFAUL
     status: "preview",
     parameters: circleDivisionParameters,
     explanation: circleDivisionExplanation,
-    bounds: boundsFromPoints(points, Math.max(50, radius * 0.15)),
-    referenceFrame: { unit: "mm", origin: O, xLabel: "X", yLabel: "Y", yOrientation: "up" },
-    axes: [],
-    points,
-    segments: [],
-    arcs: [],
-    circles: [{ id: "circle-main", centre: O, radius, role: "shape" }],
-    ellipses: [],
-    constructionLines,
-    dimensions,
-    controls: dividedPoints.map((item, index) => ({ id: `control-${index + 1}`, label: `Distance O → ${item.id}`, value: radius, unit: "mm" as const, pointIds: ["O", item.id] })),
-    quantities: [{ id: "q-sector", label: "Angle entre divisions", value: sectorAngle, unit: "°" as const, quality: "exact" as const }],
-    steps,
   };
-  return validateTraceModel(model);
+
+  return parametricShapeToTraceModel(shape, metadata, { dimensions });
 }

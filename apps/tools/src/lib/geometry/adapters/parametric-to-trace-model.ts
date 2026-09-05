@@ -15,11 +15,11 @@
  */
 import type { CategoryId } from "../../categories";
 import type { Arc, Circle, Dimension, Ellipse, Point, Polygon, Polyline, Segment } from "../primitives";
-import { boundsFromPoints } from "../primitives";
 import type { RealisticPreviewMetadata, TraceDifficulty, TraceExplanation, TraceModel, TraceParameter, TraceStatus } from "../trace-model";
 import { validateTraceModel } from "../trace-model";
 import type { Quantity, SiteStep } from "../shape-model";
-import type { Arc2D, Circle2D, Ellipse2D, Segment2D } from "../engine/types";
+import type { Arc2D, Circle2D, Ellipse2D, Point2D, Segment2D } from "../engine/types";
+import { boundsFromPoints as boundsFromPoints2D } from "../engine/measure";
 import type { DimensionResult } from "../engine/dimensions";
 import type { ParametricShape } from "../engine/model";
 import { validateGeometry } from "../engine/validate";
@@ -133,7 +133,10 @@ export function parametricShapeToTraceModel(shape: ParametricShape, metadata: Tr
     const id = `${modelId}-segment-${index}`;
     registry.registerSegment(segment, id);
     const mapped: Segment = { id, start: withId(`${id}-start`, segment.start), end: withId(`${id}-end`, segment.end), role: segment.role ?? "shape" };
-    (segment.role === "construction" ? constructionLines : segments).push(mapped);
+    // Un segment "axis" (repère de symétrie) n'est pas le tracé final : comme "construction", il
+    // rejoint constructionLines, où TraceViewer sait déjà distinguer les deux via `role` (couche
+    // Axes vs couche Construction) — seul le routage groupé change, pas le rôle affiché (C4-LOT1-V1 §8).
+    (segment.role === "construction" || segment.role === "axis" ? constructionLines : segments).push(mapped);
   });
 
   const circles: Circle[] = primitives.circles.map((circle, index) => {
@@ -237,11 +240,28 @@ export function parametricShapeToTraceModel(shape: ParametricShape, metadata: Tr
     quantities.push({ id: "q-error-tolerance", label: "Tolérance d'approximation", value: shape.errorTolerance, unit: "mm", quality: "estimate" });
   }
 
-  const allPointsForBounds = points.length ? points : [origin];
+  // Bounds : ne pas se limiter aux points nommés (§27 C3 / C4-LOT1-V1) — un cœur ou une arche
+  // n'a par exemple pas de point nommé au sommet de ses lobes/arcs, seulement leur centre. On
+  // couvre donc l'enveloppe réelle de toute la géométrie (points, extrémités de segments,
+  // rectangle centre±rayon des cercles/arcs/ellipses — toujours un sur-ensemble sûr même pour un
+  // arc partiel —, et points des polylignes/polygones), jamais recalculée à partir d'une formule
+  // de forme : uniquement des min/max sur des coordonnées déjà connues.
+  const extentPoints: Point2D[] = [
+    ...points.map((p) => ({ x: p.x, y: p.y })),
+    ...[...segments, ...constructionLines].flatMap((s) => [s.start, s.end]),
+    ...circles.flatMap((c) => [{ x: c.centre.x - c.radius, y: c.centre.y - c.radius }, { x: c.centre.x + c.radius, y: c.centre.y + c.radius }]),
+    ...arcs.flatMap((a) => [{ x: a.centre.x - a.radius, y: a.centre.y - a.radius }, { x: a.centre.x + a.radius, y: a.centre.y + a.radius }]),
+    ...ellipses.flatMap((e) => {
+      const m = Math.max(e.radiusX, e.radiusY);
+      return [{ x: e.centre.x - m, y: e.centre.y - m }, { x: e.centre.x + m, y: e.centre.y + m }];
+    }),
+    ...[...polylines, ...polygons].flatMap((entity) => entity.points),
+  ];
+  const boundsSource = extentPoints.length ? extentPoints : [origin];
   const model: TraceModel = {
     id: modelId,
     name: metadata.name,
-    bounds: boundsFromPoints(allPointsForBounds, Math.max(shape.width, shape.height) * 0.05 || 10),
+    bounds: boundsFromPoints2D(boundsSource, Math.max(shape.width, shape.height) * 0.05 || 10),
     referenceFrame: { unit: "mm", origin, xLabel: "X", yLabel: "Y", yOrientation: "up" },
     axes: [],
     points,
