@@ -4,9 +4,10 @@ Imprimable. Une ligne = une case à cocher, une heure, un opérateur, un résult
 Détail complet de chaque étape : `docs/runbooks/ELSATIA_PRODUCTION_CUTOVER_PREFLIGHT_FINAL_V1.md`
 (§14–§26). Rollback détaillé : `docs/runbooks/ELSATIA_PRODUCTION_ROLLBACK_V1.md`.
 
-**Cible** : branche `feat/elsatia-commercial-canonical-r1-r2-r3-v1`, SHA app `c1930ab366109a…`,
-ledger visé **261**. **Date/heure réelles et noms à écrire à la main ci-dessous — rien n'est
-présupposé.**
+**Cible** : branche `feat/elsatia-commercial-canonical-r1-r2-r3-v1`, SHA app
+`a81f31760bf11aa1a72d366f68c28d7b6174ef2d`, ledger visé **263** (rebasé 2026-09-05, lot
+`ELSATIA-CUTOVER-FINAL-TARGET-REBASE-V1` — remplace l'ancien SHA `c1930ab`/ledger 261). **Date/heure
+réelles et noms à écrire à la main ci-dessous — rien n'est présupposé.**
 
 Date : ______________  Heure de début (UTC) : ______________
 
@@ -31,9 +32,9 @@ Date : ______________  Heure de début (UTC) : ______________
 | T-15 | Test de restauration exécuté (base probe) | | | ☐ PASS ☐ FAIL | |
 | T0 | **Gate P0-3** + **checklist GO-T0** complète (voir carte T0 ↓) | | | ☐ PASS ☐ FAIL | ☐ GO ☐ STOP |
 | T0 | Application des migrations manquantes (ordre lexical) | | | ☐ PASS ☐ FAIL | |
-| T+10 | Ledger = 261, `…255` + `…263` présentes, 2ᵉ `migration up` vide | | | ☐ PASS ☐ FAIL | |
+| T+10 | Ledger = 263, `…255` + `…263` présentes, 2ᵉ `migration up` vide | | | ☐ PASS ☐ FAIL | |
 | T+20 | pgTAP critique + smoke SQL sentinelles inchangées → **point de décision migration** | | | ☐ PASS ☐ FAIL | ☐ GO ☐ ROLLBACK |
-| T+30 | Déploiement app `c1930ab` + login, `/abonnement`, dashboard, chantier, stock, pas de 5xx/boucle | | | ☐ PASS ☐ FAIL | |
+| T+30 | Déploiement app `a81f317` + login, `/abonnement`, dashboard, chantier, stock, pas de 5xx/boucle | | | ☐ PASS ☐ FAIL | |
 | T+45 | MFA admin 1 + admin 2, multitenant A/B, Colors, Tools, Stripe TEST | | | ☐ PASS ☐ FAIL | |
 | T+60 | **Décision GO/NO-GO globale** (toutes cases PASS ci-dessus) | | | | ☐ GO — ouverture ☐ ROLLBACK |
 | T+90 | Si GO : surveillance rapprochée. Si ROLLBACK : suivi procédure §26 | | | ☐ PASS ☐ FAIL | |
@@ -46,7 +47,7 @@ Date : ______________  Heure de début (UTC) : ______________
 ☐ Ref Production confirmée (`exhvuzegsefmoguxoiak`)
 ☐ Ledger lu : `count = ____`  `max(version) = ____________`
 ☐ `…000255_acl_reconciliation_v1` **absente** (attendu)
-☐ Gap vers 261 calculé : `____` migrations
+☐ Gap vers 263 calculé : `____` migrations
 ☐ Sentinelles (entreprises/utilisateurs/clients/chantiers/devis/factures) cohérentes avec le dernier snapshot DR connu
 ☐ Admins plateforme listés (email/rôle/actif/statut) — au moins 1 `total` actif
 ☐ État MFA des admins vérifié (facteurs enrôlés/vérifiés — pas de seed/QR/code lu ici)
@@ -57,7 +58,7 @@ Date : ______________  Heure de début (UTC) : ______________
 ## Carte T0 — GO/NO-GO migration (à T0, avant toute écriture)
 
 ☐ P0-1 PASS ☐ Gap figé ☐ P0-3 PASS (restauration prouvée) ☐ Responsable rollback (C) présent
-☐ SHA app `c1930ab` prêt à déployer ☐ Production Branch = branche canonique (**≠ `main`**)
+☐ SHA app `a81f317` prêt à déployer ☐ Production Branch = branche canonique (**≠ `main`**)
 ☐ Variables Production présentes (fiche §5 du préflight) ☐ `ABONNEMENTS_PUBLICS_OUVERTS=false`
 ☐ Stripe mode = TEST ☐ Webhook mode = TEST ☐ Aucun secret manquant
 ☐ Variables Vercel Ed25519 provisionnées (registry DB = après T0, voir §18bis) ☐ Second admin MFA (E) joignable
