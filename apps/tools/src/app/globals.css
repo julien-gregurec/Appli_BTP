@@ -381,6 +381,54 @@ footer { background: #e9e8e3; }
 .offline-page p { color: var(--ink-soft); line-height: 1.7; }
 .offline-page div a { display: inline-block; margin-top: 12px; padding: 14px 22px; border-radius: 8px; background: var(--navy); color: white; }
 
+/* Atelier — socle projet (accueil + nouveau tracé) */
+.atelier-page { padding-bottom: 70px; }
+.atelier-hero { padding: 30px 0 36px; border-block: 1px solid #dedfdb; background: #ecebe6; }
+.atelier-hero h1 { margin: 6px 0 8px; font-family: Georgia, serif; font-size: 33px; font-weight: 500; }
+.atelier-hero p { margin: 0; color: var(--ink-soft); font-size: 13px; }
+.atelier-section { padding-top: 26px; }
+.atelier-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding-top: 18px; }
+.atelier-cta { display: inline-grid; min-height: 48px; place-items: center; padding: 0 22px; border-radius: 9px; background: var(--navy); color: white; font-size: 12px; font-weight: 800; }
+.atelier-cta.ghost { background: transparent; border: 1px solid #cdd2cf; color: var(--ink-soft); }
+.atelier-draft { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: center; margin-top: 18px; padding: 16px 18px; border: 1px solid #e6c98f; border-radius: 12px; background: var(--amber-soft); }
+.atelier-draft p { margin: 0; flex: 1 1 220px; color: #7a5205; font-size: 12px; font-weight: 700; }
+.atelier-draft button { min-height: 40px; padding: 0 16px; border: 1px solid #d7b877; border-radius: 8px; background: white; cursor: pointer; font-size: 11px; font-weight: 800; }
+.atelier-draft button.primary { background: var(--navy); border-color: var(--navy); color: white; }
+.atelier-list { display: grid; gap: 12px; padding-top: 16px; }
+.atelier-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--white); }
+.atelier-card h2 { margin: 0 0 6px; font-family: Georgia, serif; font-size: 20px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.atelier-card small { color: #a96a00; font-size: 9px; font-weight: 900; letter-spacing: .1em; }
+.atelier-card .atelier-meta { margin: 4px 0 0; color: var(--ink-soft); font-size: 11px; }
+.atelier-card time { display: block; margin-top: 4px; color: #8a9599; font-size: 10px; }
+.atelier-card a { display: inline-grid; min-height: 40px; place-items: center; padding: 0 16px; border-radius: 8px; background: var(--navy); color: white; font-size: 10px; font-weight: 800; }
+.atelier-empty { padding: 56px 24px; border: 1px dashed #cfd4d1; border-radius: 13px; color: var(--ink-soft); text-align: center; }
+.atelier-empty span { color: var(--amber); font-size: 46px; }
+.atelier-empty h2 { margin: 10px 0 6px; color: var(--ink); font-family: Georgia, serif; font-size: 24px; font-weight: 500; }
+.atelier-empty p { font-size: 12px; }
+.atelier-steps { display: flex; gap: 8px; padding-top: 16px; }
+.atelier-steps span { flex: 1; height: 4px; border-radius: 99px; background: #dfe1dd; }
+.atelier-steps span.on { background: var(--amber); }
+.atelier-wizard { padding-top: 22px; }
+.atelier-wizard h2 { margin: 0 0 4px; font-family: Georgia, serif; font-size: 25px; font-weight: 500; }
+.atelier-wizard > p.hint { margin: 0 0 18px; color: var(--ink-soft); font-size: 12px; }
+.atelier-choices { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.atelier-choice { display: grid; gap: 4px; min-height: 74px; padding: 14px; border: 1px solid var(--line); border-radius: 11px; background: var(--white); cursor: pointer; text-align: left; }
+.atelier-choice:hover, .atelier-choice.on { border-color: #e0ad55; box-shadow: var(--shadow); }
+.atelier-choice b { font-size: 13px; }
+.atelier-choice small { color: var(--ink-soft); font-size: 10px; line-height: 1.4; }
+.atelier-fields { display: grid; gap: 15px; max-width: 460px; }
+.atelier-fields label { display: grid; gap: 6px; color: #5e6f76; font-size: 11px; font-weight: 800; }
+.atelier-fields input { width: 100%; min-height: 46px; padding: 9px 12px; border: 1px solid #d6dad7; border-radius: 8px; background: white; color: var(--ink); outline: 0; font-size: 15px; }
+.atelier-fields input:focus { border-color: var(--amber); box-shadow: 0 0 0 2px rgba(245,170,34,.18); }
+.atelier-nav { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+.atelier-nav button { min-height: 46px; padding: 0 20px; border: 1px solid #cdd2cf; border-radius: 9px; background: white; cursor: pointer; font-size: 12px; font-weight: 800; }
+.atelier-nav button.primary { background: var(--navy); border-color: var(--navy); color: white; }
+.atelier-nav button:disabled { opacity: .5; cursor: not-allowed; }
+.atelier-feedback { min-height: 16px; margin: 10px 0 0; color: #9a402c; font-size: 11px; font-weight: 700; }
+.atelier-yesno { display: flex; gap: 10px; }
+.atelier-yesno button { min-height: 52px; flex: 1; border: 1px solid var(--line); border-radius: 11px; background: var(--white); cursor: pointer; font-size: 13px; font-weight: 800; }
+.atelier-yesno button.on { border-color: var(--amber); background: var(--amber-soft); color: #8c5600; }
+
 @media (max-width: 900px) {
   .category-grid { grid-template-columns: repeat(3, 1fr); }
   .calculator-grid { grid-template-columns: 330px minmax(0, 1fr); }
@@ -462,6 +510,11 @@ footer { background: #e9e8e3; }
   .locked-projects { grid-template-columns: 1fr; }
   .pricing-grid { grid-template-columns: 1fr; }
   .monetization-panel { padding: 22px 18px; }
+  .atelier-hero h1 { font-size: 27px; }
+  .atelier-card { grid-template-columns: 1fr; }
+  .atelier-card a { width: 100%; }
+  .atelier-choices { grid-template-columns: 1fr; }
+  .atelier-nav button { flex: 1; }
 }
 
 @media print {
