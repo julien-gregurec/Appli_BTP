@@ -1,6 +1,9 @@
 import type { Arc, Axis, BoundingBox, Circle, Dimension, Ellipse, Point, Segment } from "./primitives";
 
-export type ShapeLayer = "shape" | "construction" | "dimensions" | "axes" | "points" | "labels";
+// "centers" ajouté de façon additive (ENGINE-FOUNDATION-V1) pour permettre de distinguer à terme
+// les centres de construction des autres points — actuellement confondus dans "points" par
+// AdvancedPlan.tsx, qui n'est pas modifié dans ce lot et continue de fonctionner à l'identique.
+export type ShapeLayer = "shape" | "construction" | "dimensions" | "axes" | "points" | "labels" | "centers";
 export type Quantity = { id: string; label: string; value: number; unit: "mm" | "mm²" | "m²" | "°"; quality: "exact" | "estimate" };
 export type SiteControl = { id: string; label: string; value: number; unit: "mm" | "°"; pointIds: readonly string[] };
 export type SiteStep = { id: string; title: string; instruction: string; measurements: readonly string[]; pointIds: readonly string[]; controlId?: string };
