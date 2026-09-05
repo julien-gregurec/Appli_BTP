@@ -6,6 +6,8 @@ import { activeTools, type ToolDefinition, type ToolId } from "@/lib/catalog";
 import { categories, getCategory, type CategoryId } from "@/lib/categories";
 import { revealFilteredTools, toggleCategoryFilter } from "@/lib/home-navigation";
 import { createPersistentStorage, migratePersistentStorage, readPersistentIds, STORAGE_KEYS } from "@/lib/storage";
+import { PUBLIC_LEGAL_LINKS } from "@/lib/site";
+import { ExternalLink } from "./ExternalLink";
 import { ToolIcon } from "./ToolIcon";
 import { ProFeaturePreview } from "./ProFeaturePreview";
 import { useAccount } from "./AccountProvider";
@@ -102,4 +104,4 @@ function ToolSection({ eyebrow, id, sectionRef, title, toolsToShow, favorites, t
 }
 
 export function Brand() { return <Link className="brand" href="/"><span className="brand-mark">E</span><span><b>ELSATIA</b><small>TOOLS</small></span></Link>; }
-function Footer() { return <footer><div className="shell footer-inner"><Brand /><p>Des outils précis. Des gestes plus sûrs.<br />Pensé pour le chantier, fait pour tous.</p><span className="offline-badge"><i /> Disponible hors connexion</span></div><div className="footer-bottom shell"><span>© 2026 ELSATIA</span><span>Outils essentiels gratuits · Sans compte</span></div></footer>; }
+function Footer() { return <footer><div className="shell footer-inner"><Brand /><p>Des outils précis. Des gestes plus sûrs.<br />Pensé pour le chantier, fait pour tous.</p><span className="offline-badge"><i /> Disponible hors connexion</span></div><nav className="footer-legal shell" aria-label="Informations légales ELSATIA">{PUBLIC_LEGAL_LINKS.map((link) => <ExternalLink key={link.href} href={link.href}>{link.label}</ExternalLink>)}</nav><div className="footer-bottom shell"><span>© 2026 ELSATIA</span><span>Outils essentiels gratuits · Sans compte</span></div></footer>; }

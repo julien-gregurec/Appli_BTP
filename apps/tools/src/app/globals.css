@@ -89,7 +89,10 @@ footer { background: #e9e8e3; }
 .footer-inner > p { color: var(--ink-soft); font-size: 12px; line-height: 1.6; }
 .offline-badge { margin-left: auto; color: var(--ink-soft); font-size: 11px; }
 .offline-badge i { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--green); }
-.footer-bottom { display: flex; justify-content: space-between; padding-block: 16px; border-top: 1px solid #d5d6d2; color: #758287; font-size: 9px; }
+.footer-legal { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 22px; padding-block: 6px 10px; }
+.footer-legal a { display: inline-flex; min-height: 32px; align-items: center; color: #5f6d73; font-size: 11px; font-weight: 800; }
+.footer-legal a:hover, .footer-legal a:focus-visible { color: var(--navy); text-decoration: underline; }
+.footer-bottom { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; padding-block: 16px; border-top: 1px solid #d5d6d2; color: #758287; font-size: 9px; }
 
 /* Calculator */
 .calculator-page { min-height: 100vh; }
@@ -518,6 +521,7 @@ body[data-elsatia-update-banner] .offline-flag { top: calc(env(safe-area-inset-t
   .step-instruction { min-height: 0; font-size: 15px; }
   .elsatia-promotion { grid-template-columns: 1fr; gap: 10px; }
   .footer-inner { min-height: 220px; flex-direction: column; align-items: flex-start; justify-content: center; gap: 18px; }
+  .footer-legal { gap: 2px 16px; }
   .offline-badge { margin-left: 0; }
   .calculator-header { height: 70px; }
   .home-actions { gap: 9px; }
