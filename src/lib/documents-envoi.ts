@@ -34,7 +34,7 @@ export async function envoyerDocumentCommercialParEmail(
   if (!brevoEstConfigure()) return { error: "L'envoi automatique par e-mail n'est pas encore configuré" };
 
   const email = contenuEmailDocument({
-    typeDoc: params.typeDocument,
+    typeDoc: params.typeDocument === "facture" && donnees.estAvoir ? "avoir" : params.typeDocument,
     numero: donnees.numero,
     client: { nom: donnees.client.nom_affiche, prenom: null, societe: null, email: donnees.clientEmail },
     montantTtc: Number(donnees.montantTtc),

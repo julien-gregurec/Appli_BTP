@@ -22,6 +22,9 @@ export type DonneesDocumentImprimable = {
   montantTtc: number;
   notesClient: string | null;
   estFacture: boolean;
+  // Uniquement vrai pour une facture de type "avoir" (jamais pour un devis) — permet à l'email
+  // (documents-envoi.ts) de distinguer le wording sans dupliquer la lecture de facture.type.
+  estAvoir: boolean;
   signatures: SignatureImprimable[];
   photos: Array<{ id: string; nom: string; legende?: string | null }>;
   // Métadonnées hors DocumentImprimable, utiles aux appelants (email, nom de fichier PDF, statut).
@@ -97,6 +100,7 @@ export async function chargerDonneesDevisImprimable(
     montantTtc: devis.montant_ttc,
     notesClient: devis.notes_client,
     estFacture: false,
+    estAvoir: false,
     signatures: signatures ?? [],
     photos: (photos ?? []).map((p) => ({ id: p.id, nom: p.nom_original, legende: p.legende })),
     statut: devis.statut,
@@ -168,6 +172,7 @@ export async function chargerDonneesFactureImprimable(
     montantTtc: facture.montant_ttc,
     notesClient: facture.notes_client,
     estFacture: true,
+    estAvoir: facture.type === "avoir",
     signatures: signatures ?? [],
     photos: [],
     statut: facture.statut,

@@ -40,12 +40,28 @@ const donneesDevis = {
   montantTtc: 120,
   notesClient: null,
   estFacture: false,
+  estAvoir: false,
   signatures: [],
   photos: [],
   statut: "brouillon",
   clientEmail: "client@example.invalid",
   emailEnvoyeLe: null,
   entrepriseNom: "ELSATIA",
+};
+
+const donneesFacture = {
+  ...donneesDevis,
+  typeDoc: "Facture",
+  numero: "FAC-2026-0001",
+  estFacture: true,
+  estAvoir: false,
+};
+
+const donneesAvoir = {
+  ...donneesFacture,
+  typeDoc: "Facture — Avoir",
+  numero: "AV-2026-0001",
+  estAvoir: true,
 };
 
 const paramsBase = {
@@ -139,5 +155,32 @@ describe("envoyerDocumentCommercialParEmail", () => {
     await envoyerDocumentCommercialParEmail(supabaseMock(), { ...paramsBase, complementCorps: "Payez ici : https://paiement.test" });
     const appel = envoyerEmailBrevoMock.mock.calls[0][0];
     expect(appel.texte).toContain("Payez ici : https://paiement.test");
+  });
+
+  it("ELSATIA-EMAILS-METIER-P1-CLOSURE-V1 : facture normale -> wording \"Facture\", jamais \"Avoir\"", async () => {
+    chargerFactureMock.mockResolvedValue(donneesFacture);
+    await envoyerDocumentCommercialParEmail(supabaseMock(), { ...paramsBase, typeDocument: "facture", documentId: "facture-1" });
+    const appel = envoyerEmailBrevoMock.mock.calls[0][0];
+    expect(appel.sujet).toBe("Facture FAC-2026-0001 — ELSATIA");
+    expect(appel.texte).toContain("la facture FAC-2026-0001");
+    expect(appel.sujet).not.toContain("Avoir");
+    expect(appel.texte).not.toContain("Avoir");
+  });
+
+  it("ELSATIA-EMAILS-METIER-P1-CLOSURE-V1 : facture.type = \"avoir\" -> wording \"Avoir\", jamais \"Facture\"", async () => {
+    chargerFactureMock.mockResolvedValue(donneesAvoir);
+    await envoyerDocumentCommercialParEmail(supabaseMock(), { ...paramsBase, typeDocument: "facture", documentId: "avoir-1" });
+    const appel = envoyerEmailBrevoMock.mock.calls[0][0];
+    expect(appel.sujet).toBe("Avoir AV-2026-0001 — ELSATIA");
+    expect(appel.texte).toContain("l'avoir AV-2026-0001");
+    expect(appel.sujet).not.toContain("Facture");
+    expect(appel.texte).not.toContain("la facture");
+  });
+
+  it("ELSATIA-EMAILS-METIER-P1-CLOSURE-V1 : le devis reste inchangé (wording \"Devis\")", async () => {
+    await envoyerDocumentCommercialParEmail(supabaseMock(), paramsBase);
+    const appel = envoyerEmailBrevoMock.mock.calls[0][0];
+    expect(appel.sujet).toBe("Devis DEV-2026-0001 — ELSATIA");
+    expect(appel.texte).toContain("le devis DEV-2026-0001");
   });
 });
