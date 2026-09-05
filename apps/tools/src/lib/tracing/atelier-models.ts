@@ -1,71 +1,53 @@
 /**
  * §8 — Choix de modèle à la création d'un tracé.
  *
- * Ce lot NE reconstruit PAS le catalogue géométrique et n'importe AUCUN module de
- * `geometry/engine/**` ni `geometry/models/**` (encore en évolution dans une autre
- * conversation). On expose ici un contrat minimal et stable : une courte liste de
- * `modelId` (slugs) que le moteur géométrique résoudra plus tard.
+ * ATELIER-MODELID-ENGINE-B-BRIDGE-V1 §3 : ce fichier ne définit PLUS sa propre liste de
+ * slugs. Il projette le registre géométrique réel (`geometry/models/catalog.ts`, 13 modèles
+ * sur Engine B) vers le vocabulaire de l'assistant « nouveau tracé ». Le `modelId` retenu
+ * est donc, par construction, un slug que `model-resolver.ts` sait résoudre.
+ *
+ * Ce fichier n'ajoute que de l'information produit qui n'a pas sa place dans le moteur :
+ * une courte description et l'affinité avec un type d'ouvrage. Aucun paramètre, aucun
+ * défaut, aucune géométrie — tout cela reste publié par le modèle lui-même (§4).
  *
  * `TracingProject.modelId` reste optionnel : « Décider plus tard » est un choix valide.
  */
 
+import { TRACE_MODEL_CATALOG, TRACE_MODEL_SLUGS, type TraceModelSlug } from "../geometry/models/catalog";
 import type { TracingProjectType } from "./project";
 
 export type AtelierModelOption = {
-  /** Slug stable — voir `optionalModelId` dans project.ts (`^[a-z0-9][a-z0-9-]{0,39}$`). */
-  modelId: string;
+  /** Slug du registre — voir `optionalModelId` dans project.ts (`^[a-z0-9][a-z0-9-]{0,39}$`). */
+  modelId: TraceModelSlug;
   label: string;
   description: string;
   /** Types d'ouvrage pour lesquels ce modèle est proposé en premier. */
   ouvrages: readonly TracingProjectType[];
 };
 
-const ALL_OUVRAGES: readonly TracingProjectType[] = ["ceiling", "wall", "niche", "arch", "other"];
+/** Information purement produit, indexée sur les slugs du registre. */
+const PRESENTATION: Readonly<Record<TraceModelSlug, { description: string; ouvrages: readonly TracingProjectType[] }>> = {
+  "circle-division": { description: "Un cercle directeur divisé en parts égales.", ouvrages: ["ceiling", "niche", "other"] },
+  "star-5": { description: "Branches régulières à partir d'un rayon directeur.", ouvrages: ["ceiling", "wall", "other"] },
+  "rosette-6": { description: "Six pétales répartis autour d'un centre.", ouvrages: ["ceiling", "niche", "wall"] },
+  heart: { description: "Deux lobes et une pointe, sur largeur et hauteur données.", ouvrages: ["wall", "other"] },
+  "arch-full-round": { description: "Demi-cercle sur deux naissances.", ouvrages: ["arch", "niche"] },
+  "ogive-equilateral": { description: "Arc brisé à deux centres.", ouvrages: ["arch", "niche"] },
+  "ellipse-pedagogical": { description: "Tracé elliptique par grand et petit axe, méthode des foyers.", ouvrages: ["ceiling", "arch", "niche"] },
+  "spiral-archimedes": { description: "Spirale à pas constant, du rayon de départ au rayon final.", ouvrages: ["ceiling", "wall", "other"] },
+  "flower-4": { description: "Quatre pétales inscrits dans un cercle directeur.", ouvrages: ["ceiling", "wall", "niche"] },
+  "flower-5": { description: "Cinq pétales inscrits dans un cercle directeur.", ouvrages: ["ceiling", "wall", "niche"] },
+  "flower-6-elongated": { description: "Six pétales allongés autour d'un centre.", ouvrages: ["ceiling", "wall", "niche"] },
+  turbine: { description: "Rosace tournante : branches décalées d'un angle constant.", ouvrages: ["ceiling", "other"] },
+  "double-s": { description: "Composition de deux S opposés, largeur et bombement réglables.", ouvrages: ["wall", "other"] },
+};
 
-export const ATELIER_MODEL_OPTIONS: readonly AtelierModelOption[] = [
-  {
-    modelId: "trace-libre",
-    label: "Tracé libre",
-    description: "Composer la géométrie à la main, sans modèle de départ.",
-    ouvrages: ALL_OUVRAGES,
-  },
-  {
-    modelId: "cercle-division",
-    label: "Cercle divisé",
-    description: "Un cercle directeur divisé en parts égales.",
-    ouvrages: ["ceiling", "niche", "other"],
-  },
-  {
-    modelId: "rosace",
-    label: "Rosace",
-    description: "Pétales répartis autour d'un centre.",
-    ouvrages: ["ceiling", "niche", "wall"],
-  },
-  {
-    modelId: "etoile",
-    label: "Étoile",
-    description: "Branches régulières à partir d'un rayon directeur.",
-    ouvrages: ["ceiling", "wall", "other"],
-  },
-  {
-    modelId: "arche-plein-cintre",
-    label: "Arche plein cintre",
-    description: "Demi-cercle sur deux naissances.",
-    ouvrages: ["arch", "niche"],
-  },
-  {
-    modelId: "ogive",
-    label: "Ogive",
-    description: "Arc brisé à deux centres.",
-    ouvrages: ["arch", "niche"],
-  },
-  {
-    modelId: "ellipse",
-    label: "Ellipse",
-    description: "Tracé elliptique par grand et petit axe.",
-    ouvrages: ["ceiling", "arch", "niche"],
-  },
-];
+export const ATELIER_MODEL_OPTIONS: readonly AtelierModelOption[] = TRACE_MODEL_SLUGS.map((slug) => ({
+  modelId: slug,
+  label: TRACE_MODEL_CATALOG[slug].label,
+  description: PRESENTATION[slug].description,
+  ouvrages: PRESENTATION[slug].ouvrages,
+}));
 
 const MODEL_BY_ID: ReadonlyMap<string, AtelierModelOption> = new Map(
   ATELIER_MODEL_OPTIONS.map((option) => [option.modelId, option]),

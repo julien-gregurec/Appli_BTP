@@ -128,17 +128,28 @@ export function combinedOriginFromProject(project: TracingProject): MeasurementO
  * Assemble les entrées de `runPreExportChecks` depuis l'état réel du projet. Ne contourne
  * ni ne duplique les règles de contrôle : cette fonction ne fait qu'assembler les faits.
  */
-export function buildPreExportInputFromProject(project: TracingProject, geometry?: ShapeGeometry): PreExportInput {
+export function buildPreExportInputFromProject(
+  project: TracingProject,
+  geometry?: ShapeGeometry,
+  /**
+   * Vrai quand `geometry` vient du moteur (modèle résolu depuis `modelId`), et non des
+   * formes vectorisées du projet. Un modèle est construit en millimètres exacts : son
+   * échelle est définie par construction, et son tracé n'est pas vide même si le projet ne
+   * porte aucune `shape` (ATELIER-MODELID-ENGINE-B-BRIDGE-V1 §7).
+   */
+  hasResolvedModelGeometry = false,
+): PreExportInput {
   const shapes: CheckShape[] = project.shapes.map((shape) => ({ id: shape.id, vertices: shape.vertices, closed: shape.closed, origin: shape.origin }));
   const usesReferenceImage = project.referenceImages.length > 0;
   const imageCalibrated = usesReferenceImage && project.referenceImages.every((image) => image.calibration.status === "calibrated");
   return {
     roomWidthMm: project.roomWidthMm,
     roomHeightMm: project.roomHeightMm,
-    scaleDefined: project.scaleStatus === "defined",
+    scaleDefined: project.scaleStatus === "defined" || hasResolvedModelGeometry,
     usesReferenceImage,
     imageCalibrated,
     shapes,
+    hasResolvedModelGeometry,
     dimensionsCount: geometry?.dimensions.length,
   };
 }
@@ -175,8 +186,12 @@ function buildReferenceImageMeta(project: TracingProject): ChantierReferenceImag
  * d'export correspondante optionnelle plutôt que d'inventer une valeur.
  */
 export function tracingProjectToChantierExportDocument(project: TracingProject, resolved: ResolvedAtelierGeometry = {}): ChantierExportDocument {
-  const geometry = resolved.geometry ?? geometryFromTracingShapes(project.shapes);
-  const preExport = resolved.preExport ?? runPreExportChecks(buildPreExportInputFromProject(project, geometry));
+  // Distinguer les deux origines possibles de la géométrie : le moteur (modèle résolu) ou
+  // les formes déjà vectorisées du projet. Le contrôle pré-export ne juge pas de la même
+  // façon un tracé paramétrique exact et un relevé photo (§7).
+  const modelGeometry = resolved.geometry;
+  const geometry = modelGeometry ?? geometryFromTracingShapes(project.shapes);
+  const preExport = resolved.preExport ?? runPreExportChecks(buildPreExportInputFromProject(project, geometry, Boolean(modelGeometry)));
   const mosaic = resolved.mosaic ?? (geometry ? buildDefaultMosaic(project, geometry) : undefined);
 
   const projectMeta: ChantierExportProjectMeta = {

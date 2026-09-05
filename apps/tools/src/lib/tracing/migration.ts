@@ -21,7 +21,7 @@ import {
 } from "./project";
 
 /** Versions de schéma que cette build sait relire (après migration éventuelle). */
-export const SUPPORTED_TRACING_SCHEMA_VERSIONS = [1, 2] as const;
+export const SUPPORTED_TRACING_SCHEMA_VERSIONS = [1, 2, 3] as const;
 export type SupportedTracingSchemaVersion = (typeof SUPPORTED_TRACING_SCHEMA_VERSIONS)[number];
 
 /** Clés de premier niveau reconnues d'un document `TracingProject` (toutes versions supportées). */
@@ -35,6 +35,7 @@ const KNOWN_TRACING_KEYS: ReadonlySet<string> = new Set([
   "units",
   "scaleStatus",
   "modelId",
+  "modelParams",
   "startFromPhoto",
   "referenceImages",
   "contours",
@@ -84,6 +85,11 @@ function upgrade(value: Record<string, unknown>, from: number): Record<string, u
   if (from < 2) {
     // v1 → v2 : `modelId` et `startFromPhoto` sont optionnels — rien à renseigner, on borne la version.
     draft = { ...draft, schemaVersion: 2 };
+  }
+  if (from < 3) {
+    // v2 → v3 : `modelParams` est optionnel. Absent, le modèle se résout avec ses seuls
+    // défauts publiés — exactement le comportement de v2. Rien à renseigner.
+    draft = { ...draft, schemaVersion: 3 };
   }
   return draft;
 }

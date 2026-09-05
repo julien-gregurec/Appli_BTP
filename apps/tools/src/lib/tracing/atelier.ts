@@ -15,7 +15,7 @@ import {
   type TracingProjectType,
 } from "./project";
 import { createProjectId } from "../projects/model";
-import { findAtelierModel } from "./atelier-models";
+import { traceModelLabelFor } from "./model-resolver";
 
 /** §7 — libellés FR des types d'ouvrage, dans l'ordre demandé (Plafond, Mur, Niche, Arche, Autre). */
 export const TRACING_OUVRAGE_LABELS: Record<TracingProjectType, string> = {
@@ -63,7 +63,7 @@ export function buildTracingProjectFromInput(
 }
 
 export type TracingProjectPatch = Partial<
-  Pick<TracingProject, "name" | "roomWidthMm" | "roomHeightMm" | "modelId" | "startFromPhoto">
+  Pick<TracingProject, "name" | "roomWidthMm" | "roomHeightMm" | "modelId" | "modelParams" | "startFromPhoto">
 >;
 
 /** Applique un correctif, remonte `updatedAt` et revalide strictement (voie autosave / étapes). */
@@ -115,7 +115,7 @@ export function describeTracingProject(project: TracingProject): TracingProjectS
     name: project.name,
     typeLabel: ouvrageLabel(project.type),
     dimensionsLabel: formatRoomDimensions(project.roomWidthMm, project.roomHeightMm),
-    modelLabel: findAtelierModel(project.modelId)?.label ?? null,
+    modelLabel: traceModelLabelFor(project.modelId),
     startFromPhoto: project.startFromPhoto === true,
     updatedAt: project.updatedAt,
   };

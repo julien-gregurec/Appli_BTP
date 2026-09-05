@@ -31,6 +31,12 @@ export type PreExportInput = {
   usesReferenceImage: boolean;
   imageCalibrated: boolean;
   shapes: readonly CheckShape[];
+  /**
+   * Le document exporté s'appuie sur une géométrie résolue par le moteur depuis le modèle
+   * du projet (ATELIER-MODELID-ENGINE-B-BRIDGE-V1). Un tel tracé n'a pas de `shapes`
+   * vectorisées : il n'est pas vide pour autant.
+   */
+  hasResolvedModelGeometry?: boolean;
   /** Emprise du motif dans le repère pièce (mm). */
   contentBounds?: BoundingBox2D;
   /** Emprise du gabarit imprimable (mm), pour détecter un dépassement de pièce. */
@@ -67,7 +73,7 @@ export function runPreExportChecks(input: PreExportInput): PreExportReport {
     add("error", "image-not-calibrated", "L'image de référence est utilisée mais n'est pas calibrée.");
   }
 
-  if (!input.shapes.length) {
+  if (!input.shapes.length && !input.hasResolvedModelGeometry) {
     add("error", "empty-drawing", "Le tracé est vide.");
   }
 

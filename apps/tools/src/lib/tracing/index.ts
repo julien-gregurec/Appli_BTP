@@ -16,4 +16,5 @@ export * from "./repository";
 export * from "./draft";
 export * from "./autosave";
 export * from "./atelier-models";
+export * from "./model-resolver";
 export * from "./atelier";

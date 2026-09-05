@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createTracingProject } from "./project";
+import { createTracingProject, TRACING_PROJECT_SCHEMA_VERSION } from "./project";
 import {
   MemoryTracingProjectRepository,
   TracingProjectExistsError,
@@ -62,8 +62,8 @@ describe("TracingProjectRepository (§2)", () => {
     const repo = new MemoryTracingProjectRepository();
     (repo as unknown as { values: Map<string, unknown> }).values.set(legacy.id, legacy);
 
-    expect((await repo.get(legacy.id))?.schemaVersion).toBe(2);
-    expect((await repo.list())[0]?.schemaVersion).toBe(2);
+    expect((await repo.get(legacy.id))?.schemaVersion).toBe(TRACING_PROJECT_SCHEMA_VERSION);
+    expect((await repo.list())[0]?.schemaVersion).toBe(TRACING_PROJECT_SCHEMA_VERSION);
   });
 
   it("refuse en écriture un projet à une version non courante", async () => {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { TRACE_MODEL_SLUGS } from "../geometry/models/catalog";
 import { validateTracingProject } from "./project";
 import {
   ATELIER_MODEL_OPTIONS,
@@ -63,17 +64,19 @@ describe("étapes modèle et photo (§8, §9)", () => {
       { type: "arch", name: "Arche couloir" },
       { id: "trace-touch001", now: new Date("2026-09-05T08:00:00Z") },
     );
-    const withModel = touchTracingProject(project, { modelId: "ogive" }, new Date("2026-09-05T08:05:00Z"));
-    expect(withModel.modelId).toBe("ogive");
+    const withModel = touchTracingProject(project, { modelId: "ogive-equilateral" }, new Date("2026-09-05T08:05:00Z"));
+    expect(withModel.modelId).toBe("ogive-equilateral");
     expect(withModel.updatedAt).toBe("2026-09-05T08:05:00.000Z");
 
     const withPhoto = touchTracingProject(withModel, { startFromPhoto: true }, new Date("2026-09-05T08:06:00Z"));
     expect(withPhoto.startFromPhoto).toBe(true);
-    expect(withPhoto.modelId).toBe("ogive");
+    expect(withPhoto.modelId).toBe("ogive-equilateral");
   });
 
-  it("le catalogue de modèles est une courte liste de slugs stables et valides", () => {
-    expect(ATELIER_MODEL_OPTIONS.length).toBeLessThanOrEqual(12);
+  it("le catalogue de modèles est exactement celui du registre géométrique", () => {
+    // ATELIER-MODELID-ENGINE-B-BRIDGE-V1 §3 : plus de liste de slugs propre à l'Atelier —
+    // l'assistant ne peut proposer que des modèles que le moteur sait résoudre.
+    expect(ATELIER_MODEL_OPTIONS.map((option) => option.modelId).sort()).toEqual([...TRACE_MODEL_SLUGS].sort());
     for (const option of ATELIER_MODEL_OPTIONS) {
       expect(option.modelId).toMatch(/^[a-z0-9][a-z0-9-]{0,39}$/);
       // Un projet portant ce modelId doit passer la validation stricte.
@@ -86,19 +89,22 @@ describe("étapes modèle et photo (§8, §9)", () => {
   });
 
   it("résout un modèle connu et rejette l'inconnu", () => {
-    expect(findAtelierModel("ogive")?.label).toBe("Ogive");
+    expect(findAtelierModel("ogive-equilateral")?.label).toBe("Ogive équilatérale à deux centres");
     expect(findAtelierModel("inexistant")).toBeUndefined();
     expect(findAtelierModel(undefined)).toBeUndefined();
-    expect(isKnownAtelierModel("rosace")).toBe(true);
+    expect(isKnownAtelierModel("rosette-6")).toBe(true);
     expect(isKnownAtelierModel("nope")).toBe(false);
+    // Les anciens slugs de l'assistant ne sont plus proposés à la création — ils restent
+    // lisibles par le résolveur (alias), mais ne rentrent pas dans un nouveau projet.
+    expect(isKnownAtelierModel("rosace")).toBe(false);
   });
 
   it("propose les modèles pertinents pour le type d'ouvrage en premier", () => {
     const forArch = atelierModelsForType("arch");
     expect(forArch).toHaveLength(ATELIER_MODEL_OPTIONS.length);
     const firstIds = forArch.slice(0, 3).map((m) => m.modelId);
-    expect(firstIds).toContain("arche-plein-cintre");
-    expect(firstIds).toContain("ogive");
+    expect(firstIds).toContain("arch-full-round");
+    expect(firstIds).toContain("ogive-equilateral");
   });
 });
 
@@ -116,7 +122,7 @@ describe("projets récents (§6)", () => {
         { type: "niche", name: "Niche salon", roomWidthMm: 1200, roomHeightMm: 2000 },
         { id: "trace-desc0001", now: new Date("2026-09-05T08:00:00Z") },
       ),
-      { modelId: "rosace", startFromPhoto: true },
+      { modelId: "rosette-6", startFromPhoto: true },
       new Date("2026-09-05T09:00:00Z"),
     );
     expect(describeTracingProject(project)).toEqual({
@@ -124,7 +130,7 @@ describe("projets récents (§6)", () => {
       name: "Niche salon",
       typeLabel: "Niche",
       dimensionsLabel: "1,2 × 2 m",
-      modelLabel: "Rosace",
+      modelLabel: "Rosace 6 pétales simple",
       startFromPhoto: true,
       updatedAt: "2026-09-05T09:00:00.000Z",
     });

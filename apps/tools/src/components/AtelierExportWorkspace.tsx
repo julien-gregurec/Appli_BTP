@@ -7,6 +7,10 @@
  *
  * Ne dépend d'aucune fixture : `projectId` vient de la route, le projet vient du
  * repository Atelier existant (`useAtelierPersistence`), jamais d'un jeu de données figé.
+ *
+ * ATELIER-MODELID-ENGINE-B-BRIDGE-V1 §7 : la géométrie remise à l'adaptateur est celle que
+ * le moteur résout depuis `modelId` + `modelParams` du projet. Le composant ne calcule
+ * rien — il appelle `resolveTracingProjectModel` puis passe le résultat tel quel.
  */
 
 import Link from "next/link";
@@ -14,6 +18,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useAtelierPersistence } from "@/lib/tracing/use-atelier-autosave";
 import type { TracingProject } from "@/lib/tracing/project";
 import { tracingProjectToChantierExportDocument } from "@/lib/exports/atelier-export-adapter";
+import { resolvedAtelierGeometry } from "@/lib/exports/atelier-resolved-geometry";
+import { resolveTracingProjectModel } from "@/lib/tracing/model-resolver";
+import { ModelResolutionCard } from "@/components/atelier/model/ModelResolutionCard";
 import { chantierExportCapabilities, type ChantierExportFormat } from "@/lib/exports/chantier-export-bus";
 import { PreExportReportView } from "@/components/atelier/export/PreExportReportView";
 import { ExportFormatPicker } from "@/components/atelier/export/ExportFormatPicker";
@@ -67,10 +74,23 @@ export function AtelierExportWorkspace() {
     };
   }, [available, repository, flushAutosave]);
 
-  const document = useMemo(
-    () => (state.status === "ready" ? tracingProjectToChantierExportDocument(state.project) : null),
+  // Résolution du modèle du projet par le moteur — jamais pendant le rendu d'un enfant,
+  // jamais dupliquée : une seule fois ici, puis partagée par la carte d'état et l'export.
+  const resolution = useMemo(
+    () => (state.status === "ready" ? resolveTracingProjectModel(state.project) : null),
     [state],
   );
+
+  const document = useMemo(() => {
+    if (state.status !== "ready" || !resolution) return null;
+    try {
+      return tracingProjectToChantierExportDocument(state.project, resolvedAtelierGeometry(resolution) ?? {});
+    } catch {
+      // §10 — un document inassemblable ne doit jamais faire tomber l'écran : la carte de
+      // modèle et le message ci-dessous restent affichés.
+      return null;
+    }
+  }, [state, resolution]);
   const capabilities = useMemo(() => (document ? chantierExportCapabilities(document) : []), [document]);
 
   return (
@@ -123,6 +143,14 @@ export function AtelierExportWorkspace() {
             {state.status === "error" && (
               <p className="atelier-feedback" role="alert">
                 {state.message}
+              </p>
+            )}
+
+            {resolution && <ModelResolutionCard resolution={resolution} />}
+
+            {state.status === "ready" && !document && (
+              <p className="atelier-feedback" role="alert">
+                Ce tracé n’a pas pu être préparé pour l’export. Reprenez-le depuis l’Atelier pour corriger son modèle.
               </p>
             )}
 

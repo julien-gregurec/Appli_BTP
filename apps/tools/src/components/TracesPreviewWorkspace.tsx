@@ -13,54 +13,35 @@ import { TraceViewer } from "./TraceViewer";
 import { TraceSteps } from "./TraceSteps";
 import { SiteMode } from "./SiteMode";
 import { TraceParametersForm } from "./TraceParametersForm";
-import { circleDivisionParameters, createCircleDivisionGeometry } from "@/lib/geometry/models/circle-division";
-import { createStarGeometry, starParameters } from "@/lib/geometry/models/star";
-import { createRosetteGeometry, rosetteParameters } from "@/lib/geometry/models/rosette";
-import { createHeartGeometry, heartParameters } from "@/lib/geometry/models/heart";
-import { archFullRoundParameters, createArchFullRoundGeometry } from "@/lib/geometry/models/arch-full-round";
-import { createOgiveGeometry, ogiveParameters } from "@/lib/geometry/models/ogive";
-import { createEllipsePedagogicalGeometry, ellipsePedagogicalParameters } from "@/lib/geometry/models/ellipse-pedagogical";
-import { createSpiralGeometry, spiralParameters } from "@/lib/geometry/models/spiral";
-import { createFlower4Geometry, flower4Parameters } from "@/lib/geometry/models/flower4";
-import { createFlower5Geometry, flower5Parameters } from "@/lib/geometry/models/flower5";
-import { createFlower6ElongatedGeometry, flower6ElongatedParameters } from "@/lib/geometry/models/flower6-elongated";
-import { createTurbineGeometry, turbineParameters } from "@/lib/geometry/models/turbine";
-import { createDoubleSGeometry, doubleSParameters } from "@/lib/geometry/models/double-s";
+import { TRACE_MODEL_CATALOG, TRACE_MODEL_SLUGS, traceModelDefaults, type TraceModelSlug } from "@/lib/geometry/models/catalog";
 import type { TraceModel, TraceParameter } from "@/lib/geometry/trace-model";
 
-type ModelKey =
-  | "circle-division" | "star-5" | "rosette-6" | "heart" | "arch-full-round" | "ogive-equilateral" | "ellipse-pedagogical" | "spiral-archimedes"
-  | "flower-4" | "flower-5" | "flower-6-elongated" | "turbine" | "double-s";
-
+// ATELIER-MODELID-ENGINE-B-BRIDGE-V1 §2 : la table modèle → paramètres → générateur vivait
+// ici, dans un composant React, donc hors de portée de l'Atelier, de l'export et des tests.
+// Elle est remontée dans `lib/geometry/models/catalog.ts` ; cette page la consomme.
+type ModelKey = TraceModelSlug;
 type ModelDefinition = { label: string; group: "Fondamentaux" | "Décoratifs"; parameters: readonly TraceParameter[]; build: (values: Record<string, number>) => TraceModel };
 
-const MODEL_DEFINITIONS: Record<ModelKey, ModelDefinition> = {
-  "circle-division": { label: "Cercle divisé", group: "Fondamentaux", parameters: circleDivisionParameters, build: (v) => createCircleDivisionGeometry({ diameter: v.diameter, divisions: v.divisions, startAngle: v.startAngle }) },
-  "star-5": { label: "Étoile 5 branches", group: "Fondamentaux", parameters: starParameters, build: (v) => createStarGeometry({ outerDiameter: v.outerDiameter, innerRatio: v.innerRatio, rotation: v.rotation }) },
-  "rosette-6": { label: "Rosace 6 pétales simple", group: "Fondamentaux", parameters: rosetteParameters, build: (v) => createRosetteGeometry({ diameter: v.diameter, rotation: v.rotation }) },
-  heart: { label: "Cœur géométrique", group: "Fondamentaux", parameters: heartParameters, build: (v) => createHeartGeometry({ width: v.width, height: v.height }) },
-  "arch-full-round": { label: "Arche plein cintre", group: "Fondamentaux", parameters: archFullRoundParameters, build: (v) => createArchFullRoundGeometry({ width: v.width }) },
-  "ogive-equilateral": { label: "Ogive équilatérale à deux centres", group: "Fondamentaux", parameters: ogiveParameters, build: (v) => createOgiveGeometry({ width: v.width }) },
-  "ellipse-pedagogical": { label: "Ellipse pédagogique", group: "Fondamentaux", parameters: ellipsePedagogicalParameters, build: (v) => createEllipsePedagogicalGeometry({ width: v.width, height: v.height }) },
-  "spiral-archimedes": { label: "Spirale d'Archimède", group: "Fondamentaux", parameters: spiralParameters, build: (v) => createSpiralGeometry({ startRadius: v.startRadius, endRadius: v.endRadius, turns: v.turns, rotation: v.rotation }) },
-  "flower-4": { label: "Fleur 4 pétales", group: "Décoratifs", parameters: flower4Parameters, build: (v) => createFlower4Geometry({ diameter: v.diameter, rotation: v.rotation }) },
-  "flower-5": { label: "Fleur 5 pétales", group: "Décoratifs", parameters: flower5Parameters, build: (v) => createFlower5Geometry({ diameter: v.diameter, rotation: v.rotation }) },
-  "flower-6-elongated": { label: "Fleur 6 pétales allongés", group: "Décoratifs", parameters: flower6ElongatedParameters, build: (v) => createFlower6ElongatedGeometry({ diameter: v.diameter, rotation: v.rotation }) },
-  turbine: { label: "Rosace tournante (turbine)", group: "Décoratifs", parameters: turbineParameters, build: (v) => createTurbineGeometry({ diameter: v.diameter, branches: v.branches, twist: v.twist, rotation: v.rotation }) },
-  "double-s": { label: "Composition double-S", group: "Décoratifs", parameters: doubleSParameters, build: (v) => createDoubleSGeometry({ width: v.width, height: v.height, waistRatio: v.waistRatio }) },
-};
+const GROUP_LABELS: Record<"fondamentaux" | "decoratifs", ModelDefinition["group"]> = { fondamentaux: "Fondamentaux", decoratifs: "Décoratifs" };
+
+const MODEL_DEFINITIONS: Record<ModelKey, ModelDefinition> = Object.fromEntries(
+  TRACE_MODEL_SLUGS.map((slug) => {
+    const descriptor = TRACE_MODEL_CATALOG[slug];
+    return [slug, { label: descriptor.label, group: GROUP_LABELS[descriptor.group], parameters: descriptor.parameters, build: descriptor.build }];
+  }),
+) as Record<ModelKey, ModelDefinition>;
 
 const MODEL_KEYS = Object.keys(MODEL_DEFINITIONS) as ModelKey[];
 const GROUPS: ModelDefinition["group"][] = ["Fondamentaux", "Décoratifs"];
 
-function defaultValues(parameters: readonly TraceParameter[]): Record<string, number> {
-  return Object.fromEntries(parameters.map((parameter) => [parameter.id, parameter.defaultValue]));
+function defaultValues(key: ModelKey): Record<string, number> {
+  return traceModelDefaults(TRACE_MODEL_CATALOG[key]);
 }
 
 export function TracesPreviewWorkspace() {
   const [modelKey, setModelKey] = useState<ModelKey>("circle-division");
   const [valuesByModel, setValuesByModel] = useState<Record<ModelKey, Record<string, number>>>(() =>
-    Object.fromEntries(MODEL_KEYS.map((key) => [key, defaultValues(MODEL_DEFINITIONS[key].parameters)])) as Record<ModelKey, Record<string, number>>,
+    Object.fromEntries(MODEL_KEYS.map((key) => [key, defaultValues(key)])) as Record<ModelKey, Record<string, number>>,
   );
   const [stepIndex, setStepIndex] = useState<number | null>(null);
   const [view, setView] = useState<"steps" | "site">("steps");

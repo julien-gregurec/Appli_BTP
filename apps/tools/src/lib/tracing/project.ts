@@ -32,11 +32,14 @@ import type { GeometricShape, RawContour } from "./vectorization";
  * - v1 : socle workflow production (photo → tracé → calibration → export).
  * - v2 : ajout de `modelId` (§8 — modèle d'ouvrage choisi à la création) et `startFromPhoto`
  *        (§9 — intention « partir d'une photo »), tous deux optionnels et additifs.
+ * - v3 : ajout de `modelParams` (ATELIER-MODELID-ENGINE-B-BRIDGE-V1 §4 — surcharges de
+ *        paramètres du modèle choisi), optionnel et additif. Rien n'est à renseigner en
+ *        migration : sans surcharge, le modèle est résolu avec ses seuls défauts publiés.
  *
  * La frontière de lecture tolérante (migration des versions connues) vit dans `./migration.ts` ;
  * `validateTracingProject` ci-dessous reste strict sur la version courante.
  */
-export const TRACING_PROJECT_SCHEMA_VERSION = 2;
+export const TRACING_PROJECT_SCHEMA_VERSION = 3;
 
 export type TracingProjectType = "ceiling" | "wall" | "arch" | "niche" | "other";
 export const TRACING_PROJECT_TYPES: readonly TracingProjectType[] = ["ceiling", "wall", "arch", "niche", "other"];
@@ -93,8 +96,14 @@ export type TracingProject = {
   roomHeightMm?: number;
   units: TracingUnits;
   scaleStatus: "defined" | "undefined";
-  /** §8 — modèle d'ouvrage retenu à la création. Contrat minimal : slug stable résolu plus tard par le moteur géométrique. */
+  /** §8 — modèle d'ouvrage retenu à la création. Slug du registre `geometry/models/catalog.ts`, résolu par `model-resolver.ts`. */
   modelId?: string;
+  /**
+   * Surcharges de paramètres du modèle (§4). N'y figurent QUE les valeurs voulues par
+   * l'utilisateur : les défauts restent publiés par le modèle et ne sont jamais recopiés
+   * ici. Jamais de géométrie dérivée — celle-ci est recalculée par Engine B (§8).
+   */
+  modelParams?: Record<string, number>;
   /** §9 — l'utilisateur a répondu « oui » à « partir d'une photo ? ». L'upload/caméra/calibration arrivent dans un lot ultérieur. */
   startFromPhoto?: boolean;
   referenceImages: TracingReferenceImage[];
@@ -132,6 +141,7 @@ export type CreateTracingProjectInput = {
   roomWidthMm?: number;
   roomHeightMm?: number;
   modelId?: string;
+  modelParams?: Record<string, number>;
   startFromPhoto?: boolean;
   companyId?: string;
   userId?: string;
@@ -149,6 +159,7 @@ export function createTracingProject(input: CreateTracingProjectInput, now: Date
     units: input.units ?? "mm",
     scaleStatus: "undefined",
     modelId: input.modelId,
+    modelParams: input.modelParams,
     startFromPhoto: input.startFromPhoto ? true : undefined,
     referenceImages: [],
     contours: [],
@@ -190,6 +201,26 @@ function optionalModelId(value: unknown): string | undefined {
     throw new TracingProjectError("Le modèle choisi est invalide.");
   }
   return value;
+}
+
+/**
+ * §4 — surcharges de paramètres du modèle : dictionnaire borné de nombres finis. Les
+ * identifiants inconnus du modèle ne sont PAS rejetés ici (le projet ne connaît pas le
+ * catalogue) : `model-resolver.ts` les signale en avertissement au moment de la résolution.
+ */
+function optionalModelParams(value: unknown): Record<string, number> | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "object" || Array.isArray(value)) throw new TracingProjectError("Les paramètres du modèle sont invalides.");
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (!entries.length) return undefined;
+  if (entries.length > 40) throw new TracingProjectError("Trop de paramètres de modèle (max 40).");
+  const result: Record<string, number> = {};
+  for (const [key, raw] of entries) {
+    if (!/^[a-zA-Z][a-zA-Z0-9]{0,39}$/.test(key)) throw new TracingProjectError(`Le paramètre de modèle « ${key} » a un identifiant invalide.`);
+    if (typeof raw !== "number" || !Number.isFinite(raw)) throw new TracingProjectError(`Le paramètre de modèle « ${key} » doit être un nombre.`);
+    result[key] = raw;
+  }
+  return result;
 }
 
 /**
@@ -251,6 +282,7 @@ export function validateTracingProject(raw: unknown): TracingProject {
     units,
     scaleStatus: value.scaleStatus,
     modelId: optionalModelId(value.modelId),
+    modelParams: optionalModelParams(value.modelParams),
     startFromPhoto: value.startFromPhoto === true ? true : undefined,
     referenceImages: referenceImages as TracingReferenceImage[],
     contours: contours as RawContour[],

@@ -12,13 +12,30 @@ import {
   touchTracingProject,
 } from "@/lib/tracing/atelier";
 import { atelierModelsForType } from "@/lib/tracing/atelier-models";
+import { resolveTracingProjectModel } from "@/lib/tracing/model-resolver";
+import { findTraceModelDescriptor, traceModelDefaults } from "@/lib/geometry/models/catalog";
+import { TraceParametersForm } from "./TraceParametersForm";
+import { ModelResolutionCard } from "@/components/atelier/model/ModelResolutionCard";
 import { useAtelierPersistence } from "@/lib/tracing/use-atelier-autosave";
 import { useAccount } from "./AccountProvider";
 import { Brand } from "./HomeDashboard";
 
-type Step = "type" | "infos" | "modele" | "photo" | "done";
-const STEP_ORDER: readonly Step[] = ["type", "infos", "modele", "photo"];
+type Step = "type" | "infos" | "modele" | "parametres" | "photo" | "done";
+const STEP_ORDER: readonly Step[] = ["type", "infos", "modele", "parametres", "photo"];
 const LATER = "__later__";
+
+/**
+ * ATELIER-MODELID-ENGINE-B-BRIDGE-V1 §4 — n'enregistrer que ce que l'utilisateur a
+ * réellement changé. Les défauts restent publiés par le modèle et ne sont jamais recopiés
+ * dans le projet : `modelParams` ne porte que les écarts.
+ */
+function overridesOnly(values: Readonly<Record<string, number>>, defaults: Readonly<Record<string, number>>): Record<string, number> | undefined {
+  const overrides: Record<string, number> = {};
+  for (const [id, value] of Object.entries(values)) {
+    if (defaults[id] !== value) overrides[id] = value;
+  }
+  return Object.keys(overrides).length ? overrides : undefined;
+}
 
 export function NouveauTraceWorkspace() {
   const router = useRouter();
@@ -32,6 +49,7 @@ export function NouveauTraceWorkspace() {
   const [width, setWidth] = useState("");
   const [height, setHeight] = useState("");
   const [project, setProject] = useState<TracingProject | null>(null);
+  const [paramValues, setParamValues] = useState<Record<string, number>>({});
   const [feedback, setFeedback] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -48,6 +66,10 @@ export function NouveauTraceWorkspace() {
         setProject(found);
         setType(found.type);
         setName(found.name);
+        // Reprise : repartir des réglages déjà enregistrés, complétés par les défauts du
+        // modèle — jamais d'un jeu de valeurs recréé ici (§4).
+        const known = findTraceModelDescriptor(found.modelId);
+        setParamValues(known ? { ...traceModelDefaults(known), ...(found.modelParams ?? {}) } : {});
         setStep("modele");
       })
       .catch(() => {});
@@ -57,6 +79,15 @@ export function NouveauTraceWorkspace() {
   }, [available, repository]);
 
   const models = useMemo(() => (type ? atelierModelsForType(type) : []), [type]);
+
+  // Descripteur et résolution du modèle en cours de réglage — le composant ne calcule
+  // aucune géométrie lui-même : il interroge le résolveur (§2).
+  const modelId = project?.modelId;
+  const descriptor = useMemo(() => findTraceModelDescriptor(modelId), [modelId]);
+  const previewResolution = useMemo(
+    () => (modelId ? resolveTracingProjectModel({ modelId, modelParams: paramValues }) : null),
+    [modelId, paramValues],
+  );
 
   const createProject = useCallback(async () => {
     if (!type || !repository) return;
@@ -90,13 +121,35 @@ export function NouveauTraceWorkspace() {
   const chooseModel = useCallback(
     (modelId: string | null) => {
       if (!project) return;
-      const next = touchTracingProject(project, { modelId: modelId ?? undefined });
+      // Changer de modèle invalide les surcharges de l'ancien : on repart de ses défauts
+      // plutôt que de transporter des paramètres qui n'ont plus de sens (§4).
+      const next = touchTracingProject(project, { modelId: modelId ?? undefined, modelParams: undefined });
       setProject(next);
       scheduleAutosave(next);
-      setStep("photo");
+      const chosen = findTraceModelDescriptor(modelId);
+      if (!chosen) {
+        setParamValues({});
+        setStep("photo");
+        return;
+      }
+      setParamValues(traceModelDefaults(chosen));
+      setStep("parametres");
     },
     [project, scheduleAutosave],
   );
+
+  const confirmParameters = useCallback(() => {
+    if (!project || !descriptor) return;
+    if (previewResolution && previewResolution.status !== "resolved") {
+      setFeedback("Corrigez les paramètres avant de continuer.");
+      return;
+    }
+    setFeedback("");
+    const next = touchTracingProject(project, { modelParams: overridesOnly(paramValues, traceModelDefaults(descriptor)) });
+    setProject(next);
+    scheduleAutosave(next);
+    setStep("photo");
+  }, [project, descriptor, previewResolution, paramValues, scheduleAutosave]);
 
   const choosePhoto = useCallback(
     async (startFromPhoto: boolean) => {
@@ -241,6 +294,34 @@ export function NouveauTraceWorkspace() {
           </>
         )}
 
+        {available && step === "parametres" && project && descriptor && (
+          <>
+            <h2>Réglages du modèle</h2>
+            <p className="hint">
+              Les valeurs proposées sont celles du modèle. Ajustez-les si besoin : seules vos modifications sont
+              enregistrées, la géométrie reste calculée par le moteur.
+            </p>
+            <TraceParametersForm
+              parameters={descriptor.parameters}
+              values={paramValues}
+              onChange={(id, value) => setParamValues((current) => ({ ...current, [id]: value }))}
+            />
+            {previewResolution && <ModelResolutionCard resolution={previewResolution} />}
+            <p className="atelier-feedback">{feedback}</p>
+            <div className="atelier-nav">
+              <button type="button" onClick={() => setStep("modele")}>
+                Retour
+              </button>
+              <button type="button" onClick={() => setParamValues(traceModelDefaults(descriptor))}>
+                Valeurs du modèle
+              </button>
+              <button type="button" className="primary" onClick={confirmParameters}>
+                Continuer
+              </button>
+            </div>
+          </>
+        )}
+
         {available && step === "photo" && project && (
           <>
             <h2>Partir d’une photo ?</h2>
@@ -262,7 +343,7 @@ export function NouveauTraceWorkspace() {
               </button>
             </div>
             <div className="atelier-nav">
-              <button type="button" onClick={() => setStep("modele")}>
+              <button type="button" onClick={() => setStep(project.modelId ? "parametres" : "modele")}>
                 Retour
               </button>
             </div>

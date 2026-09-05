@@ -17,12 +17,29 @@ describe("migrateTracingProject (§3)", () => {
   it("migre un projet v1 connu vers la version courante", () => {
     const legacy = { ...JSON.parse(JSON.stringify(base)), schemaVersion: 1 };
     delete legacy.modelId;
+    delete legacy.modelParams;
     delete legacy.startFromPhoto;
     const out = migrateTracingProject(legacy);
-    expect(out.schemaVersion).toBe(2);
+    expect(out.schemaVersion).toBe(TRACING_PROJECT_SCHEMA_VERSION);
     expect(out.modelId).toBeUndefined();
+    expect(out.modelParams).toBeUndefined();
     expect(out.startFromPhoto).toBeUndefined();
     expect(out.id).toBe(base.id);
+  });
+
+  it("migre un projet v2 vers v3 sans inventer de paramètres de modèle", () => {
+    const legacy = { ...JSON.parse(JSON.stringify(base)), schemaVersion: 2, modelId: "circle-division" };
+    delete legacy.modelParams;
+    const out = migrateTracingProject(legacy);
+    expect(out.schemaVersion).toBe(3);
+    expect(out.modelId).toBe("circle-division");
+    // v2 n'avait pas de surcharges : la résolution retombera sur les seuls défauts du modèle.
+    expect(out.modelParams).toBeUndefined();
+  });
+
+  it("conserve les surcharges de paramètres d'un projet v3", () => {
+    const out = migrateTracingProject({ ...JSON.parse(JSON.stringify(base)), modelId: "circle-division", modelParams: { diameter: 3000, divisions: 8 } });
+    expect(out.modelParams).toEqual({ diameter: 3000, divisions: 8 });
   });
 
   it("refuse une version plus récente que celle supportée", () => {
@@ -47,7 +64,7 @@ describe("migrateTracingProject (§3)", () => {
   });
 
   it("déclare explicitement les versions supportées", () => {
-    expect([...SUPPORTED_TRACING_SCHEMA_VERSIONS]).toEqual([1, 2]);
+    expect([...SUPPORTED_TRACING_SCHEMA_VERSIONS]).toEqual([1, 2, 3]);
     expect(SUPPORTED_TRACING_SCHEMA_VERSIONS).toContain(TRACING_PROJECT_SCHEMA_VERSION);
   });
 });
