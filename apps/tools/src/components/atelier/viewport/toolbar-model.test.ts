@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildToolbarModel,
+  canEditHandles,
   canSelectEntities,
   DEFAULT_TOOLBAR_STATE,
   selectTool,
@@ -56,20 +57,30 @@ describe("gestes", () => {
     expect(shouldPanOnBackgroundDrag()).toBe(true);
   });
 
-  it("n'autorise la sélection d'entité qu'en mode Sélection", () => {
+  it("autorise la désignation en Sélection comme en Édition, jamais en Déplacer", () => {
     expect(canSelectEntities({ ...DEFAULT_TOOLBAR_STATE, tool: "select" })).toBe(true);
+    expect(canSelectEntities({ ...DEFAULT_TOOLBAR_STATE, tool: "edit" })).toBe(true);
     expect(canSelectEntities({ ...DEFAULT_TOOLBAR_STATE, tool: "pan" })).toBe(false);
+  });
+
+  it("ne rend les poignées saisissables qu'en mode Édition", () => {
+    expect(canEditHandles({ ...DEFAULT_TOOLBAR_STATE, tool: "edit" })).toBe(true);
+    expect(canEditHandles({ ...DEFAULT_TOOLBAR_STATE, tool: "select" })).toBe(false);
+    expect(canEditHandles({ ...DEFAULT_TOOLBAR_STATE, tool: "pan" })).toBe(false);
   });
 });
 
 describe("buildToolbarModel", () => {
-  it("expose exactement les cinq entrées du lot", () => {
+  it("expose exactement les huit entrées du lot, dans l'ordre", () => {
     expect(buildToolbarModel(DEFAULT_TOOLBAR_STATE).map((button) => button.id)).toEqual([
       "select",
+      "edit",
       "pan",
       "grid",
       "recenter",
       "properties",
+      "undo",
+      "redo",
     ]);
   });
 
@@ -112,5 +123,52 @@ describe("buildToolbarModel", () => {
     for (const button of buildToolbarModel(DEFAULT_TOOLBAR_STATE, { hasSelection: true })) {
       if (button.disabled) expect(button.pressed).not.toBe(true);
     }
+  });
+
+  /* ---- Édition, annulation, rétablissement (VERTEX-EDIT §8) ---- */
+
+  it("désactive le mode Édition tant qu'aucune poignée n'est réglable", () => {
+    expect(buildToolbarModel(DEFAULT_TOOLBAR_STATE).find((b) => b.id === "edit")?.disabled).toBe(true);
+    expect(buildToolbarModel(DEFAULT_TOOLBAR_STATE, { editingAvailable: true }).find((b) => b.id === "edit")?.disabled).toBe(false);
+  });
+
+  it("dit pourquoi le mode Édition est indisponible", () => {
+    const label = buildToolbarModel(DEFAULT_TOOLBAR_STATE).find((b) => b.id === "edit")?.ariaLabel ?? "";
+    expect(label).toContain("aucun sommet réglable");
+  });
+
+  it("désactive Annuler et Rétablir quand l'historique est vide", () => {
+    const model = buildToolbarModel(DEFAULT_TOOLBAR_STATE);
+    expect(model.find((b) => b.id === "undo")?.disabled).toBe(true);
+    expect(model.find((b) => b.id === "redo")?.disabled).toBe(true);
+  });
+
+  it("active Annuler et Rétablir indépendamment l'un de l'autre", () => {
+    const undoOnly = buildToolbarModel(DEFAULT_TOOLBAR_STATE, { canUndo: true });
+    expect(undoOnly.find((b) => b.id === "undo")?.disabled).toBe(false);
+    expect(undoOnly.find((b) => b.id === "redo")?.disabled).toBe(true);
+
+    const redoOnly = buildToolbarModel(DEFAULT_TOOLBAR_STATE, { canRedo: true });
+    expect(redoOnly.find((b) => b.id === "undo")?.disabled).toBe(true);
+    expect(redoOnly.find((b) => b.id === "redo")?.disabled).toBe(false);
+  });
+
+  it("annonce le raccourci clavier dans le libellé accessible", () => {
+    const model = buildToolbarModel(DEFAULT_TOOLBAR_STATE, { canUndo: true, canRedo: true });
+    expect(model.find((b) => b.id === "undo")?.ariaLabel).toContain("Ctrl+Z");
+    expect(model.find((b) => b.id === "redo")?.ariaLabel).toContain("Ctrl+Maj+Z");
+  });
+
+  it("laisse Annuler et Rétablir sans aria-pressed : ce sont des commandes, pas des bascules", () => {
+    const model = buildToolbarModel(DEFAULT_TOOLBAR_STATE, { canUndo: true, canRedo: true });
+    expect(model.find((b) => b.id === "undo")?.pressed).toBeUndefined();
+    expect(model.find((b) => b.id === "redo")?.pressed).toBeUndefined();
+  });
+
+  it("garde le mode Édition pressé quand il est actif et disponible", () => {
+    const model = buildToolbarModel({ ...DEFAULT_TOOLBAR_STATE, tool: "edit" }, { editingAvailable: true });
+    expect(model.find((b) => b.id === "edit")?.pressed).toBe(true);
+    expect(model.find((b) => b.id === "select")?.pressed).toBe(false);
+    expect(model.find((b) => b.id === "pan")?.pressed).toBe(false);
   });
 });

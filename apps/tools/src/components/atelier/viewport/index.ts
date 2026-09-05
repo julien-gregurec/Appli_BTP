@@ -9,14 +9,24 @@
  * ajoutent le branchement sur un modèle DÉJÀ résolu par Engine B. La règle ci-dessus tient
  * toujours — ces deux modules lisent une `TracingModelResolution` reçue en argument, ils
  * n'appellent jamais le moteur eux-mêmes.
+ *
+ * ATELIER-VERTEX-EDIT-UNDO-REDO-V1 : `HandleLayer` dessine les poignées, et `AtelierEditingApi`
+ * les relaie. La règle tient encore — les poignées arrivent en props, calculées par
+ * `lib/tracing/handle-map.ts` : le viewport ne construit aucune poignée et n'appelle jamais un
+ * générateur de modèle.
  */
 
 export { PlanViewport, type PlanViewportProps, type PlanViewportRenderArgs } from "./PlanViewport";
 export { PlanSceneLayer, type PlanSceneLayerProps } from "./PlanSceneLayer";
 export { GridOverlay } from "./GridOverlay";
 export { AtelierToolbar, type AtelierToolbarProps } from "./AtelierToolbar";
+export { HandleLayer, type HandleLayerProps } from "./HandleLayer";
 export { PropertiesSheet, type PropertiesSheetProps } from "./PropertiesSheet";
-export { AtelierViewportWorkspace, type AtelierViewportWorkspaceProps } from "./AtelierViewportWorkspace";
+export {
+  AtelierViewportWorkspace,
+  type AtelierEditingApi,
+  type AtelierViewportWorkspaceProps,
+} from "./AtelierViewportWorkspace";
 export { ResolvedModelViewport, type ResolvedModelViewportProps } from "./ResolvedModelViewport";
 export { atelierViewKey, planSceneForStep, resolvedPlanScene, stepAt } from "./resolved-scene";
 export { usePlanViewport, type PlanViewportController } from "./use-plan-viewport";
@@ -50,9 +60,32 @@ export {
   toleranceWorldFor,
   type PointerPrecision,
 } from "@/lib/viewport/pointer-targeting";
-export { useViewportGestures, DRAG_THRESHOLD_PX } from "./use-viewport-gestures";
+export { useViewportGestures, DRAG_THRESHOLD_PX, type ViewportGestureHandlers } from "./use-viewport-gestures";
+export {
+  HANDLE_GRAB_PX,
+  TOUCH_HANDLE_GRAB_PX,
+  handleGrabPx,
+} from "@/lib/viewport/pointer-targeting";
+export {
+  buildEditableHandles,
+  findHandle,
+  nearestEditableHandle,
+  HANDLE_RULES,
+} from "@/lib/tracing/handle-map";
+export {
+  describeHandleDrives,
+  describeHandleValues,
+  measureAt,
+  paramsForHandleTarget,
+  quantiseParam,
+  type EditableHandle,
+  type HandleConstraint,
+  type HandleDrive,
+  type HandleMeasure,
+} from "@/lib/tracing/editable-handle";
 export {
   buildToolbarModel,
+  canEditHandles,
   canSelectEntities,
   DEFAULT_TOOLBAR_STATE,
   selectTool,
@@ -61,6 +94,7 @@ export {
   toggleProperties,
   type AtelierTool,
   type ToolbarActionId,
+  type ToolbarCapabilities,
   type ToolbarButtonModel,
   type ToolbarState,
 } from "./toolbar-model";

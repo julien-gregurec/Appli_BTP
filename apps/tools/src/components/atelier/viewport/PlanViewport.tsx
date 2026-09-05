@@ -22,7 +22,7 @@ import { pointerPrecisionOf, type PointerPrecision } from "@/lib/viewport/pointe
 import type { ScreenPoint, ViewportSize, ViewportState } from "@/lib/viewport/viewport-math";
 import { GridOverlay } from "./GridOverlay";
 import type { PlanViewportController } from "./use-plan-viewport";
-import { useViewportGestures } from "./use-viewport-gestures";
+import { useViewportGestures, type ViewportGestureHandlers } from "./use-viewport-gestures";
 import styles from "./viewport.module.css";
 
 export type PlanViewportRenderArgs = {
@@ -37,7 +37,13 @@ export type PlanViewportProps = {
   label: string;
   gridVisible?: boolean;
   /** Le mode courant ne change que le curseur ; le pan à un doigt reste toujours accessible. */
-  tool?: "select" | "pan";
+  tool?: "select" | "edit" | "pan";
+  /**
+   * Saisie d'une poignée (ATELIER-VERTEX-EDIT-UNDO-REDO-V1 §4). Transmise telle quelle aux
+   * gestes : le viewport ne sait pas ce qu'est une poignée, il sait seulement qu'un contact
+   * peut lui être pris. Absente, le comportement est exactement celui d'avant ce lot.
+   */
+  grab?: ViewportGestureHandlers["grab"];
   /**
    * Clic sur la toile, en coordonnées ÉCRAN locales au viewport, avec la finesse du pointeur
    * (ATELIER-HITTEST-SNAP-FOUNDATION-V1 §7/§8). Le viewport ne sait pas ce qu'il y a sous ce
@@ -65,13 +71,14 @@ export function PlanViewport({
   label,
   gridVisible = true,
   tool = "pan",
+  grab,
   onCanvasClick,
   onCanvasHover,
   children,
   status,
 }: PlanViewportProps) {
   const { containerRef, element, size, view, ready, percent, pan, zoomAtPoint, zoomIn, zoomOut, recenter } = controller;
-  const { handlers, consumeDrag } = useViewportGestures(element, { pan, zoomAtPoint });
+  const { handlers, consumeDrag } = useViewportGestures(element, { pan, zoomAtPoint, grab });
 
   // Finesse du dernier pointeur vu. `onClick` ne reçoit qu'un `MouseEvent`, qui ne dit pas si
   // le geste venait d'un doigt : on la retient au `pointerdown`, qui le sait (§8).
@@ -101,6 +108,10 @@ export function PlanViewport({
     (event: React.PointerEvent<HTMLDivElement>) => {
       handlers.onPointerMove(event);
       if (!onCanvasHover) return;
+      // Pendant un glissement de poignée, l'accrochage affiché est celui du geste en cours :
+      // un survol concurrent le remplacerait par celui du curseur libre, et la croix
+      // sauterait entre deux cibles à chaque trame.
+      if (event.buttons !== 0) return;
       // Le survol au doigt n'a pas de sens : le contact EST déjà un geste de pan ou de clic.
       if (event.pointerType === "touch") return;
       const point = localPointOf(event);

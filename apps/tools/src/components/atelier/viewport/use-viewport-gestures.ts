@@ -7,14 +7,42 @@
  * aucune dépendance externe (§4). `touch-action: none` sur la zone (CSS) empêche le navigateur
  * de préempter le geste ; la molette est interceptée en `passive: false` UNIQUEMENT sur cette
  * zone, pour ne jamais bloquer le défilement du reste de la page (§3).
+ *
+ * ## ATELIER-VERTEX-EDIT-UNDO-REDO-V1 §4 — un pan ne devient jamais un glissement de poignée
+ *
+ * L'arbitrage se fait UNE FOIS, au `pointerdown`, et pas autrement : `grab.onDown` répond
+ * « je prends ce geste » ou non, et sa réponse vaut pour toute la durée du contact. Décider
+ * plus tard — au premier mouvement, ou selon la distance parcourue — laisserait le plan
+ * glisser de quelques pixels avant que la poignée ne prenne la main, ce qui se voit et se
+ * ressent comme un défaut.
+ *
+ * L'automate d'arbitrage lui-même vit dans `gesture-routing.ts`, pur et testé à part : c'est
+ * là que sont écrites, et vérifiées, les trois règles (un seul arbitrage au `pointerdown`, un
+ * contact capté ne déplace pas le plan, les contacts surnuméraires sont ignorés).
  */
 
 import { useCallback, useEffect, useRef } from "react";
 import { screenDistance, screenMidpoint, type ScreenPoint } from "@/lib/viewport/viewport-math";
+import {
+  IDLE_GESTURE_ROUTING,
+  routePointerDown,
+  routePointerMove,
+  routePointerUp,
+  type GestureRoutingState,
+} from "./gesture-routing";
 
 export type ViewportGestureHandlers = {
   pan: (dxScreen: number, dyScreen: number) => void;
   zoomAtPoint: (anchor: ScreenPoint, factor: number) => void;
+  /**
+   * Saisie d'une poignée (§4). `onDown` renvoie `true` pour capter le contact ; le viewport
+   * cesse alors de déplacer le plan et route `onMove` / `onUp` jusqu'au relâchement.
+   */
+  grab?: {
+    onDown: (localPoint: ScreenPoint, pointerType: string | undefined) => boolean;
+    onMove: (localPoint: ScreenPoint) => void;
+    onUp: (localPoint: ScreenPoint) => void;
+  };
 };
 
 /** Au-delà de ce déplacement (px), le geste est un pan : le clic de sélection est annulé. */
@@ -41,11 +69,13 @@ function capturePointer(element: Element, pointerId: number, capture: boolean) {
   }
 }
 
-export function useViewportGestures(element: HTMLElement | null, { pan, zoomAtPoint }: ViewportGestureHandlers) {
+export function useViewportGestures(element: HTMLElement | null, { pan, zoomAtPoint, grab }: ViewportGestureHandlers) {
   const pointers = useRef<Map<number, PointerSample>>(new Map());
   const pinchDistance = useRef<number | null>(null);
   const pinchAnchor = useRef<ScreenPoint | null>(null);
   const dragged = useRef(false);
+  /** Arbitrage plan / poignée (§4) — automate pur, cf. `gesture-routing.ts`. */
+  const routing = useRef<GestureRoutingState>(IDLE_GESTURE_ROUTING);
 
   const localPoint = useCallback(
     (event: { clientX: number; clientY: number }): ScreenPoint => {
@@ -74,6 +104,18 @@ export function useViewportGestures(element: HTMLElement | null, { pan, zoomAtPo
   const onPointerDown = useCallback(
     (event: React.PointerEvent<HTMLElement>) => {
       const point = localPoint(event);
+      const step = routePointerDown(routing.current, event.pointerId, () =>
+        Boolean(grab?.onDown(point, event.pointerType)),
+      );
+      routing.current = step.state;
+      // Un sommet est déjà tenu : tout contact supplémentaire est sans effet.
+      if (step.route === "ignored") return;
+      if (step.route === "handle") {
+        dragged.current = false;
+        capturePointer(event.currentTarget, event.pointerId, true);
+        return;
+      }
+
       pointers.current.set(event.pointerId, { ...point, pointerId: event.pointerId });
       dragged.current = false;
       if (pointers.current.size === 2) {
@@ -83,11 +125,20 @@ export function useViewportGestures(element: HTMLElement | null, { pan, zoomAtPo
       }
       capturePointer(event.currentTarget, event.pointerId, true);
     },
-    [localPoint],
+    [grab, localPoint],
   );
 
   const onPointerMove = useCallback(
     (event: React.PointerEvent<HTMLElement>) => {
+      const route = routePointerMove(routing.current, event.pointerId);
+      if (route === "ignored") return;
+      if (route === "handle") {
+        // Le glissement d'une poignée est un glissement : le clic qui le conclut ne doit ni
+        // sélectionner ni désélectionner (§4).
+        dragged.current = true;
+        grab?.onMove(localPoint(event));
+        return;
+      }
       const previous = pointers.current.get(event.pointerId);
       if (!previous) return;
       const point = localPoint(event);
@@ -118,17 +169,28 @@ export function useViewportGestures(element: HTMLElement | null, { pan, zoomAtPo
         pan(dx, dy);
       }
     },
-    [localPoint, pan, zoomAtPoint],
+    [grab, localPoint, pan, zoomAtPoint],
   );
 
-  const endPointer = useCallback((event: React.PointerEvent<HTMLElement>) => {
-    pointers.current.delete(event.pointerId);
-    if (pointers.current.size < 2) {
-      pinchDistance.current = null;
-      pinchAnchor.current = null;
-    }
-    capturePointer(event.currentTarget, event.pointerId, false);
-  }, []);
+  const endPointer = useCallback(
+    (event: React.PointerEvent<HTMLElement>) => {
+      const step = routePointerUp(routing.current, event.pointerId);
+      routing.current = step.state;
+      if (step.route === "ignored") return;
+      if (step.route === "handle") {
+        capturePointer(event.currentTarget, event.pointerId, false);
+        grab?.onUp(localPoint(event));
+        return;
+      }
+      pointers.current.delete(event.pointerId);
+      if (pointers.current.size < 2) {
+        pinchDistance.current = null;
+        pinchAnchor.current = null;
+      }
+      capturePointer(event.currentTarget, event.pointerId, false);
+    },
+    [grab, localPoint],
+  );
 
   /** Un clic consécutif à un pan ne doit pas sélectionner (§11). */
   const consumeDrag = useCallback(() => {

@@ -62,6 +62,28 @@ export function buildTracingProjectFromInput(
   );
 }
 
+/**
+ * ATELIER-VERTEX-EDIT-UNDO-REDO-V1 — surcharges à conserver quand l'utilisateur (re)choisit
+ * un modèle.
+ *
+ * Changer de modèle invalide les surcharges de l'ancien : `{ diameter: 2400 }` ne veut rien
+ * dire sur une ogive, et le résolveur les signalerait comme paramètres inconnus. Elles sont
+ * donc abandonnées.
+ *
+ * Re-choisir le MÊME modèle, en revanche, doit les conserver. Ce n'est pas un cas de bord :
+ * la reprise d'un tracé enregistré repose l'utilisateur sur l'étape « modèle » avec son
+ * modèle déjà sélectionné, et le geste naturel pour continuer est de le re-toucher. Effacer
+ * les réglages à cet instant perdrait silencieusement le travail enregistré — exactement ce
+ * que l'autosave existe pour empêcher.
+ */
+export function modelParamsAfterModelChoice(
+  project: Pick<TracingProject, "modelId" | "modelParams">,
+  nextModelId: string | null | undefined,
+): Record<string, number> | undefined {
+  const sameModel = (project.modelId ?? null) === (nextModelId ?? null);
+  return sameModel ? project.modelParams : undefined;
+}
+
 export type TracingProjectPatch = Partial<
   Pick<TracingProject, "name" | "roomWidthMm" | "roomHeightMm" | "modelId" | "modelParams" | "startFromPhoto">
 >;

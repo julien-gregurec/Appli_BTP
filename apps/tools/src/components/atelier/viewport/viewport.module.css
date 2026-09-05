@@ -36,6 +36,10 @@
   outline: none;
 }
 
+.canvas[data-tool="edit"] {
+  cursor: crosshair;
+}
+
 .canvas[data-tool="select"] {
   cursor: default;
 }
@@ -147,6 +151,48 @@
   évènement SVG : le hit-test géométrique travaille sur le point monde du clic, il n'a besoin
   d'aucune cible DOM. Le curseur de désignation reste porté par la toile en mode Sélection.
 */
+
+/* ---- Poignées d'édition (VERTEX-EDIT §3) --------------------------------- */
+
+/*
+  Les états se distinguent par la FORME autant que par la couleur — disque pour une poignée
+  saisissable, losange pour un point verrouillé. Un plan lu en plein soleil, ou par un
+  daltonien, doit rester lisible sans compter sur la teinte.
+*/
+.handle {
+  fill: var(--white);
+  stroke: var(--amber);
+  stroke-width: 2;
+}
+
+.handleSelected {
+  fill: var(--amber-soft);
+  stroke-width: 2.6;
+}
+
+.handleActive {
+  fill: var(--amber);
+  stroke: var(--navy);
+  stroke-width: 2.2;
+}
+
+/* Point visible mais non réglable : discret, et jamais de la couleur des poignées. */
+.handleLocked {
+  fill: none;
+  stroke: var(--ink-soft);
+  stroke-width: 1.3;
+  opacity: 0.75;
+}
+
+/* Guide de contrainte : uniquement sous la poignée tenue, jamais en permanence. */
+.handleGuide circle,
+.handleGuide line {
+  fill: none;
+  stroke: var(--amber);
+  stroke-width: 1;
+  stroke-dasharray: 5 4;
+  opacity: 0.55;
+}
 
 /* ---- Bandeau d'état ------------------------------------------------------ */
 

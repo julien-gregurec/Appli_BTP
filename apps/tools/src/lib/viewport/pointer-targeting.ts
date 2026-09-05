@@ -29,6 +29,17 @@ export const TOUCH_TOLERANCE_PX = 20;
 export const SNAP_TOLERANCE_PX = 10;
 export const TOUCH_SNAP_TOLERANCE_PX = 16;
 
+/**
+ * ATELIER-VERTEX-EDIT-UNDO-REDO-V1 §4 — zone de prise d'une poignée d'édition.
+ *
+ * Plus généreuse que la sélection : en mode Édition, la poignée EST la cible du geste, et
+ * rater une poignée fait glisser le plan à sa place — une erreur bien plus coûteuse que de
+ * désigner la mauvaise entité, puisqu'elle interrompt le réglage. Au doigt, 26 px valent
+ * environ 7 mm sur un téléphone courant : de quoi prendre un sommet sans le viser.
+ */
+export const HANDLE_GRAB_PX = 14;
+export const TOUCH_HANDLE_GRAB_PX = 26;
+
 export type PointerPrecision = "fine" | "coarse";
 
 /** Tolérance de sélection en pixels selon la finesse du pointeur. */
@@ -47,6 +58,11 @@ export function snapTolerancePx(precision: PointerPrecision): number {
  */
 export function toleranceWorldFor(tolerancePx: number, view: ViewportState): number {
   return screenToWorldLength(tolerancePx, view);
+}
+
+/** Zone de prise d'une poignée en pixels selon la finesse du pointeur (§4). */
+export function handleGrabPx(precision: PointerPrecision): number {
+  return precision === "coarse" ? TOUCH_HANDLE_GRAB_PX : HANDLE_GRAB_PX;
 }
 
 /** Nature du pointeur d'un évènement — `pen` vise aussi précisément qu'une souris. */

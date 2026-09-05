@@ -14,6 +14,7 @@ import {
   describeTracingProject,
   formatRoomDimensions,
   metresInputToMm,
+  modelParamsAfterModelChoice,
   touchTracingProject,
 } from "./atelier";
 
@@ -134,5 +135,36 @@ describe("projets récents (§6)", () => {
       startFromPhoto: true,
       updatedAt: "2026-09-05T09:00:00.000Z",
     });
+  });
+});
+
+/* ---- ATELIER-VERTEX-EDIT-UNDO-REDO-V1 — (re)choix de modèle ---- */
+
+describe("modelParamsAfterModelChoice", () => {
+  const reglé = { modelId: "rosette-6", modelParams: { diameter: 14000 } };
+
+  it("conserve les réglages quand on re-choisit le même modèle", () => {
+    // C'est le cas de la reprise : l'étape « modèle » revient avec le modèle déjà retenu, et
+    // le re-toucher ne doit pas effacer ce qui a été enregistré.
+    expect(modelParamsAfterModelChoice(reglé, "rosette-6")).toEqual({ diameter: 14000 });
+  });
+
+  it("abandonne les réglages quand on change réellement de modèle", () => {
+    // `diameter` n'existe pas sur l'ogive : le transporter produirait un paramètre inconnu.
+    expect(modelParamsAfterModelChoice(reglé, "ogive-equilateral")).toBeUndefined();
+  });
+
+  it("abandonne les réglages quand on repasse à « décider plus tard »", () => {
+    expect(modelParamsAfterModelChoice(reglé, null)).toBeUndefined();
+    expect(modelParamsAfterModelChoice(reglé, undefined)).toBeUndefined();
+  });
+
+  it("traite « aucun modèle » et « décider plus tard » comme le même choix", () => {
+    const sansModele = { modelId: undefined, modelParams: undefined };
+    expect(modelParamsAfterModelChoice(sansModele, null)).toBeUndefined();
+  });
+
+  it("ne rend rien quand le projet n'avait aucune surcharge", () => {
+    expect(modelParamsAfterModelChoice({ modelId: "rosette-6", modelParams: undefined }, "rosette-6")).toBeUndefined();
   });
 });

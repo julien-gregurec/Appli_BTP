@@ -1,15 +1,21 @@
 /**
  * État de la barre d'outils Atelier (§9), isolé du rendu pour rester testable.
  *
- * Ce lot n'expose que les outils réellement opérationnels — Sélection et Pan — plus trois
- * commandes (Grille, Recentrer, Propriétés). Les outils d'édition à venir (contour, cote, LED,
- * spot…) sont déclarés désactivés : ils apparaissent au bon endroit sans laisser croire qu'ils
- * fonctionnent, et sans transformer la barre en mur de quinze boutons.
+ * Trois outils — Sélection, Édition, Déplacer — et cinq commandes (Grille, Recentrer,
+ * Propriétés, Annuler, Rétablir). Les outils encore absents (contour, cote, LED, spot…) ne
+ * sont toujours pas déclarés : ils arriveront avec le lot qui les rendra utilisables, plutôt
+ * que de transformer la barre en mur de quinze boutons.
+ *
+ * ATELIER-VERTEX-EDIT-UNDO-REDO-V1 §3/§8 — le mode « Édition » est ce qui fait apparaître les
+ * poignées. C'est délibéré : afficher en permanence les sommets saisissables encombrerait le
+ * plan et rendrait la lecture du tracé moins sûre sur un chantier. Le mode est aussi désactivé
+ * quand aucune poignée n'existe (modèle non résolu, tracé sans modèle) — un mode qui ne fait
+ * rien ne doit pas être proposé.
  */
 
-export type AtelierTool = "select" | "pan";
+export type AtelierTool = "select" | "edit" | "pan";
 
-export type ToolbarActionId = "grid" | "recenter" | "properties";
+export type ToolbarActionId = "grid" | "recenter" | "properties" | "undo" | "redo";
 
 export type ToolbarState = {
   tool: AtelierTool;
@@ -55,12 +61,31 @@ export function shouldPanOnBackgroundDrag(): boolean {
   return true;
 }
 
+/**
+ * Désignation et retour visuel (survol, accrochage) : actifs en Sélection comme en Édition.
+ * En Édition, désigner reste utile — c'est ce qui remplit le panneau propriétés pendant qu'on
+ * règle la forme.
+ */
 export function canSelectEntities(state: ToolbarState): boolean {
-  return state.tool === "select";
+  return state.tool === "select" || state.tool === "edit";
 }
 
-export function buildToolbarModel(state: ToolbarState, options?: { hasSelection?: boolean }): readonly ToolbarButtonModel[] {
+/** Les poignées ne sont saisissables — ni même visibles — qu'en mode Édition (§3). */
+export function canEditHandles(state: ToolbarState): boolean {
+  return state.tool === "edit";
+}
+
+export type ToolbarCapabilities = {
+  hasSelection?: boolean;
+  /** Le modèle courant publie-t-il au moins une poignée éditable ? */
+  editingAvailable?: boolean;
+  canUndo?: boolean;
+  canRedo?: boolean;
+};
+
+export function buildToolbarModel(state: ToolbarState, options?: ToolbarCapabilities): readonly ToolbarButtonModel[] {
   const hasSelection = options?.hasSelection ?? false;
+  const editingAvailable = options?.editingAvailable ?? false;
   return [
     {
       id: "select",
@@ -68,6 +93,16 @@ export function buildToolbarModel(state: ToolbarState, options?: { hasSelection?
       ariaLabel: "Outil sélection",
       pressed: state.tool === "select",
       disabled: false,
+      kind: "tool",
+    },
+    {
+      id: "edit",
+      label: "Édition",
+      ariaLabel: editingAvailable
+        ? "Outil édition des sommets"
+        : "Outil édition des sommets — aucun sommet réglable sur ce tracé",
+      pressed: state.tool === "edit",
+      disabled: !editingAvailable,
       kind: "tool",
     },
     {
@@ -100,6 +135,22 @@ export function buildToolbarModel(state: ToolbarState, options?: { hasSelection?
       pressed: state.propertiesOpen,
       disabled: !hasSelection && !state.propertiesOpen,
       kind: "toggle",
+    },
+    {
+      id: "undo",
+      label: "Annuler",
+      // Le raccourci est annoncé dans le libellé accessible : sans lui, un utilisateur au
+      // clavier n'a aucun moyen d'apprendre qu'il existe (§8).
+      ariaLabel: "Annuler la dernière modification (Ctrl+Z)",
+      disabled: !(options?.canUndo ?? false),
+      kind: "command",
+    },
+    {
+      id: "redo",
+      label: "Rétablir",
+      ariaLabel: "Rétablir la modification annulée (Ctrl+Maj+Z)",
+      disabled: !(options?.canRedo ?? false),
+      kind: "command",
     },
   ];
 }

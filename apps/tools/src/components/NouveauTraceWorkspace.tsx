@@ -9,14 +9,19 @@ import {
   TRACING_OUVRAGE_ORDER,
   buildTracingProjectFromInput,
   metresInputToMm,
+  modelParamsAfterModelChoice,
   touchTracingProject,
 } from "@/lib/tracing/atelier";
 import { atelierModelsForType } from "@/lib/tracing/atelier-models";
 import { resolveTracingProjectModel } from "@/lib/tracing/model-resolver";
-import { findTraceModelDescriptor, traceModelDefaults } from "@/lib/geometry/models/catalog";
+import { findTraceModelDescriptor } from "@/lib/geometry/models/catalog";
+import { buildEditableHandles } from "@/lib/tracing/handle-map";
+import { useModelEditing } from "@/lib/tracing/use-model-editing";
+import { useUndoRedoShortcuts } from "@/lib/tracing/use-undo-redo-shortcuts";
+import type { ParamOverrides } from "@/lib/tracing/param-history";
 import { TraceParametersForm } from "./TraceParametersForm";
 import { ModelResolutionCard } from "@/components/atelier/model/ModelResolutionCard";
-import { ResolvedModelViewport } from "@/components/atelier/viewport";
+import { ResolvedModelViewport, type AtelierEditingApi } from "@/components/atelier/viewport";
 import { useAtelierPersistence } from "@/lib/tracing/use-atelier-autosave";
 import { useAccount } from "./AccountProvider";
 import { Brand } from "./HomeDashboard";
@@ -25,18 +30,12 @@ type Step = "type" | "infos" | "modele" | "parametres" | "photo" | "done";
 const STEP_ORDER: readonly Step[] = ["type", "infos", "modele", "parametres", "photo"];
 const LATER = "__later__";
 
-/**
- * ATELIER-MODELID-ENGINE-B-BRIDGE-V1 §4 — n'enregistrer que ce que l'utilisateur a
- * réellement changé. Les défauts restent publiés par le modèle et ne sont jamais recopiés
- * dans le projet : `modelParams` ne porte que les écarts.
+/*
+ * ATELIER-VERTEX-EDIT-UNDO-REDO-V1 §9/§10 — l'ancien `overridesOnly` local a disparu : le
+ * calcul des surcharges vit désormais dans `lib/tracing/param-history.ts`, avec l'historique
+ * qui s'en sert. Une seule définition de « ce qui est enregistré », partagée par le
+ * formulaire, les poignées, l'annulation et l'autosave.
  */
-function overridesOnly(values: Readonly<Record<string, number>>, defaults: Readonly<Record<string, number>>): Record<string, number> | undefined {
-  const overrides: Record<string, number> = {};
-  for (const [id, value] of Object.entries(values)) {
-    if (defaults[id] !== value) overrides[id] = value;
-  }
-  return Object.keys(overrides).length ? overrides : undefined;
-}
 
 export function NouveauTraceWorkspace() {
   const router = useRouter();
@@ -50,7 +49,6 @@ export function NouveauTraceWorkspace() {
   const [width, setWidth] = useState("");
   const [height, setHeight] = useState("");
   const [project, setProject] = useState<TracingProject | null>(null);
-  const [paramValues, setParamValues] = useState<Record<string, number>>({});
   const [feedback, setFeedback] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -67,10 +65,9 @@ export function NouveauTraceWorkspace() {
         setProject(found);
         setType(found.type);
         setName(found.name);
-        // Reprise : repartir des réglages déjà enregistrés, complétés par les défauts du
-        // modèle — jamais d'un jeu de valeurs recréé ici (§4).
-        const known = findTraceModelDescriptor(found.modelId);
-        setParamValues(known ? { ...traceModelDefaults(known), ...(found.modelParams ?? {}) } : {});
+        // Reprise : `useModelEditing` s'amorce lui-même sur `modelParams`, complété par les
+        // défauts du modèle. Rien à recopier ici — c'était la seconde source de vérité qui
+        // pouvait diverger du formulaire (§10).
         setStep("modele");
       })
       .catch(() => {});
@@ -85,9 +82,66 @@ export function NouveauTraceWorkspace() {
   // aucune géométrie lui-même : il interroge le résolveur (§2).
   const modelId = project?.modelId;
   const descriptor = useMemo(() => findTraceModelDescriptor(modelId), [modelId]);
+
+  /**
+   * §9 — enregistrement d'une modification de réglage : projet remonté puis autosave. C'est
+   * le SEUL chemin d'écriture, emprunté aussi bien par le formulaire que par une poignée ou
+   * une annulation, ce qui garantit qu'aucune de ces voies ne peut oublier de sauvegarder.
+   *
+   * `flushAutosave`, la reprise IndexedDB et le schéma v3 sont intacts : on continue d'écrire
+   * `modelParams` — le même champ, avec la même forme — via `touchTracingProject`, qui revalide
+   * strictement le projet avant de le rendre.
+   */
+  const persistOverrides = useCallback(
+    (overrides: ParamOverrides | undefined) => {
+      setProject((current) => {
+        if (!current) return current;
+        const next = touchTracingProject(current, { modelParams: overrides });
+        scheduleAutosave(next);
+        return next;
+      });
+    },
+    [scheduleAutosave],
+  );
+
+  const editingState = useModelEditing({
+    descriptor,
+    initialOverrides: project?.modelParams,
+    // Changer de projet ou de modèle remet réglages ET historique à plat : annuler vers les
+    // paramètres d'un autre modèle n'aurait aucun sens.
+    modelKey: `${project?.id ?? "sans-projet"}::${descriptor?.slug ?? "sans-modele"}`,
+    onPersist: persistOverrides,
+  });
+  const paramValues = editingState.values;
+
   const previewResolution = useMemo(
     () => (modelId ? resolveTracingProjectModel({ modelId, modelParams: paramValues }) : null),
     [modelId, paramValues],
+  );
+
+  /**
+   * §1/§2 — poignées du modèle courant. Construites à partir de la résolution DÉJÀ calculée :
+   * aucun second appel au moteur, et les positions sont lues dans la géométrie affichée, donc
+   * exactement là où l'utilisateur les voit.
+   */
+  const handles = useMemo(() => {
+    if (!descriptor || previewResolution?.status !== "resolved") return [];
+    return buildEditableHandles(descriptor, previewResolution.params, previewResolution.model);
+  }, [descriptor, previewResolution]);
+
+  useUndoRedoShortcuts({ onUndo: editingState.undo, onRedo: editingState.redo, enabled: step === "parametres" });
+
+  const editing = useMemo<AtelierEditingApi>(
+    () => ({
+      handles,
+      onPreviewParams: editingState.previewValues,
+      onCommitParams: (values, label, source) => editingState.commitValues(values, label, source),
+      canUndo: editingState.canUndo,
+      canRedo: editingState.canRedo,
+      onUndo: editingState.undo,
+      onRedo: editingState.redo,
+    }),
+    [handles, editingState],
   );
 
   const createProject = useCallback(async () => {
@@ -122,19 +176,17 @@ export function NouveauTraceWorkspace() {
   const chooseModel = useCallback(
     (modelId: string | null) => {
       if (!project) return;
-      // Changer de modèle invalide les surcharges de l'ancien : on repart de ses défauts
-      // plutôt que de transporter des paramètres qui n'ont plus de sens (§4).
-      const next = touchTracingProject(project, { modelId: modelId ?? undefined, modelParams: undefined });
+      // Changer de modèle abandonne les surcharges de l'ancien ; re-choisir le même les
+      // conserve — cf. `modelParamsAfterModelChoice`, qui porte la règle et son pourquoi.
+      const next = touchTracingProject(project, {
+        modelId: modelId ?? undefined,
+        modelParams: modelParamsAfterModelChoice(project, modelId),
+      });
       setProject(next);
       scheduleAutosave(next);
-      const chosen = findTraceModelDescriptor(modelId);
-      if (!chosen) {
-        setParamValues({});
-        setStep("photo");
-        return;
-      }
-      setParamValues(traceModelDefaults(chosen));
-      setStep("parametres");
+      // Sur un vrai changement de modèle, les valeurs repartent des défauts par le seul fait
+      // que la clé d'identité change : `useModelEditing` se réinitialise, historique compris.
+      setStep(findTraceModelDescriptor(modelId) ? "parametres" : "photo");
     },
     [project, scheduleAutosave],
   );
@@ -146,11 +198,11 @@ export function NouveauTraceWorkspace() {
       return;
     }
     setFeedback("");
-    const next = touchTracingProject(project, { modelParams: overridesOnly(paramValues, traceModelDefaults(descriptor)) });
-    setProject(next);
-    scheduleAutosave(next);
+    // Plus rien à enregistrer ici : chaque réglage — au formulaire comme à la poignée — a déjà
+    // été validé et confié à l'autosave au moment où il a été fait (§9). « Continuer » ne fait
+    // donc qu'avancer d'étape, et quitter la page en cours de réglage ne perd plus rien.
     setStep("photo");
-  }, [project, descriptor, previewResolution, paramValues, scheduleAutosave]);
+  }, [project, descriptor, previewResolution]);
 
   const choosePhoto = useCallback(
     async (startFromPhoto: boolean) => {
@@ -299,13 +351,15 @@ export function NouveauTraceWorkspace() {
           <>
             <h2>Réglages du modèle</h2>
             <p className="hint">
-              Les valeurs proposées sont celles du modèle. Ajustez-les si besoin : seules vos modifications sont
-              enregistrées, la géométrie reste calculée par le moteur.
+              Les valeurs proposées sont celles du modèle. Ajustez-les au formulaire, ou passez le plan en mode
+              Édition pour tirer directement un sommet réglable : les deux modifient les mêmes réglages, et tout est
+              annulable (Ctrl+Z). Seules vos modifications sont enregistrées, la géométrie reste calculée par le
+              moteur.
             </p>
             <TraceParametersForm
               parameters={descriptor.parameters}
               values={paramValues}
-              onChange={(id, value) => setParamValues((current) => ({ ...current, [id]: value }))}
+              onChange={(id, value, label) => editingState.setValueFromForm(id, value, label)}
             />
             {/*
               ATELIER-RESOLVED-MODEL-VIEWPORT-INTEGRATION-V1 §5 — le plan suit les réglages en
@@ -313,14 +367,20 @@ export function NouveauTraceWorkspace() {
               aucun second appel au moteur, et le zoom/pan survit aux frappes puisque la vue
               est identifiée par le projet et le modèle, pas par les bornes de la géométrie.
             */}
-            {previewResolution && <ResolvedModelViewport resolution={previewResolution} projectId={project.id} />}
+            {previewResolution && (
+              <ResolvedModelViewport resolution={previewResolution} projectId={project.id} editing={editing} />
+            )}
             {previewResolution && <ModelResolutionCard resolution={previewResolution} />}
-            <p className="atelier-feedback">{feedback}</p>
+            <p className="atelier-feedback" aria-live="polite">
+              {editingState.announcement
+                ? `${editingState.announcement.kind === "undo" ? "Annulé" : "Rétabli"} : ${editingState.announcement.label}`
+                : feedback}
+            </p>
             <div className="atelier-nav">
               <button type="button" onClick={() => setStep("modele")}>
                 Retour
               </button>
-              <button type="button" onClick={() => setParamValues(traceModelDefaults(descriptor))}>
+              <button type="button" onClick={editingState.resetToDefaults}>
                 Valeurs du modèle
               </button>
               <button type="button" className="primary" onClick={confirmParameters}>

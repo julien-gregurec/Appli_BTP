@@ -8,7 +8,13 @@ import type { TraceParameter } from "@/lib/geometry/trace-model";
 export type TraceParametersFormProps = {
   parameters: readonly TraceParameter[];
   values: Readonly<Record<string, number>>;
-  onChange: (id: string, value: number) => void;
+  /**
+   * ATELIER-VERTEX-EDIT-UNDO-REDO-V1 §7 — le libellé du paramètre accompagne la valeur : c'est
+   * lui qui nomme l'entrée d'historique (« Annulé : Diamètre »). Le passer ici évite à
+   * l'appelant de re-chercher le paramètre par son identifiant pour retrouver son nom.
+   * Argument facultatif à la lecture : un `onChange` à deux paramètres reste valide.
+   */
+  onChange: (id: string, value: number, label: string) => void;
 };
 
 export function TraceParametersForm({ parameters, values, onChange }: TraceParametersFormProps) {
@@ -30,7 +36,7 @@ export function TraceParametersForm({ parameters, values, onChange }: TraceParam
             aria-label={parameter.label}
             onChange={(event) => {
               const parsed = Number(event.target.value.replace(",", "."));
-              if (Number.isFinite(parsed)) onChange(parameter.id, parsed);
+              if (Number.isFinite(parsed)) onChange(parameter.id, parsed, parameter.label);
             }}
           />
         </label>

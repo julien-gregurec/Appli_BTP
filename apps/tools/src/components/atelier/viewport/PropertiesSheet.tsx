@@ -3,14 +3,20 @@
 /**
  * Panneau « propriétés » — SHELL UNIQUEMENT (§10).
  *
- * Affiche en lecture seule les données de l'entité fournies en props. Aucune édition
- * géométrique : les champs sont du texte, pas des inputs — c'est le lot suivant qui décidera
- * quelles propriétés deviennent modifiables et par quelle commande.
+ * Affiche en lecture seule les données de l'entité fournies en props. Les champs restent du
+ * texte : l'édition d'un sommet passe par sa poignée dans le plan ou par le formulaire de
+ * réglages, jamais par une troisième saisie qui aurait sa propre notion de validité.
+ *
+ * ATELIER-VERTEX-EDIT-UNDO-REDO-V1 §3/§10 — le panneau dit ce que le point sélectionné
+ * PILOTE, ou pourquoi il ne pilote rien. C'est ce qui rend la matrice d'éditabilité lisible
+ * sur le chantier plutôt que réservée au code : « Foyer F1 — les foyers découlent des deux
+ * axes » vaut mieux qu'une poignée absente sans explication.
  *
  * Mobile : feuille basse fixée (`sheetFloating`). Desktop : colonne latérale collante — les deux
  * variantes sont pilotées par le CSS Module, sans branche JS de mise en page.
  */
 
+import { describeHandleDrives, type EditableHandle } from "@/lib/tracing/editable-handle";
 import type { SceneEntityDetails } from "./plan-scene";
 import { entityKindLabel } from "./plan-scene";
 import styles from "./viewport.module.css";
@@ -19,11 +25,13 @@ export type PropertiesSheetProps = {
   open: boolean;
   details: SceneEntityDetails | null;
   onClose: () => void;
+  /** Poignée du point sélectionné, quand il en a une. */
+  handle?: EditableHandle | null;
   /** Variante mobile en feuille basse. Le desktop garde le panneau dans le flux. */
   floating?: boolean;
 };
 
-export function PropertiesSheet({ open, details, onClose, floating = false }: PropertiesSheetProps) {
+export function PropertiesSheet({ open, details, onClose, handle = null, floating = false }: PropertiesSheetProps) {
   if (!open) return null;
 
   return (
@@ -59,9 +67,17 @@ export function PropertiesSheet({ open, details, onClose, floating = false }: Pr
         <p className={styles.sheetEmpty}>Aucun élément sélectionné.</p>
       )}
 
-      <p className={styles.sheetNotice}>
-        Lecture seule : la modification des cotes et des sommets arrivera avec les outils d’édition.
-      </p>
+      {handle ? (
+        <p className={styles.sheetNotice}>
+          {handle.editable
+            ? `Réglable en mode Édition : ${describeHandleDrives(handle)}.`
+            : `Non réglable. ${handle.readonlyReason}`}
+        </p>
+      ) : (
+        <p className={styles.sheetNotice}>
+          Lecture seule : seuls les sommets réglables du modèle se déplacent, en mode Édition.
+        </p>
+      )}
     </section>
   );
 }
