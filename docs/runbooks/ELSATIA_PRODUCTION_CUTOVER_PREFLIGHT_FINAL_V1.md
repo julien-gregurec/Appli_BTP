@@ -6,8 +6,8 @@ pack opérationnel de fenêtre aux §14–§27.** Aucune migration Production, a
 Production, aucune mutation Stripe Live, aucun secret affiché, aucune modification de code ou de
 migration Production dans ce lot.
 
-> **Rebasage 2026-09-05 — cible cutover figée sur `b371641` / ledger 263.** Deux lots validés
-> depuis la version 1.2 (`b371641` remplace l'ancien SHA cible `c1930ab` partout dans ce
+> **Rebasage 2026-09-05 — cible cutover figée sur `1d15289` / ledger 263.** Deux lots validés
+> depuis la version 1.2 (`1d15289` remplace l'ancien SHA cible `c1930ab` partout dans ce
 > document) : recette premier client (migration `…000264`, correctifs onboarding/ACL
 > `entreprise_besoins` et `cout_horaire` employé) et politique d'essai (migration `…000265`,
 > essai 30 jours borné aux modules catalogue `actif`). Baseline Production confirmée = **210
@@ -25,7 +25,7 @@ runbook de bascule/rollback existant :
 - Preuves BDD E2E + rollback local (cible 253) : `docs/audits/ELSATIA_PREPROD_DB_E2E_ROLLBACK_V1.md`.
 - Canonicalisation d'historique : `docs/audits/migration-canonicalization-v2.md`.
 - Revue indépendante préprod : `docs/audits/ELSATIA_PREPROD_INDEPENDENT_REVIEW_V1_R2.md`.
-- **Preuves d'exécution offline au SHA `b371641` (Fresh 263, Restore→263, rollback, drift ACL)** :
+- **Preuves d'exécution offline au SHA `1d15289` (Fresh 263, Restore→263, rollback, drift ACL)** :
   §13 de ce document (lot `ELSATIA-CUTOVER-OFFLINE-P0-CLOSURE-V1`, 2026-09-04).
 - **Pack opérationnel de fenêtre réelle** (rôles, P0-1/P0-3/T0/MFA/multitenant/Colors-Tools/
   Stripe/GO/rollback) : §14–§27 de ce document (lot
@@ -43,7 +43,7 @@ runbook de bascule/rollback existant :
 | Élément | Runbook V1 (2026-09-02) | Préflight final (ce document) |
 |---|---|---|
 | Branche cible | `feat/tarification-on-canonical-preprod-v1` | `feat/elsatia-commercial-canonical-r1-r2-r3-v1` |
-| SHA cible | `ac7bf050…` | **`b371641572489337671c89e0a9dfcf4d8c3a5824`** |
+| SHA cible | `ac7bf050…` | **`1d15289294434643b5085af3585440ac2d162ddc`** |
 | Ledger cible | 253 (`…000255`) | **263 (`…000265`)** |
 | Delta vs `ac7bf05` | — | **+10 migrations** : `…000256` → `…000265` (R1 capacité, R3 modules, R2 Stripe capacité, ACL webhook abonnement, clôture lifecycle, correctif ACL onboarding/`entreprise_besoins`, correctif `cout_horaire` employé, essai 30 jours borné aux modules catalogue) |
 | Frontend Production actuel | `release/commercialisation-v1` @ `fcdd4e7c` (obsolète pré-canonique) | inchangé |
@@ -77,7 +77,7 @@ reconfirmée par une lecture en lecture seule** par l'opérateur, à T-60 :
 # jeton d'accès personnel Supabase requis dans l'environnement de l'opérateur
 supabase login                      # ou export SUPABASE_ACCESS_TOKEN=...
 supabase migration list --linked --project-ref exhvuzegsefmoguxoiak
-# → colonne "Remote" = ledger réel ; comparer au fichier supabase/migrations/ de b371641
+# → colonne "Remote" = ledger réel ; comparer au fichier supabase/migrations/ de 1d15289
 
 # ledger brut + sentinelles (psql lecture seule sur la chaîne Production)
 psql "$PROD_READONLY_DSN" -c "select count(*), max(version) from supabase_migrations.schema_migrations;"
@@ -92,19 +92,19 @@ psql "$PROD_READONLY_DSN" -c "select
 ```
 
 **Sortie attendue à archiver** : liste ordonnée des versions Production + `count`/`max` +
-sentinelles. Le diff `versions canoniques (b371641) − versions Production` **est** la liste
+sentinelles. Le diff `versions canoniques (1d15289) − versions Production` **est** la liste
 d'application du §2.
 
 ---
 
 ## 2. Migration gap — liste ordonnée à appliquer
 
-Cible canonique : **263 migrations** (`supabase/migrations/*.sql` @ `b371641`,
+Cible canonique : **263 migrations** (`supabase/migrations/*.sql` @ `1d15289`,
 `verify:migrations` = « 263 migrations valides, noms et horodatages uniques »).
 
 Aucune migration historique déjà présente sur Production (≤ `fcdd4e7c`) n'est modifiée par la
 lignée canonique — vérifié par la revue indépendante R2
-(`git diff fcdd4e7c..b371641 -- supabase/migrations/` : aucune migration existante touchée).
+(`git diff fcdd4e7c..1d15289 -- supabase/migrations/` : aucune migration existante touchée).
 **Le cutover est donc purement additif (append-only).**
 
 ### 2.1 Volume
@@ -113,7 +113,7 @@ lignée canonique — vérifié par la revue indépendante R2
 |---|---|---|
 | ledger **210** (dernière `…000231`) | ledger **263** (dernière `…000265`) | **53** |
 
-La liste exacte = **toute version de `supabase/migrations/` @ `b371641` absente du ledger
+La liste exacte = **toute version de `supabase/migrations/` @ `1d15289` absente du ledger
 Production**, appliquée **dans l'ordre lexical du nom de fichier** (= ordre d'application).
 Y compris les versions à horodatage inférieur au `max(version)` Production (migrations Preview-only
 et réconciliations réintégrées par la canonicalisation v2).
@@ -152,7 +152,7 @@ supplémentaire pour l'ancien binaire au-delà de ce que 255 impose déjà (cf. 
 ### 2.4 Contrôles post-application (T0)
 
 - ledger final = **263**, `…000263` présente, `…000255` présente, aucune collision de timestamp ;
-- `verify:migrations` (dans un environnement portant le code `b371641`) = 263 uniques ;
+- `verify:migrations` (dans un environnement portant le code `1d15289`) = 263 uniques ;
 - second passage `supabase migration up` : `applied: []` ;
 - pgTAP Production ciblé (référence Fresh 263 **et** Restore→263, drill offline §13.1/§13.2 :
   **54 fichiers / 1154 tests — PASS**, identique sur les deux) + smoke SQL sentinelles inchangées ;
@@ -171,13 +171,13 @@ supplémentaire pour l'ancien binaire au-delà de ce que 255 impose déjà (cf. 
    `fcdd4e7c` échouera fermé sur des chemins plateforme/remise et ignore R1/R2/R3.
 
 2. **Un cutover coordonné DB + app est nécessaire.** Ordre : migrations (T0) → déploiement de
-   l'app sur **`b371641`** (T+15) → contrôles → ouverture (T+30). L'app `b371641` est la seule
+   l'app sur **`1d15289`** (T+15) → contrôles → ouverture (T+30). L'app `1d15289` est la seule
    qui connaît le schéma cible complet (ACL 255, MFA/AAL2, Colors, Tools, R1/R2/R3).
 
 3. **Point de non-retour exact : application de `20260902000255_acl_reconciliation_v1`.**
    Avant : un rollback Vercel seul suffit. Après : le rollback code seul est insuffisant — les
    migrations 256–263 ne déplacent pas ce point (append-only, sans REVOKE large supplémentaire),
-   mais elles élargissent le schéma que seul `b371641` sait exploiter.
+   mais elles élargissent le schéma que seul `1d15289` sait exploiter.
 
 4. **Rollback = restauration DB (PITR / snapshot pris à T-30) + redéploiement coordonné du
    frontend correspondant à l'état DB restauré.** Détail : runbook V1 §5 (stratégies A/B/C),
@@ -262,7 +262,7 @@ au lieu des Prices « 10 × mensuel » de la grille canonique — lot
 
 Aucun QR, seed TOTP ni code n'est demandé, transmis ou consigné (ici ou ailleurs).
 
-1. **Déployer l'app canonique (`b371641`)** sur la Production Branch correcte (**pas `main`**).
+1. **Déployer l'app canonique (`1d15289`)** sur la Production Branch correcte (**pas `main`**).
 2. **Login AAL1** de l'admin humain (`julien@elsatia.fr`) — les sessions AAL1 pré-cutover sont
    automatiquement re-challengées (comportement voulu).
 3. **Enrollment TOTP** si le facteur n'existe pas / doit être renouvelé : l'admin scanne son
@@ -283,7 +283,7 @@ ré-enrôlement TOTP. **Jamais** de `DELETE FROM auth.mfa_factors` manuel comme 
 
 ## 7. Colors / Tools — impact du cutover
 
-- **`b371641` contient déjà** l'intégration Colors (`apps/colors/**`, migrations `…000246`–`…000249`)
+- **`1d15289` contient déjà** l'intégration Colors (`apps/colors/**`, migrations `…000246`–`…000249`)
   et Tools (`apps/tools/**`, migrations `…8`/`…9`/`…10`, R8/R9/R10), la convergence multi-app
   (`…000234`), le compte partagé plateforme et le catalogue d'accès. Ces éléments sont dans le
   **bloc 210→253 déjà validé** Fresh + Restore + pgTAP + E2E `Playwright 40/40`.
@@ -292,11 +292,11 @@ ré-enrôlement TOTP. **Jamais** de `DELETE FROM auth.mfa_factors` manuel comme 
 - **Contrat multi-app** (compte partagé, catalogue d'accès, redirect URLs Colors/Tools) : porté
   par `…000234`–`…000240`/`…000248`/`…000250`, inclus dans le bloc déjà validé ; le cutover ne
   le modifie pas.
-- **Devient immédiatement fonctionnel après migrations + déploiement `b371641`** :
+- **Devient immédiatement fonctionnel après migrations + déploiement `1d15289`** :
   - R1 — compteur « personnes actives » X/Y sur `/abonnement`, garde de capacité serveur ;
   - R3 — section **Modules** de `/abonnement` (inclus plan / ajoutés / disponibles), garde
     module `acces_module_pour_permission` dans le proxy, page terminale
-    `/abonnement/module-non-inclus` (correctif boucle post-login `b371641`) ;
+    `/abonnement/module-non-inclus` (correctif boucle post-login `1d15289`) ;
   - R2 — gestion de capacité supplémentaire (+1/+5/+10, prévisualisation, baisse planifiée,
     annulation) câblée sur Stripe **TEST** ;
   - webhook abonnement Stripe conforme à l'ACL canonique (RPC SECURITY DEFINER dédiées).
@@ -335,8 +335,8 @@ Durées **indicatives** (repères d'ordre, pas d'engagement). Détail des contr�
 - [ ] Gel : aucun merge, aucun déploiement concurrent sur la branche canonique.
 - [ ] **Relecture baseline Production en direct** (§1) : ledger réel, `max(version)`, sentinelles,
       confirmation que `…000255` n'est pas appliquée. Archiver la sortie.
-- [ ] Calculer le diff `versions(b371641) − versions(Production)` → **liste d'application ordonnée** (§2).
-- [ ] Vérifier SHA cible `b371641` et SHA Production actuel (`fcdd4e7c` attendu).
+- [ ] Calculer le diff `versions(1d15289) − versions(Production)` → **liste d'application ordonnée** (§2).
+- [ ] Vérifier SHA cible `1d15289` et SHA Production actuel (`fcdd4e7c` attendu).
 - [ ] Accès rollback vérifiés : Vercel, PITR/snapshot activé sur le projet, volume DR chiffré monté.
 - [x] Preuves vertes (offline, §13) : Fresh 263 + pgTAP 54/1154, Restore→263 + pgTAP 54/1154,
       drift ACL applicatif = 0, rollback 210 → 263 → 210 sur snapshot ; GP `vitest` 791/791 +
@@ -361,7 +361,7 @@ Durées **indicatives** (repères d'ordre, pas d'engagement). Détail des contr�
 - [ ] **Point de décision migration** : ledger + pgTAP OK → continuer ; sinon → §10 scénario T0.
 
 ### T+15 — Déploiement app + vérifications
-- [ ] Déployer l'app sur **`b371641`** (Production Branch correcte, **pas `main`**).
+- [ ] Déployer l'app sur **`1d15289`** (Production Branch correcte, **pas `main`**).
 - [ ] **Auth / MFA** (§6) : login AAL1 → challenge TOTP → AAL2 → `/plateforme` → logout/relogin.
 - [ ] **Admin / rôle** : matrice non-auth / AAL1 / AAL2 non-admin / AAL2 admin inactif / AAL2 admin `total` actif.
 - [ ] **Multitenant** : entreprise A ne voit rien de B (tables, RPC, documents, Storage, habilitations apps, changement d'entreprise).
@@ -419,9 +419,9 @@ extraction de la clé privée Ed25519 hors Vercel, `DELETE FROM auth.mfa_factors
 | # | Blocker | État | Levée |
 |---|---|---|---|
 | P0-1 | **Baseline Production non relue en direct** dans un contexte autorisé (ledger réel, sentinelles, absence de `…000255`) | ouvert (pas d'accès Production dans le lot de préparation) | opérateur exécute §1 à T-60, archive la sortie |
-| P0-2 | ~~Répétition Fresh 263 + Restore 263 + pgTAP + rollback `210 → 263 → 210`~~ | **FERMÉ 2026-09-04** — drill offline complet au SHA `b371641`, preuves §13.1–§13.3 | — |
+| P0-2 | ~~Répétition Fresh 263 + Restore 263 + pgTAP + rollback `210 → 263 → 210`~~ | **FERMÉ 2026-09-04** — drill offline complet au SHA `1d15289`, preuves §13.1–§13.3 | — |
 | P0-3 | **PITR/snapshot + dump chiffré + backup Storage + test de restauration** au `backup_id` du **cutover réel** | non créés (interdits hors fenêtre Production) — le T0-snapshot §13.2 est un drill offline, pas la sauvegarde Production | T-30, opérateur + CODEX |
-| P0-4 | ~~Diff ACL applicatif Fresh↔Restore rejoué au SHA `b371641`~~ | **FERMÉ 2026-09-04** — `application_acl_drift = 0` (6 294 lignes normalisées, 0 diff), preuve §13.4 | — |
+| P0-4 | ~~Diff ACL applicatif Fresh↔Restore rejoué au SHA `1d15289`~~ | **FERMÉ 2026-09-04** — `application_acl_drift = 0` (6 294 lignes normalisées, 0 diff), preuve §13.4 | — |
 | P0-5 | ~~Préparation opérationnelle de la fenêtre (rôles, planning, checklists P0-1/P0-3/T0, GO/rollback)~~ | **PRÉPARATION FERMÉE 2026-09-04** — pack complet §14–§27 + checklist imprimable ; **reste à faire par Julien** : fixer la date/heure réelle et les noms (§14.3, §27) | Julien renseigne date + noms sur la checklist |
 
 ### Blockers P1 (à traiter, non bloquants pour figer la date)
@@ -458,7 +458,7 @@ Production live, sauvegardes datées du cutover réel — les deux nécessitent 
 que ce lot n'a pas). **P0-2, P0-4 et la préparation opérationnelle de P0-5 sont fermés**
 (2026-09-04) :
 - P0-2/P0-4 (preuves §13) : drill Fresh 263 / Restore→263 / rollback / drift ACL au bon SHA
-  (`b371641`) fait et vert, rejoué sur le schéma historique exact de `5777abb` (210 migrations,
+  (`1d15289`) fait et vert, rejoué sur le schéma historique exact de `5777abb` (210 migrations,
   baseline Production confirmée — remplace l'ancienne référence `fcdd4e7c`/211 du runbook V1) —
   sans lire la Production réelle : le ledger live reste à confirmer au P0-1.
 - P0-5 (pack §14–§27 + checklist imprimable) : rôles définis, planning horaire relatif figé,
@@ -466,7 +466,7 @@ que ce lot n'a pas). **P0-2, P0-4 et la préparation opérationnelle de P0-5 son
   exécutables. **Il manque uniquement une date/heure réelle et des noms**, volontairement non
   inventés (décision de Julien).
 
-La **cible technique est prête et figée** : SHA `b371641`, ledger 263, 53 migrations additives
+La **cible technique est prête et figée** : SHA `1d15289`, ledger 263, 53 migrations additives
 ordonnées depuis la baseline Production confirmée (210, dernière `…000231`), aucune migration
 historique modifiée, runbook et rollback définis, socle commercial + correctif boucle post-login
 validés en local **et** via un upgrade réel 210→263 rejoué sur ce schéma historique. **Le
@@ -503,13 +503,13 @@ avec la méthode déjà documentée par `ELSATIA_PREPROD_DB_E2E_ROLLBACK_V1.md` 
 depuis les ledgers et objets observés, pas depuis une restauration physique distante ») — avec un
 jeu de migrations **exact** ici (fichiers git réels), pas une reconstruction approximative.
 
-Confirmé au préalable (`git diff --name-status 5777abb b371641 -- supabase/migrations/`) :
+Confirmé au préalable (`git diff --name-status 5777abb 1d15289 -- supabase/migrations/`) :
 **53 fichiers ajoutés, 0 modifié** → le gap est purement additif, et est la même liste que le §2.
 
 ### 13.1 A. Fresh 263
 
 - Pile : projet Supabase local `btp-platform` (existant), `supabase db reset --local` au SHA
-  `b371641`+docs (`6be33d4`, sans effet sur les migrations).
+  `1d15289`+docs (`6be33d4`, sans effet sur les migrations).
 - Résultat : 263 migrations appliquées dans l'ordre, 0 erreur, ~38 s.
 - Ledger : `count=263`, `max=20260904000263`.
 - Sondes objets : colonne capacité R1 présente ; `modules_gestion_pro`/`modules_entreprises`
@@ -608,7 +608,7 @@ observée par ailleurs reste couverte par l'allowlist figée de
 `elsatia-supabase-system-drift-audit-v1.md` (532 écarts système managés, classés, sans droit
 `anon`/`authenticated`/`service_role`/`authenticator` en trop) — non remise en cause ici.
 
-### 13.5 Tests finaux (SHA `b371641` + docs `6be33d4`)
+### 13.5 Tests finaux (SHA `1d15289` + docs `6be33d4`)
 
 | Contrôle | Résultat |
 |---|---:|
@@ -641,7 +641,7 @@ concernées par ce lot n'ont pas été touchées.
 ### 13.7 Verdict du drill
 
 ```text
-P0-2 (Fresh/Restore/rollback au SHA b371641) : FERMÉ
+P0-2 (Fresh/Restore/rollback au SHA 1d15289) : FERMÉ
 P0-4 (drift ACL applicatif Fresh↔Restore)     : FERMÉ — application_acl_drift = 0
 ```
 
@@ -676,7 +676,7 @@ exécution (fichier imprimable : `ELSATIA_PRODUCTION_CUTOVER_OPERATOR_CHECKLIST_
 | **T0** | **Gate P0-3** + **checklist GO-T0** complète (§17). Un seul item KO → **NO-GO**, aucune migration. Si PASS intégral : démarrage immédiat des migrations (§18). | GO/NO-GO |
 | **T+10** | Ledger vérifié = 263, `…000255` et `…000263` présentes, second `migration up` = rien à appliquer. | — |
 | **T+20** | pgTAP critique + smoke SQL sentinelles inchangées. **Point de décision migration** : continuer vers déploiement, ou STOP + rollback DB (§13 runbook V1, scénario T0) si ledger incohérent. | GO/ROLLBACK |
-| **T+30** | Déploiement app `b371641` (§19) démarré + premiers contrôles (login, absence 5xx critique, absence boucle de redirection, `/abonnement`, dashboard, chantier, stock, module inclus/non inclus). | — |
+| **T+30** | Déploiement app `1d15289` (§19) démarré + premiers contrôles (login, absence 5xx critique, absence boucle de redirection, `/abonnement`, dashboard, chantier, stock, module inclus/non inclus). | — |
 | **T+45** | MFA admin 1 + admin 2 (§20), multitenant A/B (§21), Colors/Tools (§22), Stripe TEST (§23). | — |
 | **T+60** | **Décision GO/NO-GO globale** (§24/§25). GO → ouverture du service (fin de maintenance active). Un seul critère rollback → §26 engagé immédiatement. | GO/ROLLBACK |
 | **T+90** | Si GO : surveillance rapprochée (Sentry, 5xx, login/MFA réels, webhooks Stripe Test, upload/download, RLS). Si rollback engagé : suivi de la procédure §26 en cours. | — |
@@ -727,7 +727,7 @@ mot de passe DB, clé API). Commandes de référence : §1 de ce document.
       procédure standard, ne pas réappliquer 255)
 - [ ] Gap réel vers 263 calculé (`263 − ledger observé`, attendu **53** si le ledger observé
       confirme bien la baseline à 210) et **liste exacte des versions absentes** matérialisée
-      (diff avec `supabase/migrations/` @ `b371641`)
+      (diff avec `supabase/migrations/` @ `1d15289`)
 - [ ] Confirmer que le ledger réel correspond bien à la baseline attendue de **210** (et non
       l'ancienne hypothèse de 211) — noter la valeur observée, ne pas supposer
 - [ ] Sentinelles métier lues (`count` sur entreprises/utilisateurs/clients/chantiers/devis/
@@ -741,7 +741,7 @@ mot de passe DB, clé API). Commandes de référence : §1 de ce document.
 ### 15.2 Résultat
 
 **Résultat = PASS** uniquement si les 10 cases sont cochées ET le gap est cohérent avec les
-migrations `supabase/migrations/*.sql` @ `b371641` (aucune version canonique manquante de la
+migrations `supabase/migrations/*.sql` @ `1d15289` (aucune version canonique manquante de la
 liste calculée, aucune version inattendue côté Production qui ne serait pas dans l'historique
 canonique). Sinon **FAIL**.
 
@@ -790,7 +790,7 @@ backup non testé n'est pas un backup valide au sens de ce runbook.
 - [ ] Gap exact confirmé (liste figée, §15)
 - [ ] Backup vérifié (§16, PASS, restauration prouvée)
 - [ ] Responsable rollback (**C**) présent et joignable
-- [ ] SHA app `b371641572489337671c89e0a9dfcf4d8c3a5824` disponible et prêt à déployer (build
+- [ ] SHA app `1d15289294434643b5085af3585440ac2d162ddc` disponible et prêt à déployer (build
       Vercel préparé)
 - [ ] Branche Vercel « Production Branch » correcte (branche canonique de release)
 - [ ] Production Branch **≠ `main`** (cf. `NE_PAS_DEPLOYER_MAIN.md`)
@@ -864,7 +864,7 @@ Provisioning détaillé, formats et commandes exactes : `ELSATIA_ED25519_ATTESTA
 
 ## 19. Déploiement application (après DB verte, T+20 → T+30)
 
-Déployer **uniquement** `b371641572489337671c89e0a9dfcf4d8c3a5824` sur la Production Branch
+Déployer **uniquement** `1d15289294434643b5085af3585440ac2d162ddc` sur la Production Branch
 correcte.
 
 Vérifications (exécutant **A**, contrôle **D**) :
@@ -872,7 +872,7 @@ Vérifications (exécutant **A**, contrôle **D**) :
 - [ ] `app.elsatia.fr` répond (pas de 5xx à l'accueil)
 - [ ] Login fonctionnel (formulaire + redirection post-login)
 - [ ] Aucun 5xx critique sur les routes clés
-- [ ] Aucune boucle de redirection (le correctif `b371641` couvre le cas compte dépôt sans
+- [ ] Aucune boucle de redirection (le correctif `1d15289` couvre le cas compte dépôt sans
       module borne → `/abonnement/module-non-inclus` terminal, cf. mission
       `ELSATIA-POSTLOGIN-MODULE-ROUTING-CLOSURE-V1`)
 - [ ] `/abonnement` : statut, offre, capacité X/Y, section Modules rendue
