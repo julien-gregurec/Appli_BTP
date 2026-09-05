@@ -401,6 +401,8 @@ footer { background: #e9e8e3; }
 .atelier-card .atelier-meta { margin: 4px 0 0; color: var(--ink-soft); font-size: 11px; }
 .atelier-card time { display: block; margin-top: 4px; color: #8a9599; font-size: 10px; }
 .atelier-card a { display: inline-grid; min-height: 40px; place-items: center; padding: 0 16px; border-radius: 8px; background: var(--navy); color: white; font-size: 10px; font-weight: 800; }
+.atelier-card-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.atelier-card-actions a.ghost { background: transparent; border: 1px solid var(--line); color: var(--navy); }
 .atelier-empty { padding: 56px 24px; border: 1px dashed #cfd4d1; border-radius: 13px; color: var(--ink-soft); text-align: center; }
 .atelier-empty span { color: var(--amber); font-size: 46px; }
 .atelier-empty h2 { margin: 10px 0 6px; color: var(--ink); font-family: Georgia, serif; font-size: 24px; font-weight: 500; }

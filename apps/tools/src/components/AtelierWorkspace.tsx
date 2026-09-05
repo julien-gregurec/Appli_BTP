@@ -141,7 +141,12 @@ export function AtelierWorkspace() {
                   {project.dimensionsLabel && <p className="atelier-meta">Pièce : {project.dimensionsLabel}</p>}
                   <time dateTime={project.updatedAt}>Modifié le {dateFormat.format(new Date(project.updatedAt))}</time>
                 </div>
-                <Link href={`/atelier/nouveau?reprendre=${encodeURIComponent(project.id)}`}>Reprendre</Link>
+                <div className="atelier-card-actions">
+                  <Link href={`/atelier/nouveau?reprendre=${encodeURIComponent(project.id)}`}>Reprendre</Link>
+                  <Link href={`/atelier/export?projectId=${encodeURIComponent(project.id)}`} className="ghost">
+                    Exporter
+                  </Link>
+                </div>
               </article>
             ))}
           </div>

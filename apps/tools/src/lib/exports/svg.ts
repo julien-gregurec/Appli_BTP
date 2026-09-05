@@ -1,4 +1,4 @@
-import { createArcPath, createPlanTransform } from "../geometry/plan-model";
+import { createArcPath, createPlanTransform, createPolygonPath, createPolylinePath } from "../geometry/plan-model";
 import type { ShapeGeometry } from "../geometry/shape-model";
 import type { ProjectDocument } from "./document";
 
@@ -20,6 +20,8 @@ export function renderPlanSvg(model: ShapeGeometry, title: string, options: SvgE
   for (const item of model.arcs) parts.push(`<path id="${escape(item.id)}" class="shape" d="${createArcPath(item, transform)}"/>`);
   for (const item of model.circles.filter((circle) => circle.role !== "construction")) { const centre = p(item.centre); parts.push(`<circle id="${escape(item.id)}" class="shape" cx="${number(centre.x)}" cy="${number(centre.y)}" r="${number(transform.radius(item.radius))}"/>`); }
   for (const item of model.ellipses) { const centre = p(item.centre); parts.push(`<ellipse id="${escape(item.id)}" class="shape" cx="${number(centre.x)}" cy="${number(centre.y)}" rx="${number(transform.radius(item.radiusX))}" ry="${number(transform.radius(item.radiusY))}"/>`); }
+  for (const item of model.polylines ?? []) parts.push(`<path id="${escape(item.id)}" class="shape" d="${createPolylinePath(item, transform)}"/>`);
+  for (const item of model.polygons ?? []) parts.push(`<path id="${escape(item.id)}" class="shape" d="${createPolygonPath(item, transform)}"/>`);
   if (showDetails) {
     for (const item of model.dimensions) { const a = p(item.from); const b = p(item.to); const midX = (a.x + b.x) / 2; const midY = (a.y + b.y) / 2 - 10; parts.push(`<g id="${escape(item.id)}" class="dimension">${line(`${item.id}-line`, a, b, "dimension-line")}<text x="${number(midX)}" y="${number(midY)}">${escape(item.label)}</text></g>`); }
     for (const item of model.points) { const value = p(item); parts.push(`<g id="point-${escape(item.id)}" class="point"><circle cx="${number(value.x)}" cy="${number(value.y)}" r="4"/><text x="${number(value.x + 8)}" y="${number(value.y - 8)}">${escape(item.label ?? item.id)}</text></g>`); }

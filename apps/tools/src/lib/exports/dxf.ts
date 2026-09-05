@@ -255,6 +255,12 @@ export function shapeGeometryToDxf(model: ShapeGeometry): ShapeGeometryToDxfResu
       value: dimension.label,
     });
   }
+  for (const polyline of model.polylines ?? []) {
+    entities.polylines!.push({ layer: "FINAL", closed: false, points: polyline.points.map((point) => ({ x: point.x, y: point.y })) });
+  }
+  for (const polygon of model.polygons ?? []) {
+    entities.polylines!.push({ layer: "FINAL", closed: true, points: polygon.points.map((point) => ({ x: point.x, y: point.y })) });
+  }
 
   return { entities, approximations };
 }

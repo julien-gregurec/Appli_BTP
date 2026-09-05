@@ -90,6 +90,12 @@ function desiredArcDelta(arc: Arc) {
   return delta;
 }
 
+/** Trace une polyligne déjà projetée en points écran ; ferme le contour si `closed`. */
+function drawPolyPath(pdf: jsPDF, points: readonly { x: number; y: number }[], closed: boolean) {
+  for (let index = 1; index < points.length; index++) pdf.line(points[index - 1].x, points[index - 1].y, points[index].x, points[index].y);
+  if (closed && points.length > 2) pdf.line(points[points.length - 1].x, points[points.length - 1].y, points[0].x, points[0].y);
+}
+
 function drawSchematicPlan(pdf: jsPDF, model: ShapeGeometry, x: number, y: number, width: number, height: number) {
   const transform = createPlanTransform(model, width, height, 5);
   const p = (source: { x: number; y: number }) => { const value = transform.point(source); return { x: x + value.x, y: y + value.y }; };
@@ -104,6 +110,8 @@ function drawSchematicPlan(pdf: jsPDF, model: ShapeGeometry, x: number, y: numbe
   for (const item of model.segments) { const a = p(item.start); const b = p(item.end); pdf.line(a.x, a.y, b.x, b.y); }
   for (const item of model.circles.filter((circle) => circle.role !== "construction")) { const centre = p(item.centre); pdf.circle(centre.x, centre.y, transform.radius(item.radius)); }
   for (const item of model.ellipses) { const centre = p(item.centre); pdf.ellipse(centre.x, centre.y, transform.radius(item.radiusX), transform.radius(item.radiusY)); }
+  for (const item of model.polylines ?? []) drawPolyPath(pdf, item.points.map(p), false);
+  for (const item of model.polygons ?? []) drawPolyPath(pdf, item.points.map(p), true);
   for (const item of model.arcs) {
     const delta = desiredArcDelta(item);
     const steps = Math.max(24, Math.ceil(Math.abs(delta) / (Math.PI / 36)));
@@ -431,6 +439,9 @@ function drawTilePage(pdf: jsPDF, geometry: ShapeGeometry, tile: MosaicTile, mos
   pdf.setLineWidth(.35);
   for (const segment of geometry.segments) { const a = toPage(segment.start); const b = toPage(segment.end); pdf.line(a.x, a.y, b.x, b.y); }
   for (const circle of geometry.circles) { const centre = toPage(circle.centre); pdf.circle(centre.x, centre.y, circle.radius); }
+  for (const ellipse of geometry.ellipses) { const centre = toPage(ellipse.centre); pdf.ellipse(centre.x, centre.y, ellipse.radiusX, ellipse.radiusY); }
+  for (const item of geometry.polylines ?? []) drawPolyPath(pdf, item.points.map(toPage), false);
+  for (const item of geometry.polygons ?? []) drawPolyPath(pdf, item.points.map(toPage), true);
   for (const arc of geometry.arcs) {
     const delta = desiredArcDelta(arc);
     const steps = Math.max(24, Math.ceil(Math.abs(delta) / (Math.PI / 36)));
