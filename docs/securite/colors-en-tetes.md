@@ -118,39 +118,11 @@ rien apporté.
 
 ## 4. Réinitialisation de mot de passe — état réel
 
-Le code applicatif est en place et testé. **Deux réglages hors dépôt empêchent
-aujourd'hui le parcours d'aboutir sur Colors en Production.** Ils demandent une
-intervention humaine dans le Dashboard Supabase et n'ont pas été touchés.
+Le code applicatif de Colors est en place et testé. Deux réglages Supabase
+Production ont été appliqués par l'exploitant après la première passe de ce
+lot ; les mesures ci-dessous sont postérieures.
 
-### 4.1 Le gabarit d'e-mail est ancré sur `SiteURL`
-
-`supabase/templates/reset_password.html`, appliqué en Production lors de la
-phase P5 (voir `docs/organisation/REGISTRE_CENTRAL.md`), construit le lien avec :
-
-```
-{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery
-```
-
-`SiteURL` du projet Supabase Production vaut `https://app.elsatia.fr` (mesuré,
-§4.3). Le gabarit est unique pour tout le projet : un utilisateur qui demande
-une réinitialisation **depuis Colors** reçoit donc un lien vers Gestion Pro, sur
-un chemin `/auth/confirm` que Colors ne possède pas. `redirectTo` n'intervient
-pas dans la construction du lien avec ce gabarit.
-
-### 4.2 Le `redirectTo` de Colors ne passe pas la liste blanche
-
-`urlCallbackReinitialisation()` produit :
-
-```
-https://colors.elsatia.fr/auth/callback?next=%2Fnouveau-mot-de-passe
-```
-
-La liste blanche Production contient l'entrée **exacte**
-`https://colors.elsatia.fr/auth/callback`, sans joker. GoTrue compare la chaîne
-entière : la présence de la chaîne de requête suffit à faire échouer la
-comparaison, et le repli est `SiteURL`. Mesuré, §4.3.
-
-### 4.3 Mesures — liste blanche Auth Production
+### 4.1 Liste blanche Auth — RÉSOLUE
 
 Sondage en lecture seule de `/auth/v1/verify` avec un jeton invalide : une URL
 autorisée est reprise telle quelle dans `Location`, une URL refusée retombe sur
@@ -158,34 +130,61 @@ autorisée est reprise telle quelle dans `Location`, une URL refusée retombe su
 
 | `redirect_to` sondé | `Location` obtenu | Lecture |
 | --- | --- | --- |
-| `https://colors.elsatia.fr/auth/callback` | reprise telle quelle | **autorisée** |
-| `https://colors.elsatia.fr/auth/callback?x=1` | `https://app.elsatia.fr` | refusée |
-| `https://colors.elsatia.fr/auth/callback/` | `https://app.elsatia.fr` | refusée |
-| `https://colors.elsatia.fr` | `https://app.elsatia.fr` | refusée |
-| `https://sous-domaine-test.elsatia.fr/auth/callback` | `https://app.elsatia.fr` | refusée |
-| `https://tools.elsatia.fr/auth/callback` | `https://app.elsatia.fr` | refusée |
-| `https://app.elsatia.fr/nimporte-quoi?a=b` | reprise telle quelle | hôte de `SiteURL`, toujours autorisé |
-| `https://exemple-non-autorise.invalid/auth/callback` | `https://app.elsatia.fr` | refusée (témoin) |
+| `https://colors.elsatia.fr/auth/callback?next=%2Fnouveau-mot-de-passe` | reprise telle quelle | **autorisée** (entrée ajoutée) |
+| `https://colors.elsatia.fr/auth/callback` | reprise telle quelle | autorisée |
+| `https://colors.elsatia.fr` | `https://app.elsatia.fr` | **refusée** |
+| `https://exemple-non-autorise.invalid/x` | `https://app.elsatia.fr` | refusée (témoin) |
 
-### 4.4 Actions humaines requises (non exécutées)
+Le `redirectTo` que produit `urlCallbackReinitialisation()` passe désormais la
+validation Supabase. `SiteURL` reste `https://app.elsatia.fr`.
 
-Dashboard Supabase, projet `elsatia-production` (`exhvuzegsefmoguxoiak`) :
+### 4.2 Gabarit « Reset password » — RÉGRESSION OUVERTE
 
-1. **Authentication → URL Configuration → Redirect URLs** : *ajouter* — sans
-   rien supprimer — `https://colors.elsatia.fr/auth/callback?next=%2Fnouveau-mot-de-passe`,
-   ou l'entrée `https://colors.elsatia.fr/auth/callback**` qui couvre aussi les
-   évolutions du paramètre. `https://tools.elsatia.fr/auth/callback` est absente
-   également, si l'application Tools doit un jour ouvrir ce parcours.
-2. **Authentication → Emails → Reset Password** : le gabarit unique du projet
-   doit cesser d'ancrer le lien sur `SiteURL` pour que chaque application
-   ramène l'utilisateur chez elle. C'est une décision de produit — gabarit
-   pointant sur `{{ .RedirectTo }}`, ou renvoi assumé de la réinitialisation
-   Colors vers le portail de compte commun — et non un correctif mécanique :
-   elle n'a pas été tranchée ici.
+Le gabarit unique du projet a été modifié en remplaçant `{{ .SiteURL }}` par
+`{{ .RedirectTo }}` dans le lien. La ligne devient donc :
 
-Tant que le point 2 n'est pas tranché, la réinitialisation demandée depuis
-Colors aboutit sur Gestion Pro. Le compte ELSATIA étant commun, le mot de passe
-change bien ; le parcours, lui, n'est pas celui de Colors.
+```
+{{ .RedirectTo }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery
+```
+
+`.RedirectTo` n'est pas une origine : c'est l'URL complète passée par
+l'application, chaîne de requête comprise. La concaténation produit une URL
+malformée pour **les deux** applications.
+
+| Application | `redirectTo` envoyé | Lien composé |
+| --- | --- | --- |
+| Colors | `https://colors.elsatia.fr/auth/callback?next=%2Fnouveau-mot-de-passe` | `…/auth/callback?next=%2Fnouveau-mot-de-passe/auth/confirm?token_hash=…&type=recovery` |
+| Gestion Pro | `https://app.elsatia.fr/auth/callback?next=%2Fnouveau-mot-de-passe` | idem sur `app.elsatia.fr` |
+
+Le chemin réellement atteint est `/auth/callback`, sans paramètre `code`, et
+`token_hash` se retrouve enfoui dans la valeur de `next`.
+
+Effet mesuré en exécutant l'URL composée contre le code réel :
+
+- **Colors** — `GET /auth/callback?next=%2Fnouveau-mot-de-passe/auth/confirm?token_hash=FAUX_JETON&type=recovery`
+  répond `307` vers `/nouveau-mot-de-passe/auth/confirm?token_hash=FAUX_JETON`,
+  route inexistante : 404, aucune session ouverte. `cheminInterneSur` fait son
+  travail — la destination reste interne — mais la réinitialisation n'aboutit pas.
+- **Gestion Pro** — `src/app/auth/callback/route.ts` exige un `code` et
+  redirige sinon vers `/login?error=Lien de connexion invalide ou expiré.`
+  Le parcours de réinitialisation de Gestion Pro, jusqu'ici fonctionnel, est
+  donc cassé par cette modification.
+
+`{{ .RedirectTo }}` reste la bonne variable — c'est la seule qui varie par
+application — mais elle doit porter une **origine**, pas une URL de callback
+déjà pourvue d'une chaîne de requête. La forme cohérente est :
+
+| Élément | Valeur cible |
+| --- | --- |
+| Gabarit | `{{ .RedirectTo }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery` (inchangé) |
+| `redirectTo` Colors et Gestion Pro | `https://<origine de l'application>` |
+| Liste blanche | ajouter `https://colors.elsatia.fr` (mesurée refusée aujourd'hui) |
+| Code Colors | route `/auth/confirm` absente, à créer sur le modèle de Gestion Pro (page à clic explicite + `verifyOtp`) |
+| Code Gestion Pro | `urlCallbackReinitialisation()` doit renvoyer l'origine seule |
+
+Cela relève d'un lot distinct : il touche Gestion Pro et ajoute une route à
+Colors. En attendant, remettre `{{ .SiteURL }}` dans le gabarit restaure le
+parcours de Gestion Pro et remet Colors dans l'état décrit avant ce lot.
 
 ## 5. Vérifications effectuées
 
@@ -221,18 +220,11 @@ créée ni modifiée.
 | Variable | Production | Preview |
 | --- | --- | --- |
 | `NEXT_PUBLIC_COLORS_URL` | `https://colors.elsatia.fr` — **conforme** | **absente** |
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://exhvuzegsefmoguxoiak.supabase.co/rest/v1/` — **suffixe anormal** | présente |
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://exhvuzegsefmoguxoiak.supabase.co` — **conforme** (le suffixe `/rest/v1/` relevé lors de la première passe a été retiré par l'exploitant) | présente |
 
-Deux points à traiter hors de ce lot :
+Un point reste à traiter hors de ce lot :
 
-1. **`NEXT_PUBLIC_SUPABASE_URL` porte `/rest/v1/`.** `@supabase/supabase-js`
-   attend l'URL de projet et compose lui-même ses chemins : avec ce suffixe,
-   l'authentification viserait `…/rest/v1/auth/v1` et les URL signées de
-   Storage `…/rest/v1/storage/v1`. La valeur attendue est
-   `https://exhvuzegsefmoguxoiak.supabase.co`. La CSP n'en est pas affectée —
-   `origineAutorisee()` réduit la valeur à son origine — mais le reste de
-   l'application l'est.
-2. **`NEXT_PUBLIC_COLORS_URL` est absente en Preview.** Conséquence assumée par
+1. **`NEXT_PUBLIC_COLORS_URL` est absente en Preview.** Conséquence assumée par
    le code : `urlCallbackReinitialisation()` renvoie `null` et l'écran affiche
    « réinitialisation momentanément indisponible » plutôt que d'émettre un lien
    vers un hôte non maîtrisé. À définir avant toute recette Preview du parcours.
