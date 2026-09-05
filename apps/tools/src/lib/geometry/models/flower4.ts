@@ -1,13 +1,19 @@
-// Famille décorative (DECORATIVE-FAMILIES-V1 §3) : fleur à 4 pétales, construction radiale
-// générique par composition de primitives existantes (divideCircle, Circle, point) — aucune
-// primitive Petal/Flower ajoutée au moteur. Même relation pétale/centre déjà éprouvée en
-// Production par le moteur Pro (pro-engine.ts, fleur-4/5/6/8, mêmes rapports rayon/pétale),
-// réimplémentée ici en fonction TraceModel indépendante — jamais un import du moteur commercial,
-// pour ne pas mélanger le système de preview interne et le catalogue payant. Construction
-// géométrique générale, aucune référence tierce.
-import { assertFinitePositive, boundsFromPoints, divideCircle, point } from "../primitives";
+// Famille décorative (DECORATIVE-FAMILIES-V1 §3) : fleur à 4 pétales.
+//
+// C4-LOT3-ROSETTES-V1 — Migré vers Engine B : la géométrie (centre, 4 centres de pétales, 4
+// cercles de pétales) provient de `engine/rosettes.ts::createRosette({elementType:"circle"})` en
+// mode "classique" (diamètre intérieur omis). Chaque pétale est un cercle qui passe par O — pas
+// un pétale en amande (`elementType:"petal"`, qui produirait une forme pointue différente de
+// l'historique). Le cercle directeur extérieur (bornage visuel, = le diamètre saisi) et le petit
+// cercle central décoratif sont propres à ce modèle (pas un concept générique de rosace) : ajoutés
+// ici, jamais dans Engine B. Aucune formule géométrique locale active après migration — ces deux
+// cercles ont un rayon directement dérivé du paramètre utilisateur, sans autre calcul.
+import { createAngleDimension, createDiameterDimension, createRadiusDimension } from "../engine/dimensions";
+import { createRosette } from "../engine/rosettes";
+import { dimensionResultToDimension, parametricShapeToTraceModel, validateTraceModel, type TraceModelMetadata } from "../adapters";
+import type { Dimension } from "../primitives";
 import type { SiteStep } from "../shape-model";
-import { validateTraceModel, type TraceExplanation, type TraceModel, type TraceParameter } from "../trace-model";
+import type { TraceExplanation, TraceModel, TraceParameter } from "../trace-model";
 
 export type Flower4Input = { diameter: number; rotation?: number };
 
@@ -32,72 +38,79 @@ export const flower4Explanation: TraceExplanation = {
     "Depuis chaque centre, tracer un cercle de rayon R/2 : c'est un pétale.",
     "Tracer le petit cercle central pour finir le motif.",
   ],
-  tips: ["Les 4 centres de pétales sont toujours à mi-rayon : pas besoin de recalculer, un simple partage en deux du rayon suffit.", "Contrôlez la symétrie en vérifiant que les pétales opposés sont alignés avec O."],
+  tips: [
+    "Les 4 centres de pétales sont toujours à mi-rayon : pas besoin de recalculer, un simple partage en deux du rayon suffit.",
+    "Contrôlez la symétrie en vérifiant que les pétales opposés sont alignés avec O.",
+    // Contrairement à la rosace à 6 pétales (cercles superposés dépassant le cercle directeur),
+    // les pétales de cette fleur sont inscrits DANS le cercle directeur : l'encombrement réel du
+    // motif fini est exactement le diamètre saisi, sans dépassement (§6).
+    "Ici, les pétales tiennent exactement dans le diamètre saisi — contrairement à la rosace à 6 pétales, il n'y a aucun dépassement à anticiper.",
+  ],
   commonErrors: ["Centrer un pétale directement sur le cercle directeur au lieu de le placer à mi-rayon.", "Mélanger le rayon du cercle directeur et celui des pétales."],
   finalCheck: "Contrôlez que les 4 centres de pétales sont à la même distance de O (R/2) et que l'angle entre deux directions consécutives est bien de 90°.",
   warnings: ["Vérifiez le tracé avant toute découpe ou peinture définitive."],
 };
 
 export function createFlower4Geometry(input: Flower4Input = DEFAULT_INPUT): TraceModel {
-  const diameter = assertFinitePositive(input.diameter, "Le diamètre");
+  // 1. Traduction des paramètres UI vers Engine B.
+  const diameter = input.diameter;
+  if (!Number.isFinite(diameter) || diameter <= 0) throw new Error("Le diamètre doit être supérieur à 0.");
   const rotationDegrees = input.rotation ?? 0;
   if (!Number.isFinite(rotationDegrees)) throw new Error("L'orientation initiale doit être une valeur finie.");
-  const rotationRadians = (rotationDegrees * Math.PI) / 180;
 
+  // 2. Géométrie : exclusivement Engine B, mode "classique". Le cercle directeur EXTÉRIEUR
+  //    (diamètre saisi) est deux fois le rayon des pétales : on demande donc à Engine B un
+  //    diamètre moitié, pour que directorRadius/elementRadius (= le rayon renvoyé) valent
+  //    exactement outerRadius/2 = petalRadius, la relation historique de ce modèle.
   const outerRadius = diameter / 2;
-  const petalRadius = outerRadius / 2;
-  const centreRadius = outerRadius - petalRadius; // = petalRadius, relation identique au moteur Pro déjà validé.
-  const O = point("O", 0, 0, "Centre O", "center");
+  const shape = createRosette({ outerDiameter: outerRadius, count: PETALS, elementType: "circle", rotationDegrees });
+  const petalRadius = shape.metadata.directorRadius as number;
+  const O = shape.primitives.points.O;
+  const C1 = shape.primitives.points.C1;
+  const C2 = shape.primitives.points.C2;
 
-  const directions = divideCircle(O, outerRadius, PETALS, rotationRadians, "D");
-  const petalCentres = divideCircle(O, centreRadius, PETALS, rotationRadians, "C").map((item) => ({ ...item, role: "center" as const }));
-
-  const points = [O, ...directions, ...petalCentres];
-  const sectorAngle = 360 / PETALS;
-  const axisHalfExtent = Math.max(60, outerRadius * 1.15);
-
-  const petalCircles = petalCentres.map((centre, index) => ({ id: `petal-${index + 1}`, centre, radius: petalRadius, role: "shape" as const }));
+  // Cercle directeur extérieur (bornage, = diamètre saisi) et petit cercle central décoratif :
+  // propres à ce modèle, ajoutés à la géométrie Engine B avant adaptation (jamais une seconde
+  // formule — leurs rayons dérivent directement des valeurs déjà calculées par Engine B).
   const centralRadius = petalRadius * 0.35;
+  shape.primitives.circles.push({ centre: O, radius: outerRadius, role: "construction" });
+  shape.primitives.circles.push({ centre: O, radius: centralRadius, role: "shape" });
 
-  const steps: SiteStep[] = [
-    { id: "step-axes", title: "Tracer les axes", instruction: "Tracez deux axes perpendiculaires, centrés en O.", measurements: [], pointIds: ["O"], visibleEntityIds: ["axis-x", "axis-y"] },
-    { id: "step-outer", title: "Tracer le cercle directeur", instruction: `Tracez le cercle directeur de rayon ${outerRadius} mm.`, measurements: [`${outerRadius} mm`], pointIds: ["O", directions[0].id], visibleEntityIds: ["axis-x", "axis-y", "circle-outer"] },
-    { id: "step-centres", title: "Placer les 4 centres de pétales", instruction: `Sur chaque axe, placez un centre à ${petalRadius} mm de O.`, measurements: [`${petalRadius} mm`], pointIds: petalCentres.map((c) => c.id), controlId: "control-1", visibleEntityIds: ["axis-x", "axis-y", "circle-outer", "circle-construction"] },
-    { id: "step-petals", title: "Tracer les 4 pétales", instruction: `Depuis chaque centre, tracez un cercle de rayon ${petalRadius} mm.`, measurements: [`${petalRadius} mm`], pointIds: petalCentres.map((c) => c.id), visibleEntityIds: ["circle-outer", "circle-construction", ...petalCircles.map((c) => c.id)] },
-    { id: "step-centre-circle", title: "Tracer le centre", instruction: `Terminez avec un petit cercle central de rayon ${Math.round(centralRadius)} mm.`, measurements: [`${Math.round(centralRadius)} mm`], pointIds: ["O"], visibleEntityIds: [...petalCircles.map((c) => c.id), "circle-central"] },
+  // 3. Cotations : moteur de cotation Engine B, valeurs jamais réécrites à la main.
+  const dimensions: Dimension[] = [
+    dimensionResultToDimension("dim-diameter", `Ø ${diameter} mm`, createDiameterDimension({ centre: O, radius: outerRadius })),
+    dimensionResultToDimension("dim-radius", `R pétale ${Math.round(petalRadius)} mm`, createRadiusDimension({ centre: O, radius: petalRadius })),
+    dimensionResultToDimension("dim-sector", `${Number((360 / PETALS).toFixed(2))}°`, createAngleDimension(O, C1, C2)),
   ];
 
-  const model: TraceModel = {
-    id: "flower-4", name: "Fleur 4 pétales", slug: "flower-4", categoryId: "forms-design", difficulty: "easy",
-    tags: ["fleur", "4 pétales", "radial", "plafond", "décoratif"], status: "preview",
-    parameters: flower4Parameters, explanation: flower4Explanation,
-    bounds: boundsFromPoints(points, Math.max(60, outerRadius * 0.15)),
-    referenceFrame: { unit: "mm", origin: O, xLabel: "X", yLabel: "Y", yOrientation: "up" },
-    axes: [],
-    points,
-    segments: [],
-    arcs: [],
-    circles: [
-      { id: "circle-outer", centre: O, radius: outerRadius, role: "construction" },
-      { id: "circle-construction", centre: O, radius: centreRadius, role: "construction" },
-      ...petalCircles,
-      { id: "circle-central", centre: O, radius: centralRadius, role: "shape" },
-    ],
-    ellipses: [],
-    constructionLines: [
-      { id: "axis-x", start: point("axis-x-", -axisHalfExtent, 0), end: point("axis-x+", axisHalfExtent, 0), role: "axis" },
-      { id: "axis-y", start: point("axis-y-", 0, -axisHalfExtent), end: point("axis-y+", 0, axisHalfExtent), role: "axis" },
-    ],
-    dimensions: [
-      { id: "dim-diameter", kind: "diameter", from: directions[0], to: directions[2], label: `Ø ${diameter} mm`, value: diameter, unit: "mm" },
-      { id: "dim-sector", kind: "angle", from: directions[0], to: directions[1], label: `${sectorAngle}°`, value: sectorAngle, unit: "°" },
-    ],
-    controls: petalCentres.map((item, index) => ({ id: `control-${index + 1}`, label: `Distance O → ${item.id}`, value: centreRadius, unit: "mm" as const, pointIds: ["O", item.id] })),
-    quantities: [
-      { id: "q-petal-radius", label: "Rayon de chaque pétale", value: petalRadius, unit: "mm", quality: "exact" },
-      { id: "q-sector", label: "Angle entre directions", value: sectorAngle, unit: "°", quality: "exact" },
-    ],
-    steps,
+  // 4. Métadonnées pédagogiques — couche UI uniquement.
+  const metadata: TraceModelMetadata = {
+    id: "flower-4",
+    name: "Fleur 4 pétales",
+    slug: "flower-4",
+    categoryId: "forms-design",
+    difficulty: "easy",
+    tags: ["fleur", "4 pétales", "radial", "plafond", "décoratif"],
+    status: "preview",
+    parameters: flower4Parameters,
+    explanation: flower4Explanation,
   };
-  return validateTraceModel(model);
+
+  const model = parametricShapeToTraceModel(shape, metadata, { dimensions });
+
+  // Enrichissement pédagogique (§7) : une étape dédiée pour le cercle central décoratif, propre à
+  // ce modèle — insérée avant le contrôle final fourni par Engine B, sans dupliquer sa géométrie
+  // (référence l'entité déjà adaptée par son id réel).
+  const centralCircleId = model.circles.find((c) => Math.abs(c.radius - centralRadius) < 1e-6)?.id;
+  const centralStep: SiteStep = {
+    id: "step-central-circle",
+    title: "Tracer le cercle central",
+    instruction: `Terminez avec un petit cercle central de rayon ${Math.round(centralRadius)} mm.`,
+    measurements: [`${Math.round(centralRadius)} mm`],
+    pointIds: ["O"],
+    visibleEntityIds: centralCircleId ? [centralCircleId] : undefined,
+  };
+  const steps = [...model.steps.slice(0, -1), centralStep, model.steps.at(-1)!];
+
+  return validateTraceModel({ ...model, steps });
 }

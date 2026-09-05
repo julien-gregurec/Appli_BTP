@@ -45,8 +45,10 @@ describe("createFlower6ElongatedGeometry — DECORATIVE-FAMILIES-V1 §15", () =>
     // allongée utilise des ellipses dont le petit axe est nettement inférieur au grand axe.
     const petal = flower.ellipses[0];
     expect(petal.radiusX).toBeLessThan(petal.radiusY);
-    const rosetteSecondaryRadius = rosette.circles.find((c) => c.id === "petal-1")!.radius;
-    const rosetteDirectingRadius = rosette.circles.find((c) => c.id === "circle-directing")!.radius;
+    // rosette-6 migré vers Engine B (C4-LOT3-ROSETTES-V1) : les 6 pétales n'ont plus d'id fixe
+    // ("petal-N"), le cercle directeur non plus ("circle-directing") — distingués ici par rôle.
+    const rosetteSecondaryRadius = rosette.circles.find((c) => c.role !== "construction")!.radius;
+    const rosetteDirectingRadius = rosette.circles.find((c) => c.role === "construction")!.radius;
     expect(rosetteSecondaryRadius).toBeCloseTo(rosetteDirectingRadius, 8); // rosette-6 : même rayon partout.
     expect(petal.radiusX).not.toBeCloseTo(petal.radiusY, 1); // fleur allongée : rayons très différents.
   });

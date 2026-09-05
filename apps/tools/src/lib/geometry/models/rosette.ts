@@ -1,15 +1,17 @@
-// Modèle réel n°3 (FIRST-FUNCTIONAL-LOT-V1) : rosace à 6 pétales simple, construction
-// géométrique classique et générique (compas/règle, connue depuis l'Antiquité — parfois appelée
-// "fleur à 6 pétales" ou motif de rosace radiale), PAS une reproduction d'une création tierce
-// spécifique. Formule : un cercle directeur de rayon R divisé en 6 points ; depuis chacun de ces
-// 6 points, un cercle de MÊME rayon R. Comme les 6 centres sont eux-mêmes à distance R de O et
-// à distance R les uns des autres (division en 6 d'un cercle de rayon R = triangle équilatéral
-// entre O et deux centres voisins), chaque cercle secondaire passe exactement par O et par ses
-// deux voisins : c'est cette propriété — vérifiable par calcul, pas approximative — qui produit
-// le motif à 6 pétales. Non référencé par catalog.ts : reste interne/preview.
-import { assertFinitePositive, boundsFromPoints, circleCircleIntersections, divideCircle, point } from "../primitives";
-import type { SiteStep } from "../shape-model";
-import { validateTraceModel, type TraceExplanation, type TraceModel, type TraceParameter } from "../trace-model";
+// Modèle réel n°3 (FIRST-FUNCTIONAL-LOT-V1) : rosace à 6 pétales simple.
+//
+// C4-LOT3-ROSETTES-V1 — Migré vers Engine B : la géométrie (centre, 6 centres secondaires, 6
+// cercles superposés, pointes de pétales, steps) provient exclusivement de
+// `engine/rosettes.ts::createRosette({elementType:"circle"})`, étendu ce lot avec un mode
+// "classique" (diamètre intérieur omis) qui reproduit exactement la construction historique —
+// chaque cercle secondaire passe par O — au lieu du mode "anneau" existant (tangence, non
+// applicable ici). Voir §6/§7 pour l'analyse de l'ambiguïté « diamètre directeur vs encombrement
+// réel » signalée par la recette A.
+import { createAngleDimension, createDiameterDimension, createRadiusDimension } from "../engine/dimensions";
+import { createRosette } from "../engine/rosettes";
+import { dimensionResultToDimension, parametricShapeToTraceModel, type TraceModelMetadata } from "../adapters";
+import type { Dimension } from "../primitives";
+import type { TraceExplanation, TraceModel, TraceParameter } from "../trace-model";
 
 export type RosetteInput = { diameter: number; rotation?: number };
 
@@ -33,76 +35,60 @@ export const rosetteExplanation: TraceExplanation = {
     "Depuis chaque centre secondaire, tracer un cercle du même rayon R.",
     "Vérifier que chaque cercle passe bien par O et par ses deux voisins.",
   ],
-  tips: ["Gardez le même réglage de compas du début à la fin : c'est le même rayon R partout.", "Tracez les 6 cercles secondaires dans le même ordre pour ne pas en oublier."],
-  commonErrors: ["Changer le réglage du compas entre deux cercles secondaires.", "Décaler légèrement le centre O en cours de tracé."],
+  tips: [
+    "Gardez le même réglage de compas du début à la fin : c'est le même rayon R partout.",
+    "Tracez les 6 cercles secondaires dans le même ordre pour ne pas en oublier.",
+    // Clarification du contrat produit (§6) : le « diamètre » saisi est celui du cercle
+    // directeur (où se placent les 6 centres), pas l'encombrement final du motif — les pétales
+    // dépassent ce cercle. Encombrement réel, pointe à pointe : diamètre × √3 (≈ 1,73×).
+    "Le diamètre saisi est celui du cercle directeur : le motif fini (pointe à pointe) est environ 1,73 fois plus large — vérifiez l'espace disponible sur l'encombrement réel, pas sur le seul diamètre directeur.",
+  ],
+  commonErrors: ["Changer le réglage du compas entre deux cercles secondaires.", "Décaler légèrement le centre O en cours de tracé.", "Confondre le diamètre directeur saisi avec l'encombrement réel du motif fini, plus grand."],
   finalCheck: "Chaque centre secondaire doit être exactement à R du centre O, et les cercles voisins doivent se croiser précisément sur le centre O.",
-  warnings: ["Un tracé décoratif au plafond doit être vérifié en plusieurs points avant peinture ou perçage définitif."],
+  warnings: ["Un tracé décoratif au plafond doit être vérifié en plusieurs points avant peinture ou perçage définitif.", "Vérifiez que l'encombrement réel (pointe à pointe, ≈ 1,73 × le diamètre directeur) tient dans l'espace disponible, pas seulement le cercle directeur."],
 };
 
 export function createRosetteGeometry(input: RosetteInput = DEFAULT_INPUT): TraceModel {
-  const diameter = assertFinitePositive(input.diameter, "Le diamètre directeur");
+  // 1. Traduction des paramètres UI vers Engine B.
+  const diameter = input.diameter;
+  if (!Number.isFinite(diameter) || diameter <= 0) throw new Error("Le diamètre directeur doit être supérieur à 0.");
   const rotationDegrees = input.rotation ?? 0;
   if (!Number.isFinite(rotationDegrees)) throw new Error("L'orientation initiale doit être une valeur finie.");
-  const rotationRadians = (rotationDegrees * Math.PI) / 180;
 
-  const R = diameter / 2;
-  const O = point("O", 0, 0, "Centre O", "center");
-  const secondaryCentres = divideCircle(O, R, PETALS, rotationRadians, "C").map((item) => ({ ...item, role: "center" as const }));
+  // 2. Géométrie : exclusivement Engine B, mode "classique" (aucun diamètre intérieur) — chaque
+  //    cercle secondaire a pour rayon sa propre distance à O (= diameter / 2, sans autre division).
+  const shape = createRosette({ outerDiameter: diameter, count: PETALS, elementType: "circle", rotationDegrees, computeTips: true });
+  const R = shape.metadata.directorRadius as number;
+  const O = shape.primitives.points.O;
+  const C1 = shape.primitives.points.C1;
+  const C2 = shape.primitives.points.C2;
+  // Encombrement géométrique réel (§6) : distance centre → pointe de pétale, calculée par
+  // Engine B lui-même via l'intersection des cercles réellement construits (jamais réécrite à la
+  // main) — exposée en `metadata.tipDistance` par `createRosette`.
+  const tipDistance = shape.metadata.tipDistance as number;
 
-  const secondaryCircles = secondaryCentres.map((centre, index) => ({ id: `petal-${index + 1}`, centre, radius: R, role: "shape" as const }));
-
-  // Pointe de chaque pétale = la seconde intersection (la première étant toujours O lui-même,
-  // par construction — voir la note de tête de fichier) de deux cercles secondaires voisins.
-  const tips = secondaryCircles.map((circle, index) => {
-    const next = secondaryCircles[(index + 1) % PETALS];
-    const intersections = circleCircleIntersections(circle, next, `tip-${index + 1}-`);
-    const tip = intersections.find((candidate) => Math.hypot(candidate.x - O.x, candidate.y - O.y) > R / 2);
-    if (!tip) throw new Error(`Impossible de déterminer la pointe du pétale ${index + 1} : construction géométrique invalide.`);
-    return { ...tip, id: `T${index + 1}`, label: `T${index + 1}`, role: "reference" as const };
-  });
-
-  const points = [O, ...secondaryCentres, ...tips];
-  const sectorAngle = 360 / PETALS;
-
-  const axisHalfExtent = Math.max(80, R * 2.4);
-  const constructionLines = [
-    { id: "axis-x", start: point("axis-x-", -axisHalfExtent, 0), end: point("axis-x+", axisHalfExtent, 0), role: "axis" as const },
-    { id: "axis-y", start: point("axis-y-", 0, -axisHalfExtent), end: point("axis-y+", 0, axisHalfExtent), role: "axis" as const },
+  // 3. Cotations : moteur de cotation Engine B, valeurs jamais réécrites à la main. Distingue
+  //    explicitement le diamètre directeur (paramètre utilisateur) de l'encombrement réel du
+  //    motif fini — jamais mélangés dans une seule cote (§6).
+  const dimensions: Dimension[] = [
+    dimensionResultToDimension("dim-diameter", `Ø directeur ${diameter} mm`, createDiameterDimension({ centre: O, radius: R })),
+    dimensionResultToDimension("dim-radius", `R ${R} mm`, createRadiusDimension({ centre: O, radius: R })),
+    dimensionResultToDimension("dim-sector", `${Number((360 / PETALS).toFixed(2))}°`, createAngleDimension(O, C1, C2)),
+    dimensionResultToDimension("dim-envelope", `Encombrement réel Ø ${Math.round(tipDistance * 2)} mm`, createDiameterDimension({ centre: O, radius: tipDistance })),
   ];
 
-  const dimensions = [
-    { id: "dim-radius", kind: "radius" as const, from: O, to: secondaryCentres[0], label: `R ${R} mm`, value: R, unit: "mm" as const },
-    { id: "dim-sector", kind: "angle" as const, from: secondaryCentres[0], to: secondaryCentres[1], label: `${sectorAngle}°`, value: sectorAngle, unit: "°" as const },
-  ];
-
-  const steps: SiteStep[] = [
-    { id: "step-directing", title: "Tracer le cercle directeur", instruction: `Réglez le compas au rayon ${R} mm et tracez le cercle directeur depuis O.`, measurements: [`${R} mm`], pointIds: ["O"], visibleEntityIds: ["axis-x", "axis-y", "circle-directing"] },
-    { id: "step-divide", title: "Diviser en 6", instruction: `Reportez les 6 centres secondaires, espacés de ${sectorAngle}°.`, measurements: [`${sectorAngle}°`], pointIds: secondaryCentres.map((c) => c.id), controlId: "control-1", visibleEntityIds: ["axis-x", "axis-y", "circle-directing"] },
-    { id: "step-petals", title: "Tracer les 6 pétales", instruction: `Sans changer le réglage du compas, tracez un cercle de rayon ${R} mm depuis chaque centre secondaire.`, measurements: [`${R} mm`], pointIds: secondaryCircles.map((c) => c.centre.id), visibleEntityIds: [...secondaryCircles.map((c) => c.id)] },
-    { id: "step-check", title: "Vérifier le recouvrement", instruction: "Contrôlez que chaque cercle passe bien par O et par ses deux voisins.", measurements: [], pointIds: ["O", ...tips.map((t) => t.id)], visibleEntityIds: [...secondaryCircles.map((c) => c.id)] },
-  ];
-
-  const model: TraceModel = {
-    id: "rosette-6", name: "Rosace 6 pétales simple", slug: "rosette-6", categoryId: "forms-design", difficulty: "easy",
-    tags: ["rosace", "6 pétales", "radial", "plafond", "compas"], status: "preview",
-    parameters: rosetteParameters, explanation: rosetteExplanation,
-    // Padding = R (un rayon complet) : chaque cercle secondaire s'étend jusqu'à `centre + R`, et
-    // chaque centre est déjà à R de O — un point du modèle atteint donc au plus R avant padding,
-    // +R de padding garantit de couvrir l'extension réelle des 6 cercles (jusqu'à 2R depuis O).
-    bounds: boundsFromPoints(points, Math.max(150, R)),
-    referenceFrame: { unit: "mm", origin: O, xLabel: "X", yLabel: "Y", yOrientation: "up" },
-    axes: [], points, segments: [], arcs: [],
-    circles: [{ id: "circle-directing", centre: O, radius: R, role: "construction" }, ...secondaryCircles],
-    ellipses: [], constructionLines, dimensions,
-    controls: secondaryCentres.map((item, index) => ({ id: `control-${index + 1}`, label: `Distance O → ${item.id}`, value: R, unit: "mm" as const, pointIds: ["O", item.id] })),
-    quantities: [
-      { id: "q-radius", label: "Rayon (directeur = secondaire)", value: R, unit: "mm", quality: "exact" },
-      { id: "q-sector", label: "Angle entre centres secondaires", value: sectorAngle, unit: "°", quality: "exact" },
-      // Propriété du triangle équilatéral O-Ci-Ci+1 (voir note de tête de fichier) : la pointe de
-      // chaque pétale est à R√3 du centre O — valeur exacte, pas une estimation.
-      { id: "q-tip-distance", label: "Distance centre → pointe de pétale", value: R * Math.sqrt(3), unit: "mm", quality: "exact" },
-    ],
-    steps,
+  // 4. Métadonnées pédagogiques — couche UI uniquement.
+  const metadata: TraceModelMetadata = {
+    id: "rosette-6",
+    name: "Rosace 6 pétales simple",
+    slug: "rosette-6",
+    categoryId: "forms-design",
+    difficulty: "easy",
+    tags: ["rosace", "6 pétales", "radial", "plafond", "compas"],
+    status: "preview",
+    parameters: rosetteParameters,
+    explanation: rosetteExplanation,
   };
-  return validateTraceModel(model);
+
+  return parametricShapeToTraceModel(shape, metadata, { dimensions });
 }

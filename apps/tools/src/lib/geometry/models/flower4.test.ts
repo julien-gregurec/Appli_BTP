@@ -2,14 +2,20 @@ import { describe, expect, it } from "vitest";
 import { distance } from "../primitives";
 import { createFlower4Geometry } from "./flower4";
 
-describe("createFlower4Geometry — DECORATIVE-FAMILIES-V1 §15", () => {
-  it("invariant 1 : 90° exactement entre deux directions consécutives", () => {
+// C4-LOT3-ROSETTES-V1 : mêmes invariants qu'en DECORATIVE-FAMILIES-V1 §15, contrôlés sur la
+// sortie désormais produite via Engine B (`createRosette`, mode classique) puis le pont
+// `parametricShapeToTraceModel`. Schéma d'identifiants : centre "O", centres de pétales "C1..C4"
+// (remplace les anciens points "D" — mêmes positions angulaires, seul le rayon diffère : les "D"
+// historiques étaient sur le cercle directeur, les pétales sont centrés à mi-rayon).
+describe("createFlower4Geometry — C4-LOT3 (Engine B)", () => {
+  it("invariant 1 : 90° exactement entre deux centres de pétales consécutifs", () => {
     const model = createFlower4Geometry({ diameter: 1200, rotation: 0 });
-    const [O] = model.points;
-    const directions = model.points.filter((p) => p.id.startsWith("D"));
-    for (let index = 0; index < directions.length; index++) {
-      const current = directions[index];
-      const next = directions[(index + 1) % directions.length];
+    const O = model.points.find((p) => p.id === "O")!;
+    const centres = model.points.filter((p) => /^C\d+$/.test(p.id));
+    expect(centres).toHaveLength(4);
+    for (let index = 0; index < centres.length; index++) {
+      const current = centres[index];
+      const next = centres[(index + 1) % centres.length];
       let delta = ((Math.atan2(next.y - O.y, next.x - O.x) - Math.atan2(current.y - O.y, current.x - O.x)) * 180) / Math.PI;
       if (delta < 0) delta += 360;
       expect(delta).toBeCloseTo(90, 6);
@@ -18,40 +24,57 @@ describe("createFlower4Geometry — DECORATIVE-FAMILIES-V1 §15", () => {
 
   it("invariant 2 : distance centre -> chaque centre secondaire est constante", () => {
     const model = createFlower4Geometry({ diameter: 1200, rotation: 0 });
-    const [O] = model.points;
-    const centres = model.points.filter((p) => p.id.startsWith("C"));
-    expect(centres).toHaveLength(4);
+    const O = model.points.find((p) => p.id === "O")!;
+    const centres = model.points.filter((p) => /^C\d+$/.test(p.id));
     const distances = centres.map((c) => distance(O, c));
     for (const value of distances) expect(value).toBeCloseTo(distances[0], 6);
   });
 
-  it("4 pétales de même rayon", () => {
+  it("4 pétales de même rayon (R/2)", () => {
     const model = createFlower4Geometry({ diameter: 1200 });
-    const petals = model.circles.filter((c) => c.id.startsWith("petal-"));
+    // Un cercle directeur intermédiaire (rayon 300 lui aussi, centré en O) est matérialisé en
+    // construction depuis l'étape Engine B correspondante — exclu ici par rôle, distinct des 4
+    // pétales (centrés hors de O).
+    const petals = model.circles.filter((c) => c.role !== "construction" && Math.abs(c.radius - 300) < 1e-6);
     expect(petals).toHaveLength(4);
-    for (const petal of petals) expect(petal.radius).toBeCloseTo(300, 8);
   });
 
   it("mise à l'échelle : 1200 / 2400 / 3600 mm", () => {
     for (const diameter of [1200, 2400, 3600]) {
       const model = createFlower4Geometry({ diameter });
-      expect(model.quantities.find((q) => q.id === "q-petal-radius")?.value).toBeCloseTo(diameter / 4, 8);
+      expect(model.dimensions.find((d) => d.id === "dim-radius")?.value).toBeCloseTo(diameter / 4, 8);
+      expect(model.dimensions.find((d) => d.id === "dim-diameter")?.value).toBeCloseTo(diameter, 8);
     }
+  });
+
+  it("encombrement réel = diamètre saisi exactement (pétales inscrits, aucun dépassement)", () => {
+    const model = createFlower4Geometry({ diameter: 1200 });
+    const O = model.points.find((p) => p.id === "O")!;
+    // Chaque pétale est tangent intérieurement au cercle directeur : centre + rayon = outerRadius.
+    const petals = model.circles.filter((c) => c.role !== "construction" && Math.abs(c.radius - 300) < 1e-6);
+    for (const petal of petals) expect(distance(O, petal.centre) + petal.radius).toBeCloseTo(600, 6);
   });
 
   it("vue tracé final uniquement : les pétales + centre restent complets sans les auxiliaires de construction", () => {
     const model = createFlower4Geometry({ diameter: 1200 });
     const finalEntities = model.circles.filter((c) => c.role !== "construction");
-    // 4 pétales + le petit cercle central = 5 entités "shape", indépendantes des cercles de
-    // construction (directeur + orbite des centres), qui peuvent être masqués sans rien perdre
-    // de la silhouette finale.
+    // 4 pétales + le petit cercle central = 5 entités "shape", indépendantes du cercle directeur
+    // de construction (masqué par défaut).
     expect(finalEntities).toHaveLength(5);
     expect(finalEntities.every((c) => c.role === "shape")).toBe(true);
+    expect(model.circles.some((c) => c.role === "construction" && Math.abs(c.radius - 600) < 1e-6)).toBe(true);
   });
 
   it("aucune valeur NaN ni Infinity", () => {
     const model = createFlower4Geometry({ diameter: 1200 });
     expect(/NaN|Infinity/.test(JSON.stringify(model))).toBe(false);
+  });
+
+  it("pas-à-pas : une étape dédiée au cercle central, avant le contrôle final", () => {
+    const model = createFlower4Geometry({ diameter: 1200 });
+    const titles = model.steps.map((s) => s.title);
+    expect(titles).toContain("Tracer le cercle central");
+    expect(titles.at(-1)?.toLowerCase()).toContain("contrôl");
   });
 
   it("explication réellement renseignée", () => {

@@ -9,6 +9,7 @@ import { createLeaf } from "../engine/petals";
 import { createArch } from "../engine/arches";
 import { createHeart } from "../engine/hearts";
 import { createRadialPattern } from "../engine/radial-pattern";
+import { createRosette } from "../engine/rosettes";
 import { offsetShape } from "../engine/api";
 import { createDiameterDimension, createRadiusDimension, createAlignedDimension, createAngleDimension } from "../engine/dimensions";
 
@@ -91,6 +92,21 @@ describe("pilotes de convergence ParametricShape → TraceModel", () => {
     for (const c of model.circles) {
       expect(c.centre.y + c.radius).toBeLessThanOrEqual(model.bounds.maxY + 1e-6);
       expect(c.centre.y - c.radius).toBeGreaterThanOrEqual(model.bounds.minY - 1e-6);
+    }
+  });
+
+  it("pilote 5c — rosace classique (sans diamètre intérieur) : cercles secondaires en tracé final, cercle directeur matérialisé en construction (C4-LOT3-ROSETTES-V1 §9)", () => {
+    const shape = createRosette({ outerDiameter: 2400, count: 6, elementType: "circle", rotationDegrees: -90 });
+    const model = parametricShapeToTraceModel(shape, baseMetadata({ name: "Rosace pilote", slug: "pilot-rosette" }));
+    expect(() => validateTraceModel(model)).not.toThrow();
+    const secondary = model.circles.filter((c) => c.role !== "construction");
+    expect(secondary).toHaveLength(6);
+    for (const c of secondary) expect(c.centre.x ** 2 + c.centre.y ** 2).toBeCloseTo(c.radius ** 2, 4); // passe par O
+    expect(model.circles.some((c) => c.role === "construction")).toBe(true);
+    // Bounds : l'enveloppe des pointes (au-delà du cercle directeur) doit être couverte.
+    for (const c of secondary) {
+      expect(c.centre.x + c.radius).toBeLessThanOrEqual(model.bounds.maxX + 1e-6);
+      expect(c.centre.x - c.radius).toBeGreaterThanOrEqual(model.bounds.minX - 1e-6);
     }
   });
 
