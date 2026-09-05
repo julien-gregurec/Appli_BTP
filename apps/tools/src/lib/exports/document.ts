@@ -18,7 +18,7 @@ export function safeFilePart(value: string, fallback = "projet") {
   return cleaned || fallback;
 }
 
-export function projectFileName(document: ProjectDocument, extension: "pdf" | "svg" | "elsatiatools") {
+export function projectFileName(document: ProjectDocument, extension: "pdf" | "svg" | "dxf" | "png" | "elsatiatools") {
   const date = document.generatedAt.slice(0, 10); const parts = ["elsatia-tools", safeFilePart(document.tool.slug), document.project.siteName ? safeFilePart(document.project.siteName) : safeFilePart(document.project.name), date];
   return `${parts.join("-").slice(0, 150)}.${extension}`;
 }
