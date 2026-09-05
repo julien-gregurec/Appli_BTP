@@ -34,12 +34,21 @@ const composants = {
   em: (p: React.HTMLAttributes<HTMLElement>) => <em className="text-neutral-500" {...p} />,
 };
 
+// SIRET et mention de TVA : mêmes jetons et même principe que le site vitrine
+// (elsatia-site/src/app/[slug]/page.tsx) — une variable d'environnement par
+// déploiement, jamais une valeur en dur dans le markdown, avec un repli neutre
+// qui n'affirme ni régime ni numéro tant qu'ils ne sont pas confirmés.
+const REPLI_SIRET = "en cours de finalisation";
+const REPLI_MENTION_TVA = "à confirmer";
+
 export function DocumentLegal({ fichier }: { fichier: string }) {
   const chemin = path.join(process.cwd(), "docs/juridique", fichier);
   let contenu = fs.readFileSync(chemin, "utf8");
   contenu = contenu
     .replaceAll("[EMAIL_SUPPORT]", BRAND_SERVER.supportEmail ?? "—")
-    .replaceAll("[URL_APPLICATION]", BRAND.urlPublique ?? "—");
+    .replaceAll("[URL_APPLICATION]", BRAND.urlPublique ?? "—")
+    .replaceAll("[EDITEUR_SIRET]", process.env.NEXT_PUBLIC_LEGAL_SIRET?.trim() || REPLI_SIRET)
+    .replaceAll("[EDITEUR_MENTION_TVA]", process.env.NEXT_PUBLIC_LEGAL_TVA?.trim() || REPLI_MENTION_TVA);
 
   return (
     <main className="min-h-screen bg-neutral-50 px-4 py-12 dark:bg-neutral-950">

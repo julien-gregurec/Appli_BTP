@@ -50,6 +50,8 @@ Vos données sont accessibles à l'Éditeur et à ses sous-traitants techniques,
 | Vercel, Inc. | Hébergement de l'application | UE / États-Unis (fonctions exécutées en `fra1`, Francfort) | CCT / Data Privacy Framework |
 | Stripe Payments Europe, Ltd. | Paiement et facturation | Irlande (UE) | Conforme RGPD |
 | Brevo (Sendinblue SAS) | Envoi d'e-mails transactionnels | France (UE) | Conforme RGPD |
+| Sentry (Functional Software, Inc.) | Surveillance des erreurs applicatives (aucune donnée personnelle envoyée volontairement) | À confirmer selon la région du projet Sentry configuré | Clauses contractuelles types |
+| OpenAI, L.L.C. | Assistant IA et préparation assistée de devis ; aucun historique de conversation n'est conservé côté serveur | États-Unis (traitement API standard, pas de résidence de données UE configurée) | Conditions d'utilisation API OpenAI — DPA à vérifier/accepter formellement |
 
 La liste détaillée est tenue dans notre `rgpd-sous-traitants.md`.
 
