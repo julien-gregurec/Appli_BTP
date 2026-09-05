@@ -1,9 +1,14 @@
 "use client";
 
 // Page interne de démonstration du futur module "Tracés & Géométrie" (FIRST-FUNCTIONAL-LOT-V1
-// §13). Non commerciale, non cataloguée (catalog.ts n'y fait aucune référence), robots noindex
-// (voir page.tsx). Prouve le flux complet : paramètres utilisateur -> calcul géométrique ->
-// TraceModel -> rendu vectoriel -> couches -> pas-à-pas -> mode chantier, sur 3 modèles réels.
+// §13, étendue en FUNDAMENTAL-MODELS-V1 §20-21 à 8 modèles). Non commerciale, non cataloguée
+// (catalog.ts n'y fait aucune référence), robots noindex (voir page.tsx). Prouve le flux
+// complet : paramètres utilisateur -> calcul géométrique -> TraceModel -> rendu vectoriel ->
+// couches -> pas-à-pas -> mode chantier.
+//
+// Sélecteur en <select> natif plutôt qu'une rangée de 8 onglets (§21 : illisible sur mobile
+// avec autant d'entrées) — pas de refonte de l'UI existante, juste le contrôle le plus simple et
+// déjà accessible par défaut.
 import { useMemo, useState } from "react";
 import { TraceViewer } from "./TraceViewer";
 import { TraceSteps } from "./TraceSteps";
@@ -12,9 +17,14 @@ import { TraceParametersForm } from "./TraceParametersForm";
 import { circleDivisionParameters, createCircleDivisionGeometry } from "@/lib/geometry/models/circle-division";
 import { createStarGeometry, starParameters } from "@/lib/geometry/models/star";
 import { createRosetteGeometry, rosetteParameters } from "@/lib/geometry/models/rosette";
+import { createHeartGeometry, heartParameters } from "@/lib/geometry/models/heart";
+import { archFullRoundParameters, createArchFullRoundGeometry } from "@/lib/geometry/models/arch-full-round";
+import { createOgiveGeometry, ogiveParameters } from "@/lib/geometry/models/ogive";
+import { createEllipsePedagogicalGeometry, ellipsePedagogicalParameters } from "@/lib/geometry/models/ellipse-pedagogical";
+import { createSpiralGeometry, spiralParameters } from "@/lib/geometry/models/spiral";
 import type { TraceModel, TraceParameter } from "@/lib/geometry/trace-model";
 
-type ModelKey = "circle-division" | "star-5" | "rosette-6";
+type ModelKey = "circle-division" | "star-5" | "rosette-6" | "heart" | "arch-full-round" | "ogive-equilateral" | "ellipse-pedagogical" | "spiral-archimedes";
 
 const MODEL_DEFINITIONS: Record<ModelKey, { label: string; parameters: readonly TraceParameter[]; build: (values: Record<string, number>) => TraceModel }> = {
   "circle-division": {
@@ -32,7 +42,34 @@ const MODEL_DEFINITIONS: Record<ModelKey, { label: string; parameters: readonly 
     parameters: rosetteParameters,
     build: (values) => createRosetteGeometry({ diameter: values.diameter, rotation: values.rotation }),
   },
+  heart: {
+    label: "Cœur géométrique",
+    parameters: heartParameters,
+    build: (values) => createHeartGeometry({ width: values.width, height: values.height }),
+  },
+  "arch-full-round": {
+    label: "Arche plein cintre",
+    parameters: archFullRoundParameters,
+    build: (values) => createArchFullRoundGeometry({ width: values.width }),
+  },
+  "ogive-equilateral": {
+    label: "Ogive simple à deux centres",
+    parameters: ogiveParameters,
+    build: (values) => createOgiveGeometry({ width: values.width }),
+  },
+  "ellipse-pedagogical": {
+    label: "Ellipse pédagogique",
+    parameters: ellipsePedagogicalParameters,
+    build: (values) => createEllipsePedagogicalGeometry({ width: values.width, height: values.height }),
+  },
+  "spiral-archimedes": {
+    label: "Spirale d'Archimède",
+    parameters: spiralParameters,
+    build: (values) => createSpiralGeometry({ startRadius: values.startRadius, endRadius: values.endRadius, turns: values.turns, rotation: values.rotation }),
+  },
 };
+
+const MODEL_KEYS = Object.keys(MODEL_DEFINITIONS) as ModelKey[];
 
 function defaultValues(parameters: readonly TraceParameter[]): Record<string, number> {
   return Object.fromEntries(parameters.map((parameter) => [parameter.id, parameter.defaultValue]));
@@ -40,11 +77,9 @@ function defaultValues(parameters: readonly TraceParameter[]): Record<string, nu
 
 export function TracesPreviewWorkspace() {
   const [modelKey, setModelKey] = useState<ModelKey>("circle-division");
-  const [valuesByModel, setValuesByModel] = useState<Record<ModelKey, Record<string, number>>>({
-    "circle-division": defaultValues(MODEL_DEFINITIONS["circle-division"].parameters),
-    "star-5": defaultValues(MODEL_DEFINITIONS["star-5"].parameters),
-    "rosette-6": defaultValues(MODEL_DEFINITIONS["rosette-6"].parameters),
-  });
+  const [valuesByModel, setValuesByModel] = useState<Record<ModelKey, Record<string, number>>>(() =>
+    Object.fromEntries(MODEL_KEYS.map((key) => [key, defaultValues(MODEL_DEFINITIONS[key].parameters)])) as Record<ModelKey, Record<string, number>>,
+  );
   const [stepIndex, setStepIndex] = useState<number | null>(null);
   const [view, setView] = useState<"steps" | "site">("steps");
 
@@ -76,16 +111,15 @@ export function TracesPreviewWorkspace() {
       <header className="traces-preview-header">
         <p className="eyebrow">INTERNE · NON PUBLIÉ</p>
         <h1>Prévisualisation technique — Tracés &amp; Géométrie</h1>
-        <p>Page de travail non commerciale : ces 3 modèles ne sont pas dans le catalogue public.</p>
+        <p>Page de travail non commerciale : ces {MODEL_KEYS.length} modèles ne sont pas dans le catalogue public.</p>
       </header>
 
-      <div className="traces-preview-model-select" role="tablist" aria-label="Choisir un modèle">
-        {(Object.keys(MODEL_DEFINITIONS) as ModelKey[]).map((key) => (
-          <button key={key} type="button" role="tab" aria-selected={modelKey === key} className={modelKey === key ? "active" : ""} onClick={() => selectModel(key)}>
-            {MODEL_DEFINITIONS[key].label}
-          </button>
-        ))}
-      </div>
+      <label className="traces-preview-model-select">
+        <span>Modèle</span>
+        <select value={modelKey} onChange={(event) => selectModel(event.target.value as ModelKey)} aria-label="Choisir un modèle">
+          {MODEL_KEYS.map((key) => <option key={key} value={key}>{MODEL_DEFINITIONS[key].label}</option>)}
+        </select>
+      </label>
 
       <div className="traces-preview-body">
         <section className="traces-preview-parameters" aria-label="Paramètres">

@@ -250,10 +250,16 @@ footer { background: #e9e8e3; }
 .trace-parameter-field input { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 15px; color: var(--ink); }
 
 .traces-preview { padding: 24px; max-width: 1100px; margin: 0 auto; }
-.traces-preview-model-select { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 24px; }
-.traces-preview-model-select button { min-height: 44px; padding: 0 14px; border: 1px solid var(--navy); border-radius: 8px; background: white; color: var(--navy); font-weight: 700; cursor: pointer; }
-.traces-preview-model-select button.active { background: var(--navy); color: white; }
-.traces-preview-body { display: grid; gap: 20px; }
+/* Sélecteur natif (FUNDAMENTAL-MODELS-V1 §21) : reste lisible avec 8 modèles sur mobile,
+   contrairement à une rangée d'onglets qui déborderait ou se compresserait illisiblement. */
+.traces-preview-model-select { display: grid; gap: 6px; margin: 16px 0 24px; max-width: 360px; font-size: 11px; font-weight: 700; color: var(--ink-soft); }
+.traces-preview-model-select select { min-height: 46px; padding: 0 12px; border: 1px solid var(--navy); border-radius: 8px; background: white; color: var(--navy); font-weight: 700; font-size: 15px; cursor: pointer; }
+/* min-width:0 sur les enfants directs : sans cela, un enfant de grille hérite d'un min-width
+   "auto" qui reflète le contenu défilable de TraceViewer (SVG interne) plutôt que la piste de
+   grille disponible — débordement horizontal du body observé et corrigé en test mobile 375px
+   (§23). Correctif scoping à ce lot (nouvelle classe), aucune page existante concernée. */
+.traces-preview-body { display: grid; gap: 20px; min-width: 0; }
+.traces-preview-body > * { min-width: 0; }
 .traces-preview-view-toggle { display: flex; gap: 8px; }
 .traces-preview-view-toggle button { min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: white; cursor: pointer; font-weight: 700; }
 .traces-preview-view-toggle button.active { border-color: var(--amber); background: var(--amber-soft); }
