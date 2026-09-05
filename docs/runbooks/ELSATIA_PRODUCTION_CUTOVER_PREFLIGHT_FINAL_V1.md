@@ -430,7 +430,7 @@ extraction de la clé privée Ed25519 hors Vercel, `DELETE FROM auth.mfa_factors
 |---|---|---|
 | P1-1 | 4 `STRIPE_PRICE_*_ANNUEL` encore ×12 en environnement → `verify:stripe-prices --strict` non 8/8 (lot `ELSATIA-STRIPE-TEST-ANNUAL-ENV-ALIGNMENT-V1`) | ouvert |
 | P1-2 | Ancienne Price Enterprise mensuelle dupliquée sans lookup key côté Stripe TEST (laissée intacte, sélection fail-closed) | observé |
-| P1-3 | Protection de branche GitHub `main` + épinglage Vercel « Production Branch ≠ main » à re-vérifier (`NE_PAS_DEPLOYER_MAIN.md`) | à vérifier |
+| P1-3 | ~~Protection de branche GitHub `main` + épinglage Vercel « Production Branch ≠ main »~~ | **FERMÉ 2026-09-05** — rulesets GitHub actifs sur `main`/`release/commercialisation-v1`/branche canonique, Production Branch confirmée `release/commercialisation-v1` ≠ `main` (`ELSATIA-GITHUB-VERCEL-RELEASE-GUARD-CLOSURE-V2`, `docs/runbooks/ELSATIA_RELEASE_GOVERNANCE_V1.md`) |
 | P1-4 | HTTP 500 Preview (P0 historique **du projet Preview**, sans causalité migration prouvée) — n'affecte pas Production mais doit être tranché avant d'utiliser Preview comme miroir de validation | ouvert |
 
 ### Éléments externes non techniques

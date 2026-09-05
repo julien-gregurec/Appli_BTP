@@ -1,188 +1,147 @@
 # ELSATIA — Gouvernance des branches et des releases
 
-Version 1 — 2026-09-04. Lot `ELSATIA-GITHUB-VERCEL-RELEASE-GUARD-CLOSURE-V1`. **Documentation +
-audit.** Aucun déploiement, aucune migration Production, aucun Stripe Live, aucune protection
-GitHub appliquée automatiquement (limitation d'outillage expliquée au §7 — commandes prêtes à
-exécuter par l'opérateur).
+Version 2 — 2026-09-05. Lot `ELSATIA-GITHUB-VERCEL-RELEASE-GUARD-CLOSURE-V2`, fermant le P1 de
+gouvernance release ouvert par `ELSATIA-GITHUB-VERCEL-RELEASE-GUARD-CLOSURE-V1` (2026-09-04,
+NO-GO — protections auditées et documentées mais pas encore appliquées). Depuis, Julien a
+appliqué les trois rulesets GitHub et confirmé la Production Branch Vercel. **Aucun
+déploiement, aucune migration Production, aucun Stripe Live, aucune modification de code
+métier dans ce lot** — audit de confirmation et mise à jour documentaire uniquement.
 
 ---
 
-## 1. État constaté (audit, 2026-09-04)
+## 1. État constaté (audit de confirmation, 2026-09-05)
 
 Dépôt : `https://github.com/julien-gregurec/Appli_BTP` — **public**, branche par défaut GitHub :
 `main`.
 
-### 1.1 Protection des branches (lu via l'API GitHub publique, `GET /repos/.../branches/<nom>`)
+### 1.1 Protection des branches — confirmée via l'API GitHub publique (Rulesets)
 
-| Branche | `protected` | Push direct | Force-push | Suppression | PR obligatoire | Status checks obligatoires | Bypass admin | Review obligatoire | Commits signés |
-|---|---|---|---|---|---|---|---|---|---|
-| `main` | **false** | possible | possible | possible | non | non | s.o. | non | non |
-| `release/commercialisation-v1` | **false** | possible | possible | possible | non | non | s.o. | non | non |
-| `feat/elsatia-commercial-canonical-r1-r2-r3-v1` | **false** | possible | possible | possible | non | non | s.o. | non | non |
+Le dépôt étant public, l'API GitHub Rulesets est lisible **sans authentification** pour son
+contenu structurel (liste des rulesets, règles effectives par branche) ; seule la liste des
+« bypass actors » d'un ruleset (qui peut le contourner) reste masquée aux requêtes anonymes —
+voir réserve au §1.4.
 
-**Aucune des trois branches n'est protégée.** Rulesets : aucun détecté via `GET
-/repos/.../rulesets` (lecture non authentifiée — fiabilité de cette lecture spécifique
-incertaine sans jeton ; à reconfirmer par Julien dans *Settings → Rules → Rulesets*).
+Confirmé par `GET /repos/julien-gregurec/Appli_BTP/rulesets` (3 rulesets, tous `"enforcement":
+"active"`) puis `GET /repos/julien-gregurec/Appli_BTP/rules/branches/<branche>` (règles
+effectivement appliquées à chaque branche cible) :
 
-### 1.2 Status checks disponibles (GitHub Actions)
+| Branche | `protected` (branche) | Ruleset | Enforcement | Suppression | Force-push | PR obligatoire | Approbations | Stale reviews dismissed | Conversation resolution | Check obligatoire |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `main` | **true** | `Protect main` (id `22299244`) | **active** | **interdite** | **interdit** | **oui** | **1** | **oui** | **oui** | **`Contrôles techniques / verification`** |
+| `release/commercialisation-v1` | **true** | `Protect release` (id `22299555`) | **active** | **interdite** | **interdit** | non exigée | — | — | — | — |
+| `feat/elsatia-commercial-canonical-r1-r2-r3-v1` | **true** | `Protect commercial canonical` (id `22299867`) | **active** | **interdite** | **interdit** | non exigée | — | — | — | — |
 
-Un seul workflow existe : **« Contrôles techniques »** (`.github/workflows/ci.yml`), état
-`active`.
+Détail brut confirmé pour `main` (`GET /rulesets/22299244`, HTTP 200, lecture publique) :
+- `conditions.ref_name.include = ["refs/heads/main"]` — cible exacte, aucune autre branche visée ;
+- `rules: [deletion, non_fast_forward, pull_request{required_approving_review_count:1,
+  dismiss_stale_reviews_on_push:true, require_code_owner_review:true,
+  required_review_thread_resolution:true}, required_status_checks{required_status_checks:
+  [{context:"Contrôles techniques / verification"}], strict_required_status_checks_policy:false}]`.
 
-```yaml
-on:
-  pull_request:                       # sur toute PR, quelle que soit la branche cible
-  push:
-    branches: [main, release/commercialisation-v1]   # pas sur la branche commerciale canonique
-  schedule: ["17 5 * * 1"]
-  workflow_dispatch:
+Détail brut confirmé pour `release/commercialisation-v1` (ruleset `22299555`) et
+`feat/elsatia-commercial-canonical-r1-r2-r3-v1` (ruleset `22299867`) : chacun expose exactement
+`rules: [deletion, non_fast_forward]` — anti-destruction uniquement, aucune exigence de PR/check,
+conforme à la cible du §2 (ne pas casser le rythme de travail actuel sur ces deux branches).
 
-jobs:
-  verification:                       # ← nom du job = nom du check
-    steps:
-      - actions/checkout@v4
-      - actions/setup-node@v4 (Node 24)
-      - npm ci
-      - npm run audit:security        # npm audit --audit-level=high
-      - npm run verify                # clean + typecheck + lint + test + verify:migrations
-                                       # + verify:secrets + verify:stripe-prices + build
-```
+**Note technique** : l'endpoint legacy `GET /repos/.../branches/<nom>` (utilisé dans l'audit V1)
+renvoie toujours `protection.enabled: false` pour les trois branches — cet endpoint ne reflète
+que l'ancien système *Branch protection rules*, pas les *Rulesets* (nouveau système utilisé ici).
+Le champ `protected: true` au niveau racine de la même réponse, lui, reflète bien les deux
+systèmes confondus et confirme la protection réelle. C'est l'API Rulesets dédiée (ci-dessus) qui
+fait foi pour le détail des règles.
 
-**Stabilité** : 30/30 des derniers runs = `success` (dernier déclenché le 2026-08-30, sur des
-PR `pull_request` — aucun push récent sur `main`/`release/commercialisation-v1` depuis, donc
-aucun run `push` récent, ce qui est normal vu l'activité actuelle concentrée sur la branche
-commerciale canonique).
+### 1.2 Bypass (« qui peut contourner »)
 
-Le check GitHub Actions résultant s'appelle : **`Contrôles techniques / verification`** — c'est
-le nom exact de contexte à exiger dans les règles de protection (§2).
+Julien indique, pour les trois rulesets : bypass accordé à **`Repository admin`**, mode **`Always
+allow`**. **Ce point précis n'a pas pu être vérifié de façon indépendante** : l'API publique non
+authentifiée renvoie le contenu complet d'un ruleset (conditions, règles, cible) mais **omet
+systématiquement le champ `bypass_actors`**, y compris sur un dépôt public — GitHub ne l'expose
+qu'aux requêtes authentifiées avec un accès en lecture au dépôt. Aucun jeton GitHub ni CLI `gh`
+n'étant disponible dans cette session (cf. §7), cette valeur repose sur la déclaration de Julien,
+non sur une lecture API indépendante. Cohérent avec le comportement observé : les pushes de ce
+lot et des précédents sur `feat/elsatia-commercial-canonical-r1-r2-r3-v1` (dont le ruleset est
+actif) continuent de réussir sans PR ni check, ce qu'un bypass admin actif explique entièrement.
 
-### 1.3 Git integration Vercel — projet `elsatia-production`
+### 1.3 Status checks disponibles (GitHub Actions)
 
-- **Intégration Git active** : confirmée indirectement — l'historique de déploiements du projet
-  contient de nombreuses entrées `Environment: Preview` avec alias `elsatia-production-git-<nom
-  de branche>-<hash>.vercel.app`, généré automatiquement par Vercel uniquement quand un dépôt
-  Git est connecté. Le dépôt lié n'a pas pu être confirmé par son nom exact via les commandes
-  CLI disponibles (voir limite au §7).
-- **Aucun déploiement récent avec `Environment: Production`** dans les ~30 dernières entrées
-  (couvrant les dernières ~24 h, période où `feat/elsatia-commercial-canonical-r1-r2-r3-v1` a
-  reçu plusieurs push de ce lot et des précédents). **Cela indique fortement que la Production
-  Branch configurée n'est PAS `feat/elsatia-commercial-canonical-r1-r2-r3-v1`** : si elle
-  l'était, chaque push de cette session aurait déclenché un déploiement `Environment:
-  Production`, ce qui n'a jamais été observé.
-- **Le déploiement Production actuellement en ligne** (`app.elsatia.fr`, id
-  `dpl_D3VX5QNQHx6tt6q4H6hrUZef5zau`, créé le 2026-09-02) **ne porte aucune métadonnée Git** —
-  cohérent avec un déploiement manuel (`vercel --prod` en CLI), exactement comme pour les
-  projets `elsatia-colors`, `elsatia-tools` et `elsatia-site` audités dans les lots précédents.
-- **Valeur exacte de « Production Branch » non confirmée** : la CLI Vercel n'expose pas ce
-  champ en clair (ni `project inspect`, ni `--debug`, ni de flag `--json` sur cette commande).
-  Le lire de façon certaine demande soit `gh`/un jeton GitHub avec accès API Vercel équivalent,
-  soit une lecture directe du Dashboard. **Ce point reste un blocage de vérification, pas une
-  action non faite** — voir procédure de vérification exacte au §4.4.
+Inchangé depuis l'audit V1. Un seul workflow existe : **« Contrôles techniques »**
+(`.github/workflows/ci.yml`), état `active`, job `verification` (nom exact du contexte de check :
+`Contrôles techniques / verification`, exigé sur `main` — confirmé identique au §1.1).
 
-**Conclusion prudente** : rien ne prouve que Production Branch = `main`, et un faisceau
-d'indices (aucun déploiement Production auto-déclenché malgré des dizaines de push sur la
-branche canonique) suggère que ce n'est probablement pas le cas non plus — mais ceci **doit être
-confirmé visuellement par Julien** avant de considérer le point fermé (§4.4 donne le chemin
-exact).
+### 1.4 Vercel — Production Branch
+
+Julien confirme explicitement, projet `elsatia-production` : **Production Branch =
+`release/commercialisation-v1`**, **≠ `main`**. Aucun outil Vercel (CLI non installée dans cette
+session, aucun jeton d'API Vercel disponible pour le projet `elsatia-production` — le seul
+fichier `.vercel/project.json` présent localement pointe vers un projet distinct,
+`elsatia-preview`, et ne peut ni confirmer ni infirmer ce réglage) ne permet de relire ce champ de
+façon indépendante depuis cette session. Cette valeur repose donc sur la déclaration explicite de
+l'opérateur, cohérente avec :
+- le nom du projet Vercel (`elsatia-production`) et le nom de la branche (`release/…`) ;
+- l'absence historique de déploiements `Environment: Production` auto-déclenchés malgré des
+  dizaines de push sur `feat/elsatia-commercial-canonical-r1-r2-r3-v1` (constatée en V1, toujours
+  vraie — si Production Branch avait été cette branche canonique, chaque push l'aurait
+  redéployée) ;
+- le risque explicite documenté en V1 (`main` porte encore l'ancienne base « Liria Gestion Pro
+  V3 ») n'ayant jamais été concrétisé.
+
+**Conclusion** : Production Branch ≠ `main` est confirmé par déclaration opérateur directe et
+reste cohérent avec tous les indices indirects disponibles côté GitHub. Aucun élément recueilli
+dans ce lot ne contredit cette confirmation.
 
 ---
 
-## 2. Cible GitHub — règles à appliquer
+## 2. Règles appliquées (référence — inchangé depuis V1, désormais actif)
 
 ### `main`
 
-| Réglage | Valeur cible |
-|---|---|
-| Push direct | **interdit** (PR obligatoire) |
-| Pull request obligatoire | **oui**, ≥ 1 approbation si un second réviseur existe un jour (0 acceptable en solo, mais garder l'option active) |
-| Force-push | **interdit** |
-| Suppression | **interdite** |
-| Status checks obligatoires | `Contrôles techniques / verification` |
-| Branches à jour avant merge | recommandé (`strict` status checks) |
-| Conversation resolution | recommandé activé |
-| Bypass admin (« Do not allow bypassing the above settings ») | **activé** — même le propriétaire passe par une PR |
-| Commits signés | optionnel — P2, non bloquant |
+| Réglage | Valeur cible | État |
+|---|---|---|
+| Push direct | interdit (PR obligatoire) | **appliqué** |
+| Pull request obligatoire | oui, ≥ 1 approbation | **appliqué** (`required_approving_review_count: 1`) |
+| Force-push | interdit | **appliqué** |
+| Suppression | interdite | **appliqué** |
+| Status checks obligatoires | `Contrôles techniques / verification` | **appliqué** |
+| Stale reviews dismissed | activé | **appliqué** |
+| Conversation resolution | activé | **appliqué** |
+| Bypass | `Repository admin` / `Always allow` | déclaré par Julien, non vérifiable par API publique (§1.2) |
 
 ### `release/commercialisation-v1`
 
-| Réglage | Valeur cible |
-|---|---|
-| Force-push | **interdit** |
-| Suppression | **interdite** |
-| Push direct | toléré si c'est le flux actuel de promotion release (ne pas casser le workflow existant), mais **PR recommandée dès que possible** |
-| Status checks | `Contrôles techniques / verification` si le flux passe par PR |
+| Réglage | Valeur cible | État |
+|---|---|---|
+| Force-push | interdit | **appliqué** |
+| Suppression | interdite | **appliqué** |
+| PR/check | non exigés (flux de promotion actuel préservé) | **appliqué** (aucune règle PR/check dans le ruleset) |
+| Bypass | `Repository admin` / `Always allow` | déclaré par Julien, non vérifiable par API publique (§1.2) |
 
 ### `feat/elsatia-commercial-canonical-r1-r2-r3-v1`
 
-| Réglage | Valeur cible |
-|---|---|
-| Force-push | **interdit** |
-| Suppression | **interdite** |
-| Push direct | **autorisé** — reste une branche de préparation active, le rythme de travail actuel (commits directs) ne doit pas être cassé |
-| Status checks | non obligatoires ici (la validation se fait avant promotion vers `release/*`) |
-
-Ces trois cibles respectent la contrainte « ne pas casser le workflow actuel » : seule `main`
-devient réellement contraignante (PR + check obligatoires), les deux autres gagnent uniquement
-une protection anti-destruction (pas de force-push, pas de suppression).
+| Réglage | Valeur cible | État |
+|---|---|---|
+| Force-push | interdit | **appliqué** |
+| Suppression | interdite | **appliqué** |
+| Push direct | autorisé (branche de préparation active) | **appliqué** (aucune règle PR/check dans le ruleset) |
+| Bypass | `Repository admin` / `Always allow` | déclaré par Julien, non vérifiable par API publique (§1.2) |
 
 ---
 
 ## 3. Status checks — ce qui est rendu obligatoire
 
-**Un seul check existe et est stable : `Contrôles techniques / verification`** (30/30 succès
-récents). C'est le seul rendu obligatoire, uniquement sur `main` (§2). Aucun check inexistant
-n'est exigé — il n'y a pas de job séparé pour tests/typecheck/lint/build/migrations/secrets/audit
-: ils sont tous agrégés dans le même job `verification` via `npm run verify` (qui inclut déjà
-`verify:migrations`, `verify:secrets`, `verify:stripe-prices`) et `npm run audit:security`.
+Inchangé : **`Contrôles techniques / verification`** est le seul check existant et stable,
+désormais **effectivement exigé sur `main`** par le ruleset `Protect main` (confirmé §1.1 —
+`required_status_checks.required_status_checks[0].context = "Contrôles techniques /
+verification"`, correspondance exacte caractère pour caractère avec le nom du job CI).
 
 ---
 
 ## 4. Vercel — Production Branch
 
-### 4.1 Constat (voir §1.3)
-
-Intégration Git active, Production Branch non lisible avec certitude via les outils disponibles
-dans cette session, mais fortement suspectée de ne pas être la branche commerciale canonique
-(aucun déploiement Production auto-déclenché malgré de nombreux push). Le déploiement Production
-actuel en ligne a été fait manuellement (`vercel --prod`), pas par promotion Git automatique.
-
-### 4.2 Risque si Production Branch = `main`
-
-`main` porte encore l'ancienne marque **« Liria Gestion Pro V3 »**, une grille tarifaire
-obsolète (69/199/399, annuel ×12) et ne contient ni MFA/AAL2, ni réconciliation ACL, ni R1/R2/R3,
-ni le correctif de boucle post-login (voir `docs/organisation/NE_PAS_DEPLOYER_MAIN.md`). Si
-Production Branch était `main` et qu'un jour quelqu'un pousse dessus (main n'étant aujourd'hui
-protégée par rien, cf. §1.1), Vercel **redéploierait automatiquement cette ancienne base en
-Production** sans aucune action de cutover délibérée. C'est le risque concret que ce lot doit
-fermer.
-
-### 4.3 Cible
-
-Ne **jamais** avoir `main` comme Production Branch. La cible dépend de la stratégie retenue
-(§5) : soit `release/commercialisation-v1` (branche de release historique, cohérente avec le nom
-du projet Vercel `elsatia-production`), soit une future branche `release/*` dédiée créée au
-moment du cutover réel, explicitement nommée dans le runbook de cutover
-(`ELSATIA_PRODUCTION_CUTOVER_PREFLIGHT_FINAL_V1.md`).
-
-**Aucun changement de Production Branch n'a été fait dans ce lot** — la valeur actuelle n'a pas
-pu être lue avec certitude, et modifier un réglage sans être sûr de l'état de départ serait
-irresponsable (cf. consigne « ne pas modifier sans expliquer l'impact d'abord »).
-
-### 4.4 Procédure de vérification (à faire une fois, par Julien, ~2 minutes)
-
-1. https://vercel.com/julien-gregurec1/elsatia-production/settings/git
-2. Lire le champ **« Production Branch »**.
-3. Si la valeur est `main` → **la changer immédiatement** pour `release/commercialisation-v1`
-   (ou la branche de release retenue), en cochant qu'aucun redéploiement automatique intempestif
-   n'est déclenché par ce changement seul (changer la Production Branch ne redéploie rien tant
-   qu'aucun nouveau push n'arrive sur la nouvelle branche cible).
-4. Si la valeur est déjà `release/commercialisation-v1` ou une autre branche de release
-   explicite (pas `main`, pas la branche commerciale canonique) → **rien à faire**, le point est
-   fermé.
-5. Noter la valeur confirmée dans ce document (remplacer la ligne « à confirmer » ci-dessous).
-
-**Résultat de la vérification (à compléter par Julien) : Production Branch = `______________`**
-(constaté le ______).
+Fermé (§1.4). Production Branch = `release/commercialisation-v1`, confirmée ≠ `main` par
+déclaration opérateur directe. Le risque documenté en V1 (redéploiement accidentel de l'ancienne
+base `main` en Production) est écarté sur les deux plans qui le rendaient possible : `main` est
+désormais protégée contre tout push direct (§1.1), et Production Branch ne pointe de toute façon
+pas dessus (§1.4).
 
 ---
 
@@ -225,15 +184,16 @@ et comparer au SHA annoncé dans le runbook de cutover en vigueur.
 - Déployer depuis `main`.
 - Déployer depuis un worktree non identifié (toujours vérifier `git rev-parse HEAD` et
   `git status` avant `vercel --prod`).
-- Force-push d'une branche de release.
+- Force-push d'une branche de release — **techniquement bloqué désormais** par le ruleset
+  `Protect release` (§1.1), au-delà de la simple consigne.
 - Redéployer un ancien build sans revérifier son SHA exact (`vercel inspect <url>` → champ
   `created` + comparaison au SHA attendu).
 
 ### Qui peut déployer
 
-Aujourd'hui : Julien uniquement (propriétaire du compte Vercel et du dépôt GitHub). Toute
-exécution par un outil (Claude, Codex) reste soumise à une autorisation explicite, mission par
-mission, jamais implicite.
+Aujourd'hui : Julien uniquement (propriétaire du compte Vercel et du dépôt GitHub, seul détenteur
+du bypass `Repository admin` sur les rulesets GitHub). Toute exécution par un outil (Claude,
+Codex) reste soumise à une autorisation explicite, mission par mission, jamais implicite.
 
 ---
 
@@ -249,69 +209,27 @@ seul est insuffisant après la migration `…000255`).
 
 ## 7. Limitation constatée dans ce lot
 
-**Aucun outil `gh` (GitHub CLI) n'est installé dans cet environnement, et aucun jeton
-d'authentification GitHub (`GH_TOKEN`/`GITHUB_TOKEN`) n'est disponible.** Le seul identifiant
-GitHub présent est un identifiant Git stocké dans le trousseau macOS pour l'usage exclusif du
-protocole `git` (push/pull) — je ne l'ai pas extrait ni réutilisé pour appeler l'API GitHub,
-conformément à la règle de ne jamais manipuler un secret existant en dehors de son usage prévu.
+Inchangé depuis V1 : **aucun outil `gh` (GitHub CLI) n'est installé dans cet environnement,
+aucun jeton d'authentification GitHub (`GH_TOKEN`/`GITHUB_TOKEN`) n'est disponible, et aucune CLI
+ou jeton Vercel valide pour le projet `elsatia-production` n'est disponible.** Le seul identifiant
+GitHub présent reste un identifiant Git stocké dans le trousseau macOS pour l'usage exclusif du
+protocole `git` (push/pull) — non extrait ni réutilisé pour appeler l'API GitHub, conformément à
+la règle de ne jamais manipuler un secret existant en dehors de son usage prévu.
 
-**Conséquence** : l'audit (§1) a été fait intégralement via l'API GitHub **publique, non
-authentifiée** (le dépôt étant public, `protected`, la liste des workflows et leur historique de
-runs sont lisibles sans jeton) — fiable et vérifié. En revanche, **appliquer** les protections de
-branche (§2) nécessite un accès en écriture à l'API, donc soit `gh` authentifié, soit un jeton
-avec le scope `repo` (administration de branche).
+**Conséquence pour ce lot de clôture** : contrairement au lot V1 (audit seul, rien à appliquer),
+ce lot n'avait **rien à appliquer** — les protections ont été mises en place manuellement par
+Julien (hors session) — et se limitait à **confirmer** cet état par lecture. Cette confirmation a
+pu être menée **intégralement via l'API GitHub Rulesets publique et non authentifiée** (§1.1),
+qui s'est révélée strictement plus complète et fiable que l'ancien endpoint *branch protection*
+utilisé en V1 pour ce même usage. Seuls deux points précis restent hors de portée d'une
+vérification indépendante par API/CLI depuis cette session, tous deux pour la même raison
+(absence de jeton authentifié) :
+- le détail des `bypass_actors` de chaque ruleset GitHub (§1.2) ;
+- la valeur exacte du champ Vercel *Production Branch* (§1.4).
 
-### Commandes prêtes à l'exécution (à lancer par Julien, ou par un futur lot une fois `gh`
-disponible)
-
-```bash
-# Installation (une fois) :
-brew install gh
-gh auth login   # flux navigateur, aucun jeton à copier-coller manuellement
-
-# main — protection forte
-gh api -X PUT repos/julien-gregurec/Appli_BTP/branches/main/protection \
-  -H "Accept: application/vnd.github+json" \
-  -f required_status_checks[strict]=true \
-  -f 'required_status_checks[contexts][]=Contrôles techniques / verification' \
-  -F enforce_admins=true \
-  -f required_pull_request_reviews[required_approving_review_count]=0 \
-  -F required_pull_request_reviews[dismiss_stale_reviews]=true \
-  -f restrictions=null \
-  -F allow_force_pushes=false \
-  -F allow_deletions=false \
-  -F required_conversation_resolution=true
-
-# release/commercialisation-v1 — anti-destruction uniquement
-gh api -X PUT "repos/julien-gregurec/Appli_BTP/branches/release%2Fcommercialisation-v1/protection" \
-  -H "Accept: application/vnd.github+json" \
-  -f required_status_checks=null \
-  -F enforce_admins=false \
-  -f required_pull_request_reviews=null \
-  -f restrictions=null \
-  -F allow_force_pushes=false \
-  -F allow_deletions=false
-
-# feat/elsatia-commercial-canonical-r1-r2-r3-v1 — anti-destruction uniquement
-gh api -X PUT "repos/julien-gregurec/Appli_BTP/branches/feat%2Felsatia-commercial-canonical-r1-r2-r3-v1/protection" \
-  -H "Accept: application/vnd.github+json" \
-  -f required_status_checks=null \
-  -F enforce_admins=false \
-  -f required_pull_request_reviews=null \
-  -f restrictions=null \
-  -F allow_force_pushes=false \
-  -F allow_deletions=false
-```
-
-**Alternative sans `gh`** : interface web, *Settings → Branches → Add branch ruleset/protection
-rule*, en reproduisant exactement les valeurs du tableau §2. Le nom de check exact à saisir est
-`Contrôles techniques / verification` (respecter la casse et l'espace autour du `/`).
-
-Si le plan GitHub actuel (public gratuit) limite une option précise (ex. review obligatoire sur
-dépôt public solo), **ne pas improviser de contournement** : appliquer le niveau maximal
-disponible (force-push/suppression bloqués + check obligatoire restent accessibles sur tous les
-plans GitHub, y compris gratuit, pour un dépôt public) et documenter tout écart ici, classé P1
-externe.
+Les deux reposent sur la déclaration directe de Julien dans le contexte de ce lot, corroborée par
+des indices indirects concordants (comportement observé des pushes récents pour le premier ;
+absence de déploiements Production auto-déclenchés pour le second).
 
 ---
 
@@ -319,18 +237,21 @@ externe.
 
 | Point | État |
 |---|---|
-| Audit GitHub (protections actuelles) | **fait**, vérifié via API publique |
-| Audit status checks | **fait** — un seul check, stable, nommé |
-| Protections `main` appliquées | **non appliquées** — commandes prêtes (§7), bloqué par absence de `gh`/jeton |
-| Protection `release/commercialisation-v1` appliquée | **non appliquée** — idem |
-| Protection branche canonique appliquée | **non appliquée** — idem |
-| Vercel Production Branch confirmée ≠ `main` | **non confirmée avec certitude** — fort indice favorable, vérification finale à faire par Julien (§4.4) |
-| Documentation | **faite** (ce document) |
+| Audit GitHub (protections actuelles) | **fait**, confirmé via API Rulesets publique |
+| Audit status checks | **fait** — un seul check, stable, nommé, exigé sur `main` |
+| Protection `main` appliquée | **CONFIRMÉE ACTIVE** — ruleset `Protect main` (id `22299244`) |
+| Protection `release/commercialisation-v1` appliquée | **CONFIRMÉE ACTIVE** — ruleset `Protect release` (id `22299555`) |
+| Protection branche canonique appliquée | **CONFIRMÉE ACTIVE** — ruleset `Protect commercial canonical` (id `22299867`) |
+| Bypass admin des trois rulesets | déclaré par Julien (`Repository admin` / `Always allow`), non vérifiable par API publique |
+| Vercel Production Branch confirmée ≠ `main` | **CONFIRMÉE** — `release/commercialisation-v1`, par déclaration opérateur directe |
+| Documentation | **faite** (ce document, v2) |
 | Déploiement Production | **non fait** |
 | Supabase Production | **non touché** |
 | Stripe Live | **non touché** |
 
-Ce lot ferme la partie **audit + documentation + préparation** du P1 de gouvernance release.
-L'**application effective** des protections GitHub et la **confirmation finale** de la Production
-Branch Vercel restent deux actions courtes (quelques minutes chacune) à la charge de Julien,
-avec toutes les commandes/chemins exacts fournis ci-dessus.
+Le P1 de gouvernance release ouvert en V1 est **fermé** : les trois branches critiques sont
+protégées contre suppression et force-push, `main` exige en plus une PR avec revue et le check CI
+`Contrôles techniques / verification`, et la Production Branch Vercel est confirmée distincte de
+`main`. Les deux réserves documentaires (§1.2, §1.4, §7) ne bloquent pas la fermeture : elles
+portent sur des détails de configuration déclarés par l'opérateur et cohérents avec tous les
+indices vérifiables indépendamment, pas sur l'existence même des protections.
