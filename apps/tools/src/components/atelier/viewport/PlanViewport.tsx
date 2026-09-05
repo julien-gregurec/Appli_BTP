@@ -25,6 +25,14 @@ import type { PlanViewportController } from "./use-plan-viewport";
 import { useViewportGestures, type ViewportGestureHandlers } from "./use-viewport-gestures";
 import styles from "./viewport.module.css";
 
+/**
+ * Intentions portées par un clic, indépendamment des touches qui les produisent (§8).
+ * `additive` = « ajoute ou retire de la sélection » plutôt que « remplace la sélection ».
+ */
+export type CanvasClickModifiers = { additive: boolean };
+
+export const PLAIN_CLICK: CanvasClickModifiers = { additive: false };
+
 export type PlanViewportRenderArgs = {
   view: ViewportState;
   size: ViewportSize;
@@ -49,8 +57,14 @@ export type PlanViewportProps = {
    * (ATELIER-HITTEST-SNAP-FOUNDATION-V1 §7/§8). Le viewport ne sait pas ce qu'il y a sous ce
    * point : c'est l'appelant qui décide, par hit-test, s'il faut sélectionner ou désélectionner.
    * Ignoré après un glissement.
+   *
+   * ATELIER-INTERSECTIONS-MULTISELECT-V1 §8 — `modifiers` transporte l'intention ADDITIVE du
+   * geste, pas la touche qui l'a produite. Le viewport lit `shiftKey` parce que c'est ce que
+   * le DOM lui donne ; l'appelant, lui, n'a pas à savoir qu'une touche existe — ce qui laisse
+   * une autre entrée (bascule tactile, raccourci) fournir la même intention plus tard sans
+   * toucher à cette signature.
    */
-  onCanvasClick?: (localPoint: ScreenPoint, precision: PointerPrecision) => void;
+  onCanvasClick?: (localPoint: ScreenPoint, precision: PointerPrecision, modifiers: CanvasClickModifiers) => void;
   /**
    * Survol de la toile — `null` à la sortie du pointeur (§9). Émis à la cadence de l'écran
    * (une seule notification par trame, §10) pour qu'un hit-test de survol ne coûte jamais plus
@@ -95,7 +109,7 @@ export function PlanViewport({
     (event: React.MouseEvent<HTMLDivElement>) => {
       // Un clic qui conclut un pan ne doit ni sélectionner ni désélectionner (§11).
       if (consumeDrag()) return;
-      onCanvasClick?.(localPointOf(event), precision.current);
+      onCanvasClick?.(localPointOf(event), precision.current, { additive: event.shiftKey });
     },
     [consumeDrag, localPointOf, onCanvasClick],
   );

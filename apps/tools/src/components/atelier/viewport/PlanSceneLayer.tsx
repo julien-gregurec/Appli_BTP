@@ -26,39 +26,69 @@ export type PlanSceneLayerProps = {
   scene: PlanScene;
   view: ViewportState;
   size: ViewportSize;
+  /**
+   * Entité ACTIVE — celle que le panneau propriétés détaille et que le cycle fait avancer.
+   * Toujours l'un des `selectedEntityIds` quand la multisélection est utilisée.
+   */
   selectedEntityId?: string | null;
+  /**
+   * ATELIER-INTERSECTIONS-MULTISELECT-V1 §11 — toutes les entités retenues. Omise, le rendu
+   * est exactement celui d'avant ce lot : seule l'entité active est mise en évidence.
+   */
+  selectedEntityIds?: readonly string[];
   /** Entité survolée, désignée par le hit-test géométrique (§9). Desktop uniquement. */
   hoveredEntityId?: string | null;
   /** Point d'accrochage proposé sous le pointeur, en coordonnées monde (§9). */
   snapPoint?: { x: number; y: number } | null;
+  /**
+   * Nature de l'accrochage proposé (§11). Une intersection reçoit un marqueur légèrement
+   * différent : c'est le seul accrochage qui ne corresponde à aucun point dessiné du modèle,
+   * donc le seul qu'on puisse croire inventé si rien ne le distingue.
+   */
+  snapIsIntersection?: boolean;
   showPoints?: boolean;
 };
+
+/** Référence stable pour « pas de multisélection » — évite de périmer les mémos à chaque trame. */
+const NO_SELECTION: readonly string[] = [];
 
 export function PlanSceneLayer({
   scene,
   view,
   size,
   selectedEntityId = null,
+  selectedEntityIds = NO_SELECTION,
   hoveredEntityId = null,
   snapPoint = null,
+  snapIsIntersection = false,
   showPoints = true,
 }: PlanSceneLayerProps) {
   const transform = createViewportTransform(view, size);
   const project = transform.point;
 
+  /**
+   * §11 — trois niveaux, jamais plus : entité active (ambre épais), entité retenue parmi
+   * d'autres (ambre plus discret), entité survolée. Empiler un quatrième état rendrait un
+   * plan dense illisible, ce qui est exactement ce qu'on cherche à éviter en le sélectionnant.
+   */
+  const selectionClass = (id: string): string | null => {
+    if (id === selectedEntityId) return styles.selected;
+    if (selectedEntityIds.includes(id)) return styles.coselected;
+    if (id === hoveredEntityId) return styles.hovered;
+    return null;
+  };
+
   const strokeClass = (role: string | undefined, id: string) => {
     const base = role === "construction" ? styles.construction : role === "axis" ? styles.axis : styles.shape;
     // La sélection l'emporte sur le survol : survoler l'entité déjà retenue ne doit pas la
     // faire changer d'apparence, sans quoi on croirait avoir perdu la sélection.
-    if (id === selectedEntityId) return `${base} ${styles.selected}`;
-    if (id === hoveredEntityId) return `${base} ${styles.hovered}`;
-    return base;
+    const state = selectionClass(id);
+    return state ? `${base} ${state}` : base;
   };
 
   const markClass = (id: string, base: string) => {
-    if (id === selectedEntityId) return `${base} ${styles.selected}`;
-    if (id === hoveredEntityId) return `${base} ${styles.hovered}`;
-    return base;
+    const state = selectionClass(id);
+    return state ? `${base} ${state}` : base;
   };
 
   return (
@@ -160,10 +190,26 @@ export function PlanSceneLayer({
       {snapPoint &&
         (() => {
           const marker = project(snapPoint);
+          // Croix DROITE pour un point du modèle, croix EN X pour une intersection (§11) :
+          // la forme suffit à dire « ce point est calculé, il n'est pas dessiné », sans
+          // ajouter ni couleur ni étiquette sur un plan déjà chargé.
+          const arm = snapIsIntersection ? 5 : 7;
           return (
-            <g className={styles.snapMark} aria-hidden="true">
-              <line x1={marker.x - 7} y1={marker.y} x2={marker.x + 7} y2={marker.y} />
-              <line x1={marker.x} y1={marker.y - 7} x2={marker.x} y2={marker.y + 7} />
+            <g
+              className={snapIsIntersection ? `${styles.snapMark} ${styles.snapIntersection}` : styles.snapMark}
+              aria-hidden="true"
+            >
+              {snapIsIntersection ? (
+                <>
+                  <line x1={marker.x - arm} y1={marker.y - arm} x2={marker.x + arm} y2={marker.y + arm} />
+                  <line x1={marker.x - arm} y1={marker.y + arm} x2={marker.x + arm} y2={marker.y - arm} />
+                </>
+              ) : (
+                <>
+                  <line x1={marker.x - arm} y1={marker.y} x2={marker.x + arm} y2={marker.y} />
+                  <line x1={marker.x} y1={marker.y - arm} x2={marker.x} y2={marker.y + arm} />
+                </>
+              )}
               <circle cx={marker.x} cy={marker.y} r={3.5} />
             </g>
           );

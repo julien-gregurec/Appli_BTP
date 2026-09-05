@@ -16,7 +16,13 @@
  * générateur de modèle.
  */
 
-export { PlanViewport, type PlanViewportProps, type PlanViewportRenderArgs } from "./PlanViewport";
+export {
+  PlanViewport,
+  PLAIN_CLICK,
+  type CanvasClickModifiers,
+  type PlanViewportProps,
+  type PlanViewportRenderArgs,
+} from "./PlanViewport";
 export { PlanSceneLayer, type PlanSceneLayerProps } from "./PlanSceneLayer";
 export { GridOverlay } from "./GridOverlay";
 export { AtelierToolbar, type AtelierToolbarProps } from "./AtelierToolbar";
@@ -42,6 +48,7 @@ export {
 export {
   SNAP_PRIORITY,
   geometrySnapCandidates,
+  intersectionSnapCandidates,
   snap,
   snapCandidates,
   snapToGrid,
@@ -49,6 +56,46 @@ export {
   type SnapKind,
   type SnapOptions,
 } from "@/lib/geometry/snap";
+/**
+ * ATELIER-INTERSECTIONS-MULTISELECT-V1 — intersections et sélection avancée. Comme le reste
+ * de ce baril, ces modules sont PURS : le viewport les consomme, ils n'en savent rien.
+ */
+export {
+  MAX_INTERSECTION_PAIRS,
+  MIN_INTERSECTABLE_SIZE,
+  arcBounds,
+  buildIntersectionIndex,
+  intersectionIndexOf,
+  intersectionsNear,
+  pairIntersections,
+  sceneIntersections,
+  type GeometryIntersection,
+  type GeometryIntersectionType,
+  type IndexedIntersectable,
+  type IntersectableKind,
+  type IntersectionIndex,
+} from "@/lib/geometry/intersections";
+export {
+  CYCLE_ANCHOR_PX,
+  IDLE_SELECTION_CYCLE,
+  TOUCH_CYCLE_ANCHOR_PX,
+  advanceSelectionCycle,
+  cycleAnchorPx,
+  resetSelectionCycle,
+  type SelectionCycleInput,
+  type SelectionCycleState,
+  type SelectionCycleStep,
+} from "@/lib/viewport/selection-cycle";
+export {
+  EMPTY_SELECTION,
+  isSelected,
+  primarySelection,
+  retainExisting,
+  sameSelection,
+  selectSingle,
+  toggleSelection,
+  type SelectionSet,
+} from "@/lib/viewport/selection-set";
 export {
   POINTER_TOLERANCE_PX,
   SNAP_TOLERANCE_PX,
@@ -101,6 +148,7 @@ export {
 export {
   countSceneEntities,
   describeSceneEntity,
+  describeSceneSelection,
   entityKindLabel,
   entityLabel,
   listSceneEntities,
@@ -109,5 +157,7 @@ export {
   type SceneEntityDetails,
   type SceneEntityKind,
   type SceneEntitySummary,
+  type SceneSelectionDetails,
+  type SceneSelectionKindCount,
 } from "./plan-scene";
 export { DENSE_SCENE, MEDIUM_SCENE, PREVIEW_SCENES, SIMPLE_SCENE, createDenseScene } from "./preview-fixture";

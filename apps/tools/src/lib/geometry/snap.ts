@@ -5,18 +5,30 @@
  * Rien ici ne déplace un sommet, ne modifie un paramètre ni ne crée de primitive (§11) — le
  * résultat est une suggestion, que seul un futur outil d'édition consommera.
  *
- * Types couverts dans ce lot : points existants du modèle, extrémités, milieux, centres, et la
- * grille. Les intersections (droite/droite, droite/cercle, cercle/cercle) sont hors lot : elles
- * demandent de décider quelles paires calculer sans faire exploser le coût, ce qui est une
- * question de conception à part entière. Le type `SnapKind` les prévoit déjà pour que les
- * ajouter n'oblige pas à casser le contrat.
+ * Types couverts : points existants du modèle, extrémités, milieux, centres, et la grille.
+ *
+ * ## ATELIER-INTERSECTIONS-MULTISELECT-V1 §5 — les intersections rejoignent le moteur
+ *
+ * Le `SnapKind` « intersection » était déjà déclaré ; il est désormais alimenté par
+ * `geometry/intersections.ts`. Une seule règle de conception le sépare des autres natures :
+ *
+ *   les intersections ne sont JAMAIS calculées sans tolérance.
+ *
+ * Toutes les autres natures s'énumèrent en O(n) — un centre par cercle, deux extrémités par
+ * segment — et `geometrySnapCandidates` peut donc les produire toutes, puis filtrer. Les
+ * intersections sont quadratiques : les produire toutes pour n'en garder qu'une reviendrait à
+ * balayer la scène entière à chaque mouvement de pointeur. Elles sont donc calculées dans
+ * `snapCandidates`, seul endroit qui connaisse le rayon, via `intersectionsNear` qui borne le
+ * travail au voisinage du pointeur. `geometrySnapCandidates` garde exactement son
+ * comportement d'avant ce lot — ses appelants ne changent pas.
  *
  * Engine B n'est pas touché (§6) : tout se calcule à partir des primitives Engine A publiées par
- * le modèle déjà résolu.
+ * le modèle déjà résolu ; les formules d'intersection sont LUES dans Engine B, jamais modifiées.
  */
 
 import { arcEndpoints, arcMidpoint, type PlanePoint } from "./closest-point";
 import type { HitTestScene } from "./hit-test";
+import { intersectionsNear, type GeometryIntersection } from "./intersections";
 
 export type SnapKind = "point" | "endpoint" | "midpoint" | "center" | "intersection" | "grid";
 
@@ -26,8 +38,19 @@ export type SnapCandidate = {
   position: PlanePoint;
   /** Distance monde entre la cible et ce point. */
   distance: number;
-  /** Entité dont il provient — absent pour la grille, qui n'appartient à aucune entité. */
+  /**
+   * Entité dont il provient — absent pour la grille, qui n'appartient à aucune entité. Pour
+   * une intersection, c'est la PREMIÈRE des deux entités dans l'ordre déterministe du couple :
+   * le champ garde ainsi le même sens qu'avant ce lot pour tous ses lecteurs.
+   */
   entityId?: string;
+  /**
+   * Toutes les entités à l'origine du candidat (§5). Une intersection en a deux, tout le reste
+   * en a une (ou zéro pour la grille). Additif : `entityId` reste la voie d'accès simple.
+   */
+  entityIds?: readonly string[];
+  /** Vrai quand les deux entités se touchent sans se traverser. Faux ailleurs. */
+  tangent?: boolean;
   /** Libellé lisible, pour un futur affichage d'infobulle. */
   label: string;
   priority: number;
@@ -129,7 +152,11 @@ export function geometrySnapCandidates(scene: HitTestScene, target: PlanePoint):
 function better(a: SnapCandidate, b: SnapCandidate): boolean {
   if (a.priority !== b.priority) return a.priority < b.priority;
   if (Math.abs(a.distance - b.distance) > MERGE_EPSILON) return a.distance < b.distance;
-  return (a.entityId ?? "") < (b.entityId ?? "");
+  // Deux intersections différentes partagent leur première entité : le libellé, qui nomme le
+  // COUPLE, est alors le seul discriminant stable. Sans lui, l'ordre retomberait sur celui du
+  // tableau, donc sur l'ordre de publication du générateur (§6).
+  if ((a.entityId ?? "") !== (b.entityId ?? "")) return (a.entityId ?? "") < (b.entityId ?? "");
+  return a.label < b.label;
 }
 
 /**
@@ -147,6 +174,36 @@ function dedupeByPosition(candidates: readonly SnapCandidate[]): SnapCandidate[]
     else if (better(item, kept[existing])) kept[existing] = item;
   }
   return kept;
+}
+
+/**
+ * Libellé d'une intersection. Nomme le COUPLE, jamais une entité seule : c'est ce qui rend le
+ * candidat identifiable dans une infobulle et discriminable dans le tri.
+ */
+function intersectionLabel(item: GeometryIntersection): string {
+  const nature = item.tangent ? "tangence" : "intersection";
+  return item.entityAId === item.entityBId
+    ? `${item.entityAId} — ${nature}`
+    : `${item.entityAId} × ${item.entityBId} — ${nature}`;
+}
+
+/**
+ * §5 — candidats d'accrochage aux intersections, bornés au voisinage du pointeur.
+ *
+ * Contrairement aux autres natures, celle-ci EXIGE une tolérance : voir l'en-tête du module.
+ * Exposée pour que les tests et un futur calque « points remarquables » puissent l'appeler
+ * sans repasser par le tri complet.
+ */
+export function intersectionSnapCandidates(
+  scene: HitTestScene,
+  target: PlanePoint,
+  toleranceWorld: number,
+): readonly SnapCandidate[] {
+  return intersectionsNear(scene, target, toleranceWorld).map((item) => ({
+    ...candidate("intersection", item.position, target, intersectionLabel(item), item.entityAId),
+    entityIds: item.entityAId === item.entityBId ? [item.entityAId] : [item.entityAId, item.entityBId],
+    tangent: item.tangent,
+  }));
 }
 
 export type SnapOptions = {
@@ -168,6 +225,14 @@ export function snapCandidates(scene: HitTestScene, target: PlanePoint, options:
   const allowed = options.kinds ? new Set(options.kinds) : null;
 
   const collected = [...geometrySnapCandidates(scene, target)];
+
+  // Calculées ici et nulle part ailleurs : c'est le seul endroit qui connaisse le rayon, donc
+  // le seul où le coût quadratique puisse être borné (§4/§5). Écartée d'emblée si l'appelant a
+  // désactivé cette nature — on ne paie alors rien du tout.
+  if (tolerance > 0 && (!allowed || allowed.has("intersection"))) {
+    collected.push(...intersectionSnapCandidates(scene, target, tolerance));
+  }
+
   if (options.gridStepMm && options.gridStepMm > 0) {
     const position = snapToGrid(target, options.gridStepMm);
     collected.push(candidate("grid", position, target, `Grille ${options.gridStepMm} mm`));

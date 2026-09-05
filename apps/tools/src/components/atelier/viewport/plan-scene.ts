@@ -239,6 +239,72 @@ export function describeSceneEntity(scene: PlanScene, entityId: string | null): 
   return null;
 }
 
+/**
+ * ATELIER-INTERSECTIONS-MULTISELECT-V1 §10 — synthèse d'une sélection multiple.
+ *
+ * LECTURE SEULE, sans exception. Ce lot ne fournit aucun formulaire groupé et ne modifie
+ * jamais plusieurs entités d'un coup : une modification géométrique passe par une poignée ou
+ * par le formulaire de paramètres, un objet à la fois, pour que l'historique et l'autosave
+ * restent lisibles.
+ */
+export type SceneSelectionKindCount = { kind: SceneEntityKind; label: string; count: number };
+
+export type SceneSelectionDetails = {
+  count: number;
+  /** Répartition par nature, dans l'ordre stable de `listSceneEntities`. */
+  kinds: readonly SceneSelectionKindCount[];
+  /** Rôles métier présents, dédoublonnés et triés. */
+  roles: readonly string[];
+  /** Les entités elles-mêmes, dans l'ordre de désignation. */
+  entries: readonly SceneEntitySummary[];
+  /**
+   * Propriétés dont le libellé ET la valeur sont IDENTIQUES sur toutes les entités
+   * sélectionnées — cinq cercles de même rayon affichent donc « Rayon 120 mm ».
+   *
+   * Ce sont les seules lignes communes qu'on puisse afficher sans inventer de contrat : ni
+   * somme, ni moyenne, ni plage. Additionner des longueurs de natures différentes n'aurait
+   * pas de sens métier, et la somme d'un développé n'est pas une propriété de la sélection.
+   */
+  commonRows: readonly PropertyRow[];
+};
+
+const KIND_ORDER: readonly SceneEntityKind[] = ["polygon", "segment", "arc", "circle", "ellipse", "polyline", "point"];
+
+export function describeSceneSelection(
+  scene: PlanScene,
+  entityIds: readonly string[],
+): SceneSelectionDetails | null {
+  const details = entityIds
+    .map((id) => describeSceneEntity(scene, id))
+    .filter((item): item is SceneEntityDetails => item !== null);
+  if (details.length === 0) return null;
+
+  const counts = new Map<SceneEntityKind, number>();
+  for (const item of details) counts.set(item.kind, (counts.get(item.kind) ?? 0) + 1);
+
+  const kinds = KIND_ORDER.filter((kind) => counts.has(kind)).map((kind) => ({
+    kind,
+    label: entityKindLabel(kind),
+    count: counts.get(kind) ?? 0,
+  }));
+
+  const roles = [...new Set(details.map((item) => item.role).filter((role): role is string => Boolean(role)))].sort();
+
+  // Une ligne est commune si le couple libellé/valeur se retrouve à l'identique partout.
+  const [first, ...rest] = details;
+  const commonRows = first.rows.filter((row) =>
+    rest.every((item) => item.rows.some((other) => other.label === row.label && other.value === row.value)),
+  );
+
+  return {
+    count: details.length,
+    kinds,
+    roles,
+    entries: details.map(({ id, kind, label, role }) => ({ id, kind, label, role })),
+    commonRows,
+  };
+}
+
 function pathLength(points: readonly { x: number; y: number }[], closed: boolean): number {
   if (points.length < 2) return 0;
   let total = 0;

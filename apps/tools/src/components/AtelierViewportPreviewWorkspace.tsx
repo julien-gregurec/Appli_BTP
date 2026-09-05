@@ -10,17 +10,35 @@
  *
  * La liste d'entités tient lieu de source de sélection en attendant le hit-testing complet
  * (§11) : elle prouve que `selectedEntityId` / `onSelectEntity` alimentent bien le panneau.
+ *
+ * ATELIER-INTERSECTIONS-MULTISELECT-V1 §15 — la sélection y est passée à l'ENSEMBLE, comme
+ * dans l'Atelier réel : c'est ce qui rend le cycle (re-clic au même endroit) et le Shift +
+ * clic éprouvables à la main, sur la scène de charge comprise.
  */
 
-import { useMemo, useState } from "react";
-import { AtelierViewportWorkspace, listSceneEntities, PREVIEW_SCENES } from "@/components/atelier/viewport";
+import { useCallback, useMemo, useState } from "react";
+import {
+  AtelierViewportWorkspace,
+  EMPTY_SELECTION,
+  listSceneEntities,
+  PREVIEW_SCENES,
+  primarySelection,
+  selectSingle,
+  toggleSelection,
+  type SelectionSet,
+} from "@/components/atelier/viewport";
 
 export function AtelierViewportPreviewWorkspace() {
   const [sceneIndex, setSceneIndex] = useState(0);
-  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+  const [selection, setSelection] = useState<SelectionSet>(EMPTY_SELECTION);
 
   const scene = PREVIEW_SCENES[sceneIndex];
   const entities = useMemo(() => listSceneEntities(scene), [scene]);
+  const selectedEntityId = primarySelection(selection);
+
+  const onSelectEntity = useCallback((entityId: string | null) => {
+    setSelection((current) => selectSingle(current, entityId));
+  }, []);
 
   return (
     <main className="shell" style={{ paddingBlock: 32, display: "grid", gap: 18, maxWidth: 1080, minWidth: 0 }}>
@@ -42,7 +60,7 @@ export function AtelierViewportPreviewWorkspace() {
             aria-pressed={index === sceneIndex}
             onClick={() => {
               setSceneIndex(index);
-              setSelectedEntityId(null);
+              setSelection(EMPTY_SELECTION);
             }}
             style={{
               minHeight: 40,
@@ -64,7 +82,9 @@ export function AtelierViewportPreviewWorkspace() {
       <AtelierViewportWorkspace
         scene={scene}
         selectedEntityId={selectedEntityId}
-        onSelectEntity={setSelectedEntityId}
+        onSelectEntity={onSelectEntity}
+        selectedEntityIds={selection}
+        onSelectEntities={setSelection}
       />
 
       <section
@@ -81,22 +101,30 @@ export function AtelierViewportPreviewWorkspace() {
           Sélection — fixture
         </h2>
         <p style={{ color: "var(--ink-soft)", fontSize: 12, lineHeight: 1.5, margin: "0 0 12px" }}>
-          Alimente <code>selectedEntityId</code> sans hit-testing géométrique (hors lot). En mode
-          <strong> Sélection</strong>, un appui direct sur un tracé fonctionne aussi.
+          Alimente la sélection sans hit-testing géométrique. En mode <strong>Sélection</strong>, un appui direct sur un
+          tracé fonctionne aussi : re-cliquer au même endroit descend dans les entités superposées, et{" "}
+          <kbd>Maj</kbd> + clic ajoute ou retire de la sélection.
         </p>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
           {entities.slice(0, 24).map((entity) => (
             <button
               key={entity.id}
               type="button"
-              aria-pressed={entity.id === selectedEntityId}
-              onClick={() => setSelectedEntityId(entity.id === selectedEntityId ? null : entity.id)}
+              aria-pressed={selection.includes(entity.id)}
+              // Maj + clic dans la liste : même geste additif que dans le plan.
+              onClick={(event) =>
+                setSelection((current) =>
+                  event.shiftKey
+                    ? toggleSelection(current, entity.id)
+                    : selectSingle(current, primarySelection(current) === entity.id && current.length === 1 ? null : entity.id),
+                )
+              }
               style={{
                 minHeight: 34,
                 padding: "5px 10px",
                 borderRadius: 8,
-                border: `1px solid ${entity.id === selectedEntityId ? "var(--amber)" : "var(--line)"}`,
-                background: entity.id === selectedEntityId ? "var(--amber-soft)" : "var(--paper)",
+                border: `1px solid ${selection.includes(entity.id) ? "var(--amber)" : "var(--line)"}`,
+                background: selection.includes(entity.id) ? "var(--amber-soft)" : "var(--paper)",
                 color: "var(--ink)",
                 fontSize: 12,
                 cursor: "pointer",

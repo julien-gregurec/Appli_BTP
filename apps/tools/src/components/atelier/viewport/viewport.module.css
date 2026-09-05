@@ -134,6 +134,29 @@
   opacity: 1;
 }
 
+/*
+  ATELIER-INTERSECTIONS-MULTISELECT-V1 §11 — entité retenue dans une sélection multiple, sans
+  être l'entité active. Même TEINTE que la sélection (c'est bien le même état métier), mais
+  trait plus fin et légèrement atténué : sur une sélection de dix entités, dix traits pleine
+  épaisseur masqueraient le tracé qu'on essaie justement de lire. L'ambre reste, donc l'œil
+  compte les entités retenues d'un coup ; l'épaisseur dit laquelle est détaillée par le
+  panneau.
+*/
+.coselected {
+  stroke: var(--amber);
+  stroke-width: 2.4;
+  opacity: 0.85;
+}
+
+/*
+  Accrochage sur une intersection (§11) : une croix EN X, là où un point du modèle reçoit une
+  croix droite. Le trait est un peu plus appuyé parce que le point n'est pas dessiné sous la
+  croix — il n'y a rien d'autre à voir que le marqueur.
+*/
+.snapIntersection line {
+  stroke-width: 1.6;
+}
+
 /* Point d'accrochage proposé : croix fine, ambre, non interactive. */
 .snapMark line {
   stroke: var(--amber);
@@ -373,6 +396,32 @@
   font-weight: 700;
   color: var(--navy);
   font-variant-numeric: tabular-nums;
+}
+
+/*
+  ATELIER-INTERSECTIONS-MULTISELECT-V1 §10 — liste des entités d'une sélection multiple.
+  Bornée en hauteur et défilante : sur un mobile, une sélection de vingt entités ne doit pas
+  pousser la note de bas de panneau hors de l'écran.
+*/
+.sheetList {
+  margin: 0 0 16px;
+  padding: 0 16px;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  max-height: 34vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sheetListItem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  font-size: 12.5px;
+  color: var(--navy);
 }
 
 .sheetEmpty {

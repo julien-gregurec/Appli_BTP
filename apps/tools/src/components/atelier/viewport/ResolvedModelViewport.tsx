@@ -23,10 +23,12 @@
  */
 
 import { useCallback, useMemo, useState } from "react";
+import { EMPTY_SELECTION, primarySelection, retainExisting, type SelectionSet } from "@/lib/viewport/selection-set";
 import type { SiteStep } from "@/lib/geometry/shape-model";
 import type { TracingModelResolution } from "@/lib/tracing/model-resolver";
 import { buildModelResolutionViewModel } from "../model/model-resolution-view-model";
 import { AtelierViewportWorkspace, type AtelierEditingApi } from "./AtelierViewportWorkspace";
+import { listSceneEntities } from "./plan-scene";
 import { atelierViewKey, planSceneForStep, resolvedPlanScene } from "./resolved-scene";
 
 export type ResolvedModelViewportProps = {
@@ -40,7 +42,12 @@ export type ResolvedModelViewportProps = {
 };
 
 export function ResolvedModelViewport({ resolution, projectId, activeStep = null, editing }: ResolvedModelViewportProps) {
-  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+  /**
+   * ATELIER-INTERSECTIONS-MULTISELECT-V1 §8 — la sélection est désormais un ENSEMBLE ordonné.
+   * L'entité active en est dérivée (`primarySelection`), jamais stockée en double : deux états
+   * pour une seule vérité finiraient par diverger sur un chemin oublié.
+   */
+  const [selection, setSelection] = useState<SelectionSet>(EMPTY_SELECTION);
 
   const scene = resolvedPlanScene(resolution);
   const slug = resolution.status === "resolved" ? resolution.slug : undefined;
@@ -50,12 +57,28 @@ export function ResolvedModelViewport({ resolution, projectId, activeStep = null
   const [selectionKey, setSelectionKey] = useState(viewKey);
   if (selectionKey !== viewKey) {
     setSelectionKey(viewKey);
-    setSelectedEntityId(null);
+    setSelection(EMPTY_SELECTION);
   }
 
   const stepScene = useMemo(() => (scene ? planSceneForStep(scene, activeStep) : null), [scene, activeStep]);
 
-  const onSelectEntity = useCallback((entityId: string | null) => setSelectedEntityId(entityId), []);
+  /**
+   * §7/§8 — une étape de chantier masque des entités : celles qui disparaissent quittent la
+   * sélection. Sans cela, le panneau détaillerait un objet que le plan ne dessine plus, et le
+   * compte affiché ne correspondrait à rien de visible. Dérivé, jamais recopié dans un état.
+   */
+  const visibleSelection = useMemo(() => {
+    if (!stepScene || selection.length === 0) return EMPTY_SELECTION;
+    return retainExisting(selection, new Set(listSceneEntities(stepScene).map((entity) => entity.id)));
+  }, [stepScene, selection]);
+
+  const onSelectEntities = useCallback((entityIds: readonly string[]) => setSelection(entityIds), []);
+  // Conservé pour les composants écrits autour d'un identifiant unique : ils continuent de
+  // fonctionner sans savoir qu'un ensemble existe.
+  const onSelectEntity = useCallback(
+    (entityId: string | null) => setSelection((current) => (primarySelection(current) === entityId ? current : entityId ? [entityId] : EMPTY_SELECTION)),
+    [],
+  );
 
   if (!stepScene) {
     const view = buildModelResolutionViewModel(resolution);
@@ -72,8 +95,10 @@ export function ResolvedModelViewport({ resolution, projectId, activeStep = null
     <AtelierViewportWorkspace
       scene={stepScene}
       viewKey={viewKey}
-      selectedEntityId={selectedEntityId}
+      selectedEntityId={primarySelection(visibleSelection)}
       onSelectEntity={onSelectEntity}
+      selectedEntityIds={visibleSelection}
+      onSelectEntities={onSelectEntities}
       editing={editing}
     />
   );
