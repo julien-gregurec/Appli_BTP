@@ -1,0 +1,122 @@
+/**
+ * §6 / §7 — Aides de l'accueil Atelier et du flux « nouveau tracé ».
+ *
+ * Pas d'UI ici : uniquement des fonctions pures (libellés, construction et mise à jour
+ * d'un `TracingProject`, description pour la liste des projets récents). Les composants
+ * React s'appuient dessus.
+ */
+
+import {
+  createTracingProject,
+  validateTracingProject,
+  TracingProjectError,
+  TRACING_PROJECT_TYPES,
+  type TracingProject,
+  type TracingProjectType,
+} from "./project";
+import { createProjectId } from "../projects/model";
+import { findAtelierModel } from "./atelier-models";
+
+/** §7 — libellés FR des types d'ouvrage, dans l'ordre demandé (Plafond, Mur, Niche, Arche, Autre). */
+export const TRACING_OUVRAGE_LABELS: Record<TracingProjectType, string> = {
+  ceiling: "Plafond",
+  wall: "Mur",
+  niche: "Niche",
+  arch: "Arche",
+  other: "Autre",
+};
+
+export const TRACING_OUVRAGE_ORDER: readonly TracingProjectType[] = ["ceiling", "wall", "niche", "arch", "other"];
+
+export function ouvrageLabel(type: TracingProjectType): string {
+  return TRACING_OUVRAGE_LABELS[type];
+}
+
+/** État collecté par l'assistant avant la création réelle du projet. */
+export type NewTraceInput = {
+  type: TracingProjectType;
+  name: string;
+  roomWidthMm?: number;
+  roomHeightMm?: number;
+};
+
+/** §7 — crée réellement un `TracingProject` à partir de la saisie de l'assistant. */
+export function buildTracingProjectFromInput(
+  input: NewTraceInput,
+  options: { id?: string; now?: Date; companyId?: string; userId?: string } = {},
+): TracingProject {
+  if (!TRACING_PROJECT_TYPES.includes(input.type)) {
+    throw new TracingProjectError("Le type d'ouvrage est inconnu.");
+  }
+  return createTracingProject(
+    {
+      id: options.id ?? createProjectId(),
+      name: input.name,
+      type: input.type,
+      roomWidthMm: input.roomWidthMm,
+      roomHeightMm: input.roomHeightMm,
+      companyId: options.companyId,
+      userId: options.userId,
+    },
+    options.now ?? new Date(),
+  );
+}
+
+export type TracingProjectPatch = Partial<
+  Pick<TracingProject, "name" | "roomWidthMm" | "roomHeightMm" | "modelId" | "startFromPhoto">
+>;
+
+/** Applique un correctif, remonte `updatedAt` et revalide strictement (voie autosave / étapes). */
+export function touchTracingProject(
+  project: TracingProject,
+  patch: TracingProjectPatch,
+  now: Date = new Date(),
+): TracingProject {
+  return validateTracingProject({ ...project, ...patch, updatedAt: now.toISOString() });
+}
+
+/** Convertit une saisie optionnelle en mètres (« 4,2 ») vers des millimètres bornés. */
+export function metresInputToMm(raw: string): number | undefined {
+  const trimmed = raw.trim().replace(",", ".");
+  if (!trimmed) return undefined;
+  const value = Number(trimmed);
+  if (!Number.isFinite(value) || value <= 0 || value > 1000) {
+    throw new TracingProjectError("La dimension de pièce doit être comprise entre 0 et 1000 m.");
+  }
+  return Math.round(value * 1000);
+}
+
+function formatMetres(mm: number): string {
+  return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(mm / 1000);
+}
+
+/** §6 — libellé « dimensions » pour la liste des projets récents (ou `null` si non renseigné). */
+export function formatRoomDimensions(widthMm?: number, heightMm?: number): string | null {
+  if (widthMm && heightMm) return `${formatMetres(widthMm)} × ${formatMetres(heightMm)} m`;
+  if (widthMm) return `Largeur ${formatMetres(widthMm)} m`;
+  if (heightMm) return `Hauteur ${formatMetres(heightMm)} m`;
+  return null;
+}
+
+export type TracingProjectSummary = {
+  id: string;
+  name: string;
+  typeLabel: string;
+  dimensionsLabel: string | null;
+  modelLabel: string | null;
+  startFromPhoto: boolean;
+  updatedAt: string;
+};
+
+/** §6 — projection d'un `TracingProject` pour l'affichage « projets récents ». */
+export function describeTracingProject(project: TracingProject): TracingProjectSummary {
+  return {
+    id: project.id,
+    name: project.name,
+    typeLabel: ouvrageLabel(project.type),
+    dimensionsLabel: formatRoomDimensions(project.roomWidthMm, project.roomHeightMm),
+    modelLabel: findAtelierModel(project.modelId)?.label ?? null,
+    startFromPhoto: project.startFromPhoto === true,
+    updatedAt: project.updatedAt,
+  };
+}

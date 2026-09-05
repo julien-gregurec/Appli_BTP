@@ -26,7 +26,17 @@ import {
 } from "./reference-image";
 import type { GeometricShape, RawContour } from "./vectorization";
 
-export const TRACING_PROJECT_SCHEMA_VERSION = 1;
+/**
+ * Version courante du schéma `TracingProject`.
+ *
+ * - v1 : socle workflow production (photo → tracé → calibration → export).
+ * - v2 : ajout de `modelId` (§8 — modèle d'ouvrage choisi à la création) et `startFromPhoto`
+ *        (§9 — intention « partir d'une photo »), tous deux optionnels et additifs.
+ *
+ * La frontière de lecture tolérante (migration des versions connues) vit dans `./migration.ts` ;
+ * `validateTracingProject` ci-dessous reste strict sur la version courante.
+ */
+export const TRACING_PROJECT_SCHEMA_VERSION = 2;
 
 export type TracingProjectType = "ceiling" | "wall" | "arch" | "niche" | "other";
 export const TRACING_PROJECT_TYPES: readonly TracingProjectType[] = ["ceiling", "wall", "arch", "niche", "other"];
@@ -83,6 +93,10 @@ export type TracingProject = {
   roomHeightMm?: number;
   units: TracingUnits;
   scaleStatus: "defined" | "undefined";
+  /** §8 — modèle d'ouvrage retenu à la création. Contrat minimal : slug stable résolu plus tard par le moteur géométrique. */
+  modelId?: string;
+  /** §9 — l'utilisateur a répondu « oui » à « partir d'une photo ? ». L'upload/caméra/calibration arrivent dans un lot ultérieur. */
+  startFromPhoto?: boolean;
   referenceImages: TracingReferenceImage[];
   contours: RawContour[];
   shapes: GeometricShape[];
@@ -117,6 +131,8 @@ export type CreateTracingProjectInput = {
   units?: TracingUnits;
   roomWidthMm?: number;
   roomHeightMm?: number;
+  modelId?: string;
+  startFromPhoto?: boolean;
   companyId?: string;
   userId?: string;
 };
@@ -132,6 +148,8 @@ export function createTracingProject(input: CreateTracingProjectInput, now: Date
     roomHeightMm: input.roomHeightMm,
     units: input.units ?? "mm",
     scaleStatus: "undefined",
+    modelId: input.modelId,
+    startFromPhoto: input.startFromPhoto ? true : undefined,
     referenceImages: [],
     contours: [],
     shapes: [],
@@ -161,6 +179,15 @@ function optionalDimension(value: unknown, label: string): number | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== "number" || !Number.isFinite(value) || value <= 0 || value > 1_000_000) {
     throw new TracingProjectError(`${label} est hors limites.`);
+  }
+  return value;
+}
+
+/** §8 — slug de modèle stable : minuscules, chiffres et tirets, 40 caractères max. Absent = « à décider ». */
+function optionalModelId(value: unknown): string | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "string" || !/^[a-z0-9][a-z0-9-]{0,39}$/.test(value)) {
+    throw new TracingProjectError("Le modèle choisi est invalide.");
   }
   return value;
 }
@@ -223,6 +250,8 @@ export function validateTracingProject(raw: unknown): TracingProject {
     roomHeightMm: optionalDimension(value.roomHeightMm, "La hauteur de la pièce"),
     units,
     scaleStatus: value.scaleStatus,
+    modelId: optionalModelId(value.modelId),
+    startFromPhoto: value.startFromPhoto === true ? true : undefined,
     referenceImages: referenceImages as TracingReferenceImage[],
     contours: contours as RawContour[],
     shapes: shapes as GeometricShape[],

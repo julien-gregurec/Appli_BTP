@@ -46,4 +46,20 @@ describe("projet de traçage (§2)", () => {
     expect(image.layer.locked).toBe(true);
     expect(image.assetRef).toBeUndefined();
   });
+
+  it("porte un modelId et une intention photo optionnels (§8, §9)", () => {
+    const project = createTracingProject({ ...baseInput, modelId: "ogive", startFromPhoto: true });
+    expect(project.modelId).toBe("ogive");
+    expect(project.startFromPhoto).toBe(true);
+    const rehydrated = validateTracingProject(JSON.parse(JSON.stringify(project)));
+    expect(rehydrated.modelId).toBe("ogive");
+    expect(rehydrated.startFromPhoto).toBe(true);
+  });
+
+  it("laisse modelId et startFromPhoto absents par défaut et rejette un modelId mal formé", () => {
+    const project = createTracingProject(baseInput);
+    expect(project.modelId).toBeUndefined();
+    expect(project.startFromPhoto).toBeUndefined();
+    expect(() => validateTracingProject({ ...project, modelId: "Ogive Brisée!" })).toThrow(/modèle/i);
+  });
 });
