@@ -138,7 +138,7 @@ autorisée est reprise telle quelle dans `Location`, une URL refusée retombe su
 Le `redirectTo` que produit `urlCallbackReinitialisation()` passe désormais la
 validation Supabase. `SiteURL` reste `https://app.elsatia.fr`.
 
-### 4.2 Gabarit « Reset password » — RÉGRESSION OUVERTE
+### 4.2 Gabarit « Reset password » — RÉSOLUE, PRESCRIPTION SUPERSÉDÉE
 
 Le gabarit unique du projet a été modifié en remplaçant `{{ .SiteURL }}` par
 `{{ .RedirectTo }}` dans le lien. La ligne devient donc :
@@ -170,21 +170,39 @@ Effet mesuré en exécutant l'URL composée contre le code réel :
   Le parcours de réinitialisation de Gestion Pro, jusqu'ici fonctionnel, est
   donc cassé par cette modification.
 
-`{{ .RedirectTo }}` reste la bonne variable — c'est la seule qui varie par
-application — mais elle doit porter une **origine**, pas une URL de callback
-déjà pourvue d'une chaîne de requête. La forme cohérente est :
+> **Remplacé par `ELSATIA-COLORS-MULTIAPP-PASSWORD-RESET-FLOW-V1`.** La
+> mesure ci-dessus reste valable et c'est elle qui a écarté `.RedirectTo` ; la
+> conclusion qu'en tirait ce lot, elle, ne l'est plus. Voir
+> [`reset-password-multiapp.md`](./reset-password-multiapp.md).
 
-| Élément | Valeur cible |
+Le gabarit partagé conserve `{{ .SiteURL }}` :
+
+```
+{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery
+```
+
+**`{{ .RedirectTo }}` ne doit pas y être réintroduit**, sous aucune forme. La
+mesure ci-dessus en donne la raison : `.RedirectTo` porte l'URL de callback
+complète, chaîne de requête comprise, et sa concaténation casse le parcours des
+deux applications. Aucun réglage de liste blanche ne change cela.
+
+La provenance de la demande n'est donc pas portée par le lien — elle ne peut
+l'être par aucun canal disponible avant `verifyOtp`. Le lot de réinitialisation
+multi-application a retenu la seule donnée fiable qui reste, le **choix
+explicite de la personne** : le lien atterrit sur `/auth/confirm` de Gestion
+Pro, qui propose de poursuivre sur Colors et relaie le jeton **non consommé**
+vers `/auth/confirm` de Colors, où `verifyOtp` s'exécute sur la bonne origine.
+
+Ce que le présent document annonçait comme « lot distinct » est donc livré, mais
+par une autre voie que celle esquissée ici :
+
+| Élément | État réel |
 | --- | --- |
-| Gabarit | `{{ .RedirectTo }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery` (inchangé) |
-| `redirectTo` Colors et Gestion Pro | `https://<origine de l'application>` |
-| Liste blanche | ajouter `https://colors.elsatia.fr` (mesurée refusée aujourd'hui) |
-| Code Colors | route `/auth/confirm` absente, à créer sur le modèle de Gestion Pro (page à clic explicite + `verifyOtp`) |
-| Code Gestion Pro | `urlCallbackReinitialisation()` doit renvoyer l'origine seule |
-
-Cela relève d'un lot distinct : il touche Gestion Pro et ajoute une route à
-Colors. En attendant, remettre `{{ .SiteURL }}` dans le gabarit restaure le
-parcours de Gestion Pro et remet Colors dans l'état décrit avant ce lot.
+| Gabarit | `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery` — **inchangé** |
+| `SiteURL` | `https://app.elsatia.fr` — inchangé |
+| Liste blanche | aucune entrée requise par le relais : `verifyOtp` n'engage aucun `redirect_to` |
+| Code Colors | route `/auth/confirm` créée (page à clic explicite + `verifyOtp`, aucune destination paramétrable) |
+| Code Gestion Pro | `urlCallbackReinitialisation()` **inchangée** ; un lien de relais s'ajoute sous le bouton « Confirmer » |
 
 ## 5. Vérifications effectuées
 
