@@ -37,6 +37,7 @@ Voir [docs/native.md](docs/native.md) pour l’architecture, les prérequis, l�
 - `src/lib/geometry/plan-model.ts` : transformation exclusive millimètres vers espace SVG ;
 - `src/lib/geometry/models.ts` : modèles géométriques historiques des outils Free ;
 - `src/lib/geometry/diagram-model.ts` : projection des modèles vers primitives et annotations de plans ;
+- `src/lib/geometry/engine/` : moteur géométrique paramétrique générique (polygones, étoiles, arches, rosaces, spirales, offsets, snap…) pour le futur Atelier de traçage — additif, voir [docs/geometry-engine.md](docs/geometry-engine.md) ;
 - `src/components/ToolDiagram.tsx` : renderer SVG des outils Free sans formule métier ;
 - `src/components/AdvancedPlan.tsx` : renderer Pro par couches, zoom et pan ;
 - `src/lib/promotions.ts` : promotions croisées ELSATIA centralisées ;
