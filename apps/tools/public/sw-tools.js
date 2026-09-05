@@ -22,10 +22,19 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+// Le clone doit etre pris SYNCHRONEMENT, avant que la reponse ne soit rendue au client :
+// differe (par exemple apres `caches.open`), `clone()` leve « Response body is already used »
+// et la mise en cache d'execution n'a jamais lieu — le shell reste sans JS ni CSS hors ligne.
+function cacheResponse(event, response) {
+  const copy = response.clone();
+  const written = caches.open(CACHE).then((cache) => cache.put(event.request, copy)).catch(() => undefined);
+  try { event.waitUntil(written); } catch { /* evenement deja clos : ecriture best-effort */ }
+}
+
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET" || !event.request.url.startsWith(self.location.origin)) return;
   event.respondWith(fetch(event.request).then((response) => {
-    if (response.ok) caches.open(CACHE).then((cache) => cache.put(event.request, response.clone()));
+    if (response.ok) cacheResponse(event, response);
     return response;
   }).catch(async () => (await caches.match(event.request, { ignoreSearch: true })) || (event.request.mode === "navigate" ? caches.match("/offline") : Response.error())));
 });
