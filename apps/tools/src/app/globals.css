@@ -198,6 +198,68 @@ footer { background: #e9e8e3; }
 .plan-dimensions text, .plan-points text { fill: #435861; stroke: none; font: 11px Arial, sans-serif; paint-order: stroke; stroke: #fbfaf6; stroke-width: 4px; stroke-linejoin: round; }
 .plan-dimensions text { text-anchor: middle; }
 .plan-points circle { fill: var(--amber); stroke: var(--navy); stroke-width: 1.2; }
+
+/* FIRST-FUNCTIONAL-LOT-V1 : classes dédiées trace-viewer-* (jamais plan-*) pour ne jamais
+   interférer avec AdvancedPlan.tsx, même si les deux composants sont un jour rendus côte à côte.
+   Distinction des couches par trait/tirets/forme, pas uniquement par couleur (§8/§20). */
+.trace-viewer { min-width: 0; }
+.trace-viewer-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.trace-viewer-layer-toggles { display: flex; flex-wrap: wrap; gap: 5px; }
+.trace-viewer-layer-toggles button, .trace-viewer-zoom-controls button { min-height: 36px; padding: 0 11px; border: 1px solid #d9dcd9; border-radius: 7px; background: white; color: #68777d; cursor: pointer; font-size: 10px; font-weight: 700; }
+.trace-viewer-layer-toggles button.active { border-color: #d9a54e; background: var(--amber-soft); color: #875400; }
+.trace-viewer-zoom-controls { display: flex; flex: 0 0 auto; align-items: center; gap: 4px; }
+.trace-viewer-zoom-controls output { min-width: 48px; color: var(--ink-soft); font-size: 10px; text-align: center; }
+.trace-viewer-viewport { max-height: 540px; overflow: auto; border: 1px solid #e1e2de; border-radius: 10px; background: #fbfaf6; touch-action: pan-x pan-y pinch-zoom; }
+.trace-viewer-svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.trace-viewer-svg line, .trace-viewer-svg path, .trace-viewer-svg circle, .trace-viewer-svg ellipse, .trace-viewer-svg rect { vector-effect: non-scaling-stroke; }
+.trace-shape { fill: none; stroke: var(--ink); stroke-width: 2.5; }
+.trace-shape path { fill: none; }
+.trace-construction { fill: none; stroke: #9ba5a8; stroke-width: 1.15; stroke-dasharray: 6 5; }
+.trace-axes { stroke: #d09a39; stroke-width: 1; stroke-dasharray: 10 5 2 5; }
+.trace-dimensions { fill: none; stroke: #a96700; stroke-width: 1.2; }
+.trace-dimensions text, .trace-points text, .trace-centers text { fill: #435861; stroke: none; font: 11px Arial, sans-serif; paint-order: stroke; stroke: #fbfaf6; stroke-width: 4px; stroke-linejoin: round; }
+.trace-dimensions text { text-anchor: middle; }
+.trace-points circle { fill: var(--amber); stroke: var(--navy); stroke-width: 1.2; }
+/* Centres : carré plutôt que rond, pour rester distinguable sans dépendre de la couleur. */
+.trace-centers rect { fill: var(--navy); stroke: var(--amber); stroke-width: 1.4; }
+.trace-shape .highlight, .trace-construction .highlight { stroke: var(--green); stroke-width: 3.5; }
+
+.trace-steps, .site-mode { padding: 20px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); }
+.trace-steps-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.trace-steps-progress { display: flex; align-items: center; gap: 10px; color: var(--ink-soft); font-size: 10px; font-weight: 800; }
+.trace-steps-progress progress { width: 90px; height: 6px; accent-color: var(--amber); }
+.trace-steps-content h3 { margin: 12px 0 6px; font-family: Georgia, serif; font-size: 20px; font-weight: 500; }
+.trace-steps-measurements, .site-mode-measurements { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.trace-steps-measurements span, .site-mode-measurements span { padding: 6px 9px; border-radius: 6px; background: var(--amber-soft); color: var(--navy); font-weight: 800; font-size: 12px; }
+.trace-steps-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 18px; }
+.trace-steps-actions button, .site-mode-actions button { min-height: 46px; border: 1px solid var(--navy); border-radius: 9px; background: white; color: var(--navy); cursor: pointer; font-weight: 700; font-size: 12px; }
+.trace-steps-actions button.active { background: var(--navy); color: white; }
+.trace-steps-actions button:disabled, .site-mode-actions button:disabled { opacity: .35; }
+
+.site-mode-progress { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; color: var(--ink-soft); font-size: 11px; font-weight: 800; }
+.site-mode-progress progress { flex: 1; height: 8px; accent-color: var(--amber); }
+.site-mode-title { margin: 0 0 10px; font-family: Georgia, serif; font-size: 26px; font-weight: 500; }
+.site-mode-points, .site-mode-action { font-size: 15px; line-height: 1.5; }
+.site-mode-action strong, .site-mode-points strong { color: #885500; }
+.site-mode-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 24px; }
+.site-mode-actions button { min-height: 56px; font-size: 15px; }
+.site-mode-actions button:last-child { background: var(--navy); color: white; }
+
+.trace-parameters-form { display: grid; gap: 12px; }
+.trace-parameter-field { display: grid; gap: 4px; font-size: 11px; color: var(--ink-soft); font-weight: 700; }
+.trace-parameter-field input { min-height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 15px; color: var(--ink); }
+
+.traces-preview { padding: 24px; max-width: 1100px; margin: 0 auto; }
+.traces-preview-model-select { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 24px; }
+.traces-preview-model-select button { min-height: 44px; padding: 0 14px; border: 1px solid var(--navy); border-radius: 8px; background: white; color: var(--navy); font-weight: 700; cursor: pointer; }
+.traces-preview-model-select button.active { background: var(--navy); color: white; }
+.traces-preview-body { display: grid; gap: 20px; }
+.traces-preview-view-toggle { display: flex; gap: 8px; }
+.traces-preview-view-toggle button { min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: white; cursor: pointer; font-weight: 700; }
+.traces-preview-view-toggle button.active { border-color: var(--amber); background: var(--amber-soft); }
+.traces-preview-error { padding: 14px; border-radius: 8px; background: #fdecea; color: #8a2c22; font-weight: 700; }
+.traces-preview-explanation { padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); }
+
 .coordinates-content { padding: 32px; }
 .coordinates-content h2 { margin: 0; font-family: Georgia, serif; font-size: 28px; font-weight: 500; }
 .coordinates-content > p:not(.eyebrow) { color: var(--ink-soft); font-size: 11px; }
@@ -348,6 +410,10 @@ footer { background: #e9e8e3; }
   .pro-grid { grid-template-columns: minmax(0, 1fr); }
   .pro-tabs { grid-template-columns: repeat(2, 1fr); }
   .advanced-plan-svg { min-width: 560px; }
+  .trace-viewer-svg { min-width: 480px; }
+  .trace-steps-actions { grid-template-columns: repeat(2, 1fr); }
+  .site-mode-actions button { min-height: 60px; }
+  .traces-preview { padding: 16px; }
   .coordinates-content, .site-step-mode { padding: 24px 18px; }
   .coordinate-table { overflow-x: auto; }
   .coordinate-table > div { min-width: 570px; }

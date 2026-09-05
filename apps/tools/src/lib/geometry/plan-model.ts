@@ -1,4 +1,4 @@
-import type { Arc, Point } from "./primitives";
+import type { Arc, Point, Polygon, Polyline } from "./primitives";
 import type { ShapeGeometry } from "./shape-model";
 
 export function createPlanTransform(model: ShapeGeometry, width = 760, height = 520, margin = 46) {
@@ -20,4 +20,17 @@ export function createArcPath(arc: Arc, transform: ReturnType<typeof createPlanT
   // La projection écran inverse Y : le sweep SVG est donc l’inverse du sens métier.
   const sweep = arc.counterClockwise === false ? 1 : 0;
   return `M ${start.x} ${start.y} A ${transform.radius(arc.radius)} ${transform.radius(arc.radius)} 0 ${Math.abs(delta) > Math.PI ? 1 : 0} ${sweep} ${end.x} ${end.y}`;
+}
+
+// Ajouts additifs (FIRST-FUNCTIONAL-LOT-V1) : Polyline/Polygon n'existaient pas quand ce fichier
+// a été écrit (ENGINE-FOUNDATION-V1). Même convention que createArcPath : un chemin SVG "d",
+// jamais de mutation de transform/model.
+export function createPolylinePath(polyline: Polyline, transform: ReturnType<typeof createPlanTransform>) {
+  if (!polyline.points.length) return "";
+  return polyline.points.map((source, index) => { const p = transform.point(source); return `${index === 0 ? "M" : "L"} ${p.x} ${p.y}`; }).join(" ");
+}
+
+export function createPolygonPath(polygon: Polygon, transform: ReturnType<typeof createPlanTransform>) {
+  if (!polygon.points.length) return "";
+  return `${createPolylinePath(polygon, transform)} Z`;
 }

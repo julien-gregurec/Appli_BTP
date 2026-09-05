@@ -1,4 +1,7 @@
-export type Point = { id: string; x: number; y: number; label?: string; role?: "reference" | "construction" | "control" };
+// "center" ajouté de façon additive (FIRST-FUNCTIONAL-LOT-V1) pour permettre à un renderer de
+// distinguer un centre de construction (O, centres secondaires...) des autres points de
+// référence/contrôle, sans changer le comportement des rôles déjà utilisés.
+export type Point = { id: string; x: number; y: number; label?: string; role?: "reference" | "construction" | "control" | "center" };
 export type Vector = { x: number; y: number };
 export type Segment = { id: string; start: Point; end: Point; role?: "shape" | "construction" | "axis" };
 export type Circle = { id: string; centre: Point; radius: number; role?: "shape" | "construction" };
