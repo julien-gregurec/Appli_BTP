@@ -1,16 +1,29 @@
-export type Point = { id: string; x: number; y: number; label?: string; role?: "reference" | "construction" | "control" };
+// "center" ajouté de façon additive (FIRST-FUNCTIONAL-LOT-V1) pour permettre à un renderer de
+// distinguer un centre de construction (O, centres secondaires...) des autres points de
+// référence/contrôle, sans changer le comportement des rôles déjà utilisés.
+export type Point = { id: string; x: number; y: number; label?: string; role?: "reference" | "construction" | "control" | "center" };
 export type Vector = { x: number; y: number };
 export type Segment = { id: string; start: Point; end: Point; role?: "shape" | "construction" | "axis" };
 export type Circle = { id: string; centre: Point; radius: number; role?: "shape" | "construction" };
 export type Ellipse = { id: string; centre: Point; radiusX: number; radiusY: number; rotation?: number; role?: "shape" | "construction" };
 export type Arc = { id: string; centre: Point; radius: number; startAngle: number; endAngle: number; counterClockwise?: boolean; role?: "shape" | "construction" };
 export type Axis = { id: string; origin: Point; direction: Vector; label: string };
+// Droite mathématique infinie (contrairement à Axis, qui est un axe de rendu nommé/étiqueté,
+// et à Segment, qui est borné par deux points). Sert de brique de calcul future — non consommée
+// par le rendu existant. direction n'a pas besoin d'être normalisée par l'appelant.
+export type Line = { id: string; point: Point; direction: Vector; role?: "shape" | "construction" | "axis" };
+// Demi-droite : origine + direction, non bornée du côté direction.
+export type Ray = { id: string; origin: Point; direction: Vector; role?: "shape" | "construction" };
+// Suite ordonnée de points, ouverte (pas de segment implicite entre le dernier et le premier).
+export type Polyline = { id: string; points: readonly Point[]; role?: "shape" | "construction" };
+// Contour fermé : le dernier point se referme implicitement sur le premier (jamais dupliqué en mémoire).
+export type Polygon = { id: string; points: readonly Point[]; role?: "shape" | "construction" };
 export type BoundingBox = { minX: number; minY: number; maxX: number; maxY: number };
 export type Angle = { radians: number; degrees: number };
 export type ConstructionPoint = Point & { role: "construction" | "control" };
 export type Dimension = {
   id: string;
-  kind: "linear" | "radius" | "diameter" | "angle";
+  kind: "linear" | "radius" | "diameter" | "angle" | "aligned" | "annotation";
   from: Point;
   to: Point;
   label: string;
@@ -19,7 +32,7 @@ export type Dimension = {
   offset?: number;
 };
 
-const EPSILON = 1e-9;
+export const EPSILON = 1e-9;
 
 export function assertFinitePositive(value: number, label: string) {
   if (!Number.isFinite(value) || value <= 0) throw new Error(`${label} doit être supérieur à 0.`);
@@ -104,6 +117,18 @@ export function sagitta(radius: number, chord: number) {
   assertFinitePositive(radius, "Le rayon"); assertFinitePositive(chord, "La corde");
   if (chord > radius * 2) throw new Error("La corde ne peut pas dépasser le diamètre.");
   return radius - Math.sqrt(radius ** 2 - (chord / 2) ** 2);
+}
+// Division régulière d'un cercle en `count` points équidistants, extraite de la logique déjà
+// utilisée (en ligne) par createRadialPattern (shapes.ts) : même formule, même sens de rotation
+// (trigonométrique standard), généralisée en primitive réutilisable. Angles en radians (convention
+// déjà en vigueur dans ce fichier — polar/rotate/angleBetween). Ordre stable : le point d'indice i
+// est toujours à l'angle startAngle + i * (2π / count), jamais réordonné.
+export function divideCircle(centre: Point, radius: number, count: number, startAngle = 0, prefix = "P"): Point[] {
+  assertFinitePositive(radius, "Le rayon");
+  if (!Number.isInteger(count) || count < 1) throw new Error("Le nombre de divisions doit être un entier supérieur ou égal à 1.");
+  if (!Number.isFinite(startAngle)) throw new Error("L'angle de départ doit être une valeur finie.");
+  const step = (2 * Math.PI) / count;
+  return Array.from({ length: count }, (_, index) => polar(centre, radius, startAngle + index * step, `${prefix}${index + 1}`));
 }
 export function boundsFromPoints(points: readonly Point[], padding = 0): BoundingBox {
   if (!points.length) throw new Error("Une bounding box exige au moins un point.");
