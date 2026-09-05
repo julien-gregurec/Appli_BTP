@@ -317,7 +317,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
         <p className="mt-2 text-[11px] text-neutral-500">Estimation sur l’abonnement de base et les comptes supplémentaires. Les dépassements d’appareils et de stockage, facturés séparément, n’y sont pas inclus ; le montant exact figure sur votre facture Stripe.</p>
       </div>}
       <dl className="mt-5 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-lg bg-neutral-50 p-3 dark:bg-neutral-900"><dt className="text-xs uppercase text-neutral-500">Offre {offre.nom}</dt><dd className="mt-1 font-semibold">{euros(offre.base)} HT/mois</dd><p className="text-xs text-neutral-500">{offre.comptesInclus} compte(s) inclus</p></div>
+        <div className="rounded-lg bg-neutral-50 p-3 dark:bg-neutral-900"><dt className="text-xs uppercase text-neutral-500">Offre {offre.nom}</dt><dd className="mt-1 font-semibold">{euros(offre.base)} HT/mois</dd><p className="text-xs text-neutral-500">{offre.comptesInclus} personne(s) active(s) incluse(s)</p></div>
         <div className="rounded-lg bg-neutral-50 p-3 dark:bg-neutral-900"><dt className="text-xs uppercase text-neutral-500">Comptes de l’entreprise</dt><dd className="mt-1 font-semibold">{nbComptesFacturables} compte(s) facturable(s)</dd><p className="text-xs text-neutral-500">{prixComptes.employesSupplementaires > 0 ? `${prixComptes.employesSupplementaires} supplémentaire(s) × ${euros(prixComptes.parEmployeSup)} HT/mois` : "Aucun compte supplémentaire"}</p></div>
         <div className="rounded-lg bg-neutral-50 p-3 dark:bg-neutral-900"><dt className="text-xs uppercase text-neutral-500">Appareils supplémentaires</dt><dd className="mt-1 font-semibold">{euros(supplementAppareilsMensuel)} HT/mois</dd><p className="text-xs text-neutral-500">Deux appareils actifs sont inclus par salarié</p></div>
         <div className="rounded-lg bg-neutral-50 p-3 dark:bg-neutral-900"><dt className="text-xs uppercase text-neutral-500">Stockage supplémentaire</dt><dd className="mt-1 font-semibold">{euros(stockageMensuel.montantHt)} HT/mois</dd><p className="text-xs text-neutral-500">{stockageMensuel.depassementGo > 0 ? `${stockageMensuel.depassementGo.toLocaleString("fr-FR")} Go au-delà du quota` : "Aucun dépassement"}</p></div>
@@ -401,7 +401,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
 
     {souscrit && offreSuivante && <section className="rounded-xl border p-5">
       <h2 className="font-semibold">Passer à l’offre {offreSuivante.nom}</h2>
-      <p className="mt-1 text-sm text-neutral-500">{offreSuivante.devisObligatoire ? "Sur devis, après échange avec notre équipe." : `${offreSuivante.comptesInclus} comptes inclus, à partir de ${euros(offreSuivante.base)} HT/mois.`}</p>
+      <p className="mt-1 text-sm text-neutral-500">{offreSuivante.devisObligatoire ? "Sur devis, après échange avec notre équipe." : `${offreSuivante.comptesInclus} personnes actives incluses, à partir de ${euros(offreSuivante.base)} HT/mois.`}</p>
       {gainsOffreSuivante.length > 0 && <div className="mt-3">
         <p className="text-xs uppercase text-neutral-500">Vous gagneriez notamment</p>
         <ul className="mt-2 flex flex-wrap gap-2">{gainsOffreSuivante.map((g) => <li key={g} className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium dark:bg-neutral-800">{g}</li>)}</ul>

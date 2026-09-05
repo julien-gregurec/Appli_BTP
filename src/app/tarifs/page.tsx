@@ -40,7 +40,7 @@ export default function TarifsPage() {
           <p className="text-sm font-semibold uppercase tracking-wide text-[#c9a24a]">{PRODUCT_NAME}</p>
           <h1 className="mt-2 text-4xl font-bold text-[#0d1b2a] dark:text-white">Une tarification lisible, sans surprise</h1>
           <p className="mx-auto mt-4 max-w-3xl text-neutral-600 dark:text-neutral-300">
-            Chaque offre indique le nombre de comptes{iaVisible ? ", le stockage et le quota IA inclus" : " et le stockage inclus"}. Essai de {DUREE_ESSAI_JOURS} jours.
+            Chaque offre indique le nombre de personnes actives{iaVisible ? ", le stockage et le quota IA inclus" : " et le stockage inclus"}. Essai de {DUREE_ESSAI_JOURS} jours.
             Les abonnements en ligne ouvriront prochainement ; contactez-nous pour préparer votre accès.
           </p>
         </div>
@@ -57,7 +57,7 @@ export default function TarifsPage() {
               {!offre.devisObligatoire ? <p className="text-xs text-neutral-500">HT / mois</p> : null}
               {!offre.devisObligatoire ? <p className="mt-1 text-xs font-medium text-green-700">{formatMontantCentimes(offre.prixAnnuelCentimes)} HT/an · 2 mois offerts</p> : <p className="mt-1 text-xs text-neutral-500">Tarif défini après cadrage de vos besoins</p>}
               <ul className="mt-5 flex-1 space-y-2 text-sm">
-                <li>✓ {offre.libelleComptesInclus ?? `${offre.comptesInclus} comptes inclus`}</li>
+                <li>✓ {offre.libelleComptesInclus ?? `${offre.comptesInclus} personnes actives incluses`}</li>
                 {iaVisible && <li>✓ {offre.operationsIAIncluses.toLocaleString("fr-FR")} opérations IA / mois</li>}
                 <li>✓ {offre.stockageGoInclus} Go de stockage</li>
                 {beneficesAffiches(offre.cle).map((point) => <li key={point}>✓ {point}</li>)}
@@ -86,7 +86,7 @@ export default function TarifsPage() {
         <section className="mt-10 overflow-hidden rounded-2xl border bg-white dark:border-neutral-800 dark:bg-neutral-900">
           <div className="p-6"><h2 className="text-xl font-bold">Comparer les offres</h2><p className="mt-1 text-sm text-neutral-500">Un droit individuel reste toujours contrôlé par le rôle défini par l’administrateur de l’entreprise.</p></div>
           <div className="overflow-x-auto"><table className="w-full min-w-[850px] text-center text-sm"><thead className="bg-neutral-50 dark:bg-neutral-950"><tr><th className="px-4 py-3 text-left">Capacité</th>{OFFRES_TARIFAIRES.map(offre=><th key={offre.cle} className="px-4 py-3">{offre.nom}</th>)}</tr></thead><tbody>{[
-            ["Comptes inclus",...(OFFRES_TARIFAIRES.map(o=>o.libelleComptesInclus ?? String(o.comptesInclus)))],
+            ["Personnes actives incluses",...(OFFRES_TARIFAIRES.map(o=>o.libelleComptesInclus ?? String(o.comptesInclus)))],
             ["Administrateurs inclus",...(OFFRES_TARIFAIRES.map(o=>o.administrateursInclus===null?"Sur devis":String(o.administrateursInclus)))],
             ...(iaVisible ? [["Opérations IA / mois",...(OFFRES_TARIFAIRES.map(o=>o.operationsIAIncluses.toLocaleString("fr-FR")))]] : []),
             ["Stockage inclus",...(OFFRES_TARIFAIRES.map(o=>`${o.stockageGoInclus} Go`))],

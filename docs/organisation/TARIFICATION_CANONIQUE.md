@@ -6,12 +6,12 @@ un bug à corriger dans le sens de ce tableau.
 
 ## Grille ELSATIA Gestion Pro — `CANONICAL-V3-2026-09`
 
-| Offre | Mensuel HT | Annuel HT | Comptes inclus | Compte sup. / mois |
+| Offre | Mensuel HT | Annuel HT | Personnes actives incluses | Personne active sup. / mois |
 |---|---:|---:|---:|---:|
 | Mini | 79 € (7 900 c) | 790 € (79 000 c) | 3 | 15 € |
 | Pro | 249 € (24 900 c) | 2 490 € (249 000 c) | 15 | 12 € |
 | Business | 449 € (44 900 c) | 4 490 € (449 000 c) | 30 | 9 € |
-| Entreprise | 599 € (59 900 c) | 5 990 € (599 000 c) | 50 (40 salariés + 10 administrateurs) | 9 € |
+| Entreprise | 599 € (59 900 c) | 5 990 € (599 000 c) | 50 | 9 € |
 | Sur mesure | sur devis | sur devis | selon contrat | — |
 
 **Règle annuelle officielle : ANNUEL = 10 × MENSUEL — « 2 mois offerts ».**
@@ -22,7 +22,11 @@ Aucune autre remise annuelle. Aucune exception par offre. Essai : 30 jours.
 - grille 69 / 199 / 399 / 599 (« TARIFS-V2 ») ;
 - annuel × 12 ;
 - remise annuelle générique −20 % (ancienne CGV art. 4.3) ;
-- exception Entreprise −10 % annuel (539 €/mois).
+- exception Entreprise −10 % annuel (539 €/mois) ;
+- libellé de capacité « 40 salariés + 10 administrateurs » : la capacité publique s'énonce
+  uniquement en **personnes actives** (3 / 15 / 30 / 50), lot
+  `ELSATIA-GP-PUBLIC-PRICING-CANONICAL-ALIGNMENT-V1`. Les administrateurs inclus
+  (1 / 3 / 6 / 10) sont un sous-ensemble de cette capacité, jamais un supplément.
 
 ## Où vit la grille (une seule définition par surface, consommée partout)
 

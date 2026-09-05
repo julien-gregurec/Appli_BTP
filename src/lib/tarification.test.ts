@@ -28,7 +28,11 @@ describe("grille tarifaire", () => {
     for (const offre of OFFRES_TARIFAIRES.filter((item) => !item.devisObligatoire)) {
       expect(offre.prixAnnuelCentimes).toBe(offre.prixMensuelCentimes * 10);
     }
-    expect(offreTarifaireParCle("entreprise").libelleComptesInclus).toBe("40 salariés + 10 administrateurs");
+    // ELSATIA-GP-PUBLIC-PRICING-CANONICAL-ALIGNMENT-V1 : plus aucun libellé de capacité ne
+    // décompose Entreprise en « 40 salariés + 10 administrateurs ». La capacité publique
+    // s'énonce uniquement en personnes actives (50), via `comptesInclus`.
+    expect(offreTarifaireParCle("entreprise").libelleComptesInclus).toBeUndefined();
+    expect(offreTarifaireParCle("entreprise").comptesInclus).toBe(50);
     expect(offreTarifaireParCle("sur_mesure")).toMatchObject({ devisObligatoire: true, prixMensuelCentimes: 0, prixAnnuelCentimes: 0 });
     expect(offreTarifaireParCle("entreprise").populaire).toBe(true);
     expect(SERVICES_MISE_EN_SERVICE.map((service) => service.prixMinCentimes)).toEqual([

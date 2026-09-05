@@ -82,6 +82,10 @@ const AVANCE = [
 // (deux mois offerts), figée par tarification.test.ts. Toute nouvelle grille est une décision
 // explicite, historisée (`historique_tarification`), sans effet rétroactif sur les contrats
 // en cours (cf. CGV art. 4.4). Voir docs/organisation/TARIFICATION_CANONIQUE.md.
+// Capacité : `comptesInclus` s'énonce publiquement en « personnes actives » (3 / 15 / 30 / 50),
+// formulation unique partagée par elsatia.fr et l'application (ELSATIA-GP-PUBLIC-PRICING-
+// CANONICAL-ALIGNMENT-V1). `administrateursInclus` reste un sous-ensemble de cette capacité et
+// n'est jamais additionné à elle dans un libellé public.
 export const OFFRES_TARIFAIRES: readonly OffreTarifaire[] = [
   {
     cle: "mini",
@@ -141,11 +145,10 @@ export const OFFRES_TARIFAIRES: readonly OffreTarifaire[] = [
     prixAnnuelCentimes: 599_000,
     comptesInclus: 50,
     administrateursInclus: 10,
-    libelleComptesInclus: "40 salariés + 10 administrateurs",
     parCompteSup: 9,
     operationsIAIncluses: 3_000,
     stockageGoInclus: 300,
-    resume: "40 salariés et 10 administrateurs inclus, avec accompagnement prioritaire.",
+    resume: "50 personnes actives incluses, avec accompagnement prioritaire.",
     fonctionnalites: [...SOCLE, ...TERRAIN, ...GESTION, ...PILOTAGE, ...AVANCE],
     populaire: true,
   },

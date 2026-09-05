@@ -31,7 +31,7 @@ export default async function BesoinsPage({
           <div className="rounded-xl border border-neutral-200 p-6 text-center dark:border-neutral-800">
             <div className="text-4xl font-bold">{prix.total} € <span className="text-base font-normal text-neutral-500">/ mois HT</span></div>
             <p className="mt-2 text-xs text-neutral-500">
-              Base {prix.base} € (jusqu&apos;à {prix.employesInclus} comptes inclus)
+              Base {prix.base} € (jusqu&apos;à {prix.employesInclus} personnes actives incluses)
               {prix.employesSupplementaires > 0 && <> + {prix.employesSupplementaires} compte(s) × {prix.parEmployeSup} €</>}
               {" "}· pour {nbEmployes} salarié(s)
             </p>
