@@ -66,7 +66,7 @@ reconfirmée par une lecture en lecture seule** par l'opérateur, à T-60 :
 | Attendu (runbook V1) | À reconfirmer en direct |
 |---|---|
 | Branche/SHA app | `release/commercialisation-v1` @ `fcdd4e7c90f32abb15502e825335659f9d57c9a1` |
-| Ledger migrations Production | **211** versions (l'audit de canonicalisation observait 210 ; l'écart de 1 est précisément la raison de cette relecture) |
+| Ledger migrations Production | **210** versions (baseline confirmée par lecture directe de l'historique git — dernière migration `…000231` — remplace l'ancienne hypothèse à 211 du runbook V1 ; à reconfirmer malgré tout en direct ci-dessous, jamais supposée) |
 | Dernière version appliquée | à lire |
 | `…000255_acl_reconciliation_v1` appliquée ? | **non** attendu (point de non-retour non encore franchi) |
 | Sentinelles métier | 6 entreprises / 6 utilisateurs / 31 clients / 30 chantiers / 108 devis / 73 factures (snapshot DR 2026-09-02) |
@@ -118,7 +118,7 @@ Production**, appliquée **dans l'ordre lexical du nom de fichier** (= ordre d'a
 Y compris les versions à horodatage inférieur au `max(version)` Production (migrations Preview-only
 et réconciliations réintégrées par la canonicalisation v2).
 
-### 2.2 Bloc 211 → 253 (identique au runbook V1)
+### 2.2 Bloc 210 → 253 (identique au runbook V1)
 
 42 migrations, déjà validées Fresh + Restore + pgTAP 870/870 + rollback local 210→253→210
 (`ELSATIA_PREPROD_DB_E2E_ROLLBACK_V1`). Comprend notamment, dans l'ordre :
@@ -198,8 +198,8 @@ Rappel synthétique :
 | dump | **`pg_dump` format custom `--compress=9`** | SHA-256 calculé puis relu ; manifeste (taille, SHA-256, TOC count, `backup_id`) | volume DR chiffré `/Volumes/ELSATIA-PRODUCTION-DR/…/database/` **uniquement** (jamais de fichier en clair hors volume) |
 | storage | **Backup Storage chiffré (13 buckets)** | `verify-storage-backup` PASS ; SHA-256 par objet ; manifeste | volume DR chiffré `…/storage/` |
 | lien | **Manifestes DB + Storage reliés au même `backup_id`** (horodatage UTC commun, ex. `20260904T…Z`) | cohérents | volume DR chiffré `…/manifest/` |
-| état | ledger (attendu 211) + inventaire ACL (`aclexplode` + policies) + inventaire admins plateforme (email, `utilisateur_id`, rôle, `actif`, `statut_identite`) + état MFA (facteurs TOTP, moyens de récupération) | archivés | volume DR chiffré |
-| preuve | **test de restauration** : dump → base isolée → sentinelles `…|211|…` exactes (cf. `ELSATIA_PREPROD_DB_E2E_ROLLBACK_V1` §10, rollback local 210→253→210 déjà prouvé) | sentinelles identiques avant/après | base probe jetable, jamais Preview/Production |
+| état | ledger (attendu 210) + inventaire ACL (`aclexplode` + policies) + inventaire admins plateforme (email, `utilisateur_id`, rôle, `actif`, `statut_identite`) + état MFA (facteurs TOTP, moyens de récupération) | archivés | volume DR chiffré |
+| preuve | **test de restauration** : dump → base isolée → sentinelles `…|210|…` exactes (cf. `ELSATIA_PREPROD_DB_E2E_ROLLBACK_V1` §10, rollback local 210→253→210 déjà prouvé) | sentinelles identiques avant/après | base probe jetable, jamais Preview/Production |
 
 Aucun secret n'apparaît dans les manifestes, dumps, tickets ou logs. Le rôle de dump dédié
 `elsatia_backup` (NOLOGIN hors fenêtre) est réactivé le temps du dump puis refermé.
@@ -286,7 +286,7 @@ ré-enrôlement TOTP. **Jamais** de `DELETE FROM auth.mfa_factors` manuel comme 
 - **`36642e3` contient déjà** l'intégration Colors (`apps/colors/**`, migrations `…000246`–`…000249`)
   et Tools (`apps/tools/**`, migrations `…8`/`…9`/`…10`, R8/R9/R10), la convergence multi-app
   (`…000234`), le compte partagé plateforme et le catalogue d'accès. Ces éléments sont dans le
-  **bloc 211→253 déjà validé** Fresh + Restore + pgTAP + E2E `Playwright 40/40`.
+  **bloc 210→253 déjà validé** Fresh + Restore + pgTAP + E2E `Playwright 40/40`.
 - **Les migrations 256–263 ne touchent ni Colors, ni Tools, ni `apps.*`, ni les redirect URLs
   multi-app** (vérifié : `grep -liE "colors_|elsatia_tools|apps\." supabase/migrations/2026090*_25[6-9]|26[0-3]` → aucun).
 - **Contrat multi-app** (compte partagé, catalogue d'accès, redirect URLs Colors/Tools) : porté
@@ -349,12 +349,12 @@ Durées **indicatives** (repères d'ordre, pas d'engagement). Détail des contr�
 - [ ] PITR/snapshot Production — id + horodatage UTC notés, restaurabilité **vérifiée**.
 - [ ] Dump DB chiffré + SHA-256 relu + manifeste (`backup_id`).
 - [ ] Backup Storage chiffré + `verify-storage-backup` PASS + manifeste au même `backup_id`.
-- [ ] Capture ledger (211), inventaire ACL, inventaire admins plateforme + état MFA.
-- [ ] Test de restauration sur base probe jetable → sentinelles `…|211|…` exactes.
+- [ ] Capture ledger (210), inventaire ACL, inventaire admins plateforme + état MFA.
+- [ ] Test de restauration sur base probe jetable → sentinelles `…|210|…` exactes.
 
 ### T0 — Migrations
 - [ ] Fenêtre de maintenance activée si retenue.
-- [ ] Appliquer les **50** (ou 51) migrations absentes, dans l'ordre lexical, via la CLI Supabase officielle.
+- [ ] Appliquer les **53** migrations absentes, dans l'ordre lexical, via la CLI Supabase officielle.
 - [ ] Ledger final = **263**, `…000263` + `…000255` présentes, aucune collision.
 - [ ] `verify:migrations` = 263 ; second `migration up` → `applied: []`.
 - [ ] pgTAP Production ciblé + smoke SQL sentinelles inchangées + 5 lignes d'audit `…000254` attendues.
@@ -458,19 +458,20 @@ Production live, sauvegardes datées du cutover réel — les deux nécessitent 
 que ce lot n'a pas). **P0-2, P0-4 et la préparation opérationnelle de P0-5 sont fermés**
 (2026-09-04) :
 - P0-2/P0-4 (preuves §13) : drill Fresh 263 / Restore→263 / rollback / drift ACL au bon SHA
-  (`36642e3`) fait et vert, rejoué sur le schéma historique exact de `fcdd4e7c` (211 migrations,
-  commit git de référence Production selon le runbook V1) — sans lire la Production réelle : le
-  ledger live reste à confirmer au P0-1.
+  (`36642e3`) fait et vert, rejoué sur le schéma historique exact de `5777abb` (210 migrations,
+  baseline Production confirmée — remplace l'ancienne référence `fcdd4e7c`/211 du runbook V1) —
+  sans lire la Production réelle : le ledger live reste à confirmer au P0-1.
 - P0-5 (pack §14–§27 + checklist imprimable) : rôles définis, planning horaire relatif figé,
   checklists P0-1/P0-3/GO-T0/MFA/multitenant/Colors-Tools/Stripe/GO/rollback complètes et
   exécutables. **Il manque uniquement une date/heure réelle et des noms**, volontairement non
   inventés (décision de Julien).
 
 La **cible technique est prête et figée** : SHA `36642e3`, ledger 263, 53 migrations additives
-ordonnées depuis `fcdd4e7c`, aucune migration historique modifiée, runbook et rollback définis,
-socle commercial + correctif boucle post-login validés en local **et** via un upgrade réel
-211→263 rejoué sur ce schéma historique. **Le prochain geste technique attendu est l'exécution
-réelle** (P0-1 → P0-3 → migrations → déploiement), pas un nouveau lot de préparation.
+ordonnées depuis la baseline Production confirmée (210, dernière `…000231`), aucune migration
+historique modifiée, runbook et rollback définis, socle commercial + correctif boucle post-login
+validés en local **et** via un upgrade réel 210→263 rejoué sur ce schéma historique. **Le
+prochain geste technique attendu est l'exécution réelle** (P0-1 → P0-3 → migrations →
+déploiement), pas un nouveau lot de préparation.
 
 ---
 
@@ -493,16 +494,17 @@ projets Supabase dédiés au drill (containers Docker isolés), jetables, nettoy
 
 Aucun accès Production dans ce lot (cf. §1). Le drill ne rejoue donc pas le **dump chiffré réel**
 de Production (volume DR non déverrouillé ici), mais reconstruit un état « ancien Production »
-**représentatif et vérifiable** : les **211 fichiers de migration exacts** présents au commit
-`fcdd4e7c90f32abb15502e825335659f9d57c9a1` (SHA Production de référence, runbook V1) sont
-rejoués tels quels sur une pile Supabase locale dédiée neuve (images/managed schemas
-authentiques, pas de bricolage de schéma). Cette approche est cohérente avec la méthode déjà
-documentée par `ELSATIA_PREPROD_DB_E2E_ROLLBACK_V1.md` (« reconstruits depuis les ledgers et
-objets observés, pas depuis une restauration physique distante ») — avec un jeu de migrations
-**exact** ici (fichiers git réels), pas une reconstruction approximative.
+**représentatif et vérifiable** : les **210 fichiers de migration exacts** présents au commit
+`5777abb` (baseline Production confirmée — dernière migration `…000231` ; remplace l'ancienne
+référence `fcdd4e7c`/211 du runbook V1, qui incluait une migration, `…000233`, jamais réellement
+appliquée en Production) sont rejoués tels quels sur une pile Supabase locale dédiée neuve
+(images/managed schemas authentiques, pas de bricolage de schéma). Cette approche est cohérente
+avec la méthode déjà documentée par `ELSATIA_PREPROD_DB_E2E_ROLLBACK_V1.md` (« reconstruits
+depuis les ledgers et objets observés, pas depuis une restauration physique distante ») — avec un
+jeu de migrations **exact** ici (fichiers git réels), pas une reconstruction approximative.
 
-Confirmé au préalable (`git diff --name-status fcdd4e7c 36642e3 -- supabase/migrations/`) :
-**50 fichiers ajoutés, 0 modifié** → le gap est purement additif, et est la même liste que le §2.
+Confirmé au préalable (`git diff --name-status 5777abb 36642e3 -- supabase/migrations/`) :
+**53 fichiers ajoutés, 0 modifié** → le gap est purement additif, et est la même liste que le §2.
 
 ### 13.1 A. Fresh 263
 
@@ -527,19 +529,19 @@ Confirmé au préalable (`git diff --name-status fcdd4e7c 36642e3 -- supabase/mi
   (même `config.toml` que `btp-platform`, project_id et ports seuls changés) — managed schemas
   (`auth`, `storage`, `extensions`, `graphql`, `realtime`, `vault`, `supabase_functions`)
   authentiques, pas reconstruits à la main.
-- **Ancien état** : les 211 fichiers de migration exacts de `fcdd4e7c` appliqués via
-  `supabase start` → ledger `count=211`, `max=20260825000233` (identique à `fcdd4e7c`).
+- **Ancien état** : les 210 fichiers de migration exacts de `5777abb` appliqués via
+  `supabase start` → ledger `count=210`, `max=20260824000231` (baseline Production confirmée).
 - **Sentinelles synthétiques représentatives** insérées (1 utilisateur Auth, 1 entreprise
   offre `business` statut `actif`, 1 poste + permissions + rattachement, 1 client, 1 chantier
   budget `12345.67`, 1 devis TTC `1200.00`, 1 facture TTC `1200.00`) — même structure de preuve
   que les 7 sentinelles de `ELSATIA_PREPROD_DB_E2E_ROLLBACK_V1`.
-- **T0-snapshot** : `pg_dump -Fc --compress=9` → `drill_211_snapshot.dump`, **2 025 167 octets**,
+- **T0-snapshot** : `pg_dump -Fc --compress=9` → `drill_210_snapshot.dump`, **2 025 167 octets**,
   SHA-256 `5e6df7532eb07620b16f662f7f479e5f2ab13e468a99d866a1112f11ea5f7adb` (conservé localement
   pour la durée du lot, supprimé avec le reste du drill).
-- **Migrations manquantes → 263** : les 50 fichiers du §2 copiés dans le répertoire de
+- **Migrations manquantes → 263** : les 53 fichiers du §2 copiés dans le répertoire de
   migrations, puis `supabase migration up --local --include-all` (le flag `--include-all` est
   requis, exactement comme documenté par `migration-canonicalization-v2.md`, car plusieurs
-  fichiers portent un horodatage antérieur au max déjà appliqué). **50/50 appliquées, 0 erreur,
+  fichiers portent un horodatage antérieur au max déjà appliqué). **53/53 appliquées, 0 erreur,
   ~2,2 s**, dans l'ordre lexical exact du §2.
 - **Vérifications post-upgrade** :
   - ledger `count=263`, `max=20260904000263` ;
@@ -552,7 +554,7 @@ Confirmé au préalable (`git diff --name-status fcdd4e7c 36642e3 -- supabase/mi
 
 ### 13.3 C. Rollback drill — 210 → 263 → 210
 
-- Restauration du **même** dump T0 (`drill_211_snapshot.dump`) dans une base probe jetable
+- Restauration du **même** dump T0 (`drill_210_snapshot.dump`) dans une base probe jetable
   (`rollback_probe`, `template0`) du même cluster de drill — jamais Preview/Production, jamais
   la base de travail elle-même (méthodologie identique à `elsatia_preprod_rollback_probe` de
   `ELSATIA_PREPROD_DB_E2E_ROLLBACK_V1`).
@@ -568,7 +570,7 @@ Confirmé au préalable (`git diff --name-status fcdd4e7c 36642e3 -- supabase/mi
   `ELSATIA_PREPROD_DB_E2E_ROLLBACK_V1.md` §10 (« la suite pgTAP complète ne doit pas être
   relancée dans une base secondaire ») — constat identique, pas une régression nouvelle.
 - **Preuve retenue** (niveau structurel/donnée, la cible de ce drill) :
-  - ledger revenu à `count=211`, `max=20260825000233` — **identique à l'état pré-upgrade** ;
+  - ledger revenu à `count=210`, `max=20260824000231` — **identique à l'état pré-upgrade** ;
   - sentinelles **byte-identiques** à la capture pré-upgrade (diff nul, ledger exclu) ;
   - **149 tables `public`**, toutes RLS **activées**, **443 policies** restaurées — cohérent
     avec l'état pré-`…255` (ACL/RLS antérieures, pas les 1 220 REVOKE de la migration 255) ;
@@ -717,15 +719,17 @@ mot de passe DB, clé API). Commandes de référence : §1 de ce document.
 
 - [ ] Ref Supabase Production confirmée = `exhvuzegsefmoguxoiak`
 - [ ] Ledger réel lu : `count(*)` et `max(version)` sur `supabase_migrations.schema_migrations`
-- [ ] Nombre de migrations compté (attendu 210 ou 211 — **la lecture tranche définitivement**)
+- [ ] Nombre de migrations compté (attendu **210**, baseline confirmée par lecture directe de
+      l'historique git — la lecture Production tranche définitivement)
 - [ ] Dernière migration appliquée identifiée (version exacte)
 - [ ] Présence/absence de `20260902000255_acl_reconciliation_v1` confirmée (**absente** attendue —
       si présente, le point de non-retour est déjà franchi : STOP, traiter comme un cas hors
       procédure standard, ne pas réappliquer 255)
-- [ ] Gap réel vers 263 calculé (`263 − ledger observé`, attendu **50** si 211, **51** si 210) et
-      **liste exacte des versions absentes** matérialisée (diff avec `supabase/migrations/` @
-      `36642e3`)
-- [ ] Écart 210 vs 211 tranché — noter la valeur observée, ne pas supposer
+- [ ] Gap réel vers 263 calculé (`263 − ledger observé`, attendu **53** si le ledger observé
+      confirme bien la baseline à 210) et **liste exacte des versions absentes** matérialisée
+      (diff avec `supabase/migrations/` @ `36642e3`)
+- [ ] Confirmer que le ledger réel correspond bien à la baseline attendue de **210** (et non
+      l'ancienne hypothèse de 211) — noter la valeur observée, ne pas supposer
 - [ ] Sentinelles métier lues (`count` sur entreprises/utilisateurs/clients/chantiers/devis/
       factures) et rapprochées du dernier snapshot DR connu (6/6/31/30/108/73 au 2026-09-02) —
       un écart n'est pas nécessairement un défaut (activité réelle depuis), mais doit être noté

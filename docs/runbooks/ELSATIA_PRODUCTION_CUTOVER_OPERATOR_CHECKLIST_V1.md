@@ -27,7 +27,7 @@ Date : ______________  Heure de début (UTC) : ______________
 |---|---|---|---|---|---|
 | T-60 | Gel changements + rôles présents + accès rollback vérifiés (Vercel, PITR, volume DR) | | | ☐ PASS ☐ FAIL | |
 | T-60 | **P0-1** exécuté : ledger Production lu, sentinelles, admins, MFA (voir carte P0-1 ↓) | | | ☐ PASS ☐ FAIL | |
-| T-45 | **Gate P0-1** : baseline conforme, gap figé (☐ 50 ☐ 51) | | | ☐ PASS ☐ FAIL | ☐ GO ☐ STOP |
+| T-45 | **Gate P0-1** : baseline conforme (210), gap figé (**53**) | | | ☐ PASS ☐ FAIL | ☐ GO ☐ STOP |
 | T-30 | **P0-3** démarré : PITR/snapshot + dump chiffré + Storage backup + manifestes | | | ☐ PASS ☐ FAIL | |
 | T-15 | Test de restauration exécuté (base probe) | | | ☐ PASS ☐ FAIL | |
 | T0 | **Gate P0-3** + **checklist GO-T0** complète (voir carte T0 ↓) | | | ☐ PASS ☐ FAIL | ☐ GO ☐ STOP |
@@ -47,7 +47,7 @@ Date : ______________  Heure de début (UTC) : ______________
 ☐ Ref Production confirmée (`exhvuzegsefmoguxoiak`)
 ☐ Ledger lu : `count = ____`  `max(version) = ____________`
 ☐ `…000255_acl_reconciliation_v1` **absente** (attendu)
-☐ Gap vers 263 calculé : `____` migrations
+☐ Gap vers 263 calculé : `____` migrations (attendu **53** si le ledger lu confirme la baseline à 210 — noter la valeur observée, ne pas supposer)
 ☐ Sentinelles (entreprises/utilisateurs/clients/chantiers/devis/factures) cohérentes avec le dernier snapshot DR connu
 ☐ Admins plateforme listés (email/rôle/actif/statut) — au moins 1 `total` actif
 ☐ État MFA des admins vérifié (facteurs enrôlés/vérifiés — pas de seed/QR/code lu ici)
