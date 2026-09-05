@@ -27,6 +27,15 @@ export type PlanSceneLayerProps = {
   view: ViewportState;
   size: ViewportSize;
   selectedEntityId?: string | null;
+  /**
+   * ATELIER-INTERSECTIONS-MULTISELECT-V1 §5 — toutes les entités sélectionnées.
+   *
+   * Fourni, il l'emporte sur `selectedEntityId`, qui reste accepté pour les appelants encore en
+   * sélection unique. Les deux ne sont pas fusionnés : additionner une liste et un identifiant
+   * ferait apparaître comme sélectionnée une entité qu'un appelant multiple vient justement de
+   * retirer.
+   */
+  selectedEntityIds?: readonly string[] | null;
   /** Entité survolée, désignée par le hit-test géométrique (§9). Desktop uniquement. */
   hoveredEntityId?: string | null;
   /** Point d'accrochage proposé sous le pointeur, en coordonnées monde (§9). */
@@ -39,6 +48,7 @@ export function PlanSceneLayer({
   view,
   size,
   selectedEntityId = null,
+  selectedEntityIds = null,
   hoveredEntityId = null,
   snapPoint = null,
   showPoints = true,
@@ -46,17 +56,21 @@ export function PlanSceneLayer({
   const transform = createViewportTransform(view, size);
   const project = transform.point;
 
+  // `Set` plutôt que `includes` : la classe de chaque entité est calculée à chaque rendu, donc
+  // une recherche linéaire par entité redeviendrait quadratique sur une scène dense (§7).
+  const selected = new Set(selectedEntityIds ?? (selectedEntityId ? [selectedEntityId] : []));
+
   const strokeClass = (role: string | undefined, id: string) => {
     const base = role === "construction" ? styles.construction : role === "axis" ? styles.axis : styles.shape;
     // La sélection l'emporte sur le survol : survoler l'entité déjà retenue ne doit pas la
     // faire changer d'apparence, sans quoi on croirait avoir perdu la sélection.
-    if (id === selectedEntityId) return `${base} ${styles.selected}`;
+    if (selected.has(id)) return `${base} ${styles.selected}`;
     if (id === hoveredEntityId) return `${base} ${styles.hovered}`;
     return base;
   };
 
   const markClass = (id: string, base: string) => {
-    if (id === selectedEntityId) return `${base} ${styles.selected}`;
+    if (selected.has(id)) return `${base} ${styles.selected}`;
     if (id === hoveredEntityId) return `${base} ${styles.hovered}`;
     return base;
   };

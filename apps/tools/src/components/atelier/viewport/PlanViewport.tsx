@@ -49,8 +49,13 @@ export type PlanViewportProps = {
    * (ATELIER-HITTEST-SNAP-FOUNDATION-V1 §7/§8). Le viewport ne sait pas ce qu'il y a sous ce
    * point : c'est l'appelant qui décide, par hit-test, s'il faut sélectionner ou désélectionner.
    * Ignoré après un glissement.
+   *
+   * ATELIER-INTERSECTIONS-MULTISELECT-V1 §5 — `additive` dit que le clic doit S'AJOUTER à la
+   * sélection au lieu de la remplacer. Le viewport le lit sur la touche Maj, mais le transmet
+   * comme une intention et non comme une touche : le mobile, qui n'a pas de Maj, pourra la
+   * produire autrement sans que l'appelant change d'une ligne.
    */
-  onCanvasClick?: (localPoint: ScreenPoint, precision: PointerPrecision) => void;
+  onCanvasClick?: (localPoint: ScreenPoint, precision: PointerPrecision, additive: boolean) => void;
   /**
    * Survol de la toile — `null` à la sortie du pointeur (§9). Émis à la cadence de l'écran
    * (une seule notification par trame, §10) pour qu'un hit-test de survol ne coûte jamais plus
@@ -95,7 +100,9 @@ export function PlanViewport({
     (event: React.MouseEvent<HTMLDivElement>) => {
       // Un clic qui conclut un pan ne doit ni sélectionner ni désélectionner (§11).
       if (consumeDrag()) return;
-      onCanvasClick?.(localPointOf(event), precision.current);
+      // `shiftKey` est lu ici, au bord de l'application : c'est la seule couche qui a le droit de
+      // connaître le clavier. En dessous, seule l'intention « ajouter » circule (§5).
+      onCanvasClick?.(localPointOf(event), precision.current, event.shiftKey);
     },
     [consumeDrag, localPointOf, onCanvasClick],
   );

@@ -14,6 +14,10 @@
  * les relaie. La règle tient encore — les poignées arrivent en props, calculées par
  * `lib/tracing/handle-map.ts` : le viewport ne construit aucune poignée et n'appelle jamais un
  * générateur de modèle.
+ *
+ * ATELIER-INTERSECTIONS-MULTISELECT-V1 : `intersections`, `selection-cycle` et `selection-set`
+ * sont trois modules PURS de plus (géométrie et règles de sélection), réexportés ici pour que
+ * l'Atelier n'ait qu'un point d'entrée. Aucun ne connaît React, l'écran ni la persistance.
  */
 
 export { PlanViewport, type PlanViewportProps, type PlanViewportRenderArgs } from "./PlanViewport";
@@ -40,8 +44,10 @@ export {
   type HitTestScene,
 } from "@/lib/geometry/hit-test";
 export {
+  MAX_INTERSECTION_ENTITIES,
   SNAP_PRIORITY,
   geometrySnapCandidates,
+  intersectionSnapCandidates,
   snap,
   snapCandidates,
   snapToGrid,
@@ -49,6 +55,34 @@ export {
   type SnapKind,
   type SnapOptions,
 } from "@/lib/geometry/snap";
+export {
+  INTERSECTION_TOLERANCE_MM,
+  arcArcIntersections,
+  arcCircleIntersections,
+  circleCircleIntersections,
+  intersectionsBetween,
+  lineSegmentIntersections,
+  segmentArcIntersections,
+  segmentCircleIntersections,
+  segmentSegmentIntersections,
+  type Intersectable,
+} from "@/lib/geometry/intersections";
+export {
+  SELECTION_CYCLE_ANCHOR_PX,
+  SELECTION_CYCLE_SCALE_RATIO,
+  advanceSelectionCycle,
+  type SelectionCycleRequest,
+  type SelectionCycleState,
+  type SelectionCycleStep,
+} from "@/lib/viewport/selection-cycle";
+export {
+  EMPTY_SELECTION,
+  applySelectionClick,
+  primarySelection,
+  pruneSelection,
+  selectionFromId,
+  toggleSelection,
+} from "@/lib/viewport/selection-set";
 export {
   POINTER_TOLERANCE_PX,
   SNAP_TOLERANCE_PX,
@@ -101,6 +135,7 @@ export {
 export {
   countSceneEntities,
   describeSceneEntity,
+  describeSceneSelection,
   entityKindLabel,
   entityLabel,
   listSceneEntities,
@@ -109,5 +144,6 @@ export {
   type SceneEntityDetails,
   type SceneEntityKind,
   type SceneEntitySummary,
+  type SceneSelectionSummary,
 } from "./plan-scene";
 export { DENSE_SCENE, MEDIUM_SCENE, PREVIEW_SCENES, SIMPLE_SCENE, createDenseScene } from "./preview-fixture";

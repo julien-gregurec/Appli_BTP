@@ -16,6 +16,13 @@
  * La sélection est locale à la vue : désigner une entité ne modifie ni le projet, ni la
  * géométrie, ni l'export. Rien de ce qui est affiché ici n'est persisté (§11).
  *
+ * ATELIER-INTERSECTIONS-MULTISELECT-V1 §5 — la sélection devient une LISTE. Elle reste locale à
+ * la vue et hors persistance : désigner plusieurs entités ne modifie ni le projet, ni la
+ * géométrie, ni l'export. Deux nettoyages la gardent cohérente sans effet de bord :
+ * changer de modèle la vide (les identifiants n'existent plus), et changer d'étape de chantier
+ * la RESTREINT aux entités encore visibles — vider dans ce cas punirait l'utilisateur qui avait
+ * sélectionné trois entités dont deux subsistent à l'étape suivante.
+ *
  * ATELIER-VERTEX-EDIT-UNDO-REDO-V1 — `editing` est un simple relais vers l'écran parent, qui
  * détient les paramètres, l'historique et l'autosave. Ce composant continue de ne rien
  * posséder d'autre que la sélection : sans `editing`, il se comporte exactement comme avant
@@ -23,10 +30,12 @@
  */
 
 import { useCallback, useMemo, useState } from "react";
+import { EMPTY_SELECTION, pruneSelection } from "@/lib/viewport/selection-set";
 import type { SiteStep } from "@/lib/geometry/shape-model";
 import type { TracingModelResolution } from "@/lib/tracing/model-resolver";
 import { buildModelResolutionViewModel } from "../model/model-resolution-view-model";
 import { AtelierViewportWorkspace, type AtelierEditingApi } from "./AtelierViewportWorkspace";
+import { listSceneEntities } from "./plan-scene";
 import { atelierViewKey, planSceneForStep, resolvedPlanScene } from "./resolved-scene";
 
 export type ResolvedModelViewportProps = {
@@ -40,7 +49,7 @@ export type ResolvedModelViewportProps = {
 };
 
 export function ResolvedModelViewport({ resolution, projectId, activeStep = null, editing }: ResolvedModelViewportProps) {
-  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+  const [selectedEntityIds, setSelectedEntityIds] = useState<readonly string[]>(EMPTY_SELECTION);
 
   const scene = resolvedPlanScene(resolution);
   const slug = resolution.status === "resolved" ? resolution.slug : undefined;
@@ -50,12 +59,24 @@ export function ResolvedModelViewport({ resolution, projectId, activeStep = null
   const [selectionKey, setSelectionKey] = useState(viewKey);
   if (selectionKey !== viewKey) {
     setSelectionKey(viewKey);
-    setSelectedEntityId(null);
+    setSelectedEntityIds(EMPTY_SELECTION);
   }
 
   const stepScene = useMemo(() => (scene ? planSceneForStep(scene, activeStep) : null), [scene, activeStep]);
 
-  const onSelectEntity = useCallback((entityId: string | null) => setSelectedEntityId(entityId), []);
+  // Élagage DÉRIVÉ, pas corrigé par un effet : une entité masquée par l'étape courante ne doit
+  // plus compter comme sélectionnée, et le rendu suivant part déjà de la bonne liste.
+  // `pruneSelection` rend la même référence quand rien ne disparaît, ce qui laisse les mémos en
+  // aval intacts dans le cas courant.
+  const visibleSelection = useMemo(() => {
+    if (!stepScene || selectedEntityIds.length === 0) return EMPTY_SELECTION;
+    return pruneSelection(selectedEntityIds, new Set(listSceneEntities(stepScene).map((entity) => entity.id)));
+  }, [stepScene, selectedEntityIds]);
+
+  const onSelectEntities = useCallback((entityIds: readonly string[]) => setSelectedEntityIds(entityIds), []);
+  // Conservé pour le contrat de `AtelierViewportWorkspace`, qui appelle toujours les deux : la
+  // liste étant la source de vérité, ce rappel n'a rien à enregistrer de plus.
+  const onSelectEntity = useCallback(() => {}, []);
 
   if (!stepScene) {
     const view = buildModelResolutionViewModel(resolution);
@@ -72,8 +93,10 @@ export function ResolvedModelViewport({ resolution, projectId, activeStep = null
     <AtelierViewportWorkspace
       scene={stepScene}
       viewKey={viewKey}
-      selectedEntityId={selectedEntityId}
+      selectedEntityId={visibleSelection.at(-1) ?? null}
       onSelectEntity={onSelectEntity}
+      selectedEntityIds={visibleSelection}
+      onSelectEntities={onSelectEntities}
       editing={editing}
     />
   );

@@ -5,18 +5,44 @@
  * Rien ici ne déplace un sommet, ne modifie un paramètre ni ne crée de primitive (§11) — le
  * résultat est une suggestion, que seul un futur outil d'édition consommera.
  *
- * Types couverts dans ce lot : points existants du modèle, extrémités, milieux, centres, et la
- * grille. Les intersections (droite/droite, droite/cercle, cercle/cercle) sont hors lot : elles
- * demandent de décider quelles paires calculer sans faire exploser le coût, ce qui est une
- * question de conception à part entière. Le type `SnapKind` les prévoit déjà pour que les
- * ajouter n'oblige pas à casser le contrat.
+ * Types couverts : points existants du modèle, extrémités, milieux, centres, la grille, et —
+ * depuis ATELIER-INTERSECTIONS-MULTISELECT-V1 §2 — les INTERSECTIONS réellement calculées.
+ *
+ * ## §2/§7 — pourquoi les intersections ne coûtent pas O(n²)
+ *
+ * Croiser toutes les paires d'entités à chaque mouvement de pointeur serait quadratique, donc
+ * intenable sur une scène dense. La parade ne demande pourtant ni cache, ni index spatial, ni
+ * heuristique : elle tient dans une remarque de géométrie.
+ *
+ * Un point d'intersection retenu doit être à moins de `toleranceWorld` de la cible ET appartenir
+ * aux DEUX entités qui le produisent. Chacune de ces deux entités passe donc, elle aussi, à
+ * moins de `toleranceWorld` de la cible. Il suffit de ne conserver que les entités dont le point
+ * le plus proche est dans la tolérance — un balayage linéaire, la même trigonométrie que le
+ * hit-test — puis de ne croiser QUE celles-là.
+ *
+ * Le filtre est EXACT et non approché : aucune paire écartée ne pouvait produire un candidat
+ * recevable, donc aucun faux négatif. Le coût devient O(n) + O(k²) où k est le nombre d'entités
+ * passant sous le pointeur — un ou deux en pratique, trois ou quatre à un croisement chargé. Pas
+ * de cache à invalider : le résultat ne dépend que de la cible et de la scène, ce qui le rend
+ * juste par construction quand la géométrie change sous une prévisualisation.
+ *
+ * `MAX_INTERSECTION_ENTITIES` borne k pour le cas pathologique (des dizaines de traits
+ * confondus) : au-delà, mieux vaut renoncer aux intersections que rendre le survol saccadé.
  *
  * Engine B n'est pas touché (§6) : tout se calcule à partir des primitives Engine A publiées par
  * le modèle déjà résolu.
  */
 
-import { arcEndpoints, arcMidpoint, type PlanePoint } from "./closest-point";
+import {
+  arcEndpoints,
+  arcMidpoint,
+  closestPointOnArc,
+  closestPointOnCircle,
+  closestPointOnSegmentEntity,
+  type PlanePoint,
+} from "./closest-point";
 import type { HitTestScene } from "./hit-test";
+import { intersectionsBetween, type Intersectable } from "./intersections";
 
 export type SnapKind = "point" | "endpoint" | "midpoint" | "center" | "intersection" | "grid";
 
@@ -26,7 +52,13 @@ export type SnapCandidate = {
   position: PlanePoint;
   /** Distance monde entre la cible et ce point. */
   distance: number;
-  /** Entité dont il provient — absent pour la grille, qui n'appartient à aucune entité. */
+  /**
+   * Entité dont il provient — absent pour la grille, qui n'appartient à aucune entité.
+   *
+   * Une intersection naît de DEUX entités : le champ y porte leurs identifiants joints par `×`,
+   * triés pour rester stable. Ce n'est donc pas l'identifiant d'une entité de la scène, et il ne
+   * doit pas être passé à `hitTest` ni à la sélection — il sert à tracer l'origine du candidat.
+   */
   entityId?: string;
   /** Libellé lisible, pour un futur affichage d'infobulle. */
   label: string;
@@ -126,6 +158,76 @@ export function geometrySnapCandidates(scene: HitTestScene, target: PlanePoint):
   return found;
 }
 
+/**
+ * §7 — garde-fou de densité. Au-delà de ce nombre d'entités passant simultanément sous la
+ * tolérance, on renonce aux intersections plutôt que de payer k² : 12 entités valent 66 paires,
+ * ce qui reste imperceptible, tandis qu'un paquet de traits confondus ferait décrocher le survol.
+ * Les autres natures d'accrochage (points, extrémités, milieux, centres) continuent d'être
+ * proposées — c'est un repli, pas une panne.
+ */
+export const MAX_INTERSECTION_ENTITIES = 12;
+
+/**
+ * Entités croisables passant à moins de `tolerance` de la cible (§7).
+ *
+ * C'est le filtre exact décrit en tête de fichier. La distance est mesurée avec les mêmes
+ * projections que le hit-test — de vraies projections, jamais une boîte englobante — pour que
+ * « proche » veuille dire la même chose ici et à la sélection.
+ */
+function nearbyIntersectables(scene: HitTestScene, target: PlanePoint, tolerance: number): readonly Intersectable[] {
+  const near: Intersectable[] = [];
+
+  for (const item of [...(scene.segments ?? []), ...(scene.constructionLines ?? [])]) {
+    if (closestPointOnSegmentEntity(target, item).distance <= tolerance) near.push({ kind: "segment", id: item.id, entity: item });
+  }
+  for (const item of scene.arcs ?? []) {
+    if (closestPointOnArc(target, item).distance <= tolerance) near.push({ kind: "arc", id: item.id, entity: item });
+  }
+  for (const item of scene.circles ?? []) {
+    if (closestPointOnCircle(target, item).distance <= tolerance) near.push({ kind: "circle", id: item.id, entity: item });
+  }
+
+  return near;
+}
+
+/**
+ * §2 — candidats d'accrochage aux intersections RÉELLEMENT calculées.
+ *
+ * Trois conditions, toutes nécessaires : le point est issu d'un calcul d'intersection bornée
+ * (pas d'un prolongement imaginaire), il tombe dans la tolérance, et les deux entités qui le
+ * produisent sont dans la scène qu'on nous a passée — c'est-à-dire visibles, puisque le filtrage
+ * par étape de chantier a déjà eu lieu en amont (`planSceneForStep`). Une intersection avec un
+ * trait masqué serait invisible à l'écran et incompréhensible à l'usage.
+ *
+ * L'identifiant reporté est celui des DEUX entités, joint par `×` : c'est ce qui rend l'infobulle
+ * lisible (« axe-h × cercle-1 ») et le candidat traçable jusqu'à sa source. Les deux
+ * identifiants sont triés pour que le libellé ne dépende pas de l'ordre de parcours de la scène.
+ */
+export function intersectionSnapCandidates(
+  scene: HitTestScene,
+  target: PlanePoint,
+  tolerance: number,
+): readonly SnapCandidate[] {
+  if (!Number.isFinite(tolerance) || tolerance <= 0) return [];
+
+  const near = nearbyIntersectables(scene, target, tolerance);
+  if (near.length < 2 || near.length > MAX_INTERSECTION_ENTITIES) return [];
+
+  const found: SnapCandidate[] = [];
+  for (let first = 0; first < near.length; first += 1) {
+    for (let second = first + 1; second < near.length; second += 1) {
+      const a = near[first];
+      const b = near[second];
+      for (const point of intersectionsBetween(a, b)) {
+        if (Math.hypot(target.x - point.x, target.y - point.y) > tolerance) continue;
+        const [left, right] = a.id < b.id ? [a.id, b.id] : [b.id, a.id];
+        found.push(candidate("intersection", point, target, `${left} × ${right}`, `${left}×${right}`));
+      }
+    }
+  }
+  return found;
+}
+
 function better(a: SnapCandidate, b: SnapCandidate): boolean {
   if (a.priority !== b.priority) return a.priority < b.priority;
   if (Math.abs(a.distance - b.distance) > MERGE_EPSILON) return a.distance < b.distance;
@@ -168,6 +270,9 @@ export function snapCandidates(scene: HitTestScene, target: PlanePoint, options:
   const allowed = options.kinds ? new Set(options.kinds) : null;
 
   const collected = [...geometrySnapCandidates(scene, target)];
+  // Les intersections ne sont calculées que si elles peuvent être retenues : demander une
+  // sélection de natures qui les exclut évite tout le balayage (§7).
+  if (!allowed || allowed.has("intersection")) collected.push(...intersectionSnapCandidates(scene, target, tolerance));
   if (options.gridStepMm && options.gridStepMm > 0) {
     const position = snapToGrid(target, options.gridStepMm);
     collected.push(candidate("grid", position, target, `Grille ${options.gridStepMm} mm`));

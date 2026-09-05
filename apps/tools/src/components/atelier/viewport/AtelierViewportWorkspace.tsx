@@ -10,6 +10,19 @@
  * est converti en point MONDE, puis `hitTest` désigne l'entité la plus pertinente dans la
  * tolérance. Le clic à vide désélectionne. La couche de rendu ne porte aucune zone de clic.
  *
+ * ## ATELIER-INTERSECTIONS-MULTISELECT-V1 §4/§5 — cycle et sélection multiple
+ *
+ * Le clic ne consulte plus `hitTest` mais `hitTestAll`, et confie la liste au cycle : re-cliquer
+ * au même endroit descend d'un cran dans les entités superposées, ce qui rend enfin atteignable
+ * l'axe qui passe SOUS celui que la priorité désigne. Les deux décisions — quel candidat, quelle
+ * sélection en résulte — vivent dans des modules purs (`lib/viewport/selection-cycle.ts`,
+ * `lib/viewport/selection-set.ts`) ; ce composant ne fait que les enchaîner.
+ *
+ * La sélection est doublement CONTRÔLÉE et rétro-compatible : `onSelectEntities` reçoit la liste
+ * complète, `onSelectEntity` continue de recevoir l'entité principale. Un parent resté en
+ * sélection unique fonctionne donc sans changement, et l'édition par poignée — qui ne connaît
+ * qu'une entité (§9) — continue de viser la principale.
+ *
  * ## ATELIER-VERTEX-EDIT-UNDO-REDO-V1 — édition d'un sommet
  *
  * Ce composant orchestre le geste ; il ne décide de rien. Le cycle est
@@ -33,9 +46,15 @@
  */
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import { hitTest } from "@/lib/geometry/hit-test";
+import { hitTest, hitTestAll } from "@/lib/geometry/hit-test";
 import { snap } from "@/lib/geometry/snap";
 import { chooseGridStep } from "@/lib/viewport/grid";
+import {
+  advanceSelectionCycle,
+  SELECTION_CYCLE_ANCHOR_PX,
+  type SelectionCycleState,
+} from "@/lib/viewport/selection-cycle";
+import { applySelectionClick, primarySelection, selectionFromId } from "@/lib/viewport/selection-set";
 import { screenToWorld, type ScreenPoint } from "@/lib/viewport/viewport-math";
 import {
   handleGrabPx,
@@ -65,7 +84,7 @@ import {
   type ToolbarActionId,
   type ToolbarState,
 } from "./toolbar-model";
-import { countSceneEntities, describeSceneEntity, type PlanScene } from "./plan-scene";
+import { countSceneEntities, describeSceneEntity, describeSceneSelection, type PlanScene } from "./plan-scene";
 import styles from "./viewport.module.css";
 
 /**
@@ -88,6 +107,17 @@ export type AtelierViewportWorkspaceProps = {
   scene: PlanScene;
   selectedEntityId: string | null;
   onSelectEntity: (entityId: string | null) => void;
+  /**
+   * §5 — sélection multiple. Absente, la sélection reste celle de `selectedEntityId` et le
+   * composant se comporte exactement comme avant ce lot.
+   */
+  selectedEntityIds?: readonly string[];
+  /**
+   * §5 — nouvelle sélection complète. Toujours appelée EN PLUS de `onSelectEntity`, jamais à sa
+   * place : un parent qui n'écoute que la sélection simple continue d'être servi, et la
+   * principale qu'il reçoit est bien celle de la liste — les deux ne peuvent pas diverger.
+   */
+  onSelectEntities?: (entityIds: readonly string[]) => void;
   /** État initial de la barre (utile pour une preview qui veut démarrer en mode Sélection). */
   initialToolbarState?: ToolbarState;
   /**
@@ -120,6 +150,8 @@ export function AtelierViewportWorkspace({
   scene,
   selectedEntityId,
   onSelectEntity,
+  selectedEntityIds,
+  onSelectEntities,
   initialToolbarState = DEFAULT_TOOLBAR_STATE,
   viewKey,
   editing,
@@ -130,9 +162,33 @@ export function AtelierViewportWorkspace({
   const [activeHandleId, setActiveHandleId] = useState<string | null>(null);
   const [liveReadout, setLiveReadout] = useState<string | null>(null);
   const drag = useRef<DragSession | null>(null);
+  /**
+   * §4 — cycle de sélection. Une `ref` et non un état : le cycle ne se DESSINE pas, il ne fait
+   * que mémoriser ce qu'a désigné le clic précédent. En faire un état déclencherait un rendu
+   * supplémentaire à chaque clic sans qu'aucun pixel change.
+   */
+  const cycle = useRef<SelectionCycleState | null>(null);
   const controller = usePlanViewport({ bounds: scene.bounds, viewKey });
 
-  const details = useMemo(() => describeSceneEntity(scene, selectedEntityId), [scene, selectedEntityId]);
+  /**
+   * §5 — sélection effective. `selectedEntityIds` l'emporte quand le parent la fournit ; sinon on
+   * relit la sélection simple. Le `useMemo` garde la référence stable tant que rien ne change,
+   * ce dont dépendent les mémos en aval.
+   */
+  const selection = useMemo(
+    () => selectedEntityIds ?? selectionFromId(selectedEntityId),
+    [selectedEntityIds, selectedEntityId],
+  );
+  const selectionSummary = useMemo(() => describeSceneSelection(scene, selection), [scene, selection]);
+  const multiple = selection.length > 1;
+
+  // La fiche détaillée décrit la PRINCIPALE ; au-delà d'une entité, c'est le résumé qui est
+  // affiché, et calculer une fiche qu'on n'affiche pas serait du travail perdu à chaque clic.
+  const primaryId = primarySelection(selection);
+  const details = useMemo(
+    () => (multiple ? null : describeSceneEntity(scene, primaryId)),
+    [multiple, scene, primaryId],
+  );
   const entityCount = useMemo(() => countSceneEntities(scene), [scene]);
 
   const handles = editing?.handles ?? NO_HANDLES;
@@ -173,27 +229,52 @@ export function AtelierViewportWorkspace({
     setToolbar((current) => (current.propertiesOpen ? toggleProperties(current) : current));
   }, []);
 
-  const pickEntity = useCallback(
-    (entityId: string) => {
-      onSelectEntity(entityId);
-      setToolbar((current) => (current.propertiesOpen ? current : toggleProperties(current)));
+  /**
+   * §5 — publie une nouvelle sélection sur les DEUX canaux, et ouvre le panneau si elle n'est
+   * pas vide. L'entité principale est dérivée de la liste, jamais transmise à part : c'est ce
+   * qui interdit à `selectedEntityId` et `selectedEntityIds` de se contredire.
+   */
+  const publishSelection = useCallback(
+    (next: readonly string[]) => {
+      onSelectEntities?.(next);
+      onSelectEntity(primarySelection(next));
+      if (next.length > 0) setToolbar((current) => (current.propertiesOpen ? current : toggleProperties(current)));
     },
-    [onSelectEntity],
+    [onSelectEntities, onSelectEntity],
   );
 
   /**
-   * §7 — un clic désigne l'entité la plus pertinente sous le pointeur, ou désélectionne si
-   * rien n'est assez proche. La tolérance est convertie depuis les pixels à la vue courante,
-   * donc identique à l'œil quel que soit le zoom (§2).
+   * §4/§5 — un clic désigne une entité, ou désélectionne si rien n'est assez proche.
+   *
+   * L'enchaînement est : tolérance écran → tolérance monde (§2, identique à l'œil quel que soit
+   * le zoom) → `hitTestAll` (liste ordonnée, déterministe) → cycle (quel rang dans cette liste)
+   * → règle de sélection (remplacer ou ajouter).
+   *
+   * Le cycle est nourri de la clé de vue et de l'identifiant de la scène : changer de modèle,
+   * d'étape de chantier ou de paramètre change cette clé, ce qui referme le cycle sans qu'aucun
+   * effet de nettoyage soit nécessaire (§4).
    */
   const onCanvasClick = useCallback(
-    (local: ScreenPoint, precision: PointerPrecision) => {
+    (local: ScreenPoint, precision: PointerPrecision, additive: boolean) => {
+      const world = worldOf(local);
       const tolerance = toleranceWorldFor(selectionTolerancePx(precision), view);
-      const found = hitTest(scene, worldOf(local), tolerance);
-      if (found) pickEntity(found.entityId);
-      else onSelectEntity(null);
+      const candidates = hitTestAll(scene, world, tolerance);
+
+      const step = advanceSelectionCycle(cycle.current, {
+        world,
+        scale: view.scale,
+        sceneKey: `${viewKey ?? ""}|${scene.id}`,
+        candidateIds: candidates.map((candidate) => candidate.entityId),
+        anchorToleranceWorld: toleranceWorldFor(SELECTION_CYCLE_ANCHOR_PX, view),
+        // Composer une sélection ne doit pas déplacer la cible : le Maj+clic lit le rang
+        // courant sans le faire tourner, faute de quoi il ne pourrait jamais rien retirer (§5).
+        advance: !additive,
+      });
+      cycle.current = step.state;
+
+      publishSelection(applySelectionClick(selection, step.entityId, additive));
     },
-    [onSelectEntity, pickEntity, scene, view, worldOf],
+    [publishSelection, scene, selection, view, viewKey, worldOf],
   );
 
   /**
@@ -296,16 +377,19 @@ export function AtelierViewportWorkspace({
     };
   }, [editMode, editing, scene, view, worldOf]);
 
+  // §9 — pas d'édition simultanée dans ce lot : au-delà d'une entité sélectionnée, aucune
+  // poignée n'est mise en avant. Le panneau le dit explicitement plutôt que de laisser une
+  // poignée orpheline suggérer que le réglage vaudrait pour tout le lot.
   const selectedHandle = useMemo(
-    () => handles.find((handle) => handle.entityId === selectedEntityId) ?? null,
-    [handles, selectedEntityId],
+    () => (multiple ? null : handles.find((handle) => handle.entityId === primaryId) ?? null),
+    [handles, multiple, primaryId],
   );
 
   return (
     <div className={styles.workspace} data-properties={toolbar.propertiesOpen ? "open" : "closed"}>
       <AtelierToolbar
         state={{ ...toolbar, tool: effectiveTool }}
-        hasSelection={Boolean(selectedEntityId)}
+        hasSelection={selection.length > 0}
         editingAvailable={editingAvailable}
         canUndo={editing?.canUndo ?? false}
         canRedo={editing?.canRedo ?? false}
@@ -325,7 +409,13 @@ export function AtelierViewportWorkspace({
           <>
             <span>{entityCount} entités</span>
             {editMode && <span>{editableCount} sommets réglables</span>}
-            {liveReadout ? <span aria-live="polite">{liveReadout}</span> : details && <span>Sélection : {details.label}</span>}
+            {liveReadout ? (
+              <span aria-live="polite">{liveReadout}</span>
+            ) : multiple ? (
+              <span>{selection.length} éléments sélectionnés</span>
+            ) : (
+              details && <span>Sélection : {details.label}</span>
+            )}
           </>
         }
       >
@@ -335,7 +425,7 @@ export function AtelierViewportWorkspace({
               scene={scene}
               view={frameView}
               size={frameSize}
-              selectedEntityId={selectedEntityId}
+              selectedEntityIds={selection}
               hoveredEntityId={feedbackVisible ? hoveredEntityId : null}
               snapPoint={feedbackVisible ? snapPoint : null}
             />
@@ -345,7 +435,7 @@ export function AtelierViewportWorkspace({
                 view={frameView}
                 size={frameSize}
                 activeHandleId={activeHandleId}
-                selectedEntityId={selectedEntityId}
+                selectedEntityId={multiple ? null : primaryId}
               />
             )}
           </>
@@ -355,6 +445,7 @@ export function AtelierViewportWorkspace({
       <PropertiesSheet
         open={toolbar.propertiesOpen}
         details={details}
+        selection={selectionSummary}
         handle={selectedHandle}
         onClose={closeProperties}
         floating

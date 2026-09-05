@@ -10,6 +10,7 @@
  */
 
 import type { Arc, BoundingBox, Circle, Ellipse, Point, Polygon, Polyline, Segment } from "../../../lib/geometry/primitives";
+import { arcSweep } from "../../../lib/geometry/closest-point";
 
 export type PlanScene = {
   id: string;
@@ -256,4 +257,80 @@ function pathLength(points: readonly { x: number; y: number }[], closed: boolean
 /** Nombre total d'entités rendues — sert au contrôle de charge de la scène (§14). */
 export function countSceneEntities(scene: PlanScene): number {
   return listSceneEntities(scene).length;
+}
+
+/**
+ * ATELIER-INTERSECTIONS-MULTISELECT-V1 §6 — résumé d'une sélection MULTIPLE.
+ *
+ * Volontairement descriptif, jamais éditable : ce lot n'implémente pas la modification groupée
+ * (§9). Le panneau doit répondre à « qu'est-ce que je tiens ? », pas offrir un formulaire.
+ *
+ * Trois choix méritent d'être dits :
+ *
+ * - les entités sont rendues dans l'ordre de la SÉLECTION, pas dans celui de la scène. C'est
+ *   l'ordre dans lequel l'utilisateur les a désignées, donc celui où il les cherche ;
+ * - les identifiants inconnus de la scène sont ignorés silencieusement. Une sélection peut
+ *   survivre à un changement de paramètre qui supprime une entité ; le panneau doit alors
+ *   décrire ce qui reste, pas afficher une ligne fantôme ;
+ * - la répartition par nature est calculée sur les entités RETROUVÉES, pour que le compte affiché
+ *   et la liste affichée ne puissent pas se contredire.
+ */
+export type SceneSelectionSummary = {
+  /** Nombre d'entités effectivement retrouvées dans la scène. */
+  count: number;
+  /** Répartition par nature, dans l'ordre d'apparition dans la sélection. */
+  kinds: readonly { kind: SceneEntityKind; count: number }[];
+  /** Les entités retrouvées, dans l'ordre de sélection. */
+  entities: readonly SceneEntitySummary[];
+  /** Rôle métier commun à TOUTES les entités, s'il existe — sinon `null`. */
+  commonRole: string | null;
+  /** Quelques propriétés communes, calculées seulement quand elles ont un sens pour tout le lot. */
+  rows: readonly PropertyRow[];
+};
+
+/** Longueur d'une entité, ou `null` si la notion ne s'applique pas (point, ellipse, contour ouvert). */
+function entityLength(scene: PlanScene, entityId: string): number | null {
+  for (const { item } of sceneSegments(scene)) {
+    if (item.id === entityId) return Math.hypot(item.end.x - item.start.x, item.end.y - item.start.y);
+  }
+  for (const item of scene.arcs ?? []) {
+    if (item.id === entityId) return Math.abs(item.radius * arcSweep(item));
+  }
+  for (const item of scene.circles ?? []) if (item.id === entityId) return 2 * Math.PI * item.radius;
+  for (const item of scene.polylines ?? []) if (item.id === entityId) return pathLength(item.points, false);
+  for (const item of scene.polygons ?? []) if (item.id === entityId) return pathLength(item.points, true);
+  return null;
+}
+
+export function describeSceneSelection(scene: PlanScene, entityIds: readonly string[]): SceneSelectionSummary {
+  const byId = new Map(listSceneEntities(scene).map((entity) => [entity.id, entity]));
+  const entities = entityIds.map((id) => byId.get(id)).filter((entity): entity is SceneEntitySummary => Boolean(entity));
+
+  const counts: { kind: SceneEntityKind; count: number }[] = [];
+  for (const entity of entities) {
+    const existing = counts.find((row) => row.kind === entity.kind);
+    if (existing) existing.count += 1;
+    else counts.push({ kind: entity.kind, count: 1 });
+  }
+
+  const roles = new Set(entities.map((entity) => entity.role ?? "—"));
+  const commonRole = entities.length > 0 && roles.size === 1 ? [...roles][0] : null;
+
+  const rows: PropertyRow[] = [
+    { label: "Sélection", value: `${entities.length} entité${entities.length > 1 ? "s" : ""}` },
+    { label: "Natures", value: counts.map((row) => `${entityKindLabel(row.kind)} × ${row.count}`).join(" · ") || "—" },
+  ];
+  if (commonRole && commonRole !== "—") rows.push({ label: "Rôle commun", value: commonRole });
+
+  // La longueur cumulée n'est affichée que si CHAQUE entité en a une : additionner les seules
+  // entités mesurables afficherait un total juste pour un sous-ensemble muet, ce qu'aucun libellé
+  // ne rattraperait sur un chantier.
+  const lengths = entities.map((entity) => entityLength(scene, entity.id));
+  if (entities.length > 0 && lengths.every((value): value is number => value !== null)) {
+    rows.push({ label: "Longueur cumulée", value: millimetres(lengths.reduce((total, value) => total + value, 0)) });
+  }
+
+  rows.push({ label: "Identifiants", value: entities.map((entity) => entity.id).join(", ") || "—" });
+
+  return { count: entities.length, kinds: counts, entities, commonRole, rows };
 }
