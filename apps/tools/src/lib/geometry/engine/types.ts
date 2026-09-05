@@ -9,15 +9,25 @@ export type Vector2D = { x: number; y: number };
 /** Ligne infinie définie par un point et une direction (non nécessairement unitaire). */
 export type Line2D = { point: Point2D; direction: Vector2D };
 
-/** Segment borné entre deux points. */
-export type Segment2D = { start: Point2D; end: Point2D };
+/**
+ * Rôle sémantique optionnel d'une primitive : distingue le tracé final de l'aide de
+ * construction, sans imposer cette distinction à un générateur qui ne la renseigne pas
+ * (champ additif — absent = traité comme "shape" par les consommateurs, ex. l'adaptateur
+ * `geometry/adapters` vers TraceModel). Vocabulaire aligné sur `Segment.role`/`Circle.role`
+ * d'Engine A (`primitives.ts`) pour que le pont entre les deux moteurs n'ait pas à traduire un
+ * vocabulaire différent.
+ */
+export type PrimitiveRole = "shape" | "construction" | "axis";
 
-export type Circle2D = { centre: Point2D; radius: number };
+/** Segment borné entre deux points. */
+export type Segment2D = { start: Point2D; end: Point2D; role?: PrimitiveRole };
+
+export type Circle2D = { centre: Point2D; radius: number; role?: Exclude<PrimitiveRole, "axis"> };
 
 /** Arc de cercle. Angles en radians. `counterClockwise` par défaut à true (sens trigonométrique). */
-export type Arc2D = { centre: Point2D; radius: number; startAngle: number; endAngle: number; counterClockwise?: boolean };
+export type Arc2D = { centre: Point2D; radius: number; startAngle: number; endAngle: number; counterClockwise?: boolean; role?: Exclude<PrimitiveRole, "axis"> };
 
-export type Ellipse2D = { centre: Point2D; radiusX: number; radiusY: number; rotation?: number };
+export type Ellipse2D = { centre: Point2D; radiusX: number; radiusY: number; rotation?: number; role?: Exclude<PrimitiveRole, "axis"> };
 
 /** Ligne brisée ouverte ou fermée. */
 export type Polyline2D = { points: readonly Point2D[]; closed?: boolean };
