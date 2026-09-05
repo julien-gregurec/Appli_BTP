@@ -16,6 +16,7 @@ import { resolveTracingProjectModel } from "@/lib/tracing/model-resolver";
 import { findTraceModelDescriptor, traceModelDefaults } from "@/lib/geometry/models/catalog";
 import { TraceParametersForm } from "./TraceParametersForm";
 import { ModelResolutionCard } from "@/components/atelier/model/ModelResolutionCard";
+import { ResolvedModelViewport } from "@/components/atelier/viewport";
 import { useAtelierPersistence } from "@/lib/tracing/use-atelier-autosave";
 import { useAccount } from "./AccountProvider";
 import { Brand } from "./HomeDashboard";
@@ -306,6 +307,13 @@ export function NouveauTraceWorkspace() {
               values={paramValues}
               onChange={(id, value) => setParamValues((current) => ({ ...current, [id]: value }))}
             />
+            {/*
+              ATELIER-RESOLVED-MODEL-VIEWPORT-INTEGRATION-V1 §5 — le plan suit les réglages en
+              direct. La résolution est celle déjà calculée ci-dessus (`previewResolution`) :
+              aucun second appel au moteur, et le zoom/pan survit aux frappes puisque la vue
+              est identifiée par le projet et le modèle, pas par les bornes de la géométrie.
+            */}
+            {previewResolution && <ResolvedModelViewport resolution={previewResolution} projectId={project.id} />}
             {previewResolution && <ModelResolutionCard resolution={previewResolution} />}
             <p className="atelier-feedback">{feedback}</p>
             <div className="atelier-nav">

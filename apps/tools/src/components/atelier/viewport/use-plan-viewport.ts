@@ -9,9 +9,10 @@
  *
  * Deux choix de structure évitent tout `setState` en effet (cascade de rendus) :
  * - le cadrage automatique (`fit`) est DÉRIVÉ à chaque rendu, jamais recopié dans un état ;
- * - la vue manuelle est mémorisée avec la clé des bornes qui l'a produite. Changer de scène
+ * - la vue manuelle est mémorisée avec la clé de la scène qui l'a produite. Changer de scène
  *   périme donc la vue sans effet de réinitialisation : on retombe automatiquement sur le
- *   cadrage recentré de la nouvelle géométrie.
+ *   cadrage recentré de la nouvelle géométrie. Cette clé vaut les bornes par défaut, ou
+ *   `viewKey` quand l'appelant sait ce que la scène représente (§4/§5).
  *
  * La mesure initiale est prise dans la ref de rappel, en phase de commit, et NON dans le
  * `ResizeObserver` : sur une page masquée (onglet en arrière-plan, panneau replié) le navigateur
@@ -39,6 +40,17 @@ export type UsePlanViewportOptions = {
   bounds: WorldBounds;
   /** Marge de recentrage, en px. */
   padding?: number;
+  /**
+   * Identité de la vue (ATELIER-RESOLVED-MODEL-VIEWPORT-INTEGRATION-V1 §4/§5).
+   *
+   * Par défaut la vue manuelle est mémorisée sous la clé des bornes : changer de géométrie
+   * périme le cadrage. C'est le bon comportement pour une scène figée, mais pas pour un
+   * modèle paramétrique — chaque frappe dans un champ déplace les bornes et remettrait donc
+   * la vue à plat. Un appelant qui connaît l'identité réelle de ce qu'il montre (projet +
+   * `modelId`) la passe ici : le zoom et le pan survivent alors aux changements de
+   * paramètres, et ne sont réinitialisés que sur un vrai changement de modèle ou de projet.
+   */
+  viewKey?: string;
 };
 
 type PinnedView = { key: string; state: ViewportState };
@@ -46,12 +58,12 @@ type PinnedView = { key: string; state: ViewportState };
 const EMPTY_SIZE: ViewportSize = { width: 0, height: 0 };
 const FALLBACK_VIEW: ViewportState = { scale: 1, centerX: 0, centerY: 0 };
 
-export function usePlanViewport({ bounds, padding }: UsePlanViewportOptions) {
+export function usePlanViewport({ bounds, padding, viewKey }: UsePlanViewportOptions) {
   const [element, setElement] = useState<HTMLDivElement | null>(null);
   const [size, setSize] = useState<ViewportSize>(EMPTY_SIZE);
   const [pinned, setPinned] = useState<PinnedView | null>(null);
 
-  const boundsKey = `${bounds.minX}|${bounds.minY}|${bounds.maxX}|${bounds.maxY}`;
+  const sceneKey = viewKey ?? `${bounds.minX}|${bounds.minY}|${bounds.maxX}|${bounds.maxY}`;
 
   /** Ref de rappel : capte l'élément et le mesure dès le commit, sans attendre de peinture. */
   const containerRef = useCallback((node: HTMLDivElement | null) => {
@@ -91,18 +103,18 @@ export function usePlanViewport({ bounds, padding }: UsePlanViewportOptions) {
     [bounds, size, padding],
   );
 
-  const view = pinned && pinned.key === boundsKey ? pinned.state : fit ?? FALLBACK_VIEW;
+  const view = pinned && pinned.key === sceneKey ? pinned.state : fit ?? FALLBACK_VIEW;
   const ready = fit !== null;
 
   /** Applique une transformation à la vue courante, bornage du pan compris (§5). */
   const update = useCallback(
     (transformView: (current: ViewportState) => ViewportState) => {
       setPinned((current) => {
-        const base = current && current.key === boundsKey ? current.state : fit ?? FALLBACK_VIEW;
-        return { key: boundsKey, state: clampPan(transformView(base), bounds, size) };
+        const base = current && current.key === sceneKey ? current.state : fit ?? FALLBACK_VIEW;
+        return { key: sceneKey, state: clampPan(transformView(base), bounds, size) };
       });
     },
-    [boundsKey, bounds, size, fit],
+    [sceneKey, bounds, size, fit],
   );
 
   const pan = useCallback(

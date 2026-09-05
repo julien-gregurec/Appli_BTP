@@ -28,6 +28,12 @@ export type AtelierViewportWorkspaceProps = {
   onSelectEntity: (entityId: string | null) => void;
   /** État initial de la barre (utile pour une preview qui veut démarrer en mode Sélection). */
   initialToolbarState?: ToolbarState;
+  /**
+   * Identité de ce que montre le viewport (§4/§5) — transmise telle quelle à `usePlanViewport`.
+   * Sans elle, le cadrage repart des bornes et se réinitialise à chaque changement de
+   * paramètre ; avec elle, le zoom et le pan ne sont perdus qu'au changement de modèle.
+   */
+  viewKey?: string;
 };
 
 export function AtelierViewportWorkspace({
@@ -35,9 +41,10 @@ export function AtelierViewportWorkspace({
   selectedEntityId,
   onSelectEntity,
   initialToolbarState = DEFAULT_TOOLBAR_STATE,
+  viewKey,
 }: AtelierViewportWorkspaceProps) {
   const [toolbar, setToolbar] = useState<ToolbarState>(initialToolbarState);
-  const controller = usePlanViewport({ bounds: scene.bounds });
+  const controller = usePlanViewport({ bounds: scene.bounds, viewKey });
 
   const details = useMemo(() => describeSceneEntity(scene, selectedEntityId), [scene, selectedEntityId]);
   const entityCount = useMemo(() => countSceneEntities(scene), [scene]);

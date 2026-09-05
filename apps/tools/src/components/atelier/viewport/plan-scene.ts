@@ -17,6 +17,13 @@ export type PlanScene = {
   bounds: BoundingBox;
   points?: readonly Point[];
   segments?: readonly Segment[];
+  /**
+   * Traits de construction du modèle (ATELIER-RESOLVED-MODEL-VIEWPORT-INTEGRATION-V1 §3).
+   * Champ distinct plutôt que des segments marqués `role: "construction"` : un `TraceModel`
+   * les publie déjà séparément (`ShapeGeometry.constructionLines`), donc le brancher ainsi
+   * reste une simple lecture — aucune recopie, aucune fusion de listes en amont.
+   */
+  constructionLines?: readonly Segment[];
   arcs?: readonly Arc[];
   circles?: readonly Circle[];
   ellipses?: readonly Ellipse[];
@@ -82,6 +89,18 @@ function coordinates(source: { x: number; y: number }): string {
 }
 
 /**
+ * Segments de la scène, traits de construction compris. Les traits de construction d'un
+ * `TraceModel` n'ont pas toujours de `role` explicite — leur nature vient du champ qui les
+ * porte, on la restitue donc ici plutôt que de la présumer côté rendu.
+ */
+function sceneSegments(scene: PlanScene): readonly { item: Segment; role: string | undefined }[] {
+  return [
+    ...(scene.segments ?? []).map((item) => ({ item, role: item.role })),
+    ...(scene.constructionLines ?? []).map((item) => ({ item, role: item.role ?? "construction" })),
+  ];
+}
+
+/**
  * Inventaire ordonné des entités sélectionnables de la scène. L'ordre est stable (contours,
  * segments, arcs, cercles, ellipses, polylignes, points) pour que la liste de la fixture et le
  * futur hit-testing désignent les mêmes objets.
@@ -93,7 +112,7 @@ export function listSceneEntities(scene: PlanScene): readonly SceneEntitySummary
   };
 
   for (const item of scene.polygons ?? []) push("polygon", item.id, undefined, item.role);
-  for (const item of scene.segments ?? []) push("segment", item.id, undefined, item.role);
+  for (const { item, role } of sceneSegments(scene)) push("segment", item.id, undefined, role);
   for (const item of scene.arcs ?? []) push("arc", item.id, undefined, item.role);
   for (const item of scene.circles ?? []) push("circle", item.id, undefined, item.role);
   for (const item of scene.ellipses ?? []) push("ellipse", item.id, undefined, item.role);
@@ -107,14 +126,14 @@ export function listSceneEntities(scene: PlanScene): readonly SceneEntitySummary
 export function describeSceneEntity(scene: PlanScene, entityId: string | null): SceneEntityDetails | null {
   if (!entityId) return null;
 
-  for (const item of scene.segments ?? []) {
+  for (const { item, role } of sceneSegments(scene)) {
     if (item.id !== entityId) continue;
     const length = Math.hypot(item.end.x - item.start.x, item.end.y - item.start.y);
     return {
       id: item.id,
       kind: "segment",
       label: entityLabel("segment", item.id),
-      role: item.role,
+      role,
       rows: [
         { label: "Départ", value: coordinates(item.start) },
         { label: "Arrivée", value: coordinates(item.end) },

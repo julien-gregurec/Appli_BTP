@@ -71,12 +71,16 @@ export function PlanSceneLayer({ scene, view, size, selectedEntityId = null, onP
         );
       })}
 
-      {(scene.segments ?? []).map((segment) => {
+      {/* Traits de construction d'abord : ils passent sous la forme, comme au trace reel. */}
+      {[
+        ...(scene.constructionLines ?? []).map((item) => ({ item, role: item.role ?? "construction" })),
+        ...(scene.segments ?? []).map((item) => ({ item, role: item.role })),
+      ].map(({ item: segment, role }) => {
         const start = project(segment.start);
         const end = project(segment.end);
         return (
           <g key={segment.id}>
-            <line className={strokeClass(segment.role, segment.id)} x1={start.x} y1={start.y} x2={end.x} y2={end.y} />
+            <line className={strokeClass(role, segment.id)} x1={start.x} y1={start.y} x2={end.x} y2={end.y} />
             {selectable && (
               <line className={styles.hitArea} x1={start.x} y1={start.y} x2={end.x} y2={end.y} onClick={pick(segment.id)} />
             )}

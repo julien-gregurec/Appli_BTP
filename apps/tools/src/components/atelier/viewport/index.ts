@@ -4,6 +4,11 @@
  * Viewport SVG (pan / zoom / pinch), grille visuelle adaptative, barre d'outils mobile,
  * shell du panneau propriétés et API de sélection préparatoire. Tout arrive par props : aucun
  * accès au moteur géométrique, aux modèles, aux adaptateurs, aux exports ni à la persistance.
+ *
+ * ATELIER-RESOLVED-MODEL-VIEWPORT-INTEGRATION-V1 : `resolved-scene` et `ResolvedModelViewport`
+ * ajoutent le branchement sur un modèle DÉJÀ résolu par Engine B. La règle ci-dessus tient
+ * toujours — ces deux modules lisent une `TracingModelResolution` reçue en argument, ils
+ * n'appellent jamais le moteur eux-mêmes.
  */
 
 export { PlanViewport, type PlanViewportProps, type PlanViewportRenderArgs } from "./PlanViewport";
@@ -12,6 +17,8 @@ export { GridOverlay } from "./GridOverlay";
 export { AtelierToolbar, type AtelierToolbarProps } from "./AtelierToolbar";
 export { PropertiesSheet, type PropertiesSheetProps } from "./PropertiesSheet";
 export { AtelierViewportWorkspace, type AtelierViewportWorkspaceProps } from "./AtelierViewportWorkspace";
+export { ResolvedModelViewport, type ResolvedModelViewportProps } from "./ResolvedModelViewport";
+export { atelierViewKey, planSceneForStep, resolvedPlanScene, stepAt } from "./resolved-scene";
 export { usePlanViewport, type PlanViewportController } from "./use-plan-viewport";
 export { useViewportGestures, DRAG_THRESHOLD_PX } from "./use-viewport-gestures";
 export {

@@ -21,6 +21,7 @@ import { tracingProjectToChantierExportDocument } from "@/lib/exports/atelier-ex
 import { resolvedAtelierGeometry } from "@/lib/exports/atelier-resolved-geometry";
 import { resolveTracingProjectModel } from "@/lib/tracing/model-resolver";
 import { ModelResolutionCard } from "@/components/atelier/model/ModelResolutionCard";
+import { ResolvedModelViewport } from "@/components/atelier/viewport";
 import { chantierExportCapabilities, type ChantierExportFormat } from "@/lib/exports/chantier-export-bus";
 import { PreExportReportView } from "@/components/atelier/export/PreExportReportView";
 import { ExportFormatPicker } from "@/components/atelier/export/ExportFormatPicker";
@@ -145,6 +146,13 @@ export function AtelierExportWorkspace() {
                 {state.message}
               </p>
             )}
+
+            {/*
+              §3 — le plan montré est la géométrie réellement résolue, celle-là même que
+              l'adaptateur remet à l'export ci-dessous. Le viewport n'est jamais source de
+              vérité (§10) : il lit `resolution`, il ne la produit pas.
+            */}
+            {resolution && <ResolvedModelViewport resolution={resolution} projectId={state.status === "ready" ? state.project.id : undefined} />}
 
             {resolution && <ModelResolutionCard resolution={resolution} />}
 
