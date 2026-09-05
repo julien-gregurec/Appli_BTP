@@ -1,14 +1,13 @@
 "use client";
 
 // Page interne de démonstration du futur module "Tracés & Géométrie" (FIRST-FUNCTIONAL-LOT-V1
-// §13, étendue en FUNDAMENTAL-MODELS-V1 §20-21 à 8 modèles). Non commerciale, non cataloguée
-// (catalog.ts n'y fait aucune référence), robots noindex (voir page.tsx). Prouve le flux
-// complet : paramètres utilisateur -> calcul géométrique -> TraceModel -> rendu vectoriel ->
-// couches -> pas-à-pas -> mode chantier.
+// §13, étendue en FUNDAMENTAL-MODELS-V1 puis DECORATIVE-FAMILIES-V1 §18 à 13 modèles répartis en
+// FONDAMENTAUX / DÉCORATIFS). Non commerciale, non cataloguée (catalog.ts n'y fait aucune
+// référence), robots noindex (voir page.tsx). Prouve le flux complet : paramètres utilisateur ->
+// calcul géométrique -> TraceModel -> rendu vectoriel -> couches -> pas-à-pas -> mode chantier.
 //
-// Sélecteur en <select> natif plutôt qu'une rangée de 8 onglets (§21 : illisible sur mobile
-// avec autant d'entrées) — pas de refonte de l'UI existante, juste le contrôle le plus simple et
-// déjà accessible par défaut.
+// Sélecteur en <select> natif avec <optgroup> : reste lisible sur mobile même à 13 entrées,
+// aucune grosse navigation ajoutée (§18).
 import { useMemo, useState } from "react";
 import { TraceViewer } from "./TraceViewer";
 import { TraceSteps } from "./TraceSteps";
@@ -22,54 +21,37 @@ import { archFullRoundParameters, createArchFullRoundGeometry } from "@/lib/geom
 import { createOgiveGeometry, ogiveParameters } from "@/lib/geometry/models/ogive";
 import { createEllipsePedagogicalGeometry, ellipsePedagogicalParameters } from "@/lib/geometry/models/ellipse-pedagogical";
 import { createSpiralGeometry, spiralParameters } from "@/lib/geometry/models/spiral";
+import { createFlower4Geometry, flower4Parameters } from "@/lib/geometry/models/flower4";
+import { createFlower5Geometry, flower5Parameters } from "@/lib/geometry/models/flower5";
+import { createFlower6ElongatedGeometry, flower6ElongatedParameters } from "@/lib/geometry/models/flower6-elongated";
+import { createTurbineGeometry, turbineParameters } from "@/lib/geometry/models/turbine";
+import { createDoubleSGeometry, doubleSParameters } from "@/lib/geometry/models/double-s";
 import type { TraceModel, TraceParameter } from "@/lib/geometry/trace-model";
 
-type ModelKey = "circle-division" | "star-5" | "rosette-6" | "heart" | "arch-full-round" | "ogive-equilateral" | "ellipse-pedagogical" | "spiral-archimedes";
+type ModelKey =
+  | "circle-division" | "star-5" | "rosette-6" | "heart" | "arch-full-round" | "ogive-equilateral" | "ellipse-pedagogical" | "spiral-archimedes"
+  | "flower-4" | "flower-5" | "flower-6-elongated" | "turbine" | "double-s";
 
-const MODEL_DEFINITIONS: Record<ModelKey, { label: string; parameters: readonly TraceParameter[]; build: (values: Record<string, number>) => TraceModel }> = {
-  "circle-division": {
-    label: "Cercle divisé",
-    parameters: circleDivisionParameters,
-    build: (values) => createCircleDivisionGeometry({ diameter: values.diameter, divisions: values.divisions, startAngle: values.startAngle }),
-  },
-  "star-5": {
-    label: "Étoile 5 branches",
-    parameters: starParameters,
-    build: (values) => createStarGeometry({ outerDiameter: values.outerDiameter, innerRatio: values.innerRatio, rotation: values.rotation }),
-  },
-  "rosette-6": {
-    label: "Rosace 6 pétales simple",
-    parameters: rosetteParameters,
-    build: (values) => createRosetteGeometry({ diameter: values.diameter, rotation: values.rotation }),
-  },
-  heart: {
-    label: "Cœur géométrique",
-    parameters: heartParameters,
-    build: (values) => createHeartGeometry({ width: values.width, height: values.height }),
-  },
-  "arch-full-round": {
-    label: "Arche plein cintre",
-    parameters: archFullRoundParameters,
-    build: (values) => createArchFullRoundGeometry({ width: values.width }),
-  },
-  "ogive-equilateral": {
-    label: "Ogive simple à deux centres",
-    parameters: ogiveParameters,
-    build: (values) => createOgiveGeometry({ width: values.width }),
-  },
-  "ellipse-pedagogical": {
-    label: "Ellipse pédagogique",
-    parameters: ellipsePedagogicalParameters,
-    build: (values) => createEllipsePedagogicalGeometry({ width: values.width, height: values.height }),
-  },
-  "spiral-archimedes": {
-    label: "Spirale d'Archimède",
-    parameters: spiralParameters,
-    build: (values) => createSpiralGeometry({ startRadius: values.startRadius, endRadius: values.endRadius, turns: values.turns, rotation: values.rotation }),
-  },
+type ModelDefinition = { label: string; group: "Fondamentaux" | "Décoratifs"; parameters: readonly TraceParameter[]; build: (values: Record<string, number>) => TraceModel };
+
+const MODEL_DEFINITIONS: Record<ModelKey, ModelDefinition> = {
+  "circle-division": { label: "Cercle divisé", group: "Fondamentaux", parameters: circleDivisionParameters, build: (v) => createCircleDivisionGeometry({ diameter: v.diameter, divisions: v.divisions, startAngle: v.startAngle }) },
+  "star-5": { label: "Étoile 5 branches", group: "Fondamentaux", parameters: starParameters, build: (v) => createStarGeometry({ outerDiameter: v.outerDiameter, innerRatio: v.innerRatio, rotation: v.rotation }) },
+  "rosette-6": { label: "Rosace 6 pétales simple", group: "Fondamentaux", parameters: rosetteParameters, build: (v) => createRosetteGeometry({ diameter: v.diameter, rotation: v.rotation }) },
+  heart: { label: "Cœur géométrique", group: "Fondamentaux", parameters: heartParameters, build: (v) => createHeartGeometry({ width: v.width, height: v.height }) },
+  "arch-full-round": { label: "Arche plein cintre", group: "Fondamentaux", parameters: archFullRoundParameters, build: (v) => createArchFullRoundGeometry({ width: v.width }) },
+  "ogive-equilateral": { label: "Ogive équilatérale à deux centres", group: "Fondamentaux", parameters: ogiveParameters, build: (v) => createOgiveGeometry({ width: v.width }) },
+  "ellipse-pedagogical": { label: "Ellipse pédagogique", group: "Fondamentaux", parameters: ellipsePedagogicalParameters, build: (v) => createEllipsePedagogicalGeometry({ width: v.width, height: v.height }) },
+  "spiral-archimedes": { label: "Spirale d'Archimède", group: "Fondamentaux", parameters: spiralParameters, build: (v) => createSpiralGeometry({ startRadius: v.startRadius, endRadius: v.endRadius, turns: v.turns, rotation: v.rotation }) },
+  "flower-4": { label: "Fleur 4 pétales", group: "Décoratifs", parameters: flower4Parameters, build: (v) => createFlower4Geometry({ diameter: v.diameter, rotation: v.rotation }) },
+  "flower-5": { label: "Fleur 5 pétales", group: "Décoratifs", parameters: flower5Parameters, build: (v) => createFlower5Geometry({ diameter: v.diameter, rotation: v.rotation }) },
+  "flower-6-elongated": { label: "Fleur 6 pétales allongés", group: "Décoratifs", parameters: flower6ElongatedParameters, build: (v) => createFlower6ElongatedGeometry({ diameter: v.diameter, rotation: v.rotation }) },
+  turbine: { label: "Rosace tournante (turbine)", group: "Décoratifs", parameters: turbineParameters, build: (v) => createTurbineGeometry({ diameter: v.diameter, branches: v.branches, twist: v.twist, rotation: v.rotation }) },
+  "double-s": { label: "Composition double-S", group: "Décoratifs", parameters: doubleSParameters, build: (v) => createDoubleSGeometry({ width: v.width, height: v.height, waistRatio: v.waistRatio }) },
 };
 
 const MODEL_KEYS = Object.keys(MODEL_DEFINITIONS) as ModelKey[];
+const GROUPS: ModelDefinition["group"][] = ["Fondamentaux", "Décoratifs"];
 
 function defaultValues(parameters: readonly TraceParameter[]): Record<string, number> {
   return Object.fromEntries(parameters.map((parameter) => [parameter.id, parameter.defaultValue]));
@@ -115,9 +97,15 @@ export function TracesPreviewWorkspace() {
       </header>
 
       <label className="traces-preview-model-select">
-        <span>Modèle</span>
+        <span>Modèle ({definition.group})</span>
         <select value={modelKey} onChange={(event) => selectModel(event.target.value as ModelKey)} aria-label="Choisir un modèle">
-          {MODEL_KEYS.map((key) => <option key={key} value={key}>{MODEL_DEFINITIONS[key].label}</option>)}
+          {GROUPS.map((group) => (
+            <optgroup key={group} label={group}>
+              {MODEL_KEYS.filter((key) => MODEL_DEFINITIONS[key].group === group).map((key) => (
+                <option key={key} value={key}>{MODEL_DEFINITIONS[key].label}</option>
+              ))}
+            </optgroup>
+          ))}
         </select>
       </label>
 

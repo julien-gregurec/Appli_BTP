@@ -51,7 +51,7 @@ describe("createOgiveGeometry — FUNDAMENTAL-MODELS-V1 §16", () => {
 
   it("nommé clairement comme une variante précise, pas une famille générale", () => {
     const model = createOgiveGeometry();
-    expect(model.name).toBe("Ogive simple à deux centres");
+    expect(model.name).toBe("Ogive équilatérale à deux centres");
     expect(model.slug).toBe("ogive-equilateral");
   });
 

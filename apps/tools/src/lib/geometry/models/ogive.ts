@@ -1,6 +1,13 @@
-// Modèle fondamental (FUNDAMENTAL-MODELS-V1 §4) : OGIVE SIMPLE À DEUX CENTRES (arc en
-// tiers-point / ogive équilatérale) — une seule variante, nommée explicitement, comme demandé.
-// Ne prétend pas couvrir les autres familles d'ogives (lancéolée, surhaussée...).
+// Modèle fondamental (FUNDAMENTAL-MODELS-V1 §4, libellé corrigé en DECORATIVE-FAMILIES-V1 §1) :
+// OGIVE ÉQUILATÉRALE À DEUX CENTRES — une seule variante, nommée explicitement, comme demandé.
+// Nom retenu : "équilatérale" est directement vérifiable par la géométrie elle-même (le
+// triangle A-B-S a ses trois côtés égaux à la largeur, prouvé dans les tests). L'appellation
+// "en tiers-point" avait été assimilée sans preuve dans le rapport FUNDAMENTAL-MODELS-V1 ; une
+// vérification a posteriori (Wikipédia FR, « Arc brisé »/« Ogive (architecture) ») confirme que
+// les deux termes désignent historiquement la même construction (rayon = portée) — mentionné
+// ci-dessous à titre de synonyme documenté, mais "équilatérale à deux centres" reste le nom
+// principal et sûr du modèle. Ne prétend pas couvrir les autres familles d'ogives (lancéolée,
+// surhaussée...). Aucun défaut géométrique identifié — la géométrie n'est pas modifiée.
 //
 // Construction et preuve : chaque centre est le point de naissance OPPOSÉ, avec un rayon égal à
 // la largeur d'ouverture. Le cercle centré en A (largeur W) passe par B (distance A-B = W = rayon)
@@ -22,11 +29,11 @@ export const ogiveParameters: readonly TraceParameter[] = [
 const DEFAULT_INPUT: OgiveInput = { width: 1200 };
 
 export const ogiveExplanation: TraceExplanation = {
-  objective: "Tracer une ogive simple à deux centres (arc en tiers-point), la construction gothique la plus classique.",
+  objective: "Tracer une ogive équilatérale à deux centres, une construction gothique classique et vérifiable géométriquement.",
   usage: "Baie ou porte en ogive, niche pointue, habillage décoratif d'une ouverture.",
   materials: ["Compas de chantier ou ficelle + crayon de longueur égale à la largeur d'ouverture", "Cordeau pour la ligne de naissance"],
   preparation: "Implantez les deux points de naissance A et B avant de chercher les centres : ce sont eux-mêmes les centres des arcs.",
-  principle: "Dans cette variante (équilatérale, dite « en tiers-point »), chaque centre est le point de naissance opposé et le rayon est égal à la largeur d'ouverture. Le cercle centré en A passe exactement par B, et réciproquement — les deux arcs se croisent alors nécessairement au sommet, sans réglage supplémentaire.",
+  principle: "Dans cette variante équilatérale (parfois nommée « en tiers-point » dans la littérature architecturale, le rayon étant égal à la portée), chaque centre est le point de naissance opposé et le rayon est égal à la largeur d'ouverture. Le cercle centré en A passe exactement par B, et réciproquement — les deux arcs se croisent alors nécessairement au sommet, sans réglage supplémentaire.",
   steps: [
     "Tracer la ligne de naissance A–B à la largeur exacte.",
     "Piquer le compas en A, ouverture réglée sur la largeur A–B.",
@@ -77,8 +84,8 @@ export function createOgiveGeometry(input: OgiveInput = DEFAULT_INPUT): TraceMod
   ];
 
   const model: TraceModel = {
-    id: "ogive-equilateral", name: "Ogive simple à deux centres", slug: "ogive-equilateral", categoryId: "tracing", difficulty: "intermediate",
-    tags: ["ogive", "tiers-point", "gothique", "arc"], status: "preview",
+    id: "ogive-equilateral", name: "Ogive équilatérale à deux centres", slug: "ogive-equilateral", categoryId: "tracing", difficulty: "intermediate",
+    tags: ["ogive", "équilatérale", "gothique", "arc"], status: "preview",
     parameters: ogiveParameters, explanation: ogiveExplanation,
     bounds: boundsFromPoints(points, halfExtent),
     referenceFrame: { unit: "mm", origin: A, xLabel: "X", yLabel: "Y", yOrientation: "up" },
