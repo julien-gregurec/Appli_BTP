@@ -26,6 +26,12 @@ export type ConstructionStepGeometry =
 
 export type ConstructionStep = {
   id: string;
+  /**
+   * Titre court optionnel (champ additif). Quand il est renseigné, le pont
+   * `geometry/adapters` l'utilise comme `SiteStep.title` et garde `instruction` pour le texte
+   * complet ; absent, `title` retombe sur `instruction` (comportement historique inchangé).
+   */
+  title?: string;
   instruction: string;
   geometry: ConstructionStepGeometry[];
 };

@@ -1,9 +1,17 @@
-// Modèle réel n°2 (FIRST-FUNCTIONAL-LOT-V1) : étoile régulière à 5 branches, construction
-// paramétrique originale ELSATIA (2 cercles directeurs + polygone à sommets alternés). Aucune
-// référence tierce, aucune image. Non référencé par catalog.ts : reste interne/preview.
-import { assertFinitePositive, boundsFromPoints, divideCircle, point } from "../primitives";
-import type { SiteStep } from "../shape-model";
-import { validateTraceModel, type TraceExplanation, type TraceModel, type TraceParameter } from "../trace-model";
+// Modèle réel n°2 (FIRST-FUNCTIONAL-LOT-V1) : étoile régulière à 5 branches.
+//
+// C3-PILOT-V1 — Migré vers Engine B : la géométrie (sommets, rayons, angles, polygone,
+// étapes) provient exclusivement de `engine/stars.ts::createStar`, projetée en TraceModel par
+// le pont officiel `parametricShapeToTraceModel`. Cette couche ne fait que : (1) traduire les
+// paramètres utilisateur (diamètre + ratio) vers les paramètres Engine B (rayons), (2) appeler
+// Engine B, (3) coter via le moteur de cotation Engine B, (4) enrichir avec les métadonnées
+// pédagogiques UI. Aucune formule géométrique n'est réimplémentée ici (§3/§4). Slug interne et
+// contrat d'appel (`createStarGeometry`, `starParameters`) strictement inchangés (§17).
+import { createDiameterDimension, createRadiusDimension, createAngleDimension } from "../engine/dimensions";
+import { createStar } from "../engine/stars";
+import { dimensionResultToDimension, parametricShapeToTraceModel, type TraceModelMetadata } from "../adapters";
+import type { Dimension } from "../primitives";
+import type { TraceExplanation, TraceModel, TraceParameter } from "../trace-model";
 
 export type StarInput = { outerDiameter: number; innerRatio: number; rotation?: number };
 
@@ -37,65 +45,42 @@ export const starExplanation: TraceExplanation = {
 };
 
 export function createStarGeometry(input: StarInput = DEFAULT_INPUT): TraceModel {
-  const outerDiameter = assertFinitePositive(input.outerDiameter, "Le diamètre extérieur");
+  // 1. Traduction des paramètres UI vers Engine B — aucune géométrie, seulement des gardes de
+  //    contrat côté produit (Engine B refuse déjà rayon <= 0 et rayon intérieur >= extérieur).
+  const outerDiameter = input.outerDiameter;
+  if (!Number.isFinite(outerDiameter) || outerDiameter <= 0) throw new Error("Le diamètre extérieur doit être supérieur à 0.");
   const innerRatio = input.innerRatio;
   if (!Number.isFinite(innerRatio) || innerRatio <= 0 || innerRatio >= 1) throw new Error("Le ratio du rayon intérieur doit être strictement compris entre 0 et 1.");
   const rotationDegrees = input.rotation ?? -90;
   if (!Number.isFinite(rotationDegrees)) throw new Error("L'orientation initiale doit être une valeur finie.");
-  const rotationRadians = (rotationDegrees * Math.PI) / 180;
-
   const outerRadius = outerDiameter / 2;
   const innerRadius = outerRadius * innerRatio;
-  const O = point("O", 0, 0, "Centre O", "center");
-  const outerSectorRadians = (2 * Math.PI) / BRANCHES;
-  const outerPoints = divideCircle(O, outerRadius, BRANCHES, rotationRadians, "outer");
-  const innerPoints = divideCircle(O, innerRadius, BRANCHES, rotationRadians + outerSectorRadians / 2, "inner");
 
-  const polygonPoints = outerPoints.flatMap((item, index) => [item, innerPoints[index]]);
-  const points = [O, ...outerPoints, ...innerPoints];
-  const outerAngleDegrees = 360 / BRANCHES;
-  const innerAngleDegrees = outerAngleDegrees / 2;
+  // 2. Géométrie : exclusivement Engine B.
+  const shape = createStar({ points: BRANCHES, outerRadius, innerRadius, rotationDegrees });
 
-  const dimensions = [
-    { id: "dim-outer-radius", kind: "radius" as const, from: O, to: outerPoints[0], label: `R ext. ${outerRadius} mm`, value: outerRadius, unit: "mm" as const },
-    { id: "dim-inner-radius", kind: "radius" as const, from: O, to: innerPoints[0], label: `R int. ${Math.round(innerRadius)} mm`, value: innerRadius, unit: "mm" as const },
-    { id: "dim-outer-sector", kind: "angle" as const, from: outerPoints[0], to: outerPoints[1], label: `${outerAngleDegrees}°`, value: outerAngleDegrees, unit: "°" as const },
-    { id: "dim-inner-sector", kind: "angle" as const, from: outerPoints[0], to: innerPoints[0], label: `${innerAngleDegrees}°`, value: innerAngleDegrees, unit: "°" as const },
+  // 3. Cotations : moteur de cotation Engine B, valeurs jamais réécrites à la main (§9).
+  const [outerCircle, innerCircle] = shape.primitives.circles;
+  const O = shape.primitives.points.O;
+  const dimensions: Dimension[] = [
+    dimensionResultToDimension("dim-outer-diameter", `Ø ext. ${outerDiameter} mm`, createDiameterDimension(outerCircle)),
+    dimensionResultToDimension("dim-outer-radius", `R ext. ${outerRadius} mm`, createRadiusDimension(outerCircle)),
+    dimensionResultToDimension("dim-inner-radius", `R int. ${Math.round(innerRadius)} mm`, createRadiusDimension(innerCircle)),
+    dimensionResultToDimension("dim-division-angle", `${360 / BRANCHES}°`, createAngleDimension(O, shape.primitives.points.T1, shape.primitives.points.T2)),
   ];
 
-  const steps: SiteStep[] = [
-    { id: "step-outer-circle", title: "Tracer le cercle extérieur", instruction: `Réglez le compas au rayon ${outerRadius} mm et tracez le cercle extérieur depuis O.`, measurements: [`${outerRadius} mm`], pointIds: ["O", outerPoints[0].id], visibleEntityIds: ["circle-outer"] },
-    { id: "step-outer-divide", title: "Diviser en 5", instruction: `Reportez les 5 sommets extérieurs, espacés de ${outerAngleDegrees}°.`, measurements: [`${outerAngleDegrees}°`], pointIds: outerPoints.map((p) => p.id), controlId: "control-outer-1", visibleEntityIds: ["circle-outer"] },
-    { id: "step-inner-radius", title: "Déterminer le rayon intérieur", instruction: `Réglez le compas au rayon intérieur ${Math.round(innerRadius)} mm et tracez le cercle intérieur.`, measurements: [`${Math.round(innerRadius)} mm`], pointIds: ["O"], visibleEntityIds: ["circle-outer", "circle-inner"] },
-    { id: "step-inner-points", title: "Placer les points intérieurs", instruction: `Reportez les 5 sommets intérieurs, décalés de ${innerAngleDegrees}° par rapport aux sommets extérieurs.`, measurements: [`${innerAngleDegrees}°`], pointIds: innerPoints.map((p) => p.id), controlId: "control-inner-1", visibleEntityIds: ["circle-outer", "circle-inner"] },
-    { id: "step-link", title: "Relier alternativement", instruction: "Reliez chaque sommet extérieur au sommet intérieur voisin, en alternant tout le tour.", measurements: [], pointIds: polygonPoints.map((p) => p.id), visibleEntityIds: ["circle-outer", "circle-inner", "star-polygon"] },
-    { id: "step-symmetry", title: "Vérifier la symétrie", instruction: "Contrôlez que les 5 branches sont identiques par rotation de 72° autour de O.", measurements: [`${outerAngleDegrees}°`], pointIds: outerPoints.map((p) => p.id), visibleEntityIds: ["star-polygon"] },
-  ];
-
-  const model: TraceModel = {
-    id: "star-5", name: "Étoile 5 branches", slug: "star-5", categoryId: "forms-design", difficulty: "intermediate",
-    tags: ["étoile", "5 branches", "polygone", "radial", "décoratif"], status: "preview",
-    parameters: starParameters, explanation: starExplanation,
-    bounds: boundsFromPoints(points, Math.max(80, outerRadius * 0.15)),
-    referenceFrame: { unit: "mm", origin: O, xLabel: "X", yLabel: "Y", yOrientation: "up" },
-    axes: [], points, segments: [], arcs: [],
-    circles: [
-      { id: "circle-outer", centre: O, radius: outerRadius, role: "construction" },
-      { id: "circle-inner", centre: O, radius: innerRadius, role: "construction" },
-    ],
-    ellipses: [], constructionLines: [], dimensions,
-    controls: [
-      ...outerPoints.map((item, index) => ({ id: `control-outer-${index + 1}`, label: `Distance O → ${item.id}`, value: outerRadius, unit: "mm" as const, pointIds: ["O", item.id] })),
-      ...innerPoints.map((item, index) => ({ id: `control-inner-${index + 1}`, label: `Distance O → ${item.id}`, value: innerRadius, unit: "mm" as const, pointIds: ["O", item.id] })),
-    ],
-    quantities: [
-      { id: "q-outer-radius", label: "Rayon extérieur", value: outerRadius, unit: "mm", quality: "exact" },
-      { id: "q-inner-radius", label: "Rayon intérieur", value: innerRadius, unit: "mm", quality: "exact" },
-      { id: "q-outer-angle", label: "Angle entre sommets extérieurs", value: outerAngleDegrees, unit: "°", quality: "exact" },
-      { id: "q-inner-angle", label: "Angle sommet extérieur → sommet intérieur", value: innerAngleDegrees, unit: "°", quality: "exact" },
-    ],
-    steps,
-    polygons: [{ id: "star-polygon", points: polygonPoints, role: "shape" }],
+  // 4. Métadonnées pédagogiques — couche UI uniquement, jamais poussées dans Engine B.
+  const metadata: TraceModelMetadata = {
+    id: "star-5",
+    name: "Étoile 5 branches",
+    slug: "star-5",
+    categoryId: "forms-design",
+    difficulty: "intermediate",
+    tags: ["étoile", "5 branches", "polygone", "radial", "décoratif"],
+    status: "preview",
+    parameters: starParameters,
+    explanation: starExplanation,
   };
-  return validateTraceModel(model);
+
+  return parametricShapeToTraceModel(shape, metadata, { dimensions });
 }

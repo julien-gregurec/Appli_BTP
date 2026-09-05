@@ -48,6 +48,15 @@ describe("pilotes de convergence ParametricShape → TraceModel", () => {
     expect(model.circles).toHaveLength(2); // cercles directeurs extérieur/intérieur
   });
 
+  it("pilote 3 bis — les titres courts de ConstructionStep sont transférés en SiteStep.title", () => {
+    const shape = createStar({ points: 5, outerRadius: 300, innerRadius: 120 });
+    const model = parametricShapeToTraceModel(shape, baseMetadata({ name: "Étoile titrée", slug: "pilot-star-titled" }));
+    // createStar fournit des titres courts distincts de l'instruction complète.
+    expect(model.steps[0].title).toBe("Tracer le cercle extérieur");
+    expect(model.steps[0].instruction.length).toBeGreaterThan(model.steps[0].title.length);
+    expect(model.steps.every((s) => s.title.length > 0)).toBe(true);
+  });
+
   it("pilote 4 — pétale (feuille)", () => {
     const shape = createLeaf({ width: 200, height: 400 });
     const model = parametricShapeToTraceModel(shape, baseMetadata({ name: "Pétale pilote", slug: "pilot-leaf" }));

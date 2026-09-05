@@ -1,7 +1,7 @@
 import { degToRad } from "./angles";
 import { boundsFromPoints, pointAtPolar } from "./measure";
 import { emptyPrimitives, registerShapeGenerator, type ParametricShape } from "./model";
-import { assertFinitePositive, type Point2D } from "./types";
+import { assertFinitePositive, type Circle2D, type Point2D } from "./types";
 
 export type StarParameters = {
   centre?: Point2D;
@@ -27,12 +27,18 @@ export function createStar(params: StarParameters): ParametricShape<StarParamete
   const primitives = emptyPrimitives();
   primitives.points.O = centre;
   vertices.forEach((v, i) => { primitives.points[i % 2 === 0 ? `T${i / 2 + 1}` : `V${(i - 1) / 2 + 1}`] = v; });
-  for (let i = 0; i < vertices.length; i++) primitives.segments.push({ start: vertices[i], end: vertices[(i + 1) % vertices.length] });
-  primitives.circles.push({ centre, radius: outerRadius }, { centre, radius: innerRadius });
+  // Contour tracé = segments alternés, classés "construction" : le tracé final exploitable est
+  // le polygone fermé ci-dessous (les segments matérialisent le geste "relier", pas la forme).
+  for (let i = 0; i < vertices.length; i++) primitives.segments.push({ start: vertices[i], end: vertices[(i + 1) % vertices.length], role: "construction" });
+  const outerCircle: Circle2D = { centre, radius: outerRadius, role: "construction" };
+  const innerCircle: Circle2D = { centre, radius: innerRadius, role: "construction" };
+  primitives.circles.push(outerCircle, innerCircle);
   primitives.polygons.push({ points: vertices });
   const bounds = boundsFromPoints(vertices, Math.max(20, outerRadius * 0.05));
   const outerPointIds = Array.from({ length: params.points }, (_, i) => `T${i + 1}`);
   const innerPointIds = Array.from({ length: params.points }, (_, i) => `V${i + 1}`);
+  const outerAngle = Number((360 / params.points).toFixed(2));
+  const innerAngle = Number((180 / params.points).toFixed(2));
   return {
     id: `star-${params.points}`,
     type: "star",
@@ -45,10 +51,42 @@ export function createStar(params: StarParameters): ParametricShape<StarParamete
     rotation,
     metadata: { shouldBeClosed: true, branches: params.points },
     constructionSteps: [
-      { id: "step-centre", instruction: "Matérialiser le centre O.", geometry: [{ kind: "point", id: "O" }] },
-      { id: "step-outer-circle", instruction: `Tracer le cercle directeur extérieur de rayon ${outerRadius.toFixed(1)} mm et y reporter les ${params.points} pointes.`, geometry: [{ kind: "circle", circle: { centre, radius: outerRadius } }, ...outerPointIds.map((id) => ({ kind: "point" as const, id }))] },
-      { id: "step-inner-circle", instruction: `Tracer le cercle directeur intérieur de rayon ${innerRadius.toFixed(1)} mm et y reporter les ${params.points} creux, décalés d'une demi-pointe.`, geometry: [{ kind: "circle", circle: { centre, radius: innerRadius } }, ...innerPointIds.map((id) => ({ kind: "point" as const, id }))] },
-      { id: "step-connect", instruction: "Relier alternativement pointes et creux pour former l'étoile.", geometry: primitives.segments.map((segment) => ({ kind: "segment" as const, segment })) },
+      {
+        id: "step-outer-circle",
+        title: "Tracer le cercle extérieur",
+        instruction: `Tracez le cercle directeur extérieur de rayon ${outerRadius.toFixed(1)} mm depuis O.`,
+        geometry: [{ kind: "circle", circle: outerCircle }],
+      },
+      {
+        id: "step-outer-divide",
+        title: "Répartir les pointes",
+        instruction: `Reportez les ${params.points} sommets extérieurs sur le cercle, espacés de ${outerAngle}°.`,
+        geometry: [{ kind: "circle", circle: outerCircle }, ...outerPointIds.map((id) => ({ kind: "point" as const, id }))],
+      },
+      {
+        id: "step-inner-circle",
+        title: "Tracer le cercle intérieur",
+        instruction: `Tracez le cercle directeur intérieur de rayon ${innerRadius.toFixed(1)} mm depuis O.`,
+        geometry: [{ kind: "circle", circle: innerCircle }],
+      },
+      {
+        id: "step-inner-divide",
+        title: "Placer les creux",
+        instruction: `Reportez les ${params.points} sommets intérieurs, décalés de ${innerAngle}° par rapport aux sommets extérieurs.`,
+        geometry: [{ kind: "circle", circle: innerCircle }, ...innerPointIds.map((id) => ({ kind: "point" as const, id }))],
+      },
+      {
+        id: "step-connect",
+        title: "Relier alternativement",
+        instruction: "Reliez chaque sommet extérieur au sommet intérieur voisin, en alternant sur tout le tour.",
+        geometry: primitives.segments.map((segment) => ({ kind: "segment" as const, segment })),
+      },
+      {
+        id: "step-symmetry",
+        title: "Vérifier la symétrie",
+        instruction: `Contrôlez que les ${params.points} branches se superposent par rotation de ${outerAngle}° autour de O.`,
+        geometry: outerPointIds.map((id) => ({ kind: "point" as const, id })),
+      },
     ],
     quality: "exact",
   };

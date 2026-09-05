@@ -121,7 +121,10 @@ export function parametricShapeToTraceModel(shape: ParametricShape, metadata: Tr
   const primitives = shape.primitives;
   const registry = createShapeRegistry();
 
-  const points: Point[] = Object.entries(primitives.points).map(([id, p]) => withId(id, p));
+  // Convention partagée des deux moteurs : le point nommé "O" est le centre de construction
+  // (rôle "center" côté Engine A, exploité par la couche "Centres" de TraceViewer). Engine B ne
+  // porte pas de rôle sur ses points ; on rétablit celui-ci sans inventer de coordonnée.
+  const points: Point[] = Object.entries(primitives.points).map(([id, p]) => withId(id, p, undefined, id === "O" ? "center" : undefined));
   const pointIds = new Set(points.map((p) => p.id));
 
   const segments: Segment[] = [];
@@ -216,9 +219,10 @@ export function parametricShapeToTraceModel(shape: ParametricShape, metadata: Tr
     }
     return {
       id: step.id,
-      // Engine B ne sépare pas un titre court de l'instruction complète (§8) : les deux
-      // portent le même texte réel plutôt que d'inventer un titre qui n'existe pas côté source.
-      title: step.instruction,
+      // Titre court si le générateur Engine B en fournit un (`ConstructionStep.title`, champ
+      // additif) ; sinon les deux portent le même texte réel plutôt que d'inventer un titre
+      // qui n'existe pas côté source (§8).
+      title: step.title ?? step.instruction,
       instruction: step.instruction,
       measurements: [],
       pointIds: referencedPointIds,
