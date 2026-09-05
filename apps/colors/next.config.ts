@@ -5,6 +5,8 @@ import { headersSecuriteColors } from "./src/lib/security/en-tetes";
 const nextConfig: NextConfig = {
   transpilePackages: ["@elsatia/application-access"],
   poweredByHeader: false,
+  // En-têtes constants seulement. La CSP porte un nonce régénéré à chaque
+  // requête : elle est émise par `src/proxy.ts`, pas ici.
   async headers() {
     return [
       {
