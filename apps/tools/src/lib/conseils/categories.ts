@@ -27,6 +27,10 @@ export const CONSEIL_CATEGORIES: readonly ConseilCategory[] = [
   { id: "finitions", name: "Finitions", icon: "◒", order: 120, description: "Ponçage, raccords et préparation avant peinture" },
   { id: "astuces-pose", name: "Astuces de pose", icon: "✦", order: 130, description: "Gestes qui font gagner du temps sur chantier" },
   { id: "securite", name: "Sécurité", icon: "⚠", order: 140, description: "Manutention, EPI et prévention des risques" },
+  { id: "fixation", name: "Fixation", icon: "⊕", order: 150, description: "Chevilles, ancrages et reprise de charge" },
+  { id: "etancheite", name: "Étanchéité", icon: "≋", order: 160, description: "Joints, calfeutrement et continuité à l'air" },
+  { id: "diagnostic", name: "Diagnostic", icon: "⌕", order: 170, description: "Remonter d'un défaut visible à sa cause réelle" },
+  { id: "entretien", name: "Entretien", icon: "◔", order: 180, description: "Maintenance et durabilité des ouvrages posés" },
 ];
 
 const BY_ID = new Map<ConseilCategoryId, ConseilCategory>(

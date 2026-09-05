@@ -1,4 +1,5 @@
 import { getConseilCategory } from "./categories";
+import { expandSynonyms } from "./synonyms";
 import { normalizeText, tokenize } from "./text";
 import type { ConseilFiche } from "./types";
 
@@ -13,6 +14,7 @@ type SearchDoc = {
   tags: string;
   category: string;
   trades: string;
+  tools: string;
   haystack: string;
 };
 
@@ -23,6 +25,7 @@ function buildDoc(fiche: ConseilFiche): SearchDoc {
   const tags = fiche.tags.map(normalizeText).join(" ");
   const categoryText = `${normalizeText(category.name)} ${fiche.category}`;
   const trades = fiche.trades.map(normalizeText).join(" ");
+  const tools = [...fiche.tools, ...fiche.materials].map(normalizeText).join(" ");
   return {
     fiche,
     title,
@@ -30,7 +33,16 @@ function buildDoc(fiche: ConseilFiche): SearchDoc {
     tags,
     category: categoryText,
     trades,
-    haystack: [title, description, tags, categoryText, trades, normalizeText(fiche.subcategory ?? "")]
+    tools,
+    haystack: [
+      title,
+      description,
+      tags,
+      categoryText,
+      trades,
+      tools,
+      normalizeText(fiche.subcategory ?? ""),
+    ]
       .filter(Boolean)
       .join(" "),
   };
@@ -40,15 +52,41 @@ export function createConseilSearchIndex(fiches: readonly ConseilFiche[]): Searc
   return fiches.map(buildDoc);
 }
 
-/** Score simple : titre > tags > catégorie/métier > description. 0 = aucune correspondance. */
+/**
+ * Score d'un jeton *littéral* : titre > tags > catégorie/métier > outils > description.
+ * Retourne 0 si le jeton n'apparaît nulle part.
+ */
+function scoreToken(doc: SearchDoc, token: string): number {
+  if (!doc.haystack.includes(token)) return 0;
+  let score = 1; // présent quelque part (ex. dans une sous-catégorie)
+  if (doc.title.includes(token)) score += 8;
+  if (doc.tags.includes(token)) score += 4;
+  if (doc.category.includes(token) || doc.trades.includes(token)) score += 3;
+  if (doc.tools.includes(token)) score += 2;
+  if (doc.description.includes(token)) score += 2;
+  return score;
+}
+
+/**
+ * Score simple. Chaque jeton de la requête doit correspondre — directement ou via un
+ * synonyme métier (`synonyms.ts`). Une correspondance par synonyme vaut moins qu'une
+ * correspondance littérale : la fiche qui emploie le mot exact reste devant.
+ */
 function scoreDoc(doc: SearchDoc, tokens: readonly string[]): number {
   let score = 0;
   for (const token of tokens) {
-    if (!doc.haystack.includes(token)) return 0; // tous les jetons doivent apparaître
-    if (doc.title.includes(token)) score += 8;
-    if (doc.tags.includes(token)) score += 4;
-    if (doc.category.includes(token) || doc.trades.includes(token)) score += 3;
-    if (doc.description.includes(token)) score += 2;
+    const direct = scoreToken(doc, token);
+    if (direct > 0) {
+      score += direct;
+      continue;
+    }
+    let best = 0;
+    for (const variant of expandSynonyms(token)) {
+      if (variant === token) continue;
+      best = Math.max(best, scoreToken(doc, variant));
+    }
+    if (best === 0) return 0; // tous les jetons doivent correspondre
+    score += Math.max(1, Math.round(best / 2));
   }
   return score;
 }

@@ -14,6 +14,7 @@ import {
   getConseilBySlug,
 } from "@/lib/conseils/registry";
 import { createConseilsStore, type ConseilsStore } from "@/lib/conseils/storage";
+import { formatEstimatedDuration } from "@/lib/conseils/text";
 import {
   CONSEIL_DIFFICULTIES,
   CONSEIL_TRADE_IDS,
@@ -38,12 +39,22 @@ const TRADE_LABEL: Record<ConseilTradeId, string> = {
   peintre: "Peintre",
   carreleur: "Carreleur",
   metallier: "Métallier",
+  vitrier: "Vitrier",
   "chef-de-chantier": "Chef de chantier",
 };
 
 const CATEGORIES_WITH_CONTENT = CONSEIL_CATEGORIES_ORDERED.filter((category) =>
   CONSEIL_FICHES_PUBLISHED.some((fiche) => fiche.category === category.id),
 );
+
+/** Index id → fiche : la bibliothèque dépasse la trentaine de fiches, on évite les scans. */
+const PUBLISHED_BY_ID = new Map(CONSEIL_FICHES_PUBLISHED.map((fiche) => [fiche.id, fiche]));
+
+function resolveIds(ids: readonly string[]): ConseilFiche[] {
+  return ids
+    .map((id) => PUBLISHED_BY_ID.get(id))
+    .filter((fiche): fiche is ConseilFiche => fiche !== undefined);
+}
 
 export function ConseilsPreviewWorkspace() {
   const [query, setQuery] = useState("");
@@ -78,12 +89,8 @@ export function ConseilsPreviewWorkspace() {
   );
 
   const isBrowsing = query.trim().length > 0 || category !== null || trade !== null || difficulty !== null;
-  const favoriteFiches = favorites
-    .map((id) => CONSEIL_FICHES_PUBLISHED.find((fiche) => fiche.id === id))
-    .filter((fiche): fiche is ConseilFiche => fiche !== undefined);
-  const recentFiches = recent
-    .map((id) => CONSEIL_FICHES_PUBLISHED.find((fiche) => fiche.id === id))
-    .filter((fiche): fiche is ConseilFiche => fiche !== undefined);
+  const favoriteFiches = resolveIds(favorites);
+  const recentFiches = resolveIds(recent);
 
   const toggleFavorite = (id: string) => {
     void storeRef.current?.toggleFavorite(id).then((next) => next && setFavorites(next));
@@ -198,7 +205,7 @@ export function ConseilsPreviewWorkspace() {
         title={
           isBrowsing
             ? `${results.length} fiche${results.length > 1 ? "s" : ""}`
-            : "Toutes les fiches"
+            : `Toutes les fiches (${results.length})`
         }
         fiches={results}
         favorites={favorites}
@@ -242,7 +249,8 @@ function FicheSection({
               <li key={fiche.id} className="cp-card">
                 <button className="cp-card-main" onClick={() => onOpen(fiche.slug)}>
                   <span className="cp-card-meta">
-                    <b>{cat.icon}</b> {cat.name} · {DIFFICULTY_LABEL[fiche.difficulty]}
+                    <b>{cat.icon}</b> {cat.name} · {DIFFICULTY_LABEL[fiche.difficulty]} ·{" "}
+                    {formatEstimatedDuration(fiche.estimatedMinutes)}
                   </span>
                   <strong>{fiche.title}</strong>
                   <p>{fiche.shortDescription}</p>
@@ -309,6 +317,7 @@ function ConseilDetail({
         <p className="cp-sub">{fiche.shortDescription}</p>
         <div className="cp-badges">
           <span className={`cp-badge diff-${fiche.difficulty}`}>{DIFFICULTY_LABEL[fiche.difficulty]}</span>
+          <span className="cp-badge">⏱ {formatEstimatedDuration(fiche.estimatedMinutes)}</span>
           {fiche.trades.filter((t) => t !== "tous").length === 0 ? (
             <span className="cp-badge">{TRADE_LABEL.tous}</span>
           ) : (
@@ -331,7 +340,8 @@ function ConseilDetail({
         </div>
       )}
 
-      <AccordionList title="Matériel" items={fiche.materials} open />
+      <AccordionList title="Outils" items={fiche.tools} open />
+      <AccordionList title="Fournitures" items={fiche.materials} />
       <AccordionList title="Préparation" items={fiche.preparation} />
 
       <details className="cp-acc" open>

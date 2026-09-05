@@ -26,6 +26,10 @@ export const CONSEIL_CATEGORY_IDS = [
   "finitions",
   "astuces-pose",
   "securite",
+  "fixation",
+  "etancheite",
+  "diagnostic",
+  "entretien",
 ] as const;
 export type ConseilCategoryId = (typeof CONSEIL_CATEGORY_IDS)[number];
 
@@ -39,6 +43,7 @@ export const CONSEIL_TRADE_IDS = [
   "peintre",
   "carreleur",
   "metallier",
+  "vitrier",
   "chef-de-chantier",
 ] as const;
 export type ConseilTradeId = (typeof CONSEIL_TRADE_IDS)[number];
@@ -104,6 +109,11 @@ export type ConseilFiche = {
   trades: readonly ConseilTradeId[];
   tags: readonly string[];
   difficulty: ConseilDifficulty;
+  /** Durée indicative d'exécution, en minutes (>= 1). Affichée telle quelle, sans engagement. */
+  estimatedMinutes: number;
+  /** Outillage nécessaire (matériel réutilisable). Au moins un outil. */
+  tools: readonly string[];
+  /** Fournitures consommées par l'opération. Peut être vide (méthode purement gestuelle). */
   materials: readonly string[];
   preparation: readonly string[];
   steps: readonly ConseilStep[];

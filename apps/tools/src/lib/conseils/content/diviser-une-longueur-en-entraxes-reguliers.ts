@@ -4,8 +4,8 @@ import type { ConseilFiche } from "../types";
  * Fiche de démonstration ELSATIA — contenu original.
  * Sujet générique (répartition en entraxes réguliers), aucune référence tierce.
  */
-export const diviserLongueurEntraxesReguliers: ConseilFiche = {
-  id: "cf-diviser-longueur-entraxes-reguliers",
+export const diviserUneLongueurEnEntraxesReguliers: ConseilFiche = {
+  id: "cf-diviser-une-longueur-en-entraxes-reguliers",
   slug: "diviser-une-longueur-en-entraxes-reguliers",
   title: "Diviser une longueur en entraxes réguliers",
   shortDescription:
@@ -15,11 +15,13 @@ export const diviserLongueurEntraxesReguliers: ConseilFiche = {
   trades: ["tous", "platrier", "plaquiste", "metallier", "chef-de-chantier"],
   tags: ["entraxe", "repartition", "montants", "suspentes", "fixations", "pas", "espacement"],
   difficulty: "intermediaire",
-  materials: [
+  estimatedMinutes: 20,
+  tools: [
     "Un mètre ruban ou un télémètre",
     "Une calculatrice (ou l'outil Répartir des entraxes)",
-    "Un crayon et un cordeau",
+    "Un crayon et un cordeau à tracer",
   ],
+  materials: [],
   preparation: [
     "Mesurer la longueur nette à équiper, entre les deux appuis d'extrémité.",
     "Fixer l'entraxe maximum admissible (donné par la fiche technique du produit posé).",

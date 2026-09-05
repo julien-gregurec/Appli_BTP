@@ -7,6 +7,7 @@ import {
   CONSEIL_TRADE_IDS,
   type ConseilFiche,
 } from "./types";
+import { isConseilTraceModelId } from "./trace-models";
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -45,6 +46,12 @@ export function validateConseilFiche(fiche: ConseilFiche): string[] {
   if (!CONSEIL_DIFFICULTIES.includes(fiche.difficulty)) {
     add(`difficulty inconnue : ${fiche.difficulty}.`);
   }
+  if (!Number.isInteger(fiche.estimatedMinutes) || fiche.estimatedMinutes < 1) {
+    add("estimatedMinutes doit être un entier >= 1 (durée indicative en minutes).");
+  }
+  if (!Array.isArray(fiche.tools) || fiche.tools.length === 0) {
+    add("tools doit contenir au moins un outil.");
+  }
   if (!Array.isArray(fiche.steps) || fiche.steps.length === 0) {
     add("steps doit contenir au moins une étape.");
   } else {
@@ -53,12 +60,23 @@ export function validateConseilFiche(fiche: ConseilFiche): string[] {
       if (!step || !step.text || step.text.trim().length < 4) add(`steps[${i}].text trop court.`);
     });
   }
-  for (const key of ["materials", "preparation", "tips", "commonErrors", "finalCheck", "warnings"] as const) {
+  for (const key of ["tools", "materials", "preparation", "tips", "commonErrors", "finalCheck", "warnings"] as const) {
     if (!Array.isArray(fiche[key])) add(`${key} doit être un tableau.`);
   }
   if (fiche.finalCheck.length === 0) add("finalCheck ne doit pas être vide.");
   if (!Array.isArray(fiche.relatedToolIds)) add("relatedToolIds doit être un tableau.");
-  if (!Array.isArray(fiche.relatedTraceIds)) add("relatedTraceIds doit être un tableau.");
+  if (!Array.isArray(fiche.relatedTraceIds)) {
+    add("relatedTraceIds doit être un tableau.");
+  } else {
+    for (const traceId of fiche.relatedTraceIds) {
+      if (!isConseilTraceModelId(traceId)) {
+        add(`relatedTraceIds : modèle de tracé inconnu « ${traceId} » (slug hors registre).`);
+      }
+    }
+    if (new Set(fiche.relatedTraceIds).size !== fiche.relatedTraceIds.length) {
+      add("relatedTraceIds contient un doublon.");
+    }
+  }
   if (!Array.isArray(fiche.media)) {
     add("media doit être un tableau.");
   } else {

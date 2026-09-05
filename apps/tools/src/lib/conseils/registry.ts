@@ -11,7 +11,7 @@ import type { ConseilFiche, ConseilFilter } from "./types";
 import { validateConseilRegistry } from "./validate";
 
 /** Version du schéma de contenu. À incrémenter lors d'un changement de structure de fiche. */
-export const CONSEILS_CONTENT_VERSION = "1.0.0";
+export const CONSEILS_CONTENT_VERSION = "1.1.0";
 
 /** Fiches triées de façon déterministe (par titre, locale FR). */
 export const CONSEIL_FICHES: readonly ConseilFiche[] = [...CONSEIL_FICHES_SOURCE].sort((a, b) =>
