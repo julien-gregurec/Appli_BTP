@@ -268,3 +268,9 @@ a { color: inherit; text-decoration: none; }
   .primary-action, .outline-button, .danger-button { width: 100%; }
   .photo-first { padding-left: 70px; }
 }
+
+.auth-link { margin: 16px 0 0; text-align: center; font-size: 12px; }
+.auth-link a { color: var(--aubergine); font-weight: 700; text-decoration: none; }
+.auth-link a:hover { text-decoration: underline; }
+.auth-foot a { color: var(--aubergine); font-weight: 700; text-decoration: none; }
+.auth-foot a:hover { text-decoration: underline; }

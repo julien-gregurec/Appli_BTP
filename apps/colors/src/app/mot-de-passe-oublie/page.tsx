@@ -2,14 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Brand } from "@/components/Brand";
-import { connexionAction } from "@/app/actions";
+import { demanderReinitialisationAction } from "@/app/actions";
 import { createClient } from "@/lib/supabase/server";
-import { cheminInterneSur } from "@/lib/redirection-sure";
 import { messageConfirmationConnexion, messageErreurConnexion } from "@/lib/messages-auth";
 
-export const metadata: Metadata = { title: "Connexion" };
+export const metadata: Metadata = { title: "Mot de passe oublié" };
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+export default async function MotDePasseOubliePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -17,32 +16,28 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   // Aucun texte reçu par l’URL n’est rendu : seuls des codes connus le sont.
   const error = messageErreurConnexion(params.error);
   const message = messageConfirmationConnexion(params.message);
-  const suivant = cheminInterneSur(params.next);
 
   return (
     <div className="public-page">
       <section className="public-art">
         <div className="art-content">
           <Brand />
-          <h1>La couleur,<br/>maîtrisée.</h1>
-          <p>Gestion intelligente des stocks et des teintes de peinture, pensée pour les équipes qui travaillent sur le terrain.</p>
+          <h1>Reprenez<br/>la main.</h1>
+          <p>Un lien de réinitialisation vous est envoyé sur l’adresse de votre compte ELSATIA commun.</p>
           <div className="art-palette" aria-hidden="true"><span/><span/><span/></div>
         </div>
       </section>
       <section className="public-content">
-        <form className="auth-card" action={connexionAction}>
+        <form className="auth-card" action={demanderReinitialisationAction}>
           <div className="mobile-public-brand"><Brand /></div>
           <span className="eyebrow">Compte ELSATIA commun</span>
-          <h2>Ravi de vous revoir</h2>
-          <p>Utilisez les mêmes identifiants que pour les autres applications ELSATIA. Aucun second compte n’est nécessaire.</p>
+          <h2>Mot de passe oublié</h2>
+          <p>Indiquez l’adresse email de votre compte ELSATIA. Si elle correspond à un compte, vous recevrez un lien de réinitialisation.</p>
           {error && <div className="form-message">{error}</div>}
           {message && <div className="form-message success">{message}</div>}
-          <input type="hidden" name="next" value={suivant}/>
           <label>Adresse email<input name="email" type="email" autoComplete="email" required placeholder="vous@entreprise.fr"/></label>
-          <label>Mot de passe<input name="password" type="password" autoComplete="current-password" required placeholder="••••••••"/></label>
-          <button className="primary-button" type="submit">Se connecter à Colors</button>
-          <p className="auth-link"><Link href="/mot-de-passe-oublie">Mot de passe oublié ?</Link></p>
-          <p className="auth-foot">L’accès nécessite un droit Colors actif pour votre organisation et une habilitation individuelle. Les sessions de cette application restent isolées sur son domaine.</p>
+          <button className="primary-button" type="submit">Envoyer le lien</button>
+          <p className="auth-foot"><Link href="/login">Revenir à la connexion</Link><br/>Le lien reçu est à usage unique et expire rapidement. Il ne modifie que le mot de passe : vos habilitations Colors restent inchangées.</p>
         </form>
       </section>
     </div>
