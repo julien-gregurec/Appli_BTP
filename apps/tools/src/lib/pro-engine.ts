@@ -1,6 +1,6 @@
 import type { ToolDefinition, ToolId } from "./catalog";
 import type { InputDefinition, ResultLine } from "./tool-engine";
-import { createAdvancedArch, createArchedNiche, createEllipse, createRadialPattern, createRing, createRoomCircle, type ArchMode } from "./geometry/shapes";
+import { createAdvancedArch, createArchedNiche, createRoomEllipse, createRadialMotif, createRing, createRoomCircle, type ArchMode } from "./geometry/shapes";
 import type { ShapeGeometry } from "./geometry/shape-model";
 
 export const PRO_TOOL_IDS = ["arche-avancee", "niche-cintree", "plafond-circulaire", "ellipse", "couronne", "fleur-4", "fleur-5", "fleur-6", "fleur-8", "rosace-radiale"] as const satisfies readonly ToolId[];
@@ -67,11 +67,11 @@ export function buildProGeometry(id: ProToolId, values: Record<string, string>):
   if (id === "arche-avancee") return createAdvancedArch(archInput(values));
   if (id === "niche-cintree") return createArchedNiche({ ...archInput(values), depth: length(values, "depth") });
   if (id === "plafond-circulaire") return createRoomCircle({ ...roomInput(values), diameter: length(values, "diameter") });
-  if (id === "ellipse") return createEllipse({ ...roomInput(values), width: length(values, "width"), height: length(values, "height") });
+  if (id === "ellipse") return createRoomEllipse({ ...roomInput(values), width: length(values, "width"), height: length(values, "height") });
   if (id === "couronne") return createRing(length(values, "outerDiameter"), values.ringMode === "inner" ? length(values, "innerDiameter") : undefined, values.ringMode === "band" ? length(values, "bandWidth") : undefined);
   const fixedSectors = id === "rosace-radiale" ? Number(values.sectors) : Number(id.split("-")[1]);
   if (![4, 5, 6, 8].includes(fixedSectors)) throw new Error("Le nombre de secteurs doit être 4, 5, 6 ou 8.");
-  return createRadialPattern({ diameter: length(values, "diameter"), centralDiameter: length(values, "centralDiameter"), sectors: fixedSectors as 4 | 5 | 6 | 8, rotationDegrees: n(values, "rotation"), kind: id === "rosace-radiale" ? "rosette" : "flower" });
+  return createRadialMotif({ diameter: length(values, "diameter"), centralDiameter: length(values, "centralDiameter"), sectors: fixedSectors as 4 | 5 | 6 | 8, rotationDegrees: n(values, "rotation"), kind: id === "rosace-radiale" ? "rosette" : "flower" });
 }
 
 const numberFormat = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });

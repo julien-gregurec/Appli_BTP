@@ -20,7 +20,7 @@ export function reflect(source: Point, axis: Line, id = source.id): Point {
 }
 
 // Génère `count` copies de `source`, régulièrement réparties par rotation autour de `centre`
-// (généralise la boucle manuelle déjà écrite dans shapes.ts/createRadialPattern). `count` copies
+// (généralise la boucle manuelle déjà écrite dans shapes.ts/createRadialMotif). `count` copies
 // couvrent un tour complet à partir de `startAngle` — mêmes conventions que divideCircle
 // (radians, ordre stable, index i -> angle startAngle + i * 2π/count).
 export function repeatRadial(source: Point, centre: Point, count: number, startAngle = 0, prefix = source.id): Point[] {

@@ -33,6 +33,16 @@ export type ConstructionStep = {
    */
   title?: string;
   instruction: string;
+  /**
+   * Mesures chantier de l'étape (champ additif, ENGINE-B-STEP-MEASUREMENTS-V1) : valeurs déjà
+   * formatées, à reporter telles quelles sur le chantier (ouverture de compas, rayon, hauteur,
+   * angle…). Optionnel : un générateur qui n'a aucune mesure utile à publier ne renseigne rien,
+   * et le pont `geometry/adapters` retombe alors sur `[]` — comportement historique inchangé.
+   * Chaque valeur DOIT provenir d'une grandeur déjà calculée par Engine B pour cette étape
+   * (jamais une seconde formule, jamais une valeur écrite en dur) ; le formatage passe par
+   * `engine/format.ts` pour rester cohérent avec le texte de l'instruction.
+   */
+  measurements?: readonly string[];
   geometry: ConstructionStepGeometry[];
 };
 

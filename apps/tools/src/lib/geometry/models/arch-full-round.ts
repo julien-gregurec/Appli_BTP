@@ -1,14 +1,14 @@
 // Modèle fondamental (FUNDAMENTAL-MODELS-V1 §3) : arche plein cintre, fiche pédagogique dédiée.
-// Réutilise createAdvancedArch (mode "semicircle") déjà validé dans shapes.ts — aucune formule
-// concurrente. Ce fichier n'ajoute qu'un habillage TraceModel (paramètres/explication/étapes
-// pédagogiques propres) autour d'une géométrie déjà éprouvée par les tests de shapes.test.ts.
-// Paramètre volontairement réduit à la seule largeur : pour un plein cintre, le rayon est
-// entièrement déterminé (rayon = largeur / 2) — ajouter un départ de cintre indépendant
-// nécessiterait de dupliquer la logique de translation déjà couverte par le mode
-// "total-spring" de createAdvancedArch, hors périmètre d'une fiche pédagogique volontairement
-// simple (cf. §3 : « ou structure équivalente »).
-import { createAdvancedArch } from "../shapes";
-import { validateTraceModel, type TraceExplanation, type TraceModel, type TraceParameter } from "../trace-model";
+//
+// C4-LOT2-ARCHES-V1 — Migré vers Engine B : la géométrie (naissance, centre, sommet, arc, guides
+// de construction, steps) provient exclusivement de `engine/arches.ts::createArch({type:
+// "semicircular"})`. Ce modèle n'appelle plus `shapes.ts::createAdvancedArch` (conservé pour les
+// autres outils historiques qui en dépendent, notamment la niche cintrée — non touché ici).
+import { createHorizontalDimension, createRadiusDimension, createVerticalDimension } from "../engine/dimensions";
+import { createArch } from "../engine/arches";
+import { dimensionResultToDimension, parametricShapeToTraceModel, type TraceModelMetadata } from "../adapters";
+import type { Dimension } from "../primitives";
+import type { TraceExplanation, TraceModel, TraceParameter } from "../trace-model";
 
 export type ArchFullRoundInput = { width: number };
 
@@ -38,9 +38,26 @@ export const archFullRoundExplanation: TraceExplanation = {
 };
 
 export function createArchFullRoundGeometry(input: ArchFullRoundInput = DEFAULT_INPUT): TraceModel {
-  const base = createAdvancedArch({ width: input.width, mode: "semicircle" }, "arch-full-round", "Arche plein cintre");
-  const model: TraceModel = {
-    ...base,
+  // 1. Traduction des paramètres UI vers Engine B.
+  const width = input.width;
+  if (!Number.isFinite(width) || width <= 0) throw new Error("La largeur doit être supérieure à 0.");
+
+  // 2. Géométrie : exclusivement Engine B (invariant : radius = width / 2).
+  const shape = createArch({ type: "semicircular", width });
+  const { O, A, B, S } = shape.primitives.points;
+
+  // 3. Cotations : moteur de cotation Engine B, valeurs jamais réécrites à la main.
+  const radius = shape.primitives.arcs[0].radius;
+  const dimensions: Dimension[] = [
+    dimensionResultToDimension("dim-width", `Largeur ${width} mm`, createHorizontalDimension(A, B, -80)),
+    dimensionResultToDimension("dim-rise", `Flèche ${Math.round(S.y - A.y)} mm`, createVerticalDimension({ x: O.x, y: A.y }, S, 70)),
+    dimensionResultToDimension("dim-radius", `R ${Math.round(radius)} mm`, createRadiusDimension({ centre: O, radius })),
+  ];
+
+  // 4. Métadonnées pédagogiques — couche UI uniquement.
+  const metadata: TraceModelMetadata = {
+    id: "arch-full-round",
+    name: "Arche plein cintre",
     slug: "arch-full-round",
     categoryId: "tracing",
     difficulty: "easy",
@@ -49,5 +66,6 @@ export function createArchFullRoundGeometry(input: ArchFullRoundInput = DEFAULT_
     parameters: archFullRoundParameters,
     explanation: archFullRoundExplanation,
   };
-  return validateTraceModel(model);
+
+  return parametricShapeToTraceModel(shape, metadata, { dimensions });
 }

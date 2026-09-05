@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { TraceModelMetadata } from "./parametric-to-trace-model";
 import { dimensionResultToDimension, parametricShapeToTraceModel, validateParametricShape } from "./parametric-to-trace-model";
 import { validateTraceModel } from "../trace-model";
+import type { ParametricShape } from "../engine/model";
 import { createCircle } from "../engine/basic-shapes";
 import { createRegularPolygon } from "../engine/polygons";
 import { createStar } from "../engine/stars";
@@ -9,6 +10,7 @@ import { createLeaf } from "../engine/petals";
 import { createArch } from "../engine/arches";
 import { createHeart } from "../engine/hearts";
 import { createRadialPattern } from "../engine/radial-pattern";
+import { createRosette } from "../engine/rosettes";
 import { offsetShape } from "../engine/api";
 import { createDiameterDimension, createRadiusDimension, createAlignedDimension, createAngleDimension } from "../engine/dimensions";
 
@@ -69,6 +71,44 @@ describe("pilotes de convergence ParametricShape → TraceModel", () => {
     const model = parametricShapeToTraceModel(shape, baseMetadata({ name: "Arche pilote", slug: "pilot-arch" }));
     expect(() => validateTraceModel(model)).not.toThrow();
     expect(model.arcs.length).toBeGreaterThan(0);
+  });
+
+  it("pilote 5a bis — l'arche : ligne de naissance en construction, axe visible, bounds couvrant le sommet de l'arc (C4-LOT2-ARCHES-V1 §7/§10)", () => {
+    const shape = createArch({ type: "semicircular", width: 1000 });
+    const model = parametricShapeToTraceModel(shape, baseMetadata({ name: "Arche rôles", slug: "pilot-arch-roles" }));
+    expect(model.arcs[0].role).not.toBe("construction");
+    expect(model.constructionLines.some((l) => l.role === "construction")).toBe(true);
+    expect(model.constructionLines.some((l) => l.role === "axis")).toBe(true);
+    const arc = model.arcs[0];
+    expect(arc.centre.y + arc.radius).toBeLessThanOrEqual(model.bounds.maxY + 1e-6);
+  });
+
+  it("pilote 5a ter — l'ogive : deux cercles complets en construction, deux arcs en tracé final", () => {
+    const shape = createArch({ type: "lancet", width: 1000, pointedness: "equilateral" });
+    const model = parametricShapeToTraceModel(shape, baseMetadata({ name: "Ogive rôles", slug: "pilot-ogive-roles" }));
+    expect(model.circles).toHaveLength(2);
+    expect(model.circles.every((c) => c.role === "construction")).toBe(true);
+    expect(model.arcs).toHaveLength(2);
+    expect(model.arcs.every((a) => a.role !== "construction")).toBe(true);
+    for (const c of model.circles) {
+      expect(c.centre.y + c.radius).toBeLessThanOrEqual(model.bounds.maxY + 1e-6);
+      expect(c.centre.y - c.radius).toBeGreaterThanOrEqual(model.bounds.minY - 1e-6);
+    }
+  });
+
+  it("pilote 5c — rosace classique (sans diamètre intérieur) : cercles secondaires en tracé final, cercle directeur matérialisé en construction (C4-LOT3-ROSETTES-V1 §9)", () => {
+    const shape = createRosette({ outerDiameter: 2400, count: 6, elementType: "circle", rotationDegrees: -90 });
+    const model = parametricShapeToTraceModel(shape, baseMetadata({ name: "Rosace pilote", slug: "pilot-rosette" }));
+    expect(() => validateTraceModel(model)).not.toThrow();
+    const secondary = model.circles.filter((c) => c.role !== "construction");
+    expect(secondary).toHaveLength(6);
+    for (const c of secondary) expect(c.centre.x ** 2 + c.centre.y ** 2).toBeCloseTo(c.radius ** 2, 4); // passe par O
+    expect(model.circles.some((c) => c.role === "construction")).toBe(true);
+    // Bounds : l'enveloppe des pointes (au-delà du cercle directeur) doit être couverte.
+    for (const c of secondary) {
+      expect(c.centre.x + c.radius).toBeLessThanOrEqual(model.bounds.maxX + 1e-6);
+      expect(c.centre.x - c.radius).toBeGreaterThanOrEqual(model.bounds.minX - 1e-6);
+    }
   });
 
   it("pilote 5b — cœur", () => {
@@ -197,5 +237,53 @@ describe("validation du résultat de l'adaptateur", () => {
     const model = parametricShapeToTraceModel(pattern, baseMetadata({ name: "Rosace 8", slug: "pilot-rosace-8" }));
     const allIds = [...model.points, ...model.segments, ...model.arcs, ...model.circles, ...model.ellipses, ...model.constructionLines, ...model.dimensions, ...model.controls, ...model.steps].map((e) => e.id);
     expect(new Set(allIds).size).toBe(allIds.length);
+  });
+});
+
+/**
+ * ENGINE-B-STEP-MEASUREMENTS-V1 §7 — `ConstructionStep.measurements` (champ additif optionnel)
+ * traverse le pont vers `SiteStep.measurements`, consommé tel quel par `TraceSteps`/`SiteMode`.
+ */
+describe("mesures chantier des étapes de construction", () => {
+  const shapeWithSteps = (steps: ParametricShape["constructionSteps"]): ParametricShape => {
+    const shape = createCircle({ radius: 500 }) as ParametricShape;
+    return { ...shape, constructionSteps: steps };
+  };
+
+  it("une étape sans measurements produit un SiteStep à measurements vide (comportement historique)", () => {
+    const shape = shapeWithSteps([{ id: "s1", title: "Sans mesure", instruction: "Tracer.", geometry: [] }]);
+    const model = parametricShapeToTraceModel(shape, baseMetadata({ name: "Sans mesure", slug: "pilot-no-measure" }));
+    expect(model.steps[0].measurements).toEqual([]);
+  });
+
+  it("une étape avec measurements les transmet telles quelles, sans reformatage ni duplication", () => {
+    const shape = shapeWithSteps([
+      { id: "s1", title: "Compas", instruction: "Régler le compas.", measurements: ["500.0 mm"], geometry: [] },
+      { id: "s2", title: "Secteurs", instruction: "Diviser.", measurements: ["72.00°", "150.0 mm"], geometry: [] },
+      { id: "s3", title: "Contrôle", instruction: "Contrôler.", geometry: [] },
+    ]);
+    const model = parametricShapeToTraceModel(shape, baseMetadata({ name: "Mesures", slug: "pilot-measures" }));
+    expect(model.steps.map((s) => s.id)).toEqual(["s1", "s2", "s3"]); // ordre inchangé
+    expect(model.steps[0].measurements).toEqual(["500.0 mm"]);
+    expect(model.steps[1].measurements).toEqual(["72.00°", "150.0 mm"]);
+    expect(model.steps[2].measurements).toEqual([]);
+  });
+
+  it("les mesures ne sont jamais dupliquées d'une étape à l'autre", () => {
+    const shape = shapeWithSteps([
+      { id: "s1", title: "A", instruction: "A.", measurements: ["100.0 mm"], geometry: [] },
+      { id: "s2", title: "B", instruction: "B.", geometry: [] },
+    ]);
+    const model = parametricShapeToTraceModel(shape, baseMetadata({ name: "Non dupliquées", slug: "pilot-measures-unique" }));
+    expect(model.steps.flatMap((s) => s.measurements)).toEqual(["100.0 mm"]);
+  });
+
+  it("rosace Engine B : chaque mesure publiée correspond à une grandeur réellement calculée", () => {
+    const shape = createRosette({ outerDiameter: 600, count: 6, elementType: "circle", rotationDegrees: 0, centralCircleRatio: 0.35 });
+    const model = parametricShapeToTraceModel(shape, baseMetadata({ name: "Rosace mesurée", slug: "pilot-rosette-measures" }));
+    expect(model.steps.find((s) => s.id === "step-director-circle")?.measurements).toEqual(["300.0 mm"]);
+    expect(model.steps.find((s) => s.id === "step-divide")?.measurements).toEqual(["60.00°"]);
+    expect(model.steps.find((s) => s.id === "step-centre-circle")?.measurements).toEqual(["105.0 mm"]); // 300 × 0.35
+    expect(model.steps.find((s) => s.id === "step-centre")?.measurements).toEqual([]);
   });
 });

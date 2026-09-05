@@ -46,9 +46,11 @@ describe("Scénario A — rosace 6 pétales Ø 2400 dans une pièce 5000×4000",
   it("A1 — création : modèle valide, rayon directeur = 1200 mm", () => {
     expect(model.id).toBe("rosette-6");
     expect(model.referenceFrame.unit).toBe("mm");
-    const R = model.quantities.find((q) => q.id === "q-radius")!;
+    // C4-LOT3-ROSETTES-V1 : rosette-6 migré vers Engine B expose ses cotes via `dimensions`
+    // (moteur de cotation Engine B), plus via `quantities` (vide hormis tolérance d'offset) —
+    // même valeur exacte, seul l'accesseur change, comme pour tous les modèles déjà migrés.
+    const R = model.dimensions.find((d) => d.id === "dim-radius")!;
     expect(R.value).toBe(1200);
-    expect(R.quality).toBe("exact");
   });
 
   it("A2 — 6 centres secondaires, chacun EXACTEMENT à 1200 mm de O", () => {
@@ -57,17 +59,23 @@ describe("Scénario A — rosace 6 pétales Ø 2400 dans une pièce 5000×4000",
   });
 
   it("A3 — entraxe angulaire = 60°, 6 pétales", () => {
-    const sector = model.quantities.find((q) => q.id === "q-sector")!;
-    expect(sector.value).toBe(60);
-    expect(model.circles.filter((c) => c.id.startsWith("petal-"))).toHaveLength(6);
+    const sector = model.dimensions.find((d) => d.id === "dim-sector")!;
+    // Angle mesuré géométriquement (createAngleDimension, via Math.acos) plutôt que la constante
+    // 360/6 codée en dur de l'ancien modèle : même valeur, bruit flottant ~1e-14 attendu.
+    expect(sector.value).toBeCloseTo(60, 9);
+    // Les 6 pétales sont les cercles "shape" (tracé final) ; le cercle directeur, matérialisé
+    // en construction depuis l'étape Engine B correspondante, est exclu ici par rôle plutôt que
+    // par id fixe (id désormais généré par l'adaptateur).
+    expect(model.circles.filter((c) => c.role !== "construction")).toHaveLength(6);
   });
 
   it("A4 — pointes de pétales à R·√3 = 2078.46 mm de O (propriété exacte)", () => {
     expect(tips).toHaveLength(6);
     const expected = 1200 * Math.sqrt(3);
     for (const t of tips) expect(distanceA(O, t)).toBeCloseTo(expected, 4);
-    const q = model.quantities.find((q) => q.id === "q-tip-distance")!;
-    expect(q.value).toBeCloseTo(expected, 6);
+    // Encombrement réel exposé en dimension "diamètre" (pointe à pointe, = 2×distance) — cf. §6.
+    const envelope = model.dimensions.find((d) => d.id === "dim-envelope")!;
+    expect(envelope.value / 2).toBeCloseTo(expected, 6);
   });
 
   it("A5 — centrage : bounds symétriques autour de O(0,0) ; cercle directeur Ø2400 tient, enveloppe du motif ≈ Ø4157", () => {
@@ -86,8 +94,8 @@ describe("Scénario A — rosace 6 pétales Ø 2400 dans une pièce 5000×4000",
     expect(tipEnvelope).toBeLessThan(ROOM.w); // l'enveloppe tient en largeur (5000)
   });
 
-  it("A6 — pas-à-pas : 4 étapes, chaque étape référence des points réels du modèle", () => {
-    expect(model.steps).toHaveLength(4);
+  it("A6 — pas-à-pas : 5 étapes (Engine B ajoute un contrôle final), chaque étape référence des points réels du modèle", () => {
+    expect(model.steps).toHaveLength(5);
     const ids = new Set(model.points.map((p) => p.id));
     for (const step of model.steps) {
       expect(step.instruction.length).toBeGreaterThan(10);

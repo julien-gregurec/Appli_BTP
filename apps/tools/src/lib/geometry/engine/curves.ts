@@ -5,15 +5,21 @@ import { emptyPrimitives, registerShapeGenerator, type ParametricShape } from ".
 import { applyTransform, compose, rotationAround, translation } from "./transform";
 import { assertFinitePositive, type Point2D } from "./types";
 
-export type WaveCurveParameters = { width: number; height: number; segments: number; centre?: Point2D; rotationDegrees?: number };
+export type WaveCurveParameters = { width: number; height: number; segments: number; centre?: Point2D; rotationDegrees?: number; bulgeRatio?: number };
 
-/** Courbe en vagues constructible : alterne des arcs de flèche égale et de signe opposé (S simple = 2, double S = 4). */
+/**
+ * Courbe en vagues constructible : alterne des arcs de flèche égale et de signe opposé (S simple
+ * = 2, double S = 4). `bulgeRatio` (défaut 1, additif — C4-LOT4-CURVES-V1 §5) multiplie la flèche
+ * de base `width/2` : un signe négatif inverse le sens de bombement de la courbe entière, une
+ * magnitude différente de 1 change son amplitude, sans toucher la construction corde+flèche.
+ */
 export function createWaveCurve(params: WaveCurveParameters): ParametricShape<WaveCurveParameters> {
   if (!Number.isInteger(params.segments) || params.segments < 2) throw new Error("Une courbe en vagues exige au moins 2 segments.");
   const width = assertFinitePositive(params.width, "La largeur");
   const height = assertFinitePositive(params.height, "La hauteur");
   const centre = params.centre ?? { x: 0, y: 0 };
   const rotation = degToRad(params.rotationDegrees ?? 0);
+  const bulgeRatio = params.bulgeRatio ?? 1;
   const transform = compose(translation(centre.x, centre.y), rotationAround({ x: 0, y: 0 }, rotation));
   const segmentHeight = height / params.segments;
   const localPoints: Point2D[] = Array.from({ length: params.segments + 1 }, (_, i) => ({ x: 0, y: height / 2 - i * segmentHeight }));
@@ -22,14 +28,16 @@ export function createWaveCurve(params: WaveCurveParameters): ParametricShape<Wa
   const arcs = [];
   for (let i = 0; i < params.segments; i++) {
     const sign = i % 2 === 0 ? 1 : -1;
-    const local = arcThroughChordAndSagitta(localPoints[i], localPoints[i + 1], (sign * width) / 2);
+    const local = arcThroughChordAndSagitta(localPoints[i], localPoints[i + 1], (sign * bulgeRatio * width) / 2);
     const worldCentre = applyTransform(transform, local.centre);
     const arc = { centre: worldCentre, radius: local.radius, startAngle: local.startAngle + rotation, endAngle: local.endAngle + rotation, counterClockwise: local.counterClockwise };
     arcs.push(arc);
     primitives.arcs.push(arc);
+    primitives.points[`C${i}`] = worldCentre;
   }
   localPoints.forEach((p, i) => { const world = applyTransform(transform, p); worldPoints.push(world); primitives.points[`P${i}`] = world; });
   const bounds = boundsFromPoints(worldPoints, Math.max(10, width * 0.3));
+  const sagittaAbs = Math.abs(bulgeRatio * width) / 2;
   return {
     id: `wave-${params.segments}`,
     type: "waveCurve",
@@ -42,8 +50,8 @@ export function createWaveCurve(params: WaveCurveParameters): ParametricShape<Wa
     rotation,
     metadata: { segments: params.segments },
     constructionSteps: [
-      { id: "step-points", instruction: `Placer ${params.segments + 1} points alignés, espacés de ${segmentHeight.toFixed(1)} mm.`, geometry: worldPoints.map((_, i) => ({ kind: "point" as const, id: `P${i}` })) },
-      { id: "step-arcs", instruction: `Tracer ${params.segments} arcs successifs de flèche ${(width / 2).toFixed(1)} mm, alternant de côté.`, geometry: arcs.map((arc) => ({ kind: "arc" as const, arc })) },
+      { id: "step-points", title: "Placer les points de repère", instruction: `Placer ${params.segments + 1} points alignés, espacés de ${segmentHeight.toFixed(1)} mm.`, geometry: worldPoints.map((_, i) => ({ kind: "point" as const, id: `P${i}` })) },
+      ...arcs.map((arc, i) => ({ id: `step-arc-${i}`, title: `Tracer l'arc ${i + 1}`, instruction: `Placer le centre C${i} et tracer l'arc ${i + 1} de flèche ${sagittaAbs.toFixed(1)} mm.`, geometry: [{ kind: "point" as const, id: `C${i}` }, { kind: "arc" as const, arc }] })),
     ],
     quality: "exact",
   };

@@ -1,14 +1,23 @@
 // Famille décorative (DECORATIVE-FAMILIES-V1 §5) : « Fleur 6 pétales allongés ». Variante
-// RÉELLEMENT différente de rosette-6 (FUNDAMENTAL-MODELS-V1) : rosette-6 superpose 6 cercles
-// pleins de même rayon que le cercle directeur (les pétales naissent du recouvrement des
-// cercles) ; ici, chaque pétale est une ELLIPSE orientée radialement (grand axe = longueur du
-// pétale, petit axe = largeur), ce qui donne des pétales allongés et pointus plutôt que des
-// lobes ronds qui se chevauchent — une composition géométrique différente, pas une reprise
-// visuelle de rosette-6. Utilise Ellipse (primitive déjà existante) + divideCircle + rotation
-// individuelle de chaque pétale pour l'aligner radialement. Aucune primitive nouvelle.
-import { assertFinitePositive, boundsFromPoints, divideCircle, point } from "../primitives";
-import type { SiteStep } from "../shape-model";
-import { validateTraceModel, type TraceExplanation, type TraceModel, type TraceParameter } from "../trace-model";
+// RÉELLEMENT différente de rosette-6 : chaque pétale est une ELLIPSE orientée radialement (grand
+// axe = longueur du pétale, petit axe = largeur), pas un cercle plein superposé.
+//
+// C4-LOT5-FLOWER6-V1 — Migré vers Engine B : aucun générateur spécialisé n'a été créé — une seule
+// ellipse "source" (canonique, placée le long de +X) est répétée par
+// `engine/radial-pattern.ts::createRadialPattern` (count=6), qui gère déjà nativement Ellipse2D
+// (rotation ET centre transformés ensemble par `transformGeometry`, vérifié algébriquement
+// équivalent à l'ancienne formule `theta - π/2` point par point). Le cercle directeur, le petit
+// cercle central et l'axe vertical restent des ajouts de mise en page côté modèle (comme
+// `spacing` l'était déjà pour double-s), pas remontés dans Engine B.
+import { degToRad } from "../engine/angles";
+import { createAlignedDimension, createAngleDimension, createDiameterDimension } from "../engine/dimensions";
+import { emptyPrimitives, type ConstructionStep, type ParametricShape } from "../engine/model";
+import { pointAtPolar } from "../engine/measure";
+import { createRadialPattern } from "../engine/radial-pattern";
+import { assertFinitePositive, type Ellipse2D } from "../engine/types";
+import { dimensionResultToDimension, parametricShapeToTraceModel, type TraceModelMetadata } from "../adapters";
+import type { Dimension } from "../primitives";
+import type { TraceExplanation, TraceModel, TraceParameter } from "../trace-model";
 
 export type Flower6ElongatedInput = { diameter: number; rotation?: number };
 
@@ -19,7 +28,7 @@ export const flower6ElongatedParameters: readonly TraceParameter[] = [
 
 const DEFAULT_INPUT: Flower6ElongatedInput = { diameter: 1800, rotation: -90 };
 const PETALS = 6;
-const WIDTH_RATIO = 0.42; // largeur du pétale = 42% de sa longueur — pétale visiblement allongé, pas rond.
+const WIDTH_RATIO = 0.42; // largeur du pétale = 42% de sa longueur — pétale visiblement allongé, pas rond (inchangé depuis l'ancien modèle).
 
 export const flower6ElongatedExplanation: TraceExplanation = {
   objective: "Tracer une fleur à 6 pétales allongés et pointus, différente d'une rosace à lobes ronds superposés.",
@@ -40,67 +49,102 @@ export const flower6ElongatedExplanation: TraceExplanation = {
   warnings: ["Un motif à pétales allongés est plus sensible aux petites erreurs d'orientation qu'un motif à lobes ronds — vérifiez chaque pétale avant de passer au suivant."],
 };
 
-export function createFlower6ElongatedGeometry(input: Flower6ElongatedInput = DEFAULT_INPUT): TraceModel {
-  const diameter = assertFinitePositive(input.diameter, "Le diamètre");
-  const rotationDegrees = input.rotation ?? -90;
-  if (!Number.isFinite(rotationDegrees)) throw new Error("L'orientation initiale doit être une valeur finie.");
-  const rotationRadians = (rotationDegrees * Math.PI) / 180;
-
-  const outerRadius = diameter / 2;
+/** Assemble le motif à 6 pétales-ellipse via createRadialPattern (source canonique le long de +X, comme rosettes.ts) + les ajouts de mise en page (cercle directeur, cercle central, axe). */
+function buildFlower6Shape(outerRadius: number, rotationDegrees: number): ParametricShape<Flower6ElongatedInput> {
   const petalLength = outerRadius;
   const petalHalfLength = petalLength / 2;
   const petalHalfWidth = (petalLength * WIDTH_RATIO) / 2;
-  const O = point("O", 0, 0, "Centre O", "center");
-
-  const petalCentres = divideCircle(O, petalHalfLength, PETALS, rotationRadians, "C").map((item) => ({ ...item, role: "center" as const }));
-  const sectorAngle = 360 / PETALS;
-  const points = [O, ...petalCentres];
-  const axisHalfExtent = Math.max(60, outerRadius * 1.15);
-
-  const petals = petalCentres.map((centre, index) => {
-    const theta = rotationRadians + index * ((2 * Math.PI) / PETALS);
-    return { id: `petal-${index + 1}`, centre, radiusX: petalHalfWidth, radiusY: petalHalfLength, rotation: theta - Math.PI / 2, role: "shape" as const };
-  });
-
   const centralRadius = petalHalfWidth * 0.5;
+  const O = { x: 0, y: 0 };
 
-  const steps: SiteStep[] = [
-    { id: "step-outer", title: "Tracer le cercle directeur", instruction: `Tracez le cercle directeur de rayon ${outerRadius} mm.`, measurements: [`${outerRadius} mm`], pointIds: ["O"], visibleEntityIds: ["circle-outer"] },
-    { id: "step-divide", title: "Diviser en 6", instruction: `Reportez 6 divisions régulières de ${sectorAngle}° chacune.`, measurements: [`${sectorAngle}°`], pointIds: petalCentres.map((c) => c.id), controlId: "control-sector", visibleEntityIds: ["circle-outer"] },
-    { id: "step-centres", title: "Placer les centres de pétales", instruction: `Sur chaque direction, marquez un centre à ${Math.round(petalHalfLength)} mm de O.`, measurements: [`${Math.round(petalHalfLength)} mm`], pointIds: petalCentres.map((c) => c.id), visibleEntityIds: ["circle-outer"] },
-    { id: "step-petals", title: "Tracer les 6 pétales", instruction: `Tracez chaque pétale : ${Math.round(petalLength)} mm de long, ${Math.round(petalHalfWidth * 2)} mm de large, orienté vers l'extérieur.`, measurements: [`${Math.round(petalLength)} mm`, `${Math.round(petalHalfWidth * 2)} mm`], pointIds: petalCentres.map((c) => c.id), visibleEntityIds: [...petals.map((p) => p.id)] },
-    { id: "step-centre-circle", title: "Tracer le centre", instruction: `Terminez avec un petit cercle central de rayon ${Math.round(centralRadius)} mm.`, measurements: [`${Math.round(centralRadius)} mm`], pointIds: ["O"], visibleEntityIds: [...petals.map((p) => p.id), "circle-central"] },
+  // Ellipse source canonique : placée le long de +X (angle 0), pointe vers l'extérieur (rotation
+  // -π/2 aligne son grand axe — radiusY — sur la direction radiale). `createRadialPattern`
+  // applique ensuite la même rotation (centre ET orientation) à chaque copie — vérifié
+  // algébriquement équivalent à l'ancienne formule `theta - π/2` par instance.
+  const source: Ellipse2D = { centre: { x: petalHalfLength, y: 0 }, radiusX: petalHalfWidth, radiusY: petalHalfLength, rotation: -Math.PI / 2, role: "shape" };
+  const pattern = createRadialPattern({ source, centre: O, count: PETALS, startAngleDegrees: rotationDegrees });
+
+  const primitives = emptyPrimitives();
+  primitives.points.O = O;
+  primitives.ellipses.push(...pattern.primitives.ellipses);
+  const centreIds = Array.from({ length: PETALS }, (_, i) => `C${i + 1}`);
+  pattern.primitives.ellipses.forEach((ellipse, i) => { primitives.points[centreIds[i]] = ellipse.centre; });
+
+  const circleOuter = { centre: O, radius: outerRadius, role: "construction" as const };
+  const circleCentral = { centre: O, radius: centralRadius, role: "shape" as const };
+  primitives.circles.push(circleOuter, circleCentral);
+
+  const axisHalfExtent = Math.max(60, outerRadius * 1.15);
+  const axisY = { start: { x: 0, y: -axisHalfExtent }, end: { x: 0, y: axisHalfExtent }, role: "axis" as const };
+  primitives.segments.push(axisY);
+
+  const sectorDegrees = 360 / PETALS;
+  const constructionSteps: ConstructionStep[] = [
+    { id: "step-centre", title: "Repérer le centre", instruction: "Matérialiser le centre O.", geometry: [{ kind: "point", id: "O" }] },
+    { id: "step-outer", title: "Tracer le cercle directeur", instruction: `Tracer le cercle directeur de rayon ${outerRadius.toFixed(1)} mm.`, geometry: [{ kind: "circle", circle: circleOuter }] },
+    { id: "step-divide", title: `Diviser en ${PETALS}`, instruction: `Diviser en ${PETALS} directions de ${sectorDegrees.toFixed(1)}°.`, geometry: centreIds.map((id) => ({ kind: "point" as const, id })) },
+    { id: "step-petals", title: "Tracer les pétales", instruction: `Tracer chaque pétale : ${petalLength.toFixed(1)} mm de long, ${(petalHalfWidth * 2).toFixed(1)} mm de large, orienté vers l'extérieur.`, geometry: pattern.primitives.ellipses.map((ellipse) => ({ kind: "ellipse" as const, ellipse })) },
+    { id: "step-centre-circle", title: "Tracer le centre", instruction: `Terminer avec un petit cercle central de rayon ${centralRadius.toFixed(1)} mm.`, geometry: [{ kind: "circle", circle: circleCentral }] },
+    { id: "step-check", title: "Contrôle final", instruction: "Contrôler que les 6 pétales sont identiques par rotation de 60°, et que chaque pointe touche le cercle directeur.", geometry: centreIds.map((id) => ({ kind: "point" as const, id })) },
   ];
 
-  const model: TraceModel = {
-    id: "flower-6-elongated", name: "Fleur 6 pétales allongés", slug: "flower-6-elongated", categoryId: "forms-design", difficulty: "advanced",
-    tags: ["fleur", "6 pétales", "allongé", "ellipse", "décoratif"], status: "preview",
-    parameters: flower6ElongatedParameters, explanation: flower6ElongatedExplanation,
-    bounds: boundsFromPoints(points, Math.max(80, outerRadius * 0.2)),
-    referenceFrame: { unit: "mm", origin: O, xLabel: "X", yLabel: "Y", yOrientation: "up" },
-    axes: [],
-    points,
-    segments: [],
-    arcs: [],
-    circles: [
-      { id: "circle-outer", centre: O, radius: outerRadius, role: "construction" },
-      { id: "circle-central", centre: O, radius: centralRadius, role: "shape" },
-    ],
-    ellipses: petals,
-    constructionLines: [{ id: "axis-y", start: point("axis-y-", 0, -axisHalfExtent), end: point("axis-y+", 0, axisHalfExtent), role: "axis" }],
-    dimensions: [
-      { id: "dim-length", kind: "linear", from: O, to: petalCentres[0], label: `Longueur ${Math.round(petalHalfLength)} mm (demi)`, value: petalHalfLength, unit: "mm" },
-      { id: "dim-sector", kind: "angle", from: petalCentres[0], to: petalCentres[1], label: `${sectorAngle}°`, value: sectorAngle, unit: "°" },
-    ],
-    controls: [
-      { id: "control-sector", label: "Angle entre deux pétales", value: sectorAngle, unit: "°", pointIds: [petalCentres[0].id, petalCentres[1].id] },
-    ],
-    quantities: [
-      { id: "q-petal-half-length", label: "Demi-longueur de chaque pétale", value: petalHalfLength, unit: "mm", quality: "exact" },
-      { id: "q-petal-half-width", label: "Demi-largeur de chaque pétale", value: petalHalfWidth, unit: "mm", quality: "exact" },
-      { id: "q-sector", label: "Angle entre pétales", value: sectorAngle, unit: "°", quality: "exact" },
-    ],
-    steps,
+  return {
+    id: "flower-6-elongated",
+    type: "flower6Elongated",
+    parameters: { diameter: outerRadius * 2, rotation: rotationDegrees },
+    primitives,
+    boundingBox: pattern.boundingBox,
+    centre: O,
+    width: pattern.boundingBox.maxX - pattern.boundingBox.minX,
+    height: pattern.boundingBox.maxY - pattern.boundingBox.minY,
+    rotation: degToRad(rotationDegrees),
+    metadata: { petalLength, petalHalfLength, petalHalfWidth, centralRadius },
+    constructionSteps,
+    quality: "exact",
   };
-  return validateTraceModel(model);
+}
+
+export function createFlower6ElongatedGeometry(input: Flower6ElongatedInput = DEFAULT_INPUT): TraceModel {
+  // 1. Traduction des paramètres UI — aucun calcul géométrique ici au-delà de la mise en page.
+  const diameter = assertFinitePositive(input.diameter, "Le diamètre");
+  const rotationDegrees = input.rotation ?? -90;
+  if (!Number.isFinite(rotationDegrees)) throw new Error("L'orientation initiale doit être une valeur finie.");
+  const outerRadius = diameter / 2;
+
+  // 2. Géométrie : exclusivement Engine B (createRadialPattern sur une ellipse source).
+  const shape = buildFlower6Shape(outerRadius, rotationDegrees);
+  const O = shape.primitives.points.O;
+  const c1 = shape.primitives.points.C1;
+  const c2 = shape.primitives.points.C2;
+  const petalHalfLength = shape.metadata.petalHalfLength as number;
+  const petalHalfWidth = shape.metadata.petalHalfWidth as number;
+  const rotationRadians = degToRad(rotationDegrees);
+  const farTip = pointAtPolar(O, 2 * petalHalfLength, rotationRadians); // pointe du premier pétale, exactement sur le cercle directeur.
+  const petal0 = shape.primitives.ellipses[0];
+  const widthAxisAngle = petal0.rotation ?? 0; // direction du petit axe (axe local X de l'ellipse, perpendiculaire au grand axe radial).
+  const widthTipA = pointAtPolar(petal0.centre, petalHalfWidth, widthAxisAngle);
+  const widthTipB = pointAtPolar(petal0.centre, petalHalfWidth, widthAxisAngle + Math.PI);
+
+  // 3. Cotations : moteur de cotation Engine B, valeurs jamais réécrites à la main.
+  const dimensions: Dimension[] = [
+    dimensionResultToDimension("dim-diameter", `Ø directeur ${diameter} mm`, createDiameterDimension({ centre: O, radius: outerRadius })),
+    dimensionResultToDimension("dim-major-axis", `Grand axe ${Math.round(2 * petalHalfLength)} mm`, createAlignedDimension(O, farTip)),
+    dimensionResultToDimension("dim-minor-axis", `Petit axe ${Math.round(2 * petalHalfWidth)} mm`, createAlignedDimension(widthTipA, widthTipB)),
+    dimensionResultToDimension("dim-sector", `${Number((360 / PETALS).toFixed(2))}°`, createAngleDimension(O, c1, c2)),
+  ];
+
+  // 4. Métadonnées pédagogiques — couche UI uniquement.
+  const metadata: TraceModelMetadata = {
+    id: "flower-6-elongated",
+    name: "Fleur 6 pétales allongés",
+    slug: "flower-6-elongated",
+    categoryId: "forms-design",
+    difficulty: "advanced",
+    tags: ["fleur", "6 pétales", "allongé", "ellipse", "décoratif"],
+    status: "preview",
+    parameters: flower6ElongatedParameters,
+    explanation: flower6ElongatedExplanation,
+  };
+
+  return parametricShapeToTraceModel(shape, metadata, { dimensions });
 }
