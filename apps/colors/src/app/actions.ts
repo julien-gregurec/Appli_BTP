@@ -3,7 +3,11 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { cheminInterneSur } from "@/lib/redirection-sure";
-import { urlCallbackReinitialisation } from "@/lib/auth-redirects-colors";
+import {
+  DESTINATION_NOUVEAU_MOT_DE_PASSE,
+  urlCallbackReinitialisation,
+} from "@/lib/auth-redirects-colors";
+import { jetonRecuperationSur, TYPE_RECUPERATION } from "@/lib/jeton-recuperation";
 import { journaliserEchecTechnique } from "@/lib/journal-securite";
 import {
   CODE_ACCES_COLORS_ABSENT,
@@ -97,6 +101,37 @@ export async function demanderReinitialisationAction(formData: FormData) {
   const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
   if (error) journaliserEchecTechnique("reinitialisation.demande", error);
   redirect(`/mot-de-passe-oublie?message=${CODE_DEMANDE_ENVOYEE}`);
+}
+
+/**
+ * Vérification du lien de récupération, sur l'origine de Colors.
+ *
+ * Le gabarit d'e-mail Supabase est unique pour tout le projet ELSATIA et ancré
+ * sur `SiteURL` : le lien reçu ouvre toujours le portail de compte commun. Ce
+ * dernier ne consomme pas le jeton lorsque la personne indique poursuivre sur
+ * Colors, il le relaie tel quel ici. `verifyOtp` est donc exécuté par Colors,
+ * et la session de récupération naît sur `colors.elsatia.fr` — les cookies
+ * d'authentification sont propres à chaque origine, aucune session ouverte
+ * ailleurs ne serait lisible ici.
+ *
+ * La destination de succès est une constante : cette action n'accepte aucune
+ * cible venue de la requête.
+ */
+export async function confirmerRecuperationAction(formData: FormData) {
+  const jeton = jetonRecuperationSur(formData.get("token_hash"), formData.get("type"));
+  if (!jeton) redirect(`/mot-de-passe-oublie?error=${CODE_LIEN_INVALIDE}`);
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.verifyOtp({ type: TYPE_RECUPERATION, token_hash: jeton });
+  if (error) {
+    // Un jeton expiré et un jeton déjà consommé remontent la même erreur selon
+    // les versions de GoTrue : un seul message, qui propose de redemander un
+    // lien, couvre honnêtement les deux cas sans rien affirmer de faux.
+    journaliserEchecTechnique("recuperation.verification", error);
+    redirect(`/mot-de-passe-oublie?error=${CODE_LIEN_INVALIDE}`);
+  }
+
+  redirect(DESTINATION_NOUVEAU_MOT_DE_PASSE);
 }
 
 /**

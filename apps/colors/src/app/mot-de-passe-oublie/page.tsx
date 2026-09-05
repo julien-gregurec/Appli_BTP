@@ -37,7 +37,7 @@ export default async function MotDePasseOubliePage({ searchParams }: { searchPar
           {message && <div className="form-message success">{message}</div>}
           <label>Adresse email<input name="email" type="email" autoComplete="email" required placeholder="vous@entreprise.fr"/></label>
           <button className="primary-button" type="submit">Envoyer le lien</button>
-          <p className="auth-foot"><Link href="/login">Revenir à la connexion</Link><br/>Le lien reçu est à usage unique et expire rapidement. Il ne modifie que le mot de passe : vos habilitations Colors restent inchangées.</p>
+          <p className="auth-foot"><Link href="/login">Revenir à la connexion</Link><br/>Le mot de passe est celui de votre compte ELSATIA commun : le lien reçu ouvre le portail de compte ELSATIA, qui vous propose de poursuivre sur Colors. Il est à usage unique, expire rapidement, et ne modifie que le mot de passe — vos habilitations Colors restent inchangées.</p>
         </form>
       </section>
     </div>
