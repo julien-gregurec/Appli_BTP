@@ -65,3 +65,63 @@ describe("provider OpenAI — usage/coût (AI-LAUNCH-V1C)", () => {
     expect(create).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ timeout: 25_000 }));
   });
 });
+
+describe("provider OpenAI — rétention RGPD (ELSATIA-OPENAI-RGPD-V1)", () => {
+  it("completer : transmet store:false (aucune conservation de l'objet Response côté OpenAI)", async () => {
+    create.mockResolvedValue(reponseNonStreamee(null));
+    const provider = creerProviderOpenAI();
+
+    await provider.completer({ historique: [{ role: "user", contenu: "Bonjour" }] });
+
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ store: false }), expect.anything());
+  });
+
+  it("completerAvecFichier : transmet store:false", async () => {
+    create.mockResolvedValue(reponseNonStreamee(null));
+    const provider = creerProviderOpenAI();
+
+    await provider.completerAvecFichier({
+      texte: "Analyse",
+      fichier: { base64: "AAAA", mimeType: "application/pdf" },
+    });
+
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ store: false }), expect.anything());
+  });
+
+  it("streamer : transmet store:false en même temps que stream:true", async () => {
+    create.mockResolvedValue({
+      async *[Symbol.asyncIterator]() {
+        yield { type: "response.output_text.delta", delta: "Ré" };
+        yield { type: "response.completed", response: { output_text: "Réponse", usage: null } };
+      },
+    });
+    const provider = creerProviderOpenAI();
+
+    const flux = provider.streamer({ historique: [{ role: "user", contenu: "Bonjour" }] });
+    while (!(await flux.next()).done) { /* consomme le flux */ }
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ store: false, stream: true }),
+      expect.anything(),
+    );
+  });
+
+  it("aucun appel du provider ne dépend de previous_response_id / response_id (l'historique est reconstruit)", async () => {
+    create.mockResolvedValue(reponseNonStreamee(null));
+    const provider = creerProviderOpenAI();
+
+    await provider.completer({
+      historique: [
+        { role: "user", contenu: "Bonjour" },
+        { role: "assistant", contenu: "Bonjour, comment puis-je aider ?" },
+        { role: "user", contenu: "Fais un devis" },
+      ],
+    });
+
+    const [corps] = create.mock.calls[0];
+    expect(corps).not.toHaveProperty("previous_response_id");
+    expect(corps).not.toHaveProperty("response_id");
+    // Tout le contexte est renvoyé à chaque appel : 3 messages d'historique.
+    expect(corps.input).toHaveLength(3);
+  });
+});
