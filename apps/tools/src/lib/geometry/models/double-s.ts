@@ -1,15 +1,27 @@
-// Famille décorative NON radiale (DECORATIVE-FAMILIES-V1 §7) : composition double-S. Chaque « S »
-// (courbe en doucine / ogee) est fait de DEUX arcs de cercle de même rayon, raccordés au point
-// milieu avec la MÊME tangente — la continuité C1 est garantie par construction : le second arc
-// est l'image du premier par rotation de 180° autour du point milieu (rotate, primitive
-// existante), ce qui préserve la direction de la tangente. La seconde courbe en S est la MÊME
-// construction, décalée et à bombement inversé (composition « complémentaire » demandée).
-// Aucune courbe libre, aucun Bezier : tout est traçable au compas. Le rayon de chaque arc est
-// obtenu par la relation corde + flèche -> rayon, la même que celle déjà utilisée par
-// createAdvancedArch (shapes.ts) : radius = (demi-corde² + flèche²) / (2 · flèche).
-import { assertFinitePositive, boundsFromPoints, point, rotate, type Arc, type Point } from "../primitives";
-import type { SiteStep } from "../shape-model";
-import { validateTraceModel, type TraceExplanation, type TraceModel, type TraceParameter } from "../trace-model";
+// Famille décorative NON radiale (DECORATIVE-FAMILIES-V1 §7) : composition double-S.
+//
+// C4-LOT4-CURVES-V1 — Migré vers Engine B : chaque « S » (courbe en doucine / ogee) est
+// exclusivement construit par `engine/curves.ts::createSCurve` (deux arcs de même rayon,
+// raccordés au point milieu, continuité C1 garantie par construction — voir le commentaire de
+// `createWaveCurve`). Extension additive minimale d'Engine B (§5, "ne pas créer un nouveau
+// générateur double-s si une extension du générateur existant suffit") : `bulgeRatio?` sur
+// `WaveCurveParameters`/`SCurveParameters`, qui multiplie la flèche de base `width/2` — un signe
+// négatif inverse le bombement, permettant de composer deux S mirroir sans dupliquer la formule
+// corde+flèche->rayon. Le mapping `bulgeRatio = ±2·waistRatio` (vérifié empiriquement contre les
+// centres d'arc de l'ancien modèle) reproduit exactement `bulge = waistRatio·width`.
+// L'assemblage des deux S (décalage, préfixage des points, fusion des étapes) reste une décision
+// de mise en page propre à CE modèle (comme l'était déjà `spacing` dans l'ancien fichier) : il
+// n'est pas remonté dans Engine B, qui ne connaît qu'un seul S à la fois — pas de nouveau
+// générateur "double-s" enregistré (cf. createDoubleSCurve, laissé inchangé, qui compose un
+// mouvement vertical à 4 segments, une forme différente de deux S décalés horizontalement).
+import { createHorizontalDimension, createRadiusDimension, createVerticalDimension } from "../engine/dimensions";
+import { createSCurve } from "../engine/curves";
+import { boundsFromPoints } from "../engine/measure";
+import { emptyPrimitives, type ConstructionStep, type ParametricShape } from "../engine/model";
+import { assertFinitePositive, type Point2D } from "../engine/types";
+import { dimensionResultToDimension, parametricShapeToTraceModel, type TraceModelMetadata } from "../adapters";
+import type { Dimension } from "../primitives";
+import type { TraceExplanation, TraceModel, TraceParameter } from "../trace-model";
 
 export type DoubleSInput = { width: number; height: number; waistRatio: number };
 
@@ -20,40 +32,6 @@ export const doubleSParameters: readonly TraceParameter[] = [
 ];
 
 const DEFAULT_INPUT: DoubleSInput = { width: 800, height: 2000, waistRatio: 0.3 };
-
-// Retourne l'arc mineur (le plus court des deux) passant par `fromPoint` et `toPoint` sur le
-// cercle de centre `centre` et de rayon `radius`. Choisit automatiquement le sens de balayage
-// en normalisant delta dans (-π, π] — évite d'avoir à raisonner à la main sur counterClockwise
-// pour chaque arc (technique locale de composition, pas une primitive ajoutée au moteur).
-function minorArc(id: string, centre: Point, radius: number, fromPoint: Point, toPoint: Point, role: Arc["role"]): Arc {
-  const a1 = Math.atan2(fromPoint.y - centre.y, fromPoint.x - centre.x);
-  const a2 = Math.atan2(toPoint.y - centre.y, toPoint.x - centre.x);
-  let delta = a2 - a1;
-  while (delta > Math.PI) delta -= 2 * Math.PI;
-  while (delta <= -Math.PI) delta += 2 * Math.PI;
-  return { id, centre, radius, startAngle: a1, endAngle: a1 + delta, counterClockwise: delta >= 0, role };
-}
-
-type OgeeS = { a: Point; m: Point; b: Point; centreLower: Point; centreUpper: Point; radius: number; arcLower: Arc; arcUpper: Arc };
-
-function buildOgeeS(prefix: string, originX: number, height: number, bulge: number, bulgeSign: 1 | -1, role: Arc["role"]): OgeeS {
-  // Corde verticale A -> M (moitié basse du S). demi-corde = height/4, flèche = bulge.
-  const halfChord = height / 4;
-  const radius = (halfChord ** 2 + bulge ** 2) / (2 * bulge);
-  const a = point(`${prefix}A`, originX, 0, `${prefix} bas`);
-  const m = point(`${prefix}M`, originX, height / 2, `${prefix} milieu`);
-  const b = point(`${prefix}B`, originX, height, `${prefix} haut`);
-  // Centre de l'arc bas : sur la perpendiculaire à la corde (donc horizontale), du côté opposé
-  // au bombement, à la distance (radius - bulge) du milieu de corde.
-  const centreLower = point(`${prefix}CL`, originX - bulgeSign * (radius - bulge), height / 4, `${prefix} centre bas`, "center");
-  // Arc haut : image de l'arc bas par rotation de 180° autour de M -> tangente identique en M.
-  const centreUpper = { ...rotate(centreLower, m, Math.PI, `${prefix}CU`), label: `${prefix} centre haut`, role: "center" as const };
-  return {
-    a, m, b, centreLower, centreUpper, radius,
-    arcLower: minorArc(`${prefix}arc-lower`, centreLower, radius, a, m, role),
-    arcUpper: minorArc(`${prefix}arc-upper`, centreUpper, radius, m, b, role),
-  };
-}
 
 export const doubleSExplanation: TraceExplanation = {
   objective: "Tracer deux courbes en S (doucines) complémentaires, uniquement au compas, sans courbe libre.",
@@ -75,60 +53,106 @@ export const doubleSExplanation: TraceExplanation = {
   warnings: ["Un raccord d'arcs mal tangent se voit immédiatement sur une frise — vérifiez chaque point M avant de poursuivre."],
 };
 
+function prefixPoints(points: Record<string, Point2D>, prefix: string): Record<string, Point2D> {
+  return Object.fromEntries(Object.entries(points).map(([id, p]) => [`${prefix}${id}`, p]));
+}
+
+/** Reporte le préfixe sur les seules références par id (`kind:"point"`) — les autres géométries embarquées sont déjà des valeurs, résolues par égalité par l'adaptateur, jamais par id. */
+function prefixSteps(steps: ConstructionStep[], titlePrefix: string, idPrefix: string, pointPrefix: string): ConstructionStep[] {
+  return steps.map((step) => ({
+    id: `${idPrefix}-${step.id}`,
+    title: step.title ? `${titlePrefix} — ${step.title}` : step.title,
+    instruction: step.instruction,
+    geometry: step.geometry.map((g) => (g.kind === "point" ? { ...g, id: `${pointPrefix}${g.id}` } : g)),
+  }));
+}
+
+/** Assemble deux « S » (createSCurve) décalés horizontalement, bombement inversé, en une seule forme paramétrique fusionnée — aucune formule géométrique nouvelle, uniquement une mise en page (comme `spacing` l'était déjà dans l'ancien modèle). */
+function buildDoubleSShape(width: number, height: number, waistRatio: number): ParametricShape<DoubleSInput> {
+  const bulge = waistRatio * width;
+  const spacing = 2 * bulge + width * 0.2; // écart interne entre les deux S, dérivé, non exposé — formule inchangée depuis l'ancien modèle.
+  const bulgeRatio = 2 * waistRatio;
+
+  // Mapping vérifié empiriquement (dump des centres d'arc) : bulgeRatio négatif pour le premier S
+  // reproduit exactement le bombement de l'ancien `buildOgeeS(..., bulgeSign=1)`, positif pour le
+  // second (bulgeSign=-1, mirroir).
+  const s1 = createSCurve({ width, height, centre: { x: 0, y: height / 2 }, bulgeRatio: -bulgeRatio });
+  const s2 = createSCurve({ width, height, centre: { x: spacing, y: height / 2 }, bulgeRatio: bulgeRatio });
+
+  const primitives = emptyPrimitives();
+  Object.assign(primitives.points, prefixPoints(s1.primitives.points, "S1-"), prefixPoints(s2.primitives.points, "S2-"));
+  primitives.arcs.push(...s1.primitives.arcs, ...s2.primitives.arcs);
+
+  const axisHalfExtent = Math.max(80, height * 0.08);
+  const axisS1 = { start: { x: 0, y: -axisHalfExtent }, end: { x: 0, y: height + axisHalfExtent }, role: "axis" as const };
+  const axisS2 = { start: { x: spacing, y: -axisHalfExtent }, end: { x: spacing, y: height + axisHalfExtent }, role: "axis" as const };
+  primitives.segments.push(axisS1, axisS2);
+
+  const constructionSteps: ConstructionStep[] = [
+    { id: "step-axes", title: "Tracer les axes et repères", instruction: "Tracez l'axe vertical de chaque S.", geometry: [{ kind: "segment", segment: axisS1 }, { kind: "segment", segment: axisS2 }] },
+    ...prefixSteps(s1.constructionSteps, "Premier S", "s1", "S1-"),
+    ...prefixSteps(s2.constructionSteps, "Second S (bombement inversé)", "s2", "S2-"),
+    {
+      id: "step-final-check",
+      title: "Contrôler la symétrie finale",
+      instruction: "Contrôlez que les deux S ont la même hauteur et un rayon identique, et que le second est bien le symétrique du premier.",
+      geometry: [{ kind: "point", id: "S1-P2" }, { kind: "point", id: "S2-P2" }],
+    },
+  ];
+
+  const bounds = boundsFromPoints([...Object.values(primitives.points), ...primitives.arcs.flatMap((a) => [{ x: a.centre.x - a.radius, y: a.centre.y - a.radius }, { x: a.centre.x + a.radius, y: a.centre.y + a.radius }])], Math.max(60, width * 0.15));
+
+  return {
+    id: "double-s",
+    type: "doubleSOgee",
+    parameters: { width, height, waistRatio },
+    primitives,
+    boundingBox: bounds,
+    centre: { x: spacing / 2, y: height / 2 },
+    width: bounds.maxX - bounds.minX,
+    height: bounds.maxY - bounds.minY,
+    rotation: 0,
+    metadata: { bulge, spacing, radius: s1.primitives.arcs[1]?.radius },
+    constructionSteps,
+    quality: "exact",
+  };
+}
+
 export function createDoubleSGeometry(input: DoubleSInput = DEFAULT_INPUT): TraceModel {
+  // 1. Traduction des paramètres UI — aucun calcul géométrique ici au-delà de la mise en page.
   const width = assertFinitePositive(input.width, "La largeur");
   const height = assertFinitePositive(input.height, "La hauteur");
   const waistRatio = input.waistRatio;
   if (!Number.isFinite(waistRatio) || waistRatio <= 0 || waistRatio >= 1) throw new Error("Le rapport de bombement doit être strictement compris entre 0 et 1.");
 
-  const bulge = waistRatio * width;
-  const spacing = 2 * bulge + width * 0.2; // écart interne entre les deux S, dérivé, non exposé.
+  // 2. Géométrie : exclusivement Engine B (deux createSCurve assemblés, cf. buildDoubleSShape).
+  const shape = buildDoubleSShape(width, height, waistRatio);
+  const s1M = shape.primitives.points["S1-P1"];
+  const s2M = shape.primitives.points["S2-P1"];
+  const s1A = shape.primitives.points["S1-P2"];
+  const s1B = shape.primitives.points["S1-P0"];
+  const lowerArc = shape.primitives.arcs[1]; // S1 : arc du bas (A -> M), cf. mapping vérifié dans buildDoubleSShape.
 
-  const s1 = buildOgeeS("S1-", 0, height, bulge, 1, "shape");
-  const s2 = buildOgeeS("S2-", spacing, height, bulge, -1, "shape");
-
-  const points = [s1.a, s1.m, s1.b, s1.centreLower, s1.centreUpper, s2.a, s2.m, s2.b, s2.centreLower, s2.centreUpper];
-  const axisHalfExtent = Math.max(80, height * 0.08);
-
-  const steps: SiteStep[] = [
-    { id: "step-axis", title: "Tracer les axes et repères", instruction: "Tracez l'axe vertical du premier S et placez A (bas), M (milieu), B (haut).", measurements: [`${height} mm`], pointIds: ["S1-A", "S1-M", "S1-B"], visibleEntityIds: ["axis-s1"] },
-    { id: "step-radius", title: "Calculer le rayon", instruction: `Rayon des arcs : ${Math.round(s1.radius)} mm (déduit de la demi-hauteur ${Math.round(height / 4)} mm et du bombement ${Math.round(bulge)} mm).`, measurements: [`${Math.round(s1.radius)} mm`], pointIds: ["S1-A", "S1-M"], visibleEntityIds: ["axis-s1"] },
-    { id: "step-arc-lower", title: "Tracer l'arc bas du premier S", instruction: `Placez le centre à ${Math.round(s1.radius - bulge)} mm de la corde, côté opposé au bombement, et tracez l'arc de A à M.`, measurements: [`${Math.round(s1.radius)} mm`], pointIds: ["S1-CL", "S1-A", "S1-M"], controlId: "control-radius-s1", visibleEntityIds: ["axis-s1", "S1-arc-lower"] },
-    { id: "step-arc-upper", title: "Tracer l'arc haut du premier S", instruction: "Placez le centre de l'arc haut par retournement de 180° autour de M, puis tracez l'arc de M à B.", measurements: [], pointIds: ["S1-CU", "S1-M", "S1-B"], visibleEntityIds: ["axis-s1", "S1-arc-lower", "S1-arc-upper"] },
-    { id: "step-second-s", title: "Tracer le second S", instruction: `Refaites la même construction, décalée de ${Math.round(spacing)} mm, avec le bombement inversé.`, measurements: [`${Math.round(spacing)} mm`], pointIds: ["S2-A", "S2-M", "S2-B"], visibleEntityIds: ["S1-arc-lower", "S1-arc-upper", "S2-arc-lower", "S2-arc-upper"] },
+  // 3. Cotations : moteur de cotation Engine B, valeurs jamais réécrites à la main.
+  const dimensions: Dimension[] = [
+    dimensionResultToDimension("dim-height", `Hauteur ${height} mm`, createVerticalDimension(s1A, s1B, -60)),
+    dimensionResultToDimension("dim-bulge", `Bombement ${Math.round(shape.metadata.bulge as number)} mm`, createHorizontalDimension(s1M, { x: shape.metadata.bulge as number, y: s1M.y })),
+    dimensionResultToDimension("dim-radius", `R ${Math.round(lowerArc.radius)} mm`, createRadiusDimension(lowerArc)),
+    dimensionResultToDimension("dim-spacing", `Entraxe ${Math.round(shape.metadata.spacing as number)} mm`, createHorizontalDimension(s1M, s2M)),
   ];
 
-  const model: TraceModel = {
-    id: "double-s", name: "Composition double-S", slug: "double-s", categoryId: "forms-design", difficulty: "advanced",
-    tags: ["double-s", "doucine", "ogee", "frise", "non radial", "décoratif"], status: "preview",
-    parameters: doubleSParameters, explanation: doubleSExplanation,
-    bounds: boundsFromPoints(points, axisHalfExtent),
-    referenceFrame: { unit: "mm", origin: s1.a, xLabel: "X", yLabel: "Y", yOrientation: "up" },
-    axes: [],
-    points,
-    segments: [],
-    arcs: [s1.arcLower, s1.arcUpper, s2.arcLower, s2.arcUpper],
-    circles: [],
-    ellipses: [],
-    constructionLines: [
-      { id: "axis-s1", start: point("axis-s1-", 0, -axisHalfExtent), end: point("axis-s1+", 0, height + axisHalfExtent), role: "axis" },
-      { id: "axis-s2", start: point("axis-s2-", spacing, -axisHalfExtent), end: point("axis-s2+", spacing, height + axisHalfExtent), role: "axis" },
-    ],
-    dimensions: [
-      { id: "dim-height", kind: "linear", from: s1.a, to: s1.b, label: `Hauteur ${height} mm`, value: height, unit: "mm", offset: -60 },
-      { id: "dim-bulge", kind: "linear", from: s1.m, to: point("bulge-tip", bulge, height / 4), label: `Bombement ${Math.round(bulge)} mm`, value: bulge, unit: "mm", offset: 0 },
-      { id: "dim-radius", kind: "radius", from: s1.centreLower, to: s1.a, label: `R ${Math.round(s1.radius)} mm`, value: s1.radius, unit: "mm" },
-    ],
-    controls: [
-      { id: "control-radius-s1", label: "Rayon des arcs du premier S (O bas → A)", value: s1.radius, unit: "mm", pointIds: ["S1-CL", "S1-A"] },
-      { id: "control-symmetry", label: "Hauteur identique des deux S", value: height, unit: "mm", pointIds: ["S1-A", "S2-A"] },
-    ],
-    quantities: [
-      { id: "q-radius", label: "Rayon de chaque arc", value: s1.radius, unit: "mm", quality: "exact" },
-      { id: "q-bulge", label: "Bombement de chaque S", value: bulge, unit: "mm", quality: "exact" },
-      { id: "q-spacing", label: "Décalage entre les deux S", value: spacing, unit: "mm", quality: "exact" },
-    ],
-    steps,
+  // 4. Métadonnées pédagogiques — couche UI uniquement.
+  const metadata: TraceModelMetadata = {
+    id: "double-s",
+    name: "Composition double-S",
+    slug: "double-s",
+    categoryId: "forms-design",
+    difficulty: "advanced",
+    tags: ["double-s", "doucine", "ogee", "frise", "non radial", "décoratif"],
+    status: "preview",
+    parameters: doubleSParameters,
+    explanation: doubleSExplanation,
   };
-  return validateTraceModel(model);
+
+  return parametricShapeToTraceModel(shape, metadata, { dimensions });
 }

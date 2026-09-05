@@ -1,7 +1,14 @@
 import { degToRad } from "./angles";
 import { boundsFromPoints, pointAtPolar } from "./measure";
 import { emptyPrimitives, registerShapeGenerator, type ParametricShape } from "./model";
-import { assertFinitePositive, type Arc2D, type Point2D, type Segment2D } from "./types";
+import { assertFinite, assertFinitePositive, type Arc2D, type Point2D, type Segment2D } from "./types";
+
+/** Un rayon de départ nul est une spirale valide (elle part du centre) — seul un rayon négatif est refusé. */
+function assertFiniteNonNegative(value: number, label: string): number {
+  const finite = assertFinite(value, label);
+  if (finite < 0) throw new Error(`${label} doit être positif ou nul.`);
+  return finite;
+}
 
 export type SpiralParameters = { centre?: Point2D; startRadius: number; growthPerTurn: number; turns: number; startAngleDegrees?: number; samplesPerTurn?: number };
 
@@ -16,7 +23,7 @@ export function archimedeanSpiralRadius(params: SpiralParameters, thetaRadians: 
  * dimension de chantier — voir `approximateSpiralWithArcs` pour la version constructible.
  */
 export function createMathematicalSpiral(params: SpiralParameters): ParametricShape<SpiralParameters> {
-  assertFinitePositive(params.startRadius, "Le rayon de départ");
+  assertFiniteNonNegative(params.startRadius, "Le rayon de départ");
   assertFinitePositive(params.turns, "Le nombre de tours");
   const centre = params.centre ?? { x: 0, y: 0 };
   const startAngle = degToRad(params.startAngleDegrees ?? 0);
@@ -29,7 +36,10 @@ export function createMathematicalSpiral(params: SpiralParameters): ParametricSh
   });
   const primitives = emptyPrimitives();
   primitives.points.O = centre;
+  primitives.points.start = points[0];
+  primitives.points.end = points[points.length - 1];
   primitives.polylines.push({ points, closed: false });
+  const endRadius = archimedeanSpiralRadius(params, params.turns * 2 * Math.PI);
   const bounds = boundsFromPoints(points, 10);
   return {
     id: "spiral-mathematical",
@@ -41,9 +51,17 @@ export function createMathematicalSpiral(params: SpiralParameters): ParametricSh
     width: bounds.maxX - bounds.minX,
     height: bounds.maxY - bounds.minY,
     rotation: startAngle,
-    metadata: { curveEquation: "r(θ) = startRadius + growthPerTurn·θ/2π", samplingOnly: true },
+    metadata: { curveEquation: "r(θ) = startRadius + growthPerTurn·θ/2π", samplingOnly: true, endRadius },
     constructionSteps: [
-      { id: "step-note", instruction: "Courbe mathématique : non reportable directement au compas. Utiliser la version chantier (arcs) pour le traçage.", geometry: [] },
+      { id: "step-centre", title: "Repérer le centre", instruction: "Marquer le centre O et l'angle de départ.", geometry: [{ kind: "point", id: "O" }] },
+      { id: "step-start", title: "Définir le rayon initial", instruction: `Reporter le premier point à ${params.startRadius.toFixed(1)} mm du centre.`, geometry: [{ kind: "point", id: "start" }] },
+      { id: "step-progress", title: "Reporter la progression", instruction: `Reporter des points à intervalles angulaires réguliers, à rayon croissant de ${params.growthPerTurn.toFixed(1)} mm par tour.`, geometry: [] },
+      // Ne pas référencer la polyligne ici (kind:"polyline") : l'adaptateur la rematérialiserait
+      // systématiquement comme une seconde entité "construction" distincte (jamais dédupliquée
+      // par valeur, contrairement aux segments/cercles/arcs) — coûteux pour ~480 points et inutile
+      // puisque la polyligne "shape" est déjà visible dans le tracé final.
+      { id: "step-turns", title: "Construire les tours", instruction: `Relier les points par une courbe continue sur ${params.turns} tour${params.turns > 1 ? "s" : ""}.`, geometry: [] },
+      { id: "step-end", title: "Contrôler le rayon final", instruction: `Contrôler que le dernier point est à ${endRadius.toFixed(1)} mm du centre.`, geometry: [{ kind: "point", id: "end" }] },
     ],
     quality: "exact",
   };
