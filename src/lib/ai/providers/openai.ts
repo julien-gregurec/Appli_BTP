@@ -103,6 +103,10 @@ export function creerProviderOpenAI(): ProviderIA {
         tools: outils?.map(convertirOutil),
         tool_choice: forcerOutil ? { type: "function", name: forcerOutil } : undefined,
         max_output_tokens: maxTokens,
+        // RGPD : ne jamais laisser OpenAI conserver l'objet Response (30 jours par defaut) —
+        // le provider reconstruit tout l'historique a chaque appel (construireInput), aucune
+        // dependance a response_id/previous_response_id/retrieve — voir rgpd-sous-traitants.md.
+        store: false,
       }, { timeout: TIMEOUT_MS });
       return { texte: response.output_text ?? "", appelsOutils: extraireAppelsOutils(response.output), usage: extraireUsage(modele, response.usage) };
     },
@@ -113,6 +117,7 @@ export function creerProviderOpenAI(): ProviderIA {
         instructions: system,
         input: [{ role: "user", content: [construireContenuFichier(fichier), { type: "input_text", text: texte }] }],
         max_output_tokens: maxTokens,
+        store: false,
       }, { timeout: TIMEOUT_MS });
       return { texte: response.output_text ?? "", usage: extraireUsage(modele, response.usage) };
     },
@@ -125,6 +130,7 @@ export function creerProviderOpenAI(): ProviderIA {
         tools: outils?.map(convertirOutil),
         max_output_tokens: maxTokens,
         stream: true,
+        store: false,
       }, { timeout: TIMEOUT_MS });
 
       const appelsOutils: AppelOutilIA[] = [];
