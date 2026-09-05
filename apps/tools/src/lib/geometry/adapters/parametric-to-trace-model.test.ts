@@ -71,6 +71,29 @@ describe("pilotes de convergence ParametricShape → TraceModel", () => {
     expect(model.arcs.length).toBeGreaterThan(0);
   });
 
+  it("pilote 5a bis — l'arche : ligne de naissance en construction, axe visible, bounds couvrant le sommet de l'arc (C4-LOT2-ARCHES-V1 §7/§10)", () => {
+    const shape = createArch({ type: "semicircular", width: 1000 });
+    const model = parametricShapeToTraceModel(shape, baseMetadata({ name: "Arche rôles", slug: "pilot-arch-roles" }));
+    expect(model.arcs[0].role).not.toBe("construction");
+    expect(model.constructionLines.some((l) => l.role === "construction")).toBe(true);
+    expect(model.constructionLines.some((l) => l.role === "axis")).toBe(true);
+    const arc = model.arcs[0];
+    expect(arc.centre.y + arc.radius).toBeLessThanOrEqual(model.bounds.maxY + 1e-6);
+  });
+
+  it("pilote 5a ter — l'ogive : deux cercles complets en construction, deux arcs en tracé final", () => {
+    const shape = createArch({ type: "lancet", width: 1000, pointedness: "equilateral" });
+    const model = parametricShapeToTraceModel(shape, baseMetadata({ name: "Ogive rôles", slug: "pilot-ogive-roles" }));
+    expect(model.circles).toHaveLength(2);
+    expect(model.circles.every((c) => c.role === "construction")).toBe(true);
+    expect(model.arcs).toHaveLength(2);
+    expect(model.arcs.every((a) => a.role !== "construction")).toBe(true);
+    for (const c of model.circles) {
+      expect(c.centre.y + c.radius).toBeLessThanOrEqual(model.bounds.maxY + 1e-6);
+      expect(c.centre.y - c.radius).toBeGreaterThanOrEqual(model.bounds.minY - 1e-6);
+    }
+  });
+
   it("pilote 5b — cœur", () => {
     const shape = createHeart({ width: 400, height: 400 });
     const model = parametricShapeToTraceModel(shape, baseMetadata({ name: "Cœur pilote", slug: "pilot-heart" }));
