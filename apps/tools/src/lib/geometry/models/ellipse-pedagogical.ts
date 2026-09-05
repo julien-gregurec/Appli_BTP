@@ -2,11 +2,17 @@
 // foyers, centrée sur la construction elle-même (grand axe/petit axe/foyers/distance focale),
 // SANS positionnement dans une pièce (contrairement à createEllipse de shapes.ts, couplé à
 // positionInRoom : un fichier différent, pas une seconde implémentation concurrente de la même
-// formule). Même formule exacte que shapes.ts : c = sqrt(a² - b²) — reprise ici littéralement,
-// jamais recalculée différemment.
-import { assertFinitePositive, boundsFromPoints, point } from "../primitives";
-import type { SiteStep } from "../shape-model";
-import { validateTraceModel, type TraceExplanation, type TraceModel, type TraceParameter } from "../trace-model";
+// formule).
+//
+// C4-LOT6-ELLIPSE-FINAL-V1 — Migré vers Engine B, DERNIER modèle de la convergence C4 : la
+// formule c = √(a² − b²) et toute la géométrie (foyers, sommets, axes, ellipse) vivent
+// exclusivement dans `engine/ellipse.ts::createEllipse` (générateur générique, réutilisable,
+// délibérément PAS nommé "createPedagogicalEllipse" — la pédagogie reste ici, côté modèle).
+import { createAlignedDimension } from "../engine/dimensions";
+import { createEllipse } from "../engine/ellipse";
+import { dimensionResultToDimension, parametricShapeToTraceModel, type TraceModelMetadata } from "../adapters";
+import type { Dimension } from "../primitives";
+import type { TraceExplanation, TraceModel, TraceParameter } from "../trace-model";
 
 export type EllipsePedagogicalInput = { width: number; height: number };
 
@@ -37,65 +43,42 @@ export const ellipsePedagogicalExplanation: TraceExplanation = {
 };
 
 export function createEllipsePedagogicalGeometry(input: EllipsePedagogicalInput = DEFAULT_INPUT): TraceModel {
-  const width = assertFinitePositive(input.width, "La largeur");
-  const height = assertFinitePositive(input.height, "La hauteur");
-  const halfWidth = width / 2;
-  const halfHeight = height / 2;
-  const majorHorizontal = halfWidth >= halfHeight;
-  const a = Math.max(halfWidth, halfHeight);
-  const b = Math.min(halfWidth, halfHeight);
-  const c = Math.sqrt(a ** 2 - b ** 2);
+  // 1. Traduction des paramètres UI — aucun calcul géométrique ici.
+  const width = input.width;
+  if (!Number.isFinite(width) || width <= 0) throw new Error("La largeur doit être supérieure à 0.");
+  const height = input.height;
+  if (!Number.isFinite(height) || height <= 0) throw new Error("La hauteur doit être supérieure à 0.");
 
-  const O = point("O", 0, 0, "Centre O", "center");
-  const F1 = point("F1", majorHorizontal ? -c : 0, majorHorizontal ? 0 : -c, "Foyer F1");
-  const F2 = point("F2", majorHorizontal ? c : 0, majorHorizontal ? 0 : c, "Foyer F2");
-  const A = point("A", -halfWidth, 0, "A");
-  const B = point("B", halfWidth, 0, "B");
-  const C = point("C", 0, halfHeight, "C");
-  const D = point("D", 0, -halfHeight, "D");
+  // 2. Géométrie : exclusivement Engine B (createEllipse, sans rotation — non exposée côté UI).
+  const shape = createEllipse({ width, height });
+  const F1 = shape.primitives.points.F1;
+  const F2 = shape.primitives.points.F2;
+  const { a, b, c } = shape.metadata as { a: number; b: number; c: number };
+  const majorAlongX = shape.metadata.majorAlongX as boolean;
+  const majorStart = majorAlongX ? shape.primitives.points["Vx-"] : shape.primitives.points["Vy-"];
+  const majorEnd = majorAlongX ? shape.primitives.points["Vx+"] : shape.primitives.points["Vy+"];
+  const minorStart = majorAlongX ? shape.primitives.points["Vy-"] : shape.primitives.points["Vx-"];
+  const minorEnd = majorAlongX ? shape.primitives.points["Vy+"] : shape.primitives.points["Vx+"];
 
-  const points = [O, F1, F2, A, B, C, D];
-  const stringLength = 2 * a;
-
-  const steps: SiteStep[] = [
-    { id: "step-axes", title: "Tracer les deux axes", instruction: `Tracez les axes de ${width} mm et ${height} mm, centrés en O.`, measurements: [`${width} mm`, `${height} mm`], pointIds: ["A", "B", "C", "D", "O"], visibleEntityIds: ["axis-x", "axis-y"] },
-    { id: "step-focal", title: "Calculer la distance focale", instruction: `c = √(${Math.round(a)}² − ${Math.round(b)}²) = ${Math.round(c)} mm.`, measurements: [`${Math.round(c)} mm`], pointIds: ["O"], visibleEntityIds: ["axis-x", "axis-y"] },
-    { id: "step-foyers", title: "Placer les foyers", instruction: `Placez F1 et F2 à ${Math.round(c)} mm de O sur le grand axe.`, measurements: [`${Math.round(c)} mm`], pointIds: ["O", "F1", "F2"], controlId: "control-foci", visibleEntityIds: ["axis-x", "axis-y"] },
-    { id: "step-string", title: "Régler la ficelle", instruction: `Nouez une ficelle de longueur totale ${Math.round(stringLength)} mm autour des deux foyers.`, measurements: [`${Math.round(stringLength)} mm`], pointIds: ["F1", "F2"], controlId: "control-string", visibleEntityIds: ["axis-x", "axis-y"] },
-    { id: "step-trace", title: "Tracer l'ellipse", instruction: "Tendez la ficelle avec le crayon et parcourez tout le tour des deux foyers.", measurements: [], pointIds: ["F1", "F2", "A", "B", "C", "D"], visibleEntityIds: ["axis-x", "axis-y", "ellipse-main"] },
+  // 3. Cotations : moteur de cotation Engine B, valeurs jamais réécrites à la main.
+  const dimensions: Dimension[] = [
+    dimensionResultToDimension("dim-major", `Grand axe ${Math.round(2 * a)} mm`, createAlignedDimension(majorStart, majorEnd, majorAlongX ? -60 : 60)),
+    dimensionResultToDimension("dim-minor", `Petit axe ${Math.round(2 * b)} mm`, createAlignedDimension(minorStart, minorEnd, 60)),
+    dimensionResultToDimension("dim-foci", `Foyers ${Math.round(2 * c)} mm`, createAlignedDimension(F1, F2)),
   ];
 
-  const model: TraceModel = {
-    id: "ellipse-pedagogical", name: "Ellipse pédagogique (méthode des foyers)", slug: "ellipse-pedagogical", categoryId: "forms-design", difficulty: "intermediate",
-    tags: ["ellipse", "ovale", "foyers", "ficelle", "pédagogique"], status: "preview",
-    parameters: ellipsePedagogicalParameters, explanation: ellipsePedagogicalExplanation,
-    bounds: boundsFromPoints(points, Math.max(80, a * 0.12)),
-    referenceFrame: { unit: "mm", origin: O, xLabel: "X", yLabel: "Y", yOrientation: "up" },
-    axes: [],
-    points,
-    segments: [],
-    arcs: [],
-    circles: [],
-    ellipses: [{ id: "ellipse-main", centre: O, radiusX: halfWidth, radiusY: halfHeight, role: "shape" }],
-    constructionLines: [
-      { id: "axis-x", start: point("axis-x-", -halfWidth - 40, 0), end: point("axis-x+", halfWidth + 40, 0), role: "axis" },
-      { id: "axis-y", start: point("axis-y-", 0, -halfHeight - 40), end: point("axis-y+", 0, halfHeight + 40), role: "axis" },
-    ],
-    dimensions: [
-      { id: "dim-major", kind: "linear", from: majorHorizontal ? A : D, to: majorHorizontal ? B : C, label: `Grand axe ${majorHorizontal ? width : height} mm`, value: majorHorizontal ? width : height, unit: "mm", offset: majorHorizontal ? -60 : 60 },
-      { id: "dim-minor", kind: "linear", from: majorHorizontal ? D : A, to: majorHorizontal ? C : B, label: `Petit axe ${majorHorizontal ? height : width} mm`, value: majorHorizontal ? height : width, unit: "mm", offset: 60 },
-      { id: "dim-foci", kind: "linear", from: F1, to: F2, label: `Foyers ${Math.round(2 * c)} mm`, value: 2 * c, unit: "mm" },
-    ],
-    controls: [
-      { id: "control-foci", label: "Distance centre → chaque foyer", value: c, unit: "mm", pointIds: ["O", "F1"] },
-      { id: "control-string", label: "Longueur de ficelle F1–point–F2", value: stringLength, unit: "mm", pointIds: ["F1", "A", "F2"] },
-    ],
-    quantities: [
-      { id: "q-a", label: "Demi-grand axe (a)", value: a, unit: "mm", quality: "exact" },
-      { id: "q-b", label: "Demi-petit axe (b)", value: b, unit: "mm", quality: "exact" },
-      { id: "q-c", label: "Distance focale (c)", value: c, unit: "mm", quality: "exact" },
-    ],
-    steps,
+  // 4. Métadonnées pédagogiques — couche UI uniquement (foyers, ficelle : jamais dans Engine B).
+  const metadata: TraceModelMetadata = {
+    id: "ellipse-pedagogical",
+    name: "Ellipse pédagogique (méthode des foyers)",
+    slug: "ellipse-pedagogical",
+    categoryId: "forms-design",
+    difficulty: "intermediate",
+    tags: ["ellipse", "ovale", "foyers", "ficelle", "pédagogique"],
+    status: "preview",
+    parameters: ellipsePedagogicalParameters,
+    explanation: ellipsePedagogicalExplanation,
   };
-  return validateTraceModel(model);
+
+  return parametricShapeToTraceModel(shape, metadata, { dimensions });
 }
