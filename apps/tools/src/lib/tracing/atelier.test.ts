@@ -12,6 +12,7 @@ import {
   TRACING_OUVRAGE_ORDER,
   buildTracingProjectFromInput,
   describeTracingProject,
+  filterTracingProjects,
   formatRoomDimensions,
   metresInputToMm,
   modelParamsAfterModelChoice,
@@ -187,5 +188,35 @@ describe("modelParamsAfterModelChoice", () => {
 
   it("ne rend rien quand le projet n'avait aucune surcharge", () => {
     expect(modelParamsAfterModelChoice({ modelId: "rosette-6", modelParams: undefined }, "rosette-6")).toBeUndefined();
+  });
+});
+
+describe("filterTracingProjects (TRACING-WORKSHOP-UI-V1 §5)", () => {
+  const summaries = [
+    { id: "a", name: "Plafond séjour", typeLabel: "Plafond", dimensionsLabel: "5 × 4 m", modelLabel: "Rosace 6 pétales simple", mode: "parametric" as const, modeLabel: null, startFromPhoto: false, updatedAt: "2026-09-05T09:00:00.000Z" },
+    { id: "b", name: "Arche couloir", typeLabel: "Arche", dimensionsLabel: null, modelLabel: "Arche plein cintre", mode: "parametric" as const, modeLabel: null, startFromPhoto: false, updatedAt: "2026-09-04T09:00:00.000Z" },
+    { id: "c", name: "Niche entrée", typeLabel: "Niche", dimensionsLabel: null, modelLabel: null, mode: "free" as const, modeLabel: "TRACÉ LIBRE", startFromPhoto: true, updatedAt: "2026-09-03T09:00:00.000Z" },
+  ];
+
+  it("une recherche vide renvoie la liste inchangée", () => {
+    expect(filterTracingProjects(summaries, "   ")).toBe(summaries);
+  });
+
+  it("trouve par nom, sans accent ni casse", () => {
+    expect(filterTracingProjects(summaries, "sejour").map((item) => item.id)).toEqual(["a"]);
+    expect(filterTracingProjects(summaries, "PLAFOND").map((item) => item.id)).toEqual(["a"]);
+  });
+
+  it("trouve par type d'ouvrage et par modèle", () => {
+    expect(filterTracingProjects(summaries, "niche").map((item) => item.id)).toEqual(["c"]);
+    expect(filterTracingProjects(summaries, "plein cintre").map((item) => item.id)).toEqual(["b"]);
+  });
+
+  it("trouve par mode, comme la carte l'affiche (WORKSHOP-UI-CANONICAL-V2)", () => {
+    expect(filterTracingProjects(summaries, "trace libre").map((item) => item.id)).toEqual(["c"]);
+  });
+
+  it("ne ramène rien plutôt qu'un repli quand rien ne correspond", () => {
+    expect(filterTracingProjects(summaries, "zzz")).toHaveLength(0);
   });
 });

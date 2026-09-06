@@ -434,6 +434,12 @@ body[data-elsatia-update-banner] .offline-flag { top: calc(env(safe-area-inset-t
 .atelier-card a { display: inline-grid; min-height: 40px; place-items: center; padding: 0 16px; border-radius: 8px; background: var(--navy); color: white; font-size: 10px; font-weight: 800; }
 .atelier-card-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .atelier-card-actions a.ghost { background: transparent; border: 1px solid var(--line); color: var(--navy); }
+/* TRACING-WORKSHOP-UI-V1 §5 — recherche dans les tracés enregistrés. */
+.atelier-search { display: grid; gap: 6px; padding-top: 16px; }
+.atelier-search label { color: var(--ink-soft); font-size: 11px; font-weight: 700; }
+.atelier-search input { width: 100%; min-height: 48px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); color: var(--ink); font-size: 15px; }
+.atelier-search input:focus-visible { outline: 2px solid var(--amber); outline-offset: 1px; }
+.atelier-empty .atelier-cta { margin-top: 14px; }
 .atelier-empty { padding: 56px 24px; border: 1px dashed #cfd4d1; border-radius: 13px; color: var(--ink-soft); text-align: center; }
 .atelier-empty span { color: var(--amber); font-size: 46px; }
 .atelier-empty h2 { margin: 10px 0 6px; color: var(--ink); font-family: Georgia, serif; font-size: 24px; font-weight: 500; }

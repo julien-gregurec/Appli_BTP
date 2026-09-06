@@ -185,3 +185,35 @@ export function describeTracingProject(project: TracingProject): TracingProjectS
     updatedAt: project.updatedAt,
   };
 }
+
+/**
+ * TRACING-WORKSHOP-UI-V1 §5 — recherche dans les tracés enregistrés.
+ *
+ * Porte sur ce qui est affiché sur la carte : nom, type d'ouvrage, modèle, MODE (« tracé
+ * libre ») et dimensions de pièce. Accents et casse ignorés — sur un téléphone de chantier,
+ * « plafond sejour » doit retrouver « Plafond séjour ». Une recherche vide ne filtre rien et
+ * renvoie la même liste.
+ *
+ * WORKSHOP-UI-CANONICAL-V2 — le mode rejoint la recherche parce que la carte l'affiche depuis
+ * FREE-DRAWING §2 : un critère visible qu'on ne peut pas taper se lit comme un bug.
+ */
+export function filterTracingProjects(
+  summaries: readonly TracingProjectSummary[],
+  query: string,
+): readonly TracingProjectSummary[] {
+  const needle = searchKey(query.trim());
+  if (!needle) return summaries;
+  return summaries.filter((summary) =>
+    searchKey(
+      [summary.name, summary.typeLabel, summary.modelLabel ?? "", summary.modeLabel ?? "", summary.dimensionsLabel ?? ""].join(" "),
+    ).includes(needle),
+  );
+}
+
+/** Minuscules sans diacritiques combinants (U+0300–U+036F). */
+function searchKey(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}

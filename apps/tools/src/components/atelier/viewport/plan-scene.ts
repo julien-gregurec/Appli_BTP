@@ -9,7 +9,7 @@
  * Ce module est pur (aucun React, aucun DOM) pour rester testable côté Node.
  */
 
-import type { Arc, BoundingBox, Circle, Ellipse, Point, Polygon, Polyline, Segment } from "../../../lib/geometry/primitives";
+import type { Arc, BoundingBox, Circle, Dimension, Ellipse, Point, Polygon, Polyline, Segment } from "../../../lib/geometry/primitives";
 import { freeContourMeasures, type FreeContourMeasures } from "../../../lib/tracing/free-contour";
 
 export type PlanScene = {
@@ -30,6 +30,18 @@ export type PlanScene = {
   ellipses?: readonly Ellipse[];
   polylines?: readonly Polyline[];
   polygons?: readonly Polygon[];
+  /**
+   * Cotations du modèle (TRACING-WORKSHOP-UI-V1 §15). Optionnel et additif comme les autres
+   * champs : une `ShapeGeometry` les publie déjà, la scène se contente de les laisser passer.
+   *
+   * Ce sont des ANNOTATIONS, pas des entités sélectionnables : ni `listSceneEntities` ni le
+   * hit-test ne les considèrent. On ne désigne pas une cote au doigt sur un chantier, on la lit.
+   *
+   * Les AXES, eux, n'ont pas de champ propre : dans tous les modèles du moteur ils sont des
+   * `constructionLines` portant `role: "axis"` (voir `shapes.ts`). On les distingue donc par
+   * leur rôle, comme le fait déjà `AdvancedPlan`, plutôt que d'introduire une seconde source.
+   */
+  dimensions?: readonly Dimension[];
 };
 
 export type SceneEntityKind = "segment" | "arc" | "circle" | "ellipse" | "polyline" | "polygon" | "point";

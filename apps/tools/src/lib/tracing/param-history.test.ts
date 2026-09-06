@@ -136,6 +136,14 @@ describe("surcharges et valeurs effectives", () => {
     expect(overridesOf(defaults, defaults)).toEqual({});
   });
 
+  // Porté depuis `atelier.test.ts` avec la réconciliation WORKSHOP-UI-CANONICAL-V2 : le lot
+  // Workshop portait un second calcul de surcharges (`modelParamOverrides`), supprimé au
+  // profit de celui-ci. Son cas propre reste couvert, ici et une seule fois.
+  it("retient une valeur dont le modèle ne publie pas de défaut", () => {
+    expect(overridesOf({ diameter: 2400 }, {})).toEqual({ diameter: 2400 });
+    expect(overridesForProject(overridesOf({ diameter: 2400 }, {}))).toEqual({ diameter: 2400 });
+  });
+
   it("recompose les valeurs effectives", () => {
     expect(valuesOf(defaults, { diameter: 2400 })).toEqual({ diameter: 2400, divisions: 6, startAngle: 0 });
     expect(valuesOf(defaults, undefined)).toEqual(defaults);

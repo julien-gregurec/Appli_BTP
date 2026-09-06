@@ -7,6 +7,8 @@ import {
   majorGridInterval,
   MAX_GRID_LINES,
   MIN_GRID_SPACING_PX,
+  WORKSHOP_GRID_STEPS_MM,
+  resolveGridStep,
 } from "./grid";
 import { fitToBounds, type ViewportSize, type ViewportState } from "./viewport-math";
 
@@ -112,5 +114,32 @@ describe("formatGridStep", () => {
     expect(formatGridStep(100)).toBe("100 mm");
     expect(formatGridStep(1000)).toBe("1 m");
     expect(formatGridStep(5000)).toBe("5 m");
+  });
+});
+
+describe("pas imposé (TRACING-WORKSHOP-UI-V1 §16)", () => {
+  it("retient le pas demandé et ignore un pas absurde", () => {
+    expect(resolveGridStep(0.1, 250)).toBe(250);
+    expect(resolveGridStep(0.1, null)).toBe(chooseGridStep(0.1));
+    expect(resolveGridStep(0.1, 0)).toBe(chooseGridStep(0.1));
+    expect(resolveGridStep(0.1, -50)).toBe(chooseGridStep(0.1));
+    expect(resolveGridStep(0.1, Number.NaN)).toBe(chooseGridStep(0.1));
+  });
+
+  it("dessine la grille au pas demandé, pas à celui du zoom", () => {
+    const view: ViewportState = { scale: 0.2, centerX: 0, centerY: 0 };
+    const model = buildGridModel(view, SIZE, undefined, 250)!;
+    expect(model.stepMm).toBe(250);
+    expect(model.spacingPx).toBeCloseTo(250 * view.scale);
+  });
+
+  it("le garde-fou de densité s'applique aussi au pas imposé", () => {
+    // Très dézoomé + pas très fin : la grille n'est PAS dessinée plutôt que d'exploser.
+    expect(buildGridModel({ scale: 0.001, centerX: 0, centerY: 0 }, SIZE, undefined, 10)).toBeNull();
+  });
+
+  it("les pas proposés à l'artisan sont croissants et exploitables", () => {
+    expect([...WORKSHOP_GRID_STEPS_MM]).toEqual([...WORKSHOP_GRID_STEPS_MM].sort((a, b) => a - b));
+    for (const step of WORKSHOP_GRID_STEPS_MM) expect(step).toBeGreaterThan(0);
   });
 });

@@ -52,7 +52,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { hitTest, hitTestAll } from "@/lib/geometry/hit-test";
 import { snap, type SnapCandidate } from "@/lib/geometry/snap";
-import { chooseGridStep } from "@/lib/viewport/grid";
+import { resolveGridStep } from "@/lib/viewport/grid";
 import {
   advanceSelectionCycle,
   cycleAnchorPx,
@@ -186,6 +186,22 @@ export type AtelierViewportWorkspaceProps = {
   editing?: AtelierEditingApi;
   /** §4 — outils de création, déplacement direct et suppression du tracé libre. */
   drawing?: AtelierFreeDrawingApi;
+  /**
+   * TRACING-WORKSHOP-UI-V1 §12/§16 — barre d'outils CONTRÔLÉE.
+   *
+   * Fournir `toolbarState` + `onToolbarStateChange` transfère l'état au parent : l'Atelier
+   * peut alors partager un même interrupteur de grille entre sa barre et son panneau Grille,
+   * au lieu d'avoir deux vérités qui se contredisent à l'écran. Sans ces props, la barre
+   * reste autonome, exactement comme avant ce lot.
+   */
+  toolbarState?: ToolbarState;
+  onToolbarStateChange?: (next: ToolbarState) => void;
+  /** Pas de grille imposé (§16) ; `null` laisse le pas suivre le zoom. */
+  gridStepMm?: number | null;
+  /** Cotations du modèle (§15). */
+  showDimensions?: boolean;
+  /** Étiquettes des points et des cotes. */
+  showLabels?: boolean;
 };
 
 /**
@@ -252,8 +268,24 @@ export function AtelierViewportWorkspace({
   viewKey,
   editing,
   drawing,
+  toolbarState,
+  onToolbarStateChange,
+  gridStepMm = null,
+  showDimensions = false,
+  showLabels = true,
 }: AtelierViewportWorkspaceProps) {
-  const [toolbar, setToolbar] = useState<ToolbarState>(initialToolbarState);
+  const [internalToolbar, setInternalToolbar] = useState<ToolbarState>(initialToolbarState);
+  const toolbar = toolbarState ?? internalToolbar;
+
+  // Un seul point de mutation pour les deux régimes : les gestionnaires ci-dessous ignorent
+  // complètement de savoir qui détient l'état.
+  const setToolbar = useCallback(
+    (update: (current: ToolbarState) => ToolbarState) => {
+      if (toolbarState && onToolbarStateChange) onToolbarStateChange(update(toolbarState));
+      else setInternalToolbar(update);
+    },
+    [toolbarState, onToolbarStateChange],
+  );
   const [hoveredEntityId, setHoveredEntityId] = useState<string | null>(null);
   const [snapCandidate, setSnapCandidate] = useState<SnapCandidate | null>(null);
   const [activeHandleId, setActiveHandleId] = useState<string | null>(null);
@@ -351,9 +383,12 @@ export function AtelierViewportWorkspace({
   /** Point monde d'un point écran local, à la vue courante. */
   const worldOf = useCallback((local: ScreenPoint) => screenToWorld(local, view, size), [view, size]);
 
-  const onSelectTool = useCallback((tool: AtelierTool) => {
-    setToolbar((current) => selectTool(current, tool));
-  }, []);
+  const onSelectTool = useCallback(
+    (tool: AtelierTool) => {
+      setToolbar((current) => selectTool(current, tool));
+    },
+    [setToolbar],
+  );
 
   const onAction = useCallback(
     (action: ToolbarActionId) => {
@@ -363,16 +398,16 @@ export function AtelierViewportWorkspace({
       else if (action === "redo") editing?.onRedo();
       else controller.recenter();
     },
-    [controller, editing],
+    [controller, editing, setToolbar],
   );
 
   const closeProperties = useCallback(() => {
     setToolbar((current) => (current.propertiesOpen ? toggleProperties(current) : current));
-  }, []);
+  }, [setToolbar]);
 
   const openProperties = useCallback(() => {
     setToolbar((current) => (current.propertiesOpen ? current : toggleProperties(current)));
-  }, []);
+  }, [setToolbar]);
 
   /**
    * Applique une nouvelle sélection par UN SEUL canal.
@@ -419,11 +454,11 @@ export function AtelierViewportWorkspace({
       const world = worldOf(local);
       const candidate = snap(scene, world, {
         toleranceWorld: toleranceWorldFor(snapTolerancePx(precision), view),
-        gridStepMm: chooseGridStep(view.scale),
+        gridStepMm: resolveGridStep(view.scale, gridStepMm),
       });
       return { position: candidate?.position ?? world, snapped: Boolean(candidate) };
     },
-    [scene, view, worldOf],
+    [gridStepMm, scene, view, worldOf],
   );
 
   /**
@@ -505,7 +540,7 @@ export function AtelierViewportWorkspace({
       // lui-même, bornées à la tolérance (§5). Le survol reste donc un seul appel par trame.
       const candidate = snap(scene, world, {
         toleranceWorld: toleranceWorldFor(snapTolerancePx(precision), view),
-        gridStepMm: chooseGridStep(view.scale),
+        gridStepMm: resolveGridStep(view.scale, gridStepMm),
       });
       setSnapCandidate(candidate);
       // §6 — le point courant du tracé en cours EST la position accrochée : le fantôme montre
@@ -513,7 +548,7 @@ export function AtelierViewportWorkspace({
       setDrawCursor(candidate ? candidate.position : world);
       setDrawCloseReachMm(toleranceWorldFor(selectionTolerancePx(precision), view));
     },
-    [scene, view, worldOf],
+    [gridStepMm, scene, view, worldOf],
   );
 
   /**
@@ -559,7 +594,7 @@ export function AtelierViewportWorkspace({
         const world = worldOf(local);
         const candidate = snap(session.snapScene, world, {
           toleranceWorld: toleranceWorldFor(snapTolerancePx(session.precision), view),
-          gridStepMm: chooseGridStep(view.scale),
+          gridStepMm: resolveGridStep(view.scale, gridStepMm),
         });
         // La position ACCROCHÉE est celle qui traverse l'inversion (§6) : accrocher pour
         // l'affichage seulement reviendrait à mentir sur ce qui va être enregistré.
@@ -613,7 +648,7 @@ export function AtelierViewportWorkspace({
         }
       },
     };
-  }, [drawing, editMode, editing, scene, view, worldOf]);
+  }, [drawing, editMode, editing, gridStepMm, scene, view, worldOf]);
 
   /**
    * §4 — fin explicite d'une polyligne. Deux chemins, un seul comportement : la touche
@@ -692,6 +727,7 @@ export function AtelierViewportWorkspace({
         controller={controller}
         label={`Plan interactif — ${scene.name}`}
         gridVisible={toolbar.gridVisible}
+        gridStepMm={gridStepMm}
         tool={effectiveTool}
         grab={grab}
         onCanvasClick={drawTool ? onDrawClick : feedbackVisible ? onCanvasClick : undefined}
@@ -750,6 +786,8 @@ export function AtelierViewportWorkspace({
               hoveredEntityId={feedbackVisible ? hoveredEntityId : null}
               snapPoint={snapFeedbackVisible ? snapCandidate?.position ?? null : null}
               snapIsIntersection={snapCandidate?.kind === "intersection"}
+              showDimensions={showDimensions}
+              showLabels={showLabels}
             />
             {editMode && (
               <HandleLayer

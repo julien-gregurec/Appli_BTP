@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import { describeTracingProject, type TracingProjectSummary } from "@/lib/tracing/atelier";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { describeTracingProject, filterTracingProjects, type TracingProjectSummary } from "@/lib/tracing/atelier";
 import { evaluateDraftRecovery, type TracingDraftPointer } from "@/lib/tracing/draft";
 import { useAtelierPersistence } from "@/lib/tracing/use-atelier-autosave";
 import { useAccount } from "./AccountProvider";
@@ -20,6 +20,7 @@ export function AtelierWorkspace() {
   const [projects, setProjects] = useState<TracingProjectSummary[] | null>(null);
   const [draft, setDraft] = useState<DraftState>(null);
   const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
 
   const refresh = useCallback(async () => {
     if (!repository) return;
@@ -54,6 +55,10 @@ export function AtelierWorkspace() {
     };
   }, [available, repository, draftStore, refresh]);
 
+  // §5 — recherche sur la liste déjà chargée : instantanée, hors ligne, sans relecture du
+  // stockage. La liste complète reste la source ; seule la vue est filtrée.
+  const visible = useMemo(() => (projects ? filterTracingProjects(projects, query) : null), [projects, query]);
+
   const ignoreDraft = useCallback(() => {
     if (draft && draftStore) draftStore.write({ ...draft.pointer, closedCleanly: true });
     setDraft(null);
@@ -81,6 +86,9 @@ export function AtelierWorkspace() {
           <Link href="/atelier/nouveau" className="atelier-cta">
             + Nouveau tracé
           </Link>
+          <Link href="/atelier/modeles" className="atelier-cta ghost">
+            Modèles ELSATIA
+          </Link>
           <Link href="/projets" className="atelier-cta ghost">
             Mes projets d’outils
           </Link>
@@ -107,6 +115,20 @@ export function AtelierWorkspace() {
         <p className="eyebrow">TRACÉS RÉCENTS</p>
         {error && <p className="atelier-feedback">{error}</p>}
 
+        {projects !== null && projects.length > 0 && (
+          <div className="atelier-search">
+            <label htmlFor="atelier-search-input">Rechercher un tracé</label>
+            <input
+              id="atelier-search-input"
+              type="search"
+              value={query}
+              placeholder="nom, ouvrage, modèle…"
+              autoComplete="off"
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
+        )}
+
         {!ready ? (
           <p className="atelier-feedback" aria-live="polite">
             Chargement…
@@ -126,10 +148,19 @@ export function AtelierWorkspace() {
             <span aria-hidden="true">◇</span>
             <h2>Aucun tracé pour l’instant</h2>
             <p>Créez votre premier tracé : il sera sauvegardé automatiquement.</p>
+            <Link href="/atelier/modeles" className="atelier-cta">
+              Parcourir les modèles
+            </Link>
+          </div>
+        ) : visible !== null && visible.length === 0 ? (
+          <div className="atelier-empty">
+            <span aria-hidden="true">◇</span>
+            <h2>Aucun tracé ne correspond</h2>
+            <p>Essayez un autre mot, ou effacez la recherche.</p>
           </div>
         ) : (
           <div className="atelier-list">
-            {projects.map((project) => (
+            {(visible ?? []).map((project) => (
               <article className="atelier-card" key={project.id}>
                 <div>
                   <small>
@@ -143,7 +174,10 @@ export function AtelierWorkspace() {
                   <time dateTime={project.updatedAt}>Modifié le {dateFormat.format(new Date(project.updatedAt))}</time>
                 </div>
                 <div className="atelier-card-actions">
-                  <Link href={`/atelier/nouveau?reprendre=${encodeURIComponent(project.id)}`}>Reprendre</Link>
+                  <Link href={`/atelier/tracer?projectId=${encodeURIComponent(project.id)}`}>Ouvrir l’atelier</Link>
+                  <Link href={`/atelier/nouveau?reprendre=${encodeURIComponent(project.id)}`} className="ghost">
+                    Assistant
+                  </Link>
                   <Link href={`/atelier/export?projectId=${encodeURIComponent(project.id)}`} className="ghost">
                     Exporter
                   </Link>

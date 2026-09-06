@@ -17,7 +17,7 @@
  */
 
 import { useCallback, useEffect, useRef, type ReactNode } from "react";
-import { chooseGridStep, formatGridStep } from "@/lib/viewport/grid";
+import { buildGridModel, formatGridStep, resolveGridStep } from "@/lib/viewport/grid";
 import { pointerPrecisionOf, type PointerPrecision } from "@/lib/viewport/pointer-targeting";
 import type { ScreenPoint, ViewportSize, ViewportState } from "@/lib/viewport/viewport-math";
 import type { AtelierTool } from "./toolbar-model";
@@ -45,6 +45,12 @@ export type PlanViewportProps = {
   controller: PlanViewportController;
   label: string;
   gridVisible?: boolean;
+  /**
+   * Pas de grille imposé, en millimètres (§16). `null` — le défaut — laisse le pas suivre le
+   * zoom comme avant ce lot. Un pas trop fin pour le cadrage courant n'est pas dessiné : la
+   * barre d'état le dit alors explicitement, plutôt que d'afficher un pas qu'on ne voit pas.
+   */
+  gridStepMm?: number | null;
   /** Le mode courant ne change que le curseur ; le pan à un doigt reste toujours accessible. */
   tool?: AtelierTool;
   /**
@@ -101,6 +107,7 @@ export function PlanViewport({
   controller,
   label,
   gridVisible = true,
+  gridStepMm = null,
   tool = "pan",
   grab,
   onCanvasClick,
@@ -112,6 +119,18 @@ export function PlanViewport({
 }: PlanViewportProps) {
   const { containerRef, element, size, view, ready, percent, pan, zoomAtPoint, zoomIn, zoomOut, recenter } = controller;
   const { handlers, consumeDrag } = useViewportGestures(element, { pan, zoomAtPoint, grab });
+
+  /**
+   * Ce que la barre d'état annonce sur la grille. Un pas imposé que le garde-fou de densité
+   * refuse de dessiner doit se voir : afficher « Grille 100 mm » au-dessus d'un fond vide
+   * serait un mensonge d'interface.
+   */
+  const gridStatus = (() => {
+    const step = resolveGridStep(view.scale, gridStepMm);
+    if (gridStepMm == null) return `Grille ${formatGridStep(step)}`;
+    const drawn = buildGridModel(view, size, undefined, gridStepMm) !== null;
+    return drawn ? `Grille ${formatGridStep(step)}` : `Grille ${formatGridStep(step)} — trop fine à ce zoom`;
+  })();
 
   // Finesse du dernier pointeur vu. `onClick` ne reçoit qu'un `MouseEvent`, qui ne dit pas si
   // le geste venait d'un doigt : on la retient au `pointerdown`, qui le sait (§8).
@@ -231,7 +250,7 @@ export function PlanViewport({
         onPointerLeave={onPointerLeave}
       >
         <svg className={styles.svg} width={size.width || undefined} height={size.height || undefined} aria-hidden="true">
-          {ready && gridVisible && <GridOverlay view={view} size={size} />}
+          {ready && gridVisible && <GridOverlay view={view} size={size} stepMm={gridStepMm} />}
           {ready && children({ view, size, consumeDrag })}
         </svg>
       </div>
@@ -247,7 +266,7 @@ export function PlanViewport({
 
       <p className={styles.statusBar}>
         <span>Zoom {percent} %</span>
-        {gridVisible && <span>Grille {formatGridStep(chooseGridStep(view.scale))}</span>}
+        {gridVisible && <span>{gridStatus}</span>}
         {status}
       </p>
     </div>

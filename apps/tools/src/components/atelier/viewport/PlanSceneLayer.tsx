@@ -47,10 +47,17 @@ export type PlanSceneLayerProps = {
    */
   snapIsIntersection?: boolean;
   showPoints?: boolean;
+  /** Cotations du modèle (§15). Absentes par défaut : elles n'ont de sens qu'en mode Cotations. */
+  showDimensions?: boolean;
+  /** Libellés des points et des cotes. Un plan chargé se lit mieux sans eux. */
+  showLabels?: boolean;
 };
 
 /** Référence stable pour « pas de multisélection » — évite de périmer les mémos à chaque trame. */
 const NO_SELECTION: readonly string[] = [];
+
+/** Décalage écran d'une ligne de cote, en pixels — même convention que `AdvancedPlan`. */
+const DIMENSION_OFFSET_PX = 18;
 
 export function PlanSceneLayer({
   scene,
@@ -62,6 +69,8 @@ export function PlanSceneLayer({
   snapPoint = null,
   snapIsIntersection = false,
   showPoints = true,
+  showDimensions = false,
+  showLabels = true,
 }: PlanSceneLayerProps) {
   const transform = createViewportTransform(view, size);
   const project = transform.point;
@@ -177,9 +186,46 @@ export function PlanSceneLayer({
               ) : (
                 <circle className={markClass(item.id, styles.pointMark)} cx={position.x} cy={position.y} r={4} />
               )}
-              {item.label && (
+              {showLabels && item.label && (
                 <text className={styles.pointLabel} x={position.x + 8} y={position.y - 8}>
                   {item.label}
+                </text>
+              )}
+            </g>
+          );
+        })}
+
+      {/*
+        Cotations (§15) : ligne décalée perpendiculairement au segment coté, extrémités
+        marquées, libellé du modèle au milieu. Le décalage est exprimé en PIXELS écran — comme
+        dans `AdvancedPlan` — pour qu'une cote reste lisible à tous les zooms au lieu de
+        s'éloigner du tracé en zoomant. Aucune valeur n'est recalculée ici : `label` est celui
+        que le moteur publie.
+      */}
+      {showDimensions &&
+        (scene.dimensions ?? []).map((dimension) => {
+          const from = project(dimension.from);
+          const to = project(dimension.to);
+          const dx = to.x - from.x;
+          const dy = to.y - from.y;
+          const length = Math.hypot(dx, dy) || 1;
+          const offset = dimension.offset ?? DIMENSION_OFFSET_PX;
+          const shiftX = (-dy / length) * offset;
+          const shiftY = (dx / length) * offset;
+          const x1 = from.x + shiftX;
+          const y1 = from.y + shiftY;
+          const x2 = to.x + shiftX;
+          const y2 = to.y + shiftY;
+          return (
+            <g key={`dimension-${dimension.id}`} className={styles.dimension}>
+              <line x1={from.x} y1={from.y} x2={x1} y2={y1} className={styles.dimensionWitness} />
+              <line x1={to.x} y1={to.y} x2={x2} y2={y2} className={styles.dimensionWitness} />
+              <line x1={x1} y1={y1} x2={x2} y2={y2} />
+              <circle cx={x1} cy={y1} r={2.5} />
+              <circle cx={x2} cy={y2} r={2.5} />
+              {showLabels && (
+                <text className={styles.dimensionLabel} x={(x1 + x2) / 2} y={(y1 + y2) / 2 - 7}>
+                  {dimension.label}
                 </text>
               )}
             </g>

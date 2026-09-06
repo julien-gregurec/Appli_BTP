@@ -171,6 +171,32 @@ export function NouveauTraceWorkspace() {
     [handles, editingState],
   );
 
+  /**
+   * WORKSHOP-UI-CANONICAL-V2 §3/§7 — appliquer un modèle à un projet DONNÉ.
+   *
+   * Extrait de `chooseModel` pour une seule raison : la création venue de la bibliothèque
+   * (`?modele=<slug>`) doit choisir le modèle dans la foulée du `repository.create`, donc sur
+   * un projet que `setProject` n'a pas encore publié. Passer par l'état rendrait le choix
+   * dépendant d'un rendu intermédiaire.
+   *
+   * La règle appliquée reste EXACTEMENT celle du canon (`modelParamsAfterModelChoice`) : un
+   * vrai changement de modèle abandonne les surcharges, re-choisir le même les conserve. Les
+   * valeurs repartent des défauts par le seul fait que la clé d'identité change —
+   * `useModelEditing` se réinitialise, historique compris — donc rien n'est recopié ici.
+   */
+  const applyModel = useCallback(
+    (target: TracingProject, modelId: string | null) => {
+      const next = touchTracingProject(target, {
+        modelId: modelId ?? undefined,
+        modelParams: modelParamsAfterModelChoice(target, modelId),
+      });
+      setProject(next);
+      scheduleAutosave(next);
+      setStep(findTraceModelDescriptor(modelId) ? "parametres" : "photo");
+    },
+    [scheduleAutosave],
+  );
+
   const createProject = useCallback(async () => {
     if (!type || !repository) return;
     setFeedback("");
@@ -192,30 +218,26 @@ export function NouveauTraceWorkspace() {
       const draft = buildTracingProjectFromInput({ type, name, roomWidthMm, roomHeightMm });
       const created = await repository.create(draft);
       setProject(created);
-      setStep("modele");
+      // TRACING-WORKSHOP-UI-V1 §7 — venu de la bibliothèque (?modele=<slug>) : le modèle est
+      // déjà choisi, on n'oblige pas à le rechoisir. Le slug est lu ICI, au moment du clic,
+      // plutôt que conservé dans un état : rien à synchroniser, rien à réhydrater. Un slug
+      // inconnu du registre est ignoré — jamais substitué par un autre modèle (§3).
+      const preset = new URLSearchParams(window.location.search).get("modele");
+      if (preset && findTraceModelDescriptor(preset)) applyModel(created, preset);
+      else setStep("modele");
     } catch (cause) {
       setFeedback(cause instanceof Error ? cause.message : "Création du tracé impossible.");
     } finally {
       setBusy(false);
     }
-  }, [type, repository, width, height, name]);
+  }, [type, repository, width, height, name, applyModel]);
 
   const chooseModel = useCallback(
     (modelId: string | null) => {
       if (!project) return;
-      // Changer de modèle abandonne les surcharges de l'ancien ; re-choisir le même les
-      // conserve — cf. `modelParamsAfterModelChoice`, qui porte la règle et son pourquoi.
-      const next = touchTracingProject(project, {
-        modelId: modelId ?? undefined,
-        modelParams: modelParamsAfterModelChoice(project, modelId),
-      });
-      setProject(next);
-      scheduleAutosave(next);
-      // Sur un vrai changement de modèle, les valeurs repartent des défauts par le seul fait
-      // que la clé d'identité change : `useModelEditing` se réinitialise, historique compris.
-      setStep(findTraceModelDescriptor(modelId) ? "parametres" : "photo");
+      applyModel(project, modelId);
     },
-    [project, scheduleAutosave],
+    [applyModel, project],
   );
 
   /**
