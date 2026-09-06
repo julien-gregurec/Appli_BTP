@@ -98,12 +98,51 @@ L’architecture et la matrice de validation R8 sont détaillées dans [docs/r8-
 
 L’accueil, la recherche, les routes statiques, les catégories, le SEO, les favoris et les contrôles d’accès sont alimentés par le catalogue.
 
+## Variables publiques et garde de build
+
+Next fige les `NEXT_PUBLIC_*` dans le bundle au moment du build. Un build lancé sans elles **réussit** : il livre simplement un Tools sans compte ni abonnement, avec une CSP repliée sur `connect-src 'self'`. Cohérent, donc silencieux — et invisible avant la mise en ligne.
+
+`scripts/verify-public-env.mjs` ferme ce trou. Elle s'exécute avant `next build` (`prebuild`, `prebuild:native`), n'affiche jamais de valeur, et n'énonce que des noms de variables.
+
+| Variable | Statut | Lue par |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | requise | `src/lib/auth/client.ts`, `connect-src` de `next.config.ts` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | requise | `src/lib/auth/client.ts` |
+| `NEXT_PUBLIC_TOOLS_BILLING_API_URL` | requise | `src/lib/monetization-client.ts`, `connect-src` de `next.config.ts` |
+| `NEXT_PUBLIC_TOOLS_URL` | recommandée | `src/lib/site.ts` — repli `https://tools.elsatia.fr` |
+
+Tools lit `NEXT_PUBLIC_SUPABASE_ANON_KEY`, pas `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` : cette dernière est la convention de Gestion Pro (`src/lib/supabase/keys.ts`). Les deux applications ne lisent pas la même variable, et un environnement qui ne porterait que celle de Gestion Pro ferait échouer cette garde — c'est le comportement voulu.
+
+Le mode de build vient de `NEXT_PUBLIC_TOOLS_ENV`, avec la règle de `getAppEnvironment()` : **absente ou inconnue vaut `production`**. Un build qui ne se déclare pas est donc traité comme un build publié.
+
+| `NEXT_PUBLIC_TOOLS_ENV` | Effet |
+|---|---|
+| `production`, `native-production`, absente | une variable requise manquante, vide, non-URL ou en `http` **interrompt le build** |
+| `preview` | signalé, non bloquant |
+| `local`, `native-dev` | silencieux ; `http://localhost` accepté |
+
+Une valeur publique ayant la forme d'une clé de service Supabase (`sb_secret_…`, ou JWT `role: service_role`) bloque le build dans **tous** les modes : c'est une fuite, pas un oubli.
+
+Un build local ou de recette se déclare donc explicitement :
+
+```bash
+NEXT_PUBLIC_TOOLS_ENV=local npm run build --prefix apps/tools
+```
+
+C'est ce que fait la CI dans `.github/workflows/ci.yml`.
+
 ## Validation
 
 ```bash
 npm run test --prefix apps/tools
 npm run typecheck --prefix apps/tools
 npm run lint --prefix apps/tools
-npm run build --prefix apps/tools
-npm run build:native --prefix apps/tools
+NEXT_PUBLIC_TOOLS_ENV=local npm run build --prefix apps/tools
+NEXT_PUBLIC_TOOLS_ENV=local npm run build:native --prefix apps/tools
+```
+
+Le contrôle des variables publiques peut être joué seul, sans build :
+
+```bash
+npm run verify:public-env --prefix apps/tools
 ```

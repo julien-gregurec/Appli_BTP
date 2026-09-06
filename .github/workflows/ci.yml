@@ -34,4 +34,10 @@ jobs:
         run: npm run audit:security
 
       - name: Contrôles reproductibles
+        env:
+          # Le build Tools de la CI n'est pas un build publié. Sans cette déclaration, la garde
+          # `apps/tools/scripts/verify-public-env.mjs` le traiterait comme un build Production —
+          # c'est sa règle par défaut, celle de `getAppEnvironment()` — et exigerait les variables
+          # publiques du compte et de l'abonnement, que la CI n'a pas et n'a pas à avoir.
+          NEXT_PUBLIC_TOOLS_ENV: local
         run: npm run verify

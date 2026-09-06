@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "next dev -p 3020",
+    "verify:public-env": "node scripts/verify-public-env.mjs",
+    "prebuild": "npm run verify:public-env",
+    "prebuild:native": "npm run verify:public-env",
     "build": "next build --webpack && node scripts/generate-service-worker.mjs --mode=server",
     "build:native": "ELSATIA_TOOLS_NATIVE=1 NEXT_PUBLIC_TOOLS_RUNTIME=native next build --webpack && node scripts/generate-service-worker.mjs --mode=export",
     "start": "next start -p 3020",
