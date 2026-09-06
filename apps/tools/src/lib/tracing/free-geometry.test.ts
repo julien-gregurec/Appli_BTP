@@ -53,11 +53,11 @@ const POLYLINE: FreeEntity = {
 };
 
 describe("validateFreeGeometry (§13)", () => {
-  it("accepte les trois primitives de la V1", () => {
+  it("accepte les quatre primitives libres", () => {
     const geometry = geometryOf(POINT, SEGMENT, POLYLINE);
     expect(geometry.entities).toHaveLength(3);
     expect(countFreeVertices(geometry)).toBe(6);
-    expect(countFreeEntitiesByKind(geometry)).toEqual({ point: 1, segment: 1, polyline: 1 });
+    expect(countFreeEntitiesByKind(geometry)).toEqual({ point: 1, segment: 1, polyline: 1, polygon: 0 });
   });
 
   it("refuse NaN et Infinity", () => {

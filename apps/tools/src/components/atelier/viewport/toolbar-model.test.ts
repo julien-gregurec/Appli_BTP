@@ -71,9 +71,11 @@ describe("gestes", () => {
 });
 
 describe("buildToolbarModel", () => {
-  it("expose exactement les onze entrées de la barre, dans l'ordre", () => {
-    // FREE-DRAWING §4 — les trois outils de création s'insèrent après « Déplacer », donc dans
-    // la moitié droite de la barre : la zone la plus sûre du pouce sur un téléphone.
+  it("expose exactement les douze entrées de la barre, dans l'ordre", () => {
+    // FREE-DRAWING §4 — les outils de création s'insèrent après « Déplacer », donc dans la
+    // moitié droite de la barre : la zone la plus sûre du pouce sur un téléphone.
+    // FREE-CONTOUR §3 — « Contour » vient après « Polyligne » : c'est le même geste de tracé,
+    // poursuivi d'un cran, et l'ordre de la barre suit l'ordre d'apprentissage.
     expect(buildToolbarModel(DEFAULT_TOOLBAR_STATE).map((button) => button.id)).toEqual([
       "select",
       "edit",
@@ -81,6 +83,7 @@ describe("buildToolbarModel", () => {
       "point",
       "segment",
       "polyline",
+      "polygon",
       "grid",
       "recenter",
       "properties",

@@ -64,6 +64,21 @@ export {
 
 export { degToRad, radToDeg, normalizeAngle } from "../geometry/engine/angles";
 
+/**
+ * ATELIER-FREE-CONTOUR-AREA-V1 — aire algébrique et auto-intersection, empruntées au moteur.
+ *
+ * Le contour libre a besoin des deux, et aucune des deux ne doit être réécrite ici : le moteur
+ * les possède déjà (`engine/area.ts`, `engine/validate.ts`), il les applique aux polygones
+ * paramétriques, et une seconde implémentation ferait exister deux vérités sur « quelle est la
+ * surface de cette forme » — exactement ce que ce port existe pour empêcher (§34).
+ *
+ * `segmentSegmentIntersection` est exposée pour la même raison : `free-contour.ts` a besoin du
+ * PRÉDICAT de croisement, pas d'un algorithme de croisement à lui.
+ */
+export { signedPolygonArea, polygonArea } from "../geometry/engine/area";
+export { hasSelfIntersection } from "../geometry/engine/validate";
+export { segmentSegmentIntersection } from "../geometry/engine/intersections";
+
 import { DEFAULT_EPSILON } from "../geometry/engine/types";
 import type { Point2D } from "../geometry/engine/types";
 

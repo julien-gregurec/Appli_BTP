@@ -11,8 +11,10 @@ import {
   FREE_DRAW_TOOLS,
   beginFreeDraw,
   canFinishFreeDraw,
+  closesFreeContour,
   freeDrawCancel,
   freeDrawClick,
+  freeDrawContourPreview,
   freeDrawFinish,
   freeDrawGhostSegments,
   freeDrawHint,
@@ -187,5 +189,187 @@ describe("barre d'outils (§4)", () => {
     expect(showsSnapFeedback({ ...DEFAULT_TOOLBAR_STATE, tool: "segment" })).toBe(true);
     expect(showsSnapFeedback({ ...DEFAULT_TOOLBAR_STATE, tool: "select" })).toBe(true);
     expect(showsSnapFeedback({ ...DEFAULT_TOOLBAR_STATE, tool: "pan" })).toBe(false);
+  });
+});
+
+/**
+ * ATELIER-FREE-CONTOUR-AREA-V1 §3/§4/§18 — outil Contour.
+ *
+ * Le contour partage tout le flux de la polyligne et n'y ajoute qu'une chose : le clic sur le
+ * PREMIER sommet referme la forme. C'est ce clic-là qui est vérifié sous tous ses angles, parce
+ * que c'est le seul geste réellement nouveau — et parce que l'automate le rencontre au moment
+ * précis où il aurait autrement rejeté un « sommet qui ne dit rien de neuf ».
+ */
+describe("outil Contour (§3/§4)", () => {
+  const D = { x: 0, y: 800 };
+
+  it("n'ouvre aucune primitive avant le troisième sommet", () => {
+    const { state, commits } = clicks(beginFreeDraw("polygon"), [A, B, C]);
+    expect(commits).toEqual([]);
+    expect(state.pending).toHaveLength(3);
+  });
+
+  it("referme sur un clic au premier sommet, sans y répéter ce sommet", () => {
+    const { state, commits } = clicks(beginFreeDraw("polygon"), [A, B, C, D, A]);
+    expect(commits).toHaveLength(1);
+    expect(commits[0].kind).toBe("polygon");
+    expect(commits[0].points).toEqual([A, B, C, D]);
+    expect(state.pending).toEqual([]);
+  });
+
+  it("referme aussi par Entrée / double-clic, à partir de trois sommets", () => {
+    const started = clicks(beginFreeDraw("polygon"), [A, B, C]);
+    expect(canFinishFreeDraw(started.state)).toBe(true);
+    const finished = freeDrawFinish(started.state);
+    expect(finished.commit).toEqual({ kind: "polygon", points: [A, B, C] });
+    expect(finished.state.pending).toEqual([]);
+  });
+
+  it("refuse de refermer à deux sommets — un contour de deux côtés n'enferme rien", () => {
+    const two = clicks(beginFreeDraw("polygon"), [A, B]);
+    expect(canFinishFreeDraw(two.state)).toBe(false);
+    // Le clic sur le premier sommet ne referme pas non plus, et n'ajoute PAS un sommet en
+    // double : il est refusé sur-le-champ, en disant ce qui manque.
+    const back = freeDrawClick(two.state, A);
+    expect(back.commit).toBeNull();
+    expect(back.rejected).toMatch(/au moins 3 sommets pour refermer/);
+    expect(back.state.pending).toEqual([A, B]);
+  });
+
+  it("abandonne un tracé trop court plutôt que d'inventer une forme", () => {
+    const abandoned = freeDrawFinish(clicks(beginFreeDraw("polygon"), [A, B]).state);
+    expect(abandoned.commit).toBeNull();
+    expect(abandoned.rejected).toMatch(/au moins trois/);
+    expect(abandoned.state.pending).toEqual([]);
+  });
+
+  it("§6 — Échap efface le tracé en cours sans rien valider", () => {
+    const started = clicks(beginFreeDraw("polygon"), [A, B, C]);
+    expect(isFreeDrawInProgress(started.state)).toBe(true);
+    const cancelled = freeDrawCancel(started.state);
+    expect(cancelled.pending).toEqual([]);
+    expect(isFreeDrawInProgress(cancelled)).toBe(false);
+  });
+
+  it("continue de refuser un sommet confondu avec le précédent", () => {
+    const started = clicks(beginFreeDraw("polygon"), [A, B]);
+    const repeated = freeDrawClick(started.state, { x: B.x, y: B.y });
+    expect(repeated.commit).toBeNull();
+    expect(repeated.rejected).toMatch(/confondu/);
+    expect(repeated.state.pending).toHaveLength(2);
+  });
+
+  it("annonce la fermeture possible exactement quand elle l'est", () => {
+    expect(closesFreeContour(clicks(beginFreeDraw("polygon"), [A, B]).state, A)).toBe(false);
+    expect(closesFreeContour(clicks(beginFreeDraw("polygon"), [A, B, C]).state, A)).toBe(true);
+    // Un demi-millimètre plus loin, ce n'est plus le premier sommet : l'accrochage n'a pas mordu.
+    expect(closesFreeContour(clicks(beginFreeDraw("polygon"), [A, B, C]).state, { x: 0.5, y: 0 })).toBe(false);
+    // Une polyligne ne referme jamais, quel que soit le clic.
+    expect(closesFreeContour(clicks(beginFreeDraw("polyline"), [A, B, C]).state, A)).toBe(false);
+  });
+
+  it("§18 — dessine le côté de fermeture pendant le tracé", () => {
+    const started = clicks(beginFreeDraw("polygon"), [A, B, C]);
+    const ghosts = freeDrawGhostSegments(started.state, D);
+    // A→B, B→C, C→curseur, puis curseur→A : la forme enfermée est visible avant le dernier clic.
+    expect(ghosts).toHaveLength(4);
+    expect(ghosts[3]).toEqual([D, A]);
+  });
+
+  it("§18 — ne double pas le trait quand un seul sommet est posé", () => {
+    const one = clicks(beginFreeDraw("polygon"), [A]);
+    expect(freeDrawGhostSegments(one.state, B)).toEqual([[A, B]]);
+  });
+
+  it("§18 — la prévisualisation de surface est la forme qui SERAIT validée", () => {
+    const started = clicks(beginFreeDraw("polygon"), [A, B]);
+    expect(freeDrawContourPreview(started.state, null)).toBeNull(); // deux sommets : rien à mesurer
+    expect(freeDrawContourPreview(started.state, C)).toEqual([A, B, C]);
+    expect(freeDrawContourPreview(clicks(beginFreeDraw("polyline"), [A, B, C]).state, D)).toBeNull();
+  });
+
+  it("plafonne le nombre de sommets en le disant", () => {
+    let state = beginFreeDraw("polygon");
+    for (let index = 0; index < MAX_FREE_POLYLINE_VERTICES; index += 1) {
+      state = freeDrawClick(state, { x: index * 10, y: index % 2 === 0 ? 0 : 10 }).state;
+    }
+    const refused = freeDrawClick(state, { x: 99_999, y: 42 });
+    expect(refused.rejected).toMatch(new RegExp(`${MAX_FREE_POLYLINE_VERTICES} sommets`));
+    expect(refused.state.pending).toHaveLength(MAX_FREE_POLYLINE_VERTICES);
+  });
+
+  it("guide le geste à chaque étape, sans promettre un geste impossible", () => {
+    expect(freeDrawHint(beginFreeDraw("polygon"))).toMatch(/premier sommet/);
+    expect(freeDrawHint(clicks(beginFreeDraw("polygon"), [A]).state)).toMatch(/encore 2/);
+    expect(freeDrawHint(clicks(beginFreeDraw("polygon"), [A, B]).state)).toMatch(/encore 1/);
+    // Refermer n'est proposé qu'une fois possible.
+    expect(freeDrawHint(clicks(beginFreeDraw("polygon"), [A, B]).state)).not.toMatch(/refermer/);
+    expect(freeDrawHint(clicks(beginFreeDraw("polygon"), [A, B, C]).state)).toMatch(/refermer/);
+  });
+
+  it("est proposé par la barre au même titre que les autres outils de création", () => {
+    expect(FREE_DRAW_TOOLS).toContain("polygon");
+    expect(freeDrawToolOf({ ...DEFAULT_TOOLBAR_STATE, tool: "polygon" })).toBe("polygon");
+    expect(showsSnapFeedback({ ...DEFAULT_TOOLBAR_STATE, tool: "polygon" })).toBe(true);
+    const button = buildToolbarModel(DEFAULT_TOOLBAR_STATE, { drawingAvailable: true }).find(
+      (entry) => entry.id === "polygon",
+    );
+    expect(button?.label).toBe("Contour");
+    expect(button?.disabled).toBe(false);
+  });
+});
+
+/**
+ * ATELIER-FREE-CONTOUR-AREA-V1 §4 — portée de VISÉE du clic de fermeture.
+ *
+ * Les sommets d'un tracé en cours ne sont pas dans la scène : l'accrochage ne les propose pas
+ * comme cibles, donc le clic de fermeture ne peut pas tomber au millième de millimètre sur le
+ * premier sommet. Cette tolérance est ce qui rend la fermeture à la souris réalisable — et ce
+ * qui est vérifié ici est qu'elle ne coûte AUCUNE précision sur la forme enregistrée.
+ */
+describe("fermeture à la visée (§4)", () => {
+  const REACH = 25;
+  const near = { x: A.x + 12, y: A.y - 9 }; // à 15 mm du premier sommet
+
+  it("referme quand le clic tombe dans la portée annoncée", () => {
+    const started = clicks(beginFreeDraw("polygon"), [A, B, C]);
+    expect(closesFreeContour(started.state, near, REACH)).toBe(true);
+    const closed = freeDrawClick(started.state, near, { closeToleranceMm: REACH });
+    expect(closed.commit?.kind).toBe("polygon");
+  });
+
+  it("n'enregistre PAS la position du clic : le contour validé est celui qui était posé", () => {
+    const started = clicks(beginFreeDraw("polygon"), [A, B, C]);
+    const closed = freeDrawClick(started.state, near, { closeToleranceMm: REACH });
+    // Trois sommets, exactement ceux qui ont été accrochés — pas quatre, et pas `near`.
+    expect(closed.commit?.points).toEqual([A, B, C]);
+  });
+
+  it("ne referme pas hors de la portée", () => {
+    const started = clicks(beginFreeDraw("polygon"), [A, B, C]);
+    const far = { x: A.x + 200, y: A.y };
+    expect(closesFreeContour(started.state, far, REACH)).toBe(false);
+    expect(freeDrawClick(started.state, far, { closeToleranceMm: REACH }).commit).toBeNull();
+  });
+
+  it("reste strict quand l'appelant ne dit rien de son pointeur", () => {
+    const started = clicks(beginFreeDraw("polygon"), [A, B, C]);
+    expect(closesFreeContour(started.state, near)).toBe(false);
+    expect(closesFreeContour(started.state, A)).toBe(true);
+  });
+
+  it("refuse une fermeture prématurée dans la portée, sans ajouter de sommet", () => {
+    const two = clicks(beginFreeDraw("polygon"), [A, B]);
+    const early = freeDrawClick(two.state, near, { closeToleranceMm: REACH });
+    expect(early.commit).toBeNull();
+    expect(early.rejected).toMatch(/au moins 3 sommets pour refermer/);
+    expect(early.state.pending).toEqual([A, B]);
+  });
+
+  it("n'applique jamais la portée à une polyligne", () => {
+    const started = clicks(beginFreeDraw("polyline"), [A, B, C]);
+    expect(closesFreeContour(started.state, near, REACH)).toBe(false);
+    // Le clic pose un quatrième sommet, comme n'importe quel autre.
+    expect(freeDrawClick(started.state, near, { closeToleranceMm: REACH }).state.pending).toHaveLength(4);
   });
 });

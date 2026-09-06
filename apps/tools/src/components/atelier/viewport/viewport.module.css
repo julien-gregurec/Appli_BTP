@@ -259,6 +259,25 @@
   outline-offset: 2px;
 }
 
+/*
+  ATELIER-FREE-CONTOUR-AREA-V1 §19 — au doigt, cette action passe à 44 px de haut.
+
+  Elle change de statut avec ce lot. « Terminer la polyligne » était un raccourci : sans lui, un
+  double-tap terminait le tracé. « Fermer le contour » est, sur un téléphone, le geste de fin le
+  plus sûr — refermer en visant le premier sommet demande une précision que le doigt n'a pas, et
+  le double-tap reste ambigu. Un raccourci de 32 px se rate sans conséquence ; un geste de fin
+  raté oblige à recommencer le contour.
+
+  La règle ne s'applique qu'au pointeur grossier : à la souris, ces 44 px alourdiraient un
+  bandeau d'état qui doit rester discret, et la précision du curseur les rend inutiles.
+*/
+@media (pointer: coarse) {
+  .statusAction {
+    min-height: 44px;
+    padding: 10px 16px;
+  }
+}
+
 /* ---- Tracé libre en cours (FREE-DRAWING §6) ------------------------------- */
 
 /*
@@ -280,6 +299,19 @@
   fill: var(--amber);
   stroke: var(--white);
   stroke-width: 1.4;
+}
+
+/*
+  ATELIER-FREE-CONTOUR-AREA-V1 §18 — halo du sommet de FERMETURE.
+
+  Un anneau, pas un disque : il entoure le premier sommet sans le masquer, donc on voit à la
+  fois où l'on va cliquer et ce que ce clic va faire.
+*/
+.ghostClosing {
+  fill: none;
+  stroke: var(--amber);
+  stroke-width: 2;
+  opacity: 0.9;
 }
 
 /* Point courant sous le curseur : creux, car il n'est pas encore posé. */

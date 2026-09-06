@@ -43,6 +43,10 @@ export function freeHandleId(entityId: string, index: number): string {
 function vertexLabel(kind: Parameters<typeof freeEntityKindLabel>[0], entityId: string, index: number, total: number): string {
   if (kind === "point") return `${freeEntityKindLabel(kind)} ${entityId}`;
   if (kind === "segment") return `${freeEntityKindLabel(kind)} ${entityId} — ${index === 0 ? "départ" : "arrivée"}`;
+  // ATELIER-FREE-CONTOUR-AREA-V1 §9 — un contour n'a ni départ ni arrivée : ses sommets sont
+  // numérotés en cercle, exactement comme ceux d'une polyligne, et le libellé ne prétend pas le
+  // contraire. La classe C n'a rien de plus à dire ici : un sommet de contour se déplace comme
+  // tout autre sommet libre, puisqu'il EST la donnée (§7 du lot fondateur).
   return `${freeEntityKindLabel(kind)} ${entityId} — sommet ${index + 1}/${total}`;
 }
 

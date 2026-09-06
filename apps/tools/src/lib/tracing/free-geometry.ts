@@ -41,24 +41,64 @@ import type { BoundingBox } from "../geometry/primitives";
  * Version du document de géométrie libre, imbriquée dans `TracingProject.freeGeometry`.
  *
  * Elle est distincte de `TRACING_PROJECT_SCHEMA_VERSION` à dessein : la forme des primitives
- * libres évoluera (arcs, cercles, contours fermés — §3 les exclut de ce lot) plus vite que
- * l'enveloppe du projet, et faire porter les deux rythmes par un seul numéro obligerait à
- * migrer tous les projets pour un changement qui n'en concerne qu'une partie.
+ * libres évoluera (arcs, cercles — hors lot) plus vite que l'enveloppe du projet, et faire
+ * porter les deux rythmes par un seul numéro obligerait à migrer tous les projets pour un
+ * changement qui n'en concerne qu'une partie.
+ *
+ * ## Pourquoi le contour fermé ne l'a PAS incrémentée
+ *
+ * ATELIER-FREE-CONTOUR-AREA-V1 §2 — ajouter la nature `polygon` n'invalide aucun document
+ * existant, et aucune migration n'est nécessaire : un tracé écrit avant ce lot se relit
+ * inchangé, sommet pour sommet.
+ *
+ * Il reste le sens INVERSE — un document contenant un contour, relu par une version antérieure.
+ * L'incrémenter aurait alors fait rejeter le document ENTIER (« créé avec une version plus
+ * récente »), y compris les tracés sans le moindre contour, puisque le numéro est écrit à
+ * chaque enregistrement quelle que soit la nature des entités. En le laissant à 1, une version
+ * antérieure continue de lire tout ce qu'elle sait lire, et ne refuse que ce qu'elle ne sait
+ * réellement pas lire, en le nommant : « la nature "polygon" n'existe pas dans cette version ».
+ * Un refus étroit et exact vaut mieux qu'un refus large et vague.
  */
 export const FREE_GEOMETRY_VERSION = 1;
 
 /** Sommet monde, en millimètres. Jamais un pixel (§12). */
 export type FreeVertex = { x: number; y: number };
 
-/** §3 — primitives de la V1. Cercle, arc, ellipse, spline, texte et image sont hors lot. */
-export type FreeEntityKind = "point" | "segment" | "polyline";
+/**
+ * §3 — primitives libres. Cercle, arc, ellipse, spline, texte et image restent hors lot.
+ *
+ * ## Pourquoi « polygon » et non « contour »
+ *
+ * ATELIER-FREE-CONTOUR-AREA-V1 §2 — le contour fermé porte le nom que toute la chaîne aval lui
+ * donne déjà : la primitive `Polygon` de `geometry/primitives`, le champ `ShapeGeometry.polygons`
+ * qu'elle remplit, la nature `"polygon"` du hit-test et de la scène, le `closed: true` du DXF.
+ * Chaque nature libre porte ainsi le nom du champ d'export qu'elle alimente — `point` → `points`,
+ * `segment` → `segments`, `polyline` → `polylines`, `polygon` → `polygons` — et cette
+ * correspondance mot pour mot est ce qui rend la projection (`free-shape.ts`) lisible d'un coup
+ * d'œil. L'appeler `contour` ici aurait créé un second vocabulaire pour une seule forme.
+ *
+ * Le mot « contour », lui, reste celui de l'INTERFACE : c'est le libellé français de la nature
+ * (`KIND_LABELS`), déjà celui qu'affichait la fiche propriétés avant ce lot.
+ */
+export type FreeEntityKind = "point" | "segment" | "polyline" | "polygon";
 
-export const FREE_ENTITY_KINDS: readonly FreeEntityKind[] = ["point", "segment", "polyline"];
+export const FREE_ENTITY_KINDS: readonly FreeEntityKind[] = ["point", "segment", "polyline", "polygon"];
 
 export type FreeEntity = {
   id: string;
   kind: FreeEntityKind;
-  /** Sommets ordonnés, en millimètres. Arité imposée par `kind` (cf. `ARITY`). */
+  /**
+   * Sommets ordonnés, en millimètres. Arité imposée par `kind` (cf. `ARITY`).
+   *
+   * ATELIER-FREE-CONTOUR-AREA-V1 §2 — sur un `polygon`, la fermeture est IMPLICITE : le
+   * dernier sommet rejoint le premier, et le premier n'est jamais répété en fin de liste.
+   *
+   * Répéter le premier point serait une donnée que rien ne maintient : un glissement du sommet
+   * 1 devrait déplacer deux entrées, l'oublier ouvrirait le contour sans que le document le
+   * dise, et le nombre de sommets affiché mentirait d'une unité. La fermeture est donc une
+   * propriété de la NATURE, pas une donnée à tenir à jour — `polygonEdges` est le seul endroit
+   * qui la matérialise, et tout ce qui parcourt les côtés passe par lui.
+   */
   points: readonly FreeVertex[];
 };
 
@@ -87,6 +127,15 @@ export const MAX_FREE_POLYLINE_VERTICES = 500;
 export const MAX_FREE_VERTICES = 5000;
 
 /**
+ * ATELIER-FREE-CONTOUR-AREA-V1 §5 — un contour demande au moins trois sommets.
+ *
+ * En deçà, il n'enferme aucune surface : deux sommets donnent un aller-retour d'aire nulle,
+ * un seul ne donne rien. Ce n'est pas une limite de confort mais la définition même de ce que
+ * la primitive promet — une aire et un périmètre fermé.
+ */
+export const MIN_FREE_CONTOUR_VERTICES = 3;
+
+/**
  * Étendue admissible d'une coordonnée, en millimètres : ±1 km. Même ordre de grandeur que la
  * borne des dimensions de pièce (`optionalDimension`, 1 000 000 mm), ce qui évite qu'un tracé
  * accepté ici soit refusé par l'enveloppe du projet.
@@ -106,12 +155,18 @@ const ARITY: Readonly<Record<FreeEntityKind, Arity>> = {
   point: { min: 1, max: 1, label: "Un point libre porte exactement un sommet." },
   segment: { min: 2, max: 2, label: "Un segment libre porte exactement deux sommets." },
   polyline: { min: 2, max: MAX_FREE_POLYLINE_VERTICES, label: "Une polyligne libre porte au moins deux sommets." },
+  polygon: {
+    min: MIN_FREE_CONTOUR_VERTICES,
+    max: MAX_FREE_POLYLINE_VERTICES,
+    label: "Un contour libre porte au moins trois sommets.",
+  },
 };
 
 const KIND_LABELS: Readonly<Record<FreeEntityKind, string>> = {
   point: "Point libre",
   segment: "Segment libre",
   polyline: "Polyligne libre",
+  polygon: "Contour libre",
 };
 
 /** Préfixe d'identifiant par nature — court, lisible dans un export DXF ou un tableau de report. */
@@ -119,6 +174,7 @@ const ID_PREFIX: Readonly<Record<FreeEntityKind, string>> = {
   point: "pt",
   segment: "sg",
   polyline: "pl",
+  polygon: "pg",
 };
 
 const ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,39}$/;
@@ -198,7 +254,50 @@ export function validateFreeEntity(raw: unknown): FreeEntity {
     throw new FreeGeometryError(`Le segment libre ${value.id} a une longueur nulle.`);
   }
 
+  /*
+   * ATELIER-FREE-CONTOUR-AREA-V1 §5 — un contour n'admet aucun côté nul, FERMETURE COMPRISE.
+   *
+   * Le côté de fermeture mérite d'être vérifié comme les autres, et c'est le contrôle qu'on
+   * oublie : un contour dont le dernier sommet retombe sur le premier est celui qu'un clic de
+   * fermeture mal placé produit le plus souvent. Il paraît correct à l'écran — le trait de
+   * fermeture est simplement invisible — mais il porte un sommet de plus que sa forme réelle,
+   * et ce sommet fantôme se retrouverait dans le report, dans le DXF et sous le doigt.
+   *
+   * Le contrôle est fait ICI plutôt que dans `free-contour.ts` parce qu'il est STRUCTUREL :
+   * il porte sur la donnée elle-même, il est en O(n), et un document qui le viole est abîmé —
+   * pas seulement inexploitable. L'auto-intersection, elle, est un jugement sur la FORME et
+   * reste hors de la validation (cf. `free-contour.ts`).
+   */
+  if (kind === "polygon") {
+    const count = points.length;
+    for (let index = 0; index < count; index += 1) {
+      if (!sameFreeVertex(points[index], points[(index + 1) % count])) continue;
+      const isClosing = index === count - 1;
+      throw new FreeGeometryError(
+        isClosing
+          ? `Le contour libre ${value.id} referme sur son premier sommet : le dernier sommet fait double emploi.`
+          : `Le contour libre ${value.id} a un côté de longueur nulle (sommets ${index + 1} et ${index + 2}).`,
+      );
+    }
+  }
+
   return { id: value.id, kind: kind as FreeEntityKind, points };
+}
+
+/**
+ * ATELIER-FREE-CONTOUR-AREA-V1 §2 — côtés d'une entité, dans l'ordre du tracé.
+ *
+ * SEUL endroit où la fermeture implicite d'un contour devient un côté réel. Tout ce qui
+ * parcourt les arêtes — périmètre, auto-intersection, fantôme de tracé — passe par ici, ce qui
+ * garantit qu'aucun consommateur ne peut « oublier » le côté de fermeture ni, à l'inverse, en
+ * inventer un sur une polyligne ouverte.
+ */
+export function freeEntityEdges(entity: FreeEntity): readonly (readonly [FreeVertex, FreeVertex])[] {
+  const edges: (readonly [FreeVertex, FreeVertex])[] = [];
+  const count = entity.points.length;
+  for (let index = 1; index < count; index += 1) edges.push([entity.points[index - 1], entity.points[index]]);
+  if (entity.kind === "polygon" && count > 2) edges.push([entity.points[count - 1], entity.points[0]]);
+  return edges;
 }
 
 /**
@@ -387,15 +486,16 @@ export function freeGeometryBounds(geometry: FreeGeometry): BoundingBox | null {
   return { minX, minY, maxX, maxY };
 }
 
-/** Longueur développée d'une entité — 0 pour un point, qui n'en a pas (§11). */
+/**
+ * Longueur développée d'une entité — 0 pour un point, qui n'en a pas (§11).
+ *
+ * ATELIER-FREE-CONTOUR-AREA-V1 §7 — sur un contour, c'est le PÉRIMÈTRE : le côté de fermeture
+ * y est compté comme les autres, parce que `freeEntityEdges` le produit. Le développé cumulé du
+ * tracé (`freeGeometryLength`) en hérite sans rien changer.
+ */
 export function freeEntityLength(entity: FreeEntity): number {
   let total = 0;
-  for (let index = 1; index < entity.points.length; index += 1) {
-    total += Math.hypot(
-      entity.points[index].x - entity.points[index - 1].x,
-      entity.points[index].y - entity.points[index - 1].y,
-    );
-  }
+  for (const [from, to] of freeEntityEdges(entity)) total += Math.hypot(to.x - from.x, to.y - from.y);
   return total;
 }
 
@@ -406,7 +506,7 @@ export function freeGeometryLength(geometry: FreeGeometry): number {
 
 /** Répartition par nature, dans l'ordre de `FREE_ENTITY_KINDS` — sert au report et à l'UI. */
 export function countFreeEntitiesByKind(geometry: FreeGeometry): Record<FreeEntityKind, number> {
-  const counts: Record<FreeEntityKind, number> = { point: 0, segment: 0, polyline: 0 };
+  const counts: Record<FreeEntityKind, number> = { point: 0, segment: 0, polyline: 0, polygon: 0 };
   for (const entity of geometry.entities) counts[entity.kind] += 1;
   return counts;
 }

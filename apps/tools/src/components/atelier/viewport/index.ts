@@ -46,8 +46,10 @@ export {
   FREE_DRAW_TOOLS,
   beginFreeDraw,
   canFinishFreeDraw,
+  closesFreeContour,
   freeDrawCancel,
   freeDrawClick,
+  freeDrawContourPreview,
   freeDrawFinish,
   freeDrawGhostSegments,
   freeDrawHint,
@@ -68,11 +70,13 @@ export {
   MAX_FREE_ENTITIES,
   MAX_FREE_POLYLINE_VERTICES,
   MAX_FREE_VERTICES,
+  MIN_FREE_CONTOUR_VERTICES,
   addFreeEntity,
   countFreeEntitiesByKind,
   createFreeEntity,
   deletableFreeEntityIds,
   findFreeEntity,
+  freeEntityEdges,
   freeEntityKindLabel,
   freeEntityLabel,
   freeEntityLength,
@@ -89,6 +93,19 @@ export {
   type FreeVertex,
 } from "@/lib/tracing/free-geometry";
 export { freeGeometryToShape, freeSceneBounds } from "@/lib/tracing/free-shape";
+/** ATELIER-FREE-CONTOUR-AREA-V1 §6/§7/§8 — mesures des contours libres, réexportées telles quelles. */
+export {
+  FREE_CONTOUR_MIN_AREA_MM2,
+  freeContourMeasures,
+  freeContourSelfIntersects,
+  freeContourTotals,
+  freeGeometryContourMeasures,
+  isFreeContour,
+  type FreeContourMeasures,
+  type FreeContourOrientation,
+  type FreeContourStatus,
+  type FreeContourTotals,
+} from "@/lib/tracing/free-contour";
 export { ResolvedModelViewport, type ResolvedModelViewportProps } from "./ResolvedModelViewport";
 export { atelierViewKey, planSceneForStep, resolvedPlanScene, stepAt } from "./resolved-scene";
 export { usePlanViewport, type PlanViewportController } from "./use-plan-viewport";
@@ -209,6 +226,7 @@ export {
   describeSceneSelection,
   entityKindLabel,
   formatMillimetres,
+  formatSquareMetres,
   formatWorldPoint,
   entityLabel,
   listSceneEntities,

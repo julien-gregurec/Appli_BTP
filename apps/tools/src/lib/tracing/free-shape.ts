@@ -28,8 +28,9 @@
  * ligne de géométrie nouvelle (§5).
  */
 
-import type { Point, Polyline, Segment } from "../geometry/primitives";
-import { validateShapeGeometry, type ShapeGeometry } from "../geometry/shape-model";
+import type { Point, Polygon, Polyline, Segment } from "../geometry/primitives";
+import { validateShapeGeometry, type Quantity, type ShapeGeometry } from "../geometry/shape-model";
+import { freeGeometryContourMeasures, type FreeContourMeasures } from "./free-contour";
 import {
   freeGeometryBounds,
   type FreeEntity,
@@ -83,8 +84,10 @@ function entityToPrimitives(entity: FreeEntity): {
   point?: Point;
   segment?: Segment;
   polyline?: Polyline;
+  polygon?: Polygon;
 } {
   const at = (index: number) => vertexPoint(freeVertexPointId(entity.id, index), entity.points[index]);
+  const vertices = () => entity.points.map((_, index) => at(index));
 
   switch (entity.kind) {
     case "point":
@@ -92,9 +95,19 @@ function entityToPrimitives(entity: FreeEntity): {
     case "segment":
       return { segment: { id: entity.id, start: at(0), end: at(1), role: FREE_ROLE } };
     case "polyline":
-      return {
-        polyline: { id: entity.id, points: entity.points.map((_, index) => at(index)), role: FREE_ROLE },
-      };
+      return { polyline: { id: entity.id, points: vertices(), role: FREE_ROLE } };
+    /*
+     * ATELIER-FREE-CONTOUR-AREA-V1 §15/§16 — le contour part dans `polygons`, sans son premier
+     * sommet répété.
+     *
+     * C'est ce champ, et lui seul, qui referme la forme partout en aval, sans qu'une ligne du
+     * pipeline d'export ait à changer : `createPolygonPath` ajoute le `Z` du SVG, `dxf.ts`
+     * écrit `closed: true` sur la POLYLINE, le PDF ferme le chemin, `hit-test` et `snap`
+     * traitent le côté de fermeture comme les autres. Dupliquer le premier point ici aurait
+     * produit un sommet en trop dans chacun de ces cinq consommateurs à la fois.
+     */
+    case "polygon":
+      return { polygon: { id: entity.id, points: vertices(), role: FREE_ROLE } };
   }
 }
 
@@ -139,6 +152,44 @@ function freeContentBounds(geometry: FreeGeometry) {
   return freeGeometryBounds(geometry) ?? { minX: 0, minY: 0, maxX: 0, maxY: 0 };
 }
 
+/**
+ * ATELIER-FREE-CONTOUR-AREA-V1 §14 — quantités DÉMONTRABLES d'un contour, et rien d'autre.
+ *
+ * Deux lignes par contour exploitable : sa surface et son périmètre. Ce sont les deux seules
+ * grandeurs que la géométrie établit sans rien savoir de ce que la forme représente — un
+ * matériau, une chute, un nombre de plaques, un volume supposeraient tous une hypothèse métier
+ * que ce lot n'a pas à prendre (§14).
+ *
+ * Un contour non exploitable ne publie AUCUNE ligne de surface. Il en publie une de périmètre :
+ * la longueur développée d'une ligne fermée reste juste même quand ses côtés se croisent —
+ * c'est l'aire, pas la longueur, que le croisement rend ambiguë.
+ *
+ * `quality: "exact"` : ces sommets ont été posés en millimètres, éventuellement accrochés à une
+ * géométrie exacte. Rien n'est ici approché, ni développé, ni relevé sur une image calibrée.
+ */
+function contourQuantities(measures: readonly FreeContourMeasures[]): Quantity[] {
+  const quantities: Quantity[] = [];
+  for (const measure of measures) {
+    if (measure.areaM2 !== null) {
+      quantities.push({
+        id: `q-${measure.entityId}-area`,
+        label: `Surface du contour ${measure.entityId}`,
+        value: measure.areaM2,
+        unit: "m²",
+        quality: "exact",
+      });
+    }
+    quantities.push({
+      id: `q-${measure.entityId}-perimeter`,
+      label: `Périmètre du contour ${measure.entityId}`,
+      value: measure.perimeterMm,
+      unit: "mm",
+      quality: "exact",
+    });
+  }
+  return quantities;
+}
+
 export type FreeShapeOptions = {
   id?: string;
   name?: string;
@@ -153,6 +204,18 @@ export type FreeShapeOptions = {
    * La géométrie est identique dans les deux cas — seul le cadre change.
    */
   frame?: "content" | "sheet";
+  /**
+   * ATELIER-FREE-CONTOUR-AREA-V1 §14/§20 — publier les quantités des contours (`false` par défaut).
+   *
+   * Désactivé par défaut parce que le VIEWPORT n'en lit aucune et que ce n'est pas gratuit : le
+   * statut d'un contour demande une détection d'auto-intersection, quadratique en nombre de
+   * côtés, et cette projection est refaite à CHAQUE trame d'un glissement de sommet. L'export,
+   * lui, la demande une fois par document et l'obtient en passant `quantities: true`.
+   *
+   * Ce n'est donc pas un réglage de contenu — la géométrie est identique dans les deux cas —
+   * mais l'aveu qu'une seule des deux voies a besoin du calcul.
+   */
+  quantities?: boolean;
 };
 
 /**
@@ -168,12 +231,14 @@ export function freeGeometryToShape(geometry: FreeGeometry, options: FreeShapeOp
   const points: Point[] = [];
   const segments: Segment[] = [];
   const polylines: Polyline[] = [];
+  const polygons: Polygon[] = [];
 
   for (const entity of geometry.entities) {
     const projected = entityToPrimitives(entity);
     if (projected.point) points.push(projected.point);
     if (projected.segment) segments.push(projected.segment);
     if (projected.polyline) polylines.push(projected.polyline);
+    if (projected.polygon) polygons.push(projected.polygon);
   }
 
   const model: ShapeGeometry = {
@@ -190,10 +255,10 @@ export function freeGeometryToShape(geometry: FreeGeometry, options: FreeShapeOp
     constructionLines: [],
     dimensions: [],
     controls: [],
-    quantities: [],
+    quantities: options.quantities ? contourQuantities(freeGeometryContourMeasures(geometry)) : [],
     steps: [],
     polylines: polylines.length ? polylines : undefined,
-    polygons: undefined,
+    polygons: polygons.length ? polygons : undefined,
   };
 
   return validateShapeGeometry(model);

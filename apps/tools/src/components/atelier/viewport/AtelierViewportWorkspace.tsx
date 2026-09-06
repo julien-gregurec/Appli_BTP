@@ -81,10 +81,12 @@ import { paramsForHandleTarget } from "@/lib/tracing/editable-handle";
 import { nearestEditableHandle } from "@/lib/tracing/handle-map";
 import type { FreeVertex } from "@/lib/tracing/free-geometry";
 import {
+  FREE_DRAW_EPSILON_MM,
   beginFreeDraw,
   canFinishFreeDraw,
   freeDrawCancel,
   freeDrawClick,
+  freeDrawContourPreview,
   freeDrawFinish,
   freeDrawHint,
   isFreeDrawInProgress,
@@ -115,9 +117,11 @@ import {
   countSceneEntities,
   describeSceneEntity,
   describeSceneSelection,
+  formatSquareMetres,
   formatWorldPoint,
   type PlanScene,
 } from "./plan-scene";
+import { freeContourMeasures } from "@/lib/tracing/free-contour";
 import styles from "./viewport.module.css";
 
 /**
@@ -258,6 +262,15 @@ export function AtelierViewportWorkspace({
   const [draw, setDraw] = useState<FreeDrawState | null>(null);
   /** §6 — point courant ACCROCHÉ, en millimètres monde : là où le prochain clic posera un sommet. */
   const [drawCursor, setDrawCursor] = useState<FreeVertex | null>(null);
+  /**
+   * ATELIER-FREE-CONTOUR-AREA-V1 §4 — portée de VISÉE du clic de fermeture, en millimètres.
+   *
+   * Elle vit dans un état plutôt que d'être recalculée à l'affichage parce qu'elle dépend du
+   * POINTEUR : un doigt vise moins bien qu'une souris, et c'est le survol — le seul endroit qui
+   * connaisse le type de pointeur — qui l'établit. La couche de prévisualisation reçoit la même
+   * valeur, ce qui garantit que le halo promet exactement ce que le clic fera (§18).
+   */
+  const [drawCloseReachMm, setDrawCloseReachMm] = useState<number>(FREE_DRAW_EPSILON_MM);
   /** §4 — dernier geste refusé, dit à l'utilisateur plutôt qu'avalé en silence. */
   const [drawNotice, setDrawNotice] = useState<string | null>(null);
   const drag = useRef<DragSession | null>(null);
@@ -329,6 +342,7 @@ export function AtelierViewportWorkspace({
   if ((draw?.tool ?? null) !== drawTool) {
     setDraw(drawTool ? beginFreeDraw(drawTool) : null);
     setDrawCursor(null);
+    setDrawCloseReachMm(FREE_DRAW_EPSILON_MM);
     setDrawNotice(null);
   }
 
@@ -420,12 +434,17 @@ export function AtelierViewportWorkspace({
     (local: ScreenPoint, precision: PointerPrecision) => {
       if (!draw || !drawing) return;
       const { position } = snappedWorldOf(local, precision);
-      const step = freeDrawClick(draw, position);
+      // §4 — la portée de fermeture est celle de la DÉSIGNATION, pas celle de l'accrochage : un
+      // clic qui refermerait le contour est un clic qui « prend » le premier sommet, et la
+      // tolérance de prise est déjà définie une fois pour toutes par `selectionTolerancePx`.
+      const step = freeDrawClick(draw, position, {
+        closeToleranceMm: toleranceWorldFor(selectionTolerancePx(precision), view),
+      });
       setDraw(step.state);
       setDrawNotice(step.rejected ?? null);
       if (step.commit) drawing.onCreateEntity(step.commit);
     },
-    [draw, drawing, snappedWorldOf],
+    [draw, drawing, snappedWorldOf, view],
   );
 
   const onCanvasClick = useCallback(
@@ -476,6 +495,7 @@ export function AtelierViewportWorkspace({
         setHoveredEntityId(null);
         setSnapCandidate(null);
         setDrawCursor(null);
+        setDrawCloseReachMm(FREE_DRAW_EPSILON_MM);
         return;
       }
       const world = worldOf(local);
@@ -491,6 +511,7 @@ export function AtelierViewportWorkspace({
       // §6 — le point courant du tracé en cours EST la position accrochée : le fantôme montre
       // donc exactement le sommet que le clic posera, et non la position brute du curseur.
       setDrawCursor(candidate ? candidate.position : world);
+      setDrawCloseReachMm(toleranceWorldFor(selectionTolerancePx(precision), view));
     },
     [scene, view, worldOf],
   );
@@ -636,6 +657,19 @@ export function AtelierViewportWorkspace({
     [draw, drawing, finishDraw, applySelection, selection],
   );
 
+  /**
+   * §18 — mesures du contour en cours, curseur compris. `null` hors d'un tracé de contour.
+   *
+   * Mémoïsé sur l'état du tracé et la position accrochée : la détection d'auto-intersection est
+   * quadratique (`free-contour.ts`), et sans mémo elle serait refaite à chaque rendu déclenché
+   * par un survol ou un zoom, pas seulement quand le tracé change (§20).
+   */
+  const drawPreview = useMemo(() => {
+    const points = draw ? freeDrawContourPreview(draw, drawCursor) : null;
+    if (!points) return null;
+    return freeContourMeasures({ id: "contour-en-cours", kind: "polygon", points });
+  }, [draw, drawCursor]);
+
   const selectedHandle = useMemo(
     () => handles.find((handle) => handle.entityId === selectedEntityId) ?? null,
     [handles, selectedEntityId],
@@ -674,11 +708,23 @@ export function AtelierViewportWorkspace({
               le mobile ne peut pas déduire d'un survol.
             */}
             {draw && <span aria-live="polite">{drawNotice ?? freeDrawHint(draw)}</span>}
+            {/*
+              ATELIER-FREE-CONTOUR-AREA-V1 §18 — la surface du contour en cours, pendant qu'on
+              le trace. C'est ce qui permet d'ajuster un sommet AVANT de refermer, plutôt que de
+              découvrir l'aire une fois la forme validée. Elle se tait dès que la forme se croise
+              — annoncer une aire sur un contour noué serait exactement le chiffre trompeur que
+              ce lot refuse (§13).
+            */}
+            {drawPreview && (
+              <span aria-live="polite">
+                {drawPreview.areaM2 === null ? "Surface non exploitable en l’état" : `≈ ${formatSquareMetres(drawPreview.areaM2)}`}
+              </span>
+            )}
             {draw && canFinishFreeDraw(draw) && (
               // Sans clavier, `Entrée` n'existe pas et le double-tap n'est pas une évidence :
-              // un bouton explicite est le seul moyen sûr de terminer une polyligne au doigt (§14).
+              // un bouton explicite est le seul moyen sûr de terminer au doigt (§14/§19).
               <button type="button" className={styles.statusAction} onClick={finishDraw}>
-                Terminer la polyligne
+                {draw.tool === "polygon" ? "Fermer le contour" : "Terminer la polyligne"}
               </button>
             )}
             {liveReadout ? (
@@ -715,7 +761,13 @@ export function AtelierViewportWorkspace({
               />
             )}
             {draw && (
-              <FreeDrawPreviewLayer state={draw} cursor={drawCursor} view={frameView} size={frameSize} />
+              <FreeDrawPreviewLayer
+                state={draw}
+                cursor={drawCursor}
+                closeReachMm={drawCloseReachMm}
+                view={frameView}
+                size={frameSize}
+              />
             )}
           </>
         )}

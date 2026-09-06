@@ -29,6 +29,7 @@ import {
   witnessDimension,
   type CheckShape,
   type LedPlan,
+  type MaterialLine,
   type MosaicPlan,
   type PreExportInput,
   type PreExportReport,
@@ -57,6 +58,17 @@ export type ResolvedAtelierGeometry = {
   geometry?: ShapeGeometry;
   /** Table de report déjà construite (`buildReportTable`), si des points le permettent. */
   report?: ReportTable;
+  /**
+   * ATELIER-FREE-CONTOUR-AREA-V1 §14 — lignes de métré DÉMONTRÉES par la géométrie, ajoutées à
+   * la nomenclature du projet.
+   *
+   * Additif et optionnel : la voie paramétrique ne le renseigne pas, donc rien ne change pour
+   * elle. Seul le tracé libre en produit aujourd'hui — la surface et le périmètre de ses
+   * contours fermés — et ces lignes s'AJOUTENT aux matières saisies par l'utilisateur au lieu
+   * de les remplacer : les deux disent des choses différentes du même ouvrage, et faire choisir
+   * l'une contre l'autre ferait disparaître du travail.
+   */
+  nomenclature?: readonly MaterialLine[];
   /** Plan LED déjà calculé (`planLed`) — TracingProject ne stocke pas encore de segments LED. */
   ledSummary?: LedPlan;
   /** Plans de profils déjà calculés (`planProfiles`). */
@@ -205,6 +217,11 @@ export function tracingProjectToChantierExportDocument(project: TracingProject, 
     generatedAt: new Date().toISOString(),
   };
 
+  // §14 — matières saisies d'abord, quantités géométriques ensuite : l'ordre de lecture d'un
+  // métré va du choisi au constaté, et les identifiants des deux origines ne se recouvrent pas
+  // (les lignes géométriques sont préfixées `q-`).
+  const nomenclature: MaterialLine[] = [...project.materials, ...(resolved.nomenclature ?? [])];
+
   const constructionSteps: ChantierConstructionStep[] | undefined = project.constructionSteps.length
     ? project.constructionSteps.map((step) => ({ id: step.id, title: step.title, instruction: step.instruction }))
     : undefined;
@@ -214,7 +231,7 @@ export function tracingProjectToChantierExportDocument(project: TracingProject, 
     geometry,
     report: resolved.report,
     constructionSteps,
-    nomenclature: project.materials.length ? project.materials : undefined,
+    nomenclature: nomenclature.length ? nomenclature : undefined,
     ledSummary: resolved.ledSummary,
     profiles: resolved.profiles,
     lightingRows: project.lighting.length ? lightingExportRows(project.lighting) : undefined,

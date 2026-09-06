@@ -33,7 +33,8 @@ import { freeGeometryToShape } from "@/lib/tracing/free-shape";
 import { useFreeDrawing } from "@/lib/tracing/use-free-drawing";
 import { useUndoRedoShortcuts } from "@/lib/tracing/use-undo-redo-shortcuts";
 import { EMPTY_SELECTION, retainExisting } from "@/lib/viewport/selection-set";
-import { formatMillimetres } from "@/components/atelier/viewport";
+import { formatMillimetres, formatSquareMetres } from "@/components/atelier/viewport";
+import { freeContourTotals } from "@/lib/tracing/free-contour";
 
 function noParams() {}
 
@@ -133,6 +134,7 @@ export function AtelierFreePreviewWorkspace() {
   }, []);
 
   const counts = countFreeEntitiesByKind(drawingState.committedGeometry);
+  const contours = freeContourTotals(drawingState.committedGeometry);
   const total = drawingState.committedGeometry.entities.length;
 
   const chip = (active: boolean) => ({
@@ -153,10 +155,12 @@ export function AtelierFreePreviewWorkspace() {
         <p className="eyebrow">Aperçu interne</p>
         <h1 style={{ fontFamily: "Georgia, serif", fontWeight: 500, margin: 0 }}>Atelier — tracé libre</h1>
         <p style={{ color: "var(--ink-soft)", fontSize: 13, lineHeight: 1.6, margin: "6px 0 0" }}>
-          Outils <strong>Point</strong>, <strong>Segment</strong>, <strong>Polyligne</strong> : cliquez sur le plan.
-          Chaque sommet prend la position <strong>accrochée</strong> (extrémité, milieu, centre, intersection,
-          grille), pas celle du curseur. Polyligne : <kbd>Entrée</kbd> ou double-clic termine, <kbd>Échap</kbd>
-          annule le tracé en cours sans rien enregistrer.
+          Outils <strong>Point</strong>, <strong>Segment</strong>, <strong>Polyligne</strong>,{" "}
+          <strong>Contour</strong> : cliquez sur le plan. Chaque sommet prend la position{" "}
+          <strong>accrochée</strong> (extrémité, milieu, centre, intersection, grille), pas celle du curseur.
+          Polyligne : <kbd>Entrée</kbd> ou double-clic termine. Contour : cliquez le premier sommet,{" "}
+          <kbd>Entrée</kbd> ou double-clic pour refermer, à partir de trois sommets. <kbd>Échap</kbd> annule le
+          tracé en cours sans rien enregistrer.
         </p>
         <p style={{ color: "var(--ink-soft)", fontSize: 13, lineHeight: 1.6, margin: "6px 0 0" }}>
           Mode <strong>Édition</strong> : tirez un sommet pour le déplacer (accroché lui aussi). Mode
@@ -206,8 +210,20 @@ export function AtelierFreePreviewWorkspace() {
       <p aria-live="polite" style={{ color: "var(--ink-soft)", fontSize: 13, lineHeight: 1.6, margin: 0 }}>
         {total === 0
           ? "Tracé vide — choisissez un outil et cliquez sur le plan."
-          : `${total} primitives — ${counts.point} point(s), ${counts.segment} segment(s), ${counts.polyline} polyligne(s) · développé ${formatMillimetres(freeGeometryLength(drawingState.committedGeometry))} · ${liveSelection.length} sélectionnée(s)`}
+          : `${total} primitives — ${counts.point} point(s), ${counts.segment} segment(s), ${counts.polyline} polyligne(s), ${counts.polygon} contour(s) · développé ${formatMillimetres(freeGeometryLength(drawingState.committedGeometry))} · ${liveSelection.length} sélectionnée(s)`}
       </p>
+
+      {/* ATELIER-FREE-CONTOUR-AREA-V1 §13 — le métré des contours, sur la géométrie ENGAGÉE. */}
+      {contours.contourCount > 0 && (
+        <p aria-live="polite" style={{ color: "var(--ink-soft)", fontSize: 13, lineHeight: 1.6, margin: 0 }}>
+          {`${contours.contourCount} contour(s) · périmètre cumulé ${formatMillimetres(contours.perimeterMm)} · `}
+          {contours.areaM2 === null
+            ? "aucune surface exploitable"
+            : `surface cumulée ${formatSquareMetres(contours.areaM2)}`}
+          {contours.exploitableCount < contours.contourCount &&
+            ` — ${contours.contourCount - contours.exploitableCount} hors surface (croisé ou aplati)`}
+        </p>
+      )}
 
       <p aria-live="polite" style={{ color: "var(--ink-soft)", fontSize: 13, lineHeight: 1.6, margin: 0, minHeight: 20 }}>
         {drawingState.error ??

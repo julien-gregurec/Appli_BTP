@@ -34,12 +34,13 @@ import {
   type AtelierFreeDrawingApi,
 } from "@/components/atelier/viewport";
 import { countFreeEntitiesByKind, freeGeometryLength, type FreeGeometry } from "@/lib/tracing/free-geometry";
+import { freeContourTotals } from "@/lib/tracing/free-contour";
 import { buildFreeVertexHandles } from "@/lib/tracing/free-handles";
 import { freeGeometryToShape } from "@/lib/tracing/free-shape";
 import { useFreeDrawing } from "@/lib/tracing/use-free-drawing";
 import { useUndoRedoShortcuts } from "@/lib/tracing/use-undo-redo-shortcuts";
 import { EMPTY_SELECTION, retainExisting } from "@/lib/viewport/selection-set";
-import { formatMillimetres } from "@/components/atelier/viewport";
+import { formatMillimetres, formatSquareMetres } from "@/components/atelier/viewport";
 
 export type FreeDrawingBoardProps = {
   projectId: string;
@@ -106,6 +107,18 @@ export function FreeDrawingBoard({ projectId, projectName, geometry, onPersist }
   const counts = countFreeEntitiesByKind(drawingState.committedGeometry);
   const total = drawingState.committedGeometry.entities.length;
 
+  /**
+   * ATELIER-FREE-CONTOUR-AREA-V1 §13/§14 — report du tracé libre : ce que les contours mesurent.
+   *
+   * Calculé sur la géométrie ENGAGÉE, pas sur celle qui suit le doigt : un chiffre qui change
+   * à chaque trame de glissement ne se lit pas, et il n'est de toute façon pas encore acquis.
+   *
+   * Deux règles de lecture, et ce sont celles de tout le lot : une surface non démontrable
+   * n'est pas écrite « 0 m² » mais dite non exploitable, et le total ne compte que les contours
+   * exploitables — en disant combien manquent, plutôt qu'en les additionnant à zéro.
+   */
+  const contours = useMemo(() => freeContourTotals(drawingState.committedGeometry), [drawingState.committedGeometry]);
+
   return (
     <div className="atelier-free-board">
       <AtelierViewportWorkspace
@@ -124,9 +137,20 @@ export function FreeDrawingBoard({ projectId, projectName, geometry, onPersist }
 
       <p className="atelier-free-summary" aria-live="polite">
         {total === 0
-          ? "Aucune primitive libre pour l’instant : choisissez Point, Segment ou Polyligne, puis cliquez sur le plan."
-          : `${total} primitive${total > 1 ? "s" : ""} — ${counts.point} point${counts.point > 1 ? "s" : ""}, ${counts.segment} segment${counts.segment > 1 ? "s" : ""}, ${counts.polyline} polyligne${counts.polyline > 1 ? "s" : ""} · développé ${formatMillimetres(freeGeometryLength(drawingState.committedGeometry))}`}
+          ? "Aucune primitive libre pour l’instant : choisissez Point, Segment, Polyligne ou Contour, puis cliquez sur le plan."
+          : `${total} primitive${total > 1 ? "s" : ""} — ${counts.point} point${counts.point > 1 ? "s" : ""}, ${counts.segment} segment${counts.segment > 1 ? "s" : ""}, ${counts.polyline} polyligne${counts.polyline > 1 ? "s" : ""}, ${counts.polygon} contour${counts.polygon > 1 ? "s" : ""} · développé ${formatMillimetres(freeGeometryLength(drawingState.committedGeometry))}`}
       </p>
+
+      {contours.contourCount > 0 && (
+        <p className="atelier-free-summary" aria-live="polite">
+          {`${contours.contourCount} contour${contours.contourCount > 1 ? "s" : ""} · périmètre cumulé ${formatMillimetres(contours.perimeterMm)} · `}
+          {contours.areaM2 === null
+            ? "aucune surface exploitable"
+            : `surface cumulée ${formatSquareMetres(contours.areaM2)}`}
+          {contours.exploitableCount < contours.contourCount &&
+            ` — ${contours.contourCount - contours.exploitableCount} contour${contours.contourCount - contours.exploitableCount > 1 ? "s" : ""} hors surface (contour croisé ou aplati)`}
+        </p>
+      )}
 
       <p className="atelier-feedback" aria-live="polite">
         {drawingState.error ??

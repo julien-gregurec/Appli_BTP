@@ -10,6 +10,7 @@
  */
 
 import type { Arc, BoundingBox, Circle, Ellipse, Point, Polygon, Polyline, Segment } from "../../../lib/geometry/primitives";
+import { freeContourMeasures, type FreeContourMeasures } from "../../../lib/tracing/free-contour";
 
 export type PlanScene = {
   id: string;
@@ -84,6 +85,17 @@ export function formatMillimetres(value: number): string {
 
 export function formatWorldPoint(source: { x: number; y: number }): string {
   return coordinates(source);
+}
+
+/**
+ * ATELIER-FREE-CONTOUR-AREA-V1 §12/§18 — écriture unique d'une surface en m².
+ *
+ * Exportée pour la même raison que `formatMillimetres` l'était : la surface annoncée pendant le
+ * tracé et celle relue dans la fiche propriétés doivent s'écrire à l'identique. Deux formatages
+ * concurrents finiraient par arrondir différemment, et l'on douterait du chiffre.
+ */
+export function formatSquareMetres(value: number): string {
+  return squareMetres(value);
 }
 
 function millimetres(value: number): string {
@@ -229,10 +241,7 @@ export function describeSceneEntity(scene: PlanScene, entityId: string | null): 
       kind: "polygon",
       label: entityLabel("polygon", item.id),
       role: item.role,
-      rows: [
-        { label: "Sommets", value: `${item.points.length}` },
-        { label: "Périmètre", value: millimetres(pathLength(item.points, true)) },
-      ],
+      rows: contourRows(item),
     };
   }
 
@@ -317,6 +326,56 @@ export function describeSceneSelection(
     entries: details.map(({ id, kind, label, role }) => ({ id, kind, label, role })),
     commonRows,
   };
+}
+
+/**
+ * ATELIER-FREE-CONTOUR-AREA-V1 §12 — fiche d'un contour : sommets, périmètre, surface,
+ * orientation, statut. LECTURE SEULE, comme toute cette fiche.
+ *
+ * Les mesures viennent de `free-contour.ts`, pas d'un calcul refait ici : c'est la même
+ * fonction qui décide de la surface affichée, de celle qui part à l'export et de celle que le
+ * report annonce. Trois arrondis différents du même contour seraient le plus sûr moyen de faire
+ * douter du chiffre sur un chantier.
+ *
+ * La ligne « Surface » ne disparaît JAMAIS : un contour invalide affiche la raison à sa place.
+ * Une ligne absente se lit comme une donnée qu'on n'a pas pensé à afficher ; une raison écrite
+ * se lit comme un refus motivé, et dit quoi corriger (§13).
+ */
+function contourRows(polygon: Polygon): readonly PropertyRow[] {
+  // Le contour est reconstitué en entité libre pour être mesuré : les deux représentations
+  // portent la même chose — des sommets ordonnés à fermeture implicite — et la conversion est
+  // une recopie, pas une traduction.
+  const measures: FreeContourMeasures = freeContourMeasures({
+    id: polygon.id,
+    kind: "polygon",
+    points: polygon.points.map((point) => ({ x: point.x, y: point.y })),
+  });
+
+  return [
+    { label: "Sommets", value: `${measures.vertexCount}` },
+    { label: "Périmètre", value: millimetres(measures.perimeterMm) },
+    { label: "Surface", value: measures.areaM2 === null ? "Non exploitable" : squareMetres(measures.areaM2) },
+    { label: "Orientation", value: ORIENTATION_LABELS[measures.orientation] },
+    { label: "Statut", value: measures.reason ?? "Contour fermé exploitable." },
+  ];
+}
+
+const ORIENTATION_LABELS: Readonly<Record<FreeContourMeasures["orientation"], string>> = {
+  "counter-clockwise": "Antihoraire",
+  clockwise: "Horaire",
+  indeterminate: "Indéterminée",
+};
+
+/**
+ * Surface en m², arrondie à trois décimales — le millimètre carré près serait illisible, et le
+ * centimètre carré près masquerait la différence entre 0,001 m² et rien du tout.
+ *
+ * L'arrondi est ICI, à l'affichage, et nulle part dans la source : `FreeContourMeasures` porte
+ * la valeur exacte (§6).
+ */
+function squareMetres(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  return `${value.toLocaleString("fr-FR", { maximumFractionDigits: 3 })} m²`;
 }
 
 function pathLength(points: readonly { x: number; y: number }[], closed: boolean): number {

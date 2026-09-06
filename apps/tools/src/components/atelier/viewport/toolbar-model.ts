@@ -1,10 +1,10 @@
 /**
  * État de la barre d'outils Atelier (§9), isolé du rendu pour rester testable.
  *
- * Trois outils — Sélection, Édition, Déplacer — et cinq commandes (Grille, Recentrer,
- * Propriétés, Annuler, Rétablir). Les outils encore absents (contour, cote, LED, spot…) ne
- * sont toujours pas déclarés : ils arriveront avec le lot qui les rendra utilisables, plutôt
- * que de transformer la barre en mur de quinze boutons.
+ * Trois outils de navigation — Sélection, Édition, Déplacer — et cinq commandes (Grille,
+ * Recentrer, Propriétés, Annuler, Rétablir). Les outils encore absents (cote, LED, spot, cercle
+ * libre…) ne sont toujours pas déclarés : ils arriveront avec le lot qui les rendra utilisables,
+ * plutôt que de transformer la barre en mur de quinze boutons.
  *
  * ATELIER-VERTEX-EDIT-UNDO-REDO-V1 §3/§8 — le mode « Édition » est ce qui fait apparaître les
  * poignées. C'est délibéré : afficher en permanence les sommets saisissables encombrerait le
@@ -12,8 +12,8 @@
  * quand aucune poignée n'existe (modèle non résolu, tracé sans modèle) — un mode qui ne fait
  * rien ne doit pas être proposé.
  *
- * ATELIER-FREE-DRAWING-FOUNDATION-V1 §4 — trois outils de CRÉATION s'ajoutent : Point, Segment,
- * Polyligne. Ils suivent la même règle que « Édition » : proposés seulement quand ils peuvent
+ * ATELIER-FREE-DRAWING-FOUNDATION-V1 §4 — des outils de CRÉATION s'ajoutent : Point, Segment,
+ * Polyligne, puis Contour (ATELIER-FREE-CONTOUR-AREA-V1 §3). Ils suivent la même règle que « Édition » : proposés seulement quand ils peuvent
  * agir, c'est-à-dire sur un projet en mode tracé libre (§2). Sur un tracé paramétrique ils
  * restent visibles mais désactivés, avec un libellé accessible qui dit pourquoi — les masquer
  * ferait changer la barre de taille d'un projet à l'autre, ce qui déplace les boutons sous le
@@ -91,7 +91,7 @@ export function canEditHandles(state: ToolbarState): boolean {
  * l'automate de tracé, et un booléen l'obligerait à refaire le test juste après.
  */
 export function freeDrawToolOf(state: ToolbarState): FreeDrawTool | null {
-  return state.tool === "point" || state.tool === "segment" || state.tool === "polyline" ? state.tool : null;
+  return FREE_DRAW_TOOLS.includes(state.tool as FreeDrawTool) ? (state.tool as FreeDrawTool) : null;
 }
 
 /**
@@ -120,6 +120,7 @@ const DRAW_TOOL_LABELS: Readonly<Record<FreeDrawTool, { label: string; ariaLabel
   point: { label: "Point", ariaLabel: "Outil point libre" },
   segment: { label: "Segment", ariaLabel: "Outil segment libre" },
   polyline: { label: "Polyligne", ariaLabel: "Outil polyligne libre" },
+  polygon: { label: "Contour", ariaLabel: "Outil contour libre fermé" },
 };
 
 /** §4 — motif unique du refus, pour que les trois outils disent la même chose. */

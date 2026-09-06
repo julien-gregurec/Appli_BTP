@@ -13,7 +13,10 @@
  * - le **segment fantôme** qui rejoint le curseur, tireté : il dit ce que le prochain clic
  *   ajoutera, ce qui est la seule information dont on a besoin pour viser ;
  * - le **point courant**, creux : la position exacte — accrochée, donc pas celle du curseur
- *   brut — où le sommet tombera.
+ *   brut — où le sommet tombera ;
+ * - ATELIER-FREE-CONTOUR-AREA-V1 §18 — le **halo de fermeture** autour du premier sommet, dès
+ *   qu'un clic dessus refermerait le contour. Sans lui, refermer se tente à l'aveugle et l'on
+ *   ne sait qu'après coup si le contour s'est fermé ou si l'on vient d'ajouter un sommet.
  *
  * Rien ici n'est persisté : le tracé en cours n'existe que dans l'état de l'automate, et il
  * disparaît sans laisser d'historique si le geste est annulé (§6).
@@ -26,13 +29,21 @@
 import type { ViewportSize, ViewportState } from "@/lib/viewport/viewport-math";
 import { createViewportTransform } from "@/lib/viewport/viewport-math";
 import type { FreeVertex } from "@/lib/tracing/free-geometry";
-import { freeDrawGhostSegments, type FreeDrawState } from "./free-draw-model";
+import { closesFreeContour, freeDrawGhostSegments, type FreeDrawState } from "./free-draw-model";
 import styles from "./viewport.module.css";
 
 export type FreeDrawPreviewLayerProps = {
   state: FreeDrawState;
   /** Position accrochée du curseur, en millimètres monde. `null` hors de la toile. */
   cursor: FreeVertex | null;
+  /**
+   * ATELIER-FREE-CONTOUR-AREA-V1 §18 — portée de visée du clic de fermeture, en millimètres.
+   *
+   * Fournie par le workspace, qui seul connaît le type de pointeur. La recevoir plutôt que la
+   * deviner est ce qui fait que le halo et le clic s'accordent : deux calculs séparés
+   * finiraient par diverger, et le halo promettrait une fermeture que le clic refuserait.
+   */
+  closeReachMm?: number;
   view: ViewportState;
   size: ViewportSize;
 };
@@ -41,9 +52,27 @@ export type FreeDrawPreviewLayerProps = {
 const VERTEX_RADIUS_PX = 4;
 const CURSOR_RADIUS_PX = 5.5;
 
-export function FreeDrawPreviewLayer({ state, cursor, view, size }: FreeDrawPreviewLayerProps) {
+/**
+ * ATELIER-FREE-CONTOUR-AREA-V1 §18 — halo du sommet qui refermerait le contour.
+ *
+ * Plus large que le sommet lui-même, et pas seulement d'une autre couleur : sur un plan tenu à
+ * bout de bras au soleil, une différence de teinte se perd, une différence de TAILLE non.
+ */
+const CLOSING_RADIUS_PX = 9;
+
+export function FreeDrawPreviewLayer({ state, cursor, closeReachMm, view, size }: FreeDrawPreviewLayerProps) {
   const project = createViewportTransform(view, size).point;
   const ghosts = freeDrawGhostSegments(state, cursor);
+
+  /*
+   * §18 — le premier sommet s'entoure d'un halo dès qu'un clic dessus refermerait le contour.
+   *
+   * La condition vient de `closesFreeContour`, c'est-à-dire de la fonction que l'automate
+   * consulte lui-même au clic suivant. Ce qui est MONTRÉ et ce qui sera FAIT sont donc décidés
+   * au même endroit : un halo ne peut pas promettre une fermeture que le clic refuserait, ni
+   * manquer une fermeture que le clic accepterait.
+   */
+  const closingVertex = cursor && closesFreeContour(state, cursor, closeReachMm) ? state.pending[0] : null;
 
   return (
     <g aria-hidden="true">
@@ -65,6 +94,15 @@ export function FreeDrawPreviewLayer({ state, cursor, view, size }: FreeDrawPrev
           />
         );
       })}
+
+      {closingVertex && (
+        <circle
+          className={styles.ghostClosing}
+          cx={project(closingVertex).x}
+          cy={project(closingVertex).y}
+          r={CLOSING_RADIUS_PX}
+        />
+      )}
 
       {cursor && (
         <circle
