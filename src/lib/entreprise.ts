@@ -4,12 +4,13 @@ import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { estPlateformeAdmin } from "@/lib/plateforme";
+import { cheminAccessibleEssaiExpire } from "@/lib/acces-socle-essai";
 
-// Seule page où un essai expiré sans offre doit rester accessible (choisir une
-// offre) au lieu de rediriger vers /abonnement-suspendu — voir le middleware
-// (src/lib/supabase/proxy.ts) qui transmet le chemin via cet en-tête, un
-// Server Component n'y ayant pas accès autrement.
-const CHEMIN_EXEMPTE_ESSAI_EXPIRE = "/abonnement";
+// Chemins qui restent accessibles quand l'essai est expiré sans offre — souscrire,
+// demander de l'aide, récupérer ses données (ELSATIA-GP-TRIAL-EXPIRY-P1-CLOSURE-V1).
+// La liste fait autorité dans src/lib/acces-socle-essai.ts ; c'est le middleware
+// (src/lib/supabase/proxy.ts) qui transmet le chemin via cet en-tête, un Server
+// Component n'y ayant pas accès autrement.
 
 // Sentinel utilisé quand aucune entreprise réelle n'est rattachée (même convention
 // que compteurs_reference : aucune entreprise n'a jamais cet id, donc les requêtes
@@ -30,10 +31,11 @@ export type ContexteEntreprise = {
   suspensionPrevueAt: string | null;
   impayeMessage: string | null;
   accesSupportPlateforme: boolean;
-  // Essai (30 jours) expiré sans offre active. N'est jamais `true` que sur
-  // /abonnement (seule page exemptée de la redirection) : tout autre appelant
-  // est redirigé vers /abonnement-suspendu avant de recevoir ce contexte, pour
-  // que les pages métier restent bloquées proprement.
+  // Essai (30 jours) expiré sans offre active. N'est jamais `true` que sur les
+  // chemins de sortie d'essai (CHEMINS_ACCESSIBLES_ESSAI_EXPIRE : abonnement,
+  // aide, données RGPD) : tout autre appelant est redirigé vers
+  // /abonnement-suspendu avant de recevoir ce contexte, pour que les pages
+  // métier restent bloquées proprement.
   essaiExpireSansOffre: boolean;
 };
 
@@ -180,8 +182,10 @@ export const getContexteEntreprise = cache(async function getContexteEntreprise(
     redirect("/abonnement-suspendu");
   }
   if (essaiExpireSansOffre) {
+    // Le métier reste bloqué ; l'aide, l'export RGPD et la souscription restent
+    // ouverts — un essai terminé ne doit pas retenir les données du client.
     const cheminActuel = (await headers()).get("x-elsatia-pathname");
-    if (cheminActuel !== CHEMIN_EXEMPTE_ESSAI_EXPIRE) {
+    if (!cheminAccessibleEssaiExpire(cheminActuel)) {
       redirect("/abonnement-suspendu?motif=essai_expire");
     }
   }

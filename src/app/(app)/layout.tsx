@@ -10,6 +10,8 @@ import { AssistantIA } from "@/components/AssistantIA";
 import { AppPresenceTracker } from "@/components/AppPresenceTracker";
 import { AbonnementBanner } from "@/components/AbonnementBanner";
 import { SupportAccessBanner } from "@/components/SupportAccessBanner";
+import { EssaiExpireBanner, EssaiPreavisBanner } from "@/components/EssaiBanner";
+import { preavisEssai } from "@/lib/acces-socle-essai";
 import { activeFeaturesForCompany } from "@/lib/feature-flags";
 import { boutiqueEstActive, iaEstActive } from "@/lib/preview-features";
 import { listerApplicationsPourSwitcher } from "@/lib/multi-app-server";
@@ -26,6 +28,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ]);
   const activeFeatures = await activeFeaturesForCompany(ctx, permissions, plateformeAdmin);
   const peutVoirAlerteAbonnement = permissions === null || permissions.includes("gerer_utilisateurs") || permissions.includes("gerer_parametres");
+  // Préavis de fin d'essai (ELSATIA-GP-TRIAL-EXPIRY-P1-CLOSURE-V1) : visible par
+  // TOUS les membres — ils subissent le blocage à J31 — mais seul un profil
+  // habilité se voit proposer le lien de souscription, qui exige acces_parametres.
+  const preavis = ctx.accesSupportPlateforme
+    ? null
+    : preavisEssai({
+        abonnementStatut: ctx.abonnementStatut,
+        essaiDebut: ctx.abonnementEssaiDebut,
+        essaiFin: ctx.abonnementEssaiFin,
+      });
 
   return (
     <div className="app-shell flex min-h-full flex-1">
@@ -62,6 +74,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <div className="min-w-0 flex-1">
         {ctx.accesSupportPlateforme&&<SupportAccessBanner entrepriseNom={ctx.entrepriseNom}/>}
         {!ctx.accesSupportPlateforme&&ctx.suspensionPrevueAt&&peutVoirAlerteAbonnement&&<AbonnementBanner echeance={ctx.suspensionPrevueAt} message={ctx.impayeMessage}/>}
+        {ctx.essaiExpireSansOffre&&<EssaiExpireBanner peutSouscrire={peutVoirAlerteAbonnement}/>}
+        {preavis&&<EssaiPreavisBanner joursRestants={preavis.joursRestants} niveau={preavis.niveau} finEssai={ctx.abonnementEssaiFin} peutSouscrire={peutVoirAlerteAbonnement}/>}
         <ModuleAccessBoundary permissions={permissions} activeFeatures={activeFeatures}>{children}</ModuleAccessBoundary>
       </div>
       <MobileBack />
