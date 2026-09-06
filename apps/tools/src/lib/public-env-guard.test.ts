@@ -33,7 +33,7 @@ import { APP_ENVIRONMENTS as SITE_ENVIRONMENTS, getAppEnvironment } from "./site
 const COMPLETE = {
   NEXT_PUBLIC_TOOLS_ENV: "production",
   NEXT_PUBLIC_SUPABASE_URL: "https://abcdefgh.supabase.co",
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_valeur-de-test",
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_valeur-de-test",
   NEXT_PUBLIC_TOOLS_BILLING_API_URL: "https://app.elsatia.fr",
   NEXT_PUBLIC_TOOLS_URL: "https://tools.elsatia.fr",
 } as const;
@@ -53,18 +53,20 @@ const REQUIRED = PUBLIC_ENV_CONTRACT.filter((entry) => entry.level === "required
 describe("contrat des variables publiques", () => {
   /*
    * Le contrat n'est pas déclaratif : il doit décrire ce que le code lit réellement. Tools lit
-   * `NEXT_PUBLIC_SUPABASE_ANON_KEY` (`auth/client.ts`) et non `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
-   * qui est la convention de Gestion Pro. Confondre les deux ferait passer la garde pour verte sur
-   * un environnement où le compte ELSATIA est en réalité mort.
+   * `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (`auth/client.ts`), convention unique de l'écosystème,
+   * déjà celle de Gestion Pro (`src/lib/supabase/keys.ts`). L'ancien nom `..._ANON_KEY` est banni
+   * du contrat, et pas seulement absent : les clés JWT legacy sont désactivées côté projet
+   * Supabase, donc l'accepter en repli ferait passer la garde pour verte sur un environnement où
+   * le compte ELSATIA est en réalité mort.
    */
   it("porte exactement les trois variables requises par le compte et l'abonnement", () => {
     expect(REQUIRED.map((entry) => entry.name)).toEqual([
       "NEXT_PUBLIC_SUPABASE_URL",
-      "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
       "NEXT_PUBLIC_TOOLS_BILLING_API_URL",
     ]);
     const names = PUBLIC_ENV_CONTRACT.map((entry) => entry.name);
-    expect(names).not.toContain("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
+    expect(names).not.toContain("NEXT_PUBLIC_SUPABASE_ANON_KEY");
     /* `NEXT_PUBLIC_TOOLS_URL` a un repli correct dans `site.ts` : recommandée, jamais bloquante. */
     expect(names).toContain("NEXT_PUBLIC_TOOLS_URL");
     expect(PUBLIC_ENV_CONTRACT.find((entry) => entry.name === "NEXT_PUBLIC_TOOLS_URL")?.level).toBe("recommended");
@@ -112,9 +114,9 @@ describe("build publié", () => {
   });
 
   it("traite une variable vide comme une variable absente", () => {
-    const result = evaluatePublicEnv({ ...COMPLETE, NEXT_PUBLIC_SUPABASE_ANON_KEY: "   " });
+    const result = evaluatePublicEnv({ ...COMPLETE, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "   " });
     expect(result.ok).toBe(false);
-    expect(result.failures[0]).toMatchObject({ name: "NEXT_PUBLIC_SUPABASE_ANON_KEY", reason: REASONS.blank });
+    expect(result.failures[0]).toMatchObject({ name: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", reason: REASONS.blank });
   });
 
   /*
@@ -206,11 +208,11 @@ describe("aucun secret ne franchit la garde", () => {
   });
 
   it("bloque une clé de service jusque dans un build local", () => {
-    const env = { NEXT_PUBLIC_TOOLS_ENV: "local", NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_secret_valeur-de-test" };
+    const env = { NEXT_PUBLIC_TOOLS_ENV: "local", NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_secret_valeur-de-test" };
     const result = evaluatePublicEnv(env);
     expect(result.ok).toBe(false);
     expect(result.failures[0]).toMatchObject({
-      name: "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      name: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
       reason: REASONS.secretShaped,
     });
   });
@@ -222,7 +224,7 @@ describe("aucun secret ne franchit la garde", () => {
    * reviendrait à conseiller de publier le secret quand même.
    */
   it("ne propose jamais de contourner une fuite en déclarant un build local", () => {
-    const leak = formatReport(evaluatePublicEnv({ NEXT_PUBLIC_TOOLS_ENV: "local", NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_secret_x" }));
+    const leak = formatReport(evaluatePublicEnv({ NEXT_PUBLIC_TOOLS_ENV: "local", NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_secret_x" }));
     expect(leak).not.toContain("NEXT_PUBLIC_TOOLS_ENV=local");
     expect(leak).toContain("Aucun mode ne leve ce refus.");
     const missing = formatReport(evaluatePublicEnv({ NEXT_PUBLIC_TOOLS_ENV: "production" }));
@@ -239,7 +241,7 @@ describe("aucun secret ne franchit la garde", () => {
     const env = {
       NEXT_PUBLIC_TOOLS_ENV: "production",
       NEXT_PUBLIC_SUPABASE_URL: "javascript:alert(1)",
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_secret_valeur-tres-reconnaissable",
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_secret_valeur-tres-reconnaissable",
       NEXT_PUBLIC_TOOLS_BILLING_API_URL: "http://origine-privee.interne",
       NEXT_PUBLIC_TOOLS_URL: "http://autre-valeur-reconnaissable",
     };

@@ -34,10 +34,15 @@ export const ADVISORY_MODES = ["preview"];
  *
  * - `NEXT_PUBLIC_SUPABASE_URL`      lue par `src/lib/auth/client.ts` et par `next.config.ts`
  *                                   (origine `connect-src` de la CSP).
- * - `NEXT_PUBLIC_SUPABASE_ANON_KEY` lue par `src/lib/auth/client.ts`. Tools n'utilise PAS
- *                                   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, qui est la convention
- *                                   de Gestion Pro (`src/lib/supabase/keys.ts`) : les deux
- *                                   applications ne lisent pas la meme variable.
+ * - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` lue par `src/lib/auth/client.ts`. C'est la convention
+ *                                   unique de l'ecosysteme, deja celle de Gestion Pro
+ *                                   (`src/lib/supabase/keys.ts`) et du seul inventaire d'env
+ *                                   versionne (`.env.example`). `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+ *                                   n'est PAS acceptee en repli : les cles JWT legacy (`anon`,
+ *                                   `service_role`) sont desactivees au niveau du projet Supabase
+ *                                   depuis SECURITY-CREDENTIALS-V1B/V1C, donc une valeur portee
+ *                                   par l'ancien nom n'authentifierait plus rien. Un repli
+ *                                   transformerait cette panne d'authentification en build vert.
  * - `NEXT_PUBLIC_TOOLS_BILLING_API_URL` lue par `src/lib/monetization-client.ts` et par
  *                                   `next.config.ts`. Sans elle, `apiBase()` vaut `""` : le
  *                                   catalogue, le checkout, le portail et la verification des
@@ -56,7 +61,7 @@ export const PUBLIC_ENV_CONTRACT = [
     role: "compte ELSATIA (connexion, droits) et origine connect-src de la CSP",
   },
   {
-    name: "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    name: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
     kind: "key",
     level: "required",
     role: "compte ELSATIA (client Supabase navigateur)",

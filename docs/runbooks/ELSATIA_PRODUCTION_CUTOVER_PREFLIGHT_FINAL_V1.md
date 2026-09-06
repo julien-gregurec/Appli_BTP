@@ -210,8 +210,13 @@ Aucun secret n'apparaît dans les manifestes, dumps, tickets ou logs. Le rôle d
 
 Valeurs jamais affichées. Présence/état à cocher sur la fiche Vercel (runbook V1 §10).
 
-**Supabase (Production) :** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-(ou `NEXT_PUBLIC_SUPABASE_ANON_KEY` selon convention), `SUPABASE_SERVICE_ROLE_KEY`.
+**Supabase (Production) :** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
+`SUPABASE_SERVICE_ROLE_KEY`. La convention publique est **unique et sans variante** :
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, lue par Gestion Pro (`src/lib/supabase/keys.ts`) comme
+par Tools (`apps/tools/src/lib/auth/client.ts`). `NEXT_PUBLIC_SUPABASE_ANON_KEY` n'est plus un
+nom accepté : les clés JWT legacy (`anon`, `service_role`) sont désactivées au niveau du projet
+Supabase depuis SECURITY-CREDENTIALS-V1B/V1C, donc une valeur portée par l'ancien nom
+n'authentifierait plus rien. Ne pas la recréer en Production.
 
 **Stripe (TEST — recette Production fermée) :** `STRIPE_SECRET_KEY` (clé `sk_test_…`),
 `STRIPE_WEBHOOK_EXPECTED_MODE` (= `test`), `STRIPE_WEBHOOK_ABONNEMENT_SECRET`,

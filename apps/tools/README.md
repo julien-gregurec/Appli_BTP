@@ -64,7 +64,7 @@ Les composants ne contiennent pas de conditions commerciales dispersées. `acces
 
 Chaque outil déclare `access` et ses `capabilities` dans le catalogue. Tous les outils R3 sont `free`. Sans droit Pro, les pages avancées montrent un aperçu descriptif qui ne calcule ni fausse cote ni fausse forme. R8 résout les droits côté serveur via `tools_resoudre_entitlements` ; aucun e-mail ni drapeau d’environnement ne peut auto-attribuer Pro.
 
-Le compte facultatif utilise `NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Les refresh tokens sont stockés dans Keychain sur iOS, Android Keystore sur Android, et chiffrés AES-GCM avec une clé Web Crypto non exportable sur le Web. Le cache de droits est lié à l’utilisateur, protégé contre l’altération et valable au maximum sept jours hors ligne.
+Le compte facultatif utilise `NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Les refresh tokens sont stockés dans Keychain sur iOS, Android Keystore sur Android, et chiffrés AES-GCM avec une clé Web Crypto non exportable sur le Web. Le cache de droits est lié à l’utilisateur, protégé contre l’altération et valable au maximum sept jours hors ligne.
 
 Les conventions complètes du moteur de traçage figurent dans [docs/tracing-engine.md](docs/tracing-engine.md). Le stockage et les documents chantier sont détaillés dans [docs/projects-exports.md](docs/projects-exports.md).
 
@@ -107,11 +107,11 @@ Next fige les `NEXT_PUBLIC_*` dans le bundle au moment du build. Un build lancé
 | Variable | Statut | Lue par |
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | requise | `src/lib/auth/client.ts`, `connect-src` de `next.config.ts` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | requise | `src/lib/auth/client.ts` |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | requise | `src/lib/auth/client.ts` |
 | `NEXT_PUBLIC_TOOLS_BILLING_API_URL` | requise | `src/lib/monetization-client.ts`, `connect-src` de `next.config.ts` |
 | `NEXT_PUBLIC_TOOLS_URL` | recommandée | `src/lib/site.ts` — repli `https://tools.elsatia.fr` |
 
-Tools lit `NEXT_PUBLIC_SUPABASE_ANON_KEY`, pas `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` : cette dernière est la convention de Gestion Pro (`src/lib/supabase/keys.ts`). Les deux applications ne lisent pas la même variable, et un environnement qui ne porterait que celle de Gestion Pro ferait échouer cette garde — c'est le comportement voulu.
+Tools lit `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, la convention unique de l'écosystème, déjà celle de Gestion Pro (`src/lib/supabase/keys.ts`) et du seul inventaire d'env versionné (`.env.example`). `NEXT_PUBLIC_SUPABASE_ANON_KEY` n'est **pas** acceptée en repli : les clés JWT legacy (`anon`, `service_role`) sont désactivées au niveau du projet Supabase depuis SECURITY-CREDENTIALS-V1B/V1C, donc une valeur portée par l'ancien nom n'authentifierait plus rien. Un repli convertirait cette panne d'authentification en build vert — c'est précisément ce que la garde doit empêcher.
 
 Le mode de build vient de `NEXT_PUBLIC_TOOLS_ENV`, avec la règle de `getAppEnvironment()` : **absente ou inconnue vaut `production`**. Un build qui ne se déclare pas est donc traité comme un build publié.
 
