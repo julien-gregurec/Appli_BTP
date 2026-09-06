@@ -118,11 +118,40 @@ Toute anomalie bloquante interdit la migration. Le contrôle détecte les applic
 dans l'historique, états incohérents, UID dupliqués, sessions orphelines et l'absence d'un
 administrateur `total` actif.
 
-## Compte professionnel ELSATIA
+## Propriétaire global ELSATIA
 
-`julien@elsatia.fr` est l'identité officielle à terme, mais reste sans droit jusqu'à un lot
-d'activation séparé ayant validé connexion, récupération, email, MFA et absence de dépendance
-à l'ancienne adresse. `julien.gregurec@gmail.com` n'est pas supprimé par ce correctif.
+Depuis ELSATIA-GLOBAL-OWNER-ALL-APPS-ACCESS-V1 (migration 00266), `julien@elsatia.fr` est le
+**propriétaire global** : `plateforme_admins.proprietaire = true`, rôle `total`, unique.
+La désignation seule n'accorde aucun droit — l'identité suit le même cycle que les autres.
+
+Le propriétaire dispose d'un chemin d'activation propre, `plateforme_proprietaire_revendiquer()`,
+qui ne s'applique qu'à lui et n'assouplit le cycle d'aucun administrateur délégué. Il exige
+simultanément : session **AAL2**, **facteur MFA vérifié** sur le compte appelant, email Auth
+confirmé, compte ni banni ni supprimé, et une adresse identique à celle de la ligne propriétaire.
+Il refuse un compte déjà rattaché à un autre UID et refuse de réactiver une identité révoquée.
+L'appel est journalisé dans `plateforme_journal_actions` (`proprietaire_plateforme_revendique`)
+et il est idempotent.
+
+Prérequis à préparer **avant** l'appel, hors de tout canal public : le compte Auth
+`julien@elsatia.fr` existe, son email est confirmé, et un facteur MFA y est vérifié.
+
+Une fois actif, le propriétaire accède automatiquement à toutes les applications **actives** du
+catalogue — présentes et futures, `reserves` incluse dès son inscription — sans habilitation ni
+entitlement par application. Cela n'ouvre aucune donnée métier d'entreprise : les RLS métier et la
+règle Colors « lecture seule sous session support » restent entières.
+
+Le propriétaire ne peut être ni révoqué ni dégradé depuis `/plateforme`, y compris par un autre
+administrateur `total`. `julien.gregurec@gmail.com` conserve son rôle d'administrateur délégué et
+n'est pas supprimé.
+
+### Environnement neuf
+
+Sur une base reconstruite depuis zéro, aucune ligne `plateforme_admins` n'a d'`utilisateur_id` :
+il n'existe alors aucun administrateur `total` actif, donc aucun appelant possible pour
+`plateforme_rattacher_admin` / `plateforme_activer_admin`. `plateforme_proprietaire_revendiquer()`
+est le chemin prévu pour rendre un tel environnement administrable sans intervention SQL de
+maintenance. La section « Premier administrateur ou récupération » reste valable pour tout autre
+cas de perte d'accès.
 
 `DISABLE_EMAIL_LOGIN` n'est jamais une procédure d'administration. Le mode démonstration exige
 en plus `ELSATIA_LOCAL_DEMO=true`, une base Supabase locale, un environnement non Production et

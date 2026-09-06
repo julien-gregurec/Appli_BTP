@@ -50,5 +50,6 @@ describe("normalisation des abonnements", () => {
   it("bloque le double achat dès qu'une source Pro existe", () => {
     expect(shouldPreventDuplicatePurchase(["apple"])).toBe(true);
     expect(shouldPreventDuplicatePurchase(["free-default"])).toBe(false);
+    expect(shouldPreventDuplicatePurchase(["plateforme"])).toBe(true);
   });
 });

@@ -10,7 +10,7 @@ import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { RemiseConfirmButton } from "@/components/RemiseConfirmButton";
 import { BRAND_NAME } from "@/lib/brand";
 
-type MembrePlateforme = { email: string; role: string; nom: string | null; ajoute_par: string | null; actif: boolean | null; statut_identite: string | null; created_at: string };
+type MembrePlateforme = { email: string; role: string; nom: string | null; ajoute_par: string | null; actif: boolean | null; statut_identite: string | null; proprietaire: boolean | null; created_at: string };
 const ROLE_LABEL: Record<string, string> = { total: "Accès total", support: "Support", facturation: "Facturation", lecture: "Lecture seule" };
 
 // Les quatre états du cycle d'identité administrateur (migration 20260826000237).
@@ -79,7 +79,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
   let peutGererIdentites = false;
   const modeDemonstration = isEmailLoginDisabled();
   if (modeDemonstration) {
-    const { data } = await supabase.from("plateforme_admins").select("email, role, nom, ajoute_par, actif, statut_identite, created_at").order("created_at");
+    const { data } = await supabase.from("plateforme_admins").select("email, role, nom, ajoute_par, actif, statut_identite, proprietaire, created_at").order("created_at");
     membresPlateforme = (data ?? []) as MembrePlateforme[];
   } else {
     const [{ data }, { data: autorise, error: erreurAutorisation }] = await Promise.all([
@@ -175,6 +175,14 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                       {m.nom && <span className="ml-2 text-neutral-500">{m.email}</span>}
                       <span className="ml-2 rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">{ROLE_LABEL[m.role] ?? m.role}</span>
                       <span className={`ml-2 rounded px-2 py-0.5 text-xs ${etat.classe}`}>{etat.libelle}</span>
+                      {m.proprietaire && (
+                        <span
+                          className="ml-2 rounded bg-indigo-100 px-2 py-0.5 text-xs font-semibold text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-200"
+                          title="Propriétaire global ELSATIA : accès automatique à toutes les applications actives du catalogue, présentes et futures."
+                        >
+                          Propriétaire ELSATIA
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                       {m.statut_identite === "rattachee_non_confirmee" && peutGererIdentites && (
@@ -199,7 +207,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
                           </ConfirmSubmitButton>
                         </form>
                       )}
-                      {m.statut_identite !== "revoquee" && (
+                      {m.statut_identite !== "revoquee" && !m.proprietaire && (
                         <form action={retirerAdminPlateformeAction}>
                           <input type="hidden" name="email" value={m.email} />
                           <ConfirmSubmitButton
