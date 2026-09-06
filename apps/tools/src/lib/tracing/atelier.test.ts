@@ -12,7 +12,9 @@ import {
   TRACING_OUVRAGE_ORDER,
   buildTracingProjectFromInput,
   describeTracingProject,
+  filterTracingProjects,
   formatRoomDimensions,
+  modelParamOverrides,
   metresInputToMm,
   touchTracingProject,
 } from "./atelier";
@@ -134,5 +136,42 @@ describe("projets récents (§6)", () => {
       startFromPhoto: true,
       updatedAt: "2026-09-05T09:00:00.000Z",
     });
+  });
+});
+
+describe("filterTracingProjects (TRACING-WORKSHOP-UI-V1 §5)", () => {
+  const summaries = [
+    { id: "a", name: "Plafond séjour", typeLabel: "Plafond", dimensionsLabel: "5 × 4 m", modelLabel: "Rosace 6 pétales simple", startFromPhoto: false, updatedAt: "2026-09-05T09:00:00.000Z" },
+    { id: "b", name: "Arche couloir", typeLabel: "Arche", dimensionsLabel: null, modelLabel: "Arche plein cintre", startFromPhoto: false, updatedAt: "2026-09-04T09:00:00.000Z" },
+    { id: "c", name: "Niche entrée", typeLabel: "Niche", dimensionsLabel: null, modelLabel: null, startFromPhoto: true, updatedAt: "2026-09-03T09:00:00.000Z" },
+  ];
+
+  it("une recherche vide renvoie la liste inchangée", () => {
+    expect(filterTracingProjects(summaries, "   ")).toBe(summaries);
+  });
+
+  it("trouve par nom, sans accent ni casse", () => {
+    expect(filterTracingProjects(summaries, "sejour").map((item) => item.id)).toEqual(["a"]);
+    expect(filterTracingProjects(summaries, "PLAFOND").map((item) => item.id)).toEqual(["a"]);
+  });
+
+  it("trouve par type d'ouvrage et par modèle", () => {
+    expect(filterTracingProjects(summaries, "niche").map((item) => item.id)).toEqual(["c"]);
+    expect(filterTracingProjects(summaries, "plein cintre").map((item) => item.id)).toEqual(["b"]);
+  });
+
+  it("ne ramène rien plutôt qu'un repli quand rien ne correspond", () => {
+    expect(filterTracingProjects(summaries, "zzz")).toHaveLength(0);
+  });
+});
+
+describe("modelParamOverrides (TRACING-WORKSHOP-UI-V1)", () => {
+  it("n'enregistre que les écarts aux défauts du modèle", () => {
+    expect(modelParamOverrides({ a: 1, b: 2 }, { a: 1, b: 2 })).toBeUndefined();
+    expect(modelParamOverrides({ a: 1, b: 3 }, { a: 1, b: 2 })).toEqual({ b: 3 });
+  });
+
+  it("retient une valeur dont le modèle ne publie pas de défaut", () => {
+    expect(modelParamOverrides({ a: 5 }, {})).toEqual({ a: 5 });
   });
 });

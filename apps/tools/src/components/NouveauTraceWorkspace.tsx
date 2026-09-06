@@ -9,6 +9,7 @@ import {
   TRACING_OUVRAGE_ORDER,
   buildTracingProjectFromInput,
   metresInputToMm,
+  modelParamOverrides,
   touchTracingProject,
 } from "@/lib/tracing/atelier";
 import { atelierModelsForType } from "@/lib/tracing/atelier-models";
@@ -24,19 +25,6 @@ import { Brand } from "./HomeDashboard";
 type Step = "type" | "infos" | "modele" | "parametres" | "photo" | "done";
 const STEP_ORDER: readonly Step[] = ["type", "infos", "modele", "parametres", "photo"];
 const LATER = "__later__";
-
-/**
- * ATELIER-MODELID-ENGINE-B-BRIDGE-V1 §4 — n'enregistrer que ce que l'utilisateur a
- * réellement changé. Les défauts restent publiés par le modèle et ne sont jamais recopiés
- * dans le projet : `modelParams` ne porte que les écarts.
- */
-function overridesOnly(values: Readonly<Record<string, number>>, defaults: Readonly<Record<string, number>>): Record<string, number> | undefined {
-  const overrides: Record<string, number> = {};
-  for (const [id, value] of Object.entries(values)) {
-    if (defaults[id] !== value) overrides[id] = value;
-  }
-  return Object.keys(overrides).length ? overrides : undefined;
-}
 
 export function NouveauTraceWorkspace() {
   const router = useRouter();
@@ -90,6 +78,26 @@ export function NouveauTraceWorkspace() {
     [modelId, paramValues],
   );
 
+  /** Applique un modèle à un projet DONNÉ — utilisable avant que l'état `project` soit posé. */
+  const applyModel = useCallback(
+    (target: TracingProject, modelId: string | null) => {
+      // Changer de modèle invalide les surcharges de l'ancien : on repart de ses défauts
+      // plutôt que de transporter des paramètres qui n'ont plus de sens (§4).
+      const next = touchTracingProject(target, { modelId: modelId ?? undefined, modelParams: undefined });
+      setProject(next);
+      scheduleAutosave(next);
+      const chosen = findTraceModelDescriptor(modelId);
+      if (!chosen) {
+        setParamValues({});
+        setStep("photo");
+        return;
+      }
+      setParamValues(traceModelDefaults(chosen));
+      setStep("parametres");
+    },
+    [scheduleAutosave],
+  );
+
   const createProject = useCallback(async () => {
     if (!type || !repository) return;
     setFeedback("");
@@ -111,32 +119,26 @@ export function NouveauTraceWorkspace() {
       const draft = buildTracingProjectFromInput({ type, name, roomWidthMm, roomHeightMm });
       const created = await repository.create(draft);
       setProject(created);
-      setStep("modele");
+      // TRACING-WORKSHOP-UI-V1 §7 — venu de la bibliothèque (?modele=<slug>) : le modèle est
+      // déjà choisi, on n'oblige pas à le rechoisir. Le slug est lu ICI, au moment du clic,
+      // plutôt que conservé dans un état : rien à synchroniser, rien à réhydrater. Un slug
+      // inconnu du registre est ignoré — jamais substitué par un autre modèle (§3).
+      const preset = new URLSearchParams(window.location.search).get("modele");
+      if (preset && findTraceModelDescriptor(preset)) applyModel(created, preset);
+      else setStep("modele");
     } catch (cause) {
       setFeedback(cause instanceof Error ? cause.message : "Création du tracé impossible.");
     } finally {
       setBusy(false);
     }
-  }, [type, repository, width, height, name]);
+  }, [type, repository, width, height, name, applyModel]);
 
   const chooseModel = useCallback(
     (modelId: string | null) => {
       if (!project) return;
-      // Changer de modèle invalide les surcharges de l'ancien : on repart de ses défauts
-      // plutôt que de transporter des paramètres qui n'ont plus de sens (§4).
-      const next = touchTracingProject(project, { modelId: modelId ?? undefined, modelParams: undefined });
-      setProject(next);
-      scheduleAutosave(next);
-      const chosen = findTraceModelDescriptor(modelId);
-      if (!chosen) {
-        setParamValues({});
-        setStep("photo");
-        return;
-      }
-      setParamValues(traceModelDefaults(chosen));
-      setStep("parametres");
+      applyModel(project, modelId);
     },
-    [project, scheduleAutosave],
+    [applyModel, project],
   );
 
   const confirmParameters = useCallback(() => {
@@ -146,7 +148,7 @@ export function NouveauTraceWorkspace() {
       return;
     }
     setFeedback("");
-    const next = touchTracingProject(project, { modelParams: overridesOnly(paramValues, traceModelDefaults(descriptor)) });
+    const next = touchTracingProject(project, { modelParams: modelParamOverrides(paramValues, traceModelDefaults(descriptor)) });
     setProject(next);
     scheduleAutosave(next);
     setStep("photo");
