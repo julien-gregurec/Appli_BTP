@@ -161,17 +161,19 @@ select ok(
 
 -- ── Applications futures : Réserves et une application encore inconnue ───────
 reset role;
+-- Réserves n'est plus une hypothèse : ELSATIA-RESERVES-V1-FOUNDATION-AND-WORKFLOW-V1
+-- l'a inscrite au catalogue (migration 00268). Le test la traite donc comme
+-- l'application réellement seedée, et n'invente plus que l'application inconnue.
 insert into public.applications_elsatia (code, nom, description, ordre)
-values ('reserves', 'ELSATIA Réserves', 'Application future du catalogue', 40),
-       ('future_test_app', 'Application future inconnue', 'Ajoutée sans aucune habilitation', 90);
--- Aucune habilitation, aucun accès entreprise, aucun rôle applicatif n'est créé
--- pour ces deux applications : c'est précisément ce que le test doit prouver.
+values ('future_test_app', 'Application future inconnue', 'Ajoutée sans aucune habilitation', 90);
+-- Aucune habilitation, aucun accès entreprise, aucun rôle applicatif Réserves n'est
+-- attribué au propriétaire : c'est précisément ce que le test doit prouver.
 set local role authenticated;
 select set_config('request.jwt.claim.sub', current_setting('elsatia.test_proprietaire_uid'), true);
 select set_config('request.jwt.claim.email', 'julien@elsatia.fr', true);
 
 select ok(public.a_acces_application('a0000000-0000-0000-0000-000000000001','reserves'),
-  'propriétaire : Réserves devient accessible dès son inscription au catalogue');
+  'propriétaire : Réserves est accessible du seul fait de son inscription au catalogue');
 select ok(public.a_acces_application('a0000000-0000-0000-0000-000000000001','future_test_app'),
   'propriétaire : une application future inconnue est accessible sans habilitation');
 select is(

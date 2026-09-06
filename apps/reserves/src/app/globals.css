@@ -1,0 +1,185 @@
+/* ELSATIA Réserves — identité propre.
+   Réserves n'emprunte ni l'aubergine de Colors ni la charte de Gestion Pro : le repère
+   visuel est celui du chantier en cours de réception — ardoise profonde et ambre de
+   signalisation. Conception mobile d'abord : cibles tactiles ≥ 44 px partout. */
+
+:root {
+  --ardoise-900: #10201f;
+  --ardoise-800: #16302e;
+  --ardoise-700: #1d413e;
+  --ardoise-100: #e4ecea;
+  --ambre: #e0952f;
+  --ambre-clair: #f6dcb4;
+  --papier: #f7f6f3;
+  --carte: #ffffff;
+  --texte: #17211f;
+  --texte-doux: #5c6b68;
+  --bord: #dcdedb;
+  --rouge: #b3372c;
+  --vert: #2f7a52;
+  --bleu: #2b5c86;
+  --rayon: 10px;
+  --touche: 44px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--papier);
+  color: var(--texte);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+a { color: var(--ardoise-700); }
+
+/* ── Marque ─────────────────────────────────────────────────────────────── */
+.marque { display: flex; align-items: center; gap: 10px; }
+.marque-jalon {
+  width: 26px; height: 26px; border-radius: 5px; flex: none;
+  background: var(--ambre);
+  position: relative;
+}
+.marque-jalon::after {
+  content: ""; position: absolute; inset: 8px;
+  border: 2px solid var(--ardoise-900); border-radius: 2px;
+}
+.marque-texte { font-weight: 700; letter-spacing: 0.02em; }
+.marque-texte span { font-weight: 400; opacity: 0.72; }
+
+/* ── Coquille applicative ───────────────────────────────────────────────── */
+.coquille { min-height: 100dvh; display: flex; flex-direction: column; }
+
+.barre {
+  background: var(--ardoise-900); color: #fff;
+  padding: 12px 16px; display: flex; align-items: center;
+  justify-content: space-between; gap: 12px;
+  position: sticky; top: 0; z-index: 20;
+}
+.barre .marque-texte { color: #fff; }
+.barre-org { font-size: 13px; opacity: 0.78; text-align: right; }
+
+.navigation {
+  display: flex; gap: 4px; overflow-x: auto; background: var(--ardoise-800);
+  padding: 0 8px; position: sticky; top: 50px; z-index: 19;
+  scrollbar-width: none;
+}
+.navigation::-webkit-scrollbar { display: none; }
+.navigation a {
+  color: #cfdcd9; text-decoration: none; white-space: nowrap;
+  padding: 0 14px; min-height: var(--touche); display: flex; align-items: center;
+  font-size: 14px; border-bottom: 3px solid transparent;
+}
+.navigation a[aria-current="page"] { color: #fff; border-bottom-color: var(--ambre); }
+
+.contenu { flex: 1; padding: 16px; max-width: 1080px; width: 100%; margin: 0 auto; }
+.pied { padding: 16px; color: var(--texte-doux); font-size: 13px; text-align: center; }
+
+/* ── Blocs ──────────────────────────────────────────────────────────────── */
+h1 { font-size: 22px; margin: 4px 0 4px; }
+h2 { font-size: 17px; margin: 24px 0 10px; }
+.sous-titre { color: var(--texte-doux); margin: 0 0 18px; font-size: 14px; }
+
+.carte {
+  background: var(--carte); border: 1px solid var(--bord);
+  border-radius: var(--rayon); padding: 14px; margin-bottom: 12px;
+}
+
+.compteurs { display: grid; gap: 10px; grid-template-columns: repeat(2, 1fr); }
+@media (min-width: 720px) { .compteurs { grid-template-columns: repeat(4, 1fr); } }
+.compteur {
+  background: var(--carte); border: 1px solid var(--bord);
+  border-radius: var(--rayon); padding: 12px 14px;
+}
+.compteur b { display: block; font-size: 26px; line-height: 1.1; }
+.compteur span { font-size: 13px; color: var(--texte-doux); }
+.compteur.alerte { border-color: var(--rouge); }
+.compteur.alerte b { color: var(--rouge); }
+
+/* ── Liste de réserves ──────────────────────────────────────────────────── */
+.liste { list-style: none; margin: 0; padding: 0; }
+.liste li { margin-bottom: 10px; }
+.reserve {
+  display: block; text-decoration: none; color: inherit;
+  background: var(--carte); border: 1px solid var(--bord);
+  border-left: 4px solid var(--bord);
+  border-radius: var(--rayon); padding: 12px 14px; min-height: var(--touche);
+}
+.reserve.p-haute { border-left-color: var(--ambre); }
+.reserve.p-bloquante { border-left-color: var(--rouge); }
+.reserve-tete { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.reserve-num { font-variant-numeric: tabular-nums; color: var(--texte-doux); font-size: 13px; }
+.reserve-titre { font-weight: 600; }
+.reserve-meta { margin-top: 6px; font-size: 13px; color: var(--texte-doux); display: flex; gap: 10px; flex-wrap: wrap; }
+
+.etiquette {
+  display: inline-block; font-size: 12px; padding: 3px 8px;
+  border-radius: 999px; background: var(--ardoise-100); color: var(--ardoise-800);
+  white-space: nowrap;
+}
+.etiquette.attente { background: var(--ambre-clair); color: #6b4708; }
+.etiquette.refus { background: #f6dad7; color: var(--rouge); }
+.etiquette.levee { background: #d9ece2; color: var(--vert); }
+.etiquette.retard { background: var(--rouge); color: #fff; }
+
+/* ── Formulaires et actions ─────────────────────────────────────────────── */
+label { display: block; margin-bottom: 12px; font-size: 14px; font-weight: 500; }
+input, select, textarea {
+  display: block; width: 100%; margin-top: 5px; padding: 10px 12px;
+  min-height: var(--touche); font: inherit; color: inherit;
+  background: #fff; border: 1px solid var(--bord); border-radius: 8px;
+}
+textarea { min-height: 96px; resize: vertical; }
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible {
+  outline: 2px solid var(--ambre); outline-offset: 2px;
+}
+
+.bouton, button.bouton {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: var(--touche); padding: 0 18px; border-radius: 8px;
+  border: 1px solid var(--ardoise-900); background: var(--ardoise-900); color: #fff;
+  font: inherit; font-weight: 600; cursor: pointer; text-decoration: none;
+}
+.bouton.secondaire { background: transparent; color: var(--ardoise-900); }
+.bouton.danger { background: var(--rouge); border-color: var(--rouge); }
+.bouton:disabled { opacity: 0.5; cursor: not-allowed; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+.message { padding: 10px 12px; border-radius: 8px; background: var(--ambre-clair); color: #6b4708; margin-bottom: 12px; font-size: 14px; }
+.message.erreur { background: #f6dad7; color: var(--rouge); }
+.vide { color: var(--texte-doux); padding: 20px 0; }
+
+/* ── Repérage sur plan ──────────────────────────────────────────────────── */
+.plan { position: relative; background: var(--ardoise-100); border: 1px solid var(--bord); border-radius: var(--rayon); aspect-ratio: 4 / 3; overflow: hidden; }
+.plan-repere {
+  position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px;
+  border-radius: 50%; background: var(--ambre); border: 2px solid var(--ardoise-900);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: var(--ardoise-900);
+}
+.plan-absent { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--texte-doux); font-size: 14px; padding: 16px; text-align: center; }
+
+/* ── Historique ─────────────────────────────────────────────────────────── */
+.chrono { list-style: none; margin: 0; padding: 0 0 0 18px; border-left: 2px solid var(--bord); }
+.chrono li { position: relative; padding: 0 0 16px 14px; font-size: 14px; }
+.chrono li::before {
+  content: ""; position: absolute; left: -21px; top: 6px;
+  width: 8px; height: 8px; border-radius: 50%; background: var(--ardoise-700);
+}
+.chrono time { display: block; color: var(--texte-doux); font-size: 12px; }
+
+/* ── Pages publiques ────────────────────────────────────────────────────── */
+.page-publique { min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px; }
+.carte-auth { width: 100%; max-width: 400px; background: var(--carte); border: 1px solid var(--bord); border-radius: 14px; padding: 24px; }
+.carte-auth h1 { margin-top: 14px; }
+.carte-auth .bouton { width: 100%; }
+.mention { font-size: 13px; color: var(--texte-doux); margin-top: 16px; }
+
+/* ── Impression : c'est le chemin d'export PDF de la V1 ─────────────────── */
+@media print {
+  .barre, .navigation, .pied, .actions, .bouton { display: none !important; }
+  body { background: #fff; }
+  .contenu { max-width: none; padding: 0; }
+  .carte, .reserve { border-color: #999; break-inside: avoid; }
+}
