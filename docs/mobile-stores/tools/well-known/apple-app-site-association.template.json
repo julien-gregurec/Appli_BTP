@@ -1,0 +1,20 @@
+{
+  "_comment": "MODELE — NE PAS DEPLOYER EN L'ETAT. Remplacer TEAMID par le Team ID Apple reel (10 caracteres, visible dans Apple Developer > Membership) puis retirer les cles _comment. Ce fichier doit ensuite etre servi par https://tools.elsatia.fr/.well-known/apple-app-site-association en Content-Type application/json, SANS extension .json dans l'URL, en HTTPS, sans redirection. Voir TOOLS_STORE_DISTRIBUTION_READINESS_V1.md section Deep links.",
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": ["TEAMID.fr.elsatia.tools"],
+        "components": [
+          { "/": "/", "comment": "Accueil" },
+          { "/": "/projets", "comment": "Mes projets" },
+          { "/": "/projets/", "comment": "Mes projets, forme avec barre finale" },
+          { "/": "/outils/*", "comment": "Fiche outil" }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["TEAMID.fr.elsatia.tools"]
+  }
+}

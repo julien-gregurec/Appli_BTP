@@ -18,6 +18,7 @@
     "build:ios:debug": "npm run native:sync && cap build ios",
     "icons:generate": "node scripts/generate-icons.mjs",
     "og:generate": "node scripts/generate-og-image.mjs",
+    "store:assets": "node scripts/generate-store-assets.mjs",
     "lint": "eslint src scripts service-worker next.config.ts capacitor.config.ts",
     "typecheck": "tsc --noEmit --incremental false",
     "test": "vitest run"
