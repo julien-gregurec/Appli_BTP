@@ -32,12 +32,17 @@ export function ExportActions({
 }) {
   const [busy, setBusy] = useState<"none" | "download" | "share">("none");
   const [feedback, setFeedback] = useState("");
+  // §18 — les approximations introduites par le format (ellipse → polyligne DXF…) doivent
+  // être visibles par l'utilisateur : un DXF approché ne doit jamais passer pour exact.
+  const [approximations, setApproximations] = useState<readonly string[]>([]);
 
   async function run(kind: "download" | "share") {
     setBusy(kind);
     setFeedback("");
+    setApproximations([]);
     try {
       const result = await exportChantier(document, format, options);
+      setApproximations(result.approximations);
       onExported?.(result);
       if (kind === "download") {
         await downloadExportedFile(result);
@@ -64,6 +69,16 @@ export function ExportActions({
         {busy === "share" ? "Génération…" : "Partager"}
       </button>
       {feedback && <p className="atelier-export-feedback" role="status" aria-live="polite">{feedback}</p>}
+      {approximations.length > 0 && (
+        <div className="atelier-export-approximations" role="note">
+          <p>Approximations de ce format :</p>
+          <ul>
+            {approximations.map((approximation) => (
+              <li key={approximation}>{approximation}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

@@ -13,7 +13,7 @@
  * toute génération de fichier est refusée avant même de router vers un format.
  */
 
-import { renderPlanSvg } from "./svg";
+import { renderFullScaleSvg, renderPlanSvg } from "./svg";
 import { renderDxf, shapeGeometryToDxf } from "./dxf";
 import { renderChantierPng, type PngExportOptions } from "./png";
 import { buildChantierPdf, buildChantierMosaicPdf } from "./chantier-pdf";
@@ -21,10 +21,11 @@ import { chantierExportFileName, validateChantierExportDocument, type ChantierEx
 import type { SvgExportOptions } from "./svg";
 import { downloadBlob, shareBlob, type DownloadOutcome, type ShareOutcome } from "./share";
 import type { CheckIssue } from "../chantier/pre-export-check";
+import { assessMosaicSafety } from "../chantier/print-safety";
 
-export type ChantierExportFormat = "pdf" | "svg" | "dxf" | "png" | "pdf-mosaic" | "print-1to1";
+export type ChantierExportFormat = "pdf" | "svg" | "svg-1to1" | "dxf" | "png" | "pdf-mosaic" | "print-1to1";
 
-export const CHANTIER_EXPORT_FORMATS: readonly ChantierExportFormat[] = ["pdf", "svg", "dxf", "png", "pdf-mosaic", "print-1to1"];
+export const CHANTIER_EXPORT_FORMATS: readonly ChantierExportFormat[] = ["pdf", "svg", "svg-1to1", "dxf", "png", "pdf-mosaic", "print-1to1"];
 
 export class ChantierExportError extends Error {}
 
@@ -39,6 +40,7 @@ export type ChantierExportCapability = { format: ChantierExportFormat; ready: bo
 const FORMAT_LABELS: Record<ChantierExportFormat, string> = {
   pdf: "Dossier PDF",
   svg: "Plan SVG",
+  "svg-1to1": "Gabarit SVG 1:1",
   dxf: "Plan DXF",
   png: "Image PNG",
   "pdf-mosaic": "Mosaïque PDF (A4/A3…)",
@@ -53,19 +55,41 @@ export function chantierExportFormatLabel(format: ChantierExportFormat): string 
 export function chantierExportCapabilities(document: ChantierExportDocument): ChantierExportCapability[] {
   const hasGeometry = Boolean(document.geometry);
   const hasMosaic = Boolean(document.mosaic);
+  // §39 — un plan de mosaïque au-delà du plafond n'est pas « prêt » : le dire ici évite
+  // de proposer un bouton qui ne pourra que échouer.
+  const safety = document.mosaic ? assessMosaicSafety(document.mosaic) : undefined;
+  const mosaicReady = hasGeometry && hasMosaic && safety?.level !== "blocked";
+  const mosaicReason = mosaicReady
+    ? undefined
+    : safety?.level === "blocked"
+      ? safety.message
+      : "Géométrie et plan de mosaïque (planMosaic) requis.";
   return [
     { format: "pdf", ready: true },
     { format: "svg", ready: hasGeometry, reason: hasGeometry ? undefined : "Géométrie requise." },
+    { format: "svg-1to1", ready: hasGeometry, reason: hasGeometry ? undefined : "Géométrie requise." },
     { format: "dxf", ready: hasGeometry, reason: hasGeometry ? undefined : "Géométrie requise." },
     { format: "png", ready: hasGeometry, reason: hasGeometry ? undefined : "Géométrie requise." },
-    { format: "pdf-mosaic", ready: hasGeometry && hasMosaic, reason: hasGeometry && hasMosaic ? undefined : "Géométrie et plan de mosaïque (planMosaic) requis." },
-    { format: "print-1to1", ready: hasGeometry && hasMosaic, reason: hasGeometry && hasMosaic ? undefined : "Géométrie et plan de mosaïque (planMosaic) requis." },
+    { format: "pdf-mosaic", ready: mosaicReady, reason: mosaicReason },
+    { format: "print-1to1", ready: mosaicReady, reason: mosaicReason },
   ];
 }
 
 export type ChantierExportOptions = { svg?: SvgExportOptions; png?: PngExportOptions };
 
-export type ChantierExportResult = { format: ChantierExportFormat; blob: Blob; fileName: string; mimeType: string };
+export type ChantierExportResult = {
+  format: ChantierExportFormat;
+  blob: Blob;
+  fileName: string;
+  mimeType: string;
+  /**
+   * §18 — Approximations géométriques réellement introduites par le format de sortie
+   * (ex. ellipse convertie en polyligne pour DXF R12). Vide quand la conversion est exacte.
+   * Le lot P0 calculait cette liste puis la jetait : le DXF était livré comme exact.
+   * L'appelant DOIT l'afficher si elle n'est pas vide.
+   */
+  approximations: readonly string[];
+};
 
 function requireGeometry(document: ChantierExportDocument, format: ChantierExportFormat) {
   if (!document.geometry) throw new ChantierExportError(`Une géométrie (ShapeGeometry) est requise pour l'export ${chantierExportFormatLabel(format)}.`);
@@ -88,35 +112,41 @@ export async function exportChantier(rawDocument: ChantierExportDocument, format
   switch (format) {
     case "pdf": {
       const bytes = buildChantierPdf(document);
-      return { format, blob: new Blob([bytes], { type: "application/pdf" }), fileName: chantierExportFileName(document, "pdf"), mimeType: "application/pdf" };
+      return { format, blob: new Blob([bytes], { type: "application/pdf" }), fileName: chantierExportFileName(document, "pdf"), mimeType: "application/pdf", approximations: [] };
     }
     case "svg": {
       const geometry = requireGeometry(document, format);
       const svg = renderPlanSvg(geometry, document.project.name, options.svg);
-      return { format, blob: new Blob([svg], { type: "image/svg+xml;charset=utf-8" }), fileName: chantierExportFileName(document, "svg"), mimeType: "image/svg+xml" };
+      return { format, blob: new Blob([svg], { type: "image/svg+xml;charset=utf-8" }), fileName: chantierExportFileName(document, "svg"), mimeType: "image/svg+xml", approximations: [] };
+    }
+    case "svg-1to1": {
+      const geometry = requireGeometry(document, format);
+      const svg = renderFullScaleSvg(geometry, document.project.name);
+      return { format, blob: new Blob([svg], { type: "image/svg+xml;charset=utf-8" }), fileName: chantierExportFileName(document, "svg", "1-1"), mimeType: "image/svg+xml", approximations: [] };
     }
     case "dxf": {
       const geometry = requireGeometry(document, format);
-      const { entities } = shapeGeometryToDxf(geometry);
+      const { entities, approximations } = shapeGeometryToDxf(geometry);
       const dxf = renderDxf(entities);
-      return { format, blob: new Blob([dxf], { type: "application/dxf" }), fileName: chantierExportFileName(document, "dxf"), mimeType: "application/dxf" };
+      return { format, blob: new Blob([dxf], { type: "application/dxf" }), fileName: chantierExportFileName(document, "dxf"), mimeType: "application/dxf", approximations };
     }
     case "png": {
       const geometry = requireGeometry(document, format);
       const blob = await renderChantierPng(geometry, document.project.name, options.png);
-      return { format, blob, fileName: chantierExportFileName(document, "png"), mimeType: "image/png" };
+      // Le PNG est un aperçu raster : il n'est jamais un document dimensionnel (§4).
+      return { format, blob, fileName: chantierExportFileName(document, "png"), mimeType: "image/png", approximations: ["Aperçu raster : ne pas utiliser comme gabarit dimensionnel."] };
     }
     case "pdf-mosaic": {
       requireGeometry(document, format);
       requireMosaic(document, format);
       const bytes = buildChantierMosaicPdf(document);
-      return { format, blob: new Blob([bytes], { type: "application/pdf" }), fileName: chantierExportFileName(document, "pdf", "mosaique"), mimeType: "application/pdf" };
+      return { format, blob: new Blob([bytes], { type: "application/pdf" }), fileName: chantierExportFileName(document, "pdf", "mosaique"), mimeType: "application/pdf", approximations: [] };
     }
     case "print-1to1": {
       requireGeometry(document, format);
       requireMosaic(document, format);
       const bytes = buildChantierMosaicPdf(document);
-      return { format, blob: new Blob([bytes], { type: "application/pdf" }), fileName: chantierExportFileName(document, "pdf", "1-1"), mimeType: "application/pdf" };
+      return { format, blob: new Blob([bytes], { type: "application/pdf" }), fileName: chantierExportFileName(document, "pdf", "1-1"), mimeType: "application/pdf", approximations: [] };
     }
     default: {
       const exhaustive: never = format;
