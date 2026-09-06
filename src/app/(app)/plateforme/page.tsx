@@ -117,6 +117,7 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
             <Link href="/plateforme/roles-demo" className="rounded-md border px-3 py-2 text-sm font-medium">Rôles de démonstration</Link>
             <Link href="/plateforme/support" className="rounded-md border px-3 py-2 text-sm font-medium">Support</Link>
             <Link href="/plateforme/facturation" className="rounded-md border px-3 py-2 text-sm font-medium">Relevés de facturation</Link>
+            <Link href="/plateforme/stripe" className="rounded-md border px-3 py-2 text-sm font-medium">Diagnostic Stripe</Link>
           </div>
         </div>
 

@@ -5,6 +5,7 @@ import { verifierSignatureStripe } from "@/lib/stripe";
 import { categoriserErreurSupabase, empreinteEvenementStripe, identifiantUuidValide, resoudreModeStripeWebhook } from "@/lib/stripe-webhook-environment";
 import { reconcilierCapacitePersonnesStripe } from "@/lib/stripe-capacite-reconcile";
 import { passerelleStripeRemise } from "@/lib/stripe-discount-gateway";
+import { notifierPaiementAbonnementEchoue } from "@/lib/abonnement-notifications";
 import { acquerirVerrouRemise, libererVerrouRemise, lireOperationActiveRemiseServeur, reconcilierOperationRemiseSousVerrou, synchroniserExpirationRemiseSousVerrou, VerrouRemiseOccupe } from "@/lib/stripe-discount-server";
 
 // B1 — un verrou remise occupé est un état transitoire (un autre évènement de la
@@ -46,6 +47,7 @@ type StripeObjet = {
   metadata?: Record<string, string>;
   discounts?: Array<string | { id?: string }> | null;
   number?: string | null;
+  customer_email?: string | null;
   currency?: string;
   subtotal_excluding_tax?: number | null;
   total?: number;
@@ -205,6 +207,31 @@ export async function synchroniserAbonnementCoordonne(
   }
 }
 
+async function notifierPaiementEchoueSansEchouer(admin: SupabaseAdmin, entrepriseId: string, objet: StripeObjet) {
+  try {
+    const { data: entreprise } = await admin
+      .from("entreprises")
+      .select("nom,abonnement_offre,abonnement_periodicite")
+      .eq("id", entrepriseId)
+      .maybeSingle();
+    if (!entreprise?.nom) return;
+    await notifierPaiementAbonnementEchoue({
+      destinataire: objet.customer_email ?? null,
+      entrepriseNom: String(entreprise.nom),
+      offre: entreprise.abonnement_offre ?? null,
+      periodicite: entreprise.abonnement_periodicite ?? null,
+      montantTtc: typeof objet.total === "number" ? objet.total / 100 : null,
+      devise: objet.currency ?? null,
+      dateEvenementIso: instantDepuisUnix(objet.created),
+      numeroFacture: objet.number ?? null,
+      lienFacture: objet.hosted_invoice_url ?? null,
+    });
+  } catch {
+    // Notification purement informative : jamais bloquante pour le webhook.
+    console.warn("Notification paiement échoué non envoyée", { categorie: "preparation_impossible" });
+  }
+}
+
 export async function POST(request: Request) {
   const secret = process.env.STRIPE_WEBHOOK_ABONNEMENT_SECRET;
   if (!secret) return NextResponse.json({ error: "Webhook abonnement non configuré" }, { status: 503 });
@@ -323,6 +350,14 @@ export async function POST(request: Request) {
       }).eq("id", entrepriseId);
       if (error) throw new Error(error.message);
       await synchroniserFactureAbonnement(admin, entrepriseId, objet, objet.status || evenement.type.replace("invoice.", ""));
+      // P1 — un paiement d'abonnement échoué suspend l'accès (ci-dessus) : le
+      // client doit en être informé. Best-effort STRICT : l'envoi ne peut ni
+      // faire échouer le webhook, ni provoquer un rejeu Stripe (un rejeu
+      // enverrait un doublon). Le destinataire est l'email de facturation connu
+      // de Stripe, jamais une adresse reconstruite côté ELSATIA.
+      if (evenement.type === "invoice.payment_failed") {
+        await notifierPaiementEchoueSansEchouer(admin, entrepriseId, objet);
+      }
     }
     await admin.rpc("finaliser_evenement_abonnement_service", {
       p_stripe_event_id: evenement.id,
