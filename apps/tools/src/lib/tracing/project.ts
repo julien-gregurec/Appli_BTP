@@ -14,16 +14,23 @@
 import type { LightingFixture } from "../chantier/lighting";
 import type { MaterialLine } from "../chantier/nomenclature";
 import type { PaperFormat, PaperOrientation } from "../chantier/mosaic";
+import { isValidAssetRef } from "./asset-store";
+import { MEASUREMENT_ORIGINS, type MeasurementOrigin } from "./measurement-origin";
 import {
+  clampLayer,
   DEFAULT_REFERENCE_ADJUST,
   DEFAULT_REFERENCE_LAYER,
   UNDEFINED_CALIBRATION,
+  calibrationQualityFromError,
+  type CalibrationCheck,
   type CalibrationState,
   type ReferenceImageAdjust,
   type ReferenceImageFormat,
   type ReferenceImageLayer,
   type ReferenceImageSource,
 } from "./reference-image";
+import type { LengthUnit } from "../units";
+import type { Point2D } from "./geometry-port";
 import type { GeometricShape, RawContour } from "./vectorization";
 
 export const TRACING_PROJECT_SCHEMA_VERSION = 1;
@@ -165,10 +172,174 @@ function optionalDimension(value: unknown, label: string): number | undefined {
   return value;
 }
 
+/** Bornes de contenu — une photo détectée peut produire des milliers de points (§42). */
+export const MAX_CONTOUR_POINTS = 20_000;
+export const MAX_SHAPE_VERTICES = 20_000;
+
+function readPoint(raw: unknown, label: string): Point2D {
+  if (!raw || typeof raw !== "object") throw new TracingProjectError(`${label} est invalide.`);
+  const point = raw as Record<string, unknown>;
+  if (typeof point.x !== "number" || typeof point.y !== "number" || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+    throw new TracingProjectError(`${label} est invalide.`);
+  }
+  return { x: point.x, y: point.y };
+}
+
+function readPoints(raw: unknown, label: string, max: number): Point2D[] {
+  if (!Array.isArray(raw) || raw.length < 2) throw new TracingProjectError(`${label} exige au moins deux points.`);
+  if (raw.length > max) throw new TracingProjectError(`${label} dépasse ${max} points.`);
+  return raw.map((point) => readPoint(point, label));
+}
+
+function readLengthUnit(raw: unknown): LengthUnit {
+  return raw === "cm" || raw === "m" || raw === "in" ? raw : "mm";
+}
+
+function readIsoDate(raw: unknown, fallback: string): string {
+  return typeof raw === "string" && !Number.isNaN(Date.parse(raw)) ? raw : fallback;
+}
+
+function readCalibrationCheck(raw: unknown, fallbackDate: string): CalibrationCheck | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const check = raw as Record<string, unknown>;
+  const expectedMm = check.expectedMm;
+  const measuredMm = check.measuredMm;
+  if (typeof expectedMm !== "number" || typeof measuredMm !== "number" || !Number.isFinite(expectedMm) || !Number.isFinite(measuredMm) || expectedMm <= 0) {
+    return undefined;
+  }
+  const deviationMm = measuredMm - expectedMm;
+  const errorPercent = Math.abs(deviationMm / expectedMm) * 100;
+  return {
+    pointA: readPoint(check.pointA, "Le point de contrôle A"),
+    pointB: readPoint(check.pointB, "Le point de contrôle B"),
+    expectedMm,
+    measuredMm,
+    deviationMm,
+    errorPercent,
+    quality: calibrationQualityFromError(errorPercent),
+    checkedAt: readIsoDate(check.checkedAt, fallbackDate),
+  };
+}
+
 /**
- * Validation stricte et bornée. Elle contrôle l'enveloppe métier ; les tableaux `contours`
- * et `shapes` sont bornés en nombre mais leur contenu détaillé reste validé par
- * `createRawContour` / `contourToGeometricShape` au moment de leur création.
+ * Relit une calibration enregistrée. Un projet antérieur au suivi de traçabilité (§9) ne
+ * contient que le facteur d'échelle : les points sont alors reconstruits sur l'axe X à partir
+ * de la distance pixel enregistrée. L'échelle, elle, est conservée exactement — c'est la seule
+ * grandeur dont dépendent les cotes.
+ */
+export function readCalibrationState(raw: unknown, fallbackDate: string): CalibrationState {
+  if (!raw || typeof raw !== "object") return UNDEFINED_CALIBRATION;
+  const value = raw as Record<string, unknown>;
+  if (value.status !== "calibrated") return UNDEFINED_CALIBRATION;
+  const mmPerPixel = value.mmPerPixel;
+  const pixelDistance = value.pixelDistance;
+  const realDistanceMm = value.realDistanceMm;
+  if (
+    typeof mmPerPixel !== "number" || !Number.isFinite(mmPerPixel) || mmPerPixel <= 0 ||
+    typeof pixelDistance !== "number" || !Number.isFinite(pixelDistance) || pixelDistance <= 0 ||
+    typeof realDistanceMm !== "number" || !Number.isFinite(realDistanceMm) || realDistanceMm <= 0
+  ) {
+    throw new TracingProjectError("La calibration enregistrée est invalide.");
+  }
+  const hasPoints = value.pointA !== undefined && value.pointB !== undefined;
+  return {
+    status: "calibrated",
+    mmPerPixel,
+    pixelDistance,
+    realDistanceMm,
+    pointA: hasPoints ? readPoint(value.pointA, "Le point de calibration A") : { x: 0, y: 0 },
+    pointB: hasPoints ? readPoint(value.pointB, "Le point de calibration B") : { x: pixelDistance, y: 0 },
+    realUnit: readLengthUnit(value.realUnit),
+    calibratedAt: readIsoDate(value.calibratedAt, fallbackDate),
+    origin: "calibrated",
+    check: readCalibrationCheck(value.check, fallbackDate),
+  };
+}
+
+const REFERENCE_SOURCES: readonly ReferenceImageSource[] = ["camera", "gallery", "screenshot", "sketch", "scan", "imported"];
+const REFERENCE_FORMATS: readonly ReferenceImageFormat[] = ["jpg", "jpeg", "png", "webp", "heic"];
+
+export function readReferenceImage(raw: unknown, fallbackDate: string): TracingReferenceImage {
+  if (!raw || typeof raw !== "object") throw new TracingProjectError("Une image de référence est invalide.");
+  const value = raw as Record<string, unknown>;
+  if (typeof value.id !== "string" || !value.id.trim()) throw new TracingProjectError("L'identifiant d'une image de référence est invalide.");
+  if (!REFERENCE_SOURCES.includes(value.source as ReferenceImageSource)) throw new TracingProjectError("La provenance d'une image de référence est inconnue.");
+  if (!REFERENCE_FORMATS.includes(value.format as ReferenceImageFormat)) throw new TracingProjectError("Le format d'une image de référence est inconnu.");
+  const widthPx = value.widthPx;
+  const heightPx = value.heightPx;
+  if (typeof widthPx !== "number" || typeof heightPx !== "number" || !Number.isInteger(widthPx) || !Number.isInteger(heightPx) || widthPx < 1 || heightPx < 1 || widthPx > 20_000 || heightPx > 20_000) {
+    throw new TracingProjectError("Les dimensions d'une image de référence sont invalides.");
+  }
+  const adjustRaw = (value.adjust && typeof value.adjust === "object" ? value.adjust : {}) as Partial<ReferenceImageAdjust>;
+  const adjust: ReferenceImageAdjust = {
+    rotationDeg: typeof adjustRaw.rotationDeg === "number" && Number.isFinite(adjustRaw.rotationDeg) ? adjustRaw.rotationDeg : 0,
+    mirrorX: adjustRaw.mirrorX === true,
+    mirrorY: adjustRaw.mirrorY === true,
+  };
+  if (adjustRaw.crop && typeof adjustRaw.crop === "object") {
+    const { x, y, width, height } = adjustRaw.crop as Record<string, unknown>;
+    if ([x, y, width, height].every((entry) => typeof entry === "number" && Number.isFinite(entry)) && (width as number) > 0 && (height as number) > 0) {
+      adjust.crop = { x: x as number, y: y as number, width: width as number, height: height as number };
+    }
+  }
+  const layerRaw = (value.layer && typeof value.layer === "object" ? value.layer : DEFAULT_REFERENCE_LAYER) as ReferenceImageLayer;
+  if (value.assetRef !== undefined && !isValidAssetRef(value.assetRef)) {
+    throw new TracingProjectError("La référence de l'image stockée est invalide.");
+  }
+  return {
+    id: value.id,
+    name: cleanText(value.name, "Le nom de l'image", 120) ?? "Référence",
+    source: value.source as ReferenceImageSource,
+    format: value.format as ReferenceImageFormat,
+    widthPx,
+    heightPx,
+    adjust,
+    layer: clampLayer(layerRaw),
+    calibration: readCalibrationState(value.calibration, fallbackDate),
+    assetRef: value.assetRef as string | undefined,
+  };
+}
+
+export function readRawContour(raw: unknown): RawContour {
+  if (!raw || typeof raw !== "object") throw new TracingProjectError("Un contour enregistré est invalide.");
+  const value = raw as Record<string, unknown>;
+  if (typeof value.id !== "string" || !value.id.trim()) throw new TracingProjectError("L'identifiant d'un contour est invalide.");
+  if (value.space !== "image-pixels" && value.space !== "millimetres") throw new TracingProjectError("L'espace d'un contour est inconnu.");
+  if (value.source !== "manual" && value.source !== "detected" && value.source !== "imported") {
+    throw new TracingProjectError("La provenance d'un contour est inconnue.");
+  }
+  // §17 — un contour détecté ne peut jamais être relu comme confirmé : le statut est reforcé.
+  const status = value.source === "detected" ? "proposition" : value.status === "confirmed" ? "confirmed" : "proposition";
+  return {
+    id: value.id,
+    points: readPoints(value.points, "Un contour", MAX_CONTOUR_POINTS),
+    space: value.space,
+    closed: value.closed === true,
+    source: value.source,
+    status,
+  };
+}
+
+export function readGeometricShape(raw: unknown): GeometricShape {
+  if (!raw || typeof raw !== "object") throw new TracingProjectError("Une forme enregistrée est invalide.");
+  const value = raw as Record<string, unknown>;
+  if (typeof value.id !== "string" || !value.id.trim()) throw new TracingProjectError("L'identifiant d'une forme est invalide.");
+  if (value.kind !== "polyline" && value.kind !== "polygon") throw new TracingProjectError("Le type d'une forme est inconnu.");
+  if (!MEASUREMENT_ORIGINS.includes(value.origin as MeasurementOrigin)) throw new TracingProjectError("L'origine de mesure d'une forme est inconnue.");
+  return {
+    id: value.id,
+    kind: value.kind,
+    vertices: readPoints(value.vertices, "Une forme", MAX_SHAPE_VERTICES),
+    closed: value.closed === true,
+    origin: value.origin as MeasurementOrigin,
+    derivedFrom: typeof value.derivedFrom === "string" && value.derivedFrom.trim() ? value.derivedFrom : undefined,
+  };
+}
+
+/**
+ * Validation stricte et bornée : enveloppe métier **et** contenu (images de référence,
+ * contours, formes). Un projet relu ne peut donc pas ressusciter avec une calibration
+ * corrompue ou un contour détecté marqué « confirmé » (§17, §50).
  */
 export function validateTracingProject(raw: unknown): TracingProject {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new TracingProjectError("Le projet de traçage n'est pas un objet valide.");
@@ -223,9 +394,9 @@ export function validateTracingProject(raw: unknown): TracingProject {
     roomHeightMm: optionalDimension(value.roomHeightMm, "La hauteur de la pièce"),
     units,
     scaleStatus: value.scaleStatus,
-    referenceImages: referenceImages as TracingReferenceImage[],
-    contours: contours as RawContour[],
-    shapes: shapes as GeometricShape[],
+    referenceImages: referenceImages.map((image) => readReferenceImage(image, value.updatedAt as string)),
+    contours: contours.map(readRawContour),
+    shapes: shapes.map(readGeometricShape),
     layers,
     lighting: lighting as LightingFixture[],
     materials: materials as MaterialLine[],
@@ -256,4 +427,41 @@ export function newReferenceImage(id: string, name: string, source: ReferenceIma
     layer: { ...DEFAULT_REFERENCE_LAYER },
     calibration: UNDEFINED_CALIBRATION,
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  §39, §40 — Sérialisation                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Sérialise un projet de traçage. Les octets des images ne passent jamais par ici : seul le
+ * `assetRef` est écrit, les blobs vivant dans `asset-store` (§40).
+ */
+export function serializeTracingProject(project: TracingProject): string {
+  return JSON.stringify(validateTracingProject(project), null, 2);
+}
+
+export function parseTracingProjectFile(content: string): TracingProject {
+  if (typeof content !== "string" || content.length > 20_000_000) throw new TracingProjectError("Le fichier de projet est illisible.");
+  try {
+    return validateTracingProject(JSON.parse(content));
+  } catch (error) {
+    if (error instanceof TracingProjectError) throw error;
+    throw new TracingProjectError("Le fichier de projet n'est pas un JSON valide.");
+  }
+}
+
+/** Horodate une modification. `scaleStatus` suit l'état réel des calibrations enregistrées. */
+export function touchTracingProject(project: TracingProject, now: Date = new Date()): TracingProject {
+  const calibrated = project.referenceImages.some((image) => image.calibration.status === "calibrated");
+  return { ...project, scaleStatus: calibrated ? "defined" : "undefined", updatedAt: now.toISOString() };
+}
+
+/** Références d'images réellement utilisées — entrée de `pruneOrphanAssets` (§39). */
+export function referencedAssetRefs(projects: readonly TracingProject[]): string[] {
+  const refs = new Set<string>();
+  for (const project of projects) {
+    for (const image of project.referenceImages) if (image.assetRef) refs.add(image.assetRef);
+  }
+  return [...refs];
 }
