@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { AtelierExportWorkspace } from "@/components/AtelierExportWorkspace";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Exporter le tracé - ELSATIA Tools",
+// Atelier pas encore commercialement prêt : navigation interne autorisée, indexation refusée.
+export const metadata: Metadata = pageMetadata({
+  title: "Exporter le tracé",
   description: "Contrôlez, choisissez un format et exportez votre tracé d’atelier en dossier chantier, SVG, DXF ou PNG.",
-  // Atelier pas encore commercialement prêt : navigation interne autorisée, indexation refusée.
-  robots: { index: false, follow: false, nocache: true },
-};
+  path: "/atelier/export",
+  index: false,
+});
 
 // Route statique (compatible export natif Capacitor, comme /atelier/nouveau) : l'identifiant
 // du tracé arrive en paramètre de requête (?projectId=<id>), lu côté client — jamais de
