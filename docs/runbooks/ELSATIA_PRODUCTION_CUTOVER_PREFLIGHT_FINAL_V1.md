@@ -1,5 +1,13 @@
 # ELSATIA — Préflight final de cutover Production V1
 
+> **📘 Document de RÉFÉRENCE DÉTAILLÉE — non opératoire seul.**
+> La conduite du jour J se fait avec la source unique :
+> **`docs/runbooks/ELSATIA_GP_CUTOVER_DAY_OF_RUNBOOK_V1.md`**, qui **prime en cas de divergence**.
+> Ce document reste en vigueur pour le détail des étapes, la fiche variables et les preuves (§13).
+> Index et statuts : `docs/runbooks/INDEX_CUTOVER_GP_V1.md`.
+> Correction `ELSATIA-GP-CUTOVER-DOCUMENTATION-CLOSURE-V1` (2026-09-06) : le gate **T-45** de
+> §14.2 affichait un gap périmé (« 50 ou 51 ») ; **la seule valeur canonique est 53**.
+
 Version 1.5 — 2026-09-05 (**fiche variables réalignée sur le runtime réel**, lot
 `ELSATIA-GP-CUTOVER-ENV-DOC-DELTA-CLOSURE-V1`, sur la base de l'audit
 `ELSATIA-GP-CUTOVER-ENV-PREFLIGHT-AUDIT-V1` ; version 1.4 = `ELSATIA-GP-CUTOVER-RUNBOOK-AND-QA-REBASE-V1` ;
@@ -966,7 +974,7 @@ exécution (fichier imprimable : `ELSATIA_PRODUCTION_CUTOVER_OPERATOR_CHECKLIST_
 | Repère | Contenu | Gate |
 |---|---|---|
 | **T-60** | Gel des changements, rôles présents, accès rollback vérifiés (Vercel, PITR, volume DR chiffré monté). **Lancement immédiat de P0-1** (§15). | — |
-| **T-45** | **Gate P0-1** : baseline Production conforme, gap réel figé (50 ou 51). Un seul item KO → **STOP**, fenêtre annulée, rien touché. | GO/STOP |
+| **T-45** | **Gate P0-1** : baseline Production conforme, gap réel figé = **53** (valeur canonique : ledger 210 → cible 263 ; noter la valeur observée, ne jamais la supposer). Un seul item KO → **STOP**, fenêtre annulée, rien touché. | GO/STOP |
 | **T-30** | Démarrage **P0-3** (§16) : PITR/snapshot, dump chiffré, backup Storage, manifestes. | — |
 | **T-15** | Test de restauration exécuté sur base probe jetable ; sentinelles + ACL/RLS de contrôle vérifiés. | — |
 | **T0** | **Gate P0-3** + **checklist GO-T0** complète (§17). Un seul item KO → **NO-GO**, aucune migration. Si PASS intégral : démarrage immédiat des migrations (§18). | GO/NO-GO |

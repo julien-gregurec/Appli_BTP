@@ -1,5 +1,10 @@
 # Runbook — Go-live et rollback Production ELSATIA
 
+> **📘 Document de RÉFÉRENCE DÉTAILLÉE — non opératoire seul.**
+> La conduite du jour J se fait avec **`docs/runbooks/ELSATIA_GP_CUTOVER_DAY_OF_RUNBOOK_V1.md`**,
+> qui prime en cas de divergence. Ce document reste la référence de la procédure de rollback.
+> Index et statuts : `docs/runbooks/INDEX_CUTOVER_GP_V1.md`.
+
 Version 2 — 2026-09-05 (**rebasage sur la cible cutover réelle**, lot
 `ELSATIA-GP-CUTOVER-RUNBOOK-AND-QA-REBASE-V1`). **Documentation opérateur.** Ce document décrit
 une procédure ; il n'exécute rien et ne crée aucun snapshot Production.
