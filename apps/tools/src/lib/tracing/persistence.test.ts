@@ -6,12 +6,13 @@ import {
   newReferenceImage,
   referencedAssetRefs,
   serializeTracingProject,
-  touchTracingProject,
+  derivedScaleStatus,
   TracingProjectError,
   validateTracingProject,
   type TracingProject,
 } from "./project";
 import { migrateTracingProject } from "./migration";
+import { touchTracingProject } from "./atelier";
 
 /**
  * Relecture d'un document sérialisé. On passe par `migrateTracingProject` — la frontière
@@ -50,7 +51,8 @@ function projectWithReference(): TracingProject {
     }),
   );
   const shape = contourToGeometricShape(contour, { calibration, imageHeightPx: 1800 });
-  return touchTracingProject({ ...base, referenceImages: [image], contours: [contour], shapes: [shape] }, new Date("2026-09-06T09:10:00.000Z"));
+  const project = { ...base, referenceImages: [image], contours: [contour], shapes: [shape] };
+  return touchTracingProject(project, { scaleStatus: derivedScaleStatus(project) }, new Date("2026-09-06T09:10:00.000Z"));
 }
 
 describe("persistance du projet de traçage (§39, §50)", () => {
@@ -157,9 +159,11 @@ describe("persistance du projet de traçage (§39, §50)", () => {
     expect(() => migrateTracingProject({ schemaVersion: 99 })).toThrow(TracingProjectError);
   });
 
-  it("suit l'état d'échelle du projet d'après les calibrations réelles", () => {
+  it("déduit l'état d'échelle du projet des calibrations réelles", () => {
     const base = createTracingProject({ id: "projet-tracage-02", name: "Niche", type: "niche" });
-    expect(touchTracingProject(base).scaleStatus).toBe("undefined");
-    expect(touchTracingProject(projectWithReference()).scaleStatus).toBe("defined");
+    expect(derivedScaleStatus(base)).toBe("undefined");
+    expect(derivedScaleStatus(projectWithReference())).toBe("defined");
+    // La mutation passe par la voie unique du canon, correctif + revalidation stricte.
+    expect(touchTracingProject(base, { scaleStatus: "defined" }).scaleStatus).toBe("defined");
   });
 });

@@ -8,6 +8,18 @@
  *
  * §44 — vie privée : tout reste sur l'appareil. Aucun envoi vers un service externe n'est
  * effectué ici, et aucun n'est prévu sans demande explicite de l'utilisateur.
+ *
+ * ## Pourquoi une base distincte de `elsatia-atelier`
+ *
+ * IMAGE-VECTORIZATION-CANONICAL-RECONCILIATION-V1 §4 — les projets vivent dans la base
+ * `elsatia-atelier` (`repository.ts`), en version 1. Y ajouter un magasin d'images aurait exigé
+ * d'incrémenter sa version, donc de faire passer une migration IndexedDB à TOUS les projets
+ * déjà enregistrés — pour une donnée qui n'a ni le même cycle de vie ni la même taille qu'un
+ * document projet, et qu'on veut pouvoir purger sans jamais toucher aux tracés.
+ *
+ * La base est en revanche cloisonnée par le même périmètre que les projets (`local` /
+ * `company:<id>`) : une photo de chantier d'une société ne doit pas être lisible depuis un
+ * autre périmètre simplement parce qu'elle est rangée ailleurs.
  */
 
 import type { ReferenceImageFormat } from "./reference-image";
@@ -38,9 +50,20 @@ export interface ReferenceAssetStore {
   listRefs(): Promise<string[]>;
 }
 
-const DATABASE_NAME = "elsatia-tools-reference-assets";
+const DATABASE_NAME = "elsatia-atelier-assets";
 const STORE_NAME = "assets";
 const DATABASE_VERSION = 1;
+
+/** Même cloisonnement que les projets (`repository.ts`). */
+export type AssetStorageScope = `company:${string}` | "local";
+
+export function assetStorageScope(companyId?: string | null): AssetStorageScope {
+  return companyId ? `company:${companyId}` : "local";
+}
+
+export function assetDatabaseName(scope: AssetStorageScope): string {
+  return scope === "local" ? DATABASE_NAME : `${DATABASE_NAME}-${scope}`;
+}
 
 /** Identifiant opaque d'un asset — même fabrique d'identifiants que les projets. */
 export function createAssetRef(): string {
@@ -73,11 +96,14 @@ function normalize(input: PutReferenceAssetInput): StoredReferenceAsset {
 }
 
 export class IndexedDbReferenceAssetStore implements ReferenceAssetStore {
-  constructor(private readonly indexedDb: IDBFactory = indexedDB) {}
+  constructor(
+    private readonly indexedDb: IDBFactory = indexedDB,
+    private readonly scope: AssetStorageScope = "local",
+  ) {}
 
   private open() {
     return new Promise<IDBDatabase>((resolve, reject) => {
-      const request = this.indexedDb.open(DATABASE_NAME, DATABASE_VERSION);
+      const request = this.indexedDb.open(assetDatabaseName(this.scope), DATABASE_VERSION);
       request.onupgradeneeded = () => {
         const database = request.result;
         if (!database.objectStoreNames.contains(STORE_NAME)) database.createObjectStore(STORE_NAME, { keyPath: "ref" });
@@ -145,9 +171,9 @@ export class MemoryReferenceAssetStore implements ReferenceAssetStore {
   }
 }
 
-export function createReferenceAssetStore(): ReferenceAssetStore {
+export function createReferenceAssetStore(scope: AssetStorageScope = "local"): ReferenceAssetStore {
   if (typeof indexedDB === "undefined") throw new Error("Le stockage des images n'est pas disponible sur cette plateforme.");
-  return new IndexedDbReferenceAssetStore(indexedDB);
+  return new IndexedDbReferenceAssetStore(indexedDB, scope);
 }
 
 /**

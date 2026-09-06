@@ -86,10 +86,30 @@ export function modelParamsAfterModelChoice(
   return sameModel ? project.modelParams : undefined;
 }
 
+/**
+ * IMAGE-VECTORIZATION-CANONICAL-RECONCILIATION-V1 — `referenceImages` et `scaleStatus`
+ * rejoignent le correctif.
+ *
+ * Avant l'import photo, aucune image ne pouvait porter de calibration : `scaleStatus` était
+ * posé une fois pour toutes à la création. Il est désormais DÉDUIT (`derivedScaleStatus`), et
+ * les images de référence changent au fil du relevé. Les faire passer par ce correctif — donc
+ * par la revalidation stricte — évite d'ouvrir une seconde voie d'écriture du projet à côté
+ * de celle-ci.
+ */
 export type TracingProjectPatch = Partial<
   Pick<
     TracingProject,
-    "name" | "roomWidthMm" | "roomHeightMm" | "modelId" | "modelParams" | "freeGeometry" | "startFromPhoto"
+    | "name"
+    | "roomWidthMm"
+    | "roomHeightMm"
+    | "modelId"
+    | "modelParams"
+    | "freeGeometry"
+    | "startFromPhoto"
+    | "referenceImages"
+    | "contours"
+    | "shapes"
+    | "scaleStatus"
   >
 >;
 

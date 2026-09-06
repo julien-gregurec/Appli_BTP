@@ -16,7 +16,10 @@ import { fitGeometry, type FitOptions, type GeometryProposal } from "./fitting";
 import { decideReferenceFile, computeWorkingSize, rescaleCalibration } from "./image-import";
 import type { MeasurementOrigin } from "./measurement-origin";
 import { rectifyQuadToRectangle, type RectifyInput, type RectifyResult } from "./perspective";
-import { newReferenceImage, type TracingReferenceImage } from "./project";
+import { touchTracingProject } from "./atelier";
+import { addShapeToFreeGeometry } from "./free-conversion";
+import { EMPTY_FREE_GEOMETRY, type FreeEntity } from "./free-geometry";
+import { derivedScaleStatus, newReferenceImage, type TracingProject, type TracingReferenceImage } from "./project";
 import {
   clampLayer,
   computeCalibration,
@@ -212,4 +215,89 @@ export function createTracingGeometryFromImage(
     id: options.id,
     manualOrigin: options.manualOrigin,
   });
+}
+
+/* -------------------------------------------------------------------------- */
+/*  §11 — La géométrie confirmée rejoint le tracé libre canonique             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Point de sortie unique du workflow photo vers le projet.
+ *
+ * Tout ce qui précède — calque, calibration, redressement, détection, ajustement,
+ * simplification — reste au stade de la PROPOSITION et ne touche pas le document. C'est ici, et
+ * seulement ici, qu'un relevé devient une donnée du projet ; et il y devient un tracé libre
+ * ordinaire, indiscernable pour l'aval de ce que l'utilisateur aurait dessiné à la main.
+ *
+ * Le refus du mode paramétrique n'est pas une précaution d'interface : `validateTracingProject`
+ * rejette la coexistence `modelId` + `freeGeometry`, et l'annoncer ici évite de laisser
+ * l'utilisateur faire tout le relevé avant de découvrir que son projet ne peut pas l'accueillir.
+ */
+export type ConfirmToProjectInput = {
+  project: TracingProject;
+  contour: RawContour;
+  image?: TracingReferenceImage;
+  /** Réduit automatiquement un relevé trop dense pour le tracé libre (§11). */
+  simplifyIfNeeded?: boolean;
+  manualOrigin?: MeasurementOrigin;
+  now?: Date;
+};
+
+export type ConfirmToProjectResult = {
+  project: TracingProject;
+  shape: GeometricShape;
+  entity: FreeEntity;
+  /** Écart mesuré introduit par la réduction éventuelle, en millimètres. */
+  maxDeviationMm: number;
+  notice: string;
+};
+
+export function confirmVectorizationIntoProject(input: ConfirmToProjectInput): ConfirmToProjectResult {
+  if (input.project.modelId) {
+    throw new Error(
+      "Ce tracé suit un modèle paramétrique : il ne peut pas recevoir de tracé libre. Créez un tracé « dessin libre » pour y verser le relevé photo.",
+    );
+  }
+  const confirmed = confirmContourGeometry(input.contour);
+  const shape = input.image
+    ? createTracingGeometryFromImage(confirmed, input.image, { manualOrigin: input.manualOrigin })
+    : createTracingGeometry(confirmed, { manualOrigin: input.manualOrigin });
+
+  const converted = addShapeToFreeGeometry(input.project.freeGeometry ?? EMPTY_FREE_GEOMETRY, shape, {
+    simplifyIfNeeded: input.simplifyIfNeeded,
+  });
+
+  const referenceImages = input.image
+    ? [...input.project.referenceImages.filter((existing) => existing.id !== input.image!.id), input.image]
+    : input.project.referenceImages;
+  const patched = { ...input.project, referenceImages };
+
+  return {
+    project: touchTracingProject(
+      patched,
+      {
+        referenceImages,
+        freeGeometry: converted.geometry,
+        contours: [...input.project.contours.filter((existing) => existing.id !== confirmed.id), confirmed],
+        shapes: [...input.project.shapes.filter((existing) => existing.id !== shape.id), shape],
+        scaleStatus: derivedScaleStatus(patched),
+      },
+      input.now,
+    ),
+    shape,
+    entity: converted.entity,
+    maxDeviationMm: converted.maxDeviationMm,
+    notice: converted.notice,
+  };
+}
+
+/** Attache ou met à jour une image de référence sans rien confirmer (§3, §17). */
+export function attachReferenceImage(
+  project: TracingProject,
+  image: TracingReferenceImage,
+  now?: Date,
+): TracingProject {
+  const referenceImages = [...project.referenceImages.filter((existing) => existing.id !== image.id), image];
+  const patched = { ...project, referenceImages };
+  return touchTracingProject(patched, { referenceImages, scaleStatus: derivedScaleStatus(patched) }, now);
 }

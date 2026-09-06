@@ -588,10 +588,17 @@ export function serializeTracingProject(project: TracingProject): string {
  * sait lire. Un appelant qui part d'une chaîne fait donc `migrateTracingProject(JSON.parse(…))`.
  */
 
-/** Horodate une modification. `scaleStatus` suit l'état réel des calibrations enregistrées. */
-export function touchTracingProject(project: TracingProject, now: Date = new Date()): TracingProject {
-  const calibrated = project.referenceImages.some((image) => image.calibration.status === "calibrated");
-  return { ...project, scaleStatus: calibrated ? "defined" : "undefined", updatedAt: now.toISOString() };
+/**
+ * État d'échelle DÉDUIT des images de référence réellement calibrées.
+ *
+ * Il n'y a pas de `touchTracingProject` ici : la voie de mutation du canon est
+ * `atelier.ts` (correctif + revalidation stricte), et en ouvrir une seconde ferait exister
+ * deux façons d'écrire un projet. Ce module ne fournit donc que la DÉDUCTION, que l'appelant
+ * passe en correctif — `scaleStatus` cesse d'être un drapeau posé à la main dès lors qu'une
+ * image peut porter une calibration.
+ */
+export function derivedScaleStatus(project: Pick<TracingProject, "referenceImages">): "defined" | "undefined" {
+  return project.referenceImages.some((image) => image.calibration.status === "calibrated") ? "defined" : "undefined";
 }
 
 /** Références d'images réellement utilisées — entrée de `pruneOrphanAssets` (§39). */

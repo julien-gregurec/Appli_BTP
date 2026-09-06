@@ -427,6 +427,28 @@ describe("service worker Tools — requetes hors perimetre", () => {
     expect(harness.requested).toEqual([]);
   });
 
+  /*
+   * IMAGE-VECTORIZATION-CANONICAL-RECONCILIATION-V1 §18 — les photos de l'utilisateur ne
+   * doivent JAMAIS entrer dans Cache Storage.
+   *
+   * Elles vivent en IndexedDB (`tracing/asset-store.ts`) et ne sont affichees que via une URL
+   * `blob:` ou `data:`. Le garde qui l'assure est celui de l'origine : une URL `blob:` commence
+   * par le schema `blob:`, pas par `https://origine/`, et le worker se retire donc avant meme
+   * d'examiner le chemin. Ce test epingle ce comportement, parce qu'un elargissement du garde
+   * d'origine ferait silencieusement recopier des photos de chantier dans un cache partage avec
+   * les assets publics de l'application.
+   */
+  it("n'intercepte jamais une image locale de l'utilisateur (blob:, data:)", () => {
+    const harness = fresh();
+    const userImages = [
+      { url: `blob:${ORIGIN}/3f2a91c8-0d44-4f0f-9a1e-6b0a2f7c1d55`, method: "GET", mode: "no-cors", headers: { get: () => null } },
+      { url: "data:image/jpeg;base64,/9j/4AAQSkZJRg==", method: "GET", mode: "no-cors", headers: { get: () => null } },
+      { url: "filesystem:https://tools.elsatia.fr/temporary/photo.jpg", method: "GET", mode: "no-cors", headers: { get: () => null } },
+    ];
+    for (const target of userImages) expect(dispatch(harness, target as FakeRequest).answered, target.url).toBeNull();
+    expect(harness.requested).toEqual([]);
+  });
+
   it("laisse passer les requetes RSC sans les mettre en cache", async () => {
     const harness = fresh();
     expect(dispatch(harness, request("/projets", "no-cors", { RSC: "1" })).answered).toBeNull();

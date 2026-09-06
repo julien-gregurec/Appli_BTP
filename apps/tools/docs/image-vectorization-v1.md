@@ -222,8 +222,9 @@ les réserves affichables :
 
 - Le `TracingProject` ne transporte **jamais** d'octets d'image : seulement un `assetRef`
   opaque. Un test vérifie l'absence de `base64` / `data:image` dans le JSON sérialisé.
-- Les blobs vivent dans `asset-store.ts` (IndexedDB `elsatia-tools-reference-assets`), avec une
-  implémentation mémoire pour les tests et `pruneOrphanAssets` pour la purge.
+- Les blobs vivent dans `asset-store.ts` (IndexedDB `elsatia-atelier-assets`, cloisonnée par
+  périmètre `local` / `company:<id>` comme les projets), avec une implémentation mémoire pour
+  les tests et `pruneOrphanAssets` pour la purge.
 - `validateTracingProject` valide désormais le **contenu** : images de référence, calibration,
   contours, formes. Une calibration corrompue est rejetée ; un contour `detected` marqué
   « confirmed » dans le fichier est ramené à « proposition ».
@@ -231,11 +232,25 @@ les réserves affichables :
   d'échelle. Il est relu en conservant `mmPerPixel` exactement, les points de calibration étant
   reconstruits sur l'axe X à partir de `pixelDistance`. Aucun bump de `TRACING_PROJECT_SCHEMA_VERSION`
   n'a été nécessaire.
-- `serializeTracingProject` / `parseTracingProjectFile` couvrent l'aller-retour fichier.
+- `serializeTracingProject` écrit ; la RELECTURE passe par `migrateTracingProject`
+  (`migration.ts`), frontière tolérante du canon. Il n'existe volontairement pas de second point
+  d'entrée de lecture.
 
-**Frontière** : le branchement du `TracingProject` sur `ProjectRepository` / `migrateProject`
-(`projects/model.ts`, `PROJECT_SCHEMA_VERSION`) reste hors de ce lot — il appartient au lot
-Atelier, qui possède cette frontière. Tout ce qui est nécessaire côté traçage est prêt et testé.
+**Persistance réelle** : le tracé est enregistré par `repository.ts` (IndexedDB `elsatia-atelier`),
+la voie de mutation unique est `touchTracingProject` (`atelier.ts`). Voir
+`docs/audits/ELSATIA_TOOLS_IMAGE_VECTORIZATION_CANONICAL_RECONCILIATION_V1.md`.
+
+## Le relevé confirmé devient un tracé libre (§11 de la réconciliation)
+
+`free-conversion.ts` est le seul point de passage entre la photo et le document : une
+`GeometricShape` confirmée devient une entité `FreeGeometry` du canon (contour ou polyligne), et
+emprunte ensuite exactement les mêmes rails que ce que l'utilisateur aurait dessiné à la main —
+édition de sommets, annulation, scène, cotations, SVG / DXF / PDF / PNG / mosaïque / impression.
+Aucun export ne connaît la photo.
+
+Trois refus explicites : contour non confirmé (levée en amont), projet portant un `modelId`
+(invariant du canon : jamais deux sources de vérité géométrique), relevé dépassant 500 sommets
+(refus avec la conduite à tenir, ou réduction sur demande avec l'écart mesuré).
 
 ## Annuler / rétablir (§38)
 

@@ -23,6 +23,7 @@ export * from "./image-import";
 export * from "./perspective";
 export * from "./edge-detection";
 export * from "./fitting";
+export * from "./free-conversion";
 export * from "./symmetry";
 export * from "./vectorization";
 export * from "./reliability";
