@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { exigerShellReserves, peutEmettre } from "@/lib/acces-reserves";
-import { lireChantier, listerIntervenants, listerPlans, listerReserves } from "@/lib/donnees";
+import { exigerShellReserves, peutEmettre, peutGererChantiers } from "@/lib/acces-reserves";
+import {
+  BUCKET_PLANS, lireChantier, listerIntervenants, listerPlansComplets,
+  listerReserves, signerFichiers,
+} from "@/lib/donnees";
 import { EtiquetteStatut } from "@/components/Etiquette";
+import { PlanChantier } from "@/components/PlanChantier";
 import { estEnRetard } from "@/lib/workflow";
 
 export const metadata: Metadata = { title: "Chantier" };
@@ -17,61 +21,58 @@ export default async function PageChantier({ params }: { params: Promise<{ id: s
   const [reserves, intervenants, plans] = await Promise.all([
     listerReserves({ chantierId: id }),
     listerIntervenants(id),
-    listerPlans(id),
+    listerPlansComplets(id),
   ]);
 
-  const premierPlan = plans[0] ?? null;
-  const reperes = premierPlan
-    ? reserves.filter((r) => r.plan_id === premierPlan.id && r.position_x !== null)
-    : [];
+  const liens = await signerFichiers(
+    BUCKET_PLANS,
+    plans.map((p) => p.storage_path).filter((c): c is string => Boolean(c)),
+  );
+
+  const plansAffichables = plans.map((p) => ({
+    id: p.id,
+    nom: p.nom,
+    niveau: p.niveau,
+    zone: p.zone,
+    url: p.storage_path ? liens.get(p.storage_path) ?? null : null,
+    image: Boolean(p.mime_type?.startsWith("image/")),
+  }));
+
+  const reperes = reserves
+    .filter((r) => r.plan_id && r.position_x !== null && r.position_y !== null)
+    .map((r) => ({
+      id: r.id, numero: r.numero, titre: r.titre, statut: r.statut,
+      x: Number(r.position_x), y: Number(r.position_y), planId: r.plan_id as string,
+    }));
+
+  const emission = peutEmettre(contexte.roleReserves);
 
   return (
     <>
       <h1>{chantier.nom}</h1>
       <p className="sous-titre">
-        {chantier.ville ?? "Adresse non renseignée"} — {reserves.length} réserve
-        {reserves.length > 1 ? "s" : ""}, {intervenants.length} entreprise
-        {intervenants.length > 1 ? "s" : ""} intervenante{intervenants.length > 1 ? "s" : ""}.
+        {[chantier.ville, chantier.reference].filter(Boolean).join(" · ") || "Chantier Réserves"}
+        {" — "}{reserves.length} réserve{reserves.length > 1 ? "s" : ""},
+        {" "}{intervenants.length} entreprise{intervenants.length > 1 ? "s" : ""}.
       </p>
 
       <div className="actions">
-        {peutEmettre(contexte.roleReserves) && (
-          <Link className="bouton" href={`/chantiers/${id}/nouvelle-reserve`}>
-            Nouvelle réserve
-          </Link>
+        {emission && (
+          <Link className="bouton" href={`/chantiers/${id}/nouvelle-reserve`}>Nouvelle réserve</Link>
         )}
-        <Link className="bouton secondaire" href={`/chantiers/${id}/export`}>
-          Export imprimable
-        </Link>
+        {peutGererChantiers(contexte.roleReserves) && (
+          <Link className="bouton secondaire" href={`/chantiers/${id}/plans`}>Plans</Link>
+        )}
+        <Link className="bouton secondaire" href={`/chantiers/${id}/export`}>Export imprimable</Link>
       </div>
 
       <h2>Repérage sur plan</h2>
-      <div className="plan">
-        {premierPlan ? (
-          reperes.map((r) => (
-            <Link
-              key={r.id}
-              className="plan-repere"
-              href={`/reserves/${r.id}`}
-              style={{ left: `${Number(r.position_x) * 100}%`, top: `${Number(r.position_y) * 100}%` }}
-              title={`n°${r.numero} — ${r.titre}`}
-            >
-              {r.numero}
-            </Link>
-          ))
-        ) : (
-          <p className="plan-absent">
-            Aucun plan n’est rattaché à ce chantier. Les positions déjà pointées restent
-            enregistrées ; seul leur fond de plan manque.
-          </p>
-        )}
-        {premierPlan && reperes.length === 0 && (
-          <p className="plan-absent">
-            {premierPlan.nom}
-            {premierPlan.niveau ? ` — ${premierPlan.niveau}` : ""} : aucune réserve pointée.
-          </p>
-        )}
-      </div>
+      <PlanChantier
+        chantierId={id}
+        plans={plansAffichables}
+        reperes={reperes}
+        peutEmettre={emission}
+      />
 
       <h2>Réserves</h2>
       {reserves.length === 0 ? (
@@ -91,6 +92,7 @@ export default async function PageChantier({ params }: { params: Promise<{ id: s
                   {r.intervenant_id && (
                     <span>{intervenants.find((i) => i.id === r.intervenant_id)?.nom ?? "Entreprise"}</span>
                   )}
+                  {r.plan_id && <span>Repérée sur plan</span>}
                 </span>
               </Link>
             </li>

@@ -183,3 +183,80 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-
   .contenu { max-width: none; padding: 0; }
   .carte, .reserve { border-color: #999; break-inside: avoid; }
 }
+
+/* ── V2 : capture terrain ───────────────────────────────────────────────── */
+.paire { display: grid; gap: 0 12px; grid-template-columns: 1fr; }
+@media (min-width: 560px) { .paire { grid-template-columns: 1fr 1fr; } }
+.sans-marge { margin-bottom: 0; }
+
+.case { display: flex; align-items: center; gap: 10px; min-height: var(--touche); font-weight: 500; }
+.case input { width: 22px; height: 22px; min-height: 22px; margin: 0; flex: none; }
+
+input[type="file"] {
+  padding: 10px; background: var(--papier); border-style: dashed; cursor: pointer;
+}
+.champ-photo { margin-bottom: 12px; }
+.apercu-photo { margin-top: 8px; }
+.apercu-photo img {
+  display: block; width: 100%; max-height: 260px; object-fit: cover;
+  border-radius: var(--rayon); border: 1px solid var(--bord);
+}
+
+/* Galerie */
+.galerie-section { margin-top: 18px; }
+.galerie-section h3 { font-size: 15px; margin: 0 0 2px; }
+.galerie { display: grid; gap: 8px; grid-template-columns: repeat(2, 1fr); margin-top: 10px; }
+@media (min-width: 560px) { .galerie { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 900px) { .galerie { grid-template-columns: repeat(4, 1fr); } }
+.vignette {
+  display: block; padding: 0; border: 1px solid var(--bord); border-radius: var(--rayon);
+  overflow: hidden; background: var(--carte); cursor: zoom-in; text-align: left;
+  font: inherit; color: inherit; min-height: var(--touche);
+}
+.vignette img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+.vignette-absente {
+  display: flex; align-items: center; justify-content: center;
+  aspect-ratio: 4 / 3; color: var(--texte-doux); font-size: 13px;
+}
+.vignette-pied { display: block; padding: 6px 8px; font-size: 12px; color: var(--texte-doux); }
+
+.plein-ecran {
+  position: fixed; inset: 0; z-index: 100; background: rgba(16, 32, 31, 0.94);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 16px; gap: 12px;
+}
+.plein-ecran img { max-width: 100%; max-height: 78vh; object-fit: contain; border-radius: 6px; }
+.plein-legende { color: #dfe8e6; font-size: 13px; text-align: center; margin: 0; }
+.plein-fermer { position: absolute; top: 14px; right: 14px; background: #fff; }
+
+/* Visionneuse de plan */
+.visionneuse { margin-bottom: 12px; }
+.visionneuse-barre { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.visionneuse-barre .bouton { min-width: 44px; padding: 0 12px; }
+.visionneuse-cadre {
+  position: relative; overflow: hidden; background: var(--ardoise-100);
+  border: 1px solid var(--bord); border-radius: var(--rayon); touch-action: none;
+}
+.visionneuse-contenu {
+  position: absolute; inset: 0; transform-origin: center center;
+  display: flex; align-items: center; justify-content: center;
+}
+.visionneuse-contenu img {
+  display: block; max-width: 100%; max-height: 100%; object-fit: contain;
+  user-select: none; -webkit-user-drag: none;
+}
+.barre-plan { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 10px; }
+.barre-plan label { flex: 1 1 220px; }
+
+/* Pastilles : la couleur dit l'état sans qu'il faille ouvrir la réserve. */
+.plan-repere.s-levee { background: var(--vert); color: #fff; border-color: #1d5537; }
+.plan-repere.s-levee_demandee { background: var(--ambre); }
+.plan-repere.s-refusee_responsabilite,
+.plan-repere.s-levee_refusee { background: var(--rouge); color: #fff; }
+.plan-repere.s-emise { background: #fff; }
+.plan-repere { text-decoration: none; z-index: 2; }
+
+.ligne-role { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; margin-top: 8px; }
+.ligne-role label { flex: 1 1 240px; }
+.ligne-role input[name="motif"] { flex: 1 1 160px; }
+details.carte summary { cursor: pointer; min-height: var(--touche); display: flex; align-items: center; font-weight: 600; }

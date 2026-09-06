@@ -3,15 +3,19 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { exigerShellReserves, estCompteIntervenant, peutValiderLevee } from "@/lib/acces-reserves";
-import { listerIntervenants } from "@/lib/donnees";
+import {
+  BUCKET_PHOTOS, listerIntervenants, listerPhotosReserve, signerFichiers,
+} from "@/lib/donnees";
+import { GaleriePhotos } from "@/components/GaleriePhotos";
+import { ChampPhoto } from "@/components/ChampPhoto";
 import { EtiquetteStatut } from "@/components/Etiquette";
 import {
   LIBELLES_PRIORITE, estEnRetard, peutDemanderLevee, transitionAutorisee,
   type PrioriteReserve, type StatutReserve,
 } from "@/lib/workflow";
 import {
-  ajouterPhotoAction, assignerAction, commenterAction, demanderLeveeAction,
-  repondreResponsabiliteAction, rouvrirAction, statuerLeveeAction,
+  assignerAction, commenterAction, demanderLeveeAction, repondreResponsabiliteAction,
+  rouvrirAction, statuerLeveeAction, supprimerPhotoAction, televerserPhotoAction,
 } from "@/app/actions";
 
 export const metadata: Metadata = { title: "Réserve" };
@@ -28,7 +32,6 @@ type LigneHistorique = {
   commentaire: string | null; created_at: string;
 };
 
-type Photo = { id: string; usage: string; legende: string | null; storage_path: string; created_at: string };
 type Message = { id: string; contenu: string; created_at: string };
 
 const LIBELLES_ACTION: Record<string, string> = {
@@ -67,21 +70,28 @@ export default async function PageReserve({
   if (!data) notFound();
   const reserve = data as Detail;
 
-  const [{ data: historique }, { data: photos }, { data: messages }, intervenants] = await Promise.all([
+  const [{ data: historique }, photos, { data: messages }, intervenants] = await Promise.all([
     supabase.from("reserves_historique")
       .select("id, action, statut_avant, statut_apres, commentaire, created_at")
       .eq("reserve_id", id).order("created_at", { ascending: true }),
-    supabase.from("reserves_photos")
-      .select("id, usage, legende, storage_path, created_at")
-      .eq("reserve_id", id).order("created_at", { ascending: true }),
+    listerPhotosReserve(id),
     supabase.from("reserves_messages").select("id, contenu, created_at")
       .order("created_at", { ascending: true }),
     listerIntervenants(reserve.chantier_id),
   ]);
 
+  // Aucun fichier n'est public : chaque vignette reçoit une URL signée de courte durée.
+  const liens = await signerFichiers(BUCKET_PHOTOS, photos.map((p) => p.storage_path));
+  const photosAffichees = photos.map((p) => ({
+    id: p.id, usage: p.usage, legende: p.legende,
+    url: liens.get(p.storage_path) ?? null,
+    taille_octets: p.taille_octets, nom_fichier: p.nom_fichier,
+    deposee_par_hote: p.deposee_par_hote, created_at: p.created_at,
+  }));
+
   const intervenant = estCompteIntervenant(contexte.roleReserves);
   const erreur = typeof query.error === "string" ? query.error : null;
-  const photosTravaux = (photos ?? []).filter((p) => p.usage === "travaux" || p.usage === "levee");
+  const photosTravaux = photos.filter((p) => p.usage === "travaux" || p.usage === "levee");
   const levee = peutDemanderLevee({
     statut: reserve.statut,
     photoObligatoireLevee: reserve.photo_obligatoire_levee,
@@ -118,10 +128,10 @@ export default async function PageReserve({
             Motif (obligatoire en cas de refus)
             <textarea name="motif" maxLength={2000} placeholder="Ouvrage non exécuté par nos équipes…" />
           </label>
-          <label>
-            Photo justificative (chemin de stockage, facultatif)
-            <input name="photo_path" maxLength={500} />
-          </label>
+          <p className="mention">
+            Pour joindre une preuve en cas de refus, ajoutez d’abord une photo
+            « Preuve de refus » ci-dessous, puis revenez ici.
+          </p>
           <div className="actions">
             <button className="bouton" type="submit" name="accepte" value="oui">J’accepte</button>
             <button className="bouton danger" type="submit" name="accepte" value="non">Je refuse</button>
@@ -205,45 +215,57 @@ export default async function PageReserve({
       )}
 
       {/* ── Photos ──────────────────────────────────────────────────────── */}
-      <h2>Photos ({(photos ?? []).length})</h2>
-      {(photos ?? []).length === 0 ? (
-        <p className="vide">Aucune photo rattachée.</p>
-      ) : (
-        <ul className="liste">
-          {(photos as Photo[]).map((p) => (
-            <li key={p.id} className="carte">
-              <b>{p.usage}</b>
-              <div className="reserve-meta">
-                <span>{p.legende ?? "Sans légende"}</span>
-                <span>{new Date(p.created_at).toLocaleString("fr-FR")}</span>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-      <form className="carte" action={ajouterPhotoAction}>
+      <h2>Photos</h2>
+      <GaleriePhotos photos={photosAffichees} />
+
+      <form className="carte" action={televerserPhotoAction} encType="multipart/form-data">
         <input type="hidden" name="reserve_id" value={id} />
-        <label>
-          Chemin de stockage de la photo
-          <input name="storage_path" required maxLength={500} placeholder="entreprise/reserve/photo.jpg" />
-        </label>
-        <label>
-          Usage
-          <select name="usage" defaultValue="constat">
-            <option value="constat">Constat</option>
-            <option value="travaux">Travaux réalisés</option>
-            <option value="levee">Levée</option>
-            <option value="preuve_refus">Preuve de refus</option>
-          </select>
-        </label>
-        <label>
-          Légende
-          <input name="legende" maxLength={500} />
-        </label>
+        <ChampPhoto
+          nom="photo"
+          requis
+          libelle="Ajouter une photo"
+          aide={intervenant && reserve.statut === "acceptee"
+            ? "Une photo après intervention atteste de l’état de l’ouvrage au moment de votre demande de levée."
+            : undefined}
+        />
+        <div className="paire">
+          <label>
+            Nature
+            <select name="usage" defaultValue={intervenant ? "travaux" : "constat"}>
+              <option value="constat">Constat — avant</option>
+              <option value="travaux">Travaux réalisés — après</option>
+              <option value="levee">Levée</option>
+              <option value="preuve_refus">Preuve de refus</option>
+            </select>
+          </label>
+          <label>Légende<input name="legende" maxLength={500} /></label>
+        </div>
         <div className="actions">
-          <button className="bouton secondaire" type="submit">Rattacher la photo</button>
+          <button className="bouton secondaire" type="submit">Joindre la photo</button>
         </div>
       </form>
+
+      {photosAffichees.length > 0 && (
+        <details className="carte">
+          <summary>Retirer une photo</summary>
+          <p className="mention">
+            Une photo qui a accompagné une décision — acceptation, refus, demande ou
+            validation de levée — est verrouillée et ne peut plus être retirée. Les
+            autres restent tracées à l’historique après leur retrait.
+          </p>
+          {photosAffichees.map((photo) => (
+            <form key={photo.id} action={supprimerPhotoAction} className="ligne-role">
+              <input type="hidden" name="reserve_id" value={id} />
+              <input type="hidden" name="photo_id" value={photo.id} />
+              <span className="mention">
+                {photo.usage} · {photo.legende ?? photo.nom_fichier ?? "sans légende"}
+              </span>
+              <input name="motif" placeholder="Motif" maxLength={500} />
+              <button className="bouton danger" type="submit">Retirer</button>
+            </form>
+          ))}
+        </details>
+      )}
 
       {/* ── Échanges ────────────────────────────────────────────────────── */}
       <h2>Échanges</h2>

@@ -18,6 +18,9 @@ export type IntervenantReserves = {
   corps_etat: string | null;
   statut: "invitee" | "active" | "revoquee";
   entreprise_intervenante_id: string | null;
+  email_contact: string | null;
+  telephone_contact: string | null;
+  chantier_id: string;
 };
 
 export type PlanReserves = {
@@ -131,7 +134,7 @@ export async function listerIntervenants(chantierId?: string): Promise<Intervena
   const supabase = await createClient();
   let requete = supabase
     .from("reserves_intervenants")
-    .select("id, nom, corps_etat, statut, entreprise_intervenante_id")
+    .select("id, nom, corps_etat, statut, entreprise_intervenante_id, email_contact, telephone_contact, chantier_id")
     .order("nom");
   if (chantierId) requete = requete.eq("chantier_id", chantierId);
   const { data } = await requete;
@@ -146,4 +149,78 @@ export async function listerPlans(chantierId: string): Promise<PlanReserves[]> {
     .eq("chantier_id", chantierId)
     .order("ordre");
   return (data ?? []) as PlanReserves[];
+}
+
+// ── V2 : fichiers, plans et membres ─────────────────────────────────────────
+
+export const BUCKET_PHOTOS = "reserves-photos";
+export const BUCKET_PLANS = "reserves-plans";
+
+/** Durée de vie d'une URL signée. Assez pour afficher une galerie, pas pour la diffuser. */
+const DUREE_URL_SIGNEE = 900;
+
+export type PhotoReserve = {
+  id: string;
+  usage: string;
+  legende: string | null;
+  storage_path: string;
+  mime_type: string;
+  taille_octets: number | null;
+  nom_fichier: string | null;
+  deposee_par_hote: boolean;
+  created_at: string;
+};
+
+export type MembreReserves = {
+  utilisateur_id: string;
+  prenom: string | null;
+  nom: string | null;
+  email: string | null;
+  statut_membre: string;
+  role_code: string | null;
+  autorise: boolean;
+};
+
+/**
+ * Les fichiers ne sont jamais publics : chaque affichage passe par une URL signée à
+ * durée courte, émise seulement pour les objets que les policies laissent lire.
+ */
+export async function signerFichiers(
+  bucket: string,
+  chemins: string[],
+): Promise<Map<string, string>> {
+  const liens = new Map<string, string>();
+  if (chemins.length === 0) return liens;
+  const supabase = await createClient();
+  const { data } = await supabase.storage.from(bucket).createSignedUrls(chemins, DUREE_URL_SIGNEE);
+  for (const entree of data ?? []) {
+    if (entree.signedUrl && entree.path) liens.set(entree.path, entree.signedUrl);
+  }
+  return liens;
+}
+
+export async function listerPhotosReserve(reserveId: string): Promise<PhotoReserve[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("reserves_photos_visibles", { p_reserve_id: reserveId });
+  return (data ?? []) as PhotoReserve[];
+}
+
+export async function listerPlansComplets(chantierId: string) {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("reserves_plans")
+    .select("id, nom, niveau, zone, storage_path, mime_type, nom_fichier, taille_octets, ordre")
+    .eq("chantier_id", chantierId)
+    .order("ordre");
+  return (data ?? []) as {
+    id: string; nom: string; niveau: string | null; zone: string | null;
+    storage_path: string | null; mime_type: string | null;
+    nom_fichier: string | null; taille_octets: number | null; ordre: number;
+  }[];
+}
+
+export async function listerMembres(entrepriseId: string): Promise<MembreReserves[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("reserves_lister_membres", { p_entreprise_id: entrepriseId });
+  return (data ?? []) as MembreReserves[];
 }

@@ -88,11 +88,11 @@ Colors. Les tests le vérifient dans les deux sens.
 
 ## 5. Ce qu'il reste à construire
 
-- **Écran d'administration des habilitations Réserves.** Aujourd'hui l'attribution des
-  rôles passe par les RPC plateforme de `00234`, réservées à l'administrateur plateforme.
-  Une organisation ne peut donc pas encore habiliter ses propres membres en autonomie.
-- **Recherche d'organisation à l'invitation.** L'écran demande l'identifiant technique de
-  l'organisation invitée ; un annuaire ou un envoi par e-mail sera nécessaire pour un
-  usage réel.
-- **Révocation côté entreprise invitée.** `reserves_revoquer_intervenant()` existe mais
-  n'a pas encore d'écran.
+- ~~**Écran d'administration des habilitations Réserves.**~~ Livré par la V2 :
+  `reserves_attribuer_role()` et l'écran « Membres Réserves » permettent à une
+  organisation d'habiliter ses propres membres, sans administrateur plateforme.
+- **Recherche d'organisation à l'invitation.** L'écran demande toujours l'identifiant
+  technique de l'organisation invitée. La V2 fournit un lien d'invitation copiable et une
+  page « rejoindre » réelle ; un annuaire et un envoi d'e-mail restent à faire.
+- ~~**Révocation côté entreprise invitée.**~~ Livrée par la V2 sur l'écran « Entreprises
+  intervenantes ».

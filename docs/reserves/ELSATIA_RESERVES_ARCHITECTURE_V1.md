@@ -1,5 +1,10 @@
 # ELSATIA Réserves — architecture V1
 
+> **Mise à jour V2** — le stockage réel des photos et des plans, la gestion des
+> chantiers et des plans, et l'administration des membres par l'organisation sont
+> livrés par `ELSATIA-RESERVES-V2-TERRAIN-CAPTURE`. Voir
+> [ELSATIA_RESERVES_TERRAIN_V2.md](ELSATIA_RESERVES_TERRAIN_V2.md).
+
 Lot : `ELSATIA-RESERVES-V1-FOUNDATION-AND-WORKFLOW-V1`
 Base : `integration/gp-postcutover-precommercial-ops-v1` (`4266ba6`)
 Migration : `supabase/migrations/20260906000268_reserves_v1_foundation_workflow_v1.sql`
@@ -143,9 +148,9 @@ filtrable par entreprise intervenante et soumis aux mêmes contrôles d'accès q
 lecture normale : aucune donnée cross-tenant ne peut y figurer.
 
 La page `/chantiers/[id]/export` met ces données en forme pour l'impression (feuille de
-style `@media print`). **Le PDF de la V1 est l'impression navigateur.** Un rendu PDF
-côté serveur — en-tête, pagination, vignettes photo, extrait de plan avec repères —
-n'est pas livré ici.
+style `@media print`). **Le PDF reste l'impression navigateur**, en V1 comme en V2. Un
+rendu PDF côté serveur — en-tête, pagination, vignettes photo, extrait de plan avec
+repères — n'est toujours pas livré.
 
 ## 9. Ce que ce lot ne livre pas
 

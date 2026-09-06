@@ -5,7 +5,7 @@
 
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(97);
+select plan(98);
 
 \ir fixtures/isolation_multitenant.inc
 
@@ -344,9 +344,17 @@ select throws_like(
   '%Photo obligatoire%',
   'la demande de levée est refusée tant que la preuve photographique exigée manque'
 );
+-- V2 : une photo n'est plus un chemin annoncé mais un fichier. La base réserve
+-- l'emplacement, le client dépose, puis la présence du fichier est confirmée.
+select set_config('elsatia.photo_r1', (
+  select photo_id::text from public.reserves_ajouter_photo(
+    current_setting('elsatia.test_reserve_1')::uuid, 'travaux', 'Reprise terminée',
+    'image/jpeg', 120000, 'travaux.jpg')), true);
+insert into storage.objects (id, bucket_id, name, metadata)
+select '99000000-0000-0000-0000-000000000001','reserves-photos', ph.storage_path, '{"mimetype":"image/jpeg"}'
+from public.reserves_photos ph where ph.id = current_setting('elsatia.photo_r1')::uuid;
 select lives_ok(
-  $$select public.reserves_ajouter_photo(current_setting('elsatia.test_reserve_1')::uuid,
-      'a0000000-0000-0000-0000-000000000001/reserve-1/travaux.jpg','travaux','Reprise terminée')$$,
+  $$select public.reserves_confirmer_photo(current_setting('elsatia.photo_r1')::uuid)$$,
   'l''entreprise joint la photo des travaux réalisés'
 );
 select lives_ok(
@@ -366,10 +374,19 @@ select throws_like(
   $$select public.reserves_repondre_responsabilite(current_setting('elsatia.test_reserve_2')::uuid, false)$$,
   '%motif est obligatoire%', 'un refus de responsabilité sans motif est rejeté'
 );
+-- La preuve du refus est déposée avant la réponse, comme n'importe quelle photo.
+select set_config('elsatia.photo_r2', (
+  select photo_id::text from public.reserves_ajouter_photo(
+    current_setting('elsatia.test_reserve_2')::uuid, 'preuve_refus', 'Ouvrage d''un tiers',
+    'image/jpeg', 90000, 'preuve.jpg')), true);
+insert into storage.objects (id, bucket_id, name, metadata)
+select '99000000-0000-0000-0000-000000000002','reserves-photos', ph.storage_path, '{"mimetype":"image/jpeg"}'
+from public.reserves_photos ph where ph.id = current_setting('elsatia.photo_r2')::uuid;
+select lives_ok($$select public.reserves_confirmer_photo(current_setting('elsatia.photo_r2')::uuid)$$,
+  'la preuve du refus est déposée');
 select lives_ok(
   $$select public.reserves_repondre_responsabilite(current_setting('elsatia.test_reserve_2')::uuid, false,
-      'Ouvrage non exécuté par nos équipes',
-      'a0000000-0000-0000-0000-000000000001/reserve-2/preuve.jpg')$$,
+      'Ouvrage non exécuté par nos équipes')$$,
   'le refus motivé, preuve jointe, est enregistré'
 );
 select is(

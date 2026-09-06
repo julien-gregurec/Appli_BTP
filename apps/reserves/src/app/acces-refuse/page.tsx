@@ -27,6 +27,7 @@ export default async function PageAccesRefuse({
           Demandez-la à l’administrateur de votre organisation.
         </p>
         <div className="actions">
+          <Link className="bouton secondaire" href="/rejoindre">Voir mes invitations</Link>
           <Link className="bouton secondaire" href="/login">Retour à la connexion</Link>
         </div>
       </div>

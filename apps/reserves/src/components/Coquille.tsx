@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Marque } from "@/components/Marque";
 import { Navigation } from "@/components/Navigation";
 import { deconnexionAction } from "@/app/actions";
-import { estCompteIntervenant } from "@/lib/acces-reserves";
+import { estCompteIntervenant, peutInviterEntreprise } from "@/lib/acces-reserves";
 import type { ContexteReserves } from "@/lib/contexte";
 
 export function Coquille({
@@ -13,6 +13,7 @@ export function Coquille({
   children: ReactNode;
 }) {
   const intervenant = estCompteIntervenant(contexte.roleReserves);
+  const administrateur = peutInviterEntreprise(contexte.roleReserves);
   return (
     <div className="coquille">
       <header className="barre">
@@ -26,7 +27,7 @@ export function Coquille({
           </form>
         </div>
       </header>
-      <Navigation intervenant={intervenant} />
+      <Navigation intervenant={intervenant} administrateur={administrateur} />
       <main className="contenu">{children}</main>
       <footer className="pied">
         ELSATIA Réserves — application indépendante de l’écosystème ELSATIA.
