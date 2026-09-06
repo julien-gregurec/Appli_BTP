@@ -160,6 +160,32 @@ describe("indexation", () => {
     }
   });
 
+  /*
+   * FINAL-PREPILOT-CONSOLIDATION-V1 — garde-fou de non-régression.
+   *
+   * Les routes Atelier arrivées avec le lot Workshop (`/atelier/tracer`, `/atelier/modeles`)
+   * avaient été écrites AVANT ce module SEO : elles posaient leur `robots` à la main, avec
+   * `follow: false`. Elles refusaient donc au robot de suivre leurs liens internes, à rebours
+   * de la règle que ce module porte (crawl ouvert, indexation refusée) — et sans qu'aucun test
+   * ne le voie, `index: false` étant présent dans les deux écritures.
+   *
+   * La règle est donc rendue structurelle : une page non indexable passe par `pageMetadata`.
+   * Les seules dispensées sont les recettes internes, refusées au crawl : ce sont des culs-de-sac
+   * assumés, et leur `follow: false` est cohérent avec leur `Disallow`.
+   */
+  it("fait passer toute page non indexable par `pageMetadata`, jamais par un robots écrit à la main", () => {
+    for (const { route, source } of ROUTES) {
+      if (route === "/outils/[id]" || INDEXABLE_PATHS.includes(route)) continue;
+      if ((CRAWLER_DISALLOWED_PATHS as readonly string[]).includes(route)) continue;
+      expect(`${route} utilise pageMetadata: ${source.includes("pageMetadata(")}`).toBe(
+        `${route} utilise pageMetadata: true`,
+      );
+      expect(`${route} écrit robots à la main: ${/\brobots:\s*\{/.test(source)}`).toBe(
+        `${route} écrit robots à la main: false`,
+      );
+    }
+  });
+
   it("balaie bien toutes les routes de l'application, pas un sous-ensemble", () => {
     const routes = ROUTES.map(({ route }) => route);
     expect(routes).toEqual(expect.arrayContaining(["/", "/outils/[id]", ...CRAWLER_DISALLOWED_PATHS]));

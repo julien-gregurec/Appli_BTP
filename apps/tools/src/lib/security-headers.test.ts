@@ -30,6 +30,40 @@ describe("politique de sécurité HTTP publique", () => {
     expect(buildConnectSrc({ supabaseUrl: "  " })).toEqual(["'self'"]);
   });
 
+  /*
+   * FINAL-PREPILOT-CONSOLIDATION-V1 §8 — le repli `connect-src 'self'` n'est PAS un trou.
+   *
+   * La réserve connue est qu'un build sans `NEXT_PUBLIC_SUPABASE_URL` produit une CSP réduite à
+   * l'origine propre. Ce n'est pas un blocage silencieux, parce que la CSP et le code client
+   * sont décidés par le MÊME environnement de build : Next fige les `NEXT_PUBLIC_*` dans le
+   * bundle, donc un build sans la variable embarque un `isElsatiaAccountConfigured()` faux et
+   * n'émet jamais d'appel Supabase. La politique décrit exactement ce que l'application fait.
+   *
+   * La divergence redoutée — CSP sans l'origine, client qui l'appelle quand même — exigerait
+   * deux environnements différents pour un seul build. Elle est donc structurellement
+   * impossible, et c'est cela que ce test fixe : le repli est TOTAL (aucune origine résiduelle),
+   * pas partiel.
+   *
+   * Ce qui reste à couvrir avant un déploiement n'est pas une question de sécurité mais de
+   * parité fonctionnelle : rien n'échoue bruyamment si la variable manque, et le déploiement
+   * livrerait alors un Tools sans compte. `scripts/verify-secrets.mjs` ne porte pas sur les
+   * `NEXT_PUBLIC_*` de Tools — d'où la garde de pré-déploiement demandée au rapport.
+   */
+  it("replie la CSP en cohérence avec un client qui n'appellera aucun cloud", () => {
+    const policy = buildContentSecurityPolicy({});
+    expect(directive(policy, "connect-src")).toBe("connect-src 'self'");
+    /* Aucune origine cloud résiduelle nulle part dans la politique. */
+    expect(policy).not.toMatch(/supabase|elsatia\.fr|wss:/);
+    /* Le durcissement, lui, ne dépend d'aucune variable : il tient dans les deux cas. */
+    for (const options of [{}, PROD]) {
+      const built = buildContentSecurityPolicy(options);
+      expect(directive(built, "frame-ancestors")).toBe("frame-ancestors 'none'");
+      expect(directive(built, "object-src")).toBe("object-src 'none'");
+      expect(directive(built, "base-uri")).toBe("base-uri 'none'");
+      expect(built).toContain("upgrade-insecure-requests");
+    }
+  });
+
   it("verrouille les directives structurantes de la CSP", () => {
     const policy = buildContentSecurityPolicy(PROD);
     expect(directive(policy, "default-src")).toBe("default-src 'self'");
