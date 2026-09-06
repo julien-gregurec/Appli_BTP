@@ -152,6 +152,50 @@ describe("getContexteEntreprise — essai 30 jours vs suspension pour impayé", 
     expect(ctx.essaiExpireSansOffre).toBe(true);
   });
 
+  // ELSATIA-GP-TRIAL-EXPIRY-P1-CLOSURE-V1 : après J30, le métier reste bloqué,
+  // mais l'aide, l'export RGPD et la souscription restent atteignables.
+  it.each([
+    ["aide et support", "/aide"],
+    ["page RGPD (export + suppression)", "/parametres/donnees"],
+    ["téléchargement de l'export RGPD", "/api/rgpd/export"],
+  ])("essai expiré, %s (%s) : pas de redirection, essaiExpireSansOffre=true", async (_libelle, chemin) => {
+    mocks.rpcMaybeSingle.mockResolvedValue({
+      data: abonnement({ abonnement_essai_fin: "2000-01-01" }),
+    });
+    mocks.headersGet.mockReturnValue(chemin);
+    const ctx = await getContexteEntreprise();
+    expect(mocks.redirect).not.toHaveBeenCalled();
+    expect(ctx.essaiExpireSansOffre).toBe(true);
+  });
+
+  it.each([
+    ["tableau de bord", "/dashboard"],
+    ["clients", "/clients"],
+    ["factures", "/factures"],
+    ["exports comptables", "/exports"],
+    ["paramètres métier", "/parametres"],
+    ["paramètres de facturation", "/parametres/facturation"],
+    ["accès utilisateurs", "/parametres/acces"],
+    ["cul-de-sac module non inclus (message « essai » faux après J30)", "/abonnement/module-non-inclus"],
+  ])("essai expiré, %s (%s) : toujours redirigé, aucun module ne rouvre", async (_libelle, chemin) => {
+    mocks.rpcMaybeSingle.mockResolvedValue({
+      data: abonnement({ abonnement_essai_fin: "2000-01-01" }),
+    });
+    mocks.headersGet.mockReturnValue(chemin);
+    await expect(getContexteEntreprise()).rejects.toThrow("REDIRECT:/abonnement-suspendu?motif=essai_expire");
+  });
+
+  it.each(["/aide", "/parametres/donnees", "/api/rgpd/export", "/abonnement"])(
+    "abonnement suspendu pour impayé : %s reste bloqué (la sortie d'essai n'est pas un contournement de statut)",
+    async (chemin) => {
+      mocks.rpcMaybeSingle.mockResolvedValue({
+        data: abonnement({ abonnement_statut: "suspendu", abonnement_essai_fin: "2999-01-01" }),
+      });
+      mocks.headersGet.mockReturnValue(chemin);
+      await expect(getContexteEntreprise()).rejects.toThrow("REDIRECT:/abonnement-suspendu");
+    },
+  );
+
   it("essai_fin absente mais essai_debut + 30 jours dans le futur : pas de redirection (repli défensif)", async () => {
     const debutHier = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     mocks.rpcMaybeSingle.mockResolvedValue({

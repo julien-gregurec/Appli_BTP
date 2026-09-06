@@ -149,3 +149,101 @@ export function droitOuvertSansModule(
   const offreCouvreDroit = (!offre && !permissionEstPorteDEntreeModule(droit)) || Boolean(offre);
   return offreCouvreDroit && permissionIncluseDansOffre(droit, offre);
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * SORTIE D'ESSAI — ELSATIA-GP-TRIAL-EXPIRY-P1-CLOSURE-V1
+ *
+ * L'essai expiré bloque le métier ; il ne doit jamais enfermer le client. Trois
+ * droits restent ouverts après J30, indépendamment de toute offre :
+ *   — demander de l'aide (support) ;
+ *   — récupérer ses données (export RGPD, droit à la portabilité) ;
+ *   — souscrire (sortie payante).
+ *
+ * Ce contrat est déclaré ICI, pas dans `getContexteEntreprise`, pour être
+ * testable sans base ni requête et pour rester la source unique de la frontière.
+ * Il n'ouvre AUCUNE permission : la garde de module du proxy et les droits de
+ * rôle restent évalués exactement comme avant. Il ne fait que lever la
+ * redirection vers /abonnement-suspendu sur ces chemins précis.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Chemins restant accessibles après expiration de l'essai. Volontairement
+ * énumérés un par un, jamais un préfixe large :
+ *
+ *  - `/abonnement`        souscrire ;
+ *  - `/aide`              messagerie de support + FAQ ;
+ *  - `/parametres/donnees` page RGPD (export + suppression), et RIEN d'autre
+ *                          sous /parametres — les réglages métier restent fermés ;
+ *  - `/api/rgpd/export`   téléchargement effectif de l'export RGPD.
+ *
+ * `/abonnement/module-non-inclus` n'y figure volontairement PAS : après J30 son
+ * message (« module optionnel non compris dans l'essai ») serait faux, et
+ * l'utilisateur doit voir /abonnement-suspendu?motif=essai_expire, qui dit la
+ * vérité et propose les trois sorties.
+ */
+export const CHEMINS_ACCESSIBLES_ESSAI_EXPIRE: readonly string[] = [
+  "/abonnement",
+  "/aide",
+  "/parametres/donnees",
+  "/api/rgpd/export",
+];
+
+/**
+ * Vrai si ce chemin fait partie de la sortie d'essai. Égalité EXACTE (au slash
+ * final près), jamais un préfixe : ouvrir `/parametres/donnees` n'ouvre donc
+ * aucune autre page de /parametres, et `/abonnement-suspendu` comme
+ * `/abonnement/module-non-inclus` restent en dehors. Toute nouvelle sortie doit
+ * être ajoutée explicitement à la liste ci-dessus.
+ */
+export function cheminAccessibleEssaiExpire(chemin: string | null | undefined): boolean {
+  if (!chemin) return false;
+  const normalise = chemin.length > 1 && chemin.endsWith("/") ? chemin.slice(0, -1) : chemin;
+  return CHEMINS_ACCESSIBLES_ESSAI_EXPIRE.includes(normalise);
+}
+
+/**
+ * Jours calendaires restants avant la fin de l'essai (0 = dernier jour, l'essai
+ * courant encore jusqu'à 23:59:59 UTC). `null` si l'entreprise n'est pas en
+ * essai, si la fenêtre est inconnue, ou si l'essai est déjà expiré.
+ */
+export function joursRestantsEssai(fenetre: FenetreEssai, maintenant: Date = new Date()): number | null {
+  if (fenetre.abonnementStatut !== "essai") return null;
+  const fin = finEssaiEffective(fenetre);
+  if (!fin) return null;
+  const finMs = new Date(`${fin}T23:59:59.999Z`).getTime();
+  if (finMs < maintenant.getTime()) return null;
+  const jourCourant = Date.UTC(maintenant.getUTCFullYear(), maintenant.getUTCMonth(), maintenant.getUTCDate());
+  const jourFin = new Date(`${fin}T00:00:00.000Z`).getTime();
+  return Math.max(0, Math.round((jourFin - jourCourant) / 86_400_000));
+}
+
+/** Paliers de préavis demandés au contrat : J-7, J-3, J-1. */
+export const PALIERS_PREAVIS_ESSAI = [7, 3, 1] as const;
+
+export type NiveauPreavisEssai = "info" | "attention" | "urgent";
+
+export type PreavisEssai = {
+  joursRestants: number;
+  /** Palier atteint (7, 3 ou 1) : le plus proche palier ≥ joursRestants. */
+  palier: (typeof PALIERS_PREAVIS_ESSAI)[number];
+  niveau: NiveauPreavisEssai;
+};
+
+/**
+ * Préavis de fin d'essai, ou `null` s'il n'y a rien à annoncer.
+ *
+ * Le contrat demande J-7, J-3 et J-1. Un préavis affiché UNIQUEMENT ces trois
+ * jours-là serait invisible pour un client qui ne se connecte pas précisément
+ * ce jour : le bandeau reste donc affiché en continu dès J-7, en changeant de
+ * niveau aux paliers demandés (7→4 « info », 3→2 « attention », 1→0 « urgent »).
+ * Aucune notification poussée, aucun envoi : affichage local uniquement.
+ */
+export function preavisEssai(fenetre: FenetreEssai, maintenant: Date = new Date()): PreavisEssai | null {
+  const joursRestants = joursRestantsEssai(fenetre, maintenant);
+  if (joursRestants === null || joursRestants > PALIERS_PREAVIS_ESSAI[0]) return null;
+  // Palier atteint = le plus petit seuil encore ≥ au reste à courir : J-5 est
+  // toujours dans le palier « 7 », J-2 dans le palier « 3 », J-0 dans « 1 ».
+  const palier = [...PALIERS_PREAVIS_ESSAI].reverse().find((seuil) => seuil >= joursRestants) ?? PALIERS_PREAVIS_ESSAI[0];
+  const niveau: NiveauPreavisEssai = palier === 1 ? "urgent" : palier === 3 ? "attention" : "info";
+  return { joursRestants, palier, niveau };
+}

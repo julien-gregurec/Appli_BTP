@@ -4,10 +4,15 @@ import {
   OFFRE_SOCLE,
   PERMISSIONS_HORS_SOCLE,
   PERMISSIONS_SOCLE,
+  CHEMINS_ACCESSIBLES_ESSAI_EXPIRE,
+  PALIERS_PREAVIS_ESSAI,
+  cheminAccessibleEssaiExpire,
   droitOuvertSansModule,
   essaiEnCours,
   finEssaiEffective,
+  joursRestantsEssai,
   permissionEstSocle,
+  preavisEssai,
   socleOuvertPendantEssai,
 } from "./acces-socle-essai";
 import { MODULE_PERMISSION_PAR_CHEMIN } from "./module-permissions";
@@ -291,5 +296,165 @@ describe("§12 — parcours premier client, essai sans offre ni SQL manuel", () 
     const permissions = PARCOURS.map(([, , permission]) => permission).filter((p): p is string => p !== null);
     expect(permissions.every((p) => droitOuvertSansModule(p, ESSAI_VALIDE, MAINTENANT))).toBe(true);
     expect(ESSAI_VALIDE.abonnementOffre).toBeNull();
+  });
+});
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * ELSATIA-GP-TRIAL-EXPIRY-P1-CLOSURE-V1 — sortie d'essai.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+describe("cheminAccessibleEssaiExpire — frontière de la sortie d'essai", () => {
+  it.each([
+    ["souscrire", "/abonnement"],
+    ["souscrire (slash final)", "/abonnement/"],
+    ["aide et support", "/aide"],
+    ["page RGPD", "/parametres/donnees"],
+    ["téléchargement de l'export RGPD", "/api/rgpd/export"],
+  ])("%s (%s) reste accessible après J30", (_libelle, chemin) => {
+    expect(cheminAccessibleEssaiExpire(chemin)).toBe(true);
+  });
+
+  it.each([
+    ["tableau de bord", "/dashboard"],
+    ["clients", "/clients"],
+    ["devis", "/devis"],
+    ["factures", "/factures"],
+    ["employés", "/employes"],
+    ["planning", "/planning"],
+    ["messagerie", "/messagerie"],
+    ["stock", "/stock"],
+    ["exports comptables", "/exports"],
+    ["export comptable API", "/api/exports/comptabilite"],
+    ["paramètres métier", "/parametres"],
+    ["paramètres de facturation", "/parametres/facturation"],
+    ["accès utilisateurs", "/parametres/acces"],
+    ["cul-de-sac module non inclus", "/abonnement/module-non-inclus"],
+  ])("%s (%s) reste bloqué après J30", (_libelle, chemin) => {
+    expect(cheminAccessibleEssaiExpire(chemin)).toBe(false);
+  });
+
+  it("ne confond jamais un chemin voisin avec un chemin ouvert", () => {
+    // /abonnement-suspendu et /aide-en-ligne ne sont pas des sous-chemins.
+    expect(cheminAccessibleEssaiExpire("/abonnement-suspendu")).toBe(false);
+    expect(cheminAccessibleEssaiExpire("/aide-memoire")).toBe(false);
+    expect(cheminAccessibleEssaiExpire("/parametres/donnees-bancaires")).toBe(false);
+    expect(cheminAccessibleEssaiExpire("/api/rgpd/exportation")).toBe(false);
+  });
+
+  it("un chemin inconnu du proxy (en-tête absent) est traité comme bloqué", () => {
+    expect(cheminAccessibleEssaiExpire(null)).toBe(false);
+    expect(cheminAccessibleEssaiExpire(undefined)).toBe(false);
+    expect(cheminAccessibleEssaiExpire("")).toBe(false);
+  });
+
+  it("n'ouvre que trois besoins : souscrire, être aidé, récupérer ses données", () => {
+    expect([...CHEMINS_ACCESSIBLES_ESSAI_EXPIRE].sort()).toEqual(
+      ["/abonnement", "/aide", "/api/rgpd/export", "/parametres/donnees"],
+    );
+  });
+
+  it("aucun chemin de sortie n'expose de donnée métier d'un autre module", () => {
+    // Aucune route de module (MODULE_PERMISSION_PAR_CHEMIN) ne devient
+    // accessible, hors les deux administratives déjà ouvertes sans offre.
+    const routesModulesOuvertes = MODULE_PERMISSION_PAR_CHEMIN
+      .filter(([chemin]) => cheminAccessibleEssaiExpire(chemin))
+      .map(([chemin, permission]) => `${chemin}:${permission}`);
+    // Seul /abonnement : sa permission (acces_parametres) n'est pas une porte
+    // d'entrée de module et était déjà ouverte sans offre.
+    expect(routesModulesOuvertes).toEqual(["/abonnement:acces_parametres"]);
+    expect(PERMISSIONS_HORS_SOCLE.some((p) => p === "acces_parametres")).toBe(false);
+  });
+});
+
+describe("joursRestantsEssai / preavisEssai — préavis J-7, J-3, J-1", () => {
+  /** Essai se terminant le 2026-09-30 inclus. */
+  const fenetre = { abonnementStatut: "essai", essaiDebut: "2026-09-01", essaiFin: "2026-09-30" };
+  const jour = (iso: string) => new Date(`${iso}T09:00:00.000Z`);
+
+  it.each([
+    ["2026-09-23", 7],
+    ["2026-09-27", 3],
+    ["2026-09-29", 1],
+    ["2026-09-30", 0],
+  ])("le %s, il reste %i jour(s)", (iso, attendu) => {
+    expect(joursRestantsEssai(fenetre, jour(iso))).toBe(attendu);
+  });
+
+  it("aucun préavis tant que la fin est à plus de 7 jours", () => {
+    expect(preavisEssai(fenetre, jour("2026-09-22"))).toBeNull();
+  });
+
+  it.each([
+    ["2026-09-23", 7, "info"],
+    ["2026-09-26", 7, "info"],
+    ["2026-09-27", 3, "attention"],
+    ["2026-09-28", 3, "attention"],
+    ["2026-09-29", 1, "urgent"],
+    ["2026-09-30", 1, "urgent"],
+  ])("le %s, palier %i (%s)", (iso, palier, niveau) => {
+    const preavis = preavisEssai(fenetre, jour(iso));
+    expect(preavis?.palier).toBe(palier);
+    expect(preavis?.niveau).toBe(niveau);
+  });
+
+  it("les trois paliers du contrat sont bien couverts", () => {
+    const paliersVus = new Set(
+      ["2026-09-23", "2026-09-27", "2026-09-29"].map((iso) => preavisEssai(fenetre, jour(iso))?.palier),
+    );
+    expect([...paliersVus].sort((a, b) => Number(b) - Number(a))).toEqual([...PALIERS_PREAVIS_ESSAI]);
+  });
+
+  it("aucun préavis après expiration (le bandeau « essai terminé » prend le relais)", () => {
+    expect(joursRestantsEssai(ESSAI_EXPIRE, MAINTENANT)).toBeNull();
+    expect(preavisEssai(ESSAI_EXPIRE, MAINTENANT)).toBeNull();
+  });
+
+  it("aucun préavis hors statut essai (abonné actif, suspendu, annulé)", () => {
+    for (const statut of ["actif", "suspendu", "annule"]) {
+      expect(preavisEssai({ ...fenetre, abonnementStatut: statut }, jour("2026-09-29"))).toBeNull();
+    }
+  });
+
+  it("aucun préavis si la fenêtre d'essai est inconnue (jamais d'alarme inventée)", () => {
+    expect(preavisEssai({ abonnementStatut: "essai", essaiDebut: null, essaiFin: null }, MAINTENANT)).toBeNull();
+  });
+
+  it("repli sur essai_debut + 30 jours quand essai_fin est absente", () => {
+    const sansFin = { abonnementStatut: "essai", essaiDebut: "2026-09-01", essaiFin: null };
+    // 2026-09-01 + 30 jours = 2026-10-01 inclus.
+    expect(joursRestantsEssai(sansFin, jour("2026-09-30"))).toBe(1);
+    expect(preavisEssai(sansFin, jour("2026-09-30"))?.niveau).toBe("urgent");
+  });
+});
+
+describe("après J30 — aucun module métier ne rouvre, aucune donnée ne fuit", () => {
+  it("aucune entrée de navigation métier n'est atteignable après expiration", () => {
+    const entreesAtteignables = NAVIGATION_APPLICATION
+      .filter((item) => cheminAccessibleEssaiExpire(item.href))
+      .map((item) => item.href);
+    // Seule la sortie payante figure dans la navigation ; /aide (bouton flottant)
+    // et /parametres/donnees (sous-page de réglages) n'y sont pas des entrées.
+    expect(entreesAtteignables).toEqual(["/abonnement"]);
+  });
+
+  it("aucune permission du SOCLE ne se rouvre après expiration", () => {
+    for (const permission of PERMISSIONS_SOCLE) {
+      expect(socleOuvertPendantEssai(permission, ESSAI_EXPIRE, MAINTENANT)).toBe(false);
+    }
+  });
+
+  it("aucune permission hors SOCLE ne se rouvre après expiration", () => {
+    for (const permission of PERMISSIONS_HORS_SOCLE) {
+      expect(droitOuvertSansModule(permission, ESSAI_EXPIRE, MAINTENANT)).toBe(false);
+    }
+  });
+
+  it("la sortie d'essai ne concerne que des chemins, jamais un droit", () => {
+    // Seules les permissions administratives (jamais des portes d'entrée de
+    // module) restent ouvertes sans offre : c'était déjà le cas avant ce lot.
+    expect(droitOuvertSansModule("acces_parametres", ESSAI_EXPIRE, MAINTENANT)).toBe(true);
+    expect(droitOuvertSansModule("gerer_parametres", ESSAI_EXPIRE, MAINTENANT)).toBe(true);
+    expect(droitOuvertSansModule("acces_clients", ESSAI_EXPIRE, MAINTENANT)).toBe(false);
+    expect(droitOuvertSansModule("acces_factures", ESSAI_EXPIRE, MAINTENANT)).toBe(false);
   });
 });
