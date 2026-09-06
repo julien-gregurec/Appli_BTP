@@ -130,11 +130,27 @@ async function precache() {
 self.addEventListener("install", (event) => {
   event.waitUntil(precache());
   /*
-   * Aucun appel a skipWaiting : prendre la main au milieu d'une session purgerait le cache de la
-   * version que la page ouverte est en train d'utiliser, et ses chunks lazy deviendraient
-   * introuvables hors ligne. La nouvelle version s'active a la fermeture des derniers clients.
+   * Aucun appel a skipWaiting ici : prendre la main au milieu d'une session purgerait le cache de
+   * la version que la page ouverte est en train d'utiliser, et ses chunks lazy deviendraient
+   * introuvables hors ligne. La nouvelle version s'active a la fermeture des derniers clients, ou
+   * sur demande explicite de l'utilisateur (message `SKIP_WAITING`, plus bas), jamais autrement.
    * Une premiere installation (aucun worker precedent) s'active immediatement d'elle-meme.
    */
+});
+
+/*
+ * Activation controlee par l'utilisateur (lot PWA-UPDATE-UX). Le worker en attente ne prend jamais
+ * la main de lui-meme : il n'appelle `skipWaiting()` que sur ce message, envoye par la page apres
+ * un clic explicite sur « Mettre a jour ». Aucun reseau n'est requis, ce qui rend l'operation sure
+ * hors ligne : le precache de CETTE version est deja complet (sinon `install` aurait echoue), et
+ * `activate` ne purge les caches precedents qu'apres l'avoir verifie.
+ *
+ * Tout autre message est ignore : ce canal n'accepte pas d'ordre venu d'ailleurs que de la page.
+ */
+self.addEventListener("message", (event) => {
+  const data = event && event.data;
+  const type = typeof data === "string" ? data : data && data.type;
+  if (type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {

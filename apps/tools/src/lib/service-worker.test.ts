@@ -99,6 +99,7 @@ type Harness = {
   network: "ok" | "fail" | "hang";
   requested: string[];
   claimed: number;
+  skipWaiting: number;
 };
 
 function loadServiceWorker(code: string, options: { store?: Map<string, FakeCache>; server?: string[]; network?: Harness["network"] } = {}): Harness {
@@ -110,6 +111,7 @@ function loadServiceWorker(code: string, options: { store?: Map<string, FakeCach
     network: options.network ?? "ok",
     requested: [],
     claimed: 0,
+    skipWaiting: 0,
   };
 
   const caches = {
@@ -135,6 +137,7 @@ function loadServiceWorker(code: string, options: { store?: Map<string, FakeCach
       addEventListener: (type: string, listener: (event: unknown) => void) => listeners.set(type, listener),
       location: { origin: ORIGIN },
       clients: { claim: async () => { harness.claimed += 1; } },
+      skipWaiting: () => { harness.skipWaiting += 1; },
     },
     caches,
     Response: FakeResponse,
@@ -177,6 +180,11 @@ async function run(harness: Harness, type: "install" | "activate") {
   await Promise.all(waited);
 }
 
+/** Emet un `message` sur le worker, comme le fait `worker.postMessage(...)` depuis la page. */
+function postMessage(harness: Harness, data: unknown) {
+  harness.listeners.get("message")?.({ data });
+}
+
 const cacheNames = (harness: Harness) => [...harness.store.keys()];
 const urlsIn = (harness: Harness, name: string) => [...(harness.store.get(name)?.entries.keys() ?? [])];
 
@@ -210,8 +218,21 @@ describe("service worker Tools — installation", () => {
     expect(urlsIn(harness, `elsatia-tools-${built.version}`)).toContain(absolute(CSS));
   });
 
-  it("ne prend jamais la main au milieu d'une session (pas de skipWaiting)", () => {
-    expect(buildWorker().code).not.toMatch(/skipWaiting\s*\(/);
+  /*
+   * L'invariant n'est plus « aucun skipWaiting dans le code » mais « aucun skipWaiting SPONTANE » :
+   * depuis le lot PWA-UPDATE-UX il existe un unique appel, derriere le message explicite de la
+   * page. Le cycle install/activate, lui, ne doit toujours jamais prendre la main tout seul.
+   */
+  it("ne prend jamais la main au milieu d'une session sans ordre explicite", async () => {
+    const built = buildWorker();
+    const harness = loadServiceWorker(built.code, { server: [...built.critical, ...built.optional] });
+    await run(harness, "install");
+    await run(harness, "activate");
+    expect(harness.skipWaiting).toBe(0);
+
+    const dispatchAll = [...harness.listeners.keys()];
+    expect(dispatchAll).toContain("message");
+    expect(built.code.match(/self\.skipWaiting\s*\(/g) ?? []).toHaveLength(1);
   });
 });
 
@@ -411,5 +432,72 @@ describe("service worker Tools — requetes hors perimetre", () => {
     expect(dispatch(harness, request("/projets", "no-cors", { RSC: "1" })).answered).toBeNull();
     expect(dispatch(harness, request("/projets?_rsc=abc123")).answered).toBeNull();
     expect(harness.requested).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------- activation sur demande
+
+describe("service worker Tools — activation demandee par l'utilisateur", () => {
+  function fresh() {
+    const built = buildWorker();
+    return loadServiceWorker(built.code, { server: [...built.critical, ...built.optional] });
+  }
+
+  it("n'appelle jamais skipWaiting de lui-meme a l'installation", async () => {
+    const harness = fresh();
+    await run(harness, "install");
+    expect(harness.skipWaiting).toBe(0);
+  });
+
+  it("appelle skipWaiting sur le message SKIP_WAITING — l'ordre explicite de l'utilisateur", async () => {
+    const harness = fresh();
+    await run(harness, "install");
+    postMessage(harness, { type: "SKIP_WAITING" });
+    expect(harness.skipWaiting).toBe(1);
+  });
+
+  it("accepte aussi la forme chaine, tolerante aux clients plus anciens", () => {
+    const harness = fresh();
+    postMessage(harness, "SKIP_WAITING");
+    expect(harness.skipWaiting).toBe(1);
+  });
+
+  it("ignore tout autre message : ce canal ne prend d'ordre de personne d'autre", () => {
+    const harness = fresh();
+    for (const data of [undefined, null, "", "skipwaiting", { type: "PURGE" }, { type: "CLAIM" }, 42, []]) postMessage(harness, data);
+    expect(harness.skipWaiting).toBe(0);
+  });
+
+  it("active la nouvelle version sans reseau : SKIP_WAITING puis activate hors ligne", async () => {
+    const built = buildWorker();
+    const store = new Map<string, FakeCache>();
+    const online = loadServiceWorker(built.code, { store, server: [...built.critical, ...built.optional] });
+    await run(online, "install");
+
+    // Reseau coupe apres l'installation : plus rien ne sort, le worker a deja tout ce qu'il faut.
+    const offline = loadServiceWorker(built.code, { store, server: [...built.critical, ...built.optional], network: "fail" });
+    postMessage(offline, { type: "SKIP_WAITING" });
+    await run(offline, "activate");
+
+    expect(offline.skipWaiting).toBe(1);
+    expect(offline.requested).toEqual([]);
+    expect(offline.claimed).toBe(1);
+    const cached = urlsIn(offline, `elsatia-tools-${built.version}`);
+    for (const url of ["/", "/offline", CSS, MAIN_JS]) expect(cached).toContain(absolute(url));
+  });
+
+  it("ne detruit pas le cache hors ligne : la nouvelle version sert le shell sans reseau", async () => {
+    const built = buildWorker();
+    const store = new Map<string, FakeCache>();
+    const installed = loadServiceWorker(built.code, { store, server: [...built.critical, ...built.optional] });
+    await run(installed, "install");
+
+    const activated = loadServiceWorker(built.code, { store, server: [...built.critical, ...built.optional], network: "fail" });
+    postMessage(activated, { type: "SKIP_WAITING" });
+    await run(activated, "activate");
+
+    const served = loadServiceWorker(built.code, { store, server: [], network: "fail" });
+    const shell = dispatch(served, request("/", "navigate"));
+    await expect(shell.answered).resolves.toMatchObject({ ok: true, url: absolute("/") });
   });
 });
