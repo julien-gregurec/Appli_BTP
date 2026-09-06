@@ -71,3 +71,6 @@ output/verification/
 /output/video/orchestre.wav
 /output/video/bornes.json
 /output/video/points.json
+
+# Captures de démonstration produites localement (ELSATIA-GP-SAFE-DEMO-CAPTURE-BUILD-V1).
+/captures/
