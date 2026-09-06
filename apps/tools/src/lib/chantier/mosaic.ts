@@ -54,6 +54,9 @@ export type MosaicTile = {
 export type MosaicPlan = {
   format: PaperFormat;
   orientation: PaperOrientation;
+  /** Emprise réelle du motif découpé (mm), reportée telle quelle sur le plan d'assemblage. */
+  contentWidthMm: number;
+  contentHeightMm: number;
   sheetWidthMm: number;
   sheetHeightMm: number;
   marginMm: number;
@@ -143,6 +146,8 @@ export function planMosaic(input: MosaicInput): MosaicPlan {
   return {
     format: input.format,
     orientation,
+    contentWidthMm,
+    contentHeightMm,
     sheetWidthMm,
     sheetHeightMm,
     marginMm,

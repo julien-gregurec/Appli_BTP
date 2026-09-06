@@ -118,3 +118,67 @@ describe("gabarit mosaïque / 1:1 (§16-§18, §12)", () => {
     expect(new TextDecoder().decode(bytes.slice(0, 8))).toContain("%PDF-");
   });
 });
+
+describe("pagination réelle du dossier (§5)", () => {
+  const manyRows = (count: number) =>
+    buildReportTable(Array.from({ length: count }, (_, index) => ({ label: `P${index + 1}`, point: { x: index * 10, y: index * 7 } })));
+
+  it("une table de report longue déborde sur plusieurs pages au lieu d'être tronquée", () => {
+    // Le lot P0 s'arrêtait au bas de la première page de report (`break`) : le document
+    // comptait 3 pages quel que soit le nombre de points, les lignes suivantes étaient
+    // perdues sans avertissement.
+    const short = buildChantierPdfDocument({ project: baseProject, geometry: model, report: manyRows(5) });
+    const long = buildChantierPdfDocument({ project: baseProject, geometry: model, report: manyRows(200) });
+    expect(short.getNumberOfPages()).toBe(3);
+    expect(long.getNumberOfPages()).toBeGreaterThan(short.getNumberOfPages());
+    expect(long.getNumberOfPages()).toBeGreaterThanOrEqual(6);
+  });
+
+  it("le nombre de pages croît avec le nombre de points de report", () => {
+    const pages = [50, 150, 300].map((count) => buildChantierPdfDocument({ project: baseProject, report: manyRows(count) }).getNumberOfPages());
+    expect(pages[1]).toBeGreaterThan(pages[0]);
+    expect(pages[2]).toBeGreaterThan(pages[1]);
+  });
+
+  it("des étapes de construction volumineuses ne débordent pas de la page", () => {
+    const steps = Array.from({ length: 60 }, (_, index) => ({
+      id: `s${index}`,
+      title: `Étape ${index + 1} — report du point sur l'axe principal`,
+      instruction: "Reporter la cote depuis l'origine, contrôler l'équerrage puis marquer le point au crayon gras. ".repeat(3),
+      measurements: [`Distance : ${index * 25} mm`, `Angle : ${index}°`],
+    }));
+    const pdf = buildChantierPdfDocument({ project: baseProject, constructionSteps: steps });
+    expect(pdf.getNumberOfPages()).toBeGreaterThan(3);
+  });
+
+  it("une nomenclature longue se pagine également", () => {
+    const nomenclature = buildNomenclature({
+      counts: Array.from({ length: 120 }, (_, index) => ({ label: `Élément ${index + 1}`, value: index + 1 })),
+    });
+    const pdf = buildChantierPdfDocument({ project: baseProject, nomenclature });
+    expect(pdf.getNumberOfPages()).toBeGreaterThan(2);
+  });
+
+  it("des notes très longues ne débordent pas de la couverture", () => {
+    const pdf = buildChantierPdfDocument({ project: baseProject, notes: "Contrôler l'aplomb avant fixation. ".repeat(400) });
+    expect(pdf.getNumberOfPages()).toBeGreaterThan(1);
+  });
+
+  it("reste déterministe : deux générations du même document produisent la même taille", () => {
+    const input: ChantierExportDocument = { project: baseProject, geometry: model, report: manyRows(80) };
+    expect(buildChantierPdf(input).byteLength).toBe(buildChantierPdf(input).byteLength);
+  });
+});
+
+describe("garde-fou de volume mosaïque (§39)", () => {
+  it("refuse de générer un gabarit au-delà du plafond de feuilles", () => {
+    const mosaic = planMosaic({ contentWidthMm: 40_000, contentHeightMm: 40_000, format: "A4" });
+    expect(mosaic.sheetCount).toBeGreaterThan(400);
+    expect(() => buildChantierMosaicPdfDocument({ project: baseProject, geometry: model, mosaic })).toThrow(/plafond|feuilles/i);
+  });
+
+  it("un gabarit sous le plafond reste généré normalement", () => {
+    const mosaic = planMosaic({ contentWidthMm: 2400, contentHeightMm: 2400, format: "A3" });
+    expect(() => buildChantierMosaicPdfDocument({ project: baseProject, geometry: model, mosaic })).not.toThrow();
+  });
+});

@@ -15,8 +15,15 @@
  * Choix assumé sur la cote témoin (§15) : elle n'est jamais dessinée sur la page « Plan »
  * du dossier (page 2), qui est un schéma ajusté à la mise en page (`createPlanTransform`,
  * jamais à l'échelle 1:1) — y tracer un témoin serait un mensonge de mise à l'échelle. Le
- * témoin réel n'est imprimé qu'sur le gabarit mosaïque/1:1, seul document réellement à
- * l'échelle. La page « Plan » se contente d'une mention textuelle de la valeur définie.
+ * témoin réel n'est imprimé que sur le gabarit mosaïque/1:1, seul document réellement à
+ * l'échelle. La page « Plan » se contente d'une mention textuelle de la valeur définie, et
+ * annonce désormais son échelle d'affichage réelle (§6, `describeDisplayScale`).
+ *
+ * Pagination (§5) : tout le contenu textuel passe par `PdfFlow` (`exports/pdf-flow.ts`).
+ * Aucune section ne peut plus déborder de la page ni perdre silencieusement des lignes —
+ * le lot P0 interrompait la table de report par un `break` au bas de la première page.
+ * L'en-tête et le pied de page sont apposés en seconde passe (`stampPages`), une fois le
+ * nombre total de pages connu, pour un « Page X / Y » exact.
  */
 
 import { jsPDF } from "jspdf";
@@ -26,6 +33,9 @@ import type { ShapeGeometry } from "../geometry/shape-model";
 import { describeOrigin } from "../tracing/measurement-origin";
 import { formatReportRow } from "../chantier/report-table";
 import { sheetCaption, type MosaicPlan, type MosaicTile } from "../chantier/mosaic";
+import { describeDisplayScale, type DisplayScale } from "../chantier/print-scale";
+import { assessMosaicSafety, MAX_MOSAIC_SHEETS, PRINT_INSTRUCTION } from "../chantier/print-safety";
+import { PdfFlow, stampPages } from "./pdf-flow";
 import type { ChantierExportDocument } from "./chantier-document";
 
 const ink: [number, number, number] = [23, 48, 63];
@@ -81,7 +91,7 @@ function sectionTitle(pdf: jsPDF, title: string, y: number) {
 /*  Dossier multipage (§5)                                                    */
 /* -------------------------------------------------------------------------- */
 
-type Section = { title: string; render: (pdf: jsPDF, y: number) => void };
+type Section = { title: string; render: (flow: PdfFlow) => void };
 
 function desiredArcDelta(arc: Arc) {
   let delta = arc.endAngle - arc.startAngle;
@@ -96,7 +106,11 @@ function drawPolyPath(pdf: jsPDF, points: readonly { x: number; y: number }[], c
   if (closed && points.length > 2) pdf.line(points[points.length - 1].x, points[points.length - 1].y, points[0].x, points[0].y);
 }
 
-function drawSchematicPlan(pdf: jsPDF, model: ShapeGeometry, x: number, y: number, width: number, height: number) {
+/**
+ * Dessine le schéma d'ensemble et retourne l'échelle d'affichage réellement appliquée,
+ * afin que la page puisse l'annoncer honnêtement (§6) au lieu de laisser croire à un 1:1.
+ */
+function drawSchematicPlan(pdf: jsPDF, model: ShapeGeometry, x: number, y: number, width: number, height: number): DisplayScale {
   const transform = createPlanTransform(model, width, height, 5);
   const p = (source: { x: number; y: number }) => { const value = transform.point(source); return { x: x + value.x, y: y + value.y }; };
   pdf.setLineWidth(.25);
@@ -132,6 +146,7 @@ function drawSchematicPlan(pdf: jsPDF, model: ShapeGeometry, x: number, y: numbe
     pdf.line(a.x, a.y, b.x, b.y);
     pdf.text(safe(item.label), (a.x + b.x) / 2, (a.y + b.y) / 2 - 1.5, { align: "center" });
   }
+  return describeDisplayScale(transform.scale);
 }
 
 /**
@@ -161,50 +176,113 @@ export function resolveChantierPdfSections(document: ChantierExportDocument): Ch
   };
 }
 
+/* --- primitives de flux (§5) : rien n'est écrit sans réserver la place --- */
+
+const LINE_HEIGHT = 4.6;
+const TITLE_BLOCK = 11;
+
+/** Titre de section dans le flux ; répète « (suite) » après une rupture de page. */
+function flowSectionTitle(flow: PdfFlow, title: string) {
+  flow.ensure(TITLE_BLOCK);
+  sectionTitle(flow.pdf, title, flow.y);
+  flow.advance(7);
+}
+
+/** Écrit un texte en le repliant sur la largeur utile, avec rupture de page ligne à ligne. */
+function flowText(flow: PdfFlow, text: string, options: { indent?: number; lineHeight?: number; maxWidth?: number } = {}) {
+  const indent = options.indent ?? 0;
+  const lineHeight = options.lineHeight ?? LINE_HEIGHT;
+  const maxWidth = options.maxWidth ?? flow.contentWidth - indent;
+  const lines = flow.pdf.splitTextToSize(safe(text), maxWidth) as string[];
+  for (const line of lines) {
+    flow.ensure(lineHeight);
+    flow.pdf.text(line, flow.left + indent, flow.y);
+    flow.advance(lineHeight);
+  }
+}
+
+/** Ligne « libellé à gauche / valeur à droite », sans chevauchement possible. */
+function flowLabelValue(flow: PdfFlow, label: string, value: string) {
+  flow.ensure(LINE_HEIGHT);
+  const valueWidth = flow.pdf.getTextWidth(safe(value));
+  const labelMax = Math.max(20, flow.contentWidth - valueWidth - 4);
+  const labelLines = flow.pdf.splitTextToSize(safe(label), labelMax) as string[];
+  const inkColour = ink;
+  flow.pdf.setTextColor(...inkColour);
+  flow.pdf.text(labelLines[0], flow.left, flow.y);
+  flow.pdf.setTextColor(...grey);
+  flow.pdf.text(safe(value), flow.pageWidth - flow.right, flow.y, { align: "right" });
+  flow.advance(LINE_HEIGHT);
+  for (const extra of labelLines.slice(1)) {
+    flow.ensure(LINE_HEIGHT);
+    flow.pdf.setTextColor(...inkColour);
+    flow.pdf.text(extra, flow.left, flow.y);
+    flow.advance(LINE_HEIGHT);
+  }
+}
+
 function coverSection(document: ChantierExportDocument): Section {
   const { project } = document;
   return {
     title: "Couverture",
-    render(pdf, y) {
+    render(flow) {
+      const pdf = flow.pdf;
       pdf.setTextColor(...ink);
       pdf.setFont("helvetica", "bold");
       pdf.setFontSize(18);
-      pdf.text(safe(project.name), 10, y);
-      let cursor = y + 10;
+      const titleLines = pdf.splitTextToSize(safe(project.name), flow.contentWidth) as string[];
+      for (const line of titleLines) {
+        flow.ensure(9);
+        pdf.text(line, flow.left, flow.y);
+        flow.advance(9);
+      }
+      flow.advance(4);
+
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(9);
       pdf.setTextColor(...grey);
       const ouvrageLabel: Record<string, string> = { ceiling: "Plafond", wall: "Mur", arch: "Arche", niche: "Niche", other: "Ouvrage" };
       const lines = [
+        `Référence : ${project.id}`,
         project.ouvrageType ? `Type d'ouvrage : ${ouvrageLabel[project.ouvrageType] ?? project.ouvrageType}` : undefined,
         project.siteName ? `Chantier : ${project.siteName}` : undefined,
         project.roomWidthMm && project.roomHeightMm ? `Dimensions pièce : ${numberFormat.format(project.roomWidthMm)} × ${numberFormat.format(project.roomHeightMm)} mm` : undefined,
+        `Unité du projet : ${project.units}`,
         `Document généré le ${formatDate(project.generatedAt)}`,
         project.measurementOrigin ? `Origine de mesure : ${describeOrigin(project.measurementOrigin)}` : undefined,
         project.author ? `Auteur : ${project.author}` : undefined,
         project.companyName ? `Entreprise : ${project.companyName}` : undefined,
       ].filter((value): value is string => Boolean(value));
-      for (const line of lines) { pdf.text(safe(line), 10, cursor); cursor += 6; }
+      for (const line of lines) flowText(flow, line, { lineHeight: 6 });
+
+      if (document.referenceImage) {
+        flowText(
+          flow,
+          `Image de référence : ${document.referenceImage.name} — ${document.referenceImage.calibrated ? "calibrée" : "NON calibrée : les dimensions qui en dérivent ne sont pas certifiées"}.`,
+          { lineHeight: 5.2 },
+        );
+      }
+
       const quality = nomenclatureQualityStatus(document.nomenclature);
       if (quality) {
-        cursor += 2;
+        flow.advance(2);
         pdf.setFont("helvetica", "italic");
-        pdf.text(safe(quality === "estimate" ? "Statut des quantités : contient des valeurs estimées (voir nomenclature)." : "Statut des quantités : valeurs exactes."), 10, cursor);
-        cursor += 6;
+        flowText(flow, quality === "estimate" ? "Statut des quantités : contient des valeurs estimées (voir nomenclature)." : "Statut des quantités : valeurs exactes.", { lineHeight: 6 });
         pdf.setFont("helvetica", "normal");
       }
+
       if (document.witness) {
-        cursor += 2;
-        pdf.text(safe(`Cote témoin définie : ${document.witness.lengthMm} mm — imprimée à l'échelle réelle uniquement sur le gabarit mosaïque/1:1.`), 10, cursor, { maxWidth: pdf.internal.pageSize.getWidth() - 20 });
-        cursor += 8;
+        flow.advance(2);
+        flowText(flow, `Cote témoin définie : ${document.witness.lengthMm} mm — imprimée à l'échelle réelle uniquement sur le gabarit mosaïque/1:1.`, { lineHeight: 5.2 });
+        flow.advance(2);
       }
+
       if (document.notes) {
-        cursor += 2;
-        sectionTitle(pdf, "Notes", cursor);
-        cursor += 7;
+        flow.advance(4);
+        flowSectionTitle(flow, "Notes");
         pdf.setTextColor(...ink);
-        const wrapped = pdf.splitTextToSize(safe(document.notes), pdf.internal.pageSize.getWidth() - 20) as string[];
-        pdf.text(wrapped, 10, cursor);
+        pdf.setFontSize(9);
+        flowText(flow, document.notes);
       }
     },
   };
@@ -214,48 +292,72 @@ function planSection(document: ChantierExportDocument): Section | null {
   if (!document.geometry) return null;
   return {
     title: "Plan",
-    render(pdf, y) {
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      sectionTitle(pdf, "Plan", y);
-      drawSchematicPlan(pdf, document.geometry!, 10, y + 6, pageWidth - 20, pageHeight - y - 20);
+    render(flow) {
+      const pdf = flow.pdf;
+      flowSectionTitle(flow, "Plan");
+      // Le schéma occupe le reste de la page en un seul bloc : il ne se pagine pas.
+      const drawingTop = flow.y;
+      const reservedCaption = 10;
+      const scale = drawSchematicPlan(pdf, document.geometry!, flow.left, drawingTop, flow.contentWidth, flow.limit - drawingTop - reservedCaption);
+      flow.y = flow.limit - reservedCaption;
       pdf.setFont("helvetica", "italic");
       pdf.setFontSize(6.5);
       pdf.setTextColor(...grey);
-      pdf.text("Schéma d'ensemble — utiliser les valeurs numériques, ne pas mesurer directement sur ce plan.", 10, pageHeight - 14);
+      flowText(flow, scale.caption, { lineHeight: 3.6 });
+      flowText(flow, "Schéma d'ensemble — utiliser les valeurs numériques cotées, ne pas mesurer directement sur ce plan.", { lineHeight: 3.6 });
+      pdf.setFont("helvetica", "normal");
     },
   };
 }
+
+const REPORT_COLUMNS = [10, 55, 95, 135, 175];
 
 function reportSection(document: ChantierExportDocument): Section | null {
   const report = document.report;
   if (!report || !report.rows.length) return null;
   return {
     title: "Report",
-    render(pdf, y) {
-      sectionTitle(pdf, "Table de report", y);
-      let cursor = y + 8;
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(7.5);
-      pdf.setTextColor(...grey);
-      const columns = [10, 55, 95, 135, 175];
+    render(flow) {
+      const pdf = flow.pdf;
       const headers = ["Point", `X (mm, ${report.originLabel})`, `Y (mm, ${report.originLabel})`, `Distance ${report.originLabel} (mm)`, "Angle"];
-      headers.forEach((label, index) => pdf.text(label, columns[index], cursor));
-      cursor += 5;
-      pdf.setDrawColor(210);
-      pdf.line(10, cursor - 3, pdf.internal.pageSize.getWidth() - 10, cursor - 3);
-      pdf.setFont("helvetica", "normal");
-      pdf.setTextColor(...ink);
+
+      const drawHead = () => {
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(...grey);
+        headers.forEach((label, index) => pdf.text(safe(label), REPORT_COLUMNS[index], flow.y));
+        flow.advance(5);
+        pdf.setDrawColor(210);
+        pdf.line(flow.left, flow.y - 3, flow.pageWidth - flow.right, flow.y - 3);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(...ink);
+      };
+
+      flowSectionTitle(flow, "Table de report");
+      flow.advance(1);
+      drawHead();
+      // Après une rupture de page, l'en-tête du tableau est réimprimé : une page isolée
+      // reste lisible sur le chantier.
+      flow.onPageBreak = (broken) => {
+        sectionTitle(broken.pdf, "Table de report (suite)", broken.y);
+        broken.advance(8);
+        drawHead();
+      };
+
       for (const row of report.rows) {
+        flow.ensure(5);
         const cells = formatReportRow(row);
-        cells.forEach((cell, index) => pdf.text(safe(cell), columns[index], cursor));
-        cursor += 5;
-        if (cursor > pdf.internal.pageSize.getHeight() - 20) break;
+        cells.forEach((cell, index) => pdf.text(safe(cell), REPORT_COLUMNS[index], flow.y));
+        flow.advance(5);
       }
+      flow.onPageBreak = undefined;
+
+      flow.advance(3);
       pdf.setFont("helvetica", "italic");
       pdf.setFontSize(6.5);
       pdf.setTextColor(...grey);
-      pdf.text(safe(`Origine de mesure : ${report.measurementOriginLabel}.`), 10, pdf.internal.pageSize.getHeight() - 14);
+      flowText(flow, `Origine de mesure : ${report.measurementOriginLabel}. Coordonnées en millimètres depuis ${report.originLabel}.`, { lineHeight: 3.6 });
+      pdf.setFont("helvetica", "normal");
     },
   };
 }
@@ -265,24 +367,25 @@ function constructionSection(document: ChantierExportDocument): Section | null {
   if (!steps || !steps.length) return null;
   return {
     title: "Construction",
-    render(pdf, y) {
-      sectionTitle(pdf, "Étapes de construction", y);
-      let cursor = y + 8;
+    render(flow) {
+      const pdf = flow.pdf;
+      flowSectionTitle(flow, "Étapes de construction");
+      flow.onPageBreak = (broken) => {
+        sectionTitle(broken.pdf, "Étapes de construction (suite)", broken.y);
+        broken.advance(8);
+      };
       pdf.setFontSize(8);
       steps.forEach((step, index) => {
         pdf.setFont("helvetica", "bold");
         pdf.setTextColor(...ink);
-        const lines = pdf.splitTextToSize(`${index + 1}. ${safe(step.title)}`, pdf.internal.pageSize.getWidth() - 20) as string[];
-        pdf.text(lines, 10, cursor);
-        cursor += lines.length * 4.2;
+        flowText(flow, `${index + 1}. ${step.title}`, { lineHeight: 4.2 });
         pdf.setFont("helvetica", "normal");
         pdf.setTextColor(...grey);
-        const instructionLines = pdf.splitTextToSize(safe(step.instruction), pdf.internal.pageSize.getWidth() - 24) as string[];
-        pdf.text(instructionLines, 14, cursor);
-        cursor += instructionLines.length * 4.2;
-        for (const measurement of step.measurements ?? []) { pdf.text(safe(`• ${measurement}`), 14, cursor); cursor += 4; }
-        cursor += 3;
+        flowText(flow, step.instruction, { indent: 4, lineHeight: 4.2 });
+        for (const measurement of step.measurements ?? []) flowText(flow, `• ${measurement}`, { indent: 4, lineHeight: 4 });
+        flow.advance(3);
       });
+      flow.onPageBreak = undefined;
     },
   };
 }
@@ -292,56 +395,57 @@ function quantitiesSection(document: ChantierExportDocument): Section | null {
   if (!hasContent) return null;
   return {
     title: "Quantités",
-    render(pdf, y) {
-      let cursor = y;
+    render(flow) {
+      const pdf = flow.pdf;
+
       if (document.nomenclature?.length) {
-        sectionTitle(pdf, "Nomenclature", cursor);
-        cursor += 7;
+        flowSectionTitle(flow, "Nomenclature");
         pdf.setFontSize(8);
         for (const line of document.nomenclature) {
-          pdf.setTextColor(...ink);
-          pdf.text(safe(line.label), 10, cursor);
-          pdf.setTextColor(...grey);
-          pdf.text(safe(`${numberFormat.format(line.quantity)} ${line.unit}${line.quality === "estimate" ? " (estimation)" : ""}`), pdf.internal.pageSize.getWidth() - 10, cursor, { align: "right" });
-          cursor += 4.6;
+          flowLabelValue(flow, line.label, `${numberFormat.format(line.quantity)} ${line.unit}${line.quality === "estimate" ? " (estimation)" : ""}`);
         }
-        cursor += 3;
+        flow.advance(3);
       }
+
       if (document.ledSummary) {
-        sectionTitle(pdf, "LED", cursor);
-        cursor += 7;
+        flowSectionTitle(flow, "LED");
         pdf.setFontSize(8);
         pdf.setTextColor(...ink);
         const led = document.ledSummary;
-        const marginNote = led.margin.percent > 0 ? ` (+${led.margin.percent}% = ${numberFormat.format(led.margin.withMarginMm / 1000)} m)` : "";
-        pdf.text(safe(`Longueur totale : ${numberFormat.format(led.totalLengthMm / 1000)} m${marginNote} · ${led.breaks} rupture(s)`), 10, cursor);
-        cursor += 4.6;
-        pdf.text(safe(`Rouleaux ${numberFormat.format(led.roll.lengthMm / 1000)} m : ${led.roll.count} — chute ${numberFormat.format(led.roll.wasteMm / 1000)} m`), 10, cursor);
-        cursor += 8;
+        // Théorique puis avec marge (§23) : les deux valeurs restent lisibles séparément.
+        flowText(flow, `Longueur théorique : ${numberFormat.format(led.totalLengthMm / 1000)} m · ${led.breaks} rupture(s)`, { lineHeight: 4.6 });
+        if (led.margin.percent > 0) {
+          flowText(flow, `Avec marge +${led.margin.percent} % : ${numberFormat.format(led.margin.withMarginMm / 1000)} m`, { lineHeight: 4.6 });
+        }
+        flowText(flow, `Rouleaux de ${numberFormat.format(led.roll.lengthMm / 1000)} m : ${led.roll.count} — commandé ${numberFormat.format(led.roll.orderedMm / 1000)} m, chute ${numberFormat.format(led.roll.wasteMm / 1000)} m`, { lineHeight: 4.6 });
+        flow.advance(4);
       }
+
       if (document.profiles?.length) {
-        sectionTitle(pdf, "Profils", cursor);
-        cursor += 7;
+        flowSectionTitle(flow, "Profils");
         pdf.setFontSize(8);
         for (const profile of document.profiles) {
-          pdf.setTextColor(...ink);
-          pdf.text(safe(`${profile.type} : ${profile.barCount} barre(s) de ${numberFormat.format(profile.barLengthMm / 1000)} m`), 10, cursor);
-          pdf.setTextColor(...grey);
-          pdf.text(safe(`chute ${numberFormat.format(profile.offcutMm / 1000)} m`), pdf.internal.pageSize.getWidth() - 10, cursor, { align: "right" });
-          cursor += 4.6;
+          flowLabelValue(
+            flow,
+            `${profile.type} : ${profile.barCount} barre(s) de ${numberFormat.format(profile.barLengthMm / 1000)} m`,
+            `théorique ${numberFormat.format(profile.totalLengthMm / 1000)} m · chute ${numberFormat.format(profile.offcutMm / 1000)} m`,
+          );
         }
-        cursor += 3;
+        flow.advance(3);
       }
+
       if (document.lightingRows?.length) {
-        sectionTitle(pdf, "Éclairage", cursor);
-        cursor += 7;
+        flowSectionTitle(flow, "Éclairage");
+        flow.onPageBreak = (broken) => {
+          sectionTitle(broken.pdf, "Éclairage (suite)", broken.y);
+          broken.advance(8);
+        };
         pdf.setFontSize(7.5);
+        pdf.setTextColor(...ink);
         for (const row of document.lightingRows) {
-          if (cursor > pdf.internal.pageSize.getHeight() - 20) break;
-          pdf.setTextColor(...ink);
-          pdf.text(safe(`${row.ref} — ${row.kind} — X ${row.xMm} mm / Y ${row.yMm} mm${row.note ? ` — ${row.note}` : ""}`), 10, cursor);
-          cursor += 4.2;
+          flowText(flow, `${row.ref} — ${row.kind} — X ${row.xMm} mm / Y ${row.yMm} mm${row.note ? ` — ${row.note}` : ""}`, { lineHeight: 4.2 });
         }
+        flow.onPageBreak = undefined;
       }
     },
   };
@@ -356,19 +460,30 @@ function quantitiesSection(document: ChantierExportDocument): Section | null {
 export function buildChantierPdfDocument(document: ChantierExportDocument): jsPDF {
   const cover = coverSection(document);
   const sections = [planSection(document), reportSection(document), constructionSection(document), quantitiesSection(document)].filter((section): section is Section => section !== null);
-  const total = 1 + sections.length;
 
   const pdf = new jsPDF({ unit: "mm", format: "a4", compress: true });
-  header(pdf, document.project.name, 1, total);
-  cover.render(pdf, 30);
-  footer(pdf, "Document généré localement — ELSATIA Tools.");
+  const flow = new PdfFlow(pdf);
 
-  sections.forEach((section, index) => {
-    pdf.addPage(undefined, "portrait");
-    header(pdf, document.project.name, index + 2, total);
-    section.render(pdf, 26);
-    footer(pdf, "Document généré localement — ELSATIA Tools.");
-  });
+  // La couverture démarre un peu plus bas que les sections courantes.
+  flow.y = 30;
+  cover.render(flow);
+
+  for (const section of sections) {
+    // Chaque section commence sur une page neuve : un document court conserve donc
+    // exactement une page par section, tandis qu'une section longue déborde
+    // proprement sur autant de pages que nécessaire au lieu d'être tronquée.
+    flow.startPage();
+    flow.onPageBreak = undefined;
+    section.render(flow);
+    flow.onPageBreak = undefined;
+  }
+
+  // Seconde passe : le total est maintenant connu, la pagination est exacte.
+  stampPages(
+    pdf,
+    (page, total) => header(pdf, document.project.name, page, total),
+    () => footer(pdf, "Document généré localement — ELSATIA Tools."),
+  );
 
   return pdf;
 }
@@ -382,21 +497,56 @@ export function buildChantierPdf(document: ChantierExportDocument) {
 /*  Gabarit mosaïque / 1:1 (§16-§18, §12)                                     */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * §12 — Plan d'assemblage. Récapitule la grille AVANT les feuilles : dimensions globales
+ * réelles, orientation (repère « HAUT DU MOTIF »), nombre de feuilles, recouvrement, et la
+ * consigne d'impression (§7) sans laquelle le reste du gabarit n'est pas fiable.
+ */
 function drawAssemblyPage(pdf: jsPDF, mosaic: MosaicPlan, document: ChantierExportDocument) {
   header(pdf, document.project.name, 1, 1 + mosaic.sheetCount);
   sectionTitle(pdf, "Plan de mosaïque", 28);
+
   pdf.setFontSize(8.5);
   pdf.setTextColor(...grey);
-  pdf.text(
-    safe(`Format ${mosaic.format} ${mosaic.orientation === "landscape" ? "paysage" : "portrait"} · marge ${mosaic.marginMm} mm · recouvrement ${mosaic.overlapMm} mm · ${mosaic.sheetCount} feuille(s) à assembler.`),
-    10,
-    36,
-  );
   const pageWidth = pdf.internal.pageSize.getWidth();
-  const gridTop = 46;
+  const intro = [
+    `Motif complet : ${numberFormat.format(mosaic.contentWidthMm)} × ${numberFormat.format(mosaic.contentHeightMm)} mm.`,
+    `${mosaic.sheetCount} feuille(s) ${mosaic.format} ${mosaic.orientation === "landscape" ? "paysage" : "portrait"} — ${mosaic.columns} colonne(s) × ${mosaic.rows} rangée(s).`,
+    `Marge non imprimable ${mosaic.marginMm} mm · recouvrement ${mosaic.overlapMm} mm entre feuilles adjacentes.`,
+    "Échelle 1:1 — dimensions réelles.",
+  ];
+  let cursor = 36;
+  for (const line of intro) {
+    pdf.text(safe(line), 10, cursor);
+    cursor += 5;
+  }
+
+  pdf.setFont("helvetica", "bold");
+  pdf.setTextColor(...amber);
+  const instruction = pdf.splitTextToSize(safe(PRINT_INSTRUCTION), pageWidth - 20) as string[];
+  cursor += 2;
+  pdf.text(instruction, 10, cursor);
+  cursor += instruction.length * 5 + 4;
+  pdf.setFont("helvetica", "normal");
+
+  // Repère d'orientation : sans lui, une grille symétrique peut être assemblée à l'envers.
+  pdf.setTextColor(...ink);
+  pdf.setFontSize(7.5);
+  pdf.setFont("helvetica", "bold");
+  pdf.text("HAUT DU MOTIF", 10, cursor);
+  pdf.setFont("helvetica", "normal");
+  pdf.setDrawColor(...ink);
+  pdf.setLineWidth(.4);
+  const arrowX = 10 + pdf.getTextWidth("HAUT DU MOTIF") + 6;
+  pdf.line(arrowX, cursor, arrowX, cursor - 5);
+  pdf.line(arrowX, cursor - 5, arrowX - 1.6, cursor - 3);
+  pdf.line(arrowX, cursor - 5, arrowX + 1.6, cursor - 3);
+  cursor += 6;
+
+  const gridTop = cursor;
   const cellWidth = Math.min(28, (pageWidth - 20) / mosaic.columns);
-  const cellHeight = 20;
-  pdf.setFontSize(9);
+  const cellHeight = Math.min(20, (pdf.internal.pageSize.getHeight() - gridTop - 22) / Math.max(1, mosaic.rows));
+  pdf.setFontSize(cellHeight < 12 ? 6.5 : 9);
   mosaic.assembly.forEach((row, rowIndex) => {
     row.forEach((label, columnIndex) => {
       const x = 10 + columnIndex * cellWidth;
@@ -408,6 +558,13 @@ function drawAssemblyPage(pdf: jsPDF, mosaic: MosaicPlan, document: ChantierExpo
       pdf.text(label, x + (cellWidth - 2) / 2, y + (cellHeight - 2) / 2 + 1.5, { align: "center" });
     });
   });
+
+  if (document.witness) {
+    pdf.setFontSize(6.5);
+    pdf.setTextColor(...grey);
+    pdf.text(safe(document.witness.text), 10, pdf.internal.pageSize.getHeight() - 16, { maxWidth: pageWidth - 20 });
+  }
+
   footer(pdf, "Document généré localement — ELSATIA Tools.");
 }
 
@@ -464,14 +621,35 @@ function drawTilePage(pdf: jsPDF, geometry: ShapeGeometry, tile: MosaicTile, mos
   pdf.setTextColor(...amber);
   pdf.text(safe(`${witness.lengthMm} mm`), witnessX, witnessY - 1.5);
 
+  // Repères d'assemblage : quelles feuilles jouxtent celle-ci (§12).
+  const neighbour = (row: number, column: number) =>
+    row >= 0 && row < mosaic.rows && column >= 0 && column < mosaic.columns ? mosaic.assembly[row][column] : undefined;
+  const neighbours = [
+    neighbour(tile.row - 1, tile.column) ? `haut ${neighbour(tile.row - 1, tile.column)}` : undefined,
+    neighbour(tile.row, tile.column + 1) ? `droite ${neighbour(tile.row, tile.column + 1)}` : undefined,
+    neighbour(tile.row + 1, tile.column) ? `bas ${neighbour(tile.row + 1, tile.column)}` : undefined,
+    neighbour(tile.row, tile.column - 1) ? `gauche ${neighbour(tile.row, tile.column - 1)}` : undefined,
+  ].filter((value): value is string => Boolean(value));
+
+  const captionY = mosaic.sheetHeightMm - margin + 4;
   pdf.setFont("helvetica", "bold");
   pdf.setFontSize(7);
   pdf.setTextColor(...ink);
-  pdf.text(safe(`${sheetCaption(tile)} — ${tile.label}`), margin, mosaic.sheetHeightMm - margin + 5);
+  pdf.text(safe(`${sheetCaption(tile)} — ${tile.label}`), margin, captionY);
   pdf.setFont("helvetica", "normal");
   pdf.setFontSize(5.5);
   pdf.setTextColor(...grey);
-  pdf.text(safe(document.project.name), mosaic.sheetWidthMm - margin, mosaic.sheetHeightMm - margin + 5, { align: "right" });
+  pdf.text(safe(`${document.project.name} — échelle 1:1`), mosaic.sheetWidthMm - margin, captionY, { align: "right" });
+
+  // La consigne imprimante est répétée sur CHAQUE feuille : une feuille réimprimée seule
+  // doit porter la même contrainte que le reste du gabarit (§7).
+  pdf.setFontSize(5);
+  pdf.setTextColor(...amber);
+  pdf.text(safe(PRINT_INSTRUCTION), margin, captionY + 3.4);
+  if (neighbours.length) {
+    pdf.setTextColor(...grey);
+    pdf.text(safe(`Voisines : ${neighbours.join(" · ")}`), mosaic.sheetWidthMm - margin, captionY + 3.4, { align: "right" });
+  }
 }
 
 /**
@@ -485,6 +663,13 @@ export function buildChantierMosaicPdfDocument(document: ChantierExportDocument)
   if (!geometry) throw new Error("Géométrie requise pour un export mosaïque/1:1.");
   const mosaic = document.mosaic;
   if (!mosaic) throw new Error("Plan de mosaïque requis (planMosaic) pour cet export.");
+
+  // §39 — plafond dur : mieux vaut refuser explicitement que produire un document
+  // ingérable (et bloquer l'appareil) pour un motif démesuré sur un petit format.
+  const safety = assessMosaicSafety(mosaic);
+  if (safety.level === "blocked") {
+    throw new Error(safety.message ?? `Le gabarit dépasse le plafond de ${MAX_MOSAIC_SHEETS} feuilles.`);
+  }
 
   const needsAssembly = mosaic.sheetCount > 1;
   const pdf = new jsPDF({ unit: "mm", format: needsAssembly ? "a4" : [mosaic.sheetWidthMm, mosaic.sheetHeightMm], compress: true });
