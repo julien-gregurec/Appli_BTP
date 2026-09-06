@@ -4,14 +4,23 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { estPlateformeAdmin, statutAbonnement, prixAbonnementMensuel, offreParCle, REDUCTION_ANNUELLE, type EntrepriseAbonnement } from "@/lib/plateforme";
-import { ajouterAdminPlateformeAction, appliquerRemiseAction, creerEntreprisePlateformeAction, definirCapacitePersonnesSupplementaireAction, entrerEntreprisePlateformeAction, enregistrerReglementPlateformeAction, genererSnapshotFacturationAction, modifierAbonnementAction, modifierTarifPostePlateformeAction, reinitialiserMotDePassePlateformeAction, retirerAdminPlateformeAction, retirerRemiseAction, signalerImpayePlateformeAction } from "@/app/actions/plateforme";
+import { activerAdminPlateformeAction, ajouterAdminPlateformeAction, appliquerRemiseAction, creerEntreprisePlateformeAction, definirCapacitePersonnesSupplementaireAction, detacherAdminPlateformeAction, entrerEntreprisePlateformeAction, enregistrerReglementPlateformeAction, genererSnapshotFacturationAction, modifierAbonnementAction, modifierTarifPostePlateformeAction, rattacherAdminPlateformeAction, reinitialiserMotDePassePlateformeAction, retirerAdminPlateformeAction, retirerRemiseAction, signalerImpayePlateformeAction } from "@/app/actions/plateforme";
 import { AbonnementCountdown } from "@/components/AbonnementCountdown";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { RemiseConfirmButton } from "@/components/RemiseConfirmButton";
 import { BRAND_NAME } from "@/lib/brand";
 
-type MembrePlateforme = { email: string; role: string; nom: string | null; ajoute_par: string | null; created_at: string };
+type MembrePlateforme = { email: string; role: string; nom: string | null; ajoute_par: string | null; actif: boolean | null; statut_identite: string | null; created_at: string };
 const ROLE_LABEL: Record<string, string> = { total: "Accès total", support: "Support", facturation: "Facturation", lecture: "Lecture seule" };
+
+// Les quatre états du cycle d'identité administrateur (migration 20260826000237).
+// Seul « active » confère des droits : les trois autres sont volontairement inertes.
+const ETATS_IDENTITE: Record<string, { libelle: string; classe: string }> = {
+  en_attente: { libelle: "Déclarée, sans compte", classe: "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300" },
+  rattachee_non_confirmee: { libelle: "Rattachée, à activer", classe: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200" },
+  active: { libelle: "Active", classe: "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200" },
+  revoquee: { libelle: "Révoquée", classe: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-200" },
+};
 
 const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -61,12 +70,24 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
   }
 
   let membresPlateforme: MembrePlateforme[] = [];
-  if (isEmailLoginDisabled()) {
-    const { data } = await supabase.from("plateforme_admins").select("email, role, nom, ajoute_par, created_at").order("created_at");
+  // Le cycle d'identité (rattacher / activer / détacher) est réservé au rôle `total` en
+  // session AAL2. `plateforme_ecriture_autorisee` applique exactement ce prédicat côté base ;
+  // l'écran ne fait que le refléter pour expliquer une commande absente. Si le prédicat
+  // n'est pas interrogeable, on laisse les commandes visibles plutôt que de rendre la
+  // plateforme inadministrable : chaque RPC refuse de toute façon l'appel qui l'atteindrait
+  // hors rôle `total` et AAL2. La base reste la seule autorité.
+  let peutGererIdentites = false;
+  const modeDemonstration = isEmailLoginDisabled();
+  if (modeDemonstration) {
+    const { data } = await supabase.from("plateforme_admins").select("email, role, nom, ajoute_par, actif, statut_identite, created_at").order("created_at");
     membresPlateforme = (data ?? []) as MembrePlateforme[];
   } else {
-    const { data } = await supabase.rpc("plateforme_lister_admins");
+    const [{ data }, { data: autorise, error: erreurAutorisation }] = await Promise.all([
+      supabase.rpc("plateforme_lister_admins"),
+      supabase.rpc("plateforme_ecriture_autorisee", { p_roles: ["total"] }),
+    ]);
     membresPlateforme = (data ?? []) as MembrePlateforme[];
+    peutGererIdentites = erreurAutorisation ? true : autorise === true;
   }
 
   const parStatut = (cle: string) => entreprises.filter((e) => e.abonnement_statut === cle).length;
@@ -124,21 +145,103 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
 
         <section className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
           <h2 className="font-semibold">Équipe plateforme</h2>
-          <p className="text-xs text-neutral-500">Les collaborateurs {BRAND_NAME} qui peuvent assister toutes les entreprises. Accès total pour l&apos;instant ; les niveaux d&apos;accès seront affinés ensuite.</p>
+          <p className="text-xs text-neutral-500">
+            Les collaborateurs {BRAND_NAME} qui peuvent assister toutes les entreprises. Une identité ne
+            devient opérationnelle qu&apos;au terme du cycle <strong>déclarer → rattacher → activer</strong>.
+            Chaque étape exige le rôle « Accès total » et une session en authentification forte (AAL2) ;
+            l&apos;auto-rattachement et l&apos;auto-activation sont refusés par la base.
+          </p>
+          {modeDemonstration ? (
+            <p className="mt-3 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+              Mode démonstration : la gestion des administrateurs plateforme est fermée. Le cycle
+              d&apos;identité exige des comptes authentifiés réels.
+            </p>
+          ) : !peutGererIdentites && (
+            <p className="mt-3 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+              Cycle d&apos;identité indisponible depuis cette session : il demande le rôle « Accès total »
+              et une authentification forte (AAL2). Réauthentifiez-vous avec votre second facteur, puis
+              rechargez cette page.
+            </p>
+          )}
           <ul className="mt-3 space-y-2">
-            {membresPlateforme.map((m) => (
-              <li key={m.email} className="flex flex-wrap items-center justify-between gap-2 rounded border border-neutral-100 p-2 text-sm dark:border-neutral-800">
-                <div>
-                  <strong>{m.nom || m.email}</strong>
-                  {m.nom && <span className="ml-2 text-neutral-500">{m.email}</span>}
-                  <span className="ml-2 rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">{ROLE_LABEL[m.role] ?? m.role}</span>
-                </div>
-                <form action={retirerAdminPlateformeAction}>
-                  <input type="hidden" name="email" value={m.email} />
-                  <button className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50">Retirer</button>
-                </form>
-              </li>
-            ))}
+            {membresPlateforme.map((m) => {
+              const etat = ETATS_IDENTITE[m.statut_identite ?? ""] ?? { libelle: m.statut_identite ?? "état inconnu", classe: "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300" };
+              const aRattacher = m.statut_identite === "en_attente" || m.statut_identite === "revoquee";
+              return (
+                <li key={m.email} className="rounded border border-neutral-100 p-2 text-sm dark:border-neutral-800">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <strong>{m.nom || m.email}</strong>
+                      {m.nom && <span className="ml-2 text-neutral-500">{m.email}</span>}
+                      <span className="ml-2 rounded bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">{ROLE_LABEL[m.role] ?? m.role}</span>
+                      <span className={`ml-2 rounded px-2 py-0.5 text-xs ${etat.classe}`}>{etat.libelle}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {m.statut_identite === "rattachee_non_confirmee" && peutGererIdentites && (
+                        <form action={activerAdminPlateformeAction}>
+                          <input type="hidden" name="email" value={m.email} />
+                          <ConfirmSubmitButton
+                            className="rounded border border-green-300 px-2 py-1 text-xs font-semibold text-green-800 hover:bg-green-50"
+                            message={`Activer ${m.email} comme administrateur plateforme « ${ROLE_LABEL[m.role] ?? m.role} » ? Cette personne obtiendra immédiatement les droits du rôle sur toutes les entreprises. L'activation est tracée avec votre identifiant.`}
+                          >
+                            Activer
+                          </ConfirmSubmitButton>
+                        </form>
+                      )}
+                      {m.statut_identite === "revoquee" && peutGererIdentites && (
+                        <form action={detacherAdminPlateformeAction}>
+                          <input type="hidden" name="email" value={m.email} />
+                          <ConfirmSubmitButton
+                            className="rounded border border-neutral-300 px-2 py-1 text-xs text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300"
+                            message={`Détacher le compte de connexion de ${m.email} ? L'identité reste révoquée et conservée pour l'audit ; le détachement est refusé si une session support est encore ouverte.`}
+                          >
+                            Détacher le compte
+                          </ConfirmSubmitButton>
+                        </form>
+                      )}
+                      {m.statut_identite !== "revoquee" && (
+                        <form action={retirerAdminPlateformeAction}>
+                          <input type="hidden" name="email" value={m.email} />
+                          <ConfirmSubmitButton
+                            className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                            message={`Révoquer ${m.email} ? Ses droits plateforme sont retirés et ses sessions support ouvertes sont fermées immédiatement. La base refuse de révoquer le dernier administrateur « Accès total » actif.`}
+                          >
+                            Retirer
+                          </ConfirmSubmitButton>
+                        </form>
+                      )}
+                    </div>
+                  </div>
+                  {aRattacher && peutGererIdentites && (
+                    <form action={rattacherAdminPlateformeAction} className="mt-2 grid gap-2 border-t border-neutral-100 pt-2 dark:border-neutral-800 sm:grid-cols-[2fr_auto]">
+                      <input type="hidden" name="email" value={m.email} />
+                      <label className="text-xs text-neutral-500">
+                        Identifiant du compte Supabase (Authentication → Users → UID)
+                        <input
+                          name="utilisateur_id"
+                          required
+                          autoComplete="off"
+                          spellCheck={false}
+                          placeholder="00000000-0000-0000-0000-000000000000"
+                          pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+                          className={`${input} mt-1 block w-full font-mono`}
+                        />
+                      </label>
+                      <ConfirmSubmitButton
+                        className="self-end rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white"
+                        message={`Rattacher ${m.email} à cet identifiant de compte ? Aucun droit n'est accordé à cette étape : l'identité passera en « rattachée, non confirmée » et devra encore être activée.`}
+                      >
+                        Rattacher
+                      </ConfirmSubmitButton>
+                      <p className="text-xs text-neutral-500 sm:col-span-2">
+                        La base vérifie que ce compte existe, porte exactement cette adresse et l&apos;a
+                        confirmée. L&apos;activation exigera en plus un facteur MFA vérifié sur ce compte.
+                      </p>
+                    </form>
+                  )}
+                </li>
+              );
+            })}
             {membresPlateforme.length === 0 && <li className="text-sm text-neutral-500">Aucun membre listé.</li>}
           </ul>
           <form action={ajouterAdminPlateformeAction} className="mt-3 grid gap-2 border-t border-neutral-100 pt-3 dark:border-neutral-800 sm:grid-cols-[1.5fr_1fr_1fr_auto]">
@@ -150,9 +253,14 @@ export default async function PlateformePage({ searchParams }: { searchParams: P
               <option value="facturation">Facturation</option>
               <option value="lecture">Lecture seule</option>
             </select>
-            <button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Ajouter</button>
+            <button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Déclarer</button>
           </form>
-          <p className="mt-2 text-xs text-neutral-500">Après ajout : créez le compte de connexion dans Supabase (Authentication → Add user) avec le même email, puis communiquez le mot de passe au collaborateur.</p>
+          <p className="mt-2 text-xs text-neutral-500">
+            Après la déclaration : créez le compte de connexion dans Supabase (Authentication → Add user)
+            avec le même email, faites confirmer l&apos;adresse et enrôler un facteur MFA, puis revenez ici
+            pour rattacher son identifiant et activer l&apos;identité. Aucune intervention SQL n&apos;est
+            nécessaire. Ne recopiez jamais un mot de passe ni un jeton dans cet écran.
+          </p>
         </section>
 
         <div className="space-y-3">
