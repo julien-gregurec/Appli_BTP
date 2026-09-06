@@ -13,8 +13,17 @@ import { buildGridModel } from "@/lib/viewport/grid";
 import { worldToScreen, type ViewportSize, type ViewportState } from "@/lib/viewport/viewport-math";
 import styles from "./viewport.module.css";
 
-export function GridOverlay({ view, size }: { view: ViewportState; size: ViewportSize }) {
-  const grid = useMemo(() => buildGridModel(view, size), [view, size]);
+export function GridOverlay({
+  view,
+  size,
+  stepMm = null,
+}: {
+  view: ViewportState;
+  size: ViewportSize;
+  /** Pas imposé par l'utilisateur (§16) ; `null` laisse le pas suivre le zoom. */
+  stepMm?: number | null;
+}) {
+  const grid = useMemo(() => buildGridModel(view, size, undefined, stepMm), [view, size, stepMm]);
   const origin = useMemo(() => worldToScreen({ x: 0, y: 0 }, view, size), [view, size]);
   if (!grid) return null;
 

@@ -23,7 +23,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { hitTest } from "@/lib/geometry/hit-test";
 import { snap } from "@/lib/geometry/snap";
-import { chooseGridStep } from "@/lib/viewport/grid";
+import { resolveGridStep } from "@/lib/viewport/grid";
 import { screenToWorld, type ScreenPoint } from "@/lib/viewport/viewport-math";
 import { selectionTolerancePx, snapTolerancePx, toleranceWorldFor, type PointerPrecision } from "@/lib/viewport/pointer-targeting";
 import { usePlanViewport } from "./use-plan-viewport";
@@ -47,6 +47,22 @@ export type AtelierViewportWorkspaceProps = {
    * paramètre ; avec elle, le zoom et le pan ne sont perdus qu'au changement de modèle.
    */
   viewKey?: string;
+  /**
+   * TRACING-WORKSHOP-UI-V1 §12/§16 — barre d'outils CONTRÔLÉE.
+   *
+   * Fournir `toolbarState` + `onToolbarStateChange` transfère l'état au parent : l'Atelier
+   * peut alors partager un même interrupteur de grille entre sa barre et son panneau Grille,
+   * au lieu d'avoir deux vérités qui se contredisent à l'écran. Sans ces props, la barre
+   * reste autonome, exactement comme avant ce lot.
+   */
+  toolbarState?: ToolbarState;
+  onToolbarStateChange?: (next: ToolbarState) => void;
+  /** Pas de grille imposé (§16) ; `null` laisse le pas suivre le zoom. */
+  gridStepMm?: number | null;
+  /** Cotations du modèle (§15). */
+  showDimensions?: boolean;
+  /** Étiquettes des points et des cotes. */
+  showLabels?: boolean;
 };
 
 export function AtelierViewportWorkspace({
@@ -55,8 +71,24 @@ export function AtelierViewportWorkspace({
   onSelectEntity,
   initialToolbarState = DEFAULT_TOOLBAR_STATE,
   viewKey,
+  toolbarState,
+  onToolbarStateChange,
+  gridStepMm = null,
+  showDimensions = false,
+  showLabels = true,
 }: AtelierViewportWorkspaceProps) {
-  const [toolbar, setToolbar] = useState<ToolbarState>(initialToolbarState);
+  const [internalToolbar, setInternalToolbar] = useState<ToolbarState>(initialToolbarState);
+  const toolbar = toolbarState ?? internalToolbar;
+
+  // Un seul point de mutation pour les deux régimes : les gestionnaires ci-dessous ignorent
+  // complètement de savoir qui détient l'état.
+  const setToolbar = useCallback(
+    (update: (current: ToolbarState) => ToolbarState) => {
+      if (toolbarState && onToolbarStateChange) onToolbarStateChange(update(toolbarState));
+      else setInternalToolbar(update);
+    },
+    [toolbarState, onToolbarStateChange],
+  );
   const [hoveredEntityId, setHoveredEntityId] = useState<string | null>(null);
   const [snapPoint, setSnapPoint] = useState<{ x: number; y: number } | null>(null);
   const controller = usePlanViewport({ bounds: scene.bounds, viewKey });
@@ -78,9 +110,12 @@ export function AtelierViewportWorkspace({
   /** Point monde d'un point écran local, à la vue courante. */
   const worldOf = useCallback((local: ScreenPoint) => screenToWorld(local, view, size), [view, size]);
 
-  const onSelectTool = useCallback((tool: AtelierTool) => {
-    setToolbar((current) => selectTool(current, tool));
-  }, []);
+  const onSelectTool = useCallback(
+    (tool: AtelierTool) => {
+      setToolbar((current) => selectTool(current, tool));
+    },
+    [setToolbar],
+  );
 
   const onAction = useCallback(
     (action: ToolbarActionId) => {
@@ -88,19 +123,19 @@ export function AtelierViewportWorkspace({
       else if (action === "properties") setToolbar(toggleProperties);
       else controller.recenter();
     },
-    [controller],
+    [controller, setToolbar],
   );
 
   const closeProperties = useCallback(() => {
     setToolbar((current) => (current.propertiesOpen ? toggleProperties(current) : current));
-  }, []);
+  }, [setToolbar]);
 
   const pickEntity = useCallback(
     (entityId: string) => {
       onSelectEntity(entityId);
       setToolbar((current) => (current.propertiesOpen ? current : toggleProperties(current)));
     },
-    [onSelectEntity],
+    [onSelectEntity, setToolbar],
   );
 
   /**
@@ -134,11 +169,11 @@ export function AtelierViewportWorkspace({
       setHoveredEntityId(found?.entityId ?? null);
       const candidate = snap(scene, world, {
         toleranceWorld: toleranceWorldFor(snapTolerancePx(precision), view),
-        gridStepMm: chooseGridStep(view.scale),
+        gridStepMm: resolveGridStep(view.scale, gridStepMm),
       });
       setSnapPoint(candidate ? candidate.position : null);
     },
-    [scene, view, worldOf],
+    [gridStepMm, scene, view, worldOf],
   );
 
   return (
@@ -154,6 +189,7 @@ export function AtelierViewportWorkspace({
         controller={controller}
         label={`Plan interactif — ${scene.name}`}
         gridVisible={toolbar.gridVisible}
+        gridStepMm={gridStepMm}
         tool={toolbar.tool}
         onCanvasClick={canSelectEntities(toolbar) ? onCanvasClick : undefined}
         onCanvasHover={canSelectEntities(toolbar) ? onCanvasHover : undefined}
@@ -172,6 +208,8 @@ export function AtelierViewportWorkspace({
             selectedEntityId={selectedEntityId}
             hoveredEntityId={feedbackVisible ? hoveredEntityId : null}
             snapPoint={feedbackVisible ? snapPoint : null}
+            showDimensions={showDimensions}
+            showLabels={showLabels}
           />
         )}
       </PlanViewport>

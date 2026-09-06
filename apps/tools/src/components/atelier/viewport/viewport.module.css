@@ -130,6 +130,39 @@
   opacity: 1;
 }
 
+/*
+  Cotations (TRACING-WORKSHOP-UI-V1 §15). Contraste volontairement plus soutenu que la
+  construction : sur chantier, une cote se lit à bout de bras, souvent en plein jour.
+*/
+.dimension line {
+  stroke: var(--navy);
+  stroke-width: 1.3;
+}
+
+.dimension circle {
+  fill: var(--navy);
+  stroke: none;
+}
+
+.dimensionWitness {
+  stroke: var(--ink-soft);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  opacity: 0.8;
+}
+
+.dimensionLabel {
+  fill: var(--navy);
+  font-size: 11.5px;
+  font-weight: 700;
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: var(--white);
+  stroke-width: 3.5;
+  stroke-linejoin: round;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Point d'accrochage proposé : croix fine, ambre, non interactive. */
 .snapMark line {
   stroke: var(--amber);
