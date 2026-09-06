@@ -6,6 +6,14 @@
  * recoit systematiquement « Autorisez l'ouverture de la vue d'impression. » alors que la
  * fenetre s'est bien ouverte. Le test verrouille le contrat : handle exploitable, ecoute du
  * `load` posee AVANT `document.close()` (qui declenche cet evenement), puis `print()`.
+ *
+ * Reconciliation ELSATIA-TOOLS-PREPILOT-CANONICAL-PRINT-RECONCILIATION-V1 : l'assertion d'ordre
+ * portait sur une position incidente de l'abonnement (avant `document.open()`). Le contrat reel
+ * est « abonnement pose avant `close()` » : c'est `close()`, et lui seul, qui declenche le `load`
+ * du document ecrit. L'implementation retenue abonne juste avant `close()`, ce qui satisfait le
+ * contrat ; l'assertion verrouille desormais l'invariant plutot que sa position historique.
+ * La couverture etendue (repli `readyState`, repli temporel, garde anti-double impression,
+ * plateforme sans `window.print`) vit dans `print.test.ts`.
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { createToolProject } from "../projects/model";
@@ -30,9 +38,11 @@ function installFakeWindow() {
   const target = {
     opener: {} as unknown,
     document: {
+      // Le navigateur bascule `readyState` sur `complete` en refermant le document ecrit.
+      readyState: "loading",
       open: () => { calls.push("open"); },
       write: (html: string) => { written = html; calls.push("write"); },
-      close: () => { calls.push("close"); listeners.forEach((listener) => listener()); },
+      close: () => { calls.push("close"); target.document.readyState = "complete"; listeners.forEach((listener) => listener()); },
     },
     focus: () => { calls.push("focus"); },
     print: () => { calls.push("print"); },
@@ -53,8 +63,14 @@ describe("ouverture de la vue d'impression", () => {
   it("ecrit le document puis declenche l'impression", () => {
     const fake = installFakeWindow();
     printProjectDocument(projectDocument);
-    expect(fake.calls).toEqual(["listen:load", "open", "write", "close", "focus", "print"]);
+    expect(fake.calls).toEqual(["open", "write", "listen:load", "close", "focus", "print"]);
     expect(fake.getWritten()).toContain("ELSATIA");
+  });
+
+  it("pose l'ecoute du `load` avant `close()`, qui declenche cet evenement", () => {
+    const fake = installFakeWindow();
+    printProjectDocument(projectDocument);
+    expect(fake.calls.indexOf("listen:load")).toBeLessThan(fake.calls.indexOf("close"));
   });
 
   it("coupe `opener` : la fenetre ecrite ne garde pas de lien vers l'application", () => {
