@@ -9,12 +9,26 @@
  * `free-geometry` (contrat), `free-shape` (projection scène/export), `free-history`
  * (annulation par opérations) et `free-handles` (poignées de classe C). Voir
  * docs/ATELIER_FREE_DRAWING_V1.md.
+ *
+ * Import photo, calibration, redressement, vectorisation assistée et conversion du résultat
+ * confirmé en tracé libre : `image-import`, `perspective`, `edge-detection`, `fitting`,
+ * `symmetry`, `reliability`, `asset-store`, `free-conversion` et l'API `api`. Voir
+ * docs/image-vectorization-v1.md.
  */
 
 export * from "./geometry-port";
 export * from "./measurement-origin";
 export * from "./reference-image";
+export * from "./image-import";
+export * from "./perspective";
+export * from "./edge-detection";
+export * from "./fitting";
+export * from "./symmetry";
 export * from "./vectorization";
+export * from "./reliability";
+export * from "./history";
+export * from "./asset-store";
+export * from "./api";
 export * from "./project";
 export * from "./migration";
 export * from "./repository";
