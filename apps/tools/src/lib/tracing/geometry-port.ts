@@ -13,6 +13,8 @@
  *                  rotationAround, mirrorHorizontal, mirrorVertical, scaleAround,
  *                  translation, IDENTITY_TRANSFORM
  *   - angles     : degToRad, radToDeg, normalizeAngle
+ *   - cercles    : circleFromThreePoints, arcThroughChordAndSagitta, pointsOnCircle, divideCircle
+ *   - simplif.   : simplifyPolylineDouglasPeucker, simplifyToConstructionElements (segments + arcs)
  *   - garde      : assertFinite, assertFinitePositive, DEFAULT_EPSILON, isFinitePoint
  *
  * Fonctions absentes du moteur au moment de l'écriture et donc fournies localement
@@ -25,10 +27,16 @@ export type {
   Point2D,
   Vector2D,
   Segment2D,
+  Line2D,
+  Circle2D,
+  Arc2D,
+  Ellipse2D,
   Polyline2D,
   BoundingBox2D,
   Transform2D,
   Dimensions2D,
+  Angle,
+  GeometryQuality,
 } from "../geometry/engine/types";
 
 export {
@@ -47,7 +55,30 @@ export {
   boundsCentre,
   mergeBounds,
   polarAngle,
+  pointAtPolar,
+  angleAtVertex,
+  angleBetweenVectors,
+  cross,
+  dot,
+  vectorBetween,
+  vectorLength,
+  normalizeVector,
+  projectOntoLine,
+  projectOntoSegment,
+  perpendicularBisector,
+  arcLength,
+  angularSweepOf,
 } from "../geometry/engine/measure";
+
+export { circleFromThreePoints, arcThroughChordAndSagitta, pointsOnCircle, divideCircle } from "../geometry/engine/circle-tools";
+
+export {
+  simplifyPolylineDouglasPeucker,
+  simplifyToConstructionElements,
+  type ConstructionElement,
+  type SimplificationMode,
+  type SimplificationResult,
+} from "../geometry/engine/simplify";
 
 export {
   IDENTITY_TRANSFORM,
@@ -58,7 +89,9 @@ export {
   rotationAround,
   mirrorHorizontal,
   mirrorVertical,
+  mirrorAxis,
   scaleAround,
+  scaleXY,
   translation,
 } from "../geometry/engine/transform";
 
