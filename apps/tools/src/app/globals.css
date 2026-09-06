@@ -697,6 +697,11 @@ body[data-elsatia-update-banner] .offline-flag { top: calc(env(safe-area-inset-t
 .atelier-export-action-button.is-secondary { background: var(--white); color: var(--navy); border: 2px solid var(--navy); }
 .atelier-export-action-button:disabled { opacity: .5; cursor: not-allowed; }
 .atelier-export-feedback { flex-basis: 100%; margin: 4px 0 0; font-size: 13px; color: var(--ink-soft); }
+/* Approximations du format (ellipse -> polyligne DXF...) : meme traitement visuel que les
+   avertissements pre-export, pour qu'une sortie approchee ne se lise jamais comme exacte. */
+.atelier-export-approximations { flex-basis: 100%; margin: 8px 0 0; padding: 10px 14px; border-radius: 10px; background: var(--amber-soft); color: #7a4b00; font-size: 13px; }
+.atelier-export-approximations p { margin: 0 0 4px; font-weight: 800; }
+.atelier-export-approximations ul { margin: 0; padding-left: 18px; }
 
 @media (max-width: 480px) {
   .atelier-export-format-picker { grid-template-columns: 1fr; }
