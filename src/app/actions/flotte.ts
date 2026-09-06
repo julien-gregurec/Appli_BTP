@@ -25,7 +25,7 @@ export async function creerVehiculeAction(formData: FormData) {
     prochain_entretien_km: Number(champ(formData, "prochain_entretien_km")) || null,
     notes: champ(formData, "notes") || null,
   }).select("id").single();
-  if (error || !data) redirect(`/flotte/nouveau?error=${encodeURIComponent(error?.message ?? "Erreur")}`);
+  if (error || !data) redirect(`/flotte/nouveau?error=${encodeURIComponent(messageErreurUtilisateur("creerVehiculeAction", error, "Impossible de créer le véhicule."))}`);
   revalidatePath("/flotte"); redirect(`/flotte/${data.id}`);
 }
 

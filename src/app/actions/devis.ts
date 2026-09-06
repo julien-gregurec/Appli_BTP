@@ -280,8 +280,8 @@ export async function genererDevisIAAction(description: string) {
     journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "devis", statut: "succes" });
     return { lignes };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Erreur lors de la génération IA du devis.";
-    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "devis", statut: "erreur", messageErreur: message });
-    return { error: message };
+    const messageBrut = err instanceof Error ? err.message : "Erreur lors de la génération IA du devis.";
+    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "devis", statut: "erreur", messageErreur: messageBrut });
+    return { error: messageErreurUtilisateur("genererDevisIAAction", err, "La génération assistée du devis n’est pas disponible pour le moment.") };
   }
 }

@@ -47,7 +47,7 @@ export async function creerPrestationDepuisLigneAction(ligne: LigneDevis) {
 
   if (error || !data) {
     const doublon = error?.code === "23505";
-    return { error: doublon ? "Une prestation porte déjà ce nom." : (error?.message ?? "Impossible d’enregistrer la prestation.") };
+    return { error: doublon ? "Une prestation porte déjà ce nom." : messageErreurUtilisateur("creerPrestationDepuisLigneAction", error, "Impossible d’enregistrer la prestation.") };
   }
 
   return { prestation: data as PrestationCatalogue };

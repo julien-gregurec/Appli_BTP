@@ -123,8 +123,8 @@ export async function analyserDocumentIAAction(documentId: string) {
     journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "documents", statut: "succes" });
     return { analyse };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Erreur lors de l'analyse IA.";
-    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "documents", statut: "erreur", messageErreur: message });
-    return { error: message };
+    const messageBrut = err instanceof Error ? err.message : "Erreur lors de l'analyse IA.";
+    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "documents", statut: "erreur", messageErreur: messageBrut });
+    return { error: messageErreurUtilisateur("analyserDocumentIAAction", err, "L’analyse assistée du document n’est pas disponible pour le moment.") };
   }
 }
