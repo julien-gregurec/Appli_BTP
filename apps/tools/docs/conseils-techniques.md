@@ -1,8 +1,12 @@
-# Conseils & Techniques — fondation data-driven (V1)
+# Conseils & Techniques — bibliothèque data-driven
 
 Bibliothèque de méthodes professionnelles de chantier, embarquée dans le bundle Tools.
-Ce lot pose **la fondation** : modèle de données, registre versionné, recherche locale,
-filtres, favoris/récents, preview interne mobile et 3 fiches de démonstration originales.
+
+- **V1 (fondation)** : modèle de données, registre versionné, recherche locale, filtres,
+  favoris/récents, preview interne mobile, 3 fiches de démonstration.
+- **V1.1 (extension de contenu)** : 30 fiches, 18 catégories, durée estimée et outillage sur
+  chaque fiche, `relatedTraceIds` contraints aux 13 modèles réels, synonymes métier dans la
+  recherche.
 
 ## Principes
 
@@ -27,7 +31,9 @@ src/lib/conseils/
   validate.ts     validation d'une fiche + intégrité du registre (slug/id uniques)
   storage.ts      favoris & récents — primitives Tools, namespace `elsatia.tools.conseils.*`
   registry.ts     registre versionné : agrégation, tri, lookup, recherche+filtres combinés
-  content/        fiches versionnées (3 fiches de démo)
+  synonyms.ts     table statique de synonymes métier (placo/plaque, vitre/vitrage…)
+  trace-models.ts vocabulaire des 13 modèles autorisés dans `relatedTraceIds`
+  content/        fiches versionnées (30 fiches, un fichier par slug)
   *.test.ts       registre, recherche, filtres, favoris, récents, validation
 src/app/conseils-preview/page.tsx     route interne non cataloguée (noindex)
 src/components/ConseilsPreviewWorkspace.tsx   UI mobile (liste, fiche, accordéons)
@@ -36,24 +42,57 @@ src/components/ConseilsPreviewWorkspace.tsx   UI mobile (liste, fiche, accordéo
 ## Modèle de fiche
 
 `ConseilFiche` (voir `types.ts`) : `id`, `slug`, `title`, `shortDescription`, `category`,
-`subcategory?`, `trades[]`, `tags[]`, `difficulty`, `materials[]`, `preparation[]`,
-`steps[]` (`{ title, text, hint? }`), `tips[]`, `commonErrors[]`, `finalCheck[]`,
-`warnings[]`, `relatedToolIds[]`, `relatedTraceIds[]`, `media[]`
-(`{ type: image|diagram|animation|video, src, alt, caption?, source? }`),
+`subcategory?`, `trades[]`, `tags[]`, `difficulty`, `estimatedMinutes`, `tools[]`,
+`materials[]`, `preparation[]`, `steps[]` (`{ title, text, hint? }`), `tips[]`,
+`commonErrors[]`, `finalCheck[]`, `warnings[]`, `relatedToolIds[]`, `relatedTraceIds[]`,
+`media[]` (`{ type: image|diagram|animation|video, src, alt, caption?, source? }`),
 `version`, `status`, `createdAt`, `updatedAt`.
 
-## Lien futur avec Tracés
+Conventions appliquées à tout le contenu et vérifiées par les tests :
 
-`relatedTraceIds` reste un simple tableau de chaînes. Quand le moteur sera stable, la fiche
-pourra afficher `[ VOIR LE SCHÉMA ] [ PAS À PAS ] [ MODE CHANTIER ]`. La preview réserve
-déjà l'emplacement (bloc désactivé « Tracés interactifs »). **Ne pas importer TraceViewer
-dans ce lot.**
+- `id` = `cf-` + `slug`, et le fichier du contenu porte le nom du slug ;
+- `tools` non vide (outillage), `materials` peut l'être (fournitures consommées) ;
+- `estimatedMinutes` entier ≥ 1, purement indicatif ;
+- `commonErrors` et `finalCheck` non vides : une fiche sans contrôle final n'est pas utile.
+
+### Catégories
+
+18 catégories déclarées dans `categories.ts`. L'extension V1.1 en a ajouté quatre :
+`fixation`, `etancheite`, `diagnostic`, `entretien`. Une catégorie sans fiche publiée
+n'apparaît pas dans les filtres de la preview.
+
+## Recherche
+
+Recherche locale, sans réseau et sans IA. L'index couvre titre, description, tags, catégorie,
+métiers, sous-catégorie **et l'outillage cité par la fiche**. Tous les jetons de la requête
+doivent correspondre.
+
+Le vocabulaire de chantier est irrégulier (« placo », « vitre », « huisserie ») : `synonyms.ts`
+porte une table statique de classes d'équivalence. Une correspondance par synonyme compte
+moins qu'une correspondance littérale, donc la fiche qui emploie le mot exact reste en tête.
+Ajouter un synonyme = ajouter un terme dans un groupe existant, en écriture **déjà normalisée**
+(minuscules, sans accent) — `synonyms.test.ts` le vérifie.
+
+## Lien avec les Tracés
+
+`relatedTraceIds` reste un tableau de chaînes, mais il n'accepte plus n'importe quoi : les
+seules valeurs admises sont les **13 slugs réels** du registre géométrique. Le vocabulaire est
+recopié dans `trace-models.ts` plutôt qu'importé, pour que le module Conseils n'embarque pas
+le moteur géométrique ; `trace-models.test.ts` compare la liste au catalogue réel, une
+divergence casse les tests. `validate.ts` refuse tout slug hors registre et tout doublon.
+
+Quand le moteur sera relié, la fiche pourra afficher `[ VOIR LE SCHÉMA ] [ PAS À PAS ]
+[ MODE CHANTIER ]`. La preview réserve déjà l'emplacement (bloc désactivé « Tracés
+interactifs »). **Ne pas importer TraceViewer ici.**
 
 ## Ajouter une fiche
 
-1. Créer `src/lib/conseils/content/<slug>.ts` exportant un `ConseilFiche`.
-2. L'ajouter au tableau de `src/lib/conseils/content/index.ts`.
-3. `npm test` — `validateConseilRegistry` refuse tout slug/id dupliqué ou champ manquant.
+1. Créer `src/lib/conseils/content/<slug>.ts` exportant un `ConseilFiche` dont l'`id` est
+   `cf-<slug>`.
+2. L'importer et l'ajouter au tableau de `src/lib/conseils/content/index.ts` (l'ordre du
+   tableau n'importe pas : le registre trie par titre en locale FR).
+3. `npm test` — `validateConseilRegistry` refuse tout slug/id dupliqué, tout champ manquant,
+   toute catégorie inconnue et tout `relatedTraceIds` hors registre.
 
 ## Preview
 

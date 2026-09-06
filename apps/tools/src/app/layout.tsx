@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { NativeRuntimeBridge } from "@/components/NativeRuntimeBridge";
 import { AccountProvider } from "@/components/AccountProvider";
 import { getPublicUrl, SITE } from "@/lib/site";
@@ -13,6 +14,8 @@ export const metadata: Metadata = {
   description: "Calculateurs et tracés BTP gratuits : équerrage, pentes, surfaces, répartitions, cercles et arches. Sans compte.",
   applicationName: SITE.productName,
   manifest: "/manifest.webmanifest",
+  // iOS ignore le manifeste : sans ce lien il fabrique une icone d'ecran d'accueil a partir d'une capture.
+  icons: { apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }] },
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Tools" },
   formatDetection: { telephone: false },
   openGraph: { title: SITE.productName, description: SITE.tagline, type: "website", locale: "fr_FR" },
@@ -21,5 +24,5 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { themeColor: "#f5aa22", colorScheme: "light", viewportFit: "cover" };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="fr"><body><AccountProvider>{children}</AccountProvider><NativeRuntimeBridge /><ServiceWorkerRegister /></body></html>;
+  return <html lang="fr"><body><AccountProvider>{children}</AccountProvider><NativeRuntimeBridge /><ServiceWorkerRegister /><OfflineIndicator /></body></html>;
 }

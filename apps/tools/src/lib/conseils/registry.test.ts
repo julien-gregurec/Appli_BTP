@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CONSEIL_CATEGORY_IDS } from "./types";
+import { CONSEIL_CATEGORIES } from "./categories";
+import { isConseilTraceModelId } from "./trace-models";
 import {
   CONSEIL_FICHES,
   CONSEIL_FICHES_PUBLISHED,
@@ -10,14 +12,17 @@ import {
   getConseilBySlug,
 } from "./registry";
 
+/** Cible éditoriale du lot d'extension : une base métier initiale réellement utilisable. */
+const MIN_FICHES = 25;
+
 describe("registre Conseils & Techniques", () => {
   it("expose une version de contenu sémantique", () => {
     expect(CONSEILS_CONTENT_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
   });
 
-  it("charge les 3 fiches de démonstration, toutes publiées", () => {
-    expect(CONSEIL_FICHES).toHaveLength(3);
-    expect(CONSEIL_FICHES_PUBLISHED).toHaveLength(3);
+  it("charge une bibliothèque d'au moins 25 fiches, toutes publiées", () => {
+    expect(CONSEIL_FICHES.length).toBeGreaterThanOrEqual(MIN_FICHES);
+    expect(CONSEIL_FICHES_PUBLISHED).toHaveLength(CONSEIL_FICHES.length);
     expect(CONSEIL_FICHES_PUBLISHED.every((fiche) => fiche.status === "published")).toBe(true);
   });
 
@@ -31,16 +36,61 @@ describe("registre Conseils & Techniques", () => {
     expect(new Set(CONSEIL_FICHES.map((f) => f.slug)).size).toBe(CONSEIL_FICHES.length);
   });
 
-  it("ne référence que des catégories connues", () => {
+  it("dérive l'id du slug, de façon prévisible", () => {
     for (const fiche of CONSEIL_FICHES) {
-      expect(CONSEIL_CATEGORY_IDS).toContain(fiche.category);
+      expect(fiche.id).toBe(`cf-${fiche.slug}`);
     }
   });
 
-  it("laisse relatedTraceIds vide (contrat de chaîne seulement)", () => {
+  it("ne référence que des catégories connues et déclarées", () => {
+    const declared = new Set(CONSEIL_CATEGORIES.map((category) => category.id));
+    for (const fiche of CONSEIL_FICHES) {
+      expect(CONSEIL_CATEGORY_IDS).toContain(fiche.category);
+      expect(declared.has(fiche.category)).toBe(true);
+    }
+  });
+
+  it("couvre les grands domaines métier attendus", () => {
+    const used = new Set(CONSEIL_FICHES.map((fiche) => fiche.category));
+    for (const expected of [
+      "tracage",
+      "implantation",
+      "mesures",
+      "vitrage",
+      "cloisons",
+      "menuiserie",
+      "etancheite",
+      "fixation",
+      "securite",
+      "diagnostic",
+      "finitions",
+      "entretien",
+    ] as const) {
+      expect(used.has(expected)).toBe(true);
+    }
+  });
+
+  it("ne référence que des modèles de tracés réels dans relatedTraceIds", () => {
     for (const fiche of CONSEIL_FICHES) {
       expect(Array.isArray(fiche.relatedTraceIds)).toBe(true);
-      expect(fiche.relatedTraceIds).toHaveLength(0);
+      for (const traceId of fiche.relatedTraceIds) {
+        expect(isConseilTraceModelId(traceId)).toBe(true);
+      }
+    }
+  });
+
+  it("relie effectivement les fiches de traçage à des modèles", () => {
+    const linked = CONSEIL_FICHES.filter((fiche) => fiche.relatedTraceIds.length > 0);
+    expect(linked.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("donne à chaque fiche une durée estimée et un outillage", () => {
+    for (const fiche of CONSEIL_FICHES) {
+      expect(fiche.estimatedMinutes).toBeGreaterThan(0);
+      expect(fiche.tools.length).toBeGreaterThan(0);
+      expect(fiche.finalCheck.length).toBeGreaterThan(0);
+      expect(fiche.commonErrors.length).toBeGreaterThan(0);
+      expect(fiche.tags.length).toBeGreaterThan(0);
     }
   });
 
@@ -57,11 +107,23 @@ describe("registre Conseils & Techniques", () => {
   });
 
   it("combine recherche et filtres via browseConseils", () => {
-    const all = browseConseils("", {});
-    expect(all).toHaveLength(3);
-    const angle = browseConseils("angle droit", {});
-    expect(angle[0]?.slug).toBe("verifier-un-angle-droit-au-3-4-5");
-    const facilesImplantation = browseConseils("", { category: "implantation", difficulty: "facile" });
-    expect(facilesImplantation.map((f) => f.slug)).toEqual(["trouver-le-centre-d-un-rectangle"]);
+    expect(browseConseils("", {})).toHaveLength(CONSEIL_FICHES_PUBLISHED.length);
+    expect(browseConseils("angle droit", {})[0]?.slug).toBe("verifier-un-angle-droit-au-3-4-5");
+
+    const tracage = browseConseils("", { category: "tracage" });
+    expect(tracage.length).toBeGreaterThanOrEqual(5);
+    expect(tracage.every((fiche) => fiche.category === "tracage")).toBe(true);
+
+    const vitrageAvance = browseConseils("", { category: "vitrage", difficulty: "avance" });
+    expect(vitrageAvance.map((f) => f.slug)).toEqual(["caler-un-vitrage-dans-son-chassis"]);
+  });
+
+  it("reste sérialisable tel quel (contenu embarqué, hors ligne)", () => {
+    const json = JSON.stringify(CONSEIL_FICHES);
+    const restored = JSON.parse(json) as typeof CONSEIL_FICHES;
+    expect(restored).toHaveLength(CONSEIL_FICHES.length);
+    expect(restored[0]?.slug).toBe(CONSEIL_FICHES[0]?.slug);
+    expect(json).not.toContain("http://");
+    expect(json).not.toContain("https://");
   });
 });

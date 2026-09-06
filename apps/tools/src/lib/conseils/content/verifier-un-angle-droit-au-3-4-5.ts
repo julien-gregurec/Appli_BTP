@@ -4,8 +4,8 @@ import type { ConseilFiche } from "../types";
  * Fiche de démonstration ELSATIA — contenu original.
  * Sujet générique (méthode 3-4-5), aucune référence tierce.
  */
-export const verifierAngleDroit345: ConseilFiche = {
-  id: "cf-verifier-angle-droit-3-4-5",
+export const verifierUnAngleDroitAu345: ConseilFiche = {
+  id: "cf-verifier-un-angle-droit-au-3-4-5",
   slug: "verifier-un-angle-droit-au-3-4-5",
   title: "Vérifier un angle droit au 3-4-5",
   shortDescription:
@@ -15,11 +15,13 @@ export const verifierAngleDroit345: ConseilFiche = {
   trades: ["tous", "platrier", "plaquiste", "menuisier", "chef-de-chantier"],
   tags: ["angle droit", "equerrage", "3 4 5", "pythagore", "implantation", "controle"],
   difficulty: "facile",
-  materials: [
+  estimatedMinutes: 10,
+  tools: [
     "Un mètre ruban (3 m minimum)",
     "Un crayon de chantier ou un marqueur",
-    "Éventuellement un cordeau et deux clous / pointes",
+    "Éventuellement un cordeau à tracer",
   ],
+  materials: ["Deux pointes ou deux vis de repère si le cordeau est utilisé"],
   preparation: [
     "Repérer le sommet de l'angle à contrôler (intersection des deux lignes).",
     "Nettoyer les deux lignes sur au moins 1,20 m depuis le sommet.",

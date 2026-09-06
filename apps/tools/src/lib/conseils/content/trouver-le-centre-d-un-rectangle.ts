@@ -4,8 +4,8 @@ import type { ConseilFiche } from "../types";
  * Fiche de démonstration ELSATIA — contenu original.
  * Sujet générique (centre d'un rectangle par les diagonales), aucune référence tierce.
  */
-export const trouverCentreRectangle: ConseilFiche = {
-  id: "cf-trouver-centre-rectangle",
+export const trouverLeCentreDUnRectangle: ConseilFiche = {
+  id: "cf-trouver-le-centre-d-un-rectangle",
   slug: "trouver-le-centre-d-un-rectangle",
   title: "Trouver le centre d'un rectangle",
   shortDescription:
@@ -15,11 +15,13 @@ export const trouverCentreRectangle: ConseilFiche = {
   trades: ["tous", "plaquiste", "menuisier", "agenceur"],
   tags: ["centre", "diagonales", "axe", "plafond", "spot", "implantation", "milieu"],
   difficulty: "facile",
-  materials: [
+  estimatedMinutes: 10,
+  tools: [
     "Un cordeau à tracer ou une règle longue",
     "Un mètre ruban",
     "Un crayon",
   ],
+  materials: [],
   preparation: [
     "Vérifier que la zone est bien un rectangle (côtés opposés égaux, angles droits).",
     "Dégager les quatre coins pour pouvoir y accrocher un cordeau.",

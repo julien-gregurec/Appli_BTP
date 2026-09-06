@@ -20,3 +20,16 @@ export function tokenize(query: string): string[] {
   const normalized = normalizeText(query);
   return normalized.length === 0 ? [] : normalized.split(" ");
 }
+
+/**
+ * Met en forme une durée indicative de fiche (minutes) : « 25 min », « 1 h », « 1 h 30 ».
+ * Purement présentationnelle — aucune promesse de délai.
+ */
+export function formatEstimatedDuration(minutes: number): string {
+  if (!Number.isFinite(minutes) || minutes < 1) return "—";
+  const total = Math.round(minutes);
+  if (total < 60) return `${total} min`;
+  const hours = Math.floor(total / 60);
+  const rest = total % 60;
+  return rest === 0 ? `${hours} h` : `${hours} h ${String(rest).padStart(2, "0")}`;
+}

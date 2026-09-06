@@ -13,7 +13,9 @@ function baseFiche(overrides: Partial<ConseilFiche> = {}): ConseilFiche {
     trades: ["tous"],
     tags: ["test"],
     difficulty: "facile",
-    materials: ["Un mètre"],
+    estimatedMinutes: 15,
+    tools: ["Un mètre"],
+    materials: [],
     preparation: ["Préparer la zone"],
     steps: [{ title: "Étape 1", text: "Faire quelque chose de précis." }],
     tips: [],
@@ -69,6 +71,29 @@ describe("validateConseilFiche", () => {
       ],
     });
     expect(validateConseilFiche(fiche).join(" ")).toContain("interne");
+  });
+
+  it("exige une durée estimée entière et positive", () => {
+    expect(validateConseilFiche(baseFiche({ estimatedMinutes: 0 })).join(" ")).toContain(
+      "estimatedMinutes",
+    );
+    expect(validateConseilFiche(baseFiche({ estimatedMinutes: 12.5 })).join(" ")).toContain(
+      "estimatedMinutes",
+    );
+  });
+
+  it("exige au moins un outil", () => {
+    expect(validateConseilFiche(baseFiche({ tools: [] })).join(" ")).toContain("tools");
+  });
+
+  it("refuse un relatedTraceIds hors du registre des 13 modèles", () => {
+    expect(validateConseilFiche(baseFiche({ relatedTraceIds: ["circle-division"] }))).toEqual([]);
+    expect(
+      validateConseilFiche(baseFiche({ relatedTraceIds: ["cercle-divise"] })).join(" "),
+    ).toContain("modèle de tracé inconnu");
+    expect(
+      validateConseilFiche(baseFiche({ relatedTraceIds: ["star-5", "star-5"] })).join(" "),
+    ).toContain("doublon");
   });
 
   it("refuse updatedAt antérieure à createdAt", () => {
