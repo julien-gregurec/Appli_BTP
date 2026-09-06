@@ -211,10 +211,20 @@ Variables réellement consommées par `apps/colors` :
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Plan de données ; origine `connect-src`/`img-src` de la CSP |
 | `NEXT_PUBLIC_COLORS_URL` | ✅ | Origine publique ; `metadataBase` et `redirectTo` de la réinitialisation |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Client Supabase serveur |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Client Supabase serveur — **convention obsolète depuis `fix/colors-supabase-public-key-predeploy-guard-v1`**, voir la note en fin de section |
 | `NEXT_PUBLIC_ELSATIA_ACCOUNT_URL` | ✅ | Renvoi vers le portail d'abonnement |
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅ (Secret) | Opérations serveur privilégiées |
 | `ELSATIA_APPLICATION_ENV` | ✅ (Secret) | Cloisonnement d'environnement |
+
+> **Note de convention obsolète — ajoutée le 2026-09-06, relevé d'origine non modifié.**
+> Le tableau ci-dessus décrit l'état constaté au moment de l'audit. Depuis le lot
+> `fix/colors-supabase-public-key-predeploy-guard-v1`, Colors lit
+> `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` et ne lit plus `NEXT_PUBLIC_SUPABASE_ANON_KEY`, sans
+> repli : les clés JWT legacy (`anon`, `service_role`) sont désactivées au niveau du projet
+> Supabase, donc l'ancien nom ne peut plus authentifier. La ligne « ✅ » de `..._ANON_KEY` ne vaut
+> donc plus « prêt » mais « reliquat à retirer », et le projet Vercel `elsatia-colors` doit porter
+> la clé publishable avant tout déploiement — voir le §0 de
+> `docs/exploitation/COLORS_PLAN_DEPLOIEMENT_PREDEPLOY_V1.md`.
 
 **Valeur attendue de `NEXT_PUBLIC_COLORS_URL` : `https://colors.elsatia.fr`.**
 La valeur stockée est chiffrée dans le listing Vercel et n'a pas été extraite —

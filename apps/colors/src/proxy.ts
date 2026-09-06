@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { POLITIQUE_RESSOURCES_PUBLIQUES, construireCspColors } from "@/lib/security/en-tetes";
+import { clePubliqueSupabase, urlSupabase, urlSupabaseConfiguree } from "@/lib/supabase/cles";
 
 /**
  * Ressources publiques servies telles quelles. Elles reçoivent une CSP — une
@@ -34,7 +35,7 @@ export async function proxy(request: NextRequest) {
   const csp = construireCspColors({
     nonce,
     estDeveloppement: process.env.NODE_ENV === "development",
-    urlSupabase: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    urlSupabase: urlSupabaseConfiguree(),
   });
 
   // Next 16 lit le nonce sur l'en-tête `Content-Security-Policy` **de la
@@ -47,8 +48,8 @@ export async function proxy(request: NextRequest) {
 
   let response = NextResponse.next({ request: { headers: enTetesRequete } });
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    urlSupabase(),
+    clePubliqueSupabase(),
     {
       cookies: {
         getAll: () => request.cookies.getAll(),

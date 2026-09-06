@@ -33,7 +33,7 @@ describe("proxy — CSP et nonce", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://exemple.supabase.co";
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "cle-anonyme-de-test";
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_cle-de-test";
     mocks.getUser.mockResolvedValue({ data: { user: null }, error: null });
     mocks.createServerClient.mockReturnValue({ auth: { getUser: mocks.getUser } });
   });
@@ -101,6 +101,36 @@ describe("proxy — CSP et nonce", () => {
     const nonceRequete = reponse.headers.get("x-middleware-request-x-nonce");
     expect(politiqueRequete).toBe(politiqueReponse);
     expect(politiqueReponse).toContain(`'nonce-${nonceRequete}'`);
+  });
+
+  it("construit le client avec la clé publishable, jamais avec l’ancien nom", async () => {
+    // La convention `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` n’est pas cosmétique : les clés JWT
+    // legacy sont désactivées côté projet Supabase, donc une valeur portée par
+    // `NEXT_PUBLIC_SUPABASE_ANON_KEY` n’authentifierait plus rien. Ce test interdit qu’un repli
+    // sur l’ancien nom soit réintroduit sans que rien ne le signale.
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "valeur-legacy-qui-ne-doit-jamais-servir";
+    try {
+      await proxy(requete("/dashboard"));
+      const [url, cle] = mocks.createServerClient.mock.calls[0];
+      expect(url).toBe("https://exemple.supabase.co");
+      expect(cle).toBe("sb_publishable_cle-de-test");
+    } finally {
+      delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    }
+  });
+
+  it("échoue explicitement si la clé publique est absente, au lieu de démarrer sans", async () => {
+    // Sans cette exception, `createServerClient` recevrait `undefined` et lèverait un
+    // « supabaseUrl is required » du SDK, qui ne nomme pas la variable en cause.
+    const cle = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    try {
+      await expect(proxy(requete("/dashboard"))).rejects.toThrowError(
+        /NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY/,
+      );
+    } finally {
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = cle;
+    }
   });
 
   it("ne laisse fuir aucune origine externe hors Supabase", async () => {
