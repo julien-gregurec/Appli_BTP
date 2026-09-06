@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { MODULE_PERMISSION_PAR_CHEMIN, PERMISSIONS_ACCES_ALTERNATIVES, droitsGestionPour } from "@/lib/module-permissions";
-import { permissionEstPorteDEntreeModule, permissionIncluseDansOffre } from "@/lib/tarification";
+import { droitOuvertSansModule } from "@/lib/acces-socle-essai";
 import { appliquerRateLimit, politiquesRateLimitPour } from "@/lib/security/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { clePubliqueSupabase } from "@/lib/supabase/keys";
@@ -18,6 +18,23 @@ import {
 } from "@/lib/supabase/routage-proxy";
 
 const PUBLIC_PATHS = ["/login", "/signup", "/tarifs", "/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/confidentialite", "/cookies", "/auth", "/mfa", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu", "/guides", "/videos", "/paiement", "/document", "/imprimer/partage", "/api/documents/partage", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements", "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import"];
+
+type LigneAbonnementSocle = {
+  abonnement_offre?: string | null;
+  abonnement_statut?: string | null;
+  abonnement_essai_debut?: string | null;
+  abonnement_essai_fin?: string | null;
+} | null;
+
+/** Adapte la ligne `entreprises` au contrat pur de `droitOuvertSansModule`. */
+function etatAbonnementSocle(ligne: LigneAbonnementSocle) {
+  return {
+    abonnementOffre: ligne?.abonnement_offre ?? null,
+    abonnementStatut: ligne?.abonnement_statut ?? null,
+    essaiDebut: ligne?.abonnement_essai_debut ?? null,
+    essaiFin: ligne?.abonnement_essai_fin ?? null,
+  };
+}
 
 export async function updateSession(request: NextRequest) {
   // Transmet le chemin demandé aux Server Components (layout ET page appellent
@@ -162,17 +179,12 @@ export async function updateSession(request: NextRequest) {
     if (!ctx.entreprise_id || ctx.acces_support === true) return true;
     const { data: ent } = await supabase
       .from("entreprises")
-      .select("abonnement_offre")
+      .select("abonnement_offre,abonnement_statut,abonnement_essai_debut,abonnement_essai_fin")
       .eq("id", ctx.entreprise_id)
       .maybeSingle();
-    // Sans offre choisie, le plan ne peut jamais ouvrir lui-même une porte de
-    // MODULE (ELSATIA-TRIAL-MODULES-POLICY-CLOSURE-V1) : seul l'entitlement
-    // module (achat, offert, ou essai actif sur un module catalogue "actif")
-    // le peut. Les permissions administratives (paramètres, utilisateurs)
-    // restent ouvertes offre ou pas, exactement comme avant.
-    const offreCouvrePermission = (!ent?.abonnement_offre && !permissionEstPorteDEntreeModule(permission))
-      || Boolean(ent?.abonnement_offre);
-    if (offreCouvrePermission && permissionIncluseDansOffre(permission, ent?.abonnement_offre)) return true;
+    // Décision centrale : SOCLE d'essai OU règle de plan. L'entitlement module
+    // reste évalué juste après, en OU (voir droitOuvertSansModule).
+    if (droitOuvertSansModule(permission, etatAbonnementSocle(ent))) return true;
     const { data: parModule } = await supabase.rpc("acces_module_pour_permission", {
       p_entreprise_id: ctx.entreprise_id,
       p_permissions: [permission],
@@ -215,17 +227,18 @@ export async function updateSession(request: NextRequest) {
     if (droitRequis) {
       const { data: entreprise } = await supabase
         .from("entreprises")
-        .select("abonnement_offre")
+        .select("abonnement_offre,abonnement_statut,abonnement_essai_debut,abonnement_essai_fin")
         .eq("id", ctx.entreprise_id)
         .maybeSingle();
-      // Sans offre choisie, le plan ne peut jamais ouvrir lui-même une porte de
-      // MODULE (ELSATIA-TRIAL-MODULES-POLICY-CLOSURE-V1) : seul l'entitlement
-      // module (achat, offert, ou essai actif sur un module catalogue "actif")
-      // le peut. Les permissions administratives (paramètres, utilisateurs)
-      // restent ouvertes offre ou pas, exactement comme avant.
-      let droitsInclus = droitsAcces.some((droit) =>
-        ((!entreprise?.abonnement_offre && !permissionEstPorteDEntreeModule(droit)) || Boolean(entreprise?.abonnement_offre))
-        && permissionIncluseDansOffre(droit, entreprise?.abonnement_offre));
+      const etatSocle = etatAbonnementSocle(entreprise);
+      // Correctif P0-1 (ELSATIA-GP-TRIAL-SOCLE-ACCESS-AND-CAPACITY-FIX-V1) : le
+      // SOCLE — périmètre de l'offre d'entrée, cf. src/lib/acces-socle-essai.ts —
+      // n'est PAS une porte d'entrée de module. Pendant un essai valide sans
+      // offre, il s'ouvre sans `modules_entreprises`, sans SQL manuel et sans
+      // geste plateforme. Les modules réellement optionnels restent gouvernés
+      // par le catalogue, à l'identique (branche `acces_module_pour_permission`
+      // ci-dessous, toujours évaluée en OU).
+      let droitsInclus = droitsAcces.some((droit) => droitOuvertSansModule(droit, etatSocle));
       if (!droitsInclus) {
         // R3 : un module optionnel explicitement acquis par l'entreprise (achat,
         // offert, essai, geste plateforme) débloque sa permission porte-d'entrée,

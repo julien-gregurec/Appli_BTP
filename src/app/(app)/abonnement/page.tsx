@@ -13,6 +13,7 @@ import { BRAND_NAME, PRODUCT_NAME, resoudreUrlContactCommercial } from "@/lib/br
 import { calculerGainsOffreSuivante, calculerReductionRemise, CATEGORIES_COMPARATIF, etatLigneComparatif, LIBELLE_ETAT_COMMERCIAL, type EtatCommercial } from "@/lib/comparatif-offres";
 import { estCodeOffreTarifaire } from "@/lib/tarification";
 import { abonnementsPublicsOuverts } from "@/lib/commercialisation-abonnements";
+import { messageDepassementCapacite, messageLimiteAtteinte, type ContexteQuotaPersonnes } from "@/lib/quota-personnes-message";
 import { OFFRES_ABONNEMENT_COMMERCIALISEES } from "@/lib/stripe-abonnement";
 import { RACCOURCIS_CAPACITE, resoudreCibleCapacite, resumeChangementCapacite } from "@/lib/stripe-capacite-personnes";
 import { BoutonEnvoi } from "@/components/BoutonEnvoi";
@@ -133,6 +134,14 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
   const capaciteOffreEligible = (OFFRES_ABONNEMENT_COMMERCIALISEES as readonly string[]).includes(String(entreprise?.abonnement_offre ?? ""));
   const capaciteMensuel = entreprise?.abonnement_periodicite === "mensuel";
   const capaciteGerable = Boolean(cap) && souscrit && capaciteOffreEligible && capaciteMensuel;
+  // Contexte des messages de quota : n'expose que des actions réellement
+  // possibles (ELSATIA-GP-TRIAL-SOCLE-ACCESS-AND-CAPACITY-FIX-V1 §7).
+  const contexteQuota: ContexteQuotaPersonnes = {
+    abonnementOffre: entreprise?.abonnement_offre ?? null,
+    abonnementsOuverts,
+    capaciteAutogerable: souscrit && capaciteOffreEligible && capaciteMensuel,
+    urlContact: contactCommercial,
+  };
   const operationCapaciteEnCours = String(capStripe?.operation_en_cours ?? "");
   const capaciteFigee = ["pending", "stripe_applied", "db_applied", "needs_reconcile"].includes(operationCapaciteEnCours);
   const LIBELLE_OPERATION_CAPACITE: Record<string, { texte: string; classe: string }> = {
@@ -194,8 +203,8 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
         <strong className={cap.etat==="ok" ? "text-lg" : "text-lg text-red-700"}>{cap.actives} / {cap.totale}</strong>
       </div>
       {cap.sup>0&&<p className="mt-2 text-xs text-neutral-500">{cap.base} incluses dans l’offre + {cap.sup} de capacité supplémentaire.</p>}
-      {cap.etat==="limite_atteinte"&&<p className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-900">Vous avez atteint la limite de personnes actives de votre abonnement. Pour en enregistrer une de plus : archivez une personne, ajoutez de la capacité ou changez d’offre. Aucune donnée n’est supprimée.</p>}
-      {cap.etat==="over_capacity"&&<p className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-800">Votre abonnement autorise {cap.totale} personnes actives et vous en avez actuellement {cap.actives}. Aucune nouvelle personne ne peut être activée tant que ce dépassement dure : archivez {Math.max(1,cap.actives-cap.totale)} personne(s), ajoutez de la capacité ou changez d’offre. Aucune donnée n’est supprimée.</p>}
+      {cap.etat==="limite_atteinte"&&<p className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-900">{messageLimiteAtteinte(contexteQuota)}</p>}
+      {cap.etat==="over_capacity"&&<p className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-800">{messageDepassementCapacite(contexteQuota,{actives:cap.actives,totale:cap.totale})}</p>}
 
       {capaciteGerable && <div className="mt-4 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
         <div className="flex flex-wrap items-start justify-between gap-2">

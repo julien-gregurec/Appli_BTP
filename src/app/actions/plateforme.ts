@@ -75,6 +75,48 @@ export async function definirModuleEntrepriseAction(entrepriseId: string, formDa
   redirect("/plateforme?succes=1");
 }
 
+/**
+ * Capacité de personnes actives — ELSATIA-GP-TRIAL-SOCLE-ACCESS-AND-CAPACITY-FIX-V1
+ * (P0-2 / P0-4).
+ *
+ * Le plafond reste porté par le trigger `trg_capacite_personnes_actives`
+ * (migration 20260903000256) : rien n'est contourné, aucune migration ajoutée.
+ * Cette action ne fait que CÂBLER la RPC plateforme qui existe déjà au ledger 263
+ * (`plateforme_definir_capacite_personnes_supplementaire`, plateforme + AAL2,
+ * journalisée dans `historique_capacite_personnes`). Sans ce câblage, la seule
+ * façon d'accorder des places à un client pilote en essai était du SQL manuel.
+ *
+ * Le libre-service côté client reste, lui, conditionné à un abonnement Stripe
+ * actif : tant que `ABONNEMENTS_PUBLICS_OUVERTS=false`, l'augmentation de
+ * capacité pendant l'essai est un geste plateforme, jamais un faux CTA client.
+ */
+export async function definirCapacitePersonnesSupplementaireAction(entrepriseId: string, formData: FormData) {
+  if (!(await estPlateformeAdmin())) redirect("/dashboard");
+  if (isEmailLoginDisabled()) {
+    redirect(`/plateforme?error=${encodeURIComponent("La capacité sécurisée nécessite un compte plateforme authentifié")}`);
+  }
+  const capacite = Math.round(Number(String(formData.get("capacite") ?? "").replace(",", ".")));
+  const motif = String(formData.get("motif") ?? "").trim();
+  if (!Number.isFinite(capacite) || capacite < 0 || capacite > 100_000) {
+    redirect(`/plateforme?error=${encodeURIComponent("Capacité supplémentaire invalide (0 à 100000)")}`);
+  }
+  if (motif.length < 5) {
+    redirect(`/plateforme?error=${encodeURIComponent("Indiquez un motif d’au moins 5 caractères (tracé dans l’historique de capacité)")}`);
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("plateforme_definir_capacite_personnes_supplementaire", {
+    p_entreprise_id: entrepriseId,
+    p_capacite: capacite,
+    p_motif: motif,
+    p_source: "admin_plateforme",
+    p_reference_externe: null,
+  });
+  if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/plateforme");
+  revalidatePath("/abonnement");
+  redirect(`/plateforme?succes=${encodeURIComponent(`Capacité supplémentaire fixée à ${capacite} personne(s)`)}`);
+}
+
 export async function creerEntreprisePlateformeAction(formData:FormData){
   if(!(await estPlateformeAdmin()))redirect("/dashboard");
   const nom=String(formData.get("nom")??"").trim(),siret=String(formData.get("siret")??"").trim()||null,ville=String(formData.get("ville")??"").trim()||null;

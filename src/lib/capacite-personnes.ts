@@ -1,5 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { CODE_ERREUR_CAPACITE_PERSONNES, estErreurCapacitePersonnes } from "@/lib/erreurs-utilisateur";
+import { abonnementsPublicsOuverts } from "@/lib/commercialisation-abonnements";
+import { resoudreUrlContactCommercial } from "@/lib/brand";
+import { OFFRES_ABONNEMENT_COMMERCIALISEES } from "@/lib/stripe-abonnement";
+import { messageLimiteAtteinte, type ContexteQuotaPersonnes } from "@/lib/quota-personnes-message";
 
 /**
  * Plafond DUR de personnes actives (ELSATIA-ACTIVE-PERSON-CAPACITY-R1).
@@ -64,9 +68,32 @@ export async function lireCapacitePersonnes(entrepriseId: string): Promise<Capac
 
 export type ResultatVerification = { ok: true } | { ok: false; message: string };
 
-const MESSAGE_LIMITE =
-  "Votre abonnement autorise un nombre limité de personnes actives et cette limite est atteinte. " +
-  "Archivez une personne, ajoutez de la capacité ou changez d’offre.";
+/**
+ * Contexte commercial réel de l'entreprise, pour ne jamais proposer une action
+ * impossible dans un message de quota (ELSATIA-GP-TRIAL-SOCLE-ACCESS-AND-
+ * CAPACITY-FIX-V1 §7). Lecture seule, aucune écriture, aucune migration.
+ */
+export async function contexteQuotaPersonnes(entrepriseId: string): Promise<ContexteQuotaPersonnes> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("entreprises")
+    .select("abonnement_offre,abonnement_periodicite,stripe_subscription_id")
+    .eq("id", entrepriseId)
+    .maybeSingle();
+  const offre = data?.abonnement_offre ?? null;
+  return {
+    abonnementOffre: offre,
+    abonnementsOuverts: abonnementsPublicsOuverts(),
+    // Mêmes conditions que le bloc libre-service de /abonnement : sans
+    // abonnement Stripe mensuel sur une offre commercialisée, « ajouter de la
+    // capacité » n'existe pas.
+    capaciteAutogerable:
+      Boolean(data?.stripe_subscription_id)
+      && (OFFRES_ABONNEMENT_COMMERCIALISEES as readonly string[]).includes(String(offre ?? ""))
+      && data?.abonnement_periodicite === "mensuel",
+    urlContact: resoudreUrlContactCommercial(),
+  };
+}
 
 /**
  * Pré-contrôle applicatif : `p_delta` personnes actives supplémentaires
@@ -84,7 +111,9 @@ export async function verifierCapacitePersonnes(
     p_delta: delta,
   });
   if (!error) return { ok: true };
-  if (estErreurCapacitePersonnes(error)) return { ok: false, message: MESSAGE_LIMITE };
+  if (estErreurCapacitePersonnes(error)) {
+    return { ok: false, message: messageLimiteAtteinte(await contexteQuotaPersonnes(entrepriseId)) };
+  }
   console.error("verifierCapacitePersonnes", error);
   return { ok: true };
 }
