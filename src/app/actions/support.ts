@@ -5,6 +5,50 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
+import { notifierReponseSupport } from "@/lib/support-notifications";
+
+type ClientSupabase = Awaited<ReturnType<typeof createClient>>;
+
+type DestinataireReponseSupport = {
+  email: string | null;
+  prenom: string | null;
+  nom: string | null;
+  entreprise_nom: string | null;
+  demande: string | null;
+};
+
+// Notification e-mail du demandeur : purement informative, jamais bloquante.
+// La réponse support est déjà enregistrée quand on arrive ici — une panne Brevo,
+// une adresse introuvable ou une session support expirée ne doivent pas la
+// remettre en cause. Un appel = une réponse insérée = au plus un e-mail.
+async function notifierReponseSupportSansEchouer(supabase: ClientSupabase, entrepriseId: string, reponse: string) {
+  try {
+    const { data, error } = await supabase.rpc("plateforme_support_destinataire_reponse", {
+      p_entreprise_id: entrepriseId,
+    });
+    if (error) {
+      console.warn("Notification réponse support non envoyée", { categorie: "destinataire_illisible" });
+      return;
+    }
+    const cible = (Array.isArray(data) ? data[0] : data) as DestinataireReponseSupport | null | undefined;
+    if (!cible?.email) {
+      // Aucune adresse fiable rattachée au demandeur : on n'en reconstruit pas.
+      console.warn("Notification réponse support non envoyée", { categorie: "destinataire_absent" });
+      return;
+    }
+    await notifierReponseSupport({
+      destinataire: cible.email,
+      prenom: cible.prenom,
+      nom: cible.nom,
+      entrepriseId,
+      entrepriseNom: cible.entreprise_nom,
+      demande: cible.demande,
+      reponse,
+    });
+  } catch {
+    console.warn("Notification réponse support non envoyée", { categorie: "preparation_impossible" });
+  }
+}
 
 // Côté entreprise : envoyer un message au support plateforme.
 export async function envoyerMessageSupportAction(formData: FormData) {
@@ -35,6 +79,7 @@ export async function repondreSupportPlateformeAction(entrepriseId: string, form
     p_contenu: contenu,
   });
   if (error) redirect(`/plateforme/support?entreprise=${entrepriseId}&error=${encodeURIComponent(messageErreurUtilisateur("repondreSupportPlateformeAction", error, "Impossible d’envoyer la réponse."))}`);
+  await notifierReponseSupportSansEchouer(supabase, entrepriseId, contenu);
   revalidatePath("/plateforme/support");
   redirect(`/plateforme/support?entreprise=${entrepriseId}&envoye=1`);
 }
