@@ -1,5 +1,13 @@
 # ELSATIA — Checklist opérateur cutover Production
 
+> # ⚠ SUPERSEDED — NE PAS UTILISER SEUL LE JOUR J
+>
+> Ce document est **remplacé** par la source unique opératoire :
+> **`docs/runbooks/ELSATIA_GP_CUTOVER_DAY_OF_RUNBOOK_V1.md`**.
+> Il est **conservé comme historique** (lot `ELSATIA-GP-CUTOVER-DOCUMENTATION-CLOSURE-V1`,
+> 2026-09-06). En cas de divergence, **le runbook du jour J fait foi**.
+> Statut de chaque document : `docs/runbooks/INDEX_CUTOVER_GP_V1.md`.
+
 Imprimable. Une ligne = une case à cocher, une heure, un opérateur, un résultat.
 Détail complet de chaque étape : `docs/runbooks/ELSATIA_PRODUCTION_CUTOVER_PREFLIGHT_FINAL_V1.md`
 (§14–§26). Rollback détaillé : `docs/runbooks/ELSATIA_PRODUCTION_ROLLBACK_V1.md`.
@@ -76,7 +84,7 @@ Date : ______________  Heure de début (UTC) : ______________
 ☐ P0-1 PASS ☐ Gap figé ☐ P0-3 PASS (restauration prouvée) ☐ Responsable rollback (C) présent
 ☐ `git fetch origin` fait ; `origin/release/commercialisation-v1` = `fcdd4e7c` (SHA Production réel)
 ☐ Vérifié : `git merge-base --is-ancestor origin/release/commercialisation-v1 996be15` → **vrai** (promotion en fast-forward, jamais `--force`)
-☐ ⚠ La branche **locale** `release/commercialisation-v1` peut avoir divergé (constaté à `8fe737e` le 2026-09-05, non descendant de `fcdd4e7c`) — promouvoir depuis `origin`, pas depuis un local non resynchronisé
+☐ ⚠ La branche **locale** `release/commercialisation-v1` peut être périmée (constatée à `8fe737e` le 2026-09-05, soit **3 commits en retard** sur `fcdd4e7c` — elle en est un ancêtre, pas une divergence, mais ce n'est pas la vérité déployée) — `git fetch origin` **obligatoire**, puis promouvoir depuis `origin`, jamais depuis un local non resynchronisé
 ☐ SHA app `996be15` promu dans `release/commercialisation-v1` et prêt à déployer
 ☐ Production Branch Vercel = `release/commercialisation-v1`, **inchangée** (**≠ `main`**, **≠ `feat/…`**)
 ☐ Variables Production présentes **par nom** (fiche §5 du préflight) ☐ `ABONNEMENTS_PUBLICS_OUVERTS=false`
