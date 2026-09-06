@@ -49,9 +49,25 @@ describe("géométrie résolue → document d'export (§7)", () => {
   });
 
   it("débloque SVG/DXF/PNG, la mosaïque et le 1:1 dès que le modèle est résolu", () => {
-    const capabilities = chantierExportCapabilities(documentFor(modelProject("rosette-6")));
-    for (const format of ["pdf", "svg", "dxf", "png", "pdf-mosaic", "print-1to1"] as ChantierExportFormat[]) {
+    // Le volume d'impression conditionne désormais la mosaïque (§39) : on prend une rosace
+    // d'emprise réaliste pour vérifier le déblocage, pas un motif de 5 m sur A4.
+    const capabilities = chantierExportCapabilities(documentFor(modelProject("rosette-6", { diameter: 600 })));
+    for (const format of ["pdf", "svg", "svg-1to1", "dxf", "png", "pdf-mosaic", "print-1to1"] as ChantierExportFormat[]) {
       expect(capabilities.find((capability) => capability.format === format)?.ready, format).toBe(true);
+    }
+  });
+
+  it("refuse la mosaïque et le 1:1 quand le motif dépasse le plafond de feuilles (§39)", () => {
+    // Une rosace au diamètre par défaut occupe ~5,3 m : 570 feuilles A4. Le format vectoriel
+    // reste disponible, mais proposer le gabarit papier serait promettre l'impossible.
+    const capabilities = chantierExportCapabilities(documentFor(modelProject("rosette-6")));
+    for (const format of ["svg", "svg-1to1", "dxf", "png"] as ChantierExportFormat[]) {
+      expect(capabilities.find((capability) => capability.format === format)?.ready, format).toBe(true);
+    }
+    for (const format of ["pdf-mosaic", "print-1to1"] as ChantierExportFormat[]) {
+      const capability = capabilities.find((entry) => entry.format === format);
+      expect(capability?.ready, format).toBe(false);
+      expect(capability?.reason, format).toMatch(/plafond/i);
     }
   });
 
