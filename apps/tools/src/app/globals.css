@@ -21,10 +21,19 @@ button { color: inherit; }
 .shell { width: min(1160px, calc(100% - 40px)); margin-inline: auto; }
 .eyebrow { margin: 0 0 10px; color: #b06f00; font-size: 11px; font-weight: 800; letter-spacing: .14em; }
 .hero { padding-top: 28px; }
-.topline { display: flex; align-items: center; justify-content: space-between; }
-.home-actions { display: flex; align-items: center; gap: 16px; }
+/* Bandeau d'accueil. `justify-content: space-between` sans `flex-wrap` collait
+   le logotype aux liens dès que la place manquait : les libellés se cassaient
+   en colonnes de 33 px (« Mes / projets ») et venaient toucher « ELSATIA
+   TOOLS », et sous 360 px le groupe débordait de son conteneur. On autorise
+   donc le retour à la ligne, on impose une gouttière minimale, et on empêche
+   les libellés de se couper. */
+.topline { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 18px; }
+/* Les actions occupent le reste de la ligne et restent alignées à droite ;
+   quand elles n'y tiennent plus, elles passent à la ligne suivante ensemble. */
+.home-actions { display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px 16px; }
 .home-actions > a { color: var(--ink-soft); font-size: 11px; font-weight: 800; }
-.brand { display: inline-flex; align-items: center; gap: 11px; }
+.home-actions > a, .home-actions > .free-pill { white-space: nowrap; }
+.brand { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 11px; }
 .brand-mark { display: grid; width: 41px; height: 41px; place-items: center; border-radius: 11px; background: var(--amber); color: var(--navy); font-family: Georgia, serif; font-size: 26px; font-weight: 900; box-shadow: inset 0 -2px rgba(0,0,0,.08); }
 .brand > span:last-child { display: grid; line-height: 1; }
 .brand b { font-size: 15px; letter-spacing: .14em; }
@@ -524,8 +533,11 @@ body[data-elsatia-update-banner] .offline-flag { top: calc(env(safe-area-inset-t
   .footer-legal { gap: 2px 16px; }
   .offline-badge { margin-left: 0; }
   .calculator-header { height: 70px; }
-  .home-actions { gap: 9px; }
-  .home-actions > a { font-size: 10px; }
+  /* Gouttière resserrée mais jamais nulle, et cibles tactiles confortables :
+     les liens ne faisaient que 12 px de haut. */
+  .topline { gap: 10px 12px; }
+  .home-actions { gap: 6px 12px; }
+  .home-actions > a { display: inline-flex; min-height: 44px; align-items: center; font-size: 11px; }
   .calculator-nav { gap: 10px; }
   .calculator-nav .all-tools { display: none; }
   .tool-hero { padding: 22px 0 30px; }
