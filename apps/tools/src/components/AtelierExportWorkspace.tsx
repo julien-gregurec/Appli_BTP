@@ -11,6 +11,11 @@
  * ATELIER-MODELID-ENGINE-B-BRIDGE-V1 §7 : la géométrie remise à l'adaptateur est celle que
  * le moteur résout depuis `modelId` + `modelParams` du projet. Le composant ne calcule
  * rien — il appelle `resolveTracingProjectModel` puis passe le résultat tel quel.
+ *
+ * ATELIER-FREE-DRAWING-FOUNDATION-V1 §11 : un projet en mode tracé libre n'a pas de modèle à
+ * résoudre, et sa géométrie vient de `freeAtelierGeometry`. Les deux voies produisent le même
+ * type et ne peuvent pas coexister sur un même projet (§2) : le pipeline d'export lui-même
+ * n'a donc pas bougé d'une ligne — SVG, DXF, PNG et PDF lisent la même `ShapeGeometry`.
  */
 
 import Link from "next/link";
@@ -19,6 +24,7 @@ import { useAtelierPersistence } from "@/lib/tracing/use-atelier-autosave";
 import type { TracingProject } from "@/lib/tracing/project";
 import { tracingProjectToChantierExportDocument } from "@/lib/exports/atelier-export-adapter";
 import { resolvedAtelierGeometry } from "@/lib/exports/atelier-resolved-geometry";
+import { freeAtelierGeometry } from "@/lib/exports/atelier-free-geometry";
 import { resolveTracingProjectModel } from "@/lib/tracing/model-resolver";
 import { ModelResolutionCard } from "@/components/atelier/model/ModelResolutionCard";
 import { ResolvedModelViewport } from "@/components/atelier/viewport";
@@ -85,7 +91,12 @@ export function AtelierExportWorkspace() {
   const document = useMemo(() => {
     if (state.status !== "ready" || !resolution) return null;
     try {
-      return tracingProjectToChantierExportDocument(state.project, resolvedAtelierGeometry(resolution) ?? {});
+      // ATELIER-FREE-DRAWING-FOUNDATION-V1 §11 — deux sources possibles, jamais les deux à la
+      // fois (§2) : le modèle résolu par Engine B, ou le tracé libre de l'utilisateur. Celle
+      // qui n'a rien à dire répond `undefined`, donc l'enchaînement suffit — aucun arbitrage à
+      // écrire, et rien n'a changé pour un tracé paramétrique.
+      const geometry = resolvedAtelierGeometry(resolution) ?? freeAtelierGeometry(state.project) ?? {};
+      return tracingProjectToChantierExportDocument(state.project, geometry);
     } catch {
       // §10 — un document inassemblable ne doit jamais faire tomber l'écran : la carte de
       // modèle et le message ci-dessous restent affichés.

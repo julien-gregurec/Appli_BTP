@@ -132,9 +132,30 @@ describe("projets récents (§6)", () => {
       typeLabel: "Niche",
       dimensionsLabel: "1,2 × 2 m",
       modelLabel: "Rosace 6 pétales simple",
+      // FREE-DRAWING §2 — le mode est DÉDUIT du projet ; un tracé paramétrique n'a pas de
+      // badge à afficher, d'où le libellé nul.
+      mode: "parametric",
+      modeLabel: null,
       startFromPhoto: true,
       updatedAt: "2026-09-05T09:00:00.000Z",
     });
+  });
+
+  it("signale un tracé libre dans la liste (§2)", () => {
+    const project = touchTracingProject(
+      buildTracingProjectFromInput({ type: "wall", name: "Mur atelier" }, { id: "trace-desc0002" }),
+      {
+        freeGeometry: {
+          version: 1,
+          entities: [{ id: "pt-1", kind: "point", points: [{ x: 10, y: 20 }] }],
+        },
+      },
+      new Date("2026-09-06T09:00:00Z"),
+    );
+    const summary = describeTracingProject(project);
+    expect(summary.mode).toBe("free");
+    expect(summary.modeLabel).toBe("TRACÉ LIBRE");
+    expect(summary.modelLabel).toBeNull();
   });
 });
 

@@ -20,6 +20,7 @@ import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import { chooseGridStep, formatGridStep } from "@/lib/viewport/grid";
 import { pointerPrecisionOf, type PointerPrecision } from "@/lib/viewport/pointer-targeting";
 import type { ScreenPoint, ViewportSize, ViewportState } from "@/lib/viewport/viewport-math";
+import type { AtelierTool } from "./toolbar-model";
 import { GridOverlay } from "./GridOverlay";
 import type { PlanViewportController } from "./use-plan-viewport";
 import { useViewportGestures, type ViewportGestureHandlers } from "./use-viewport-gestures";
@@ -37,7 +38,7 @@ export type PlanViewportProps = {
   label: string;
   gridVisible?: boolean;
   /** Le mode courant ne change que le curseur ; le pan à un doigt reste toujours accessible. */
-  tool?: "select" | "edit" | "pan";
+  tool?: AtelierTool;
   /**
    * Saisie d'une poignée (ATELIER-VERTEX-EDIT-UNDO-REDO-V1 §4). Transmise telle quelle aux
    * gestes : le viewport ne sait pas ce qu'est une poignée, il sait seulement qu'un contact
@@ -62,6 +63,22 @@ export type PlanViewportProps = {
    * d'un calcul par image affichée.
    */
   onCanvasHover?: (localPoint: ScreenPoint | null, precision: PointerPrecision) => void;
+  /**
+   * ATELIER-FREE-DRAWING-FOUNDATION-V1 §4/§8 — double-clic sur la toile (fin d'une polyligne).
+   * Le viewport ne sait pas ce qu'il termine : il rapporte le geste, l'appelant décide.
+   */
+  onCanvasDoubleClick?: () => void;
+  /**
+   * §4/§8 — touche pressée sur la toile, consultée AVANT les raccourcis de navigation. L'appelant
+   * répond `true` s'il a consommé la touche ; le viewport arrête alors le traitement et bloque
+   * le comportement par défaut.
+   *
+   * Cet ordre n'est pas arbitraire : `Entrée`, `Échap`, `Suppr` et `Retour arrière` n'ont
+   * aucune signification pour le pan et le zoom, tandis que les flèches en ont une pour les
+   * deux. Donner la priorité à l'appelant lui laisse fermer une polyligne sans jamais lui
+   * permettre de confisquer une touche de navigation qu'il n'aurait pas réclamée.
+   */
+  onCanvasKeyDown?: (key: string) => boolean;
   children: (args: PlanViewportRenderArgs) => ReactNode;
   /** Ligne d'état complémentaire (nombre d'entités, sélection…). */
   status?: ReactNode;
@@ -79,6 +96,8 @@ export function PlanViewport({
   grab,
   onCanvasClick,
   onCanvasHover,
+  onCanvasDoubleClick,
+  onCanvasKeyDown,
   children,
   status,
 }: PlanViewportProps) {
@@ -149,6 +168,10 @@ export function PlanViewport({
 
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
+      if (onCanvasKeyDown?.(event.key)) {
+        event.preventDefault();
+        return;
+      }
       const center = { x: size.width / 2, y: size.height / 2 };
       switch (event.key) {
         case "ArrowLeft":
@@ -179,7 +202,7 @@ export function PlanViewport({
       }
       event.preventDefault();
     },
-    [pan, recenter, size.height, size.width, zoomAtPoint],
+    [onCanvasKeyDown, pan, recenter, size.height, size.width, zoomAtPoint],
   );
 
   return (
@@ -194,6 +217,7 @@ export function PlanViewport({
         tabIndex={0}
         onKeyDown={onKeyDown}
         onClick={onClick}
+        onDoubleClick={onCanvasDoubleClick}
         {...handlers}
         onPointerDownCapture={onPointerDownCapture}
         onPointerMove={onPointerMove}

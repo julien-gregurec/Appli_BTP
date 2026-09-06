@@ -7,7 +7,7 @@ import {
   traceModelLabelFor,
 } from "./model-resolver";
 import { TRACE_MODEL_CATALOG, TRACE_MODEL_SLUGS, traceModelDefaults } from "../geometry/models/catalog";
-import { createTracingProject, validateTracingProject } from "./project";
+import { createTracingProject, validateTracingProject, TRACING_PROJECT_SCHEMA_VERSION } from "./project";
 
 function project(modelId?: string, modelParams?: Record<string, number>) {
   return { modelId, modelParams };
@@ -180,7 +180,7 @@ describe("intégration avec le contrat TracingProject", () => {
       modelId: "rosette-6",
       modelParams: { diameter: 2600 },
     });
-    expect(created.schemaVersion).toBe(3);
+    expect(created.schemaVersion).toBe(TRACING_PROJECT_SCHEMA_VERSION);
     const resolution = resolveTracingProjectModel(created);
     expect(resolution.status).toBe("resolved");
     if (resolution.status !== "resolved") return;

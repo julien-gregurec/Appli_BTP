@@ -46,8 +46,14 @@ export type PlanePoint = { x: number; y: number };
  */
 export type HandleMeasure = "radius" | "angle" | "axisX" | "axisY";
 
-/** Nature du déplacement autorisé — sert au rendu et au libellé, jamais au calcul. */
-export type HandleConstraint = "polar" | "radial" | "angular" | "axis-x" | "axis-y" | "plane" | "locked";
+/**
+ * Nature du déplacement autorisé — sert au rendu et au libellé, jamais au calcul.
+ *
+ * ATELIER-FREE-DRAWING-FOUNDATION-V1 §7 — `free` est la contrainte de la CLASSE C : le sommet
+ * va où on le pose, sans mesure ni pente, parce que sa position est la source de vérité et non
+ * la conséquence d'un paramètre. C'est la seule contrainte qui n'exprime aucune restriction.
+ */
+export type HandleConstraint = "polar" | "radial" | "angular" | "axis-x" | "axis-y" | "plane" | "locked" | "free";
 
 /** Une composante du déplacement, et le paramètre source qu'elle pilote. */
 export type HandleDrive = {
@@ -61,6 +67,20 @@ export type HandleDrive = {
   min?: number;
   max?: number;
   step?: number;
+};
+
+/**
+ * ATELIER-FREE-DRAWING-FOUNDATION-V1 §7 — sommet d'une géométrie LIBRE désigné par la poignée.
+ *
+ * Sa présence est ce qui distingue la classe C des classes A et B : elle dit que le
+ * déplacement s'écrit directement dans la source, sans passer par `paramsForHandleTarget`.
+ * Absente, la poignée est celle d'un modèle paramétrique et rien ne change pour elle.
+ */
+export type HandleVertexRef = {
+  /** Identifiant de l'entité libre — le même que celui de la scène, donc la même sélection. */
+  entityId: string;
+  /** Rang du sommet dans l'entité. */
+  index: number;
 };
 
 export type EditableHandle = {
@@ -87,6 +107,11 @@ export type EditableHandle = {
   readonlyReason?: string;
   /** Valeurs effectives du modèle au moment de la construction — base de l'inversion. */
   baseParams: Readonly<Record<string, number>>;
+  /**
+   * §7 — sommet libre piloté par cette poignée (classe C). Renseigné si et seulement si le
+   * déplacement s'écrit dans la géométrie source plutôt que dans `modelParams`.
+   */
+  vertex?: HandleVertexRef;
 };
 
 /** En deçà de cette pente (en unités de mesure par unité de paramètre), la poignée ne répond pas. */
@@ -168,6 +193,10 @@ export function paramsForHandleTarget(
   handle: EditableHandle,
   target: PlanePoint,
 ): Record<string, number> | null {
+  // Une poignée de sommet libre ne pilote aucun paramètre : son déplacement s'écrit dans la
+  // géométrie source (§7). Répondre `null` ici, plutôt que de laisser la boucle tourner à
+  // vide, dit explicitement que ce chemin n'est pas le sien.
+  if (handle.vertex) return null;
   if (!handle.editable || handle.drives.length === 0) return null;
 
   const next: Record<string, number> = { ...handle.baseParams };
@@ -205,6 +234,10 @@ export function handlePositionIn(points: readonly Point[], entityId: string): Pl
 /** Libellé court de ce qu'une poignée pilote — « Diamètre · Angle de départ ». */
 export function describeHandleDrives(handle: EditableHandle): string {
   if (!handle.editable) return handle.readonlyReason ?? "Lecture seule.";
+  // Classe C : il n'y a pas de paramètre à nommer — le sommet est la donnée elle-même. Dire
+  // « aucun réglage » serait faux ; c'est au contraire le seul cas où tout est réglable.
+  // Sans point final : l'appelant en ajoute un (`PropertiesSheet`), et deux se verraient.
+  if (handle.vertex) return "sommet libre, déplacement direct accroché à la géométrie voisine";
   return handle.drives.map((drive) => drive.label).join(" · ");
 }
 

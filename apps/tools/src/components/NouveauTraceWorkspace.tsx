@@ -19,6 +19,9 @@ import { buildEditableHandles } from "@/lib/tracing/handle-map";
 import { useModelEditing } from "@/lib/tracing/use-model-editing";
 import { useUndoRedoShortcuts } from "@/lib/tracing/use-undo-redo-shortcuts";
 import type { ParamOverrides } from "@/lib/tracing/param-history";
+import { tracingProjectMode } from "@/lib/tracing/project";
+import type { FreeGeometry } from "@/lib/tracing/free-geometry";
+import { FreeDrawingBoard } from "@/components/atelier/free/FreeDrawingBoard";
 import { TraceParametersForm } from "./TraceParametersForm";
 import { ModelResolutionCard } from "@/components/atelier/model/ModelResolutionCard";
 import { ResolvedModelViewport, type AtelierEditingApi } from "@/components/atelier/viewport";
@@ -26,9 +29,10 @@ import { useAtelierPersistence } from "@/lib/tracing/use-atelier-autosave";
 import { useAccount } from "./AccountProvider";
 import { Brand } from "./HomeDashboard";
 
-type Step = "type" | "infos" | "modele" | "parametres" | "photo" | "done";
+type Step = "type" | "infos" | "modele" | "parametres" | "libre" | "photo" | "done";
 const STEP_ORDER: readonly Step[] = ["type", "infos", "modele", "parametres", "photo"];
 const LATER = "__later__";
+const FREE = "__free__";
 
 /*
  * ATELIER-VERTEX-EDIT-UNDO-REDO-V1 §9/§10 — l'ancien `overridesOnly` local a disparu : le
@@ -68,7 +72,11 @@ export function NouveauTraceWorkspace() {
         // Reprise : `useModelEditing` s'amorce lui-même sur `modelParams`, complété par les
         // défauts du modèle. Rien à recopier ici — c'était la seconde source de vérité qui
         // pouvait diverger du formulaire (§10).
-        setStep("modele");
+        //
+        // FREE-DRAWING §2 — un tracé libre déjà commencé rouvre sur son plan, pas sur le choix
+        // du modèle : reposer la question du modèle à quelqu'un qui a déjà tracé lui ferait
+        // croire que son travail a été perdu.
+        setStep(tracingProjectMode(found) === "free" ? "libre" : "modele");
       })
       .catch(() => {});
     return () => {
@@ -97,6 +105,25 @@ export function NouveauTraceWorkspace() {
       setProject((current) => {
         if (!current) return current;
         const next = touchTracingProject(current, { modelParams: overrides });
+        scheduleAutosave(next);
+        return next;
+      });
+    },
+    [scheduleAutosave],
+  );
+
+  /**
+   * FREE-DRAWING §10 — enregistrement du tracé libre : projet remonté puis autosave. Même
+   * chemin que `persistOverrides`, même `touchTracingProject`, même revalidation stricte. Le
+   * tracé libre emprunte donc exactement la voie de persistance déjà éprouvée — c'est ce qui
+   * lui donne l'autosave debouncée, le flush au masquage de l'onglet et la reprise de
+   * brouillon sans une ligne de code nouvelle côté persistance.
+   */
+  const persistFreeGeometry = useCallback(
+    (freeGeometry: FreeGeometry | undefined) => {
+      setProject((current) => {
+        if (!current) return current;
+        const next = touchTracingProject(current, { freeGeometry });
         scheduleAutosave(next);
         return next;
       });
@@ -190,6 +217,20 @@ export function NouveauTraceWorkspace() {
     },
     [project, scheduleAutosave],
   );
+
+  /**
+   * §2 — bascule explicite en mode tracé libre. Le modèle est ABANDONNÉ, et il faut qu'il le
+   * soit : un projet ne peut pas porter les deux sources à la fois, et `validateTracingProject`
+   * refuserait l'écriture. Le geste est donc réversible dans un sens seulement tant que le
+   * tracé libre est vide — c'est ce que dit l'avertissement de l'étape.
+   */
+  const chooseFreeDrawing = useCallback(() => {
+    if (!project) return;
+    const next = touchTracingProject(project, { modelId: undefined, modelParams: undefined });
+    setProject(next);
+    scheduleAutosave(next);
+    setStep("libre");
+  }, [project, scheduleAutosave]);
 
   const confirmParameters = useCallback(() => {
     if (!project || !descriptor) return;
@@ -335,6 +376,15 @@ export function NouveauTraceWorkspace() {
                 </button>
               ))}
               <button
+                key={FREE}
+                type="button"
+                className={`atelier-choice ${tracingProjectMode(project) === "free" ? "on" : ""}`}
+                onClick={chooseFreeDrawing}
+              >
+                <b>Tracé libre</b>
+                <small>Composer à la main : points, segments et polylignes, accrochés à la grille et au tracé.</small>
+              </button>
+              <button
                 key={LATER}
                 type="button"
                 className={`atelier-choice ${project.modelId ? "" : "on"}`}
@@ -390,6 +440,33 @@ export function NouveauTraceWorkspace() {
           </>
         )}
 
+        {available && step === "libre" && project && (
+          <>
+            <h2>Tracé libre</h2>
+            <p className="hint">
+              Choisissez <strong>Point</strong>, <strong>Segment</strong> ou <strong>Polyligne</strong>, puis cliquez
+              sur le plan. Chaque sommet s’accroche à la géométrie voisine et à la grille : c’est la position
+              accrochée qui est enregistrée. Sur une polyligne, <kbd>Entrée</kbd> ou un double-clic termine le tracé,
+              <kbd>Échap</kbd> l’annule. En mode <strong>Édition</strong>, tirez un sommet pour le déplacer ;
+              <kbd>Suppr</kbd> retire la sélection. Tout est annulable (Ctrl+Z) et enregistré en continu.
+            </p>
+            <FreeDrawingBoard
+              projectId={project.id}
+              projectName={project.name}
+              geometry={project.freeGeometry}
+              onPersist={persistFreeGeometry}
+            />
+            <div className="atelier-nav">
+              <button type="button" onClick={() => setStep("modele")}>
+                Retour
+              </button>
+              <button type="button" className="primary" onClick={() => setStep("photo")}>
+                Continuer
+              </button>
+            </div>
+          </>
+        )}
+
         {available && step === "photo" && project && (
           <>
             <h2>Partir d’une photo ?</h2>
@@ -411,7 +488,12 @@ export function NouveauTraceWorkspace() {
               </button>
             </div>
             <div className="atelier-nav">
-              <button type="button" onClick={() => setStep(project.modelId ? "parametres" : "modele")}>
+              <button
+                type="button"
+                onClick={() =>
+                  setStep(project.modelId ? "parametres" : tracingProjectMode(project) === "free" ? "libre" : "modele")
+                }
+              >
                 Retour
               </button>
             </div>

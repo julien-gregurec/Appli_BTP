@@ -102,11 +102,20 @@ export function PropertiesSheet({ open, details, onClose, selection = null, hand
             ? `Réglable en mode Édition : ${describeHandleDrives(handle)}.`
             : `Non réglable. ${handle.readonlyReason}`}
         </p>
-      ) : (
+      ) : details ? (
+        /*
+          Une entité est sélectionnée mais ne publie aucune poignée. Le dire est utile — c'est
+          la réponse à « pourquoi ne puis-je pas la tirer ? ».
+
+          ATELIER-FREE-DRAWING-FOUNDATION-V1 — la même phrase n'est PLUS affichée quand rien
+          n'est sélectionné : elle prétendait alors que « seuls les sommets réglables du modèle
+          se déplacent », ce qui est faux sur un tracé libre, où ils se déplacent tous. Un
+          panneau vide ne doit rien affirmer sur ce qu'il ne montre pas.
+        */
         <p className={styles.sheetNotice}>
-          Lecture seule : seuls les sommets réglables du modèle se déplacent, en mode Édition.
+          Lecture seule : cet élément n’expose aucun sommet réglable.
         </p>
-      )}
+      ) : null}
     </section>
   );
 }

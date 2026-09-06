@@ -135,6 +135,7 @@ export function AtelierWorkspace() {
                   <small>
                     {project.typeLabel}
                     {project.modelLabel ? ` · ${project.modelLabel}` : ""}
+                    {project.modeLabel ? ` · ${project.modeLabel}` : ""}
                     {project.startFromPhoto ? " · PHOTO" : ""}
                   </small>
                   <h2>{project.name}</h2>
