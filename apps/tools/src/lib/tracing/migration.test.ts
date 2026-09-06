@@ -27,11 +27,14 @@ describe("migrateTracingProject (§3)", () => {
     expect(out.id).toBe(base.id);
   });
 
-  it("migre un projet v2 vers v3 sans inventer de paramètres de modèle", () => {
+  it("migre un projet v2 sans inventer de paramètres de modèle", () => {
     const legacy = { ...JSON.parse(JSON.stringify(base)), schemaVersion: 2, modelId: "circle-division" };
     delete legacy.modelParams;
     const out = migrateTracingProject(legacy);
-    expect(out.schemaVersion).toBe(3);
+    // La chaîne de migration va jusqu'à la version courante : v2 → v3 (modelParams) → v4
+    // (freeGeometry). Comparer à la constante plutôt qu'à un littéral évite de réécrire ce
+    // test à chaque palier — ce qu'il vérifie est qu'aucun champ n'a été inventé au passage.
+    expect(out.schemaVersion).toBe(TRACING_PROJECT_SCHEMA_VERSION);
     expect(out.modelId).toBe("circle-division");
     // v2 n'avait pas de surcharges : la résolution retombera sur les seuls défauts du modèle.
     expect(out.modelParams).toBeUndefined();
@@ -64,7 +67,7 @@ describe("migrateTracingProject (§3)", () => {
   });
 
   it("déclare explicitement les versions supportées", () => {
-    expect([...SUPPORTED_TRACING_SCHEMA_VERSIONS]).toEqual([1, 2, 3]);
+    expect([...SUPPORTED_TRACING_SCHEMA_VERSIONS]).toEqual([1, 2, 3, 4]);
     expect(SUPPORTED_TRACING_SCHEMA_VERSIONS).toContain(TRACING_PROJECT_SCHEMA_VERSION);
   });
 });

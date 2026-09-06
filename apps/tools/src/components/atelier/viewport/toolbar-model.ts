@@ -11,9 +11,18 @@
  * plan et rendrait la lecture du tracé moins sûre sur un chantier. Le mode est aussi désactivé
  * quand aucune poignée n'existe (modèle non résolu, tracé sans modèle) — un mode qui ne fait
  * rien ne doit pas être proposé.
+ *
+ * ATELIER-FREE-DRAWING-FOUNDATION-V1 §4 — trois outils de CRÉATION s'ajoutent : Point, Segment,
+ * Polyligne. Ils suivent la même règle que « Édition » : proposés seulement quand ils peuvent
+ * agir, c'est-à-dire sur un projet en mode tracé libre (§2). Sur un tracé paramétrique ils
+ * restent visibles mais désactivés, avec un libellé accessible qui dit pourquoi — les masquer
+ * ferait changer la barre de taille d'un projet à l'autre, ce qui déplace les boutons sous le
+ * doigt et fait douter de l'outil.
  */
 
-export type AtelierTool = "select" | "edit" | "pan";
+import { FREE_DRAW_TOOLS, type FreeDrawTool } from "./free-draw-model";
+
+export type AtelierTool = "select" | "edit" | "pan" | FreeDrawTool;
 
 export type ToolbarActionId = "grid" | "recenter" | "properties" | "undo" | "redo";
 
@@ -75,17 +84,51 @@ export function canEditHandles(state: ToolbarState): boolean {
   return state.tool === "edit";
 }
 
+/**
+ * ATELIER-FREE-DRAWING-FOUNDATION-V1 §4 — outil de création actif, ou `null`.
+ *
+ * Une fonction plutôt qu'un drapeau : l'appelant a besoin de SAVOIR LEQUEL pour armer
+ * l'automate de tracé, et un booléen l'obligerait à refaire le test juste après.
+ */
+export function freeDrawToolOf(state: ToolbarState): FreeDrawTool | null {
+  return state.tool === "point" || state.tool === "segment" || state.tool === "polyline" ? state.tool : null;
+}
+
+/**
+ * §5/§6 — le retour visuel d'accrochage est actif pendant la création aussi.
+ *
+ * C'est même là qu'il compte le plus : accrocher pendant la SÉLECTION ne fait que renseigner,
+ * tandis qu'accrocher pendant la création décide de la coordonnée qui sera enregistrée. La
+ * croix d'accrochage doit donc être visible au moment de poser le sommet, pas seulement en
+ * survolant un tracé déjà fait.
+ */
+export function showsSnapFeedback(state: ToolbarState): boolean {
+  return canSelectEntities(state) || freeDrawToolOf(state) !== null;
+}
+
 export type ToolbarCapabilities = {
   hasSelection?: boolean;
   /** Le modèle courant publie-t-il au moins une poignée éditable ? */
   editingAvailable?: boolean;
+  /** Le projet est-il en mode tracé libre, donc capable d'accueillir une primitive (§2/§4) ? */
+  drawingAvailable?: boolean;
   canUndo?: boolean;
   canRedo?: boolean;
 };
 
+const DRAW_TOOL_LABELS: Readonly<Record<FreeDrawTool, { label: string; ariaLabel: string }>> = {
+  point: { label: "Point", ariaLabel: "Outil point libre" },
+  segment: { label: "Segment", ariaLabel: "Outil segment libre" },
+  polyline: { label: "Polyligne", ariaLabel: "Outil polyligne libre" },
+};
+
+/** §4 — motif unique du refus, pour que les trois outils disent la même chose. */
+const NO_FREE_DRAWING = "ce tracé suit un modèle paramétrique";
+
 export function buildToolbarModel(state: ToolbarState, options?: ToolbarCapabilities): readonly ToolbarButtonModel[] {
   const hasSelection = options?.hasSelection ?? false;
   const editingAvailable = options?.editingAvailable ?? false;
+  const drawingAvailable = options?.drawingAvailable ?? false;
   return [
     {
       id: "select",
@@ -113,6 +156,16 @@ export function buildToolbarModel(state: ToolbarState, options?: ToolbarCapabili
       disabled: false,
       kind: "tool",
     },
+    ...FREE_DRAW_TOOLS.map((tool) => ({
+      id: tool,
+      label: DRAW_TOOL_LABELS[tool].label,
+      ariaLabel: drawingAvailable
+        ? DRAW_TOOL_LABELS[tool].ariaLabel
+        : `${DRAW_TOOL_LABELS[tool].ariaLabel} — indisponible : ${NO_FREE_DRAWING}`,
+      pressed: state.tool === tool,
+      disabled: !drawingAvailable,
+      kind: "tool" as const,
+    })),
     {
       id: "grid",
       label: "Grille",

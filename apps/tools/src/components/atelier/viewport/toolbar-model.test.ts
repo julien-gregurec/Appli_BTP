@@ -71,11 +71,16 @@ describe("gestes", () => {
 });
 
 describe("buildToolbarModel", () => {
-  it("expose exactement les huit entrées du lot, dans l'ordre", () => {
+  it("expose exactement les onze entrées de la barre, dans l'ordre", () => {
+    // FREE-DRAWING §4 — les trois outils de création s'insèrent après « Déplacer », donc dans
+    // la moitié droite de la barre : la zone la plus sûre du pouce sur un téléphone.
     expect(buildToolbarModel(DEFAULT_TOOLBAR_STATE).map((button) => button.id)).toEqual([
       "select",
       "edit",
       "pan",
+      "point",
+      "segment",
+      "polyline",
       "grid",
       "recenter",
       "properties",

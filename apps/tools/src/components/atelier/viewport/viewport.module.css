@@ -44,6 +44,18 @@
   cursor: default;
 }
 
+/*
+  ATELIER-FREE-DRAWING-FOUNDATION-V1 §4 — les trois outils de création partagent le réticule :
+  ce qui compte au moment de poser un sommet est de VOIR le point visé, pas de reconnaître
+  l'outil au curseur — la barre et la ligne d'état le disent déjà, et un curseur exotique
+  masquerait justement la zone qu'on vise.
+*/
+.canvas[data-tool="point"],
+.canvas[data-tool="segment"],
+.canvas[data-tool="polyline"] {
+  cursor: crosshair;
+}
+
 .canvas:focus-visible {
   box-shadow: inset 0 0 0 2px var(--amber);
 }
@@ -215,6 +227,66 @@
   stroke-width: 1;
   stroke-dasharray: 5 4;
   opacity: 0.55;
+}
+
+/*
+  Action inline du bandeau d'état (FREE-DRAWING §14) : « Terminer la polyligne ». Dimensionnée
+  pour le doigt (44 px de haut avec ses marges) parce que c'est le geste de fin sur mobile, où
+  ni Entrée ni le double-clic ne sont des évidences.
+*/
+.statusAction {
+  /*
+    Le bandeau d'état est `pointer-events: none` — il informe sans jamais voler un clic destiné
+    au plan, qui passe au travers. Cette action est la seule exception, et elle doit la
+    déclarer : sans cette ligne, le bouton se voit et ne répond pas, ce qui est pire que de ne
+    pas l'afficher du tout.
+  */
+  pointer-events: auto;
+  appearance: none;
+  border: 1px solid var(--amber);
+  background: var(--white);
+  color: var(--navy);
+  border-radius: 999px;
+  font: inherit;
+  font-weight: 600;
+  padding: 6px 12px;
+  min-height: 32px;
+  cursor: pointer;
+}
+
+.statusAction:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+/* ---- Tracé libre en cours (FREE-DRAWING §6) ------------------------------- */
+
+/*
+  Le fantôme doit se lire comme « pas encore posé ». Le tiret et l'opacité disent l'un et
+  l'autre le provisoire ; les cumuler est volontaire, pour que la distinction survive à une
+  impression d'écran en noir et blanc comme à un plein soleil de chantier.
+*/
+.ghostLine {
+  fill: none;
+  stroke: var(--amber);
+  stroke-width: 1.6;
+  stroke-dasharray: 6 4;
+  opacity: 0.8;
+  stroke-linecap: round;
+}
+
+/* Sommets DÉJÀ posés du tracé en cours : pleins, car ceux-là sont acquis. */
+.ghostVertex {
+  fill: var(--amber);
+  stroke: var(--white);
+  stroke-width: 1.4;
+}
+
+/* Point courant sous le curseur : creux, car il n'est pas encore posé. */
+.ghostCursor {
+  fill: var(--white);
+  stroke: var(--amber);
+  stroke-width: 2;
 }
 
 /* ---- Bandeau d'état ------------------------------------------------------ */

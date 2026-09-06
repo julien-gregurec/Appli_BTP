@@ -11,7 +11,9 @@ import {
   validateTracingProject,
   TracingProjectError,
   TRACING_PROJECT_TYPES,
+  tracingProjectMode,
   type TracingProject,
+  type TracingProjectMode,
   type TracingProjectType,
 } from "./project";
 import { createProjectId } from "../projects/model";
@@ -85,7 +87,10 @@ export function modelParamsAfterModelChoice(
 }
 
 export type TracingProjectPatch = Partial<
-  Pick<TracingProject, "name" | "roomWidthMm" | "roomHeightMm" | "modelId" | "modelParams" | "startFromPhoto">
+  Pick<
+    TracingProject,
+    "name" | "roomWidthMm" | "roomHeightMm" | "modelId" | "modelParams" | "freeGeometry" | "startFromPhoto"
+  >
 >;
 
 /** Applique un correctif, remonte `updatedAt` et revalide strictement (voie autosave / étapes). */
@@ -126,18 +131,36 @@ export type TracingProjectSummary = {
   typeLabel: string;
   dimensionsLabel: string | null;
   modelLabel: string | null;
+  /**
+   * FREE-DRAWING §2 — mode réel du tracé, DÉDUIT de ce que le projet porte (jamais stocké).
+   * La liste doit le montrer : « Reprendre » ne mène pas au même écran selon le mode, et un
+   * tracé libre qui apparaîtrait « sans modèle » ferait croire à un projet resté vide.
+   */
+  mode: TracingProjectMode;
+  modeLabel: string | null;
   startFromPhoto: boolean;
   updatedAt: string;
 };
 
+const MODE_LABELS: Readonly<Record<TracingProjectMode, string | null>> = {
+  parametric: null,
+  free: "TRACÉ LIBRE",
+  // « Sans modèle » n'a rien d'anormal — c'est « décider plus tard » — et n'a pas à être
+  // signalé comme un manque dans une liste.
+  undecided: null,
+};
+
 /** §6 — projection d'un `TracingProject` pour l'affichage « projets récents ». */
 export function describeTracingProject(project: TracingProject): TracingProjectSummary {
+  const mode = tracingProjectMode(project);
   return {
     id: project.id,
     name: project.name,
     typeLabel: ouvrageLabel(project.type),
     dimensionsLabel: formatRoomDimensions(project.roomWidthMm, project.roomHeightMm),
     modelLabel: traceModelLabelFor(project.modelId),
+    mode,
+    modeLabel: MODE_LABELS[mode],
     startFromPhoto: project.startFromPhoto === true,
     updatedAt: project.updatedAt,
   };

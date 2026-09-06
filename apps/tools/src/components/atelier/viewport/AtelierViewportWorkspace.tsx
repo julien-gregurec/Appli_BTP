@@ -30,6 +30,23 @@
  *    figerait le glissement ;
  * 3. **la position ACCROCHÉE est celle qui est validée**, pas seulement celle qui est
  *    affichée (§6) — c'est elle qui traverse l'inversion, la quantification et le bornage.
+ *
+ * ## ATELIER-FREE-DRAWING-FOUNDATION-V1 §4/§6/§7/§8 — tracé libre
+ *
+ * Trois gestes s'ajoutent, et aucun ne change la règle ci-dessus : ce composant ORCHESTRE, il
+ * ne décide de rien et ne possède aucune géométrie.
+ *
+ * - **créer** (§4/§6) : l'automate `free-draw-model` accumule les sommets d'une primitive en
+ *   cours. Elle n'existe que là, et n'en sort qu'une fois complète, par `onCreateEntity`. Un
+ *   `Échap` la fait disparaître sans que rien n'ait été enregistré ni empilé ;
+ * - **déplacer un sommet** (§7) : le MÊME cycle que la poignée paramétrique — même prise, même
+ *   arbitrage de geste, même accrochage, même gel de la scène. Seule la fin diffère, et elle
+ *   se lit sur la poignée : `handle.vertex` renseigné signifie que le déplacement s'écrit dans
+ *   la géométrie source (classe C), sinon il se traduit en `modelParams` (classe A) ;
+ * - **supprimer** (§8) : `Suppr` / `Retour arrière` transmet la SÉLECTION au parent, qui seul
+ *   sait ce qui lui appartient. Ce composant ne filtre rien — il ne connaît pas le document
+ *   libre — et c'est ce qui rend structurellement impossible de supprimer une primitive
+ *   dérivée d'Engine B par ce chemin.
  */
 
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -43,7 +60,13 @@ import {
   resetSelectionCycle,
   type SelectionCycleState,
 } from "@/lib/viewport/selection-cycle";
-import { primarySelection, selectSingle, toggleSelection, type SelectionSet } from "@/lib/viewport/selection-set";
+import {
+  EMPTY_SELECTION,
+  primarySelection,
+  selectSingle,
+  toggleSelection,
+  type SelectionSet,
+} from "@/lib/viewport/selection-set";
 import { screenToWorld, type ScreenPoint } from "@/lib/viewport/viewport-math";
 import {
   handleGrabPx,
@@ -56,6 +79,19 @@ import {
 import { describeHandleValues, type EditableHandle } from "@/lib/tracing/editable-handle";
 import { paramsForHandleTarget } from "@/lib/tracing/editable-handle";
 import { nearestEditableHandle } from "@/lib/tracing/handle-map";
+import type { FreeVertex } from "@/lib/tracing/free-geometry";
+import {
+  beginFreeDraw,
+  canFinishFreeDraw,
+  freeDrawCancel,
+  freeDrawClick,
+  freeDrawFinish,
+  freeDrawHint,
+  isFreeDrawInProgress,
+  type FreeDrawCommit,
+  type FreeDrawState,
+} from "./free-draw-model";
+import { FreeDrawPreviewLayer } from "./FreeDrawPreviewLayer";
 import { usePlanViewport } from "./use-plan-viewport";
 import { PlanViewport, type CanvasClickModifiers } from "./PlanViewport";
 import { PlanSceneLayer } from "./PlanSceneLayer";
@@ -66,14 +102,22 @@ import {
   canEditHandles,
   canSelectEntities,
   DEFAULT_TOOLBAR_STATE,
+  freeDrawToolOf,
   selectTool,
+  showsSnapFeedback,
   toggleGrid,
   toggleProperties,
   type AtelierTool,
   type ToolbarActionId,
   type ToolbarState,
 } from "./toolbar-model";
-import { countSceneEntities, describeSceneEntity, describeSceneSelection, type PlanScene } from "./plan-scene";
+import {
+  countSceneEntities,
+  describeSceneEntity,
+  describeSceneSelection,
+  formatWorldPoint,
+  type PlanScene,
+} from "./plan-scene";
 import styles from "./viewport.module.css";
 
 /**
@@ -91,6 +135,27 @@ export type AtelierEditingApi = {
   onUndo: () => void;
   onRedo: () => void;
 };
+
+/**
+ * §4/§7/§8 — intentions du tracé libre. Absente, le viewport se comporte exactement comme
+ * avant ce lot : pas d'outil de création, pas de suppression, pas de déplacement direct.
+ *
+ * Toutes les fonctions reçoivent une INTENTION, jamais un document : le viewport n'a pas de
+ * géométrie libre à donner, il n'en possède aucune.
+ */
+export type AtelierFreeDrawingApi = {
+  /** §4/§6 — une primitive complète, validée par le geste. Seul chemin de création. */
+  onCreateEntity: (commit: FreeDrawCommit) => void;
+  /** §7 — pendant le glissement d'un sommet : afficher sans enregistrer ni empiler. */
+  onPreviewVertex: (move: FreeVertexMove) => void;
+  /** §7 — fin du geste : c'est ici, et seulement ici, qu'historique et autosave entrent. */
+  onCommitVertex: (move: FreeVertexMove) => void;
+  /** §8 — la sélection courante, telle quelle. Le parent en retient ce qui lui appartient. */
+  onDeleteEntities: (entityIds: readonly string[]) => void;
+};
+
+/** §7 — un sommet libre et la position monde où il doit aller, en millimètres. */
+export type FreeVertexMove = { entityId: string; index: number; position: FreeVertex };
 
 export type AtelierViewportWorkspaceProps = {
   scene: PlanScene;
@@ -115,6 +180,8 @@ export type AtelierViewportWorkspaceProps = {
    */
   viewKey?: string;
   editing?: AtelierEditingApi;
+  /** §4 — outils de création, déplacement direct et suppression du tracé libre. */
+  drawing?: AtelierFreeDrawingApi;
 };
 
 /**
@@ -124,14 +191,48 @@ export type AtelierViewportWorkspaceProps = {
  */
 const NO_HANDLES: readonly EditableHandle[] = [];
 
+/**
+ * §6 du lot précédent, §7 de celui-ci — scène d'accrochage gelée, privée de ce qu'on tient.
+ *
+ * Ce qui est retiré diffère selon la classe de la poignée, et la différence a une raison :
+ *
+ * - **classe A** (paramétrique) : seul le POINT tenu disparaît. Le reste du modèle est
+ *   recalculé à chaque trame mais reste une cible légitime — on règle souvent un sommet sur un
+ *   axe ou un cercle de la même figure ;
+ * - **classe C** (libre) : l'ENTITÉ entière disparaît. Son autre extrémité n'est pas une cible
+ *   souhaitable — s'y accrocher produirait le segment de longueur nulle que la validation
+ *   refuse — et ses propres sommets suivraient le geste, donc s'accrocheraient à eux-mêmes.
+ */
+function freezeSnapScene(scene: PlanScene, handle: EditableHandle): PlanScene {
+  if (!handle.vertex) {
+    return { ...scene, points: (scene.points ?? []).filter((point) => point.id !== handle.entityId) };
+  }
+  const held = handle.vertex.entityId;
+  const without = <T extends { id: string }>(items: readonly T[] | undefined): readonly T[] | undefined =>
+    items && items.filter((item) => item.id !== held);
+  return {
+    ...scene,
+    points: without(scene.points),
+    segments: without(scene.segments),
+    polylines: without(scene.polylines),
+    polygons: without(scene.polygons),
+  };
+}
+
 /** Geste en cours. Gelé au `pointerdown`, jeté au relâchement. */
 type DragSession = {
   handle: EditableHandle;
   precision: PointerPrecision;
   /** Scène d'accrochage figée, privée du point tenu (§6). */
   snapScene: PlanScene;
-  /** Dernières valeurs prévisualisées, ou `null` si rien n'a bougé. */
+  /** Dernières valeurs prévisualisées, ou `null` si rien n'a bougé (classe A). */
   pending: Record<string, number> | null;
+  /**
+   * Dernière position visée du sommet libre, ou `null` si le curseur n'a pas quitté sa
+   * position d'origine (classe C, §7). Les deux champs ne sont jamais renseignés ensemble :
+   * `handle.vertex` dit lequel des deux est le bon, et il ne change pas pendant le geste.
+   */
+  pendingVertex: FreeVertex | null;
 };
 
 /** Référence stable pour « sélection réduite à l'entité active ». */
@@ -146,12 +247,19 @@ export function AtelierViewportWorkspace({
   initialToolbarState = DEFAULT_TOOLBAR_STATE,
   viewKey,
   editing,
+  drawing,
 }: AtelierViewportWorkspaceProps) {
   const [toolbar, setToolbar] = useState<ToolbarState>(initialToolbarState);
   const [hoveredEntityId, setHoveredEntityId] = useState<string | null>(null);
   const [snapCandidate, setSnapCandidate] = useState<SnapCandidate | null>(null);
   const [activeHandleId, setActiveHandleId] = useState<string | null>(null);
   const [liveReadout, setLiveReadout] = useState<string | null>(null);
+  /** §4/§6 — tracé en cours. `null` hors d'un outil de création : rien à afficher, rien à annuler. */
+  const [draw, setDraw] = useState<FreeDrawState | null>(null);
+  /** §6 — point courant ACCROCHÉ, en millimètres monde : là où le prochain clic posera un sommet. */
+  const [drawCursor, setDrawCursor] = useState<FreeVertex | null>(null);
+  /** §4 — dernier geste refusé, dit à l'utilisateur plutôt qu'avalé en silence. */
+  const [drawNotice, setDrawNotice] = useState<string | null>(null);
   const drag = useRef<DragSession | null>(null);
   /**
    * §7 — le cycle vit dans une `ref`, JAMAIS dans un état. Un état serait recréé à chaque
@@ -192,13 +300,37 @@ export function AtelierViewportWorkspace({
 
   // Dérivé du mode courant plutôt que remis à zéro par un effet : passer en « Déplacer » éteint
   // aussitôt le survol et l'accrochage, sans état résiduel à nettoyer.
-  const feedbackVisible = canSelectEntities(toolbar);
-  const editMode = canEditHandles(toolbar) && editingAvailable;
+  const drawingAvailable = Boolean(drawing);
 
   // Le mode Édition ne peut pas rester actif si le modèle cesse d'offrir des poignées (autre
   // modèle, paramètres invalides) : on retombe sur la sélection, par dérivation et non par un
-  // effet de nettoyage qui provoquerait un second rendu.
-  const effectiveTool: AtelierTool = toolbar.tool === "edit" && !editingAvailable ? "select" : toolbar.tool;
+  // effet de nettoyage qui provoquerait un second rendu. Même règle pour les trois outils de
+  // création sur un projet qui n'est pas en tracé libre (§4).
+  const requestedDrawTool = freeDrawToolOf(toolbar);
+  const effectiveTool: AtelierTool =
+    (toolbar.tool === "edit" && !editingAvailable) || (requestedDrawTool !== null && !drawingAvailable)
+      ? "select"
+      : toolbar.tool;
+  const effectiveState: ToolbarState = { ...toolbar, tool: effectiveTool };
+
+  const feedbackVisible = canSelectEntities(effectiveState);
+  const snapFeedbackVisible = showsSnapFeedback(effectiveState);
+  const editMode = canEditHandles(effectiveState) && editingAvailable;
+  const drawTool = drawingAvailable ? freeDrawToolOf(effectiveState) : null;
+
+  /*
+   * §4/§6 — l'automate suit l'outil, par DÉRIVATION et non par un effet.
+   *
+   * Changer d'outil au milieu d'une polyligne doit abandonner le tracé en cours : le
+   * reconstruire ici, pendant le rendu, garantit qu'aucune trame n'affiche les sommets d'un
+   * outil avec le comportement d'un autre — ce qu'un `useEffect` de nettoyage laisserait
+   * arriver le temps d'un rendu.
+   */
+  if ((draw?.tool ?? null) !== drawTool) {
+    setDraw(drawTool ? beginFreeDraw(drawTool) : null);
+    setDrawCursor(null);
+    setDrawNotice(null);
+  }
 
   const { view, size } = controller;
 
@@ -262,6 +394,40 @@ export function AtelierViewportWorkspace({
    * La tolérance est convertie depuis les pixels à la vue courante, donc identique à l'œil
    * quel que soit le zoom (§2).
    */
+  /**
+   * §5 — position ACCROCHÉE d'un point écran. Un seul chemin pour la création et pour la
+   * prévisualisation : le sommet dessiné sous le curseur et celui qui sera enregistré sont
+   * calculés par le même appel, donc ils ne peuvent pas différer (§5 : « le point créé doit
+   * utiliser la position accrochée, pas seulement un retour visuel »).
+   */
+  const snappedWorldOf = useCallback(
+    (local: ScreenPoint, precision: PointerPrecision): { position: FreeVertex; snapped: boolean } => {
+      const world = worldOf(local);
+      const candidate = snap(scene, world, {
+        toleranceWorld: toleranceWorldFor(snapTolerancePx(precision), view),
+        gridStepMm: chooseGridStep(view.scale),
+      });
+      return { position: candidate?.position ?? world, snapped: Boolean(candidate) };
+    },
+    [scene, view, worldOf],
+  );
+
+  /**
+   * §4/§6 — un clic en mode création : il pose un sommet, et publie la primitive dès qu'elle
+   * est complète. Rien n'est enregistré tant que l'automate ne rend pas de `commit`.
+   */
+  const onDrawClick = useCallback(
+    (local: ScreenPoint, precision: PointerPrecision) => {
+      if (!draw || !drawing) return;
+      const { position } = snappedWorldOf(local, precision);
+      const step = freeDrawClick(draw, position);
+      setDraw(step.state);
+      setDrawNotice(step.rejected ?? null);
+      if (step.commit) drawing.onCreateEntity(step.commit);
+    },
+    [draw, drawing, snappedWorldOf],
+  );
+
   const onCanvasClick = useCallback(
     (local: ScreenPoint, precision: PointerPrecision, modifiers: CanvasClickModifiers) => {
       const tolerance = toleranceWorldFor(selectionTolerancePx(precision), view);
@@ -309,6 +475,7 @@ export function AtelierViewportWorkspace({
       if (!local) {
         setHoveredEntityId(null);
         setSnapCandidate(null);
+        setDrawCursor(null);
         return;
       }
       const world = worldOf(local);
@@ -321,6 +488,9 @@ export function AtelierViewportWorkspace({
         gridStepMm: chooseGridStep(view.scale),
       });
       setSnapCandidate(candidate);
+      // §6 — le point courant du tracé en cours EST la position accrochée : le fantôme montre
+      // donc exactement le sommet que le clic posera, et non la position brute du curseur.
+      setDrawCursor(candidate ? candidate.position : world);
     },
     [scene, view, worldOf],
   );
@@ -349,13 +519,16 @@ export function AtelierViewportWorkspace({
           precision,
           // Scène d'accrochage gelée et privée du point tenu (§6) : les cibles ne doivent pas
           // bouger avec la géométrie qu'on est en train de déformer.
-          snapScene: { ...scene, points: (scene.points ?? []).filter((point) => point.id !== found.entityId) },
+          snapScene: freezeSnapScene(scene, found),
           pending: null,
+          pendingVertex: null,
         };
         setActiveHandleId(found.id);
         setSnapCandidate(null);
         setHoveredEntityId(null);
-        setLiveReadout(describeHandleValues(found, found.baseParams));
+        setLiveReadout(
+          found.vertex ? formatWorldPoint(found.position) : describeHandleValues(found, found.baseParams),
+        );
         return true;
       },
 
@@ -372,6 +545,16 @@ export function AtelierViewportWorkspace({
         const target = candidate?.position ?? world;
         setSnapCandidate(candidate);
 
+        // §7 — classe C : la position visée EST la nouvelle donnée. Aucune inversion, aucune
+        // quantification, aucun bornage — il n'y a pas de paramètre derrière ce sommet.
+        const vertex = session.handle.vertex;
+        if (vertex && drawing) {
+          session.pendingVertex = target;
+          setLiveReadout(formatWorldPoint(target));
+          drawing.onPreviewVertex({ ...vertex, position: target });
+          return;
+        }
+
         const next = paramsForHandleTarget(session.handle, target);
         session.pending = next;
         const values = next ?? session.handle.baseParams;
@@ -386,6 +569,16 @@ export function AtelierViewportWorkspace({
         setSnapCandidate(null);
         setLiveReadout(null);
         if (!session) return;
+
+        const vertex = session.handle.vertex;
+        if (vertex && drawing) {
+          if (session.pendingVertex) drawing.onCommitVertex({ ...vertex, position: session.pendingVertex });
+          // Le sommet n'a pas bougé : remettre l'état de départ plutôt que de laisser une
+          // prévisualisation orpheline, et n'empiler rien (même règle que la classe A).
+          else drawing.onPreviewVertex({ ...vertex, position: session.handle.position });
+          return;
+        }
+
         if (session.pending) {
           editing.onCommitParams(
             session.pending,
@@ -399,7 +592,49 @@ export function AtelierViewportWorkspace({
         }
       },
     };
-  }, [editMode, editing, scene, view, worldOf]);
+  }, [drawing, editMode, editing, scene, view, worldOf]);
+
+  /**
+   * §4 — fin explicite d'une polyligne. Deux chemins, un seul comportement : la touche
+   * `Entrée` au clavier, et le double-clic — qui est aussi ce que le mobile produit par un
+   * double-tap, seul geste de fin disponible sans clavier.
+   */
+  const finishDraw = useCallback(() => {
+    if (!draw || !drawing) return false;
+    if (!canFinishFreeDraw(draw)) return false;
+    const step = freeDrawFinish(draw);
+    setDraw(step.state);
+    setDrawNotice(step.rejected ?? null);
+    if (step.commit) drawing.onCreateEntity(step.commit);
+    return true;
+  }, [draw, drawing]);
+
+  /**
+   * §4/§6/§8 — touches consommées par le plan, dans l'ordre de spécificité.
+   *
+   * `Échap` passe avant tout : c'est la sortie de secours, et elle doit marcher même quand un
+   * geste est à moitié fait. `Suppr` n'agit qu'en dehors d'un tracé en cours — pendant un
+   * tracé, la seule chose qu'on veut supprimer est ce tracé, et c'est `Échap` qui le fait.
+   */
+  const onCanvasKeyDown = useCallback(
+    (key: string) => {
+      if (key === "Escape" && draw && isFreeDrawInProgress(draw)) {
+        // §6 — annulation SANS historique : rien n'ayant été enregistré, il n'y a rien à défaire.
+        setDraw(freeDrawCancel(draw));
+        setDrawNotice("Tracé en cours annulé.");
+        return true;
+      }
+      if (key === "Enter") return finishDraw();
+      if ((key === "Delete" || key === "Backspace") && drawing && selection.length > 0) {
+        // La sélection part telle quelle : le parent seul sait ce qui lui appartient (§8).
+        drawing.onDeleteEntities(selection);
+        applySelection(EMPTY_SELECTION);
+        return true;
+      }
+      return false;
+    },
+    [draw, drawing, finishDraw, applySelection, selection],
+  );
 
   const selectedHandle = useMemo(
     () => handles.find((handle) => handle.entityId === selectedEntityId) ?? null,
@@ -409,9 +644,10 @@ export function AtelierViewportWorkspace({
   return (
     <div className={styles.workspace} data-properties={toolbar.propertiesOpen ? "open" : "closed"}>
       <AtelierToolbar
-        state={{ ...toolbar, tool: effectiveTool }}
-        hasSelection={Boolean(selectedEntityId)}
+        state={effectiveState}
+        hasSelection={selection.length > 0}
         editingAvailable={editingAvailable}
+        drawingAvailable={drawingAvailable}
         canUndo={editing?.canUndo ?? false}
         canRedo={editing?.canRedo ?? false}
         onSelectTool={onSelectTool}
@@ -424,12 +660,27 @@ export function AtelierViewportWorkspace({
         gridVisible={toolbar.gridVisible}
         tool={effectiveTool}
         grab={grab}
-        onCanvasClick={feedbackVisible ? onCanvasClick : undefined}
-        onCanvasHover={feedbackVisible ? onCanvasHover : undefined}
+        onCanvasClick={drawTool ? onDrawClick : feedbackVisible ? onCanvasClick : undefined}
+        onCanvasHover={snapFeedbackVisible ? onCanvasHover : undefined}
+        onCanvasDoubleClick={drawTool ? finishDraw : undefined}
+        onCanvasKeyDown={drawing ? onCanvasKeyDown : undefined}
         status={
           <>
             <span>{entityCount} entités</span>
             {editMode && <span>{editableCount} sommets réglables</span>}
+            {/*
+              §6/§14 — la consigne du tracé en cours passe avant tout le reste : c'est la seule
+              information qui dit ce que le prochain geste va faire, et c'est aussi la seule que
+              le mobile ne peut pas déduire d'un survol.
+            */}
+            {draw && <span aria-live="polite">{drawNotice ?? freeDrawHint(draw)}</span>}
+            {draw && canFinishFreeDraw(draw) && (
+              // Sans clavier, `Entrée` n'existe pas et le double-tap n'est pas une évidence :
+              // un bouton explicite est le seul moyen sûr de terminer une polyligne au doigt (§14).
+              <button type="button" className={styles.statusAction} onClick={finishDraw}>
+                Terminer la polyligne
+              </button>
+            )}
             {liveReadout ? (
               <span aria-live="polite">{liveReadout}</span>
             ) : selection.length > 1 ? (
@@ -451,7 +702,7 @@ export function AtelierViewportWorkspace({
               selectedEntityId={selectedEntityId}
               selectedEntityIds={selection}
               hoveredEntityId={feedbackVisible ? hoveredEntityId : null}
-              snapPoint={feedbackVisible ? snapCandidate?.position ?? null : null}
+              snapPoint={snapFeedbackVisible ? snapCandidate?.position ?? null : null}
               snapIsIntersection={snapCandidate?.kind === "intersection"}
             />
             {editMode && (
@@ -462,6 +713,9 @@ export function AtelierViewportWorkspace({
                 activeHandleId={activeHandleId}
                 selectedEntityId={selectedEntityId}
               />
+            )}
+            {draw && (
+              <FreeDrawPreviewLayer state={draw} cursor={drawCursor} view={frameView} size={frameSize} />
             )}
           </>
         )}

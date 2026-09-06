@@ -81,6 +81,25 @@ export const HIT_PRIORITY: Readonly<Record<HitEntityKind, number>> = {
 /** Deux distances séparées de moins de ceci sont tenues pour égales lors du départage. */
 const TIE_EPSILON = 1e-6;
 
+/**
+ * ATELIER-TOOLS-FREE-DRAWING-R2-RECONCILIATION-V1 — quantification des distances avant
+ * comparaison. Reprise de la lignée `b0c55e8`, que la refonte R2 n'avait pas emportée.
+ *
+ * Un comparateur « |a − b| < ε ⇒ égaux » N'EST PAS TRANSITIF : avec ε = 1, 0 et 0,6 sont
+ * égaux, 0,6 et 1,2 aussi, mais 0 et 1,2 non. `Array.prototype.sort` suppose une relation
+ * d'ordre TOTALE ; nourri d'un comparateur intransitif, il rend un résultat qui dépend de
+ * l'ordre d'entrée. Tant que seule la TÊTE du classement était consommée cela restait
+ * invisible — c'est le cas de `hitTest`. Le cycle de sélection parcourt toute la liste et
+ * exige, lui, un ordre reproductible d'un clic à l'autre.
+ *
+ * Arrondir la distance sur une grille de pas ε rétablit la transitivité : deux distances
+ * tombent dans le même godet ou non, sans cas intermédiaire. Le départage par identifiant
+ * reprend ensuite la main, et il est total puisque les identifiants sont uniques.
+ */
+function distanceRank(distance: number): number {
+  return Math.round(distance / TIE_EPSILON);
+}
+
 type Candidate = HitTestResult;
 
 function push(into: Candidate[], kind: HitEntityKind, id: string, hit: ClosestPoint | null, role?: string, label?: string) {
@@ -132,7 +151,9 @@ export function hitTestCandidates(scene: HitTestScene, target: PlanePoint): read
  */
 function better(candidate: HitTestResult, current: HitTestResult): boolean {
   if (candidate.priority !== current.priority) return candidate.priority < current.priority;
-  if (Math.abs(candidate.distance - current.distance) > TIE_EPSILON) return candidate.distance < current.distance;
+  const rank = distanceRank(candidate.distance);
+  const currentRank = distanceRank(current.distance);
+  if (rank !== currentRank) return rank < currentRank;
   return candidate.entityId < current.entityId;
 }
 
@@ -152,8 +173,16 @@ export function hitTest(scene: HitTestScene, target: PlanePoint, toleranceWorld:
 }
 
 /**
- * Candidats dans la tolérance, du plus pertinent au moins pertinent. Sert au futur cycle
- * « re-cliquer pour prendre l'entité en dessous » ; ce lot n'en consomme que la tête.
+ * Candidats dans la tolérance, du plus pertinent au moins pertinent.
+ *
+ * L'ordre est exactement celui de `hitTest`, dont le résultat est donc toujours le premier
+ * élément de cette liste : une seule règle de priorité dans l'application, pas deux
+ * classements qui pourraient diverger.
+ *
+ * Il est TOTAL et DÉTERMINISTE (cf. `distanceRank`) : à scène et point identiques, la même
+ * liste sort dans le même ordre, quelle que soit la façon dont la scène a été construite.
+ * C'est la condition pour que re-cliquer au même endroit désigne toujours l'entité suivante,
+ * et pour que le cycle revienne exactement à son point de départ après un tour complet.
  */
 export function hitTestAll(scene: HitTestScene, target: PlanePoint, toleranceWorld: number): readonly HitTestResult[] {
   const tolerance = Number.isFinite(toleranceWorld) && toleranceWorld > 0 ? toleranceWorld : 0;

@@ -14,6 +14,11 @@
  * les relaie. La règle tient encore — les poignées arrivent en props, calculées par
  * `lib/tracing/handle-map.ts` : le viewport ne construit aucune poignée et n'appelle jamais un
  * générateur de modèle.
+ *
+ * ATELIER-FREE-DRAWING-FOUNDATION-V1 : le tracé libre ajoute `free-draw-model` (automate pur du
+ * geste de création) et `FreeDrawPreviewLayer` (rendu du tracé en cours). La règle tient encore :
+ * la géométrie libre arrive en props, sa validation et son historique vivent dans `lib/tracing/`,
+ * et le viewport n'écrit jamais dans le document — il émet des intentions.
  */
 
 export {
@@ -31,8 +36,59 @@ export { PropertiesSheet, type PropertiesSheetProps } from "./PropertiesSheet";
 export {
   AtelierViewportWorkspace,
   type AtelierEditingApi,
+  type AtelierFreeDrawingApi,
   type AtelierViewportWorkspaceProps,
+  type FreeVertexMove,
 } from "./AtelierViewportWorkspace";
+export { FreeDrawPreviewLayer, type FreeDrawPreviewLayerProps } from "./FreeDrawPreviewLayer";
+export {
+  FREE_DRAW_EPSILON_MM,
+  FREE_DRAW_TOOLS,
+  beginFreeDraw,
+  canFinishFreeDraw,
+  freeDrawCancel,
+  freeDrawClick,
+  freeDrawFinish,
+  freeDrawGhostSegments,
+  freeDrawHint,
+  isFreeDrawInProgress,
+  type FreeDrawCommit,
+  type FreeDrawState,
+  type FreeDrawStep,
+  type FreeDrawTool,
+} from "./free-draw-model";
+export {
+  buildFreeVertexHandles,
+  countFreeVertexHandles,
+  freeHandleId,
+} from "@/lib/tracing/free-handles";
+export {
+  EMPTY_FREE_GEOMETRY,
+  FREE_GEOMETRY_VERSION,
+  MAX_FREE_ENTITIES,
+  MAX_FREE_POLYLINE_VERTICES,
+  MAX_FREE_VERTICES,
+  addFreeEntity,
+  countFreeEntitiesByKind,
+  createFreeEntity,
+  deletableFreeEntityIds,
+  findFreeEntity,
+  freeEntityKindLabel,
+  freeEntityLabel,
+  freeEntityLength,
+  freeGeometryBounds,
+  freeGeometryIsEmpty,
+  freeGeometryLength,
+  moveFreeVertex,
+  nextFreeEntityId,
+  removeFreeEntities,
+  validateFreeGeometry,
+  type FreeEntity,
+  type FreeEntityKind,
+  type FreeGeometry,
+  type FreeVertex,
+} from "@/lib/tracing/free-geometry";
+export { freeGeometryToShape, freeSceneBounds } from "@/lib/tracing/free-shape";
 export { ResolvedModelViewport, type ResolvedModelViewportProps } from "./ResolvedModelViewport";
 export { atelierViewKey, planSceneForStep, resolvedPlanScene, stepAt } from "./resolved-scene";
 export { usePlanViewport, type PlanViewportController } from "./use-plan-viewport";
@@ -135,6 +191,8 @@ export {
   canEditHandles,
   canSelectEntities,
   DEFAULT_TOOLBAR_STATE,
+  freeDrawToolOf,
+  showsSnapFeedback,
   selectTool,
   shouldPanOnBackgroundDrag,
   toggleGrid,
@@ -150,6 +208,8 @@ export {
   describeSceneEntity,
   describeSceneSelection,
   entityKindLabel,
+  formatMillimetres,
+  formatWorldPoint,
   entityLabel,
   listSceneEntities,
   type PlanScene,

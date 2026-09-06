@@ -72,6 +72,20 @@ export function entityLabel(kind: SceneEntityKind, id: string): string {
   return id.charAt(0).toUpperCase() + id.slice(1);
 }
 
+/**
+ * ATELIER-FREE-DRAWING-FOUNDATION-V1 §7/§12 — formatage exporté pour que le glissement d'un
+ * sommet libre affiche ses coordonnées avec EXACTEMENT la même écriture que la fiche
+ * propriétés. Deux formatages concurrents finiraient par arrondir différemment, et le chiffre
+ * lu pendant le geste ne serait plus celui relu après.
+ */
+export function formatMillimetres(value: number): string {
+  return millimetres(value);
+}
+
+export function formatWorldPoint(source: { x: number; y: number }): string {
+  return coordinates(source);
+}
+
 function millimetres(value: number): string {
   if (!Number.isFinite(value)) return "—";
   const rounded = Math.round(value * 10) / 10;

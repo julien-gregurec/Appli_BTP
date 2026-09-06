@@ -25,6 +25,12 @@ import {
   type ReferenceImageSource,
 } from "./reference-image";
 import type { GeometricShape, RawContour } from "./vectorization";
+import {
+  FreeGeometryError,
+  freeGeometryIsEmpty,
+  validateFreeGeometry,
+  type FreeGeometry,
+} from "./free-geometry";
 
 /**
  * Version courante du schéma `TracingProject`.
@@ -35,11 +41,15 @@ import type { GeometricShape, RawContour } from "./vectorization";
  * - v3 : ajout de `modelParams` (ATELIER-MODELID-ENGINE-B-BRIDGE-V1 §4 — surcharges de
  *        paramètres du modèle choisi), optionnel et additif. Rien n'est à renseigner en
  *        migration : sans surcharge, le modèle est résolu avec ses seuls défauts publiés.
+ * - v4 : ajout de `freeGeometry` (ATELIER-FREE-DRAWING-FOUNDATION-V1 §1 — tracé libre de
+ *        l'utilisateur), optionnel et additif. Rien n'est à renseigner en migration : aucun
+ *        projet antérieur ne pouvait porter de tracé libre, et son absence signifie
+ *        exactement ce qu'elle signifiait avant — il n'y en a pas.
  *
  * La frontière de lecture tolérante (migration des versions connues) vit dans `./migration.ts` ;
  * `validateTracingProject` ci-dessous reste strict sur la version courante.
  */
-export const TRACING_PROJECT_SCHEMA_VERSION = 3;
+export const TRACING_PROJECT_SCHEMA_VERSION = 4;
 
 export type TracingProjectType = "ceiling" | "wall" | "arch" | "niche" | "other";
 export const TRACING_PROJECT_TYPES: readonly TracingProjectType[] = ["ceiling", "wall", "arch", "niche", "other"];
@@ -104,6 +114,15 @@ export type TracingProject = {
    * ici. Jamais de géométrie dérivée — celle-ci est recalculée par Engine B (§8).
    */
   modelParams?: Record<string, number>;
+  /**
+   * ATELIER-FREE-DRAWING-FOUNDATION-V1 §1/§2 — tracé libre de l'utilisateur.
+   *
+   * Contrairement à `modelParams`, qui n'est qu'un réglage d'une géométrie DÉRIVÉE, ce champ
+   * porte une géométrie SOURCE : rien ne la recalcule, et sa perte serait la perte du travail
+   * lui-même. C'est pourquoi il ne peut pas coexister avec `modelId` (§2) — deux sources de
+   * vérité géométrique dans un même projet, et plus rien ne dit laquelle exporter.
+   */
+  freeGeometry?: FreeGeometry;
   /** §9 — l'utilisateur a répondu « oui » à « partir d'une photo ? ». L'upload/caméra/calibration arrivent dans un lot ultérieur. */
   startFromPhoto?: boolean;
   referenceImages: TracingReferenceImage[];
@@ -142,6 +161,8 @@ export type CreateTracingProjectInput = {
   roomHeightMm?: number;
   modelId?: string;
   modelParams?: Record<string, number>;
+  /** §2 — démarrer directement en mode « tracé libre » : le projet naît sans modèle, avec un document libre vide. */
+  freeGeometry?: FreeGeometry;
   startFromPhoto?: boolean;
   companyId?: string;
   userId?: string;
@@ -160,6 +181,7 @@ export function createTracingProject(input: CreateTracingProjectInput, now: Date
     scaleStatus: "undefined",
     modelId: input.modelId,
     modelParams: input.modelParams,
+    freeGeometry: input.freeGeometry,
     startFromPhoto: input.startFromPhoto ? true : undefined,
     referenceImages: [],
     contours: [],
@@ -224,6 +246,47 @@ function optionalModelParams(value: unknown): Record<string, number> | undefined
 }
 
 /**
+ * §1/§13 — tracé libre du projet. La validation détaillée (arité, sommets finis, limites,
+ * identifiants uniques) appartient à `free-geometry.ts` ; on ne fait ici que la déléguer et
+ * traduire son refus dans le vocabulaire d'erreur du projet, pour que tous les appelants de
+ * `validateTracingProject` n'aient qu'un seul type d'erreur à connaître.
+ *
+ * Un document VIDE est ramené à `undefined` : `freeGeometry: { entities: [] }` et l'absence de
+ * champ décrivent le même fait — aucun tracé libre — et n'en garder qu'une écriture évite
+ * qu'une comparaison de projets signale une différence là où il n'y en a aucune.
+ */
+function optionalFreeGeometry(value: unknown): FreeGeometry | undefined {
+  if (value === undefined || value === null) return undefined;
+  let geometry: FreeGeometry;
+  try {
+    geometry = validateFreeGeometry(value);
+  } catch (cause) {
+    throw new TracingProjectError(
+      cause instanceof FreeGeometryError ? cause.message : "Le tracé libre du projet est invalide.",
+    );
+  }
+  return freeGeometryIsEmpty(geometry) ? undefined : geometry;
+}
+
+/**
+ * §2 — mode réel d'un projet. Il n'est pas stocké : le déduire de ce que le projet PORTE rend
+ * impossible qu'un drapeau dise « paramétrique » sur un projet qui contient un tracé libre.
+ *
+ * - `parametric` : un modèle est choisi, la géométrie est dérivée par Engine B ;
+ * - `free` : un tracé libre existe, la géométrie est la source ;
+ * - `undecided` : ni l'un ni l'autre — c'est un état valide, celui d'un projet qui vient
+ *   d'être créé ou dont l'utilisateur a répondu « décider plus tard » (§3 du bridge Engine B).
+ */
+export type TracingProjectMode = "parametric" | "free" | "undecided";
+
+export function tracingProjectMode(
+  project: Pick<TracingProject, "modelId" | "freeGeometry">,
+): TracingProjectMode {
+  if (!freeGeometryIsEmpty(project.freeGeometry)) return "free";
+  return project.modelId ? "parametric" : "undecided";
+}
+
+/**
  * Validation stricte et bornée. Elle contrôle l'enveloppe métier ; les tableaux `contours`
  * et `shapes` sont bornés en nombre mais leur contenu détaillé reste validé par
  * `createRawContour` / `contourToGeometricShape` au moment de leur création.
@@ -272,6 +335,17 @@ export function validateTracingProject(raw: unknown): TracingProject {
     includeDimensions: exportRaw.includeDimensions !== false,
   };
 
+  const modelId = optionalModelId(value.modelId);
+  const freeGeometry = optionalFreeGeometry(value.freeGeometry);
+  // §2 — l'invariant qui tient tout le lot : jamais deux sources de vérité géométrique dans le
+  // même projet. Le refus est ici, dans la validation, et non dans l'UI : c'est la seule place
+  // que ni un import, ni une reprise de brouillon, ni une écriture directe ne peut contourner.
+  if (modelId && freeGeometry) {
+    throw new TracingProjectError(
+      "Un tracé ne peut pas porter à la fois un modèle paramétrique et un tracé libre : choisissez l'un des deux.",
+    );
+  }
+
   return {
     id: value.id,
     schemaVersion: TRACING_PROJECT_SCHEMA_VERSION,
@@ -281,8 +355,9 @@ export function validateTracingProject(raw: unknown): TracingProject {
     roomHeightMm: optionalDimension(value.roomHeightMm, "La hauteur de la pièce"),
     units,
     scaleStatus: value.scaleStatus,
-    modelId: optionalModelId(value.modelId),
+    modelId,
     modelParams: optionalModelParams(value.modelParams),
+    freeGeometry,
     startFromPhoto: value.startFromPhoto === true ? true : undefined,
     referenceImages: referenceImages as TracingReferenceImage[],
     contours: contours as RawContour[],
