@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import type { ToolsLedgerEnvironment } from "@/lib/tools-store-environment";
 
 export const TOOLS_SKUS = ["tools_pro_monthly", "tools_pro_annual"] as const;
 export type ToolsSku = (typeof TOOLS_SKUS)[number];
@@ -196,7 +197,12 @@ export function toolsOptions(request: Request) { return new Response(null, { sta
 
 export type ToolsEventReservation = {
   provider: "stripe" | "apple" | "google";
-  environment: "test" | "sandbox";
+  /*
+   * Le schéma accepte `test`, `sandbox` et `production` depuis l'origine. Ce type, lui, ne savait
+   * pas exprimer `production` : c'est ce qui a rendu invisible le codage en dur du bac à sable
+   * dans les quatre routes. Il suit désormais la contrainte SQL.
+   */
+  environment: ToolsLedgerEnvironment;
   externalEventId: string;
   eventType: string;
   userId?: string | null;

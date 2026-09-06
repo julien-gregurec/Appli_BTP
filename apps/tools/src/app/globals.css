@@ -318,6 +318,8 @@ footer { background: #e9e8e3; }
 .account-actions .secondary { border: 1px solid var(--navy); background: white; color: var(--navy); }
 .account-warning, .account-error { padding: 12px; border-radius: 7px; background: #fff4d8; color: #704900 !important; font-size: 12px; }
 .account-error { background: #fff0ef; color: #8a2922 !important; }
+/* Confirmation d'une demande enregistree : meme gabarit que l'alerte, registre chromatique oppose. */
+.account-success { padding: 12px; border-radius: 7px; background: #eaf6ee; color: #1f5b34 !important; font-size: 12px; }
 .monetization-panel { margin-block: 26px 80px; padding: 28px; border: 1px solid var(--line); border-radius: 14px; background: white; }
 .monetization-panel h2 { margin: 7px 0 9px; font-family: Georgia, serif; font-size: 30px; font-weight: 500; }
 .monetization-panel > p:not(.eyebrow) { color: var(--ink-soft); line-height: 1.6; }

@@ -23,6 +23,13 @@ export async function POST(request: Request) {
 
   let admin;
   try {
+    /*
+     * `"test"` n'est pas un codage en dur oublié, contrairement à ceux d'Apple et de Google : cette
+     * route refuse `livemode` et Connect quelques lignes plus haut, et exige `config.testMode`.
+     * Elle ne peut donc traiter QUE des événements d'essai, et le registre doit le dire.
+     * Le jour où Tools vendra par Stripe en réel, c'est cette garde-là qu'il faudra rouvrir, et
+     * l'environnement suivra le mode de la clé — pas l'inverse.
+     */
     const reservation = await reserveToolsMonetizationEvent({ provider: "stripe", environment: "test", externalEventId: event.id, eventType: event.type, metadata: { object_id: event.data.object.id } });
     if (reservation.duplicate) return NextResponse.json({ received: true, duplicate: true });
     admin = reservation.admin;

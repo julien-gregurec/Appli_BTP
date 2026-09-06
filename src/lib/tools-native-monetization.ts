@@ -4,6 +4,7 @@ import { Environment, SignedDataVerifier, type JWSTransactionDecodedPayload, typ
 import { GoogleAuth, OAuth2Client } from "google-auth-library";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { ToolsSubscriptionStatus, ToolsSku } from "@/lib/tools-monetization";
+import { assertTransactionEnvironmentAllowed, resolveToolsStoreEnvironment, type ToolsStoreEnvironment } from "@/lib/tools-store-environment";
 
 const APP_ID = "fr.elsatia.tools";
 const APPLE_PRODUCTS: Record<string, ToolsSku> = {
@@ -17,10 +18,41 @@ const GOOGLE_PRODUCTS: Record<string, ToolsSku> = {
 
 function iso(value?: number | null) { return value ? new Date(value).toISOString() : null; }
 
-function appleVerifier() {
+/** Correspondance entre l'énumération de la bibliothèque Apple et notre vocabulaire de registre. */
+const APPLE_ENVIRONMENTS: Record<string, ToolsStoreEnvironment> = {
+  [Environment.SANDBOX]: "sandbox",
+  [Environment.PRODUCTION]: "production",
+};
+
+function appleEnvironment(environment: ToolsStoreEnvironment) {
+  return environment === "production" ? Environment.PRODUCTION : Environment.SANDBOX;
+}
+
+function appleVerifier(environment: ToolsStoreEnvironment) {
   const roots = process.env.APPLE_ROOT_CA_BASE64?.split(",").map((value) => Buffer.from(value.trim(), "base64")).filter((value) => value.length > 0) ?? [];
   if (!roots.length) throw new Error("Certificats racine Apple non configurés");
-  return new SignedDataVerifier(roots, true, Environment.SANDBOX, APP_ID);
+  return new SignedDataVerifier(roots, true, appleEnvironment(environment), APP_ID);
+}
+
+/*
+ * Lecture NON VÉRIFIÉE de l'environnement annoncé par un JWS Apple.
+ *
+ * Elle ne sert qu'à choisir le vérificateur : `SignedDataVerifier` doit être construit pour un
+ * environnement donné et refuse une charge utile qui n'en relève pas. On lit donc la revendication
+ * pour instancier le bon vérificateur, puis c'est LUI qui fait foi — et la valeur retenue ensuite
+ * est celle de la charge utile vérifiée, jamais celle-ci. Un JWS qui mentirait ici échouerait à la
+ * vérification qui suit.
+ */
+export function readUnverifiedAppleEnvironment(jws: string): ToolsStoreEnvironment | null {
+  const segment = jws.split(".")[1];
+  if (!segment) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(segment, "base64url").toString("utf8")) as Record<string, unknown>;
+    const declared = payload.environment ?? (payload.data as Record<string, unknown> | undefined)?.environment;
+    return typeof declared === "string" ? APPLE_ENVIRONMENTS[declared] ?? null : null;
+  } catch {
+    return null;
+  }
 }
 
 export function appleStatus(transaction: Pick<JWSTransactionDecodedPayload, "expiresDate" | "revocationDate">, renewal?: Pick<JWSRenewalInfoDecodedPayload, "gracePeriodExpiresDate"> | null, now = Date.now()): ToolsSubscriptionStatus {
@@ -31,18 +63,29 @@ export function appleStatus(transaction: Pick<JWSTransactionDecodedPayload, "exp
 }
 
 export async function verifyAppleTransaction(signedTransaction: string, expectedUserId?: string) {
-  const verifier = appleVerifier();
+  const verifier = appleVerifier(readUnverifiedAppleEnvironment(signedTransaction) ?? resolveToolsStoreEnvironment());
   const transaction = await verifier.verifyAndDecodeTransaction(signedTransaction);
-  if (transaction.environment !== Environment.SANDBOX || transaction.bundleId !== APP_ID) throw new Error("Transaction Apple hors sandbox ou mauvaise application");
+  /* À partir d'ici, `transaction` est vérifiée : son environnement fait foi. */
+  const environment = APPLE_ENVIRONMENTS[transaction.environment ?? ""];
+  if (!environment) throw new Error("Environnement Apple inconnu");
+  assertTransactionEnvironmentAllowed(environment);
+  if (transaction.bundleId !== APP_ID) throw new Error("Transaction Apple pour une autre application");
   if (!transaction.productId || !APPLE_PRODUCTS[transaction.productId] || !transaction.originalTransactionId || !transaction.transactionId) throw new Error("Produit Apple Tools invalide");
   if (!transaction.appAccountToken || expectedUserId && transaction.appAccountToken !== expectedUserId) throw new Error("Compte ELSATIA Apple incohérent");
-  return { verifier, transaction };
+  return { verifier, transaction, environment };
 }
 
 export function appleSubscriptionPayload(transaction: JWSTransactionDecodedPayload, event: { id: string; type: string }, renewal?: JWSRenewalInfoDecodedPayload | null) {
   const productId = transaction.productId as string;
+  /*
+   * L'environnement inscrit est celui qu'Apple a signé dans la transaction vérifiée. C'est ce qui
+   * permet à une phase TestFlight (bac à sable) et à la vente réelle (production) de coexister
+   * dans le registre : toutes les clés d'unicité du schéma portent `environment`.
+   */
+  const environment = APPLE_ENVIRONMENTS[transaction.environment ?? ""];
+  if (!environment) throw new Error("Environnement Apple inconnu");
   return {
-    user_id: transaction.appAccountToken, provider: "apple", environment: "sandbox",
+    user_id: transaction.appAccountToken, provider: "apple", environment,
     product_sku: APPLE_PRODUCTS[productId], external_product_id: productId,
     external_subscription_id: transaction.originalTransactionId,
     external_transaction_id: transaction.transactionId,
@@ -56,15 +99,18 @@ export function appleSubscriptionPayload(transaction: JWSTransactionDecodedPaylo
 }
 
 export async function verifyAppleNotification(signedPayload: string) {
-  const verifier = appleVerifier();
+  const verifier = appleVerifier(readUnverifiedAppleEnvironment(signedPayload) ?? resolveToolsStoreEnvironment());
   const notification = await verifier.verifyAndDecodeNotification(signedPayload);
-  if (notification.data?.environment !== Environment.SANDBOX) throw new Error("Notification Apple hors sandbox");
+  /* Notification vérifiée : son environnement fait foi, et la politique de déploiement s'applique. */
+  const environment = APPLE_ENVIRONMENTS[notification.data?.environment ?? ""];
+  if (!environment) throw new Error("Environnement Apple inconnu");
+  assertTransactionEnvironmentAllowed(environment);
   const signedTransaction = notification.data?.signedTransactionInfo;
-  if (!signedTransaction) return { notification, payload: null };
+  if (!signedTransaction) return { notification, environment, payload: null };
   const transaction = await verifier.verifyAndDecodeTransaction(signedTransaction);
   const renewal = notification.data?.signedRenewalInfo ? await verifier.verifyAndDecodeRenewalInfo(notification.data.signedRenewalInfo) : null;
   if (!notification.notificationUUID) throw new Error("Notification Apple sans identifiant");
-  return { notification, payload: appleSubscriptionPayload(transaction, { id: notification.notificationUUID, type: String(notification.notificationType ?? "UNKNOWN") }, renewal) };
+  return { notification, environment, payload: appleSubscriptionPayload(transaction, { id: notification.notificationUUID, type: String(notification.notificationType ?? "UNKNOWN") }, renewal) };
 }
 
 export function googleAccountId(userId: string) { return createHash("sha256").update(`elsatia-tools:${userId}`).digest("hex"); }
@@ -106,13 +152,19 @@ export async function retrieveGoogleSubscription(purchaseToken: string) {
   return { client, subscription: response.data };
 }
 
-export function googleSubscriptionPayload(subscription: GoogleSubscription, purchaseToken: string, userId: string, event: { id: string; type: string }) {
+/*
+ * Google, contrairement à Apple, ne signe aucun environnement dans ses charges utiles : un achat
+ * de testeur de licence et un achat réel empruntent le même point d'accès et se ressemblent trait
+ * pour trait. L'environnement du registre est donc celui du DÉPLOIEMENT, résolu strictement — et
+ * jamais une constante.
+ */
+export function googleSubscriptionPayload(subscription: GoogleSubscription, purchaseToken: string, userId: string, event: { id: string; type: string }, environment = resolveToolsStoreEnvironment()) {
   const item = subscription.lineItems?.[0];
   const productId = item?.productId ?? "";
   if (!GOOGLE_PRODUCTS[productId]) throw new Error("Produit Google Tools invalide");
   if (subscription.externalAccountIdentifiers?.obfuscatedExternalAccountId !== googleAccountId(userId)) throw new Error("Compte ELSATIA Google incohérent");
   return {
-    user_id: userId, provider: "google", environment: "sandbox", product_sku: GOOGLE_PRODUCTS[productId],
+    user_id: userId, provider: "google", environment, product_sku: GOOGLE_PRODUCTS[productId],
     external_product_id: productId, external_subscription_id: purchaseToken,
     external_transaction_id: subscription.latestOrderId ?? null,
     status: googleStatus(subscription.subscriptionState), raw_status: subscription.subscriptionState ?? "UNKNOWN",
@@ -131,9 +183,9 @@ export async function acknowledgeGoogleSubscription(purchaseToken: string, subsc
   await client.request({ method: "POST", url: `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${APP_ID}/purchases/subscriptions/${encodeURIComponent(productId)}/tokens/${encodeURIComponent(purchaseToken)}:acknowledge`, data: {} });
 }
 
-export async function saveGoogleAccountMapping(userId: string) {
+export async function saveGoogleAccountMapping(userId: string, environment = resolveToolsStoreEnvironment()) {
   const { error } = await createAdminClient().from("tools_monetization_customers").upsert({
-    user_id: userId, provider: "google", environment: "sandbox", external_customer_id: googleAccountId(userId),
+    user_id: userId, provider: "google", environment, external_customer_id: googleAccountId(userId),
   }, { onConflict: "user_id,provider,environment" });
   if (error) throw new Error(error.message);
 }

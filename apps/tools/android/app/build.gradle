@@ -1,5 +1,40 @@
 apply plugin: 'com.android.application'
 
+/*
+ * Signature de release.
+ *
+ * Rien de secret ne vit ici, et rien de secret ne doit y arriver. La configuration lit, dans cet
+ * ordre, un fichier `android/keystore.properties` (poste de Julien) puis des variables
+ * d'environnement (CI). Les deux sont exclus de Git par `apps/tools/.gitignore`, qui ignore déjà
+ * `android/keystore.properties` ainsi que tout fichier d'extension .jks ou .keystore.
+ *
+ * Quand aucune des deux sources n'est fournie, `signingConfig` reste nul et Gradle produit un AAB
+ * NON SIGNÉ. C'est volontaire : un AAB signé par une clé de debug n'est pas déposable, et le
+ * laisser croire serait pire que de ne rien signer. Le build ne doit donc jamais échouer faute de
+ * clé, mais il ne doit jamais non plus prétendre en avoir une.
+ *
+ * Rappel Play App Signing : la clé configurée ici est la clé de TÉLÉVERSEMENT. La clé de
+ * signature d'application, celle dont l'empreinte SHA-256 va dans `assetlinks.json`, est détenue
+ * par Google et se relève dans Play Console.
+ */
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
+/** Valeur du fichier si présente, sinon de l'environnement, sinon nulle. */
+def signingValue = { String key, String variable ->
+    keystoreProperties.getProperty(key) ?: System.getenv(variable)
+}
+
+def releaseStoreFile = signingValue('storeFile', 'ELSATIA_TOOLS_KEYSTORE_FILE')
+def releaseStorePassword = signingValue('storePassword', 'ELSATIA_TOOLS_KEYSTORE_PASSWORD')
+def releaseKeyAlias = signingValue('keyAlias', 'ELSATIA_TOOLS_KEY_ALIAS')
+def releaseKeyPassword = signingValue('keyPassword', 'ELSATIA_TOOLS_KEY_PASSWORD')
+def hasReleaseSigning = releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword
+
+
 android {
     namespace = "fr.elsatia.tools"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,8 +51,20 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (hasReleaseSigning) {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
+            /* Nul si aucune clé n'est fournie : l'AAB sort alors non signé, et l'assume. */
+            signingConfig hasReleaseSigning ? signingConfigs.release : null
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
@@ -52,4 +99,16 @@ try {
     }
 } catch(Exception e) {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
+
+/*
+ * Diagnostic explicite, à lancer avant un dépôt : `./gradlew :app:signingStatus`.
+ * Il dit si la release sera signée, SANS jamais imprimer un chemin, un alias ou un mot de passe.
+ */
+tasks.register('signingStatus') {
+    doLast {
+        println hasReleaseSigning
+            ? '[signature] release SIGNEE — cle de televersement fournie'
+            : '[signature] release NON SIGNEE — aucune cle fournie (attendu hors depot Store)'
+    }
 }
