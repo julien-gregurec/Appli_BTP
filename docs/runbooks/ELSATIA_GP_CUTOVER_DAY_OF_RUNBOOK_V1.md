@@ -99,6 +99,23 @@ déborde, les suivants glissent — on ne saute jamais une vérification.
 > Pro — 25 $/mois »). **Un prévisionnel n'est pas une preuve.**
 > **Statut : À VÉRIFIER PAR L'OPÉRATEUR.** Sans capacité de restauration constatée, P0-3 est
 > infaisable et la stratégie de rollback B est indisponible : **la fenêtre ne s'ouvre pas.**
+>
+> ⚠ **Ne pas confondre les deux mécanismes — ils n'offrent pas la même garantie.**
+>
+> | Mécanisme | Ce qu'il donne | Inclus ? |
+> |---|---|---|
+> | **Sauvegarde managée quotidienne** (plan Pro) | 1 point de restauration par jour, rétention 7 jours | inclus dans Supabase Pro (25 $/mois, `docs/BUDGET_MISE_EN_SERVICE.md`) |
+> | **PITR** — restauration à la seconde | un point de restauration **pris à T-30**, donc immédiatement avant les migrations | **option payante séparée, non incluse par défaut** |
+>
+> Le runbook de rollback suppose un **snapshot pris à T-30**. Une sauvegarde quotidienne
+> n'en fournit pas : au mieux elle ramène à la nuit précédente, c'est-à-dire avec **perte des
+> écritures métier de la journée**. L'opérateur doit donc trancher explicitement à J-1 :
+>
+> ☐ **PITR actif** → snapshot T-30 réel, rollback conforme au runbook
+> ☐ **Sauvegarde quotidienne seule** → le point de restauration disponible est celui de la nuit
+>   précédente. Ce niveau de garantie doit être **accepté explicitement par le décideur avant
+>   T0**, ou la fenêtre est reportée jusqu'à activation du PITR. **Ne pas découvrir ce point
+>   pendant l'incident.**
 
 ---
 
@@ -310,7 +327,7 @@ Aucune valeur secrète n'est imprimée, aucun QR/seed/code TOTP n'est lu ou cons
 
 ☐ **Rôle C nommé et présent** ☐ Décideur GO/NO-GO présent
 ☐ P0-1 PASS ☐ Gap figé à **53** ☐ P0-3 PASS (restauration prouvée à T-15)
-☐ Plan Supabase : PITR / snapshot managé **vérifié restaurable** (J-1.1)
+☐ Plan Supabase : PITR / snapshot managé **vérifié restaurable** (J-1.1) — et **niveau de garantie tranché** : PITR actif (snapshot T-30 réel), ou sauvegarde quotidienne seule **explicitement acceptée par le décideur**
 ☐ `git fetch origin` fait ; `origin/release/commercialisation-v1` = `fcdd4e7c`
 ☐ `git merge-base --is-ancestor origin/release/commercialisation-v1 996be15` → **vrai** (fast-forward strict, **jamais `--force`**)
 ☐ ⚠ Ref **locale** `release/commercialisation-v1` **non utilisée** sans resynchronisation (constatée 3 commits en retard le 2026-09-05)
