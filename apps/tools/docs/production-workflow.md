@@ -89,3 +89,15 @@ Total : **50 tests** ajoutés, suite `apps/tools` à 157/157.
   en POLYLINE 72 segments et **listées comme approximations**.
 - §28 : chaque `GeometricShape` porte son `origin` ; `pre-export-check` émet
   `unreliable-scale` pour toute forme `imported` / `approximated`.
+
+## Suite du lot : import photo & vectorisation V1
+
+Voir `image-vectorization-v1.md`. Ce lot lève une partie des sujets différés ci-dessus :
+
+| Sujet différé ci-dessus | État après `image-vectorization-v1` |
+| --- | --- |
+| Décodage image, warp de perspective | **Livré** — `image-decode.ts` (décodage + réduction) et `perspective.ts` (homographie 4 points + inverse). Le rendu du calque reste à l'interface. |
+| Détection automatique de contours | **Livré, borné** — `edge-detection.ts` (Otsu, Sobel, Moore). Sort toujours en proposition ; échoue proprement plutôt que de rendre du bruit. |
+| Support HEIC réel | **Toujours refusé**, désormais avec un message explicite à l'import. |
+| Undo/redo | **Livré** — `history.ts`, pile générique bornée, sans couplage à l'Atelier. |
+| Persistance `TracingProject` | **Partiellement livré** — validation de contenu, sérialisation, stockage des blobs d'image (`asset-store.ts`). Le branchement sur `ProjectRepository` reste au lot Atelier. |
