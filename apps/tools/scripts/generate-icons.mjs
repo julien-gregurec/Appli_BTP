@@ -21,8 +21,8 @@ const APP_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 /* Couleurs et coordonnees reprises telles quelles de `public/icon.svg` (viewBox 0 0 512 512). */
 export const AMBER = [0xf5, 0xaa, 0x22];
-const NAVY = [0x17, 0x2c, 0x3b];
-const CREAM = [0xff, 0xf7, 0xe4];
+export const NAVY = [0x17, 0x2c, 0x3b];
+export const CREAM = [0xff, 0xf7, 0xe4];
 /* `M130 116h252v64H200v44h154v62H200v46h188v64H130V116Z` */
 export const E_POLYGON = [[130, 116], [382, 116], [382, 180], [200, 180], [200, 224], [354, 224], [354, 286], [200, 286], [200, 332], [388, 332], [388, 396], [130, 396]];
 /* `M348 88v336`, stroke-width 20, opacity .88 */
@@ -43,7 +43,8 @@ function insidePolygon(polygon, x, y) {
   return inside;
 }
 
-function distanceToSegment(x, y, [[ax, ay], [bx, by]]) {
+/* Reutilise par `generate-og-image.mjs` : meme rasterisation de traits a bouts ronds. */
+export function distanceToSegment(x, y, [[ax, ay], [bx, by]]) {
   const dx = bx - ax;
   const dy = by - ay;
   const length = dx * dx + dy * dy;
@@ -51,7 +52,7 @@ function distanceToSegment(x, y, [[ax, ay], [bx, by]]) {
   return Math.hypot(x - (ax + t * dx), y - (ay + t * dy));
 }
 
-function blend(base, color, alpha) {
+export function blend(base, color, alpha) {
   return [0, 1, 2].map((channel) => base[channel] + (color[channel] - base[channel]) * alpha);
 }
 
@@ -110,16 +111,18 @@ function chunk(type, data) {
   return Buffer.concat([length, body, crc]);
 }
 
-export function encodePng(pixels, size) {
+/* `height` par defaut = `width` : les icones sont carrees, l'image Open Graph ne l'est pas. */
+export function encodePng(pixels, width, height = width) {
   const header = Buffer.alloc(13);
-  header.writeUInt32BE(size, 0);
-  header.writeUInt32BE(size, 4);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
   header[8] = 8; /* profondeur 8 bits */
   header[9] = 2; /* type couleur 2 : RGB sans alpha, donc opaque par construction */
-  const raw = Buffer.alloc(size * (size * 3 + 1));
-  for (let row = 0; row < size; row += 1) {
-    raw[row * (size * 3 + 1)] = 0; /* filtre None : sortie stable et lisible */
-    pixels.copy(raw, row * (size * 3 + 1) + 1, row * size * 3, (row + 1) * size * 3);
+  const stride = width * 3;
+  const raw = Buffer.alloc(height * (stride + 1));
+  for (let row = 0; row < height; row += 1) {
+    raw[row * (stride + 1)] = 0; /* filtre None : sortie stable et lisible */
+    pixels.copy(raw, row * (stride + 1) + 1, row * stride, (row + 1) * stride);
   }
   return Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),

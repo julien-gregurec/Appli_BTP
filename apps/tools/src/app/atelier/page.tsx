@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { AtelierWorkspace } from "@/components/AtelierWorkspace";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Atelier de traçage - ELSATIA Tools",
+// Atelier pas encore commercialement prêt : navigation interne autorisée, indexation refusée.
+export const metadata: Metadata = pageMetadata({
+  title: "Atelier de traçage",
   description: "Créez et retrouvez vos tracés d’ouvrage, enregistrés automatiquement sur cet appareil.",
-  // Atelier pas encore commercialement prêt : navigation interne autorisée, indexation refusée.
-  robots: { index: false, follow: false, nocache: true },
-};
+  path: "/atelier",
+  index: false,
+});
 
 export default function AtelierPage() {
   return <AtelierWorkspace />;

@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { NouveauTraceWorkspace } from "@/components/NouveauTraceWorkspace";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Nouveau tracé - ELSATIA Tools",
+// Atelier pas encore commercialement prêt : navigation interne autorisée, indexation refusée.
+export const metadata: Metadata = pageMetadata({
+  title: "Nouveau tracé",
   description: "Décrivez l’ouvrage : type, nom, dimensions de pièce et modèle de départ.",
-  // Atelier pas encore commercialement prêt : navigation interne autorisée, indexation refusée.
-  robots: { index: false, follow: false, nocache: true },
-};
+  path: "/atelier/nouveau",
+  index: false,
+});
 
 export default function NouveauTracePage() {
   return <NouveauTraceWorkspace />;
