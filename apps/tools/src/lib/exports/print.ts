@@ -12,5 +12,5 @@ export function renderPrintHtml(document: ProjectDocument) {
 }
 
 export function printProjectDocument(document: ProjectDocument) {
-  const target = window.open("", "_blank", "noopener,noreferrer"); if (!target) throw new Error("Autorisez l’ouverture de la vue d’impression."); target.document.open(); target.document.write(renderPrintHtml(document)); target.document.close(); target.addEventListener("load", () => { target.focus(); target.print(); }, { once: true });
+  const target = window.open("", "_blank"); if (!target) throw new Error("Autorisez l’ouverture de la vue d’impression."); target.opener = null; target.addEventListener("load", () => { target.focus(); target.print(); }, { once: true }); target.document.open(); target.document.write(renderPrintHtml(document)); target.document.close();
 }
