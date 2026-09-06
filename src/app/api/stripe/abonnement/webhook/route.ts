@@ -5,6 +5,7 @@ import { verifierSignatureStripe } from "@/lib/stripe";
 import { categoriserErreurSupabase, empreinteEvenementStripe, identifiantUuidValide, resoudreModeStripeWebhook } from "@/lib/stripe-webhook-environment";
 import { passerelleStripeRemise } from "@/lib/stripe-discount-gateway";
 import { acquerirVerrouRemise, libererVerrouRemise, lireOperationActiveRemiseServeur, reconcilierOperationRemiseSousVerrou, synchroniserExpirationRemiseSousVerrou } from "@/lib/stripe-discount-server";
+import { synchroniserCapacitePersonnesDepuisStripe } from "@/lib/stripe-capacite-personnes";
 
 type StripeReference = string | { id?: string } | null | undefined;
 type StripeObjet = {
@@ -202,6 +203,7 @@ export async function synchroniserAbonnementCoordonne(
       admin, entrepriseId, abonnementActuel, verrou, passerelleStripeRemise,
     );
     if (expiration) abonnementActuel = await recupererAbonnementStripe(subscriptionId);
+    await synchroniserCapacitePersonnesDepuisStripe(admin, entrepriseId, abonnementActuel, evenementId);
     return await synchroniserAbonnement(admin, entrepriseId, abonnementActuel);
   } finally {
     await libererVerrouRemise(admin, subscriptionId, verrou);

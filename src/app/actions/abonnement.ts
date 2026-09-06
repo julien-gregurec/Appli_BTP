@@ -18,6 +18,7 @@ import {
   modifierOptionIAAbonnement,
   retirerOptionIAAbonnement,
 } from "@/lib/stripe-abonnement";
+import { modifierCapacitePersonnesStripe } from "@/lib/stripe-capacite-personnes";
 
 async function verifierDroitAbonnement() {
   const ctx = await getContexteEntreprise();
@@ -31,6 +32,32 @@ async function verifierDroitAbonnement() {
 function retourErreurAutorise(valeur: FormDataEntryValue | null) {
   const retour = String(valeur ?? "/abonnement");
   return retour.startsWith("/onboarding/besoins") ? retour : "/abonnement";
+}
+
+export async function modifierCapacitePersonnesAction(formData: FormData) {
+  const ctx = await verifierDroitAbonnement();
+  const nouvelleQuantite = Number(formData.get("nouvelle_quantite"));
+  if (!Number.isInteger(nouvelleQuantite) || nouvelleQuantite < 0 || nouvelleQuantite > 100000) {
+    redirect(`/abonnement?error=${encodeURIComponent("Quantité de capacité invalide")}`);
+  }
+  let message: string;
+  try {
+    const resultat = await modifierCapacitePersonnesStripe({
+      entrepriseId: ctx.entrepriseId,
+      nouvelleQuantite,
+      acteurId: ctx.userId,
+    });
+    message = resultat.statut === "planifiee"
+      ? `Baisse programmée au ${new Date(resultat.dateEffet).toLocaleDateString("fr-FR")}`
+      : resultat.statut === "paiement_en_attente"
+        ? "Paiement en attente : la capacité n’a pas encore été accordée"
+        : "Capacité supplémentaire mise à jour";
+  } catch (error) {
+    console.error("modifierCapacitePersonnesAction", error);
+    redirect(`/abonnement?error=${encodeURIComponent(error instanceof Error ? error.message : "Modification de capacité impossible")}`);
+  }
+  revalidatePath("/abonnement");
+  redirect(`/abonnement?succes=${encodeURIComponent(message)}`);
 }
 
 export async function demarrerAbonnementAction(formData: FormData) {

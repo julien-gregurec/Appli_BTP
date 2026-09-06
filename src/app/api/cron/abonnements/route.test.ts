@@ -11,6 +11,7 @@ vi.mock("@/lib/stripe-abonnement", () => ({
   reconcilierAbonnementStripe,
 }));
 vi.mock("@/lib/relances-cron", () => ({ traiterRelancesAutomatiques }));
+vi.mock("@/lib/stripe-capacite-personnes", () => ({ traiterBaissesCapacitePersonnesEchues: vi.fn(async () => []) }));
 
 const { GET } = await import("./route");
 

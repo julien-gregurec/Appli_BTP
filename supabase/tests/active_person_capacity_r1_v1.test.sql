@@ -186,8 +186,8 @@ select ok(
 );
 select ok(
   not has_function_privilege('anon','public.capacite_personnes_entreprise(uuid)','EXECUTE')
-  and not has_function_privilege('service_role','public.plateforme_definir_capacite_personnes_supplementaire(uuid,integer,text,text,text)','EXECUTE'),
-  'anon sans lecture capacité ; service_role sans RPC capacité plateforme'
+  and has_function_privilege('service_role','public.plateforme_definir_capacite_personnes_supplementaire(uuid,integer,text,text,text)','EXECUTE'),
+  'anon sans lecture capacité ; service_role R2 limité à la RPC capacité auditée'
 );
 select matches(
   pg_get_functiondef('public.trg_capacite_personnes_actives()'::regprocedure),

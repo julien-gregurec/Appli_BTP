@@ -7,6 +7,8 @@ const {
   appliquerCouponAbonnement,
   calculerFacturationStockage,
   creerCouponRemise,
+  changerOffreStripe,
+  identifierItemsCapacitePersonnes,
   observerRemiseDepuisAbonnement,
   prixOptionIAStripePour,
   prixStripePour,
@@ -18,6 +20,40 @@ const {
   variablesStripeBillingManquantes,
 } = await import("./stripe-abonnement");
 
+describe("items Stripe de capacité personnes", () => {
+  it("identifie la capacité par allowlist même si elle n'est pas le premier item", () => {
+    vi.stubEnv("STRIPE_PRICE_COMPTE_SUP_MINI_MENSUEL", "price_capacity");
+    const abonnement = { id: "sub", customer: "cus", status: "active", items: { data: [
+      { id: "si_ia", price: { id: "price_ia" } },
+      { id: "si_capacity", quantity: 5, price: { id: "price_capacity" } },
+    ] } };
+    expect(identifierItemsCapacitePersonnes(abonnement)).toEqual([expect.objectContaining({ id: "si_capacity", quantity: 5 })]);
+  });
+
+  it("change ensemble le Price de base et celui de capacité en conservant la quantité", async () => {
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_fake");
+    vi.stubEnv("STRIPE_PRICE_MINI_MENSUEL", "price_base_old");
+    vi.stubEnv("STRIPE_PRICE_PRO_MENSUEL", "price_base_new");
+    vi.stubEnv("STRIPE_PRICE_COMPTE_SUP_MINI_MENSUEL", "price_capacity_old");
+    vi.stubEnv("STRIPE_PRICE_COMPTE_SUP_PRO_MENSUEL", "price_capacity_new");
+    const appels: Array<{ method: string; body: string }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, options: { method?: string; body?: URLSearchParams } = {}) => {
+      if ((options.method ?? "GET") === "GET") return { ok: true, json: async () => ({
+        id: "sub", customer: "cus", status: "active", items: { data: [
+          { id: "si_capacity", quantity: 5, price: { id: "price_capacity_old" } },
+          { id: "si_base", quantity: 1, price: { id: "price_base_old" } },
+        ] },
+      }) };
+      appels.push({ method: options.method ?? "POST", body: options.body?.toString() ?? "" });
+      return { ok: true, json: async () => ({ id: "sub", customer: "cus", status: "active" }) };
+    }));
+    await changerOffreStripe("sub", "pro", "mensuel");
+    expect(appels[0].body).toContain("items%5B0%5D%5Bid%5D=si_base");
+    expect(appels[0].body).toContain("items%5B1%5D%5Bprice%5D=price_capacity_new");
+    expect(appels[0].body).toContain("items%5B1%5D%5Bquantity%5D=5");
+  });
+});
+
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
@@ -27,19 +63,13 @@ afterEach(() => {
 // Fabrique un client Supabase minimal couvrant exactement les requêtes faites par
 // reconcilierAbonnementStripe : l'entreprise (abonnement Stripe + offre/périodicité) et
 // le comptage des comptes facturables (compte_application_statut actif/pause).
-function supabaseFakePourReconciliation(params: { entreprise: Record<string, unknown> | null; nbComptes: number }) {
+function supabaseFakePourReconciliation(params: { entreprise: Record<string, unknown> | null; capacite: number }) {
   return {
     from(table: string) {
       if (table === "entreprises") {
         const requete: Record<string, unknown> = {};
         for (const methode of ["select", "eq"]) requete[methode] = () => requete;
-        requete.maybeSingle = async () => ({ data: params.entreprise, error: null });
-        return requete;
-      }
-      if (table === "employes") {
-        const requete: Record<string, unknown> = {};
-        for (const methode of ["select", "eq"]) requete[methode] = () => requete;
-        requete.in = () => Promise.resolve({ count: params.nbComptes, error: null });
+        requete.maybeSingle = async () => ({ data: params.entreprise ? { ...params.entreprise, capacite_personnes_supplementaire: params.capacite } : null, error: null });
         return requete;
       }
       throw new Error(`Table non prévue par ce mock : ${table}`);
@@ -223,7 +253,7 @@ describe("réconciliation des comptes supplémentaires (COMPTES-SUPPLEMENTAIRES-
     vi.stubEnv("NODE_ENV", "test");
     createAdminClient.mockReturnValue(supabaseFakePourReconciliation({
       entreprise: { stripe_subscription_id: "sub_test", abonnement_offre: "mini", abonnement_periodicite: "mensuel" },
-      nbComptes: 5,
+      capacite: 5,
     }));
     const { fauxFetch, appels } = fetchFakeStripe({});
     vi.stubGlobal("fetch", fauxFetch);
@@ -238,7 +268,7 @@ describe("réconciliation des comptes supplémentaires (COMPTES-SUPPLEMENTAIRES-
     vi.stubEnv("NODE_ENV", "test");
     createAdminClient.mockReturnValue(supabaseFakePourReconciliation({
       entreprise: { stripe_subscription_id: null, abonnement_offre: "mini", abonnement_periodicite: "mensuel" },
-      nbComptes: 5,
+      capacite: 5,
     }));
     const { fauxFetch, appels } = fetchFakeStripe({});
     vi.stubGlobal("fetch", fauxFetch);
@@ -254,7 +284,7 @@ describe("réconciliation des comptes supplémentaires (COMPTES-SUPPLEMENTAIRES-
     stubEnvPrixMini();
     createAdminClient.mockReturnValue(supabaseFakePourReconciliation({
       entreprise: { stripe_subscription_id: "sub_test", abonnement_offre: "mini", abonnement_periodicite: "mensuel" },
-      nbComptes: 3, // Mini inclut déjà 3 comptes.
+      capacite: 0,
     }));
     const { fauxFetch, appels } = fetchFakeStripe({});
     vi.stubGlobal("fetch", fauxFetch);
@@ -270,7 +300,7 @@ describe("réconciliation des comptes supplémentaires (COMPTES-SUPPLEMENTAIRES-
     stubEnvPrixMini();
     createAdminClient.mockReturnValue(supabaseFakePourReconciliation({
       entreprise: { stripe_subscription_id: "sub_test", abonnement_offre: "mini", abonnement_periodicite: "mensuel" },
-      nbComptes: 5, // 3 inclus + 2 supplémentaires.
+      capacite: 2,
     }));
     const { fauxFetch, appels } = fetchFakeStripe({});
     vi.stubGlobal("fetch", fauxFetch);
@@ -289,7 +319,7 @@ describe("réconciliation des comptes supplémentaires (COMPTES-SUPPLEMENTAIRES-
     stubEnvPrixMini();
     createAdminClient.mockReturnValue(supabaseFakePourReconciliation({
       entreprise: { stripe_subscription_id: "sub_test", abonnement_offre: "mini", abonnement_periodicite: "mensuel" },
-      nbComptes: 6, // 3 supplémentaires désormais.
+      capacite: 3,
     }));
     const { fauxFetch, appels } = fetchFakeStripe({ itemExistant: { id: "si_existant", price: { id: "price_compte_sup_mini_m" } } });
     vi.stubGlobal("fetch", fauxFetch);
@@ -306,7 +336,7 @@ describe("réconciliation des comptes supplémentaires (COMPTES-SUPPLEMENTAIRES-
     stubEnvPrixMini();
     createAdminClient.mockReturnValue(supabaseFakePourReconciliation({
       entreprise: { stripe_subscription_id: "sub_test", abonnement_offre: "mini", abonnement_periodicite: "mensuel" },
-      nbComptes: 3, // Retour au quota inclus.
+      capacite: 0,
     }));
     const { fauxFetch, appels } = fetchFakeStripe({ itemExistant: { id: "si_existant", price: { id: "price_compte_sup_mini_m" } } });
     vi.stubGlobal("fetch", fauxFetch);

@@ -131,6 +131,31 @@ async function main() {
     }
   }
 
+  // R2 : l'ancien nom COMPTE_SUP désigne désormais un Price unitaire de
+  // capacité de personne active. L'annuel reste hors validation commerciale ;
+  // seul le contrat mensuel figé 15/12/9/9 est bloquant ici.
+  const capaciteMensuelle = { mini: 1500, pro: 1200, business: 900, entreprise: 900 };
+  for (const [offre, centimes] of Object.entries(capaciteMensuelle)) {
+    const nomVar = `STRIPE_PRICE_COMPTE_SUP_${offre.toUpperCase()}_MENSUEL`;
+    const id = process.env[nomVar];
+    if (!id) {
+      if (STRICT) err(`${nomVar} non défini dans l'environnement`);
+      else log(`• ${nomVar} non défini — capacité R2 SKIP`);
+      continue;
+    }
+    variablesPresentes += 1;
+    const price = await recupererPrice(id);
+    if (!price || price.error) { err(`${nomVar} → Price illisible`); continue; }
+    const pbs = [];
+    if (price.unit_amount !== centimes) pbs.push(`montant ${price.unit_amount} ≠ ${centimes}`);
+    if ((price.currency || "").toLowerCase() !== "eur") pbs.push(`devise ${price.currency} ≠ eur`);
+    if (price.recurring?.interval !== "month") pbs.push(`interval ${price.recurring?.interval} ≠ month`);
+    if (price.active !== true) pbs.push("Price inactif");
+    if (price.livemode !== false) pbs.push("livemode attendu false");
+    if (pbs.length) err(`${offre} capacité (${id}) : ${pbs.join(" ; ")}`);
+    else log(`${OK} ${offre} capacité : ${(centimes / 100).toFixed(2)} € /personne/mois — ${id}`);
+  }
+
   log("");
   if (erreurs > 0) {
     err(`${erreurs} divergence(s). Le prix affiché ne correspond pas au prix facturé.`);

@@ -5,6 +5,7 @@ const deps = vi.hoisted(() => ({
   createAdminClient: vi.fn(),
   recupererAbonnementStripe: vi.fn(),
   synchroniserExpirationRemiseSousVerrou: vi.fn(async () => null),
+  synchroniserCapacitePersonnesDepuisStripe: vi.fn(async () => ({ quantite: 0, item: null })),
   statutAbonnementDepuisStripe: vi.fn(() => "actif"),
   reconcilierAbonnementStripe: vi.fn(),
   ajouterDepassementAppareilsFacture: vi.fn(),
@@ -41,6 +42,9 @@ vi.mock("@/lib/stripe-discount-server", () => ({
   lireOperationActiveRemiseServeur: deps.lireOperationActiveRemiseServeur,
   reconcilierOperationRemiseSousVerrou: deps.reconcilierOperationRemiseSousVerrou,
   synchroniserExpirationRemiseSousVerrou: deps.synchroniserExpirationRemiseSousVerrou,
+}));
+vi.mock("@/lib/stripe-capacite-personnes", () => ({
+  synchroniserCapacitePersonnesDepuisStripe: deps.synchroniserCapacitePersonnesDepuisStripe,
 }));
 
 const { POST, synchroniserAbonnementCoordonne } = await import("./route");

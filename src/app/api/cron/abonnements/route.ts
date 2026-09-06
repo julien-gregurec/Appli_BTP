@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ajouterOptionIAAbonnement, estPalierOptionIA, estPeriodiciteAbonnement, reconcilierAbonnementStripe } from "@/lib/stripe-abonnement";
 import { cronsSontActifs, relancesAutoEstActive } from "@/lib/preview-features";
 import { traiterRelancesAutomatiques } from "@/lib/relances-cron";
+import { traiterBaissesCapacitePersonnesEchues } from "@/lib/stripe-capacite-personnes";
 
 // Bascule les essais Option IA expires vers la facturation reelle. Regroupe avec le cron
 // des abonnements (et non un cron dedie) car le plan Vercel Hobby limite le nombre de
@@ -73,6 +74,7 @@ async function notifierPointagesManquantsEtAValider(admin: ReturnType<typeof cre
 // même authentification CRON_SECRET, même cadence Vercel : seul le contenu exécuté à
 // l'intérieur se ramifie en deux branches indépendantes.
 async function executerJobsHistoriques(admin: ReturnType<typeof createAdminClient>) {
+  const baissesCapacite = await traiterBaissesCapacitePersonnesEchues(admin);
   const { data: entreprises, error } = await admin.from("entreprises").select("id").not("stripe_subscription_id", "is", null).in("abonnement_statut", ["essai", "actif"]);
   if (error) {
     console.error("Échec du traitement périodique des abonnements", error);
@@ -90,7 +92,7 @@ async function executerJobsHistoriques(admin: ReturnType<typeof createAdminClien
   const optionIA = await convertirEssaisOptionIAExpires(admin);
   const paiePeriodes = await synchroniserPeriodesPaieOuvertes(admin);
   const alertesPointage = await notifierPointagesManquantsEtAValider(admin);
-  return { traitees: resultats.length, resultats, optionIA, paiePeriodes, alertesPointage };
+  return { traitees: resultats.length, resultats, baissesCapacite, optionIA, paiePeriodes, alertesPointage };
 }
 
 export async function GET(request: Request) {

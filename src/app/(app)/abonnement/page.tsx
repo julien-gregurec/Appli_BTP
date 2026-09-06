@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { choisirPalierOptionIAAction, configurerPolitiqueIAAction, demarrerAbonnementAction, desactiverOptionIAAction, ouvrirPortailAbonnementAction, reactiverOptionIAAction } from "@/app/actions/abonnement";
 import { AlerteDepassementAppareils } from "@/components/AlerteDepassementAppareils";
+import { GestionCapacitePersonnes } from "@/components/GestionCapacitePersonnes";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { calculerDepassementsAppareilsFacturables } from "@/lib/facturation-appareils";
@@ -12,6 +13,7 @@ import { BRAND_NAME, PRODUCT_NAME, resoudreUrlContactCommercial } from "@/lib/br
 import { calculerGainsOffreSuivante, calculerReductionRemise, CATEGORIES_COMPARATIF, etatLigneComparatif, LIBELLE_ETAT_COMMERCIAL, type EtatCommercial } from "@/lib/comparatif-offres";
 import { estCodeOffreTarifaire } from "@/lib/tarification";
 import { abonnementsPublicsOuverts } from "@/lib/commercialisation-abonnements";
+import { TARIF_CAPACITE_PERSONNE_MENSUEL_HT } from "@/lib/stripe-capacite-personnes";
 
 const input = "rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -26,7 +28,7 @@ const COULEUR_ETAT: Record<EtatCommercial, string> = {
 const FAQ_ABONNEMENT: Array<{ question: string; reponse: string }> = [
   { question: "Puis-je changer d'offre en cours d'abonnement ?", reponse: "Pas encore en libre-service : ni le portail Stripe, ni l'application ne proposent aujourd'hui de changement de plan autonome. Contactez-nous, le changement est fait manuellement." },
   { question: "Que se passe-t-il à la fin de l'essai de 30 jours ?", reponse: "Les nouvelles souscriptions sont temporairement fermées. Avant leur ouverture, les conditions de fin d'essai, la première échéance et le montant seront présentés pour validation. Les abonnements existants continuent selon leurs conditions contractuelles." },
-  { question: "Puis-je ajouter des comptes au-delà du nombre inclus ?", reponse: "Oui, chaque compte supplémentaire est facturé en plus selon le tarif de votre offre, visible dans la section « Coût actuel de l'application » ci-dessus." },
+  { question: "Puis-je ajouter des personnes au-delà du nombre inclus ?", reponse: "Oui, chaque place de personne active supplémentaire est facturée selon le tarif de votre offre. Les boutons +1/+5/+10 ajustent une seule quantité Stripe." },
   { question: "Où trouver mes factures d'abonnement ?", reponse: "Dans la section « Factures et historique » ci-dessous, ou via « Gérer mon abonnement » (portail Stripe) une fois souscrit." },
   { question: "Puis-je annuler mon abonnement ?", reponse: "Oui, depuis le portail Stripe (« Gérer mon abonnement ») : la résiliation prend effet à la fin de la période en cours, pas immédiatement." },
   { question: "Mes données sont-elles supprimées si j'annule ?", reponse: "Non, pas automatiquement. La suppression suit la procédure RGPD dédiée (menu Paramètres → Données), avec un délai de 30 jours avant purge définitive." },
@@ -39,7 +41,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
   const [{ error, succes }, ctx] = await Promise.all([searchParams, getContexteEntreprise()]);
   const supabase = await createClient();
   const [{ data: entreprise }, { data: utilisationStockage }, { data: employesFacturables }, { data: postes }, { data: appareils }, consommationIA, { data: facturesAbonnement }, { data: historique }, { data: capacitePersonnes }] = await Promise.all([
-    supabase.from("entreprises").select("abonnement_statut,abonnement_echeance,abonnement_offre,abonnement_periodicite,abonnement_essai_fin,abonnement_annulation_prevue_at,stripe_customer_id,stripe_subscription_id,derniere_facture_url,derniere_facture_pdf,derniere_facture_statut,derniere_facture_at,option_ia_statut,option_ia_essai_fin,option_ia_palier,ia_active,ia_politique_quota,ia_plafond_cout_mensuel_ht,remise_description,remise_appliquee_at,remise_duree_mois,remise_type,remise_valeur").eq("id",ctx.entrepriseId).single(),
+    supabase.from("entreprises").select("abonnement_statut,abonnement_echeance,abonnement_offre,abonnement_periodicite,abonnement_essai_fin,abonnement_annulation_prevue_at,stripe_customer_id,stripe_subscription_id,capacite_personnes_future,capacite_personnes_future_at,derniere_facture_url,derniere_facture_pdf,derniere_facture_statut,derniere_facture_at,option_ia_statut,option_ia_essai_fin,option_ia_palier,ia_active,ia_politique_quota,ia_plafond_cout_mensuel_ht,remise_description,remise_appliquee_at,remise_duree_mois,remise_type,remise_valeur").eq("id",ctx.entrepriseId).single(),
     supabase.rpc("utilisation_stockage_entreprise", { p_entreprise_id: ctx.entrepriseId }),
     supabase.from("employes").select("utilisateur_id,prenom,nom,poste_id,compte_application_statut").eq("entreprise_id", ctx.entrepriseId).in("compte_application_statut", ["actif", "pause"]),
     supabase.from("postes").select("id,nom,tarif_compte_mensuel").eq("entreprise_id", ctx.entrepriseId),
@@ -64,18 +66,19 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
     employes: employesFacturables ?? [],
     postes: postes ?? [],
   });
-  const nbComptesFacturables = employesFacturables?.length ?? 0;
   const supplementAppareilsMensuel = depassementsAppareils.reduce((total, ligne) => total + ligne.supplementMensuelHt, 0);
-  const prixComptes = prixAbonnementMensuel(nbComptesFacturables, offre);
   const stockageMensuel = calculerFacturationStockage({
     octetsUtilises: Number(stockage?.octets_utilises ?? 0),
     quotaGo: offre.stockageGoInclus,
     periodicite: "mensuel",
   });
   const annuel = entreprise?.abonnement_periodicite === "annuel";
-  const abonnementAvantRemiseMensuel = prixComptes.total + supplementAppareilsMensuel;
+  const capSup = Number((capacitePersonnes as { capacite_supplementaire?: number } | null)?.capacite_supplementaire ?? 0);
+  const prixCapaciteUnitaire = TARIF_CAPACITE_PERSONNE_MENSUEL_HT[offre.cle as keyof typeof TARIF_CAPACITE_PERSONNE_MENSUEL_HT] ?? 0;
+  const coutCapaciteMensuel = capSup * prixCapaciteUnitaire;
+  const abonnementAvantRemiseMensuel = offre.base + coutCapaciteMensuel + supplementAppareilsMensuel;
   const coutPeriodeEstime = annuel
-    ? prixComptes.totalAnnuel + supplementAppareilsMensuel * 12 + stockageMensuel.montantHt * 12
+    ? offre.base * 10 + coutCapaciteMensuel * 12 + supplementAppareilsMensuel * 12 + stockageMensuel.montantHt * 12
     : abonnementAvantRemiseMensuel + stockageMensuel.montantHt;
   const coutMensuelEstime = annuel ? coutPeriodeEstime / 12 : coutPeriodeEstime;
   const nouvelleGrille = ["mini", "pro", "business", "entreprise", "sur_mesure"].includes(String(entreprise?.abonnement_offre ?? ""));
@@ -133,6 +136,11 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
       {cap.sup>0&&<p className="mt-2 text-xs text-neutral-500">{cap.base} incluses dans l’offre + {cap.sup} de capacité supplémentaire.</p>}
       {cap.etat==="limite_atteinte"&&<p className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-900">Vous avez atteint la limite de personnes actives de votre abonnement. Pour en enregistrer une de plus : archivez une personne, ajoutez de la capacité ou changez d’offre. Aucune donnée n’est supprimée.</p>}
       {cap.etat==="over_capacity"&&<p className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-800">Votre abonnement autorise {cap.totale} personnes actives et vous en avez actuellement {cap.actives}. Aucune nouvelle personne ne peut être activée tant que ce dépassement dure : archivez {Math.max(1,cap.actives-cap.totale)} personne(s), ajoutez de la capacité ou changez d’offre. Aucune donnée n’est supprimée.</p>}
+      <div className="mt-4 rounded-lg bg-neutral-50 p-4 dark:bg-neutral-900">
+        <p className="text-sm"><strong>Capacité supplémentaire : {cap.sup}</strong> · {euros(prixCapaciteUnitaire)} HT/mois/personne · {euros(coutCapaciteMensuel)} HT/mois</p>
+        {entreprise?.capacite_personnes_future_at&&<p className="mt-2 text-sm text-amber-800">Baisse programmée à {Number(entreprise.capacite_personnes_future ?? 0)} place(s) le {new Date(entreprise.capacite_personnes_future_at).toLocaleDateString("fr-FR")}.</p>}
+        <GestionCapacitePersonnes actuelle={cap.sup} base={cap.base} prixUnitaire={prixCapaciteUnitaire} dateEcheance={entreprise?.abonnement_echeance ?? null} activee={souscrit&&entreprise?.abonnement_periodicite==="mensuel"&&prixCapaciteUnitaire>0}/>
+      </div>
     </section>}
 
     <section className="rounded-xl border p-5">
@@ -157,11 +165,11 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
       </div>}
       <dl className="mt-5 grid gap-3 sm:grid-cols-2">
         <div className="rounded-lg bg-neutral-50 p-3 dark:bg-neutral-900"><dt className="text-xs uppercase text-neutral-500">Offre {offre.nom}</dt><dd className="mt-1 font-semibold">{euros(offre.base)} HT/mois</dd><p className="text-xs text-neutral-500">{offre.comptesInclus} compte(s) inclus</p></div>
-        <div className="rounded-lg bg-neutral-50 p-3 dark:bg-neutral-900"><dt className="text-xs uppercase text-neutral-500">Comptes de l’entreprise</dt><dd className="mt-1 font-semibold">{nbComptesFacturables} compte(s) facturable(s)</dd><p className="text-xs text-neutral-500">{prixComptes.employesSupplementaires > 0 ? `${prixComptes.employesSupplementaires} supplémentaire(s) × ${euros(prixComptes.parEmployeSup)} HT/mois` : "Aucun compte supplémentaire"}</p></div>
+        <div className="rounded-lg bg-neutral-50 p-3 dark:bg-neutral-900"><dt className="text-xs uppercase text-neutral-500">Capacité personnes</dt><dd className="mt-1 font-semibold">{capSup} place(s) supplémentaire(s)</dd><p className="text-xs text-neutral-500">{capSup > 0 ? `${capSup} × ${euros(prixCapaciteUnitaire)} HT/mois` : "Aucune capacité supplémentaire"}</p></div>
         <div className="rounded-lg bg-neutral-50 p-3 dark:bg-neutral-900"><dt className="text-xs uppercase text-neutral-500">Appareils supplémentaires</dt><dd className="mt-1 font-semibold">{euros(supplementAppareilsMensuel)} HT/mois</dd><p className="text-xs text-neutral-500">Deux appareils actifs sont inclus par salarié</p></div>
         <div className="rounded-lg bg-neutral-50 p-3 dark:bg-neutral-900"><dt className="text-xs uppercase text-neutral-500">Stockage supplémentaire</dt><dd className="mt-1 font-semibold">{euros(stockageMensuel.montantHt)} HT/mois</dd><p className="text-xs text-neutral-500">{stockageMensuel.depassementGo > 0 ? `${stockageMensuel.depassementGo.toLocaleString("fr-FR")} Go au-delà du quota` : "Aucun dépassement"}</p></div>
       </dl>
-      <p className="mt-3 text-xs text-neutral-500">Les comptes actifs et en pause restent facturables. {annuel ? "Le prix annuel contractuel de l’offre est appliqué ; les options et dépassements restent détaillés séparément." : "Le montant définitif peut varier en cas de prorata ou de changement en cours de période."}</p>
+      <p className="mt-3 text-xs text-neutral-500">La capacité achetée porte sur les personnes actives enregistrées, qu’elles aient ou non un compte de connexion. {annuel ? "Le prix annuel contractuel de l’offre est appliqué ; les options et dépassements restent détaillés séparément." : "Le montant définitif peut varier en cas de prorata ou de changement en cours de période."}</p>
     </section>
 
     <AlerteDepassementAppareils lignes={depassementsAppareils}/>

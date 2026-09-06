@@ -91,6 +91,8 @@ const VARIABLES_PRIX: Partial<Record<OffreAbonnement, Record<PeriodiciteAbonneme
   entreprise: { mensuel: "STRIPE_PRICE_ENTREPRISE_MENSUEL", annuel: "STRIPE_PRICE_ENTREPRISE_ANNUEL" },
 };
 
+// Dette de nommage conservée pour R2 : les variables COMPTE_SUP portent désormais
+// un Price unitaire de capacité de PERSONNE ACTIVE, jamais un compteur Auth.
 const VARIABLES_PRIX_COMPTE_SUP: Partial<Record<OffreAbonnement, Record<PeriodiciteAbonnement, string>>> = {
   essentiel: { mensuel: "STRIPE_PRICE_COMPTE_SUP_ESSENTIEL_MENSUEL", annuel: "STRIPE_PRICE_COMPTE_SUP_ESSENTIEL_ANNUEL" },
   pro: { mensuel: "STRIPE_PRICE_COMPTE_SUP_PRO_MENSUEL", annuel: "STRIPE_PRICE_COMPTE_SUP_PRO_ANNUEL" },
@@ -99,6 +101,47 @@ const VARIABLES_PRIX_COMPTE_SUP: Partial<Record<OffreAbonnement, Record<Periodic
   business: { mensuel: "STRIPE_PRICE_COMPTE_SUP_BUSINESS_MENSUEL", annuel: "STRIPE_PRICE_COMPTE_SUP_BUSINESS_ANNUEL" },
   entreprise: { mensuel: "STRIPE_PRICE_COMPTE_SUP_ENTREPRISE_MENSUEL", annuel: "STRIPE_PRICE_COMPTE_SUP_ENTREPRISE_ANNUEL" },
 };
+
+export function prixCapacitePersonneStripePour(
+  offre: OffreAbonnement,
+  periodicite: PeriodiciteAbonnement,
+  environnement: NodeJS.ProcessEnv = process.env,
+) {
+  const variable = VARIABLES_PRIX_COMPTE_SUP[offre]?.[periodicite];
+  return variable ? environnement[variable] || null : null;
+}
+
+export function prixCapacitePersonneStripeAutorises(environnement: NodeJS.ProcessEnv = process.env) {
+  return new Set(
+    Object.values(VARIABLES_PRIX_COMPTE_SUP)
+      .flatMap((variables) => Object.values(variables ?? {}))
+      .map((variable) => environnement[variable])
+      .filter((prix): prix is string => Boolean(prix)),
+  );
+}
+
+export function identifierItemsCapacitePersonnes(
+  abonnement: StripeSubscription,
+  environnement: NodeJS.ProcessEnv = process.env,
+) {
+  const allowlist = prixCapacitePersonneStripeAutorises(environnement);
+  return (abonnement.items?.data ?? []).filter((item) => item.price?.id && allowlist.has(item.price.id));
+}
+
+export function identifierItemBaseAbonnement(
+  abonnement: StripeSubscription,
+  environnement: NodeJS.ProcessEnv = process.env,
+) {
+  const allowlist = new Set(
+    Object.values(VARIABLES_PRIX)
+      .flatMap((variables) => Object.values(variables ?? {}))
+      .map((variable) => environnement[variable])
+      .filter((prix): prix is string => Boolean(prix)),
+  );
+  const items = (abonnement.items?.data ?? []).filter((item) => item.price?.id && allowlist.has(item.price.id));
+  if (items.length !== 1) throw new Error("Ligne de forfait Stripe absente ou dupliquée");
+  return items[0];
+}
 
 export const PALIERS_OPTION_IA = ["100", "300", "illimite"] as const;
 export type PalierOptionIA = (typeof PALIERS_OPTION_IA)[number];
@@ -399,42 +442,58 @@ export async function changerOffreStripe(
   periodicite: PeriodiciteAbonnement,
 ) {
   const abonnement = await recupererAbonnementStripe(subscriptionId);
-  const itemId = abonnement.items?.data?.[0]?.id;
+  const itemId = identifierItemBaseAbonnement(abonnement).id;
   const prix = prixStripePour(offre, periodicite);
   if (!itemId || !prix) throw new Error("La ligne d’abonnement Stripe est introuvable");
+  const itemsCapacite = identifierItemsCapacitePersonnes(abonnement);
+  if (itemsCapacite.length > 1) throw new Error("Lignes de capacité Stripe dupliquées");
+  const itemCapacite = itemsCapacite[0];
+  const prixCapacite = prixCapacitePersonneStripePour(offre, periodicite);
+  if (itemCapacite && !prixCapacite) throw new Error("Le Price de capacité du nouveau forfait est absent");
+  const corps = new URLSearchParams({
+    "items[0][id]": itemId,
+    "items[0][price]": prix,
+    proration_behavior: "create_prorations",
+    "metadata[offre]": offre,
+    "metadata[periodicite]": periodicite,
+  });
+  if (itemCapacite && prixCapacite) {
+    corps.set("items[1][id]", itemCapacite.id);
+    corps.set("items[1][price]", prixCapacite);
+    corps.set("items[1][quantity]", String(itemCapacite.quantity ?? 1));
+  }
   return requeteStripe<StripeSubscription>(`subscriptions/${encodeURIComponent(subscriptionId)}`, {
-    corps: new URLSearchParams({
-      [`items[0][id]`]: itemId,
-      [`items[0][price]`]: prix,
-      proration_behavior: "create_prorations",
-      "metadata[offre]": offre,
-      "metadata[periodicite]": periodicite,
-    }),
+    corps,
     idempotence: `abonnement-changement-${subscriptionId}-${offre}-${periodicite}`,
   });
 }
 
 export async function reconcilierAbonnementStripe(entrepriseId: string) {
   const admin = createAdminClient();
-  const { data: entreprise } = await admin.from("entreprises").select("stripe_subscription_id,abonnement_offre,abonnement_periodicite").eq("id", entrepriseId).maybeSingle();
+  const { data: entreprise, error } = await admin.from("entreprises").select("stripe_subscription_id,abonnement_offre,abonnement_periodicite,capacite_personnes_supplementaire").eq("id", entrepriseId).maybeSingle();
+  if (error) throw new Error("Lecture de la capacité impossible");
   const offre = String(entreprise?.abonnement_offre ?? "");
   const periodicite = String(entreprise?.abonnement_periodicite ?? "");
   if (!entreprise?.stripe_subscription_id || !estOffreAbonnement(offre) || !estPeriodiciteAbonnement(periodicite)) {
     return { synchronise: false, raison: "abonnement_absent" } as const;
   }
-  const variablePrixSupplement = VARIABLES_PRIX_COMPTE_SUP[offre]?.[periodicite];
-  const prixSupplement = variablePrixSupplement ? process.env[variablePrixSupplement] : undefined;
+  const prixSupplement = prixCapacitePersonneStripePour(offre, periodicite);
   if (!prixSupplement) return { synchronise: false, raison: "prix_supplement_absent" } as const;
-  const { count } = await admin.from("employes").select("id", { count: "exact", head: true }).eq("entreprise_id", entrepriseId).in("compte_application_statut", ["actif", "pause"]);
-  const quantite = Math.max(0, Number(count ?? 0) - offreParCle(offre).comptesInclus);
+  const quantite = Math.max(0, Number(entreprise.capacite_personnes_supplementaire ?? 0));
   const abonnement = await recupererAbonnementStripe(entreprise.stripe_subscription_id);
-  const item = abonnement.items?.data?.find((ligne) => ligne.price?.id === prixSupplement);
+  const itemsCapacite = identifierItemsCapacitePersonnes(abonnement);
+  if (itemsCapacite.length > 1) throw new Error("Lignes de capacité Stripe dupliquées");
+  const item = itemsCapacite[0];
   if (item && quantite === 0) {
-    await requeteStripe(`subscription_items/${encodeURIComponent(item.id)}`, { methode: "DELETE", corps: new URLSearchParams({ proration_behavior: "create_prorations" }), idempotence: `abonnement-suppression-comptes-${entrepriseId}-${Date.now()}` });
+    await requeteStripe(`subscription_items/${encodeURIComponent(item.id)}`, { methode: "DELETE", corps: new URLSearchParams({ proration_behavior: "create_prorations" }), idempotence: `capacite-suppression-${entrepriseId}-${item.id}` });
   } else if (item) {
-    await requeteStripe(`subscription_items/${encodeURIComponent(item.id)}`, { corps: new URLSearchParams({ quantity: String(quantite), proration_behavior: "create_prorations" }), idempotence: `abonnement-comptes-${entrepriseId}-${quantite}` });
+    if (item.price?.id !== prixSupplement) {
+      await requeteStripe(`subscription_items/${encodeURIComponent(item.id)}`, { corps: new URLSearchParams({ price: prixSupplement, quantity: String(quantite), proration_behavior: "create_prorations" }), idempotence: `capacite-price-${entrepriseId}-${prixSupplement}-${quantite}` });
+    } else if (Number(item.quantity ?? 0) !== quantite) {
+      await requeteStripe(`subscription_items/${encodeURIComponent(item.id)}`, { corps: new URLSearchParams({ quantity: String(quantite), proration_behavior: "create_prorations" }), idempotence: `capacite-quantite-${entrepriseId}-${quantite}` });
+    }
   } else if (quantite > 0) {
-    await requeteStripe(`subscription_items`, { corps: new URLSearchParams({ subscription: entreprise.stripe_subscription_id, price: prixSupplement, quantity: String(quantite), proration_behavior: "create_prorations" }), idempotence: `abonnement-ajout-comptes-${entrepriseId}-${quantite}` });
+    await requeteStripe(`subscription_items`, { corps: new URLSearchParams({ subscription: entreprise.stripe_subscription_id, price: prixSupplement, quantity: String(quantite), proration_behavior: "create_prorations" }), idempotence: `capacite-ajout-${entrepriseId}-${quantite}` });
   }
   return { synchronise: true, quantite } as const;
 }
