@@ -13,6 +13,10 @@ import { OperationRemiseAReconcilier, type EtatSouhaiteRemise, type OperationRem
 import { reconcilierOperationRemiseServeur, resoudreAbonnementOperationRemiseServeur } from "@/lib/stripe-discount-server";
 import { passerelleStripeRemise } from "@/lib/stripe-discount-gateway";
 
+// UID Supabase Auth de la cible : accepté seulement au format UUID canonique. La RPC
+// vérifie ensuite que ce compte existe, porte exactement le même email et l’a confirmé.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function modifierAbonnementAction(entrepriseId: string, formData: FormData) {
   if (!(await estPlateformeAdmin())) {
     redirect("/dashboard");
@@ -174,6 +178,73 @@ export async function retirerAdminPlateformeAction(formData: FormData) {
   }
   revalidatePath("/plateforme");
   redirect(`/plateforme?succes=${encodeURIComponent(`${email} révoqué de l'équipe plateforme`)}`);
+}
+
+/**
+ * Cycle d'identité d'un administrateur plateforme — ELSATIA-GP-PLATFORM-SECOND-ADMIN-OPERABILITY-P1-V1.
+ *
+ * `plateforme_ajouter_admin` (déjà câblée) ne crée qu'une identité `en_attente` :
+ * sans droit, sans UID. Les deux étapes qui la transforment en second administrateur
+ * réellement opérationnel — `plateforme_rattacher_admin` puis `plateforme_activer_admin`
+ * (migration 20260826000237, ledger 263) — n'étaient appelées par aucun écran. Le seul
+ * chemin restant était du SQL manuel : bus factor 1 sur la plateforme.
+ *
+ * Ces actions ne font que router l'appel. Aucune garde n'est déplacée côté application :
+ * chaque RPC exige elle-même le rôle `total`, une session AAL2 (claim `aal` du JWT vérifié),
+ * un verrou advisory sérialisant le cycle, l'email Auth confirmé, le MFA vérifié de la cible
+ * et refuse l'auto-rattachement comme l'auto-activation. Aucune migration n'est ajoutée.
+ *
+ * La trace reste celle de la base : `plateforme_admins` porte `activation_at/activation_par`,
+ * `revocation_at/revocation_par/revocation_origine` et `role_updated_at/role_updated_by`,
+ * écrits par les RPC avec `auth.uid()` de l'appelant. `plateforme_journaliser` est révoquée
+ * à `authenticated` : l'application ne peut ni écrire ni contourner ce journal.
+ */
+export async function rattacherAdminPlateformeAction(formData: FormData) {
+  if (!(await estPlateformeAdmin())) redirect("/dashboard");
+  if (isEmailLoginDisabled()) {
+    redirect(`/plateforme?error=${encodeURIComponent("La gestion des administrateurs plateforme est désactivée en mode démonstration")}`);
+  }
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const utilisateurId = String(formData.get("utilisateur_id") ?? "").trim();
+  if (!email || !email.includes("@")) redirect(`/plateforme?error=${encodeURIComponent("Email invalide")}`);
+  if (!UUID_RE.test(utilisateurId)) {
+    redirect(`/plateforme?error=${encodeURIComponent("Identifiant du compte Supabase invalide : copiez l’UID affiché dans Authentication → Users")}`);
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("plateforme_rattacher_admin", { p_email: email, p_utilisateur_id: utilisateurId });
+  if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/plateforme");
+  redirect(`/plateforme?succes=${encodeURIComponent(`${email} rattaché à son compte Supabase. L’identité reste sans droit tant qu’elle n’est pas activée.`)}`);
+}
+
+export async function activerAdminPlateformeAction(formData: FormData) {
+  if (!(await estPlateformeAdmin())) redirect("/dashboard");
+  if (isEmailLoginDisabled()) {
+    redirect(`/plateforme?error=${encodeURIComponent("La gestion des administrateurs plateforme est désactivée en mode démonstration")}`);
+  }
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!email) redirect(`/plateforme?error=${encodeURIComponent("Email manquant")}`);
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("plateforme_activer_admin", { p_email: email });
+  if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/plateforme");
+  redirect(`/plateforme?succes=${encodeURIComponent(`${email} est administrateur plateforme actif. Activation tracée avec votre identifiant.`)}`);
+}
+
+// Détacher n'est possible qu'après révocation et fermeture des sessions support :
+// la RPC le vérifie. L'étape libère l'UID pour un futur rattachement.
+export async function detacherAdminPlateformeAction(formData: FormData) {
+  if (!(await estPlateformeAdmin())) redirect("/dashboard");
+  if (isEmailLoginDisabled()) {
+    redirect(`/plateforme?error=${encodeURIComponent("La gestion des administrateurs plateforme est désactivée en mode démonstration")}`);
+  }
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!email) redirect(`/plateforme?error=${encodeURIComponent("Email manquant")}`);
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("plateforme_detacher_admin_revoque", { p_email: email });
+  if (error) redirect(`/plateforme?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/plateforme");
+  redirect(`/plateforme?succes=${encodeURIComponent(`Compte Supabase détaché de ${email}`)}`);
 }
 
 export async function modifierTarifPostePlateformeAction(posteId: string, formData: FormData) {
