@@ -559,7 +559,11 @@ body[data-elsatia-update-banner] .offline-flag { top: calc(env(safe-area-inset-t
   .pricing-grid { grid-template-columns: 1fr; }
   .monetization-panel { padding: 22px 18px; }
   .atelier-hero h1 { font-size: 27px; }
-  .atelier-card { grid-template-columns: 1fr; }
+  /* `minmax(0, 1fr)` et non `1fr` : une piste `1fr` ne descend jamais sous le min-content de la
+     carte (titre, horodatage, actions), ce qui portait la carte a 389px dans un viewport de
+     375px et faisait defiler l'Atelier horizontalement sur telephone. */
+  .atelier-list { grid-template-columns: minmax(0, 1fr); }
+  .atelier-card { grid-template-columns: minmax(0, 1fr); }
   .atelier-card a { width: 100%; }
   .atelier-choices { grid-template-columns: 1fr; }
   .atelier-nav button { flex: 1; }
