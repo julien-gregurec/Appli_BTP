@@ -1,22 +1,46 @@
 # ELSATIA — Préflight final de cutover Production V1
 
-Version 1.3 — 2026-09-05 (**rebasage de cible**, lot `ELSATIA-CUTOVER-FINAL-TARGET-REBASE-V1`).
+> **📘 Document de RÉFÉRENCE DÉTAILLÉE — non opératoire seul.**
+> La conduite du jour J se fait avec la source unique :
+> **`docs/runbooks/ELSATIA_GP_CUTOVER_DAY_OF_RUNBOOK_V1.md`**, qui **prime en cas de divergence**.
+> Ce document reste en vigueur pour le détail des étapes, la fiche variables et les preuves (§13).
+> Index et statuts : `docs/runbooks/INDEX_CUTOVER_GP_V1.md`.
+> Correction `ELSATIA-GP-CUTOVER-DOCUMENTATION-CLOSURE-V1` (2026-09-06) : le gate **T-45** de
+> §14.2 affichait un gap périmé (« 50 ou 51 ») ; **la seule valeur canonique est 53**.
+
+Version 1.5 — 2026-09-05 (**fiche variables réalignée sur le runtime réel**, lot
+`ELSATIA-GP-CUTOVER-ENV-DOC-DELTA-CLOSURE-V1`, sur la base de l'audit
+`ELSATIA-GP-CUTOVER-ENV-PREFLIGHT-AUDIT-V1` ; version 1.4 = `ELSATIA-GP-CUTOVER-RUNBOOK-AND-QA-REBASE-V1` ;
+version 1.3 = `ELSATIA-CUTOVER-FINAL-TARGET-REBASE-V1`).
 **Documentation opérateur — lecture / préparation, plus preuves d'exécution offline au §13 et
 pack opérationnel de fenêtre aux §14–§27.** Aucune migration Production, aucun déploiement
-Production, aucune mutation Stripe Live, aucun secret affiché, aucune modification de code ou de
-migration Production dans ce lot.
+Production, aucune mutation Stripe Live, aucun secret affiché, aucune migration modifiée.
+Le lot 1.4 ajoutait **uniquement des fichiers de test** et de la documentation ; **le lot 1.5 ne
+touche que de la documentation** (§5 réécrite, §8, §11, §17, §23) : aucun fichier de production
+modifié, l'artefact déployable reste `996be15` inchangé.
 
-> **Rebasage 2026-09-05 — cible cutover figée sur `1d15289` / ledger 263.** Deux lots validés
-> depuis la version 1.2 (`1d15289` remplace l'ancien SHA cible `c1930ab` partout dans ce
-> document) : recette premier client (migration `…000264`, correctifs onboarding/ACL
-> `entreprise_besoins` et `cout_horaire` employé) et politique d'essai (migration `…000265`,
-> essai 30 jours borné aux modules catalogue `actif`). Baseline Production confirmée = **210
-> migrations** (dernière `…000231`) ; gap réel = **53 migrations** (`…000200` → `…000265`,
-> canonicalisées lexicalement avant `…000216`). Drill complet (Fresh 263, Restore 210→263,
-> rollback 210→263→210, drift ACL = 0) rejoué et documenté au §13 ; voir le rapport de mission
-> `ELSATIA-CUTOVER-FINAL-TARGET-REBASE-V1` pour le détail intégral. Toute mention résiduelle de
-> `c1930ab` / ledger 261 / gap 51 ailleurs dans ce document doit être lue comme remplacée par
-> cette cible.
+> **Cible cutover figée sur `996be15` / ledger 263.** `996be15` est le HEAD de la branche
+> canonique `feat/elsatia-commercial-canonical-r1-r2-r3-v1` et remplace, comme cible applicative,
+> les SHA successivement annoncés `c1930ab` (v1.2), `a81f317`, `b371641` puis `1d15289` (v1.3).
+> Baseline Production confirmée = **210 migrations** (dernière `…000231`) ; gap réel =
+> **53 migrations** (`…000200` → `…000265`, canonicalisées lexicalement avant `…000216`).
+> Toute mention résiduelle de `c1930ab` / ledger 261 / gap 51 ailleurs dans ce document doit être
+> lue comme remplacée par cette cible.
+>
+> **Attribution des preuves — ne pas confondre les deux étages (lot
+> `ELSATIA-GP-CUTOVER-RUNBOOK-AND-QA-REBASE-V1`, 2026-09-05).**
+>
+> | Étage | SHA d'exécution réel | Date | Où |
+> |---|---|---|---|
+> | **Drill DB** — Fresh 263, Restore 210→263, rollback 210→263→210, pgTAP 54/1154, drift ACL 0 | **`a81f317`** | 2026-09-05 | §13.1–§13.4 |
+> | **QA applicative** — Vitest GP + Tools, typecheck, ESLint, build, `verify:migrations`, `verify:secrets`, `npm audit`, `git diff --check` | **`996be15`** | 2026-09-05 | §13.5 |
+>
+> Le drill DB **n'a pas été exécuté à `996be15`** et ce document ne l'affirme nulle part. Il reste
+> valable pour `996be15` par **identité stricte de l'arbre `supabase/migrations/`** entre
+> `a81f317`, `1d15289` et `996be15` (même objet git `3691fc7dd1ad6e3082349b1517861d27f8ac9546` ;
+> `git diff --name-status a81f317..996be15 -- supabase/migrations/` = vide). Les trois commits
+> applicatifs intercalés (`36642e3` légal, `b371641` OpenAI `store:false`, `1d15289` e-mail/avoir)
+> ne touchent aucune migration ; ils sont couverts par la QA applicative §13.5 rejouée à `996be15`.
 
 Il **met à jour** la cible du cutover avec le vrai HEAD commercial canonique et se superpose au
 runbook de bascule/rollback existant :
@@ -25,8 +49,11 @@ runbook de bascule/rollback existant :
 - Preuves BDD E2E + rollback local (cible 253) : `docs/audits/ELSATIA_PREPROD_DB_E2E_ROLLBACK_V1.md`.
 - Canonicalisation d'historique : `docs/audits/migration-canonicalization-v2.md`.
 - Revue indépendante préprod : `docs/audits/ELSATIA_PREPROD_INDEPENDENT_REVIEW_V1_R2.md`.
-- **Preuves d'exécution offline au SHA `1d15289` (Fresh 263, Restore→263, rollback, drift ACL)** :
-  §13 de ce document (lot `ELSATIA-CUTOVER-OFFLINE-P0-CLOSURE-V1`, 2026-09-04).
+- **Preuves d'exécution offline du drill DB — exécuté au SHA `a81f317`** (Fresh 263,
+  Restore→263, rollback 210→263→210, drift ACL) : §13.1–§13.4 de ce document (lot
+  `ELSATIA-CUTOVER-OFFLINE-P0-CLOSURE-V1` puis rejeu `ELSATIA-CUTOVER-FINAL-TARGET-REBASE-V1`).
+- **QA applicative rejouée au SHA cible `996be15`** (Vitest, typecheck, lint, build, verify,
+  audit) : §13.5 (lot `ELSATIA-GP-CUTOVER-RUNBOOK-AND-QA-REBASE-V1`, 2026-09-05).
 - **Pack opérationnel de fenêtre réelle** (rôles, P0-1/P0-3/T0/MFA/multitenant/Colors-Tools/
   Stripe/GO/rollback) : §14–§27 de ce document (lot
   `ELSATIA-PRODUCTION-CUTOVER-WINDOW-PREPARATION-V1`, 2026-09-04).
@@ -43,7 +70,7 @@ runbook de bascule/rollback existant :
 | Élément | Runbook V1 (2026-09-02) | Préflight final (ce document) |
 |---|---|---|
 | Branche cible | `feat/tarification-on-canonical-preprod-v1` | `feat/elsatia-commercial-canonical-r1-r2-r3-v1` |
-| SHA cible | `ac7bf050…` | **`1d15289294434643b5085af3585440ac2d162ddc`** |
+| SHA cible | `ac7bf050…` | **`996be15c136f09d9977375e700462b503a1720c3`** |
 | Ledger cible | 253 (`…000255`) | **263 (`…000265`)** |
 | Delta vs `ac7bf05` | — | **+10 migrations** : `…000256` → `…000265` (R1 capacité, R3 modules, R2 Stripe capacité, ACL webhook abonnement, clôture lifecycle, correctif ACL onboarding/`entreprise_besoins`, correctif `cout_horaire` employé, essai 30 jours borné aux modules catalogue) |
 | Frontend Production actuel | `release/commercialisation-v1` @ `fcdd4e7c` (obsolète pré-canonique) | inchangé |
@@ -77,7 +104,7 @@ reconfirmée par une lecture en lecture seule** par l'opérateur, à T-60 :
 # jeton d'accès personnel Supabase requis dans l'environnement de l'opérateur
 supabase login                      # ou export SUPABASE_ACCESS_TOKEN=...
 supabase migration list --linked --project-ref exhvuzegsefmoguxoiak
-# → colonne "Remote" = ledger réel ; comparer au fichier supabase/migrations/ de 1d15289
+# → colonne "Remote" = ledger réel ; comparer au fichier supabase/migrations/ de 996be15
 
 # ledger brut + sentinelles (psql lecture seule sur la chaîne Production)
 psql "$PROD_READONLY_DSN" -c "select count(*), max(version) from supabase_migrations.schema_migrations;"
@@ -92,19 +119,19 @@ psql "$PROD_READONLY_DSN" -c "select
 ```
 
 **Sortie attendue à archiver** : liste ordonnée des versions Production + `count`/`max` +
-sentinelles. Le diff `versions canoniques (1d15289) − versions Production` **est** la liste
+sentinelles. Le diff `versions canoniques (996be15) − versions Production` **est** la liste
 d'application du §2.
 
 ---
 
 ## 2. Migration gap — liste ordonnée à appliquer
 
-Cible canonique : **263 migrations** (`supabase/migrations/*.sql` @ `1d15289`,
+Cible canonique : **263 migrations** (`supabase/migrations/*.sql` @ `996be15`,
 `verify:migrations` = « 263 migrations valides, noms et horodatages uniques »).
 
 Aucune migration historique déjà présente sur Production (≤ `fcdd4e7c`) n'est modifiée par la
 lignée canonique — vérifié par la revue indépendante R2
-(`git diff fcdd4e7c..1d15289 -- supabase/migrations/` : aucune migration existante touchée).
+(`git diff fcdd4e7c..996be15 -- supabase/migrations/` : aucune migration existante touchée).
 **Le cutover est donc purement additif (append-only).**
 
 ### 2.1 Volume
@@ -113,7 +140,7 @@ lignée canonique — vérifié par la revue indépendante R2
 |---|---|---|
 | ledger **210** (dernière `…000231`) | ledger **263** (dernière `…000265`) | **53** |
 
-La liste exacte = **toute version de `supabase/migrations/` @ `1d15289` absente du ledger
+La liste exacte = **toute version de `supabase/migrations/` @ `996be15` absente du ledger
 Production**, appliquée **dans l'ordre lexical du nom de fichier** (= ordre d'application).
 Y compris les versions à horodatage inférieur au `max(version)` Production (migrations Preview-only
 et réconciliations réintégrées par la canonicalisation v2).
@@ -152,9 +179,10 @@ supplémentaire pour l'ancien binaire au-delà de ce que 255 impose déjà (cf. 
 ### 2.4 Contrôles post-application (T0)
 
 - ledger final = **263**, `…000263` présente, `…000255` présente, aucune collision de timestamp ;
-- `verify:migrations` (dans un environnement portant le code `1d15289`) = 263 uniques ;
+- `verify:migrations` (dans un environnement portant le code `996be15`) = 263 uniques ;
 - second passage `supabase migration up` : `applied: []` ;
-- pgTAP Production ciblé (référence Fresh 263 **et** Restore→263, drill offline §13.1/§13.2 :
+- pgTAP Production ciblé (référence Fresh 263 **et** Restore→263, drill offline §13.1/§13.2
+  exécuté au SHA `a81f317`, arbre de migrations identique à `996be15` :
   **54 fichiers / 1154 tests — PASS**, identique sur les deux) + smoke SQL sentinelles inchangées ;
 - 5 lignes d'audit tarifaire (`…000254`) attendues sur Production (0 si l'état est déjà réconcilié).
 
@@ -171,13 +199,16 @@ supplémentaire pour l'ancien binaire au-delà de ce que 255 impose déjà (cf. 
    `fcdd4e7c` échouera fermé sur des chemins plateforme/remise et ignore R1/R2/R3.
 
 2. **Un cutover coordonné DB + app est nécessaire.** Ordre : migrations (T0) → déploiement de
-   l'app sur **`1d15289`** (T+15) → contrôles → ouverture (T+30). L'app `1d15289` est la seule
-   qui connaît le schéma cible complet (ACL 255, MFA/AAL2, Colors, Tools, R1/R2/R3).
+   l'app sur **`996be15`** (T+15) → contrôles → ouverture (T+30). L'app `996be15` est la seule
+   qui connaît le schéma cible complet (ACL 255, MFA/AAL2, Colors, Tools, R1/R2/R3). Le chemin de
+   déploiement est : **promotion de `996be15` dans `release/commercialisation-v1`** (la Production
+   Branch Vercel, inchangée) → déploiement de cette release. La Production Branch **ne devient pas**
+   la branche `feat/…` ; sa configuration Vercel n'est pas modifiée par le cutover.
 
 3. **Point de non-retour exact : application de `20260902000255_acl_reconciliation_v1`.**
    Avant : un rollback Vercel seul suffit. Après : le rollback code seul est insuffisant — les
    migrations 256–263 ne déplacent pas ce point (append-only, sans REVOKE large supplémentaire),
-   mais elles élargissent le schéma que seul `1d15289` sait exploiter.
+   mais elles élargissent le schéma que seul `996be15` sait exploiter.
 
 4. **Rollback = restauration DB (PITR / snapshot pris à T-30) + redéploiement coordonné du
    frontend correspondant à l'état DB restauré.** Détail : runbook V1 §5 (stratégies A/B/C),
@@ -208,53 +239,215 @@ Aucun secret n'apparaît dans les manifestes, dumps, tickets ou logs. Le rôle d
 
 ## 5. Variables / secrets requis avant cutover — **noms uniquement**
 
-Valeurs jamais affichées. Présence/état à cocher sur la fiche Vercel (runbook V1 §10).
+Valeurs de secrets jamais affichées. Fiche **alignée sur le runtime réel** lu au SHA cible
+`996be15` (lot `ELSATIA-GP-CUTOVER-ENV-PREFLIGHT-AUDIT-V1`, 2026-09-05) : plus aucune variante
+« selon convention », et séparation explicite entre ce qui est **consommé par le code**, ce qui est
+**réservé aux scripts d'ops**, et ce qui possède un **défaut dans le code**.
 
-**Supabase (Production) :** `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-(ou `NEXT_PUBLIC_SUPABASE_ANON_KEY` selon convention), `SUPABASE_SERVICE_ROLE_KEY`.
+### 5.0 Type Vercel `sensitive` — ce qui ne peut PAS être relu pendant la fenêtre
 
-**Stripe (TEST — recette Production fermée) :** `STRIPE_SECRET_KEY` (clé `sk_test_…`),
-`STRIPE_WEBHOOK_EXPECTED_MODE` (= `test`), `STRIPE_WEBHOOK_ABONNEMENT_SECRET`,
-`STRIPE_WEBHOOK_SECRET`, `STRIPE_WEBHOOK_BOUTIQUE_SECRET`,
-`STRIPE_PRICE_{MINI,PRO,BUSINESS,ENTREPRISE}_{MENSUEL,ANNUEL}`,
-`STRIPE_PRICE_COMPTE_SUP_{…}_{MENSUEL,ANNUEL}`, `STRIPE_PRICE_OPTION_IA_{100,300,ILLIMITE}_{MENSUEL,ANNUEL}`,
-`STRIPE_AUTOMATIC_TAX_ENABLED`, `STRIPE_CONNECT_CLIENT_ID` (si Connect utilisé).
+Sur `elsatia-production`, **27 des 46 variables sont de type Vercel `sensitive`** : leur valeur est
+**irrécupérable**, y compris par le propriétaire du projet et y compris via `vercel env pull`.
+`vercel env ls` n'affiche que le **nom** et le type.
 
-**Attestation Ed25519 (Stripe state proof) :** `STRIPE_STATE_ATTESTATION_KEY_ID` (non secret,
-doit correspondre entre Vercel et la registry en base), `STRIPE_STATE_ATTESTATION_PRIVATE_KEY_B64`
-(**Vercel uniquement**, jamais dans doc/dump/log). Les deux étaient absentes sur
-`elsatia-production` au 2026-09-04 ; couple Ed25519 (`test`) généré, auto-vérifié et prêt à
-provisionner — procédure complète, formats exacts, migration créatrice (`…244`/`…245`) et
-commandes Vercel/SQL : `ELSATIA_ED25519_ATTESTATION_PROVISIONING_V1.md`. Le registry DB
-(`stripe_attestation.public_keys`/`.configuration`) ne peut être rempli qu'**après** que le
-ledger a atteint `…245` — jamais avant.
+Sont concernées, au-delà des vrais secrets :
 
-**Feature flags / gel commercial :** `ABONNEMENTS_PUBLICS_OUVERTS` (= `false`),
-`FEATURE_AI_ENABLED`, `FEATURE_BOUTIQUE_ENABLED`, `FEATURE_CRONS_ENABLED`,
-`DISABLE_EMAIL_LOGIN` (= `false` en Production), `ELSATIA_APPLICATION_ENV`.
+`FEATURE_AI_ENABLED`, `FEATURE_AI_DEVIS_ENABLED`, `FEATURE_RELANCES_AUTO_ENABLED`,
+`STRIPE_SECRET_KEY`, **tous** les `STRIPE_PRICE_*`, `SUPPORT_EMAIL`, `EMAIL_FROM_ADDRESS`.
 
-**URLs app :** `NEXT_PUBLIC_APP_URL` (= `https://app.elsatia.fr`), `SUPPORT_EMAIL`
-(= `support@elsatia.fr`), `EMAIL_FROM_ADDRESS`, `EMAIL_FROM_NAME`.
+**Conséquence opératoire, à ne pas contourner** : pour ces variables, « vérifier la valeur » est
+**impossible**. Aucune case de ce runbook ne doit être cochée sur la foi d'une lecture de valeur, et
+aucun secret ne doit être affiché pour « contrôler ». Les deux seules actions légitimes sont :
 
-**Colors / Tools (multi-app) :** `NEXT_PUBLIC_TOOLS_BILLING_API_URL`, `TOOLS_APP_URL`,
-`TOOLS_ALLOWED_ORIGINS`, `STRIPE_TOOLS_SECRET_KEY`, `STRIPE_TOOLS_WEBHOOK_SECRET`,
-`STRIPE_TOOLS_PRICE_{MONTHLY,ANNUAL}`.
+1. la **réaffirmation explicite** — réécrire la variable avec la valeur voulue (§5.5) ;
+2. un **smoke de comportement** — observer ce que fait l'application, sans lire la clé (§5.6).
 
-**Crons / webhooks / intégrations :** `CRON_SECRET`, `NOTIFICATIONS_WEBHOOK_SECRET`,
-`PAYROLL_IMPORT_SECRET`, `RATE_LIMIT_HMAC_KEY`, `BANK_DATA_ENCRYPTION_KEY`,
-`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`,
-`POWENS_CLIENT_ID`, `POWENS_CLIENT_SECRET`, `POWENS_API_BASE_URL`, `POWENS_WEBVIEW_BASE_URL`,
-`OPENAI_API_KEY`, `OPENAI_MODEL`, `BREVO_API_KEY`,
+### 5.1 Supabase (Production) — obligatoires
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — **seule** clé publique Supabase lue par l'application.
+  `src/lib/supabase/keys.ts` **jette** (`Configuration Supabase incomplète :
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY absente`) si elle manque : sans elle, l'application ne
+  fonctionne pas.
+  **`NEXT_PUBLIC_SUPABASE_ANON_KEY` n'est lue nulle part au SHA `996be15`.** Ne pas la créer, ne pas
+  la chercher, ne pas la considérer comme un équivalent acceptable. Les versions antérieures de
+  cette fiche proposaient les deux « ou selon convention » : **ambiguïté supprimée**.
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+### 5.2 Variables d'ops (scripts et gardes) — ne sont pas des clés applicatives
+
+`SUPABASE_PROJECT_REF` et `ELSATIA_SUPABASE_PROJECT_NAME` ne sont **jamais lues par le runtime
+applicatif** : aucune occurrence dans `src/` au SHA `996be15`. Elles sont consommées par les
+**scripts et gardes d'ops** — `scripts/garde-scripts-production.mjs` (qui refuse d'agir si
+`SUPABASE_PROJECT_REF` est absente ou incohérente avec l'hôte de `NEXT_PUBLIC_SUPABASE_URL`) et
+`scripts/seed-elsatia-preview-year.mjs`.
+
+Ce ne sont **pas** des clés client, elles ne transitent pas dans le bundle, et elles **doivent
+correspondre au projet Production ciblé**. Valeurs Production, non secrètes, vérifiables :
+
+```
+SUPABASE_PROJECT_REF=exhvuzegsefmoguxoiak
+ELSATIA_SUPABASE_PROJECT_NAME=elsatia-production
+```
+
+Contrôle à faire : l'hôte de `NEXT_PUBLIC_SUPABASE_URL` (`exhvuzegsefmoguxoiak.supabase.co`) et
+`SUPABASE_PROJECT_REF` désignent bien le **même** projet. Une divergence fait échouer la garde d'ops
+en refus explicite — c'est le comportement voulu, pas un incident.
+
+### 5.3 Stripe — abonnements (TEST, recette Production fermée)
+
+Requises par `variablesStripeBillingManquantes()` (`src/lib/stripe-abonnement.ts`) :
+`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_ABONNEMENT_SECRET`, `NEXT_PUBLIC_APP_URL`, et les **8**
+`STRIPE_PRICE_{MINI,PRO,BUSINESS,ENTREPRISE}_{MENSUEL,ANNUEL}`. S'y ajoutent les 8
+`STRIPE_PRICE_COMPTE_SUP_{MINI,PRO,BUSINESS,ENTREPRISE}_{MENSUEL,ANNUEL}` pour les comptes
+supplémentaires, et `STRIPE_WEBHOOK_EXPECTED_MODE` (= `test`).
+
+Non provisionnées et **non requises** pour ce cutover, chacune gardée fail-closed dans le code :
+`STRIPE_WEBHOOK_SECRET` (porte de `stripeEstConfigure()` — sans elle le paiement de facture par
+Stripe Connect est simplement masqué), `STRIPE_WEBHOOK_BOUTIQUE_SECRET` (boutique désactivée),
+`STRIPE_CONNECT_CLIENT_ID` (Connect non ouvert). **P1, hors fenêtre.**
+
+### 5.4 Attestation Ed25519 (Stripe state proof)
+
+`STRIPE_STATE_ATTESTATION_KEY_ID` (non secret, doit correspondre entre Vercel et la registry en
+base) et `STRIPE_STATE_ATTESTATION_PRIVATE_KEY_B64` (**Vercel uniquement**, jamais dans doc/dump/log).
+
+Les deux étaient absentes sur `elsatia-production` au 2026-09-04, **et le sont toujours au
+2026-09-05** (revérifié en lecture seule) : c'est **attendu**. Couple Ed25519 (`test`) généré,
+auto-vérifié et prêt à provisionner — procédure complète, formats exacts, migration créatrice
+(`…244`/`…245`) et commandes Vercel/SQL : `ELSATIA_ED25519_ATTESTATION_PROVISIONING_V1.md`. Le
+registry DB (`stripe_attestation.public_keys`/`.configuration`) ne peut être rempli qu'**après** que
+le ledger a atteint `…245` — jamais avant.
+
+Surface d'impact réelle avant provisioning : un seul appelant,
+`finaliser()` dans `src/lib/stripe-discount-server.ts`, atteint par les sagas de remise plateforme
+et par le webhook abonnement. Abonnements gelés ⇒ chemin non exercé.
+
+**→ P0 pendant fenêtre, item A (§11).**
+
+### 5.5 Feature flags / gel commercial
+
+| Variable | Comportement code | Valeur voulue | Relisible ? |
+|---|---|---|---|
+| `ABONNEMENTS_PUBLICS_OUVERTS` | `=== "true"` requis pour ouvrir | `false` | oui |
+| `FEATURE_BOUTIQUE_ENABLED` | fail-**open** (absente ⇒ active) | `false` | oui |
+| `FEATURE_CRONS_ENABLED` | fail-**open** (absente ⇒ actif) | `false` | oui |
+| `DISABLE_EMAIL_LOGIN` | `=== "true"` requis pour couper | `false` | oui |
+| `ELSATIA_APPLICATION_ENV` | `preview`/`production`, sinon `local` | `production` | oui |
+| `FEATURE_AI_ENABLED` | fail-**closed** | `false` | **NON — `sensitive`** |
+| `FEATURE_AI_DEVIS_ENABLED` | fail-**closed** | `false` | **NON — `sensitive`** |
+| `FEATURE_RELANCES_AUTO_ENABLED` | fail-**closed** | `false` | **NON — `sensitive`** |
+
+Le fail-closed protège contre l'**absence**, pas contre un `true` posé par erreur — et la valeur
+réelle de ces trois flags n'est plus lisible. Ils doivent donc être **réaffirmés explicitement
+pendant la fenêtre** (`FEATURE_AI_ENABLED=false`, `FEATURE_AI_DEVIS_ENABLED=false`,
+`FEATURE_RELANCES_AUTO_ENABLED=false`), sans jamais tenter de les « vérifier » par lecture.
+
+**→ P0 pendant fenêtre, item B (§11).**
+
+### 5.6 Mode Stripe — documenté, mais partiellement non lisible
+
+- `STRIPE_WEBHOOK_EXPECTED_MODE = test` — **lisible en clair**, non ambigu.
+  `resoudreModeStripeWebhook()` rejette fermé tout événement `livemode=true`.
+- **Le mode réel de `STRIPE_SECRET_KEY` reste NON LISIBLE** (type `sensitive`) : le préfixe
+  `sk_test_` / `sk_live_` ne peut être ni lu ni déduit sans réécrire la variable. Les 16
+  `STRIPE_PRICE_*` sont dans le même cas.
+- **Ne jamais afficher la clé pour trancher.** Le mode se confirme par le **smoke contrôlé** de §23,
+  qui observe le comportement de l'application sans révéler aucune valeur.
+- **Aucune activation Live.** Passage Live = lot P15 distinct, hors de ce cutover.
+
+**→ P0 pendant fenêtre, item C (§11).**
+
+### 5.7 URLs app et e-mail
+
+`NEXT_PUBLIC_APP_URL` (= `https://app.elsatia.fr`, vérifiée), `SUPPORT_EMAIL`, `EMAIL_FROM_ADDRESS`,
+`BREVO_API_KEY`.
+
+### 5.8 Mentions légales de l'éditeur
+
+`NEXT_PUBLIC_LEGAL_SIRET`, `NEXT_PUBLIC_LEGAL_TVA`, lues par `src/components/DocumentLegal.tsx` pour
+substituer les jetons `[EDITEUR_SIRET]` et `[EDITEUR_MENTION_TVA]` de
+`docs/juridique/mentions-legales.md` et `cgv.md`.
+
+- `NEXT_PUBLIC_LEGAL_SIRET` = `850 559 873 00011` — **provisionnée et vérifiée conforme** sur
+  `elsatia-production` (valeur non secrète, relue en direct le 2026-09-05).
+- `NEXT_PUBLIC_LEGAL_TVA` : **régime non confirmé à ce jour — laisser vide**. Absente sur
+  Production, ce qui est le comportement voulu. Ne pas inventer de régime ni de numéro.
+- **Comportement fail-open, non bloquant pour le cutover** : variable absente ou vide → repli neutre
+  affiché (« en cours de finalisation » / « à confirmer »), jamais de jeton brut ni de valeur
+  supposée (garde couverte par `src/components/DocumentLegal.test.ts`, §13.5bis). Les mentions
+  légales publiques restent **incomplètes** tant que le régime de TVA n'est pas renseigné : à traiter
+  avant ouverture commerciale (P1-6).
+
+### 5.9 Billing Tools — hébergé par GP, non provisionné (P1 hors cutover)
+
+`STRIPE_TOOLS_SECRET_KEY`, `STRIPE_TOOLS_WEBHOOK_SECRET`, `STRIPE_TOOLS_PRICE_MONTHLY`,
+`STRIPE_TOOLS_PRICE_ANNUAL`, `TOOLS_APP_URL` sont consommées par **l'API billing Tools hébergée dans
+GP** (`src/lib/tools-monetization.ts`, `toolsStripeConfiguration()`) — et non par le projet Vercel
+`elsatia-tools`, contrairement à ce que suggérait le classement « Colors / Tools (multi-app) » des
+versions antérieures de cette fiche.
+
+**État constaté** : les 5 sont **non provisionnées** sur `elsatia-production` ⇒ `ready = false` ⇒ le
+checkout Tools est indisponible en Production. **Classement : P1, hors cutover — ne pas les traiter
+comme P0**, ne pas les provisionner pendant la fenêtre.
+
+`NEXT_PUBLIC_TOOLS_BILLING_API_URL` : **n'est consommée nulle part dans GP au SHA `996be15`** (aucune
+occurrence dans `src/`). Elle figurait dans les versions antérieures de cette fiche : **ne pas la
+présenter comme requise**, ne pas la provisionner.
+
+### 5.10 Variables à défaut code — explicitement NON bloquantes
+
+Leur absence est sans effet : le code fournit un défaut. Ne pas les provisionner « par sécurité »,
+ne pas les compter comme secret manquant.
+
+| Variable | Défaut appliqué par le code |
+|---|---|
+| `EMAIL_FROM_NAME` | `"ELSATIA"` (`src/lib/brevo.ts`) |
+| `OPENAI_MODEL` | modèle par défaut (`src/lib/ai/providers/openai.ts`, `src/lib/ai/journal.ts`) |
+| `STRIPE_AUTOMATIC_TAX_ENABLED` | absente ⇒ `false` (`src/lib/stripe-abonnement.ts`) |
+| `TOOLS_ALLOWED_ORIGINS` | `https://tools.elsatia.fr` déjà en dur dans l'allowlist (`src/lib/tools-monetization.ts`) |
+
+### 5.11 Prices legacy — non commercialisés, provisioning NON demandé
+
+`STRIPE_PRICE_ESSENTIEL_{MENSUEL,ANNUEL}`, `STRIPE_PRICE_PREMIUM_{MENSUEL,ANNUEL}` et les comptes
+supplémentaires associés (`STRIPE_PRICE_COMPTE_SUP_{ESSENTIEL,PREMIUM}_{MENSUEL,ANNUEL}`)
+correspondent à des offres **absentes de `OFFRES_ABONNEMENT_COMMERCIALISEES`** : elles restent
+déclarées dans les tables de correspondance du code (aucune modification de code dans ce lot) mais
+**ne sont pas commercialisées**. Elles figurent encore dans `.env.example` — legacy.
+
+Idem pour `STRIPE_PRICE_OPTION_IA_{100,300,ILLIMITE}_{MENSUEL,ANNUEL}` : l'option IA est fermée.
+
+**Ne pas provisionner ces variables, ne pas les compter comme manquantes.**
+
+### 5.12 Crons / webhooks / intégrations
+
+`CRON_SECRET`, `RATE_LIMIT_HMAC_KEY` (son absence en Production fait échouer en `503` **toute**
+requête de mutation, dont `POST /login` — obligatoire), `BANK_DATA_ENCRYPTION_KEY`.
+
+Features désactivées, absences **normales et fail-closed** : `NOTIFICATIONS_WEBHOOK_SECRET`,
+`PAYROLL_IMPORT_SECRET`, `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`,
+`POWENS_CLIENT_ID`/`POWENS_CLIENT_SECRET`/`POWENS_API_BASE_URL`/`POWENS_WEBVIEW_BASE_URL`,
 `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`, `GOOGLE_PLAY_RTDN_SERVICE_ACCOUNT_EMAIL`,
-`GOOGLE_PLAY_RTDN_AUDIENCE`, `APPLE_ROOT_CA_BASE64`.
+`GOOGLE_PLAY_RTDN_AUDIENCE`, `APPLE_ROOT_CA_BASE64`. `OPENAI_API_KEY` est présente mais inerte tant
+que `FEATURE_AI_ENABLED` n'est pas `true`.
 
-**Observabilité :** `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`,
-`SENTRY_PROJECT`.
+Cohérence crons : `FEATURE_CRONS_ENABLED=false` **et** `CRON_SECRET` présent — plus sûr que le
+minimum requis. Nuance : `/api/cron/abonnements` ne sort en 404 que si `FEATURE_CRONS_ENABLED` **et**
+`FEATURE_RELANCES_AUTO_ENABLED` sont faux ; `CRON_SECRET` étant présent, aucune combinaison ne
+produit de `503`.
 
-**Écart connu (P1) :** les 4 `STRIPE_PRICE_*_ANNUEL` peuvent encore pointer sur des Prices ×12
-au lieu des Prices « 10 × mensuel » de la grille canonique — lot
-`ELSATIA-STRIPE-TEST-ANNUAL-ENV-ALIGNMENT-V1`. `verify:stripe-prices --strict` doit être
-**8/8** dans un environnement portant réellement les variables.
+### 5.13 Observabilité
+
+`SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` —
+présentes.
+
+### 5.14 Écart connu (P1)
+
+Les 4 `STRIPE_PRICE_*_ANNUEL` peuvent encore pointer sur des Prices ×12 au lieu des Prices
+« 10 × mensuel » de la grille canonique — lot `ELSATIA-STRIPE-TEST-ANNUAL-ENV-ALIGNMENT-V1`.
+`verify:stripe-prices --strict` doit être **8/8** dans un environnement portant réellement les
+variables. **Ces variables étant `sensitive`, cet écart n'est pas vérifiable par lecture** : il ne
+peut être tranché que par l'exécution du script dans un environnement qui les porte.
 
 ---
 
@@ -262,7 +455,8 @@ au lieu des Prices « 10 × mensuel » de la grille canonique — lot
 
 Aucun QR, seed TOTP ni code n'est demandé, transmis ou consigné (ici ou ailleurs).
 
-1. **Déployer l'app canonique (`1d15289`)** sur la Production Branch correcte (**pas `main`**).
+1. **Déployer l'app canonique (`996be15`)** : promotion de `996be15` dans
+   `release/commercialisation-v1` (Production Branch Vercel, **pas `main`**), puis déploiement.
 2. **Login AAL1** de l'admin humain (`julien@elsatia.fr`) — les sessions AAL1 pré-cutover sont
    automatiquement re-challengées (comportement voulu).
 3. **Enrollment TOTP** si le facteur n'existe pas / doit être renouvelé : l'admin scanne son
@@ -283,7 +477,7 @@ ré-enrôlement TOTP. **Jamais** de `DELETE FROM auth.mfa_factors` manuel comme 
 
 ## 7. Colors / Tools — impact du cutover
 
-- **`1d15289` contient déjà** l'intégration Colors (`apps/colors/**`, migrations `…000246`–`…000249`)
+- **`996be15` contient déjà** l'intégration Colors (`apps/colors/**`, migrations `…000246`–`…000249`)
   et Tools (`apps/tools/**`, migrations `…8`/`…9`/`…10`, R8/R9/R10), la convergence multi-app
   (`…000234`), le compte partagé plateforme et le catalogue d'accès. Ces éléments sont dans le
   **bloc 210→253 déjà validé** Fresh + Restore + pgTAP + E2E `Playwright 40/40`.
@@ -292,11 +486,12 @@ ré-enrôlement TOTP. **Jamais** de `DELETE FROM auth.mfa_factors` manuel comme 
 - **Contrat multi-app** (compte partagé, catalogue d'accès, redirect URLs Colors/Tools) : porté
   par `…000234`–`…000240`/`…000248`/`…000250`, inclus dans le bloc déjà validé ; le cutover ne
   le modifie pas.
-- **Devient immédiatement fonctionnel après migrations + déploiement `1d15289`** :
+- **Devient immédiatement fonctionnel après migrations + déploiement `996be15`** :
   - R1 — compteur « personnes actives » X/Y sur `/abonnement`, garde de capacité serveur ;
   - R3 — section **Modules** de `/abonnement` (inclus plan / ajoutés / disponibles), garde
     module `acces_module_pour_permission` dans le proxy, page terminale
-    `/abonnement/module-non-inclus` (correctif boucle post-login `1d15289`) ;
+    `/abonnement/module-non-inclus` (correctif boucle post-login `c1930ab`, inclus dans
+    `996be15`) ;
   - R2 — gestion de capacité supplémentaire (+1/+5/+10, prévisualisation, baisse planifiée,
     annulation) câblée sur Stripe **TEST** ;
   - webhook abonnement Stripe conforme à l'ACL canonique (RPC SECURITY DEFINER dédiées).
@@ -311,8 +506,11 @@ ré-enrôlement TOTP. **Jamais** de `DELETE FROM auth.mfa_factors` manuel comme 
   aucun Price Live, aucun webhook Live créé, lu ou modifié.
 - `ABONNEMENTS_PUBLICS_OUVERTS = false` : la souscription publique en ligne reste **fermée**
   (changement d'offre et ajout de capacité = opérations internes / contactez-nous).
-- `STRIPE_WEBHOOK_EXPECTED_MODE = test` — `resoudreModeStripeWebhook` rejette fermé tout
-  événement `livemode=true`.
+- `STRIPE_WEBHOOK_EXPECTED_MODE = test` — **valeur lisible et vérifiée** ;
+  `resoudreModeStripeWebhook` rejette fermé tout événement `livemode=true`.
+- **Limite à assumer** : `STRIPE_SECRET_KEY` est de type Vercel `sensitive` (§5.0), donc son mode
+  réel (`sk_test_` / `sk_live_`) **n'est pas lisible**. Il est confirmé par le **smoke contrôlé de
+  §23**, jamais par affichage de la clé. Idem pour les 16 `STRIPE_PRICE_*`.
 - **Recette minimale post-cutover — Stripe TEST uniquement** :
   - `verify:stripe-prices --strict` = 8/8 (après alignement des 4 `_ANNUEL`) ;
   - 8 parcours Checkout Test aux bons montants (79/790, 249/2 490, 449/4 490, 599/5 990),
@@ -335,12 +533,14 @@ Durées **indicatives** (repères d'ordre, pas d'engagement). Détail des contr�
 - [ ] Gel : aucun merge, aucun déploiement concurrent sur la branche canonique.
 - [ ] **Relecture baseline Production en direct** (§1) : ledger réel, `max(version)`, sentinelles,
       confirmation que `…000255` n'est pas appliquée. Archiver la sortie.
-- [ ] Calculer le diff `versions(1d15289) − versions(Production)` → **liste d'application ordonnée** (§2).
-- [ ] Vérifier SHA cible `1d15289` et SHA Production actuel (`fcdd4e7c` attendu).
+- [ ] Calculer le diff `versions(996be15) − versions(Production)` → **liste d'application ordonnée** (§2).
+- [ ] Vérifier SHA cible `996be15` et SHA Production actuel (`fcdd4e7c` attendu).
 - [ ] Accès rollback vérifiés : Vercel, PITR/snapshot activé sur le projet, volume DR chiffré monté.
-- [x] Preuves vertes (offline, §13) : Fresh 263 + pgTAP 54/1154, Restore→263 + pgTAP 54/1154,
-      drift ACL applicatif = 0, rollback 210 → 263 → 210 sur snapshot ; GP `vitest` 791/791 +
-      Tools 107/107 + typecheck + lint + build. **Reste à faire à T-60 réel** : le même contrôle
+- [x] Preuves vertes (offline, §13) — **drill DB exécuté à `a81f317`**, **QA applicative à
+      `996be15`** : Fresh 263 + pgTAP 54/1154, Restore→263 + pgTAP 54/1154,
+      drift ACL applicatif = 0, rollback 210 → 263 → 210 sur snapshot ; GP `vitest` **815/815**
+      (93 fichiers) + Tools **107/107** (20 fichiers) + typecheck + lint + build + `verify:secrets`
+      1 304 + `npm audit` 0/0, mesurés à `996be15` (§13.5). **Reste à faire à T-60 réel** : le même contrôle
       sur le **dump Production chiffré** (pas le drill de reconstruction) une fois le PITR/dump
       T-30 disponible.
 - [ ] Responsable de rollback (P13) confirmé et joignable ; fenêtre de maintenance (P12) communiquée.
@@ -361,7 +561,8 @@ Durées **indicatives** (repères d'ordre, pas d'engagement). Détail des contr�
 - [ ] **Point de décision migration** : ledger + pgTAP OK → continuer ; sinon → §10 scénario T0.
 
 ### T+15 — Déploiement app + vérifications
-- [ ] Déployer l'app sur **`1d15289`** (Production Branch correcte, **pas `main`**).
+- [ ] Promouvoir `996be15` dans `release/commercialisation-v1`, puis déployer cette release
+      (Production Branch Vercel inchangée, **pas `main`**).
 - [ ] **Auth / MFA** (§6) : login AAL1 → challenge TOTP → AAL2 → `/plateforme` → logout/relogin.
 - [ ] **Admin / rôle** : matrice non-auth / AAL1 / AAL2 non-admin / AAL2 admin inactif / AAL2 admin `total` actif.
 - [ ] **Multitenant** : entreprise A ne voit rien de B (tables, RPC, documents, Storage, habilitations apps, changement d'entreprise).
@@ -419,12 +620,59 @@ extraction de la clé privée Ed25519 hors Vercel, `DELETE FROM auth.mfa_factors
 | # | Blocker | État | Levée |
 |---|---|---|---|
 | P0-1 | **Baseline Production non relue en direct** dans un contexte autorisé (ledger réel, sentinelles, absence de `…000255`) | ouvert (pas d'accès Production dans le lot de préparation) | opérateur exécute §1 à T-60, archive la sortie |
-| P0-2 | ~~Répétition Fresh 263 + Restore 263 + pgTAP + rollback `210 → 263 → 210`~~ | **FERMÉ 2026-09-04** — drill offline complet au SHA `1d15289`, preuves §13.1–§13.3 | — |
+| P0-2 | ~~Répétition Fresh 263 + Restore 263 + pgTAP + rollback `210 → 263 → 210`~~ | **FERMÉ** — drill offline complet **exécuté au SHA `a81f317`** (2026-09-05), preuves §13.1–§13.3 ; valable pour `996be15` (arbre `supabase/migrations/` identique) | — |
 | P0-3 | **PITR/snapshot + dump chiffré + backup Storage + test de restauration** au `backup_id` du **cutover réel** | non créés (interdits hors fenêtre Production) — le T0-snapshot §13.2 est un drill offline, pas la sauvegarde Production | T-30, opérateur + CODEX |
-| P0-4 | ~~Diff ACL applicatif Fresh↔Restore rejoué au SHA `1d15289`~~ | **FERMÉ 2026-09-04** — `application_acl_drift = 0` (6 294 lignes normalisées, 0 diff), preuve §13.4 | — |
+| P0-4 | ~~Diff ACL applicatif Fresh↔Restore~~ | **FERMÉ** — rejoué **au SHA `a81f317`**, `application_acl_drift = 0` (6 294 lignes normalisées, 0 diff), preuve §13.4 | — |
+| P0-6 | ~~QA applicative jamais re-mesurée depuis `c1930ab` (3 commits runtime non couverts : `36642e3`, `b371641`, `1d15289`)~~ | **FERMÉ 2026-09-05** — suite complète rejouée au SHA cible `996be15` : Vitest GP 93/815, Tools 20/107, typecheck, ESLint (0 erreur), build GP+Tools, `verify:migrations` 263, `verify:secrets` 1 304, `npm audit` 0/0, `git diff --check` — preuves §13.5 ; les 3 correctifs runtime sont couverts par des tests dédiés (§13.5bis) | — |
 | P0-5 | ~~Préparation opérationnelle de la fenêtre (rôles, planning, checklists P0-1/P0-3/T0, GO/rollback)~~ | **PRÉPARATION FERMÉE 2026-09-04** — pack complet §14–§27 + checklist imprimable ; **reste à faire par Julien** : fixer la date/heure réelle et les noms (§14.3, §27) | Julien renseigne date + noms sur la checklist |
 
+### P0 pendant fenêtre — environnement (lot `ELSATIA-GP-CUTOVER-ENV-DOC-DELTA-CLOSURE-V1`)
+
+Distincts des blockers P0 ci-dessus : ceux-ci **ne bloquent pas l'ouverture de la fenêtre**, ils
+doivent être exécutés **dans** la fenêtre, au moment indiqué. **Il y en a exactement trois.**
+
+**A. Provisionner les variables Ed25519**
+
+`STRIPE_STATE_ATTESTATION_KEY_ID` et `STRIPE_STATE_ATTESTATION_PRIVATE_KEY_B64` sur Vercel
+Production, **au bon moment du runbook** : variables Vercel au plus tard à la checklist GO-T0
+(§17) ; **registry DB seulement après** que le ledger a confirmé `…244`/`…245` (§18bis). Jamais
+l'inverse. Procédure : `ELSATIA_ED25519_ATTESTATION_PROVISIONING_V1.md`. Détail : §5.4.
+
+**B. Réaffirmer explicitement les trois flags non relisibles**
+
+```
+FEATURE_AI_ENABLED=false
+FEATURE_AI_DEVIS_ENABLED=false
+FEATURE_RELANCES_AUTO_ENABLED=false
+```
+
+Type Vercel `sensitive` ⇒ valeur **non lisible** (§5.0). Le fail-closed du code protège contre
+l'absence, pas contre un `true` posé par erreur. **Réécrire, ne pas « vérifier ».** Détail : §5.5.
+
+**C. Confirmer le mode Stripe par smoke contrôlé**
+
+`STRIPE_SECRET_KEY` est `sensitive` : son mode réel n'est pas lisible. Le confirmer par le smoke
+de **§23**, qui observe le comportement de l'application sans révéler aucune valeur. **Aucune
+activation Live.** Détail : §5.6.
+
 ### Blockers P1 (à traiter, non bloquants pour figer la date)
+
+> **P1-7 (nouveau, 2026-09-05)** — Billing Tools non provisionné sur `elsatia-production`
+> (`STRIPE_TOOLS_SECRET_KEY`, `STRIPE_TOOLS_WEBHOOK_SECRET`, `STRIPE_TOOLS_PRICE_{MONTHLY,ANNUAL}`,
+> `TOOLS_APP_URL`) ⇒ `toolsStripeConfiguration().ready = false`, checkout Tools indisponible en
+> Production. L'API billing Tools est hébergée **dans GP** (§5.9). **P1, hors cutover — ne pas
+> provisionner pendant la fenêtre.**
+
+> **P1-8 (nouveau, 2026-09-05)** — `STRIPE_WEBHOOK_SECRET` absente ⇒ `stripeEstConfigure()` faux ⇒
+> le paiement de facture par Stripe Connect est masqué en Production. Fail-closed, non bloquant
+> sous gel commercial ; à traiter avant ouverture commerciale (§5.3).
+
+> **P1-6 (2026-09-05, mis à jour)** — `NEXT_PUBLIC_LEGAL_SIRET` est désormais **provisionnée et
+> vérifiée conforme** sur `elsatia-production` (`850 559 873 00011`, valeur non secrète relue en
+> direct). **Reste ouvert : `NEXT_PUBLIC_LEGAL_TVA`**, absente — régime non confirmé, à laisser vide
+> jusqu'à confirmation par Julien. Tant qu'elle l'est, les mentions légales et les CGV publient un
+> repli neutre au lieu du régime de TVA : fail-open, non bloquant pour le cutover technique,
+> **bloquant pour l'ouverture commerciale**. Ne pas inventer de régime ni de numéro.
 
 | # | Blocker | État |
 |---|---|---|
@@ -455,21 +703,29 @@ extraction de la clé privée Ed25519 hors Vercel, `DELETE FROM auth.mfa_factors
 
 **NOT READY** au sens « exécutable maintenant » : **P0-1 et P0-3 restent ouverts** (relecture
 Production live, sauvegardes datées du cutover réel — les deux nécessitent un accès Production
-que ce lot n'a pas). **P0-2, P0-4 et la préparation opérationnelle de P0-5 sont fermés**
-(2026-09-04) :
-- P0-2/P0-4 (preuves §13) : drill Fresh 263 / Restore→263 / rollback / drift ACL au bon SHA
-  (`1d15289`) fait et vert, rejoué sur le schéma historique exact de `5777abb` (210 migrations,
+que ce lot n'a pas). **P0-2, P0-4, P0-6 et la préparation opérationnelle de P0-5 sont fermés** :
+- P0-2/P0-4 (preuves §13) : drill Fresh 263 / Restore→263 / rollback / drift ACL **exécuté au SHA
+  `a81f317`** (et non à `996be15`) fait et vert, rejoué sur le schéma historique exact de `5777abb` (210 migrations,
   baseline Production confirmée — remplace l'ancienne référence `fcdd4e7c`/211 du runbook V1) —
   sans lire la Production réelle : le ledger live reste à confirmer au P0-1.
 - P0-5 (pack §14–§27 + checklist imprimable) : rôles définis, planning horaire relatif figé,
   checklists P0-1/P0-3/GO-T0/MFA/multitenant/Colors-Tools/Stripe/GO/rollback complètes et
   exécutables. **Il manque uniquement une date/heure réelle et des noms**, volontairement non
   inventés (décision de Julien).
+- P0-6 (preuves §13.5, 2026-09-05) : QA applicative **rejouée au SHA cible `996be15`** — Vitest
+  GP 93 fichiers / 815 tests, Tools 20 / 107, typecheck, ESLint 0 erreur, build GP + Tools,
+  `verify:migrations` 263, `verify:secrets` 1 304 fichiers, `npm audit` 0 vulnérabilité
+  (racine + Tools), `git diff --check`. Les trois correctifs runtime postérieurs au drill DB
+  (`36642e3`, `b371641`, `1d15289`) sont couverts par des tests dédiés (§13.5bis).
 
-La **cible technique est prête et figée** : SHA `1d15289`, ledger 263, 53 migrations additives
-ordonnées depuis la baseline Production confirmée (210, dernière `…000231`), aucune migration
-historique modifiée, runbook et rollback définis, socle commercial + correctif boucle post-login
-validés en local **et** via un upgrade réel 210→263 rejoué sur ce schéma historique. **Le
+La **cible technique est prête et figée** : SHA `996be15`
+(`996be15c136f09d9977375e700462b503a1720c3`, HEAD de `feat/elsatia-commercial-canonical-r1-r2-r3-v1`),
+ledger 263, 53 migrations additives ordonnées depuis la baseline Production confirmée (210,
+dernière `…000231`), aucune migration historique modifiée, runbook et rollback définis, socle
+commercial + correctif boucle post-login (`c1930ab`) validés en local **et** via un upgrade réel
+210→263 rejoué sur ce schéma historique (drill DB au SHA `a81f317`), QA applicative complète
+rejouée au SHA cible `996be15`. Chemin de déploiement : **promotion de `996be15` dans
+`release/commercialisation-v1`**, la Production Branch Vercel restant inchangée. **Le
 prochain geste technique attendu est l'exécution réelle** (P0-1 → P0-3 → migrations →
 déploiement), pas un nouveau lot de préparation.
 
@@ -479,12 +735,23 @@ déploiement), pas un nouveau lot de préparation.
 
 - Aucun déploiement Production. Aucune migration Production. Aucune mutation Stripe Live.
 - Aucun secret affiché (noms de variables uniquement).
-- Aucune modification des migrations 256–263 ni de la migration 255.
+- Aucune modification des migrations 256–265 ni de la migration 255.
 - Aucun réélargissement d'ACL `service_role`.
+- Aucune modification de code de production : le lot 1.4 n'ajoute que des fichiers de test
+  (`src/components/DocumentLegal.test.ts`, cas ajoutés à `src/lib/ai/providers/openai.test.ts`),
+  la documentation des runbooks et les deux variables légales de `.env.example`. `git diff
+  996be15..HEAD` ne touche aucun fichier exécuté en Production.
 
 ---
 
-## 13. Preuves d'exécution — drill offline P0-2 / P0-4 (2026-09-04)
+## 13. Preuves d'exécution — drill offline P0-2 / P0-4 / P0-6
+
+> **Deux étages, deux SHA — à ne jamais fusionner.**
+> §13.1 à §13.4 (**drill DB**) ont été exécutés au SHA **`a81f317`**.
+> §13.5 (**QA applicative**) a été rejouée au SHA cible **`996be15`** le 2026-09-05
+> (lot `ELSATIA-GP-CUTOVER-RUNBOOK-AND-QA-REBASE-V1`).
+> Le drill DB reste opposable pour `996be15` parce que l'arbre `supabase/migrations/` y est
+> identique au bit près (`3691fc7dd1ad6e3082349b1517861d27f8ac9546`).
 
 Lot `ELSATIA-CUTOVER-OFFLINE-P0-CLOSURE-V1`. **Aucune Supabase/Vercel Production, aucun Stripe
 Live, aucune migration 255–263 modifiée.** Toutes les preuves ci-dessous sont locales, sur des
@@ -503,13 +770,14 @@ avec la méthode déjà documentée par `ELSATIA_PREPROD_DB_E2E_ROLLBACK_V1.md` 
 depuis les ledgers et objets observés, pas depuis une restauration physique distante ») — avec un
 jeu de migrations **exact** ici (fichiers git réels), pas une reconstruction approximative.
 
-Confirmé au préalable (`git diff --name-status 5777abb 1d15289 -- supabase/migrations/`) :
+Confirmé au préalable (`git diff --name-status 5777abb a81f317 -- supabase/migrations/`, résultat
+identique avec `996be15`) :
 **53 fichiers ajoutés, 0 modifié** → le gap est purement additif, et est la même liste que le §2.
 
 ### 13.1 A. Fresh 263
 
 - Pile : projet Supabase local `btp-platform` (existant), `supabase db reset --local` au SHA
-  `1d15289`+docs (`6be33d4`, sans effet sur les migrations).
+  `a81f317` (SHA d'exécution du drill).
 - Résultat : 263 migrations appliquées dans l'ordre, 0 erreur, ~38 s.
 - Ledger : `count=263`, `max=20260904000263`.
 - Sondes objets : colonne capacité R1 présente ; `modules_gestion_pro`/`modules_entreprises`
@@ -608,27 +876,63 @@ observée par ailleurs reste couverte par l'allowlist figée de
 `elsatia-supabase-system-drift-audit-v1.md` (532 écarts système managés, classés, sans droit
 `anon`/`authenticated`/`service_role`/`authenticator` en trop) — non remise en cause ici.
 
-### 13.5 Tests finaux (SHA `1d15289` + docs `6be33d4`)
+### 13.5 QA applicative — **rejouée au SHA cible `996be15`** (2026-09-05)
 
-| Contrôle | Résultat |
-|---|---:|
-| `verify:migrations` | PASS — 263 migrations valides, noms/horodatages uniques |
-| pgTAP Fresh 263 | **54 fichiers / 1154 tests — PASS** |
-| pgTAP Restore→263 | **54 fichiers / 1154 tests — PASS** (identique) |
-| GP Vitest | **92 fichiers / 791 tests — PASS** |
-| Tools Vitest | **20 fichiers / 107 tests — PASS** |
-| Typecheck (GP + Tools) | PASS |
-| ESLint (GP + Tools) | PASS — 0 erreur, 3 avertissements `<img>` préexistants |
-| Build (GP + Tools) | PASS |
-| `verify:secrets` | PASS — 1 297 fichiers suivis, aucun secret reconnu |
-| `npm audit` (racine + Tools) | 0 vulnérabilité (les deux) |
-| `git diff --check` | PASS |
+Lot `ELSATIA-GP-CUTOVER-RUNBOOK-AND-QA-REBASE-V1`. Exécution réelle dans un worktree git isolé
+créé exactement sur `996be15c136f09d9977375e700462b503a1720c3` (`git worktree add`, HEAD vérifié,
+`git status` vide avant exécution), dépendances installées par `npm ci` sur les `package-lock.json`
+de ce SHA (racine + `apps/tools`). **Aucune valeur n'est reprise d'une mesure antérieure.**
+
+> Les chiffres de la version 1.3 de ce document (« 92 fichiers / 791 tests », « 1 297 fichiers
+> suivis ») dataient en réalité du SHA `c1930ab` (2026-09-04) et avaient été reportés sans être
+> re-mesurés lors des rebasages successifs. Ils sont **remplacés** par les mesures ci-dessous.
+
+| Contrôle | Commande | Résultat mesuré à `996be15` |
+|---|---|---:|
+| GP Vitest | `npx vitest run` | **93 fichiers / 815 tests — PASS** |
+| Tools Vitest | `npm --prefix apps/tools run test` | **20 fichiers / 107 tests — PASS** |
+| Typecheck (GP + Tools) | `npm run typecheck` | **PASS** — 0 erreur |
+| ESLint (GP + Tools) | `npm run lint` | **PASS** — 0 erreur, 3 avertissements `<img>` préexistants (`boutique/[produitId]`, `boutique`, `SignatureEmploye`) |
+| Build (GP + Tools) | `npm run build` | **PASS** — GP Next.js 16.2.12 (Turbopack), 186 routes ; Tools Next.js 16.2.12 (webpack), 10 routes |
+| `verify:migrations` | `npm run verify:migrations` | **PASS** — « 263 migrations valides, noms et horodatages uniques » |
+| `verify:secrets` | `npm run verify:secrets` | **PASS** — 1 304 fichiers suivis contrôlés, aucun secret reconnu |
+
+> `verify:secrets` compte les fichiers **suivis par git**. 1 304 est la valeur de l'arbre
+> `996be15` **pristine** — c'est-à-dire de l'artefact déployé. Rejouée sur la branche de ce lot
+> (`docs/gp-cutover-runbook-qa-rebase-v1`), la commande renvoie 1 305 : le fichier de test
+> `src/components/DocumentLegal.test.ts` ajouté ici, jamais exécuté en Production.
+
+| `npm audit` racine | `npm run audit:security` (`--audit-level=high`) puis `npm audit` | **0 vulnérabilité** (toutes sévérités) |
+| `npm audit` Tools | `npm audit` dans `apps/tools` | **0 vulnérabilité** |
+| `git diff --check` | `git diff --check` | **PASS** |
+
+**Rappel d'attribution** : les lignes pgTAP (`54 fichiers / 1154 tests`, Fresh 263 et
+Restore→263) appartiennent au drill DB §13.1–§13.4 et ont été **exécutées au SHA `a81f317`**.
+Elles ne sont pas reproduites ici pour ne pas les attribuer implicitement à `996be15`.
+
+#### 13.5bis Couverture des trois correctifs runtime postérieurs à `a81f317`
+
+Ces trois commits sont les seuls écarts applicatifs entre le SHA du drill DB et la cible. Ils
+sont désormais couverts par des tests exécutés à `996be15` (les tests ajoutés par ce lot sont
+**exclusivement des fichiers de test** — aucun fichier de production n'est modifié, la cible
+`996be15` reste donc l'artefact déployé) :
+
+| Correctif | Commit d'origine | Couverture à `996be15` |
+|---|---|---|
+| **Légal** — jetons `[EDITEUR_SIRET]` / `[EDITEUR_MENTION_TVA]`, repli neutre | `36642e3` | `src/components/DocumentLegal.test.ts` — **5 cas** : repli neutre sans variable (« en cours de finalisation » / « à confirmer », aucun numéro ni régime inventé), substitution du SIRET réel, substitution de la mention de TVA dans `mentions-legales.md` **et** `cgv.md`, valeur blanche → repli, et garde-fou « aucun jeton `[…]` brut ne fuit » sur les 5 pages juridiques publiques |
+| **OpenAI / RGPD** — `store: false` | `b371641` | `src/lib/ai/providers/openai.test.ts` — **4 cas ajoutés** : `store: false` transmis par `completer`, `completerAvecFichier` et `streamer` (avec `stream: true`), et absence de dépendance à `previous_response_id` / `response_id` (historique intégralement reconstruit à chaque appel) |
+| **E-mail / avoir + URL app** | `1d15289` | `src/lib/email.test.ts` (devis → « Devis / le devis » ; facture → « Facture / la facture » ; avoir → « Avoir / l'avoir », jamais « Facture ») et `src/lib/documents-envoi.test.ts` (`facture.type = "avoir"` → wording « Avoir » de bout en bout, devis inchangé). `NEXT_PUBLIC_APP_URL` reste couverte par `src/lib/brand.test.ts` et `src/lib/auth-redirects.test.ts` (normalisation, rejet des schémas non http/https) |
+
+Les deux gardes ajoutés ont été **vérifiés non vacants** par mutation : neutraliser la
+substitution `[EDITEUR_SIRET]` fait échouer 4 des 5 cas légaux, et retirer les trois `store: false`
+fait échouer 3 des 8 cas OpenAI. Les fichiers de production ont été restaurés à l'identique après
+ces vérifications (`git diff` vide sur `DocumentLegal.tsx` et `openai.ts`).
 
 R1/R2/R3, ACL webhook abonnement, clôture lifecycle et MFA/AAL2 sont couverts par la suite
-pgTAP ci-dessus (fichiers `active_person_capacity_*`, `capacity_stripe_r2_*`,
+pgTAP du drill DB (fichiers `active_person_capacity_*`, `capacity_stripe_r2_*`,
 `modules_a_la_carte_r3_*`, `stripe_subscription_webhook_acl_v1`,
 `stripe_subscription_lifecycle_closure_v1`, `platform_aal2_role_integrity_v1` et suites MFA
-associées) — tous verts sur les deux bases (13.1 et 13.2).
+associées) — tous verts sur les deux bases (13.1 et 13.2), **au SHA `a81f317`**.
 
 ### 13.6 Nettoyage
 
@@ -641,7 +945,7 @@ concernées par ce lot n'ont pas été touchées.
 ### 13.7 Verdict du drill
 
 ```text
-P0-2 (Fresh/Restore/rollback au SHA 1d15289) : FERMÉ
+P0-2 (Fresh/Restore/rollback, exécuté au SHA a81f317) : FERMÉ
 P0-4 (drift ACL applicatif Fresh↔Restore)     : FERMÉ — application_acl_drift = 0
 ```
 
@@ -670,13 +974,13 @@ exécution (fichier imprimable : `ELSATIA_PRODUCTION_CUTOVER_OPERATOR_CHECKLIST_
 | Repère | Contenu | Gate |
 |---|---|---|
 | **T-60** | Gel des changements, rôles présents, accès rollback vérifiés (Vercel, PITR, volume DR chiffré monté). **Lancement immédiat de P0-1** (§15). | — |
-| **T-45** | **Gate P0-1** : baseline Production conforme, gap réel figé (50 ou 51). Un seul item KO → **STOP**, fenêtre annulée, rien touché. | GO/STOP |
+| **T-45** | **Gate P0-1** : baseline Production conforme, gap réel figé = **53** (valeur canonique : ledger 210 → cible 263 ; noter la valeur observée, ne jamais la supposer). Un seul item KO → **STOP**, fenêtre annulée, rien touché. | GO/STOP |
 | **T-30** | Démarrage **P0-3** (§16) : PITR/snapshot, dump chiffré, backup Storage, manifestes. | — |
 | **T-15** | Test de restauration exécuté sur base probe jetable ; sentinelles + ACL/RLS de contrôle vérifiés. | — |
 | **T0** | **Gate P0-3** + **checklist GO-T0** complète (§17). Un seul item KO → **NO-GO**, aucune migration. Si PASS intégral : démarrage immédiat des migrations (§18). | GO/NO-GO |
 | **T+10** | Ledger vérifié = 263, `…000255` et `…000263` présentes, second `migration up` = rien à appliquer. | — |
 | **T+20** | pgTAP critique + smoke SQL sentinelles inchangées. **Point de décision migration** : continuer vers déploiement, ou STOP + rollback DB (§13 runbook V1, scénario T0) si ledger incohérent. | GO/ROLLBACK |
-| **T+30** | Déploiement app `1d15289` (§19) démarré + premiers contrôles (login, absence 5xx critique, absence boucle de redirection, `/abonnement`, dashboard, chantier, stock, module inclus/non inclus). | — |
+| **T+30** | Déploiement app `996be15` via `release/commercialisation-v1` (§19) démarré + premiers contrôles (login, absence 5xx critique, absence boucle de redirection, `/abonnement`, dashboard, chantier, stock, module inclus/non inclus). | — |
 | **T+45** | MFA admin 1 + admin 2 (§20), multitenant A/B (§21), Colors/Tools (§22), Stripe TEST (§23). | — |
 | **T+60** | **Décision GO/NO-GO globale** (§24/§25). GO → ouverture du service (fin de maintenance active). Un seul critère rollback → §26 engagé immédiatement. | GO/ROLLBACK |
 | **T+90** | Si GO : surveillance rapprochée (Sentry, 5xx, login/MFA réels, webhooks Stripe Test, upload/download, RLS). Si rollback engagé : suivi de la procédure §26 en cours. | — |
@@ -727,7 +1031,7 @@ mot de passe DB, clé API). Commandes de référence : §1 de ce document.
       procédure standard, ne pas réappliquer 255)
 - [ ] Gap réel vers 263 calculé (`263 − ledger observé`, attendu **53** si le ledger observé
       confirme bien la baseline à 210) et **liste exacte des versions absentes** matérialisée
-      (diff avec `supabase/migrations/` @ `1d15289`)
+      (diff avec `supabase/migrations/` @ `996be15`)
 - [ ] Confirmer que le ledger réel correspond bien à la baseline attendue de **210** (et non
       l'ancienne hypothèse de 211) — noter la valeur observée, ne pas supposer
 - [ ] Sentinelles métier lues (`count` sur entreprises/utilisateurs/clients/chantiers/devis/
@@ -741,7 +1045,7 @@ mot de passe DB, clé API). Commandes de référence : §1 de ce document.
 ### 15.2 Résultat
 
 **Résultat = PASS** uniquement si les 10 cases sont cochées ET le gap est cohérent avec les
-migrations `supabase/migrations/*.sql` @ `1d15289` (aucune version canonique manquante de la
+migrations `supabase/migrations/*.sql` @ `996be15` (aucune version canonique manquante de la
 liste calculée, aucune version inattendue côté Production qui ne serait pas dans l'historique
 canonique). Sinon **FAIL**.
 
@@ -790,19 +1094,32 @@ backup non testé n'est pas un backup valide au sens de ce runbook.
 - [ ] Gap exact confirmé (liste figée, §15)
 - [ ] Backup vérifié (§16, PASS, restauration prouvée)
 - [ ] Responsable rollback (**C**) présent et joignable
-- [ ] SHA app `1d15289294434643b5085af3585440ac2d162ddc` disponible et prêt à déployer (build
-      Vercel préparé)
+- [ ] SHA app `996be15c136f09d9977375e700462b503a1720c3` disponible et **promu dans
+      `release/commercialisation-v1`**, build Vercel préparé
 - [ ] Branche Vercel « Production Branch » correcte (branche canonique de release)
 - [ ] Production Branch **≠ `main`** (cf. `NE_PAS_DEPLOYER_MAIN.md`)
-- [ ] Variables d'environnement Production validées (présence uniquement, cf. §5 — jamais les
-      valeurs)
-- [ ] `ABONNEMENTS_PUBLICS_OUVERTS = false`
-- [ ] Mode Stripe = **TEST**
-- [ ] Mode webhook = **TEST** (`STRIPE_WEBHOOK_EXPECTED_MODE=test`)
-- [ ] Aucun secret manquant (fiche §5 complète)
+- [ ] Variables d'environnement Production validées **par présence de nom uniquement** (cf. §5 —
+      jamais les valeurs). Rappel §5.0 : 27 variables sont de type `sensitive` et **ne peuvent pas
+      être relues** — ne cocher aucun item sur la foi d'une lecture de valeur
+- [ ] `ABONNEMENTS_PUBLICS_OUVERTS = false` (valeur lisible, vérifiée)
+- [ ] `ELSATIA_APPLICATION_ENV = production` · `NEXT_PUBLIC_APP_URL = https://app.elsatia.fr`
+      (valeurs lisibles)
+- [ ] `SUPABASE_PROJECT_REF = exhvuzegsefmoguxoiak` cohérent avec l'hôte de
+      `NEXT_PUBLIC_SUPABASE_URL` ; `ELSATIA_SUPABASE_PROJECT_NAME = elsatia-production` (§5.2 —
+      variables d'ops, pas des clés applicatives)
+- [ ] `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` présente (**seule** clé publique lue ; l'app jette sans
+      elle). **Ne pas chercher `NEXT_PUBLIC_SUPABASE_ANON_KEY`** : non consommée au SHA `996be15`
+- [ ] Mode webhook = **TEST** (`STRIPE_WEBHOOK_EXPECTED_MODE=test`, valeur lisible)
+- [ ] Mode Stripe : **non vérifiable ici** — `STRIPE_SECRET_KEY` est `sensitive`. Confirmation
+      reportée au smoke contrôlé de §23 (**P0 pendant fenêtre, item C**). Ne pas afficher la clé
+- [ ] Trois flags `sensitive` **réaffirmés explicitement** (pas « vérifiés ») :
+      `FEATURE_AI_ENABLED=false`, `FEATURE_AI_DEVIS_ENABLED=false`,
+      `FEATURE_RELANCES_AUTO_ENABLED=false` (**P0 pendant fenêtre, item B** — §5.5)
+- [ ] Aucun secret manquant parmi les **obligatoires** de la fiche §5 — les absences listées §5.3,
+      §5.9, §5.10, §5.11 et §5.12 sont **normales et attendues**, ne pas les traiter comme manquantes
 - [ ] Variables Vercel `STRIPE_STATE_ATTESTATION_KEY_ID`/`_PRIVATE_KEY_B64` provisionnées (§3.1
       de `ELSATIA_ED25519_ATTESTATION_PROVISIONING_V1.md`) — **le registry DB, lui, se remplit
-      après T0** (§18bis), pas ici
+      après T0** (§18bis), pas ici (**P0 pendant fenêtre, item A**)
 - [ ] Second admin `total` (**E**) disponible et confirmé joignable
 - [ ] Aucun incident Production en cours (monitoring vérifié avant de lancer)
 
@@ -864,15 +1181,42 @@ Provisioning détaillé, formats et commandes exactes : `ELSATIA_ED25519_ATTESTA
 
 ## 19. Déploiement application (après DB verte, T+20 → T+30)
 
-Déployer **uniquement** `1d15289294434643b5085af3585440ac2d162ddc` sur la Production Branch
-correcte.
+Déployer **uniquement** `996be15c136f09d9977375e700462b503a1720c3`, par **promotion de ce commit
+dans `release/commercialisation-v1`** (la Production Branch Vercel, inchangée), puis déploiement de
+cette release. **Ne pas** reconfigurer la Production Branch sur la branche `feat/…`, **ni** sur
+`main`.
+
+**Faisabilité de la promotion — vérifiée le 2026-09-05 :**
+
+```bash
+git merge-base --is-ancestor origin/release/commercialisation-v1 996be15   # → vrai
+git merge-base origin/release/commercialisation-v1 996be15                 # → fcdd4e7c…
+```
+
+`origin/release/commercialisation-v1` (`fcdd4e7c`) est un **ancêtre** de `996be15` : la promotion
+est un **fast-forward strict**, sans merge ni réécriture d'historique.
+
+> **Piège vérifié — la branche locale `release/commercialisation-v1` a divergé.** Dans le dépôt de
+> travail au 2026-09-05, `release/commercialisation-v1` **local** pointe sur `8fe737e`, qui n'est
+> **pas** un descendant de `origin/release/commercialisation-v1` (`fcdd4e7c`) : 3 commits présents
+> côté `origin` sont absents en local. Promouvoir depuis cette branche locale sans la
+> resynchroniser écraserait l'historique réellement déployé. **À T-60, avant toute promotion :**
+>
+> ```bash
+> git fetch origin
+> git rev-parse origin/release/commercialisation-v1   # doit valoir fcdd4e7c… (SHA Production)
+> git log --oneline -1 996be15                        # cible
+> git merge-base --is-ancestor origin/release/commercialisation-v1 996be15   # doit être vrai
+> ```
+>
+> Puis promouvoir **en fast-forward uniquement** (jamais `--force`).
 
 Vérifications (exécutant **A**, contrôle **D**) :
 
 - [ ] `app.elsatia.fr` répond (pas de 5xx à l'accueil)
 - [ ] Login fonctionnel (formulaire + redirection post-login)
 - [ ] Aucun 5xx critique sur les routes clés
-- [ ] Aucune boucle de redirection (le correctif `1d15289` couvre le cas compte dépôt sans
+- [ ] Aucune boucle de redirection (le correctif `c1930ab`, inclus dans `996be15`, couvre le cas compte dépôt sans
       module borne → `/abonnement/module-non-inclus` terminal, cf. mission
       `ELSATIA-POSTLOGIN-MODULE-ROUTING-CLOSURE-V1`)
 - [ ] `/abonnement` : statut, offre, capacité X/Y, section Modules rendue
@@ -885,6 +1229,9 @@ Vérifications (exécutant **A**, contrôle **D**) :
 ---
 
 ## 20. MFA — checklist d'exécution fenêtre (T+45)
+
+> **À EXÉCUTER PENDANT LE CUTOVER (T+45).** Aucun de ces contrôles n'a été exécuté à `996be15` :
+> ils exigent la Production réelle (auth, second admin, facteurs TOTP).
 
 Aucun QR, seed ou code n'est **jamais** affiché, transmis, demandé par un outil, ou consigné
 dans ce document ou ailleurs. Aucune manipulation manuelle de `auth.mfa_factors`.
@@ -909,6 +1256,9 @@ poursuivre.
 
 ## 21. Multitenant — smoke obligatoire (T+45)
 
+> **À EXÉCUTER PENDANT LE CUTOVER (T+45).** Non exécuté à `996be15` : exige deux entreprises
+> réelles sur la base Production migrée.
+
 Exécuté par **D**, sur deux entreprises de recette distinctes (A et B) :
 
 - [ ] Entreprise A voit uniquement ses propres clients ; B ne voit rien de A sur les clients
@@ -924,6 +1274,9 @@ Exécuté par **D**, sur deux entreprises de recette distinctes (A et B) :
 ---
 
 ## 22. Colors / Tools — vérifications post-migration (T+45)
+
+> **À EXÉCUTER PENDANT LE CUTOVER (T+45).** Non exécuté à `996be15` : le build Tools est vert
+> (§13.5) mais les smokes Colors/Tools exigent la Production migrée et les habilitations réelles.
 
 **Colors**
 - [ ] Login avec le compte partagé
@@ -946,10 +1299,32 @@ ce cutover ne change aucune décision commerciale (cf. INTERDIT, §7 de la missi
 
 ## 23. Stripe TEST — vérifications post-migration (T+45)
 
+> **À EXÉCUTER PENDANT LE CUTOVER (T+45).** Non exécuté à `996be15` : exige les clés Stripe
+> Production (mode TEST) et le webhook réel. **Stripe Live reste hors périmètre.**
+
 Production technique **reste en TEST** pendant tout le cutover (§8).
 
 - [ ] `ABONNEMENTS_PUBLICS_OUVERTS = false`
-- [ ] Mode observé = `test` (`STRIPE_WEBHOOK_EXPECTED_MODE`, clé `sk_test_…`)
+- [ ] `STRIPE_WEBHOOK_EXPECTED_MODE = test` (valeur lisible, vérifiée par lecture)
+
+**Smoke contrôlé de confirmation du mode `STRIPE_SECRET_KEY` — P0 pendant fenêtre, item C**
+
+`STRIPE_SECRET_KEY` est de type Vercel `sensitive` : son préfixe (`sk_test_` / `sk_live_`) **n'est
+pas lisible** (§5.0, §5.6). Le mode se confirme donc **par comportement**, sans jamais afficher ni
+journaliser la clé. Deux observations concordantes suffisent :
+
+- [ ] **Observation 1 — objets Stripe renvoyés.** Sur un parcours Checkout de recette (§8), la
+      session créée revient avec `livemode = false`. Un `livemode = true` = **STOP immédiat**,
+      rollback de la posture Stripe, escalade à **B**.
+- [ ] **Observation 2 — attestation.** `environnementAttestationStripe()`
+      (`src/lib/stripe-state-attestation.ts`) dérive `test`/`live` du seul préfixe de la clé et
+      **jette** sur tout autre format. Une fois le registry Ed25519 rempli (§18bis, configuré en
+      `environment = 'test'`), une saga de remise attestée qui aboutit prouve la cohérence
+      `clé ↔ registry` : une clé `sk_live_` produirait un `environment = live` et un rejet.
+- [ ] Mode conclu = **`test`** sur les deux observations, **concordantes**. Discordance ou doute →
+      **NO-GO Stripe**, ne pas poursuivre le §23.
+- [ ] **Aucune valeur de clé affichée, copiée, journalisée ou écrite dans ce runbook.**
+
 - [ ] Aucun objet Live détecté (aucune clé `sk_live_`, aucun Price Live câblé)
 - [ ] Prices conformes à la grille canonique (`verify:stripe-prices --strict`, 8/8 une fois les
       4 `_ANNUEL` alignés — P1-1)
