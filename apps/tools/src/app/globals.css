@@ -373,6 +373,13 @@ footer { background: #e9e8e3; }
 .empty-projects p { font-size: 12px; }
 .empty-projects a { display: inline-block; margin-top: 9px; color: #96600c; font-size: 11px; font-weight: 800; }
 .locked-projects { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding-block: 40px 80px; }
+.offline-flag { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 10px); left: 50%; z-index: 60; transform: translateX(-50%); padding: 6px 13px; border-radius: 99px; background: rgba(19, 43, 58, .92); color: var(--amber-soft); font-size: 11px; font-weight: 800; letter-spacing: .06em; pointer-events: none; }
+.app-error { display: grid; min-height: 100dvh; place-content: center; gap: 14px; padding: 24px; text-align: center; }
+.app-error h1 { margin: 0; font-family: Georgia, serif; font-size: 27px; font-weight: 500; }
+.app-error p { max-width: 420px; margin: 0; color: var(--ink-soft); font-size: 14px; line-height: 1.6; }
+.app-error > div { display: flex; justify-content: center; gap: 10px; }
+.app-error a, .app-error button { padding: 11px 18px; border: 1px solid var(--line); border-radius: 11px; background: var(--white); color: var(--ink); cursor: pointer; font-size: 13px; font-weight: 700; }
+.app-error button { border-color: var(--navy); background: var(--navy); color: var(--amber-soft); }
 .offline-page { display: grid; min-height: 100vh; place-items: center; padding: 30px; text-align: center; }
 .offline-page > .brand { position: absolute; top: 25px; left: 25px; }
 .offline-page > div { max-width: 480px; }

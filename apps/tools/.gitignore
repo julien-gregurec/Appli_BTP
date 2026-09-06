@@ -1,4 +1,6 @@
 /.next/
+# Genere par `scripts/generate-service-worker.mjs` a chaque build : jamais versionne.
+/public/sw-tools.js
 /node_modules/
 /out/
 *.tsbuildinfo
