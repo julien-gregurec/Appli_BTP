@@ -4,7 +4,15 @@ import { permissionsUtilisateur } from "@/lib/permissions";
 import { peutExporterComptabilite } from "@/lib/permissions-financieres";
 import { periodeDepuisUrl, reponseCsv } from "@/lib/csv";
 import { reponseXlsx } from "@/lib/xlsx";
-const nomClient = (client: { nom: string | null; prenom: string | null; societe: string | null } | null) => client?.societe || [client?.prenom, client?.nom].filter(Boolean).join(" ") || "";
+import { nomClientDocument } from "@/lib/client-snapshot";
+// Un export comptable rejoue des documents DÉJÀ ÉMIS : il doit restituer le
+// destinataire tel qu'il figurait sur la facture, pas la fiche client
+// d'aujourd'hui (ELSATIA-GP-CLIENT-DOCUMENT-SNAPSHOT-P0-V1). La fiche reste
+// la source de repli pour les rares lignes sans identité figée.
+const client_snapshot_reference = (snapshot: unknown): string | null =>
+  typeof snapshot === "object" && snapshot !== null && !Array.isArray(snapshot)
+    ? ((snapshot as { reference_interne?: string | null }).reference_interne ?? null)
+    : null;
 const un = <T,>(value: T | T[] | null): T | null => Array.isArray(value) ? value[0] ?? null : value;
 const reponseExport = (lignes: unknown[][], nom: string, feuille: string, format: string) => format === "csv"
   ? reponseCsv(lignes, `${nom}.csv`)
@@ -19,15 +27,15 @@ export async function GET(request: Request) {
   }
   const supabase = await createClient();
   if (type === "ventes") {
-    const { data, error } = await supabase.from("factures").select("numero,date_emission,date_echeance,type,statut,montant_ht,montant_tva,montant_ttc,montant_paye,client:clients!factures_client_id_fkey(reference_interne,nom,prenom,societe)").eq("entreprise_id", ctx.entrepriseId).not("numero", "is", null).gte("date_emission", periode.debut).lte("date_emission", periode.fin).order("date_emission").order("numero");
+    const { data, error } = await supabase.from("factures").select("numero,date_emission,date_echeance,type,statut,montant_ht,montant_tva,montant_ttc,montant_paye,client_snapshot,client:clients!factures_client_id_fkey(reference_interne,nom,prenom,societe)").eq("entreprise_id", ctx.entrepriseId).not("numero", "is", null).gte("date_emission", periode.debut).lte("date_emission", periode.fin).order("date_emission").order("numero");
     if (error) return Response.json({ error: "Export temporairement indisponible" }, { status: 503 }); const lignes: unknown[][] = [["Date", "N° facture", "Type", "Statut", "Réf. client", "Client", "HT", "TVA", "TTC", "Encaissé", "Reste dû", "Échéance"]];
-    for (const facture of data ?? []) { const client = un(facture.client); const ttc = Number(facture.montant_ttc), paye = Number(facture.montant_paye); lignes.push([facture.date_emission, facture.numero, facture.type, facture.statut, client?.reference_interne ?? "", nomClient(client), Number(facture.montant_ht), Number(facture.montant_tva), ttc, paye, Math.max(0, ttc - paye), facture.date_echeance ?? ""]); }
+    for (const facture of data ?? []) { const client = un(facture.client); const ttc = Number(facture.montant_ttc), paye = Number(facture.montant_paye); lignes.push([facture.date_emission, facture.numero, facture.type, facture.statut, client_snapshot_reference(facture.client_snapshot) ?? client?.reference_interne ?? "", nomClientDocument(facture.client_snapshot, client), Number(facture.montant_ht), Number(facture.montant_tva), ttc, paye, Math.max(0, ttc - paye), facture.date_echeance ?? ""]); }
     return reponseExport(lignes, `journal-ventes-${periode.debut}-${periode.fin}`, "Journal des ventes", format);
   }
   if (type === "reglements") {
-    const { data, error } = await supabase.from("paiements").select("date,montant,mode,reference,facture:factures!inner(numero,entreprise_id,type,client:clients!factures_client_id_fkey(reference_interne,nom,prenom,societe))").eq("facture.entreprise_id", ctx.entrepriseId).gte("date", periode.debut).lte("date", periode.fin).order("date");
+    const { data, error } = await supabase.from("paiements").select("date,montant,mode,reference,facture:factures!inner(numero,entreprise_id,type,client_snapshot,client:clients!factures_client_id_fkey(reference_interne,nom,prenom,societe))").eq("facture.entreprise_id", ctx.entrepriseId).gte("date", periode.debut).lte("date", periode.fin).order("date");
     if (error) return Response.json({ error: "Export temporairement indisponible" }, { status: 503 }); const lignes: unknown[][] = [["Date", "N° facture", "Réf. client", "Client", "Mode", "Référence règlement", "Montant"]];
-    for (const paiement of data ?? []) { const facture = un(paiement.facture); const client = facture ? un(facture.client) : null; lignes.push([paiement.date, facture?.numero ?? "", client?.reference_interne ?? "", nomClient(client), paiement.mode, paiement.reference ?? "", (facture?.type === "avoir" ? -1 : 1) * Number(paiement.montant)]); }
+    for (const paiement of data ?? []) { const facture = un(paiement.facture); const client = facture ? un(facture.client) : null; lignes.push([paiement.date, facture?.numero ?? "", client_snapshot_reference(facture?.client_snapshot) ?? client?.reference_interne ?? "", nomClientDocument(facture?.client_snapshot, client), paiement.mode, paiement.reference ?? "", (facture?.type === "avoir" ? -1 : 1) * Number(paiement.montant)]); }
     return reponseExport(lignes, `reglements-${periode.debut}-${periode.fin}`, "Règlements clients", format);
   }
   if (type === "achats") {
