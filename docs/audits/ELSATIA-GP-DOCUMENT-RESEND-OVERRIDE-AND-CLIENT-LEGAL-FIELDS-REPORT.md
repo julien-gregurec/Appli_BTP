@@ -46,7 +46,8 @@ l'écriture.
 |---|---|
 | Branche | `feat/gp-client-document-snapshot-p0-v1` (poursuite de la lignée Snapshot) |
 | SHA de base | `dfb6f35c9b14acbda2f17e1de3fee9fdf62c181a` |
-| SHA final poussé | `__SHA_FINAL__` |
+| SHA du lot (complet) | `12909d395e9f75a840990245e8445d1291428ec1` |
+| Tête de branche | commit de clôture documentaire — `git rev-parse origin/feat/gp-client-document-snapshot-p0-v1` |
 | Fusionnée | **non** |
 | Déployée | **non** |
 | Migration créée | **aucune** |
@@ -512,4 +513,18 @@ supprimé, désactivé ni affaibli.
 
 ## 11. État Git final
 
-_(complété ci-dessous)_
+| | |
+|---|---|
+| Branche | `feat/gp-client-document-snapshot-p0-v1` |
+| SHA de base | `dfb6f35c9b14acbda2f17e1de3fee9fdf62c181a` |
+| **SHA du lot** | `12909d395e9f75a840990245e8445d1291428ec1` — `feat(gp): surcharge tracée de l'adresse de renvoi des documents commerciaux` |
+| Commit de clôture | documentation seule (ce tableau) ; un commit ne peut pas porter sa propre empreinte — lire `git rev-parse origin/feat/gp-client-document-snapshot-p0-v1` |
+| Poussée sur `origin` | oui |
+| Fusionnée | **non** |
+| Déployée | **non** |
+| Migration créée | **aucune** — `supabase/migrations/` intact, 266 fichiers |
+| Worktree | `/Volumes/ELSATIA-DEV/worktrees/gp-client-document-snapshot-p0-v1` — conservé |
+
+**Non touché :** la base locale `btp-platform`, la Production Branch Vercel, les
+branches et worktrees des autres lots, les 3 stashes, et la branche
+`feat/client-contracts-canonical-v1`.
