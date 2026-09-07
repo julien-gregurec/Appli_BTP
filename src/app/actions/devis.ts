@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
+import { peutSurchargerDestinataire } from "@/lib/permissions-envoi";
+import type { SurchargeDestinataire } from "@/lib/document-resend-override";
 import type { LigneDevis } from "@/lib/devis";
 import { TRANSITIONS_DEVIS } from "@/lib/devis";
 import { genererLignesDevisIA } from "@/lib/ai/devis";
@@ -231,7 +233,10 @@ export async function dupliquerDevisAction(devisId: string) {
   redirect(`/devis/${data}/modifier`);
 }
 
-export async function envoyerDevisEmailAction(devisId: string): Promise<{ error: string } | { ok: true }> {
+export async function envoyerDevisEmailAction(
+  devisId: string,
+  surchargeDestinataire?: SurchargeDestinataire | null,
+): Promise<{ error: string } | { ok: true }> {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const permissions = await permissionsUtilisateur(ctx);
@@ -246,6 +251,8 @@ export async function envoyerDevisEmailAction(devisId: string): Promise<{ error:
     userId: ctx.userId,
     typeDocument: "devis",
     documentId: devisId,
+    surchargeDestinataire,
+    peutSurchargerDestinataire: peutSurchargerDestinataire(permissions),
   });
   if ("error" in resultat) return resultat;
 

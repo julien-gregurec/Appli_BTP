@@ -5,6 +5,11 @@ import { contenuEmailDocument, corpsHtmlEmailDocument } from "@/lib/email";
 import { chargerDonneesDevisImprimable, chargerDonneesFactureImprimable } from "@/lib/documents-commerciaux";
 import { genererPdfDepuisUrl, nomFichierPdf } from "@/lib/pdf/generer";
 import { obtenirNouveauTokenPartage, urlDocumentPartage, urlImpressionPartage } from "@/lib/documents-partage";
+import {
+  construireEntreeJournalSurcharge,
+  resoudreDestinataireEnvoi,
+  type SurchargeDestinataire,
+} from "@/lib/document-resend-override";
 
 // Au-delà de cette taille, on n'attache plus le PDF (l'e-mail resterait
 // bloqué par Brevo) : le lien sécurisé /document/[token] reste toujours
@@ -23,6 +28,10 @@ export async function envoyerDocumentCommercialParEmail(
     typeDocument: TypeDocument;
     documentId: string;
     complementCorps?: string;
+    // Adresse de substitution saisie explicitement par un utilisateur autorisé.
+    // Absente = envoi vers l'adresse figée du document (cas nominal).
+    surchargeDestinataire?: SurchargeDestinataire | null;
+    peutSurchargerDestinataire?: boolean;
   },
 ): Promise<{ error: string } | { ok: true }> {
   const donnees =
@@ -33,10 +42,23 @@ export async function envoyerDocumentCommercialParEmail(
 
   if (!brevoEstConfigure()) return { error: "L'envoi automatique par e-mail n'est pas encore configuré" };
 
+  // `donnees.clientEmail` est l'adresse FIGÉE sur le document (snapshot). Elle
+  // reste la destination par défaut ; seule une saisie explicite d'un
+  // utilisateur autorisé peut s'en écarter, et jamais l'adresse courante de la
+  // fiche client, qui n'est pas consultée ici.
+  const destinataire = resoudreDestinataireEnvoi({
+    adresseFigee: donnees.clientEmail,
+    surcharge: params.surchargeDestinataire,
+    peutSurcharger: params.peutSurchargerDestinataire === true,
+  });
+  if (!destinataire.ok) return { error: destinataire.erreur };
+
   const email = contenuEmailDocument({
     typeDoc: params.typeDocument === "facture" && donnees.estAvoir ? "avoir" : params.typeDocument,
     numero: donnees.numero,
-    client: { nom: donnees.client.nom_affiche, prenom: null, societe: null, email: donnees.clientEmail },
+    // Le corps du message garde l'identité figée du document : seule l'adresse
+    // d'acheminement peut différer, jamais le destinataire imprimé.
+    client: { nom: donnees.client.nom_affiche, prenom: null, societe: null, email: destinataire.email },
     montantTtc: Number(donnees.montantTtc),
     entrepriseNom: params.entrepriseNom,
     prenomEmetteur: params.prenomEmetteur,
@@ -70,6 +92,33 @@ export async function envoyerDocumentCommercialParEmail(
     }
   }
 
+  // Journalise l'écart d'adresse, quelle que soit l'issue de l'envoi : un envoi
+  // refusé doit laisser la même trace qu'un envoi réussi, et chaque nouvelle
+  // tentative ajoute sa propre entrée (le journal est un historique, jamais un
+  // état). L'écriture d'audit ne peut pas faire échouer l'envoi lui-même.
+  const journaliserEcart = async (resultat: "succes" | "echec", erreur?: string) => {
+    if (!destinataire.surchargee) return;
+    try {
+      await supabase.from("journal_activite").insert(
+        construireEntreeJournalSurcharge({
+          entrepriseId: params.entrepriseId,
+          utilisateurId: params.userId,
+          typeDocument: params.typeDocument,
+          documentId: params.documentId,
+          numero: donnees.numero === "BROUILLON" ? null : donnees.numero,
+          adresseFigee: destinataire.adresseFigee,
+          adresseUtilisee: destinataire.email,
+          motif: destinataire.motif,
+          typeEnvoi: donnees.emailEnvoyeLe ? "renvoi" : "envoi_initial",
+          resultat,
+          erreur,
+        }),
+      );
+    } catch {
+      // Journal indisponible : on ne masque pas l'issue réelle de l'envoi.
+    }
+  };
+
   try {
     await envoyerEmailBrevo({
       to: email.to,
@@ -82,8 +131,12 @@ export async function envoyerDocumentCommercialParEmail(
           : undefined,
     });
   } catch (cause) {
-    return { error: cause instanceof Error ? cause.message : "Envoi de l'e-mail impossible" };
+    const message = cause instanceof Error ? cause.message : "Envoi de l'e-mail impossible";
+    await journaliserEcart("echec", message);
+    return { error: message };
   }
+
+  await journaliserEcart("succes");
 
   const table = params.typeDocument === "devis" ? "devis" : "factures";
   await supabase

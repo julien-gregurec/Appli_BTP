@@ -5,7 +5,7 @@
 -- le changement porte B.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(21);
+select plan(26);
 
 \ir fixtures/isolation_multitenant.inc
 
@@ -254,6 +254,64 @@ select is(
   (select client_snapshot ->> 'provenance' from public.devis where id = 'd1000000-0000-0000-0000-000000000003'),
   'backfill_identite_actuelle',
   'une identité reconstituée est marquée comme telle, jamais présentée comme observée à l''émission'
+);
+
+-- ---------------------------------------------------------------------------
+-- 22-26. ELSATIA-GP-DOCUMENT-RESEND-OVERRIDE-AND-CLIENT-LEGAL-FIELDS-V1
+-- ---------------------------------------------------------------------------
+--
+-- 22-24 : vérification de l'affirmation « le snapshot sait déjà recevoir les
+-- champs légaux à null ». Ces cinq clés sont dans la liste blanche de
+-- construire_client_snapshot alors que quatre d'entre elles n'existent PAS
+-- encore comme colonnes de public.clients. La preuve porte sur le fait que la
+-- clé est bien PRÉSENTE et vaut null — et non absente, ce qui obligerait le
+-- code de lecture à distinguer « champ inconnu » de « champ vide ».
+
+select is(
+  (select count(*)::integer
+   from jsonb_object_keys(
+     public.construire_client_snapshot(
+       'a3000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001'
+     )
+   ) as k
+   where k in ('numero_tva', 'forme_juridique', 'nom_commercial', 'adresse_complement', 'pays')),
+  5,
+  'le snapshot porte déjà les cinq champs d''identité légale demandés'
+);
+
+select ok(
+  (select bool_and(
+     public.construire_client_snapshot(
+       'a3000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001'
+     ) -> k = 'null'::jsonb)
+   from unnest(array['numero_tva', 'forme_juridique', 'nom_commercial', 'adresse_complement', 'pays']) as k),
+  'ces cinq champs valent null tant que les colonnes correspondantes n''existent pas'
+);
+
+select ok(
+  (select bool_and(
+     not exists (
+       select 1 from information_schema.columns
+       where table_schema = 'public' and table_name = 'clients' and column_name = c
+     ))
+   from unnest(array['numero_tva', 'forme_juridique', 'nom_commercial', 'adresse_complement', 'pays']) as c),
+  'aucune de ces colonnes n''existe encore sur public.clients (partie 2 bloquée par le ledger)'
+);
+
+-- 25-26 : le journal d'audit de la surcharge d'adresse s'appuie sur
+-- public.journal_activite. Sa valeur probante tient à deux propriétés, vérifiées
+-- ici plutôt que supposées : il est en AJOUT SEUL pour les utilisateurs, et il
+-- est cloisonné par entreprise.
+
+select ok(
+  not has_table_privilege('authenticated', 'public.journal_activite', 'UPDATE')
+  and not has_table_privilege('authenticated', 'public.journal_activite', 'DELETE'),
+  'le journal d''audit est en ajout seul : un utilisateur ne peut ni réécrire ni effacer une trace'
+);
+
+select ok(
+  (select relrowsecurity from pg_class where oid = 'public.journal_activite'::regclass),
+  'le journal d''audit est cloisonné par entreprise (RLS active)'
 );
 
 select * from finish();
