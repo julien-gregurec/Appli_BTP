@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { exigerShellReserves, peutEmettre } from "@/lib/acces-reserves";
 import { lireChantier, listerIntervenants, listerPlansComplets } from "@/lib/donnees";
 import { creerReserveAction } from "@/app/actions";
+import { CleIdempotence } from "@/components/CleIdempotence";
 import { ChampPhoto } from "@/components/ChampPhoto";
 
 export const metadata: Metadata = { title: "Nouvelle réserve" };
@@ -28,8 +29,6 @@ export default async function PageNouvelleReserve({
     listerIntervenants(id),
     listerPlansComplets(id),
   ]);
-
-  const erreur = typeof query.error === "string" ? query.error : null;
   const planPointe = typeof query.plan === "string" ? query.plan : "";
   const x = typeof query.x === "string" ? query.x : "";
   const y = typeof query.y === "string" ? query.y : "";
@@ -42,7 +41,6 @@ export default async function PageNouvelleReserve({
     <>
       <h1>Nouvelle réserve</h1>
       <p className="sous-titre">{chantier.nom}</p>
-      {erreur && <div className="message erreur">{erreur}</div>}
 
       {plan && x && y && (
         <div className="message">
@@ -53,6 +51,8 @@ export default async function PageNouvelleReserve({
       )}
 
       <form className="carte" action={creerReserveAction} encType="multipart/form-data">
+        {/* Un double envoi sur un réseau de chantier ne doit pas créer deux réserves. */}
+        <CleIdempotence />
         <input type="hidden" name="chantier_id" value={id} />
         <input type="hidden" name="plan_id" value={planPointe} />
         <input type="hidden" name="position_x" value={x} />

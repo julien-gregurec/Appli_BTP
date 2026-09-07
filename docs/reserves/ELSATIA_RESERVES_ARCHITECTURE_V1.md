@@ -134,8 +134,14 @@ d'ancrage vérifiables :
 
 - `reserves.origine_client_id` et `reserves_photos.origine_client_id` : clés
   d'idempotence côté client, avec index unique par organisation ;
-- `reserves_creer()` renvoie la réserve existante lorsqu'une création locale est rejouée
-  (comportement prouvé par le test pgTAP).
+- `reserves_creer()` renvoie la réserve existante lorsqu'une création locale est rejouée.
+
+> **Rectification (lot V4).** Cette page affirmait que ce rejeu était « prouvé par le test
+> pgTAP ». Aucun test du dépôt ne mentionnait alors `origine_client_id` : la preuve
+> n'existait pas, et aucun formulaire n'émettait la clé — la protection était du code mort.
+> Les deux manques sont corrigés par le lot V4 : voir
+> `supabase/tests/reserves_v4_resilience_reseau.test.sql` et
+> `docs/reserves/ELSATIA_RESERVES_RECETTE_V4.md`.
 
 Ce qui manque pour un vrai mode hors-ligne : file d'attente locale, mise en cache des
 chantiers et plans, upload différé des photos, et une politique de résolution de

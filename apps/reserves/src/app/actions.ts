@@ -11,6 +11,7 @@ import {
   DUREE_INVITATION_JOURS, creerJetonInvitation, hacherJetonInvitation, urlInvitation,
 } from "@/lib/invitations";
 import { envoyerInvitation } from "@/lib/emails-reserves";
+import { estCleIdempotence } from "@/lib/offline/resilience";
 
 const MESSAGE_SANS_RESERVES = "Votre compte ELSATIA ne dispose pas d’un accès actif à Réserves.";
 
@@ -122,7 +123,13 @@ export async function creerReserveAction(formData: FormData) {
     p_plan_page: pageDuPlan === null ? null : Number(pageDuPlan),
     p_photo_obligatoire_levee: formData.get("photo_obligatoire_levee") === "on",
     p_echeance: texteOuNull(formData, "echeance"),
-    p_origine_client_id: texteOuNull(formData, "origine_client_id"),
+    // Clé d'idempotence émise par le formulaire : elle rend un double envoi inoffensif.
+    // Une valeur qui n'est pas une clé valide est IGNORÉE plutôt que transmise : la
+    // création doit aboutir, quitte à perdre la protection, jamais échouer à cause d'elle.
+    p_origine_client_id: (() => {
+      const cle = texteOuNull(formData, "origine_client_id");
+      return estCleIdempotence(cle) ? cle : null;
+    })(),
   });
   if (error) {
     redirect(`/chantiers/${chantierId}/nouvelle-reserve?error=${encodeURIComponent(error.message)}`);

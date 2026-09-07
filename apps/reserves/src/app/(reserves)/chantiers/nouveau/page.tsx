@@ -6,15 +6,9 @@ import { creerChantierAction } from "@/app/actions";
 
 export const metadata: Metadata = { title: "Nouveau chantier" };
 
-export default async function PageNouveauChantier({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const query = await searchParams;
+export default async function PageNouveauChantier() {
   const contexte = await exigerShellReserves();
   if (!peutGererChantiers(contexte.roleReserves)) redirect("/chantiers");
-  const erreur = typeof query.error === "string" ? query.error : null;
 
   return (
     <>
@@ -23,7 +17,6 @@ export default async function PageNouveauChantier({
         Réserves gère ses propres chantiers. Aucune information de Gestion Pro n’est
         requise : seul le nom est obligatoire.
       </p>
-      {erreur && <div className="message erreur">{erreur}</div>}
 
       <form className="carte" action={creerChantierAction}>
         <label>Nom du chantier<input name="nom" required maxLength={180} placeholder="Résidence Les Tilleuls" /></label>

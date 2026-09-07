@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Marque } from "@/components/Marque";
+import { BanniereRetour } from "@/components/BanniereRetour";
 import { Navigation } from "@/components/Navigation";
 import { deconnexionAction } from "@/app/actions";
 import { estCompteIntervenant, peutInviterEntreprise } from "@/lib/acces-reserves";
@@ -37,7 +38,10 @@ export function Coquille({
         notificationsNonLues={notificationsNonLues}
         messagesNonLus={messagesNonLus}
       />
-      <main className="contenu">{children}</main>
+      <main className="contenu">
+        <BanniereRetour />
+        {children}
+      </main>
       <footer className="pied">
         ELSATIA Réserves — application indépendante de l’écosystème ELSATIA.
       </footer>

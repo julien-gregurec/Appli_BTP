@@ -3,9 +3,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { exigerShellReserves } from "@/lib/acces-reserves";
 import { lireEnteteExport, lireLignesExport, listerIntervenantsExport } from "@/lib/donnees";
-import { LIBELLES_PRIORITE, LIBELLES_STATUT, STATUTS_RESERVE, PRIORITES_RESERVE } from "@/lib/workflow";
+import {
+  LIBELLES_PRIORITE, LIBELLES_STATUT, PRIORITES_RESERVE, STATUTS_RESERVE, estEnRetard,
+} from "@/lib/workflow";
+import {
+  appliquerVue, filtresBase, FORMATS_EXPORT, LIBELLES_FORMAT, LIBELLES_VUE,
+  lireOptionsExport, suffixeExport, VUES_EXPORT, type OptionsExport,
+} from "@/lib/export/options";
 
 export const metadata: Metadata = { title: "Exports du chantier" };
+
+/** Lien PDF d'une sélection dérivée de la sélection courante. */
+function lienPdf(id: string, base: OptionsExport, ecart: Partial<OptionsExport>) {
+  return `/api/documents/chantier/${id}/pdf${suffixeExport({ ...base, ...ecart })}`;
+}
 
 /**
  * Console d'export. Elle ne rend PAS le document : elle compose la sélection, montre
@@ -24,35 +35,18 @@ export default async function PageExport({
   const { id } = await params;
   const query = await searchParams;
   await exigerShellReserves();
-
-  const lire = (cle: string) => (typeof query[cle] === "string" ? (query[cle] as string) : "");
-  const intervenantId = lire("entreprise") || null;
-  const statut = lire("statut") || null;
-  const priorite = lire("priorite") || null;
-  const echeance = lire("echeance") || null;
-  const inclureLevees = lire("levees") !== "0";
-  const historique = lire("historique") === "complet" ? "complet" : "synthese";
-  const photos = lire("photos") !== "0";
+  const options = lireOptionsExport(query);
 
   const entete = await lireEnteteExport(id);
   if (!entete) notFound();
 
-  const [lignes, intervenants] = await Promise.all([
-    lireLignesExport(id, {
-      intervenantId, statut, priorite, echeanceAvant: echeance, inclureLevees,
-    }),
+  const [brutes, intervenants] = await Promise.all([
+    lireLignesExport(id, filtresBase(options)),
     listerIntervenantsExport(id),
   ]);
-
-  const parametres = new URLSearchParams();
-  if (intervenantId) parametres.set("entreprise", intervenantId);
-  if (statut) parametres.set("statut", statut);
-  if (priorite) parametres.set("priorite", priorite);
-  if (echeance) parametres.set("echeance", echeance);
-  if (!inclureLevees) parametres.set("levees", "0");
-  if (historique === "complet") parametres.set("historique", "complet");
-  if (!photos) parametres.set("photos", "0");
-  const suffixe = parametres.toString() ? `?${parametres.toString()}` : "";
+  const lignes = appliquerVue(brutes, options.vue);
+  const suffixe = suffixeExport(options);
+  const detaille = options.format === "detaillee";
 
   return (
     <>
@@ -67,8 +61,16 @@ export default async function PageExport({
         <h2 className="sans-marge">Sélection</h2>
         <div className="paire">
           <label>
+            Liste à imprimer
+            <select name="vue" defaultValue={options.vue}>
+              {VUES_EXPORT.map((v) => (
+                <option key={v} value={v}>{LIBELLES_VUE[v]}</option>
+              ))}
+            </select>
+          </label>
+          <label>
             Entreprise
-            <select name="entreprise" defaultValue={intervenantId ?? ""}>
+            <select name="entreprise" defaultValue={options.intervenantId ?? ""}>
               <option value="">Toutes les entreprises</option>
               {intervenants.map((i) => (
                 <option key={i.intervenant_id} value={i.intervenant_id}>
@@ -77,42 +79,63 @@ export default async function PageExport({
               ))}
             </select>
           </label>
+        </div>
+        <div className="paire">
           <label>
-            Statut
-            <select name="statut" defaultValue={statut ?? ""}>
-              <option value="">Tous les statuts</option>
-              {STATUTS_RESERVE.map((s) => <option key={s} value={s}>{LIBELLES_STATUT[s]}</option>)}
+            Format
+            <select name="format" defaultValue={options.format}>
+              {FORMATS_EXPORT.map((f) => (
+                <option key={f} value={f}>{LIBELLES_FORMAT[f]}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Orientation
+            <select name="orientation" defaultValue={options.orientation}>
+              <option value="portrait">A4 portrait</option>
+              <option value="paysage">A4 paysage — liste large</option>
             </select>
           </label>
         </div>
         <div className="paire">
           <label>
+            Statut précis
+            <select name="statut" defaultValue={options.statut ?? ""}>
+              <option value="">Tous les statuts</option>
+              {STATUTS_RESERVE.map((s) => <option key={s} value={s}>{LIBELLES_STATUT[s]}</option>)}
+            </select>
+          </label>
+          <label>
             Priorité
-            <select name="priorite" defaultValue={priorite ?? ""}>
+            <select name="priorite" defaultValue={options.priorite ?? ""}>
               <option value="">Toutes les priorités</option>
               {PRIORITES_RESERVE.map((p) => <option key={p} value={p}>{LIBELLES_PRIORITE[p]}</option>)}
             </select>
           </label>
-          <label>
-            Échéance au plus tard le
-            <input type="date" name="echeance" defaultValue={echeance ?? ""} />
-          </label>
         </div>
-        <label className="case">
-          <input type="checkbox" name="levees" value="1" defaultChecked={inclureLevees} />
-          Inclure les réserves levées et annulées
-        </label>
         <label>
-          Contenu du document
-          <select name="historique" defaultValue={historique}>
-            <option value="synthese">Synthèse — sans historique détaillé</option>
-            <option value="complet">Complet — avec l’historique de chaque réserve</option>
-          </select>
+          Échéance au plus tard le
+          <input type="date" name="echeance" defaultValue={options.echeanceAvant ?? ""} />
         </label>
-        <label className="case">
-          <input type="checkbox" name="photos" value="1" defaultChecked={photos} />
-          Inclure les photos
-        </label>
+
+        {/* Ces trois options ne concernent que la fiche détaillée : sur une liste
+            synthétique, il n'y a ni photo, ni plan, ni historique à inclure. */}
+        <fieldset className="options-detail" disabled={!detaille}>
+          <legend className="mention">Contenu des fiches détaillées</legend>
+          <label className="case">
+            <input type="checkbox" name="photos" value="1" defaultChecked={options.photos} />
+            Inclure les photos
+          </label>
+          <label className="case">
+            <input type="checkbox" name="plans" value="1" defaultChecked={options.plans} />
+            Inclure la miniature du plan et le repère
+          </label>
+          <label className="case">
+            <input type="checkbox" name="historique" value="1" defaultChecked={options.historique} />
+            Inclure les décisions et leurs motifs
+          </label>
+        </fieldset>
+
         <div className="actions">
           <button className="bouton secondaire" type="submit">Appliquer la sélection</button>
         </div>
@@ -123,8 +146,10 @@ export default async function PageExport({
           {lignes.length} réserve{lignes.length > 1 ? "s" : ""} dans ce document
         </h2>
         <p className="mention">
-          Le document est horodaté et porte l’organisation émettrice, le chantier et son
-          auteur. Il ne contient que les réserves que vous êtes autorisé à consulter.
+          {LIBELLES_VUE[options.vue]} · format {detaille ? "détaillé" : "synthétique"} ·
+          A4 {options.orientation}. Le document est horodaté et porte l’organisation
+          émettrice, le chantier et son auteur. Il ne contient que les réserves que vous
+          êtes autorisé à consulter.
         </p>
         <div className="actions">
           <a className="bouton" href={`/api/documents/chantier/${id}/pdf${suffixe}`}>
@@ -136,12 +161,35 @@ export default async function PageExport({
         </div>
       </div>
 
+      {/* Les tirages qu'on redemande à chaque réunion, sans repasser par le formulaire. */}
+      <div className="carte">
+        <h2 className="sans-marge">Tirages courants</h2>
+        <div className="actions">
+          <a className="bouton secondaire" href={lienPdf(id, options, { vue: "ouvertes", format: "synthetique" })}>
+            Ouvertes — synthèse
+          </a>
+          <a className="bouton secondaire" href={lienPdf(id, options, { vue: "retard", format: "synthetique" })}>
+            En retard — synthèse
+          </a>
+          <a className="bouton secondaire" href={lienPdf(id, options, { vue: "attente_levee", format: "synthetique" })}>
+            En attente de levée
+          </a>
+          <a className="bouton secondaire" href={lienPdf(id, options, { vue: "levees", format: "synthetique" })}>
+            Levées
+          </a>
+          <a className="bouton secondaire" href={lienPdf(id, options, { vue: "ouvertes", format: "detaillee" })}>
+            Ouvertes — fiches détaillées
+          </a>
+        </div>
+      </div>
+
       {intervenants.length > 0 && (
         <div className="carte">
           <h2 className="sans-marge">PDF par entreprise</h2>
           <p className="mention">
             Un document par corps d’état, ne contenant que ses réserves : c’est ce qui se
-            transmet à une entreprise sans lui montrer le reste du chantier.
+            transmet à une entreprise sans lui montrer le reste du chantier. La sélection
+            courante ({LIBELLES_VUE[options.vue].toLowerCase()}) s’y applique.
           </p>
           <ul className="liste">
             {intervenants.map((i) => (
@@ -152,11 +200,11 @@ export default async function PageExport({
                 </div>
                 <div className="actions">
                   <a className="bouton secondaire"
-                     href={`/api/documents/chantier/${id}/pdf?entreprise=${i.intervenant_id}${historique === "complet" ? "&historique=complet" : ""}`}>
+                     href={lienPdf(id, options, { intervenantId: i.intervenant_id })}>
                     PDF de cette entreprise
                   </a>
                   <Link className="bouton secondaire"
-                        href={`/chantiers/${id}/export?entreprise=${i.intervenant_id}`}>
+                        href={`/chantiers/${id}/export${suffixeExport({ ...options, intervenantId: i.intervenant_id })}`}>
                     Prévisualiser
                   </Link>
                 </div>
@@ -186,6 +234,7 @@ export default async function PageExport({
                   </span>
                 )}
                 {l.echeance && <span>Échéance {l.echeance}</span>}
+                {estEnRetard(l) && <span className="etiquette refus">En retard</span>}
                 <span>{l.nb_photos} photo{l.nb_photos > 1 ? "s" : ""}</span>
               </div>
             </li>

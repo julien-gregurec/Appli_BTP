@@ -31,6 +31,12 @@ test.skip(
   "Définir E2E_RESERVES_URL pour exécuter la recette ELSATIA Réserves",
 );
 
+// Ce parcours enchaîne deux identités réelles, six navigations rendues côté serveur et un
+// export : il dépasse structurellement le budget par défaut (45 s) de la configuration,
+// calibré pour des tests d'écran. Le budget est donc relevé ICI plutôt que globalement,
+// pour ne pas masquer une lenteur sur les tests courts.
+test.describe.configure({ timeout: 180_000 });
+
 async function jetonSupabase(request: APIRequestContext, email: string) {
   const url = process.env.E2E_SUPABASE_URL;
   const key = process.env.E2E_SUPABASE_ANON_KEY;
@@ -59,7 +65,28 @@ async function rpc(
   });
 }
 
+/** Bascule d'identité : session vierge, sans dépendre d'un bouton propre à la coquille. */
+async function deconnexion(page: Page) {
+  await page.context().clearCookies();
+}
+
+/**
+ * Déconnexion par le bouton de la coquille — la vraie, celle de l'utilisateur.
+ *
+ * Le clic DÉCLENCHE une navigation vers /login ; il ne l'attend pas. Enchaîner
+ * immédiatement un `goto` fait atterrir la redirection en retard, par-dessus la
+ * destination demandée : le paramètre `next` est alors silencieusement perdu et l'acteur
+ * suivant se retrouve sur le tableau de bord. On attend donc l'atterrissage.
+ */
+async function deconnexionUI(page: Page) {
+  await page.getByRole("button", { name: "Se déconnecter" }).click();
+  await expect(page).toHaveURL(/\/login/);
+}
+
 async function connexion(page: Page, email: string, destination: string) {
+  // Chaque étape s'exécute sous l'identité qu'elle annonce : on ne dépend jamais d'une
+  // session résiduelle de l'acteur précédent.
+  await page.context().clearCookies();
   await page.goto(`${RESERVES}/login?next=${encodeURIComponent(destination)}`);
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Mot de passe", { exact: true }).fill("test");
@@ -97,7 +124,10 @@ test("A invite B, B rejoint, lève une réserve pointée page 2, A exporte puis 
   // Le lien est à usage unique : le rejouer ne rattache rien.
   await page.goto(`${RESERVES}/invitation/${jeton}`);
   await expect(page.locator("body")).toContainText("n’est plus valide");
-  await page.getByRole("button", { name: "Se déconnecter" }).click().catch(() => {});
+  // Cette page est PUBLIQUE : elle ne porte aucun bouton de déconnexion. La bascule
+  // d'identité se fait donc en repartant d'une session vierge, ce qui est aussi la
+  // garantie que l'étape suivante s'exécute bien sous l'acteur annoncé.
+  await deconnexion(page);
 
   // ── 4. A crée une réserve pointée sur la page 2 du plan PDF ───────────────
   const creation = await rpc(request, jetonA, "reserves_creer", {
@@ -122,12 +152,13 @@ test("A invite B, B rejoint, lève une réserve pointée page 2, A exporte puis 
   await expect(page.locator("body")).toContainText("Réserve attribuée à votre entreprise");
 
   await page.goto(`${RESERVES}/reserves/${reserveId}`);
-  await page.getByRole("button", { name: /Accepter/i }).click();
+  // Libellé réel de l'écran : la prise en charge s'énonce à la première personne.
+  await page.getByRole("button", { name: "J’accepte" }).click();
   await expect(page.locator("body")).toContainText(/Acceptée/i);
 
   await page.getByRole("button", { name: /Demander la levée/i }).click();
   await expect(page.locator("body")).toContainText(/Levée demandée/i);
-  await page.getByRole("button", { name: "Se déconnecter" }).click();
+  await deconnexionUI(page);
 
   // ── 6. A valide la levée ──────────────────────────────────────────────────
   await connexion(page, "admin-a@invalid.local", `/reserves/${reserveId}`);
@@ -136,16 +167,23 @@ test("A invite B, B rejoint, lève une réserve pointée page 2, A exporte puis 
 
   // ── 7. A exporte le PDF de B ──────────────────────────────────────────────
   await page.goto(`${RESERVES}/chantiers/${CHANTIER}/export?entreprise=${INTERVENANT}`);
-  await expect(page.locator("body")).toContainText("1 réserve dans ce document");
+  // On n'affirme PAS un décompte : le chantier de recette porte d'autres réserves, et un
+  // test couplé à leur nombre casserait à chaque enrichissement du décor sans qu'aucune
+  // régression n'ait eu lieu. Ce qui doit être vrai, c'est le CLOISONNEMENT.
+  await expect(page.locator("body")).toContainText(/réserves? dans ce document/);
   const imprimable = await page.request.get(
-    `${RESERVES}/imprimer/chantier/${CHANTIER}?entreprise=${INTERVENANT}&historique=complet`,
+    `${RESERVES}/imprimer/chantier/${CHANTIER}?entreprise=${INTERVENANT}&format=detaillee`,
   );
   expect(imprimable.status()).toBe(200);
   const documentHtml = await imprimable.text();
   expect(documentHtml).toContain("Étanchéité B");
+  // La réserve créée par ce parcours, pointée page 2 du plan, est bien dans le document.
+  expect(documentHtml).toContain("Relevé d’étanchéité insuffisant");
   expect(documentHtml).toContain("page 2");
-  // Le document restreint ne doit rien contenir d'une autre entreprise.
+  // Le document restreint ne contient AUCUNE réserve d'un autre corps d'état.
   expect(documentHtml).not.toContain("RECETTE_B_Etancheite");
+  expect(documentHtml).not.toContain("Menuiserie C");
+  expect(documentHtml).not.toContain("Calfeutrement de menuiserie");
 
   // ── 8. A révoque B, l'historique reste intact ─────────────────────────────
   await page.goto(`${RESERVES}/intervenants`);
@@ -160,7 +198,7 @@ test("A invite B, B rejoint, lève une réserve pointée page 2, A exporte puis 
   expect(lignes.map((l) => l.action)).toEqual(
     expect.arrayContaining(["creation", "acceptation", "demande_levee", "levee_validee"]),
   );
-  await page.getByRole("button", { name: "Se déconnecter" }).click();
+  await deconnexionUI(page);
 
   // ── 9. B n'a plus accès ───────────────────────────────────────────────────
   const jetonB = await jetonSupabase(request, "gerant-b@invalid.local");

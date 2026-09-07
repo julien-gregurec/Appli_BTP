@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { genererPdfDepuisUrl, nomFichierChantier } from "@/lib/pdf/generer";
+import { genererPdfDepuisUrl } from "@/lib/pdf/generer";
+import {
+  lireOptionsExport, nomFichierExport, parametresExport,
+} from "@/lib/export/options";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const PARAMETRES = ["entreprise", "statut", "priorite", "echeance", "levees", "historique", "photos"];
+// Les paramètres ne sont plus recopiés à l'aveugle : ils sont RELUS par le contrat
+// d'export commun, puis réémis sous leur forme canonique. Une valeur hors contrat ne
+// traverse donc pas jusqu'au document, et l'URL imprimée est exactement celle que
+// l'aperçu annonçait.
 
 /**
  * PDF serveur d'un chantier, éventuellement restreint à une entreprise.
@@ -34,14 +40,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!details) return NextResponse.json({ error: "Chantier introuvable" }, { status: 404 });
 
   const entrant = new URL(request.url);
+  const options = lireOptionsExport(
+    Object.fromEntries(entrant.searchParams.entries()),
+  );
   const cible = new URL(`/imprimer/chantier/${id}`, request.url);
-  for (const parametre of PARAMETRES) {
-    const valeur = entrant.searchParams.get(parametre);
-    if (valeur !== null) cible.searchParams.set(parametre, valeur);
+  for (const [cle, valeur] of parametresExport(options)) {
+    cible.searchParams.set(cle, valeur);
   }
 
   let nomEntreprise: string | null = null;
-  const intervenantId = entrant.searchParams.get("entreprise");
+  const intervenantId = options.intervenantId;
   if (intervenantId) {
     const { data: intervenants } = await supabase
       .rpc("reserves_export_intervenants", { p_chantier_id: id });
@@ -52,7 +60,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   let pdf: Buffer;
   try {
-    pdf = await genererPdfDepuisUrl(cible.toString(), request.headers.get("cookie"));
+    pdf = await genererPdfDepuisUrl(cible.toString(), request.headers.get("cookie"), {
+      paysage: options.orientation === "paysage",
+      pied: [details.chantier, nomEntreprise].filter(Boolean).join(" — "),
+    });
   } catch {
     return NextResponse.json({ error: "Génération du PDF impossible" }, { status: 502 });
   }
@@ -60,7 +71,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   return new NextResponse(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${nomFichierChantier(details.chantier, nomEntreprise)}"`,
+      "Content-Disposition": `inline; filename="${nomFichierExport(details.chantier, nomEntreprise, options)}"`,
       "Cache-Control": "private, no-store",
     },
   });

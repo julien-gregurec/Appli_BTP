@@ -33,8 +33,6 @@ export default async function PageIntervenants({
   if (estCompteIntervenant(contexte.roleReserves)) redirect("/dashboard");
 
   const [intervenants, chantiers] = await Promise.all([listerIntervenants(), listerChantiers()]);
-  const erreur = typeof query.error === "string" ? query.error : null;
-  const message = typeof query.message === "string" ? query.message : null;
   const lien = typeof query.lien === "string" ? query.lien : null;
   const transfert = typeof query.transfert === "string" ? query.transfert : null;
   const recherche = typeof query.q === "string" ? query.q.trim() : "";
@@ -75,8 +73,6 @@ export default async function PageIntervenants({
         vous lui attribuez. Elle ne voit ni vos clients, ni vos autres chantiers, ni les
         réserves des autres corps d’état.
       </p>
-      {erreur && <div className="message erreur">{erreur}</div>}
-      {message && <div className="message">{message}</div>}
 
       {lien && (
         <div className="carte">

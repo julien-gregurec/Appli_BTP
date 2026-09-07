@@ -7,17 +7,11 @@ import { publierAnnuaireAction } from "@/app/actions";
 
 export const metadata: Metadata = { title: "Annuaire ELSATIA Réserves" };
 
-export default async function PageAnnuaire({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const query = await searchParams;
+export default async function PageAnnuaire() {
   const contexte = await exigerShellReserves();
   if (!peutInviterEntreprise(contexte.roleReserves) || !contexte.entrepriseId) {
     redirect("/dashboard");
   }
-  const erreur = typeof query.error === "string" ? query.error : null;
   const publication = await lirePublicationAnnuaire(contexte.entrepriseId);
 
   return (
@@ -28,7 +22,6 @@ export default async function PageAnnuaire({
         trouver <strong>par son nom</strong> pour l’inviter sur un chantier. Sans
         publication, seule la saisie de votre SIRET exact permet de vous désigner.
       </p>
-      {erreur && <div className="message erreur">{erreur}</div>}
 
       <div className="carte">
         <form action={publierAnnuaireAction}>

@@ -6,14 +6,8 @@ import { definirPreferenceAction } from "@/app/actions";
 
 export const metadata: Metadata = { title: "Préférences de notification" };
 
-export default async function PagePreferences({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const query = await searchParams;
+export default async function PagePreferences() {
   const contexte = await exigerShellReserves();
-  const erreur = typeof query.error === "string" ? query.error : null;
   const preferences = contexte.entrepriseId ? await lirePreferences(contexte.entrepriseId) : [];
 
   return (
@@ -24,7 +18,6 @@ export default async function PagePreferences({
         {contexte.entrepriseNom}. Les notifications restent toujours consultables dans
         l’application : couper un e-mail est un confort, se rendre aveugle n’en est pas un.
       </p>
-      {erreur && <div className="message erreur">{erreur}</div>}
 
       {preferences.length === 0 ? (
         <p className="vide">Aucune organisation active.</p>

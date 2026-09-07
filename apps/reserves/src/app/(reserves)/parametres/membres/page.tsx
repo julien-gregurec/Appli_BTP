@@ -13,12 +13,7 @@ const ROLES = [
   { code: "reserves_consultation", libelle: "Consultation", aide: "Lecture et export seulement" },
 ];
 
-export default async function PageMembres({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const query = await searchParams;
+export default async function PageMembres() {
   const contexte = await exigerShellReserves();
   // `peutInviterEntreprise` et l'administration des membres reposent sur le même rôle :
   // administrateur de l'organisation.
@@ -27,7 +22,6 @@ export default async function PageMembres({
   }
 
   const membres = await listerMembres(contexte.entrepriseId);
-  const erreur = typeof query.error === "string" ? query.error : null;
   const habilites = membres.filter((m) => m.autorise);
 
   return (
@@ -37,7 +31,6 @@ export default async function PageMembres({
         {contexte.entrepriseNom} — {habilites.length} personne{habilites.length > 1 ? "s" : ""} habilitée
         {habilites.length > 1 ? "s" : ""} sur {membres.length}.
       </p>
-      {erreur && <div className="message erreur">{erreur}</div>}
 
       <p className="mention">
         Une habilitation Réserves ne vaut que pour Réserves : elle n’ouvre ni Gestion Pro,

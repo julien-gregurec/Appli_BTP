@@ -53,13 +53,10 @@ const LIBELLES_ACTION: Record<string, string> = {
 
 export default async function PageReserve({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { id } = await params;
-  const query = await searchParams;
   const contexte = await exigerShellReserves();
   const supabase = await createClient();
 
@@ -91,7 +88,6 @@ export default async function PageReserve({
   }));
 
   const intervenant = estCompteIntervenant(contexte.roleReserves);
-  const erreur = typeof query.error === "string" ? query.error : null;
   const photosTravaux = photos.filter((p) => p.usage === "travaux" || p.usage === "levee");
   const levee = peutDemanderLevee({
     statut: reserve.statut,
@@ -115,8 +111,6 @@ export default async function PageReserve({
         )}
         {reserve.photo_obligatoire_levee && <span className="etiquette attente">Photo exigée pour la levée</span>}
       </p>
-
-      {erreur && <div className="message erreur">{erreur}</div>}
 
       {reserve.description && <div className="carte">{reserve.description}</div>}
 

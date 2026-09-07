@@ -10,13 +10,10 @@ export const metadata: Metadata = { title: "Plans du chantier" };
 
 export default async function PagePlans({
   params,
-  searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { id } = await params;
-  const query = await searchParams;
   const contexte = await exigerShellReserves();
   if (!peutGererChantiers(contexte.roleReserves)) redirect(`/chantiers/${id}`);
 
@@ -27,7 +24,6 @@ export default async function PagePlans({
     BUCKET_PLANS,
     plans.map((p) => p.storage_path).filter((c): c is string => Boolean(c)),
   );
-  const erreur = typeof query.error === "string" ? query.error : null;
 
   return (
     <>
@@ -39,7 +35,6 @@ export default async function PagePlans({
         Un plan situe les réserves par niveau et par zone. Les images permettent le
         repérage tactile ; un PDF reste consultable mais ne porte pas de pastille.
       </p>
-      {erreur && <div className="message erreur">{erreur}</div>}
 
       {plans.length === 0 ? (
         <p className="vide">Aucun plan sur ce chantier.</p>
