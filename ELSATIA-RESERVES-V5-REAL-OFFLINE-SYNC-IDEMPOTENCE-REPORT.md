@@ -23,7 +23,10 @@ l'application, mesurée et distinguée comme telle.
 | Branche de base | `feat/reserves-v4-e2e-offline-pdf-print` |
 | SHA de base (complet) | `cb9df18946b4a2d4ff04a55fe78de3d3a2ca7055` |
 | Branche de travail | `feat/reserves-v4-e2e-offline-pdf-print` (poursuivie) |
-| SHA final (complet, poussé) | `7c0fc3d158a0f7b6a3de27eaba8b4be47cb60b00` |
+| SHA du code V5 (complet) | `7c0fc3d158a0f7b6a3de27eaba8b4be47cb60b00` |
+
+Le SHA final poussé est la tête de la branche : les commits documentaires viennent au-dessus
+du code, sans le modifier. Il est relevé par `git rev-parse origin/feat/reserves-v4-e2e-offline-pdf-print`.
 
 > **Le SHA de base n'était pas poussé.** Vérifié au démarrage : aucune branche distante
 > ne contenait `cb9df18`. Les deux commits sont désormais sur
