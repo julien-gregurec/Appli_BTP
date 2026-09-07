@@ -21,7 +21,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@elsatia/application-access": ["./packages/application-access/src/index.ts"],
-      "@elsatia/email": ["./packages/email/src/index.ts"]
+      "@elsatia/email": ["./packages/email/src/index.ts"],
+      "@elsatia/client-contracts": ["./packages/client-contracts/src/index.ts"]
     }
   },
   "include": [
