@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { nomClient } from "@/lib/chantier-statuts";
+import { identiteClientDocument, type OrigineIdentiteClient } from "@/lib/client-snapshot";
 import { typeFactureLabel } from "@/lib/factures";
 import type { EntrepriseEntete, ClientEntete, LigneImprimable, SignatureImprimable } from "@/components/DocumentImprimable";
 
@@ -30,6 +30,10 @@ export type DonneesDocumentImprimable = {
   // Métadonnées hors DocumentImprimable, utiles aux appelants (email, nom de fichier PDF, statut).
   statut: string;
   clientEmail: string | null;
+  // Origine de l'identité destinataire affichée : figée à l'émission, reconstituée
+  // par le rattrapage des documents antérieurs, ou lue en direct (brouillon).
+  clientOrigine: OrigineIdentiteClient;
+  clientSnapshotAt: string | null;
   emailEnvoyeLe: string | null;
   entrepriseNom: string;
 };
@@ -45,7 +49,7 @@ export async function chargerDonneesDevisImprimable(
   const { data: devis } = await supabase
     .from("devis")
     .select(
-      "id,numero,statut,date_emission,date_validite,montant_ht,montant_tva,montant_ttc,notes_client,email_envoye_le,email_envoye_a,client:clients!devis_client_id_fkey(nom,prenom,societe,email,adresse_facturation,code_postal,ville,siret)",
+      "id,numero,statut,date_emission,date_validite,montant_ht,montant_tva,montant_ttc,notes_client,email_envoye_le,email_envoye_a,client_snapshot,client_snapshot_at,client:clients!devis_client_id_fkey(nom,prenom,societe,email,adresse_facturation,code_postal,ville,siret)",
     )
     .eq("id", params.id)
     .eq("entreprise_id", params.entrepriseId)
@@ -72,6 +76,13 @@ export async function chargerDonneesDevisImprimable(
   ]);
 
   const client = Array.isArray(devis.client) ? devis.client[0] : devis.client;
+  // Un devis émis (numéroté) porte l'identité destinataire figée à ce moment-là ;
+  // seul un brouillon reflète encore la fiche client courante.
+  const identiteClient = identiteClientDocument({
+    snapshot: devis.client_snapshot,
+    fiche: client,
+    captureeLe: devis.client_snapshot_at,
+  });
 
   return {
     typeDoc: "Devis",
@@ -79,13 +90,7 @@ export async function chargerDonneesDevisImprimable(
     dateEmission: devis.date_emission,
     dateSecondaire: devis.date_validite ? { label: "Valable jusqu'au", valeur: devis.date_validite } : null,
     entreprise: entreprise ?? { nom: "" },
-    client: {
-      nom_affiche: client ? nomClient(client) : "—",
-      adresse_facturation: client?.adresse_facturation,
-      code_postal: client?.code_postal,
-      ville: client?.ville,
-      siret: client?.siret,
-    },
+    client: identiteClient.entete,
     lignes: (lignes ?? []).map((l) => ({
       designation: l.designation,
       description: l.description,
@@ -104,7 +109,9 @@ export async function chargerDonneesDevisImprimable(
     signatures: signatures ?? [],
     photos: (photos ?? []).map((p) => ({ id: p.id, nom: p.nom_original, legende: p.legende })),
     statut: devis.statut,
-    clientEmail: client?.email ?? null,
+    clientEmail: identiteClient.email,
+    clientOrigine: identiteClient.origine,
+    clientSnapshotAt: devis.client_snapshot_at ?? null,
     emailEnvoyeLe: devis.email_envoye_le,
     entrepriseNom: entreprise?.nom ?? "",
   };
@@ -117,7 +124,7 @@ export async function chargerDonneesFactureImprimable(
   const { data: facture } = await supabase
     .from("factures")
     .select(
-      "id,numero,statut,type,date_emission,date_echeance,montant_ht,montant_tva,montant_ttc,notes_client,email_envoye_le,email_envoye_a,entreprise_snapshot,client:clients!factures_client_id_fkey(nom,prenom,societe,email,adresse_facturation,code_postal,ville,siret)",
+      "id,numero,statut,type,date_emission,date_echeance,montant_ht,montant_tva,montant_ttc,notes_client,email_envoye_le,email_envoye_a,entreprise_snapshot,client_snapshot,client_snapshot_at,client:clients!factures_client_id_fkey(nom,prenom,societe,email,adresse_facturation,code_postal,ville,siret)",
     )
     .eq("id", params.id)
     .eq("entreprise_id", params.entrepriseId)
@@ -137,6 +144,13 @@ export async function chargerDonneesFactureImprimable(
   ]);
 
   const client = Array.isArray(facture.client) ? facture.client[0] : facture.client;
+  // Symétrique de entreprise_snapshot : une facture ou un avoir déjà émis garde
+  // à vie l'identité du destinataire telle qu'elle était à l'émission.
+  const identiteClient = identiteClientDocument({
+    snapshot: facture.client_snapshot,
+    fiche: client,
+    captureeLe: facture.client_snapshot_at,
+  });
   const typeDoc = facture.type === "simple" ? "Facture" : `Facture — ${typeFactureLabel(facture.type)}`;
   // Une facture déjà émise garde à vie l'identité de l'entreprise telle qu'elle
   // était à ce moment-là (voir 20260812000200_documents_commerciaux_p9.sql) ;
@@ -151,13 +165,7 @@ export async function chargerDonneesFactureImprimable(
     dateEmission: facture.date_emission,
     dateSecondaire: facture.date_echeance ? { label: "Échéance le", valeur: facture.date_echeance } : null,
     entreprise,
-    client: {
-      nom_affiche: client ? nomClient(client) : "—",
-      adresse_facturation: client?.adresse_facturation,
-      code_postal: client?.code_postal,
-      ville: client?.ville,
-      siret: client?.siret,
-    },
+    client: identiteClient.entete,
     lignes: (lignes ?? []).map((l) => ({
       designation: l.designation,
       description: l.description,
@@ -176,7 +184,9 @@ export async function chargerDonneesFactureImprimable(
     signatures: signatures ?? [],
     photos: [],
     statut: facture.statut,
-    clientEmail: client?.email ?? null,
+    clientEmail: identiteClient.email,
+    clientOrigine: identiteClient.origine,
+    clientSnapshotAt: facture.client_snapshot_at ?? null,
     emailEnvoyeLe: facture.email_envoye_le,
     entrepriseNom: entrepriseCourante?.nom ?? "",
   };

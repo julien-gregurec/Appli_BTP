@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { euros, LIGNE_TYPES } from "@/lib/devis";
-import { nomClient } from "@/lib/chantier-statuts";
+import { identiteClientDocument, mentionOrigineIdentite } from "@/lib/client-snapshot";
 import { StatutDevisSelect } from "@/components/StatutDevisSelect";
 import { associerDevisChantierAction, dupliquerDevisAction, supprimerDevisAction, envoyerDevisEmailAction, retirerPieceJointeDevisAction } from "@/app/actions/devis";
 import { creerFactureDepuisDevisAction } from "@/app/actions/factures";
@@ -61,10 +61,17 @@ export default async function DevisDetailPage({ params, searchParams }: { params
   const creerFacture = creerFactureDepuisDevisAction.bind(null, id, "simple");
   const dupliquer = dupliquerDevisAction.bind(null, id);
   const peutSupprimer = ["brouillon", "refuse", "annule"].includes(devis.statut);
+  // Un devis déjà émis affiche — et réexpédie — l'identité du destinataire figée
+  // à son émission ; seul un brouillon reflète la fiche client actuelle.
+  const identiteDocument = identiteClientDocument({
+    snapshot: devis.client_snapshot,
+    fiche: client,
+    captureeLe: devis.client_snapshot_at,
+  });
   const email = contenuEmailDocument({
     typeDoc: "devis",
     numero: devis.numero,
-    client,
+    client: { nom: identiteDocument.entete.nom_affiche, prenom: null, societe: null, email: identiteDocument.email },
     montantTtc: Number(devis.montant_ttc),
     entrepriseNom: ctx.entrepriseNom,
     prenomEmetteur: ctx.prenom,
@@ -80,9 +87,10 @@ export default async function DevisDetailPage({ params, searchParams }: { params
             <Link href="/devis" className="text-sm text-neutral-500 hover:underline">← Devis</Link>
             <h1 className="mt-1 text-xl font-semibold">{devis.numero ?? "Devis (brouillon)"}</h1>
             <p className="text-sm text-neutral-500">
-              {client ? nomClient(client) : "—"}
+              {identiteDocument.entete.nom_affiche}
               {chantier && <> · chantier <Link href={`/chantiers/${chantier.id}`} className="hover:underline">{chantier.nom}</Link></>}
             </p>
+            <p className="mt-1 text-xs text-neutral-500">{mentionOrigineIdentite(identiteDocument)}</p>
           </div>
           <div className="flex items-center gap-3">
             <form action={dupliquer}>
