@@ -155,7 +155,8 @@ récent n'existe.
 | SHA de départ (complet) | `4266ba6ce347ed3a4f379430442b341b67df516e` |
 | Branche finale | `feat/gp-client-document-snapshot-p0-v1` |
 | Worktree | `/Volumes/ELSATIA-DEV/worktrees/gp-client-document-snapshot-p0-v1` (conservé) |
-| SHA final (complet) | _voir §13_ |
+| SHA du lot (complet) | `8743af230f39a218a0241a3f75181db4e7958d38` |
+| Tête de branche | commit de clôture documentaire, voir §13 |
 
 ---
 
@@ -636,9 +637,11 @@ suppression existantes.
 |---|---|
 | Branche | `feat/gp-client-document-snapshot-p0-v1` |
 | Base | `integration/gp-postcutover-precommercial-ops-v1` — `4266ba6ce347ed3a4f379430442b341b67df516e` |
-| Commit | `__SHA_COURT__` — `feat(gp): fige l'identité du destinataire sur les documents commerciaux` |
-| SHA final (complet) | `__SHA_LONG__` |
-| Poussée sur `origin` | oui |
+| Commit de code | `8743af2` — `feat(gp): fige l'identité du destinataire sur les documents commerciaux` |
+| **SHA du lot (complet)** | `8743af230f39a218a0241a3f75181db4e7958d38` |
+| Commit de clôture | `docs(gp): consigne le SHA final du lot client snapshot` — documentation seule, aucune ligne de code ni de migration |
+| Empreinte du commit de clôture | Non inscrite ici : un commit ne peut pas contenir sa propre empreinte. Elle se lit par `git rev-parse origin/feat/gp-client-document-snapshot-p0-v1`. |
+| Poussée sur `origin` | oui — `origin/feat/gp-client-document-snapshot-p0-v1` |
 | Fusionnée | **non** — délibérément |
 | Déployée | **non** — délibérément |
 | Worktree | `/Volumes/ELSATIA-DEV/worktrees/gp-client-document-snapshot-p0-v1` — **conservé**, non nettoyé |
