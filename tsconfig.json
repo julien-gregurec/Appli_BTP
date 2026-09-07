@@ -21,7 +21,8 @@
     "paths": {
       "@/*": ["./src/*"],
       "@elsatia/application-access": ["./packages/application-access/src/index.ts"],
-      "@elsatia/drone-core": ["./packages/drone-core/src/index.ts"]
+      "@elsatia/drone-core": ["./packages/drone-core/src/index.ts"],
+      "@elsatia/drone-photogrammetry": ["./packages/drone-photogrammetry/src/index.ts"]
     }
   },
   "include": [

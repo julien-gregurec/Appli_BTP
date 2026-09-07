@@ -5,6 +5,10 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      // Paquets internes : mêmes chemins que les `paths` du tsconfig.
+      "@elsatia/drone-core": fileURLToPath(
+        new URL("./packages/drone-core/src/index.ts", import.meta.url),
+      ),
       // Next.js intercepte cet import spécial au build ; en dehors de son
       // bundler (ici Vitest), le vrai paquet lève systématiquement une
       // erreur. On le neutralise comme le fait Next, uniquement pour les tests.

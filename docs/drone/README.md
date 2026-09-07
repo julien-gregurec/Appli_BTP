@@ -1,8 +1,8 @@
 # docs/drone — ELSATIA Drone
 
-Étude d'architecture produite le **2026-09-07**, puis premier lot de code (noyau et contrats)
-le **2026-09-07**. Toujours **aucune migration, aucun déploiement, aucune modification
-Production** : le ledger de la cible cutover reste figé à 263.
+Étude d'architecture produite le **2026-09-07**, puis premier lot de code (noyau et contrats),
+puis prototype de pipeline photogrammétrique. Toujours **aucune migration, aucun déploiement,
+aucune modification Production** : le ledger de la cible cutover reste figé à 263.
 
 | Livrable | Fichier | Objet |
 |---|---|---|
@@ -12,6 +12,8 @@ Production** : le ledger de la cible cutover reste figé à 263.
 | 4 | [ELSATIA_DRONE_DATA_MODEL_V1.md](ELSATIA_DRONE_DATA_MODEL_V1.md) | Entités, provenance des mesures, cycles de vie. Sans migration |
 | 5 | [ELSATIA_DRONE_MVP_ROADMAP_V1.md](ELSATIA_DRONE_MVP_ROADMAP_V1.md) | P0 / P1 / P2 / hors MVP, lots parallélisables, critères d'acceptation |
 | — | [data-contracts-implementation-v1.md](data-contracts-implementation-v1.md) | **Implémentation** du noyau `packages/drone-core` : types, unités, provenance, idempotence, contrats d'export, interfaces, jeux d'essai |
+| — | [ODM_LICENSE_RISK.md](ODM_LICENSE_RISK.md) | AGPL-3.0, clause réseau, questions à poser au conseil PI. **Ne conclut rien juridiquement** |
+| — | [PHOTOGRAMMETRY_PIPELINE_PROTOTYPE_V1.md](PHOTOGRAMMETRY_PIPELINE_PROTOTYPE_V1.md) | **Prototype** `packages/drone-photogrammetry` : adaptateurs ODM/Metashape/démo, file, ingestion, coûts, protocole de benchmark, verdicts |
 
 Les fichiers thématiques annoncés au §122 du brief (`sdk-compatibility.md`,
 `photogrammetry.md`, `measurement-quality.md`, `solar.md`, `privacy.md`,
@@ -34,3 +36,22 @@ cinq livrables ci-dessus, qui portent les noms imposés par les §125 à §129.
   à 263 migrations).
 - Conseil en propriété intellectuelle sur l'**AGPL-3.0** d'OpenDroneMap.
 - **Test matériel réel** Mini 3 + RC-N1 + Android avant toute promesse de mode connecté.
+
+## Où en est le prototype photogrammétrique
+
+`packages/drone-photogrammetry` **implémente** le port `ReconstructionEngineAdapter` du
+noyau : adaptateur NodeODM expérimental, contrat Metashape sans implémentation, moteur de
+démonstration déterministe, file locale, ingestion (téléversement par morceaux, EXIF,
+qualité, sécurité), rapatriement des artefacts et formule de coût. Exécutable sans GPU ni
+réseau.
+
+Trois verdicts :
+
+- **ODM techniquement viable : oui**, sous réserve de mesure — aucune reconstruction réelle
+  n'a été exécutée.
+- **ODM commercialement autorisé : non** — conseil PI non saisi.
+- **Metashape en repli : viable sur le plan de l'architecture** (substitution prouvée par
+  test), non vérifié en exploitation — aucune licence acquise.
+
+Aucun benchmark n'a été exécuté et aucun tarif n'est calculable : le code refuse de
+convertir un coût en crédits tant que les mesures réelles n'existent pas.
