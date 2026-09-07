@@ -19,6 +19,13 @@ export type ClientSnapshot = {
   identite_incertaine?: boolean | null;
   nom_affiche?: string | null;
   reference_interne?: string | null;
+  // `type` / `statut` / `conditions_paiement` figurent dans la liste blanche de
+  // 20260908000272 et sont donc bel et bien présents dans le JSON stocké : les
+  // omettre ici rendait le type moins large que la donnée réelle, et masquait
+  // trois champs au moment de convertir vers le contrat canonique.
+  type?: string | null;
+  statut?: string | null;
+  conditions_paiement?: string | null;
   nom?: string | null;
   prenom?: string | null;
   societe?: string | null;
