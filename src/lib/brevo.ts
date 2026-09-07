@@ -1,45 +1,11 @@
-const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
-
-export function brevoEstConfigure(environnement: NodeJS.ProcessEnv = process.env) {
-  return Boolean(environnement.BREVO_API_KEY && environnement.EMAIL_FROM_ADDRESS);
-}
-
-export type PieceJointeBrevo = { nom: string; contenuBase64: string };
-
-export async function envoyerEmailBrevo(params: {
-  to: string;
-  toName?: string | null;
-  sujet: string;
-  texte: string;
-  html?: string;
-  replyTo?: string | null;
-  piecesJointes?: PieceJointeBrevo[];
-}) {
-  const apiKey = process.env.BREVO_API_KEY;
-  const fromAddress = process.env.EMAIL_FROM_ADDRESS;
-  if (!apiKey || !fromAddress) throw new Error("Envoi email indisponible : Brevo n'est pas configuré");
-  const fromName = process.env.EMAIL_FROM_NAME || "ELSATIA";
-
-  const reponse = await fetch(BREVO_API_URL, {
-    method: "POST",
-    headers: { "api-key": apiKey, "content-type": "application/json", accept: "application/json" },
-    body: JSON.stringify({
-      sender: { name: fromName, email: fromAddress },
-      to: [{ email: params.to, name: params.toName || undefined }],
-      replyTo: params.replyTo ? { email: params.replyTo } : undefined,
-      subject: params.sujet,
-      textContent: params.texte,
-      htmlContent: params.html || undefined,
-      attachment: params.piecesJointes?.length
-        ? params.piecesJointes.map((p) => ({ name: p.nom, content: p.contenuBase64 }))
-        : undefined,
-    }),
-  });
-
-  if (!reponse.ok) {
-    // Ne jamais journaliser le corps de la réponse Brevo : peut contenir l'adresse du destinataire.
-    throw new Error(`Envoi email impossible (Brevo a répondu ${reponse.status})`);
-  }
-  const donnees: { messageId?: string } = await reponse.json();
-  return { messageId: donnees.messageId ?? null };
-}
+// Le transport Brevo vit désormais dans `packages/email`, partagé avec ELSATIA Réserves
+// (et disponible pour les autres applications du socle). Ce module reste le point
+// d'entrée historique de Gestion Pro : réexport pur, aucune logique dupliquée, aucun
+// second jeu de secrets.
+export {
+  brevoEstConfigure,
+  envoyerEmailBrevo,
+  echapperHtml,
+  gabaritEmailElsatia,
+  type PieceJointeBrevo,
+} from "@elsatia/email";

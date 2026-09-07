@@ -20,7 +20,8 @@
     ],
     "paths": {
       "@/*": ["./src/*"],
-      "@elsatia/application-access": ["./packages/application-access/src/index.ts"]
+      "@elsatia/application-access": ["./packages/application-access/src/index.ts"],
+      "@elsatia/email": ["./packages/email/src/index.ts"]
     }
   },
   "include": [
