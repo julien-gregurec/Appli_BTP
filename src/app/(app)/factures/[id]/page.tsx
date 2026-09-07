@@ -17,6 +17,7 @@ import { CopierLienPaiement } from "@/components/CopierLienPaiement";
 import { SignatureDocumentMetier } from "@/components/SignatureDocumentMetier";
 import { RelanceDocumentSection } from "@/components/RelanceDocumentSection";
 import { permissionsUtilisateur } from "@/lib/permissions";
+import { peutSurchargerDestinataire } from "@/lib/permissions-envoi";
 
 const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -121,6 +122,8 @@ export default async function FactureDetailPage({
                 envoiAutomatiqueDisponible={brevoEstConfigure()}
                 envoyerAutomatiquementAction={envoyerFactureEmailAction}
                 emailEnvoyeLe={facture.email_envoye_le}
+                adresseFigee={identiteDocument.email}
+                peutSurchargerDestinataire={peutSurchargerDestinataire(permissions)}
               />
             ) : (
               <span className="cursor-default rounded-md border border-neutral-200 px-3 py-1.5 text-sm text-neutral-400 dark:border-neutral-800" title="Aucun email renseigné pour ce client">

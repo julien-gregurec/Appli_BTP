@@ -12,6 +12,7 @@ import { contenuEmailDocument } from "@/lib/email";
 import { brevoEstConfigure } from "@/lib/brevo";
 import { EmailDocumentButton } from "@/components/EmailDocumentButton";
 import { permissionsUtilisateur } from "@/lib/permissions";
+import { peutSurchargerDestinataire } from "@/lib/permissions-envoi";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { SignatureDocumentMetier } from "@/components/SignatureDocumentMetier";
 import { RelanceDocumentSection } from "@/components/RelanceDocumentSection";
@@ -123,6 +124,8 @@ export default async function DevisDetailPage({ params, searchParams }: { params
                 envoiAutomatiqueDisponible={brevoEstConfigure()}
                 envoyerAutomatiquementAction={envoyerDevisEmailAction}
                 emailEnvoyeLe={devis.email_envoye_le}
+                adresseFigee={identiteDocument.email}
+                peutSurchargerDestinataire={peutSurchargerDestinataire(permissions)}
               />
             ) : (
               <span className="cursor-default rounded-md border border-neutral-200 px-3 py-1.5 text-sm text-neutral-400 dark:border-neutral-800" title="Aucun email renseigné pour ce client">

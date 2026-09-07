@@ -82,6 +82,28 @@ function supabaseMock() {
   } as unknown as import("@supabase/supabase-js").SupabaseClient;
 }
 
+// Mock traçant : enregistre chaque table touchée et chaque ligne insérée, pour
+// prouver ce qui est écrit — et surtout ce qui ne l'est PAS (public.clients,
+// devis.client_snapshot).
+type EcritureTracee = { table: string; operation: "insert" | "update"; charge: unknown };
+
+function supabaseTracant() {
+  const ecritures: EcritureTracee[] = [];
+  const client = {
+    from: (table: string) => ({
+      insert: (charge: unknown) => {
+        ecritures.push({ table, operation: "insert", charge });
+        return Promise.resolve({ error: null });
+      },
+      update: (charge: unknown) => {
+        ecritures.push({ table, operation: "update", charge });
+        return { eq: () => ({ eq: () => Promise.resolve({ error: null }) }) };
+      },
+    }),
+  } as unknown as import("@supabase/supabase-js").SupabaseClient;
+  return { client, ecritures };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   chargerDevisMock.mockResolvedValue(donneesDevis);
@@ -99,10 +121,14 @@ describe("envoyerDocumentCommercialParEmail", () => {
     expect(envoyerEmailBrevoMock).not.toHaveBeenCalled();
   });
 
-  it("échoue si le client n'a pas d'adresse e-mail", async () => {
+  // Message reformulé par ELSATIA-GP-DOCUMENT-RESEND-OVERRIDE-V1 : depuis le
+  // lot Snapshot, l'adresse utilisée est celle FIGÉE SUR LE DOCUMENT, pas celle
+  // de la fiche client — « ce client n'a pas d'adresse » était devenu inexact.
+  // Le scénario, le refus et l'absence d'envoi sont inchangés.
+  it("échoue si le document ne porte aucune adresse de destinataire", async () => {
     chargerDevisMock.mockResolvedValue({ ...donneesDevis, clientEmail: null });
     const resultat = await envoyerDocumentCommercialParEmail(supabaseMock(), paramsBase);
-    expect(resultat).toEqual({ error: "Ce client n'a pas d'adresse e-mail renseignée" });
+    expect(resultat).toEqual({ error: "Ce document ne porte aucune adresse e-mail de destinataire." });
     expect(envoyerEmailBrevoMock).not.toHaveBeenCalled();
   });
 
@@ -182,5 +208,158 @@ describe("envoyerDocumentCommercialParEmail", () => {
     const appel = envoyerEmailBrevoMock.mock.calls[0][0];
     expect(appel.sujet).toBe("Devis DEV-2026-0001 — ELSATIA");
     expect(appel.texte).toContain("le devis DEV-2026-0001");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ELSATIA-GP-DOCUMENT-RESEND-OVERRIDE-V1
+// ---------------------------------------------------------------------------
+
+describe("surcharge de l'adresse de renvoi", () => {
+  const FIGEE = "client@example.invalid";
+  const AUTRE = "nouveau-contact@example.invalid";
+
+  it("1. envoie à l'adresse figée quand aucune surcharge n'est demandée", async () => {
+    const { client, ecritures } = supabaseTracant();
+    const resultat = await envoyerDocumentCommercialParEmail(client, paramsBase);
+    expect(resultat).toEqual({ ok: true });
+    expect(envoyerEmailBrevoMock.mock.calls[0][0].to).toBe(FIGEE);
+    // Aucun écart : aucune entrée de journal.
+    expect(ecritures.filter((e) => e.table === "journal_activite")).toHaveLength(0);
+  });
+
+  it("2. + 5. envoie à l'adresse surchargée et journalise l'écart", async () => {
+    const { client, ecritures } = supabaseTracant();
+    const resultat = await envoyerDocumentCommercialParEmail(client, {
+      ...paramsBase,
+      surchargeDestinataire: { email: AUTRE, motif: "Le contact a changé" },
+      peutSurchargerDestinataire: true,
+    });
+    expect(resultat).toEqual({ ok: true });
+    expect(envoyerEmailBrevoMock.mock.calls[0][0].to).toBe(AUTRE);
+
+    const journal = ecritures.filter((e) => e.table === "journal_activite");
+    expect(journal).toHaveLength(1);
+    expect(journal[0].charge).toMatchObject({
+      entreprise_id: "ent-1",
+      utilisateur_id: "user-1",
+      action: "envoi_document_adresse_surchargee",
+      ressource: "devis",
+      ressource_id: "devis-1",
+      metadata: {
+        adresse_figee: FIGEE,
+        adresse_utilisee: AUTRE,
+        motif: "Le contact a changé",
+        type_envoi: "envoi_initial",
+        resultat: "succes",
+      },
+    });
+  });
+
+  it("4. refuse la surcharge d'un utilisateur non autorisé, sans rien envoyer", async () => {
+    const { client, ecritures } = supabaseTracant();
+    const resultat = await envoyerDocumentCommercialParEmail(client, {
+      ...paramsBase,
+      surchargeDestinataire: { email: AUTRE },
+      peutSurchargerDestinataire: false,
+    });
+    expect(resultat).toMatchObject({ error: expect.stringContaining("ne permet pas") });
+    expect(envoyerEmailBrevoMock).not.toHaveBeenCalled();
+    expect(ecritures).toHaveLength(0);
+  });
+
+  it("6. le PDF joint reste celui du document, généré depuis la page du snapshot", async () => {
+    const { client } = supabaseTracant();
+    await envoyerDocumentCommercialParEmail(client, {
+      ...paramsBase,
+      surchargeDestinataire: { email: AUTRE },
+      peutSurchargerDestinataire: true,
+    });
+    // Le PDF est produit à partir de l'URL d'impression partagée, sans aucun
+    // paramètre lié à l'adresse : la surcharge ne peut pas l'influencer.
+    expect(genererPdfMock).toHaveBeenCalledWith("https://app.elsatia.fr/imprimer/partage/token-abc");
+    const appel = envoyerEmailBrevoMock.mock.calls[0][0];
+    expect(appel.piecesJointes).toHaveLength(1);
+    expect(appel.piecesJointes[0].nom).toBe("devis-DEV-2026-0001.pdf");
+    // Le corps s'adresse toujours au destinataire figé du document.
+    expect(appel.texte).toContain("DEV-2026-0001");
+  });
+
+  it("7. + 8. n'écrit ni le snapshot du document, ni la fiche client", async () => {
+    const { client, ecritures } = supabaseTracant();
+    await envoyerDocumentCommercialParEmail(client, {
+      ...paramsBase,
+      surchargeDestinataire: { email: AUTRE },
+      peutSurchargerDestinataire: true,
+    });
+    expect(ecritures.some((e) => e.table === "clients")).toBe(false);
+    const tables = new Set(ecritures.map((e) => e.table));
+    expect([...tables].sort()).toEqual(["devis", "journal_activite"]);
+    // La seule écriture sur le document est la traçabilité d'envoi : jamais
+    // client_snapshot, jamais client_id.
+    const surDocument = ecritures.filter((e) => e.table === "devis");
+    for (const ecriture of surDocument) {
+      expect(Object.keys(ecriture.charge as object).sort()).toEqual(["email_envoye_a", "email_envoye_le"]);
+    }
+  });
+
+  it("9. journalise un envoi refusé par le fournisseur, avec sa cause", async () => {
+    envoyerEmailBrevoMock.mockRejectedValue(new Error("Brevo 401"));
+    const { client, ecritures } = supabaseTracant();
+    const resultat = await envoyerDocumentCommercialParEmail(client, {
+      ...paramsBase,
+      surchargeDestinataire: { email: AUTRE },
+      peutSurchargerDestinataire: true,
+    });
+    expect(resultat).toEqual({ error: "Brevo 401" });
+    const journal = ecritures.filter((e) => e.table === "journal_activite");
+    expect(journal).toHaveLength(1);
+    expect(journal[0].charge).toMatchObject({ metadata: { resultat: "echec", erreur: "Brevo 401" } });
+  });
+
+  it("10. une nouvelle tentative après échec ajoute une seconde entrée de journal", async () => {
+    envoyerEmailBrevoMock.mockRejectedValueOnce(new Error("Brevo 401"));
+    const { client, ecritures } = supabaseTracant();
+    const surcharge = { surchargeDestinataire: { email: AUTRE }, peutSurchargerDestinataire: true };
+
+    await envoyerDocumentCommercialParEmail(client, { ...paramsBase, ...surcharge });
+    chargerDevisMock.mockResolvedValue({ ...donneesDevis, emailEnvoyeLe: "2026-09-07T10:00:00.000Z" });
+    const seconde = await envoyerDocumentCommercialParEmail(client, { ...paramsBase, ...surcharge });
+
+    expect(seconde).toEqual({ ok: true });
+    const journal = ecritures.filter((e) => e.table === "journal_activite");
+    expect(journal).toHaveLength(2);
+    expect(journal[0].charge).toMatchObject({ metadata: { resultat: "echec", type_envoi: "envoi_initial" } });
+    expect(journal[1].charge).toMatchObject({ metadata: { resultat: "succes", type_envoi: "renvoi" } });
+  });
+
+  it("un journal indisponible ne fait pas échouer un envoi réussi", async () => {
+    const client = {
+      from: (table: string) => ({
+        insert: () => {
+          if (table === "journal_activite") throw new Error("journal indisponible");
+          return Promise.resolve({ error: null });
+        },
+        update: () => ({ eq: () => ({ eq: () => Promise.resolve({ error: null }) }) }),
+      }),
+    } as unknown as import("@supabase/supabase-js").SupabaseClient;
+
+    const resultat = await envoyerDocumentCommercialParEmail(client, {
+      ...paramsBase,
+      surchargeDestinataire: { email: AUTRE },
+      peutSurchargerDestinataire: true,
+    });
+    expect(resultat).toEqual({ ok: true });
+  });
+
+  it("enregistre l'adresse réellement utilisée dans la traçabilité d'envoi du document", async () => {
+    const { client, ecritures } = supabaseTracant();
+    await envoyerDocumentCommercialParEmail(client, {
+      ...paramsBase,
+      surchargeDestinataire: { email: AUTRE },
+      peutSurchargerDestinataire: true,
+    });
+    const surDocument = ecritures.find((e) => e.table === "devis");
+    expect(surDocument?.charge).toMatchObject({ email_envoye_a: AUTRE });
   });
 });
