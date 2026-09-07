@@ -2,8 +2,11 @@ import type { NextConfig } from "next";
 import { fileURLToPath } from "node:url";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@elsatia/application-access"],
+  transpilePackages: ["@elsatia/application-access", "@elsatia/email"],
   poweredByHeader: false,
+  // Chromium headless et son pilote ne sont jamais empaquetés par le bundler : ils sont
+  // chargés à l'exécution par la route de génération de PDF, comme dans Gestion Pro.
+  serverExternalPackages: ["@sparticuz/chromium", "puppeteer-core"],
   experimental: {
     // Les photos de chantier transitent par une action serveur. Elles sont compressées
     // côté navigateur avant l'envoi (≈ 2048 px, JPEG 0.85) ; cette marge couvre les

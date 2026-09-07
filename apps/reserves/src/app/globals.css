@@ -260,3 +260,21 @@ input[type="file"] {
 .ligne-role label { flex: 1 1 240px; }
 .ligne-role input[name="motif"] { flex: 1 1 160px; }
 details.carte summary { cursor: pointer; min-height: var(--touche); display: flex; align-items: center; font-weight: 600; }
+
+/* Pastille de compteur dans la navigation. Purement décorative (aria-hidden) : le
+   libellé du lien reste la seule information annoncée aux lecteurs d'écran, et le
+   décompte exact est donné sur la page elle-même. */
+.pastille {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #b4402f;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  vertical-align: middle;
+}

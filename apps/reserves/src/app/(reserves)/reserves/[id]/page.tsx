@@ -15,6 +15,7 @@ import {
 } from "@/lib/workflow";
 import {
   assignerAction, commenterAction, demanderLeveeAction, repondreResponsabiliteAction,
+  transfererResponsabiliteAction,
   rouvrirAction, statuerLeveeAction, supprimerPhotoAction, televerserPhotoAction,
 } from "@/app/actions";
 
@@ -184,6 +185,46 @@ export default async function PageReserve({
         </form>
       )}
 
+      {/* Transfert de responsabilité. La matrice de 00270 autorise la réassignation
+          depuis « acceptée », « levée demandée » et « levée refusée » : c'est le cas réel
+          d'une entreprise révoquée en cours de chantier. Le motif est obligatoire, et
+          l'historique conserve nommément l'entreprise dessaisie. */}
+      {!intervenant && reserve.intervenant_id
+        && ["acceptee", "levee_demandee", "levee_refusee"].includes(reserve.statut) && (
+        <details className="carte">
+          <summary>Transférer la responsabilité à une autre entreprise</summary>
+          <form action={transfererResponsabiliteAction}>
+            <input type="hidden" name="reserve_id" value={id} />
+            <label>
+              Nouvelle entreprise
+              <select name="intervenant_cible_id" required defaultValue="">
+                <option value="" disabled>Choisir une entreprise</option>
+                {intervenants
+                  .filter((i) => i.id !== reserve.intervenant_id && i.statut !== "revoquee")
+                  .map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.nom}{i.corps_etat ? ` — ${i.corps_etat}` : ""}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label>
+              Motif du transfert (obligatoire)
+              <textarea name="motif" required maxLength={2000}
+                        placeholder="Entreprise révoquée du chantier, reprise confiée à…" />
+            </label>
+            <p className="mention">
+              La réserve repart au statut « assignée » chez la nouvelle entreprise, qui
+              devra accepter la responsabilité. L’entreprise dessaisie est prévenue et son
+              passage reste au dossier.
+            </p>
+            <div className="actions">
+              <button className="bouton" type="submit">Transférer</button>
+            </div>
+          </form>
+        </details>
+      )}
+
       {!intervenant && peutValiderLevee(contexte.roleReserves)
         && reserve.statut === "levee_demandee" && (
         <form className="carte" action={statuerLeveeAction}>
@@ -281,11 +322,19 @@ export default async function PageReserve({
           ))}
         </ul>
       )}
-      <form className="carte" action={commenterAction}>
+      <form className="carte" action={commenterAction} encType="multipart/form-data">
         <input type="hidden" name="reserve_id" value={id} />
         <label>
           Message
           <textarea name="contenu" required maxLength={4000} />
+        </label>
+        {/* La pièce jointe est une photo de la réserve, déposée par la séquence de la V2
+            (chemin composé par la base, vérifié contre la réserve réelle). Son usage
+            « échange » la distingue d'une preuve : elle ne satisfait jamais l'exigence de
+            photo à la levée. */}
+        <label>
+          Photo jointe (facultatif)
+          <input type="file" name="piece_jointe" accept="image/jpeg,image/png,image/webp" />
         </label>
         <div className="actions">
           <button className="bouton secondaire" type="submit">Envoyer</button>

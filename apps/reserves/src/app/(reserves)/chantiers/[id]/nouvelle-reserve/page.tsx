@@ -33,6 +33,9 @@ export default async function PageNouvelleReserve({
   const planPointe = typeof query.plan === "string" ? query.plan : "";
   const x = typeof query.x === "string" ? query.x : "";
   const y = typeof query.y === "string" ? query.y : "";
+  // Page du plan pointé. Absente pour une image ou un PDF d'une seule page : la base
+  // retiendra alors la page 1, ce qui est exactement le sens du repère.
+  const page = typeof query.page === "string" ? query.page : "";
   const plan = plans.find((p) => p.id === planPointe) ?? null;
 
   return (
@@ -44,7 +47,8 @@ export default async function PageNouvelleReserve({
       {plan && x && y && (
         <div className="message">
           Position relevée sur <b>{plan.nom}</b>
-          {plan.niveau ? ` — ${plan.niveau}` : ""} : {Number(x).toFixed(3)} ; {Number(y).toFixed(3)}
+          {plan.niveau ? ` — ${plan.niveau}` : ""}
+          {page ? `, page ${page}` : ""} : {Number(x).toFixed(3)} ; {Number(y).toFixed(3)}
         </div>
       )}
 
@@ -53,6 +57,7 @@ export default async function PageNouvelleReserve({
         <input type="hidden" name="plan_id" value={planPointe} />
         <input type="hidden" name="position_x" value={x} />
         <input type="hidden" name="position_y" value={y} />
+        <input type="hidden" name="plan_page" value={page} />
 
         <label>
           Ce qui est constaté

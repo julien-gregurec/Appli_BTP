@@ -25,6 +25,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@elsatia/email": [
+        "../../packages/email/src/index.ts"
       ]
     }
   },

@@ -73,9 +73,12 @@ select is(
   (select count(*) from public.roles_applications_elsatia where application_code = 'reserves'),
   5::bigint, 'les cinq rôles applicatifs Réserves sont déclarés'
 );
+-- Quatorze arêtes en V1 ; la V3 (00270) en ajoute trois — réassignation depuis
+-- `acceptee`, `levee_demandee` et `levee_refusee` — pour permettre le transfert de
+-- responsabilité après révocation d'une entreprise.
 select is(
-  (select count(*) from public.reserves_transitions), 14::bigint,
-  'la matrice des transitions compte quatorze arêtes'
+  (select count(*) from public.reserves_transitions), 17::bigint,
+  'la matrice des transitions compte dix-sept arêtes'
 );
 select ok(
   not exists (select 1 from public.reserves_transitions where statut_avant = 'emise' and statut_apres = 'levee'),

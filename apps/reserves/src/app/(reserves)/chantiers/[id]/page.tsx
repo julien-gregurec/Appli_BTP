@@ -8,6 +8,7 @@ import {
 } from "@/lib/donnees";
 import { EtiquetteStatut } from "@/components/Etiquette";
 import { PlanChantier } from "@/components/PlanChantier";
+import { enregistrerPaginationAction } from "@/app/actions";
 import { estEnRetard } from "@/lib/workflow";
 
 export const metadata: Metadata = { title: "Chantier" };
@@ -36,6 +37,8 @@ export default async function PageChantier({ params }: { params: Promise<{ id: s
     zone: p.zone,
     url: p.storage_path ? liens.get(p.storage_path) ?? null : null,
     image: Boolean(p.mime_type?.startsWith("image/")),
+    pdf: p.mime_type === "application/pdf",
+    nbPages: p.nb_pages,
   }));
 
   const reperes = reserves
@@ -43,6 +46,8 @@ export default async function PageChantier({ params }: { params: Promise<{ id: s
     .map((r) => ({
       id: r.id, numero: r.numero, titre: r.titre, statut: r.statut,
       x: Number(r.position_x), y: Number(r.position_y), planId: r.plan_id as string,
+      // Les réserves pointées avant la V3 l'ont été sur une image : page 1.
+      page: r.plan_page ?? 1,
     }));
 
   const emission = peutEmettre(contexte.roleReserves);
@@ -63,7 +68,7 @@ export default async function PageChantier({ params }: { params: Promise<{ id: s
         {peutGererChantiers(contexte.roleReserves) && (
           <Link className="bouton secondaire" href={`/chantiers/${id}/plans`}>Plans</Link>
         )}
-        <Link className="bouton secondaire" href={`/chantiers/${id}/export`}>Export imprimable</Link>
+        <Link className="bouton secondaire" href={`/chantiers/${id}/export`}>Exports et PDF</Link>
       </div>
 
       <h2>Repérage sur plan</h2>
@@ -72,6 +77,7 @@ export default async function PageChantier({ params }: { params: Promise<{ id: s
         plans={plansAffichables}
         reperes={reperes}
         peutEmettre={emission}
+        enregistrerPagination={enregistrerPaginationAction}
       />
 
       <h2>Réserves</h2>

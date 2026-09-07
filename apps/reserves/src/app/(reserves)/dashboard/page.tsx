@@ -40,21 +40,53 @@ export default async function PageDashboard({
           : `${contexte.entrepriseNom} — vue d’ensemble des réserves en cours.`}
       </p>
 
+      {/* Les compteurs sont ordonnés par ce qu'ils APPELLENT comme geste, pas par état :
+          « à traiter » d'abord, « levées » loin derrière. Un tableau de bord qui commence
+          par le total ne dit pas quoi faire aujourd'hui. */}
       {compteurs ? (
         <div className="compteurs">
-          <div className="compteur"><b>{compteurs.total}</b><span>Total</span></div>
-          <div className="compteur"><b>{compteurs.emises}</b><span>Émises</span></div>
-          <div className="compteur"><b>{compteurs.assignees + compteurs.acceptees}</b><span>Assignées</span></div>
-          <div className="compteur"><b>{compteurs.en_attente}</b><span>En attente de vous</span></div>
-          <div className="compteur"><b>{compteurs.demandes_levee}</b><span>Demandes de levée</span></div>
-          <div className="compteur"><b>{compteurs.levees}</b><span>Levées</span></div>
-          <div className="compteur"><b>{compteurs.refusees}</b><span>Responsabilité refusée</span></div>
+          <div className={compteurs.a_traiter > 0 ? "compteur alerte" : "compteur"}>
+            <b>{compteurs.a_traiter}</b><span>À traiter</span>
+          </div>
           <div className={compteurs.en_retard > 0 ? "compteur alerte" : "compteur"}>
             <b>{compteurs.en_retard}</b><span>En retard</span>
           </div>
+          <div className="compteur"><b>{compteurs.echeance_proche}</b><span>Échéance sous 7 jours</span></div>
+          <div className="compteur"><b>{compteurs.demandes_levee}</b><span>Demandes de levée</span></div>
+          <div className="compteur"><b>{compteurs.refusees}</b><span>Responsabilité refusée</span></div>
+          <div className="compteur"><b>{compteurs.messages_non_lus}</b><span>Messages non lus</span></div>
+          <div className="compteur"><b>{compteurs.en_attente}</b><span>En attente de vous</span></div>
+          <div className="compteur"><b>{compteurs.levees}</b><span>Levées</span></div>
+          <div className="compteur"><b>{compteurs.total}</b><span>Total</span></div>
+          {!intervenant && compteurs.invitations_a_suivre > 0 && (
+            <div className="compteur"><b>{compteurs.invitations_a_suivre}</b><span>Invitations en attente</span></div>
+          )}
         </div>
       ) : (
         <p className="vide">Aucun compteur disponible pour cette session.</p>
+      )}
+
+      {compteurs && (compteurs.messages_non_lus > 0 || compteurs.notifications_non_lues > 0) && (
+        <p className="message">
+          {compteurs.notifications_non_lues > 0 && (
+            <>
+              <Link href="/notifications">
+                {compteurs.notifications_non_lues} notification
+                {compteurs.notifications_non_lues > 1 ? "s" : ""} non lue
+                {compteurs.notifications_non_lues > 1 ? "s" : ""}
+              </Link>
+              {compteurs.messages_non_lus > 0 ? " · " : "."}
+            </>
+          )}
+          {compteurs.messages_non_lus > 0 && (
+            <>
+              <Link href="/messages">
+                {compteurs.messages_non_lus} message{compteurs.messages_non_lus > 1 ? "s" : ""} non lu
+                {compteurs.messages_non_lus > 1 ? "s" : ""}
+              </Link>.
+            </>
+          )}
+        </p>
       )}
 
       <h2>Filtrer</h2>

@@ -42,6 +42,7 @@ export type LigneReserve = {
   intervenant_id: string | null;
   chantier_id: string;
   plan_id: string | null;
+  plan_page: number | null;
   position_x: number | null;
   position_y: number | null;
   created_at: string;
@@ -59,6 +60,12 @@ export type CompteursReserves = {
   annulees: number;
   en_attente: number;
   en_retard: number;
+  // V3 : la charge de travail, pas seulement l'état.
+  a_traiter: number;
+  echeance_proche: number;
+  messages_non_lus: number;
+  notifications_non_lues: number;
+  invitations_a_suivre: number;
 };
 
 export type FiltresReserves = {
@@ -96,7 +103,7 @@ export async function listerReserves(filtres: FiltresReserves = {}): Promise<Lig
   const supabase = await createClient();
   let requete = supabase
     .from("reserves")
-    .select("id, numero, titre, description, statut, priorite, echeance, photo_obligatoire_levee, intervenant_id, chantier_id, plan_id, position_x, position_y, created_at")
+    .select("id, numero, titre, description, statut, priorite, echeance, photo_obligatoire_levee, intervenant_id, chantier_id, plan_id, plan_page, position_x, position_y, created_at")
     .order("numero", { ascending: true });
   if (filtres.chantierId) requete = requete.eq("chantier_id", filtres.chantierId);
   if (filtres.intervenantId) requete = requete.eq("intervenant_id", filtres.intervenantId);
@@ -209,13 +216,14 @@ export async function listerPlansComplets(chantierId: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("reserves_plans")
-    .select("id, nom, niveau, zone, storage_path, mime_type, nom_fichier, taille_octets, ordre")
+    .select("id, nom, niveau, zone, storage_path, mime_type, nom_fichier, taille_octets, ordre, nb_pages")
     .eq("chantier_id", chantierId)
     .order("ordre");
   return (data ?? []) as {
     id: string; nom: string; niveau: string | null; zone: string | null;
     storage_path: string | null; mime_type: string | null;
     nom_fichier: string | null; taille_octets: number | null; ordre: number;
+    nb_pages: number | null;
   }[];
 }
 
@@ -223,4 +231,311 @@ export async function listerMembres(entrepriseId: string): Promise<MembreReserve
   const supabase = await createClient();
   const { data } = await supabase.rpc("reserves_lister_membres", { p_entreprise_id: entrepriseId });
   return (data ?? []) as MembreReserves[];
+}
+
+// ── V3 : annuaire, invitations, notifications, exports ──────────────────────
+
+export type ResultatAnnuaire = {
+  entreprise_id: string;
+  nom: string;
+  ville: string | null;
+  corps_etat: string | null;
+  zone_intervention: string | null;
+  deja_utilisatrice: boolean;
+  origine: "siret" | "annuaire";
+};
+
+/**
+ * La recherche n'est jamais élargie côté application : elle transmet le terme tel quel
+ * et laisse la base décider ce qu'elle expose (SIRET exact partout, nom uniquement parmi
+ * les organisations publiées).
+ */
+export async function rechercherAnnuaire(
+  entrepriseId: string,
+  terme: string,
+): Promise<{ resultats: ResultatAnnuaire[]; erreur: string | null }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("reserves_annuaire_rechercher", {
+    p_entreprise_id: entrepriseId,
+    p_terme: terme,
+  });
+  if (error) return { resultats: [], erreur: error.message };
+  return { resultats: (data ?? []) as ResultatAnnuaire[], erreur: null };
+}
+
+export type PublicationAnnuaire = {
+  publiee: boolean;
+  corps_etat: string | null;
+  zone_intervention: string | null;
+  email_contact: string | null;
+  telephone_contact: string | null;
+};
+
+export async function lirePublicationAnnuaire(
+  entrepriseId: string,
+): Promise<PublicationAnnuaire | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("reserves_annuaire_publication")
+    .select("publiee, corps_etat, zone_intervention, email_contact, telephone_contact")
+    .eq("entreprise_id", entrepriseId)
+    .maybeSingle();
+  return (data as PublicationAnnuaire) ?? null;
+}
+
+export type InvitationChantier = {
+  id: string;
+  intervenant_id: string;
+  intervenant: string;
+  email: string;
+  contact_nom: string | null;
+  etat: "acceptee" | "revoquee" | "expiree" | "a_envoyer" | "en_attente";
+  expire_at: string;
+  envoye_at: string | null;
+  created_at: string;
+};
+
+export async function listerInvitations(chantierId: string): Promise<InvitationChantier[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("reserves_invitations_chantier", {
+    p_chantier_id: chantierId,
+  });
+  return (data ?? []) as InvitationChantier[];
+}
+
+export type NotificationInApp = {
+  id: string;
+  type: string;
+  libelle: string;
+  categorie: string;
+  critique: boolean;
+  chantier_id: string | null;
+  chantier: string | null;
+  reserve_id: string | null;
+  reserve_numero: number | null;
+  reserve_titre: string | null;
+  payload: Record<string, unknown> | null;
+  lu: boolean;
+  created_at: string;
+};
+
+export async function listerNotifications(
+  limite = 50,
+  nonLuesSeulement = false,
+): Promise<NotificationInApp[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("reserves_notifications_in_app", {
+    p_limite: limite,
+    p_non_lues_seulement: nonLuesSeulement,
+  });
+  return (data ?? []) as NotificationInApp[];
+}
+
+export async function compterNotifications(): Promise<number> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("reserves_notifications_compteur");
+  return typeof data === "number" ? data : 0;
+}
+
+export type PreferenceNotification = {
+  categorie: string;
+  libelle: string;
+  email: boolean;
+  contient_critique: boolean;
+};
+
+export async function lirePreferences(entrepriseId: string): Promise<PreferenceNotification[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("reserves_preferences_lire", {
+    p_entreprise_id: entrepriseId,
+  });
+  return (data ?? []) as PreferenceNotification[];
+}
+
+export type ConversationReserves = {
+  id: string;
+  titre: string;
+  chantier_id: string;
+  chantier: string;
+  reserve_id: string | null;
+  reserve_numero: number | null;
+  intervenant: string | null;
+  non_lus: number;
+  dernier_message: string | null;
+  dernier_extrait: string | null;
+};
+
+export async function listerConversations(chantierId?: string): Promise<ConversationReserves[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("reserves_conversations_visibles", {
+    p_chantier_id: chantierId ?? null,
+  });
+  return (data ?? []) as ConversationReserves[];
+}
+
+export type ReperePlanPage = {
+  id: string;
+  numero: number;
+  titre: string;
+  statut: string;
+  priorite: string;
+  position_x: number;
+  position_y: number;
+};
+
+export async function listerReperesPlan(
+  planId: string,
+  page: number,
+): Promise<ReperePlanPage[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("reserves_reperes_plan", {
+    p_plan_id: planId,
+    p_page: page,
+  });
+  return (data ?? []) as ReperePlanPage[];
+}
+
+// ── Jeux de données d'export ────────────────────────────────────────────────
+
+export type EnteteExport = {
+  chantier: string;
+  reference: string | null;
+  adresse: string | null;
+  code_postal: string | null;
+  ville: string | null;
+  statut: string;
+  date_reception: string | null;
+  organisation: string;
+  organisation_siret: string | null;
+  total: number;
+  ouvertes: number;
+  levees: number;
+  en_retard: number;
+};
+
+export type LigneExport = {
+  id: string;
+  numero: number;
+  titre: string;
+  description: string | null;
+  statut: StatutReserve;
+  priorite: PrioriteReserve;
+  intervenant: string | null;
+  intervenant_corps_etat: string | null;
+  plan: string | null;
+  plan_niveau: string | null;
+  plan_zone: string | null;
+  plan_page: number | null;
+  position_x: number | null;
+  position_y: number | null;
+  echeance: string | null;
+  photo_obligatoire_levee: boolean;
+  nb_photos: number;
+  created_at: string;
+  assignee_at: string | null;
+  acceptee_at: string | null;
+  levee_demandee_at: string | null;
+  levee_at: string | null;
+};
+
+export type LigneHistoriqueExport = {
+  reserve_id: string;
+  numero: number;
+  action: string;
+  statut_avant: string | null;
+  statut_apres: string | null;
+  commentaire: string | null;
+  auteur: string | null;
+  auteur_organisation: string | null;
+  created_at: string;
+};
+
+export type PhotoExport = {
+  reserve_id: string;
+  numero: number;
+  photo_id: string;
+  usage: string;
+  legende: string | null;
+  storage_path: string;
+  created_at: string;
+};
+
+export type IntervenantExport = {
+  intervenant_id: string;
+  nom: string;
+  corps_etat: string | null;
+  statut: string;
+  total: number;
+  ouvertes: number;
+  levees: number;
+};
+
+export type FiltresExport = {
+  intervenantId?: string | null;
+  statut?: string | null;
+  priorite?: string | null;
+  echeanceAvant?: string | null;
+  inclureLevees?: boolean;
+};
+
+export async function lireEnteteExport(chantierId: string): Promise<EnteteExport | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .rpc("reserves_export_entete", { p_chantier_id: chantierId })
+    .maybeSingle();
+  return (data as EnteteExport) ?? null;
+}
+
+export async function lireLignesExport(
+  chantierId: string,
+  filtres: FiltresExport = {},
+): Promise<LigneExport[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("reserves_export_chantier", {
+    p_chantier_id: chantierId,
+    p_intervenant_id: filtres.intervenantId ?? null,
+    p_statut: filtres.statut ?? null,
+    p_priorite: filtres.priorite ?? null,
+    p_echeance_avant: filtres.echeanceAvant ?? null,
+    p_inclure_levees: filtres.inclureLevees ?? true,
+  });
+  return (data ?? []) as LigneExport[];
+}
+
+export async function lireHistoriqueExport(
+  chantierId: string,
+  intervenantId?: string | null,
+): Promise<LigneHistoriqueExport[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("reserves_export_historique", {
+    p_chantier_id: chantierId,
+    p_intervenant_id: intervenantId ?? null,
+  });
+  return (data ?? []) as LigneHistoriqueExport[];
+}
+
+export async function lirePhotosExport(
+  chantierId: string,
+  intervenantId?: string | null,
+): Promise<PhotoExport[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("reserves_export_photos", {
+    p_chantier_id: chantierId,
+    p_intervenant_id: intervenantId ?? null,
+  });
+  return (data ?? []) as PhotoExport[];
+}
+
+export async function listerIntervenantsExport(chantierId: string): Promise<IntervenantExport[]> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("reserves_export_intervenants", {
+    p_chantier_id: chantierId,
+  });
+  return (data ?? []) as IntervenantExport[];
+}
+
+export async function compterMessagesNonLus(): Promise<number> {
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("reserves_messages_non_lus");
+  return typeof data === "number" ? data : 0;
 }
