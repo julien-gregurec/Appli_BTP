@@ -11,9 +11,25 @@ import {
   DUREE_INVITATION_JOURS, creerJetonInvitation, hacherJetonInvitation, urlInvitation,
 } from "@/lib/invitations";
 import { envoyerInvitation } from "@/lib/emails-reserves";
-import { estCleIdempotence } from "@/lib/offline/resilience";
+import { estCleIdempotence } from "@/lib/offline/contrat";
 
 const MESSAGE_SANS_RESERVES = "Votre compte ELSATIA ne dispose pas d’un accès actif à Réserves.";
+const MESSAGE_INDISPONIBLE =
+  "Le service d’authentification ne répond pas. Vos identifiants sont probablement corrects : réessayez dans un instant.";
+
+/**
+ * Distingue une INDISPONIBILITÉ d'un refus d'identifiants.
+ *
+ * Supabase Auth rend un statut HTTP pour les deux : 400/401 quand le mot de passe est
+ * faux, 5xx (ou aucune réponse) quand il n'a pas pu joindre sa base. Le code est donc le
+ * seul discriminant fiable ; le message, lui, est localisé et changeant.
+ */
+function estIndisponibilite(erreur: { status?: number; code?: string }): boolean {
+  if (typeof erreur.status === "number" && erreur.status >= 500) return true;
+  if (typeof erreur.status === "number" && erreur.status === 429) return true;
+  // Pas de statut du tout : la requête n'a pas abouti (réseau, délai dépassé).
+  return erreur.status === undefined;
+}
 
 type ContexteCanonique = { entreprise_id: string | null };
 
@@ -37,7 +53,15 @@ export async function connexionAction(formData: FormData) {
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) redirect(`/login?error=${encodeURIComponent("Identifiants incorrects.")}`);
+  if (error) {
+    // Un service d'authentification injoignable N'EST PAS un mauvais mot de passe.
+    // Les confondre envoie l'utilisateur chercher une faute de frappe qui n'existe pas,
+    // et lui fait ressaisir ses identifiants pendant que le serveur est simplement
+    // indisponible — exactement le mauvais geste sur un chantier mal couvert.
+    redirect(`/login?error=${encodeURIComponent(
+      estIndisponibilite(error) ? MESSAGE_INDISPONIBLE : "Identifiants incorrects.",
+    )}`);
+  }
 
   const { data: contexte, error: erreurContexte } = await supabase
     .rpc("contexte_application_courant")
@@ -141,7 +165,8 @@ export async function creerReserveAction(formData: FormData) {
   // la réserve déjà créée — l'utilisateur la retrouve et pourra rattacher la photo.
   const constat = formData.get("photo");
   if (constat instanceof File && constat.size > 0) {
-    const resultat = await deposerPhoto(reserveId, constat, "constat", null);
+    const resultat = await deposerPhoto(
+      reserveId, constat, "constat", null, texteOuNull(formData, "origine_client_id_photo"));
     if (!estIdentifiantPhoto(resultat)) {
       redirect(`/reserves/${reserveId}?error=${encodeURIComponent(resultat)}`);
     }
@@ -164,6 +189,7 @@ async function deposerPhoto(
   fichier: File,
   usage: string,
   legende: string | null,
+  origineClientId: string | null = null,
 ): Promise<string> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -174,6 +200,9 @@ async function deposerPhoto(
       p_mime_type: fichier.type,
       p_taille_octets: fichier.size,
       p_nom_fichier: fichier.name,
+      // P1 du lot V4 : la base savait dédoublonner, mais personne ne lui donnait la clé.
+      // Sans elle, un double clic sur un réseau lent créait deux fois la même photo.
+      p_origine_client_id: estCleIdempotence(origineClientId) ? origineClientId : null,
     })
     .maybeSingle();
   if (error || !data) return error?.message ?? "Photo refusée.";
@@ -183,7 +212,10 @@ async function deposerPhoto(
   };
   const { error: erreurDepot } = await supabase.storage
     .from(BUCKET_PHOTOS)
-    .upload(chemin, fichier, { contentType: fichier.type, upsert: false });
+    // `upsert: true` n'est pas un laxisme : le chemin est composé par la base à partir
+    // de la clé d'idempotence, donc réécrire signifie forcément « même photo, même
+    // envoi ». Sans lui, une reprise après coupure échouerait sur « objet déjà présent ».
+    .upload(chemin, fichier, { contentType: fichier.type, upsert: true });
   if (erreurDepot) {
     await supabase.rpc("reserves_supprimer_photo", {
       p_photo_id: photoId, p_motif: "Téléversement interrompu",
@@ -257,15 +289,18 @@ export async function commenterAction(formData: FormData) {
   if (piece instanceof File && piece.size > 0) {
     const fichier = fichierDeposeValide(piece, MIMES_PHOTO, TAILLE_MAX_PHOTO);
     if (typeof fichier === "string") redirect(`${retour}?error=${encodeURIComponent(fichier)}`);
-    const resultat = await deposerPhoto(id, fichier, "echange", null);
+    const resultat = await deposerPhoto(
+      id, fichier, "echange", null, texteOuNull(formData, "origine_client_id_photo"));
     if (!estIdentifiantPhoto(resultat)) redirect(`${retour}?error=${encodeURIComponent(resultat)}`);
     photoId = resultat;
   }
 
+  const cleCommentaire = texteOuNull(formData, "origine_client_id");
   return appeler("reserves_commenter", {
     p_reserve_id: id,
     p_contenu: texte(formData, "contenu"),
     p_photo_id: photoId,
+    p_origine_client_id: estCleIdempotence(cleCommentaire) ? cleCommentaire : null,
   }, retour);
 }
 
@@ -323,6 +358,7 @@ export async function televerserPhotoAction(formData: FormData) {
 
   const resultat = await deposerPhoto(
     reserveId, fichier, texte(formData, "usage") || "constat", texteOuNull(formData, "legende"),
+    texteOuNull(formData, "origine_client_id_photo"),
   );
   if (!estIdentifiantPhoto(resultat)) redirect(`${retour}?error=${encodeURIComponent(resultat)}`);
   revalidatePath(retour);
@@ -416,6 +452,8 @@ export async function ajouterPlanAction(formData: FormData) {
   }
   const { plan_id: planId, storage_path: chemin } = data as { plan_id: string; storage_path: string };
 
+  // Les plans n'ont PAS de clé d'idempotence : deux dépôts sont deux plans distincts, et
+  // écraser un objet existant signifierait perdre un document. On garde donc le refus.
   const { error: erreurDepot } = await supabase.storage
     .from(BUCKET_PLANS)
     .upload(chemin, fichier, { contentType: fichier.type, upsert: false });

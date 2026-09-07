@@ -1,5 +1,6 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { createHash, randomUUID } from "node:crypto";
+import { connexion, jetonSupabase, RESERVES, rpc } from "./reserves-aides";
 
 /**
  * Recette V4 — résilience réseau, anti-doublon et terrain mobile.
@@ -10,7 +11,6 @@ import { createHash, randomUUID } from "node:crypto";
  * que ce soit vrai, et signaler le moment où ça le devient.
  */
 
-const RESERVES = process.env.E2E_RESERVES_URL ?? "http://127.0.0.1:3020";
 const CHANTIER = "e0000000-0000-0000-0000-000000000001";
 const INTERVENANT_B = "e2000000-0000-0000-0000-00000000000b";
 const ENTREPRISE_B = "f0000000-0000-0000-0000-000000000001";
@@ -22,68 +22,18 @@ test.skip(
 
 test.describe.configure({ mode: "serial", timeout: 180_000 });
 
-async function connexion(page: Page, email: string, destination: string) {
-  await page.context().clearCookies();
-  await page.goto(`${RESERVES}/login?next=${encodeURIComponent(destination)}`);
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Mot de passe", { exact: true }).fill("test");
-  await page.getByRole("button", { name: "Se connecter" }).click();
-  await page.getByRole("button", { name: "Se déconnecter" }).waitFor();
-}
-
-async function jetonSupabase(request: APIRequestContext, email: string) {
-  const url = process.env.E2E_SUPABASE_URL;
-  const key = process.env.E2E_SUPABASE_ANON_KEY;
-  if (!url || !key || !url.startsWith("http://127.0.0.1")) {
-    throw new Error("La recette E2E exige un Supabase local explicite");
-  }
-  const reponse = await request.post(`${url}/auth/v1/token?grant_type=password`, {
-    headers: { apikey: key, "Content-Type": "application/json" },
-    data: { email, password: "test" },
-  });
-  expect(reponse.status()).toBe(200);
-  return (await reponse.json()).access_token as string;
-}
-
-async function rpc(
-  request: APIRequestContext, accessToken: string,
-  fonction: string, parametres: Record<string, unknown>,
-) {
-  return request.post(`${process.env.E2E_SUPABASE_URL}/rest/v1/rpc/${fonction}`, {
-    headers: {
-      apikey: process.env.E2E_SUPABASE_ANON_KEY!,
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    data: parametres,
-  });
-}
-
 // ── §11 — ce que le hors-ligne fait RÉELLEMENT ────────────────────────────────
 
-test("sans réseau, l'application est aujourd'hui inutilisable — constat mesuré", async ({
-  page, context,
-}) => {
-  await connexion(page, "admin-a@invalid.local", "/dashboard");
-  await page.goto(`${RESERVES}/chantiers/${CHANTIER}`);
-  await expect(page.locator("h1")).toContainText("RECETTE_A_Groupe scolaire");
-
-  // Aucun service worker n'est enregistré : rien ne peut servir la page sans réseau.
-  const travailleurs = await page.evaluate(
-    async () => (await navigator.serviceWorker?.getRegistrations?.() ?? []).length,
-  );
-  expect(travailleurs).toBe(0);
-
-  await context.setOffline(true);
-  // Un chantier DÉJÀ chargé n'est pas consultable après coupure : la navigation échoue.
-  await expect(
-    page.goto(`${RESERVES}/reserves`, { waitUntil: "domcontentloaded", timeout: 10_000 }),
-  ).rejects.toThrow(/ERR_INTERNET_DISCONNECTED|net::/);
-  await context.setOffline(false);
-
-  // Le jour où un cache hors-ligne sera livré, ce test tombera : il faudra alors le
-  // remplacer par la vérification du contenu réellement servi sans réseau.
-});
+/*
+ * Le constat du lot V4 — « sans réseau, l'application est inutilisable » — a été retiré
+ * d'ici : il est devenu FAUX. Le lot V5 livre le hors-ligne réel (service worker, cache
+ * de coquille, base locale cloisonnée, file de mutations), et le test qui mesurait cette
+ * absence échouait désormais, exactement comme il avait été écrit pour le faire.
+ *
+ * Sa relève est assurée par `reserves-v5-offline.spec.ts`, qui ne constate plus une
+ * absence mais démontre le fonctionnement : coupure réelle, consultation, saisie,
+ * persistance au rechargement, synchronisation au retour du réseau.
+ */
 
 // ── §12 — aucune duplication à la reconnexion ────────────────────────────────
 
@@ -116,14 +66,14 @@ test("un envoi rejoué ne crée pas de doublon : la clé d'idempotence fait son 
     expect(await rejeu.json()).toBe(identifiant);
   }
 
-  await connexion(page, "admin-a@invalid.local", "/dashboard");
+  await connexion(page, "admin-a@invalid.local");
   await page.goto(`${RESERVES}/imprimer/chantier/${CHANTIER}?vue=toutes`);
   const lignes = page.locator(".table-synthese tbody tr").filter({ hasText: titre });
   await expect(lignes).toHaveCount(1);
 });
 
 test("le formulaire de création émet réellement une clé d'idempotence", async ({ page }) => {
-  await connexion(page, "admin-a@invalid.local", "/dashboard");
+  await connexion(page, "admin-a@invalid.local");
   await page.goto(`${RESERVES}/chantiers/${CHANTIER}/nouvelle-reserve`);
   const cle = page.locator('input[name="origine_client_id"]');
   await expect(cle).toHaveCount(1);
@@ -150,13 +100,16 @@ test("une levée validée ne peut pas être réécrite par une reprise", async (
   expect(creation.status()).toBe(200);
   const reserve = (await creation.json()) as string;
 
-  // La matrice de transitions n'autorise aucun passage direct depuis « levée » : une
-  // reprise locale qui tenterait de rouvrir la réserve est refusée par la base.
-  const interdit = await rpc(request, jetonA, "reserves_appliquer_transition", {
-    p_reserve_id: reserve, p_action: "levee_validee", p_commentaire: null,
+  // Valider une levée qui n'a jamais été demandée est refusé par la matrice de
+  // transitions. On interroge la fonction PUBLIQUE `reserves_statuer_levee` : l'interne
+  // `reserves_appliquer_transition` n'est pas accordée au rôle `authenticated`, si bien
+  // qu'un test dirigé vers elle recevrait un 403 de permission et prouverait seulement
+  // qu'elle est privée — jamais que la règle métier tient.
+  const interdit = await rpc(request, jetonA, "reserves_statuer_levee", {
+    p_reserve_id: reserve, p_validee: true, p_commentaire: null,
   });
-  // La réserve n'est pas au stade « levée demandée » : la transition est refusée.
-  expect([400, 401, 403, 404, 409, 500]).toContain(interdit.status());
+  expect(interdit.status()).toBeGreaterThanOrEqual(400);
+  expect(await interdit.text()).toMatch(/impossible|Transition/i);
 });
 
 // ── §14 / §15 — terrain mobile ───────────────────────────────────────────────
@@ -164,7 +117,7 @@ test("une levée validée ne peut pas être réécrite par une reprise", async (
 const LARGEURS = [375, 390, 430];
 
 test("@responsive les écrans de terrain tiennent sur 375, 390 et 430 px", async ({ page }) => {
-  await connexion(page, "admin-a@invalid.local", "/dashboard");
+  await connexion(page, "admin-a@invalid.local");
 
   for (const largeur of LARGEURS) {
     await page.setViewportSize({ width: largeur, height: 844 });
@@ -182,7 +135,7 @@ test("@responsive les écrans de terrain tiennent sur 375, 390 et 430 px", async
 });
 
 test("@responsive les cibles tactiles atteignent 44 px", async ({ page }) => {
-  await connexion(page, "admin-a@invalid.local", "/dashboard");
+  await connexion(page, "admin-a@invalid.local");
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto(`${RESERVES}/chantiers/${CHANTIER}`);
 
@@ -215,7 +168,7 @@ test("@responsive l'entreprise invitée ne voit que ses réserves, sur mobile", 
 
   let rattachee = await (async () => {
     try {
-      await connexion(page, "gerant-b@invalid.local", "/dashboard");
+      await connexion(page, "gerant-b@invalid.local");
       return true;
     } catch { return false; }
   })();
@@ -233,7 +186,7 @@ test("@responsive l'entreprise invitée ne voit que ses réserves, sur mobile", 
       p_token_hash: empreinte, p_entreprise_id: ENTREPRISE_B,
     });
     expect(acceptation.status()).toBe(200);
-    await connexion(page, "gerant-b@invalid.local", "/dashboard");
+    await connexion(page, "gerant-b@invalid.local");
     rattachee = true;
   }
   expect(rattachee).toBe(true);

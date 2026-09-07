@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { nouvelleCleIdempotence } from "@/lib/offline/resilience";
+import { nouvelleCle } from "@/lib/offline/contrat";
 
 /**
  * Clé d'idempotence de la saisie en cours.
@@ -18,6 +18,6 @@ import { nouvelleCleIdempotence } from "@/lib/offline/resilience";
  * suivants, contrairement à un appel direct dans le corps du composant.
  */
 export function CleIdempotence({ nom = "origine_client_id" }: { nom?: string }) {
-  const [cle] = useState(nouvelleCleIdempotence);
+  const [cle] = useState(nouvelleCle);
   return <input type="hidden" name={nom} value={cle} />;
 }

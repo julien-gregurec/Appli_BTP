@@ -9,6 +9,9 @@ export const metadata: Metadata = {
   applicationName: "ELSATIA Réserves",
   // Application interne pré-commerciale : elle ne doit pas être indexée.
   robots: { index: false, follow: false },
+  // Déclaré pour que Réserves soit installable sur un téléphone de chantier : le mode
+  // autonome retire la barre d'adresse, qui coûte de la hauteur utile sur 375 px.
+  manifest: "/manifest.webmanifest",
 };
 
 export const viewport: Viewport = {

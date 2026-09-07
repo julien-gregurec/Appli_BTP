@@ -1,8 +1,11 @@
 import type { ReactNode } from "react";
 import { Marque } from "@/components/Marque";
 import { BanniereRetour } from "@/components/BanniereRetour";
+import { AtelierOffline } from "@/components/offline/AtelierOffline";
+import { IndicateurOffline } from "@/components/offline/IndicateurOffline";
+import { ServiceWorkerReserves } from "@/components/offline/ServiceWorkerReserves";
+import { BoutonDeconnexion } from "@/components/offline/BoutonDeconnexion";
 import { Navigation } from "@/components/Navigation";
-import { deconnexionAction } from "@/app/actions";
 import { estCompteIntervenant, peutInviterEntreprise } from "@/lib/acces-reserves";
 import type { ContexteReserves } from "@/lib/contexte";
 
@@ -20,16 +23,18 @@ export function Coquille({
   const intervenant = estCompteIntervenant(contexte.roleReserves);
   const administrateur = peutInviterEntreprise(contexte.roleReserves);
   return (
+    <AtelierOffline
+      entrepriseId={contexte.entrepriseId}
+      utilisateurId={contexte.userId}
+    >
     <div className="coquille">
+      <ServiceWorkerReserves />
       <header className="barre">
         <Marque />
         <div className="barre-org">
           {contexte.entrepriseNom}
-          <form action={deconnexionAction}>
-            <button type="submit" className="bouton secondaire" style={{ color: "#fff", borderColor: "#3a5a57", minHeight: 32, padding: "0 10px", marginTop: 4, fontSize: 13 }}>
-              Se déconnecter
-            </button>
-          </form>
+          {/* La déconnexion purge d'abord ce que l'appareil garde en mémoire. */}
+          <BoutonDeconnexion />
         </div>
       </header>
       <Navigation
@@ -39,6 +44,9 @@ export function Coquille({
         messagesNonLus={messagesNonLus}
       />
       <main className="contenu">
+        {/* L'état du travail non transmis est visible sur TOUTES les pages : c'est ce
+            qui empêche de croire une saisie enregistrée alors qu'elle dort ici. */}
+        <IndicateurOffline />
         <BanniereRetour />
         {children}
       </main>
@@ -46,5 +54,6 @@ export function Coquille({
         ELSATIA Réserves — application indépendante de l’écosystème ELSATIA.
       </footer>
     </div>
+    </AtelierOffline>
   );
 }
