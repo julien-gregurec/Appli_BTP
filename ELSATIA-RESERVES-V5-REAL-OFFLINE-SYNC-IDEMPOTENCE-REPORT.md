@@ -23,10 +23,12 @@ l'application, mesurée et distinguée comme telle.
 | Branche de base | `feat/reserves-v4-e2e-offline-pdf-print` |
 | SHA de base (complet) | `cb9df18946b4a2d4ff04a55fe78de3d3a2ca7055` |
 | Branche de travail | `feat/reserves-v4-e2e-offline-pdf-print` (poursuivie) |
-| SHA final | *voir §14* |
+| SHA final (complet, poussé) | `7c0fc3d158a0f7b6a3de27eaba8b4be47cb60b00` |
 
 > **Le SHA de base n'était pas poussé.** Vérifié au démarrage : aucune branche distante
-> ne contenait `cb9df18`. Il l'est désormais, avec le présent lot (§14).
+> ne contenait `cb9df18`. Les deux commits sont désormais sur
+> `origin/feat/reserves-v4-e2e-offline-pdf-print`. Aucune pull request n'a été ouverte,
+> aucune fusion effectuée.
 
 Aucune fusion. Aucun déploiement. Aucune écriture en Production.
 
