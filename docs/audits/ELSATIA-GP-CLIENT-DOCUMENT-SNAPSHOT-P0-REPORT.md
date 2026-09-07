@@ -435,19 +435,40 @@ fonction que ce lot redéfinit — et `relances_auto_v1_reclamation.test.sql`.
 | Commande | Résultat |
 |---|---|
 | `npm run typecheck` (racine GP **+** `apps/tools`) | **0 erreur** |
-| `npm run lint` (racine GP **+** `apps/tools`) | **0 erreur**, 6 avertissements — tous préexistants (`@next/next/no-img-element`) ; `npx eslint` sur les 7 fichiers touchés par ce lot : **0 problème** |
+| `npm run lint` (racine GP **+** `apps/tools`) | code de sortie **0** — **0 erreur**, 3 avertissements, tous préexistants et hors de ce lot (`@next/next/no-img-element` dans `boutique/[produitId]`, `boutique` et `SignatureEmploye`) ; `npx eslint` sur les 7 fichiers touchés par ce lot : **0 problème** |
 | `npx vitest run` (racine GP) | **102 fichiers, 1012 tests, tous passants** |
 | dont `src/lib/client-snapshot.test.ts` | **13 tests, tous passants** (nouveau fichier) |
 | `npm run verify:migrations` | `266 migrations valides, noms et horodatages uniques.` |
 | `npx next build` | **succès** (code de sortie 0, manifeste de routes complet émis) — bâti contre la pile Docker isolée via un `.env.local` local et gitignoré, jamais contre Production ni Preview |
 
-> Note d'honnêteté : un premier passage de `vitest run` a rapporté 2 échecs
-> (`src/lib/xlsx.test.ts` et un test scannant l'arborescence `src/`), tous deux
-> `Test timed out in 5000ms`. Cause : contention disque sur le volume externe
-> (`db reset` Docker et copie de `node_modules` en parallèle). Rejoués machine
-> au repos, **102/102 fichiers et 1012/1012 tests passent**. Aucun rapport avec
-> ce lot — ni `xlsx` ni ce scan ne touchent l'identité client — et aucun test
-> n'a été modifié pour obtenir ce résultat.
+#### Instabilité constatée — et attribuée par mesure, pas par supposition
+
+Sous charge (Docker + une seconde suite Vitest en parallèle sur le même volume
+externe), deux tests sortent par `Test timed out in 5000ms` :
+`src/lib/xlsx.test.ts` et `src/lib/stripe-discount-legacy-surface.test.ts`.
+
+Plutôt que de les déclarer « sans rapport », la cause a été **mesurée** : la
+suite complète a été rejouée sur le **canon `4266ba6` non modifié**, dans le même
+worktree de référence, sous exactement la même charge concurrente.
+
+| Exécution | Résultat |
+|---|---|
+| Ce lot, machine au repos | 102 fichiers / **1012 tests, tous passants** |
+| Ce lot, sous charge | 1 à 2 échecs, tous `Test timed out in 5000ms` |
+| **Canon `4266ba6` (aucune modification), sous charge** | **même échec** : `stripe-discount-legacy-surface`, `Test timed out in 5000ms` (101 fichiers / 999 tests) |
+| Les 2 tests isolés, sur ce lot | 3/3 passants en 2,0 s |
+| Les 2 tests isolés, sur le canon | 3/3 passants en 0,2 s |
+
+**L'instabilité est donc préexistante au lot et d'origine environnementale**
+(délai d'E/S sur `/Volumes/ELSATIA-DEV` et plafond Vitest de 5 s par test), et
+non introduite par cette correction. L'écart de volumétrie entre les deux
+colonnes (102/1012 contre 101/999) correspond exactement au fichier ajouté par
+ce lot, `src/lib/client-snapshot.test.ts` et ses 13 tests.
+
+Aucun test n'a été modifié, allongé en délai, désactivé ni assoupli pour obtenir
+un résultat vert. Une piste corrective pour un lot séparé, si la gêne persiste :
+relever `testTimeout` dans `vitest.config.ts`, ou déplacer les worktrees hors du
+volume externe.
 
 ### 10.4bis Fichiers modifiés
 
