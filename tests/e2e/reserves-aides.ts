@@ -1,4 +1,6 @@
-import { expect, type APIRequestContext, type Page } from "@playwright/test";
+import {
+  expect, request as apiPlaywright, type APIRequestContext, type Page,
+} from "@playwright/test";
 
 /**
  * Utilitaires communs à la recette ELSATIA Réserves.
@@ -117,4 +119,19 @@ export async function rpc(
     // parfois plus de quinze secondes à répondre. Ce n'est pas ce que la recette mesure.
     timeout: 60_000,
   });
+}
+
+
+/**
+ * Contexte d'API INDÉPENDANT du navigateur.
+ *
+ * Le contexte de test applique `setOffline` à toutes ses requêtes, y compris celles de
+ * l'API : pendant une coupure simulée, la fixture `request` ne peut donc plus joindre le
+ * serveur. Or certains scénarios ont précisément besoin qu'un AUTRE appareil agisse
+ * pendant que celui-ci est hors ligne — une levée validée ailleurs, par exemple. Ce
+ * contexte-ci n'est pas soumis à l'émulation réseau du navigateur : il représente
+ * l'autre appareil, resté connecté.
+ */
+export async function contexteAutreAppareil(): Promise<APIRequestContext> {
+  return apiPlaywright.newContext();
 }

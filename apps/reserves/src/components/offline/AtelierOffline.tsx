@@ -149,6 +149,25 @@ export function AtelierOffline({
     return () => { vivant = false; };
   }, [identite, rafraichir, synchroniserMaintenant]);
 
+  /**
+   * Reprise périodique tant qu'il reste du travail non transmis.
+   *
+   * La synchronisation était déclenchée au montage et au retour de l'événement `online`.
+   * Ces deux signaux ne suffisent pas : si la première tentative échoue pour une cause
+   * passagère — service momentanément injoignable, écriture lente — plus rien ne la
+   * relance tant que l'utilisateur reste sur la même page. Sa saisie resterait en attente
+   * sous ses yeux, avec un réseau pourtant revenu. La coquille hors-ligne avait déjà cette
+   * reprise ; l'application entière la partage désormais.
+   */
+  const resteAEnvoyer = mutations.some(
+    (m) => m.etat === "en_attente" || m.etat === "echec",
+  );
+  useEffect(() => {
+    if (!identite || !resteAEnvoyer) return;
+    const minuterie = setInterval(() => { void synchroniserMaintenant(); }, 15_000);
+    return () => clearInterval(minuterie);
+  }, [identite, resteAEnvoyer, synchroniserMaintenant]);
+
   // Réseau : l'événement `online` est le déclencheur naturel de la reprise.
   useEffect(() => {
     // La sonde est asynchrone : l'état n'est donc jamais posé pendant l'effet lui-même,

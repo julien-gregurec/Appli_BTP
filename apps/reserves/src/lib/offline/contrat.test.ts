@@ -49,6 +49,10 @@ describe("machine à états de la file", () => {
     expect(transitionAutorisee("en_cours", "synchronise")).toBe(true);
   });
 
+  it("laisse un envoi interrompu retourner en file", () => {
+    expect(transitionAutorisee("en_cours", "en_attente")).toBe(true);
+  });
+
   it("ne renvoie JAMAIS une mutation déjà acquittée", () => {
     // C'est le seul scénario capable de produire un doublon malgré l'idempotence.
     for (const cible of ETATS_MUTATION) {
@@ -170,9 +174,19 @@ describe("classement des réponses serveur", () => {
     expect(etatApresReponse({ issue: "conflit", motif: "levée déjà validée" })).toBe("conflit");
   });
 
-  it("range refus et coupure réseau en échec rejouable", () => {
+  it("laisse un refus métier en échec : il attend une décision", () => {
     expect(etatApresReponse({ issue: "refus", motif: "x" })).toBe("echec");
-    expect(etatApresReponse({ issue: "reseau", motif: "x" })).toBe("echec");
+  });
+
+  it("remet en file une coupure réseau, qui se répare toute seule", () => {
+    // Exiger un clic pour se remettre d'une coupure de trente secondes serait absurde
+    // sur un chantier : la file repart d'elle-même au passage suivant.
+    expect(etatApresReponse({ issue: "reseau", motif: "x" }, 1)).toBe("en_attente");
+    expect(etatApresReponse({ issue: "reseau", motif: "x" }, TENTATIVES_MAX - 1)).toBe("en_attente");
+  });
+
+  it("cesse d'insister au plafond de tentatives", () => {
+    expect(etatApresReponse({ issue: "reseau", motif: "x" }, TENTATIVES_MAX)).toBe("echec");
   });
 
   it("plafonne les tentatives pour ne pas boucler sur un refus définitif", () => {
