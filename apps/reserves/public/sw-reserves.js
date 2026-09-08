@@ -14,7 +14,7 @@
  * hors-ligne quand il n'y a pas de réseau.
  */
 
-const VERSION = "reserves-v5-4";
+const VERSION = "reserves-v6-1";
 const CACHE_COQUILLE = `${VERSION}-coquille`;
 const CACHE_STATIQUE = `${VERSION}-statique`;
 
@@ -76,6 +76,26 @@ self.addEventListener("activate", (evenement) => {
     );
     await self.clients.claim();
   })());
+});
+
+/**
+ * Rafraîchissement de la coquille sur demande de la page.
+ *
+ * POURQUOI IL FALLAIT L'AJOUTER. La coquille et ses ressources n'étaient mises en cache
+ * qu'à l'INSTALLATION du service worker — c'est-à-dire quand le fichier `sw-reserves.js`
+ * change d'un seul octet. Or l'application, elle, est redéployée bien plus souvent : les
+ * empreintes des morceaux `/_next/static/` changent à chaque construction. Entre deux
+ * modifications de ce fichier, l'appareil conservait donc indéfiniment une coquille figée
+ * à la version du jour de l'installation — avec son ancien code de file, capable d'écrire
+ * une charge utile d'un format que le serveur ne lit plus.
+ *
+ * La page signale donc à chaque démarrage EN LIGNE qu'il faut reprendre l'empreinte. Le
+ * rafraîchissement remplace l'entrée existante ; en cas d'échec (hors ligne, ressource
+ * absente), l'ancienne coquille reste en place — elle vaut toujours mieux que rien.
+ */
+self.addEventListener("message", (evenement) => {
+  if (evenement.data?.type !== "rafraichir-coquille") return;
+  evenement.waitUntil(precacherCoquille().catch(() => undefined));
 });
 
 /**

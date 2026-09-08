@@ -12,7 +12,10 @@ import {
   estEnSuspens, LIBELLES_ETAT, LIBELLES_TYPE, type Mutation,
 } from "@/lib/offline/contrat";
 import { CaptureOffline } from "./CaptureOffline";
-import { reprendreApresRedemarrage, synchroniser } from "@/lib/offline/synchronisation";
+import {
+  rattraperEchecs, reprendreApresRedemarrage, synchroniser,
+} from "@/lib/offline/synchronisation";
+import { useRepriseAutomatique } from "./useReprise";
 import { reseauJoignable } from "@/lib/offline/reseau";
 
 /**
@@ -31,6 +34,9 @@ export function CoquilleHorsLigne() {
   const [mutations, setMutations] = useState<Mutation[]>([]);
   const [enLigne, setEnLigne] = useState(true);
   const [identite, setIdentite] = useState<ReturnType<typeof lireIdentiteLocale>>(null);
+  // Brouillon ouvert en reprise. Il sert aussi de `key` au formulaire : changer de
+  // brouillon remonte le composant, donc réinitialise ses champs sans effet de bord.
+  const [brouillon, setBrouillon] = useState<Mutation | null>(null);
 
   const relire = useCallback(async () => {
     const courante = lireIdentiteLocale();
@@ -83,8 +89,8 @@ export function CoquilleHorsLigne() {
     };
   }, [relire]);
 
-  const enSuspens = mutations.filter((m) => estEnSuspens(m.etat));
-  const resteAEnvoyer = mutations.some((m) => m.etat === "en_attente" || m.etat === "echec");
+  const brouillons = mutations.filter((m) => m.etat === "brouillon");
+  const enSuspens = mutations.filter((m) => estEnSuspens(m.etat) && m.etat !== "brouillon");
 
   /**
    * Reprise périodique tant que la coquille est ouverte.
@@ -93,19 +99,27 @@ export function CoquilleHorsLigne() {
    * laisse l'écran ouvert en attendant le retour du réseau verrait sa file rester en
    * « en attente » indéfiniment, alors que la connexion est revenue. C'est aussi ce qui
    * permet de repartir après une tentative bloquée par le verrou inter-onglets.
+   *
+   * V6 : la cadence n'est plus fixe. Cette page est CELLE QU'ON LAISSE OUVERTE en
+   * attendant le réseau — une sonde toutes les cinq secondes, indéfiniment, y était le
+   * pire réglage possible pour la batterie, et elle continuait de tourner même quand la
+   * file ne contenait plus que des échecs définitifs, que rien ne renvoie jamais.
    */
-  useEffect(() => {
-    if (!identite || !resteAEnvoyer) return;
-    let vivant = true;
-    const minuterie = setInterval(async () => {
-      if (!vivant || !(await reseauJoignable())) return;
-      try {
-        await synchroniser(identite);
-        if (vivant) await relire();
-      } catch { /* on retentera au tour suivant */ }
-    }, 5_000);
-    return () => { vivant = false; clearInterval(minuterie); };
-  }, [identite, resteAEnvoyer, relire]);
+  const tenterReprise = useCallback(async () => {
+    if (!identite) return false;
+    if (!(await reseauJoignable())) return false;
+    try {
+      await rattraperEchecs(identite);
+      const bilan = await synchroniser(identite);
+      await relire();
+      // Différée par le verrou : rien n'a été tenté, donc rien à espacer.
+      return bilan.differee || bilan.synchronisees > 0;
+    } catch {
+      return false;
+    }
+  }, [identite, relire]);
+
+  useRepriseAutomatique(identite !== null && !chargement, mutations, tenterReprise);
 
   return (
     <main className="page-publique" data-test="coquille-hors-ligne">
@@ -131,11 +145,45 @@ export function CoquilleHorsLigne() {
           <>
             {identite && (
               <CaptureOffline
+                key={brouillon?.id ?? "nouvelle-saisie"}
                 identite={identite}
                 chantiers={chantiers}
                 reserves={reserves}
-                surEnregistrement={relire}
+                brouillon={brouillon}
+                surAbandonEdition={() => setBrouillon(null)}
+                surEnregistrement={async () => { setBrouillon(null); await relire(); }}
               />
+            )}
+
+            {/* Les brouillons ne sont PAS « à envoyer » : ce sont des saisies que leur
+                auteur a délibérément gardées incomplètes. Les mêler à la file ferait
+                croire qu'elles partiront seules. */}
+            {brouillons.length > 0 && (
+              <>
+                <h2>Brouillons sur l’appareil</h2>
+                <ul className="liste" data-test="brouillons-hors-ligne">
+                  {brouillons.map((mutation) => (
+                    <li key={mutation.id} className="carte" data-etat="brouillon">
+                      <div className="reserve-tete">
+                        <span className="reserve-titre">{LIBELLES_TYPE[mutation.type]}</span>
+                        <span className="etiquette">{LIBELLES_ETAT.brouillon}</span>
+                      </div>
+                      {typeof mutation.payload.titre === "string" && <p>{mutation.payload.titre}</p>}
+                      {typeof mutation.payload.contenu === "string" && <p>{mutation.payload.contenu}</p>}
+                      <p className="mention">
+                        Saisi le {new Date(mutation.creeeA).toLocaleString("fr-FR")} · non transmis
+                      </p>
+                      <div className="actions">
+                        <button className="bouton secondaire" type="button"
+                                data-test="reprendre-brouillon"
+                                onClick={() => setBrouillon(mutation)}>
+                          Reprendre
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
 
             {/* 1. Ce qui n'est pas parti — la seule chose qui puisse être perdue. */}

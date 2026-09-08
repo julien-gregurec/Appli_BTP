@@ -2,9 +2,9 @@
 
 import { useRef, useState } from "react";
 import {
-  ACCEPT_PHOTO, COTE_MAX_PHOTO, QUALITE_PHOTO, TAILLE_MAX_PHOTO,
-  dimensionsCompressees, estMimePhotoAccepte, formaterOctets,
+  ACCEPT_PHOTO, TAILLE_MAX_PHOTO, estMimePhotoAccepte, formaterOctets,
 } from "@/lib/images";
+import { compresserPhoto } from "@/lib/images-navigateur";
 
 /**
  * Champ photo du terrain. `capture="environment"` ouvre directement l'appareil photo
@@ -32,27 +32,6 @@ export function ChampPhoto({
   const [erreur, setErreur] = useState<string | null>(null);
   const [travail, setTravail] = useState(false);
 
-  async function compresser(fichier: File): Promise<File> {
-    const bitmap = await createImageBitmap(fichier);
-    const { largeur, hauteur } = dimensionsCompressees(
-      bitmap.width, bitmap.height, COTE_MAX_PHOTO,
-    );
-    const toile = document.createElement("canvas");
-    toile.width = largeur;
-    toile.height = hauteur;
-    const ctx = toile.getContext("2d");
-    if (!ctx) return fichier;
-    ctx.drawImage(bitmap, 0, 0, largeur, hauteur);
-    bitmap.close();
-
-    const blob = await new Promise<Blob | null>((resoudre) =>
-      toile.toBlob(resoudre, "image/jpeg", QUALITE_PHOTO),
-    );
-    if (!blob) return fichier;
-    const base = fichier.name.replace(/\.[^.]+$/, "") || "photo";
-    return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
-  }
-
   async function surChangement() {
     const champ = entree.current;
     const fichier = champ?.files?.[0];
@@ -77,7 +56,7 @@ export function ChampPhoto({
 
     setTravail(true);
     try {
-      const compresse = await compresser(fichier);
+      const compresse = await compresserPhoto(fichier);
       // Le champ envoyé au serveur porte l'image compressée, pas le cliché brut.
       const transfert = new DataTransfer();
       transfert.items.add(compresse);
@@ -89,8 +68,8 @@ export function ChampPhoto({
           : formaterOctets(compresse.size),
       );
     } catch {
-      // Navigateur sans createImageBitmap ou image illisible : on envoie l'original,
-      // que le serveur validera de toute façon.
+      // `compresserPhoto` rend déjà l'original quand elle échoue ; ce filet ne couvre
+      // plus que l'aperçu lui-même.
       setApercu(URL.createObjectURL(fichier));
       setDetail(formaterOctets(fichier.size));
     } finally {

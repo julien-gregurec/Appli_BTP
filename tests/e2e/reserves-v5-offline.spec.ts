@@ -102,8 +102,18 @@ async function saisir(page: Page, champs: {
   await expect(page.locator('[data-test="message-capture"]')).toBeVisible();
 }
 
-async function tailleFile(page: Page): Promise<number> {
-  return page.locator('[data-test="file-hors-ligne"] li').count();
+/**
+ * Attend que la file AFFICHE au moins une action.
+ *
+ * Un `count()` ne réessaie pas : il rend l'état de l'instant. Or l'écriture locale et le
+ * rafraîchissement de la liste sont asynchrones — le message « Enregistré sur l'appareil »
+ * paraît d'abord, la liste suit. Sur une machine chargée, le test lisait donc l'instant
+ * d'avant et échouait sur un écran parfaitement juste.
+ */
+async function attendreFileNonVide(page: Page) {
+  await expect(page.locator('[data-test="file-hors-ligne"] li').first()).toBeVisible({
+    timeout: 20_000,
+  });
 }
 
 // ── §1 — consultation hors ligne ─────────────────────────────────────────────
@@ -142,12 +152,15 @@ test("un rechargement hors ligne ne perd ni le cache ni la file", async ({ page,
 
   const titre = `Persistance ${randomUUID().slice(0, 8)}`;
   await saisir(page, { type: "reserve_creer", titre, description: "Rechargement hors ligne." });
-  expect(await tailleFile(page)).toBeGreaterThan(0);
+  await attendreFileNonVide(page);
 
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.locator('[data-test="capture-offline"]')).toBeVisible({ timeout: 20_000 });
   await expect(page.locator('[data-test="file-hors-ligne"]')).toContainText(titre);
-  expect(await page.locator('[data-test="reserves-hors-ligne"] li').count()).toBeGreaterThan(0);
+  // Assertion ATTENDANTE : la liste vient d'IndexedDB, lue après l'hydratation. Un
+  // `count()` immédiat rendait zéro dès que la machine était chargée — l'écran était
+  // juste, le test mesurait l'instant d'avant.
+  await expect(page.locator('[data-test="reserves-hors-ligne"] li').first()).toBeVisible();
   await context.setOffline(false);
 });
 

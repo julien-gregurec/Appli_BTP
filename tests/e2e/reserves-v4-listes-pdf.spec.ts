@@ -26,6 +26,9 @@ test.skip(
 
 test.describe.configure({ mode: "serial", timeout: 120_000 });
 
+/** Budget de génération d'un PDF serveur, aligné sur le `maxDuration` de la route. */
+const BUDGET_PDF = 60_000;
+
 /** Ouvre le document imprimable sous la session courante. */
 async function document(page: Page, requete: string) {
   await page.goto(`${RESERVES}/imprimer/chantier/${CHANTIER}${requete}`);
@@ -216,6 +219,11 @@ test("le PDF serveur est un vrai PDF, paginé, et suit l'orientation demandée",
   const lire = async (requete: string) => {
     const reponse = await page.request.get(
       `${RESERVES}/api/documents/chantier/${CHANTIER}/pdf${requete}`,
+      // La route LANCE un Chromium et imprime le document : sa durée n'a rien à voir
+      // avec celle d'une action d'écran, et le budget par défaut de la recette (15 s)
+      // la faisait échouer au hasard sur un poste chargé — un faux négatif qui fait
+      // douter d'un code correct. On s'aligne sur le `maxDuration` de la route.
+      { timeout: BUDGET_PDF },
     );
     expect(reponse.status()).toBe(200);
     expect(reponse.headers()["content-type"]).toContain("application/pdf");
@@ -249,7 +257,10 @@ test("le PDF serveur est un vrai PDF, paginé, et suit l'orientation demandée",
 
 test("le PDF détaillé reste d'un poids raisonnable, et sans photo il maigrit", async ({ page }) => {
   const poids = async (requete: string) => {
-    const r = await page.request.get(`${RESERVES}/api/documents/chantier/${CHANTIER}/pdf${requete}`);
+    const r = await page.request.get(
+      `${RESERVES}/api/documents/chantier/${CHANTIER}/pdf${requete}`,
+      { timeout: BUDGET_PDF },
+    );
     expect(r.status()).toBe(200);
     return (await r.body()).length;
   };
@@ -272,6 +283,7 @@ test("le document par entreprise ne contient que cette entreprise", async ({ pag
 
   const pdf = await page.request.get(
     `${RESERVES}/api/documents/chantier/${CHANTIER}/pdf?entreprise=${ETANCHEITE}`,
+    { timeout: BUDGET_PDF },
   );
   expect(pdf.status()).toBe(200);
   expect(pdf.headers()["content-disposition"]).toContain("Etancheite");

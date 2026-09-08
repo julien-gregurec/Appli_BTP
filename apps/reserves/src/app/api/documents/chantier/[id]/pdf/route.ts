@@ -4,6 +4,7 @@ import { genererPdfDepuisUrl } from "@/lib/pdf/generer";
 import {
   lireOptionsExport, nomFichierExport, parametresExport,
 } from "@/lib/export/options";
+import { urlApplicationReserves } from "@/lib/invitations";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -43,7 +44,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const options = lireOptionsExport(
     Object.fromEntries(entrant.searchParams.entries()),
   );
-  const cible = new URL(`/imprimer/chantier/${id}`, request.url);
+
+  // L'origine du document est CELLE QUI EST CONFIGURÉE, jamais celle de la requête.
+  //
+  // `request.url` est composée à partir de l'en-tête `Host` (ou `X-Forwarded-Host`).
+  // L'utiliser ici revenait à laisser l'appelant choisir vers quel serveur Chromium
+  // navigue — avec le cookie de session de l'utilisateur en poche. Un `Host:` falsifié
+  // suffisait à faire visiter un hôte tiers à un navigateur authentifié. La même variable
+  // sert déjà à composer les liens d'invitation : elle est donc renseignée partout où
+  // l'application est déployée.
+  const cible = new URL(`/imprimer/chantier/${id}`, urlApplicationReserves());
   for (const [cle, valeur] of parametresExport(options)) {
     cible.searchParams.set(cle, valeur);
   }

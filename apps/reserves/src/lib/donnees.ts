@@ -99,19 +99,73 @@ export async function lireChantier(id: string): Promise<ChantierReserves | null>
   return (data as ChantierReserves) ?? null;
 }
 
+/**
+ * PLAFOND DE LIGNES DE L'API DE DONNÉES — et pourquoi il faut le franchir explicitement.
+ *
+ * `supabase/config.toml` fixe `max_rows = 1000`, et Supabase Cloud applique la même valeur
+ * par défaut. C'est une bonne protection contre une requête accidentelle ou malveillante :
+ * personne ne doit pouvoir tirer un million de lignes d'une seule main. Mais PostgREST
+ * l'applique EN SILENCE — il rend mille lignes et rien, ni statut ni en-tête d'erreur, ne
+ * dit qu'il en manque.
+ *
+ * Pour Réserves, ce silence est le pire défaut possible. Un chantier de réception
+ * d'immeuble dépasse couramment le millier de réserves, et la « liste des réserves » n'est
+ * pas un écran de confort : c'est une pièce que l'on annexe à un procès-verbal, que l'on
+ * signe et que l'on oppose à une entreprise. Un document tronqué sans le dire est un
+ * document FAUX — les réserves manquantes passent pour inexistantes, donc pour levées.
+ *
+ * On pagine donc explicitement : on demande les lignes par tranches, jusqu'à ce qu'une
+ * tranche revienne incomplète. Le plafond continue de protéger chaque REQUÊTE ; il ne
+ * décide plus, à notre insu, du contenu d'un document contractuel.
+ */
+export const TRANCHE = 1000;
+
+/**
+ * Une garde d'arrêt, pour qu'une pagination ne devienne jamais une boucle infinie si le
+ * serveur se mettait à rendre toujours la même tranche. Deux cent mille réserves sur un
+ * seul chantier n'existent pas ; une boucle sans fin sur un rendu serveur, si.
+ */
+export const TRANCHES_MAX = 200;
+
+/**
+ * Lit toutes les lignes d'une requête paginée, tranche par tranche.
+ *
+ * `lire(de, a)` doit rendre les lignes de l'intervalle demandé, bornes comprises.
+ */
+export async function toutesLesLignes<T>(
+  lire: (de: number, a: number) => PromiseLike<{ data: unknown }>,
+): Promise<T[]> {
+  const cumul: T[] = [];
+  for (let tranche = 0; tranche < TRANCHES_MAX; tranche += 1) {
+    const de = tranche * TRANCHE;
+    const { data } = await lire(de, de + TRANCHE - 1);
+    const lignes = (data ?? []) as T[];
+    cumul.push(...lignes);
+    // Une tranche incomplète est la DERNIÈRE : c'est le seul signal disponible, puisque
+    // PostgREST ne distingue pas « tout est là » de « j'ai coupé au plafond ».
+    if (lignes.length < TRANCHE) break;
+  }
+  return cumul;
+}
+
 export async function listerReserves(filtres: FiltresReserves = {}): Promise<LigneReserve[]> {
   const supabase = await createClient();
-  let requete = supabase
-    .from("reserves")
-    .select("id, numero, titre, description, statut, priorite, echeance, photo_obligatoire_levee, intervenant_id, chantier_id, plan_id, plan_page, position_x, position_y, created_at")
-    .order("numero", { ascending: true });
-  if (filtres.chantierId) requete = requete.eq("chantier_id", filtres.chantierId);
-  if (filtres.intervenantId) requete = requete.eq("intervenant_id", filtres.intervenantId);
-  if (filtres.statut) requete = requete.eq("statut", filtres.statut);
-  if (filtres.priorite) requete = requete.eq("priorite", filtres.priorite);
-  if (filtres.echeanceAvant) requete = requete.lte("echeance", filtres.echeanceAvant);
-  const { data } = await requete;
-  return (data ?? []) as LigneReserve[];
+  // La requête est RECONSTRUITE à chaque tranche : un constructeur de requête
+  // supabase-js porte son état et ne se rejoue pas — le réutiliser rendrait la deuxième
+  // tranche identique à la première, donc une liste pleine de doublons.
+  const tranche = (de: number, a: number) => {
+    let requete = supabase
+      .from("reserves")
+      .select("id, numero, titre, description, statut, priorite, echeance, photo_obligatoire_levee, intervenant_id, chantier_id, plan_id, plan_page, position_x, position_y, created_at")
+      .order("numero", { ascending: true });
+    if (filtres.chantierId) requete = requete.eq("chantier_id", filtres.chantierId);
+    if (filtres.intervenantId) requete = requete.eq("intervenant_id", filtres.intervenantId);
+    if (filtres.statut) requete = requete.eq("statut", filtres.statut);
+    if (filtres.priorite) requete = requete.eq("priorite", filtres.priorite);
+    if (filtres.echeanceAvant) requete = requete.lte("echeance", filtres.echeanceAvant);
+    return requete.range(de, a);
+  };
+  return toutesLesLignes<LigneReserve>(tranche);
 }
 
 /**
@@ -139,13 +193,15 @@ export async function lireCompteurs(
 
 export async function listerIntervenants(chantierId?: string): Promise<IntervenantReserves[]> {
   const supabase = await createClient();
-  let requete = supabase
-    .from("reserves_intervenants")
-    .select("id, nom, corps_etat, statut, entreprise_intervenante_id, email_contact, telephone_contact, chantier_id")
-    .order("nom");
-  if (chantierId) requete = requete.eq("chantier_id", chantierId);
-  const { data } = await requete;
-  return (data ?? []) as IntervenantReserves[];
+  const tranche = (de: number, a: number) => {
+    let requete = supabase
+      .from("reserves_intervenants")
+      .select("id, nom, corps_etat, statut, entreprise_intervenante_id, email_contact, telephone_contact, chantier_id")
+      .order("nom");
+    if (chantierId) requete = requete.eq("chantier_id", chantierId);
+    return requete.range(de, a);
+  };
+  return toutesLesLignes<IntervenantReserves>(tranche);
 }
 
 export async function listerPlans(chantierId: string): Promise<PlanReserves[]> {
@@ -491,15 +547,16 @@ export async function lireLignesExport(
   filtres: FiltresExport = {},
 ): Promise<LigneExport[]> {
   const supabase = await createClient();
-  const { data } = await supabase.rpc("reserves_export_chantier", {
-    p_chantier_id: chantierId,
-    p_intervenant_id: filtres.intervenantId ?? null,
-    p_statut: filtres.statut ?? null,
-    p_priorite: filtres.priorite ?? null,
-    p_echeance_avant: filtres.echeanceAvant ?? null,
-    p_inclure_levees: filtres.inclureLevees ?? true,
-  });
-  return (data ?? []) as LigneExport[];
+  return toutesLesLignes<LigneExport>((de, a) => supabase
+    .rpc("reserves_export_chantier", {
+      p_chantier_id: chantierId,
+      p_intervenant_id: filtres.intervenantId ?? null,
+      p_statut: filtres.statut ?? null,
+      p_priorite: filtres.priorite ?? null,
+      p_echeance_avant: filtres.echeanceAvant ?? null,
+      p_inclure_levees: filtres.inclureLevees ?? true,
+    })
+    .range(de, a));
 }
 
 export async function lireHistoriqueExport(
@@ -507,11 +564,15 @@ export async function lireHistoriqueExport(
   intervenantId?: string | null,
 ): Promise<LigneHistoriqueExport[]> {
   const supabase = await createClient();
-  const { data } = await supabase.rpc("reserves_export_historique", {
-    p_chantier_id: chantierId,
-    p_intervenant_id: intervenantId ?? null,
-  });
-  return (data ?? []) as LigneHistoriqueExport[];
+  // L'historique est la table qui grossit le plus vite : chaque commentaire, chaque
+  // photo, chaque transition y laisse une ligne. Un chantier de mille réserves en porte
+  // plusieurs milliers, et c'est précisément ce journal qui fait foi.
+  return toutesLesLignes<LigneHistoriqueExport>((de, a) => supabase
+    .rpc("reserves_export_historique", {
+      p_chantier_id: chantierId,
+      p_intervenant_id: intervenantId ?? null,
+    })
+    .range(de, a));
 }
 
 export async function lirePhotosExport(
@@ -519,11 +580,12 @@ export async function lirePhotosExport(
   intervenantId?: string | null,
 ): Promise<PhotoExport[]> {
   const supabase = await createClient();
-  const { data } = await supabase.rpc("reserves_export_photos", {
-    p_chantier_id: chantierId,
-    p_intervenant_id: intervenantId ?? null,
-  });
-  return (data ?? []) as PhotoExport[];
+  return toutesLesLignes<PhotoExport>((de, a) => supabase
+    .rpc("reserves_export_photos", {
+      p_chantier_id: chantierId,
+      p_intervenant_id: intervenantId ?? null,
+    })
+    .range(de, a));
 }
 
 export async function listerIntervenantsExport(chantierId: string): Promise<IntervenantExport[]> {

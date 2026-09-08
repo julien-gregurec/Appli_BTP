@@ -63,6 +63,40 @@ function gabaritPied(pied: string | null | undefined): string {
     </div>`;
 }
 
+/**
+ * Découpe un en-tête `Cookie` en cookies nommés, PORTÉS PAR UNE URL.
+ *
+ * C'est le cœur du correctif V6. L'implémentation précédente passait l'en-tête `Cookie`
+ * entier à `page.setExtraHTTPHeaders()`, ce qui l'attache à TOUTES les requêtes émises par
+ * la page — y compris celles qui partent vers une autre origine. Or le document imprimé
+ * charge les photos et les plans depuis des URL signées Supabase : le jeton de session de
+ * l'utilisateur partait donc, à chaque tirage, vers une origine tierce qui n'a aucune
+ * raison de le recevoir. Et si l'URL cible avait pu être détournée (en-tête `Host`), ce
+ * même jeton serait parti vers l'hôte du détournement.
+ *
+ * En posant les cookies dans le magasin de Chromium avec l'URL du document, on retrouve
+ * le comportement d'un navigateur ordinaire : ils ne sont émis QUE vers cette origine.
+ *
+ * La valeur n'est pas retaillée : un cookie Supabase est du base64 et contient des « = ».
+ * Seul le PREMIER sépare le nom de la valeur.
+ */
+function cookiesPourUrl(enTete: string, url: string) {
+  return enTete
+    .split(";")
+    .map((morceau) => morceau.trim())
+    .filter((morceau) => morceau !== "")
+    .map((morceau) => {
+      const separateur = morceau.indexOf("=");
+      if (separateur <= 0) return null;
+      return {
+        name: morceau.slice(0, separateur),
+        value: morceau.slice(separateur + 1),
+        url,
+      };
+    })
+    .filter((cookie): cookie is { name: string; value: string; url: string } => cookie !== null);
+}
+
 export async function genererPdfDepuisUrl(
   url: string,
   cookieHeader?: string | null,
@@ -72,8 +106,12 @@ export async function genererPdfDepuisUrl(
   try {
     const page = await navigateur.newPage();
     // Le cookie de session de la requête entrante est réémis : Chromium est donc
-    // authentifié EXACTEMENT comme l'appelant, jamais davantage.
-    if (cookieHeader) await page.setExtraHTTPHeaders({ cookie: cookieHeader });
+    // authentifié EXACTEMENT comme l'appelant, jamais davantage — et seulement vers
+    // l'origine du document, jamais vers les URL signées qu'il référence.
+    if (cookieHeader) {
+      const cookies = cookiesPourUrl(cookieHeader, url);
+      if (cookies.length > 0) await page.setCookie(...cookies);
+    }
     const reponse = await page.goto(url, { waitUntil: "networkidle0" });
     if (!reponse || !reponse.ok()) {
       throw new Error(`Document introuvable (${reponse?.status() ?? "pas de réponse"})`);

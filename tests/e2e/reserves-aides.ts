@@ -74,20 +74,32 @@ export async function jetonSupabase(request: APIRequestContext, email: string) {
     throw new Error("La recette E2E exige un Supabase local explicite");
   }
 
-  let dernier = 0;
+  let dernier: number | string = 0;
   for (let essai = 0; essai < TENTATIVES; essai += 1) {
-    const reponse = await request.post(`${url}/auth/v1/token?grant_type=password`, {
-      headers: { apikey: key, "Content-Type": "application/json" },
-      data: { email, password: "test" },
-    });
+    let reponse;
+    try {
+      // Le budget par défaut de Playwright (15 s) est celui d'une ACTION d'écran, pas
+      // celui d'une authentification sur un poste qui héberge une dizaine de piles
+      // Supabase. Un dépassement de délai y est une indisponibilité d'environnement —
+      // exactement ce que ce module s'engage à réessayer — et non un refus.
+      reponse = await request.post(`${url}/auth/v1/token?grant_type=password`, {
+        headers: { apikey: key, "Content-Type": "application/json" },
+        data: { email, password: "test" },
+        timeout: 60_000,
+      });
+    } catch (erreur) {
+      dernier = erreur instanceof Error ? erreur.message.split("\n")[0] : "délai dépassé";
+      await pause(3_000 * (essai + 1));
+      continue;
+    }
     if (reponse.status() === 200) return (await reponse.json()).access_token as string;
     dernier = reponse.status();
     // 5xx et 429 : le service ne répond pas, on laisse retomber la charge. Un 400,
     // lui, désigne de vrais mauvais identifiants et ne se réessaie pas.
-    if (dernier < 500 && dernier !== 429) break;
+    if (typeof dernier === "number" && dernier < 500 && dernier !== 429) break;
     await pause(2_000 * (essai + 1));
   }
-  throw new Error(`Jeton indisponible pour ${email} (HTTP ${dernier})`);
+  throw new Error(`Jeton indisponible pour ${email} (${dernier})`);
 }
 
 export async function rpc(
@@ -101,5 +113,8 @@ export async function rpc(
       "Content-Type": "application/json",
     },
     data: parametres,
+    // Même raison que pour l'authentification : sur un poste chargé, PostgREST met
+    // parfois plus de quinze secondes à répondre. Ce n'est pas ce que la recette mesure.
+    timeout: 60_000,
   });
 }

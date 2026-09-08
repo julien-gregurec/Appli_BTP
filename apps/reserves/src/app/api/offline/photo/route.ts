@@ -4,6 +4,7 @@ import { BUCKET_PHOTOS } from "@/lib/donnees";
 import { MIMES_PHOTO, TAILLE_MAX_PHOTO } from "@/lib/images";
 import { estCleIdempotence } from "@/lib/offline/contrat";
 import { identiteCourante } from "@/lib/offline/identite";
+import { deposerObjet } from "@/lib/depot-photo";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -92,13 +93,11 @@ export async function POST(requete: Request) {
     photo_id: string; storage_path: string;
   };
 
-  // 2. Téléversement. `upsert: true` est ici le comportement JUSTE, et non un laxisme :
-  //    le chemin a été composé par la base à partir de la clé d'idempotence, donc écrire
-  //    deux fois signifie forcément « même photo, même mutation ». Sans lui, une reprise
-  //    après coupure échouerait sur « l'objet existe déjà » alors que tout va bien.
-  const { error: erreurDepot } = await supabase.storage
-    .from(BUCKET_PHOTOS)
-    .upload(chemin, fichier, { contentType: fichier.type, upsert: true });
+  // 2. Téléversement, SANS écrasement — et « l'objet est déjà là » vaut succès.
+  //    Le chemin vient de la base, dérivé de la clé d'idempotence : un objet présent à
+  //    cette adresse est nécessairement le nôtre. Voir `lib/depot-photo` pour le détail
+  //    du défaut que ce chemin corrige (un renvoi de photo échouait définitivement).
+  const erreurDepot = await deposerObjet(supabase, BUCKET_PHOTOS, chemin, fichier);
 
   if (erreurDepot) {
     // La ligne reste en attente (`disponible_at` nul) : elle n'apparaît dans aucun export

@@ -4,6 +4,7 @@ import {
 import {
   changerEtat, type Identite, lirePhoto, listerMutations,
 } from "./base-locale";
+import { echecsRattrapables } from "./reprise";
 
 /**
  * Moteur de synchronisation — côté navigateur.
@@ -19,6 +20,16 @@ export type ResultatSynchro = {
   synchronisees: number;
   conflits: number;
   echecs: number;
+  /**
+   * Vrai quand la passe n'a RIEN TENTÉ parce qu'un autre contexte tenait le verrou.
+   *
+   * La distinction compte pour la temporisation : un envoi qui échoue justifie d'espacer
+   * la reprise, un envoi qui n'a pas eu lieu ne justifie rien du tout. Confondre les deux
+   * faisait reculer la cadence à cause d'un simple recouvrement entre deux onglets — la
+   * file mettait alors des dizaines de secondes à repartir après un rechargement, là où
+   * rien n'était en panne.
+   */
+  differee: boolean;
 };
 
 /** Un seul passage à la fois : deux boucles concurrentes doubleraient les envois. */
@@ -45,7 +56,13 @@ const BAIL_VERROU = 12_000;
 function prendreVerrou(): boolean {
   try {
     const depuis = Number(localStorage.getItem(VERROU) ?? "0");
-    if (Number.isFinite(depuis) && Date.now() - depuis < BAIL_VERROU) return false;
+    const age = Date.now() - depuis;
+    // `age` NÉGATIF signifie que le verrou a été posé « dans le futur » : l'horloge de
+    // l'appareil a reculé — remise à l'heure, fuseau, batterie vidée. Sans ce cas, la
+    // comparaison « age < bail » restait vraie et la file était bloquée jusqu'à ce que
+    // l'horloge rattrape la date du verrou, ce qui peut prendre des heures. Un verrou
+    // venu du futur est un verrou périmé.
+    if (Number.isFinite(depuis) && age >= 0 && age < BAIL_VERROU) return false;
     localStorage.setItem(VERROU, String(Date.now()));
     return true;
   } catch {
@@ -117,6 +134,9 @@ async function envoyerLot(
         id: m.id, type: m.type, entrepriseId: m.entrepriseId,
         utilisateurId: m.utilisateurId, reserveId: m.reserveId,
         chantierId: m.chantierId, payload: m.payload,
+        // La version du format voyage avec la charge utile : le serveur doit pouvoir
+        // refuser ce qu'il ne sait pas lire, plutôt que d'en tirer ce qu'il peut.
+        version: m.version,
       })),
     }),
     signal,
@@ -163,9 +183,17 @@ export async function synchroniser(
   identite: Identite,
   options: { signal?: AbortSignal } = {},
 ): Promise<ResultatSynchro> {
-  const bilan: ResultatSynchro = { envoyees: 0, synchronisees: 0, conflits: 0, echecs: 0 };
-  if (enCours || !prendreVerrou()) return bilan;
+  const bilan: ResultatSynchro = {
+    envoyees: 0, synchronisees: 0, conflits: 0, echecs: 0, differee: false,
+  };
+  if (enCours || !prendreVerrou()) return { ...bilan, differee: true };
   enCours = true;
+  // Un onglet fermé — ou une navigation — au milieu d'un envoi n'exécute jamais le
+  // `finally` ci-dessous : le verrou resterait alors posé pendant tout son bail, et la
+  // page suivante attendrait sans raison. `pagehide` est le dernier moment où le
+  // navigateur nous laisse parler, et il couvre aussi la mise en cache de la page.
+  const liberer = () => rendreVerrou();
+  if (typeof window !== "undefined") window.addEventListener("pagehide", liberer);
   try {
     const file = aEnvoyer(await listerMutations(identite), identite);
     for (const mutation of file) {
@@ -205,6 +233,7 @@ export async function synchroniser(
     return bilan;
   } finally {
     enCours = false;
+    if (typeof window !== "undefined") window.removeEventListener("pagehide", liberer);
     rendreVerrou();
   }
 }
@@ -235,7 +264,42 @@ export async function reprendreApresRedemarrage(identite: Identite): Promise<num
   return reprises;
 }
 
-/** Remise en file d'un échec, à la demande explicite de l'utilisateur. */
+/**
+ * Remise en file d'un échec, à la demande explicite de l'utilisateur.
+ *
+ * Le compteur de tentatives est REMIS À ZÉRO. Ce n'est pas une complaisance : le plafond
+ * de tentatives borne les reprises AUTOMATIQUES, pour qu'un refus définitif ne tourne pas
+ * en boucle. Un geste humain, lui, est une décision — souvent prise parce que la cause a
+ * été levée entre-temps (session rouverte, réseau retrouvé, droit rendu). Sans cette
+ * remise à zéro, une mutation ayant épuisé son budget serait renvoyée une fois puis
+ * abandonnée aussitôt, sans que rien ne l'explique à l'écran.
+ */
 export async function reessayer(identite: Identite, id: string): Promise<void> {
-  await changerEtat(identite, id, "en_attente", { derniereErreur: null });
+  await changerEtat(identite, id, "en_attente", { derniereErreur: null, tentatives: 0 });
+}
+
+/**
+ * Rattrapage automatique des échecs, avant une tentative de synchronisation.
+ *
+ * En V5, une mutation tombée en `echec` n'y sortait QUE par un clic. Or l'échec le plus
+ * courant sur un chantier n'est pas un refus : c'est une session expirée ou un envoi
+ * coupé en plein vol — deux causes qui disparaissent d'elles-mêmes. L'utilisateur, lui,
+ * a rangé son téléphone : il ne cliquera pas.
+ *
+ * On remet donc en file les échecs qui n'ont pas épuisé leur budget de tentatives. Le
+ * plafond est ce qui empêche cette commodité de devenir une boucle : un refus métier
+ * s'arrête après cinq passages et attend une décision, avec son motif affiché.
+ */
+export async function rattraperEchecs(identite: Identite): Promise<number> {
+  const rattrapables = echecsRattrapables(await listerMutations(identite));
+  let remises = 0;
+  for (const mutation of rattrapables) {
+    try {
+      await changerEtat(identite, mutation.id, "en_attente");
+      remises += 1;
+    } catch {
+      // Transition refusée par la machine à états : on laisse la mutation où elle est.
+    }
+  }
+  return remises;
 }

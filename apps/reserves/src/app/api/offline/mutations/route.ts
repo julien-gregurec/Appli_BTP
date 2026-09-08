@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { estCleIdempotence, type TypeMutation } from "@/lib/offline/contrat";
+import {
+  estCleIdempotence, VERSION_PAYLOAD, type TypeMutation,
+} from "@/lib/offline/contrat";
 import { identiteCourante } from "@/lib/offline/identite";
 
 export const runtime = "nodejs";
@@ -34,6 +36,8 @@ type MutationEntrante = {
   reserveId: string | null;
   chantierId: string | null;
   payload: Record<string, unknown>;
+  /** Version du format de charge utile, telle que l'appareil l'a écrite. */
+  version?: number;
 };
 
 type Resultat =
@@ -78,6 +82,23 @@ export async function POST(requete: Request) {
   for (const mutation of mutations) {
     if (!estCleIdempotence(mutation.id)) {
       resultats.push({ id: String(mutation.id), issue: "refus", motif: "Clé de mutation invalide." });
+      continue;
+    }
+
+    // ── Format de la charge utile ─────────────────────────────────────────
+    // Une file écrite par une version PLUS RÉCENTE de l'application n'est pas
+    // interprétable ici : la refuser explicitement vaut mieux que d'en tirer les champs
+    // que l'on croit reconnaître. Le client garde sa saisie et la renverra après mise à
+    // jour. Une version absente vient d'un client antérieur à ce champ : elle est
+    // traitée comme la version 1, qui est bien celle qu'il écrivait.
+    const version = typeof mutation.version === "number" ? mutation.version : 1;
+    if (!Number.isInteger(version) || version < 1 || version > VERSION_PAYLOAD) {
+      resultats.push({
+        id: mutation.id,
+        issue: "refus",
+        motif: "Cette action a été préparée par une version plus récente de l’application : "
+             + "rechargez ELSATIA Réserves pour l’envoyer.",
+      });
       continue;
     }
 

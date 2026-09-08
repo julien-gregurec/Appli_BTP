@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { retirerLienInvitation } from "@/lib/invitation-relais";
 import {
   exigerShellReserves, estCompteIntervenant, peutGererChantiers, peutInviterEntreprise,
 } from "@/lib/acces-reserves";
@@ -33,7 +34,9 @@ export default async function PageIntervenants({
   if (estCompteIntervenant(contexte.roleReserves)) redirect("/dashboard");
 
   const [intervenants, chantiers] = await Promise.all([listerIntervenants(), listerChantiers()]);
-  const lien = typeof query.lien === "string" ? query.lien : null;
+  // Le lien d'invitation n'est plus transporté par l'URL (historique, journaux d'accès) :
+  // l'URL ne porte qu'un drapeau, et le lien lui-même vient d'un cookie éphémère.
+  const lien = query.lien === "1" ? await retirerLienInvitation() : null;
   const transfert = typeof query.transfert === "string" ? query.transfert : null;
   const recherche = typeof query.q === "string" ? query.q.trim() : "";
   const cible = typeof query.pour === "string" ? query.pour : null;
@@ -78,8 +81,10 @@ export default async function PageIntervenants({
         <div className="carte">
           <h2>Lien d’invitation à transmettre</h2>
           <p className="mention">
-            L’e-mail n’est pas parti, mais l’invitation est bien créée. Ce lien n’est
-            affiché qu’une fois : il n’est stocké nulle part en clair.
+            L’e-mail n’est pas parti, mais l’invitation est bien créée. Copiez ce lien
+            maintenant : il n’est conservé nulle part et cet écran ne pourra plus le
+            réafficher dans quelques minutes. S’il vous échappe, révoquez l’invitation
+            ci-dessous et réémettez-en une.
           </p>
           <label>
             Lien sécurisé

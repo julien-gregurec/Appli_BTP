@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { envoyerNotification, type NotificationAExpedier } from "@/lib/emails-reserves";
@@ -28,10 +29,29 @@ const LOT = 100;
  * Un échec d'expédition ne réarme rien automatiquement : une file qui se rejoue toute
  * seule sur une adresse invalide finit par faire blacklister le domaine expéditeur.
  */
+/**
+ * Comparaison à temps constant. Une égalité de chaînes ordinaire s'arrête au premier
+ * caractère qui diffère : le temps de réponse renseigne alors, octet par octet, sur le
+ * secret attendu. Sur une route publiquement joignable et sans limitation de débit, c'est
+ * une fuite exploitable.
+ */
+function memeSecret(fourni: string | null, attendu: string): boolean {
+  if (fourni === null) return false;
+  const a = Buffer.from(fourni);
+  const b = Buffer.from(`Bearer ${attendu}`);
+  // `timingSafeEqual` exige des longueurs égales : on compare d'abord une empreinte de
+  // même taille, pour ne pas trahir la longueur non plus.
+  if (a.length !== b.length) {
+    timingSafeEqual(b, b);
+    return false;
+  }
+  return timingSafeEqual(a, b);
+}
+
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return NextResponse.json({ error: "CRON_SECRET absent" }, { status: 503 });
-  if (request.headers.get("authorization") !== `Bearer ${secret}`) {
+  if (!memeSecret(request.headers.get("authorization"), secret)) {
     return NextResponse.json({ error: "Accès refusé" }, { status: 401 });
   }
 
