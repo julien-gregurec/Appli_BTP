@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "next dev -p 3010",
+    "verify:public-env": "node scripts/verify-public-env.mjs",
+    "prebuild": "npm run verify:public-env",
     "build": "next build",
     "start": "next start -p 3010",
-    "lint": "eslint src next.config.ts",
+    "lint": "eslint src scripts next.config.ts",
     "typecheck": "tsc --noEmit --incremental false",
     "test": "vitest run"
   },
