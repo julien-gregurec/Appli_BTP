@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { connexion, RESERVES } from "./reserves-aides";
 
 /**
  * Recette V4 — listes de réserves imprimables.
@@ -14,7 +15,6 @@ import { expect, test, type Page } from "@playwright/test";
  *   scripts/e2e/prepare-reserves-v4-listes.sql
  */
 
-const RESERVES = process.env.E2E_RESERVES_URL ?? "http://127.0.0.1:3020";
 const CHANTIER = "e0000000-0000-0000-0000-000000000001";
 const ETANCHEITE = "e2000000-0000-0000-0000-00000000000b";
 const MENUISERIE = "e2000000-0000-0000-0000-00000000000c";
@@ -25,15 +25,6 @@ test.skip(
 );
 
 test.describe.configure({ mode: "serial", timeout: 120_000 });
-
-async function connexion(page: Page, email: string, destination: string) {
-  await page.context().clearCookies();
-  await page.goto(`${RESERVES}/login?next=${encodeURIComponent(destination)}`);
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Mot de passe", { exact: true }).fill("test");
-  await page.getByRole("button", { name: "Se connecter" }).click();
-  await expect(page).toHaveURL(new RegExp(destination.split("?")[0].replace(/[/]/g, "\\/")));
-}
 
 /** Ouvre le document imprimable sous la session courante. */
 async function document(page: Page, requete: string) {

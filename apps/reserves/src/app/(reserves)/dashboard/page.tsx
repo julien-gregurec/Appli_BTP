@@ -3,6 +3,7 @@ import Link from "next/link";
 import { exigerShellReserves, estCompteIntervenant } from "@/lib/acces-reserves";
 import { lireCompteurs, listerChantiers, listerReserves } from "@/lib/donnees";
 import { EtiquetteStatut } from "@/components/Etiquette";
+import { SemeurCache } from "@/components/offline/SemeurCache";
 import { estEnRetard } from "@/lib/workflow";
 
 export const metadata: Metadata = { title: "Tableau de bord" };
@@ -33,6 +34,21 @@ export default async function PageDashboard({
 
   return (
     <>
+      {/* Ce que cet écran vient d'afficher est recopié dans la base locale de
+          l'utilisateur : c'est ce qui le rend consultable après une perte de réseau.
+          Aucune requête supplémentaire, et donc aucune donnée qui ne soit déjà
+          autorisée pour cette session. */}
+      <SemeurCache
+        chantiers={chantiers.map((c) => ({
+          id: c.id, nom: c.nom, reference: c.reference ?? null, ville: c.ville ?? null,
+        }))}
+        reserves={dernieres.map((r) => ({
+          id: r.id, chantierId: r.chantier_id, numero: r.numero, titre: r.titre,
+          description: r.description ?? null, statut: r.statut, priorite: r.priorite,
+          intervenant: null, echeance: r.echeance ?? null,
+          plan: null, planPage: r.plan_page ?? null,
+        }))}
+      />
       <h1>{intervenant ? "Vos réserves" : "Tableau de bord"}</h1>
       <p className="sous-titre">
         {intervenant

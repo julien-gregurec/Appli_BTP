@@ -9,6 +9,7 @@ import {
 import { GaleriePhotos } from "@/components/GaleriePhotos";
 import { ChampPhoto } from "@/components/ChampPhoto";
 import { EtiquetteStatut } from "@/components/Etiquette";
+import { CleIdempotence } from "@/components/CleIdempotence";
 import {
   LIBELLES_PRIORITE, estEnRetard, peutDemanderLevee, transitionAutorisee,
   type PrioriteReserve, type StatutReserve,
@@ -254,6 +255,8 @@ export default async function PageReserve({
       <GaleriePhotos photos={photosAffichees} />
 
       <form className="carte" action={televerserPhotoAction} encType="multipart/form-data">
+        {/* Un double envoi sur un réseau de chantier ne doit pas créer deux photos. */}
+        <CleIdempotence nom="origine_client_id_photo" />
         <input type="hidden" name="reserve_id" value={id} />
         <ChampPhoto
           nom="photo"
@@ -317,6 +320,9 @@ export default async function PageReserve({
         </ul>
       )}
       <form className="carte" action={commenterAction} encType="multipart/form-data">
+        {/* Même protection pour le message et sa pièce jointe éventuelle. */}
+        <CleIdempotence />
+        <CleIdempotence nom="origine_client_id_photo" />
         <input type="hidden" name="reserve_id" value={id} />
         <label>
           Message

@@ -1,5 +1,6 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { createHash } from "node:crypto";
+import { connexion, deconnexionUI, jetonSupabase, RESERVES, rpc } from "./reserves-aides";
 
 /**
  * Parcours V3 de bout en bout, dans le navigateur.
@@ -21,7 +22,6 @@ import { createHash } from "node:crypto";
  * mécanisme d'accès.
  */
 
-const RESERVES = process.env.E2E_RESERVES_URL ?? "http://127.0.0.1:3020";
 const INTERVENANT = "e2000000-0000-0000-0000-00000000000b";
 const CHANTIER = "e0000000-0000-0000-0000-000000000001";
 const PLAN = "e3000000-0000-0000-0000-000000000001";
@@ -37,60 +37,9 @@ test.skip(
 // pour ne pas masquer une lenteur sur les tests courts.
 test.describe.configure({ timeout: 180_000 });
 
-async function jetonSupabase(request: APIRequestContext, email: string) {
-  const url = process.env.E2E_SUPABASE_URL;
-  const key = process.env.E2E_SUPABASE_ANON_KEY;
-  if (!url || !key || !url.startsWith("http://127.0.0.1")) {
-    throw new Error("La recette E2E exige un Supabase local explicite");
-  }
-  const reponse = await request.post(`${url}/auth/v1/token?grant_type=password`, {
-    headers: { apikey: key, "Content-Type": "application/json" },
-    data: { email, password: "test" },
-  });
-  expect(reponse.status()).toBe(200);
-  return (await reponse.json()).access_token as string;
-}
-
-async function rpc(
-  request: APIRequestContext,
-  accessToken: string,
-  fonction: string,
-  parametres: Record<string, unknown>,
-) {
-  const url = process.env.E2E_SUPABASE_URL!;
-  const key = process.env.E2E_SUPABASE_ANON_KEY!;
-  return request.post(`${url}/rest/v1/rpc/${fonction}`, {
-    headers: { apikey: key, Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
-    data: parametres,
-  });
-}
-
 /** Bascule d'identité : session vierge, sans dépendre d'un bouton propre à la coquille. */
 async function deconnexion(page: Page) {
   await page.context().clearCookies();
-}
-
-/**
- * Déconnexion par le bouton de la coquille — la vraie, celle de l'utilisateur.
- *
- * Le clic DÉCLENCHE une navigation vers /login ; il ne l'attend pas. Enchaîner
- * immédiatement un `goto` fait atterrir la redirection en retard, par-dessus la
- * destination demandée : le paramètre `next` est alors silencieusement perdu et l'acteur
- * suivant se retrouve sur le tableau de bord. On attend donc l'atterrissage.
- */
-async function deconnexionUI(page: Page) {
-  await page.getByRole("button", { name: "Se déconnecter" }).click();
-  await expect(page).toHaveURL(/\/login/);
-}
-
-async function connexion(page: Page, email: string, destination: string) {
-  // Chaque étape s'exécute sous l'identité qu'elle annonce : on ne dépend jamais d'une
-  // session résiduelle de l'acteur précédent.
-  await page.context().clearCookies();
-  await page.goto(`${RESERVES}/login?next=${encodeURIComponent(destination)}`);
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Mot de passe", { exact: true }).fill("test");
-  await page.getByRole("button", { name: "Se connecter" }).click();
 }
 
 test("A invite B, B rejoint, lève une réserve pointée page 2, A exporte puis révoque", async ({
