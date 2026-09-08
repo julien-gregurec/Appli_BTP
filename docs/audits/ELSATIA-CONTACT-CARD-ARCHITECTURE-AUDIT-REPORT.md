@@ -656,7 +656,8 @@ complet tant qu'aucune preuve E2E n'a été produite ; vente de cartes physiques
 |---|---|
 | Branche | `audit/elsatia-contact-card-architecture-v1` |
 | SHA de base complet | `1fc1331842cdf5980b374169994587813bdee7b6` |
-| SHA final complet poussé | *renseigné en fin de lot* |
+| SHA du commit des livrables | `5fb137770f7ae5e24bd0bb19b5a4528612958b54` |
+| **SHA final complet poussé** | `b515285ccd385ad13c0cf606e2eea23eeaf33c5b` |
 
 Aucune fusion, aucun déploiement, aucune migration canonique, aucune modification de
 `main`, aucune écriture en Production.
