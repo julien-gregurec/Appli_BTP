@@ -656,8 +656,8 @@ complet tant qu'aucune preuve E2E n'a été produite ; vente de cartes physiques
 |---|---|
 | Branche | `audit/elsatia-contact-card-architecture-v1` |
 | SHA de base complet | `1fc1331842cdf5980b374169994587813bdee7b6` |
-| SHA du commit des livrables | `5fb137770f7ae5e24bd0bb19b5a4528612958b54` |
-| **SHA final complet poussé** | `b515285ccd385ad13c0cf606e2eea23eeaf33c5b` |
+| **SHA du commit des livrables** | `5fb137770f7ae5e24bd0bb19b5a4528612958b54` |
+| **SHA final poussé** | tête de la branche après le commit de traçabilité — un document ne peut pas contenir l'empreinte du commit qui l'introduit ; le SHA est donné dans le compte rendu du lot et lisible par `git rev-parse origin/audit/elsatia-contact-card-architecture-v1` |
 
 Aucune fusion, aucun déploiement, aucune migration canonique, aucune modification de
 `main`, aucune écriture en Production.
