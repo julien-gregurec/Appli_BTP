@@ -1,4 +1,5 @@
 begin;
+create extension if not exists pgtap with schema extensions;
 select plan(8);
 
 select has_table('public', 'rate_limits_applicatifs', 'table de compteurs présente');
