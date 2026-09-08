@@ -11,14 +11,9 @@
 //   3. les valeurs sont normalisées avant stockage, pour que la base ne contienne qu'une
 //      seule forme de la même donnée.
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-vi.mock("next/navigation", () => ({ redirect: vi.fn() }));
-vi.mock("@/lib/entreprise", () => ({ getContexteEntreprise: vi.fn(async () => ({ entrepriseId: "ent-a" })) }));
-vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({})) }));
-
-import { lireIdentiteLegale } from "./clients";
+import { lireIdentiteLegale } from "./client-identite-legale";
 
 function form(champs: Record<string, string>): FormData {
   const fd = new FormData();
