@@ -21,7 +21,7 @@ corrigé, les 14 scénarios passent à charge moyenne **60**.
 |---|---|
 | Branche dédiée | `fix/reserves-offline-resilience-train-v2` |
 | Base | `1fc1331842cdf5980b374169994587813bdee7b6` (train canonique) |
-| SHA final complet poussé | *voir §9* |
+| SHA final complet poussé | voir §9 |
 
 **Aucune fusion, aucun déploiement, aucune modification de Production.**
 La branche isolée `50c50ff…` n'a **jamais** été fusionnée : seuls des correctifs ciblés
@@ -287,7 +287,8 @@ Aucun délai n'a été relevé pour obtenir ce résultat : le relèvement global
 | Branche dédiée | `fix/reserves-offline-resilience-train-v2` |
 | Base | `1fc1331842cdf5980b374169994587813bdee7b6` |
 | Commits | `52e8ac2` (correctifs 1-4), `414d8c4` (décor Auth) |
-| SHA final complet poussé | *renseigné à la publication ci-dessous* |
+| SHA du contenu (code + décor + rapport) | `ec5ab22906b6fc31a8111ff7606d34bd91d8a304` |
+| SHA final complet poussé | tête de `origin/fix/reserves-offline-resilience-train-v2`, relevée par `git rev-parse` |
 
 **À l'intégration de V6, rappel du §2 :** les correctifs **1 et 4** restent nécessaires ;
 les correctifs **2 et 3** doivent céder la place à `reprise.ts` de V6, sans fusion des
