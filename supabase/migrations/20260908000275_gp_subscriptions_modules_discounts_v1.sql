@@ -291,7 +291,12 @@ begin
   if not public.est_plateforme_admin() then
     raise exception 'Accès réservé à la plateforme';
   end if;
-  -- Réutilise le garde AAL2 + journal d'effet externe déjà en place.
+  -- Garde AAL2 EXPLICITE. `plateforme_autoriser_effet_externe` l'exige déjà, mais
+  -- par indirection : l'invariant du dépôt — « aucune mutation plateforme sans AAL2 »
+  -- — se vérifie en lisant le corps des fonctions, et une protection qu'on ne voit
+  -- qu'en dépliant un appel n'est pas une protection lisible. L'appel est idempotent :
+  -- il lève ou ne fait rien, et ne change aucun comportement.
+  perform public.plateforme_exiger_session_aal2();
   perform public.plateforme_autoriser_effet_externe('remise_abonnement');
 
   select abonnement_periodicite into v_periodicite from public.entreprises where id = p_entreprise_id;
@@ -356,6 +361,12 @@ begin
   if not public.est_plateforme_admin() then
     raise exception 'Accès réservé à la plateforme';
   end if;
+  -- Garde AAL2 EXPLICITE. `plateforme_autoriser_effet_externe` l'exige déjà, mais
+  -- par indirection : l'invariant du dépôt — « aucune mutation plateforme sans AAL2 »
+  -- — se vérifie en lisant le corps des fonctions, et une protection qu'on ne voit
+  -- qu'en dépliant un appel n'est pas une protection lisible. L'appel est idempotent :
+  -- il lève ou ne fait rien, et ne change aucun comportement.
+  perform public.plateforme_exiger_session_aal2();
   perform public.plateforme_autoriser_effet_externe('remise_abonnement');
 
   select * into v_avant from public.remises_commerciales where id = p_remise_id for update;

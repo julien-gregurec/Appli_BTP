@@ -381,6 +381,15 @@ comment on column public.entreprises.montant_impaye_ht is
 
 grant execute on function public.plateforme_journaliser(text,text,text,jsonb) to authenticated;
 
+-- Les compteurs de l'annuaire sont SECURITY DEFINER : sans révocation explicite,
+-- PostgreSQL les laisse exécutables par `public`, donc par `anon`. La fonction de
+-- liste voisine avait bien sa révocation ; celle des compteurs avait été oubliée,
+-- exposant à un visiteur non authentifié le nombre d'entreprises clientes, d'impayés
+-- et de retards. Le contrôle interne de permission n'y change rien : une surface
+-- qui n'a aucune raison d'être atteignable ne doit pas l'être.
+revoke all on function public.plateforme_annuaire_compteurs(text,jsonb) from public, anon;
+grant execute on function public.plateforme_annuaire_compteurs(text,jsonb) to authenticated;
+
 
 -- ───────────────────────────────────────────────────────────────────────────
 -- BLOC 7 — Rôle « commercial »

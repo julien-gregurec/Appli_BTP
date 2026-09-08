@@ -428,7 +428,19 @@ select is(
    join pg_namespace n on n.oid=p.pronamespace
    where n.nspname='public'
      and p.proname like 'plateforme_%'
-     and p.proname <> 'plateforme_quitter_entreprise'
+     -- Deux exclusions, et deux seulement, toutes deux au titre de la FERMETURE PROPRE :
+     -- une opération qui met FIN à un accès ne doit jamais pouvoir être bloquée par
+     -- une exigence d'authentification renforcée, sans quoi on se retrouve incapable
+     -- de refermer ce qu'on a ouvert.
+     --   • `plateforme_quitter_entreprise` : sortie d'une entreprise ;
+     --   • `plateforme_journaliser` : écriture d'une TRACE, jamais d'un effet métier.
+     --     Elle n'écrit que dans `plateforme_journal_actions`, après avoir vérifié que
+     --     l'appelant porte bien un rôle plateforme, et elle est appelée par
+     --     `assistance_quitter` et `assistance_revoquer` : lui imposer AAL2 rendrait
+     --     impossible la FERMETURE d'une session d'assistance, et ferait perdre des
+     --     traces au lieu d'en garantir. Un journal doit être le plus facile possible
+     --     à écrire — une action non tracée est pire qu'une trace écrite en AAL1.
+     and p.proname not in ('plateforme_quitter_entreprise', 'plateforme_journaliser')
      and p.prosrc ~* '\m(insert|update|delete)\M'
      and has_function_privilege('authenticated',p.oid,'EXECUTE')
      and p.prosrc not like '%plateforme_exiger_session_aal2%'),
