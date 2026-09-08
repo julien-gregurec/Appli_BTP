@@ -45,6 +45,12 @@ jobs:
       - name: Installation verrouillée
         run: npm ci
 
+      # `npm run typecheck` compile aussi apps/tools, qui a son propre lock.
+      # Sans cette installation le typecheck echoue sur des modules absents —
+      # panne preexistante a ce lot, sans rapport avec Stripe.
+      - name: Installation verrouillée (apps/tools)
+        run: npm ci --prefix apps/tools
+
       - name: Audit des vulnérabilités élevées et critiques
         run: npm run audit:security
 
