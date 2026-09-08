@@ -225,7 +225,7 @@ l'actif valide. Il reste **conservé**.
 | **Branche** | `feat/stripe-test-canonical-prices-p0-v1` |
 | Lot initial | `a882250a1af57b5d77fc7b6b52b936c830e6e245` |
 | Complément Train V3 | `527f18f8fa88d6d8ead435e8116808a466c4df9d` |
-| **SHA final** | *(§ 8)* |
+| **SHA final** | `abb3b83423cc8fbf84d1a6e79c42209296013e20` |
 
 **Non fusionné. Non déployé.**
 
@@ -245,6 +245,13 @@ Exécution `34270020661`, branche `feat/stripe-test-canonical-prices-p0-v1`.
 | Audit des vulnérabilités élevées et critiques | ✅ |
 | **Tarifs Stripe Test alignés sur le contrat canonique (strict)** | ✅ |
 | Contrôles reproductibles (`npm run verify`) | ✅ |
+
+Journal du pas, extrait :
+
+```
+verify:stripe-prices — catalogue CANONICAL-V4-2026-09 — accès Stripe: api — carte Test versionnée: 27 Price
+✓ Catalogue et Prices Stripe alignés (27 Price(s) contrôlé(s)).
+```
 
 **Conclusion : `success`.** Le contrôle strict s'exécute pour de bon — il lit le
 secret d'environnement, interroge le compte Stripe Test et compare les 27 Price
