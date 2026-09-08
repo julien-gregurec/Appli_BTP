@@ -2,7 +2,8 @@
 
 Lot : `ELSATIA-CONTACT-CARD-RECIPROCAL-EXCHANGE-GP-BRIDGE-V1`
 Date : 2026-09-08
-Révision : **R2** — verdict accepté par Julien, décisions D1 à D10 arbitrées et intégrées.
+Révision : **R3** — O1 à O4, E4 et E5 arbitrées ; SQL proposé recetté et invariants vérifiés.
+R1 = `5fb1377` · R2 = `0fd1e32`.
 Nature : **audit en lecture seule + conception**. Aucune migration créée, aucune fusion,
 aucun déploiement, aucune écriture en Production.
 
@@ -24,14 +25,15 @@ tranchées** par les décisions D1 à D10 :
 
 | # | Condition | État après arbitrage |
 |---|---|---|
-| C1 | Aucune migration ne peut entrer aujourd'hui | **Toujours ouverte.** Le ledger est en cours de réconciliation (P0). Toute évolution SQL reste en `.sql.proposed`. Seule condition qui subsiste. |
+| C1 | Aucune migration ne peut entrer aujourd'hui | **Tranchée (O1).** Le SQL **reste** `.sql.proposed` ; il sera repris, audité, numéroté et testé **au prochain train global**. Le ledger actuel n'est pas modifié. Ce n'est plus une condition ouverte, c'est un calendrier arrêté. |
 | C2 | L'OCR n'existe **pas** dans le produit | **Tranchée (D1, D2, D3).** L'OCR entre au périmètre cible, facultatif et désactivable par entreprise, annoncé à l'utilisateur, confirmé **champ par champ**, et sans aucun pouvoir de création. Reste à écrire : tout. |
 | C3 | Trois destinations de classement n'ont **pas** de modèle cible | **Tranchée (D5, D6).** Un vivier de candidats, un registre de partenaires et un registre de contacts professionnels généraux sont à créer côté Gestion Pro. |
 | C4 | Un tiers ne peut pas être fournisseur **et** sous-traitant | **Tranchée (D4).** `type_tiers` est remplacé par un modèle de rôles multiples. Coût mesuré : **6 usages dans 4 fichiers**, tous des filtres `.eq()` — voir §4.3. |
 | C5 | `contacts_clients` est en retard sur le contrat canonique | **Tranchée (D7).** `prenom` et `telephone_mobile` sont ajoutés à la proposition SQL. |
 
-Aucune de ces conditions n'invalide l'architecture. C1 seule détermine encore le calendrier ;
-les quatre autres déterminent désormais **le contenu du lot de réalisation** (§14).
+**Les cinq conditions du verdict sont désormais levées ou planifiées.** Ce qui subsiste
+n'est plus une inconnue d'architecture mais une file de travaux : le SQL attend le prochain
+train (O1), et trois points attendent une validation juridique ou commerciale (§13.3).
 
 ---
 
@@ -295,6 +297,17 @@ porte typiquement « Prénom NOM », un fixe **et** un mobile. Verser un contact
 `contacts_clients` aujourd'hui, c'est perdre le prénom (aggloméré dans `nom`) et perdre le
 mobile.
 
+**Et surtout, elle est hors d'atteinte.** La réconciliation ACL `20260902000255` a révoqué
+`SELECT`, `INSERT`, `UPDATE` et `DELETE` pour `authenticated` **et** `service_role` : à la
+recette, `authenticated` n'a plus **aucun** privilège, et `service_role` ne conserve que
+`REFERENCES`, `TRIGGER` et `TRUNCATE` — dont aucun ne touche une ligne. Ce n'est pas un gel
+accidentel : cette migration retire des ACL « historiques excédentaires » **absentes de la
+référence canonique Fresh**.
+
+> C'est ce fait, découvert en R3, qui a fait **retirer** la proposition R2 d'étendre cette
+> table : y ajouter des colonnes n'aurait rendu personne capable de les écrire. Voir §4.2 du
+> document de correspondance pour les deux options étudiées et le choix retenu.
+
 La table n'a pas de colonne `entreprise_id` : le cloisonnement passe par `clients` — les
 politiques RLS remontent systématiquement au client
 (`exists(select 1 from clients c where c.id = contacts_clients.client_id and a_permission(c.entreprise_id, …))`).
@@ -465,7 +478,9 @@ logo et la photo de profil affichés sur la page publique peuvent vivre dans
 | Boîte de réception des contacts reçus | **non** | — |
 | Carte reçue + résultat OCR + confiances | **non** (forme oui) | Deux schémas de référence existent, tous deux inutilisés. |
 | Carnet de contacts hors client | **non** | Tout contact est aujourd'hui rattaché à un `clients` (§4.2). |
-| Contacts d'un fournisseur | **non** | Un seul champ texte `contact_nom` (§4.3). |
+| Contacts d'un fournisseur | **non** | Un seul champ texte `contact_nom` (§4.3). → **`interlocuteurs_tiers` (E4)** |
+| Site Internet, où que ce soit | **non** | **Aucune colonne `site_web` dans les 272 migrations**, ni sur `clients` ni sur `fournisseurs`. → **à créer (E5)** |
+| Mobile d'un interlocuteur | **non** | → `interlocuteurs_tiers.telephone_mobile` (E4, E5) |
 | Registre « partenaire » | **non** | Aucune trace. → **à créer (D6)** |
 | Registre « contact professionnel général » | **non** | Aucune trace. → **à créer (D6)** |
 | Candidat / vivier | **non** | Aucune trace (§4.5). → **à créer (D5)** |
@@ -647,7 +662,8 @@ Traités en détail dans `ELSATIA-CONTACT-CARD-PRIVACY-SECURITY-MODEL-V1.md`. Po
 * formulaire réciproque : consentement explicite obligatoire, plafonné par
   `rate_limits_applicatifs`, abus tracés dans `journal_abus_securite` ;
 * images : validation MIME, taille maximale, bucket **privé**, suppression de l'original
-  après confirmation humaine selon la politique retenue (→ question ouverte O2) ;
+  après confirmation humaine selon la politique arrêtée en O2 — 30 jours pour une carte non
+  traitée, 7 jours après confirmation, aucune conservation illimitée ;
 * OCR sous **double interrupteur** (D1) : `FEATURE_AI_ENABLED` côté plateforme et
   `contact_parametres.ocr_actif` côté entreprise, tous deux *fail-closed*. Une entreprise
   qui refuse que ses images partent chez un tiers coupe l'OCR **sans perdre le produit** ;
@@ -670,6 +686,9 @@ Traités en détail dans `ELSATIA-CONTACT-CARD-PRIVACY-SECURITY-MODEL-V1.md`. Po
 | Recherche d'un modèle carte/NFC/vCard | **aucun** |
 | Exclusivité `fournisseurs.type_tiers` | **confirmée** — `check(type_tiers in ('fournisseur','sous_traitant'))` |
 | Coût du retrait de `type_tiers` | **6 usages, 4 fichiers**, tous des filtres `.eq()` ; 2 migrations le mentionnent |
+| Privilèges de `contacts_clients` | `authenticated` : **aucun** ; `service_role` : `REFERENCES`/`TRIGGER`/`TRUNCATE` seulement — révoqués par la réconciliation ACL 255 |
+| Dépendances de `contacts_clients` | **1 clé étrangère** (`appels_contacts.contact_id`), **0 code applicatif** |
+| Colonne `site_web` dans le dépôt | **inexistante** — 0 occurrence dans les 272 migrations |
 | Table de contacts fournisseur | **inexistante** — un seul champ `contact_nom` |
 | Écart `contacts_clients` ↔ `ClientContact` | **confirmé** — prénom, mobile, notes, statut, rôles absents |
 | Code applicatif utilisant les tables OCR | **zéro occurrence** sur tout le dépôt |
@@ -683,7 +702,7 @@ Traités en détail dans `ELSATIA-CONTACT-CARD-PRIVACY-SECURITY-MODEL-V1.md`. Po
 | Consommateurs de `@elsatia/client-contracts` | 4 fichiers GP (snapshot, identité légale, resend) |
 | Intégrité du worktree et des branches | aucune suppression, aucune modification externe |
 
-### 10.1 Recette du SQL proposé — exécutée en R2
+### 10.1 Recette du SQL proposé — exécutée (R2, étendue en R3)
 
 Contrairement à R1, où aucun SQL n'était exécutable, la proposition a été **réellement
 appliquée** sur un conteneur Postgres jetable, par-dessus les 272 migrations du train,
@@ -702,9 +721,38 @@ via le harnais existant `/Volumes/ELSATIA-DEV/ELSATIA-STACKS/train-v2-dbtest/har
 | **D2** — champ OCR décidé sans confirmateur ni date | refusé | refusé — `contact_analyses_ocr_champs_check` |
 | **D2** — clôture d'une analyse alors qu'un champ reste `en_attente` | refusé | refusé — `Analyse …: confirmation impossible, des champs restent à vérifier individuellement` |
 
-Les huit invariants sont donc **portés par la base**, pas seulement par l'interface : c'est
-la différence entre une règle affirmée et une règle vérifiable. Aucune base réelle — locale,
+### Invariants ajoutés en R3
+
+| Test | Attendu | Résultat |
+|---|---|---|
+| Application du SQL **R3** sur les 272 migrations | s'applique sans erreur | **272 migrations appliquées, proposition R3 appliquée sans erreur** |
+| **O3** — une entreprise active l'OCR alors que la plateforme ne l'autorise pas | refusé | refusé — `OCR non autorisé par la plateforme ELSATIA : une entreprise ne peut pas l'activer seule` |
+| **O3** — la plateforme s'autorise sans nommer fournisseur ni région | refusé | refusé — `contact_ocr_plateforme_check` |
+| **O3** — plateforme correctement autorisée, **puis** entreprise | accepté | accepté ; durées par défaut relevées : **30 j / 7 j** |
+| **O2** — conservation exceptionnelle sans motif ni expiration | refusé | refusé — `contact_cartes_recues_conservation_check` |
+| **O2** — image `supprimee` conservant un chemin de fichier | refusé | refusé — `contact_cartes_recues_image_supprimee_check` |
+| **O2** — **purge idempotente** : deux appels consécutifs | 1 puis 0, une seule ligne de journal | **`purge 1er appel = 1`, `purge 2e appel = 0`, `lignes de journal = 1`** |
+| **O2** — conservation exceptionnelle expirée | redevient purgeable seule | `purge après expiration = 1`, `statut image = a_supprimer` |
+| **E4** — deux cartes du même fournisseur | 2 interlocuteurs, 1 fournisseur | **`interlocuteurs=2 / fournisseurs=1`** |
+| **E4** — deuxième interlocuteur principal actif sur le même tiers | refusé | refusé — `interlocuteurs_tiers_principal_unique` |
+| **E4** — inactiver le principal libère la place | le remplaçant est accepté | `remplaçant principal = 1` |
+| **E4** — interlocuteur rattaché à un tiers inexistant | refusé | refusé — `le tiers fournisseur/… n'existe pas pour ce locataire` |
+| **E5** — mobile sur une personne **morale** | refusé | refusé — `clients_mobile_particulier_check` |
+| **E5** — mobile sur un **particulier** | accepté | `particulier mobile = 0611223344` |
+| **E5** — champ OCR repris sans cible organisation/interlocuteur | refusé | refusé — `contact_analyses_ocr_champs_check3` |
+| **E5** — même champ avec cible retenue | accepté | `champ mobile -> interlocuteur` |
+| **E4** — `contacts_clients` modifiée par ce lot ? | **non** | `colonnes ajoutées = 0` ; FK `appels_contacts` intacte |
+| **E4** — privilèges restants sur `contacts_clients` | aucun accès aux lignes | `authenticated` : **aucun privilège** ; `service_role` : `REFERENCES`, `TRIGGER`, `TRUNCATE` seulement |
+
+**Vingt-quatre tests exécutés au total.** Les invariants sont donc **portés par la base**,
+pas seulement par l'interface : c'est la différence entre une règle affirmée et une règle
+vérifiable. Le conteneur a été détruit après recette. Aucune base réelle — locale,
 préproduction ou Production — n'a été touchée.
+
+Une précision de méthode : trois tests ont d'abord échoué sur **mon jeu d'essai**, pas sur
+le modèle — `created_by` n'a pas de valeur hors session authentifiée, `auth.uid()` valant
+alors `null`. Ils ont été rejoués avec un auteur explicite et sont consignés ci-dessus dans
+leur version corrigée.
 
 ## 11. Tests non exécutés — et pourquoi
 
@@ -727,7 +775,7 @@ préproduction ou Production — n'a été touchée.
 | `docs/audits/ELSATIA-CONTACT-CARD-GP-INTEGRATION-MAPPING-V1.md` | correspondance champ par champ avec Gestion Pro |
 | `docs/audits/ELSATIA-CONTACT-CARD-PRIVACY-SECURITY-MODEL-V1.md` | sécurité, RGPD, RLS, rétention |
 | `docs/audits/contact-card-wireframes/index.html` | wireframes fonctionnels isolés (fichier autonome, ne touche aucun produit) |
-| `docs/migrations-proposees/contact-card-v1.sql.proposed` | **NON INTÉGRÉ — BLOQUÉ PAR LE TRAIN GLOBAL** |
+| `docs/migrations-proposees/contact-card-v1.sql.proposed` | **NON INTÉGRÉ — BLOQUÉ PAR LE TRAIN GLOBAL** ; sera repris, audité, numéroté et testé au prochain train (O1) |
 
 ---
 
@@ -752,45 +800,89 @@ SQL proposé.
 | **D9** | **`client:propose` conservée impérativement** | Inchangée, et désormais énoncée comme invariant non négociable : Contact / Card propose, Gestion Pro confirme. Aucune écriture directe, quelle que soit la confiance de l'OCR. |
 | **D10** | Produit **utilisable sans Gestion Pro** | Carnet autonome, boîte de réception, recherche, classement, doublons et export : le socle est conçu pour fonctionner seul, le pont Gestion Pro reste optionnel et révocable. |
 
-### 13.2 Décisions encore ouvertes
+### 13.2 Questions O1 à O4 — toutes tranchées
 
-Quatre points restent à trancher. Aucun ne bloque la conception ; tous bloquent une mise en
-service.
-
-| # | Question ouverte | Pourquoi elle doit être tranchée |
+| # | Question | Décision rendue |
 |---|---|---|
-| **O1** | **Quand le train rouvre-t-il ?** | C'est la seule condition restante du verdict (C1). Tant que le ledger est en réconciliation, rien de ce qui est proposé ici ne peut devenir une migration. |
-| **O2** | **Conservation des images de cartes** — délai exact avant suppression de l'original après confirmation | Exigence RGPD ; l'ancienne décision D6 sur ce point n'a pas été rendue. Proposition : suppression à la confirmation, purge de sécurité à 30 jours. |
-| **O3** | **Fournisseur d'OCR, coût et contrat** | D1 ouvre l'OCR sans nommer le fournisseur. Le seul implémenté est OpenAI ; les images de cartes partiraient chez un tiers. À porter au registre et à couvrir contractuellement avant d'activer quoi que ce soit. |
-| **O4** | **Domaine des cartes publiques** | Un sous-domaine dédié reste recommandé : une page publique atteignable par n'importe qui ne doit pas partager l'origine — donc les cookies — de l'application authentifiée. |
+| **O1** | Intégration au train | Le SQL **reste** `docs/migrations-proposees/contact-card-v1.sql.proposed`. Il sera repris, audité, numéroté et testé **au prochain train global**. Le ledger actuel n'est pas modifié, et aucune migration canonique n'est créée. |
+| **O2** | Conservation des images | 30 jours pour une carte jamais traitée · 7 jours après confirmation · suppression anticipée à la demande · conservation prolongée **manuelle uniquement**, avec motif, auteur, expiration et journal · **aucune conservation illimitée** · durées configurables sans migration. |
+| **O3** | Fournisseur OCR | OpenAI **envisagé**, OCR **désactivé par défaut**, double interrupteur **ordonné** (plateforme puis entreprise). Interface fournisseur remplaçable. Dix points à valider avant activation réelle. **Aucun appel n'a été émis vers un fournisseur pour produire ce dossier.** |
+| **O4** | Domaine public | **`card.elsatia.fr`**, origine distincte de l'application authentifiée, avec les douze contraintes détaillées au §9.1 du modèle de sécurité. |
 
-Deux points antérieurement listés comme décisions sont **sortis du périmètre** et ne
-demandent aucun arbitrage aujourd'hui : la forme applicative (application autonome
-`apps/contact`, imposée par D10) et l'ouverture Boutique des cartes physiques, qui reste
-hors périmètre et sans prix, délai, garantie ni stock.
+### 13.3 Ce qui dépend encore d'une validation juridique ou commerciale
+
+Aucun de ces points ne bloque la conception ni la construction du socle. Tous bloquent
+**l'activation** de l'OCR, et seulement lui.
+
+| # | Point | Nature |
+|---|---|---|
+| J1 | Coût par analyse, contrat, région de traitement | **commercial et juridique** |
+| J2 | Conservation chez le fournisseur, mécanisme de suppression, sous-traitants ultérieurs | **juridique** — notre purge à 7 jours ne vaut rien si le tiers garde l'image |
+| J3 | Base juridique, registre des traitements, politique sur les données sensibles éventuellement portées par une carte | **juridique** |
+
+La base **refuse** l'autorisation plateforme tant que le fournisseur et la région ne sont
+pas nommés : ces validations ne peuvent pas être contournées par distraction.
 
 ---
 
-## 14. Ce qui peut être promis en V1, et ce qui ne peut pas
+## 14. État réel du produit — sept catégories
 
-**Livrable sans dépendre du train** — le socle autonome ne touche aucune table existante :
-partage NFC / QR / lien ; page publique sans application ; vCard téléchargeable ; échange
-réciproque par formulaire consenti ; boîte de réception ; saisie manuelle et lecture de QR ;
-classement explicite ; détection de doublon ; carnet autonome sans Gestion Pro ; gestion,
-suspension et révocation des cartes ; notifications avec état de lecture ; isolation
-multi-tenant.
+C'est la section à lire si l'on ne doit en lire qu'une. Elle sépare ce qui est **décidé**,
+ce qui est **écrit**, ce qui est **vérifié**, et ce qui n'est **rien de tout cela**.
 
-**Au périmètre cible, mais suspendu à la réouverture du train** (C1/O1) : l'OCR facultatif
-avec confirmation champ par champ (D1, D2) ; les rôles multiples de tiers (D4) ; le vivier
-de candidats (D5) ; les registres partenaires et contacts généraux (D6) ; `prenom` et
-`telephone_mobile` sur les contacts clients (D7) ; l'idempotence réelle des notifications
-(D8) ; le versement vers Gestion Pro, qui suppose les destinations ci-dessus.
+### 14.1 Décisions fermées
 
-**Ne sera pas promis, quelle que soit la décision** :
-la création automatique d'une fiche — client, fournisseur, sous-traitant, partenaire,
-candidat ou salarié — interdite par conception (D3, D9) ; un fonctionnement hors ligne tant
-qu'aucune preuve E2E n'a été produite ; la vente de cartes physiques, hors périmètre et sans
-prix, délai, garantie ni stock.
+D1 à D10 (§13.1) et O1 à O4 (§13.2). **Quatorze décisions, toutes rendues.** Elles sont
+intégrées aux quatre rapports, aux wireframes et au SQL proposé.
+
+S'y ajoute l'arbitrage E4/E5 : le modèle générique `interlocuteurs_tiers` est retenu, et
+`public.contacts_clients` n'est **ni lue, ni écrite, ni modifiée** — voir §14.7.
+
+### 14.2 Dépendant du prochain train de migrations
+
+**Tout le SQL.** Le fichier `.sql.proposed` s'applique proprement (§10.1) mais **n'est pas
+une migration** : pas de numéro, pas d'entrée au ledger, pas de déploiement. Sont dans ce
+cas : les tables du produit, l'enregistrement de l'application, les rôles multiples de
+tiers, le vivier de candidats, les registres partenaires et contacts professionnels, les
+interlocuteurs de tiers, `site_web` et `telephone_mobile`, la correction d'idempotence des
+notifications, et le modèle de conservation des images.
+
+### 14.3 Dépendant d'une validation juridique ou commerciale
+
+J1, J2 et J3 (§13.3). Ils ne concernent **que l'OCR**. Le reste du produit ne les attend pas.
+
+### 14.4 Fonctionnalités spécifiées
+
+Seize parcours (P1 à P16, plus P9 bis et P15 bis), neuf états de carte reçue, six états
+d'image, neuf catégories de classement, le protocole de proposition vers Gestion Pro, le
+modèle de notification idempotent, le modèle de sécurité et de vie privée, et **92 tests**
+rédigés. Tout cela est écrit, argumenté et cohérent.
+
+### 14.5 Fonctionnalités réellement développées
+
+> ### Aucune.
+
+Il n'existe à ce jour **ni table, ni route, ni composant, ni ligne de code produit** pour
+ELSATIA Contact / Card. Ce lot est un travail d'architecture. Les seuls artefacts exécutables
+qu'il produit sont un fichier SQL proposé — non intégré — et des wireframes statiques.
+
+Cette ligne est la plus importante du rapport, et elle ne doit pas être adoucie : un dossier
+d'architecture complet peut donner l'illusion d'un produit avancé. Il n'y a pas de produit.
+
+### 14.6 Tests SQL exécutés
+
+**Vingt-quatre**, sur conteneur Postgres jetable, par-dessus les 272 migrations du train.
+Détail au §10.1. Ils portent sur le schéma et sur les invariants — jamais sur le produit.
+
+### 14.7 Tests applicatifs non exécutables
+
+**Les 92 tests fonctionnels de la spécification.** Ils décrivent le comportement d'une
+application qui n'existe pas : aucun ne peut être exécuté aujourd'hui, et aucun résultat
+n'est annoncé les concernant. Ils seront écrits au lot de réalisation.
+
+Ne sont pas non plus exécutables : toute mesure de taux de reconnaissance OCR (aucun code,
+aucun appel émis), toute preuve de fonctionnement hors ligne (rien n'est construit), et
+toute vérification sur base réelle — locale, préproduction ou Production.
 
 ---
 
@@ -801,6 +893,7 @@ prix, délai, garantie ni stock.
 | Branche | `audit/elsatia-contact-card-architecture-v1` |
 | SHA de base complet | `1fc1331842cdf5980b374169994587813bdee7b6` |
 | SHA de la révision R1 (audit initial) | `5fb137770f7ae5e24bd0bb19b5a4528612958b54` |
+| SHA de la révision R2 (décisions D1–D10) | `0fd1e32b40294ece102376e3f867031c5ff02135` |
 | **SHA du commit des livrables** | `5fb137770f7ae5e24bd0bb19b5a4528612958b54` |
 | **SHA final poussé** | tête de la branche après le commit de traçabilité — un document ne peut pas contenir l'empreinte du commit qui l'introduit ; le SHA est donné dans le compte rendu du lot et lisible par `git rev-parse origin/audit/elsatia-contact-card-architecture-v1` |
 

@@ -2,7 +2,7 @@
 
 Base : `1fc1331842cdf5980b374169994587813bdee7b6`
 Branche : `audit/elsatia-contact-card-architecture-v1`
-Révision : **R2** — décisions D1 à D10 de Julien intégrées.
+Révision : **R3** — O1 à O4, E4 et E5 arbitrées. R2 = `0fd1e32`.
 Statut : **spécification**. Rien de ce document n'est implémenté.
 
 Ce document se lit après `ELSATIA-CONTACT-CARD-ARCHITECTURE-AUDIT-REPORT.md`, qui établit ce
@@ -90,6 +90,34 @@ Les dix états exigés au §9 de la mission :
 
 `reçue → ocr_en_attente → à_vérifier → à_classer → doublon_possible → classée →
 synchronisation_en_cours → synchronisée`, plus `erreur` et `archivée`.
+
+### 3.2 bis États de l'image — un cycle distinct de celui de la carte
+
+`statut` décrit la **carte**, `image_statut` décrit l'**image**. Les confondre rendrait
+impossible l'état qui est précisément le but de la politique de conservation : *carte
+classée, données conservées, image supprimée*.
+
+```
+image :  absente → présente → à_supprimer → supprimée
+                        ↘ conservation_exceptionnelle ↗
+                        ↘ erreur_suppression ↻ (reprise)
+```
+
+| Règle | Traduction |
+|---|---|
+| Carte reçue jamais traitée | image purgeable à **30 jours** |
+| Carte vérifiée et confirmée | image supprimée sous **7 jours** |
+| Suppression anticipée | possible à tout moment, à la demande |
+| Conservation prolongée | **action manuelle uniquement**, avec motif, auteur et date d'expiration |
+| Conservation illimitée | **impossible** — l'expiration est obligatoire, et une conservation échue redevient purgeable d'elle-même |
+| Suppression de l'image | **ne supprime jamais** les données structurées légitimement conservées |
+| Image ayant échoué à l'OCR | reste purgeable — aucun état d'erreur ne bloque la purge |
+| Purge | **idempotente** : la rejouer ne produit aucun effet supplémentaire |
+| Durées | **configurables sans migration**, par entreprise |
+
+La purge marque, elle n'efface pas : l'effacement du stockage appartient à l'application,
+qui confirme ensuite. C'est cette séparation qui rend la reprise sûre après une coupure —
+une image marquée mais non effacée est reprise au passage suivant, sans double effet.
 
 Sans OCR, le chemin est direct : `reçue → à_vérifier`. `ocr_en_attente` n'apparaît que si
 **les deux interrupteurs** sont fermés (D1) : `FEATURE_AI_ENABLED` côté plateforme **et**
@@ -186,6 +214,16 @@ honnête.
 parte (D2) : ce qui est envoyé, à qui, pourquoi, et comment couper la fonction. L'information
 est donnée une fois par entreprise, pas à chaque carte — un bandeau répété n'est plus lu.
 
+**Les deux interrupteurs sont ordonnés** (O3) : l'entreprise ne peut pas activer l'OCR si
+la plateforme ne l'a pas autorisé. L'ordre est porté par la base, pas par l'interface — une
+règle d'ordre qui ne vivrait que dans du TypeScript se contournerait par un appel direct.
+
+**Le fournisseur est remplaçable.** Le domaine Contact / Card parle à une interface, jamais
+à OpenAI directement — sur le modèle de `ProviderIA` (`src/lib/ai/provider.ts`), dont le
+commentaire prévoit déjà « un futur `providers/anthropic.ts` ou `providers/gemini.ts` »
+sans changement ailleurs. Changer de fournisseur doit rester une décision d'exploitation,
+pas une réécriture du produit.
+
 ### P9 — Vérifier l'OCR
 
 Chaque champ reconnu s'affiche avec sa confiance, sur trois niveaux visuels : **fiable**,
@@ -204,6 +242,31 @@ principales, confirmer l'entreprise, ou abandonner l'import.
 Rien ne franchit cet écran sans un geste explicite, et l'analyse ne peut pas passer en
 « confirmée » tant qu'un seul champ retenu reste non confirmé — garanti en base, sur la
 forme de `colors_analyses_ocr` (`confirme_par` **et** `confirme_at` obligatoires).
+
+### P9 bis — Ranger la bonne donnée au bon endroit
+
+Une carte de visite mélange **les coordonnées de l'organisation** et **celles de la
+personne**. Les verser au même endroit produit des fiches fausses : une SARL qui a un
+mobile, un commercial qui a un standard.
+
+Le scanner **propose** donc une cible par champ :
+
+| Donnée reconnue | Cible proposée |
+|---|---|
+| Site Internet | organisation |
+| Standard téléphonique | organisation |
+| Adresse postale | organisation |
+| Ligne directe | **interlocuteur** |
+| Mobile personnel | **interlocuteur** |
+| Fonction | **interlocuteur** |
+
+**Toute proposition reste modifiable avant validation.** Une suggestion qu'on ne peut pas
+contredire est une décision déguisée.
+
+Deux règles qui ne se négocient pas :
+
+* on n'attribue **pas** de mobile à une personne morale — la base le refuse ;
+* un **client particulier** est une personne physique : son mobile va bien sur sa fiche.
 
 ### P10 — Détecter un doublon
 
@@ -287,6 +350,19 @@ elle doit être portée par les politiques RLS, pas seulement par l'interface.
 
 Départ d'un salarié : révocation de la carte, et **choix explicite** sur le carnet personnel —
 versé à l'entreprise, ou conservé par la personne. Un choix, pas un défaut silencieux.
+
+### P15 bis — Plusieurs cartes du même fournisseur
+
+Recevoir la carte de deux commerciaux de « Dupont Matériaux » doit produire **un
+fournisseur et deux interlocuteurs**, jamais deux fournisseurs.
+
+L'écran de classement le montre explicitement : quand la détection de doublon reconnaît
+l'organisation, le choix par défaut proposé est « ajouter comme nouvel interlocuteur », et
+la création d'un second tiers demande un geste délibéré assorti d'un avertissement.
+
+Un interlocuteur qui quitte l'entreprise passe **inactif** : il n'est pas supprimé, le
+fournisseur n'est pas touché, et l'historique reste lisible. La place d'interlocuteur
+principal se libère alors pour son remplaçant.
 
 ### P16 — Révoquer une carte perdue
 
@@ -423,6 +499,45 @@ comportement du produit, que cette recette ne couvre pas.
 52. Une entreprise ne peut pas consulter les cartes reçues par une autre.
 53. Un responsable ne peut pas lire le carnet non versé d'un collaborateur.
 54. Le jeton public ne donne accès à aucune autre donnée de l'entreprise.
+
+### Conservation des images — O2
+60. Une carte reçue et jamais traitée voit son image purgée après **30 jours**.
+61. L'image d'une carte confirmée est supprimée **sept jours** après la confirmation.
+62. Les données structurées survivent intégralement à la suppression de l'image.
+63. Une suppression anticipée à la demande fonctionne à tout moment.
+64. Une conservation exceptionnelle exige motif, auteur **et** date d'expiration.
+65. Une conservation exceptionnelle échue redevient purgeable automatiquement.
+66. Aucune conservation ne peut être illimitée, y compris par erreur de saisie.
+67. Une image dont l'OCR a échoué reste purgeable.
+68. **La purge est idempotente** : deux exécutions consécutives ne produisent pas deux effets.
+69. Une purge interrompue est reprise au passage suivant, sans double suppression.
+70. Modifier les durées de conservation ne demande aucune migration.
+71. Chaque transition d'image écrit une ligne de journal, et une seule.
+
+### Fournisseur OCR et domaine public — O3, O4
+72. Une entreprise ne peut **pas** activer l'OCR si la plateforme ne l'a pas autorisé.
+73. Aucune requête n'est émise vers le fournisseur quand l'OCR est désactivé, à l'un ou l'autre niveau.
+74. Changer de fournisseur OCR ne modifie aucun code du domaine Contact / Card.
+75. La page `card.elsatia.fr` ne reçoit **aucun cookie de session** Gestion Pro.
+76. La page publique n'accède à aucun stockage authentifié.
+77. Une carte révoquée est **immédiatement** inaccessible sur son ancienne URL.
+78. Modifier l'URL publique ne donne accès à aucune donnée supplémentaire.
+79. Le plafond de requêtes est appliqué sur l'ouverture de carte et sur l'envoi du formulaire.
+80. L'anti-indexation est actif par défaut et configurable par entreprise.
+81. Les journaux de la page publique ne contiennent ni IP, ni agent, ni référent.
+
+### Interlocuteurs de tiers — E4, E5
+82. **Deux cartes du même fournisseur produisent deux interlocuteurs et un seul fournisseur.**
+83. Fournisseur et sous-traitant se cumulent **sans dupliquer l'organisation**.
+84. Un interlocuteur devient inactif sans supprimer ni modifier le tiers.
+85. Un seul interlocuteur principal actif par tiers ; l'inactiver libère la place.
+86. Le mobile reconnu est affecté à l'**interlocuteur**, le site Internet à l'**organisation**.
+87. Un standard téléphonique est affecté à l'organisation, une ligne directe à l'interlocuteur.
+88. Toute cible proposée par le scanner est modifiable avant validation.
+89. Un **client particulier** conserve son mobile sur sa fiche personnelle.
+90. Une personne morale ne peut pas se voir attribuer un mobile.
+91. `public.contacts_clients` n'est ni lue, ni écrite, ni modifiée par Contact / Card.
+92. Un interlocuteur ne peut pas être rattaché à un tiers d'un **autre locataire**.
 
 ### Autonomie et mobile — D10
 55. Le parcours complet fonctionne sur mobile.

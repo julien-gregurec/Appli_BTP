@@ -1,7 +1,7 @@
 # ELSATIA Contact / Card — Correspondance avec Gestion Pro V1
 
 Base : `1fc1331842cdf5980b374169994587813bdee7b6`
-Révision : **R2** — décisions D1 à D10 de Julien intégrées.
+Révision : **R3** — O1 à O4, E4 et E5 arbitrées. R2 = `0fd1e32`.
 Statut : **conception**. Aucune migration, aucun code d'intégration écrit.
 
 Toutes les colonnes citées ont été relevées dans les migrations du train, pas supposées.
@@ -39,9 +39,9 @@ seulement documentée ».
 | Classification | Destination cible | Écriture | État du modèle |
 |---|---|---|---|
 | **Prospect** | `clients` avec `statut = 'prospect'` | création ou rattachement | **existe** — migration 004 |
-| **Client** | `clients` + `contacts_clients` (avec `prenom`, `telephone_mobile`) | création ou rattachement | existe ; **colonnes à ajouter (D7)** |
-| **Fournisseur** | `fournisseurs` + rôle `fournisseur` | création ou rattachement, **ou ajout de rôle** | existe ; **rôles à créer (D4)** |
-| **Sous-traitant** | `fournisseurs` + rôle `sous_traitant`, **cumulable** | création ou rattachement, **ou ajout de rôle** | existe ; **rôles à créer (D4)** |
+| **Client** | `clients` + `interlocuteurs_tiers` (`tiers_type='client'`) | création ou rattachement | `clients` **existe** ; interlocuteurs **à créer (E4)** |
+| **Fournisseur** | `fournisseurs` + rôle `fournisseur` + `interlocuteurs_tiers` | création, rattachement, **ou ajout de rôle**, **ou ajout d'interlocuteur** | existe ; **rôles (D4) et interlocuteurs (E4) à créer** |
+| **Sous-traitant** | `fournisseurs` + rôle `sous_traitant`, **cumulable** | idem | existe ; **rôles (D4) et interlocuteurs (E4) à créer** |
 | **Partenaire** | `partenaires` | création ou rattachement | **à créer (D6)** |
 | **Candidat / futur employé** | `candidats`, statut `propose` | **proposition uniquement** | **à créer (D5)** |
 | **Contact professionnel général** | `contacts_professionnels` | création ou rattachement | **à créer (D6)** |
@@ -121,48 +121,94 @@ Trois options, aucune ne pouvant être appliquée aujourd'hui (train bloqué) :
 
 ---
 
-## 4. Correspondance des champs — destination `contacts_clients`
+## 4. Correspondance des champs — destination `interlocuteurs_tiers`
 
-| Champ Contact / Card | Colonne | Remarque |
+### 4.1 Pourquoi ce n'est plus `contacts_clients`
+
+R2 proposait d'ajouter `prenom` et `telephone_mobile` à `public.contacts_clients`. **Cette
+proposition est retirée**, sur la foi de trois faits vérifiés depuis :
+
+1. **Plus aucun rôle applicatif ne peut la lire ni l'écrire.** `20260902000255` révoque
+   `SELECT`, `INSERT`, `UPDATE` et `DELETE` pour `authenticated` **et** `service_role`.
+   Vérifié en recette : `authenticated` n'a plus **aucun** privilège ; `service_role` ne
+   conserve que `REFERENCES`, `TRIGGER` et `TRUNCATE`, dont aucun ne touche une ligne.
+2. **Ce n'est pas un gel accidentel.** Cette migration est une *réconciliation ACL* : elle
+   retire des ACL « historiques excédentaires observées sur la restauration Production
+   210 → 252 » qui étaient **absentes de la référence canonique Fresh**. La table n'a jamais
+   été exposée dans le modèle canonique.
+3. **Rien ne l'utilise.** Une seule clé étrangère la référence (`appels_contacts.contact_id`)
+   et **aucun** code applicatif ne la touche — la seule mention TypeScript du dépôt est le
+   commentaire de `@elsatia/client-contracts` qui la déclare « gelée ».
+
+Ajouter des colonnes à cette table n'aurait rendu personne capable de les écrire. Honorer
+D7 supposait donc, en plus, de **ré-accorder ses grants** — c'est-à-dire défaire une
+réconciliation ACL délibérée. Ce n'est pas un travail de ce lot.
+
+> **L'intention de D7 est intégralement honorée** — prénom et mobile sur les interlocuteurs
+> clients — mais sur une table vivante. Et `public.contacts_clients` n'est **ni lue, ni
+> écrite, ni modifiée** : les données existantes sont préservées par abstention, ce qui est
+> la forme la plus sûre de préservation.
+
+### 4.2 Les deux options, et le critère qui les départage
+
+| | **Option A — dédiée** | **Option B — générique** ✅ |
 |---|---|---|
-| prénom | `prenom` | **à créer (D7)** — aujourd'hui aggloméré dans `nom` |
+| Forme | dégeler `contacts_clients`, l'étendre, cloner `contacts_fournisseurs` | une table `interlocuteurs_tiers` pour tous les registres |
+| Données existantes | modifie la table héritée (colonnes **et** grants) | **n'y touche pas du tout** |
+| Gouvernance ACL | **rouvre** la réconciliation fermée au 255 | aucune ACL existante touchée |
+| Couverture | clients et fournisseurs | clients, fournisseurs, sous-traitants, partenaires, contacts professionnels |
+| Intégrité référentielle | clé étrangère réelle | **référence polymorphe** — compromis assumé |
+| Divergence à terme | deux tables jumelles qui dériveront | une seule forme |
+
+Le critère demandé était « celle qui préserve le mieux les données existantes ».
+**L'option qui ne touche à rien de l'existant le préserve mieux que celle qui rouvre ses
+ACL.** D'où la recommandation de l'option B.
+
+Son seul vrai coût — l'absence de clé étrangère sur `tiers_id` — est borné par un
+déclencheur qui vérifie que le tiers visé **existe** et appartient au **même locataire**.
+C'est ce qu'une clé étrangère aurait garanti ; à défaut, on le vérifie explicitement plutôt
+que d'y renoncer.
+
+L'option A reste écrite, en commentaire, dans `contact-card-v1.sql.proposed` §E4-A.
+
+### 4.3 Champs
+
+| Champ Contact / Card | Colonne `interlocuteurs_tiers` | Remarque |
+|---|---|---|
+| civilité | `civilite` | facultative |
+| prénom | `prenom` | **séparé du nom**, enfin |
 | nom | `nom` | — |
 | fonction | `fonction` | — |
-| téléphone | `telephone` | — |
-| mobile | `telephone_mobile` | **à créer (D7)** |
-| e-mail | `email` | — |
-| principal | `principal` | booléen, pas un tableau de rôles |
-| notes | `notes` | à créer — complément d'alignement sur `ClientContact` |
-| statut | `statut` | à créer — permet d'archiver un interlocuteur remplacé plutôt que de le supprimer |
+| e-mail | `email` | `normalizeEmail` avant écriture |
+| téléphone (ligne directe) | `telephone` | celui de la **personne** |
+| mobile | `telephone_mobile` | celui de la **personne** |
+| adresse professionnelle | `adresse`, `code_postal`, `ville`, `pays` | facultative — inutile de répéter celle de l'organisation |
+| notes | `notes` | — |
+| statut actif/inactif | `statut` | inactiver ≠ supprimer |
+| rôles | `roles[]` | `primary`, `billing`, `site`, `commercial`, `technique`, `direction` |
+| contact principal | `principal` | **un seul actif par tiers**, index unique partiel |
+| source | `source` | `contact_card` quand la fiche vient d'une carte |
+| date de réception | `recu_at` | — |
+| consentement | `consentement_donne`, `consentement_at` | — |
+| entreprise de rattachement | `tiers_type` + `tiers_id` | le registre **et** l'identifiant |
+| identifiant de la carte source | `carte_recue_id` | clé étrangère réelle |
+| historique | `contact_images_journal` + `journal_activite` | — |
 
-Écart mesuré avec `ClientContact` de `@elsatia/client-contracts`, qui définit `civility`,
-`firstName`, `lastName`, `jobTitle`, `email`, `phone`, `mobile`, `roles[]`
-(`primary`/`billing`/`site`), `status` (`active`/`inactive`), `notes`.
-
-> **La table était en retard sur le contrat.** Verser une carte de visite dans
-> `contacts_clients` aujourd'hui perd le prénom séparé et le mobile — soit précisément les
-> deux informations qu'une carte de visite porte toujours. **D7 tranche : `prenom` et
-> `telephone_mobile` sont ajoutés**, avec `notes` et `statut` pour terminer l'alignement sur
-> `ClientContact`. Tant que le train est fermé, la perte demeure et le carnet Contact / Card
-> conserve ces valeurs.
-
-`contacts_clients` n'a pas de colonne `entreprise_id` : son cloisonnement remonte au client
-via les politiques RLS (`exists (select 1 from clients c where c.id = contacts_clients.client_id
-and a_permission(c.entreprise_id, 'gerer_clients'))`). Tout code de versement doit donc
-d'abord résoudre le client, puis écrire — jamais l'inverse.
-
----
+Aucune perte. Chacun des seize points demandés a une colonne.
 
 ## 5. Correspondance des champs — destination `fournisseurs`
 
 | Champ Contact / Card | Colonne | Remarque |
 |---|---|---|
 | entreprise | `nom` | `not null`, `check (btrim(nom) <> '')` |
-| prénom + nom du porteur | `contact_nom` | **un seul champ texte, une seule personne** |
-| fonction | *aucune* | perte |
-| e-mail | `email` | — |
-| téléphone | `telephone` | — |
-| mobile | *aucune* | perte |
+| prénom + nom du porteur | `interlocuteurs_tiers.prenom` / `.nom` | **plusieurs personnes possibles (E4)** ; `fournisseurs.contact_nom` n'est plus la cible |
+| fonction | `interlocuteurs_tiers.fonction` | — |
+| e-mail de l'organisation | `fournisseurs.email` | standard |
+| e-mail de la personne | `interlocuteurs_tiers.email` | ligne nominative |
+| standard téléphonique | `fournisseurs.telephone` | organisation |
+| ligne directe | `interlocuteurs_tiers.telephone` | personne |
+| mobile | `interlocuteurs_tiers.telephone_mobile` | **personne uniquement (E5)** |
+| site Internet | `fournisseurs.site_web` | **à créer (E5)** — n'existait nulle part |
 | adresse / CP / ville | `adresse`, `code_postal`, `ville` | — |
 | SIRET | `siret` | — |
 | n° TVA | `numero_tva` | migration 111 |
@@ -173,16 +219,22 @@ d'abord résoudre le client, puis écrire — jamais l'inverse.
 `reference` est `not null` avec `unique (entreprise_id, reference)` : elle doit être générée
 avant l'insertion, contrairement à `clients` qui a un trigger.
 
-### 5.1 Deux limites structurelles
+### 5.1 Deux limites structurelles, désormais levées
 
-**Un fournisseur n'a pas d'interlocuteurs.** Il n'existe aucune table
-`contacts_fournisseurs`. Recevoir deux cartes de deux commerciaux du même fournisseur n'a
-aujourd'hui **aucune traduction correcte** : soit on écrase `contact_nom`, soit on crée un
-second fournisseur — les deux sont faux.
+**Un fournisseur n'avait pas d'interlocuteurs.** Il n'existait aucune table
+`contacts_fournisseurs` : recevoir deux cartes de deux commerciaux du même fournisseur
+n'avait aucune traduction correcte — soit on écrasait `contact_nom`, soit on créait un
+second fournisseur, et les deux sont faux.
 
-> Décision V1 : **ne rien écraser**. Le second interlocuteur reste dans le carnet
-> Contact / Card, rattaché logiquement au fournisseur, jusqu'à ce qu'une table
-> d'interlocuteurs existe (proposition SQL, §7).
+> **E4 tranche : `interlocuteurs_tiers` accueille autant de personnes que nécessaire, pour
+> un seul tiers.** Deux cartes du même fournisseur produisent **un fournisseur et deux
+> interlocuteurs**. Un interlocuteur qui part devient `inactif` : il n'est pas supprimé, le
+> tiers n'est pas touché, et la place d'interlocuteur principal se libère pour son
+> remplaçant.
+
+`fournisseurs.contact_nom` n'est **pas** supprimée — la retirer serait une perte de données
+sur une colonne peut-être peuplée. Elle devient une donnée héritée, que l'application cesse
+d'écrire une fois les interlocuteurs en place.
 
 **Fournisseur et sous-traitant s'excluaient.**
 `check(type_tiers in ('fournisseur','sous_traitant'))` porte une valeur unique, ce qui
@@ -267,16 +319,16 @@ Aucune de ces évolutions n'est appliquée. Elles sont décrites dans
 |---|---|---|---|
 | E1 | Tables propres à Contact / Card (cartes, profils, jetons, réception, analyses **par champ**, carnet, propositions, paramètres) | D1, D2 | pas de produit |
 | E2 | `applications_elsatia` : ligne `contact` + rôles + permissions | D10 | pas de branchement multi-app |
-| E3 | `contacts_clients` : `prenom`, `telephone_mobile`, `notes`, `statut` | **D7** | prénom et mobile perdus au versement |
-| E4 | Table d'interlocuteurs fournisseur | — | un seul contact par fournisseur, écrasé à chaque carte |
-| E5 | `clients` : `mobile`, `site_web` | — | mobile et site perdus au versement |
+| E3 | ~~`contacts_clients` : `prenom`, `telephone_mobile`…~~ **retirée** | D7, révisée | remplacée par E4 : plus aucun rôle applicatif ne peut lire ni écrire cette table (§4.1) |
+| E4 | `interlocuteurs_tiers` — interlocuteurs de **tous** les registres | **E4, D7** | un seul contact par tiers, écrasé à chaque carte |
+| E5 | `clients.site_web`, `clients.telephone_mobile` (particulier), `fournisseurs.site_web` | **E5** | site et mobile perdus au versement |
 | E6 | `fournisseurs_roles` — rôles multiples de tiers | **D4** | fournisseur **et** sous-traitant impossible |
 | E7 | `notifications_utilisateurs.cle_idempotence` unique, retrait de l'index trompeur | **D8** | l'exigence « une seule notification » non tenue |
 | E8 | `candidats` — vivier sans lien vers la paie | **D5** | classement « candidat » sans destination |
 | E9 | `partenaires`, `contacts_professionnels`, `tiers_liens` | **D6** | classements « partenaire » et « contact général » sans destination |
 | E10 | Catégorie Boutique pour cartes NFC | hors périmètre | vente impossible |
 
-E3, E5, E6 et E7 sont des **corrections de dettes préexistantes** que Contact / Card révèle
+E5, E6 et E7 sont des **corrections de dettes préexistantes** que Contact / Card révèle
 sans les avoir introduites. E7 en particulier — l'index d'unicité des notifications qui
 n'unifie rien — concerne **toutes** les notifications de Gestion Pro, pas seulement celles de
 ce produit : elle gagnerait à être traitée pour elle-même, dès la réouverture du train, sans

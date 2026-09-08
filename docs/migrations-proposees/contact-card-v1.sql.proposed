@@ -18,7 +18,7 @@
 --
 --  Base d'écriture : 1fc1331842cdf5980b374169994587813bdee7b6
 --  Branche         : audit/elsatia-contact-card-architecture-v1
---  Révision        : R2 — décisions D1 à D10 de Julien intégrées
+--  Révision        : R3 — O1 à O4, E4 et E5 arbitrées ; R2 = 0fd1e32
 --  Rapport         : docs/audits/ELSATIA-CONTACT-CARD-ARCHITECTURE-AUDIT-REPORT.md
 --
 --  DÉCISIONS ARBITRÉES (R2). Les sections E3 à E9, laissées en commentaire en R1 faute
@@ -45,9 +45,31 @@
 --  comme à la clôture (D2). Le conteneur a été détruit. AUCUNE base réelle n'a été touchée,
 --  et le fait que ce SQL s'applique ne le rend pas intégrable : il reste bloqué par C1.
 --
---  CE QUI RESTE HORS DE CE FICHIER. E4 (interlocuteurs fournisseur), E5 (mobile et site
---  sur clients) et E10 (catégorie Boutique) n'ont pas été arbitrés et restent en
---  commentaire, en fin de fichier.
+--  ARBITRAGES R3.
+--
+--    O1  Reste .sql.proposed. Repris, audité, numéroté et testé au PROCHAIN train.
+--        Le ledger actuel n'est pas modifié.
+--    O2  Politique de conservation des images                          -> §O2
+--    O3  Fournisseur OCR remplaçable, désactivé par défaut, double
+--        interrupteur dont l'ordre est CONTRAINT en base                -> §O3
+--    O4  Domaine public card.elsatia.fr, isolé de l'application         -> §O4
+--    E4  Interlocuteurs de tiers — DEUX options présentées, l'option
+--        générique est retenue et justifiée                             -> §E4
+--    E5  Mobile et site : organisation vs personne                      -> §E5
+--
+--  CORRECTION D'UNE RECOMMANDATION R2. R2 proposait d'ajouter `prenom` et
+--  `telephone_mobile` DIRECTEMENT à public.contacts_clients. Cette proposition était
+--  fondée sur une lecture incomplète : la table n'a AUCUN grant PostgREST depuis
+--  20260902000255 (REVOKE SELECT/INSERT/UPDATE/DELETE pour `authenticated` ET
+--  `service_role`), et cette migration retire des ACL « historiques excédentaires »
+--  ABSENTES de la référence canonique Fresh. La table est donc dormante par conception,
+--  et non gelée par accident. Y ajouter des colonnes n'aurait rendu personne capable de
+--  les écrire. L'intention de D7 est honorée — prénom et mobile sur les interlocuteurs
+--  clients — mais sur la table vivante de §E4, pas sur celle-là. Voir §E4 pour la
+--  démonstration et §E4-A pour l'option écartée, conservée en commentaire.
+--
+--  CE QUI RESTE HORS DE CE FICHIER. E10 (catégorie Boutique) n'a pas été arbitrée et
+--  reste en commentaire, en fin de fichier.
 -- =====================================================================================
 
 
@@ -363,6 +385,14 @@ create table public.contact_analyses_ocr_champs (
   valeur_suggeree text,
   confiance numeric(5,2) check (confiance is null or confiance between 0 and 100),
 
+  -- E5 — ROUTAGE PROPOSÉ, jamais imposé. Le scanner PROPOSE où ranger la valeur :
+  --   site Internet -> organisation      mobile personnel -> interlocuteur
+  --   standard      -> organisation      ligne directe    -> interlocuteur
+  -- L'utilisateur peut toujours changer avant validation : c'est une suggestion, et une
+  -- suggestion qu'on ne peut pas contredire est une décision déguisée.
+  cible_proposee text check (cible_proposee is null or cible_proposee in ('organisation','interlocuteur')),
+  cible_retenue  text check (cible_retenue  is null or cible_retenue  in ('organisation','interlocuteur')),
+
   -- Ce que l'humain retient réellement. NULL = il a écarté le champ.
   valeur_retenue text,
   -- 'accepte'  : la suggestion est reprise telle quelle
@@ -388,7 +418,10 @@ create table public.contact_analyses_ocr_champs (
   -- Un champ accepté ou corrigé porte une valeur ; un champ écarté n'en porte pas.
   check ((decision in ('accepte','corrige') and valeur_retenue is not null)
          or decision not in ('accepte','corrige')),
-  check (decision <> 'ecarte' or valeur_retenue is null)
+  check (decision <> 'ecarte' or valeur_retenue is null),
+  -- Un champ repris doit dire OÙ il est repris. Sans cela, « mobile » finirait sur
+  -- l'organisation aussi souvent que sur la personne.
+  check (decision not in ('accepte','corrige') or cible_retenue is not null)
 );
 
 create index contact_analyses_ocr_champs_analyse_idx
@@ -543,50 +576,310 @@ create table public.contact_propositions_gp (
 
 
 -- =====================================================================================
---  E1.f — Paramètres par entreprise (D1)
+--  O3 — AUTORISATION PLATEFORME DE L'OCR
 --
---  L'OCR entre au périmètre cible, mais il doit rester FACULTATIF et DÉSACTIVABLE PAR
---  ENTREPRISE. Deux interrupteurs indépendants, tous deux fail-closed :
+--  « L'entreprise ne peut pas activer l'OCR si la plateforme ne l'a pas autorisé. »
+--  Cette règle est écrite EN BASE, pas dans l'application : une règle d'ordre entre deux
+--  interrupteurs qui ne vit que dans du TypeScript se contourne par un appel direct.
 --
---    plateforme : FEATURE_AI_ENABLED (src/lib/preview-features.ts, iaEstActive())
---    entreprise : contact_parametres.ocr_actif, ci-dessous, FAUX par défaut
+--  Table à ligne unique. Le motif `id boolean primary key default true check(id)` est le
+--  singleton PostgreSQL classique : une seule ligne peut exister.
+-- =====================================================================================
+
+create table public.contact_ocr_plateforme (
+  id boolean primary key default true check (id),
+
+  -- Faux par défaut. ELSATIA doit poser un geste explicite avant qu'une seule entreprise
+  -- puisse activer quoi que ce soit.
+  autorise boolean not null default false,
+
+  -- Le fournisseur n'est PAS codé en dur. Le domaine Contact / Card parle à une interface
+  -- (voir la note d'implémentation plus bas) ; cette colonne dit seulement lequel est
+  -- contractuellement autorisé aujourd'hui.
+  fournisseur text check (fournisseur is null or fournisseur ~ '^[a-z][a-z0-9_]{1,49}$'),
+  region_traitement text check (region_traitement is null or length(region_traitement) <= 80),
+
+  -- Les dix points à valider avant activation réelle (O3). Stockés en jsonb plutôt qu'en
+  -- dix colonnes : la liste évoluera avec le droit, pas avec le schéma.
+  --   cout_par_analyse · contrat · region · conservation_fournisseur · information_utilisateur
+  --   registre_traitements · base_juridique · mecanisme_suppression · sous_traitants_ulterieurs
+  --   politique_donnees_sensibles
+  validations jsonb not null default '{}'::jsonb check (jsonb_typeof(validations) = 'object'),
+
+  autorise_par uuid references public.utilisateurs(id) on delete set null,
+  autorise_at timestamptz,
+  updated_at timestamptz not null default now(),
+
+  check (not autorise or (fournisseur is not null
+                          and region_traitement is not null
+                          and autorise_par is not null
+                          and autorise_at is not null))
+);
+
+-- La ligne existe, désactivée. Aucun appel à aucun fournisseur n'est possible dans cet
+-- état, et aucun n'a été émis pour écrire ce fichier.
+insert into public.contact_ocr_plateforme (id, autorise) values (true, false)
+  on conflict (id) do nothing;
+
+comment on table public.contact_ocr_plateforme is
+  'Interrupteur PLATEFORME de l''OCR Contact / Card (O3). Faux par défaut. Une entreprise ne peut pas activer son propre interrupteur tant que celui-ci est faux — règle portée par le déclencheur contact_parametres_ocr_ordre_trg, pas par l''application. Le fournisseur est nommé ici, jamais codé en dur dans le domaine.';
+
+
+-- =====================================================================================
+--  E1.f — Paramètres par entreprise (D1, O2, O3, O4)
 --
---  Les deux doivent être vrais pour qu'une seule image parte. Une entreprise qui refuse
---  que les photos de ses cartes soient envoyées à un tiers coupe l'OCR sans perdre le
---  produit : la saisie manuelle reste un parcours complet.
+--  Deux interrupteurs indépendants, tous deux fail-closed, et désormais ORDONNÉS :
+--
+--    plateforme : contact_ocr_plateforme.autorise      (O3, ci-dessus)
+--    entreprise : contact_parametres.ocr_actif         (D1, ci-dessous)
+--
+--  Les durées de conservation vivent ici, en COLONNES : O2 exige qu'elles soient
+--  « configurables sans migration supplémentaire ». Les mettre dans un `check` ou dans du
+--  code les figerait.
 -- =====================================================================================
 
 create table public.contact_parametres (
   entreprise_id uuid primary key references public.entreprises(id) on delete cascade,
 
-  -- Faux par défaut, délibérément. Activer un traitement qui envoie des images chez un
-  -- tiers ne doit jamais être le comportement d'une entreprise qui n'a rien demandé.
+  -- --- OCR (D1, O3) ---
   ocr_actif boolean not null default false,
-  -- Horodatage de l'information donnée à l'entreprise (D2). Sans lui, on ne peut pas
-  -- démontrer que le traitement a été annoncé avant le premier envoi.
   ocr_information_affichee_at timestamptz,
   ocr_active_par uuid references public.utilisateurs(id) on delete set null,
   ocr_active_at  timestamptz,
 
-  -- Rétention des images d'origine. NULL = suppression dès la confirmation humaine.
-  -- La valeur exacte relève de la question ouverte O2 et n'est pas fixée ici.
-  retention_images_jours integer check (retention_images_jours is null
-                                        or retention_images_jours between 0 and 365),
+  -- --- Conservation des images (O2) ---
+  -- Valeurs par défaut = politique retenue. Modifiables par simple UPDATE, sans migration.
+  retention_non_traitee_jours integer not null default 30
+    check (retention_non_traitee_jours between 1 and 365),
+  retention_apres_confirmation_jours integer not null default 7
+    check (retention_apres_confirmation_jours between 0 and 365),
+  -- Plafond d'une conservation exceptionnelle. AUCUNE conservation illimitée n'est
+  -- possible : la colonne est `not null`, et l'expiration est obligatoire (voir §O2).
+  conservation_exceptionnelle_max_jours integer not null default 365
+    check (conservation_exceptionnelle_max_jours between 1 and 1095),
 
-  -- Le versement vers Gestion Pro est optionnel ET révocable (D10). Le couper n'efface
-  -- rien de ce qui a déjà été versé : il arrête les versements futurs.
+  -- --- Page publique (O4) ---
+  -- Anti-indexation CONFIGURABLE, mais fermée par défaut : une carte n'a aucune raison
+  -- d'être indexée sans que son entreprise l'ait voulu.
+  indexation_publique_autorisee boolean not null default false,
+
+  -- --- Pont Gestion Pro (D10) ---
   pont_gestion_pro_actif boolean not null default false,
 
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
-  -- On ne peut pas activer l'OCR sans avoir affiché l'information, ni sans savoir qui
-  -- l'a activé et quand.
   check (not ocr_actif or (ocr_information_affichee_at is not null
                            and ocr_active_par is not null
                            and ocr_active_at is not null))
 );
 
+-- O3 — L'ORDRE DES INTERRUPTEURS, EN BASE.
+create or replace function public.contact_parametres_ocr_ordre()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  if new.ocr_actif and not coalesce(
+       (select p.autorise from public.contact_ocr_plateforme p where p.id), false) then
+    raise exception
+      'OCR non autorisé par la plateforme ELSATIA : une entreprise ne peut pas l''activer seule';
+  end if;
+  return new;
+end; $$;
+
+create trigger contact_parametres_ocr_ordre_trg
+  before insert or update on public.contact_parametres
+  for each row execute function public.contact_parametres_ocr_ordre();
+
+revoke all on function public.contact_parametres_ocr_ordre() from public, anon, authenticated;
+
+
+-- =====================================================================================
+--  O2 — CONSERVATION ET PURGE DES IMAGES DE CARTES
+--
+--  Politique retenue :
+--    - carte reçue jamais traitée .................. 30 jours maximum
+--    - image d'une carte vérifiée et confirmée ..... supprimée sous 7 jours
+--    - suppression anticipée ....................... toujours possible, à la demande
+--    - conservation prolongée ...................... action MANUELLE seulement, avec motif,
+--                                                    auteur, date d'expiration et journal
+--    - conservation illimitée ...................... IMPOSSIBLE, y compris par erreur
+--
+--  DEUX CYCLES DE VIE DISTINCTS, ET C'EST DÉLIBÉRÉ. `statut` décrit la CARTE (reçue,
+--  vérifiée, classée…) ; `image_statut` décrit l'IMAGE (présente, à supprimer, supprimée…).
+--  Les confondre en une seule colonne rendrait impossible l'état qui est précisément le
+--  but de O2 : « carte classée, données conservées, image supprimée ».
+--
+--  Les neuf états demandés se répartissent donc ainsi :
+--    reçue · en attente d'analyse · analysée · vérifiée · classée   -> contact_cartes_recues.statut
+--    image à supprimer · image supprimée · conservation exceptionnelle
+--    · erreur de suppression                                        -> contact_cartes_recues.image_statut
+-- =====================================================================================
+
+alter table public.contact_cartes_recues
+  add column if not exists image_statut text not null default 'absente',
+  add column if not exists image_purge_due_at timestamptz,
+  add column if not exists image_purge_tentatives integer not null default 0,
+  add column if not exists image_purge_erreur text,
+  add column if not exists conservation_motif text,
+  add column if not exists conservation_par uuid references public.utilisateurs(id) on delete set null,
+  add column if not exists conservation_demandee_at timestamptz,
+  add column if not exists conservation_expire_at timestamptz;
+
+alter table public.contact_cartes_recues drop constraint if exists contact_cartes_recues_image_statut_check;
+alter table public.contact_cartes_recues add constraint contact_cartes_recues_image_statut_check
+  check (image_statut in ('absente','presente','a_supprimer','supprimee',
+                          'conservation_exceptionnelle','erreur_suppression'));
+
+-- Une image supprimée ne laisse plus de chemin. C'est ce qui rend la suppression
+-- VÉRIFIABLE plutôt que déclarative.
+alter table public.contact_cartes_recues drop constraint if exists contact_cartes_recues_image_supprimee_check;
+alter table public.contact_cartes_recues add constraint contact_cartes_recues_image_supprimee_check
+  check (image_statut <> 'supprimee' or (image_path is null and image_supprimee_at is not null));
+
+alter table public.contact_cartes_recues drop constraint if exists contact_cartes_recues_image_presente_check;
+alter table public.contact_cartes_recues add constraint contact_cartes_recues_image_presente_check
+  check (image_statut not in ('presente','a_supprimer','conservation_exceptionnelle')
+         or image_path is not null);
+
+-- CONSERVATION EXCEPTIONNELLE : jamais implicite, jamais illimitée, toujours attribuable.
+-- Les quatre conditions de O2 — motif, auteur, date d'expiration, journal — dont trois
+-- sont ici et la quatrième dans contact_images_journal.
+alter table public.contact_cartes_recues drop constraint if exists contact_cartes_recues_conservation_check;
+alter table public.contact_cartes_recues add constraint contact_cartes_recues_conservation_check
+  check (image_statut <> 'conservation_exceptionnelle'
+         or (conservation_motif is not null
+             and btrim(conservation_motif) <> ''
+             and conservation_par is not null
+             and conservation_demandee_at is not null
+             and conservation_expire_at is not null));
+
+create index if not exists contact_cartes_recues_purge_idx
+  on public.contact_cartes_recues (image_purge_due_at)
+  where image_statut in ('presente','a_supprimer');
+
+create index if not exists contact_cartes_recues_conservation_idx
+  on public.contact_cartes_recues (conservation_expire_at)
+  where image_statut = 'conservation_exceptionnelle';
+
+comment on column public.contact_cartes_recues.image_statut is
+  'Cycle de vie de l''IMAGE, distinct de `statut` qui décrit la carte. Permet l''état visé par O2 : carte classée, données structurées conservées, image supprimée. Une image ayant échoué à l''OCR reste purgeable : aucun état d''erreur d''analyse ne bloque la purge.';
+
+
+-- Journal d'audit des images. Append-only : aucune politique de UPDATE ni de DELETE ne
+-- sera écrite pour cette table. Même esprit que historique_acces_applications.
+create table public.contact_images_journal (
+  id bigint generated always as identity primary key,
+  entreprise_id uuid not null references public.entreprises(id) on delete cascade,
+  carte_recue_id uuid not null,
+  action text not null check (action in
+    ('image_recue','purge_programmee','purge_effectuee','purge_echouee',
+     'suppression_anticipee','conservation_accordee','conservation_expiree','conservation_revoquee')),
+  motif text check (motif is null or length(motif) <= 500),
+  auteur uuid references public.utilisateurs(id) on delete set null,
+  -- NULL = geste automatique du traitement de purge, et non un humain anonyme.
+  automatique boolean not null default false,
+  created_at timestamptz not null default now(),
+  foreign key (carte_recue_id, entreprise_id)
+    references public.contact_cartes_recues(id, entreprise_id) on delete cascade
+);
+
+create index contact_images_journal_carte_idx
+  on public.contact_images_journal (carte_recue_id, created_at desc);
+
+
+-- PURGE IDEMPOTENTE (O2).
+--
+-- La fonction ne supprime AUCUN octet : le stockage est hors de la base. Elle MARQUE les
+-- images échues comme `a_supprimer`, et l'application les efface puis confirme. Cette
+-- séparation est ce qui rend la reprise sûre après une coupure : une image marquée mais
+-- non effacée sera reprise au passage suivant, sans double effet.
+--
+-- Idempotence : la fonction ne considère que `image_statut = 'presente'` et ne produit
+-- qu'une transition vers 'a_supprimer'. La rejouer immédiatement ne sélectionne plus
+-- rien. Le journal reçoit une ligne par transition RÉELLE, jamais par exécution.
+create or replace function public.contact_purger_images(p_limite integer default 500)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare v_nb integer;
+begin
+  -- Une conservation exceptionnelle échue redevient purgeable. Sans cette étape, un
+  -- « prolongé une fois » deviendrait un « conservé pour toujours ».
+  with expirees as (
+    update public.contact_cartes_recues c
+       set image_statut = 'presente',
+           conservation_motif = null, conservation_par = null,
+           conservation_demandee_at = null, conservation_expire_at = null,
+           updated_at = now()
+     where c.image_statut = 'conservation_exceptionnelle'
+       and c.conservation_expire_at <= now()
+    returning c.id, c.entreprise_id
+  )
+  insert into public.contact_images_journal (entreprise_id, carte_recue_id, action, automatique)
+  select e.entreprise_id, e.id, 'conservation_expiree', true from expirees e;
+
+  with echues as (
+    update public.contact_cartes_recues c
+       set image_statut = 'a_supprimer', updated_at = now()
+     where c.image_statut = 'presente'
+       and c.image_purge_due_at is not null
+       and c.image_purge_due_at <= now()
+       and c.id in (
+         select c2.id from public.contact_cartes_recues c2
+          where c2.image_statut = 'presente'
+            and c2.image_purge_due_at is not null
+            and c2.image_purge_due_at <= now()
+          order by c2.image_purge_due_at
+          limit p_limite
+       )
+    returning c.id, c.entreprise_id
+  ), journalisees as (
+    insert into public.contact_images_journal (entreprise_id, carte_recue_id, action, automatique)
+    select e.entreprise_id, e.id, 'purge_programmee', true from echues e
+    returning 1
+  )
+  select count(*)::integer into v_nb from journalisees;
+
+  return coalesce(v_nb, 0);
+end;
+$$;
+
+revoke all on function public.contact_purger_images(integer) from public, anon, authenticated;
+
+comment on function public.contact_purger_images(integer) is
+  'Marque les images échues comme `a_supprimer` et libère les conservations exceptionnelles expirées. IDEMPOTENTE : elle ne transitionne que depuis `presente`, donc un second appel immédiat ne sélectionne plus rien et n''écrit aucune ligne de journal. Ne supprime aucun octet — l''effacement du stockage appartient à l''application, qui confirme ensuite en passant à `supprimee`. Cette séparation rend la reprise après coupure sûre.';
+
+
+-- =====================================================================================
+--  O4 — DOMAINE PUBLIC card.elsatia.fr
+--
+--  La page publique est servie par un domaine DÉDIÉ, isolé de l'application authentifiée.
+--  Rien de cela ne s'écrit en SQL — c'est une décision d'hébergement et d'en-têtes — mais
+--  la contrainte est consignée ici parce qu'elle conditionne la sûreté du modèle de jetons
+--  ci-dessus :
+--
+--    - aucun cookie de session Gestion Pro sur ce domaine : origine distincte, donc les
+--      cookies de app.elsatia.fr ne sont jamais envoyés ;
+--    - aucun accès au stockage authentifié : la page ne lit que ce que la fonction
+--      contact_carte_par_token() lui rend, et cette fonction ne rend qu'un identifiant ;
+--    - jeton non prédictible (256 bits) et stocké UNIQUEMENT en sha256 — voir §E1.b ;
+--    - révocation immédiate : le filtre `revoque_at is null` est DANS la fonction de
+--      résolution, donc appliqué avant tout accès aux données ;
+--    - rate limiting : réutilise rate_limits_applicatifs et journal_abus_securite
+--      (20260731000193), clés proposées `contact_carte_ouverture` et `contact_echange_envoi` ;
+--    - anti-indexation configurable : contact_parametres.indexation_publique_autorisee,
+--      faux par défaut ;
+--    - aucune fuite entre locataires : un jeton résout UNE carte, et rien d'autre ;
+--    - aucune donnée supplémentaire en modifiant l'URL : il n'existe aucun identifiant
+--      séquentiel ni énumérable dans le chemin public ;
+--    - CSP dédiée, plus stricte que celle de l'application ;
+--    - collecte minimale de journaux : contact_cartes_jetons ne porte qu'un COMPTEUR
+--      d'ouvertures et une date. Ni IP, ni agent, ni géolocalisation, ni référent ;
+--    - le NFC et le QR portent la même URL révocable de ce domaine, et JAMAIS les
+--      coordonnées ni un secret permanent.
+-- =====================================================================================
 
 -- =====================================================================================
 --  RLS — à écrire au lot de réalisation, PAS ici
@@ -615,6 +908,12 @@ create table public.contact_parametres (
 --                              écriture : a_permission(entreprise_id,'gerer_cartes_entreprise')
 --                                         — activer l'OCR engage l'entreprise, ce n'est pas
 --                                           un réglage de titulaire
+--    contact_ocr_plateforme    lecture  : authenticated (savoir si l'OCR est ouvert)
+--                              écriture : est_plateforme_admin() UNIQUEMENT
+--    contact_images_journal    lecture  : est_membre_actif(entreprise_id)
+--                              écriture : INSERT seul — append-only, ni UPDATE ni DELETE
+--    interlocuteurs_tiers      lecture  : a_permission(entreprise_id,'acces_interlocuteurs_tiers')
+--                              écriture : a_permission(entreprise_id,'gerer_interlocuteurs_tiers')
 --
 --  Tables Gestion Pro créées par E6, E8 et E9, sur le patron de leurs voisines :
 --    fournisseurs_roles        lecture  : a_permission(entreprise_id,'acces_sous_traitants')
@@ -636,40 +935,212 @@ create table public.contact_parametres (
 
 
 -- =====================================================================================
---  E3 (D7) — Contacts clients : prénom et téléphone mobile
+--  E4 (+ D7, E5) — INTERLOCUTEURS DE TIERS
 --
---  La table date de 20260710000004 et n'a jamais rejoint le contrat canonique
---  `ClientContact` de @elsatia/client-contracts, qui définit firstName, lastName,
---  jobTitle, email, phone, MOBILE, roles[], status et notes.
+--  BESOIN. Recevoir plusieurs cartes de personnes DIFFÉRENTES travaillant chez le MÊME
+--  fournisseur ou sous-traitant, sans créer un fournisseur par carte.
 --
---  Julien nomme deux colonnes : `prenom` et `telephone_mobile`. Elles sont ajoutées
---  telles quelles. `notes` et `statut` complètent l'alignement — sans elles, remplacer un
---  interlocuteur obligerait à le SUPPRIMER, ce qui effacerait l'historique.
+--  DEUX OPTIONS ONT ÉTÉ ÉTUDIÉES, comme demandé. Voici les faits mesurés qui les
+--  départagent — pas des préférences de style.
 --
---  Le nom retenu est `telephone_mobile` et non `mobile` : la table porte déjà
---  `telephone`, et deux colonnes `telephone` / `telephone_mobile` se lisent sans
---  ambiguïté, là où `telephone` / `mobile` invite à la confusion.
+--  ┌─ FAIT 1 ─────────────────────────────────────────────────────────────────────────┐
+--  │ public.contacts_clients n'est plus ni lisible ni écrivable. 20260902000255 révoque│
+--  │ SELECT, INSERT, UPDATE et DELETE pour `authenticated` ET `service_role`. Vérifié  │
+--  │ en recette : `authenticated` n'a plus AUCUN privilège ; `service_role` ne garde   │
+--  │ que REFERENCES, TRIGGER et TRUNCATE, dont aucun ne touche une ligne.              │
+--  └──────────────────────────────────────────────────────────────────────────────────┘
+--  ┌─ FAIT 2 ─────────────────────────────────────────────────────────────────────────┐
+--  │ Ce n'est pas un gel accidentel. 20260902000255 est une RÉCONCILIATION ACL : elle  │
+--  │ retire des ACL « historiques excédentaires observées sur la restauration          │
+--  │ Production 210 -> 252 » qui étaient ABSENTES de la référence canonique Fresh.     │
+--  │ Dans le modèle canonique, cette table n'a jamais été exposée.                     │
+--  └──────────────────────────────────────────────────────────────────────────────────┘
+--  ┌─ FAIT 3 ─────────────────────────────────────────────────────────────────────────┐
+--  │ Elle n'est référencée que par UNE clé étrangère — appels_contacts.contact_id      │
+--  │ (20260715000080) — et par ZÉRO code applicatif. La seule mention TypeScript du    │
+--  │ dépôt est un commentaire de @elsatia/client-contracts qui la déclare « gelée ».   │
+--  └──────────────────────────────────────────────────────────────────────────────────┘
+--
+--  OPTION A — dédiée : dégeler contacts_clients, l'étendre, et créer sa jumelle
+--  contacts_fournisseurs.
+--    + aucune donnée déplacée, FK appels_contacts intacte, forme familière ;
+--    - exige de RÉ-ACCORDER des grants que la réconciliation ACL vient délibérément de
+--      retirer. C'est rouvrir un chantier fermé au 255, sur une table que la référence
+--      canonique n'expose pas. Le risque n'est pas technique, il est de gouvernance ;
+--    - deux tables quasi identiques qui divergeront, et toujours rien pour les
+--      partenaires ni les contacts professionnels créés par D6.
+--
+--  OPTION B — générique `interlocuteurs_tiers` : une table vivante, pour tous les
+--  registres.  >>> RETENUE <<<
+--    + ne touche PAS contacts_clients : ni ses lignes, ni ses colonnes, ni ses grants,
+--      ni sa FK. C'est l'option qui préserve le mieux l'existant, précisément parce
+--      qu'elle le laisse tranquille ;
+--    + une seule table pour clients, fournisseurs, sous-traitants, partenaires et
+--      contacts professionnels — au lieu de deux jumelles plus deux modèles en ligne ;
+--    + porte nativement roles[], statut, source, consentement et carte d'origine, que
+--      contacts_clients ne saurait pas porter sans être réécrite ;
+--    - référence polymorphe : pas de clé étrangère sur tiers_id (même compromis assumé
+--      que tiers_liens). Contrepartie acceptée, et bornée par un déclencheur de
+--      cohérence de locataire ci-dessous.
+--
+--  RECOMMANDATION. Option B. Le critère demandé était « préserver le mieux les données
+--  existantes » : l'option qui ne touche à rien de l'existant le préserve mieux que celle
+--  qui rouvre ses ACL. Option A reste écrite, en commentaire, au cas où l'arbitrage
+--  changerait — voir §E4-A.
 -- =====================================================================================
 
-alter table public.contacts_clients
-  add column if not exists prenom text,
-  add column if not exists telephone_mobile text,
-  add column if not exists notes text,
-  add column if not exists statut text not null default 'active';
+create table public.interlocuteurs_tiers (
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references public.entreprises(id) on delete cascade,
 
-alter table public.contacts_clients drop constraint if exists contacts_clients_statut_check;
-alter table public.contacts_clients add constraint contacts_clients_statut_check
-  check (statut in ('active','inactive')) not valid;
+  -- Référence polymorphe vers le registre du tiers. Pas de FK : cinq cibles possibles.
+  -- L'intégrité est portée par l'application et par le déclencheur de locataire ci-dessous.
+  tiers_type text not null check (tiers_type in
+    ('client','fournisseur','partenaire','contact_professionnel')),
+  tiers_id uuid not null,
 
-comment on column public.contacts_clients.prenom is
-  'Prénom de l''interlocuteur. Jusqu''ici aggloméré dans `nom`, ce qui faisait perdre le prénom de toute carte de visite versée. Correspond à ClientContact.firstName.';
-comment on column public.contacts_clients.telephone_mobile is
-  'Ligne mobile, distincte de `telephone` (fixe/standard). Correspond à ClientContact.mobile. Une carte de visite porte presque toujours les deux.';
-comment on column public.contacts_clients.statut is
-  'active | inactive. Permet d''archiver un interlocuteur remplacé au lieu de le supprimer — la suppression effacerait l''historique des échanges.';
+  civilite text check (civilite is null or length(civilite) <= 20),
+  prenom   text check (prenom   is null or length(prenom)   <= 120),
+  nom      text check (nom      is null or length(nom)      <= 120),
+  fonction text check (fonction is null or length(fonction) <= 160),
 
--- `not valid` : les lignes existantes ne sont pas revalidées. `statut` vient d'être créée
--- avec un défaut conforme, donc aucune ligne ne peut violer la contrainte aujourd'hui.
+  email text check (email is null or email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'),
+  -- E5 — la ligne directe de la PERSONNE, pas le standard de l'organisation.
+  telephone text check (telephone is null or length(telephone) <= 40),
+  telephone_mobile text check (telephone_mobile is null or length(telephone_mobile) <= 40),
+
+  -- Adresse professionnelle FACULTATIVE : le plus souvent celle de l'organisation, donc
+  -- inutile de la répéter. Renseignée seulement quand la personne siège ailleurs.
+  adresse text, code_postal text, ville text,
+  pays text check (pays is null or pays ~ '^[A-Z]{2}$'),
+
+  notes text,
+
+  -- Rôles, sur le modèle de ClientContact (@elsatia/client-contracts) plutôt que de
+  -- booléens indépendants : `roles: []` est refusé, et « principal ET pas principal »
+  -- devient impossible à représenter.
+  roles text[] not null default array['primary']::text[],
+  principal boolean not null default false,
+  statut text not null default 'actif' check (statut in ('actif','inactif')),
+
+  -- Provenance. C'est ce qui permet de répondre « d'où vient cet interlocuteur ? »
+  source text not null default 'saisie_manuelle' check (source in
+    ('saisie_manuelle','contact_card','import','reprise')),
+  carte_recue_id uuid,
+  recu_at timestamptz,
+  consentement_donne boolean not null default false,
+  consentement_at timestamptz,
+
+  created_by uuid not null default auth.uid() references public.utilisateurs(id) on delete restrict,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  unique (id, entreprise_id),
+  foreign key (carte_recue_id, entreprise_id)
+    references public.contact_cartes_recues(id, entreprise_id) on delete set null (carte_recue_id),
+
+  -- Même invariant que ClientContact : un interlocuteur sans identité ni moyen de le
+  -- joindre n'est pas un interlocuteur.
+  check (num_nonnulls(prenom, nom, email, telephone, telephone_mobile) > 0),
+  check (cardinality(roles) > 0),
+  check (roles <@ array['primary','billing','site','commercial','technique','direction']::text[]),
+  check (source <> 'contact_card' or carte_recue_id is not null),
+  check (not consentement_donne or consentement_at is not null)
+);
+
+create index interlocuteurs_tiers_tiers_idx
+  on public.interlocuteurs_tiers (entreprise_id, tiers_type, tiers_id, statut);
+create index interlocuteurs_tiers_carte_idx
+  on public.interlocuteurs_tiers (carte_recue_id) where carte_recue_id is not null;
+
+-- Un seul interlocuteur PRINCIPAL actif par tiers. Un interlocuteur inactivé libère la
+-- place — c'est ce qui permet de remplacer le contact principal sans supprimer l'ancien,
+-- donc sans perdre l'historique.
+create unique index interlocuteurs_tiers_principal_unique
+  on public.interlocuteurs_tiers (entreprise_id, tiers_type, tiers_id)
+  where principal and statut = 'actif';
+
+-- Bornage du polymorphisme : le tiers visé doit exister ET appartenir au MÊME locataire.
+-- C'est ce qu'une clé étrangère aurait garanti ; à défaut, on le vérifie explicitement
+-- plutôt que d'y renoncer.
+create or replace function public.interlocuteurs_tiers_coherence()
+returns trigger language plpgsql set search_path = public as $$
+declare v_ok boolean;
+begin
+  execute format(
+    'select exists (select 1 from public.%I where id = $1 and entreprise_id = $2)',
+    case new.tiers_type
+      when 'client'      then 'clients'
+      when 'fournisseur' then 'fournisseurs'
+      when 'partenaire'  then 'partenaires'
+      else                    'contacts_professionnels'
+    end)
+  into v_ok using new.tiers_id, new.entreprise_id;
+
+  if not v_ok then
+    raise exception 'Interlocuteur: le tiers %/% n''existe pas pour ce locataire',
+      new.tiers_type, new.tiers_id;
+  end if;
+  return new;
+end; $$;
+
+create trigger interlocuteurs_tiers_coherence_trg
+  before insert or update of tiers_type, tiers_id, entreprise_id on public.interlocuteurs_tiers
+  for each row execute function public.interlocuteurs_tiers_coherence();
+
+revoke all on function public.interlocuteurs_tiers_coherence() from public, anon, authenticated;
+
+comment on table public.interlocuteurs_tiers is
+  'Interlocuteurs d''un tiers, quel que soit son registre (client, fournisseur, sous-traitant, partenaire, contact professionnel). Retenue en option B de E4 parce qu''elle ne touche PAS public.contacts_clients — dont les grants PostgREST ont été délibérément retirés par la réconciliation ACL 20260902000255 et dont la référence canonique Fresh n''expose rien. Plusieurs cartes de visite du même fournisseur produisent ici plusieurs interlocuteurs, jamais plusieurs fournisseurs.';
+
+insert into public.permissions_disponibles (cle, module, description) values
+  ('acces_interlocuteurs_tiers', 'Tiers', 'Consulter les interlocuteurs des clients, fournisseurs et partenaires'),
+  ('gerer_interlocuteurs_tiers', 'Tiers', 'Créer et modifier les interlocuteurs des tiers')
+on conflict (cle) do update set module = excluded.module, description = excluded.description;
+
+
+-- =====================================================================================
+--  E5 — MOBILE ET SITE INTERNET : ORGANISATION vs PERSONNE
+--
+--  CONSTAT MESURÉ : aucune colonne `site_web` n'existe NULLE PART dans les 272
+--  migrations — ni sur clients, ni sur fournisseurs. L'instruction « conserver site_web
+--  sur les fournisseurs si le modèle le permet déjà » ne s'applique donc pas : il n'y a
+--  rien à conserver, il y a à créer.
+--
+--  RÈGLE STRUCTURANTE : on n'attribue pas un mobile à une personne morale. `clients` est
+--  une ORGANISATION — sauf quand elle ne l'est pas : `type = 'particulier'` désigne une
+--  personne physique, qui a bel et bien un mobile. La contrainte ci-dessous dit exactement
+--  cela, plutôt que de laisser la règle à la vigilance de chaque écran.
+-- =====================================================================================
+
+alter table public.clients
+  add column if not exists site_web text,
+  add column if not exists telephone_mobile text;
+
+alter table public.clients drop constraint if exists clients_site_web_forme_check;
+alter table public.clients add constraint clients_site_web_forme_check
+  check (site_web is null or site_web ~ '^https?://[^[:space:]]+$') not valid;
+
+-- Le mobile n'existe que sur une personne physique. Sur une SARL, il est faux par nature :
+-- le numéro appartiendrait à quelqu'un, pas à la société.
+alter table public.clients drop constraint if exists clients_mobile_particulier_check;
+alter table public.clients add constraint clients_mobile_particulier_check
+  check (telephone_mobile is null or type = 'particulier') not valid;
+
+comment on column public.clients.site_web is
+  'Site Internet de l''ORGANISATION. Une carte de visite le porte presque toujours ; il n''existait aucune colonne pour l''accueillir dans les 272 migrations.';
+comment on column public.clients.telephone_mobile is
+  'Mobile, autorisé UNIQUEMENT sur un client de type `particulier` — une personne morale n''a pas de mobile, le numéro appartiendrait à une personne. Le mobile d''un interlocuteur professionnel va dans interlocuteurs_tiers.telephone_mobile.';
+
+alter table public.fournisseurs
+  add column if not exists site_web text;
+
+alter table public.fournisseurs drop constraint if exists fournisseurs_site_web_forme_check;
+alter table public.fournisseurs add constraint fournisseurs_site_web_forme_check
+  check (site_web is null or site_web ~ '^https?://[^[:space:]]+$') not valid;
+
+comment on column public.fournisseurs.site_web is
+  'Site Internet du tiers. Créé par E5 : contrairement à ce que supposait la consigne, aucune colonne de site n''existait sur fournisseurs.';
 
 
 -- =====================================================================================
@@ -924,22 +1395,36 @@ on conflict (cle) do update set module = excluded.module, description = excluded
 
 
 -- =====================================================================================
---  E4, E5, E10 — NON ARBITRÉES, laissées en commentaire
+--  E4-A — OPTION DÉDIÉE, ÉTUDIÉE PUIS ÉCARTÉE
 --
---  E4 — Interlocuteurs fournisseur. Il n'existe AUCUNE table équivalente à
---    contacts_clients côté fournisseur, seulement `fournisseurs.contact_nom`, un champ
---    texte unique. Recevoir deux cartes de deux commerciaux du même fournisseur n'a
---    aujourd'hui aucune traduction correcte : soit on écrase contact_nom, soit on crée un
---    second fournisseur — les deux sont faux. Une table `contacts_fournisseurs` sur le
---    modèle de contacts_clients (corrigé par E3) reste nécessaire.
---    En attendant : Contact / Card n'écrase rien, et conserve le second interlocuteur
---    dans son carnet.
+--  Conservée en commentaire parce que Julien a demandé que LES DEUX options soient
+--  présentées, et parce qu'un arbitrage peut changer. Elle n'est pas exécutable en
+--  l'état : elle suppose une décision de gouvernance ACL qui n'appartient pas à ce lot.
 --
---  E5 — clients n'a ni mobile ni site Internet, alors que le contrat canonique définit
---    `mobile` et `website`. Ces deux champs restent dans le carnet Contact / Card et ne
---    sont pas versés. Symétrique de E3, qui ne portait que sur contacts_clients.
+--  Ce que R2 proposait, et pourquoi c'est écarté : ajouter les colonnes ci-dessous à
+--  contacts_clients ne rendrait personne capable de les écrire, puisque plus aucun rôle
+--  applicatif n'y a de privilège de lecture ou d'écriture depuis 20260902000255. Il faudrait donc aussi RÉ-ACCORDER ces
+--  grants — c'est-à-dire défaire une réconciliation ACL délibérée, sur une table que la
+--  référence canonique Fresh n'expose pas. C'est cela, et non la difficulté technique,
+--  qui écarte l'option A.
 --
---  E10 — Boutique. La catégorie produit est fermée à quatre valeurs
+--    alter table public.contacts_clients
+--      add column if not exists prenom text,
+--      add column if not exists telephone_mobile text,
+--      add column if not exists notes  text,
+--      add column if not exists statut text not null default 'active';
+--    alter table public.contacts_clients add constraint contacts_clients_statut_check
+--      check (statut in ('active','inactive')) not valid;
+--    -- puis, INDISPENSABLE et hors périmètre de ce lot :
+--    --   grant select, insert, update on public.contacts_clients to authenticated;
+--    -- et la table jumelle contacts_fournisseurs, de forme identique.
+--
+--  DANS TOUS LES CAS, public.contacts_clients N'EST PAS TOUCHÉE par ce fichier : ni ses
+--  lignes, ni ses colonnes, ni ses grants, ni la clé étrangère appels_contacts.contact_id
+--  qui la référence. Les données existantes sont préservées par abstention.
+--
+--
+--  E10 — Boutique, non arbitrée. La catégorie produit est fermée à quatre valeurs
 --    (imprimante_code_barres, plastifieuse, consommable_plastification,
 --    etiquette_aimantee — 20260724000144) et le catalogue est VIDE : aucun
 --    `insert into boutique_produits` n'existe dans les 272 migrations. Vendre une carte

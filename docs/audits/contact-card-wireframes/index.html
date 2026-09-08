@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ELSATIA Contact / Card — wireframes fonctionnels V1 (R2)</title>
+<title>ELSATIA Contact / Card — wireframes fonctionnels V1 (R3)</title>
 <style>
   :root{
     --fond:#f4f5f7; --papier:#ffffff; --encre:#101418; --encre-2:#5b636d;
@@ -73,7 +73,7 @@
   <h1>ELSATIA Contact / Card — wireframes fonctionnels V1</h1>
   <p class="sous">Lot <code>ELSATIA-CONTACT-CARD-RECIPROCAL-EXCHANGE-GP-BRIDGE-V1</code> ·
   base <code>1fc1331</code> · branche <code>audit/elsatia-contact-card-architecture-v1</code> ·
-  <strong>révision R2</strong>, décisions D1 à D10 intégrées</p>
+  <strong>révision R3</strong> — D1 à D10, O1 à O4, E4 et E5 intégrées</p>
 </header>
 
 <div class="avert">
@@ -273,8 +273,11 @@
       <span class="puce a">contact_nom : « P. Dupont » → « Pierre Dupont »</span></div>
     <div class="bloc"><p class="p">Rôles</p>
       <span class="puce o">fournisseur</span> <span class="puce o">sous-traitant</span></div>
-    <div class="bloc creux">Mobile et site Internet restent au carnet :
-      la fiche fournisseur ne porte pas ces champs (E5 non arbitrée).</div>
+    <div class="bloc"><p class="p">Répartition des coordonnées</p>
+      <span class="puce">site → organisation</span>
+      <span class="puce">standard → organisation</span>
+      <span class="puce o">mobile → interlocuteur</span>
+      <span class="puce o">ligne directe → interlocuteur</span></div>
     <div class="bouton">Confirmer le classement</div>
     <p class="note">Rien n'est écrasé sans être montré. Ce qui ne peut pas être versé est
     dit, pas tu.</p>
@@ -332,6 +335,61 @@
   </div>
 </div>
 
+<h2>D bis · Interlocuteurs, images et OCR</h2>
+<div class="grille">
+
+  <div class="tel">
+    <div class="titre">P15 bis — Deux cartes, un seul fournisseur</div>
+    <div class="bloc"><strong>Dupont Matériaux</strong>
+      <p class="p">Fournisseur · Sous-traitant · SIRET 123…</p></div>
+    <div class="bloc"><div class="barre"><strong>Pierre Dupont</strong>
+      <span class="puce o">principal</span></div>
+      <p class="p">Commercial · 06 12 34 56 78</p></div>
+    <div class="bloc"><div class="barre"><strong>Sophie Bernard</strong>
+      <span class="puce">technique</span></div>
+      <p class="p">Chargée d'affaires · 06 98 76 54 32</p></div>
+    <div class="bloc creux">Ajouter une carte de ce fournisseur
+      <br><span class="puce o">→ nouvel interlocuteur, pas nouveau fournisseur</span></div>
+    <p class="note">Deux cartes du même fournisseur produisent <strong>un fournisseur et deux
+    interlocuteurs</strong>. Un interlocuteur qui part devient inactif : rien n'est supprimé,
+    et la place de principal se libère pour son remplaçant.</p>
+  </div>
+
+  <div class="tel">
+    <div class="titre">O2 — Cycle de vie de l'image</div>
+    <div class="bloc"><div class="barre"><strong>Carte de Sophie Martin</strong>
+      <span class="puce o">classée</span></div>
+      <p class="p">Données conservées</p></div>
+    <div class="bloc"><div class="barre"><span>Photo d'origine</span>
+      <span class="puce a">supprimée dans 5 j</span></div>
+      <p class="p">Confirmée le 03/09 · suppression automatique à 7 jours</p></div>
+    <div class="bouton creux">Supprimer l'image maintenant</div>
+    <div class="bouton creux">Conserver exceptionnellement…</div>
+    <div class="bloc creux">Une conservation exige un <strong>motif</strong>, un
+      <strong>auteur</strong> et une <strong>date d'expiration</strong>. Aucune conservation
+      illimitée n'est possible.</div>
+    <p class="note">Carte classée, données conservées, image supprimée : c'est l'état visé,
+    et c'est pourquoi la carte et l'image ont deux cycles de vie séparés. Une carte jamais
+    traitée voit son image purgée à 30 jours.</p>
+  </div>
+
+  <div class="tel">
+    <div class="titre">O3 — Activer l'OCR (paramètres)</div>
+    <div class="bloc"><div class="barre"><span>Plateforme ELSATIA</span>
+      <span class="puce d">non autorisé</span></div>
+      <p class="p">Fournisseur et région non validés</p></div>
+    <div class="bloc creux">☐ Activer la reconnaissance automatique
+      <br><span class="puce d">indisponible tant que la plateforme n'a pas autorisé</span></div>
+    <div class="bloc"><p class="p">Ce qui se passera si vous activez</p>
+      <ul class="compact"><li>les photos partent chez un prestataire</li>
+      <li>chaque champ reste à confirmer un par un</li>
+      <li>vous pouvez désactiver à tout moment</li></ul></div>
+    <p class="note">Deux interrupteurs, dans cet <strong>ordre</strong> : plateforme puis
+    entreprise. L'ordre est refusé par la base, pas seulement par l'écran. Les deux sont
+    fermés par défaut.</p>
+  </div>
+</div>
+
 <h2>E · Chaîne de traitement</h2>
 <div class="flux"><pre>
   réception   NFC · QR · photo · PDF · formulaire · saisie · carte ELSATIA
@@ -362,6 +420,18 @@
 
   [ archivée ]   état terminal, aucune transition sortante
 
+  ── cycle de vie de l'IMAGE, distinct de celui de la carte ──────────────────
+
+  absente → présente ──(30 j si non traitée, 7 j après confirmation)──┐
+                   ↘ conservation_exceptionnelle ──(expiration)──────→│
+                                                                      ▼
+                                          a_supprimer → supprimee (chemin effacé)
+                                                    ↘ erreur_suppression ↻ reprise
+
+  La purge MARQUE, elle n'efface pas : l'application efface puis confirme.
+  C'est ce qui la rend idempotente et reprenable après coupure.
+  Supprimer l'image ne supprime JAMAIS les données structurées.
+
   Transitions interdites, à faire respecter par la base :
     reçue ─✗→ classée                 on ne classe pas ce qu'on n'a pas vérifié
     doublon_possible ─✗→ synchronisée on ne synchronise pas un doublon non arbitré
@@ -370,7 +440,8 @@
 
 <footer>
   Wireframes fonctionnels — lot ELSATIA-CONTACT-CARD-RECIPROCAL-EXCHANGE-GP-BRIDGE-V1,
-  révision R2. Aucune reprise de nom, marque, logo, texte, visuel, couleur, structure
+  révision R3. Page publique servie par <code>card.elsatia.fr</code>, origine distincte de
+  l'application authentifiée. Aucune reprise de nom, marque, logo, texte, visuel, couleur, structure
   commerciale, garantie ou témoignage d'un produit tiers. Aucun prix, aucun délai, aucun
   stock, aucune garantie n'est énoncé. Documents associés :
   <code>ELSATIA-CONTACT-CARD-ARCHITECTURE-AUDIT-REPORT.md</code>,
