@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { estCleIdempotence, type TypeMutation } from "@/lib/offline/contrat";
-import { identiteCourante } from "@/lib/offline/identite";
+import { resoudreIdentite } from "@/lib/offline/identite";
 
 export const runtime = "nodejs";
 
@@ -54,10 +54,15 @@ export async function POST(requete: Request) {
   // `getContexteReserves()` REDIRIGE quand la session manque : dans une route d'API,
   // cela produirait un 307 vers /login qu'un client hors-ligne interpréterait comme une
   // réponse métier. On résout donc l'identité sans redirection, et on répond 401.
-  const identite = await identiteCourante();
-  if (!identite) {
+  const resolution = await resoudreIdentite();
+  if (resolution.etat === "indisponible") {
+    // 503, et non 401 : la file doit réessayer, pas envoyer l'utilisateur se reconnecter.
+    return NextResponse.json({ error: resolution.motif }, { status: 503 });
+  }
+  if (resolution.etat === "anonyme") {
     return NextResponse.json({ error: "Authentification requise" }, { status: 401 });
   }
+  const identite = resolution.identite;
 
   let corps: { mutations?: MutationEntrante[] };
   try {

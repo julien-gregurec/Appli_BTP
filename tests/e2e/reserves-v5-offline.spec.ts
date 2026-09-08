@@ -1,6 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
-import { randomUUID } from "node:crypto";
-import { connexion, jetonSupabase, RESERVES, rpc } from "./reserves-aides";
+import { createHash, randomUUID } from "node:crypto";
+import {
+  connexion, contexteAutreAppareil, jetonSupabase, RESERVES, rpc,
+} from "./reserves-aides";
 
 /**
  * Recette V5 — hors-ligne réel, en navigateur.
@@ -15,6 +17,7 @@ import { connexion, jetonSupabase, RESERVES, rpc } from "./reserves-aides";
 
 const CHANTIER = "e0000000-0000-0000-0000-000000000001";
 const INTERVENANT_B = "e2000000-0000-0000-0000-00000000000b";
+const ENTREPRISE_B = "f0000000-0000-0000-0000-000000000001";
 
 test.skip(
   !process.env.E2E_RESERVES_URL,
@@ -60,16 +63,15 @@ async function preparerAppareil(page: Page) {
  * La coquille relance une synchronisation à chaque ouverture : on la recharge jusqu'à ce
  * qu'elle annonce n'avoir plus rien à envoyer, plutôt que d'attendre un délai arbitraire.
  */
-async function attendreFileVidee(page: Page, essais = 6) {
-  for (let i = 0; i < essais; i += 1) {
-    await page.goto(`${RESERVES}/hors-ligne`, { waitUntil: "domcontentloaded" });
-    // On OBSERVE la coquille se vider, sans la recharger : chaque rechargement relance
-    // une synchronisation, et plusieurs envois concurrents de la même mutation se
-    // disputeraient la même ligne en base.
-    const vide = page.locator('[data-test="rien-a-envoyer"]');
-    if (await vide.isVisible({ timeout: 25_000 }).catch(() => false)) return;
-  }
-  await expect(page.locator('[data-test="rien-a-envoyer"]')).toBeVisible({ timeout: 25_000 });
+async function attendreFileVidee(page: Page) {
+  // On ouvre la coquille UNE fois, puis on la laisse travailler sous les yeux — c'est
+  // exactement ce que fait un utilisateur qui attend le retour du réseau, et c'est aussi
+  // la seule façon de mesurer la synchronisation : chaque navigation interrompt l'envoi
+  // en cours, si bien qu'une boucle de rechargements peut empêcher indéfiniment une file
+  // de se vider alors que l'application fonctionne. La coquille réessaie toute seule.
+  await page.goto(`${RESERVES}/hors-ligne`, { waitUntil: "domcontentloaded" });
+  await expect(page.locator('[data-test="capture-offline"]')).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('[data-test="rien-a-envoyer"]')).toBeVisible({ timeout: 90_000 });
 }
 
 /** Ouvre la coquille hors-ligne et attend son hydratation. */
@@ -158,18 +160,24 @@ test("une réserve saisie hors ligne arrive en base au retour du réseau", async
 }) => {
   await connexion(page, "admin-a@invalid.local");
   await preparerAppareil(page);
-  await context.setOffline(true);
-  await ouvrirCoquilleHorsLigne(page);
 
+  // Le titre est tiré, et son ABSENCE du serveur constatée, AVANT la coupure : le
+  // contexte Playwright applique `setOffline` à toutes ses requêtes, y compris celles
+  // de l'API. Vérifier depuis le réseau pendant la coupure ne testerait donc pas
+  // l'application, seulement l'émulation.
   const titre = `Constat hors ligne ${randomUUID().slice(0, 8)}`;
-  await saisir(page, { type: "reserve_creer", titre, description: "Saisi sans couverture." });
-  await expect(page.locator('[data-test="message-capture"]')).toContainText("retour du réseau");
-  await expect(page.locator('[data-test="file-hors-ligne"]')).toContainText(titre);
-
-  // Rien n'est parti : le serveur ne connaît pas encore cette réserve.
   const jetonA = await jetonSupabase(request, "admin-a@invalid.local");
   const avant = await rpc(request, jetonA, "reserves_export_chantier", { p_chantier_id: CHANTIER });
   expect(JSON.stringify(await avant.json())).not.toContain(titre);
+
+  await context.setOffline(true);
+  await ouvrirCoquilleHorsLigne(page);
+
+  await saisir(page, { type: "reserve_creer", titre, description: "Saisi sans couverture." });
+  // La preuve que rien n'est parti est LOCALE, et c'est la bonne : la saisie est annoncée
+  // comme non transmise et figure dans la file de l'appareil.
+  await expect(page.locator('[data-test="message-capture"]')).toContainText("retour du réseau");
+  await expect(page.locator('[data-test="file-hors-ligne"]')).toContainText(titre);
 
   // Retour du réseau : la file part d'elle-même.
   await context.setOffline(false);
@@ -241,9 +249,14 @@ test("une photo saisie hors ligne est conservée puis déposée, sans doublon", 
   await ouvrirCoquilleHorsLigne(page);
 
   await page.locator('[data-test="type-mutation"]').selectOption("photo_ajouter");
+  // La réserve tout juste créée n'est pas forcément dans le cache local : le semeur ne
+  // mémorise que ce que l'écran a listé. On retombe alors sur une autre réserve connue —
+  // et l'on relit ENSUITE l'identifiant réellement sélectionné, faute de quoi la
+  // vérification finale porterait sur une réserve qui n'a jamais reçu la photo.
   await page.locator('[data-test="reserve"]').selectOption(reserveId).catch(async () => {
     await page.locator('[data-test="reserve"]').selectOption({ index: 0 });
   });
+  const reserveVisee = await page.locator('[data-test="reserve"]').inputValue();
   // Un JPEG minimal mais réel : le serveur valide le type MIME, pas un nom de fichier.
   await page.locator('[data-test="photo"]').setInputFiles({
     name: "constat.jpg", mimeType: "image/jpeg",
@@ -268,8 +281,8 @@ test("une photo saisie hors ligne est conservée puis déposée, sans doublon", 
     p_chantier_id: CHANTIER, p_intervenant_id: null,
   });
   const liste = (await photos.json()) as { reserve_id: string }[];
-  // Exactement UNE photo pour cette réserve : la clé d'idempotence a fait son office.
-  expect(liste.filter((p) => p.reserve_id === reserveId)).toHaveLength(1);
+  // Exactement UNE photo pour la réserve VISÉE : la clé d'idempotence a fait son office.
+  expect(liste.filter((p) => p.reserve_id === reserveVisee)).toHaveLength(1);
 });
 
 // ── §3 — idempotence et reprise ──────────────────────────────────────────────
@@ -304,9 +317,20 @@ test("une file rejouée plusieurs fois ne duplique rien", async ({ page, context
   await context.setOffline(false);
   // Cinq rejeux consécutifs de la MÊME mutation.
   for (let essai = 0; essai < 5; essai += 1) {
-    const reponse = await page.request.post(`${RESERVES}/api/offline/mutations`, {
+    // Un 503 signale un service momentanément injoignable — c'est précisément ce que la
+    // file traite comme transitoire et rejoue. On l'imite ici : ce test porte sur
+    // l'ABSENCE DE DOUBLON au rejeu, pas sur la disponibilité du poste de recette.
+    let reponse = await page.request.post(`${RESERVES}/api/offline/mutations`, {
       data: { mutations: [mutation] },
+      // Cet appel ÉCRIT en base : son budget n'est pas celui d'une action d'écran.
+      timeout: 60_000,
     });
+    for (let reprise = 0; reprise < 4 && reponse.status() === 503; reprise += 1) {
+      await page.waitForTimeout(3_000);
+      reponse = await page.request.post(`${RESERVES}/api/offline/mutations`, {
+        data: { mutations: [mutation] }, timeout: 60_000,
+      });
+    }
     expect(reponse.status()).toBe(200);
     const corps = await reponse.json() as { resultats: { issue: string }[] };
     // Le premier applique, les suivants sont reconnus comme des rejeux : jamais un échec.
@@ -370,6 +394,28 @@ test("une levée validée pendant la coupure n'est JAMAIS écrasée par la file"
   const jetonA = await jetonSupabase(request, "admin-a@invalid.local");
   const jetonB = await jetonSupabase(request, "gerant-b@invalid.local");
 
+  // Ce test exige que B soit RATTACHÉE au chantier. Le décor la laisse « invitée », et le
+  // parcours V3 la révoque en fin de course : selon ce qui a tourné avant, son état
+  // diffère. Le test établit donc lui-même sa condition d'entrée, au lieu de dépendre de
+  // l'ordre d'exécution des spécifications.
+  await rpc(request, jetonA, "reserves_reactiver_intervenant", {
+    p_intervenant_id: INTERVENANT_B,
+  });
+  const dejaRattachee = await rpc(request, jetonB, "reserves_export_chantier", {
+    p_chantier_id: CHANTIER,
+  });
+  if (((await dejaRattachee.json()) as unknown[]).length === 0) {
+    const jeton = `recette-conflit-${Date.now()}`;
+    const empreinte = createHash("sha256").update(jeton).digest("hex");
+    expect((await rpc(request, jetonA, "reserves_inviter_intervenant", {
+      p_intervenant_id: INTERVENANT_B, p_token_hash: empreinte,
+      p_email: "gerant-b@invalid.local", p_contact_nom: "Bernard É.",
+    })).status()).toBeLessThan(300);
+    expect((await rpc(request, jetonB, "reserves_invitation_accepter", {
+      p_token_hash: empreinte, p_entreprise_id: ENTREPRISE_B,
+    })).status()).toBeLessThan(300);
+  }
+
   // Une réserve prise en charge par B : c'est l'état qui autorise une demande de levée.
   const creation = await rpc(request, jetonA, "reserves_creer", {
     p_chantier_id: CHANTIER, p_titre: `Conflit levée ${randomUUID().slice(0, 8)}`,
@@ -396,12 +442,16 @@ test("une levée validée pendant la coupure n'est JAMAIS écrasée par la file"
   await expect(page.locator('[data-test="message-capture"]')).toBeVisible();
 
   // Pendant ce temps, sur un autre appareil : la levée est demandée PUIS validée.
-  expect((await rpc(request, jetonB, "reserves_demander_levee", {
+  // Ces actions viennent d'un AUTRE appareil, resté connecté : elles passent donc par un
+  // contexte d'API indépendant de l'émulation réseau du navigateur.
+  const autreAppareil = await contexteAutreAppareil();
+  expect((await rpc(autreAppareil, jetonB, "reserves_demander_levee", {
     p_reserve_id: reserveId,
   })).status()).toBeLessThan(300);
-  expect((await rpc(request, jetonA, "reserves_statuer_levee", {
+  expect((await rpc(autreAppareil, jetonA, "reserves_statuer_levee", {
     p_reserve_id: reserveId, p_validee: true,
   })).status()).toBeLessThan(300);
+  await autreAppareil.dispose();
 
   await context.setOffline(false);
   // Un conflit ne vide JAMAIS la file : on ouvre la coquille et on laisse la
@@ -412,8 +462,13 @@ test("une levée validée pendant la coupure n'est JAMAIS écrasée par la file"
 
   // La réserve reste LEVÉE : la file n'a rien réécrit.
   const lignes = await rpc(request, jetonA, "reserves_export_chantier", { p_chantier_id: CHANTIER });
-  const reserve = ((await lignes.json()) as { id: string; statut: string }[])
-    .find((l) => l.id === reserveId);
+  // On vérifie la réponse AVANT de la parcourir : en cas d'indisponibilité du service, le
+  // corps est un objet d'erreur, et un `.find()` dessus masquerait la vraie cause derrière
+  // un « n'est pas une fonction » parfaitement illisible.
+  expect(lignes.status(), await lignes.text()).toBe(200);
+  const corps = await lignes.json();
+  expect(Array.isArray(corps)).toBe(true);
+  const reserve = (corps as { id: string; statut: string }[]).find((l) => l.id === reserveId);
   expect(reserve?.statut).toBe("levee");
 
   // Et la saisie de B n'est pas perdue : elle est conservée, marquée en conflit.
@@ -457,6 +512,7 @@ test("la file préparée par A n'est jamais envoyée sous l'identité de B", asy
 
   const refus = await page.request.post(`${RESERVES}/api/offline/mutations`, {
     data: { mutations: [mutation] },
+    timeout: 60_000,
   });
   expect(refus.status()).toBe(200);
   const corps = await refus.json() as { resultats: { issue: string; motif?: string }[] };

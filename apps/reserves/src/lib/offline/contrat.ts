@@ -67,7 +67,10 @@ export function estEnSuspens(etat: EtatMutation): boolean {
 const TRANSITIONS: Record<EtatMutation, readonly EtatMutation[]> = {
   brouillon: ["en_attente", "annule"],
   en_attente: ["en_cours", "annule"],
-  en_cours: ["synchronise", "echec", "conflit"],
+  // `en_cours → en_attente` : un envoi interrompu par le réseau retourne en file de
+  // lui-même. Sans ce chemin, une coupure passagère exigerait un geste humain pour
+  // repartir, alors qu'elle se résout seule dès que la liaison revient.
+  en_cours: ["synchronise", "en_attente", "echec", "conflit"],
   echec: ["en_attente", "annule"],
   conflit: ["annule"],
   synchronise: [],
@@ -191,6 +194,9 @@ export function aEnvoyer(
 
 // ── Classement des réponses serveur ──────────────────────────────────────────
 
+/** Plafond de reprises automatiques : au-delà, la file cesse d'insister toute seule. */
+export const TENTATIVES_MAX = 5;
+
 export type IssueServeur =
   | { issue: "applique"; identifiant: string | null }
   | { issue: "rejeu"; identifiant: string | null }
@@ -199,13 +205,21 @@ export type IssueServeur =
   | { issue: "reseau"; motif: string };
 
 /**
- * État d'arrivée d'une mutation selon la réponse.
+ * État d'arrivée d'une mutation selon la réponse et le nombre de tentatives déjà faites.
  *
- * Un REJEU vaut un succès : c'est la réponse normale quand le premier envoi a abouti mais
- * que son accusé s'est perdu. Le présenter comme un échec pousserait l'utilisateur à
- * ressaisir une action déjà enregistrée.
+ * Trois principes :
+ *
+ *  — un REJEU vaut un succès : c'est la réponse normale quand le premier envoi a abouti
+ *    mais que son accusé s'est perdu. Le présenter comme un échec pousserait à ressaisir
+ *    une action déjà enregistrée ;
+ *
+ *  — une panne RÉSEAU est transitoire par nature : la mutation retourne en file et
+ *    repartira seule, jusqu'au plafond de tentatives. Exiger un clic pour se remettre
+ *    d'une coupure de trente secondes serait absurde sur un chantier ;
+ *
+ *  — un REFUS métier, lui, ne se répare pas tout seul : il attend une décision.
  */
-export function etatApresReponse(reponse: IssueServeur): EtatMutation {
+export function etatApresReponse(reponse: IssueServeur, tentatives = 0): EtatMutation {
   switch (reponse.issue) {
     case "applique":
     case "rejeu":
@@ -213,13 +227,11 @@ export function etatApresReponse(reponse: IssueServeur): EtatMutation {
     case "conflit":
       return "conflit";
     case "refus":
-    case "reseau":
       return "echec";
+    case "reseau":
+      return tentatives >= TENTATIVES_MAX ? "echec" : "en_attente";
   }
 }
-
-/** Un refus métier définitif ne doit pas être rejoué en boucle : il est plafonné. */
-export const TENTATIVES_MAX = 5;
 
 export function doitAbandonner(mutation: Pick<Mutation, "tentatives">): boolean {
   return mutation.tentatives >= TENTATIVES_MAX;
