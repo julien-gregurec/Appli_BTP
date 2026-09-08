@@ -89,6 +89,11 @@ async function envoyerPhoto(
   corps.set("photo", blob, String(mutation.payload.nomFichier ?? "photo.jpg"));
 
   const reponse = await fetch("/api/offline/photo", { method: "POST", body: corps, signal });
+  if (reponse.status === 503) {
+    // Le serveur dit lui-même qu'il est indisponible : on réessaiera, sans inquiéter
+    // l'utilisateur sur une session qui, elle, est parfaitement valide.
+    return { issue: "reseau", motif: "Serveur momentanément indisponible : nouvel essai à venir." };
+  }
   if (reponse.status === 401) {
     return { issue: "reseau", motif: "Session expirée : reconnectez-vous pour envoyer." };
   }
@@ -122,10 +127,11 @@ async function envoyerLot(
     signal,
   });
 
-  if (reponse.status === 401) {
-    for (const m of mutations) {
-      issues.set(m.id, { issue: "reseau", motif: "Session expirée : reconnectez-vous pour envoyer." });
-    }
+  if (reponse.status === 401 || reponse.status === 503) {
+    const motif = reponse.status === 503
+      ? "Serveur momentanément indisponible : nouvel essai à venir."
+      : "Session expirée : reconnectez-vous pour envoyer.";
+    for (const m of mutations) issues.set(m.id, { issue: "reseau", motif });
     return issues;
   }
   const donnees = await reponse.json().catch(() => null) as ReponseLot | null;
@@ -191,7 +197,7 @@ export async function synchroniser(
       }
 
       const tentatives = mutation.tentatives + 1;
-      const etat = etatApresReponse(issue);
+      const etat = etatApresReponse(issue, tentatives);
       await changerEtat(identite, mutation.id, etat, {
         tentatives,
         derniereErreur: "motif" in issue ? issue.motif : null,
@@ -201,6 +207,8 @@ export async function synchroniser(
       if (etat === "synchronise") bilan.synchronisees += 1;
       else if (etat === "conflit") bilan.conflits += 1;
       else bilan.echecs += 1;
+      // Une mutation remise en file ne doit pas être renvoyée dans CE passage : elle
+      // repartira au prochain, une fois la cause probable dissipée.
     }
     return bilan;
   } finally {

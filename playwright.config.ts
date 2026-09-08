@@ -17,8 +17,13 @@ export default defineConfig({
     // consomme tout le budget du test : l'échec se présente alors comme un dépassement de
     // délai global, à des dizaines de lignes de la vraie cause. Ce plafond fait échouer
     // l'action là où elle est écrite.
-    actionTimeout: 15_000,
-    navigationTimeout: 30_000,
+    // Budgets calibrés sur une machine CHARGÉE. Le poste de recette héberge plusieurs
+    // piles Supabase simultanées ; on y a mesuré des authentifications à plus de dix
+    // secondes et des navigations sous service worker au-delà de trente. Des plafonds
+    // trop serrés y font échouer la recette sur la contention, jamais sur une
+    // régression — c'est le pire des deux mondes : du rouge qui n'apprend rien.
+    actionTimeout: 30_000,
+    navigationTimeout: 60_000,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "off",

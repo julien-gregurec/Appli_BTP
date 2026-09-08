@@ -1,4 +1,6 @@
-import { expect, type APIRequestContext, type Page } from "@playwright/test";
+import {
+  expect, request as apiPlaywright, type APIRequestContext, type Page,
+} from "@playwright/test";
 
 /**
  * Utilitaires communs à la recette ELSATIA Réserves.
@@ -79,6 +81,11 @@ export async function jetonSupabase(request: APIRequestContext, email: string) {
     const reponse = await request.post(`${url}/auth/v1/token?grant_type=password`, {
       headers: { apikey: key, "Content-Type": "application/json" },
       data: { email, password: "test" },
+      // Budget propre : le plafond global de la configuration vise des actions d'écran,
+      // alors qu'ici on interroge un service d'authentification mesuré comme lent sous
+      // charge sur ce poste. Un dépassement y signifierait « machine occupée », pas
+      // « identifiants refusés ».
+      timeout: 60_000,
     });
     if (reponse.status() === 200) return (await reponse.json()).access_token as string;
     dernier = reponse.status();
@@ -101,5 +108,22 @@ export async function rpc(
       "Content-Type": "application/json",
     },
     data: parametres,
+    // Ces appels ÉCRIVENT en base : même raison que ci-dessus.
+    timeout: 60_000,
   });
+}
+
+
+/**
+ * Contexte d'API INDÉPENDANT du navigateur.
+ *
+ * Le contexte de test applique `setOffline` à toutes ses requêtes, y compris celles de
+ * l'API : pendant une coupure simulée, la fixture `request` ne peut donc plus joindre le
+ * serveur. Or certains scénarios ont précisément besoin qu'un AUTRE appareil agisse
+ * pendant que celui-ci est hors ligne — une levée validée ailleurs, par exemple. Ce
+ * contexte-ci n'est pas soumis à l'émulation réseau du navigateur : il représente
+ * l'autre appareil, resté connecté.
+ */
+export async function contexteAutreAppareil(): Promise<APIRequestContext> {
+  return apiPlaywright.newContext();
 }

@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { BUCKET_PHOTOS } from "@/lib/donnees";
 import { MIMES_PHOTO, TAILLE_MAX_PHOTO } from "@/lib/images";
 import { estCleIdempotence } from "@/lib/offline/contrat";
-import { identiteCourante } from "@/lib/offline/identite";
+import { resoudreIdentite } from "@/lib/offline/identite";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -22,10 +22,14 @@ export const maxDuration = 60;
  * ni photo fantôme qui satisferait à tort l'exigence de preuve à la levée.
  */
 export async function POST(requete: Request) {
-  const identite = await identiteCourante();
-  if (!identite) {
+  const resolution = await resoudreIdentite();
+  if (resolution.etat === "indisponible") {
+    return NextResponse.json({ error: resolution.motif }, { status: 503 });
+  }
+  if (resolution.etat === "anonyme") {
     return NextResponse.json({ error: "Authentification requise" }, { status: 401 });
   }
+  const identite = resolution.identite;
 
   const formulaire = await requete.formData().catch(() => null);
   if (!formulaire) {
