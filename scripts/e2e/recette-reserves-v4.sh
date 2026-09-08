@@ -54,6 +54,15 @@ psql_fichier "$RACINE/scripts/e2e/prepare-local-recipe.sql"
 echo "3/5 · Décor de collaboration V3"
 psql_fichier "$RACINE/scripts/e2e/prepare-reserves-v3-recipe.sql"
 
+# La normalisation Auth est REJOUÉE ici, et ce n'est pas une précaution de style.
+# `prepare-reserves-v3-recipe.sql` crée le gérant de l'entreprise extérieure APRÈS
+# l'étape 2 : ses colonnes de jetons restent donc NULL, et GoTrue échoue à les lire
+# (« converting NULL to string is unsupported ») avec un 500 sur toute tentative de
+# connexion. Le symptôme était intermittent en apparence seulement — il frappait
+# systématiquement l'entreprise invitée, donc les seuls scénarios qui la font agir.
+# Le script étant idempotent, le rejouer ici couvre tout compte créé par le décor.
+psql_fichier "$RACINE/scripts/e2e/prepare-local-recipe.sql"
+
 echo "4/5 · Remise à zéro du parcours + décor des listes V4"
 psql_fichier "$RACINE/scripts/e2e/reset-reserves-recipe.sql"
 psql_fichier "$RACINE/scripts/e2e/prepare-reserves-v4-listes.sql"
