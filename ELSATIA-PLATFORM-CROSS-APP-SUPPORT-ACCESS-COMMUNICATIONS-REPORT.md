@@ -6,7 +6,7 @@
 | Branche | `feat/platform-cross-app-support-access-communications-v1` |
 | Base | `integration/elsatia-ecosystem-train-v2-reserves-gp-v1` @ `1fc1331842cdf5980b374169994587813bdee7b6` |
 | Worktree isolé | `/Volumes/ELSATIA-DEV/ELSATIA-WORKTREES/platform-support-comms-v1` |
-| SHA final poussé | *(voir §14 — consigné au commit qui suit ce rapport)* |
+| SHA du contenu du lot | `dfb00f62978665f0a5e652e36b3b1c2f31755b67` — poussé sur `origin` |
 | Migration canonique créée | **aucune** — ledger inchangé à **272 fichiers**, numéro fonctionnel maximal **274** |
 | Production / Stripe Live | **non touchés** |
 | Fusion / déploiement | **aucun** |
@@ -688,4 +688,5 @@ dans la coquille de chaque application.
 
 | SHA | Objet |
 |---|---|
-| *(à compléter)* | contrat transverse, SQL proposé, écrans plateforme, bandeaux, rapport |
+| `dfb00f62978665f0a5e652e36b3b1c2f31755b67` | contrat transverse, SQL proposé, écrans plateforme, bandeaux, rapport |
+| le commit suivant | consigne ce SHA dans le rapport, comme le font les lots précédents |
