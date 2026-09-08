@@ -2,6 +2,7 @@ import { confirmerCompteAction } from "@/app/actions/auth";
 import { PiedLegal } from "@/components/PiedLegal";
 import { BrandWordmark } from "@/components/BrandWordmark";
 import { PRODUCT_NAME } from "@/lib/brand";
+import { lienRelaisColors } from "@/lib/auth-relais-colors";
 
 export default async function ConfirmerPage({
   searchParams,
@@ -10,6 +11,15 @@ export default async function ConfirmerPage({
 }) {
   const { token_hash, type, next } = await searchParams;
   const lienValide = Boolean(token_hash && type);
+  // Le gabarit d'e-mail Supabase est unique pour tout le projet et ancré sur
+  // SiteURL : une réinitialisation demandée depuis Colors atterrit ici. Rien
+  // dans le lien n'en porte la trace, et le jeton n'a pas encore été vérifié :
+  // le seul discriminant fiable est le choix explicite de la personne. Choisir
+  // Colors relaie le jeton **non consommé** vers son écran équivalent, qui
+  // exécutera verifyOtp sur son origine — les sessions ne sont pas partagées
+  // entre sous-domaines. Absent de la configuration, le relais ne s'affiche pas
+  // et cette page se comporte exactement comme avant.
+  const relaisColors = lienRelaisColors({ tokenHash: token_hash, type });
 
   return (
     <main className="flex flex-1 items-center justify-center p-6">
@@ -36,6 +46,19 @@ export default async function ConfirmerPage({
                 Confirmer
               </button>
             </form>
+            {relaisColors && (
+              <div className="space-y-2 border-t border-neutral-200 pt-4">
+                <p className="text-center text-xs text-neutral-500">
+                  Le mot de passe est commun à toutes les applications ELSATIA.
+                </p>
+                <a
+                  href={relaisColors}
+                  className="block w-full rounded-md border border-neutral-300 px-3 py-2 text-center text-sm font-medium text-neutral-700"
+                >
+                  Poursuivre sur ELSATIA Colors
+                </a>
+              </div>
+            )}
           </>
         ) : (
           <p className="rounded-md bg-red-50 px-3 py-2 text-center text-sm text-red-700">

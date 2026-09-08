@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { ROBOTS_PRECOMMERCIAL } from "@/lib/seo/indexation";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -9,6 +10,9 @@ export const metadata: Metadata = {
   description: "Gestion intelligente des stocks et des teintes de peinture",
   applicationName: "ELSATIA Colors",
   manifest: "/manifest.webmanifest",
+  // Phase précommerciale : aucune route de Colors n'est indexable.
+  // Hérité par toutes les pages, aucune ne le redéclare.
+  robots: ROBOTS_PRECOMMERCIAL,
   icons: {
     icon: "/icons/colors-icon.svg",
     apple: "/icons/colors-icon.svg",
