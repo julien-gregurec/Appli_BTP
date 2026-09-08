@@ -86,7 +86,8 @@
     <div class="box"><div class="img">visuel produit</div><strong class="esp">Nom du produit</strong>
       Description courte<div class="flex esp"><span class="champ">&lt;prix à définir&gt;</span><span class="etat">rupture</span></div></div>
   </div>
-  <p class="note esp"><b>Règles.</b> Le prix affiché est TTC en premier pour un particulier, HT en premier pour un professionnel.
+  <p class="note esp"><b>Règles.</b> Le prix affiché est TTC en premier pour un <b>particulier</b>, HT en premier pour un <b>professionnel</b>
+  — les deux audiences sont servies (décision D-Q2), et l'audience est déterminée avant le paiement, jamais déduite après.
   Un produit en rupture reste visible et reste non commandable — il n'est jamais masqué pour faire croire à un catalogue plein.
   Le délai affiché vient du fournisseur ou du transporteur, jamais d'une estimation.</p>
 </div>
@@ -199,10 +200,15 @@
       <div class="rappel esp"><b>Le code n'est ni sur la puce, ni dans le QR.</b> Il arrive par un canal distinct de l'objet.
       Usage unique, expirable, tentatives limitées.</div>
       <div class="esp"><span class="champ">Carte à associer : &lt;choisir ou créer&gt;</span></div>
+      <div class="note esp"><b>Un compte ELSATIA est requis pour activer</b>, jamais pour acheter (D-Q2).
+      Une commande passée sans compte se rattache ici, en une fois.</div>
       <div class="flex esp"><span class="btn">Activer</span></div></div>
   </div>
   <p class="note esp"><b>Rappel d'architecture.</b> La puce ne contient qu'une URL — décision Contact/Card V1, inchangée.
   Ce que ce lot ajoute, c'est le niveau « support » qui permet réattribution et remplacement sans jeter l'objet.</p>
+  <p class="note esp"><b>Socle permanent (D-Q9).</b> Une fois activée, la carte résout et affiche le profil <b>sans abonnement</b> :
+  URL révocable, NFC, QR, vCard, coordonnées essentielles, modification du profil de base, désactivation en cas de perte.
+  Aucun écran de facturation ne peut désactiver ce socle.</p>
 </div>
 
 <!-- 7 -->
@@ -249,11 +255,15 @@
     <tr><td>&lt;série&gt;</td><td>&lt;lot&gt;</td><td><span class="etat">révoqué</span></td><td>—</td><td>&lt;date&gt;</td></tr></table></div>
   <div class="grid g2 esp">
     <div class="box"><strong>Réattribuer</strong>
-      <span class="champ">Nouvelle carte à associer</span>
+      <span class="champ">Nouveau titulaire</span>
       <div class="esp"><span class="champ">Motif (obligatoire)</span></div>
+      <div class="rappel esp"><b>Confirmation exigée (D-Q8) :</b> administrateur de l'entreprise détentrice.
+      Pour une carte détenue en propre par un particulier, <b>le titulaire est l'autorité</b>.</div>
       <div class="flex esp"><span class="btn">Réattribuer</span></div>
-      <div class="note esp">Clôt l'association en cours, en ouvre une nouvelle. <b>La puce ne change pas.</b>
-      L'ancienne carte reste révoquée et terminale.</div></div>
+      <div class="note esp">Enchaîne les neuf exigences : révocation de l'ancien <b>jeton de profil</b> · désactivation
+      de l'ancien profil · contrôle des permissions · confirmation · nouveau jeton · nouvelle attribution ·
+      audit append-only · notification · <b>aucun accès résiduel pour l'ancien titulaire</b>.
+      <b>La puce ne change pas</b> et le QR imprimé reste valide.</div></div>
     <div class="box"><strong>Révoquer le support</strong>
       <div class="rappel">Perte, vol, casse. <b>Irréversible.</b> L'URL de la puce ne résout plus jamais.
       Le profil et les contacts du titulaire sont conservés et peuvent être portés sur un support de remplacement.</div>

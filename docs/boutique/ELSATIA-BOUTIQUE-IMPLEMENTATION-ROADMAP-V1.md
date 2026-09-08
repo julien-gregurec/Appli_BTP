@@ -7,31 +7,35 @@
 
 ---
 
-## 1. Trois préalables qui ne sont pas des lots
+## 1. Préalables — état après les décisions R2
 
-Aucun des lots ci-dessous ne peut être planifié tant que ces trois points ne sont pas rendus.
+| Préalable | Statut |
+|---|---|
+| **Q2 — vend-on à des particuliers ?** | **TRANCHÉ — oui.** Le lot 1 construit **deux modèles clients distincts**, sans faux tenant professionnel. |
+| **Q9 — la carte fonctionne-t-elle sans abonnement ?** | **TRANCHÉ — oui**, socle permanent. Le lot 7 ne conditionne aucune fonction du socle à un paiement. |
+| **Q8 — réattribution** | **TRANCHÉ.** Le lot 7 peut démarrer une fois ses dépendances levées. |
+| **Facturation de vente** | **devient P0-3** : condition d'ouverture, plus un simple lot aval. Dépend encore d'une validation juridique. |
 
-| Préalable | Nature | Qui tranche |
-|---|---|---|
-| **Q2 — vend-on à des particuliers ?** | commerciale | Julien |
-| **Q9 — la carte fonctionne-t-elle sans abonnement ?** | commerciale **et** juridique | Julien + juriste |
-| **9.8 — facturation de vente** | juridique, bloquant | juriste |
-
-Q2 détermine à elle seule si le lot 1 doit construire un modèle client à deux audiences ou une
-seule. Se tromper ici, c'est refaire le socle.
+Il reste des questions ouvertes (Q1, Q3 à Q7, Q10, Q11, Q13), mais **aucune ne bloque plus le
+démarrage du lot 1** : elles portent sur la fabrication, la TVA, le périmètre géographique et la
+forme de la surface, pas sur le modèle client.
 
 ---
 
-## 2. Lot P0 — corrections indépendantes
+## 2. P0 — quatre conditions bloquantes avant toute ouverture
 
-Ne dépend d'aucun arbitrage. Peut partir immédiatement, et **devrait** partir avant le Train V3.
+| # | Condition | Dépend de | Effort |
+|---|---|---|---:|
+| **P0-1** | `boutiqueEstActive()` en fail-closed + `FEATURE_BOUTIQUE_ENABLED` documentée | rien | ~0,5 j |
+| **P0-2** | Le webhook **refuse** un `livemode` ne correspondant pas à l'environnement | rien | ~0,5 j |
+| **P0-3** | **Aucune commande payable sans facture de vente ELSATIA** | lots 1, 4, 5 puis 8 + juriste | cf. lot 8 |
+| **P0-4** | Boutique masquée, catalogue vide, tant que P0-1 à P0-3 ne sont pas fermées | — | tenu |
 
-| # | Correction | Fichier | Effort |
-|---|---|---|---|
-| P0-A | `boutiqueEstActive()` en fail-closed + documenter `FEATURE_BOUTIQUE_ENABLED` dans `.env.example` | `src/lib/preview-features.ts` | ~0,5 j |
-| P0-B | Vérifier `livemode` avant traitement de l'événement | `…/stripe/boutique/webhook/route.ts` | ~0,5 j |
+**P0-1 et P0-2 (~1 jour) ne dépendent d'aucun arbitrage** et devraient partir avant le Train V3.
 
-**Total P0 : ~1 jour**, tests compris.
+**P0-3 supprime le palier intermédiaire.** Il n'existe plus d'étape où la Boutique serait ouverte
+mais pas encore facturante : le lot 8 cesse d'être différable et devient une dépendance de
+l'ouverture, au même titre que le paiement.
 
 ---
 
@@ -42,48 +46,55 @@ fonctionnelle et hors rédaction juridique. Elles supposent les préalables rend
 
 | # | Lot | Contenu | Dépend de | Estimation |
 |---:|---|---|---|---:|
-| 1 | **Socle catalogue** | Produit / variante / prix daté, natures, catégories, statut commercial, archivage, médias, journal append-only, **client Boutique** | Q2, Train V3 | 12–18 j |
+| 1 | **Socle catalogue** | Produit / variante / prix daté, natures, catégories, statut commercial, archivage, médias, journal append-only, **deux modèles clients (particulier / professionnel)**, rattachement ultérieur idempotent, suivi par jeton borné | Train V3 | 15–22 j |
 | 2 | **Administration** | 16 domaines, surface plateforme, réutilisation annuaire + accès support strict | 1, Train V3 | 10–15 j |
 | 3 | **Panier** | Panier serveur, revalidation des prix, **réservation de stock**, expiration | 1 | 5–8 j |
 | 4 | **Paiement Test** | Checkout, webhook durci (`livemode`), TVA résolue au devis, idempotence | 3, P0, Stripe | 8–12 j |
 | 5 | **Commandes** | 4 axes d'états, transitions, permissions, preuves, notifications, gabarits e-mail | 4 | 10–15 j |
 | 6 | **Logistique** | Expéditions, transporteur, suivi, incidents, réexpédition, pont faible GP | 5 | 8–12 j |
-| 7 | **Cartes NFC** | Support physique, indirection de résolution, encodage, activation, association, réattribution, révocation | 5, **Contact/Card** | 15–22 j |
-| 8 | **Factures et avoirs** | Numérotation, PDF, archivage, avoirs, mentions | 5, juriste | 10–14 j |
+| 7 | **Cartes NFC** | Support physique, indirection de résolution (jeton de profil), encodage, activation, association, **réattribution à 9 exigences**, révocation, **socle permanent non désactivable par la facturation** | 5, **Contact/Card** | 18–26 j |
+| 8 | **Factures et avoirs** — **bloque l'ouverture (P0-3)** | Numérotation, PDF, archivage, avoirs, mentions | 5, juriste | 10–14 j |
 | 9 | **Retours et remboursements** | Demande, autorisation, bordereau, réception, constat, remboursement plafonné, litiges | 8 | 10–14 j |
 | 10 | **Recette** | pgTAP, tests d'intégration, parcours de bout en bout, jeux d'essai | 1–9 | 12–18 j |
 | 11 | **Préparation Production** | CGV publiées, mentions, médiation, RGPD, runbook, bascule Stripe, plan de retour arrière | 10, juriste | 8–12 j |
 
-**Total indicatif : 108 à 160 jours de développement**, hors P0, hors rédaction juridique, hors
+**Total indicatif : 114 à 172 jours de développement**, hors P0, hors rédaction juridique, hors
 sourcing fournisseur.
+
+L'écart avec l'estimation de l'audit `6cb0b79` (108–160 j) vient de deux décisions : le lot 1
+porte désormais **deux modèles clients** au lieu d'un, et le lot 7 porte les **neuf exigences de
+réattribution** ainsi que la garantie que la facturation ne peut pas désactiver le socle.
 
 ### Ce que ces chiffres ne disent pas
 
-Ils supposent : le fournisseur choisi, les finitions connues, les délais transporteur connus, les
-CGV rédigées, et Q2/Q9 tranchées. **Aucune de ces conditions n'est remplie aujourd'hui.** Le
-chemin critique réel n'est pas le développement : c'est le sourcing et le juridique.
+Ils supposent : le fournisseur choisi, les finitions connues, les délais transporteur connus et
+les CGV rédigées. **Aucune de ces conditions n'est remplie.** Q2, Q8 et Q9 sont désormais
+tranchées, ce qui débloque la conception — mais **le chemin critique reste le sourcing
+fournisseur, le juridique et la fusion du Train V3**, pas le développement.
 
 ---
 
 ## 4. Séquencement
 
 ```
-  P0 ───────────────────────────────────────────────────────► (indépendant)
+  P0-1, P0-2 ──────────────────────────────────────────────► (indépendants, immédiats)
 
-  Q2, Q9, 9.8 ──► Lot 1 ──┬──► Lot 2
-                          │
-                          └──► Lot 3 ──► Lot 4 ──► Lot 5 ──┬──► Lot 6
-                                                           │
-                                                           ├──► Lot 7  (+ Contact/Card)
-                                                           │
-                                                           └──► Lot 8 ──► Lot 9
+  Train V3 ──► Lot 1 ──┬──► Lot 2
+                       │
+                       └──► Lot 3 ──► Lot 4 ──► Lot 5 ──┬──► Lot 6
+                                                        │
+                                                        ├──► Lot 7   (+ Contact/Card)
+                                                        │
+                                                        └──► Lot 8 ──► Lot 9
+                                                             ▲
+                                                        P0-3 ┘  ← barrière d'ouverture
 
-                                            Lots 1–9 ──► Lot 10 ──► Lot 11
+                                         Lots 1–9 ──► Lot 10 ──► Lot 11 ──► OUVERTURE
 ```
 
-Deux chemins peuvent avancer en parallèle une fois le lot 5 livré : la logistique (6) et la
-facturation (8). Le lot 7 est le plus long et **ne doit pas être démarré avant** que Q8
-(indirection de résolution Contact/Card) soit validée.
+Deux chemins avancent en parallèle une fois le lot 5 livré : la logistique (6) et la facturation
+(8). **Le lot 8 est désormais sur le chemin critique de l'ouverture** (P0-3). Le lot 7 est le
+plus long ; Q8 étant tranchée, il n'attend plus qu'un socle Contact/Card qui n'existe pas.
 
 ---
 
@@ -107,8 +118,8 @@ bloquée par l'état de l'écosystème autour d'elle.
 
 ## 6. Ordre recommandé, en une phrase
 
-> Faire P0 maintenant · trancher Q2 et Q9 · faire fusionner le Train V3 · développer Contact/Card ·
-> puis, et seulement puis, ouvrir le lot 1.
+> Faire P0-1 et P0-2 maintenant · faire fusionner le Train V3 · ouvrir le lot 1 (deux modèles
+> clients) · développer Contact/Card en parallèle · et ne rien ouvrir avant que P0-3 soit fermé.
 
 ---
 

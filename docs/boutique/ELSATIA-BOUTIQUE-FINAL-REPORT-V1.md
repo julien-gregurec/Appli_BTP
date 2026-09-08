@@ -4,6 +4,7 @@
 |---|---|
 | Lot | `ELSATIA-BOUTIQUE-COMMERCE-ARCHITECTURE-READINESS-V1` |
 | Nature | **Documentaire exclusivement.** |
+| Révision | **R2 — décisions Q2, Q8, Q9 et P0 consignées.** Audit `6cb0b79` accepté. |
 | Branche | `audit/elsatia-boutique-commerce-architecture-v1` |
 | SHA de base | `1fc1331` — `integration/elsatia-ecosystem-train-v2-reserves-gp-v1` |
 | SHA du contenu | `406b8d3` |
@@ -36,6 +37,21 @@ Deux constats dominent tous les autres :
 elle est bloquée par l'état de l'écosystème autour d'elle.** Cinq de ses sept dépendances sont
 sur des branches non fusionnées.
 
+### Ce que la révision R2 change
+
+Trois décisions ont été rendues et consignées (`ELSATIA-BOUTIQUE-DECISIONS-R2-V1.md`) :
+
+| Décision | Effet |
+|---|---|
+| **D-Q2 — B2C accepté** | Deux modèles clients distincts. `entreprise_id` cesse d'être la clé d'entrée. **Aucun faux tenant professionnel** n'est acceptable comme contournement. Acheter ne demande plus de compte ; **activer**, si. |
+| **D-Q8 — réattribution** | Retenue, avec l'indirection au niveau du support. Le jeton révoqué est celui **du profil**, pas l'identifiant gravé — sinon la carte serait à usage unique et le QR imprimé deviendrait faux. |
+| **D-Q9 — socle permanent** | La carte est un **bien vendu**, pas un service loué. L'arrêt d'un abonnement avancé ne désactive pas le socle. C'est une contrainte de code, pas une consigne d'exploitation. |
+
+**Le P0 passe de deux à quatre conditions**, et la quatrième change le séquencement du projet :
+plus aucune commande ne peut être payable sans facture de vente ELSATIA. Il n'existe donc plus de
+palier intermédiaire où la Boutique serait ouverte mais pas encore facturante — le lot
+« Factures et avoirs » cesse d'être différable.
+
 ## 2. État réel de l'existant
 
 Vérifié dans le code au SHA `1fc1331`, et non repris du constat historique.
@@ -62,14 +78,16 @@ Vérifié dans le code au SHA `1fc1331`, et non repris du constat historique.
 | Inclus | Motif |
 |---|---|
 | Catalogue multi-nature : produit / variante / **prix daté** | Sans lui, aucune des natures demandées n'est représentable |
-| **Client Boutique** distinct de l'entreprise | Sans lui, on ne vend qu'aux abonnés existants |
+| **Deux modèles clients** : particulier et professionnel (D-Q2) | Sans eux, on ne vend qu'aux abonnés existants. Aucun faux tenant professionnel |
+| Achat sans compte, **activation avec compte**, rattachement ultérieur idempotent (D-Q2) | Un dirigeant commande pour son équipe ; un particulier offre une carte |
 | Panier serveur avec **réservation de stock** | Corrige la survente silencieuse |
 | Paiement ponctuel, Stripe **Test uniquement** | Le mode déjà en place, durci |
 | Commandes à 4 axes d'états | Les 20 libellés demandés, sans combinaisons impossibles |
 | **Facture de vente ELSATIA** + avoirs | Bloquant légal |
 | Retours, remboursement plafonné, litiges | Absents aujourd'hui |
 | Expéditions, transporteur, suivi, incidents | Absents aujourd'hui |
-| Cartes NFC : support, activation, association, réattribution, révocation | Le produit V1 envisagé |
+| Cartes NFC : support, activation, association, **réattribution à 9 exigences**, révocation (D-Q8) | Le produit V1 envisagé |
+| **Socle permanent** non désactivable par la facturation (D-Q9) | La carte est un bien vendu |
 | Administration plateforme (16 domaines) | 2 sur 16 existent |
 | Journal append-only | Aucune trace aujourd'hui |
 
@@ -77,8 +95,8 @@ Vérifié dans le code au SHA `1fc1331`, et non repris du constat historique.
 
 | Différé | Motif |
 |---|---|
-| **Commande sans compte** | Le seul produit V1 (carte NFC) exige une identité pour être activé. Un parcours invité créerait un second parcours complet — panier, suivi par jeton, RGPD dégradé — pour des ventes qui n'existent pas. Le modèle de données prévoit néanmoins le client Boutique pour ne pas avoir à tout refaire. |
-| **Panier mixte bien + abonnement** | Fragile chez Stripe, et brouille la frontière bien / service qu'il faut tenir nette pour les CGV. |
+| ~~Commande sans compte~~ | **Plus différée (D-Q2).** L'achat sans compte est retenu, avec rattachement ultérieur facultatif. Les difficultés relevées deviennent des exigences du lot 1 : lien de suivi borné en durée et en portée, vérification d'identité RGPD ne se réduisant pas à l'adresse e-mail, rattachement idempotent. |
+| **Panier mixte bien + abonnement** | **Écarté définitivement (D-Q9)** : option C retenue — achat du bien seul, abonnement proposé à l'activation. |
 | **Coupons Stripe** | Bloqués par l'usage de `price_data` inline. À rouvrir si l'option B ou C du §1.10 du catalogue est retenue. |
 | **Vente hors de France** | Suppose la résolution complète de la TVA par pays. À décider (Q7), pas à subir. |
 | **Précommande** | Modélisée comme disponibilité, non développée en V1. |
@@ -116,7 +134,9 @@ Aucun prix, aucun délai, aucune finition, aucune garantie n'est fixé.
 | # | Risque | Gravité | Observation |
 |---|---|---|---|
 | R1 | **Encaisser sans facturer** | **critique** | Existe aujourd'hui dans le code |
-| R2 | **Réouverture accidentelle de la Boutique** | **élevée** | `boutiqueEstActive()` fail-open + un override `entreprise_feature_flags` suffisent. Seul le catalogue vide protège |
+| R2 | **Réouverture accidentelle de la Boutique** | **élevée** | `boutiqueEstActive()` fail-open + un override `entreprise_feature_flags` suffisent. Seul le catalogue vide protège. **Couvert par P0-1 et P0-4** |
+| R11 | **Socle permanent sans règle de fin de service** | moyenne | Un socle annoncé permanent est un engagement de durée. Sans préavis, export et sort de l'URL publique écrits dans les CGV, c'est une promesse que rien ne borne (D-Q9) |
+| R12 | **Coût du socle permanent non couvert** | moyenne | Le socle a un coût d'exploitation qu'aucun abonnement ne financera. Il doit entrer dans le coût réel unitaire de la carte, sinon la vente est perdante sur la durée |
 | R3 | **Confusion Test / Live** | **élevée** | `livemode` journalisé, jamais vérifié. Un événement Test marquerait une commande payée en Live |
 | R4 | **Survente silencieuse** | moyenne | `greatest(0, stock − qté)` absorbe la survente sans alerte |
 | R5 | **Rétractation mal exclue sur un produit personnalisé** | **élevée** | Sans acceptation explicite archivée avant paiement, l'exclusion ne tient pas |
@@ -130,31 +150,41 @@ Aucun prix, aucun délai, aucune finition, aucune garantie n'est fixé.
 
 | # | Question | Qui | Bloque |
 |---|---|---|---|
-| **Q1** | Module dans Gestion Pro, ou surface autonome ? | Julien | tout le lot 1 |
-| **Q2** | Vend-on à des **particuliers** ? *(absorbe Q12)* | Julien | CGV, TVA, RGPD, modèle client |
+| **Q1** | Module dans Gestion Pro, ou surface autonome ? | Julien | **fortement contrainte par D-Q2** — un particulier ne traversant aucune entreprise, ce ne peut plus être un simple module interne |
+| ~~Q2~~ | ~~Vend-on à des particuliers ?~~ | — | **TRANCHÉE — oui** (D-Q2) |
 | **Q3** | Qui **fabrique** les cartes ? | Julien | lot 7, conformité |
 | **Q4** | Rendre `FEATURE_BOUTIQUE_ENABLED` fail-closed avant le Train V3 ? | Julien | rien — recommandé immédiatement |
 | **Q5** | Conserve-t-on le rattachement automatique à la trésorerie client ? | Julien | pont faible |
 | **Q6** | `automatic_tax` Stripe, ou calcul TVA côté ELSATIA ? | Julien | lot 4 |
 | **Q7** | Vend-on hors de France en V1 ? | Julien | TVA, livraison |
-| **Q8** | Ajouter le niveau « support » à la résolution Contact/Card ? | Julien | **lot 7 — à valider avant tout développement** |
-| **Q9** | La carte fonctionne-t-elle **sans abonnement** ? | Julien + juriste | nature du contrat, CGV |
+| ~~Q8~~ | ~~Niveau « support » dans la résolution Contact/Card ?~~ | — | **TRANCHÉE** (D-Q8), lecture « jeton de profil » |
+| ~~Q9~~ | ~~La carte fonctionne-t-elle sans abonnement ?~~ | — | **TRANCHÉE — oui**, socle permanent (D-Q9) |
 | **Q10** | Qui **encode** les puces ? | Julien | flux de jetons vers un tiers |
 | **Q11** | Code d'activation imprimé (pastille) ou en ligne seulement ? | Julien | parcours d'activation |
 | **Q13** | Accepte-t-on la décomposition des états en 4 axes ? | Julien | lot 5 |
-| **Q14** | Bien + abonnement : deux paiements, panier mixte, ou proposition à l'activation ? | Julien | lots 4 et 7 |
+| ~~Q14~~ | ~~Bien + abonnement~~ | — | **RÉSOLUE de fait par D-Q9** : option C, proposition à l'activation |
 
 *(Q12 était une reformulation restreinte de Q2 et a été fusionnée.)*
+
+**Restent ouvertes : Q1, Q3, Q4, Q5, Q6, Q7, Q10, Q11, Q13.** Aucune ne bloque plus le démarrage
+du lot 1 : elles portent sur la fabrication, la TVA, le périmètre géographique et la forme de la
+surface, pas sur le modèle client.
 
 ## 9. Estimation de développement
 
 | Ensemble | Estimation |
 |---|---:|
-| **Lot P0** (fail-closed + contrôle `livemode`) | ~1 j |
-| Lots 1 à 9 (socle → remboursements) | 88 – 130 j |
+| **P0-1 + P0-2** (fail-closed + contrôle `livemode`) | ~1 j |
+| Lots 1 à 9 (socle → remboursements) | 94 – 142 j |
 | Lot 10 (recette) | 12 – 18 j |
 | Lot 11 (préparation Production) | 8 – 12 j |
-| **Total hors P0** | **108 – 160 jours de développement** |
+| **Total hors P0-1/P0-2** | **114 – 172 jours de développement** |
+
+L'écart avec l'estimation de l'audit `6cb0b79` (108–160 j) vient de deux décisions : le lot 1
+porte désormais **deux modèles clients** au lieu d'un, et le lot 7 porte les **neuf exigences de
+réattribution** ainsi que la garantie que la facturation ne peut pas désactiver le socle.
+**P0-3 (facturation) n'ajoute pas de jours** — il déplace le lot 8 sur le chemin critique de
+l'ouverture.
 
 Hors rédaction juridique, hors sourcing fournisseur, hors refonte visuelle (lot ELSATIA-UI-V2).
 
@@ -166,20 +196,20 @@ consommés utilement.
 
 Tous sous `docs/boutique/`, aucun ailleurs.
 
-| Fichier | Lignes |
-|---|---:|
-| `ELSATIA-BOUTIQUE-ARCHITECTURE-AUDIT-REPORT.md` | 378 |
-| `ELSATIA-BOUTIQUE-FUNCTIONAL-SPECIFICATION-V1.md` | 403 |
-| `ELSATIA-BOUTIQUE-CATALOG-ORDERS-MODEL-V1.md` | 405 |
-| `ELSATIA-BOUTIQUE-NFC-CARD-COMMERCE-V1.md` | 253 |
-| `ELSATIA-BOUTIQUE-LEGAL-COMPLIANCE-CHECKLIST-V1.md` | 223 |
-| `ELSATIA-BOUTIQUE-SECURITY-PAYMENT-MODEL-V1.md` | 181 |
-| `ELSATIA-BOUTIQUE-IMPLEMENTATION-ROADMAP-V1.md` | 156 |
-| `wireframes/index.html` | 268 |
-| `ELSATIA-BOUTIQUE-FINAL-REPORT-V1.md` | ce document |
+| Fichier | Lignes | Révision |
+|---|---:|---|
+| `ELSATIA-BOUTIQUE-DECISIONS-R2-V1.md` | 231 | **créé en R2** |
+| `ELSATIA-BOUTIQUE-ARCHITECTURE-AUDIT-REPORT.md` | 380 | mis à jour en R2 |
+| `ELSATIA-BOUTIQUE-FUNCTIONAL-SPECIFICATION-V1.md` | 429 | mis à jour en R2 |
+| `ELSATIA-BOUTIQUE-CATALOG-ORDERS-MODEL-V1.md` | 405 | inchangé |
+| `ELSATIA-BOUTIQUE-NFC-CARD-COMMERCE-V1.md` | 305 | mis à jour en R2 |
+| `ELSATIA-BOUTIQUE-LEGAL-COMPLIANCE-CHECKLIST-V1.md` | 231 | mis à jour en R2 |
+| `ELSATIA-BOUTIQUE-SECURITY-PAYMENT-MODEL-V1.md` | 197 | mis à jour en R2 |
+| `ELSATIA-BOUTIQUE-IMPLEMENTATION-ROADMAP-V1.md` | 167 | mis à jour en R2 |
+| `wireframes/index.html` | 278 | mis à jour en R2 |
+| `ELSATIA-BOUTIQUE-FINAL-REPORT-V1.md` | 235 | mis à jour en R2 |
 
-**SHA du contenu du lot : `406b8d3`** — les neuf fichiers ci-dessus.
-Le SHA final poussé est celui du commit qui consigne cette ligne.
+**SHA du contenu R2 : `<consigné après commit>`** — les dix fichiers ci-dessus.
 
 ## 11. Confirmation de non-intervention
 

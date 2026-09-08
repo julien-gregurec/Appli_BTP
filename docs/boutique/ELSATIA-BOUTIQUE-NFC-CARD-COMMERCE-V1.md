@@ -79,11 +79,17 @@ Cela règle les deux impasses :
 - **perte** = révoquer le **support** (terminal pour cet objet), ré-associer la **carte** à un
   support de remplacement. Le profil et les contacts survivent.
 
-> **Point de réconciliation à valider (Q8).** Ceci ne contredit pas Contact/Card V1 : cela
-> ajoute un niveau que V1 n'avait pas besoin d'avoir, puisqu'il n'y avait rien à fabriquer. Mais
-> la fonction de résolution de V1 devra être revue lors de la réalisation. Ce n'est pas une
-> réécriture : c'est un filtre supplémentaire au même endroit. **À faire valider avant tout
-> développement de la carte physique.**
+> **DÉCIDÉ (D-Q8).** L'indirection au niveau du support est retenue, dans la lecture où
+> « le jeton » révoqué et remplacé lors d'une réattribution est le **jeton de profil de la carte
+> logique**, et non l'identifiant gravé dans la puce.
+>
+> La lecture inverse — révoquer le jeton gravé — imposerait de **ré-encoder physiquement la
+> puce** à chaque réattribution, donc de récupérer la carte, **et rendrait faux le QR imprimé**,
+> puisque Contact/Card V1 impose que QR et NFC portent le même jeton. La carte deviendrait de
+> fait à usage unique. Cette lecture est écartée.
+>
+> La fonction de résolution de Contact/Card V1 devra donc être revue lors de la réalisation :
+> ce n'est pas une réécriture, c'est un filtre supplémentaire au même endroit.
 
 ---
 
@@ -101,15 +107,31 @@ propres droits et sa propre preuve.
 | 5 | Association au titulaire | Association support ↔ carte | Journal d'association | oui — un support peut être activé sans titulaire |
 | 6 | Abonnement logiciel éventuel | Abonnement | Facture d'abonnement | **oui, et c'est essentiel** |
 
-**L'étape 6 est facultative et doit le rester.** Contact/Card V1 prévoit explicitement un
-fonctionnement sans Gestion Pro (§5 de sa spécification). Vendre une carte physique qui cesse de
-fonctionner si l'on ne paie pas un abonnement transformerait un bien acheté en service loué —
-un changement de nature commerciale et juridique qui devrait alors être écrit noir sur blanc
-avant l'achat, pas découvert après. **Recommandation : la carte achetée résout et affiche le
-profil sans abonnement.** Ce qui se paie, ce sont les fonctions d'équipe, de classement et
-d'intégration Gestion Pro.
+**L'étape 6 est facultative — DÉCIDÉ (D-Q9).** Une carte NFC achetée **continue à fonctionner
+sans abonnement payant**. La carte est un bien vendu, pas un service loué.
 
-C'est une question à trancher — **Q9** — parce qu'elle change les CGV, pas seulement le prix.
+| Socle **permanent** — jamais conditionné à un paiement récurrent | Fonctions **avancées** — abonnement facultatif |
+|---|---|
+| URL publique révocable | Gestion d'équipe |
+| NFC | Statistiques |
+| QR code | OCR |
+| vCard | Synchronisation Gestion Pro |
+| Coordonnées essentielles | Classement automatique |
+| Modification du profil de base | Campagnes |
+| Désactivation en cas de perte | Personnalisation avancée, automatisations |
+
+> **L'arrêt d'un abonnement avancé ne doit pas désactiver le socle de la carte achetée.**
+
+Trois conséquences qui ne sont pas rédactionnelles :
+
+1. **contrainte de code, pas d'exploitation** : aucun mécanisme de facturation ne doit pouvoir
+   désactiver la résolution de l'URL publique d'une carte achetée. Un impayé d'abonnement avancé
+   ne touche pas le socle ;
+2. **le poste `coût_logiciel_amorti` devient applicable** : le socle permanent a un coût
+   d'hébergement et d'exploitation que **aucun abonnement ne couvrira**. Il doit entrer dans le
+   coût réel unitaire de la carte, sous peine de vendre à perte sur la durée ;
+3. **« permanent » est un engagement de durée** : la règle de fin de service (préavis, export,
+   sort de l'URL publique) doit être écrite dans les CGV **avant** la première vente.
 
 ---
 
@@ -220,6 +242,36 @@ valeurs seront celles du fournisseur retenu, et pas d'autres.
 **Un support révoqué ne renaît pas.** Comme la carte logique dans Contact/Card V1, et pour la
 même raison : c'est ce qui rend la perte sans conséquence.
 
+### Réattribution — les neuf exigences (D-Q8)
+
+| # | Exigence | Porté par |
+|---|---|---|
+| 1 | Révocation de l'ancien **jeton de profil** | fonction de résolution |
+| 2 | Désactivation de l'ancien profil | carte logique |
+| 3 | Contrôle des permissions | RLS |
+| 4 | Confirmation de l'administrateur de l'entreprise | parcours d'administration |
+| 5 | Nouveau jeton de profil | carte logique |
+| 6 | Nouvelle attribution | association support ↔ carte |
+| 7 | Audit **append-only** | journal |
+| 8 | Notification | notifications |
+| 9 | **Absence totale d'accès pour l'ancien titulaire** | RLS + révocation |
+
+Le support ELSATIA n'intervient que par le **mécanisme d'assistance strict** : justifié, limité
+dans le temps, notifié. Aucun droit d'administration général.
+
+**Deux frontières précisées.**
+
+*Carte détenue par un particulier.* L'exigence 4 vise l'administrateur d'une entreprise. Depuis
+D-Q2, une carte peut être achetée par un particulier, qui n'en a pas. Règle retenue : pour une
+carte détenue en propre, **le titulaire est l'autorité** ; la réattribution reste tracée et
+notifiée. Une carte détenue par une entreprise reste soumise à la confirmation de son
+administrateur.
+
+*Portée de l'exigence 9.* « Absence totale d'accès » vise **la carte et son profil**, et ce que
+la carte reçoit désormais. Elle ne défait pas la règle de Contact/Card V1 sur le carnet de
+contacts personnel — versé à l'entreprise ou conservé par la personne, **un choix, pas un défaut
+silencieux**. Le sort du carnet est une décision distincte, qui appartient au lot Contact/Card.
+
 ### Départ d'un salarié — la règle est déjà écrite
 
 Contact/Card V1 tranche (P15) : révocation de la carte, et **choix explicite** sur le carnet
@@ -244,10 +296,10 @@ genre de défaut silencieux que V1 refuse.
 
 | # | Question | Pourquoi elle bloque |
 |---|---|---|
-| Q8 | Ajouter le niveau « support » à la fonction de résolution Contact/Card | Sans lui, ni réattribution ni remplacement. À valider avant tout développement. |
-| Q9 | La carte achetée fonctionne-t-elle **sans** abonnement ? | Change la nature du bien vendu, donc les CGV, pas seulement le prix. |
-| Q10 | Qui fabrique et qui encode ? | Si le fabricant encode, il reçoit une liste de jetons : cela devient un flux de données à encadrer contractuellement. |
-| Q11 | Le code d'activation est-il imprimé (pastille) ou uniquement en ligne ? | La pastille est plus simple pour l'utilisateur, mais elle voyage avec l'objet. |
-| Q12 | Vend-on la carte à des particuliers, ou seulement à des entreprises ? | Détermine tout le régime de rétractation et le modèle client (cf. Q2). |
+| ~~Q8~~ | ~~Niveau « support » dans la résolution Contact/Card~~ | **TRANCHÉE** — retenu, lecture « jeton de profil ». Cf. §2. |
+| ~~Q9~~ | ~~La carte achetée fonctionne-t-elle sans abonnement ?~~ | **TRANCHÉE — oui**, socle permanent. Cf. §3. |
+| Q10 | Qui fabrique et qui encode ? | **ouverte** — si le fabricant encode, il reçoit une liste d'identifiants : flux de données à encadrer contractuellement. |
+| Q11 | Le code d'activation est-il imprimé (pastille) ou uniquement en ligne ? | **ouverte** — la pastille est plus simple, mais elle voyage avec l'objet. |
+| ~~Q12~~ | ~~Vend-on la carte à des particuliers ?~~ | **TRANCHÉE — oui.** Fusionnée dans D-Q2. |
 
-Aucune n'est tranchée. Elles remontent au rapport final.
+Q10 et Q11 restent ouvertes et remontent au rapport final.

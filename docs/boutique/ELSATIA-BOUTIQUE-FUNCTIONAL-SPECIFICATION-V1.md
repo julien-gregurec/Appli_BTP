@@ -104,23 +104,30 @@ tiers pour demander son historique. Un compte, lui, offre un canal authentifié.
 carte, et une carte a un titulaire (Contact/Card V1). Vendre une carte à un acheteur anonyme
 produit un objet qu'il faudra de toute façon rattacher à un compte pour qu'il serve.
 
-### Conclusion — recommandation
+### Conclusion — **décidée (D-Q2)**
 
-| Cas | Compte |
+L'analyse ci-dessus concluait, faute d'arbitrage, à un compte obligatoire pour toute commande.
+**La décision R2 remplace cette recommandation** : le B2C est accepté, et le modèle doit assurer
+le *rattachement ultérieur facultatif à un compte ELSATIA*.
+
+| Moment | Compte ELSATIA |
 |---|---|
-| Produit **activable** (carte NFC, licence, abonnement) | **Compte obligatoire.** Non négociable : sans identité, le produit ne fonctionne pas. |
-| Produit **non activable** (accessoire seul) | Compte non requis techniquement. |
-| **Recommandation V1** | **Compte obligatoire pour tout.** |
+| **Acheter** | facultatif |
+| **Activer** un produit activable (carte NFC, licence) | **obligatoire** — sans titulaire, le produit ne fonctionne pas |
+| **Rattacher** une commande passée à un compte | à l'initiative du client, à tout moment |
 
-Justification : le seul produit V1 réellement envisagé est la carte NFC, qui exige un compte.
-Ouvrir un parcours invité pour les seuls accessoires ferait construire, tester et maintenir un
-second parcours complet — panier invité, suivi par jeton, procédure RGPD dégradée, réconciliation
-si l'invité crée un compte ensuite — pour une part de ventes qui n'existe pas encore.
+Cette règle est cohérente avec l'usage réel : une carte peut être **achetée** par quelqu'un qui
+n'en sera pas le titulaire — un dirigeant qui commande pour son équipe, un particulier qui
+l'offre. Le rattachement ultérieur devient le chemin normal, pas une exception.
 
-**Ce n'est pas un refus définitif.** C'est un report motivé : la commande invité redeviendra
-pertinente le jour où le catalogue comportera des produits non activables vendus seuls. Le
-modèle de données doit donc prévoir un **client Boutique** distinct de l'entreprise
-(cf. §A.4) — pour ne pas avoir à tout refaire à ce moment-là.
+Les trois difficultés relevées ci-dessus ne disparaissent pas pour autant : elles deviennent des
+exigences du lot 1.
+
+| Difficulté | Exigence qui en découle |
+|---|---|
+| Suivi sans compte | Lien porteur de jeton **borné en durée et en portée**, révocable. |
+| Droits RGPD sans canal authentifié | Vérification d'identité qui ne se réduit **pas** à la connaissance de l'adresse e-mail. |
+| Réconciliation | Rattachement **idempotent** : rattacher deux fois la même commande ne la duplique pas. |
 
 ## A.4 Le modèle client — le point de rupture avec l'existant
 
@@ -131,10 +138,24 @@ de Gestion Pro.
 Conséquence directe : **on ne peut vendre qu'à un client Gestion Pro existant.** Un artisan qui
 veut seulement une carte NFC ne peut pas acheter.
 
-### Conception retenue
+### Conception retenue — **décidée (D-Q2)**
 
-Un **client Boutique** est une entité propre, avec un type (`particulier` | `professionnel`),
-ses adresses, ses commandes, et un **rattachement facultatif** à une entreprise Gestion Pro.
+Deux modèles clients **distincts** : `particulier` et `professionnel`. Un client Boutique est une
+entité propre, avec ses adresses, ses commandes, ses consentements, et un **rattachement
+facultatif** à une entreprise Gestion Pro.
+
+Ce qu'un particulier ne doit **jamais** avoir à fournir :
+
+| Interdit d'exiger | Conséquence |
+|---|---|
+| Une entreprise Gestion Pro | `entreprise_id` cesse d'être la clé d'entrée de la Boutique |
+| Un SIRET | Attribut **du modèle professionnel seulement** |
+| Un abonnement Gestion Pro | Acheter n'exige pas d'être abonné |
+| **Un faux tenant professionnel** | **Aucun contournement par entreprise fictive n'est acceptable** |
+
+Le dernier point est le plus important. Créer une entreprise fantôme pour faire entrer un
+particulier dans le modèle existant aurait fonctionné techniquement, et aurait pollué
+définitivement l'annuaire, la facturation et les statistiques. C'est explicitement écarté.
 
 ```
    compte utilisateur
@@ -347,8 +368,13 @@ affiché à une date donnée est actuellement impossible.
 
 Deux incohérences connues du moteur commercial pèsent sur la Boutique et **ne sont pas tranchées
 ici** : deux modèles de comptes supplémentaires incompatibles, et un tarif annuel calculé ×10
-d'un côté et ×12 de l'autre. Elles n'affectent la Boutique que si Q9 conclut que la carte
-embarque un service. **Elles relèvent du lot tarifaire et du Train V3, pas de ce lot.**
+d'un côté et ×12 de l'autre.
+
+**D-Q9 les rend pertinentes, contrairement à ce qui était écrit avant la révision R2.** Le socle
+de la carte est permanent et gratuit, mais les **fonctions avancées** reposent sur un abonnement
+facultatif — qui sera tarifé par ce même moteur. Les deux incohérences s'appliqueront donc dès
+que cet abonnement existera. **Elles relèvent du lot tarifaire et du Train V3, pas de ce lot**,
+mais elles ne peuvent plus être écartées comme hypothétiques.
 
 ---
 

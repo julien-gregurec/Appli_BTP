@@ -62,6 +62,7 @@ une case à cocher : c'est une copie à conserver.
 
 | # | Point | Hypothèse de travail — **non validée** | Statut |
 |---|---|---|---|
+| 3.0 | **Applicabilité** | **Le B2C étant accepté (D-Q2), toute la section 3 s'applique.** Elle n'est plus conditionnelle | **acquis** |
 | 3.1 | Principe | 14 jours pour un particulier achetant à distance | à confirmer |
 | 3.2 | Point de départ | Réception du bien | à confirmer |
 | 3.3 | **Bien personnalisé** | Exclusion possible pour un bien confectionné selon les spécifications du consommateur | **à confirmer — ⚠︎ dépendance technique** |
@@ -135,8 +136,10 @@ qui doit dire lequel s'impose**, pas l'ergonomie.
 | 8.2 | Coordonnées | À publier dans les CGV et les mentions légales | dépend de 8.1 |
 | 8.3 | Plateforme de règlement en ligne | Information éventuelle | à examiner |
 
-**Dépend entièrement de Q2 (vend-on à des particuliers ?).** Si la réponse est non, la section 8
-disparaît. Si elle est oui, elle est **obligatoire et à traiter avant la première vente**.
+> **Q2 est tranchée : le B2C est accepté (D-Q2).** La section 8 n'est donc plus conditionnelle :
+> elle est **obligatoire et à traiter avant la première vente à un particulier**. L'adhésion à un
+> dispositif de médiation n'est pas instantanée — c'est une démarche à engager tôt, pas à la
+> veille de l'ouverture.
 
 ## 9. Fiscalité et facturation
 
@@ -159,7 +162,7 @@ disparaît. Si elle est oui, elle est **obligatoire et à traiter avant la premi
 |---|---|---|---|
 | 10.1 | Base légale | Exécution du contrat pour la commande ; autre base pour la prospection | à examiner |
 | 10.2 | Durées de conservation | **Non uniformes** : facture ≠ fichier de personnalisation ≠ historique d'achat | **⚠︎ dépendance technique** |
-| 10.3 | Droit d'accès | Doit être exerçable par un client Boutique **non abonné** | **⚠︎ dépendance technique** |
+| 10.3 | Droit d'accès | Doit être exerçable par un client Boutique **non abonné et non rattaché à un compte** (D-Q2). La vérification d'identité ne peut pas se réduire à la connaissance de l'adresse e-mail | **⚠︎ dépendance technique** |
 | 10.4 | Droit d'effacement | Limité par les obligations comptables : savoir dire ce qui est conservé et pourquoi | **⚠︎ dépendance technique** |
 | 10.5 | Sous-traitant de fabrication | Contrat de sous-traitance si le fabricant reçoit des données | **à examiner** |
 | 10.6 | Fichiers fournis par le client | Logos : durée de conservation, effacement, droits de tiers | **⚠︎ dépendance technique** |
@@ -188,15 +191,18 @@ disparaît. Si elle est oui, elle est **obligatoire et à traiter avant la premi
 | # | Point | À faire examiner | Statut |
 |---|---|---|---|
 | 13.1 | Contenu numérique | Fourniture, exécution, rétractation | à examiner |
-| 13.2 | Abonnement lié à un bien | **Si** la carte inclut un service (cf. Q9), la nature du contrat change | **⚠︎ à trancher d'abord** |
+| 13.2 | Abonnement lié à un bien | **TRANCHÉ (D-Q9)** : la carte est un **bien vendu**, l'abonnement avancé est un service **distinct et facultatif**. Deux contrats, pas un | **acquis — à rédiger** |
+| 13.2 bis | **Engagement de « socle permanent »** | Le socle fonctionne sans abonnement, sans limite liée au paiement. À écrire : **règle de fin de service** (préavis, export, sort de l'URL publique) et ce que « permanent » signifie exactement | **à rédiger — obligatoire avant la première vente** |
 | 13.3 | Reconduction | Information avant échéance | à examiner |
 | 13.4 | Résiliation | Modalités, y compris en ligne | à examiner |
-| 13.5 | Conséquence de la résiliation sur un bien acheté | **Une carte achetée doit-elle cesser de fonctionner ?** | **⚠︎ à trancher — Q9** |
+| 13.5 | Conséquence de la résiliation sur un bien acheté | **TRANCHÉ (D-Q9) : non.** L'arrêt d'un abonnement avancé **ne désactive pas** le socle de la carte achetée. À écrire explicitement dans les CGV | **acquis — à rédiger** |
 
-**13.5 est une question juridique autant que technique.** Un bien acheté qui cesse de fonctionner
-faute d'abonnement n'est pas vendu, il est loué. La recommandation technique est que la carte
-fonctionne sans abonnement (cf. `…-NFC-CARD-COMMERCE-V1.md` §3) ; **cette recommandation doit
-être confirmée juridiquement avant d'être écrite dans une CGV.**
+**13.5 est tranché.** Un bien acheté qui cesserait de fonctionner faute d'abonnement ne serait pas
+vendu, il serait loué. La décision D-Q9 écarte cette ambiguïté : la carte est un bien.
+
+Il reste au juriste à **rédiger** cette garantie, et surtout à traiter 13.2 bis : un socle annoncé
+comme permanent est un engagement de durée. Sans règle de fin de service écrite, c'est une
+promesse que rien ne borne.
 
 ---
 
@@ -204,13 +210,15 @@ fonctionne sans abonnement (cf. `…-NFC-CARD-COMMERCE-V1.md` §3) ; **cette rec
 
 | Rang | Point | Motif |
 |---|---|---|
-| 1 | **9.8** — absence de facture | On ne peut pas encaisser sans facturer. Bloquant absolu. |
-| 2 | **Q2** — vend-on à des particuliers ? | Détermine les sections 3, 8, et une partie de 9 et 10. |
-| 3 | **Q9 / 13.5** — la carte fonctionne-t-elle sans abonnement ? | Détermine la nature du contrat. |
-| 4 | **3.3 / 3.4** — exclusion de rétractation | Détermine le parcours d'achat lui-même. |
-| 5 | 2.1 / 2.2 — rédaction des CGV | Ne peut commencer qu'après 2, 3 et 4. |
-| 6 | 5.x — conformité produit | À poser avant la commande fournisseur. |
-| 7 | 8.x — médiation | Avant la première vente à un particulier. |
+| 1 | **9.8 / P0-3** — absence de facture | On ne peut pas encaisser sans facturer. **Condition d'ouverture.** |
+| 2 | **3.3 / 3.4** — exclusion de rétractation sur bien personnalisé | Le B2C étant acquis, cela détermine le parcours d'achat lui-même. |
+| 3 | **8.x** — médiation de la consommation | Obligatoire depuis D-Q2. L'adhésion prend du temps : à engager tôt. |
+| 4 | **13.2 bis** — règle de fin de service du socle permanent | Un engagement de durée sans borne écrite. |
+| 5 | 2.1 / 2.2 — rédaction des CGV particuliers **et** professionnels | Ne peut commencer qu'après 1 à 4. |
+| 6 | 5.x — conformité produit | À poser **avant** la commande fournisseur. |
+| 7 | 10.x — RGPD du client non rattaché | Découle de D-Q2. |
+
+Q2 et Q9 ne figurent plus dans cet ordre : elles sont tranchées.
 
 ---
 

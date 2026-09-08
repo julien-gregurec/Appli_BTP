@@ -28,7 +28,7 @@
 
 ## A.2 Le cas décisif : carte physique + abonnement logiciel
 
-Trois options, à trancher (**Q14**) :
+Trois options avaient été posées. **D-Q9 tranche : option C.**
 
 | Option | Fonctionnement | Risque |
 |---|---|---|
@@ -36,10 +36,14 @@ Trois options, à trancher (**Q14**) :
 | **B — Un seul panier mixte** | Une session Stripe contenant bien + abonnement. | Fragile : la date de début de période dépend du paiement, la livraison du bien n'y est pas liée, un remboursement du bien ne doit pas résilier l'abonnement — et inversement. |
 | **C — Achat du bien, puis proposition d'abonnement à l'activation** | La carte s'achète seule. L'abonnement est proposé au moment de l'activation, quand l'utilité est démontrée. | Aucun. |
 
-**Recommandation : C.** Elle découle de la conception des cartes NFC : la carte achetée doit
-fonctionner sans abonnement (cf. `…-NFC-CARD-COMMERCE-V1.md` §3, question Q9). Vendre le bien et
-le service ensemble, dans une même transaction, brouille exactement la frontière qu'il faut tenir
-nette pour les CGV : un bien est livré et peut être retourné, un service est fourni et se résilie.
+**DÉCIDÉ : option C (D-Q9).** La carte achetée fonctionne sans abonnement — socle permanent. Les
+options A (deux paiements imposés) et B (panier mixte) sont écartées. Vendre le bien et le service
+dans une même transaction brouillerait exactement la frontière qu'il faut tenir nette pour les
+CGV : un bien est livré et peut être retourné, un service est fourni et se résilie.
+
+**Contrainte de code qui en découle :** aucun mécanisme de facturation ne doit pouvoir désactiver
+le socle d'une carte achetée. Un impayé d'abonnement avancé ne touche pas la résolution de l'URL
+publique. Ce doit être une propriété du code, pas une consigne d'exploitation.
 
 ## A.3 Facturation — indépendance des documents
 
@@ -171,11 +175,23 @@ Quatre conséquences :
 - **le sous-traitant de fabrication** reçoit des données (noms, éventuellement adresses, visuels).
   Cela suppose un cadre contractuel — porté en checklist juridique, cf. `…-LEGAL-COMPLIANCE-CHECKLIST-V1.md`.
 
-## B.6 Lot P0 — deux corrections mûres, indépendantes du reste
+## B.6 Lot P0 — quatre conditions bloquantes avant toute ouverture (D-P0)
 
-Consignées, **non appliquées** ici. Elles ne dépendent d'aucune décision commerciale.
+Consignées, **non appliquées** ici. **Tant qu'elles ne sont pas toutes fermées, la Boutique reste
+masquée et son catalogue vide.**
 
-| # | Correction | Fichier | Pourquoi maintenant |
-|---|---|---|---|
-| P0-A | Rendre `boutiqueEstActive()` **fail-closed** et documenter `FEATURE_BOUTIQUE_ENABLED` dans `.env.example` | `src/lib/preview-features.ts` | La fonction est la seule des quatre du fichier à être fail-open, contre le commentaire du fichier lui-même. Aujourd'hui seul le catalogue vide protège la Boutique. |
-| P0-B | Vérifier `livemode` avant de traiter un événement | `src/app/api/stripe/boutique/webhook/route.ts` | La valeur est déjà lue et stockée. Il manque la comparaison. |
+| # | Condition | Où | Effort |
+|---|---|---|---:|
+| **P0-1** | Rendre `boutiqueEstActive()` **fail-closed** et documenter `FEATURE_BOUTIQUE_ENABLED` dans `.env.example` | `src/lib/preview-features.ts` | ~0,5 j |
+| **P0-2** | **Refuser** tout événement dont `livemode` ne correspond pas à l'environnement | `…/stripe/boutique/webhook/route.ts` | ~0,5 j |
+| **P0-3** | **Aucune commande payable sans facture de vente ELSATIA** | lot Factures | cf. ci-dessous |
+| **P0-4** | Boutique masquée et catalogue vide tant que P0-1 à P0-3 ne sont pas fermées | — | **tenu aujourd'hui** |
+
+**P0-1 et P0-2** ne dépendent d'aucun arbitrage commercial et restent immédiatement réalisables
+(~1 jour à eux deux).
+
+**P0-3 change le séquencement du projet.** La facturation était le lot 8, en aval des commandes
+et de la logistique ; en faire une condition d'ouverture supprime tout palier intermédiaire où la
+Boutique serait ouverte mais pas encore facturante. C'est aussi le seul des quatre points qui
+dépende d'une validation extérieure à ELSATIA — les mentions obligatoires, la numérotation et la
+durée de conservation relèvent du juriste.

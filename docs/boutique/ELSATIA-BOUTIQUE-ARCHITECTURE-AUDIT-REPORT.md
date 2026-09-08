@@ -356,7 +356,9 @@ La colonne « Réutilisable » estime la part du travail existant récupérable 
    est propre sur la partie qu'il couvre ; il est étroit.
 2. **Le point de rupture est le modèle client**, pas le paiement. Tant que la commande est
    attachée à `entreprises`, la Boutique ne peut vendre qu'à des clients Gestion Pro existants.
-   C'est incompatible avec la vente de cartes NFC telle qu'elle est décrite dans la commande.
+   **La décision D-Q2 rend ce point bloquant et non plus hypothétique** : le B2C étant accepté,
+   `entreprise_id not null` doit disparaître de la clé d'entrée, et un faux tenant professionnel
+   est explicitement écarté comme contournement.
 3. **La facturation de vente est le premier bloquant légal**, avant même les CGV : on ne peut pas
    encaisser sans facturer.
 4. **Deux corrections sont mûres et indépendantes de tout le reste** : rendre
@@ -369,8 +371,8 @@ La colonne « Réutilisable » estime la part du travail existant récupérable 
 
 | # | Question | Pourquoi elle bloque |
 |---|---|---|
-| Q1 | La Boutique doit-elle rester un module **dans** Gestion Pro, ou devenir une surface **autonome** ? | Détermine s'il faut un modèle client hors `entreprises`, donc toute la phase 4. |
-| Q2 | Vend-on à des **particuliers** ? | Change les CGV (rétractation), la TVA, le RGPD et le modèle de commande. |
+| Q1 | La Boutique doit-elle rester un module **dans** Gestion Pro, ou devenir une surface **autonome** ? | **Fortement contrainte par D-Q2** : un particulier ne devant traverser aucune entreprise, la Boutique ne peut plus être un simple module interne. Pas formellement tranchée. |
+| ~~Q2~~ | ~~Vend-on à des **particuliers** ?~~ | **TRANCHÉE — oui.** Cf. `ELSATIA-BOUTIQUE-DECISIONS-R2-V1.md` § D-Q2. |
 | Q3 | Qui **fabrique** les cartes NFC — sous-traitant ou interne ? | Détermine s'il faut un état « envoyée en fabrication » et un échange fournisseur. |
 | Q4 | Le drapeau `FEATURE_BOUTIQUE_ENABLED` doit-il devenir fail-closed **avant** le Train V3 ? | Aujourd'hui, seul le catalogue vide protège la Boutique. |
 | Q5 | Le rattachement automatique à la trésorerie du client est-il **conservé** ? | Bonne idée produit, mais il ne doit plus tenir lieu de facture. |
