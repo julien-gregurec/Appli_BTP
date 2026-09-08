@@ -26,6 +26,24 @@ psql_fichier() {
   docker exec -i "$CONTENEUR" psql -U postgres -q -v ON_ERROR_STOP=1 < "$1"
 }
 
+# Le jeu multi-tenant insère un MOUVEMENT DE STOCK de sortie. Ses insertions sont en
+# `on conflict do nothing`, mais le trigger `appliquer_mouvement_stock()` a, lui, déjà
+# décrémenté l'article au premier passage — et la ligne d'article n'est jamais réécrite.
+# Au bout de dix rejeux, la quantité tombe à zéro et le décor entier s'arrête sur
+# « Stock insuffisant », très loin de ce que la recette Réserves cherche à vérifier.
+#
+# On remet donc les deux articles de test à leur quantité nominale avant de rejouer. Ce
+# n'est pas un contournement : c'est ce qui rend le script réellement rejouable, comme son
+# en-tête l'annonce. Aucun autre article n'est touché — la clause porte sur les seuls
+# identifiants du jeu de test.
+echo "0/5 · Remise à niveau du stock du jeu de test"
+docker exec -i "$CONTENEUR" psql -U postgres -q -v ON_ERROR_STOP=1 <<'SQL'
+update public.articles_stock set quantite_stock = 10
+ where id = 'ad000000-0000-0000-0000-000000000001' and quantite_stock < 10;
+update public.articles_stock set quantite_stock = 20
+ where id = 'bd000000-0000-0000-0000-000000000001' and quantite_stock < 20;
+SQL
+
 echo "1/5 · Jeu métier multi-tenant"
 { echo "begin;"; cat "$RACINE/supabase/tests/fixtures/isolation_multitenant.inc"; echo "commit;"; } \
   | docker exec -i "$CONTENEUR" psql -U postgres -q -v ON_ERROR_STOP=1

@@ -11,8 +11,9 @@ import {
   changerEtat, enregistrerMutation, type Identite, listerMutations, supprimerMutation,
 } from "@/lib/offline/base-locale";
 import {
-  reessayer as remettreEnFile, reprendreApresRedemarrage, synchroniser,
+  rattraperEchecs, reessayer as remettreEnFile, reprendreApresRedemarrage, synchroniser,
 } from "@/lib/offline/synchronisation";
+import { useRepriseAutomatique } from "./useReprise";
 import { memoriserIdentiteLocale } from "@/lib/offline/identite-locale";
 import { reseauJoignable } from "@/lib/offline/reseau";
 
@@ -91,6 +92,30 @@ export function AtelierOffline({
     setSynchronisationEnCours(true);
     try {
       await synchroniser(identite);
+    } finally {
+      setSynchronisationEnCours(false);
+      await rafraichir();
+    }
+  }, [identite, rafraichir]);
+
+  /**
+   * Une passe de reprise automatique. Rend « vrai » si quelque chose a bougé — c'est ce
+   * qui remet la temporisation à son intervalle le plus court.
+   */
+  const tenterReprise = useCallback(async () => {
+    if (!identite) return false;
+    const joignable = await reseauJoignable();
+    setEnLigne(joignable);
+    if (!joignable) return false;
+    // Les échecs rattrapables repassent en file AVANT l'envoi : sans cela, une session
+    // expirée pendant la coupure ne repartirait jamais sans un clic.
+    await rattraperEchecs(identite).catch(() => 0);
+    setSynchronisationEnCours(true);
+    try {
+      const bilan = await synchroniser(identite);
+      // Une passe différée par le verrou n'est pas un échec : on ne recule pas la cadence
+      // pour un simple recouvrement entre deux onglets.
+      return bilan.differee || bilan.synchronisees > 0;
     } finally {
       setSynchronisationEnCours(false);
       await rafraichir();
@@ -189,6 +214,11 @@ export function AtelierOffline({
     await supprimerMutation(identite, id);
     await rafraichir();
   }, [identite, rafraichir]);
+
+  // Reprise périodique, temporisée et bornée. En V5, la coquille applicative ne reprenait
+  // qu'à l'événement `online` — que le système n'émet pas quand la couverture revient sur
+  // un lien resté « connecté ». Une file préparée dans un sous-sol y restait indéfiniment.
+  useRepriseAutomatique(identite !== null && fileChargee, mutations, tenterReprise);
 
   const pret = identite === null || fileChargee;
 

@@ -52,8 +52,10 @@ export function IndicateurOffline() {
  * avec, pour chaque ligne, la cause en clair et le geste qui la débloque.
  */
 export function FileOffline() {
-  const { mutations, reessayer, annuler, oublier, enLigne, synchroniserMaintenant } =
-    useAtelierOffline();
+  const {
+    mutations, reessayer, annuler, oublier, enLigne, synchroniserMaintenant,
+    soumettreBrouillon,
+  } = useAtelierOffline();
   const visibles = mutations.filter((m) => m.etat !== "annule");
 
   if (visibles.length === 0) {
@@ -109,7 +111,17 @@ export function FileOffline() {
               </button>
             )}
             {mutation.etat === "brouillon" && (
-              <span className="mention">Brouillon local — non transmis.</span>
+              <>
+                {/* Un brouillon ne part JAMAIS seul : c'est ce qui le distingue d'une
+                    action en attente. Il lui faut donc un geste, et un seul. */}
+                <button className="bouton" type="button" data-test="soumettre-brouillon"
+                        onClick={() => void soumettreBrouillon(mutation.id)}>
+                  Mettre en file d’envoi
+                </button>
+                <span className="mention">
+                  Brouillon local — non transmis. Modifiable depuis l’écran hors ligne.
+                </span>
+              </>
             )}
             {peutAnnuler(mutation.etat) && (
               <button className="bouton danger" type="button"

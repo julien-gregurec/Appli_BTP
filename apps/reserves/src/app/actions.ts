@@ -11,7 +11,9 @@ import {
   DUREE_INVITATION_JOURS, creerJetonInvitation, hacherJetonInvitation, urlInvitation,
 } from "@/lib/invitations";
 import { envoyerInvitation } from "@/lib/emails-reserves";
+import { deposerLienInvitation } from "@/lib/invitation-relais";
 import { estCleIdempotence } from "@/lib/offline/contrat";
+import { deposerObjet } from "@/lib/depot-photo";
 
 const MESSAGE_SANS_RESERVES = "Votre compte ELSATIA ne dispose pas d’un accès actif à Réserves.";
 const MESSAGE_INDISPONIBLE =
@@ -210,12 +212,10 @@ async function deposerPhoto(
   const { photo_id: photoId, storage_path: chemin } = data as {
     photo_id: string; storage_path: string;
   };
-  const { error: erreurDepot } = await supabase.storage
-    .from(BUCKET_PHOTOS)
-    // `upsert: true` n'est pas un laxisme : le chemin est composé par la base à partir
-    // de la clé d'idempotence, donc réécrire signifie forcément « même photo, même
-    // envoi ». Sans lui, une reprise après coupure échouerait sur « objet déjà présent ».
-    .upload(chemin, fichier, { contentType: fichier.type, upsert: true });
+  // Dépôt sans écrasement : les policies Storage n'accordent que `select` et `insert`,
+  // délibérément. Un objet déjà présent à ce chemin est le nôtre — même clé
+  // d'idempotence — et vaut donc succès plutôt qu'échec.
+  const erreurDepot = await deposerObjet(supabase, BUCKET_PHOTOS, chemin, fichier);
   if (erreurDepot) {
     await supabase.rpc("reserves_supprimer_photo", {
       p_photo_id: photoId, p_motif: "Téléversement interrompu",
@@ -644,9 +644,12 @@ export async function inviterIntervenantAction(formData: FormData) {
   if (resultat.envoye) {
     redirect(`${retour}?message=${encodeURIComponent(`Invitation envoyée à ${email}.`)}`);
   }
-  // Le lien voyage dans l'URL de retour : c'est le seul moyen de le remettre à
-  // l'utilisateur sans le persister, puisqu'il n'existe nulle part ailleurs en clair.
-  redirect(`${retour}?lien=${encodeURIComponent(lien)}&error=${encodeURIComponent(
+  // Le lien est remis à l'utilisateur par un cookie éphémère, JAMAIS par l'URL de retour :
+  // un jeton d'invitation placé dans une URL se retrouve aussitôt dans l'historique du
+  // navigateur et dans les journaux d'accès du serveur, où il survit très largement aux
+  // trente jours de validité de l'invitation. L'URL ne porte plus qu'un drapeau.
+  await deposerLienInvitation(lien);
+  redirect(`${retour}?lien=1&error=${encodeURIComponent(
     `${resultat.motif ?? "Envoi impossible."} Le lien reste valide : transmettez-le vous-même.`,
   )}`);
 }

@@ -179,13 +179,32 @@ export function envoyableSous(
   );
 }
 
+/**
+ * Une charge utile écrite par une version PLUS RÉCENTE de l'application n'est pas lisible.
+ *
+ * Le cas se produit pour de bon : l'application se met à jour pendant qu'une file est
+ * active, l'utilisateur revient sur un ancien onglet — ou, plus fréquemment, un appareil
+ * rouvre une page servie depuis le cache du service worker après un retour en arrière de
+ * version. Le champ `version` était écrit depuis la V5 mais n'était LU nulle part : une
+ * charge utile d'un format inconnu était donc envoyée comme si elle était comprise, et le
+ * serveur en tirait ce qu'il pouvait — c'est-à-dire potentiellement autre chose que ce que
+ * l'utilisateur avait saisi.
+ *
+ * Une version plus ANCIENNE, elle, reste envoyable : les champs d'un ancien format sont un
+ * sous-ensemble du nouveau, et refuser une saisie de terrain déjà faite serait pire que
+ * l'envoyer avec les seuls champs connus.
+ */
+export function payloadLisible(mutation: Pick<Mutation, "version">): boolean {
+  return typeof mutation.version === "number" && mutation.version <= VERSION_PAYLOAD;
+}
+
 /** Mutations réellement prêtes à partir, dans l'ordre où elles ont été saisies. */
 export function aEnvoyer(
   mutations: Mutation[],
   identite: { entrepriseId: string | null; utilisateurId: string | null },
 ): Mutation[] {
   return mutations
-    .filter((m) => m.etat === "en_attente" && envoyableSous(m, identite))
+    .filter((m) => m.etat === "en_attente" && envoyableSous(m, identite) && payloadLisible(m))
     .sort((a, b) => a.creeeA.localeCompare(b.creeeA));
 }
 
