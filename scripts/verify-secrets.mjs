@@ -20,8 +20,24 @@ const signatures = [
   },
 ];
 
+// EXCEPTIONS NOMMÉES, une par une, jamais un motif large.
+//
+// Un fichier qui TESTE un détecteur de secrets contient forcément des chaînes qui
+// ressemblent à des secrets : c'est son objet même. Les exclure par chemin explicite
+// vaut mieux que d'affaiblir les signatures ci-dessus, ce qui rendrait le scanner
+// aveugle partout. Toute entrée ajoutée ici doit être justifiée en clair.
+const EXCEPTIONS = new Map([
+  [
+    "apps/colors/src/lib/public-env-guard.test.ts",
+    "Suite de tests du garde-fou d'environnement public de Colors : elle vérifie que "
+      + "`ressembleAUnSecret()` reconnaît une clé privée et un JWT de service. Les valeurs "
+      + "y sont factices (« AAAA », « signature ») et n'ouvrent aucun accès.",
+  ],
+]);
+
 const alertes = [];
 for (const fichier of fichiers) {
+  if (EXCEPTIONS.has(fichier)) continue;
   let contenu;
   try {
     contenu = readFileSync(fichier, "utf8");
@@ -38,4 +54,7 @@ if (alertes.length) {
   process.exit(1);
 }
 
-console.log(`${fichiers.length} fichiers suivis contrôlés, aucun secret reconnu.`);
+console.log(
+  `${fichiers.length} fichiers suivis contrôlés, aucun secret reconnu`
+    + (EXCEPTIONS.size ? ` (${EXCEPTIONS.size} exception${EXCEPTIONS.size > 1 ? "s" : ""} nommée${EXCEPTIONS.size > 1 ? "s" : ""}).` : "."),
+);
