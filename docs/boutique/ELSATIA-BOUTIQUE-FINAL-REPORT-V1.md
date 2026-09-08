@@ -6,7 +6,8 @@
 | Nature | **Documentaire exclusivement.** |
 | Branche | `audit/elsatia-boutique-commerce-architecture-v1` |
 | SHA de base | `1fc1331` — `integration/elsatia-ecosystem-train-v2-reserves-gp-v1` |
-| SHA final | *(consigné ci-dessous après publication)* |
+| SHA du contenu | `406b8d3` |
+| SHA final poussé | *(commit de consignation, ci-dessous)* |
 | Worktree | `/Volumes/ELSATIA-DEV/ELSATIA-WORKTREES/boutique-commerce-architecture-v1` |
 | Date | 2026-09-08 |
 
@@ -176,6 +177,9 @@ Tous sous `docs/boutique/`, aucun ailleurs.
 | `ELSATIA-BOUTIQUE-IMPLEMENTATION-ROADMAP-V1.md` | 156 |
 | `wireframes/index.html` | 268 |
 | `ELSATIA-BOUTIQUE-FINAL-REPORT-V1.md` | ce document |
+
+**SHA du contenu du lot : `406b8d3`** — les neuf fichiers ci-dessus.
+Le SHA final poussé est celui du commit qui consigne cette ligne.
 
 ## 11. Confirmation de non-intervention
 
