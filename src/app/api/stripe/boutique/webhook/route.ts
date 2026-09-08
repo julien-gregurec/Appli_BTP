@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifierSignatureStripe } from "@/lib/stripe";
 import { boutiqueEstActive } from "@/lib/preview-features";
+import { empreinteEvenementStripe, resoudreModeStripeWebhook } from "@/lib/stripe-webhook-environment";
 
 type StripeEvent = { id: string; type: string; livemode: boolean; data: { object: {
   id: string; payment_status?: string; metadata?: { commande_id?: string };
@@ -20,6 +21,38 @@ export async function POST(request: Request) {
     evenement = JSON.parse(brut) as StripeEvent;
   } catch {
     return NextResponse.json({ error: "JSON invalide" }, { status: 400 });
+  }
+
+  // CONTRÔLE DE MODE, FAIL-CLOSED (P0 de l'audit Boutique).
+  //
+  // Cette route journalisait `livemode` sans jamais le confronter à
+  // l'environnement : un événement Live reçu par un déploiement Test était donc
+  // traité comme un paiement réel — commande finalisée, journal écrit — et
+  // symétriquement un événement Test reçu en Live. La signature ne protège pas de
+  // cela : chaque mode a sa propre clé, mais un endpoint mal recâblé reste signé.
+  //
+  // On réutilise le résolveur du webhook abonnement plutôt que d'en écrire un
+  // second : même variable, même règle, un seul endroit à auditer. Configuration
+  // absente, vide ou invalide ⇒ on refuse, on ne devine pas.
+  if (!boutiqueEstActive()) return NextResponse.json({ error: "Fonctionnalité indisponible" }, { status: 404 });
+  const configurationMode = resoudreModeStripeWebhook();
+  if (!configurationMode.valide) {
+    console.error("Webhook boutique non traité", {
+      categorie: `configuration_${configurationMode.motif}`,
+      type_evenement: evenement.type,
+      empreinte_evenement: empreinteEvenementStripe(evenement.id),
+    });
+    return NextResponse.json({ error: "Webhook temporairement indisponible" }, { status: 503 });
+  }
+  if (evenement.livemode !== configurationMode.livemode) {
+    console.warn("Webhook boutique non traité", {
+      categorie: "mode_stripe_incorrect",
+      type_evenement: evenement.type,
+      empreinte_evenement: empreinteEvenementStripe(evenement.id),
+      mode_recu: evenement.livemode ? "live" : "test",
+      mode_attendu: configurationMode.mode,
+    });
+    return NextResponse.json({ error: "Webhook temporairement indisponible" }, { status: 503 });
   }
 
   const admin = createAdminClient();
