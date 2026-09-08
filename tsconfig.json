@@ -22,7 +22,8 @@
       "@/*": ["./src/*"],
       "@elsatia/application-access": ["./packages/application-access/src/index.ts"],
       "@elsatia/email": ["./packages/email/src/index.ts"],
-      "@elsatia/client-contracts": ["./packages/client-contracts/src/index.ts"]
+      "@elsatia/client-contracts": ["./packages/client-contracts/src/index.ts"],
+      "@elsatia/platform-support-comms": ["./packages/platform-support-comms/src/index.ts"]
     }
   },
   "include": [
