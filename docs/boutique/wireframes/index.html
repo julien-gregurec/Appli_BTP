@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ELSATIA — Boutique : wireframes V1</title>
+<style>
+  :root{
+    --encre:#1d2733; --gris:#6b7684; --trait:#c3cad3; --fond:#f6f7f9;
+    --carte:#ffffff; --accent:#0d1b2a; --or:#c9a24a; --alerte:#b4472c;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:32px 20px 80px;background:var(--fond);color:var(--encre);
+       font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .doc{max-width:1080px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 4px}
+  .sous{color:var(--gris);margin:0 0 8px}
+  .avert{border-left:3px solid var(--or);background:#fffdf7;padding:12px 14px;margin:18px 0 32px;font-size:13px}
+  h2{font-size:16px;margin:44px 0 4px;padding-top:18px;border-top:1px solid var(--trait)}
+  .but{color:var(--gris);font-size:13px;margin:0 0 14px}
+  .wf{background:var(--carte);border:1px solid var(--trait);border-radius:6px;padding:16px;margin:0 0 10px}
+  .bar{display:flex;justify-content:space-between;align-items:center;background:var(--accent);
+       color:#fff;border-radius:4px;padding:9px 12px;font-size:12px;margin:-4px 0 14px}
+  .bar .marque{font-weight:600;letter-spacing:.04em}
+  .box{border:1px dashed var(--trait);border-radius:4px;padding:12px;color:var(--gris);font-size:12px}
+  .box strong{color:var(--encre);font-weight:600;display:block;margin-bottom:5px;font-size:12.5px}
+  .grid{display:grid;gap:10px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g13{grid-template-columns:1.6fr 1fr}
+  .img{background:repeating-linear-gradient(45deg,#eef0f3,#eef0f3 7px,#e5e8ec 7px,#e5e8ec 14px);
+       border:1px dashed var(--trait);border-radius:4px;height:82px;display:flex;align-items:center;
+       justify-content:center;color:var(--gris);font-size:11px}
+  .btn{display:inline-block;background:var(--accent);color:#fff;border-radius:4px;
+       padding:8px 14px;font-size:12px;font-weight:600}
+  .btn.sec{background:transparent;color:var(--encre);border:1px solid var(--trait);font-weight:500}
+  .btn.dan{background:var(--alerte)}
+  .champ{border:1px solid var(--trait);border-radius:4px;padding:8px 10px;color:var(--gris);
+         font-size:12px;background:#fcfcfd}
+  .note{font-size:12px;color:var(--gris);margin:8px 0 0;padding-left:14px;border-left:2px solid var(--trait)}
+  .note b{color:var(--encre)}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}
+  th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--trait);vertical-align:top}
+  th{color:var(--gris);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+  .etat{display:inline-block;border:1px solid var(--trait);border-radius:99px;padding:2px 9px;font-size:11px}
+  .fil{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:11px;color:var(--gris)}
+  .fil span{border:1px solid var(--trait);border-radius:3px;padding:3px 8px;background:#fcfcfd}
+  .rappel{background:#fdf4f1;border:1px solid #e8c3b8;border-radius:4px;padding:10px 12px;font-size:12px}
+  .flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .esp{margin-top:10px}
+  ul{margin:6px 0 0;padding-left:18px;font-size:12px;color:var(--gris)}
+</style>
+</head>
+<body>
+<div class="doc">
+
+<h1>ELSATIA — Boutique : wireframes V1</h1>
+<p class="sous">Schémas de structure, basse fidélité. Base <code>1fc1331</code>.</p>
+
+<div class="avert">
+  <b>Ce que ces schémas sont, et ne sont pas.</b><br>
+  Ils décrivent <b>ce que chaque écran doit contenir et dans quel ordre</b>, pas son apparence.
+  Aucune couleur, aucune typographie et aucune mise en page ne sont proposées ici comme définitives —
+  la refonte visuelle relève du lot ELSATIA-UI-V2.<br><br>
+  Ils sont <b>originaux</b> : aucune reprise de texte, d'agencement, d'argument ou de prix d'izi.Card
+  ou d'une autre boutique.<br><br>
+  <b>Aucun prix, stock, délai, garantie, remise ni avis client n'y figure.</b> Les emplacements
+  correspondants sont marqués <code>&lt;à définir&gt;</code>.
+</div>
+
+<!-- 1 -->
+<h2>W1 — Catalogue</h2>
+<p class="but">But : présenter ce qui est réellement vendable, sans jamais laisser croire à une disponibilité qui n'existe pas.</p>
+<div class="wf">
+  <div class="bar"><span class="marque">ELSATIA</span><span>Boutique &nbsp;·&nbsp; Panier (0)</span></div>
+  <div class="grid g13">
+    <div class="box"><strong>Filtres</strong>Catégorie · Nature · Disponibilité<div class="fil esp"><span>Cartes</span><span>Accessoires</span><span>Prestations</span></div></div>
+    <div class="box"><strong>En-tête</strong>Titre de la Boutique + une phrase de contexte.
+      <div class="note esp"><b>Distinction Market obligatoire ici :</b> ELSATIA est le vendeur.</div></div>
+  </div>
+  <div class="grid g3 esp">
+    <div class="box"><div class="img">visuel produit</div><strong class="esp">Nom du produit</strong>
+      Description courte<div class="flex esp"><span class="champ">&lt;prix à définir&gt;</span><span class="etat">disponibilité</span></div></div>
+    <div class="box"><div class="img">visuel produit</div><strong class="esp">Nom du produit</strong>
+      Description courte<div class="flex esp"><span class="champ">&lt;prix à définir&gt;</span><span class="etat">sur commande</span></div></div>
+    <div class="box"><div class="img">visuel produit</div><strong class="esp">Nom du produit</strong>
+      Description courte<div class="flex esp"><span class="champ">&lt;prix à définir&gt;</span><span class="etat">rupture</span></div></div>
+  </div>
+  <p class="note esp"><b>Règles.</b> Le prix affiché est TTC en premier pour un particulier, HT en premier pour un professionnel.
+  Un produit en rupture reste visible et reste non commandable — il n'est jamais masqué pour faire croire à un catalogue plein.
+  Le délai affiché vient du fournisseur ou du transporteur, jamais d'une estimation.</p>
+</div>
+
+<!-- 2 -->
+<h2>W2 — Fiche produit, variantes et personnalisation</h2>
+<p class="but">But : que le client sache exactement ce qu'il achète, et qu'il soit informé de l'exclusion de rétractation <em>avant</em> de s'engager.</p>
+<div class="wf">
+  <div class="grid g13">
+    <div class="box"><strong>Visuels</strong><div class="img">image principale</div>
+      <div class="grid g3 esp"><div class="img" style="height:40px">2</div><div class="img" style="height:40px">3</div><div class="img" style="height:40px">4</div></div></div>
+    <div>
+      <div class="box"><strong>Identité</strong>Nom · Référence · Description longue · Mentions obligatoires liées à la nature du produit</div>
+      <div class="box esp"><strong>Options de variante</strong>
+        Finition : <span class="fil"><span>&lt;valeurs fournisseur&gt;</span></span>
+        <div class="esp">Conditionnement : <span class="fil"><span>&lt;à définir&gt;</span></span></div>
+        <div class="note esp"><b>Le prix et la disponibilité changent avec la variante</b>, pas avec le produit.</div></div>
+      <div class="box esp"><strong>Personnalisation</strong>
+        Nom à imprimer · Fonction · Logo (téléversement)
+        <div class="rappel esp"><b>Information affichée ici, avant le panier :</b> un produit personnalisé est confectionné
+        selon vos indications ; le droit de rétractation ne s'y applique pas. Case d'acceptation explicite, non pré-cochée.</div></div>
+      <div class="box esp"><strong>Achat</strong><div class="flex"><span class="champ">&lt;prix à définir&gt;</span>
+        <span class="etat">délai indicatif &lt;à obtenir&gt;</span><span class="btn">Ajouter au panier</span></div></div>
+    </div>
+  </div>
+  <p class="note esp"><b>Point de conception.</b> L'acceptation de l'exclusion de rétractation est <b>horodatée et archivée avec la commande</b>.
+  Sans cette preuve, l'exclusion ne tient pas.</p>
+</div>
+
+<!-- 3 -->
+<h2>W3 — Aperçu avant paiement</h2>
+<p class="but">But : le dernier moment où une erreur coûte zéro. Après, la fabrication est irréversible.</p>
+<div class="wf">
+  <div class="grid g2">
+    <div class="box"><strong>Aperçu de la carte</strong><div class="img" style="height:150px">rendu exact de ce qui sera fabriqué</div>
+      <div class="note esp">Recto et verso. Zone d'impression et marges du fournisseur matérialisées.</div></div>
+    <div class="box"><strong>Ce qui sera imprimé</strong>
+      <table><tr><th>Champ</th><th>Valeur</th></tr>
+      <tr><td>Nom</td><td>&lt;saisi&gt;</td></tr><tr><td>Fonction</td><td>&lt;saisi&gt;</td></tr>
+      <tr><td>Logo</td><td>&lt;fichier&gt;</td></tr><tr><td>Finition</td><td>&lt;choisie&gt;</td></tr></table>
+      <div class="rappel esp"><b>Validation explicite exigée :</b> « Je confirme que cet aperçu correspond à ma commande. »
+      Case non pré-cochée. L'aperçu validé est archivé — c'est la seule preuve arbitrable en cas de réclamation.</div>
+      <div class="flex esp"><span class="btn sec">Corriger</span><span class="btn">Valider et continuer</span></div></div>
+  </div>
+</div>
+
+<!-- 4 -->
+<h2>W4 — Panier, adresses, livraison, paiement</h2>
+<p class="but">But : ne jamais faire dépendre un montant de ce que le navigateur envoie.</p>
+<div class="wf">
+  <div class="grid g13">
+    <div>
+      <div class="box"><strong>Lignes du panier</strong>
+        <table><tr><th>Produit</th><th>Variante</th><th>Qté</th><th>Montant</th></tr>
+        <tr><td>&lt;nom&gt;</td><td>&lt;options&gt;</td><td>1</td><td>&lt;calculé serveur&gt;</td></tr>
+        <tr><td>&lt;nom&gt;</td><td>&lt;options&gt;</td><td>2</td><td>&lt;calculé serveur&gt;</td></tr></table></div>
+      <div class="box esp"><strong>Adresse de facturation</strong>
+        <div class="grid g2"><span class="champ">Nom / Raison sociale</span><span class="champ">SIREN (si professionnel)</span>
+        <span class="champ">Adresse</span><span class="champ">Complément</span>
+        <span class="champ">Code postal · Ville</span><span class="champ">Pays (obligatoire)</span></div>
+        <div class="note esp"><b>Le pays détermine la TVA.</b> Il n'est jamais deviné.</div></div>
+      <div class="box esp"><strong>Adresse de livraison</strong>Identique, ou distincte. Case « identique à la facturation ».</div>
+      <div class="box esp"><strong>Mode de livraison</strong>
+        <div class="fil"><span>&lt;transporteur&gt;</span><span>délai &lt;à obtenir&gt;</span><span>frais &lt;à définir&gt;</span></div></div>
+    </div>
+    <div>
+      <div class="box"><strong>Récapitulatif</strong>
+        <table><tr><td>Total HT</td><td>&lt;calculé&gt;</td></tr><tr><td>Livraison</td><td>&lt;calculé&gt;</td></tr>
+        <tr><td>TVA (taux résolu)</td><td>&lt;calculé&gt;</td></tr><tr><td><b>Total TTC</b></td><td><b>&lt;calculé&gt;</b></td></tr></table>
+        <div class="note esp"><b>Tout est recalculé côté serveur</b> à l'affichage et une seconde fois juste avant le paiement.
+        Le navigateur ne transmet que des identifiants et des quantités.</div></div>
+      <div class="box esp"><strong>Conditions</strong>Acceptation des CGV, version archivée avec la commande.
+        Rappel de l'exclusion de rétractation si le panier contient un produit personnalisé.</div>
+      <div class="esp"><span class="btn">Payer</span></div>
+      <div class="note esp">Le paiement se fait sur une page hébergée par le prestataire. <b>Aucune donnée de carte ne transite par ELSATIA.</b></div>
+    </div>
+  </div>
+</div>
+
+<!-- 5 -->
+<h2>W5 — Suivi de commande (client)</h2>
+<p class="but">But : montrer <b>un</b> état lisible, calculé à partir des quatre axes internes.</p>
+<div class="wf">
+  <div class="box"><strong>Commande &lt;référence&gt;</strong>
+    <div class="flex esp"><span class="etat">Expédiée</span><span style="font-size:11px;color:var(--gris)">état affiché — un seul libellé</span></div>
+    <div class="note esp">Calcul interne : <b>litige &gt; retour &gt; paiement &gt; cycle</b>. Le client ne voit jamais quatre colonnes.</div>
+  </div>
+  <div class="box esp"><strong>Étapes</strong>
+    <table><tr><th>Étape</th><th>Date</th><th>Preuve</th></tr>
+    <tr><td>Payée</td><td>&lt;date&gt;</td><td>référence de paiement</td></tr>
+    <tr><td>En préparation</td><td>&lt;date&gt;</td><td>—</td></tr>
+    <tr><td>Expédiée</td><td>&lt;date&gt;</td><td>transporteur + n° de suivi</td></tr>
+    <tr><td>Livrée</td><td>—</td><td>—</td></tr></table></div>
+  <div class="box esp"><strong>Actions</strong>
+    <div class="flex"><span class="btn sec">Télécharger la facture</span><span class="btn sec">Demander un retour</span><span class="btn sec">Contacter l'assistance</span></div>
+    <div class="note esp">« Demander un retour » <b>ouvre une demande</b> — elle n'autorise rien. L'autorisation est une décision ELSATIA.</div></div>
+</div>
+
+<!-- 6 -->
+<h2>W6 — Activation d'une carte NFC</h2>
+<p class="but">But : qu'une carte interceptée avant activation ne serve à rien.</p>
+<div class="wf">
+  <div class="grid g2">
+    <div class="box"><strong>Écran public — support non activé</strong>
+      <div class="img" style="height:70px">page « carte non activée »</div>
+      <div class="note esp">C'est tout ce que renvoie l'URL de la puce tant que le support n'est pas activé :
+      <b>aucun nom, aucune coordonnée, aucun profil</b>.</div></div>
+    <div class="box"><strong>Activation</strong>
+      <span class="champ">Code d'activation</span>
+      <div class="rappel esp"><b>Le code n'est ni sur la puce, ni dans le QR.</b> Il arrive par un canal distinct de l'objet.
+      Usage unique, expirable, tentatives limitées.</div>
+      <div class="esp"><span class="champ">Carte à associer : &lt;choisir ou créer&gt;</span></div>
+      <div class="flex esp"><span class="btn">Activer</span></div></div>
+  </div>
+  <p class="note esp"><b>Rappel d'architecture.</b> La puce ne contient qu'une URL — décision Contact/Card V1, inchangée.
+  Ce que ce lot ajoute, c'est le niveau « support » qui permet réattribution et remplacement sans jeter l'objet.</p>
+</div>
+
+<!-- 7 -->
+<h2>W7 — Admin : file de validation des personnalisations</h2>
+<p class="but">But : dernier contrôle humain avant une fabrication irréversible.</p>
+<div class="wf">
+  <div class="bar"><span class="marque">ELSATIA · Plateforme</span><span>Boutique &nbsp;·&nbsp; À vérifier</span></div>
+  <div class="grid g13">
+    <div class="box"><strong>File d'attente</strong>
+      <table><tr><th>Commande</th><th>Client</th><th>Reçue</th><th>État</th></tr>
+      <tr><td>&lt;réf&gt;</td><td>&lt;client&gt;</td><td>&lt;date&gt;</td><td><span class="etat">à vérifier</span></td></tr>
+      <tr><td>&lt;réf&gt;</td><td>&lt;client&gt;</td><td>&lt;date&gt;</td><td><span class="etat">à vérifier</span></td></tr></table></div>
+    <div class="box"><strong>Contrôle</strong><div class="img" style="height:110px">aperçu validé par le client</div>
+      <div class="note esp">L'agent voit <b>exactement</b> l'aperçu que le client a validé.</div>
+      <div class="flex esp"><span class="btn">Envoyer en fabrication</span><span class="btn sec">Refuser</span></div>
+      <div class="note esp"><b>Un refus est motivé et déclenche un remboursement.</b> Il n'existe pas d'abandon silencieux.</div></div>
+  </div>
+</div>
+
+<!-- 8 -->
+<h2>W8 — Admin : remboursement</h2>
+<p class="but">But : le seul écran qui fait sortir de l'argent. Il doit être difficile de s'y tromper.</p>
+<div class="wf">
+  <div class="box"><strong>Commande &lt;référence&gt;</strong>
+    <table><tr><th>Encaissé</th><th>Déjà remboursé</th><th>Plafond restant</th></tr>
+    <tr><td>&lt;montant&gt;</td><td>&lt;montant&gt;</td><td><b>&lt;calculé&gt;</b></td></tr></table>
+    <div class="note esp"><b>Plafond cumulé contrôlé en base</b>, pas seulement dans l'interface :
+    la somme des remboursements ne peut jamais dépasser le montant encaissé.</div></div>
+  <div class="box esp"><strong>Remboursement</strong>
+    <div class="grid g2"><span class="champ">Montant (≤ plafond)</span><span class="champ">Motif (obligatoire)</span></div>
+    <div class="note esp">Un avoir est généré automatiquement. <b>Aucun remboursement sans avoir</b> — sinon l'argent sort sans pièce comptable.</div>
+    <div class="flex esp"><span class="btn dan">Rembourser</span><span class="btn sec">Émettre un avoir sans remboursement</span></div>
+    <div class="note esp">Au-delà d'un seuil <code>&lt;à définir&gt;</code> : <b>double validation</b>. Réservé au responsable et à la comptabilité.</div></div>
+</div>
+
+<!-- 9 -->
+<h2>W9 — Admin : supports NFC, association et réattribution</h2>
+<p class="but">But : tracer qui répond derrière une URL déjà imprimée.</p>
+<div class="wf">
+  <div class="box"><strong>Supports</strong>
+    <table><tr><th>N° de série</th><th>Lot</th><th>État</th><th>Associé à</th><th>Depuis</th></tr>
+    <tr><td>&lt;série&gt;</td><td>&lt;lot&gt;</td><td><span class="etat">actif</span></td><td>&lt;titulaire&gt;</td><td>&lt;date&gt;</td></tr>
+    <tr><td>&lt;série&gt;</td><td>&lt;lot&gt;</td><td><span class="etat">encodé</span></td><td>—</td><td>—</td></tr>
+    <tr><td>&lt;série&gt;</td><td>&lt;lot&gt;</td><td><span class="etat">révoqué</span></td><td>—</td><td>&lt;date&gt;</td></tr></table></div>
+  <div class="grid g2 esp">
+    <div class="box"><strong>Réattribuer</strong>
+      <span class="champ">Nouvelle carte à associer</span>
+      <div class="esp"><span class="champ">Motif (obligatoire)</span></div>
+      <div class="flex esp"><span class="btn">Réattribuer</span></div>
+      <div class="note esp">Clôt l'association en cours, en ouvre une nouvelle. <b>La puce ne change pas.</b>
+      L'ancienne carte reste révoquée et terminale.</div></div>
+    <div class="box"><strong>Révoquer le support</strong>
+      <div class="rappel">Perte, vol, casse. <b>Irréversible.</b> L'URL de la puce ne résout plus jamais.
+      Le profil et les contacts du titulaire sont conservés et peuvent être portés sur un support de remplacement.</div>
+      <div class="flex esp"><span class="btn dan">Révoquer</span></div></div>
+  </div>
+  <p class="note esp"><b>Journal.</b> Chaque activation, réattribution et révocation écrit une entrée append-only :
+  auteur, date, motif, ancienne et nouvelle association. Aucune ligne n'est modifiable ni supprimable.</p>
+</div>
+
+</div>
+</body>
+</html>
