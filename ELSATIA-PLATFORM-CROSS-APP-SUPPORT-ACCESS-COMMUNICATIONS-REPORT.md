@@ -6,7 +6,7 @@
 | Branche | `feat/platform-cross-app-support-access-communications-v1` |
 | Base | `integration/elsatia-ecosystem-train-v2-reserves-gp-v1` @ `1fc1331842cdf5980b374169994587813bdee7b6` |
 | Worktree isolé | `/Volumes/ELSATIA-DEV/ELSATIA-WORKTREES/platform-support-comms-v1` |
-| SHA du contenu du lot | `dfb00f62978665f0a5e652e36b3b1c2f31755b67` — poussé sur `origin` |
+| SHA du contenu du lot | `922610e0bc2ee51983e5848103095d799434fd48` — correction P0 « assistance stricte par défaut » incluse, poussé sur `origin` |
 | Migration canonique créée | **aucune** — ledger inchangé à **272 fichiers**, numéro fonctionnel maximal **274** |
 | Production / Stripe Live | **non touchés** |
 | Fusion / déploiement | **aucun** |
@@ -727,4 +727,6 @@ dans la coquille de chaque application.
 | SHA | Objet |
 |---|---|
 | `dfb00f62978665f0a5e652e36b3b1c2f31755b67` | contrat transverse, SQL proposé, écrans plateforme, bandeaux, rapport |
-| le commit suivant | consigne ce SHA dans le rapport, comme le font les lots précédents |
+| `3da097b940609e1541a79f96c6786855b4248daf` | consigne le SHA du contenu dans le rapport |
+| `922610e0bc2ee51983e5848103095d799434fd48` | **correction P0** : mode strict par défaut, verrouillé en Production, refus par défaut, 8 cas de tests demandés |
+| le commit suivant | consigne le SHA final dans le rapport |
