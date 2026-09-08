@@ -3,7 +3,8 @@ import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { createClient } from "@/lib/supabase/server";
 import type { ContexteEntreprise } from "@/lib/entreprise";
 import { filtrerPermissionsSelonOffre } from "@/lib/tarification";
-import { assistanceStricteActive, permissionsAssistanceGestionPro } from "@/lib/assistance-server";
+import { modeAssistance, permissionsAssistanceGestionPro } from "@/lib/assistance-server";
+import { permissionsDeConsultation, resoudrePermissionsAssistance } from "@elsatia/platform-support-comms";
 
 // null signifie « accès complet » (prototype sans connexion).
 /**
@@ -31,19 +32,23 @@ export const permissionsUtilisateur = cache(async function permissionsUtilisateu
   //
   // Trois cas, dans cet ordre :
   //   * le contrat existe en base -> ses droits font foi ;
-  //   * il n'existe pas encore (migration proposee, non canonique) et l'exploitant a
-  //     pose ELSATIA_ASSISTANCE_STRICTE=1 -> lecture seule immediate ;
-  //   * il n'existe pas encore et l'interrupteur est absent -> comportement herite,
-  //     conserve pour ne pas interrompre un depannage en cours de production. Ce
-  //     dernier cas disparait a l'application de la migration.
+  //   * il n'existe pas encore et la posture est STRICTE -> lecture seule. C'est le
+  //     defaut : variable absente, vide ou invalide, et toujours en Production ;
+  //   * il n'existe pas encore et le mode HERITE a ete explicitement demande hors
+  //     Production -> comportement historique, avec avertissement de securite.
   if(accesSupport===true){
     const perimetre=await permissionsAssistanceGestionPro(ctx.entrepriseId);
-    if(perimetre!==undefined)return perimetre;
-    if(assistanceStricteActive()){
-      const {data:lecture}=await sb.from("permissions_disponibles").select("cle");
-      return (lecture??[]).map(x=>x.cle).filter(c=>c.startsWith("acces_")||c.startsWith("voir_"));
-    }
-    return null;
+    const mode=modeAssistance();
+    // Le catalogue n'est lu que dans le cas ou il sert reellement : inutile de payer
+    // une requete quand le contrat serveur a deja repondu.
+    const lectureSeule=perimetre===undefined&&mode.strict
+      ?permissionsDeConsultation(((await sb.from("permissions_disponibles").select("cle")).data??[]).map(x=>x.cle))
+      :[];
+    return resoudrePermissionsAssistance({
+      perimetreServeur:perimetre,
+      mode,
+      permissionsLectureSeule:lectureSeule,
+    }).permissions;
   }
   if(!appartenance?.poste_id)return [];
   const {data}=await sb.from("permissions_poste").select("cle_permission").eq("entreprise_id",ctx.entrepriseId).eq("poste_id",appartenance.poste_id).eq("autorise",true);

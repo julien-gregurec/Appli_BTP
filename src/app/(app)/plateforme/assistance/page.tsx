@@ -123,8 +123,13 @@ export default async function PlateformeAssistancePage({
               Le SQL de ce lot est proposé dans{" "}
               <code>docs/migrations-proposees/platform-support-access-communications-v1.sql.proposed</code>{" "}
               et n’a réservé aucun numéro de migration, le Train V3 et le chantier Pricing
-              étant en cours. Cet écran devient opérant dès son intégration ; d’ici là, le
-              mode support historique (`/plateforme`, bouton « Entrer ») reste en service.
+              étant en cours. Cet écran devient opérant dès son intégration.
+            </p>
+            <p className="mt-1">
+              D’ici là, le mode support historique (<code>/plateforme</code>, bouton
+              « Entrer ») reste en service, mais <strong>en lecture seule</strong> : la
+              posture stricte est le comportement par défaut et ne peut pas être désactivée
+              en Production.
             </p>
           </div>
         )}

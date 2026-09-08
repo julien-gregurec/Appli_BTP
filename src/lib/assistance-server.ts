@@ -3,7 +3,9 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import {
   construireBandeauAssistance,
+  resoudreModeAssistance,
   type BandeauAssistance,
+  type ModeAssistance,
   type PerimetreAssistance,
 } from "@elsatia/platform-support-comms";
 
@@ -99,8 +101,8 @@ export const lireEtatAssistance = cache(async function lireEtatAssistance(
 /**
  * Permissions Gestion Pro à appliquer pendant une session d'assistance.
  *
- * `undefined` : le contrat n'est pas encore en base — l'appelant applique la règle
- *   héritée (voir `permissions.ts`, qui la documente et l'encadre).
+ * `undefined` : le contrat n'est pas encore en base — l'appelant applique alors la
+ *   posture d'environnement, stricte par défaut (voir `permissions.ts`).
  * `null` : aucune session d'assistance sur Gestion Pro pour cette entreprise.
  * `string[]` : la liste EXACTE des droits du périmètre choisi.
  */
@@ -117,12 +119,45 @@ export async function permissionsAssistanceGestionPro(
 }
 
 /**
- * Interrupteur d'exploitation. Tant que la migration n'est pas appliquée, une session
- * support ouverte conserve le comportement historique (tous les droits) — le changer
- * en silence casserait le dépannage en cours de production. Poser
- * `ELSATIA_ASSISTANCE_STRICTE=1` bascule immédiatement en lecture seule, sans
- * attendre le Train V3, pour l'exploitant qui préfère la posture la plus sûre.
+ * Un déploiement de Production, au sens le plus large possible.
+ *
+ * Le test est délibérément large et cumulatif dans le sens du OU : n'importe lequel de
+ * ces indices suffit à verrouiller la posture. Se tromper en croyant être en Production
+ * n'a aucun coût — la posture reste stricte, ce qui est le comportement voulu partout ;
+ * se tromper dans l'autre sens ouvrirait tous les droits sur un déploiement réel.
+ */
+export function estDeploiementProduction(): boolean {
+  return (
+    process.env.NODE_ENV === "production" ||
+    process.env.VERCEL_ENV === "production" ||
+    process.env.ELSATIA_ENV === "production"
+  );
+}
+
+/**
+ * Posture d'assistance effective.
+ *
+ * **Le mode strict est le défaut, et il est verrouillé en Production.** Variable
+ * absente, valeur inconnue, valeur vide : strict. Seules les valeurs `0` et `false`
+ * demandent le mode hérité, et seulement hors Production — auquel cas un avertissement
+ * de sécurité est journalisé à chaque résolution, pour qu'un environnement laissé dans
+ * cet état finisse par se faire remarquer.
+ */
+export function modeAssistance(): ModeAssistance {
+  const mode = resoudreModeAssistance({
+    valeurBrute: process.env.ELSATIA_ASSISTANCE_STRICTE,
+    production: estDeploiementProduction(),
+  });
+  if (mode.avertissement) {
+    console.warn(`[securite][assistance] ${mode.avertissement}`);
+  }
+  return mode;
+}
+
+/**
+ * Conservée pour les appelants qui n'ont besoin que du booléen. Elle ne peut plus
+ * renvoyer `false` sur un déploiement de Production.
  */
 export function assistanceStricteActive(): boolean {
-  return process.env.ELSATIA_ASSISTANCE_STRICTE === "1";
+  return modeAssistance().strict;
 }

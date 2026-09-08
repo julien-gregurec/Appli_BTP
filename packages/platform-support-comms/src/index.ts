@@ -7,6 +7,7 @@ export * from "./applications";
 export * from "./motifs";
 export * from "./perimetres";
 export * from "./session";
+export * from "./mode-assistance";
 export * from "./audit";
 export * from "./notifications-assistance";
 export * from "./texte";

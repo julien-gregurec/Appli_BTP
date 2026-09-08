@@ -5,7 +5,11 @@ import {
   type DemandeAction,
   type PerimetreAssistance,
 } from "./perimetres";
-import { motifPublic, type CategorieMotifAssistance } from "./motifs";
+import {
+  definitionMotif,
+  motifPublic,
+  type CategorieMotifAssistance,
+} from "./motifs";
 
 /**
  * Contrat transverse d'une session d'assistance.
@@ -46,6 +50,8 @@ export const INACTIVITE_MAXIMALE_MINUTES = 15;
 
 export type RaisonRefusSession =
   | "aucune_session"
+  | "justification_absente"
+  | "fenetre_invalide"
   | "session_terminee"
   | "session_revoquee"
   | "session_expiree"
@@ -74,6 +80,26 @@ function minutesEcoulees(depuis: string, maintenant: Date): number {
 }
 
 /**
+ * La justification est obligatoire : catégorie connue, et détail présent quand la
+ * catégorie l'exige. Ce contrôle est rejoué ici, à chaque action, et pas seulement à
+ * l'ouverture — une session dont le motif aurait été vidé ne doit plus rien autoriser.
+ */
+function justificationValide(session: SessionAssistance): boolean {
+  const definition = definitionMotif(session.motifCategorie);
+  if (!definition) return false;
+  if (!definition.detailRequis) return true;
+  return (session.motifDetailInterne ?? "").trim().length >= 10;
+}
+
+/** Une durée est valide si la fenêtre existe, est datée, et finit après son début. */
+function fenetreValide(session: SessionAssistance): boolean {
+  const debut = new Date(session.ouverteAt).getTime();
+  const fin = new Date(session.expireAt).getTime();
+  if (Number.isNaN(debut) || Number.isNaN(fin)) return false;
+  return fin > debut;
+}
+
+/**
  * Décision unique, partagée par toutes les applications. Chaque application appelle
  * cette fonction avec SON code : une session ouverte sur Gestion Pro ne peut donc pas
  * ouvrir Colors ou Réserves, même si l'entreprise y est abonnée.
@@ -95,6 +121,25 @@ export function evaluerSessionAssistance(
   }
   if (!session) {
     return { autorise: false, raison: "aucune_session", message: "Aucune session d’assistance ouverte" };
+  }
+  // Une session sans justification exploitable, ou dont la fenêtre est incohérente, est
+  // une session que personne ne saurait défendre après coup. On la refuse avant même de
+  // regarder si elle est encore vivante : mieux vaut une session inutilisable qu'un accès
+  // dont l'audit ne dirait ni pourquoi ni jusqu'à quand.
+  const justification = justificationValide(session);
+  if (!justification) {
+    return {
+      autorise: false,
+      raison: "justification_absente",
+      message: "Session d’assistance sans motif exploitable",
+    };
+  }
+  if (!fenetreValide(session)) {
+    return {
+      autorise: false,
+      raison: "fenetre_invalide",
+      message: "Fenêtre de session d’assistance incohérente",
+    };
   }
   if (session.revoqueeAt !== null) {
     return { autorise: false, raison: "session_revoquee", message: "Session d’assistance révoquée" };

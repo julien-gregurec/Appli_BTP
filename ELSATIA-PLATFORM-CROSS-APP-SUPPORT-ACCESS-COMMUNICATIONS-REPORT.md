@@ -39,7 +39,7 @@ Trois conclusions, dans l'ordre d'importance :
    notion d'application. Tout le §9 au §16 est nouveau.
 
 **Ce qui est utilisable immédiatement** : le contrat transverse
-`@elsatia/platform-support-comms` (147 tests), les écrans plateforme, le bandeau dans
+`@elsatia/platform-support-comms` (166 tests), les écrans plateforme, le bandeau dans
 Gestion Pro, Colors et Réserves.
 **Ce qui attend le Train V3** : les tables et fonctions, livrées en `.sql.proposed`
 sans numéro de ledger réservé, conformément à la consigne.
@@ -384,7 +384,7 @@ Exigences demandées, et où elles sont tenues :
 | Idempotence | balayage, notifications (unicité `session × destinataire × type`), accusés (`on conflict do update`) |
 | Index | 18 index, dont trois partiels (sessions ouvertes, refus d'audit, actions sensibles) |
 | Rétention | `assistance_purger_retention()` — 36 mois audit, 24 mois notifications, 18 mois lectures |
-| pgTAP proposé | `…-v1.pgtap.sql.proposed`, **93 assertions** |
+| pgTAP proposé | `…-v1.pgtap.sql.proposed`, **96 assertions** |
 
 **Bascule.** `plateforme_acces_entreprises` n'est pas supprimée : `est_acces_support_actif(uuid)`
 reste inchangée (≈ 40 appels), et une **surcharge** `est_acces_support_actif(uuid, text)`
@@ -401,9 +401,11 @@ mécanisme fait l'objet d'un lot ultérieur.
 
 | Suite | Résultat |
 |---|---|
-| `packages/platform-support-comms` (11 fichiers) | **147 assertions — PASS** |
+| `packages/platform-support-comms` (12 fichiers) | **166 assertions — PASS** |
 | `src/app/actions/plateforme-assistance.test.ts` | **10 assertions — PASS** |
-| Suite complète du dépôt (`vitest run`) | **1 397 tests PASS** ; 2 échecs par *dépassement du délai de 5 s*, non par assertion — voir §6.4 |
+| `src/lib/assistance-server.test.ts` (posture d'environnement) | **6 assertions — PASS** |
+| `src/lib/permissions-assistance.test.ts` (intégration du P0) | **6 assertions — PASS** |
+| Suite complète du dépôt (`vitest run`) | **1 428 tests PASS** ; 2 échecs par *dépassement du délai de 5 s*, non par assertion — voir §6.4 |
 
 Couverture demandée au §17, et où elle est prouvée :
 
@@ -432,7 +434,7 @@ développement n'a jamais été touchée.**
 |---|---|
 | Train complet (272 migrations) | **272 appliquées, aucune erreur** |
 | SQL proposé par-dessus | **appliqué sans erreur** |
-| pgTAP du lot | **plan 93, 93 ok, 0 not ok, 0 erreur — PASS** |
+| pgTAP du lot | **plan 96, 96 ok, 0 not ok, 0 erreur — PASS** |
 | pgTAP existantes du dépôt (68 fichiers) | après correction : **67 fichiers PASS, 1 870 assertions** ; 1 fichier à 91/92, dont l'unique échec est **identique sur le témoin sans ce lot** — voir §6.4 |
 | Conteneur témoin (train **sans** le SQL proposé) | monté pour trancher l'origine des échecs |
 
@@ -448,7 +450,7 @@ Harnais : `/Volumes/ELSATIA-DEV/ELSATIA-STACKS/support-comms-dbtest/` (hors dép
 | `next build` Colors et Réserves | **succès** |
 | Tests Colors / Réserves | **27 PASS** / **106 PASS** |
 | `verify:migrations` | **272 migrations valides** — le ledger n'a pas bougé |
-| `verify:secrets` | **1 515 fichiers contrôlés, aucun secret** |
+| `verify:secrets` | **1 559 fichiers contrôlés, aucun secret** |
 | `git diff --check` | **propre** |
 
 ### 6.4 Échecs constatés, et leur cause
@@ -503,21 +505,52 @@ rapport avec ce lot**, à confirmer sur une pile complète lors de la recette.
 
 ---
 
-## 8. Interrupteur d'exploitation
+## 8. Posture d'assistance : stricte par défaut
 
-Le contrat applicatif est livré **avant** sa migration. Trois comportements, dans cet
-ordre, pour `permissionsUtilisateur()` sous session support :
+**Correction P0 appliquée après la première livraison.** La version initiale conservait
+« tous les droits » quand `ELSATIA_ASSISTANCE_STRICTE` était absente. La règle est
+désormais inversée : **tout ce qui n'est pas une demande explicite et valide de mode
+hérité donne le mode strict.**
 
-1. le contrat existe en base → **ses droits font foi** (moindre privilège) ;
-2. il n'existe pas encore **et** `ELSATIA_ASSISTANCE_STRICTE=1` → **lecture seule
-   immédiate**, sans attendre le Train V3 ;
-3. il n'existe pas encore et l'interrupteur est absent → comportement hérité (tous les
-   droits), **conservé délibérément** pour ne pas interrompre un dépannage en cours de
-   production.
+| `ELSATIA_ASSISTANCE_STRICTE` | Hors Production | En Production |
+|---|---|---|
+| absente | **strict** | **strict** |
+| `1` / `true` | **strict** | **strict** |
+| valeur inconnue, vide, mal orthographiée | **strict** + avertissement | **strict** + avertissement |
+| `0` / `false` | hérité + **avertissement de sécurité** | **strict imposé** + avertissement de refus |
 
-Le troisième cas est le P0-2 non encore refermé. Il disparaît à l'application de la
-migration. **L'exploitant qui préfère la posture la plus sûre peut poser la variable
-dès aujourd'hui** — c'est la raison d'être de l'interrupteur.
+La Production est détectée par un **OU** sur `NODE_ENV`, `VERCEL_ENV` et `ELSATIA_ENV` :
+se tromper en croyant y être ne coûte rien — la posture reste stricte, ce qui est le
+comportement voulu partout ; se tromper dans l'autre sens ouvrirait tous les droits sur
+un déploiement réel.
+
+Ordre de décision de `permissionsUtilisateur()` sous session support :
+
+1. le contrat existe en base → **ses droits font foi**, et l'environnement ne peut pas
+   les rouvrir — même une réponse vide reste une réponse ;
+2. contrat absent, posture stricte → **lecture seule** (`acces_*` et `voir_*` seulement) ;
+3. contrat absent, mode hérité explicitement demandé **hors Production** → comportement
+   historique, avec un avertissement journalisé à chaque résolution pour qu'un
+   environnement laissé dans cet état finisse par se faire remarquer.
+
+Le mode hérité ne subsiste que pour reproduire hors Production le comportement d'une base
+où le contrat n'est pas encore appliqué. **Le P0-2 est refermé : il n'existe plus de
+chemin, en Production, par lequel une session d'assistance obtienne tous les droits.**
+
+### Refus par défaut
+
+Côté contrat comme côté base, l'accès est **refusé** tant que ne sont pas simultanément
+réunis : une session vivante (ni terminée, ni révoquée, ni expirée, ni inactive), une
+**justification exploitable** (catégorie connue, détail présent quand elle l'exige), une
+**fenêtre de durée valide**, l'entreprise exacte, l'**application explicitement
+sélectionnée**, et une famille d'action dans le périmètre. La justification et la fenêtre
+sont revérifiées **à chaque action**, pas seulement à l'ouverture — une session dont le
+motif serait vidé après coup n'autorise plus rien.
+
+**Aucune application future n'hérite d'un droit support global** : le contrat ne connaît
+aucune liste d'applications, il compare à ce qui a été coché à l'ouverture. Une
+application ajoutée au catalogue pendant qu'une session est ouverte reste fermée — c'est
+prouvé par une assertion pgTAP qui l'ajoute en cours de test.
 
 ---
 
@@ -528,7 +561,7 @@ dès aujourd'hui** — c'est la raison d'être de l'interrupteur.
 | # | Sujet | État |
 |---|---|---|
 | P0-1 | Portée par application d'une session support | **corrigé** (SQL proposé + contrat) |
-| P0-2 | Moindre privilège dans Gestion Pro | **corrigé**, actif à la migration ou via `ELSATIA_ASSISTANCE_STRICTE=1` |
+| P0-2 | Moindre privilège dans Gestion Pro | **corrigé et refermé** — posture stricte par défaut, verrouillée en Production (§8) |
 | P0-3 | Notification et historique client | **corrigé** (SQL proposé) |
 | P0-4 | Régression `reserves_action_autorisee` (perte de `gerer_membres`) | **trouvée et corrigée** — voir §6.4 |
 
@@ -581,7 +614,7 @@ Points de contact à surveiller au moment de l'intégration :
 3. Attribuer le numéro de migration (`<horodatage>_platform_support_access_communications_v1.sql`)
    et déplacer le `.sql.proposed` tel quel dans `supabase/migrations/`.
 4. Déplacer le `.pgtap.sql.proposed` dans `supabase/tests/`, sans modification.
-5. Rejouer la recette conteneur : train + migration + les **93** assertions du lot +
+5. Rejouer la recette conteneur : train + migration + les **96** assertions du lot +
    les **68** suites existantes.
 6. Vérifier le point de contact Pricing (segment d'abonnement).
 7. `npm run verify` complet.
@@ -628,7 +661,10 @@ test abonnée à Gestion Pro et Colors, un gérant et un ouvrier :
 **Non-régression** :
 
 22. un dépannage support classique reste possible pendant la bascule ;
-23. `ELSATIA_ASSISTANCE_STRICTE=1` → bascule effective en lecture seule.
+23. sans variable d'environnement, un dépannage support est **déjà** en lecture seule ;
+24. poser `ELSATIA_ASSISTANCE_STRICTE=0` sur un environnement de Production → refusé,
+    avertissement de sécurité dans les journaux, lecture seule maintenue ;
+25. poser une valeur farfelue (`oui`, `strict`, `2`) → lecture seule, avertissement.
 
 ---
 
@@ -637,7 +673,7 @@ test abonnée à Gestion Pro et Colors, un gérant et un ouvrier :
 | Étape | Contenu | Réversible |
 |---|---|---|
 | J0 | Rebase sur Train V3, numéro attribué, recette conteneur complète | oui |
-| J0 | `ELSATIA_ASSISTANCE_STRICTE=1` posé en Production **avant** la migration : le P0-2 se referme immédiatement, sans schéma | oui (retrait de la variable) |
+| J0 | Rien à poser : la posture stricte est le défaut et est verrouillée en Production. Vérifier seulement qu'aucun environnement de Production ne porte `ELSATIA_ASSISTANCE_STRICTE=0` — ce serait refusé, mais l'avertissement doit être traité | sans objet |
 | J1 | Migration en Preview, recette humaine §12 intégrale | oui (base Preview jetable) |
 | J1 | Sauvegarde datée de la base Production, vérifiée restaurable | — |
 | J2 | Migration en Production, hors heures de chantier | **la migration est additive** : aucune table existante n'est supprimée ni réécrite ; le repli est le retrait des nouvelles fonctions |
@@ -660,7 +696,7 @@ tests, `README.md`.
 
 **SQL proposé** — `docs/migrations-proposees/` :
 `platform-support-access-communications-v1.sql.proposed` (1 820 lignes) et
-`platform-support-access-communications-v1.pgtap.sql.proposed` (93 assertions).
+`platform-support-access-communications-v1.pgtap.sql.proposed` (96 assertions).
 
 **Gestion Pro** — écrans `/plateforme/assistance` et `/plateforme/communications`,
 actions serveur `plateforme-assistance.ts` / `plateforme-communications.ts`, composants
@@ -682,7 +718,9 @@ dans la coquille de chaque application.
    `reserves_action_autorisee` au moment de l'intégration — la leçon du §6.4.
 3. **Le seul couplage avec le chantier Pricing** est la lecture de
    `entreprises.abonnement_statut` pour le segment d'audience.
-4. `ELSATIA_ASSISTANCE_STRICTE=1` referme le P0-2 **sans migration**, dès aujourd'hui.
+4. La posture stricte est le **défaut** et ne se désactive pas en Production. Le mode
+   hérité (`ELSATIA_ASSISTANCE_STRICTE=0`) n'existe que hors Production, pour reproduire
+   une base sans le contrat, et journalise un avertissement de sécurité.
 
 ### 14.3 Commits
 
