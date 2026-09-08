@@ -3,6 +3,7 @@ import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { createClient } from "@/lib/supabase/server";
 import type { ContexteEntreprise } from "@/lib/entreprise";
 import { filtrerPermissionsSelonOffre } from "@/lib/tarification";
+import { assistanceStricteActive, permissionsAssistanceGestionPro } from "@/lib/assistance-server";
 
 // null signifie « accès complet » (prototype sans connexion).
 /**
@@ -23,7 +24,27 @@ export const permissionsUtilisateur = cache(async function permissionsUtilisateu
     sb.from("utilisateurs_entreprises").select("poste_id,pointage_personnel_actif").eq("utilisateur_id",ctx.userId).eq("entreprise_id",ctx.entrepriseId).eq("statut","actif").maybeSingle(),
     sb.from("entreprises").select("option_ia_statut,option_ia_essai_fin,abonnement_offre").eq("id",ctx.entrepriseId).maybeSingle(),
   ]);
-  if(accesSupport===true)return null;
+  // ELSATIA-PLATFORM-CROSS-APP-SUPPORT-ACCESS-AND-COMMUNICATIONS-V1.
+  // Historiquement, une session support renvoyait `null`, c'est-a-dire TOUS les droits :
+  // ni moindre privilege, ni lecture seule, ni distinction de perimetre. Le contrat
+  // d'assistance remplace cette regle par la liste exacte du perimetre choisi.
+  //
+  // Trois cas, dans cet ordre :
+  //   * le contrat existe en base -> ses droits font foi ;
+  //   * il n'existe pas encore (migration proposee, non canonique) et l'exploitant a
+  //     pose ELSATIA_ASSISTANCE_STRICTE=1 -> lecture seule immediate ;
+  //   * il n'existe pas encore et l'interrupteur est absent -> comportement herite,
+  //     conserve pour ne pas interrompre un depannage en cours de production. Ce
+  //     dernier cas disparait a l'application de la migration.
+  if(accesSupport===true){
+    const perimetre=await permissionsAssistanceGestionPro(ctx.entrepriseId);
+    if(perimetre!==undefined)return perimetre;
+    if(assistanceStricteActive()){
+      const {data:lecture}=await sb.from("permissions_disponibles").select("cle");
+      return (lecture??[]).map(x=>x.cle).filter(c=>c.startsWith("acces_")||c.startsWith("voir_"));
+    }
+    return null;
+  }
   if(!appartenance?.poste_id)return [];
   const {data}=await sb.from("permissions_poste").select("cle_permission").eq("entreprise_id",ctx.entrepriseId).eq("poste_id",appartenance.poste_id).eq("autorise",true);
   const droits=new Set((data??[]).map(x=>x.cle_permission));

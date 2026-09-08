@@ -1,0 +1,1820 @@
+-- ELSATIA-PLATFORM-CROSS-APP-SUPPORT-ACCESS-AND-COMMUNICATIONS-V1
+--
+-- ⚠️  CE FICHIER N'EST PAS UNE MIGRATION CANONIQUE.
+--     Extension `.sql.proposed` : il n'est ni exécuté par `supabase db reset`, ni vu
+--     par `scripts/verify-migrations.mjs`, et AUCUN numéro de ledger n'est réservé.
+--     Un Train V3 et un chantier Pricing/Abonnements sont en cours en parallèle ;
+--     numéroter ici provoquerait une collision. Le numéro sera attribué au moment de
+--     l'intégration, après le Train V3 (voir le rapport, §« Ordre d'intégration »).
+--
+-- Base de référence : `integration/elsatia-ecosystem-train-v2-reserves-gp-v1` @ 1fc1331
+-- (ledger 272 fichiers, numéro fonctionnel maximal 274).
+--
+-- Ce que ce fichier AJOUTE, et pourquoi l'existant ne suffit pas :
+--
+--   * `plateforme_acces_entreprises` (00075 / 00236 / 00237) porte déjà une session
+--     support par administrateur : motif libre, expiration fixe à 4 h, AAL2 exigé à
+--     l'ouverture. Il lui manque quatre choses structurantes : (1) aucune notion
+--     d'APPLICATION — une session ouverte pour Gestion Pro donne aujourd'hui la
+--     lecture Colors ET Réserves via `colors_action_autorisee` /
+--     `reserves_action_autorisee` ; (2) aucun PÉRIMÈTRE — côté Gestion Pro,
+--     `permissionsUtilisateur()` renvoie « tous les droits » dès qu'une session est
+--     active ; (3) aucune DURÉE choisie ni révocation par un tiers ; (4) aucune
+--     NOTIFICATION de l'entreprise assistée.
+--
+--   * Aucun centre de communications n'existe. `notifications_utilisateurs` (00081)
+--     est mono-application (Gestion Pro), ciblé par permission de poste, sans
+--     programmation, sans acquittement, sans consentement et sans image.
+--
+-- Ce que ce fichier NE FAIT PAS :
+--   * il ne réécrit pas `plateforme_acces_entreprises` : l'ancienne table reste en
+--     place pendant la bascule et n'est retirée que par un lot ultérieur (§ 12) ;
+--   * il n'accorde aucun droit sur les DONNÉES d'une entreprise en dehors d'une
+--     session d'assistance justifiée ;
+--   * il ne touche ni à Stripe, ni à la tarification, ni au Global Owner (00266),
+--     qui est déjà intégré au train et reste la source du rôle plateforme.
+--
+-- Conventions reprises de l'existant : `security definer` + `set search_path = public`,
+-- `revoke all … from public, anon` puis `grant execute … to authenticated`, RLS
+-- activée sur chaque table, audit append-only protégé par trigger.
+
+begin;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 1. CATALOGUE : portée des données d'une application
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Tools stocke ses `tools_projects` par UTILISATEUR, sans entreprise. Une session
+-- d'assistance vise une entreprise : elle n'a donc pas de sens sur Tools. Plutôt
+-- qu'une exception codée sur le nom « tools », le catalogue déclare la portée, et
+-- toute application future hérite du bon comportement en déclarant la sienne.
+alter table public.applications_elsatia
+  add column if not exists portee_donnees text not null default 'entreprise';
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'applications_elsatia_portee_check') then
+    alter table public.applications_elsatia
+      add constraint applications_elsatia_portee_check
+      check (portee_donnees in ('entreprise', 'compte'));
+  end if;
+end $$;
+
+update public.applications_elsatia set portee_donnees = 'compte'
+where code = 'tools' and portee_donnees <> 'compte';
+
+-- Inscription des applications manquantes au catalogue. Le propriétaire global et
+-- tout admin plateforme `total` y accèdent alors SANS entitlement manuel, parce que
+-- `a_acces_application()` (00234) accorde déjà toute application active à
+-- `est_plateforme_admin()`. C'est le mécanisme voulu au §2 : ajouter une application
+-- suffit, aucune ligne d'habilitation n'est à créer.
+insert into public.applications_elsatia(code, nom, description, ordre, statut_produit, portee_donnees)
+values
+  ('reserves', 'ELSATIA Réserves', 'Réserves, levées et livrables de chantier', 30, 'disponible', 'entreprise'),
+  ('tools', 'ELSATIA Tools', 'Calculs, tracés et outils de chantier', 40, 'disponible', 'compte'),
+  ('drone', 'ELSATIA Drone / Scan', 'Captation drone, photogrammétrie et scan', 50, 'bientot', 'entreprise')
+on conflict(code) do update
+  set nom = excluded.nom,
+      description = coalesce(public.applications_elsatia.description, excluded.description),
+      portee_donnees = excluded.portee_donnees;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 2. RÉFÉRENTIELS D'ASSISTANCE
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Tables de référence plutôt que contraintes `check` en dur : ajouter un motif ou un
+-- périmètre ne doit pas exiger une migration. Le miroir TypeScript
+-- (`@elsatia/platform-support-comms`) est testé contre ces mêmes valeurs.
+
+create table if not exists public.assistance_motifs (
+  cle text primary key check (cle ~ '^[a-z][a-z0-9_]{1,49}$'),
+  libelle_interne text not null check (btrim(libelle_interne) <> ''),
+  -- Texte montré au CLIENT. Volontairement neutre pour `securite` et
+  -- `controle_signalement` : on ne prévient pas la personne contrôlée qu'elle l'est.
+  libelle_public text not null check (btrim(libelle_public) <> ''),
+  detail_requis boolean not null default false,
+  detail_strictement_interne boolean not null default false,
+  ordre integer not null default 0
+);
+
+insert into public.assistance_motifs(cle, libelle_interne, libelle_public, detail_requis, detail_strictement_interne, ordre)
+values
+  ('demande_client', 'Assistance demandée par le client', 'une demande d’assistance de votre part', false, false, 10),
+  ('erreur_configuration', 'Erreur de configuration', 'la correction d’un paramétrage', false, false, 20),
+  ('incident_technique', 'Incident technique', 'un incident technique', false, false, 30),
+  ('controle_signalement', 'Contrôle après signalement', 'une vérification de conformité de la plateforme', true, true, 40),
+  ('recuperation_correction', 'Récupération ou correction autorisée', 'une récupération ou une correction de données autorisée', true, false, 50),
+  ('securite', 'Sécurité', 'un contrôle de sécurité de la plateforme', true, true, 60),
+  ('autre', 'Autre motif', 'une intervention de l’assistance ELSATIA', true, false, 70)
+on conflict(cle) do update
+  set libelle_interne = excluded.libelle_interne,
+      libelle_public = excluded.libelle_public,
+      detail_requis = excluded.detail_requis,
+      detail_strictement_interne = excluded.detail_strictement_interne,
+      ordre = excluded.ordre;
+
+create table if not exists public.assistance_perimetres (
+  cle text primary key check (cle ~ '^[a-z][a-z0-9_]{1,49}$'),
+  libelle text not null check (btrim(libelle) <> ''),
+  familles text[] not null check (array_length(familles, 1) between 1 and 16),
+  duree_maximale_minutes integer not null check (duree_maximale_minutes between 5 and 480),
+  confirmation_renforcee boolean not null default false,
+  rang integer not null
+);
+
+insert into public.assistance_perimetres(cle, libelle, familles, duree_maximale_minutes, confirmation_renforcee, rang)
+values
+  ('lecture_seule', 'Lecture seule', array['lire'], 240, false, 1),
+  ('diagnostic', 'Diagnostic', array['lire','diagnostiquer'], 240, false, 2),
+  ('configuration', 'Configuration', array['lire','diagnostiquer','configurer'], 120, false, 3),
+  ('correction_limitee', 'Correction limitée', array['lire','diagnostiquer','configurer','corriger'], 60, false, 4),
+  ('assistance_etendue', 'Assistance étendue (exceptionnelle)', array['lire','diagnostiquer','configurer','corriger','exporter','supprimer'], 60, true, 5)
+on conflict(cle) do update
+  set libelle = excluded.libelle, familles = excluded.familles,
+      duree_maximale_minutes = excluded.duree_maximale_minutes,
+      confirmation_renforcee = excluded.confirmation_renforcee, rang = excluded.rang;
+
+create table if not exists public.assistance_domaines_sensibles (
+  domaine text primary key,
+  libelle text not null,
+  lecture_des text not null references public.assistance_perimetres(cle),
+  -- NULL = écriture jamais autorisée pendant une assistance, quel que soit le périmètre.
+  ecriture_des text references public.assistance_perimetres(cle),
+  confirmation_renforcee boolean not null default true
+);
+
+insert into public.assistance_domaines_sensibles(domaine, libelle, lecture_des, ecriture_des) values
+  ('factures', 'Factures', 'diagnostic', null),
+  ('paiements', 'Paiements et coordonnées bancaires', 'assistance_etendue', null),
+  ('donnees_salaries', 'Données salariés et paie', 'correction_limitee', null),
+  ('notes_frais', 'Notes de frais', 'diagnostic', 'correction_limitee'),
+  ('documents', 'Documents', 'diagnostic', 'correction_limitee'),
+  ('photos', 'Photos et médias terrain', 'diagnostic', 'correction_limitee'),
+  ('donnees_personnelles', 'Données personnelles', 'correction_limitee', 'assistance_etendue'),
+  ('exports', 'Exports de masse', 'assistance_etendue', 'assistance_etendue'),
+  ('suppression', 'Suppression de données', 'correction_limitee', 'assistance_etendue'),
+  ('abonnement', 'Abonnement', 'lecture_seule', null),
+  ('remises', 'Remises commerciales', 'diagnostic', null),
+  ('roles', 'Rôles et habilitations', 'diagnostic', null),
+  ('securite', 'Sécurité (MFA, sessions, clés)', 'assistance_etendue', null)
+on conflict(domaine) do update
+  set libelle = excluded.libelle, lecture_des = excluded.lecture_des,
+      ecriture_des = excluded.ecriture_des;
+
+-- Interdits absolus : aucune session, aucun périmètre, aucune confirmation ne les lève.
+-- La table sert de documentation exécutable ; `assistance_autorise()` la consulte.
+create table if not exists public.assistance_actions_interdites (
+  action text primary key,
+  motif text not null
+);
+
+insert into public.assistance_actions_interdites(action, motif) values
+  ('afficher_secret', 'Un secret ne se lit jamais, même en assistance'),
+  ('recuperer_mot_de_passe', 'Aucun mot de passe client n’est demandé, connu ni utilisé'),
+  ('desactiver_audit', 'L’audit ne se désactive pas'),
+  ('supprimer_historique_assistance', 'Une session ne supprime pas son propre historique'),
+  ('modifier_facture_emise', 'Une facture émise est un document comptable'),
+  ('contourner_rls', 'Aucun contournement de RLS sans contrôle serveur explicite'),
+  ('acceder_autre_entreprise', 'Une session ne vise qu’une entreprise')
+on conflict(action) do nothing;
+
+alter table public.assistance_motifs enable row level security;
+alter table public.assistance_perimetres enable row level security;
+alter table public.assistance_domaines_sensibles enable row level security;
+alter table public.assistance_actions_interdites enable row level security;
+
+-- Les référentiels sont lisibles par tout compte authentifié : le CLIENT doit pouvoir
+-- afficher le libellé public d'un motif dans son propre centre de sécurité.
+do $$
+declare t text;
+begin
+  foreach t in array array['assistance_motifs','assistance_perimetres','assistance_domaines_sensibles','assistance_actions_interdites']
+  loop
+    execute format('drop policy if exists %I_lecture on public.%I', t, t);
+    execute format('create policy %I_lecture on public.%I for select to authenticated using (true)', t, t);
+    execute format('revoke all on table public.%I from public, anon, authenticated', t);
+    execute format('grant select on table public.%I to authenticated', t);
+  end loop;
+end $$;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 3. SESSIONS D'ASSISTANCE
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Une session d'assistance N'EST PAS une connexion avec le compte du client :
+-- `acteur_id` reste l'identité Auth réelle de l'administrateur plateforme, et aucune
+-- colonne ne permet de se substituer à un utilisateur. `utilisateur_assiste_id` est
+-- descriptif — la personne accompagnée, jamais l'auteur des écritures.
+create table if not exists public.assistance_sessions (
+  id uuid primary key default gen_random_uuid(),
+  acteur_id uuid not null references auth.users(id) on delete restrict,
+  acteur_email text not null,
+  entreprise_id uuid not null references public.entreprises(id) on delete restrict,
+  utilisateur_assiste_id uuid references auth.users(id) on delete set null,
+  motif_cle text not null references public.assistance_motifs(cle),
+  motif_detail text check (motif_detail is null or char_length(btrim(motif_detail)) between 10 and 500),
+  ticket text check (ticket is null or char_length(btrim(ticket)) between 2 and 64),
+  perimetre text not null references public.assistance_perimetres(cle),
+  incident_global boolean not null default false,
+  confirmation_renforcee boolean not null default false,
+  ouverte_at timestamptz not null default now(),
+  expire_at timestamptz not null,
+  derniere_activite_at timestamptz not null default now(),
+  terminee_at timestamptz,
+  terminee_motif text,
+  revoquee_at timestamptz,
+  revoquee_par uuid references auth.users(id) on delete set null,
+  adresse_ip inet,
+  contexte jsonb not null default '{}'::jsonb check (jsonb_typeof(contexte) = 'object'),
+  created_at timestamptz not null default now(),
+  check (expire_at > ouverte_at),
+  check (terminee_at is null or terminee_at >= ouverte_at),
+  check (revoquee_at is null or revoquee_at >= ouverte_at),
+  -- Une session révoquée est nécessairement close : les deux dates vont ensemble.
+  check (revoquee_at is null or terminee_at is not null)
+);
+
+-- Une seule session ouverte par administrateur : un opérateur ne travaille pas dans
+-- deux entreprises en parallèle, et cette unicité rend la révocation non ambiguë.
+create unique index if not exists assistance_sessions_ouverte_unique
+  on public.assistance_sessions(acteur_id) where terminee_at is null;
+create index if not exists assistance_sessions_entreprise_idx
+  on public.assistance_sessions(entreprise_id, ouverte_at desc);
+create index if not exists assistance_sessions_actives_idx
+  on public.assistance_sessions(entreprise_id, expire_at) where terminee_at is null;
+create index if not exists assistance_sessions_acteur_idx
+  on public.assistance_sessions(acteur_id, ouverte_at desc);
+
+-- Applications explicitement sélectionnées. Table séparée et non tableau : elle porte
+-- une clé étrangère vers le catalogue, donc une application retirée ne peut pas rester
+-- silencieusement autorisée dans une session historique.
+create table if not exists public.assistance_sessions_applications (
+  session_id uuid not null references public.assistance_sessions(id) on delete cascade,
+  application_code text not null references public.applications_elsatia(code) on delete restrict,
+  primary key (session_id, application_code)
+);
+create index if not exists assistance_sessions_applications_code_idx
+  on public.assistance_sessions_applications(application_code);
+
+alter table public.assistance_sessions enable row level security;
+alter table public.assistance_sessions_applications enable row level security;
+
+-- Lecture : la plateforme voit tout ; l'entreprise assistée voit SES sessions, parce
+-- que le §7 lui garantit un historique consultable. Aucune écriture directe n'est
+-- accordée : tout passe par les RPC ci-dessous.
+drop policy if exists assistance_sessions_lecture on public.assistance_sessions;
+create policy assistance_sessions_lecture on public.assistance_sessions
+for select to authenticated
+using (
+  public.est_plateforme_admin()
+  or exists (
+    select 1 from public.utilisateurs_entreprises ue
+    where ue.utilisateur_id = auth.uid()
+      and ue.entreprise_id = public.assistance_sessions.entreprise_id
+      and ue.statut = 'actif'
+  )
+);
+
+drop policy if exists assistance_sessions_applications_lecture on public.assistance_sessions_applications;
+create policy assistance_sessions_applications_lecture on public.assistance_sessions_applications
+for select to authenticated
+using (
+  exists (
+    select 1 from public.assistance_sessions s
+    where s.id = public.assistance_sessions_applications.session_id
+  )
+);
+
+revoke all on table public.assistance_sessions from public, anon, authenticated;
+revoke all on table public.assistance_sessions_applications from public, anon, authenticated;
+grant select on table public.assistance_sessions to authenticated;
+grant select on table public.assistance_sessions_applications to authenticated;
+
+-- Immutabilité : une session ne se réécrit pas rétroactivement. Seules les colonnes
+-- de clôture et l'horodatage d'activité peuvent changer, et jamais en arrière.
+create or replace function public.assistance_sessions_immuable()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  if new.id <> old.id
+     or new.acteur_id <> old.acteur_id
+     or new.entreprise_id <> old.entreprise_id
+     or new.motif_cle <> old.motif_cle
+     or coalesce(new.motif_detail,'') <> coalesce(old.motif_detail,'')
+     or new.perimetre <> old.perimetre
+     or new.ouverte_at <> old.ouverte_at
+     or new.incident_global <> old.incident_global then
+    raise exception 'Une session d''assistance ne se réécrit pas' using errcode = '42501';
+  end if;
+  -- Prolonger une session en repoussant `expire_at` contournerait la durée choisie.
+  if new.expire_at > old.expire_at then
+    raise exception 'Une session d''assistance ne se prolonge pas : ouvrez-en une nouvelle'
+      using errcode = '42501';
+  end if;
+  if old.terminee_at is not null and new.terminee_at is distinct from old.terminee_at then
+    raise exception 'Une session close ne se rouvre pas' using errcode = '42501';
+  end if;
+  if new.derniere_activite_at < old.derniere_activite_at then
+    raise exception 'Horodatage d''activité incohérent' using errcode = '22007';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists assistance_sessions_immuable_trg on public.assistance_sessions;
+create trigger assistance_sessions_immuable_trg
+before update on public.assistance_sessions
+for each row execute function public.assistance_sessions_immuable();
+
+create or replace function public.assistance_sessions_pas_de_suppression()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  raise exception 'L''historique d''assistance ne se supprime pas' using errcode = '42501';
+end;
+$$;
+drop trigger if exists assistance_sessions_pas_de_suppression_trg on public.assistance_sessions;
+create trigger assistance_sessions_pas_de_suppression_trg
+before delete on public.assistance_sessions
+for each row execute function public.assistance_sessions_pas_de_suppression();
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 4. AUDIT D'ASSISTANCE (append-only)
+-- ═══════════════════════════════════════════════════════════════════════════════
+create table if not exists public.assistance_evenements (
+  id bigint generated always as identity primary key,
+  session_id uuid not null references public.assistance_sessions(id) on delete restrict,
+  -- Dénormalisé volontairement : l'audit doit rester lisible même si la session est
+  -- un jour purgée par la politique de rétention, et il ne doit dépendre d'aucune
+  -- jointure pour prouver QUI a fait QUOI.
+  acteur_id uuid not null references auth.users(id) on delete restrict,
+  acteur_email text not null,
+  entreprise_id uuid not null references public.entreprises(id) on delete restrict,
+  utilisateur_assiste_id uuid references auth.users(id) on delete set null,
+  application_code text not null references public.applications_elsatia(code) on delete restrict,
+  action text not null check (btrim(action) <> ''),
+  famille text not null,
+  domaine text references public.assistance_domaines_sensibles(domaine),
+  objet_type text not null,
+  objet_id uuid,
+  ancien jsonb,
+  nouveau jsonb,
+  motif_interne text not null,
+  ticket text,
+  adresse_ip inet,
+  agent text,
+  resultat text not null check (resultat in ('succes','refus','erreur')),
+  refus_raison text,
+  survenu_at timestamptz not null default now()
+);
+
+create index if not exists assistance_evenements_session_idx
+  on public.assistance_evenements(session_id, survenu_at desc);
+create index if not exists assistance_evenements_entreprise_idx
+  on public.assistance_evenements(entreprise_id, survenu_at desc);
+create index if not exists assistance_evenements_acteur_idx
+  on public.assistance_evenements(acteur_id, survenu_at desc);
+-- Index partiel : la détection d'anomalies (§14 « alertes anormales ») ne balaie que
+-- les refus, qui sont rares.
+create index if not exists assistance_evenements_refus_idx
+  on public.assistance_evenements(acteur_id, survenu_at desc) where resultat = 'refus';
+-- Les actions sensibles sont celles que le client doit voir dans son historique.
+create index if not exists assistance_evenements_sensibles_idx
+  on public.assistance_evenements(entreprise_id, survenu_at desc) where domaine is not null;
+
+alter table public.assistance_evenements enable row level security;
+
+-- Le client voit les ACTIONS SENSIBLES le concernant, la plateforme voit tout.
+-- Publier au client l'intégralité des lectures techniques n'apporterait rien et
+-- exposerait le détail du diagnostic ; le §7 demande « actions sensibles réalisées ».
+drop policy if exists assistance_evenements_lecture on public.assistance_evenements;
+create policy assistance_evenements_lecture on public.assistance_evenements
+for select to authenticated
+using (
+  public.est_plateforme_admin()
+  or (
+    domaine is not null
+    and exists (
+      select 1 from public.utilisateurs_entreprises ue
+      where ue.utilisateur_id = auth.uid()
+        and ue.entreprise_id = public.assistance_evenements.entreprise_id
+        and ue.statut = 'actif'
+    )
+  )
+);
+
+revoke all on table public.assistance_evenements from public, anon, authenticated;
+grant select on table public.assistance_evenements to authenticated;
+
+-- Append-only strict : ni UPDATE ni DELETE, pour personne, y compris la plateforme.
+-- C'est la garantie « historique immuable » du §7 et l'interdit `desactiver_audit`
+-- du §6 : la seule façon de vider ce journal est la fonction de rétention ci-dessous,
+-- qui n'efface que ce qui a dépassé la durée légale de conservation.
+create or replace function public.assistance_evenements_append_only()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  raise exception 'Le journal d''assistance est en écriture seule (append-only)'
+    using errcode = '42501';
+end;
+$$;
+drop trigger if exists assistance_evenements_append_only_trg on public.assistance_evenements;
+create trigger assistance_evenements_append_only_trg
+before update or delete on public.assistance_evenements
+for each row execute function public.assistance_evenements_append_only();
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 5. NOTIFICATIONS D'ASSISTANCE ENVOYÉES À L'ENTREPRISE
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Table dédiée et non `notifications_utilisateurs` : celle-ci est propre à Gestion Pro
+-- (RLS par `est_membre_actif`, qui devient vraie sous session support — donc l'admin
+-- plateforme y verrait les notifications qu'il déclenche lui-même). Une notification
+-- d'assistance appartient au client, jamais à l'assistance.
+create table if not exists public.assistance_notifications (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid not null references public.assistance_sessions(id) on delete restrict,
+  entreprise_id uuid not null references public.entreprises(id) on delete restrict,
+  destinataire_id uuid not null references auth.users(id) on delete cascade,
+  qualite text not null check (qualite in ('proprietaire','administrateur','responsable_configure')),
+  type text not null check (type in ('assistance_ouverte','assistance_terminee')),
+  titre text not null,
+  -- Contient EXCLUSIVEMENT le libellé public du motif. Le détail interne n'entre
+  -- jamais dans cette table : la contrainte ci-dessous le rend vérifiable.
+  message text not null,
+  lue_at timestamptz,
+  envoye_email_at timestamptz,
+  created_at timestamptz not null default now(),
+  unique (session_id, destinataire_id, type)
+);
+
+create index if not exists assistance_notifications_destinataire_idx
+  on public.assistance_notifications(destinataire_id, created_at desc);
+create index if not exists assistance_notifications_entreprise_idx
+  on public.assistance_notifications(entreprise_id, created_at desc);
+
+alter table public.assistance_notifications enable row level security;
+
+drop policy if exists assistance_notifications_lecture on public.assistance_notifications;
+create policy assistance_notifications_lecture on public.assistance_notifications
+for select to authenticated
+using (destinataire_id = auth.uid());
+
+-- Marquer comme lu est la seule écriture accordée au destinataire, et il ne peut pas
+-- réécrire le contenu : la garde est portée par le trigger d'immutabilité.
+drop policy if exists assistance_notifications_marquer_lue on public.assistance_notifications;
+create policy assistance_notifications_marquer_lue on public.assistance_notifications
+for update to authenticated
+using (destinataire_id = auth.uid())
+with check (destinataire_id = auth.uid());
+
+revoke all on table public.assistance_notifications from public, anon, authenticated;
+grant select, update on table public.assistance_notifications to authenticated;
+
+create or replace function public.assistance_notifications_immuable()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  if new.id <> old.id or new.session_id <> old.session_id
+     or new.entreprise_id <> old.entreprise_id or new.destinataire_id <> old.destinataire_id
+     or new.type <> old.type or new.titre <> old.titre or new.message <> old.message then
+    raise exception 'Une notification d''assistance ne se réécrit pas' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists assistance_notifications_immuable_trg on public.assistance_notifications;
+create trigger assistance_notifications_immuable_trg
+before update on public.assistance_notifications
+for each row execute function public.assistance_notifications_immuable();
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 6. DÉCISION : une session est-elle valide, et cette action est-elle permise ?
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+-- Session courante de l'appelant, close automatiquement si elle a expiré ou si
+-- l'inactivité dépasse la politique. `stable`, sans effet de bord : la clôture
+-- effective est faite par `assistance_toucher()` et par le balayage périodique.
+create or replace function public.assistance_session_courante()
+returns public.assistance_sessions
+language sql security definer stable set search_path = public as $$
+  select s.*
+  from public.assistance_sessions s
+  where s.acteur_id = auth.uid()
+    and s.terminee_at is null
+    and s.expire_at > now()
+    and s.derniere_activite_at > now() - interval '15 minutes'
+  limit 1;
+$$;
+revoke all on function public.assistance_session_courante() from public, anon;
+grant execute on function public.assistance_session_courante() to authenticated;
+
+-- Décision centrale, appelée par CHAQUE application. Elle exige simultanément :
+-- l'identité plateforme active, la session vivante, l'entreprise exacte,
+-- l'APPLICATION explicitement sélectionnée, le périmètre, et l'absence d'interdit.
+create or replace function public.assistance_autorise(
+  p_entreprise_id uuid,
+  p_application_code text,
+  p_famille text default 'lire',
+  p_domaine text default null,
+  p_action text default null,
+  p_confirmation_renforcee boolean default false
+) returns boolean
+language plpgsql security definer stable set search_path = public as $$
+declare
+  v_session public.assistance_sessions;
+  v_perimetre public.assistance_perimetres;
+  v_domaine public.assistance_domaines_sensibles;
+  v_rang_requis integer;
+  v_ecriture boolean;
+begin
+  if auth.uid() is null or p_entreprise_id is null or p_application_code is null then
+    return false;
+  end if;
+  -- Le rôle plateforme est revérifié à chaque appel : un retrait de rôle doit
+  -- invalider immédiatement la session, sans attendre son expiration (§5).
+  if coalesce(public.plateforme_role_courant(), '') not in ('total','support') then
+    return false;
+  end if;
+  if p_action is not null
+     and exists (select 1 from public.assistance_actions_interdites where action = p_action) then
+    return false;
+  end if;
+
+  v_session := public.assistance_session_courante();
+  if v_session.id is null then return false; end if;
+  if v_session.entreprise_id <> p_entreprise_id then return false; end if;
+  if not exists (
+    select 1 from public.assistance_sessions_applications sa
+    where sa.session_id = v_session.id and sa.application_code = p_application_code
+  ) then
+    return false;
+  end if;
+
+  select * into v_perimetre from public.assistance_perimetres where cle = v_session.perimetre;
+  if not found or not (p_famille = any (v_perimetre.familles)) then return false; end if;
+
+  if p_domaine is null then return true; end if;
+  select * into v_domaine from public.assistance_domaines_sensibles where domaine = p_domaine;
+  if not found then return false; end if;
+
+  v_ecriture := p_famille in ('configurer','corriger','supprimer','exporter');
+  if v_ecriture then
+    if v_domaine.ecriture_des is null then return false; end if;
+    select rang into v_rang_requis from public.assistance_perimetres where cle = v_domaine.ecriture_des;
+  else
+    select rang into v_rang_requis from public.assistance_perimetres where cle = v_domaine.lecture_des;
+  end if;
+  if v_perimetre.rang < v_rang_requis then return false; end if;
+  if v_domaine.confirmation_renforcee and not coalesce(p_confirmation_renforcee, false) then
+    return false;
+  end if;
+  return true;
+end;
+$$;
+revoke all on function public.assistance_autorise(uuid,text,text,text,text,boolean) from public, anon;
+grant execute on function public.assistance_autorise(uuid,text,text,text,text,boolean) to authenticated;
+
+-- Contrat exposé aux interfaces : de quoi peindre le bandeau permanent sans jamais
+-- divulguer le motif interne. `motif_public` seulement, jamais `motif_detail`.
+create or replace function public.assistance_bandeau(p_application_code text)
+returns jsonb
+language plpgsql security definer stable set search_path = public as $$
+declare
+  v_session public.assistance_sessions;
+  v_motif public.assistance_motifs;
+begin
+  v_session := public.assistance_session_courante();
+  if v_session.id is null then return null; end if;
+  if not exists (
+    select 1 from public.assistance_sessions_applications sa
+    where sa.session_id = v_session.id and sa.application_code = p_application_code
+  ) then
+    return null;
+  end if;
+  select * into v_motif from public.assistance_motifs where cle = v_session.motif_cle;
+  return jsonb_build_object(
+    'session_id', v_session.id,
+    'entreprise_id', v_session.entreprise_id,
+    'entreprise_nom', (select nom from public.entreprises where id = v_session.entreprise_id),
+    'application_code', p_application_code,
+    'application_nom', (select nom from public.applications_elsatia where code = p_application_code),
+    'motif_public', v_motif.libelle_public,
+    'perimetre', v_session.perimetre,
+    'acteur_email', v_session.acteur_email,
+    'ouverte_at', v_session.ouverte_at,
+    'expire_at', v_session.expire_at,
+    'secondes_restantes', greatest(0, extract(epoch from (v_session.expire_at - now()))::integer)
+  );
+end;
+$$;
+revoke all on function public.assistance_bandeau(text) from public, anon;
+grant execute on function public.assistance_bandeau(text) to authenticated;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 7. OUVERTURE, ACTIVITÉ, CLÔTURE, RÉVOCATION
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+create or replace function public.assistance_ouvrir(
+  p_entreprise_id uuid,
+  p_applications text[],
+  p_motif_cle text,
+  p_motif_detail text default null,
+  p_perimetre text default 'lecture_seule',
+  p_duree_minutes integer default 30,
+  p_ticket text default null,
+  p_incident_global boolean default false,
+  p_confirmation_renforcee boolean default false,
+  p_utilisateur_assiste_id uuid default null
+) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := auth.uid();
+  v_role text;
+  v_motif public.assistance_motifs;
+  v_perimetre public.assistance_perimetres;
+  v_applications text[];
+  v_abonnees text[];
+  v_session_id uuid;
+  v_code text;
+begin
+  if v_uid is null then raise exception 'Authentification requise' using errcode = '42501'; end if;
+  v_role := public.plateforme_role_courant();
+  if coalesce(v_role, '') not in ('total','support') then
+    raise exception 'Accès assistance non autorisé' using errcode = '42501';
+  end if;
+  -- MFA/AAL2 obligatoire : le claim `aal` du JWT vérifié par Supabase, jamais un
+  -- paramètre client (même source de vérité que la migration 00237).
+  perform public.plateforme_exiger_session_aal2();
+
+  if not exists (select 1 from public.entreprises where id = p_entreprise_id) then
+    raise exception 'Entreprise introuvable' using errcode = 'P0002';
+  end if;
+
+  select * into v_motif from public.assistance_motifs where cle = p_motif_cle;
+  if not found then raise exception 'Motif d''assistance inconnu' using errcode = '22023'; end if;
+  if v_motif.detail_requis and char_length(btrim(coalesce(p_motif_detail, ''))) < 10 then
+    raise exception 'Détaillez le motif (10 caractères minimum)' using errcode = '22023';
+  end if;
+
+  select * into v_perimetre from public.assistance_perimetres where cle = p_perimetre;
+  if not found then raise exception 'Périmètre d''assistance inconnu' using errcode = '22023'; end if;
+  if p_duree_minutes is null or p_duree_minutes < 5 then
+    raise exception 'Durée minimale : 5 minutes' using errcode = '22023';
+  end if;
+  if p_duree_minutes > v_perimetre.duree_maximale_minutes then
+    raise exception 'Le périmètre « % » est limité à % minutes',
+      v_perimetre.libelle, v_perimetre.duree_maximale_minutes using errcode = '22023';
+  end if;
+
+  -- Applications : dédoublonnées, actives, à portée « entreprise », et réellement
+  -- ouvertes à cette entreprise. Une session ne s'ouvre jamais sur une application
+  -- que l'entreprise n'utilise pas.
+  select coalesce(array_agg(distinct a), '{}') into v_applications
+  from unnest(coalesce(p_applications, '{}'::text[])) a where btrim(a) <> '';
+  if coalesce(array_length(v_applications, 1), 0) = 0 then
+    raise exception 'Sélectionnez au moins une application' using errcode = '22023';
+  end if;
+
+  select coalesce(array_agg(distinct ae.code), '{}') into v_abonnees
+  from public.applications_elsatia ae
+  join public.acces_applications_entreprises aae
+    on aae.application_code = ae.code
+   and aae.entreprise_id = p_entreprise_id
+   and aae.autorise
+   and (aae.valide_du is null or aae.valide_du <= now())
+   and (aae.valide_jusqu_au is null or aae.valide_jusqu_au > now())
+  where ae.actif and ae.portee_donnees = 'entreprise';
+
+  foreach v_code in array v_applications loop
+    if not (v_code = any (v_abonnees)) then
+      raise exception 'Cette entreprise n''utilise pas l''application « % »', v_code using errcode = '42501';
+    end if;
+  end loop;
+
+  -- « Toutes les applications » est un mode d'incident global, pas un raccourci : il
+  -- exige d'être coché ET confirmé, comme le périmètre exceptionnel.
+  if array_length(v_applications, 1) = array_length(v_abonnees, 1)
+     and array_length(v_abonnees, 1) > 1
+     and not coalesce(p_incident_global, false) then
+    raise exception 'Sélectionner toutes les applications relève d''un incident global : cochez-le explicitement'
+      using errcode = '22023';
+  end if;
+  if (coalesce(p_incident_global, false) or v_perimetre.confirmation_renforcee)
+     and not coalesce(p_confirmation_renforcee, false) then
+    raise exception 'Confirmation renforcée requise' using errcode = '42501';
+  end if;
+
+  -- Une session en cours est close avant d'en ouvrir une autre : l'index unique
+  -- l'imposerait de toute façon, mais une clôture explicite laisse une trace propre.
+  update public.assistance_sessions
+  set terminee_at = now(), terminee_motif = 'changement_de_session'
+  where acteur_id = v_uid and terminee_at is null;
+
+  insert into public.assistance_sessions(
+    acteur_id, acteur_email, entreprise_id, utilisateur_assiste_id,
+    motif_cle, motif_detail, ticket, perimetre, incident_global,
+    confirmation_renforcee, expire_at
+  ) values (
+    v_uid, coalesce(auth.email(), ''), p_entreprise_id, p_utilisateur_assiste_id,
+    p_motif_cle, nullif(btrim(coalesce(p_motif_detail, '')), ''), nullif(btrim(coalesce(p_ticket, '')), ''),
+    p_perimetre, coalesce(p_incident_global, false),
+    coalesce(p_confirmation_renforcee, false), now() + make_interval(mins => p_duree_minutes)
+  ) returning id into v_session_id;
+
+  insert into public.assistance_sessions_applications(session_id, application_code)
+  select v_session_id, unnest(v_applications);
+
+  perform public.assistance_notifier_ouverture(v_session_id);
+  perform public.plateforme_journaliser(
+    'assistance_session_ouverte', 'entreprise', p_entreprise_id::text,
+    jsonb_build_object(
+      'session_id', v_session_id, 'applications', to_jsonb(v_applications),
+      'perimetre', p_perimetre, 'motif', p_motif_cle,
+      'duree_minutes', p_duree_minutes, 'incident_global', coalesce(p_incident_global, false)
+    )
+  );
+  return v_session_id;
+end;
+$$;
+revoke all on function public.assistance_ouvrir(uuid,text[],text,text,text,integer,text,boolean,boolean,uuid) from public, anon;
+grant execute on function public.assistance_ouvrir(uuid,text[],text,text,text,integer,text,boolean,boolean,uuid) to authenticated;
+
+-- Prolonge l'horodatage d'activité (politique d'inactivité), jamais l'expiration.
+create or replace function public.assistance_toucher()
+returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  update public.assistance_sessions
+  set derniere_activite_at = now()
+  where acteur_id = auth.uid()
+    and terminee_at is null
+    and expire_at > now()
+    and derniere_activite_at > now() - interval '15 minutes';
+end;
+$$;
+revoke all on function public.assistance_toucher() from public, anon;
+grant execute on function public.assistance_toucher() to authenticated;
+
+create or replace function public.assistance_quitter(p_motif text default 'sortie_explicite')
+returns void
+language plpgsql security definer set search_path = public as $$
+declare v_session_id uuid;
+begin
+  update public.assistance_sessions
+  set terminee_at = now(),
+      terminee_motif = coalesce(nullif(btrim(p_motif), ''), 'sortie_explicite')
+  where acteur_id = auth.uid() and terminee_at is null
+  returning id into v_session_id;
+  if v_session_id is null then return; end if;
+  perform public.assistance_notifier_fermeture(v_session_id);
+  perform public.plateforme_journaliser('assistance_session_quittee', 'session', v_session_id::text, '{}'::jsonb);
+end;
+$$;
+revoke all on function public.assistance_quitter(text) from public, anon;
+grant execute on function public.assistance_quitter(text) to authenticated;
+
+-- Révocation immédiate par un administrateur `total`, y compris pendant que la
+-- session travaille. Un opérateur ne peut pas révoquer sa propre session pour
+-- effacer une trace : il la QUITTE, ce qui laisse un motif différent.
+create or replace function public.assistance_revoquer(p_session_id uuid, p_motif text)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare v_session public.assistance_sessions;
+begin
+  perform public.plateforme_exiger_role('total');
+  perform public.plateforme_exiger_session_aal2();
+  if char_length(btrim(coalesce(p_motif, ''))) < 5 then
+    raise exception 'Indiquez le motif de révocation' using errcode = '22023';
+  end if;
+  select * into v_session from public.assistance_sessions where id = p_session_id for update;
+  if not found then raise exception 'Session introuvable' using errcode = 'P0002'; end if;
+  if v_session.terminee_at is not null then
+    raise exception 'Session déjà close' using errcode = '22023';
+  end if;
+  update public.assistance_sessions
+  set terminee_at = now(), terminee_motif = 'revocation',
+      revoquee_at = now(), revoquee_par = auth.uid()
+  where id = p_session_id;
+  perform public.assistance_notifier_fermeture(p_session_id);
+  perform public.plateforme_journaliser(
+    'assistance_session_revoquee', 'session', p_session_id::text,
+    jsonb_build_object('motif', btrim(p_motif), 'acteur_revoque', v_session.acteur_id)
+  );
+end;
+$$;
+revoke all on function public.assistance_revoquer(uuid,text) from public, anon;
+grant execute on function public.assistance_revoquer(uuid,text) to authenticated;
+
+-- Balayage : expiration et inactivité. Idempotent — relancer ne referme rien deux
+-- fois et ne renotifie pas (la contrainte d'unicité de `assistance_notifications`
+-- l'empêche). Appelé par un cron, ou opportunistement à l'ouverture d'une session.
+create or replace function public.assistance_fermer_sessions_echues()
+returns integer
+language plpgsql security definer set search_path = public as $$
+declare v_nombre integer := 0; v_id uuid;
+begin
+  for v_id in
+    update public.assistance_sessions
+    set terminee_at = now(),
+        terminee_motif = case
+          when expire_at <= now() then 'expiration' else 'inactivite' end
+    where terminee_at is null
+      and (expire_at <= now() or derniere_activite_at <= now() - interval '15 minutes')
+    returning id
+  loop
+    perform public.assistance_notifier_fermeture(v_id);
+    v_nombre := v_nombre + 1;
+  end loop;
+  return v_nombre;
+end;
+$$;
+revoke all on function public.assistance_fermer_sessions_echues() from public, anon, authenticated;
+grant execute on function public.assistance_fermer_sessions_echues() to service_role;
+
+-- Retrait du rôle plateforme : ferme immédiatement les sessions de l'identité visée.
+-- Complète `plateforme_retirer_admin` (00266) qui ne connaissait que l'ancienne table.
+create or replace function public.assistance_fermer_sessions_acteur(p_acteur_id uuid)
+returns integer
+language plpgsql security definer set search_path = public as $$
+declare v_nombre integer := 0; v_id uuid;
+begin
+  for v_id in
+    update public.assistance_sessions
+    set terminee_at = now(), terminee_motif = 'retrait_role_plateforme'
+    where acteur_id = p_acteur_id and terminee_at is null
+    returning id
+  loop
+    perform public.assistance_notifier_fermeture(v_id);
+    v_nombre := v_nombre + 1;
+  end loop;
+  return v_nombre;
+end;
+$$;
+revoke all on function public.assistance_fermer_sessions_acteur(uuid) from public, anon, authenticated;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 8. JOURNALISATION ET NOTIFICATION
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+create or replace function public.assistance_journaliser(
+  p_application_code text,
+  p_action text,
+  p_objet_type text,
+  p_objet_id uuid default null,
+  p_famille text default 'lire',
+  p_domaine text default null,
+  p_ancien jsonb default null,
+  p_nouveau jsonb default null,
+  p_resultat text default 'succes',
+  p_refus_raison text default null
+) returns bigint
+language plpgsql security definer set search_path = public as $$
+declare
+  v_session public.assistance_sessions;
+  v_motif public.assistance_motifs;
+  v_id bigint;
+begin
+  v_session := public.assistance_session_courante();
+  if v_session.id is null then
+    raise exception 'Aucune session d''assistance ouverte' using errcode = '42501';
+  end if;
+  select * into v_motif from public.assistance_motifs where cle = v_session.motif_cle;
+
+  insert into public.assistance_evenements(
+    session_id, acteur_id, acteur_email, entreprise_id, utilisateur_assiste_id,
+    application_code, action, famille, domaine, objet_type, objet_id,
+    -- Un avant/après identique n'apporte rien : on ne bruite pas l'audit.
+    ancien, nouveau,
+    motif_interne, ticket, resultat, refus_raison
+  ) values (
+    v_session.id, v_session.acteur_id, v_session.acteur_email, v_session.entreprise_id,
+    v_session.utilisateur_assiste_id, p_application_code, p_action, p_famille, p_domaine,
+    p_objet_type, p_objet_id,
+    case when p_ancien is not distinct from p_nouveau then null else p_ancien end,
+    case when p_ancien is not distinct from p_nouveau then null else p_nouveau end,
+    v_motif.libelle_interne || coalesce(' — ' || v_session.motif_detail, ''),
+    v_session.ticket, p_resultat, p_refus_raison
+  ) returning id into v_id;
+
+  update public.assistance_sessions set derniere_activite_at = now() where id = v_session.id;
+  return v_id;
+end;
+$$;
+revoke all on function public.assistance_journaliser(text,text,text,uuid,text,text,jsonb,jsonb,text,text) from public, anon;
+grant execute on function public.assistance_journaliser(text,text,text,uuid,text,text,jsonb,jsonb,text,text) to authenticated;
+
+-- Destinataires : propriétaire (poste « Gérant » ou droit complet) et administrateurs
+-- (permission `gerer_utilisateurs`). Le modèle Gestion Pro n'a pas de rôle « owner » :
+-- la qualité est déduite des permissions réelles, pas d'un nom de poste (qui est libre).
+create or replace function public.assistance_destinataires(p_entreprise_id uuid)
+returns table(destinataire_id uuid, qualite text)
+language sql security definer stable set search_path = public as $$
+  select ue.utilisateur_id,
+         case when bool_or(pp.cle_permission = 'gerer_parametres') then 'proprietaire'
+              else 'administrateur' end
+  from public.utilisateurs_entreprises ue
+  join public.permissions_poste pp
+    on pp.entreprise_id = ue.entreprise_id and pp.poste_id = ue.poste_id and pp.autorise
+  where ue.entreprise_id = p_entreprise_id
+    and ue.statut = 'actif'
+    and pp.cle_permission in ('gerer_utilisateurs','gerer_parametres')
+  group by ue.utilisateur_id;
+$$;
+revoke all on function public.assistance_destinataires(uuid) from public, anon, authenticated;
+
+create or replace function public.assistance_notifier_ouverture(p_session_id uuid)
+returns integer
+language plpgsql security definer set search_path = public as $$
+declare
+  v_session public.assistance_sessions;
+  v_motif public.assistance_motifs;
+  v_applications text;
+  v_nombre integer;
+begin
+  select * into v_session from public.assistance_sessions where id = p_session_id;
+  if not found then return 0; end if;
+  select * into v_motif from public.assistance_motifs where cle = v_session.motif_cle;
+  select string_agg(ae.nom, ', ' order by ae.ordre) into v_applications
+  from public.assistance_sessions_applications sa
+  join public.applications_elsatia ae on ae.code = sa.application_code
+  where sa.session_id = p_session_id;
+
+  insert into public.assistance_notifications(
+    session_id, entreprise_id, destinataire_id, qualite, type, titre, message
+  )
+  select p_session_id, v_session.entreprise_id, d.destinataire_id, d.qualite,
+         'assistance_ouverte', 'Accès de l’assistance ELSATIA',
+         format(
+           'L’assistance ELSATIA a accédé à votre espace %s le %s dans le cadre de : %s.',
+           coalesce(v_applications, 'ELSATIA'),
+           to_char(v_session.ouverte_at at time zone 'Europe/Paris', 'DD/MM/YYYY') || ' à '
+             || to_char(v_session.ouverte_at at time zone 'Europe/Paris', 'HH24:MI'),
+           v_motif.libelle_public
+         )
+  from public.assistance_destinataires(v_session.entreprise_id) d
+  on conflict (session_id, destinataire_id, type) do nothing;
+  get diagnostics v_nombre = row_count;
+  return v_nombre;
+end;
+$$;
+revoke all on function public.assistance_notifier_ouverture(uuid) from public, anon, authenticated;
+
+create or replace function public.assistance_notifier_fermeture(p_session_id uuid)
+returns integer
+language plpgsql security definer set search_path = public as $$
+declare v_session public.assistance_sessions; v_nombre integer;
+begin
+  select * into v_session from public.assistance_sessions where id = p_session_id;
+  if not found or v_session.terminee_at is null then return 0; end if;
+
+  insert into public.assistance_notifications(
+    session_id, entreprise_id, destinataire_id, qualite, type, titre, message
+  )
+  select p_session_id, v_session.entreprise_id, n.destinataire_id, n.qualite,
+         'assistance_terminee', 'Fin de la session d’assistance ELSATIA',
+         format(
+           'La session d’assistance ELSATIA ouverte le %s s’est terminée le %s.',
+           to_char(v_session.ouverte_at at time zone 'Europe/Paris', 'DD/MM/YYYY à HH24:MI'),
+           to_char(v_session.terminee_at at time zone 'Europe/Paris', 'DD/MM/YYYY à HH24:MI')
+         )
+  -- Les destinataires de la fermeture sont EXACTEMENT ceux de l'ouverture : un
+  -- changement de poste entre-temps ne doit ni ajouter ni retirer quelqu'un.
+  from public.assistance_notifications n
+  where n.session_id = p_session_id and n.type = 'assistance_ouverte'
+  on conflict (session_id, destinataire_id, type) do nothing;
+  get diagnostics v_nombre = row_count;
+  return v_nombre;
+end;
+$$;
+revoke all on function public.assistance_notifier_fermeture(uuid) from public, anon, authenticated;
+
+-- Historique consultable par le CLIENT (§7). Lecture seule, sans motif interne.
+create or replace function public.assistance_historique_entreprise(p_entreprise_id uuid)
+returns table(
+  session_id uuid, applications text[], debut timestamptz, fin timestamptz,
+  statut text, categorie_motif text, intervenant text, actions_sensibles integer
+)
+language plpgsql security definer stable set search_path = public as $$
+begin
+  if not exists (
+    select 1 from public.utilisateurs_entreprises ue
+    where ue.utilisateur_id = auth.uid() and ue.entreprise_id = p_entreprise_id and ue.statut = 'actif'
+  ) and not public.est_plateforme_admin() then
+    raise exception 'Accès refusé' using errcode = '42501';
+  end if;
+  return query
+  select s.id,
+         array(select sa.application_code from public.assistance_sessions_applications sa where sa.session_id = s.id),
+         s.ouverte_at, s.terminee_at,
+         case when s.revoquee_at is not null then 'revoquee'
+              when s.terminee_at is not null then 'terminee'
+              when s.expire_at <= now() then 'expiree'
+              else 'en_cours' end,
+         m.libelle_public,
+         'Assistance ELSATIA',
+         (select count(*)::integer from public.assistance_evenements e
+          where e.session_id = s.id and e.domaine is not null)
+  from public.assistance_sessions s
+  join public.assistance_motifs m on m.cle = s.motif_cle
+  where s.entreprise_id = p_entreprise_id
+  order by s.ouverte_at desc;
+end;
+$$;
+revoke all on function public.assistance_historique_entreprise(uuid) from public, anon;
+grant execute on function public.assistance_historique_entreprise(uuid) to authenticated;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 9. CENTRE DE COMMUNICATIONS
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+create table if not exists public.communications (
+  id uuid primary key default gen_random_uuid(),
+  titre text not null check (char_length(btrim(titre)) between 3 and 120),
+  texte_court text not null check (char_length(btrim(texte_court)) between 3 and 280),
+  contenu text check (contenu is null or char_length(btrim(contenu)) between 3 and 5000),
+  type text not null check (type in (
+    'information','nouveaute','maintenance','incident','securite','action_requise',
+    'conseil','commerciale','interruption_planifiee','conditions','autre')),
+  -- Nature dérivée du type, matérialisée pour rendre le contrôle du §13 vérifiable :
+  -- une communication commerciale ne peut pas emprunter le canal non refusable.
+  nature text not null check (nature in ('service','produit','commerciale')),
+  priorite text not null default 'normale' check (priorite in ('basse','normale','haute','critique')),
+  mode_affichage text not null check (mode_affichage in (
+    'banniere','carte_tableau_de_bord','modale','bloquant','centre_notifications')),
+  frequence text not null default 'une_seule_fois' check (frequence in (
+    'une_seule_fois','rappel_periodique','jusqu_a_acquittement','permanent')),
+  canaux text[] not null default array['in_app'] check (
+    array_length(canaux, 1) between 1 and 3
+    and canaux <@ array['in_app','email','push']),
+  lien text,
+  libelle_bouton text check (libelle_bouton is null or char_length(btrim(libelle_bouton)) between 1 and 40),
+  statut text not null default 'brouillon' check (statut in (
+    'brouillon','programmee','publiee','en_pause','expiree','annulee','archivee')),
+  debut_at timestamptz not null,
+  fin_at timestamptz,
+  auteur_id uuid not null references auth.users(id) on delete restrict,
+  auteur_email text not null,
+  publiee_at timestamptz,
+  publiee_par uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (fin_at is null or fin_at > debut_at),
+  -- Bouton et lien vont ensemble : un bouton mort est un défaut, pas une mise en page.
+  check ((lien is null) = (libelle_bouton is null)),
+  -- Le HTML n'est jamais accepté : le contenu est du texte, rendu par JSX échappé.
+  check (titre !~ '[<>]' and texte_court !~ '[<>]' and (contenu is null or contenu !~ '[<>]')),
+  -- Seuls quatre types peuvent bloquer l'accès. Une publicité bloquante est refusée
+  -- par la base, pas seulement par l'interface.
+  check (mode_affichage <> 'bloquant'
+         or type in ('securite','conditions','interruption_planifiee','action_requise')),
+  -- Un lien est interne ou https sur un domaine ELSATIA ; jamais `javascript:` ni
+  -- `data:` ni protocol-relative.
+  check (lien is null
+         or lien ~ '^/[^/\\]'
+         or lien ~* '^https://([a-z0-9-]+\.)*elsatia\.fr(/|$|\?)')
+);
+
+create index if not exists communications_diffusion_idx
+  on public.communications(statut, debut_at desc) where statut in ('publiee','programmee');
+create index if not exists communications_auteur_idx on public.communications(auteur_id, created_at desc);
+
+create table if not exists public.communications_audiences (
+  communication_id uuid primary key references public.communications(id) on delete cascade,
+  -- NULL = « toutes ». Un tableau vide serait ambigu, il est donc interdit.
+  applications text[] check (applications is null or array_length(applications, 1) > 0),
+  entreprises uuid[] check (entreprises is null or array_length(entreprises, 1) > 0),
+  segments text[] check (segments is null or segments <@ array['pilote','essai','actif','expire']),
+  roles text[] check (roles is null or array_length(roles, 1) > 0),
+  permissions text[],
+  roles_applicatifs text[]
+);
+
+-- Pièces jointes : une seule image par communication en V1, stockée dans un bucket
+-- privé ELSATIA. Aucune URL distante n'est acceptée (§11).
+create table if not exists public.communications_pieces_jointes (
+  id uuid primary key default gen_random_uuid(),
+  communication_id uuid not null references public.communications(id) on delete cascade,
+  chemin_stockage text not null check (btrim(chemin_stockage) <> ''),
+  mime text not null check (mime in ('image/png','image/jpeg','image/webp')),
+  octets integer not null check (octets between 1 and 2097152),
+  largeur integer not null check (largeur between 320 and 2400),
+  hauteur integer not null check (hauteur between 180 and 1600),
+  texte_alternatif text not null check (char_length(btrim(texte_alternatif)) between 5 and 160),
+  created_at timestamptz not null default now(),
+  unique (communication_id)
+);
+
+create table if not exists public.communications_lectures (
+  communication_id uuid not null references public.communications(id) on delete cascade,
+  utilisateur_id uuid not null references auth.users(id) on delete cascade,
+  etat text not null default 'non_vu' check (etat in ('non_vu','vu','ignore','acquitte','clique')),
+  vu_at timestamptz,
+  acquitte_at timestamptz,
+  clique_at timestamptz,
+  affichages integer not null default 0 check (affichages >= 0),
+  dernier_affichage_at timestamptz,
+  appareil text,
+  updated_at timestamptz not null default now(),
+  primary key (communication_id, utilisateur_id)
+);
+create index if not exists communications_lectures_utilisateur_idx
+  on public.communications_lectures(utilisateur_id, updated_at desc);
+
+create table if not exists public.communications_preferences (
+  utilisateur_id uuid primary key references auth.users(id) on delete cascade,
+  -- Opt-in explicite : l'absence de choix n'est pas un consentement.
+  accepte_commerciales boolean not null default false,
+  accepte_produit boolean not null default true,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.communications_journal (
+  id bigint generated always as identity primary key,
+  communication_id uuid not null references public.communications(id) on delete restrict,
+  action text not null check (action in (
+    'creation','modification','publication','depublication','pause','reprise',
+    'annulation','archivage','ciblage','image','duplication')),
+  acteur_id uuid not null references auth.users(id) on delete restrict,
+  acteur_email text not null,
+  ancien jsonb,
+  nouveau jsonb,
+  resultat text not null default 'succes' check (resultat in ('succes','refus','erreur')),
+  created_at timestamptz not null default now()
+);
+create index if not exists communications_journal_idx
+  on public.communications_journal(communication_id, created_at desc);
+
+alter table public.communications enable row level security;
+alter table public.communications_audiences enable row level security;
+alter table public.communications_pieces_jointes enable row level security;
+alter table public.communications_lectures enable row level security;
+alter table public.communications_preferences enable row level security;
+alter table public.communications_journal enable row level security;
+
+-- La plateforme lit tout ; un lecteur ne lit RIEN directement. La diffusion passe
+-- exclusivement par `communications_pour_utilisateur()`, qui applique le ciblage et
+-- le consentement — sans quoi une entreprise pourrait lire les messages destinés à
+-- une autre (fuite entre tenants, §15).
+drop policy if exists communications_lecture_plateforme on public.communications;
+create policy communications_lecture_plateforme on public.communications
+for select to authenticated using (public.est_plateforme_admin());
+
+drop policy if exists communications_audiences_lecture on public.communications_audiences;
+create policy communications_audiences_lecture on public.communications_audiences
+for select to authenticated using (public.est_plateforme_admin());
+
+drop policy if exists communications_pieces_jointes_lecture on public.communications_pieces_jointes;
+create policy communications_pieces_jointes_lecture on public.communications_pieces_jointes
+for select to authenticated using (public.est_plateforme_admin());
+
+drop policy if exists communications_journal_lecture on public.communications_journal;
+create policy communications_journal_lecture on public.communications_journal
+for select to authenticated using (public.est_plateforme_admin());
+
+-- Chacun voit et met à jour SES lectures et SES préférences, jamais celles d'un autre.
+drop policy if exists communications_lectures_personnelles on public.communications_lectures;
+create policy communications_lectures_personnelles on public.communications_lectures
+for select to authenticated using (utilisateur_id = auth.uid() or public.est_plateforme_admin());
+
+drop policy if exists communications_preferences_personnelles on public.communications_preferences;
+create policy communications_preferences_personnelles on public.communications_preferences
+for select to authenticated using (utilisateur_id = auth.uid());
+drop policy if exists communications_preferences_maj on public.communications_preferences;
+create policy communications_preferences_maj on public.communications_preferences
+for update to authenticated using (utilisateur_id = auth.uid()) with check (utilisateur_id = auth.uid());
+drop policy if exists communications_preferences_creation on public.communications_preferences;
+create policy communications_preferences_creation on public.communications_preferences
+for insert to authenticated with check (utilisateur_id = auth.uid());
+
+do $$
+declare t text;
+begin
+  foreach t in array array['communications','communications_audiences','communications_pieces_jointes',
+                           'communications_lectures','communications_journal']
+  loop
+    execute format('revoke all on table public.%I from public, anon, authenticated', t);
+    execute format('grant select on table public.%I to authenticated', t);
+  end loop;
+end $$;
+revoke all on table public.communications_preferences from public, anon, authenticated;
+grant select, insert, update on table public.communications_preferences to authenticated;
+
+-- Journal append-only, comme l'audit d'assistance.
+create or replace function public.communications_journal_append_only()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  raise exception 'Le journal des communications est en écriture seule' using errcode = '42501';
+end;
+$$;
+drop trigger if exists communications_journal_append_only_trg on public.communications_journal;
+create trigger communications_journal_append_only_trg
+before update or delete on public.communications_journal
+for each row execute function public.communications_journal_append_only();
+
+-- Après publication, le CONTENU est figé. Seuls la fin de diffusion et le statut
+-- peuvent bouger : c'est la réponse au « modification silencieuse après publication ».
+create or replace function public.communications_figer_apres_publication()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  new.updated_at := now();
+  if old.publiee_at is null then return new; end if;
+  if new.titre <> old.titre or new.texte_court <> old.texte_court
+     or coalesce(new.contenu,'') <> coalesce(old.contenu,'')
+     or new.type <> old.type or new.mode_affichage <> old.mode_affichage
+     or coalesce(new.lien,'') <> coalesce(old.lien,'')
+     or coalesce(new.libelle_bouton,'') <> coalesce(old.libelle_bouton,'')
+     or new.debut_at <> old.debut_at then
+    raise exception 'Une communication publiée ne se modifie pas : dupliquez-la'
+      using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists communications_figer_trg on public.communications;
+create trigger communications_figer_trg
+before update on public.communications
+for each row execute function public.communications_figer_apres_publication();
+
+-- L'audience d'une communication publiée est figée elle aussi : élargir le ciblage
+-- après coup enverrait un message qu'aucune trace ne relierait à sa validation.
+create or replace function public.communications_audience_figee()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  if exists (
+    select 1 from public.communications c
+    where c.id = coalesce(new.communication_id, old.communication_id) and c.publiee_at is not null
+  ) then
+    raise exception 'Le ciblage d''une communication publiée ne se modifie pas' using errcode = '42501';
+  end if;
+  return coalesce(new, old);
+end;
+$$;
+drop trigger if exists communications_audience_figee_trg on public.communications_audiences;
+create trigger communications_audience_figee_trg
+before update or delete on public.communications_audiences
+for each row execute function public.communications_audience_figee();
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 10. DIFFUSION ET ACQUITTEMENT
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+create or replace function public.communications_creer(
+  p_titre text, p_texte_court text, p_type text, p_mode_affichage text,
+  p_debut_at timestamptz, p_fin_at timestamptz default null,
+  p_contenu text default null, p_priorite text default 'normale',
+  p_frequence text default 'une_seule_fois', p_canaux text[] default array['in_app'],
+  p_lien text default null, p_libelle_bouton text default null,
+  p_applications text[] default null, p_entreprises uuid[] default null,
+  p_segments text[] default null, p_roles text[] default null,
+  p_permissions text[] default null, p_roles_applicatifs text[] default null
+) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare v_id uuid; v_nature text;
+begin
+  perform public.plateforme_exiger_role('total');
+  perform public.plateforme_exiger_session_aal2();
+  v_nature := case p_type
+    when 'commerciale' then 'commerciale'
+    when 'nouveaute' then 'produit'
+    when 'conseil' then 'produit'
+    when 'autre' then 'produit'
+    else 'service' end;
+
+  insert into public.communications(
+    titre, texte_court, contenu, type, nature, priorite, mode_affichage, frequence,
+    canaux, lien, libelle_bouton, debut_at, fin_at, auteur_id, auteur_email
+  ) values (
+    btrim(p_titre), btrim(p_texte_court), nullif(btrim(coalesce(p_contenu,'')),''), p_type, v_nature,
+    p_priorite, p_mode_affichage, p_frequence, p_canaux,
+    nullif(btrim(coalesce(p_lien,'')),''), nullif(btrim(coalesce(p_libelle_bouton,'')),''),
+    p_debut_at, p_fin_at, auth.uid(), coalesce(auth.email(), '')
+  ) returning id into v_id;
+
+  insert into public.communications_audiences(
+    communication_id, applications, entreprises, segments, roles, permissions, roles_applicatifs
+  ) values (v_id, p_applications, p_entreprises, p_segments, p_roles, p_permissions, p_roles_applicatifs);
+
+  insert into public.communications_journal(communication_id, action, acteur_id, acteur_email, nouveau)
+  values (v_id, 'creation', auth.uid(), coalesce(auth.email(), ''),
+          jsonb_build_object('titre', btrim(p_titre), 'type', p_type, 'mode', p_mode_affichage));
+  return v_id;
+end;
+$$;
+revoke all on function public.communications_creer(text,text,text,text,timestamptz,timestamptz,text,text,text,text[],text,text,text[],uuid[],text[],text[],text[],text[]) from public, anon;
+grant execute on function public.communications_creer(text,text,text,text,timestamptz,timestamptz,text,text,text,text[],text,text,text[],uuid[],text[],text[],text[],text[]) to authenticated;
+
+create or replace function public.communications_changer_statut(p_id uuid, p_transition text)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare v_statut text; v_nouveau text;
+begin
+  perform public.plateforme_exiger_role('total');
+  perform public.plateforme_exiger_session_aal2();
+  select statut into v_statut from public.communications where id = p_id for update;
+  if not found then raise exception 'Communication introuvable' using errcode = 'P0002'; end if;
+
+  v_nouveau := case
+    when p_transition = 'publier' and v_statut in ('brouillon','programmee') then 'publiee'
+    when p_transition = 'programmer' and v_statut = 'brouillon' then 'programmee'
+    when p_transition = 'mettre_en_pause' and v_statut in ('publiee','programmee') then 'en_pause'
+    when p_transition = 'reprendre' and v_statut = 'en_pause' then 'publiee'
+    when p_transition = 'annuler' and v_statut in ('brouillon','programmee','publiee','en_pause') then 'annulee'
+    when p_transition = 'archiver' and v_statut in ('publiee','en_pause','expiree','annulee') then 'archivee'
+    else null end;
+  if v_nouveau is null then
+    raise exception 'Transition « % » impossible depuis « % »', p_transition, v_statut using errcode = '22023';
+  end if;
+
+  update public.communications
+  set statut = v_nouveau,
+      publiee_at = case when v_nouveau = 'publiee' and publiee_at is null then now() else publiee_at end,
+      publiee_par = case when v_nouveau = 'publiee' and publiee_par is null then auth.uid() else publiee_par end
+  where id = p_id;
+
+  insert into public.communications_journal(communication_id, action, acteur_id, acteur_email, ancien, nouveau)
+  values (p_id,
+          case p_transition
+            when 'publier' then 'publication' when 'programmer' then 'publication'
+            when 'mettre_en_pause' then 'pause' when 'reprendre' then 'reprise'
+            when 'annuler' then 'annulation' else 'archivage' end,
+          auth.uid(), coalesce(auth.email(), ''),
+          jsonb_build_object('statut', v_statut), jsonb_build_object('statut', v_nouveau));
+end;
+$$;
+revoke all on function public.communications_changer_statut(uuid,text) from public, anon;
+grant execute on function public.communications_changer_statut(uuid,text) to authenticated;
+
+-- Diffusion. Elle s'appuie sur `assistance_roles_correspondance`, définie juste après :
+-- un corps plpgsql n'est pas résolu à la création, l'ordre est donc sans effet à
+-- l'exécution, et regrouper la table avec le reste du ciblage se lit mieux.
+--
+-- Une seule fonction, appelée par TOUTES les applications avec leur code :
+-- le ciblage, le consentement et la fréquence sont décidés côté serveur, jamais par
+-- le client. Un message d'une autre entreprise n'est pas filtré à l'affichage : il
+-- n'est jamais renvoyé.
+create or replace function public.communications_pour_utilisateur(
+  p_application_code text,
+  p_entreprise_id uuid default null
+) returns table(
+  id uuid, titre text, texte_court text, contenu text, type text, nature text,
+  priorite text, mode_affichage text, frequence text, lien text, libelle_bouton text,
+  image_chemin text, image_alt text, debut_at timestamptz, fin_at timestamptz,
+  refusable boolean, etat text, affichages integer, dernier_affichage_at timestamptz
+)
+language plpgsql security definer stable set search_path = public as $$
+declare
+  v_uid uuid := auth.uid();
+  v_segment text;
+  v_modele text;
+  v_permissions text[];
+  v_roles_applicatifs text[];
+  v_prefs public.communications_preferences;
+begin
+  if v_uid is null then return; end if;
+
+  -- Appartenance réelle : un utilisateur ne reçoit les messages d'une entreprise que
+  -- s'il en est membre actif. Une session d'assistance ne donne PAS ce droit — un
+  -- opérateur n'a pas à recevoir les communications destinées au client.
+  if p_entreprise_id is not null and not exists (
+    select 1 from public.utilisateurs_entreprises ue
+    where ue.utilisateur_id = v_uid and ue.entreprise_id = p_entreprise_id and ue.statut = 'actif'
+  ) then
+    return;
+  end if;
+
+  select case
+           when e.abonnement_statut = 'essai' then 'essai'
+           when e.abonnement_statut = 'actif' then 'actif'
+           when e.abonnement_statut in ('suspendu','annule') then 'expire'
+           else null end
+  into v_segment from public.entreprises e where e.id = p_entreprise_id;
+
+  select lower(btrim(p.nom)) into v_modele
+  from public.utilisateurs_entreprises ue
+  join public.postes p on p.id = ue.poste_id
+  where ue.utilisateur_id = v_uid and ue.entreprise_id = p_entreprise_id;
+
+  select coalesce(array_agg(pp.cle_permission), '{}') into v_permissions
+  from public.utilisateurs_entreprises ue
+  join public.permissions_poste pp
+    on pp.entreprise_id = ue.entreprise_id and pp.poste_id = ue.poste_id and pp.autorise
+  where ue.utilisateur_id = v_uid and ue.entreprise_id = p_entreprise_id;
+
+  select coalesce(array_agg(h.role_code), '{}') into v_roles_applicatifs
+  from public.habilitations_applications_utilisateurs h
+  where h.utilisateur_id = v_uid and h.entreprise_id = p_entreprise_id and h.autorise;
+
+  select * into v_prefs from public.communications_preferences where utilisateur_id = v_uid;
+
+  return query
+  select c.id, c.titre, c.texte_court, c.contenu, c.type, c.nature, c.priorite,
+         c.mode_affichage, c.frequence, c.lien, c.libelle_bouton,
+         pj.chemin_stockage, pj.texte_alternatif, c.debut_at, c.fin_at,
+         c.nature <> 'service',
+         coalesce(l.etat, 'non_vu'), coalesce(l.affichages, 0), l.dernier_affichage_at
+  from public.communications c
+  join public.communications_audiences a on a.communication_id = c.id
+  left join public.communications_pieces_jointes pj on pj.communication_id = c.id
+  left join public.communications_lectures l on l.communication_id = c.id and l.utilisateur_id = v_uid
+  where c.statut = 'publiee'
+    and c.debut_at <= now()
+    and (c.fin_at is null or c.fin_at > now())
+    and (a.applications is null or p_application_code = any (a.applications))
+    and (a.entreprises is null or (p_entreprise_id is not null and p_entreprise_id = any (a.entreprises)))
+    and (a.segments is null or (v_segment is not null and v_segment = any (a.segments)))
+    and (
+      (a.roles is null and coalesce(array_length(a.permissions, 1), 0) = 0
+        and coalesce(array_length(a.roles_applicatifs, 1), 0) = 0)
+      or exists (
+        select 1 from public.assistance_roles_correspondance rc
+        where rc.cle = any (coalesce(a.roles, '{}'))
+          and (rc.modele_poste = v_modele
+               or rc.permission = any (v_permissions)
+               or rc.role_applicatif = any (v_roles_applicatifs))
+      )
+      or (a.permissions && v_permissions)
+      or (a.roles_applicatifs && v_roles_applicatifs)
+    )
+    -- Consentement : un message de service passe toujours ; produit et commercial
+    -- respectent la préférence, avec l'opt-in commercial par défaut à faux.
+    and (
+      c.nature = 'service'
+      or (c.nature = 'produit' and coalesce(v_prefs.accepte_produit, true))
+      or (c.nature = 'commerciale' and coalesce(v_prefs.accepte_commerciales, false))
+    )
+    -- Fréquence : ce qui est acquitté ne revient jamais ; « une seule fois » s'arrête
+    -- au premier affichage ; le rappel respecte 24 h.
+    and l.acquitte_at is null
+    and (
+      c.frequence <> 'une_seule_fois' or coalesce(l.affichages, 0) = 0
+    )
+    and (
+      c.frequence <> 'rappel_periodique'
+      or l.dernier_affichage_at is null
+      or l.dernier_affichage_at <= now() - interval '24 hours'
+    )
+  order by
+    case c.priorite when 'critique' then 0 when 'haute' then 1 when 'normale' then 2 else 3 end,
+    c.debut_at desc;
+end;
+$$;
+revoke all on function public.communications_pour_utilisateur(text,uuid) from public, anon;
+grant execute on function public.communications_pour_utilisateur(text,uuid) to authenticated;
+
+-- Table de correspondance rôle demandé → modèle de poste / permission / rôle applicatif.
+-- Miroir de `ciblage.ts`.
+--
+-- Deux précisions qui comptent :
+--
+--   * `modele_poste` contient le NOM du poste en minuscules, pas une clé. Gestion Pro
+--     ne conserve AUCUN lien entre un poste et le modèle dont il dérive : la seule
+--     donnée disponible est `postes.nom`, que l'entreprise peut renommer librement. Ce
+--     chemin est donc une heuristique, utile tant que le nom d'origine est conservé —
+--     et c'est précisément pourquoi le chemin `permission` existe à côté : lui reste
+--     exact après un renommage.
+--
+--   * les deux écarts documentés (gestionnaire de stock, responsable matériel) n'ont
+--     aucune ligne `modele_poste` : c'est voulu, aucun modèle Gestion Pro ne leur
+--     correspond.
+create table if not exists public.assistance_roles_correspondance (
+  cle text not null,
+  modele_poste text,
+  permission text,
+  role_applicatif text,
+  check (num_nonnulls(modele_poste, permission, role_applicatif) = 1)
+);
+create unique index if not exists assistance_roles_correspondance_unique
+  on public.assistance_roles_correspondance(cle, coalesce(modele_poste,''), coalesce(permission,''), coalesce(role_applicatif,''));
+create index if not exists assistance_roles_correspondance_cle_idx
+  on public.assistance_roles_correspondance(cle);
+
+insert into public.assistance_roles_correspondance(cle, modele_poste, permission, role_applicatif) values
+  ('proprietaire','gérant',null,null),
+  ('proprietaire',null,null,'colors_admin_organisation'),
+  ('proprietaire',null,null,'reserves_admin_organisation'),
+  ('administrateur','gérant',null,null),
+  ('administrateur','administration',null,null),
+  ('administrateur',null,'gerer_utilisateurs',null),
+  ('administratif','administration',null,null),
+  ('administratif',null,'acces_parametres',null),
+  ('conducteur_travaux','conducteur de travaux',null,null),
+  ('conducteur_travaux','directeur travaux',null,null),
+  ('conducteur_travaux',null,'gerer_chantiers',null),
+  ('conducteur_travaux',null,null,'reserves_responsable'),
+  ('chef_chantier','chef de chantier',null,null),
+  ('chef_chantier',null,'gerer_planning',null),
+  ('chef_chantier',null,null,'reserves_emetteur'),
+  ('chef_equipe','chef d’équipe',null,null),
+  ('salarie_terrain','ouvrier',null,null),
+  ('salarie_terrain',null,'saisir_son_pointage',null),
+  ('salarie_terrain',null,null,'colors_utilisateur_depot'),
+  ('salarie_terrain',null,null,'reserves_intervenant'),
+  ('rh','rh',null,null),
+  ('rh',null,'gerer_employes',null),
+  ('comptabilite','comptable',null,null),
+  ('comptabilite',null,'gerer_factures',null),
+  ('gestionnaire_stock',null,'gerer_stock',null),
+  ('gestionnaire_stock',null,null,'colors_gestionnaire_stock'),
+  ('responsable_materiel',null,'gerer_outillage',null),
+  ('responsable_materiel',null,'gerer_flotte',null)
+on conflict do nothing;
+
+alter table public.assistance_roles_correspondance enable row level security;
+drop policy if exists assistance_roles_correspondance_lecture on public.assistance_roles_correspondance;
+create policy assistance_roles_correspondance_lecture on public.assistance_roles_correspondance
+for select to authenticated using (true);
+revoke all on table public.assistance_roles_correspondance from public, anon, authenticated;
+grant select on table public.assistance_roles_correspondance to authenticated;
+
+-- Accusé de lecture. Idempotent par construction : rejouer un acquittement remonté
+-- hors-ligne ne crée pas de doublon et n'écrase pas la date d'origine.
+create or replace function public.communications_accuser(
+  p_communication_id uuid,
+  p_evenement text,
+  p_produit_at timestamptz default null,
+  p_appareil text default null
+) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_at timestamptz := coalesce(p_produit_at, now());
+begin
+  if auth.uid() is null then raise exception 'Authentification requise' using errcode = '42501'; end if;
+  if p_evenement not in ('affichage','ignore','acquittement','clic') then
+    raise exception 'Événement inconnu' using errcode = '22023';
+  end if;
+  -- Un horodatage hors-ligne dans le futur serait une horloge d'appareil faussée :
+  -- on le ramène à maintenant plutôt que d'inscrire une date impossible.
+  if v_at > now() then v_at := now(); end if;
+
+  insert into public.communications_lectures(
+    communication_id, utilisateur_id, etat, vu_at, acquitte_at, clique_at,
+    affichages, dernier_affichage_at, appareil
+  ) values (
+    p_communication_id, auth.uid(),
+    case p_evenement when 'acquittement' then 'acquitte' when 'clic' then 'clique'
+                     when 'ignore' then 'ignore' else 'vu' end,
+    v_at,
+    case when p_evenement = 'acquittement' then v_at end,
+    case when p_evenement = 'clic' then v_at end,
+    case when p_evenement = 'affichage' then 1 else 0 end,
+    case when p_evenement = 'affichage' then v_at end,
+    p_appareil
+  )
+  on conflict (communication_id, utilisateur_id) do update set
+    etat = case
+      when public.communications_lectures.acquitte_at is not null then 'acquitte'
+      when p_evenement = 'acquittement' then 'acquitte'
+      when p_evenement = 'clic' then 'clique'
+      when p_evenement = 'ignore' then 'ignore'
+      when public.communications_lectures.etat = 'non_vu' then 'vu'
+      else public.communications_lectures.etat end,
+    vu_at = coalesce(public.communications_lectures.vu_at, v_at),
+    acquitte_at = coalesce(public.communications_lectures.acquitte_at,
+                           case when p_evenement = 'acquittement' then v_at end),
+    clique_at = coalesce(public.communications_lectures.clique_at,
+                         case when p_evenement = 'clic' then v_at end),
+    affichages = public.communications_lectures.affichages
+                 + case when p_evenement = 'affichage' then 1 else 0 end,
+    dernier_affichage_at = case
+      when p_evenement = 'affichage'
+       and (public.communications_lectures.dernier_affichage_at is null
+            or v_at > public.communications_lectures.dernier_affichage_at)
+      then v_at else public.communications_lectures.dernier_affichage_at end,
+    updated_at = now();
+end;
+$$;
+revoke all on function public.communications_accuser(uuid,text,timestamptz,text) from public, anon;
+grant execute on function public.communications_accuser(uuid,text,timestamptz,text) to authenticated;
+
+create or replace function public.communications_definir_preferences(
+  p_accepte_commerciales boolean,
+  p_accepte_produit boolean
+) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then raise exception 'Authentification requise' using errcode = '42501'; end if;
+  insert into public.communications_preferences(utilisateur_id, accepte_commerciales, accepte_produit)
+  values (auth.uid(), coalesce(p_accepte_commerciales, false), coalesce(p_accepte_produit, true))
+  on conflict (utilisateur_id) do update
+    set accepte_commerciales = excluded.accepte_commerciales,
+        accepte_produit = excluded.accepte_produit,
+        updated_at = now();
+end;
+$$;
+revoke all on function public.communications_definir_preferences(boolean,boolean) from public, anon;
+grant execute on function public.communications_definir_preferences(boolean,boolean) to authenticated;
+
+-- Statistiques minimales (§14). Agrégées, jamais nominatives hors plateforme, et
+-- refusées à une entreprise pour une autre (§15 « lecture des statistiques d'une
+-- autre entreprise »).
+create or replace function public.communications_statistiques(p_communication_id uuid)
+returns table(destinataires integer, vus integer, acquittes integer, cliques integer, ignores integer)
+language plpgsql security definer stable set search_path = public as $$
+begin
+  perform public.plateforme_exiger_role('total','support','lecture');
+  return query
+  select count(*)::integer,
+         count(*) filter (where l.vu_at is not null)::integer,
+         count(*) filter (where l.acquitte_at is not null)::integer,
+         count(*) filter (where l.clique_at is not null)::integer,
+         count(*) filter (where l.etat = 'ignore')::integer
+  from public.communications_lectures l
+  where l.communication_id = p_communication_id;
+end;
+$$;
+revoke all on function public.communications_statistiques(uuid) from public, anon;
+grant execute on function public.communications_statistiques(uuid) to authenticated;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 11. STOCKAGE DES IMAGES
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Bucket PRIVÉ : les images sont servies par URL signée. Un bucket public
+-- permettrait d'énumérer les visuels d'une campagne non encore publiée.
+insert into storage.buckets(id, name, public, file_size_limit, allowed_mime_types)
+values ('communications-elsatia', 'communications-elsatia', false, 2097152,
+        array['image/png','image/jpeg','image/webp'])
+on conflict(id) do update
+  set public = false,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists communications_images_lecture on storage.objects;
+create policy communications_images_lecture on storage.objects
+for select to authenticated
+using (bucket_id = 'communications-elsatia');
+
+drop policy if exists communications_images_ecriture on storage.objects;
+create policy communications_images_ecriture on storage.objects
+for insert to authenticated
+with check (bucket_id = 'communications-elsatia' and public.plateforme_a_permission('gerer_equipe'));
+
+drop policy if exists communications_images_suppression on storage.objects;
+create policy communications_images_suppression on storage.objects
+for delete to authenticated
+using (bucket_id = 'communications-elsatia' and public.plateforme_a_permission('gerer_equipe'));
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 12. RÉTENTION
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Journal d'assistance : 36 mois. Durée alignée sur la conservation des traces
+-- d'accès aux données personnelles ; au-delà, la trace ne sert plus qu'à constituer
+-- un historique de navigation de l'opérateur, ce qui n'est pas sa finalité.
+-- Notifications client : 24 mois. Lectures de communications : 18 mois.
+-- La purge est explicite, journalisée, et ne touche jamais une session encore ouverte.
+create or replace function public.assistance_purger_retention(
+  p_mois_evenements integer default 36,
+  p_mois_notifications integer default 24,
+  p_mois_lectures integer default 18
+) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare v_evenements integer; v_notifications integer; v_lectures integer;
+begin
+  -- Le trigger append-only bloque DELETE : la purge le désactive localement, dans la
+  -- transaction, ce qui reste tracé par ce journal et n'ouvre aucun chemin applicatif.
+  alter table public.assistance_evenements disable trigger assistance_evenements_append_only_trg;
+  delete from public.assistance_evenements
+  where survenu_at < now() - make_interval(months => p_mois_evenements);
+  get diagnostics v_evenements = row_count;
+  alter table public.assistance_evenements enable trigger assistance_evenements_append_only_trg;
+
+  delete from public.assistance_notifications
+  where created_at < now() - make_interval(months => p_mois_notifications);
+  get diagnostics v_notifications = row_count;
+
+  delete from public.communications_lectures
+  where updated_at < now() - make_interval(months => p_mois_lectures);
+  get diagnostics v_lectures = row_count;
+
+  return jsonb_build_object(
+    'evenements_purges', v_evenements,
+    'notifications_purgees', v_notifications,
+    'lectures_purgees', v_lectures
+  );
+end;
+$$;
+revoke all on function public.assistance_purger_retention(integer,integer,integer) from public, anon, authenticated;
+grant execute on function public.assistance_purger_retention(integer,integer,integer) to service_role;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 13. BASCULE DEPUIS L'ANCIENNE SESSION SUPPORT
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- `plateforme_acces_entreprises` n'est PAS supprimée ici : Colors, Réserves et
+-- Gestion Pro l'interrogent encore via `est_acces_support_actif()`. Cette fonction
+-- est étendue pour reconnaître les DEUX mécanismes le temps de la bascule, puis
+-- l'ancien sera retiré par un lot dédié (voir le rapport, « Ordre d'intégration »).
+--
+-- Le paramètre application est ajouté en SURCHARGE, sans toucher à la signature
+-- existante à un argument : les ~40 appels actuels continuent de compiler.
+create or replace function public.est_acces_support_actif(
+  p_entreprise_id uuid,
+  p_application_code text
+) returns boolean
+language sql security definer stable set search_path = public as $$
+  select public.assistance_autorise(p_entreprise_id, p_application_code, 'lire');
+$$;
+revoke all on function public.est_acces_support_actif(uuid,text) from public, anon;
+grant execute on function public.est_acces_support_actif(uuid,text) to authenticated;
+
+-- Les deux applications à rôles fixes basculent sur le contrat par application. La
+-- règle métier reste identique — lecture seule pour la plateforme — mais elle exige
+-- désormais que l'application ait été SÉLECTIONNÉE à l'ouverture de la session.
+--
+-- ATTENTION à la reprise : ces deux corps sont copiés depuis la DERNIÈRE définition du
+-- ledger — `colors_action_autorisee` vient de 00246, `reserves_action_autorisee` de
+-- **00269** (et non de 00268, qui ignorait encore l'action `gerer_membres`). Repartir
+-- d'une version antérieure retirerait silencieusement des droits : c'est arrivé pendant
+-- ce lot, et c'est la suite pgTAP `reserves_v2_terrain_capture` qui l'a détecté. Au
+-- moment de l'intégration après le Train V3, revérifier qu'aucune migration plus récente
+-- ne les a redéfinies.
+create or replace function public.colors_action_autorisee(p_entreprise_id uuid, p_action text)
+returns boolean language plpgsql security definer stable set search_path = public as $$
+declare v_role text;
+begin
+  if auth.uid() is null then return false; end if;
+  if public.est_plateforme_admin() then
+    return p_action = 'voir' and public.est_acces_support_actif(p_entreprise_id, 'colors');
+  end if;
+  v_role := public.colors_role_courant(p_entreprise_id);
+  if v_role is null then return false; end if;
+  if p_action in ('voir','voir_fiche') then return true; end if;
+  if p_action in ('ajouter_seau','mouvement','ocr') then
+    return v_role in ('colors_admin_organisation','colors_gestionnaire_stock','colors_utilisateur_depot');
+  end if;
+  if p_action in ('modifier_seau','archiver','restaurer','gerer_emplacements') then
+    return v_role in ('colors_admin_organisation','colors_gestionnaire_stock');
+  end if;
+  if p_action = 'exporter' then
+    return v_role in ('colors_admin_organisation','colors_gestionnaire_stock','colors_consultation');
+  end if;
+  if p_action = 'gerer_parametres' then return v_role = 'colors_admin_organisation'; end if;
+  return false;
+end;
+$$;
+
+create or replace function public.reserves_action_autorisee(p_entreprise_id uuid, p_action text)
+returns boolean language plpgsql security definer stable set search_path = public as $$
+declare v_role text;
+begin
+  if auth.uid() is null or p_entreprise_id is null then return false; end if;
+  if public.est_plateforme_admin() then
+    return p_action = 'voir' and public.est_acces_support_actif(p_entreprise_id, 'reserves');
+  end if;
+  v_role := public.reserves_role_courant(p_entreprise_id);
+  if v_role is null then return false; end if;
+  if v_role = 'reserves_intervenant' then return false; end if;
+  if p_action in ('voir','exporter') then return true; end if;
+  if v_role = 'reserves_consultation' then return false; end if;
+  if p_action in ('creer_reserve','assigner','commenter') then return true; end if;
+  if p_action in ('valider_levee','gerer_chantier','gerer_plans','gerer_intervenants') then
+    return v_role in ('reserves_admin_organisation','reserves_responsable');
+  end if;
+  if p_action in ('gerer_parametres','inviter_entreprise','gerer_membres') then
+    return v_role = 'reserves_admin_organisation';
+  end if;
+  return false;
+end;
+$$;
+
+-- Gestion Pro : les permissions d'une session d'assistance suivent son PÉRIMÈTRE.
+-- Aujourd'hui `permissionsUtilisateur()` renvoie « tous les droits » dès qu'une
+-- session support est ouverte ; cette fonction lui donne la liste réelle à appliquer.
+create or replace function public.assistance_permissions_gestion_pro(p_entreprise_id uuid)
+returns text[]
+language plpgsql security definer stable set search_path = public as $$
+declare
+  v_session public.assistance_sessions;
+  v_perimetre public.assistance_perimetres;
+  v_droits text[];
+begin
+  v_session := public.assistance_session_courante();
+  if v_session.id is null or v_session.entreprise_id <> p_entreprise_id then return null; end if;
+  if not exists (
+    select 1 from public.assistance_sessions_applications sa
+    where sa.session_id = v_session.id and sa.application_code = 'gestion_pro'
+  ) then
+    return null;
+  end if;
+  select * into v_perimetre from public.assistance_perimetres where cle = v_session.perimetre;
+
+  -- Lecture : toutes les permissions `acces_*` et `voir_*`, jamais les `gerer_*`.
+  select coalesce(array_agg(pd.cle), '{}') into v_droits
+  from public.permissions_disponibles pd
+  where pd.cle like 'acces\_%' or pd.cle like 'voir\_%';
+
+  if 'configurer' = any (v_perimetre.familles) then
+    v_droits := v_droits || array['gerer_parametres'];
+  end if;
+  if 'corriger' = any (v_perimetre.familles) then
+    v_droits := v_droits || array['gerer_clients','gerer_chantiers','gerer_devis','gerer_planning'];
+  end if;
+  if 'exporter' = any (v_perimetre.familles) then
+    v_droits := v_droits || array['acces_exports'];
+  end if;
+  -- Jamais accordés en assistance, quel que soit le périmètre : ils touchent aux
+  -- domaines sensibles dont l'écriture est refusée (paiements, paie, rôles, factures).
+  select coalesce(array_agg(d), '{}') into v_droits
+  from unnest(v_droits) d
+  where d not in (
+    'gerer_utilisateurs','gerer_paie','gerer_coordonnees_bancaires','preparer_virements',
+    'valider_virements','gerer_factures','gerer_facturation_avancee','acces_paiements_bancaires'
+  );
+  return v_droits;
+end;
+$$;
+revoke all on function public.assistance_permissions_gestion_pro(uuid) from public, anon;
+grant execute on function public.assistance_permissions_gestion_pro(uuid) to authenticated;
+
+notify pgrst, 'reload schema';
+
+commit;

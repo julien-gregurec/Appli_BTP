@@ -5,6 +5,8 @@ import { DesktopNavigation, MobileNavigation } from "@/components/Navigation";
 import { ApplicationSwitcher } from "@/components/ApplicationSwitcher";
 import { deconnexionAction } from "@/app/actions";
 import type { ContexteColors } from "@/lib/contexte";
+import { BandeauAssistanceElsatia } from "@/components/BandeauAssistanceElsatia";
+import type { BandeauAssistance } from "@elsatia/platform-support-comms";
 
 const LIBELLES_ROLES: Record<string, string> = {
   colors_admin_organisation: "Administrateur Colors",
@@ -14,7 +16,15 @@ const LIBELLES_ROLES: Record<string, string> = {
   administrateur_plateforme_global: "Administration ELSATIA",
 };
 
-export function Shell({ contexte, children }: { contexte: ContexteColors; children: ReactNode }) {
+export function Shell({
+  contexte,
+  bandeauAssistance = null,
+  children,
+}: {
+  contexte: ContexteColors;
+  bandeauAssistance?: BandeauAssistance | null;
+  children: ReactNode;
+}) {
   const compteUrl = process.env.NEXT_PUBLIC_ELSATIA_ACCOUNT_URL ?? "http://localhost:3000/abonnement";
   const role = contexte.roleColors ? LIBELLES_ROLES[contexte.roleColors] : null;
   return (
@@ -43,6 +53,7 @@ export function Shell({ contexte, children }: { contexte: ContexteColors; childr
             </Link>
           </div>
         </header>
+        <BandeauAssistanceElsatia bandeau={bandeauAssistance} />
         <main className="content">{children}</main>
       </div>
     </div>

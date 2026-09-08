@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@elsatia/application-access": "file:../../packages/application-access",
+    "@elsatia/platform-support-comms": "file:../../packages/platform-support-comms",
     "@sparticuz/chromium": "^149.0.0",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.2",

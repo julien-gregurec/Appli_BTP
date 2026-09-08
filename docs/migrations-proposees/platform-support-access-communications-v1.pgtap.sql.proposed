@@ -1,0 +1,616 @@
+-- ELSATIA-PLATFORM-CROSS-APP-SUPPORT-ACCESS-AND-COMMUNICATIONS-V1 — suite pgTAP PROPOSÉE
+--
+-- ⚠️  Extension `.pgtap.sql.proposed` : ce fichier ne vit PAS dans `supabase/tests/` tant
+--     que la migration n'est pas canonique. Il sera déplacé tel quel, sans modification,
+--     au moment de l'intégration après le Train V3.
+--
+-- Exécution pendant ce lot : conteneur Postgres jetable
+--   /Volumes/ELSATIA-DEV/ELSATIA-STACKS/support-comms-dbtest/harness.sh psc-1
+--   /Volumes/ELSATIA-DEV/ELSATIA-STACKS/support-comms-dbtest/pgtap.sh   psc-1
+-- La base locale de développement (ledger 265, jeu multi-app de test) n'est jamais touchée.
+--
+-- Le décor est autonome (aucun `\ir fixtures/…`) pour rester exécutable hors de
+-- `supabase test db`.
+
+begin;
+create extension if not exists pgtap with schema extensions;
+select plan(93);
+
+set local elsatia.capacite_personnes_bypass = 'on';
+
+-- ── Décor ─────────────────────────────────────────────────────────────────────
+insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at)
+values
+  ('00000000-0000-0000-0000-000000000000','c0000000-0000-0000-0000-000000000001','authenticated','authenticated','ops-total@invalid.local',crypt('t',gen_salt('bf')),now(),now(),now()),
+  ('00000000-0000-0000-0000-000000000000','c0000000-0000-0000-0000-000000000002','authenticated','authenticated','ops-support@invalid.local',crypt('t',gen_salt('bf')),now(),now(),now()),
+  ('00000000-0000-0000-0000-000000000000','c0000000-0000-0000-0000-000000000003','authenticated','authenticated','gerant-c@invalid.local',crypt('t',gen_salt('bf')),now(),now(),now()),
+  ('00000000-0000-0000-0000-000000000000','c0000000-0000-0000-0000-000000000004','authenticated','authenticated','ouvrier-c@invalid.local',crypt('t',gen_salt('bf')),now(),now(),now())
+on conflict (id) do nothing;
+
+insert into public.utilisateurs (id, prenom, nom) values
+  ('c0000000-0000-0000-0000-000000000001','Ops','Total'),
+  ('c0000000-0000-0000-0000-000000000002','Ops','Support'),
+  ('c0000000-0000-0000-0000-000000000003','Gérant','C'),
+  ('c0000000-0000-0000-0000-000000000004','Ouvrier','C')
+on conflict (id) do nothing;
+
+insert into public.plateforme_admins (email, role, utilisateur_id, actif, statut_identite, activation_at) values
+  ('ops-total@invalid.local','total','c0000000-0000-0000-0000-000000000001',true,'active',now()),
+  ('ops-support@invalid.local','support','c0000000-0000-0000-0000-000000000002',true,'active',now())
+on conflict (email) do nothing;
+
+insert into public.entreprises (id, nom, code_adhesion) values
+  ('c1000000-0000-0000-0000-000000000001','Entreprise Assistance C','ASSC0001'),
+  ('c1000000-0000-0000-0000-000000000002','Entreprise Assistance D','ASSD0001')
+on conflict (id) do nothing;
+
+insert into public.postes (id, entreprise_id, nom) values
+  ('c2000000-0000-0000-0000-000000000001','c1000000-0000-0000-0000-000000000001','Gérant'),
+  ('c2000000-0000-0000-0000-000000000002','c1000000-0000-0000-0000-000000000001','Ouvrier')
+on conflict (id) do nothing;
+
+insert into public.permissions_poste (entreprise_id, poste_id, cle_permission, autorise)
+select 'c1000000-0000-0000-0000-000000000001','c2000000-0000-0000-0000-000000000001', cle, true
+from public.permissions_disponibles where cle in ('gerer_utilisateurs','gerer_parametres','gerer_stock')
+on conflict do nothing;
+insert into public.permissions_poste (entreprise_id, poste_id, cle_permission, autorise)
+select 'c1000000-0000-0000-0000-000000000001','c2000000-0000-0000-0000-000000000002', cle, true
+from public.permissions_disponibles where cle in ('saisir_son_pointage')
+on conflict do nothing;
+
+insert into public.utilisateurs_entreprises (utilisateur_id, entreprise_id, poste_id, statut) values
+  ('c0000000-0000-0000-0000-000000000003','c1000000-0000-0000-0000-000000000001','c2000000-0000-0000-0000-000000000001','actif'),
+  ('c0000000-0000-0000-0000-000000000004','c1000000-0000-0000-0000-000000000001','c2000000-0000-0000-0000-000000000002','actif')
+on conflict do nothing;
+
+-- Abonnements applicatifs de l'entreprise C : Gestion Pro, Colors et Réserves.
+insert into public.acces_applications_entreprises (entreprise_id, application_code, autorise, source) values
+  ('c1000000-0000-0000-0000-000000000001','gestion_pro',true,'test'),
+  ('c1000000-0000-0000-0000-000000000001','colors',true,'test'),
+  ('c1000000-0000-0000-0000-000000000001','reserves',true,'test'),
+  ('c1000000-0000-0000-0000-000000000002','gestion_pro',true,'test')
+on conflict (entreprise_id, application_code) do update set autorise = true;
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- A. Catalogue et Global Owner
+-- ═══════════════════════════════════════════════════════════════════════════════
+select ok(
+  (select count(*) from public.applications_elsatia where code in ('gestion_pro','colors','tools','reserves')) = 4,
+  'A1 — les quatre applications actuelles sont au catalogue'
+);
+select is(
+  (select portee_donnees from public.applications_elsatia where code = 'tools'), 'compte',
+  'A2 — Tools est déclarée à portée « compte » : aucune session d''assistance ne la vise'
+);
+select is(
+  (select portee_donnees from public.applications_elsatia where code = 'gestion_pro'), 'entreprise',
+  'A3 — Gestion Pro est à portée « entreprise »'
+);
+select ok(
+  exists (select 1 from public.applications_elsatia where code = 'drone'),
+  'A4 — l''application future Drone / Scan est inscrite au catalogue'
+);
+
+-- Le propriétaire global et tout `total` accèdent au catalogue actif sans entitlement.
+select set_config('request.jwt.claim.sub','c0000000-0000-0000-0000-000000000001',true);
+select set_config('request.jwt.claim.email','ops-total@invalid.local',true);
+select set_config('request.jwt.claims','{"aal":"aal2"}',true);
+
+select ok(public.est_plateforme_admin(), 'A5 — l''identité plateforme est résolue par UID');
+select ok(public.plateforme_est_superuser(), 'A6 — un rôle total est superuser applicatif');
+select ok(
+  public.a_acces_application('c1000000-0000-0000-0000-000000000001','colors'),
+  'A7 — accès Colors accordé par le catalogue, sans entitlement manuel'
+);
+select ok(
+  public.a_acces_application('c1000000-0000-0000-0000-000000000001','reserves'),
+  'A8 — accès Réserves accordé de la même façon'
+);
+select ok(
+  (select count(*) from public.entitlements_utilisateurs_elsatia
+   where utilisateur_id = 'c0000000-0000-0000-0000-000000000001') = 0,
+  'A9 — aucun entitlement commercial n''a été créé pour l''administrateur plateforme'
+);
+select is(
+  (public.tools_resoudre_entitlements() ->> 'tier'), 'pro',
+  'A10 — Tools renvoie Pro pour un superuser plateforme, sans abonnement'
+);
+select is(
+  (public.tools_resoudre_entitlements() ->> 'source'), 'plateforme',
+  'A11 — la source de ce Pro est « plateforme », pas une source commerciale'
+);
+
+-- Une application ajoutée au catalogue APRÈS coup est immédiatement accessible.
+insert into public.applications_elsatia(code, nom, description, ordre, portee_donnees)
+values ('appli_future','Application future','Ajoutée pendant le test',900,'entreprise')
+on conflict(code) do nothing;
+select ok(
+  public.a_acces_application('c1000000-0000-0000-0000-000000000001','appli_future'),
+  'A12 — une application ajoutée au catalogue est accessible sans nouvel entitlement'
+);
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- B. Ouverture d'une session d'assistance
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+-- Motif obligatoire.
+select throws_ok(
+  $$select public.assistance_ouvrir('c1000000-0000-0000-0000-000000000001', array['gestion_pro'], 'autre', null, 'lecture_seule', 30)$$,
+  null, null, 'B1 — un motif « autre » sans détail est refusé'
+);
+select throws_ok(
+  $$select public.assistance_ouvrir('c1000000-0000-0000-0000-000000000001', array['gestion_pro'], 'motif_invente', 'détail suffisant', 'lecture_seule', 30)$$,
+  null, null, 'B2 — une catégorie de motif inconnue est refusée'
+);
+
+-- AAL2 obligatoire.
+select set_config('request.jwt.claims','{"aal":"aal1"}',true);
+select throws_ok(
+  $$select public.assistance_ouvrir('c1000000-0000-0000-0000-000000000001', array['gestion_pro'], 'demande_client', null, 'lecture_seule', 30)$$,
+  null, null, 'B3 — une session AAL1 est refusée : MFA obligatoire'
+);
+select set_config('request.jwt.claims','{"aal":"aal2"}',true);
+
+-- Durée bornée par le périmètre.
+select throws_ok(
+  $$select public.assistance_ouvrir('c1000000-0000-0000-0000-000000000001', array['gestion_pro'], 'demande_client', null, 'correction_limitee', 240)$$,
+  null, null, 'B4 — la durée est bornée par le périmètre demandé'
+);
+
+-- Application non utilisée par l'entreprise.
+select throws_ok(
+  $$select public.assistance_ouvrir('c1000000-0000-0000-0000-000000000002', array['colors'], 'demande_client', null, 'lecture_seule', 30)$$,
+  null, null, 'B5 — impossible d''ouvrir sur une application que l''entreprise n''utilise pas'
+);
+
+-- Toutes les applications sans incident global déclaré.
+select throws_ok(
+  $$select public.assistance_ouvrir('c1000000-0000-0000-0000-000000000001', array['gestion_pro','colors','reserves'], 'incident_technique', null, 'lecture_seule', 30)$$,
+  null, null, 'B6 — « toutes les applications » exige le drapeau incident global'
+);
+select throws_ok(
+  $$select public.assistance_ouvrir('c1000000-0000-0000-0000-000000000001', array['gestion_pro','colors','reserves'], 'incident_technique', null, 'lecture_seule', 30, null, true, false)$$,
+  null, null, 'B7 — un incident global exige la confirmation renforcée'
+);
+select throws_ok(
+  $$select public.assistance_ouvrir('c1000000-0000-0000-0000-000000000001', array['gestion_pro'], 'demande_client', null, 'assistance_etendue', 30, null, false, false)$$,
+  null, null, 'B8 — le périmètre exceptionnel exige la confirmation renforcée'
+);
+
+-- Ouverture nominale.
+select lives_ok(
+  $$select public.assistance_ouvrir('c1000000-0000-0000-0000-000000000001', array['gestion_pro'], 'demande_client', null, 'lecture_seule', 30)$$,
+  'B9 — ouverture nominale : motif, périmètre, durée, AAL2'
+);
+select is(
+  (select count(*)::int from public.assistance_sessions where terminee_at is null
+   and acteur_id = 'c0000000-0000-0000-0000-000000000001'), 1,
+  'B10 — une seule session ouverte par administrateur'
+);
+select is(
+  (select entreprise_id from public.assistance_sessions where terminee_at is null
+   and acteur_id = 'c0000000-0000-0000-0000-000000000001'),
+  'c1000000-0000-0000-0000-000000000001'::uuid,
+  'B11 — la session vise exactement l''entreprise demandée'
+);
+select is(
+  (select acteur_id from public.assistance_sessions where terminee_at is null
+   and acteur_id = 'c0000000-0000-0000-0000-000000000001'),
+  'c0000000-0000-0000-0000-000000000001'::uuid,
+  'B12 — l''acteur enregistré est l''administrateur réel, jamais le client'
+);
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- C. Portée par application et périmètre
+-- ═══════════════════════════════════════════════════════════════════════════════
+select ok(
+  public.assistance_autorise('c1000000-0000-0000-0000-000000000001','gestion_pro','lire'),
+  'C1 — la lecture est autorisée sur l''application sélectionnée'
+);
+select ok(
+  not public.assistance_autorise('c1000000-0000-0000-0000-000000000001','colors','lire'),
+  'C2 — une session Gestion Pro n''ouvre PAS Colors'
+);
+select ok(
+  not public.assistance_autorise('c1000000-0000-0000-0000-000000000001','reserves','lire'),
+  'C3 — une session Gestion Pro n''ouvre PAS Réserves'
+);
+select ok(
+  not public.assistance_autorise('c1000000-0000-0000-0000-000000000002','gestion_pro','lire'),
+  'C4 — la session ne déborde pas sur une autre entreprise'
+);
+select ok(
+  not public.assistance_autorise('c1000000-0000-0000-0000-000000000001','gestion_pro','corriger'),
+  'C5 — aucune écriture en lecture seule'
+);
+select ok(
+  not public.assistance_autorise('c1000000-0000-0000-0000-000000000001','gestion_pro','lire',null,'afficher_secret'),
+  'C6 — une action interdite est refusée même en lecture'
+);
+select ok(
+  not public.assistance_autorise('c1000000-0000-0000-0000-000000000001','gestion_pro','lire','paiements',null,true),
+  'C7 — les paiements ne sont pas lisibles en lecture seule'
+);
+
+-- Le bandeau expose le motif public et le temps restant, jamais le motif interne.
+select ok(
+  public.assistance_bandeau('gestion_pro') is not null,
+  'C8 — le bandeau est disponible sur l''application sélectionnée'
+);
+select ok(
+  public.assistance_bandeau('colors') is null,
+  'C9 — aucun bandeau sur une application hors session'
+);
+select ok(
+  (public.assistance_bandeau('gestion_pro') ->> 'secondes_restantes')::int between 1 and 1800,
+  'C10 — le bandeau porte un temps restant borné par la durée choisie'
+);
+select ok(
+  (public.assistance_bandeau('gestion_pro') ? 'motif_public')
+  and not (public.assistance_bandeau('gestion_pro') ? 'motif_detail'),
+  'C11 — le bandeau expose le motif public et jamais le détail interne'
+);
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- D. Notification de l'entreprise
+-- ═══════════════════════════════════════════════════════════════════════════════
+select ok(
+  (select count(*) from public.assistance_notifications
+   where entreprise_id = 'c1000000-0000-0000-0000-000000000001' and type = 'assistance_ouverte') >= 1,
+  'D1 — l''entreprise est notifiée à l''ouverture'
+);
+select ok(
+  (select bool_and(destinataire_id = 'c0000000-0000-0000-0000-000000000003')
+   from public.assistance_notifications
+   where entreprise_id = 'c1000000-0000-0000-0000-000000000001'),
+  'D2 — seuls le propriétaire et les administrateurs sont notifiés, pas l''ouvrier'
+);
+select ok(
+  (select message like '%a accédé à votre espace%dans le cadre de%'
+   from public.assistance_notifications
+   where type = 'assistance_ouverte'
+     and entreprise_id = 'c1000000-0000-0000-0000-000000000001' limit 1),
+  'D3 — le message reprend le libellé attendu'
+);
+
+-- Un motif sensible ne fuit jamais dans la notification.
+select set_config('request.jwt.claim.sub','c0000000-0000-0000-0000-000000000002',true);
+select set_config('request.jwt.claim.email','ops-support@invalid.local',true);
+select public.assistance_ouvrir(
+  'c1000000-0000-0000-0000-000000000001', array['colors'], 'securite',
+  'suspicion de fraude signalée par un tiers', 'lecture_seule', 15
+);
+select ok(
+  (select bool_and(message not ilike '%fraude%' and message not ilike '%suspicion%')
+   from public.assistance_notifications
+   where entreprise_id = 'c1000000-0000-0000-0000-000000000001'),
+  'D4 — le détail interne d''un motif de sécurité ne fuit pas au client'
+);
+select ok(
+  (select count(*) from public.assistance_notifications n
+   join public.assistance_sessions s on s.id = n.session_id
+   where s.motif_cle = 'securite'
+     and n.message like '%contrôle de sécurité de la plateforme%') >= 1,
+  'D5 — le client reçoit la catégorie publique neutre'
+);
+
+-- Cette seconde session vise Colors : elle n'ouvre pas Gestion Pro.
+select ok(
+  public.assistance_autorise('c1000000-0000-0000-0000-000000000001','colors','lire'),
+  'D6 — la session Colors autorise Colors'
+);
+select ok(
+  not public.assistance_autorise('c1000000-0000-0000-0000-000000000001','gestion_pro','lire'),
+  'D7 — la session Colors n''ouvre pas Gestion Pro'
+);
+select ok(
+  public.colors_action_autorisee('c1000000-0000-0000-0000-000000000001','voir'),
+  'D8 — Colors accorde la lecture sous session ciblée'
+);
+select ok(
+  not public.colors_action_autorisee('c1000000-0000-0000-0000-000000000001','mouvement'),
+  'D9 — Colors refuse toute écriture à l''assistance'
+);
+select ok(
+  not public.reserves_action_autorisee('c1000000-0000-0000-0000-000000000001','voir'),
+  'D10 — Réserves refuse : l''application n''a pas été sélectionnée'
+);
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- E. Audit, clôture, révocation, immutabilité
+-- ═══════════════════════════════════════════════════════════════════════════════
+select lives_ok(
+  $$select public.assistance_journaliser('colors','colors.seau.lire','colors_seau',null,'lire')$$,
+  'E1 — une lecture se journalise'
+);
+select is(
+  (select acteur_id from public.assistance_evenements order by id desc limit 1),
+  'c0000000-0000-0000-0000-000000000002'::uuid,
+  'E2 — l''événement porte l''acteur réel'
+);
+select ok(
+  (select motif_interne like '%fraude%' from public.assistance_evenements order by id desc limit 1),
+  'E3 — l''audit interne conserve le motif détaillé'
+);
+select throws_ok(
+  $$update public.assistance_evenements set action = 'falsifie' where id = (select max(id) from public.assistance_evenements)$$,
+  null, null, 'E4 — le journal d''assistance est en écriture seule (UPDATE refusé)'
+);
+select throws_ok(
+  $$delete from public.assistance_evenements where id = (select max(id) from public.assistance_evenements)$$,
+  null, null, 'E5 — le journal d''assistance ne se supprime pas (DELETE refusé)'
+);
+select throws_ok(
+  $$update public.assistance_sessions set expire_at = now() + interval '10 hours' where terminee_at is null$$,
+  null, null, 'E6 — une session ne se prolonge pas'
+);
+select throws_ok(
+  $$update public.assistance_sessions set motif_cle = 'demande_client' where terminee_at is null$$,
+  null, null, 'E7 — le motif d''une session ne se réécrit pas'
+);
+select throws_ok(
+  $$delete from public.assistance_sessions where terminee_at is null$$,
+  null, null, 'E8 — l''historique des sessions ne se supprime pas'
+);
+
+-- Clôture explicite, puis non-réutilisabilité.
+select lives_ok($$select public.assistance_quitter('sortie_explicite')$$, 'E9 — quitter l''assistance');
+select ok(
+  not public.assistance_autorise('c1000000-0000-0000-0000-000000000001','colors','lire'),
+  'E10 — après la sortie, plus aucun droit'
+);
+select ok(
+  (select count(*) from public.assistance_notifications
+   where type = 'assistance_terminee'
+     and entreprise_id = 'c1000000-0000-0000-0000-000000000001') >= 1,
+  'E11 — la fermeture est notifiée au client'
+);
+select ok(
+  (select count(*) from public.assistance_sessions s
+   join public.assistance_notifications n on n.session_id = s.id and n.type = 'assistance_terminee'
+   where s.terminee_at is not null) >= 1,
+  'E12 — la notification de fermeture est rattachée à la session close'
+);
+
+-- Expiration : une session échue n'est jamais réutilisable.
+select set_config('request.jwt.claim.sub','c0000000-0000-0000-0000-000000000001',true);
+select set_config('request.jwt.claim.email','ops-total@invalid.local',true);
+select public.assistance_quitter('sortie_explicite');
+-- La fenêtre d'une session est immuable (`expire_at` ne se repousse pas, `ouverte_at`
+-- ne se réécrit pas) : on ne peut donc pas « vieillir » une session ouverte par la RPC.
+-- Le décor insère directement une session dont la fenêtre entière est passée, ce qui
+-- respecte l'invariant `expire_at > ouverte_at` au lieu de le contourner.
+insert into public.assistance_sessions(
+  acteur_id, acteur_email, entreprise_id, motif_cle, perimetre,
+  ouverte_at, expire_at, derniere_activite_at
+) values (
+  'c0000000-0000-0000-0000-000000000001', 'ops-total@invalid.local',
+  'c1000000-0000-0000-0000-000000000001', 'incident_technique', 'lecture_seule',
+  now() - interval '20 minutes', now() - interval '1 minute', now() - interval '2 minutes'
+);
+insert into public.assistance_sessions_applications(session_id, application_code)
+select id, 'gestion_pro' from public.assistance_sessions
+where acteur_id = 'c0000000-0000-0000-0000-000000000001' and terminee_at is null;
+select ok(
+  not public.assistance_autorise('c1000000-0000-0000-0000-000000000001','gestion_pro','lire'),
+  'E13 — une session expirée n''autorise plus rien'
+);
+select ok(
+  public.assistance_bandeau('gestion_pro') is null,
+  'E14 — une session expirée n''affiche plus de bandeau'
+);
+select ok(
+  public.assistance_fermer_sessions_echues() >= 1,
+  'E15 — le balayage ferme les sessions échues'
+);
+select is(
+  (select terminee_motif from public.assistance_sessions
+   where acteur_id = 'c0000000-0000-0000-0000-000000000001'
+     and ouverte_at < now() - interval '10 minutes'
+   order by ouverte_at desc limit 1),
+  'expiration',
+  'E16 — le motif de clôture de la session échue est bien l''expiration'
+);
+select is(
+  public.assistance_fermer_sessions_echues(), 0,
+  'E17 — le balayage est idempotent'
+);
+
+-- Révocation par un tiers `total`.
+select set_config('request.jwt.claim.sub','c0000000-0000-0000-0000-000000000002',true);
+select set_config('request.jwt.claim.email','ops-support@invalid.local',true);
+select public.assistance_ouvrir('c1000000-0000-0000-0000-000000000001', array['gestion_pro'], 'incident_technique', null, 'lecture_seule', 30);
+select set_config('request.jwt.claim.sub','c0000000-0000-0000-0000-000000000001',true);
+select set_config('request.jwt.claim.email','ops-total@invalid.local',true);
+select lives_ok(
+  $$select public.assistance_revoquer(
+      (select id from public.assistance_sessions where acteur_id = 'c0000000-0000-0000-0000-000000000002' and terminee_at is null),
+      'incident de sécurité côté plateforme')$$,
+  'E18 — un administrateur total révoque immédiatement une session'
+);
+select set_config('request.jwt.claim.sub','c0000000-0000-0000-0000-000000000002',true);
+select set_config('request.jwt.claim.email','ops-support@invalid.local',true);
+select ok(
+  not public.assistance_autorise('c1000000-0000-0000-0000-000000000001','gestion_pro','lire'),
+  'E19 — une session révoquée n''autorise plus rien'
+);
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- F. Communications
+-- ═══════════════════════════════════════════════════════════════════════════════
+select set_config('request.jwt.claim.sub','c0000000-0000-0000-0000-000000000001',true);
+select set_config('request.jwt.claim.email','ops-total@invalid.local',true);
+
+select throws_ok(
+  $$insert into public.communications(titre, texte_court, type, nature, mode_affichage, debut_at, auteur_id, auteur_email)
+    values ('<b>Promo</b>', 'Texte', 'commerciale', 'commerciale', 'banniere', now(), 'c0000000-0000-0000-0000-000000000001','x')$$,
+  null, null, 'F1 — le HTML est refusé par la base, pas seulement par l''interface'
+);
+select throws_ok(
+  $$insert into public.communications(titre, texte_court, type, nature, mode_affichage, debut_at, auteur_id, auteur_email)
+    values ('Promo', 'Texte', 'commerciale', 'commerciale', 'bloquant', now(), 'c0000000-0000-0000-0000-000000000001','x')$$,
+  null, null, 'F2 — une publicité ne peut jamais être bloquante'
+);
+select throws_ok(
+  $$insert into public.communications(titre, texte_court, type, nature, mode_affichage, debut_at, lien, libelle_bouton, auteur_id, auteur_email)
+    values ('Info', 'Texte', 'information', 'service', 'banniere', now(), 'javascript:alert(1)', 'Voir', 'c0000000-0000-0000-0000-000000000001','x')$$,
+  null, null, 'F3 — un lien javascript: est refusé'
+);
+select throws_ok(
+  $$insert into public.communications(titre, texte_court, type, nature, mode_affichage, debut_at, lien, libelle_bouton, auteur_id, auteur_email)
+    values ('Info', 'Texte', 'information', 'service', 'banniere', now(), 'https://evil.example/x', 'Voir', 'c0000000-0000-0000-0000-000000000001','x')$$,
+  null, null, 'F4 — un lien hors domaine ELSATIA est refusé'
+);
+select throws_ok(
+  $$insert into public.communications(titre, texte_court, type, nature, mode_affichage, debut_at, lien, auteur_id, auteur_email)
+    values ('Info', 'Texte', 'information', 'service', 'banniere', now(), 'https://app.elsatia.fr/x', 'c0000000-0000-0000-0000-000000000001','x')$$,
+  null, null, 'F5 — un lien sans libellé de bouton est refusé'
+);
+select lives_ok(
+  $$insert into public.communications(titre, texte_court, type, nature, mode_affichage, debut_at, lien, libelle_bouton, auteur_id, auteur_email)
+    values ('Sécurité', 'Activez la double authentification.', 'securite', 'service', 'bloquant', now(), 'https://app.elsatia.fr/parametres', 'Configurer', 'c0000000-0000-0000-0000-000000000001','x')$$,
+  'F6 — un message de sécurité peut être bloquant'
+);
+
+-- Diffusion ciblée.
+select set_config('elsatia.comm_secu', (
+  select id::text from public.communications where type = 'securite' order by created_at desc limit 1
+), true);
+insert into public.communications_audiences(communication_id, applications, entreprises, segments, roles)
+values (current_setting('elsatia.comm_secu')::uuid, array['gestion_pro'], null, null, null)
+on conflict (communication_id) do nothing;
+update public.communications set statut = 'publiee', publiee_at = now()
+where id = current_setting('elsatia.comm_secu')::uuid;
+
+select set_config('elsatia.comm_pub', (
+  public.communications_creer(
+    'Offre de rentrée', 'Profitez de l’offre.', 'commerciale', 'banniere',
+    now() - interval '1 hour', now() + interval '30 days', null, 'normale',
+    'une_seule_fois', array['in_app'], null, null,
+    array['gestion_pro'], null, null, array['chef_chantier']
+  )
+)::text, true);
+select public.communications_changer_statut(current_setting('elsatia.comm_pub')::uuid, 'publier');
+
+-- Le gérant (poste « Gérant ») reçoit le message de sécurité, pas la publicité
+-- destinée aux chefs de chantier, et pas non plus la publicité sans consentement.
+select set_config('request.jwt.claim.sub','c0000000-0000-0000-0000-000000000003',true);
+select set_config('request.jwt.claim.email','gerant-c@invalid.local',true);
+select ok(
+  exists (select 1 from public.communications_pour_utilisateur('gestion_pro','c1000000-0000-0000-0000-000000000001')
+          where type = 'securite'),
+  'F7 — un message de sécurité atteint le gérant malgré tout refus'
+);
+select ok(
+  not exists (select 1 from public.communications_pour_utilisateur('gestion_pro','c1000000-0000-0000-0000-000000000001')
+              where type = 'commerciale'),
+  'F8 — une publicité ciblée « chef de chantier » n''atteint pas le gérant'
+);
+select ok(
+  not exists (select 1 from public.communications_pour_utilisateur('colors','c1000000-0000-0000-0000-000000000001')),
+  'F9 — un message ciblé Gestion Pro ne s''affiche pas dans Colors'
+);
+select ok(
+  not exists (select 1 from public.communications_pour_utilisateur('gestion_pro','c1000000-0000-0000-0000-000000000002')),
+  'F10 — aucun message ne fuit vers une entreprise dont l''utilisateur n''est pas membre'
+);
+
+-- Consentement commercial : opt-in explicite.
+select lives_ok(
+  $$select public.communications_definir_preferences(true, true)$$,
+  'F11 — l''utilisateur peut accepter les communications commerciales'
+);
+select lives_ok(
+  $$select public.communications_definir_preferences(false, true)$$,
+  'F12 — et les refuser à nouveau'
+);
+
+-- Acquittement idempotent.
+select lives_ok(
+  $$select public.communications_accuser(current_setting('elsatia.comm_secu')::uuid, 'acquittement', now() - interval '2 hours')$$,
+  'F13 — un acquittement produit hors-ligne est accepté'
+);
+select lives_ok(
+  $$select public.communications_accuser(current_setting('elsatia.comm_secu')::uuid, 'acquittement', now() - interval '1 hour')$$,
+  'F14 — le rejouer ne crée pas de doublon'
+);
+select is(
+  (select count(*)::int from public.communications_lectures
+   where communication_id = current_setting('elsatia.comm_secu')::uuid
+     and utilisateur_id = 'c0000000-0000-0000-0000-000000000003'), 1,
+  'F15 — une seule ligne de lecture par message et par personne'
+);
+select ok(
+  (select acquitte_at < now() - interval '90 minutes' from public.communications_lectures
+   where communication_id = current_setting('elsatia.comm_secu')::uuid
+     and utilisateur_id = 'c0000000-0000-0000-0000-000000000003'),
+  'F16 — la date du premier acquittement fait foi'
+);
+select ok(
+  not exists (select 1 from public.communications_pour_utilisateur('gestion_pro','c1000000-0000-0000-0000-000000000001')
+              where id = current_setting('elsatia.comm_secu')::uuid),
+  'F17 — un message acquitté ne réapparaît plus'
+);
+
+-- Modification silencieuse après publication.
+select set_config('request.jwt.claim.sub','c0000000-0000-0000-0000-000000000001',true);
+select set_config('request.jwt.claim.email','ops-total@invalid.local',true);
+select throws_ok(
+  $$update public.communications set titre = 'Titre remplacé' where id = current_setting('elsatia.comm_secu')::uuid$$,
+  null, null, 'F18 — le contenu d''une communication publiée ne se modifie pas'
+);
+select throws_ok(
+  $$update public.communications_audiences set entreprises = null where communication_id = current_setting('elsatia.comm_pub')::uuid$$,
+  null, null, 'F19 — le ciblage d''une communication publiée ne s''élargit pas après coup'
+);
+select throws_ok(
+  $$update public.communications_journal set action = 'creation' where id = (select max(id) from public.communications_journal)$$,
+  null, null, 'F20 — le journal des communications est en écriture seule'
+);
+select ok(
+  (select count(*) from public.communications_journal
+   where communication_id = current_setting('elsatia.comm_pub')::uuid) >= 2,
+  'F21 — création et publication sont journalisées'
+);
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- G. Permissions Gestion Pro sous assistance
+-- ═══════════════════════════════════════════════════════════════════════════════
+select public.assistance_ouvrir('c1000000-0000-0000-0000-000000000001', array['gestion_pro'], 'demande_client', null, 'lecture_seule', 30);
+select ok(
+  not ('gerer_devis' = any (public.assistance_permissions_gestion_pro('c1000000-0000-0000-0000-000000000001'))),
+  'G1 — en lecture seule, aucune permission de gestion'
+);
+select ok(
+  'acces_clients' = any (public.assistance_permissions_gestion_pro('c1000000-0000-0000-0000-000000000001')),
+  'G2 — la lecture des modules reste accordée'
+);
+select ok(
+  public.assistance_permissions_gestion_pro('c1000000-0000-0000-0000-000000000002') is null,
+  'G3 — aucune permission sur une entreprise hors session'
+);
+select public.assistance_quitter('sortie_explicite');
+select public.assistance_ouvrir('c1000000-0000-0000-0000-000000000001', array['gestion_pro'], 'recuperation_correction', 'correction du devis 2026-114', 'correction_limitee', 30);
+select ok(
+  'gerer_devis' = any (public.assistance_permissions_gestion_pro('c1000000-0000-0000-0000-000000000001')),
+  'G4 — en correction limitée, la correction des devis est accordée'
+);
+select ok(
+  not ('gerer_utilisateurs' = any (public.assistance_permissions_gestion_pro('c1000000-0000-0000-0000-000000000001'))),
+  'G5 — les rôles ne se gèrent jamais sous assistance'
+);
+select ok(
+  not ('gerer_paie' = any (public.assistance_permissions_gestion_pro('c1000000-0000-0000-0000-000000000001'))),
+  'G6 — la paie ne se modifie jamais sous assistance'
+);
+select ok(
+  not ('gerer_coordonnees_bancaires' = any (public.assistance_permissions_gestion_pro('c1000000-0000-0000-0000-000000000001'))),
+  'G7 — les coordonnées bancaires ne se modifient jamais sous assistance'
+);
+select ok(
+  not ('gerer_factures' = any (public.assistance_permissions_gestion_pro('c1000000-0000-0000-0000-000000000001'))),
+  'G8 — une facture émise ne se modifie jamais sous assistance'
+);
+
+select * from finish();
+rollback;
