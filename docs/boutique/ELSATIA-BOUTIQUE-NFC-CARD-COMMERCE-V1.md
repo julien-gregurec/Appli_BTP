@@ -56,20 +56,25 @@ sur un nouvel objet. Une révocation unique ne peut pas faire les deux.
 
 ### Conception retenue : une indirection au niveau du support
 
+**La puce NFC et le QR imprimé portent le même identifiant physique, opaque et immuable. Ils ne
+portent pas le jeton révocable du profil logique.**
+
 ```
-  puce NFC / QR imprimé
-        │
-        │  https://<domaine>/c/<token_support>      (gravé, immuable)
-        ▼
-  SUPPORT PHYSIQUE  ──── association active ────►  CARTE  ────►  profil, contacts
-  série, finition, lot                             (Contact/Card V1, inchangée)
-  état propre
+  puce NFC  ─┐
+             ├──►  IDENTIFIANT PHYSIQUE (opaque, immuable, gravé/imprimé)
+  QR imprimé ─┘              │
+                             ▼
+                    ATTRIBUTION ACTIVE
+                             │
+                             ▼
+                    PROFIL LOGIQUE PUBLIC  ────►  coordonnées, contacts
+                    (jeton révocable)
 ```
 
-La fonction de résolution devient : `token → support → association active → carte`, et applique
-**deux** filtres au lieu d'un : le support n'est ni désactivé ni révoqué, **et** la carte n'est
-pas révoquée. Le principe de Contact/Card V1 — le filtre est dans la fonction de résolution, pas
-dans l'affichage — est conservé tel quel.
+La fonction de résolution devient : `identifiant physique → attribution active → profil logique`,
+et applique **trois** filtres au lieu d'un : le support n'est ni bloqué ni révoqué, une attribution
+est active, **et** le profil n'est pas révoqué. Le principe de Contact/Card V1 — le filtre est
+dans la fonction de résolution, pas dans l'affichage — est conservé tel quel.
 
 Cela règle les deux impasses :
 
@@ -79,17 +84,16 @@ Cela règle les deux impasses :
 - **perte** = révoquer le **support** (terminal pour cet objet), ré-associer la **carte** à un
   support de remplacement. Le profil et les contacts survivent.
 
-> **DÉCIDÉ (D-Q8).** L'indirection au niveau du support est retenue, dans la lecture où
-> « le jeton » révoqué et remplacé lors d'une réattribution est le **jeton de profil de la carte
-> logique**, et non l'identifiant gravé dans la puce.
+> **DÉCIDÉ (D-Q8, rectifié en R3).** Le jeton révoqué et remplacé lors d'une réattribution est
+> celui **du profil logique**. L'identifiant physique gravé et imprimé ne change **jamais** :
+> aucune réécriture NFC, aucune réimpression QR.
 >
-> La lecture inverse — révoquer le jeton gravé — imposerait de **ré-encoder physiquement la
-> puce** à chaque réattribution, donc de récupérer la carte, **et rendrait faux le QR imprimé**,
-> puisque Contact/Card V1 impose que QR et NFC portent le même jeton. La carte deviendrait de
-> fait à usage unique. Cette lecture est écartée.
->
-> La fonction de résolution de Contact/Card V1 devra donc être revue lors de la réalisation :
-> ce n'est pas une réécriture, c'est un filtre supplémentaire au même endroit.
+> **Point de réconciliation avec Contact/Card V1.** V1 énonce que la puce contient
+> `https://<domaine>/c/<token>` et que ce jeton est repris à l'identique dans le QR. La forme
+> reste vraie — un identifiant unique porté à l'identique par les deux supports — mais **cet
+> identifiant est celui du support physique, pas celui du profil**. La fonction de résolution de
+> V1 gagne un niveau : ce n'est pas une réécriture, c'est un maillon supplémentaire au même
+> endroit. À porter au lot Contact/Card.
 
 ---
 
@@ -110,28 +114,39 @@ propres droits et sa propre preuve.
 **L'étape 6 est facultative — DÉCIDÉ (D-Q9).** Une carte NFC achetée **continue à fonctionner
 sans abonnement payant**. La carte est un bien vendu, pas un service loué.
 
-| Socle **permanent** — jamais conditionné à un paiement récurrent | Fonctions **avancées** — abonnement facultatif |
-|---|---|
-| URL publique révocable | Gestion d'équipe |
-| NFC | Statistiques |
-| QR code | OCR |
-| vCard | Synchronisation Gestion Pro |
-| Coordonnées essentielles | Classement automatique |
-| Modification du profil de base | Campagnes |
-| Désactivation en cas de perte | Personnalisation avancée, automatisations |
+> **Formulation imposée (R3), seule à employer :**
+> **« Service de base inclus sans abonnement récurrent. »**
+>
+> Toute promesse « permanente » ou « à vie » est retirée. Ce sont des engagements de durée absolue
+> que rien ne borne. « Inclus sans abonnement récurrent » dit exactement ce qui est vrai — le
+> service ne dépend d'aucun paiement périodique — sans promettre une durée intenable.
 
-> **L'arrêt d'un abonnement avancé ne doit pas désactiver le socle de la carte achetée.**
+| **Service de base** — inclus sans abonnement récurrent | Fonctions **avancées** — abonnement facultatif |
+|---|---|
+| NFC | Gestion d'équipe |
+| QR code | Statistiques |
+| vCard | OCR |
+| Profil essentiel | Synchronisation Gestion Pro |
+| Désactivation en cas de perte | Classement automatique |
+| | Campagnes |
+| | Personnalisation avancée, automatisations |
+
+Le service de base s'entend **sous réserve des conditions de service définies dans les CGV**.
+L'URL publique est la cible de résolution du NFC et du QR ; son devenir en cas d'arrêt du service
+est un point de CGV, pas une promesse implicite.
+
+> **L'arrêt d'un abonnement avancé ne doit pas désactiver le service de base de la carte achetée.**
 
 Trois conséquences qui ne sont pas rédactionnelles :
 
 1. **contrainte de code, pas d'exploitation** : aucun mécanisme de facturation ne doit pouvoir
-   désactiver la résolution de l'URL publique d'une carte achetée. Un impayé d'abonnement avancé
-   ne touche pas le socle ;
-2. **le poste `coût_logiciel_amorti` devient applicable** : le socle permanent a un coût
+   désactiver la résolution de l'identifiant physique d'une carte achetée. Un impayé d'abonnement
+   avancé ne touche pas le service de base ;
+2. **le poste `coût_logiciel_amorti` devient applicable** : le service de base a un coût
    d'hébergement et d'exploitation que **aucun abonnement ne couvrira**. Il doit entrer dans le
    coût réel unitaire de la carte, sous peine de vendre à perte sur la durée ;
-3. **« permanent » est un engagement de durée** : la règle de fin de service (préavis, export,
-   sort de l'URL publique) doit être écrite dans les CGV **avant** la première vente.
+3. **sept points de CGV** à écrire avant la première vente : disponibilité, maintenance,
+   évolution, préavis en cas d'arrêt, export, suppression, devenir de l'URL publique.
 
 ---
 
@@ -219,28 +234,62 @@ valeurs seront celles du fournisseur retenu, et pas d'autres.
   a_fabriquer ──► en_fabrication ──► encode ──► expedie ──► livre
                                                                │
                                                                ▼
-                                                        active ──┬──► suspendu ──► active
-                                                                 │
-                                          reattribue ◄───────────┤
-                                                                 │
-                                                                 └──► revoque   (terminal)
-                                                                       ▲
-                                          perdu / vole / casse ────────┘
+                                                        actif ──┬──► suspendu ──► actif
+                                                                │
+                                         reattribue ◄───────────┤
+                                                                │
+              perdu / vole / conteste ──► bloque ───────────────┤   (vérification favorable)
+                                             │                  │
+                                             ▼                  ▼
+                                          revoque  ◄─────────  revoque   (terminal)
 ```
 
-| État | Le jeton résout ? | Sens |
+| État | L'identifiant résout ? | Sens |
 |---|---|---|
 | `a_fabriquer` | non | Payé, pas encore lancé en production. |
 | `en_fabrication` | non | Chez le fabricant. |
 | `encode` | page « non activée » **uniquement** | La puce est écrite, l'objet existe, personne ne le détient. |
 | `expedie` | idem | En transit. |
 | `livre` | idem | Reçu, pas encore activé. |
-| `actif` | **oui**, via l'association | En service. |
-| `suspendu` | non | Suspension réversible (congé, litige, enquête). |
-| `revoque` | **jamais plus** | Terminal. Perte, vol, destruction, fin de vie. |
+| `actif` | **oui**, via l'attribution active | En service. |
+| `suspendu` | non | Retrait **volontaire et réversible** (congé, litige interne, enquête). |
+| **`bloque`** | non | **Mesure conservatoire** : carte déclarée volée, perdue ou contestée. Réversible **après vérification** ; sinon révoquée. |
+| `revoque` | **jamais plus** | Terminal. Destruction, fin de vie, ou blocage confirmé. |
+
+**`bloque` n'est pas `suspendu`.** La suspension est une décision assumée par le détenteur ; le
+blocage est une réaction à un doute, prise avant de savoir. Les confondre conduirait à traiter une
+carte volée comme un congé — et à la remettre en service par simple inattention.
 
 **Un support révoqué ne renaît pas.** Comme la carte logique dans Contact/Card V1, et pour la
 même raison : c'est ce qui rend la perte sans conséquence.
+
+### Autorité — qui peut agir sur une carte
+
+| Situation | Autorité |
+|---|---|
+| **Carte d'entreprise** | Administrateur **habilité** |
+| **Carte personnelle** | Le titulaire, **après réauthentification forte** |
+| **Support ELSATIA** | Accès **strict, justifié, limité dans le temps et notifié**. Aucun droit d'administration général |
+| **Carte volée, perdue ou contestée** | **Blocage jusqu'à vérification** (état `bloque`) |
+
+La réauthentification forte sur une carte personnelle n'est pas une formalité : la réattribution
+change qui répond derrière un identifiant déjà imprimé et déjà distribué. C'est l'opération la
+plus sensible du produit, et elle n'a pas d'administrateur pour la contrôler dans le cas
+personnel.
+
+### Contacts reçus — propriété
+
+| Type de carte | Les contacts reçus sont… |
+|---|---|
+| **Professionnelle**, appartenant à l'entreprise | des **données professionnelles de l'entreprise** |
+| **Personnelle** | un **carnet personnel séparé** |
+
+> **Réconciliation avec Contact/Card V1.** V1 (P15) prévoyait, au départ d'un salarié, un **choix
+> explicite** : carnet versé à l'entreprise ou conservé par la personne. Cette règle **restreint
+> ce choix pour les cartes professionnelles** — les contacts reçus via une carte d'entreprise sont
+> des données de l'entreprise dès l'origine, il n'y a donc rien à choisir à leur sujet. Le choix
+> de V1 garde tout son sens pour le **carnet personnel**, qui reste séparé. À porter au lot
+> Contact/Card, qui devra ajuster P15.
 
 ### Réattribution — les neuf exigences (D-Q8)
 
@@ -297,8 +346,9 @@ genre de défaut silencieux que V1 refuse.
 | # | Question | Pourquoi elle bloque |
 |---|---|---|
 | ~~Q8~~ | ~~Niveau « support » dans la résolution Contact/Card~~ | **TRANCHÉE** — retenu, lecture « jeton de profil ». Cf. §2. |
-| ~~Q9~~ | ~~La carte achetée fonctionne-t-elle sans abonnement ?~~ | **TRANCHÉE — oui**, socle permanent. Cf. §3. |
-| Q10 | Qui fabrique et qui encode ? | **ouverte** — si le fabricant encode, il reçoit une liste d'identifiants : flux de données à encadrer contractuellement. |
+| ~~Q9~~ | ~~La carte achetée fonctionne-t-elle sans abonnement ?~~ | **TRANCHÉE — oui** : *service de base inclus sans abonnement récurrent*. Cf. §3. |
+| ~~Q1~~ | ~~Module Gestion Pro ou surface autonome ?~~ | **TRANCHÉE (R3)** — **application commerciale autonome de l'écosystème**. Compte ELSATIA partagé, lien facultatif à Gestion Pro. |
+| Q10 | Qui fabrique et qui encode ? | **ouverte** — si le fabricant encode, il reçoit une liste d'identifiants physiques : flux de données à encadrer contractuellement. |
 | Q11 | Le code d'activation est-il imprimé (pastille) ou uniquement en ligne ? | **ouverte** — la pastille est plus simple, mais elle voyage avec l'objet. |
 | ~~Q12~~ | ~~Vend-on la carte à des particuliers ?~~ | **TRANCHÉE — oui.** Fusionnée dans D-Q2. |
 

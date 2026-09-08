@@ -20,6 +20,21 @@ facturation, de la livraison et du service après-vente.
 **ELSATIA Market est autre chose** : une plateforme où des professionnels abonnés publient leurs
 propres biens, surplus et matériels. ELSATIA n'y est pas vendeur.
 
+### Positionnement — fermé (D-Q1)
+
+> **La Boutique ELSATIA est une application commerciale autonome de l'écosystème.**
+
+Elle partage le **compte ELSATIA** et peut être **reliée** à Gestion Pro, mais **un particulier
+peut commander sans entreprise ni abonnement Gestion Pro**.
+
+Trois conséquences structurelles :
+
+1. la Boutique **n'est pas un module de Gestion Pro** ;
+2. `entreprise_id` **ne peut plus être la clé d'entrée**, ni dans le modèle, ni dans la RLS — le
+   rattachement à Gestion Pro est un lien facultatif, pas une condition d'existence ;
+3. l'identité est celle du **compte ELSATIA**, partagée avec le reste de l'écosystème : pas
+   d'annuaire propre à la Boutique.
+
 Cette distinction n'est pas rédactionnelle, elle est structurante : dans la Boutique, toute
 réclamation, tout retour et tout remboursement engagent ELSATIA. Aucun écran, aucun libellé,
 aucune page publique ne doit laisser croire que la Boutique est un espace de mise en relation.
@@ -370,9 +385,9 @@ Deux incohérences connues du moteur commercial pèsent sur la Boutique et **ne 
 ici** : deux modèles de comptes supplémentaires incompatibles, et un tarif annuel calculé ×10
 d'un côté et ×12 de l'autre.
 
-**D-Q9 les rend pertinentes, contrairement à ce qui était écrit avant la révision R2.** Le socle
-de la carte est permanent et gratuit, mais les **fonctions avancées** reposent sur un abonnement
-facultatif — qui sera tarifé par ce même moteur. Les deux incohérences s'appliqueront donc dès
+**D-Q9 les rend pertinentes, contrairement à ce qui était écrit avant la révision R2.** Le service
+de base de la carte est inclus sans abonnement récurrent, mais les **fonctions avancées** reposent
+sur un abonnement facultatif — qui sera tarifé par ce même moteur. Les deux incohérences s'appliqueront donc dès
 que cet abonnement existera. **Elles relèvent du lot tarifaire et du Train V3, pas de ce lot**,
 mais elles ne peuvent plus être écartées comme hypothétiques.
 

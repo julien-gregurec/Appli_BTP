@@ -206,9 +206,9 @@
   </div>
   <p class="note esp"><b>Rappel d'architecture.</b> La puce ne contient qu'une URL — décision Contact/Card V1, inchangée.
   Ce que ce lot ajoute, c'est le niveau « support » qui permet réattribution et remplacement sans jeter l'objet.</p>
-  <p class="note esp"><b>Socle permanent (D-Q9).</b> Une fois activée, la carte résout et affiche le profil <b>sans abonnement</b> :
-  URL révocable, NFC, QR, vCard, coordonnées essentielles, modification du profil de base, désactivation en cas de perte.
-  Aucun écran de facturation ne peut désactiver ce socle.</p>
+  <p class="note esp"><b>Service de base inclus sans abonnement récurrent (D-Q9).</b> Une fois activée, la carte résout et
+  affiche le profil <b>sans abonnement</b> : NFC, QR, vCard, profil essentiel, désactivation en cas de perte —
+  sous réserve des conditions de service définies dans les CGV. Aucun écran de facturation ne peut le désactiver.</p>
 </div>
 
 <!-- 7 -->
@@ -252,18 +252,22 @@
     <table><tr><th>N° de série</th><th>Lot</th><th>État</th><th>Associé à</th><th>Depuis</th></tr>
     <tr><td>&lt;série&gt;</td><td>&lt;lot&gt;</td><td><span class="etat">actif</span></td><td>&lt;titulaire&gt;</td><td>&lt;date&gt;</td></tr>
     <tr><td>&lt;série&gt;</td><td>&lt;lot&gt;</td><td><span class="etat">encodé</span></td><td>—</td><td>—</td></tr>
-    <tr><td>&lt;série&gt;</td><td>&lt;lot&gt;</td><td><span class="etat">révoqué</span></td><td>—</td><td>&lt;date&gt;</td></tr></table></div>
+    <tr><td>&lt;série&gt;</td><td>&lt;lot&gt;</td><td><span class="etat">bloqué</span></td><td>&lt;titulaire&gt;</td><td>&lt;date&gt;</td></tr>
+    <tr><td>&lt;série&gt;</td><td>&lt;lot&gt;</td><td><span class="etat">révoqué</span></td><td>—</td><td>&lt;date&gt;</td></tr></table>
+    <div class="note esp"><b>« bloqué » n'est pas « suspendu ».</b> La suspension est une décision assumée du détenteur ;
+    le blocage est une mesure conservatoire prise sur un doute — vol, perte, contestation — et ne se lève qu'après vérification.</div></div>
   <div class="grid g2 esp">
     <div class="box"><strong>Réattribuer</strong>
       <span class="champ">Nouveau titulaire</span>
       <div class="esp"><span class="champ">Motif (obligatoire)</span></div>
-      <div class="rappel esp"><b>Confirmation exigée (D-Q8) :</b> administrateur de l'entreprise détentrice.
-      Pour une carte détenue en propre par un particulier, <b>le titulaire est l'autorité</b>.</div>
+      <div class="rappel esp"><b>Autorité exigée (D-Q8) :</b> carte d'entreprise → <b>administrateur habilité</b> ·
+      carte personnelle → <b>le titulaire, après réauthentification forte</b> ·
+      carte volée, perdue ou contestée → <b>blocage jusqu'à vérification</b>, pas de réattribution.</div>
       <div class="flex esp"><span class="btn">Réattribuer</span></div>
       <div class="note esp">Enchaîne les neuf exigences : révocation de l'ancien <b>jeton de profil</b> · désactivation
       de l'ancien profil · contrôle des permissions · confirmation · nouveau jeton · nouvelle attribution ·
       audit append-only · notification · <b>aucun accès résiduel pour l'ancien titulaire</b>.
-      <b>La puce ne change pas</b> et le QR imprimé reste valide.</div></div>
+      <b>L'identifiant physique gravé et imprimé ne change jamais</b> : aucune réécriture NFC, aucune réimpression QR.</div></div>
     <div class="box"><strong>Révoquer le support</strong>
       <div class="rappel">Perte, vol, casse. <b>Irréversible.</b> L'URL de la puce ne résout plus jamais.
       Le profil et les contacts du titulaire sont conservés et peuvent être portés sur un support de remplacement.</div>

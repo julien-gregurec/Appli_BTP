@@ -87,60 +87,101 @@ Neuf exigences, toutes retenues :
 Le support ELSATIA ne peut intervenir que par le **mécanisme d'assistance strict** : justifié,
 limité dans le temps, notifié.
 
-### ⚠︎ Point à confirmer — que désigne « le jeton » ?
+### L'identifiant physique — rectification R3, ambiguïté levée
 
-L'exigence 1 (révoquer l'ancien jeton) et l'exigence 5 (nouveau jeton) sont réalisables de deux
-façons, et **elles n'ont pas le même coût** :
+> **La puce NFC et le QR imprimé portent le même identifiant physique, opaque et immuable.
+> Ils ne portent pas le jeton révocable du profil logique.**
 
-| Lecture | Ce qu'elle implique | Verdict |
-|---|---|---|
-| **A — le jeton est celui gravé dans la puce** | Réattribuer impose de **ré-encoder la puce** — donc de récupérer physiquement la carte — **et le QR imprimé devient faux**, puisque Contact/Card V1 impose que QR et NFC portent le même jeton. La carte devient de fait à usage unique. | **impraticable** |
-| **B — le jeton est celui de la carte logique (le profil)** | La puce garde son identifiant gravé ; c'est le jeton **de profil** qui est révoqué et remplacé. Les neuf exigences sont satisfaites, la carte reste réutilisable, le QR imprimé reste valide. | **retenue** |
-
-**Lecture retenue : B.** Elle est la seule qui rende les neuf exigences simultanément
-satisfaisables sans détruire l'objet. Concrètement :
+Chaîne de résolution, côté serveur :
 
 ```
-  puce + QR imprimé  ──►  identifiant de SUPPORT (gravé, immuable)
-                              │
-                              ▼
-                     association active  ──►  CARTE (jeton de profil, révocable et remplaçable)
+  puce NFC  ─┐
+             ├──►  IDENTIFIANT PHYSIQUE (opaque, immuable, gravé/imprimé)
+  QR imprimé ─┘              │
+                             ▼
+                    ATTRIBUTION ACTIVE
+                             │
+                             ▼
+                    PROFIL LOGIQUE PUBLIC (jeton révocable)
 ```
 
-Après réattribution : l'ancien jeton de profil est révoqué et ne résout plus jamais ; un nouveau
-jeton de profil est créé pour le nouveau titulaire ; l'association du support bascule vers lui.
-L'ancien titulaire n'a plus **aucun** accès — ni au profil, ni à ce que la carte reçoit.
+Cela lève l'ambiguïté signalée en R2 : le jeton révoqué lors d'une réattribution est celui **du
+profil logique**, jamais l'identifiant gravé. L'objet physique n'est donc jamais consommé par une
+réattribution.
 
-> Si vous entendiez la lecture A, dites-le : cela change la nature du produit (carte non
-> réattribuable, à remplacer physiquement) et le contenu du lot 7.
+**Déroulé d'une réattribution :**
 
-### ⚠︎ Deux frontières à préciser
+| # | Effet |
+|---|---|
+| 1 | Le **support physique reste inchangé** |
+| 2 | L'ancien profil est **révoqué** |
+| 3 | L'ancienne attribution est **fermée** |
+| 4 | Une **nouvelle attribution** est créée |
+| 5 | Un **nouveau profil logique** devient actif |
+| 6 | **Aucune réécriture NFC, aucune réimpression QR** |
+| 7 | L'historique reste **append-only** |
 
-**a) Carte détenue par un particulier.** L'exigence 4 impose la confirmation de
-*l'administrateur de l'entreprise*. Une carte achetée par un particulier — désormais possible
-depuis D-Q2 — n'a pas d'entreprise. **Règle retenue par défaut :** pour une carte détenue en
-propre, le **titulaire est l'autorité** ; la réattribution est un acte du propriétaire du
-support, tracé et notifié comme les autres. Une carte détenue par une entreprise reste soumise à
-la confirmation de son administrateur.
+L'ancien titulaire n'a plus **aucun** accès — ni au profil, ni à ce que la carte reçoit désormais.
 
-**b) Ce que « absence totale d'accès » ne recouvre pas.** L'exigence 9 porte sur **la carte et
-son profil**. Elle ne défait pas la règle de Contact/Card V1 (P15) sur le carnet de contacts
-personnel d'un salarié qui part : *« versé à l'entreprise, ou conservé par la personne — un
-choix, pas un défaut silencieux »*. Révoquer une carte ne confisque pas rétroactivement les
-contacts d'une personne ; cela lui retire la carte, son profil et ce que la carte reçoit
-désormais. Si vous vouliez aussi trancher le sort du carnet, c'est une décision distincte, qui
-appartient au lot Contact/Card.
+> **Point de réconciliation avec Contact/Card V1.** V1 énonce que la puce contient
+> `https://<domaine>/c/<token>` et que ce jeton est repris à l'identique dans le QR. Cela reste
+> vrai dans sa forme — un identifiant unique porté à l'identique par les deux supports — mais
+> **cet identifiant est désormais celui du support physique, pas celui du profil**. La fonction
+> de résolution de V1 gagne un niveau. À porter au lot Contact/Card.
+
+### Autorité — qui peut agir sur une carte
+
+| Situation | Autorité |
+|---|---|
+| **Carte d'entreprise** | Administrateur **habilité** |
+| **Carte personnelle** | Le titulaire, **après réauthentification forte** |
+| **Support ELSATIA** | Accès **strict, justifié, limité dans le temps et notifié**. Aucun droit d'administration général |
+| **Carte volée, perdue ou contestée** | **Blocage jusqu'à vérification** |
+
+Le dernier cas introduit un état que le cycle de vie R2 n'avait pas : **`bloque`**, distinct de
+`suspendu` (retrait volontaire et réversible) et de `revoque` (terminal). Le blocage est une
+mesure conservatoire : l'identifiant cesse de résoudre, mais la décision définitive — remise en
+service ou révocation — attend une vérification. Il est ajouté au cycle de vie du support.
+
+### Contacts reçus — propriété
+
+| Type de carte | Les contacts reçus sont… |
+|---|---|
+| **Professionnelle**, appartenant à l'entreprise | des **données professionnelles de l'entreprise** |
+| **Personnelle** | un **carnet personnel séparé** |
+
+> **Point de réconciliation avec Contact/Card V1.** V1 (P15) prévoyait, au départ d'un salarié,
+> un **choix explicite** : carnet versé à l'entreprise, ou conservé par la personne. Cette
+> rectification **restreint ce choix pour les cartes professionnelles** : les contacts reçus via
+> une carte d'entreprise sont, dès l'origine, des données de l'entreprise — il n'y a donc plus de
+> choix à faire à leur sujet. Le choix de V1 conserve tout son sens pour le **carnet personnel**,
+> qui reste séparé. À porter au lot Contact/Card, qui devra ajuster P15.
 
 ---
 
-## D-Q9 — Socle permanent, sans abonnement
+## D-Q9 — Service de base inclus sans abonnement récurrent
 
 > **Une carte NFC achetée continue à fonctionner sans abonnement payant.**
 
-### Socle permanent — jamais conditionné à un paiement récurrent
+### ⚠︎ Rectification R3 — formulation imposée
 
-URL publique révocable · NFC · QR code · vCard · coordonnées essentielles · modification du
-profil de base · désactivation en cas de perte.
+Toute promesse « **permanente** » ou « **à vie** » est **retirée** de l'ensemble des documents et
+remplacée par la formule suivante, qui est la seule à employer :
+
+> **« Service de base inclus sans abonnement récurrent. »**
+
+Motif : « permanent » et « à vie » sont des engagements de durée absolue, que rien ne borne et
+que rien ne garantit. « Inclus sans abonnement récurrent » dit exactement ce qui est vrai — le
+service ne dépend d'aucun paiement périodique — sans promettre une durée qu'ELSATIA ne peut pas
+tenir contractuellement.
+
+### Service de base — jamais conditionné à un paiement récurrent
+
+**NFC · QR code · vCard · profil essentiel · désactivation en cas de perte**,
+**sous réserve des conditions de service définies dans les CGV.**
+
+L'URL publique est la cible de résolution du NFC et du QR ; son devenir en cas d'arrêt du service
+est un point de CGV (cf. ci-dessous), et non une promesse implicite.
 
 ### Fonctions avancées — peuvent dépendre d'un abonnement facultatif
 
@@ -157,18 +198,23 @@ campagnes · personnalisation avancée · automatisations.
    proposition d'abonnement **à l'activation**. Les options A (deux paiements imposés) et B
    (panier mixte) sont écartées.
 3. **Le poste `coût_logiciel_amorti`** du modèle de coût devient **applicable** : le socle
-   permanent a un coût d'hébergement et d'exploitation qui ne sera couvert par aucun
+   de base a un coût d'hébergement et d'exploitation qui ne sera couvert par aucun
    abonnement. Il doit être intégré au coût réel unitaire de la carte, et non ignoré.
 
-### ⚠︎ Une conséquence à écrire dans les CGV
+### Sept points à écrire dans les futures CGV
 
-Un socle « permanent » est un engagement de durée pris envers l'acheteur. Deux points doivent
-être écrits **avant** la première vente, sous peine de promesse non tenable :
+Le service de base n'étant conditionné à aucun paiement, ses conditions doivent être écrites, et
+non supposées. Sept points, tous obligatoires **avant la première vente** :
 
-- **la règle de fin de service** : que se passe-t-il si ELSATIA cesse d'exploiter le service —
-  préavis, export des données, sort de l'URL publique ;
-- **ce que « permanent » signifie** : sans limite de durée liée au paiement, ce qui n'est pas
-  la même chose que sans limite de durée absolue.
+| # | Point |
+|---|---|
+| 1 | **Disponibilité** |
+| 2 | **Maintenance** |
+| 3 | **Évolution** |
+| 4 | **Préavis en cas d'arrêt** |
+| 5 | **Export** |
+| 6 | **Suppression** |
+| 7 | **Devenir de l'URL publique** |
 
 Ce n'est pas un obstacle à la décision : c'est la rédaction qu'elle impose.
 Porté en checklist juridique §13.
@@ -216,16 +262,44 @@ arbitrage. Ils devraient partir avant le Train V3.
 
 ---
 
+## D-Q1 — Positionnement fermé (rectification R3)
+
+> **La Boutique ELSATIA est une application commerciale autonome de l'écosystème.**
+
+| Elle partage | Elle peut être reliée à | Elle n'exige pas |
+|---|---|---|
+| Le **compte ELSATIA** | **Gestion Pro** | Une entreprise Gestion Pro |
+| | | Un abonnement Gestion Pro |
+
+**Un particulier peut commander sans entreprise ni abonnement Gestion Pro.**
+
+Ce que cela ferme :
+
+1. **La Boutique n'est pas un module de Gestion Pro.** L'audit `6cb0b79` laissait la question
+   ouverte ; D-Q2 l'avait fortement contrainte ; elle est désormais tranchée.
+2. **`entreprise_id` ne peut plus être la clé d'entrée**, ni dans le modèle, ni dans les
+   politiques RLS. Le rattachement à Gestion Pro devient un **lien facultatif**, pas une
+   condition d'existence.
+3. **L'identité est celle du compte ELSATIA**, partagée avec le reste de l'écosystème — pas une
+   identité propre à la Boutique, ce qui aurait créé un second annuaire.
+4. Le **pont faible avec Gestion Pro** (trésorerie, outillage) conserve exactement le régime
+   défini en phase 6 : proposé, jamais appliqué, et seulement pour les clients rattachés.
+
 ## Récapitulatif des questions
 
 | # | Question | Statut |
 |---|---|---|
 | Q2 | Vend-on à des particuliers ? | **TRANCHÉE — oui** |
 | Q8 | Réattribution d'une carte NFC | **TRANCHÉE**, sous réserve de la lecture B du « jeton » |
-| Q9 | La carte fonctionne-t-elle sans abonnement ? | **TRANCHÉE — oui, socle permanent** |
-| Q1, Q3 à Q7, Q10, Q11, Q13, Q14 | — | **toujours ouvertes** |
+| Q9 | La carte fonctionne-t-elle sans abonnement ? | **TRANCHÉE — oui** : *service de base inclus sans abonnement récurrent* |
+| Q1 | Module GP ou surface autonome ? | **TRANCHÉE (R3) — application commerciale autonome** |
+| Q3 à Q7, Q10, Q11, Q13 | — | **toujours ouvertes** |
 
 Q14 (bien + abonnement) est **résolue de fait** par D-Q9 : option C.
-Q1 (module GP ou surface autonome) est **fortement contrainte** par D-Q2 : un particulier ne
-devant traverser aucune entreprise, la Boutique ne peut plus être un simple module interne à
-Gestion Pro. Elle n'est pas formellement tranchée pour autant.
+Q1 est **fermée par la rectification R3** : application commerciale autonome de l'écosystème.
+
+Les questions encore ouvertes — Q3 (fabricant), Q4 (fail-closed, recommandé sans réserve),
+Q5 (rattachement trésorerie), Q6 (TVA Stripe ou ELSATIA), Q7 (périmètre géographique),
+Q10 (qui encode), Q11 (code d'activation imprimé ou en ligne), Q13 (décomposition des états) —
+**ne bloquent aucun démarrage**. Elles portent sur la fabrication, la fiscalité et la forme, pas
+sur le modèle.

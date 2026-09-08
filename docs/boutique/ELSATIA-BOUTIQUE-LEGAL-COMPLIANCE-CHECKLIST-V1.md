@@ -192,7 +192,7 @@ qui doit dire lequel s'impose**, pas l'ergonomie.
 |---|---|---|---|
 | 13.1 | Contenu numérique | Fourniture, exécution, rétractation | à examiner |
 | 13.2 | Abonnement lié à un bien | **TRANCHÉ (D-Q9)** : la carte est un **bien vendu**, l'abonnement avancé est un service **distinct et facultatif**. Deux contrats, pas un | **acquis — à rédiger** |
-| 13.2 bis | **Engagement de « socle permanent »** | Le socle fonctionne sans abonnement, sans limite liée au paiement. À écrire : **règle de fin de service** (préavis, export, sort de l'URL publique) et ce que « permanent » signifie exactement | **à rédiger — obligatoire avant la première vente** |
+| 13.2 bis | **Conditions du service de base** | Formule imposée : **« Service de base inclus sans abonnement récurrent »** — toute mention « permanent » ou « à vie » est proscrite. Sept points à rédiger : **disponibilité · maintenance · évolution · préavis en cas d'arrêt · export · suppression · devenir de l'URL publique** | **à rédiger — obligatoire avant la première vente** |
 | 13.3 | Reconduction | Information avant échéance | à examiner |
 | 13.4 | Résiliation | Modalités, y compris en ligne | à examiner |
 | 13.5 | Conséquence de la résiliation sur un bien acheté | **TRANCHÉ (D-Q9) : non.** L'arrêt d'un abonnement avancé **ne désactive pas** le socle de la carte achetée. À écrire explicitement dans les CGV | **acquis — à rédiger** |
@@ -200,9 +200,11 @@ qui doit dire lequel s'impose**, pas l'ergonomie.
 **13.5 est tranché.** Un bien acheté qui cesserait de fonctionner faute d'abonnement ne serait pas
 vendu, il serait loué. La décision D-Q9 écarte cette ambiguïté : la carte est un bien.
 
-Il reste au juriste à **rédiger** cette garantie, et surtout à traiter 13.2 bis : un socle annoncé
-comme permanent est un engagement de durée. Sans règle de fin de service écrite, c'est une
-promesse que rien ne borne.
+Il reste au juriste à **rédiger** cette garantie, et surtout à traiter 13.2 bis. La rectification
+R3 y aide : en remplaçant « permanent » par **« inclus sans abonnement récurrent »**, on cesse de
+promettre une durée absolue et on décrit ce qui est réellement vrai. Restent à écrire les sept
+conditions de service — sans elles, un service « inclus » reste un service dont personne ne sait
+ce qu'il garantit.
 
 ---
 
@@ -213,7 +215,7 @@ promesse que rien ne borne.
 | 1 | **9.8 / P0-3** — absence de facture | On ne peut pas encaisser sans facturer. **Condition d'ouverture.** |
 | 2 | **3.3 / 3.4** — exclusion de rétractation sur bien personnalisé | Le B2C étant acquis, cela détermine le parcours d'achat lui-même. |
 | 3 | **8.x** — médiation de la consommation | Obligatoire depuis D-Q2. L'adhésion prend du temps : à engager tôt. |
-| 4 | **13.2 bis** — règle de fin de service du socle permanent | Un engagement de durée sans borne écrite. |
+| 4 | **13.2 bis** — les sept conditions du service de base | Un service inclus dont les garanties ne sont pas écrites. |
 | 5 | 2.1 / 2.2 — rédaction des CGV particuliers **et** professionnels | Ne peut commencer qu'après 1 à 4. |
 | 6 | 5.x — conformité produit | À poser **avant** la commande fournisseur. |
 | 7 | 10.x — RGPD du client non rattaché | Découle de D-Q2. |

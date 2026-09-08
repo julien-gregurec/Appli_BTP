@@ -144,7 +144,7 @@ Trois faits mesurés :
 déclare `store: DISABLED`, et `/boutique` est mappé sur la feature `store`. Trois couches
 l'appliquent : `activeFeaturesForCompany()`, `ModuleAccessBoundary` et le filtre de `Sidebar`.
 
-**Conséquence à trancher (question ouverte Q1).** `activeFeaturesForCompany` lit une table
+**Conséquence — et elle survit à la fermeture de Q1.** `activeFeaturesForCompany` lit une table
 d'exceptions par entreprise :
 
 ```ts
@@ -371,7 +371,7 @@ La colonne « Réutilisable » estime la part du travail existant récupérable 
 
 | # | Question | Pourquoi elle bloque |
 |---|---|---|
-| Q1 | La Boutique doit-elle rester un module **dans** Gestion Pro, ou devenir une surface **autonome** ? | **Fortement contrainte par D-Q2** : un particulier ne devant traverser aucune entreprise, la Boutique ne peut plus être un simple module interne. Pas formellement tranchée. |
+| ~~Q1~~ | ~~Module **dans** Gestion Pro, ou surface **autonome** ?~~ | **TRANCHÉE (R3) — application commerciale autonome de l'écosystème.** Compte ELSATIA partagé, lien facultatif à Gestion Pro, achat possible sans entreprise ni abonnement. |
 | ~~Q2~~ | ~~Vend-on à des **particuliers** ?~~ | **TRANCHÉE — oui.** Cf. `ELSATIA-BOUTIQUE-DECISIONS-R2-V1.md` § D-Q2. |
 | Q3 | Qui **fabrique** les cartes NFC — sous-traitant ou interne ? | Détermine s'il faut un état « envoyée en fabrication » et un échange fournisseur. |
 | Q4 | Le drapeau `FEATURE_BOUTIQUE_ENABLED` doit-il devenir fail-closed **avant** le Train V3 ? | Aujourd'hui, seul le catalogue vide protège la Boutique. |

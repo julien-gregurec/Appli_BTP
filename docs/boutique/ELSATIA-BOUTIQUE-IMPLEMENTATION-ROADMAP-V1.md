@@ -12,7 +12,8 @@
 | Préalable | Statut |
 |---|---|
 | **Q2 — vend-on à des particuliers ?** | **TRANCHÉ — oui.** Le lot 1 construit **deux modèles clients distincts**, sans faux tenant professionnel. |
-| **Q9 — la carte fonctionne-t-elle sans abonnement ?** | **TRANCHÉ — oui**, socle permanent. Le lot 7 ne conditionne aucune fonction du socle à un paiement. |
+| **Q9 — la carte fonctionne-t-elle sans abonnement ?** | **TRANCHÉ — oui** : *service de base inclus sans abonnement récurrent*. Le lot 7 ne conditionne aucune fonction du service de base à un paiement. |
+| **Q1 — module Gestion Pro ou surface autonome ?** | **TRANCHÉ (R3) — application commerciale autonome de l'écosystème.** Compte ELSATIA partagé, lien facultatif à Gestion Pro. |
 | **Q8 — réattribution** | **TRANCHÉ.** Le lot 7 peut démarrer une fois ses dépendances levées. |
 | **Facturation de vente** | **devient P0-3** : condition d'ouverture, plus un simple lot aval. Dépend encore d'une validation juridique. |
 
@@ -52,7 +53,7 @@ fonctionnelle et hors rédaction juridique. Elles supposent les préalables rend
 | 4 | **Paiement Test** | Checkout, webhook durci (`livemode`), TVA résolue au devis, idempotence | 3, P0, Stripe | 8–12 j |
 | 5 | **Commandes** | 4 axes d'états, transitions, permissions, preuves, notifications, gabarits e-mail | 4 | 10–15 j |
 | 6 | **Logistique** | Expéditions, transporteur, suivi, incidents, réexpédition, pont faible GP | 5 | 8–12 j |
-| 7 | **Cartes NFC** | Support physique, indirection de résolution (jeton de profil), encodage, activation, association, **réattribution à 9 exigences**, révocation, **socle permanent non désactivable par la facturation** | 5, **Contact/Card** | 18–26 j |
+| 7 | **Cartes NFC** | Support physique à **identifiant opaque immuable**, chaîne `identifiant → attribution → profil`, encodage, activation, **réattribution à 9 exigences**, états `bloque` / `revoque`, quatre régimes d'autorité, **service de base non désactivable par la facturation** | 5, **Contact/Card** | 18–26 j |
 | 8 | **Factures et avoirs** — **bloque l'ouverture (P0-3)** | Numérotation, PDF, archivage, avoirs, mentions | 5, juriste | 10–14 j |
 | 9 | **Retours et remboursements** | Demande, autorisation, bordereau, réception, constat, remboursement plafonné, litiges | 8 | 10–14 j |
 | 10 | **Recette** | pgTAP, tests d'intégration, parcours de bout en bout, jeux d'essai | 1–9 | 12–18 j |
@@ -105,7 +106,7 @@ plus long ; Q8 étant tranchée, il n'attend plus qu'un socle Contact/Card qui n
 | **Train V3** | socle multiproduit, annuaire plateforme, accès support strict | non fusionné | Le lot 1 devrait dupliquer un modèle client et un annuaire déjà écrits ailleurs. **Bloquant de fait.** |
 | **Moteur multiproduit** | figement du prix contractuel | non fusionné | Sans lui, la Boutique inventerait sa propre notion de prix figé, en concurrence avec celle du moteur. |
 | **Contact/Card** | architecture logicielle de la carte | close en documentaire, `0e644d5`, **zéro code** | Le lot 7 n'a rien sur quoi s'appuyer : il faudrait développer Contact/Card d'abord. |
-| **Gestion Pro** | trésorerie, outillage, entreprises | dans le train | Pont **faible et optionnel** uniquement. Aucune dépendance forte à créer. |
+| **Gestion Pro** | trésorerie, outillage, entreprises | dans le train | Pont **faible et optionnel** uniquement. **D-Q1 le confirme** : la Boutique est autonome, le lien à Gestion Pro est facultatif et ne conditionne jamais un achat. |
 | **Stripe** | paiements, remboursements | Test seulement | Aucun repointage Live avant figement du prix contractuel par le Train V3. |
 | **Site** | dépôt distinct `elsatia-site` | non touché | Seul un bloc « À venir » est nécessaire. Cf. §7. |
 | **Support transversal** | assistance stricte, verrouillée en Production | non fusionné | Sans lui, l'administration Boutique devrait inventer son propre régime d'accès aux données client. |

@@ -36,14 +36,15 @@ Trois options avaient été posées. **D-Q9 tranche : option C.**
 | **B — Un seul panier mixte** | Une session Stripe contenant bien + abonnement. | Fragile : la date de début de période dépend du paiement, la livraison du bien n'y est pas liée, un remboursement du bien ne doit pas résilier l'abonnement — et inversement. |
 | **C — Achat du bien, puis proposition d'abonnement à l'activation** | La carte s'achète seule. L'abonnement est proposé au moment de l'activation, quand l'utilité est démontrée. | Aucun. |
 
-**DÉCIDÉ : option C (D-Q9).** La carte achetée fonctionne sans abonnement — socle permanent. Les
+**DÉCIDÉ : option C (D-Q9).** La carte achetée fonctionne sans abonnement — *service de base
+inclus sans abonnement récurrent*. Les
 options A (deux paiements imposés) et B (panier mixte) sont écartées. Vendre le bien et le service
 dans une même transaction brouillerait exactement la frontière qu'il faut tenir nette pour les
 CGV : un bien est livré et peut être retourné, un service est fourni et se résilie.
 
 **Contrainte de code qui en découle :** aucun mécanisme de facturation ne doit pouvoir désactiver
-le socle d'une carte achetée. Un impayé d'abonnement avancé ne touche pas la résolution de l'URL
-publique. Ce doit être une propriété du code, pas une consigne d'exploitation.
+le service de base d'une carte achetée. Un impayé d'abonnement avancé ne touche pas la résolution
+de l'identifiant physique. Ce doit être une propriété du code, pas une consigne d'exploitation.
 
 ## A.3 Facturation — indépendance des documents
 
