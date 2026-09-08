@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ELSATIA Contact / Card — wireframes fonctionnels V1</title>
+<title>ELSATIA Contact / Card — wireframes fonctionnels V1 (R2)</title>
 <style>
   :root{
     --fond:#f4f5f7; --papier:#ffffff; --encre:#101418; --encre-2:#5b636d;
@@ -72,7 +72,8 @@
 <header class="chapeau">
   <h1>ELSATIA Contact / Card — wireframes fonctionnels V1</h1>
   <p class="sous">Lot <code>ELSATIA-CONTACT-CARD-RECIPROCAL-EXCHANGE-GP-BRIDGE-V1</code> ·
-  base <code>1fc1331</code> · branche <code>audit/elsatia-contact-card-architecture-v1</code></p>
+  base <code>1fc1331</code> · branche <code>audit/elsatia-contact-card-architecture-v1</code> ·
+  <strong>révision R2</strong>, décisions D1 à D10 intégrées</p>
 </header>
 
 <div class="avert">
@@ -81,7 +82,35 @@
   existant. Elle décrit des <em>intentions d'écran</em>, pas une charte graphique : ni
   couleurs, ni typographie, ni composants définitifs. La refonte visuelle relève du lot
   ELSATIA-UI-V2.
+  <br><br>
+  Les quatre captures d'izi.Card transmises avec la mission ont servi d'inspiration
+  <em>strictement fonctionnelle</em> sur trois points : la carte physique NFC, l'ouverture
+  sans installation d'application, et la simplicité du parcours. <strong>Aucun élément de
+  marque, texte, design, tarif, garantie ou argument commercial n'est repris.</strong>
 </div>
+
+<h2>Parcours réciproque — les neuf étapes</h2>
+<div class="flux"><pre>
+  1  je transmets ma carte                        NFC · QR · lien
+  2  le destinataire enregistre ma vCard          sans installer d'application
+  3  il reçoit une proposition FACULTATIVE        rien n'est présélectionné
+  4  je reçois sa carte dans ma boîte             notification idempotente
+ ─────────────────────────────────────────────────────────────────────────────
+  5  JE VÉRIFIE les informations                  ← geste humain obligatoire
+       si OCR : confirmation CHAMP PAR CHAMP        pas de « tout accepter »
+  6  JE SÉLECTIONNE la destination                ← geste humain obligatoire
+       client · prospect · fournisseur · sous-traitant
+       partenaire · candidat · contact général
+  7  Gestion Pro détecte les doublons             détection automatique,
+                                                  DÉCISION non automatique
+  8  JE CONFIRME création ou rattachement         ← geste humain obligatoire
+ ─────────────────────────────────────────────────────────────────────────────
+  9  je reçois une notification                   où la carte a été rangée,
+                                                  une seule fois
+
+  Trois écrans humains — 5, 6 et 8 — que rien ne contourne, quelle que soit
+  la confiance de la reconnaissance.  Contact / Card propose, Gestion Pro confirme.
+</pre></div>
 
 <h2>A · Donner sa carte</h2>
 <div class="grille">
@@ -164,9 +193,10 @@
     <div class="champ"><span class="lib">Entreprise</span><span>—</span></div>
     <div class="champ"><span class="lib">Mobile</span><span>—</span></div>
     <div class="bouton">Continuer</div>
-    <p class="note"><strong>Écran par défaut du produit.</strong>
-    <code>FEATURE_AI_ENABLED</code> est faux : aucune reconnaissance n'est proposée, et
-    rien ne le laisse croire. Saisie assistée, pas parcours dégradé.</p>
+    <p class="note"><strong>Écran par défaut du produit.</strong> L'OCR exige
+    <em>deux</em> interrupteurs fermés (D1) : <code>FEATURE_AI_ENABLED</code> côté
+    plateforme et <code>ocr_actif</code> côté entreprise, tous deux faux par défaut.
+    Saisie assistée, pas parcours dégradé.</p>
   </div>
 
   <div class="tel">
@@ -181,11 +211,14 @@
       <span>06 12 34 5? 78 <span class="puce d">incertain</span></span></div>
     <div class="champ"><span class="lib">SIRET</span>
       <span>non détecté <span class="puce">absent</span></span></div>
-    <div class="bouton">Valider ces informations</div>
+    <div class="bloc creux">Chaque champ se confirme, se corrige ou s'écarte
+      <strong>individuellement</strong>.</div>
+    <div class="bouton inactif">Terminer — inactif tant qu'un champ reste à vérifier</div>
     <div class="bouton creux">Abandonner l'import</div>
-    <p class="note">Confiance <strong>par champ</strong>. Aucun champ n'est pré-validé en
-    silence. La base refuse un statut « confirmée » sans confirmateur ni date —
-    même contrainte que <code>colors_analyses_ocr</code>.</p>
+    <p class="note"><strong>Aucun bouton « tout accepter » (D2).</strong> C'est le geste qui
+    viderait la vérification de son sens. Un champ non confirmé n'est jamais repris, même
+    donné comme fiable. Chaque décision porte son confirmateur et son horodatage, et un
+    déclencheur en base refuse de clore l'analyse tant qu'un champ reste en attente.</p>
   </div>
 </div>
 
@@ -218,14 +251,15 @@
     <p class="p">Destination principale — obligatoire</p>
     <div class="bloc">◉ Fournisseur</div>
     <div class="bloc">○ Prospect &nbsp; ○ Client &nbsp; ○ Sous-traitant</div>
-    <div class="bloc creux">○ Partenaire · ○ Candidat · ○ Contact général
-      <br><span class="puce a">reste au carnet ELSATIA Contact</span></div>
-    <div class="bloc creux">☐ Aussi sous-traitant
-      <br><span class="puce d">indisponible — un tiers ne peut porter qu'un rôle</span></div>
+    <div class="bloc">○ Partenaire &nbsp; ○ Candidat &nbsp; ○ Contact général
+      <br><span class="puce o">registres créés — D5, D6</span></div>
+    <div class="bloc">☑ <strong>Aussi sous-traitant</strong>
+      <br><span class="puce o">cumul autorisé — D4, une seule fiche</span></div>
     <div class="bouton">Continuer</div>
-    <p class="note">Trois catégories n'ont aucune destination dans Gestion Pro, et l'écran
-    le dit. Le multi-rôle est interdit par <code>fournisseurs_type_tiers_check</code> :
-    l'interface l'affiche comme indisponible plutôt que de le simuler.</p>
+    <p class="note">Les sept catégories ont désormais un registre cible. Le cumul
+    fournisseur <em>et</em> sous-traitant se fait sur <strong>une seule fiche</strong> —
+    deux fiches pour un même SIRET seraient le doublon que le produit prétend éviter.
+    « Candidat » crée <strong>une proposition</strong>, jamais un salarié.</p>
   </div>
 
   <div class="tel">
@@ -237,8 +271,10 @@
       <p class="p">Aucune fiche ne sera créée.</p></div>
     <div class="bloc"><p class="p">Sera écrasé</p>
       <span class="puce a">contact_nom : « P. Dupont » → « Pierre Dupont »</span></div>
+    <div class="bloc"><p class="p">Rôles</p>
+      <span class="puce o">fournisseur</span> <span class="puce o">sous-traitant</span></div>
     <div class="bloc creux">Mobile et site Internet restent au carnet :
-      la fiche fournisseur ne porte pas ces champs.</div>
+      la fiche fournisseur ne porte pas ces champs (E5 non arbitrée).</div>
     <div class="bouton">Confirmer le classement</div>
     <p class="note">Rien n'est écrasé sans être montré. Ce qui ne peut pas être versé est
     dit, pas tu.</p>
@@ -333,10 +369,10 @@
 </pre></div>
 
 <footer>
-  Wireframes fonctionnels — lot ELSATIA-CONTACT-CARD-RECIPROCAL-EXCHANGE-GP-BRIDGE-V1.
-  Aucune reprise de nom, marque, logo, texte, visuel, couleur, structure commerciale,
-  garantie ou témoignage d'un produit tiers. Aucun prix, aucun délai, aucun stock, aucune
-  garantie n'est énoncé. Documents associés :
+  Wireframes fonctionnels — lot ELSATIA-CONTACT-CARD-RECIPROCAL-EXCHANGE-GP-BRIDGE-V1,
+  révision R2. Aucune reprise de nom, marque, logo, texte, visuel, couleur, structure
+  commerciale, garantie ou témoignage d'un produit tiers. Aucun prix, aucun délai, aucun
+  stock, aucune garantie n'est énoncé. Documents associés :
   <code>ELSATIA-CONTACT-CARD-ARCHITECTURE-AUDIT-REPORT.md</code>,
   <code>ELSATIA-CONTACT-CARD-FUNCTIONAL-SPECIFICATION-V1.md</code>,
   <code>ELSATIA-CONTACT-CARD-GP-INTEGRATION-MAPPING-V1.md</code>,

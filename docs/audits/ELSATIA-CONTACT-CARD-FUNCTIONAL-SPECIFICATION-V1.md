@@ -2,6 +2,7 @@
 
 Base : `1fc1331842cdf5980b374169994587813bdee7b6`
 Branche : `audit/elsatia-contact-card-architecture-v1`
+Révision : **R2** — décisions D1 à D10 de Julien intégrées.
 Statut : **spécification**. Rien de ce document n'est implémenté.
 
 Ce document se lit après `ELSATIA-CONTACT-CARD-ARCHITECTURE-AUDIT-REPORT.md`, qui établit ce
@@ -36,6 +37,33 @@ date de confirmation. Contact / Card l'applique, il ne l'invente pas.
 
 ---
 
+## 2 bis. Le parcours réciproque, de bout en bout
+
+C'est le parcours central du produit. Les neuf étapes, dans l'ordre, avec **ce qui est
+automatique** et **ce qui exige un geste humain** — la distinction est le produit lui-même.
+
+| # | Étape | Qui agit | Automatique ? |
+|---|---|---|---|
+| 1 | **Je transmets ma carte** — NFC approché, QR scanné, lien envoyé | moi | l'ouverture de la page, oui |
+| 2 | **Le destinataire enregistre ma vCard**, sans installer d'application | lui | le fichier est construit à la demande, à partir des seuls champs autorisés |
+| 3 | **Il reçoit une proposition facultative** de transmettre ses coordonnées en retour | lui | la proposition s'affiche ; **rien n'est présélectionné, rien n'est forcé** |
+| 4 | **Je reçois sa carte dans ma boîte de réception** | — | oui, avec notification idempotente |
+| 5 | **Je vérifie les informations** | **moi — obligatoire** | **non.** Si l'OCR a tourné, chaque champ est confirmé **individuellement** |
+| 6 | **Je sélectionne la destination** : client, prospect, fournisseur, sous-traitant, partenaire, candidat ou contact général | **moi — obligatoire** | **non.** Jamais déduite du texte de la carte |
+| 7 | **Gestion Pro détecte les doublons** | — | oui — la *détection* est automatique, **la décision ne l'est pas** |
+| 8 | **Je confirme la création ou le rattachement** | **moi — obligatoire** | **non** |
+| 9 | **Je reçois une notification** indiquant précisément où la carte a été rangée | — | oui, **une seule fois** |
+
+Trois écrans humains — étapes 5, 6 et 8 — que **rien ne peut contourner**, quelle que soit
+la confiance de la reconnaissance. C'est l'application directe de D3 et D9 : Contact / Card
+propose, Gestion Pro confirme.
+
+Aux étapes 6 et 8, la destination affichée est celle qui existe réellement : les sept
+catégories ont désormais toutes un registre cible (décisions D4, D5 et D6), et l'écran de
+confirmation nomme la fiche qui sera créée ou rattachée avant de l'écrire.
+
+---
+
 ## 3. Objets du produit
 
 | Objet | Rôle | Propriétaire |
@@ -64,7 +92,9 @@ Les dix états exigés au §9 de la mission :
 synchronisation_en_cours → synchronisée`, plus `erreur` et `archivée`.
 
 Sans OCR, le chemin est direct : `reçue → à_vérifier`. `ocr_en_attente` n'apparaît que si
-`FEATURE_AI_ENABLED` est vrai.
+**les deux interrupteurs** sont fermés (D1) : `FEATURE_AI_ENABLED` côté plateforme **et**
+`contact_parametres.ocr_actif` côté entreprise. Les deux sont *fail-closed* ; l'entreprise
+peut couper l'OCR sans perdre le produit.
 
 Transitions interdites, à faire respecter par la base et non seulement par l'interface :
 
@@ -147,9 +177,14 @@ est créée, avec une clé d'idempotence.
 Photo ou import (image, PDF). L'original va dans un bucket **privé**. Validation MIME et
 taille avant tout traitement.
 
-**Si `FEATURE_AI_ENABLED` est faux — ce qui est le cas par défaut — aucun OCR n'est proposé.**
-L'écran passe directement en saisie manuelle assistée, avec la photo affichée à côté du
-formulaire. C'est un parcours complet, pas un parcours dégradé : il est simplement honnête.
+**Si l'un des deux interrupteurs est ouvert — ce qui est le cas par défaut — aucun OCR n'est
+proposé.** L'écran passe directement en saisie manuelle assistée, avec la photo affichée à
+côté du formulaire. C'est un parcours complet, pas un parcours dégradé : il est simplement
+honnête.
+
+**Si l'OCR est actif**, l'utilisateur en est informé **avant** que la première image ne
+parte (D2) : ce qui est envoyé, à qui, pourquoi, et comment couper la fonction. L'information
+est donnée une fois par entreprise, pas à chaque carte — un bandeau répété n'est plus lu.
 
 ### P9 — Vérifier l'OCR
 
@@ -157,12 +192,18 @@ Chaque champ reconnu s'affiche avec sa confiance, sur trois niveaux visuels : **
 **à vérifier**, **incertain**. Un champ incertain est signalé, jamais pré-validé
 silencieusement.
 
+**La confirmation est champ par champ (D2), jamais globale.** Il n'existe pas de bouton
+« tout accepter » : c'est précisément le geste qui vide la vérification de son sens. Chaque
+champ retenu porte son propre confirmateur et son propre horodatage, dans
+`contact_analyses_ocr_champs`. Un champ non confirmé n'est **pas repris**, même s'il est
+donné comme fiable.
+
 L'utilisateur peut corriger, supprimer un champ erroné, compléter, désigner les coordonnées
 principales, confirmer l'entreprise, ou abandonner l'import.
 
-Rien ne franchit cet écran sans un geste explicite. La forme est celle de
-`colors_analyses_ocr` : `statut = 'confirmee'` exige `confirme_par` **et** `confirme_at`,
-garanti par un `check` en base.
+Rien ne franchit cet écran sans un geste explicite, et l'analyse ne peut pas passer en
+« confirmée » tant qu'un seul champ retenu reste non confirmé — garanti en base, sur la
+forme de `colors_analyses_ocr` (`confirme_par` **et** `confirme_at` obligatoires).
 
 ### P10 — Détecter un doublon
 
@@ -184,12 +225,20 @@ Neuf catégories : prospect · client · fournisseur · sous-traitant · partena
 contact professionnel général · à classer plus tard · autre catégorie configurable.
 
 **Une destination principale est obligatoire** — c'est elle qui rend la navigation
-compréhensible. Des rôles secondaires sont possibles quand le modèle cible les autorise
-réellement ; aujourd'hui il ne les autorise pas pour fournisseur/sous-traitant (décision D2
-du rapport d'audit), et l'interface doit le dire plutôt que de faire semblant.
+compréhensible.
 
-Le rôle n'est **jamais** déduit du texte de la carte. Une suggestion peut être affichée
-(« cette entreprise ressemble à un fournisseur existant ») ; elle n'est jamais préappliquée.
+**Les rôles multiples sont autorisés (D4)** là où le modèle cible les porte réellement.
+Le cas nommé — fournisseur **et** sous-traitant — devient possible : une seule fiche tiers,
+deux rôles, aucun doublon. Le cumul inter-registres (« client et partenaire ») passe par un
+lien déclaré entre les deux fiches, sans fusion et sans fiche principale imposée.
+
+Deux garde-fous qui ne bougent pas :
+
+* « Candidat / futur employé » crée **uniquement une proposition de candidat** (D5). Jamais
+  un salarié, jamais un contrat, jamais une donnée de paie. L'écran le dit.
+* Le rôle n'est **jamais** déduit du texte de la carte (D3). Une suggestion peut être
+  affichée — « cette entreprise ressemble à un fournisseur existant » — elle n'est jamais
+  préappliquée.
 
 ### P12 — Confirmer le classement
 
@@ -295,7 +344,13 @@ produit existant.
 
 ## 8. Tests attendus
 
-À écrire au lot de réalisation. **Aucun n'est exécuté ici** : le produit n'existe pas.
+À écrire au lot de réalisation. **Aucun test de produit n'est exécuté ici** : le produit
+n'existe pas.
+
+En revanche, **neuf recettes de schéma ont bien été exécutées** en R2 sur un conteneur
+jetable — application du SQL proposé sur les 272 migrations, puis huit tests négatifs
+d'invariants. Voir §10.1 du rapport d'audit. Les tests ci-dessous portent sur le
+comportement du produit, que cette recette ne couvre pas.
 
 ### Carte et lien public
 1. Un lien NFC ouvre le bon profil.
@@ -318,52 +373,78 @@ produit existant.
 14. Le plafond de soumissions est appliqué et l'abus journalisé.
 15. Un contact reçu apparaît dans la boîte du bon titulaire, et d'aucun autre.
 
-### OCR
+### OCR — D1, D2, D3
 16. L'OCR ne déclenche aucune création automatique, quelle que soit la confiance.
 17. Chaque champ incertain est signalé visuellement.
 18. `FEATURE_AI_ENABLED` absent ou faux ⇒ aucun appel OCR n'est émis.
-19. Une analyse ne peut pas passer en « confirmée » sans confirmateur ni date.
+19. `contact_parametres.ocr_actif` faux ⇒ aucun appel OCR n'est émis, **même si la plateforme l'autorise**.
+20. Les deux interrupteurs sont vrais ⇒ l'OCR est proposé, et **reste refusable** carte par carte.
+21. Couper l'OCR au niveau de l'entreprise ne casse aucun parcours : la saisie manuelle reste complète.
+22. L'information sur le traitement OCR est présentée **avant** le premier envoi d'image.
+23. Un champ non confirmé individuellement n'est **jamais** repris dans le contact.
+24. Il n'existe **aucun** geste de confirmation globale (« tout accepter ») dans l'interface.
+25. Une analyse ne peut pas passer en « confirmée » tant qu'un champ retenu reste non confirmé.
+26. Chaque champ confirmé porte son propre confirmateur et son propre horodatage.
 
-### Classement
-20. La classification client crée ou rattache correctement le contact.
-21. La classification fournisseur écrit dans `fournisseurs`, `type_tiers = 'fournisseur'`.
-22. La classification sous-traitant écrit dans `fournisseurs`, `type_tiers = 'sous_traitant'`, et **n'écrit jamais** dans `sous_traitants_chantiers`.
-23. La classification candidat ne crée jamais d'`employes`, ni de contrat, ni de donnée de paie.
-24. Le rôle n'est jamais déduit du seul texte de la carte.
-25. Une destination principale est obligatoire.
+### Classement — D4, D5, D6
+27. La classification client crée ou rattache correctement le contact.
+28. La classification fournisseur crée le rôle `fournisseur` sur le tiers.
+29. La classification sous-traitant crée le rôle `sous_traitant`, et **n'écrit jamais** dans `sous_traitants_chantiers`.
+30. **Un même tiers peut porter les deux rôles simultanément**, sans créer de seconde fiche.
+31. Retirer un rôle à un tiers qui en porte deux ne supprime pas la fiche.
+32. La classification partenaire écrit dans `partenaires`.
+33. La classification contact général écrit dans `contacts_professionnels`.
+34. La classification candidat crée une **proposition de candidat**, et rien d'autre.
+35. Aucun chemin, quel qu'il soit, ne crée un `employes`, un contrat de travail ou une donnée de paie.
+36. Un lien inter-registres (client **et** partenaire) n'entraîne aucune fusion des deux fiches.
+37. Le rôle n'est jamais déduit du seul texte de la carte.
+38. Une destination principale est obligatoire.
 
-### Idempotence et doublons
-26. Rejouer un transfert ne crée pas un second client ou fournisseur.
-27. Un doublon n'est jamais fusionné automatiquement.
-28. Une fusion validée conserve la provenance de chaque champ.
-29. Un conflit `duplicate_identity` arrête le transfert.
+### Versement et contrat — D9
+39. Rejouer un transfert ne crée pas un second client, fournisseur ou partenaire.
+40. Contact / Card n'émet **jamais** une enveloppe en portée `client:write`.
+41. Une enveloppe en `client:propose` ne produit aucune écriture avant confirmation humaine.
+42. `prenom` et `telephone_mobile` d'une carte scannée arrivent intacts dans `contacts_clients` (D7).
 
-### Notifications
-30. La notification indique la bonne destination.
-31. La notification n'est créée qu'une seule fois, y compris après rejeu.
-32. L'utilisateur peut ouvrir la fiche depuis la notification.
-33. Une notification externe ne contient pas les coordonnées reçues.
+### Doublons
+43. Un doublon n'est jamais fusionné automatiquement.
+44. Une fusion validée conserve la provenance de chaque champ.
+45. Un conflit `duplicate_identity` arrête le transfert.
+
+### Notifications — D8
+46. La notification indique la bonne destination et la fiche exacte où la carte a été rangée.
+47. La notification n'est créée qu'une seule fois, y compris après rejeu.
+48. **Deux exécutions de la même action métier à des horodatages différents ne produisent qu'une notification.**
+49. L'utilisateur peut ouvrir la fiche depuis la notification.
+50. Une notification externe ne contient pas les coordonnées reçues.
 
 ### Isolation
-34. Les contacts restent isolés entre entreprises.
-35. Une entreprise ne peut pas consulter les cartes reçues par une autre.
-36. Un responsable ne peut pas lire le carnet non versé d'un collaborateur.
-37. Le jeton public ne donne accès à aucune autre donnée de l'entreprise.
+51. Les contacts restent isolés entre entreprises.
+52. Une entreprise ne peut pas consulter les cartes reçues par une autre.
+53. Un responsable ne peut pas lire le carnet non versé d'un collaborateur.
+54. Le jeton public ne donne accès à aucune autre donnée de l'entreprise.
 
-### Autonomie et mobile
-38. Le parcours complet fonctionne sur mobile.
-39. Le produit reste utilisable sans Gestion Pro.
-40. L'activation ultérieure de Gestion Pro ne crée pas de doublon et ne perd pas d'historique.
+### Autonomie et mobile — D10
+55. Le parcours complet fonctionne sur mobile.
+56. Le produit reste utilisable sans Gestion Pro : carnet, réception, recherche, classement, doublons, export.
+57. L'export du carnet autonome est complet et relisible.
+58. L'activation ultérieure de Gestion Pro ne crée pas de doublon et ne perd pas d'historique.
+59. Révoquer la liaison Gestion Pro n'efface rien de ce qui a déjà été versé.
 
 ---
 
 ## 9. Ce que cette spécification ne promet pas
 
-* **L'OCR de carte papier.** Aucun code OCR n'existe dans le dépôt. Sous réserve de la
-  décision D5, la V1 se limite aux entrées structurées et à la saisie manuelle.
+* **Un calendrier.** L'OCR (D1), les rôles multiples (D4), le vivier (D5), les registres
+  (D6), `prenom`/`telephone_mobile` (D7) et l'idempotence des notifications (D8) sont au
+  périmètre cible et **suspendus à la réouverture du train** : aucune migration ne peut
+  entrer aujourd'hui.
+* **Un taux de reconnaissance OCR.** Aucun code OCR n'existe encore dans le dépôt ; aucun
+  chiffre ne sera annoncé avant mesure.
 * **Un fonctionnement hors ligne**, tant qu'aucune preuve E2E n'existe.
-* **Une destination Gestion Pro** pour « partenaire », « candidat » et « contact général » :
-  ces modèles n'existent pas (décisions D3 et D4).
-* **Le multi-rôle fournisseur/sous-traitant**, interdit par la base (décision D2).
+* **La création automatique d'une fiche**, quelle qu'elle soit : c'est un refus de
+  conception, pas une limite temporaire (D3, D9).
+* **Le passage automatique d'un candidat au statut de salarié** : le vivier ne touche jamais
+  la paie (D5).
 * **Toute donnée commerciale** — prix, délai, garantie, stock, remboursement : hors périmètre,
   et rien n'en est inventé ici.

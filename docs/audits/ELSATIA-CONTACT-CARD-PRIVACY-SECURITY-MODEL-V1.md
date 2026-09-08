@@ -1,6 +1,7 @@
 # ELSATIA Contact / Card — Modèle de vie privée et de sécurité V1
 
 Base : `1fc1331842cdf5980b374169994587813bdee7b6`
+Révision : **R2** — décisions D1 à D10 de Julien intégrées.
 Statut : **conception**. Rien n'est implémenté ; aucune politique RLS n'est créée ici.
 
 ---
@@ -118,7 +119,7 @@ plafonné et traité comme du texte, jamais interprété.
 | Bucket | **privé**. Sur les 13 buckets du dépôt, un seul est public (`entreprise-assets`) et il n'accueille que logos et photos de profil affichés |
 | Accès | URL signées de courte durée, jamais d'URL publique |
 | Antivirus | **aucun antivirus n'est disponible dans l'écosystème aujourd'hui.** Ne rien promettre. Si un scan est ajouté, il devra être réel et vérifiable |
-| Conservation | l'original est supprimé après confirmation humaine des données extraites — délai à fixer (décision D6) |
+| Conservation | l'original est supprimé après confirmation humaine des données extraites — délai exact à fixer (**question ouverte O2**) ; paramétrable par entreprise via `contact_parametres.retention_images_jours` |
 
 Une photo de carte de visite contient un nom, un employeur, un téléphone et souvent un
 visage. Elle est aussi sensible que le contact lui-même, et parfois plus.
@@ -219,15 +220,42 @@ documentées, sur le modèle de `politiques_conservation_notes_frais` qui existe
 
 ### 7.5 Transferts hors UE
 
-Si l'OCR est activé (décision D5), **les images de cartes de visite partent chez le
-fournisseur d'IA** — aujourd'hui OpenAI, seul fournisseur implémenté dans
+**D1 place l'OCR au périmètre cible**, mais facultatif et **désactivable par entreprise**.
+Cela ne supprime pas le sujet : quand il est actif, **les images de cartes de visite partent
+chez le fournisseur d'IA** — aujourd'hui OpenAI, seul fournisseur implémenté dans
 `src/lib/ai/providers/`. C'est un transfert de données personnelles vers un tiers, qui doit
-être : mentionné à la politique de confidentialité, porté au registre, et couvert
-contractuellement.
+être mentionné à la politique de confidentialité, porté au registre, et couvert
+contractuellement (**question ouverte O3**).
 
-> **Tant que ce point n'est pas tranché, `FEATURE_AI_ENABLED` reste faux.** La porte est
-> déjà *fail-closed* : variable absente ⇒ IA indisponible. C'est le bon défaut et il ne doit
-> pas être inversé.
+### Le double interrupteur (D1)
+
+| Niveau | Réglage | Défaut | Qui décide |
+|---|---|---|---|
+| Plateforme | `FEATURE_AI_ENABLED` | absent ⇒ **faux** | ELSATIA |
+| Entreprise | `contact_parametres.ocr_actif` | **faux** | l'entreprise cliente |
+
+Les deux doivent être vrais pour qu'une seule image parte. Les deux sont *fail-closed*.
+
+C'est le point qui rend le dispositif défendable : **une entreprise qui refuse que les
+photos de ses cartes soient envoyées à un tiers coupe l'OCR sans perdre le produit.** La
+saisie manuelle reste un parcours complet, pas un mode dégradé.
+
+La base refuse d'activer l'OCR sans trace de l'information donnée ni de qui l'a activée —
+`check (not ocr_actif or (ocr_information_affichee_at is not null and ocr_active_par is not
+null and ocr_active_at is not null))`, vérifié en recette.
+
+### L'annonce et la confirmation (D2)
+
+Le traitement est **annoncé avant le premier envoi d'image** : ce qui part, chez qui,
+pourquoi, et comment couper la fonction. L'horodatage de cette annonce est conservé —
+sans lui, on ne peut pas démontrer que le traitement a été porté à la connaissance de
+l'entreprise.
+
+La confirmation est ensuite exigée **champ par champ**, jamais globalement. Il n'existe
+aucun geste « tout accepter » : c'est précisément celui qui viderait la vérification de son
+sens, et l'absence de ce bouton est un choix de conception, pas un oubli d'interface. Un
+champ non confirmé n'est jamais repris, et une analyse ne peut pas se clore tant qu'un champ
+reste en attente — garanti par contrainte et par déclencheur, tous deux vérifiés en recette.
 
 ---
 
@@ -255,7 +283,7 @@ La page publique de carte doit :
 * servir le QR avec `Cache-Control: private, no-store, max-age=0` et
   `X-Content-Type-Options: nosniff` — patron de `src/app/api/identification/[id]/qr/route.ts` ;
 * porter une CSP stricte — Réserves V6 et Colors en ont déjà écrit une, réutilisable ;
-* **ne partager aucune origine avec l'application authentifiée** (décision D7). Une page
+* **ne partager aucune origine avec l'application authentifiée** (**question ouverte O4**). Une page
   publique atteignable par n'importe qui ne doit pas vivre sur le domaine qui porte les
   cookies de session de Gestion Pro.
 
@@ -271,8 +299,10 @@ La page publique de carte doit :
 | Carte d'un salarié parti restée active | **élevé** | révocation au départ, **procédure obligatoire** à documenter |
 | Contact personnel absorbé sans le vouloir par l'entreprise | **élevé** | versement toujours explicite, jamais par défaut |
 | Doublon créé par un rejeu | moyen | `buildIdempotencyKey` sur l'identifiant de carte reçue |
-| Image de carte conservée trop longtemps | moyen | D6 |
-| Transfert d'images à un tiers IA | **élevé** | D5, drapeau fail-closed |
+| Image de carte conservée trop longtemps | moyen | **O2** — rétention paramétrable, valeur à fixer |
+| Transfert d'images à un tiers IA | **élevé** | **O3** — double interrupteur *fail-closed* (D1), annonce obligatoire (D2) ; contrat et registre restent à établir |
+| Une entreprise subit l'OCR sans l'avoir voulu | moyen | impossible : `ocr_actif` est faux par défaut et son activation est attribuable (D1) |
+| Un candidat devient salarié par inadvertance | **élevé** | impossible : `candidats` n'a **aucune** clé étrangère vers `employes` ni la paie (D5), vérifié en recette |
 | Notification externe trop bavarde | moyen | §8 |
 | Antivirus annoncé mais inexistant | moyen | ne rien annoncer |
 

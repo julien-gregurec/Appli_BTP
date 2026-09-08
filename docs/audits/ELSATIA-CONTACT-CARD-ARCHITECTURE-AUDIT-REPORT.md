@@ -2,6 +2,7 @@
 
 Lot : `ELSATIA-CONTACT-CARD-RECIPROCAL-EXCHANGE-GP-BRIDGE-V1`
 Date : 2026-09-08
+Révision : **R2** — verdict accepté par Julien, décisions D1 à D10 arbitrées et intégrées.
 Nature : **audit en lecture seule + conception**. Aucune migration créée, aucune fusion,
 aucun déploiement, aucune écriture en Production.
 
@@ -18,18 +19,19 @@ client canoniques avec normalisation / détection de doublon / enveloppe de sync
 idempotente, et une implémentation hors-ligne réelle de référence (Réserves V5).
 
 Le produit est donc **constructible sans inventer de socle**. Ce qui bloque n'est pas la
-conception, ce sont cinq réalités mesurées sur le code :
+conception, ce sont cinq réalités mesurées sur le code — dont **quatre sont désormais
+tranchées** par les décisions D1 à D10 :
 
-| # | Condition | Nature du blocage |
+| # | Condition | État après arbitrage |
 |---|---|---|
-| C1 | Aucune migration ne peut entrer aujourd'hui | Le ledger est en cours de réconciliation (P0). Toute évolution SQL sort ici en `.sql.proposed`. |
-| C2 | L'OCR n'existe **pas** dans le produit | Deux tables OCR sont au schéma (`suggestions_ocr_notes_frais`, `colors_analyses_ocr`) et **zéro ligne de code applicatif ne les utilise**. Le seul moteur réellement disponible est `ProviderIA.completerAvecFichier()`, coupé par défaut (`FEATURE_AI_ENABLED`). |
-| C3 | Trois destinations de classement n'ont **pas** de modèle cible | « candidat / futur employé », « partenaire » et « contact professionnel général » n'existent nulle part dans Gestion Pro. |
-| C4 | Un tiers ne peut pas être fournisseur **et** sous-traitant | `fournisseurs.type_tiers` est une contrainte `check` à valeur unique. Le multi-rôle demandé au §6 de la mission est aujourd'hui interdit par la base. |
-| C5 | `contacts_clients` est en retard sur le contrat canonique | La table ne porte ni prénom, ni mobile, ni notes, ni statut, ni rôles — alors que `ClientContact` de `@elsatia/client-contracts` les définit. Une carte de visite scannée porte précisément prénom et mobile. |
+| C1 | Aucune migration ne peut entrer aujourd'hui | **Toujours ouverte.** Le ledger est en cours de réconciliation (P0). Toute évolution SQL reste en `.sql.proposed`. Seule condition qui subsiste. |
+| C2 | L'OCR n'existe **pas** dans le produit | **Tranchée (D1, D2, D3).** L'OCR entre au périmètre cible, facultatif et désactivable par entreprise, annoncé à l'utilisateur, confirmé **champ par champ**, et sans aucun pouvoir de création. Reste à écrire : tout. |
+| C3 | Trois destinations de classement n'ont **pas** de modèle cible | **Tranchée (D5, D6).** Un vivier de candidats, un registre de partenaires et un registre de contacts professionnels généraux sont à créer côté Gestion Pro. |
+| C4 | Un tiers ne peut pas être fournisseur **et** sous-traitant | **Tranchée (D4).** `type_tiers` est remplacé par un modèle de rôles multiples. Coût mesuré : **6 usages dans 4 fichiers**, tous des filtres `.eq()` — voir §4.3. |
+| C5 | `contacts_clients` est en retard sur le contrat canonique | **Tranchée (D7).** `prenom` et `telephone_mobile` sont ajoutés à la proposition SQL. |
 
-Aucune de ces cinq conditions n'invalide l'architecture proposée. Elles déterminent
-**l'ordre de construction** et **ce qui peut être promis en V1** (§14).
+Aucune de ces conditions n'invalide l'architecture. C1 seule détermine encore le calendrier ;
+les quatre autres déterminent désormais **le contenu du lot de réalisation** (§14).
 
 ---
 
@@ -59,17 +61,30 @@ aurait conduit à déclarer « manquantes » des briques qui existent.
 
 ---
 
-## 2. Réserve de méthode — captures izi.Card
+## 2. Référence fonctionnelle — captures izi.Card
 
-La mission indique que des captures d'izi.Card servent de référence fonctionnelle.
-**Aucune capture n'a été transmise dans cette conversation.** L'audit s'appuie donc
-exclusivement sur le cahier des charges écrit et sur le code du dépôt.
+**Quatre captures du produit izi.Card ont été transmises avec la mission.** Elles servent
+d'inspiration **strictement fonctionnelle**, sur trois points et trois seulement :
 
-Cela n'affaiblit pas le résultat — la mission interdit de toute façon toute reprise de nom,
-marque, logo, texte, visuel, couleur, structure commerciale, garantie ou témoignage — mais
-il faut le dire : **rien dans ce rapport n'est dérivé d'une observation d'izi.Card**, et le
-principe retenu (une puce NFC qui n'ouvre qu'une URL publique révocable) est le
-fonctionnement générique d'une carte NFC, pas une reprise d'un produit tiers.
+1. le principe d'une **carte physique NFC** qu'on approche d'un téléphone ;
+2. l'**ouverture sans installation d'application** ;
+3. la **simplicité du parcours** — un geste, une page, une action.
+
+### Ce qui n'est pas repris, et ne doit jamais l'être
+
+Ni le nom, ni la marque, ni le logo, ni les textes, ni les visuels, ni les couleurs, ni la
+structure commerciale, ni les garanties, ni les témoignages, ni la présentation graphique.
+**Aucun tarif, aucune offre, aucun argument commercial d'izi.Card n'est repris.**
+
+ELSATIA Contact / Card porte son identité propre et répond à un besoin qu'izi.Card ne traite
+pas : le **rangement dans le bon registre métier** d'un contact reçu — client, prospect,
+fournisseur, sous-traitant, partenaire, candidat ou contact général — avec détection de
+doublon et confirmation humaine. C'est là que se situe la valeur du produit ELSATIA, et
+c'est de la conception propre, pas de l'inspiration.
+
+Les trois points d'inspiration retenus relèvent par ailleurs du fonctionnement générique
+d'une carte NFC : une puce qui n'expose qu'une URL publique révocable est le seul montage
+sûr, indépendamment de tout produit tiers.
 
 ---
 
@@ -298,7 +313,17 @@ Deux faits mesurés :
 
 1. **Un tiers est fournisseur OU sous-traitant, jamais les deux.** La mission demande
    explicitement d'étudier « fournisseur et sous-traitant ». La base l'interdit aujourd'hui.
-   → décision D2 (§13).
+   → **décision D4 : le cumul de rôles est retenu.**
+
+   Coût mesuré du changement, et il est petit : `type_tiers` n'est lu qu'à **6 endroits,
+   dans 4 fichiers**, et les 6 sont des filtres `.eq("type_tiers", …)` :
+   `fournisseurs/page.tsx:18`, `sous-traitants/page.tsx:18`,
+   `sous-traitants/[id]/page.tsx:20`, `actions/sous-traitants.ts:21,59,70`.
+   Côté SQL, deux migrations seulement le mentionnent (111 et 194).
+
+   Un modèle de rôles multiples est donc **tractable**, à condition de conserver
+   `type_tiers` en lecture pendant la transition plutôt que de le supprimer d'un bloc —
+   voir §6.4.
 2. **Un fournisseur n'a pas de table de contacts.** Il porte un unique champ texte
    `contact_nom`. Il n'existe aucun équivalent de `contacts_clients` côté fournisseur. Une
    carte de visite d'un commercial fournisseur n'a donc, aujourd'hui, **aucun endroit
@@ -335,10 +360,16 @@ qui est vraie, et la première n'existe pas.
 métier** — les deux occurrences trouvées sont des commentaires sans rapport (« liste de
 candidats » d'un cron de relances, « migration candidate »).
 
-> **Il n'existe aucun modèle de candidat dans ELSATIA.** L'interdiction de la mission
-> (« ne jamais créer automatiquement un salarié, un contrat de travail ou une donnée de
-> paie à partir d'une carte de visite ») est donc respectée par construction en V1 :
-> la seule destination possible d'un candidat est le carnet Contact / Card. → décision D3.
+> **Il n'existe aucun modèle de candidat dans ELSATIA.**
+> → **décision D5 : un vivier de candidats est à créer, strictement distinct des salariés.**
+>
+> L'interdiction de la mission — « ne jamais créer automatiquement un salarié, un contrat de
+> travail ou une donnée de paie à partir d'une carte de visite » — reste entière et devient
+> une propriété du modèle : le vivier n'a **aucune clé étrangère vers `employes`**, aucun
+> lien avec `dossiers_paie_salaries` ni `profils_paie_employes`, et le classement
+> « futur employé » ne crée **qu'une proposition de candidat**, jamais un candidat confirmé
+> et encore moins un salarié. Le passage candidat → salarié reste un geste RH manuel,
+> hors de portée de Contact / Card.
 
 ### 4.6 `appels_contacts` — le bon endroit pour le contexte de rencontre
 
@@ -435,10 +466,11 @@ logo et la photo de profil affichés sur la page publique peuvent vivre dans
 | Carte reçue + résultat OCR + confiances | **non** (forme oui) | Deux schémas de référence existent, tous deux inutilisés. |
 | Carnet de contacts hors client | **non** | Tout contact est aujourd'hui rattaché à un `clients` (§4.2). |
 | Contacts d'un fournisseur | **non** | Un seul champ texte `contact_nom` (§4.3). |
-| Rôle « partenaire » | **non** | Aucune trace. |
-| Candidat / vivier | **non** | Aucune trace (§4.5). |
-| Multi-rôle d'un tiers | **non** | Interdit par `fournisseurs_type_tiers_check` (§4.3). |
-| Prénom / mobile sur un contact | **non** | Absents de `contacts_clients` (§4.2). |
+| Registre « partenaire » | **non** | Aucune trace. → **à créer (D6)** |
+| Registre « contact professionnel général » | **non** | Aucune trace. → **à créer (D6)** |
+| Candidat / vivier | **non** | Aucune trace (§4.5). → **à créer (D5)** |
+| Multi-rôle d'un tiers | **non** | Interdit par `fournisseurs_type_tiers_check` (§4.3). → **à lever (D4)** |
+| Prénom / mobile sur un contact | **non** | Absents de `contacts_clients` (§4.2). → **à ajouter (D7)** |
 | Application `contact` au catalogue | **non** | Le socle d'accueil existe (§3.4). |
 | Catégorie Boutique pour une carte NFC | **non** | `check` fermé à 4 valeurs (§4.8). |
 
@@ -502,6 +534,55 @@ réception (NFC | QR | photo | PDF | formulaire | saisie | partage ELSATIA)
 
 **Aucune flèche automatique ne traverse l'écran humain.** C'est l'invariant du produit.
 
+### 6.4 Rôles multiples de tiers (D4)
+
+`type_tiers` disparaît comme **source de vérité**, sans disparaître comme **colonne**.
+
+Le modèle cible est une table de rôles, `fournisseurs_roles (entreprise_id,
+fournisseur_id, role)` avec `role ∈ ('fournisseur','sous_traitant')` et une clé primaire
+sur le triplet : un tiers porte autant de lignes que de rôles, donc zéro, un ou deux.
+
+Trois raisons de ne pas supprimer `type_tiers` dans le même geste :
+
+1. les 6 usages applicatifs sont des filtres `.eq()` ; les basculer sur une jointure est un
+   changement de requête, pas de logique — mais il doit être **fait et vérifié**, pas
+   supposé ;
+2. la contrainte `check` protège aujourd'hui contre une valeur aberrante ; la retirer avant
+   que la table de rôles soit peuplée ouvrirait une fenêtre où un tiers n'a plus de rôle du
+   tout ;
+3. la migration de reprise doit **peupler `fournisseurs_roles` depuis `type_tiers`**, ce qui
+   exige que la colonne existe encore au moment où elle s'exécute.
+
+La séquence est donc : créer la table de rôles → la peupler → basculer les 6 lectures →
+**puis seulement** retirer la contrainte et la colonne, dans un lot ultérieur. Un `type_tiers`
+laissé en place et non maintenu deviendrait une seconde source de vérité — c'est le seul
+risque réel de cette évolution, et il se traite par une date de retrait, pas par un
+commentaire.
+
+> **Ce que ce lot ne fait pas.** Unifier `clients` et `fournisseurs` en un registre unique
+> de tiers — qui serait le modèle « juste » pour exprimer « client et partenaire » ou
+> « ancien salarié et sous-traitant » — est un **refactor structurel de Gestion Pro**. Il ne
+> doit pas être introduit en effet de bord d'un produit de cartes de visite. D4 est honoré
+> sur le cas nommé par Julien (fournisseur **et** sous-traitant) ; le cumul inter-registres
+> passe par les liens décrits en §6.5, et l'unification reste un lot à part entière.
+
+### 6.5 Registres partenaires et contacts généraux (D6)
+
+Deux registres nouveaux côté Gestion Pro, volontairement **légers** — ils n'émettent aucun
+document commercial, ne portent aucune identité légale obligatoire, et n'entrent pas dans la
+facturation :
+
+* `partenaires` — organisation partenaire et ses interlocuteurs ;
+* `contacts_professionnels` — carnet professionnel de l'entreprise, pour ce qui n'est ni
+  client, ni fournisseur, ni partenaire, ni candidat.
+
+Un même interlocuteur peut exister dans plusieurs registres (le partenaire d'aujourd'hui est
+le client de demain). Pour ne pas fabriquer de doublons silencieux, une table de liens
+`tiers_liens` déclare que deux fiches de registres différents **désignent la même
+organisation réelle** — sans les fusionner, sans en élire une principale, et sans préjuger
+de l'unification future. C'est la réponse minimale et non destructive au « client et
+partenaire » du §6 de la mission.
+
 ---
 
 ## 7. Correspondance avec Gestion Pro
@@ -510,16 +591,21 @@ Le détail, champ par champ, est dans
 `ELSATIA-CONTACT-CARD-GP-INTEGRATION-MAPPING-V1.md`. Synthèse des destinations **réelles**,
 corrigée par rapport au tableau supposé de la mission :
 
-| Classification | Destination réelle vérifiée | Écart avec la mission |
+| Classification | Destination cible après arbitrage | État du modèle |
 |---|---|---|
-| Prospect | `clients` avec `statut='prospect'` (valeur par défaut) | conforme |
-| Client | `clients` + `contacts_clients` | conforme, mais prénom/mobile perdus (§4.2) |
-| Fournisseur | `fournisseurs` avec `type_tiers='fournisseur'` | conforme, mais **pas de table d'interlocuteurs** (§4.3) |
-| Sous-traitant | `fournisseurs` avec `type_tiers='sous_traitant'` | **le « registre sous-traitants » n'existe pas** ; `sous_traitants_chantiers` est une affectation, pas un registre |
-| Partenaire | **aucune destination** | modèle absent → reste au carnet Contact / Card |
-| Candidat / futur employé | **aucune destination** | modèle absent → reste au carnet, jamais `employes` |
-| Contact général | **aucune destination** | pas de carnet hors client → reste au carnet Contact / Card |
-| À classer | boîte de réception Contact / Card | conforme |
+| Prospect | `clients` avec `statut='prospect'` (valeur par défaut) | **existe** |
+| Client | `clients` + `contacts_clients` enrichie de `prenom` et `telephone_mobile` | existe, **à compléter (D7)** |
+| Fournisseur | `fournisseurs` + rôle `fournisseur` dans `fournisseurs_roles` | existe, **rôles à créer (D4)** ; interlocuteurs à créer (E4) |
+| Sous-traitant | `fournisseurs` + rôle `sous_traitant` — **cumulable** avec `fournisseur` | existe, **rôles à créer (D4)** |
+| Partenaire | `partenaires` | **à créer (D6)** |
+| Candidat / futur employé | `candidats` — **proposition de candidat uniquement** | **à créer (D5)** ; aucun lien vers `employes` |
+| Contact général | `contacts_professionnels` | **à créer (D6)** |
+| À classer | boîte de réception Contact / Card | existe (produit) |
+
+Deux constats d'audit restent vrais et ne sont pas annulés par les décisions :
+`sous_traitants_chantiers` demeure une **affectation** et non un registre — Contact / Card
+n'y écrit jamais — et le classement « futur employé » ne produit **jamais** un `employes`,
+seulement une proposition dans le vivier.
 
 ---
 
@@ -561,7 +647,12 @@ Traités en détail dans `ELSATIA-CONTACT-CARD-PRIVACY-SECURITY-MODEL-V1.md`. Po
 * formulaire réciproque : consentement explicite obligatoire, plafonné par
   `rate_limits_applicatifs`, abus tracés dans `journal_abus_securite` ;
 * images : validation MIME, taille maximale, bucket **privé**, suppression de l'original
-  après OCR selon la politique retenue (→ décision D6) ;
+  après confirmation humaine selon la politique retenue (→ question ouverte O2) ;
+* OCR sous **double interrupteur** (D1) : `FEATURE_AI_ENABLED` côté plateforme et
+  `contact_parametres.ocr_actif` côté entreprise, tous deux *fail-closed*. Une entreprise
+  qui refuse que ses images partent chez un tiers coupe l'OCR **sans perdre le produit** ;
+* traitement OCR **annoncé avant l'envoi** de la première image, et confirmé **champ par
+  champ** (D2) — jamais globalement ;
 * isolation multi-tenant par `entreprise_id` + RLS, sur le patron `est_membre_actif` /
   `a_permission` déjà employé partout ;
 * `robots: { index: false, follow: false }` sur la page publique, comme
@@ -578,6 +669,7 @@ Traités en détail dans `ELSATIA-CONTACT-CARD-PRIVACY-SECURITY-MODEL-V1.md`. Po
 | Recherche d'un modèle partenaire | **aucun** |
 | Recherche d'un modèle carte/NFC/vCard | **aucun** |
 | Exclusivité `fournisseurs.type_tiers` | **confirmée** — `check(type_tiers in ('fournisseur','sous_traitant'))` |
+| Coût du retrait de `type_tiers` | **6 usages, 4 fichiers**, tous des filtres `.eq()` ; 2 migrations le mentionnent |
 | Table de contacts fournisseur | **inexistante** — un seul champ `contact_nom` |
 | Écart `contacts_clients` ↔ `ClientContact` | **confirmé** — prénom, mobile, notes, statut, rôles absents |
 | Code applicatif utilisant les tables OCR | **zéro occurrence** sur tout le dépôt |
@@ -591,12 +683,35 @@ Traités en détail dans `ELSATIA-CONTACT-CARD-PRIVACY-SECURITY-MODEL-V1.md`. Po
 | Consommateurs de `@elsatia/client-contracts` | 4 fichiers GP (snapshot, identité légale, resend) |
 | Intégrité du worktree et des branches | aucune suppression, aucune modification externe |
 
+### 10.1 Recette du SQL proposé — exécutée en R2
+
+Contrairement à R1, où aucun SQL n'était exécutable, la proposition a été **réellement
+appliquée** sur un conteneur Postgres jetable, par-dessus les 272 migrations du train,
+via le harnais existant `/Volumes/ELSATIA-DEV/ELSATIA-STACKS/train-v2-dbtest/harness.sh`
+(image `supabase/postgres:17.6.1.143`, prélude `storage`, conteneur détruit après recette).
+
+| Test | Attendu | Résultat |
+|---|---|---|
+| Application des 272 migrations puis de `contact-card-v1.sql.proposed` | s'applique sans erreur | **272 migrations appliquées, proposition appliquée sans erreur** |
+| **D8** — deux notifications, même `cle_idempotence`, horodatages différents | la seconde est refusée | refusée — `duplicate key … notifications_cle_idempotence_unique` |
+| **D4** — un même tiers porte les deux rôles | accepté, une seule fiche | accepté — `roles du tiers = fournisseur+sous_traitant` |
+| **D1** — `ocr_actif = true` sans information affichée ni activateur | refusé | refusé — `contact_parametres_check` |
+| **D3** — carte reçue passée en `classee` sans vérification humaine | refusé | refusé — `contact_cartes_recues_check2` |
+| Formulaire réciproque sans consentement | refusé | refusé — `contact_cartes_recues_check1` |
+| **D5** — clés étrangères de `candidats` vers `employes` ou la paie | **aucune** | **`AUCUNE`** — vérifié sur `information_schema` |
+| **D2** — champ OCR décidé sans confirmateur ni date | refusé | refusé — `contact_analyses_ocr_champs_check` |
+| **D2** — clôture d'une analyse alors qu'un champ reste `en_attente` | refusé | refusé — `Analyse …: confirmation impossible, des champs restent à vérifier individuellement` |
+
+Les huit invariants sont donc **portés par la base**, pas seulement par l'interface : c'est
+la différence entre une règle affirmée et une règle vérifiable. Aucune base réelle — locale,
+préproduction ou Production — n'a été touchée.
+
 ## 11. Tests non exécutés — et pourquoi
 
 | Test attendu (§16) | Pourquoi non exécuté |
 |---|---|
-| Les 26 tests fonctionnels de la mission | Ils portent sur un produit **qui n'existe pas encore**. Ce lot est un audit d'architecture : il n'a créé ni table, ni route, ni composant produit. Les tests sont **spécifiés** dans la spécification fonctionnelle (§16), prêts à être écrits au lot de réalisation. |
-| Vérification en base réelle | Le CLI Supabase est bloqué sur ce poste ; la base locale est au ledger 265 et un `db reset` détruirait le jeu multi-app de test. L'audit est donc fait **sur les migrations sources**, qui sont la vérité du schéma. |
+| Les tests fonctionnels du produit | Ils portent sur un produit **qui n'existe pas encore**. Ce lot est un audit d'architecture : il n'a créé ni table, ni route, ni composant produit. **52 tests sont spécifiés** dans la spécification fonctionnelle (§8), dont 12 ajoutés par les décisions D1 à D10, prêts à être écrits au lot de réalisation. |
+| Vérification sur une base **réelle** (locale, préproduction, Production) | Le CLI Supabase est bloqué sur ce poste, et la base locale est au ledger 265 : un `db reset` y détruirait le jeu multi-app de test. La recette a donc été faite sur un **conteneur jetable** (§10.1), ce qui vérifie le schéma et les invariants — mais ne dit rien du comportement sur des données réelles ni des performances. |
 | Preuve E2E du hors-ligne | Rien n'est construit. Conformément au §12, **aucun fonctionnement hors ligne n'est annoncé** sans preuve. |
 | Preuve OCR | Aucun code OCR n'existe. Aucune promesse de taux de reconnaissance n'est faite. |
 | Rendu mobile | Les maquettes fournies sont des wireframes statiques isolés, non un produit mesuré. |
@@ -616,37 +731,66 @@ Traités en détail dans `ELSATIA-CONTACT-CARD-PRIVACY-SECURITY-MODEL-V1.md`. Po
 
 ---
 
-## 13. Décisions à prendre par Julien
+## 13. Décisions — arbitrage de Julien
 
-| # | Décision | Recommandation | Conséquence si non tranchée |
-|---|---|---|---|
-| **D1** | Application autonome `apps/contact` ou module de Gestion Pro ? | **Application autonome**, seule forme compatible avec le §11 | Le §11 devient infaisable |
-| **D2** | Autoriser un tiers fournisseur **et** sous-traitant ? | Remplacer `type_tiers` par une table de rôles, ou un `text[]` — migration bloquée aujourd'hui | Le multi-rôle du §6 reste interdit |
-| **D3** | Créer un vivier de candidats dans Gestion Pro ? | **Non en V1.** Les candidats restent au carnet Contact / Card | Le classement « candidat » reste sans destination — ce qui est acceptable et sûr |
-| **D4** | Créer un rôle « partenaire » ? | Une relation de rôle, **pas** une valeur de plus dans `clients.type` (qui est un type juridique, pas une relation) | Idem D3 |
-| **D5** | Activer l'OCR ? Avec quel fournisseur, à quel coût ? | OCR **hors périmètre V1**. Ouvrir par `FEATURE_AI_ENABLED` seulement après arbitrage coût + RGPD (les images partent chez un tiers) | Le §5 se limite à la saisie manuelle et aux formats structurés (QR, NFC, formulaire) — ce qui reste un produit complet |
-| **D6** | Conservation des images de cartes | Suppression de l'original **après** confirmation humaine, délai à fixer | Blocage RGPD |
-| **D7** | Domaine des cartes publiques | Sous-domaine dédié plutôt qu'un chemin sur `app.elsatia.fr` : une carte publique ne doit pas partager l'origine de l'application authentifiée | Risque de cookies/CSP mêlés |
-| **D8** | Ouverture Boutique des cartes NFC | Hors périmètre. Nécessite d'étendre le `check` de catégorie **et** de choisir un fournisseur physique | Aucune |
-| **D9** | Corriger `contacts_clients` (prénom, mobile, statut, rôles) ? | Oui, alignement sur `ClientContact` — mais migration bloquée | Le versement d'un contact perd prénom et mobile |
-| **D10** | Corriger l'index d'unicité des notifications | Oui, sur le patron `cle_idempotence unique` | L'exigence « une seule notification » reste non tenue |
+Les dix décisions ont été rendues. Elles sont **fermées** et intégrées à ce rapport, à la
+spécification fonctionnelle, à la correspondance Gestion Pro, au modèle de sécurité et au
+SQL proposé.
+
+### 13.1 Décisions fermées
+
+| # | Décision rendue | Traduction dans les documents |
+|---|---|---|
+| **D1** | **OCR au périmètre cible**, facultatif et **désactivable par entreprise** | Double interrupteur : `FEATURE_AI_ENABLED` (plateforme, *fail-closed*) **et** `contact_parametres.ocr_actif` (entreprise, **faux par défaut**). Les deux doivent être vrais. Une entreprise peut couper l'OCR sans couper le produit. |
+| **D2** | Traitement OCR **annoncé**, conforme RGPD, **confirmation humaine champ par champ** | La confirmation globale est abandonnée au profit d'une table par champ, `contact_analyses_ocr_champs`. Un champ non confirmé n'est **jamais** repris. Bandeau d'information avant tout envoi d'image, et transfert au tiers IA porté au registre. |
+| **D3** | **Aucune création automatique** par l'OCR — client, fournisseur, sous-traitant, partenaire, candidat, salarié | Déjà garanti par la portée `client:propose` ; désormais aussi par contrainte de base : une carte reçue ne quitte l'état « à vérifier » que si `verifiee_par` **et** `verifiee_at` sont renseignés. |
+| **D4** | **Rôles multiples** de tiers, notamment fournisseur **et** sous-traitant | `fournisseurs_roles` remplace `type_tiers` comme source de vérité (§6.4). Coût mesuré : 6 usages, 4 fichiers. Retrait de la colonne dans un lot ultérieur, pas dans celui-ci. |
+| **D5** | **Vivier de candidats** distinct des salariés ; « futur employé » ne crée qu'une **proposition de candidat** | Table `candidats` **sans aucune clé étrangère vers `employes`**, statut initial `propose`. Le passage au salariat reste un geste RH manuel. |
+| **D6** | Registres **partenaires** et **contacts professionnels généraux** | Tables `partenaires` et `contacts_professionnels`, plus `tiers_liens` pour le cumul inter-registres sans fusion (§6.5). |
+| **D7** | `prenom` et `telephone_mobile` sur les contacts clients | `alter table public.contacts_clients` dans le SQL proposé, plus `notes` et `statut` pour rejoindre `ClientContact`. |
+| **D8** | **Idempotence réelle** des notifications, indépendante de `created_at` | Colonne `cle_idempotence text unique` sur `notifications_utilisateurs` et retrait de l'index trompeur `notifications_evenement_unique`. Corrige une dette **préexistante** que ce lot révèle sans l'avoir introduite. |
+| **D9** | **`client:propose` conservée impérativement** | Inchangée, et désormais énoncée comme invariant non négociable : Contact / Card propose, Gestion Pro confirme. Aucune écriture directe, quelle que soit la confiance de l'OCR. |
+| **D10** | Produit **utilisable sans Gestion Pro** | Carnet autonome, boîte de réception, recherche, classement, doublons et export : le socle est conçu pour fonctionner seul, le pont Gestion Pro reste optionnel et révocable. |
+
+### 13.2 Décisions encore ouvertes
+
+Quatre points restent à trancher. Aucun ne bloque la conception ; tous bloquent une mise en
+service.
+
+| # | Question ouverte | Pourquoi elle doit être tranchée |
+|---|---|---|
+| **O1** | **Quand le train rouvre-t-il ?** | C'est la seule condition restante du verdict (C1). Tant que le ledger est en réconciliation, rien de ce qui est proposé ici ne peut devenir une migration. |
+| **O2** | **Conservation des images de cartes** — délai exact avant suppression de l'original après confirmation | Exigence RGPD ; l'ancienne décision D6 sur ce point n'a pas été rendue. Proposition : suppression à la confirmation, purge de sécurité à 30 jours. |
+| **O3** | **Fournisseur d'OCR, coût et contrat** | D1 ouvre l'OCR sans nommer le fournisseur. Le seul implémenté est OpenAI ; les images de cartes partiraient chez un tiers. À porter au registre et à couvrir contractuellement avant d'activer quoi que ce soit. |
+| **O4** | **Domaine des cartes publiques** | Un sous-domaine dédié reste recommandé : une page publique atteignable par n'importe qui ne doit pas partager l'origine — donc les cookies — de l'application authentifiée. |
+
+Deux points antérieurement listés comme décisions sont **sortis du périmètre** et ne
+demandent aucun arbitrage aujourd'hui : la forme applicative (application autonome
+`apps/contact`, imposée par D10) et l'ouverture Boutique des cartes physiques, qui reste
+hors périmètre et sans prix, délai, garantie ni stock.
 
 ---
 
 ## 14. Ce qui peut être promis en V1, et ce qui ne peut pas
 
-**Peut être promis** — tout repose sur des briques existantes :
+**Livrable sans dépendre du train** — le socle autonome ne touche aucune table existante :
 partage NFC / QR / lien ; page publique sans application ; vCard téléchargeable ; échange
 réciproque par formulaire consenti ; boîte de réception ; saisie manuelle et lecture de QR ;
 classement explicite ; détection de doublon ; carnet autonome sans Gestion Pro ; gestion,
 suspension et révocation des cartes ; notifications avec état de lecture ; isolation
 multi-tenant.
 
-**Ne peut pas être promis en V1** :
-OCR de carte papier (D5) ; création automatique de fiche, quelle qu'elle soit — c'est
-interdit par conception ; destination Gestion Pro pour « partenaire », « candidat » et
-« contact général » (D3, D4) ; multi-rôle fournisseur/sous-traitant (D2) ; hors-ligne
-complet tant qu'aucune preuve E2E n'a été produite ; vente de cartes physiques (D8).
+**Au périmètre cible, mais suspendu à la réouverture du train** (C1/O1) : l'OCR facultatif
+avec confirmation champ par champ (D1, D2) ; les rôles multiples de tiers (D4) ; le vivier
+de candidats (D5) ; les registres partenaires et contacts généraux (D6) ; `prenom` et
+`telephone_mobile` sur les contacts clients (D7) ; l'idempotence réelle des notifications
+(D8) ; le versement vers Gestion Pro, qui suppose les destinations ci-dessus.
+
+**Ne sera pas promis, quelle que soit la décision** :
+la création automatique d'une fiche — client, fournisseur, sous-traitant, partenaire,
+candidat ou salarié — interdite par conception (D3, D9) ; un fonctionnement hors ligne tant
+qu'aucune preuve E2E n'a été produite ; la vente de cartes physiques, hors périmètre et sans
+prix, délai, garantie ni stock.
 
 ---
 
@@ -656,6 +800,7 @@ complet tant qu'aucune preuve E2E n'a été produite ; vente de cartes physiques
 |---|---|
 | Branche | `audit/elsatia-contact-card-architecture-v1` |
 | SHA de base complet | `1fc1331842cdf5980b374169994587813bdee7b6` |
+| SHA de la révision R1 (audit initial) | `5fb137770f7ae5e24bd0bb19b5a4528612958b54` |
 | **SHA du commit des livrables** | `5fb137770f7ae5e24bd0bb19b5a4528612958b54` |
 | **SHA final poussé** | tête de la branche après le commit de traçabilité — un document ne peut pas contenir l'empreinte du commit qui l'introduit ; le SHA est donné dans le compte rendu du lot et lisible par `git rev-parse origin/audit/elsatia-contact-card-architecture-v1` |
 

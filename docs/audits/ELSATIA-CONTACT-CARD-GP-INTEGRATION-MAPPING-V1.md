@@ -1,6 +1,7 @@
 # ELSATIA Contact / Card — Correspondance avec Gestion Pro V1
 
 Base : `1fc1331842cdf5980b374169994587813bdee7b6`
+Révision : **R2** — décisions D1 à D10 de Julien intégrées.
 Statut : **conception**. Aucune migration, aucun code d'intégration écrit.
 
 Toutes les colonnes citées ont été relevées dans les migrations du train, pas supposées.
@@ -26,23 +27,30 @@ seulement documentée ».
 > Une carte scannée produit une *proposition*, qu'un humain valide. C'est le mécanisme
 > existant qui rend structurellement impossible la création automatique de fiche demandée
 > comme interdite par la mission.
+>
+> **D9 fige cette règle comme invariant du produit** : elle ne se négocie ni contre un gain
+> d'ergonomie, ni contre un taux de confiance OCR élevé, ni pour un lot ultérieur.
+> Contact / Card propose ; Gestion Pro confirme.
 
 ---
 
 ## 2. Table de correspondance des classifications
 
-| Classification | Destination **réelle** | Écriture | Vérifié dans |
+| Classification | Destination cible | Écriture | État du modèle |
 |---|---|---|---|
-| **Prospect** | `clients` avec `statut = 'prospect'` | création ou rattachement | migration 004 : `statut … default 'prospect' check (statut in ('prospect','actif','inactif'))` |
-| **Client** | `clients` (+ `contacts_clients` pour l'interlocuteur) | création ou rattachement | migration 004 |
-| **Fournisseur** | `fournisseurs` avec `type_tiers = 'fournisseur'` | création ou rattachement | migrations 021 et 111 |
-| **Sous-traitant** | `fournisseurs` avec `type_tiers = 'sous_traitant'` | création ou rattachement | migration 111 |
-| **Partenaire** | *aucune* | — | aucune occurrence dans les 272 migrations |
-| **Candidat / futur employé** | *aucune* | — | aucune occurrence ; `employes` est adossé à la paie |
-| **Contact professionnel général** | *aucune* | — | tout contact est rattaché à un `clients` |
-| **À classer** | boîte de réception Contact / Card | — | — |
+| **Prospect** | `clients` avec `statut = 'prospect'` | création ou rattachement | **existe** — migration 004 |
+| **Client** | `clients` + `contacts_clients` (avec `prenom`, `telephone_mobile`) | création ou rattachement | existe ; **colonnes à ajouter (D7)** |
+| **Fournisseur** | `fournisseurs` + rôle `fournisseur` | création ou rattachement, **ou ajout de rôle** | existe ; **rôles à créer (D4)** |
+| **Sous-traitant** | `fournisseurs` + rôle `sous_traitant`, **cumulable** | création ou rattachement, **ou ajout de rôle** | existe ; **rôles à créer (D4)** |
+| **Partenaire** | `partenaires` | création ou rattachement | **à créer (D6)** |
+| **Candidat / futur employé** | `candidats`, statut `propose` | **proposition uniquement** | **à créer (D5)** |
+| **Contact professionnel général** | `contacts_professionnels` | création ou rattachement | **à créer (D6)** |
+| **À classer** | boîte de réception Contact / Card | — | existe (produit) |
 
-### 2.1 Trois corrections au tableau supposé de la mission
+Aucune de ces destinations n'est atteignable tant que le train est fermé : les six lignes
+marquées « à créer » ou « à ajouter » vivent dans `contact-card-v1.sql.proposed`.
+
+### 2.1 Trois corrections au tableau initial, qui restent vraies après arbitrage
 
 **« Prospect → fiche prospect ou client avec statut prospect ».**
 Il n'y a pas de « fiche prospect » : il y a `clients.statut = 'prospect'`, et c'est déjà la
@@ -58,9 +66,15 @@ de tiers. Seule la seconde branche est vraie.
 > pas de montant. L'affectation est un geste ultérieur, dans Gestion Pro, par un humain.
 
 **« Candidat → vivier de candidats ».**
-Il n'y a pas de vivier. Une recherche `candidat|vivier|recrutement` sur les 272 migrations ne
-renvoie que deux commentaires sans rapport. La destination reste le carnet Contact / Card,
-ce qui satisfait par construction l'interdiction de créer un salarié depuis une carte.
+Il n'y avait pas de vivier — une recherche `candidat|vivier|recrutement` sur les 272
+migrations ne renvoie que deux commentaires sans rapport. **D5 tranche : le vivier est à
+créer**, strictement distinct des salariés.
+
+La garantie tient alors à trois propriétés du modèle, pas à une promesse : `candidats` n'a
+**aucune clé étrangère vers `employes`**, aucun lien avec `dossiers_paie_salaries` ni
+`profils_paie_employes`, et le classement « futur employé » écrit un candidat au statut
+`propose` — jamais un candidat confirmé, jamais un salarié. Le recrutement effectif reste un
+geste RH manuel, hors de portée de Contact / Card.
 
 ---
 
@@ -111,22 +125,26 @@ Trois options, aucune ne pouvant être appliquée aujourd'hui (train bloqué) :
 
 | Champ Contact / Card | Colonne | Remarque |
 |---|---|---|
-| prénom + nom | `nom` | **agglomérés** : la colonne `prenom` n'existe pas |
+| prénom | `prenom` | **à créer (D7)** — aujourd'hui aggloméré dans `nom` |
+| nom | `nom` | — |
 | fonction | `fonction` | — |
 | téléphone | `telephone` | — |
-| **mobile** | *aucune* | perte |
+| mobile | `telephone_mobile` | **à créer (D7)** |
 | e-mail | `email` | — |
 | principal | `principal` | booléen, pas un tableau de rôles |
-| **notes** | *aucune* | perte |
-| **statut** | *aucune* | pas d'archivage d'un interlocuteur remplacé |
+| notes | `notes` | à créer — complément d'alignement sur `ClientContact` |
+| statut | `statut` | à créer — permet d'archiver un interlocuteur remplacé plutôt que de le supprimer |
 
 Écart mesuré avec `ClientContact` de `@elsatia/client-contracts`, qui définit `civility`,
 `firstName`, `lastName`, `jobTitle`, `email`, `phone`, `mobile`, `roles[]`
 (`primary`/`billing`/`site`), `status` (`active`/`inactive`), `notes`.
 
-> **La table est en retard sur le contrat.** Verser une carte de visite dans
+> **La table était en retard sur le contrat.** Verser une carte de visite dans
 > `contacts_clients` aujourd'hui perd le prénom séparé et le mobile — soit précisément les
-> deux informations qu'une carte de visite porte toujours.
+> deux informations qu'une carte de visite porte toujours. **D7 tranche : `prenom` et
+> `telephone_mobile` sont ajoutés**, avec `notes` et `statut` pour terminer l'alignement sur
+> `ClientContact`. Tant que le train est fermé, la perte demeure et le carnet Contact / Card
+> conserve ces valeurs.
 
 `contacts_clients` n'a pas de colonne `entreprise_id` : son cloisonnement remonte au client
 via les politiques RLS (`exists (select 1 from clients c where c.id = contacts_clients.client_id
@@ -149,7 +167,7 @@ d'abord résoudre le client, puis écrire — jamais l'inverse.
 | SIRET | `siret` | — |
 | n° TVA | `numero_tva` | migration 111 |
 | notes | `notes` | — |
-| rôle | `type_tiers` | `'fournisseur'` **ou** `'sous_traitant'` — jamais les deux |
+| rôle | `fournisseurs_roles.role` | `fournisseur` **et/ou** `sous_traitant` — **cumul autorisé (D4)** ; `type_tiers` reste en lecture pendant la transition |
 | spécialité | `specialite` | migration 111 |
 
 `reference` est `not null` avec `unique (entreprise_id, reference)` : elle doit être générée
@@ -166,11 +184,22 @@ second fournisseur — les deux sont faux.
 > Contact / Card, rattaché logiquement au fournisseur, jusqu'à ce qu'une table
 > d'interlocuteurs existe (proposition SQL, §7).
 
-**Fournisseur et sous-traitant s'excluent.**
-`check(type_tiers in ('fournisseur','sous_traitant'))` porte une valeur unique. Le cas
-« fournisseur et sous-traitant » du §6 de la mission est **interdit par la base**. Contact /
-Card doit l'afficher comme indisponible, pas le simuler par deux fiches — deux fiches pour un
-même SIRET seraient exactement le doublon que le produit prétend éviter.
+**Fournisseur et sous-traitant s'excluaient.**
+`check(type_tiers in ('fournisseur','sous_traitant'))` porte une valeur unique, ce qui
+interdisait le cas « fournisseur et sous-traitant » du §6 de la mission. **D4 tranche : le
+cumul est retenu**, via `fournisseurs_roles`.
+
+L'ampleur réelle du changement a été mesurée avant de le proposer : `type_tiers` n'est lu
+qu'à **6 endroits dans 4 fichiers**, tous des filtres `.eq()`
+(`fournisseurs/page.tsx:18`, `sous-traitants/page.tsx:18`,
+`sous-traitants/[id]/page.tsx:20`, `actions/sous-traitants.ts:21,59,70`), et n'apparaît que
+dans 2 migrations. Le refactor est donc contenu — à condition de **conserver la colonne
+pendant la transition** : c'est elle qui alimente la table de rôles à la reprise, et la
+supprimer d'abord ouvrirait une fenêtre où un tiers n'a plus aucun rôle.
+
+En attendant, Contact / Card affiche le cumul comme *à venir* plutôt que de le simuler par
+deux fiches — deux fiches pour un même SIRET seraient exactement le doublon que le produit
+prétend éviter.
 
 ---
 
@@ -234,22 +263,24 @@ Aucune de ces évolutions n'est appliquée. Elles sont décrites dans
 `docs/migrations-proposees/contact-card-v1.sql.proposed`, marqué
 **NON INTÉGRÉ — BLOQUÉ PAR LE TRAIN GLOBAL**.
 
-| # | Évolution | Sans elle |
-|---|---|---|
-| E1 | Tables propres à Contact / Card (cartes, profils, jetons, réception, analyses, carnet, propositions) | pas de produit |
-| E2 | `applications_elsatia` : ligne `contact` + rôles | pas de branchement multi-app |
-| E3 | `contacts_clients` : `prenom`, `mobile`, `notes`, `statut` | prénom et mobile perdus au versement |
-| E4 | Table d'interlocuteurs fournisseur | un seul contact par fournisseur, écrasé à chaque carte |
-| E5 | `clients` : `mobile`, `site_web` | mobile et site perdus au versement |
-| E6 | Multi-rôle de tiers (remplacement de `type_tiers`) | fournisseur **et** sous-traitant impossible |
-| E7 | Correction de `notifications_evenement_unique` | l'exigence « une seule notification » non tenue |
-| E8 | Vivier de candidats | classement « candidat » sans destination |
-| E9 | Rôle « partenaire » | classement « partenaire » sans destination |
-| E10 | Catégorie Boutique pour cartes NFC | vente impossible |
+| # | Évolution | Décision | Sans elle |
+|---|---|---|---|
+| E1 | Tables propres à Contact / Card (cartes, profils, jetons, réception, analyses **par champ**, carnet, propositions, paramètres) | D1, D2 | pas de produit |
+| E2 | `applications_elsatia` : ligne `contact` + rôles + permissions | D10 | pas de branchement multi-app |
+| E3 | `contacts_clients` : `prenom`, `telephone_mobile`, `notes`, `statut` | **D7** | prénom et mobile perdus au versement |
+| E4 | Table d'interlocuteurs fournisseur | — | un seul contact par fournisseur, écrasé à chaque carte |
+| E5 | `clients` : `mobile`, `site_web` | — | mobile et site perdus au versement |
+| E6 | `fournisseurs_roles` — rôles multiples de tiers | **D4** | fournisseur **et** sous-traitant impossible |
+| E7 | `notifications_utilisateurs.cle_idempotence` unique, retrait de l'index trompeur | **D8** | l'exigence « une seule notification » non tenue |
+| E8 | `candidats` — vivier sans lien vers la paie | **D5** | classement « candidat » sans destination |
+| E9 | `partenaires`, `contacts_professionnels`, `tiers_liens` | **D6** | classements « partenaire » et « contact général » sans destination |
+| E10 | Catégorie Boutique pour cartes NFC | hors périmètre | vente impossible |
 
-E3, E5, E6, E7 sont des **corrections de dettes existantes** que Contact / Card révèle mais
-n'introduit pas. Elles gagneraient à être traitées pour elles-mêmes, indépendamment de ce
-produit.
+E3, E5, E6 et E7 sont des **corrections de dettes préexistantes** que Contact / Card révèle
+sans les avoir introduites. E7 en particulier — l'index d'unicité des notifications qui
+n'unifie rien — concerne **toutes** les notifications de Gestion Pro, pas seulement celles de
+ce produit : elle gagnerait à être traitée pour elle-même, dès la réouverture du train, sans
+attendre ce lot.
 
 ---
 
@@ -261,9 +292,16 @@ produit.
    idempotentes.
 3. **Carnet et classement** — recherche, doublons via `@elsatia/client-contracts`,
    catégories, carnet complet sans Gestion Pro.
-4. **Pont Gestion Pro** — enveloppes `client:propose` vers `clients` et `fournisseurs`
-   uniquement, les seules destinations qui existent.
-5. **Le reste** — OCR (D5), hors-ligne (après preuve E2E), partenaire/candidat (D3, D4),
-   multi-rôle (D2), Boutique (D8).
+4. **Pont Gestion Pro** — enveloppes `client:propose` vers `clients` et `fournisseurs`,
+   les deux seules destinations qui existent aujourd'hui.
+5. **Destinations nouvelles**, à la réouverture du train — rôles multiples (D4), vivier
+   (D5), partenaires et contacts généraux (D6), `prenom`/`telephone_mobile` (D7),
+   idempotence des notifications (D8).
+6. **OCR** (D1, D2) — après O3 (fournisseur, coût, contrat) et O2 (rétention des images),
+   derrière le double interrupteur.
+7. **Le reste** — hors-ligne après preuve E2E, Boutique hors périmètre.
+
+Les étapes 1 à 3 ne touchent **aucune table existante** : elles sont livrables même train
+fermé. C'est ce qui rend le produit constructible dès maintenant, sans attendre O1.
 
 Chaque étape est livrable et vérifiable seule. Aucune n'exige la suivante.

@@ -18,11 +18,36 @@
 --
 --  Base d'écriture : 1fc1331842cdf5980b374169994587813bdee7b6
 --  Branche         : audit/elsatia-contact-card-architecture-v1
+--  Révision        : R2 — décisions D1 à D10 de Julien intégrées
 --  Rapport         : docs/audits/ELSATIA-CONTACT-CARD-ARCHITECTURE-AUDIT-REPORT.md
 --
---  DÉCISIONS PRÉALABLES. Les sections E3 à E9 dépendent d'arbitrages de Julien (D2, D3,
---  D4, D9, D10 du rapport). Elles sont laissées en commentaire, non en SQL actif, pour
---  qu'aucune reprise mécanique de ce fichier ne puisse les appliquer par inadvertance.
+--  DÉCISIONS ARBITRÉES (R2). Les sections E3 à E9, laissées en commentaire en R1 faute
+--  d'arbitrage, sont désormais écrites en SQL : Julien a tranché.
+--
+--    D1  OCR au périmètre cible, facultatif et DÉSACTIVABLE PAR ENTREPRISE  -> §E1.f
+--    D2  OCR annoncé, RGPD, confirmation humaine CHAMP PAR CHAMP           -> §E1.c
+--    D3  Aucune création automatique, quelle que soit la confiance          -> contraintes §E1.c/§E1.e
+--    D4  Rôles multiples de tiers (fournisseur ET sous-traitant)            -> §E6
+--    D5  Vivier de candidats distinct des salariés                          -> §E8
+--    D6  Registres partenaires et contacts professionnels généraux          -> §E9
+--    D7  prenom et telephone_mobile sur les contacts clients                -> §E3
+--    D8  Idempotence réelle des notifications, hors created_at              -> §E7
+--    D9  client:propose conservée impérativement                            -> §E1.e
+--    D10 Produit utilisable sans Gestion Pro                                -> §E1.d
+--
+--  RECETTE EXÉCUTÉE. Ce fichier a été appliqué sans erreur sur un conteneur Postgres
+--  JETABLE (supabase/postgres:17.6.1.143), par-dessus les 272 migrations du train, via
+--  /Volumes/ELSATIA-DEV/ELSATIA-STACKS/train-v2-dbtest/harness.sh. Huit invariants ont été
+--  vérifiés par tests négatifs : idempotence des notifications (D8), cumul de rôles (D4),
+--  garde OCR par entreprise (D1), refus du classement sans vérification humaine (D3),
+--  refus du formulaire sans consentement, absence totale de clé étrangère de `candidats`
+--  vers la paie (D5), et refus de toute confirmation OCR non attribuée, champ par champ
+--  comme à la clôture (D2). Le conteneur a été détruit. AUCUNE base réelle n'a été touchée,
+--  et le fait que ce SQL s'applique ne le rend pas intégrable : il reste bloqué par C1.
+--
+--  CE QUI RESTE HORS DE CE FICHIER. E4 (interlocuteurs fournisseur), E5 (mobile et site
+--  sur clients) et E10 (catégorie Boutique) n'ont pas été arbitrés et restent en
+--  commentaire, en fin de fichier.
 -- =====================================================================================
 
 
@@ -300,25 +325,97 @@ create table public.contact_analyses_ocr (
   statut text not null default 'a_confirmer'
     check (statut in ('a_confirmer','confirmee','rejetee','erreur','non_configure')),
 
-  suggestions jsonb not null default '{}'::jsonb check (jsonb_typeof(suggestions) = 'object'),
-  -- Confiance PAR CHAMP, pas une confiance globale : le §5 de la mission exige que
-  -- chaque champ incertain soit signalé, ce qu'une note unique ne permet pas.
-  confiances  jsonb not null default '{}'::jsonb check (jsonb_typeof(confiances)  = 'object'),
   incoherences text[] not null default array[]::text[],
-
   erreur_code text check (erreur_code is null or length(erreur_code) <= 80),
+
+  -- Trace brute du fournisseur, à des fins de diagnostic. Ce n'est PAS la source des
+  -- valeurs reprises : celles-ci vivent dans contact_analyses_ocr_champs, une ligne par
+  -- champ, chacune avec sa propre confirmation.
+  brut_metadata jsonb not null default '{}'::jsonb check (jsonb_typeof(brut_metadata) = 'object'),
+
+  cloture_par uuid references public.utilisateurs(id) on delete restrict,
+  cloture_at  timestamptz,
+  created_at  timestamptz not null default now(),
+
+  foreign key (carte_recue_id, entreprise_id)
+    references public.contact_cartes_recues(id, entreprise_id) on delete cascade,
+  unique (id, entreprise_id),
+
+  check ((statut = 'confirmee' and cloture_par is not null and cloture_at is not null)
+         or statut <> 'confirmee')
+);
+
+
+-- D2 — CONFIRMATION CHAMP PAR CHAMP.
+--
+-- R1 proposait une confirmation GLOBALE : un `suggestions jsonb` + un `confiances jsonb`
+-- + un unique couple (confirme_par, confirme_at), sur le modèle de colors_analyses_ocr.
+-- Julien a tranché l'inverse, et il a raison : une confirmation globale se réduit en
+-- pratique à un bouton « tout accepter », qui est exactement le geste qui vide la
+-- vérification de son sens. Un champ, une ligne, une décision.
+create table public.contact_analyses_ocr_champs (
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references public.entreprises(id) on delete cascade,
+  analyse_id uuid not null,
+
+  champ text not null check (champ ~ '^[a-z][a-z0-9_]{1,49}$'),
+
+  valeur_suggeree text,
+  confiance numeric(5,2) check (confiance is null or confiance between 0 and 100),
+
+  -- Ce que l'humain retient réellement. NULL = il a écarté le champ.
+  valeur_retenue text,
+  -- 'accepte'  : la suggestion est reprise telle quelle
+  -- 'corrige'  : elle est reprise modifiée
+  -- 'ecarte'   : elle est refusée
+  -- 'en_attente' : personne ne l'a encore regardée — état initial, jamais repris
+  decision text not null default 'en_attente'
+    check (decision in ('en_attente','accepte','corrige','ecarte')),
+
   confirme_par uuid references public.utilisateurs(id) on delete restrict,
   confirme_at  timestamptz,
   created_at   timestamptz not null default now(),
 
-  foreign key (carte_recue_id, entreprise_id)
-    references public.contact_cartes_recues(id, entreprise_id) on delete cascade,
+  foreign key (analyse_id, entreprise_id)
+    references public.contact_analyses_ocr(id, entreprise_id) on delete cascade,
+  unique (analyse_id, champ),
 
-  -- LA contrainte du produit : une analyse ne peut pas se dire confirmée sans dire par
-  -- qui et quand. Copiée de colors_analyses_ocr.
-  check ((statut = 'confirmee' and confirme_par is not null and confirme_at is not null)
-         or statut <> 'confirmee')
+  -- Toute décision autre que « en_attente » est attribuable et datée. C'est la traduction
+  -- littérale de D2 : la confirmation humaine est exigée CHAMP PAR CHAMP, et la base le
+  -- vérifie au lieu de faire confiance à l'interface.
+  check (decision = 'en_attente'
+         or (confirme_par is not null and confirme_at is not null)),
+  -- Un champ accepté ou corrigé porte une valeur ; un champ écarté n'en porte pas.
+  check ((decision in ('accepte','corrige') and valeur_retenue is not null)
+         or decision not in ('accepte','corrige')),
+  check (decision <> 'ecarte' or valeur_retenue is null)
 );
+
+create index contact_analyses_ocr_champs_analyse_idx
+  on public.contact_analyses_ocr_champs (analyse_id, decision);
+
+-- Une analyse ne peut pas se clore tant qu'un champ reste « en_attente ». Écrit en
+-- trigger et non en check, parce que l'invariant porte sur une AUTRE table que celle
+-- dont on modifie la ligne.
+create or replace function public.contact_analyse_cloture_complete()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  if new.statut = 'confirmee' and exists (
+    select 1 from public.contact_analyses_ocr_champs c
+    where c.analyse_id = new.id and c.decision = 'en_attente'
+  ) then
+    raise exception
+      'Analyse %: confirmation impossible, des champs restent à vérifier individuellement',
+      new.id;
+  end if;
+  return new;
+end; $$;
+
+create trigger contact_analyse_cloture_complete_trg
+  before update on public.contact_analyses_ocr
+  for each row execute function public.contact_analyse_cloture_complete();
+
+revoke all on function public.contact_analyse_cloture_complete() from public, anon, authenticated;
 
 
 -- =====================================================================================
@@ -402,13 +499,15 @@ create table public.contact_propositions_gp (
   -- créer de neuf. Patron : reserves_notifications_envois.cle_idempotence (20260907000270).
   cle_idempotence text not null unique check (length(cle_idempotence) between 8 and 200),
 
-  -- Seules destinations qui EXISTENT réellement dans Gestion Pro. « partenaire »,
-  -- « candidat » et « contact général » sont volontairement absents : leurs modèles
-  -- cibles n'existent pas (décisions D3 et D4). Les inscrire ici laisserait croire
-  -- qu'une destination attend, ce qui est faux.
-  destination text not null check (destination in ('client','fournisseur')),
-  -- Reporté sur fournisseurs.type_tiers, qui est exclusif (20260718000111).
-  sous_type text check (sous_type is null or sous_type in ('fournisseur','sous_traitant')),
+  -- Les cinq destinations retenues après arbitrage. « partenaire », « candidat » et
+  -- « contact_general » y entrent parce que D5 et D6 créent leurs registres (§E8, §E9) ;
+  -- en R1 elles étaient absentes, faute de modèle cible.
+  destination text not null check (destination in
+    ('client','fournisseur','partenaire','candidat','contact_general')),
+
+  -- D4 : plusieurs rôles, pas un seul. Un tiers peut être proposé à la fois comme
+  -- fournisseur et comme sous-traitant, en UNE proposition et UNE fiche.
+  roles text[] not null default array[]::text[],
 
   operation text not null default 'create' check (operation in ('create','update')),
   statut text not null default 'en_attente'
@@ -431,9 +530,61 @@ create table public.contact_propositions_gp (
   foreign key (carnet_id, entreprise_id)
     references public.contact_carnet(id, entreprise_id) on delete cascade,
 
-  check (destination <> 'fournisseur' or sous_type is not null),
+  check (destination <> 'fournisseur' or cardinality(roles) > 0),
+  check (roles <@ array['fournisseur','sous_traitant']::text[]),
   check (statut <> 'acceptee' or (objet_cible_id is not null and traitee_at is not null)),
-  check (statut <> 'conflit'  or conflit_type is not null)
+  check (statut <> 'conflit'  or conflit_type is not null),
+
+  -- D5 — GARDE-FOU EXPLICITE. Une proposition de candidat ne peut viser que le vivier.
+  -- Elle ne porte aucun identifiant de salarié, et le modèle ne lui offre aucun chemin
+  -- vers public.employes : il n'existe aucune clé étrangère de candidats vers employes.
+  check (destination <> 'candidat' or operation = 'create')
+);
+
+
+-- =====================================================================================
+--  E1.f — Paramètres par entreprise (D1)
+--
+--  L'OCR entre au périmètre cible, mais il doit rester FACULTATIF et DÉSACTIVABLE PAR
+--  ENTREPRISE. Deux interrupteurs indépendants, tous deux fail-closed :
+--
+--    plateforme : FEATURE_AI_ENABLED (src/lib/preview-features.ts, iaEstActive())
+--    entreprise : contact_parametres.ocr_actif, ci-dessous, FAUX par défaut
+--
+--  Les deux doivent être vrais pour qu'une seule image parte. Une entreprise qui refuse
+--  que les photos de ses cartes soient envoyées à un tiers coupe l'OCR sans perdre le
+--  produit : la saisie manuelle reste un parcours complet.
+-- =====================================================================================
+
+create table public.contact_parametres (
+  entreprise_id uuid primary key references public.entreprises(id) on delete cascade,
+
+  -- Faux par défaut, délibérément. Activer un traitement qui envoie des images chez un
+  -- tiers ne doit jamais être le comportement d'une entreprise qui n'a rien demandé.
+  ocr_actif boolean not null default false,
+  -- Horodatage de l'information donnée à l'entreprise (D2). Sans lui, on ne peut pas
+  -- démontrer que le traitement a été annoncé avant le premier envoi.
+  ocr_information_affichee_at timestamptz,
+  ocr_active_par uuid references public.utilisateurs(id) on delete set null,
+  ocr_active_at  timestamptz,
+
+  -- Rétention des images d'origine. NULL = suppression dès la confirmation humaine.
+  -- La valeur exacte relève de la question ouverte O2 et n'est pas fixée ici.
+  retention_images_jours integer check (retention_images_jours is null
+                                        or retention_images_jours between 0 and 365),
+
+  -- Le versement vers Gestion Pro est optionnel ET révocable (D10). Le couper n'efface
+  -- rien de ce qui a déjà été versé : il arrête les versements futurs.
+  pont_gestion_pro_actif boolean not null default false,
+
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  -- On ne peut pas activer l'OCR sans avoir affiché l'information, ni sans savoir qui
+  -- l'a activé et quand.
+  check (not ocr_actif or (ocr_information_affichee_at is not null
+                           and ocr_active_par is not null
+                           and ocr_active_at is not null))
 );
 
 
@@ -455,10 +606,29 @@ create table public.contact_propositions_gp (
 --                              contact_carte_par_token(), security definer, grant anon
 --    contact_cartes_recues     lecture  : destinataire_id = auth.uid() UNIQUEMENT
 --    contact_analyses_ocr      lecture  : via la carte reçue, même règle
+--    contact_analyses_ocr_champs        : via l'analyse, même règle
 --    contact_carnet            lecture  : proprietaire_id = auth.uid()
 --                                         OU (verse_at is not null
 --                                             AND a_permission(entreprise_id,'acces_carnet_partage'))
 --    contact_propositions_gp   lecture  : a_permission(entreprise_id,'acces_contact_card')
+--    contact_parametres        lecture  : est_membre_actif(entreprise_id)
+--                              écriture : a_permission(entreprise_id,'gerer_cartes_entreprise')
+--                                         — activer l'OCR engage l'entreprise, ce n'est pas
+--                                           un réglage de titulaire
+--
+--  Tables Gestion Pro créées par E6, E8 et E9, sur le patron de leurs voisines :
+--    fournisseurs_roles        lecture  : a_permission(entreprise_id,'acces_sous_traitants')
+--                                         OU a_permission(entreprise_id,'acces_fournisseurs')
+--                              écriture : a_permission(entreprise_id,'gerer_sous_traitants')
+--    candidats                 lecture  : a_permission(entreprise_id,'acces_candidats')
+--                              écriture : a_permission(entreprise_id,'gerer_candidats')
+--    partenaires               lecture  : a_permission(entreprise_id,'acces_partenaires')
+--                              écriture : a_permission(entreprise_id,'gerer_partenaires')
+--    contacts_professionnels   lecture  : a_permission(entreprise_id,'acces_contacts_professionnels')
+--                              écriture : a_permission(entreprise_id,'gerer_contacts_professionnels')
+--    tiers_liens               lecture  : est_membre_actif(entreprise_id)
+--                              écriture : porteur d'un droit de gestion sur AU MOINS UN
+--                                         des deux registres liés
 --
 --  `gerer_cartes_entreprise` donne le droit de RÉVOQUER une carte, jamais celui de LIRE
 --  un carnet. Ces deux droits ne doivent jamais être fusionnés « pour simplifier ».
@@ -466,57 +636,315 @@ create table public.contact_propositions_gp (
 
 
 -- =====================================================================================
---  E3 à E10 — ÉVOLUTIONS SUSPENDUES À DÉCISION
+--  E3 (D7) — Contacts clients : prénom et téléphone mobile
 --
---  Volontairement laissées en commentaire, pour qu'une reprise mécanique de ce fichier
---  ne puisse pas les appliquer. Chacune touche un modèle EXISTANT et partagé.
+--  La table date de 20260710000004 et n'a jamais rejoint le contrat canonique
+--  `ClientContact` de @elsatia/client-contracts, qui définit firstName, lastName,
+--  jobTitle, email, phone, MOBILE, roles[], status et notes.
 --
---  E3 (D9) — contacts_clients est en retard sur ClientContact de @elsatia/client-contracts :
---    alter table public.contacts_clients
---      add column if not exists prenom text,
---      add column if not exists mobile text,
---      add column if not exists notes  text,
---      add column if not exists statut text not null default 'active'
---        check (statut in ('active','inactive'));
---    Sans E3, verser une carte de visite perd le prénom (aggloméré dans `nom`) et le
---    mobile — les deux informations qu'une carte porte toujours.
+--  Julien nomme deux colonnes : `prenom` et `telephone_mobile`. Elles sont ajoutées
+--  telles quelles. `notes` et `statut` complètent l'alignement — sans elles, remplacer un
+--  interlocuteur obligerait à le SUPPRIMER, ce qui effacerait l'historique.
 --
---  E4 — Interlocuteurs fournisseur : il n'existe AUCUNE table équivalente à
---    contacts_clients côté fournisseur, seulement `fournisseurs.contact_nom`, un champ
---    texte unique. Recevoir deux cartes de deux commerciaux du même fournisseur n'a
---    aujourd'hui aucune traduction correcte. Une table `contacts_fournisseurs` sur le
---    modèle de contacts_clients (corrigé par E3) est nécessaire.
+--  Le nom retenu est `telephone_mobile` et non `mobile` : la table porte déjà
+--  `telephone`, et deux colonnes `telephone` / `telephone_mobile` se lisent sans
+--  ambiguïté, là où `telephone` / `mobile` invite à la confusion.
+-- =====================================================================================
+
+alter table public.contacts_clients
+  add column if not exists prenom text,
+  add column if not exists telephone_mobile text,
+  add column if not exists notes text,
+  add column if not exists statut text not null default 'active';
+
+alter table public.contacts_clients drop constraint if exists contacts_clients_statut_check;
+alter table public.contacts_clients add constraint contacts_clients_statut_check
+  check (statut in ('active','inactive')) not valid;
+
+comment on column public.contacts_clients.prenom is
+  'Prénom de l''interlocuteur. Jusqu''ici aggloméré dans `nom`, ce qui faisait perdre le prénom de toute carte de visite versée. Correspond à ClientContact.firstName.';
+comment on column public.contacts_clients.telephone_mobile is
+  'Ligne mobile, distincte de `telephone` (fixe/standard). Correspond à ClientContact.mobile. Une carte de visite porte presque toujours les deux.';
+comment on column public.contacts_clients.statut is
+  'active | inactive. Permet d''archiver un interlocuteur remplacé au lieu de le supprimer — la suppression effacerait l''historique des échanges.';
+
+-- `not valid` : les lignes existantes ne sont pas revalidées. `statut` vient d'être créée
+-- avec un défaut conforme, donc aucune ligne ne peut violer la contrainte aujourd'hui.
+
+
+-- =====================================================================================
+--  E6 (D4) — Rôles multiples de tiers
 --
---  E5 — clients n'a ni mobile ni site Internet, alors que le contrat canonique définit
---    `mobile` et `website`. En V1 ces deux champs restent dans le carnet Contact / Card.
+--  `fournisseurs.type_tiers` (20260718000111) porte un check à valeur UNIQUE, qui interdit
+--  qu'un tiers soit à la fois fournisseur et sous-traitant. Julien tranche le cumul.
 --
---  E6 (D2) — fournisseurs.type_tiers porte un check à valeur UNIQUE :
---    check(type_tiers in ('fournisseur','sous_traitant'))
---    Un tiers ne peut donc pas être fournisseur ET sous-traitant. Le §6 de la mission
---    demande ce cas. Le lever suppose une table de rôles ou un text[], et une reprise de
---    tout le code qui lit type_tiers — ce n'est pas une correction locale.
+--  AMPLEUR MESURÉE AVANT PROPOSITION. `type_tiers` n'est lu qu'à 6 endroits, dans 4
+--  fichiers, et les 6 sont des filtres `.eq()` :
+--      src/app/(app)/fournisseurs/page.tsx:18
+--      src/app/(app)/sous-traitants/page.tsx:18
+--      src/app/(app)/sous-traitants/[id]/page.tsx:20
+--      src/app/actions/sous-traitants.ts:21, 59, 70
+--  Côté SQL, deux migrations seulement le mentionnent (111 et 194).
 --
---  E7 (D10) — l'index censé rendre les notifications uniques ne l'est pas :
+--  LA COLONNE N'EST PAS SUPPRIMÉE ICI, ET C'EST DÉLIBÉRÉ. Trois raisons :
+--    1. c'est elle qui PEUPLE la table de rôles à la reprise — la supprimer d'abord
+--       perdrait l'information ;
+--    2. son check protège encore contre une valeur aberrante tant que les rôles ne sont
+--       pas peuplés ;
+--    3. les 6 lectures doivent être basculées ET VÉRIFIÉES, pas supposées.
+--
+--  Séquence : créer -> peupler -> basculer les 6 lectures -> PUIS retirer la colonne,
+--  dans un lot ultérieur et daté. Un `type_tiers` laissé en place et non maintenu
+--  deviendrait une seconde source de vérité : c'est le seul risque réel de E6, et il se
+--  traite par une date de retrait, pas par un commentaire.
+-- =====================================================================================
+
+create table public.fournisseurs_roles (
+  entreprise_id uuid not null references public.entreprises(id) on delete cascade,
+  fournisseur_id uuid not null,
+  role text not null check (role in ('fournisseur','sous_traitant')),
+  attribue_par uuid references public.utilisateurs(id) on delete set null,
+  created_at timestamptz not null default now(),
+  primary key (entreprise_id, fournisseur_id, role),
+  foreign key (fournisseur_id, entreprise_id)
+    references public.fournisseurs(id, entreprise_id) on delete cascade
+);
+
+create index fournisseurs_roles_par_role_idx on public.fournisseurs_roles (entreprise_id, role);
+
+-- Reprise : chaque tiers existant reçoit le rôle qu'il portait. Idempotente.
+insert into public.fournisseurs_roles (entreprise_id, fournisseur_id, role)
+select f.entreprise_id, f.id, f.type_tiers
+from public.fournisseurs f
+on conflict do nothing;
+
+comment on table public.fournisseurs_roles is
+  'Rôles d''un tiers payable. Remplace fournisseurs.type_tiers comme SOURCE DE VÉRITÉ : un tiers porte autant de lignes que de rôles, donc zéro, un ou deux. La colonne type_tiers subsiste en lecture le temps de basculer les 6 usages applicatifs, puis sera retirée par un lot dédié.';
+
+-- Lecture de transition : les écrans peuvent basculer un par un sans big bang.
+create or replace view public.fournisseurs_avec_roles as
+  select f.*,
+         coalesce(array_agg(r.role order by r.role) filter (where r.role is not null),
+                  array[]::text[]) as roles
+  from public.fournisseurs f
+  left join public.fournisseurs_roles r
+    on r.fournisseur_id = f.id and r.entreprise_id = f.entreprise_id
+  group by f.id;
+
+
+-- =====================================================================================
+--  E7 (D8) — Idempotence réelle des notifications
+--
+--  L'index censé garantir l'unicité ne garantit rien (20260715000081) :
 --      create unique index notifications_evenement_unique
 --        on public.notifications_utilisateurs(utilisateur_id,type,ressource_id,created_at)
---        where ressource_id is not null;                          -- 20260715000081
---    created_at fait partie de la clé : deux insertions à des horodatages différents
---    passent toutes les deux. Le bon patron est cle_idempotence text not null unique
---    (reserves_notifications_envois, 20260907000270). Dette PRÉEXISTANTE, révélée par ce
---    lot mais non introduite par lui.
+--        where ressource_id is not null;
+--  `created_at` fait partie de la clé : deux insertions à des horodatages différents
+--  passent toutes les deux. C'est exactement ce que D8 interdit.
 --
---  E8 (D3) — Vivier de candidats : aucun modèle n'existe. En V1, un candidat reste au
---    carnet Contact / Card et n'atteint JAMAIS public.employes, qui est adossé à la paie.
+--  PORTÉE. Cette correction ne concerne PAS que Contact / Card : elle vaut pour TOUTES
+--  les notifications de Gestion Pro. C'est une dette préexistante, révélée par ce lot et
+--  non introduite par lui. Elle gagnerait à être reprise pour elle-même, sans attendre.
 --
---  E9 (D4) — Rôle « partenaire » : aucun modèle n'existe. clients.type est un type
---    JURIDIQUE (particulier / professionnel / collectivité / syndic / promoteur), pas une
---    relation commerciale : y ajouter « partenaire » mélangerait deux notions.
+--  Le bon patron existe déjà dans le dépôt, et il est récent :
+--  reserves_notifications_envois.cle_idempotence (20260907000270).
+-- =====================================================================================
+
+alter table public.notifications_utilisateurs
+  add column if not exists cle_idempotence text;
+
+alter table public.notifications_utilisateurs
+  drop constraint if exists notifications_cle_idempotence_forme_check;
+alter table public.notifications_utilisateurs
+  add constraint notifications_cle_idempotence_forme_check
+  check (cle_idempotence is null or length(cle_idempotence) between 8 and 200) not valid;
+
+-- Partiel : les notifications historiques n'ont pas de clé et ne doivent pas être
+-- rétroactivement mises en défaut. Seules les nouvelles écritures sont contraintes.
+create unique index if not exists notifications_cle_idempotence_unique
+  on public.notifications_utilisateurs (cle_idempotence)
+  where cle_idempotence is not null;
+
+-- L'ancien index est retiré : le conserver laisserait croire qu'une protection existe.
+drop index if exists public.notifications_evenement_unique;
+
+comment on column public.notifications_utilisateurs.cle_idempotence is
+  'Clé d''idempotence d''une action métier. Construite sur (ressource, type d''événement, destinataire) et JAMAIS sur created_at : rejouer la même action ne doit produire qu''une notification. Remplace notifications_evenement_unique, qui incluait created_at et ne protégeait de rien.';
+
+
+-- =====================================================================================
+--  E8 (D5) — Vivier de candidats, strictement distinct des salariés
 --
---  E10 (D8) — Boutique : la catégorie produit est fermée à quatre valeurs
---    (imprimante_code_barres, plastifieuse, consommable_plastification, etiquette_aimantee,
---    20260724000144) et le catalogue est VIDE — aucun insert into boutique_produits
---    n'existe dans les 272 migrations. Vendre une carte NFC suppose d'étendre ce check.
---    Aucun prix, aucun délai, aucune garantie, aucun stock n'est proposé ici.
+--  Aucun modèle de candidat n'existe dans les 272 migrations. Julien tranche sa création.
+--
+--  L'INVARIANT DU MODÈLE : cette table n'a AUCUNE clé étrangère vers public.employes, ni
+--  vers dossiers_paie_salaries, ni vers profils_paie_employes. Ce n'est pas un oubli,
+--  c'est la garantie. Aucun chemin SQL ne mène d'un candidat à un salarié : le
+--  recrutement effectif est un geste RH manuel, hors de portée de Contact / Card.
+--
+--  Le classement « futur employé » écrit un candidat au statut `propose` — une
+--  PROPOSITION, pas un candidat retenu, et encore moins un salarié.
+-- =====================================================================================
+
+create table public.candidats (
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references public.entreprises(id) on delete cascade,
+
+  prenom text, nom text,
+  email text check (email is null or email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'),
+  telephone text, telephone_mobile text,
+  poste_vise text check (poste_vise is null or length(poste_vise) <= 160),
+  -- Champ LIBRE, volontairement. Un référentiel de métiers du BTP serait un lot en soi,
+  -- et un référentiel incomplet ferait perdre l'information plutôt que la structurer.
+  specialite text check (specialite is null or length(specialite) <= 160),
+  notes text,
+
+  -- `propose` est l'état d'entrée depuis Contact / Card. Les suivants sont des gestes RH.
+  statut text not null default 'propose'
+    check (statut in ('propose','a_rencontrer','rencontre','retenu','ecarte','archive')),
+
+  origine text not null default 'contact_card'
+    check (origine in ('contact_card','candidature_spontanee','recommandation','autre')),
+
+  -- Provenance, à des fins de traçabilité. AUCUN lien vers employes.
+  contact_carnet_id uuid,
+
+  created_by uuid not null default auth.uid() references public.utilisateurs(id) on delete restrict,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+
+  unique (id, entreprise_id),
+  check (num_nonnulls(prenom, nom, email, telephone, telephone_mobile) > 0)
+);
+
+create index candidats_entreprise_idx on public.candidats (entreprise_id, statut, updated_at desc);
+
+comment on table public.candidats is
+  'Vivier de candidats. STRICTEMENT DISTINCT de public.employes : aucune clé étrangère vers employes, dossiers_paie_salaries ou profils_paie_employes. Une carte de visite classée « futur employé » crée ici une ligne au statut `propose`, jamais un salarié, jamais un contrat, jamais une donnée de paie. Le passage au salariat est un geste RH manuel, hors de portée d''ELSATIA Contact / Card.';
+
+insert into public.permissions_disponibles (cle, module, description) values
+  ('acces_candidats', 'Recrutement', 'Consulter le vivier de candidats'),
+  ('gerer_candidats', 'Recrutement', 'Créer et modifier les candidats du vivier')
+on conflict (cle) do update set module = excluded.module, description = excluded.description;
+
+
+-- =====================================================================================
+--  E9 (D6) — Registres partenaires et contacts professionnels généraux
+--
+--  Deux registres délibérément LÉGERS : ils n'émettent aucun document commercial, ne
+--  portent aucune identité légale obligatoire et n'entrent pas dans la facturation. Les
+--  charger des contraintes de `clients` (SIRET, TVA, conditions de paiement) créerait une
+--  friction que rien ne justifie pour un partenaire ou un contact de carnet.
+-- =====================================================================================
+
+create table public.partenaires (
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references public.entreprises(id) on delete cascade,
+
+  nom text not null check (btrim(nom) <> ''),
+  raison_sociale text,
+  type_partenariat text check (type_partenariat is null or length(type_partenariat) <= 120),
+  siret text check (siret is null or siret ~ '^[0-9]{14}$'),
+  email text, telephone text, site_web text,
+  adresse text, code_postal text, ville text,
+  pays text check (pays is null or pays ~ '^[A-Z]{2}$'),
+  notes text,
+  actif boolean not null default true,
+
+  created_by uuid not null default auth.uid() references public.utilisateurs(id) on delete restrict,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (id, entreprise_id)
+);
+
+create table public.contacts_professionnels (
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references public.entreprises(id) on delete cascade,
+
+  prenom text, nom text, fonction text,
+  organisation text,
+  email text, telephone text, telephone_mobile text, site_web text,
+  adresse text, code_postal text, ville text,
+  pays text check (pays is null or pays ~ '^[A-Z]{2}$'),
+  notes text,
+  archive_at timestamptz,
+
+  created_by uuid not null default auth.uid() references public.utilisateurs(id) on delete restrict,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (id, entreprise_id),
+  check (num_nonnulls(prenom, nom, email, telephone, telephone_mobile, organisation) > 0)
+);
+
+-- CUMUL INTER-REGISTRES, SANS FUSION.
+--
+-- Le §6 de la mission cite « client et partenaire » et « ancien salarié et sous-traitant ».
+-- Le modèle « juste » serait un registre unique de tiers dont clients, fournisseurs et
+-- partenaires ne seraient que des rôles — mais c'est un REFACTOR STRUCTUREL de Gestion
+-- Pro, qui ne doit pas être introduit en effet de bord d'un produit de cartes de visite.
+--
+-- Cette table est la réponse minimale et non destructive : elle DÉCLARE que deux fiches
+-- de registres différents désignent la même organisation réelle. Elle ne les fusionne
+-- pas, n'en élit aucune principale, et ne préjuge pas de l'unification future.
+create table public.tiers_liens (
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references public.entreprises(id) on delete cascade,
+
+  registre_a text not null check (registre_a in ('client','fournisseur','partenaire','contact_professionnel','candidat')),
+  objet_a_id uuid not null,
+  registre_b text not null check (registre_b in ('client','fournisseur','partenaire','contact_professionnel','candidat')),
+  objet_b_id uuid not null,
+
+  motif text check (motif is null or length(motif) <= 300),
+  declare_par uuid not null default auth.uid() references public.utilisateurs(id) on delete restrict,
+  created_at timestamptz not null default now(),
+
+  -- Un lien n'a pas de sens orienté : (A,B) et (B,A) sont le même fait. L'index unique
+  -- ci-dessous s'appuie sur une paire ordonnée pour interdire le doublon inverse.
+  check ((registre_a, objet_a_id) <> (registre_b, objet_b_id))
+);
+
+create unique index tiers_liens_paire_unique on public.tiers_liens (
+  entreprise_id,
+  least(registre_a || ':' || objet_a_id::text, registre_b || ':' || objet_b_id::text),
+  greatest(registre_a || ':' || objet_a_id::text, registre_b || ':' || objet_b_id::text)
+);
+
+-- PAS de clé étrangère sur objet_a_id / objet_b_id : elles pointent vers cinq tables
+-- différentes selon le registre. L'intégrité est portée par l'application, et le nettoyage
+-- par une purge périodique des liens orphelins. C'est le compromis assumé d'un lien
+-- polymorphe ; l'alternative — cinq tables de liens — serait pire à lire et à maintenir.
+
+insert into public.permissions_disponibles (cle, module, description) values
+  ('acces_partenaires', 'Partenaires', 'Consulter les partenaires de l''entreprise'),
+  ('gerer_partenaires', 'Partenaires', 'Créer et modifier les partenaires'),
+  ('acces_contacts_professionnels', 'Carnet professionnel', 'Consulter le carnet professionnel de l''entreprise'),
+  ('gerer_contacts_professionnels', 'Carnet professionnel', 'Créer et modifier les contacts du carnet professionnel')
+on conflict (cle) do update set module = excluded.module, description = excluded.description;
+
+
+-- =====================================================================================
+--  E4, E5, E10 — NON ARBITRÉES, laissées en commentaire
+--
+--  E4 — Interlocuteurs fournisseur. Il n'existe AUCUNE table équivalente à
+--    contacts_clients côté fournisseur, seulement `fournisseurs.contact_nom`, un champ
+--    texte unique. Recevoir deux cartes de deux commerciaux du même fournisseur n'a
+--    aujourd'hui aucune traduction correcte : soit on écrase contact_nom, soit on crée un
+--    second fournisseur — les deux sont faux. Une table `contacts_fournisseurs` sur le
+--    modèle de contacts_clients (corrigé par E3) reste nécessaire.
+--    En attendant : Contact / Card n'écrase rien, et conserve le second interlocuteur
+--    dans son carnet.
+--
+--  E5 — clients n'a ni mobile ni site Internet, alors que le contrat canonique définit
+--    `mobile` et `website`. Ces deux champs restent dans le carnet Contact / Card et ne
+--    sont pas versés. Symétrique de E3, qui ne portait que sur contacts_clients.
+--
+--  E10 — Boutique. La catégorie produit est fermée à quatre valeurs
+--    (imprimante_code_barres, plastifieuse, consommable_plastification,
+--    etiquette_aimantee — 20260724000144) et le catalogue est VIDE : aucun
+--    `insert into boutique_produits` n'existe dans les 272 migrations. Vendre une carte
+--    NFC suppose d'étendre ce check. Aucun prix, aucun délai, aucune garantie, aucun
+--    stock n'est proposé ici.
 -- =====================================================================================
 
 --                    NON INTÉGRÉ — BLOQUÉ PAR LE TRAIN GLOBAL
