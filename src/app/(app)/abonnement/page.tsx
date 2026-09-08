@@ -170,7 +170,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
     : null;
 
   return <main className="p-4 sm:p-8"><div className="mx-auto max-w-5xl space-y-6">
-    <header><h1 className="text-xl font-semibold">Mon abonnement {PRODUCT_NAME}</h1><p className="text-sm text-neutral-500">Offre, moyen de paiement, échéances et factures de votre entreprise.</p></header>
+    <header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-xl font-semibold">Mon abonnement {PRODUCT_NAME}</h1><p className="text-sm text-neutral-500">Offre, moyen de paiement, échéances et factures de votre entreprise.</p></div><Link href="/abonnement/configurateur" className="rounded-md border px-3 py-2 text-sm font-medium">Configurer mon abonnement</Link></header>
     {ctx.essaiExpireSansOffre&&<div className="rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200">
       <p className="font-semibold">Votre essai gratuit de 30 jours est terminé.</p>
       <p className="mt-1">Les fonctionnalités métier de {PRODUCT_NAME} sont bloquées tant qu’aucune offre n’est choisie. Vos données sont conservées intégralement et seront immédiatement disponibles après souscription.</p>
