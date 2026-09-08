@@ -638,7 +638,8 @@ réexporte, son API publique est inchangée.
 | Branche | `feat/gp-subscriptions-modules-discounts-canonical-v1` |
 | Base | `1fc1331842cdf5980b374169994587813bdee7b6` |
 | SHA du contenu | `7d9a1ea427688cfcce4b2ee9ce828e1f0c5a5946` — `feat(commercial)`, tout le code, les tests et le SQL proposé |
-| SHA final | le commit qui ajoute ce rapport ; `git rev-parse origin/feat/gp-subscriptions-modules-discounts-canonical-v1` |
+| SHA du rapport | `9344167ea1e6ba867d55f92803d135f0140cd40d` — `docs(commercial)` |
+| SHA final | le commit ci-dessous, qui consigne ces valeurs ; `git rev-parse origin/feat/gp-subscriptions-modules-discounts-canonical-v1` |
 
 Poussée sur `origin`. **Aucune fusion, aucun déploiement.**
 
