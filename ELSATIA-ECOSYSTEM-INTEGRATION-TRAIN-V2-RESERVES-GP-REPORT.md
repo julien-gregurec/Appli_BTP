@@ -26,7 +26,7 @@ machine au repos est exigée avant de lever la réserve (§10, P1).
 |---|---|
 | Branche d'intégration | `integration/elsatia-train-v2-reserves-gp-isole-v1` |
 | SHA de base (train global) | `4f1f17044a38beba3b09e6937b2f8f626a8d87e0` |
-| SHA final complet poussé | *voir §11* |
+| SHA final complet poussé | `80093c29726693e4fdc959d83d9b15b74c797d5f` (rapport) — code : `0fda7d2` |
 
 **Sources intégrées**
 
