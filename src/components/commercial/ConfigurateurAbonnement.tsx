@@ -125,7 +125,7 @@ export function ConfigurateurAbonnement({
             className="w-24 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
           />
           <span className="text-sm text-neutral-500">
-            {offre.comptesInclus} incluses · au-delà {formatCentimes(Math.round(offre.parCompteSup * 100))} / personne / mois
+            {offre.comptesInclus} incluses · au-delà, le tarif suit le rôle du compte (terrain 5 € · chef d’équipe 9 € · administratif 15 € · expert-comptable gratuit)
           </span>
         </div>
         <p className="mt-3 text-xs text-neutral-500">

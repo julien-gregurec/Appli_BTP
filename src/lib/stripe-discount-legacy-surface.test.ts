@@ -20,5 +20,9 @@ describe("surface cliente des anciennes RPC de remise", () => {
       .filter((chemin) => RPC_LEGACY.test(readFileSync(chemin, "utf8")))
       .map((chemin) => relative(process.cwd(), chemin));
     expect(appels).toEqual([]);
-  });
+    // Budget PROPRE à ce test, et non hausse du plafond global : il lit
+    // l'intégralité de `src/` de façon synchrone, et le Train V3 y a ajouté le
+    // moteur commercial, l'annuaire plateforme et l'assistance interapplications.
+    // Le dépassement mesuré était une taille d'arborescence, jamais un appel legacy.
+  }, 30_000);
 });

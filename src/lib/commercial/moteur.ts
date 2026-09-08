@@ -111,10 +111,19 @@ export function construireLignes(configuration: ConfigurationAbonnement): {
     statutPrix: "valide",
   });
 
-  // 2. Comptes — deux modèles, jamais mélangés
+  // 2. Comptes — deux générations, jamais mélangées, une seule vendable
   const modele = configuration.modeleComptes ?? MODELE_COMPTES_PAR_DEFAUT;
   const facteurComptes = multiplicateur("comptes", periodicite);
   if (modele === "capacite_personnes") {
+    // Génération RETIRÉE de la vente (COMPTES-PAR-FORFAIT-2026-07) : le prix ne
+    // dépendait pas du rôle réel du compte. Elle reste calculable pour honorer un
+    // contrat souscrit sous elle ; elle ne peut plus en fonder un nouveau.
+    avertissements.push(
+      "Génération de comptes retirée de la vente : le prix par forfait « personne active » "
+      + "n'est conservé que pour les contrats souscrits sous cette génération. Un nouveau "
+      + "contrat doit utiliser la grille par rôle (terrain, chef d’équipe, administratif, "
+      + "expert-comptable).",
+    );
     const voulues = Math.max(0, Math.trunc(configuration.personnesActives ?? offre.comptesInclus));
     const supplementaires = Math.max(0, voulues - offre.comptesInclus);
     if (supplementaires > 0) {
@@ -158,10 +167,6 @@ export function construireLignes(configuration: ConfigurationAbonnement): {
         statutPrix: type.statutPrix,
       });
     }
-    avertissements.push(
-      "Modèle « prix par type de compte » : ces montants ne sont facturés par aucun Price Stripe "
-      + "et ne sont pas distingués en base. Modèle divergent, à arbitrer avant toute vente.",
-    );
   }
 
   // 3. Modules optionnels

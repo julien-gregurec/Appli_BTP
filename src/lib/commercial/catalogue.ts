@@ -3,6 +3,7 @@ import {
   OPTIONS_TARIFAIRES,
   SERVICES_MISE_EN_SERVICE,
   offreTarifaireParCle,
+  tarifCompteSupplementaireHistoriqueCentimes,
   type CodeOffreTarifaire,
   type OffreTarifaire,
   type PeriodiciteAbonnement,
@@ -44,8 +45,8 @@ export type Devise = "eur";
 export const DEVISE: Devise = "eur";
 
 /** Version du catalogue commercial, distincte de la version de la grille publique. */
-export const VERSION_CATALOGUE_COMMERCIAL = "GP-COMMERCIAL-V1-2026-09";
-export const VERSION_GRILLE_PUBLIQUE = "CANONICAL-V3-2026-09";
+export const VERSION_CATALOGUE_COMMERCIAL = "GP-COMMERCIAL-V2-2026-09";
+export const VERSION_GRILLE_PUBLIQUE = "CANONICAL-V4-2026-09";
 
 export type CodeForfaitVendable = "mini" | "pro" | "business" | "entreprise";
 export const FORFAITS_VENDABLES: readonly CodeForfaitVendable[] = ["mini", "pro", "business", "entreprise"] as const;
@@ -62,19 +63,21 @@ export type { CodeOffreTarifaire, OffreTarifaire, PeriodiciteAbonnement };
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * « ANNUEL = 10 × MENSUEL — 2 mois offerts » est la règle CANONIQUE du forfait,
- * figée par `tarification.test.ts` et par `verify:stripe-prices`.
+ * « ANNUEL = 10 × MENSUEL — 2 mois offerts ».
  *
- * Elle n'a jamais été tranchée pour les LIGNES OPTIONNELLES : le dépôt contient
- * aujourd'hui deux comportements contradictoires —
- *   - `plateforme.prixAbonnementMensuel` : `totalAnnuel = prixAnnuelFixe + sup × parCompteSup × 12`
- *   - `tarification.calculerTarifAbonnement` : `optionsPeriode = optionsMensuelles × 12`
- * soit ×12 pour les options alors que le forfait est à ×10.
+ * La règle était canonique pour le FORFAIT, mais était restée ouverte pour les
+ * lignes optionnelles : le dépôt portait deux comportements contradictoires
+ * (×12 pour les options, ×10 pour le forfait), ce que le moteur reproduisait
+ * par prudence plutôt que par décision.
  *
- * Le moteur reproduit l'état actuel par défaut (×12) pour ne pas modifier
- * silencieusement une facturation existante, et expose la valeur recommandée
- * (×10, cohérente avec la promesse publique « 2 mois offerts ») comme une
- * décision à prendre — cf. §11 du rapport et `MULTIPLICATEURS_ANNUELS`.
+ * Le Train V3 ferme l'arbitrage dans le sens de la grille V4 : TOUT élément
+ * RÉCURRENT annuel vaut dix mensualités — forfait, compte supplémentaire,
+ * module, stockage, IA intensive, et toute option récurrente future. La
+ * promesse publique « 2 mois offerts » vaut donc pour la totalité de
+ * l'abonnement, et non pour son seul forfait.
+ *
+ * Un ACHAT PONCTUEL (pack de crédits IA, prestation) n'est jamais multiplié :
+ * il ne se renouvelle pas, il n'a pas de version annuelle. D'où `prestation: 1`.
  */
 export const MULTIPLICATEUR_ANNUEL_FORFAIT = 10;
 
@@ -82,39 +85,48 @@ export type FamilleLigne = "forfait" | "comptes" | "modules" | "stockage" | "ia"
 
 export const MULTIPLICATEURS_ANNUELS: Record<FamilleLigne, { valeur: number; statut: StatutPrix; recommande: number }> = {
   forfait: { valeur: 10, statut: "valide", recommande: 10 },
-  comptes: { valeur: 12, statut: "divergent", recommande: 10 },
-  modules: { valeur: 10, statut: "recommande", recommande: 10 },
-  stockage: { valeur: 12, statut: "divergent", recommande: 10 },
-  ia: { valeur: 12, statut: "divergent", recommande: 10 },
+  comptes: { valeur: 10, statut: "valide", recommande: 10 },
+  modules: { valeur: 10, statut: "valide", recommande: 10 },
+  stockage: { valeur: 10, statut: "valide", recommande: 10 },
+  ia: { valeur: 10, statut: "valide", recommande: 10 },
   prestation: { valeur: 1, statut: "valide", recommande: 1 },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2. Comptes et salariés — DEUX MODÈLES COEXISTANTS, aucun choisi arbitrairement
+// 2. Comptes et salariés — DEUX GÉNÉRATIONS, UNE SEULE VENDABLE
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * §4 du lot. Le dépôt porte deux modèles incompatibles de facturation des accès :
+ * Le dépôt a longtemps porté deux modèles de facturation des accès sans qu'aucun
+ * soit tranché. Le Train V3 ferme cet arbitrage en reprenant la décision V4
+ * (`src/lib/tarification.ts`, `COMPTES_SUPPLEMENTAIRES`) : le prix suit le RÔLE
+ * réel du compte, jamais le forfait souscrit. Les deux modèles restent calculables,
+ * mais ils ne sont plus équivalents — ce sont désormais deux GÉNÉRATIONS :
  *
- * A. `capacite_personnes` — prix PLAT par « personne active » et par forfait
- *    (Mini 15 € · Pro 12 € · Business 9 € · Entreprise 9 €). C'est le modèle
- *    RÉELLEMENT IMPLÉMENTÉ de bout en bout : `tarification.canonical.json`,
- *    `OffreTarifaire.parCompteSup`, migration 20260903000256 (trigger de
- *    capacité), Price Stripe `STRIPE_PRICE_COMPTE_SUP_*`, page `/abonnement`.
+ * A. `capacite_personnes` — prix plat par « personne active » et par forfait
+ *    (Mini 15 € · Pro 12 € · Business 9 € · Entreprise 9 €). C'est la génération
+ *    `COMPTES-PAR-FORFAIT-2026-07`, RETIRÉE de la vente : le prix ne dépendait pas
+ *    du rôle réel du compte. Elle reste calculable pour honorer les contrats
+ *    souscrits sous elle — et pour rien d'autre.
+ *    → `selectionnablePourNouveauContrat: false`.
+ *
+ * B. `par_type_de_compte` — prix par rôle (terrain 5 € · chef d'équipe 9 €
+ *    · administratif 15 € · expert-comptable 0 €). C'est la génération COURANTE
+ *    `COMPTES-PAR-ROLE-2026-09`, seule vendable, arbitrée par la grille V4.
  *    → statut `valide`.
  *
- * B. `par_type_de_compte` — prix par RÔLE (terrain 5 € · chef d'équipe 9 € ·
- *    administratif 15 € · expert-comptable 0 €). Présent uniquement de façon
- *    DÉCLARATIVE dans `OPTIONS_TARIFAIRES`, plus des constantes dupliquées en
- *    dur dans `calculerTarifAbonnement`. Rien côté base ni côté Stripe ne
- *    distingue un compte terrain d'un compte administratif.
- *    → statut `divergent` : c'est le modèle demandé au §4 du lot, mais il n'est
- *      pas encore une décision actée ni une capacité technique.
- *
- * Le moteur sait calculer les deux. Le défaut reste A (l'existant facturé).
+ * Le défaut du moteur est donc B : un devis établi sans précision porte la
+ * génération vendable, jamais la génération retirée.
  */
 export type ModeleComptes = "capacite_personnes" | "par_type_de_compte";
-export const MODELE_COMPTES_PAR_DEFAUT: ModeleComptes = "capacite_personnes";
+export const MODELE_COMPTES_PAR_DEFAUT: ModeleComptes = "par_type_de_compte";
+
+/** La génération retirée ne peut plus fonder un nouveau contrat. */
+export const MODELES_COMPTES_VENDABLES: readonly ModeleComptes[] = ["par_type_de_compte"] as const;
+
+export function modeleComptesVendable(modele: ModeleComptes): boolean {
+  return MODELES_COMPTES_VENDABLES.includes(modele);
+}
 
 export type TypeCompte = "terrain" | "chef_equipe" | "administratif" | "expert_comptable";
 
@@ -123,7 +135,7 @@ export type DefinitionTypeCompte = {
   nom: string;
   /** Peut se connecter à l'application. Un salarié sans compte ne coûte rien. */
   connexion: boolean;
-  /** Compte facturé au titre de la capacité « personnes actives » (modèle A). */
+  /** Compte facturé au titre de la capacité « personnes actives » (génération retirée). */
   compteDansCapacite: boolean;
   prixMensuelCentimes: number;
   statutPrix: StatutPrix;
@@ -131,8 +143,9 @@ export type DefinitionTypeCompte = {
 };
 
 /**
- * Modèle B — prix par type de compte. Repris à l'identique d'`OPTIONS_TARIFAIRES`
- * (aucun montant modifié ici : §4 « ne pas les modifier arbitrairement »).
+ * Génération COURANTE — prix par rôle. Les montants sont ceux de la grille V4
+ * (`COMPTES_SUPPLEMENTAIRES_PAR_ROLE`), et sont vérifiés contre elle par test :
+ * ce fichier ne redéclare pas une vérité concurrente, il la reprend.
  */
 export const TYPES_COMPTE: readonly DefinitionTypeCompte[] = [
   {
@@ -141,8 +154,8 @@ export const TYPES_COMPTE: readonly DefinitionTypeCompte[] = [
     connexion: true,
     compteDansCapacite: true,
     prixMensuelCentimes: 500,
-    statutPrix: "divergent",
-    origine: "OPTIONS_TARIFAIRES.compte_terrain — jamais facturé (aucun Price Stripe, aucune distinction en base)",
+    statutPrix: "valide",
+    origine: "Grille V4 — COMPTES_SUPPLEMENTAIRES_PAR_ROLE.terrain (5 € HT/mois, plancher public)",
   },
   {
     cle: "chef_equipe",
@@ -150,8 +163,8 @@ export const TYPES_COMPTE: readonly DefinitionTypeCompte[] = [
     connexion: true,
     compteDansCapacite: true,
     prixMensuelCentimes: 900,
-    statutPrix: "divergent",
-    origine: "OPTIONS_TARIFAIRES.compte_chef_equipe — idem",
+    statutPrix: "valide",
+    origine: "Grille V4 — COMPTES_SUPPLEMENTAIRES_PAR_ROLE.chef_equipe (9 € HT/mois, plancher public)",
   },
   {
     cle: "administratif",
@@ -159,8 +172,8 @@ export const TYPES_COMPTE: readonly DefinitionTypeCompte[] = [
     connexion: true,
     compteDansCapacite: true,
     prixMensuelCentimes: 1_500,
-    statutPrix: "divergent",
-    origine: "OPTIONS_TARIFAIRES.compte_administratif — idem ; égale par coïncidence le parCompteSup Mini (15 €)",
+    statutPrix: "valide",
+    origine: "Grille V4 — COMPTES_SUPPLEMENTAIRES_PAR_ROLE.administratif (15 € HT/mois, plancher public)",
   },
   {
     cle: "expert_comptable",
@@ -168,8 +181,8 @@ export const TYPES_COMPTE: readonly DefinitionTypeCompte[] = [
     connexion: true,
     compteDansCapacite: false,
     prixMensuelCentimes: 0,
-    statutPrix: "recommande",
-    origine: "OPTIONS_TARIFAIRES.expert_comptable — gratuit, hors capacité facturée (intervenant externe)",
+    statutPrix: "valide",
+    origine: "Grille V4 — COMPTES_SUPPLEMENTAIRES_PAR_ROLE.expert_comptable (gratuit, hors capacité facturée)",
   },
 ] as const;
 
@@ -177,9 +190,14 @@ export function typeCompteParCle(cle: string): DefinitionTypeCompte | null {
   return TYPES_COMPTE.find((type) => type.cle === cle) ?? null;
 }
 
-/** Modèle A — prix plat de la personne active supplémentaire, par forfait. */
+/**
+ * Génération RETIRÉE — prix plat de la personne active supplémentaire, par
+ * forfait. Ne sert plus qu'à honorer un contrat souscrit sous cette génération :
+ * un nouveau contrat passe par `TYPES_COMPTE` (prix par rôle). La valeur vient
+ * de la grille V4, qui conserve la table historique — elle n'est pas redéclarée ici.
+ */
 export function prixPersonneSupplementaireCentimes(forfait: CodeOffreTarifaire): number {
-  return Math.round(offreTarifaireParCle(forfait).parCompteSup * 100);
+  return tarifCompteSupplementaireHistoriqueCentimes(forfait);
 }
 
 /**

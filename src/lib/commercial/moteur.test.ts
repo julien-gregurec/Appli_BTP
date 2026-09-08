@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   BLOC_STOCKAGE,
+  MODELE_COMPTES_PAR_DEFAUT,
   MODULES_COMMERCIAUX,
   MULTIPLICATEURS_ANNUELS,
   OFFRES_TARIFAIRES,
   TYPES_COMPTE,
   moduleCommercialParCle,
+  modeleComptesVendable,
   offreTarifaireParCle,
   prixModuleCentimes,
   prixPersonneSupplementaireCentimes,
@@ -63,8 +65,14 @@ describe("catalogue commercial", () => {
     for (const type of TYPES_COMPTE) expect(type.prixMensuelCentimes).toBe(attendu[type.cle]);
   });
 
-  it("marque comme divergent le modèle par type de compte, non facturé aujourd'hui", () => {
-    expect(TYPES_COMPTE.find((t) => t.cle === "terrain")?.statutPrix).toBe("divergent");
+  it("acte la grille par rôle comme génération vendable, et garde l'ancienne pour les contrats en cours", () => {
+    // Arbitrage V4 : le prix suit le rôle du compte. Ces montants ne sont plus
+    // « divergents » — ils sont la grille.
+    for (const type of TYPES_COMPTE) expect(type.statutPrix).toBe("valide");
+    expect(MODELE_COMPTES_PAR_DEFAUT).toBe("par_type_de_compte");
+    expect(modeleComptesVendable("par_type_de_compte")).toBe(true);
+    expect(modeleComptesVendable("capacite_personnes")).toBe(false);
+    // La génération retirée reste lisible, aux montants sous lesquels elle a été souscrite.
     expect(prixPersonneSupplementaireCentimes("mini")).toBe(1_500);
     expect(prixPersonneSupplementaireCentimes("pro")).toBe(1_200);
     expect(prixPersonneSupplementaireCentimes("business")).toBe(900);
@@ -85,35 +93,57 @@ describe("comptes et salariés", () => {
   });
 
   it("Mini avec cinq salariés mais seulement trois comptes ne facture rien de plus", () => {
-    // Cinq fiches employés, trois comptes applicatifs ouverts : la capacité
-    // facturée compte les PERSONNES ACTIVES, pas les fiches.
-    const calcul = calculerAbonnement({ ...MINI, personnesActives: 3 });
+    // Cinq fiches employés, trois comptes applicatifs ouverts : seuls les comptes
+    // supplémentaires réellement ouverts sont facturés, jamais les fiches.
+    const calcul = calculerAbonnement({ ...MINI, comptesSupplementaires: {} });
     expect(calcul.totalHtCentimes).toBe(7_900);
   });
 
-  it("Mini avec cinq comptes ajoute deux personnes supplémentaires", () => {
-    const calcul = calculerAbonnement({ ...MINI, personnesActives: 5 });
-    expect(calcul.totalHtCentimes).toBe(7_900 + 2 * 1_500);
+  it("Mini avec deux comptes terrain supplémentaires les facture au tarif du rôle", () => {
+    const calcul = calculerAbonnement({ ...MINI, comptesSupplementaires: { terrain: 2 } });
+    expect(calcul.totalHtCentimes).toBe(7_900 + 2 * 500);
     const ligne = calcul.lignes.find((l) => l.famille === "comptes");
     expect(ligne?.quantite).toBe(2);
-    expect(ligne?.prixUnitaireMensuelCentimes).toBe(1_500);
+    expect(ligne?.prixUnitaireMensuelCentimes).toBe(500);
   });
 
-  it("n'oblige jamais à passer sur Pro à cause du nombre de personnes", () => {
-    const cinqPersonnes = calculerAbonnement({ ...MINI, personnesActives: 5 });
-    const pro = calculerAbonnement({ forfait: "pro", periodicite: "mensuel", personnesActives: 5 });
-    expect(cinqPersonnes.totalHtCentimes).toBe(10_900);
-    expect(cinqPersonnes.totalHtCentimes).toBeLessThan(pro.totalHtCentimes);
+  it("facture le même rôle au même prix quel que soit le forfait souscrit", () => {
+    // C'est tout l'objet de l'arbitrage V4 : un compte terrain vaut 5 €, que
+    // l'entreprise soit en Mini ou en Business.
+    const mini = calculerAbonnement({ ...MINI, comptesSupplementaires: { terrain: 2 } });
+    const business = calculerAbonnement({
+      forfait: "business", periodicite: "mensuel", comptesSupplementaires: { terrain: 2 },
+    });
+    const ligneMini = mini.lignes.find((l) => l.famille === "comptes");
+    const ligneBusiness = business.lignes.find((l) => l.famille === "comptes");
+    expect(ligneMini?.prixUnitaireMensuelCentimes).toBe(ligneBusiness?.prixUnitaireMensuelCentimes);
   });
 
-  it("sait aussi calculer le modèle par type de compte, en le signalant comme divergent", () => {
+  it("n'oblige jamais à passer sur Pro à cause du nombre de comptes", () => {
+    const cinqComptes = calculerAbonnement({ ...MINI, comptesSupplementaires: { terrain: 2 } });
+    const pro = calculerAbonnement({
+      forfait: "pro", periodicite: "mensuel", comptesSupplementaires: { terrain: 2 },
+    });
+    expect(cinqComptes.totalHtCentimes).toBe(8_900);
+    expect(cinqComptes.totalHtCentimes).toBeLessThan(pro.totalHtCentimes);
+  });
+
+  it("calcule encore la génération retirée, en disant qu'elle ne fonde plus de contrat", () => {
     const calcul = calculerAbonnement({
       ...MINI,
-      modeleComptes: "par_type_de_compte",
+      modeleComptes: "capacite_personnes",
+      personnesActives: 5,
+    });
+    expect(calcul.totalHtCentimes).toBe(7_900 + 2 * 1_500);
+    expect(calcul.avertissements.join(" ")).toContain("retirée de la vente");
+  });
+
+  it("additionne les rôles d'une configuration mixte, l'expert-comptable restant gratuit", () => {
+    const calcul = calculerAbonnement({
+      ...MINI,
       comptesSupplementaires: { terrain: 2, chef_equipe: 1, expert_comptable: 1 },
     });
     expect(calcul.totalHtCentimes).toBe(7_900 + 2 * 500 + 900);
-    expect(calcul.avertissements.join(" ")).toContain("divergent");
   });
 
   it("ne facture jamais l'accès expert-comptable", () => {
@@ -192,12 +222,18 @@ describe("mensuel et annuel", () => {
     expect(economie.economieCentimes).toBe(15_800);
   });
 
-  it("documente le multiplicateur divergent des lignes optionnelles", () => {
-    // État actuel du dépôt : options ×12 alors que le forfait est ×10.
-    const annuel = calculerAbonnement({ ...MINI, periodicite: "annuel", personnesActives: 5 });
-    expect(annuel.totalHtCentimes).toBe(79_000 + 2 * 1_500 * 12);
-    expect(MULTIPLICATEURS_ANNUELS.comptes.statut).toBe("divergent");
-    expect(MULTIPLICATEURS_ANNUELS.comptes.recommande).toBe(10);
+  it("applique dix mensualités à TOUTE ligne récurrente, pas au seul forfait", () => {
+    // Arbitrage V4 : « 2 mois offerts » vaut pour l'abonnement entier.
+    const annuel = calculerAbonnement({
+      ...MINI, periodicite: "annuel", comptesSupplementaires: { terrain: 2 },
+    });
+    expect(annuel.totalHtCentimes).toBe(79_000 + 2 * 500 * 10);
+    for (const famille of ["forfait", "comptes", "modules", "stockage", "ia"] as const) {
+      expect(MULTIPLICATEURS_ANNUELS[famille].valeur).toBe(10);
+      expect(MULTIPLICATEURS_ANNUELS[famille].statut).toBe("valide");
+    }
+    // Un achat ponctuel n'est jamais multiplié : il ne se renouvelle pas.
+    expect(MULTIPLICATEURS_ANNUELS.prestation.valeur).toBe(1);
   });
 });
 
@@ -230,14 +266,17 @@ describe("HT, TVA, TTC et arrondis", () => {
   });
 
   it("répartit une remise globale au prorata, à la somme exacte", () => {
-    const configuration: ConfigurationAbonnement = { ...MINI, personnesActives: 5, modules: ["stock"] };
+    const configuration: ConfigurationAbonnement = {
+      ...MINI, comptesSupplementaires: { terrain: 2 }, modules: ["stock"],
+    };
     const calcul = calculerAbonnement(configuration, {
       date: "2026-10-01",
       remises: [remise({ id: "r1", type: "pourcentage", valeur: 33, duree: { mode: "permanente", debut: "2026-01-01" } })],
     });
-    expect(calcul.sousTotalHtCentimes).toBe(13_800);
-    expect(calcul.totalRemisesCentimes).toBe(Math.round((13_800 * 33) / 100));
-    expect(calcul.totalHtCentimes).toBe(13_800 - calcul.totalRemisesCentimes);
+    // 79 € forfait + 2 × 5 € comptes terrain + 29 € module Stock.
+    expect(calcul.sousTotalHtCentimes).toBe(11_800);
+    expect(calcul.totalRemisesCentimes).toBe(Math.round((11_800 * 33) / 100));
+    expect(calcul.totalHtCentimes).toBe(11_800 - calcul.totalRemisesCentimes);
   });
 
   it("ne produit jamais un prix négatif", () => {
@@ -538,20 +577,28 @@ describe("non-rétroactivité", () => {
 
 describe("comparaison et recommandation", () => {
   it("compare la configuration avec les quatre forfaits standards", () => {
-    const comparaisons = comparerForfaits({ ...MINI, personnesActives: 5 });
+    const comparaisons = comparerForfaits({ ...MINI, comptesSupplementaires: { terrain: 2 } });
     expect(comparaisons.map((c) => c.forfait)).toEqual(["mini", "pro", "business", "entreprise"]);
-    expect(comparaisons.find((c) => c.actuel)?.totalHtCentimes).toBe(10_900);
-    expect(comparaisons.find((c) => c.forfait === "pro")?.totalHtCentimes).toBe(24_900);
+    // Le tarif du rôle ne dépend plus du forfait : le supplément est le même partout,
+    // et l'écart entre deux forfaits est celui des forfaits eux-mêmes.
+    expect(comparaisons.find((c) => c.actuel)?.totalHtCentimes).toBe(8_900);
+    expect(comparaisons.find((c) => c.forfait === "pro")?.totalHtCentimes).toBe(25_900);
   });
 
   it("ne recommande rien quand la configuration actuelle est déjà la moins chère", () => {
-    const recommandation = recommanderForfait({ ...MINI, personnesActives: 5 });
+    const recommandation = recommanderForfait({ ...MINI, comptesSupplementaires: { terrain: 2 } });
     expect(recommandation.forfait).toBeNull();
     expect(recommandation.forcee).toBe(false);
   });
 
   it("recommande le forfait supérieur quand il devient moins cher, sans l'imposer", () => {
-    const configuration: ConfigurationAbonnement = { ...MINI, personnesActives: 20 };
+    // Cas propre à la génération RETIRÉE : le prix du compte y dépendait du forfait,
+    // si bien qu'un forfait supérieur pouvait revenir moins cher. Sous la grille par
+    // rôle, le supplément est identique partout — la montée en gamme ne s'achète plus
+    // au nombre de comptes, et c'est précisément ce que l'arbitrage V4 voulait obtenir.
+    const configuration: ConfigurationAbonnement = {
+      ...MINI, modeleComptes: "capacite_personnes", personnesActives: 20,
+    };
     const recommandation = recommanderForfait(configuration);
     expect(recommandation.forfait).toBe("pro");
     // Mini 20 personnes : 7 900 + 17 × 1 500 = 33 400 ; Pro : 24 900 + 5 × 1 200 = 30 900.
@@ -617,14 +664,14 @@ describe("lignes d'abonnement", () => {
     const { lignes } = construireLignes({
       forfait: "mini",
       periodicite: "mensuel",
-      personnesActives: 5,
+      comptesSupplementaires: { terrain: 2 },
       modules: ["stock", "pointage"],
       blocsStockage: 1,
       optionIA: "intensive",
     });
     expect(lignes.map((l) => l.famille)).toEqual(["forfait", "comptes", "modules", "modules", "stockage", "ia"]);
     expect(lignes.reduce((somme, l) => somme + l.montantPeriodeCentimes, 0)).toBe(
-      7_900 + 2 * 1_500 + 2_900 + 2_500 + 1_900 + 7_900,
+      7_900 + 2 * 500 + 2_900 + 2_500 + 1_900 + 7_900,
     );
   });
 });
