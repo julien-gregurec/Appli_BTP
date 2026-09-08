@@ -457,6 +457,12 @@ describe("le contrat public ne porte que des tarifs publics", () => {
       canonique.comptesSupplementaires.generationsPrecedentes[0].parForfait.map((f) => [f.offre, f.mensuelCentimes]),
     ).toEqual(COMPTES_SUPPLEMENTAIRES_PAR_FORFAIT_HISTORIQUE.map((f) => [f.offre, f.mensuelCentimes]));
     expect(canonique.comptesSupplementaires.generationsPrecedentes[0].selectionnablePourNouveauContrat).toBe(false);
+    // La règle est affichée telle quelle sur le site : elle doit être écrite
+    // en français correct, accents compris.
+    expect(canonique.comptesSupplementaires.regle).toBe(COMPTES_SUPPLEMENTAIRES.regle);
+    expect(canonique.comptesSupplementaires.generationCourante.libelle).toBe(
+      COMPTES_SUPPLEMENTAIRES.generationCourante.libelle,
+    );
     expect(canonique.optionsIA.packCredits).toMatchObject({
       nature: "achat_ponctuel",
       prixCentimes: PACK_CREDITS_IA.prixCentimes,
