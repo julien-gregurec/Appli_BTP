@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ELSATIA Contact / Card — wireframes fonctionnels V1</title>
+<style>
+  :root{
+    --fond:#f4f5f7; --papier:#ffffff; --encre:#101418; --encre-2:#5b636d;
+    --trait:#d9dde2; --trait-fort:#aab2bb; --accent:#0d1b2a;
+    --alerte:#8a5a00; --alerte-fond:#fdf6e6; --danger:#8a2020; --danger-fond:#fdeaea;
+    --ok:#1d5c34; --ok-fond:#eaf5ee;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --fond:#0e1216; --papier:#171c22; --encre:#eef1f4; --encre-2:#9aa4ae;
+      --trait:#2a323b; --trait-fort:#414c57; --accent:#c8d6e5;
+      --alerte:#e8c06a; --alerte-fond:#2c2415; --danger:#e79a9a; --danger-fond:#2e1818;
+      --ok:#8fd0a5; --ok-fond:#16281c;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--fond);color:var(--encre);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .page{max-width:1180px;margin:0 auto;padding:32px 20px 80px}
+  header.chapeau{border-bottom:2px solid var(--encre);padding-bottom:16px;margin-bottom:8px}
+  h1{font-size:24px;margin:0 0 4px}
+  .sous{color:var(--encre-2);font-size:13px}
+  .avert{margin:20px 0 32px;padding:12px 14px;border-left:3px solid var(--alerte);
+    background:var(--alerte-fond);color:var(--encre);font-size:13px}
+  h2{font-size:15px;text-transform:uppercase;letter-spacing:.07em;margin:44px 0 14px;
+    padding-bottom:6px;border-bottom:1px solid var(--trait)}
+  .grille{display:grid;gap:22px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+  .tel{background:var(--papier);border:1px solid var(--trait-fort);border-radius:16px;
+    padding:14px;display:flex;flex-direction:column;gap:9px;min-height:400px}
+  .tel .titre{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--encre-2);
+    border-bottom:1px dashed var(--trait);padding-bottom:7px;margin-bottom:3px}
+  .barre{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--encre-2)}
+  .h{font-weight:600;font-size:16px;margin:0}
+  .p{font-size:13px;color:var(--encre-2);margin:0}
+  .bloc{border:1px solid var(--trait);border-radius:9px;padding:9px 10px;font-size:13px}
+  .bloc.creux{border-style:dashed;color:var(--encre-2)}
+  .champ{border:1px solid var(--trait);border-radius:7px;padding:7px 9px;font-size:12px;
+    display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+  .champ .lib{color:var(--encre-2);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+  .bouton{background:var(--accent);color:var(--fond);border-radius:8px;padding:9px;
+    text-align:center;font-size:13px;font-weight:600}
+  @media (prefers-color-scheme: dark){ .bouton{color:#0e1216} }
+  .bouton.creux{background:transparent;color:var(--encre);border:1px solid var(--trait-fort);font-weight:500}
+  .bouton.inactif{background:transparent;color:var(--encre-2);border:1px dashed var(--trait-fort);font-weight:500}
+  .puce{display:inline-block;font-size:10.5px;padding:2px 7px;border-radius:99px;
+    border:1px solid var(--trait-fort);color:var(--encre-2);white-space:nowrap}
+  .puce.a{background:var(--alerte-fond);color:var(--alerte);border-color:transparent}
+  .puce.d{background:var(--danger-fond);color:var(--danger);border-color:transparent}
+  .puce.o{background:var(--ok-fond);color:var(--ok);border-color:transparent}
+  .note{font-size:11.5px;color:var(--encre-2);border-top:1px dotted var(--trait);
+    padding-top:7px;margin-top:auto}
+  .avatar{width:56px;height:56px;border-radius:50%;border:1px dashed var(--trait-fort);
+    display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--encre-2)}
+  .rang{display:flex;gap:8px;align-items:center}
+  ul.compact{margin:0;padding-left:17px;font-size:12.5px;color:var(--encre-2)}
+  ul.compact li{margin:2px 0}
+  .flux{background:var(--papier);border:1px solid var(--trait);border-radius:12px;padding:16px;overflow-x:auto}
+  .flux pre{margin:0;font:12px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--encre)}
+  footer{margin-top:56px;padding-top:16px;border-top:1px solid var(--trait);
+    font-size:12px;color:var(--encre-2)}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="chapeau">
+  <h1>ELSATIA Contact / Card — wireframes fonctionnels V1</h1>
+  <p class="sous">Lot <code>ELSATIA-CONTACT-CARD-RECIPROCAL-EXCHANGE-GP-BRIDGE-V1</code> ·
+  base <code>1fc1331</code> · branche <code>audit/elsatia-contact-card-architecture-v1</code></p>
+</header>
+
+<div class="avert">
+  <strong>Fichier isolé.</strong> Cette page est une maquette fonctionnelle autonome. Elle
+  n'importe rien, n'est référencée par aucune application, et ne touche aucun produit
+  existant. Elle décrit des <em>intentions d'écran</em>, pas une charte graphique : ni
+  couleurs, ni typographie, ni composants définitifs. La refonte visuelle relève du lot
+  ELSATIA-UI-V2.
+</div>
+
+<h2>A · Donner sa carte</h2>
+<div class="grille">
+
+  <div class="tel">
+    <div class="titre">P4 — Page publique · sans compte</div>
+    <div class="rang"><div class="avatar">photo</div>
+      <div><p class="h">Sophie Martin</p><p class="p">Conductrice de travaux</p>
+      <p class="p">Bâtiment Martin</p></div></div>
+    <div class="champ"><span class="lib">Mobile</span><span>06 __ __ __ __</span></div>
+    <div class="champ"><span class="lib">E-mail</span><span>s.martin@…</span></div>
+    <div class="champ"><span class="lib">Site</span><span>batiment-martin.fr</span></div>
+    <div class="bouton">Ajouter à mes contacts</div>
+    <div class="rang"><span class="bouton creux" style="flex:1">Appeler</span>
+      <span class="bouton creux" style="flex:1">Écrire</span></div>
+    <p class="note">Seuls les champs autorisés au profil sont affichés — et la vCard ne
+    contient rien de plus. Une seule source pour l'écran et pour le fichier.
+    <code>noindex, nofollow</code>.</p>
+  </div>
+
+  <div class="tel">
+    <div class="titre">P6 — Échange réciproque · proposition</div>
+    <div class="bloc creux">↑ les coordonnées restent visibles au-dessus</div>
+    <p class="h">Souhaitez-vous partager vos coordonnées en retour ?</p>
+    <p class="p">Facultatif. Vos informations seront transmises à
+      <strong>Sophie Martin — Bâtiment Martin</strong>, pour vous recontacter dans un cadre
+      professionnel.</p>
+    <div class="bouton creux">J'ai déjà une carte ELSATIA</div>
+    <div class="bouton creux">Je remplis mes coordonnées</div>
+    <p class="note">Jamais en interstitiel, jamais bloquant, jamais coché d'avance.
+    Refuser n'empêche pas d'enregistrer la carte de Sophie.</p>
+  </div>
+
+  <div class="tel">
+    <div class="titre">P6 — Formulaire · consentement</div>
+    <div class="champ"><span class="lib">Prénom</span><span>—</span></div>
+    <div class="champ"><span class="lib">Nom</span><span>—</span></div>
+    <div class="champ"><span class="lib">Fonction</span><span>—</span></div>
+    <div class="champ"><span class="lib">Entreprise</span><span>—</span></div>
+    <div class="champ"><span class="lib">E-mail</span><span>—</span></div>
+    <div class="champ"><span class="lib">Mobile</span><span>—</span></div>
+    <div class="champ"><span class="lib">Contexte</span><span>—</span></div>
+    <div class="bloc">☐ <strong>J'accepte</strong> que ces informations soient transmises à
+      Sophie Martin — Bâtiment Martin.</div>
+    <div class="bouton inactif">Envoyer — inactif tant que la case n'est pas cochée</div>
+    <p class="note">Le texte exact du consentement, sa date et son heure sont conservés :
+    un consentement dont on ne peut pas produire le libellé n'est pas prouvable.
+    Plafonné par <code>rate_limits_applicatifs</code>.</p>
+  </div>
+</div>
+
+<h2>B · Recevoir et vérifier</h2>
+<div class="grille">
+
+  <div class="tel">
+    <div class="titre">P7 — Boîte de réception</div>
+    <div class="barre"><span>Cartes reçues</span><span class="puce">4</span></div>
+    <div class="bloc"><div class="barre"><strong>Sophie Martin</strong>
+      <span class="puce a">à classer</span></div>
+      <p class="p">Bâtiment Martin · formulaire · aujourd'hui</p></div>
+    <div class="bloc"><div class="barre"><strong>Pierre Dupont</strong>
+      <span class="puce a">doublon possible</span></div>
+      <p class="p">Dupont Matériaux · photo · hier</p></div>
+    <div class="bloc"><div class="barre"><strong>Karim Bensaïd</strong>
+      <span class="puce o">synchronisée</span></div>
+      <p class="p">Client Gestion Pro · il y a 3 jours</p></div>
+    <div class="bloc"><div class="barre"><strong>carte sans nom</strong>
+      <span class="puce d">erreur</span></div>
+      <p class="p">import PDF · illisible</p></div>
+    <p class="note">Boîte du <strong>titulaire</strong>. Un responsable voit qu'une carte a
+    reçu des contacts — jamais lesquels, tant qu'ils ne sont pas versés.</p>
+  </div>
+
+  <div class="tel">
+    <div class="titre">P8 — Carte papier · sans OCR</div>
+    <div class="bloc creux" style="min-height:96px;display:flex;align-items:center;
+      justify-content:center">photo de la carte, affichée à côté du formulaire</div>
+    <div class="champ"><span class="lib">Prénom</span><span>—</span></div>
+    <div class="champ"><span class="lib">Nom</span><span>—</span></div>
+    <div class="champ"><span class="lib">Entreprise</span><span>—</span></div>
+    <div class="champ"><span class="lib">Mobile</span><span>—</span></div>
+    <div class="bouton">Continuer</div>
+    <p class="note"><strong>Écran par défaut du produit.</strong>
+    <code>FEATURE_AI_ENABLED</code> est faux : aucune reconnaissance n'est proposée, et
+    rien ne le laisse croire. Saisie assistée, pas parcours dégradé.</p>
+  </div>
+
+  <div class="tel">
+    <div class="titre">P9 — Vérification OCR · si activé</div>
+    <div class="champ"><span class="lib">Nom</span>
+      <span>Dupont <span class="puce o">fiable</span></span></div>
+    <div class="champ"><span class="lib">Prénom</span>
+      <span>Pierre <span class="puce o">fiable</span></span></div>
+    <div class="champ"><span class="lib">Entreprise</span>
+      <span>Dupont Matériaux <span class="puce a">à vérifier</span></span></div>
+    <div class="champ"><span class="lib">Mobile</span>
+      <span>06 12 34 5? 78 <span class="puce d">incertain</span></span></div>
+    <div class="champ"><span class="lib">SIRET</span>
+      <span>non détecté <span class="puce">absent</span></span></div>
+    <div class="bouton">Valider ces informations</div>
+    <div class="bouton creux">Abandonner l'import</div>
+    <p class="note">Confiance <strong>par champ</strong>. Aucun champ n'est pré-validé en
+    silence. La base refuse un statut « confirmée » sans confirmateur ni date —
+    même contrainte que <code>colors_analyses_ocr</code>.</p>
+  </div>
+</div>
+
+<h2>C · Ranger</h2>
+<div class="grille">
+
+  <div class="tel">
+    <div class="titre">P10 — Doublon possible</div>
+    <p class="h">Pierre Dupont</p>
+    <div class="bloc"><div class="barre"><strong>Dupont Matériaux</strong>
+      <span class="puce a">92 %</span></div>
+      <p class="p">Fournisseur existant · <strong>même SIRET</strong></p></div>
+    <div class="bloc"><div class="barre"><strong>Dupont Matériaux Sud</strong>
+      <span class="puce">41 %</span></div>
+      <p class="p">Fournisseur existant · nom voisin, SIRET différent</p></div>
+    <ul class="compact">
+      <li>Rattacher à l'entreprise existante</li>
+      <li>Ajouter comme nouvel interlocuteur</li>
+      <li>Compléter la fiche existante</li>
+      <li>Fusionner après validation</li>
+      <li>Conserver séparément</li>
+      <li>Laisser en attente</li>
+    </ul>
+    <p class="note">La cause du rapprochement est toujours dite. Aucun choix par défaut,
+    aucune fusion automatique — <code>CLIENT_SYNC_RESOLUTIONS[0] === "manual"</code>.</p>
+  </div>
+
+  <div class="tel">
+    <div class="titre">P11 — Classement</div>
+    <p class="p">Destination principale — obligatoire</p>
+    <div class="bloc">◉ Fournisseur</div>
+    <div class="bloc">○ Prospect &nbsp; ○ Client &nbsp; ○ Sous-traitant</div>
+    <div class="bloc creux">○ Partenaire · ○ Candidat · ○ Contact général
+      <br><span class="puce a">reste au carnet ELSATIA Contact</span></div>
+    <div class="bloc creux">☐ Aussi sous-traitant
+      <br><span class="puce d">indisponible — un tiers ne peut porter qu'un rôle</span></div>
+    <div class="bouton">Continuer</div>
+    <p class="note">Trois catégories n'ont aucune destination dans Gestion Pro, et l'écran
+    le dit. Le multi-rôle est interdit par <code>fournisseurs_type_tiers_check</code> :
+    l'interface l'affiche comme indisponible plutôt que de le simuler.</p>
+  </div>
+
+  <div class="tel">
+    <div class="titre">P12 — Confirmation avant écriture</div>
+    <div class="bloc"><p class="p">Destination</p>
+      <strong>Gestion Pro › Fournisseurs</strong></div>
+    <div class="bloc"><p class="p">Action</p>
+      <strong>Rattacher à « Dupont Matériaux »</strong>
+      <p class="p">Aucune fiche ne sera créée.</p></div>
+    <div class="bloc"><p class="p">Sera écrasé</p>
+      <span class="puce a">contact_nom : « P. Dupont » → « Pierre Dupont »</span></div>
+    <div class="bloc creux">Mobile et site Internet restent au carnet :
+      la fiche fournisseur ne porte pas ces champs.</div>
+    <div class="bouton">Confirmer le classement</div>
+    <p class="note">Rien n'est écrasé sans être montré. Ce qui ne peut pas être versé est
+    dit, pas tu.</p>
+  </div>
+</div>
+
+<h2>D · Suivre et administrer</h2>
+<div class="grille">
+
+  <div class="tel">
+    <div class="titre">P13 — Notifications</div>
+    <div class="bloc"><div class="barre"><strong>Carte classée</strong>
+      <span class="puce o">lue</span></div>
+      <p class="p">Sophie Martin — Bâtiment Martin a été ajoutée aux <strong>clients</strong>
+      de Gestion Pro.</p><div class="bouton creux">Ouvrir la fiche</div></div>
+    <div class="bloc"><div class="barre"><strong>Doublon possible</strong>
+      <span class="puce a">non lue</span></div>
+      <p class="p">Pierre Dupont — vérification nécessaire.</p>
+      <div class="bouton creux">Vérifier</div></div>
+    <p class="note">Clé d'idempotence sur <code>(carte reçue, événement, destinataire)</code>,
+    jamais sur l'horodatage. Une notification externe ne porte <strong>ni téléphone, ni
+    e-mail, ni adresse</strong>.</p>
+  </div>
+
+  <div class="tel">
+    <div class="titre">P15 — Cartes de l'équipe</div>
+    <div class="bloc"><div class="barre"><strong>Sophie Martin</strong>
+      <span class="puce o">active</span></div>
+      <p class="p">activée le 12/03 · 34 ouvertures · 6 contacts reçus</p></div>
+    <div class="bloc"><div class="barre"><strong>Karim Bensaïd</strong>
+      <span class="puce a">suspendue</span></div>
+      <p class="p">congé · réactivable</p></div>
+    <div class="bloc"><div class="barre"><strong>Léa Fournier</strong>
+      <span class="puce d">révoquée</span></div>
+      <p class="p">départ le 02/09 · remplacée</p></div>
+    <div class="bloc creux">Les carnets non versés des titulaires ne sont pas consultables
+      ici.</div>
+    <p class="note">« Gérer les cartes » et « lire un carnet » sont deux droits distincts,
+    et ils ne doivent jamais être fusionnés.</p>
+  </div>
+
+  <div class="tel">
+    <div class="titre">P16 — Révoquer une carte perdue</div>
+    <p class="h">Révoquer la carte de Léa Fournier ?</p>
+    <ul class="compact">
+      <li>La puce NFC et le QR cessent immédiatement de fonctionner.</li>
+      <li>L'URL publique ne renverra plus rien.</li>
+      <li>Les contacts déjà reçus sont conservés.</li>
+      <li><strong>Irréversible</strong> : une nouvelle carte devra être émise.</li>
+    </ul>
+    <div class="bouton" style="background:var(--danger);color:#fff">Révoquer définitivement</div>
+    <div class="bouton creux">Annuler</div>
+    <p class="note">La révocation est filtrée <em>dans la fonction de résolution</em>, donc
+    avant tout accès aux données — pas au moment de l'affichage.</p>
+  </div>
+</div>
+
+<h2>E · Chaîne de traitement</h2>
+<div class="flux"><pre>
+  réception   NFC · QR · photo · PDF · formulaire · saisie · carte ELSATIA
+      │
+      ▼   aucune écriture métier
+  [ reçue ]
+      │
+      ▼   OCR facultatif — seulement si FEATURE_AI_ENABLED
+  [ ocr_en_attente ] ────► [ erreur ]
+      │
+      ▼
+  [ à_vérifier ]     ◄── ÉCRAN HUMAIN OBLIGATOIRE
+      │                  corriger · supprimer · compléter · abandonner
+      ▼
+  [ à_classer ]
+      │
+      ├──► [ doublon_possible ] ──► arbitrage humain ──┐
+      │                                                │
+      ▼◄───────────────────────────────────────────────┘
+  [ classée ]        destination principale + rôles secondaires
+      │
+      ▼   uniquement si Gestion Pro est lié — portée client:propose
+  [ synchronisation_en_cours ] ──► [ synchronisée ]
+      │                                  │
+      ▼                                  ▼
+  [ erreur ]                        notification, une seule fois
+                                    (clé d'idempotence)
+
+  [ archivée ]   état terminal, aucune transition sortante
+
+  Transitions interdites, à faire respecter par la base :
+    reçue ─✗→ classée                 on ne classe pas ce qu'on n'a pas vérifié
+    doublon_possible ─✗→ synchronisée on ne synchronise pas un doublon non arbitré
+    archivée ─✗→ (tout)
+</pre></div>
+
+<footer>
+  Wireframes fonctionnels — lot ELSATIA-CONTACT-CARD-RECIPROCAL-EXCHANGE-GP-BRIDGE-V1.
+  Aucune reprise de nom, marque, logo, texte, visuel, couleur, structure commerciale,
+  garantie ou témoignage d'un produit tiers. Aucun prix, aucun délai, aucun stock, aucune
+  garantie n'est énoncé. Documents associés :
+  <code>ELSATIA-CONTACT-CARD-ARCHITECTURE-AUDIT-REPORT.md</code>,
+  <code>ELSATIA-CONTACT-CARD-FUNCTIONAL-SPECIFICATION-V1.md</code>,
+  <code>ELSATIA-CONTACT-CARD-GP-INTEGRATION-MAPPING-V1.md</code>,
+  <code>ELSATIA-CONTACT-CARD-PRIVACY-SECURITY-MODEL-V1.md</code>.
+</footer>
+
+</div>
+</body>
+</html>

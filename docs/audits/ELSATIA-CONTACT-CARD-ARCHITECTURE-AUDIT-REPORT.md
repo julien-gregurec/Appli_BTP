@@ -1,0 +1,662 @@
+# ELSATIA Contact / Card — Rapport d'audit d'architecture V1
+
+Lot : `ELSATIA-CONTACT-CARD-RECIPROCAL-EXCHANGE-GP-BRIDGE-V1`
+Date : 2026-09-08
+Nature : **audit en lecture seule + conception**. Aucune migration créée, aucune fusion,
+aucun déploiement, aucune écriture en Production.
+
+---
+
+## 0. Verdict
+
+> ### GO ARCHITECTURE SOUS CONDITIONS
+
+L'écosystème ELSATIA contient déjà **la quasi-totalité des briques techniques** dont
+Contact / Card a besoin : lien public révocable par jeton haché, file de notifications avec
+push, journal d'audit, limitation de débit anti-abus, socle multi-applications, contrats
+client canoniques avec normalisation / détection de doublon / enveloppe de synchronisation
+idempotente, et une implémentation hors-ligne réelle de référence (Réserves V5).
+
+Le produit est donc **constructible sans inventer de socle**. Ce qui bloque n'est pas la
+conception, ce sont cinq réalités mesurées sur le code :
+
+| # | Condition | Nature du blocage |
+|---|---|---|
+| C1 | Aucune migration ne peut entrer aujourd'hui | Le ledger est en cours de réconciliation (P0). Toute évolution SQL sort ici en `.sql.proposed`. |
+| C2 | L'OCR n'existe **pas** dans le produit | Deux tables OCR sont au schéma (`suggestions_ocr_notes_frais`, `colors_analyses_ocr`) et **zéro ligne de code applicatif ne les utilise**. Le seul moteur réellement disponible est `ProviderIA.completerAvecFichier()`, coupé par défaut (`FEATURE_AI_ENABLED`). |
+| C3 | Trois destinations de classement n'ont **pas** de modèle cible | « candidat / futur employé », « partenaire » et « contact professionnel général » n'existent nulle part dans Gestion Pro. |
+| C4 | Un tiers ne peut pas être fournisseur **et** sous-traitant | `fournisseurs.type_tiers` est une contrainte `check` à valeur unique. Le multi-rôle demandé au §6 de la mission est aujourd'hui interdit par la base. |
+| C5 | `contacts_clients` est en retard sur le contrat canonique | La table ne porte ni prénom, ni mobile, ni notes, ni statut, ni rôles — alors que `ClientContact` de `@elsatia/client-contracts` les définit. Une carte de visite scannée porte précisément prénom et mobile. |
+
+Aucune de ces cinq conditions n'invalide l'architecture proposée. Elles déterminent
+**l'ordre de construction** et **ce qui peut être promis en V1** (§14).
+
+---
+
+## 1. Audit Git
+
+| Élément | Valeur |
+|---|---|
+| Dépôt | `/Users/juliengregurec/Projects/elsatia-main` |
+| Base canonique auditée | `integration/elsatia-ecosystem-train-v2-reserves-gp-v1` |
+| **SHA de base complet** | `1fc1331842cdf5980b374169994587813bdee7b6` |
+| Branche du lot | `audit/elsatia-contact-card-architecture-v1` |
+| Worktree dédié | `/Volumes/ELSATIA-DEV/ELSATIA-WORKTREES/contact-card-architecture-v1` |
+| Migrations présentes à la base | 272 fichiers, numéro fonctionnel maximum **274** |
+| Applications du monorepo | racine = Gestion Pro ; `apps/colors`, `apps/reserves`, `apps/tools` |
+| Paquets partagés | `packages/client-contracts`, `packages/application-access`, `packages/email` |
+
+Le worktree est créé sur le disque externe `/Volumes/ELSATIA-DEV`, conformément à la règle
+disque du poste. **Aucun stash, aucune branche, aucun commit, aucun worktree existant n'a
+été supprimé ni modifié.** Aucun des 60 worktrees ouverts par les autres conversations n'a
+été touché.
+
+### Pourquoi le train et non `main`
+
+`main` est à `a083c37` et n'est pas la référence fonctionnelle : le train v2 porte les
+272 migrations réconciliées, les contrats client canoniques et Réserves V5. Auditer `main`
+aurait conduit à déclarer « manquantes » des briques qui existent.
+
+---
+
+## 2. Réserve de méthode — captures izi.Card
+
+La mission indique que des captures d'izi.Card servent de référence fonctionnelle.
+**Aucune capture n'a été transmise dans cette conversation.** L'audit s'appuie donc
+exclusivement sur le cahier des charges écrit et sur le code du dépôt.
+
+Cela n'affaiblit pas le résultat — la mission interdit de toute façon toute reprise de nom,
+marque, logo, texte, visuel, couleur, structure commerciale, garantie ou témoignage — mais
+il faut le dire : **rien dans ce rapport n'est dérivé d'une observation d'izi.Card**, et le
+principe retenu (une puce NFC qui n'ouvre qu'une URL publique révocable) est le
+fonctionnement générique d'une carte NFC, pas une reprise d'un produit tiers.
+
+---
+
+## 3. Modèles existants réutilisés
+
+### 3.1 Lien public révocable — **réutilisation intégrale**
+
+C'est la brique la plus importante, et elle est déjà écrite et éprouvée.
+
+`supabase/migrations/20260812000200_documents_commerciaux_p9.sql` :
+
+```sql
+create table public.acces_externes_documents (
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references public.entreprises(id) on delete cascade,
+  type_document text not null check (type_document in ('devis','facture')),
+  document_id uuid not null,
+  token_hash text not null unique,
+  cree_le timestamptz not null default now(),
+  cree_par uuid references public.utilisateurs(id) on delete set null,
+  expire_le timestamptz,
+  revoque_le timestamptz
+);
+```
+
+et sa résolution, **accordée à `anon`**, qui est exactement ce qu'il faut pour une page
+publique sans compte :
+
+```sql
+create or replace function public.document_commercial_par_token(p_token_hash text)
+returns table (type_document text, document_id uuid, entreprise_id uuid)
+language sql security definer stable set search_path = public as $$
+  select a.type_document, a.document_id, a.entreprise_id
+  from public.acces_externes_documents a
+  where a.token_hash = p_token_hash
+    and a.revoque_le is null
+    and (a.expire_le is null or a.expire_le > now())
+  limit 1;
+$$;
+revoke all on function public.document_commercial_par_token(text) from public;
+grant execute on function public.document_commercial_par_token(text) to anon, authenticated;
+```
+
+Côté applicatif, `src/lib/documents-partage.ts` porte déjà les trois gestes :
+`randomBytes(32).toString("base64url")` pour un jeton non prédictible, `sha256` pour
+l'empreinte — **le jeton en clair n'est jamais stocké** — et une révocation qui ferme tous
+les jetons actifs avant d'en émettre un nouveau.
+
+`src/app/document/[token]/page.tsx` montre le patron de page publique : résolution par le
+client **anonyme**, puis lecture des données par le client **admin** une fois — et seulement
+une fois — l'identité de la ressource établie. La page porte `robots: { index: false }`.
+
+> **Conséquence directe pour Contact / Card.** Le couple puce NFC / QR code ne contient
+> qu'une URL de la forme `https://<domaine>/c/<token>`. Le jeton est aléatoire sur 256 bits,
+> seule son empreinte va en base, il est révocable et expirable. **Aucun secret, aucune
+> donnée personnelle n'est écrit dans la puce.** Le §13 de la mission est satisfait par
+> réemploi, pas par invention.
+
+`reserves_invitations` (migration 270) fournit la version enrichie du même patron —
+`expire_at`, `consomme_at`, `revoque_at`, `created_by`, plus une contrainte
+`check (consomme_at is null or revoque_at is null)` — et c'est ce modèle-là, plus complet,
+qui doit servir de gabarit à la table des cartes.
+
+### 3.2 Notifications — réutilisation, avec un défaut à ne pas recopier
+
+`notifications_utilisateurs` (migration 081) est générique et convient :
+
+```sql
+create table if not exists public.notifications_utilisateurs(
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references public.entreprises(id) on delete cascade,
+  utilisateur_id uuid not null references auth.users(id) on delete cascade,
+  type text not null, titre text not null, message text, lien text,
+  niveau text not null default 'information' check(niveau in ('information','attention','critique')),
+  ressource_type text, ressource_id uuid,
+  lue_at timestamptz, created_at timestamptz not null default now()
+);
+```
+
+La chaîne complète existe : `push_abonnements`, `preferences_notifications_push` (modèle
+opt-out), `src/lib/push.ts`, un webhook temps réel et un cron de secours
+(`src/app/api/cron/notifications-push/route.ts`). Le champ `lue_at` couvre l'exigence
+« notification non lue visible à la prochaine connexion ».
+
+**Le défaut à connaître.** L'index censé garantir l'unicité ne la garantit pas :
+
+```sql
+create unique index if not exists notifications_evenement_unique
+  on public.notifications_utilisateurs(utilisateur_id,type,ressource_id,created_at)
+  where ressource_id is not null;
+```
+
+`created_at` fait partie de la clé. Deux insertions successives à des horodatages
+différents passent toutes les deux. **L'exigence « la notification n'est créée qu'une seule
+fois » (§16) n'est donc pas tenue par cet index.**
+
+Le bon patron existe ailleurs, et il est récent — `reserves_notifications_envois`
+(migration 270) : `cle_idempotence text not null unique`. C'est celui-là qu'il faut
+reprendre. Contact / Card doit construire sa clé d'idempotence à partir de
+`(carte_recue_id, type_evenement, destinataire)` et **jamais** de l'horodatage.
+
+### 3.3 Contrats client canoniques — le cœur de l'intégration
+
+`packages/client-contracts` (v1.0.0) est déjà écrit, testé, et fournit — sans qu'il faille
+en écrire une ligne — presque tout le §8 « détection des doublons » de la mission :
+
+* normalisation : `normalizeEmail`, `normalizePhoneNumber`, `normalizePostalCode`,
+  `normalizeVatNumber`, `normalizeSearchText`, `tokenizeSearchTerm`, `buildSearchDocument` ;
+* validation légale : `isValidSiret`, `isValidSiren`, `isValidVatNumber`,
+  `isValidActivityCode`, `isPlausibleEmail`, `isPlausiblePhoneNumber`, et le contrôle croisé
+  « le SIRET commence-t-il par le SIREN déclaré » ;
+* recherche : `buildClientSearchPlan` sur 14 champs, dont `email`, `phone`, `siret`,
+  `vatNumber`, `postalCode`, `city` — exactement les critères listés au §8 ;
+* synchronisation idempotente : `buildIdempotencyKey`, `ClientSyncEnvelope`,
+  `detectClientSyncConflict` avec le conflit `duplicate_identity`.
+
+Et surtout, une décision d'architecture déjà prise et déjà codée, qui règle à elle seule le
+problème « une carte scannée ne doit pas créer un client » :
+
+```ts
+export const CLIENT_SYNC_SCOPES = ["client:read", "client:propose", "client:write"] as const;
+export const CLIENT_AUTHORITATIVE_APPLICATION: ClientSourceApplication = "gestion_pro";
+export const CLIENT_SYNC_RESOLUTIONS = ["manual", "authority_wins", "rejected"] as const;
+```
+
+Le commentaire du paquet est explicite : une application tierce ne peut porter que
+`client:read` et `client:propose`, « sa demande devient une proposition qu'un humain valide
+dans Gestion Pro », et cette règle « est **vérifiée par le validateur** d'enveloppe, pas
+seulement documentée ». La résolution par défaut est `manual`.
+
+> **Contact / Card doit être un émetteur `client:propose`, jamais `client:write`.** C'est le
+> mécanisme, déjà existant, qui interdit structurellement la création automatique de fiche
+> depuis un OCR.
+
+### 3.4 Socle multi-applications
+
+`applications_elsatia`, `roles_applications_elsatia`, `acces_applications_entreprises`,
+`habilitations_applications_utilisateurs`, `historique_acces_applications` et la fonction
+`a_acces_application(entreprise, code)` (migration 234) forment le point de branchement
+standard. Trois applications l'ont déjà emprunté : Colors (234), Tools (236), Réserves (268).
+
+Contact / Card s'y branche à l'identique : une ligne `applications_elsatia` de code
+`contact`, ses rôles, et rien d'autre. Aucun droit n'est accordé par la migration elle-même.
+
+### 3.5 Anti-abus et audit
+
+* `rate_limits_applicatifs` (clé, `identifiant_hash` sha256, fenêtre, compteur) et
+  `journal_abus_securite` (migration 193) : le formulaire réciproque public s'y branche
+  directement. Le §13 « limitation du nombre de soumissions » ne demande aucun code neuf.
+* `journal_activite` (`action`, `ressource`, `ressource_id`, `metadata jsonb`) : journal
+  générique par entreprise.
+* `historique_acces_applications` : audit append-only des droits.
+
+### 3.6 Hors ligne — implémentation de référence disponible
+
+`apps/reserves/src/lib/offline/` (`base-locale.ts`, `identite-locale.ts`, `contrat.ts`,
+`reseau.ts`, `synchronisation.ts`) plus `apps/reserves/public/sw-reserves.js` constituent
+une implémentation hors-ligne **réelle et mesurée** : IndexedDB cloisonné par identité,
+file de synchronisation idempotente, service worker. C'est le gabarit du §12.
+
+### 3.7 Dépendances déjà présentes
+
+`qrcode` ^1.5.4 (génération, déjà utilisé par `src/app/api/identification/[id]/qr/route.ts`)
+et `@zxing/browser` ^0.2.1 (lecture). **Le §15-3 « partage par QR code » et la lecture d'un
+QR reçu ne demandent aucune dépendance nouvelle.**
+
+---
+
+## 4. Modèles existants — et leurs limites réelles
+
+### 4.1 `clients` — convient, sans modification
+
+```
+type    ∈ particulier | professionnel | collectivite | syndic | promoteur
+statut  ∈ prospect | actif | inactif
+```
+
+plus `societe`, `raison_sociale`, `siret`, `email`, `telephone`, `adresse_facturation`,
+`code_postal`, `ville`, et depuis la migration 274 `numero_tva`, `forme_juridique`,
+`adresse_complement`, `pays`.
+
+**« Prospect » n'est pas une entité : c'est `clients.statut = 'prospect'`**, qui est déjà la
+valeur par défaut. La ligne « Prospect » du tableau de la mission se résout donc sans
+aucun modèle neuf.
+
+Correspondance de dénomination déjà tranchée par la migration 274, à ne pas rejouer :
+`tradeName → clients.societe`, `legalName → clients.raison_sociale`. **Ne pas créer de
+`nom_commercial`.**
+
+### 4.2 `contacts_clients` — insuffisante pour une carte de visite
+
+```sql
+create table public.contacts_clients (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references public.clients(id) on delete cascade,
+  nom text not null, fonction text, telephone text, email text,
+  principal boolean not null default false,
+  created_at timestamptz not null default now()
+);
+```
+
+À comparer au contrat canonique `ClientContact`, qui porte `civility`, `firstName`,
+`lastName`, `jobTitle`, `email`, `phone`, **`mobile`**, `roles[]` (`primary`/`billing`/`site`),
+`status` (`active`/`inactive`), `notes`.
+
+Manquent donc en base : **prénom, mobile, notes, statut, rôles**. Or une carte de visite
+porte typiquement « Prénom NOM », un fixe **et** un mobile. Verser un contact scanné dans
+`contacts_clients` aujourd'hui, c'est perdre le prénom (aggloméré dans `nom`) et perdre le
+mobile.
+
+La table n'a pas de colonne `entreprise_id` : le cloisonnement passe par `clients` — les
+politiques RLS remontent systématiquement au client
+(`exists(select 1 from clients c where c.id = contacts_clients.client_id and a_permission(c.entreprise_id, …))`).
+Un modèle Contact / Card devra faire de même ou porter son propre `entreprise_id`.
+
+### 4.3 `fournisseurs` — et l'exclusivité fournisseur / sous-traitant
+
+```sql
+alter table public.fournisseurs
+  add column if not exists type_tiers text not null default 'fournisseur', …;
+alter table public.fournisseurs add constraint fournisseurs_type_tiers_check
+  check(type_tiers in ('fournisseur','sous_traitant'));
+```
+
+Deux faits mesurés :
+
+1. **Un tiers est fournisseur OU sous-traitant, jamais les deux.** La mission demande
+   explicitement d'étudier « fournisseur et sous-traitant ». La base l'interdit aujourd'hui.
+   → décision D2 (§13).
+2. **Un fournisseur n'a pas de table de contacts.** Il porte un unique champ texte
+   `contact_nom`. Il n'existe aucun équivalent de `contacts_clients` côté fournisseur. Une
+   carte de visite d'un commercial fournisseur n'a donc, aujourd'hui, **aucun endroit
+   normalisé où atterrir** autre que d'écraser `contact_nom`.
+
+### 4.4 `sous_traitants_chantiers` — ce n'est pas un registre de tiers
+
+```sql
+create table if not exists public.sous_traitants_chantiers(
+  id uuid primary key …,
+  entreprise_id uuid not null …,
+  fournisseur_id uuid not null,
+  chantier_id uuid not null,
+  mission text not null …,
+  …
+);
+```
+
+C'est une **affectation** : un fournisseur, un chantier, une mission, un montant. Il n'existe
+pas de « registre sous-traitants » indépendant. Le tableau de la mission dit « registre
+sous-traitants existant **ou** fournisseur avec rôle spécialisé » : c'est la seconde branche
+qui est vraie, et la première n'existe pas.
+
+> **Classer une carte en « sous-traitant » = créer/rattacher un `fournisseurs` avec
+> `type_tiers = 'sous_traitant'`. Le lien chantier n'est créé que plus tard, par un humain,
+> quand une mission existe.** Contact / Card ne doit jamais écrire dans
+> `sous_traitants_chantiers` : il n'y a pas de chantier au moment du scan.
+
+### 4.5 `employes` — et l'absence totale de vivier
+
+`employes` est adossé à la paie : `dossiers_paie_salaries`, `profils_paie_employes`,
+`bulletins_paie`, `temps_travail_paie`, `journal_audit_paie`. Une recherche sur
+`candidat|vivier|recrutement` dans les 272 migrations ne renvoie **aucune définition
+métier** — les deux occurrences trouvées sont des commentaires sans rapport (« liste de
+candidats » d'un cron de relances, « migration candidate »).
+
+> **Il n'existe aucun modèle de candidat dans ELSATIA.** L'interdiction de la mission
+> (« ne jamais créer automatiquement un salarié, un contrat de travail ou une donnée de
+> paie à partir d'une carte de visite ») est donc respectée par construction en V1 :
+> la seule destination possible d'un candidat est le carnet Contact / Card. → décision D3.
+
+### 4.6 `appels_contacts` — le bon endroit pour le contexte de rencontre
+
+```
+type ∈ appel | email | sms | courrier | rendez_vous     sens ∈ entrant | sortant
+client_id, contact_id, employe_id, objet, compte_rendu, a_rappeler_at, termine
+```
+
+Le champ « message ou contexte de la rencontre » du formulaire réciproque, et la date de
+rencontre d'une carte scannée, se journalisent ici une fois le contact versé à un client —
+`type = 'rendez_vous'`, `sens = 'entrant'`. Aucun modèle neuf.
+
+### 4.7 OCR — deux schémas, zéro code
+
+| Table | Migration | Code applicatif qui l'utilise |
+|---|---|---|
+| `suggestions_ocr_notes_frais` | 058 | **aucun** |
+| `colors_analyses_ocr` | 246 | **aucun** |
+
+Vérifié par recherche des deux noms de table sur l'ensemble des `.ts`/`.tsx` du dépôt hors
+`node_modules` : zéro occurrence.
+
+Ces deux schémas restent néanmoins la **bonne forme**, et ils disent la même chose tous les
+deux — c'est une convention établie de la maison :
+
+```sql
+-- notes de frais
+suggestions jsonb, confiances jsonb, incoherences text[],
+statut ∈ en_attente|termine|erreur|non_configure, valide_par_utilisateur boolean
+
+-- colors
+resultat jsonb, confiance numeric(5,2),
+statut ∈ a_confirmer|confirmee|rejetee|erreur, confirme_par uuid, confirme_at timestamptz,
+check ((statut='confirmee' and confirme_par is not null and confirme_at is not null) or statut<>'confirmee')
+```
+
+Ce `check` final est précisément l'exigence « aucune information OCR ne doit être présentée
+comme certaine sans confirmation humaine », **écrite dans la base plutôt que dans le code**.
+Contact / Card reprend cette contrainte mot pour mot.
+
+Le seul moteur réellement disponible est `src/lib/ai/provider.ts` :
+
+```ts
+/** Complétion à partir d'une image ou d'un document (PDF), sans outils. */
+completerAvecFichier(params: { system?; texte; fichier: FichierIA; maxTokens? }):
+  Promise<{ texte: string; usage?: UsageIA }>;
+```
+
+Un seul fournisseur est implémenté (`providers/openai.ts`), et la porte est **fail-closed** :
+
+```ts
+export function iaEstActive(env = process.env): boolean {
+  return env.FEATURE_AI_ENABLED?.trim().toLowerCase() === "true";
+}
+```
+
+Variable absente ⇒ IA indisponible. Le coût est déjà comptabilisé (`UsageIA`, `journal_ia`).
+
+### 4.8 Boutique — existe, mais fermée et vide
+
+`boutique_produits` / `boutique_lignes_commande` / `boutique_commandes` (migrations 144-145),
+avec Stripe Checkout. Deux limites mesurées :
+
+```sql
+categorie text not null check (categorie in
+  ('imprimante_code_barres','plastifieuse','consommable_plastification','etiquette_aimantee'))
+```
+
+1. **Aucune catégorie ne peut accueillir une carte NFC** sans modifier ce `check`.
+2. **Aucun `insert into public.boutique_produits` n'existe dans les 272 migrations** : le
+   catalogue est vide. Le drapeau `FEATURE_BOUTIQUE_ENABLED` gouverne l'ouverture.
+
+Conforme à la mission : rien n'est ouvert, aucun prix, aucun délai, aucune garantie, aucun
+stock n'est inventé ici. Seule la **forme** de l'extension future est décrite (§14 du modèle
+d'intégration).
+
+### 4.9 Stockage
+
+Sur les 13 buckets déclarés, **un seul est public : `entreprise-assets`**. Tous les autres
+(`colors-seaux`, `notes-frais`, `bulletins-paie`, `documents-employes`, `pointage-preuves`…)
+sont privés. La photo d'une carte à traiter par OCR va dans un bucket **privé** ; seuls le
+logo et la photo de profil affichés sur la page publique peuvent vivre dans
+`entreprise-assets`.
+
+---
+
+## 5. Modèles manquants
+
+| Besoin de la mission | Existe ? | Constat |
+|---|---|---|
+| Carte (physique/numérique) et son jeton public | **non** | Le patron existe (`acces_externes_documents`, `reserves_invitations`), l'entité non. |
+| Profil public affichable | **non** | — |
+| Boîte de réception des contacts reçus | **non** | — |
+| Carte reçue + résultat OCR + confiances | **non** (forme oui) | Deux schémas de référence existent, tous deux inutilisés. |
+| Carnet de contacts hors client | **non** | Tout contact est aujourd'hui rattaché à un `clients` (§4.2). |
+| Contacts d'un fournisseur | **non** | Un seul champ texte `contact_nom` (§4.3). |
+| Rôle « partenaire » | **non** | Aucune trace. |
+| Candidat / vivier | **non** | Aucune trace (§4.5). |
+| Multi-rôle d'un tiers | **non** | Interdit par `fournisseurs_type_tiers_check` (§4.3). |
+| Prénom / mobile sur un contact | **non** | Absents de `contacts_clients` (§4.2). |
+| Application `contact` au catalogue | **non** | Le socle d'accueil existe (§3.4). |
+| Catégorie Boutique pour une carte NFC | **non** | `check` fermé à 4 valeurs (§4.8). |
+
+---
+
+## 6. Architecture retenue
+
+### 6.1 Une application, pas un module de Gestion Pro
+
+Le §11 impose que Contact / Card reste utile **sans** Gestion Pro. Un module interne à GP ne
+peut pas satisfaire cela. La forme retenue est donc `apps/contact`, quatrième application du
+monorepo, sur le gabarit exact d'`apps/reserves` (port dédié, `next.config.ts`,
+`vercel.json`, `@elsatia/application-access`, `@elsatia/email`).
+
+Le lien avec Gestion Pro est **optionnel, explicite et révocable** : il passe par l'enveloppe
+`ClientSyncEnvelope` en portée `client:propose`, jamais par une écriture directe.
+
+### 6.2 Trois patrimoines strictement distincts
+
+Le §10 exige de distinguer la carte de l'entreprise, le profil personnel, le contact reçu
+personnellement, et le contact versé au patrimoine commercial. C'est la décision structurante
+du modèle :
+
+```
+carte                → appartient à l'ENTREPRISE (elle l'émet, la suspend, la révoque)
+profil affiché       → appartient au TITULAIRE (il édite ses coordonnées)
+contact reçu         → appartient au TITULAIRE tant qu'il n'est pas versé
+contact versé        → appartient à l'ENTREPRISE (visible du registre partagé)
+```
+
+Un responsable de cartes **ne voit pas** les contacts non versés d'un collaborateur. Il voit
+l'existence des cartes, leur état, leur activité agrégée — jamais le carnet personnel. Le
+versement est un geste explicite du titulaire, horodaté et journalisé.
+
+### 6.3 Chaîne de traitement d'une carte reçue
+
+```
+réception (NFC | QR | photo | PDF | formulaire | saisie | partage ELSATIA)
+      │
+      ▼  aucune écriture métier
+[ carte reçue ]  statut = reçue
+      │
+      ▼  OCR facultatif, si et seulement si FEATURE_AI_ENABLED
+[ analyse ]  suggestions jsonb + confiances jsonb + incohérences
+      │
+      ▼  ÉCRAN HUMAIN OBLIGATOIRE — corriger, supprimer, compléter, abandonner
+[ vérifiée ]
+      │
+      ▼  recherche de doublon (buildClientSearchPlan + normalisations)
+[ doublon possible ] ──► choix humain : rattacher | nouvel interlocuteur | compléter
+      │                                | fusionner après validation | garder séparé | attendre
+      ▼  classement explicite
+[ classée ]  destination principale + rôles secondaires
+      │
+      ▼  si et seulement si Gestion Pro est lié
+[ proposition client:propose ] ──► file idempotente ──► [ synchronisée ]
+      │
+      ▼
+[ notification ]  clé d'idempotence, une seule fois
+```
+
+**Aucune flèche automatique ne traverse l'écran humain.** C'est l'invariant du produit.
+
+---
+
+## 7. Correspondance avec Gestion Pro
+
+Le détail, champ par champ, est dans
+`ELSATIA-CONTACT-CARD-GP-INTEGRATION-MAPPING-V1.md`. Synthèse des destinations **réelles**,
+corrigée par rapport au tableau supposé de la mission :
+
+| Classification | Destination réelle vérifiée | Écart avec la mission |
+|---|---|---|
+| Prospect | `clients` avec `statut='prospect'` (valeur par défaut) | conforme |
+| Client | `clients` + `contacts_clients` | conforme, mais prénom/mobile perdus (§4.2) |
+| Fournisseur | `fournisseurs` avec `type_tiers='fournisseur'` | conforme, mais **pas de table d'interlocuteurs** (§4.3) |
+| Sous-traitant | `fournisseurs` avec `type_tiers='sous_traitant'` | **le « registre sous-traitants » n'existe pas** ; `sous_traitants_chantiers` est une affectation, pas un registre |
+| Partenaire | **aucune destination** | modèle absent → reste au carnet Contact / Card |
+| Candidat / futur employé | **aucune destination** | modèle absent → reste au carnet, jamais `employes` |
+| Contact général | **aucune destination** | pas de carnet hors client → reste au carnet Contact / Card |
+| À classer | boîte de réception Contact / Card | conforme |
+
+---
+
+## 8. Détection des doublons
+
+Entièrement bâtie sur `@elsatia/client-contracts`, sans règle réécrite :
+
+| Critère | Fonction | Poids proposé |
+|---|---|---|
+| SIRET identique | `isValidSiret` + égalité chiffres | quasi-certain |
+| E-mail normalisé identique | `normalizeEmail` | fort |
+| Téléphone normalisé identique | `normalizePhoneNumber` | fort |
+| N° TVA identique | `normalizeVatNumber` | fort |
+| Domaine du site identique | dérivé de `website` | moyen |
+| Raison sociale + code postal | `normalizeSearchText` + `normalizePostalCode` | moyen |
+| Nom + prénom seuls | `tokenizeSearchTerm` | faible — jamais suffisant |
+
+Trois règles non négociables, toutes déjà portées par le contrat :
+
+1. **Aucune fusion automatique.** `CLIENT_SYNC_RESOLUTIONS[0] === "manual"`, et c'est la
+   valeur par défaut documentée comme « la seule sûre ».
+2. Un doublon détecté produit le conflit `duplicate_identity` et **s'arrête** — il ne
+   déclenche pas d'écriture.
+3. La provenance de chaque champ est conservée (valeur reçue / valeur corrigée / auteur),
+   afin de savoir en permanence ce qui vient de la carte scannée.
+
+---
+
+## 9. Sécurité et RGPD
+
+Traités en détail dans `ELSATIA-CONTACT-CARD-PRIVACY-SECURITY-MODEL-V1.md`. Points fermes :
+
+* jeton `randomBytes(32).toString("base64url")`, stocké **en sha256 seulement** ;
+* aucun secret ni donnée personnelle dans la puce NFC ou le QR — **uniquement une URL** ;
+* révocation immédiate, expiration, et une ancienne URL révoquée ne renvoie plus rien
+  (la fonction de résolution filtre `revoque_le is null` avant tout accès) ;
+* la page publique est cloisonnée : le jeton ne résout qu'**une** carte, jamais un chemin
+  vers les autres données de l'entreprise ;
+* formulaire réciproque : consentement explicite obligatoire, plafonné par
+  `rate_limits_applicatifs`, abus tracés dans `journal_abus_securite` ;
+* images : validation MIME, taille maximale, bucket **privé**, suppression de l'original
+  après OCR selon la politique retenue (→ décision D6) ;
+* isolation multi-tenant par `entreprise_id` + RLS, sur le patron `est_membre_actif` /
+  `a_permission` déjà employé partout ;
+* `robots: { index: false, follow: false }` sur la page publique, comme
+  `src/app/document/[token]/page.tsx`.
+
+---
+
+## 10. Tests exécutés
+
+| Test | Résultat |
+|---|---|
+| Inventaire des tables des 272 migrations | 213 tables recensées |
+| Recherche d'un modèle candidat/vivier/recrutement | **aucun** — 0 définition métier |
+| Recherche d'un modèle partenaire | **aucun** |
+| Recherche d'un modèle carte/NFC/vCard | **aucun** |
+| Exclusivité `fournisseurs.type_tiers` | **confirmée** — `check(type_tiers in ('fournisseur','sous_traitant'))` |
+| Table de contacts fournisseur | **inexistante** — un seul champ `contact_nom` |
+| Écart `contacts_clients` ↔ `ClientContact` | **confirmé** — prénom, mobile, notes, statut, rôles absents |
+| Code applicatif utilisant les tables OCR | **zéro occurrence** sur tout le dépôt |
+| Grant `anon` sur la résolution de jeton | **confirmé** (migration 200, ligne 108) |
+| Unicité réelle de `notifications_evenement_unique` | **inopérante** — `created_at` dans la clé |
+| Patron d'idempotence correct | **trouvé** — `reserves_notifications_envois.cle_idempotence unique` |
+| Catalogue Boutique | **vide** — aucun `insert into boutique_produits` |
+| `check` de catégorie Boutique | fermé à 4 valeurs, aucune compatible NFC |
+| Buckets publics | **1 sur 13** — `entreprise-assets` |
+| Dépendances QR | `qrcode` et `@zxing/browser` **présentes** |
+| Consommateurs de `@elsatia/client-contracts` | 4 fichiers GP (snapshot, identité légale, resend) |
+| Intégrité du worktree et des branches | aucune suppression, aucune modification externe |
+
+## 11. Tests non exécutés — et pourquoi
+
+| Test attendu (§16) | Pourquoi non exécuté |
+|---|---|
+| Les 26 tests fonctionnels de la mission | Ils portent sur un produit **qui n'existe pas encore**. Ce lot est un audit d'architecture : il n'a créé ni table, ni route, ni composant produit. Les tests sont **spécifiés** dans la spécification fonctionnelle (§16), prêts à être écrits au lot de réalisation. |
+| Vérification en base réelle | Le CLI Supabase est bloqué sur ce poste ; la base locale est au ledger 265 et un `db reset` détruirait le jeu multi-app de test. L'audit est donc fait **sur les migrations sources**, qui sont la vérité du schéma. |
+| Preuve E2E du hors-ligne | Rien n'est construit. Conformément au §12, **aucun fonctionnement hors ligne n'est annoncé** sans preuve. |
+| Preuve OCR | Aucun code OCR n'existe. Aucune promesse de taux de reconnaissance n'est faite. |
+| Rendu mobile | Les maquettes fournies sont des wireframes statiques isolés, non un produit mesuré. |
+
+---
+
+## 12. Livrables
+
+| Fichier | Objet |
+|---|---|
+| `docs/audits/ELSATIA-CONTACT-CARD-ARCHITECTURE-AUDIT-REPORT.md` | ce rapport |
+| `docs/audits/ELSATIA-CONTACT-CARD-FUNCTIONAL-SPECIFICATION-V1.md` | parcours, écrans, états, tests attendus |
+| `docs/audits/ELSATIA-CONTACT-CARD-GP-INTEGRATION-MAPPING-V1.md` | correspondance champ par champ avec Gestion Pro |
+| `docs/audits/ELSATIA-CONTACT-CARD-PRIVACY-SECURITY-MODEL-V1.md` | sécurité, RGPD, RLS, rétention |
+| `docs/audits/contact-card-wireframes/index.html` | wireframes fonctionnels isolés (fichier autonome, ne touche aucun produit) |
+| `docs/migrations-proposees/contact-card-v1.sql.proposed` | **NON INTÉGRÉ — BLOQUÉ PAR LE TRAIN GLOBAL** |
+
+---
+
+## 13. Décisions à prendre par Julien
+
+| # | Décision | Recommandation | Conséquence si non tranchée |
+|---|---|---|---|
+| **D1** | Application autonome `apps/contact` ou module de Gestion Pro ? | **Application autonome**, seule forme compatible avec le §11 | Le §11 devient infaisable |
+| **D2** | Autoriser un tiers fournisseur **et** sous-traitant ? | Remplacer `type_tiers` par une table de rôles, ou un `text[]` — migration bloquée aujourd'hui | Le multi-rôle du §6 reste interdit |
+| **D3** | Créer un vivier de candidats dans Gestion Pro ? | **Non en V1.** Les candidats restent au carnet Contact / Card | Le classement « candidat » reste sans destination — ce qui est acceptable et sûr |
+| **D4** | Créer un rôle « partenaire » ? | Une relation de rôle, **pas** une valeur de plus dans `clients.type` (qui est un type juridique, pas une relation) | Idem D3 |
+| **D5** | Activer l'OCR ? Avec quel fournisseur, à quel coût ? | OCR **hors périmètre V1**. Ouvrir par `FEATURE_AI_ENABLED` seulement après arbitrage coût + RGPD (les images partent chez un tiers) | Le §5 se limite à la saisie manuelle et aux formats structurés (QR, NFC, formulaire) — ce qui reste un produit complet |
+| **D6** | Conservation des images de cartes | Suppression de l'original **après** confirmation humaine, délai à fixer | Blocage RGPD |
+| **D7** | Domaine des cartes publiques | Sous-domaine dédié plutôt qu'un chemin sur `app.elsatia.fr` : une carte publique ne doit pas partager l'origine de l'application authentifiée | Risque de cookies/CSP mêlés |
+| **D8** | Ouverture Boutique des cartes NFC | Hors périmètre. Nécessite d'étendre le `check` de catégorie **et** de choisir un fournisseur physique | Aucune |
+| **D9** | Corriger `contacts_clients` (prénom, mobile, statut, rôles) ? | Oui, alignement sur `ClientContact` — mais migration bloquée | Le versement d'un contact perd prénom et mobile |
+| **D10** | Corriger l'index d'unicité des notifications | Oui, sur le patron `cle_idempotence unique` | L'exigence « une seule notification » reste non tenue |
+
+---
+
+## 14. Ce qui peut être promis en V1, et ce qui ne peut pas
+
+**Peut être promis** — tout repose sur des briques existantes :
+partage NFC / QR / lien ; page publique sans application ; vCard téléchargeable ; échange
+réciproque par formulaire consenti ; boîte de réception ; saisie manuelle et lecture de QR ;
+classement explicite ; détection de doublon ; carnet autonome sans Gestion Pro ; gestion,
+suspension et révocation des cartes ; notifications avec état de lecture ; isolation
+multi-tenant.
+
+**Ne peut pas être promis en V1** :
+OCR de carte papier (D5) ; création automatique de fiche, quelle qu'elle soit — c'est
+interdit par conception ; destination Gestion Pro pour « partenaire », « candidat » et
+« contact général » (D3, D4) ; multi-rôle fournisseur/sous-traitant (D2) ; hors-ligne
+complet tant qu'aucune preuve E2E n'a été produite ; vente de cartes physiques (D8).
+
+---
+
+## 15. Traçabilité
+
+| Élément | Valeur |
+|---|---|
+| Branche | `audit/elsatia-contact-card-architecture-v1` |
+| SHA de base complet | `1fc1331842cdf5980b374169994587813bdee7b6` |
+| SHA final complet poussé | *renseigné en fin de lot* |
+
+Aucune fusion, aucun déploiement, aucune migration canonique, aucune modification de
+`main`, aucune écriture en Production.
