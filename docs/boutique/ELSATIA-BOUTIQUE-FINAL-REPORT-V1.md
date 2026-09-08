@@ -9,6 +9,7 @@
 | SHA de base | `1fc1331` — `integration/elsatia-ecosystem-train-v2-reserves-gp-v1` |
 | SHA du contenu R1 | `406b8d3` (audit accepté : `6cb0b79`) |
 | SHA du contenu R2 | `06f6aa4` |
+| SHA du contenu R3 | `f8530eb` |
 | SHA final poussé | *(commit de consignation, ci-dessous)* |
 | Worktree | `/Volumes/ELSATIA-DEV/ELSATIA-WORKTREES/boutique-commerce-architecture-v1` |
 | Date | 2026-09-08 |
@@ -214,7 +215,7 @@ Tous sous `docs/boutique/`, aucun ailleurs.
 | `wireframes/index.html` | 282 | R2 + R3 |
 | `ELSATIA-BOUTIQUE-FINAL-REPORT-V1.md` | 239 | R2 + R3 |
 
-**SHA du contenu R3 : `<consigné après commit>`** — les dix fichiers ci-dessus.
+**SHA du contenu R3 : `f8530eb`** — les dix fichiers ci-dessus.
 
 ## 11. Confirmation de non-intervention
 
