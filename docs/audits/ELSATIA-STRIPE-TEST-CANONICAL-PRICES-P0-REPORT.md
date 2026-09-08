@@ -288,7 +288,7 @@ ID Live n'apparaît nulle part. `.env.local` n'est pas suivi par Git.
 |---|---|
 | **Branche** | `feat/stripe-test-canonical-prices-p0-v1` |
 | **SHA de base** | `ab6f9bda7977bf4ea6984970000595cc9a36a99c` (`feat/tarification-decisions-commerciales-v1`, porteur de `CANONICAL-V4-2026-09`) |
-| **SHA final poussé** | *(voir § ci-dessous)* |
+| **SHA final poussé** | `7fdd534bcde2c7fee698186ad90cc9c90974ecd8` |
 | Train V2 | `1fc1331842cdf5980b374169994587813bdee7b6` — base commune `996be15`, 33 commits d'écart |
 | Moteur commercial | `9c835579ca504eda9e39537a3293cefa926423f3` — branche distincte, non fusionnée |
 | Décisions tarifaires | `ab6f9bda7977bf4ea6984970000595cc9a36a99c` — **base retenue** |
