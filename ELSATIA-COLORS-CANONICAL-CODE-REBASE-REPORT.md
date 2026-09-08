@@ -14,9 +14,11 @@ dupliquée, et sans qu'aucune migration de l'ancienne base amputée n'ait été
 réintroduite.
 
 - Branche livrée : `integration/colors-code-on-ecosystem-ledger-v1`
-- SHA complet poussé (tête de branche) : `97672a4da680bdabedd7addb93bdb68616ab5114`
-- SHA complet du commit de code : `e9a6e6bc40d29e021f96c6395e0efce25f4b085a`
-  (le commit de tête n'ajoute que le présent rapport)
+- **SHA complet du lot** (le seul à reprendre) : `e9a6e6bc40d29e021f96c6395e0efce25f4b085a`
+  — commit unique portant tout le code et toute la documentation d'architecture.
+- Tête de branche poussée : ce commit, suivi du seul commit ajoutant le présent
+  rapport. `git rev-parse origin/integration/colors-code-on-ecosystem-ledger-v1`
+  en donne la valeur courante ; elle n'a aucune importance pour la reprise (§12).
 - Base : `integration/elsatia-ledger-reconciliation-p0-v1` @ `4f1f17044a38beba3b09e6937b2f8f626a8d87e0`
 - Migrations : **270 fichiers avant, 270 après** — delta nul, vérifié par
   `git diff 4f1f170 -- supabase/migrations` (0 ligne).
