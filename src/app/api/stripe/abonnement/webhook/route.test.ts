@@ -49,7 +49,11 @@ vi.mock("@/lib/stripe-discount-server", () => ({
   synchroniserExpirationRemiseSousVerrou: deps.synchroniserExpirationRemiseSousVerrou,
 }));
 
-const { POST, synchroniserAbonnementCoordonne } = await import("./route");
+const { POST } = await import("./route");
+// La logique métier ne peut plus être exportée depuis `route.ts` (Next.js n'y
+// autorise que les gestionnaires HTTP) : elle vit dans son module dédié, où
+// elle reste directement testable.
+const { synchroniserAbonnementCoordonne } = await import("@/lib/stripe-abonnement-synchronisation");
 const { passerelleStripeRemise } = await import("@/lib/stripe-discount-gateway");
 const SECRET = "whsec_test_uniquement";
 const ENTREPRISE = "11111111-1111-4111-8111-111111111111";
@@ -351,5 +355,72 @@ describe("email de paiement échoué", () => {
     deps.notifierPaiementAbonnementEchoue.mockRejectedValueOnce(new Error("Brevo indisponible"));
     const response = await POST(request(evenementFacture("invoice.payment_failed")));
     expect(response.status).toBe(200);
+  });
+});
+
+// ── P0 — extraction de la logique métier hors de `route.ts` (build Next.js 16) ─
+// Next.js refuse tout export de `route.ts` autre qu'un gestionnaire HTTP ou une
+// clé de configuration de segment. Ces tests verrouillent le résultat de
+// l'extraction : surface d'export de la route, testabilité du module métier et
+// comportement Stripe inchangé.
+describe("surface d'export de la route et module métier", () => {
+  it("la route n'expose que le gestionnaire POST", async () => {
+    const routeModule = await import("./route");
+    expect(Object.keys(routeModule)).toEqual(["POST"]);
+  });
+
+  it("`synchroniserAbonnementCoordonne` reste appelable depuis son module métier", async () => {
+    const metier = await import("@/lib/stripe-abonnement-synchronisation");
+    expect(typeof metier.synchroniserAbonnementCoordonne).toBe("function");
+    const admin = adminFake();
+    await expect(
+      metier.synchroniserAbonnementCoordonne(admin as never, ENTREPRISE, "sub_test", "evt_module"),
+    ).resolves.toBe("actif");
+  });
+
+  it("un événement d'abonnement valide déclenche une seule coordination métier", async () => {
+    const admin = adminFake();
+    deps.createAdminClient.mockReturnValue(admin);
+    const response = await POST(request(event({ livemode: false, type: "customer.subscription.updated" })));
+    expect(response.status).toBe(200);
+    expect(deps.acquerirVerrouRemise).toHaveBeenCalledTimes(1);
+    expect(deps.libererVerrouRemise).toHaveBeenCalledTimes(1);
+    expect(admin.appels.filter((a) => a.table === "synchroniser_abonnement_stripe_service")).toHaveLength(1);
+  });
+
+  it("un type d'événement inconnu est journalisé sans erreur ni coordination", async () => {
+    const admin = adminFake();
+    deps.createAdminClient.mockReturnValue(admin);
+    const response = await POST(request(event({ livemode: false, type: "customer.discount.deleted" })));
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ received: true });
+    expect(deps.acquerirVerrouRemise).not.toHaveBeenCalled();
+    expect(admin.appels.some((a) => a.table === "finaliser_evenement_abonnement_service")).toBe(true);
+  });
+
+  it("une erreur métier renvoie 500 sans détail interne et rejoue l'événement", async () => {
+    const journal = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const admin = adminFake();
+    deps.createAdminClient.mockReturnValue(admin);
+    deps.recupererAbonnementStripe.mockRejectedValueOnce(new Error("secret interne Stripe"));
+    const response = await POST(request(event({ livemode: false, type: "customer.subscription.updated" })));
+    expect(response.status).toBe(500);
+    const corps = await response.text();
+    expect(corps).toContain("Synchronisation impossible");
+    expect(corps).not.toContain("secret interne Stripe");
+    expect(JSON.stringify(journal.mock.calls)).not.toContain("secret interne Stripe");
+    // réservation annulée : Stripe pourra re-livrer l'événement
+    expect(admin.appels.some((a) => a.table === "annuler_evenement_abonnement_service")).toBe(true);
+    // le verrou remise est relâché même en cas d'échec
+    expect(deps.libererVerrouRemise).toHaveBeenCalledWith(admin, "sub_test", "verrou-test");
+  });
+
+  it("le module métier ne contient ni secret Stripe, ni Price ID, ni montant tarifaire", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync("src/lib/stripe-abonnement-synchronisation.ts", "utf8");
+    expect(source).not.toMatch(/sk_(test|live)_/);
+    expect(source).not.toMatch(/whsec_/);
+    expect(source).not.toMatch(/\bprice_[A-Za-z0-9]/);
+    expect(source).not.toMatch(/unit_amount|montant_ht|montant_ttc/);
   });
 });

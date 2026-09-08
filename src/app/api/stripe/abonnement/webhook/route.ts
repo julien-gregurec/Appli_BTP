@@ -1,30 +1,15 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { ajouterDepassementAppareilsFacture, ajouterDepassementStockageFacture, calculerDepassementAppareils, reconcilierAbonnementStripe, recupererAbonnementStripe, statutAbonnementDepuisStripe, type StripeSubscription } from "@/lib/stripe-abonnement";
+import { ajouterDepassementAppareilsFacture, ajouterDepassementStockageFacture, calculerDepassementAppareils, reconcilierAbonnementStripe } from "@/lib/stripe-abonnement";
 import { verifierSignatureStripe } from "@/lib/stripe";
 import { categoriserErreurSupabase, empreinteEvenementStripe, identifiantUuidValide, resoudreModeStripeWebhook } from "@/lib/stripe-webhook-environment";
 import { reconcilierCapacitePersonnesStripe } from "@/lib/stripe-capacite-reconcile";
-import { passerelleStripeRemise } from "@/lib/stripe-discount-gateway";
 import { notifierPaiementAbonnementEchoue } from "@/lib/abonnement-notifications";
-import { acquerirVerrouRemise, libererVerrouRemise, lireOperationActiveRemiseServeur, reconcilierOperationRemiseSousVerrou, synchroniserExpirationRemiseSousVerrou, VerrouRemiseOccupe } from "@/lib/stripe-discount-server";
+import { VerrouRemiseOccupe } from "@/lib/stripe-discount-server";
+// Next.js n'autorise dans un `route.ts` que les exports de gestionnaires HTTP
+// et la configuration de segment : la logique métier vit dans ce module.
+import { identifiant, instantDepuisUnix, synchroniserAbonnementCoordonne, type StripeReference, type SupabaseAdmin } from "@/lib/stripe-abonnement-synchronisation";
 
-// B1 — un verrou remise occupé est un état transitoire (un autre évènement de la
-// MÊME subscription est en cours de traitement), pas une panne. On tente une
-// courte reprise en place ; si le verrou reste occupé, l'appelant renvoie un
-// code HTTP « rejouable » (503) pour que Stripe re-livre — jamais un 500.
-async function acquerirVerrouRemiseAvecReprise(admin: SupabaseAdmin, subscriptionId: string, proprietaire: string) {
-  const attentesMs = [150, 300, 600];
-  for (let i = 0; ; i++) {
-    try {
-      return await acquerirVerrouRemise(admin, subscriptionId, proprietaire);
-    } catch (e) {
-      if (!(e instanceof VerrouRemiseOccupe) || i >= attentesMs.length) throw e;
-      await new Promise((r) => setTimeout(r, attentesMs[i]));
-    }
-  }
-}
-
-type StripeReference = string | { id?: string } | null | undefined;
 type StripeObjet = {
   id: string;
   object?: string;
@@ -54,15 +39,10 @@ type StripeObjet = {
   total_tax_amounts?: Array<{ amount?: number }>;
 };
 type StripeEvent = { id: string; type: string; livemode: boolean; created?: number; account?: string; data: { object: StripeObjet } };
-type SupabaseAdmin = ReturnType<typeof createAdminClient>;
 type EntrepriseStripe = { id: string; stripe_customer_id?: string | null; stripe_subscription_id?: string | null };
 type ResolutionEntreprise =
   | { ok: true; entrepriseId: string }
   | { ok: false; categorie: "metadata_absente" | "format_identifiant_invalide" | "entreprise_inconnue" | "rattachement_stripe_incoherent" | ReturnType<typeof categoriserErreurSupabase> };
-
-function identifiant(reference: StripeReference) {
-  return typeof reference === "string" ? reference : reference?.id || null;
-}
 
 function evenementStripeMinimalValide(valeur: unknown): valeur is StripeEvent {
   if (!valeur || typeof valeur !== "object") return false;
@@ -73,14 +53,6 @@ function evenementStripeMinimalValide(valeur: unknown): valeur is StripeEvent {
     && !!candidat.data && typeof candidat.data === "object"
     && !!candidat.data.object && typeof candidat.data.object === "object"
     && typeof candidat.data.object.id === "string" && candidat.data.object.id.trim() !== "";
-}
-
-function dateDepuisUnix(valeur?: number | null) {
-  return valeur ? new Date(valeur * 1000).toISOString().slice(0, 10) : null;
-}
-
-function instantDepuisUnix(valeur?: number | null) {
-  return valeur ? new Date(valeur * 1000).toISOString() : null;
 }
 
 async function lireEntreprise(requete: PromiseLike<{ data: EntrepriseStripe | null; error: { code?: string; message?: string } | null }>): Promise<ResolutionEntreprise | EntrepriseStripe | null> {
@@ -125,31 +97,6 @@ function diagnosticWebhook(niveau: "warn" | "error", evenement: Pick<StripeEvent
   });
 }
 
-async function synchroniserAbonnement(admin: SupabaseAdmin, entrepriseId: string, abonnement: StripeSubscription) {
-  const offre = abonnement.metadata?.offre;
-  const periodicite = abonnement.metadata?.periodicite;
-  const statut = statutAbonnementDepuisStripe(abonnement.status);
-  // ACL canonique (migration 255) : `service_role` n'a plus d'écriture directe sur
-  // `entreprises` (hors colonnes abonnement/stripe), `plans_abonnement`,
-  // `abonnements_entreprises`. La synchronisation passe par une RPC SECURITY
-  // DEFINER bornée qui vérifie le lien subscription ↔ entreprise (fail-closed).
-  const { data, error } = await admin.rpc("synchroniser_abonnement_stripe_service", {
-    p_entreprise_id: entrepriseId,
-    p_stripe_subscription_id: abonnement.id,
-    p_stripe_customer_id: identifiant(abonnement.customer),
-    p_statut: statut,
-    p_offre: ["essentiel", "premium", "mini", "pro", "business", "entreprise", "sur_mesure"].includes(offre || "") ? offre : null,
-    p_periodicite: ["mensuel", "annuel"].includes(periodicite || "") ? periodicite : null,
-    p_echeance: dateDepuisUnix(abonnement.current_period_end),
-    p_essai_fin: dateDepuisUnix(abonnement.trial_end),
-    p_annulation_prevue_at: abonnement.cancel_at_period_end ? instantDepuisUnix(abonnement.cancel_at || abonnement.current_period_end) : null,
-    p_debut_periode: instantDepuisUnix(abonnement.current_period_start),
-    p_fin_periode: instantDepuisUnix(abonnement.current_period_end),
-  });
-  if (error) throw new Error(error.message);
-  return (data as string) ?? statut;
-}
-
 async function synchroniserFactureAbonnement(admin: SupabaseAdmin, entrepriseId: string, objet: StripeObjet, statut: string) {
   const taxes = (objet.total_tax_amounts ?? []).reduce((total, taxe) => total + Number(taxe.amount ?? 0), 0);
   const totalCentimes = Number(objet.total ?? 0);
@@ -170,41 +117,6 @@ async function synchroniserFactureAbonnement(admin: SupabaseAdmin, entrepriseId:
     p_url_pdf: objet.invoice_pdf ?? null,
   });
   if (error) throw new Error(error.message);
-}
-
-export async function synchroniserAbonnementCoordonne(
-  admin: SupabaseAdmin,
-  entrepriseId: string,
-  subscriptionId: string,
-  evenementId: string,
-) {
-  const verrou = await acquerirVerrouRemiseAvecReprise(admin, subscriptionId, `webhook:${empreinteEvenementStripe(evenementId)}`);
-  try {
-    // Le payload peut être ancien ou désordonné : seule cette relecture est une
-    // observation Stripe utilisable pour la remise et la saga active.
-    let abonnementActuel = await recupererAbonnementStripe(subscriptionId);
-    // B3 — première liaison : la chaîne remise ci-dessous exige que la
-    // subscription soit déjà rattachée à l'entreprise. On lie ici (CAS sur NULL,
-    // fail-closed si déjà liée à une autre subscription).
-    const lien = await admin.rpc("lier_subscription_entreprise_service", {
-      p_entreprise_id: entrepriseId,
-      p_stripe_subscription_id: subscriptionId,
-      p_stripe_customer_id: identifiant(abonnementActuel.customer),
-    });
-    if (lien.error) throw new Error(lien.error.message);
-    const operation = await lireOperationActiveRemiseServeur(admin, subscriptionId, verrou);
-    if (operation) {
-      await reconcilierOperationRemiseSousVerrou(admin, operation, verrou, passerelleStripeRemise);
-      abonnementActuel = await recupererAbonnementStripe(subscriptionId);
-    }
-    const expiration = await synchroniserExpirationRemiseSousVerrou(
-      admin, entrepriseId, abonnementActuel, verrou, passerelleStripeRemise,
-    );
-    if (expiration) abonnementActuel = await recupererAbonnementStripe(subscriptionId);
-    return await synchroniserAbonnement(admin, entrepriseId, abonnementActuel);
-  } finally {
-    await libererVerrouRemise(admin, subscriptionId, verrou);
-  }
 }
 
 async function notifierPaiementEchoueSansEchouer(admin: SupabaseAdmin, entrepriseId: string, objet: StripeObjet) {
