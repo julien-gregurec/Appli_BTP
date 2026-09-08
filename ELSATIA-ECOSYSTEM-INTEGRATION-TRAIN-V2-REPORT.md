@@ -15,7 +15,8 @@ aucune fusion, aucun accès Supabase distant, aucun worktree ni stash supprimé.
 |---|---|
 | Branche | `integration/elsatia-ecosystem-train-v2-reserves-gp-v1` |
 | SHA de base | `4f1f17044a38beba3b09e6937b2f8f626a8d87e0` |
-| SHA final | *(renseigné au commit de ce rapport — voir §11)* |
+| SHA du contenu du train | `3535a72` — `docs(train-v2)`, dernier commit de contenu, poussé sur `origin` |
+| SHA final | le commit ci-dessous, qui consigne cette valeur ; voir `git rev-parse origin/integration/elsatia-ecosystem-train-v2-reserves-gp-v1` |
 | Worktree | `/Volumes/ELSATIA-DEV/ELSATIA-WORKTREES/train-v2-reserves-gp` |
 | Ledger | **272 fichiers**, numéro fonctionnel maximal **274** |
 | Delta depuis la baseline Production | **62 migrations** |
@@ -415,3 +416,4 @@ Reste à faire avant de considérer le lot clos :
 | `bfb5e7b` | migration canonique **274** — champs clients légaux | ce passage |
 | `86e4825` | activation de l'identité légale et branchement des validateurs partagés | ce passage |
 | `f88dd16` | sortie de `lireIdentiteLegale` du module Server Actions (correctif de build) | ce passage |
+| `3535a72` | rapport d'intégration et préflight de cutover actualisé | ce passage |
