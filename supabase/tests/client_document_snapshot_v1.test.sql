@@ -5,7 +5,7 @@
 -- le changement porte B.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(26);
+select plan(28);
 
 \ir fixtures/isolation_multitenant.inc
 
@@ -285,17 +285,26 @@ select ok(
        'a3000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001'
      ) -> k = 'null'::jsonb)
    from unnest(array['numero_tva', 'forme_juridique', 'nom_commercial', 'adresse_complement', 'pays']) as k),
-  'ces cinq champs valent null tant que les colonnes correspondantes n''existent pas'
+  'ces cinq champs valent null pour un client qui ne les a pas renseignés, que la colonne existe (274) ou non (nom_commercial)'
 );
+
+-- Cette assertion constatait l'ABSENCE des cinq colonnes tant que le ledger bloquait la
+-- partie 2 du lot. La migration 20260908000274 ayant été appliquée, elle constate désormais
+-- l'état voulu : les quatre colonnes d'identité légale existent, et `nom_commercial` reste
+-- délibérément absent (son rôle est tenu par `clients.societe`, cf. 274).
 
 select ok(
   (select bool_and(
-     not exists (
+     exists (
        select 1 from information_schema.columns
        where table_schema = 'public' and table_name = 'clients' and column_name = c
      ))
-   from unnest(array['numero_tva', 'forme_juridique', 'nom_commercial', 'adresse_complement', 'pays']) as c),
-  'aucune de ces colonnes n''existe encore sur public.clients (partie 2 bloquée par le ledger)'
+   from unnest(array['numero_tva', 'forme_juridique', 'adresse_complement', 'pays']) as c)
+  and not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'clients' and column_name = 'nom_commercial'
+  ),
+  'les quatre colonnes légales existent (274) et nom_commercial reste volontairement absent'
 );
 
 -- 25-26 : le journal d'audit de la surcharge d'adresse s'appuie sur
@@ -312,6 +321,39 @@ select ok(
 select ok(
   (select relrowsecurity from pg_class where oid = 'public.journal_activite'::regclass),
   'le journal d''audit est cloisonné par entreprise (RLS active)'
+);
+
+-- ---------------------------------------------------------------------------
+-- 27-28. ELSATIA-GP-CLIENT-LEGAL-FIELDS-V1 (migration 20260908000274)
+-- ---------------------------------------------------------------------------
+--
+-- 27 : la liste blanche du snapshot capture RÉELLEMENT les valeurs une fois les colonnes
+-- créées. Sans cette assertion, 22 et 23 ne prouvent que la présence de clés nulles.
+
+update public.clients set
+  numero_tva = 'FR40303265045',
+  forme_juridique = 'SAS',
+  adresse_complement = 'Bâtiment A, 3e étage',
+  pays = 'FR'
+where id = 'a3000000-0000-0000-0000-000000000001';
+
+select is(
+  (select public.construire_client_snapshot(
+     'a3000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001'
+   ) - 'capture_le' - 'source' ->> 'numero_tva'),
+  'FR40303265045',
+  'une valeur écrite dans les colonnes de 274 est effectivement capturée par le snapshot'
+);
+
+-- 28 : les contraintes de forme sont actives sur les écritures nouvelles. Elles sont posées
+-- `not valid` : elles ne relisent pas l'existant, mais elles contrôlent bien les mises à jour.
+
+select throws_ok(
+  $$update public.clients set pays = 'France'
+    where id = 'a3000000-0000-0000-0000-000000000001'$$,
+  '23514',
+  null,
+  'la contrainte de forme refuse un pays qui n''est pas un code ISO alpha-2'
 );
 
 select * from finish();

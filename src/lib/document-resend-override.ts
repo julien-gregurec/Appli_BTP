@@ -25,6 +25,8 @@
 // Module pur : aucune dépendance à Supabase, à React ni au réseau, pour que la
 // règle soit testable sans environnement.
 
+import { isPlausibleEmail } from "@elsatia/client-contracts";
+
 /** Adresse de substitution saisie explicitement par un utilisateur autorisé. */
 export type SurchargeDestinataire = {
   email?: string | null;
@@ -44,18 +46,20 @@ export type ResolutionDestinataire =
     }
   | { ok: false; erreur: string };
 
-// Garde-fou de format volontairement minimal — il refuse ce qui ne peut
-// manifestement pas être remis (espace, arobase absente ou multiple, domaine
-// sans point). Ce n'est PAS un validateur d'adresse complet, et il n'a pas
-// vocation à le devenir : `@elsatia/client-contracts` expose déjà
-// `isPlausibleEmail`, validé séparément. Ce garde-fou est le point de
-// substitution prévu — voir le rapport du lot, section « dépendance Client
-// Contracts ». Le rejet définitif reste de toute façon prononcé par Brevo.
-const FORMAT_MINIMAL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+// SUBSTITUTION EFFECTUÉE (ELSATIA-ECOSYSTEM-INTEGRATION-TRAIN-V2). Le garde-fou de format
+// local, écrit à titre temporaire parce que `@elsatia/client-contracts` n'était pas encore
+// au train, est remplacé par le validateur partagé `isPlausibleEmail`. Il n'existe donc
+// plus qu'une seule définition de « adresse plausible » dans l'écosystème.
+//
+// La borne de longueur est CONSERVÉE et n'est pas un doublon du validateur : 320 caractères
+// est la limite d'adresse de la RFC 5321 (64 pour la partie locale, 255 pour le domaine).
+// C'est une contrainte de transport, pas de forme — `isPlausibleEmail` ne la porte pas, et
+// ne doit pas la porter. Le rejet définitif reste de toute façon prononcé par Brevo.
+const LONGUEUR_MAX_ADRESSE = 320;
 
 export function adresseRemisePlausible(valeur: string | null | undefined): boolean {
   const nettoyee = (valeur ?? "").trim();
-  return nettoyee.length > 0 && nettoyee.length <= 320 && FORMAT_MINIMAL.test(nettoyee);
+  return nettoyee.length > 0 && nettoyee.length <= LONGUEUR_MAX_ADRESSE && isPlausibleEmail(nettoyee);
 }
 
 function memeAdresse(a: string | null, b: string | null): boolean {

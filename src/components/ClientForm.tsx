@@ -5,8 +5,13 @@ type ClientInitial = {
   nom?: string | null;
   prenom?: string | null;
   societe?: string | null;
+  raison_sociale?: string | null;
   siret?: string | null;
+  numero_tva?: string | null;
+  forme_juridique?: string | null;
   adresse_facturation?: string | null;
+  adresse_complement?: string | null;
+  pays?: string | null;
   code_postal?: string | null;
   ville?: string | null;
   telephone?: string | null;
@@ -63,14 +68,46 @@ export function ClientForm({
         </div>
       </div>
 
+      {/*
+        Deux noms, deux rôles, une seule source chacun (ELSATIA-GP-CLIENT-LEGAL-FIELDS-V1) :
+        « Société » est le nom commercial d'usage (clients.societe), affiché partout ;
+        « Raison sociale » est la dénomination légale (clients.raison_sociale), portée sur
+        les documents commerciaux. La colonne existait depuis 20260710000004 sans jamais
+        être saisie — c'est ce formulaire qui l'active. Aucune colonne `nom_commercial`
+        n'est créée : elle ferait doublon avec `societe`.
+      */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
           <label className={labelClass} htmlFor="societe">Société</label>
           <input id="societe" name="societe" defaultValue={initial?.societe ?? ""} className={inputClass} />
+          <p className="text-xs text-neutral-500">Nom commercial ou enseigne, utilisé pour l&apos;affichage.</p>
         </div>
+        <div className="space-y-1">
+          <label className={labelClass} htmlFor="raison_sociale">Raison sociale</label>
+          <input id="raison_sociale" name="raison_sociale" defaultValue={initial?.raison_sociale ?? ""} className={inputClass} />
+          <p className="text-xs text-neutral-500">Dénomination légale, si elle diffère du nom commercial.</p>
+        </div>
+      </div>
+
+      {/*
+        Identité légale — facultative, et sans effet pour un particulier. Les champs restent
+        visibles quel que soit le type de client : le formulaire est rendu côté serveur, et
+        masquer une saisie déjà enregistrée derrière un changement de type ferait disparaître
+        une donnée de l'écran sans la supprimer en base. Le libellé porte donc la nuance,
+        plutôt qu'un affichage conditionnel qui mentirait sur le contenu réel.
+      */}
+      <div className="grid grid-cols-3 gap-4">
         <div className="space-y-1">
           <label className={labelClass} htmlFor="siret">SIRET</label>
           <input id="siret" name="siret" defaultValue={initial?.siret ?? ""} className={inputClass} />
+        </div>
+        <div className="space-y-1">
+          <label className={labelClass} htmlFor="numero_tva">N° TVA intracommunautaire</label>
+          <input id="numero_tva" name="numero_tva" placeholder="FR40303265045" defaultValue={initial?.numero_tva ?? ""} className={inputClass} />
+        </div>
+        <div className="space-y-1">
+          <label className={labelClass} htmlFor="forme_juridique">Forme juridique</label>
+          <input id="forme_juridique" name="forme_juridique" placeholder="SAS, SARL, SCI…" defaultValue={initial?.forme_juridique ?? ""} className={inputClass} />
         </div>
       </div>
 
@@ -79,7 +116,12 @@ export function ClientForm({
         <input id="adresse_facturation" name="adresse_facturation" defaultValue={initial?.adresse_facturation ?? ""} className={inputClass} />
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="space-y-1">
+        <label className={labelClass} htmlFor="adresse_complement">Complément d&apos;adresse</label>
+        <input id="adresse_complement" name="adresse_complement" placeholder="Bâtiment, étage, boîte postale" defaultValue={initial?.adresse_complement ?? ""} className={inputClass} />
+      </div>
+
+      <div className="grid grid-cols-4 gap-4">
         <div className="space-y-1">
           <label className={labelClass} htmlFor="code_postal">Code postal</label>
           <input id="code_postal" name="code_postal" defaultValue={initial?.code_postal ?? ""} className={inputClass} />
@@ -87,6 +129,11 @@ export function ClientForm({
         <div className="col-span-2 space-y-1">
           <label className={labelClass} htmlFor="ville">Ville</label>
           <input id="ville" name="ville" defaultValue={initial?.ville ?? ""} className={inputClass} />
+        </div>
+        <div className="space-y-1">
+          <label className={labelClass} htmlFor="pays">Pays</label>
+          <input id="pays" name="pays" placeholder="FR" maxLength={2} defaultValue={initial?.pays ?? ""} className={inputClass} />
+          <p className="text-xs text-neutral-500">Code ISO à 2 lettres. Vide = France.</p>
         </div>
       </div>
 
