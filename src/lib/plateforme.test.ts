@@ -12,10 +12,10 @@ describe("prixAbonnementMensuel", () => {
 
   it("facture chaque compte au-delà des comptes inclus", () => {
     expect(prixAbonnementMensuel(4)).toMatchObject({
-      total: mini.base + mini.parCompteSup,
+      total: mini.base + mini.parCompteSupHistorique,
       employesSupplementaires: 1,
     });
-    expect(prixAbonnementMensuel(16, pro).total).toBe(pro.base + pro.parCompteSup);
+    expect(prixAbonnementMensuel(16, pro).total).toBe(pro.base + pro.parCompteSupHistorique);
   });
 
   it("ajoute le dépassement d'appareils", () => {
