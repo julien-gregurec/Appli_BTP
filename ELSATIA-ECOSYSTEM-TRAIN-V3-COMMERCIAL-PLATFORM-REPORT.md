@@ -282,6 +282,41 @@ pack IA ponctuel, IA intensive récurrente, modules sans double facturation,
 remise temporaire et à vie, ancien contrat préservé, ancien Price connu mais non
 vendable, checkout limité à la génération courante.
 
+### Performance de l'annuaire
+
+Mesuré sur une base issue de l'upgrade depuis le Train V2, avec un décor de
+500 puis 5 000 entreprises (noms, raisons sociales, villes et SIRET réalistes).
+
+**Les index de la migration 00276 sont bien choisis par le planificateur** — ce
+qui importe davantage qu'un temps isolé, car un bon temps obtenu par balayage
+séquentiel sur 5 000 lignes ne dit rien de ce qui se passera à 50 000 :
+
+| Requête | Plan retenu à 5 000 | Temps |
+|---|---|---|
+| Recherche texte | `Bitmap Index Scan` sur `entreprises_recherche_nom_trgm` | 3,9 ms |
+| Recherche SIRET | `Index Scan` sur `entreprises_siret_chiffres` | 1,2 ms |
+| Page profonde | `Index Scan` sur `entreprises_created_at_idx` | 3,7 ms |
+
+RPC complète (pagination serveur, 25 lignes par page) :
+
+| | 500 entreprises | 5 000 entreprises |
+|---|---|---|
+| Page 1, tri par date | 9,3 ms | **27,2 ms** |
+| Recherche texte | 21,0 ms | **125,4 ms** |
+
+**Réserve de méthode, explicite.** La machine portait en parallèle les piles de
+plusieurs autres travaux (charge système supérieure à 45). Les mesures brutes
+allaient de 271 ms à 33 s **pour la même requête** : ce pire cas mesure la
+contention de la machine, pas l'annuaire. Les chiffres ci-dessus sont donc le
+**minimum sur neuf appels**, borne la plus proche du coût réel ; la moyenne
+observée était de 91 ms (page 1) et 308 ms (recherche), et n'est pas
+représentative. Une mesure sur machine au repos reste souhaitable avant de
+conclure sur le passage à 50 000 entreprises.
+
+Le plafond dur de 100 lignes par page est appliqué par la fonction elle-même,
+quelle que soit la taille demandée : le volume transféré ne dépend pas du
+client.
+
 ### Stripe Test
 
 Les 27 Price `CANONICAL-V4-2026-09` sont repris, ainsi que la séparation Price
