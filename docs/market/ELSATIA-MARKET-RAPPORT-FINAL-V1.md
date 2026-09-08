@@ -1,10 +1,12 @@
 # ELSATIA-MARKET — RAPPORT FINAL DU LOT
 
 Lot : `ELSATIA-MARKET-BUSINESS-LEGAL-TECHNICAL-ARCHITECTURE-V1`
-Révision : **R2 — décisions produit fermées** (`ELSATIA-MARKET-R2-FINAL-PRODUCT-DECISIONS`)
+Révision : **R2 — décisions produit fermées** (`ELSATIA-MARKET-R2-FINAL-PRODUCT-DECISIONS`),
+complétée des **décisions D-5, D-6, D-10 et D-11 arrêtées après acceptation de la R2**.
 Branche : `feat/market-architecture-legal-business-v1`
 SHA de base : `1fc1331842cdf5980b374169994587813bdee7b6`
 SHA R1 : `281769b0d6345914ad93574f8549999862cd2dea`
+SHA R2 accepté : `87415d1011bca967f2d8b8065245f7e87d2f688b`
 Date : 2026-09-08
 
 ---
@@ -44,13 +46,13 @@ l'opérationnel — capacité de traitement, délai tenu, homogénéité des dé
 | **D-2 — Séparation des surfaces publique et vendeur** | **FERMÉE** | projection publique dédiée, lecture par fonctions à projection explicite, aucun identifiant technique exposé | aucune |
 | **D-3 — ELSATIA encaisse-t-elle la vente ?** | **FERMÉE — NON** | aucune commission, aucun reversement, aucun portefeuille, aucun séquestre, aucun remboursement, aucun litige financier ; Connect non utilisé pour les ventes | réexamen possible en V2 vers un paiement **sans commission** (le vendeur encaisse sur son compte) ; question juridique G-2 |
 | **D-4 — Source de vérification d'entreprise** | **REQUALIFIÉE** | **n'est plus bloquante** : validation manuelle sur pièce, tracée et outillée ; aucun prestataire choisi | automatisation de N2 pour la montée en charge ; comparaison de prestataires à conduire |
-| **D-5 — Notifications : dupliquer ou généraliser ?** | **OUVERTE** | modèle Réserves dupliqué pour Market (généraliser imposerait de modifier Réserves, interdit ici) | factorisation ultérieure d'un socle de notifications d'écosystème |
-| **D-6 — Événement « publié sur Market » vers Colors** | **OUVERTE** (recommandation : oui) | Market émet l'événement dès la V1, sans consommateur | consommation par Colors dans un lot Colors ultérieur |
+| **D-5 — Notifications** | **ARBITRÉE** | les notifications reposeront **à terme sur un socle partagé ELSATIA**, avec des **événements Market spécifiques**. **Aucune duplication permanente du modèle Réserves** n'est acceptée. | socle de notifications d'écosystème ; toute implémentation Market provisoire est explicitement transitoire (§2.2) |
+| **D-6 — Événements Market vers Colors** | **ARBITRÉE** | Market **émet** des événements. **Colors ne modifie jamais automatiquement son stock** sur une publication ou une réservation. Seule une **transaction confirmée** peut déclencher une **proposition idempotente et traçable**, soumise à l'utilisateur. | consommation par Colors dans un lot Colors ultérieur, sous cette contrainte |
 | **D-7 — Prix figé au contrat** | **FERMÉE — intégrée à D-8** | le prix cesse d'être relu dans le code : il est figé sur la ligne d'abonnement produit (règle H2) | traitée par le lot multiproduit **MP** |
 | **D-8 — Modèle d'abonnement multiproduit** | **FERMÉE dans son principe** | contrat commercial d'entreprise + une **ligne par produit souscrit** ; `produit_id` stable ; génération, périodicité et prix **par produit** ; un seul `Customer` Stripe, une `Subscription` par produit | **lot MP** : plan de migration en 8 étapes, réconciliation à zéro écart, pgTAP sur base clonée. **Interdit de lever `unique(entreprise_id)` sans ce plan.** |
 | **D-9 — Vente entre particuliers (C2C)** | **FERMÉE — EXCLUE** | un particulier ne publie pas, ne vend pas, ne se déclare pas professionnel | audit juridique dédié (G-1) avant toute ouverture |
-| **D-10 — Arbitrage tarifaire Market** | **OUVERTE** | aucun palier, aucun quota, aucune durée d'essai, aucun montant n'est proposé | lot tarifaire dédié, après étude de marché |
-| **D-11 — Facture consolidée ou factures par produit ?** | **OUVERTE** *(nouvelle)* | plusieurs `Subscription` Stripe produisent plusieurs factures Stripe | soit facture ELSATIA consolidée via `factures_abonnement` (qui existe), soit acceptation de factures multiples |
+| **D-10 — Arbitrage tarifaire Market** | **OUVERTE — maintenue ouverte** | aucun palier, aucun quota, aucune durée d'essai, aucun montant n'est proposé | **maintenue ouverte jusqu'à l'étude des coûts** ; lot tarifaire dédié ensuite |
+| **D-11 — Facturation multiproduit** | **ORIENTÉE** | **un `Customer` par entreprise et plusieurs souscriptions peuvent être retenus techniquement**, mais **l'expérience plateforme doit présenter une facturation consolidée**. Des factures Stripe multiples ne sont pas une réponse acceptable en l'état. | **forme définitive décidée dans le lot multiproduit du Train V3** |
 | **D-12 — Prestations de service** | **FERMÉE — HORS V1** *(nouvelle)* | Market vend des **biens** ; main-d'œuvre, sous-traitance et prestations ne sont pas publiables | produit distinct, à instruire pour lui-même (G-5) |
 
 ### 2.1 Décisions désormais fermées — récapitulatif
@@ -66,7 +68,82 @@ l'opérationnel — capacité de traitement, délai tenu, homogénéité des dé
 | 7 | **Market porte des biens professionnels**, jamais un bien interdit, dangereux, volé, contrefait ou non conforme. **Prestations hors V1.** |
 | 8 | **Market fonctionne sans Gestion Pro.** Ponts facultatifs, liens **faibles et nullables**. |
 
-### 2.2 Décisions tarifaires encore ouvertes
+### 2.2 Décisions complémentaires arrêtées après acceptation de la R2
+
+Ces quatre décisions sont consignées ici et **nulle part ailleurs** : elles orientent des lots
+ultérieurs, pas la spécification Market.
+
+#### D-5 — Notifications : socle partagé, pas de duplication
+
+> Les notifications reposeront **à terme sur un socle partagé ELSATIA**, avec des **événements Market
+> spécifiques**. **Aucune duplication permanente du modèle Réserves.**
+
+Ce que cela change par rapport à la R2 : la recommandation « dupliquer le modèle Réserves » n'était
+acceptable que comme raccourci. Elle est **refusée comme état final**.
+
+| Conséquence | |
+|---|---|
+| Le socle de notifications devient un **lot d'écosystème**, au même titre que le socle multiproduit | il sert Réserves, Market et les produits suivants |
+| Le **catalogue d'événements Market** (§6.2 de la spécification) reste valide | il décrit *quoi* notifier, pas *par quel mécanisme* |
+| La distinction **service / sécurité / commercial / publicité** est portée par le socle | et non réinventée par produit |
+| Si une implémentation Market devait précéder le socle, elle serait **explicitement transitoire** | jamais présentée comme définitive, et dimensionnée pour être reprise |
+| Contrainte non négociable, conservée | les notifications **sécurité** ne sont jamais désactivables, l'ouverture d'un accès d'assistance en fait partie |
+
+#### D-6 — Événements Market → Colors : proposition, jamais mutation
+
+> Market **émet** des événements, mais **Colors ne modifie jamais automatiquement son stock** sur une
+> publication ou une réservation. Une **transaction confirmée** peut seulement déclencher une
+> **proposition idempotente et traçable**.
+
+C'est une contrainte plus forte que celle de la R2, et elle est juste : une publication n'est pas une
+sortie, et une réservation n'est pas une vente. Seule une remise confirmée constitue un fait
+susceptible d'affecter un stock — et même alors, elle **propose**, elle n'applique pas.
+
+| Règle | |
+|---|---|
+| **C1** | Ni une publication, ni une réservation, ni une acceptation d'offre ne produisent d'effet sur un stock Colors ou Gestion Pro. |
+| **C2** | Seule une **transaction confirmée** (code de retrait validé, ou double code pour un échange) peut donner lieu à une proposition. |
+| **C3** | La proposition est **idempotente** : rejouer l'événement, le dupliquer ou le recevoir deux fois ne produit **jamais** un second effet. La clé d'idempotence est portée par l'événement, pas déduite. |
+| **C4** | La proposition est **traçable** : origine, événement source, horodatage, quantité, destinataire — et son acceptation comme son rejet sont journalisés. |
+| **C5** | La proposition est **soumise à un utilisateur habilité**. Aucune application automatique, même paramétrable, n'est prévue. |
+| **C6** | Une proposition non traitée **expire** sans effet. L'absence de décision n'est jamais interprétée comme un accord. |
+
+Cette décision est **cohérente avec le document Bridge** (règle B2 : Market n'écrit jamais dans le
+stock ; §5.2 : le décrément reste un mouvement de stock ordinaire saisi par le vendeur). Elle la
+**durcit** sur deux points : le déclencheur est restreint à la transaction confirmée, et
+l'idempotence devient une exigence explicite du contrat d'événement.
+
+#### D-10 — Tarif Market : ouvert jusqu'à l'étude des coûts
+
+> Le tarif Market est **maintenu ouvert jusqu'à l'étude des coûts**.
+
+L'arbitrage ne dépend donc pas seulement d'une étude de marché mais d'abord d'une **étude de coûts** :
+coût de la vérification professionnelle (la voie manuelle est une charge humaine récurrente), coût de
+la modération, coût du stockage des photos, coût de la recherche, coût d'acquisition. Aucun palier,
+aucune durée d'essai, aucun montant ne sera proposé avant.
+
+#### D-11 — Facturation multiproduit : consolidée à l'expérience
+
+> **Un `Customer` par entreprise et plusieurs souscriptions peuvent être retenus techniquement**,
+> mais **l'expérience plateforme doit présenter une facturation consolidée**. La forme définitive sera
+> décidée dans le **lot multiproduit du Train V3**.
+
+Le découpage technique recommandé en R2 — une `Subscription` Stripe par produit, imposé par le fait
+que les items d'une même souscription partagent le même intervalle de facturation — **reste
+recevable**. Ce qui est refusé, c'est d'en laisser la conséquence remonter jusqu'au client : une
+entreprise abonnée à trois produits ne doit pas recevoir trois factures sans lien apparent, ni
+consulter trois espaces.
+
+| Exigence | |
+|---|---|
+| Un **espace de facturation unique** par entreprise | déjà porté par le `Customer` unique |
+| Une **vue consolidée** de ce qui est souscrit, produit par produit | — |
+| Une **facturation présentée comme consolidée** | la forme — document unique, relevé périodique, ou autre — relève du Train V3 |
+| `factures_abonnement` existe et sait produire une facture ELSATIA | c'est une des voies possibles, pas la décision |
+
+**Arbitrage renvoyé au lot multiproduit du Train V3.** Il n'est ni tranché, ni préempté ici.
+
+### 2.3 Décisions tarifaires encore ouvertes
 
 Aucun montant n'est proposé dans ce lot. Restent à arbitrer (**D-10**) :
 
@@ -75,6 +152,8 @@ en avant (**achat ponctuel**, jamais un « /mois ») · page vendeur enrichie ·
 grands comptes (devis) · **période d'essai** — durée, contenu, avec ou sans moyen de paiement ·
 **offre de lancement** — taux, durée, éligibilité · confirmation de la règle maison `annuel = 10 ×
 mensuel` pour Market. Et, distinctement, **D-11** sur la forme de la facture.
+
+**Rappel D-10** : l'arbitrage est **maintenu ouvert jusqu'à l'étude des coûts** (§2.2).
 
 **Point d'attention commercial.** Le palier gratuit étant écarté, l'amorçage n'est plus subventionné.
 Trois leviers compatibles avec la décision restent disponibles et sont recommandés à l'étude :
@@ -240,3 +319,32 @@ existante.
 
 **Market n'est présenté nulle part comme ouvert ou disponible. Aucun tarif définitif n'est formulé.
 Aucune marketplace existante n'a été imitée. Aucune recommandation « freemium vendeur » ne subsiste.**
+
+---
+
+## 10. Clôture du lot Market
+
+**La conversation Market est close.** La R2 est acceptée au SHA `87415d1`, et les décisions
+complémentaires D-5, D-6, D-10 et D-11 sont consignées au §2.2.
+
+> **Règle d'ordonnancement, opposable aux lots suivants : aucun lot de développement Market ne
+> commence avant le socle multiproduit.**
+
+Elle est cohérente avec le chemin critique établi au §7 — aucune annonce n'étant publiable sans
+abonnement actif, le socle multiproduit conditionne l'ouverture commerciale — et elle l'étend :
+elle suspend aussi les lots M1 à M7 et M9, qui étaient techniquement parallélisables.
+
+Ce qui reste à faire avant qu'un lot Market puisse s'ouvrir :
+
+| Préalable | Nature |
+|---|---|
+| **Socle multiproduit (lot MP, Train V3)** | interne — **condition d'ordonnancement** |
+| Cadrage juridique par un avocat (checklist §12 du cadre juridique) | externe |
+| Étude des coûts, puis arbitrage tarifaire (D-10) | interne |
+| Socle de notifications partagé (D-5) | interne, lot d'écosystème |
+| Extensions PostgreSQL `unaccent`, `pg_trgm`, `earthdistance`/`cube` | infrastructure |
+| Fusion du lot assistance et communications `9fcf128` | interne |
+| Lot ELSATIA-UI-V2 | interne — **aucune UI Market avant** |
+
+Les huit documents de `docs/market/` constituent la référence du produit. Ils sont figés en l'état
+jusqu'à la reprise du sujet.
