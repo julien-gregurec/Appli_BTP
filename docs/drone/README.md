@@ -15,6 +15,41 @@ aucune modification Production** : le ledger de la cible cutover reste figé à 
 | — | [ODM_LICENSE_RISK.md](ODM_LICENSE_RISK.md) | AGPL-3.0, clause réseau, questions à poser au conseil PI. **Ne conclut rien juridiquement** |
 | — | [PHOTOGRAMMETRY_PIPELINE_PROTOTYPE_V1.md](PHOTOGRAMMETRY_PIPELINE_PROTOTYPE_V1.md) | **Prototype** `packages/drone-photogrammetry` : adaptateurs ODM/Metashape/démo, file, ingestion, coûts, protocole de benchmark, verdicts |
 
+## Seconde génération — lot architecture Scan (2026-09-08)
+
+Lot `ELSATIA-DRONE-SCAN-ARCHITECTURE-MASTER-V1`, branche
+`audit/elsatia-drone-scan-architecture-master-v1`, base `698eb54`.
+Ces documents **n'annulent aucun des précédents** : ils les auditent, rejouent leurs
+vérifications externes et comblent le manque. Toujours aucune migration, aucun code.
+
+| Livrable | Fichier | Objet |
+|---|---|---|
+| A | [ELSATIA-DRONE-SCAN-ARCHITECTURE-AUDIT-REPORT.md](ELSATIA-DRONE-SCAN-ARCHITECTURE-AUDIT-REPORT.md) | Audit de l'existant Drone avec SHA complets, sept constats, verdict |
+| B | [ELSATIA-DRONE-SCAN-FUNCTIONAL-SPECIFICATION-V1.md](ELSATIA-DRONE-SCAN-FUNCTIONAL-SPECIFICATION-V1.md) | **Arbitrage Drone / Scan**, 8 rôles, 22 types de missions |
+| C | [ELSATIA-DRONE-SDK-HARDWARE-COMPATIBILITY-V1.md](ELSATIA-DRONE-SDK-HARDWARE-COMPATIBILITY-V1.md) | Matrice **R2** au 2026-09-08 — correction majeure sur Parrot |
+| D | [ELSATIA-DRONE-MISSION-FLIGHT-DATA-MODEL-V1.md](ELSATIA-DRONE-MISSION-FLIGHT-DATA-MODEL-V1.md) | Dossier d'intervention, checklist, provenance des données |
+| E | [ELSATIA-DRONE-OFFLINE-MEDIA-SYNC-V1.md](ELSATIA-DRONE-OFFLINE-MEDIA-SYNC-V1.md) | Hors-ligne réel, idempotence, double clé média |
+| F | [ELSATIA-DRONE-MEASUREMENT-PHOTOGRAMMETRY-V1.md](ELSATIA-DRONE-MEASUREMENT-PHOTOGRAMMETRY-V1.md) | Six niveaux de mesure, protocole d'étalonnage, IA |
+| G | [ELSATIA-DRONE-GP-RESERVES-DOE-BRIDGES-V1.md](ELSATIA-DRONE-GP-RESERVES-DOE-BRIDGES-V1.md) | Les trois ponts + le port DOE manquant |
+| H | [ELSATIA-DRONE-SECURITY-PRIVACY-COMPLIANCE-V1.md](ELSATIA-DRONE-SECURITY-PRIVACY-COMPLIANCE-V1.md) | Sécurité, vie privée, **réglementation datée post-2026** |
+| I | [ELSATIA-DRONE-BUSINESS-MODEL-V1.md](ELSATIA-DRONE-BUSINESS-MODEL-V1.md) | Trois modèles, branchés sur le moteur commercial |
+| J | [ELSATIA-DRONE-IMPLEMENTATION-ROADMAP-V1.md](ELSATIA-DRONE-IMPLEMENTATION-ROADMAP-V1.md) | 15 lots, préalables hors développement, estimation |
+| K | [ELSATIA-DRONE-TEST-STRATEGY-V1.md](ELSATIA-DRONE-TEST-STRATEGY-V1.md) | 50 tests spécifiés, non exécutés |
+| L | [ELSATIA-DRONE-WIREFRAMES-V1.md](ELSATIA-DRONE-WIREFRAMES-V1.md) | 8 schémas fonctionnels originaux |
+| M | [ELSATIA-DRONE-SCAN-MASTER-FINAL-REPORT-V1.md](ELSATIA-DRONE-SCAN-MASTER-FINAL-REPORT-V1.md) | Rapport final, verdict, décisions demandées |
+
+### Trois faits nouveaux du 2026-09-08
+
+1. **Parrot expose Ground SDK iOS (Swift), une Web API REST et une licence BSD-3** — seule
+   voie connue vers un mode connecté sur iPhone. DJI ferme cette porte par construction.
+2. **La réglementation française a changé au 1ᵉʳ janvier 2026** : fin des scénarios nationaux
+   S-1/S-2/S-3, invalidation des brevets par déclaration sur l'honneur.
+3. **La doctrine de provenance du noyau cite un fichier absent du train canonique** —
+   `apps/tools/src/lib/tracing/measurement-origin.ts` n'existe ni à `996be15`, ni à `1fc1331`,
+   ni sur `main`.
+
+---
+
 Les fichiers thématiques annoncés au §122 du brief (`sdk-compatibility.md`,
 `photogrammetry.md`, `measurement-quality.md`, `solar.md`, `privacy.md`,
 `integration-contracts.md`) ne sont pas créés en doublon : leur contenu est porté par les
