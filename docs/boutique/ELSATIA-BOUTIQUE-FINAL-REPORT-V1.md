@@ -7,7 +7,8 @@
 | Révision | **R2 — décisions Q2, Q8, Q9 et P0 consignées.** Audit `6cb0b79` accepté. |
 | Branche | `audit/elsatia-boutique-commerce-architecture-v1` |
 | SHA de base | `1fc1331` — `integration/elsatia-ecosystem-train-v2-reserves-gp-v1` |
-| SHA du contenu | `406b8d3` |
+| SHA du contenu R1 | `406b8d3` (audit accepté : `6cb0b79`) |
+| SHA du contenu R2 | `06f6aa4` |
 | SHA final poussé | *(commit de consignation, ci-dessous)* |
 | Worktree | `/Volumes/ELSATIA-DEV/ELSATIA-WORKTREES/boutique-commerce-architecture-v1` |
 | Date | 2026-09-08 |
@@ -209,7 +210,7 @@ Tous sous `docs/boutique/`, aucun ailleurs.
 | `wireframes/index.html` | 278 | mis à jour en R2 |
 | `ELSATIA-BOUTIQUE-FINAL-REPORT-V1.md` | 235 | mis à jour en R2 |
 
-**SHA du contenu R2 : `<consigné après commit>`** — les dix fichiers ci-dessus.
+**SHA du contenu R2 : `06f6aa4`** — les dix fichiers ci-dessus.
 
 ## 11. Confirmation de non-intervention
 
