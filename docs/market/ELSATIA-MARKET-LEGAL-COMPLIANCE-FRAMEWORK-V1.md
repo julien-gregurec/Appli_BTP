@@ -1,7 +1,8 @@
 # ELSATIA-MARKET-LEGAL-COMPLIANCE-FRAMEWORK-V1
 
 Lot : `ELSATIA-MARKET-BUSINESS-LEGAL-TECHNICAL-ARCHITECTURE-V1` — Phase 9
-Branche : `feat/market-architecture-legal-business-v1` — base `1fc1331`
+Révision : **R2 — décisions produit fermées** (`ELSATIA-MARKET-R2-FINAL-PRODUCT-DECISIONS`)
+Branche : `feat/market-architecture-legal-business-v1` — base `1fc1331` — R1 `281769b`
 
 ---
 
@@ -19,7 +20,35 @@ comme telles ; le droit applicable évolue, et une erreur de référence dans un
 ne doit jamais devenir une conclusion opérationnelle.
 
 Aucune conclusion juridique définitive n'est formulée. Chaque section se termine par ce qui doit être
-validé.
+validé. Le §12 rassemble l'ensemble en une **checklist destinée à un avocat**.
+
+---
+
+## 0.2 AVERTISSEMENT CENTRAL — « sans encaissement » ne dispense de rien
+
+La décision R2 est claire : **ELSATIA n'encaisse pas le prix des ventes en V1.** Cette décision
+supprime un ensemble d'obligations bien identifié — celles qui découlent de la **détention de fonds
+pour compte de tiers** : statut d'établissement de paiement ou d'agent, KYC/LCB-FT financier,
+séquestre, reversement, gestion des chargebacks, comptabilité de flux de tiers, TVA sur des flux
+qu'ELSATIA n'encaisse pas.
+
+**Elle n'en supprime aucune autre.**
+
+| Ce qui reste dû **malgré** l'absence d'encaissement | Pourquoi |
+|---|---|
+| **Obligations DSA** | elles pèsent sur l'**opérateur de plateforme en ligne**, en raison de l'**intermédiation de contenu**, pas du paiement : conditions générales, signalement et action, exposé des motifs, recours interne, transparence du classement, point de contact, rapports de transparence |
+| **Traçabilité des professionnels (DSA)** | déclenchée par le fait de **permettre la conclusion de contrats**, non par le fait d'en encaisser le prix. Voir J-1 : c'est précisément la question ouverte. |
+| **Obligations P2B** | elles pèsent sur le **service d'intermédiation en ligne** fourni à des entreprises utilisatrices : classement, préavis, motivation des restrictions, réclamations, médiation |
+| **Loyauté des plateformes (Code de la consommation)** | information sur la qualité de l'annonceur, sur le référencement et le classement |
+| **Obligations déclaratives DAC7** | l'assiette est l'activité **mise en relation en vue d'une vente de biens**. L'absence d'intermédiation du paiement ouvre une discussion sur la connaissance de la contrepartie (J-8), **elle n'exonère pas par principe**. |
+| **RGPD** | inchangé, et même central : la V1 traite des données de particuliers |
+| **Responsabilité au titre des contenus illicites** | inchangée : recel, contrefaçon, produits interdits |
+| **Médiation de la consommation** | due par ELSATIA **pour son propre service** (l'abonnement Market) |
+
+**Règle de rédaction, opposable à tous les documents Market** : il ne doit jamais être écrit, ni
+laissé entendre, que le modèle sans encaissement dispense automatiquement ELSATIA du DSA, du P2B, du
+Code de la consommation ou de DAC7. Ce qu'il fait, et c'est déjà beaucoup, c'est **réduire fortement
+la surface de risque financier** et **écarter le régime des services de paiement**.
 
 ---
 
@@ -326,7 +355,7 @@ gardes du modèle, et la détection d'une tentative alimente le score de confian
 | J-14 | Portée exacte de l'obligation de déclaration d'absence d'amiante à la charge du vendeur | sécurité + responsabilité d'ELSATIA |
 | J-15 | Responsabilité d'ELSATIA si une annonce interdite est publiée malgré les gardes | dimensionne l'assurance et la modération |
 | J-16 | Échange entre professionnels : régime fiscal et comptable de l'échange (double vente) | fonction prévue en V1 |
-| J-17 | Ouverture éventuelle au C2C (D-9) | **audit dédié requis** |
+| J-17 | Ouverture éventuelle au C2C — **exclu de la V1 par décision R2** | **audit dédié requis** avant toute ouverture |
 
 ---
 
@@ -428,19 +457,136 @@ précisément la distinction que tout ce document s'emploie à établir.
 
 ## 11. Ce que ce cadrage recommande avant toute ouverture
 
-1. **Faire trancher J-1** (qualification DSA) par un avocat. Tout le dimensionnement en dépend.
-2. **Faire trancher J-8** (DAC7). Idem pour la charge et le modèle de données.
-3. **Faire valider la liste des catégories** — J-9 à J-14 — avant d'ouvrir la moindre catégorie
-   `sous_conditions`.
-4. **Faire rédiger les documents contractuels** par un professionnel, pas les dériver de l'existant.
-5. **Ne pas ouvrir le C2C** (D-9 / J-17).
-6. **Contracter une source de vérification d'entreprise** (D-4) : sans elle, l'exigence
-   « un particulier ne doit pas pouvoir se déclarer professionnel » n'est pas tenue, et R2 comme R3
-   deviennent probables plutôt qu'hypothétiques.
+1. **Faire trancher A-1** (qualification DSA) par un avocat. Tout le dimensionnement en dépend.
+2. **Faire trancher A-2** (DAC7). Idem pour la charge et le modèle de données. Rappel du §0.2 :
+   l'absence d'encaissement **n'exonère pas par principe**.
+3. **Faire valider les catégories** — E-1 à E-9 — avant d'ouvrir la moindre catégorie
+   `sous_conditions`. À défaut de réponse sur E-1, traiter **tous** les EPI d'occasion comme
+   interdits.
+4. **Faire rédiger les documents contractuels** par un professionnel, pas les dériver de ceux de
+   Gestion Pro : le rapport juridique est différent par nature.
+5. **Ne pas ouvrir le C2C** — exclu de la V1 par décision R2 ; un audit dédié (G-1) précéderait toute
+   ouverture.
+6. **Ne pas ouvrir les prestations de service** — hors V1 par décision R2 (G-5).
+7. **Tenir la vérification professionnelle**, par la voie automatique **ou par validation manuelle**.
+   La voie manuelle est un chemin de premier rang, spécifié et outillé : elle permet d'ouvrir sans
+   dépendre d'un contrat externe, mais elle transforme le prérequis en **capacité de traitement**.
+   Ouvrir sans aucune vérification rendrait le recel probable plutôt qu'hypothétique.
+
+## 12. Checklist à transmettre à un avocat
+
+Document de travail destiné à un professionnel du droit. Il présente le produit tel qu'il est décidé,
+puis pose les questions dans l'ordre où leurs réponses conditionnent la construction.
+
+### 12.0 Le produit, en dix lignes
+
+ELSATIA Market est une **place de marché de biens professionnels d'occasion, de surplus et de
+déstockage**, opérée par ELSATIA en France. Des **entreprises vérifiées** y publient des annonces
+portant sur des biens **dont elles sont propriétaires** (matériaux, outillage, machines, équipements,
+mobilier, pièces détachées, lots). **Des particuliers comme des professionnels** peuvent consulter et
+acheter. La consultation est **anonyme et gratuite**. Un **abonnement est obligatoire pour publier**,
+facturé par ELSATIA au vendeur. **ELSATIA n'encaisse jamais le prix des biens** : la vente se conclut
+et se règle directement entre le vendeur et l'acheteur, souvent par retrait sur place. La plateforme
+fournit une messagerie interne, un mécanisme d'offres et de contre-offres, un mécanisme d'**échange
+entre professionnels** (avec soulte éventuelle réglée hors plateforme), une **réservation** et un
+**code de retrait** attestant la remise dans son système. La **vente entre particuliers est exclue**.
+Les **prestations de service sont exclues**.
+
+### 12.1 Questions dimensionnantes — à traiter en premier
+
+| # | Question | Ce qui en dépend |
+|---|---|---|
+| **A-1** | Market est-il une « plateforme en ligne permettant aux consommateurs de conclure des contrats à distance avec des professionnels » au sens du DSA, **alors que la vente se conclut et se règle hors plateforme** ? Une réservation acceptée, portant accord sur le bien, la quantité et le prix, suffit-elle à caractériser la conclusion d'un contrat sur la plateforme ? | déclenche ou non la **traçabilité des professionnels** (collecte, vérification, conservation, présentation à l'acheteur, suspension du professionnel défaillant) — le poste le plus lourd du projet |
+| **A-2** | **DAC7** s'applique-t-elle à un opérateur qui met en relation en vue de la vente de biens **sans intermédier le paiement** et **sans connaître la contrepartie réellement versée** ? L'affichage d'un prix demandé suffit-il à caractériser une contrepartie connue ou raisonnablement connaissable ? | collecte de l'identité fiscale des vendeurs, mesure des transactions, **déclaration annuelle**, information des vendeurs |
+| **A-3** | Le bénéfice du régime de responsabilité allégée de l'hébergeur est-il conservé, compte tenu d'une **nomenclature fermée**, d'une **vérification des vendeurs**, d'une **modération a priori de certaines catégories**, d'un **classement** des résultats et d'une **mise en avant payante** ? | régime de responsabilité sur les contenus |
+| **A-4** | ELSATIA franchit-elle les seuils du **P2B** déclenchant le système interne de traitement des réclamations et la désignation de médiateurs ? Quels sont les seuils applicables et à quelle date s'apprécient-ils ? | dispositif de réclamation, médiateurs |
+| **A-5** | Le **code de retrait** produit par ELSATIA, attestant qu'une remise a eu lieu dans son système, fait-il d'elle un tiers à la transaction, avec les responsabilités correspondantes ? | rédaction des CGU, exposition |
+
+### 12.2 Statut, responsabilité, contractuel
+
+| # | Question |
+|---|---|
+| B-1 | Quelle qualification retenir pour ELSATIA : hébergeur, opérateur de plateforme, éditeur — et pour quelles fonctions respectivement ? |
+| B-2 | Quelles obligations de **conservation et de transparence** de la modération s'imposent (durées, contenu des rapports) ? |
+| B-3 | Quelle est l'exposition d'ELSATIA si une annonce **interdite** est publiée malgré les gardes techniques, puis retirée après signalement ? Quelle diligence est attendue ? |
+| B-4 | Quelle **assurance** couvre cette exposition, et pour quels montants ? |
+| B-5 | Quels documents contractuels sont nécessaires, et lesquels doivent être **distincts** de ceux de Gestion Pro : CGU Market, CGU vendeur (P2B), CGV abonnement, charte de publication, politique de modération, critères de classement, politique de confidentialité ? |
+| B-6 | Quel **préavis** doit précéder une modification défavorable des conditions faites aux vendeurs ? |
+| B-7 | Quelles mentions sont obligatoires sur la page publique d'une annonce ? |
+
+### 12.3 Identité du vendeur et données
+
+| # | Question |
+|---|---|
+| C-1 | Quelles informations d'identité du vendeur doivent être **affichées publiquement** ? Le **SIRET complet** doit-il l'être — sachant que son affichage facilite l'usurpation ? |
+| C-2 | Le compromis proposé — identité de l'entreprise publique, coordonnées de contact révélées après demande tracée et acceptée — est-il conforme ? |
+| C-3 | Quelle **durée de conservation** pour les pièces de vérification (extrait de registre, identité du représentant, justificatif de pouvoir) ? |
+| C-4 | Le **journal append-only** peut-il être concilié avec le **droit à l'effacement** par pseudonymisation des données personnelles, les faits et leur chaîne étant conservés ? |
+| C-5 | Quelle base légale retenir pour chaque traitement (compte particulier, traçabilité des vendeurs, messagerie, annonces, signalements) ? |
+| C-6 | Sous quelles conditions la modération peut-elle accéder au contenu d'une **conversation privée** signalée ? L'information des deux parties est-elle suffisante ? |
+
+### 12.4 Vente, garanties, rétractation
+
+| # | Question |
+|---|---|
+| D-1 | Le **droit de rétractation** s'applique-t-il lorsque l'accord est formé en ligne mais que le bien est **retiré sur place** ? |
+| D-2 | Quelles **exceptions** au droit de rétractation sont mobilisables, en particulier pour les peintures et produits chimiques ? |
+| D-3 | La **garantie légale de conformité** peut-elle être réduite pour les biens d'occasion, dans quelles conditions et à quelle durée minimale ? |
+| D-4 | Quelle information ELSATIA doit-elle donner au **vendeur** sur ses propres obligations, et sa carence engage-t-elle sa responsabilité ? |
+| D-5 | Un vendeur peut-il licitement **réserver ses ventes aux professionnels** et refuser les particuliers ? |
+| D-6 | Quel régime fiscal et comptable pour l'**échange entre professionnels** (double vente, soulte, TVA de part et d'autre) ? Que doit rappeler la plateforme sans jamais le calculer ? |
+| D-7 | Quelles obligations de **facturation** pèsent sur le vendeur, et ELSATIA doit-elle les rappeler ? |
+| D-8 | Le **régime de la marge** est-il mobilisable, par quels vendeurs et pour quels biens ? |
+
+### 12.5 Catégories de biens — validations bloquantes
+
+Aucune catégorie `sous_conditions` ne doit être ouverte avant réponse.
+
+| # | Question |
+|---|---|
+| E-1 | **Liste exacte des EPI d'occasion interdits à la vente** en France. À défaut de réponse, l'ensemble des EPI d'occasion sera traité comme interdit. |
+| E-2 | Conditions exactes de vente d'**équipements de travail d'occasion** : certificat de conformité, forme, contenu, débiteur de l'obligation. |
+| E-3 | **Matériaux de construction issus de dépose** : à quelles conditions relèvent-ils du **réemploi** (vente possible) et non du **déchet** (régime des déchets) ? C'est le cœur du cas d'usage « fin de chantier ». |
+| E-4 | Portée exacte de l'obligation de **déclaration d'absence d'amiante** à la charge du vendeur, et diligence attendue de la plateforme. |
+| E-5 | Cession d'équipements contenant des **fluides frigorigènes**. |
+| E-6 | Obligations du **vendeur professionnel de véhicules d'occasion** à un particulier (contrôle technique, certificat de situation administrative, cession). |
+| E-7 | **Engins de levage** : le rapport de vérification périodique en cours de validité est-il exigible à la publication ? |
+| E-8 | **Produits chimiques et peintures** : conditions de cession, étiquetage, fiche de données de sécurité, restrictions d'expédition. |
+| E-9 | La liste des **catégories interdites** (§5.4) est-elle complète et correctement fondée ? |
+
+### 12.6 Fraude, autorités, contrefaçon
+
+| # | Question |
+|---|---|
+| F-1 | Quelle procédure ELSATIA doit-elle suivre en cas de **soupçon d'infraction grave** (recel, contrefaçon, bien dangereux) ? Quand un signalement aux autorités est-il obligatoire ? |
+| F-2 | Quelle **conservation des éléments** est attendue, et pendant combien de temps ? |
+| F-3 | La collecte d'un **numéro de série non affiché**, comparable par un modérateur et communicable sur réquisition, est-elle licite et opportune ? |
+| F-4 | Quelle procédure de **notification par les titulaires de droits** en matière de contrefaçon ? |
+| F-5 | Quelles conditions encadrent la **suspension d'un vendeur** — motivation, préavis, recours ? |
+
+### 12.7 Évolutions futures — à cadrer avant décision
+
+| # | Question |
+|---|---|
+| G-1 | **Ouverture au C2C** : obligations d'information sur le statut du vendeur, seuils de requalification en activité professionnelle, obligations déclaratives pour les vendeurs particuliers, exposition accrue à la fraude et au recel. **Exclu de la V1 ; audit dédié requis avant toute ouverture.** |
+| G-2 | **Paiement en ligne sans commission** (le vendeur encaisse sur son propre compte, la plateforme n'intercepte rien) : qualification, obligations, différence avec un paiement intermédié. |
+| G-3 | **Commission sur transaction** : statut, KYC, obligations. À ne pas instruire tant que la décision de ne pas encaisser reste en vigueur. |
+| G-4 | **Avis après transaction** : obligations relatives aux avis en ligne. |
+| G-5 | **Prestations de service** : régime propre (travail dissimulé, prêt de main-d'œuvre, responsabilité du donneur d'ordre). Hors V1. |
+
+### 12.8 Ce qui est demandé en retour
+
+1. Une **réponse hiérarchisée** sur A-1 à A-5, ces réponses conditionnant la construction.
+2. Un **avis écrit** sur la qualification de la plateforme et sur l'étendue de sa responsabilité.
+3. La **validation ou la correction** des trois listes de catégories (autorisé, sous conditions,
+   interdit).
+4. La **rédaction** des documents contractuels listés en B-5.
+5. Une **procédure écrite** de traitement des signalements graves et de coopération avec les
+   autorités.
 
 ---
 
-## 12. Confirmation
+## 13. Confirmation
 
 Document de cadrage. Aucun code, aucune migration, aucun objet Stripe, aucune Production, aucun
 dépôt tiers modifié. **Ce document ne constitue pas un avis juridique.**

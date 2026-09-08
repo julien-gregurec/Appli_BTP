@@ -1,6 +1,7 @@
 # ELSATIA-MARKET-GP-COLORS-STOCK-BRIDGE-V1
 
 Lot : `ELSATIA-MARKET-BUSINESS-LEGAL-TECHNICAL-ARCHITECTURE-V1` — Phase 4
+Révision : **R2 — décisions produit fermées** (`ELSATIA-MARKET-R2-FINAL-PRODUCT-DECISIONS`)
 Nature : étude de liaison. **Aucun développement.** Aucune modification de Gestion Pro, Colors,
 Réserves, Tools ni du site.
 Branche : `feat/market-architecture-legal-business-v1` — base `1fc1331`
@@ -14,9 +15,28 @@ Le lot pose une contrainte structurante :
 > Toute liaison inter-application doit être faible et optionnelle. Un professionnel sans Gestion Pro
 > ou Colors doit pouvoir utiliser Market. Ne pas rendre obligatoire un identifiant produit central.
 
+**Décision R2 (§8), fermée** : Market doit fonctionner **sans abonnement Gestion Pro**. Les ponts
+avec Gestion Pro, Stock et Colors restent **facultatifs**. Un vendeur peut créer une annonce
+**manuellement**. Un article lié à Gestion Pro ou Colors conserve un **lien faible et nullable**.
+
 Cette contrainte n'est pas un confort : elle détermine la viabilité commerciale de Market. Une place
 de marché qui exigerait Gestion Pro se priverait de la quasi-totalité de son marché adressable, et
 n'aurait aucune chance d'atteindre la masse critique dont dépend l'intérêt même d'une marketplace.
+
+**Vérification d'autonomie** — un vendeur sans aucun autre produit ELSATIA doit pouvoir accomplir la
+totalité du parcours :
+
+| Étape | Dépendance à Gestion Pro ou Colors |
+|---|---|
+| Créer un compte, activer Market | **aucune** |
+| Se faire vérifier (N1–N3) | **aucune** |
+| Souscrire l'abonnement Market | **aucune** |
+| Créer une annonce de bout en bout | **aucune** — saisie manuelle intégrale |
+| Publier, négocier, échanger, réserver, confirmer une remise | **aucune** |
+| Facturer | ses propres outils |
+
+Les ponts n'apportent que du **confort de saisie**. Aucun champ obligatoire d'une annonce n'en
+provient.
 
 Quatre règles en découlent :
 
@@ -24,7 +44,7 @@ Quatre règles en découlent :
 |---|---|
 | **B1 — Market est autonome** | Le modèle d'annonce est complet et se suffit à lui-même. Aucun champ obligatoire d'une annonce ne provient d'une autre application. |
 | **B2 — Le pont est sortant et unidirectionnel** | On publie **depuis** Stock, Colors ou Gestion Pro **vers** Market. Market n'écrit jamais dans le stock, ne modifie jamais un seau, ne crée jamais un article. |
-| **B3 — La liaison est une référence faible, pas une clé étrangère** | Une annonce mémorise l'origine de sa création. Elle ne dépend pas de la survie de l'objet source. |
+| **B3 — La liaison est une référence faible et NULLABLE, jamais une clé étrangère** | Une annonce mémorise l'origine de sa création dans des champs **facultatifs**. Aucune contrainte référentielle vers Gestion Pro ou Colors : la disparition, l'archivage ou l'absence de l'objet source **ne peut ni bloquer, ni altérer, ni invalider l'annonce**. Une annonce saisie manuellement porte simplement `origine = 'saisie_manuelle'` et des références nulles. |
 | **B4 — Le pont est une commodité de saisie, pas un mécanisme de synchronisation** | L'import pré-remplit un formulaire. Il n'installe aucun lien vivant qui propagerait les modifications ultérieures. |
 
 **Conséquence de B4, à assumer explicitement** : si le vendeur modifie l'article de stock après avoir

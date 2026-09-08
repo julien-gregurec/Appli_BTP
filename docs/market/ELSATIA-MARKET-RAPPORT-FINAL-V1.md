@@ -1,225 +1,228 @@
 # ELSATIA-MARKET — RAPPORT FINAL DU LOT
 
 Lot : `ELSATIA-MARKET-BUSINESS-LEGAL-TECHNICAL-ARCHITECTURE-V1`
+Révision : **R2 — décisions produit fermées** (`ELSATIA-MARKET-R2-FINAL-PRODUCT-DECISIONS`)
 Branche : `feat/market-architecture-legal-business-v1`
-SHA de base : `1fc1331` (`integration/elsatia-ecosystem-train-v2-reserves-gp-v1`)
+SHA de base : `1fc1331842cdf5980b374169994587813bdee7b6`
+SHA R1 : `281769b0d6345914ad93574f8549999862cd2dea`
 Date : 2026-09-08
 
 ---
 
-## 1. Verdict
+## 1. Verdict, actualisé
 
-**Market est un produit entièrement neuf, posé sur un socle sain mais partiel. Aucun obstacle
-technique rédhibitoire. Trois décisions non techniques déterminent l'essentiel de la charge.**
+**Market est un produit neuf, dont le périmètre V1 est désormais fermé. Aucun obstacle technique
+rédhibitoire. Un seul lot transverse le bloque commercialement : le modèle d'abonnement
+multiproduit.**
 
-L'audit établit un fait net : **zéro ligne de Market** existe aujourd'hui — ni table, ni fonction, ni
-écran, ni contrat, dans aucune des 272 migrations ni dans aucun des dépôts applicatifs.
+La R1 posait dix décisions ; la R2 en ferme huit. Ce qui reste ouvert est **tarifaire** ou
+**juridique**, non structurel.
 
-Ce qui est acquis est solide : le socle multi-application (migration 234) est générique et
-correctement conçu ; l'isolation multi-tenant est mature (168 activations RLS) ; l'anti-abus est
-réutilisable tel quel ; le mécanisme d'assistance justifiée existe ; la structure du contrat
-tarifaire canonique est un bon modèle ; et l'annuaire Réserves fournit le seul précédent maison de
-publication cross-tenant — avec des gardes anti-énumération dont la prudence doit être reprise sans
-être diluée.
+Deux constats de l'audit gouvernent la suite :
 
-Ce qui manque n'est pas accessoire. **Cinq briques structurantes sont absentes de tout
-l'écosystème** : l'identité d'un particulier sans organisation, la vérification qu'un vendeur est
-réellement un professionnel, la lecture publique anonyme gouvernée, la recherche textuelle et
-géographique, et la modération. Aucune ne se dérive d'un existant.
+- **Stripe Connect Standard est câblé** (`entreprises.stripe_account_id`, OAuth avec garde d'état)
+  mais **sans `application_fee` ni `transfer_data`**. La décision de ne pas encaisser les ventes rend
+  cette absence sans conséquence en V1 : Stripe ne sert qu'à facturer l'abonnement vendeur.
+- **L'écosystème possède trois modèles de monétisation incompatibles** — `abonnements_entreprises`
+  (par entreprise, `unique`) pour Gestion Pro, `tools_monetization_subscriptions` +
+  `entitlements_utilisateurs_elsatia` (par **utilisateur**, multi-fournisseur) pour Tools, et **rien
+  du tout** pour Colors et Réserves. Le sujet n'est donc pas de lever une contrainte d'unicité, mais
+  d'**unifier trois représentations du fait commercial**.
 
-Deux découvertes d'audit changent le dimensionnement :
-
-- **Stripe Connect Standard est déjà câblé** (`entreprises.stripe_account_id`, OAuth avec garde
-  d'état, contrôle de permission) — **mais sans aucun `application_fee` ni `transfer_data`**. La
-  brique d'un paiement vendeur existe ; celle d'une commission n'existe pas du tout.
-- **`abonnements_entreprises.entreprise_id` est `unique`** : une entreprise, un abonnement. Une
-  entreprise abonnée à Gestion Pro **et** à Market ne rentre pas dans le modèle actuel. C'est le
-  principal obstacle technique du volet commercial, et il est indépendant du modèle retenu.
+Une décision R2 change utilement le chemin critique : **la validation manuelle de la vérification
+professionnelle est un chemin de premier rang.** Le prérequis « contracter une source externe »,
+présenté comme bloquant en R1, ne l'est plus. Le risque se déplace du contractuel vers
+l'opérationnel — capacité de traitement, délai tenu, homogénéité des décisions.
 
 ---
 
-## 2. Périmètre V1 recommandé
+## 2. Tableau des décisions
 
-Vérification professionnelle (N1–N3) · annonces avec photos · nomenclature fermée avec catégories
-réglementées · recherche textuelle, par catégorie et par distance · favoris, recherches enregistrées,
-alertes · messagerie interne avec quotas · offres et contre-offres · échange entre professionnels ·
-réservation avec code de retrait · signalement et modération avec recours · journal append-only ·
-notifications de service et de sécurité · abonnement vendeur · **mise en relation sans encaissement
-de la vente**.
+| Décision | Statut | Conséquence V1 | Dépendance future |
+|---|---|---|---|
+| **D-1 — Identité du particulier acheteur** | **FERMÉE** | consultation et recherche **anonymes** ; compte acheteur requis pour contacter, offrir, réserver ; **jamais d'entreprise fantôme** | identité Market autonome à modéliser dès l'ouverture des interactions ; export RGPD particulier obligatoire |
+| **D-2 — Séparation des surfaces publique et vendeur** | **FERMÉE** | projection publique dédiée, lecture par fonctions à projection explicite, aucun identifiant technique exposé | aucune |
+| **D-3 — ELSATIA encaisse-t-elle la vente ?** | **FERMÉE — NON** | aucune commission, aucun reversement, aucun portefeuille, aucun séquestre, aucun remboursement, aucun litige financier ; Connect non utilisé pour les ventes | réexamen possible en V2 vers un paiement **sans commission** (le vendeur encaisse sur son compte) ; question juridique G-2 |
+| **D-4 — Source de vérification d'entreprise** | **REQUALIFIÉE** | **n'est plus bloquante** : validation manuelle sur pièce, tracée et outillée ; aucun prestataire choisi | automatisation de N2 pour la montée en charge ; comparaison de prestataires à conduire |
+| **D-5 — Notifications : dupliquer ou généraliser ?** | **OUVERTE** | modèle Réserves dupliqué pour Market (généraliser imposerait de modifier Réserves, interdit ici) | factorisation ultérieure d'un socle de notifications d'écosystème |
+| **D-6 — Événement « publié sur Market » vers Colors** | **OUVERTE** (recommandation : oui) | Market émet l'événement dès la V1, sans consommateur | consommation par Colors dans un lot Colors ultérieur |
+| **D-7 — Prix figé au contrat** | **FERMÉE — intégrée à D-8** | le prix cesse d'être relu dans le code : il est figé sur la ligne d'abonnement produit (règle H2) | traitée par le lot multiproduit **MP** |
+| **D-8 — Modèle d'abonnement multiproduit** | **FERMÉE dans son principe** | contrat commercial d'entreprise + une **ligne par produit souscrit** ; `produit_id` stable ; génération, périodicité et prix **par produit** ; un seul `Customer` Stripe, une `Subscription` par produit | **lot MP** : plan de migration en 8 étapes, réconciliation à zéro écart, pgTAP sur base clonée. **Interdit de lever `unique(entreprise_id)` sans ce plan.** |
+| **D-9 — Vente entre particuliers (C2C)** | **FERMÉE — EXCLUE** | un particulier ne publie pas, ne vend pas, ne se déclare pas professionnel | audit juridique dédié (G-1) avant toute ouverture |
+| **D-10 — Arbitrage tarifaire Market** | **OUVERTE** | aucun palier, aucun quota, aucune durée d'essai, aucun montant n'est proposé | lot tarifaire dédié, après étude de marché |
+| **D-11 — Facture consolidée ou factures par produit ?** | **OUVERTE** *(nouvelle)* | plusieurs `Subscription` Stripe produisent plusieurs factures Stripe | soit facture ELSATIA consolidée via `factures_abonnement` (qui existe), soit acceptation de factures multiples |
+| **D-12 — Prestations de service** | **FERMÉE — HORS V1** *(nouvelle)* | Market vend des **biens** ; main-d'œuvre, sous-traitance et prestations ne sont pas publiables | produit distinct, à instruire pour lui-même (G-5) |
 
-**Consultation entièrement anonyme.** Compte requis seulement pour interagir. Ce choix maximise
-l'audience d'une place de marché naissante tout en minimisant la collecte de données personnelles.
+### 2.1 Décisions désormais fermées — récapitulatif
+
+| # | Énoncé |
+|---|---|
+| 1 | **Abonnement vendeur obligatoire à partir de la première annonce publiée. Consultation et achat gratuits. Brouillons possibles avant souscription.** Le freemium est écarté. |
+| 2 | **ELSATIA n'encaisse pas l'argent de la vente en V1.** Stripe ne sert qu'à facturer l'abonnement vendeur. |
+| 3 | **Publication réservée aux professionnels vérifiés.** C2C exclu. |
+| 4 | **Échanges autorisés entre professionnels vérifiés**, soulte possible, réglée hors plateforme. |
+| 5 | **Vérification professionnelle obligatoire**, automatique **ou manuelle**, avec dossier tracé, expiration et journal d'audit. |
+| 6 | **Modèle d'abonnement multiproduit** : un contrat d'entreprise, une ligne par produit. |
+| 7 | **Market porte des biens professionnels**, jamais un bien interdit, dangereux, volé, contrefait ou non conforme. **Prestations hors V1.** |
+| 8 | **Market fonctionne sans Gestion Pro.** Ponts facultatifs, liens **faibles et nullables**. |
+
+### 2.2 Décisions tarifaires encore ouvertes
+
+Aucun montant n'est proposé dans ce lot. Restent à arbitrer (**D-10**) :
+
+paliers d'abonnement vendeur (volume d'annonces actives) · annonce supplémentaire à l'unité · mise
+en avant (**achat ponctuel**, jamais un « /mois ») · page vendeur enrichie · offre multi-sites et
+grands comptes (devis) · **période d'essai** — durée, contenu, avec ou sans moyen de paiement ·
+**offre de lancement** — taux, durée, éligibilité · confirmation de la règle maison `annuel = 10 ×
+mensuel` pour Market. Et, distinctement, **D-11** sur la forme de la facture.
+
+**Point d'attention commercial.** Le palier gratuit étant écarté, l'amorçage n'est plus subventionné.
+Trois leviers compatibles avec la décision restent disponibles et sont recommandés à l'étude :
+**période d'essai bornée** (une souscription au statut `essai`, qui **finit** — ce n'est pas du
+freemium), **tarif d'entrée bas**, et **amorçage manuel** du catalogue depuis le parc existant. Un
+quatrième — inclure Market un temps dans Gestion Pro — est signalé comme **piège** : ce qui a été
+inclus est très difficile à facturer ensuite.
 
 ---
 
-## 3. Fonctions différées
+## 3. Périmètre V1 définitif
+
+**Acheteurs.** Consultation, recherche et filtres **anonymes et gratuits**. Compte gratuit pour
+favoris, alertes, messagerie, offres, réservations. Aucun abonnement, jamais — particulier comme
+professionnel.
+
+**Vendeurs.** Entreprise **vérifiée** (N1–N3, voie automatique ou manuelle) **et** abonnement Market
+**actif** : deux conditions cumulatives et indépendantes. Brouillons libres avant souscription.
+Rôles Market propres, habilitation par personne, validation interne optionnelle par organisation.
+
+**Annonces.** Nomenclature **fermée** avec catégories réglementées, mentions bloquantes, photos
+obligatoires, partie publique et partie privée séparées, localisation **approchée**, modification
+encadrée et versionnée, cycle de vie complet avec journal append-only.
+
+**Interactions.** Messagerie interne à quotas, sans lien externe, sans pièce jointe · offres et
+contre-offres · **échanges entre professionnels vérifiés, avec soulte, contre-propositions,
+expiration, annulation, historique exportable et double code de retrait** · réservation avec code de
+retrait · signalement ouvert aux anonymes · modération motivée et contestable.
+
+**Recherche.** Projection publique dédiée, plein texte insensible aux accents, distance approchée,
+pagination par curseur, gardes anti-énumération.
+
+**Commercial.** Abonnement vendeur facturé par ELSATIA via Stripe, sur le modèle multiproduit.
+**Aucun flux financier de vente ne transite par ELSATIA.**
+
+---
+
+## 4. Fonctionnalités différées
 
 | Fonction | Motif |
 |---|---|
-| Paiement de la vente sur la plateforme | change la nature juridique et fiscale ; impose KYC, litiges, chargebacks |
-| Commission sur transaction | idem, et suppose de mesurer la valeur avant de la tarifer |
+| Paiement de la vente sur la plateforme | décision D-3 |
+| Commission sur transaction | décision D-3 ; aucune brique n'existe |
+| **Vente entre particuliers (C2C)** | **exclue par décision D-9** ; audit juridique dédié requis |
+| **Prestations de service, main-d'œuvre, sous-traitance** | **exclues par décision D-12** |
+| **Palier gratuit permanent autorisant la publication** | **écarté par décision** |
 | Avis et réputation | sans transaction observée, un avis n'est pas vérifiable — donc manipulable |
-| Don / gratuité | régime fiscal et responsabilité distincts du prix zéro |
+| Don / mise à disposition gratuite | régime fiscal et responsabilité distincts du prix zéro |
 | Achat groupé | suppose un agrégateur de demande et une gestion de seuil |
-| **Vente entre particuliers (C2C)** | **audit juridique dédié requis — décision de Julien (D-9)** |
 | Transport intégré | responsabilité de commissionnaire de transport |
 | API publique | multiplie la surface d'aspiration avant d'avoir mesuré l'usage |
 | Application mobile dédiée | le web responsive suffit à valider le marché |
 | Score de confiance influençant le classement public | transparence DSA/P2B ; données insuffisantes en V1 |
+| Paiement en ligne **sans commission** (V2 possible) | la brique Connect Standard existe ; à réexaminer si le besoin est démontré (G-2) |
 
 ---
 
-## 4. Modèle économique recommandé
+## 5. Risques juridiques — inchangés dans leur nature
 
-**Modèle 3 — abonnement de base avec palier gratuit et options de visibilité — pour le lancement,
-avec une trajectoire explicite vers le Modèle 1 (abonnement vendeur pur).**
+Trois régimes se superposent : **DSA**, **P2B**, **Code de la consommation**, plus éventuellement
+**DAC7**.
 
-Trois modèles ont été étudiés (abonnement pur ; abonnement + commission ; freemium encadré).
+> **Avertissement central, à ne jamais omettre** : le fait qu'ELSATIA n'encaisse pas la vente
+> **ne la dispense pas** du DSA, du P2B, du Code de la consommation ni de DAC7. Cette décision
+> supprime les obligations liées à la **détention de fonds pour compte de tiers** — statut de
+> paiement, KYC financier, séquestre, chargebacks. **Elle n'en supprime aucune autre.**
 
-- **La commission est prématurée, pas mauvaise.** Elle exige d'intermédier des paiements entre tiers
-  — KYC, litiges, chargebacks, TVA sur biens d'occasion — alors qu'aucune de ces briques n'existe.
-  Et elle repose sur un pari défavorable : que les parties paieront sur la plateforme plutôt que de
-  sortir après la mise en relation, sur des biens souvent retirés sur place et réglés par virement.
-- **L'abonnement pur est le bon régime de croisière, un mauvais point de départ** : facturer la
-  publication dans un catalogue vide, c'est vendre une audience qui n'existe pas.
-- **Le freemium encadré est l'abonnement pur avec une rampe d'accès.** Même simplicité juridique,
-  même coût opérationnel modéré, et il résout l'amorçage. Les deux convergent naturellement.
+Une **checklist destinée à un avocat** est livrée (§12 du cadre juridique) : contexte produit en dix
+lignes, cinq questions dimensionnantes (A-1 à A-5), puis les questions de statut, de données, de
+vente, de catégories, de fraude et d'évolutions futures — 40 points au total, avec ce qui est demandé
+en retour.
 
-**À éviter absolument : lancer avec une commission.** Charge maximale au moment où le produit a le
-moins de valeur démontrée, et très difficile à retirer une fois annoncée.
+Les deux questions qui commandent le dimensionnement restent **A-1** (Market permet-il de conclure un
+contrat à distance, alors que la vente se conclut hors plateforme ?) et **A-2** (DAC7 s'applique-t-elle
+sans intermédiation du paiement ?). **Position d'ingénierie recommandée sur les deux : construire
+comme si la réponse était oui.**
 
-**Paiement : S1 + S5 + S6** — contact direct, paiement au retrait, facturation par le vendeur.
-ELSATIA ne touche jamais le prix d'un bien. Trajectoire V2 si le besoin est démontré : **Connect
-Standard sans commission**, la brique existant déjà.
-
-**Aucun tarif n'est proposé.** Les montants relèvent d'un lot tarifaire dédié et d'une décision de
-Julien, comme cela a été fait pour Gestion Pro.
-
----
-
-## 5. Risques juridiques principaux
-
-| # | Risque | Gravité |
-|---|---|:---:|
-| R1 | Qualification en plateforme de contrats à distance non anticipée (DSA) — **question juridique n° 1** | **majeure** |
-| R2 | Publication d'un bien interdit (amiante, EPI, machine non conforme) | **majeure** |
-| R3 | **Recel** | **majeure** |
-| R4 | Perte du bénéfice du régime d'hébergeur | **majeure** |
-| R5 | Obligations déclaratives **DAC7** non tenues | haute |
-| R6 | Confusion Boutique / Market dans l'esprit de l'acheteur | haute |
-| R8 | Fuite multi-tenant par l'index de recherche | haute |
-| R11 | Market utilisé comme canal d'hameçonnage | haute |
-| R12 | C2C ouvert sans audit | **majeure** (nulle si non ouvert) |
-
-Trois régimes se superposent : **DSA** (règlement UE 2022/2065, dont la traçabilité des
-professionnels), **P2B** (règlement UE 2019/1150, transparence du classement, motivation des
-restrictions), et le **Code de la consommation**. Dix-neuf points sont listés comme devant être
-validés par un avocat (J-1 à J-19), dont deux sont dimensionnants : **J-1** (Market permet-il de
-conclure un contrat à distance, alors que la vente se conclut hors plateforme ?) et **J-8** (DAC7
-s'applique-t-elle sans intermédiation du paiement ?).
-
-**Position d'ingénierie recommandée sur les deux : appliquer comme si la réponse était oui.** Le coût
-de la prévoyance est modéré ; celui de la correction rétroactive est élevé.
+**Catégories interdites** : amiante et matériaux en contenant (aucune exception, pas même « pour
+dépose ») · déchets destinés à l'élimination · produits REACH restreints ou hors emballage d'origine ·
+phytosanitaires · EPI d'occasion des catégories interdites · équipements de travail non conformes ·
+contrefaçons · biens non possédés (**recel**) · armes, munitions, explosifs · gaz consignés et
+extincteurs non contrôlés · matériels de concessionnaire de réseau · **fichiers clients** ·
+**prestations de service** · véhicules gagés · **toute catégorie absente de la nomenclature**.
 
 ---
 
-## 6. Catégories interdites
-
-Publication **techniquement impossible**, et non simple règle de modération :
-
-**Amiante et tout matériau en contenant** (interdiction générale de mise sur le marché, décret
-n° 96-1133 du 24 décembre 1996 — aucune exception, aucun « à débarrasser », aucun « pour dépose ») ·
-déchets destinés à l'élimination · produits chimiques interdits ou restreints par REACH, hors
-emballage d'origine ou sans étiquetage · produits phytosanitaires · EPI d'occasion des catégories
-interdites · équipements de travail non conformes · contrefaçons et biens à marque retirée ou
-altérée · biens dont le vendeur n'est pas propriétaire (**recel**) · armes, munitions, explosifs,
-artifices · bouteilles de gaz consignées et extincteurs non contrôlés · matériels appartenant à un
-concessionnaire de réseau · **données et fichiers clients** · prestations de service et
-main-d'œuvre · véhicules gagés ou sans certificat d'immatriculation · **toute catégorie absente de
-la nomenclature**.
-
-Principe directeur : **dans le doute, ne pas ouvrir la catégorie.** Une catégorie fermée fait perdre
-du chiffre d'affaires ; une catégorie ouverte à tort peut faire perdre l'entreprise.
-
----
-
-## 7. Dépendances
+## 6. Dépendances
 
 | Dépendance | Nature | Bloquant |
 |---|---|:---:|
-| **Source de vérification d'entreprise** (registre officiel) | **externe, contractuelle** | **OUI** |
-| Extensions PostgreSQL `unaccent`, `pg_trgm`, `earthdistance`/`cube` | infrastructure, **non installées** | **OUI** (recherche) |
-| Fusion du lot assistance + communications `9fcf128` | interne, branche non fusionnée | **OUI** |
-| Cadrage juridique par un avocat (J-1 à J-19) | **externe** | **OUI** |
+| **Lot MP — modèle d'abonnement multiproduit** | interne, transverse | **OUI pour M8** (donc pour l'ouverture commerciale) |
+| **Capacité de traitement manuel des vérifications** | organisationnel | **OUI** si la voie manuelle est retenue |
+| Extensions PostgreSQL `unaccent`, `pg_trgm`, `earthdistance`/`cube` | infrastructure, **non installées** | **OUI pour M3** |
+| Cadrage juridique par un avocat (checklist §12) | **externe** | **OUI** |
+| Fusion du lot assistance + communications `9fcf128` | interne, non fusionné | **OUI** |
+| Modération d'images (EXIF au minimum) | externe ou interne | **OUI** |
 | Géocodage d'adresses | **externe** | oui (distance) |
-| Modération d'images | **externe ou humaine** | oui |
+| Source automatique de vérification | **externe** | **non** — repli manuel |
 | Réconciliation du ledger de migrations | interne | oui |
-| Prix figé au contrat (dette du moteur commercial) | interne | oui (volet commercial) |
-| Lot **ELSATIA-UI-V2** (refonte visuelle) | interne, non démarré | **oui — toute UI produite avant serait à refaire** |
-| Marque ELSATIA — jalon de commercialisation 21/10/2026 | juridique | oui (communication) |
+| Lot **ELSATIA-UI-V2** | interne, non démarré | **oui — toute UI produite avant serait à refaire** |
+| Marque ELSATIA — jalon du 21/10/2026 | juridique | oui (communication) |
 
 ---
 
-## 8. Décisions demandées à Julien
+## 7. Estimation de réalisation par lots
 
-| # | Décision | Recommandation d'audit | Criticité |
-|---|---|---|:---:|
-| **D-1** | Comment existe un particulier acheteur ? (entreprise fantôme / identité Market autonome / achat sans compte) | **achat sans compte en V1**, identité Market autonome dès l'ouverture de la messagerie. **Jamais l'entreprise fantôme** : elle pollue le registre et ment sur la nature de l'acteur. | **haute** |
-| **D-2** | Séparation physique des surfaces publique et vendeur | **oui** : chemins, policies et projections distincts ; lecture publique par fonctions à projection explicite | haute |
-| **D-3** | **ELSATIA touche-t-elle l'argent de la vente ?** | **non en V1.** C'est la décision dont dépendent le modèle économique, le juridique, le KYC, la TVA, les litiges et l'essentiel de la charge. | **maximale** |
-| **D-4** | Contracter une source de vérification d'entreprise | **oui, prérequis à l'ouverture.** Sans elle, l'exigence « un particulier ne doit pas pouvoir se déclarer professionnel » n'est pas tenue et le recel devient probable. | **maximale** |
-| **D-5** | Notifications : dupliquer le modèle Réserves ou le généraliser ? | **dupliquer en V1** (généraliser imposerait de modifier Réserves) ; factoriser plus tard | moyenne |
-| **D-6** | Émettre dès la V1 l'événement « publié sur Market » destiné à Colors, sans consommateur ? | **oui.** L'émettre coûte peu ; le rétro-installer sur un historique constitué coûte beaucoup. | moyenne |
-| **D-7** | Traiter la dette « prix non figé au contrat » **avant** de créer une offre Market | **oui**, sinon le défaut se reproduit sur un deuxième produit | haute |
-| **D-8** | Lever `unique(entreprise_id)` sur `abonnements_entreprises`, ou modèle d'abonnement par application ? | **abonnement par application** — plus coûteux, mais Market doit pouvoir être souscrit **sans** Gestion Pro | **haute** |
-| **D-9** | **Ouvrir la vente entre particuliers ?** | **non**, et pas sans un audit juridique dédié | **haute** |
-| **D-10** | Arbitrage tarifaire Market (paliers, gratuit, mise en avant, essai) | **lot tarifaire dédié**, après étude de marché. Aucun montant n'est proposé ici. | moyenne |
+| Lot | Contenu | Charge | Bloqué par |
+|---|---|---|---|
+| **M0** | Arbitrages D-10, D-11 ; cadrage juridique (checklist §12) | — | — |
+| **M1** | Socle : catalogue, rôles, **dossier de vérification** (N1–N3, voies auto et manuelle, expiration, journal), espace vendeur | **lourd** | — |
+| **M2** | Annonces : modèle, états, nomenclature, mentions réglementaires, photos, bucket public, modération de base | **lourd** | M1 |
+| **M3** | Recherche : projection, extensions, index, distance, filtres, curseur | **moyen à lourd** | extensions PostgreSQL |
+| **M4** | Vitrine publique : pages anonymes, référencement, mentions | **moyen** | M2, M3 |
+| **M5** | Interactions : messagerie, offres, **échanges avec soulte et double code de retrait**, réservations | **moyen à lourd** | M2 |
+| **M6** | Modération et sécurité : signalements, file, suspensions, contestations, score | **moyen** | M2 |
+| **M7** | Notifications | **moyen** | M5 |
+| **M8** | **Commercial** : offre Market, abonnement, blocage de publication, facturation | **moyen** | **MP** |
+| **M9** | Ponts Stock et Colors (liens faibles nullables) | **léger à moyen** | M2 |
+| **M10** | Site public « À venir » (**dépôt `elsatia-site`, hors de ce lot**) | **léger** | — |
+| **M11** | Recette, sécurité, RGPD, charge | **moyen** | tous |
+| **MP** | **Modèle d'abonnement multiproduit ELSATIA** — lot d'écosystème : catalogue produit, contrat, lignes produit, modules et options génériques, migration en 8 étapes, réconciliation, pgTAP | **lourd** | — |
 
----
+**Chemin critique.** M1 → M2 → {M3, M5, M6, M9} → M4 → M7 → M11. **M8 est parallèle mais bloqué par
+MP** — et comme aucune annonce n'est publiable sans abonnement actif, **MP conditionne l'ouverture
+commerciale**, pas la construction du produit. MP peut donc être conduit en parallèle de M1–M7, ce
+qui est recommandé : c'est un lot d'écosystème qui bénéficie à tous les produits et corrige une dette
+existante.
 
-## 9. Estimation de réalisation par lots
-
-| Lot | Contenu | Charge |
-|---|---|---|
-| **M0** | Décisions D-1 à D-10 + cadrage juridique (J-1 à J-19) | — |
-| **M1** | Socle : catalogue, rôles, vérification pro N1–N3, espace vendeur | **lourd** |
-| **M2** | Annonces : modèle, états, nomenclature, photos, bucket public, modération de base | **lourd** |
-| **M3** | Recherche : projection, extensions, index, distance, filtres, curseur | **moyen à lourd** |
-| **M4** | Vitrine publique : pages anonymes, référencement, mentions | **moyen** |
-| **M5** | Interactions : messagerie, offres, réservations, code de retrait, quotas | **moyen à lourd** |
-| **M6** | Modération et sécurité : signalements, file, suspensions, contestations, score | **moyen** |
-| **M7** | Notifications | **moyen** |
-| **M8** | Commercial : offre Market, abonnement (**dépend de D-8**), facturation | **moyen** |
-| **M9** | Ponts Stock et Colors | **léger à moyen** |
-| **M10** | Site public « À venir » (**dépôt `elsatia-site`, hors de ce lot**) | **léger** |
-| **M11** | Recette, sécurité, RGPD, charge | **moyen** |
-
-**M1 ne peut pas démarrer avant D-4** (source de vérification). **M3 ne peut pas démarrer avant
-l'installation des extensions PostgreSQL.** **Aucune UI ne doit être produite avant
-ELSATIA-UI-V2.**
+**Aucune UI ne doit être produite avant ELSATIA-UI-V2.**
 
 ---
 
-## 10. Livrables
+## 8. Documents révisés
 
-| Fichier | Objet |
+| Fichier | Révision R2 |
 |---|---|
-| `docs/market/ELSATIA-MARKET-ARCHITECTURE-AUDIT-REPORT.md` | Phase 1 — audit et matrice de réutilisation (36 besoins) |
-| `docs/market/ELSATIA-MARKET-FUNCTIONAL-SPECIFICATION-V1.md` | Phases 2, 3, 5, 6, 11, 12, 13 |
-| `docs/market/ELSATIA-MARKET-BUSINESS-MODEL-V1.md` | Phases 7 et 8 |
-| `docs/market/ELSATIA-MARKET-LEGAL-COMPLIANCE-FRAMEWORK-V1.md` | Phase 9 |
-| `docs/market/ELSATIA-MARKET-GP-COLORS-STOCK-BRIDGE-V1.md` | Phase 4 |
-| `docs/market/ELSATIA-MARKET-SECURITY-MODERATION-MODEL-V1.md` | Phase 10 |
-| `docs/market/ELSATIA-MARKET-WIREFRAMES-V1.md` | Wireframes fonctionnels originaux |
-| `docs/market/ELSATIA-MARKET-RAPPORT-FINAL-V1.md` | Ce document |
-
-**Aucun SQL proposé n'a été créé.** L'exception prévue par le lot (absence de modèle rendant une
-décision impossible) n'a pas eu à être invoquée : les manques de modèle sont documentés comme des
-besoins (D-1, D-4, D-8) sans qu'aucun SQL ne soit écrit ni aucun numéro de ledger réservé.
+| `ELSATIA-MARKET-ARCHITECTURE-AUDIT-REPORT.md` | §4 (issues des cinq questions), §6 (verdict actualisé, trois modèles de monétisation) |
+| `ELSATIA-MARKET-FUNCTIONAL-SPECIFICATION-V1.md` | **§2.5.1 abonnement obligatoire** (règles AB1–AB7), §2.6 C2C exclu, **§2.7 architecture de vérification** (dossier, sources, repli manuel, expiration), §3.2.1 périmètre produit et prestations hors V1, **§3.7 échanges entre professionnels** (soulte, états, double code de retrait, historique), §5.1 parcours vendeur, §9 périmètre V1, matrice des droits |
+| `ELSATIA-MARKET-BUSINESS-MODEL-V1.md` | **réécrit** : cadre fermé, freemium écarté, §3 amorçage sans palier gratuit, **§5 modèle d'abonnement multiproduit** (trois modèles incompatibles, modèle cible, Stripe, protection des contrats historiques, plan de migration en 8 étapes) |
+| `ELSATIA-MARKET-LEGAL-COMPLIANCE-FRAMEWORK-V1.md` | **§0.2 « sans encaissement » ne dispense de rien**, §11 recommandations actualisées, **§12 checklist avocat** (40 points) |
+| `ELSATIA-MARKET-GP-COLORS-STOCK-BRIDGE-V1.md` | règle B3 (lien **faible et nullable**), §1 vérification d'autonomie sans Gestion Pro |
+| `ELSATIA-MARKET-SECURITY-MODERATION-MODEL-V1.md` | §2 validation manuelle comme chemin de premier rang, conséquences opérationnelles, récapitulatif des manques actualisé |
+| `ELSATIA-MARKET-WIREFRAMES-V1.md` | **W-08 bis publication bloquée**, **W-14 bis proposition d'échange avec soulte**, W-08 vérification gratuite et antérieure, W-12 double condition |
+| `ELSATIA-MARKET-RAPPORT-FINAL-V1.md` | ce document |
 
 ---
 
-## 11. Confirmation de non-modification
+## 9. Confirmation de non-modification
 
 | Vérification | Résultat |
 |---|---|
@@ -234,7 +237,6 @@ besoins (D-1, D-4, D-8) sans qu'aucun SQL ne soit écrit ni aucun numéro de led
 | Fusion | **aucune** |
 | Branche poussée | `feat/market-architecture-legal-business-v1` **uniquement** |
 | Worktrees d'autres conversations touchés | **aucun** |
-| Emplacement du worktree | `/Volumes/ELSATIA-DEV/ELSATIA-WORKTREES/market-architecture-v1` (volume externe) |
 
-**Market n'est présenté nulle part comme ouvert ou disponible. Aucun tarif définitif n'est
-formulé. Aucune marketplace existante n'a été imitée.**
+**Market n'est présenté nulle part comme ouvert ou disponible. Aucun tarif définitif n'est formulé.
+Aucune marketplace existante n'a été imitée. Aucune recommandation « freemium vendeur » ne subsiste.**

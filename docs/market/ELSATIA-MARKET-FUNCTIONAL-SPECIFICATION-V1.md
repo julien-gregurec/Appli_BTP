@@ -1,9 +1,13 @@
 # ELSATIA-MARKET-FUNCTIONAL-SPECIFICATION-V1
 
 Lot : `ELSATIA-MARKET-BUSINESS-LEGAL-TECHNICAL-ARCHITECTURE-V1`
+Révision : **R2 — décisions produit fermées** (`ELSATIA-MARKET-R2-FINAL-PRODUCT-DECISIONS`)
 Nature : spécification. Aucun code, aucune migration.
-Branche : `feat/market-architecture-legal-business-v1` — base `1fc1331`
+Branche : `feat/market-architecture-legal-business-v1` — base `1fc1331` — R1 `281769b`
 Document lié : `ELSATIA-MARKET-ARCHITECTURE-AUDIT-REPORT.md`
+
+> **Règle commerciale de référence (décision R2)** — *Abonnement vendeur obligatoire à partir de la
+> première annonce publiée. Consultation et achat gratuits. Brouillons possibles avant souscription.*
 
 > **Statut du produit : à venir.** Market n'est ni ouvert, ni disponible, ni annoncé. Aucune date de
 > lancement n'est engagée par ce document. Aucun tarif n'y est définitif.
@@ -45,7 +49,9 @@ de commande, **aucun** parcours de paiement.
 
 ### 1.3 Ce que Market n'est pas, en V1
 
-- pas une plateforme de vente entre particuliers (C2C) — voir §2.6 ;
+- **pas une plateforme de vente entre particuliers (C2C)** — exclu de la V1 par décision, §2.6 ;
+- **pas une place de marché de prestations de service** — Market vend des **biens**. La main-d'œuvre,
+  la sous-traitance et les prestations sont **hors V1** (§3.2.1) ;
 - pas un site d'enchères ;
 - pas un séquestre de fonds ni un établissement de paiement ;
 - pas un transporteur ni un commissionnaire de transport ;
@@ -103,15 +109,15 @@ chantier n'est pas vendeur Market par hérédité.
 | Enregistrer une recherche / alerte | ✖ | ✔ | ✔ | ✔ | ✔ | ✔ | — | — | — | compte requis |
 | Contacter un vendeur | ✖ | ✔ | ✔ | ✔ | ✔ | ✖ | ✖ | ✖ | ✖ | quota anti-spam |
 | Proposer un prix (offre) | ✖ | C | ✔ | ✔ | ✔ | ✖ | ✖ | ✖ | ✖ | C : seulement si l'annonce est « négociable » |
-| Proposer un échange | ✖ | ✖ | ✔ | ✔ | ✔ | ✖ | ✖ | ✖ | ✖ | **B2B uniquement** |
+| Proposer un échange | ✖ | ✖ | C | C | C | ✖ | ✖ | ✖ | ✖ | **C : entre professionnels VÉRIFIÉS uniquement** (§3.7) |
 | Demander une réservation | ✖ | ✔ | ✔ | ✔ | ✔ | ✖ | ✖ | ✖ | ✖ | — |
 | Acheter | ✖ | ✔ | ✔ | ✔ | ✔ | ✖ | ✖ | ✖ | ✖ | hors plateforme en V1 (§ Business Model) |
 | Signaler une annonce / un message | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | — | — | — | anonyme : rate-limité |
 | Déposer un avis | ✖ | C | C | C | C | ✖ | ✖ | ✖ | ✖ | C : transaction conclue et confirmée — **différé V2** |
-| Créer une annonce | ✖ | ✖ | ✖ | ✔ | ✔ | ✖ | ✖ | ✖ | ✖ | entreprise vérifiée + abonnement actif |
+| Créer une annonce **en brouillon** | ✖ | ✖ | ✖ | ✔ | ✔ | ✖ | ✖ | ✖ | ✖ | **autorisé avant souscription** (§2.5.1) |
 | Modifier une annonce non publiée | ✖ | ✖ | ✖ | ✔ | ✔ | ✖ | ✖ | ✖ | ✖ | — |
 | Modifier une annonce publiée | ✖ | ✖ | ✖ | C | C | ✖ | ✖ | ✖ | ✖ | C : champs restreints, versionné, journalisé (§3.6) |
-| **Publier** une annonce | ✖ | ✖ | ✖ | ✔ | C | ✖ | ✖ | ✖ | ✖ | C : selon l'option « validation interne » (§2.5) |
+| **Publier** une annonce | ✖ | ✖ | ✖ | C | C | ✖ | ✖ | ✖ | ✖ | **C : entreprise VÉRIFIÉE ET abonnement Market ACTIF** (§2.5.1, §2.7.5), plus l'option « validation interne » pour A6 (§2.5) |
 | Retirer / suspendre sa propre annonce | ✖ | ✖ | ✖ | ✔ | ✔ | ✖ | ✖ | ✖ | ✖ | — |
 | Accepter une offre | ✖ | ✖ | ✖ | ✔ | ✔ | ✖ | ✖ | ✖ | ✖ | — |
 | Marquer vendu / échangé | ✖ | ✖ | ✖ | ✔ | ✔ | ✖ | ✖ | ✖ | ✖ | — |
@@ -157,36 +163,150 @@ Motif : une PME de trois personnes serait paralysée par une validation obligato
 de cent personnes en a besoin. L'imposer par défaut ferait fuir la cible principale ; l'interdire
 disqualifierait les grands comptes. Le réglage est journalisé à chaque changement.
 
-### 2.6 Vente entre particuliers (C2C) — non ouverte
+### 2.5.1 Abonnement vendeur — la condition de publication
 
-Le lot est explicite : **ne pas ouvrir automatiquement la vente entre particuliers**. Cette
-spécification ne l'ouvre pas.
+**Décision R2, fermée.**
 
-Ce que cela impliquerait, si Julien l'envisageait un jour, est documenté au titre de la Phase 9
+> Abonnement vendeur obligatoire à partir de la première annonce publiée. Consultation et achat
+> gratuits. Brouillons possibles avant souscription.
+
+| Acte | Abonnement Market actif requis |
+|---|:---:|
+| Consulter, rechercher | **non** — et aucun compte n'est requis |
+| Acheter, contacter, offrir, réserver | **non** |
+| Activer Market pour son entreprise | non |
+| Déposer un dossier de vérification | non |
+| **Créer et préparer un brouillon** | **non** |
+| Prévisualiser un brouillon | non |
+| **Soumettre / publier une annonce** | **OUI — bloquant** |
+| Maintenir une annonce publiée | **OUI** |
+| Répondre à un acheteur sur une annonce publiée | oui (l'annonce l'est déjà) |
+
+**Règles d'implémentation**
+
+| # | Règle |
+|---|---|
+| **AB1** | La transition `brouillon → soumise/publiée` **échoue** si l'abonnement n'est pas actif. Le contrôle est **serveur**, jamais un simple masquage de bouton. |
+| **AB2** | Le blocage est **explicite et actionnable** : il dit ce qui manque et mène à la souscription. Un bouton grisé sans explication fait perdre le vendeur. |
+| **AB3** | Aucune annonce n'est détruite par l'absence d'abonnement. Les brouillons restent accessibles **indéfiniment**. |
+| **AB4** | À la **suspension** ou la **résiliation** de l'abonnement : les annonces `publiee` passent en `suspendue`, motif `abonnement_inactif` (règle R9, §3.3). Elles sont **restaurées** à la réactivation, dans leur état antérieur. |
+| **AB5** | Un abonnement au statut `essai` **est** un abonnement actif : l'essai borné est une souscription, pas un palier gratuit. |
+| **AB6** | Le quota d'annonces actives du palier souscrit est vérifié **à la publication**, pas seulement à l'affichage. |
+| **AB7** | La publication vérifie l'**autorisation applicative** (`acces_applications_entreprises('market')`), que la couche commerciale alimente — jamais la ligne d'abonnement directement. Voir `BUSINESS-MODEL-V1` §5.2. |
+
+**Ce qui n'est pas proposé ici** : aucun palier, aucun quota chiffré, aucune durée d'essai, aucun
+montant. Ces éléments relèvent de l'arbitrage tarifaire **D-10**.
+
+### 2.6 Vente entre particuliers (C2C) — **exclue de la V1**
+
+**Décision R2, fermée : le C2C est exclu de la V1.** Un particulier ne peut ni publier, ni vendre,
+ni se déclarer professionnel sans vérification, ni contourner l'abonnement vendeur.
+
+Ce que son ouverture impliquerait, si Julien l'envisageait un jour, est documenté au titre de la Phase 9
 (cadre juridique) : obligations d'information renforcées sur le statut du vendeur, distinction
 particulier/professionnel devant l'acheteur, seuils de requalification en activité professionnelle,
 obligations déclaratives de la plateforme envers l'administration fiscale pour les vendeurs
 particuliers, et une exposition à la fraude et au recel sensiblement plus élevée. **C'est une
-décision de Julien, appuyée sur un audit juridique dédié.** Décision D-9.
+décision de Julien, appuyée sur un audit juridique dédié.** Décision D-9 — **fermée en R2 : C2C exclu de la V1**.
 
-### 2.7 Empêcher qu'un particulier se déclare professionnel
+### 2.7 Vérification professionnelle — architecture
 
-Exigence du lot. Elle ne peut pas être tenue par une case à cocher. Le dispositif spécifié comporte
-quatre niveaux cumulatifs :
+**Décision R2 : la publication nécessite une entreprise vérifiée.** L'exigence ne peut pas être
+tenue par une case à cocher. Quatre niveaux cumulatifs :
 
-| Niveau | Contrôle | Automatisable | Bloquant en V1 |
-|---|---|:---:|:---:|
-| N1 | SIRET **formellement valide** : 14 chiffres, clé de Luhn | oui, hors ligne | **oui** |
-| N2 | SIRET **existant et actif** dans un registre officiel, raison sociale concordante | oui, source externe | **oui** |
-| N3 | Preuve de **rattachement** de la personne à l'entreprise | non — pièce déposée, revue humaine | oui, à la première publication |
-| N4 | Éléments de confiance complémentaires : assurance RC pro / décennale (déjà collectées sur `entreprises`), ancienneté du compte, historique | partiel | non — alimente le score |
+| Niveau | Contrôle | Automatisable | Bloquant |
+|---|---|:---:|---|
+| **N1** | SIREN/SIRET **formellement valide** : longueur, composition, clé de Luhn | oui, hors ligne | **oui, avant tout** |
+| **N2** | Entreprise **existante et active** au registre, raison sociale et adresse concordantes | oui, **source externe** ; **à défaut, revue manuelle** | **oui** |
+| **N3** | **Identité du représentant** ou **justificatif de pouvoir** rattachant la personne à l'entreprise | non — pièce déposée, revue humaine | **oui, avant la première publication** |
+| **N4** | Éléments de confiance : assurance RC pro et décennale (déjà portées par `entreprises`), ancienneté, historique | partiel | non — alimente le score |
 
-N1 est immédiat. **N2 dépend d'une source externe non contractée à ce jour** (décision D-4). N3
-suppose un dépôt de pièce, sa conservation, une durée de rétention et une revue par un modérateur.
+#### 2.7.1 Le dossier de vérification — champs minimaux
 
-Tant que N2 n'est pas disponible, **Market ne doit pas ouvrir la publication** : une place de marché
-professionnelle qui accepte n'importe quel SIRET saisi n'a pas de barrière à l'entrée, et la
-première conséquence est le recel.
+Le lot R2 fixe le contenu minimal. Chaque champ ci-dessous est un élément du **dossier de
+vérification**, distinct de la fiche `entreprises` : la fiche porte ce que l'entreprise déclare, le
+dossier porte ce que la plateforme a **constaté**.
+
+| Champ | Rôle |
+|---|---|
+| `siren` / `siret` | identifiant contrôlé |
+| `raison_sociale_constatee` | telle que retournée par la source, **pas** telle que saisie |
+| `statut_registre` | actif / cessé / radié / inconnu |
+| `representant_nom`, `representant_qualite` | identité du représentant |
+| `justificatif_pouvoir` | pièce déposée lorsque le demandeur n'est pas le représentant |
+| `adresse_constatee`, `code_postal`, `ville` | adresse au registre |
+| **`pays`** | **obligatoire** — conditionne le registre interrogeable et le régime applicable |
+| `date_verification` | horodatage du constat |
+| **`source_verification`** | `registre_officiel`, `prestataire`, `revue_manuelle`, `document_fourni` |
+| `reference_source` | identifiant de la réponse obtenue, pour rejouabilité |
+| **`resultat`** | `verifiee`, `refusee`, `en_attente`, `expiree`, `revoquee` |
+| `motif` | requis pour `refusee` et `revoquee` — la décision doit être contestable |
+| **`expire_le`** | une vérification n'est **jamais définitive** (§2.7.3) |
+| `revision_demandee_le` | déclenchement d'une revérification |
+| `verifie_par` | modérateur, lorsque la décision est humaine |
+
+**Journal d'audit dédié, append-only** : chaque demande, chaque constat, chaque décision, chaque
+révision et chaque accès aux pièces est journalisé — auteur, horodatage, motif, source. C'est ce
+journal qui rend la décision opposable et le refus contestable.
+
+#### 2.7.2 Aucun prestataire n'est choisi ici
+
+**Décision R2 : ne choisir aucun prestataire payant sans comparaison ultérieure.** Ce document ne
+nomme donc aucun fournisseur et n'en compare aucun.
+
+Ce qu'il fixe, c'est **l'indépendance du modèle vis-à-vis de la source** : `source_verification` et
+`reference_source` sont des champs, pas des constantes. Changer de source — ou en cumuler deux —
+ne doit imposer aucune modification du modèle. C'est la condition pour que la comparaison
+ultérieure reste réellement ouverte.
+
+#### 2.7.3 Repli obligatoire : la validation manuelle
+
+**Décision R2 : en l'absence de vérification automatique disponible, prévoir une validation manuelle
+par la plateforme.**
+
+Le repli n'est pas un mode dégradé accidentel : c'est un **chemin de premier rang**, spécifié et
+outillé.
+
+| | Voie automatique | **Voie manuelle** |
+|---|---|---|
+| N1 | automatique | automatique (identique) |
+| N2 | interrogation d'un registre | **modérateur** : contrôle sur pièce (extrait de registre fourni par le demandeur, de moins de 3 mois) |
+| N3 | jamais automatique | modérateur |
+| `source_verification` | `registre_officiel` / `prestataire` | `revue_manuelle` / `document_fourni` |
+| Délai annoncé au vendeur | immédiat à quelques minutes | **annoncé explicitement**, en jours ouvrés |
+| Traçabilité | référence de la réponse | identité du modérateur + pièce conservée |
+
+**Conséquence de planning importante** : la voie manuelle **débloque l'ouverture de Market sans
+dépendre d'un contrat externe**. La décision D-4 de la R1 — « contracter une source de vérification
+est un prérequis bloquant » — est donc **levée** : elle devient un objectif de montée en charge, non
+un préalable. Le prérequis réel est désormais **la capacité de traitement manuel** : un délai
+d'examen tenu est une promesse commerciale, et un dossier en attente est un vendeur qui ne paie pas
+encore.
+
+#### 2.7.4 Expiration et révision
+
+Une entreprise vérifiée peut cesser d'exister, être radiée, changer de représentant. Une vérification
+figée une fois pour toutes deviendrait fausse en silence.
+
+| Règle | |
+|---|---|
+| V1 | Toute vérification porte une **date d'expiration**. |
+| V2 | À l'expiration, l'entreprise passe en `expiree` : **les annonces publiées sont suspendues**, motif `verification_expiree` ; les brouillons restent accessibles. |
+| V3 | Un signalement d'usurpation, une incohérence constatée ou un changement de représentant déclenchent une **révision** immédiate. |
+| V4 | Une révocation est **motivée, notifiée et contestable**. |
+| V5 | Le résultat d'une vérification n'est **jamais** exposé publiquement au-delà du fait binaire « entreprise vérifiée ». Ni SIRET complet, ni pièce, ni source. |
+
+#### 2.7.5 Articulation avec l'abonnement
+
+Deux conditions **cumulatives et indépendantes** gouvernent la publication :
+
+```
+publier une annonce  ⟺  entreprise VÉRIFIÉE  ET  abonnement Market ACTIF
+```
+
+Elles ne se substituent pas l'une à l'autre. Une entreprise vérifiée sans abonnement ne publie pas ;
+une entreprise abonnée non vérifiée ne publie pas davantage. Dans les deux cas, **les brouillons
+restent autorisés** — c'est ce qui permet au vendeur d'avancer pendant l'examen de son dossier.
 
 ---
 
@@ -291,6 +411,29 @@ et des mentions obligatoires. Le détail juridique figure dans
 Toute catégorie absente de la nomenclature est, par construction, **impubliable**. C'est une garde
 volontaire : on n'ouvre pas une catégorie sans l'avoir instruite.
 
+#### 3.2.1 Ce que Market accepte, et ce qu'il refuse par nature
+
+**Décision R2 — périmètre produit.** Market porte des **biens professionnels** : surplus de stock,
+matériaux, fins de chantier, consommables, outillage, machines, matériel professionnel, équipements,
+mobilier professionnel, pièces détachées, lots de déstockage, et les autres biens professionnels
+autorisés par la nomenclature.
+
+Le vendeur peut publier des biens de nature très différente. Il ne peut **jamais** publier un bien
+**interdit, dangereux, volé, contrefait ou non conforme** — ces cinq qualifications sont des gardes
+du modèle, pas des règles de modération, et une tentative alimente le score de confiance (§10 du
+modèle de sécurité).
+
+**Les prestations de service sont hors V1.** Main-d'œuvre, sous-traitance, location de matériel avec
+opérateur, transport, formation : rien de tout cela n'est publiable. Trois raisons :
+
+1. **Nature différente** : une prestation n'a ni état d'usure, ni quantité en stock, ni preuve de
+   remise. Tout le modèle d'annonce lui est étranger.
+2. **Régime juridique différent** : une place de marché de main-d'œuvre soulève le travail dissimulé,
+   le prêt illicite de main-d'œuvre et la responsabilité solidaire du donneur d'ordre — un tout autre
+   dossier que la vente de biens.
+3. **Périmètre** : Market est une place de marché de **biens**. Une place de marché de prestations
+   serait un autre produit, à instruire pour lui-même.
+
 ### 3.3 États d'une annonce
 
 ```
@@ -356,11 +499,12 @@ volontaire : on n'ouvre pas une catégorie sans l'avoir instruite.
 | Prix fixe pour un lot | ✔ | `prix_unite = 'lot'` |
 | Quantité partielle | ✔ | `vente_partielle_autorisee` + `quantite_minimale` |
 | Prix négociable / offre | ✔ | file d'offres, contre-offres, expiration |
-| Échange B2B | ✔ | **entre professionnels uniquement** |
+| Échange entre professionnels | ✔ | **entre professionnels vérifiés uniquement**, avec soulte possible — §3.7 |
 | Don / mise à disposition gratuite | **différé** | prix 0 ≠ don : régime fiscal et responsabilité distincts |
 | Achat groupé | **différé** | suppose un agrégateur de demande et une gestion de seuil |
 | Enchère | **hors périmètre** | régime juridique propre (ventes aux enchères) |
 | Réservation + retrait sur place | ✔ | sans paiement plateforme en V1 |
+| Prestation de service, main-d'œuvre, sous-traitance | **hors V1** | Market vend des **biens** (§3.2.1) |
 
 ### 3.5 Localisation — règle de précision
 
@@ -390,6 +534,92 @@ d'échapper à la modération.
 | mentions réglementaires | **oui**, mais repasse en `en_verification` |
 
 Chaque version est conservée. Un acheteur en négociation doit pouvoir prouver ce qui était affiché.
+
+### 3.7 Échanges entre professionnels
+
+**Décision R2 : les échanges sont autorisés entre professionnels vérifiés.**
+
+L'échange est le mode le plus spécifique de Market, et le moins couvert par les usages d'une place de
+marché ordinaire. Il mérite un modèle propre.
+
+#### 3.7.1 Périmètre et gardes
+
+| Règle | |
+|---|---|
+| **E1** | L'échange est **exclusivement B2B** : les deux parties sont des **entreprises vérifiées**. Un particulier ne propose ni ne reçoit d'échange. |
+| **E2** | L'entreprise **initiatrice** doit disposer d'un **abonnement Market actif** : elle publie, en pratique, un bien en contrepartie. |
+| **E3** | L'annonce cible doit porter `nature_transaction ∈ {echange, vente_ou_echange}`. Une annonce de vente pure ne reçoit pas de proposition d'échange. |
+| **E4** | **ELSATIA n'encaisse ni la soulte, ni la valeur de l'échange.** Le règlement de la soulte se fait directement entre les parties. |
+| **E5** | Un échange est **deux ventes croisées** sur le plan fiscal et comptable. Chaque partie facture l'autre. La plateforme le **rappelle** sans jamais le calculer (voir J-16 du cadre juridique). |
+| **E6** | Le bien proposé en contrepartie obéit **aux mêmes règles que toute annonce** : catégorie autorisée, mentions réglementaires, interdits. Un bien impubliable n'est pas échangeable. |
+
+#### 3.7.2 Le modèle de proposition d'échange
+
+| Champ | Rôle |
+|---|---|
+| `annonce_cible` | l'annonce convoitée |
+| `entreprise_initiatrice`, `entreprise_destinataire` | les deux parties, vérifiées |
+| **`bien_propose`** | soit une **annonce publiée** de l'initiateur (recommandé : le bien est déjà décrit, catégorisé et photographié), soit une **description libre** avec photos et catégorie — sans publication |
+| `quantite_proposee`, `unite_proposee` | — |
+| `quantite_demandee` | sur l'annonce cible |
+| **`soulte_montant_ht`**, `soulte_sens` | `initiateur_verse` / `destinataire_verse` / `aucune`. La soulte peut être **nulle**. |
+| `soulte_tva` | déclarée par la partie qui la verse |
+| `message` | libre |
+| `expire_le` | défaut 7 jours |
+| `statut` | §3.7.3 |
+| `proposition_parente` | chaînage des contre-propositions |
+
+**Pourquoi préférer un bien déjà publié** : il a passé la nomenclature, les mentions réglementaires
+et, le cas échéant, la vérification a priori. Une description libre contourne ces contrôles — elle
+reste possible pour ne pas obliger un vendeur à publier un bien qu'il ne souhaite pas exposer, mais
+elle **déclenche une vérification a priori** si sa catégorie est `sous_conditions`.
+
+#### 3.7.3 États d'une proposition d'échange
+
+```
+   proposee ──accepte──▶ acceptee ──remise croisée confirmée──▶ conclue
+      │  │  │                 │
+      │  │  │                 └──annulation d'un commun accord──▶ annulee
+      │  │  └──refuse──▶ refusee
+      │  └──contre-proposition──▶ contre_proposee ──▶ (nouvelle proposition chaînée)
+      └──échéance──▶ expiree
+```
+
+| Règle | |
+|---|---|
+| **X1** | `acceptee` **bloque** la quantité engagée des **deux** côtés (§5 du document Bridge) : sur l'annonce cible, et sur le bien proposé s'il est lui-même une annonce publiée. |
+| **X2** | Une contre-proposition **ferme** la proposition précédente et en ouvre une nouvelle, **chaînée**. L'historique complet de la négociation est conservé et restituable aux deux parties. |
+| **X3** | `expiree` libère les engagements. Aucune reconduction tacite. |
+| **X4** | `conclue` exige la **confirmation de la remise par les deux parties** — c'est la différence avec une vente, où une seule remise a lieu. |
+| **X5** | `annulee` après acceptation est possible **d'un commun accord**, ou unilatéralement avant toute remise ; elle est motivée et journalisée. |
+| **X6** | Une annulation après remise partielle (un bien remis, l'autre non) **n'est pas** traitée par la plateforme : elle bascule en **litige**, avec restitution de la trace aux deux parties. |
+
+#### 3.7.4 Preuve de remise croisée
+
+Un échange comporte **deux remises**. Le mécanisme de code de retrait (§5.3) est donc **dédoublé** :
+
+```
+acceptation
+   ├─ code de retrait A  →  remis par l'entreprise destinataire à l'initiatrice
+   └─ code de retrait B  →  remis par l'entreprise initiatrice à la destinataire
+
+conclusion  ⟺  code A confirmé  ET  code B confirmé
+```
+
+Tant qu'une seule remise est confirmée, l'échange reste `acceptee` et **la trace de l'asymétrie est
+conservée** — c'est précisément ce qui a de la valeur en cas de litige. Une échéance de remise est
+fixée à l'acceptation ; son dépassement notifie les deux parties.
+
+**Ce qu'ELSATIA atteste** : que deux codes ont été confirmés dans son système, à telle date, par
+telles entreprises. **Rien d'autre** : ni la conformité des biens, ni le versement de la soulte, ni
+la valeur de l'échange.
+
+#### 3.7.5 Historique
+
+Chaque proposition, contre-proposition, acceptation, refus, expiration, annulation et confirmation
+de remise est écrite au **journal append-only**, avec auteur, horodatage et motif. Les deux parties
+peuvent consulter et **exporter** l'historique complet de leur négociation — c'est ce qui remplace,
+en l'absence de flux financier, la preuve qu'aurait constituée un paiement.
 
 ---
 
@@ -452,24 +682,34 @@ surface RGPD.
 ```
  1. L'entreprise a déjà un compte ELSATIA (ou le crée)
  2. Activation de Market : acces_applications_entreprises('market')
- 3. VÉRIFICATION PROFESSIONNELLE (N1 → N3)                     ← BLOQUANT
- 4. Choix de l'offre Market (§ Business Model)                 ← BLOQUANT
- 5. Habilitation des collaborateurs (rôles Market)
- 6. (option) Activation de la validation interne
- 7. Création d'une annonce : formulaire piloté par la catégorie
- 8. Photos : dépôt, ordre, photo principale, contrôle
- 9. Prix, TVA, négociabilité, quantité, unité
-10. Mentions réglementaires si la catégorie l'exige            ← BLOQUANT
-11. Prévisualisation « telle que la verra un visiteur »
+ 3. VÉRIFICATION PROFESSIONNELLE (N1 → N3)          gratuite, sans abonnement
+     · voie automatique, ou VALIDATION MANUELLE (§2.7.3)
+ 4. Habilitation des collaborateurs (rôles Market)
+ 5. (option) Activation de la validation interne
+ 6. Création d'une annonce : formulaire piloté par la catégorie   ← SANS ABONNEMENT
+ 7. Photos : dépôt, ordre, photo principale, contrôle             ← SANS ABONNEMENT
+ 8. Prix, TVA, négociabilité, quantité, unité                     ← SANS ABONNEMENT
+ 9. Mentions réglementaires si la catégorie l'exige   ← BLOQUANT (contenu)
+10. Prévisualisation « telle que la verra un visiteur »           ← SANS ABONNEMENT
+    ─────────────────────────────────────────────────────────────────────────
+11. SOUSCRIPTION DE L'ABONNEMENT MARKET              ← BLOQUANT (AB1)
+    ─────────────────────────────────────────────────────────────────────────
 12. Soumission → (validation interne) → (vérification plateforme) → publiée
-13. Réception des demandes : messages, offres, réservations
-14. Négociation : contre-offre, refus, acceptation
-15. Acceptation → réservation → révélation de l'adresse
+13. Réception des demandes : messages, offres, propositions d'échange,
+    réservations
+14. Négociation : contre-offre, contre-proposition d'échange, refus, acceptation
+15. Acceptation → réservation → révélation de l'adresse (ou codes croisés, §3.7.4)
 16. Remise ou expédition, preuve de remise
 17. Facturation : par le vendeur, avec ses propres outils
 18. Clôture : vendue / échangée
 19. Suivi : tableau de bord, statistiques, historique
 20. Archivage
+
+**La souscription arrive délibérément tard.** Le vendeur a préparé son annonce, vu à quoi elle
+ressemblera et mesuré le travail que la plateforme lui épargne : c'est le moment où l'abonnement
+s'explique de lui-même. Le lui demander à l'étape 2, avant qu'il n'ait rien vu, ferait abandonner
+la majorité des vendeurs — et il faut le dire, puisque le palier gratuit qui absorbait cette
+friction est écarté.
 ```
 
 ### 5.2 Intervention de plusieurs collaborateurs
@@ -692,11 +932,13 @@ Market prend place dans `/a-venir` aux côtés des autres produits non commercia
 
 ### 9.1 V1
 
-Vérification professionnelle (N1–N3) · annonces avec photos · nomenclature fermée avec catégories
-réglementées · recherche textuelle, par catégorie et par distance · favoris, recherches enregistrées,
-alertes · messagerie interne avec quotas · offres et contre-offres · échange B2B · réservation avec
-code de retrait · signalement et modération · journal append-only · notifications de service et de
-sécurité · abonnement vendeur · **mise en relation sans encaissement de la vente**.
+Vérification professionnelle (N1–N3), **voie automatique ou manuelle** · annonces avec photos ·
+nomenclature fermée avec catégories réglementées · recherche textuelle, par catégorie et par
+distance · favoris, recherches enregistrées, alertes · messagerie interne avec quotas · offres et
+contre-offres · **échanges entre professionnels vérifiés, avec soulte** · réservation avec code de
+retrait · signalement et modération avec recours · journal append-only · notifications de service et
+de sécurité · **abonnement vendeur obligatoire à partir de la première annonce publiée, brouillons
+libres avant souscription** · **mise en relation sans encaissement de la vente**.
 
 ### 9.2 Différé — et pourquoi
 
@@ -707,7 +949,9 @@ sécurité · abonnement vendeur · **mise en relation sans encaissement de la v
 | Avis et réputation | sans transaction observée par la plateforme, un avis n'est pas vérifiable — donc manipulable |
 | Don / gratuité | régime fiscal et responsabilité distincts du prix zéro |
 | Achat groupé | suppose un agrégateur de demande et une gestion de seuil |
-| Vente entre particuliers | **audit juridique dédié requis** — décision de Julien (D-9) |
+| Vente entre particuliers (C2C) | **exclue de la V1 par décision R2** ; toute ouverture ultérieure suppose un audit juridique dédié |
+| Prestations de service, main-d'œuvre, sous-traitance | **hors V1 par décision R2** (§3.2.1) |
+| Palier gratuit permanent autorisant la publication | **écarté par décision R2** — voir `BUSINESS-MODEL-V1` §2.3 |
 | Transport intégré | responsabilité de commissionnaire de transport |
 | API publique | multiplie la surface d'aspiration avant d'avoir mesuré l'usage |
 | Application mobile dédiée | le web responsive suffit à valider le marché |

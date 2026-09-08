@@ -1,8 +1,9 @@
 # ELSATIA-MARKET-WIREFRAMES-V1
 
 Lot : `ELSATIA-MARKET-BUSINESS-LEGAL-TECHNICAL-ARCHITECTURE-V1` — livrable 7
+Révision : **R2 — décisions produit fermées** (`ELSATIA-MARKET-R2-FINAL-PRODUCT-DECISIONS`)
 Nature : wireframes **fonctionnels**. Structure et contenu, pas de design.
-Branche : `feat/market-architecture-legal-business-v1` — base `1fc1331`
+Branche : `feat/market-architecture-legal-business-v1` — base `1fc1331` — R1 `281769b`
 
 ---
 
@@ -356,7 +357,7 @@ remise que la plateforme produira.
 │                                                                              │
 │  ÉTAPE 2 — Votre rattachement à l'entreprise           ⏳ En cours d'examen   │
 │    Justificatif déposé le 00/00/0000                                         │
-│    Délai d'examen indicatif : 2 jours ouvrés                                  │
+│    Examiné par ELSATIA · délai indicatif : 2 jours ouvrés                     │
 │    [ Remplacer le justificatif ]                                             │
 │                                                                              │
 │  ÉTAPE 3 — Éléments de confiance (facultatif)                                │
@@ -365,8 +366,9 @@ remise que la plateforme produira.
 │    Ces éléments ne sont pas publiés. Ils renforcent votre dossier.            │
 │                                                                              │
 │  ─────────────────────────────────────────────────────────────────────────   │
-│  Tant que la vérification n'est pas complète, vous pouvez préparer vos        │
-│  annonces en brouillon, sans les publier.                                     │
+│  La vérification est gratuite et ne nécessite aucun abonnement.               │
+│  Tant qu'elle n'est pas complète, vous pouvez préparer vos annonces en        │
+│  brouillon, sans les publier.                                                 │
 │                                                                              │
 │                                     [ Préparer une annonce ]  (publication ⛔) │
 └──────────────────────────────────────────────────────────────────────────────┘
@@ -374,6 +376,62 @@ remise que la plateforme produira.
 
 La vérification est **le premier écran**, pas une formalité intercalée après la souscription. Elle
 est aussi le point où le refus doit rester compréhensible et contestable.
+
+**Elle est gratuite et antérieure à l'abonnement** : demander de payer avant d'avoir dit si
+l'entreprise est acceptée serait à la fois commercialement absurde et juridiquement inconfortable.
+
+L'ÉTAPE 1 est vérifiée automatiquement quand la source le permet, **et par examen sur pièce
+sinon** — dans ce cas l'écran demande un extrait de registre de moins de trois mois et annonce le
+délai. Le vendeur n'a pas à savoir laquelle des deux voies a été empruntée ; il doit seulement savoir
+**où en est son dossier** et **quand il aura une réponse**.
+
+---
+
+### W-08 bis — Publication bloquée : souscription requise
+
+Écran atteint depuis la prévisualisation (W-12), quand le vendeur clique « Soumettre à publication »
+sans abonnement actif.
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  Publier « Titre de l'annonce »                                              │
+├──────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Votre annonce est prête. Il vous manque un abonnement Market pour la        │
+│  publier.                                                                    │
+│                                                                              │
+│   ✔ Entreprise vérifiée                                                      │
+│   ✔ Annonce complète — 4 photos, informations réglementaires renseignées      │
+│   ⛔ Abonnement Market — aucun abonnement actif                               │
+│                                                                              │
+│  ─────────────────────────────────────────────────────────────────────────   │
+│  L'abonnement Market est nécessaire pour publier. Consulter les annonces      │
+│  et acheter restent gratuits, pour vous comme pour vos acheteurs.             │
+│                                                                              │
+│  Votre brouillon est conservé. Vous le retrouverez tel quel.                  │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │  [ choix de l'offre — paliers, périodicité, options ]                  │  │
+│  │  (contenu et montants : non arbitrés — décision D-10)                  │  │
+│  └────────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+│                       [ Revenir au brouillon ]  [ Choisir un abonnement ]    │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Décisions portées par cet écran**
+
+- Le blocage est **explicite et actionnable** (règle AB2) : il dit exactement ce qui manque, confirme
+  ce qui est déjà acquis, et mène à la souscription. Un bouton grisé sans explication ferait perdre
+  le vendeur au moment précis où il est le plus engagé.
+- **« Votre brouillon est conservé »** est écrit, pas sous-entendu (règle AB3). C'est ce qui rend le
+  refus supportable.
+- Le rappel que la consultation et l'achat restent gratuits **pour ses acheteurs** est un argument
+  commercial, pas une formalité : le vendeur paie pour être vu par une audience qui, elle, ne paie
+  rien.
+- Ce même écran sert au cas d'un abonnement **suspendu** ou **résilié**, et au cas d'un **quota de
+  palier atteint** (règle AB6) — seule la ligne ⛔ change.
+- **Aucun montant ne figure dans ce wireframe.** Les paliers relèvent de D-10.
 
 ---
 
@@ -522,6 +580,7 @@ avant de lui dire que sa publication est impossible.
 │  AVANT DE PUBLIER                                                            │
 │   ✔ Entreprise vérifiée                                                      │
 │   ✔ Abonnement Market actif — 12 annonces sur 20                             │
+│     (les deux conditions sont requises, et indépendantes)                     │
 │   ✔ 4 photos                                                                 │
 │   ✔ Informations réglementaires complètes                                    │
 │   ⏳ Cette annonce sera vérifiée avant sa mise en ligne (catégorie soumise    │
@@ -613,6 +672,75 @@ ce qu'ELSATIA atteste. Elle doit figurer à l'écran, pas seulement dans les CGU
 
 Le rappel de la sortie de stock est la matérialisation de la règle B2 : Market ne décrémente rien, il
 rappelle.
+
+---
+
+### W-14 bis — Proposition d'échange entre professionnels
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  Proposer un échange — Titre de l'annonce convoitée                          │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  Vous proposez à : Raison sociale · Ville (00)  ✔ Entreprise vérifiée        │
+│                                                                              │
+│  CE QUE VOUS DEMANDEZ                                                        │
+│   Annonce      Titre · MK-XXXXXXXX                                           │
+│   Quantité     [   45   ] m²        (disponible : 45 m²)                     │
+│   Valeur affichée par le vendeur     000,00 € HT                             │
+│                                                                              │
+│  ─────────────────────────────────────────────────────────────────────────   │
+│  CE QUE VOUS PROPOSEZ EN ÉCHANGE                                             │
+│   (•) Une de mes annonces publiées                                           │
+│       ┌──────────────────────────────────────────────────────────────────┐   │
+│       │ (•) [img] Titre · MK-XXXXXXXX · 12 u · 000 € HT                  │   │
+│       │ ( ) [img] Titre · MK-XXXXXXXX · 3 u  · 000 € HT                  │   │
+│       └──────────────────────────────────────────────────────────────────┘   │
+│       Quantité proposée  [   12   ] u                                        │
+│                                                                              │
+│   ( ) Un bien non publié — à décrire                                         │
+│       ⚠ Un bien non publié doit être décrit, catégorisé et photographié.     │
+│         S'il relève d'une catégorie soumise à conditions, votre proposition   │
+│         sera vérifiée avant d'être transmise.                                │
+│                                                                              │
+│  ─────────────────────────────────────────────────────────────────────────   │
+│  SOULTE (différence de valeur)                                               │
+│   (•) Aucune soulte                                                          │
+│   ( ) Je verse une soulte de      [        ] € HT   TVA ▼                    │
+│   ( ) Je reçois une soulte de     [        ] € HT   TVA ▼                    │
+│                                                                              │
+│  Message (facultatif)   ······························                       │
+│  Votre proposition est valable 7 jours.                                      │
+│                                                                              │
+│  ─────────────────────────────────────────────────────────────────────────   │
+│  ⓘ Un échange vaut deux ventes : chacun facture l'autre, chacun déclare sa    │
+│    TVA. ELSATIA n'encaisse ni la soulte, ni la valeur de l'échange, et ne     │
+│    calcule aucune de ces valeurs.                                             │
+│                                                                              │
+│    Si votre proposition est acceptée, deux codes de retrait seront émis :     │
+│    un pour chaque remise. L'échange n'est conclu que lorsque les deux ont     │
+│    été confirmés.                                                             │
+│                                                                              │
+│                                    [ Annuler ]  [ Proposer l'échange ]       │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Décisions portées par cet écran**
+
+- **Réservé aux professionnels vérifiés** : la qualité de l'interlocuteur est affichée en tête, et un
+  particulier n'atteint jamais cet écran.
+- **Proposer une annonce déjà publiée est le choix par défaut** : le bien a déjà passé la
+  nomenclature, les mentions réglementaires et, le cas échéant, la vérification a priori. Le bien non
+  publié reste possible — un vendeur peut ne pas vouloir exposer ce qu'il cède — mais l'écran
+  annonce **immédiatement** qu'il déclenchera une vérification.
+- **La soulte a trois états explicites**, dont « aucune ». Un champ montant laissé vide serait
+  ambigu ; ici le sens du versement est déclaré.
+- **« Un échange vaut deux ventes »** figure à l'écran, pas seulement dans les CGU. C'est le
+  contresens le plus fréquent en matière d'échange professionnel, et il a des conséquences fiscales
+  réelles.
+- **Les deux codes de retrait sont annoncés avant l'engagement**, pas découverts après : c'est ce qui
+  distingue un échange d'une vente dans le parcours, et le vendeur doit le savoir en proposant.
+- ELSATIA n'encaisse ni la soulte ni la valeur de l'échange, **et ne calcule aucune de ces valeurs** —
+  la seconde moitié de la phrase est aussi importante que la première.
 
 ---
 
@@ -730,6 +858,9 @@ modifie pas.
 | 10 | Transparence du classement et de la mise en avant | W-01, W-02 |
 | 11 | Conversations privées inaccessibles par défaut | W-16 — le verrou est visible |
 | 12 | Le pont ne synchronise pas | W-10, W-14 — dit à l'écran |
+| 13 | **Abonnement obligatoire pour publier, brouillons libres avant** | W-08 bis, W-12 |
+| 14 | **Vérification gratuite et antérieure à l'abonnement** | W-08 |
+| 15 | **Échange = deux ventes, deux codes de retrait, aucune valeur calculée** | W-14 bis |
 
 ---
 

@@ -1,9 +1,10 @@
 # ELSATIA-MARKET-BUSINESS-MODEL-V1
 
 Lot : `ELSATIA-MARKET-BUSINESS-LEGAL-TECHNICAL-ARCHITECTURE-V1` — Phases 7 et 8
+Révision : **R2 — décisions produit fermées** (`ELSATIA-MARKET-R2-FINAL-PRODUCT-DECISIONS`)
 Nature : étude. **Aucun tarif définitif, aucun prix Stripe, aucun objet Stripe créé, lu par API ou
 modifié.**
-Branche : `feat/market-architecture-legal-business-v1` — base `1fc1331`
+Branche : `feat/market-architecture-legal-business-v1` — base `1fc1331` — R1 `281769b`
 
 > **Tous les montants de ce document sont des ordres de grandeur d'étude.** Aucun n'est arbitré.
 > Aucun ne doit être affiché, communiqué ou saisi dans Stripe. La grille canonique ELSATIA
@@ -11,197 +12,176 @@ Branche : `feat/market-architecture-legal-business-v1` — base `1fc1331`
 
 ---
 
-## 1. Le cadre posé par Julien
+## 1. Le cadre — désormais fermé
 
-> Seuls les professionnels qui publient des annonces paient un abonnement ou une offre commerciale
-> liée à la vente. Les particuliers acheteurs ne paient aucun abonnement pour consulter ou acheter.
+La R1 posait des questions ; la R2 y répond. Les décisions ci-dessous ne sont plus des
+recommandations d'audit : ce sont des **décisions produit arrêtées**, et ce document en tire les
+conséquences.
 
-Cette décision est **structurante** et n'est pas remise en question ici. Elle a trois conséquences
-que l'étude doit assumer :
+### 1.1 Qui paie
 
-1. **L'acheteur est gratuit, toujours** — particulier comme professionnel. Aucun des trois modèles
-   étudiés ne facture l'acheteur.
-2. **Le revenu vient du vendeur, et de lui seul.**
-3. **Le revenu n'est pas indexé sur la valeur des transactions** dans le modèle de base. C'est la
-   principale différence avec les places de marché grand public, et c'est un choix défendable : il
-   rend le revenu prévisible et évite d'avoir à observer, mesurer et sécuriser les transactions —
-   c'est-à-dire l'essentiel du coût et du risque d'une marketplace.
+> **Abonnement vendeur obligatoire à partir de la première annonce publiée. Consultation et achat
+> gratuits. Brouillons possibles avant souscription.**
+
+C'est la formulation de référence. Elle remplace partout toute mention de « freemium vendeur », qui
+n'a plus cours.
+
+| Acteur | Paie |
+|---|---|
+| Particulier acheteur | **rien** |
+| Professionnel acheteur qui ne publie pas | **rien** |
+| Professionnel qui **publie** | **abonnement Market actif, obligatoire** |
+
+**Règle d'implémentation, non contournable** : la **publication** est bloquée tant que l'abonnement
+vendeur n'est pas actif. La **création et la préparation de brouillons** sont autorisées avant
+souscription — c'est ce qui permet au vendeur d'évaluer l'outil sans que la plateforme se remplisse
+d'annonces gratuites.
+
+**Le modèle freemium — un palier gratuit permanent autorisant la publication — est écarté.** Il ne
+sera pas proposé, ni comme recommandation, ni comme variante.
+
+### 1.2 Encaissement des ventes
+
+**ELSATIA ne touche pas l'argent de la vente en V1.** La V1 est une plateforme de **mise en
+relation, de négociation et de réservation**. Le règlement se fait directement entre le vendeur et
+l'acheteur, selon les moyens qu'ils conviennent.
+
+Conséquences, toutes définitives pour la V1 :
+
+| Conséquence | |
+|---|---|
+| Commission sur transaction | **aucune** |
+| Reversement vendeur | **aucun** |
+| Portefeuille | **aucun** |
+| Séquestre | **aucun** |
+| Remboursement traité par ELSATIA | **aucun** |
+| Litige financier arbitré par ELSATIA | **aucun** |
+| Stripe Connect pour encaisser les ventes | **non utilisé en V1** |
+| Stripe | **uniquement** pour facturer l'abonnement vendeur Market |
+
+### 1.3 Ce que ces deux décisions produisent ensemble
+
+Un modèle économique **simple, prévisible et juridiquement léger** : un abonnement B2B classique,
+facturé par ELSATIA à ses propres clients, sur une mécanique qu'elle maîtrise déjà. Aucun flux de
+tiers, aucun KYC financier, aucune exposition aux chargebacks.
+
+Le prix de cette simplicité est réel et doit être énoncé : **le revenu est déconnecté de la valeur
+échangée**, et **l'amorçage n'est plus subventionné par un palier gratuit**. Le §3 traite ce second
+point, qui est le vrai sujet.
 
 ---
 
-## 2. Le problème économique propre à une marketplace : l'amorçage
+## 2. Les trois modèles étudiés — et l'issue
 
-Toute place de marché affronte le même obstacle. Un acheteur ne vient que s'il y a des annonces ; un
-vendeur ne paie que s'il y a des acheteurs. Facturer le vendeur **dès le premier jour**, alors qu'il
-n'y a aucune audience, revient à lui vendre une promesse.
+L'étude R1 comparait trois modèles. La décision R2 en retient un et en écarte deux. Le comparatif
+est conservé pour la traçabilité de la décision.
 
-Trois éléments propres à ELSATIA atténuent le problème, sans le supprimer :
+### 2.1 Modèle 1 — Abonnement vendeur pur — **RETENU**
+
+Le vendeur paie un abonnement pour publier. Aucune commission, aucune observation des transactions.
+
+| Avantages | Limites assumées |
+|---|---|
+| Revenu **prévisible et récurrent** | revenu déconnecté de la valeur créée : une vente à 40 000 € rapporte autant qu'une à 40 € |
+| Statut juridique le plus simple — aucun encaissement de la vente | l'abonnement est **le premier poste coupé** dans une PME sous tension |
+| Aucun KYC financier, aucune obligation d'établissement de paiement | plafond de revenu bas |
+| **Coût opérationnel le plus faible des trois** : ni séquestre, ni litige de paiement, ni chargeback, ni TVA sur la transaction | **amorçage non subventionné** (§3) |
+| Mécanique **déjà maîtrisée** par ELSATIA | |
+| Aucune dépendance à Stripe Connect | |
+
+### 2.2 Modèle 2 — Abonnement + commission sur transaction — **ÉCARTÉ**
+
+Écarté par la décision 1.2. L'analyse qui y conduisait reste valable et mérite d'être conservée :
+
+- **Contournement structurel** : la mise en relation faite, les deux parties ont un intérêt
+  convergent à sortir de la plateforme. Sur des biens professionnels souvent lourds, retirés sur
+  place et réglés par virement, ce risque est décisif.
+- **Changement de nature juridique** : ELSATIA deviendrait intermédiaire de paiement — KYC/LCB-FT de
+  tous les vendeurs, litiges, remboursements, chargebacks, TVA sur biens d'occasion, comptabilité de
+  flux de tiers.
+- **Aucune brique n'existe** : l'audit établit que le Connect en place n'a **ni `application_fee`,
+  ni `transfer_data`, ni `on_behalf_of`**.
+- Une commission est **très difficile à retirer** une fois annoncée.
+
+### 2.3 Modèle 3 — Freemium encadré — **ÉCARTÉ PAR DÉCISION**
+
+Écarté par la décision 1.1. Il proposait un palier gratuit permanent autorisant la publication, ce
+que la décision produit exclut. L'argument qu'il portait — l'amorçage — reste entier et doit être
+traité autrement : c'est l'objet du §3.
+
+Ce que son abandon coûte, dit franchement : le catalogue ne se remplira pas tout seul, et le coût de
+vérification et de modération sera supporté **uniquement** pour des vendeurs payants — ce qui est
+d'ailleurs son seul avantage opérationnel.
+
+### 2.4 Comparatif conservé
+
+| Critère | **M1 — retenu** | M2 — écarté | M3 — écarté |
+|---|:---:|:---:|:---:|
+| Conformité aux décisions R2 | **totale** | non | non |
+| Amorçage du catalogue | **difficile** | moyen | facile |
+| Prévisibilité du revenu | **forte** | faible | moyenne |
+| Plafond de revenu | bas | élevé | moyen |
+| Complexité juridique | **faible** | élevée | faible |
+| Coût opérationnel | **faible** | élevé | moyen |
+| Charge de développement V1 | **faible** | élevée | faible à moyenne |
+| Risque de contournement | **sans objet** | majeur | sans objet |
+| Délai de mise sur le marché | **court** | long | court |
+
+---
+
+## 3. L'amorçage sans palier gratuit — le vrai sujet
+
+Toute place de marché affronte le même obstacle : un acheteur ne vient que s'il y a des annonces, un
+vendeur ne paie que s'il y a des acheteurs. Le palier gratuit était la réponse habituelle. Il est
+écarté. **L'obstacle, lui, ne l'est pas.**
+
+Trois atouts propres à ELSATIA l'atténuent :
 
 | Atout | Portée |
 |---|---|
 | Base installée d'entreprises BTP déjà clientes | l'offre de départ peut naître du parc existant, sans acquisition |
-| Compte ELSATIA commun (socle multi-app livré) | activer Market ne demande ni inscription ni nouveau compte |
-| Ponts Stock / Colors | le coût de publication d'une annonce est bas pour un client existant |
+| Compte ELSATIA commun (socle multi-app livré) | activer Market ne demande ni inscription, ni nouveau compte |
+| Ponts Stock et Colors | le coût de publication d'une annonce est bas pour un client existant |
 
-**Conséquence pour tous les modèles** : une phase d'amorçage à revenu nul ou quasi nul est
-**inévitable**. Ce n'est pas une remise, c'est le prix d'entrée sur ce marché. Le nier conduirait à
-poser une grille qui ne se vendra pas.
+Ils ne suffisent pas. Cinq leviers restent disponibles, **tous compatibles avec la décision 1.1**, et
+**tous relevant de l'arbitrage tarifaire (D-10)** :
 
----
+| Levier | Description | Compatible 1.1 ? |
+|---|---|:---:|
+| **L1 — Période d'essai bornée** | souscription obligatoire, statut `essai`, durée limitée, échéance ferme. **Ce n'est pas du freemium** : il y a souscription, l'abonnement est actif, et l'essai **finit**. Le socle le sait déjà faire (`abonnements_entreprises.statut = 'essai'`, `initialiser_essai_entreprise()`). | **oui** |
+| **L2 — Tarif d'entrée bas** | un premier palier à faible nombre d'annonces, payant mais peu cher | **oui** |
+| **L3 — Offre de lancement à durée limitée** | remise sur les premiers mois pour les premiers vendeurs, avec une date de fin. Le socle le sait faire (`promotions_commerciales`, `plateforme_operations_remise`). | **oui** |
+| **L4 — Inclusion temporaire pour les clients existants** | Market inclus un temps dans un abonnement Gestion Pro, avec une échéance annoncée | **oui**, mais crée une attente de gratuité — **à manier avec prudence** |
+| **L5 — Amorçage manuel** | ELSATIA sollicite directement des vendeurs de son parc pour constituer un premier inventaire | **oui** |
 
-## 3. Les trois modèles économiques
+**Recommandation d'étude : L1 + L2 + L5.** L'essai borné lève la friction du premier paiement sans
+créer de palier gratuit permanent ; un premier palier bas rend la conversion crédible ; l'amorçage
+manuel constitue l'inventaire initial, qui est la seule chose qu'aucun tarif ne peut acheter.
 
-### Modèle 1 — Abonnement vendeur pur
+**L4 est signalé comme un piège** : ce qui a été inclus est très difficile à facturer ensuite, et
+l'attente de gratuité survit longtemps à l'échéance annoncée.
 
-**Principe.** Le vendeur paie un abonnement mensuel ou annuel donnant droit à publier. Aucune
-commission, aucune observation des transactions. ELSATIA n'intervient pas dans la vente.
+**Aucun de ces leviers n'est arbitré ici. Aucune durée, aucun montant, aucun taux de remise n'est
+proposé.** Ils relèvent de D-10.
 
-**Structuration.** Trois niveaux, différenciés par le nombre d'annonces actives simultanées, le
-nombre de photos, la durée de publication et la présence d'une page vendeur.
+### 3.1 Ce qu'il faudra tarifer — sans le tarifer ici
 
-| Palier | Annonces actives | Ordre de grandeur (étude) |
-|---|---:|---|
-| Découverte | 3 | gratuit ou très bas |
-| Standard | 20 | dizaines d'euros / mois |
-| Volume | 100 | ~2 à 3 × Standard |
-| Multi-sites / grand compte | négocié | devis |
-
-Annonces supplémentaires à l'unité, mises en avant en option.
-
-| Avantages | Risques | Coût opérationnel |
-|---|---|---|
-| Revenu **prévisible et récurrent** | à l'amorçage, le vendeur paie sans audience | **le plus bas des trois** |
-| Aucun encaissement de la vente → statut juridique le plus simple | revenu **déconnecté de la valeur créée** : une vente à 40 000 € rapporte autant qu'une à 40 € | ni KYC, ni séquestre, ni litige de paiement, ni chargeback, ni TVA sur la transaction |
-| Aucun KYC de paiement, aucune obligation d'établissement de paiement | l'abonnement est **le premier poste coupé** dans une PME sous tension | facturation = celle qui existe déjà (`abonnements_entreprises`, Stripe) |
-| Modèle **déjà maîtrisé** par ELSATIA (abonnements GP) | plafond de revenu bas | modération et vérification pro restent à la charge d'ELSATIA |
-| Compatible avec le socle livré, sans Connect | | |
-
-**Alignement avec la décision de Julien : total.**
-
----
-
-### Modèle 2 — Abonnement vendeur + commission sur transaction
-
-**Principe.** Abonnement d'accès réduit, complété par une commission (ordre de grandeur d'étude :
-2 à 5 %) prélevée sur les ventes conclues **via la plateforme**.
-
-**Prérequis absolu** : ELSATIA doit **observer et intermédier le paiement**. Une commission sur une
-transaction qu'on ne voit pas est incollectable — le vendeur conclura hors plateforme.
-
-| Avantages | Risques | Coût opérationnel |
-|---|---|---|
-| Revenu **aligné sur la valeur créée** | **contournement** : la mise en relation faite, les deux parties ont un intérêt convergent à sortir de la plateforme. C'est le risque n° 1, et il est structurel. | **très élevé** |
-| Barrière d'entrée basse pour le vendeur | change la **nature juridique** : ELSATIA devient intermédiaire de paiement | KYC/LCB-FT de tous les vendeurs |
-| Aligne ELSATIA sur le succès de ses vendeurs | expose aux **litiges, remboursements et chargebacks** | gestion des litiges, remboursements, avoirs |
-| Potentiel de revenu **très supérieur** | complexité TVA (biens d'occasion, régime de la marge, autoliquidation, ventes intracommunautaires) | Stripe Connect Express/Custom complet |
-| | responsabilité perçue d'ELSATIA sur la transaction | support opérationnel permanent |
-| | tension directe avec « seuls ceux qui publient paient un abonnement » | comptabilité de flux de tiers |
-
-**Alignement avec la décision de Julien : partiel.** La commission n'est ni un abonnement, ni « une
-offre liée à la vente » au sens d'un forfait — c'est un prélèvement sur le prix du bien. Cela ne
-contredit pas frontalement l'instruction, mais cela en déplace le centre de gravité et mérite un
-arbitrage explicite.
-
----
-
-### Modèle 3 — Abonnement de base + options de visibilité (freemium encadré)
-
-**Principe.** Un socle **gratuit et durable** (3 annonces actives, photos limitées, durée courte)
-ouvert à toute entreprise vérifiée. La monétisation porte sur le **volume** et la **visibilité** :
-paliers d'annonces, remontée en tête de catégorie, mise en avant sur la page d'accueil, page
-vendeur enrichie, alertes prioritaires.
-
-| Avantages | Risques | Coût opérationnel |
-|---|---|---|
-| **Résout l'amorçage** : le catalogue se remplit avant qu'on ne facture | revenu **incertain et tardif** ; le gratuit peut suffire à beaucoup de vendeurs occasionnels | **moyen** |
-| Barrière d'entrée nulle → volume d'annonces | coût de **modération et de vérification supporté aussi pour les gratuits** | vérification pro sur tout le parc, y compris non payant |
-| Aucune commission → statut juridique simple, comme le Modèle 1 | la mise en avant payante impose une **transparence sur le classement** (obligation d'information sur les critères de référencement) | modération sur tout le parc |
-| Monétise ce qui a une valeur réelle et mesurable : la visibilité | risque d'un catalogue de faible qualité si le gratuit est trop généreux | affichage du classement et de son critère |
-| Conversion naturelle : le vendeur paie **après** avoir constaté l'intérêt | | facturation : socle existant |
-
-**Alignement avec la décision de Julien : bon.** Seuls les professionnels qui publient paient — ceux
-qui publient **beaucoup** ou **veulent être vus**. Les acheteurs restent gratuits.
-
----
-
-### 3.4 Comparaison
-
-| Critère | M1 Abonnement pur | M2 + Commission | M3 Freemium encadré |
-|---|:---:|:---:|:---:|
-| Alignement décision Julien | **total** | partiel | **bon** |
-| Amorçage du catalogue | difficile | moyen | **facile** |
-| Prévisibilité du revenu | **forte** | faible | moyenne |
-| Plafond de revenu | bas | **élevé** | moyen |
-| Complexité juridique | **faible** | **élevée** | faible |
-| Coût opérationnel | **faible** | **élevé** | moyen |
-| Charge de développement V1 | **faible** | **élevée** | faible à moyenne |
-| Risque de contournement | sans objet | **majeur** | sans objet |
-| Réversibilité | **forte** | faible | **forte** |
-| Délai de mise sur le marché | **court** | long | court |
-
-### 3.5 Recommandation
-
-**Modèle 3 pour le lancement, avec une trajectoire explicite vers le Modèle 1.**
-
-Raisonnement :
-
-1. **Le Modèle 2 est prématuré, pas mauvais.** Il exige de savoir intermédier des paiements entre
-   tiers — KYC, litiges, chargebacks, TVA sur biens d'occasion — alors qu'aucune de ces briques
-   n'existe (l'audit établit que le Connect en place n'a **aucun** `application_fee`). Et il repose
-   sur un pari non vérifié : que les parties accepteront de payer sur la plateforme plutôt que de
-   sortir après la mise en relation. Sur des biens professionnels d'occasion, souvent retirés sur
-   place et payés par virement, ce pari est franchement défavorable.
-
-2. **Le Modèle 1 est le bon régime de croisière, mais un mauvais point de départ.** Facturer un
-   abonnement pour publier dans un catalogue vide, c'est vendre une audience qui n'existe pas.
-
-3. **Le Modèle 3 est le Modèle 1 avec une rampe d'accès.** Il partage sa simplicité juridique et son
-   coût opérationnel modéré, et il résout l'amorçage. Le gratuit n'est pas une remise : c'est le
-   moyen de constituer l'inventaire sans lequel il n'y a rien à vendre.
-
-4. **Ils convergent naturellement.** Quand le catalogue est dense et l'audience réelle, le palier
-   gratuit se resserre et le Modèle 3 devient le Modèle 1 sans rupture de contrat pour personne.
-
-**Ce qu'il faut éviter absolument** : lancer avec une commission. Elle impose la charge maximale au
-moment où le produit a le moins de valeur démontrée, et elle est **très difficile à retirer** une
-fois annoncée.
-
-### 3.6 Ce que le modèle recommandé implique de tarifer — sans le tarifer ici
-
-| Objet | Nature | Arbitrage requis |
-|---|---|---|
-| Palier gratuit | annonces actives, photos, durée | **D-10** |
-| Paliers payants | volume d'annonces actives | **D-10** |
+| Objet | Nature | Arbitrage |
+|---|---|:---:|
+| Paliers d'abonnement vendeur | volume d'annonces actives simultanées | **D-10** |
 | Annonce supplémentaire | à l'unité, récurrente | **D-10** |
 | Mise en avant | **achat ponctuel** — jamais un « /mois » | **D-10** |
 | Page vendeur enrichie | option récurrente | **D-10** |
-| Multi-sites / grands comptes | devis (`devis_obligatoire` existe déjà sur `plans_abonnement`) | **D-10** |
-| Période d'essai | durée, contenu | **D-10** |
+| Multi-sites, grands comptes | devis (`plans_abonnement.devis_obligatoire` existe déjà) | **D-10** |
+| **Période d'essai** (L1) | durée, contenu, avec ou sans moyen de paiement | **D-10** |
+| **Offre de lancement** (L3) | taux, durée, éligibilité | **D-10** |
 | Périodicité annuelle | la règle maison est `annuel = 10 × mensuel` | à confirmer pour Market |
-
-**Aucun de ces montants n'est proposé ici.** Ils appellent une étude de marché et une décision de
-Julien, dans un lot tarifaire dédié — comme cela a été fait pour Gestion Pro.
-
-### 3.7 Insertion dans le contrat canonique
-
-Le contrat `CANONICAL-V4-2026-09` est la source de vérité unique, consommée par l'application **et**
-par le site vitrine. Une offre Market devra **y entrer** — pas vivre à côté.
-
-Sa structure s'y prête : `offres`, options récurrentes, achats ponctuels (le pack de crédits IA est
-le précédent exact d'une mise en avant ponctuelle), `modules`, et surtout des **générations
-tarifaires versionnées avec conservation des anciennes**, mécanisme mûr et directement applicable.
-
-**Dette héritée, à traiter avant et non après** (constat d'audit) : le prix souscrit n'est
-aujourd'hui **pas figé au niveau du contrat** — il est relu dans le code à chaque affichage — et
-`options_abonnement_entreprises.prix_unitaire_contractuel_ht` n'est **écrit par aucun code
-applicatif**. Créer une offre Market sur cette base, c'est reproduire le défaut sur un deuxième
-produit. **Décision D-7.**
 
 ---
 
 ## 4. Phase 8 — Paiement et facturation
 
-### 4.1 Deux flux à ne jamais confondre
+### 4.1 Deux flux, désormais tranchés
 
 | | **Flux A — Abonnement Market** | **Flux B — Prix du bien vendu** |
 |---|---|---|
@@ -210,213 +190,327 @@ produit. **Décision D-7.**
 | Nature | service d'ELSATIA | vente entre le vendeur et l'acheteur |
 | Facture | ELSATIA → vendeur | vendeur → acheteur |
 | TVA | TVA française sur un service, régime ELSATIA | régime du vendeur et du bien (§4.5) |
-| Existe aujourd'hui | infrastructure **livrée** | **rien** |
-| Recommandation V1 | **Stripe, socle existant** | **hors plateforme** |
+| Stripe | **oui — et uniquement pour ce flux** | **non** |
+| Décision | fermée | **fermée : hors plateforme** |
 
-**Le Flux A n'est pas discutable** : c'est un abonnement ELSATIA de plus, sur une mécanique éprouvée
-(`abonnements_entreprises`, `factures_abonnement`, webhooks cloisonnés, idempotence traitée via
-`stripe_webhook_events`).
+### 4.2 Les six schémas — issue
 
-Tout le reste de cette phase porte sur le **Flux B**.
+| Schéma | Issue R2 |
+|---|---|
+| **S1 — Contact direct, aucun paiement intégré** | **RETENU** |
+| **S5 — Paiement au retrait** | **RETENU** (c'est S1 appliqué au retrait) |
+| **S6 — Facturation directe vendeur → acheteur** | **RETENU** (corollaire obligé de S1 et S5) |
+| S2 — Réservation avec acompte | **écarté** : toute la complexité du paiement intégré, pour une fraction du montant. Le pire rapport valeur/complexité des six. |
+| S3 — Paiement complet via la plateforme | **écarté** : détenir des fonds pour compte de tiers relève d'un régime réglementé |
+| S4 — Stripe Connect | **écarté pour les ventes en V1.** La brique Standard existe (`entreprises.stripe_account_id`, OAuth câblé) et reste disponible pour une V2 **sans commission**, si le besoin est un jour démontré. Elle n'est pas utilisée par Market. |
 
-### 4.2 Les six schémas comparés (Flux B)
+### 4.3 Analyse des points exigés par la Phase 8, sous le modèle retenu
 
-#### S1 — Contact direct, aucun paiement intégré
+| Point | Sous S1 + S5 + S6 (V1, décidé) |
+|---|---|
+| **KYC vendeur** | vérification **professionnelle** (§5 de la spécification), **pas** un KYC financier |
+| **Reversement** | sans objet |
+| **Commission** | aucune |
+| **Remboursement** | entre les parties ; ELSATIA n'en traite aucun |
+| **Litige** | **médiation sur les faits tracés** (échanges, offres, réservations, remises), **jamais** arbitrage financier |
+| **Chargeback** | sans objet |
+| **TVA de la vente** | **entièrement au vendeur** |
+| **Facture de vente** | par le vendeur |
+| **Avoir** | par le vendeur |
+| **Paiement partiel** | entre les parties |
+| **Caution** | **non proposée** |
+| **Annulation** | libération de la quantité engagée ; aucun flux financier |
+| **Preuve de livraison** | **code de retrait** + photo et signature optionnelles |
+| **Responsabilité ELSATIA** | **hébergement et mise en relation** |
 
-Market met en relation. Le paiement se règle entre les parties (espèces, virement, chèque, terminal
-du vendeur), hors du système.
+> **Avertissement à ne jamais omettre** : le fait qu'ELSATIA n'encaisse pas la vente **ne la dispense
+> pas** des obligations du DSA, du P2B, du Code de la consommation ni, éventuellement, de DAC7. Voir
+> `ELSATIA-MARKET-LEGAL-COMPLIANCE-FRAMEWORK-V1.md` §0.2.
 
-- **Rôle d'ELSATIA** : mise en relation et traçabilité des échanges.
-- **KYC** : néant (aucun flux financier).
-- **Coût de développement** : **nul** au-delà de la messagerie et de la réservation.
-- **Risque** : aucune preuve de paiement ; litige non arbitrable par ELSATIA.
-- **Responsabilité** : minimale — ELSATIA n'a jamais détenu de fonds.
-- **Adapté à** : retrait sur place, virement B2B — c'est-à-dire **le cas dominant** des biens
-  professionnels d'occasion.
+### 4.4 TVA
 
-#### S2 — Réservation avec acompte
-
-Un acompte est versé pour bloquer le bien ; le solde se règle au retrait.
-
-- **Rôle d'ELSATIA** : encaisse et reverse, ou intermédie l'acompte.
-- **KYC** : **oui**, dès qu'ELSATIA touche des fonds destinés à un tiers.
-- **Coût** : **élevé** — reversement, remboursement, gestion du non-retrait, litige sur l'acompte.
-- **Risque** : l'acompte est le point de friction juridique par excellence (qui le conserve si
-  l'acheteur ne vient pas ? si le bien n'est pas conforme ?).
-- **Verdict** : **le pire rapport valeur/complexité des six.** Toute la complexité du paiement
-  intégré, pour une fraction du montant.
-
-#### S3 — Paiement complet via la plateforme (ELSATIA encaisse puis reverse)
-
-- **Rôle d'ELSATIA** : intermédiaire de paiement de plein exercice.
-- **KYC** : **oui, lourd** — LCB-FT sur tous les vendeurs, bénéficiaires effectifs, surveillance.
-- **Coût** : **le plus élevé** — séquestre, reversement, remboursement, chargeback, réconciliation,
-  comptabilité de flux de tiers.
-- **Risque** : détenir des fonds pour compte de tiers relève d'un **régime réglementé** ; opérer
-  sans le statut ou l'exemption adéquate est une prise de risque majeure.
-- **Verdict** : **hors de portée en V1**, et disproportionné au regard du volume attendu.
-
-#### S4 — Stripe Connect (comptes vendeurs connectés)
-
-Trois déclinaisons, qui ne se valent pas :
-
-| Déclinaison | Qui porte le KYC | Charge ELSATIA | Existant |
-|---|---|---|---|
-| **Standard** | **Stripe** (relation directe avec le vendeur) | faible | **DÉJÀ CÂBLÉ** : `entreprises.stripe_account_id`, OAuth, garde d'état anti-CSRF, contrôle de permission |
-| **Express** | Stripe, avec parcours intégré | moyenne | inexistant |
-| **Custom** | **ELSATIA** | **très élevée** | inexistant |
-
-Constat d'audit décisif : **le Connect Standard existe déjà** — mais **sans `application_fee_amount`,
-sans `transfer_data`, sans `on_behalf_of`**. Aucune commission n'est câblée, et le paiement se fait
-*au nom de* l'entreprise connectée (`stripeAccount`).
-
-Autrement dit : ELSATIA sait déjà faire payer un client **du vendeur** sur le compte **du vendeur**,
-sans jamais toucher les fonds. C'est exactement la brique dont Market aurait besoin — et elle est
-compatible avec un modèle **sans commission**.
-
-- **Verdict** : **la seule voie crédible** si un paiement en ligne est souhaité un jour. En V1, elle
-  n'est pas nécessaire.
-
-#### S5 — Paiement au retrait
-
-Le prix se règle physiquement à la remise, contre le code de retrait Market.
-
-- **Rôle d'ELSATIA** : **aucun** sur le flux financier ; traçabilité de la remise seulement.
-- **Coût** : nul.
-- **Adapté à** : le retrait sur place, c'est-à-dire le cas dominant.
-- **Verdict** : **c'est S1, appliqué au retrait.** À retenir avec S1.
-
-#### S6 — Facturation directe vendeur → acheteur
-
-Le vendeur facture avec ses propres outils (dont Gestion Pro, s'il en est client).
-
-- **Rôle d'ELSATIA** : aucun. Éventuellement un **rappel** au vendeur d'établir sa facture.
-- **Verdict** : **le corollaire obligé de S1 et S5.** C'est le vendeur qui doit facturer, parce que
-  c'est lui le vendeur.
-
-### 4.3 Recommandation
-
-**V1 : S1 + S5 + S6.** Mise en relation, remise tracée par code de retrait, facturation par le
-vendeur. ELSATIA ne touche jamais le prix d'un bien.
-
-**Trajectoire V2, si et seulement si le besoin est démontré** : **S4 Standard sans commission** —
-le vendeur encaisse en ligne sur son propre compte Stripe, la brique existe déjà, ELSATIA ne détient
-rien et ne change pas de statut.
-
-**S2 et S3 : écartés.** S2 concentre la complexité sans la valeur. S3 suppose un statut réglementé
-sans rapport avec la taille du projet.
-
-Ce choix n'est pas un renoncement. C'est la reconnaissance d'un fait de marché : sur des biens
-professionnels d'occasion, souvent lourds, retirés sur place et réglés par virement entre
-entreprises, **un paiement en ligne intégré n'est pas ce qui manque**. Ce qui manque, c'est
-l'audience et la confiance.
-
-### 4.4 Analyse des points exigés par la Phase 8
-
-| Point | Sous S1+S5+S6 (V1) | Sous S4 sans commission (V2) | Sous S3 / commission (écarté) |
-|---|---|---|---|
-| **KYC vendeur** | vérification **professionnelle** (SIRET, rattachement) — pas un KYC financier | KYC **porté par Stripe** (Standard) | KYC LCB-FT **porté par ELSATIA** |
-| **Reversement** | sans objet | sans objet (le vendeur encaisse directement) | à construire |
-| **Commission** | aucune | aucune | `application_fee_amount` — **inexistant** |
-| **Remboursement** | entre les parties | par le vendeur, dans son Stripe | par ELSATIA |
-| **Litige** | **médiation** ELSATIA sur les faits tracés, jamais arbitrage financier | idem | arbitrage financier |
-| **Chargeback** | sans objet | supporté par le vendeur | supporté par ELSATIA |
-| **TVA** | **entièrement** au vendeur | idem | ELSATIA doit qualifier chaque flux |
-| **Facture de vente** | par le vendeur | par le vendeur | par le vendeur, via ELSATIA |
-| **Avoir** | par le vendeur | par le vendeur | à gérer |
-| **Paiement partiel** | entre les parties | à construire | à construire |
-| **Caution** | **non proposée** | non | à construire |
-| **Annulation** | libération de la quantité engagée, aucun flux | idem | remboursement |
-| **Preuve de livraison** | **code de retrait** + photo + signature optionnelle | idem | idem |
-| **Responsabilité ELSATIA** | **hébergement et mise en relation** | idem | intermédiaire de paiement |
-
-### 4.5 TVA — ce qui doit être dit sans être tranché
-
-En V1, **ELSATIA n'a aucune obligation de TVA sur les ventes** : elle n'est pas partie à la vente.
-Sa seule TVA est celle de son propre abonnement (Flux A), déjà gérée.
+En V1, **ELSATIA n'a aucune obligation de TVA sur les ventes** : elle n'est pas partie à la vente. Sa
+seule TVA est celle de son propre abonnement (Flux A).
 
 Le vendeur, lui, affronte une matière complexe que le **modèle d'annonce doit savoir représenter**
-sans que la plateforme la tranche à sa place :
+sans que la plateforme la tranche : TVA normale, **régime de la marge** sur certains biens
+d'occasion, exonérations, vente à un particulier (TTC affiché) ou à un professionnel (HT, avec
+autoliquidation possible), ventes intracommunautaires.
 
-- TVA normale (20 %) sur un bien neuf ou un surplus vendu par un assujetti ;
-- **régime de la marge** sur certains biens d'occasion ;
-- exonérations et cas particuliers ;
-- vente à un particulier (TTC affiché) vs. à un professionnel (HT), avec autoliquidation possible ;
-- ventes intracommunautaires.
+D'où le champ `tva_applicable` du modèle d'annonce, et la règle d'affichage : **prix TTC pour un
+acheteur particulier, prix HT pour un acheteur professionnel**, sans ambiguïté.
 
-D'où le champ `tva_applicable` du modèle d'annonce, avec des valeurs explicites **dont
-`marge`** — et une règle d'affichage : **prix TTC pour un acheteur particulier, prix HT pour un
-acheteur professionnel**, sans ambiguïté. Une place de marché qui affiche un prix dont on ne sait
-pas s'il est HT ou TTC fabrique du litige à la chaîne.
-
-**ELSATIA ne calcule ni ne certifie la TVA d'une vente.** Le vendeur déclare, sous sa responsabilité,
-et les CGU le disent. Voir le cadre juridique.
-
-### 4.6 Facturation de l'abonnement Market (Flux A)
-
-Entièrement couverte par l'existant :
-
-```
-plans_abonnement            → un plan Market (code, version, prix, quotas, devis_obligatoire)
-abonnements_entreprises     → une souscription par entreprise
-factures_abonnement         → facture ELSATIA
-stripe_webhook_events       → idempotence
-promotions_commerciales,
-plateforme_operations_remise → remises et promotions
-```
-
-**Une limite structurelle à lever** : `abonnements_entreprises` porte `entreprise_id` en
-**`unique`** — une entreprise, un abonnement. Une entreprise abonnée à Gestion Pro **et** à Market
-ne rentre pas dans ce modèle. Trois voies : un second enregistrement (lever l'unicité — impact sur
-tout le code existant), un modèle d'abonnement par application (plus propre, plus coûteux), ou
-Market traité comme une **option** de l'abonnement existant (le plus simple, mais faux : Market doit
-pouvoir être souscrit **sans** Gestion Pro).
-
-**Décision D-8.** C'est le principal obstacle technique du modèle économique, et il est indépendant
-du modèle retenu.
-
-### 4.7 Ce qui ne sera jamais fait
-
-| Interdit | Motif |
-|---|---|
-| Encaisser le prix d'un bien sur un compte ELSATIA | régime réglementé sans rapport avec le projet |
-| Détenir des fonds pour compte de tiers | idem |
-| Proposer un séquestre | idem |
-| Garantir une transaction | ELSATIA n'est ni assureur ni garant |
-| Proposer un crédit ou un paiement fractionné | régime réglementé |
-| Afficher un prix sans dire s'il est HT ou TTC | fabrique du litige |
-| Facturer l'acheteur | contraire à la décision de Julien |
+**ELSATIA ne calcule ni ne certifie la TVA d'une vente.**
 
 ---
 
-## 5. Estimation de charge par lot
+## 5. Le modèle d'abonnement multiproduit ELSATIA
 
-Ordres de grandeur pour une réalisation par lots séquentiels, hors décisions et hors juridique.
+> **Décision R2 (§6)** : le modèle actuel `abonnements_entreprises.entreprise_id unique` ne convient
+> pas à l'écosystème. Une entreprise doit pouvoir souscrire simultanément Gestion Pro, Tools, Colors,
+> Réserves, Drone, Market, Contact/Card et d'autres produits futurs. **Ne pas simplement supprimer la
+> contrainte unique sans plan de migration et tests.**
+
+Cette section dépasse Market. Elle est pourtant ici parce que **Market est le premier produit qui
+rend le défaut bloquant** : il doit pouvoir être souscrit par une entreprise déjà abonnée à Gestion
+Pro, et par une entreprise qui ne l'est pas du tout.
+
+### 5.1 L'état réel — trois modèles de monétisation incompatibles coexistent
+
+L'audit établit un constat plus lourd que la seule contrainte d'unicité. L'écosystème ne possède pas
+*un* modèle commercial à étendre : il en possède **trois, incompatibles**, plus un vide.
+
+| Produit | Modèle commercial | Portée | Observations |
+|---|---|---|---|
+| **Gestion Pro** | `abonnements_entreprises` (+ `modules_entreprises`, `options_abonnement_entreprises`) | **entreprise**, `unique(entreprise_id)` | le seul modèle contractuel complet. `modules_entreprises` référence `modules_gestion_pro` : **il n'est pas générique**. |
+| **Tools** | `tools_monetization_subscriptions` + `entitlements_utilisateurs_elsatia` | **utilisateur**, multi-fournisseur (`stripe`, `apple`, `google`) | modèle entièrement distinct, imposé par les stores mobiles. Ne connaît pas la notion d'entreprise. |
+| **Colors** | **aucun** | — | seul `acces_applications_entreprises` porte le droit d'usage. Aucune trace commerciale. |
+| **Réserves** | **aucun** | — | idem. |
+| **Drone, Contact/Card, Market** | **aucun** | — | produits non développés ou non monétisés. |
+
+Deux conséquences :
+
+1. **Le problème n'est pas « lever une contrainte unique »**, c'est **unifier trois représentations
+   du fait commercial**. Supprimer l'unicité produirait un modèle où Gestion Pro serait multi-lignes
+   pendant que Tools resterait par utilisateur et Colors sans rien : le désordre serait plus grand
+   qu'avant.
+2. **`entitlements_utilisateurs_elsatia` est le seul élément déjà générique par
+   `application_code`** — mais il décrit un **droit d'usage par personne** (`niveau ∈ {free, pro}`),
+   pas un **contrat commercial**. Il ne peut pas tenir ce rôle.
+
+### 5.2 Le principe directeur : séparer le contrat, la ligne produit et l'autorisation
+
+L'écosystème possède déjà une couche d'autorisation propre et bien conçue :
+`acces_applications_entreprises` (droit d'usage de l'organisation) et
+`habilitations_applications_utilisateurs` (habilitation de la personne), avec la fonction de décision
+`a_acces_application()`. Le commentaire de la migration 234 est explicite : *la source commerciale
+reste configurable et ne participe pas directement à la décision d'autorisation.*
+
+**Cette séparation est saine et doit être préservée.** Le modèle commercial **alimente**
+l'autorisation ; il ne la remplace pas.
+
+```
+   ┌─────────────────────────────────────────────────────────────┐
+   │  COUCHE COMMERCIALE            (ce qui est vendu et facturé) │
+   │                                                             │
+   │  contrat commercial d'entreprise                            │
+   │    └─ ligne d'abonnement produit  (une par produit souscrit)│
+   │         ├─ modules                                          │
+   │         ├─ options                                          │
+   │         └─ remises                                          │
+   └────────────────────────────┬────────────────────────────────┘
+                                │  alimente (source, référence)
+                                ▼
+   ┌─────────────────────────────────────────────────────────────┐
+   │  COUCHE D'AUTORISATION        (ce qui est réellement permis) │
+   │                                                             │
+   │  acces_applications_entreprises      — EXISTANT, inchangé    │
+   │  habilitations_applications_utilisateurs — EXISTANT, inchangé│
+   │  a_acces_application()               — EXISTANT, inchangé    │
+   └─────────────────────────────────────────────────────────────┘
+```
+
+**Règle** : aucune décision d'accès ne lit la couche commerciale. Un impayé, une résiliation ou une
+fin d'essai agissent en **écrivant** dans la couche d'autorisation, jamais en la court-circuitant.
+C'est ce qui permet aussi d'accorder un accès sans vente (essai, geste commercial, usage interne) —
+ce que le socle sait déjà faire via `acces_applications_entreprises.source`.
+
+### 5.3 Le modèle recommandé
+
+#### (a) Catalogue produit — un `produit_id` stable
+
+Un référentiel de **produits commercialisables**, distinct de `applications_elsatia`.
+
+| Pourquoi ne pas réutiliser `applications_elsatia` | |
+|---|---|
+| Un produit vendu n'est pas toujours une application | formations, cartes NFC, prestations de mise en service (`catalogue_services_mise_en_service` existe déjà) |
+| Une application n'est pas toujours vendue séparément | une application peut être incluse dans une offre |
+| Le catalogue applicatif porte des URL et un statut technique | le catalogue produit porte une nature commerciale et un cycle de vie propre |
+
+Le `code` produit est **stable et définitif** : `gestion_pro`, `colors`, `reserves`, `tools`,
+`market`, `drone`, `contact_card`. Il ne change jamais, y compris si le nom commercial change — un
+identifiant qui bouge invalide l'historique des contrats.
+
+Correspondance vers `applications_elsatia.code` : **facultative et nullable**. Un produit peut ne
+pointer vers aucune application.
+
+#### (b) Contrat commercial d'entreprise — **un seul espace de facturation**
+
+Un contrat par entreprise. Il porte ce qui est **commun à tous les produits** :
+
+| Élément | Rôle |
+|---|---|
+| Référence de contrat | opposable, stable |
+| **`stripe_customer_id`** | **un seul client Stripe par entreprise** — c'est ce qui réalise « un seul espace de facturation ELSATIA » |
+| Devise | commune |
+| Coordonnées et données de facturation | communes |
+| Statut du contrat | actif, suspendu, résilié |
+| Date d'effet, date de fin | — |
+
+C'est l'unique endroit où l'unicité par entreprise reste légitime.
+
+#### (c) Ligne d'abonnement produit — **une par produit souscrit**
+
+C'est le cœur du modèle, et c'est ce qui manque aujourd'hui.
+
+| Champ | Rôle | Corrige |
+|---|---|---|
+| contrat (référence) | rattachement | — |
+| **`produit_code`** | quel produit | **lève l'unicité par entreprise** |
+| `code_offre` | quel palier | — |
+| **`generation_tarifaire`** | quelle génération de grille, **par produit** | permet GP en génération 2026-07 et Market en 2027-01 |
+| `version_tarif` | version dans la génération | — |
+| **`periodicite`** | **par produit** | permet GP annuel et Market mensuel |
+| **`prix_contractuel_ht`** | **prix figé à la souscription** | **corrige la dette D-7** : le prix cesse d'être relu dans le code à chaque affichage |
+| Devise | héritée du contrat | — |
+| Statut | `essai`, `actif`, `impaye`, `suspendu`, `resilie` | supporte L1 (essai borné) |
+| Date d'effet, date de fin, date de résiliation | cycle de vie **propre au produit** | résilier Market sans toucher Gestion Pro |
+| `stripe_subscription_id`, `stripe_price_id` | rattachement Stripe **par produit** | §5.4 |
+| Changement planifié | palier suivant, date d'effet | l'existant le fait déjà (`plan_suivant_id`, `changement_prevu_at`) |
+
+**Unicité** : au plus **une ligne active par (contrat, produit)**. L'historique des lignes résiliées
+est **conservé** — c'est lui qui protège les contrats passés.
+
+#### (d) Modules, options, remises — génériques et rattachés à la ligne produit
+
+| Aujourd'hui | Défaut | Cible |
+|---|---|---|
+| `modules_entreprises` → `modules_gestion_pro` | **spécifique à Gestion Pro** | modules rattachés à la **ligne produit**, catalogue de modules **par produit** |
+| `options_abonnement_entreprises` → `catalogue_options_abonnement` | déjà générique, mais rattaché à l'**entreprise**, pas au produit ; et **`prix_unitaire_contractuel_ht` n'est écrit par aucun code applicatif** | rattachées à la **ligne produit**, avec le prix **effectivement figé** |
+| `promotions_commerciales`, `plateforme_operations_remise` | portée entreprise | remise applicable **au contrat** ou **à une ligne produit**, au choix |
+
+#### (e) Ce qui ne change pas
+
+`plans_abonnement` (catalogue d'offres versionné), `factures_abonnement`, `stripe_webhook_events`,
+`historique_tarification`, et toute la couche d'autorisation. Le modèle **s'insère**, il ne
+remplace pas.
+
+### 5.4 Stripe — architecture recommandée, sans aucune opération
+
+**Un `Customer` par entreprise. Une `Subscription` par produit souscrit.**
+
+| Option | Verdict |
+|---|---|
+| Une seule `Subscription` multi-items | **écartée**. Tous les items d'une souscription Stripe partagent le **même intervalle de facturation** : une entreprise en Gestion Pro annuel et Market mensuel devient irreprésentable. S'y ajoutent la résiliation d'un seul produit et les décalages de cycle. |
+| **Une `Subscription` par produit, un `Customer` commun** | **retenue**. Périodicités indépendantes, cycles indépendants, résiliation produit par produit, et **un seul espace de facturation** côté client. |
+
+**Contrepartie à assumer** : plusieurs souscriptions produisent **plusieurs factures Stripe**. Si une
+facture ELSATIA consolidée est souhaitée, elle doit être **produite par ELSATIA** — `factures_abonnement`
+existe déjà et sait le faire. C'est un arbitrage à porter (D-11), pas un obstacle.
+
+**Aucune opération Stripe n'est effectuée dans cette conversation.** Aucun produit, aucun prix,
+aucun client, aucune souscription n'est créé, lu par API ou modifié, ni en Test ni en Live.
+
+### 5.5 Protection des contrats historiques
+
+C'est la contrainte la plus importante du plan, et l'écosystème sait déjà la tenir : le contrat
+canonique `CANONICAL-V4-2026-09` conserve la génération `COMPTES-PAR-FORFAIT-2026-07` comme
+**génération précédente, lisible et non sélectionnable**, précisément *« pour honorer les contrats
+souscrits sous cette génération : un abonnement existant n'est jamais migré silencieusement »*.
+
+Le modèle multiproduit reprend cette doctrine et la **renforce** :
+
+| Règle | |
+|---|---|
+| **H1** | La génération tarifaire est **figée sur la ligne produit** à la souscription. |
+| **H2** | Le `prix_contractuel_ht` est **figé sur la ligne produit**. Il n'est **jamais** relu depuis le code ni depuis le catalogue courant. C'est la correction de la dette D-7, et elle est structurelle. |
+| **H3** | Un changement de génération est un **acte explicite, daté, journalisé**, jamais un effet de bord d'une migration. |
+| **H4** | Les générations retirées restent **lisibles** ; elles cessent seulement d'être **sélectionnables** pour un nouveau contrat. |
+| **H5** | Aucune migration ne modifie un prix souscrit. La reprise fige **la valeur constatée**, pas la valeur recalculée. |
+
+### 5.6 Plan de migration — sans SQL, sans numéro de ledger
+
+> **Aucun SQL n'est écrit dans cette conversation. Aucun numéro de ledger n'est réservé.** Ce plan
+> décrit une méthode ; sa mise en œuvre est un lot à part entière.
+
+| Étape | Contenu | Réversible |
+|---|---|:---:|
+| **E0 — Inventaire** | recensement en lecture seule de tous les contrats existants : `abonnements_entreprises`, `modules_entreprises`, `options_abonnement_entreprises`, `tools_monetization_subscriptions`, `entitlements_utilisateurs_elsatia`, et l'état Stripe correspondant. **Écarts documentés avant toute écriture.** | — |
+| **E1 — Modèle à côté** | création du nouveau modèle, **vide**, sans toucher l'existant. Aucun code ne le lit encore. | **oui** |
+| **E2 — Reprise** | chaque `abonnements_entreprises` devient un **contrat** + une **ligne produit `gestion_pro`**, génération et prix figés **à la valeur constatée** (H5). Modules et options rattachés à cette ligne. | **oui** — le nouveau modèle est jetable tant qu'il n'est pas lu |
+| **E3 — Réconciliation** | comparaison automatisée ancien ↔ nouveau, entreprise par entreprise, **et** contre Stripe. Zéro écart toléré avant de poursuivre. | **oui** |
+| **E4 — Lecture** | le code lit le nouveau modèle ; l'ancien reste écrit en miroir. Vues de compatibilité pour le code non encore migré. | **oui** — retour à l'ancienne lecture |
+| **E5 — Écriture** | les écritures basculent sur le nouveau modèle ; l'ancien devient dérivé. | difficile |
+| **E6 — Observation** | période d'observation en Production, sans retrait de l'ancien. | — |
+| **E7 — Retrait** | dépose de l'ancien modèle après observation concluante. | non |
+| **E8 — Tools** | rattachement du canal mobile : la ligne produit `tools` **B2B** vit dans le nouveau modèle ; `tools_monetization_subscriptions` reste le canal **B2C mobile**, les deux se rejoignant dans `entitlements_utilisateurs_elsatia`. **À instruire séparément** — les stores imposent leurs règles. | — |
+
+**Tests.** La recette se joue en **pgTAP sur une base clonée jetable**, jamais sur la base locale
+courante : un `db reset` détruirait le jeu de données multi-app local. Couverture minimale : reprise
+fidèle de chaque contrat, immuabilité du prix figé (H2), refus d'une seconde ligne active pour un
+même produit, indépendance des périodicités, résiliation d'un produit sans effet sur les autres,
+cohérence avec la couche d'autorisation.
+
+**Ce que ce plan interdit explicitement** : supprimer `unique(entreprise_id)` et « voir ce qui se
+passe ». La contrainte est aujourd'hui la seule garantie qu'aucune entreprise n'a deux abonnements
+contradictoires ; la lever sans le modèle de remplacement et sans la réconciliation E3 ouvrirait une
+classe de défauts de facturation silencieux — c'est-à-dire la pire espèce.
+
+### 5.7 Ce que Market peut faire en attendant
+
+Le modèle multiproduit est un lot lourd, et Market en dépend. Deux voies :
+
+| Voie | Description | Verdict |
+|---|---|---|
+| **A** | Market attend le modèle multiproduit | **retenue.** Le volet commercial de Market (M8) est de toute façon en fin de chaîne, après le socle, les annonces, la recherche et la modération. |
+| **B** | Market se dote d'un modèle commercial provisoire | **écartée.** Ce serait un **quatrième** modèle de monétisation — exactement le désordre que la décision R2 vise à corriger. |
+
+**Conséquence de planning** : les lots M1 à M7 et M9 de Market **ne dépendent pas** du modèle
+multiproduit et peuvent être conduits en parallèle. Seul **M8 est bloqué**, et avec lui l'ouverture
+commerciale — puisque sans abonnement actif, aucune annonce n'est publiable (décision 1.1).
+
+---
+
+## 6. Facturation de l'abonnement Market — Flux A
+
+Sous le modèle multiproduit :
+
+```
+contrat commercial d'entreprise        → un Customer Stripe, un espace de facturation
+  └─ ligne produit « market »          → une Subscription Stripe propre
+       ├─ palier (annonces actives)
+       ├─ options (mise en avant : achat ponctuel ; page vendeur : récurrent)
+       └─ remise éventuelle (offre de lancement L3)
+factures_abonnement                    → facture ELSATIA
+stripe_webhook_events                  → idempotence (existant)
+```
+
+**Lien avec l'autorisation** : la ligne produit `market` active alimente
+`acces_applications_entreprises('market')`. La publication vérifie **l'autorisation**, pas la ligne
+commerciale — conformément à la règle du §5.2.
+
+**Comportement en cas d'abonnement inactif** (rappel de la règle R9 de la spécification) : les
+annonces publiées passent en `suspendue`, motif `abonnement_inactif`, et sont **restaurées** à la
+réactivation. Les brouillons restent accessibles. Aucune annonce n'est détruite.
+
+---
+
+## 7. Estimation de charge par lot
 
 | Lot | Contenu | Charge |
 |---|---|---|
-| **M0** | Décisions D-1 à D-10, cadrage juridique par un professionnel du droit | — |
-| **M1** | Socle : enregistrement au catalogue, rôles, vérification pro N1–N3, espace vendeur | **lourd** |
+| **M0** | Décisions tarifaires restantes (D-10, D-11) et cadrage juridique | — |
+| **M1** | Socle : catalogue, rôles, **vérification pro**, espace vendeur | **lourd** |
 | **M2** | Annonces : modèle, états, nomenclature, photos, bucket public, modération de base | **lourd** |
-| **M3** | Recherche : projection, extensions, index, distance, filtres, pagination par curseur | **moyen à lourd** |
-| **M4** | Vitrine publique : pages anonymes, référencement, mentions légales | **moyen** |
-| **M5** | Interactions : messagerie, offres, réservations, code de retrait, quotas | **moyen à lourd** |
+| **M3** | Recherche : projection, extensions, index, distance, filtres, curseur | **moyen à lourd** |
+| **M4** | Vitrine publique : pages anonymes, référencement, mentions | **moyen** |
+| **M5** | Interactions : messagerie, offres, **échanges avec soulte**, réservations, code de retrait | **moyen à lourd** |
 | **M6** | Modération et sécurité : signalements, file, suspensions, contestations, score | **moyen** |
-| **M7** | Notifications : typologie, préférences, file d'envoi | **moyen** |
-| **M8** | Commercial : offre Market, abonnement (**dépend de D-8**), facturation | **moyen** |
+| **M7** | Notifications | **moyen** |
+| **M8** | Commercial : offre Market, abonnement, facturation — **bloqué par MP** | **moyen** |
 | **M9** | Ponts Stock et Colors | **léger à moyen** |
 | **M10** | Site public « À venir » (**dépôt `elsatia-site`, hors de ce lot**) | **léger** |
 | **M11** | Recette, sécurité, RGPD, charge | **moyen** |
+| **MP** | **Modèle d'abonnement multiproduit ELSATIA** (§5) — lot transverse, hors Market | **lourd** |
 
-Prérequis externes bloquants : **M1 dépend d'une source de vérification d'entreprise (D-4)** et
-**M3 d'extensions PostgreSQL non installées** (`unaccent`, `pg_trgm`, `earthdistance`/`cube`).
-Dépendances internes : fusion de `9fcf128` (assistance), réconciliation du ledger, lot ELSATIA-UI-V2
-(toute UI produite avant serait à refaire).
+**MP est un lot d'écosystème, pas un lot Market.** Il bénéficie à tous les produits et corrige une
+dette existante. Market en est le déclencheur, pas le propriétaire.
 
 ---
 
-## 6. Confirmation
+## 8. Confirmation
 
 Étude économique et comparaison de schémas de paiement. **Aucun objet Stripe créé, lu par API ou
-modifié**, ni en Test ni en Live. Aucun prix, aucun produit, aucun plan. Aucun tarif définitif.
-Aucune modification du contrat tarifaire canonique. Aucun code, aucune migration.
+modifié**, ni en Test ni en Live. Aucun prix, aucun produit, aucun plan, aucune souscription. Aucun
+tarif définitif. Aucune modification du contrat tarifaire canonique. **Aucun code, aucune migration,
+aucun SQL proposé, aucun numéro de ledger réservé.**

@@ -1,7 +1,8 @@
 # ELSATIA-MARKET-SECURITY-MODERATION-MODEL-V1
 
 Lot : `ELSATIA-MARKET-BUSINESS-LEGAL-TECHNICAL-ARCHITECTURE-V1` — Phase 10
-Branche : `feat/market-architecture-legal-business-v1` — base `1fc1331`
+Révision : **R2 — décisions produit fermées** (`ELSATIA-MARKET-R2-FINAL-PRODUCT-DECISIONS`)
+Branche : `feat/market-architecture-legal-business-v1` — base `1fc1331` — R1 `281769b`
 
 ---
 
@@ -41,6 +42,17 @@ applications. Elle a besoin de ses propres gardes.
 
 **N1 et N2 sont bloquants avant toute publication. N3 est bloquant avant la première publication.**
 
+**Décision R2 : en l'absence de vérification automatique disponible, la validation manuelle par la
+plateforme est le chemin de repli — et c'est un chemin de premier rang.** N2 se tient alors par
+contrôle sur pièce (extrait de registre de moins de trois mois fourni par le demandeur), avec
+`source_verification = 'revue_manuelle'` ou `'document_fourni'`, l'identité du modérateur et la pièce
+conservée. Le modèle complet du dossier de vérification — champs, résultats, expiration, journal — est
+spécifié au §2.7 de `ELSATIA-MARKET-FUNCTIONAL-SPECIFICATION-V1.md`.
+
+**Décision R2 : aucun prestataire payant n'est choisi sans comparaison ultérieure.** Le modèle est
+donc indépendant de la source : `source_verification` et `reference_source` sont des champs, pas des
+constantes.
+
 Le rejet de N2 doit être **motivé et contestable** : une entreprise récemment immatriculée, un
 établissement fermé mais une entreprise active, un changement de dénomination — les cas légitimes
 existent, et un refus automatique sans recours ferait fuir des clients valables.
@@ -55,8 +67,21 @@ trace de vérification**. Aucune colonne ne dit si, quand, par qui et contre que
 barrière à l'entrée est un canal de recel. Ce n'est pas une hypothèse pessimiste : c'est le mode de
 défaillance connu et documenté de ce type de service.
 
-**Décision D-4** : contracter une source de vérification d'entreprise. **Market ne doit pas ouvrir la
-publication avant.**
+**Ce qui change en R2** : le prérequis n'est plus *contracter une source externe*, mais **tenir N2
+par un moyen ou par un autre**. La validation manuelle rend l'ouverture possible sans contrat
+externe. Le risque se déplace : il devient **opérationnel** — capacité de traitement, délai tenu,
+homogénéité des décisions — et non plus contractuel.
+
+Trois conséquences à assumer :
+
+| Conséquence | |
+|---|---|
+| **Le délai devient une promesse commerciale** | un vendeur en attente de vérification est un vendeur qui ne paie pas encore et qui peut renoncer. Le délai annoncé doit être tenu. |
+| **L'homogénéité doit être outillée** | des critères écrits, des motifs de refus normalisés et une revue croisée des refus, sans quoi deux modérateurs décideront différemment sur le même dossier. |
+| **La montée en charge est bornée** | la revue manuelle ne suit pas au-delà d'un certain volume. L'automatisation de N2 reste l'objectif ; elle cesse seulement d'être un préalable au lancement. |
+
+**Le pire scénario reste d'ouvrir sans aucune vérification.** Ni la voie automatique ni la voie
+manuelle ne sont facultatives.
 
 ### 2.3 Conservation des pièces
 
@@ -336,7 +361,9 @@ part entière, et il est **obligatoire** dès qu'un compte particulier existe.
 
 | Brique | État | Bloquant pour l'ouverture |
 |---|---|:---:|
-| Vérification d'entreprise (N2) | **inexistante**, source externe non contractée | **OUI** |
+| Vérification d'entreprise (N1–N3) | **inexistante** — modèle de dossier à construire | **OUI** |
+| Source externe de vérification (N2 automatique) | non contractée | **non** — repli par validation manuelle (§2.2) |
+| Capacité de traitement manuel des dossiers | à organiser | **OUI** si la voie manuelle est retenue |
 | Signalement et file de modération | **inexistants** | **OUI** |
 | Contrôle d'image (EXIF, contenu) | **inexistant** | **OUI** (EXIF au minimum) |
 | Policies de lecture anonyme gouvernée | **inexistantes** | **OUI** |

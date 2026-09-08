@@ -1,6 +1,10 @@
 # ELSATIA-MARKET-ARCHITECTURE-AUDIT-REPORT
 
 Lot : `ELSATIA-MARKET-BUSINESS-LEGAL-TECHNICAL-ARCHITECTURE-V1`
+Révision : **R2 — décisions produit fermées** (`ELSATIA-MARKET-R2-FINAL-PRODUCT-DECISIONS`).
+Le corps de l'audit est **inchangé** : c'est un constat daté, et les décisions R2 ne modifient pas
+ce qui a été observé. Seuls les §4 et §6, qui posaient des questions désormais tranchées, sont mis à
+jour.
 Nature : audit d'architecture, lecture seule. Aucun code métier, aucune migration, aucune opération Stripe.
 Branche : `feat/market-architecture-legal-business-v1`
 SHA de base : `1fc1331` (`integration/elsatia-ecosystem-train-v2-reserves-gp-v1`)
@@ -402,7 +406,19 @@ modération.
 
 ---
 
-## 4. Les cinq questions d'architecture que l'audit ne peut pas trancher seul
+## 4. Les cinq questions d'architecture — issues R2
+
+> **Mise à jour R2.** Quatre des cinq questions sont tranchées. L'analyse est conservée : elle
+> documente le fondement des décisions.
+>
+> | Question | Issue R2 |
+> |---|---|
+> | §4.1 Identité du particulier | **achat sans compte en V1** ; identité Market autonome dès l'ouverture des interactions. C2C exclu. |
+> | §4.2 Application ou site public | **les deux, physiquement séparés** |
+> | §4.3 ELSATIA touche-t-elle l'argent ? | **NON en V1** — décision fermée |
+> | §4.4 Vérification sans source externe | **oui, par validation manuelle** — chemin de premier rang, spécifié |
+> | §4.5 Notifications | **ouverte** (D-5) |
+
 
 ### 4.1 Comment existe un particulier acheteur ?
 
@@ -415,7 +431,7 @@ Trois voies, toutes coûteuses :
 | **C. Achat sans compte** | consultation et mise en relation anonymes, compte requis seulement pour messagerie/réservation | V1 minimale, très faible surface RGPD | ferme la porte aux favoris, alertes, historique, avis |
 
 **Recommandation d'audit : C pour la V1 publique, B introduite dès que la messagerie ou la
-réservation est ouverte.** Décision D-1.
+réservation est ouverte.** Décision D-1 — **fermée en R2** : achat sans compte en V1, C2C exclu.
 
 ### 4.2 Market est-il une application du catalogue, ou un site public ?
 
@@ -426,7 +442,7 @@ faire le premier et n'a jamais fait le second.
 Conséquence d'architecture : les deux surfaces doivent être **physiquement séparées** — chemins
 distincts, policies distinctes, et idéalement une lecture publique servie par des fonctions
 `security definer` à projection explicite plutôt que par des policies `anon` sur les tables
-(le patron `reserves_annuaire_rechercher` généralisé). Décision D-2.
+(le patron `reserves_annuaire_rechercher` généralisé). Décision D-2 — **fermée en R2**.
 
 ### 4.3 ELSATIA touche-t-elle l'argent de la vente ?
 
@@ -438,14 +454,22 @@ litiges et l'essentiel de la charge de développement. L'audit constate seulemen
 - la décision de Julien déjà énoncée (*« seuls les professionnels qui publient paient un abonnement
   de base »*) est **compatible avec un modèle sans encaissement de la vente**.
 
-Traité au titre des Phases 7, 8 et 9. Décision D-3.
+**Issue R2 : ELSATIA n'encaisse pas le prix des ventes en V1.** Décision fermée. Aucune commission,
+aucun reversement, aucun portefeuille, aucun séquestre, aucun remboursement, aucun litige financier
+arbitré. Stripe Connect n'est pas utilisé pour les ventes ; Stripe ne sert qu'à facturer l'abonnement
+vendeur Market.
 
 ### 4.4 Peut-on tenir une vérification professionnelle sans source externe ?
 
-Non. Un SIRET saisi à la main n'est pas une vérification. Une vérification sérieuse suppose une
-consultation d'un registre officiel (INSEE/Sirene, base entreprise) — donc une dépendance externe,
-un contrat, une conservation de preuve et une politique de rétention. Aucune de ces briques
-n'existe. Décision D-4.
+Un SIRET saisi à la main n'est pas une vérification. Une vérification **automatique** suppose la
+consultation d'un registre officiel — donc une dépendance externe, un contrat, une conservation de
+preuve et une politique de rétention. Aucune de ces briques n'existe.
+
+**Issue R2 : la validation manuelle par la plateforme est le repli, et c'est un chemin de premier
+rang.** N2 se tient alors par contrôle sur pièce, avec traçabilité de la source, du modérateur et de
+la décision. Le prérequis cesse d'être **contractuel** et devient **opérationnel** : capacité de
+traitement, délai tenu, homogénéité des décisions. Aucun prestataire payant n'est choisi sans
+comparaison ultérieure.
 
 ### 4.5 Duplique-t-on ou généralise-t-on les notifications ?
 
@@ -492,9 +516,19 @@ réelle est dominée non par la technique mais par trois décisions non techniqu
 juridique de la plateforme, l'encaissement ou non de la vente, et la source de vérification
 professionnelle — dont l'issue détermine entre un projet modeste et un projet lourd.
 
-**Recommandation d'audit** : ne rien construire avant que les décisions D-1 à D-8 (rapport final)
-soient rendues, et privilégier une V1 délibérément étroite — mise en relation sans encaissement —
-qui rend le produit exploitable tout en laissant chaque option ouverte.
+**Recommandation d'audit, actualisée R2** : les décisions structurantes sont rendues. La V1 est
+délibérément étroite — **mise en relation sans encaissement, publication conditionnée à un abonnement
+vendeur actif, C2C et prestations exclus** — ce qui rend le produit exploitable tout en laissant
+chaque option ouverte. Restent à trancher les arbitrages **tarifaires** (D-10, D-11) et les points
+**juridiques** (checklist avocat, §12 du cadre juridique).
+
+**Un constat de l'audit prend, en R2, une importance qu'il n'avait pas** : l'écosystème possède
+**trois modèles de monétisation incompatibles** — `abonnements_entreprises` (par entreprise, unique)
+pour Gestion Pro, `tools_monetization_subscriptions` + `entitlements_utilisateurs_elsatia` (par
+**utilisateur**, multi-fournisseur) pour Tools, et **rien du tout** pour Colors et Réserves. La
+décision R2 sur les abonnements multiproduits ne consiste donc pas à lever une contrainte d'unicité,
+mais à **unifier trois représentations du fait commercial**. Voir `ELSATIA-MARKET-BUSINESS-MODEL-V1.md`
+§5.
 
 ---
 
