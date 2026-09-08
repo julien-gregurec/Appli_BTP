@@ -29,6 +29,7 @@ doit être numéroté avant tout usage à plusieurs entreprises hôtes ; et le p
 | Tête V5 (base de ce lot) | `3db106d84de2454401fe207e9fc3e970b3554d40` |
 | SHA du code V5 | `7c0fc3d158a0f7b6a3de27eaba8b4be47cb60b00` |
 | Branche de ce lot | `feat/reserves-v6-security-offline-pilot-gate-v1` |
+| SHA du code V6 (complet) | `72aefe000fb3de0f25a5719c0bcdc0edbd5a4c00` |
 | Worktree | `/Volumes/ELSATIA-DEV/ELSATIA-WORKTREES/reserves-v6-security` |
 | Migration candidate 271 | **non promue, non renommée, non touchée** |
 
