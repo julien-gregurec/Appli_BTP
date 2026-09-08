@@ -19,6 +19,10 @@
 //   - CLI `stripe` authentifiée présente       → `stripe prices retrieve <id>` ; sinon
 //   - SKIP non bloquant (sauf --strict, ou variable CI STRIPE_PRICES_VERIFY_STRICT=1).
 //
+// Les Price IDs viennent de l'environnement, sinon de la carte versionnée
+// `config/stripe-prices.test.json` (Test uniquement). Une clé Live fait échouer
+// le contrôle immédiatement : il ne s'exécute que contre Stripe Test.
+//
 // Exit : 0 OK / skip toléré · 1 divergence ou skip en mode strict.
 
 import { readFileSync } from "node:fs";
@@ -40,6 +44,41 @@ const err = (m) => {
 };
 
 const catalogue = JSON.parse(readFileSync(join(ROOT, "src/lib/tarification.canonical.json"), "utf8"));
+
+/**
+ * Résolution d'un Price ID : l'environnement d'abord, puis la carte versionnée
+ * du compte Test. Un `price_id` n'est pas un secret — il n'ouvre rien sans la clé
+ * — et le versionner évite de confier vingt-sept identifiants au coffre de la CI
+ * pour un contrôle qui n'a besoin que d'une clé de lecture.
+ *
+ * La carte n'est JAMAIS consultée hors mode Test : si la clé fournie est une clé
+ * Live, on refuse plutôt que de comparer des Price Test à un compte Live.
+ */
+function chargerCarteTest() {
+  try {
+    const carte = JSON.parse(readFileSync(join(ROOT, "config/stripe-prices.test.json"), "utf8"));
+    if (carte.environment !== "test") return null;
+    if (carte.generation !== catalogue.version) {
+      err(`config/stripe-prices.test.json annonce la génération ${carte.generation}, le catalogue ${catalogue.version}`);
+      return null;
+    }
+    return carte;
+  } catch {
+    return null;
+  }
+}
+
+const CLE = process.env.STRIPE_SECRET_KEY ?? "";
+const CLE_EST_LIVE = CLE.startsWith("sk_live_") || CLE.startsWith("rk_live_");
+const CARTE = CLE_EST_LIVE ? null : chargerCarteTest();
+
+function resoudrePriceId(nomVar) {
+  const depuisEnv = process.env[nomVar];
+  if (depuisEnv) return { id: depuisEnv, source: "env" };
+  const depuisCarte = CARTE?.prices?.[nomVar];
+  if (depuisCarte) return { id: depuisCarte, source: "config/stripe-prices.test.json" };
+  return { id: null, source: null };
+}
 
 function stripeViaCli(id) {
   try {
@@ -77,6 +116,10 @@ function detecterMode() {
 
 async function main() {
   const mode = detecterMode();
+  if (CLE_EST_LIVE) {
+    err("STRIPE_SECRET_KEY est une clé Live. Ce contrôle ne s'exécute que contre Stripe Test.");
+    process.exit(1);
+  }
   if (mode === "none") {
     const msg = "verify:stripe-prices : aucun accès Stripe (STRIPE_SECRET_KEY absent, CLI stripe absente).";
     if (STRICT) {
@@ -86,7 +129,8 @@ async function main() {
     log("• " + msg + " SKIP (non bloquant).");
     process.exit(0);
   }
-  log(`verify:stripe-prices — catalogue ${catalogue.version} — accès Stripe: ${mode}\n`);
+  log(`verify:stripe-prices — catalogue ${catalogue.version} — accès Stripe: ${mode}` +
+      (CARTE ? ` — carte Test versionnée: ${Object.keys(CARTE.prices ?? {}).length} Price` : "") + "\n");
 
   const attendus = construireAttendus(catalogue);
   const montantsLus = {};
@@ -97,16 +141,16 @@ async function main() {
   for (const gratuite of offresSansPriceStripe(catalogue)) {
     const fautives = gratuite.prefixesVarInterdits
       .flatMap((p) => [`${p}_MENSUEL`, `${p}_ANNUEL`, `${p}_PONCTUEL`])
-      .filter((nom) => process.env[nom]);
+      .filter((nom) => resoudrePriceId(nom).id);
     if (fautives.length) err(`${gratuite.libelle} est gratuit mais ${fautives.join(", ")} pointe un Price payant`);
     else log(`${OK} ${gratuite.libelle} : gratuit, aucun Price Stripe (absence vérifiée)`);
   }
 
   // 2. Chaque Price attendu par le catalogue doit exister et porter le bon montant.
   for (const a of attendus) {
-    const id = process.env[a.nomVar];
+    const { id } = resoudrePriceId(a.nomVar);
     if (!id) {
-      const msg = `${a.nomVar} non défini dans l'environnement`;
+      const msg = `${a.nomVar} non défini (ni environnement, ni config/stripe-prices.test.json)`;
       if (STRICT) err(msg);
       else log(`• ${msg} — SKIP`);
       continue;

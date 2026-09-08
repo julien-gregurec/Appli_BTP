@@ -17,6 +17,16 @@ jobs:
   verification:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # Le prix affiché doit être le prix facturé. Sans ce drapeau, le contrôle
+      # « skippe » silencieusement quand aucun accès Stripe n'est présent — c'est
+      # exactement ce qui a laissé vivre la divergence TARIFS-V2. En strict, une
+      # configuration Stripe absente est un ÉCHEC, pas un avertissement.
+      STRIPE_PRICES_VERIFY_STRICT: "1"
+      # Clé de LECTURE du compte Stripe TEST (`sk_test_…`). Le script refuse une
+      # clé Live. Les Price IDs, eux, ne sont pas des secrets : ils sont versionnés
+      # dans config/stripe-prices.test.json, donc un seul secret suffit ici.
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_TEST_SECRET_KEY }}
     steps:
       - name: Récupérer le dépôt
         uses: actions/checkout@v4
@@ -32,6 +42,13 @@ jobs:
 
       - name: Audit des vulnérabilités élevées et critiques
         run: npm run audit:security
+
+      # Contrôle bloquant et non contournable : ce job n'est jamais facultatif,
+      # et ce pas n'a ni `continue-on-error` ni `if:` d'échappement. S'il casse,
+      # soit un tarif Stripe Test diverge du contrat canonique, soit le secret
+      # STRIPE_TEST_SECRET_KEY n'est pas configuré. Les deux doivent bloquer.
+      - name: Tarifs Stripe Test alignés sur le contrat canonique (strict)
+        run: npm run verify:stripe-prices
 
       - name: Contrôles reproductibles
         run: npm run verify
