@@ -248,3 +248,100 @@ describe("validerOuvertureAssistance", () => {
     expect(r.valide === false && r.erreur).toContain("60 minutes");
   });
 });
+
+// ── Correction P0 : assistance stricte, isolation et refus par défaut ──────────
+
+describe("refus par défaut : session, application, justification, durée", () => {
+  const demande = {
+    entrepriseId: "ent-1",
+    applicationCode: "gestion_pro",
+    action: { famille: "lire" as const },
+    maintenant: T0,
+    enLigne: true,
+  };
+
+  it("5. isolation entre applications : une autorisation Gestion Pro n’ouvre rien d’autre", () => {
+    const s = session({ applications: ["gestion_pro"] });
+    for (const autre of ["colors", "reserves", "tools", "drone", "appli_future"]) {
+      const d = evaluerSessionAssistance(s, { ...demande, applicationCode: autre });
+      expect(d).toMatchObject({ autorise: false, raison: "application_hors_perimetre" });
+    }
+    expect(evaluerSessionAssistance(s, demande).autorise).toBe(true);
+  });
+
+  it("aucune application future n’hérite d’un droit support global", () => {
+    // Le contrat ne connaît aucune liste d'applications : il compare à ce qui a été
+    // coché à l'ouverture. Une application inventée à l'instant est donc refusée sans
+    // qu'aucun code n'ait eu à la déclarer.
+    const s = session({ applications: ["gestion_pro", "colors"] });
+    for (const future of ["drone", "scan", "compta", "n_importe_quoi"]) {
+      expect(
+        evaluerSessionAssistance(s, { ...demande, applicationCode: future }).autorise,
+      ).toBe(false);
+    }
+  });
+
+  it("6. absence de permission : le périmètre ne s’étend jamais par défaut", () => {
+    const s = session({ perimetre: "lecture_seule" });
+    for (const famille of ["configurer", "corriger", "exporter", "supprimer"] as const) {
+      expect(evaluerSessionAssistance(s, { ...demande, action: { famille } }).autorise).toBe(false);
+    }
+  });
+
+  it("7. session expirée : accès refusé", () => {
+    const s = session({ expireAt: "2026-09-08T09:59:59.000Z" });
+    expect(evaluerSessionAssistance(s, demande)).toMatchObject({
+      autorise: false,
+      raison: "session_expiree",
+    });
+  });
+
+  it("8. session révoquée : accès refusé, avant même l’expiration", () => {
+    const s = session({ revoqueeAt: "2026-09-08T09:55:00.000Z", revoqueePar: "uid-autre" });
+    expect(evaluerSessionAssistance(s, demande)).toMatchObject({
+      autorise: false,
+      raison: "session_revoquee",
+    });
+  });
+
+  it("justification absente ou insuffisante : accès refusé", () => {
+    // Catégorie inconnue.
+    expect(
+      evaluerSessionAssistance(
+        session({ motifCategorie: "curiosite" as never }),
+        demande,
+      ),
+    ).toMatchObject({ autorise: false, raison: "justification_absente" });
+
+    // Catégorie exigeant un détail, sans détail exploitable.
+    for (const detail of [null, "", "   ", "ok"]) {
+      expect(
+        evaluerSessionAssistance(
+          session({ motifCategorie: "securite", motifDetailInterne: detail }),
+          demande,
+        ),
+      ).toMatchObject({ autorise: false, raison: "justification_absente" });
+    }
+
+    // La même catégorie, correctement justifiée, passe.
+    expect(
+      evaluerSessionAssistance(
+        session({ motifCategorie: "securite", motifDetailInterne: "contrôle après alerte MFA" }),
+        demande,
+      ).autorise,
+    ).toBe(true);
+  });
+
+  it("durée invalide : accès refusé", () => {
+    for (const surcharge of [
+      { expireAt: "2026-09-08T09:50:00.000Z" },
+      { expireAt: "2026-09-08T09:40:00.000Z" },
+      { expireAt: "pas-une-date" },
+      { ouverteAt: "pas-une-date" },
+    ]) {
+      const d = evaluerSessionAssistance(session(surcharge), demande);
+      expect(d.autorise).toBe(false);
+      if (!d.autorise) expect(["fenetre_invalide", "session_expiree"]).toContain(d.raison);
+    }
+  });
+});

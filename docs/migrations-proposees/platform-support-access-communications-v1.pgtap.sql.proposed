@@ -14,7 +14,7 @@
 
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(93);
+select plan(96);
 
 set local elsatia.capacite_personnes_bypass = 'on';
 
@@ -249,6 +249,31 @@ select ok(
   (public.assistance_bandeau('gestion_pro') ? 'motif_public')
   and not (public.assistance_bandeau('gestion_pro') ? 'motif_detail'),
   'C11 — le bandeau expose le motif public et jamais le détail interne'
+);
+
+-- Aucune application future n'hérite d'un droit support global : on en ajoute une au
+-- catalogue pendant que la session est ouverte, et elle reste fermée.
+insert into public.applications_elsatia(code, nom, description, ordre, portee_donnees)
+values ('appli_ajoutee_a_chaud', 'Application ajoutée à chaud', 'Test', 901, 'entreprise')
+on conflict(code) do nothing;
+insert into public.acces_applications_entreprises(entreprise_id, application_code, autorise, source)
+values ('c1000000-0000-0000-0000-000000000001', 'appli_ajoutee_a_chaud', true, 'test')
+on conflict (entreprise_id, application_code) do update set autorise = true;
+select ok(
+  not public.assistance_autorise('c1000000-0000-0000-0000-000000000001','appli_ajoutee_a_chaud','lire'),
+  'C12 — une application ajoutée au catalogue pendant la session n''hérite d''aucun droit'
+);
+
+-- Justification et durée : deux conditions revérifiées à chaque action.
+update public.assistance_motifs set detail_requis = true where cle = 'demande_client';
+select ok(
+  not public.assistance_autorise('c1000000-0000-0000-0000-000000000001','gestion_pro','lire'),
+  'C13 — une session dont le motif n''est plus justifié n''autorise plus rien'
+);
+update public.assistance_motifs set detail_requis = false where cle = 'demande_client';
+select ok(
+  public.assistance_autorise('c1000000-0000-0000-0000-000000000001','gestion_pro','lire'),
+  'C14 — et elle réautorise dès que la justification redevient exploitable'
 );
 
 -- ═══════════════════════════════════════════════════════════════════════════════

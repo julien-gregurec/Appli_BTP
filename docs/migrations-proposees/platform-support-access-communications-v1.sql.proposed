@@ -500,9 +500,14 @@ $$;
 revoke all on function public.assistance_session_courante() from public, anon;
 grant execute on function public.assistance_session_courante() to authenticated;
 
--- Décision centrale, appelée par CHAQUE application. Elle exige simultanément :
--- l'identité plateforme active, la session vivante, l'entreprise exacte,
--- l'APPLICATION explicitement sélectionnée, le périmètre, et l'absence d'interdit.
+-- Décision centrale, appelée par CHAQUE application. Elle REFUSE par défaut et n'accorde
+-- que si TOUT est réuni : identité plateforme active, session vivante, justification
+-- exploitable, fenêtre de durée valide, entreprise exacte, APPLICATION explicitement
+-- sélectionnée, famille d'action dans le périmètre, et aucun interdit absolu.
+--
+-- Aucune de ces conditions n'a de valeur par défaut permissive : une application ajoutée
+-- au catalogue demain n'hérite d'aucun droit d'assistance tant qu'elle n'a pas été cochée
+-- à l'ouverture d'une session.
 create or replace function public.assistance_autorise(
   p_entreprise_id uuid,
   p_application_code text,
@@ -534,6 +539,28 @@ begin
 
   v_session := public.assistance_session_courante();
   if v_session.id is null then return false; end if;
+
+  -- Justification exploitable exigée à CHAQUE action, pas seulement à l'ouverture : une
+  -- session dont le motif aurait été vidé après coup n'autoriserait plus rien, et l'audit
+  -- ne pourrait jamais montrer un accès sans raison consignée.
+  if not exists (
+    select 1 from public.assistance_motifs m
+    where m.cle = v_session.motif_cle
+      and (
+        not m.detail_requis
+        or char_length(btrim(coalesce(v_session.motif_detail, ''))) >= 10
+      )
+  ) then
+    return false;
+  end if;
+  -- Durée : la contrainte de table garantit `expire_at > ouverte_at` à l'insertion, et
+  -- le trigger interdit de repousser `expire_at`. On revérifie malgré tout la fenêtre,
+  -- pour qu'une restauration partielle ou une écriture privilégiée ne puisse pas laisser
+  -- une session sans fin exploitable.
+  if v_session.expire_at is null or v_session.expire_at <= v_session.ouverte_at then
+    return false;
+  end if;
+
   if v_session.entreprise_id <> p_entreprise_id then return false; end if;
   if not exists (
     select 1 from public.assistance_sessions_applications sa
