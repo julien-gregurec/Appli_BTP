@@ -11,7 +11,7 @@ import { consommationIAMensuelle } from "@/lib/ai/journal";
 import { iaEstActive } from "@/lib/preview-features";
 import { BRAND_NAME, PRODUCT_NAME, resoudreUrlContactCommercial } from "@/lib/brand";
 import { calculerGainsOffreSuivante, calculerReductionRemise, CATEGORIES_COMPARATIF, etatLigneComparatif, LIBELLE_ETAT_COMMERCIAL, type EtatCommercial } from "@/lib/comparatif-offres";
-import { estCodeOffreTarifaire } from "@/lib/tarification";
+import { estCodeOffreTarifaire, tarifCompteSupplementaireHistoriqueCentimes } from "@/lib/tarification";
 import { abonnementsPublicsOuverts } from "@/lib/commercialisation-abonnements";
 import { messageDepassementCapacite, messageLimiteAtteinte, type ContexteQuotaPersonnes } from "@/lib/quota-personnes-message";
 import { OFFRES_ABONNEMENT_COMMERCIALISEES } from "@/lib/stripe-abonnement";
@@ -210,12 +210,13 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h3 className="text-sm font-semibold">Capacité supplémentaire</h3>
-            <p className="mt-1 text-xs text-neutral-500">Personnes actives au-delà des {cap.base} incluses. {euros(offre.parCompteSup)} HT/mois par personne, facturé sur votre abonnement. Hausse : effet immédiat, facture proratisée. Baisse : effet à la fin de la période, sans suppression de personne.</p>
+            <p className="mt-1 text-xs text-neutral-500">Personnes actives au-delà des {cap.base} incluses. {euros(tarifCompteSupplementaireHistoriqueCentimes(entreprise?.abonnement_offre) / 100)} HT/mois par personne, facturé sur votre abonnement. Hausse : effet immédiat, facture proratisée. Baisse : effet à la fin de la période, sans suppression de personne.</p>
+            <p className="mt-1 text-xs text-neutral-500">Ce tarif est celui de votre contrat, à la génération tarifaire sous laquelle il a été souscrit. Il ne change pas : une nouvelle grille ne s’applique jamais rétroactivement à un abonnement en cours.</p>
           </div>
           {capaciteFigee && <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${LIBELLE_OPERATION_CAPACITE[operationCapaciteEnCours]?.classe ?? ""}`}>{LIBELLE_OPERATION_CAPACITE[operationCapaciteEnCours]?.texte ?? "Mise à jour en cours"}</span>}
         </div>
 
-        <p className="mt-3 text-sm">Aujourd’hui : <strong>{cap.sup}</strong> personne(s) supplémentaire(s) — {euros(cap.sup * offre.parCompteSup)} HT/mois.</p>
+        <p className="mt-3 text-sm">Aujourd’hui : <strong>{cap.sup}</strong> personne(s) supplémentaire(s) — {euros(cap.sup * tarifCompteSupplementaireHistoriqueCentimes(entreprise?.abonnement_offre) / 100)} HT/mois.</p>
 
         {baissePlanifiee && <div className="mt-2 rounded-md bg-neutral-100 p-3 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
           <p>Modification planifiée : passage à {baissePlanifiee.cible} personne(s) supplémentaire(s) le {new Date(baissePlanifiee.effetAt).toLocaleDateString("fr-FR")}. Aucune personne ne sera supprimée.</p>

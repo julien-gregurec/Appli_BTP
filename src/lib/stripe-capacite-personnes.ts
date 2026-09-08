@@ -6,7 +6,11 @@ import {
   type PeriodiciteAbonnement,
   type StripeSubscription,
 } from "@/lib/stripe-abonnement";
-import { offreTarifaireParCle } from "@/lib/tarification";
+import {
+  GENERATION_COMPTES_PRECEDENTE,
+  generationComptesSelectionnable,
+  tarifCompteSupplementaireHistoriqueCentimes,
+} from "@/lib/tarification";
 
 /**
  * ELSATIA-CAPACITY-STRIPE-R2 — logique pure (slice 1 : DB + lib + tests).
@@ -436,9 +440,14 @@ export type SensChangementCapacite = "hausse" | "baisse" | "aucun";
 export type ResumeChangementCapacite = {
   plan: OffreAbonnement;
   sens: SensChangementCapacite;
-  /** Prix unitaire mensuel HT d'une personne active supplémentaire pour ce plan
-   *  (grille tarifaire canonique serveur : `OffreTarifaire.parCompteSup`). */
+  /** Prix unitaire mensuel HT d'une personne active supplémentaire pour ce plan.
+   *  Il vient de la génération PRÉCÉDENTE (tarif par forfait) : ce mécanisme
+   *  facture une PERSONNE, sans notion de rôle, alors que la grille courante
+   *  dépend du rôle réel du compte. */
   prixUnitaireMensuelHt: number;
+  /** Génération tarifaire dont relève ce mécanisme, et son ouverture. */
+  generation: typeof GENERATION_COMPTES_PRECEDENTE;
+  selectionnablePourNouveauContrat: boolean;
   supplementActuel: number;
   supplementCible: number;
   /** `supplementCible - supplementActuel`, signé. */
@@ -496,7 +505,7 @@ export function resumeChangementCapacite(params: {
   if (!estOffreAbonnement(plan)) return null;
   if (!(OFFRES_ABONNEMENT_COMMERCIALISEES as readonly string[]).includes(plan)) return null;
 
-  const prixUnitaire = offreTarifaireParCle(plan).parCompteSup;
+  const prixUnitaire = tarifCompteSupplementaireHistoriqueCentimes(plan) / 100;
   const actuel = Math.max(0, Math.trunc(params.supplementActuel));
   const cible = Math.max(0, Math.trunc(params.supplementCible));
   const delta = cible - actuel;
@@ -507,6 +516,8 @@ export function resumeChangementCapacite(params: {
     plan: plan as OffreAbonnement,
     sens,
     prixUnitaireMensuelHt: prixUnitaire,
+    generation: GENERATION_COMPTES_PRECEDENTE,
+    selectionnablePourNouveauContrat: generationComptesSelectionnable(GENERATION_COMPTES_PRECEDENTE),
     supplementActuel: actuel,
     supplementCible: cible,
     deltaPersonnes: delta,

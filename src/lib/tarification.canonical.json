@@ -1,12 +1,71 @@
 {
-  "version": "CANONICAL-V3-2026-09",
-  "decision": "ELSATIA-TARIFICATION-CANONICAL-ALIGNMENT-V1",
+  "version": "CANONICAL-V4-2026-09",
+  "decision": "ELSATIA-TARIFICATION-DECISIONS-COMMERCIALES-V1",
+  "remplace": "CANONICAL-V3-2026-09",
   "regleAnnuelle": "annuel = 10 x mensuel (2 mois offerts)",
   "devise": "eur",
+  "note": "Source de verite unique consommee par l'application ET, via un artefact genere, par le site vitrine. Elle ne porte que des tarifs PUBLICS. Ce qu'elle s'interdit est enumere par le test « le contrat public ne porte que des tarifs publics » : le dire ici mot pour mot ferait echouer ce test sur sa propre documentation.",
   "offres": [
-    { "cle": "mini",       "nom": "Mini",       "mensuelCentimes": 7900,  "annuelCentimes": 79000,  "comptesInclus": 3,  "parCompteSupEuros": 15 },
-    { "cle": "pro",        "nom": "Pro",        "mensuelCentimes": 24900, "annuelCentimes": 249000, "comptesInclus": 15, "parCompteSupEuros": 12 },
-    { "cle": "business",   "nom": "Business",   "mensuelCentimes": 44900, "annuelCentimes": 449000, "comptesInclus": 30, "parCompteSupEuros": 9 },
-    { "cle": "entreprise", "nom": "Entreprise", "mensuelCentimes": 59900, "annuelCentimes": 599000, "comptesInclus": 50, "parCompteSupEuros": 9 }
+    { "cle": "mini",       "nom": "Mini",       "mensuelCentimes": 7900,  "annuelCentimes": 79000,  "comptesInclus": 3 },
+    { "cle": "pro",        "nom": "Pro",        "mensuelCentimes": 24900, "annuelCentimes": 249000, "comptesInclus": 15 },
+    { "cle": "business",   "nom": "Business",   "mensuelCentimes": 44900, "annuelCentimes": 449000, "comptesInclus": 30 },
+    { "cle": "entreprise", "nom": "Entreprise", "mensuelCentimes": 59900, "annuelCentimes": 599000, "comptesInclus": 50 }
+  ],
+  "comptesSupplementaires": {
+    "regle": "Le tarif depend du ROLE reel du compte supplementaire, jamais du forfait souscrit.",
+    "generationCourante": {
+      "cle": "COMPTES-PAR-ROLE-2026-09",
+      "libelle": "Par role du compte",
+      "selectionnablePourNouveauContrat": true,
+      "roles": [
+        { "cle": "terrain",          "nom": "Compte terrain supplémentaire",      "mensuelCentimes": 500,  "aPartirDe": true },
+        { "cle": "chef_equipe",      "nom": "Compte chef d\u2019équipe supplémentaire", "mensuelCentimes": 900,  "aPartirDe": true },
+        { "cle": "administratif",    "nom": "Compte administratif supplémentaire", "mensuelCentimes": 1500, "aPartirDe": true },
+        { "cle": "expert_comptable", "nom": "Accès expert-comptable",              "mensuelCentimes": 0,    "aPartirDe": false }
+      ]
+    },
+    "generationsPrecedentes": [
+      {
+        "cle": "COMPTES-PAR-FORFAIT-2026-07",
+        "libelle": "Par forfait souscrit (generation precedente)",
+        "selectionnablePourNouveauContrat": false,
+        "motifRetrait": "Le prix ne dependait pas du role reel du compte. Conservee UNIQUEMENT pour honorer les contrats souscrits sous cette generation : un abonnement existant n'est jamais migre silencieusement.",
+        "parForfait": [
+          { "offre": "mini",       "mensuelCentimes": 1500 },
+          { "offre": "pro",        "mensuelCentimes": 1200 },
+          { "offre": "business",   "mensuelCentimes": 900 },
+          { "offre": "entreprise", "mensuelCentimes": 900 }
+        ]
+      }
+    ]
+  },
+  "optionsIA": {
+    "packCredits": {
+      "cle": "credits_ia",
+      "nom": "Pack de crédits IA",
+      "nature": "achat_ponctuel",
+      "prixCentimes": 2900,
+      "aPartirDe": true,
+      "operations": 500,
+      "prixAnnuelCentimes": null,
+      "renouvellementAutomatique": false,
+      "note": "Achat ponctuel. Ni /mois, ni tarif annuel, ni multiplication par 10 ou 12, ni reconduction."
+    },
+    "capaciteRenforcee": {
+      "cle": "ia_intensive",
+      "nom": "IA intensive",
+      "nature": "recurrente",
+      "mensuelCentimes": 7900,
+      "annuelCentimes": 79000,
+      "operations": 2500,
+      "note": "Option recurrente, distincte du pack ponctuel. L'annuel ne s'applique que si l'abonnement est souscrit en periodicite annuelle."
+    }
+  },
+  "modules": [
+    { "cle": "pointage",            "nom": "Pointage",               "mensuelCentimes": 2500, "annuelCentimes": 25000, "codesCatalogue": ["pointage"],              "permissionsPorteDEntree": ["acces_pointage"] },
+    { "cle": "stock",               "nom": "Stock",                  "mensuelCentimes": 2900, "annuelCentimes": 29000, "codesCatalogue": ["stock"],                 "permissionsPorteDEntree": ["acces_stock"] },
+    { "cle": "materiel_vehicules",  "nom": "Matériel et véhicules",  "mensuelCentimes": 1900, "annuelCentimes": 19000, "codesCatalogue": ["materiel", "vehicules"], "permissionsPorteDEntree": ["acces_outillage", "acces_flotte"] },
+    { "cle": "notes_frais",         "nom": "Notes de frais",         "mensuelCentimes": 1200, "annuelCentimes": 12000, "codesCatalogue": ["notes_frais"],           "permissionsPorteDEntree": ["saisir_ses_notes_frais"] },
+    { "cle": "rentabilite_avancee", "nom": "Rentabilité avancée",    "mensuelCentimes": 2900, "annuelCentimes": 29000, "codesCatalogue": ["rentabilite_avancee"],   "permissionsPorteDEntree": ["acces_rentabilite"] }
   ]
 }

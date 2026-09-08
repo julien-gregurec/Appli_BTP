@@ -75,11 +75,24 @@ export default function TarifsPage() {
             {optionsAffichees.map((option) => (
               <div key={option.cle} className="rounded-xl bg-neutral-50 p-4 dark:bg-neutral-950">
                 <p className="font-semibold">{option.nom}</p>
-                <p className="mt-1 text-sm text-neutral-500">{option.prixMensuelCentimes === 0 ? "Gratuit" : `À partir de ${formatMontantCentimes(option.prixMensuelCentimes)} HT/mois`}</p>
+                {/* Un achat PONCTUEL ne porte ni « /mois » ni tarif annuel : le
+                    pack de crédits IA se paie une fois, sans reconduction. Le
+                    confondre avec l'option récurrente « IA intensive » ferait
+                    croire à un abonnement là où il n'y en a pas. */}
+                <p className="mt-1 text-sm text-neutral-500">
+                  {option.nature === "achat_ponctuel"
+                    ? `À partir de ${formatMontantCentimes(option.prixCentimes)} HT — achat ponctuel`
+                    : option.mensuelCentimes === 0
+                      ? "Gratuit"
+                      : `${option.aPartirDe ? "À partir de " : ""}${formatMontantCentimes(option.mensuelCentimes ?? 0)} HT/mois`}
+                </p>
+                {option.nature === "achat_ponctuel" && (
+                  <p className="mt-1 text-xs text-neutral-500">Sans reconduction automatique. Aucun tarif annuel.</p>
+                )}
               </div>
             ))}
           </div>
-          {iaVisible && <p className="mt-4 text-xs text-neutral-500">Un crédit IA correspond à une opération assistée (analyse, génération ou extraction). Les opérations comprises dans l’offre sont remises à zéro chaque mois ; un pack additionnel n’est activé qu’après accord explicite.</p>}
+          {iaVisible && <p className="mt-4 text-xs text-neutral-500">Un crédit IA correspond à une opération assistée (analyse, génération ou extraction). Les opérations comprises dans l’offre sont remises à zéro chaque mois ; un pack additionnel est un achat ponctuel, activé seulement après accord explicite.</p>}
           <p className="mt-2 text-xs text-neutral-500">Toute option payante et tout dépassement sont présentés avant activation. Aucun numéro de carte n’est stocké par {PRODUCT_NAME}.</p>
         </section>
 
