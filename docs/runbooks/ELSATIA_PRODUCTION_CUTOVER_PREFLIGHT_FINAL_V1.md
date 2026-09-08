@@ -18,6 +18,25 @@ migration Production dans ce lot.
 > `c1930ab` / ledger 261 / gap 51 ailleurs dans ce document doit être lue comme remplacée par
 > cette cible.
 
+> **Rebasage 2026-09-08 — cible cutover portée au ledger 272, lot
+> `ELSATIA-ECOSYSTEM-INTEGRATION-TRAIN-V2`.** Ce bloc **remplace les chiffres du rebasage
+> 2026-09-05 ci-dessus** : partout où ce document écrit ledger 263, dernière `…000265`, delta
+> 53 ou SHA cible `1d15289`, lire désormais la cible ci-dessous. Le reste du document
+> (mécanique de bascule, rollback, pack de fenêtre) **reste applicable tel quel**.
+>
+> | Élément | Rebasage 2026-09-05 | **Cible 2026-09-08** |
+> |---|---|---|
+> | Branche | `feat/elsatia-commercial-canonical-r1-r2-r3-v1` | `integration/elsatia-ecosystem-train-v2-reserves-gp-v1` |
+> | Ledger cible | 263 (dernière `…000265`) | **272** (dernière `…000274`) |
+> | Numéro fonctionnel maximal | 265 | **274** |
+> | Delta depuis la baseline Production | 53 | **62** |
+>
+> **Le delta n'est pas 53, et n'est plus 60.** 53 valait pour la cible ledger 263 ; 60 pour le
+> train intermédiaire `integration/elsatia-ledger-reconciliation-p0-v1` (ledger 270). La cible
+> ajoute depuis deux migrations canoniques — `20260908000273` (idempotence hors-ligne Réserves
+> V5) et `20260908000274` (champs d'identité légale du client) — d'où **62**. Détail, preuves
+> d'exécution et contrôles au §2.1bis.
+
 Il **met à jour** la cible du cutover avec le vrai HEAD commercial canonique et se superpose au
 runbook de bascule/rollback existant :
 
@@ -111,12 +130,97 @@ lignée canonique — vérifié par la revue indépendante R2
 
 | Départ Production (confirmé) | Cible | Migrations à appliquer |
 |---|---|---|
-| ledger **210** (dernière `…000231`) | ledger **263** (dernière `…000265`) | **53** |
+| ledger **210** (dernière `…000231`) | ledger **272** (dernière `…000274`) | **62** |
+
+> Ligne actualisée le 2026-09-08 (cible ledger 272). L'ancienne valeur — cible 263, delta 53 —
+> reste lisible dans l'historique Git de ce fichier.
 
 La liste exacte = **toute version de `supabase/migrations/` @ `1d15289` absente du ledger
 Production**, appliquée **dans l'ordre lexical du nom de fichier** (= ordre d'application).
 Y compris les versions à horodatage inférieur au `max(version)` Production (migrations Preview-only
 et réconciliations réintégrées par la canonicalisation v2).
+
+### 2.1bis Recalcul du delta au 2026-09-08 (ledger 272)
+
+Lot `ELSATIA-ECOSYSTEM-INTEGRATION-TRAIN-V2`, branche
+`integration/elsatia-ecosystem-train-v2-reserves-gp-v1`.
+
+#### Le compte exact
+
+| Repère | Fichiers | Dernière migration | Delta depuis Production |
+|---|---|---|---|
+| Baseline Production | **210** appliquées | `20260824000231` (rang 223) | — |
+| Ancienne cible (préflight 2026-09-05) | 263 | `20260905000265` | 53 |
+| Train intermédiaire ledger P0 | 270 | `20260908000272` | 60 |
+| **Cible de ce lot** | **272** | **`20260908000274`** | **62** |
+
+Les deux migrations qui font passer 60 à 62 :
+
+| Ordre | Fichier | Objet |
+|---|---|---|
+| 271ᵉ | `20260908000273_reserves_v5_offline_idempotence_v1.sql` | Idempotence des mutations différées Réserves V5 (clé d'idempotence par organisation, registre `reserves_mutations_appliquees`, transition différée qui distingue rejeu bénin et vrai conflit). Renumérotée depuis la candidate `20260907000271`, jamais appliquée nulle part. |
+| 272ᵉ | `20260908000274_client_legal_fields_v1.sql` | Quatre colonnes d'identité légale sur `public.clients` (`numero_tva`, `forme_juridique`, `adresse_complement`, `pays`), contraintes de forme `not valid`, aucun backfill. |
+
+#### Pourquoi 210 et non 223
+
+La baseline Production compte **210 lignes** dans `supabase_migrations.schema_migrations`
+pour un rang maximal de **223** : les rangs **195 → 207** (ligne TARIFS-V2 / admin /
+avenants, 13 migrations) n'ont jamais été appliquées en Production. `194 + 16 = 210`.
+Le delta de 62 se décompose donc en **13 migrations à horodatage antérieur** au `max(version)`
+Production, rattrapées par `--include-all`, **plus 49 postérieures**.
+
+#### Ordre d'application
+
+Inchangé et non négociable : **ordre lexical du préfixe à 14 chiffres**, qui est celui que
+Supabase applique. Ce n'est **pas** l'ordre des numéros fonctionnels : le dépôt porte six
+doublons historiques de numéro (`000200`, `000236` à `000240`) dont trois sont appliqués en
+Production. Ces doublons ne se corrigent pas — les préfixes 14 chiffres, eux, sont uniques
+(`npm run verify:migrations` : **272 migrations valides, noms et horodatages uniques**).
+
+#### Point de non-retour — inchangé
+
+`20260902000255_acl_reconciliation_v1.sql`, **rang 253** du train (le « 255 » est son numéro
+fonctionnel, pas son rang). Le seuil ne bouge pas : les deux migrations ajoutées par ce lot
+sont très postérieures et purement additives. Tout ce que dit le §3 sur ce point reste vrai.
+
+#### Sauvegarde préalable et rollback
+
+Inchangé, et rappelé ici parce que le delta a grossi :
+
+- **Une sauvegarde datée est obligatoire avant la première migration**, pas avant la 255 :
+  les 62 migrations sont additives, mais l'inversion fiable des ~1 220 `REVOKE` ciblés de
+  la 255 ne passe pas par un script inverse.
+- **Après application de la 255, un rollback exige la restauration du snapshot.** Revenir en
+  arrière migration par migration n'est pas une option supportée.
+- **Un rollback frontend seul est incompatible.** Le frontend Production actuel ne connaît ni
+  l'ACL 255, ni Colors, ni Tools, ni Réserves, ni les colonnes d'identité légale de la 274.
+  Redescendre le frontend sans restaurer la base laisse une application qui ignore son propre
+  schéma. Bascule et rollback sont coordonnés, base et frontend ensemble.
+
+#### Contrôles nécessaires avant la fenêtre
+
+1. **Relire le ledger Production en direct** (§1) : le chiffre de 210 date du lot de
+   réconciliation, il doit être reconfirmé le jour J. Le delta se recalcule à partir de la
+   lecture réelle, jamais à partir de ce document.
+2. `npm run verify:migrations` sur le SHA cible — attendu : 272, préfixes uniques.
+3. Vérifier que `20260908000273` et `20260908000274` sont **absentes** du ledger Production
+   (elles n'ont jamais été appliquées nulle part).
+4. Sauvegarde datée prise et **restauration vérifiée**, pas seulement déclarée.
+5. Fenêtre et responsable nommés (P0-5 du lot de préparation, toujours ouvert).
+
+#### Preuves d'exécution de ce lot
+
+Sur pile PostgreSQL jetable (image `supabase/postgres:17.6.1.143`), hors Production :
+
+| Scénario | Résultat |
+|---|---|
+| Fresh install (272 migrations) | **PASS** |
+| Upgrade depuis la baseline Production (210 → +62) | **PASS** |
+| Upgrade depuis le ledger 263 (+9) | **PASS** |
+| Upgrade depuis le canon GP 270, pas à pas +273 puis +274 | **PASS** |
+| Rejeu de `20260908000274` (×2) | **PASS** — idempotente |
+| Rejeu de `20260908000273` | **ÉCHEC attendu** — `create policy` non idempotent (cf. rapport du lot, P2) |
+| pgTAP | 67 fichiers PASS / 68, **1 870 assertions** |
 
 ### 2.2 Bloc 210 → 253 (identique au runbook V1)
 
