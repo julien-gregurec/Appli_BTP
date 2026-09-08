@@ -12,10 +12,10 @@
     { "cle": "entreprise", "nom": "Entreprise", "mensuelCentimes": 59900, "annuelCentimes": 599000, "comptesInclus": 50 }
   ],
   "comptesSupplementaires": {
-    "regle": "Le tarif depend du ROLE reel du compte supplementaire, jamais du forfait souscrit.",
+    "regle": "Le tarif d\u00e9pend du r\u00f4le r\u00e9el du compte suppl\u00e9mentaire, jamais du forfait souscrit.",
     "generationCourante": {
       "cle": "COMPTES-PAR-ROLE-2026-09",
-      "libelle": "Par role du compte",
+      "libelle": "Par r\u00f4le du compte",
       "selectionnablePourNouveauContrat": true,
       "roles": [
         { "cle": "terrain",          "nom": "Compte terrain supplémentaire",      "mensuelCentimes": 500,  "aPartirDe": true },
@@ -27,7 +27,7 @@
     "generationsPrecedentes": [
       {
         "cle": "COMPTES-PAR-FORFAIT-2026-07",
-        "libelle": "Par forfait souscrit (generation precedente)",
+        "libelle": "Par forfait souscrit (g\u00e9n\u00e9ration pr\u00e9c\u00e9dente)",
         "selectionnablePourNouveauContrat": false,
         "motifRetrait": "Le prix ne dependait pas du role reel du compte. Conservee UNIQUEMENT pour honorer les contrats souscrits sous cette generation : un abonnement existant n'est jamais migre silencieusement.",
         "parForfait": [
