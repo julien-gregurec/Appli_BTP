@@ -180,6 +180,6 @@ Cinq étapes, dans un ordre impératif :
 |---|---|
 | **Branche** | `feat/stripe-test-canonical-prices-p0-v1` |
 | Base intégrée | `9261214917438dbefb67b5311e512dd5a0f0180d` |
-| **SHA final** | *(dernière ligne ci-dessous)* |
+| **SHA final** | `b9110a2dfe6595e67c1dd5091282c321b73f5f8d` |
 
 **Non fusionné. Non déployé.**
