@@ -124,6 +124,36 @@ export function allowlistPrixBaseGenerationsPrecedentes(
   );
 }
 
+/**
+ * Un Price de génération historique a été présenté à la vente. Jamais rattrapable
+ * silencieusement : le client recevrait un tarif retiré du catalogue.
+ */
+export class PrixGenerationHistoriqueNonVendable extends Error {
+  constructor(public readonly priceId: string) {
+    super("Ce tarif appartient à une génération fermée et ne peut pas être vendu");
+    this.name = "PrixGenerationHistoriqueNonVendable";
+  }
+}
+
+/**
+ * Dernier rempart avant un nouveau contrat : *connu* ne vaut pas *vendable*.
+ *
+ * `allowlistPrixBase` reconnaît volontairement les Price des générations fermées,
+ * sans quoi les abonnements déjà souscrits deviendraient inclassables. Cette
+ * reconnaissance ne doit jamais déborder sur la vente — une variable courante
+ * repointée par erreur sur un ancien Price doit faire échouer le checkout, pas
+ * facturer un tarif retiré.
+ */
+export function verifierPrixVendable(
+  priceId: string,
+  environnement: Record<string, string | undefined> = process.env,
+): string {
+  if (allowlistPrixBaseGenerationsPrecedentes(environnement).has(priceId)) {
+    throw new PrixGenerationHistoriqueNonVendable(priceId);
+  }
+  return priceId;
+}
+
 export const PALIERS_OPTION_IA = ["100", "300", "illimite"] as const;
 export type PalierOptionIA = (typeof PALIERS_OPTION_IA)[number];
 export function estPalierOptionIA(valeur: string): valeur is PalierOptionIA {
@@ -308,10 +338,14 @@ export async function creerSessionAbonnementStripe(params: {
   customerId: string;
   offre: OffreAbonnement;
   periodicite: PeriodiciteAbonnement;
+  /** Injectable pour les tests ; `process.env` en exécution réelle. */
+  environnement?: Record<string, string | undefined>;
 }) {
-  const prix = prixStripePour(params.offre, params.periodicite);
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+  const prix = prixStripePour(params.offre, params.periodicite, params.environnement);
+  const baseUrl = (params.environnement ?? process.env).NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
   if (!prix || !baseUrl) throw new Error("Les tarifs Stripe Billing ne sont pas encore configurés");
+  // Aucun nouveau contrat ne repart sur une génération fermée.
+  verifierPrixVendable(prix, params.environnement);
   const corps = new URLSearchParams({
     mode: "subscription",
     customer: params.customerId,
@@ -330,7 +364,7 @@ export async function creerSessionAbonnementStripe(params: {
     "subscription_data[metadata][offre]": params.offre,
     "subscription_data[metadata][periodicite]": params.periodicite,
   });
-  if (process.env.STRIPE_AUTOMATIC_TAX_ENABLED === "true") {
+  if ((params.environnement ?? process.env).STRIPE_AUTOMATIC_TAX_ENABLED === "true") {
     corps.set("automatic_tax[enabled]", "true");
   }
   return requeteStripe<StripeSession>("checkout/sessions", {
