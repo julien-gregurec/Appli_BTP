@@ -99,6 +99,31 @@ const VARIABLES_PRIX_COMPTE_SUP: Partial<Record<OffreAbonnement, Record<Periodic
   entreprise: { mensuel: "STRIPE_PRICE_COMPTE_SUP_ENTREPRISE_MENSUEL", annuel: "STRIPE_PRICE_COMPTE_SUP_ENTREPRISE_ANNUEL" },
 };
 
+/**
+ * Price de forfait des GÉNÉRATIONS PRÉCÉDENTES encore portés par des
+ * abonnements en cours, listés par configuration (IDs séparés par des virgules).
+ *
+ * Repointer `STRIPE_PRICE_<OFFRE>_<PERIODICITE>` sur une nouvelle génération ne
+ * doit jamais rendre inclassable un abonnement déjà souscrit : le classifieur
+ * est fail-closed, un Price hors allowlist bloque toute réconciliation de
+ * capacité. Ces IDs restent donc *connus* (l'abonnement reste réconciliable)
+ * sans jamais devenir *sélectionnables* : `prixStripePour` ne les rend pas.
+ */
+export const VARIABLE_PRIX_BASE_GENERATIONS_PRECEDENTES =
+  "STRIPE_PRICE_BASE_GENERATIONS_PRECEDENTES";
+
+export function allowlistPrixBaseGenerationsPrecedentes(
+  environnement: Record<string, string | undefined> = process.env,
+): Set<string> {
+  const brut = environnement[VARIABLE_PRIX_BASE_GENERATIONS_PRECEDENTES] ?? "";
+  return new Set(
+    brut
+      .split(",")
+      .map((id) => id.trim())
+      .filter((id) => id.startsWith("price_")),
+  );
+}
+
 export const PALIERS_OPTION_IA = ["100", "300", "illimite"] as const;
 export type PalierOptionIA = (typeof PALIERS_OPTION_IA)[number];
 export function estPalierOptionIA(valeur: string): valeur is PalierOptionIA {
@@ -111,7 +136,7 @@ const VARIABLES_PRIX_OPTION_IA: Record<PalierOptionIA, Record<PeriodiciteAbonnem
   illimite: { mensuel: "STRIPE_PRICE_OPTION_IA_ILLIMITE_MENSUEL", annuel: "STRIPE_PRICE_OPTION_IA_ILLIMITE_ANNUEL" },
 };
 
-export function prixOptionIAStripePour(palier: PalierOptionIA, periodicite: PeriodiciteAbonnement, environnement: NodeJS.ProcessEnv = process.env) {
+export function prixOptionIAStripePour(palier: PalierOptionIA, periodicite: PeriodiciteAbonnement, environnement: Record<string, string | undefined> = process.env) {
   return environnement[VARIABLES_PRIX_OPTION_IA[palier][periodicite]] || null;
 }
 
@@ -126,13 +151,17 @@ export function estPeriodiciteAbonnement(valeur: string): valeur is PeriodiciteA
 export function prixStripePour(
   offre: OffreAbonnement,
   periodicite: PeriodiciteAbonnement,
-  environnement: NodeJS.ProcessEnv = process.env,
+  environnement: Record<string, string | undefined> = process.env,
 ) {
   const variable = VARIABLES_PRIX[offre]?.[periodicite];
   return variable ? environnement[variable] || null : null;
 }
 
-/** Ensemble de tous les Price IDs de forfait de base configurés (toutes offres × périodicités). */
+/**
+ * Ensemble des Price IDs de forfait de base *connus du serveur* : la génération
+ * courante (toutes offres × périodicités) plus celles des générations
+ * précédentes encore souscrites. Sert au classifieur, jamais à la vente.
+ */
 export function allowlistPrixBase(environnement: Record<string, string | undefined> = process.env): Set<string> {
   const ids = new Set<string>();
   for (const parPeriode of Object.values(VARIABLES_PRIX)) {
@@ -141,6 +170,7 @@ export function allowlistPrixBase(environnement: Record<string, string | undefin
       if (valeur) ids.add(valeur);
     }
   }
+  for (const id of allowlistPrixBaseGenerationsPrecedentes(environnement)) ids.add(id);
   return ids;
 }
 
@@ -156,7 +186,41 @@ export function allowlistPrixOptionIA(environnement: Record<string, string | und
   return ids;
 }
 
-export function variablesStripeBillingManquantes(environnement: NodeJS.ProcessEnv = process.env) {
+/**
+ * Price des modules et de l'IA de la génération courante. Une ligne d'abonnement
+ * qui les porte doit être reconnue, sinon le classifieur ferme sur un item
+ * pourtant légitime.
+ */
+const VARIABLES_PRIX_MODULES_ET_IA = [
+  "STRIPE_PRICE_MODULE_POINTAGE_MENSUEL",
+  "STRIPE_PRICE_MODULE_POINTAGE_ANNUEL",
+  "STRIPE_PRICE_MODULE_STOCK_MENSUEL",
+  "STRIPE_PRICE_MODULE_STOCK_ANNUEL",
+  "STRIPE_PRICE_MODULE_MATERIEL_VEHICULES_MENSUEL",
+  "STRIPE_PRICE_MODULE_MATERIEL_VEHICULES_ANNUEL",
+  "STRIPE_PRICE_MODULE_NOTES_FRAIS_MENSUEL",
+  "STRIPE_PRICE_MODULE_NOTES_FRAIS_ANNUEL",
+  "STRIPE_PRICE_MODULE_RENTABILITE_AVANCEE_MENSUEL",
+  "STRIPE_PRICE_MODULE_RENTABILITE_AVANCEE_ANNUEL",
+  "STRIPE_PRICE_IA_CREDITS_PACK_PONCTUEL",
+  "STRIPE_PRICE_IA_INTENSIVE_MENSUEL",
+  "STRIPE_PRICE_IA_INTENSIVE_ANNUEL",
+] as const;
+
+/**
+ * Tous les Price hors forfait de base et hors capacité que le serveur sait
+ * nommer : anciens paliers d'option IA, modules et IA de la génération courante.
+ */
+export function allowlistPrixHorsForfait(environnement: Record<string, string | undefined> = process.env): Set<string> {
+  const ids = allowlistPrixOptionIA(environnement);
+  for (const variable of VARIABLES_PRIX_MODULES_ET_IA) {
+    const valeur = environnement[variable];
+    if (valeur) ids.add(valeur);
+  }
+  return ids;
+}
+
+export function variablesStripeBillingManquantes(environnement: Record<string, string | undefined> = process.env) {
   const variables = [
     "STRIPE_SECRET_KEY",
     "STRIPE_WEBHOOK_ABONNEMENT_SECRET",
@@ -166,7 +230,7 @@ export function variablesStripeBillingManquantes(environnement: NodeJS.ProcessEn
   return variables.filter((nom) => !environnement[nom]);
 }
 
-export function stripeBillingEstConfigure(environnement: NodeJS.ProcessEnv = process.env) {
+export function stripeBillingEstConfigure(environnement: Record<string, string | undefined> = process.env) {
   return variablesStripeBillingManquantes(environnement).length === 0;
 }
 
