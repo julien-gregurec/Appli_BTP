@@ -100,7 +100,7 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
     ) : null;
 
   return (
-    <main className="p-4 sm:p-8">
+    <main className="ecran-mobile p-4 sm:p-8">
       <div className="mx-auto max-w-4xl space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

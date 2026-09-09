@@ -47,7 +47,7 @@ export default async function DocumentsChantierPage({
   const ajouter = ajouterDocumentChantierAction.bind(null, id);
 
   return (
-    <main className="p-8">
+    <main className="ecran-mobile p-8">
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>

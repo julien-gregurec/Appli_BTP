@@ -126,7 +126,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
   const message = `Planning ${ctx.entrepriseNom} — semaine du ${dateFr(debut, true)} au ${dateFr(fin, true)}\n\n${lignesPartage.length ? lignesPartage.join("\n") : "Aucune affectation planifiée."}`;
 
   return (
-    <main className="p-4 sm:p-8">
+    <main className="ecran-mobile p-4 sm:p-8">
       <div className="mx-auto max-w-[1500px] space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

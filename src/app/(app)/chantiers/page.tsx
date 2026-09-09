@@ -3,6 +3,8 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { CHANTIER_STATUTS, statutChantier, nomClient } from "@/lib/chantier-statuts";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { Lien as Link } from "@/components/Lien";
+import { BarreActionMobile } from "@/components/mobile/BarreActionMobile";
+import { EtatEcran } from "@/components/mobile/EtatEcran";
 
 const TAILLE_PAGE = 25;
 
@@ -40,7 +42,7 @@ export default async function ChantiersPage({ searchParams }: { searchParams: Pr
   };
 
   return (
-    <main className="p-8">
+    <main className="ecran-mobile p-8">
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="flex items-center justify-between">
           <div>
@@ -63,9 +65,12 @@ export default async function ChantiersPage({ searchParams }: { searchParams: Pr
         </form>
 
         {chantiersFiltres.length === 0 ? (
-          <div className="rounded-md border border-dashed border-neutral-300 p-8 text-center text-sm text-neutral-500 dark:border-neutral-700">
-            {total === 0 && !q && !statut ? "Aucun chantier pour l’instant." : "Aucun chantier ne correspond aux filtres."}
-          </div>
+          <EtatEcran
+            nature="vide"
+            titre={total === 0 && !q && !statut ? "Aucun chantier pour l’instant." : "Aucun chantier ne correspond aux filtres."}
+            detail={total === 0 && !q && !statut ? undefined : "Modifiez la recherche ou le statut, ou réinitialisez les filtres."}
+            action={(q || statut) ? <Link href="/chantiers" className="rounded-md border px-4 py-2 text-sm font-medium">Réinitialiser les filtres</Link> : undefined}
+          />
         ) : (
           <>
           <div className="grid gap-3 md:hidden">
@@ -148,6 +153,13 @@ export default async function ChantiersPage({ searchParams }: { searchParams: Pr
           </div>
         )}
       </div>
+      {peutGerer && (
+        <BarreActionMobile>
+          <Link href="/chantiers/nouveau" className="rounded-md bg-neutral-900 px-4 text-sm font-semibold text-white dark:bg-white dark:text-neutral-900">
+            + Nouveau chantier
+          </Link>
+        </BarreActionMobile>
+      )}
     </main>
   );
 }

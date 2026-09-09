@@ -39,7 +39,7 @@ export default async function ComptesRendusChantierPage({ params, searchParams }
   }
 
   return (
-    <main className="p-8">
+    <main className="ecran-mobile p-8">
       <div className="mx-auto max-w-3xl space-y-6">
         <div>
           <Link href={`/chantiers/${id}`} className="text-sm text-neutral-500 hover:underline">← {chantier.nom}</Link>

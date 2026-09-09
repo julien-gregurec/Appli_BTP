@@ -56,7 +56,7 @@ export default async function PointagePage({searchParams}:{searchParams:Promise<
   const totalSup=pointages.reduce((s,p)=>s+Number(p.heures_supplementaires),0);
   const maSessionOuverte=ouvertes[0];
 
-  return <main className="p-4 sm:p-8"><div className="mx-auto max-w-5xl space-y-6">
+  return <main className="ecran-mobile p-4 sm:p-8"><div className="mx-auto max-w-5xl space-y-6">
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div><h1 className="text-xl font-semibold">Mon pointage</h1><p className="text-sm text-neutral-500">Je pointe uniquement mon arrivée et mon départ, avec la date, l’heure serveur et ma position GPS.</p></div>
       <div className="flex flex-wrap items-center gap-2">

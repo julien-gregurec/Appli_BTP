@@ -279,7 +279,7 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <main className="p-8">
+    <main className="ecran-mobile p-8">
       <div className="mx-auto max-w-6xl space-y-6">
         {peutVoirBriefing ? (
           <BriefingMatin prenom={prenomAffiche} lignes={lignesBriefing} peutUtiliserIA={iaEstActive() && aAccesIA(permissions)} />
@@ -344,7 +344,7 @@ export default async function DashboardPage() {
 
         {voir.planning && <DashboardWidget id="planning"><section className="rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
           <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-semibold">Prochaines affectations</h2><Link href="/planning" className="text-xs text-neutral-500 hover:underline">Ouvrir le planning</Link></div>
-          {affectations?.length ? <div className="grid grid-cols-3 gap-2">{affectations.map((affectation) => { const chantier = un(affectation.chantier); const employe = un(affectation.employe); return <div key={affectation.id} className="rounded-md bg-neutral-50 p-3 text-sm dark:bg-neutral-900"><div className="text-xs text-neutral-500">{new Date(`${affectation.date}T00:00:00`).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })} · {Number(affectation.heures)} h</div><div className="mt-1 font-medium">{employe ? `${employe.prenom} ${employe.nom}` : "—"}</div><div className="text-xs text-neutral-500">{chantier?.nom ?? "—"}{affectation.tache ? ` · ${affectation.tache}` : ""}</div></div>; })}</div> : <p className="text-sm text-neutral-500">Aucune affectation à venir.</p>}
+          {affectations?.length ? <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{affectations.map((affectation) => { const chantier = un(affectation.chantier); const employe = un(affectation.employe); return <div key={affectation.id} className="rounded-md bg-neutral-50 p-3 text-sm dark:bg-neutral-900"><div className="text-xs text-neutral-500">{new Date(`${affectation.date}T00:00:00`).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })} · {Number(affectation.heures)} h</div><div className="mt-1 font-medium">{employe ? `${employe.prenom} ${employe.nom}` : "—"}</div><div className="text-xs text-neutral-500">{chantier?.nom ?? "—"}{affectation.tache ? ` · ${affectation.tache}` : ""}</div></div>; })}</div> : <p className="text-sm text-neutral-500">Aucune affectation à venir.</p>}
         </section></DashboardWidget>}
       </div>
     </main>

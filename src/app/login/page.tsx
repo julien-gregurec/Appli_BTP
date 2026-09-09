@@ -6,6 +6,7 @@ import { PiedLegal } from "@/components/PiedLegal";
 import { BrandWordmark } from "@/components/BrandWordmark";
 import { ChampMotDePasse } from "@/components/ChampMotDePasse";
 import { PRODUCT_NAME } from "@/lib/brand";
+import { PurgeLocaleAuLogin } from "@/components/mobile/PurgeLocaleAuLogin";
 
 export default async function LoginPage({
   searchParams,
@@ -20,6 +21,7 @@ export default async function LoginPage({
 
   return (
     <main className="flex flex-1 items-center justify-center p-6">
+      <PurgeLocaleAuLogin />
       <div className="w-full max-w-sm space-y-6">
         <div className="flex flex-col items-center gap-3 text-center">
           <BrandWordmark className="text-2xl text-[#0d1b2a] dark:text-white" />

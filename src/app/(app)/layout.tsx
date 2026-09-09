@@ -47,34 +47,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="app-shell flex min-h-full flex-1">
       <AppPresenceTracker actif={!isEmailLoginDisabled()} />
-      <style>{`@media (max-width:767px){
-        /* Le header mobile est fixe (h-16) : on décale le contenu dessous + zone sûre iOS,
-           sinon le titre ET les liens « ← Retour » passent cachés sous la barre. */
-        .app-shell>header{padding-top:env(safe-area-inset-top)!important;height:auto!important;min-height:4rem}
-        .app-shell main{width:100%;min-width:0;padding:calc(4rem + env(safe-area-inset-top) + 0.5rem) 1rem calc(1rem + env(safe-area-inset-bottom))!important}
-        .app-shell main>div{width:100%;min-width:0}
-        .app-shell main [class*="grid-cols-"]{grid-template-columns:minmax(0,1fr)!important}
-        .app-shell main [class*="col-span-"]{grid-column:auto!important}
-        .app-shell main .flex{flex-wrap:wrap}
-        .app-shell main form.flex{align-items:stretch}
-        .app-shell main form.flex>:is(input,select,textarea,label){min-width:0;width:100%}
-        .app-shell main :is(input,select,textarea,button){max-width:100%}
-        .app-shell main :is(button,a.rounded-md){min-height:42px}
-        .app-shell main table{min-width:680px}
-        .app-shell main :is(.overflow-hidden,.overflow-x-hidden):has(>table){overflow-x:auto!important;-webkit-overflow-scrolling:touch}
-        .app-shell main article{min-width:0}
-        .app-shell main h1{font-size:1.35rem;line-height:1.25}
-        .app-shell main h2{line-height:1.3}
-        .app-shell main .fixed[role="dialog"]>div{max-height:calc(100dvh - 2rem);overflow-y:auto;padding:1rem}
-      }`}</style>
-      <style>{`
-        .lecture-seule main form:not([method="get"]),
-        .lecture-seule main a[href$="/nouveau"],
-        .lecture-seule main a[href*="/modifier"],
-        .lecture-seule main button[type="button"]{display:none!important}
-        .lecture-seule main form[method="get"]{display:flex!important}
-        .lecture-seule main form[method="get"] button{display:inline-flex!important}
-      `}</style>
       <Sidebar entrepriseNom={ctx.entrepriseNom} logoUrl={ctx.logoUrl} authDisabled={isEmailLoginDisabled()} permissions={permissions} plateformeAdmin={plateformeAdmin} boutiqueActive={boutiqueEstActive()} activeFeatures={activeFeatures} applications={applications} />
       <div className="min-w-0 flex-1">
         {ctx.accesSupportPlateforme&&<SupportAccessBanner entrepriseNom={ctx.entrepriseNom} bandeau={bandeauAssistance}/>}

@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { logoutAction } from "@/app/actions/auth";
+import { BoutonDeconnexion } from "@/components/mobile/BoutonDeconnexion";
 import { PwaInstallButton } from "@/components/PwaInstallButton";
 import { NAVIGATION_APPLICATION, NAVIGATION_GROUPES, navigationAutorisee } from "@/lib/navigation";
 import { Lien as Link } from "@/components/Lien";
@@ -119,14 +119,7 @@ export function Sidebar({
       <PwaInstallButton />
       {!authDisabled && (
         <div className="border-t border-white/10 p-2">
-          <form action={logoutAction}>
-            <button
-              type="submit"
-              className="w-full rounded-md px-3 py-2 text-left text-sm text-white/60 hover:bg-white/10 hover:text-white"
-            >
-              {compteDepot?"Déconnecter le compte dépôt":"Se déconnecter"}
-            </button>
-          </form>
+          <BoutonDeconnexion libelle={compteDepot?"Déconnecter le compte dépôt":"Se déconnecter"} />
         </div>
       )}
     </aside>

@@ -21,7 +21,7 @@ export default async function NotesFraisPage({ searchParams }: { searchParams: P
   const peutExporter = permissions?.includes("exporter_notes_frais") ?? false;
   const peutAdministrer = permissions?.includes("administrer_archivage_notes_frais") ?? false;
   const peutGererEquipe = permissions === null || permissions.includes("gerer_notes_frais") || permissions.includes("verifier_notes_frais") || permissions.includes("comptabiliser_notes_frais");
-  if (prototype) return <main className="p-8"><div className="mx-auto max-w-4xl space-y-4"><h1 className="text-xl font-semibold">Notes de frais et justificatifs</h1><p className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"><strong>Compte utilisateur individuel requis.</strong><br />Les justificatifs personnels nécessitent une identité individuelle et ne sont pas disponibles depuis un accès partagé.</p></div></main>;
+  if (prototype) return <main className="ecran-mobile p-8"><div className="mx-auto max-w-4xl space-y-4"><h1 className="text-xl font-semibold">Notes de frais et justificatifs</h1><p className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"><strong>Compte utilisateur individuel requis.</strong><br />Les justificatifs personnels nécessitent une identité individuelle et ne sont pas disponibles depuis un accès partagé.</p></div></main>;
 
   const [{ data: employe }, { data: categories }, { data: chantiers }, { data: grandsDeplacements }] = await Promise.all([
     supabase.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("utilisateur_id", ctx.userId).maybeSingle(),
@@ -41,7 +41,7 @@ export default async function NotesFraisPage({ searchParams }: { searchParams: P
   const aVerifier = new Set(["soumis","en_verification","correction_demandee"]);
   const groupes = Array.from(liste.reduce((map,note)=>{const emp=un(note.employe as {id:string;prenom:string;nom:string}|{id:string;prenom:string;nom:string}[]|null);const cle=emp?.id??"sans-employe";const groupe=map.get(cle)??{id:cle,nom:emp?`${emp.prenom} ${emp.nom}`:"Employé non relié",notes:[] as typeof liste,total:0,aVerifier:0};groupe.notes.push(note);groupe.total+=Number(note.montant_ttc);if(aVerifier.has(note.statut))groupe.aVerifier++;map.set(cle,groupe);return map;},new Map<string,{id:string;nom:string;notes:typeof liste;total:number;aVerifier:number}>()).values());
 
-  return <main className="p-8"><div className="mx-auto max-w-6xl space-y-6">
+  return <main className="ecran-mobile p-8"><div className="mx-auto max-w-6xl space-y-6">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-xl font-semibold">Notes de frais et justificatifs</h1><p className="text-sm text-neutral-500">Création personnelle, validation, intégrité et transmission comptable.</p></div><div className="flex gap-2">{peutExporter && <Link href="/notes-frais/exports" className="rounded-md border px-3 py-2 text-sm font-medium">Exports comptables</Link>}{peutAdministrer && <Link href="/parametres/notes-frais" className="rounded-md border px-3 py-2 text-sm font-medium">Paramètres d’archivage</Link>}</div></div>
     {filtres.error && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{filtres.error}</p>}
     {!employe && <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">Votre compte doit être lié à une fiche employé active pour créer une dépense.</p>}

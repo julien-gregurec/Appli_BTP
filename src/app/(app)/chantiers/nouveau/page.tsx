@@ -33,7 +33,7 @@ export default async function NouveauChantierPage({
   const aucunClient = !clients || clients.length === 0;
 
   return (
-    <main className="p-8">
+    <main className="ecran-mobile p-8">
       <div className="mx-auto max-w-2xl space-y-6">
         <div>
           <Link href="/chantiers" className="text-sm text-neutral-500 hover:underline">← Chantiers</Link>
@@ -89,7 +89,7 @@ export default async function NouveauChantierPage({
               <input id="adresse" name="adresse" className={inputClass} />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-1">
                 <label className={labelClass} htmlFor="code_postal">Code postal</label>
                 <input id="code_postal" name="code_postal" className={inputClass} />
