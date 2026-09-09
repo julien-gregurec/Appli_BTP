@@ -4,6 +4,7 @@ import {
   CODE_ACCES_COLORS_ABSENT,
   CODE_DECONNEXION,
   CODE_IDENTIFIANTS_INVALIDES,
+  CODE_SERVICE_INDISPONIBLE,
   messageConfirmationConnexion,
   messageErreurConnexion,
 } from "@/lib/messages-auth";
@@ -37,5 +38,18 @@ describe("messages de l’écran de connexion", () => {
   it("ne croise pas erreurs et confirmations", () => {
     expect(messageConfirmationConnexion(CODE_IDENTIFIANTS_INVALIDES)).toBeNull();
     expect(messageErreurConnexion(CODE_DECONNEXION)).toBeNull();
+  });
+});
+
+describe("une panne d'authentification n'est pas un mot de passe faux", () => {
+  it("le code de service indisponible a son propre libellé, qui disculpe l'utilisateur", () => {
+    const libelle = messageErreurConnexion(CODE_SERVICE_INDISPONIBLE);
+    expect(libelle).toMatch(/ne répond pas/);
+    expect(libelle).toMatch(/vos identifiants ne sont pas en cause/);
+  });
+
+  it("il reste distinct du refus d'identifiants", () => {
+    expect(messageErreurConnexion(CODE_SERVICE_INDISPONIBLE))
+      .not.toBe(messageErreurConnexion(CODE_IDENTIFIANTS_INVALIDES));
   });
 });

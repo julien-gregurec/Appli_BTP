@@ -20,6 +20,7 @@ import {
   CODE_MOT_DE_PASSE_REFUSE,
   CODE_MOT_DE_PASSE_TROP_COURT,
   CODE_MOTS_DE_PASSE_DIFFERENTS,
+  CODE_SERVICE_INDISPONIBLE,
   CODE_RESET_INDISPONIBLE,
   LONGUEUR_MINIMALE_MOT_DE_PASSE,
 } from "@/lib/messages-auth";
@@ -39,7 +40,23 @@ export async function connexionAction(formData: FormData) {
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) redirect(`/login?error=${CODE_IDENTIFIANTS_INVALIDES}`);
+  if (error) {
+    /*
+     * Une panne du service d'authentification n'est pas un mot de passe faux.
+     * Constaté pendant la recette : sous saturation, GoTrue répond 504 et cette
+     * garde annonçait « Identifiants incorrects ». Quelqu'un qui lit cela
+     * pendant une indisponibilité change son mot de passe pour rien, et le
+     * support cherche du côté du compte au lieu du service.
+     *
+     * `AuthRetryableFetchError` couvre l'injoignable et les 5xx ; un `status`
+     * de 500 ou plus couvre le reste. Tout le reste — 400, identifiants
+     * réellement refusés — garde le message d'origine, qui est le bon.
+     */
+    const panne = error.name === "AuthRetryableFetchError"
+      || (typeof error.status === "number" && error.status >= 500);
+    if (panne) journaliserEchecTechnique("connexion.service", error);
+    redirect(`/login?error=${panne ? CODE_SERVICE_INDISPONIBLE : CODE_IDENTIFIANTS_INVALIDES}`);
+  }
 
   const { data: contexte, error: erreurContexte } = await supabase
     .rpc("contexte_application_courant")
