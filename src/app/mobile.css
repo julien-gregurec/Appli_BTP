@@ -26,6 +26,26 @@
    rattraper, ce fichier disparaît. */
 
 @media (max-width: 767px) {
+  /* ── Règles valables sur TOUTE page, shell authentifié ou non ──────────────
+     Ces deux règles étaient d'abord portées par `.app-shell`. La MESURE au
+     navigateur a montré l'erreur : /login, /signup, /mfa, /mot-de-passe-oublie et
+     /nouveau-mot-de-passe vivent HORS du shell — ils n'en recevaient donc aucune.
+     C'est précisément l'écran de connexion, c'est-à-dire le premier que voit un
+     salarié sur son téléphone, qui était le moins bien traité. */
+
+  /* Un champ sous 16 px déclenche le zoom automatique de Safari iOS : la page
+     saute à la mise au point, l'utilisateur perd son repère et doit dézoomer à la
+     main. Mesuré à 14 px sur le formulaire de connexion. */
+  :is(input, select, textarea) { font-size: max(16px, 1em); }
+
+  /* Zone tactile : 44 px est le seuil recommandé par Apple ET par Android. La
+     valeur précédente, 42 px, passait juste en dessous des deux.
+     Portée aux COMMANDES seulement — boutons et liens présentés comme des
+     boutons. Un lien de texte en ligne (« CGV » dans un pied de page) n'est pas
+     une commande : lui imposer 44 px de haut étirerait le pied de page sans
+     rendre le lien plus facile à toucher. */
+  :is(button, [role="button"], a.rounded-md, a.rounded-lg) { min-height: 44px; }
+
   /* Le header mobile est fixe : on décale le contenu dessous, zone sûre iOS comprise,
      sinon le titre et les liens « ← Retour » passent sous la barre. */
   .app-shell > header {
@@ -46,14 +66,6 @@
   .app-shell main article { min-width: 0; }
   .app-shell main h1 { font-size: 1.35rem; line-height: 1.25; }
   .app-shell main h2 { line-height: 1.3; }
-
-  /* Zone tactile : 44 px est le seuil recommandé par Apple ET par Android.
-     La valeur précédente, 42 px, passait juste en dessous des deux. */
-  .app-shell main :is(button, a.rounded-md, [role="button"]) { min-height: 44px; }
-
-  /* Un champ de saisie sous 16 px déclenche le zoom automatique de Safari iOS :
-     la page saute, l'utilisateur perd son repère et doit dézoomer à la main. */
-  .app-shell :is(input, select, textarea) { font-size: max(16px, 1em); }
 
   .app-shell main :is(input, select, textarea, button) { max-width: 100%; }
 
@@ -106,9 +118,11 @@
     grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr));
   }
 
-  /* Le doigt reste le moyen de pointage : on garde le seuil tactile. */
-  .app-shell main :is(button, a.rounded-md, [role="button"]) { min-height: 44px; }
-  .app-shell :is(input, select, textarea) { font-size: max(16px, 1em); }
+  /* Le doigt reste le moyen de pointage sur une tablette : on garde le seuil
+     tactile et la taille de champ, hors du shell comme dedans — la connexion se
+     fait aussi sur iPad. */
+  :is(button, [role="button"], a.rounded-md, a.rounded-lg) { min-height: 44px; }
+  :is(input, select, textarea) { font-size: max(16px, 1em); }
 }
 
 /* Mode lecture seule (support plateforme) — inchangé, déplacé ici avec le reste. */

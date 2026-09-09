@@ -19,7 +19,12 @@ export default function OfflinePage() {
       <div className="space-y-2">
         <h1 className="text-xl font-semibold">Vous êtes hors ligne</h1>
         <p className="max-w-sm text-sm text-white/70">
-          {PRODUCT_NAME} a besoin d&apos;une connexion Internet pour afficher vos données.
+          {/* Espace explicite : mesuré au navigateur, la page rendait « Gestion Proa besoin ».
+              Quand une interpolation OUVRE une ligne JSX, l'espace qui la suit peut être
+              absorbé au découpage des enfants ; l'écrire en clair le rend insensible à la
+              mise en forme du source. */}
+          {PRODUCT_NAME}{" "}
+          a besoin d&apos;une connexion Internet pour afficher vos données.
           Vérifiez votre réseau, puis réessayez.
         </p>
       </div>

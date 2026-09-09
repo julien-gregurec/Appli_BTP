@@ -1,9 +1,17 @@
 export const MARQUE = "ELSATIA";
 export const NOM_APPLICATION = "ELSATIA Gestion Pro";
-// Nom affiché SOUS l'icône de l'écran d'accueil. iOS et Android le tronquent autour de
-// 12 caractères : « ELSATIA Gestion Pro » y devenait « ELSATIA Ges… », qui ne distingue
-// plus Gestion Pro des autres applications ELSATIA installées sur le même téléphone.
-export const NOM_COURT_PWA = "Gestion Pro";
+// Nom affiché SOUS l'icône de l'écran d'accueil.
+//
+// CONSTAT REMONTÉ, DÉCISION NON PRISE (lot ELSATIA-GP-MOBILE-APPLICATION-FOUNDATION-V1) :
+// iOS et Android tronquent ce libellé autour de 12 caractères. « ELSATIA Gestion Pro »
+// s'affiche donc « ELSATIA Ges… », qui ne distingue plus Gestion Pro des autres
+// applications ELSATIA installées sur le même téléphone.
+//
+// La valeur officielle est CONSERVÉE : le nommage de la marque relève d'un arbitrage
+// commercial, pas d'une correction technique — d'autant que `brand.test.ts` et
+// `brand-visible.test.ts` verrouillent explicitement « les noms officiels ». Les options
+// (« Gestion Pro », « ELSATIA GP », statu quo) sont exposées dans le rapport du lot.
+export const NOM_COURT_PWA = "ELSATIA Gestion Pro";
 export const DESCRIPTION_APPLICATION = "ELSATIA Gestion Pro — La gestion BTP simplifiée";
 export const URL_CONTACT_COMMERCIAL = "https://elsatia.fr/contact";
 export const BRAND_NAME = MARQUE;

@@ -18,6 +18,16 @@
         "PATH=\"$HOME/.nvm/versions/node/v24.18.0/bin:$PATH\" npm --prefix apps/reserves run dev -- --webpack"
       ],
       "port": 3020
+    },
+    {
+      "_note": "Recette mobile du lot ELSATIA-GP-MOBILE-APPLICATION-FOUNDATION-V1. Les valeurs Supabase sont des REMPLISSAGES : elles suffisent aux pages publiques (connexion, hors ligne, manifeste, service worker) et pas aux pages authentifiees. Voir docs/mobile/ELSATIA_GP_MOBILE_TESTS_PHASE_H_V1.md, section 8, pour la recette complete avec le decor E2E.",
+      "name": "gp-mobile-foundation-recette",
+      "runtimeExecutable": "/bin/bash",
+      "runtimeArgs": [
+        "-lc",
+        "cd /Volumes/ELSATIA-DEV/ELSATIA-WORKTREES/gp-mobile-foundation-v1 && export NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:59998 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=recette-locale-sans-authentification SUPABASE_SERVICE_ROLE_KEY=recette-locale RATE_LIMIT_HMAC_KEY=recette-locale-au-moins-32-octets-de-remplissage NEXT_PUBLIC_APP_URL=http://127.0.0.1:3190 && PATH=\"$HOME/.nvm/versions/node/v24.18.0/bin:$PATH\" npx next start -p 3190"
+      ],
+      "port": 3190
     }
   ]
 }

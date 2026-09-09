@@ -22,6 +22,15 @@ describe("association d'application", () => {
     expect(matcher).toContain(".well-known/");
   });
 
+  it("laisse le service worker hors du proxy d'authentification", () => {
+    // Constaté à la MESURE, pas déduit : /sw.js répondait 307 vers /login. Un service
+    // worker qui reçoit une page HTML au lieu de son script ne s'enregistre pas, et
+    // l'échec est silencieux — `register()` est entouré d'un `.catch()`. L'application
+    // perdait son hors-ligne sans le dire dès que la session manquait.
+    const matcher = PROXY.slice(PROXY.indexOf("matcher:"));
+    expect(matcher).toContain("sw.js");
+  });
+
   it("expose des gabarits valides en JSON", () => {
     // Un fichier mal formé est mis en cache par Apple aussi sûrement qu'un fichier correct.
     expect(() => JSON.parse(AASA)).not.toThrow();
