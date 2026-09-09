@@ -26,6 +26,17 @@
 import { distanceLab, ralLePlusProche, type ReferenceRal } from "@/lib/ral";
 import type { EtatNuancier, ReferenceNuancier } from "@/lib/nuancier/contrat";
 
+/**
+ * Version du moteur de proximité.
+ *
+ * Une proposition n'est interprétable que si l'on sait comment elle a été
+ * calculée. `1.0` désigne : conversion sRGB → L*a*b* (illuminant D65, blanc de
+ * référence 2°) puis ΔE*ab CIE76, sur la totalité du nuancier chargé. Toute
+ * modification de la formule ou des seuils incrémente ce numéro — deux exports
+ * portant des versions différentes ne se comparent pas ligne à ligne.
+ */
+export const VERSION_MOTEUR_CORRESPONDANCE = "1.0";
+
 export type NiveauEcart = "imperceptible" | "faible" | "visible" | "net" | "eloigne";
 
 export const LIBELLES_ECART: Record<NiveauEcart, string> = {
@@ -59,6 +70,8 @@ export type PropositionNuancier = {
   /** Provenance citable de la référence proposée. */
   source: string;
   version: string;
+  /** Version du moteur ayant produit l'écart. Voir `VERSION_MOTEUR_CORRESPONDANCE`. */
+  moteur: string;
 };
 
 export type AbsenceProposition = {
@@ -99,6 +112,7 @@ export function proposerReference(hexDeclare: string | null | undefined, nuancie
     niveau: niveauEcart(proche.distance),
     source: nuancier.source,
     version: nuancier.version,
+    moteur: VERSION_MOTEUR_CORRESPONDANCE,
   };
 }
 
