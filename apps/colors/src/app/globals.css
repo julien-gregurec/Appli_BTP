@@ -333,3 +333,28 @@ a { color: inherit; text-decoration: none; }
   .onboarding-steps li { grid-template-columns: 34px 1fr; }
   .onboarding-steps li > .outline-button, .onboarding-steps li > .badge { grid-column: 1 / -1; width: 100%; text-align: center; }
 }
+
+/* Teinte, référence proposée et finition — trois faits tenus distincts. */
+.nuancier-panel { margin-top: 14px; }
+.nuancier-lignes { display: grid; gap: 12px; margin: 16px 0 0; }
+.nuancier-lignes > div { display: grid; grid-template-columns: 160px 1fr; align-items: baseline; gap: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.nuancier-lignes > div:first-child { padding-top: 0; border-top: 0; }
+.nuancier-lignes dt { color: var(--muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.nuancier-lignes dd { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin: 0; font-size: 13px; }
+.nuancier-pastille { display: inline-block; width: 22px; height: 22px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 7px; }
+.nuancier-nom { color: var(--muted); font-size: 12px; }
+.nuancier-inconnu { color: var(--muted); font-size: 12px; line-height: 1.55; }
+.nuancier-provenance { margin: 14px 0 0; color: var(--muted); font-size: 11px; }
+.nuancier-explication { color: #5f5561; font-size: 12px; line-height: 1.65; }
+.nuancier-explication code { padding: 2px 6px; border-radius: 6px; background: #f5eff5; font-size: 11px; }
+.nuancier-liste { display: grid; gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; }
+.nuancier-liste li { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; }
+.nuancier-liste li > div { display: grid; gap: 3px; min-width: 0; }
+.nuancier-liste strong { font-size: 12px; }
+.nuancier-liste small { color: var(--muted); font-size: 11px; }
+
+@media (max-width: 760px) {
+  .nuancier-lignes > div { grid-template-columns: 1fr; gap: 6px; }
+  .nuancier-liste li { grid-template-columns: 22px 1fr; }
+  .nuancier-liste li > .badge { grid-column: 1 / -1; }
+}
