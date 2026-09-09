@@ -1,5 +1,6 @@
 import { LIBELLES_ECART, type ResultatNuancier } from "@/lib/nuancier/correspondance";
-import type { FinitionSeau } from "@/lib/finition-colors";
+import { FINITIONS, LIBELLES_FINITION, type FinitionSeau } from "@/lib/finition-colors";
+import { confirmerReferenceNuancierAction, definirFinitionAction } from "@/app/actions-metier";
 
 const RAISONS: Record<Extract<ResultatNuancier, { statut: "sans_proposition" }>["raison"], string> = {
   teinte_non_declaree: "Aucune teinte n’est renseignée sur cette fiche : saisissez la valeur HEX relevée sur l’étiquette pour obtenir une proposition.",
@@ -7,15 +8,23 @@ const RAISONS: Record<Extract<ResultatNuancier, { statut: "sans_proposition" }>[
   nuancier_absent: "Aucun nuancier n’est chargé sur cette installation : aucune référence ne peut être proposée.",
 };
 
+export type ReferenceEnregistree = {
+  code: string | null;
+  distance: number | null;
+  confirmee: boolean;
+};
+
 /**
- * Encart « référence proposée » de la fiche seau.
+ * Encart « teinte, référence et finition » de la fiche seau.
  *
- * Quatre informations y sont tenues distinctes, parce que les confondre serait
- * précisément la faute à ne pas commettre :
+ * Cinq faits y sont tenus distincts, parce que les confondre serait exactement
+ * la faute à ne pas commettre :
  *
  *  - la **couleur déclarée** : ce que quelqu'un a saisi, et rien d'autre ;
- *  - la **référence proposée** : la plus proche du nuancier chargé, avec son
- *    écart chiffré et sa provenance citable ;
+ *  - la **référence proposée** : la plus proche du nuancier chargé, recalculée
+ *    à chaque affichage, avec son écart chiffré et sa provenance citable ;
+ *  - la **référence confirmée** : celle qu'une personne a explicitement retenue,
+ *    et la seule qui soit enregistrée en base ;
  *  - la **finition** : déclarée d'après l'étiquette, ou inconnue ;
  *  - l'**inconnu** : dit comme tel, jamais comblé par une valeur plausible.
  *
@@ -24,17 +33,23 @@ const RAISONS: Record<Extract<ResultatNuancier, { statut: "sans_proposition" }>[
  * déclaration dont elle part, et le texte le dit.
  */
 export function CorrespondanceNuancier({
+  seauId,
   hexDeclare,
   resultat,
   finition,
+  reference,
+  peutModifier,
 }: {
+  seauId: string;
   hexDeclare: string | null;
   resultat: ResultatNuancier;
   finition: FinitionSeau;
+  reference: ReferenceEnregistree;
+  peutModifier: boolean;
 }) {
   return (
     <article className="panel nuancier-panel">
-      <h2>Teinte et référence</h2>
+      <h2>Teinte, référence et finition</h2>
 
       <dl className="nuancier-lignes">
         <div>
@@ -52,11 +67,24 @@ export function CorrespondanceNuancier({
             {resultat.statut === "proposition"
               ? <>
                   <span className="nuancier-pastille" style={{ background: resultat.hex }} aria-hidden="true"/>
-                  <strong>{resultat.code}</strong>
+                  <strong data-test="reference-proposee">{resultat.code}</strong>
                   {resultat.nom && <span className="nuancier-nom">{resultat.nom}</span>}
                   <span className="badge">ΔE {resultat.distance.toFixed(2)} — {LIBELLES_ECART[resultat.niveau]}</span>
                 </>
-              : <span className="nuancier-inconnu">{RAISONS[resultat.raison]}</span>}
+              : <span className="nuancier-inconnu" data-test="sans-proposition">{RAISONS[resultat.raison]}</span>}
+          </dd>
+        </div>
+
+        <div>
+          <dt>Référence retenue</dt>
+          <dd>
+            {reference.code
+              ? <>
+                  <strong data-test="reference-confirmee">{reference.code}</strong>
+                  <span className="badge">{reference.confirmee ? "Confirmée par une personne" : "Enregistrée, non confirmée"}</span>
+                  {reference.distance !== null && <span className="nuancier-nom">ΔE {reference.distance.toFixed(2)}</span>}
+                </>
+              : <span className="nuancier-inconnu" data-test="sans-reference">Aucune référence n’a été retenue pour ce seau.</span>}
           </dd>
         </div>
 
@@ -64,11 +92,48 @@ export function CorrespondanceNuancier({
           <dt>Finition</dt>
           <dd>
             {finition.origine === "declaree"
-              ? <><strong>{finition.libelle}</strong><span className="badge">Déclarée</span></>
-              : <span className="nuancier-inconnu">{finition.libelle}</span>}
+              ? <><strong data-test="finition">{finition.libelle}</strong><span className="badge">Déclarée</span></>
+              : <span className="nuancier-inconnu" data-test="finition">{finition.libelle}</span>}
           </dd>
         </div>
       </dl>
+
+      {peutModifier && (
+        <div className="nuancier-actions">
+          {/*
+            La finition est un choix fermé : un champ libre inviterait à saisir
+            « mate satinée » ou « brillant léger », que rien ne saurait exploiter.
+          */}
+          <form action={definirFinitionAction.bind(null, seauId)} className="inline-form">
+            <label>
+              Déclarer la finition
+              <select name="finition" defaultValue={finition.valeur}>
+                {FINITIONS.map((valeur) => (
+                  <option key={valeur} value={valeur}>{LIBELLES_FINITION[valeur]}</option>
+                ))}
+              </select>
+            </label>
+            <button className="outline-button" data-test="enregistrer-finition">Enregistrer la finition</button>
+          </form>
+
+          {resultat.statut === "proposition" && !reference.confirmee && (
+            <form action={confirmerReferenceNuancierAction.bind(null, seauId)} className="inline-form">
+              <input type="hidden" name="reference" value={resultat.code}/>
+              <input type="hidden" name="distance" value={resultat.distance}/>
+              <button className="outline-button" data-test="confirmer-reference">
+                Retenir « {resultat.code} » pour ce seau
+              </button>
+            </form>
+          )}
+
+          {reference.code && (
+            <form action={confirmerReferenceNuancierAction.bind(null, seauId)} className="inline-form">
+              <input type="hidden" name="reference" value=""/>
+              <button className="outline-button" data-test="retirer-reference">Retirer la référence retenue</button>
+            </form>
+          )}
+        </div>
+      )}
 
       {resultat.statut === "proposition" && (
         <p className="nuancier-provenance">

@@ -1,3 +1,5 @@
+import type { FinitionColors } from "@/lib/finition-colors";
+
 export type EtatSeau = "ferme" | "ouvert" | "vide" | "archive";
 export type ModeQuantite = "pourcentage" | "volume" | "poids";
 export type UniteQuantite = "pourcent" | "l" | "ml" | "kg" | "g";
@@ -27,6 +29,8 @@ export type SeauColors = {
   ral_approxime: string | null;
   ral_distance: number | null;
   ral_confirme: boolean;
+  /** Finition déclarée d'après l'étiquette (V1.5). Jamais estimée depuis une photo. */
+  finition: FinitionColors;
   mode_quantite: ModeQuantite;
   quantite_nominale: number | null;
   quantite_restante: number | null;

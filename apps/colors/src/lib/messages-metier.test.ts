@@ -76,13 +76,36 @@ describe("actions métier — aucun détail base dans l’URL", () => {
     expect(redirections[0]).toBe("redirect(`${path}?${type}=${encodeURIComponent(code)}`)");
   });
 
-  it("route tout échec base vers echecBase()", () => {
-    // Chaque garde d’échec Supabase de la source doit passer par echecBase(),
-    // seul endroit où le message technique est journalisé puis remplacé.
-    const gardes = SOURCE_ACTIONS.split("\n").filter((ligne) =>
-      /^\s*if\((?:error|erreurDb)\b/.test(ligne),
-    );
-    expect(gardes.length).toBeGreaterThanOrEqual(8);
-    for (const garde of gardes) expect(garde).toContain("echecBase(");
+  it("route tout échec base vers echecBase() ou une journalisation explicite", () => {
+    // Chaque garde d'échec Supabase doit journaliser le message technique avant
+    // de le remplacer par un code. `echecBase()` fait les deux d'un coup ; une
+    // garde qui distingue plusieurs SQLSTATE — `confirmerReferenceNuancierAction`
+    // sépare CLR01 du reste — s'étale sur plusieurs lignes et doit alors
+    // journaliser elle-même. On inspecte donc le BLOC de la garde, pas sa
+    // première ligne : l'invariant porte sur ce que la garde fait, pas sur sa
+    // mise en forme.
+    const lignes = SOURCE_ACTIONS.split("\n");
+    const blocs: string[] = [];
+    lignes.forEach((ligne, index) => {
+      if (!/^\s*if\((?:error|erreurDb)\b/.test(ligne)) return;
+      // Une garde sur une seule ligne se suffit ; une garde ouvrante entraîne
+      // les lignes jusqu'à sa fermeture au même niveau d'indentation.
+      if (!ligne.trimEnd().endsWith("{")) { blocs.push(ligne); return; }
+      const indentation = ligne.match(/^\s*/)![0];
+      const bloc = [ligne];
+      for (let i = index + 1; i < lignes.length; i += 1) {
+        bloc.push(lignes[i]);
+        if (lignes[i] === `${indentation}}`) break;
+      }
+      blocs.push(bloc.join("\n"));
+    });
+
+    expect(blocs.length).toBeGreaterThanOrEqual(10);
+    for (const bloc of blocs) {
+      expect(bloc, bloc.slice(0, 80)).toMatch(/echecBase\(|journaliserEchecTechnique\(/);
+    }
+
+    // Et aucune garde ne doit laisser fuir le message technique vers l'URL.
+    for (const bloc of blocs) expect(bloc).not.toMatch(/retour\([^)]*error[^)]*\.message/);
   });
 });
