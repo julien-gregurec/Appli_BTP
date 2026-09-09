@@ -43,6 +43,7 @@ export async function proxy(request: NextRequest) {
     nonce,
     estDeveloppement: process.env.NODE_ENV === "development",
     urlSupabase: urlSupabaseConfiguree(),
+    urlColors: process.env.NEXT_PUBLIC_COLORS_URL,
   });
 
   // Next 16 lit le nonce sur l'en-tête `Content-Security-Policy` **de la

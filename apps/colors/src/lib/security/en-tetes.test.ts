@@ -4,6 +4,7 @@ import {
   ANTI_ENCADREMENT,
   POLITIQUE_PERMISSIONS,
   construireCspColors,
+  exigeSurclassementHttps,
   headersSecuriteColors,
   origineAutorisee,
 } from "@/lib/security/en-tetes";
@@ -181,5 +182,35 @@ describe("origineAutorisee", () => {
     expect(origineAutorisee("javascript:alert(1)", true)).toBeNull();
     expect(origineAutorisee("pas-une-url", true)).toBeNull();
     expect(origineAutorisee(undefined, true)).toBeNull();
+  });
+});
+
+describe("upgrade-insecure-requests — surclassement HTTPS", () => {
+  it("est émis sur une origine publique HTTPS", () => {
+    expect(exigeSurclassementHttps("https://colors.elsatia.fr", false)).toBe(true);
+    expect(construireCspColors({ nonce: "n", estDeveloppement: false, urlSupabase: undefined, urlColors: "https://colors.elsatia.fr" }))
+      .toContain("upgrade-insecure-requests");
+  });
+
+  it("n'est jamais émis en développement", () => {
+    expect(exigeSurclassementHttps("https://colors.elsatia.fr", true)).toBe(false);
+  });
+
+  it("n'est pas émis sur une origine servie en clair", () => {
+    // Mesure sous WebKit avant correction : chaque feuille de style et chaque
+    // fragment de script etait reclame en https sur une origine http, echouait
+    // sur une erreur TLS, et la page s'affichait sans style ni script. Chromium
+    // exempte 127.0.0.1 du surclassement, WebKit non.
+    expect(exigeSurclassementHttps("http://127.0.0.1:3031", false)).toBe(false);
+    expect(exigeSurclassementHttps("http://localhost:3010", false)).toBe(false);
+    expect(construireCspColors({ nonce: "n", estDeveloppement: false, urlSupabase: undefined, urlColors: "http://127.0.0.1:3031" }))
+      .not.toContain("upgrade-insecure-requests");
+  });
+
+  it("émet la directive quand l'origine est inconnue ou illisible : le défaut prudent", () => {
+    // Une origine absente est plus probablement un déploiement mal configuré
+    // qu'un poste local, et refuser le contenu mixte est alors le bon défaut.
+    expect(exigeSurclassementHttps(undefined, false)).toBe(true);
+    expect(exigeSurclassementHttps("pas une url", false)).toBe(true);
   });
 });
