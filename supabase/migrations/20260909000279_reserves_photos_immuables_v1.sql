@@ -40,7 +40,11 @@ create policy reserves_photos_jamais_reecrites on storage.objects
   using (bucket_id <> 'reserves-photos')
   with check (bucket_id <> 'reserves-photos');
 
-comment on policy reserves_photos_jamais_supprimables on storage.objects is
-  'Garantie produit Réserves : une photo déposée ne peut jamais être effacée depuis l''application. Policy restrictive, donc opposable à toute policy permissive ultérieure.';
+-- Pas de `comment on policy` ici, et c'est délibéré : commenter un objet exige d'en
+-- être PROPRIÉTAIRE, or `storage.objects` appartient à `supabase_storage_admin` sur une
+-- pile Supabase réelle. Créer une policy ne le demande pas — la commenter, si. Cette
+-- migration échouait donc sur une vraie pile tout en passant sur un conteneur PostgreSQL
+-- nu, où le prélude de recette crée la table sous un autre rôle. La justification vit
+-- dans l'en-tête de ce fichier, qui n'a pas ce défaut.
 
 commit;
