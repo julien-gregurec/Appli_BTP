@@ -1,6 +1,9 @@
 export const MARQUE = "ELSATIA";
 export const NOM_APPLICATION = "ELSATIA Gestion Pro";
-export const NOM_COURT_PWA = "ELSATIA Gestion Pro";
+// Nom affiché SOUS l'icône de l'écran d'accueil. iOS et Android le tronquent autour de
+// 12 caractères : « ELSATIA Gestion Pro » y devenait « ELSATIA Ges… », qui ne distingue
+// plus Gestion Pro des autres applications ELSATIA installées sur le même téléphone.
+export const NOM_COURT_PWA = "Gestion Pro";
 export const DESCRIPTION_APPLICATION = "ELSATIA Gestion Pro — La gestion BTP simplifiée";
 export const URL_CONTACT_COMMERCIAL = "https://elsatia.fr/contact";
 export const BRAND_NAME = MARQUE;

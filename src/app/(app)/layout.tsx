@@ -5,6 +5,7 @@ import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { estPlateformeAdmin } from "@/lib/plateforme";
 import { ModuleAccessBoundary } from "@/components/ModuleAccessBoundary";
 import { MobileBack } from "@/components/MobileBack";
+import { MiseAJourApplication } from "@/components/mobile/MiseAJourApplication";
 import { AideButton } from "@/components/AideButton";
 import { AssistantIA } from "@/components/AssistantIA";
 import { AppPresenceTracker } from "@/components/AppPresenceTracker";
@@ -56,6 +57,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <ModuleAccessBoundary permissions={permissions} activeFeatures={activeFeatures}>{children}</ModuleAccessBoundary>
       </div>
       <MobileBack />
+      <MiseAJourApplication />
       <AideButton />
       {iaEstActive() && aAccesIA(permissions) && <AssistantIA />}
     </div>

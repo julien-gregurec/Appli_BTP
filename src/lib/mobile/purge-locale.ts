@@ -50,9 +50,25 @@ export function purgerStockageCleValeur(stockage: StockageEnumerable): number {
   return effacees;
 }
 
+/**
+ * Demande au service worker de vider ses caches.
+ *
+ * Le message part sans attendre de réponse, et c'est voulu : la déconnexion se termine par
+ * une redirection, la page ne sera plus là pour recevoir un accusé. Le service worker, lui,
+ * survit à la navigation et achève sa purge (`event.waitUntil`) même une fois la page partie.
+ */
+function demanderPurgeDesCaches(): void {
+  try {
+    navigator.serviceWorker?.controller?.postMessage({ type: "PURGER_CACHES" });
+  } catch {
+    // Pas de service worker actif, ou API indisponible : il n'y a alors aucun cache à vider.
+  }
+}
+
 /** Purge complète côté navigateur. Sans effet — et sans erreur — hors navigateur. */
 export function purgerDonneesLocales(): void {
   if (typeof window === "undefined") return;
   try { purgerStockageCleValeur(window.localStorage); } catch { /* stockage refusé */ }
   try { purgerStockageCleValeur(window.sessionStorage); } catch { /* stockage refusé */ }
+  demanderPurgeDesCaches();
 }
