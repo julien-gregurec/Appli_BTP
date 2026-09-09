@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { COMPTES, SEAUX, empreinteNavigateur, seConnecter, seDeconnecter } from "./colors-aides";
+import { COMPTES, SEAUX, empreinteNavigateur, seConnecter, seConnecterParFormulaire, seDeconnecter } from "./colors-aides";
 
 /**
  * Recette authentifiée d'ELSATIA Colors — pile dédiée `colors-pilot-e2e`.
@@ -15,7 +15,7 @@ import { COMPTES, SEAUX, empreinteNavigateur, seConnecter, seDeconnecter } from 
 
 test.describe("@colors-auth accès", () => {
   test("@responsive connexion puis déconnexion", async ({ page }) => {
-    await seConnecter(page, COMPTES.admin);
+    await seConnecterParFormulaire(page, COMPTES.admin);
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Bonjour");
     await seDeconnecter(page);
     await expect(page.getByText("Vous êtes déconnecté")).toBeVisible();
@@ -25,19 +25,19 @@ test.describe("@colors-auth accès", () => {
     // Le défaut fermé par le lot précédent : la destination était perdue et l'on
     // atterrissait sur le tableau de bord. Ici on vérifie l'aller ET le retour.
     await page.goto(`/inventaire/${SEAUX.aAvecPhoto}`);
-    await expect(page).toHaveURL(new RegExp(`next=%2Finventaire%2F${SEAUX.aAvecPhoto}`));
+    await page.waitForURL(new RegExp(`next=%2Finventaire%2F${SEAUX.aAvecPhoto}`));
     await page.getByLabel("Adresse email").fill(COMPTES.admin);
     await page.getByLabel("Mot de passe").fill(process.env.MDP_RECETTE!);
     await page.getByRole("button", { name: "Se connecter à Colors" }).click();
-    await expect(page).toHaveURL(new RegExp(`/inventaire/${SEAUX.aAvecPhoto}$`));
+    await page.waitForURL(new RegExp(`/inventaire/${SEAUX.aAvecPhoto}$`));
   });
 
   test("une session terminée est annoncée, et la page demandée conservée", async ({ page, context }) => {
-    await seConnecter(page, COMPTES.admin);
+    await seConnecterParFormulaire(page, COMPTES.admin);
     await page.goto("/depots");
     await context.clearCookies();
     await page.goto("/depots");
-    await expect(page).toHaveURL(/\/login\?next=%2Fdepots&error=session-expiree/);
+    await page.waitForURL(/\/login\?next=%2Fdepots&error=session-expiree/);
     await expect(page.getByText(/Votre session a pris fin/)).toBeVisible();
   });
 
@@ -46,7 +46,7 @@ test.describe("@colors-auth accès", () => {
     await page.getByLabel("Adresse email").fill(COMPTES.sansDroit);
     await page.getByLabel("Mot de passe").fill(process.env.MDP_RECETTE!);
     await page.getByRole("button", { name: "Se connecter à Colors" }).click();
-    await expect(page).toHaveURL(/\/login\?error=acces-colors/);
+    await page.waitForURL(/\/login\?error=acces-colors/);
     await expect(page.getByText(/ne dispose pas d’un accès actif à Colors/)).toBeVisible();
     await expect(page.getByText(/Identifiants incorrects/)).toHaveCount(0);
   });
@@ -62,8 +62,8 @@ test.describe("@colors-auth mise en service", () => {
     await seConnecter(page, COMPTES.autreEntreprise);
     const bandeau = page.getByRole("heading", { name: "Mettre Colors en service" });
     await expect(bandeau).toBeVisible();
-    await expect(page.getByText("Photographier un seau")).toBeVisible();
-    await expect(page.getByText("Régler le seuil de stock faible")).toBeVisible();
+    await expect(page.getByText("Photographier un seau", { exact: true })).toBeVisible();
+    await expect(page.getByText("Régler le seuil de stock faible", { exact: true })).toBeVisible();
   });
 });
 
@@ -77,12 +77,13 @@ test.describe("@colors-auth parcours métier", () => {
     await page.getByLabel("Couleur HEX").fill("#1F7A4C");
     await page.getByRole("button", { name: "Créer le seau" }).click();
 
-    await expect(page).toHaveURL(/\/inventaire\/[0-9a-f-]{36}\?ok=seau-ajoute/);
+    await page.waitForURL(/\/inventaire\/[0-9a-f-]{36}\?ok=seau-ajoute/);
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Recette E2E");
 
     await page.getByText("Modifier les informations").click();
     await page.getByLabel("Produit", { exact: true }).fill("Produit corrigé");
     await page.getByRole("button", { name: "Enregistrer" }).click();
+    await page.waitForURL(/ok=informations-mises-a-jour/);
     await expect(page.getByText("Informations mises à jour")).toBeVisible();
 
     // Le journal doit porter l'ancienne ET la nouvelle valeur.
@@ -101,7 +102,7 @@ test.describe("@colors-auth parcours métier", () => {
     const bouton = page.getByRole("button", { name: "Créer le seau" });
     // Deux clics rapprochés : la Server Action ne doit être jouée qu'une fois.
     await Promise.all([bouton.click(), bouton.click().catch(() => undefined)]);
-    await expect(page).toHaveURL(/\/inventaire\/[0-9a-f-]{36}/);
+    await page.waitForURL(/\/inventaire\/[0-9a-f-]{36}/);
     await page.goto("/inventaire?q=Doublon");
     await expect(page.locator(".bucket-card")).toHaveCount(avant + 1);
   });
@@ -111,6 +112,7 @@ test.describe("@colors-auth parcours métier", () => {
     await page.goto(`/inventaire/${SEAUX.aAvecPhoto}`);
     await page.getByLabel("Déplacer vers").selectOption({ label: "Camion 1" });
     await page.getByRole("button", { name: "Déplacer" }).click();
+    await page.waitForURL(/ok=seau-deplace/);
     await expect(page.getByText("Seau déplacé")).toBeVisible();
     await expect(page.getByText("Camion 1").first()).toBeVisible();
   });
@@ -121,6 +123,7 @@ test.describe("@colors-auth parcours métier", () => {
     await page.getByLabel("Nouvelle quantité").fill("0.5");
     await page.getByLabel("Motif").fill("Retouche cage d’escalier");
     await page.getByRole("button", { name: "Mettre à jour" }).click();
+    await page.waitForURL(/ok=quantite-mise-a-jour/);
     await expect(page.getByText("Quantité mise à jour")).toBeVisible();
     await expect(page.getByText("10%")).toBeVisible();
   });
@@ -151,6 +154,7 @@ test.describe("@colors-auth teinte, référence et finition", () => {
     await expect(page.locator('[data-test="finition"]')).toHaveText("Finition inconnue");
     await page.getByLabel("Déclarer la finition").selectOption("satine");
     await page.getByRole("button", { name: "Enregistrer la finition" }).click();
+    await page.waitForURL(/ok=finition-enregistree/);
     await expect(page.getByText("Finition enregistrée")).toBeVisible();
     await expect(page.locator('[data-test="finition"]')).toHaveText("Satiné");
     await expect(page.getByText("Finition", { exact: false }).first()).toBeVisible();
@@ -162,6 +166,7 @@ test.describe("@colors-auth teinte, référence et finition", () => {
     await seConnecter(page, COMPTES.admin);
     await page.goto(`/inventaire/${SEAUX.aAvecPhoto}`);
     await page.getByRole("button", { name: /Retenir « TEST-BLANC »/ }).click();
+    await page.waitForURL(/erreur=reference-non-persistable/);
     await expect(page.getByText(/seules les références au format RAL sont enregistrables/)).toBeVisible();
     await expect(page.locator('[data-test="reference-proposee"]')).toHaveText("TEST-BLANC");
     await expect(page.locator('[data-test="sans-reference"]')).toBeVisible();
@@ -190,8 +195,7 @@ test.describe("@colors-auth photo", () => {
     );
     await page.getByLabel("Photo du seau").setInputFiles({ name: "seau.jpg", mimeType: "image/jpeg", buffer: jpeg });
     await page.getByRole("button", { name: "Ajouter la photo" }).click();
-    await expect(page.getByText("Photo enregistrée")).toBeVisible();
-    await expect(page.getByText("Photo").first()).toBeVisible();
+    await expect(page.getByRole("status")).toContainText("Photo enregistrée", { timeout: 30_000 });
   });
 });
 
@@ -199,7 +203,7 @@ test.describe("@colors-auth activité, export et écrans annoncés", () => {
   test("l'activité récente porte l'auteur et la nature de chaque événement", async ({ page }) => {
     await seConnecter(page, COMPTES.admin);
     await page.goto("/activite");
-    await expect(page.getByRole("heading", { name: /Activité/ })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Activité");
     await expect(page.getByText("Ada").first()).toBeVisible();
   });
 

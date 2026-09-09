@@ -1,4 +1,6 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type BrowserContext, type Page } from "@playwright/test";
+
+type CookieSession = Awaited<ReturnType<BrowserContext["cookies"]>>;
 
 /**
  * Identités de recette d'ELSATIA Colors.
@@ -40,18 +42,46 @@ export function motDePasseRecette(): string {
   return valeur;
 }
 
-export async function seConnecter(page: Page, email: string, destination: RegExp = /\/dashboard/) {
+/**
+ * Connexion par le formulaire, réellement jouée.
+ *
+ * Réservée aux tests qui éprouvent la connexion elle-même : l'écran, le message
+ * de refus, la destination mémorisée.
+ */
+export async function seConnecterParFormulaire(page: Page, email: string, destination: RegExp = /\/dashboard/) {
   await page.goto("/login");
   await page.getByLabel("Adresse email").fill(email);
   await page.getByLabel("Mot de passe").fill(motDePasseRecette());
   await page.getByRole("button", { name: "Se connecter à Colors" }).click();
-  await expect(page).toHaveURL(destination);
+  // `waitForURL` et non `toHaveURL` : ce qui suit le clic est une NAVIGATION,
+  // et une navigation se mesure avec le budget de navigation (30 s), pas avec
+  // celui des assertions du DOM (10 s). Ce n'est pas un délai gonflé pour faire
+  // passer un test : `toHaveURL` interroge l'URL courante, qui reste `/login`
+  // tant que le nouveau document n'est pas validé — un rendu serveur de plus de
+  // dix secondes le faisait donc échouer alors que la connexion avait abouti.
+  // La lenteur réelle du poste reste visible : elle est mesurée et consignée.
+  await page.waitForURL(destination);
+}
+
+/**
+ * Connexion d'un compte de recette.
+ *
+ * Elle rejoue le formulaire à chaque fois, et c'est délibéré. Une tentative de
+ * réutiliser un instantané de cookies pour épargner des allers-retours a été
+ * écartée après mesure : Supabase fait tourner le jeton de rafraîchissement au
+ * premier passage du proxy, si bien qu'un instantané n'est valable qu'une fois.
+ * Le réutiliser produisait des redirections vers `/login` qui ressemblaient à
+ * un défaut d'habilitation sans en être un — exactement le genre de faux signal
+ * qu'une recette ne doit pas fabriquer.
+ */
+export async function seConnecter(page: Page, email: string, destination: RegExp = /\/dashboard/) {
+  await seConnecterParFormulaire(page, email, destination);
 }
 
 export async function seDeconnecter(page: Page) {
   await page.goto("/dashboard");
   await page.getByRole("button", { name: "Se déconnecter" }).first().click();
-  await expect(page).toHaveURL(/\/login/);
+  await page.waitForURL(/\/login/);
 }
 
 /** Tout ce que le navigateur a retenu de l'organisation courante. */

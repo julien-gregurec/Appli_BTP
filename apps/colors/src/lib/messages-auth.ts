@@ -11,6 +11,8 @@ export const CODE_IDENTIFIANTS_INVALIDES = "identifiants";
 export const CODE_ACCES_COLORS_ABSENT = "acces-colors";
 export const CODE_DECONNEXION = "deconnexion";
 export const CODE_SESSION_EXPIREE = "session-expiree";
+/** Le service d'authentification n'a pas répondu. Ce n'est pas un mot de passe faux. */
+export const CODE_SERVICE_INDISPONIBLE = "service-indisponible";
 
 /** Réinitialisation de mot de passe. */
 export const CODE_EMAIL_REQUIS = "email-requis";
@@ -31,6 +33,10 @@ const ERREURS = new Map<string, string>([
   [
     CODE_SESSION_EXPIREE,
     "Votre session a pris fin. Connectez-vous pour reprendre où vous en étiez.",
+  ],
+  [
+    CODE_SERVICE_INDISPONIBLE,
+    "Le service d’authentification ELSATIA ne répond pas pour l’instant. Réessayez dans un instant : vos identifiants ne sont pas en cause.",
   ],
   [CODE_EMAIL_REQUIS, "Saisissez votre adresse email."],
   [
