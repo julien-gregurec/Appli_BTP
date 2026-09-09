@@ -67,7 +67,51 @@ export type OptionsCsp = {
   estDeveloppement: boolean;
   /** `NEXT_PUBLIC_SUPABASE_URL` : sert d'origine d'images (URL signées Storage). */
   urlSupabase: string | undefined;
+  /**
+   * Origine publique de l'application (`NEXT_PUBLIC_COLORS_URL`). Décide
+   * l'émission de `upgrade-insecure-requests` — voir `exigeSurclassementHttps`.
+   */
+  urlColors?: string | undefined;
 };
+
+/**
+ * Faut-il émettre `upgrade-insecure-requests` ?
+ *
+ * La directive force le navigateur à réécrire en `https:` toute sous-ressource
+ * `http:` de la page. Sur une origine déjà servie en HTTPS, elle ne coûte rien
+ * et ferme le contenu mixte. Sur une origine servie en clair, elle est
+ * destructrice — et pas de la même façon selon le navigateur :
+ *
+ *   - Chromium exempte `localhost` et `127.0.0.1` du surclassement ;
+ *   - WebKit ne les exempte pas.
+ *
+ * Résultat mesuré sur `next start` en clair, sous WebKit : chaque feuille de
+ * style et chaque fragment de script est réclamé en `https://127.0.0.1:3031`,
+ * échoue sur une erreur TLS, et la page s'affiche sans aucun style ni aucun
+ * script. Toute préversion ou recette servie en HTTP est donc entierement
+ * cassée sur Safari et sur iPhone, sans que rien ne le signale.
+ *
+ * La condition retenue n'est donc pas « ce n'est pas du développement » mais
+ * « l'origine publique de l'application est en HTTPS ». C'est le seul cas où la
+ * directive a quelque chose à surclasser. En Production
+ * (`https://colors.elsatia.fr`) elle reste émise, à l'identique.
+ *
+ * À défaut d'origine déclarée, la directive est émise : une origine inconnue est
+ * plus probablement un déploiement mal configuré qu'un poste local, et refuser
+ * le contenu mixte est le défaut prudent.
+ */
+export function exigeSurclassementHttps(
+  urlColors: string | undefined,
+  estDeveloppement: boolean,
+): boolean {
+  if (estDeveloppement) return false;
+  if (!urlColors) return true;
+  try {
+    return new URL(urlColors).protocol === "https:";
+  } catch {
+    return true;
+  }
+}
 
 /**
  * Construit la CSP de Colors.
@@ -102,7 +146,7 @@ export type OptionsCsp = {
  * - `worker-src 'self'` : `sw-colors.js` est servi par l'application elle-même.
  * - `frame-src 'none'` : Colors n'intègre aucune iframe (ni Stripe, ni carte).
  */
-export function construireCspColors({ nonce, estDeveloppement, urlSupabase }: OptionsCsp): string {
+export function construireCspColors({ nonce, estDeveloppement, urlSupabase, urlColors }: OptionsCsp): string {
   const supabase = origineAutorisee(urlSupabase, estDeveloppement);
 
   const scriptSrc = ["'self'", `'nonce-${nonce}'`, "'strict-dynamic'"];
@@ -128,7 +172,7 @@ export function construireCspColors({ nonce, estDeveloppement, urlSupabase }: Op
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
-    ...(estDeveloppement ? [] : ["upgrade-insecure-requests"]),
+    ...(exigeSurclassementHttps(urlColors, estDeveloppement) ? ["upgrade-insecure-requests"] : []),
   ].join("; ");
 }
 

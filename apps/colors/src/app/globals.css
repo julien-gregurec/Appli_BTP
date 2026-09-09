@@ -407,3 +407,22 @@ a { color: inherit; text-decoration: none; }
 /* Cibles tactiles — un chantier se visite avec des gants et une main occupée. */
 .filter-bar .check input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--aubergine); }
 .topbar .brand { min-height: 44px; padding: 3px 0; }
+
+/*
+ * Logotype sur fond aubergine.
+ *
+ * `--coral-texte` a ete assombri pour etre lisible sur les fonds clairs, ou il
+ * mesure 5,0 a 5,8:1. Sur le panneau d'illustration de la page de connexion, le
+ * fond est aubergine : le meme corail sombre y retombe a 2,19:1. Le corail de
+ * marque, lui, y mesure 5,22:1. Deux fonds, deux valeurs — decouvert par la
+ * recette E2E sur Chromium bureau, la mesure precedente ayant ete faite a
+ * 375 px, largeur ou ce panneau est masque.
+ */
+.public-art .brand-copy span { color: var(--coral); }
+
+/*
+ * Lien inline dans une phrase. WCAG 2.2 exempte ces liens de la taille de cible
+ * minimale, mais 16 px de haut restent inconfortables sur un telephone : une
+ * marge verticale porte la boite a 24 px sans rompre la phrase.
+ */
+.no-account a { display: inline-block; padding: 4px 0; }
