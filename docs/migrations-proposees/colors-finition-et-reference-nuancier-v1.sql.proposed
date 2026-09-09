@@ -1,0 +1,149 @@
+-- ELSATIA Colors — finition du produit et persistance de la référence proposée.
+--
+-- MIGRATION PROPOSÉE. Aucun numéro de ledger n'est réservé : ce fichier n'est
+-- pas dans supabase/migrations et ne sera appliqué qu'après arbitrage. Le code
+-- applicatif livré dans le lot COLORS-COMMERCIAL-READINESS-V1 fonctionne sans
+-- elle : la correspondance de nuancier y est calculée à l'affichage et n'est
+-- jamais écrite, et le modèle de finition y est complet mais non branché sur
+-- une écriture.
+--
+-- ## Pourquoi une migration est indispensable
+--
+-- `colors_valider_seau` (V1.4) refuse toute mutation de `colors_seaux` qui ne
+-- passe pas par une RPC métier appartenant à `postgres` :
+--
+--     if tg_op = 'UPDATE' then ... raise exception 'Utilisez une action métier
+--     Colors pour cette modification'; end if;
+--
+-- Aucune écriture de `finition`, `ral_approxime`, `ral_distance` ou
+-- `ral_confirme` n'est donc possible depuis l'application sans (a) une colonne
+-- pour la finition et (b) une RPC habilitée pour les deux. C'est exactement la
+-- garantie qui rend Colors auditable ; on ne la contourne pas.
+--
+-- ## Ce que la migration ajoute
+--
+--  1. `colors_seaux.finition` — valeur déclarée, jamais estimée. `indetermine`
+--     est la valeur par défaut et un état de plein droit : une photographie ne
+--     permet pas de conclure sur une finition, et rien dans ce schéma ne doit
+--     laisser croire le contraire. Aucune colonne « finition estimée » n'est
+--     prévue, délibérément.
+--
+--  2. `colors_definir_reference_nuancier` — écrit la référence proposée et son
+--     écart, ou les efface. `ral_confirme` ne peut passer à vrai que par un
+--     geste humain explicite : c'est le seul point du modèle où une proposition
+--     devient une donnée assumée par l'organisation.
+--
+--     La contrainte existante `ral_approxime ~ '^RAL [0-9]{4}$'` est conservée
+--     telle quelle. Elle a une conséquence assumée : seules des références au
+--     format RAL peuvent être persistées. Une référence fabricant reste
+--     affichable comme proposition, sans être écrite. Élargir la contrainte
+--     serait un autre arbitrage, à instruire séparément.
+--
+--  3. Le journal `colors_mouvements` reçoit ces changements comme les autres,
+--     par `colors_diff_seau` : une finition corrigée et une référence confirmée
+--     laissent une trace nominative, au même titre qu'un déplacement.
+
+begin;
+
+alter table public.colors_seaux
+  add column finition text not null default 'indetermine'
+    check (finition in ('mat','satine','brillant','texture','indetermine'));
+
+comment on column public.colors_seaux.finition is
+  'Finition déclarée d''après l''étiquette. Jamais estimée depuis une photographie.';
+
+-- La finition entre dans le diff journalisé au même titre que la teinte.
+create or replace function public.colors_diff_seau(avant public.colors_seaux, apres public.colors_seaux)
+returns jsonb language plpgsql stable set search_path = public as $$
+declare v_diff jsonb := '[]'::jsonb;
+begin
+  v_diff := public.colors_diff_seau_base(avant, apres);
+  if apres.finition is distinct from avant.finition then
+    v_diff := v_diff || jsonb_build_array(jsonb_build_object(
+      'champ','finition','avant',avant.finition,'apres',apres.finition));
+  end if;
+  if apres.ral_approxime is distinct from avant.ral_approxime then
+    v_diff := v_diff || jsonb_build_array(jsonb_build_object(
+      'champ','reference_nuancier','avant',avant.ral_approxime,'apres',apres.ral_approxime));
+  end if;
+  if apres.ral_confirme is distinct from avant.ral_confirme then
+    v_diff := v_diff || jsonb_build_array(jsonb_build_object(
+      'champ','reference_confirmee',
+      'avant',case when avant.ral_confirme then 'oui' else 'non' end,
+      'apres',case when apres.ral_confirme then 'oui' else 'non' end));
+  end if;
+  return v_diff;
+end; $$;
+-- NOTE D'APPLICATION : `colors_diff_seau_base` doit être créée par extraction
+-- du corps actuel de `colors_diff_seau` (migration 20260908000271, section 5)
+-- avant d'exécuter le remplacement ci-dessus, faute de quoi la fonction
+-- s'appellerait elle-même. Cette extraction est mécanique et sans changement de
+-- comportement ; elle est laissée à l'application de la migration pour que la
+-- proposition n'ait pas à recopier ici un corps susceptible d'avoir évolué.
+
+-- Finition : ajoutée à la RPC de modification, en 9e paramètre pour ne pas
+-- déplacer les huit existants. Une valeur absente laisse la finition inchangée.
+create or replace function public.colors_definir_finition(p_seau_id uuid, p_finition text)
+returns public.colors_seaux language plpgsql security definer set search_path = public as $$
+declare avant public.colors_seaux; v public.colors_seaux; v_diff jsonb;
+begin
+  select * into avant from public.colors_seaux where id = p_seau_id for update;
+  if avant.id is null or not public.colors_action_autorisee(avant.entreprise_id,'modifier_seau') then
+    raise exception 'Accès Colors refusé';
+  end if;
+  if p_finition is null or p_finition not in ('mat','satine','brillant','texture','indetermine') then
+    raise exception 'Finition Colors invalide';
+  end if;
+  update public.colors_seaux set finition = p_finition where id = avant.id returning * into v;
+  v_diff := public.colors_diff_seau(avant, v);
+  if jsonb_array_length(v_diff) > 0 then
+    insert into public.colors_mouvements(entreprise_id,seau_id,type,quantite_avant,quantite_apres,
+      pourcentage_avant,pourcentage_apres,unite,emplacement_avant_id,emplacement_apres_id,
+      etat_avant,etat_apres,auteur_id,motif,champs_modifies)
+    values(v.entreprise_id,v.id,'modification',v.quantite_restante,v.quantite_restante,
+      v.pourcentage_restant,v.pourcentage_restant,v.unite,v.emplacement_id,v.emplacement_id,
+      v.etat,v.etat,auth.uid(),null,v_diff);
+  end if;
+  return v;
+end; $$;
+
+-- Référence de nuancier : écriture ou effacement, confirmation humaine explicite.
+create or replace function public.colors_definir_reference_nuancier(
+  p_seau_id uuid, p_reference text, p_distance numeric, p_confirme boolean default false
+) returns public.colors_seaux language plpgsql security definer set search_path = public as $$
+declare avant public.colors_seaux; v public.colors_seaux; v_diff jsonb;
+begin
+  select * into avant from public.colors_seaux where id = p_seau_id for update;
+  if avant.id is null or not public.colors_action_autorisee(avant.entreprise_id,'modifier_seau') then
+    raise exception 'Accès Colors refusé';
+  end if;
+  -- Une confirmation sans référence n'a pas de sens : la contrainte de table
+  -- l'interdit déjà, on refuse ici avec un message exploitable.
+  if p_confirme and p_reference is null then
+    raise exception 'Une référence est requise pour être confirmée';
+  end if;
+  update public.colors_seaux
+     set ral_approxime = p_reference,
+         ral_distance  = case when p_reference is null then null else p_distance end,
+         ral_confirme  = coalesce(p_confirme, false)
+   where id = avant.id returning * into v;
+  v_diff := public.colors_diff_seau(avant, v);
+  if jsonb_array_length(v_diff) > 0 then
+    insert into public.colors_mouvements(entreprise_id,seau_id,type,quantite_avant,quantite_apres,
+      pourcentage_avant,pourcentage_apres,unite,emplacement_avant_id,emplacement_apres_id,
+      etat_avant,etat_apres,auteur_id,motif,champs_modifies)
+    values(v.entreprise_id,v.id,'modification',v.quantite_restante,v.quantite_restante,
+      v.pourcentage_restant,v.pourcentage_restant,v.unite,v.emplacement_id,v.emplacement_id,
+      v.etat,v.etat,auth.uid(),null,v_diff);
+  end if;
+  return v;
+end; $$;
+
+revoke all on function public.colors_definir_finition(uuid,text) from public, anon, service_role;
+revoke all on function public.colors_definir_reference_nuancier(uuid,text,numeric,boolean) from public, anon, service_role;
+grant execute on function public.colors_definir_finition(uuid,text) to authenticated;
+grant execute on function public.colors_definir_reference_nuancier(uuid,text,numeric,boolean) to authenticated;
+
+notify pgrst,'reload schema';
+
+commit;
