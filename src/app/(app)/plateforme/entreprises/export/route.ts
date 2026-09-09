@@ -83,20 +83,23 @@ async function journaliserExport(
   if (modeDemonstration) return { ok: true };
 
   const supabase = await createClient();
-  const { error } = await supabase.rpc("plateforme_journaliser", {
-    p_action: "annuaire_export_csv",
-    p_cible_type: "annuaire",
-    p_cible_id: onglet,
-    // Ni identifiants d'entreprise ni contenu exporté : seulement le périmètre.
-    p_details: { recherche_non_vide: recherche.length > 0, onglet, colonnes: nbColonnes },
+  // On ne compose plus l'événement d'audit : on déclare le PÉRIMÈTRE de
+  // l'extraction, et la RPC écrit elle-même l'action qui lui correspond. Le
+  // journal générique n'est plus exécutable par un rôle applicatif (migration
+  // 00280) — précisément pour qu'aucun appelant ne puisse fabriquer sa trace.
+  // Ni identifiants d'entreprise ni contenu exporté ne sont transmis.
+  const { error } = await supabase.rpc("plateforme_annuaire_journaliser_export", {
+    p_onglet: onglet,
+    p_recherche_non_vide: recherche.length > 0,
+    p_colonnes: nbColonnes,
   });
 
   if (!error) return { ok: true };
   return {
     ok: false,
     raison:
-      `La fonction \`plateforme_journaliser\` n'est pas exécutable par cette session (${error.message}). ` +
-      "Elle n'est aujourd'hui accordée à aucun rôle applicatif : voir la proposition SQL " +
-      "docs/migrations-proposees/ (grant d'exécution au rôle `authenticated`).",
+      `L'extraction n'a pas pu être journalisée (${error.message}). ` +
+      "L'export exige un rôle plateforme habilité ET une session en authentification " +
+      "renforcée (AAL2) : sans trace, aucun fichier n'est produit.",
   };
 }
