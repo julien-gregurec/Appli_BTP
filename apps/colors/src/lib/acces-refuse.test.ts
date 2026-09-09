@@ -15,6 +15,7 @@ vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 
 import { getContexteColors, lireContexteRefus } from "@/lib/contexte";
 import { MOTIF_APPARTENANCE, MOTIF_PAR_DEFAUT, explicationRefus } from "@/lib/messages-refus";
+import { urlConnexionDepuis } from "@/lib/destination-connexion";
 
 function source(chemin: string) {
   return readFileSync(fileURLToPath(new URL(chemin, import.meta.url)), "utf8");
@@ -77,11 +78,27 @@ describe("boucle /acces-refuse — invariant structurel", () => {
   });
 
   it("aucune page terminale ne peut se rediriger vers elle-même", () => {
+    // La destination n'est plus un littéral : elle mémorise la page demandée et
+    // signale une session terminée (`destination-connexion.ts`). L'invariant à
+    // tenir n'a pas changé — une page terminale ne renvoie que vers /login — il
+    // se vérifie donc en deux temps : la page n'appelle que le calculateur, et
+    // le calculateur ne produit jamais autre chose qu'une URL de connexion.
     for (const page of [PAGE_ACCES_REFUSE, PAGE_ABONNEMENT]) {
-      const cibles = [...page.matchAll(/redirect\("([^"]+)"\)/g)].map((m) => m[1]);
-      expect(cibles).toEqual(["/login"]);
-      expect(cibles).not.toContain("/acces-refuse");
-      expect(cibles).not.toContain("/abonnement-requis");
+      const appels = [...page.matchAll(/redirect\(([^;]+?)\)\s*;/g)].map((m) => m[1].trim());
+      expect(appels).toEqual(["await urlConnexionCourante()"]);
+      expect(page).not.toMatch(/redirect\("\/(?:acces-refuse|abonnement-requis)/);
+    }
+  });
+
+  it("le calculateur de destination ne produit jamais autre chose qu'une URL de connexion", () => {
+    const entrees = [
+      null, "", "/", "/dashboard", "/inventaire/1", "/acces-refuse", "/abonnement-requis",
+      "//exemple.test", "https://exemple.test", "/\\exemple.test", "javascript:alert(1)",
+    ];
+    for (const chemin of entrees) {
+      for (const sessionPresente of [true, false]) {
+        expect(urlConnexionDepuis({ chemin, sessionPresente })).toMatch(/^\/login(?:\?|$)/);
+      }
     }
   });
 });

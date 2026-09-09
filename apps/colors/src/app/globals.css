@@ -7,6 +7,16 @@
   --aubergine: #44264d;
   --aubergine-soft: #f2eaf4;
   --coral: #ff7f6d;
+  /*
+   * Corail lisible. Mesure sur pixels avant correction : le corail de marque
+   * donne 2,43:1 sur le papier, 2,25:1 sur le fond — la moitie du 4,5:1 exige
+   * pour du texte. Il portait pourtant `.eyebrow`, present sur l'en-tete de
+   * CHAQUE ecran, et le mot « Colors » du logotype.
+   * `#b23c22` mesure 5,81:1 sur le papier, 5,38:1 sur le fond et 5,01:1 sur
+   * l'aubergine clair. Le corail de marque reste inchange partout ou il est
+   * graphique — pastilles, jauges, degrades : la contrainte porte sur le texte.
+   */
+  --coral-texte: #b23c22;
   --yellow: #f7c85e;
   --mint: #79cbb8;
   --shadow: 0 18px 48px rgba(50, 30, 54, .08);
@@ -27,7 +37,7 @@ a { color: inherit; text-decoration: none; }
 .brand-mark span:nth-child(3) { width: 20px; height: 20px; left: 12px; bottom: 4px; background: var(--mint); }
 .brand-copy { display: grid; line-height: 1; }
 .brand-copy strong { font-size: 14px; letter-spacing: .2em; }
-.brand-copy span { margin-top: 4px; color: var(--coral); font-family: Georgia, serif; font-size: 20px; font-style: italic; }
+.brand-copy span { margin-top: 4px; color: var(--coral-texte); font-family: Georgia, serif; font-size: 20px; font-style: italic; }
 
 .app-shell { min-height: 100vh; }
 .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 30; display: flex; width: 274px; flex-direction: column; border-right: 1px solid var(--line); background: var(--paper); }
@@ -60,7 +70,7 @@ a { color: inherit; text-decoration: none; }
 .app-switcher { position: relative; }
 .app-switcher-trigger { display: flex; min-width: 238px; align-items: center; gap: 12px; padding: 9px 13px; border: 1px solid var(--line); border-radius: 14px; background: white; color: inherit; cursor: pointer; box-shadow: 0 8px 24px rgba(43, 28, 47, .04); font: inherit; text-align: left; }
 .app-switcher-trigger:focus-visible { outline: 3px solid rgba(236, 111, 93, .35); outline-offset: 2px; }
-.switcher-grid { display: grid; place-items: center; width: 30px; height: 30px; color: var(--coral); font-size: 17px; line-height: 7px; letter-spacing: 1px; border-radius: 9px; background: #fff0ed; }
+.switcher-grid { display: grid; place-items: center; width: 30px; height: 30px; color: var(--coral-texte); font-size: 17px; line-height: 7px; letter-spacing: 1px; border-radius: 9px; background: #fff0ed; }
 .app-switcher-trigger > span:nth-child(2) { display: grid; }
 .app-switcher small { color: #928995; font-size: 9px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
 .app-switcher strong { margin-top: 2px; font-size: 12px; }
@@ -77,7 +87,7 @@ a { color: inherit; text-decoration: none; }
 .current-check { color: #3f9b78; }
 
 .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 28px; margin-bottom: 34px; }
-.eyebrow { color: var(--coral); font-size: 10px; font-weight: 850; letter-spacing: .17em; text-transform: uppercase; }
+.eyebrow { color: var(--coral-texte); font-size: 10px; font-weight: 850; letter-spacing: .17em; text-transform: uppercase; }
 .page-heading h1, .coming-soon h1 { margin: 8px 0 7px; font-family: Georgia, "Times New Roman", serif; font-size: clamp(30px, 4vw, 46px); font-weight: 500; letter-spacing: -.035em; }
 .page-heading p, .coming-soon > p { max-width: 680px; margin: 0; color: var(--muted); font-size: 14px; line-height: 1.65; }
 .outline-button { padding: 11px 16px; border: 1px solid var(--line); border-radius: 11px; color: var(--aubergine); background: white; font-size: 12px; font-weight: 750; }
@@ -197,7 +207,8 @@ a { color: inherit; text-decoration: none; }
 .bucket-head strong { font-size: 14px; }
 .bucket-head small, .bucket-meta { color: var(--muted); font-size: 10px; }
 .badge { display: inline-flex; width: fit-content; padding: 5px 8px; border-radius: 999px; color: #665969; background: #f3eef4; font-size: 9px; font-weight: 800; text-transform: uppercase; }
-.state-ouvert { color: #946815; background: #fff3ce; }.state-vide, .state-archive { color: #8c382e; background: #ffebe7; }.state-ferme { color: #247057; background: #e4f7ef; }
+/* 4,46:1 mesure avant correction, sous le seuil de 4,5:1. */
+.state-ouvert { color: #8a6013; background: #fff3ce; }.state-vide, .state-archive { color: #8c382e; background: #ffebe7; }.state-ferme { color: #247057; background: #e4f7ef; }
 .level, .big-level > div { height: 7px; overflow: hidden; border-radius: 999px; background: #eee8ed; }
 .level i, .big-level i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,var(--coral),var(--yellow)); }
 .bucket-meta { display: flex; justify-content: space-between; gap: 10px; }
@@ -213,7 +224,12 @@ a { color: inherit; text-decoration: none; }
 .cleanup-notice span { color: #7a6a53; font-size: 10.5px; line-height: 1.55; }
 .big-level { display: grid; gap: 10px; margin: 22px 0; }.big-level strong{font-family:Georgia,serif;font-size:42px;font-weight:500}.big-level span{color:var(--muted);font-size:11px}
 .button-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
-.history { margin-top: 18px; }.history-row{display:grid;grid-template-columns:120px minmax(150px,1fr) minmax(140px,2fr) auto;align-items:center;gap:14px;padding:13px 0;border-top:1px solid var(--line);font-size:11px}.history-row:first-of-type{border-top:0}.history-row small{color:var(--muted)}
+.history { margin-top: 18px; }/* `minmax(0, …)` et non `minmax(150px, …)` : une piste de grille a par defaut
+   un plancher `min-content`, si bien que la ligne d'historique exigeait
+   120 + 150 + 140 px plus les gouttieres — davantage que les 410 px de contenu
+   dont elle dispose sur une tablette en portrait. Mesure a 768 px avant
+   correction : 51 px de debordement horizontal de toute la page. */
+.history-row{display:grid;grid-template-columns:110px minmax(0,1fr) minmax(0,1.4fr) auto;align-items:center;gap:14px;padding:13px 0;border-top:1px solid var(--line);font-size:11px}.history-row > *{min-width:0}.history-detail{overflow-wrap:anywhere}.history-row:first-of-type{border-top:0}.history-row small{color:var(--muted)}
 .location-grid article h2 { margin: 14px 0 7px; font-size: 15px; }.location-grid article p{margin:0;color:var(--muted);font-size:11px}
 .settings-form { max-width: 560px; }.settings-form p{color:var(--muted);font-size:11px;line-height:1.6}.settings-form input{max-width:220px}
 .metric-value { position: absolute; right: 20px; top: 19px; font-family: Georgia,serif; font-size: 34px; }
@@ -227,7 +243,11 @@ a { color: inherit; text-decoration: none; }
   .inventory-grid { grid-template-columns: repeat(2,1fr); }
 }
 
-@media (max-width: 760px) {
+/* Le tiroir prend le relais des 900 px et non des 760 px. Mesure a 768 px :
+   la barre laterale fixe de 274 px ne laissait que 494 px de contenu, soit des
+   cartes d'inventaire de 197 px de large — illisibles sur une tablette en
+   portrait, qui est un poste de travail de chantier, pas un cas limite. */
+@media (max-width: 900px) {
   .sidebar { display: none; }
   .shell-main { margin-left: 0; }
   .topbar { height: 70px; padding: 0 16px; backdrop-filter: none; }
@@ -270,8 +290,31 @@ a { color: inherit; text-decoration: none; }
   .photo-first { padding-left: 70px; }
 }
 
+/*
+ * Tablettes en portrait (761–900 px).
+ *
+ * Le tiroir remplace desormais la barre laterale des 900 px, ce qui rend au
+ * contenu toute la largeur — mais le bloc mobile ci-dessus ramene aussi chaque
+ * grille a une colonne, ce qui gaspille 730 px sur un iPad. Cette plage retablit
+ * la densite d'une tablette sans ramener la barre laterale.
+ */
+@media (min-width: 761px) and (max-width: 900px) {
+  .metric-grid, .inventory-grid, .location-grid, .form-grid, .detail-grid { grid-template-columns: repeat(2, 1fr); }
+  .filter-bar { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  .form-grid .wide { grid-column: 1 / -1; }
+  .primary-action, .outline-button, .danger-button { width: auto; }
+  .page-heading { flex-direction: row; align-items: center; }
+  .content { padding: 32px 26px; }
+  .history-row { grid-template-columns: 110px minmax(0, 1fr) auto; }
+  .onboarding-steps li { grid-template-columns: 34px 1fr auto; }
+  .onboarding-steps li > .outline-button, .onboarding-steps li > .badge { grid-column: auto; width: auto; }
+}
+
 .auth-link { margin: 16px 0 0; text-align: center; font-size: 12px; }
-.auth-link a { color: var(--aubergine); font-weight: 700; text-decoration: none; }
+/* Cible tactile : le lien mesurait 15 px de haut, soit un tiers du minimum
+   recommande. Il reste un lien de texte, mais sa zone de contact est portee a
+   44 px sans deplacer le texte. */
+.auth-link a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; color: var(--aubergine); font-weight: 700; text-decoration: none; }
 .auth-link a:hover { text-decoration: underline; }
 .auth-foot a { color: var(--aubergine); font-weight: 700; text-decoration: none; }
 .auth-foot a:hover { text-decoration: underline; }
@@ -308,3 +351,78 @@ a { color: inherit; text-decoration: none; }
   .activity-diff li { gap: 5px; }
   .pager { flex-direction: column; }
 }
+
+/* Première utilisation — visible d'emblée, sans masquer le tableau de bord. */
+.onboarding { margin: 0 0 22px; padding: 22px 24px; border: 1px solid var(--line); border-radius: 20px; background: var(--paper); box-shadow: var(--shadow); }
+.onboarding-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.onboarding-head h2 { margin: 6px 0 6px; font-size: 19px; }
+.onboarding-head p { margin: 0; color: var(--muted); font-size: 12px; }
+.onboarding-count { flex: 0 0 auto; padding: 7px 13px; border-radius: 999px; background: var(--aubergine-soft); color: var(--aubergine); font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.onboarding-steps { display: grid; gap: 10px; margin: 18px 0 0; padding: 0; list-style: none; counter-reset: none; }
+.onboarding-steps li { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 14px; padding: 13px 15px; border: 1px solid var(--line); border-radius: 14px; }
+.onboarding-steps li.done { border-color: #d8ece4; background: #f4fbf8; }
+.onboarding-steps li.next { border-color: var(--aubergine); background: #fdfaff; }
+.onboarding-steps li.later { opacity: .62; }
+.onboarding-rank { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 11px; background: var(--aubergine-soft); color: var(--aubergine); font-weight: 800; font-size: 13px; }
+/* Blanc sur menthe mesurait 1,9:1 : la coche « fait » etait le pire
+   contraste de tout l'ecran. Encre sombre sur la meme menthe. */
+.onboarding-steps li.done .onboarding-rank { background: var(--mint); color: #10352a; }
+.onboarding-steps li > div { display: grid; gap: 4px; min-width: 0; }
+.onboarding-steps strong { font-size: 13px; }
+.onboarding-steps small { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.no-account { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+
+@media (max-width: 760px) {
+  .onboarding { padding: 18px; }
+  .onboarding-head { flex-direction: column; }
+  .onboarding-steps li { grid-template-columns: 34px 1fr; }
+  .onboarding-steps li > .outline-button, .onboarding-steps li > .badge { grid-column: 1 / -1; width: 100%; text-align: center; }
+}
+
+/* Teinte, référence proposée et finition — trois faits tenus distincts. */
+.nuancier-panel { margin-top: 14px; }
+.nuancier-lignes { display: grid; gap: 12px; margin: 16px 0 0; }
+.nuancier-lignes > div { display: grid; grid-template-columns: 160px 1fr; align-items: baseline; gap: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.nuancier-lignes > div:first-child { padding-top: 0; border-top: 0; }
+.nuancier-lignes dt { color: var(--muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.nuancier-lignes dd { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin: 0; font-size: 13px; }
+.nuancier-pastille { display: inline-block; width: 22px; height: 22px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 7px; }
+.nuancier-nom { color: var(--muted); font-size: 12px; }
+.nuancier-inconnu { color: var(--muted); font-size: 12px; line-height: 1.55; }
+.nuancier-provenance { margin: 14px 0 0; color: var(--muted); font-size: 11px; }
+.nuancier-explication { color: #5f5561; font-size: 12px; line-height: 1.65; }
+.nuancier-explication code { padding: 2px 6px; border-radius: 6px; background: #f5eff5; font-size: 11px; }
+.nuancier-liste { display: grid; gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; }
+.nuancier-liste li { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; }
+.nuancier-liste li > div { display: grid; gap: 3px; min-width: 0; }
+.nuancier-liste strong { font-size: 12px; }
+.nuancier-liste small { color: var(--muted); font-size: 11px; }
+
+@media (max-width: 760px) {
+  .nuancier-lignes > div { grid-template-columns: 1fr; gap: 6px; }
+  .nuancier-liste li { grid-template-columns: 22px 1fr; }
+  .nuancier-liste li > .badge { grid-column: 1 / -1; }
+}
+
+/* Cibles tactiles — un chantier se visite avec des gants et une main occupée. */
+.filter-bar .check input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--aubergine); }
+.topbar .brand { min-height: 44px; padding: 3px 0; }
+
+/*
+ * Logotype sur fond aubergine.
+ *
+ * `--coral-texte` a ete assombri pour etre lisible sur les fonds clairs, ou il
+ * mesure 5,0 a 5,8:1. Sur le panneau d'illustration de la page de connexion, le
+ * fond est aubergine : le meme corail sombre y retombe a 2,19:1. Le corail de
+ * marque, lui, y mesure 5,22:1. Deux fonds, deux valeurs — decouvert par la
+ * recette E2E sur Chromium bureau, la mesure precedente ayant ete faite a
+ * 375 px, largeur ou ce panneau est masque.
+ */
+.public-art .brand-copy span { color: var(--coral); }
+
+/*
+ * Lien inline dans une phrase. WCAG 2.2 exempte ces liens de la taille de cible
+ * minimale, mais 16 px de haut restent inconfortables sur un telephone : une
+ * marge verticale porte la boite a 24 px sans rompre la phrase.
+ */
+.no-account a { display: inline-block; padding: 4px 0; }

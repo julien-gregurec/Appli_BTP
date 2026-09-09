@@ -14,8 +14,13 @@ export const metadata: Metadata = {
   // Hérité par toutes les pages, aucune ne le redéclare.
   robots: ROBOTS_PRECOMMERCIAL,
   icons: {
-    icon: "/icons/colors-icon.svg",
-    apple: "/icons/colors-icon.svg",
+    icon: [
+      { url: "/icons/colors-icon.svg", type: "image/svg+xml" },
+      { url: "/icons/colors-icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    // iOS ne lit pas une icône SVG : sans ce PNG, « Sur l'écran d'accueil »
+    // remplace l'icône par une capture de la page.
+    apple: { url: "/icons/colors-apple-touch.png", sizes: "180x180", type: "image/png" },
   },
 };
 

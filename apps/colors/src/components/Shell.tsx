@@ -5,6 +5,7 @@ import { DesktopNavigation, MobileNavigation } from "@/components/Navigation";
 import { ApplicationSwitcher } from "@/components/ApplicationSwitcher";
 import { deconnexionAction } from "@/app/actions";
 import type { ContexteColors } from "@/lib/contexte";
+import { urlCompteElsatia } from "@/lib/compte-elsatia";
 import { BandeauAssistanceElsatia } from "@/components/BandeauAssistanceElsatia";
 import type { BandeauAssistance } from "@elsatia/platform-support-comms";
 
@@ -25,7 +26,7 @@ export function Shell({
   bandeauAssistance?: BandeauAssistance | null;
   children: ReactNode;
 }) {
-  const compteUrl = process.env.NEXT_PUBLIC_ELSATIA_ACCOUNT_URL ?? "http://localhost:3000/abonnement";
+  const compteUrl = urlCompteElsatia();
   const role = contexte.roleColors ? LIBELLES_ROLES[contexte.roleColors] : null;
   return (
     <div className="app-shell">

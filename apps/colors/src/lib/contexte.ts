@@ -1,7 +1,10 @@
 import "server-only";
 import { cache } from "react";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { EN_TETE_CHEMIN, EN_TETE_SESSION, sessionPresenteSelon } from "@/lib/en-tetes-requete";
+import { urlConnexionDepuis } from "@/lib/destination-connexion";
 import { MOTIF_APPARTENANCE } from "@/lib/messages-refus";
 import type { RoleApplicationColors } from "@elsatia/application-access";
 
@@ -25,10 +28,25 @@ type ContexteApplicationCourant = {
 
 export const ENTREPRISE_PAR_DEFAUT = "Votre organisation";
 
+/**
+ * Destination de connexion pour la requête courante.
+ *
+ * Elle mémorise la page demandée et, lorsqu'un cookie d'authentification
+ * accompagnait la requête, annonce une session terminée plutôt que de renvoyer
+ * un formulaire muet. Voir `destination-connexion.ts`.
+ */
+export async function urlConnexionCourante(): Promise<string> {
+  const enTetes = await headers();
+  return urlConnexionDepuis({
+    chemin: enTetes.get(EN_TETE_CHEMIN),
+    sessionPresente: sessionPresenteSelon(enTetes.get(EN_TETE_SESSION)),
+  });
+}
+
 export const getContexteColors = cache(async (): Promise<ContexteColors> => {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect(await urlConnexionCourante());
 
   const { data, error } = await supabase.rpc("contexte_application_courant").maybeSingle();
   if (error) throw new Error("Contexte ELSATIA indisponible");

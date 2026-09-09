@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Brand } from "@/components/Brand";
 import { deconnexionAction } from "@/app/actions";
-import { ENTREPRISE_PAR_DEFAUT, lireContexteRefus } from "@/lib/contexte";
+import { ENTREPRISE_PAR_DEFAUT, lireContexteRefus, urlConnexionCourante } from "@/lib/contexte";
 import { explicationRefus } from "@/lib/messages-refus";
+import { urlCompteElsatia } from "@/lib/compte-elsatia";
 
 export const metadata: Metadata = { title: "Accès non habilité" };
 
@@ -15,9 +16,9 @@ export const metadata: Metadata = { title: "Accès non habilité" };
  */
 export default async function AccesRefusePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const [params, contexte] = await Promise.all([searchParams, lireContexteRefus()]);
-  if (!contexte.authentifie) redirect("/login");
+  if (!contexte.authentifie) redirect(await urlConnexionCourante());
 
-  const compteUrl = process.env.NEXT_PUBLIC_ELSATIA_ACCOUNT_URL ?? "http://localhost:3000/abonnement";
+  const compteUrl = urlCompteElsatia();
   const organisation = contexte.entrepriseNom ?? ENTREPRISE_PAR_DEFAUT;
   return (
     <main className="denied-page">

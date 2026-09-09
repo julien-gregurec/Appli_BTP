@@ -10,6 +10,7 @@
 export const CODE_IDENTIFIANTS_INVALIDES = "identifiants";
 export const CODE_ACCES_COLORS_ABSENT = "acces-colors";
 export const CODE_DECONNEXION = "deconnexion";
+export const CODE_SESSION_EXPIREE = "session-expiree";
 
 /** Réinitialisation de mot de passe. */
 export const CODE_EMAIL_REQUIS = "email-requis";
@@ -27,6 +28,10 @@ export const LONGUEUR_MINIMALE_MOT_DE_PASSE = 12;
 const ERREURS = new Map<string, string>([
   [CODE_IDENTIFIANTS_INVALIDES, "Identifiants incorrects."],
   [CODE_ACCES_COLORS_ABSENT, "Votre compte ELSATIA ne dispose pas d’un accès actif à Colors."],
+  [
+    CODE_SESSION_EXPIREE,
+    "Votre session a pris fin. Connectez-vous pour reprendre où vous en étiez.",
+  ],
   [CODE_EMAIL_REQUIS, "Saisissez votre adresse email."],
   [
     CODE_RESET_INDISPONIBLE,

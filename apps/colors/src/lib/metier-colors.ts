@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { EmplacementColors, NettoyagePhotoColors, SeauColors } from "@/lib/colors-types";
 import { TAILLE_PAGE_ACTIVITE, type EvenementActiviteColors } from "@/lib/activite-colors";
 import { colonnesTri, fenetrePage, TAILLE_PAGE_INVENTAIRE, TRI_PAR_DEFAUT, type TriInventaire } from "@/lib/tri-inventaire";
+import type { FaitsDemarrageColors } from "@/lib/demarrage-colors";
 
 export type FiltresServeurColors = {
   q?: string;
@@ -136,6 +137,14 @@ export async function statistiquesColors(entrepriseId: string) {
   return {actifs:Number(statistiques.actifs),ouverts:Number(statistiques.ouverts),faibles:Number(statistiques.faibles),vides:Number(statistiques.vides),seuil_stock_faible_pourcent:Number(statistiques.seuil_stock_faible_pourcent)};
 }
 
+/**
+ * Paramètres de l'organisation.
+ *
+ * `defini` distingue « l'organisation a enregistré son seuil » de « personne n'y
+ * a jamais touché et 20 % est le défaut du modèle ». Les deux cas produisent la
+ * même valeur mais n'ont pas le même sens : seul le premier vaut une étape de
+ * démarrage franchie.
+ */
 export async function obtenirParametresColors(entrepriseId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase.from("colors_parametres")
@@ -143,5 +152,27 @@ export async function obtenirParametresColors(entrepriseId: string) {
     .eq("entreprise_id",entrepriseId)
     .maybeSingle();
   if (error) throw new Error("Impossible de charger les paramètres Colors");
-  return { seuil_stock_faible_pourcent: Number(data?.seuil_stock_faible_pourcent ?? 20) };
+  return { seuil_stock_faible_pourcent: Number(data?.seuil_stock_faible_pourcent ?? 20), defini: data != null };
+}
+
+/**
+ * Faits de démarrage de l'organisation, lus au plus court.
+ *
+ * Trois comptages `head: true` : la base renvoie un nombre, jamais les lignes.
+ * Le tableau de bord n'a besoin que de savoir si chaque étape est franchie.
+ */
+export async function faitsDemarrageColors(entrepriseId: string): Promise<FaitsDemarrageColors> {
+  const supabase = await createClient();
+  const [emplacements, seaux, avecPhoto, parametres] = await Promise.all([
+    supabase.from("colors_emplacements").select("id",{count:"exact",head:true}).eq("entreprise_id",entrepriseId).eq("actif",true),
+    supabase.from("colors_seaux").select("id",{count:"exact",head:true}).eq("entreprise_id",entrepriseId).neq("etat","archive"),
+    supabase.from("colors_seaux").select("id",{count:"exact",head:true}).eq("entreprise_id",entrepriseId).not("photo_principale_path","is",null),
+    obtenirParametresColors(entrepriseId),
+  ]);
+  return {
+    emplacements: emplacements.count ?? 0,
+    seaux: seaux.count ?? 0,
+    seauxAvecPhoto: avecPhoto.count ?? 0,
+    seuilEnregistre: parametres.defini,
+  };
 }

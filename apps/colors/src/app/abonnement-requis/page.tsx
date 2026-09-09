@@ -2,16 +2,17 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Brand } from "@/components/Brand";
 import { deconnexionAction } from "@/app/actions";
-import { ENTREPRISE_PAR_DEFAUT, lireContexteRefus } from "@/lib/contexte";
+import { ENTREPRISE_PAR_DEFAUT, lireContexteRefus, urlConnexionCourante } from "@/lib/contexte";
+import { urlCompteElsatia } from "@/lib/compte-elsatia";
 
 export const metadata: Metadata = { title: "Abonnement requis" };
 
 /** Page terminale : même règle que `/acces-refuse`, aucun contexte redirigeant. */
 export default async function AbonnementRequisPage() {
   const contexte = await lireContexteRefus();
-  if (!contexte.authentifie) redirect("/login");
+  if (!contexte.authentifie) redirect(await urlConnexionCourante());
 
-  const compteUrl = process.env.NEXT_PUBLIC_ELSATIA_ACCOUNT_URL ?? "http://localhost:3000/abonnement";
+  const compteUrl = urlCompteElsatia();
   const organisation = contexte.entrepriseNom ?? ENTREPRISE_PAR_DEFAUT;
   return (
     <main className="denied-page">
