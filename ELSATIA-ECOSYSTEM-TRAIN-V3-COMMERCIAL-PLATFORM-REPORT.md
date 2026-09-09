@@ -2,23 +2,30 @@
 
 ## Verdict
 
-**VALIDÉ SOUS RÉSERVES.**
+**VALIDÉ SOUS RÉSERVE D'UNE SEULE MESURE MANQUANTE.**
 
-Le train est construit, testé et cohérent. Trois réserves, toutes explicites et
-aucune silencieuse :
+Les trois réserves de la version précédente du rapport ont été levées :
 
-1. **Comparaison Boutique en attente.** Le P0 Boutique a été intégré ici
-   (`9f4f121`) puis gelé sur consigne, dans l'attente du SHA du lot mené en
-   parallèle. Une seule implémentation sera conservée. **Le SHA final du train
-   n'est pas publié tant que cette comparaison n'a pas eu lieu.**
-2. **E2E Réserves non rejoués dans ce train** (voir §« Ce qui n'a pas été
-   mesuré »). Ils exigent une pile Supabase complète ; la seule disponible
-   appartient à une autre conversation et n'a pas été touchée.
-3. **`plateforme_journaliser` reste sans exigence AAL2**, délibérément, et
-   l'arbitrage est posé au §« Arbitrages » plutôt que tranché en silence.
+1. **Boutique** — la référence externe (`audit/elsatia-boutique-commerce-architecture-v1`
+   @ `65999e2`) s'est révélée **exclusivement documentaire** : dix fichiers de
+   documentation, zéro ligne de code. Il n'existait aucune seconde implémentation à
+   comparer. Le correctif du train a été vérifié contre les dix critères, et ses deux
+   contrôles sont prouvés NON VACANTS.
+2. **`plateforme_journaliser`** — l'arbitrage est appliqué : le journal n'est plus
+   écrivable à la main. 12 assertions pgTAP.
+3. **`reserves_v2_terrain_capture` #26** — instruite, comprise et corrigée. 94/94.
 
-Production intacte : rien n'a été poussé sur `main`, rien n'a été déployé,
-aucun appel Stripe Live, aucun endpoint Stripe Test touché ni désactivé.
+**pgTAP : 70 suites, 70 au vert, zéro échec.** L'objectif 69/69 est atteint et dépassé
+(70 avec la nouvelle suite du journal borné), sans qu'aucune assertion ait été
+neutralisée ni aucune protection affaiblie.
+
+**La seule mesure manquante reste les E2E Réserves.** Une pile Supabase jetable et
+dédiée a bien été construite sur des ports libres, mais son service de stockage n'a
+pas pu démarrer — voir §« Pile Supabase dédiée ». Aucune pile appartenant à un autre
+travail n'a été utilisée, arrêtée ni modifiée.
+
+Production intacte : rien n'a été poussé sur `main`, rien n'a été déployé, aucun appel
+Stripe Live, aucun endpoint Stripe Test touché ni désactivé.
 
 ---
 
@@ -228,33 +235,34 @@ portail client — reste un lot à part entière**, conformément au §9.
 
 | Vérification | Résultat |
 |---|---|
-| `verify:migrations` | **276 migrations valides**, noms et horodatages uniques |
-| Fresh install | ✅ 276 migrations sur base jetable |
-| Upgrade depuis Production n°210 | ✅ 202 socle + **74** migrations |
-| Upgrade depuis ledger n°263 | ✅ 261 socle + **15** migrations |
-| Upgrade depuis Train V2 n°274 | ✅ 272 socle + **4** migrations |
+| `verify:migrations` | **278 migrations valides**, noms et horodatages uniques |
+| Fresh install | ✅ 278 migrations sur base jetable |
+| Upgrade depuis Production n°210 | ✅ 202 socle + 76 migrations |
+| Upgrade depuis ledger n°263 | ✅ 261 socle + 17 migrations |
+| Upgrade depuis Train V2 n°274 | ✅ 272 socle + 6 migrations |
 
-Les trois upgrades aboutissent au même état : `contrats_abonnement` présente,
-4 générations tarifaires, 24 tarifs de modules, assistance créée.
+Les trois upgrades aboutissent au même état.
 
-### pgTAP
+### pgTAP — 70 suites, 70 au vert
 
-**69 suites, 68 au vert.** Chaque échec a été rejoué sur une base **Train V2
-pure** pour distinguer ce que le train cause de ce qu'il hérite :
+Chaque échec rencontré a été rejoué sur une base **Train V2 pure** pour distinguer ce
+que le train cause de ce qu'il hérite, puis instruit jusqu'à sa cause.
 
 | Suite | Train V2 | Train V3 | Verdict |
 |---|---|---|---|
-| `isolation_multitenant_surface` | 10/10 | 9/10 → **10/10** | régression du train, **corrigée** |
-| `platform_aal2_role_integrity_v1` | 80/80 | 79/80 → **80/80** | régression du train, **corrigée** |
+| `isolation_multitenant_surface` | 10/10 | 9/10 → **10/10** | régression du train, corrigée |
+| `platform_aal2_role_integrity_v1` | 80/80 | 79/80 → **80/80** | régression du train, corrigée |
 | `rate_limiting_applicatif` | échec | **8/8** | défaut du test, corrigé par reprise de `1fceabc` |
-| `reserves_v2_terrain_capture` #26 | **échec** | échec | **antérieur au train**, non corrigé ici |
-| `contract_price_freeze_v1` (nouveau) | — | **17/17** | — |
+| `reserves_v2_terrain_capture` | 91/92 | **94/94** | défaut hérité, instruit et corrigé |
+| `contract_price_freeze_v1` *(nouveau)* | — | **17/17** | figement contractuel |
+| `platform_audit_log_bounded_v1` *(nouveau)* | — | **12/12** | journal non fabricable |
 
-Les deux régressions corrigées étaient des surfaces de sécurité :
-`plateforme_annuaire_compteurs` exécutable par `anon`, et deux mutations de
-remise dont la garde AAL2 n'était qu'indirecte.
+Aucune assertion n'a été neutralisée pour atteindre ce résultat, et aucune protection
+n'a été affaiblie. La seule exclusion ajoutée à un test est celle de
+`plateforme_journaliser`, désormais sans objet : la fonction n'est plus exécutable par
+un rôle applicatif.
 
-### Applications
+### Applications### Applications
 
 | | Tests | Typecheck | Build |
 |---|---|---|---|
@@ -301,8 +309,8 @@ RPC complète (pagination serveur, 25 lignes par page) :
 
 | | 500 entreprises | 5 000 entreprises |
 |---|---|---|
-| Page 1, tri par date | 9,3 ms | **27,2 ms** |
-| Recherche texte | 21,0 ms | **125,4 ms** |
+| Page 1, tri par date | 2,7 ms | **22,3 ms** |
+| Recherche texte | 12,2 ms | **158,3 ms** |
 
 **Réserve de méthode, explicite.** La machine portait en parallèle les piles de
 plusieurs autres travaux (charge système supérieure à 45). Les mesures brutes
@@ -333,39 +341,76 @@ deux bases distinctes — ce point reste consigné tel quel.
 
 ---
 
-## Ce qui n'a PAS été mesuré
+## Pile Supabase dédiée, et ce qui n'a pas pu être mesuré
 
-**Les E2E Réserves (14/14 hors ligne, WebKit et Chromium) n'ont pas été rejoués
-dans ce train.** Ils exigent une pile Supabase complète (auth, PostgREST,
-storage), que le CLI Supabase bloqué sur cette machine ne permet pas de monter.
-La seule pile complète disponible appartient à une autre conversation et n'a
-délibérément pas été touchée.
+### Ce qui a été construit
 
-Ce que cela laisse ouvert, précisément : la migration 277 redéfinit
-`reserves_action_autorisee()`. Le contre-audit prouve que le corps est identique
-à la dernière version du ledger hors l'argument d'application, et les 154 tests
-Réserves passent — mais **le parcours hors ligne complet n'a pas été rejoué
-après cette redéfinition**. C'est la vérification la plus utile qui reste.
+Une pile Supabase **jetable et dédiée au Train V3** a été composée à la main, sur des
+ports libres (`60321` pour la passerelle, `60322` pour la base), dans un réseau Docker
+isolé. Le CLI Supabase étant inutilisable sur ce poste, chaque service a été assemblé
+à partir des images déjà présentes, en reprenant la configuration lue — sans y toucher
+— sur une pile existante.
 
-Le rapport ne présente donc aucun résultat E2E : il n'y en a pas.
+| Service | État |
+|---|---|
+| Base de données | ✅ **278 migrations, 221 tables** |
+| Authentification (GoTrue) | ✅ `/auth/v1/health` → 200 |
+| API REST (PostgREST) | ✅ `/rest/v1/` → 200 |
+| Passerelle (Kong) | ✅ healthy |
+| **Stockage (storage-api)** | ❌ **ne démarre pas** |
 
----
+Trois obstacles ont été levés au passage, et méritent d'être consignés pour la
+prochaine fois : les rôles internes (`supabase_auth_admin`, `supabase_storage_admin`,
+`authenticator`) n'ont pas de mot de passe dans l'image et doivent être fixés sous
+`supabase_admin`, seul superutilisateur — `postgres` ne l'est pas ; le schéma `public`
+doit appartenir à `pg_database_owner`, faute de quoi la migration 00243 échoue en
+« permission denied » ; et le cache de schéma de PostgREST dépasse son délai par défaut
+sur 221 tables, d'où un `statement_timeout` relevé pour le seul rôle `authenticator`.
+
+### Le blocage du stockage
+
+`storage-api` démarre, se connecte à la base — vérifié directement depuis le conteneur,
+la requête `select current_user` répond `supabase_storage_admin` — puis **n'émet aucun
+log et ne crée rien**. Lors des tentatives où il produisait une erreur, celle-ci était
+constante : sa migration interne `storage-schema` échoue sur « must be owner of table
+buckets », y compris après avoir donné à ce rôle la propriété des tables, du schéma,
+puis l'attribut superutilisateur.
+
+Ont été essayés sans succès : la création préalable du schéma par le prélude de recette,
+sa suppression pour laisser storage-api le créer lui-même, la reprise **à l'identique**
+des 27 variables d'environnement d'une pile qui fonctionne, et l'ajout du volume monté
+sur `/mnt` qui manquait. Aucune de ces pistes n'a débloqué le service.
+
+### Conséquence, énoncée sans détour
+
+**Les 14 scénarios hors connexion n'ont pas été rejoués, ni sur WebKit/iPhone, ni sur
+Chromium/Android.** Le dépôt de photo passe par le stockage : lancer la recette sans ce
+service aurait produit des échecs dus au décor et non au code, c'est-à-dire une mesure
+trompeuse. Le rapport ne présente donc **aucun résultat E2E** : il n'y en a pas.
+
+Ce que cela laisse précisément ouvert : la migration 00277 redéfinit
+`reserves_action_autorisee()`. Le contre-audit prouve que son corps est identique à la
+dernière version du ledger hors l'argument d'application, les 154 tests Réserves
+passent, et les 70 suites pgTAP sont au vert — mais **le parcours hors ligne complet
+n'a pas été rejoué après cette redéfinition**. C'est la vérification la plus utile qui
+reste, et elle demande une session dédiée pour finir de monter le stockage.
+
+Aucune pile appartenant à un autre travail n'a été utilisée, arrêtée ni modifiée. La
+pile du Train V3 (`*_elsatia-train-v3-e2e`) reste en place, avec son script de
+reconstruction, prête à être reprise.
 
 ## Recette humaine restante
 
-1. **Comparer les deux implémentations du P0 Boutique**, puis n'en conserver
-   qu'une. Aucun résolveur ni test ne doit être dupliqué.
-2. **Rejouer les E2E Réserves** sur une pile complète, en particulier le
-   parcours hors ligne après la redéfinition de `reserves_action_autorisee()`.
-3. **Arbitrer `plateforme_journaliser`** (AAL2 ou exclusion documentée).
-4. **Rationaliser les deux endpoints Stripe Test** — recette bloquante avant
-   Production, hors périmètre de ce train.
-5. **Décider de la reprise des remises existantes** : les colonnes
+1. **Terminer la pile de recette** : débloquer `storage-api`, puis rejouer les 14
+   scénarios hors connexion dans une même exécution, WebKit/iPhone et Chromium/Android,
+   en particulier après la redéfinition de `reserves_action_autorisee()`.
+2. **Rationaliser les deux endpoints Stripe Test** — recette bloquante avant Production,
+   hors périmètre de ce train.
+3. **Décider de la reprise des remises existantes** : les colonnes
    `entreprises.remise_*` non nulles restent à convertir en lignes
    `remises_commerciales`.
-6. **Corriger `reserves_v2_terrain_capture` #26**, défaut antérieur au train.
-
----
+4. **Mesurer les performances de l'annuaire sur machine au repos** avant de conclure
+   sur le passage à 50 000 entreprises.
 
 ## Production intacte
 
