@@ -18,7 +18,7 @@ import {
  * Supabase par icône.
  */
 const RESSOURCES_PUBLIQUES =
-  /^\/(?:icons\/|sw-colors\.js$|favicon\.ico$|manifest\.webmanifest$|robots\.txt$)/;
+  /^\/(?:icons\/|sw-colors\.js$|hors-ligne\.html$|favicon\.ico$|manifest\.webmanifest$|robots\.txt$)/;
 
 /**
  * Nonce de 128 bits, régénéré à chaque requête.
