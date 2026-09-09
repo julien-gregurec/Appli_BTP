@@ -115,6 +115,30 @@ export const CONTRAT_ENV_PUBLIC = [
   },
 ];
 
+/*
+ * Lecture d'étiquette (OCR).
+ *
+ * `FOURNISSEURS_OCR_CONNUS` doit rester le miroir exact du registre
+ * `src/lib/ocr/fournisseurs.ts`. Un test unitaire compare les deux listes : les
+ * laisser diverger permettrait à un build publié de se déclarer actif avec un
+ * prestataire que l'application ne sait pas instancier — ou l'inverse.
+ *
+ * La garde ferme un mode de défaillance précis : quelqu'un pose
+ * `COLORS_OCR_ACTIF=oui` dans un tableau de bord Vercel, avec un nom de
+ * prestataire plausible mais inexistant. Le build réussirait, l'écran
+ * annoncerait « lecture d'étiquette inactive » sans dire pourquoi, et la cause
+ * — une faute de frappe dans un nom — resterait invisible. Une activation
+ * demandée mais impossible est une erreur de configuration, pas un état normal :
+ * elle interrompt le build publié.
+ *
+ * L'inverse n'est PAS une erreur : ne rien déclarer laisse l'OCR fermé, et
+ * c'est le fonctionnement attendu tant qu'aucun prestataire n'est contracté.
+ */
+export const VARIABLE_OCR_ACTIF = "COLORS_OCR_ACTIF";
+export const VARIABLE_OCR_FOURNISSEUR = "COLORS_OCR_FOURNISSEUR";
+export const VALEUR_ACTIVATION_OCR = "oui";
+export const FOURNISSEURS_OCR_CONNUS = [];
+
 /** Raisons possibles. Catégorielles : aucune ne peut contenir de valeur. */
 export const RAISONS = {
   absente: "absente",
@@ -125,7 +149,28 @@ export const RAISONS = {
   modeIncoherent: "déclare un environnement non Production sur un build Production",
   formeSecrete: "a la forme d'une clé de service ou privée (jamais publiable)",
   nomAbandonne: "nom abandonné, plus lu par l'application",
+  ocrSansFournisseur: "demande l'activation de la lecture d'étiquette sans prestataire déclaré",
+  ocrFournisseurInconnu: "désigne un prestataire de lecture d'étiquette que cette version n'implémente pas",
 };
+
+/**
+ * Contrôle de cohérence de l'activation OCR. Retourne un constat, ou `null`.
+ *
+ * Ne lit jamais la clé d'accès du prestataire : la garde constate une
+ * intention de configuration, elle n'a pas à connaître de secret.
+ */
+export function inspecterOcr(env = process.env) {
+  const demande = (env[VARIABLE_OCR_ACTIF] ?? "").trim().toLowerCase();
+  if (demande !== VALEUR_ACTIVATION_OCR) return null;
+  const fournisseur = (env[VARIABLE_OCR_FOURNISSEUR] ?? "").trim();
+  if (fournisseur === "") {
+    return { name: VARIABLE_OCR_ACTIF, reason: RAISONS.ocrSansFournisseur, role: "lecture d'étiquette par un sous-traitant" };
+  }
+  if (!FOURNISSEURS_OCR_CONNUS.includes(fournisseur)) {
+    return { name: VARIABLE_OCR_FOURNISSEUR, reason: RAISONS.ocrFournisseurInconnu, role: "identité du sous-traitant de lecture d'étiquette" };
+  }
+  return null;
+}
 
 /**
  * Mode du build.
@@ -263,6 +308,14 @@ export function evaluerEnvPublic(env = process.env, contrat = CONTRAT_ENV_PUBLIC
     if (niveau !== "ignore" || fauteDeSaisie) warnings.push(constat);
   }
 
+  const constatOcr = inspecterOcr(env);
+  if (constatOcr) {
+    // Bloquant sur un build publié, consultatif ailleurs : sur un poste local,
+    // désigner un prestataire absent est une expérimentation, pas un incident.
+    if (niveau === "bloquant") failures.push(constatOcr);
+    else if (niveau === "consultatif") warnings.push(constatOcr);
+  }
+
   for (const fuite of secretsPublics(env)) {
     if (failures.some((constat) => constat.name === fuite.name)) continue;
     failures.push(fuite);
@@ -303,6 +356,11 @@ export function formaterRapport({ mode, niveau, failures, warnings }) {
       lignes.push("Un build publié sans ces variables réussirait silencieusement et livrerait un");
       lignes.push("Colors sans authentification, sans photos et sans réinitialisation. Pour un");
       lignes.push("build local ou de recette, déclarer ELSATIA_APPLICATION_ENV=local.");
+    }
+    if (failures.some((constat) => constat.reason === RAISONS.ocrSansFournisseur || constat.reason === RAISONS.ocrFournisseurInconnu)) {
+      lignes.push("La lecture d'étiquette est demandée mais ne peut pas fonctionner : aucun prestataire");
+      lignes.push("n'est implémenté par cette version. Retirer COLORS_OCR_ACTIF laisse l'application");
+      lignes.push("dans son fonctionnement normal, lecture d'étiquette fermée.");
     }
     if (failures.some((constat) => constat.reason === RAISONS.formeSecrete)) {
       lignes.push("Une valeur NEXT_PUBLIC_* est inscrite en clair dans le bundle : retirer cette clé");
