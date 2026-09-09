@@ -6,7 +6,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { decisionOcr, RAISONS_OCR_INACTIF, VALEUR_ACTIVATION } from "@/lib/ocr/politique";
-import { etatOcrColors, fournisseurOcrActif, fournisseursConnus } from "@/lib/ocr/fournisseurs";
+import { FOURNISSEURS_OCR, etatOcrColors, fournisseurOcrActif, fournisseursConnus } from "@/lib/ocr/fournisseurs";
 import { champsAConfirmer, estRejet, resultatConfirme } from "@/lib/ocr/confirmation";
 import type { PropositionOcrColors } from "@/lib/ocr-colors";
 
@@ -147,5 +147,59 @@ describe("invariants d'exposition", () => {
     const route = readFileSync(fileURLToPath(new URL("../../app/api/ocr/route.ts", import.meta.url)), "utf8");
     expect(route).not.toMatch(/from\("colors_seaux"\)\s*\.\s*(?:insert|update|upsert|delete)/);
     expect(route).toContain("colors_creer_analyse_ocr");
+  });
+});
+
+describe("garde de build : un prestataire fictif ne peut pas atteindre la Production", () => {
+  async function garde() {
+    return import("../../../scripts/verify-public-env.mjs" as string) as Promise<{
+      inspecterOcr: (env: Record<string, string | undefined>) => { name: string; reason: string } | null;
+      evaluerEnvPublic: (env: Record<string, string | undefined>) => { failures: { name: string; reason: string }[]; ok: boolean };
+      FOURNISSEURS_OCR_CONNUS: string[];
+      RAISONS: Record<string, string>;
+    }>;
+  }
+
+  const PRODUCTION = {
+    VERCEL_ENV: "production",
+    ELSATIA_APPLICATION_ENV: "production",
+    NEXT_PUBLIC_SUPABASE_URL: "https://exemple.supabase.co",
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_exemple",
+    NEXT_PUBLIC_COLORS_URL: "https://colors.exemple.fr",
+    NEXT_PUBLIC_ELSATIA_ACCOUNT_URL: "https://app.exemple.fr/abonnement",
+  };
+
+  it("la liste de la garde est le miroir exact du registre applicatif", async () => {
+    // Deux listes divergentes laisseraient un build se déclarer actif avec un
+    // prestataire que l'application ne sait pas instancier — ou l'inverse.
+    const { FOURNISSEURS_OCR_CONNUS } = await garde();
+    expect([...FOURNISSEURS_OCR_CONNUS].sort()).toEqual([...fournisseursConnus()].sort());
+  });
+
+  it("un build Production qui demande l'activation sans prestataire est interrompu", async () => {
+    const { evaluerEnvPublic, RAISONS } = await garde();
+    const resultat = evaluerEnvPublic({ ...PRODUCTION, COLORS_OCR_ACTIF: "oui" });
+    expect(resultat.ok).toBe(false);
+    expect(resultat.failures.map((f) => f.reason)).toContain(RAISONS.ocrSansFournisseur);
+  });
+
+  it("un build Production qui désigne un prestataire fictif est interrompu", async () => {
+    const { evaluerEnvPublic, RAISONS } = await garde();
+    const resultat = evaluerEnvPublic({
+      ...PRODUCTION,
+      COLORS_OCR_ACTIF: "oui",
+      COLORS_OCR_FOURNISSEUR: "prestataire-qui-nexiste-pas",
+    });
+    expect(resultat.ok).toBe(false);
+    expect(resultat.failures.map((f) => f.reason)).toContain(RAISONS.ocrFournisseurInconnu);
+  });
+
+  it("ne rien déclarer laisse le build passer : l'OCR fermé est l'état normal", async () => {
+    const { evaluerEnvPublic } = await garde();
+    expect(evaluerEnvPublic(PRODUCTION).ok).toBe(true);
+  });
+
+  it("le registre est gelé : aucun code ne peut y ajouter un prestataire à l'exécution", () => {
+    expect(Object.isFrozen(FOURNISSEURS_OCR)).toBe(true);
   });
 });
