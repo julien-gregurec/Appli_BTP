@@ -103,6 +103,13 @@ le cataplasme en place uniquement pour les pages hors périmètre, où il reste 
 
 ## 4. Classement des 141 pages (analyse statique)
 
+> **Correction apportée en phase C — cette section est périmée.** Le scanner utilisé ici
+> comptait tout `<table>` comme hostile, sans voir que `/planning`, `/notes-frais` et
+> `/chantiers` embarquent **déjà** une vue mobile dédiée, le tableau étant réservé au grand
+> écran par `hidden md:block`. Les chiffres ci-dessous **surestiment** le travail restant.
+> Le classement corrigé fait foi : `ELSATIA_GP_MOBILE_BACKLOG_141_PAGES_V1.md`.
+> En bref : 25 pages lourdes et non 36, 75 sans aucun signal et non 41.
+
 Score d'hostilité mobile : tableau 3, largeur fixe 3, canvas 3, éditeur 3, grille ≥ 3 colonnes 2,
 iframe 2, en-têtes de tableau 1, dialogue 1.
 

@@ -6,21 +6,47 @@ Ce document classe **la totalité** des 141 `page.tsx` de Gestion Pro. Il compl�
 `ELSATIA_GP_MOBILE_AUDIT_PHASE_A_V1.md` et sert de plan d'extension progressive du mobile
 au-delà de la V1 terrain.
 
+## Avertissement : ce classement a été corrigé en cours de lot
+
+La première version de ce document, produite en phase A, **surestimait le travail restant**.
+Son scanner comptait tout `<table>` comme hostile. Il classait donc `/planning`,
+`/notes-frais` et `/chantiers` parmi les pages à refondre, alors que ces trois pages
+embarquent **déjà** une vue mobile dédiée — cartes ou navigation par jour — le tableau étant
+réservé au grand écran par `hidden md:block`.
+
+L'erreur a été découverte en phase C, à la première lecture du code de `/chantiers`. Le
+scanner a été repris (`scripts/mobile/scan-hostilite-mobile.mjs`) et le classement rejoué.
+
+| Tranche | Première version | **Après correction** |
+|---|---|---|
+| Lourd (≥ 6) | 36 | **25** |
+| Moyen (3–5) | 32 | **31** |
+| Léger (1–2) | 32 | **10** |
+| Aucun signal | 41 | **75** |
+
+Le socle mobile de Gestion Pro est donc **nettement meilleur** que ce que la phase A
+annonçait. Ce document fait foi ; la table de la phase A est périmée sur ce point.
+
 ## Méthode de classement
 
-Le classement croise deux critères :
+Un signal n'est retenu que s'il atteint réellement un écran de 375 px :
 
-1. **Un score d'hostilité mobile mesuré** par analyse statique du code de la page et de ses
-   composants importés — tableau 3, largeur fixe en pixels 3, canvas 3, éditeur 3,
-   grille ≥ 3 colonnes 2, iframe 2, en-têtes de tableau 1, dialogue 1.
-2. **Un jugement de destination d'usage.** Un score élevé ne condamne pas une page : il dit
-   qu'elle ne tiendra pas sur 375 px sans transformation. Reste à savoir si elle *doit* y
-   tenir. Une grille de paie, un rapprochement bancaire ou la console plateforme sont des
-   gestes de bureau, rares, longs, à forte densité — les rendre confortables sur téléphone
-   coûterait cher pour un usage qui n'existe pas.
+- un **tableau** ne compte pas si la page fournit une vue de repli `*:hidden` ;
+- une **grille** ne compte que si son nombre de colonnes est posé **sans préfixe de palier** :
+  `grid-cols-3` compte, `md:grid-cols-3` non — ce dernier ne s'applique qu'au-delà de 768 px ;
+- une **largeur fixe** ne compte pas si son bloc est réservé au grand écran.
 
-**Limite déclarée** : ce classement est statique. Il n'a pas été confronté au rendu réel aux
-cinq largeurs (mesure reportée en phase H). Il indique où regarder, pas ce qu'on verra.
+Poids : tableau sans repli 3, largeur fixe 3, canvas 3, éditeur 3, grille sans palier 2,
+iframe 2. Les marqueurs `upload`, `capture`, `gps` et `repli_mobile_present` sont
+**informatifs** et ne pèsent pas sur le score.
+
+Le classement croise ce score avec un **jugement de destination d'usage** : un score élevé ne
+condamne pas une page, il dit qu'elle ne tiendra pas sur 375 px sans transformation. Reste à
+savoir si elle *doit* y tenir. Une grille de paie, un rapprochement bancaire ou la console
+plateforme sont des gestes de bureau, rares et denses.
+
+**Limite qui subsiste.** L'outil sait qu'une vue mobile de repli existe ; il ne sait pas si
+elle est **bonne**. Seule la mesure navigateur le dira (phase H).
 
 ## Règles de portée héritées de la décision de cadrage
 
@@ -35,172 +61,172 @@ cinq largeurs (mesure reportée en phase H). Il indique où regarder, pas ce qu'
 
 | Route | Score | Signaux |
 |---|---|---|
-| `/planning` | 7 | table, thead_lourd, largeur_fixe, overflow_x, formulaire |
-| `/dashboard` | 6 | grid_3plus, largeur_fixe, formulaire, gps, dialog |
-| `/notes-frais` | 6 | table, thead_lourd, grid_3plus, overflow_x, formulaire |
-| `/chantiers` | 4 | table, thead_lourd, overflow_x, formulaire |
-| `/chantiers/[id]` | 2 | grid_3plus, formulaire |
-| `/chantiers/[id]/comptes-rendus` | 2 | grid_3plus, formulaire, upload, capture |
-| `/chantiers/[id]/documents` | 2 | grid_3plus, formulaire, upload, capture |
-| `/chantiers/nouveau` | 2 | grid_3plus, formulaire, gps |
-| `/notes-frais/[id]` | 2 | grid_3plus, formulaire, upload, capture |
-| `/pointage` | 2 | grid_3plus, formulaire, gps |
-| `/pointage/gestion` | 2 | grid_3plus, formulaire |
+| `/chantiers/[id]/comptes-rendus` | 2 | grille_sans_palier, upload, capture |
+| `/chantiers/nouveau` | 2 | grille_sans_palier, gps |
+| `/dashboard` | 2 | grille_sans_palier, gps, repli_mobile_present |
+| `/chantiers` | 0 | repli_mobile_present |
+| `/chantiers/[id]` | 0 | — |
+| `/chantiers/[id]/documents` | 0 | upload, capture |
 | `/mes-travaux` | 0 | — |
+| `/notes-frais` | 0 | repli_mobile_present |
+| `/notes-frais/[id]` | 0 | upload, capture |
+| `/planning` | 0 | repli_mobile_present |
+| `/pointage` | 0 | gps |
+| `/pointage/gestion` | 0 | — |
 
-### Déjà utilisable sur mobile — 24 pages
-
-| Route | Score | Signaux |
-|---|---|---|
-| `/chantiers/[id]/doe` | 2 | grid_3plus, formulaire |
-| `/clients/[id]/modifier` | 2 | grid_3plus, formulaire |
-| `/clients/nouveau` | 2 | grid_3plus, formulaire |
-| `/conges` | 2 | grid_3plus, formulaire |
-| `/depenses/[id]` | 2 | grid_3plus, formulaire, upload, capture |
-| `/employes` | 2 | grid_3plus |
-| `/employes/[id]/modifier` | 2 | grid_3plus, formulaire |
-| `/employes/nouveau` | 2 | grid_3plus, formulaire |
-| `/flotte/[id]` | 2 | grid_3plus, formulaire |
-| `/grands-deplacements` | 2 | grid_3plus, formulaire |
-| `/outillage/[id]` | 2 | grid_3plus, formulaire |
-| `/page.tsx` | 2 | grid_3plus |
-| `/sous-traitants/[id]` | 2 | grid_3plus, formulaire |
-| `/stock/[id]` | 2 | grid_3plus, formulaire, upload |
-| `/aide` | 0 | overflow_x, formulaire |
-| `/chantiers/[id]/emails` | 0 | formulaire |
-| `/chantiers/[id]/localisation` | 0 | formulaire, gps |
-| `/devis/[id]/creer-chantier` | 0 | formulaire |
-| `/employes/[id]/carte` | 0 | formulaire |
-| `/flotte/nouveau` | 0 | formulaire |
-| `/fournisseurs/[id]` | 0 | formulaire |
-| `/messagerie` | 0 | formulaire, upload |
-| `/mon-espace` | 0 | formulaire |
-| `/outillage/nouveau` | 0 | formulaire |
-
-### Correction légère — 14 pages
+### Déjà utilisable sur mobile — 30 pages
 
 | Route | Score | Signaux |
 |---|---|---|
-| `/clients/[id]` | 5 | table, grid_3plus |
-| `/commandes/[id]` | 5 | table, thead_lourd, formulaire, dialog |
-| `/devis/[id]` | 5 | table, thead_lourd, formulaire, dialog |
-| `/factures/[id]` | 5 | table, thead_lourd, formulaire, dialog |
-| `/factures/[id]/modifier` | 5 | grid_3plus, editeur |
-| `/clients` | 4 | table, thead_lourd, overflow_x, formulaire |
-| `/commandes` | 4 | table, thead_lourd |
-| `/flotte` | 4 | table, thead_lourd, overflow_x, formulaire, upload |
-| `/outillage` | 4 | table, thead_lourd, overflow_x, formulaire, upload |
-| `/stock/reception` | 4 | table, thead_lourd, overflow_x |
+| `/clients/[id]/modifier` | 2 | grille_sans_palier |
+| `/clients/nouveau` | 2 | grille_sans_palier |
+| `/devis` | 2 | grille_sans_palier, repli_mobile_present |
+| `/employes/[id]/modifier` | 2 | grille_sans_palier |
+| `/employes/nouveau` | 2 | grille_sans_palier |
+| `/aide` | 0 | — |
+| `/chantiers/[id]/doe` | 0 | — |
+| `/chantiers/[id]/emails` | 0 | — |
+| `/chantiers/[id]/localisation` | 0 | gps |
+| `/clients` | 0 | repli_mobile_present |
+| `/conges` | 0 | — |
+| `/depenses/[id]` | 0 | upload, capture |
+| `/devis/[id]/creer-chantier` | 0 | — |
+| `/employes` | 0 | — |
+| `/employes/[id]/carte` | 0 | — |
+| `/factures` | 0 | repli_mobile_present |
+| `/flotte` | 0 | upload, repli_mobile_present |
+| `/flotte/[id]` | 0 | — |
+| `/flotte/nouveau` | 0 | — |
+| `/fournisseurs/[id]` | 0 | — |
+| `/grands-deplacements` | 0 | — |
+| `/messagerie` | 0 | upload |
+| `/mon-espace` | 0 | — |
+| `/outillage` | 0 | upload, repli_mobile_present |
+| `/outillage/[id]` | 0 | — |
+| `/outillage/nouveau` | 0 | — |
+| `/page.tsx` | 0 | — |
+| `/sous-traitants/[id]` | 0 | — |
+| `/stock/[id]` | 0 | upload |
+| `/stock/borne` | 0 | — |
+
+### Correction légère — 11 pages
+
+| Route | Score | Signaux |
+|---|---|---|
+| `/clients/[id]` | 5 | table_sans_repli, grille_sans_palier |
+| `/factures/[id]/modifier` | 5 | grille_sans_palier, editeur |
+| `/commandes` | 3 | table_sans_repli |
+| `/commandes/[id]` | 3 | table_sans_repli |
 | `/commandes/nouveau` | 3 | editeur |
-| `/devis/[id]/modifier` | 3 | upload, camera, editeur |
-| `/devis/nouveau` | 3 | upload, camera, editeur |
-| `/stock/borne` | 3 | grid_3plus, formulaire, camera, dialog |
+| `/devis/[id]` | 3 | table_sans_repli |
+| `/devis/[id]/modifier` | 3 | editeur, upload |
+| `/devis/nouveau` | 3 | editeur, upload |
+| `/factures/[id]` | 3 | table_sans_repli |
+| `/fournisseurs` | 3 | table_sans_repli |
+| `/stock/reception` | 3 | table_sans_repli |
 
-### Refonte nécessaire — 8 pages
+### Refonte nécessaire — 5 pages
 
 | Route | Score | Signaux |
 |---|---|---|
-| `/stock` | 10 | table, thead_lourd, grid_3plus, largeur_fixe, overflow_x, formulaire, upload, camera, dialog |
-| `/depenses` | 9 | table, thead_lourd, grid_3plus, largeur_fixe, overflow_x, formulaire |
-| `/sous-traitants` | 9 | table, thead_lourd, grid_3plus, largeur_fixe, overflow_x, formulaire |
-| `/interventions` | 7 | table, thead_lourd, largeur_fixe, overflow_x, formulaire |
-| `/devis` | 6 | table, thead_lourd, grid_3plus, overflow_x, formulaire |
-| `/employes/[id]` | 6 | table, formulaire, upload, capture, canvas |
-| `/factures` | 6 | table, thead_lourd, grid_3plus, overflow_x, formulaire |
-| `/fournisseurs` | 6 | table, thead_lourd, grid_3plus, formulaire |
+| `/depenses` | 6 | table_sans_repli, largeur_fixe |
+| `/employes/[id]` | 6 | table_sans_repli, canvas, upload, capture |
+| `/interventions` | 6 | table_sans_repli, largeur_fixe |
+| `/sous-traitants` | 6 | table_sans_repli, largeur_fixe |
+| `/stock` | 6 | table_sans_repli, largeur_fixe, upload |
 
 ### Administration à conserver principalement sur ordinateur — 59 pages
 
 | Route | Score | Signaux |
 |---|---|---|
-| `/abonnement` | 9 | table, thead_lourd, grid_3plus, largeur_fixe, overflow_x, formulaire |
-| `/connecteurs` | 9 | table, thead_lourd, grid_3plus, largeur_fixe, overflow_x, formulaire |
-| `/facturation-avancee` | 9 | table, thead_lourd, grid_3plus, largeur_fixe, overflow_x, formulaire |
-| `/inventaires/[id]` | 9 | table, thead_lourd, grid_3plus, largeur_fixe, overflow_x, formulaire |
-| `/paie/[id]` | 9 | table, thead_lourd, grid_3plus, largeur_fixe, overflow_x, formulaire |
-| `/paie/[id]/[dossierId]` | 9 | table, thead_lourd, grid_3plus, largeur_fixe, overflow_x, formulaire, upload |
-| `/paie/parametres` | 9 | table, thead_lourd, grid_3plus, largeur_fixe, overflow_x, formulaire |
-| `/parametres/relances` | 9 | table, thead_lourd, grid_3plus, largeur_fixe, overflow_x, formulaire |
-| `/plateforme/applications` | 9 | table, thead_lourd, grid_3plus, largeur_fixe, overflow_x |
-| `/plateforme/boutique` | 9 | table, thead_lourd, grid_3plus, largeur_fixe, overflow_x, formulaire |
-| `/plateforme/entreprises` | 9 | table, thead_lourd, grid_3plus, largeur_fixe, overflow_x, formulaire |
-| `/plateforme/entreprises/[entrepriseId]` | 9 | table, thead_lourd, grid_3plus, largeur_fixe, overflow_x, formulaire |
-| `/plateforme/facturation` | 9 | table, thead_lourd, grid_3plus, largeur_fixe, overflow_x, formulaire |
-| `/plateforme/stripe` | 9 | table, thead_lourd, grid_3plus, largeur_fixe, overflow_x |
-| `/plateforme/tarification` | 9 | table, thead_lourd, grid_3plus, largeur_fixe, overflow_x, formulaire |
-| `/rentabilite` | 9 | table, thead_lourd, grid_3plus, largeur_fixe, overflow_x |
-| `/imprimer/paie/[id]` | 7 | table, thead_lourd, largeur_fixe |
-| `/inventaires` | 7 | table, thead_lourd, largeur_fixe, overflow_x, formulaire |
-| `/paie` | 7 | table, thead_lourd, largeur_fixe, overflow_x, formulaire |
-| `/abonnement/configurateur` | 6 | table, thead_lourd, grid_3plus |
-| `/notes-frais/exports` | 6 | table, thead_lourd, grid_3plus, overflow_x, formulaire |
-| `/parametres/import` | 6 | table, thead_lourd, grid_3plus, overflow_x, formulaire, upload |
-| `/plateforme/remises` | 6 | table, thead_lourd, grid_3plus, formulaire |
-| `/parametres/acces/apercu/[id]` | 5 | grid_3plus, largeur_fixe, overflow_x |
-| `/plateforme/roles-demo` | 5 | grid_3plus, largeur_fixe, overflow_x, formulaire |
-| `/tresorerie` | 5 | grid_3plus, largeur_fixe, overflow_x |
-| `/imprimer/commandes/[id]` | 4 | table, thead_lourd |
-| `/imprimer/devis/[id]` | 4 | table, thead_lourd |
-| `/imprimer/factures/[id]` | 4 | table, thead_lourd |
-| `/imprimer/partage/[token]` | 4 | table, thead_lourd |
-| `/plateforme/assistance` | 4 | table, thead_lourd, overflow_x, formulaire |
-| `/prestations` | 4 | table, thead_lourd, formulaire |
-| `/imprimer/doe/[id]` | 3 | table |
-| `/parametres` | 3 | grid_3plus, formulaire, upload, dialog |
-| `/appels-offres` | 2 | grid_3plus, formulaire |
-| `/boutique` | 2 | grid_3plus |
-| `/charges` | 2 | grid_3plus, formulaire |
-| `/crm` | 2 | grid_3plus, formulaire |
-| `/depot` | 2 | grid_3plus, formulaire |
-| `/ouvrages` | 2 | grid_3plus, formulaire |
-| `/paie/profils/[employeId]` | 2 | grid_3plus, formulaire, upload |
-| `/parametres/acces` | 2 | grid_3plus, formulaire |
-| `/plateforme` | 2 | grid_3plus, formulaire |
-| `/plateforme/communications` | 2 | grid_3plus, formulaire, upload |
+| `/abonnement` | 8 | table_sans_repli, grille_sans_palier, largeur_fixe |
+| `/facturation-avancee` | 8 | table_sans_repli, grille_sans_palier, largeur_fixe |
+| `/connecteurs` | 6 | table_sans_repli, largeur_fixe |
+| `/imprimer/paie/[id]` | 6 | table_sans_repli, largeur_fixe |
+| `/inventaires` | 6 | table_sans_repli, largeur_fixe |
+| `/inventaires/[id]` | 6 | table_sans_repli, largeur_fixe |
+| `/paie` | 6 | table_sans_repli, largeur_fixe |
+| `/paie/[id]` | 6 | table_sans_repli, largeur_fixe |
+| `/paie/[id]/[dossierId]` | 6 | table_sans_repli, largeur_fixe, upload |
+| `/paie/parametres` | 6 | table_sans_repli, largeur_fixe |
+| `/parametres/relances` | 6 | table_sans_repli, largeur_fixe |
+| `/plateforme/applications` | 6 | table_sans_repli, largeur_fixe |
+| `/plateforme/boutique` | 6 | table_sans_repli, largeur_fixe |
+| `/plateforme/entreprises/[entrepriseId]` | 6 | table_sans_repli, largeur_fixe |
+| `/plateforme/facturation` | 6 | table_sans_repli, largeur_fixe |
+| `/plateforme/stripe` | 6 | table_sans_repli, largeur_fixe |
+| `/plateforme/tarification` | 6 | table_sans_repli, largeur_fixe |
+| `/rentabilite` | 6 | table_sans_repli, largeur_fixe |
+| `/parametres/acces/apercu/[id]` | 5 | grille_sans_palier, largeur_fixe |
+| `/plateforme/roles-demo` | 5 | grille_sans_palier, largeur_fixe |
+| `/tresorerie` | 5 | grille_sans_palier, largeur_fixe |
+| `/abonnement/configurateur` | 3 | table_sans_repli |
+| `/imprimer/commandes/[id]` | 3 | table_sans_repli |
+| `/imprimer/devis/[id]` | 3 | table_sans_repli |
+| `/imprimer/doe/[id]` | 3 | table_sans_repli |
+| `/imprimer/factures/[id]` | 3 | table_sans_repli |
+| `/imprimer/partage/[token]` | 3 | table_sans_repli |
+| `/notes-frais/exports` | 3 | table_sans_repli |
+| `/parametres/import` | 3 | table_sans_repli, upload |
+| `/plateforme/assistance` | 3 | table_sans_repli |
+| `/plateforme/remises` | 3 | table_sans_repli |
+| `/prestations` | 3 | table_sans_repli |
+| `/depot` | 2 | grille_sans_palier |
 | `/abonnement/module-non-inclus` | 0 | — |
+| `/appels-offres` | 0 | — |
 | `/banque-paie` | 0 | — |
+| `/boutique` | 0 | — |
 | `/boutique/[produitId]` | 0 | — |
-| `/boutique/commande/[id]` | 0 | formulaire |
-| `/boutique/panier` | 0 | formulaire |
-| `/exports` | 0 | formulaire |
-| `/parametres/donnees` | 0 | formulaire |
-| `/parametres/notes-frais` | 0 | formulaire |
+| `/boutique/commande/[id]` | 0 | — |
+| `/boutique/panier` | 0 | — |
+| `/charges` | 0 | — |
+| `/crm` | 0 | — |
+| `/exports` | 0 | — |
+| `/ouvrages` | 0 | — |
+| `/paie/profils/[employeId]` | 0 | upload |
+| `/parametres` | 0 | upload |
+| `/parametres/acces` | 0 | — |
+| `/parametres/donnees` | 0 | — |
+| `/parametres/notes-frais` | 0 | — |
 | `/parametres/notifications` | 0 | — |
-| `/parametres/securite` | 0 | formulaire |
+| `/parametres/securite` | 0 | — |
 | `/parametres/version` | 0 | — |
-| `/plateforme/entreprises/[entrepriseId]/applications` | 0 | formulaire |
-| `/plateforme/support` | 0 | formulaire |
-| `/prestations/[id]/modifier` | 0 | formulaire |
-| `/prestations/nouveau` | 0 | formulaire |
+| `/plateforme` | 0 | — |
+| `/plateforme/communications` | 0 | upload |
+| `/plateforme/entreprises` | 0 | repli_mobile_present |
+| `/plateforme/entreprises/[entrepriseId]/applications` | 0 | — |
+| `/plateforme/support` | 0 | — |
+| `/prestations/[id]/modifier` | 0 | — |
+| `/prestations/nouveau` | 0 | — |
 
 ### Hors périmètre (pages publiques, tunnels, légal, impression) — 24 pages
 
 | Route | Score | Signaux |
 |---|---|---|
-| `/paiements-bancaires` | 9 | table, thead_lourd, grid_3plus, largeur_fixe, overflow_x, formulaire, upload |
-| `/tarifs` | 9 | table, thead_lourd, grid_3plus, largeur_fixe, overflow_x |
-| `/cgu` | 4 | table, thead_lourd, overflow_x |
-| `/cgv` | 4 | table, thead_lourd, overflow_x |
-| `/confidentialite` | 4 | table, thead_lourd, overflow_x |
-| `/cookies` | 4 | table, thead_lourd, overflow_x |
-| `/document/[token]` | 4 | table, thead_lourd |
-| `/mentions-legales` | 4 | table, thead_lourd, overflow_x |
-| `/onboarding` | 2 | grid_3plus, formulaire |
-| `/abonnement-suspendu` | 0 | formulaire |
-| `/auth/confirm` | 0 | formulaire |
-| `/en-attente` | 0 | formulaire |
-| `/login` | 0 | formulaire |
-| `/mfa/challenge` | 0 | formulaire |
-| `/mot-de-passe-oublie` | 0 | formulaire |
-| `/nouveau-mot-de-passe` | 0 | formulaire |
+| `/paiements-bancaires` | 6 | table_sans_repli, largeur_fixe, upload |
+| `/tarifs` | 6 | table_sans_repli, largeur_fixe |
+| `/cgu` | 3 | table_sans_repli |
+| `/cgv` | 3 | table_sans_repli |
+| `/confidentialite` | 3 | table_sans_repli |
+| `/cookies` | 3 | table_sans_repli |
+| `/document/[token]` | 3 | table_sans_repli |
+| `/mentions-legales` | 3 | table_sans_repli |
+| `/onboarding` | 2 | grille_sans_palier |
+| `/abonnement-suspendu` | 0 | — |
+| `/auth/confirm` | 0 | — |
+| `/en-attente` | 0 | — |
+| `/login` | 0 | — |
+| `/mfa/challenge` | 0 | — |
+| `/mot-de-passe-oublie` | 0 | — |
+| `/nouveau-mot-de-passe` | 0 | — |
 | `/offline` | 0 | — |
-| `/onboarding/besoins` | 0 | formulaire |
+| `/onboarding/besoins` | 0 | — |
 | `/onboarding/demarrage` | 0 | — |
 | `/paiement/abonnement/annule` | 0 | — |
 | `/paiement/abonnement/succes` | 0 | — |
 | `/paiement/annule` | 0 | — |
 | `/paiement/succes` | 0 | — |
-| `/signup` | 0 | formulaire |
+| `/signup` | 0 | — |
 
 
 **Total : 141 pages classées.**
@@ -211,10 +237,10 @@ cinq largeurs (mesure reportée en phase H). Il indique où regarder, pas ce qu'
 
 | Page | Score | Décision |
 |---|---|---|
-| `/clients` | 4 | Liste avec tableau — consultable via le défilement horizontal du shell. Refonte en cartes reportée. |
-| `/clients/[id]` | 5 | Fiche + tableau d'historique. Consultable. Refonte reportée. |
-| `/employes` | 2 | Déjà utilisable. |
-| `/employes/[id]` | 6 | Contient un `canvas` (signature) et une capture photo. **À vérifier en priorité au prochain lot** : un canvas de signature mal dimensionné est inutilisable au doigt. |
+| `/clients` | 0 | Repli mobile présent. Consultable. |
+| `/clients/[id]` | 3 | Tableau d'historique sans repli. Consultable par défilement. Refonte reportée. |
+| `/employes` | 0 | Déjà utilisable. |
+| `/employes/[id]` | 6 | `canvas` de signature + tableau sans repli. **À vérifier en priorité au prochain lot** : un canvas de signature mal dimensionné est inutilisable au doigt. |
 | `/employes/[id]/carte` | 0 | Déjà utilisable. |
 
 Aucune de ces cinq pages n'est modifiée dans ce lot. Elles sont vérifiées comme
@@ -233,3 +259,16 @@ ne doivent **pas** être rendues responsives — le faire dégraderait le PDF pr
 Les 14 pages `/plateforme/*` sont réservées à l'exploitant ELSATIA. Elles restent des écrans
 de bureau assumés. Aucun effort mobile n'est justifié avant que l'exploitation courante ne
 l'exige.
+
+### Les deux seuls vrais défauts de grille du périmètre V1
+
+Repérés par le scanner corrigé, puis vérifiés ligne à ligne :
+
+| Emplacement | Code | Effet sur 375 px |
+|---|---|---|
+| `src/app/(app)/dashboard/page.tsx:347` | `grid grid-cols-3 gap-2` | Trois affectations côte à côte, ~110 px chacune, texte illisible |
+| `src/app/(app)/chantiers/nouveau/page.tsx:92` | `grid grid-cols-3 gap-4` | Trois champs de formulaire côte à côte |
+
+**Faux positif écarté** : `src/components/PhotosCompteRendu.tsx:46` utilise
+`grid-cols-3 gap-2 sm:grid-cols-4` pour des **vignettes photo**. Trois vignettes de ~110 px
+sur un téléphone sont un bon choix, pas un défaut. Elle n'est pas corrigée.
