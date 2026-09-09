@@ -48,7 +48,8 @@ describe("analyserNuancier — entête", () => {
   });
 
   it("refuse en bloc un nuancier sans mention de licence", () => {
-    const { licence: _licence, ...sansLicence } = NUANCIER_VALIDE;
+    const sansLicence: Record<string, unknown> = { ...NUANCIER_VALIDE };
+    delete sansLicence.licence;
     expect(analyserNuancier(sansLicence)).toEqual({ disponible: false, raison: "format_invalide" });
   });
 
