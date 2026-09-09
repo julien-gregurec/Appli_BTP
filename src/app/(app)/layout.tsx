@@ -6,6 +6,8 @@ import { estPlateformeAdmin } from "@/lib/plateforme";
 import { ModuleAccessBoundary } from "@/components/ModuleAccessBoundary";
 import { MobileBack } from "@/components/MobileBack";
 import { MiseAJourApplication } from "@/components/mobile/MiseAJourApplication";
+import { FileHorsLigne } from "@/components/mobile/FileHorsLigne";
+import { IndicateurReseau } from "@/components/mobile/IndicateurReseau";
 import { AideButton } from "@/components/AideButton";
 import { AssistantIA } from "@/components/AssistantIA";
 import { AppPresenceTracker } from "@/components/AppPresenceTracker";
@@ -54,6 +56,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {!ctx.accesSupportPlateforme&&ctx.suspensionPrevueAt&&peutVoirAlerteAbonnement&&<AbonnementBanner echeance={ctx.suspensionPrevueAt} message={ctx.impayeMessage}/>}
         {ctx.essaiExpireSansOffre&&<EssaiExpireBanner peutSouscrire={peutVoirAlerteAbonnement}/>}
         {preavis&&<EssaiPreavisBanner joursRestants={preavis.joursRestants} niveau={preavis.niveau} finEssai={ctx.abonnementEssaiFin} peutSouscrire={peutVoirAlerteAbonnement}/>}
+        <IndicateurReseau />
+        {/* La file n'existe que pour un utilisateur rattaché à une entreprise réelle : le
+            support plateforme consulte les écrans d'un client, il n'y prépare aucune saisie. */}
+        {!ctx.accesSupportPlateforme && <FileHorsLigne entrepriseId={ctx.entrepriseId} utilisateurId={ctx.userId} />}
         <ModuleAccessBoundary permissions={permissions} activeFeatures={activeFeatures}>{children}</ModuleAccessBoundary>
       </div>
       <MobileBack />

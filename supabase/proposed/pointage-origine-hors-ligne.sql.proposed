@@ -1,0 +1,66 @@
+-- PROPOSITION — NON APPLIQUÉE, NON NUMÉROTÉE, HORS supabase/migrations
+--
+-- Lot : ELSATIA-GP-MOBILE-APPLICATION-FOUNDATION-V1, phase E.
+-- Statut : soumis à arbitrage. AUCUN numéro de ledger n'est réservé.
+--
+-- ── Ce que ce fichier propose, et pourquoi il n'est pas indispensable ─────────────────
+--
+-- La V1 hors ligne fonctionne SANS cette migration, et c'est important : elle n'est pas
+-- livrée comme un blocage.
+--
+-- Un pointage préparé hors ligne reste traçable en l'état, parce que deux horloges
+-- coexistent déjà dans la table :
+--   * `created_at` — horloge SERVEUR, écrite à l'insertion, non falsifiable par l'appareil ;
+--   * `arrivee_at` / `depart_at` — horloge de l'APPAREIL, c'est-à-dire l'instant du geste.
+-- L'écart entre les deux révèle le report. Un pointage transmis quatre heures après
+-- l'arrivée se lit sans ambiguïté.
+--
+-- Ce que la proposition apporte : rendre ce fait LISIBLE SANS CALCUL. Aujourd'hui,
+-- reconnaître un pointage différé suppose de comparer deux colonnes et de savoir pourquoi.
+-- Pour un contrôle anti-fraude — le cœur de ce que le pointage GPS sert à établir — c'est
+-- une charge de lecture inutile, et une occasion d'erreur d'interprétation.
+--
+-- ── Pourquoi le contournement actuel n'est pas satisfaisant ──────────────────────────
+--
+-- `pointages.origine_pointage` est contraint à quatre valeurs :
+--     'gps_complet', 'arrivee_oubliee', 'depart_oublie', 'regularisation_responsable'
+-- Aucune ne signifie « préparé hors ligne, transmis plus tard ». Un pointage différé est
+-- donc enregistré en `gps_complet`, ce qui est vrai (il porte bien une position GPS) mais
+-- incomplet : il tait la seule chose qui le distingue.
+--
+-- La V1 compense par une mention en clair dans `commentaire`. C'est lisible par un humain
+-- et inexploitable par une requête.
+--
+-- ── Ce qu'il faudrait décider avant d'appliquer ──────────────────────────────────────
+--
+-- 1. La nouvelle valeur d'origine doit-elle être exclusive des quatre autres ? Un pointage
+--    peut être à la fois « oublié » et « transmis hors ligne ».
+-- 2. `capture_at` fait-il doublon avec `arrivee_at` ? Ils coïncident pour une arrivée, pas
+--    pour une clôture de session — où `capture_at` vaudrait l'instant du geste de départ.
+-- 3. Les exports de paie et les vérifications de cohérence existantes doivent-ils tenir
+--    compte de la nouvelle valeur ? `verifier_pointage_coherence` la verrait passer.
+--
+-- Ces trois questions relèvent du métier, pas de la technique. C'est pourquoi ce fichier
+-- s'arrête ici.
+
+alter table public.pointages
+  drop constraint pointages_origine_pointage_check;
+
+alter table public.pointages
+  add constraint pointages_origine_pointage_check
+  check (origine_pointage = any (array[
+    'gps_complet',
+    'arrivee_oubliee',
+    'depart_oublie',
+    'regularisation_responsable',
+    'hors_ligne_differe'
+  ]));
+
+-- Instant du geste sur l'appareil, quand il diffère de l'instant d'enregistrement serveur.
+-- Nul pour tout pointage saisi en ligne : l'absence de valeur signifie « pas de report ».
+alter table public.sessions_pointage
+  add column capture_at timestamptz;
+
+comment on column public.sessions_pointage.capture_at is
+  'Instant du geste sur l''appareil lorsque la saisie a été préparée hors ligne. Nul en ligne. '
+  'L''écart avec created_at mesure le report de transmission.';

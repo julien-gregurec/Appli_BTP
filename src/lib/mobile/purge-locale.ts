@@ -17,6 +17,7 @@
  * indéfiniment sur l'appareil.
  */
 import { estCleGestionPro } from "@/lib/mobile/identite-locale";
+import { purgerBasesLocales } from "@/lib/mobile/offline/base-locale";
 
 export type StockageEnumerable = Pick<Storage, "getItem" | "removeItem" | "key" | "length">;
 
@@ -71,4 +72,8 @@ export function purgerDonneesLocales(): void {
   try { purgerStockageCleValeur(window.localStorage); } catch { /* stockage refusé */ }
   try { purgerStockageCleValeur(window.sessionStorage); } catch { /* stockage refusé */ }
   demanderPurgeDesCaches();
+  // IndexedDB : suppression asynchrone, lancée sans être attendue. La page part en
+  // redirection ; `deleteDatabase` poursuit côté navigateur. C'est la même logique que le
+  // message au service worker — on déclenche, on ne surveille pas.
+  void purgerBasesLocales().catch(() => undefined);
 }

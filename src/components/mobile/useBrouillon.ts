@@ -23,15 +23,38 @@ export function useBrouillon<T>(
   { actif = true }: { actif?: boolean } = {},
 ): { restaure: T | null; oublier: () => void } {
   const [restaure, setRestaure] = useState<T | null>(null);
-  const dernieres = useRef(valeurs);
-  dernieres.current = valeurs;
 
-  // Relecture au montage uniquement : réagir aux changements de `valeurs` ferait réapparaître
-  // un brouillon que l'utilisateur vient d'écarter.
+  // Les valeurs les plus récentes, lues par les gestionnaires d'événement.
+  //
+  // La ref est mise à jour DANS un effet, jamais pendant le rendu. Écrire une ref pendant
+  // le rendu casse le rendu concurrent : React peut préparer un rendu qu'il abandonne
+  // ensuite, et la ref garderait alors des valeurs qui n'ont jamais été affichées.
+  const dernieres = useRef(valeurs);
+  useEffect(() => { dernieres.current = valeurs; }, [valeurs]);
+
+  /**
+   * Relecture du brouillon, au montage uniquement.
+   *
+   * Réagir aux changements de `valeurs` ferait réapparaître un brouillon que l'utilisateur
+   * vient d'écarter.
+   *
+   * Deux règles sont levées ici, et chacune mérite sa justification plutôt qu'un silence :
+   *
+   * `set-state-in-effect` — la règle protège des rendus en cascade. Il s'agit ici d'une
+   * lecture UNIQUE au montage, dans un stockage que le rendu ne peut pas consulter : le
+   * serveur n'a pas de `localStorage`, donc la valeur ne peut ni être calculée au rendu
+   * initial, ni figurer dans un initialiseur d'état sans provoquer un écart d'hydratation.
+   * L'unique rendu supplémentaire est le prix de la correction.
+   *
+   * `exhaustive-deps` — les dépendances sont volontairement vides. Les ajouter relirait le
+   * brouillon à chaque changement d'identité ou de formulaire, ce qui est précisément le
+   * comportement qu'on ne veut pas.
+   */
   useEffect(() => {
     if (!actif || typeof window === "undefined") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- lecture unique au montage, voir ci-dessus
     setRestaure(lireBrouillon<T>(window.localStorage, identite, formulaire));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- au montage, à dessein (voir ci-dessus)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- au montage seulement, voir ci-dessus
   }, []);
 
   useEffect(() => {
