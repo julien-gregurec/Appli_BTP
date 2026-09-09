@@ -56,3 +56,28 @@ describe("invariant : aucune finition estimée", () => {
     }
   });
 });
+
+describe("écriture de la finition — contrat avec la base", () => {
+  it("le modèle applicatif et la contrainte SQL déclarent exactement les mêmes valeurs", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { fileURLToPath } = await import("node:url");
+    const migration = readFileSync(
+      fileURLToPath(new URL("../../../../supabase/migrations/20260909000281_colors_finition_reference_nuancier_v15.sql", import.meta.url)),
+      "utf8",
+    );
+    // Deux listes qui divergeraient laisseraient l'application proposer une
+    // valeur que la base refuse — un formulaire qui échoue à l'enregistrement.
+    const contrainte = migration.match(/check \(finition in \(([^)]+)\)\)/)?.[1];
+    expect(contrainte).toBeTruthy();
+    const valeursSql = contrainte!.split(",").map((v) => v.trim().replace(/'/g, ""));
+    expect([...valeursSql].sort()).toEqual([...FINITIONS].sort());
+  });
+
+  it("la RPC de finition est la seule voie d'écriture citée par l'application", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { fileURLToPath } = await import("node:url");
+    const actions = readFileSync(fileURLToPath(new URL("../app/actions-metier.ts", import.meta.url)), "utf8");
+    expect(actions).toContain('rpc("colors_definir_finition"');
+    expect(actions).not.toMatch(/from\("colors_seaux"\)[\s\S]{0,80}finition/);
+  });
+});

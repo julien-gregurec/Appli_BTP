@@ -19,13 +19,13 @@
  * pas un échec — c'est l'état honnête d'un seau dont personne n'a lu
  * l'étiquette.
  *
- * ### État de livraison
+ * ### Écriture
  *
- * Ce modèle est complet et testé, mais **il n'est branché sur aucune écriture**.
- * La colonne `colors_seaux.finition` n'existe pas, et `colors_valider_seau`
- * refuse toute mutation qui ne passe pas par une RPC métier : la persister
- * exige donc une migration, non autorisée dans ce lot. Le SQL correspondant est
- * proposé dans `docs/migrations-proposees/`, sans numéro de ledger.
+ * La colonne `colors_seaux.finition` existe depuis la migration
+ * `20260909000281` (V1.5). Elle n'est écrite que par la RPC
+ * `colors_definir_finition` : `colors_valider_seau` refuse toute mutation dont
+ * l'appelant n'est pas `postgres`, ce qui ferme toute autre voie, y compris
+ * depuis la clé de service.
  */
 
 export const FINITIONS = ["mat", "satine", "brillant", "texture", "indetermine"] as const;

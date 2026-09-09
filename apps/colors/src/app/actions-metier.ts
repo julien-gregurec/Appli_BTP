@@ -21,7 +21,13 @@ import {
   CODE_SEAU_DEPLACE,
   CODE_SEAU_RESTAURE,
   CODE_SEUIL_INVALIDE,
+  CODE_VALIDATION,
+  CODE_FINITION_ENREGISTREE,
+  CODE_REFERENCE_CONFIRMEE,
+  CODE_REFERENCE_EFFACEE,
+  CODE_REFERENCE_NON_PERSISTABLE,
 } from "@/lib/messages-metier";
+import { estFinitionColors } from "@/lib/finition-colors";
 import type { EtatSeau, ModeQuantite, UniteQuantite } from "@/lib/colors-types";
 
 const texte=(f:FormData,k:string,max=500)=>String(f.get(k)??"").trim().slice(0,max);
@@ -108,6 +114,57 @@ export async function modifierSeauAction(seauId:string,formData:FormData){
   await contexteAction("modifier_seau");const supabase=await createClient();
   const {error}=await supabase.rpc("colors_modifier_seau",{p_seau_id:seauId,p_marque:texte(formData,"marque",120),p_produit:texte(formData,"produit",180),p_reference_produit:nullable(formData,"reference_produit",120),p_teinte_nom:nullable(formData,"teinte_nom",180),p_teinte_reference:nullable(formData,"teinte_reference",120),p_couleur_hex:nullable(formData,"couleur_hex",7)?.toUpperCase()??null,p_notes:nullable(formData,"notes",4000)});
   if(error)retour(`/inventaire/${seauId}`,echecBase("colors_modifier_seau",error),"erreur");revalidatePath(`/inventaire/${seauId}`);retour(`/inventaire/${seauId}`,CODE_INFORMATIONS_MISES_A_JOUR);
+}
+
+/**
+ * Déclaration de la finition d'un seau.
+ *
+ * La finition se lit sur l'étiquette : elle est déclarée, jamais déduite d'une
+ * photographie. La valeur est validée ici contre le modèle avant d'atteindre la
+ * base, pour que le refus soit un message produit et non une exception SQL.
+ */
+export async function definirFinitionAction(seauId:string,formData:FormData){
+  await contexteAction("modifier_seau");
+  const finition=texte(formData,"finition",40);
+  if(!estFinitionColors(finition))retour(`/inventaire/${seauId}`,CODE_VALIDATION,"erreur");
+  const supabase=await createClient();
+  const {error}=await supabase.rpc("colors_definir_finition",{p_seau_id:seauId,p_finition:finition});
+  if(error)retour(`/inventaire/${seauId}`,echecBase("colors_definir_finition",error),"erreur");
+  revalidatePath(`/inventaire/${seauId}`);revalidatePath("/inventaire");retour(`/inventaire/${seauId}`,CODE_FINITION_ENREGISTREE);
+}
+
+/**
+ * Confirmation ou retrait de la référence de nuancier proposée.
+ *
+ * La proposition elle-même est recalculée à chaque affichage et n'est jamais
+ * écrite : seule la CONFIRMATION humaine l'est. C'est le seul endroit du modèle
+ * où une proximité calculée devient une donnée que l'organisation assume.
+ *
+ * `CLR01` est le refus du schéma pour une référence hors format RAL. Il mérite
+ * son propre message : la proposition reste affichée et exportée, elle ne peut
+ * simplement pas être confirmée tant que la contrainte n'est pas élargie — une
+ * décision de produit, consignée dans la migration.
+ */
+export async function confirmerReferenceNuancierAction(seauId:string,formData:FormData){
+  await contexteAction("modifier_seau");
+  const reference=nullable(formData,"reference",40);
+  const distanceBrute=nombre(formData,"distance");
+  const supabase=await createClient();
+  const {error}=await supabase.rpc("colors_definir_reference_nuancier",{
+    p_seau_id:seauId,
+    p_reference:reference,
+    p_distance:reference===null?null:distanceBrute,
+    p_confirme:reference!==null,
+  });
+  if(error){
+    if((error as {code?:string}).code==="CLR01"){
+      journaliserEchecTechnique("colors_definir_reference_nuancier.format",error);
+      retour(`/inventaire/${seauId}`,CODE_REFERENCE_NON_PERSISTABLE,"erreur");
+    }
+    retour(`/inventaire/${seauId}`,echecBase("colors_definir_reference_nuancier",error),"erreur");
+  }
+  revalidatePath(`/inventaire/${seauId}`);
+  retour(`/inventaire/${seauId}`,reference===null?CODE_REFERENCE_EFFACEE:CODE_REFERENCE_CONFIRMEE);
 }
 
 export async function enregistrerParametresAction(formData:FormData){
