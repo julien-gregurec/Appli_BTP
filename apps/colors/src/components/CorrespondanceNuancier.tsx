@@ -72,7 +72,7 @@ export function CorrespondanceNuancier({
 
       {resultat.statut === "proposition" && (
         <p className="nuancier-provenance">
-          D’après {resultat.source}, version {resultat.version}.
+          D’après {resultat.source}, version {resultat.version} — proximité calculée par le moteur ELSATIA {resultat.moteur} (ΔE*ab CIE76).
         </p>
       )}
       <p className="color-note">
