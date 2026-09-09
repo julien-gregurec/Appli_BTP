@@ -308,3 +308,28 @@ a { color: inherit; text-decoration: none; }
   .activity-diff li { gap: 5px; }
   .pager { flex-direction: column; }
 }
+
+/* Première utilisation — visible d'emblée, sans masquer le tableau de bord. */
+.onboarding { margin: 0 0 22px; padding: 22px 24px; border: 1px solid var(--line); border-radius: 20px; background: var(--paper); box-shadow: var(--shadow); }
+.onboarding-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.onboarding-head h2 { margin: 6px 0 6px; font-size: 19px; }
+.onboarding-head p { margin: 0; color: var(--muted); font-size: 12px; }
+.onboarding-count { flex: 0 0 auto; padding: 7px 13px; border-radius: 999px; background: var(--aubergine-soft); color: var(--aubergine); font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.onboarding-steps { display: grid; gap: 10px; margin: 18px 0 0; padding: 0; list-style: none; counter-reset: none; }
+.onboarding-steps li { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 14px; padding: 13px 15px; border: 1px solid var(--line); border-radius: 14px; }
+.onboarding-steps li.done { border-color: #d8ece4; background: #f4fbf8; }
+.onboarding-steps li.next { border-color: var(--aubergine); background: #fdfaff; }
+.onboarding-steps li.later { opacity: .62; }
+.onboarding-rank { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 11px; background: var(--aubergine-soft); color: var(--aubergine); font-weight: 800; font-size: 13px; }
+.onboarding-steps li.done .onboarding-rank { background: var(--mint); color: white; }
+.onboarding-steps li > div { display: grid; gap: 4px; min-width: 0; }
+.onboarding-steps strong { font-size: 13px; }
+.onboarding-steps small { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.no-account { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+
+@media (max-width: 760px) {
+  .onboarding { padding: 18px; }
+  .onboarding-head { flex-direction: column; }
+  .onboarding-steps li { grid-template-columns: 34px 1fr; }
+  .onboarding-steps li > .outline-button, .onboarding-steps li > .badge { grid-column: 1 / -1; width: 100%; text-align: center; }
+}

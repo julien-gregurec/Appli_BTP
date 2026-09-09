@@ -2,6 +2,13 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { POLITIQUE_RESSOURCES_PUBLIQUES, construireCspColors } from "@/lib/security/en-tetes";
 import { clePubliqueSupabase, urlSupabase, urlSupabaseConfiguree } from "@/lib/supabase/cles";
+import { porteCookieSession } from "@/lib/destination-connexion";
+import {
+  EN_TETE_CHEMIN,
+  EN_TETE_SESSION,
+  VALEUR_SESSION_ABSENTE,
+  VALEUR_SESSION_PRESENTE,
+} from "@/lib/en-tetes-requete";
 
 /**
  * Ressources publiques servies telles quelles. Elles reçoivent une CSP — une
@@ -45,6 +52,18 @@ export async function proxy(request: NextRequest) {
   const enTetesRequete = new Headers(request.headers);
   enTetesRequete.set("x-nonce", nonce);
   enTetesRequete.set("Content-Security-Policy", csp);
+
+  // Le proxy est le seul endroit où le chemin demandé et les cookies de la
+  // requête sont tous deux lisibles ; un composant serveur ne voit ni l'un ni
+  // l'autre. Ces deux en-têtes sont posés avec `set` — jamais `append` — pour
+  // qu'une valeur envoyée par le client soit écrasée et non ajoutée : elles
+  // décrivent la requête telle que le serveur la constate, et rien d'autre.
+  // Elles sont relues par `en-tetes-requete.ts`, qui revalide le chemin.
+  enTetesRequete.set(EN_TETE_CHEMIN, `${request.nextUrl.pathname}${request.nextUrl.search}`);
+  enTetesRequete.set(
+    EN_TETE_SESSION,
+    porteCookieSession(request.cookies.getAll().map((cookie) => cookie.name)) ? VALEUR_SESSION_PRESENTE : VALEUR_SESSION_ABSENTE,
+  );
 
   let response = NextResponse.next({ request: { headers: enTetesRequete } });
   const supabase = createServerClient(
