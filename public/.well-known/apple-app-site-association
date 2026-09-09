@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["REMPLACER_PAR_TEAM_ID.fr.elsatia.gestionpro"],
+        "components": [
+          { "/": "/dashboard", "comment": "Tableau de bord" },
+          { "/": "/pointage", "comment": "Pointage" },
+          { "/": "/chantiers/*", "comment": "Chantiers" },
+          { "/": "/notes-frais/*", "comment": "Notes de frais" }
+        ]
+      }
+    ]
+  }
+}

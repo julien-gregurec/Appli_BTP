@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Gestion Pro</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; min-height: 100dvh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 1rem; padding: 2rem;
+    background: #0d1b2a; color: #fff; text-align: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  h1 { font-size: 1.15rem; margin: 0; }
+  p { max-width: 24rem; font-size: .9rem; line-height: 1.5; color: rgba(255,255,255,.7); margin: 0; }
+  strong { color: #c9a24a; }
+</style>
+</head>
+<body>
+  <!-- Cet écran n'apparaît QUE si la coque ne parvient pas à joindre l'application au tout
+       premier lancement. Une fois l'application chargée une première fois, son propre
+       service worker prend le relais et sert sa page hors ligne, bien plus utile.
+       Il n'y a donc rien à enrichir ici : c'est un filet, pas un écran de produit. -->
+  <strong>ELSATIA</strong>
+  <h1>Gestion Pro n’a pas pu se charger</h1>
+  <p>
+    Le premier lancement nécessite une connexion Internet.
+    Vérifiez votre réseau puis rouvrez l’application.
+  </p>
+</body>
+</html>

@@ -28,7 +28,15 @@ export const config = {
   // les exclure évite un aller-retour d'authentification vers Supabase pour
   // chacun. Le manuel (9,7 Mo) et les vidéos (20 Mo) le payaient à chaque
   // téléchargement.
+  //
+  // `.well-known/` doit être exclu pour une raison plus forte qu'une économie de
+  // requête : ces fichiers sont récupérés par des ROBOTS SANS SESSION — la CDN
+  // d'Apple pour `apple-app-site-association`, celle de Google pour
+  // `assetlinks.json`. Passés par le proxy, ils recevraient une redirection 307
+  // vers /login, et l'association d'application échouerait sans message d'erreur
+  // exploitable. Apple met de surcroît le résultat en cache, ce qui rend le
+  // symptôme durable et déroutant.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|guides/|videos/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|mp4|webm|mp3|wav|vtt|pdf|woff|woff2|ttf|txt)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|\\.well-known/|guides/|videos/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|mp4|webm|mp3|wav|vtt|pdf|woff|woff2|ttf|txt)$).*)",
   ],
 };
