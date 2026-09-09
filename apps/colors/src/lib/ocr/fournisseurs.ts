@@ -32,7 +32,10 @@ export function fournisseursConnus(): readonly string[] {
 }
 
 /** État de l'OCR pour cette installation, lu sur l'environnement serveur. */
-export function etatOcrColors(env: NodeJS.ProcessEnv = process.env): EtatOcrColors {
+/** Vue minimale de l'environnement : seules deux variables sont lues. */
+export type EnvironnementOcr = Partial<Record<string, string | undefined>>;
+
+export function etatOcrColors(env: EnvironnementOcr = process.env): EtatOcrColors {
   return decisionOcr({
     actif: env[VARIABLE_OCR_ACTIF],
     fournisseur: env[VARIABLE_OCR_FOURNISSEUR],
@@ -47,7 +50,7 @@ export function etatOcrColors(env: NodeJS.ProcessEnv = process.env): EtatOcrColo
  * second contrôle n'est pas redondant mais défensif : il garantit qu'aucun
  * appelant ne peut obtenir un prestataire en court-circuitant la décision.
  */
-export function fournisseurOcrActif(env: NodeJS.ProcessEnv = process.env): FournisseurOcrColors | null {
+export function fournisseurOcrActif(env: EnvironnementOcr = process.env): FournisseurOcrColors | null {
   const etat = etatOcrColors(env);
   if (!etat.actif) return null;
   const fabrique = FOURNISSEURS_OCR[etat.fournisseur];

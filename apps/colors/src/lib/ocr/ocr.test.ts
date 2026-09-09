@@ -58,13 +58,13 @@ describe("registre des prestataires", () => {
   });
 
   it("ne peut donc être activé par aucune configuration", () => {
-    const etat = etatOcrColors({ COLORS_OCR_ACTIF: "oui", COLORS_OCR_FOURNISSEUR: "n-importe-lequel" } as NodeJS.ProcessEnv);
+    const etat = etatOcrColors({ COLORS_OCR_ACTIF: "oui", COLORS_OCR_FOURNISSEUR: "n-importe-lequel" });
     expect(etat).toEqual({ actif: false, raison: "fournisseur_inconnu" });
-    expect(fournisseurOcrActif({ COLORS_OCR_ACTIF: "oui", COLORS_OCR_FOURNISSEUR: "n-importe-lequel" } as NodeJS.ProcessEnv)).toBeNull();
+    expect(fournisseurOcrActif({ COLORS_OCR_ACTIF: "oui", COLORS_OCR_FOURNISSEUR: "n-importe-lequel" })).toBeNull();
   });
 
   it("est inactif sur un environnement vierge", () => {
-    expect(etatOcrColors({} as NodeJS.ProcessEnv)).toEqual({ actif: false, raison: "desactive" });
+    expect(etatOcrColors({})).toEqual({ actif: false, raison: "desactive" });
   });
 });
 
