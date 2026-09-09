@@ -34,7 +34,6 @@ export async function POST(request: Request) {
   // On réutilise le résolveur du webhook abonnement plutôt que d'en écrire un
   // second : même variable, même règle, un seul endroit à auditer. Configuration
   // absente, vide ou invalide ⇒ on refuse, on ne devine pas.
-  if (!boutiqueEstActive()) return NextResponse.json({ error: "Fonctionnalité indisponible" }, { status: 404 });
   const configurationMode = resoudreModeStripeWebhook();
   if (!configurationMode.valide) {
     console.error("Webhook boutique non traité", {
