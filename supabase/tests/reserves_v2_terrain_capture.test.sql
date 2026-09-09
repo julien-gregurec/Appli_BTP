@@ -6,7 +6,7 @@
 
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(92);
+select plan(94);
 
 \ir fixtures/isolation_multitenant.inc
 
@@ -225,9 +225,34 @@ select ok(
   not public.reserves_storage_photo_autorisee(current_setting('elsatia.chemin_r3'), true),
   'et ne peut rien y déposer'
 );
-select throws_ok(
+-- L'assertion d'origine attendait une exception 42501. Elle ne pouvait pas
+-- l'obtenir : `authenticated` DÉTIENT le privilège `delete` sur `storage.objects`
+-- (accordé par les migrations 00032, 00033, 00037, 00042, 00050 puis 00246), si
+-- bien que PostgreSQL ne refuse jamais l'ordre au titre des privilèges. Ce qui
+-- protège les photos, c'est la RLS — et une RLS qui n'autorise aucune ligne ne
+-- lève pas d'erreur : elle supprime zéro ligne. Le test échouait donc en
+-- réclamant le mauvais mécanisme, alors que la protection, elle, fonctionnait.
+--
+-- On mesure désormais ce qui compte réellement : après la tentative, la photo est
+-- toujours là. Et depuis la migration 00279, deux policies RESTRICTIVES rendent
+-- cette garantie explicite au lieu de la laisser reposer sur l'absence de policy
+-- permissive.
+select lives_ok(
   $$delete from storage.objects where bucket_id = 'reserves-photos'$$,
-  '42501', null, 'aucune photo ne peut être effacée du stockage depuis l''application'
+  'la tentative de suppression ne lève pas : c''est la RLS, non le privilège, qui protège'
+);
+select is(
+  (select count(*) from storage.objects where bucket_id = 'reserves-photos'), 1::bigint,
+  'aucune photo n''a été effacée du stockage depuis l''application'
+);
+select ok(
+  exists (
+    select 1 from pg_policy
+    where polrelid = 'storage.objects'::regclass
+      and polname = 'reserves_photos_jamais_supprimables'
+      and not polpermissive
+  ),
+  'et la garantie est écrite, non subie : une policy restrictive ferme la suppression'
 );
 
 -- ── 5. Photo réservée, photo confirmée ──────────────────────────────────────
