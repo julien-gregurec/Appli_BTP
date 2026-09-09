@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MAQUETTE — ELSATIA UI-V2 · Direction B « Chantier »</title>
+<style>
+/* ==========================================================================
+   MAQUETTE — aucune donnée réelle. Démonstration visuelle isolée (UI-V2-R2A).
+   HTML/CSS autonomes. Aucune ressource distante. Aucun lien Supabase. Aucun JS.
+   Direction B — ELSATIA Chantier : opérationnelle, contraste renforcé,
+   « Aujourd'hui » en évidence, zones tactiles généreuses, lisible en extérieur.
+   ========================================================================== */
+:root{
+  --bg:#e9edf1;
+  --surface:#ffffff;
+  --surface-2:#eef2f6;
+  --nav-bg:#0b1a2b;
+  --nav-bg-2:#102a44;
+  --today-bg:#0e2137;      /* bandeau du jour, bleu nuit profond */
+  --text:#151a1f;          /* ≈17:1 sur blanc */
+  --text-muted:#4a5560;    /* ≈7.4:1 sur blanc */
+  --text-faint:#5f6b78;    /* ≈5.4:1 sur blanc */
+  --on-nav:#f2f6fb;
+  --on-nav-muted:#b6c3d2;  /* ≈5.6:1 sur navy */
+  --action:#1552d6;        /* bleu d'action fort (≈6.0:1 texte blanc) */
+  --action-strong:#0f3fac;
+  --action-weak:#e3ecfd;
+  --gold:#a9761f;
+  --ok:#136b3a; --ok-bg:#dcf0e3; --ok-line:#136b3a;
+  --info:#0f4bab; --info-bg:#dfeafb;
+  --warn:#7c4a06; --warn-bg:#fbe9cf;
+  --err:#a41c15; --err-bg:#fbe2df;
+  --neutral:#43505d; --neutral-bg:#e3e7ec;
+  --border:#d3d9e0;
+  --border-strong:#b9c2cc;
+  --r-sm:8px; --r-md:10px; --r-lg:14px;
+  --sh-1:0 1px 2px rgba(11,26,43,.10);
+  --sh-2:0 6px 18px rgba(11,26,43,.14);
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:22px; --s6:30px;
+  --tap:48px; /* cible tactile minimale */
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-num:ui-monospace,"SF Mono","Segoe UI Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:#d3dae1;color:var(--text);font-family:var(--font);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.rulerbar{position:sticky;top:0;z-index:20;display:flex;gap:8px;align-items:center;padding:8px 14px;background:#0b1a2b;color:#fff;font:13px/1.3 var(--font)}
+.rulerbar b{font-weight:700}
+.rulerbar .tag{margin-left:auto;background:#a41c15;color:#fff;border-radius:4px;padding:2px 8px;font-weight:700}
+.rulerbar a{border:1px solid #34506c;border-radius:6px;padding:4px 10px;color:#cdd9e6}
+.rulerbar a:hover{background:#12324c;color:#fff}
+#bureau,#tablette,#mobile{position:absolute}
+.viewport{--w:1440px;width:min(100%,var(--w));margin:18px auto;background:var(--bg);border:1px solid #b9c2cc;border-radius:12px;overflow:hidden;container-type:inline-size;box-shadow:0 10px 40px rgba(11,26,43,.18)}
+#tablette:target ~ .viewport{--w:1024px}
+#mobile:target ~ .viewport{--w:390px}
+.frame-note{max-width:1120px;margin:6px auto 0;color:#4a5560;font:12px/1.5 var(--font);padding:0 14px}
+
+.app{display:grid;grid-template-columns:256px 1fr;min-height:780px}
+.side{background:var(--nav-bg);color:var(--on-nav);display:flex;flex-direction:column;padding:14px 10px}
+.brand{display:flex;align-items:baseline;gap:8px;padding:6px 8px 12px}
+.brand .wm{font-weight:800;letter-spacing:.13em;font-size:16px}
+.brand .pn{font-size:10px;color:#e6c78f;letter-spacing:.06em}
+.ent{margin:2px 4px 10px;background:#ffffff14;border:1px solid #ffffff1f;border-radius:var(--r-md);padding:10px}
+.ent .lbl{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--on-nav-muted)}
+.ent .row{display:flex;align-items:center;gap:8px;margin-top:4px}
+.ent .logo{width:28px;height:22px;border-radius:5px;background:#fff;color:#0b1a2b;font-weight:800;font-size:11px;display:grid;place-items:center}
+.ent .name{font-size:14px;font-weight:700}
+.ent select{margin-top:8px;width:100%;min-height:40px;background:#0b1a2b;color:#f2f6fb;border:1px solid #33465c;border-radius:var(--r-sm);padding:8px;font:13px var(--font)}
+.appsw{margin:0 4px 12px}
+.appsw button{width:100%;min-height:44px;display:flex;align-items:center;gap:8px;background:#ffffff10;border:1px solid #33465c;color:var(--on-nav);border-radius:var(--r-sm);padding:10px 12px;font:13px var(--font);cursor:pointer}
+.appsw .dot{width:9px;height:9px;border-radius:2px;background:#e6c78f}
+.nav{flex:1;overflow:auto}
+.nav .grp{font-size:10px;text-transform:uppercase;letter-spacing:.14em;color:var(--on-nav-muted);padding:12px 10px 4px}
+.nav a{display:flex;align-items:center;gap:10px;border-radius:var(--r-sm);padding:11px 10px;min-height:44px;color:#d6e0ea;font-size:14px;font-weight:500}
+.nav a .ic{width:18px;height:18px;border-radius:5px;background:#ffffff26;flex:none}
+.nav a:hover{background:#ffffff17;color:#fff}
+.nav a[aria-current="page"]{background:#fff;color:#0b1a2b;font-weight:700}
+.nav a[aria-current="page"] .ic{background:var(--action)}
+.nav .plat{margin:14px 6px 4px;border-top:2px solid #ffffff26;padding-top:12px}
+.nav .plat .glbl{font-size:10px;letter-spacing:.14em;color:#e6c78f;text-transform:uppercase;padding:0 10px 4px}
+.nav .plat a{color:#efdcb6}
+.nav .plat a .ic{background:var(--gold)}
+.side .foot{border-top:2px solid #ffffff26;padding-top:8px;margin-top:6px;display:grid;gap:2px}
+.side .foot a{min-height:44px;display:flex;align-items:center;font-size:13.5px;color:var(--on-nav-muted);padding:8px 10px;border-radius:var(--r-sm)}
+.side .foot a:hover{background:#ffffff14;color:#fff}
+
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{display:flex;align-items:center;gap:14px;padding:12px 20px;background:var(--surface);border-bottom:2px solid var(--border)}
+.search{flex:1;max-width:440px;display:flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:var(--r-sm);padding:11px 14px;color:var(--text-muted);font-size:14px;min-height:var(--tap)}
+.search .k{margin-left:auto;border:1px solid var(--border-strong);border-radius:4px;padding:1px 6px;font-size:11px;color:var(--text-faint)}
+.topbar .sp{flex:1}
+.iconbtn{position:relative;width:var(--tap);height:var(--tap);border-radius:var(--r-sm);border:1px solid var(--border-strong);background:var(--surface);display:grid;place-items:center;color:var(--text-muted);cursor:pointer;font-size:18px}
+.iconbtn .badge{position:absolute;top:-6px;right:-6px;min-width:20px;height:20px;padding:0 4px;border-radius:999px;background:var(--err);color:#fff;font-size:11px;font-weight:800;display:grid;place-items:center;border:2px solid #fff}
+.me{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text-muted)}
+.me .av{width:36px;height:36px;border-radius:var(--r-sm);background:#0b1a2b;color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px}
+
+.content{padding:20px;max-width:1220px;width:100%;margin:0 auto;display:grid;gap:var(--s5)}
+.pagehead{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.pagehead h1{margin:0;font-size:24px;font-weight:750;letter-spacing:-.01em}
+.pagehead p{margin:3px 0 0;color:var(--text-muted);font-size:14px}
+.pagehead .actions{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:var(--r-sm);padding:13px 20px;min-height:var(--tap);font:700 14.5px var(--font);cursor:pointer;border:2px solid transparent}
+.btn-primary{background:var(--action);color:#fff}
+.btn-primary:hover{background:var(--action-strong)}
+.btn-secondary{background:var(--surface);color:var(--text);border-color:var(--border-strong)}
+.btn-secondary:hover{background:var(--surface-2)}
+.btn-danger{background:#fff;color:var(--err);border-color:#d98a83}
+.btn-danger:hover{background:var(--err-bg)}
+.btn:focus-visible{outline:3px solid #ffd23f;outline-offset:2px}
+
+/* ----- Bandeau « Aujourd'hui » très visible ----- */
+.today{background:var(--today-bg);color:#eef4fb;border-radius:var(--r-lg);padding:18px;display:grid;grid-template-columns:1fr 1fr;gap:18px;box-shadow:var(--sh-2)}
+.today .col{background:#ffffff}
+.today h2{margin:0 0 10px;font-size:15px;letter-spacing:.02em;display:flex;align-items:center;gap:8px;color:#dfe9f4}
+.today h2 .n{background:#ffffff26;border-radius:999px;padding:1px 10px;font-size:12px}
+.tcard{background:#fff;color:var(--text);border-radius:var(--r-md);padding:6px}
+.tline{display:flex;gap:12px;align-items:flex-start;padding:12px 10px;min-height:var(--tap)}
+.tline + .tline{border-top:1px solid var(--border)}
+.tline .glyph{width:26px;height:26px;border-radius:7px;flex:none;display:grid;place-items:center;font-weight:900;font-size:14px;color:#fff}
+.tline .glyph.err{background:var(--err)} .tline .glyph.warn{background:var(--warn)} .tline .glyph.info{background:var(--info)} .tline .glyph.ok{background:var(--ok)}
+.tline .t{font-size:14.5px;font-weight:650}
+.tline .d{font-size:12.5px;color:var(--text-muted);margin-top:2px}
+.tline .tag2{margin-left:auto;font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:6px;flex:none;text-transform:uppercase;letter-spacing:.03em}
+.tag2.err{background:var(--err-bg);color:var(--err)} .tag2.warn{background:var(--warn-bg);color:var(--warn)} .tag2.info{background:var(--info-bg);color:var(--info)}
+
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--s4)}
+.kpi{background:var(--surface);border:2px solid var(--border);border-radius:var(--r-md);padding:16px}
+.kpi .lbl{font-size:12.5px;color:var(--text-muted);font-weight:600}
+.kpi .val{margin-top:6px;font:800 26px/1 var(--font-num);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kpi .sub{margin-top:6px;font-size:12px;color:var(--text-faint)}
+.kpi.pos .val{color:var(--ok)} .kpi.warn{border-color:#e6c07a} .kpi.warn .val{color:var(--warn)}
+
+.cols{display:grid;grid-template-columns:1.25fr 1fr;gap:var(--s5)}
+.card{background:var(--surface);border:2px solid var(--border);border-radius:var(--r-md)}
+.card > h2{margin:0;padding:14px 16px;font-size:14.5px;font-weight:750;border-bottom:2px solid var(--border);display:flex;align-items:center;gap:8px}
+.card > h2 .count{margin-left:auto;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:999px;padding:1px 10px;font-size:12px;color:var(--text-muted)}
+.card .body{padding:8px}
+.li{display:flex;gap:12px;align-items:flex-start;padding:13px 10px;min-height:var(--tap)}
+.li + .li{border-top:1px solid var(--border)}
+.li:hover{background:var(--surface-2)}
+.li .t{font-size:14px;font-weight:600} .li .d{font-size:12.5px;color:var(--text-muted);margin-top:2px}
+
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;padding:3px 10px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em}
+.badge::before{content:"";width:8px;height:8px;border-radius:2px}
+.b-ok{background:var(--ok-bg);color:var(--ok)} .b-ok::before{background:var(--ok)}
+.b-info{background:var(--info-bg);color:var(--info)} .b-info::before{background:var(--info)}
+.b-warn{background:var(--warn-bg);color:var(--warn)} .b-warn::before{background:var(--warn);border-radius:0;transform:rotate(45deg)}
+.b-err{background:var(--err-bg);color:var(--err)} .b-err::before{background:var(--err);border-radius:50%}
+.b-neu{background:var(--neutral-bg);color:var(--neutral)} .b-neu::before{background:var(--neutral)}
+
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+thead th{background:var(--surface-2);text-align:left;font-weight:750;color:var(--text-muted);font-size:12px;padding:12px 14px;border-bottom:2px solid var(--border);white-space:nowrap;text-transform:uppercase;letter-spacing:.04em}
+tbody td{padding:14px;border-bottom:1px solid var(--border)}
+tbody tr:hover{background:var(--surface-2)}
+td.num{text-align:right;font-family:var(--font-num);font-variant-numeric:tabular-nums;font-weight:600}
+td.ref{font-family:var(--font-num);color:var(--text-muted)}
+
+.empty{border:2px dashed var(--border-strong);border-radius:var(--r-md);padding:34px 20px;text-align:center;background:var(--surface)}
+.empty .il{width:48px;height:48px;border-radius:12px;background:var(--action-weak);margin:0 auto 12px}
+.empty h3{margin:0 0 4px;font-size:16px}
+.empty p{margin:0 0 14px;color:var(--text-muted);font-size:13.5px}
+
+.formrow{background:var(--surface);border:2px solid var(--border);border-radius:var(--r-md);padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.field label{display:block;font-size:12.5px;color:var(--text-muted);font-weight:600;margin-bottom:6px}
+.field .req{color:var(--err)}
+.field input,.field select{width:100%;min-height:var(--tap);background:var(--surface);border:2px solid var(--border-strong);border-radius:var(--r-sm);padding:11px 12px;font:15px var(--font);color:var(--text)}
+.field input:focus,.field select:focus{outline:3px solid #ffd23f;outline-offset:1px;border-color:var(--action)}
+.field .hint{margin-top:6px;font-size:12px;color:var(--text-faint)}
+
+.dangerzone{border:2px solid #d98a83;background:var(--err-bg);border-radius:var(--r-md);padding:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.dangerzone .txt{font-size:13.5px;color:#6f1712}
+
+.mobileprev{background:var(--surface);border:2px solid var(--border);border-radius:var(--r-md);padding:14px}
+.mobileprev h2{margin:0 0 10px;font-size:13.5px;color:var(--text-muted);font-weight:700}
+.phone{width:310px;max-width:100%;margin:0 auto;border:11px solid #0b1a2b;border-radius:30px;overflow:hidden;background:var(--nav-bg)}
+.phone .pbar{display:flex;align-items:center;gap:8px;padding:12px;color:#fff}
+.phone .pbar .wm{font-weight:800;letter-spacing:.12em;font-size:13px}
+.phone .pbar .mn{margin-left:auto;border:1px solid #34506c;border-radius:6px;padding:6px 10px;font-size:12px;min-height:36px;display:flex;align-items:center}
+.phone .today-m{background:var(--today-bg);color:#eef4fb;padding:10px 12px;font-size:12px}
+.phone .today-m b{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#c9d8e6;margin-bottom:6px}
+.phone .today-m .row{display:flex;gap:8px;align-items:center;padding:6px 0}
+.phone .today-m .g{width:20px;height:20px;border-radius:5px;background:var(--err);flex:none}
+.phone .drawer{background:var(--nav-bg);padding:8px}
+.phone .drawer .grp{font-size:9px;letter-spacing:.14em;color:var(--on-nav-muted);text-transform:uppercase;padding:8px 8px 2px}
+.phone .drawer a{display:block;color:#d6e0ea;font-size:13px;padding:11px 8px;border-radius:6px;min-height:44px;box-sizing:border-box}
+.phone .drawer a[aria-current="page"]{background:#fff;color:#0b1a2b;font-weight:700}
+.phone .drawer .plat{border-top:2px solid #ffffff26;margin-top:8px;padding-top:8px}
+.phone .drawer .plat a{color:#efdcb6}
+
+@container (max-width:1080px){
+  .app{grid-template-columns:1fr}
+  .side{display:none}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .cols{grid-template-columns:1fr}
+  .today{grid-template-columns:1fr}
+  .content{padding:16px}
+}
+@container (max-width:640px){
+  .kpis{grid-template-columns:1fr 1fr}
+  .formrow{grid-template-columns:1fr}
+  .topbar{flex-wrap:wrap}
+  .search{max-width:none;order:3;width:100%}
+  .pagehead .actions{width:100%}
+  .btn{flex:1}
+  .kpi .val{font-size:22px}
+  .pagehead h1{font-size:21px}
+}
+</style>
+</head>
+<body>
+
+<div class="rulerbar">
+  <b>MAQUETTE ELSATIA UI-V2 — Direction B « Chantier »</b>
+  <a href="#bureau">Bureau 1440</a><a href="#tablette">Tablette 1024</a><a href="#mobile">Mobile 390</a>
+  <span class="tag">MAQUETTE — aucune donnée réelle</span>
+</div>
+<span id="bureau"></span><span id="tablette"></span><span id="mobile"></span>
+
+<div class="viewport">
+<div class="app">
+
+  <aside class="side"><!-- 1. barre latérale -->
+    <div class="brand"><span class="wm">ELSATIA</span><span class="pn">Gestion Pro</span></div>
+    <div class="ent"><!-- 3 + 4 -->
+      <div class="lbl">Entreprise active</div>
+      <div class="row"><span class="logo">BR</span><span class="name">BTP Rénov' Sud</span></div>
+      <select aria-label="Changer d'entreprise"><option>BTP Rénov' Sud</option><option>Ateliers Maçonnerie Est</option><option>Couverture Vallée SARL</option></select>
+    </div>
+    <div class="appsw"><button type="button"><span class="dot"></span>Applications ELSATIA ▾</button></div><!-- 5 -->
+    <nav class="nav" aria-label="Navigation principale">
+      <div class="grp">Accueil</div>
+      <a href="#" aria-current="page"><span class="ic"></span>Tableau de bord</a><a href="#"><span class="ic"></span>Mon espace</a><a href="#"><span class="ic"></span>Messagerie</a>
+      <div class="grp">Clients &amp; ventes</div>
+      <a href="#"><span class="ic"></span>Clients</a><a href="#"><span class="ic"></span>Devis</a><a href="#"><span class="ic"></span>Factures</a>
+      <div class="grp">Chantiers</div>
+      <a href="#"><span class="ic"></span>Chantiers</a><a href="#"><span class="ic"></span>Planning</a><a href="#"><span class="ic"></span>Pointage</a>
+      <div class="grp">Équipe</div>
+      <a href="#"><span class="ic"></span>Employés</a><a href="#"><span class="ic"></span>Congés</a><a href="#"><span class="ic"></span>Notes de frais</a>
+      <div class="grp">Achats &amp; stock</div>
+      <a href="#"><span class="ic"></span>Fournisseurs</a><a href="#"><span class="ic"></span>Commandes</a><a href="#"><span class="ic"></span>Stock</a>
+      <div class="grp">Pilotage</div>
+      <a href="#"><span class="ic"></span>Rentabilité</a><a href="#"><span class="ic"></span>Trésorerie</a><a href="#"><span class="ic"></span>Exports comptables</a>
+      <div class="plat"><div class="glbl">Administration plateforme</div><a href="#"><span class="ic"></span>★ Console ELSATIA</a><a href="#"><span class="ic"></span>Sécurité du compte</a></div>
+    </nav>
+    <div class="foot"><a href="#">Paramètres</a><a href="#">Aide &amp; assistant</a><a href="#">Se déconnecter</a></div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar"><!-- 2 : 6 recherche · 7 notifications -->
+      <div class="search">🔍 Rechercher un client, un devis, un chantier…<span class="k">Ctrl K</span></div>
+      <div class="sp"></div>
+      <button class="iconbtn" aria-label="Notifications (3 non lues)">🔔<span class="badge">3</span></button>
+      <div class="me"><span class="av">JG</span>Julien G.</div>
+    </header>
+
+    <div class="content">
+      <div class="pagehead"><!-- 8 titre · 9 bouton principal · 18 bouton secondaire -->
+        <div><h1>Tableau de bord</h1><p>Lundi 12 octobre · BTP Rénov' Sud</p></div>
+        <div class="actions">
+          <button class="btn btn-secondary" type="button">Exporter</button>
+          <button class="btn btn-primary" type="button">+ Nouveau devis</button>
+        </div>
+      </div>
+
+      <!-- 11 Alertes prioritaires + 12 Tâches du jour, réunies en tête -->
+      <section class="today">
+        <div class="col tcard">
+          <h2>⚠ Alertes prioritaires <span class="n">3</span></h2>
+          <div class="tline"><span class="glyph err">!</span><div><div class="t">Facture F-2026-041 impayée</div><div class="d">Maison Durand · 12 300 € · retard de 6 jours</div></div><span class="tag2 err">Retard</span></div>
+          <div class="tline"><span class="glyph err">!</span><div><div class="t">Contrôle technique dépassé · AB-482-CD</div><div class="d">Renault Master · régulariser sous 48 h</div></div><span class="tag2 err">Critique</span></div>
+          <div class="tline"><span class="glyph warn">▲</span><div><div class="t">Stock bas · Vis inox 5×60</div><div class="d">12 restants pour un seuil de 50</div></div><span class="tag2 warn">Attention</span></div>
+        </div>
+        <div class="col tcard">
+          <h2>✔ Tâches du jour <span class="n">3</span></h2>
+          <div class="tline"><span class="glyph info">→</span><div><div class="t">Relancer le devis D-2026-118</div><div class="d">Validité expire aujourd'hui</div></div><span class="tag2 info">Ce jour</span></div>
+          <div class="tline"><span class="glyph info">→</span><div><div class="t">Réception commande C-2026-077</div><div class="d">Point P · livraison ce matin</div></div><span class="tag2 info">Matin</span></div>
+          <div class="tline"><span class="glyph warn">▲</span><div><div class="t">Valider 3 notes de frais</div><div class="d">En attente depuis 4 jours</div></div><span class="tag2 warn">À faire</span></div>
+        </div>
+      </section>
+
+      <div class="kpis"><!-- 10 -->
+        <div class="kpi"><div class="lbl">Facturé (30 j)</div><div class="val">128 400 €</div><div class="sub">18 factures émises</div></div>
+        <div class="kpi pos"><div class="lbl">Encaissé</div><div class="val">96 200 €</div><div class="sub">+ 12 300 € vs. mois n-1</div></div>
+        <div class="kpi warn"><div class="lbl">Reste à encaisser</div><div class="val">32 200 €</div><div class="sub">dont 12 300 € en retard</div></div>
+        <div class="kpi"><div class="lbl">Devis acceptés</div><div class="val">54 900 €</div><div class="sub">4 devis ce mois</div></div>
+      </div>
+
+      <div class="cols">
+        <section class="card"><!-- 13 Chantiers en cours + 15 badges -->
+          <h2>Chantiers en cours <span class="count">3</span></h2>
+          <div class="body">
+            <div class="li"><div><div class="t">Réhabilitation école Jean-Moulin</div><div class="d">Fin prévue 14/10 · avancement 68 %</div></div><span class="badge b-ok" style="margin-left:auto">En cours</span></div>
+            <div class="li"><div><div class="t">Extension pavillon Lefèvre</div><div class="d">Reprise en attente d'un devis avenant</div></div><span class="badge b-warn" style="margin-left:auto">En pause</span></div>
+            <div class="li"><div><div class="t">Ravalement copropriété Les Tilleuls</div><div class="d">Démarrage semaine 43</div></div><span class="badge b-neu" style="margin-left:auto">À préparer</span></div>
+          </div>
+        </section>
+
+        <section class="card"><!-- 17 champ de formulaire -->
+          <h2>Nouveau client</h2>
+          <div class="body">
+            <div class="formrow" style="border:0;padding:8px 6px">
+              <div class="field"><label>Nom du client <span class="req">*</span></label><input type="text" value="Maison Durand"><div class="hint">Apparaît sur les devis et factures.</div></div>
+              <div class="field"><label>Type de client</label><select><option>Particulier</option><option selected>Professionnel</option><option>Syndic</option><option>Collectivité</option></select></div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <section class="card"><!-- 14 tableau métier -->
+        <h2>Devis récents <span class="count">4</span></h2>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>Référence</th><th>Client</th><th>Montant</th><th>Statut</th></tr></thead>
+            <tbody>
+              <tr><td class="ref">D-2026-118</td><td>Maison Durand</td><td class="num">8 900 €</td><td><span class="badge b-info">Envoyé</span></td></tr>
+              <tr><td class="ref">D-2026-117</td><td>SCI Horizon</td><td class="num">21 400 €</td><td><span class="badge b-ok">Accepté</span></td></tr>
+              <tr><td class="ref">D-2026-116</td><td>Mairie de Caster</td><td class="num">63 200 €</td><td><span class="badge b-neu">Brouillon</span></td></tr>
+              <tr><td class="ref">D-2026-115</td><td>Entreprise Roux</td><td class="num">4 100 €</td><td><span class="badge b-err">Refusé</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="empty"><!-- 16 état vide -->
+        <div class="il"></div><h3>Aucune intervention planifiée</h3>
+        <p>Les interventions programmées pour l'équipe apparaîtront ici.</p>
+        <button class="btn btn-secondary" type="button">Planifier une intervention</button>
+      </section>
+
+      <div class="dangerzone"><!-- 19 action dangereuse -->
+        <div class="txt"><strong>Supprimer ce devis</strong> — action définitive, l'historique et les pièces jointes seront perdus.</div>
+        <button class="btn btn-danger" type="button" style="margin-left:auto">Supprimer le devis</button>
+      </div>
+
+      <section class="mobileprev"><!-- 20 aperçu menu mobile -->
+        <h2>Aperçu du menu mobile</h2>
+        <div class="phone">
+          <div class="pbar"><span class="wm">ELSATIA</span><span class="mn">☰ Menu</span></div>
+          <div class="today-m"><b>Aujourd'hui</b>
+            <div class="row"><span class="g"></span>Facture F-2026-041 impayée · 12 300 €</div>
+            <div class="row"><span class="g" style="background:var(--warn)"></span>Valider 3 notes de frais</div>
+          </div>
+          <div class="drawer">
+            <div class="grp">Accueil</div><a href="#" aria-current="page">Tableau de bord</a><a href="#">Mon espace</a><a href="#">Messagerie</a>
+            <div class="grp">Chantiers</div><a href="#">Chantiers</a><a href="#">Planning</a><a href="#">Pointage</a>
+            <div class="plat"><a href="#">★ Console ELSATIA</a></div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+</div>
+<p class="frame-note">Direction B « Chantier » — bandeau « Aujourd'hui » bleu nuit en tête, contraste renforcé, statuts différenciés par <em>couleur + forme + libellé</em>, cibles tactiles ≥ 48 px, bordures 2 px, typographie plus grasse. Optimisée tablette et lecture en extérieur.</p>
+</body>
+</html>

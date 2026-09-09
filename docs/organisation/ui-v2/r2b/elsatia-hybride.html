@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MAQUETTE — ELSATIA UI-V2 · Direction hybride finale</title>
+<style>
+/* ==========================================================================
+   MAQUETTE — aucune donnée réelle. UI-V2-R2B — direction HYBRIDE FINALE.
+   HTML/CSS autonomes. Aucune ressource distante. Aucun script. Aucun Supabase.
+   Base : B « Chantier ». Emprunts : C (board dirigeant, typo forte, filet doré,
+   totaux) + A (surfaces douces, gris confortables, bordures fines desktop).
+   Tous les tokens sont des variables CSS sémantiques -> un mode sombre futur
+   se fait en redéfinissant ce bloc, sans toucher les composants.
+   ========================================================================== */
+:root{
+  /* ---- Surfaces (A : plus douces que B) ---- */
+  --bg:#f4f6f8;               /* fond de travail */
+  --bg-soft:#f7f9fb;          /* zones de formulaire / repos */
+  --surface:#ffffff;          /* panneaux, cartes */
+  --surface-2:#f2f4f7;        /* en-têtes de tableau, zones internes */
+  --nav-bg:#0c1a2b;           /* navigation bleu nuit ELSATIA */
+  --nav-bg-2:#12283f;
+  --today-bg:#0d2138;         /* bandeau « Aujourd'hui » */
+  --on-nav:#eef3f8;           /* texte sur navy  (~13:1) */
+  --on-nav-2:#b7c4d3;         /* secondaire sur navy (~5,6:1) */
+  --on-today-2:#c9d8e6;       /* secondaire sur bandeau (~7:1) */
+
+  /* ---- Texte (R2A : gris faibles corrigés, tous >= 4,5:1 sur blanc) ---- */
+  --text:#161b21;            /* 16,9:1 */
+  --text-muted:#4c5560;      /* 7,3:1  */
+  --text-soft:#5f6875;       /* 5,4:1  (remplace les --text-faint < 4,5 de R2A) */
+
+  /* ---- Marque / action ---- */
+  --action:#1550d6;          /* bleu d'action moderne (blanc dessus : 6,6:1) */
+  --action-strong:#0f3ea8;
+  --action-weak:#e6edfc;
+  --gold:#a97b23;            /* doré ELSATIA — ACCENT UNIQUEMENT (filet, état actif) */
+  --gold-soft:#f0e6d1;
+
+  /* ---- Statuts : couleur + forme + libellé (jamais la couleur seule) ---- */
+  --ok:#146b3c;   --ok-bg:#e4f2ea;
+  --info:#0f4bab; --info-bg:#e5eefb;
+  --warn:#7a4f0c; --warn-bg:#f8ecd6;
+  --err:#a11d16;  --err-bg:#fae4e2;
+  --neutral:#45505d; --neutral-bg:#e9ecef;
+
+  /* ---- Bordures (A : fines ; s'épaississent en densité Terrain) ---- */
+  --border:#e2e6eb;
+  --border-strong:#cdd3db;
+  --hair:#eef0f3;
+  --border-w:1px;            /* Confort */
+
+  /* ---- Rayons / ombres (A : légères) ---- */
+  --r-sm:6px; --r-md:9px; --r-lg:13px;
+  --sh-1:0 1px 2px rgba(15,23,42,.05),0 1px 1px rgba(15,23,42,.03);
+  --sh-2:0 6px 20px rgba(15,23,42,.08);
+
+  /* ---- Espacement / densité ---- */
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:22px;--s6:32px;
+  --tap:44px;               /* Confort ; Terrain -> 48 */
+  --pad-card:16px;          /* Confort ; Terrain -> 20 */
+  --row-h:44px;             /* hauteur de ligne mini ; Terrain -> 52 */
+  --field-h:44px;
+
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --num:ui-monospace,"SF Mono","Segoe UI Mono",Menlo,Consolas,monospace;
+}
+
+/* Densité TERRAIN (touch / tablette) — bascule via l'ancre #terrain, aucun script */
+#terrain:target ~ .viewport{
+  --tap:48px; --pad-card:20px; --row-h:52px; --field-h:48px; --border-w:1.5px;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;background:#dbe0e6;color:var(--text);font-family:var(--font);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+
+/* barre d'outils de la maquette (hors interface) */
+.rulerbar{position:sticky;top:0;z-index:30;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 14px;background:#0a1420;color:#fff;font:13px/1.3 var(--font)}
+.rulerbar b{font-weight:700}
+.rulerbar .grp{display:flex;gap:6px;align-items:center;padding-left:10px;border-left:1px solid #2a3a4d}
+.rulerbar .grp small{color:#8fa1b4}
+.rulerbar a{border:1px solid #33465c;border-radius:6px;padding:5px 10px;color:#cdd9e6;min-height:32px;display:inline-flex;align-items:center}
+.rulerbar a:hover{background:#12324c;color:#fff}
+.rulerbar .tag{margin-left:auto;background:#a11d16;color:#fff;border-radius:4px;padding:3px 9px;font-weight:700;letter-spacing:.02em}
+#bureau,#tablette,#mobile,#confort,#terrain{position:absolute}
+
+.viewport{--w:1440px;width:min(100%,var(--w));margin:16px auto;background:var(--bg);border:1px solid #c7cdd6;border-radius:12px;overflow:hidden;container-type:inline-size;box-shadow:0 12px 44px rgba(15,23,42,.16)}
+#tablette:target ~ .viewport{--w:1024px}
+#mobile:target ~ .viewport{--w:390px}
+.frame-note{max-width:1120px;margin:6px auto 0;color:#4c5560;font:12px/1.55 var(--font);padding:0 14px}
+.frame-note code{background:#e7ebef;border-radius:4px;padding:1px 5px}
+
+/* =================== COQUILLE =================== */
+.app{display:grid;grid-template-columns:236px 1fr;min-height:820px}
+
+/* --- 7. Navigation bleu nuit, compacte, premium --- */
+.side{background:var(--nav-bg);color:var(--on-nav);display:flex;flex-direction:column;padding:12px 8px}
+.brand{display:flex;align-items:baseline;gap:8px;padding:8px 10px 10px;border-bottom:1px solid #ffffff17}
+.brand .wm{font-weight:800;letter-spacing:.15em;font-size:15px}
+.brand .pn{font-size:9.5px;color:#d9bd85;letter-spacing:.07em}
+.ent{margin:10px 6px;padding:0 4px 10px;border-bottom:1px solid #ffffff14}
+.ent .lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:.16em;color:var(--on-nav-2)}
+.ent .row{display:flex;align-items:center;gap:8px;margin-top:5px}
+.ent .logo{width:26px;height:20px;border-radius:4px;background:#fff;color:#0c1a2b;font-weight:800;font-size:10px;display:grid;place-items:center}
+.ent .name{font-size:13.5px;font-weight:700}
+.ent select{margin-top:8px;width:100%;min-height:var(--field-h);background:#0c1a2b;color:#eef3f8;border:1px solid #2c3e54;border-radius:var(--r-sm);padding:8px;font:12.5px var(--font)}
+
+/* --- 8. Switcher applications ELSATIA : discret mais accessible --- */
+.appsw{margin:8px 6px 10px;position:relative}
+.appsw > button{width:100%;min-height:var(--tap);display:flex;align-items:center;gap:8px;background:#ffffff0f;border:1px solid #2c3e54;color:var(--on-nav);border-radius:var(--r-sm);padding:9px 11px;font:12.5px var(--font);cursor:pointer}
+.appsw .grip{width:8px;height:8px;border-radius:2px;background:var(--gold)}
+.appsw .cur{margin-left:auto;font-size:11px;color:var(--on-nav-2)}
+.appsw .menu{margin-top:6px;background:#0f2137;border:1px solid #2c3e54;border-radius:var(--r-sm);padding:5px}
+.appsw .menu a{display:flex;align-items:center;gap:9px;min-height:40px;padding:8px 9px;border-radius:6px;color:#cdd8e4;font-size:12.5px}
+.appsw .menu a:hover{background:#ffffff12;color:#fff}
+.appsw .menu a .ico{width:16px;height:16px;border-radius:4px;background:#ffffff26;flex:none}
+.appsw .menu a[aria-current="true"]{background:#ffffff14;color:#fff;font-weight:600}
+.appsw .menu a[aria-current="true"] .ico{background:var(--gold)}
+.appsw .menu a small{margin-left:auto;color:var(--on-nav-2);font-size:10.5px}
+
+.nav{flex:1;overflow:auto}
+.nav .grp{font-size:9.5px;text-transform:uppercase;letter-spacing:.17em;color:var(--on-nav-2);padding:13px 12px 4px}
+.nav a{display:flex;align-items:center;gap:10px;min-height:var(--tap);border-radius:var(--r-sm);padding:8px 12px;color:#c8d3df;font-size:13px}
+.nav a .ic{width:15px;height:15px;border-radius:4px;background:#ffffff20;flex:none}
+.nav a:hover{background:#ffffff12;color:#fff}
+.nav a[aria-current="page"]{background:#ffffff12;color:#fff;font-weight:600;box-shadow:inset 3px 0 0 var(--gold)}  /* filet doré = état actif */
+.nav a[aria-current="page"] .ic{background:var(--gold)}
+.nav .plat{margin:15px 8px 4px;border-top:1px solid #ffffff1f;padding-top:12px}
+.nav .plat .glbl{font-size:9.5px;letter-spacing:.17em;color:#d9bd85;text-transform:uppercase;padding:0 12px 4px}
+.nav .plat a{color:#e6d4ab}
+.nav .plat a[aria-current="page"]{box-shadow:inset 3px 0 0 var(--gold)}
+
+/* --- compte utilisateur (bas de nav) --- */
+.side .acct{border-top:1px solid #ffffff1f;padding-top:8px;margin-top:6px;display:flex;align-items:center;gap:9px;padding:10px}
+.side .acct .av{width:32px;height:32px;border-radius:var(--r-sm);background:#1b3350;color:#fff;display:grid;place-items:center;font-weight:800;font-size:12px}
+.side .acct .who{min-width:0}
+.side .acct .who b{font-size:12.5px;display:block}
+.side .acct .who span{font-size:10.5px;color:var(--on-nav-2)}
+.side .acct .out{margin-left:auto;color:var(--on-nav-2);font-size:11px;border:1px solid #2c3e54;border-radius:6px;padding:6px 8px;min-height:36px;display:flex;align-items:center}
+
+/* =================== ZONE PRINCIPALE =================== */
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{display:flex;align-items:center;gap:14px;padding:12px 22px;background:var(--surface);border-bottom:var(--border-w) solid var(--border)}
+.search{flex:1;max-width:440px;display:flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:9px 13px;color:var(--text-muted);font-size:13.5px;min-height:var(--tap)}
+.search .k{margin-left:auto;border:1px solid var(--border-strong);border-radius:4px;padding:1px 6px;font-size:11px;color:var(--text-soft)}
+.topbar .sp{flex:1}
+.iconbtn{position:relative;width:var(--tap);height:var(--tap);border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface);display:grid;place-items:center;color:var(--text-muted);cursor:pointer;font-size:17px}
+.iconbtn .badge{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:var(--err);color:#fff;font-size:10.5px;font-weight:800;display:grid;place-items:center;border:2px solid #fff}
+.hello{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted)}
+
+.content{padding:22px;max-width:1220px;width:100%;margin:0 auto;display:grid;gap:var(--s6)}
+
+/* --- 14. Typographie : hiérarchie forte (C), sans petites capitales partout --- */
+.pagehead{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;border-bottom:2px solid var(--gold);padding-bottom:12px}
+.eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--text-soft);font-weight:700}
+.pagehead h1{margin:3px 0 0;font-size:26px;font-weight:750;letter-spacing:-.015em;line-height:1.12}
+.pagehead p{margin:5px 0 0;color:var(--text-muted);font-size:13.5px}
+.pagehead .actions{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
+.sectitle{font-size:15px;font-weight:750;letter-spacing:-.005em;margin:0}
+
+/* --- Boutons --- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:var(--r-sm);padding:0 18px;min-height:var(--tap);font:650 13.5px var(--font);cursor:pointer;border:1px solid transparent}
+.btn-primary{background:var(--action);color:#fff}
+.btn-primary:hover{background:var(--action-strong)}
+.btn-secondary{background:var(--surface);color:var(--text);border-color:var(--border-strong)}
+.btn-secondary:hover{background:var(--surface-2)}
+.btn-danger{background:var(--surface);color:var(--err);border-color:#d69a94}
+.btn-danger:hover{background:var(--err-bg)}
+/* Focus : anneau doré principal + liseré blanc interne + halo sombre externe
+   -> séparation nette sur blanc, bleu et bleu nuit (contrat R2C). */
+.btn:focus-visible,a:focus-visible,select:focus-visible,input:focus-visible,button:focus-visible{
+  outline:3px solid var(--gold);outline-offset:2px;border-radius:var(--r-sm);
+  box-shadow:0 0 0 1px #ffffff,0 0 0 6px rgba(12,26,43,.32)}
+
+/* --- 4. « Aujourd'hui » : en tête, très visible --- */
+.today{background:var(--today-bg);color:#eef4fb;border-radius:var(--r-lg);padding:18px;box-shadow:var(--sh-2)}
+.today .th{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}
+.today .th b{font-size:14.5px;letter-spacing:.01em}
+.today .th span{font-size:11.5px;color:var(--on-today-2)}
+.today .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.tpanel{background:var(--surface);color:var(--text);border-radius:var(--r-md);padding:6px}
+.tpanel h3{margin:8px 10px 6px;font-size:12px;font-weight:700;color:var(--text-muted);display:flex;align-items:center;gap:8px}
+.tpanel h3 .n{margin-left:auto;background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:0 8px;font-size:11px;color:var(--text-muted)}
+.tline{display:flex;gap:11px;align-items:flex-start;padding:11px 10px;min-height:var(--row-h)}
+.tline + .tline{border-top:1px solid var(--hair)}
+.tline:hover{background:var(--surface-2)}
+.tline .g{width:24px;height:24px;border-radius:6px;flex:none;display:grid;place-items:center;color:#fff;font-weight:900;font-size:13px}
+.tline .g.err{background:var(--err)} .tline .g.warn{background:var(--warn)} .tline .g.info{background:var(--info)} .tline .g.ok{background:var(--ok)}
+.tline .t{font-size:13.5px;font-weight:600} .tline .d{font-size:12px;color:var(--text-muted);margin-top:2px}
+.tline .act{margin-left:auto;flex:none}
+.mini{border:1px solid var(--border-strong);background:var(--surface);border-radius:var(--r-sm);padding:0 12px;min-height:36px;font:600 12px var(--font);color:var(--action);display:inline-flex;align-items:center}
+
+/* --- 5. / 9. Board Pilotage dirigeant (C) — visible si voir_indicateurs_financiers --- */
+.board{background:var(--surface);border:var(--border-w) solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh-1);overflow:hidden}
+.board .bh{display:flex;align-items:center;gap:10px;padding:14px 18px 0}
+.board .bh .eyebrow{font-size:10.5px}
+.board .bh .perm{margin-left:auto;font-size:10.5px;color:var(--text-soft);border:1px dashed var(--border-strong);border-radius:999px;padding:2px 9px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:0;padding:12px 18px 18px}
+.kpi{padding:8px 18px}
+.kpi + .kpi{border-left:1px solid var(--hair)}
+.kpi .l{font-size:12px;color:var(--text-muted)}
+.kpi .v{margin-top:7px;font:750 26px/1 var(--num);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kpi .e{margin-top:7px;font-size:11.5px;font-weight:700;display:flex;align-items:center;gap:5px}
+.kpi .e.up{color:var(--ok)} .kpi .e.down{color:var(--err)} .kpi .e.flat{color:var(--text-soft)}
+.spark{display:inline-flex;align-items:flex-end;gap:2px;height:16px}
+.spark i{width:4px;background:var(--action);border-radius:1px;display:block}
+.trend{border-top:1px solid var(--hair);padding:14px 18px 18px}
+.trend .tt{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+.trend .tt b{font-size:12.5px} .trend .tt span{font-size:11px;color:var(--text-soft)}
+.bars{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;align-items:end;height:96px}
+.bar{display:flex;flex-direction:column;align-items:center;gap:5px;height:100%}
+.bar .c{width:24px;background:var(--action);border-radius:3px 3px 0 0;margin-top:auto}
+.bar .c.b2{background:var(--gold);opacity:.85}
+.bar .m{font-size:10.5px;color:var(--text-muted)}
+.legend{display:flex;gap:16px;margin-top:10px;font-size:11px;color:var(--text-muted)}
+.legend i{width:9px;height:9px;border-radius:2px;display:inline-block;margin-right:5px;vertical-align:middle}
+
+/* --- Grille de contenu --- */
+.grid2{display:grid;grid-template-columns:1.3fr 1fr;gap:var(--s5)}
+.col{display:grid;gap:var(--s5);align-content:start}
+.card{background:var(--surface);border:var(--border-w) solid var(--border);border-radius:var(--r-md);box-shadow:var(--sh-1)}
+.card > header{display:flex;align-items:center;gap:8px;padding:13px 16px;border-bottom:var(--border-w) solid var(--border)}
+.card > header .n{margin-left:auto;color:var(--text-soft);font-size:12px}
+.card .body{padding:8px}
+.li{display:flex;gap:12px;align-items:flex-start;padding:11px 10px;min-height:var(--row-h)}
+.li + .li{border-top:1px solid var(--hair)}
+.li:hover{background:var(--surface-2)}
+.li .bar-l{width:5px;align-self:stretch;border-radius:3px;flex:none}
+.li .bar-l.err{background:var(--err)} .li .bar-l.warn{background:var(--warn)} .li .bar-l.info{background:var(--info)} .li .bar-l.ok{background:var(--ok)}
+.li .t{font-size:13.5px;font-weight:600} .li .d{font-size:12px;color:var(--text-muted);margin-top:2px}
+
+/* --- 16. Statuts : couleur + FORME + libellé --- */
+.st{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:750;letter-spacing:.04em;text-transform:uppercase;padding:3px 10px;border-radius:5px;white-space:nowrap}
+.st::before{content:"";width:8px;height:8px;flex:none}
+.st.urgent{background:var(--err-bg);color:var(--err)}        .st.urgent::before{background:var(--err);border-radius:50%}       /* rond */
+.st.attente{background:var(--warn-bg);color:var(--warn)}     .st.attente::before{background:var(--warn);transform:rotate(45deg)} /* losange */
+.st.valide{background:var(--ok-bg);color:var(--ok)}          .st.valide::before{background:var(--ok)}                          /* carré */
+.st.relance{background:var(--info-bg);color:var(--info)}     .st.relance::before{background:var(--info);border-radius:2px;clip-path:polygon(0 0,100% 50%,0 100%)} /* triangle */
+.st.brouillon{background:var(--neutral-bg);color:var(--neutral)} .st.brouillon::before{background:var(--neutral);border-radius:1px;opacity:.7}
+
+/* --- 15. Tableau métier : lignes fines, hover léger, total clair --- */
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+thead th{text-align:left;font-weight:700;color:var(--text-muted);font-size:11.5px;letter-spacing:.03em;padding:11px 16px;border-bottom:2px solid var(--border-strong);white-space:nowrap;background:var(--surface-2)}
+tbody td{padding:12px 16px;border-bottom:1px solid var(--hair)}
+tbody tr:hover{background:var(--surface-2)}
+td.num{text-align:right;font-family:var(--num);font-variant-numeric:tabular-nums}
+td.ref{font-family:var(--num);color:var(--text-muted)}
+tfoot td{padding:12px 16px;border-top:2px solid var(--border-strong);font-weight:800;font-family:var(--num);text-align:right}
+tfoot td.lbl{text-align:left;font-family:var(--font);color:var(--text-muted);font-weight:600}
+
+/* transformation cartes (mobile) */
+.cards-metier{display:none}
+.mrow{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;box-shadow:var(--sh-1)}
+.mrow .top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.mrow .r{font-family:var(--num);color:var(--text-muted);font-size:12px}
+.mrow .m{font:700 15px var(--num)}
+.mrow .cl{font-size:13.5px;font-weight:600;margin-top:2px}
+.mrow .b{margin-top:8px}
+
+/* --- État vide --- */
+.empty{border:1px solid var(--border);border-radius:var(--r-md);padding:34px 20px;text-align:center;background:var(--surface)}
+.empty .il{width:44px;height:44px;border-radius:11px;background:var(--action-weak);margin:0 auto 12px}
+.empty h3{margin:0 0 4px;font-size:15px}
+.empty p{margin:0 0 14px;color:var(--text-muted);font-size:13px}
+
+/* --- 18. Formulaire : confort A (fond clair, séparation douce, pas d'encadrement massif) --- */
+.form{background:var(--bg-soft);border:1px solid var(--border);border-radius:var(--r-md);padding:18px}
+.form .frow{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.form .frow + .frow{margin-top:14px;padding-top:14px;border-top:1px dashed var(--border)}
+.field label{display:block;font-size:12px;color:var(--text-muted);font-weight:600;margin-bottom:5px}
+.field .req{color:var(--err)}
+.field input,.field select{width:100%;min-height:var(--field-h);background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-sm);padding:10px 12px;font:14.5px var(--font);color:var(--text)}
+.field input:focus,.field select:focus{border-color:var(--action)}
+.field.bad input{border-color:var(--err);background:#fff}
+.field .err-msg{margin-top:6px;font-size:12px;color:var(--err);display:flex;align-items:center;gap:6px}
+.field .err-msg::before{content:"!";width:15px;height:15px;border-radius:50%;background:var(--err);color:#fff;font-weight:800;font-size:10px;display:grid;place-items:center;flex:none}
+.field .hint{margin-top:6px;font-size:11.5px;color:var(--text-soft)}
+
+/* --- Zone dangereuse --- */
+.dz{border:1px solid #d69a94;background:var(--err-bg);border-radius:var(--r-md);padding:14px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.dz .tx{font-size:13px;color:#6e1712}
+.dz .btn-danger{margin-left:auto;background:#fff}
+
+/* --- Focus swatches (démo) --- */
+.focusdemo{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.focusdemo .chip{padding:8px 14px;border-radius:var(--r-sm);font-size:12.5px;outline:3px solid var(--gold);outline-offset:2px;box-shadow:0 0 0 1px #ffffff,0 0 0 6px rgba(12,26,43,.32)}
+.focusdemo .on-white{background:#fff;border:1px solid var(--border)}
+.focusdemo .on-navy{background:var(--nav-bg);color:#fff}
+.focusdemo .on-blue{background:var(--action);color:#fff}
+
+/* --- Aperçu mobile (élément visuel) --- */
+.mprev{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);padding:16px;box-shadow:var(--sh-1)}
+.mprev h3{margin:0 0 12px;font-size:13px;color:var(--text-muted);font-weight:700}
+.phones{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}
+.phone{width:300px;border:10px solid #0c1a2b;border-radius:26px;overflow:hidden;background:var(--nav-bg)}
+.phone .pb{display:flex;align-items:center;gap:8px;padding:10px 12px;color:#fff}
+.phone .pb .wm{font-weight:800;letter-spacing:.13em;font-size:12px}
+.phone .pb .mn{margin-left:auto;border:1px solid #33465c;border-radius:6px;padding:6px 10px;font-size:11px;min-height:36px;display:flex;align-items:center}
+.phone .today-m{background:var(--today-bg);color:#eef4fb;padding:11px 12px}
+.phone .today-m b{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--on-today-2)}
+.phone .today-m .r{display:flex;gap:8px;align-items:center;padding:7px 0;font-size:12px;border-top:1px solid #ffffff17;margin-top:6px}
+.phone .today-m .r:first-of-type{border-top:0;margin-top:8px}
+.phone .today-m .r .g{width:18px;height:18px;border-radius:5px;flex:none}
+.phone .qa{display:flex;gap:8px;padding:10px 12px;background:#fff}
+.phone .qa .b{flex:1;text-align:center;background:var(--action);color:#fff;border-radius:6px;padding:10px 6px;font-size:11.5px;font-weight:700}
+.phone .qa .b.sec{background:#fff;color:var(--text);border:1px solid var(--border-strong)}
+.phone .drawer{background:var(--nav-bg);padding:8px}
+.phone .drawer .grp{font-size:9px;letter-spacing:.15em;color:var(--on-nav-2);text-transform:uppercase;padding:8px 10px 2px}
+.phone .drawer a{display:block;color:#c8d3df;font-size:12.5px;padding:11px 10px;border-radius:6px;min-height:44px;box-sizing:border-box}
+.phone .drawer a[aria-current="page"]{background:#ffffff14;color:#fff;font-weight:600;box-shadow:inset 3px 0 0 var(--gold)}
+.phone .drawer .plat{border-top:1px solid #ffffff1f;margin-top:8px;padding-top:8px}
+.phone .drawer .plat a{color:#e6d4ab}
+.phone .mcards{background:var(--bg);padding:10px;display:grid;gap:8px}
+
+/* =================== RÉACTIF (container queries) =================== */
+@container (max-width:1080px){          /* tablette */
+  .app{grid-template-columns:1fr}
+  .side{display:none}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .kpi + .kpi{border-left:0}
+  .kpi:nth-child(n+3){border-top:1px solid var(--hair)}
+  .grid2{grid-template-columns:1fr}
+  .today .cols{grid-template-columns:1fr}
+  .content{padding:16px}
+}
+@container (max-width:640px){           /* mobile 390 : Aujourd'hui > actions > tâches > chantier > nav */
+  .kpis{grid-template-columns:1fr 1fr}
+  .form .frow{grid-template-columns:1fr}
+  .topbar{flex-wrap:wrap}
+  .search{max-width:none;order:3;width:100%}
+  .pagehead h1{font-size:22px}
+  .pagehead .actions{width:100%}
+  .btn{flex:1}
+  .kpi .v{font-size:22px}
+  /* KPI direction repoussés plus bas + défilement horizontal compact */
+  .board{order:5}
+  .kpis{display:flex;overflow-x:auto;padding:12px 14px;gap:12px;scroll-snap-type:x mandatory}
+  .kpi{flex:0 0 62%;border:1px solid var(--hair);border-radius:var(--r-sm);padding:12px;scroll-snap-align:start}
+  .kpi:nth-child(n+3){border-top:1px solid var(--hair)}
+  /* tableau -> cartes */
+  .tablewrap{display:none}
+  .cards-metier{display:grid;gap:8px;padding:8px}
+  .phones{gap:14px}
+}
+</style>
+</head>
+<body>
+
+<div class="rulerbar">
+  <b>MAQUETTE ELSATIA UI-V2 — Direction hybride finale</b>
+  <span class="grp"><small>Largeur</small><a href="#bureau">Bureau 1440</a><a href="#tablette">Tablette 1024</a><a href="#mobile">Mobile 390</a></span>
+  <span class="grp"><small>Densité</small><a href="#confort">Confort</a><a href="#terrain">Terrain</a></span>
+  <span class="tag">MAQUETTE — aucune donnée réelle</span>
+</div>
+<span id="bureau"></span><span id="tablette"></span><span id="mobile"></span><span id="confort"></span><span id="terrain"></span>
+
+<div class="viewport">
+<div class="app">
+
+  <!-- ======= 7. NAVIGATION ======= -->
+  <aside class="side">
+    <div class="brand"><span class="wm">ELSATIA</span><span class="pn">Gestion Pro</span></div>
+
+    <div class="ent">
+      <div class="lbl">Entreprise active</div>
+      <div class="row"><span class="logo">BR</span><span class="name">BTP Rénov' Sud</span></div>
+      <select aria-label="Changer d'entreprise"><option>BTP Rénov' Sud</option><option>Ateliers Maçonnerie Est</option><option>Couverture Vallée SARL</option></select>
+    </div>
+
+    <!-- 8. SWITCHER APPLICATIONS ELSATIA -->
+    <div class="appsw">
+      <button type="button"><span class="grip"></span>Applications ELSATIA<span class="cur">▾</span></button>
+      <div class="menu" role="menu" aria-label="Applications ELSATIA">
+        <a href="#" aria-current="true"><span class="ico"></span>Gestion Pro <small>actif</small></a>
+        <a href="#"><span class="ico"></span>Colors <small>peintures</small></a>
+        <a href="#"><span class="ico"></span>Tools <small>calculs chantier</small></a>
+      </div>
+    </div>
+
+    <nav class="nav" aria-label="Navigation principale">
+      <div class="grp">Accueil</div>
+      <a href="#" aria-current="page"><span class="ic"></span>Tableau de bord</a>
+      <a href="#"><span class="ic"></span>Mon espace</a>
+      <a href="#"><span class="ic"></span>Messagerie</a>
+      <div class="grp">Clients &amp; ventes</div>
+      <a href="#"><span class="ic"></span>Clients</a><a href="#"><span class="ic"></span>Devis</a><a href="#"><span class="ic"></span>Factures</a>
+      <div class="grp">Chantiers</div>
+      <a href="#"><span class="ic"></span>Chantiers</a><a href="#"><span class="ic"></span>Planning</a><a href="#"><span class="ic"></span>Pointage</a>
+      <div class="grp">Équipe</div>
+      <a href="#"><span class="ic"></span>Employés</a><a href="#"><span class="ic"></span>Congés</a><a href="#"><span class="ic"></span>Notes de frais</a>
+      <div class="grp">Achats &amp; stock</div>
+      <a href="#"><span class="ic"></span>Fournisseurs</a><a href="#"><span class="ic"></span>Commandes</a><a href="#"><span class="ic"></span>Stock</a>
+      <div class="grp">Pilotage</div>
+      <a href="#"><span class="ic"></span>Rentabilité</a><a href="#"><span class="ic"></span>Trésorerie</a><a href="#"><span class="ic"></span>Exports comptables</a>
+      <div class="plat"><div class="glbl">Administration plateforme</div><a href="#"><span class="ic"></span>★ Console ELSATIA</a><a href="#"><span class="ic"></span>Sécurité du compte</a></div>
+    </nav>
+
+    <div class="acct">
+      <span class="av">JG</span>
+      <span class="who"><b>Julien G.</b><span>Gérant</span></span>
+      <span class="out">Quitter</span>
+    </div>
+  </aside>
+
+  <!-- ======= ZONE PRINCIPALE ======= -->
+  <div class="main">
+    <header class="topbar">
+      <div class="search">🔍 Rechercher un client, un devis, un chantier…<span class="k">Ctrl K</span></div>
+      <div class="sp"></div>
+      <button class="iconbtn" aria-label="Notifications (3 non lues)">🔔<span class="badge">3</span></button>
+      <span class="hello">Bonjour Julien</span>
+    </header>
+
+    <div class="content">
+
+      <!-- 1. titre de page (typo forte) + boutons -->
+      <div class="pagehead">
+        <div>
+          <div class="eyebrow">Tableau de bord</div>
+          <h1>Bonjour Julien</h1>
+          <p>Lundi 12 octobre · BTP Rénov' Sud</p>
+        </div>
+        <div class="actions">
+          <button class="btn btn-secondary" type="button">Exporter</button>
+          <button class="btn btn-primary" type="button">+ Nouveau devis</button>
+        </div>
+      </div>
+
+      <!-- ======= 4. « AUJOURD'HUI » — en tête, très visible (base B) ======= -->
+      <section class="today">
+        <div class="th"><b>Aujourd'hui</b><span>Ce que vous devez traiter — 3 alertes, 3 tâches</span></div>
+        <div class="cols">
+          <div class="tpanel">
+            <h3>⚠ Alertes prioritaires <span class="n">3</span></h3>
+            <div class="tline"><span class="g err">!</span><div><div class="t">Facture F-2026-041 impayée</div><div class="d">Maison Durand · 12 300 € · retard de 6 jours</div></div><span class="st urgent act">Urgent</span></div>
+            <div class="tline"><span class="g err">!</span><div><div class="t">Contrôle technique dépassé · AB-482-CD</div><div class="d">Renault Master · régulariser sous 48 h</div></div><span class="st urgent act">Urgent</span></div>
+            <div class="tline"><span class="g warn">▲</span><div><div class="t">Stock bas · Vis inox 5×60</div><div class="d">12 restants pour un seuil de 50</div></div><span class="st attente act">En attente</span></div>
+          </div>
+          <div class="tpanel">
+            <h3>✔ Tâches du jour <span class="n">3</span></h3>
+            <div class="tline"><span class="g info">→</span><div><div class="t">Relancer le devis D-2026-118</div><div class="d">Validité expire aujourd'hui</div></div><span class="mini act">Relancer</span></div>
+            <div class="tline"><span class="g info">→</span><div><div class="t">Réception commande C-2026-077</div><div class="d">Point P · livraison ce matin</div></div><span class="mini act">Ouvrir</span></div>
+            <div class="tline"><span class="g warn">▲</span><div><div class="t">Valider 3 notes de frais</div><div class="d">En attente depuis 4 jours</div></div><span class="mini act">Valider</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======= 5./9. BOARD PILOTAGE (C) — visible si voir_indicateurs_financiers ======= -->
+      <section class="board">
+        <div class="bh"><span class="eyebrow">Pilotage</span><span class="perm">visible si permission « voir_indicateurs_financiers »</span></div>
+        <div class="kpis">
+          <div class="kpi"><div class="l">Chiffre d'affaires (30 j)</div><div class="v">142 800 €</div><div class="e up">▲ 8,1 % · en hausse <span class="spark"><i style="height:6px"></i><i style="height:9px"></i><i style="height:7px"></i><i style="height:12px"></i><i style="height:16px"></i></span></div></div>
+          <div class="kpi"><div class="l">Facturé</div><div class="v">128 400 €</div><div class="e up">▲ 9,4 % · en hausse</div></div>
+          <div class="kpi"><div class="l">Encaissé</div><div class="v">96 200 €</div><div class="e up">▲ 14,7 % · en hausse</div></div>
+          <div class="kpi"><div class="l">Marge chantiers</div><div class="v">21,4 %</div><div class="e down">▼ 1,3 pt · en baisse</div></div>
+        </div>
+        <div class="trend">
+          <div class="tt"><b>Devis émis vs. facturé</b><span>6 derniers mois (k€)</span></div>
+          <div class="bars">
+            <div class="bar"><span class="c" style="height:40%"></span><span class="c b2" style="height:32%"></span><span class="m">mai</span></div>
+            <div class="bar"><span class="c" style="height:54%"></span><span class="c b2" style="height:46%"></span><span class="m">juin</span></div>
+            <div class="bar"><span class="c" style="height:48%"></span><span class="c b2" style="height:52%"></span><span class="m">juil</span></div>
+            <div class="bar"><span class="c" style="height:66%"></span><span class="c b2" style="height:57%"></span><span class="m">août</span></div>
+            <div class="bar"><span class="c" style="height:60%"></span><span class="c b2" style="height:64%"></span><span class="m">sept</span></div>
+            <div class="bar"><span class="c" style="height:84%"></span><span class="c b2" style="height:72%"></span><span class="m">oct</span></div>
+          </div>
+          <div class="legend"><span><i style="background:var(--action)"></i>Devis émis</span><span><i style="background:var(--gold)"></i>Facturé</span></div>
+        </div>
+      </section>
+
+      <div class="grid2">
+        <div class="col">
+          <!-- 4. Chantiers en cours -->
+          <section class="card">
+            <header><h2 class="sectitle">Chantiers en cours</h2><span class="n">3</span></header>
+            <div class="body">
+              <div class="li"><span class="bar-l ok"></span><div><div class="t">Réhabilitation école Jean-Moulin</div><div class="d">Fin prévue 14/10 · avancement 68 %</div></div><span class="st valide" style="margin-left:auto">Validé</span></div>
+              <div class="li"><span class="bar-l warn"></span><div><div class="t">Extension pavillon Lefèvre</div><div class="d">Reprise en attente d'un devis avenant</div></div><span class="st attente" style="margin-left:auto">En attente</span></div>
+              <div class="li"><span class="bar-l info"></span><div><div class="t">Ravalement copropriété Les Tilleuls</div><div class="d">Démarrage semaine 43</div></div><span class="st brouillon" style="margin-left:auto">À préparer</span></div>
+            </div>
+          </section>
+
+          <!-- 15. Tableau métier + total -->
+          <section class="card">
+            <header><h2 class="sectitle">Devis récents</h2><span class="n">4</span></header>
+            <div class="tablewrap">
+              <table>
+                <thead><tr><th>Référence</th><th>Client</th><th>Montant</th><th>Statut</th></tr></thead>
+                <tbody>
+                  <tr><td class="ref">D-2026-118</td><td>Maison Durand</td><td class="num">8 900 €</td><td><span class="st relance">À relancer</span></td></tr>
+                  <tr><td class="ref">D-2026-117</td><td>SCI Horizon</td><td class="num">21 400 €</td><td><span class="st valide">Validé</span></td></tr>
+                  <tr><td class="ref">D-2026-116</td><td>Mairie de Caster</td><td class="num">63 200 €</td><td><span class="st brouillon">Brouillon</span></td></tr>
+                  <tr><td class="ref">D-2026-115</td><td>Entreprise Roux</td><td class="num">4 100 €</td><td><span class="st urgent">Refusé</span></td></tr>
+                </tbody>
+                <tfoot><tr><td class="lbl" colspan="2">Total période</td><td class="num">97 600 €</td><td></td></tr></tfoot>
+              </table>
+            </div>
+            <!-- transformation cartes (mobile) -->
+            <div class="cards-metier">
+              <div class="mrow"><div class="top"><span class="r">D-2026-118</span><span class="m">8 900 €</span></div><div class="cl">Maison Durand</div><div class="b"><span class="st relance">À relancer</span></div></div>
+              <div class="mrow"><div class="top"><span class="r">D-2026-117</span><span class="m">21 400 €</span></div><div class="cl">SCI Horizon</div><div class="b"><span class="st valide">Validé</span></div></div>
+              <div class="mrow"><div class="top"><span class="r">D-2026-116</span><span class="m">63 200 €</span></div><div class="cl">Mairie de Caster</div><div class="b"><span class="st brouillon">Brouillon</span></div></div>
+              <div class="mrow"><div class="top"><span class="r">D-2026-115</span><span class="m">4 100 €</span></div><div class="cl">Entreprise Roux</div><div class="b"><span class="st urgent">Refusé</span></div></div>
+            </div>
+          </section>
+
+          <!-- 16. état vide -->
+          <section class="empty">
+            <div class="il"></div><h3>Aucune intervention planifiée</h3>
+            <p>Les interventions programmées pour l'équipe apparaîtront ici.</p>
+            <button class="btn btn-secondary" type="button">Planifier une intervention</button>
+          </section>
+        </div>
+
+        <div class="col">
+          <!-- 6. Formulaire (confort A) -->
+          <section class="card">
+            <header><h2 class="sectitle">Nouveau client</h2></header>
+            <div class="body">
+              <div class="form">
+                <div class="frow">
+                  <div class="field"><label>Nom du client <span class="req">*</span></label><input id="f-nom" type="text" value="Maison Durand"><div class="hint">Apparaît sur les devis et factures.</div></div>
+                  <div class="field"><label>Type de client</label><select><option>Particulier</option><option selected>Professionnel</option><option>Syndic</option><option>Collectivité</option></select></div>
+                </div>
+                <div class="frow">
+                  <div class="field bad"><label>E-mail</label><input type="text" value="contact@"><div class="err-msg">Adresse e-mail incomplète.</div></div>
+                  <div class="field"><label>Téléphone</label><input type="text" value="06 12 34 56 78"><div class="hint">Facultatif.</div></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Démo focus (blanc / navy / bouton bleu) -->
+          <section class="card">
+            <header><h2 class="sectitle">Focus clavier</h2></header>
+            <div class="body" style="padding:14px">
+              <div class="focusdemo">
+                <span class="chip on-white">Sur fond blanc</span>
+                <span class="chip on-navy">Sur bleu nuit</span>
+                <span class="chip on-blue">Sur bouton bleu</span>
+              </div>
+              <p style="margin:12px 0 0;font-size:12px;color:var(--text-muted)">Contrat R2C : anneau doré 3 px + liseré blanc interne 1 px + halo sombre externe (`rgba(12,26,43,.32)`, 6 px) — séparation nette sur blanc, bleu et bleu nuit, sans jurer avec la marque.</p>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- 19. action dangereuse -->
+      <div class="dz">
+        <div class="tx"><strong>Supprimer ce devis</strong> — action définitive, l'historique et les pièces jointes seront perdus.</div>
+        <button class="btn btn-danger" type="button">Supprimer le devis</button>
+      </div>
+
+      <!-- Aperçu mobile 390 (Aujourd'hui > actions > tâches > chantier > nav) -->
+      <section class="mprev">
+        <h3>Comportement mobile 390 px</h3>
+        <div class="phones">
+          <div class="phone">
+            <div class="pb"><span class="wm">ELSATIA</span><span class="mn">☰ Menu</span></div>
+            <div class="today-m"><b>Aujourd'hui</b>
+              <div class="r"><span class="g" style="background:var(--err)"></span>Facture F-2026-041 impayée · 12 300 €</div>
+              <div class="r"><span class="g" style="background:var(--err)"></span>Contrôle technique dépassé · AB-482-CD</div>
+              <div class="r"><span class="g" style="background:var(--warn)"></span>Valider 3 notes de frais</div>
+            </div>
+            <div class="qa"><span class="b">+ Devis</span><span class="b sec">Pointer</span><span class="b sec">Note frais</span></div>
+            <div class="mcards">
+              <div class="mrow"><div class="top"><span class="cl">Réhab. école Jean-Moulin</span><span class="st valide">Validé</span></div><div class="r">Fin 14/10 · 68 %</div></div>
+              <div class="mrow"><div class="top"><span class="cl">Extension pavillon Lefèvre</span><span class="st attente">En attente</span></div><div class="r">Devis avenant</div></div>
+            </div>
+          </div>
+          <div class="phone">
+            <div class="pb"><span class="wm">ELSATIA</span><span class="mn">✕</span></div>
+            <div class="drawer">
+              <div class="grp">Applications</div>
+              <a href="#" aria-current="page">Gestion Pro</a><a href="#">Colors</a><a href="#">Tools</a>
+              <div class="grp">Accueil</div>
+              <a href="#" aria-current="page">Tableau de bord</a><a href="#">Mon espace</a><a href="#">Messagerie</a>
+              <div class="grp">Chantiers</div><a href="#">Chantiers</a><a href="#">Planning</a><a href="#">Pointage</a>
+              <div class="plat"><a href="#">★ Console ELSATIA</a></div>
+            </div>
+          </div>
+        </div>
+        <p style="margin:14px 0 0;font-size:12px;color:var(--text-muted)">Ordre de priorité mobile : <strong>Aujourd'hui → actions rapides → tâches → chantiers → navigation</strong>. Les KPI direction passent sous ce contenu et défilent horizontalement (carrousel compact). Le tableau « Devis récents » devient une liste de cartes.</p>
+      </section>
+
+    </div>
+  </div>
+</div>
+</div>
+<p class="frame-note">
+Direction <strong>hybride finale</strong>. Base B « Chantier » (bandeau <em>Aujourd'hui</em>, statuts couleur+forme+libellé, cibles ≥ 44 px). Emprunts <strong>C</strong> : board <em>Pilotage</em>, hiérarchie typo (eyebrow + H1 26 px), totaux de tableau, <em>filet doré</em> sous le titre et sur l'état actif. Emprunts <strong>A</strong> : fond doux <code>#f4f6f8</code>, gris confortables, ombres légères, bordures 1 px (desktop). Bascule <strong>Confort / Terrain</strong> et <strong>Bureau / Tablette / Mobile</strong> via les liens ci-dessus (ancres CSS — aucun script).
+</p>
+</body>
+</html>

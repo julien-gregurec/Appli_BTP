@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MAQUETTE — ELSATIA UI-V2 · Direction C « Direction »</title>
+<style>
+/* ==========================================================================
+   MAQUETTE — aucune donnée réelle. Démonstration visuelle isolée (UI-V2-R2A).
+   HTML/CSS autonomes. Aucune ressource distante. Aucun lien Supabase. Aucun JS.
+   Direction C — ELSATIA Direction : institutionnelle, forte hiérarchie typo,
+   tableau de bord de pilotage soigné, chiffres clés très lisibles.
+   ========================================================================== */
+:root{
+  --bg:#f4f5f7;
+  --surface:#ffffff;
+  --surface-2:#f7f8fa;
+  --nav-bg:#0c1a2b;
+  --nav-bg-2:#12283f;
+  --text:#1a1f27;         /* ≈16:1 sur blanc */
+  --text-muted:#565f6b;   /* ≈6.6:1 sur blanc */
+  --text-faint:#727b87;   /* ≈4.7:1 sur blanc */
+  --on-nav:#eef2f7;
+  --on-nav-muted:#9fb0c2; /* ≈4.6:1 sur navy */
+  --action:#22417a;       /* bleu profond, restreint (≈8.6:1 texte blanc) */
+  --action-strong:#182f5c;
+  --action-weak:#e9eef6;
+  --gold:#9c7422;         /* filet / marque, jamais en aplat large */
+  --ok:#1c6b3f; --ok-bg:#e6f2ea;
+  --info:#1a4f9c; --info-bg:#e7eefa;
+  --warn:#7a5312; --warn-bg:#f7ecd7;
+  --err:#9f231c; --err-bg:#f8e5e3;
+  --neutral:#4c5663; --neutral-bg:#eceef1;
+  --border:#e3e6eb;
+  --border-strong:#cfd4dc;
+  --hair:#edeff2;
+  --r-sm:5px; --r-md:6px; --r-lg:8px;
+  --sh-1:0 1px 2px rgba(20,28,44,.05);
+  --sh-2:0 8px 24px rgba(20,28,44,.10);
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:36px;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Georgia,"Times New Roman",serif; /* fallback lisible */
+  --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-num:ui-monospace,"SF Mono","Segoe UI Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:#dee1e6;color:var(--text);font-family:var(--font-ui);-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.rulerbar{position:sticky;top:0;z-index:20;display:flex;gap:8px;align-items:center;padding:8px 14px;background:#0c1a2b;color:#fff;font:13px/1.3 var(--font-ui)}
+.rulerbar b{font-weight:700}
+.rulerbar .tag{margin-left:auto;background:#9f231c;color:#fff;border-radius:4px;padding:2px 8px;font-weight:700}
+.rulerbar a{border:1px solid #34506c;border-radius:6px;padding:4px 10px;color:#cdd9e6}
+.rulerbar a:hover{background:#12324c;color:#fff}
+#bureau,#tablette,#mobile{position:absolute}
+.viewport{--w:1440px;width:min(100%,var(--w));margin:18px auto;background:var(--bg);border:1px solid #cfd4dc;border-radius:10px;overflow:hidden;container-type:inline-size;box-shadow:0 10px 40px rgba(20,28,44,.16)}
+#tablette:target ~ .viewport{--w:1024px}
+#mobile:target ~ .viewport{--w:390px}
+.frame-note{max-width:1120px;margin:6px auto 0;color:#565f6b;font:12px/1.5 var(--font-ui);padding:0 14px}
+
+.app{display:grid;grid-template-columns:236px 1fr;min-height:800px}
+.side{background:var(--nav-bg);color:var(--on-nav);display:flex;flex-direction:column;padding:14px 8px}
+.brand{display:flex;align-items:baseline;gap:8px;padding:6px 10px 10px;border-bottom:1px solid #ffffff1a}
+.brand .wm{font-weight:800;letter-spacing:.16em;font-size:15px}
+.brand .pn{font-size:9.5px;color:#d8b876;letter-spacing:.08em}
+.ent{margin:10px 6px;padding:2px 4px 10px;border-bottom:1px solid #ffffff14}
+.ent .lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:.16em;color:var(--on-nav-muted)}
+.ent .row{display:flex;align-items:center;gap:8px;margin-top:5px}
+.ent .logo{width:24px;height:19px;border-radius:3px;background:#fff;color:#0c1a2b;font-weight:800;font-size:10px;display:grid;place-items:center}
+.ent .name{font-size:13px;font-weight:700}
+.ent select{margin-top:8px;width:100%;background:#0c1a2b;color:#eef2f7;border:1px solid #2a3c52;border-radius:var(--r-sm);padding:6px 8px;font:12px var(--font-ui)}
+.appsw{margin:8px 6px 10px}
+.appsw button{width:100%;display:flex;align-items:center;gap:8px;background:transparent;border:1px solid #2a3c52;color:var(--on-nav);border-radius:var(--r-sm);padding:8px 10px;font:11.5px var(--font-ui);cursor:pointer;letter-spacing:.02em}
+.appsw .dot{width:7px;height:7px;border-radius:1px;background:#d8b876}
+.nav{flex:1;overflow:auto}
+.nav .grp{font-size:9.5px;text-transform:uppercase;letter-spacing:.18em;color:var(--on-nav-muted);padding:14px 12px 4px}
+.nav a{display:flex;align-items:center;gap:10px;border-radius:var(--r-sm);padding:7px 12px;color:#c7d2de;font-size:13px}
+.nav a .ic{width:14px;height:14px;border-radius:3px;background:#ffffff1f;flex:none}
+.nav a:hover{background:#ffffff10;color:#fff}
+.nav a[aria-current="page"]{background:#ffffff10;color:#fff;font-weight:600;box-shadow:inset 3px 0 0 var(--gold)}
+.nav a[aria-current="page"] .ic{background:var(--gold)}
+.nav .plat{margin:16px 8px 4px;border-top:1px solid #ffffff1f;padding-top:12px}
+.nav .plat .glbl{font-size:9.5px;letter-spacing:.18em;color:#d8b876;text-transform:uppercase;padding:0 12px 4px}
+.nav .plat a{color:#e6d3ac}
+.nav .plat a[aria-current="page"]{box-shadow:inset 3px 0 0 var(--gold)}
+.side .foot{border-top:1px solid #ffffff1f;padding-top:8px;margin-top:6px;display:grid;gap:1px}
+.side .foot a{font-size:12px;color:var(--on-nav-muted);padding:7px 12px;border-radius:var(--r-sm)}
+.side .foot a:hover{background:#ffffff10;color:#fff}
+
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{display:flex;align-items:center;gap:14px;padding:12px 24px;background:var(--surface);border-bottom:1px solid var(--border)}
+.search{flex:1;max-width:420px;display:flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 12px;color:var(--text-muted);font-size:13px}
+.search .k{margin-left:auto;border:1px solid var(--border-strong);border-radius:3px;padding:0 5px;font-size:11px;color:var(--text-faint)}
+.topbar .sp{flex:1}
+.iconbtn{position:relative;width:34px;height:34px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface);display:grid;place-items:center;color:var(--text-muted);cursor:pointer}
+.iconbtn .badge{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;padding:0 3px;border-radius:999px;background:var(--err);color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center}
+.me{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted)}
+.me .av{width:30px;height:30px;border-radius:var(--r-sm);background:#0c1a2b;color:#fff;display:grid;place-items:center;font-weight:700;font-size:12px}
+
+.content{padding:26px 26px 30px;max-width:1180px;width:100%;margin:0 auto;display:grid;gap:var(--s6)}
+.pagehead{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;border-bottom:2px solid var(--gold);padding-bottom:14px}
+.pagehead .eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--text-faint);font-weight:700}
+.pagehead h1{margin:4px 0 0;font-size:28px;font-weight:750;letter-spacing:-.015em;line-height:1.1}
+.pagehead p{margin:6px 0 0;color:var(--text-muted);font-size:13.5px}
+.pagehead .actions{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
+
+.btn{display:inline-flex;align-items:center;gap:8px;border-radius:var(--r-sm);padding:9px 18px;font:600 13px var(--font-ui);letter-spacing:.01em;cursor:pointer;border:1px solid transparent}
+.btn-primary{background:var(--action);color:#fff}
+.btn-primary:hover{background:var(--action-strong)}
+.btn-secondary{background:var(--surface);color:var(--text);border-color:var(--border-strong)}
+.btn-secondary:hover{background:var(--surface-2)}
+.btn-danger{background:transparent;color:var(--err);border-color:#d3a4a0}
+.btn-danger:hover{background:var(--err-bg)}
+.btn:focus-visible{outline:3px solid #8fa9d6;outline-offset:2px}
+
+/* ----- Board de pilotage : chiffres clés + tendance 6 mois (CSS pur) ----- */
+.board{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh-1);overflow:hidden}
+.board .seclbl{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--text-faint);font-weight:700;padding:16px 20px 0}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);padding:12px 20px 20px;gap:0}
+.kpi{padding:8px 20px}
+.kpi + .kpi{border-left:1px solid var(--hair)}
+.kpi .lbl{font-size:12px;color:var(--text-muted)}
+.kpi .val{margin-top:8px;font:750 30px/1 var(--font-num);letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.kpi .delta{margin-top:8px;font-size:12px;font-weight:700}
+.kpi .delta.up{color:var(--ok)} .kpi .delta.down{color:var(--err)} .kpi .delta.flat{color:var(--text-faint)}
+.trend{border-top:1px solid var(--hair);padding:16px 20px 20px}
+.trend .th{display:flex;align-items:baseline;gap:10px;margin-bottom:12px}
+.trend .th b{font-size:13px} .trend .th span{font-size:11.5px;color:var(--text-faint)}
+.bars{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;align-items:end;height:120px}
+.bar{display:flex;flex-direction:column;align-items:center;gap:6px;height:100%}
+.bar .col{width:26px;background:var(--action);border-radius:3px 3px 0 0;align-self:center;margin-top:auto}
+.bar .col.b2{background:var(--gold);opacity:.85}
+.bar .m{font-size:11px;color:var(--text-muted)}
+.legend{display:flex;gap:16px;margin-top:12px;font-size:11.5px;color:var(--text-muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:middle}
+
+.cols{display:grid;grid-template-columns:1.3fr 1fr;gap:var(--s5)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh-1)}
+.card > h2{margin:0;padding:15px 20px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.card > h2 .count{margin-left:auto;color:var(--text-faint);font-weight:600;letter-spacing:0}
+.card .body{padding:6px 10px}
+.li{display:flex;gap:14px;align-items:flex-start;padding:12px 10px}
+.li + .li{border-top:1px solid var(--hair)}
+.li:hover{background:var(--surface-2)}
+.li .mark{width:6px;align-self:stretch;border-radius:3px;flex:none}
+.li .mark.err{background:var(--err)} .li .mark.warn{background:var(--warn)} .li .mark.info{background:var(--info)} .li .mark.ok{background:var(--ok)}
+.li .t{font-size:14px;font-weight:600;font-family:var(--font)} .li .d{font-size:12.5px;color:var(--text-muted);margin-top:2px}
+.li .chip{margin-left:auto;font-size:11px;font-weight:700;padding:2px 9px;border-radius:3px;flex:none}
+.chip.err{background:var(--err-bg);color:var(--err)} .chip.warn{background:var(--warn-bg);color:var(--warn)}
+
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;padding:2px 9px;border-radius:3px;letter-spacing:.02em}
+.badge::before{content:"";width:6px;height:6px;border-radius:1px}
+.b-ok{background:var(--ok-bg);color:var(--ok)} .b-ok::before{background:var(--ok)}
+.b-info{background:var(--info-bg);color:var(--info)} .b-info::before{background:var(--info)}
+.b-warn{background:var(--warn-bg);color:var(--warn)} .b-warn::before{background:var(--warn)}
+.b-err{background:var(--err-bg);color:var(--err)} .b-err::before{background:var(--err);border-radius:50%}
+.b-neu{background:var(--neutral-bg);color:var(--neutral)} .b-neu::before{background:var(--neutral)}
+
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+thead th{text-align:left;font-weight:700;color:var(--text-faint);font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:12px 18px;border-bottom:2px solid var(--border-strong);white-space:nowrap}
+tbody td{padding:13px 18px;border-bottom:1px solid var(--hair);font-family:var(--font)}
+tbody tr:hover{background:var(--surface-2)}
+td.num{text-align:right;font-family:var(--font-num);font-variant-numeric:tabular-nums}
+td.ref{font-family:var(--font-num);color:var(--text-muted)}
+tfoot td{padding:12px 18px;font-weight:700;border-top:2px solid var(--border-strong);font-family:var(--font-num);text-align:right}
+
+.empty{border:1px solid var(--border);border-radius:var(--r-lg);padding:38px 20px;text-align:center;background:var(--surface)}
+.empty .il{width:44px;height:44px;border-radius:8px;background:var(--action-weak);margin:0 auto 14px}
+.empty h3{margin:0 0 4px;font-size:16px;font-family:var(--font)}
+.empty p{margin:0 0 16px;color:var(--text-muted);font-size:13px}
+
+.formrow{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:18px;box-shadow:var(--sh-1)}
+.field label{display:block;font-size:11.5px;color:var(--text-muted);font-weight:600;letter-spacing:.02em;margin-bottom:6px}
+.field .req{color:var(--err)}
+.field input,.field select{width:100%;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--r-sm);padding:9px 11px;font:14px var(--font-ui);color:var(--text)}
+.field input:focus,.field select:focus{outline:3px solid #8fa9d6;outline-offset:1px;border-color:var(--action)}
+.field .hint{margin-top:6px;font-size:11.5px;color:var(--text-faint)}
+
+.dangerzone{border:1px solid #d3a4a0;background:var(--err-bg);border-radius:var(--r-lg);padding:16px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.dangerzone .txt{font-size:13px;color:#6c1712}
+.dangerzone .btn-danger{margin-left:auto;background:#fff}
+
+.mobileprev{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;box-shadow:var(--sh-1)}
+.mobileprev h2{margin:0 0 12px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);font-weight:700}
+.phone{width:300px;max-width:100%;margin:0 auto;border:10px solid #0c1a2b;border-radius:26px;overflow:hidden;background:var(--nav-bg)}
+.phone .pbar{display:flex;align-items:center;gap:8px;padding:10px 12px;color:#fff}
+.phone .pbar .wm{font-weight:800;letter-spacing:.14em;font-size:12px}
+.phone .pbar .mn{margin-left:auto;border:1px solid #34506c;border-radius:5px;padding:4px 9px;font-size:11px}
+.phone .kpi-m{background:#0c1a2b;color:#eef2f7;padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;border-bottom:1px solid #ffffff14}
+.phone .kpi-m div b{display:block;font:750 17px var(--font-num)}
+.phone .kpi-m div span{font-size:10px;color:#9fb0c2}
+.phone .drawer{background:var(--nav-bg);padding:8px}
+.phone .drawer .grp{font-size:9px;letter-spacing:.16em;color:#9fb0c2;text-transform:uppercase;padding:8px 10px 2px}
+.phone .drawer a{display:block;color:#c7d2de;font-size:12.5px;padding:8px 10px;border-radius:5px}
+.phone .drawer a[aria-current="page"]{background:#ffffff12;color:#fff;font-weight:600;box-shadow:inset 3px 0 0 var(--gold)}
+.phone .drawer .plat{border-top:1px solid #ffffff1f;margin-top:8px;padding-top:8px}
+.phone .drawer .plat a{color:#e6d3ac}
+
+@container (max-width:1080px){
+  .app{grid-template-columns:1fr}
+  .side{display:none}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .kpi + .kpi{border-left:0}
+  .kpi:nth-child(3),.kpi:nth-child(4){border-top:1px solid var(--hair)}
+  .cols{grid-template-columns:1fr}
+  .content{padding:18px}
+  .bars{grid-template-columns:repeat(6,1fr)}
+}
+@container (max-width:640px){
+  .kpis{grid-template-columns:1fr 1fr}
+  .formrow{grid-template-columns:1fr}
+  .topbar{flex-wrap:wrap}
+  .search{max-width:none;order:3;width:100%}
+  .pagehead h1{font-size:23px}
+  .pagehead .actions{width:100%}
+  .btn{flex:1;justify-content:center}
+  .bars{height:96px}
+  .bar .col{width:18px}
+}
+</style>
+</head>
+<body>
+
+<div class="rulerbar">
+  <b>MAQUETTE ELSATIA UI-V2 — Direction C « Direction »</b>
+  <a href="#bureau">Bureau 1440</a><a href="#tablette">Tablette 1024</a><a href="#mobile">Mobile 390</a>
+  <span class="tag">MAQUETTE — aucune donnée réelle</span>
+</div>
+<span id="bureau"></span><span id="tablette"></span><span id="mobile"></span>
+
+<div class="viewport">
+<div class="app">
+
+  <aside class="side"><!-- 1. barre latérale -->
+    <div class="brand"><span class="wm">ELSATIA</span><span class="pn">Gestion Pro</span></div>
+    <div class="ent"><!-- 3 + 4 -->
+      <div class="lbl">Entreprise active</div>
+      <div class="row"><span class="logo">BR</span><span class="name">BTP Rénov' Sud</span></div>
+      <select aria-label="Changer d'entreprise"><option>BTP Rénov' Sud</option><option>Ateliers Maçonnerie Est</option><option>Couverture Vallée SARL</option></select>
+    </div>
+    <div class="appsw"><button type="button"><span class="dot"></span>APPLICATIONS ELSATIA ▾</button></div><!-- 5 -->
+    <nav class="nav" aria-label="Navigation principale">
+      <div class="grp">Accueil</div>
+      <a href="#" aria-current="page"><span class="ic"></span>Tableau de bord</a><a href="#"><span class="ic"></span>Mon espace</a><a href="#"><span class="ic"></span>Messagerie</a>
+      <div class="grp">Clients &amp; ventes</div>
+      <a href="#"><span class="ic"></span>Clients</a><a href="#"><span class="ic"></span>Devis</a><a href="#"><span class="ic"></span>Factures</a>
+      <div class="grp">Chantiers</div>
+      <a href="#"><span class="ic"></span>Chantiers</a><a href="#"><span class="ic"></span>Planning</a><a href="#"><span class="ic"></span>Pointage</a>
+      <div class="grp">Équipe</div>
+      <a href="#"><span class="ic"></span>Employés</a><a href="#"><span class="ic"></span>Congés</a><a href="#"><span class="ic"></span>Notes de frais</a>
+      <div class="grp">Achats &amp; stock</div>
+      <a href="#"><span class="ic"></span>Fournisseurs</a><a href="#"><span class="ic"></span>Commandes</a><a href="#"><span class="ic"></span>Stock</a>
+      <div class="grp">Pilotage</div>
+      <a href="#"><span class="ic"></span>Rentabilité</a><a href="#"><span class="ic"></span>Trésorerie</a><a href="#"><span class="ic"></span>Exports comptables</a>
+      <div class="plat"><div class="glbl">Administration plateforme</div><a href="#"><span class="ic"></span>★ Console ELSATIA</a><a href="#"><span class="ic"></span>Sécurité du compte</a></div>
+    </nav>
+    <div class="foot"><a href="#">Paramètres</a><a href="#">Aide &amp; assistant</a><a href="#">Se déconnecter</a></div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar"><!-- 2 : 6 recherche · 7 notifications -->
+      <div class="search">🔍 Rechercher…<span class="k">Ctrl K</span></div>
+      <div class="sp"></div>
+      <button class="iconbtn" aria-label="Notifications (3 non lues)">🔔<span class="badge">3</span></button>
+      <div class="me"><span class="av">JG</span>Julien G.</div>
+    </header>
+
+    <div class="content">
+      <div class="pagehead"><!-- 8 titre · 9/18 boutons -->
+        <div>
+          <div class="eyebrow">Pilotage</div>
+          <h1>Tableau de bord</h1>
+          <p>Période : 30 derniers jours · BTP Rénov' Sud · lundi 12 octobre</p>
+        </div>
+        <div class="actions">
+          <button class="btn btn-secondary" type="button">Exporter</button>
+          <button class="btn btn-primary" type="button">+ Nouveau devis</button>
+        </div>
+      </div>
+
+      <!-- Board de pilotage : 10 quatre indicateurs + tendance -->
+      <section class="board">
+        <div class="seclbl">Indicateurs clés</div>
+        <div class="kpis">
+          <div class="kpi"><div class="lbl">Facturé</div><div class="val">128 400 €</div><div class="delta up">▲ 9,4 % vs. n-1</div></div>
+          <div class="kpi"><div class="lbl">Encaissé</div><div class="val">96 200 €</div><div class="delta up">▲ 14,7 %</div></div>
+          <div class="kpi"><div class="lbl">Reste à encaisser</div><div class="val">32 200 €</div><div class="delta down">▲ dont 12 300 € en retard</div></div>
+          <div class="kpi"><div class="lbl">Devis acceptés</div><div class="val">54 900 €</div><div class="delta flat">4 devis · taux 57 %</div></div>
+        </div>
+        <div class="trend">
+          <div class="th"><b>Devis émis vs. facturé</b><span>6 derniers mois (k€)</span></div>
+          <div class="bars">
+            <div class="bar"><span class="col" style="height:38%"></span><span class="col b2" style="height:30%"></span><span class="m">mai</span></div>
+            <div class="bar"><span class="col" style="height:52%"></span><span class="col b2" style="height:44%"></span><span class="m">juin</span></div>
+            <div class="bar"><span class="col" style="height:46%"></span><span class="col b2" style="height:50%"></span><span class="m">juil</span></div>
+            <div class="bar"><span class="col" style="height:64%"></span><span class="col b2" style="height:55%"></span><span class="m">août</span></div>
+            <div class="bar"><span class="col" style="height:58%"></span><span class="col b2" style="height:62%"></span><span class="m">sept</span></div>
+            <div class="bar"><span class="col" style="height:82%"></span><span class="col b2" style="height:70%"></span><span class="m">oct</span></div>
+          </div>
+          <div class="legend"><span><i style="background:var(--action)"></i>Devis émis</span><span><i style="background:var(--gold)"></i>Facturé</span></div>
+        </div>
+      </section>
+
+      <div class="cols">
+        <div style="display:grid;gap:var(--s5)">
+          <section class="card"><!-- 11 Alertes prioritaires + 15 badges -->
+            <h2>Alertes prioritaires <span class="count">3</span></h2>
+            <div class="body">
+              <div class="li"><span class="mark err"></span><div><div class="t">Facture F-2026-041 impayée</div><div class="d">Maison Durand · 12 300 € · échéance dépassée de 6 jours</div></div><span class="chip err">Retard</span></div>
+              <div class="li"><span class="mark err"></span><div><div class="t">Contrôle technique dépassé · AB-482-CD</div><div class="d">Renault Master · à régulariser sous 48 h</div></div><span class="chip err">Critique</span></div>
+              <div class="li"><span class="mark warn"></span><div><div class="t">Stock bas · Vis inox 5×60</div><div class="d">12 restants pour un seuil de 50</div></div><span class="chip warn">Attention</span></div>
+            </div>
+          </section>
+
+          <section class="card"><!-- 14 tableau métier -->
+            <h2>Devis récents <span class="count">4</span></h2>
+            <div class="tablewrap">
+              <table>
+                <thead><tr><th>Référence</th><th>Client</th><th>Montant</th><th>Statut</th></tr></thead>
+                <tbody>
+                  <tr><td class="ref">D-2026-118</td><td>Maison Durand</td><td class="num">8 900 €</td><td><span class="badge b-info">Envoyé</span></td></tr>
+                  <tr><td class="ref">D-2026-117</td><td>SCI Horizon</td><td class="num">21 400 €</td><td><span class="badge b-ok">Accepté</span></td></tr>
+                  <tr><td class="ref">D-2026-116</td><td>Mairie de Caster</td><td class="num">63 200 €</td><td><span class="badge b-neu">Brouillon</span></td></tr>
+                  <tr><td class="ref">D-2026-115</td><td>Entreprise Roux</td><td class="num">4 100 €</td><td><span class="badge b-err">Refusé</span></td></tr>
+                </tbody>
+                <tfoot><tr><td colspan="2" style="text-align:left;font-family:var(--font-ui);color:var(--text-muted)">Total période</td><td class="num">97 600 €</td><td></td></tr></tfoot>
+              </table>
+            </div>
+          </section>
+
+          <section class="empty"><!-- 16 état vide -->
+            <div class="il"></div><h3>Aucune intervention planifiée</h3>
+            <p>Les interventions programmées pour l'équipe apparaîtront ici.</p>
+            <button class="btn btn-secondary" type="button">Planifier une intervention</button>
+          </section>
+        </div>
+
+        <div style="display:grid;gap:var(--s5)">
+          <section class="card"><!-- 12 Tâches du jour -->
+            <h2>Tâches du jour <span class="count">3</span></h2>
+            <div class="body">
+              <div class="li"><span class="mark info"></span><div><div class="t">Relancer le devis D-2026-118</div><div class="d">Validité expire aujourd'hui</div></div></div>
+              <div class="li"><span class="mark info"></span><div><div class="t">Réception commande C-2026-077</div><div class="d">Point P · livraison prévue ce matin</div></div></div>
+              <div class="li"><span class="mark warn"></span><div><div class="t">Valider 3 notes de frais</div><div class="d">En attente depuis 4 jours</div></div></div>
+            </div>
+          </section>
+
+          <section class="card"><!-- 13 Chantiers en cours -->
+            <h2>Chantiers en cours <span class="count">3</span></h2>
+            <div class="body">
+              <div class="li"><span class="mark ok"></span><div><div class="t">Réhab. école Jean-Moulin</div><div class="d">Fin prévue 14/10</div></div><span class="badge b-ok" style="margin-left:auto">En cours</span></div>
+              <div class="li"><span class="mark warn"></span><div><div class="t">Extension pavillon Lefèvre</div><div class="d">En attente devis avenant</div></div><span class="badge b-warn" style="margin-left:auto">En pause</span></div>
+              <div class="li"><span class="mark info"></span><div><div class="t">Ravalement copro. Les Tilleuls</div><div class="d">Démarrage semaine 43</div></div><span class="badge b-neu" style="margin-left:auto">À préparer</span></div>
+            </div>
+          </section>
+
+          <section class="formrow"><!-- 17 champ de formulaire -->
+            <div class="field"><label>Nom du client <span class="req">*</span></label><input type="text" value="Maison Durand"><div class="hint">Apparaît sur les devis et factures.</div></div>
+            <div class="field"><label>Type de client</label><select><option>Particulier</option><option selected>Professionnel</option><option>Syndic</option><option>Collectivité</option></select></div>
+          </section>
+        </div>
+      </div>
+
+      <div class="dangerzone"><!-- 19 action dangereuse -->
+        <div class="txt"><strong>Supprimer ce devis</strong> — action définitive, l'historique et les pièces jointes seront perdus.</div>
+        <button class="btn btn-danger" type="button">Supprimer le devis</button>
+      </div>
+
+      <section class="mobileprev"><!-- 20 aperçu menu mobile -->
+        <h2>Aperçu du menu mobile</h2>
+        <div class="phone">
+          <div class="pbar"><span class="wm">ELSATIA</span><span class="mn">☰ Menu</span></div>
+          <div class="kpi-m">
+            <div><b>128 400 €</b><span>Facturé 30 j</span></div>
+            <div><b>32 200 €</b><span>Reste à encaisser</span></div>
+          </div>
+          <div class="drawer">
+            <div class="grp">Accueil</div><a href="#" aria-current="page">Tableau de bord</a><a href="#">Mon espace</a><a href="#">Messagerie</a>
+            <div class="grp">Pilotage</div><a href="#">Rentabilité</a><a href="#">Trésorerie</a><a href="#">Exports comptables</a>
+            <div class="plat"><a href="#">★ Console ELSATIA</a></div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+</div>
+<p class="frame-note">Direction C « Direction » — forte hiérarchie typographique, board de pilotage en tête (chiffres <code>30 px</code> + deltas + tendance 6 mois en CSS pur), filet doré ELSATIA sous le titre et sur l'onglet actif, tableaux à filets fins et totaux. Bleu d'action profond <code>#22417a</code>. Reste efficace pour le terrain (nav compacte, listes denses).</p>
+</body>
+</html>
