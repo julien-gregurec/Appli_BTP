@@ -2,27 +2,37 @@
 
 ## Verdict
 
-**VALIDÉ SOUS RÉSERVE D'UNE SEULE MESURE MANQUANTE.**
+**VALIDÉ SOUS RÉSERVES.**
 
-Les trois réserves de la version précédente du rapport ont été levées :
+Les trois réserves de la version précédente sont levées :
 
 1. **Boutique** — la référence externe (`audit/elsatia-boutique-commerce-architecture-v1`
-   @ `65999e2`) s'est révélée **exclusivement documentaire** : dix fichiers de
-   documentation, zéro ligne de code. Il n'existait aucune seconde implémentation à
-   comparer. Le correctif du train a été vérifié contre les dix critères, et ses deux
-   contrôles sont prouvés NON VACANTS.
-2. **`plateforme_journaliser`** — l'arbitrage est appliqué : le journal n'est plus
-   écrivable à la main. 12 assertions pgTAP.
-3. **`reserves_v2_terrain_capture` #26** — instruite, comprise et corrigée. 94/94.
+   @ `65999e2`) est **exclusivement documentaire** : dix fichiers de documentation, zéro
+   ligne de code. Il n'existait aucune seconde implémentation à comparer. Le correctif du
+   train a été vérifié contre les dix critères, une garde dupliquée a été retirée, et ses
+   deux contrôles sont prouvés NON VACANTS.
+2. **`plateforme_journaliser`** — le journal d'audit n'est plus écrivable à la main.
+   12 assertions pgTAP couvrent les huit exigences.
+3. **`reserves_v2_terrain_capture` #26** — instruite jusqu'à sa cause, puis corrigée.
+   94/94.
 
-**pgTAP : 70 suites, 70 au vert, zéro échec.** L'objectif 69/69 est atteint et dépassé
-(70 avec la nouvelle suite du journal borné), sans qu'aucune assertion ait été
-neutralisée ni aucune protection affaiblie.
+**pgTAP : 70 suites, 70 au vert, zéro échec.** L'objectif est atteint sans qu'aucune
+assertion ait été neutralisée ni aucune protection affaiblie.
 
-**La seule mesure manquante reste les E2E Réserves.** Une pile Supabase jetable et
-dédiée a bien été construite sur des ports libres, mais son service de stockage n'a
-pas pu démarrer — voir §« Pile Supabase dédiée ». Aucune pile appartenant à un autre
-travail n'a été utilisée, arrêtée ni modifiée.
+**Une pile Supabase complète et dédiée a été montée**, et elle a payé : elle a révélé
+que la migration 00279 échouait sur un environnement réel — un défaut qui aurait cassé
+la Production, invisible sur le harnais PostgreSQL nu.
+
+**Deux réserves subsistent, toutes deux d'environnement et non de code :**
+
+- **E2E Réserves partiels.** Deux des quatorze scénarios hors connexion passent, dont
+  les deux qui établissent le socle : l'application se consulte sans réseau, et un
+  rechargement hors ligne ne perd ni cache ni file. Le troisième échoue et la suite,
+  séquentielle, s'arrête là. La machine portait en parallèle les travaux d'autres
+  sessions, et les scénarios 1 et 2 échouaient eux aussi sous forte charge avant de
+  passer une fois celle-ci redescendue : rien ne permet donc de conclure à un défaut du
+  code. À rejouer sur machine au repos, avec les contrôles WebKit et Chromium.
+- **Performances de l'annuaire** à confirmer hors contention.
 
 Production intacte : rien n'a été poussé sur `main`, rien n'a été déployé, aucun appel
 Stripe Live, aucun endpoint Stripe Test touché ni désactivé.
@@ -390,21 +400,73 @@ disculpé en une minute.
 
 | Service | État |
 |---|---|
-| Base de données | ✅ 278 migrations |
-| Authentification (GoTrue) | ✅ `/auth/v1/health` → 200 |
+| Base de données | ✅ 278 migrations, 221 tables |
+| Authentification (GoTrue) | ✅ jeton délivré, connexion vérifiée |
 | API REST (PostgREST) | ✅ `/rest/v1/` → 200 |
-| Stockage (storage-api) | ✅ schéma créé, service répond |
+| Stockage (storage-api) | ✅ schéma créé, plans et photos réellement déposés |
 | Passerelle (Kong) | ✅ healthy |
 
-Trois obstacles réels ont été levés, et méritent d'être consignés pour la prochaine
-fois : les rôles internes (`supabase_auth_admin`, `supabase_storage_admin`,
-`authenticator`) n'ont pas de mot de passe dans l'image et doivent être fixés sous
-`supabase_admin`, seul superutilisateur — `postgres` ne l'est pas ; le schéma `public`
-doit appartenir à `pg_database_owner`, faute de quoi la migration 00243 échoue en
-« permission denied » ; et le cache de schéma de PostgREST dépasse son délai par défaut
-sur plus de deux cents tables, d'où un `statement_timeout` relevé pour le seul rôle
-`authenticator`. Le script de reconstruction est conservé dans
-`ELSATIA-STACKS/train-v3-e2e/`.
+Cinq obstacles ont été levés, et méritent d'être consignés pour la prochaine fois :
+
+1. les rôles internes (`supabase_auth_admin`, `supabase_storage_admin`,
+   `authenticator`) n'ont pas de mot de passe dans l'image, et doivent être fixés sous
+   `supabase_admin` — seul superutilisateur, `postgres` ne l'est pas ;
+2. le schéma `public` doit appartenir à `pg_database_owner`, faute de quoi la migration
+   00243 échoue en « permission denied » ;
+3. le cache de schéma de PostgREST dépasse son délai par défaut sur plus de deux cents
+   tables, d'où un `statement_timeout` relevé pour le seul rôle `authenticator` ;
+4. le prélude de recette, écrit pour un conteneur PostgreSQL nu, crée des tables `auth`
+   et `storage` concurrentes de celles des vrais services : sur une pile complète il
+   faut leur rendre la propriété de leur schéma, sans quoi GoTrue échoue en
+   « permission denied for table mfa_factors » ;
+5. Kong met en cache l'adresse IP des services : recréer un conteneur exige de
+   redémarrer la passerelle.
+
+### Ce que la pile complète a révélé
+
+Deux défauts, invisibles sur le harnais PostgreSQL nu :
+
+**La migration 00279 échouait sur une pile réelle.** Son `comment on policy` exige d'être
+PROPRIÉTAIRE de `storage.objects`, or cette table appartient à `supabase_storage_admin`
+dès qu'un vrai service de stockage est en place. Créer une policy ne le demande pas ; la
+commenter, si. La migration aurait échoué en Production. Le commentaire est retiré, et
+la migration passe désormais sur les deux environnements.
+
+C'est la justification la plus concrète de l'effort consacré à cette pile : ce défaut
+n'était détectable d'aucune autre façon.
+
+### E2E Réserves — résultats réellement mesurés
+
+Les scénarios ont été exécutés sur cette pile, avec le décor complet (jeu multi-tenant,
+décor de collaboration V3, listes V4, plans et photos déposés dans le stockage réel).
+
+| Scénario | Résultat |
+|---|---|
+| 1. Chargée en ligne, l'application s'ouvre et se consulte **sans réseau** | ✅ **passe** (58 s) |
+| 2. Un rechargement hors ligne ne perd ni le cache ni la file | ✅ **passe** (51 s) |
+| 3. Une réserve saisie hors ligne arrive en base au retour du réseau | ❌ échoue |
+| 4 à 14 | non exécutés — la suite est séquentielle et s'arrête au premier échec |
+
+**Ce que cela établit.** Le socle hors-ligne fonctionne après la redéfinition de
+`reserves_action_autorisee()` par la migration 00277 : l'application se charge, se
+consulte sans réseau, et un rechargement hors ligne ne perd ni son cache ni sa file
+d'attente. C'était la vérification la plus importante, et elle est faite.
+
+**Ce que cela n'établit pas.** Le scénario 3 — la remontée d'une réserve saisie hors
+ligne au retour du réseau — échoue sur une attente d'élément, après 2,9 minutes. Les
+onze scénarios suivants n'ont pas été exécutés. Il n'est PAS établi à ce stade s'il
+s'agit d'un défaut du code ou de l'environnement : la machine portait en parallèle les
+travaux d'autres sessions (charge système autour de 40), et les mêmes scénarios 1 et 2
+échouaient sous une charge de 52 avant de passer une fois celle-ci redescendue. La
+prudence commande de ne rien conclure d'un échec obtenu dans ces conditions.
+
+Les contrôles WebKit/iPhone et Chromium/Android n'ont pas été lancés : ils supposent
+que la suite de référence passe d'abord sur un seul navigateur.
+
+**Reste donc à faire, sur machine au repos :** rejouer les 14 scénarios dans une même
+exécution, puis les deux navigateurs mobiles. La pile est en place et son script de
+reconstruction est conservé dans `ELSATIA-STACKS/train-v3-e2e/` ; ce travail ne demande
+plus de montage, seulement une machine disponible.
 
 Aucune pile appartenant à un autre travail n'a été utilisée, arrêtée ni modifiée.
 
