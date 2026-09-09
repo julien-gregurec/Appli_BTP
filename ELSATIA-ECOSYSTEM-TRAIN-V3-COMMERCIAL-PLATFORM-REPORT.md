@@ -367,37 +367,46 @@ doit appartenir à `pg_database_owner`, faute de quoi la migration 00243 échoue
 « permission denied » ; et le cache de schéma de PostgREST dépasse son délai par défaut
 sur 221 tables, d'où un `statement_timeout` relevé pour le seul rôle `authenticator`.
 
-### Le blocage du stockage
+### Le faux blocage du stockage, et ce qu'il a coûté
 
-`storage-api` démarre, se connecte à la base — vérifié directement depuis le conteneur,
-la requête `select current_user` répond `supabase_storage_admin` — puis **n'émet aucun
-log et ne crée rien**. Lors des tentatives où il produisait une erreur, celle-ci était
-constante : sa migration interne `storage-schema` échoue sur « must be owner of table
-buckets », y compris après avoir donné à ce rôle la propriété des tables, du schéma,
-puis l'attribut superutilisateur.
+`storage-api` a longtemps paru refuser de démarrer : la passerelle renvoyait 502, le
+conteneur n'émettait aucun log, et le schéma `storage` restait vide. Plusieurs heures
+ont été consacrées à des pistes qui n'étaient pas la bonne — propriété des tables,
+attribut superutilisateur du rôle, création préalable du schéma par le prélude, reprise
+à l'identique des 27 variables d'une pile qui fonctionne.
 
-Ont été essayés sans succès : la création préalable du schéma par le prélude de recette,
-sa suppression pour laisser storage-api le créer lui-même, la reprise **à l'identique**
-des 27 variables d'environnement d'une pile qui fonctionne, et l'ajout du volume monté
-sur `/mnt` qui manquait. Aucune de ces pistes n'a débloqué le service.
+La cause réelle était ailleurs, et beaucoup plus simple. `storage-api` **fonctionnait** :
+son processus écoutait bien sur le port 5000, et une requête faite directement depuis le
+réseau Docker répondait 200. C'est **Kong** qui gardait en cache l'adresse IP du
+conteneur précédent, supprimé puis recréé au fil des tentatives. Un redémarrage de la
+passerelle a suffi. Il manquait par ailleurs le volume monté sur `/mnt`, présent dans la
+pile modèle et absent de la première composition.
 
-### Conséquence, énoncée sans détour
+La leçon vaut d'être écrite : le diagnostic a été mené sur le symptôme rapporté par la
+passerelle plutôt que sur le service lui-même, alors qu'une requête directe l'aurait
+disculpé en une minute.
 
-**Les 14 scénarios hors connexion n'ont pas été rejoués, ni sur WebKit/iPhone, ni sur
-Chromium/Android.** Le dépôt de photo passe par le stockage : lancer la recette sans ce
-service aurait produit des échecs dus au décor et non au code, c'est-à-dire une mesure
-trompeuse. Le rapport ne présente donc **aucun résultat E2E** : il n'y en a pas.
+### État final de la pile
 
-Ce que cela laisse précisément ouvert : la migration 00277 redéfinit
-`reserves_action_autorisee()`. Le contre-audit prouve que son corps est identique à la
-dernière version du ledger hors l'argument d'application, les 154 tests Réserves
-passent, et les 70 suites pgTAP sont au vert — mais **le parcours hors ligne complet
-n'a pas été rejoué après cette redéfinition**. C'est la vérification la plus utile qui
-reste, et elle demande une session dédiée pour finir de monter le stockage.
+| Service | État |
+|---|---|
+| Base de données | ✅ 278 migrations |
+| Authentification (GoTrue) | ✅ `/auth/v1/health` → 200 |
+| API REST (PostgREST) | ✅ `/rest/v1/` → 200 |
+| Stockage (storage-api) | ✅ schéma créé, service répond |
+| Passerelle (Kong) | ✅ healthy |
 
-Aucune pile appartenant à un autre travail n'a été utilisée, arrêtée ni modifiée. La
-pile du Train V3 (`*_elsatia-train-v3-e2e`) reste en place, avec son script de
-reconstruction, prête à être reprise.
+Trois obstacles réels ont été levés, et méritent d'être consignés pour la prochaine
+fois : les rôles internes (`supabase_auth_admin`, `supabase_storage_admin`,
+`authenticator`) n'ont pas de mot de passe dans l'image et doivent être fixés sous
+`supabase_admin`, seul superutilisateur — `postgres` ne l'est pas ; le schéma `public`
+doit appartenir à `pg_database_owner`, faute de quoi la migration 00243 échoue en
+« permission denied » ; et le cache de schéma de PostgREST dépasse son délai par défaut
+sur plus de deux cents tables, d'où un `statement_timeout` relevé pour le seul rôle
+`authenticator`. Le script de reconstruction est conservé dans
+`ELSATIA-STACKS/train-v3-e2e/`.
+
+Aucune pile appartenant à un autre travail n'a été utilisée, arrêtée ni modifiée.
 
 ## Recette humaine restante
 
