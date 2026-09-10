@@ -1,0 +1,187 @@
+-- PROPOSITION — NON APPLIQUÉE, NON NUMÉROTÉE, HORS supabase/migrations
+--
+-- Exigence : « référence interne et sélection multiple d'articles dans les devis »,
+-- ajoutée au lot ELSATIA-GP-MOBILE-AUTHENTICATED-PILOT-CLOSURE-V1 (phase L).
+-- Statut : soumis à arbitrage. AUCUN numéro de ledger n'est réservé.
+-- Ledger constaté lors de l'audit : 278 fichiers, dernier numéro 20260909000280.
+--
+-- ── Constat d'audit (schéma réel, ledger 278) ────────────────────────────────────────
+--
+--   prestations_catalogue  catalogue des DEVIS — aucune référence, aucun fabricant, aucun
+--                          fournisseur ; UNIQUE (entreprise_id, designation).
+--   articles_stock         catalogue du STOCK — `reference` UNIQUE par entreprise,
+--                          `code_barres` UNIQUE par entreprise, `marque`, prix d'achat et de
+--                          vente, `actif` ; jamais utilisé par les devis.
+--   fiches_techniques_articles  `fabricant`, `reference_fabricant` par fiche d'un article.
+--   lignes_devis           aucune origine, aucun instantané de référence.
+--
+-- ── Arbitrage requis AVANT application ───────────────────────────────────────────────
+--
+-- A. PÉRIMÈTRE DE RECHERCHE. Les devis n'utilisent aujourd'hui que `prestations_catalogue`.
+--    L'exigence décrit des « articles » avec stock, prix d'achat, fabricant et fournisseur —
+--    c'est le vocabulaire d'`articles_stock`. Cette proposition interroge LES DEUX catalogues,
+--    sans les fusionner, en affichant l'origine de chaque résultat. Unifier les catalogues
+--    serait un autre chantier, qui n'est pas proposé ici.
+--
+-- B. `articles_stock.reference`. Elle est UNIQUE par entreprise et REQUISE à l'import : dans
+--    les faits, c'est le code article interne. L'exigence veut une `reference_interne` NON
+--    unique (plusieurs articles peuvent la partager). La proposition AJOUTE une colonne
+--    distincte et NE TOUCHE PAS à `reference`. L'initialisation de `reference_interne` à partir
+--    de `reference` est proposée en fin de fichier, désactivée : c'est une décision métier.
+--
+-- ── Garanties ────────────────────────────────────────────────────────────────────────
+--   * aucune migration existante n'est modifiée ;
+--   * aucune unicité globale ni même par entreprise sur les nouvelles références : les
+--     doublons sont DÉTECTÉS (fonction dédiée), jamais interdits ni fusionnés ;
+--   * cloisonnement : les colonnes héritent des RLS existantes ; la recherche est une
+--     fonction SECURITY INVOKER, donc soumise aux mêmes RLS que l'écran ;
+--   * le prix d'achat n'est rendu qu'avec la permission existante `voir_prix_stock` ;
+--   * les lignes de devis portent un INSTANTANÉ : modifier le catalogue ne réécrit jamais un
+--     devis émis.
+
+-- ── 1. Normalisation de comparaison ──────────────────────────────────────────────────
+-- IMMUTABLE pour pouvoir servir d'expression d'index. `unaccent` n'est que STABLE : on fige
+-- le dictionnaire en le nommant explicitement, ce qui est la façon admise de l'indexer.
+create or replace function public.normaliser_reference(p_valeur text)
+returns text
+language sql
+immutable
+parallel safe
+as $$
+  select regexp_replace(lower(public.unaccent('public.unaccent'::regdictionary, coalesce(p_valeur, ''))),
+                        '[[:space:]\-._/\\]+', '', 'g')
+$$;
+
+-- ── 2. Catalogue des devis ───────────────────────────────────────────────────────────
+alter table public.prestations_catalogue
+  add column if not exists reference_interne   text,
+  add column if not exists reference_fabricant text,
+  add column if not exists fabricant           text,
+  add column if not exists fournisseur         text,
+  add column if not exists code_barres         text;
+
+alter table public.prestations_catalogue
+  add constraint prestations_catalogue_references_longueur_check
+  check (coalesce(length(reference_interne), 0) <= 120 and coalesce(length(reference_fabricant), 0) <= 120);
+
+-- ── 3. Catalogue du stock ────────────────────────────────────────────────────────────
+alter table public.articles_stock
+  add column if not exists reference_interne   text,
+  add column if not exists reference_fabricant text;
+
+alter table public.articles_stock
+  add constraint articles_stock_references_longueur_check
+  check (coalesce(length(reference_interne), 0) <= 120 and coalesce(length(reference_fabricant), 0) <= 120);
+
+-- ── 4. Index de recherche (par entreprise, jamais globaux) ───────────────────────────
+create index if not exists prestations_catalogue_ref_interne_norm_idx
+  on public.prestations_catalogue (entreprise_id, public.normaliser_reference(reference_interne));
+create index if not exists prestations_catalogue_ref_fabricant_norm_idx
+  on public.prestations_catalogue (entreprise_id, public.normaliser_reference(reference_fabricant));
+create index if not exists prestations_catalogue_recherche_trgm_idx
+  on public.prestations_catalogue using gin (
+    public.normaliser_reference(coalesce(reference_interne, '') || ' ' || coalesce(reference_fabricant, '')
+      || ' ' || designation || ' ' || coalesce(fabricant, '') || ' ' || coalesce(fournisseur, '')) gin_trgm_ops);
+
+create index if not exists articles_stock_ref_interne_norm_idx
+  on public.articles_stock (entreprise_id, public.normaliser_reference(reference_interne));
+create index if not exists articles_stock_ref_fabricant_norm_idx
+  on public.articles_stock (entreprise_id, public.normaliser_reference(reference_fabricant));
+create index if not exists articles_stock_recherche_trgm_idx
+  on public.articles_stock using gin (
+    public.normaliser_reference(coalesce(reference_interne, '') || ' ' || coalesce(reference_fabricant, '')
+      || ' ' || coalesce(reference, '') || ' ' || designation || ' ' || coalesce(marque, '')
+      || ' ' || coalesce(code_barres, '')) gin_trgm_ops);
+
+-- ── 5. Instantané sur les lignes de devis ────────────────────────────────────────────
+alter table public.lignes_devis
+  add column if not exists source_catalogue              text,
+  add column if not exists source_id                     uuid,
+  add column if not exists reference_interne_instantane   text,
+  add column if not exists reference_fabricant_instantane text;
+
+alter table public.lignes_devis
+  add constraint lignes_devis_source_catalogue_check
+  check (source_catalogue is null or source_catalogue in ('prestation', 'article'));
+-- Pas de clé étrangère sur source_id : l'article peut être archivé, modifié ou supprimé sans
+-- que la ligne perde son instantané. C'est l'instantané qui fait foi, pas le lien.
+
+-- ── 6. Doublons au sein d'une entreprise — signalés, jamais corrigés ────────────────
+create or replace function public.doublons_references_catalogue(p_entreprise_id uuid)
+returns table (source text, champ text, reference_normalisee text, identifiants uuid[])
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  select 'prestation', 'reference_interne', public.normaliser_reference(reference_interne), array_agg(id)
+    from public.prestations_catalogue
+   where entreprise_id = p_entreprise_id and coalesce(reference_interne, '') <> ''
+   group by public.normaliser_reference(reference_interne) having count(*) > 1
+  union all
+  select 'article', 'reference_interne', public.normaliser_reference(reference_interne), array_agg(id)
+    from public.articles_stock
+   where entreprise_id = p_entreprise_id and coalesce(reference_interne, '') <> ''
+   group by public.normaliser_reference(reference_interne) having count(*) > 1
+  union all
+  select 'article', 'reference_fabricant', public.normaliser_reference(reference_fabricant), array_agg(id)
+    from public.articles_stock
+   where entreprise_id = p_entreprise_id and coalesce(reference_fabricant, '') <> ''
+   group by public.normaliser_reference(reference_fabricant) having count(*) > 1
+$$;
+
+-- ── 7. Recherche depuis un devis ─────────────────────────────────────────────────────
+-- SECURITY INVOKER : mêmes RLS que l'écran. Le classement reproduit exactement celui de
+-- `src/lib/devis/recherche-articles.ts` (six niveaux), éprouvé par ses tests.
+create or replace function public.rechercher_articles_devis(p_entreprise_id uuid, p_recherche text, p_limite int default 50)
+returns table (
+  source text, id uuid, reference_interne text, reference_fabricant text, designation text,
+  description text, fabricant text, fournisseur text, code_barres text, unite text,
+  prix_achat_ht numeric, prix_vente_ht numeric, taux_tva numeric, stock_disponible numeric,
+  actif boolean, rang int
+)
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  with q as (select public.normaliser_reference(p_recherche) as v),
+  candidats as (
+    select 'prestation'::text as source, p.id, p.reference_interne, p.reference_fabricant, p.designation,
+           p.description, p.fabricant, p.fournisseur, p.code_barres, p.unite,
+           null::numeric as prix_achat_ht, p.prix_unitaire_ht as prix_vente_ht, p.taux_tva,
+           null::numeric as stock_disponible, p.actif
+      from public.prestations_catalogue p where p.entreprise_id = p_entreprise_id
+    union all
+    select 'article', a.id, a.reference_interne, a.reference_fabricant, a.designation,
+           null, a.marque, null, a.code_barres, a.unite,
+           case when public.a_permission(p_entreprise_id, 'voir_prix_stock') then a.prix_achat_ht end,
+           a.prix_vente_ht, null, a.quantite_stock, a.actif
+      from public.articles_stock a where a.entreprise_id = p_entreprise_id
+  ),
+  classes as (
+    select c.*,
+      case
+        when public.normaliser_reference(c.reference_interne) = q.v and q.v <> '' then 1
+        when public.normaliser_reference(c.reference_fabricant) = q.v and q.v <> '' then 2
+        when q.v <> '' and public.normaliser_reference(c.reference_interne) like q.v || '%' then 3
+        when q.v <> '' and public.normaliser_reference(c.reference_fabricant) like q.v || '%' then 4
+        when q.v <> '' and (public.normaliser_reference(c.reference_interne) like '%' || q.v || '%'
+                          or public.normaliser_reference(c.reference_fabricant) like '%' || q.v || '%'
+                          or public.normaliser_reference(c.code_barres) like '%' || q.v || '%') then 5
+        when q.v <> '' and (public.normaliser_reference(c.designation) like '%' || q.v || '%'
+                          or public.normaliser_reference(c.fabricant) like '%' || q.v || '%'
+                          or public.normaliser_reference(c.fournisseur) like '%' || q.v || '%') then 6
+      end as rang
+      from candidats c, q
+  )
+  select source, id, reference_interne, reference_fabricant, designation, description, fabricant,
+         fournisseur, code_barres, unite, prix_achat_ht, prix_vente_ht, taux_tva, stock_disponible, actif, rang
+    from classes
+   where rang is not null
+   order by rang, actif desc, designation
+   limit greatest(1, least(coalesce(p_limite, 50), 200))
+$$;
+
+-- ── 8. Initialisation proposée — DÉSACTIVÉE, décision métier (arbitrage B) ──────────
+-- update public.articles_stock set reference_interne = reference where reference_interne is null;
