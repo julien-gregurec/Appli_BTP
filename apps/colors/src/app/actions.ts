@@ -58,10 +58,29 @@ export async function connexionAction(formData: FormData) {
     redirect(`/login?error=${panne ? CODE_SERVICE_INDISPONIBLE : CODE_IDENTIFIANTS_INVALIDES}`);
   }
 
+  /*
+   * Même règle que ci-dessus, appliquée aux deux lectures d'habilitation.
+   *
+   * Une ERREUR de la RPC n'est pas une ABSENCE d'accès. La version précédente
+   * confondait les deux : sous charge, un délai dépassé sur
+   * `contexte_application_courant` faisait annoncer « Votre compte ELSATIA ne
+   * dispose pas d'un accès actif à Colors » à une personne parfaitement
+   * habilitée. Le message envoie alors vers le mauvais interlocuteur — on va
+   * demander une habilitation à son administrateur au lieu d'attendre que le
+   * service revienne.
+   *
+   * Une réponse VIDE, elle, reste une absence d'accès : le contrat canonique a
+   * répondu, et il ne rattache la personne à rien.
+   */
   const { data: contexte, error: erreurContexte } = await supabase
     .rpc("contexte_application_courant")
     .maybeSingle();
-  if (erreurContexte || !contexte) {
+  if (erreurContexte) {
+    journaliserEchecTechnique("connexion.contexte", erreurContexte);
+    await supabase.auth.signOut();
+    redirect(`/login?error=${CODE_SERVICE_INDISPONIBLE}`);
+  }
+  if (!contexte) {
     await supabase.auth.signOut();
     redirect(`/login?error=${CODE_ACCES_COLORS_ABSENT}`);
   }
@@ -72,8 +91,9 @@ export async function connexionAction(formData: FormData) {
     p_application_code: "colors",
   });
   if (erreurAcces) {
+    journaliserEchecTechnique("connexion.acces", erreurAcces);
     await supabase.auth.signOut();
-    redirect(`/login?error=${CODE_ACCES_COLORS_ABSENT}`);
+    redirect(`/login?error=${CODE_SERVICE_INDISPONIBLE}`);
   }
   if (autorise === true) redirect(destination);
 
