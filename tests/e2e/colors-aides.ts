@@ -1,6 +1,4 @@
-import { expect, type BrowserContext, type Page } from "@playwright/test";
-
-type CookieSession = Awaited<ReturnType<BrowserContext["cookies"]>>;
+import { type Page } from "@playwright/test";
 
 /**
  * Identités de recette d'ELSATIA Colors.
