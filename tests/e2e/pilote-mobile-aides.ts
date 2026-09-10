@@ -72,6 +72,29 @@ export async function attendreHydratation(page: Page) {
   await expect(page.getByRole("button", { name: "Se connecter" })).toBeEnabled();
 }
 
+/**
+ * Navigue vers une route et attend d'y être RÉELLEMENT.
+ *
+ * WebKit refuse une navigation lancée pendant qu'une autre est encore en train de valider,
+ * et lève « Navigation to X is interrupted by another navigation to Y ». Chromium l'accepte
+ * silencieusement, ce qui masquait le problème sur le profil Android.
+ *
+ * Attendre l'URL de destination n'est pas un contournement : c'est ce qui rend l'échec
+ * LISIBLE. Si l'application redirigeait vraiment ailleurs, le test le dirait en nommant la
+ * page atteinte, au lieu de se plaindre d'une navigation interrompue — un message qui parle
+ * du pilote de test et pas du produit.
+ */
+export async function allerA(page: Page, route: string) {
+  // `load` — le défaut — et non `domcontentloaded` : essayé d'abord, ce dernier rendait la
+  // main pendant que la navigation précédente achevait de se valider, et WebKit refusait la
+  // suivante. Le symptôme nommait toujours la route PRÉCÉDENTE comme interruptrice, ce qui
+  // désignait la cause sans ambiguïté une fois qu'on le lisait dans ce sens.
+  await page.goto(route);
+  await page.waitForURL((url) => url.pathname === route || url.pathname.startsWith(`${route}/`), {
+    timeout: 20_000,
+  });
+}
+
 /** Débordement horizontal du document, en pixels. */
 export async function debordementHorizontal(page: Page): Promise<number> {
   return page.evaluate(

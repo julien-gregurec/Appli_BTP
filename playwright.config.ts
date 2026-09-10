@@ -2,6 +2,21 @@ import { defineConfig, devices } from "@playwright/test";
 
 const baseURL = process.env.E2E_BASE_URL ?? "http://127.0.0.1:3100";
 
+/**
+ * La recette mobile est servie en HTTPS, comme la Production.
+ *
+ * Le cookie de session porte `Secure` dès que NODE_ENV vaut « production », ce qui est le cas
+ * sous `next start` et ce qui est CORRECT. Chromium accepte un cookie Secure sur 127.0.0.1,
+ * qu'il tient pour un contexte sûr ; WEBKIT LE REFUSE. Sans HTTPS, la recette iPhone échouait
+ * sur toutes les pages authentifiées — non parce que l'application est cassée, mais parce que
+ * le navigateur n'envoyait jamais la session.
+ *
+ * Le certificat est auto-signé et local : on accepte donc son défaut de chaîne, et rien
+ * d'autre. Affaiblir le cookie pour arranger le test aurait éprouvé une configuration que
+ * personne ne déploiera.
+ */
+const baseUrlPilote = process.env.E2E_PILOTE_BASE_URL ?? baseURL;
+
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 45_000,
@@ -39,17 +54,21 @@ export default defineConfig({
     // Ouvre une session par rôle et la conserve. Voir la note de tête de
     // `pilote-mobile-sessions.setup.ts` : /login n'accepte que 10 tentatives par tranche de
     // 10 minutes et par IP, ce qui interdit à chaque test de se reconnecter.
-    { name: "pilote-sessions", testMatch: /pilote-mobile-sessions\.setup\.ts/ },
+    {
+      name: "pilote-sessions",
+      testMatch: /pilote-mobile-sessions\.setup\.ts/,
+      use: { baseURL: baseUrlPilote, ignoreHTTPSErrors: true },
+    },
 
-    { name: "pilote-android", use: { ...devices["Pixel 7"] }, grep: /@pilote/, dependencies: ["pilote-sessions"] },
-    { name: "pilote-iphone", use: { ...devices["iPhone 13"] }, grep: /@pilote/, dependencies: ["pilote-sessions"] },
+    { name: "pilote-android", use: { ...devices["Pixel 7"], baseURL: baseUrlPilote, ignoreHTTPSErrors: true }, grep: /@pilote/, dependencies: ["pilote-sessions"] },
+    { name: "pilote-iphone", use: { ...devices["iPhone 13"], baseURL: baseUrlPilote, ignoreHTTPSErrors: true }, grep: /@pilote/, dependencies: ["pilote-sessions"] },
 
     // Firefox n'a pas de profil « téléphone » chez Playwright et ne sert ici qu'à un point
     // précis : `indexedDB.databases()` y est ABSENTE, ce qui rendait la purge locale
     // inopérante (réserve R4). On l'éprouve donc en fenêtre de bureau étroite.
     {
       name: "pilote-firefox",
-      use: { ...devices["Desktop Firefox"], viewport: { width: 390, height: 844 } },
+      use: { ...devices["Desktop Firefox"], viewport: { width: 390, height: 844 }, baseURL: baseUrlPilote, ignoreHTTPSErrors: true },
       grep: /@purge/,
       dependencies: ["pilote-sessions"],
     },

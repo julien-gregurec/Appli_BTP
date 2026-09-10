@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * Bannière « nouvelle version disponible », appliquée sur geste de l'utilisateur.
@@ -16,10 +16,26 @@ import { useEffect, useState } from "react";
  * Le rechargement suit `controllerchange` plutôt qu'un appel direct à `location.reload()` :
  * recharger avant que le nouveau service worker n'ait pris la main servirait à nouveau
  * l'ancienne version, et la bannière reviendrait — en boucle.
+ *
+ * ── Le piège de `controllerchange` ──────────────────────────────────────────────────────
+ *
+ * Cet événement ne signale PAS seulement « la mise à jour que vous avez acceptée est prête ».
+ * Il se déclenche aussi à la TOUTE PREMIÈRE activation du service worker, quand `activate`
+ * appelle `clients.claim()` pour prendre la main sur les pages déjà ouvertes. Recharger sans
+ * distinguer les deux cas fait donc se recharger l'application toute seule au premier
+ * lancement — exactement le comportement que ce composant existe pour empêcher.
+ *
+ * Constaté en recette iPhone : la navigation suivante était interrompue par un rechargement
+ * que personne n'avait demandé. Sur un téléphone, cela se serait vu comme un écran qui saute
+ * pendant qu'on le touche.
+ *
+ * On ne recharge donc QUE si l'utilisateur a demandé la mise à jour.
  */
 export function MiseAJourApplication() {
   const [enAttente, setEnAttente] = useState<ServiceWorker | null>(null);
   const [application, setApplication] = useState(false);
+  /** Vrai uniquement après un geste explicite de l'utilisateur sur « Mettre à jour ». */
+  const miseAJourDemandee = useRef(false);
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
@@ -48,6 +64,9 @@ export function MiseAJourApplication() {
     navigator.serviceWorker.ready.then(surveiller).catch(() => undefined);
 
     const auChangement = () => {
+      // Sans ce garde-fou, la première activation du service worker rechargerait la page
+      // d'elle-même. Voir la note de tête.
+      if (!miseAJourDemandee.current) return;
       if (rechargement) return;
       rechargement = true;
       window.location.reload();
@@ -87,6 +106,7 @@ export function MiseAJourApplication() {
             type="button"
             disabled={application}
             onClick={() => {
+              miseAJourDemandee.current = true;
               setApplication(true);
               enAttente.postMessage({ type: "APPLIQUER_MISE_A_JOUR" });
             }}

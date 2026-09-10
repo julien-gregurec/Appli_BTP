@@ -3,6 +3,7 @@ import {
   COMPTES,
   LARGEURS_TELEPHONE,
   MARQUEUR_ENTREPRISE_B,
+  allerA,
   cheminEtatSession,
   connecter,
   debordementHorizontal,
@@ -25,13 +26,22 @@ import {
 test.describe("@responsive @pilote parcours du salarié de terrain", () => {
   test.use({ storageState: cheminEtatSession("ouvrierA") });
 
-  const PARCOURS_OUVRIER = ["/dashboard", "/pointage", "/notes-frais", "/mes-travaux"] as const;
+  /**
+   * Les écrans que le salarié de terrain ouvre réellement.
+   *
+   * `/mes-travaux` a d'abord figuré ici par erreur : il exige `voir_devis_chantier_sans_prix`,
+   * que l'Ouvrier A du décor n'a pas, et l'application le renvoyait — correctement — vers
+   * `/dashboard?acces=refuse`. Ce n'était donc pas un défaut mobile mais un mauvais
+   * découpage de ma part : le sixième parcours du périmètre V1 est « documents emportés hors
+   * ligne », traité à part, et non « mes travaux ».
+   */
+  const PARCOURS_OUVRIER = ["/dashboard", "/pointage", "/notes-frais"] as const;
 
   for (const largeur of LARGEURS_TELEPHONE) {
     test(`@responsive @pilote les écrans du salarié tiennent à ${largeur} px`, async ({ page }) => {
       await page.setViewportSize({ width: largeur, height: 844 });
       for (const route of PARCOURS_OUVRIER) {
-        await page.goto(route);
+        await allerA(page, route);
         await verifierEcranMobile(page, `${route} @${largeur}px`);
       }
     });
@@ -39,7 +49,7 @@ test.describe("@responsive @pilote parcours du salarié de terrain", () => {
 
   test("@responsive @pilote le menu mobile s'ouvre et navigue au doigt", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto("/dashboard");
+    await allerA(page, "/dashboard");
 
     const menu = page.getByRole("button", { name: /ouvrir le menu/i });
     await expect(menu).toBeVisible();
@@ -78,7 +88,7 @@ test.describe("@responsive @pilote parcours du salarié de terrain", () => {
     // nommé « Équipe & temps ». Ouvrir le menu, deviner le groupe, le déplier, toucher le
     // lien : quatre gestes pour pointer une arrivée, sur un téléphone tenu d'une main.
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto("/dashboard");
+    await allerA(page, "/dashboard");
     await page.getByRole("button", { name: /ouvrir le menu/i }).click();
 
     const tiroir = page.locator("#navigation-mobile");
@@ -93,7 +103,7 @@ test.describe("@responsive @pilote parcours du salarié de terrain", () => {
   test("@responsive @pilote le paysage ne casse pas le pointage", async ({ page }) => {
     // Un salarié qui pose son téléphone sur un capot bascule en paysage sans y penser.
     await page.setViewportSize({ width: 844, height: 390 });
-    await page.goto("/pointage");
+    await allerA(page, "/pointage");
     const debordement = await debordementHorizontal(page);
     expect(debordement, `pointage en paysage déborde de ${debordement} px`).toBeLessThanOrEqual(8);
   });
@@ -105,7 +115,7 @@ test.describe("@responsive @pilote parcours du chef d'équipe", () => {
   for (const largeur of LARGEURS_TELEPHONE) {
     test(`@responsive @pilote le planning tient à ${largeur} px`, async ({ page }) => {
       await page.setViewportSize({ width: largeur, height: 844 });
-      await page.goto("/planning");
+      await allerA(page, "/planning");
       await verifierEcranMobile(page, `/planning @${largeur}px`);
     });
   }
@@ -117,14 +127,14 @@ test.describe("@responsive @pilote parcours du conducteur de travaux", () => {
   for (const largeur of LARGEURS_TELEPHONE) {
     test(`@responsive @pilote les chantiers tiennent à ${largeur} px`, async ({ page }) => {
       await page.setViewportSize({ width: largeur, height: 844 });
-      await page.goto("/chantiers");
+      await allerA(page, "/chantiers");
       await verifierEcranMobile(page, `/chantiers @${largeur}px`);
     });
   }
 
   test("@responsive @pilote le retour mobile ramène à la liste, pas au tableau de bord", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto("/chantiers");
+    await allerA(page, "/chantiers");
 
     // « Nouveau chantier » porte lui aussi un href sous /chantiers/ et vient en premier
     // dans le DOM : sans cette exclusion, le test ouvrait le formulaire de création et
@@ -133,8 +143,14 @@ test.describe("@responsive @pilote parcours du conducteur de travaux", () => {
       .locator("main a[href^='/chantiers/']:not([href$='/nouveau'])")
       .first();
     await expect(premierChantier).toBeVisible();
+    const cible = await premierChantier.getAttribute("href");
     await premierChantier.click();
-    await expect(page).toHaveURL(/\/chantiers\/[0-9a-f-]+/);
+
+    // `Lien` désactive volontairement le préchargement de `next/link` : la charge RSC de la
+    // fiche n'est demandée qu'AU CLIC, et le commentaire du composant chiffre ce rendu à
+    // 2–4 s côté serveur. L'attente est calée là-dessus, et seulement là-dessus — ce n'est
+    // pas un délai global qu'on allonge, c'est le coût connu d'un geste précis.
+    await page.waitForURL((url) => url.pathname === cible, { timeout: 25_000 });
 
     // En mode installé il n'y a pas de bouton retour du navigateur : c'est `MobileBack` qui
     // doit ramener à la liste. Le renvoyer au tableau de bord ferait perdre le contexte.
@@ -149,6 +165,9 @@ test.describe("@pilote refus et cloisonnement", () => {
 
     test("@pilote reçoit un refus lisible, jamais un écran vide", async ({ page }) => {
       await page.setViewportSize({ width: 390, height: 844 });
+      // Navigation simple, sans attendre une destination : un compte sans aucune permission
+      // est légitimement réorienté (vers /en-attente ou un refus). Ce qui compte n'est pas
+      // OÙ il atterrit, mais que la page lui dise quelque chose.
       await page.goto("/dashboard");
 
       // Le témoin n'a AUCUNE permission. Quelle que soit la page atteinte, elle doit dire
@@ -165,7 +184,7 @@ test.describe("@pilote refus et cloisonnement", () => {
     test("@pilote ne voit jamais le décor de l'entreprise B", async ({ page }) => {
       await page.setViewportSize({ width: 390, height: 844 });
       for (const route of ["/dashboard", "/chantiers", "/notes-frais", "/planning", "/clients"]) {
-        await page.goto(route);
+        await allerA(page, route);
         await expect(page.locator("body"), `${route} laisse fuir l'entreprise B`)
           .not.toContainText(MARQUEUR_ENTREPRISE_B);
       }
@@ -186,10 +205,12 @@ test.describe("@pilote sortie de session", () => {
   test("@pilote une session expirée renvoie à la connexion sans écran blanc", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await connecter(page, COMPTES.ouvrierA);
-    await page.goto("/pointage");
+    await allerA(page, "/pointage");
 
     // On invalide la session comme le ferait une expiration : les cookies disparaissent.
     await page.context().clearCookies();
+    // Navigation simple : on ATTEND d'être redirigé, donc `allerA` — qui exige d'atteindre
+    // la route demandée — n'a pas de sens ici.
     await page.goto("/pointage");
 
     await expect(page).toHaveURL(/\/login/);
@@ -224,7 +245,7 @@ test.describe("@pilote sortie de session", () => {
     });
 
     await connecter(page, COMPTES.adminA);
-    await page.goto("/dashboard");
+    await allerA(page, "/dashboard");
     const avant = await empreinte();
 
     // Déconnexion par le VRAI bouton : c'est lui qui déclenche la purge.
@@ -233,7 +254,7 @@ test.describe("@pilote sortie de session", () => {
     await expect(page).toHaveURL(/\/login/);
 
     await connecter(page, COMPTES.adminB);
-    await page.goto("/dashboard");
+    await allerA(page, "/dashboard");
     const apres = await empreinte();
 
     for (const cle of avant.local) {
