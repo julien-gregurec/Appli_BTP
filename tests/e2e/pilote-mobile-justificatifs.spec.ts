@@ -85,7 +85,16 @@ async function preparerNoteHorsLigne(page: Page, fichier: { name: string; mimeTy
   await bloc.locator('input[type="file"]').setInputFiles(fichier);
   await bloc.getByLabel("Le document est visible en entier").check();
   await bloc.getByRole("button", { name: /conserver la note/i }).click();
-  return bloc.locator('[data-test="note-hors-ligne-etat"]');
+  // On attend l'ISSUE affichée — confirmation ou refus — avant de rendre la main, exactement
+  // comme le salarié attend le message avant de ranger son téléphone.
+  //
+  // Sans cette attente, quatre scénarios lisaient la file ou quittaient la page juste après
+  // le clic, avant la fin de l'écriture IndexedDB : la file paraissait vide (« reading 'id'
+  // of undefined »), et le test de redémarrage interrompait lui-même l'écriture en naviguant
+  // aussitôt — ce qui passait pour une photo perdue par l'application.
+  const etat = bloc.locator('[data-test="note-hors-ligne-etat"]');
+  await expect(etat).toBeVisible({ timeout: 15_000 });
+  return etat;
 }
 
 test.describe("@pilote @justificatifs note de frais avec justificatif, sans réseau", () => {
