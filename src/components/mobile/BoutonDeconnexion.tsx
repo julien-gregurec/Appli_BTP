@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { logoutAction } from "@/app/actions/auth";
 import { purgerDonneesLocales } from "@/lib/mobile/purge-locale";
 
 /**
@@ -18,6 +17,10 @@ import { purgerDonneesLocales } from "@/lib/mobile/purge-locale";
  * La purge part SANS prévenir les autres onglets : la session est encore ouverte à cet
  * instant, et un onglet prévenu trop tôt revenait sur /dashboard. C'est `PurgeLocaleAuLogin`,
  * à l'arrivée sur /login — session fermée —, qui les prévient.
+ *
+ * Le formulaire poste vers la route `/auth/deconnexion`, et non vers une Server Action : une
+ * action part à l'adresse de la page courante, où le proxy refuse toute écriture sans droit de
+ * gestion — un salarié ne pouvait pas se déconnecter depuis un chantier consulté en lecture.
  *
  * `PurgeLocaleAuLogin` couvre aussi les sorties qui ne passent pas par ce bouton (session
  * expirée, révocation à distance). Les deux ensemble couvrent toutes les sorties de session.
@@ -42,7 +45,7 @@ export function BoutonDeconnexion({ libelle }: { libelle: string }) {
   }
 
   return (
-    <form ref={formulaire} action={logoutAction} onSubmit={avantEnvoi}>
+    <form ref={formulaire} action="/auth/deconnexion" method="post" onSubmit={avantEnvoi}>
       <button
         type="submit"
         disabled={enCours}

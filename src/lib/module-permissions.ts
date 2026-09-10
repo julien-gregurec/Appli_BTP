@@ -85,6 +85,11 @@ export function droitsGestionPour(pathname: string): string[] {
 
 export const PERMISSIONS_ACCES_ALTERNATIVES: Record<string,string[]> = {
   "/chantiers": ["acces_chantiers", "voir_chantiers_assignes"],
+  // Les documents suivent le chantier : qui voit un chantier qui lui est affecté doit pouvoir en
+  // ouvrir les pièces. Sans cette entrée, le salarié voyait la liste mais chaque téléchargement
+  // (« Télécharger », « Emporter ») était renvoyé vers `acces=refuse`. Aucun élargissement de
+  // données : la route lit sous RLS, et un document réservé aux gestionnaires reste en 404.
+  "/api/documents": ["acces_chantiers", "voir_chantiers_assignes"],
   "/grands-deplacements": ["gerer_notes_frais", "saisir_ses_notes_frais"],
   "/paie": ["consulter_sa_paie", "saisir_variables_paie", "controler_variables_paie", "gerer_paie", "exporter_paie", "parametrer_paie", "voir_paie_confidentielle"],
 };
