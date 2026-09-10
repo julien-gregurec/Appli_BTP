@@ -1,15 +1,24 @@
 # ELSATIA Colors — clôture technique et intégration au Train V3
 
-**Verdict : GO PILOTE SOUS CONDITIONS.**
+**Verdict : BLOQUÉ ENVIRONNEMENT — RECETTE NON CONCLUSIVE.**
 
-La migration est intégrée et prouvée. Le cloisonnement multi-entreprise est
-démontré, RPC par RPC, sous quatre identités réelles. L'OCR est démontré fermé,
-jusqu'au refus de build. Ce qui manque n'est pas un correctif : c'est **une
-machine capable de servir la recette navigateur**. Aucune des quatre passes
-authentifiées n'a été verte, et le jeu de tests qui passe change à chaque passe
-à code identique. Détail en §6.
+Tout ce qui se démontre sans navigateur est démontré et vert : la migration, le
+cloisonnement multi-entreprise, la séparation RAL/fabricants, le nettoyage des
+photos, la fermeture de la lecture d'étiquette, les dix-sept contrôles sur arbre
+figé. Ce qui manque est la recette Playwright des 35 parcours en une passe — et
+elle ne manque pas par défaut du produit : **le poste ne peut pas la servir**.
 
----
+Ce verdict n'est pas un `GO PILOTE SOUS CONDITIONS` déguisé. La mission demande
+explicitement de ne pas produire de verdict applicatif quand la fenêtre ne
+s'ouvre pas, et elle ne s'est pas ouverte.
+
+## Ce qui a changé depuis `3e90c9f`
+
+| Décision | État |
+|---|---|
+| **D1 — RAL et fabricants séparés** | **Fermée.** Voir §2 bis. |
+| **D2 — photos débarrassées des EXIF/GPS** | **Fermée.** Voir §9 bis. |
+| Trois défauts produit trouvés | Corrigés. Voir §6 bis. |
 
 ## 1. Identification
 
@@ -20,9 +29,9 @@ authentifiées n'a été verte, et le jeu de tests qui passe change à chaque pa
 | Train V3 de départ | `59e960a0e6648a472bedff0d8b71d47caa6e56ac` |
 | SHA métier du train, vérifié ancêtre | `52d3282bede2203eb41bf8caa530a2ca5d86aa8e` |
 | Lot Colors intégré | `38d871c9ea3b0745a568fb136cf9f9c8c2cf0733` |
-| SHA final | `9eaeeb84370489572e76535ddcf6f5ac8fb93174` |
-| Commits | 14 |
-| Fichiers modifiés | 71 |
+| SHA final | **`6c4b4bffb7568172c8b189088a0ee370fb913ea5`** |
+| Commits | 17 |
+| Fichiers modifiés | 80 |
 | Migration créée | **`20260909000281_colors_finition_reference_nuancier_v15.sql`** |
 | Ledger | 278 → **279** |
 | Worktree | `/Volumes/ELSATIA-DEV/ELSATIA-WORKTREES/colors-pilot-readiness-v1` |
@@ -34,9 +43,9 @@ conflit, sur base commune identique, sans qu'aucun apport du train soit arbitré
 
 | Racine | Fichiers |
 |---|---|
-| `apps/colors/` | 61 |
+| `apps/colors/` | 69 |
+| `docs/` | 5 |
 | `tests/e2e/` | 4 |
-| `docs/` | 4 |
 | `supabase/tests/` | 1 |
 | `supabase/migrations/` | **1** |
 
@@ -83,6 +92,188 @@ contrainte revient à décider ce que contient au juste une colonne nommée
 refuse explicitement, sous `CLR01`, plutôt que de laisser la contrainte de table
 produire une erreur opaque, et l'écran affiche « la proposition reste visible,
 elle ne peut simplement pas être confirmée ».
+
+---
+
+---
+
+## 2 bis. Décision D1 — références RAL et fabricants strictement séparées
+
+### La colonne neutre n'existe pas : vérifié avant d'écrire
+
+Relevé sur le schéma de la pile dédiée : `colors_seaux` ne porte que
+`ral_approxime`, `ral_distance` et `ral_confirme`. Aucune table de nuancier
+(`article_teintes` appartient à Gestion Pro). La deuxième branche de la décision
+s'applique donc : `.sql.proposed` sans numéro, confirmation fabricant bloquée
+côté applicatif, confirmation RAL opérationnelle. **La migration 281 n'a pas été
+touchée et le ledger reste à 279.**
+
+### Le piège que ce lot ferme
+
+On pourrait croire qu'il suffit de regarder la forme du code : `RAL 9010`
+ressemble à du RAL, `PR-1024` non. C'est faux, et dangereusement. **Rien
+n'empêche un nuancier fabricant de nommer une de ses teintes « RAL 9010 »**
+parce qu'elle s'en approche. La retenir alors dans une colonne nommée
+`ral_approxime` présenterait une référence fabricant comme une norme.
+
+La nature d'une référence est donc décidée par la **provenance déclarée** du
+nuancier (`referentiel: "ral" | "fabricant"`), et le format du code n'est qu'une
+condition supplémentaire. Un nuancier muet vaut `fabricant` — le défaut prudent,
+verrouillé par un test.
+
+### Trois verrous, du plus visible au plus profond
+
+1. **L'écran** ne propose plus de bouton pour une référence non persistable :
+   proposer un bouton qui échoue ensuite ferait porter à l'utilisateur une
+   limite de schéma dont il n'est pas responsable, et l'inviterait à réessayer.
+   Il explique, et affiche la nature à côté du code.
+2. **L'action serveur** refuse avant tout appel à la base — une Server Action
+   est une surface publique, appelable sans passer par l'écran.
+3. **Le schéma** refuse sous le SQLSTATE dédié `CLR01`.
+
+### Les huit démonstrations exigées
+
+| # | Démonstration | Preuve |
+|---|---|---|
+| 1 | Proposition RAL valide | `nature: ral`, `persistable: true` |
+| 2 | Confirmation RAL valide | format applicatif **identique** à la contrainte SQL, comparé par test |
+| 3 | Refus d'un faux format | 6 variantes (`RAL9010`, `ral 9010`, `RAL 901`, `RAL 90101`, double espace, espace final) |
+| 4 | Proposition fabricant | proposée avec provenance, signalée fabricant |
+| 5 | Aucune écriture dans `ral_approxime` | **y compris pour un fabricant déguisé en RAL** |
+| 6 | Modèle neutre | proposé, six informations, **absent du ledger** (279 vérifié par test) |
+| 7 | Provenance conservée | colonne `Référentiel` : `"RAL 9010";"Fabricant"` |
+| 8 | Aucune certification | aucun intitulé ne contient `certifi\|exact\|garanti\|mesur` |
+
+23 tests unitaires, plus six vérifications HTTP sur l'application vivante
+(§6 ter) : nature affichée « Référence fabricant », **zéro bouton « Retenir »**,
+explication présente, export portant `"TEST-BLANC";"Fabricant"` et **zéro
+ligne** la présentant comme RAL.
+
+### Modèle neutre proposé
+
+`docs/migrations-proposees/colors-references-fabricants-neutres-v1.sql.proposed` :
+une table plutôt que des colonnes — une référence retenue porte six informations
+dont trois n'ont de sens qu'ensemble (fabricant, nuancier, version) —, une seule
+référence par seau, proposition **et** confirmation conservées séparément
+puisque c'est leur écart qui vaut d'être tracé, et deux contraintes qui refusent
+le format RAL dans ce modèle-ci. Elle ne migre rien depuis `ral_approxime`.
+
+Elle porte aussi une note d'application indispensable : la liste blanche de
+`colors_valider_mouvement` devra être étendue au champ `reference_fabricant`,
+faute de quoi l'insertion au journal sera rejetée — la même erreur que celle
+trouvée dans le SQL proposé du lot précédent.
+
+---
+
+## 9 bis. Décision D2 — photos débarrassées de leurs métadonnées
+
+### Réencodage, pas retrait de champs
+
+L'image est **décodée puis réencodée** : les pixels sont relus et un fichier neuf
+est écrit. Aucun bloc de métadonnées de l'original ne peut survivre à ce trajet,
+y compris ceux qu'une liste de champs à retirer aurait oubliés — un profil
+fabricant propriétaire, un commentaire XMP, une miniature enfouie.
+
+**L'orientation EXIF est appliquée aux pixels avant d'être effacée.** Sans cette
+précaution, retirer l'EXIF ferait basculer d'un quart de tour toutes les photos
+prises en portrait, et Colors afficherait des étiquettes couchées.
+
+HEIC et HEIF sortent en JPEG : aucun navigateur n'affiche du HEIC, et Colors rend
+les photos avec `next/image`. Conserver l'extension d'origine produirait une
+fiche dont l'image ne s'affiche pas — un défaut que le nettoyage n'a pas à créer.
+
+### Fermé par défaut
+
+Illisible, dimensions aberrantes, encodage impossible, métadonnées résiduelles :
+chacun **refuse le stockage**, sans repli sur l'original. Le contrôle de sortie
+porte sur les **octets** et non sur ce que le décodeur rapporte — c'est un
+contrôle, il ne doit rien devoir à la bibliothèque qui vient d'écrire le fichier.
+
+Les métadonnées retirées ne sont **jamais journalisées** : cela déplacerait la
+fuite du fichier vers des journaux qui ne sont pas cloisonnés par organisation.
+
+### Preuve de bout en bout sur la pile réelle
+
+Photo piégée téléversée par `/api/photos`, puis **fichier réellement stocké relu
+depuis le bucket** :
+
+| | Envoyé | Stocké |
+|---|---|---|
+| Taille | 1 242 o | **328 o** |
+| Dimensions | 40×20 | **20×40** (orientation appliquée) |
+| Bloc EXIF | présent | **absent** |
+| Profil ICC | présent | **absent** |
+| Orientation | 6 | **aucune** |
+| Appareil, modèle, logiciel, date | présents | **absents** |
+| Marqueur `GPSLatitude` | présent | **absent** |
+| Débuts d'image JPEG | — | **1** (aucune miniature) |
+
+### Une assertion vacante, trouvée et corrigée
+
+Une première assertion cherchait la chaîne `48/1 51/1` dans les octets, alors que
+**le GPS EXIF est stocké en rationnels binaires**. Elle ne trouvait rien ni avant
+ni après le nettoyage : elle passait au vert **sans rien démontrer**.
+
+Elle est remplacée par une lecture réelle de l'en-tête TIFF et des entrées de
+l'IFD0, à la recherche du pointeur `GPSInfo` (0x8825). Vérifiée discriminante :
+**vrai** avec GPS, **faux** sans, **faux** après nettoyage.
+
+La fixture est fabriquée à l'exécution plutôt que versionnée en binaire : un
+binaire dans le dépôt est opaque à la revue, personne ne peut vérifier en lisant
+un diff qu'il contient bien des coordonnées. Les tests démontrent **d'abord** que
+la fixture est piégée, **ensuite** qu'elle est désamorcée.
+
+### Aucun téléversement direct ne contourne le nettoyage
+
+Les politiques de stockage de la V1.2 sont `bucket_id <> 'colors-seaux'` en
+INSERT **et** en DELETE : le rôle applicatif ne peut ni écrire ni supprimer dans
+ce bucket, seule la lecture lui est ouverte. Toute écriture passe donc
+obligatoirement par la clé de service, c'est-à-dire par `/api/photos`. Un test
+vérifie côté code qu'aucune autre route n'appelle le stockage, et que la route
+de lecture d'étiquette ne stocke aucune image.
+
+25 tests couvrent le nettoyage, dont l'échec fermé et la convergence des formats.
+
+---
+
+## 6 bis. Trois défauts produit trouvés par la mesure
+
+### 1. Une panne d'authentification annoncée comme un mauvais mot de passe
+
+Corrigé au lot précédent pour `signInWithPassword`.
+
+### 2. Une panne d'habilitation annoncée comme une absence d'habilitation
+
+**Le même défaut subsistait à l'identique sur les deux lectures qui suivent**, et
+je ne l'avais pas vu. `contexte_application_courant` et `a_acces_application`
+renvoyaient toutes deux vers « Votre compte ELSATIA ne dispose pas d'un accès
+actif à Colors » dès qu'elles retournaient une erreur, quelle qu'en soit la
+cause.
+
+Constaté en mesurant : sous charge, une de ces RPC a dépassé son délai et une
+administratrice parfaitement habilitée s'est vu refuser l'entrée avec ce message.
+Il envoie vers **le mauvais interlocuteur** — on va demander une habilitation à
+son administrateur, qui n'y peut rien, au lieu d'attendre que le service revienne.
+
+Une **erreur** annonce désormais le service indisponible. Une réponse **vide**
+reste une absence d'accès : le contrat canonique a répondu, et il ne rattache la
+personne à rien. La distinction porte sur ce qui s'est passé, pas sur le résultat
+observé.
+
+### 3. Une correction du diagnostic du lot précédent
+
+Le rapport précédent attribuait **toute** la non-déterminisme de la recette à la
+saturation du poste. C'était vrai en partie seulement.
+
+Le journal du serveur de recette montre `Operation not permitted` en sourçant le
+fichier de clés depuis `launch.json` : les `export` posaient alors des valeurs
+**vides** qui écrasaient `.env.local`. Selon que le sourçage passait ou non, le
+serveur démarrait **sans nuancier chargé et sans clé de stockage** — d'où des
+tests de référence et de photo qui échouaient sans que ni le produit ni la
+machine n'y soient pour rien.
+
+C'était une faute de mon harnais, pas de l'infrastructure. Elle est corrigée :
+la configuration de lancement ne source plus rien et `.env.local` fait seul foi.
 
 ---
 
@@ -170,107 +361,138 @@ Aucun prestataire n'a été sélectionné ni ajouté.
 
 ---
 
-## 6. Recette authentifiée — ce qui n'a pas pu être mesuré
+## 6. Recette authentifiée — pourquoi elle n'est toujours pas concluante
 
-Une pile Supabase **dédiée** a été montée : projet `colors-pilot-e2e`, ports
+Une pile Supabase **dédiée** reste montée : projet `colors-pilot-e2e`, ports
 61321/61322, sept conteneurs, aucun nom ni port partagé. Les 279 migrations s'y
-sont appliquées. Sept identités en `@recette.invalid` — TLD réservé par la
-RFC 2606, aucune ne peut correspondre à une adresse réelle. Authentification
-réelle obtenue.
+appliquent, sept identités en `@recette.invalid` — TLD réservé par la RFC 2606,
+aucune ne peut correspondre à une adresse réelle. Le jeu de recette est
+rejouable, transactionnel, borné aux deux organisations de recette, et il ne
+contient **aucun compte hors recette** (vérifié : 7 de recette, 0 autre).
 
-**Quatre passes complètes du même code :**
+### La fenêtre exigée ne s'est pas ouverte
 
-| Passe | Verts | Rouges | Durée |
-|---|---|---|---|
-| 1 | 16 | 17 | 6,3 min |
-| 2 | 13 | 20 | 6,7 min |
-| 3 | 17 | 16 | 10,7 min |
-| 4 | 15 | 18 | **13,0 min** |
+Dix critères, six relevés consécutifs à 60 secondes. **Trois campagnes de
+surveillance, 41 relevés, `stable=0` sur toute la durée.**
 
-**Le jeu de tests qui passe change à chaque passe, à code identique.** Aucune
-passe n'est verte, aucune n'est rouge de la même façon.
-
-### Ce qui a été mesuré sur l'infrastructure
-
-| Mesure | Valeur |
+| Critère | État observé |
 |---|---|
-| Requêtes `/token` | 79 |
-| HTTP 504 | **15** |
-| Durée maximale d'une connexion | **41 574 ms** |
-| Requêtes > 1 s | 25 sur 79 |
-| `hostname resolving error` / `i/o timeout` | **69** |
-| Refus de quota (429) | **0** |
+| Aucun build concurrent | conforme après correction du critère (ci-dessous) |
+| Aucune autre suite Playwright | conforme |
+| `load1 < 12` | **jamais atteint** — 13 à 33 en continu |
+| DNS Docker fonctionnel | conforme |
+| GoTrue 200 | conforme |
+| Authentification < 1 s | **pics à 4 568 ms, 8 565 ms, 10 008 ms** |
+| PostgREST 200 | **retours `000` intermittents** |
+| Storage sain | **retours `000` intermittents** |
+| Application 200 | conforme |
+| SHA et worktree inchangés | conforme |
 
-`lookup supabase_db_colors-pilot-e2e on 127.0.0.11:53: dial udp: i/o timeout` :
-le DNS interne de Docker expire. Trois `next build` d'une autre conversation ont
-tourné en continu pendant toute la mission ; une surveillance de soixante
-minutes a conclu **« aucune fenêtre »** (charge sous 12 et aucun build
-concurrent, six mesures consécutives).
+### Un critère mal spécifié, de ma main, corrigé
 
-**Aucun délai global n'a été augmenté et aucun retry n'a été ajouté.** Une
-connexion à 41 secondes n'est pas une caractéristique du produit.
+Mon détecteur de « build concurrent » comptait trois processus. Mesuré : ce sont
+des **boucles de surveillance dont l'enfant courant est un `sleep`**, à **0,0 %
+de CPU** depuis plus de huit heures. Les compter comme des builds rendait la
+fenêtre inatteignable pour une raison qui n'existe pas. Le critère ne retient
+désormais que les builds consommant réellement du processeur — ce n'est pas un
+assouplissement, c'est la mesure de ce que le critère voulait dire.
 
-### Trois défauts trouvés malgré tout, dont un dans le produit
+### D'où vient réellement la charge
 
-1. **Défaut produit — corrigé.** Sous panne d'authentification, Colors annonçait
-   « Identifiants incorrects ». GoTrue répondait 504 et `connexionAction`
-   renvoyait le même code que pour un mot de passe faux. Quelqu'un qui lit cela
-   pendant une indisponibilité change son mot de passe pour rien, et le support
-   cherche du côté du compte au lieu du service. Les erreurs 5xx et injoignables
-   ont désormais leur propre message, qui disculpe explicitement l'utilisateur.
-2. **Fixtures non réinitialisées.** Une finition déjà déclarée par la passe
-   précédente faisait échouer une assertion sur l'état initial — ce qui prouvait
-   au passage que la migration fonctionne de bout en bout. Le jeu est désormais
-   rejouable, transactionnel, borné aux deux organisations de recette.
-3. **Mauvais budget d'attente.** `toHaveURL` applique le budget des assertions
-   du DOM (10 s) à des **navigations** : il interroge l'URL courante, qui reste
-   celle du départ tant que le nouveau document n'est pas validé. Un rendu
-   serveur de plus de dix secondes faisait donc échouer des connexions qui
-   avaient abouti. Remplacé par `waitForURL`, qui applique le budget de
-   navigation. **Appliquer le bon budget au bon type d'attente n'est pas gonfler
-   un délai.**
+`com.apple.Virtualization.VirtualMachine` — la machine virtuelle de Docker —
+consomme **925 % de CPU**. Attribution par pile :
 
-Une réutilisation de session par instantané de cookies a été écartée après
-mesure : Supabase fait tourner le jeton de rafraîchissement au premier passage
-du proxy, l'instantané n'est valable qu'une fois, et le réutiliser produisait de
-faux refus d'habilitation.
+| Pile | CPU conteneurs |
+|---|---|
+| `elsatia-capacity-r2-dbtest` | **127,4 %** |
+| `btp-platform` | **117,2 %** |
+| `elsatia-reserves-v4-dbtest` | **116,2 %** |
+| `elsatia-gp-contracts-snapshot-int-dbtest` | 68,8 % |
+| `elsatia-gp-client-snapshot-dbtest` | 22,0 % |
+| **`colors-pilot-e2e` (celle de cette mission)** | **11,4 %** |
 
----
+Conteneurs `analytics` et `realtime` de cinq piles laissées en fonctionnement par
+d'autres lots. **Aucun ne m'appartient et je n'en ai arrêté aucun.** Ma pile a
+`analytics` et `realtime` désactivés et pèse onze pour cent. Tant que ces cinq
+piles tournent, `load1` ne descendra pas sous 12.
 
-## 7. Validation sur arbre figé — `9eaeeb8`
+### Ce que l'environnement fait aux mesures
 
-Chaque suite comptée séparément, aucune commande chaînée n'ayant empêché la
-suivante de tourner.
+Même requête, même code, à dix minutes d'intervalle :
+
+| Fiche d'un seau | Taille servie | Formulaires |
+|---|---|---|
+| Moment défavorable | **10 870 octets** | **0** |
+| Moment favorable | **43 518 octets** | **8** |
+
+Le journal du serveur explique : `Sélecteur d'applications indisponible`,
+`Vérification d'accès indisponible`, `Impossible de charger les emplacements
+Colors`. Les RPC échouent par intermittence et la page se rend partiellement.
+
+Une recette exécutée là-dessus ne mesurerait pas le produit. **Playwright n'a
+donc pas été relancé**, conformément à la consigne.
+
+## 6 ter. Ce qui a pu être vérifié malgré tout, en HTTP direct
+
+Hors Playwright, sur l'application et la pile réelles. Requêtes légères, donc peu
+exposées aux défaillances ci-dessus. **34 vérifications, 0 échec :**
+
+| Domaine | Vérifications |
+|---|---|
+| Connexion des sept identités | 4 rôles + refus sans habilitation individuelle + autre entreprise + double appartenance |
+| Cloisonnement inter-entreprises | seau de B **404** depuis A ; export de A sans rien de B ; export de B sans rien de A |
+| Habilitations par rôle | consultation ne peut ni ajouter ni modifier ; opérateur en lecture seule et sans gestion d'emplacements ; gestionnaire gère les emplacements mais pas les paramètres |
+| Destination mémorisée | `/login?next=%2Finventaire%2F…` |
+| Session terminée | `/login?next=%2Fdepots&error=session-expiree` |
+| Lecture d'étiquette fermée | `409` + `code: desactive` ; écran « inactive » ; aucun bouton d'analyse |
+| Séparation RAL/fabricant | nature affichée, zéro bouton « Retenir », explication, colonne `Référentiel`, `"TEST-BLANC";"Fabricant"`, zéro ligne présentée comme RAL |
+| Aucun secret servi | 4 pages authentifiées, zéro occurrence |
+
+**Transparence** : un réessai est appliqué **uniquement** sur
+`service-indisponible`, la panne technique que le code sait désormais distinguer
+d'un refus d'habilitation. Un refus d'habilitation n'est jamais réessayé. Ces
+vérifications **ne remplacent pas** la recette Playwright exigée pour un
+`GO PILOTE`, où `retries: 0` reste la règle.
+
+**Les parcours métier lourds n'ont pas pu être vérifiés de façon concluante** :
+trois passes du même script ont donné 12/9, 14/7 puis 12/9 — jeux différents à
+code identique. La fiche d'un seau enchaîne cinq allers-retours ; c'est elle qui
+tombe en premier.
+
+
+## 7. Validation sur arbre figé — `6c4b4bf`
+
+Chaque contrôle compté séparément ; aucune commande chaînée n'a empêché la
+suivante de tourner. Worktree propre au moment de l'exécution.
 
 | # | Contrôle | Résultat |
 |---|---|---|
-| 1 | Suite unitaire Colors | **382 verts** / 36 fichiers |
+| 1 | Suite unitaire Colors | **427 verts** / 38 fichiers |
 | 2 | Suite unitaire racine | **1 722 verts / 1 725** — 3 échecs, voir ci-dessous |
 | 3 | Typecheck racine | propre |
 | 4 | Typecheck Colors | propre |
 | 5 | Lint racine | **0 erreur**, 4 avertissements préexistants |
 | 6 | Lint Colors | propre |
-| 7 | `verify-migrations` | **279 migrations valides**, noms et horodatages uniques |
-| 8 | `verify-secrets` | **1 750 fichiers, aucun secret** (1 exception nommée) |
+| 7 | `verify-migrations` | **279 valides**, noms et horodatages uniques |
+| 8 | `verify-secrets` | **1 756 fichiers, aucun secret** |
 | 9 | `git diff --check` | propre |
-| 10 | Build Gestion Pro | **réussi** |
-| 11 | Build Colors | **réussi**, 27 routes |
-| 12 | Fresh | 279 migrations, 1 031 lignes |
-| 13 | Upgrade | 278 + 1, 1 031 lignes, **identique au Fresh** |
-| 14 | Idempotence | rejouable, schéma inchangé |
-| 15 | pgTAP Colors | **273 assertions, 0 rouge** |
-| 16 | Non-vacuité | 1 verte / 9 rouges sans la migration |
+| 10 | Build Colors | **réussi**, 27 routes |
+| 11 | Build Gestion Pro | **réussi** |
+| 12 | Fresh 279 | empreinte **1 031 lignes** |
+| 13 | Upgrade 278 + 281 | empreinte **1 031 lignes** |
+| 14 | Comparaison des schémas | **identiques** |
+| 15 | Idempotence | rejouable, schéma inchangé |
+| 16 | pgTAP complet Colors | **273 assertions, 0 rouge** (7 suites) |
+| 17 | Non-vacuité | **1 verte / 9 rouges** sans la 281 |
 
-**Les 3 échecs racine** sont tous dans `src/lib/xlsx.test.ts`, avec
-« Test timed out in 5000ms ». Le même fichier **passe en 878 ms lancé seul**, et
-**le lot ne modifie aucun fichier sous `src/`**. C'est la saturation, pas une
-régression.
+**Les 3 échecs racine** sont tous dans `src/lib/xlsx.test.ts` (« Test timed out
+in 5000ms »). Le fichier **passe en 2,15 s lancé seul**, et **le lot ne modifie
+aucun fichier sous `src/`** (vérifié : 0). C'est la saturation.
 
-Les 4 avertissements de lint racine portent sur `src/app/(app)/boutique/…`,
-`src/components/SignatureEmploye.tsx` et `tests/e2e/reserves-v4-offline-mobile.spec.ts` :
-aucun ne vient de ce lot.
+**Une preuve inattendue** : le build Colors lancé sans variables a été **refusé
+par la garde de pré-build**, qui a nommé les cinq variables manquantes. Elle fait
+exactement ce pour quoi elle existe.
 
----
 
 ## 8. Candidat pilote — aucune dépendance Production
 
@@ -302,11 +524,13 @@ purge configurable par catégorie (quatre variables **serveur**), fail-closed
 **dans le sens de la conservation** — sans consigne, rien n'est détruit —,
 aucun effacement automatique, suppression manuelle tracée.
 
-**Un constat qu'il aurait été malhonnête de taire :** `/api/photos` téléverse
-les octets du fichier tels quels. La photo conserve donc ses métadonnées EXIF,
-**coordonnées GPS comprises**. Sur un chantier, c'est l'adresse d'un client.
+**Le point EXIF/GPS est désormais fermé** par la décision D2 : la photo stockée
+est décodée, redressée et réencodée, et ne porte plus aucune métadonnée. Voir
+§9 bis. L'inventaire du code a été mis à jour en conséquence, et un test exige
+qu'il nomme explicitement ce qui a été retiré — pour qu'une régression du
+nettoyage ne puisse pas passer inaperçue dans la fiche.
 
-Six décisions à arbitrer avant commercialisation :
+Cinq décisions restent à arbitrer avant commercialisation (C3 est tranchée) :
 `docs/colors/ELSATIA_COLORS_CONSERVATION_DONNEES_V1.md`.
 
 ---
@@ -315,25 +539,47 @@ Six décisions à arbitrer avant commercialisation :
 
 ### Avant pilote
 
-| # | Condition |
-|---|---|
-| **A1** | **Rejouer la recette authentifiée sur une machine non saturée.** C'est la seule condition qui empêche un `GO PILOTE` franc : 33 parcours écrits, aucun passage vert complet obtenu ici. |
-| A2 | Déployer cette branche. Ce qui est servi sur `colors.elsatia.fr` est un build très antérieur : réinitialisation de mot de passe en 404 et aucune en-tête de sécurité. |
-| A3 | Vérifier les cinq variables publiques dans l'environnement cible. |
-| A4 | Annoncer aux participants la durée du pilote et le sort des données. |
-| A5 | Fournir un nuancier sous licence, ou assumer l'absence de proposition. |
-| A6 | Arbitrer l'élargissement de `ral_approxime` aux référentiels non-RAL, ou assumer que seules les références RAL sont confirmables. |
+| # | Condition | État |
+|---|---|---|
+| **A1** | **Rejouer la recette Playwright des 35 parcours sur une machine capable de la servir.** | **Seule condition bloquante.** Elle ne dépend pas du code : `load1` ne descend pas sous 12 tant que cinq piles Supabase tierces consomment 460 % de CPU. Libérer ces piles — décision de leurs propriétaires — suffirait probablement. |
+| A2 | Déployer cette branche | Ce qui est servi sur `colors.elsatia.fr` reste un build très antérieur : réinitialisation de mot de passe en 404, aucune en-tête de sécurité. |
+| A3 | Vérifier les cinq variables publiques dans l'environnement cible | La garde de pré-build les exige et refuse le build à défaut — vérifié en phase F. |
+| A4 | Annoncer aux participants la durée du pilote et le sort des données | Aucune règle de conservation n'est configurée ; rien n'est détruit par défaut. |
+| A5 | Fournir un nuancier sous licence, ou assumer l'absence de proposition | Le format attend `referentiel: "ral" \| "fabricant"`. Sans déclaration, il vaut `fabricant` et rien ne peut être retenu sur une fiche. |
+| ~~A6~~ | ~~Arbitrer l'élargissement de `ral_approxime`~~ | **Tranchée (D1) : pas d'élargissement.** Un modèle neutre est proposé sans numéro. |
 
 ### Avant commercialisation
 
-- Parcours d'invitation — **aucune table, aucune route, aucun courriel** dans le dépôt.
-- Durées de conservation et purge : obligation, pas confort.
-- Écrans Catalogues, Imports, Utilisateurs : encore des annonces « bientôt disponible ».
+- **Appliquer le modèle neutre des références fabricants**, sans quoi une
+  organisation qui charge le nuancier de son fournisseur ne peut retenir aucune
+  référence sur ses fiches.
+- **Parcours d'invitation** — aucune table, aucune route, aucun courriel dans le
+  dépôt.
+- **Durées de conservation et purge** : obligation, pas confort.
+- Écrans Catalogues, Imports, Utilisateurs : encore des annonces « bientôt
+  disponible ».
 - Suppression d'une photo à l'unité depuis l'interface.
-- Sort des métadonnées EXIF (point C3).
 - Lot ELSATIA-UI-V2.
 
----
+### Ce qu'il faudrait pour lever A1
+
+1. Arrêter ou mettre en veille les piles `elsatia-capacity-r2-dbtest`,
+   `btp-platform`, `elsatia-reserves-v4-dbtest`,
+   `elsatia-gp-contracts-snapshot-int-dbtest` et
+   `elsatia-gp-client-snapshot-dbtest` — **elles ne m'appartiennent pas**, et
+   c'est la seule action qui débloquerait la charge.
+2. Relancer la surveillance :
+   `/Volumes/ELSATIA-DEV/ELSATIA-STACKS/colors-pilot-e2e/fenetre.sh`
+3. Dès la fenêtre confirmée, remettre les fixtures à zéro puis lancer les quatre
+   profils :
+   ```
+   docker exec -i -e MDP_RECETTE="…" supabase_db_colors-pilot-e2e \
+     psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q \
+     < tests/e2e/fixtures/colors-pilote.sql
+   E2E_BASE_URL=http://127.0.0.1:3041 MDP_RECETTE="…" \
+     npx playwright test --grep "@colors-auth" --reporter=list
+   ```
+   `retries: 0` et les délais de `playwright.config.ts` restent inchangés.
 
 ## 11. Déploiement ultérieur et retour arrière
 
@@ -357,6 +603,8 @@ Six décisions à arbitrer avant commercialisation :
 | **Schéma** | La migration n'est **pas destructrice** : elle ajoute une colonne avec un défaut, un index, et remplace trois fonctions. Un retour applicatif seul est sûr — le code antérieur ignore simplement `finition`. |
 | **Annulation du schéma** | Si elle est exigée : `drop index colors_seaux_finition_idx`, `alter table colors_seaux drop column finition`, et restaurer les corps V1.4 de `colors_diff_seau` et `colors_valider_mouvement` depuis `20260908000271`. **Cette annulation détruit les finitions déclarées** — elle n'est pas recommandée, le retour applicatif suffit. |
 | **Nuancier** | C'est un fichier. Le retirer revient à l'état sans correspondance, sans toucher aux données. |
+| **Nettoyage des photos** | Purement applicatif : un retour de version rétablit l'ancien comportement. Les photos déjà nettoyées le restent — le nettoyage est irréversible par construction, et c'est voulu. |
+| **Références fabricants** | Rien à annuler : le modèle neutre n'est pas appliqué. |
 
 ---
 
@@ -364,9 +612,22 @@ Six décisions à arbitrer avant commercialisation :
 
 Aucune fusion dans le Train V3, `main` ou une branche Production. Aucun
 déploiement. Aucune action Stripe. Aucun `git clean`, reset destructif, rebase,
-amend ni force-push. Aucune migration canonique existante modifiée. Aucun
-processus d'une autre conversation arrêté — les trois `next build` du worktree
-Gestion Pro mobile ont tourné sans être touchés, et les six piles Supabase
-préexistantes sont intactes. Aucune donnée RAL, aucun prix, aucun prestataire
-OCR et aucune règle juridique inventés. Aucun secret dans les sorties, les
-rapports ou les commits.
+amend ni force-push.
+
+**Aucune migration existante modifiée** : la `20260909000281` est celle du lot
+précédent, inchangée, et le ledger reste à 279. Le modèle neutre des références
+fabricants est proposé **sans numéro**.
+
+**Aucun processus d'une autre conversation arrêté.** Les cinq piles Supabase qui
+saturent la machine — et qui sont la cause du verdict — ont été identifiées,
+mesurées et **laissées intactes**. Seuls mes propres conteneurs de recette
+migrations ont été libérés après usage.
+
+**Aucune donnée RAL inventée.** Le nuancier de recette ne contient aucune
+référence au format RAL : associer un code RAL à une valeur sRGB approchée
+reviendrait à fabriquer une donnée normative. Le format RAL est éprouvé en
+pgTAP, sur une chaîne nue, sans couleur associée.
+
+Aucun prix, aucun prestataire OCR et aucune règle juridique inventés. Aucun
+secret dans les sorties, les rapports ou les commits — le mot de passe de
+recette est généré hors dépôt et transmis par variable d'environnement.
