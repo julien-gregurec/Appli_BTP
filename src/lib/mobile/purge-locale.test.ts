@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { purgerStockageCleValeur } from "@/lib/mobile/purge-locale";
+import { doitObeirALaPurge, purgerStockageCleValeur } from "@/lib/mobile/purge-locale";
 import { cleLocale } from "@/lib/mobile/identite-locale";
 
 /** Stockage énumérable, fidèle au comportement de `Storage` : `key(i)` suit l'ordre d'insertion. */
@@ -61,5 +61,27 @@ describe("purge des données locales", () => {
       removeItem: () => {},
     };
     expect(purgerStockageCleValeur(refus)).toBe(0);
+  });
+});
+
+describe("coordination de la purge entre onglets", () => {
+  it("un onglet obéit à une purge décidée dans un AUTRE onglet", () => {
+    expect(doitObeirALaPurge({ type: "purger", origine: "onglet-b" }, "onglet-a")).toBe(true);
+  });
+
+  it("un onglet n'obéit JAMAIS à sa propre purge", () => {
+    // Défaut constaté en recette : l'onglet qui se déconnectait recevait son propre message,
+    // partait vers /login avant la fermeture de session, et revenait connecté sur /dashboard.
+    expect(doitObeirALaPurge({ type: "purger", origine: "onglet-a" }, "onglet-a")).toBe(false);
+  });
+
+  it("ignore un message sans origine — l'ancien format ne prouve pas qu'il vient d'ailleurs", () => {
+    expect(doitObeirALaPurge({ type: "purger" }, "onglet-a")).toBe(false);
+  });
+
+  it("ignore tout ce qui n'est pas un ordre de purge", () => {
+    for (const message of [null, undefined, "purger", 42, { type: "autre", origine: "onglet-b" }]) {
+      expect(doitObeirALaPurge(message, "onglet-a")).toBe(false);
+    }
   });
 });

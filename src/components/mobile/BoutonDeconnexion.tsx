@@ -15,8 +15,12 @@ import { purgerDonneesLocales } from "@/lib/mobile/purge-locale";
  * On retient donc l'envoi, on ATTEND la purge, puis on soumet. Le délai n'est pas une
  * précaution de confort : c'est la condition pour que « déconnecté » veuille dire « effacé ».
  *
- * `PurgeLocaleAuLogin` couvre les sorties qui ne passent pas par ce bouton (session expirée,
- * révocation à distance). Les deux ensemble couvrent toutes les sorties de session.
+ * La purge part SANS prévenir les autres onglets : la session est encore ouverte à cet
+ * instant, et un onglet prévenu trop tôt revenait sur /dashboard. C'est `PurgeLocaleAuLogin`,
+ * à l'arrivée sur /login — session fermée —, qui les prévient.
+ *
+ * `PurgeLocaleAuLogin` couvre aussi les sorties qui ne passent pas par ce bouton (session
+ * expirée, révocation à distance). Les deux ensemble couvrent toutes les sorties de session.
  */
 export function BoutonDeconnexion({ libelle }: { libelle: string }) {
   const formulaire = useRef<HTMLFormElement>(null);
@@ -29,7 +33,7 @@ export function BoutonDeconnexion({ libelle }: { libelle: string }) {
     evenement.preventDefault();
     setEnCours(true);
     try {
-      await purgerDonneesLocales();
+      await purgerDonneesLocales({ prevenirAutresOnglets: false });
     } finally {
       purgeFaite.current = true;
       // `requestSubmit` redéclenche `onSubmit` — qui, cette fois, laisse passer.

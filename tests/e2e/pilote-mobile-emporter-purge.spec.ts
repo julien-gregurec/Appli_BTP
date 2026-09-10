@@ -113,6 +113,9 @@ test.describe("@pilote @purge purge effective sur Chromium, WebKit et Firefox", 
     await page.getByRole("button", { name: /ouvrir le menu/i }).click();
     await page.getByRole("button", { name: /se déconnecter/i }).click();
     await expect(page).toHaveURL(/\/login/);
+    // L'autre onglet n'est prévenu qu'une fois la session FERMÉE : il doit donc rester sur
+    // /login, et non être renvoyé vers /dashboard par une session encore valide.
+    await expect(second).toHaveURL(/\/login/, { timeout: 15_000 });
 
     for (const nom of avant) {
       await expect.poll(() => baseContientDesDonnees(page, nom), { timeout: 10_000, message: `la base ${nom} a survécu à la déconnexion` }).toBe(false);

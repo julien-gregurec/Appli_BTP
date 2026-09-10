@@ -70,6 +70,29 @@ function demanderPurgeDesCaches(): void {
 const CANAL_PURGE = "elsatia-gp-purge";
 
 /**
+ * Identité de CET onglet, tirée une fois par chargement.
+ *
+ * Un `BroadcastChannel` n'ignore que l'instance qui a émis : une AUTRE instance du même nom
+ * dans le même onglet reçoit le message. Or l'onglet qui se déconnecte porte les deux — celle
+ * qui émet (ici) et celle qui écoute (`GardienDonneesLocales`). Sans cette identité, il
+ * obéissait à son propre ordre : il partait vers /login AVANT que `logoutAction` n'ait fermé la
+ * session, le proxy renvoyait cette session encore valide vers /dashboard, et la navigation
+ * interrompait la déconnexion. L'utilisateur croyait être sorti ; il était toujours connecté.
+ */
+const ID_ONGLET = (() => {
+  try { return crypto.randomUUID(); } catch { return `${Date.now()}-${Math.random()}`; }
+})();
+
+export type MessagePurge = { type: "purger"; origine: string };
+
+/** Un onglet obéit à une purge décidée AILLEURS — jamais à la sienne. Pure, donc éprouvée. */
+export function doitObeirALaPurge(message: unknown, idOnglet: string): boolean {
+  if (!message || typeof message !== "object") return false;
+  const m = message as Partial<MessagePurge>;
+  return m.type === "purger" && typeof m.origine === "string" && m.origine !== idOnglet;
+}
+
+/**
  * Purge complète côté navigateur. Sans effet — et sans erreur — hors navigateur.
  *
  * L'ORDRE compte, et il a été inversé pour fermer la réserve R4 : les bases d'abord, le
@@ -79,10 +102,20 @@ const CANAL_PURGE = "elsatia-gp-purge";
  *
  * Les autres onglets sont prévenus par un canal de diffusion : un onglet oublié ouvert sur un
  * chantier tenait la base ouverte et empêchait sa suppression.
+ *
+ * `prevenirAutresOnglets` n'a de sens qu'une fois la session FERMÉE. Prévenus avant, les autres
+ * onglets partent vers /login avec une session encore valide, le proxy les renvoie vers
+ * /dashboard, et ils rouvrent la base qu'on est en train d'effacer. Le bouton de déconnexion
+ * purge donc SANS prévenir ; c'est l'arrivée sur /login — où la session n'existe plus — qui
+ * prévient. Leurs connexions n'empêchent pas la purge entre-temps : chacune se ferme d'elle-même
+ * sur `versionchange`.
  */
-export async function purgerDonneesLocales(): Promise<void> {
+export async function purgerDonneesLocales({ prevenirAutresOnglets = true }: { prevenirAutresOnglets?: boolean } = {}): Promise<void> {
   if (typeof window === "undefined") return;
-  try { new BroadcastChannel(CANAL_PURGE).postMessage({ type: "purger" }); } catch { /* API absente */ }
+  if (prevenirAutresOnglets) {
+    const message: MessagePurge = { type: "purger", origine: ID_ONGLET };
+    try { new BroadcastChannel(CANAL_PURGE).postMessage(message); } catch { /* API absente */ }
+  }
   try { await purgerBasesLocales(); } catch { /* rien : la purge ne doit jamais bloquer la sortie */ }
   try { purgerStockageCleValeur(window.localStorage); } catch { /* stockage refusé */ }
   try { purgerStockageCleValeur(window.sessionStorage); } catch { /* stockage refusé */ }
@@ -105,7 +138,7 @@ export function ecouterPurgeAutresOnglets(): () => void {
   canal.onmessage = (evenement) => {
     // Cet onglet n'appartient plus à personne : on le renvoie à la connexion. Ses connexions
     // IndexedDB se ferment d'elles-mêmes sur `versionchange`.
-    if (evenement.data?.type === "purger") window.location.assign("/login");
+    if (doitObeirALaPurge(evenement.data, ID_ONGLET)) window.location.assign("/login");
   };
   return () => canal.close();
 }

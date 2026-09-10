@@ -10,6 +10,9 @@ import { purgerDonneesLocales } from "@/lib/mobile/purge-locale";
  * déconnecté, que son jeton ait expiré, ou qu'il ait été révoqué à distance après la perte de
  * l'appareil. Dans les trois cas, ce qui reste sur le téléphone ne doit plus y être.
  *
+ * C'est aussi d'ici, et d'ici seulement, que partent les autres onglets : la session n'existe
+ * plus, ils restent donc sur /login au lieu d'être renvoyés vers /dashboard.
+ *
  * Ne rend rien.
  */
 export function PurgeLocaleAuLogin() {
