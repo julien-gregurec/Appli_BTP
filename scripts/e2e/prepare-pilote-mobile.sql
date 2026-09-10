@@ -214,3 +214,24 @@ insert into public.equipes_chantiers (entreprise_id, chantier_id, employe_id, ro
   ('a0000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000002',
    'a2000000-0000-0000-0000-000000000007', 'ouvrier', current_date)
 on conflict do nothing;
+
+-- ── Documents « Emporter » ──────────────────────────────────────────────────
+--
+-- Un plan PDF et une photo, visibles de toute l'équipe du chantier pointable : ce sont les
+-- deux formats que le salarié emporte sur le terrain. Leurs octets vivent dans le Storage, pas
+-- en base : `scripts/e2e/televerser-documents-pilote-mobile.sh` les dépose, avec les mêmes
+-- chemins. La recette vérifie les tailles exactes (92 et 70 octets).
+--
+-- Le plan réservé aux gestionnaires (`a7000000-…-0002`, décor Train V3) reste celui que le
+-- salarié ne doit PAS se voir proposer.
+insert into public.documents_chantier
+  (id, entreprise_id, chantier_id, nom, categorie, storage_path, mime_type, taille_octets, note, audience) values
+  ('a7000000-0000-0000-0000-000000000011', 'a0000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000002',
+   'Plan de recette (emporter)', 'plan',
+   'a0000000-0000-0000-0000-000000000001/a4000000-0000-0000-0000-000000000002/recette-mobile-plan.pdf',
+   'application/pdf', 92, 'RECETTE_MOBILE', 'tous_affectes'),
+  ('a7000000-0000-0000-0000-000000000012', 'a0000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000002',
+   'Photo de recette (emporter)', 'photo_pendant',
+   'a0000000-0000-0000-0000-000000000001/a4000000-0000-0000-0000-000000000002/recette-mobile-photo.png',
+   'image/png', 70, 'RECETTE_MOBILE', 'tous_affectes')
+on conflict (id) do nothing;
