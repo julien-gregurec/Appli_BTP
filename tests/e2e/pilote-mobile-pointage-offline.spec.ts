@@ -65,6 +65,10 @@ test.describe("@pilote @horsligne pointage sans réseau", () => {
 
   test("@pilote @horsligne une arrivée saisie sans réseau est conservée, pas perdue", async ({ page }) => {
     await page.goto("/pointage");
+    // Sous saturation, le proxy peut renvoyer vers le tableau de bord (refus par défaut). Le
+    // bouton « Pointage rapide » y existe aussi, recouvert par la configuration d'accueil : sans
+    // cette vérification, une redirection se lisait comme un clic intercepté.
+    await expect(page, "le pointage n'est pas atteint : redirection du proxy").toHaveURL(/\/pointage/);
     const bouton = boutonPointage(page);
     await expect(bouton).toBeVisible();
 

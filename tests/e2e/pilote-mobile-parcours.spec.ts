@@ -234,9 +234,19 @@ test.describe("@pilote sortie de session", () => {
      */
     const CLES_APPAREIL_LEGITIMES = ["elsatia-appareil-id", "liria-appareil-id"];
 
+    /**
+     * Registre des bases de l'APPAREIL. Il doit exister chez B : c'est lui qui permet à Firefox,
+     * privé de `indexedDB.databases()`, de savoir quoi purger. Son NOM survit donc, par
+     * construction ; ce qui compte est son CONTENU — aucune base de A ne doit plus y figurer.
+     * Vérifier le contenu est plus strict que vérifier le nom : c'est la seule preuve qui vaille
+     * sur Firefox, où la liste des bases est vide.
+     */
+    const CLE_REGISTRE = "elsatia:gp:registre-bases";
+
     const empreinte = () => page.evaluate(async () => {
-      const trace = { local: [] as string[], bases: [] as string[] };
+      const trace = { local: [] as string[], bases: [] as string[], registre: [] as string[] };
       try { trace.local = Object.keys(localStorage).filter((c) => c.startsWith("elsatia")); } catch { /* refusé */ }
+      try { trace.registre = JSON.parse(localStorage.getItem("elsatia:gp:registre-bases") ?? "[]"); } catch { /* absent ou illisible */ }
       if (typeof indexedDB?.databases === "function") {
         trace.bases = (await indexedDB.databases())
           .map((b) => b.name ?? "").filter((n) => n.startsWith("elsatia:gp:"));
@@ -258,8 +268,11 @@ test.describe("@pilote sortie de session", () => {
     const apres = await empreinte();
 
     for (const cle of avant.local) {
-      if (CLES_APPAREIL_LEGITIMES.includes(cle)) continue;
+      if (CLES_APPAREIL_LEGITIMES.includes(cle) || cle === CLE_REGISTRE) continue;
       expect(apres.local, `la clé « ${cle} » de A survit chez B`).not.toContain(cle);
+    }
+    for (const nom of [...avant.registre, ...avant.bases]) {
+      expect(apres.registre, `le registre de B nomme encore la base « ${nom} » de A`).not.toContain(nom);
     }
     for (const base of avant.bases) {
       expect(apres.bases, `la base « ${base} » de A survit chez B`).not.toContain(base);
