@@ -73,6 +73,8 @@ test.describe("@pilote @emporter documents emportés pour consultation hors lign
     await page.setViewportSize({ width: 390, height: 844 });
     await allerA(page, `/chantiers/${CHANTIER_TERRAIN}/documents`);
     const ligne = page.locator(`[data-test="doc-${DOC_PNG}"]`);
+    // `isVisible()` ne patiente pas : lu avant le rendu des boutons, il faisait sauter l'emport.
+    await expect(ligne.getByRole("button").first()).toBeVisible();
     if (await ligne.getByRole("button", { name: /emporter/i }).isVisible()) {
       await ligne.getByRole("button", { name: /emporter/i }).click();
       await expect(ligne).toContainText("Disponible hors ligne", { timeout: 20_000 });
@@ -86,7 +88,13 @@ test.describe("@pilote @emporter documents emportés pour consultation hors lign
     await allerA(page, `/chantiers/${CHANTIER_TERRAIN}/documents`);
     await expect(page.locator('[data-test="documents-emportes"]')).not.toContainText("Plan privé A");
     // Et le téléchargement direct est refusé par la base, pas seulement caché par l'écran.
-    const statut = await page.evaluate(async () => (await fetch("/api/documents/a7000000-0000-0000-0000-000000000002")).status);
+    // Sans `redirect: "manual"`, `fetch` suivait une redirection du proxy et rendait le 200 de
+    // la page d'arrivée : un refus se lisait comme un succès, et un succès aurait pu se lire
+    // comme un refus. Seul le 404 rendu PAR LA ROUTE, sous RLS, prouve que la base refuse.
+    const statut = await page.evaluate(async () => {
+      const r = await fetch("/api/documents/a7000000-0000-0000-0000-000000000002", { redirect: "manual" });
+      return r.type === "opaqueredirect" ? "redirection" : r.status;
+    });
     expect(statut).toBe(404);
   });
 });
@@ -98,6 +106,7 @@ test.describe("@pilote @purge purge effective sur Chromium, WebKit et Firefox", 
     await page.setViewportSize({ width: 390, height: 844 });
     await allerA(page, `/chantiers/${CHANTIER_TERRAIN}/documents`);
     const ligne = page.locator(`[data-test="doc-${DOC_PDF}"]`);
+    await expect(ligne.getByRole("button").first()).toBeVisible();
     if (await ligne.getByRole("button", { name: /emporter/i }).isVisible()) {
       await ligne.getByRole("button", { name: /emporter/i }).click();
       await expect(ligne).toContainText("Disponible hors ligne", { timeout: 20_000 });
