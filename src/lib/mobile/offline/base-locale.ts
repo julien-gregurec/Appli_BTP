@@ -23,12 +23,24 @@
  *                  récents, documents choisis). Jamais un jeton, jamais un secret.
  */
 import { estCleGestionPro } from "@/lib/mobile/identite-locale";
+import { basesAPurger, inscrireAuRegistre, lireRegistre, oublierRegistre } from "@/lib/mobile/offline/registre-bases";
 import type { EtatMutation, MutationLocale } from "@/lib/mobile/offline/contrat";
 import { ETATS_EN_SUSPENS } from "@/lib/mobile/offline/contrat";
 
-const VERSION_SCHEMA = 1;
+/**
+ * Version 2 : ajout du magasin `justificatifs` (réserve R3).
+ *
+ * L'ouverture d'une base en version 1 existante déclenche `onupgradeneeded` ; on n'y crée que
+ * ce qui manque. Les mutations déjà en file sont conservées — perdre une file au prétexte
+ * d'une mise à jour de l'application serait exactement la perte silencieuse que la file
+ * existe pour empêcher.
+ */
+const VERSION_SCHEMA = 3;
 export const MAGASIN_MUTATIONS = "mutations";
 export const MAGASIN_CONSULTATION = "consultation";
+export const MAGASIN_JUSTIFICATIFS = "justificatifs";
+/** Version 3 : documents emportés pour consultation hors ligne (phase G). */
+export const MAGASIN_DOCUMENTS = "documents_emportes";
 
 export type IdentiteBase = { entrepriseId: string; utilisateurId: string };
 
@@ -73,11 +85,31 @@ export async function ouvrirBase(identite: IdentiteBase): Promise<IDBDatabase | 
       if (!base.objectStoreNames.contains(MAGASIN_CONSULTATION)) {
         base.createObjectStore(MAGASIN_CONSULTATION, { keyPath: "cle" });
       }
+      if (!base.objectStoreNames.contains(MAGASIN_JUSTIFICATIFS)) {
+        const magasin = base.createObjectStore(MAGASIN_JUSTIFICATIFS, { keyPath: "id" });
+        // Retrouver les fichiers d'une note sans parcourir tout le magasin.
+        magasin.createIndex("mutationId", "mutationId", { unique: false });
+      }
+      if (!base.objectStoreNames.contains(MAGASIN_DOCUMENTS)) {
+        const magasin = base.createObjectStore(MAGASIN_DOCUMENTS, { keyPath: "id" });
+        magasin.createIndex("chantierId", "chantierId", { unique: false });
+      }
     };
 
     // Toute défaillance rend `null` plutôt que de lever : l'absence de stockage local
     // dégrade l'application (plus de hors-ligne), elle ne doit pas l'empêcher de servir.
-    requete.onsuccess = () => resoudre(requete.result);
+    requete.onsuccess = () => {
+      const base = requete.result;
+      // Réserve R4. Une connexion restée OUVERTE bloque `deleteDatabase` : la purge de
+      // déconnexion attendait alors indéfiniment, ou renonçait, et la base survivait. Chaque
+      // connexion cède donc la place d'elle-même dès qu'une suppression — ou une montée de
+      // version — est demandée, depuis cet onglet ou un autre.
+      base.onversionchange = () => base.close();
+      // On retient le NOM de la base : Firefox n'a pas `indexedDB.databases()`, et sans ce
+      // registre la purge ne saurait pas quelles bases supprimer.
+      try { inscrireAuRegistre(window.localStorage, nomBase(identite)); } catch { /* stockage refusé */ }
+      resoudre(base);
+    };
     requete.onerror = () => resoudre(null);
     requete.onblocked = () => resoudre(null);
   });
@@ -146,31 +178,127 @@ export async function lireConsultation<T>(base: IDBDatabase, cle: string): Promi
  * Toutes, et pas seulement celle de la session courante : l'appareil peut porter les restes
  * d'un compte précédent, et personne n'est là pour les réclamer.
  *
- * `databases()` n'existe pas sur Firefox. Quand elle manque, on ne peut pas énumérer — la
- * fonction rend alors `0` et le dit par sa valeur de retour, plutôt que de laisser croire à
- * une purge complète. C'est une limite réelle, consignée comme telle.
+ * Réserve R4 fermée ici. La liste des bases est l'UNION du registre tenu par `ouvrirBase` et
+ * de `indexedDB.databases()` quand elle existe — elle n'existe pas sur Firefox, où l'ancienne
+ * version rendait 0 et laissait tout en place. La promesse ne se résout qu'une fois chaque
+ * suppression ACHEVÉE : un `onblocked` n'est plus une sortie silencieuse, on attend que les
+ * connexions ouvertes cèdent (elles se ferment d'elles-mêmes sur `versionchange`).
  */
-export async function purgerBasesLocales(): Promise<number> {
+export async function purgerBasesLocales(filtre?: (nom: string) => boolean): Promise<number> {
   const fabrique = indexedDbDisponible();
-  if (!fabrique || typeof fabrique.databases !== "function") return 0;
+  if (!fabrique) return 0;
 
-  let bases: { name?: string }[];
-  try {
-    bases = await fabrique.databases();
-  } catch {
-    return 0;
+  let enumerees: string[] | null = null;
+  if (typeof fabrique.databases === "function") {
+    try { enumerees = (await fabrique.databases()).map((b) => b.name ?? ""); } catch { enumerees = null; }
   }
+  let registre: string[] = [];
+  try { registre = lireRegistre(window.localStorage); } catch { registre = []; }
+
+  const cibles = basesAPurger(registre, enumerees).filter((nom) => estBaseGestionPro(nom) && (!filtre || filtre(nom)));
 
   let supprimees = 0;
-  for (const { name } of bases) {
-    if (!name || !estBaseGestionPro(name)) continue;
-    await new Promise<void>((resoudre) => {
-      const requete = fabrique.deleteDatabase(name);
-      requete.onsuccess = () => { supprimees += 1; resoudre(); };
-      requete.onerror = () => resoudre();
-      // Un onglet resté ouvert bloque la suppression : on n'attend pas indéfiniment.
-      requete.onblocked = () => resoudre();
+  for (const nom of cibles) {
+    const ok = await new Promise<boolean>((resoudre) => {
+      const requete = fabrique.deleteDatabase(nom);
+      requete.onsuccess = () => resoudre(true);
+      requete.onerror = () => resoudre(false);
+      // Bloquée : une connexion n'a pas encore cédé. On NE RÉSOUT PAS ici — `onsuccess`
+      // viendra dès qu'elle se sera fermée. Un plafond évite seulement d'attendre à jamais un
+      // onglet figé ; il rend `false`, et la base est comptée comme non purgée.
+      requete.onblocked = () => { setTimeout(() => resoudre(false), 5_000); };
     });
+    if (ok) supprimees += 1;
   }
+  // Le registre n'est oublié que pour une purge COMPLÈTE : une purge partielle (changement
+  // d'entreprise) doit laisser la trace des bases qu'elle n'a pas visées.
+  if (!filtre) { try { oublierRegistre(window.localStorage); } catch { /* rien */ } }
   return supprimees;
+}
+
+// ── Justificatifs conservés sur l'appareil (réserve R3) ─────────────────────────
+
+/**
+ * Un fichier capturé hors ligne, en attente de dépôt.
+ *
+ * Le contenu est conservé en `Blob` et non en base64 : un ticket photographié pèse plusieurs
+ * mégaoctets, et le coder en texte ajouterait un tiers de poids pour rien. IndexedDB stocke
+ * les `Blob` nativement.
+ */
+export type JustificatifLocal = {
+  /** Identifiant propre au fichier : deux fichiers d'une même note ne se confondent jamais. */
+  id: string;
+  /** La note (mutation) à laquelle il appartient. */
+  mutationId: string;
+  nom: string;
+  mime: string;
+  taille: number;
+  empreinte: string;
+  contenu: Blob;
+  depose: boolean;
+  documentId: string | null;
+};
+
+export async function conserverJustificatif(base: IDBDatabase, justificatif: JustificatifLocal): Promise<void> {
+  const tx = base.transaction(MAGASIN_JUSTIFICATIFS, "readwrite");
+  await promesse(tx.objectStore(MAGASIN_JUSTIFICATIFS).put(justificatif));
+}
+
+export async function lireJustificatifs(base: IDBDatabase, mutationId: string): Promise<JustificatifLocal[]> {
+  const tx = base.transaction(MAGASIN_JUSTIFICATIFS, "readonly");
+  const index = tx.objectStore(MAGASIN_JUSTIFICATIFS).index("mutationId");
+  return promesse(index.getAll(mutationId) as IDBRequest<JustificatifLocal[]>);
+}
+
+export async function marquerJustificatifDepose(
+  base: IDBDatabase,
+  id: string,
+  documentId: string | null,
+): Promise<void> {
+  const tx = base.transaction(MAGASIN_JUSTIFICATIFS, "readwrite");
+  const magasin = tx.objectStore(MAGASIN_JUSTIFICATIFS);
+  const actuel = await promesse(magasin.get(id) as IDBRequest<JustificatifLocal | undefined>);
+  if (!actuel) return;
+  await promesse(magasin.put({ ...actuel, depose: true, documentId }));
+}
+
+/**
+ * Supprime les fichiers d'une note — à l'annulation par l'utilisateur, ou une fois TOUS
+ * déposés et acquittés. Jamais avant : effacer un fichier non déposé serait la perte
+ * silencieuse que R3 interdit.
+ */
+export async function effacerJustificatifs(base: IDBDatabase, mutationId: string): Promise<void> {
+  const fichiers = await lireJustificatifs(base, mutationId);
+  const tx = base.transaction(MAGASIN_JUSTIFICATIFS, "readwrite");
+  const magasin = tx.objectStore(MAGASIN_JUSTIFICATIFS);
+  await Promise.all(fichiers.map((f) => promesse(magasin.delete(f.id))));
+}
+
+
+// ── Documents emportés pour consultation hors ligne (phase G) ────────────────────
+
+export type DocumentEmporte = {
+  id: string;
+  chantierId: string;
+  nom: string;
+  mime: string;
+  taille: number;
+  contenu: Blob;
+  /** Date de dernière synchronisation, affichée à l'utilisateur. */
+  emporteA: number;
+};
+
+export async function conserverDocumentEmporte(base: IDBDatabase, document: DocumentEmporte): Promise<void> {
+  const tx = base.transaction(MAGASIN_DOCUMENTS, "readwrite");
+  await promesse(tx.objectStore(MAGASIN_DOCUMENTS).put(document));
+}
+
+export async function lireDocumentsEmportes(base: IDBDatabase, chantierId: string): Promise<DocumentEmporte[]> {
+  const tx = base.transaction(MAGASIN_DOCUMENTS, "readonly");
+  return promesse(tx.objectStore(MAGASIN_DOCUMENTS).index("chantierId").getAll(chantierId) as IDBRequest<DocumentEmporte[]>);
+}
+
+export async function retirerDocumentEmporte(base: IDBDatabase, id: string): Promise<void> {
+  const tx = base.transaction(MAGASIN_DOCUMENTS, "readwrite");
+  await promesse(tx.objectStore(MAGASIN_DOCUMENTS).delete(id));
 }

@@ -4,6 +4,7 @@ import { euros } from "@/lib/devis";
 import { TYPES_JUSTIFICATIF, statutNoteFrais } from "@/lib/notes-frais";
 import { creerNoteFraisAction } from "@/app/actions/notes-frais";
 import { permissionsUtilisateur } from "@/lib/permissions";
+import { NoteFraisHorsLigne } from "@/components/mobile/NoteFraisHorsLigne";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { ExpenseAmountFields } from "@/components/ExpenseAmountFields";
 import { SearchableSelect } from "@/components/SearchableSelect";
@@ -46,6 +47,8 @@ export default async function NotesFraisPage({ searchParams }: { searchParams: P
     {filtres.error && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{filtres.error}</p>}
     {!employe && <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">Votre compte doit être lié à une fiche employé active pour créer une dépense.</p>}
 
+    {/* Réserve R3 : note ET justificatif conservés ensemble hors réseau, partis ensemble. */}
+    {employe && <NoteFraisHorsLigne identite={{ entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId }} employeId={employe.id} />}
     <section className="rounded-lg border p-4"><h2 className="font-semibold">Nouvelle dépense</h2><p className="mt-1 text-xs text-neutral-500">Le brouillon sera créé d’abord. Vous pourrez ensuite photographier ou importer plusieurs pages.</p>
       <form action={creerNoteFraisAction} className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="text-xs text-neutral-500">Date du justificatif<input name="date_frais" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} className={`${input} mt-1`} /></label>

@@ -7,6 +7,7 @@ import { ajouterDocumentChantierAction, supprimerDocumentChantierAction } from "
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { AnalyseDocumentIA } from "@/components/AnalyseDocumentIA";
 import { DOCUMENT_CATEGORIES, libelleCategorie, tailleLisible } from "@/lib/documents";
+import { DocumentsEmportes } from "@/components/mobile/DocumentsEmportes";
 import { MIME_ANALYSABLES_IA } from "@/lib/ai/documents";
 import { iaEstActive } from "@/lib/preview-features";
 
@@ -58,6 +59,18 @@ export default async function DocumentsChantierPage({
           </div>
           <span className="rounded-full bg-neutral-100 px-3 py-1 text-sm dark:bg-neutral-800">{avecUrls.length + (mediasConversation?.length ?? 0)} élément{avecUrls.length + (mediasConversation?.length ?? 0) > 1 ? "s" : ""}</span>
         </div>
+
+        {/* Phase G : documents choisis pour consultation hors ligne. Rien n'est téléchargé
+            sans un geste ; le support plateforme consulte, il n'emporte rien. */}
+        {!ctx.accesSupportPlateforme && (
+          <div>
+            <DocumentsEmportes
+              identite={{ entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId }}
+              chantierId={id}
+              documents={(documents ?? []).map((d) => ({ id: d.id, nom: d.nom, mime_type: d.mime_type, taille_octets: Number(d.taille_octets) }))}
+            />
+          </div>
+        )}
 
         {messages.error && <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">{messages.error}</p>}
         {messages.success && <p className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700 dark:border-green-900 dark:bg-green-950/30 dark:text-green-300">{messages.success}</p>}

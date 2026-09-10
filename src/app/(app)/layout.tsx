@@ -7,6 +7,7 @@ import { ModuleAccessBoundary } from "@/components/ModuleAccessBoundary";
 import { MobileBack } from "@/components/MobileBack";
 import { MiseAJourApplication } from "@/components/mobile/MiseAJourApplication";
 import { FileHorsLigne } from "@/components/mobile/FileHorsLigne";
+import { GardienDonneesLocales } from "@/components/mobile/GardienDonneesLocales";
 import { IndicateurReseau } from "@/components/mobile/IndicateurReseau";
 import { AideButton } from "@/components/AideButton";
 import { AssistantIA } from "@/components/AssistantIA";
@@ -60,6 +61,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {/* La file n'existe que pour un utilisateur rattaché à une entreprise réelle : le
             support plateforme consulte les écrans d'un client, il n'y prépare aucune saisie. */}
         {!ctx.accesSupportPlateforme && <FileHorsLigne entrepriseId={ctx.entrepriseId} utilisateurId={ctx.userId} />}
+        {/* Réserve R4 : obéit aux purges des autres onglets, purge les bases des autres entreprises. */}
+        {!ctx.accesSupportPlateforme && <GardienDonneesLocales entrepriseId={ctx.entrepriseId} utilisateurId={ctx.userId} />}
         <ModuleAccessBoundary permissions={permissions} activeFeatures={activeFeatures}>{children}</ModuleAccessBoundary>
       </div>
       <MobileBack />

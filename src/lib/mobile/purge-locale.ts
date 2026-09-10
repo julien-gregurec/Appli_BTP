@@ -66,14 +66,46 @@ function demanderPurgeDesCaches(): void {
   }
 }
 
-/** Purge complète côté navigateur. Sans effet — et sans erreur — hors navigateur. */
-export function purgerDonneesLocales(): void {
+/** Canal de coordination : les autres onglets de Gestion Pro ferment et purgent aussi. */
+const CANAL_PURGE = "elsatia-gp-purge";
+
+/**
+ * Purge complète côté navigateur. Sans effet — et sans erreur — hors navigateur.
+ *
+ * L'ORDRE compte, et il a été inversé pour fermer la réserve R4 : les bases d'abord, le
+ * stockage clé/valeur ensuite. Le registre des bases vit dans ce stockage ; l'effacer en
+ * premier privait Firefox — qui n'a pas `indexedDB.databases()` — de la seule liste lui
+ * permettant de savoir quoi supprimer.
+ *
+ * Les autres onglets sont prévenus par un canal de diffusion : un onglet oublié ouvert sur un
+ * chantier tenait la base ouverte et empêchait sa suppression.
+ */
+export async function purgerDonneesLocales(): Promise<void> {
   if (typeof window === "undefined") return;
+  try { new BroadcastChannel(CANAL_PURGE).postMessage({ type: "purger" }); } catch { /* API absente */ }
+  try { await purgerBasesLocales(); } catch { /* rien : la purge ne doit jamais bloquer la sortie */ }
   try { purgerStockageCleValeur(window.localStorage); } catch { /* stockage refusé */ }
   try { purgerStockageCleValeur(window.sessionStorage); } catch { /* stockage refusé */ }
   demanderPurgeDesCaches();
-  // IndexedDB : suppression asynchrone, lancée sans être attendue. La page part en
-  // redirection ; `deleteDatabase` poursuit côté navigateur. C'est la même logique que le
-  // message au service worker — on déclenche, on ne surveille pas.
-  void purgerBasesLocales().catch(() => undefined);
+}
+
+/** Au changement d'entreprise : les bases de l'utilisateur sous une AUTRE entreprise partent. */
+export async function purgerAutresEntreprises(entrepriseActive: string, utilisateurId: string): Promise<number> {
+  if (typeof window === "undefined") return 0;
+  return purgerBasesLocales((nom) => {
+    const [, , entreprise, utilisateur] = nom.split(":");
+    return utilisateur === utilisateurId && entreprise !== entrepriseActive;
+  });
+}
+
+/** À monter une fois par onglet : obéit à une purge décidée dans un autre onglet. */
+export function ecouterPurgeAutresOnglets(): () => void {
+  if (typeof window === "undefined" || typeof BroadcastChannel === "undefined") return () => {};
+  const canal = new BroadcastChannel(CANAL_PURGE);
+  canal.onmessage = (evenement) => {
+    // Cet onglet n'appartient plus à personne : on le renvoie à la connexion. Ses connexions
+    // IndexedDB se ferment d'elles-mêmes sur `versionchange`.
+    if (evenement.data?.type === "purger") window.location.assign("/login");
+  };
+  return () => canal.close();
 }

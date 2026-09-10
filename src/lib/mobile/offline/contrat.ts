@@ -200,3 +200,24 @@ export function delaiAvantNouvelleTentative(tentatives: number): number {
   const base = 2_000 * 2 ** Math.max(0, tentatives - 1);
   return Math.min(base, 5 * 60_000);
 }
+
+// ── Perte de session ───────────────────────────────────────────────────────────
+
+/**
+ * Cette réponse signifie-t-elle que la session est perdue ?
+ *
+ * Défaut trouvé en recette, hérité du lot précédent : la route de rejeu sait répondre 401,
+ * mais une requête sans session ne l'atteint JAMAIS. Le proxy d'authentification l'intercepte
+ * avant et la redirige vers /login ; `fetch` suit la redirection et reçoit une page HTML avec
+ * un statut **200**. Le contrôle « statut 401 » ne se déclenchait donc jamais, et l'analyse
+ * JSON de cette page levait une exception au milieu de la vidange.
+ *
+ * Trois signes, dont un seul suffit : le 401 lui-même, une réponse redirigée, ou un succès
+ * qui n'est pas du JSON — une route d'API ne renvoie jamais de HTML en cas de réussite.
+ */
+export function reponseEstPerteDeSession(reponse: { status: number; redirected: boolean; contentType: string | null }): boolean {
+  if (reponse.status === 401) return true;
+  if (reponse.redirected) return true;
+  const json = (reponse.contentType ?? "").toLowerCase().includes("application/json");
+  return reponse.status >= 200 && reponse.status < 300 && !json;
+}

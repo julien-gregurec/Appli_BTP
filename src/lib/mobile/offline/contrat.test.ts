@@ -152,3 +152,31 @@ describe("délai avant nouvelle tentative", () => {
     expect(delaiAvantNouvelleTentative(-3)).toBeGreaterThan(0);
   });
 });
+
+describe("perte de session", () => {
+  // Importé ici pour ne pas toucher à l'en-tête du fichier.
+  const verifier = async () => (await import("@/lib/mobile/offline/contrat")).reponseEstPerteDeSession;
+
+  it("reconnaît la page de connexion servie en 200 après redirection", async () => {
+    // Le cas RÉEL : le proxy redirige vers /login, fetch suit, et reçoit du HTML en 200.
+    const f = await verifier();
+    expect(f({ status: 200, redirected: true, contentType: "text/html; charset=utf-8" })).toBe(true);
+  });
+
+  it("reconnaît un succès qui n'est pas du JSON", async () => {
+    const f = await verifier();
+    expect(f({ status: 200, redirected: false, contentType: "text/html" })).toBe(true);
+  });
+
+  it("reconnaît le 401 explicite", async () => {
+    const f = await verifier();
+    expect(f({ status: 401, redirected: false, contentType: "application/json" })).toBe(true);
+  });
+
+  it("ne confond pas une vraie réponse d'API avec une perte de session", async () => {
+    const f = await verifier();
+    expect(f({ status: 200, redirected: false, contentType: "application/json; charset=utf-8" })).toBe(false);
+    expect(f({ status: 409, redirected: false, contentType: "application/json" })).toBe(false);
+    expect(f({ status: 503, redirected: false, contentType: "application/json" })).toBe(false);
+  });
+});
