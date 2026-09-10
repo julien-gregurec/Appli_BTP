@@ -15,25 +15,36 @@ Relevé dans le code, pas supposé.
 
 | Catégorie | Où | Quoi | Pourquoi |
 |---|---|---|---|
-| **Photo du seau** | bucket privé `colors-seaux`, chemin `<entreprise>/<seau>/<uuid>.<ext>` | le fichier téléversé **octet pour octet** | reconnaître un seau et lire son étiquette sans le déplacer |
+| **Photo du seau** | bucket privé `colors-seaux`, chemin `<entreprise>/<seau>/<uuid>.<ext>` | l'image **décodée, redressée et réencodée**, sans aucune métadonnée | reconnaître un seau et lire son étiquette sans le déplacer |
 | **Rendu transformé** | généré à la volée par Supabase Storage à chaque lien signé (900×900, `contain`) | une réduction de la photo ; **ELSATIA n'en conserve aucune copie** | afficher la fiche sans transférer 10 Mo |
 | **Métadonnées de rattachement** | `colors_seaux.photo_principale_path`, `colors_nettoyages_photos`, journal `colors_mouvements` | le chemin courant ; le suivi des suppressions de stockage non abouties ; dans le journal, **le seul nom terminal du fichier** | rattacher une photo à un seau, garantir qu'aucune photo remplacée ne reste orpheline |
 | **Résultat de lecture d'étiquette** | `colors_analyses_ocr` | champs proposés, prestataire, statut, auteur de la confirmation — **jamais l'image** | tracer ce qu'une machine a proposé et ce qu'une personne a retenu |
 
-### Un point à ne pas taire
+### Ce point est désormais fermé (décision D2)
 
-La photo est stockée **telle quelle**. `/api/photos` lit `await photo.arrayBuffer()`
-et téléverse ces octets sans les réécrire. Le fichier conserve donc ses
-métadonnées EXIF d'origine : date de prise de vue, modèle d'appareil, et selon
-le réglage du téléphone **les coordonnées GPS du lieu de la prise de vue**.
+La photo était stockée **telle quelle** : `/api/photos` téléversait les octets
+reçus sans les réécrire, et le fichier conservait donc ses métadonnées EXIF —
+date, modèle d'appareil, logiciel, miniature intégrée, et selon le réglage du
+téléphone **les coordonnées GPS du lieu de la prise de vue**. Sur un chantier,
+c'est l'adresse d'un client.
 
-Sur un chantier, c'est l'adresse d'un client. Ces coordonnées ne sont ni
-affichées, ni indexées, ni exportées par Colors — mais elles sont dans le
-fichier, et le fichier est téléchargeable par toute personne habilitée sur
-l'organisation.
+Depuis la décision D2, l'image est **décodée, redressée selon son orientation
+EXIF, puis réencodée** avant tout stockage. Ce n'est pas un retrait de champs :
+les pixels sont relus et un fichier neuf est écrit, si bien qu'aucun bloc de
+métadonnées de l'original ne peut survivre — y compris ceux qu'une liste de
+champs à retirer aurait oubliés.
 
-Ce constat est porté dans l'inventaire du code (`DESCRIPTIONS.photo_metier`) et
-un test le verrouille : le taire dans l'inventaire reviendrait à le cacher.
+L'orientation est appliquée **avant** l'effacement : sans cette précaution,
+retirer l'EXIF ferait basculer d'un quart de tour toutes les photos prises en
+portrait.
+
+Tout échec de nettoyage **refuse le stockage**, sans repli sur l'original. Une
+seule route écrit dans le bucket, et les politiques de stockage `bucket_id <>
+'colors-seaux'` interdisent au rôle applicatif d'y écrire directement : aucun
+téléversement ne contourne le traitement.
+
+Les métadonnées retirées ne sont jamais journalisées — cela déplacerait la fuite
+du fichier vers des journaux qui ne sont pas cloisonnés par organisation.
 
 ---
 
@@ -70,7 +81,7 @@ les photos de chantier d'un client est une perte irréversible.
 |---|---|---|
 | C1 | **Durée de conservation des photos** | Dépend de ce qui est annoncé aux clients et de la durée d'exploitation d'un chantier. Une photo de seau peut servir des années après la livraison, pour une retouche. |
 | C2 | **Durée de conservation des résultats de lecture d'étiquette** | Ne se pose qu'une fois l'OCR activé, donc une fois un prestataire contractualisé. Voir §4. |
-| C3 | **Sort des métadonnées EXIF** | Trois options réelles : les conserver (utile — date de prise de vue), les retirer au téléversement (protège l'adresse du chantier mais détruit une information), ne retirer que la géolocalisation. Le troisième choix est le plus défendable, il reste un choix. |
+| ~~C3~~ | ~~Sort des métadonnées EXIF~~ | **Tranchée (D2) : retrait total au téléversement.** L'orientation est appliquée aux pixels avant l'effacement, si bien que la seule information visuellement utile est préservée. |
 | C4 | **Suppression d'une photo à l'unité depuis l'interface** | Techniquement possible ; c'est le geste métier qui manque — faut-il pouvoir retirer une photo sans en mettre une autre, et qui en a le droit ? |
 | C5 | **Sort des données à la fin d'un pilote** | À annoncer **avant** le pilote, pas après. |
 | C6 | **Durée de vie des liens signés** | 300 secondes aujourd'hui. Suffisant pour afficher, trop court pour partager — ce qui est probablement le bon réglage, mais n'a pas été arbitré. |

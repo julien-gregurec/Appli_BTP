@@ -4,6 +4,8 @@ import { exigerAccesApplication } from "@/lib/applications-elsatia";
 import { resoudreRoleColors } from "@/lib/acces-colors";
 import { peutEffectuerColors } from "@/lib/permissions-colors";
 import { cheminPhotoColors, validerPhotoColors, validerSignaturePhotoColors } from "@/lib/media-colors";
+import { nettoyerPhotoColors } from "@/lib/media/nettoyage-photo";
+import { journaliserEchecTechnique } from "@/lib/journal-securite";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminStorageClient } from "@/lib/supabase/admin-storage";
 
@@ -29,11 +31,34 @@ export async function POST(request: Request) {
   const contenu = new Uint8Array(await photo.arrayBuffer());
   const signature = validerSignaturePhotoColors(contenu,photo.type);
   if (signature.erreur || !signature.mime) return NextResponse.json({erreur:signature.erreur},{status:400});
-  const chemin = cheminPhotoColors(contexte.entrepriseId,seauId,signature.mime);
+
+  /*
+   * Nettoyage confidentiel AVANT tout stockage.
+   *
+   * Le fichier recu porte les metadonnees EXIF de l'appareil : selon son
+   * reglage, les coordonnees GPS du lieu de la prise de vue — sur un chantier,
+   * l'adresse d'un client —, le modele de l'appareil, la date exacte et souvent
+   * une miniature integree. Rien de tout cela n'est affiche par Colors, et
+   * c'est precisement ce qui rend la fuite invisible.
+   *
+   * L'image est donc decodee, redressee selon son orientation EXIF, puis
+   * reencodee. Seul le fichier produit est stocke ; le tampon d'origine n'est
+   * jamais televerse et n'est jamais ecrit ailleurs.
+   *
+   * En cas d'echec, on refuse. Il n'y a pas de repli sur l'original : un
+   * fichier non nettoye ne doit jamais atteindre le stockage.
+   */
+  const nettoyage = await nettoyerPhotoColors(contenu, signature.mime);
+  if (!nettoyage.ok) {
+    // Le motif est categoriel et ne cite jamais une valeur retiree.
+    journaliserEchecTechnique("photos.nettoyage", { message: nettoyage.echec });
+    return NextResponse.json({erreur:nettoyage.motif},{status:400});
+  }
+  const chemin = cheminPhotoColors(contexte.entrepriseId,seauId,nettoyage.mime);
   let stockage;
   try { stockage=createAdminStorageClient().storage.from("colors-seaux"); }
   catch { return NextResponse.json({erreur:"Stockage Colors indisponible"},{status:503}); }
-  const { error: erreurStockage } = await stockage.upload(chemin,contenu,{contentType:signature.mime,cacheControl:"3600",upsert:false});
+  const { error: erreurStockage } = await stockage.upload(chemin,nettoyage.contenu,{contentType:nettoyage.mime,cacheControl:"3600",upsert:false});
   if (erreurStockage) return NextResponse.json({erreur:"Téléversement impossible"},{status:400});
   const { error: erreurLiaison } = await supabase.rpc("colors_definir_photo",{p_seau_id:seauId,p_photo_path:chemin});
   if (erreurLiaison) {

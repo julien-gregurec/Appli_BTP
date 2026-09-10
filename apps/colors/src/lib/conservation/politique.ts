@@ -44,8 +44,9 @@ export const DESCRIPTIONS: Record<CategorieDonnee, DescriptionCategorie> = {
     libelle: "Photo du seau",
     emplacement: "Bucket privé `colors-seaux`, chemin `<entreprise>/<seau>/<uuid>.<ext>`",
     contenu:
-      "Le fichier téléversé, octet pour octet. Il porte donc aussi ses métadonnées d'origine — "
-      + "date de prise de vue, modèle d'appareil, et le cas échéant coordonnées GPS.",
+      "L'image décodée, redressée selon son orientation d'origine, puis réencodée. Elle ne porte "
+      + "AUCUNE métadonnée : ni coordonnées GPS, ni modèle d'appareil, ni date de prise de vue, ni "
+      + "miniature intégrée. Le fichier reçu n'est jamais conservé (décision D2).",
     raison: "Reconnaître un seau sur le terrain et lire son étiquette sans le déplacer.",
   },
   rendu_transforme: {

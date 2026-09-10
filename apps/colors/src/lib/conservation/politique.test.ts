@@ -91,10 +91,16 @@ describe("inventaire des catégories", () => {
     }
   });
 
-  it("l'inventaire dit que la photo conserve ses métadonnées d'origine", () => {
-    // Ce n'est pas un détail : une photo prise sur un chantier peut porter des
-    // coordonnées GPS. Le taire dans l'inventaire reviendrait à le cacher.
-    expect(DESCRIPTIONS.photo_metier.contenu).toMatch(/GPS/);
+  it("l'inventaire dit que la photo stockée ne porte AUCUNE métadonnée", () => {
+    // L'inventaire disait l'inverse jusqu'à la décision D2, et c'était vrai
+    // alors. Ce test suit la vérité, il ne la fige pas : il exige que
+    // l'inventaire nomme explicitement ce qui a été retiré, pour qu'une
+    // régression du nettoyage ne puisse pas passer inaperçue dans la fiche.
+    const contenu = DESCRIPTIONS.photo_metier.contenu;
+    expect(contenu).toMatch(/AUCUNE métadonnée/);
+    expect(contenu).toMatch(/GPS/);
+    expect(contenu).toMatch(/réencodée/);
+    expect(contenu).toMatch(/jamais conservé/);
   });
 
   it("distingue bien la photo métier, le rendu, les métadonnées et l'OCR", () => {

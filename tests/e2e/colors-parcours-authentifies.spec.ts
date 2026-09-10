@@ -192,20 +192,54 @@ test.describe("@colors-auth teinte, référence et finition", () => {
 });
 
 test.describe("@colors-auth photo", () => {
-  test("téléverser une photo l'associe au seau et journalise l'événement", async ({ page }) => {
+  test("une photo piégée est nettoyée avant d'être stockée, et c'est vérifiable sur le fichier servi", async ({ page }) => {
+    // Décision D2. La photo envoyée porte GPS, orientation, appareil, logiciel,
+    // date et profil colorimétrique. Ce qui est stocké ne doit rien en garder.
+    const sharp = (await import("sharp")).default;
+    const piegee = await sharp({
+      create: { width: 40, height: 20, channels: 3, background: { r: 20, g: 120, b: 200 } },
+    })
+      .withExif({
+        IFD0: { Make: "FabricantDeRecette", Model: "ModeleDeRecette X1", Software: "LogicielDeRecette 1.0", Orientation: "6" },
+        IFD2: { DateTimeOriginal: "2026:09:10 08:30:00" },
+        IFD3: { GPSLatitudeRef: "N", GPSLatitude: "48/1 51/1 2999/100", GPSLongitudeRef: "E", GPSLongitude: "2/1 17/1 2999/100" },
+      })
+      .withMetadata({ orientation: 6 })
+      .withIccProfile("srgb")
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    // La fixture est bien piégée : sans cette vérification, la suite ne
+    // prouverait rien.
+    expect(Buffer.from(piegee).toString("latin1")).toContain("FabricantDeRecette");
+
     await seConnecter(page, COMPTES.admin);
     await page.goto(`/inventaire/${SEAUX.aStockFaible}`);
-    // Un JPEG minimal valide : la route vérifie la signature binaire, pas
-    // seulement le type déclaré.
-    const jpeg = Buffer.from(
-      "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0a"
-      + "HBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAA"
-      + "AAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==",
-      "base64",
-    );
-    await page.getByLabel("Photo du seau").setInputFiles({ name: "seau.jpg", mimeType: "image/jpeg", buffer: jpeg });
+    await page.getByLabel("Photo du seau").setInputFiles({ name: "chantier.jpg", mimeType: "image/jpeg", buffer: piegee });
     await page.getByRole("button", { name: "Ajouter la photo" }).click();
     await expect(page.getByRole("status")).toContainText("Photo enregistrée", { timeout: 30_000 });
+
+    // Le fichier réellement servi par le stockage, récupéré par son lien signé.
+    await page.reload();
+    const source = await page.locator(".photo-panel img").first().getAttribute("src");
+    expect(source, "aucune photo servie").toBeTruthy();
+    const servie = await page.request.get(source!);
+    expect(servie.status()).toBe(200);
+    const octets = Buffer.from(await servie.body()).toString("latin1");
+
+    for (const secret of ["FabricantDeRecette", "ModeleDeRecette", "LogicielDeRecette", "2026:09:10", "GPSLatitude", "ICC_PROFILE"]) {
+      expect(octets, `« ${secret} » survit dans le fichier stocké`).not.toContain(secret);
+    }
+  });
+
+  test("un fichier qui n'est pas une image est refusé, et rien n'est stocké", async ({ page }) => {
+    await seConnecter(page, COMPTES.admin);
+    await page.goto(`/inventaire/${SEAUX.aAvecPhoto}`);
+    await page.getByLabel("Photo du seau").setInputFiles({
+      name: "faux.jpg", mimeType: "image/jpeg", buffer: Buffer.from("ceci n'est pas une image"),
+    });
+    await page.getByRole("button", { name: "Ajouter la photo" }).click();
+    await expect(page.getByRole("status")).toContainText(/pas une image|non pris en charge|ne correspond pas/, { timeout: 30_000 });
   });
 });
 
