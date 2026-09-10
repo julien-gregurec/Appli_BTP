@@ -46,13 +46,48 @@ test.describe("@responsive @pilote parcours du salarié de terrain", () => {
 
     // Au CLIC, pas au survol : un doigt ne survole pas.
     await menu.click();
-    const lienPointage = page.getByRole("link", { name: "Pointage", exact: true });
+
+    // Le lien est cherché DANS le tiroir. Le tableau de bord affiche sa propre grille de
+    // modules, qui contient elle aussi un « Pointage » : viser le rôle sans portée
+    // atteignait ce second lien, resté derrière le voile de fermeture du tiroir — l'échec
+    // signalait alors une interception de clic, ce qui ressemblait à un défaut de l'appli.
+    // Le libellé exact du menu est « Pointage heures » — pas « Pointage ». Viser le
+    // second ne trouvait rien dans le tiroir et renvoyait vers la grille du tableau de bord.
+    const tiroir = page.locator("#navigation-mobile");
+    const lienPointage = tiroir.getByRole("link", { name: "Pointage heures", exact: true });
     await expect(lienPointage).toBeVisible();
     await lienPointage.click();
     await expect(page).toHaveURL(/\/pointage/);
 
     // Le tiroir se referme après navigation : sinon il masque l'écran atteint.
-    await expect(page.getByRole("link", { name: "Pointage", exact: true })).toBeHidden();
+    //
+    // On mesure sa POSITION, pas sa visibilité. Le tiroir se ferme par translation
+    // (`-translate-x-full`) et reste donc dans le DOM avec une boîte non vide : Playwright
+    // le tient pour « visible » alors qu'il est entièrement hors de l'écran. Vérifier
+    // `toBeHidden()` aurait fait échouer un comportement correct.
+    await expect.poll(async () => {
+      const boite = await tiroir.boundingBox();
+      return boite ? Math.round(boite.x + boite.width) : 0;
+    }, { timeout: 5_000 }).toBeLessThanOrEqual(0);
+  });
+
+  test("@responsive @pilote les gestes du terrain sont atteignables sans déplier de menu", async ({ page }) => {
+    // Défaut trouvé en recette : les groupes de navigation étaient repliés par défaut, ce
+    // qui a du sens pour un administrateur aux cinquante entrées. Un salarié en a quatre —
+    // et « Pointage heures », son geste le plus fréquent, était enfermé dans un accordéon
+    // nommé « Équipe & temps ». Ouvrir le menu, deviner le groupe, le déplier, toucher le
+    // lien : quatre gestes pour pointer une arrivée, sur un téléphone tenu d'une main.
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto("/dashboard");
+    await page.getByRole("button", { name: /ouvrir le menu/i }).click();
+
+    const tiroir = page.locator("#navigation-mobile");
+    for (const libelle of ["Pointage heures", "Notes de frais", "Chantiers"]) {
+      await expect(
+        tiroir.getByRole("link", { name: libelle, exact: true }),
+        `« ${libelle} » exige de déplier un groupe`,
+      ).toBeVisible();
+    }
   });
 
   test("@responsive @pilote le paysage ne casse pas le pointage", async ({ page }) => {
@@ -91,7 +126,12 @@ test.describe("@responsive @pilote parcours du conducteur de travaux", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/chantiers");
 
-    const premierChantier = page.locator("main a[href^='/chantiers/']").first();
+    // « Nouveau chantier » porte lui aussi un href sous /chantiers/ et vient en premier
+    // dans le DOM : sans cette exclusion, le test ouvrait le formulaire de création et
+    // concluait à tort que la fiche ne s'ouvrait pas.
+    const premierChantier = page
+      .locator("main a[href^='/chantiers/']:not([href$='/nouveau'])")
+      .first();
     await expect(premierChantier).toBeVisible();
     await premierChantier.click();
     await expect(page).toHaveURL(/\/chantiers\/[0-9a-f-]+/);
@@ -159,6 +199,20 @@ test.describe("@pilote sortie de session", () => {
   test("@pilote changer d'utilisateur ne laisse aucune trace du précédent", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
 
+    /**
+     * Clés dont la survie est LÉGITIME.
+     *
+     * `elsatia-appareil-id` identifie l'APPAREIL PHYSIQUE, pas la personne. Le serveur le
+     * range sous `appareils_comptes`, dont la contrainte `UNIQUE (utilisateur_id,
+     * identifiant_appareil)` crée une ligne DISTINCTE par utilisateur : le même téléphone
+     * partagé par deux salariés produit deux lignes, et révoquer celle de l'un ne touche pas
+     * l'autre. Aucune donnée de A n'est donc lisible par B à travers cette clé.
+     *
+     * L'effacer à chaque déconnexion serait un défaut, pas une précaution : la liste des
+     * appareils se remplirait de fantômes et le plafond d'appareils facturés deviendrait faux.
+     */
+    const CLES_APPAREIL_LEGITIMES = ["elsatia-appareil-id", "liria-appareil-id"];
+
     const empreinte = () => page.evaluate(async () => {
       const trace = { local: [] as string[], bases: [] as string[] };
       try { trace.local = Object.keys(localStorage).filter((c) => c.startsWith("elsatia")); } catch { /* refusé */ }
@@ -183,6 +237,7 @@ test.describe("@pilote sortie de session", () => {
     const apres = await empreinte();
 
     for (const cle of avant.local) {
+      if (CLES_APPAREIL_LEGITIMES.includes(cle)) continue;
       expect(apres.local, `la clé « ${cle} » de A survit chez B`).not.toContain(cle);
     }
     for (const base of avant.bases) {

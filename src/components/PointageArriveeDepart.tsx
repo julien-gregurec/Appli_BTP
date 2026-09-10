@@ -4,6 +4,8 @@ import { enregistrerArriveeAction, enregistrerDepartAction } from "@/app/actions
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { PointageChrono } from "@/components/PointageChrono";
 import { messageErreurGps } from "@/lib/gps";
+import { useEnfilerHorsLigne } from "@/components/mobile/useEnfilerHorsLigne";
+import type { IdentiteBase } from "@/lib/mobile/offline/base-locale";
 type Option={id:string;nom:string;priorite?:"jour"|"affecte"|"autre"};
 type Session={id:string;arrivee_at:string;tache:string|null;employe:Option|null;chantier:Option|null};
 type Position={lat:number;lng:number;precision:number};
@@ -41,16 +43,79 @@ function StatutGps({gps}:{gps:ReturnType<typeof usePositionTerrain>}){
   </div>;
 }
 
+/**
+ * Interception de la soumission quand le réseau manque.
+ *
+ * En ligne, on ne touche à rien : le formulaire part vers le Server Action et l'heure est
+ * posée par l'horloge du SERVEUR, que l'appareil ne peut pas falsifier. C'est ce qui donne
+ * sa valeur probante au pointage GPS, et il n'y a aucune raison d'y renoncer pour tout le
+ * monde afin de servir le cas du sous-sol.
+ *
+ * Hors réseau, on empêche l'envoi — qui échouerait en laissant le salarié devant une page
+ * d'erreur, sa saisie perdue — et on dépose la mutation dans la file locale.
+ */
+function useSoumissionTerrain(
+  identite: IdentiteBase | null,
+  type: "pointage_arrivee" | "pointage_depart",
+  chargeUtile: () => Record<string, unknown>,
+) {
+  const { enfiler } = useEnfilerHorsLigne(identite);
+  const [horsLigne, setHorsLigne] = useState<null | { ok: boolean; message: string }>(null);
+
+  async function auEnvoi(evenement: React.FormEvent<HTMLFormElement>) {
+    // `navigator.onLine` est optimiste — il dit « en ligne » sur un wifi de chantier qui ne
+    // route rien. On ne s'en sert donc PAS pour décider d'enfiler : on s'en sert pour
+    // détecter la coupure FRANCHE, seul cas où l'envoi est certain d'échouer. Les liaisons
+    // qui répondent mal restent traitées par la file de synchronisation, sur réponse réelle.
+    if (navigator.onLine) return;
+    evenement.preventDefault();
+    const resultat = await enfiler(type, chargeUtile());
+    setHorsLigne(
+      resultat.etat === "enfile"
+        ? { ok: true, message: "Hors réseau : votre pointage est conservé sur l’appareil et partira au retour du réseau." }
+        : { ok: false, message: `Impossible de conserver ce pointage : ${resultat.motif}` },
+    );
+  }
+
+  return { auEnvoi, horsLigne };
+}
+
+function BandeauHorsLigne({ etat }: { etat: null | { ok: boolean; message: string } }) {
+  if (!etat) return null;
+  return (
+    <p
+      role="status"
+      aria-live="polite"
+      className={`rounded-md px-3 py-2 text-sm ${etat.ok
+        ? "bg-amber-50 text-amber-950 dark:bg-amber-950/40 dark:text-amber-200"
+        : "bg-red-50 text-red-800 dark:bg-red-950/40 dark:text-red-300"}`}
+      data-test="pointage-hors-ligne"
+    >
+      {etat.message}
+    </p>
+  );
+}
+
 function CarteChantier({nom}:{nom:string}){
   return<div className="rounded-md border bg-neutral-50 px-4 py-3 text-center dark:bg-neutral-900"><p className="text-xs text-neutral-500">Chantier</p><p className="text-lg font-semibold text-[#9a7625]">{nomAffiche(nom)}</p></div>;
 }
 
-function CarteArrivee({employe,chantiers,plusieursEmployes}:{employe:Option;chantiers:Option[];plusieursEmployes:boolean}){
+function CarteArrivee({employe,chantiers,plusieursEmployes,identite}:{employe:Option;chantiers:Option[];plusieursEmployes:boolean;identite:IdentiteBase|null}){
   const gps=usePositionTerrain();
   const[chantierId,setChantierId]=useState(chantiers[0]?.id??"");
   const[changerChantier,setChangerChantier]=useState(false);
+  const[tache,setTache]=useState("");
   const chantierSelectionne=chantiers.find(c=>c.id===chantierId);
-  return<form action={enregistrerArriveeAction} className="space-y-4 rounded-lg border bg-white p-5 shadow-sm dark:bg-neutral-950">
+  const terrain=useSoumissionTerrain(identite,"pointage_arrivee",()=>({
+    employe_id:employe.id,
+    chantier_id:chantierId,
+    latitude:gps.position?.lat??null,
+    longitude:gps.position?.lng??null,
+    precision_metres:gps.position?.precision??null,
+    motif_sans_gps:gps.position?null:gps.motifSansGps||null,
+    tache:tache||null,
+  }));
+  return<form action={enregistrerArriveeAction} onSubmit={terrain.auEnvoi} className="space-y-4 rounded-lg border bg-white p-5 shadow-sm dark:bg-neutral-950">
     <input type="hidden" name="employe_id" value={employe.id}/>
     <input type="hidden" name="chantier_id" value={chantierId}/>
     {plusieursEmployes&&<p className="text-xs text-neutral-500">Pointage au nom de <strong>{employe.nom}</strong></p>}
@@ -62,31 +127,42 @@ function CarteArrivee({employe,chantiers,plusieursEmployes}:{employe:Option;chan
     <ChampsGpsCaches position={gps.position} motifSansGps={gps.motifSansGps}/>
     <button disabled={!gps.peutContinuer} className="w-full rounded-md bg-green-700 px-4 py-4 text-lg font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">{gps.charge?"Localisation en cours…":"Pointer l’arrivée"}</button>
     <StatutGps gps={gps}/>
-    <details className="text-sm"><summary className="cursor-pointer text-neutral-500">Options avancées</summary><label className="mt-2 block text-xs text-neutral-500">Tâche prévue <span className="font-normal">(facultatif)</span><input name="tache" placeholder="Pose de cloisons…" className={`${input} mt-1`}/></label></details>
+    <BandeauHorsLigne etat={terrain.horsLigne}/>
+    <details className="text-sm"><summary className="cursor-pointer text-neutral-500">Options avancées</summary><label className="mt-2 block text-xs text-neutral-500">Tâche prévue <span className="font-normal">(facultatif)</span><input name="tache" value={tache} onChange={e=>setTache(e.target.value)} placeholder="Pose de cloisons…" className={`${input} mt-1`}/></label></details>
   </form>;
 }
 
-function CarteDepart({session}:{session:Session}){
+function CarteDepart({session,identite}:{session:Session;identite:IdentiteBase|null}){
   const gps=usePositionTerrain();
-  return<form action={enregistrerDepartAction.bind(null,session.id)} className="space-y-4 rounded-lg border border-red-200 bg-white p-5 shadow-sm dark:bg-neutral-950">
+  const[pause,setPause]=useState("45");
+  const terrain=useSoumissionTerrain(identite,"pointage_depart",()=>({
+    session_id:session.id,
+    pause_minutes:Number(pause)||0,
+    latitude:gps.position?.lat??null,
+    longitude:gps.position?.lng??null,
+    precision_metres:gps.position?.precision??null,
+    motif_sans_gps:gps.position?null:gps.motifSansGps||null,
+  }));
+  return<form action={enregistrerDepartAction.bind(null,session.id)} onSubmit={terrain.auEnvoi} className="space-y-4 rounded-lg border border-red-200 bg-white p-5 shadow-sm dark:bg-neutral-950">
     <p className="text-xs text-neutral-500">Pointage au nom de <strong>{session.employe?.nom}</strong></p>
     <PointageChrono depuis={session.arrivee_at}/>
     <CarteChantier nom={session.chantier?.nom??""}/>
     <ChampsGpsCaches position={gps.position} motifSansGps={gps.motifSansGps}/>
     <button disabled={!gps.peutContinuer} className="w-full rounded-md bg-red-700 px-4 py-4 text-lg font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">{gps.charge?"Localisation en cours…":"Pointer le départ"}</button>
     <StatutGps gps={gps}/>
-    <details open className="text-sm"><summary className="cursor-pointer text-neutral-500">Options avancées</summary><label className="mt-2 block text-xs text-neutral-500">Pause (minutes)<input name="pause_minutes" type="number" min="0" max="1440" step="5" defaultValue="45" className="mt-1 w-28 rounded border px-2 py-1"/></label></details>
+    <BandeauHorsLigne etat={terrain.horsLigne}/>
+    <details open className="text-sm"><summary className="cursor-pointer text-neutral-500">Options avancées</summary><label className="mt-2 block text-xs text-neutral-500">Pause (minutes)<input name="pause_minutes" type="number" min="0" max="1440" step="5" value={pause} onChange={e=>setPause(e.target.value)} className="mt-1 w-28 rounded border px-2 py-1"/></label></details>
   </form>;
 }
 
-export function PointageArriveeDepart({employes,chantiers,sessions}:{employes:Option[];chantiers:Option[];sessions:Session[]}){
+export function PointageArriveeDepart({employes,chantiers,sessions,identite=null}:{employes:Option[];chantiers:Option[];sessions:Session[];identite?:IdentiteBase|null}){
   const employesAvecSessionOuverte=new Set(sessions.map(s=>s.employe?.id).filter(Boolean));
   const employesSansSession=employes.filter(e=>!employesAvecSessionOuverte.has(e.id));
   return<section className="space-y-4 rounded-lg border-2 border-[#c9a24a]/60 bg-[#c9a24a]/5 p-5">
     <div><h2 className="text-lg font-semibold">Pointage</h2><p className="text-sm text-neutral-600">L’heure, la date et la position GPS sont ajoutées automatiquement.</p></div>
     <div className="grid gap-4 sm:grid-cols-2">
-      {employesSansSession.map(employe=><CarteArrivee key={employe.id} employe={employe} chantiers={chantiers} plusieursEmployes={employes.length>1}/>)}
-      {sessions.map(session=><CarteDepart key={session.id} session={session}/>)}
+      {employesSansSession.map(employe=><CarteArrivee key={employe.id} employe={employe} chantiers={chantiers} plusieursEmployes={employes.length>1} identite={identite}/>)}
+      {sessions.map(session=><CarteDepart key={session.id} session={session} identite={identite}/>)}
     </div>
   </section>;
 }

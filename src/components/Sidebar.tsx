@@ -43,6 +43,20 @@ export function Sidebar({
     return (!feature || activeFeatures.includes(feature)) && item.actif && navigationAutorisee(item.permission, permissions);
   });
 
+  /**
+   * Un menu court n'a rien à replier.
+   *
+   * Les groupes sont fermés par défaut, ce qui a du sens pour un administrateur dont la
+   * navigation compte une cinquantaine d'entrées. Pour un salarié de terrain, elle en compte
+   * quatre — et « Pointage », son geste le plus fréquent, se retrouvait enfermé dans un
+   * accordéon replié nommé « Équipe & temps ». Constaté en recette mobile : ouvrir le menu,
+   * deviner le bon groupe, le déplier, puis toucher le lien — quatre gestes pour pointer une
+   * arrivée, sur un téléphone tenu d'une main.
+   *
+   * Au-delà de ce seuil, on garde le repliement : c'est là qu'il rend service.
+   */
+  const menuCourt = navigation.length <= 8;
+
   return (
     <>
     <header className="fixed inset-x-0 top-0 z-[60] flex h-16 items-center justify-between border-b border-[#243447] bg-[#0d1b2a] px-4 text-white md:hidden">
@@ -74,7 +88,7 @@ export function Sidebar({
           const items = navigation.filter((item) => item.groupe === groupe.cle);
           if (!items.length) return null;
           const groupeActif = items.some((item) => pathname === item.href || pathname.startsWith(item.href + "/"));
-          return <details key={groupe.cle} className="group mb-1" open={groupe.cle === "principal" || groupeActif}>
+          return <details key={groupe.cle} className="group mb-1" open={groupe.cle === "principal" || groupeActif || menuCourt}>
             <summary className={`flex cursor-pointer list-none items-center justify-between rounded-md px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] ${groupeActif?"text-[#e5c978]":"text-white/45 hover:bg-white/5 hover:text-white/70"}`}>
               <span>{groupe.label}</span><span className="text-sm transition group-open:rotate-90">›</span>
             </summary>
