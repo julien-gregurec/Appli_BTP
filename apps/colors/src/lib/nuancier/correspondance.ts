@@ -24,7 +24,32 @@
  */
 
 import { distanceLab, ralLePlusProche, type ReferenceRal } from "@/lib/ral";
-import type { EtatNuancier, ReferenceNuancier } from "@/lib/nuancier/contrat";
+import type { EtatNuancier, ReferenceNuancier, ReferentielNuancier } from "@/lib/nuancier/contrat";
+
+/**
+ * Forme exacte qu'impose le schéma à `colors_seaux.ral_approxime`.
+ *
+ * Elle est recopiée ici depuis la contrainte SQL — un test compare les deux —
+ * pour que l'application refuse AVANT la base, avec un message produit plutôt
+ * qu'une violation de contrainte.
+ */
+export const FORMAT_RAL = /^RAL [0-9]{4}$/;
+
+/** Nature d'une référence proposée. Voir `natureReference`. */
+export type NatureReference = "ral" | "fabricant";
+
+/**
+ * Nature d'une référence, décidée par la PROVENANCE puis par le format.
+ *
+ * Une référence n'est traitée comme du RAL que si le nuancier se déclare `ral`
+ * ET que le code respecte `RAL 0000`. Toute autre combinaison est fabricant,
+ * y compris — surtout — un code en forme de RAL venu d'un nuancier fabricant :
+ * l'enregistrer dans une colonne nommée `ral_approxime` présenterait une
+ * référence fabricant comme une référence normative.
+ */
+export function natureReference(code: string, referentiel: ReferentielNuancier): NatureReference {
+  return referentiel === "ral" && FORMAT_RAL.test(code) ? "ral" : "fabricant";
+}
 
 /**
  * Version du moteur de proximité.
@@ -72,6 +97,18 @@ export type PropositionNuancier = {
   version: string;
   /** Version du moteur ayant produit l'écart. Voir `VERSION_MOTEUR_CORRESPONDANCE`. */
   moteur: string;
+  /** Provenance déclarée du nuancier d'origine. */
+  referentiel: ReferentielNuancier;
+  /** Nature retenue pour cette référence précise. Voir `natureReference`. */
+  nature: NatureReference;
+  /**
+   * La référence peut-elle être retenue en base aujourd'hui ?
+   *
+   * Vrai pour les seules références RAL : le schéma ne dispose d'aucune colonne
+   * neutre pour une référence fabricant, et en fabriquer une dans
+   * `ral_approxime` est interdit. Voir `docs/migrations-proposees/`.
+   */
+  persistable: boolean;
 };
 
 export type AbsenceProposition = {
@@ -103,6 +140,7 @@ export function proposerReference(hexDeclare: string | null | undefined, nuancie
   const proche = ralLePlusProche(hexDeclare, palette);
   if (!proche) return { statut: "sans_proposition", raison: "nuancier_absent" };
 
+  const nature = natureReference(proche.code, nuancier.referentiel);
   return {
     statut: "proposition",
     code: proche.code,
@@ -113,6 +151,9 @@ export function proposerReference(hexDeclare: string | null | undefined, nuancie
     source: nuancier.source,
     version: nuancier.version,
     moteur: VERSION_MOTEUR_CORRESPONDANCE,
+    referentiel: nuancier.referentiel,
+    nature,
+    persistable: nature === "ral",
   };
 }
 

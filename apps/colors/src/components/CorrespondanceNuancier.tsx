@@ -69,6 +69,9 @@ export function CorrespondanceNuancier({
                   <span className="nuancier-pastille" style={{ background: resultat.hex }} aria-hidden="true"/>
                   <strong data-test="reference-proposee">{resultat.code}</strong>
                   {resultat.nom && <span className="nuancier-nom">{resultat.nom}</span>}
+                  <span className="badge" data-test="nature-reference">
+                    {resultat.nature === "ral" ? "Référentiel RAL" : "Référence fabricant"}
+                  </span>
                   <span className="badge">ΔE {resultat.distance.toFixed(2)} — {LIBELLES_ECART[resultat.niveau]}</span>
                 </>
               : <span className="nuancier-inconnu" data-test="sans-proposition">{RAISONS[resultat.raison]}</span>}
@@ -116,7 +119,14 @@ export function CorrespondanceNuancier({
             <button className="outline-button" data-test="enregistrer-finition">Enregistrer la finition</button>
           </form>
 
-          {resultat.statut === "proposition" && !reference.confirmee && (
+          {/*
+            Le bouton n'existe que pour une référence RAL. Une référence
+            fabricant n'a aujourd'hui aucune colonne où être retenue : proposer
+            un bouton qui échoue ensuite ferait porter à l'utilisateur une
+            limite de schéma dont il n'est pas responsable, et l'inviterait à
+            réessayer. On explique à la place.
+          */}
+          {resultat.statut === "proposition" && resultat.persistable && !reference.confirmee && (
             <form action={confirmerReferenceNuancierAction.bind(null, seauId)} className="inline-form">
               <input type="hidden" name="reference" value={resultat.code}/>
               <input type="hidden" name="distance" value={resultat.distance}/>
@@ -124,6 +134,15 @@ export function CorrespondanceNuancier({
                 Retenir « {resultat.code} » pour ce seau
               </button>
             </form>
+          )}
+
+          {resultat.statut === "proposition" && !resultat.persistable && (
+            <p className="nuancier-inconnu" data-test="reference-non-retenable">
+              Cette référence vient d’un nuancier fabricant. Elle reste proposée et exportée avec sa
+              provenance, mais elle n’est pas enregistrée sur la fiche : ELSATIA ne conserve
+              aujourd’hui que les références du référentiel RAL, et inscrire une référence
+              fabricant à leur place la ferait passer pour une norme qu’elle n’est pas.
+            </p>
           )}
 
           {reference.code && (
@@ -137,7 +156,8 @@ export function CorrespondanceNuancier({
 
       {resultat.statut === "proposition" && (
         <p className="nuancier-provenance">
-          D’après {resultat.source}, version {resultat.version} — proximité calculée par le moteur ELSATIA {resultat.moteur} (ΔE*ab CIE76).
+          D’après {resultat.source}, version {resultat.version}, référentiel déclaré « {resultat.referentiel} » —
+          proximité calculée par le moteur ELSATIA {resultat.moteur} (ΔE*ab CIE76).
         </p>
       )}
       <p className="color-note">

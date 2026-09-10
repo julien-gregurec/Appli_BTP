@@ -28,6 +28,7 @@ import {
   CODE_REFERENCE_NON_PERSISTABLE,
 } from "@/lib/messages-metier";
 import { estFinitionColors } from "@/lib/finition-colors";
+import { FORMAT_RAL } from "@/lib/nuancier/correspondance";
 import type { EtatSeau, ModeQuantite, UniteQuantite } from "@/lib/colors-types";
 
 const texte=(f:FormData,k:string,max=500)=>String(f.get(k)??"").trim().slice(0,max);
@@ -149,6 +150,16 @@ export async function confirmerReferenceNuancierAction(seauId:string,formData:Fo
   await contexteAction("modifier_seau");
   const reference=nullable(formData,"reference",40);
   const distanceBrute=nombre(formData,"distance");
+  /*
+   * Défense en profondeur. L'écran ne propose plus de retenir une référence
+   * fabricant, mais une Server Action est une surface publique : elle peut être
+   * appelée sans passer par l'écran. On refuse ici la même chose, avec le même
+   * message, avant tout aller-retour vers la base. `CLR01` reste la dernière
+   * ligne, côté schéma.
+   */
+  if(reference!==null&&!FORMAT_RAL.test(reference)){
+    retour(`/inventaire/${seauId}`,CODE_REFERENCE_NON_PERSISTABLE,"erreur");
+  }
   const supabase=await createClient();
   const {error}=await supabase.rpc("colors_definir_reference_nuancier",{
     p_seau_id:seauId,

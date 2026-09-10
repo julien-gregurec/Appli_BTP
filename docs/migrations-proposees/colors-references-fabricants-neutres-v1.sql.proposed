@@ -1,0 +1,191 @@
+-- ELSATIA Colors — modèle neutre pour les références de nuancier fabricant.
+--
+-- MIGRATION PROPOSÉE. Aucun numéro de ledger n'est réservé : ce fichier n'est
+-- pas dans `supabase/migrations` et ne sera appliqué qu'après arbitrage.
+--
+-- ## Pourquoi elle est nécessaire
+--
+-- Décision D1, fermée : `colors_seaux.ral_approxime` reste strictement réservé
+-- au format `RAL 0000`. Il est interdit d'y enregistrer une référence
+-- fabricant, y compris sous une forme qui ressemblerait à un RAL.
+--
+-- La conséquence est directe : une organisation qui charge le nuancier de son
+-- fournisseur voit la référence la plus proche proposée à l'écran et exportée
+-- avec sa provenance, mais ne peut PAS la retenir sur la fiche du seau. Le
+-- schéma n'a aucune colonne où la mettre, et en fabriquer une dans
+-- `ral_approxime` la ferait passer pour une norme qu'elle n'est pas.
+--
+-- Cette migration ouvre cette voie, sans toucher à `ral_approxime` ni à la
+-- migration `20260909000281`, qui reste ce qu'elle est.
+--
+-- ## Ce qu'elle ajoute
+--
+-- Une table plutôt que des colonnes : une référence retenue porte six
+-- informations dont trois n'ont de sens qu'ensemble (fabricant, nuancier,
+-- version). Les étaler sur `colors_seaux` mélangerait la description du produit
+-- et la traçabilité d'une décision humaine.
+--
+-- Une seule référence retenue par seau : `seau_id` est la clé primaire. Deux
+-- références concurrentes sur une même fiche n'auraient pas de sens à la
+-- commande.
+--
+-- ## Ce qu'elle ne fait pas
+--
+-- Elle ne migre RIEN depuis `ral_approxime` : les références RAL déjà retenues
+-- y restent, c'est leur place. Les deux modèles coexistent, chacun pour ce
+-- qu'il désigne, et l'application lit les deux.
+
+begin;
+
+create table if not exists public.colors_references_nuancier (
+  seau_id uuid primary key references public.colors_seaux(id) on delete cascade,
+  entreprise_id uuid not null references public.entreprises(id) on delete cascade,
+
+  -- Provenance. Les trois ensemble rendent la référence vérifiable ; aucune
+  -- n'est facultative, parce qu'une référence sans provenance n'est pas
+  -- utilisable pour commander.
+  fabricant text not null check (btrim(fabricant) <> '' and length(fabricant) <= 180),
+  nuancier text not null check (btrim(nuancier) <> '' and length(nuancier) <= 180),
+  nuancier_version text not null check (btrim(nuancier_version) <> '' and length(nuancier_version) <= 60),
+
+  -- Ce que la machine a proposé, et ce qu'une personne a retenu. Les deux sont
+  -- conservés : ils diffèrent dès que quelqu'un corrige la proposition, et
+  -- c'est précisément cet écart qui vaut d'être tracé.
+  reference_proposee text not null check (btrim(reference_proposee) <> '' and length(reference_proposee) <= 120),
+  reference_confirmee text check (reference_confirmee is null or (btrim(reference_confirmee) <> '' and length(reference_confirmee) <= 120)),
+
+  -- Aucune de ces deux colonnes n'accepte le format RAL : ce modèle-ci est
+  -- réservé aux référentiels fabricants. Une référence RAL a sa place dans
+  -- `colors_seaux.ral_approxime`, et nulle part ailleurs.
+  check (reference_proposee !~ '^RAL [0-9]{4}$'),
+  check (reference_confirmee is null or reference_confirmee !~ '^RAL [0-9]{4}$'),
+
+  ecart numeric(10,4) check (ecart is null or ecart >= 0),
+  moteur text check (moteur is null or length(moteur) <= 40),
+
+  -- Une confirmation est un geste humain : elle a un auteur et une date, ou
+  -- elle n'a pas eu lieu. La contrainte interdit l'entre-deux.
+  confirme_par uuid references public.utilisateurs(id) on delete restrict,
+  confirme_at timestamptz,
+  check (
+    (reference_confirmee is null and confirme_par is null and confirme_at is null)
+    or (reference_confirmee is not null and confirme_par is not null and confirme_at is not null)
+  ),
+
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+comment on table public.colors_references_nuancier is
+  'Référence de nuancier FABRICANT proposée puis retenue pour un seau. Ne contient jamais de référence RAL : celles-ci vivent dans colors_seaux.ral_approxime.';
+
+create index if not exists colors_references_nuancier_entreprise_idx
+  on public.colors_references_nuancier (entreprise_id, fabricant, nuancier);
+
+-- Cohérence d'organisation : la ligne suit toujours celle du seau.
+create or replace function public.colors_valider_reference_nuancier()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_entreprise uuid;
+begin
+  select entreprise_id into v_entreprise from public.colors_seaux where id = new.seau_id;
+  if v_entreprise is distinct from new.entreprise_id then
+    raise exception 'Référence de nuancier Colors invalide';
+  end if;
+  new.updated_at := now();
+  return new;
+end; $$;
+
+drop trigger if exists colors_references_nuancier_guard on public.colors_references_nuancier;
+create trigger colors_references_nuancier_guard
+  before insert or update on public.colors_references_nuancier
+  for each row execute function public.colors_valider_reference_nuancier();
+
+alter table public.colors_references_nuancier enable row level security;
+
+-- Lecture pour qui peut voir le stock ; aucune écriture directe. Comme partout
+-- ailleurs dans Colors, la seule voie d'écriture est une RPC habilitée.
+drop policy if exists colors_references_nuancier_select on public.colors_references_nuancier;
+create policy colors_references_nuancier_select on public.colors_references_nuancier
+  for select to authenticated
+  using (public.colors_action_autorisee(entreprise_id, 'voir'));
+
+grant select on public.colors_references_nuancier to authenticated;
+revoke insert, update, delete on public.colors_references_nuancier from authenticated;
+
+create or replace function public.colors_retenir_reference_fabricant(
+  p_seau_id uuid,
+  p_fabricant text,
+  p_nuancier text,
+  p_nuancier_version text,
+  p_reference_proposee text,
+  p_reference_confirmee text default null,
+  p_ecart numeric default null,
+  p_moteur text default null
+) returns public.colors_references_nuancier
+language plpgsql security definer set search_path = public as $$
+declare v_seau public.colors_seaux; v public.colors_references_nuancier; v_diff jsonb; v_avant text;
+begin
+  select * into v_seau from public.colors_seaux where id = p_seau_id for update;
+  if v_seau.id is null or not public.colors_action_autorisee(v_seau.entreprise_id,'modifier_seau') then
+    raise exception 'Accès Colors refusé';
+  end if;
+  -- Le format RAL est refusé ici avec le même code que côté `colors_seaux` :
+  -- une référence RAL n'a rien à faire dans ce modèle.
+  if p_reference_proposee ~ '^RAL [0-9]{4}$'
+     or (p_reference_confirmee is not null and p_reference_confirmee ~ '^RAL [0-9]{4}$') then
+    raise exception 'Une référence RAL se retient sur la fiche du seau, pas dans le modèle fabricant'
+      using errcode = 'CLR02';
+  end if;
+
+  select reference_confirmee into v_avant from public.colors_references_nuancier where seau_id = p_seau_id;
+
+  insert into public.colors_references_nuancier(
+    seau_id, entreprise_id, fabricant, nuancier, nuancier_version,
+    reference_proposee, reference_confirmee, ecart, moteur,
+    confirme_par, confirme_at
+  ) values (
+    p_seau_id, v_seau.entreprise_id, p_fabricant, p_nuancier, p_nuancier_version,
+    p_reference_proposee, p_reference_confirmee, p_ecart, p_moteur,
+    case when p_reference_confirmee is null then null else auth.uid() end,
+    case when p_reference_confirmee is null then null else now() end
+  )
+  on conflict (seau_id) do update set
+    fabricant = excluded.fabricant,
+    nuancier = excluded.nuancier,
+    nuancier_version = excluded.nuancier_version,
+    reference_proposee = excluded.reference_proposee,
+    reference_confirmee = excluded.reference_confirmee,
+    ecart = excluded.ecart,
+    moteur = excluded.moteur,
+    confirme_par = excluded.confirme_par,
+    confirme_at = excluded.confirme_at
+  returning * into v;
+
+  -- Le journal reçoit la décision humaine, sous un nom lisible. Il faudra
+  -- étendre la liste blanche de `colors_valider_mouvement` au champ
+  -- `reference_fabricant` en appliquant cette migration — sans quoi l'insertion
+  -- sera rejetée par « Champ Colors non journalisable ».
+  if v_avant is distinct from v.reference_confirmee then
+    v_diff := jsonb_build_array(jsonb_build_object(
+      'champ','reference_fabricant',
+      'avant', public.colors_extrait_valeur(v_avant),
+      'apres', public.colors_extrait_valeur(v.reference_confirmee)));
+    insert into public.colors_mouvements(entreprise_id,seau_id,type,quantite_avant,quantite_apres,
+      pourcentage_avant,pourcentage_apres,unite,emplacement_avant_id,emplacement_apres_id,
+      etat_avant,etat_apres,auteur_id,motif,champs_modifies)
+    values(v_seau.entreprise_id,v_seau.id,'modification',v_seau.quantite_restante,v_seau.quantite_restante,
+      v_seau.pourcentage_restant,v_seau.pourcentage_restant,v_seau.unite,v_seau.emplacement_id,v_seau.emplacement_id,
+      v_seau.etat,v_seau.etat,auth.uid(),null,v_diff);
+  end if;
+
+  return v;
+end; $$;
+
+revoke all on function public.colors_retenir_reference_fabricant(uuid,text,text,text,text,text,numeric,text)
+  from public, anon, service_role;
+grant execute on function public.colors_retenir_reference_fabricant(uuid,text,text,text,text,text,numeric,text)
+  to authenticated;
+
+notify pgrst,'reload schema';
+
+commit;

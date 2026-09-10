@@ -160,16 +160,26 @@ test.describe("@colors-auth teinte, référence et finition", () => {
     await expect(page.getByText("Finition", { exact: false }).first()).toBeVisible();
   });
 
-  test("une référence hors format RAL est refusée avec une explication, sans effacer la proposition", async ({ page }) => {
-    // La contrainte `^RAL [0-9]{4}$` n'a pas été élargie : c'est une décision de
-    // produit laissée ouverte. L'application doit le dire, pas échouer sourdement.
+  test("une référence fabricant est proposée mais jamais retenue, et l'écran l'explique", async ({ page }) => {
+    // Décision D1 : `ral_approxime` reste réservé au format RAL. Une référence
+    // fabricant n'a aucune colonne où être retenue. L'écran ne doit donc PAS
+    // proposer de bouton qui échouerait ensuite : il explique.
     await seConnecter(page, COMPTES.admin);
     await page.goto(`/inventaire/${SEAUX.aAvecPhoto}`);
-    await page.getByRole("button", { name: /Retenir « TEST-BLANC »/ }).click();
-    await page.waitForURL(/erreur=reference-non-persistable/);
-    await expect(page.getByText(/seules les références au format RAL sont enregistrables/)).toBeVisible();
     await expect(page.locator('[data-test="reference-proposee"]')).toHaveText("TEST-BLANC");
+    await expect(page.locator('[data-test="nature-reference"]')).toHaveText("Référence fabricant");
+    await expect(page.getByRole("button", { name: /Retenir/ })).toHaveCount(0);
+    await expect(page.locator('[data-test="reference-non-retenable"]')).toBeVisible();
     await expect(page.locator('[data-test="sans-reference"]')).toBeVisible();
+  });
+
+  test("l'export distingue une référence fabricant d'une référence RAL", async ({ page }) => {
+    await seConnecter(page, COMPTES.admin);
+    const csv = await (await page.request.get("/api/export/inventaire")).text();
+    expect(csv).toContain("Référentiel");
+    expect(csv).toContain('"Fabricant"');
+    // Aucune ligne ne doit présenter cette proposition comme du RAL.
+    expect(csv).not.toContain('"TEST-BLANC";"RAL"');
   });
 
   test("l'écran Nuanciers cite la source, la version et la licence du nuancier chargé", async ({ page }) => {

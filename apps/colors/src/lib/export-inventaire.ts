@@ -19,7 +19,10 @@
  *     une proposition à 8 ΔE et une à 0,4 ΔE ne se recopient pas de la même
  *     façon ;
  *  3. la source et la version du nuancier figurent sur chaque ligne, parce
- *     qu'une référence sans provenance n'est pas vérifiable.
+ *     qu'une référence sans provenance n'est pas vérifiable ;
+ *  4. une colonne « Référentiel » distingue une référence du référentiel RAL
+ *     d'une référence de nuancier fabricant. Sans elle, un code en forme de RAL
+ *     issu d'un nuancier fabricant se lirait comme une norme.
  *
  * Quand aucun nuancier n'est chargé, ces colonnes ne sont pas émises du tout.
  * Une colonne vide se lirait comme « pas de correspondance trouvée », alors que
@@ -78,7 +81,7 @@ const COLONNES_BASE = [
 ] as const;
 
 const COLONNES_NUANCIER = [
-  "Référence proposée (non vérifiée)", "Écart ΔE", "Lecture de l’écart",
+  "Référence proposée (non vérifiée)", "Référentiel", "Écart ΔE", "Lecture de l’écart",
   "Nuancier source", "Version du nuancier", "Moteur de correspondance",
 ] as const;
 
@@ -88,9 +91,13 @@ export function entetesExport(nuancier: EtatNuancier): readonly string[] {
 
 function valeursNuancier(hex: string | null, nuancier: EtatNuancier): (string | null)[] {
   const resultat = proposerReference(hex, nuancier);
-  if (resultat.statut !== "proposition") return ["Aucune proposition", null, null, null, null, null];
+  if (resultat.statut !== "proposition") return ["Aucune proposition", null, null, null, null, null, null];
   return [
     resultat.code,
+    // La colonne existe pour que le fichier dise lui-même ce que la référence
+    // vaut : recopier « RAL 9010 » depuis un nuancier fabricant dans un bon de
+    // commande n'a pas le même sens que le recopier depuis le référentiel RAL.
+    resultat.nature === "ral" ? "RAL" : "Fabricant",
     resultat.distance.toFixed(2),
     LIBELLES_ECART[resultat.niveau],
     resultat.source,
