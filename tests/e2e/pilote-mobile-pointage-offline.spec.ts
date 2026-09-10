@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { COMPTES, cheminEtatSession, connecter, viderStockageLocal } from "./pilote-mobile-aides";
+import { allerA, cheminEtatSession, viderStockageLocal } from "./pilote-mobile-aides";
 
 /**
  * Recette du POINTAGE HORS LIGNE.
@@ -33,12 +33,29 @@ async function lireFileLocale(page: Page, entrepriseId: string, utilisateurId: s
   }, { entrepriseId, utilisateurId });
 }
 
+/**
+ * Le bouton de pointage, quel que soit l'état du salarié.
+ *
+ * L'écran montre une carte « arrivée » tant qu'aucune session n'est ouverte, et une carte
+ * « départ » ensuite. Viser uniquement l'arrivée rendait les scénarios DÉPENDANTS DE LEUR
+ * ORDRE : le premier ouvrait une session, et les suivants ne trouvaient plus le bouton
+ * qu'ils attendaient — un échec qui parlait de l'enchaînement des tests, pas du hors-ligne.
+ *
+ * Ce que ces scénarios éprouvent — dépôt en file, identité inscrite, survie au redémarrage,
+ * rejeu non dupliquant — vaut identiquement pour l'arrivée et pour le départ.
+ */
+function boutonPointage(page: Page) {
+  return page.getByRole("button", {
+    name: /pointer l’arrivée|pointer le départ|localisation en cours/i,
+  });
+}
+
 /** Identités du décor, telles que le prélude de recette les pose. */
 const ENTREPRISE_A = "a0000000-0000-0000-0000-000000000001";
-const OUVRIER_A = "10000000-0000-0000-0000-000000000002";
+const OUVRIER_TERRAIN_A = "40000000-0000-0000-0000-000000000003";
 
 test.describe("@pilote @horsligne pointage sans réseau", () => {
-  test.use({ storageState: cheminEtatSession("ouvrierA") });
+  test.use({ storageState: cheminEtatSession("ouvrierTerrainA") });
 
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -48,7 +65,7 @@ test.describe("@pilote @horsligne pointage sans réseau", () => {
 
   test("@pilote @horsligne une arrivée saisie sans réseau est conservée, pas perdue", async ({ page }) => {
     await page.goto("/pointage");
-    const bouton = page.getByRole("button", { name: /pointer l’arrivée|localisation en cours/i });
+    const bouton = boutonPointage(page);
     await expect(bouton).toBeVisible();
 
     await page.context().setOffline(true);
@@ -61,21 +78,21 @@ test.describe("@pilote @horsligne pointage sans réseau", () => {
     await expect(bandeau).toBeVisible();
     await expect(bandeau).toContainText(/conservé sur l’appareil/i);
 
-    const file = await lireFileLocale(page, ENTREPRISE_A, OUVRIER_A);
+    const file = await lireFileLocale(page, ENTREPRISE_A, OUVRIER_TERRAIN_A);
     expect(file, "rien n'a été déposé dans la file").toHaveLength(1);
-    expect(file[0].type).toBe("pointage_arrivee");
+    expect(["pointage_arrivee", "pointage_depart"]).toContain(file[0].type);
     expect(file[0].etat).toBe("en_attente");
     // L'identité qui a préparé la mutation est inscrite avec elle : c'est ce qui permettra
     // de refuser son envoi sous un autre compte.
     expect(file[0].entrepriseId).toBe(ENTREPRISE_A);
-    expect(file[0].utilisateurId).toBe(OUVRIER_A);
+    expect(file[0].utilisateurId).toBe(OUVRIER_TERRAIN_A);
 
     await page.context().setOffline(false);
   });
 
   test("@pilote @horsligne un double clic ne dépose qu'une seule fois… ou deux fois distinctes", async ({ page }) => {
     await page.goto("/pointage");
-    const bouton = page.getByRole("button", { name: /pointer l’arrivée|localisation en cours/i });
+    const bouton = boutonPointage(page);
     await expect(bouton).toBeVisible();
 
     await page.context().setOffline(true);
@@ -85,7 +102,7 @@ test.describe("@pilote @horsligne pointage sans réseau", () => {
     await bouton.click();
     await bouton.click();
 
-    const file = await lireFileLocale(page, ENTREPRISE_A, OUVRIER_A);
+    const file = await lireFileLocale(page, ENTREPRISE_A, OUVRIER_TERRAIN_A);
     // Ce qui compte n'est pas le nombre d'entrées mais qu'elles portent des identifiants
     // DISTINCTS : deux entrées de même identifiant se rejoueraient l'une l'autre en
     // silence, alors que deux identifiants distincts se verront et s'arbitreront — la
@@ -99,7 +116,7 @@ test.describe("@pilote @horsligne pointage sans réseau", () => {
 
   test("@pilote @horsligne la file survit au redémarrage de l'application", async ({ page }) => {
     await page.goto("/pointage");
-    const bouton = page.getByRole("button", { name: /pointer l’arrivée|localisation en cours/i });
+    const bouton = boutonPointage(page);
     await page.context().setOffline(true);
     await expect(bouton).toBeEnabled({ timeout: 20_000 });
     await bouton.click();
@@ -111,19 +128,19 @@ test.describe("@pilote @horsligne pointage sans réseau", () => {
     await page.context().setOffline(false);
     await page.goto("/pointage");
 
-    const file = await lireFileLocale(page, ENTREPRISE_A, OUVRIER_A);
+    const file = await lireFileLocale(page, ENTREPRISE_A, OUVRIER_TERRAIN_A);
     expect(file.length, "la file a été perdue au redémarrage").toBeGreaterThanOrEqual(1);
   });
 
   test("@pilote @horsligne le retour du réseau transmet la saisie, et le rejeu ne duplique pas", async ({ page }) => {
     await page.goto("/pointage");
-    const bouton = page.getByRole("button", { name: /pointer l’arrivée|localisation en cours/i });
+    const bouton = boutonPointage(page);
     await page.context().setOffline(true);
     await expect(bouton).toBeEnabled({ timeout: 20_000 });
     await bouton.click();
     await expect(page.locator('[data-test="pointage-hors-ligne"]')).toBeVisible();
 
-    const avant = await lireFileLocale(page, ENTREPRISE_A, OUVRIER_A);
+    const avant = await lireFileLocale(page, ENTREPRISE_A, OUVRIER_TERRAIN_A);
     const identifiant = avant[0].id;
 
     // Retour du réseau : la reprise se déclenche à l'ouverture et sur l'événement `online`.
@@ -131,62 +148,74 @@ test.describe("@pilote @horsligne pointage sans réseau", () => {
     await page.goto("/pointage");
 
     await expect
-      .poll(async () => (await lireFileLocale(page, ENTREPRISE_A, OUVRIER_A))
+      .poll(async () => (await lireFileLocale(page, ENTREPRISE_A, OUVRIER_TERRAIN_A))
         .find((m) => m.id === identifiant)?.etat, { timeout: 20_000 })
       .toMatch(/synchronise|conflit|echec/);
 
-    const apres = (await lireFileLocale(page, ENTREPRISE_A, OUVRIER_A)).find((m) => m.id === identifiant)!;
+    const apres = (await lireFileLocale(page, ENTREPRISE_A, OUVRIER_TERRAIN_A)).find((m) => m.id === identifiant)!;
 
     // Une mutation acquittée ne doit JAMAIS repartir : la table de transitions l'interdit.
     // On recharge pour vérifier qu'aucune reprise ne la remet en attente.
     await page.goto("/pointage");
     await page.waitForTimeout(1500);
-    const final = (await lireFileLocale(page, ENTREPRISE_A, OUVRIER_A)).find((m) => m.id === identifiant)!;
+    const final = (await lireFileLocale(page, ENTREPRISE_A, OUVRIER_TERRAIN_A)).find((m) => m.id === identifiant)!;
     expect(final.etat, "une mutation acquittée est repartie en file").toBe(apres.etat);
   });
 });
 
 test.describe("@pilote @horsligne refus sous une autre identité", () => {
-  test.use({ storageState: { cookies: [], origins: [] } });
+  test.use({ storageState: cheminEtatSession("ouvrierTerrainA") });
 
-  test("@pilote @horsligne une saisie préparée par A ne part jamais sous B", async ({ page }) => {
+  test("@pilote @horsligne une saisie préparée par A ne part jamais sous B", async ({ page, browser }) => {
     await page.setViewportSize({ width: 390, height: 844 });
 
     // A prépare une saisie hors réseau.
-    await connecter(page, COMPTES.ouvrierA);
-    await page.goto("/pointage");
+    await allerA(page, "/pointage");
     await viderStockageLocal(page);
-    await page.goto("/pointage");
+    await allerA(page, "/pointage");
 
-    const bouton = page.getByRole("button", { name: /pointer l’arrivée|localisation en cours/i });
+    const bouton = boutonPointage(page);
     await page.context().setOffline(true);
     await expect(bouton).toBeEnabled({ timeout: 20_000 });
     await bouton.click();
     await expect(page.locator('[data-test="pointage-hors-ligne"]')).toBeVisible();
 
-    const preparee = await lireFileLocale(page, ENTREPRISE_A, OUVRIER_A);
+    const preparee = await lireFileLocale(page, ENTREPRISE_A, OUVRIER_TERRAIN_A);
     expect(preparee).toHaveLength(1);
     const mutation = preparee[0];
 
     await page.context().setOffline(false);
 
-    // B se connecte sur le même appareil et tente d'envoyer la file de A à la main.
-    await page.goto("/login");
-    await connecter(page, COMPTES.ouvrierB);
+    // B ouvre l'application sur le même appareil, dans un contexte à part — ce qui reproduit
+    // fidèlement le téléphone de chantier qu'on se passe, sans consommer le quota de /login
+    // (10 tentatives par tranche de 10 minutes et par IP).
+    const contexteB = await browser.newContext({
+      storageState: cheminEtatSession("ouvrierB"),
+      ignoreHTTPSErrors: true,
+    });
+    try {
+      const pageB = await contexteB.newPage();
+      await pageB.goto("/dashboard");
 
-    const refus = await page.evaluate(async (m) => {
-      const reponse = await fetch("/api/mobile/offline/mutations", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ mutations: [m] }),
-      });
-      return { statut: reponse.status, corps: await reponse.json() };
-    }, mutation);
+      // B tente d'envoyer la file de A telle quelle.
+      const refus = await pageB.evaluate(async (m) => {
+        const reponse = await fetch("/api/mobile/offline/mutations", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ mutations: [m] }),
+        });
+        return { statut: reponse.status, corps: await reponse.json() };
+      }, mutation);
 
-    // Le serveur doit REFUSER explicitement, pas appliquer sous l'identité courante.
-    expect(refus.statut).toBe(200);
-    const resultat = refus.corps.resultats[0];
-    expect(resultat.issue, "une saisie de A a été acceptée sous B").toBe("refus");
-    expect(resultat.motif).toMatch(/autre compte/i);
+      // Le serveur REFUSE explicitement : il n'applique pas sous l'identité courante, et il
+      // ne se contente pas non plus d'ignorer en silence — un refus muet laisserait croire
+      // à une transmission réussie.
+      expect(refus.statut).toBe(200);
+      const resultat = refus.corps.resultats[0];
+      expect(resultat.issue, "une saisie de A a été acceptée sous B").toBe("refus");
+      expect(resultat.motif).toMatch(/autre compte/i);
+    } finally {
+      await contexteB.close();
+    }
   });
 });

@@ -17,6 +17,26 @@ const baseURL = process.env.E2E_BASE_URL ?? "http://127.0.0.1:3100";
  */
 const baseUrlPilote = process.env.E2E_PILOTE_BASE_URL ?? baseURL;
 
+/**
+ * Un téléphone de chantier a une position. Le navigateur de recette doit en avoir une aussi.
+ *
+ * Le bouton de pointage est DÉSACTIVÉ tant qu'aucune position n'est acquise et qu'aucun motif
+ * d'absence de GPS n'est saisi. C'est une garde anti-fraude correcte — un pointage GPS sans
+ * GPS ne prouve rien — mais elle rend la recette impossible sans permission de géolocalisation :
+ * les scénarios hors ligne échouaient sur un bouton qui ne s'activait jamais, ce qui n'avait
+ * rien à voir avec le hors-ligne.
+ *
+ * Les coordonnées sont celles d'un point quelconque de Strasbourg : elles n'ont pas besoin
+ * d'être vraies, seulement d'exister et d'être stables entre deux exécutions.
+ */
+const positionChantier = { latitude: 48.5734, longitude: 7.7521, accuracy: 12 };
+const usePilote = {
+  baseURL: baseUrlPilote,
+  ignoreHTTPSErrors: true,
+  permissions: ["geolocation"],
+  geolocation: positionChantier,
+};
+
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 45_000,
@@ -57,18 +77,18 @@ export default defineConfig({
     {
       name: "pilote-sessions",
       testMatch: /pilote-mobile-sessions\.setup\.ts/,
-      use: { baseURL: baseUrlPilote, ignoreHTTPSErrors: true },
+      use: usePilote,
     },
 
-    { name: "pilote-android", use: { ...devices["Pixel 7"], baseURL: baseUrlPilote, ignoreHTTPSErrors: true }, grep: /@pilote/, dependencies: ["pilote-sessions"] },
-    { name: "pilote-iphone", use: { ...devices["iPhone 13"], baseURL: baseUrlPilote, ignoreHTTPSErrors: true }, grep: /@pilote/, dependencies: ["pilote-sessions"] },
+    { name: "pilote-android", use: { ...devices["Pixel 7"], ...usePilote }, grep: /@pilote/, dependencies: ["pilote-sessions"] },
+    { name: "pilote-iphone", use: { ...devices["iPhone 13"], ...usePilote }, grep: /@pilote/, dependencies: ["pilote-sessions"] },
 
     // Firefox n'a pas de profil « téléphone » chez Playwright et ne sert ici qu'à un point
     // précis : `indexedDB.databases()` y est ABSENTE, ce qui rendait la purge locale
     // inopérante (réserve R4). On l'éprouve donc en fenêtre de bureau étroite.
     {
       name: "pilote-firefox",
-      use: { ...devices["Desktop Firefox"], viewport: { width: 390, height: 844 }, baseURL: baseUrlPilote, ignoreHTTPSErrors: true },
+      use: { ...devices["Desktop Firefox"], ...usePilote, viewport: { width: 390, height: 844 } },
       grep: /@purge/,
       dependencies: ["pilote-sessions"],
     },

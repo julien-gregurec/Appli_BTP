@@ -116,3 +116,101 @@ where e.entreprise_id = 'a0000000-0000-0000-0000-000000000001'
   and e.utilisateur_id = '10000000-0000-0000-0000-000000000002'
 limit 1
 on conflict (id) do nothing;
+
+-- ── Salarié de terrain, pointage personnel ACTIVÉ ───────────────────────────
+--
+-- Constat de recette : AUCUN compte du décor Train V3 n'a `pointage_personnel_actif = true`.
+-- Le formulaire de pointage n'y a donc jamais été exercé — la page affiche « Votre
+-- administrateur n'a pas activé le pointage personnel pour ce compte » et s'arrête là.
+--
+-- L'interrupteur est distinct de la permission de poste, et c'est volontaire : `saisir_son_
+-- pointage` dit ce que le POSTE autorise, `pointage_personnel_actif` dit ce que
+-- l'administrateur a ouvert pour CETTE personne. Un décor qui accorde la permission sans
+-- lever l'interrupteur ne teste donc rien du pointage.
+--
+-- On n'active PAS l'interrupteur sur l'Ouvrier A existant : il appartient au décor du
+-- Train V3, et le modifier changerait le comportement d'autres recettes. On ajoute un
+-- compte à nous, avec le périmètre réel d'un salarié de chantier.
+
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password,
+  email_confirmed_at, created_at, updated_at
+) values
+  ('00000000-0000-0000-0000-000000000000', '40000000-0000-0000-0000-000000000003', 'authenticated', 'authenticated',
+   'ouvrier-terrain-a@invalid.local', crypt('test', gen_salt('bf')), now(), now(), now())
+on conflict (id) do nothing;
+
+update auth.users set
+  confirmation_token = coalesce(confirmation_token, ''), recovery_token = coalesce(recovery_token, ''),
+  email_change = coalesce(email_change, ''), email_change_token_new = coalesce(email_change_token_new, ''),
+  phone_change = coalesce(phone_change, ''), phone_change_token = coalesce(phone_change_token, ''),
+  email_change_token_current = coalesce(email_change_token_current, ''),
+  reauthentication_token = coalesce(reauthentication_token, '')
+where id = '40000000-0000-0000-0000-000000000003';
+
+insert into public.utilisateurs (id, prenom, nom) values
+  ('40000000-0000-0000-0000-000000000003', 'Ouvrier terrain', 'A')
+on conflict (id) do update set prenom = excluded.prenom, nom = excluded.nom;
+
+insert into public.postes (id, entreprise_id, nom) values
+  ('a1000000-0000-0000-0000-000000000009', 'a0000000-0000-0000-0000-000000000001', 'Ouvrier terrain A (recette mobile)')
+on conflict (id) do nothing;
+
+insert into public.permissions_poste (entreprise_id, poste_id, cle_permission, autorise)
+select p.entreprise_id, p.id, d.cle, true
+from public.postes p
+join public.permissions_disponibles d on d.cle in (
+  'acces_pointage', 'saisir_son_pointage',
+  'saisir_ses_notes_frais', 'consulter_ses_notes_frais',
+  'voir_chantiers_assignes', 'voir_devis_chantier_sans_prix'
+)
+where p.id = 'a1000000-0000-0000-0000-000000000009'
+on conflict do nothing;
+
+-- L'interrupteur, sans lequel tout le reste ne sert à rien.
+insert into public.utilisateurs_entreprises (utilisateur_id, entreprise_id, poste_id, statut, pointage_personnel_actif) values
+  ('40000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001',
+   'a1000000-0000-0000-0000-000000000009', 'actif', true)
+on conflict (utilisateur_id, entreprise_id) do update set
+  poste_id = excluded.poste_id,
+  statut = excluded.statut,
+  pointage_personnel_actif = excluded.pointage_personnel_actif;
+
+-- Une fiche employé active : le pointage s'y rattache, et sans elle la page s'arrête aussi.
+insert into public.employes (id, entreprise_id, utilisateur_id, prenom, nom, statut) values
+  ('a2000000-0000-0000-0000-000000000007', 'a0000000-0000-0000-0000-000000000001',
+   '40000000-0000-0000-0000-000000000003', 'Ouvrier terrain', 'A', 'actif')
+on conflict (id) do nothing;
+
+-- ── Entreprise active ───────────────────────────────────────────────────────
+--
+-- `utilisateurs_entreprises` dit à QUELLES entreprises un compte appartient ;
+-- `utilisateurs.entreprise_active_id` dit LAQUELLE est ouverte. `contexte_application_courant`
+-- joint les deux, et sans ce pointeur l'application considère le compte comme non rattaché :
+-- elle l'envoie sur « Configurer votre accès » et aucun écran métier ne s'affiche.
+--
+-- Sans cette ligne, les trois comptes ajoutés ici atterrissaient sur l'onboarding. Le test du
+-- « témoin sans habilitation » passait alors pour une MAUVAISE raison : il vérifiait que la
+-- page n'est pas vide, et une page d'onboarding ne l'est pas.
+update public.utilisateurs
+   set entreprise_active_id = 'a0000000-0000-0000-0000-000000000001'
+ where id in (
+   '40000000-0000-0000-0000-000000000001',  -- expert-comptable
+   '40000000-0000-0000-0000-000000000002',  -- témoin sans habilitation
+   '40000000-0000-0000-0000-000000000003'   -- salarié de terrain
+ );
+
+-- ── Affectation à un chantier en cours ──────────────────────────────────────
+--
+-- Sans elle, `chantiers_pointage_disponibles` renvoie une liste VIDE et la page affiche
+-- « Votre compte doit être lié à une fiche employé active et à un chantier ». La RLS de
+-- `chantiers` passe par `peut_consulter_chantier`, qui n'ouvre au salarié que les chantiers
+-- où il figure — c'est le comportement voulu.
+--
+-- Le décor Train V3 rattache bien l'Ouvrier A à un chantier, mais celui-ci est au statut
+-- `facture` : aucun compte du décor ne voit donc de chantier pointable. On vise ici le
+-- chantier `en_cours`, qui est celui sur lequel un salarié pointe réellement.
+insert into public.equipes_chantiers (entreprise_id, chantier_id, employe_id, role_chantier, date_debut) values
+  ('a0000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000002',
+   'a2000000-0000-0000-0000-000000000007', 'ouvrier', current_date)
+on conflict do nothing;

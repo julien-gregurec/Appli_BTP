@@ -31,11 +31,14 @@ import { COMPTES, attendreHydratation, cheminEtatSession } from "./pilote-mobile
 
 const ROLES = [
   { cle: "ouvrierA", email: COMPTES.ouvrierA },
+  { cle: "ouvrierTerrainA", email: COMPTES.ouvrierTerrainA },
   { cle: "chefEquipeA", email: COMPTES.chefEquipeA },
   { cle: "conducteurA", email: COMPTES.conducteurA },
   { cle: "adminA", email: COMPTES.adminA },
   { cle: "expertComptableA", email: COMPTES.expertComptableA },
   { cle: "sansDroitA", email: COMPTES.sansDroitA },
+  // Entreprise B : sert à démontrer qu'une saisie préparée chez A ne part jamais chez B.
+  { cle: "ouvrierB", email: COMPTES.ouvrierB },
 ] as const;
 
 for (const role of ROLES) {

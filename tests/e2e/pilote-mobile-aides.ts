@@ -13,6 +13,15 @@ export const COMPTES = {
   adminA: "admin-a@invalid.local",
   chefEquipeA: "chef-equipe-a@invalid.local",
   ouvrierA: "ouvrier-a@invalid.local",
+  /**
+   * Salarié de terrain dont le POINTAGE PERSONNEL est activé.
+   *
+   * Distinct de `ouvrierA` : aucun compte du décor Train V3 n'a
+   * `pointage_personnel_actif = true`, si bien que la page de pointage y affiche
+   * « Votre administrateur n'a pas activé le pointage personnel pour ce compte » et
+   * n'expose aucun formulaire. Le pointage n'y a donc jamais été éprouvé.
+   */
+  ouvrierTerrainA: "ouvrier-terrain-a@invalid.local",
   conducteurA: "conducteur-a@invalid.local",
   expertComptableA: "expert-comptable-a@invalid.local",
   sansDroitA: "sans-droit-a@invalid.local",
