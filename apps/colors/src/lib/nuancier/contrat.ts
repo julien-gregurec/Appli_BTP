@@ -26,6 +26,7 @@
  *   "source": "Nuancier interne Peintures Martin",
  *   "version": "2026-03",
  *   "licence": "Communiqué par le fournisseur, usage interne autorisé",
+ *   "referentiel": "fabricant",
  *   "references": [{ "code": "PM-1024", "nom": "Bleu atelier", "hex": "#2E5B8A" }]
  * }
  * ```
@@ -34,15 +35,36 @@
  * version ne peut pas être cité dans un export, et un nuancier sans mention de
  * licence ne devrait pas être chargé du tout. Un fichier incomplet est refusé
  * en bloc plutôt que chargé à moitié.
+ *
+ * ### `referentiel` : pourquoi il ne se déduit pas du code
+ *
+ * `referentiel` vaut `"ral"` ou `"fabricant"`. Il est facultatif et vaut
+ * `"fabricant"` par défaut — le défaut prudent.
+ *
+ * On pourrait croire qu'il suffit de regarder la forme du code : `RAL 9010`
+ * ressemble à du RAL, `PM-1024` non. C'est faux, et dangereusement. Rien
+ * n'empêche un nuancier fabricant de nommer une de ses teintes « RAL 9010 »
+ * parce qu'elle s'en approche. La retenir alors dans une colonne nommée
+ * `ral_approxime` présenterait une référence fabricant comme une référence RAL
+ * — exactement ce que le produit s'interdit.
+ *
+ * La nature d'une référence est donc décidée par la PROVENANCE déclarée du
+ * nuancier, et le format du code n'est qu'une condition supplémentaire : une
+ * référence n'est traitée comme du RAL que si le nuancier se déclare `ral` ET
+ * que le code respecte `RAL 0000`. Toute autre combinaison est fabricant.
  */
 
 export type ReferenceNuancier = { code: string; nom: string | null; hex: `#${string}` };
+
+/** Provenance déclarée du nuancier. `fabricant` est le défaut, et le défaut prudent. */
+export type ReferentielNuancier = "ral" | "fabricant";
 
 export type NuancierCharge = {
   disponible: true;
   source: string;
   version: string;
   licence: string;
+  referentiel: ReferentielNuancier;
   references: ReferenceNuancier[];
 };
 
@@ -89,6 +111,9 @@ export function analyserNuancier(contenu: unknown): EtatNuancier {
   const source = texteNonVide(brut.source);
   const version = texteNonVide(brut.version);
   const licence = texteNonVide(brut.licence);
+  // Toute valeur autre que « ral » vaut « fabricant » : une faute de frappe ne
+  // doit pas transformer un nuancier fabricant en référentiel normatif.
+  const referentiel: ReferentielNuancier = texteNonVide(brut.referentiel) === "ral" ? "ral" : "fabricant";
   if (!source || !version || !licence || !Array.isArray(brut.references)) {
     return { disponible: false, raison: "format_invalide" };
   }
@@ -107,5 +132,5 @@ export function analyserNuancier(contenu: unknown): EtatNuancier {
   }
 
   if (references.length === 0) return { disponible: false, raison: "vide" };
-  return { disponible: true, source, version, licence, references };
+  return { disponible: true, source, version, licence, referentiel, references };
 }
