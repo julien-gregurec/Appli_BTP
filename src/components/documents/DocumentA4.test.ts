@@ -69,7 +69,7 @@ describe("27–29. aperçu A4 : un seul rendu, les mêmes pages que le paginateu
 describe("30–33. filigranes rendus", () => {
   it("30. logo : image dans le calque de filigrane", () => {
     const html = rendre(avecFiligrane({ type: "logo" }, "https://exemple.invalid/logo.png"));
-    expect(html).toMatch(/data-testid="filigrane"[^>]*>.*<img src="https:\/\/exemple\.invalid\/logo\.png"/s);
+    expect(html).toMatch(/data-testid="filigrane"[^>]*>[\s\S]*<img src="https:\/\/exemple\.invalid\/logo\.png"/);
   });
   it("30. logo absent : aucun calque plutôt qu'un cadre vide", () => {
     expect(rendre(avecFiligrane({ type: "logo" }, null))).not.toContain('data-testid="filigrane"');
@@ -82,7 +82,7 @@ describe("30–33. filigranes rendus", () => {
   });
   it("32. combiné : logo et texte dans le même motif", () => {
     const html = rendre(avecFiligrane({ type: "logo_texte", preset: "A_VALIDER" }, "https://exemple.invalid/logo.png"));
-    expect(html).toMatch(/doc-a4__motif[^>]*>.*<img[^>]*>.*À VALIDER/s);
+    expect(html).toMatch(/doc-a4__motif[^>]*>[\s\S]*<img[^>]*>[\s\S]*À VALIDER/);
   });
   it("33. sous le contenu, sans fond, à opacité bornée : ne masque jamais un montant", () => {
     const html = rendre(avecFiligrane({ type: "texte", preset: "PAYEE", opacite: 1 }));
@@ -90,7 +90,7 @@ describe("30–33. filigranes rendus", () => {
     expect(html).toMatch(/\.doc-a4__contenu\{position:relative;z-index:1;/);
     const opacite = Number(/data-testid="filigrane" style="opacity:([\d.]+)"/.exec(html)?.[1]);
     expect(opacite).toBeLessThanOrEqual(0.15);
-    const calque = /<div class="doc-a4__filigrane".*?<\/div><\/div>/s.exec(html)![0];
+    const calque = /<div class="doc-a4__filigrane"[\s\S]*?<\/div><\/div>/.exec(html)![0];
     expect(calque).not.toMatch(/€/);
   });
   it("première page seulement, ou toutes les pages", () => {
