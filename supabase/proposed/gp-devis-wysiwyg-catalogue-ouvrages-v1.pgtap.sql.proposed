@@ -47,17 +47,21 @@ insert into public.prestations_catalogue (
 ) values
   ('e1000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'PGTAP Plaque BA13', 'fourniture', 'm²', 20, 20,
    'BA13-200', 'PLACO-4521', null, 'Fabricant fictif', 'ab000000-0000-0000-0000-000000000001'),
+  -- GP V1 (références internes uniques, décision du 2026-09-11) : la référence INTERNE « ba13 200 »
+  -- serait refusée comme doublon de « BA13-200 ». Le doublon toléré et signalé porte désormais sur la
+  -- référence FABRICANT (« placo 4521 » = « PLACO-4521 »), qui reste non unique.
   ('e1000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', 'PGTAP Plaque BA13 hydro', 'fourniture', 'm²', 24, 20,
-   'ba13 200', null, '3760123456789', null, null),
+   'BA13-200-H', 'placo 4521', '3760123456789', null, null),
   ('e1000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', 'PGTAP Rail 48', 'fourniture', 'ml', 3, 20,
    'RAIL-48', 'BA13-200', null, null, null);
 
 select is(
-  (select count(*)::int from public.doublons_references_catalogue('a0000000-0000-0000-0000-000000000001') where champ = 'reference_interne'),
-  1, 'deux prestations de même référence interne sont signalées ensemble');
+  (select count(*)::int from public.doublons_references_catalogue('a0000000-0000-0000-0000-000000000001')
+    where source = 'prestation' and champ = 'reference_fabricant'),
+  1, 'deux prestations de même référence fabricant sont signalées ensemble');
 select is(
-  (select count(*)::int from public.prestations_catalogue where public.normaliser_reference(reference_interne) = 'ba13200'),
-  2, 'les deux prestations de même référence restent deux lignes : aucune fusion');
+  (select count(*)::int from public.prestations_catalogue where public.normaliser_reference(reference_fabricant) = 'placo4521'),
+  2, 'les deux prestations de même référence fabricant restent deux lignes : aucune fusion');
 
 set local role authenticated;
 select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
@@ -89,15 +93,18 @@ select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
 select is((select rang from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'BA13-200') where id = 'e1000000-0000-0000-0000-000000000001'),
   1, 'recherche : référence interne exacte au rang 1');
 select is((select rang from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'BA13-200') where id = 'e1000000-0000-0000-0000-000000000002'),
-  1, 'recherche : l''autre article de même référence remonte aussi, au même rang');
+  3, 'recherche : la variante BA13-200-H remonte au rang 3 (début de référence interne)');
 select is((select rang from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'BA13-200') where id = 'e1000000-0000-0000-0000-000000000003'),
   2, 'recherche : référence fabricant exacte au rang 2');
 select is((select rang from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', '3760123456789') where id = 'e1000000-0000-0000-0000-000000000002'),
   5, 'recherche : code-barres exact au rang 5');
 select ok((select prix_achat_ht is null from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'BA13-200') where id = 'e1000000-0000-0000-0000-000000000001'),
   'recherche : aucun prix d''achat renvoyé sans voir_couts_devis');
+-- GP V1 (décision du 2026-09-11, rapport lot A § 4.3) : à la création, la référence interne d'un article
+-- du stock reprend son code article quand aucune autre fiche ne le porte ; l'origine est donc
+-- « reference_interne ». Un code en doublon normalisé reste présenté comme « reference_stock ».
 select is((select origine_reference_interne from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'TEST_A_STK_001') where id = 'ad000000-0000-0000-0000-000000000001'),
-  'reference_stock', 'recherche : le code article du stock est présenté comme tel, jamais recopié');
+  'reference_interne', 'recherche : le code article du stock devient la référence interne quand il est libre');
 
 select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
 select is((select prix_achat_ht from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'BA13-200') where id = 'e1000000-0000-0000-0000-000000000001'),

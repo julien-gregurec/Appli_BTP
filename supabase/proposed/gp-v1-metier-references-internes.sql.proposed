@@ -646,6 +646,22 @@ begin
     p_index, p_table, p_colonne, p_colonne, p_colonne);
 end $$;
 
+-- Une référence faite seulement de séparateurs (« -- », « . ») a une forme normalisée VIDE : deux
+-- d'entre elles se heurteraient sans message compréhensible. Refusée à la saisie ; NOT VALID : les
+-- lignes existantes ne sont pas revérifiées (aucune donnée historique n'est rejetée).
+select pg_temp.ajouter_contrainte('public.clients', 'clients_reference_interne_signifiante_check',
+  'check (reference_interne is null or public.normaliser_reference(reference_interne) <> '''') not valid');
+select pg_temp.ajouter_contrainte('public.chantiers', 'chantiers_reference_interne_signifiante_check',
+  'check (reference_interne is null or public.normaliser_reference(reference_interne) <> '''') not valid');
+select pg_temp.ajouter_contrainte('public.fournisseurs', 'fournisseurs_reference_signifiante_check',
+  'check (public.normaliser_reference(reference) <> '''') not valid');
+select pg_temp.ajouter_contrainte('public.prestations_catalogue', 'prestations_catalogue_reference_interne_signifiante_check',
+  'check (reference_interne is null or public.normaliser_reference(reference_interne) <> '''') not valid');
+select pg_temp.ajouter_contrainte('public.articles_stock', 'articles_stock_reference_interne_signifiante_check',
+  'check (reference_interne is null or public.normaliser_reference(reference_interne) <> '''') not valid');
+select pg_temp.ajouter_contrainte('public.ouvrages', 'ouvrages_reference_interne_signifiante_check',
+  'check (reference_interne is null or public.normaliser_reference(reference_interne) <> '''') not valid');
+
 select pg_temp.creer_unicite_reference('public.clients', 'reference_interne', 'clients_reference_interne_norm_uniq');
 select pg_temp.creer_unicite_reference('public.chantiers', 'reference_interne', 'chantiers_reference_interne_norm_uniq');
 select pg_temp.creer_unicite_reference('public.fournisseurs', 'reference', 'fournisseurs_reference_norm_uniq');
