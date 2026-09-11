@@ -1,0 +1,244 @@
+-- ELSATIA-DOCUMENT-PARTAGE-ACL-V1 — test pgTAP PROPOSÉ, NON NUMÉROTÉ
+--
+-- À placer dans supabase/tests/document_partage_public_par_jeton_v1.test.sql en
+-- même temps que la migration numérotée issue de
+-- document-partage-public-par-jeton-v1.sql.proposed (le \ir ci-dessous suppose
+-- ce placement). Rejoue la lecture d'un devis / d'une facture par jeton comme
+-- la page /document/[token] : rôle anon, aucune session, aucun privilège de
+-- table — et vérifie qu'aucune table n'a été regrantée à service_role.
+begin;
+create extension if not exists pgtap with schema extensions;
+select plan(39);
+
+\ir fixtures/isolation_multitenant.inc
+
+\set devis_a 'public.document_commercial_public_par_token(''jeton-partage-devis-a-valide-00000000000000000'')'
+\set devis_b 'public.document_commercial_public_par_token(''jeton-partage-devis-b-valide-00000000000000000'')'
+\set facture_a 'public.document_commercial_public_par_token(''jeton-partage-facture-a-000000000000000000000'')'
+\set cles_entete 'array[''nom'',''raison_sociale'',''siret'',''adresse'',''code_postal'',''ville'',''logo_url'',''assurance_decennale_numero'',''assurance_decennale_assureur'',''assurance_rc_pro_numero'',''taux_penalites_retard'',''texte_entete'',''texte_pied_page'',''police_documents'',''taille_police_documents'',''logo_largeur_documents'',''couleur_documents'',''couleur_secondaire_documents'',''mise_en_page_documents'',''position_logo_documents'',''afficher_logo_documents'',''afficher_descriptions_documents'',''afficher_tva_lignes_documents'']'
+\set cles_client 'array[''nom_affiche'',''nom'',''prenom'',''societe'',''adresse_facturation'',''code_postal'',''ville'',''siret'',''identite_incertaine'']'
+
+-- ---------------------------------------------------------------------------
+-- 1-10. Surface : SECURITY DEFINER, search_path figé, droits minimaux, et
+-- aucune table rouverte à service_role ni à anon.
+-- ---------------------------------------------------------------------------
+select has_function(
+  'public', 'document_commercial_public_par_token', array['text'],
+  'la fonction de lecture publique par jeton existe'
+);
+select ok(
+  (select prosecdef from pg_proc where oid = 'public.document_commercial_public_par_token(text)'::regprocedure),
+  'elle est SECURITY DEFINER'
+);
+select ok(
+  (select proconfig from pg_proc where oid = 'public.document_commercial_public_par_token(text)'::regprocedure)
+    @> array['search_path=""'],
+  'son search_path est figé à vide'
+);
+select ok(
+  has_function_privilege('anon', 'public.document_commercial_public_par_token(text)', 'EXECUTE'),
+  'anon peut l''exécuter (client destinataire sans compte)'
+);
+select ok(
+  has_function_privilege('authenticated', 'public.document_commercial_public_par_token(text)', 'EXECUTE'),
+  'authenticated peut l''exécuter (visiteur connecté qui ouvre un lien)'
+);
+select ok(
+  (select p.proacl is not null
+          and not exists (select 1 from aclexplode(p.proacl) a
+                          where a.grantee = 0 and a.privilege_type = 'EXECUTE')
+   from pg_proc p where p.oid = 'public.document_commercial_public_par_token(text)'::regprocedure),
+  'PUBLIC ne l''exécute pas'
+);
+select ok(
+  not has_function_privilege('service_role', 'public.document_commercial_public_par_token(text)', 'EXECUTE'),
+  'service_role n''en a pas besoin et ne l''exécute pas'
+);
+select ok(
+  not has_table_privilege('service_role', 'public.devis', 'SELECT')
+  and not has_table_privilege('service_role', 'public.factures', 'SELECT')
+  and not has_table_privilege('service_role', 'public.lignes_devis', 'SELECT')
+  and not has_table_privilege('service_role', 'public.lignes_factures', 'SELECT')
+  and not has_table_privilege('service_role', 'public.clients', 'SELECT'),
+  '20260902000255 intacte : aucune table documentaire n''est regrantée à service_role'
+);
+select ok(
+  not has_table_privilege('anon', 'public.devis', 'SELECT')
+  and not has_table_privilege('anon', 'public.factures', 'SELECT')
+  and not has_table_privilege('anon', 'public.acces_externes_documents', 'SELECT'),
+  'anon n''obtient aucun accès direct aux tables'
+);
+select is(
+  encode(sha256(convert_to('abc', 'UTF8')), 'hex'),
+  'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+  'empreinte SHA-256 hexadécimale identique à hacherTokenPartage() (vecteur « abc »)'
+);
+
+-- ---------------------------------------------------------------------------
+-- Décor : un devis et une facture de A, un devis de B, et six jetons.
+-- ---------------------------------------------------------------------------
+update public.clients
+set email = 'client-a-prive@invalid.local',
+    telephone = '0399999999',
+    adresse_facturation = '1 rue du Client',
+    code_postal = '67000',
+    ville = 'Strasbourg'
+where id = 'a3000000-0000-0000-0000-000000000001';
+
+insert into public.devis (
+  id, entreprise_id, numero, client_id, statut, date_validite,
+  notes_client, notes_internes, montant_ht, montant_tva, montant_ttc
+) values
+  ('d7000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
+   'PART-DEV-001', 'a3000000-0000-0000-0000-000000000001', 'brouillon', current_date + 30,
+   'Merci de votre confiance', 'NOTE_INTERNE_SECRETE_A', 100, 20, 120),
+  ('d7000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000001',
+   'PART-DEV-B01', 'b3000000-0000-0000-0000-000000000001', 'brouillon', null,
+   null, 'NOTE_INTERNE_SECRETE_B', 50, 10, 60);
+
+insert into public.lignes_devis (devis_id, designation, quantite, unite, prix_unitaire_ht, taux_tva, ordre) values
+  ('d7000000-0000-0000-0000-000000000001', 'Ligne deux', 1, 'u', 40, 20, 2),
+  ('d7000000-0000-0000-0000-000000000001', 'Ligne une', 2, 'm2', 30, 20, 1),
+  ('d7000000-0000-0000-0000-000000000002', 'LIGNE_ENTREPRISE_B', 1, 'u', 50, 20, 1);
+
+insert into public.pieces_jointes_devis (
+  id, entreprise_id, devis_id, storage_path, nom_original, mime_type, type_media, taille_octets
+) values
+  ('e7000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
+   'd7000000-0000-0000-0000-000000000001',
+   'a0000000-0000-0000-0000-000000000001/d7000000-0000-0000-0000-000000000001/photo.jpg',
+   'photo-chantier-a.jpg', 'image/jpeg', 'image', 1000),
+  ('e7000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000001',
+   'd7000000-0000-0000-0000-000000000002',
+   'b0000000-0000-0000-0000-000000000001/d7000000-0000-0000-0000-000000000002/photo.jpg',
+   'PHOTO_ENTREPRISE_B.jpg', 'image/jpeg', 'image', 1000);
+
+insert into public.factures (
+  id, entreprise_id, numero, client_id, type, statut,
+  montant_ht, montant_tva, montant_ttc, notes_internes
+) values (
+  'f7000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
+  'PART-FAC-001', 'a3000000-0000-0000-0000-000000000001', 'simple', 'brouillon',
+  100, 20, 120, 'NOTE_FACTURE_SECRETE_A'
+);
+insert into public.lignes_factures (facture_id, designation, quantite, unite, prix_unitaire_ht, taux_tva, ordre) values
+  ('f7000000-0000-0000-0000-000000000001', 'Ligne facturée', 1, 'u', 100, 20, 1);
+
+-- Seule l'empreinte est stockée, comme obtenirNouveauTokenPartage().
+insert into public.acces_externes_documents (
+  entreprise_id, type_document, document_id, token_hash, expire_le, revoque_le
+) values
+  ('a0000000-0000-0000-0000-000000000001', 'devis', 'd7000000-0000-0000-0000-000000000001',
+   encode(sha256(convert_to('jeton-partage-devis-a-valide-00000000000000000', 'UTF8')), 'hex'),
+   now() + interval '60 days', null),
+  ('a0000000-0000-0000-0000-000000000001', 'devis', 'd7000000-0000-0000-0000-000000000001',
+   encode(sha256(convert_to('jeton-partage-devis-a-revoque-0000000000000000', 'UTF8')), 'hex'),
+   now() + interval '60 days', now() - interval '1 minute'),
+  ('a0000000-0000-0000-0000-000000000001', 'devis', 'd7000000-0000-0000-0000-000000000001',
+   encode(sha256(convert_to('jeton-partage-devis-a-expire-00000000000000000', 'UTF8')), 'hex'),
+   now() - interval '1 minute', null),
+  -- Ligne incohérente : jeton émis par A mais pointant un devis de B.
+  ('a0000000-0000-0000-0000-000000000001', 'devis', 'd7000000-0000-0000-0000-000000000002',
+   encode(sha256(convert_to('jeton-partage-croise-a-vers-b-0000000000000000', 'UTF8')), 'hex'),
+   now() + interval '60 days', null),
+  ('a0000000-0000-0000-0000-000000000001', 'facture', 'f7000000-0000-0000-0000-000000000001',
+   encode(sha256(convert_to('jeton-partage-facture-a-000000000000000000000', 'UTF8')), 'hex'),
+   now() + interval '60 days', null),
+  ('b0000000-0000-0000-0000-000000000001', 'devis', 'd7000000-0000-0000-0000-000000000002',
+   encode(sha256(convert_to('jeton-partage-devis-b-valide-00000000000000000', 'UTF8')), 'hex'),
+   now() + interval '60 days', null);
+
+-- ---------------------------------------------------------------------------
+-- 11-22. anon, jeton valide du devis brouillon de A : ce document, rien d'autre.
+-- ---------------------------------------------------------------------------
+set local role anon;
+select set_config('request.jwt.claim.sub', '', true);
+
+select is((:devis_a) ->> 'type_document', 'devis', 'anon : le jeton valide ouvre un devis');
+select is((:devis_a) -> 'document' ->> 'numero', 'PART-DEV-001', 'c''est le devis visé par le jeton');
+select is(jsonb_array_length((:devis_a) -> 'lignes'), 2, 'ses deux lignes sont renvoyées');
+select is((:devis_a) -> 'lignes' -> 0 ->> 'designation', 'Ligne une', 'les lignes suivent l''ordre du devis');
+select is((:devis_a) -> 'entreprise' ->> 'nom', 'Entreprise Isolation A', 'l''en-tête est celui de l''entreprise émettrice');
+select is((:devis_a) -> 'client' ->> 'nom', 'TEST_A_Client secret', 'brouillon : l''identité vient de la fiche client');
+select is(jsonb_array_length((:devis_a) -> 'photos'), 1, 'seule la photo de ce devis est renvoyée');
+select ok(
+  (select bool_and(k = any (:cles_entete)) from jsonb_object_keys((:devis_a) -> 'entreprise') k),
+  'entreprise : uniquement les colonnes d''en-tête imprimées'
+);
+select ok(position('ISOA0001' in (:devis_a)::text) = 0, 'le code d''adhésion de l''entreprise ne sort pas');
+select ok(
+  not ((:devis_a) -> 'document') ? 'notes_internes'
+  and position('NOTE_INTERNE_SECRETE_A' in (:devis_a)::text) = 0,
+  'les notes internes ne sortent pas'
+);
+select ok(
+  position('client-a-prive@invalid.local' in (:devis_a)::text) = 0
+  and position('0399999999' in (:devis_a)::text) = 0,
+  'ni l''e-mail ni le téléphone du client ne sortent'
+);
+select ok(
+  position('LIGNE_ENTREPRISE_B' in (:devis_a)::text) = 0
+  and position('PHOTO_ENTREPRISE_B' in (:devis_a)::text) = 0
+  and position('NOTE_INTERNE_SECRETE_B' in (:devis_a)::text) = 0,
+  'rien de l''entreprise B'
+);
+
+-- ---------------------------------------------------------------------------
+-- 23-29. Tout jeton non valable renvoie NULL, sans distinction.
+-- ---------------------------------------------------------------------------
+select ok(public.document_commercial_public_par_token('jeton-partage-devis-a-revoque-0000000000000000') is null,
+  'jeton révoqué : rien');
+select ok(public.document_commercial_public_par_token('jeton-partage-devis-a-expire-00000000000000000') is null,
+  'jeton expiré : rien');
+select ok(public.document_commercial_public_par_token('jeton-partage-croise-a-vers-b-0000000000000000') is null,
+  'jeton de A pointant un devis de B : rien');
+select ok(public.document_commercial_public_par_token('jeton-partage-inconnu-000000000000000000000000') is null,
+  'jeton inconnu : rien');
+select ok(
+  public.document_commercial_public_par_token(
+    encode(sha256(convert_to('jeton-partage-devis-a-valide-00000000000000000', 'UTF8')), 'hex')
+  ) is null,
+  'l''empreinte stockée ne vaut pas jeton'
+);
+select ok(public.document_commercial_public_par_token(null) is null, 'jeton absent : rien');
+select ok(public.document_commercial_public_par_token(repeat('a', 200)) is null, 'jeton démesuré : rien');
+
+-- ---------------------------------------------------------------------------
+-- 30-34. Devis de B, facture de A.
+-- ---------------------------------------------------------------------------
+select is((:devis_b) -> 'document' ->> 'numero', 'PART-DEV-B01', 'le jeton de B ouvre le devis de B');
+select is((:facture_a) ->> 'type_document', 'facture', 'le jeton de facture ouvre une facture');
+select is((:facture_a) -> 'document' ->> 'type', 'simple', 'le type de facture est renvoyé (libellé imprimé)');
+select is(jsonb_array_length((:facture_a) -> 'lignes'), 1, 'la ligne de la facture est renvoyée');
+select ok(position('NOTE_FACTURE_SECRETE_A' in (:facture_a)::text) = 0, 'facture : les notes internes ne sortent pas');
+
+-- ---------------------------------------------------------------------------
+-- 35. Visiteur connecté (membre de B) : le jeton fait foi, sans rien élargir.
+-- ---------------------------------------------------------------------------
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000001', true);
+select is((:devis_a) -> 'document' ->> 'numero', 'PART-DEV-001',
+  'authenticated : même document, ni plus ni moins');
+
+-- ---------------------------------------------------------------------------
+-- 36-39. Après émission : identité figée, fiche courante plus lue, snapshot
+-- réduit aux clés de l'en-tête (l'e-mail figé ne sort pas).
+-- ---------------------------------------------------------------------------
+reset role;
+update public.devis set statut = 'envoye' where id = 'd7000000-0000-0000-0000-000000000001';
+update public.clients set nom = 'NOM_APRES_EMISSION' where id = 'a3000000-0000-0000-0000-000000000001';
+
+set local role anon;
+select set_config('request.jwt.claim.sub', '', true);
+select ok(jsonb_typeof((:devis_a) -> 'client') = 'null', 'document émis : la fiche client courante n''est plus lue');
+select ok(
+  (select bool_and(k = any (:cles_client)) from jsonb_object_keys((:devis_a) -> 'document' -> 'client_snapshot') k),
+  'snapshot destinataire réduit aux clés de l''en-tête'
+);
+select ok(position('NOM_APRES_EMISSION' in (:devis_a)::text) = 0, 'l''identité reste celle figée à l''émission');
+select ok(position('client-a-prive@invalid.local' in (:devis_a)::text) = 0, 'l''e-mail figé dans le snapshot ne sort pas');
+
+reset role;
+select * from finish();
+rollback;
