@@ -91,6 +91,10 @@ describe("5. tolérance de saisie", () => {
     const [trouve] = rechercherArticles([plaque], "ba13200", A);
     expect(trouve.referenceInterne).toBe("BA13-200");
   });
+  it("traite les ligatures comme la base : « Cœur » = « coeur », « Æ » = « ae »", () => {
+    expect(normaliser("Bloc-Cœur 12")).toBe("bloccoeur12");
+    expect(normaliser("ÆRO.5")).toBe("aero5");
+  });
   it("normalise sans jamais confondre deux références distinctes", () => {
     expect(normaliser("BA13-200")).not.toBe(normaliser("BA13-201"));
   });

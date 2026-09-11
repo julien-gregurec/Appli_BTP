@@ -52,7 +52,10 @@ export type ArticleCatalogue = {
  */
 export function normaliser(valeur: string | null | undefined): string {
   if (!valeur) return "";
+  // Ligatures d'abord : NFD ne décompose ni « œ » ni « æ ». Même règle que la fonction SQL
+  // `normaliser_reference`, pour que l'écran et la base classent à l'identique.
   return valeur
+    .replace(/œ/g, "oe").replace(/Œ/g, "OE").replace(/æ/g, "ae").replace(/Æ/g, "AE")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
