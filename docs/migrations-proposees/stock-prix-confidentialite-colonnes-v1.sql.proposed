@@ -1,0 +1,161 @@
+-- ELSATIA-STOCK-PRIX-CONFIDENTIALITE-COLONNES-V1
+--
+-- ⚠️  CE FICHIER N'EST PAS UNE MIGRATION CANONIQUE.
+--     Extension `.sql.proposed` : il n'est ni exécuté par `supabase db reset`, ni vu
+--     par `scripts/verify-migrations.mjs`, et AUCUN numéro de ledger n'est réservé.
+--     Numéro fonctionnel maximal connu : 281 (`integration/colors-pilot-readiness-v1`,
+--     non fusionnée). Le numéro sera attribué à l'intégration, depuis le train
+--     canonique du moment, jamais depuis cette branche.
+--
+-- Base de référence : `integration/elsatia-ecosystem-train-v3-commercial-platform-v1`
+-- @ 52d3282 (278 fichiers, dernier préfixe 20260909000280). La pointe 59e960a
+-- n'ajoute que de la documentation : ledger identique.
+--
+-- ─── Défaut corrigé (confidentialité des prix d'achat, fuite PROUVÉE sur base jetable) ───
+--
+--   * 00108 (l. 209-213) retire le SELECT table-entière à `authenticated` et n'accorde
+--     plus que 14 colonnes, sans `prix_achat_ht` ni `prix_vente_ht`. La lecture des
+--     prix passe par `articles_stock_avec_prix` (voir_prix_stock / gerer_prix_stock).
+--   * 00189 (l. 10-12) réexécute `grant select on table public.articles_stock to
+--     authenticated`. Un privilège TABLE couvre toutes les colonnes : la restriction
+--     00108 est annulée (les grants colonne subsistent, mais ne restreignent plus rien).
+--   * Aucune migration postérieure ne la rétablit ; 00255 ne révoque que service_role.
+--     La seule politique RLS de lecture est `est_membre_actif(entreprise_id)`.
+--   * Conséquence : tout membre actif lit prix_achat_ht et prix_vente_ht par PostgREST
+--     (`select=*`, colonnes explicites, embed depuis mouvements_stock), alors que la
+--     voie officielle `articles_stock_avec_prix` lui répond « Accès aux prix du stock
+--     refusé ». 00189 est antérieure à la baseline Production (210 lignes) : la fuite
+--     y est probable, mais n'a PAS été mesurée sur la base vivante.
+--
+-- ─── Pourquoi 00189 avait élargi ───
+--
+--   /rentabilite (commit 91cac98, 2026-07-26, entre 00108 et 00189) lit
+--   `mouvements_stock?select=…,article:articles_stock(prix_achat_ht)`. Sous 00108 cet
+--   embed échoue en 42501 pour TOUS les postes, même habilités, puisque le privilège
+--   colonne est porté par le rôle `authenticated` et non par la permission métier.
+--   Restreindre de nouveau la colonne sans voie contrôlée recasserait la rentabilité :
+--   ce fichier ajoute donc `couts_stock_par_chantier`, calquée sur
+--   `couts_indemnites_paie_par_chantier` (00147) : agrégat par chantier, jamais de prix
+--   unitaire, réservé aux membres actifs qui ont `acces_rentabilite`.
+--
+-- ─── Ce que ce fichier FAIT ───
+--
+--   1. vérifie que la table porte exactement les 16 colonnes classées ci-dessous et
+--      échoue sinon : une colonne ajoutée d'ici l'intégration doit être déclarée
+--      publique ou confidentielle avant application, jamais exposée par défaut ;
+--   2. REVOKE SELECT au niveau table (ce qui retire aussi les grants colonne existants),
+--      puis GRANT SELECT sur les 14 colonnes non tarifaires, liste 00108 inchangée ;
+--   3. crée `couts_stock_par_chantier(p_entreprise_id, p_chantier_id default null)` ;
+--   4. recharge le cache de schéma PostgREST.
+--
+-- ─── Ce que ce fichier NE FAIT PAS ───
+--
+--   * il ne touche pas INSERT / UPDATE / DELETE : l'écriture des prix reste gardée par
+--     le trigger `verifier_droit_prix_stock` (00108) ;
+--   * il ne modifie ni `articles_stock_avec_prix` ni `lignes_inventaire_avec_prix` ;
+--   * il n'accorde rien à `anon` ni à `service_role` (00189 / 00255 inchangées).
+--
+-- ─── DÉPENDANCES APPLICATIVES — même déploiement, dans cet ordre : SQL puis code ───
+--
+--   D1. Rentabilité. Sans modification, /rentabilite et l'analyse IA ne plantent PAS :
+--       supabase-js renvoie `data: null`, le code fait `?? []`, et le coût stock tombe
+--       SILENCIEUSEMENT à 0 (marge surévaluée). Remplacer
+--         * src/app/(app)/rentabilite/page.tsx:24
+--         * src/app/actions/rentabilite.ts:28
+--       `from("mouvements_stock").select("…, article:articles_stock(prix_achat_ht)")` par
+--       `rpc("couts_stock_par_chantier", { p_entreprise_id, p_chantier_id })`, qui renvoie
+--       `{ chantier_id, total }` comme `couts_indemnites_paie_par_chantier`.
+--       L'analyse IA est gardée par `aAccesIA`, la RPC par `acces_rentabilite` : un poste
+--       IA sans acces_rentabilite obtiendrait un coût stock vide (à trancher).
+--
+--   D2. Import générique « Stock et codes-barres » (src/app/actions/import.ts:261).
+--       L'upsert PostgREST produit `ON CONFLICT … DO UPDATE SET prix_achat_ht =
+--       EXCLUDED.prix_achat_ht`, et PostgreSQL exige alors le SELECT sur la colonne
+--       cible. Mesuré après correctif : HTTP 403 / 42501 (pgTAP n° 33). Voie existante :
+--       `rpc("importer_articles_stock", { p_type: "catalogue" | "inventaire", p_lignes })`
+--       (security definer, exige gerer_stock, prix toujours gardés par le trigger 00108 ;
+--       pgTAP n° 34). Écarts à trancher : elle ne porte PAS `prix_vente_ht`, et en type
+--       « inventaire » la quantité passe par des mouvements d'ajustement au lieu d'être
+--       écrasée.
+--
+--   D3. Supprimer `src/app/(app)/stock/page 2.tsx` : copie Finder non routée depuis
+--       988fc70, importée nulle part, dont le `select("*")` échouerait en 42501.
+--
+--   Toute écriture applicative sur articles_stock doit rester en `return=minimal` : un
+--   `.insert(…).select("*")` ou un RETURNING d'un prix échoue en 42501 (pgTAP n° 35).
+
+-- 1. Garde : aucune colonne non classée ────────────────────────────────────────
+do $$
+declare
+  v_publiques constant text[] := array[
+    'id', 'entreprise_id', 'reference', 'designation', 'unite', 'quantite_stock',
+    'seuil_alerte', 'emplacement', 'actif', 'created_at', 'updated_at', 'marque',
+    'code_barres', 'zone_id'
+  ];
+  v_confidentielles constant text[] := array['prix_achat_ht', 'prix_vente_ht'];
+  v_inconnues text;
+  v_absentes text;
+begin
+  select string_agg(a.attname::text, ', ' order by a.attnum)
+    into v_inconnues
+  from pg_attribute a
+  where a.attrelid = 'public.articles_stock'::regclass
+    and a.attnum > 0 and not a.attisdropped
+    and a.attname::text <> all (v_publiques || v_confidentielles);
+
+  if v_inconnues is not null then
+    raise exception 'articles_stock porte des colonnes non classées (%) : les déclarer publiques ou confidentielles dans ce correctif avant de l''appliquer', v_inconnues;
+  end if;
+
+  select string_agg(c, ', ')
+    into v_absentes
+  from unnest(v_publiques || v_confidentielles) as c
+  where not exists (
+    select 1 from pg_attribute a
+    where a.attrelid = 'public.articles_stock'::regclass
+      and a.attname = c and a.attnum > 0 and not a.attisdropped
+  );
+
+  if v_absentes is not null then
+    raise exception 'articles_stock ne porte plus les colonnes attendues (%) : revoir ce correctif', v_absentes;
+  end if;
+end;
+$$;
+
+-- 2. Lecture restreinte aux colonnes non tarifaires ─────────────────────────────
+-- Le REVOKE niveau table retire aussi les privilèges colonne : l'état final ne dépend
+-- donc pas de l'historique (Fresh, Production 210, ou base déjà corrigée).
+revoke select on table public.articles_stock from authenticated;
+
+grant select (
+  id, entreprise_id, reference, designation, unite, quantite_stock, seuil_alerte,
+  emplacement, actif, created_at, updated_at, marque, code_barres, zone_id
+) on table public.articles_stock to authenticated;
+
+-- 3. Coût des sorties de stock par chantier, sans prix unitaire ────────────────
+-- Même calcul que l'écran actuel : quantité sortie × prix d'achat COURANT de l'article.
+create or replace function public.couts_stock_par_chantier(
+  p_entreprise_id uuid,
+  p_chantier_id uuid default null
+)
+returns table(chantier_id uuid, total numeric)
+language sql security definer stable set search_path = public as $$
+  select m.chantier_id, sum(m.quantite * a.prix_achat_ht)::numeric
+  from public.mouvements_stock m
+  join public.articles_stock a
+    on a.id = m.article_id
+   and a.entreprise_id = m.entreprise_id
+  where m.entreprise_id = p_entreprise_id
+    and m.type = 'sortie'
+    and m.chantier_id is not null
+    and (p_chantier_id is null or m.chantier_id = p_chantier_id)
+    and public.est_membre_actif(p_entreprise_id)
+    and public.a_permission(p_entreprise_id, 'acces_rentabilite')
+  group by m.chantier_id;
+$$;
+
+revoke all on function public.couts_stock_par_chantier(uuid, uuid) from public, anon;
+grant execute on function public.couts_stock_par_chantier(uuid, uuid) to authenticated;
+
+-- 4. PostgREST ─────────────────────────────────────────────────────────────────
+notify pgrst, 'reload schema';
