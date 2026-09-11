@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { resoudreTokenPartage } from "@/lib/documents-partage";
 import { chargerDonneesDevisImprimable, chargerDonneesFactureImprimable } from "@/lib/documents-commerciaux";
 import { DocumentImprimable } from "@/components/DocumentImprimable";
+import { DocumentA4 } from "@/components/documents/DocumentA4";
+import { chargerRenduParJeton, vueDepuisReponse } from "@/lib/devis/v2-serveur";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -17,6 +19,14 @@ export const metadata = { robots: { index: false, follow: false } };
 export default async function ImprimerPartagePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const supabaseAnon = await createClient();
+
+  // Moteur v2 : le document CLIENT figé (ou le brouillon v2) est rendu par une fonction résolue par
+  // le jeton lui-même, sans service_role.
+  const reponse = await chargerRenduParJeton(supabaseAnon, token);
+  if (!reponse) notFound();
+  const vue = vueDepuisReponse(reponse);
+  if (vue) return <DocumentA4 vue={vue} mode="impression" />;
+
   const resolution = await resoudreTokenPartage(supabaseAnon, token);
   if (!resolution) notFound();
 

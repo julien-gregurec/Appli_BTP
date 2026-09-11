@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 import { genererPdfDepuisUrl, nomFichierPdf } from "@/lib/pdf/generer";
+import { chargerRenduParJeton, estDebordementMiseEnPage, moteurDeReponse } from "@/lib/devis/v2-serveur";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -19,8 +21,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
 
   let pdf: Buffer;
   try {
-    pdf = await genererPdfDepuisUrl(url.toString());
-  } catch {
+    // Le moteur est lu par le jeton lui-même (fonction publique, sans service_role).
+    const moteur = moteurDeReponse(await chargerRenduParJeton(await createClient(), token));
+    pdf = moteur === 2
+      ? await genererPdfDepuisUrl(url.toString(), null, { moteur: 2 })
+      : await genererPdfDepuisUrl(url.toString());
+  } catch (e) {
+    if (estDebordementMiseEnPage(e)) return NextResponse.json({ error: e.message }, { status: 422 });
     return NextResponse.json({ error: "Lien invalide, expiré, ou document introuvable" }, { status: 404 });
   }
 

@@ -122,6 +122,12 @@ describe("7–8. sélection multiple, quantités différentes", () => {
     expect(ajouterSelection([], [{ articleId: "p1", quantite: 0 }], [plaque]).etat).toBe("refuse");
     expect(ajouterSelection([], [{ articleId: "p1", quantite: -1 }], [plaque]).etat).toBe("refuse");
   });
+  it("respecte un prix de vente saisi à la sélection, et refuse un prix négatif", () => {
+    const issue = ajouterSelection([], [{ articleId: "p1", quantite: 1, prixUnitaireHt: 18.5 }], [plaque]);
+    if (issue.etat !== "ajoute") throw new Error(issue.etat);
+    expect(issue.lignes[0].prixUnitaireHt).toBe(18.5);
+    expect(ajouterSelection([], [{ articleId: "p1", quantite: 1, prixUnitaireHt: -1 }], [plaque]).etat).toBe("refuse");
+  });
   it("respecte une unité et une description modifiées", () => {
     const issue = ajouterSelection([], [{ articleId: "p1", quantite: 2, unite: "m²", description: "Pose comprise" }], [plaque]);
     if (issue.etat !== "ajoute") throw new Error(issue.etat);
@@ -151,6 +157,13 @@ describe("9. article déjà présent dans le devis", () => {
     const issue = ajouterSelection([existante], [{ articleId: "p1", quantite: 5 }], [plaque], { p1: "annuler" });
     if (issue.etat !== "ajoute") throw new Error(issue.etat);
     expect(issue.lignes).toEqual([existante]);
+  });
+  it("remplace sur demande la première ligne par un instantané frais, sans créer de ligne", () => {
+    const perimee = { ...existante, prixUnitaireHt: 15, designation: "Ancienne désignation" };
+    const issue = ajouterSelection([perimee], [{ articleId: "p1", quantite: 7 }], [plaque], { p1: "remplacer" });
+    if (issue.etat !== "ajoute") throw new Error(issue.etat);
+    expect(issue.lignes).toHaveLength(1);
+    expect(issue.lignes[0]).toMatchObject({ quantite: 7, prixUnitaireHt: 20, designation: "Plaque de plâtre BA13" });
   });
   it("ne modifie jamais les lignes existantes en place", () => {
     const avant = JSON.stringify(existante);

@@ -4,6 +4,7 @@ import { brevoEstConfigure, envoyerEmailBrevo } from "@/lib/brevo";
 import { contenuEmailDocument, corpsHtmlEmailDocument } from "@/lib/email";
 import { chargerDonneesDevisImprimable, chargerDonneesFactureImprimable } from "@/lib/documents-commerciaux";
 import { genererPdfDepuisUrl, nomFichierPdf } from "@/lib/pdf/generer";
+import { chargerRenduDocument, moteurDeReponse } from "@/lib/devis/v2-serveur";
 import { obtenirNouveauTokenPartage, urlDocumentPartage, urlImpressionPartage } from "@/lib/documents-partage";
 import {
   construireEntreeJournalSurcharge,
@@ -86,7 +87,10 @@ export async function envoyerDocumentCommercialParEmail(
   let pdf: Buffer | null = null;
   if (urlImpression) {
     try {
-      pdf = await genererPdfDepuisUrl(urlImpression);
+      // Moteur v2 : pages A4 décidées par les données, imprimées sans marge Chromium (sinon elles
+      // seraient décalées). Moteur 1 : appel strictement identique à celui d'avant.
+      const moteur = moteurDeReponse(await chargerRenduDocument(supabase, params.typeDocument, params.documentId));
+      pdf = moteur === 2 ? await genererPdfDepuisUrl(urlImpression, null, { moteur: 2 }) : await genererPdfDepuisUrl(urlImpression);
     } catch {
       pdf = null; // Le lien de consultation reste envoyé même si la PJ échoue.
     }

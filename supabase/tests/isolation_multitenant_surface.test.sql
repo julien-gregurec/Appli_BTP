@@ -73,6 +73,12 @@ select ok(
 -- qui n'a par définition pas encore de compte. Elle ne rend que ce qu'un jeton valide,
 -- non expiré et non révoqué justifie déjà — nom de l'organisation hôte, nom du chantier,
 -- nom de l'intervention — et aucune ligne pour un jeton inconnu.
+--
+-- ELSATIA-GP-DEVIS-WYSIWYG-CATALOGUE-OUVRAGES-V1 (SQL proposé, non numéroté) ajoute
+-- document_rendu_par_token(text) : même lien de partage public que document_commercial_par_token,
+-- mêmes conditions de jeton (connu, non révoqué, non expiré), et il rend le document CLIENT figé à
+-- l'émission (aucun coût, aucun paramètre interne) — pour que le portail et la pièce jointe d'e-mail
+-- n'aient plus besoin de service_role. Sans cette migration, le nom est simplement absent de pg_proc.
 select is(
   (
     select count(*)::integer
@@ -82,7 +88,7 @@ select is(
       and p.prosecdef
       and has_function_privilege('anon', p.oid, 'EXECUTE')
       and p.prorettype <> 'trigger'::regtype
-      and p.proname not in ('document_commercial_par_token', 'reserves_invitation_consulter')
+      and p.proname not in ('document_commercial_par_token', 'reserves_invitation_consulter', 'document_rendu_par_token')
   ),
   0,
   'Aucune fonction SECURITY DEFINER métier n’est exécutable par anon (hors partage public documenté)'

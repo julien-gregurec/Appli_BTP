@@ -35,7 +35,7 @@ const CSS = `
 .doc-a4__page{position:relative;width:${PAGE_A4_MM.largeur}mm;height:${PAGE_A4_MM.hauteur}mm;
   padding:${MARGES_MM.haut}mm ${MARGES_MM.droite}mm ${MARGES_MM.bas + PIED_MM}mm ${MARGES_MM.gauche}mm;
   background:#fff;overflow:hidden;line-height:1.45;}
-.doc-a4--apercu .doc-a4__page{margin:0 auto 8mm;box-shadow:0 1px 4px rgba(0,0,0,.18);}
+.doc-a4--apercu .doc-a4__page,.doc-a4--consultation .doc-a4__page{margin:0 auto 8mm;box-shadow:0 1px 4px rgba(0,0,0,.18);}
 .doc-a4__page[data-debordement="true"]{outline:3px dashed #b91c1c;outline-offset:-3px;}
 .doc-a4__contenu{position:relative;z-index:1;height:100%;}
 .doc-a4__pied{position:absolute;z-index:1;left:${MARGES_MM.gauche}mm;right:${MARGES_MM.droite}mm;bottom:${MARGES_MM.bas}mm;
@@ -270,7 +270,11 @@ export function DocumentA4({
 }: {
   vue: VueDocument;
   pages?: PageDocument[];
-  mode?: "apercu" | "impression";
+  /**
+   * `apercu` : éditeur (pages espacées, avertissements internes) ; `consultation` : portail client
+   * (pages espacées, AUCUN avertissement interne) ; `impression` : pages jointives pour Chromium.
+   */
+  mode?: "apercu" | "consultation" | "impression";
 }) {
   const apercu = mode === "apercu";
   return (

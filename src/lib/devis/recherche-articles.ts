@@ -39,6 +39,8 @@ export type ArticleCatalogue = {
   /** `null` quand le module Stock n'est pas actif pour l'entreprise. */
   stockDisponible: number | null;
   actif: boolean;
+  /** Type de ligne de devis à poser (`lignes_devis.type`) ; défaut selon la source. */
+  typeLigne?: string | null;
 };
 
 // ── Normalisation ─────────────────────────────────────────────────────────────
@@ -150,6 +152,8 @@ export type Selection = {
   /** Modifiables seulement si les droits le permettent — le contrôle est côté appelant. */
   unite?: string;
   description?: string | null;
+  /** Prix de vente saisi à la sélection ; à défaut, celui du catalogue. */
+  prixUnitaireHt?: number;
   /** Obligatoire pour un article archivé : l'ajout doit être CONSENTI. */
   confirmeArchive?: boolean;
 };
@@ -166,6 +170,7 @@ export type LigneDevisInstantanee = {
   unite: string;
   prixUnitaireHt: number;
   tauxTva: number | null;
+  typeLigne?: string | null;
 };
 
 /**
@@ -185,12 +190,21 @@ export function instantaneLigne(article: ArticleCatalogue, selection: Selection)
     description: selection.description !== undefined ? selection.description : article.description,
     quantite: selection.quantite,
     unite: selection.unite ?? article.unite,
-    prixUnitaireHt: article.prixVenteHt,
+    prixUnitaireHt: selection.prixUnitaireHt ?? article.prixVenteHt,
     tauxTva: article.tauxTva,
+    typeLigne: article.typeLigne ?? null,
   };
 }
 
-export type DecisionDejaPresent = "additionner" | "nouvelle_ligne" | "annuler";
+/**
+ * Décision pour un article DÉJÀ présent dans le devis :
+ * - `additionner` : la quantité s'ajoute à la première ligne de cet article ;
+ * - `nouvelle_ligne` : une ligne de plus ;
+ * - `remplacer` : la première ligne de cet article est remplacée par un instantané FRAIS (valeurs
+ *   actuelles du catalogue) avec la quantité saisie — les autres lignes ne bougent pas ;
+ * - `annuler` : cet article n'est pas ajouté.
+ */
+export type DecisionDejaPresent = "additionner" | "nouvelle_ligne" | "remplacer" | "annuler";
 
 export type IssueAjout =
   | { etat: "ajoute"; lignes: LigneDevisInstantanee[] }
@@ -201,11 +215,11 @@ export type IssueAjout =
  * Ajoute une sélection de plusieurs articles à un devis, EN UNE ACTION.
  *
  * - chaque article sélectionné crée SA ligne ;
- * - aucune ligne existante n'est remplacée ;
+ * - aucune ligne existante n'est remplacée sans la décision explicite « remplacer » ;
  * - un article DÉJÀ présent exige une décision explicite (additionner, nouvelle ligne,
- *   annuler) : sans elle, rien n'est ajouté et l'appelant reçoit la liste à trancher ;
+ *   remplacer, annuler) : sans elle, rien n'est ajouté et l'appelant reçoit la liste à trancher ;
  * - un article archivé exige une confirmation explicite ;
- * - une quantité doit être un nombre strictement positif.
+ * - une quantité doit être un nombre strictement positif, un prix saisi positif ou nul.
  */
 export function ajouterSelection(
   lignesExistantes: readonly LigneDevisInstantanee[],
@@ -224,6 +238,9 @@ export function ajouterSelection(
     if (!article.actif && !s.confirmeArchive) {
       return { etat: "refuse", motif: `« ${article.designation} » est archivé : confirmez explicitement son ajout.` };
     }
+    if (s.prixUnitaireHt !== undefined && !(Number.isFinite(s.prixUnitaireHt) && s.prixUnitaireHt >= 0)) {
+      return { etat: "refuse", motif: `Prix invalide pour « ${article.designation} ».` };
+    }
   }
 
   const presents = new Set(lignesExistantes.map((l) => l.sourceId));
@@ -240,6 +257,11 @@ export function ajouterSelection(
       // quantité ne se répartit jamais en silence sur plusieurs lignes.
       const cible = lignes.find((l) => l.sourceId === s.articleId)!;
       cible.quantite += s.quantite;
+      continue;
+    }
+    if (decision === "remplacer") {
+      // Remplacement EN PLACE de la première ligne de cet article, et d'elle seule.
+      lignes[lignes.findIndex((l) => l.sourceId === s.articleId)] = instantaneLigne(article, s);
       continue;
     }
     lignes.push(instantaneLigne(article, s));

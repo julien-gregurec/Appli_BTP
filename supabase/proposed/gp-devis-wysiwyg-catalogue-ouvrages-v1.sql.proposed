@@ -1116,11 +1116,15 @@ grant execute on function public.creer_facture_depuis_devis(uuid, text) to authe
 -- selon des permissions EXPLICITES plutôt que selon l'état des privilèges de colonne ; en contrepartie,
 -- l'entreprise et le droit d'accès aux devis sont vérifiés en tête, et toutes les lectures sont filtrées
 -- par entreprise. Deux articles de même référence restent deux résultats.
+-- `drop` préalable : une redéfinition qui change les colonnes rendues ne passe pas par `create or
+-- replace`, et le fichier doit rester rejouable.
+drop function if exists public.rechercher_articles_devis(uuid, text, integer);
 create or replace function public.rechercher_articles_devis(p_entreprise_id uuid, p_recherche text, p_limite integer default 50)
 returns table (
   source text, id uuid, reference_interne text, origine_reference_interne text, reference_fabricant text,
   code_barres text, designation text, description text, fabricant text, fournisseur text, unite text,
-  prix_achat_ht numeric, prix_vente_ht numeric, taux_tva numeric, stock_disponible numeric, actif boolean, rang integer
+  prix_achat_ht numeric, prix_vente_ht numeric, taux_tva numeric, stock_disponible numeric, actif boolean,
+  type_ligne text, rang integer
 )
 language plpgsql
 stable
@@ -1149,7 +1153,7 @@ begin
            case when p.reference_interne is not null then 'reference_interne' end as origine_reference_interne,
            p.reference_fabricant, p.code_barres, p.designation, p.description, p.fabricant, f.nom as fournisseur,
            p.unite, case when v_couts then c.prix_achat_ht end as prix_achat_ht, p.prix_unitaire_ht as prix_vente_ht,
-           p.taux_tva, null::numeric as stock_disponible, p.actif
+           p.taux_tva, null::numeric as stock_disponible, p.actif, p.type as type_ligne
     from public.prestations_catalogue p
     left join public.fournisseurs f on f.id = p.fournisseur_id and f.entreprise_id = p.entreprise_id
     left join public.prestations_catalogue_couts c on c.prestation_id = p.id and c.entreprise_id = p.entreprise_id
@@ -1159,7 +1163,7 @@ begin
            case when a.reference_interne is not null then 'reference_interne' else 'reference_stock' end,
            a.reference_fabricant, a.code_barres, a.designation, null::text, a.marque, null::text, a.unite,
            case when v_prix_stock then a.prix_achat_ht end, a.prix_vente_ht, null::numeric,
-           case when v_stock then a.quantite_stock end, a.actif
+           case when v_stock then a.quantite_stock end, a.actif, 'fourniture'::text
     from public.articles_stock a
     where a.entreprise_id = p_entreprise_id
   ),
@@ -1187,7 +1191,7 @@ begin
   )
   select k.source, k.id, k.reference_interne, k.origine_reference_interne, k.reference_fabricant, k.code_barres,
          k.designation, k.description, k.fabricant, k.fournisseur, k.unite, k.prix_achat_ht, k.prix_vente_ht,
-         k.taux_tva, k.stock_disponible, k.actif, k.rang
+         k.taux_tva, k.stock_disponible, k.actif, k.type_ligne, k.rang
   from classes k
   where k.rang is not null
   order by k.rang, k.actif desc, k.designation
