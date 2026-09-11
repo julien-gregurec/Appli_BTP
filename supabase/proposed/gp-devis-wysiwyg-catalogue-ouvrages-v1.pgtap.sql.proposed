@@ -292,6 +292,10 @@ select is((select count(*)::int from public.factures_ouvrages o join public.fact
 select is((select count(*)::int from public.lignes_factures l join public.factures f on f.id = l.facture_id
            join public.devis d on d.id = f.devis_origine_id where d.conditions = 'PGTAP-V2' and l.ouvrage_cle = 'ouv1'), 2,
   'conversion : les lignes restent rattachées à leur ouvrage');
+select throws_ok($$select public.modifier_facture_brouillon(
+  (select f.id from public.factures f join public.devis d on d.id = f.devis_origine_id where d.conditions = 'PGTAP-V2'),
+  '{"client_id":"a3000000-0000-0000-0000-000000000001","type":"simple"}'::jsonb, '[]'::jsonb)$$, 'P0001', null,
+  'conversion : l''éditeur de facture historique ne peut pas aplatir une facture à ouvrages');
 
 -- ─────────────────────────────────────────────────────────────────────────────────────────────────────
 -- I. Figement de la facture à l'émission

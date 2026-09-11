@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { nomClient } from "@/lib/chantier-statuts";
 import { FactureEditor } from "@/components/FactureEditor";
+import { devisV2Actif } from "@/lib/devis/v2-serveur";
 
 export default async function ModifierFacturePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -18,6 +19,29 @@ export default async function ModifierFacturePage({ params }: { params: Promise<
   ]);
   if (!facture) notFound();
   if (facture.statut !== "brouillon") redirect(`/factures/${id}`);
+
+  // Moteur v2 : une facture issue d'un devis à ouvrages garde la présentation de son devis. L'éditeur
+  // historique réécrirait ses lignes à plat — la base le refuse d'ailleurs ; on l'explique plutôt
+  // que de laisser l'enregistrement échouer.
+  if (devisV2Actif()) {
+    const { count } = await supabase.from("factures_ouvrages").select("id", { count: "exact", head: true }).eq("facture_id", id);
+    if ((count ?? 0) > 0) {
+      return (
+        <main className="p-8">
+          <div className="mx-auto max-w-3xl space-y-4">
+            <Link href={`/factures/${id}`} className="text-sm text-neutral-500 hover:underline">← Facture</Link>
+            <h1 className="text-xl font-semibold">Modifier la facture brouillon</h1>
+            <p className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+              Cette facture reprend des ouvrages de son devis, avec leur présentation au client. Ses lignes ne se
+              modifient pas dans cet éditeur : corrigez le devis d’origine tant qu’il est modifiable, ou annulez
+              cette facture et créez-en une nouvelle.
+            </p>
+          </div>
+        </main>
+      );
+    }
+  }
+
   return <main className="p-8"><div className="mx-auto max-w-3xl space-y-6"><div><Link href={`/factures/${id}`} className="text-sm text-neutral-500 hover:underline">← Facture</Link><h1 className="mt-1 text-xl font-semibold">Modifier la facture brouillon</h1></div><FactureEditor
     facture={{ ...facture, lignes: (lignes ?? []).map((ligne) => ({ ...ligne, quantite: Number(ligne.quantite), prix_unitaire_ht: Number(ligne.prix_unitaire_ht), remise_ligne: Number(ligne.remise_ligne), taux_tva: Number(ligne.taux_tva) })) }}
     clients={(clients ?? []).map((client) => ({ id: client.id, label: nomClient(client) }))}
