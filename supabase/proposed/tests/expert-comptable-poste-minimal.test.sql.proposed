@@ -1,0 +1,46 @@
+-- pgTAP PROPOSÉ — accompagne expert-comptable-poste-minimal.sql.proposed. Non intégré.
+-- À jouer dans une base clonée jetable après application de la proposition.
+begin;
+select plan(9);
+
+select has_function('public', 'droits_mandat_expert_comptable', 'la liste blanche du mandat existe');
+
+select ok(
+  not exists (select 1 from unnest(public.droits_mandat_expert_comptable()) p where p like 'gerer\_%' or p like 'saisir\_%'
+              or p in ('acces_planning','acces_pointage','acces_parametres','gerer_utilisateurs','administrer_archivage_notes_frais','verrouiller_notes_frais')),
+  'le mandat ne contient ni gestion, ni saisie personnelle, ni planning, ni pointage, ni administration');
+
+select ok(exists (select 1 from public.modeles_roles_predefinis where cle = 'expert_comptable' and not tous_les_droits),
+  'le modèle expert-comptable existe, sans « tous les droits »');
+
+select is((select permissions from public.modeles_roles_predefinis where cle = 'expert_comptable'),
+  public.droits_mandat_expert_comptable(), 'le modèle porte exactement le mandat');
+
+-- Jeu d'essai : l'administrateur A compose un poste d'expert en demandant AUSSI des droits hors mandat.
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+create temporary table t_poste on commit drop as
+  select public.creer_poste_avec_permissions('a0000000-0000-0000-0000-000000000001', 'Expert pgTAP',
+    array['mode_expert_comptable','verifier_notes_frais','comptabiliser_notes_frais','gerer_factures','gerer_utilisateurs','acces_planning']) as id;
+
+select is((select array_agg(cle_permission order by cle_permission) from public.permissions_poste pp join t_poste t on t.id = pp.poste_id where pp.autorise),
+  array['comptabiliser_notes_frais','mode_expert_comptable','verifier_notes_frais']::text[],
+  'création : le demandé est borné au mandat — gerer_factures, gerer_utilisateurs et acces_planning refusés, rien d’ajouté d’office');
+
+select lives_ok($$ select public.enregistrer_permissions_poste('a0000000-0000-0000-0000-000000000001', (select id from t_poste),
+  array['exporter_notes_frais','acces_pointage','saisir_ses_notes_frais']) $$, 'enregistrement sans le marqueur dans le formulaire');
+
+select ok((select autorise from public.permissions_poste pp join t_poste t on t.id = pp.poste_id where pp.cle_permission = 'mode_expert_comptable'),
+  'le poste reste marqué expert-comptable même si le formulaire omet le marqueur');
+
+select is((select count(*)::int from public.permissions_poste pp join t_poste t on t.id = pp.poste_id
+           where pp.autorise and pp.cle_permission in ('acces_planning','acces_pointage','saisir_son_pointage','saisir_ses_notes_frais','demander_ses_conges','utiliser_borne_stock')),
+  0, 'enregistrement : aucun des six droits personnels n’est ajouté au poste d’expert');
+
+select is((select count(*)::int from public.permissions_poste pp
+           where pp.entreprise_id = 'a0000000-0000-0000-0000-000000000001' and pp.poste_id <> (select id from t_poste)
+             and pp.cle_permission = 'mode_expert_comptable' and pp.autorise),
+  0, 'aucun autre poste n’est touché');
+
+select * from finish();
+rollback;

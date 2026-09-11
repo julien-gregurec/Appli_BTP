@@ -1,0 +1,149 @@
+-- PROPOSITION — NON APPLIQUÉE, NON NUMÉROTÉE, HORS supabase/migrations
+--
+-- Lot : ELSATIA-GP-EXPERT-COMPTABLE-NOTES-FRAIS-CLOSURE-V1
+-- Statut : SOUMIS À AUTORISATION. Aucun numéro de ledger réservé (ledger constaté : 278
+-- fichiers, dernier n° 280). À numéroter au moment de l'intégration, après audit du ledger.
+--
+-- ── Pourquoi une migration est indispensable ────────────────────────────────────────────
+--
+-- Le poste d'un expert-comptable doit porter les SEULS droits de son mandat. Or les deux
+-- fonctions qui composent un poste AJOUTENT D'OFFICE six droits personnels à tout poste qui
+-- n'est pas un « compte dépôt » :
+--
+--   creer_poste_avec_permissions   (migration 20260713000069)
+--   enregistrer_permissions_poste  (dernière définition : 20260714000076)
+--
+--   'acces_planning','acces_pointage','saisir_son_pointage','saisir_ses_notes_frais',
+--   'demander_ses_conges','utiliser_borne_stock'
+--
+-- Un administrateur qui crée ou enregistre depuis l'écran d'accès un poste d'expert-comptable
+-- lui donne donc le PLANNING et le POINTAGE de l'entreprise — contraire au mandat. Aucun code
+-- applicatif ne peut l'empêcher : l'ajout se fait dans la base. Et aucun modèle de rôle
+-- « expert-comptable » n'existe (neuf modèles, dont un « comptable » INTERNE qui porte
+-- gerer_factures, gerer_notes_frais et gerer_paie — bien au-delà du mandat).
+--
+-- ── Ce que fait la proposition ─────────────────────────────────────────────────────────
+--
+--   1. un marqueur `mode_expert_comptable`, sur le modèle exact de `mode_compte_depot` ;
+--   2. dans les DEUX fonctions, un poste marqué reçoit l'INTERSECTION de ce qui est demandé
+--      et de la liste blanche du mandat — jamais de droit ajouté d'office, jamais de gerer_* ;
+--   3. un modèle `expert_comptable`, installable en un geste.
+--
+-- Ce qui ne change pas : la RLS, les fonctions de contrôle et de comptabilisation, les droits
+-- de tout autre poste. Gratuité : un poste est créé à `tarif_compte_mensuel = 0` par défaut, et
+-- le supplément facturé est ce tarif — rien à modifier.
+
+insert into public.permissions_disponibles (cle, module, description) values
+  ('mode_expert_comptable', 'Accès', 'Poste d’expert-comptable externe : droits limités au mandat, aucun droit personnel ajouté d’office')
+on conflict (cle) do nothing;
+
+-- Liste blanche du mandat (décision du 2026-09-11).
+create or replace function public.droits_mandat_expert_comptable()
+returns text[]
+language sql
+immutable
+set search_path = public
+as $$
+  select array[
+    'mode_expert_comptable',
+    -- notes de frais : consulter (via comptabiliser), contrôler, comptabiliser, exporter, journaux
+    'verifier_notes_frais', 'comptabiliser_notes_frais', 'exporter_notes_frais', 'consulter_audit_notes_frais',
+    -- comptabilité : consulter factures, avoirs, achats, paiements ; exports comptables
+    'acces_factures', 'acces_achats', 'acces_paiements_bancaires', 'acces_exports'
+  ]::text[]
+$$;
+
+create or replace function public.creer_poste_avec_permissions(p_entreprise_id uuid, p_nom text, p_permissions text[] default array[]::text[])
+returns uuid
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+declare
+  v_id uuid;
+  v_demande text[] := coalesce(p_permissions, array[]::text[]);
+  v_permissions text[];
+begin
+  if not public.peut_gerer_acces(p_entreprise_id) then raise exception 'Accès refusé'; end if;
+  if nullif(trim(p_nom), '') is null then raise exception 'Le nom du poste est obligatoire'; end if;
+  if 'mode_expert_comptable' = any(v_demande) then
+    -- Poste d'expert-comptable : le demandé, borné au mandat. Rien d'ajouté d'office.
+    select coalesce(array_agg(p), array[]::text[]) into v_permissions
+      from unnest(v_demande) p where p = any(public.droits_mandat_expert_comptable());
+  else
+    v_permissions := v_demande || array['acces_planning','acces_pointage','saisir_son_pointage','saisir_ses_notes_frais','demander_ses_conges','utiliser_borne_stock'];
+  end if;
+  insert into public.postes(entreprise_id, nom) values (p_entreprise_id, trim(p_nom)) returning id into v_id;
+  insert into public.permissions_poste(entreprise_id, poste_id, cle_permission, autorise)
+  select p_entreprise_id, v_id, cle, cle = any(v_permissions) from public.permissions_disponibles;
+  return v_id;
+end;
+$function$;
+
+create or replace function public.enregistrer_permissions_poste(p_entreprise_id uuid, p_poste_id uuid, p_permissions text[])
+returns void
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+declare
+  v_depot boolean;
+  v_expert boolean;
+  v_permissions text[] := coalesce(p_permissions, array[]::text[]);
+begin
+  if not public.peut_gerer_acces(p_entreprise_id) then raise exception 'Accès refusé'; end if;
+  select lower(nom) = 'compte dépôt' or exists(
+    select 1 from public.permissions_poste pp where pp.entreprise_id = p_entreprise_id
+      and pp.poste_id = p_poste_id and pp.cle_permission = 'mode_compte_depot' and pp.autorise
+  ) into v_depot from public.postes where id = p_poste_id and entreprise_id = p_entreprise_id;
+  if not found then raise exception 'Poste invalide'; end if;
+  -- Un poste déjà marqué reste expert-comptable même si le formulaire omet le marqueur.
+  v_expert := 'mode_expert_comptable' = any(v_permissions) or exists(
+    select 1 from public.permissions_poste pp where pp.entreprise_id = p_entreprise_id
+      and pp.poste_id = p_poste_id and pp.cle_permission = 'mode_expert_comptable' and pp.autorise);
+  if v_depot then
+    v_permissions := array['acces_stock', 'utiliser_borne_stock', 'mode_compte_depot'];
+  elsif v_expert then
+    select coalesce(array_agg(distinct p), array[]::text[]) into v_permissions
+      from unnest(v_permissions || array['mode_expert_comptable']) p
+      where p = any(public.droits_mandat_expert_comptable());
+  else
+    -- Inchangé pour tout autre poste (migration 20260714000076).
+    v_permissions := v_permissions || array[
+      'acces_planning','acces_pointage','saisir_son_pointage','saisir_ses_notes_frais',
+      'demander_ses_conges','utiliser_borne_stock'
+    ];
+    select array_agg(distinct p) into v_permissions from unnest(v_permissions || array[
+      case when 'gerer_clients' = any(v_permissions) then 'acces_clients' end,
+      case when 'gerer_chantiers' = any(v_permissions) then 'acces_chantiers' end,
+      case when 'gerer_devis' = any(v_permissions) then 'acces_devis' end,
+      case when 'gerer_factures' = any(v_permissions) then 'acces_factures' end,
+      case when 'gerer_achats' = any(v_permissions) then 'acces_achats' end,
+      case when 'gerer_planning' = any(v_permissions) then 'acces_planning' end,
+      case when 'gerer_employes' = any(v_permissions) then 'acces_employes' end,
+      case when 'gerer_pointage' = any(v_permissions) then 'acces_pointage' end,
+      case when 'gerer_stock' = any(v_permissions) then 'acces_stock' end,
+      case when 'gerer_flotte' = any(v_permissions) then 'acces_flotte' end,
+      case when 'gerer_outillage' = any(v_permissions) then 'acces_outillage' end,
+      case when 'gerer_parametres' = any(v_permissions) then 'acces_parametres' end
+    ]) p where p is not null;
+  end if;
+  insert into public.permissions_poste(entreprise_id, poste_id, cle_permission, autorise)
+  select p_entreprise_id, p_poste_id, cle, cle = any(coalesce(v_permissions, array[]::text[]))
+  from public.permissions_disponibles
+  on conflict (entreprise_id, poste_id, cle_permission) do update set autorise = excluded.autorise;
+end;
+$function$;
+
+-- Modèle installable. Ordre après « comptable » (80).
+insert into public.modeles_roles_predefinis (cle, nom, description, ordre, permissions, tous_les_droits) values
+  ('expert_comptable', 'Expert-comptable',
+   'Cabinet externe mandaté : consulte, contrôle, comptabilise et exporte les notes de frais ; consulte factures, achats et paiements. Ne modifie ni les dépenses, ni les justificatifs, ni les factures définitives ; n’administre rien.',
+   85, public.droits_mandat_expert_comptable(), false)
+on conflict (cle) do update set nom = excluded.nom, description = excluded.description,
+  permissions = excluded.permissions, tous_les_droits = false;
+
+-- Droits d'exécution inchangés : ces fonctions sont redéfinies à l'identique de signature ;
+-- `droits_mandat_expert_comptable` n'expose qu'une liste constante.
+revoke all on function public.droits_mandat_expert_comptable() from public;
+grant execute on function public.droits_mandat_expert_comptable() to authenticated;
