@@ -74,14 +74,12 @@ export function SelectionArticlesDialog({
     champRecherche.current?.focus();
   }, []);
 
-  // Recherche différée ; une réponse périmée (saisie plus récente) est ignorée.
+  // Recherche différée ; une réponse périmée (saisie plus récente) est ignorée. Recherche vide : les
+  // résultats sont masqués par dérivation (`affiches`), sans écrire d'état dans l'effet.
   useEffect(() => {
     const texte = recherche.trim();
     const numero = ++sequence.current;
-    if (!texte) {
-      setResultats([]);
-      return;
-    }
+    if (!texte) return;
     const minuterie = setTimeout(async () => {
       setChargement(true);
       const r = await rechercherArticlesDevisAction(texte);
@@ -99,6 +97,7 @@ export function SelectionArticlesDialog({
     return () => clearTimeout(minuterie);
   }, [recherche]);
 
+  const affiches = recherche.trim() ? resultats : [];
   const estChoisi = (id: string) => choix.some((c) => c.article.id === id);
 
   const basculer = (a: ArticleTrouve, focaliser: boolean) => {
@@ -151,13 +150,13 @@ export function SelectionArticlesDialog({
     }
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSurligne((i) => Math.min(resultats.length - 1, i + 1));
+      setSurligne((i) => Math.min(affiches.length - 1, i + 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setSurligne((i) => Math.max(0, i - 1));
-    } else if (e.key === "Enter" && resultats[surligne]) {
+    } else if (e.key === "Enter" && affiches[surligne]) {
       e.preventDefault();
-      basculer(resultats[surligne], true);
+      basculer(affiches[surligne], true);
     }
   };
 
@@ -230,9 +229,9 @@ export function SelectionArticlesDialog({
                   autoComplete="off"
                   inputMode="search"
                   role="combobox"
-                  aria-expanded={resultats.length > 0}
+                  aria-expanded={affiches.length > 0}
                   aria-controls="resultats-articles"
-                  aria-activedescendant={resultats[surligne] ? `article-${resultats[surligne].id}` : undefined}
+                  aria-activedescendant={affiches[surligne] ? `article-${affiches[surligne].id}` : undefined}
                   className={`${champ} mt-1 w-full text-base`}
                   placeholder="ex. BA13-200, 3760123456789, plaque…"
                 />
@@ -241,8 +240,8 @@ export function SelectionArticlesDialog({
               </div>
               <ul id="resultats-articles" role="listbox" aria-multiselectable="true" aria-label="Résultats" className="min-h-0 flex-1 overflow-auto px-3 pb-3">
                 {chargement && <li className="py-2 text-sm text-neutral-500">Recherche…</li>}
-                {!chargement && recherche.trim() && resultats.length === 0 && !erreur && <li className="py-2 text-sm text-neutral-500">Aucun article ne correspond.</li>}
-                {resultats.map((a, i) => (
+                {!chargement && recherche.trim() && affiches.length === 0 && !erreur && <li className="py-2 text-sm text-neutral-500">Aucun article ne correspond.</li>}
+                {affiches.map((a, i) => (
                   <li
                     key={a.id}
                     id={`article-${a.id}`}

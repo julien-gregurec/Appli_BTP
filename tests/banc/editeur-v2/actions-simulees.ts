@@ -65,7 +65,9 @@ export async function rechercherOuvragesAction(recherche: string) {
   };
 }
 
-export async function chargerOuvrageAction(_id: string): Promise<{ version: VersionOuvrage }> {
+export async function chargerOuvrageAction(ouvrageId: string): Promise<{ version: VersionOuvrage }> {
+  // Le banc ne connaît qu'un ouvrage fictif : l'identifiant demandé est sans effet.
+  void ouvrageId;
   const v = plancherChauffantFictif();
   const voir = banc().droits.voirCouts;
   return { version: { ...v, composants: v.composants.map((c) => ({ ...c, prixAchatHt: voir ? c.prixAchatHt : null })) } };

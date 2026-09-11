@@ -78,7 +78,8 @@ export function InsertionOuvrageDialog({
   useEffect(() => {
     if (instanceInitiale) return;
     const texte = recherche.trim();
-    if (!texte) { setTrouves([]); return; }
+    // Recherche vide : liste masquée par dérivation (`trouvesAffiches`), sans écrire d'état ici.
+    if (!texte) return;
     let actif = true;
     const minuterie = setTimeout(async () => {
       const r = await rechercherOuvragesAction(texte);
@@ -124,6 +125,7 @@ export function InsertionOuvrageDialog({
     .filter((o, i, t) => t.findIndex((x) => x.cle === o.cle) === i);
   const aSaisir = (instance ? instance.modele.composants : version?.composants ?? []).filter((c) => c.saisieRequise);
 
+  const trouvesAffiches = recherche.trim() ? trouves : [];
   const montants = instance ? montantsInstance(instance) : null;
   const ind = instance ? indicateursPrix(instance) : null;
   const alertes = instance ? avertissementsPrix(instance, { seuilTauxMarquePct }).filter((a) => peutVoirCouts || !["prix_inferieur_cout", "marge_sous_seuil", "cout_inconnu"].includes(a.code)) : [];
@@ -151,7 +153,7 @@ export function InsertionOuvrageDialog({
               <label htmlFor="recherche-ouvrage" className="font-medium">Référence, nom, catégorie, référence ou fabricant d’un composant</label>
               <input id="recherche-ouvrage" ref={champRecherche} value={recherche} onChange={(e) => setRecherche(e.target.value)} className={`${champ} w-full text-base`} placeholder="ex. PC-001, plancher, FAB-ISO-30…" />
               <ul className="space-y-1">
-                {trouves.map((o) => (
+                {trouvesAffiches.map((o) => (
                   <li key={o.id}>
                     <button type="button" onClick={() => void choisir(o.id)} className="flex min-h-11 w-full items-center gap-3 rounded-md border border-neutral-200 px-3 py-2 text-left hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900">
                       <span className="font-mono text-xs">{o.referenceInterne ?? "—"}</span>

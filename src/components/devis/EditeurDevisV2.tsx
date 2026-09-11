@@ -24,7 +24,7 @@ import {
 import type { EnteteDevisV2 } from "@/lib/devis/enregistrement-v2";
 import { resoudreFiligrane, type ReglagesFiligraneEntreprise } from "@/lib/devis/filigrane";
 import { MODES_PRESENTATION, type InstanceOuvrage, type ModePresentation } from "@/lib/devis/ouvrages";
-import { totauxDevis, type ElementDevis, type LigneLibre } from "@/lib/devis/presentation";
+import { totauxDevis, type LigneLibre } from "@/lib/devis/presentation";
 import { avertissementsPrix, indicateursPrix, TAUX_TVA_ADMIS } from "@/lib/devis/prix";
 
 export type ClientEditeur = { id: string; label: string; adresse: string | null; codePostal: string | null; ville: string | null; siret: string | null };
