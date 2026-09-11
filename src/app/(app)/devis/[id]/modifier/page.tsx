@@ -5,12 +5,35 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { nomClient } from "@/lib/chantier-statuts";
 import { DevisEditor } from "@/components/DevisEditor";
+import { EditeurDevisV2 } from "@/components/devis/EditeurDevisV2";
 import { iaEstActive } from "@/lib/preview-features";
+import { devisV2Actif } from "@/lib/devis/v2-serveur";
+import { chargerBrouillonV2, chargerDonneesEditeurV2 } from "@/lib/devis/editeur-v2-serveur";
 
 export default async function ModifierDevisPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+
+  // Éditeur visuel v2 : seulement une fois le schéma v2 migré et le moteur activé. Un devis
+  // historique encore en brouillon s'y ouvre comme des lignes libres et passe au moteur v2 à son
+  // premier enregistrement ; un devis déjà émis n'est jamais modifiable.
+  if (devisV2Actif()) {
+    const donnees = await chargerDonneesEditeurV2(supabase, ctx);
+    const brouillon = await chargerBrouillonV2(supabase, ctx, id, donnees.droits.voirCouts);
+    if (!brouillon) {
+      const { data: existe } = await supabase.from("devis").select("id").eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+      if (!existe) notFound();
+      redirect(`/devis/${id}`);
+    }
+    return (
+      <main className="p-4 lg:p-6">
+        <Link href={`/devis/${id}`} className="text-sm text-neutral-500 hover:underline">← Devis</Link>
+        <EditeurDevisV2 devisId={id} {...donnees} enteteInitiale={brouillon.entete} etatInitial={brouillon.etat} />
+      </main>
+    );
+  }
+
   const peutUtiliserIA = iaEstActive() && aAccesIA(await permissionsUtilisateur(ctx));
 
   const [{ data: devis }, { data: lignes }, { data: clients }, { data: chantiers }, { data: prestations }, { data: pieces }] = await Promise.all([

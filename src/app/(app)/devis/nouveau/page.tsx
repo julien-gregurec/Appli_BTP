@@ -3,8 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { DevisEditor } from "@/components/DevisEditor";
+import { EditeurDevisV2 } from "@/components/devis/EditeurDevisV2";
 import { nomClient } from "@/lib/chantier-statuts";
 import { iaEstActive } from "@/lib/preview-features";
+import { devisV2Actif } from "@/lib/devis/v2-serveur";
+import { chargerDonneesEditeurV2 } from "@/lib/devis/editeur-v2-serveur";
 
 export default async function NouveauDevisPage({
   searchParams,
@@ -14,6 +17,35 @@ export default async function NouveauDevisPage({
   const { client: clientPreselect, chantier: chantierPreselect } = await searchParams;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+
+  // Éditeur visuel v2 (aperçu A4 réel, catalogue, ouvrages) : seulement une fois le schéma v2 migré
+  // et le moteur activé. Sinon, l'éditeur historique ci-dessous, inchangé.
+  if (devisV2Actif()) {
+    const donnees = await chargerDonneesEditeurV2(supabase, ctx);
+    const chantier = chantierPreselect ? donnees.chantiers.find((c) => c.id === chantierPreselect) : undefined;
+    return (
+      <main className="p-4 lg:p-6">
+        <Link href="/devis" className="text-sm text-neutral-500 hover:underline">← Devis</Link>
+        <EditeurDevisV2
+          devisId={null}
+          {...donnees}
+          enteteInitiale={{
+            client_id: clientPreselect ?? chantier?.clientId ?? "",
+            chantier_id: chantier?.id ?? null,
+            date_emission: null,
+            date_validite: null,
+            conditions: null,
+            notes_client: null,
+            notes_internes: null,
+            remise_globale: 0,
+            filigrane: null,
+          }}
+          etatInitial={{ elements: [], origines: {} }}
+        />
+      </main>
+    );
+  }
+
   const peutUtiliserIA = iaEstActive() && aAccesIA(await permissionsUtilisateur(ctx));
 
   const { data: clients } = await supabase

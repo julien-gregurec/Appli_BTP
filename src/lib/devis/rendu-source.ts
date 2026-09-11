@@ -180,6 +180,16 @@ export function elementsDepuisRendu(r: Pick<RenduDocument, "ouvrages" | "lignes"
   return elements.sort((a, b) => a.ordre - b.ordre);
 }
 
+/** Identité émettrice depuis une ligne `entreprises` ou un instantané (mêmes noms de colonnes). */
+export function emetteurDepuisEntreprise(e: Record<string, unknown> | null): IdentiteEmetteur {
+  return emetteur(e);
+}
+
+/** Style des documents depuis une ligne `entreprises` ou un instantané. */
+export function styleDepuisEntreprise(e: Record<string, unknown> | null): Partial<StyleDocument> {
+  return style(e);
+}
+
 function emetteur(e: Record<string, unknown> | null): IdentiteEmetteur {
   const x = e ?? {};
   return {
