@@ -22,7 +22,14 @@ const possede = (permissions: string[] | null, cle: string) => permissions === n
 const INACTIF = { error: "Le nouvel éditeur de devis n’est pas encore activé." };
 const REFUS = { error: "Vous n’avez pas le droit de faire cette opération." };
 
-export type ArticleTrouve = ArticleCatalogue & { rang: number; origineReferenceInterne: string | null };
+export type ArticleTrouve = ArticleCatalogue & {
+  rang: number;
+  origineReferenceInterne: string | null;
+  /** Code chez le distributeur principal (GP V1, lot B). */
+  codeFournisseur?: string | null;
+  /** Favori de l'utilisateur connecté. */
+  favori?: boolean;
+};
 
 type LigneRecherche = {
   source: "prestation" | "article";
@@ -43,6 +50,10 @@ type LigneRecherche = {
   actif: boolean;
   type_ligne: string | null;
   rang: number;
+  // Colonnes ajoutées par la proposition « bibliothèque » (lot B) ; absentes avant elle.
+  code_fournisseur?: string | null;
+  famille?: string | null;
+  favori?: boolean | null;
 };
 
 const nombreOuNul = (x: number | string | null) => (x === null ? null : Number(x));
@@ -82,6 +93,10 @@ export async function rechercherArticlesDevisAction(recherche: string): Promise<
       actif: r.actif,
       typeLigne: r.type_ligne,
       rang: r.rang,
+      codesFournisseurs: r.code_fournisseur ? [r.code_fournisseur] : [],
+      codeFournisseur: r.code_fournisseur ?? null,
+      famille: r.famille ?? null,
+      favori: r.favori === true,
     })),
   };
 }

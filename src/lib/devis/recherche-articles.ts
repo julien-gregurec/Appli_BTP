@@ -41,6 +41,10 @@ export type ArticleCatalogue = {
   actif: boolean;
   /** Type de ligne de devis à poser (`lignes_devis.type`) ; défaut selon la source. */
   typeLigne?: string | null;
+  /** Codes de l'article chez ses distributeurs (GP V1, lot B) — comparés comme des références. */
+  codesFournisseurs?: readonly string[];
+  /** Libellé de la famille (« Famille › Sous-famille »), recherché au dernier niveau. */
+  famille?: string | null;
 };
 
 // ── Normalisation ─────────────────────────────────────────────────────────────
@@ -70,12 +74,12 @@ export function normaliser(valeur: string | null | undefined): string {
  * Niveau de pertinence d'un article pour une recherche — plus petit = plus pertinent.
  *
  *   1. référence interne exacte
- *   2. référence fabricant exacte
+ *   2. référence fabricant ou code distributeur exact
  *   3. référence interne qui COMMENCE par la recherche
- *   4. référence fabricant qui commence par la recherche
+ *   4. référence fabricant ou code distributeur qui commence par la recherche
  *   5. code-barres exact
- *   6. correspondance partielle sur une référence ou le code-barres
- *   7. désignation, fabricant ou fournisseur
+ *   6. correspondance partielle sur une référence, un code distributeur ou le code-barres
+ *   7. désignation, fabricant, fournisseur ou famille
  *
  * Le code-barres exact est un niveau à part : une douchette qui scanne un EAN désigne un
  * produit précis, il ne doit pas passer derrière une référence qui se contente de le contenir.
@@ -88,14 +92,16 @@ export function rangCorrespondance(article: ArticleCatalogue, recherche: string)
   const ri = normaliser(article.referenceInterne);
   const rf = normaliser(article.referenceFabricant);
   const cb = normaliser(article.codeBarres);
+  // Codes distributeurs : même niveau que la référence fabricant (miroir de rechercher_articles_devis).
+  const codes = (article.codesFournisseurs ?? []).map(normaliser).filter(Boolean);
 
   if (ri && ri === q) return 1;
-  if (rf && rf === q) return 2;
+  if ((rf && rf === q) || codes.includes(q)) return 2;
   if (ri && ri.startsWith(q)) return 3;
-  if (rf && rf.startsWith(q)) return 4;
+  if ((rf && rf.startsWith(q)) || codes.some((c) => c.startsWith(q))) return 4;
   if (cb && cb === q) return 5;
-  if ((ri && ri.includes(q)) || (rf && rf.includes(q)) || (cb && cb.includes(q))) return 6;
-  for (const champ of [article.designation, article.fabricant, article.fournisseur]) {
+  if ((ri && ri.includes(q)) || (rf && rf.includes(q)) || (cb && cb.includes(q)) || codes.some((c) => c.includes(q))) return 6;
+  for (const champ of [article.designation, article.fabricant, article.fournisseur, article.famille]) {
     if (normaliser(champ).includes(q)) return 7;
   }
   return null;
