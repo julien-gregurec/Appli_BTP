@@ -1323,8 +1323,34 @@ begin
     where c.prix_achat_ht is not null
       and exists (select 1 from jsonb_array_elements(p_version -> 'composants') e where e ->> 'cle' = c.cle);
   end if;
+  -- Composants sans coût fourni (dont TOUS ceux d'un utilisateur sans droit sur les coûts) : report
+  -- de la version précédente, même clé. Sinon, publier sans ce droit effacerait l'estimation.
+  perform public.reporter_couts_version_ouvrage(v_version_id);
 
   return v_ouvrage_id;
+end $$;
+
+-- Report des coûts d'une version d'ouvrage à la suivante, composant par composant (même clé).
+-- SECURITY DEFINER : l'utilisateur qui publie peut ne pas VOIR les coûts ; il ne les lit jamais ici,
+-- rien n'est rendu, et seul l'ouvrage de la version publiée est concerné. Un coût déjà fourni pour
+-- cette version n'est jamais écrasé ; un composant nouveau ne reçoit aucun coût inventé.
+create or replace function public.reporter_couts_version_ouvrage(p_version_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare
+  v public.ouvrages_versions;
+begin
+  select * into v from public.ouvrages_versions where id = p_version_id;
+  if not found or not public.a_permission(v.entreprise_id, 'gerer_ouvrages') then
+    return;
+  end if;
+  insert into public.ouvrages_composants_couts (version_id, cle_composant, entreprise_id, prix_achat_ht)
+  select p_version_id, c.cle_composant, c.entreprise_id, c.prix_achat_ht
+  from public.ouvrages_composants_couts c
+  join public.ouvrages_versions precedente on precedente.id = c.version_id
+  where precedente.ouvrage_id = v.ouvrage_id
+    and precedente.version = v.version - 1
+    and exists (select 1 from jsonb_array_elements(v.composants) e where e ->> 'cle' = c.cle_composant)
+  on conflict (version_id, cle_composant) do nothing;
 end $$;
 
 create or replace function public.changer_statut_ouvrage(p_ouvrage_id uuid, p_statut text)
@@ -1588,7 +1614,8 @@ begin
     'public.rechercher_ouvrages(uuid, text, integer)',
     'public.publier_version_ouvrage(uuid, uuid, jsonb, jsonb)',
     'public.changer_statut_ouvrage(uuid, text)',
-    'public.purger_couts_orphelins_devis(uuid)'
+    'public.purger_couts_orphelins_devis(uuid)',
+    'public.reporter_couts_version_ouvrage(uuid)'
   ] loop
     execute format('revoke all on function %s from public, anon, service_role', v_signature);
     execute format('grant execute on function %s to authenticated', v_signature);

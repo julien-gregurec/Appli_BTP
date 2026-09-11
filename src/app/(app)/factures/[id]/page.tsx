@@ -18,6 +18,7 @@ import { SignatureDocumentMetier } from "@/components/SignatureDocumentMetier";
 import { RelanceDocumentSection } from "@/components/RelanceDocumentSection";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { peutSurchargerDestinataire } from "@/lib/permissions-envoi";
+import { devisV2Actif } from "@/lib/devis/v2-serveur";
 
 const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -110,6 +111,17 @@ export default async function FactureDetailPage({
             >
               Télécharger PDF
             </a>
+            {/* Duplicata : reproduction du document FIGÉ à l'émission (moteur v2), marquée comme telle. */}
+            {devisV2Actif() && facture.statut !== "brouillon" && (facture as { rendu_instantane?: { moteur?: number } | null }).rendu_instantane?.moteur === 2 && (
+              <a
+                href={`/api/documents/factures/${id}/pdf?duplicata=1`}
+                target="_blank"
+                rel="noopener"
+                className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700"
+              >
+                Duplicata PDF
+              </a>
+            )}
             {email ? (
               <EmailDocumentButton
                 type="facture"

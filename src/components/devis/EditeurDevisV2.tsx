@@ -177,7 +177,18 @@ export function EditeurDevisV2({
 
       <div className="flex gap-2 lg:hidden" role="tablist" aria-label="Affichage">
         {(["saisie", "apercu"] as const).map((o) => (
-          <button key={o} type="button" role="tab" aria-selected={onglet === o} onClick={() => setOnglet(o)} className={`${bouton} flex-1 ${onglet === o ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900" : ""}`}>
+          <button
+            key={o}
+            type="button"
+            role="tab"
+            aria-selected={onglet === o}
+            onClick={() => setOnglet(o)}
+            // L'onglet choisi garde son fond sombre même survolé : sur mobile, le survol reste « collé »
+            // après un toucher, et un fond clair sous un texte blanc le rendait illisible.
+            className={onglet === o
+              ? "min-h-11 flex-1 rounded-md border border-neutral-900 bg-neutral-900 px-3 text-sm font-medium text-white dark:border-white dark:bg-white dark:text-neutral-900"
+              : `${bouton} flex-1`}
+          >
             {o === "saisie" ? "Saisie" : "Aperçu du document"}
           </button>
         ))}

@@ -9,6 +9,9 @@ import { prefixeIdentifiantEntreprise } from "@/lib/identifiants";
 import { DashboardWidgetPreferences } from "@/components/DashboardWidgets";
 import { BrandWordmark } from "@/components/BrandWordmark";
 import { PRODUCT_NAME } from "@/lib/brand";
+import { devisV2Actif } from "@/lib/devis/v2-serveur";
+import { lireReglagesFiligranes, lireSeuilStocke } from "@/lib/entreprise-devis-v2";
+import { FiligranesEntrepriseForm } from "@/components/parametres/FiligranesEntrepriseForm";
 
 const input = "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -19,6 +22,10 @@ export default async function ParametresPage({ searchParams }: { searchParams: P
   const peutGererAcces = permissions === null || permissions.includes("gerer_utilisateurs");
   const { data: entreprise } = await supabase.from("entreprises").select("*").eq("id", ctx.entrepriseId).single();
   const prefixeIdentifiant = entreprise?.prefixe_identifiant_employe ?? prefixeIdentifiantEntreprise(entreprise?.nom ?? "");
+  // Moteur de devis v2 : `select("*")` ci-dessus rapporte déjà `filigranes_documents` et
+  // `seuil_taux_marque_pct` une fois la migration appliquée ; ils ne sont LUS que drapeau posé.
+  const devisV2 = devisV2Actif();
+  const peutGererParametres = permissions === null || permissions.includes("gerer_parametres");
 
   return (
     <main className="p-8">
@@ -101,6 +108,14 @@ export default async function ParametresPage({ searchParams }: { searchParams: P
           </section>
           <button type="submit" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">Enregistrer les paramètres</button>
         </form>
+        {devisV2 && (
+          <FiligranesEntrepriseForm
+            initial={lireReglagesFiligranes(entreprise?.filigranes_documents)}
+            seuilInitial={lireSeuilStocke(entreprise?.seuil_taux_marque_pct)}
+            logoDisponible={Boolean(entreprise?.logo_url)}
+            peutGerer={peutGererParametres}
+          />
+        )}
       </div>
     </main>
   );

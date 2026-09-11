@@ -5,6 +5,8 @@ import { peutExporterComptabilite } from "@/lib/permissions-financieres";
 import { periodeDepuisUrl, reponseCsv } from "@/lib/csv";
 import { reponseXlsx } from "@/lib/xlsx";
 import { nomClientDocument } from "@/lib/client-snapshot";
+import { devisV2Actif } from "@/lib/devis/v2-serveur";
+import { ventilationTvaFactures } from "@/lib/devis/export-tva";
 // Un export comptable rejoue des documents DÉJÀ ÉMIS : il doit restituer le
 // destinataire tel qu'il figurait sur la facture, pas la fiche client
 // d'aujourd'hui (ELSATIA-GP-CLIENT-DOCUMENT-SNAPSHOT-P0-V1). La fiche reste
@@ -61,6 +63,27 @@ export async function GET(request: Request) {
     lignes.push([]); lignes.push(["SYNTHÈSE PAR TAUX", "", "", "Taux TVA", "Base HT", "TVA déductible", "TTC"]);
     for (const [taux, total] of [...totaux].sort(([a], [b]) => a - b)) lignes.push(["TOTAL", "", "", taux, total.ht, total.tva, total.ttc]);
     return reponseExport(lignes, `tva-deductible-achats-${periode.debut}-${periode.fin}`, "TVA déductible", format);
+  }
+  // Moteur v2 : les factures portent la remise globale du devis ; la ventilation passe par le même
+  // calcul que la base et retombe au centime sur chaque facture (voir src/lib/devis/export-tva.ts).
+  if (devisV2Actif()) {
+    const { data, error } = await supabase.from("lignes_factures").select("quantite,prix_unitaire_ht,remise_ligne,taux_tva,facture:factures!inner(numero,date_emission,entreprise_id,type,statut,remise_globale)").eq("facture.entreprise_id", ctx.entrepriseId).not("facture.numero", "is", null).gte("facture.date_emission", periode.debut).lte("facture.date_emission", periode.fin).neq("facture.statut", "annulee").order("date_emission", { referencedTable: "factures" });
+    if (error) return Response.json({ error: "Export temporairement indisponible" }, { status: 503 });
+    const details = ventilationTvaFactures((data ?? []).flatMap((ligne) => {
+      const facture = un(ligne.facture);
+      return facture ? [{
+        numero: facture.numero ?? "", date: facture.date_emission, quantite: Number(ligne.quantite), prixUnitaireHt: Number(ligne.prix_unitaire_ht),
+        remiseLignePct: Number(ligne.remise_ligne), tauxTva: Number(ligne.taux_tva), remiseGlobalePct: Number(facture.remise_globale ?? 0),
+      }] : [];
+    }));
+    const lignesV2: unknown[][] = [["Date", "N° facture", "Taux TVA", "Base HT", "TVA", "TTC"]];
+    const totauxV2 = new Map<number, { ht: number; tva: number }>();
+    for (const d of details) {
+      lignesV2.push([d.date, d.numero, d.taux, d.ht, d.tva, Math.round((d.ht + d.tva) * 100) / 100]);
+      const total = totauxV2.get(d.taux) ?? { ht: 0, tva: 0 }; total.ht = Math.round((total.ht + d.ht) * 100) / 100; total.tva = Math.round((total.tva + d.tva) * 100) / 100; totauxV2.set(d.taux, total);
+    }
+    lignesV2.push([]); lignesV2.push(["SYNTHÈSE PAR TAUX", "", "Taux TVA", "Base HT", "TVA", "TTC"]); for (const [taux, total] of [...totauxV2].sort(([a], [b]) => a - b)) lignesV2.push(["TOTAL", "", taux, total.ht, total.tva, Math.round((total.ht + total.tva) * 100) / 100]);
+    return reponseExport(lignesV2, `tva-${periode.debut}-${periode.fin}`, "TVA collectée", format);
   }
   const { data, error } = await supabase.from("lignes_factures").select("quantite,prix_unitaire_ht,remise_ligne,taux_tva,facture:factures!inner(numero,date_emission,entreprise_id,type,statut)").eq("facture.entreprise_id", ctx.entrepriseId).not("facture.numero", "is", null).gte("facture.date_emission", periode.debut).lte("facture.date_emission", periode.fin).neq("facture.statut", "annulee").order("date_emission", { referencedTable: "factures" });
   if (error) return Response.json({ error: "Export temporairement indisponible" }, { status: 503 });

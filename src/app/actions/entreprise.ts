@@ -8,6 +8,10 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { prefixeIdentifiantEntreprise } from "@/lib/identifiants";
 import { estCodeOffreTarifaire } from "@/lib/tarification";
 import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
+import { permissionsUtilisateur } from "@/lib/permissions";
+import { devisV2Actif } from "@/lib/devis/v2-serveur";
+import type { Filigrane } from "@/lib/devis/filigrane";
+import { filigranesPourEnregistrement, validerSeuilTauxMarque } from "@/lib/entreprise-devis-v2";
 
 function champ(formData: FormData, nom: string) {
   const valeur = String(formData.get(nom) ?? "").trim();
@@ -197,4 +201,37 @@ export async function modifierLogoEntrepriseAction(formData:FormData){
   // devis et factures déjà émis figent l'URL du logo qu'ils portaient. Le supprimer cassait le logo de
   // tous les documents émis dès que l'entreprise en changeait.
   revalidatePath("/","layout");revalidatePath("/parametres");revalidatePath("/imprimer","layout");redirect("/parametres?succes=logo");
+}
+
+/**
+ * Filigranes des devis et factures (défaut et brouillons) et seuil d'alerte de taux de marque —
+ * moteur de devis v2 uniquement. Revérifie l'entreprise ET `gerer_parametres` : une Server Action
+ * est un point d'entrée public. Chaque filigrane est assaini ici, jamais repris tel quel.
+ */
+export async function modifierFiligranesEntrepriseAction(entree: {
+  defaut: Partial<Filigrane> | null;
+  brouillon: Partial<Filigrane> | null;
+  seuilTauxMarquePct: number | string | null;
+}): Promise<{ ok: true } | { error: string }> {
+  if (!devisV2Actif()) return { error: "Le nouvel éditeur de devis n’est pas encore activé." };
+  const ctx = await getContexteEntreprise();
+  const permissions = await permissionsUtilisateur(ctx);
+  if (!(permissions === null || permissions.includes("gerer_parametres"))) {
+    return { error: "Vous n’avez pas le droit de modifier les paramètres de l’entreprise." };
+  }
+  const recu = (typeof entree === "object" && entree !== null ? entree : {}) as Record<string, unknown>;
+  const seuil = validerSeuilTauxMarque(recu.seuilTauxMarquePct);
+  if ("erreur" in seuil) return { error: seuil.erreur };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("entreprises").update({
+    filigranes_documents: filigranesPourEnregistrement({ defaut: recu.defaut, brouillon: recu.brouillon }),
+    seuil_taux_marque_pct: seuil.valeur,
+    updated_at: new Date().toISOString(),
+  }).eq("id", ctx.entrepriseId);
+  if (error) {
+    return { error: messageErreurUtilisateur("modifierFiligranesEntrepriseAction", error, "Impossible d’enregistrer les filigranes et le seuil de marge.") };
+  }
+  revalidatePath("/parametres");
+  return { ok: true };
 }

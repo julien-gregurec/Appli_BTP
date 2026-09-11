@@ -140,7 +140,8 @@ set local role authenticated;
 select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
 select throws_ok($$delete from public.ouvrages where reference_interne = 'PC-001'$$, '42501', null,
   'ouvrage : on archive, on ne supprime pas');
-select is((select count(*)::int from public.ouvrages_composants_couts), 1, 'ouvrage : le dirigeant voit le coût du composant');
+select is((select count(*)::int from public.ouvrages_composants_couts), 2,
+  'ouvrage : le dirigeant voit le coût du composant, reporté de la version 1 sur la version 2');
 
 select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
 select is((select count(*)::int from public.ouvrages_composants_couts), 0, 'ouvrage : le conducteur ne voit pas le coût du composant');
@@ -366,6 +367,60 @@ select is((select count(*)::int from public.lignes_devis_couts), 0, 'isolation :
 select is((select count(*)::int from public.ouvrages), 0, 'isolation : B ne voit pas la bibliothèque de A');
 select is((select count(*)::int from public.devis_prix_journal), 0, 'isolation : B ne voit pas le journal des prix de A');
 reset role;
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- N. Rôle comptable (et, par extension, un expert-comptable doté des mêmes droits)
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- Le poste Comptable de la fixture a acces_factures / gerer_factures, aucun accès aux devis et aucun
+-- droit sur les coûts. Il consulte les factures ; il ne modifie ni devis, ni facture émise, ni marges.
+-- L'identifiant de la facture est relevé AVANT de changer de rôle : le comptable ne voit pas le devis
+-- d'origine, une sous-requête passant par lui ne rendrait rien.
+select set_config('pgtap.facture_id',
+  (select f.id::text from public.factures f join public.devis d on d.id = f.devis_origine_id where d.conditions = 'PGTAP-V2'), true);
+set local role authenticated;
+select pg_temp.jwt('10000000-0000-0000-0000-000000000005');
+select throws_ok($$select public.enregistrer_devis_brouillon_v2('a0000000-0000-0000-0000-000000000001', null,
+  '{"client_id":"a3000000-0000-0000-0000-000000000001"}'::jsonb, '[]'::jsonb,
+  '[{"cle_ligne":"x","designation":"X","quantite":1,"prix_unitaire_ht":1,"taux_tva":20}]'::jsonb)$$, '42501', null,
+  'comptable : ne crée ni ne modifie de devis');
+select is((select count(*)::int from public.prestations_catalogue_couts), 0, 'comptable : ne voit aucun prix d''achat du catalogue');
+select is((select count(*)::int from public.lignes_devis_couts), 0, 'comptable : ne voit aucune marge de devis');
+select is((select count(*)::int from public.devis_prix_journal), 0, 'comptable : ne voit pas le journal des prix des devis');
+select throws_ok($$select public.publier_version_ouvrage('a0000000-0000-0000-0000-000000000001', null,
+  '{"nom":"X","unite_principale":"u","quantite_principale":1,"composants":[{"cle":"x","designation":"X","unite":"u"}]}'::jsonb)$$,
+  '42501', null, 'comptable : ne publie pas d''ouvrage');
+select is(public.document_rendu('facture', current_setting('pgtap.facture_id')::uuid) ->> 'source',
+  'instantane', 'comptable : consulte la facture figée');
+select is(public.document_rendu('devis', (select devis_origine_id from public.factures where id = current_setting('pgtap.facture_id')::uuid)), null,
+  'comptable : ne consulte pas le devis d''origine');
+select throws_ok($$update public.factures set notes_client = 'réécrit' where id = current_setting('pgtap.facture_id')::uuid$$, 'P0001', null,
+  'comptable : ne modifie pas une facture émise');
+select throws_ok($$delete from public.factures where id = current_setting('pgtap.facture_id')::uuid$$, 'P0001', null,
+  'comptable : ne supprime pas une facture émise');
+reset role;
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- O. Publication d'un ouvrage sans droit sur les coûts : l'estimation n'est pas effacée
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+insert into public.permissions_poste (entreprise_id, poste_id, cle_permission, autorise)
+values ('a0000000-0000-0000-0000-000000000001', 'a1000000-0000-0000-0000-000000000004', 'gerer_ouvrages', true)
+on conflict (entreprise_id, poste_id, cle_permission) do update set autorise = true;
+set local role authenticated;
+select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
+select lives_ok($$select public.publier_version_ouvrage('a0000000-0000-0000-0000-000000000001',
+  (select id from public.ouvrages where reference_interne = 'PC-001'),
+  '{"nom":"Plancher chauffant v4 (fictif)","reference_interne":"PC-001","unite_principale":"m²","quantite_principale":100,
+    "composants":[{"cle":"isolant","designation":"Isolant v4 (fictif)","unite":"m²"},{"cle":"nouveau","designation":"Nouveau (fictif)","unite":"u"}]}'::jsonb,
+  '[{"cle":"isolant","prix_achat_ht":1}]'::jsonb)$$, 'coûts : un gestionnaire d''ouvrages sans droit sur les coûts publie une version');
+reset role;
+select is((select c.prix_achat_ht from public.ouvrages_composants_couts c
+           join public.ouvrages_versions v on v.id = c.version_id join public.ouvrages o on o.id = v.ouvrage_id
+           where o.reference_interne = 'PC-001' and v.version = o.version_courante and c.cle_composant = 'isolant'), 12::numeric,
+  'coûts : celui de la version précédente est reporté, celui envoyé sans droit est ignoré');
+select is((select count(*)::int from public.ouvrages_composants_couts c
+           join public.ouvrages_versions v on v.id = c.version_id join public.ouvrages o on o.id = v.ouvrage_id
+           where o.reference_interne = 'PC-001' and v.version = o.version_courante and c.cle_composant = 'nouveau'), 0,
+  'coûts : un composant nouveau ne reçoit aucun coût inventé');
 
 -- ─────────────────────────────────────────────────────────────────────────────────────────────────────
 -- M. Documents historiques intacts
