@@ -184,18 +184,23 @@ create trigger catalogue_familles_renommage
 -- ─────────────────────────────────────────────────────────────────────────────────────────────────────
 -- 4. Reprise : les catégories existantes deviennent des familles (premier niveau)
 -- ─────────────────────────────────────────────────────────────────────────────────────────────────────
--- Une famille par libellé normalisé et par entreprise ; la graphie retenue est la première par ordre
+-- Une famille par libellé normalisé et par entreprise. Graphie retenue : la plus fréquente ; à égalité,
+-- celle qui n'est pas tout en minuscules (« Plâtrerie » plutôt que « platrerie »), puis l'ordre
 -- alphabétique. Les déclencheurs de libellé et d'historique sont posés APRÈS : la reprise ne réécrit
 -- aucune catégorie et n'écrit rien au journal.
 insert into public.catalogue_familles (entreprise_id, nom)
-select distinct on (s.entreprise_id, public.normaliser_reference(s.nom)) s.entreprise_id, s.nom
+select distinct on (g.entreprise_id, public.normaliser_reference(g.nom)) g.entreprise_id, g.nom
 from (
-  select entreprise_id, btrim(categorie) as nom from public.prestations_catalogue
-  union all
-  select entreprise_id, btrim(categorie) from public.ouvrages
-) s
-where public.normaliser_reference(s.nom) <> '' and length(s.nom) <= 120
-order by s.entreprise_id, public.normaliser_reference(s.nom), s.nom
+  select s.entreprise_id, s.nom, count(*) as occurrences
+  from (
+    select entreprise_id, btrim(categorie) as nom from public.prestations_catalogue
+    union all
+    select entreprise_id, btrim(categorie) from public.ouvrages
+  ) s
+  where public.normaliser_reference(s.nom) <> '' and length(s.nom) <= 120
+  group by s.entreprise_id, s.nom
+) g
+order by g.entreprise_id, public.normaliser_reference(g.nom), g.occurrences desc, (g.nom = lower(g.nom)), g.nom
 on conflict do nothing;
 
 update public.prestations_catalogue c set famille_id = f.id

@@ -114,9 +114,23 @@ select throws_ok($$insert into storage.objects (bucket_id, name) values
   '42501', null, 'image : jamais dans le dossier d''une autre entreprise');
 select throws_ok($$insert into storage.objects (bucket_id, name) values ('catalogue-images', 'pas-un-uuid/x.png')$$,
   '42501', null, 'image : un chemin sans dossier d''entreprise est refusé, sans erreur de conversion');
-delete from storage.objects where bucket_id = 'catalogue-images';
+-- La suppression SQL directe est bloquée par Storage lui-même ; l'API Storage la lève par ce réglage.
+-- On se place donc comme l'API : c'est l'absence de politique DELETE qui doit empêcher la suppression.
+select set_config('storage.allow_delete_query', 'true', true);
+create or replace function pg_temp.supprimer_images() returns integer language plpgsql as $$
+declare n integer;
+begin
+  delete from storage.objects where bucket_id = 'catalogue-images';
+  get diagnostics n = row_count;
+  return n;
+exception when insufficient_privilege then
+  return 0;
+end $$;
+select is(pg_temp.supprimer_images(), 0,
+  'image : aucune suppression, même par l''API Storage (elle peut figurer dans un document émis)');
+select set_config('storage.allow_delete_query', 'false', true);
 select is((select count(*)::int from storage.objects where bucket_id = 'catalogue-images'), 1,
-  'image : aucune suppression possible (elle peut figurer dans un document émis)');
+  'image : l''image est toujours là');
 select pg_temp.jwt('10000000-0000-0000-0000-000000000002');
 select is((select count(*)::int from storage.objects where bucket_id = 'catalogue-images'), 0,
   'image : l''ouvrier sans accès devis ne la lit pas');
@@ -236,7 +250,7 @@ select ok(exists (select 1 from public.historique_objets where ressource = 'arti
 select is((select (avant #>> '{}') || '→' || (apres #>> '{}') from public.historique_objets
             where ressource = 'article' and ressource_id = 'e2000000-0000-0000-0000-000000000001'
               and champ = 'prix_unitaire_ht' order by id desc limit 1),
-  '20→21', 'historique : changement de prix de vente avec avant et après');
+  '20.00→21.00', 'historique : changement de prix de vente avec avant et après (valeurs numeric telles quelles)');
 select is((select action from public.historique_objets where ressource = 'article'
             and ressource_id = 'e2000000-0000-0000-0000-000000000003' and champ = 'actif' order by id desc limit 1),
   'archivage', 'historique : archivage journalisé');
