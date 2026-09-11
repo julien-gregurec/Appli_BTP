@@ -8,6 +8,13 @@ import { logicielSource, typeImport } from "@/lib/import/config";
 import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 import { contexteQuotaPersonnes } from "@/lib/capacite-personnes";
 import { messageImportCapacite } from "@/lib/quota-personnes-message";
+import { permissionsUtilisateur } from "@/lib/permissions";
+import {
+  construireLignesImportStock,
+  messageErreurImportStock,
+  peutGererPrixStock,
+  type LigneImportStock,
+} from "@/lib/import/stock-lignes";
 
 const MAX_LIGNES = 5000;
 
@@ -70,6 +77,7 @@ export async function importerDonneesAction(payload: {
 
   // Construction des enregistrements selon le type.
   const enregistrements: Record<string, unknown>[] = [];
+  const lignesStock: LigneImportStock[] = [];
 
   if (payload.type === "clients") {
     for (const [i, l] of lignes.entries()) {
@@ -110,20 +118,17 @@ export async function importerDonneesAction(payload: {
       });
     }
   } else if (payload.type === "stock") {
-    for (const l of lignes) {
-      const reference = val(l, "reference");
-      const designation = val(l, "designation");
-      if (!reference || !designation) { ignores++; continue; }
-      enregistrements.push({
-        entreprise_id: entrepriseId, reference, designation,
-        code_barres: val(l, "code_barres") || null, marque: val(l, "marque") || null,
-        unite: val(l, "unite") || "u", quantite_stock: Math.max(0, nombre(val(l, "quantite_stock")) ?? 0),
-        seuil_alerte: Math.max(0, nombre(val(l, "seuil_alerte")) ?? 0),
-        prix_achat_ht: Math.max(0, nombre(val(l, "prix_achat_ht")) ?? 0),
-        prix_vente_ht: Math.max(0, nombre(val(l, "prix_vente_ht")) ?? 0),
-        emplacement: val(l, "emplacement") || null, actif: true, updated_at: new Date().toISOString(),
-      });
-    }
+    // D2 : lignes préparées pour la RPC contrôlée ; colonnes de prix refusées d'emblée
+    // sans gerer_prix_stock, cellule de prix vide = prix inchangé (jamais 0).
+    const preparation = construireLignesImportStock({
+      lignes,
+      mapping: payload.mapping,
+      peutGererPrix: peutGererPrixStock(await permissionsUtilisateur(ctx)),
+    });
+    if (preparation.refus) return { inseres: 0, ignores: preparation.ignores, erreurs: [preparation.refus] };
+    ignores += preparation.ignores;
+    erreurs.push(...preparation.erreurs);
+    lignesStock.push(...preparation.lignes);
   } else if (payload.type === "ecritures_comptables") {
     for (const l of lignes) {
       const journal = val(l, "journal"), dateEcriture = dateIso(val(l, "date_ecriture"));
@@ -253,13 +258,21 @@ export async function importerDonneesAction(payload: {
 
   // Insertion par lots.
   let inseres = 0;
+  // Stock : jamais d'upsert PostgREST (il relirait les prix via EXCLUDED et échouerait en
+  // 42501). La RPC contrôlée applique gerer_prix_stock, ne remet aucun prix à 0 et ne
+  // renvoie qu'un nombre de lignes. « inventaire » : la quantité fournie est atteinte par
+  // un mouvement d'ajustement traçable ; sans quantité, le stock n'est pas touché.
+  for (let i = 0; i < lignesStock.length; i += 200) {
+    const lot = lignesStock.slice(i, i + 200);
+    const { data, error } = await supabase.rpc("importer_articles_stock", { p_entreprise_id: entrepriseId, p_type: "inventaire", p_lignes: lot });
+    if (error) erreurs.push(`Lot ${i / 200 + 1} : ${messageErreurImportStock(error) ?? messageErreurUtilisateur("importerDonneesAction:stock", error, "import du stock impossible, aucune ligne de ce lot n’a été enregistrée")}`);
+    else inseres += Number(data ?? 0);
+  }
   for (let i = 0; i < enregistrements.length; i += 200) {
     const lot = enregistrements.slice(i, i + 200);
     const requete = payload.type === "tarifs_fournisseurs"
       ? supabase.from(conf.table).upsert(lot, { onConflict: "entreprise_id,fournisseur_id,reference_fournisseur", count: "exact" })
-      : payload.type === "stock"
-        ? supabase.from(conf.table).upsert(lot, { onConflict: "entreprise_id,reference", count: "exact" })
-        : supabase.from(conf.table).insert(lot, { count: "exact" });
+      : supabase.from(conf.table).insert(lot, { count: "exact" });
     const { error, count } = await requete;
     if (error) erreurs.push(`Lot ${i / 200 + 1} : ${messageErreurUtilisateur("importerDonneesAction:lot", error, "insertion impossible")}`);
     else inseres += count ?? lot.length;
