@@ -1,8 +1,6 @@
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { resoudreTokenPartage } from "@/lib/documents-partage";
-import { chargerDonneesDevisImprimable, chargerDonneesFactureImprimable } from "@/lib/documents-commerciaux";
+import { chargerDonneesDocumentPartage } from "@/lib/documents-commerciaux";
 import { DocumentImprimable } from "@/components/DocumentImprimable";
 
 export const metadata = { robots: { index: false, follow: false } };
@@ -13,18 +11,11 @@ export const metadata = { robots: { index: false, follow: false } };
 // devis/facture (voir src/lib/documents-envoi.ts) — Chromium headless
 // l'imprime telle quelle, sans rendu dupliqué. Pas de chrome ELSATIA ici
 // (contrairement à /document/[token], destinée elle à un humain) : ce n'est
-// que le document, prêt à être imprimé.
+// que le document, prêt à être imprimé. Même lecture que /document/[token] :
+// chargerDonneesDocumentPartage(), seule lecture permise au client service_role.
 export default async function ImprimerPartagePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const supabaseAnon = await createClient();
-  const resolution = await resoudreTokenPartage(supabaseAnon, token);
-  if (!resolution) notFound();
-
-  const supabaseAdmin = createAdminClient();
-  const donnees =
-    resolution.typeDocument === "devis"
-      ? await chargerDonneesDevisImprimable(supabaseAdmin, { id: resolution.documentId, entrepriseId: resolution.entrepriseId })
-      : await chargerDonneesFactureImprimable(supabaseAdmin, { id: resolution.documentId, entrepriseId: resolution.entrepriseId });
+  const donnees = await chargerDonneesDocumentPartage(createAdminClient(), token);
   if (!donnees) notFound();
 
   return (

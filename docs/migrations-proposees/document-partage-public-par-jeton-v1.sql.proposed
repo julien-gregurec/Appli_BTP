@@ -36,8 +36,17 @@
 --     du client (le snapshot est réduit aux clés de l'en-tête destinataire) ;
 --   - la fiche client courante n'est lue que pour un document sans identité
 --     figée (brouillon), comme identiteClientDocument() côté application.
--- Exécution accordée à anon et authenticated (un visiteur connecté à ELSATIA
--- qui ouvre un lien reste servi) ; ni PUBLIC ni service_role.
+-- Exécution accordée à service_role SEUL : les pages serveur l'appellent avec
+-- createAdminClient(). Ce rôle n'obtient qu'un accès « par jeton » : il ne lit
+-- toujours ni devis, ni factures, ni leurs lignes, ni les clients, ni même les
+-- empreintes de acces_externes_documents ; sans le jeton en clair (présent
+-- uniquement dans l'URL reçue par le client), la fonction ne rend rien.
+-- Ni anon ni authenticated : aucun point d'entrée PostgREST n'est ouvert à
+-- internet (la liste blanche anon de isolation_multitenant_surface reste
+-- inchangée), et le correctif ne dépend pas de l'USAGE d'anon sur le schéma
+-- public — que 20260714000078 a voulu retirer et qui varie selon les bases
+-- (présent via PUBLIC sur une installation fraîche, absent sur la pile E2E
+-- Train V3).
 --
 -- Ordre de livraison : SQL d'abord, code ensuite (le code appelle cette
 -- fonction ; sans elle, la page lève une erreur visible au lieu d'une 404
@@ -257,5 +266,5 @@ comment on function public.document_commercial_public_par_token(text) is
   'Accès externe (client sans compte) à UN devis ou UNE facture par jeton de partage. Hache le jeton en clair, vérifie révocation/expiration/entreprise, et ne renvoie que les champs imprimés. Remplace la lecture service_role des pages /document/[token] et /imprimer/partage/[token], fermée par 20260902000255.';
 
 revoke all on function public.document_commercial_public_par_token(text) from public;
-revoke all on function public.document_commercial_public_par_token(text) from service_role;
-grant execute on function public.document_commercial_public_par_token(text) to anon, authenticated;
+revoke all on function public.document_commercial_public_par_token(text) from anon, authenticated;
+grant execute on function public.document_commercial_public_par_token(text) to service_role;

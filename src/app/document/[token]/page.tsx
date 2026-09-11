@@ -1,8 +1,6 @@
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { resoudreTokenPartage } from "@/lib/documents-partage";
-import { chargerDonneesDevisImprimable, chargerDonneesFactureImprimable } from "@/lib/documents-commerciaux";
+import { chargerDonneesDocumentPartage } from "@/lib/documents-commerciaux";
 import { DocumentImprimable } from "@/components/DocumentImprimable";
 
 export const metadata = { robots: { index: false, follow: false } };
@@ -10,18 +8,12 @@ export const metadata = { robots: { index: false, follow: false } };
 // Page publique (sans authentification, sans navigation interne ELSATIA) :
 // c'est ce que voit un client externe qui a reçu un lien de devis/facture.
 // Ne doit jamais exposer autre chose que ce document précis — voir
-// resoudreTokenPartage() pour la résolution du token et son isolation.
+// chargerDonneesDocumentPartage() : résolution du token et lecture passent par
+// une seule fonction SECURITY DEFINER ; le client service_role n'y gagne aucun
+// droit de table et ne peut rien lire sans le token.
 export default async function DocumentPartagePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const supabaseAnon = await createClient();
-  const resolution = await resoudreTokenPartage(supabaseAnon, token);
-  if (!resolution) notFound();
-
-  const supabaseAdmin = createAdminClient();
-  const donnees =
-    resolution.typeDocument === "devis"
-      ? await chargerDonneesDevisImprimable(supabaseAdmin, { id: resolution.documentId, entrepriseId: resolution.entrepriseId })
-      : await chargerDonneesFactureImprimable(supabaseAdmin, { id: resolution.documentId, entrepriseId: resolution.entrepriseId });
+  const donnees = await chargerDonneesDocumentPartage(createAdminClient(), token);
   if (!donnees) notFound();
 
   return (

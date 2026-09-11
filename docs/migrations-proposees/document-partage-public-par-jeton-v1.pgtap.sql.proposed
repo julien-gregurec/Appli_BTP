@@ -4,11 +4,12 @@
 -- même temps que la migration numérotée issue de
 -- document-partage-public-par-jeton-v1.sql.proposed (le \ir ci-dessous suppose
 -- ce placement). Rejoue la lecture d'un devis / d'une facture par jeton comme
--- la page /document/[token] : rôle anon, aucune session, aucun privilège de
--- table — et vérifie qu'aucune table n'a été regrantée à service_role.
+-- les pages /document/[token] et /imprimer/partage/[token] : rôle service_role
+-- (createAdminClient), qui ne lit toujours AUCUNE table documentaire — seul le
+-- jeton en clair ouvre le document visé.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(39);
+select plan(40);
 
 \ir fixtures/isolation_multitenant.inc
 
@@ -19,12 +20,12 @@ select plan(39);
 \set cles_client 'array[''nom_affiche'',''nom'',''prenom'',''societe'',''adresse_facturation'',''code_postal'',''ville'',''siret'',''identite_incertaine'']'
 
 -- ---------------------------------------------------------------------------
--- 1-10. Surface : SECURITY DEFINER, search_path figé, droits minimaux, et
+-- 1-10. Surface : SECURITY DEFINER, search_path figé, service_role seul, et
 -- aucune table rouverte à service_role ni à anon.
 -- ---------------------------------------------------------------------------
 select has_function(
   'public', 'document_commercial_public_par_token', array['text'],
-  'la fonction de lecture publique par jeton existe'
+  'la fonction de lecture par jeton existe'
 );
 select ok(
   (select prosecdef from pg_proc where oid = 'public.document_commercial_public_par_token(text)'::regprocedure),
@@ -36,12 +37,16 @@ select ok(
   'son search_path est figé à vide'
 );
 select ok(
-  has_function_privilege('anon', 'public.document_commercial_public_par_token(text)', 'EXECUTE'),
-  'anon peut l''exécuter (client destinataire sans compte)'
+  has_function_privilege('service_role', 'public.document_commercial_public_par_token(text)', 'EXECUTE'),
+  'service_role peut l''exécuter (appel serveur des pages de partage)'
 );
 select ok(
-  has_function_privilege('authenticated', 'public.document_commercial_public_par_token(text)', 'EXECUTE'),
-  'authenticated peut l''exécuter (visiteur connecté qui ouvre un lien)'
+  not has_function_privilege('anon', 'public.document_commercial_public_par_token(text)', 'EXECUTE'),
+  'anon ne l''exécute pas : aucun point d''entrée public via PostgREST'
+);
+select ok(
+  not has_function_privilege('authenticated', 'public.document_commercial_public_par_token(text)', 'EXECUTE'),
+  'authenticated ne l''exécute pas'
 );
 select ok(
   (select p.proacl is not null
@@ -51,15 +56,12 @@ select ok(
   'PUBLIC ne l''exécute pas'
 );
 select ok(
-  not has_function_privilege('service_role', 'public.document_commercial_public_par_token(text)', 'EXECUTE'),
-  'service_role n''en a pas besoin et ne l''exécute pas'
-);
-select ok(
   not has_table_privilege('service_role', 'public.devis', 'SELECT')
   and not has_table_privilege('service_role', 'public.factures', 'SELECT')
   and not has_table_privilege('service_role', 'public.lignes_devis', 'SELECT')
   and not has_table_privilege('service_role', 'public.lignes_factures', 'SELECT')
-  and not has_table_privilege('service_role', 'public.clients', 'SELECT'),
+  and not has_table_privilege('service_role', 'public.clients', 'SELECT')
+  and not has_table_privilege('service_role', 'public.acces_externes_documents', 'SELECT'),
   '20260902000255 intacte : aucune table documentaire n''est regrantée à service_role'
 );
 select ok(
@@ -149,12 +151,13 @@ insert into public.acces_externes_documents (
    now() + interval '60 days', null);
 
 -- ---------------------------------------------------------------------------
--- 11-22. anon, jeton valide du devis brouillon de A : ce document, rien d'autre.
+-- 11-22. service_role, jeton valide du devis brouillon de A : ce document,
+-- rien d'autre.
 -- ---------------------------------------------------------------------------
-set local role anon;
+set local role service_role;
 select set_config('request.jwt.claim.sub', '', true);
 
-select is((:devis_a) ->> 'type_document', 'devis', 'anon : le jeton valide ouvre un devis');
+select is((:devis_a) ->> 'type_document', 'devis', 'le jeton valide ouvre un devis');
 select is((:devis_a) -> 'document' ->> 'numero', 'PART-DEV-001', 'c''est le devis visé par le jeton');
 select is(jsonb_array_length((:devis_a) -> 'lignes'), 2, 'ses deux lignes sont renvoyées');
 select is((:devis_a) -> 'lignes' -> 0 ->> 'designation', 'Ligne une', 'les lignes suivent l''ordre du devis');
@@ -213,23 +216,32 @@ select is(jsonb_array_length((:facture_a) -> 'lignes'), 1, 'la ligne de la factu
 select ok(position('NOTE_FACTURE_SECRETE_A' in (:facture_a)::text) = 0, 'facture : les notes internes ne sortent pas');
 
 -- ---------------------------------------------------------------------------
--- 35. Visiteur connecté (membre de B) : le jeton fait foi, sans rien élargir.
+-- 35-36. Le jeton reste la seule clé : service_role ne lit toujours pas la
+-- table, et un utilisateur connecté ne peut pas appeler la fonction.
 -- ---------------------------------------------------------------------------
+select throws_ok(
+  $$select count(*) from public.devis$$,
+  '42501', null,
+  'service_role ne lit toujours pas devis directement'
+);
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000001', true);
-select is((:devis_a) -> 'document' ->> 'numero', 'PART-DEV-001',
-  'authenticated : même document, ni plus ni moins');
+select throws_ok(
+  $$select public.document_commercial_public_par_token('jeton-partage-devis-a-valide-00000000000000000')$$,
+  '42501', null,
+  'authenticated ne peut pas appeler la fonction directement'
+);
 
 -- ---------------------------------------------------------------------------
--- 36-39. Après émission : identité figée, fiche courante plus lue, snapshot
+-- 37-40. Après émission : identité figée, fiche courante plus lue, snapshot
 -- réduit aux clés de l'en-tête (l'e-mail figé ne sort pas).
 -- ---------------------------------------------------------------------------
 reset role;
 update public.devis set statut = 'envoye' where id = 'd7000000-0000-0000-0000-000000000001';
 update public.clients set nom = 'NOM_APRES_EMISSION' where id = 'a3000000-0000-0000-0000-000000000001';
 
-set local role anon;
+set local role service_role;
 select set_config('request.jwt.claim.sub', '', true);
 select ok(jsonb_typeof((:devis_a) -> 'client') = 'null', 'document émis : la fiche client courante n''est plus lue');
 select ok(
