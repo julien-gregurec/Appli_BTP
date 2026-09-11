@@ -87,6 +87,7 @@ join public.permissions_disponibles d on d.cle in (
   'acces_achats',                -- factures fournisseurs
   'acces_paiements_bancaires',   -- paiements, en consultation
   'acces_exports',               -- exports comptables et TVA
+  'verifier_notes_frais',        -- contrôle : prise en charge, correction, validation, refus motivé
   'comptabiliser_notes_frais',   -- notes de frais de l'entreprise mandatée
   'exporter_notes_frais',
   'consulter_audit_notes_frais'
