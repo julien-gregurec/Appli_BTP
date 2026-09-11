@@ -18,12 +18,12 @@ import type { DecisionDejaPresent, Selection } from "@/lib/devis/recherche-artic
 
 const RANGS: Record<number, string> = {
   1: "Réf. interne exacte",
-  2: "Réf. fabricant exacte",
+  2: "Réf. fabricant ou code distrib. exact",
   3: "Réf. interne",
-  4: "Réf. fabricant",
+  4: "Réf. fabricant ou code distrib.",
   5: "Code-barres",
   6: "Réf. partielle",
-  7: "Désignation",
+  7: "Désignation ou famille",
 };
 
 type Choix = {
@@ -259,13 +259,17 @@ export function SelectionArticlesDialog({
                           {a.origineReferenceInterne === "reference_stock" && <span className="text-neutral-500"> (code stock)</span>}
                         </span>
                         {a.referenceFabricant && <span className="font-mono text-xs text-neutral-500">fab. {a.referenceFabricant}</span>}
+                        {a.codeFournisseur && <span className="font-mono text-xs text-neutral-500">dist. {a.codeFournisseur}</span>}
                         {a.codeBarres && <span className="font-mono text-xs text-neutral-500">EAN {a.codeBarres}</span>}
                         <span className="text-xs text-neutral-400">{RANGS[a.rang] ?? ""} · {libelleNature(a)}</span>
                         {!a.actif && <span className="rounded bg-amber-100 px-1.5 text-xs text-amber-900">Archivé</span>}
                       </div>
-                      <div className="font-medium">{a.designation}</div>
+                      <div className="font-medium">
+                        {a.favori && <span className="mr-1 text-amber-500" aria-label="Favori" title="Dans vos favoris">★</span>}
+                        {a.designation}
+                      </div>
                       <div className="text-xs text-neutral-500">
-                        {[a.fabricant, a.fournisseur].filter(Boolean).join(" · ")}
+                        {[a.famille, a.fabricant, a.fournisseur].filter(Boolean).join(" · ")}
                         {a.stockDisponible !== null && ` · stock ${a.stockDisponible} ${a.unite}`}
                       </div>
                     </div>

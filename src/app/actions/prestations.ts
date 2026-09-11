@@ -11,6 +11,7 @@ import { devisV2Actif } from "@/lib/devis/v2-serveur";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { lireChampsCatalogueV2, lirePrixAchat, type ChampsCatalogueV2 } from "@/lib/prestations-catalogue-v2";
 import { messageErreurReference } from "@/lib/references";
+import { lireCoefficient, lireModePrix, prixVenteRetenu, type ModePrix } from "@/lib/catalogue/prix-article";
 
 function champ(formData: FormData, nom: string) {
   return String(formData.get(nom) ?? "").trim();
@@ -27,14 +28,21 @@ function payloadFormulaire(formData: FormData) {
   };
 }
 
-// ── Moteur de devis v2 : champs de catalogue et prix d'achat ────────────────────────────────
+// ── Moteur de devis v2 : champs de catalogue, prix d'achat, coefficient ─────────────────────────
 // Chemins empruntés UNIQUEMENT quand `devisV2Actif()` : éteint, les actions ci-dessous gardent leurs
 // requêtes historiques, sans aucune colonne nouvelle.
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
-type ExtensionV2 = { champs: ChampsCatalogueV2; prixAchat: number | null };
+type CoutV2 = { prixAchat: number; coefficient: number | null; modePrix: ModePrix };
+type ExtensionV2 = {
+  champs: ChampsCatalogueV2;
+  /** Prix de vente à enregistrer : saisi, ou recalculé en mode « calculé ». */
+  prixVente: number;
+  /** `null` : rien à écrire dans la table des coûts. */
+  cout: CoutV2 | null;
+};
 
-async function lireExtensionV2(formData: FormData, ctx: ContexteEntreprise, supabase: Supabase): Promise<ExtensionV2 | { erreur: string }> {
+async function lireExtensionV2(formData: FormData, ctx: ContexteEntreprise, supabase: Supabase, prixSaisi: number): Promise<ExtensionV2 | { erreur: string }> {
   const lu = lireChampsCatalogueV2((nom) => formData.get(nom));
   if ("erreur" in lu) return lu;
   if (lu.valeurs.fournisseur_id) {
@@ -42,32 +50,50 @@ async function lireExtensionV2(formData: FormData, ctx: ContexteEntreprise, supa
       .eq("id", lu.valeurs.fournisseur_id).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
     if (!data) return { erreur: "Fournisseur introuvable." };
   }
-  // Le prix d'achat n'est pris en compte qu'avec le droit de gérer les coûts ; sinon il est ignoré,
-  // quel que soit le contenu du formulaire reçu.
+  if (lu.valeurs.famille_id) {
+    const { data } = await supabase.from("catalogue_familles").select("id")
+      .eq("id", lu.valeurs.famille_id).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+    if (!data) return { erreur: "Famille introuvable." };
+  }
+  // Prix d'achat, coefficient et mode de prix ne sont pris en compte qu'avec le droit de gérer les
+  // coûts ; sinon ils sont ignorés, quel que soit le contenu du formulaire reçu, et le prix de vente
+  // saisi fait foi (les coûts enregistrés restent intacts).
   const permissions = await permissionsUtilisateur(ctx);
   const peutGererCouts = permissions === null || permissions.includes("gerer_couts_devis");
-  if (!peutGererCouts) return { champs: lu.valeurs, prixAchat: null };
+  if (!peutGererCouts) return { champs: lu.valeurs, prixVente: prixSaisi, cout: null };
   const prix = lirePrixAchat(formData.get("prix_achat_ht"));
   if ("erreur" in prix) return prix;
-  return { champs: lu.valeurs, prixAchat: prix.valeur };
+  const coefficient = lireCoefficient(formData.get("coefficient"));
+  if ("erreur" in coefficient) return coefficient;
+  const modePrix = lireModePrix(formData.get("mode_prix"));
+  const vente = prixVenteRetenu(modePrix, prixSaisi, prix.valeur, coefficient.valeur);
+  if ("erreur" in vente) return vente;
+  if (prix.valeur === null) {
+    if (coefficient.valeur !== null) return { erreur: "Le coefficient demande un prix d’achat." };
+    return { champs: lu.valeurs, prixVente: vente.valeur, cout: null };
+  }
+  return { champs: lu.valeurs, prixVente: vente.valeur, cout: { prixAchat: prix.valeur, coefficient: coefficient.valeur, modePrix } };
 }
 
-/** Écrit le prix d'achat dans la table protégée ; `null` si tout va bien, sinon un message. */
-async function enregistrerPrixAchat(supabase: Supabase, ctx: ContexteEntreprise, prestationId: string, prixAchat: number): Promise<string | null> {
+/** Écrit prix d'achat, coefficient et mode dans la table protégée ; `null` si tout va bien, sinon un message. */
+async function enregistrerPrixAchat(supabase: Supabase, ctx: ContexteEntreprise, prestationId: string, cout: CoutV2): Promise<string | null> {
   const { error } = await supabase.from("prestations_catalogue_couts").upsert(
-    { prestation_id: prestationId, entreprise_id: ctx.entrepriseId, prix_achat_ht: prixAchat, maj_le: new Date().toISOString(), maj_par: ctx.userId },
+    {
+      prestation_id: prestationId, entreprise_id: ctx.entrepriseId, prix_achat_ht: cout.prixAchat,
+      coefficient: cout.coefficient, mode_prix: cout.modePrix, maj_le: new Date().toISOString(), maj_par: ctx.userId,
+    },
     { onConflict: "prestation_id" },
   );
   return error ? messageErreurUtilisateur("enregistrerPrixAchat", error, "le prix d’achat n’a pas pu être enregistré.") : null;
 }
 
 async function creerPrestationV2(formData: FormData, ctx: ContexteEntreprise, supabase: Supabase, payload: ReturnType<typeof payloadFormulaire>): Promise<never> {
-  const extension = await lireExtensionV2(formData, ctx, supabase);
+  const extension = await lireExtensionV2(formData, ctx, supabase, payload.prix_unitaire_ht);
   if ("erreur" in extension) redirect(`/prestations/nouveau?error=${encodeURIComponent(extension.erreur)}`);
 
   const { data, error } = await supabase
     .from("prestations_catalogue")
-    .insert({ entreprise_id: ctx.entrepriseId, ...payload, ...extension.champs })
+    .insert({ entreprise_id: ctx.entrepriseId, ...payload, prix_unitaire_ht: extension.prixVente, ...extension.champs })
     .select("id")
     .single();
   if (error || !data) {
@@ -77,20 +103,20 @@ async function creerPrestationV2(formData: FormData, ctx: ContexteEntreprise, su
 
   revalidatePath("/prestations");
   revalidatePath("/devis/nouveau");
-  if (extension.prixAchat !== null) {
-    const echec = await enregistrerPrixAchat(supabase, ctx, String(data.id), extension.prixAchat);
+  if (extension.cout) {
+    const echec = await enregistrerPrixAchat(supabase, ctx, String(data.id), extension.cout);
     if (echec) redirect(`/prestations/${data.id}/modifier?error=${encodeURIComponent(`Prestation créée, mais ${echec}`)}`);
   }
   redirect("/prestations");
 }
 
 async function modifierPrestationV2(id: string, formData: FormData, ctx: ContexteEntreprise, supabase: Supabase, payload: ReturnType<typeof payloadFormulaire>): Promise<never> {
-  const extension = await lireExtensionV2(formData, ctx, supabase);
+  const extension = await lireExtensionV2(formData, ctx, supabase, payload.prix_unitaire_ht);
   if ("erreur" in extension) redirect(`/prestations/${id}/modifier?error=${encodeURIComponent(extension.erreur)}`);
 
   const { data, error } = await supabase
     .from("prestations_catalogue")
-    .update({ ...payload, ...extension.champs, updated_at: new Date().toISOString() })
+    .update({ ...payload, prix_unitaire_ht: extension.prixVente, ...extension.champs, updated_at: new Date().toISOString() })
     .eq("id", id)
     .eq("entreprise_id", ctx.entrepriseId)
     .select("id");
@@ -99,8 +125,8 @@ async function modifierPrestationV2(id: string, formData: FormData, ctx: Context
 
   revalidatePath("/prestations");
   revalidatePath("/devis/nouveau");
-  if (extension.prixAchat !== null) {
-    const echec = await enregistrerPrixAchat(supabase, ctx, id, extension.prixAchat);
+  if (extension.cout) {
+    const echec = await enregistrerPrixAchat(supabase, ctx, id, extension.cout);
     if (echec) redirect(`/prestations/${id}/modifier?error=${encodeURIComponent(`Prestation enregistrée, mais ${echec}`)}`);
   }
   redirect("/prestations");

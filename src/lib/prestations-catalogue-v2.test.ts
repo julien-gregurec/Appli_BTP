@@ -20,8 +20,18 @@ describe("lireChampsCatalogueV2", () => {
         fabricant: null,
         fournisseur_id: null,
         categorie: "Plâtrerie",
+        famille_id: null,
+        notes_internes: null,
       },
     });
+  });
+  it("lit la famille et les notes internes (GP V1, lot B)", () => {
+    const famille = "0b9f2c1e-8d7a-4c3b-9e2f-1a2b3c4d5e6f";
+    const r = lireChampsCatalogueV2(formulaire({ famille_id: famille, notes_internes: "  À commander 48 h avant  " }));
+    expect("valeurs" in r && r.valeurs.famille_id).toBe(famille);
+    expect("valeurs" in r && r.valeurs.notes_internes).toBe("À commander 48 h avant");
+    expect(lireChampsCatalogueV2(formulaire({ famille_id: "pas-un-uuid" }))).toEqual({ erreur: "Famille invalide." });
+    expect(lireChampsCatalogueV2(formulaire({ notes_internes: "n".repeat(2001) }))).toEqual({ erreur: "Les notes internes dépassent 2000 caractères." });
   });
   it("ne recopie jamais une référence dans une autre", () => {
     const r = lireChampsCatalogueV2(formulaire({ reference_fabricant: "FAB-1" }));

@@ -12,11 +12,12 @@ import { PRODUCT_NAME } from "@/lib/brand";
 import { devisV2Actif } from "@/lib/devis/v2-serveur";
 import { lireReglagesFiligranes, lireSeuilStocke } from "@/lib/entreprise-devis-v2";
 import { FiligranesEntrepriseForm } from "@/components/parametres/FiligranesEntrepriseForm";
+import { SectionNumerotationReferences } from "@/components/parametres/SectionNumerotationReferences";
 
 const input = "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
-export default async function ParametresPage({ searchParams }: { searchParams: Promise<{ error?: string; succes?: string }> }) {
-  const [{ error, succes }, ctx] = await Promise.all([searchParams, getContexteEntreprise()]);
+export default async function ParametresPage({ searchParams }: { searchParams: Promise<{ error?: string; succes?: string; attribuees?: string }> }) {
+  const [{ error, succes, attribuees }, ctx] = await Promise.all([searchParams, getContexteEntreprise()]);
   const supabase = await createClient();
   const permissions = await permissionsUtilisateur(ctx);
   const peutGererAcces = permissions === null || permissions.includes("gerer_utilisateurs");
@@ -116,6 +117,7 @@ export default async function ParametresPage({ searchParams }: { searchParams: P
             peutGerer={peutGererParametres}
           />
         )}
+        {devisV2 && <SectionNumerotationReferences peutGerer={peutGererParametres} attribuees={attribuees} />}
       </div>
     </main>
   );
