@@ -71,8 +71,12 @@ export async function POST(request: Request) {
     }
   }
   if (commandeId && evenement.type === "checkout.session.expired") {
-    await admin.from("boutique_commandes").update({ statut: "expiree", updated_at: new Date().toISOString() })
-      .eq("id", commandeId).eq("stripe_checkout_id", objet.id).eq("statut", "en_attente_paiement");
+    // ACL canonique (migration 255) : service_role n'écrit plus boutique_commandes en direct.
+    const { error } = await admin.rpc("boutique_expirer_commande_service", { p_commande_id: commandeId, p_checkout_id: objet.id });
+    if (error) {
+      console.error("Échec d'expiration du webhook boutique", error);
+      return NextResponse.json({ error: "Synchronisation impossible" }, { status: 500 });
+    }
   }
   return NextResponse.json({ received: true });
 }

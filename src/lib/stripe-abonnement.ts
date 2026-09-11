@@ -546,8 +546,12 @@ export async function reconcilierAbonnementStripe(entrepriseId: string) {
   const variablePrixSupplement = VARIABLES_PRIX_COMPTE_SUP[offre]?.[periodicite];
   const prixSupplement = variablePrixSupplement ? process.env[variablePrixSupplement] : undefined;
   if (!prixSupplement) return { synchronise: false, raison: "prix_supplement_absent" } as const;
-  const { count } = await admin.from("employes").select("id", { count: "exact", head: true }).eq("entreprise_id", entrepriseId).in("compte_application_statut", ["actif", "pause"]);
-  const quantite = Math.max(0, Number(count ?? 0) - offreParCle(offre).comptesInclus);
+  // ACL canonique (migration 255) : service_role ne lit plus `employes` ; le nombre de comptes facturables
+  // vient d'une RPC de service. Échec explicite : un comptage absent ne doit jamais valoir 0, ce qui
+  // supprimerait l'item Stripe « comptes supplémentaires ».
+  const { data: nombreComptes, error: erreurComptage } = await admin.rpc("compter_comptes_application_service", { p_entreprise_id: entrepriseId });
+  if (erreurComptage || typeof nombreComptes !== "number") throw new Error("Comptage des comptes facturables impossible");
+  const quantite = Math.max(0, nombreComptes - offreParCle(offre).comptesInclus);
   const abonnement = await recupererAbonnementStripe(entreprise.stripe_subscription_id);
   const item = abonnement.items?.data?.find((ligne) => ligne.price?.id === prixSupplement);
   if (item && quantite === 0) {

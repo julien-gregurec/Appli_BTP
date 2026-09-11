@@ -26,8 +26,9 @@ afterEach(() => {
 
 // Fabrique un client Supabase minimal couvrant exactement les requêtes faites par
 // reconcilierAbonnementStripe : l'entreprise (abonnement Stripe + offre/périodicité) et
-// le comptage des comptes facturables (compte_application_statut actif/pause).
-function supabaseFakePourReconciliation(params: { entreprise: Record<string, unknown> | null; nbComptes: number }) {
+// le comptage des comptes facturables (compte_application_statut actif/pause), qui passe par la
+// RPC de service compter_comptes_application_service depuis l'ACL canonique (migration 255).
+function supabaseFakePourReconciliation(params: { entreprise: Record<string, unknown> | null; nbComptes: number; erreurComptage?: boolean }) {
   return {
     from(table: string) {
       if (table === "entreprises") {
@@ -36,14 +37,14 @@ function supabaseFakePourReconciliation(params: { entreprise: Record<string, unk
         requete.maybeSingle = async () => ({ data: params.entreprise, error: null });
         return requete;
       }
-      if (table === "employes") {
-        const requete: Record<string, unknown> = {};
-        for (const methode of ["select", "eq"]) requete[methode] = () => requete;
-        requete.in = () => Promise.resolve({ count: params.nbComptes, error: null });
-        return requete;
-      }
       throw new Error(`Table non prévue par ce mock : ${table}`);
     },
+    rpc: vi.fn(async (nom: string) => {
+      if (nom !== "compter_comptes_application_service") throw new Error(`RPC non prévue par ce mock : ${nom}`);
+      return params.erreurComptage
+        ? { data: null, error: { code: "42501", message: "permission denied" } }
+        : { data: params.nbComptes, error: null };
+    }),
   };
 }
 
@@ -316,6 +317,24 @@ describe("réconciliation des comptes supplémentaires (COMPTES-SUPPLEMENTAIRES-
     expect(resultat).toEqual({ synchronise: true, quantite: 0 });
     const suppression = appels.find((a) => a.url.endsWith("/subscription_items/si_existant") && a.methode === "DELETE");
     expect(suppression).toBeDefined();
+  });
+
+  // ELSATIA-SERVICE-ROLE-FLUX-ACL-V1 : après la 255, le comptage direct de `employes` était refusé,
+  // valait 0 et SUPPRIMAIT l'item Stripe des comptes supplémentaires. Un comptage en échec doit
+  // désormais bloquer la réconciliation sans toucher à Stripe.
+  it("échoue sans aucun appel d'écriture Stripe si le comptage des comptes est impossible", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    stubEnvPrixMini();
+    createAdminClient.mockReturnValue(supabaseFakePourReconciliation({
+      entreprise: { stripe_subscription_id: "sub_test", abonnement_offre: "mini", abonnement_periodicite: "mensuel" },
+      nbComptes: 0,
+      erreurComptage: true,
+    }));
+    const { fauxFetch, appels } = fetchFakeStripe({ itemExistant: { id: "si_existant", price: { id: "price_compte_sup_mini_m" } } });
+    vi.stubGlobal("fetch", fauxFetch);
+
+    await expect(reconcilierAbonnementStripe("entreprise-1")).rejects.toThrow("Comptage des comptes facturables impossible");
+    expect(appels.filter((a) => a.methode !== "GET")).toHaveLength(0);
   });
 });
 

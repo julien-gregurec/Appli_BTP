@@ -44,10 +44,11 @@ export async function chargerParametresRelances(supabase: SupabaseClient, entrep
 
 // Pour le cron : ne charge QUE les entreprises ayant explicitement activé l'auto (au moins
 // un des deux volets), pour ne jamais itérer sur l'ensemble de la base à chaque exécution.
-export async function chargerEntreprisesAvecRelancesAutoActives(supabase: SupabaseClient): Promise<ParametresRelances[]> {
-  const { data } = await supabase
-    .from("parametres_relances")
-    .select("*")
-    .or("devis_auto_actif.eq.true,factures_auto_actif.eq.true");
-  return (data ?? []).map((ligne) => versParametres((ligne as LigneParametresRelances).entreprise_id, ligne as LigneParametresRelances));
+// Appelée avec le client service_role, qui ne lit plus parametres_relances en direct depuis
+// l'ACL canonique (migration 255) : RPC de service. Une panne lève une erreur au lieu de se
+// déguiser en « aucune entreprise ».
+export async function chargerEntreprisesAvecRelancesAutoActives(admin: SupabaseClient): Promise<ParametresRelances[]> {
+  const { data, error } = await admin.rpc("relances_auto_parametres_service");
+  if (error) throw new Error("Chargement des paramètres de relances impossible");
+  return ((data ?? []) as LigneParametresRelances[]).map((ligne) => versParametres(ligne.entreprise_id, ligne));
 }

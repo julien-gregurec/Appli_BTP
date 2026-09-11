@@ -44,34 +44,45 @@ export async function envoyerNotificationPush(
 // appareils abonnés, nettoie les abonnements morts (410/404), et marque la notification
 // comme traitée dans tous les cas pour ne jamais la retenter en boucle. Appelée à la fois par
 // le webhook temps réel (une notification) et le cron de secours (plusieurs en attente).
+//
+// ACL canonique (migration 255) : le client service_role ne lit ni n'écrit plus en direct les
+// notifications, préférences et abonnements push ; tout passe par des RPC de service. Une panne de
+// lecture est journalisée et laisse la notification en attente (le cron la reprendra).
+type NotificationAPousser = {
+  id: string;
+  utilisateur_id: string;
+  titre: string;
+  message: string | null;
+  lien: string | null;
+  niveau: string;
+  preference_active: boolean | null;
+  abonnements: Array<{ id: string; endpoint: string; p256dh: string; auth: string }>;
+};
+
 export async function traiterNotificationPush(admin: SupabaseClient, notificationId: string): Promise<void> {
-  const { data: notification } = await admin
-    .from("notifications_utilisateurs")
-    .select("id, utilisateur_id, type, titre, message, lien, niveau, push_envoyee_at")
-    .eq("id", notificationId)
-    .maybeSingle();
-  if (!notification || notification.push_envoyee_at) return;
+  const { data, error } = await admin.rpc("push_preparer_notification_service", { p_notification_id: notificationId });
+  if (error) {
+    console.error("Lecture de la notification push impossible", { code: error.code });
+    return;
+  }
+  const notification = data as NotificationAPousser | null;
+  if (!notification) return;
 
   try {
     if (!pushEstConfigure()) return;
-
-    const [{ data: preference }, { data: abonnements }] = await Promise.all([
-      admin.from("preferences_notifications_push").select("actif").eq("utilisateur_id", notification.utilisateur_id).eq("type", notification.type).maybeSingle(),
-      admin.from("push_abonnements").select("id, endpoint, p256dh, auth").eq("utilisateur_id", notification.utilisateur_id),
-    ]);
-    if (preference?.actif === false) return;
-    if (!abonnements?.length) return;
+    if (notification.preference_active === false) return;
+    if (!notification.abonnements?.length) return;
 
     const payload = { titre: notification.titre, message: notification.message, lien: notification.lien, niveau: notification.niveau };
     await Promise.all(
-      abonnements.map(async (abonnement) => {
+      notification.abonnements.map(async (abonnement) => {
         const resultat = await envoyerNotificationPush(abonnement, payload);
         if (!resultat.ok && resultat.abonnementExpire) {
-          await admin.from("push_abonnements").delete().eq("id", abonnement.id);
+          await admin.rpc("push_supprimer_abonnement_service", { p_abonnement_id: abonnement.id, p_utilisateur_id: notification.utilisateur_id });
         }
       }),
     );
   } finally {
-    await admin.from("notifications_utilisateurs").update({ push_envoyee_at: new Date().toISOString() }).eq("id", notificationId);
+    await admin.rpc("push_marquer_notification_envoyee_service", { p_notification_id: notificationId });
   }
 }

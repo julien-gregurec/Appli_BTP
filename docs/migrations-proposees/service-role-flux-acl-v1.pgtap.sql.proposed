@@ -1,0 +1,390 @@
+-- ELSATIA-SERVICE-ROLE-FLUX-ACL-V1 — suite pgTAP PROPOSÉE (non numérotée).
+-- À placer dans supabase/tests/service_role_flux_acl_v1.test.sql en même temps
+-- que la migration numérotée issue de service-role-flux-acl-v1.sql.proposed.
+-- Lancer psql DEPUIS supabase/tests (\ir fixtures/… en chemin relatif) et en -At.
+--
+-- Couvre : (0) présence des fonctions, (1) exécution réservée à service_role,
+-- (2) grants par colonne EXACTS et tables métier toujours fermées,
+-- (3) chaque flux rejoué sous « set local role service_role » avec les
+-- requêtes du code, (4) refus pour authenticated et anon.
+begin;
+create extension if not exists pgtap with schema extensions;
+select no_plan();
+
+\ir fixtures/isolation_multitenant.inc
+
+-- ── données propres au lot (insérées en propriétaire, avant tout changement de rôle)
+update public.entreprises set stripe_account_id = 'acct_acl_A' where id = 'a0000000-0000-0000-0000-000000000001';
+update public.entreprises set stripe_account_id = 'acct_acl_B' where id = 'b0000000-0000-0000-0000-000000000001';
+update public.factures set stripe_checkout_id = 'cs_acl_A' where id = 'aa000000-0000-0000-0000-000000000001';
+update public.factures set stripe_checkout_id = 'cs_acl_B' where id = 'ba000000-0000-0000-0000-000000000001';
+update public.clients set email = 'client-a@invalid.local' where id = 'a3000000-0000-0000-0000-000000000001';
+
+update public.employes set compte_application_statut = 'actif' where id in ('a2000000-0000-0000-0000-000000000001', 'a2000000-0000-0000-0000-000000000002');
+update public.employes set compte_application_statut = 'pause' where id = 'a2000000-0000-0000-0000-000000000003';
+update public.employes set compte_application_statut = 'ferme' where id = 'a2000000-0000-0000-0000-000000000004';
+update public.employes set compte_application_statut = 'actif' where entreprise_id = 'b0000000-0000-0000-0000-000000000001';
+update public.employes set reference_interne = 'ACL-EMP-A2' where id = 'a2000000-0000-0000-0000-000000000002';
+
+insert into public.boutique_commandes(id, entreprise_id, statut, stripe_checkout_id) values
+  ('ac000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'en_attente_paiement', 'cs_btq_A'),
+  ('ac000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', 'payee', 'cs_btq_paye');
+
+insert into public.parametres_relances(entreprise_id, devis_auto_actif, factures_auto_actif) values
+  ('a0000000-0000-0000-0000-000000000001', true, false),
+  ('b0000000-0000-0000-0000-000000000001', false, false);
+
+insert into public.devis(id, entreprise_id, numero, client_id, chantier_id, statut, date_emission,
+                         montant_ht, montant_tva, montant_ttc) values
+  ('a9000000-0000-0000-0000-0000000000e1', 'a0000000-0000-0000-0000-000000000001', 'TEST_A_DEV_ACL',
+   'a3000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000001', 'envoye',
+   current_date - 30, 100, 20, 120);
+insert into public.relances_documents(entreprise_id, type_document, document_id, niveau, statut, date_envoi) values
+  ('a0000000-0000-0000-0000-000000000001', 'devis', 'a9000000-0000-0000-0000-0000000000e1', 1, 'envoyee', now() - interval '10 days');
+
+insert into public.periodes_paie(id, entreprise_id, mois, date_debut, date_fin, cree_par) values
+  ('ad000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', '2031-01-01', '2031-01-01', '2031-01-31',
+   '10000000-0000-0000-0000-000000000001');
+
+insert into public.notifications_utilisateurs(id, entreprise_id, utilisateur_id, type, titre) values
+  ('ae000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'acl_test', 'Titre ACL');
+insert into public.preferences_notifications_push(entreprise_id, utilisateur_id, type, actif) values
+  ('a0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'acl_test', false);
+insert into public.push_abonnements(id, entreprise_id, utilisateur_id, endpoint, p256dh, auth) values
+  ('af000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+   'https://push.invalid/acl-1', 'p256dh-acl', 'auth-acl');
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 0. Structure
+-- ─────────────────────────────────────────────────────────────────────────────
+select has_function('public', 'stripe_connect_encaisser_facture_service', 'fonction encaissement Connect présente');
+select has_function('public', 'stripe_connect_expirer_checkout_facture_service', 'fonction expiration Connect présente');
+select has_function('public', 'boutique_expirer_commande_service', 'fonction expiration Boutique présente');
+select has_function('public', 'compter_comptes_application_service', 'fonction comptage comptes présente');
+select has_function('public', 'relances_auto_parametres_service', 'fonction paramètres relances présente');
+select has_function('public', 'relances_auto_candidats_service', 'fonction candidats relances présente');
+select has_function('public', 'relance_document_service', 'fonction document relance présente');
+select has_function('public', 'relance_nouveau_lien_partage_service', 'fonction lien relance présente');
+select has_function('public', 'paie_import_preparer_bulletin_service', 'fonction préparation import paie présente');
+select has_function('public', 'paie_import_enregistrer_bulletin_service', 'fonction enregistrement import paie présente');
+select has_function('public', 'push_notifications_en_attente_service', 'fonction push en attente présente');
+select has_function('public', 'push_preparer_notification_service', 'fonction push préparation présente');
+select has_function('public', 'push_marquer_notification_envoyee_service', 'fonction push marquage présente');
+select has_function('public', 'push_supprimer_abonnement_service', 'fonction push suppression présente');
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 1. Exécution réservée à service_role
+-- ─────────────────────────────────────────────────────────────────────────────
+create temp table acl_fonctions(signature regprocedure) on commit drop;
+insert into acl_fonctions values
+  ('public.stripe_connect_encaisser_facture_service(uuid, uuid, text, text, bigint, text)'),
+  ('public.stripe_connect_expirer_checkout_facture_service(uuid, text)'),
+  ('public.boutique_expirer_commande_service(uuid, text)'),
+  ('public.compter_comptes_application_service(uuid)'),
+  ('public.relances_auto_parametres_service()'),
+  ('public.relances_auto_candidats_service(uuid, text, integer)'),
+  ('public.relance_document_service(uuid, text, uuid)'),
+  ('public.relance_nouveau_lien_partage_service(uuid, text, uuid, text, timestamptz)'),
+  ('public.paie_import_preparer_bulletin_service(uuid, text, date)'),
+  ('public.paie_import_enregistrer_bulletin_service(uuid, uuid, date, integer, numeric, date, text, bigint, text, text, text)'),
+  ('public.push_notifications_en_attente_service(timestamptz, integer)'),
+  ('public.push_preparer_notification_service(uuid)'),
+  ('public.push_marquer_notification_envoyee_service(uuid)'),
+  ('public.push_supprimer_abonnement_service(uuid, uuid)');
+grant select on acl_fonctions to service_role, authenticated, anon;
+
+select is((select count(*)::int from acl_fonctions where has_function_privilege('service_role', signature, 'EXECUTE')), 14,
+  'service_role exécute les 14 fonctions');
+select is((select count(*)::int from acl_fonctions where has_function_privilege('authenticated', signature, 'EXECUTE')), 0,
+  'authenticated n''exécute aucune des 14 fonctions');
+select is((select count(*)::int from acl_fonctions where has_function_privilege('anon', signature, 'EXECUTE')), 0,
+  'anon n''exécute aucune des 14 fonctions');
+select is((select count(*)::int from acl_fonctions f join pg_proc p on p.oid = f.signature::oid,
+                  lateral aclexplode(p.proacl) a where a.grantee = 0), 0,
+  'PUBLIC n''a l''EXECUTE sur aucune des 14 fonctions');
+select is((select count(*)::int from acl_fonctions f join pg_proc p on p.oid = f.signature::oid
+           where p.prosecdef and exists (select 1 from unnest(p.proconfig) c where c like 'search_path=%')), 14,
+  'les 14 fonctions sont SECURITY DEFINER avec search_path figé');
+
+select ok(has_function_privilege('service_role', 'public.boutique_finaliser_commande_payee(uuid, text)', 'EXECUTE'),
+  'Boutique : service_role exécute de nouveau boutique_finaliser_commande_payee');
+select ok(not has_function_privilege('authenticated', 'public.boutique_finaliser_commande_payee(uuid, text)', 'EXECUTE'),
+  'Boutique : authenticated ne peut plus marquer une commande payée');
+select ok(not has_function_privilege('anon', 'public.boutique_finaliser_commande_payee(uuid, text)', 'EXECUTE'),
+  'Boutique : anon non plus');
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 2. Grants par colonne exacts ; tables métier toujours fermées
+-- ─────────────────────────────────────────────────────────────────────────────
+create function pg_temp.colonnes_sr(p_table text, p_privilege text) returns text language sql stable as $$
+  select coalesce(string_agg(column_name, ',' order by column_name), '')
+  from information_schema.column_privileges
+  where grantee = 'service_role' and table_schema = 'public' and table_name = p_table and privilege_type = p_privilege
+$$;
+
+select is(pg_temp.colonnes_sr('stripe_webhook_events', 'INSERT'), 'event_type,facture_id,id,livemode', 'stripe_webhook_events : INSERT sur 4 colonnes');
+select is(pg_temp.colonnes_sr('stripe_webhook_events', 'SELECT'), '', 'stripe_webhook_events : aucune lecture');
+select is(pg_temp.colonnes_sr('stripe_webhook_events', 'UPDATE'), '', 'stripe_webhook_events : aucune mise à jour');
+select is(pg_temp.colonnes_sr('journal_audit_paie', 'INSERT'),
+  'action,dossier_id,entreprise_id,nouvelle_valeur,periode_id,ressource_id,ressource_type,utilisateur_id', 'journal_audit_paie : INSERT sur 8 colonnes');
+select is(pg_temp.colonnes_sr('journal_audit_paie', 'SELECT') || pg_temp.colonnes_sr('journal_audit_paie', 'UPDATE'), '',
+  'journal_audit_paie : ni lecture ni mise à jour');
+select is(pg_temp.colonnes_sr('journal_activite', 'INSERT'),
+  'action,description,entreprise_id,metadata,ressource,ressource_id,utilisateur_id', 'journal_activite : INSERT sur 7 colonnes');
+select is(pg_temp.colonnes_sr('journal_activite', 'SELECT') || pg_temp.colonnes_sr('journal_activite', 'UPDATE'), '',
+  'journal_activite : ni lecture ni mise à jour');
+select is(pg_temp.colonnes_sr('periodes_paie', 'SELECT'), 'entreprise_id,id,statut', 'periodes_paie : SELECT sur 3 colonnes');
+select is(pg_temp.colonnes_sr('periodes_paie', 'UPDATE'), 'date_export,updated_at', 'periodes_paie : UPDATE sur date_export et updated_at');
+select is(pg_temp.colonnes_sr('periodes_paie', 'INSERT'), '', 'periodes_paie : aucune insertion');
+select is(pg_temp.colonnes_sr('lots_virements', 'SELECT'), 'entreprise_id,id,provider_payment_id', 'lots_virements : SELECT sur 3 colonnes');
+select is(pg_temp.colonnes_sr('lots_virements', 'UPDATE') || pg_temp.colonnes_sr('lots_virements', 'INSERT'), '',
+  'lots_virements : ni écriture ni insertion');
+select ok(not has_table_privilege('service_role', 'public.stripe_webhook_events', 'DELETE'), 'stripe_webhook_events : pas de DELETE');
+select ok(not has_table_privilege('service_role', 'public.journal_audit_paie', 'DELETE'), 'journal_audit_paie : pas de DELETE');
+
+-- Seuls les droits de LECTURE/ÉCRITURE comptent ici. Une installation fraîche laisse aussi à
+-- service_role REFERENCES/TRIGGER/TRUNCATE/MAINTAIN par les privilèges par défaut de postgres ; la
+-- 255 ne les retire pas et ce lot n'y touche pas (voir le rapport, constats annexes).
+select is((select count(*)::int from information_schema.column_privileges
+           where grantee = 'service_role' and table_schema = 'public'
+             and privilege_type in ('SELECT', 'INSERT', 'UPDATE')
+             and table_name in ('employes', 'factures', 'paiements', 'devis', 'clients', 'bulletins_paie',
+                                'notifications_utilisateurs', 'push_abonnements', 'preferences_notifications_push',
+                                'parametres_relances', 'relances_documents', 'acces_externes_documents',
+                                'boutique_commandes', 'journal_paiements_bancaires')), 0,
+  'aucune des 14 tables métier n''est regrantée à service_role en lecture/écriture, même par colonne');
+select is((select count(*)::int from information_schema.role_table_grants
+           where grantee = 'service_role' and table_schema = 'public'
+             and privilege_type in ('SELECT', 'INSERT', 'UPDATE', 'DELETE')
+             and table_name in ('employes', 'factures', 'paiements', 'devis', 'clients', 'bulletins_paie',
+                                'notifications_utilisateurs', 'push_abonnements', 'preferences_notifications_push',
+                                'parametres_relances', 'relances_documents', 'acces_externes_documents',
+                                'boutique_commandes', 'journal_paiements_bancaires')), 0,
+  'aucun SELECT/INSERT/UPDATE/DELETE de table sur ces 14 tables');
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 3. Flux rejoués sous service_role (claims PostgREST)
+-- ─────────────────────────────────────────────────────────────────────────────
+set local role service_role;
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+
+-- 3a. Idempotence des webhooks Stripe (Connect et Boutique) — code inchangé
+select lives_ok($$insert into public.stripe_webhook_events(id, event_type, livemode, facture_id)
+                  values ('evt_acl_1', 'checkout.session.completed', false, null)$$,
+  'webhook : réservation d''un évènement');
+select throws_ok($$insert into public.stripe_webhook_events(id, event_type, livemode, facture_id)
+                   values ('evt_acl_1', 'checkout.session.completed', false, null)$$,
+  '23505', null, 'webhook : un doublon lève toujours 23505 (détection du code inchangée)');
+select throws_ok($$select id from public.stripe_webhook_events$$, '42501', null, 'webhook : toujours aucune lecture du journal');
+
+-- 3b. Webhook Connect : encaissement d'une facture client
+select is(public.stripe_connect_encaisser_facture_service('aa000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
+            'cs_acl_A', 'acct_acl_B', 5000, 'pi_acl_1'), 'ignoree', 'Connect : compte Connect d''une autre entreprise → ignorée');
+select is(public.stripe_connect_encaisser_facture_service('aa000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001',
+            'cs_acl_A', 'acct_acl_A', 5000, 'pi_acl_1'), 'ignoree', 'Connect : entreprise annoncée étrangère → ignorée');
+select is(public.stripe_connect_encaisser_facture_service('aa000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
+            'cs_autre', 'acct_acl_A', 5000, 'pi_acl_1'), 'ignoree', 'Connect : autre session Checkout → ignorée');
+select is(public.stripe_connect_encaisser_facture_service('aa000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
+            'cs_acl_A', 'acct_acl_A', 5000, 'pi_acl_1'), 'encaissee', 'Connect : encaissement');
+select is(public.stripe_connect_encaisser_facture_service('aa000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001',
+            'cs_acl_A', 'acct_acl_A', 5000, 'pi_acl_1'), 'encaissee', 'Connect : rejeu du même évènement');
+select lives_ok($$select public.stripe_connect_expirer_checkout_facture_service('ba000000-0000-0000-0000-000000000001', 'cs_autre')$$,
+  'Connect : expiration d''une autre session sans effet');
+select lives_ok($$select public.stripe_connect_expirer_checkout_facture_service('ba000000-0000-0000-0000-000000000001', 'cs_acl_B')$$,
+  'Connect : expiration de la session');
+select throws_ok($$select id from public.factures$$, '42501', null, 'Connect : toujours aucune lecture directe des factures');
+select throws_ok($$insert into public.paiements(facture_id, montant) values ('aa000000-0000-0000-0000-000000000001', 1)$$,
+  '42501', null, 'Connect : toujours aucune écriture directe des paiements');
+
+reset role;
+select is((select count(*)::int from public.paiements where stripe_session_id = 'cs_acl_A'), 1, 'Connect : un seul paiement malgré le rejeu');
+select is((select montant from public.paiements where stripe_session_id = 'cs_acl_A'), 50.00::numeric, 'Connect : montant = montant Stripe');
+select is((select stripe_payment_status from public.factures where id = 'aa000000-0000-0000-0000-000000000001'), 'paid', 'Connect : facture payée');
+select is((select stripe_payment_intent_id from public.factures where id = 'aa000000-0000-0000-0000-000000000001'), 'pi_acl_1', 'Connect : payment_intent consigné');
+select is((select montant_paye from public.factures where id = 'aa000000-0000-0000-0000-000000000001'), 50.00::numeric, 'Connect : montant_paye recalculé');
+select is((select stripe_payment_status from public.factures where id = 'ba000000-0000-0000-0000-000000000001'), 'expired', 'Connect : session expirée consignée');
+
+set local role service_role;
+select is(public.stripe_connect_encaisser_facture_service('ba000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000001',
+            'cs_acl_B', 'acct_acl_B', 999999, null), 'encaissee', 'Connect : encaissement B');
+reset role;
+select is((select montant from public.paiements where stripe_session_id = 'cs_acl_B'), 240.00::numeric, 'Connect : montant plafonné au reste dû');
+
+-- 3c. Webhook Boutique
+set local role service_role;
+select lives_ok($$select public.boutique_finaliser_commande_payee('ac000000-0000-0000-0000-0000000000ff', 'cs_inexistant')$$,
+  'Boutique : service_role exécute la finalisation');
+select lives_ok($$select public.boutique_expirer_commande_service('ac000000-0000-0000-0000-000000000001', 'cs_btq_A')$$,
+  'Boutique : expiration d''une commande en attente');
+select lives_ok($$select public.boutique_expirer_commande_service('ac000000-0000-0000-0000-000000000002', 'cs_btq_paye')$$,
+  'Boutique : expiration d''une commande payée sans effet');
+select throws_ok($$update public.boutique_commandes set statut = 'payee'$$, '42501', null, 'Boutique : toujours aucune écriture directe');
+reset role;
+select is((select statut from public.boutique_commandes where id = 'ac000000-0000-0000-0000-000000000001'), 'expiree', 'Boutique : commande expirée');
+select is((select statut from public.boutique_commandes where id = 'ac000000-0000-0000-0000-000000000002'), 'payee', 'Boutique : commande payée intacte');
+
+-- 3d. Abonnement : comptage des comptes facturables
+set local role service_role;
+select is(public.compter_comptes_application_service('a0000000-0000-0000-0000-000000000001'), 3, 'Abonnement : A = 2 actifs + 1 en pause');
+select is(public.compter_comptes_application_service('b0000000-0000-0000-0000-000000000001'), 4, 'Abonnement : B = 4 actifs');
+select is(public.compter_comptes_application_service('c0000000-0000-0000-0000-000000000001'), 0, 'Abonnement : entreprise inconnue = 0');
+select throws_ok($$select count(*) from public.employes$$, '42501', null, 'Abonnement : toujours aucune lecture directe des salariés');
+
+-- 3e. Relances automatiques
+select is((select count(*)::int from public.relances_auto_parametres_service() where entreprise_id = 'a0000000-0000-0000-0000-000000000001'), 1,
+  'Relances : A (devis auto) chargée');
+select is((select count(*)::int from public.relances_auto_parametres_service() where entreprise_id = 'b0000000-0000-0000-0000-000000000001'), 0,
+  'Relances : B (aucun volet auto) ignorée');
+select ok('a9000000-0000-0000-0000-0000000000e1'::uuid in (select id from public.relances_auto_candidats_service('a0000000-0000-0000-0000-000000000001', 'devis', 200)),
+  'Relances : devis envoyé candidat');
+select ok('a9000000-0000-0000-0000-000000000001'::uuid not in (select id from public.relances_auto_candidats_service('a0000000-0000-0000-0000-000000000001', 'devis', 200)),
+  'Relances : devis accepté non candidat');
+select is((select count(*)::int from public.relances_auto_candidats_service('b0000000-0000-0000-0000-000000000001', 'devis', 200)
+           where id = 'a9000000-0000-0000-0000-0000000000e1'), 0, 'Relances : aucun candidat d''une autre entreprise');
+select ok('aa000000-0000-0000-0000-000000000001'::uuid in (select id from public.relances_auto_candidats_service('a0000000-0000-0000-0000-000000000001', 'facture', 200)),
+  'Relances : facture envoyée candidate');
+select throws_ok($$select * from public.relances_auto_candidats_service('a0000000-0000-0000-0000-000000000001', 'chantier', 200)$$,
+  '22023', null, 'Relances : type de document invalide refusé');
+select is(public.relance_document_service('a0000000-0000-0000-0000-000000000001', 'devis', 'a9000000-0000-0000-0000-0000000000e1') -> 'client' ->> 'email',
+  'client-a@invalid.local', 'Relances : e-mail du client courant');
+select is(public.relance_document_service('a0000000-0000-0000-0000-000000000001', 'devis', 'a9000000-0000-0000-0000-0000000000e1') ->> 'statut',
+  'envoye', 'Relances : statut du devis');
+select is(public.relance_document_service('a0000000-0000-0000-0000-000000000001', 'devis', 'a9000000-0000-0000-0000-0000000000e1') ->> 'relances_envoyees',
+  '1', 'Relances : historique compté');
+select ok(public.relance_document_service('a0000000-0000-0000-0000-000000000001', 'devis', 'a9000000-0000-0000-0000-0000000000e1') ->> 'derniere_relance_envoyee' is not null,
+  'Relances : date de la dernière relance');
+select ok(public.relance_document_service('b0000000-0000-0000-0000-000000000001', 'devis', 'a9000000-0000-0000-0000-0000000000e1') is null,
+  'Relances : document d''une autre entreprise → null');
+select is(public.relance_document_service('a0000000-0000-0000-0000-000000000001', 'facture', 'aa000000-0000-0000-0000-000000000001') ->> 'montant_paye',
+  '50.00', 'Relances : facture avec montant payé');
+select lives_ok($$select public.relance_nouveau_lien_partage_service('a0000000-0000-0000-0000-000000000001', 'devis',
+                   'a9000000-0000-0000-0000-0000000000e1', repeat('a', 64), now() + interval '60 days')$$, 'Relances : premier lien');
+select lives_ok($$select public.relance_nouveau_lien_partage_service('a0000000-0000-0000-0000-000000000001', 'devis',
+                   'a9000000-0000-0000-0000-0000000000e1', repeat('b', 64), now() + interval '60 days')$$, 'Relances : lien remplacé');
+select throws_ok($$select public.relance_nouveau_lien_partage_service('a0000000-0000-0000-0000-000000000001', 'devis',
+                    'a9000000-0000-0000-0000-0000000000e1', 'pas-une-empreinte', now())$$, '22023', null, 'Relances : empreinte invalide refusée');
+select throws_ok($$select public.relance_nouveau_lien_partage_service('b0000000-0000-0000-0000-000000000001', 'devis',
+                    'a9000000-0000-0000-0000-0000000000e1', repeat('c', 64), now())$$, 'P0002', null, 'Relances : document d''une autre entreprise refusé');
+select throws_ok($$select id from public.devis$$, '42501', null, 'Relances : toujours aucune lecture directe des devis');
+select throws_ok($$select id from public.acces_externes_documents$$, '42501', null, 'Relances : toujours aucune lecture des empreintes');
+reset role;
+select is((select count(*)::int from public.acces_externes_documents
+           where document_id = 'a9000000-0000-0000-0000-0000000000e1' and revoque_le is null), 1, 'Relances : un seul lien actif');
+select is((select token_hash from public.acces_externes_documents
+           where document_id = 'a9000000-0000-0000-0000-0000000000e1' and revoque_le is null), repeat('b', 64), 'Relances : le lien actif est le dernier');
+select ok((select cree_par is null from public.acces_externes_documents
+           where document_id = 'a9000000-0000-0000-0000-0000000000e1' and revoque_le is null), 'Relances : lien automatique sans auteur humain');
+
+-- 3f. Import des bulletins de paie
+set local role service_role;
+select is((select employe_id from public.paie_import_preparer_bulletin_service('a0000000-0000-0000-0000-000000000001', 'ACL-EMP-A2', '2031-01-01')),
+  'a2000000-0000-0000-0000-000000000002'::uuid, 'Paie import : salarié résolu par sa référence');
+select is((select version from public.paie_import_preparer_bulletin_service('a0000000-0000-0000-0000-000000000001', 'ACL-EMP-A2', '2031-01-01')),
+  1, 'Paie import : première version');
+select is((select count(*)::int from public.paie_import_preparer_bulletin_service('a0000000-0000-0000-0000-000000000001', 'INCONNU', '2031-01-01')),
+  0, 'Paie import : référence inconnue → aucune ligne');
+select is((select count(*)::int from public.paie_import_preparer_bulletin_service('b0000000-0000-0000-0000-000000000001', 'ACL-EMP-A2', '2031-01-01')),
+  0, 'Paie import : référence d''une autre entreprise → aucune ligne');
+select lives_ok($$select public.paie_import_enregistrer_bulletin_service('a0000000-0000-0000-0000-000000000001', 'a2000000-0000-0000-0000-000000000002',
+                   '2031-01-01', 1, 1234.56, null, 'bulletin.pdf', 1000, repeat('d', 64),
+                   'a0000000-0000-0000-0000-000000000001/a2000000-0000-0000-0000-000000000002/2031-01/v1-acl.pdf', 'REF-EC')$$,
+  'Paie import : bulletin enregistré');
+select is((select version from public.paie_import_preparer_bulletin_service('a0000000-0000-0000-0000-000000000001', 'ACL-EMP-A2', '2031-01-01')),
+  2, 'Paie import : version suivante');
+select throws_ok($$select public.paie_import_enregistrer_bulletin_service('a0000000-0000-0000-0000-000000000001', 'b2000000-0000-0000-0000-000000000002',
+                    '2031-01-01', 1, 10, null, 'b.pdf', 10, repeat('e', 64),
+                    'a0000000-0000-0000-0000-000000000001/b2000000-0000-0000-0000-000000000002/x.pdf', null)$$,
+  'P0002', null, 'Paie import : salarié d''une autre entreprise refusé');
+select throws_ok($$select public.paie_import_enregistrer_bulletin_service('a0000000-0000-0000-0000-000000000001', 'a2000000-0000-0000-0000-000000000002',
+                    '2031-01-01', 2, 10, null, 'b.pdf', 10, repeat('e', 64), 'autre/chemin.pdf', null)$$,
+  '22023', null, 'Paie import : chemin de stockage incohérent refusé');
+select throws_ok($$select id from public.bulletins_paie$$, '42501', null, 'Paie import : toujours aucune lecture directe des bulletins');
+reset role;
+select is((select statut from public.bulletins_paie where storage_path like '%/v1-acl.pdf'), 'a_verifier', 'Paie import : statut à vérifier');
+select is((select count(*)::int from public.journal_paiements_bancaires
+           where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and action = 'bulletin_recu_expert'
+             and metadata ->> 'reference_expert_comptable' = 'REF-EC'), 1, 'Paie import : trace bancaire écrite avec le bulletin');
+
+-- 3g. Paie : export et pièces (journal d'audit + période)
+set local role service_role;
+select lives_ok($$insert into public.journal_audit_paie(entreprise_id, periode_id, utilisateur_id, action, ressource_type, ressource_id, nouvelle_valeur)
+                  values ('a0000000-0000-0000-0000-000000000001', 'ad000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001',
+                          'export_periode_paie', 'periode_paie', 'ad000000-0000-0000-0000-000000000001', '{"format":"zip"}')$$,
+  'Paie export : audit de l''export');
+select lives_ok($$insert into public.journal_audit_paie(entreprise_id, periode_id, dossier_id, utilisateur_id, action, ressource_type, ressource_id, nouvelle_valeur)
+                  values ('a0000000-0000-0000-0000-000000000001', null, null, '10000000-0000-0000-0000-000000000001',
+                          'telechargement_piece', 'piece_jointe_paie', 'af000000-0000-0000-0000-0000000000a1', '{}')$$,
+  'Paie documents : audit du téléchargement');
+select throws_ok($$select id from public.journal_audit_paie$$, '42501', null, 'Paie : le journal d''audit reste illisible');
+select throws_ok($$update public.journal_audit_paie set motif = 'x'$$, '42501', null, 'Paie : le journal d''audit reste non modifiable');
+select is((select count(*)::int from public.periodes_paie where statut in ('brouillon', 'saisie_en_cours', 'a_controler')
+           and id = 'ad000000-0000-0000-0000-000000000001'), 1, 'Paie cron : période ouverte listée');
+select throws_ok($$select cree_par from public.periodes_paie$$, '42501', null, 'Paie : les autres colonnes de la période restent fermées');
+select lives_ok($$update public.periodes_paie set date_export = now(), updated_at = now()
+                  where id = 'ad000000-0000-0000-0000-000000000001' and entreprise_id = 'a0000000-0000-0000-0000-000000000001'$$,
+  'Paie export : horodatage de l''export');
+select throws_ok($$update public.periodes_paie set statut = 'validee' where id = 'ad000000-0000-0000-0000-000000000001'$$,
+  '42501', null, 'Paie : le statut de la période reste non modifiable');
+reset role;
+select ok((select date_export is not null from public.periodes_paie where id = 'ad000000-0000-0000-0000-000000000001'), 'Paie export : date_export posée');
+select is((select count(*)::int from public.journal_audit_paie where entreprise_id = 'a0000000-0000-0000-0000-000000000001'
+           and (action, ressource_id) in (('export_periode_paie', 'ad000000-0000-0000-0000-000000000001'::uuid),
+                                         ('telechargement_piece', 'af000000-0000-0000-0000-0000000000a1'::uuid))),
+  2, 'Paie : deux entrées d''audit écrites');
+
+-- 3h. Retour Powens
+set local role service_role;
+select lives_ok($$select id, entreprise_id, provider_payment_id from public.lots_virements
+                  where id = gen_random_uuid() and entreprise_id = 'a0000000-0000-0000-0000-000000000001'$$,
+  'Powens : lecture de l''identifiant prestataire');
+select throws_ok($$select montant_total from public.lots_virements$$, '42501', null, 'Powens : montants toujours illisibles');
+
+-- 3i. Notifications push
+select ok('ae000000-0000-0000-0000-000000000001'::uuid in (select id from public.push_notifications_en_attente_service(now() - interval '25 hours', 200)),
+  'Push : notification en attente listée');
+select is(public.push_preparer_notification_service('ae000000-0000-0000-0000-000000000001') ->> 'titre', 'Titre ACL', 'Push : contenu');
+select is(public.push_preparer_notification_service('ae000000-0000-0000-0000-000000000001') ->> 'preference_active', 'false', 'Push : préférence respectée');
+select is(jsonb_array_length(public.push_preparer_notification_service('ae000000-0000-0000-0000-000000000001') -> 'abonnements'), 1, 'Push : abonnements');
+select lives_ok($$select public.push_supprimer_abonnement_service('af000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001')$$,
+  'Push : suppression par un autre utilisateur sans effet');
+select is(jsonb_array_length(public.push_preparer_notification_service('ae000000-0000-0000-0000-000000000001') -> 'abonnements'), 1, 'Push : abonnement intact');
+select lives_ok($$select public.push_supprimer_abonnement_service('af000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001')$$,
+  'Push : suppression de l''abonnement expiré');
+select is(jsonb_array_length(public.push_preparer_notification_service('ae000000-0000-0000-0000-000000000001') -> 'abonnements'), 0, 'Push : abonnement supprimé');
+select lives_ok($$select public.push_marquer_notification_envoyee_service('ae000000-0000-0000-0000-000000000001')$$, 'Push : notification marquée');
+select ok(public.push_preparer_notification_service('ae000000-0000-0000-0000-000000000001') is null, 'Push : notification traitée → null');
+select ok('ae000000-0000-0000-0000-000000000001'::uuid not in (select id from public.push_notifications_en_attente_service(now() - interval '25 hours', 200)),
+  'Push : plus en attente');
+select throws_ok($$select id from public.notifications_utilisateurs$$, '42501', null, 'Push : toujours aucune lecture directe des notifications');
+select throws_ok($$select endpoint from public.push_abonnements$$, '42501', null, 'Push : toujours aucune lecture directe des abonnements');
+
+-- 3j. Journal d'activité (signature d'un document)
+select lives_ok($$insert into public.journal_activite(entreprise_id, utilisateur_id, action, ressource, ressource_id, description, metadata)
+                  values ('a0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'document_signe', 'devis',
+                          'a9000000-0000-0000-0000-000000000001', 'Signé', '{}')$$,
+  'Signature : journal d''activité écrit');
+select throws_ok($$select id from public.journal_activite$$, '42501', null, 'Signature : le journal d''activité reste illisible');
+reset role;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 4. Aucun point d'entrée pour authenticated ni anon
+-- ─────────────────────────────────────────────────────────────────────────────
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+select throws_ok($$select public.compter_comptes_application_service('a0000000-0000-0000-0000-000000000001')$$,
+  '42501', null, 'authenticated : comptage refusé');
+select throws_ok($$select public.boutique_finaliser_commande_payee('ac000000-0000-0000-0000-000000000001', 'cs_btq_A')$$,
+  '42501', null, 'authenticated : ne peut plus marquer sa commande payée');
+select throws_ok($$select public.push_preparer_notification_service('ae000000-0000-0000-0000-000000000001')$$,
+  '42501', null, 'authenticated : lecture push refusée');
+select throws_ok($$select public.stripe_connect_encaisser_facture_service('aa000000-0000-0000-0000-000000000001',
+                    'a0000000-0000-0000-0000-000000000001', 'cs_acl_A', 'acct_acl_A', 1, null)$$,
+  '42501', null, 'authenticated : encaissement refusé');
+reset role;
+set local role anon;
+select throws_ok($$select public.relance_document_service('a0000000-0000-0000-0000-000000000001', 'devis', 'a9000000-0000-0000-0000-0000000000e1')$$,
+  '42501', null, 'anon : lecture relance refusée');
+reset role;
+
+select * from finish();
+rollback;
