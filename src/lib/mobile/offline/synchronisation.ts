@@ -75,17 +75,21 @@ function estPrete(mutation: MutationLocale, maintenant: number): boolean {
  * Sans verrou, une seconde vidange — page rechargée pendant un envoi, second onglet —
  * reprenait l'envoi EN COURS de la première : les deux vérifiaient la présence du
  * justificatif au même instant, n'y trouvaient rien, et le déposaient chacune. Constaté en
- * recette : deux documents pour une note. Le verrou rend la reprise sûre ; si une vidange
- * tourne déjà, celle-ci s'efface et le dit (`reporte`). Le navigateur libère le verrou quand
- * la page qui le tient disparaît : une application fermée ne bloque rien.
+ * recette : deux documents pour une note. Le verrou rend la reprise sûre.
+ *
+ * La vidange suivante ATTEND son tour, elle ne s'efface pas : une première version passait
+ * son chemin si le verrou était pris, et une note restait « en attente » jusqu'au prochain
+ * déclencheur — le retour du réseau pouvait donc ne rien envoyer. En attendant, elle part
+ * dès que la précédente a fini, et ne trouve plus rien d'« en cours » qui ne soit à elle.
+ * Le navigateur libère le verrou quand la page qui le tient disparaît : une application
+ * fermée ne bloque rien.
  */
 export async function viderLaFile(identite: IdentiteBase): Promise<ResultatVidange> {
   const verrous = typeof navigator !== "undefined" ? navigator.locks : undefined;
   if (!verrous?.request) return viderLaFileSousVerrou(identite);
   return verrous.request(
     `elsatia:gp:vidange:${identite.entrepriseId}:${identite.utilisateurId}`,
-    { ifAvailable: true },
-    async (verrou) => (verrou ? viderLaFileSousVerrou(identite) : { ...VIDE, reporte: true }),
+    () => viderLaFileSousVerrou(identite),
   );
 }
 

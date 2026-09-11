@@ -116,6 +116,10 @@ export function DocumentsEmportes({
     const base = await ouvrirBase(identite);
     if (!base) return;
     try { await retirerDocumentEmporte(base, id); } finally { base.close(); }
+    // L'état « disponible » posé par le téléchargement primait sur la copie locale : après
+    // retrait, la ligne affichait encore « Disponible hors ligne » alors que rien ne restait
+    // sur l'appareil. On l'efface pour que l'écran dise la vérité.
+    setEtats((e) => { const reste = { ...e }; delete reste[id]; return reste; });
     await relire();
   }
 
