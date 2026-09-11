@@ -16,18 +16,15 @@ export async function GET(request: Request) {
 
   const admin = createAdminClient();
   const depuis = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
-  const { data: enAttente, error } = await admin
-    .from("notifications_utilisateurs")
-    .select("id")
-    .is("push_envoyee_at", null)
-    .gte("created_at", depuis)
-    .limit(200);
+  // ACL canonique (migration 255) : pas de lecture directe de notifications_utilisateurs par service_role.
+  const { data, error } = await admin.rpc("push_notifications_en_attente_service", { p_depuis: depuis, p_limite: 200 });
   if (error) {
     console.error("Échec du traitement périodique des notifications", error);
     return NextResponse.json({ error: "Traitement impossible" }, { status: 500 });
   }
 
-  for (const notification of enAttente ?? []) {
+  const enAttente = (data ?? []) as Array<{ id: string }>;
+  for (const notification of enAttente) {
     await traiterNotificationPush(admin, notification.id);
   }
   return NextResponse.json({ traitees: enAttente?.length ?? 0 });

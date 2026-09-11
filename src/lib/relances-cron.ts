@@ -12,6 +12,7 @@ export type ResultatCronRelances = {
   echecs: number;
   dejaEnCours: number;
   details: Array<{ entrepriseId: string; typeDocument: string; documentId: string; statut: string; motif?: string }>;
+  erreur?: string;
 };
 
 // Job du cron quotidien de relances — greffé sur /api/cron/abonnements plutôt qu'un cron
@@ -25,43 +26,66 @@ export async function traiterRelancesAutomatiques(admin: SupabaseClient): Promis
     return { actif: false, entreprisesTraitees: 0, envoyees: 0, ignorees: 0, echecs: 0, dejaEnCours: 0, details: [] };
   }
 
-  const configs = await chargerEntreprisesAvecRelancesAutoActives(admin);
+  // ACL canonique (migration 255) : le client service_role ne lit plus les documents commerciaux en
+  // direct ; le moteur passe en « chemin de service » (RPC dédiées). Une panne de lecture est rendue
+  // visible dans le résultat du cron au lieu de ressembler à « rien à relancer ».
+  let configs: Awaited<ReturnType<typeof chargerEntreprisesAvecRelancesAutoActives>>;
+  try {
+    configs = await chargerEntreprisesAvecRelancesAutoActives(admin);
+  } catch (erreur) {
+    return {
+      actif: true, entreprisesTraitees: 0, envoyees: 0, ignorees: 0, echecs: 0, dejaEnCours: 0, details: [],
+      erreur: erreur instanceof Error ? erreur.message : "Chargement des relances impossible",
+    };
+  }
   const aujourdhui = new Date();
   const details: ResultatCronRelances["details"] = [];
   let envoyees = 0, ignorees = 0, echecs = 0, dejaEnCours = 0;
 
   for (const config of configs) {
-    const { data: entreprise } = await admin.from("entreprises").select("nom").eq("id", config.entrepriseId).maybeSingle();
-    const entrepriseNom = entreprise?.nom ?? "";
+    try {
+      const { data: entreprise } = await admin.from("entreprises").select("nom").eq("id", config.entrepriseId).maybeSingle();
+      const entrepriseNom = entreprise?.nom ?? "";
 
-    const candidats: Awaited<ReturnType<typeof listerCandidatsAutoDevis>>["candidats"] = [];
-    if (config.devisAutoActif) {
-      const { candidats: c } = await listerCandidatsAutoDevis(admin, config.entrepriseId, config, aujourdhui);
-      candidats.push(...c);
-    }
-    if (config.facturesAutoActif) {
-      const { candidats: c } = await listerCandidatsAutoFactures(admin, config.entrepriseId, config, aujourdhui);
-      candidats.push(...c);
-    }
+      const candidats: Awaited<ReturnType<typeof listerCandidatsAutoDevis>>["candidats"] = [];
+      if (config.devisAutoActif) {
+        const { candidats: c } = await listerCandidatsAutoDevis(admin, config.entrepriseId, config, aujourdhui, { service: true });
+        candidats.push(...c);
+      }
+      if (config.facturesAutoActif) {
+        const { candidats: c } = await listerCandidatsAutoFactures(admin, config.entrepriseId, config, aujourdhui, { service: true });
+        candidats.push(...c);
+      }
 
-    for (const candidat of candidats) {
-      const resultat = await executerRelance(admin, config.entrepriseId, config, candidat, {
-        automatique: true,
-        declenchePar: null,
-        entrepriseNom,
-        prenomEmetteur: null,
-        aujourdhui,
-      });
-      if (resultat.statut === "envoyee") envoyees++;
-      else if (resultat.statut === "ignoree") ignorees++;
-      else if (resultat.statut === "echec") echecs++;
-      else dejaEnCours++;
+      for (const candidat of candidats) {
+        const resultat = await executerRelance(admin, config.entrepriseId, config, candidat, {
+          automatique: true,
+          declenchePar: null,
+          entrepriseNom,
+          prenomEmetteur: null,
+          aujourdhui,
+          service: true,
+        });
+        if (resultat.statut === "envoyee") envoyees++;
+        else if (resultat.statut === "ignoree") ignorees++;
+        else if (resultat.statut === "echec") echecs++;
+        else dejaEnCours++;
+        details.push({
+          entrepriseId: config.entrepriseId,
+          typeDocument: candidat.typeDocument,
+          documentId: candidat.documentId,
+          statut: resultat.statut,
+          motif: "motif" in resultat ? resultat.motif : undefined,
+        });
+      }
+    } catch (erreur) {
+      echecs++;
       details.push({
         entrepriseId: config.entrepriseId,
-        typeDocument: candidat.typeDocument,
-        documentId: candidat.documentId,
-        statut: resultat.statut,
-        motif: "motif" in resultat ? resultat.motif : undefined,
+        typeDocument: "-",
+        documentId: "-",
+        statut: "echec",
+        motif: erreur instanceof Error ? erreur.message : "Traitement des relances impossible",
       });
     }
   }

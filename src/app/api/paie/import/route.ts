@@ -30,35 +30,40 @@ export async function POST(request: NextRequest) {
   const admin = createAdminClient();
   const { data: entreprise } = await admin.from("entreprises").select("id").eq("reference_interne", entrepriseReference).maybeSingle();
   if (!entreprise) return NextResponse.json({ error: "Entreprise introuvable" }, { status: 404 });
-  const { data: employe } = await admin.from("employes").select("id").eq("entreprise_id", entreprise.id).eq("reference_interne", employeReference).maybeSingle();
-  if (!employe) return NextResponse.json({ error: "Salarié introuvable" }, { status: 404 });
+  // ACL canonique (migration 255) : service_role ne lit plus `employes` ni `bulletins_paie`. Résolution du
+  // salarié et enregistrement (bulletin + trace bancaire, dans la même transaction) passent par des RPC de
+  // service ; une panne de lecture n'est plus confondue avec un salarié inconnu.
   const periode = `${periodeSaisie}-01`;
-  const { data: versions } = await admin.from("bulletins_paie").select("version").eq("entreprise_id", entreprise.id).eq("employe_id", employe.id).eq("periode", periode).order("version", { ascending: false }).limit(1);
-  const version = Number(versions?.[0]?.version ?? 0) + 1;
+  const { data: preparation, error: preparationError } = await admin.rpc("paie_import_preparer_bulletin_service", {
+    p_entreprise_id: entreprise.id,
+    p_employe_reference: employeReference,
+    p_periode: periode,
+  });
+  if (preparationError) return NextResponse.json({ error: "Import temporairement indisponible" }, { status: 503 });
+  const cible = (preparation as Array<{ employe_id: string; version: number }> | null)?.[0];
+  if (!cible) return NextResponse.json({ error: "Salarié introuvable" }, { status: 404 });
+  const { employe_id: employeId, version } = cible;
   const empreinte = createHash("sha256").update(contenu).digest("hex");
   const nomSain = fichier.name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(-120) || "bulletin.pdf";
-  const storagePath = `${entreprise.id}/${employe.id}/${periodeSaisie}/v${version}-${randomUUID()}-${nomSain}`;
+  const storagePath = `${entreprise.id}/${employeId}/${periodeSaisie}/v${version}-${randomUUID()}-${nomSain}`;
   const { error: uploadError } = await admin.storage.from("bulletins-paie").upload(storagePath, contenu, { contentType: "application/pdf", upsert: false });
   if (uploadError) return NextResponse.json({ error: "Stockage du bulletin impossible" }, { status: 502 });
-  const { data: bulletin, error: insertError } = await admin.from("bulletins_paie").insert({
-    entreprise_id: entreprise.id,
-    employe_id: employe.id,
-    periode,
-    version,
-    montant_net_a_payer: montant,
-    date_paiement_prevue: datePaiement,
-    statut: "a_verifier",
-    nom_fichier_original: fichier.name,
-    type_mime: "application/pdf",
-    taille_octets: fichier.size,
-    empreinte_sha256: empreinte,
-    storage_path: storagePath,
-    reference_expert_comptable: reference,
-  }).select("id").single();
-  if (insertError || !bulletin) {
+  const { data: bulletinId, error: insertError } = await admin.rpc("paie_import_enregistrer_bulletin_service", {
+    p_entreprise_id: entreprise.id,
+    p_employe_id: employeId,
+    p_periode: periode,
+    p_version: version,
+    p_montant_net: montant,
+    p_date_paiement_prevue: datePaiement,
+    p_nom_fichier: fichier.name,
+    p_taille_octets: fichier.size,
+    p_empreinte_sha256: empreinte,
+    p_storage_path: storagePath,
+    p_reference_expert_comptable: reference,
+  });
+  if (insertError || !bulletinId) {
     await admin.storage.from("bulletins-paie").remove([storagePath]);
     return NextResponse.json({ error: "Enregistrement du bulletin impossible" }, { status: 500 });
   }
-  await admin.from("journal_paiements_bancaires").insert({ entreprise_id: entreprise.id, action: "bulletin_recu_expert", ressource_type: "bulletin_paie", ressource_id: bulletin.id, nouveau_statut: "a_verifier", metadata: { reference_expert_comptable: reference } });
-  return NextResponse.json({ id: bulletin.id, statut: "a_verifier", message: "Bulletin reçu ; contrôle humain requis avant virement" }, { status: 201 });
+  return NextResponse.json({ id: bulletinId, statut: "a_verifier", message: "Bulletin reçu ; contrôle humain requis avant virement" }, { status: 201 });
 }

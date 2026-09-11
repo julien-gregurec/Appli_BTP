@@ -1,0 +1,611 @@
+-- ELSATIA-SERVICE-ROLE-FLUX-ACL-V1 — PROPOSITION NON NUMÉROTÉE
+--
+-- Ce fichier n'est PAS une migration : il ne porte aucun numéro et ne doit pas
+-- être copié tel quel dans supabase/migrations. Le numéro s'alloue depuis le
+-- train canonique au moment de l'intégration (dernier numéro du train + 1).
+-- Aucune migration existante n'est modifiée.
+--
+-- Défaut corrigé
+-- --------------
+-- 20260902000255_acl_reconciliation_v1.sql retire à service_role (client
+-- createAdminClient(), src/lib/supabase/admin.ts) tout privilège de table sauf
+-- sur 7 tables, et l'EXECUTE de 350+ fonctions. BYPASSRLS ne contourne pas les
+-- GRANT : PostgREST répond 42501 et supabase-js renvoie { data: null, error },
+-- que la plupart des appelants ignorent. Preuve par requête réelle
+-- (begin; set local role service_role; <requête exacte>; rollback;) sur un clone
+-- jetable de la pile E2E Train V3 — 36 requêtes refusées sur 12 flux, détail
+-- dans docs/audit/ELSATIA_SERVICE_ROLE_FLUX_ACL_V1.md.
+--
+-- Règle de correctif (la plus étroite par flux)
+-- ---------------------------------------------
+-- 1. Journaux en ajout seul écrits par le serveur (idempotence Stripe, audit
+--    paie, journal d'activité) : GRANT INSERT sur les SEULES colonnes écrites.
+--    Aucun SELECT, aucun UPDATE/DELETE : l'immuabilité reste entière et le code
+--    ne change pas.
+-- 2. Lectures d'identifiants techniques (période de paie, lot bancaire) :
+--    GRANT SELECT/UPDATE sur les SEULES colonnes lues/écrites.
+-- 3. Tout ce qui lit des données métier ou personnelles (factures, clients,
+--    salariés, abonnements push) ou écrit plusieurs tables avec un invariant :
+--    fonction SECURITY DEFINER dédiée `*_service`, exécutable par service_role
+--    SEUL (ni PUBLIC, ni anon, ni authenticated) — même schéma que
+--    20260904000262 (webhook abonnement). Aucune table métier n'est regrantée.
+--
+-- Ordre de livraison : SQL d'abord, code ensuite, dans le même train. Les
+-- grants par colonne (sections 1-2) réparent sans code ; les fonctions
+-- (sections 3-8) ne servent qu'au code de la branche
+-- fix/service-role-flux-acl-255-v1. Retour arrière : voir fin de fichier.
+
+begin;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 1. Journaux en ajout seul : INSERT par colonne, rien d'autre
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- Idempotence des webhooks Stripe Connect (factures clients) et Boutique.
+-- Le code s'appuie sur la violation d'unicité 23505 de la clé primaire pour
+-- détecter un doublon : elle reste levée à l'identique.
+grant insert (id, event_type, livemode, facture_id)
+  on table public.stripe_webhook_events to service_role;
+
+-- Audit paie : export d'une période (/api/paie/periodes/[id]/export) et
+-- téléchargement / anomalie d'intégrité d'une pièce (/api/paie/documents/[id]).
+-- Le déclencheur journal_paie_immuable interdit toujours UPDATE et DELETE.
+grant insert (entreprise_id, periode_id, dossier_id, utilisateur_id, action,
+              ressource_type, ressource_id, nouvelle_valeur)
+  on table public.journal_audit_paie to service_role;
+
+-- Journal d'activité : signature d'un document métier en son nom propre
+-- (src/app/actions/signatures-documents.ts).
+grant insert (entreprise_id, utilisateur_id, action, ressource, ressource_id,
+              description, metadata)
+  on table public.journal_activite to service_role;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 2. Identifiants techniques : SELECT / UPDATE par colonne
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- Cron quotidien : liste des périodes encore ouvertes, puis
+-- synchroniser_periode_paie_service (déjà exécutable par service_role).
+-- Export : horodatage date_export de la période exportée (filtre id + entreprise).
+grant select (id, entreprise_id, statut) on table public.periodes_paie to service_role;
+grant update (date_export, updated_at)  on table public.periodes_paie to service_role;
+
+-- Retour Powens : retrouver l'identifiant de paiement du prestataire, puis
+-- reconcilier_lot_virements (déjà exécutable par service_role). Ni montants,
+-- ni statut, ni IBAN.
+grant select (id, entreprise_id, provider_payment_id) on table public.lots_virements to service_role;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 3. Webhook Stripe Connect : encaissement et expiration d'une facture client
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- Reprend à l'identique la logique de src/app/api/stripe/webhook/route.ts, en
+-- une transaction : la facture n'est encaissée que si elle appartient à
+-- l'entreprise annoncée, porte cette session Checkout et si le compte Connect
+-- émetteur est celui de l'entreprise. Montant = min(montant Stripe, reste dû).
+create or replace function public.stripe_connect_encaisser_facture_service(
+  p_facture_id uuid,
+  p_entreprise_id uuid,
+  p_checkout_id text,
+  p_compte_stripe text,
+  p_montant_centimes bigint,
+  p_payment_intent_id text default null
+)
+returns text
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_facture record;
+  v_montant numeric;
+begin
+  if p_facture_id is null or p_entreprise_id is null
+     or nullif(btrim(p_checkout_id), '') is null
+     or nullif(btrim(p_compte_stripe), '') is null then
+    return 'ignoree';
+  end if;
+
+  select f.id, f.montant_ttc, f.montant_paye, f.stripe_checkout_id, e.stripe_account_id
+    into v_facture
+  from public.factures f
+  join public.entreprises e on e.id = f.entreprise_id
+  where f.id = p_facture_id and f.entreprise_id = p_entreprise_id
+  for update of f;
+
+  if not found
+     or v_facture.stripe_checkout_id is distinct from p_checkout_id
+     or v_facture.stripe_account_id is distinct from p_compte_stripe then
+    return 'ignoree';
+  end if;
+
+  v_montant := least(
+    greatest(coalesce(p_montant_centimes, 0), 0)::numeric / 100,
+    greatest(0, coalesce(v_facture.montant_ttc, 0) - coalesce(v_facture.montant_paye, 0))
+  );
+  if v_montant > 0 then
+    insert into public.paiements(facture_id, montant, date, mode, reference, stripe_session_id)
+    values (v_facture.id, v_montant, current_date, 'carte_en_ligne', 'stripe:' || p_checkout_id, p_checkout_id)
+    on conflict (stripe_session_id) do nothing;
+  end if;
+
+  update public.factures
+  set stripe_payment_status = 'paid',
+      stripe_payment_intent_id = nullif(btrim(p_payment_intent_id), '')
+  where id = v_facture.id;
+
+  return 'encaissee';
+end;
+$$;
+
+comment on function public.stripe_connect_encaisser_facture_service(uuid, uuid, text, text, bigint, text) is
+  'Webhook Stripe Connect : encaisse une facture client payée par Checkout (paiement idempotent par session). Renvoie « encaissee » ou « ignoree ». Chemin de service.';
+
+create or replace function public.stripe_connect_expirer_checkout_facture_service(
+  p_facture_id uuid,
+  p_checkout_id text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  update public.factures
+  set stripe_payment_status = 'expired'
+  where id = p_facture_id and stripe_checkout_id = p_checkout_id;
+end;
+$$;
+
+comment on function public.stripe_connect_expirer_checkout_facture_service(uuid, text) is
+  'Webhook Stripe Connect : marque expirée la session Checkout d''une facture client. Chemin de service.';
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 4. Webhook Boutique
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- La 255 a retiré l'EXECUTE à service_role mais l'a LAISSÉ à authenticated :
+-- tout utilisateur connecté pouvait marquer payée sa propre commande (il
+-- connaît son identifiant de session Checkout) sans payer — décrément de stock
+-- et dépense fournisseur « payée » compris. Seul le webhook l'appelle.
+revoke execute on function public.boutique_finaliser_commande_payee(uuid, text) from public, anon, authenticated;
+grant  execute on function public.boutique_finaliser_commande_payee(uuid, text) to service_role;
+
+create or replace function public.boutique_expirer_commande_service(
+  p_commande_id uuid,
+  p_checkout_id text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  update public.boutique_commandes
+  set statut = 'expiree', updated_at = now()
+  where id = p_commande_id
+    and stripe_checkout_id = p_checkout_id
+    and statut = 'en_attente_paiement';
+end;
+$$;
+
+comment on function public.boutique_expirer_commande_service(uuid, text) is
+  'Webhook Boutique : expire une commande en attente de paiement dont la session Checkout a expiré. Chemin de service.';
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 5. Abonnement : comptage des comptes facturables
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- reconcilierAbonnementStripe (src/lib/stripe-abonnement.ts) comptait
+-- employes.compte_application_statut in ('actif','pause') : refusé, count=null,
+-- quantité « comptes supplémentaires » à 0 et suppression de l'item Stripe.
+-- Seul le nombre sort de la fonction, jamais une ligne salarié.
+create or replace function public.compter_comptes_application_service(p_entreprise_id uuid)
+returns integer
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select count(*)::integer
+  from public.employes
+  where entreprise_id = p_entreprise_id
+    and compte_application_statut in ('actif', 'pause');
+$$;
+
+comment on function public.compter_comptes_application_service(uuid) is
+  'Abonnement : nombre de comptes application facturables (actif ou pause) d''une entreprise. Chemin de service.';
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 6. Relances automatiques (cron)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- Le moteur de relances est partagé : la relance manuelle et la simulation
+-- tournent sous la session de l'utilisateur (RLS) et ne changent pas. Seul le
+-- cron (client service_role) passe par ces quatre fonctions, qui renvoient
+-- exactement ce que le moteur lisait.
+
+create or replace function public.relances_auto_parametres_service()
+returns setof public.parametres_relances
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select *
+  from public.parametres_relances
+  where devis_auto_actif is true or factures_auto_actif is true;
+$$;
+
+comment on function public.relances_auto_parametres_service() is
+  'Relances automatiques : paramètres des entreprises ayant activé au moins un volet automatique. Chemin de service.';
+
+create or replace function public.relances_auto_candidats_service(
+  p_entreprise_id uuid,
+  p_type_document text,
+  p_limite integer default 200
+)
+returns table(id uuid)
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_limite integer := greatest(0, least(coalesce(p_limite, 200), 200));
+begin
+  if p_type_document = 'devis' then
+    return query
+      select d.id from public.devis d
+      where d.entreprise_id = p_entreprise_id
+        and d.statut = 'envoye'
+        and d.relance_auto_exclue = false
+      limit v_limite;
+  elsif p_type_document = 'facture' then
+    return query
+      select f.id from public.factures f
+      where f.entreprise_id = p_entreprise_id
+        and f.statut in ('envoyee', 'en_retard', 'payee_partiel')
+        and f.relance_auto_exclue = false
+      limit v_limite;
+  else
+    raise exception 'Type de document de relance invalide' using errcode = '22023';
+  end if;
+end;
+$$;
+
+comment on function public.relances_auto_candidats_service(uuid, text, integer) is
+  'Relances automatiques : identifiants des devis/factures candidats d''une entreprise (plafond 200). Chemin de service.';
+
+-- Même forme que la lecture PostgREST du moteur (document + objet `client`),
+-- plus l'historique d'envoi. Le client n'est joint que s'il appartient à la
+-- même entreprise que le document.
+create or replace function public.relance_document_service(
+  p_entreprise_id uuid,
+  p_type_document text,
+  p_document_id uuid
+)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_document jsonb;
+begin
+  if p_type_document = 'devis' then
+    select jsonb_build_object(
+      'id', d.id, 'entreprise_id', d.entreprise_id, 'numero', d.numero, 'statut', d.statut,
+      'date_emission', d.date_emission, 'montant_ttc', d.montant_ttc,
+      'relance_auto_exclue', d.relance_auto_exclue, 'client_id', d.client_id,
+      'client_snapshot', d.client_snapshot,
+      'client', case when c.id is null then null else jsonb_build_object(
+        'nom', c.nom, 'prenom', c.prenom, 'societe', c.societe, 'email', c.email,
+        'relance_auto_exclue', c.relance_auto_exclue) end)
+      into v_document
+    from public.devis d
+    left join public.clients c on c.id = d.client_id and c.entreprise_id = d.entreprise_id
+    where d.id = p_document_id and d.entreprise_id = p_entreprise_id;
+  elsif p_type_document = 'facture' then
+    select jsonb_build_object(
+      'id', f.id, 'entreprise_id', f.entreprise_id, 'numero', f.numero, 'statut', f.statut,
+      'date_echeance', f.date_echeance, 'montant_ttc', f.montant_ttc, 'montant_paye', f.montant_paye,
+      'relance_auto_exclue', f.relance_auto_exclue, 'client_id', f.client_id,
+      'client_snapshot', f.client_snapshot,
+      'client', case when c.id is null then null else jsonb_build_object(
+        'nom', c.nom, 'prenom', c.prenom, 'societe', c.societe, 'email', c.email,
+        'relance_auto_exclue', c.relance_auto_exclue) end)
+      into v_document
+    from public.factures f
+    left join public.clients c on c.id = f.client_id and c.entreprise_id = f.entreprise_id
+    where f.id = p_document_id and f.entreprise_id = p_entreprise_id;
+  else
+    raise exception 'Type de document de relance invalide' using errcode = '22023';
+  end if;
+
+  if v_document is null then
+    return null;
+  end if;
+
+  return v_document || jsonb_build_object(
+    'relances_envoyees', (
+      select count(*) from public.relances_documents r
+      where r.type_document = p_type_document and r.document_id = p_document_id and r.statut = 'envoyee'),
+    'derniere_relance_envoyee', (
+      select max(r.date_envoi) from public.relances_documents r
+      where r.type_document = p_type_document and r.document_id = p_document_id and r.statut = 'envoyee'));
+end;
+$$;
+
+comment on function public.relance_document_service(uuid, text, uuid) is
+  'Relances automatiques : champs d''éligibilité d''un devis/d''une facture, client courant de la même entreprise et historique d''envoi. Chemin de service.';
+
+-- Révoque les liens actifs du document puis enregistre l'empreinte d'un nouveau
+-- jeton (le jeton en clair ne quitte jamais le serveur applicatif). cree_par
+-- reste NULL : un lien émis par le cron n'a pas d'auteur humain (le code
+-- passait l'identifiant d'entreprise, refusé par la clé étrangère vers
+-- utilisateurs — l'e-mail de relance partait sans lien).
+create or replace function public.relance_nouveau_lien_partage_service(
+  p_entreprise_id uuid,
+  p_type_document text,
+  p_document_id uuid,
+  p_token_hash text,
+  p_expire_le timestamptz
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if p_token_hash is null or p_token_hash !~ '^[0-9a-f]{64}$' then
+    raise exception 'Empreinte de jeton invalide' using errcode = '22023';
+  end if;
+  if p_type_document = 'devis' then
+    perform 1 from public.devis where id = p_document_id and entreprise_id = p_entreprise_id;
+  elsif p_type_document = 'facture' then
+    perform 1 from public.factures where id = p_document_id and entreprise_id = p_entreprise_id;
+  else
+    raise exception 'Type de document de relance invalide' using errcode = '22023';
+  end if;
+  if not found then
+    raise exception 'Document introuvable dans cette entreprise' using errcode = 'P0002';
+  end if;
+
+  update public.acces_externes_documents
+  set revoque_le = now()
+  where entreprise_id = p_entreprise_id
+    and type_document = p_type_document
+    and document_id = p_document_id
+    and revoque_le is null;
+
+  insert into public.acces_externes_documents(entreprise_id, type_document, document_id, token_hash, cree_par, expire_le)
+  values (p_entreprise_id, p_type_document, p_document_id, p_token_hash, null, p_expire_le);
+end;
+$$;
+
+comment on function public.relance_nouveau_lien_partage_service(uuid, text, uuid, text, timestamptz) is
+  'Relances automatiques : remplace le lien de partage client d''un document par l''empreinte d''un nouveau jeton. Chemin de service.';
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 7. Import des bulletins de paie (expert-comptable, /api/paie/import)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- Résout le salarié par sa référence interne (unique par entreprise) et la
+-- prochaine version du bulletin. Aucune ligne si le salarié est inconnu.
+create or replace function public.paie_import_preparer_bulletin_service(
+  p_entreprise_id uuid,
+  p_employe_reference text,
+  p_periode date
+)
+returns table(employe_id uuid, version integer)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select e.id,
+         coalesce((select max(b.version) from public.bulletins_paie b
+                   where b.entreprise_id = p_entreprise_id and b.employe_id = e.id
+                     and b.periode = p_periode), 0) + 1
+  from public.employes e
+  where e.entreprise_id = p_entreprise_id
+    and e.reference_interne = nullif(btrim(p_employe_reference), '');
+$$;
+
+comment on function public.paie_import_preparer_bulletin_service(uuid, text, date) is
+  'Import paie : salarié (par référence interne) et prochaine version de bulletin pour une période. Chemin de service.';
+
+-- Enregistre le bulletin déposé ET sa trace dans journal_paiements_bancaires,
+-- dans la même transaction (la trace était auparavant écrite à part, erreur
+-- ignorée). Statut forcé à « a_verifier » : contrôle humain avant tout virement.
+create or replace function public.paie_import_enregistrer_bulletin_service(
+  p_entreprise_id uuid,
+  p_employe_id uuid,
+  p_periode date,
+  p_version integer,
+  p_montant_net numeric,
+  p_date_paiement_prevue date,
+  p_nom_fichier text,
+  p_taille_octets bigint,
+  p_empreinte_sha256 text,
+  p_storage_path text,
+  p_reference_expert_comptable text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_prefixe text := p_entreprise_id::text || '/' || p_employe_id::text || '/';
+  v_reference text := nullif(btrim(p_reference_expert_comptable), '');
+  v_id uuid;
+begin
+  if not exists (select 1 from public.employes where id = p_employe_id and entreprise_id = p_entreprise_id) then
+    raise exception 'Salarié introuvable dans cette entreprise' using errcode = 'P0002';
+  end if;
+  if p_storage_path is null or left(p_storage_path, length(v_prefixe)) <> v_prefixe then
+    raise exception 'Chemin de stockage incohérent avec le salarié' using errcode = '22023';
+  end if;
+
+  insert into public.bulletins_paie(
+    entreprise_id, employe_id, periode, version, montant_net_a_payer, date_paiement_prevue,
+    statut, nom_fichier_original, type_mime, taille_octets, empreinte_sha256, storage_path,
+    reference_expert_comptable)
+  values (
+    p_entreprise_id, p_employe_id, p_periode, p_version, p_montant_net, p_date_paiement_prevue,
+    'a_verifier', p_nom_fichier, 'application/pdf', p_taille_octets, p_empreinte_sha256, p_storage_path,
+    v_reference)
+  returning id into v_id;
+
+  insert into public.journal_paiements_bancaires(entreprise_id, action, ressource_type, ressource_id, nouveau_statut, metadata)
+  values (p_entreprise_id, 'bulletin_recu_expert', 'bulletin_paie', v_id, 'a_verifier',
+          jsonb_build_object('reference_expert_comptable', v_reference));
+
+  return v_id;
+end;
+$$;
+
+comment on function public.paie_import_enregistrer_bulletin_service(uuid, uuid, date, integer, numeric, date, text, bigint, text, text, text) is
+  'Import paie : enregistre un bulletin déposé (statut a_verifier) et sa trace bancaire, atomiquement. Chemin de service.';
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 8. Notifications push (webhook temps réel + cron de secours)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+create or replace function public.push_notifications_en_attente_service(
+  p_depuis timestamptz,
+  p_limite integer default 200
+)
+returns table(id uuid)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select n.id
+  from public.notifications_utilisateurs n
+  where n.push_envoyee_at is null
+    and n.created_at >= p_depuis
+  limit greatest(0, least(coalesce(p_limite, 200), 500));
+$$;
+
+comment on function public.push_notifications_en_attente_service(timestamptz, integer) is
+  'Push : identifiants des notifications non encore poussées depuis une date (plafond 500). Chemin de service.';
+
+-- Tout ce qu'il faut pour pousser UNE notification : son contenu, la préférence
+-- de l'utilisateur pour ce type (null = jamais réglée = active) et ses
+-- abonnements. NULL si la notification n'existe pas ou a déjà été traitée.
+create or replace function public.push_preparer_notification_service(p_notification_id uuid)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select jsonb_build_object(
+    'id', n.id, 'utilisateur_id', n.utilisateur_id, 'type', n.type, 'titre', n.titre,
+    'message', n.message, 'lien', n.lien, 'niveau', n.niveau,
+    'preference_active', (
+      select p.actif from public.preferences_notifications_push p
+      where p.utilisateur_id = n.utilisateur_id and p.type = n.type),
+    'abonnements', coalesce((
+      select jsonb_agg(jsonb_build_object('id', a.id, 'endpoint', a.endpoint, 'p256dh', a.p256dh, 'auth', a.auth)
+                       order by a.created_at)
+      from public.push_abonnements a
+      where a.utilisateur_id = n.utilisateur_id), '[]'::jsonb))
+  from public.notifications_utilisateurs n
+  where n.id = p_notification_id and n.push_envoyee_at is null;
+$$;
+
+comment on function public.push_preparer_notification_service(uuid) is
+  'Push : contenu d''une notification en attente, préférence et abonnements de son destinataire. Chemin de service.';
+
+create or replace function public.push_marquer_notification_envoyee_service(p_notification_id uuid)
+returns void
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
+  update public.notifications_utilisateurs
+  set push_envoyee_at = now()
+  where id = p_notification_id and push_envoyee_at is null;
+$$;
+
+comment on function public.push_marquer_notification_envoyee_service(uuid) is
+  'Push : marque une notification comme traitée (jamais retentée). Chemin de service.';
+
+-- Abonnement mort (410/404) : supprimé seulement s'il appartient bien au
+-- destinataire de la notification traitée.
+create or replace function public.push_supprimer_abonnement_service(p_abonnement_id uuid, p_utilisateur_id uuid)
+returns void
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
+  delete from public.push_abonnements
+  where id = p_abonnement_id and utilisateur_id = p_utilisateur_id;
+$$;
+
+comment on function public.push_supprimer_abonnement_service(uuid, uuid) is
+  'Push : supprime un abonnement expiré (410/404) de son propriétaire. Chemin de service.';
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 9. Exécution : service_role SEUL
+-- ─────────────────────────────────────────────────────────────────────────────
+
+do $$
+declare
+  v_signature text;
+begin
+  foreach v_signature in array array[
+    'public.stripe_connect_encaisser_facture_service(uuid, uuid, text, text, bigint, text)',
+    'public.stripe_connect_expirer_checkout_facture_service(uuid, text)',
+    'public.boutique_expirer_commande_service(uuid, text)',
+    'public.compter_comptes_application_service(uuid)',
+    'public.relances_auto_parametres_service()',
+    'public.relances_auto_candidats_service(uuid, text, integer)',
+    'public.relance_document_service(uuid, text, uuid)',
+    'public.relance_nouveau_lien_partage_service(uuid, text, uuid, text, timestamptz)',
+    'public.paie_import_preparer_bulletin_service(uuid, text, date)',
+    'public.paie_import_enregistrer_bulletin_service(uuid, uuid, date, integer, numeric, date, text, bigint, text, text, text)',
+    'public.push_notifications_en_attente_service(timestamptz, integer)',
+    'public.push_preparer_notification_service(uuid)',
+    'public.push_marquer_notification_envoyee_service(uuid)',
+    'public.push_supprimer_abonnement_service(uuid, uuid)'
+  ] loop
+    execute format('revoke all on function %s from public, anon, authenticated', v_signature);
+    execute format('grant execute on function %s to service_role', v_signature);
+  end loop;
+end;
+$$;
+
+notify pgrst, 'reload schema';
+
+commit;
+
+-- Retour arrière (dans cet ordre, après avoir retiré le code qui les appelle) :
+--   drop function if exists public.push_supprimer_abonnement_service(uuid, uuid);
+--   drop function if exists public.push_marquer_notification_envoyee_service(uuid);
+--   drop function if exists public.push_preparer_notification_service(uuid);
+--   drop function if exists public.push_notifications_en_attente_service(timestamptz, integer);
+--   drop function if exists public.paie_import_enregistrer_bulletin_service(uuid, uuid, date, integer, numeric, date, text, bigint, text, text, text);
+--   drop function if exists public.paie_import_preparer_bulletin_service(uuid, text, date);
+--   drop function if exists public.relance_nouveau_lien_partage_service(uuid, text, uuid, text, timestamptz);
+--   drop function if exists public.relance_document_service(uuid, text, uuid);
+--   drop function if exists public.relances_auto_candidats_service(uuid, text, integer);
+--   drop function if exists public.relances_auto_parametres_service();
+--   drop function if exists public.compter_comptes_application_service(uuid);
+--   drop function if exists public.boutique_expirer_commande_service(uuid, text);
+--   drop function if exists public.stripe_connect_expirer_checkout_facture_service(uuid, text);
+--   drop function if exists public.stripe_connect_encaisser_facture_service(uuid, uuid, text, text, bigint, text);
+--   revoke execute on function public.boutique_finaliser_commande_payee(uuid, text) from service_role;
+--     (ne PAS rendre l'EXECUTE à authenticated : c'était une faille)
+--   revoke select (id, entreprise_id, provider_payment_id) on table public.lots_virements from service_role;
+--   revoke update (date_export, updated_at) on table public.periodes_paie from service_role;
+--   revoke select (id, entreprise_id, statut) on table public.periodes_paie from service_role;
+--   revoke insert (entreprise_id, utilisateur_id, action, ressource, ressource_id, description, metadata) on table public.journal_activite from service_role;
+--   revoke insert (entreprise_id, periode_id, dossier_id, utilisateur_id, action, ressource_type, ressource_id, nouvelle_valeur) on table public.journal_audit_paie from service_role;
+--   revoke insert (id, event_type, livemode, facture_id) on table public.stripe_webhook_events from service_role;

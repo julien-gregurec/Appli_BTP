@@ -8,7 +8,7 @@ import { nomClientDocument } from "@/lib/client-snapshot";
 import { brevoEstConfigure, envoyerEmailBrevo } from "@/lib/brevo";
 import { corpsHtmlEmailDocument } from "@/lib/email";
 import { contenuEmailRelanceDevis, contenuEmailRelanceFacture } from "@/lib/relances-email";
-import { obtenirNouveauTokenPartage, urlDocumentPartage } from "@/lib/documents-partage";
+import { obtenirNouveauTokenPartage, obtenirNouveauTokenPartageService, urlDocumentPartage } from "@/lib/documents-partage";
 import { resteAPayerFacture } from "@/lib/factures";
 import { estEnPause, estWeekend, type ParametresRelances, type TypeDocumentRelance } from "@/lib/relances";
 
@@ -99,6 +99,37 @@ async function dateDerniereRelanceEnvoyee(supabase: SupabaseClient, typeDocument
   return data?.date_envoi ?? null;
 }
 
+// « Chemin de service » (cron, client service_role) : depuis l'ACL canonique (migration 255),
+// service_role ne lit plus devis, factures, clients ni relances_documents. Des RPC dédiées
+// renvoient exactement les champs des requêtes PostgREST du chemin session, plus l'historique
+// d'envoi. La relance manuelle et la simulation, sous session utilisateur (RLS), ne changent pas.
+type HistoriqueService = { relances_envoyees: number; derniere_relance_envoyee: string | null };
+
+async function lireDocumentService(
+  supabase: SupabaseClient,
+  typeDocument: TypeDocumentRelance,
+  entrepriseId: string,
+  documentId: string,
+): Promise<(Record<string, unknown> & HistoriqueService) | null> {
+  const { data, error } = await supabase.rpc("relance_document_service", {
+    p_entreprise_id: entrepriseId,
+    p_type_document: typeDocument,
+    p_document_id: documentId,
+  });
+  if (error) throw new Error("Lecture du document à relancer impossible");
+  return (data as (Record<string, unknown> & HistoriqueService) | null) ?? null;
+}
+
+async function lireCandidatsService(supabase: SupabaseClient, entrepriseId: string, typeDocument: TypeDocumentRelance): Promise<{ data: Array<{ id: string }> }> {
+  const { data, error } = await supabase.rpc("relances_auto_candidats_service", {
+    p_entreprise_id: entrepriseId,
+    p_type_document: typeDocument,
+    p_limite: PLAFOND_CANDIDATS_PAR_TYPE,
+  });
+  if (error) throw new Error("Lecture des documents à relancer impossible");
+  return { data: (data ?? []) as Array<{ id: string }> };
+}
+
 function joursDepuis(dateIso: string, aujourdhui: Date): number {
   const debut = new Date(dateIso).getTime();
   return Math.floor((aujourdhui.getTime() - debut) / (24 * 3600 * 1000));
@@ -114,10 +145,11 @@ export async function evaluerEligibiliteDevis(
   entrepriseId: string,
   devisId: string,
   config: ParametresRelances,
-  opts: { pourAuto: boolean; aujourdhui?: Date },
+  opts: { pourAuto: boolean; aujourdhui?: Date; service?: boolean },
 ): Promise<{ eligible: true; candidat: CandidatRelance } | { eligible: false; motif: string }> {
   const aujourdhui = opts.aujourdhui ?? new Date();
-  const { data } = await supabase
+  const service = opts.service ? await lireDocumentService(supabase, "devis", entrepriseId, devisId) : null;
+  const { data } = opts.service ? { data: service } : await supabase
     .from("devis")
     .select("id, entreprise_id, numero, statut, date_emission, montant_ttc, relance_auto_exclue, client_id, client_snapshot, client:clients!devis_client_id_fkey(nom, prenom, societe, email, relance_auto_exclue)")
     .eq("id", devisId)
@@ -132,10 +164,10 @@ export async function evaluerEligibiliteDevis(
   if (opts.pourAuto && client?.relance_auto_exclue) return { eligible: false, motif: "Relance automatique exclue pour ce client" };
   if (!client?.email?.trim()) return { eligible: false, motif: "Aucune adresse e-mail client" };
 
-  const niveau = await niveauSuivant(supabase, "devis", devisId);
+  const niveau = service ? Number(service.relances_envoyees ?? 0) + 1 : await niveauSuivant(supabase, "devis", devisId);
   if (niveau > config.devisNombreMaxRelances) return { eligible: false, motif: "Nombre maximum de relances déjà atteint" };
 
-  const derniereRelance = await dateDerniereRelanceEnvoyee(supabase, "devis", devisId);
+  const derniereRelance = service ? service.derniere_relance_envoyee ?? null : await dateDerniereRelanceEnvoyee(supabase, "devis", devisId);
   const delaiRequis = derniereRelance ? config.devisDelaiEntreRelancesJours : config.devisDelaiPremiereRelanceJours;
   const dateReference = derniereRelance ?? devis.date_emission;
   if (joursDepuis(dateReference, aujourdhui) < delaiRequis) return { eligible: false, motif: "Délai avant relance pas encore écoulé" };
@@ -171,10 +203,11 @@ export async function evaluerEligibiliteFacture(
   entrepriseId: string,
   factureId: string,
   config: ParametresRelances,
-  opts: { pourAuto: boolean; aujourdhui?: Date },
+  opts: { pourAuto: boolean; aujourdhui?: Date; service?: boolean },
 ): Promise<{ eligible: true; candidat: CandidatRelance } | { eligible: false; motif: string }> {
   const aujourdhui = opts.aujourdhui ?? new Date();
-  const { data } = await supabase
+  const service = opts.service ? await lireDocumentService(supabase, "facture", entrepriseId, factureId) : null;
+  const { data } = opts.service ? { data: service } : await supabase
     .from("factures")
     .select("id, entreprise_id, numero, statut, date_echeance, montant_ttc, montant_paye, relance_auto_exclue, client_id, client_snapshot, client:clients!factures_client_id_fkey(nom, prenom, societe, email, relance_auto_exclue)")
     .eq("id", factureId)
@@ -196,10 +229,10 @@ export async function evaluerEligibiliteFacture(
   if (opts.pourAuto && client?.relance_auto_exclue) return { eligible: false, motif: "Relance automatique exclue pour ce client" };
   if (!client?.email?.trim()) return { eligible: false, motif: "Aucune adresse e-mail client" };
 
-  const niveau = await niveauSuivant(supabase, "facture", factureId);
+  const niveau = service ? Number(service.relances_envoyees ?? 0) + 1 : await niveauSuivant(supabase, "facture", factureId);
   if (niveau > config.facturesNombreMaxRelances) return { eligible: false, motif: "Nombre maximum de relances déjà atteint" };
 
-  const derniereRelance = await dateDerniereRelanceEnvoyee(supabase, "facture", factureId);
+  const derniereRelance = service ? service.derniere_relance_envoyee ?? null : await dateDerniereRelanceEnvoyee(supabase, "facture", factureId);
   const delaiRequis = derniereRelance ? config.facturesDelaiEntreRelancesJours : config.facturesDelaiPremiereRelanceJours;
   const dateReference = derniereRelance ?? facture.date_echeance;
   if (joursDepuis(dateReference, aujourdhui) < delaiRequis) return { eligible: false, motif: "Délai avant relance pas encore écoulé" };
@@ -234,8 +267,9 @@ export async function listerCandidatsAutoDevis(
   entrepriseId: string,
   config: ParametresRelances,
   aujourdhui: Date,
+  opts: { service?: boolean } = {},
 ): Promise<{ candidats: CandidatRelance[]; ineligibles: Ineligibilite[] }> {
-  const { data } = await supabase
+  const { data } = opts.service ? await lireCandidatsService(supabase, entrepriseId, "devis") : await supabase
     .from("devis")
     .select("id")
     .eq("entreprise_id", entrepriseId)
@@ -245,7 +279,7 @@ export async function listerCandidatsAutoDevis(
   const candidats: CandidatRelance[] = [];
   const ineligibles: Ineligibilite[] = [];
   for (const ligne of data ?? []) {
-    const resultat = await evaluerEligibiliteDevis(supabase, entrepriseId, ligne.id, config, { pourAuto: true, aujourdhui });
+    const resultat = await evaluerEligibiliteDevis(supabase, entrepriseId, ligne.id, config, { pourAuto: true, aujourdhui, service: opts.service });
     if (resultat.eligible) candidats.push(resultat.candidat);
     else ineligibles.push({ typeDocument: "devis", documentId: ligne.id, motif: resultat.motif });
   }
@@ -257,8 +291,9 @@ export async function listerCandidatsAutoFactures(
   entrepriseId: string,
   config: ParametresRelances,
   aujourdhui: Date,
+  opts: { service?: boolean } = {},
 ): Promise<{ candidats: CandidatRelance[]; ineligibles: Ineligibilite[] }> {
-  const { data } = await supabase
+  const { data } = opts.service ? await lireCandidatsService(supabase, entrepriseId, "facture") : await supabase
     .from("factures")
     .select("id")
     .eq("entreprise_id", entrepriseId)
@@ -268,7 +303,7 @@ export async function listerCandidatsAutoFactures(
   const candidats: CandidatRelance[] = [];
   const ineligibles: Ineligibilite[] = [];
   for (const ligne of data ?? []) {
-    const resultat = await evaluerEligibiliteFacture(supabase, entrepriseId, ligne.id, config, { pourAuto: true, aujourdhui });
+    const resultat = await evaluerEligibiliteFacture(supabase, entrepriseId, ligne.id, config, { pourAuto: true, aujourdhui, service: opts.service });
     if (resultat.eligible) candidats.push(resultat.candidat);
     else ineligibles.push({ typeDocument: "facture", documentId: ligne.id, motif: resultat.motif });
   }
@@ -291,7 +326,7 @@ export async function executerRelance(
   entrepriseId: string,
   config: ParametresRelances,
   candidat: CandidatRelance,
-  opts: { automatique: boolean; declenchePar: string | null; entrepriseNom: string; prenomEmetteur: string | null; aujourdhui?: Date },
+  opts: { automatique: boolean; declenchePar: string | null; entrepriseNom: string; prenomEmetteur: string | null; aujourdhui?: Date; service?: boolean },
 ): Promise<ResultatExecutionRelance> {
   const contenu =
     candidat.typeDocument === "devis"
@@ -334,8 +369,8 @@ export async function executerRelance(
   // et maintenant.
   const revalidation =
     candidat.typeDocument === "devis"
-      ? await evaluerEligibiliteDevis(supabase, entrepriseId, candidat.documentId, config, { pourAuto: opts.automatique, aujourdhui: opts.aujourdhui })
-      : await evaluerEligibiliteFacture(supabase, entrepriseId, candidat.documentId, config, { pourAuto: opts.automatique, aujourdhui: opts.aujourdhui });
+      ? await evaluerEligibiliteDevis(supabase, entrepriseId, candidat.documentId, config, { pourAuto: opts.automatique, aujourdhui: opts.aujourdhui, service: opts.service })
+      : await evaluerEligibiliteFacture(supabase, entrepriseId, candidat.documentId, config, { pourAuto: opts.automatique, aujourdhui: opts.aujourdhui, service: opts.service });
   if (!revalidation.eligible) {
     await supabase.rpc("relance_finaliser", { p_id: idReclame, p_statut: "ignoree", p_provider_message_id: null, p_erreur_public_safe: null, p_motif: revalidation.motif });
     return { statut: "ignoree", candidat, motif: revalidation.motif };
@@ -350,12 +385,14 @@ export async function executerRelance(
   try {
     let lien: string | null = null;
     try {
-      const token = await obtenirNouveauTokenPartage(supabase, {
-        entrepriseId,
-        typeDocument: candidat.typeDocument,
-        documentId: candidat.documentId,
-        creePar: opts.declenchePar ?? entrepriseId,
-      });
+      const token = opts.service
+        ? await obtenirNouveauTokenPartageService(supabase, { entrepriseId, typeDocument: candidat.typeDocument, documentId: candidat.documentId })
+        : await obtenirNouveauTokenPartage(supabase, {
+            entrepriseId,
+            typeDocument: candidat.typeDocument,
+            documentId: candidat.documentId,
+            creePar: opts.declenchePar ?? entrepriseId,
+          });
       lien = urlDocumentPartage(token);
     } catch {
       lien = null; // Le lien est un plus, pas un pré-requis : l'email de relance reste utile sans.

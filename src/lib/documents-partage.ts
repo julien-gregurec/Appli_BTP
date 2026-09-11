@@ -21,6 +21,25 @@ export function hacherTokenPartage(token: string): string {
 
 type TypeDocumentPartage = "devis" | "facture";
 
+// Même émission de lien, pour le cron de relances (client service_role, sans session) : ACL canonique
+// (migration 255), l'écriture passe par la RPC de service relance_nouveau_lien_partage_service. Le lien
+// n'a pas d'auteur humain (cree_par NULL côté base).
+export async function obtenirNouveauTokenPartageService(
+  admin: SupabaseClient,
+  params: { entrepriseId: string; typeDocument: TypeDocumentPartage; documentId: string },
+): Promise<string> {
+  const token = genererTokenPartage();
+  const { error } = await admin.rpc("relance_nouveau_lien_partage_service", {
+    p_entreprise_id: params.entrepriseId,
+    p_type_document: params.typeDocument,
+    p_document_id: params.documentId,
+    p_token_hash: hacherTokenPartage(token),
+    p_expire_le: new Date(Date.now() + DUREE_VALIDITE_JOURS * 24 * 3600 * 1000).toISOString(),
+  });
+  if (error) throw new Error("Impossible de créer le lien d'accès sécurisé");
+  return token;
+}
+
 // Révoque tout token actif existant pour ce document puis en émet un nouveau.
 // Appelé avec le client Supabase authentifié de l'utilisateur (RLS standard :
 // il doit être membre actif avec le droit de gérer devis/factures).
