@@ -16,6 +16,7 @@ import { peutSurchargerDestinataire } from "@/lib/permissions-envoi";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { SignatureDocumentMetier } from "@/components/SignatureDocumentMetier";
 import { RelanceDocumentSection } from "@/components/RelanceDocumentSection";
+import { devisV2Actif } from "@/lib/devis/v2-serveur";
 
 export default async function DevisDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; success?: string }> }) {
   const { id } = await params;
@@ -112,6 +113,11 @@ export default async function DevisDetailPage({ params, searchParams }: { params
             >
               Télécharger PDF
             </a>
+            {devisV2Actif() && (
+              <a href={`/api/devis/${id}/lignes`} className="text-xs text-neutral-500 hover:underline">
+                Exporter les lignes (CSV)
+              </a>
+            )}
             {email ? (
               <EmailDocumentButton
                 type="devis"

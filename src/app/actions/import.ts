@@ -1,27 +1,51 @@
 "use server";
 
+import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getContexteEntreprise } from "@/lib/entreprise";
+import { getContexteEntreprise, type ContexteEntreprise } from "@/lib/entreprise";
 import { analyserFichier, type FichierAnalyse } from "@/lib/import/parse";
 import { logicielSource, typeImport } from "@/lib/import/config";
 import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 import { contexteQuotaPersonnes } from "@/lib/capacite-personnes";
 import { messageImportCapacite } from "@/lib/quota-personnes-message";
+import { permissionsUtilisateur } from "@/lib/permissions";
+import { devisV2Actif } from "@/lib/devis/v2-serveur";
+import { planifierImportCatalogue } from "@/lib/devis/import-catalogue";
+import { articlesDepuisBase, fournisseurDepuisBase } from "@/lib/devis/catalogue-base";
+import { chargerCatalogueV2 } from "@/lib/devis/catalogue-serveur";
+import {
+  appliquerOperationsImport,
+  planifierOperationsImport,
+  repliErreurImport,
+  type PortImportCatalogue,
+  type RapportImportCatalogue,
+} from "@/lib/devis/application-import-catalogue";
+import {
+  droitsImportCatalogueV2,
+  lignesPourPlanificateur,
+  lireCleRapprochement,
+  type OptionsImportCatalogueV2,
+} from "@/lib/import/catalogue-v2";
 
 const MAX_LIGNES = 5000;
 
-export async function analyserFichierImport(formData: FormData): Promise<FichierAnalyse & { erreur?: string }> {
-  await getContexteEntreprise();
+export async function analyserFichierImport(formData: FormData): Promise<FichierAnalyse & { erreur?: string; catalogueV2?: OptionsImportCatalogueV2 }> {
+  const ctx = await getContexteEntreprise();
   const file = formData.get("fichier");
   if (!(file instanceof File) || file.size === 0) return { entete: [], lignes: [], total: 0, erreur: "Aucun fichier fourni." };
   if (file.size > 8 * 1024 * 1024) return { entete: [], lignes: [], total: 0, erreur: "Fichier trop volumineux (max 8 Mo)." };
+  let analyse: FichierAnalyse;
   try {
     const res = await analyserFichier(file);
-    return { ...res, lignes: res.lignes.slice(0, MAX_LIGNES) };
+    analyse = { ...res, lignes: res.lignes.slice(0, MAX_LIGNES) };
   } catch (e) {
     return { entete: [], lignes: [], total: 0, erreur: messageErreurUtilisateur("analyserFichierImport", e, "Lecture du fichier impossible. Vérifiez le format et réessayez.") };
   }
+  // Moteur de devis v2 : l'assistant propose le profil catalogue enrichi. Éteint, réponse inchangée.
+  if (!devisV2Actif()) return analyse;
+  const droits = droitsImportCatalogueV2(await permissionsUtilisateur(ctx));
+  return { ...analyse, catalogueV2: { autorise: droits.importer, prixAchat: droits.gererCouts } };
 }
 
 // Helpers de normalisation.
@@ -269,4 +293,90 @@ export async function importerDonneesAction(payload: {
   if (payload.type === "stock") { revalidatePath("/stock"); revalidatePath("/inventaires"); }
   if (payload.type === "ecritures_comptables") revalidatePath("/exports");
   return { inseres, ignores, erreurs };
+}
+
+// ── Catalogue des devis, moteur v2 ──────────────────────────────────────────────────────────
+// Chemin emprunté UNIQUEMENT quand `devisV2Actif()` (colonnes et table de coûts du SQL proposé).
+// Éteint, l'action refuse et l'assistant n'y mène jamais : le profil catalogue reste l'historique.
+
+export type ResultatImportCatalogueV2 = RapportImportCatalogue | { erreur: string };
+
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+/** Écritures de l'import, sous la RLS de l'utilisateur, toujours bornées à son entreprise. */
+function portImportCatalogue(supabase: Supabase, ctx: ContexteEntreprise): PortImportCatalogue {
+  return {
+    insererPrestations: async (lignes) => (await supabase.from("prestations_catalogue").insert([...lignes])).error,
+    mettreAJourPrestation: async (articleId, champs) => {
+      const { data, error } = await supabase.from("prestations_catalogue").update(champs)
+        .eq("id", articleId).eq("entreprise_id", ctx.entrepriseId).select("id");
+      if (error) return error;
+      // La RLS ne lève pas d'erreur sur une ligne invisible : zéro ligne modifiée EST un échec.
+      return (data ?? []).length === 1 ? null : { code: "PGRST116", message: "Aucune ligne modifiée." };
+    },
+    enregistrerCouts: async (couts) => {
+      const majLe = new Date().toISOString();
+      const { error } = await supabase.from("prestations_catalogue_couts").upsert(
+        couts.map((c) => ({ ...c, maj_le: majLe, maj_par: ctx.userId })),
+        { onConflict: "prestation_id" },
+      );
+      return error;
+    },
+    messageErreur: (erreur) => messageErreurUtilisateur("importerCatalogueV2Action", erreur, repliErreurImport(erreur)),
+  };
+}
+
+/**
+ * Import du catalogue des devis (moteur v2) : planifie avec `planifierImportCatalogue`, puis applique
+ * le plan ligne à ligne. Droits revérifiés ici : import (page d'import + `acces_devis` +
+ * `gerer_devis`), lecture des coûts (`voir_couts_devis`), écriture des coûts (`gerer_couts_devis`).
+ * Ne renvoie que le rapport (ligne, statut, message) : aucun identifiant ni aucune valeur de la base.
+ */
+export async function importerCatalogueV2Action(payload: {
+  entete: string[];
+  mapping: Record<string, number>;
+  lignes: string[][];
+  cleRapprochement: string;
+}): Promise<ResultatImportCatalogueV2> {
+  if (!devisV2Actif()) return { erreur: "Cet import n’est pas disponible." };
+  const ctx = await getContexteEntreprise();
+  const droits = droitsImportCatalogueV2(await permissionsUtilisateur(ctx));
+  if (!droits.importer) return { erreur: "Vous n’avez pas le droit d’importer dans le catalogue des devis." };
+
+  const cle = lireCleRapprochement(payload?.cleRapprochement);
+  if (!cle) return { erreur: "Clé de rapprochement inconnue." };
+  if (!Array.isArray(payload.entete) || !Array.isArray(payload.lignes) || payload.lignes.some((l) => !Array.isArray(l))) {
+    return { erreur: "Fichier invalide : relancez l’analyse." };
+  }
+  const mapping = typeof payload.mapping === "object" && payload.mapping !== null ? payload.mapping : {};
+  const fichier = lignesPourPlanificateur(payload.entete.map((e) => String(e ?? "")), payload.lignes.slice(0, MAX_LIGNES), mapping);
+
+  const supabase = await createClient();
+  const catalogue = await chargerCatalogueV2(supabase, ctx.entrepriseId, { voirCouts: droits.voirCouts });
+  if ("erreur" in catalogue) {
+    return {
+      erreur: messageErreurUtilisateur("importerCatalogueV2Action:lecture", catalogue.erreur,
+        "Lecture du catalogue impossible : aucune ligne n’a été importée. Réessayez dans un instant."),
+    };
+  }
+
+  const plan = planifierImportCatalogue(
+    fichier.lignes,
+    articlesDepuisBase(catalogue.prestations, catalogue.couts, { voirCouts: droits.voirCouts }),
+    catalogue.fournisseurs.map(fournisseurDepuisBase),
+    { cleRapprochement: cle, peutModifierPrixAchat: droits.gererCouts },
+  );
+  const operations = planifierOperationsImport(plan, {
+    entrepriseId: ctx.entrepriseId,
+    peutModifierPrixAchat: droits.gererCouts,
+    nouvelId: () => randomUUID(),
+  });
+  const rapport = await appliquerOperationsImport(plan, operations, portImportCatalogue(supabase, ctx));
+
+  revalidatePath("/parametres/import");
+  if (operations.creations.length || operations.misesAJour.length || operations.couts.length) {
+    revalidatePath("/prestations");
+    revalidatePath("/devis/nouveau");
+  }
+  return { ...rapport, colonnesInconnues: [...new Set([...fichier.colonnesInconnues, ...rapport.colonnesInconnues])] };
 }
