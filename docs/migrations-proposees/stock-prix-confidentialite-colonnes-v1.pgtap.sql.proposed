@@ -13,15 +13,21 @@
 -- `supabase/tests/fixtures/isolation_multitenant.inc` (a…/b…).
 --
 -- Personas (entreprise E sauf mention) :
---   ouvrier      acces_stock                                   → aucun prix
---   magasinier   acces_stock, gerer_stock, voir_prix_stock     → prix via RPC seulement
---   comptable    acces_rentabilite                             → coût agrégé par chantier
---   gestionnaire acces_stock, gerer_stock, gerer_prix_stock    → écritures inchangées
---   comptable F  acces_rentabilite dans l'entreprise F         → isolation multitenant
+--   ouvrier            acces_stock                                → aucun prix, aucun coût
+--   magasinier         acces_stock, gerer_stock, voir_prix_stock  → prix via RPC seulement ;
+--                                                                   import SANS prix seulement
+--   comptable          acces_rentabilite                          → coût agrégé par chantier
+--   gestionnaire       acces_stock, gerer_stock, gerer_prix_stock → écritures et imports de prix
+--   expert-comptable   acces_factures, acces_achats, acces_exports → aucun coût, aucun prix (D3)
+--   expert mandaté     acces_factures + acces_rentabilite EXPLICITE → agrégats seulement (D3)
+--   comptable F        acces_rentabilite dans l'entreprise F      → isolation multitenant
+--
+-- Décisions couvertes : D1 (refus explicite, jamais un vide confondu avec 0 €),
+-- D2 (import : prix de vente, gerer_prix_stock, jamais de remise à 0), D3 (expert-comptable).
 
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(36);
+select plan(69);
 
 set local elsatia.capacite_personnes_bypass = 'on';
 
@@ -32,6 +38,8 @@ values
   ('00000000-0000-0000-0000-000000000000','e1000000-0000-0000-0000-000000000002','authenticated','authenticated','stkprix-magasinier-e@invalid.local',crypt('t',gen_salt('bf')),now(),now(),now()),
   ('00000000-0000-0000-0000-000000000000','e1000000-0000-0000-0000-000000000003','authenticated','authenticated','stkprix-comptable-e@invalid.local',crypt('t',gen_salt('bf')),now(),now(),now()),
   ('00000000-0000-0000-0000-000000000000','e1000000-0000-0000-0000-000000000004','authenticated','authenticated','stkprix-gestionnaire-e@invalid.local',crypt('t',gen_salt('bf')),now(),now(),now()),
+  ('00000000-0000-0000-0000-000000000000','e1000000-0000-0000-0000-000000000005','authenticated','authenticated','stkprix-expert-e@invalid.local',crypt('t',gen_salt('bf')),now(),now(),now()),
+  ('00000000-0000-0000-0000-000000000000','e1000000-0000-0000-0000-000000000006','authenticated','authenticated','stkprix-expert-mandate-e@invalid.local',crypt('t',gen_salt('bf')),now(),now(),now()),
   ('00000000-0000-0000-0000-000000000000','f1000000-0000-0000-0000-000000000001','authenticated','authenticated','stkprix-comptable-f@invalid.local',crypt('t',gen_salt('bf')),now(),now(),now());
 
 insert into public.utilisateurs (id, prenom, nom) values
@@ -39,6 +47,8 @@ insert into public.utilisateurs (id, prenom, nom) values
   ('e1000000-0000-0000-0000-000000000002','Magasinier','E'),
   ('e1000000-0000-0000-0000-000000000003','Comptable','E'),
   ('e1000000-0000-0000-0000-000000000004','Gestionnaire','E'),
+  ('e1000000-0000-0000-0000-000000000005','Expert','E'),
+  ('e1000000-0000-0000-0000-000000000006','Expert mandaté','E'),
   ('f1000000-0000-0000-0000-000000000001','Comptable','F')
 -- L'insertion dans auth.users crée déjà la ligne (même motif que la fixture canonique).
 on conflict (id) do update set prenom = excluded.prenom, nom = excluded.nom;
@@ -52,6 +62,8 @@ insert into public.postes (id, entreprise_id, nom) values
   ('e2000000-0000-0000-0000-000000000002','e0000000-0000-0000-0000-000000000001','Magasinier E'),
   ('e2000000-0000-0000-0000-000000000003','e0000000-0000-0000-0000-000000000001','Comptable E'),
   ('e2000000-0000-0000-0000-000000000004','e0000000-0000-0000-0000-000000000001','Gestionnaire prix E'),
+  ('e2000000-0000-0000-0000-000000000005','e0000000-0000-0000-0000-000000000001','Expert-comptable E'),
+  ('e2000000-0000-0000-0000-000000000006','e0000000-0000-0000-0000-000000000001','Expert-comptable mandaté E'),
   ('f2000000-0000-0000-0000-000000000001','f0000000-0000-0000-0000-000000000001','Comptable F');
 
 insert into public.utilisateurs_entreprises (utilisateur_id, entreprise_id, poste_id, statut) values
@@ -59,6 +71,8 @@ insert into public.utilisateurs_entreprises (utilisateur_id, entreprise_id, post
   ('e1000000-0000-0000-0000-000000000002','e0000000-0000-0000-0000-000000000001','e2000000-0000-0000-0000-000000000002','actif'),
   ('e1000000-0000-0000-0000-000000000003','e0000000-0000-0000-0000-000000000001','e2000000-0000-0000-0000-000000000003','actif'),
   ('e1000000-0000-0000-0000-000000000004','e0000000-0000-0000-0000-000000000001','e2000000-0000-0000-0000-000000000004','actif'),
+  ('e1000000-0000-0000-0000-000000000005','e0000000-0000-0000-0000-000000000001','e2000000-0000-0000-0000-000000000005','actif'),
+  ('e1000000-0000-0000-0000-000000000006','e0000000-0000-0000-0000-000000000001','e2000000-0000-0000-0000-000000000006','actif'),
   ('f1000000-0000-0000-0000-000000000001','f0000000-0000-0000-0000-000000000001','f2000000-0000-0000-0000-000000000001','actif');
 
 insert into public.permissions_poste (entreprise_id, poste_id, cle_permission, autorise)
@@ -73,6 +87,11 @@ join (values
   ('e2000000-0000-0000-0000-000000000004'::uuid, 'acces_stock'),
   ('e2000000-0000-0000-0000-000000000004'::uuid, 'gerer_stock'),
   ('e2000000-0000-0000-0000-000000000004'::uuid, 'gerer_prix_stock'),
+  ('e2000000-0000-0000-0000-000000000005'::uuid, 'acces_factures'),
+  ('e2000000-0000-0000-0000-000000000005'::uuid, 'acces_achats'),
+  ('e2000000-0000-0000-0000-000000000005'::uuid, 'acces_exports'),
+  ('e2000000-0000-0000-0000-000000000006'::uuid, 'acces_factures'),
+  ('e2000000-0000-0000-0000-000000000006'::uuid, 'acces_rentabilite'),
   ('f2000000-0000-0000-0000-000000000001'::uuid, 'acces_rentabilite')
 ) as v(poste_id, cle) on v.poste_id = p.id
 join public.permissions_disponibles d on d.cle = v.cle;
@@ -88,6 +107,7 @@ insert into public.chantiers (id, entreprise_id, client_id, nom, statut) values
 
 insert into public.articles_stock (id, entreprise_id, reference, designation, quantite_stock, prix_achat_ht, prix_vente_ht) values
   ('e5000000-0000-0000-0000-000000000001','e0000000-0000-0000-0000-000000000001','STKPRIX_E_001','Article E',10,5,8),
+  ('e5000000-0000-0000-0000-000000000010','e0000000-0000-0000-0000-000000000001','STKPRIX_E_010','Article E dix',0,10,15),
   ('f5000000-0000-0000-0000-000000000001','f0000000-0000-0000-0000-000000000001','STKPRIX_F_001','Article F',10,7,11);
 
 -- Une sortie de 2 (coût 2 × 5 = 10) et une ENTRÉE sur le même chantier, qui ne doit
@@ -97,7 +117,22 @@ insert into public.mouvements_stock (id, entreprise_id, article_id, chantier_id,
   ('e6000000-0000-0000-0000-000000000002','e0000000-0000-0000-0000-000000000001','e5000000-0000-0000-0000-000000000001','e4000000-0000-0000-0000-000000000001','entree',5,'Retour E'),
   ('f6000000-0000-0000-0000-000000000001','f0000000-0000-0000-0000-000000000001','f5000000-0000-0000-0000-000000000001','f4000000-0000-0000-0000-000000000001','sortie',1,'Sortie F');
 
--- ── A. Structure et privilèges (1-13) ─────────────────────────────────────────
+-- D3 : si le modèle expert-comptable proposé ailleurs (`droits_mandat_expert_comptable`)
+-- est intégré un jour, sa liste blanche ne doit porter ni rentabilité ni prix du stock.
+create function pg_temp.mandat_expert_sans_cout_ni_prix() returns boolean language plpgsql as $$
+declare v_ok boolean;
+begin
+  if to_regprocedure('public.droits_mandat_expert_comptable()') is null then
+    return true;
+  end if;
+  execute $q$select not (public.droits_mandat_expert_comptable()
+    && array['acces_rentabilite','voir_rentabilite','voir_prix_stock','gerer_prix_stock']::text[])$q$
+    into v_ok;
+  return v_ok;
+end;
+$$;
+
+-- ── A. Structure, privilèges, D3 (1-18) ───────────────────────────────────────
 select columns_are('public', 'articles_stock', array[
   'id','entreprise_id','reference','designation','unite','quantite_stock','seuil_alerte',
   'prix_achat_ht','emplacement','actif','created_at','updated_at','zone_id','marque',
@@ -137,93 +172,137 @@ select is(has_function_privilege('authenticated', 'public.couts_stock_par_chanti
   '12. authenticated peut exécuter couts_stock_par_chantier');
 select is(has_function_privilege('authenticated', 'public.articles_stock_avec_prix(uuid)', 'execute'), true,
   '13. la voie officielle articles_stock_avec_prix reste ouverte à authenticated');
+select function_returns('public', 'importer_articles_stock', array['uuid','text','jsonb'], 'integer',
+  '14. importer_articles_stock ne renvoie qu''un nombre de lignes, jamais un prix');
+select is(has_function_privilege('authenticated', 'public.importer_articles_stock_interne(uuid,text,jsonb)', 'execute'), false,
+  '15. importer_articles_stock_interne (sans contrôle de droits) reste fermée à authenticated');
+select ok(not exists(
+    select 1 from public.modeles_roles_predefinis
+    where (cle ilike '%expert%' or nom ilike '%expert%') and 'acces_rentabilite' = any(permissions)),
+  '16. D3 : aucun modèle de poste expert-comptable n''accorde acces_rentabilite par défaut');
+select ok(not exists(
+    select 1 from public.catalogue_options_abonnement
+    where code = 'expert_comptable' and configuration::text ~ '(rentabilite|prix_stock)'),
+  '17. D3 : l''option facturée expert_comptable n''embarque ni rentabilité ni prix du stock');
+select ok(pg_temp.mandat_expert_sans_cout_ni_prix(),
+  '18. D3 : la liste blanche du mandat expert-comptable (si présente) exclut rentabilité et prix');
 
 set local role authenticated;
 
--- ── B. Ouvrier E : membre actif sans aucun droit prix (14-20) ────────────────
+-- ── B. Ouvrier E : membre actif sans aucun droit prix (19-25) ────────────────
 select set_config('request.jwt.claims', '{"sub":"e1000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
 
 select results_eq(
   $$select reference::text from public.articles_stock order by reference$$,
-  $$values ('STKPRIX_E_001'::text)$$,
-  '14. l''ouvrier lit toujours les colonnes non tarifaires, et seulement son entreprise');
+  $$values ('STKPRIX_E_001'::text), ('STKPRIX_E_010'::text)$$,
+  '19. l''ouvrier lit toujours les colonnes non tarifaires, et seulement son entreprise');
 select throws_ok($$select prix_achat_ht from public.articles_stock$$, '42501', null,
-  '15. l''ouvrier ne lit plus prix_achat_ht directement');
+  '20. l''ouvrier ne lit plus prix_achat_ht directement');
 select throws_ok($$select prix_vente_ht from public.articles_stock$$, '42501', null,
-  '16. l''ouvrier ne lit plus prix_vente_ht directement');
+  '21. l''ouvrier ne lit plus prix_vente_ht directement');
 select throws_ok($$select * from public.articles_stock$$, '42501', null,
-  '17. select * (forme PostgREST par défaut) est refusé');
+  '22. select * (forme PostgREST par défaut) est refusé');
 select throws_ok(
   $$select m.quantite, a.prix_achat_ht from public.mouvements_stock m join public.articles_stock a on a.id = m.article_id$$,
   '42501', null,
-  '18. la jointure mouvements -> prix (embed /rentabilite actuel) est refusée');
+  '23. la jointure mouvements -> prix (ancien embed de /rentabilite) est refusée');
 select throws_ok(
   $$select * from public.articles_stock_avec_prix('e0000000-0000-0000-0000-000000000001')$$,
   'P0001', 'Accès aux prix du stock refusé',
-  '19. la RPC prix refuse l''ouvrier (inchangé)');
-select is_empty(
+  '24. la RPC prix refuse l''ouvrier (inchangé)');
+select throws_ok(
   $$select * from public.couts_stock_par_chantier('e0000000-0000-0000-0000-000000000001')$$,
-  '20. sans acces_rentabilite, couts_stock_par_chantier ne renvoie rien');
+  '42501', 'Accès à la rentabilité refusé : le coût du stock n''est pas communiqué',
+  '25. D1 : sans acces_rentabilite, REFUS explicite — jamais un vide confondu avec 0 €');
 
--- ── C. Magasinier E : voir_prix_stock (21-23) ─────────────────────────────────
+-- ── C. Magasinier E : voir_prix_stock (26-28) ─────────────────────────────────
 select set_config('request.jwt.claims', '{"sub":"e1000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
 
 select results_eq(
   $$select reference::text, prix_achat_ht::numeric, prix_vente_ht::numeric
     from public.articles_stock_avec_prix('e0000000-0000-0000-0000-000000000001') order by reference$$,
-  $$values ('STKPRIX_E_001'::text, 5::numeric, 8::numeric)$$,
-  '21. voir_prix_stock lit les prix par la RPC officielle');
+  $$values ('STKPRIX_E_001'::text, 5::numeric, 8::numeric), ('STKPRIX_E_010'::text, 10::numeric, 15::numeric)$$,
+  '26. voir_prix_stock lit les prix par la RPC officielle');
 select throws_ok($$select prix_achat_ht from public.articles_stock$$, '42501', null,
-  '22. même habilité, la lecture DIRECTE reste refusée : la RPC est l''unique voie');
+  '27. même habilité, la lecture DIRECTE reste refusée : la RPC est l''unique voie');
 select throws_ok(
   $$update public.articles_stock set prix_achat_ht = 99 where id = 'e5000000-0000-0000-0000-000000000001'$$,
   'P0001', 'Modification des prix du stock non autorisée',
-  '23. gerer_stock sans gerer_prix_stock ne modifie toujours pas un prix (trigger 00108)');
+  '28. gerer_stock sans gerer_prix_stock ne modifie toujours pas un prix (trigger 00108)');
 
--- ── D. Comptable E : acces_rentabilite seul (24-28) ───────────────────────────
+-- ── D. Comptable E : acces_rentabilite seul (29-33) ───────────────────────────
 select set_config('request.jwt.claims', '{"sub":"e1000000-0000-0000-0000-000000000003","role":"authenticated"}', true);
 
 select results_eq(
   $$select chantier_id, total from public.couts_stock_par_chantier('e0000000-0000-0000-0000-000000000001')$$,
   $$values ('e4000000-0000-0000-0000-000000000001'::uuid, 10::numeric)$$,
-  '24. coût stock du chantier = sorties × prix d''achat (l''entrée est ignorée)');
+  '29. coût stock du chantier = sorties × prix d''achat (l''entrée est ignorée)');
 select results_eq(
   $$select chantier_id, total from public.couts_stock_par_chantier('e0000000-0000-0000-0000-000000000001', 'e4000000-0000-0000-0000-000000000001')$$,
   $$values ('e4000000-0000-0000-0000-000000000001'::uuid, 10::numeric)$$,
-  '25. le filtre p_chantier_id (analyse IA d''un chantier) renvoie le même total');
+  '30. le filtre p_chantier_id (analyse IA d''un chantier) renvoie le même total');
 select is_empty(
   $$select * from public.couts_stock_par_chantier('e0000000-0000-0000-0000-000000000001', 'e4000000-0000-0000-0000-000000000002')$$,
-  '26. un chantier sans sortie n''a pas de ligne');
-select is_empty(
+  '31. habilité : un chantier sans sortie n''a pas de ligne (vrai zéro, pas un refus)');
+select throws_ok(
   $$select * from public.couts_stock_par_chantier('f0000000-0000-0000-0000-000000000001')$$,
-  '27. le comptable de E ne lit pas les coûts de F');
+  '42501', null,
+  '32. le comptable de E est REFUSÉ sur F (non membre), pas servi d''un vide');
 select throws_ok(
   $$select * from public.articles_stock_avec_prix('e0000000-0000-0000-0000-000000000001')$$,
   'P0001', 'Accès aux prix du stock refusé',
-  '28. acces_rentabilite ne donne PAS les prix unitaires');
+  '33. acces_rentabilite ne donne PAS les prix unitaires');
 
--- ── E. Comptable F : isolation (29-30) ────────────────────────────────────────
+-- ── E. Comptable F : isolation (34-35) ────────────────────────────────────────
 select set_config('request.jwt.claims', '{"sub":"f1000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
 
 select results_eq(
   $$select chantier_id, total from public.couts_stock_par_chantier('f0000000-0000-0000-0000-000000000001')$$,
   $$values ('f4000000-0000-0000-0000-000000000001'::uuid, 7::numeric)$$,
-  '29. le comptable de F lit le coût de son chantier');
-select is_empty(
+  '34. le comptable de F lit le coût de son chantier');
+select throws_ok(
   $$select * from public.couts_stock_par_chantier('e0000000-0000-0000-0000-000000000001')$$,
-  '30. le comptable de F ne lit pas les coûts de E');
+  '42501', null,
+  '35. le comptable de F est REFUSÉ sur E');
 
--- ── F. Gestionnaire prix E : chemins d'écriture de l'application (31-36) ──────
+-- ── H. Expert-comptable (D3) (36-41) ──────────────────────────────────────────
+select set_config('request.jwt.claims', '{"sub":"e1000000-0000-0000-0000-000000000005","role":"authenticated"}', true);
+
+select throws_ok(
+  $$select * from public.couts_stock_par_chantier('e0000000-0000-0000-0000-000000000001')$$,
+  '42501', null,
+  '36. D3 : l''expert-comptable sans acces_rentabilite n''obtient aucun coût (refus explicite)');
+select throws_ok($$select prix_achat_ht from public.articles_stock$$, '42501', null,
+  '37. D3 : l''expert-comptable ne lit aucun prix d''achat');
+select throws_ok(
+  $$select * from public.articles_stock_avec_prix('e0000000-0000-0000-0000-000000000001')$$,
+  'P0001', 'Accès aux prix du stock refusé',
+  '38. D3 : l''expert-comptable n''obtient pas le catalogue avec prix');
+
+select set_config('request.jwt.claims', '{"sub":"e1000000-0000-0000-0000-000000000006","role":"authenticated"}', true);
+
+select results_eq(
+  $$select chantier_id, total from public.couts_stock_par_chantier('e0000000-0000-0000-0000-000000000001')$$,
+  $$values ('e4000000-0000-0000-0000-000000000001'::uuid, 10::numeric)$$,
+  '39. D3 : avec acces_rentabilite EXPLICITE, l''expert-comptable lit le coût agrégé par chantier');
+select throws_ok(
+  $$select * from public.articles_stock_avec_prix('e0000000-0000-0000-0000-000000000001')$$,
+  'P0001', 'Accès aux prix du stock refusé',
+  '40. D3 : même mandaté, aucun prix d''achat ou de vente unitaire par la RPC');
+select throws_ok($$select prix_vente_ht from public.articles_stock$$, '42501', null,
+  '41. D3 : même mandaté, aucun prix de vente unitaire en lecture directe');
+
+-- ── F. Gestionnaire prix E : chemins d'écriture de l'application (42-47) ──────
 select set_config('request.jwt.claims', '{"sub":"e1000000-0000-0000-0000-000000000004","role":"authenticated"}', true);
 
 select lives_ok(
   $$update public.articles_stock set prix_achat_ht = 6, prix_vente_ht = 9
     where id = 'e5000000-0000-0000-0000-000000000001' and entreprise_id = 'e0000000-0000-0000-0000-000000000001'$$,
-  '31. modifier un prix sans le relire reste possible (actions/stock.ts:53)');
+  '42. modifier un prix sans le relire reste possible (actions/stock.ts)');
 select lives_ok(
   $$insert into public.articles_stock (entreprise_id, reference, designation, prix_achat_ht, prix_vente_ht)
     values ('e0000000-0000-0000-0000-000000000001', 'STKPRIX_E_002', 'Article E bis', 3, 4)$$,
-  '32. créer un article avec prix reste possible (actions/stock.ts:30)');
+  '43. créer un article avec prix reste possible (actions/stock.ts)');
 select throws_ok(
   $$insert into public.articles_stock (entreprise_id, reference, designation, prix_achat_ht, prix_vente_ht)
     values ('e0000000-0000-0000-0000-000000000001', 'STKPRIX_E_001', 'Article E', 6.5, 9.5)
@@ -232,21 +311,135 @@ select throws_ok(
           prix_achat_ht = excluded.prix_achat_ht,
           prix_vente_ht = excluded.prix_vente_ht$$,
   '42501', null,
-  '33. l''upsert PostgREST (SET prix = EXCLUDED.prix, actions/import.ts:261) est refusé : dépendance D2');
+  '44. l''upsert PostgREST (SET prix = EXCLUDED.prix) est refusé : l''import passe par la RPC');
 select lives_ok(
   $$select public.importer_articles_stock('e0000000-0000-0000-0000-000000000001', 'catalogue',
       '[{"reference":"STKPRIX_E_001","designation":"Article E","prix_achat_ht":6.5}]'::jsonb)$$,
-  '34. la voie de remplacement importer_articles_stock met à jour le prix (D2)');
+  '45. importer_articles_stock met à jour le prix d''achat');
 select throws_ok(
   $$insert into public.articles_stock (entreprise_id, reference, designation)
     values ('e0000000-0000-0000-0000-000000000001', 'STKPRIX_E_003', 'Article E ter') returning prix_achat_ht$$,
   '42501', null,
-  '35. RETURNING d''un prix est refusé : jamais de .insert().select("*") côté application');
+  '46. RETURNING d''un prix est refusé : jamais de .insert().select("*") côté application');
 select results_eq(
-  $$select reference::text, prix_achat_ht::numeric
+  $$select reference::text, prix_achat_ht::numeric, prix_vente_ht::numeric
     from public.articles_stock_avec_prix('e0000000-0000-0000-0000-000000000001') order by reference$$,
-  $$values ('STKPRIX_E_001'::text, 6.5::numeric), ('STKPRIX_E_002'::text, 3::numeric)$$,
-  '36. les prix écrits sont relus par la RPC officielle');
+  $$values ('STKPRIX_E_001'::text, 6.5::numeric, 9::numeric),
+           ('STKPRIX_E_002'::text, 3::numeric, 4::numeric),
+           ('STKPRIX_E_010'::text, 10::numeric, 15::numeric)$$,
+  '47. les prix écrits sont relus par la RPC officielle ; l''import sans prix de vente a conservé 9');
+
+-- ── G. Import du stock (D2) (48-69) ───────────────────────────────────────────
+-- G1. Gestionnaire (gerer_prix_stock)
+select lives_ok(
+  $$select public.importer_articles_stock('e0000000-0000-0000-0000-000000000001', 'catalogue',
+      '[{"reference":"STKPRIX_E_010","designation":"Article E dix","prix_achat_ht":11,"prix_vente_ht":16}]'::jsonb)$$,
+  '48. import avec prix d''achat ET de vente');
+select results_eq(
+  $$select prix_achat_ht::numeric, prix_vente_ht::numeric
+    from public.articles_stock_avec_prix('e0000000-0000-0000-0000-000000000001') where reference = 'STKPRIX_E_010'$$,
+  $$values (11::numeric, 16::numeric)$$,
+  '49. le prix de vente importé est transmis et conservé');
+select lives_ok(
+  $$select public.importer_articles_stock('e0000000-0000-0000-0000-000000000001', 'catalogue',
+      '[{"reference":"STKPRIX_E_010","designation":"Article E dix renommé"}]'::jsonb)$$,
+  '50. import SANS colonne tarifaire');
+select results_eq(
+  $$select designation::text, prix_achat_ht::numeric, prix_vente_ht::numeric
+    from public.articles_stock_avec_prix('e0000000-0000-0000-0000-000000000001') where reference = 'STKPRIX_E_010'$$,
+  $$values ('Article E dix renommé'::text, 11::numeric, 16::numeric)$$,
+  '51. sans colonne tarifaire : désignation mise à jour, prix JAMAIS remis à 0');
+select lives_ok(
+  $$select public.importer_articles_stock('e0000000-0000-0000-0000-000000000001', 'catalogue',
+      '[{"reference":"STKPRIX_E_010","designation":"Article E dix renommé","prix_vente_ht":17}]'::jsonb)$$,
+  '52. import du SEUL prix de vente');
+select results_eq(
+  $$select prix_achat_ht::numeric, prix_vente_ht::numeric
+    from public.articles_stock_avec_prix('e0000000-0000-0000-0000-000000000001') where reference = 'STKPRIX_E_010'$$,
+  $$values (11::numeric, 17::numeric)$$,
+  '53. le prix d''achat non fourni reste inchangé');
+select lives_ok(
+  $$select public.importer_articles_stock('e0000000-0000-0000-0000-000000000001', 'catalogue',
+      '[{"reference":"STKPRIX_E_010","designation":"Article E dix renommé","prix_achat_ht":null,"prix_vente_ht":null}]'::jsonb)$$,
+  '54. clés tarifaires présentes mais nulles (cellules vides)');
+select results_eq(
+  $$select prix_achat_ht::numeric, prix_vente_ht::numeric
+    from public.articles_stock_avec_prix('e0000000-0000-0000-0000-000000000001') where reference = 'STKPRIX_E_010'$$,
+  $$values (11::numeric, 17::numeric)$$,
+  '55. une cellule vide ne remet jamais un prix à NULL ni à 0');
+select lives_ok(
+  $$select public.importer_articles_stock('e0000000-0000-0000-0000-000000000001', 'catalogue',
+      '[{"reference":"STKPRIX_E_011","designation":"Article E onze"}]'::jsonb)$$,
+  '56. nouvelle référence importée sans prix');
+select results_eq(
+  $$select prix_achat_ht::numeric, prix_vente_ht::numeric
+    from public.articles_stock_avec_prix('e0000000-0000-0000-0000-000000000001') where reference = 'STKPRIX_E_011'$$,
+  $$values (0::numeric, 0::numeric)$$,
+  '57. une nouvelle référence sans prix prend la valeur par défaut (création, pas remise à zéro)');
+select throws_ok(
+  $$select public.importer_articles_stock('e0000000-0000-0000-0000-000000000001', 'catalogue',
+      '[{"reference":"STKPRIX_E_010","designation":"Article E dix renommé","prix_vente_ht":-1}]'::jsonb)$$,
+  '22023', 'Prix négatif refusé pour la référence STKPRIX_E_010',
+  '58. un prix négatif est refusé explicitement, jamais ramené à 0');
+select results_eq(
+  $$select prix_achat_ht::numeric, prix_vente_ht::numeric
+    from public.articles_stock_avec_prix('e0000000-0000-0000-0000-000000000001') where reference = 'STKPRIX_E_010'$$,
+  $$values (11::numeric, 17::numeric)$$,
+  '59. après ce refus, les prix sont intacts');
+select results_eq(
+  $$select public.importer_articles_stock('e0000000-0000-0000-0000-000000000001', 'catalogue',
+      '[{"reference":"STKPRIX_E_010","designation":"Article E dix renommé"},{"reference":"STKPRIX_E_011","designation":"Article E onze"}]'::jsonb)$$,
+  $$values (2)$$,
+  '60. la RPC renvoie un nombre de lignes, aucun prix');
+
+-- G2. Magasinier (gerer_stock + voir_prix_stock, SANS gerer_prix_stock)
+select set_config('request.jwt.claims', '{"sub":"e1000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
+
+select throws_ok(
+  $$select public.importer_articles_stock('e0000000-0000-0000-0000-000000000001', 'catalogue',
+      '[{"reference":"STKPRIX_E_010","designation":"Article E dix renommé","prix_vente_ht":99}]'::jsonb)$$,
+  '42501', 'Import refusé : les prix du stock (achat ou vente) exigent la permission gerer_prix_stock ; aucun article n''a été modifié',
+  '61. sans gerer_prix_stock, un prix de vente importé est REFUSÉ explicitement');
+select throws_ok(
+  $$select public.importer_articles_stock('e0000000-0000-0000-0000-000000000001', 'catalogue',
+      '[{"reference":"STKPRIX_E_099","designation":"Nouvel article"},{"reference":"STKPRIX_E_010","designation":"x","prix_achat_ht":1}]'::jsonb)$$,
+  '42501', null,
+  '62. une seule ligne tarifaire suffit à refuser l''import entier, avant toute écriture');
+select results_eq(
+  $$select count(*)::int from public.articles_stock where reference = 'STKPRIX_E_099'$$,
+  $$values (0)$$,
+  '63. après ce refus, aucune ligne n''a été créée');
+select results_eq(
+  $$select prix_achat_ht::numeric, prix_vente_ht::numeric
+    from public.articles_stock_avec_prix('e0000000-0000-0000-0000-000000000001') where reference = 'STKPRIX_E_010'$$,
+  $$values (11::numeric, 17::numeric)$$,
+  '64. après ces refus, les prix existants sont intacts');
+select lives_ok(
+  $$select public.importer_articles_stock('e0000000-0000-0000-0000-000000000001', 'catalogue',
+      '[{"reference":"STKPRIX_E_010","designation":"Article E dix magasin"}]'::jsonb)$$,
+  '65. sans gerer_prix_stock, un import SANS colonne tarifaire fonctionne');
+select results_eq(
+  $$select designation::text, prix_achat_ht::numeric, prix_vente_ht::numeric
+    from public.articles_stock_avec_prix('e0000000-0000-0000-0000-000000000001') where reference = 'STKPRIX_E_010'$$,
+  $$values ('Article E dix magasin'::text, 11::numeric, 17::numeric)$$,
+  '66. … et ne touche à aucun prix');
+select lives_ok(
+  $$select public.importer_articles_stock('e0000000-0000-0000-0000-000000000001', 'inventaire',
+      '[{"reference":"STKPRIX_E_010","designation":"Article E dix magasin","quantite":4,"prix_achat_ht":null}]'::jsonb)$$,
+  '67. import inventaire avec quantité et clé tarifaire vide : accepté sans gerer_prix_stock');
+select results_eq(
+  $$select quantite_stock::numeric from public.articles_stock where reference = 'STKPRIX_E_010'$$,
+  $$values (4::numeric)$$,
+  '68. la quantité est atteinte par un mouvement d''ajustement (traçable)');
+
+-- G3. Ouvrier (sans gerer_stock)
+select set_config('request.jwt.claims', '{"sub":"e1000000-0000-0000-0000-000000000001","role":"authenticated"}', true);
+
+select throws_ok(
+  $$select public.importer_articles_stock('e0000000-0000-0000-0000-000000000001', 'catalogue',
+      '[{"reference":"STKPRIX_E_010","designation":"Article E dix"}]'::jsonb)$$,
+  'P0001', 'Accès refusé',
+  '69. sans gerer_stock, aucun import (inchangé)');
 
 select * from finish();
 rollback;
