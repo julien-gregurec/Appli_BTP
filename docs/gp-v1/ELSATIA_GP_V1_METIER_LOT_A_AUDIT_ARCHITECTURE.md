@@ -277,3 +277,95 @@ Tout est additif. Pour revenir en arrière :
 - rejouer les définitions d'origine de `trg_ref_client` / `trg_ref_chantier` (20260710000004), `trg_fournisseur_reference` (20260710000021) et `doublons_references_catalogue` (proposition devis v2).
 
 Aucune donnée n'est supprimée. La reprise du stock ne fait que remplir `reference_interne`, qui était vide.
+
+## 11. Lot B — bibliothèque d'articles et d'ouvrages (livré)
+
+### 11.1 Livrables
+
+| Fichier | Rôle |
+|---|---|
+| `supabase/proposed/gp-v1-metier-bibliotheque.sql.proposed` | SQL proposé, non numéroté, à appliquer **après** celui des références |
+| `supabase/proposed/gp-v1-metier-bibliotheque.pgtap.sql.proposed` | preuve pgTAP (67 assertions) |
+| `src/lib/catalogue/prix-article.ts`, `familles.ts`, `src/lib/historique.ts` (+ tests) | prix, coefficient et marges en décimal exact ; arbre et libellés des familles ; historique lisible |
+| `src/lib/devis/recherche-articles.ts` (+ test) | codes distributeurs et famille dans le classement, en miroir du SQL |
+| `src/lib/prestations-catalogue-v2*.ts`, `src/app/actions/catalogue-v2.ts`, `src/app/actions/prestations.ts` | lecture des champs, chargement de la fiche, actions serveur |
+| `src/components/PrestationForm.tsx`, `src/components/prestations/*` | fiche article, bloc prix, compléments de fiche, liste du catalogue |
+| `src/app/(app)/prestations/page.tsx`, `…/[id]/modifier/page.tsx`, `…/familles/page.tsx`, `…/doublons/page.tsx` | écrans |
+| `src/components/parametres/*NumerotationReferences.tsx`, `src/app/(app)/parametres/page.tsx` | numérotation des références (lot A-bis rendu utilisable) |
+| `src/components/devis/SelectionArticlesDialog.tsx` | code distributeur, famille et favori dans la sélection d'articles |
+| `tests/banc/catalogue-v1/` | banc navigateur (vrais composants, données fictives) |
+
+Commits : `56bc26e`, `a18cd51`, `d554368`, `767b0aa`, `8772a09` et ce rapport. Tout l'écran reste
+derrière `GP_DEVIS_V2` : drapeau éteint, les écrans historiques du catalogue sont inchangés.
+
+### 11.2 Ce que fait le lot
+
+1. **Familles et sous-familles** : deux niveaux, communes au catalogue, au stock et aux ouvrages. Le nom est unique sous un même parent sur la forme normalisée, et le parent appartient à la même entreprise. Une famille qui range encore quelque chose ne se supprime pas, on l'archive.
+2. **Catégorie texte = libellé dérivé** de la famille. Une catégorie importée est rattachée à la famille active de même libellé ; sinon elle reste un texte libre, et aucune famille n'est créée en silence. Renommer une famille met à jour les libellés.
+3. **Reprise** : les catégories existantes deviennent des familles de premier niveau. La graphie retenue est la plus fréquente, puis celle qui n'est pas tout en minuscules. La reprise ne réécrit aucune catégorie et n'écrit rien au journal.
+4. **Favoris** personnels, jamais partagés, qui passent en tête de la recherche à rang égal.
+5. **Coefficient et mode de prix** (saisi ou calculé), rangés avec le prix d'achat sous `voir_couts_devis` / `gerer_couts_devis`. En mode calculé, le serveur **recalcule** le prix de vente. Sans droit sur les coûts, le prix saisi fait foi et les coûts enregistrés restent intacts.
+6. **Images** dans un bucket privé, sous le dossier de l'entreprise (la base refuse tout autre chemin), servies par URL signée de 15 min. Elles ne sont **jamais supprimées**, parce qu'elles peuvent figurer sur un document émis.
+7. **Recherche d'articles** : code distributeur aux rangs 2, 4 et 6 (comme la référence fabricant), famille au rang 7.
+8. **Duplication** : copie nommée « (copie) » avec une nouvelle référence. Code-barres et codes distributeurs ne sont pas recopiés. Le coût n'est recopié qu'avec `gerer_couts_devis`. La duplication est journalisée avec sa source.
+9. **Historique** :
+   - catalogue : création, désignation, prix de vente, TVA, unité, nature, archivage, famille ;
+   - ouvrages : nom, statut, famille, version ;
+   - stock : désignation, prix de vente, état, famille ;
+   - coûts : entrées **sensibles**, lisibles seulement avec `voir_couts_devis`.
+10. **Écrans** :
+    - fiche article : famille, notes internes, bloc prix avec marge en direct, image, codes distributeurs, historique, favori, duplication ;
+    - liste : code distributeur, famille, favoris, filtres ;
+    - pages Familles et Contrôle des doublons ;
+    - Paramètres › Numérotation des références, avec attribution à la demande.
+
+### 11.3 Résultats
+
+| Contrôle | Résultat |
+|---|---|
+| SQL appliqué deux fois de suite (après devis v2 et références) | 0 erreur |
+| pgTAP du lot | **67/67** |
+| pgTAP des références / du devis v2 (adaptée) | 69/69 / 111/111, avec la recherche redéfinie |
+| Suite pgTAP existante complète (70 fichiers) | 1 901 vertes, 1 échec **identique sur la base témoin** (`reserves_v2_terrain_capture`) : aucune différence |
+| Montée de version avec données | voir détail ci-dessous |
+| Vitest, modules touchés | 116/116 (8 fichiers) |
+| Vitest, suite complète | voir détail ci-dessous |
+| Typecheck du projet / lint des fichiers touchés | 0 / 0 |
+| Banc navigateur (données fictives, aucune erreur de console) | voir détail ci-dessous |
+
+**Montée de version avec données.** `Plâtrerie` et `platrerie` sont regroupées sous « Plâtrerie ». « carrelage », présent deux fois, l'emporte sur « Carrelage ». Les catégories vides ou sans valeur sont ignorées, les ouvrages sont rattachés, et le journal reste vide.
+
+**Vitest, suite complète.** Deux passages :
+- 1er passage : 2 293 réussis, 3 échecs (`xlsx.test.ts` et webhook Stripe Boutique ×2) ;
+- 2e passage : 2 295 réussis, 1 échec (`xlsx.test.ts`).
+
+Ces deux fichiers de test et le code qu'ils exercent sont identiques à `516469d`, et ils passent seuls (7/7). C'est une instabilité sous charge **préexistante**, déjà consignée par les lots précédents.
+
+**Banc navigateur.**
+- Le bloc prix s'affiche correctement dans ses trois états de droits.
+- Coefficient 1,75 → prix de vente 21,88 €, marge 9,38 €, taux de marge 75,04 %, taux de marque 42,87 %.
+- Un prix saisi sous le coût déclenche l'alerte.
+- Les filtres famille et favoris fonctionnent.
+- À 375 px, la page ne déborde pas.
+
+### 11.4 Réserves
+
+1. **Pas d'E2E réel ni de `next build`** : le worktree n'a aucun fichier d'environnement, et la base locale de développement est au ledger 265, à ne pas réinitialiser. Les pages serveur (fiche, familles, doublons, paramètres) ne sont vérifiées que par typecheck et lint ; les composants clients le sont sur banc.
+2. **Famille** : aucun écran sur la fiche ouvrage ni sur le stock. La colonne et le rattachement par libellé existent en base.
+3. **Codes distributeurs** : saisie seulement pour le catalogue des devis ; la table accepte aussi le stock.
+4. **Images** limitées à 2 Mo (limite des Server Actions), alors que le bucket en accepte 5. Pas de miniature dans la liste, et pas encore d'image sur le PDF (lot G).
+5. **Mode calculé** : le prix n'est recalculé que lorsqu'un gestionnaire des coûts enregistre l'article.
+6. **Changement du distributeur principal** en deux écritures, sans transaction. L'index unique empêche deux principaux ; au pire, il reste un instant sans principal.
+7. **Recherche d'ouvrages** : ni favoris ni famille dans son classement. À reprendre au lot C, avec l'insertion depuis la grille.
+
+Recette : `.claude/launch.json` du dépôt principal a reçu une entrée de serveur statique le temps du banc,
+retirée ensuite ; les modifications locales préexistantes de ce fichier ne sont pas touchées.
+
+### 11.5 Retour arrière
+
+Tout est additif. Pour revenir en arrière :
+- supprimer les déclencheurs `gp_categorie_famille`, `gp_historique_catalogue`, `gp_historique_couts` et `catalogue_familles_*` ;
+- supprimer les tables `catalogue_familles` et `catalogue_favoris`, les colonnes `famille_id`, `notes_internes`, `image_chemin`, `coefficient` et `mode_prix`, et les fonctions `dupliquer_prestation`, `libelle_famille` et `dossier_entreprise` ;
+- rejouer `rechercher_articles_devis` depuis la proposition devis v2.
+
+Les objets du bucket `catalogue-images` sont conservés. Côté code, retirer `GP_DEVIS_V2`.
