@@ -7,29 +7,37 @@ import { analyserRentabilite } from "@/lib/ai/rentabilite";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
 import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
 import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
+import { lireCoutsStockChantiers, MESSAGE_ANALYSE_RENTABILITE_REFUSEE, peutConsulterRentabilite } from "@/lib/rentabilite-stock";
 
 type PointageRentabilite = { employe_id: string; heures_normales: number; heures_supplementaires: number };
-type MouvementStockRentabilite = { quantite: number; article: { prix_achat_ht: number } | { prix_achat_ht: number }[] | null };
-const un = <T,>(valeur: T | T[] | null): T | null => (Array.isArray(valeur) ? (valeur[0] ?? null) : valeur);
 
 export async function analyserRentabiliteIAAction(chantierId: string): Promise<{ analyse: string } | { error: string }> {
   if (!iaEstActive()) return { error: MESSAGE_IA_INDISPONIBLE };
   const ctx = await getContexteEntreprise();
+  const permissions = await permissionsUtilisateur(ctx);
+  if (!aAccesIA(permissions)) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
+  // D1 : l'analyse repose sur le coût du stock et la marge. Elle exige acces_rentabilite,
+  // contrôlé AVANT toute lecture : une option IA seule ne donne accès à aucun chiffre.
+  if (!peutConsulterRentabilite(permissions)) return { error: MESSAGE_ANALYSE_RENTABILITE_REFUSEE };
   const supabase = await createClient();
-  if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
 
-  const [{ data: chantier }, { data: factures }, { data: devis }, { data: donneesPointages }, { data: depenses }, { data: donneesIndemnites }, { data: donneesMouvementsStock }, { data: donneesNotesFrais }, { data: couts }] = await Promise.all([
+  const [{ data: chantier }, { data: factures }, { data: devis }, { data: donneesPointages }, { data: depenses }, { data: donneesIndemnites }, coutsStock, { data: donneesNotesFrais }, { data: couts }] = await Promise.all([
     supabase.from("chantiers").select("id, nom").eq("id", chantierId).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),
     supabase.from("factures").select("montant_ht, statut, type").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId),
     supabase.from("devis").select("montant_ht").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId).eq("statut", "accepte"),
     supabase.from("pointages").select("employe_id, heures_normales, heures_supplementaires").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId).eq("verification_statut", "valide"),
     supabase.from("depenses_fournisseurs").select("montant_ht, statut, categorie").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId),
     supabase.rpc("couts_indemnites_paie_par_chantier", { p_entreprise_id: ctx.entrepriseId, p_chantier_id: chantierId }),
-    supabase.from("mouvements_stock").select("quantite, article:articles_stock(prix_achat_ht)").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId).eq("type", "sortie"),
+    lireCoutsStockChantiers(supabase, ctx.entrepriseId, chantierId),
     supabase.from("notes_frais").select("montant_ttc").eq("entreprise_id", ctx.entrepriseId).eq("chantier_id", chantierId).in("statut", ["valide", "exporte_comptabilite", "verrouille", "archive", "validee", "remboursee"]),
     supabase.from("employes_cout_horaire").select("employe_id, cout_horaire").eq("entreprise_id", ctx.entrepriseId),
   ]);
   if (!chantier) return { error: "Chantier introuvable." };
+  // Coût du stock refusé ou illisible : l'analyse s'arrête, sans appeler l'IA, plutôt que
+  // de raisonner sur un coût à 0 € et une marge surévaluée.
+  if (coutsStock.etat !== "disponible") return { error: coutsStock.message };
+  // Habilité et lu : un chantier absent du résultat n'a eu aucune sortie (vrai 0 €).
+  const coutStock = coutsStock.parChantier.get(chantierId) ?? 0;
 
   const coutHoraireParEmploye = new Map((couts ?? []).map((cout) => [cout.employe_id, cout.cout_horaire]));
   const budgetHt = (devis ?? []).reduce((s, item) => s + Number(item.montant_ht), 0);
@@ -50,7 +58,6 @@ export async function analyserRentabiliteIAAction(chantierId: string): Promise<{
   const coutSousTraitance = depensesChantier.filter((item) => item.categorie === "sous_traitance").reduce((s, item) => s + Number(item.montant_ht), 0);
   const coutAchats = depensesChantier.filter((item) => item.categorie !== "sous_traitance").reduce((s, item) => s + Number(item.montant_ht), 0);
   const coutIndemnitesPaie = Number((donneesIndemnites ?? [])[0]?.total ?? 0);
-  const coutStock = ((donneesMouvementsStock ?? []) as MouvementStockRentabilite[]).reduce((s, item) => s + Number(item.quantite) * Number(un(item.article)?.prix_achat_ht ?? 0), 0);
   const coutNotesFrais = (donneesNotesFrais ?? []).reduce((s, item) => s + Number(item.montant_ttc), 0);
   const marge = factureHt - coutMainOeuvre - coutAchats - coutSousTraitance - coutIndemnitesPaie - coutStock - coutNotesFrais;
   const taux = factureHt > 0 ? (marge / factureHt) * 100 : null;
