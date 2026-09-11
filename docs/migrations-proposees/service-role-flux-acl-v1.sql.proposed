@@ -29,6 +29,9 @@
 --    fonction SECURITY DEFINER dédiée `*_service`, exécutable par service_role
 --    SEUL (ni PUBLIC, ni anon, ni authenticated) — même schéma que
 --    20260904000262 (webhook abonnement). Aucune table métier n'est regrantée.
+-- 4. Décision D1 (Boutique) : seul le chemin serveur marque une commande payée —
+--    EXECUTE de boutique_finaliser_commande_payee retiré à authenticated/anon et
+--    déclencheur boutique_commandes_paiement_serveur_seul (section 4).
 --
 -- Ordre de livraison : SQL d'abord, code ensuite, dans le même train. Les
 -- grants par colonne (sections 1-2) réparent sans code ; les fonctions
@@ -119,10 +122,12 @@ begin
     return 'ignoree';
   end if;
 
-  v_montant := least(
+  -- Arrondi au centime : paiements.montant est un numeric sans échelle ; une division non
+  -- arrondie y stockerait 50.0000000000000000 (valeur juste, représentation polluée).
+  v_montant := round(least(
     greatest(coalesce(p_montant_centimes, 0), 0)::numeric / 100,
     greatest(0, coalesce(v_facture.montant_ttc, 0) - coalesce(v_facture.montant_paye, 0))
-  );
+  ), 2);
   if v_montant > 0 then
     insert into public.paiements(facture_id, montant, date, mode, reference, stripe_session_id)
     values (v_facture.id, v_montant, current_date, 'carte_en_ligne', 'stripe:' || p_checkout_id, p_checkout_id)
@@ -191,6 +196,40 @@ $$;
 
 comment on function public.boutique_expirer_commande_service(uuid, text) is
   'Webhook Boutique : expire une commande en attente de paiement dont la session Checkout a expiré. Chemin de service.';
+
+-- Décision D1 (validée le 2026-09-11) : un client ne doit JAMAIS pouvoir marquer sa propre
+-- commande payée. Retirer l'EXECUTE ci-dessus ne suffit pas : la règle RLS
+-- boutique_commandes_maj (20260724000145) laisse tout membre ayant gerer_boutique — le client
+-- propriétaire de la commande — faire UPDATE sur toutes les colonnes, donc statut = 'payee' par
+-- un simple PATCH PostgREST ; et boutique_commandes_creation le laisse insérer une commande déjà
+-- « payee ». Ce déclencheur réserve au seul chemin serveur (fonctions SECURITY DEFINER, qui
+-- s'exécutent en propriétaire après confirmation Stripe) l'entrée dans l'état « payee » et toute
+-- modification d'une commande payée. Les écritures légitimes du client (brouillon →
+-- en_attente_paiement → annulee, coordonnées de livraison, session Checkout) restent permises.
+-- Volontairement SANS security definer : current_user doit rester le rôle appelant.
+create or replace function public.boutique_commandes_paiement_serveur_seul()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  if current_user in ('anon', 'authenticated')
+     and ((tg_op = 'INSERT' and new.statut = 'payee')
+          or (tg_op = 'UPDATE' and (old.statut = 'payee' or new.statut = 'payee'))) then
+    raise exception 'Seule la confirmation du paiement par Stripe peut marquer une commande Boutique payée'
+      using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+comment on function public.boutique_commandes_paiement_serveur_seul() is
+  'Boutique : interdit à anon/authenticated de faire entrer une commande dans l''état « payee » ou de modifier une commande payée (décision D1).';
+
+drop trigger if exists boutique_commandes_paiement_serveur_seul on public.boutique_commandes;
+create trigger boutique_commandes_paiement_serveur_seul
+  before insert or update on public.boutique_commandes
+  for each row execute function public.boutique_commandes_paiement_serveur_seul();
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 5. Abonnement : comptage des comptes facturables
@@ -599,6 +638,10 @@ commit;
 --   drop function if exists public.relances_auto_parametres_service();
 --   drop function if exists public.compter_comptes_application_service(uuid);
 --   drop function if exists public.boutique_expirer_commande_service(uuid, text);
+--   (le déclencheur D1 ne se retire PAS en retour arrière ordinaire : sans lui, le client
+--    propriétaire peut de nouveau marquer sa commande payée ; seulement sur décision explicite :
+--    drop trigger if exists boutique_commandes_paiement_serveur_seul on public.boutique_commandes;
+--    drop function if exists public.boutique_commandes_paiement_serveur_seul();)
 --   drop function if exists public.stripe_connect_expirer_checkout_facture_service(uuid, text);
 --   drop function if exists public.stripe_connect_encaisser_facture_service(uuid, uuid, text, text, bigint, text);
 --   revoke execute on function public.boutique_finaliser_commande_payee(uuid, text) from service_role;

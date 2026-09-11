@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -35,13 +36,28 @@ function fichiersSource(dossier: string): string[] {
   });
 }
 
+// Pré-filtre par `git grep` (natif, parallèle) : seuls les fichiers qui mentionnent un client admin
+// sont relus. Relire tout `src/` dépassait 5 s sous la charge d'une suite complète. Repli sur le
+// parcours complet hors dépôt Git ; `--untracked` couvre aussi les fichiers pas encore suivis.
+function fichiersCandidats(): string[] {
+  try {
+    const sortie = execFileSync("git", ["grep", "-l", "-i", "--untracked", "-e", "admin", "--", "src/*.ts", "src/*.tsx"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+    });
+    return sortie.split("\n").filter((f) => f && !/\.test\.(ts|tsx)$/.test(f)).map((f) => join(process.cwd(), f));
+  } catch {
+    return fichiersSource(RACINE);
+  }
+}
+
 // `admin.from("x")`, `supabaseAdmin\n  .from("x")`, `deps.admin.from("x")`, `createAdminClient().from("x")`.
 const APPEL_ADMIN_FROM = /(?:\b\w*[aA]dmin\b|createAdminClient\(\))\s*\.from\(\s*["'`]([a-z0-9_]+)["'`]/g;
 
 describe("client service_role : aucune table fermée par la 255", () => {
   it("n'appelle .from() que sur les tables où service_role a un privilège", () => {
     const violations: string[] = [];
-    for (const fichier of fichiersSource(RACINE)) {
+    for (const fichier of fichiersCandidats()) {
       const source = readFileSync(fichier, "utf8");
       if (!/createAdminClient|admin/i.test(source)) continue;
       for (const [, table] of source.matchAll(APPEL_ADMIN_FROM)) {
