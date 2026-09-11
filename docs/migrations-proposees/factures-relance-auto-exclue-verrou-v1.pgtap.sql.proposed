@@ -1,0 +1,179 @@
+-- ELSATIA-GP-FACTURES-RELANCE-AUTO-EXCLUE-VERROU-V1 — suite pgTAP PROPOSÉE
+--
+-- ⚠️  Extension `.pgtap.sql.proposed` : ce fichier ne vit PAS dans `supabase/tests/` tant
+--     que la migration `factures-relance-auto-exclue-verrou-v1.sql.proposed` n'est pas
+--     numérotée. Il sera déplacé tel quel en
+--     `supabase/tests/factures_relance_auto_exclue_verrou_v1.test.sql` : le `\ir` ci-dessous
+--     est relatif à ce dossier-là.
+--
+-- Prouve que l'exclusion des relances automatiques (`exclureRelanceAutoDocumentAction`)
+-- aboutit sur une facture émise, sans rien ouvrir d'autre dans `verrouiller_facture_emise`
+-- ni contourner la RLS.
+--
+-- Exécution pendant ce lot : base jetable clonée depuis `supabase_db_btp-platform`
+-- (jamais `db reset` sur la base de développement), migrations 00266→00280 rejouées,
+-- puis cette suite AVANT le correctif (5 échecs sur 20 : 4, 5, 14, 15, 18) et APRÈS
+-- (20/20).
+
+begin;
+create extension if not exists pgtap with schema extensions;
+select plan(20);
+
+\ir fixtures/isolation_multitenant.inc
+
+-- Décor fourni par la fixture : TEST_A_FAC_001 (aa…01) est émise ('envoyee',
+-- 100 HT / 120 TTC, rien d'encaissé) et son snapshot destinataire a été capturé
+-- à l'insertion par `capturer_client_snapshot`.
+
+select has_column(
+  'public', 'factures', 'relance_auto_exclue',
+  'factures.relance_auto_exclue existe'
+);
+
+select is(
+  (select statut from public.factures where id = 'aa000000-0000-0000-0000-000000000001'),
+  'envoyee',
+  'précondition : la facture de test est émise'
+);
+
+select ok(
+  (select client_snapshot is not null from public.factures where id = 'aa000000-0000-0000-0000-000000000001'),
+  'précondition : le snapshot destinataire de la facture est déjà figé'
+);
+
+-- ── Gérant A (toutes permissions) : écriture exacte de exclureRelanceAutoDocumentAction ──
+set local role authenticated;
+select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000001', true);
+select set_config('request.jwt.claim.email', 'admin-a@invalid.local', true);
+
+select lives_ok(
+  $$update public.factures set relance_auto_exclue = true
+    where id = 'aa000000-0000-0000-0000-000000000001'
+      and entreprise_id = 'a0000000-0000-0000-0000-000000000001'$$,
+  'une facture émise peut être exclue des relances automatiques'
+);
+
+select is(
+  (select relance_auto_exclue from public.factures where id = 'aa000000-0000-0000-0000-000000000001'),
+  true,
+  'l''exclusion est bien enregistrée'
+);
+
+select lives_ok(
+  $$update public.factures set relance_auto_exclue = false
+    where id = 'aa000000-0000-0000-0000-000000000001'
+      and entreprise_id = 'a0000000-0000-0000-0000-000000000001'$$,
+  'une facture émise peut être réintégrée aux relances automatiques'
+);
+
+select is(
+  (select relance_auto_exclue from public.factures where id = 'aa000000-0000-0000-0000-000000000001'),
+  false,
+  'la réintégration est bien enregistrée'
+);
+
+-- ── Non-régression du verrou : la liste blanche n'ouvre aucun autre champ ──
+select throws_like(
+  $$update public.factures set montant_ht = 999 where id = 'aa000000-0000-0000-0000-000000000001'$$,
+  '%ne peut plus être modifiée%',
+  'le montant d''une facture émise reste verrouillé'
+);
+
+select throws_like(
+  $$update public.factures set relance_auto_exclue = true, montant_ht = 999 where id = 'aa000000-0000-0000-0000-000000000001'$$,
+  '%ne peut plus être modifiée%',
+  'accompagner l''exclusion d''un champ contractuel reste refusé'
+);
+
+select throws_like(
+  $$update public.factures set notes_client = 'modifiée après émission' where id = 'aa000000-0000-0000-0000-000000000001'$$,
+  '%ne peut plus être modifiée%',
+  'les notes client, imprimées sur la facture, restent verrouillées'
+);
+
+select throws_like(
+  $$update public.factures set relance_auto_exclue = true, client_snapshot = '{}'::jsonb where id = 'aa000000-0000-0000-0000-000000000001'$$,
+  '%ne peut plus être modifiée%',
+  'le snapshot destinataire figé reste immuable, même accompagné de l''exclusion'
+);
+
+select throws_like(
+  $$update public.factures set statut = 'brouillon' where id = 'aa000000-0000-0000-0000-000000000001'$$,
+  '%ne peut pas redevenir brouillon%',
+  'une facture émise ne peut toujours pas redevenir brouillon'
+);
+
+select throws_like(
+  $$delete from public.factures where id = 'aa000000-0000-0000-0000-000000000001'$$,
+  '%ne peut plus être supprimée%',
+  'une facture émise ne peut toujours pas être supprimée'
+);
+
+-- ── Facture partiellement payée : l'autre statut où la section Relances est affichée ──
+reset role;
+update public.factures set montant_paye = 50, statut = 'payee_partiel'
+where id = 'aa000000-0000-0000-0000-000000000001';
+set local role authenticated;
+
+select lives_ok(
+  $$update public.factures set relance_auto_exclue = true
+    where id = 'aa000000-0000-0000-0000-000000000001'
+      and entreprise_id = 'a0000000-0000-0000-0000-000000000001'$$,
+  'une facture partiellement payée peut aussi être exclue des relances automatiques'
+);
+
+select is(
+  (select relance_auto_exclue from public.factures where id = 'aa000000-0000-0000-0000-000000000001'),
+  true,
+  'l''exclusion de la facture partiellement payée est bien enregistrée'
+);
+
+-- ── Droits inchangés : la liste blanche ne contourne pas la RLS ──
+-- Ouvrier A : membre actif sans `gerer_factures` (politique restrictive role_gestion_update).
+select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000002', true);
+select set_config('request.jwt.claim.email', 'ouvrier-a@invalid.local', true);
+
+select is_empty(
+  $$with maj as (
+      update public.factures set relance_auto_exclue = false
+      where id = 'aa000000-0000-0000-0000-000000000001'
+      returning 1
+    ) select * from maj$$,
+  'un membre sans gerer_factures ne peut pas modifier l''exclusion'
+);
+
+-- Gérant B : autre entreprise.
+select set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000001', true);
+select set_config('request.jwt.claim.email', 'admin-b@invalid.local', true);
+
+select is_empty(
+  $$with maj as (
+      update public.factures set relance_auto_exclue = false
+      where id = 'aa000000-0000-0000-0000-000000000001'
+      returning 1
+    ) select * from maj$$,
+  'le gérant d''une autre entreprise ne peut pas modifier l''exclusion'
+);
+
+reset role;
+
+select is(
+  (select relance_auto_exclue from public.factures where id = 'aa000000-0000-0000-0000-000000000001'),
+  true,
+  'les tentatives refusées n''ont pas modifié l''exclusion'
+);
+
+select is(
+  (select montant_ht::numeric from public.factures where id = 'aa000000-0000-0000-0000-000000000001'),
+  100::numeric,
+  'le contenu contractuel de la facture est intact'
+);
+
+select trigger_is(
+  'public', 'factures', 'verrou_facture_emise',
+  'public', 'verrouiller_facture_emise',
+  'le déclencheur verrou_facture_emise reste rattaché à la fonction corrigée'
+);
+
+select * from finish();
+rollback;

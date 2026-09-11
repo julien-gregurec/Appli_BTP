@@ -1,0 +1,160 @@
+-- ============================================================================
+-- PROPOSITION — NON NUMÉROTÉE — NE PAS DÉPLACER DANS supabase/migrations TEL QUEL
+-- ============================================================================
+--
+-- ELSATIA-GP-FACTURES-RELANCE-AUTO-EXCLUE-VERROU-V1 — rendre modifiable
+-- l'exclusion des relances automatiques sur une facture émise.
+--
+-- Ce fichier porte l'extension `.sql.proposed` et vit hors de
+-- `supabase/migrations/` DÉLIBÉRÉMENT : il n'est vu ni par `supabase db reset`,
+-- ni par `scripts/verify-migrations.mjs`. Le préfixe 14 chiffres reste
+-- VOLONTAIREMENT non attribué : c'est le rapport ledger du prochain train qui
+-- le fixe.
+--
+-- ---------------------------------------------------------------------------
+-- DÉFAUT CORRIGÉ
+-- ---------------------------------------------------------------------------
+--
+-- Reproduit le 2026-09-11 sur une base jetable au ledger 20260909000280
+-- (Train V3 @ 52d3282), par le rôle `authenticated` avec la permission
+-- `gerer_factures` comme par un superutilisateur sur des factures réelles.
+--
+-- `factures.relance_auto_exclue` a été ajoutée par 20260824000230 (l.101),
+-- APRÈS l'écriture de la liste blanche de `verrouiller_facture_emise`
+-- (20260822000222). Elle n'y a jamais été ajoutée, ni par 20260824000230, ni
+-- par la réécriture de 20260908000272 (l.244-248). Or, dès qu'une facture
+-- n'est plus brouillon, le verrou compare toute la ligne en JSON, champs de la
+-- liste blanche retirés. Conséquence :
+--
+--   update public.factures set relance_auto_exclue = true where id = … ;
+--   ERROR: Cette facture a déjà été émise et ne peut plus être modifiée.
+--
+-- Le seul écrivain applicatif est `exclureRelanceAutoDocumentAction`
+-- (src/app/actions/relances.ts l.201-213), appelé par le bouton de
+-- `RelanceDocumentSection`. Côté facture, ce bouton n'est affiché QUE sur une
+-- facture émise (src/app/(app)/factures/[id]/page.tsx l.246 : statut hors
+-- brouillon/annulee/avoir_emis/payee et reste à payer > 0) : l'exclusion par
+-- facture ne peut donc JAMAIS aboutir. L'utilisateur lit « Impossible de
+-- modifier ce réglage. », le bouton ne bascule pas, et le moteur continue de
+-- relancer la facture automatiquement.
+--
+-- Hors périmètre, vérifié : les devis ne sont pas touchés
+-- (`verrouiller_devis_accepte` ne verrouille que le statut 'accepte', et le
+-- bouton devis n'est affiché qu'au statut 'envoye') ; l'exclusion par client
+-- (`clients.relance_auto_exclue`) n'a aucun verrou.
+--
+-- ---------------------------------------------------------------------------
+-- CORRECTIF
+-- ---------------------------------------------------------------------------
+--
+-- Recréer la fonction à l'identique de 20260908000272, avec
+-- 'relance_auto_exclue' ajouté à la liste blanche. C'est un réglage
+-- opérationnel interne, de même nature que `notes_internes` ou
+-- `email_envoye_le` : il ne figure ni sur le document ni dans le snapshot
+-- destinataire, et ne change rien au contenu contractuel de la facture.
+-- Tout le reste est inchangé : exemption des snapshots tant qu'ils sont nuls,
+-- refus du retour en brouillon, refus de la suppression.
+--
+-- Le déclencheur `verrou_facture_emise` n'est pas recréé : `create or replace
+-- function` conserve son rattachement, le propriétaire et les droits.
+--
+-- GARDE : la fonction n'est remplacée que si son corps courant est EXACTEMENT
+-- celui posé par 20260908000272 (md5 de pg_proc.prosrc), ou déjà celui de ce
+-- correctif. Si un autre lot l'a redéfinie entre-temps, la migration échoue au
+-- lieu d'écraser sa version en silence : reporter alors la seule entrée
+-- 'relance_auto_exclue' dans la liste blanche de la version courante, et
+-- mettre à jour les deux empreintes ci-dessous.
+--
+-- Pour appliquer, dans le prochain train :
+--   1. prendre le numéro attribué par le rapport ledger (après 20260909000280,
+--      et après 20260909000281_colors_finition_reference_nuancier_v15 si le
+--      lot Colors est fusionné avant — il ne touche pas cette fonction) ;
+--   2. renommer en
+--      `supabase/migrations/<AAAAMMJJ><NNNNNN>_factures_relance_auto_exclue_verrou_v1.sql` ;
+--   3. déplacer `factures-relance-auto-exclue-verrou-v1.pgtap.sql.proposed` en
+--      `supabase/tests/factures_relance_auto_exclue_verrou_v1.test.sql` ;
+--   4. `npm run verify:migrations`, puis pgTAP sur pile isolée (au minimum
+--      cette suite, `verrouiller_facture_emise`, `client_document_snapshot_v1`
+--      et `correctif_rls_isolation_factures`).
+
+do $garde$
+declare
+  v_md5 text;
+begin
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'factures'
+      and column_name = 'relance_auto_exclue'
+  ) then
+    raise exception 'public.factures.relance_auto_exclue est absente : ce correctif suppose 20260824000230.';
+  end if;
+
+  select md5(prosrc) into v_md5
+  from pg_proc
+  where oid = 'public.verrouiller_facture_emise()'::regprocedure;
+
+  if v_md5 is distinct from 'bb9c7249d3d6428aacdd2184843834fa'   -- corps posé par 20260908000272
+     and v_md5 is distinct from '0f99b80de013225294ef7b7282225d87' then  -- corps de ce correctif (rejeu)
+    raise exception 'verrouiller_facture_emise a été redéfinie depuis 20260908000272 (md5 %) : reporter ''relance_auto_exclue'' dans la liste blanche de la version courante au lieu de l''écraser.', v_md5;
+  end if;
+end
+$garde$;
+
+create or replace function public.verrouiller_facture_emise()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+declare
+  v_old jsonb;
+  v_new jsonb;
+  v_champs_libres text[] := array[
+    'statut', 'montant_paye', 'notes_internes', 'email_envoye_le', 'email_envoye_a',
+    'date_echeance', 'stripe_checkout_id', 'stripe_checkout_url', 'stripe_payment_intent_id',
+    'stripe_payment_status', 'lien_paiement_expire_at', 'updated_at',
+    -- Réglage opérationnel interne (20260824000230) : exclusion de la facture
+    -- des relances automatiques. Absent du document et du snapshot.
+    'relance_auto_exclue'
+  ];
+  v_champ text;
+  v_snapshot text;
+begin
+  if tg_op = 'DELETE' then
+    if old.statut <> 'brouillon' then
+      raise exception 'Cette facture a déjà été émise et ne peut plus être supprimée.';
+    end if;
+    return old;
+  end if;
+
+  if old.statut <> 'brouillon' then
+    if new.statut = 'brouillon' then
+      raise exception 'Cette facture a déjà été émise et ne peut pas redevenir brouillon.';
+    end if;
+
+    v_old := to_jsonb(old);
+    v_new := to_jsonb(new);
+    foreach v_champ in array v_champs_libres loop
+      v_old := v_old - v_champ;
+      v_new := v_new - v_champ;
+    end loop;
+    -- entreprise_snapshot / client_snapshot : verrouillés seulement une fois
+    -- déjà renseignés, pour ne pas bloquer leur capture initiale (sortie du
+    -- brouillon, ou rattrapage d'un document historique) tout en empêchant
+    -- toute falsification ultérieure de l'identité légale figée.
+    foreach v_snapshot in array array['entreprise_snapshot', 'client_snapshot', 'client_snapshot_at'] loop
+      if (v_old ? v_snapshot) and (v_old ->> v_snapshot) is null then
+        v_old := v_old - v_snapshot;
+        v_new := v_new - v_snapshot;
+      end if;
+    end loop;
+
+    if v_old is distinct from v_new then
+      raise exception 'Cette facture a déjà été émise et ne peut plus être modifiée.';
+    end if;
+  end if;
+  return new;
+end;
+$function$;
