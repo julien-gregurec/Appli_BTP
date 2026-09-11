@@ -179,3 +179,101 @@ Chaque lot fait l'objet d'un commit séparé, testé et poussé sans force, pour
 | D2 | Dépendances NPM | `@dnd-kit/core` + `@dnd-kit/sortable` (glisser-déposer accessible au clavier, lignes de devis) et `@tanstack/react-virtual` (500 lignes, centaines d'événements) ; planning en pointeur natif |
 | D3 | Sens de « référence fournisseur » et « code article fournisseur » | à trancher : voir la question posée |
 | D4 | Droits fins | nouvelles clés (`modifier_prix_vente`, `modifier_remise`, `supprimer_devis`, `transformer_devis`, `envoyer_devis`, `affecter_ressources`) accordées d'office à qui a déjà `gerer_devis` / `gerer_planning` (aucune perte de droit), et deux modèles de postes « Commercial » et « Poseur » |
+
+**Tranchées par Julien le 2026-09-11 : les quatre recommandations sont retenues.** En particulier D3 :
+« référence fournisseur » d'une fiche article = référence du **fabricant** (`reference_fabricant`) ;
+« code article fournisseur » = code de l'article chez **un distributeur** (un par fournisseur).
+
+## 10. Lot A-bis — références internes (livré)
+
+### 10.1 Livrables
+
+| Fichier | Rôle |
+|---|---|
+| `supabase/proposed/gp-v1-metier-references-internes.sql.proposed` | SQL proposé, non numéroté, à appliquer **après** celui du devis v2 |
+| `supabase/proposed/gp-v1-metier-references-internes.pgtap.sql.proposed` | preuve pgTAP (69 assertions) |
+| `src/lib/references.ts` (+ test) | formats par défaut, nettoyage, validation, aperçu, messages d'erreur ; parité des formats vérifiée contre le SQL |
+| `src/lib/erreurs-utilisateur.ts`, `src/app/actions/prestations.ts`, `src/lib/devis/application-import-catalogue.ts` | un refus portant sur une référence produit un message exact sur tous les chemins |
+| `src/components/PrestationForm.tsx` | texte d'aide aligné sur la règle d'unicité |
+
+Commits : `e86a6d8`, `dfb9b10`, `4055fff` et le correctif des références sans valeur qui suit.
+
+### 10.2 Ce que fait le SQL
+
+1. **Paramètres par entreprise** (`references_parametres`) : préfixe, largeur, année, génération automatique. Par défaut : CLI-0001, CHA-AAAA-001, FRN-0001 (inchangés), ART-00001 et OUV-0001 (nouveaux).
+2. **Générateur sûr** (`generer_reference_interne`) : n'attribue jamais une valeur déjà saisie à la main (défaut A5, **démontré** sur la base d'avant le correctif puis corrigé). Non appelable depuis le navigateur.
+3. **Normalisation** : espaces retirés, vide = absent, sur toutes les références, documents compris.
+4. **Unicité par entreprise sur la forme normalisée** : clients, chantiers, fournisseurs, catalogue, stock, ouvrages. Une nouvelle référence sans lettre ni chiffre est refusée ; les références historiques de ce type sont conservées et hors du périmètre de l'unicité.
+5. **Reprise du stock** : la référence interne reprend le code article quand aucune autre fiche ne le porte sous forme normalisée ; sinon elle reste vide et le doublon est signalé, jamais tranché.
+6. **Documents** : `reference_interne` (affaire) et `reference_client` sur devis et factures, `reference_fournisseur` (offre) sur les commandes ; non uniques, bornées, indexées.
+7. **Codes distributeurs** (`catalogue_codes_fournisseurs`, D3) : un code par article et par distributeur, un distributeur principal ; **aucune colonne de prix** ; lecture selon le module (devis, stock ou achats), écriture selon `gerer_devis` / `gerer_stock`.
+8. **Historique des objets** (`historique_objets`) : ajout seul, aucun droit d'écriture direct, lecture selon le module de l'objet, entrées sensibles réservées à `voir_couts_devis`. Alimenté ici par les changements de référence et de code distributeur ; les lots suivants y ajoutent statuts, prix, envois, planning.
+9. **Doublons** : `doublons_references_catalogue` étendue (stock, ouvrages, codes distributeurs, collisions catalogue ↔ stock) et `doublons_references` (tiers compris).
+10. **Attribution à la demande** (`attribuer_references_manquantes`) : rien n'est numéroté rétroactivement sans le geste explicite de l'entreprise ; chaque attribution est journalisée.
+
+### 10.3 Écart assumé avec le lot devis v2
+
+Le lot devis v2 avait choisi « aucune unicité » pour la référence interne du catalogue. La V1 l'exige
+unique : la preuve pgTAP du devis v2 est adaptée **sur cette branche seulement**, en trois assertions,
+avec la raison écrite en commentaire :
+- le doublon toléré et signalé porte sur la référence fabricant, qui reste non unique ;
+- la variante `BA13-200-H` remonte au rang 3 et non plus au rang 1 ;
+- le code du stock devient la référence interne quand il est libre.
+
+Elle passe 111/111. Si le lot devis v2 est intégré seul, sa preuve d'origine reste valable ; intégré
+avec celui-ci, c'est la version de cette branche qui fait foi.
+
+### 10.4 Résultats
+
+| Contrôle | Résultat |
+|---|---|
+| SQL appliqué deux fois de suite (base jetable ledger 280 + devis v2) | 0 erreur : rejouable |
+| pgTAP du lot | **69/69** |
+| pgTAP du devis v2, adaptée | **111/111** |
+| Suite pgTAP existante complète (`supabase/tests`, 70 fichiers) | 1 901 assertions vertes, **1 échec identique sur la base témoin sans le lot** (`reserves_v2_terrain_capture`, préexistant) : aucune différence |
+| Montée de version avec données (doublons de stock, références sans valeur, saisie manuelle) | reprise correcte, doublons signalés, génération sûre |
+| Montée de version refusée (clients ne différant que par la casse) | arrêt explicite, message et indication de correction, **rien d'appliqué** |
+| Vitest (5 fichiers touchés) | 149/149, dont 18 pour `references.ts` |
+| Typecheck du projet, lint des fichiers touchés | 0 erreur |
+
+### 10.5 Contrôle préalable en Production (lecture seule)
+
+À lancer avant d'appliquer la proposition : toute ligne renvoyée ferait échouer la migration (bloc 8).
+L'expression reproduit `normaliser_reference`, absente de la Production.
+
+```sql
+with refs as (
+  select 'clients' as t, entreprise_id, reference_interne as r from public.clients where reference_interne is not null
+  union all select 'chantiers', entreprise_id, reference_interne from public.chantiers where reference_interne is not null
+  union all select 'fournisseurs', entreprise_id, reference from public.fournisseurs
+  union all select 'articles_stock', entreprise_id, reference from public.articles_stock
+), normes as (
+  select t, entreprise_id, r, regexp_replace(lower(translate(
+           replace(replace(replace(replace(r, 'œ', 'oe'), 'Œ', 'OE'), 'æ', 'ae'), 'Æ', 'AE'),
+           'ÀÁÂÃÄÅàáâãäåÇçÈÉÊËèéêëÌÍÎÏìíîïÑñÒÓÔÕÖòóôõöÙÚÛÜùúûüÝýÿ',
+           'AAAAAAaaaaaaCcEEEEeeeeIIIIiiiiNnOOOOOoooooUUUUuuuuYyy')), '[[:space:]._/\\-]+', '', 'g') as k
+  from refs
+)
+select t, entreprise_id, k, array_agg(r) as valeurs
+from normes where k <> '' and t <> 'articles_stock'
+group by t, entreprise_id, k having count(*) > 1
+order by t, entreprise_id;
+```
+
+Les doublons de `articles_stock` ne bloquent pas : ils restent sans référence interne et sont signalés.
+
+### 10.6 Réserves
+
+1. **Installation à neuf (Fresh) non rejouée**, comme pour le devis v2 : prouvé en montée de version seulement.
+2. **Aucun écran** de paramétrage des références ni de saisie des codes distributeurs : c'est le lot B. La recherche d'article par code distributeur l'est aussi.
+3. La **recopie** des références d'affaire et client du devis vers la facture relève de la refonte des transformations (lot D).
+4. Le texte d'aide de la fiche article n'a pas été vu dans un navigateur : l'écran n'existe que drapeau `GP_DEVIS_V2` activé, et la base locale de développement est au ledger 265.
+5. Défaut A6 (`a_permission` et session support) : hors lot, à confier à un lot sécurité.
+
+### 10.7 Retour arrière
+
+Tout est additif. Pour revenir en arrière :
+- supprimer les déclencheurs `gp_*` et `a_gp_*`, les tables `references_parametres`, `catalogue_codes_fournisseurs` et `historique_objets`, les index `*_norm_uniq` et les contraintes `*_signifiante_check` ;
+- rejouer les définitions d'origine de `trg_ref_client` / `trg_ref_chantier` (20260710000004), `trg_fournisseur_reference` (20260710000021) et `doublons_references_catalogue` (proposition devis v2).
+
+Aucune donnée n'est supprimée. La reprise du stock ne fait que remplir `reference_interne`, qui était vide.
