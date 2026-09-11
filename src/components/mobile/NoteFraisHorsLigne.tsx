@@ -71,7 +71,8 @@ export function NoteFraisHorsLigne({ identite, employeId }: { identite: Identite
           mime: controle.mime,
           taille: octets.length,
           empreinte: await empreinteSha256(octets),
-          contenu: new Blob([octets], { type: controle.mime }),
+          // Octets bruts, pas un `Blob` : WebKit refuse un `Blob` dans IndexedDB en navigation privée.
+          contenu: octets.buffer as ArrayBuffer,
           depose: false,
           documentId: null,
         });

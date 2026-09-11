@@ -132,3 +132,8 @@
 .lecture-seule main button[type="button"] { display: none !important; }
 .lecture-seule main form[method="get"] { display: flex !important; }
 .lecture-seule main form[method="get"] button { display: inline-flex !important; }
+/* Consultation sur l'appareil : emporter, consulter, retirer une copie locale ne modifient
+   RIEN côté serveur. Ces gestes sont précisément ceux d'un salarié en lecture seule sur un
+   chantier : la règle ci-dessus, qui masque tout bouton, les rendait inaccessibles. Une zone
+   marquée `data-consultation` garde ses boutons. */
+.lecture-seule main [data-consultation] button[type="button"] { display: inline-flex !important; }

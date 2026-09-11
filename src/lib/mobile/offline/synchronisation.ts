@@ -68,7 +68,28 @@ function estPrete(mutation: MutationLocale, maintenant: number): boolean {
   return maintenant - mutation.capteA >= delaiAvantNouvelleTentative(mutation.tentatives);
 }
 
+/**
+ * Une seule vidange à la fois par identité, tous onglets confondus.
+ *
+ * La reprise des envois interrompus (plus bas) rend à la file toute mutation « en_cours ».
+ * Sans verrou, une seconde vidange — page rechargée pendant un envoi, second onglet —
+ * reprenait l'envoi EN COURS de la première : les deux vérifiaient la présence du
+ * justificatif au même instant, n'y trouvaient rien, et le déposaient chacune. Constaté en
+ * recette : deux documents pour une note. Le verrou rend la reprise sûre ; si une vidange
+ * tourne déjà, celle-ci s'efface et le dit (`reporte`). Le navigateur libère le verrou quand
+ * la page qui le tient disparaît : une application fermée ne bloque rien.
+ */
 export async function viderLaFile(identite: IdentiteBase): Promise<ResultatVidange> {
+  const verrous = typeof navigator !== "undefined" ? navigator.locks : undefined;
+  if (!verrous?.request) return viderLaFileSousVerrou(identite);
+  return verrous.request(
+    `elsatia:gp:vidange:${identite.entrepriseId}:${identite.utilisateurId}`,
+    { ifAvailable: true },
+    async (verrou) => (verrou ? viderLaFileSousVerrou(identite) : { ...VIDE, reporte: true }),
+  );
+}
+
+async function viderLaFileSousVerrou(identite: IdentiteBase): Promise<ResultatVidange> {
   const base = await ouvrirBase(identite);
   if (!base) return VIDE;
 
@@ -80,7 +101,8 @@ export async function viderLaFile(identite: IdentiteBase): Promise<ResultatVidan
     // règle ne la reprenait : `estPrete` n'accepte que « en_attente » et « echec ». Elle
     // restait donc bloquée POUR TOUJOURS, sans que rien ne le signale.
     //
-    // On la rend à la file au début de chaque vidange. C'est sûr parce que le serveur est
+    // On la rend à la file au début de chaque vidange — sous le verrou, donc jamais pendant
+    // qu'une autre vidange l'envoie. C'est sûr aussi parce que le serveur est
     // idempotent — c'est tout l'objet de la clé fournie par l'appareil : si l'envoi coupé
     // avait en réalité abouti, le renvoi sera lu comme un rejeu, pas comme un doublon.
     for (const m of await lireMutations(base)) {

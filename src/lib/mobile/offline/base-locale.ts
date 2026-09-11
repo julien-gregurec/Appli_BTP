@@ -221,10 +221,20 @@ export async function purgerBasesLocales(filtre?: (nom: string) => boolean): Pro
 /**
  * Un fichier capturé hors ligne, en attente de dépôt.
  *
- * Le contenu est conservé en `Blob` et non en base64 : un ticket photographié pèse plusieurs
- * mégaoctets, et le coder en texte ajouterait un tiers de poids pour rien. IndexedDB stocke
- * les `Blob` nativement.
+ * Le contenu est conservé en octets bruts (`ArrayBuffer`), ni en base64 — un ticket
+ * photographié pèse plusieurs mégaoctets, et le coder en texte ajouterait un tiers de poids —
+ * ni en `Blob` : WebKit REFUSE un `Blob` dans IndexedDB en contexte éphémère (navigation privée
+ * de Safari, et contextes de Playwright) — mesuré : `NotReadableError`, la note n'était jamais
+ * conservée sur iPhone. Des octets bruts passent partout. Un `Blob` déjà conservé reste lu.
  */
+/** Octets d'un fichier conservé sur l'appareil. `Blob` : forme antérieure, encore lue. */
+export type ContenuLocal = ArrayBuffer | Blob;
+
+/** Reconstitue un `Blob` pour l'envoi ou la consultation, quelle que soit la forme conservée. */
+export function enBlob(contenu: ContenuLocal, mime: string): Blob {
+  return contenu instanceof Blob ? contenu : new Blob([contenu], { type: mime });
+}
+
 export type JustificatifLocal = {
   /** Identifiant propre au fichier : deux fichiers d'une même note ne se confondent jamais. */
   id: string;
@@ -234,7 +244,7 @@ export type JustificatifLocal = {
   mime: string;
   taille: number;
   empreinte: string;
-  contenu: Blob;
+  contenu: ContenuLocal;
   depose: boolean;
   documentId: string | null;
 };
@@ -283,7 +293,7 @@ export type DocumentEmporte = {
   nom: string;
   mime: string;
   taille: number;
-  contenu: Blob;
+  contenu: ContenuLocal;
   /** Date de dernière synchronisation, affichée à l'utilisateur. */
   emporteA: number;
 };

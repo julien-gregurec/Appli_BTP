@@ -62,7 +62,7 @@ test.describe("@pilote @emporter documents emportés pour consultation hors lign
     await page.context().setOffline(true);
     const tailles = await page.evaluate(async (ids) => {
       const base = await new Promise<IDBDatabase>((r) => { const q = indexedDB.open("elsatia:gp:a0000000-0000-0000-0000-000000000001:40000000-0000-0000-0000-000000000003"); q.onsuccess = () => r(q.result); });
-      const lire = (id: string) => new Promise<number>((r) => { const q = base.transaction("documents_emportes").objectStore("documents_emportes").get(id); q.onsuccess = () => r((q.result?.contenu as Blob | undefined)?.size ?? -1); });
+      const lire = (id: string) => new Promise<number>((r) => { const q = base.transaction("documents_emportes").objectStore("documents_emportes").get(id); q.onsuccess = () => { const c = q.result?.contenu as Blob | ArrayBuffer | undefined; r(c instanceof Blob ? c.size : c?.byteLength ?? -1); }; });
       const res = await Promise.all(ids.map(lire)); base.close(); return res;
     }, [DOC_PDF, DOC_PNG]);
     expect(tailles).toEqual([92, 70]);

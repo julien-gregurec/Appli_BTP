@@ -11,6 +11,7 @@ import {
 import {
   conserverDocumentEmporte,
   lireDocumentsEmportes,
+  enBlob,
   ouvrirBase,
   retirerDocumentEmporte,
   type DocumentEmporte,
@@ -95,13 +96,13 @@ export function DocumentsEmportes({
       // sans passer par le contrôle d'accès de la base.
       const reponse = await fetch(`/api/documents/${doc.id}`);
       if (!reponse.ok) throw new Error(String(reponse.status));
-      const contenu = await reponse.blob();
+      const contenu = await reponse.arrayBuffer();
       const base = await ouvrirBase(identite);
       if (!base) throw new Error("stockage");
       try {
         await conserverDocumentEmporte(base, {
           id: doc.id, chantierId, nom: doc.nom, mime: doc.mime_type,
-          taille: contenu.size, contenu, emporteA: Date.now(),
+          taille: contenu.byteLength, contenu, emporteA: Date.now(),
         });
       } finally { base.close(); }
       setEtats((e) => ({ ...e, [doc.id]: "disponible" }));
@@ -120,7 +121,7 @@ export function DocumentsEmportes({
 
   function ouvrir(doc: DocumentEmporte) {
     // Consultation seule : une URL d'objet locale, ouverte dans un nouvel onglet.
-    const url = URL.createObjectURL(doc.contenu);
+    const url = URL.createObjectURL(enBlob(doc.contenu, doc.mime));
     window.open(url, "_blank", "noopener");
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
@@ -128,7 +129,7 @@ export function DocumentsEmportes({
   const parId = new Map(locaux.map((d) => [d.id, d]));
 
   return (
-    <section className="rounded-lg border p-4" data-test="documents-emportes" aria-label="Documents disponibles hors ligne">
+    <section className="rounded-lg border p-4" data-test="documents-emportes" data-consultation aria-label="Documents disponibles hors ligne">
       <h2 className="font-semibold">Emporter pour consulter hors ligne</h2>
       <p className="mt-1 text-xs text-neutral-500">Choisissez les documents à garder sur l’appareil. Rien n’est téléchargé sans votre accord.</p>
       {avis && <p role="status" className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900" data-test="documents-emportes-avis">{avis}</p>}
