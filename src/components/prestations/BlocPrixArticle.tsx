@@ -20,7 +20,9 @@ const nombre = (s: string): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
-const pct = (v: number | null) => (v === null ? "—" : `${String(v).replace(".", ",")} %`);
+/** Nombre affiché à la française dans un champ (la saisie accepte la virgule comme le point). */
+const fr = (v: number) => String(v).replace(".", ",");
+const pct = (v: number | null) => (v === null ? "—" : `${fr(v)} %`);
 
 /**
  * Prix de vente, prix d'achat, coefficient et marge d'un article (moteur de devis v2).
@@ -46,9 +48,9 @@ export function BlocPrixArticle({
   modeInitial: ModePrix;
 }) {
   const id = useId();
-  const [prixVente, setPrixVente] = useState(String(prixVenteInitial ?? 0));
-  const [prixAchat, setPrixAchat] = useState(prixAchatInitial === null ? "" : String(prixAchatInitial));
-  const [coefficient, setCoefficient] = useState(coefficientInitial === null ? "" : String(coefficientInitial));
+  const [prixVente, setPrixVente] = useState(fr(prixVenteInitial ?? 0));
+  const [prixAchat, setPrixAchat] = useState(prixAchatInitial === null ? "" : fr(prixAchatInitial));
+  const [coefficient, setCoefficient] = useState(coefficientInitial === null ? "" : fr(coefficientInitial));
   const [mode, setMode] = useState<ModePrix>(modeInitial);
 
   const achat = cout === "absent" ? null : nombre(prixAchat);
@@ -67,7 +69,7 @@ export function BlocPrixArticle({
           id={`${id}-vente`}
           name="prix_unitaire_ht"
           inputMode="decimal"
-          value={venteCalculee !== null ? String(venteCalculee) : prixVente}
+          value={venteCalculee !== null ? fr(venteCalculee) : prixVente}
           onChange={(e) => setPrixVente(e.target.value)}
           readOnly={venteCalculee !== null}
           aria-describedby={venteCalculee !== null ? `${id}-vente-aide` : undefined}
@@ -96,7 +98,7 @@ export function BlocPrixArticle({
               {modifiable ? (
                 <input id={`${id}-coef`} name="coefficient" inputMode="decimal" value={coefficient} onChange={(e) => setCoefficient(e.target.value)} className={champ} aria-invalid={"erreur" in coef} aria-describedby={`${id}-coef-aide`} />
               ) : (
-                <p id={`${id}-coef`} className="flex min-h-11 items-center font-mono text-sm">{coefficientInitial === null ? "—" : String(coefficientInitial).replace(".", ",")}</p>
+                <p id={`${id}-coef`} className="flex min-h-11 items-center font-mono text-sm">{coefficientInitial === null ? "—" : fr(coefficientInitial)}</p>
               )}
               {modifiable && (
                 <p id={`${id}-coef-aide`} className={`text-xs ${"erreur" in coef ? "text-red-700" : "text-neutral-500"}`}>
@@ -121,7 +123,7 @@ export function BlocPrixArticle({
             <div><dt className="text-xs text-neutral-500">Marge HT</dt><dd className={`font-mono ${indicateurs.sousLeCout ? "text-red-700" : ""}`}>{indicateurs.margeHt === null ? "—" : euros(indicateurs.margeHt)}</dd></div>
             <div><dt className="text-xs text-neutral-500">Taux de marge</dt><dd className="font-mono">{pct(indicateurs.tauxMargePct)}</dd></div>
             <div><dt className="text-xs text-neutral-500">Taux de marque</dt><dd className="font-mono">{pct(indicateurs.tauxMarquePct)}</dd></div>
-            <div><dt className="text-xs text-neutral-500">Coefficient réel</dt><dd className="font-mono">{indicateurs.coefficient === null ? "—" : String(indicateurs.coefficient).replace(".", ",")}</dd></div>
+            <div><dt className="text-xs text-neutral-500">Coefficient réel</dt><dd className="font-mono">{indicateurs.coefficient === null ? "—" : fr(indicateurs.coefficient)}</dd></div>
           </dl>
           {indicateurs.sousLeCout && <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">Prix de vente inférieur au prix d’achat.</p>}
         </fieldset>
