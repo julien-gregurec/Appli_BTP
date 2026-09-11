@@ -56,14 +56,28 @@ describe("4. classement", () => {
     // « BA13-200 » est la référence INTERNE de la plaque et la référence FABRICANT du rail.
     expect(rechercherArticles([rail, plaque], "BA13-200", A).map((a) => a.id)).toEqual(["p1", "r1"]);
   });
-  it("respecte les six niveaux", () => {
+  it("respecte les sept niveaux", () => {
+    const scanne = article({ id: "c1", referenceInterne: "CHEV-6", codeBarres: "3760123456789", designation: "Cheville" });
     expect(rangCorrespondance(plaque, "BA13-200")).toBe(1);
     expect(rangCorrespondance(rail, "BA13-200")).toBe(2);
     expect(rangCorrespondance(plaque, "BA13")).toBe(3);
     expect(rangCorrespondance(plaque, "PLACO")).toBe(4);
-    expect(rangCorrespondance(plaque, "4521")).toBe(5);
-    expect(rangCorrespondance(vis, "Placoplatre")).toBe(6);
+    expect(rangCorrespondance(scanne, "3760123456789")).toBe(5);
+    expect(rangCorrespondance(plaque, "4521")).toBe(6);
+    expect(rangCorrespondance(scanne, "456789")).toBe(6);
+    expect(rangCorrespondance(vis, "Placoplatre")).toBe(7);
     expect(rangCorrespondance(vis, "introuvable")).toBeNull();
+  });
+  it("place un code-barres scanné devant une référence qui le contient seulement", () => {
+    const scanne = article({ id: "c1", codeBarres: "3760123456789", designation: "Cheville" });
+    const contient = article({ id: "c2", referenceInterne: "X3760123456789Y", designation: "Autre" });
+    expect(rechercherArticles([contient, scanne], "3760123456789", A).map((a) => a.id)).toEqual(["c1", "c2"]);
+  });
+  it("ne confond jamais code-barres et référence : chacun garde son champ", () => {
+    const scanne = article({ id: "c1", referenceInterne: "CHEV-6", codeBarres: "3760123456789" });
+    const [trouve] = rechercherArticles([scanne], "3760123456789", A);
+    expect(trouve.referenceInterne).toBe("CHEV-6");
+    expect(trouve.codeBarres).toBe("3760123456789");
   });
 });
 

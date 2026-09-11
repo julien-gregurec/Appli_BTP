@@ -68,8 +68,12 @@ export function normaliser(valeur: string | null | undefined): string {
  *   2. référence fabricant exacte
  *   3. référence interne qui COMMENCE par la recherche
  *   4. référence fabricant qui commence par la recherche
- *   5. correspondance partielle sur une référence ou le code-barres
- *   6. désignation, fabricant ou fournisseur
+ *   5. code-barres exact
+ *   6. correspondance partielle sur une référence ou le code-barres
+ *   7. désignation, fabricant ou fournisseur
+ *
+ * Le code-barres exact est un niveau à part : une douchette qui scanne un EAN désigne un
+ * produit précis, il ne doit pas passer derrière une référence qui se contente de le contenir.
  *
  * `null` : aucune correspondance.
  */
@@ -84,9 +88,10 @@ export function rangCorrespondance(article: ArticleCatalogue, recherche: string)
   if (rf && rf === q) return 2;
   if (ri && ri.startsWith(q)) return 3;
   if (rf && rf.startsWith(q)) return 4;
-  if ((ri && ri.includes(q)) || (rf && rf.includes(q)) || (cb && cb.includes(q))) return 5;
+  if (cb && cb === q) return 5;
+  if ((ri && ri.includes(q)) || (rf && rf.includes(q)) || (cb && cb.includes(q))) return 6;
   for (const champ of [article.designation, article.fabricant, article.fournisseur]) {
-    if (normaliser(champ).includes(q)) return 6;
+    if (normaliser(champ).includes(q)) return 7;
   }
   return null;
 }
