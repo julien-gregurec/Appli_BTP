@@ -1,0 +1,263 @@
+-- =====================================================================================================
+-- PREUVE pgTAP PROPOSÉE — ELSATIA-GP-V1-METIER, lot B « bibliothèque articles et ouvrages »
+-- =====================================================================================================
+-- Base jetable au ledger 280 + devis v2 + références internes + ce lot.
+-- Acteurs : A dirigeant …-0006 (tous droits), A conducteur …-0004 (devis sans coûts), A ouvrier …-0002,
+-- B dirigeant 20000000-…-0006.
+-- =====================================================================================================
+begin;
+create extension if not exists pgtap with schema extensions;
+select * from no_plan();
+
+\ir ../tests/fixtures/isolation_multitenant.inc
+
+create or replace function pg_temp.jwt(p_sub uuid) returns void language plpgsql as $$
+begin
+  perform set_config('request.jwt.claim.sub', p_sub::text, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', p_sub, 'role', 'authenticated')::text, true);
+end $$;
+
+set local role authenticated;
+select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- A. Familles : deux niveaux, noms uniques, cloisonnement
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+select lives_ok($$insert into public.catalogue_familles (id, entreprise_id, nom) values
+  ('f0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', ' Plâtrerie ')$$, 'famille créée');
+select is((select nom from public.catalogue_familles where id = 'f0000000-0000-0000-0000-000000000001'), 'Plâtrerie',
+  'famille : nom nettoyé');
+select lives_ok($$insert into public.catalogue_familles (id, entreprise_id, parent_id, nom) values
+  ('f0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-000000000001', 'Plaques')$$,
+  'sous-famille créée');
+select throws_ok($$insert into public.catalogue_familles (entreprise_id, parent_id, nom) values
+  ('a0000000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-000000000002', 'Trop profond')$$,
+  'P0001', null, 'famille : jamais plus de deux niveaux');
+select throws_ok($$insert into public.catalogue_familles (entreprise_id, nom) values
+  ('a0000000-0000-0000-0000-000000000001', 'platrerie')$$,
+  '23505', null, 'famille : nom unique sous un même parent (forme normalisée)');
+select lives_ok($$insert into public.catalogue_familles (id, entreprise_id, nom) values
+  ('f0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', 'Menuiserie')$$, 'seconde famille');
+select lives_ok($$insert into public.catalogue_familles (entreprise_id, parent_id, nom) values
+  ('a0000000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-000000000003', 'Plaques')$$,
+  'famille : un même nom est libre sous un autre parent');
+select throws_ok($$update public.catalogue_familles set parent_id = 'f0000000-0000-0000-0000-000000000003'
+  where id = 'f0000000-0000-0000-0000-000000000001'$$,
+  'P0001', null, 'famille : une famille qui a des sous-familles ne devient pas sous-famille');
+
+select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
+select ok((select count(*) from public.catalogue_familles) >= 4, 'famille : le conducteur (accès devis) les voit');
+select lives_ok($$insert into public.catalogue_familles (entreprise_id, nom) values
+  ('a0000000-0000-0000-0000-000000000001', 'Électricité')$$, 'famille : le conducteur (gerer_devis) en crée');
+select pg_temp.jwt('10000000-0000-0000-0000-000000000002');
+select is((select count(*)::int from public.catalogue_familles), 0, 'famille : l''ouvrier ne les voit pas');
+select throws_ok($$insert into public.catalogue_familles (entreprise_id, nom) values
+  ('a0000000-0000-0000-0000-000000000001', 'Interdit')$$, '42501', null, 'famille : l''ouvrier n''en crée pas');
+select pg_temp.jwt('20000000-0000-0000-0000-000000000006');
+select is((select count(*)::int from public.catalogue_familles
+            where entreprise_id = 'a0000000-0000-0000-0000-000000000001'), 0, 'famille : cloisonnée par entreprise');
+select throws_ok($$insert into public.catalogue_familles (entreprise_id, parent_id, nom) values
+  ('b0000000-0000-0000-0000-000000000001', 'f0000000-0000-0000-0000-000000000001', 'Volée')$$,
+  '23503', null, 'famille : le parent d''une autre entreprise est refusé');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- B. Catégorie dérivée de la famille, rattachement de l'import, renommage
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
+insert into public.prestations_catalogue (id, entreprise_id, designation, type, unite, prix_unitaire_ht, taux_tva, famille_id, categorie)
+  values ('e2000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'PGTAP BA13 standard', 'fourniture', 'm²', 20, 20,
+          'f0000000-0000-0000-0000-000000000002', 'saisie divergente');
+select is((select categorie from public.prestations_catalogue where id = 'e2000000-0000-0000-0000-000000000001'),
+  'Plâtrerie › Plaques', 'catégorie : libellé dérivé de la famille, la saisie divergente est remplacée');
+
+insert into public.prestations_catalogue (id, entreprise_id, designation, type, unite, prix_unitaire_ht, taux_tva, categorie)
+  values ('e2000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', 'PGTAP import', 'fourniture', 'u', 5, 20,
+          'plâtrerie › plaques');
+select is((select famille_id from public.prestations_catalogue where id = 'e2000000-0000-0000-0000-000000000002'),
+  'f0000000-0000-0000-0000-000000000002'::uuid, 'import : une catégorie texte connue est rattachée à sa famille');
+insert into public.prestations_catalogue (id, entreprise_id, designation, type, unite, prix_unitaire_ht, taux_tva, categorie)
+  values ('e2000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', 'PGTAP inconnue', 'fourniture', 'u', 5, 20,
+          'Carrelage');
+select ok((select famille_id is null and categorie = 'Carrelage' from public.prestations_catalogue
+            where id = 'e2000000-0000-0000-0000-000000000003'),
+  'import : une catégorie inconnue reste un texte libre — aucune famille créée en silence');
+
+update public.catalogue_familles set nom = 'Plâtre' where id = 'f0000000-0000-0000-0000-000000000001';
+select is((select categorie from public.prestations_catalogue where id = 'e2000000-0000-0000-0000-000000000001'),
+  'Plâtre › Plaques', 'renommage : le libellé des articles rangés dessous suit');
+
+select throws_ok($$delete from public.catalogue_familles where id = 'f0000000-0000-0000-0000-000000000002'$$,
+  '23503', null, 'famille : une famille utilisée ne se supprime pas');
+
+update public.prestations_catalogue set famille_id = null where id = 'e2000000-0000-0000-0000-000000000002';
+select ok((select categorie is null from public.prestations_catalogue where id = 'e2000000-0000-0000-0000-000000000002'),
+  'famille retirée : la catégorie dérivée est vidée');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- C. Notes et image
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+select throws_ok($$update public.prestations_catalogue set image_chemin = 'b0000000-0000-0000-0000-000000000001/x.png'
+  where id = 'e2000000-0000-0000-0000-000000000001'$$, '23514', null,
+  'image : un chemin hors du dossier de l''entreprise est refusé par la base');
+select lives_ok($$update public.prestations_catalogue
+  set image_chemin = 'a0000000-0000-0000-0000-000000000001/e2000000-0000-0000-0000-000000000001/ba13.png',
+      notes_internes = 'Stock chez le distributeur principal'
+  where id = 'e2000000-0000-0000-0000-000000000001'$$, 'image et notes internes enregistrées');
+select throws_ok($$update public.prestations_catalogue set notes_internes = repeat('x', 2001)
+  where id = 'e2000000-0000-0000-0000-000000000001'$$, '23514', null, 'notes : bornées à 2 000 caractères');
+
+select lives_ok($$insert into storage.objects (bucket_id, name) values
+  ('catalogue-images', 'a0000000-0000-0000-0000-000000000001/e2000000-0000-0000-0000-000000000001/ba13.png')$$,
+  'image : le dirigeant dépose une image dans le dossier de son entreprise');
+select throws_ok($$insert into storage.objects (bucket_id, name) values
+  ('catalogue-images', 'b0000000-0000-0000-0000-000000000001/intrus.png')$$,
+  '42501', null, 'image : jamais dans le dossier d''une autre entreprise');
+select throws_ok($$insert into storage.objects (bucket_id, name) values ('catalogue-images', 'pas-un-uuid/x.png')$$,
+  '42501', null, 'image : un chemin sans dossier d''entreprise est refusé, sans erreur de conversion');
+delete from storage.objects where bucket_id = 'catalogue-images';
+select is((select count(*)::int from storage.objects where bucket_id = 'catalogue-images'), 1,
+  'image : aucune suppression possible (elle peut figurer dans un document émis)');
+select pg_temp.jwt('10000000-0000-0000-0000-000000000002');
+select is((select count(*)::int from storage.objects where bucket_id = 'catalogue-images'), 0,
+  'image : l''ouvrier sans accès devis ne la lit pas');
+select throws_ok($$insert into storage.objects (bucket_id, name) values
+  ('catalogue-images', 'a0000000-0000-0000-0000-000000000001/ouvrier.png')$$,
+  '42501', null, 'image : l''ouvrier n''en dépose pas');
+select pg_temp.jwt('20000000-0000-0000-0000-000000000006');
+select is((select count(*)::int from storage.objects where bucket_id = 'catalogue-images'
+            and name like 'a0000000-0000-0000-0000-000000000001/%'), 0, 'image : cloisonnée par entreprise');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- D. Coefficient et mode de prix, sous permission
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
+select lives_ok($$insert into public.prestations_catalogue_couts (prestation_id, entreprise_id, prix_achat_ht, coefficient, mode_prix)
+  values ('e2000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 12.5, 1.6, 'calcule')$$,
+  'coûts : prix d''achat et coefficient en mode calculé');
+select throws_ok($$update public.prestations_catalogue_couts set coefficient = null
+  where prestation_id = 'e2000000-0000-0000-0000-000000000001'$$, '23514', null,
+  'coûts : le mode calculé exige un coefficient');
+select throws_ok($$update public.prestations_catalogue_couts set coefficient = 0
+  where prestation_id = 'e2000000-0000-0000-0000-000000000001'$$, '23514', null, 'coûts : coefficient strictement positif');
+update public.prestations_catalogue_couts set prix_achat_ht = 13 where prestation_id = 'e2000000-0000-0000-0000-000000000001';
+
+select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
+select is((select count(*)::int from public.prestations_catalogue_couts), 0,
+  'coûts : le conducteur sans voir_couts_devis ne voit ni prix d''achat ni coefficient');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- E. Favoris personnels
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
+select lives_ok($$insert into public.catalogue_favoris (entreprise_id, prestation_id)
+  values ('a0000000-0000-0000-0000-000000000001', 'e2000000-0000-0000-0000-000000000003')$$, 'favori ajouté');
+select throws_ok($$insert into public.catalogue_favoris (entreprise_id, prestation_id)
+  values ('a0000000-0000-0000-0000-000000000001', 'e2000000-0000-0000-0000-000000000003')$$,
+  '23505', null, 'favori : une seule fois par article');
+select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
+select is((select count(*)::int from public.catalogue_favoris), 0, 'favori : invisible pour un autre utilisateur');
+select throws_ok($$insert into public.catalogue_favoris (utilisateur_id, entreprise_id, prestation_id)
+  values ('10000000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000001', 'e2000000-0000-0000-0000-000000000001')$$,
+  '42501', null, 'favori : jamais au nom d''un autre utilisateur');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- F. Recherche : code distributeur, famille, favori
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
+insert into public.catalogue_codes_fournisseurs (entreprise_id, prestation_id, fournisseur_id, code_article, principal)
+  values ('a0000000-0000-0000-0000-000000000001', 'e2000000-0000-0000-0000-000000000001', 'ab000000-0000-0000-0000-000000000001', 'DIS-9001', true);
+select is((select rang from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'dis 9001')
+            where id = 'e2000000-0000-0000-0000-000000000001'), 2, 'recherche : code distributeur exact au rang 2');
+select is((select code_fournisseur from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'dis 9001')
+            where id = 'e2000000-0000-0000-0000-000000000001'), 'DIS-9001', 'recherche : le code distributeur principal est rendu');
+select is((select rang from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'DIS-90')
+            where id = 'e2000000-0000-0000-0000-000000000001'), 4, 'recherche : début de code distributeur au rang 4');
+select is((select rang from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'plaques')
+            where id = 'e2000000-0000-0000-0000-000000000001'), 7, 'recherche : par famille au rang 7');
+select is((select famille from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'plaques')
+            where id = 'e2000000-0000-0000-0000-000000000001'), 'Plâtre › Plaques', 'recherche : le libellé de famille est rendu');
+select is((select id from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'PGTAP') limit 1),
+  'e2000000-0000-0000-0000-000000000003'::uuid, 'recherche : à rang égal, le favori de l''utilisateur passe devant');
+select ok((select favori from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'PGTAP inconnue') limit 1),
+  'recherche : le drapeau favori est rendu');
+select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
+select ok(not (select favori from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'PGTAP inconnue') limit 1),
+  'recherche : les favoris d''un autre utilisateur ne comptent pas');
+select ok((select prix_achat_ht is null from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'dis 9001') limit 1),
+  'recherche : toujours aucun prix d''achat sans voir_couts_devis');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- G. Duplication
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
+update public.prestations_catalogue set code_barres = '3760000000017' where id = 'e2000000-0000-0000-0000-000000000001';
+create temp table t_copie as select public.dupliquer_prestation('e2000000-0000-0000-0000-000000000001') as id;
+select is((select designation from public.prestations_catalogue where id = (select id from t_copie)), 'PGTAP BA13 standard (copie)',
+  'duplication : désignation « (copie) »');
+select matches((select reference_interne from public.prestations_catalogue where id = (select id from t_copie)), '^ART-[0-9]{5}$',
+  'duplication : nouvelle référence interne générée');
+select ok((select code_barres is null and famille_id = 'f0000000-0000-0000-0000-000000000002'
+                  and image_chemin like 'a0000000-0000-0000-0000-000000000001/%'
+             from public.prestations_catalogue where id = (select id from t_copie)),
+  'duplication : famille et image reprises, code-barres non recopié');
+select is((select count(*)::int from public.catalogue_codes_fournisseurs where prestation_id = (select id from t_copie)), 0,
+  'duplication : codes distributeurs non recopiés');
+select is((select coefficient from public.prestations_catalogue_couts where prestation_id = (select id from t_copie)), 1.6::numeric,
+  'duplication : coût et coefficient repris avec gerer_couts_devis');
+select is(public.dupliquer_prestation('e2000000-0000-0000-0000-000000000001') is not null, true, 'duplication : seconde copie');
+select ok(exists (select 1 from public.prestations_catalogue where designation = 'PGTAP BA13 standard (copie 2)'),
+  'duplication : la seconde copie est numérotée');
+select is((select apres ->> 'source_id' from public.historique_objets
+            where ressource = 'article' and action = 'duplication' and ressource_id = (select id from t_copie)),
+  'e2000000-0000-0000-0000-000000000001', 'duplication : journalisée avec sa source');
+
+select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
+create temp table t_copie_conducteur as select public.dupliquer_prestation('e2000000-0000-0000-0000-000000000003') as id;
+reset role;
+select is((select count(*)::int from public.prestations_catalogue_couts where prestation_id = (select id from t_copie_conducteur)), 0,
+  'duplication : sans gerer_couts_devis, aucun coût n''est recopié');
+set local role authenticated;
+select pg_temp.jwt('10000000-0000-0000-0000-000000000002');
+select throws_ok($$select public.dupliquer_prestation('e2000000-0000-0000-0000-000000000001')$$, '42501', null,
+  'duplication : refusée à l''ouvrier');
+select pg_temp.jwt('20000000-0000-0000-0000-000000000006');
+select throws_ok($$select public.dupliquer_prestation('e2000000-0000-0000-0000-000000000001')$$, '42501', null,
+  'duplication : refusée à une autre entreprise');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- H. Historique du catalogue
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
+update public.prestations_catalogue set prix_unitaire_ht = 21 where id = 'e2000000-0000-0000-0000-000000000001';
+update public.prestations_catalogue set actif = false where id = 'e2000000-0000-0000-0000-000000000003';
+select ok(exists (select 1 from public.historique_objets where ressource = 'article'
+                   and ressource_id = 'e2000000-0000-0000-0000-000000000001' and action = 'creation'),
+  'historique : création journalisée');
+select is((select (avant #>> '{}') || '→' || (apres #>> '{}') from public.historique_objets
+            where ressource = 'article' and ressource_id = 'e2000000-0000-0000-0000-000000000001'
+              and champ = 'prix_unitaire_ht' order by id desc limit 1),
+  '20→21', 'historique : changement de prix de vente avec avant et après');
+select is((select action from public.historique_objets where ressource = 'article'
+            and ressource_id = 'e2000000-0000-0000-0000-000000000003' and champ = 'actif' order by id desc limit 1),
+  'archivage', 'historique : archivage journalisé');
+select is((select count(*)::int from public.historique_objets where ressource = 'article'
+            and ressource_id = 'e2000000-0000-0000-0000-000000000001' and action = 'prix_achat_modifie'), 2,
+  'historique : saisie puis modification du prix d''achat journalisées');
+select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
+select is((select count(*)::int from public.historique_objets where action in ('prix_achat_modifie', 'coefficient_modifie')), 0,
+  'historique : les coûts restent invisibles sans voir_couts_devis');
+select ok((select count(*) from public.historique_objets where ressource = 'article' and champ = 'prix_unitaire_ht') >= 1,
+  'historique : le prix de vente, lui, est visible du conducteur');
+
+reset role;
+insert into public.ouvrages (id, entreprise_id, nom, unite_principale, famille_id)
+  values ('0e000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'PGTAP cloison', 'm²',
+          'f0000000-0000-0000-0000-000000000003');
+select is((select categorie from public.ouvrages where id = '0e000000-0000-0000-0000-000000000001'), 'Menuiserie',
+  'ouvrage : catégorie dérivée de la famille');
+select ok(exists (select 1 from public.historique_objets where ressource = 'ouvrage'
+                   and ressource_id = '0e000000-0000-0000-0000-000000000001' and action = 'creation'),
+  'ouvrage : création journalisée');
+
+select * from finish();
+rollback;
