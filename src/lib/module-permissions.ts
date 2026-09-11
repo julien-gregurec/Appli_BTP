@@ -49,7 +49,14 @@ export const GESTION_PERMISSION_PAR_CHEMIN: [string,string][] = [
 
 export const PERMISSIONS_MUTATION_ALTERNATIVES: Record<string,string[]> = {
   "/pointage": ["gerer_pointage", "saisir_son_pointage"],
-  "/notes-frais": ["gerer_notes_frais", "saisir_ses_notes_frais"],
+  // Contrôle (prise en charge, correction, validation, refus) et comptabilisation partent de
+  // /notes-frais/[id] : sans ces deux droits, le proxy les interceptait comme des écritures
+  // (303 ?lecture=seule) et l'expert-comptable ne pouvait rien contrôler. Laisser passer la
+  // requête n'ouvre AUCUNE écriture de la dépense : `transition_note_frais` et
+  // `modifier_reference_comptable_note_frais` ne touchent que le statut, le motif et la
+  // référence comptable ; la modification et la suppression de la dépense restent refusées
+  // par l'action (salarié propriétaire) ET par la RLS (`peut_modifier_note_frais_personnelle`).
+  "/notes-frais": ["gerer_notes_frais", "saisir_ses_notes_frais", "verifier_notes_frais", "comptabiliser_notes_frais"],
   "/grands-deplacements": ["gerer_notes_frais", "saisir_ses_notes_frais"],
   "/conges": ["gerer_conges", "demander_ses_conges"],
   "/paiements-bancaires": ["gerer_coordonnees_bancaires", "gerer_paie", "preparer_virements", "valider_virements", "executer_virements"],
@@ -83,6 +90,11 @@ export function droitsGestionPour(pathname: string): string[] {
   return cheminAlternatif ? PERMISSIONS_MUTATION_ALTERNATIVES[cheminAlternatif] : [droitGestion];
 }
 
+const NOTES_FRAIS_ACCES = [
+  "saisir_ses_notes_frais", "gerer_notes_frais", "verifier_notes_frais",
+  "comptabiliser_notes_frais", "exporter_notes_frais", "consulter_audit_notes_frais",
+];
+
 export const PERMISSIONS_ACCES_ALTERNATIVES: Record<string,string[]> = {
   "/chantiers": ["acces_chantiers", "voir_chantiers_assignes"],
   // Les documents suivent le chantier : qui voit un chantier qui lui est affecté doit pouvoir en
@@ -91,5 +103,11 @@ export const PERMISSIONS_ACCES_ALTERNATIVES: Record<string,string[]> = {
   // données : la route lit sous RLS, et un document réservé aux gestionnaires reste en 404.
   "/api/documents": ["acces_chantiers", "voir_chantiers_assignes"],
   "/grands-deplacements": ["gerer_notes_frais", "saisir_ses_notes_frais"],
+  // Notes de frais : le salarié (ses notes) ET le circuit de contrôle — vérificateur, comptable,
+  // exportateur, auditeur. La route ne fait qu'ouvrir l'écran : ce que chacun VOIT reste décidé
+  // par la RLS (`peut_consulter_note_frais`, journal d'audit sous `consulter_audit_notes_frais`),
+  // dans la seule entreprise dont il est membre actif.
+  "/notes-frais": NOTES_FRAIS_ACCES,
+  "/api/notes-frais": NOTES_FRAIS_ACCES,
   "/paie": ["consulter_sa_paie", "saisir_variables_paie", "controler_variables_paie", "gerer_paie", "exporter_paie", "parametrer_paie", "voir_paie_confidentielle"],
 };
