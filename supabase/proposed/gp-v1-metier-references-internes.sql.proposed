@@ -240,7 +240,7 @@ begin
   if tg_op = 'INSERT' and v_entite <> '' and (to_jsonb(new) ->> 'reference_interne') is null then
     if v_entite = 'stock' then
       v_ref := nullif(btrim(to_jsonb(new) ->> 'reference'), '');
-      if v_ref is not null and not exists (
+      if v_ref is not null and public.normaliser_reference(v_ref) <> '' and not exists (
         select 1 from public.articles_stock a
         where a.entreprise_id = new.entreprise_id
           and public.normaliser_reference(a.reference_interne) = public.normaliser_reference(v_ref)
@@ -294,7 +294,7 @@ create trigger gp_references_normalisees
 with candidats as (
   select a.id, a.entreprise_id, public.normaliser_reference(a.reference) as n
   from public.articles_stock a
-  where a.reference_interne is null and btrim(a.reference) <> ''
+  where a.reference_interne is null and public.normaliser_reference(a.reference) <> ''
 ),
 libres as (
   select c.id
@@ -624,6 +624,9 @@ $$;
 -- l'application de la proposition devis v2 et celle-ci, ou tiers historiques ne différant que par la
 -- casse), la migration S'ARRÊTE en les comptant : mieux vaut un échec explicite qu'une unicité
 -- silencieusement absente. Requête de contrôle préalable, en lecture seule, dans le rapport du lot.
+-- Les références HISTORIQUES dont la forme normalisée est vide (« - », « -- ») sont hors du périmètre de
+-- l'unicité : elles ne désignent rien et ne doivent pas bloquer la migration ; les nouvelles sont
+-- refusées par les contraintes `*_signifiante_check` ci-dessus.
 create or replace function pg_temp.creer_unicite_reference(p_table regclass, p_colonne text, p_index text)
 returns void language plpgsql as $$
 declare
@@ -633,17 +636,17 @@ begin
     return;
   end if;
   execute format(
-    'select count(*) from (select 1 from %s where %I is not null and btrim(%I) <> '''' '
+    'select count(*) from (select 1 from %s where public.normaliser_reference(%I) <> '''' '
     'group by entreprise_id, public.normaliser_reference(%I) having count(*) > 1) d',
-    p_table, p_colonne, p_colonne, p_colonne) into v_doublons;
+    p_table, p_colonne, p_colonne) into v_doublons;
   if v_doublons > 0 then
     raise exception 'Unicité impossible sur %.% : % valeur(s) en double sous forme normalisée', p_table, p_colonne, v_doublons
       using errcode = '23505',
             hint = 'Lister avec public.doublons_references(entreprise_id), corriger, puis rejouer ce fichier.';
   end if;
   execute format(
-    'create unique index %I on %s (entreprise_id, public.normaliser_reference(%I)) where %I is not null and btrim(%I) <> ''''',
-    p_index, p_table, p_colonne, p_colonne, p_colonne);
+    'create unique index %I on %s (entreprise_id, public.normaliser_reference(%I)) where public.normaliser_reference(%I) <> ''''',
+    p_index, p_table, p_colonne, p_colonne);
 end $$;
 
 -- Une référence faite seulement de séparateurs (« -- », « . ») a une forme normalisée VIDE : deux
