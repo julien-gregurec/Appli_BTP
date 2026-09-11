@@ -486,3 +486,21 @@ ledger) → écran de sélection multiple (recherche, quantités, désélection,
 clavier sur ordinateur, mobile) → import/export à deux colonnes avec rapport → tests 12 et 13
 en recette réelle. Estimation : **3 h à 5 h** après arbitrage.
 
+## Addendum — condition C4 (lot ELSATIA-GP-EXPERT-COMPTABLE-NOTES-FRAIS-CLOSURE-V1)
+
+Décision du 2026-09-11 : l'expert-comptable consulte, télécharge, contrôle, comptabilise et
+exporte les notes de frais et leurs justificatifs, et consulte les journaux ; il ne modifie
+jamais la dépense, ne supprime ni ne remplace un justificatif, ne modifie pas une facture
+définitive, n'administre rien et ne voit aucune autre entreprise. Accès gratuit.
+
+Lot `feat/gp-expert-comptable-notes-frais-closure-v1` (départ `bb17c17`) — rapport complet :
+`docs/mobile/ELSATIA_GP_EXPERT_COMPTABLE_NOTES_FRAIS_REPORT.md`.
+
+**État de C4 : AVANCÉE, NON LEVÉE.**
+
+- Livré : ouverture de `/notes-frais` et `/api/notes-frais` au circuit comptable, contrôle et
+  comptabilisation autorisés au proxy, droits comptables configurables à l'écran ; toutes les
+  permissions et tous les refus éprouvés en base sous l'identité réelle de l'expert-comptable.
+- Manquant : la recette authentifiée Android et iPhone (deux tentatives sans mesure, saturation
+  du poste) ; et la **migration proposée**, en attente d'autorisation, sans laquelle un poste
+  d'expert-comptable composé depuis l'écran reçoit d'office planning et pointage.
