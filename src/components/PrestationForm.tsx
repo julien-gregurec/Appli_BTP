@@ -74,9 +74,9 @@ function ChampsCatalogue({ prestation, options }: { prestation?: Partial<ChampsC
   return (
     <fieldset className="space-y-4 rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
       <legend className="px-1 text-sm font-semibold">Références et approvisionnement</legend>
-      <p className="text-xs text-neutral-500">Trois références distinctes : aucune n’est recopiée dans une autre. Une même référence peut désigner plusieurs articles.</p>
+      <p className="text-xs text-neutral-500">Trois références distinctes : aucune n’est recopiée dans une autre. La référence interne est unique dans votre catalogue ; une même référence fabricant peut désigner plusieurs articles.</p>
       <div className="grid gap-4 sm:grid-cols-2">
-        {texte("reference_interne", "Référence interne", "Votre propre code article.")}
+        {texte("reference_interne", "Référence interne", "Votre propre code article. Vide : attribuée automatiquement si la numérotation automatique est active.")}
         {texte("reference_fabricant", "Référence fabricant")}
         {texte("code_barres", "Code-barres", "EAN ou code scanné (64 caractères au plus).")}
         {texte("fabricant", "Fabricant")}

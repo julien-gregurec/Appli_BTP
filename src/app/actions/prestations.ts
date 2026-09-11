@@ -10,6 +10,7 @@ import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 import { devisV2Actif } from "@/lib/devis/v2-serveur";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { lireChampsCatalogueV2, lirePrixAchat, type ChampsCatalogueV2 } from "@/lib/prestations-catalogue-v2";
+import { messageErreurReference } from "@/lib/references";
 
 function champ(formData: FormData, nom: string) {
   return String(formData.get(nom) ?? "").trim();
@@ -70,7 +71,7 @@ async function creerPrestationV2(formData: FormData, ctx: ContexteEntreprise, su
     .select("id")
     .single();
   if (error || !data) {
-    const message = error?.code === "23505" ? "Une prestation porte déjà ce nom" : messageErreurUtilisateur("creerPrestationAction", error, "Impossible de créer cette prestation.");
+    const message = messageErreurReference(error) ?? (error?.code === "23505" ? "Une prestation porte déjà ce nom" : messageErreurUtilisateur("creerPrestationAction", error, "Impossible de créer cette prestation."));
     redirect(`/prestations/nouveau?error=${encodeURIComponent(message)}`);
   }
 
@@ -129,7 +130,7 @@ export async function creerPrestationDepuisLigneAction(ligne: LigneDevis) {
 
   if (error || !data) {
     const doublon = error?.code === "23505";
-    return { error: doublon ? "Une prestation porte déjà ce nom." : messageErreurUtilisateur("creerPrestationDepuisLigneAction", error, "Impossible d’enregistrer la prestation.") };
+    return { error: messageErreurReference(error) ?? (doublon ? "Une prestation porte déjà ce nom." : messageErreurUtilisateur("creerPrestationDepuisLigneAction", error, "Impossible d’enregistrer la prestation.")) };
   }
 
   return { prestation: data as PrestationCatalogue };
@@ -151,7 +152,7 @@ export async function creerPrestationAction(formData: FormData) {
   });
 
   if (error) {
-    const message = error.code === "23505" ? "Une prestation porte déjà ce nom" : messageErreurUtilisateur("creerPrestationAction", error, "Impossible de créer cette prestation.");
+    const message = messageErreurReference(error) ?? (error.code === "23505" ? "Une prestation porte déjà ce nom" : messageErreurUtilisateur("creerPrestationAction", error, "Impossible de créer cette prestation."));
     redirect(`/prestations/nouveau?error=${encodeURIComponent(message)}`);
   }
 

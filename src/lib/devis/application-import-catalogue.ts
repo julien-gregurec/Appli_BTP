@@ -30,6 +30,7 @@ import {
   type PlanImportCatalogue,
   type StatutLigneImport,
 } from "@/lib/devis/import-catalogue";
+import { messageErreurReference } from "@/lib/references";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -261,6 +262,8 @@ export async function appliquerOperationsImport(
  */
 export function repliErreurImport(erreur: unknown): string | undefined {
   const code = typeof erreur === "object" && erreur !== null && "code" in erreur ? String((erreur as { code?: unknown }).code) : "";
+  const reference = typeof erreur === "object" && erreur !== null ? messageErreurReference(erreur as Parameters<typeof messageErreurReference>[0]) : null;
+  if (reference) return reference;
   switch (code) {
     case "23505":
       return "Un article du catalogue porte déjà cette désignation.";

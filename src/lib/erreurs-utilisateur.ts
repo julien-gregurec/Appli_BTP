@@ -5,6 +5,8 @@
  * être journalisée séparément côté serveur (console.error) par l'appelant.
  */
 
+import { messageErreurReference } from "@/lib/references";
+
 type CategorieErreur =
   | "doublon"
   | "introuvable"
@@ -88,6 +90,10 @@ export function messageErreurUtilisateur(nomAction: string, erreur: unknown, rep
   // repli générique de l'appelant, pour rester cohérent sur tous les chemins
   // (création, réactivation, import, RPC de statut de compte).
   if (estErreurCapacitePersonnes(erreur)) return MESSAGE_CAPACITE_PERSONNES;
+  // Une référence interne refusée (doublon, référence sans lettre ni chiffre) a aussi un message
+  // dédié, plus juste que le repli « existe déjà » ou « ce nom est pris » de l'appelant.
+  const reference = typeof erreur === "object" && erreur !== null ? messageErreurReference(erreur as Parameters<typeof messageErreurReference>[0]) : null;
+  if (reference) return reference;
   if (repli) return repli;
   const code = typeof erreur === "object" && erreur !== null && "code" in erreur ? String((erreur as { code?: unknown }).code) : undefined;
   const message = erreur instanceof Error ? erreur.message : typeof erreur === "object" && erreur !== null && "message" in erreur ? String((erreur as { message?: unknown }).message) : undefined;

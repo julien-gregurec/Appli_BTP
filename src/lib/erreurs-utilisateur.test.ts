@@ -9,6 +9,24 @@ describe("messageErreurUtilisateur", () => {
     spy.mockRestore();
   });
 
+  it("un doublon de référence interne prime sur le repli de l'appelant", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const message = messageErreurUtilisateur(
+      "test",
+      { code: "23505", message: "duplicate key value violates unique constraint \"fournisseurs_reference_norm_uniq\"" },
+      "Impossible de créer ce fournisseur.",
+    );
+    expect(message).toBe("Cette référence est déjà utilisée par un autre fournisseur.");
+    spy.mockRestore();
+  });
+
+  it("un doublon sans rapport avec une référence garde le repli de l'appelant", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const message = messageErreurUtilisateur("test", { code: "23505", message: "duplicate key value violates unique constraint \"devis_numero_key\"" }, "Repli métier.");
+    expect(message).toBe("Repli métier.");
+    spy.mockRestore();
+  });
+
   it("traduit une violation RLS en message de droits", () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     const message = messageErreurUtilisateur("test", new Error("new row violates row-level security policy for table \"clients\""));
