@@ -1082,11 +1082,11 @@ begin
   ) returning id into v_facture_id;
 
   insert into public.factures_ouvrages (
-    id, facture_id, devis_id, entreprise_id, cle, ordre, ouvrage_id, ouvrage_version, ouvrage_reference,
+    facture_id, entreprise_id, cle, ordre, ouvrage_id, ouvrage_version, ouvrage_reference,
     ouvrage_nom, categorie, unite_principale, quantite_principale, options, saisies, libelle_client,
     description_client, mode_presentation, instantane_modele, modifications_manuelles
   )
-  select gen_random_uuid(), v_facture_id, null, o.entreprise_id, o.cle, o.ordre, o.ouvrage_id, o.ouvrage_version,
+  select v_facture_id, o.entreprise_id, o.cle, o.ordre, o.ouvrage_id, o.ouvrage_version,
          o.ouvrage_reference, o.ouvrage_nom, o.categorie, o.unite_principale, o.quantite_principale, o.options,
          o.saisies, o.libelle_client, o.description_client, o.mode_presentation, o.instantane_modele,
          o.modifications_manuelles
@@ -1602,8 +1602,10 @@ begin
     'public.ouvrages_version_immuable()',
     'public.ouvrages_couts_immuables()',
     'public.devis_prix_journal_ajout_seul()',
-    'public.refuser_edition_v1_devis_v2()',
-    'public.trg_recalc_facture_apres_remise()'
+    'public.trg_recalc_facture_apres_remise()',
+    'public.gp_toucher_updated_at()',
+    'public.ligne_pour_rendu(jsonb)',
+    'public.ouvrage_pour_rendu(jsonb)'
   ] loop
     execute format('revoke all on function %s from public, anon, authenticated, service_role', v_signature);
   end loop;

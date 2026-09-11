@@ -188,11 +188,13 @@ export async function modifierLogoEntrepriseAction(formData:FormData){
   const formats:Record<string,string>={"image/png":"png","image/jpeg":"jpg","image/webp":"webp"};const ext=formats[fichier.type];
   if(!ext)redirect(`/parametres?error=${encodeURIComponent("Format accepté : PNG, JPG ou WebP")}`);
   if(fichier.size>5*1024*1024)redirect(`/parametres?error=${encodeURIComponent("Le logo dépasse 5 Mo")}`);
-  const{data:ancienne}=await supabase.from("entreprises").select("logo_url").eq("id",ctx.entrepriseId).maybeSingle(),path=`${ctx.entrepriseId}/logo-${crypto.randomUUID()}.${ext}`;
+  const path=`${ctx.entrepriseId}/logo-${crypto.randomUUID()}.${ext}`;
   const{error:uploadError}=await supabase.storage.from("entreprise-assets").upload(path,fichier,{contentType:fichier.type,cacheControl:"3600",upsert:false});
   if(uploadError)redirect(`/parametres?error=${encodeURIComponent(messageErreurUtilisateur("modifierLogoEntrepriseAction:upload",uploadError,"Impossible d’envoyer le logo. Réessayez dans un instant."))}`);
   const{data:publicData}=supabase.storage.from("entreprise-assets").getPublicUrl(path),{error}=await supabase.from("entreprises").update({logo_url:publicData.publicUrl,updated_at:new Date().toISOString()}).eq("id",ctx.entrepriseId);
   if(error){await supabase.storage.from("entreprise-assets").remove([path]);redirect(`/parametres?error=${encodeURIComponent(messageErreurUtilisateur("modifierLogoEntrepriseAction:update",error,"Impossible d’enregistrer le nouveau logo."))}`)}
-  const marqueur="/storage/v1/object/public/entreprise-assets/",ancien=ancienne?.logo_url?.includes(marqueur)?ancienne.logo_url.split(marqueur)[1]:null;if(ancien)await supabase.storage.from("entreprise-assets").remove([decodeURIComponent(ancien)]);
+  // L'ancien fichier n'est JAMAIS supprimé : chaque logo a son propre chemin (UUID ci-dessus), et les
+  // devis et factures déjà émis figent l'URL du logo qu'ils portaient. Le supprimer cassait le logo de
+  // tous les documents émis dès que l'entreprise en changeait.
   revalidatePath("/","layout");revalidatePath("/parametres");revalidatePath("/imprimer","layout");redirect("/parametres?succes=logo");
 }

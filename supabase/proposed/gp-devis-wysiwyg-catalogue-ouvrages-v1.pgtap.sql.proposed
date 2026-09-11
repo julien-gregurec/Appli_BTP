@@ -1,0 +1,380 @@
+-- =====================================================================================================
+-- PREUVE pgTAP PROPOSÉE — ELSATIA-GP-DEVIS-WYSIWYG-CATALOGUE-OUVRAGES-V1
+-- =====================================================================================================
+-- À placer dans supabase/tests (en remplaçant le chemin de la fixture par `fixtures/…`) le jour où
+-- gp-devis-wysiwyg-catalogue-ouvrages-v1.sql.proposed est intégrée au ledger. D'ici là, elle se joue
+-- sur une base jetable au ledger 280 à laquelle la proposition a été appliquée.
+--
+-- Couvre : normalisation (parité avec le TypeScript), doublons signalés, archivage seul, coûts sous
+-- permission, recherche en sept niveaux et cloisonnement, ouvrages à versions immuables, enregistrement
+-- v2 et journal des prix, figement à l'émission (entreprise, logo, catalogue, ouvrage modifiés ensuite),
+-- verrous du devis émis, conversion devis → facture corrigée, figement de facture, rendu par jeton et
+-- pour un utilisateur connecté, duplication, isolation entre entreprises, documents historiques intacts.
+-- =====================================================================================================
+begin;
+create extension if not exists pgtap with schema extensions;
+select * from no_plan();
+
+\ir ../tests/fixtures/isolation_multitenant.inc
+
+create or replace function pg_temp.jwt(p_sub uuid) returns void language plpgsql as $$
+begin
+  perform set_config('request.jwt.claim.sub', p_sub::text, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', p_sub, 'role', 'authenticated')::text, true);
+end $$;
+
+-- Acteurs de la fixture :
+--   A dirigeant 10000000-…-0006 (tous droits, dont voir/gerer_couts_devis)
+--   A conducteur 10000000-…-0004 (devis, clients, chantiers ; ni coûts, ni factures, ni ouvrages en gestion)
+--   A comptable 10000000-…-0005 (factures ; aucun accès aux devis)
+--   B dirigeant 20000000-…-0006
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- A. Normalisation — mêmes résultats que normaliser() côté TypeScript
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+select is(public.normaliser_reference('BA13-200'), 'ba13200', 'normalisation : tiret et casse ignorés');
+select is(public.normaliser_reference(' Bà13-2.00 '), 'ba13200', 'normalisation : espaces, points et accents ignorés');
+select is(public.normaliser_reference('Bloc-Cœur 12'), 'bloccoeur12', 'normalisation : ligature œ comme en TypeScript');
+select is(public.normaliser_reference('ÆRO.5'), 'aero5', 'normalisation : ligature Æ comme en TypeScript');
+select is(public.normaliser_reference(null), '', 'normalisation : valeur absente = chaîne vide');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- B. Catalogue : références distinctes, doublons signalés, archivage seul
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+insert into public.prestations_catalogue (
+  id, entreprise_id, designation, type, unite, prix_unitaire_ht, taux_tva,
+  reference_interne, reference_fabricant, code_barres, fabricant, fournisseur_id
+) values
+  ('e1000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'PGTAP Plaque BA13', 'fourniture', 'm²', 20, 20,
+   'BA13-200', 'PLACO-4521', null, 'Fabricant fictif', 'ab000000-0000-0000-0000-000000000001'),
+  ('e1000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', 'PGTAP Plaque BA13 hydro', 'fourniture', 'm²', 24, 20,
+   'ba13 200', null, '3760123456789', null, null),
+  ('e1000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', 'PGTAP Rail 48', 'fourniture', 'ml', 3, 20,
+   'RAIL-48', 'BA13-200', null, null, null);
+
+select is(
+  (select count(*)::int from public.doublons_references_catalogue('a0000000-0000-0000-0000-000000000001') where champ = 'reference_interne'),
+  1, 'deux prestations de même référence interne sont signalées ensemble');
+select is(
+  (select count(*)::int from public.prestations_catalogue where public.normaliser_reference(reference_interne) = 'ba13200'),
+  2, 'les deux prestations de même référence restent deux lignes : aucune fusion');
+
+set local role authenticated;
+select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
+select throws_ok($$delete from public.prestations_catalogue where id = 'e1000000-0000-0000-0000-000000000002'$$,
+  '42501', null, 'une prestation ne se supprime plus : on l''archive');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- C. Coûts d'achat du catalogue sous permission
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
+select lives_ok($$insert into public.prestations_catalogue_couts (prestation_id, entreprise_id, prix_achat_ht)
+  values ('e1000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 12.5)$$,
+  'le dirigeant saisit un prix d''achat');
+select is((select count(*)::int from public.prestations_catalogue_couts), 1, 'le dirigeant voit le prix d''achat');
+
+select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
+select is((select count(*)::int from public.prestations_catalogue_couts), 0, 'le conducteur sans voir_couts_devis ne voit aucun prix d''achat');
+select throws_ok($$insert into public.prestations_catalogue_couts (prestation_id, entreprise_id, prix_achat_ht)
+  values ('e1000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', 1)$$,
+  '42501', null, 'le conducteur ne peut pas saisir de prix d''achat');
+
+select pg_temp.jwt('20000000-0000-0000-0000-000000000006');
+select is((select count(*)::int from public.prestations_catalogue_couts), 0, 'une autre entreprise ne voit jamais ces coûts');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- D. Recherche en sept niveaux, prix d'achat selon les droits, cloisonnement
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
+select is((select rang from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'BA13-200') where id = 'e1000000-0000-0000-0000-000000000001'),
+  1, 'recherche : référence interne exacte au rang 1');
+select is((select rang from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'BA13-200') where id = 'e1000000-0000-0000-0000-000000000002'),
+  1, 'recherche : l''autre article de même référence remonte aussi, au même rang');
+select is((select rang from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'BA13-200') where id = 'e1000000-0000-0000-0000-000000000003'),
+  2, 'recherche : référence fabricant exacte au rang 2');
+select is((select rang from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', '3760123456789') where id = 'e1000000-0000-0000-0000-000000000002'),
+  5, 'recherche : code-barres exact au rang 5');
+select ok((select prix_achat_ht is null from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'BA13-200') where id = 'e1000000-0000-0000-0000-000000000001'),
+  'recherche : aucun prix d''achat renvoyé sans voir_couts_devis');
+select is((select origine_reference_interne from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'TEST_A_STK_001') where id = 'ad000000-0000-0000-0000-000000000001'),
+  'reference_stock', 'recherche : le code article du stock est présenté comme tel, jamais recopié');
+
+select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
+select is((select prix_achat_ht from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'BA13-200') where id = 'e1000000-0000-0000-0000-000000000001'),
+  12.5::numeric, 'recherche : le prix d''achat est renvoyé avec voir_couts_devis');
+
+select pg_temp.jwt('10000000-0000-0000-0000-000000000005');
+select throws_ok($$select * from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'BA13')$$,
+  '42501', null, 'recherche : refusée sans accès aux devis');
+
+select pg_temp.jwt('20000000-0000-0000-0000-000000000006');
+select throws_ok($$select * from public.rechercher_articles_devis('a0000000-0000-0000-0000-000000000001', 'BA13')$$,
+  '42501', null, 'recherche : refusée sur le catalogue d''une autre entreprise');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- E. Bibliothèque d'ouvrages : versions immuables, coûts à part
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
+select lives_ok($$select public.publier_version_ouvrage('a0000000-0000-0000-0000-000000000001', null,
+  '{"nom":"Plancher chauffant (fictif)","reference_interne":"PC-001","unite_principale":"m²","quantite_principale":100,
+    "composants":[{"cle":"isolant","designation":"Isolant (fictif)","unite":"m²","referenceInterne":"PC-ISO","referenceFabricant":"FAB-ISO-30","fabricant":"Fabricant fictif"},
+                  {"cle":"tuyau","designation":"Tube (fictif)","unite":"ml","referenceInterne":"PC-TUB"}]}'::jsonb,
+  '[{"cle":"isolant","prix_achat_ht":12}]'::jsonb)$$, 'création d''un ouvrage PC-001 en version 1');
+select is((select version_courante from public.ouvrages where reference_interne = 'PC-001'), 1, 'ouvrage : version courante 1');
+select throws_ok($$select public.publier_version_ouvrage('a0000000-0000-0000-0000-000000000001', null,
+  '{"nom":"Fuite","unite_principale":"u","quantite_principale":1,"composants":[{"cle":"x","designation":"X","unite":"u","prixAchatHt":5}]}'::jsonb)$$,
+  '23514', null, 'ouvrage : un prix d''achat dans les composants est refusé par la base');
+select lives_ok($$select public.publier_version_ouvrage('a0000000-0000-0000-0000-000000000001',
+  (select id from public.ouvrages where reference_interne = 'PC-001'),
+  '{"nom":"Plancher chauffant (fictif)","reference_interne":"PC-001","unite_principale":"m²","quantite_principale":100,
+    "composants":[{"cle":"isolant","designation":"Isolant v2 (fictif)","unite":"m²","referenceInterne":"PC-ISO","referenceFabricant":"FAB-ISO-30"}]}'::jsonb)$$,
+  'ouvrage : publication d''une version 2');
+select is((select array_agg(version order by version) from public.ouvrages_versions v join public.ouvrages o on o.id = v.ouvrage_id where o.reference_interne = 'PC-001'),
+  array[1, 2], 'ouvrage : la version 1 est conservée à côté de la version 2');
+select throws_ok($$update public.ouvrages_versions set nom = 'réécrit' where version = 1$$, '42501', null,
+  'ouvrage : une version publiée ne se modifie pas — aucun droit de modification accordé');
+reset role;
+select throws_ok($$update public.ouvrages_versions set nom = 'réécrit' where version = 1$$, 'P0001', null,
+  'ouvrage : et même avec des droits d''administration, le déclencheur refuse la réécriture');
+set local role authenticated;
+select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
+select throws_ok($$delete from public.ouvrages where reference_interne = 'PC-001'$$, '42501', null,
+  'ouvrage : on archive, on ne supprime pas');
+select is((select count(*)::int from public.ouvrages_composants_couts), 1, 'ouvrage : le dirigeant voit le coût du composant');
+
+select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
+select is((select count(*)::int from public.ouvrages_composants_couts), 0, 'ouvrage : le conducteur ne voit pas le coût du composant');
+select is((select rang from public.rechercher_ouvrages('a0000000-0000-0000-0000-000000000001', 'FAB-ISO-30') limit 1), 5,
+  'ouvrage : retrouvé par la référence fabricant d''un composant');
+select throws_ok($$select public.publier_version_ouvrage('a0000000-0000-0000-0000-000000000001', null,
+  '{"nom":"Interdit","unite_principale":"u","quantite_principale":1,"composants":[{"cle":"x","designation":"X","unite":"u"}]}'::jsonb)$$,
+  '42501', null, 'ouvrage : publication refusée sans gerer_ouvrages');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- F. Enregistrement v2 d'un brouillon et journal des prix
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+select lives_ok($$select public.enregistrer_devis_brouillon_v2('a0000000-0000-0000-0000-000000000001', null,
+  '{"client_id":"a3000000-0000-0000-0000-000000000001","remise_globale":5,"conditions":"PGTAP-V2"}'::jsonb,
+  '[{"cle":"ouv1","ordre":2000,"ouvrage_version":2,"ouvrage_reference":"PC-001","ouvrage_nom":"Plancher chauffant (fictif)","unite_principale":"m²",
+     "quantite_principale":120,"libelle_client":"Plancher chauffant","mode_presentation":"regroupe","instantane_modele":{"nom":"Plancher chauffant (fictif)","composants":[]}}]'::jsonb,
+  '[{"cle_ligne":"l1","ordre":1000,"designation":"Dépose (fictif)","type":"forfait","quantite":1,"unite":"forfait","prix_unitaire_ht":450,"remise_ligne":0,"taux_tva":20},
+    {"cle_ligne":"ouv1:isolant","ouvrage_cle":"ouv1","origine_ligne":"ouvrage","ordre":2001,"designation":"Isolant (fictif)","type":"fourniture","quantite":130,"unite":"m²",
+     "prix_unitaire_ht":21,"remise_ligne":0,"taux_tva":20,"parametres_quantite":{"coefficient":1},"detail_calcul":"120 × 1 + 5 %"},
+    {"cle_ligne":"ouv1:ajustement_prix_global","ouvrage_cle":"ouv1","origine_ligne":"ajustement","motif_ajustement":"ajustement_prix_global","ordre":2002,
+     "designation":"Ajustement du prix de l’ouvrage","type":"forfait","quantite":1,"unite":"forfait","prix_unitaire_ht":-30,"remise_ligne":0,"taux_tva":20}]'::jsonb,
+  '[{"cle_ligne":"ouv1:isolant","prix_achat_ht":12}]'::jsonb)$$, 'enregistrement v2 d''un brouillon par le conducteur');
+select is((select moteur_presentation from public.devis where conditions = 'PGTAP-V2'), 2::smallint, 'enregistrement v2 : moteur de présentation 2');
+select is((select montant_ht from public.devis where conditions = 'PGTAP-V2'), 2992.50::numeric,
+  'enregistrement v2 : total HT (450 + 2730 − 30) × 0,95 calculé par la base');
+select is((select montant_ttc from public.devis where conditions = 'PGTAP-V2'), 3591.00::numeric, 'enregistrement v2 : total TTC');
+select is((select count(*)::int from public.lignes_devis l join public.devis d on d.id = l.devis_id where d.conditions = 'PGTAP-V2'), 3,
+  'enregistrement v2 : trois lignes, chacune la sienne');
+select ok(exists (select 1 from public.lignes_devis l join public.devis d on d.id = l.devis_id where d.conditions = 'PGTAP-V2' and l.cle_ligne = 'ouv1:isolant'),
+  'enregistrement v2 : la clé de ligne transmise est conservée');
+reset role;
+select is((select count(*)::int from public.lignes_devis_couts c join public.devis d on d.id = c.devis_id where d.conditions = 'PGTAP-V2'), 0,
+  'enregistrement v2 : les coûts envoyés par un utilisateur sans droit sont ignorés');
+
+set local role authenticated;
+select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
+select lives_ok($$select public.enregistrer_devis_brouillon_v2('a0000000-0000-0000-0000-000000000001',
+  (select id from public.devis where conditions = 'PGTAP-V2'),
+  '{"client_id":"a3000000-0000-0000-0000-000000000001","remise_globale":5,"conditions":"PGTAP-V2"}'::jsonb,
+  '[{"cle":"ouv1","ordre":2000,"ouvrage_version":2,"ouvrage_reference":"PC-001","ouvrage_nom":"Plancher chauffant (fictif)","unite_principale":"m²",
+     "quantite_principale":120,"libelle_client":"Plancher chauffant","mode_presentation":"regroupe","instantane_modele":{"nom":"Plancher chauffant (fictif)","composants":[]}}]'::jsonb,
+  '[{"cle_ligne":"l1","ordre":1000,"designation":"Dépose (fictif)","type":"forfait","quantite":1,"unite":"forfait","prix_unitaire_ht":450,"remise_ligne":0,"taux_tva":20},
+    {"cle_ligne":"ouv1:isolant","ouvrage_cle":"ouv1","origine_ligne":"ouvrage","ordre":2001,"designation":"Isolant (fictif)","type":"fourniture","quantite":130,"unite":"m²",
+     "prix_unitaire_ht":22,"remise_ligne":0,"taux_tva":20},
+    {"cle_ligne":"ouv1:ajustement_prix_global","ouvrage_cle":"ouv1","origine_ligne":"ajustement","motif_ajustement":"ajustement_prix_global","ordre":2002,
+     "designation":"Ajustement du prix de l’ouvrage","type":"forfait","quantite":1,"unite":"forfait","prix_unitaire_ht":-30,"remise_ligne":0,"taux_tva":20}]'::jsonb,
+  '[{"cle_ligne":"ouv1:isolant","prix_achat_ht":13}]'::jsonb)$$, 'second enregistrement par le dirigeant, prix et coût modifiés');
+select is((select count(*)::int from public.devis_prix_journal j join public.devis d on d.id = j.devis_id
+           where d.conditions = 'PGTAP-V2' and j.champ = 'prix_unitaire_ht' and j.ancienne = 21 and j.nouvelle = 22), 1,
+  'journal : la modification de prix de vente est tracée');
+select is((select count(*)::int from public.devis_prix_journal j join public.devis d on d.id = j.devis_id
+           where d.conditions = 'PGTAP-V2' and j.champ = 'prix_achat_ht'), 1, 'journal : la saisie du coût est tracée');
+
+select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
+select is((select count(*)::int from public.devis_prix_journal where champ = 'prix_achat_ht'), 0,
+  'journal : le conducteur ne voit pas les lignes de coût');
+select throws_ok($$select public.enregistrer_devis_brouillon_v2('a0000000-0000-0000-0000-000000000001', null,
+  '{"client_id":"a3000000-0000-0000-0000-000000000001","remise_globale":150}'::jsonb, '[]'::jsonb,
+  '[{"cle_ligne":"x","designation":"X","quantite":1,"prix_unitaire_ht":1,"taux_tva":20}]'::jsonb)$$, 'P0001', null,
+  'enregistrement v2 : remise globale hors bornes refusée');
+select throws_ok($$select public.enregistrer_devis_brouillon_v2('a0000000-0000-0000-0000-000000000001', null,
+  '{"client_id":"a3000000-0000-0000-0000-000000000001"}'::jsonb, '[]'::jsonb, '[]'::jsonb)$$, 'P0001', null,
+  'enregistrement v2 : un devis sans ligne est refusé');
+select throws_ok($$select public.modifier_devis_brouillon((select id from public.devis where conditions = 'PGTAP-V2'),
+  '{"client_id":"a3000000-0000-0000-0000-000000000001"}'::jsonb, '[]'::jsonb)$$, 'P0001', null,
+  'l''éditeur historique ne peut pas aplatir un devis v2');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- G. Émission : instantané de rendu figé par la base, verrous du devis émis
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+select lives_ok($$update public.devis set statut = 'envoye' where conditions = 'PGTAP-V2'$$, 'émission du devis v2');
+select ok((select rendu_instantane is not null from public.devis where conditions = 'PGTAP-V2'), 'émission : instantané de rendu capturé');
+select is((select rendu_instantane ->> 'moteur' from public.devis where conditions = 'PGTAP-V2'), '2', 'émission : moteur 2 figé');
+select ok((select (rendu_instantane ->> 'numero') is not null and rendu_instantane ->> 'numero' = numero from public.devis where conditions = 'PGTAP-V2'),
+  'émission : le numéro attribué est dans l''instantané');
+select is((select rendu_empreinte from public.devis where conditions = 'PGTAP-V2'),
+  (select encode(sha256(convert_to(rendu_instantane::text, 'UTF8')), 'hex') from public.devis where conditions = 'PGTAP-V2'),
+  'émission : empreinte SHA-256 de l''instantané');
+select ok((select not jsonb_path_exists(rendu_instantane, '$.lignes[*].parametres_quantite')
+             and not jsonb_path_exists(rendu_instantane, '$.lignes[*].detail_calcul')
+             and not jsonb_path_exists(rendu_instantane, '$.ouvrages[*].instantane_modele')
+           from public.devis where conditions = 'PGTAP-V2'),
+  'émission : aucun paramètre interne dans le document figé');
+select ok((select rendu_instantane::text not like '%prix_achat%' from public.devis where conditions = 'PGTAP-V2'),
+  'émission : aucun prix d''achat dans le document figé');
+
+reset role;
+create temp table pgtap_empreinte as select rendu_empreinte from public.devis where conditions = 'PGTAP-V2';
+update public.entreprises set nom = 'PGTAP RENOMMÉE', logo_url = 'https://exemple.invalid/nouveau-logo.png'
+where id = 'a0000000-0000-0000-0000-000000000001';
+update public.prestations_catalogue set prix_unitaire_ht = 999 where id = 'e1000000-0000-0000-0000-000000000001';
+select is((select rendu_instantane -> 'entreprise' ->> 'nom' from public.devis where conditions = 'PGTAP-V2'), 'Entreprise Isolation A',
+  'figement : renommer l''entreprise ne réécrit pas le devis émis');
+select is((select rendu_empreinte from public.devis where conditions = 'PGTAP-V2'), (select rendu_empreinte from pgtap_empreinte),
+  'figement : ni le logo, ni le catalogue modifiés ensuite ne changent le document émis');
+
+set local role authenticated;
+select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
+select lives_ok($$select public.publier_version_ouvrage('a0000000-0000-0000-0000-000000000001',
+  (select id from public.ouvrages where reference_interne = 'PC-001'),
+  '{"nom":"Plancher chauffant v3 (fictif)","reference_interne":"PC-001","unite_principale":"m²","quantite_principale":100,
+    "composants":[{"cle":"isolant","designation":"Isolant v3 (fictif)","unite":"m²"}]}'::jsonb)$$, 'nouvelle version de l''ouvrage après émission');
+select is((select o.ouvrage_version from public.devis_ouvrages o join public.devis d on d.id = o.devis_id where d.conditions = 'PGTAP-V2'), 2,
+  'figement : le devis garde la version d''ouvrage qu''il a reçue');
+
+select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
+select throws_ok($$update public.devis set conditions = 'réécrit' where conditions = 'PGTAP-V2'$$, 'P0001', null,
+  'verrou : le contenu d''un devis envoyé ne change plus');
+select throws_ok($$insert into public.lignes_devis (devis_id, designation, quantite, unite, prix_unitaire_ht, taux_tva)
+  select id, 'Ajout tardif', 1, 'u', 1, 20 from public.devis where conditions = 'PGTAP-V2'$$, 'P0001', null,
+  'verrou : aucune ligne ne s''ajoute à un devis envoyé');
+select throws_ok($$update public.devis_ouvrages set libelle_client = 'réécrit'
+  where devis_id = (select id from public.devis where conditions = 'PGTAP-V2')$$, 'P0001', null,
+  'verrou : un ouvrage d''un devis envoyé ne change plus');
+select throws_ok($$update public.devis set filigrane = '{"type":"texte","preset":"PAYEE"}'::jsonb where conditions = 'PGTAP-V2'$$, 'P0001', null,
+  'verrou : le filigrane d''un devis envoyé ne change plus');
+select lives_ok($$update public.devis set relance_auto_exclue = true where conditions = 'PGTAP-V2'$$,
+  'verrou : l''exclusion des relances reste possible');
+select lives_ok($$update public.devis set statut = 'accepte' where conditions = 'PGTAP-V2'$$,
+  'verrou : les transitions de statut restent possibles');
+reset role;
+select throws_ok($$update public.devis set rendu_instantane = '{}'::jsonb where conditions = 'PGTAP-V2'$$, 'P0001', null,
+  'verrou : l''instantané figé ne se réécrit pas, même avec des droits d''administration');
+
+set local role authenticated;
+select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
+select lives_ok($$select public.enregistrer_devis_brouillon_v2('a0000000-0000-0000-0000-000000000001', null,
+  '{"client_id":"a3000000-0000-0000-0000-000000000001","conditions":"PGTAP-V2-B"}'::jsonb, '[]'::jsonb,
+  '[{"cle_ligne":"x","designation":"X","quantite":1,"prix_unitaire_ht":1,"taux_tva":20}]'::jsonb)$$, 'second brouillon v2');
+select throws_ok($$update public.devis set rendu_instantane = '{"moteur":2}'::jsonb where conditions = 'PGTAP-V2-B'$$, '42501', null,
+  'un brouillon ne reçoit jamais d''instantané fourni par l''appelant');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- H. Conversion devis → facture corrigée
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+select throws_ok($$select public.creer_facture_depuis_devis((select id from public.devis where conditions = 'PGTAP-V2'))$$, '42501', null,
+  'conversion : refusée sans gerer_factures');
+select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
+select lives_ok($$select public.creer_facture_depuis_devis((select id from public.devis where conditions = 'PGTAP-V2'))$$,
+  'conversion : créée par un utilisateur habilité');
+reset role;
+select is((select f.remise_globale from public.factures f join public.devis d on d.id = f.devis_origine_id where d.conditions = 'PGTAP-V2'), 5::numeric,
+  'conversion : la remise globale du devis est reprise');
+select is((select f.montant_ht from public.factures f join public.devis d on d.id = f.devis_origine_id where d.conditions = 'PGTAP-V2'),
+  (select montant_ht from public.devis where conditions = 'PGTAP-V2'), 'conversion : la facture n''est plus plus chère que le devis');
+select is((select count(*)::int from public.factures_ouvrages o join public.factures f on f.id = o.facture_id
+           join public.devis d on d.id = f.devis_origine_id where d.conditions = 'PGTAP-V2'), 1, 'conversion : l''ouvrage et sa présentation sont repris');
+select is((select count(*)::int from public.lignes_factures l join public.factures f on f.id = l.facture_id
+           join public.devis d on d.id = f.devis_origine_id where d.conditions = 'PGTAP-V2' and l.ouvrage_cle = 'ouv1'), 2,
+  'conversion : les lignes restent rattachées à leur ouvrage');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- I. Figement de la facture à l'émission
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+set local role authenticated;
+select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
+select lives_ok($$update public.factures set statut = 'envoyee'
+  where devis_origine_id = (select id from public.devis where conditions = 'PGTAP-V2')$$, 'émission de la facture sans passer par l''application');
+reset role;
+select ok((select rendu_instantane is not null and entreprise_snapshot is not null from public.factures
+           where devis_origine_id = (select id from public.devis where conditions = 'PGTAP-V2')),
+  'facture : instantané de rendu et identité émettrice figés par la base');
+update public.entreprises set nom = 'PGTAP RENOMMÉE DEUX' where id = 'a0000000-0000-0000-0000-000000000001';
+select is((select rendu_instantane -> 'entreprise' ->> 'nom' from public.factures
+           where devis_origine_id = (select id from public.devis where conditions = 'PGTAP-V2')), 'PGTAP RENOMMÉE',
+  'facture : l''identité émettrice reste celle du jour d''émission');
+select throws_ok($$update public.factures set filigrane = '{"type":"texte","preset":"PAYEE"}'::jsonb
+  where devis_origine_id = (select id from public.devis where conditions = 'PGTAP-V2')$$, 'P0001', null,
+  'facture : le filigrane d''une facture émise est figé');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- J. Rendu par jeton (portail, e-mail) et rendu pour un utilisateur connecté
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+insert into public.acces_externes_documents (entreprise_id, type_document, document_id, token_hash, cree_par, expire_le, revoque_le)
+select 'a0000000-0000-0000-0000-000000000001', 'devis', id, 'pgtap-empreinte-valide', '10000000-0000-0000-0000-000000000006', now() + interval '1 day', null
+from public.devis where conditions = 'PGTAP-V2';
+insert into public.acces_externes_documents (entreprise_id, type_document, document_id, token_hash, cree_par, expire_le, revoque_le)
+select 'a0000000-0000-0000-0000-000000000001', 'devis', id, 'pgtap-empreinte-revoquee', '10000000-0000-0000-0000-000000000006', now() + interval '1 day', now()
+from public.devis where conditions = 'PGTAP-V2';
+
+set local role anon;
+select set_config('request.jwt.claims', '{"role":"anon"}', true);
+select is(public.document_rendu_par_token('pgtap-empreinte-valide') ->> 'source', 'instantane', 'jeton valide : le client reçoit le document figé');
+select is(public.document_rendu_par_token('pgtap-empreinte-revoquee'), null, 'jeton révoqué : rien');
+select is(public.document_rendu_par_token('inconnu'), null, 'jeton inconnu : rien');
+reset role;
+
+set local role authenticated;
+select pg_temp.jwt('20000000-0000-0000-0000-000000000006');
+select is(public.document_rendu('devis', (select id from public.devis where conditions = 'PGTAP-V2')), null,
+  'rendu : rien pour une autre entreprise');
+select pg_temp.jwt('10000000-0000-0000-0000-000000000005');
+select is(public.document_rendu('devis', (select id from public.devis where conditions = 'PGTAP-V2')), null,
+  'rendu : rien sans accès aux devis');
+select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
+select is(public.document_rendu('devis', (select id from public.devis where conditions = 'PGTAP-V2')) ->> 'source', 'instantane',
+  'rendu : le document figé pour un utilisateur habilité');
+select is(public.document_rendu('devis', (select id from public.devis where conditions = 'PGTAP-V2-B')) ->> 'source', 'brouillon',
+  'rendu : le rendu courant d''un brouillon v2');
+select is(public.document_rendu('devis', 'a9000000-0000-0000-0000-000000000001') ->> 'source', 'moteur_v1',
+  'rendu : un document historique reste au moteur v1');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- K. Duplication d'un devis v2
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+select lives_ok($$select public.dupliquer_devis((select id from public.devis where conditions = 'PGTAP-V2'))$$, 'duplication d''un devis v2 émis');
+reset role;
+select is((select count(*)::int from public.devis where conditions = 'PGTAP-V2' and statut = 'brouillon'), 1, 'duplication : une copie en brouillon');
+select is((select moteur_presentation from public.devis where conditions = 'PGTAP-V2' and statut = 'brouillon'), 2::smallint, 'duplication : moteur 2 conservé');
+select ok((select rendu_instantane is null from public.devis where conditions = 'PGTAP-V2' and statut = 'brouillon'), 'duplication : la copie n''a pas d''instantané');
+select is((select count(*)::int from public.devis_ouvrages o join public.devis d on d.id = o.devis_id where d.conditions = 'PGTAP-V2' and d.statut = 'brouillon'), 1,
+  'duplication : l''ouvrage est recopié');
+select is((select count(*)::int from public.lignes_devis_couts c join public.devis d on d.id = c.devis_id where d.conditions = 'PGTAP-V2' and d.statut = 'brouillon'), 0,
+  'duplication : les coûts ne sont pas recopiés par un utilisateur qui ne peut pas les gérer');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- L. Isolation entre entreprises
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+set local role authenticated;
+select pg_temp.jwt('20000000-0000-0000-0000-000000000006');
+select is((select count(*)::int from public.devis_ouvrages), 0, 'isolation : B ne voit aucun ouvrage de devis de A');
+select is((select count(*)::int from public.lignes_devis_couts), 0, 'isolation : B ne voit aucun coût de ligne de A');
+select is((select count(*)::int from public.ouvrages), 0, 'isolation : B ne voit pas la bibliothèque de A');
+select is((select count(*)::int from public.devis_prix_journal), 0, 'isolation : B ne voit pas le journal des prix de A');
+reset role;
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- M. Documents historiques intacts
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+select ok((select rendu_instantane is null and moteur_presentation is null from public.devis where id = 'a9000000-0000-0000-0000-000000000001'),
+  'historique : le devis émis avant la migration n''est pas réécrit');
+select ok((select remise_globale = 0 and montant_ht = 100 and montant_tva = 20 and montant_ttc = 120 and rendu_instantane is null
+           from public.factures where id = 'aa000000-0000-0000-0000-000000000001'),
+  'historique : la facture émise avant la migration garde ses montants et reste sans instantané');
+
+select * from finish();
+rollback;
