@@ -97,9 +97,12 @@ test.describe("@pilote @expert périmètre de l'expert-comptable", () => {
     expect(await atteint(page, `/factures/${FACTURE_A}/modifier`), "l'écran de modification est ouvert").toBe(false);
 
     const api = rest(request, await jeton(request));
-    const modification = await api.modifier(`factures?id=eq.${FACTURE_A}`, { notes: "tentative expert-comptable" });
-    const modifiees = modification.ok() ? await modification.json() : [];
-    expect(Array.isArray(modifiees) ? modifiees.length : 0, "une facture définitive a été modifiée").toBe(0);
+    // Une colonne RÉELLE : la première version envoyait `notes`, qui n'existe pas ; PostgREST
+    // répondait 400, compté comme « 0 ligne » — le test passait pour une mauvaise raison. On
+    // exige désormais une réponse 200 VIDE : le refus vient de la RLS, pas d'une requête fausse.
+    const modification = await api.modifier(`factures?id=eq.${FACTURE_A}`, { notes_internes: "tentative expert-comptable" });
+    expect(modification.status(), `modification de facture : ${await modification.text()}`).toBe(200);
+    expect(await modification.json(), "une facture définitive a été modifiée").toEqual([]);
 
     const suppression = await api.supprimer(`factures?id=eq.${FACTURE_A}`);
     const supprimees = suppression.ok() ? await suppression.json() : [];
