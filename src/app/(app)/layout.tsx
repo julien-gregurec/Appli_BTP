@@ -4,6 +4,7 @@ import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { estPlateformeAdmin } from "@/lib/plateforme";
 import { ModuleAccessBoundary } from "@/components/ModuleAccessBoundary";
+import { BadgePreview } from "@/components/BadgePreview";
 import { MobileBack } from "@/components/MobileBack";
 import { MiseAJourApplication } from "@/components/mobile/MiseAJourApplication";
 import { FileHorsLigne } from "@/components/mobile/FileHorsLigne";
@@ -71,6 +72,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {/* GP V1 : recherche globale (Ctrl+K) — la RPC arrive avec les migrations du moteur v2. */}
       <PaletteRecherche actif={devisV2Actif() && !ctx.accesSupportPlateforme} />
       <MiseAJourApplication />
+      <BadgePreview />
       <AideButton />
       {iaEstActive() && aAccesIA(permissions) && <AssistantIA />}
     </div>
