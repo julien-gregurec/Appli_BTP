@@ -1,5 +1,9 @@
 import type {
   ProjectAsset,
+  StudioTimeline,
+  StudioTimelineClip,
+  TimelineDraft,
+  TimelineDocument,
   ProjectList,
   DashboardStats,
   ProjectInput,
@@ -23,6 +27,8 @@ type Table<Row> = {
 export type Database = {
   public: {
     Tables: {
+      studio_timelines: Table<StudioTimeline>;
+      studio_timeline_clips: Table<StudioTimelineClip>;
       studio_projects: Table<StudioProject>;
       studio_project_assets: Table<ProjectAsset>;
       studio_media_assets: Table<StudioMediaAsset>;
@@ -34,6 +40,28 @@ export type Database = {
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
     Functions: {
+      studio_get_timeline: {
+        Args: { p_project: string; p_timeline: string };
+        Returns: TimelineDocument | null;
+      };
+      studio_save_timeline: {
+        Args: {
+          p_project: string;
+          p_timeline: string | null;
+          p_revision: number | null;
+          p_project_revision: number;
+          p_draft: TimelineDraft;
+        };
+        Returns: string;
+      };
+      studio_activate_timeline: {
+        Args: { p_project: string; p_timeline: string };
+        Returns: undefined;
+      };
+      studio_delete_timeline: {
+        Args: { p_project: string; p_timeline: string };
+        Returns: undefined;
+      };
       studio_project_media_stats: {
         Args: { p_project: string };
         Returns: { photos: number; videos: number; bytes: number };

@@ -1,3 +1,4 @@
+import TimelineEditor from "../../../components/TimelineEditor";
 import { projectStats } from "../../../lib/projects";
 import { bytes } from "../../../lib/media-contract";
 import { notFound, redirect } from "next/navigation";
@@ -90,6 +91,11 @@ export default async function Project({
         </p>
         <p>Template : à configurer dans un prochain lot.</p>
       </section>
+      <TimelineEditor
+        project={p.id}
+        canWrite={edit}
+        canDelete={edit && ["owner", "admin"].includes(access.role)}
+      />
       {edit && <ProjectOrdering project={p} />}
       <p aria-label="Compteurs du projet">
         {stats.photos} photos · {stats.videos} vidéos · {bytes(stats.bytes)}

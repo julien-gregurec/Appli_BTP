@@ -528,3 +528,42 @@ summary {
     padding: 1rem;
   }
 }
+
+.montage-clips {
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 1rem;
+}
+.montage-clip {
+  border: 1px solid #cbd4cb;
+  border-radius: 12px;
+  padding: 1rem;
+  min-width: 0;
+}
+.montage-clip h3 {
+  overflow-wrap: anywhere;
+}
+.montage-preview {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.montage-preview img,
+.montage-preview video {
+  width: 160px;
+  height: 100px;
+  object-fit: contain;
+  background: #17251e;
+}
+.montage-clip form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+  align-items: end;
+}
+.montage select {
+  max-width: 100%;
+}
