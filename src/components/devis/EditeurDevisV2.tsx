@@ -423,7 +423,7 @@ export function EditeurDevisV2({
               <div className="mt-2 border-t border-neutral-200 pt-2 dark:border-neutral-800" aria-label="Rentabilité (interne)">
                 <Ligne libelle={`Coût d’achat et main-d’œuvre${rentabilite.inconnu ? " (incomplet)" : ""}`} valeur={euros(rentabilite.cout)} />
                 <Ligne libelle="Marge HT" valeur={euros(rentabilite.marge)} />
-                <Ligne libelle="Taux de marque" valeur={rentabilite.tauxMarquePct === null ? "—" : `${rentabilite.tauxMarquePct} %`} />
+                <Ligne libelle="Taux de marque" valeur={rentabilite.tauxMarquePct === null ? "—" : `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(rentabilite.tauxMarquePct)} %`} />
               </div>
             )}
           </section>

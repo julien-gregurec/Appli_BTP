@@ -66,7 +66,7 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
   const [active, setActive] = useState<string | null>(null);
   const pressePapier = useRef<ElementDevis | null>(null);
   const conteneur = useRef<HTMLDivElement>(null);
-  const editables = useMemo(() => colonnes.filter((c) => c.cle !== "poignee").map((c) => c.cle as string), [colonnes]);
+  const editables = useMemo(() => colonnes.filter((c) => c.cle !== "poignee" && c.modifiable !== false).map((c) => c.cle as string), [colonnes]);
 
   const virtualise = tries.length > VIRTUALISATION_AU_DELA;
   const virtualiseur = useVirtualizer({
@@ -83,7 +83,9 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
     if (virtualise) virtualiseur.scrollToIndex(cible.index, { align: "auto" });
     const t = window.setTimeout(() => {
       const el = conteneur.current?.querySelector<HTMLElement>(`[data-cellule="${cible.index}:${cible.colonne}"]`);
-      if (el) { el.focus(); if (el instanceof HTMLInputElement) el.select(); }
+      // Déjà au bon endroit (focus posé de façon synchrone par la navigation) : ne pas resélectionner, une
+      // frappe en cours serait écrasée.
+      if (el && document.activeElement !== el) { el.focus(); if (el instanceof HTMLInputElement) el.select(); }
     }, virtualise ? 30 : 0);
     return () => window.clearTimeout(t);
   }, [cible, virtualise, virtualiseur]);
@@ -118,7 +120,15 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
     const tag = (e.target as HTMLElement).tagName;
     const ctrl = e.ctrlKey || e.metaKey;
     const col = editables.indexOf(colonne);
-    const aller = (i: number, c: string) => { e.preventDefault(); setActive(cleElement(tries[i])); setCible({ index: i, colonne: c }); };
+    // Focus posé tout de suite quand la cellule est rendue (frappe rapide après Tab) ; l'effet ci-dessus
+    // prend le relais quand la ligne doit d'abord être amenée à l'écran (virtualisation).
+    const aller = (i: number, c: string) => {
+      e.preventDefault();
+      setActive(cleElement(tries[i]));
+      setCible({ index: i, colonne: c });
+      const el = conteneur.current?.querySelector<HTMLElement>(`[data-cellule="${i}:${c}"]`);
+      if (el) { el.focus(); if (el instanceof HTMLInputElement) el.select(); }
+    };
 
     if (e.key === "Tab") {
       if (e.shiftKey) {
@@ -176,7 +186,7 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
           onFocus={() => setActive(element.ligne.cle)}
           onKeyDown={(e, colonne) => clavier(e, index, colonne)}
           onChange={(patch) => actions.setEtat(modifierLigneLibre(etat, element.ligne.cle, patch))}
-          onCouts={(c) => actions.setEtat(modifierCoutsLigne(etat, element.ligne.cle, c))}
+          onCouts={(c, prix) => { const e1 = modifierCoutsLigne(etat, element.ligne.cle, c); actions.setEtat(prix ? modifierLigneLibre(e1, element.ligne.cle, prix) : e1); }}
           onArticle={(a) => actions.setEtat(remplacerLigneParArticle(etat, element.ligne.cle, a))}
           onOuvrage={() => actions.ouvrirOuvrage(null, element.ligne.cle)}
           onRetirer={() => actions.setEtat(retirerElement(etat, element.ligne.cle))}
@@ -290,10 +300,12 @@ function Cellule({ valeur, onCommit, index, colonne, disabled, alignement, onKey
 }) {
   const [brouillon, setBrouillon] = useState(valeur);
   const [edition, setEdition] = useState(false);
-  // Valeur reçue changée hors édition (annuler, article inséré) : le brouillon la suit, pendant le rendu.
+  // Rien tapé depuis l'entrée dans la cellule : un brouillon intact ne doit jamais écraser une valeur qui
+  // vient de changer (coefficient appliqué, annulation…). Le brouillon suit la valeur reçue, pendant le rendu.
+  const [saisi, setSaisi] = useState(false);
   const [recue, setRecue] = useState(valeur);
-  if (valeur !== recue) { setRecue(valeur); if (!edition) setBrouillon(valeur); }
-  const commettre = () => { setEdition(false); if (brouillon !== valeur) onCommit(brouillon); };
+  if (valeur !== recue) { setRecue(valeur); if (!edition || !saisi) setBrouillon(valeur); }
+  const commettre = () => { setEdition(false); setSaisi(false); if (saisi && brouillon !== valeur) onCommit(brouillon); };
   return (
     <div role="gridcell" className="min-w-0" onKeyDown={(e) => { if (e.key === "Escape") { setBrouillon(valeur); setEdition(false); return; } if (e.key === "Enter" || e.key === "Tab") commettre(); onKeyDown(e, colonne); }}>
       <input
@@ -302,8 +314,8 @@ function Cellule({ valeur, onCommit, index, colonne, disabled, alignement, onKey
         value={brouillon}
         disabled={disabled}
         inputMode={format === "nombre" ? "decimal" : undefined}
-        onFocus={() => { setEdition(true); onFocus(); }}
-        onChange={(e) => setBrouillon(e.target.value)}
+        onFocus={() => { setEdition(true); setSaisi(false); onFocus(); }}
+        onChange={(e) => { setSaisi(true); setBrouillon(e.target.value); }}
         onBlur={commettre}
         className={`${cellule} ${alignement === "droite" ? "text-right" : ""}`}
       />
@@ -341,8 +353,9 @@ function CelluleDesignation({ ligne, origine, index, colonne, onCommit, onArticl
   const [surligne, setSurligne] = useState(-1);
   const sequence = useRef(0);
   const rechercheActive = typeDe(ligne) === "libre" && !origine?.sourceId;
+  const [saisi, setSaisi] = useState(false);
   const [recue, setRecue] = useState(ligne.designation);
-  if (ligne.designation !== recue) { setRecue(ligne.designation); if (!edition) setBrouillon(ligne.designation); }
+  if (ligne.designation !== recue) { setRecue(ligne.designation); if (!edition || !saisi) setBrouillon(ligne.designation); }
   const texteRecherche = edition && rechercheActive ? brouillon.trim() : "";
   const listeId = `recherche-${ligne.cle}`;
 
@@ -359,8 +372,8 @@ function CelluleDesignation({ ligne, origine, index, colonne, onCommit, onArticl
     return () => window.clearTimeout(t);
   }, [texteRecherche]);
 
-  const commettre = () => { setEdition(false); setResultats([]); if (brouillon !== ligne.designation) onCommit(brouillon); };
-  const choisir = (a: ArticleTrouve) => { setEdition(false); setResultats([]); onArticle(a); };
+  const commettre = () => { setEdition(false); setResultats([]); setSaisi(false); if (saisi && brouillon !== ligne.designation) onCommit(brouillon); };
+  const choisir = (a: ArticleTrouve) => { setEdition(false); setResultats([]); setSaisi(false); onArticle(a); };
   const ouverte = texteRecherche.length >= 2 && resultats.length > 0;
 
   return (
@@ -390,8 +403,8 @@ function CelluleDesignation({ ligne, origine, index, colonne, onCommit, onArticl
         value={brouillon}
         disabled={disabled}
         placeholder={rechercheActive ? "Désignation ou référence…" : ""}
-        onFocus={() => { setEdition(true); onFocus(); }}
-        onChange={(e) => setBrouillon(e.target.value)}
+        onFocus={() => { setEdition(true); setSaisi(false); onFocus(); }}
+        onChange={(e) => { setSaisi(true); setBrouillon(e.target.value); }}
         onBlur={() => window.setTimeout(commettre, 120)}
         className={`${cellule} ${typeDe(ligne) === "titre" ? "font-semibold" : typeDe(ligne) === "sous_titre" ? "font-medium" : typeDe(ligne) === "commentaire" ? "italic" : ""}`}
       />
@@ -419,7 +432,9 @@ function CelluleDesignation({ ligne, origine, index, colonne, onCommit, onArticl
 const LigneGrille = memo(function LigneGrille({ index, ligne, origine, colonnes, droits, poignee, sousTotal, tvaMixte, onFocus, onKeyDown, onChange, onCouts, onArticle, onOuvrage, onRetirer }: {
   index: number; ligne: LigneLibre; origine: EtatElements["origines"][string] | undefined; colonnes: Colonne[]; droits: DroitsGrille; poignee: ReactNode;
   sousTotal: number | null; tvaMixte: boolean; onFocus: () => void; onKeyDown: (e: KeyboardEvent<HTMLDivElement>, colonne: string) => void;
-  onChange: (patch: Partial<Omit<LigneLibre, "cle">>) => void; onCouts: (c: { prixAchatHt?: number | null; coutMainOeuvreHt?: number | null; coefficient?: number | null }) => void;
+  onChange: (patch: Partial<Omit<LigneLibre, "cle">>) => void;
+  /** Coûts, et éventuel prix de vente dérivé, appliqués en UNE modification. */
+  onCouts: (c: { prixAchatHt?: number | null; coutMainOeuvreHt?: number | null; coefficient?: number | null }, prix?: Partial<Omit<LigneLibre, "cle">>) => void;
   onArticle: (a: ArticleTrouve) => void; onOuvrage: () => void; onRetirer: () => void;
 }) {
   const type = typeDe(ligne);
@@ -447,7 +462,7 @@ const LigneGrille = memo(function LigneGrille({ index, ligne, origine, colonnes,
           case "unite": return <Cellule key={c.cle} {...commun} colonne="unite" aria="Unité" valeur={champModifiable(type, "unite") ? ligne.unite : ""} disabled={!peut(c, "unite")} onCommit={(v) => onChange({ unite: v || "u" })} />;
           case "prix_achat": return <Cellule key={c.cle} {...commun} colonne="prix_achat" aria="Prix d’achat HT" format="nombre" alignement="droite" valeur={type === "article" || type === "libre" ? fr(origine?.prixAchatHt ?? null, 4) : ""} disabled={!colonneModifiable(c, droits) || !(type === "article" || type === "libre")} onCommit={(v) => onCouts({ prixAchatHt: nombre(v) })} />;
           case "cout_mo": return <Cellule key={c.cle} {...commun} colonne="cout_mo" aria="Coût main-d’œuvre HT" format="nombre" alignement="droite" valeur={type === "article" || type === "libre" ? fr(origine?.coutMainOeuvreHt ?? null, 4) : ""} disabled={!colonneModifiable(c, droits) || !(type === "article" || type === "libre")} onCommit={(v) => onCouts({ coutMainOeuvreHt: nombre(v) })} />;
-          case "coefficient": return <Cellule key={c.cle} {...commun} colonne="coefficient" aria="Coefficient" format="nombre" alignement="droite" valeur={type === "article" || type === "libre" ? fr(origine?.coefficient ?? null, 4) : ""} disabled={!colonneModifiable(c, droits) || !(type === "article" || type === "libre")} onCommit={(v) => { const k = nombre(v); onCouts({ coefficient: k }); if (k !== null && origine?.prixAchatHt !== null && origine?.prixAchatHt !== undefined) onChange({ prixUnitaireHt: Math.round((origine.prixAchatHt + (origine.coutMainOeuvreHt ?? 0)) * k * 100) / 100 }); }} />;
+          case "coefficient": return <Cellule key={c.cle} {...commun} colonne="coefficient" aria="Coefficient" format="nombre" alignement="droite" valeur={type === "article" || type === "libre" ? fr(origine?.coefficient ?? null, 4) : ""} disabled={!colonneModifiable(c, droits) || !(type === "article" || type === "libre")} onCommit={(v) => { const k = nombre(v); const achat = origine?.prixAchatHt; onCouts({ coefficient: k }, k !== null && achat !== null && achat !== undefined ? { prixUnitaireHt: Math.round((achat + (origine?.coutMainOeuvreHt ?? 0)) * k * 100) / 100 } : undefined); }} />;
           case "marge": return <CelluleLecture key={c.cle} alignement="droite"><span className={marge.margeHt !== null && marge.margeHt < 0 ? "text-red-700" : ""}>{marge.margeHt === null ? "" : euros(marge.margeHt)}</span></CelluleLecture>;
           case "marge_pct": return <CelluleLecture key={c.cle} alignement="droite">{marge.tauxMarquePct === null ? "" : `${fr(marge.tauxMarquePct, 1)} %`}</CelluleLecture>;
           case "prix_vente":

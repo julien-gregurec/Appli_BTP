@@ -369,3 +369,72 @@ Tout est additif. Pour revenir en arrière :
 - rejouer `rechercher_articles_devis` depuis la proposition devis v2.
 
 Les objets du bucket `catalogue-images` sont conservés. Côté code, retirer `GP_DEVIS_V2`.
+
+## 12. Lot C — grille de devis ligne par ligne (livré)
+
+### 12.1 Livrables
+
+| Fichier | Rôle |
+|---|---|
+| `supabase/proposed/gp-v1-metier-grille-devis.sql.proposed` (+ `.pgtap`, 36 assertions) | types de lignes, coûts MO/coefficient, révision, en-tête, verrou, rendu, RPC, duplication, conversion |
+| `src/lib/devis/types-ligne.ts`, `historique-edition.ts`, `colonnes-grille.ts`, `marge-ligne.ts` (+ tests) | 10 types de lignes et leurs règles, annuler/rétablir borné, colonnes selon droits, marge par ligne |
+| `src/lib/devis/presentation.ts`, `pagination.ts`, `src/components/documents/DocumentA4.tsx` | sous-totaux calculés, base de remise de section, genres de lignes client, saut de page |
+| `src/lib/devis/editeur-etat.ts` | insertion typée, duplication, déplacement libre, article depuis la cellule, coûts de ligne, remises recalculées, validation par type |
+| `src/lib/devis/enregistrement-v2.ts`, `brouillon-v2.ts`, `rendu-source.ts`, `editeur-v2-serveur.ts`, `src/app/actions/devis-v2.ts` | aller-retour des nouveaux champs, révision, commerciaux |
+| `src/components/devis/GrilleDevis.tsx` | la grille |
+| `src/components/devis/EditeurDevisV2.tsx` | en-tête complet, barre d'outils, autosauvegarde, Ctrl+Z/Y, colonnes, saisie mobile, rentabilité |
+| `package.json` | `@dnd-kit/core` 6.3.1, `@dnd-kit/sortable` 10.0.0, `@dnd-kit/utilities` 3.2.2, `@tanstack/react-virtual` 3.14.12 (D2) |
+
+Commits : `81892a1` (SQL), `66648c8` (code) et le commit de ce rapport. Tout reste derrière `GP_DEVIS_V2`.
+
+### 12.2 Ce que fait le lot
+
+- **Dix types de lignes** : article, prestation libre, titre, sous-titre, commentaire, sous-total, remise, ligne vide, séparateur, saut de page. Règle tenue par la base **et** l'écran : une ligne non chiffrée porte 0 / 0 / 0 ; un sous-total est **calculé** (somme depuis le sous-total précédent), jamais enregistré comme montant ; une remise est un montant négatif à quantité 1, en % de sa section (recalculé à chaque changement, jamais réparti en silence sur plusieurs taux de TVA : signalé) ou fixe. `recalc_totaux_devis` reste inchangé et juste.
+- **Grille** : cellules validées à la sortie ; Tab / Maj+Tab, Entrée (valide, descend, crée en bas), ↑ ↓, Ctrl+D, Ctrl+↑/↓, Ctrl+Suppr, Ctrl+C / Ctrl+V d'une ligne, Échap ; recherche d'article **depuis la cellule Désignation** (rangs du catalogue, insertion d'un ouvrage) ; glisser-déposer (pointeur et clavier) ; virtualisation au-delà de 150 lignes ; raccourcis dans les infobulles.
+- **Colonnes** : référence, désignation, description, réf. fabricant, code distributeur, famille, fournisseur, quantité, unité, achat, MO, coefficient, marge €, marge %, PU, remise, TVA, total, commentaire interne. Les colonnes de coût **n'existent pas dans la page** sans `voir_couts_devis` ; modifiables selon `gerer_couts_devis`. Réglage par utilisateur (localStorage, lu avec indulgence).
+- **En-tête** : référence d'affaire (interne, libre après émission), référence client (imprimée, figée après émission), commercial (salarié de l'entreprise, vérifié en base), date, validité, mode de règlement, conditions de paiement, remise globale, conditions, notes.
+- **Autosauvegarde** 2 s après une pause, avec **verrou optimiste** : la révision lue est envoyée, un enregistrement sur une révision périmée est refusé (40001) — jamais d'écrasement silencieux ; hors ligne, les modifications restent à l'écran. Un nouveau devis reçoit son identifiant au premier enregistrement (adresse mise à jour sans navigation). Indicateur « Enregistré à hh:mm ».
+- **Annuler / rétablir** (100 niveaux, Ctrl+Z / Ctrl+Y) ; un en-tête modifié compte pour une entrée à la sortie du champ.
+- **Mobile** : liste des lignes, saisie d'une ligne en plein écran ; aucun débordement à 375 px.
+- **Rentabilité** sous les totaux (coût, marge, taux de marque) pour qui voit les coûts.
+- **Facture et duplication** recopient les types de lignes, la remise de section, le commentaire interne (jamais imprimé) et l'en-tête ; le rendu client ne reçoit jamais commentaire interne, code ni nom du distributeur.
+
+### 12.3 Résultats
+
+| Contrôle | Résultat |
+|---|---|
+| SQL appliqué deux fois de suite (après devis v2, références, bibliothèque) | 0 erreur |
+| pgTAP du lot | **36/36** |
+| pgTAP devis v2 / références / bibliothèque, rejouées après le SQL du lot | 111/111 · 69/69 · 67/67 |
+| Vitest `src/lib/devis` + documents | 332/332 (dont 30 nouveaux : types, historique, colonnes, structure) |
+| Typecheck du projet, lint des composants devis | 0 / 0 (1 avertissement préexistant) |
+| Banc navigateur (vrai éditeur, actions simulées) | saisie clavier complète d'une ligne (12,5 × 1,6 → 20 €, total 800 €, marge 300 €), création de ligne par Tab en fin de grille, recherche depuis la cellule (« BA13 » → 3 articles classés, insertion au clavier avec références et prix d'achat), insertion sous-total (824 €) et remise 5 %, Ctrl+Z / Ctrl+Y, autosauvegarde à 2 s avec révision et adresse mise à jour, aucune erreur de console, mobile sans débordement |
+
+### 12.4 Réserves
+
+1. **Banc historique** `tests/banc/editeur-v2/editeur-v2.banc.spec.ts` : non rejoué ; ses sélecteurs visent les anciennes cartes de lignes et sont à adapter à la grille (lot H).
+2. **Pas de recette réelle** (pile Supabase + Next, drapeau posé) — même situation que les lots précédents.
+3. **Performance** à 100 / 500 lignes : virtualisation en place, mesure à faire au lot H.
+4. Une remise en % insérée **après** un sous-total porte sur la section suivante (donc 0 tant qu'elle est vide) : conforme à la règle, à expliquer dans l'aide.
+5. Recherche d'ouvrage depuis la cellule : ouvre le dialogue d'ouvrage existant (insertion après la ligne) ; les favoris et familles n'entrent pas encore dans le classement des ouvrages.
+6. Défaut A5 corrigé au lot A-bis ; défaut A6 (`a_permission` et session support) toujours hors lot.
+
+### 12.5 Retour arrière
+
+Additif : supprimer les colonnes `type_ligne`, `remise_section_pct`, `commentaire_interne`, `*_instantane` (lignes), `cout_main_oeuvre_ht`, `coefficient` (coûts), `revision`, `mode_reglement`, `conditions_paiement`, `commercial_employe_id` (devis / factures) ; rejouer `enregistrer_devis_brouillon_v2`, `dupliquer_devis`, `creer_facture_depuis_devis`, `ligne_pour_rendu`, `verrouiller_devis_emis` et la politique du journal depuis la proposition devis v2. Côté code, retirer `GP_DEVIS_V2`.
+
+## 13. État à ce jalon
+
+| Lot | État |
+|---|---|
+| A audit / architecture / références | **terminé** |
+| A-bis références internes | **terminé** |
+| B bibliothèque articles et ouvrages | **terminé** |
+| C grille de devis | **terminé** (réserves § 12.4) |
+| D calcul unique, droits fins (D4), transformations, documents issus | non démarré |
+| E barre contextuelle, recherche globale, dernières actions | non démarré |
+| F planning | non démarré |
+| G PDF, e-mail, historique | non démarré |
+| H E2E, performance, non-régression, rapport final | non démarré |
+
+Verdict provisoire : **GO SOUS CONDITIONS pour les lots livrés**, NO-GO V1 COMMERCIALISABLE tant que D à H ne sont pas faits et que le lot 0 (SQL devis v2 numéroté au ledger) n'est pas intégré.
