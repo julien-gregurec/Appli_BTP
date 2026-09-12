@@ -1,5 +1,7 @@
 import type {
   ProjectAsset,
+  StudioRenderJob,
+  StudioRenderOutput,
   StudioTimeline,
   StudioTimelineClip,
   TimelineDraft,
@@ -27,6 +29,8 @@ type Table<Row> = {
 export type Database = {
   public: {
     Tables: {
+      studio_render_jobs: Table<StudioRenderJob>;
+      studio_render_outputs: Table<StudioRenderOutput>;
       studio_timelines: Table<StudioTimeline>;
       studio_timeline_clips: Table<StudioTimelineClip>;
       studio_projects: Table<StudioProject>;
@@ -40,6 +44,16 @@ export type Database = {
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
     Functions: {
+      studio_request_render: {
+        Args: {
+          p_project: string;
+          p_request: string;
+          p_profile: string;
+          p_retry: string | null;
+        };
+        Returns: string;
+      };
+      studio_cancel_render: { Args: { p_job: string }; Returns: undefined };
       studio_get_timeline: {
         Args: { p_project: string; p_timeline: string };
         Returns: TimelineDocument | null;

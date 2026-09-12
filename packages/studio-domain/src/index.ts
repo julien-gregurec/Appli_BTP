@@ -88,3 +88,4 @@ export * from "./media";
 export * from "./projects";
 
 export * from "./timeline";
+export * from './render';

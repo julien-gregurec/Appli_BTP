@@ -1,3 +1,4 @@
+import RenderPanel from "../../../components/RenderPanel";
 import TimelineEditor from "../../../components/TimelineEditor";
 import { projectStats } from "../../../lib/projects";
 import { bytes } from "../../../lib/media-contract";
@@ -96,6 +97,7 @@ export default async function Project({
         canWrite={edit}
         canDelete={edit && ["owner", "admin"].includes(access.role)}
       />
+      <RenderPanel project={p.id} canWrite={edit} />
       {edit && <ProjectOrdering project={p} />}
       <p aria-label="Compteurs du projet">
         {stats.photos} photos · {stats.videos} vidéos · {bytes(stats.bytes)}

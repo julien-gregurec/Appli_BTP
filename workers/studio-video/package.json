@@ -1,0 +1,30 @@
+{
+  "name": "@elsatia/studio-video",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/worker.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "node ../../apps/studio/node_modules/eslint/bin/eslint.js ."
+  },
+  "dependencies": {
+    "@elsatia/studio-domain": "file:../../packages/studio-domain",
+    "@supabase/supabase-js": "2.110.2",
+    "bullmq": "6.3.4",
+    "ioredis": "6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "ffmpeg-static": "5.3.0",
+    "ffprobe-static": "3.1.0",
+    "tsx": "^4",
+    "typescript": "^5",
+    "vitest": "^4"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "ffmpeg-static@5.3.0": true
+  }
+}
