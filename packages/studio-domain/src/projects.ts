@@ -39,6 +39,7 @@ export interface StudioProject extends Omit<ProjectInput, "status"> {
   created_by: string;
   status: ProjectStatus;
   cover_asset_id: string | null;
+  active_timeline_id?: string | null;
   created_at: string;
   updated_at: string;
   archived_at: string | null;
