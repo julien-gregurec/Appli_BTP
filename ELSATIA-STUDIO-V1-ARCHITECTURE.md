@@ -179,3 +179,20 @@ Le Lot A implémente uniquement Auth/workspaces/members dans `apps/studio` et le
 - Archivage logique owner uniquement ; membres conservés mais rendus invisibles par RLS. Purge physique, suppression de compte propriétaire et invitations email restent explicitement hors A.
 
 Détails et preuves : [rapport Lot A](ELSATIA-STUDIO-V1-LOT-A-REPORT.md).
+
+
+## 10. Décisions effectives du Lot B Media Upload
+
+La demande Lot B exclut explicitement FFmpeg et les workers : la cible d’analyse asynchrone de la section 5 reste future. Le lot implémente le stockage et une inspection légère bornée, sans montage ni Lot C.
+
+- `studio_projects` minimal : workspace, nom, type construction/travel/event/free, auteur et dates. L’association asset/projet est directe avec FK composite tenant ; pas de duplication/partage d’asset entre projets dans B.
+- `studio_media_assets` porte la réservation idempotente, l’emplacement privé, les métadonnées minimales et les tombstones. Une table de limites configure images/vidéos/projet/workspace/compteur/concurrence. Réservations sérialisées par workspace.
+- Upload TUS signé vers la route Supabase `/upload/resumable/sign`, en chunks de 6 Mio, hors Next. Reprise dans l’onglet uniquement. Formats qualifiés : JPEG/PNG/WEBP statiques et MP4/MOV H.264 avec conteneur non fragmenté exploitable ; pas de HEIC/HEVC/WEBM annoncés.
+- Inspection par Range, maximum 4 Mio, 16 requêtes et budget réseau de 45 secondes par tentative ; cache du préfixe déjà lu. Dimensions, durée et rotation selon métadonnées disponibles. Pas d’extraction GPS/date/appareil et pas de garantie de décodage de toutes les frames.
+- L’authentification, les rôles et les politiques Lot A restent inchangés. Le proxy reçoit seulement les origines CSP nécessaires aux transferts/aperçus Storage et aux previews blob. Une politique Storage restrictive interdit les opérations directes des rôles navigateur sur le bucket Studio.
+- Signature/inspection/finalisation/purge dans un module serveur à credential privilégié, après autorisation utilisateur par RLS. Aucun credential privé ou token de session Auth envoyé au client. Le token d’upload signe un seul chemin avec upsert interdit ; taille réelle vérifiée à la confirmation.
+- Preview privée de 60 s, chargée sur demande ; pagination média par 24. Suppression logique immédiate, purge physique après 30 h pour couvrir admission, token et TUS, quotas conservés jusque-là. Réconciliation manuelle locale, sans planification Production.
+
+Le sens de `ready` est limité à l’admission au stockage. La qualification codecs complète et le rendu appartiennent aux lots ultérieurs. Le secret Storage possède des privilèges étendus au niveau fournisseur et nécessite une gestion rigoureuse avant toute mise en ligne ; le contrat décrit aussi les coûts de quarantaine et la durée des capacités déjà délivrées.
+
+Détails : [contrat Storage](ELSATIA-STUDIO-STORAGE-CONTRACT.md) et [rapport Lot B](ELSATIA-STUDIO-V1-LOT-B-REPORT.md).
