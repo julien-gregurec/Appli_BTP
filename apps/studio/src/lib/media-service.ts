@@ -1,3 +1,4 @@
+import { restErrorStatus } from "./rest-status";
 import { verifiedUser, StudioAuthUnavailable } from "./verified-user";
 import "server-only";
 import { cache } from "react";
@@ -36,21 +37,32 @@ export const mediaContext = cache(async () => {
 export async function authorizeProject(id: string, write = false) {
   if (!isStudioId(id)) throw new MediaError("Projet inaccessible.", 404);
   const { client, user } = await mediaContext();
-  const { data: project, error: projectError } = await client
+  const {
+    data: project,
+    error: projectError,
+    status: projectStatus,
+  } = await client
     .from("studio_projects")
     .select("*")
     .eq("id", id)
     .maybeSingle();
   if (projectError)
-    throw new MediaError("Service projets temporairement indisponible.", 503);
+    throw new MediaError(
+      "Lecture du projet indisponible.",
+      restErrorStatus(projectError, projectStatus),
+    );
   if (!project) throw new MediaError("Projet inaccessible.", 404);
-  const { data: role, error: roleError } = await client.rpc("studio_my_role", {
+  const {
+    data: role,
+    error: roleError,
+    status: roleStatus,
+  } = await client.rpc("studio_my_role", {
     p_workspace_id: project.workspace_id,
   });
   if (roleError)
     throw new MediaError(
-      "Vérification des droits temporairement indisponible.",
-      503,
+      "Vérification des droits indisponible.",
+      restErrorStatus(roleError, roleStatus),
     );
   if (!role || (write && !writable(role)))
     throw new MediaError("Lecture seule : opération refusée.", 403);
@@ -64,13 +76,20 @@ export async function authorizeProject(id: string, write = false) {
 export async function authorizeAsset(id: string, write = false) {
   if (!isStudioId(id)) throw new MediaError("Média inaccessible.", 404);
   const { client, user } = await mediaContext();
-  const { data: asset, error: assetError } = await client
+  const {
+    data: asset,
+    error: assetError,
+    status: assetStatus,
+  } = await client
     .from("studio_media_assets")
     .select("*")
     .eq("id", id)
     .maybeSingle();
   if (assetError)
-    throw new MediaError("Service médias temporairement indisponible.", 503);
+    throw new MediaError(
+      "Lecture du média indisponible.",
+      restErrorStatus(assetError, assetStatus),
+    );
   if (!asset) throw new MediaError("Média inaccessible.", 404);
   if (write)
     return { ...(await authorizeProject(asset.project_id, true)), asset };
@@ -79,11 +98,15 @@ export async function authorizeAsset(id: string, write = false) {
 }
 export async function mediaLimits() {
   const { client } = await mediaContext();
-  const { data, error } = await client
+  const { data, error, status } = await client
     .from("studio_media_limits")
     .select("*")
     .single();
-  if (error || !data) throw new MediaError("Limites indisponibles.", 503);
+  if (error || !data)
+    throw new MediaError(
+      "Limites indisponibles.",
+      error ? restErrorStatus(error, status) : 500,
+    );
   return data;
 }
 export async function reserveMedia(
@@ -91,10 +114,23 @@ export async function reserveMedia(
   input: { requestId: string; name: string; mime: string; size: number },
 ): Promise<UploadAuthorization> {
   const { client } = await authorizeProject(projectId, true);
-  validateFile(input.name, input.mime, input.size, await mediaLimits());
+  const limits = await mediaLimits();
+  try {
+    validateFile(input.name, input.mime, input.size, limits);
+  } catch (error) {
+    // This synchronous domain validator throws plain errors, not transport errors.
+    throw new MediaError(
+      error instanceof Error ? error.message : "Fichier invalide.",
+      400,
+    );
+  }
   if (!isStudioId(input.requestId))
     throw new MediaError("Identifiant de demande invalide.");
-  const { data: id, error } = await client.rpc("studio_reserve_media", {
+  const {
+    data: id,
+    error,
+    status,
+  } = await client.rpc("studio_reserve_media", {
     p_project: projectId,
     p_request: input.requestId,
     p_name: input.name,
@@ -104,6 +140,7 @@ export async function reserveMedia(
   if (error || !id)
     throw new MediaError(
       error?.code === "22023" ? error.message : "Import refusé.",
+      error ? restErrorStatus(error, status) : 500,
     );
   return authorizeUpload(id);
 }
@@ -226,7 +263,7 @@ export async function confirmMedia(id: string) {
       error instanceof Error ? error.message : "Fichier invalide.",
     );
   }
-  const { error } = await storageAdmin().rpc("studio_finish_media", {
+  const { error, status } = await storageAdmin().rpc("studio_finish_media", {
     p_asset: id,
     p_actor: user.id,
     p_metadata: metadata,
@@ -234,7 +271,7 @@ export async function confirmMedia(id: string) {
   if (error)
     throw new MediaError(
       "Confirmation refusée : session expirée ou accès révoqué.",
-      409,
+      restErrorStatus(error, status),
     );
   return (await authorizeAsset(id)).asset;
 }

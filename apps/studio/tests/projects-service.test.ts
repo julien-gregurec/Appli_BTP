@@ -138,3 +138,21 @@ it("filtres non allowlistés refusés", async () => {
   ).rejects.toThrow();
   expect(mocks.rpc).not.toHaveBeenCalled();
 });
+for (const [name, action] of [
+  ["archive", () => archiveStudioProject(id)],
+  ["cover", () => setProjectCover(id, id)],
+  ["order", () => reorderProjectMedia(id, [id], false, 1)],
+  ["remove", () => removeProjectMedia(id, id)],
+  ["create", () => createStudioProject(id, input)],
+  ["list", () => listStudioProjects(id)],
+] as const) {
+  it(`${name}: REST unavailable is not permission denied`, async () => {
+    mocks.rpc.mockResolvedValue({
+      data: null,
+      error: { code: "PGRST000" },
+      status: 503,
+    });
+    await expect(action()).rejects.toMatchObject({ status: 503 });
+    expect(mocks.rpc).toHaveBeenCalledTimes(1);
+  });
+}
