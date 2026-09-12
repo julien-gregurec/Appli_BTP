@@ -1,6 +1,6 @@
-# ELSATIA Studio — Lots A et B
+# ELSATIA Studio — Lots A, B et C
 
-Application autonome dans `apps/studio`, port 3030. Contrats purs dans `packages/studio-domain`. Le Lot A couvre compte ELSATIA/Supabase, workspaces personnels/professionnels, membres, rôles, onboarding et RLS. Le Lot B ajoute projets minimaux, import direct TUS signé, bibliothèque privée et réconciliation. Aucun moteur vidéo ni dépendance métier Gestion Pro.
+Application autonome dans `apps/studio`, port 3030. Contrats purs dans `packages/studio-domain`. Le Lot A couvre compte ELSATIA/Supabase, workspaces personnels/professionnels, membres, rôles, onboarding et RLS. Le Lot B ajoute import direct TUS signé, bibliothèque privée et réconciliation ; le Lot C complète la gestion des projets et de leurs références média. Aucun moteur vidéo ni dépendance métier Gestion Pro.
 
 ## Installation
 
@@ -73,7 +73,7 @@ Owner unique/non transférable dans ce lot. Owner/admin peuvent renommer ; seul 
 - Studio n’est pas encore enregistré dans le sélecteur multi-app : aucun accès Gestion Pro/Colors/Tools n’est accordé implicitement. Ce branchement transversal est différé.
 - Le template email commun existant utilise `.SiteURL`. Selon la configuration distante, la confirmation peut ouvrir le portail commun, puis nécessiter une connexion Studio. Aucun SSO/cookie inter-domaines implicite. Configuration/recette email distante non réalisée.
 - Les tests locaux Auth ont la confirmation automatique activée (configuration locale existante). Les callbacks invalides et les sessions sont testables localement ; la délivrabilité email distante n’est pas prouvée.
-- Aucune fonction de montage, timeline, rendu ou Lot C n’est implémentée.
+- Aucune fonction de montage, timeline, rendu ou Lot D n’est implémentée.
 
 Voir le rapport racine `ELSATIA-STUDIO-V1-LOT-A-REPORT.md` et le workflow CI `studio-foundation.yml` (validation uniquement, aucun déploiement).
 
@@ -90,6 +90,16 @@ node --env-file=apps/studio/.env.local apps/studio/scripts/storage-reconcile.mjs
 
 Dry-run par défaut ; commandes exclusivement locales, sans cron. Le test volumétrique génère un vrai transfert de 1 Gio hors Git, injecte une coupure et mesure progression/mémoire. `mp4-muxer` est réservé aux fixtures de test WebCodecs ; il n’est pas importé dans l’application.
 
-Pour tester l’upgrade : `setup --lot-a` installe les 253 migrations Foundation dans une instance neuve ; copier ensuite la migration Lot B dans **ce dossier jetable** puis `supabase db push --local --workdir CHEMIN_JETABLE`. Le setup normal applique directement les 254 migrations. Avant le rollback local `scripts/rollback-media-local.sql`, vider puis supprimer le bucket `studio-originals` avec les API Storage ; le SQL refuse d’effacer directement les tables du fournisseur. Réappliquer ensuite uniquement la migration Lot B dans la même instance jetable. Ne jamais transposer ce rollback à des données réelles.
+Pour tester l’upgrade : `setup --lot-a` installe les 253 migrations Foundation dans une instance neuve ; copier ensuite la migration Lot B dans **ce dossier jetable** puis `supabase db push --local --workdir CHEMIN_JETABLE`. Le mode `setup --lot-b` applique les 254 migrations ; le setup normal inclut désormais le Lot C (255 migrations). Avant le rollback local `scripts/rollback-media-local.sql`, vider puis supprimer le bucket `studio-originals` avec les API Storage ; le SQL refuse d’effacer directement les tables du fournisseur. Réappliquer ensuite uniquement la migration Lot B dans la même instance jetable. Ne jamais transposer ce rollback à des données réelles.
 
-Détails : [contrat Storage](../../ELSATIA-STUDIO-STORAGE-CONTRACT.md), [rapport Lot B](../../ELSATIA-STUDIO-V1-LOT-B-REPORT.md). La CI couvre les lots A/B sans déploiement. Confirmation email distante, fournisseur distant, Safari/iOS physique et débit Internet mobile restent à recetter avant mise en ligne.
+Détails : [contrat Storage](../../ELSATIA-STUDIO-STORAGE-CONTRACT.md), [rapport Lot B](../../ELSATIA-STUDIO-V1-LOT-B-REPORT.md). La CI couvre les lots A/B/C sans déploiement. Confirmation email distante, fournisseur distant, Safari/iOS physique et débit Internet mobile restent à recetter avant mise en ligne.
+
+## Lot C — gestion des projets
+
+La liste propose recherche, filtres, tri et pagination. Le formulaire couvre les sept types, lieu/dates, format et durée (automatique ou 1–600 secondes). Les informations chantier restent libres et facultatives. Enregistrement explicite ; modifier le projet, sélectionner une image de couverture et organiser ses médias ne crée aucune vidéo.
+
+Owner/admin/editor créent, modifient et dupliquent. Owner/admin archivent, restaurent et suppriment après confirmation. Les archives restent lisibles ; restaurez-les avant modification. Viewer reste en lecture seule. Les projets dupliqués partagent les originaux privés, avec un ordre propre. Un média n’est purgé qu’après retrait de sa dernière référence, suivant la rétention Lot B.
+
+`setup --lot-b` prépare 254 migrations pour un upgrade C ; le setup normal en installe 255. `scripts/rollback-projects-local.sql` est limité à un schéma projet vide dans l’instance jetable et restaure le comportement B ; il refuse les projets peuplés et ne constitue pas une procédure de rollback Production.
+
+Tests supplémentaires : `tests/projects.test.ts`, `projects-service.test.ts`, `projects.spec.ts` et `supabase/tests/studio_project_management.test.sql`. Le workflow Studio les inclut sans déploiement. Voir [rapport Lot C](../../ELSATIA-STUDIO-V1-LOT-C-REPORT.md).

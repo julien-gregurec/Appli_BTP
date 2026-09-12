@@ -196,3 +196,19 @@ La demande Lot B exclut explicitement FFmpeg et les workers : la cible d’analy
 Le sens de `ready` est limité à l’admission au stockage. La qualification codecs complète et le rendu appartiennent aux lots ultérieurs. Le secret Storage possède des privilèges étendus au niveau fournisseur et nécessite une gestion rigoureuse avant toute mise en ligne ; le contrat décrit aussi les coûts de quarantaine et la durée des capacités déjà délivrées.
 
 Détails : [contrat Storage](ELSATIA-STUDIO-STORAGE-CONTRACT.md) et [rapport Lot B](ELSATIA-STUDIO-V1-LOT-B-REPORT.md).
+
+## 11. Décisions effectives du Lot C Projects
+
+Le projet devient un objet de configuration, sans timeline ni rendu. Sept types stables (construction/travel/wedding/birthday/event/memory/free), description/lieu/dates, status draft/ready/archived, format 9:16/16:9/1:1/4:5 et durée automatique ou entière 1–600 s. Les champs chantier client/entreprise/prestations sont du texte Studio facultatif, sans FK Gestion Pro. Sauvegarde explicite et révision pour refuser une édition ou un ordre périmés.
+
+La relation directe du Lot B est conservée comme **provenance d’upload**, et complétée par `studio_project_assets(workspace_id,project_id,asset_id,sort_order)`. Les références deviennent l’autorité d’appartenance aux projets ; leurs FKs composites empêchent un mélange de tenants. Le backfill conserve les assets et leurs clés, avec ordre created_at/id. Aucun fichier Storage déplacé ni copié.
+
+Dupliquer crée un projet draft, ses paramètres, sa couverture et ses références dans le même ordre. Seuls les projets dont tous les imports référencés sont validés peuvent être dupliqués. Chaque copie possède son ordre propre ; le workspace conserve un seul asset physique et un seul coût d’octets par original. Retirer un média enlève seulement la référence du projet courant. Supprimer un projet enlève ses références ; le dernier retrait seulement crée le tombstone physique. Les archives conservent leurs références et restent consultables/restaurables. Un trigger interdit de marquer supprimé un asset encore référencé ; la réconciliation vérifie aussi les références avant suppression Storage.
+
+La RLS média suit les références de projets accessibles et non supprimés : une copie garde l’accès après suppression du projet source. La couverture est une image ready référencée par ce même projet, garantie par FK et garde SQL. Signature/preview/TUS et formats Lot B conservés. Ordre manuel avec boutons clavier/drag-drop, sauvegarde atomique de l’ensemble des références, tri captured_at puis created_at confirmé. Ce n’est pas une timeline.
+
+Owner/admin/editor créent/modifient/dupliquent et gèrent les médias actifs ; owner/admin seulement archivent/restaurent/suppriment un projet. Viewer reste readonly. Projet archivé readonly mais duplicable par editor+. Les mutations partagent le verrou workspace Foundation ; ses tables, rôles et cookies sont inchangés. La lecture Auth vérifiée tolère une seule reprise réseau/5xx ; un refus Auth reste refusé, sans recours à une session non vérifiée.
+
+Liste paginée par 24, recherche littérale et filtres/tris SQL ; compteurs agrégés dans une RPC par liste, sans N+1 par carte. Dashboard compte les médias physiques une seule fois. Couvertures privées chargées sur demande. API projet bornée à 64 Kio pour l’ordre complet, API upload maintenue à 4 Kio ; aucun média binaire dans Next.
+
+Rollback destructif réservé à un schéma projet vide de recette ; sur données réelles, rollback applicatif/correction additive. Détails et preuves : [rapport Lot C](ELSATIA-STUDIO-V1-LOT-C-REPORT.md).

@@ -89,3 +89,11 @@ Les noms, clés, signatures et secrets ne sont pas imprimés. Le script ne touch
 ## Validation et exploitation
 
 Voir `ELSATIA-STUDIO-V1-LOT-B-REPORT.md`. La limite de 1 Gio est qualifiée par transfert local d’un MP4 synthétique complété d’une boîte libre, créé dynamiquement hors Git. Cela prouve le protocole/octet, pas le débit Internet mobile ni le décodage d’une vidéo longue réelle. La configuration distante, les coûts, la rotation du credential et les limites du compte fournisseur doivent être recettés avant toute mise en ligne autorisée.
+
+## Complément Lot C — références partagées
+
+Le contrat d’upload et les clés restent inchangés. `studio_media_assets.project_id` conserve le projet d’origine de l’upload ; `studio_project_assets` représente les appartenances actuelles et leur ordre. Dupliquer un projet ne copie aucun fichier ni ligne physique d’asset. Un asset ready reste accessible via une copie lorsque son projet d’origine est supprimé.
+
+La suppression courante retire une référence. Le tombstone et la purge physique ne sont possibles qu’après retrait de la dernière référence ; les projets archivés comptent encore comme références. La couverture est retirée dans le projet concerné lors du retrait du média. Le backend historique `studio_delete_media` retire uniquement la référence d’origine, et les nouvelles commandes prennent un projectId vérifié.
+
+L’expiration des pending/failed passe désormais par `studio_expire_media`, RPC privée de réconciliation, sous verrou workspace : retrait des références puis tombstone atomiques. Le script vérifie l’absence de références avant toute suppression Storage. La fenêtre de 30 h et l’immuabilité des objets demeurent. Quotas workspace physiques non multipliés par duplication ; limites projet appliquées aux médias référencés. Aucun cron distant ni purge de compte global introduit.
