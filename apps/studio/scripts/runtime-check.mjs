@@ -122,8 +122,8 @@ async function postgres() {
     ],
     { encoding: "utf8", timeout: 10000 },
   );
-  if (Number(output.trim()) !== 256)
-    throw Error("Expected 256 applied migrations");
+  if (Number(output.trim()) !== 257)
+    throw Error("Expected 257 applied migrations");
 }
 async function waitReady(check) {
   const end = Date.now() + 120000;
@@ -136,7 +136,7 @@ async function waitReady(check) {
       // A real denial or wrong identity/role is not a startup transport failure.
       if (
         (error.status >= 400 && error.status < 500) ||
-        /mismatch|Expected 256/.test(error.message)
+        /mismatch|Expected 257/.test(error.message)
       )
         throw error;
       last = error;
