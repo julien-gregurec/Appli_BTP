@@ -1,5 +1,24 @@
-import { describe, expect, it } from "vitest";
-import { echapperHtml, gabaritEmailElsatia } from "./index";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { echapperHtml, envoyerEmailBrevo, gabaritEmailElsatia } from "./index";
+
+describe("transport Brevo — copies et copies cachées (GP V1, lot G)", () => {
+  afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
+
+  it("transmet Cc et Cci à Brevo, et rien quand ils sont vides", async () => {
+    vi.stubEnv("BREVO_API_KEY", "cle-test");
+    vi.stubEnv("EMAIL_FROM_ADDRESS", "no-reply@exemple.invalid");
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({ messageId: "m1" }) }));
+    vi.stubGlobal("fetch", fetchMock);
+    await envoyerEmailBrevo({ to: "client@exemple.invalid", sujet: "S", texte: "T", cc: ["cc@exemple.invalid"], cci: ["cci@exemple.invalid", "cci2@exemple.invalid"] });
+    const corps = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, { body: string }])[1].body);
+    expect(corps.cc).toEqual([{ email: "cc@exemple.invalid" }]);
+    expect(corps.bcc).toEqual([{ email: "cci@exemple.invalid" }, { email: "cci2@exemple.invalid" }]);
+    await envoyerEmailBrevo({ to: "client@exemple.invalid", sujet: "S", texte: "T", cc: [], cci: [] });
+    const corps2 = JSON.parse((fetchMock.mock.calls[1] as unknown as [string, { body: string }])[1].body);
+    expect(corps2.cc).toBeUndefined();
+    expect(corps2.bcc).toBeUndefined();
+  });
+});
 
 describe("échappement HTML", () => {
   it("neutralise les cinq caractères qui font du balisage", () => {

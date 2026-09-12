@@ -14,7 +14,7 @@ import { TRANSITIONS_DEVIS } from "@/lib/devis";
 import { genererLignesDevisIA } from "@/lib/ai/devis";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
 import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
-import { envoyerDocumentCommercialParEmail } from "@/lib/documents-envoi";
+import { envoyerDocumentCommercialParEmail, type OptionsEnvoiDocument } from "@/lib/documents-envoi";
 import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 type DevisPayload = {
@@ -243,6 +243,7 @@ export async function dupliquerDevisAction(devisId: string) {
 export async function envoyerDevisEmailAction(
   devisId: string,
   surchargeDestinataire?: SurchargeDestinataire | null,
+  options?: OptionsEnvoiDocument | null,
 ): Promise<{ error: string } | { ok: true }> {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
@@ -261,6 +262,7 @@ export async function envoyerDevisEmailAction(
     documentId: devisId,
     surchargeDestinataire,
     peutSurchargerDestinataire: peutSurchargerDestinataire(permissions),
+    options,
   });
   if ("error" in resultat) return resultat;
 

@@ -59,6 +59,12 @@ const CSS = `
 .doc-a4__entete[data-logo="centre"] .doc-a4__titre{text-align:center;}
 .doc-a4__titre strong{display:block;font-size:22px;text-transform:uppercase;}
 .doc-a4__numero{font-family:monospace;font-size:15px;}
+.doc-a4__references{margin-top:4px;font-size:calc(var(--doc-taille) - 2px);color:#555;}
+.doc-a4__references span{color:#888;}
+.doc-a4__reference{font-family:monospace;font-size:calc(var(--doc-taille) - 3px);color:#777;}
+.doc-a4__cgv{font-size:calc(var(--doc-taille) - 2px);line-height:1.45;}
+.doc-a4__cgv h2{font-size:calc(var(--doc-taille) + 1px);text-transform:uppercase;letter-spacing:.05em;margin:0 0 10px;padding-bottom:6px;border-bottom:2px solid var(--doc-accent);}
+.doc-a4__cgv p{margin:0 0 6px;white-space:pre-wrap;}
 .doc-a4__filet{border:none;border-top:3px solid var(--doc-accent);margin:12px 0 18px;}
 .doc-a4__rappel{font-size:10px;color:#666;border-bottom:1px solid #ddd;padding-bottom:4px;margin-bottom:8px;}
 .doc-a4__destinataire{margin-bottom:18px;}
@@ -154,6 +160,11 @@ function Entete({ vue }: { vue: VueDocument }) {
           <div className="doc-a4__numero">{vue.numero}</div>
           {vue.dateEmission && <div className="doc-a4__gris">Émis le {vue.dateEmission}</div>}
           {vue.dateSecondaire && <div className="doc-a4__gris">{vue.dateSecondaire.libelle} {vue.dateSecondaire.valeur}</div>}
+          {vue.references.length > 0 && (
+            <div className="doc-a4__references" data-testid="references">
+              {vue.references.map((r) => <div key={r.libelle}><span>{r.libelle} : </span>{r.valeur}</div>)}
+            </div>
+          )}
         </div>
       </div>
       <hr className="doc-a4__filet" />
@@ -161,7 +172,7 @@ function Entete({ vue }: { vue: VueDocument }) {
   );
 }
 
-function Ligne({ l, afficherTva, afficherDescription }: { l: LigneClient; afficherTva: boolean; afficherDescription: boolean }) {
+function Ligne({ l, afficherTva, afficherDescription, afficherReference }: { l: LigneClient; afficherTva: boolean; afficherDescription: boolean; afficherReference: boolean }) {
   const colonnes = afficherTva ? 5 : 4;
   // GP V1 : lignes de structure — jamais de quantité ni de prix unitaire ; le sous-total est calculé.
   switch (l.genre) {
@@ -208,6 +219,7 @@ function Ligne({ l, afficherTva, afficherDescription }: { l: LigneClient; affich
     <tr data-cle={l.cle} data-niveau={l.niveau} data-entete-ouvrage={l.enTeteOuvrage}>
       <td>
         {l.designation}
+        {afficherReference && l.reference && <div className="doc-a4__reference">Réf. {l.reference}</div>}
         {afficherDescription && l.description && <div className="doc-a4__description">{l.description}</div>}
         {l.mentionTva && <div className="doc-a4__description">{l.mentionTva}</div>}
       </td>
@@ -235,7 +247,7 @@ function Tableau({ vue, bloc }: { vue: VueDocument; bloc: Extract<BlocPage, { ty
           </tr>
         </thead>
         <tbody>
-          {bloc.lignes.filter((l) => l.genre !== "saut_page").map((l) => <Ligne key={l.cle} l={l} afficherTva={tva} afficherDescription={vue.style.afficherDescriptions} />)}
+          {bloc.lignes.filter((l) => l.genre !== "saut_page").map((l) => <Ligne key={l.cle} l={l} afficherTva={tva} afficherDescription={vue.style.afficherDescriptions} afficherReference={vue.style.afficherReferences} />)}
         </tbody>
       </table>
     </>
@@ -309,6 +321,13 @@ function Bloc({ vue, bloc, apercu }: { vue: VueDocument; bloc: BlocPage; apercu:
           {vue.mentions.map((m, i) => <div key={i}>{m}</div>)}
           <div>{vue.piedProduit}</div>
         </div>
+      );
+    case "cgv":
+      return (
+        <section className="doc-a4__cgv" data-testid="cgv" aria-label="Conditions générales de vente">
+          <h2>Conditions générales de vente{bloc.suite ? " (suite)" : ""}</h2>
+          {bloc.paragraphes.map((p, i) => <p key={i}>{p}</p>)}
+        </section>
       );
   }
 }

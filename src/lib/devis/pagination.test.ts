@@ -82,3 +82,25 @@ describe("27–28. aperçu A4 et pagination réelle", () => {
     expect(h.ligne({ ...base, description: "Une description assez longue pour occuper plusieurs lignes dans la colonne de désignation du tableau." })).toBeGreaterThan(h.ligne(base));
   });
 });
+
+describe("GP V1, lot G — annexe CGV", () => {
+  it("pose les CGV après les mentions, sur leurs propres pages, coupées entre deux paragraphes", () => {
+    const paragraphes = Array.from({ length: 40 }, (_, i) => `Article ${i + 1} — ${"Texte fictif de conditions générales. ".repeat(12).trim()}`);
+    const vue = construireVueDocument(sourceFictive({ cgv: paragraphes.join("\n\n") }));
+    const pages = paginer(vue);
+    const sansCgv = paginer(construireVueDocument(sourceFictive()));
+    expect(pages.length).toBeGreaterThan(sansCgv.length + 1);
+    // Aucune page ne mélange le document et l'annexe.
+    for (const p of pages) {
+      const aCgv = p.blocs.some((b) => b.type === "cgv");
+      const aDocument = p.blocs.some((b) => ["tableau", "totaux", "mentions", "entete"].includes(b.type));
+      expect(aCgv && aDocument).toBe(false);
+      expect(p.hauteurEstimeePx).toBeLessThanOrEqual(CONTENU_HAUTEUR_PX);
+    }
+    const reçus = pages.flatMap((p) => p.blocs.flatMap((b) => (b.type === "cgv" ? b.paragraphes : [])));
+    expect(reçus).toEqual(paragraphes);
+    const blocsCgv = pages.flatMap((p) => p.blocs.filter((b) => b.type === "cgv"));
+    expect(blocsCgv[0].type === "cgv" && blocsCgv[0].suite).toBe(false);
+    expect(blocsCgv.slice(1).every((b) => b.type === "cgv" && b.suite)).toBe(true);
+  });
+});

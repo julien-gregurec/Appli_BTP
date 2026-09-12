@@ -23,6 +23,8 @@ import { RelanceDocumentSection } from "@/components/RelanceDocumentSection";
 import { devisV2Actif } from "@/lib/devis/v2-serveur";
 import { DocumentsIssusDevis } from "@/components/devis/DocumentsIssusDevis";
 import { MOTIF_DROIT_FIN, possedeDroitFin } from "@/lib/droits-devis";
+import { chargerContexteEnvoi } from "@/lib/envoi-documents-serveur";
+import { euros as eurosFr } from "@/lib/devis";
 
 export default async function DevisDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; success?: string }> }) {
   const { id } = await params;
@@ -88,6 +90,9 @@ export default async function DevisDetailPage({ params, searchParams }: { params
     prenomEmetteur: ctx.prenom,
   });
 
+  // GP V1 (lot G) : modèles d'e-mail, CGV et pièces du chantier proposés au dialogue d'envoi.
+  const contexteEnvoi = devisV2Actif() ? await chargerContexteEnvoi(supabase, { entrepriseId: ctx.entrepriseId, typeDocument: "devis", chantierId: devis.chantier_id ?? null }) : { modeles: [], cgvDisponible: false, piecesDisponibles: [] };
+  const variablesEmail = { numero: devis.numero ?? "brouillon", client: identiteDocument.entete.nom_affiche, montant_ttc: eurosFr(Number(devis.montant_ttc)), entreprise: ctx.entrepriseNom, prenom: ctx.prenom ?? "", date_validite: devis.date_validite ? new Date(String(devis.date_validite)).toLocaleDateString("fr-FR") : null, chantier: chantier?.nom ?? null, reference_client: (devis as { reference_client?: string | null }).reference_client ?? null };
   const actionsPanneau = actionsDevis({ id, statut: devis.statut, chantierId: devis.chantier_id ?? null, clientId: devis.client_id ?? null, moteurV2: devisV2Actif(), aDesLignes: true }, permissions);
   return (
     <main className="lg:pr-72 p-8"><PanneauActions titre="Devis" contexte={`${devis.numero ?? "brouillon"} · ${devis.statut}`} actions={actionsPanneau} formActions={{ dupliquer: dupliquerDevisAction.bind(null, id), transformer_facture: creerFacture, archiver: changerStatutDevisAction.bind(null, id, "annule"), supprimer }} />
@@ -104,7 +109,7 @@ export default async function DevisDetailPage({ params, searchParams }: { params
             </p>
             <p className="mt-1 text-xs text-neutral-500">{mentionOrigineIdentite(identiteDocument)}</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div id="envoi" className="flex items-center gap-3">
             <form action={dupliquer}>
               <ConfirmSubmitButton message="Créer une copie complète de ce devis ?" className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700">
                 Dupliquer
@@ -142,6 +147,10 @@ export default async function DevisDetailPage({ params, searchParams }: { params
                 emailEnvoyeLe={devis.email_envoye_le}
                 adresseFigee={identiteDocument.email}
                 peutSurchargerDestinataire={peutSurchargerDestinataire(permissions)}
+                modeles={contexteEnvoi.modeles}
+                variables={variablesEmail}
+                cgvDisponible={contexteEnvoi.cgvDisponible}
+                piecesDisponibles={contexteEnvoi.piecesDisponibles}
               />
             ) : (
               <span className="cursor-default rounded-md border border-neutral-200 px-3 py-1.5 text-sm text-neutral-400 dark:border-neutral-800" title="Aucun email renseigné pour ce client">

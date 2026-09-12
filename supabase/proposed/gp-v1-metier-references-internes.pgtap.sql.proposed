@@ -311,8 +311,9 @@ select is((select action || ':' || champ from public.historique_objets where res
 update public.commandes_fournisseurs set reference_fournisseur = ' OFF-1 ' where id = 'ac000000-0000-0000-0000-000000000001';
 select is((select reference_fournisseur from public.commandes_fournisseurs where id = 'ac000000-0000-0000-0000-000000000001'),
   'OFF-1', 'documents : référence d''offre fournisseur nettoyée sur la commande');
+-- Depuis le lot E, la création d'une commande est elle aussi journalisée : on compte le changement de référence.
 select is((select count(*)::int from public.historique_objets where ressource = 'commande'
-            and ressource_id = 'ac000000-0000-0000-0000-000000000001'), 1,
+            and ressource_id = 'ac000000-0000-0000-0000-000000000001' and action like 'reference_%'), 1,
   'documents : et journalisée');
 
 -- ─────────────────────────────────────────────────────────────────────────────────────────────────────

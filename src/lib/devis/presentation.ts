@@ -43,6 +43,8 @@ export type LigneLibre = {
   remiseSectionPct?: number | null;
   /** Jamais imprimé. */
   commentaireInterne?: string | null;
+  /** Référence interne de l'article d'origine (instantané), pour l'impression (GP V1, lot G). */
+  referenceInterne?: string | null;
 };
 
 export type ElementDevis =
@@ -138,6 +140,8 @@ export type LigneClient = {
   /** `null` : masqué, ou plusieurs taux (voir `mentionTva`). */
   tauxTva: number | null;
   mentionTva: string | null;
+  /** Référence interne de l'article ou de l'ouvrage (GP V1, lot G) ; imprimée seulement si l'entreprise le demande. */
+  reference?: string | null;
 };
 
 const arrondi = (l: LigneMontant) => versNombre(arrondir(montantLigneHtExact(l)));
@@ -157,6 +161,7 @@ function enTete(instance: InstanceOuvrage): LigneClient {
     enTeteOuvrage: true,
     designation: instance.libelleClient,
     description: instance.descriptionClient,
+    reference: instance.referenceInterne ?? null,
     quantite: instance.quantitePrincipale,
     unite: instance.unitePrincipale,
     prixUnitaireHt: null,
@@ -177,6 +182,7 @@ function ligneComposant(
     enTeteOuvrage: false,
     designation: l.designation,
     description: o.description,
+    reference: l.referenceInterne ?? null,
     quantite: o.quantite ? l.quantite : null,
     unite: o.quantite ? l.unite : null,
     prixUnitaireHt: o.prix ? l.prixVenteHt : null,
@@ -226,6 +232,7 @@ export function lignesClientOuvrage(instance: InstanceOuvrage): LigneClient[] {
           enTeteOuvrage: false,
           designation: "Autres fournitures et prestations de l’ouvrage",
           description: null,
+          reference: null,
           quantite: null,
           unite: null,
           prixUnitaireHt: null,
@@ -253,6 +260,7 @@ const vide = (l: LigneLibre, genre: GenreLigneClient): LigneClient => ({
   enTeteOuvrage: false,
   designation: l.designation,
   description: l.description,
+  reference: null,
   quantite: null,
   unite: null,
   prixUnitaireHt: null,
@@ -285,6 +293,7 @@ export function lignesClient(elements: readonly ElementDevis[]): LigneClient[] {
             enTeteOuvrage: false,
             designation: l.designation,
             description: l.description,
+            reference: l.referenceInterne ?? null,
             quantite: l.quantite,
             unite: l.unite,
             prixUnitaireHt: l.prixUnitaireHt,

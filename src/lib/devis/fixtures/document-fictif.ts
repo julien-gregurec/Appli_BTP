@@ -76,5 +76,7 @@ export function sourceFictive(p: Partial<SourceDocument> & { lignesLibres?: numb
     filigrane: p.filigrane ?? resoudreFiligrane({ typeDocument, statut, document: p.filigraneDocument }),
     duplicata: p.duplicata ?? null,
     nomProduit: p.nomProduit ?? "ELSATIA",
+    references: p.references ?? null,
+    cgv: p.cgv ?? null,
   };
 }

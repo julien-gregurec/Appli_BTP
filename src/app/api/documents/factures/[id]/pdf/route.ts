@@ -36,6 +36,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     if (estDebordementMiseEnPage(e)) return NextResponse.json({ error: e.message }, { status: 422 });
     return NextResponse.json({ error: "Génération du PDF impossible" }, { status: 502 });
   }
+  // GP V1 (lot G) : la production d'un PDF est tracée dans l'historique de l'objet ; un historique
+  // indisponible (schéma non migré) ne bloque jamais le téléchargement.
+  try { await supabase.rpc("journaliser_pdf_document", { p_entreprise_id: ctx.entrepriseId, p_type_document: "facture", p_document_id: id }); } catch { /* sans effet */ }
 
   const nom = facture.numero ?? "brouillon";
   return new NextResponse(new Uint8Array(pdf), {

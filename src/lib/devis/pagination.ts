@@ -38,7 +38,9 @@ export type BlocPage =
   | { type: "conditions" }
   | { type: "notes" }
   | { type: "bon_pour_accord" }
-  | { type: "mentions" };
+  | { type: "mentions" }
+  /** Annexe « Conditions générales de vente » (GP V1, lot G) : toujours sur ses propres pages. */
+  | { type: "cgv"; paragraphes: string[]; suite: boolean };
 
 export type PageDocument = {
   numero: number;
@@ -76,6 +78,9 @@ export type Hauteurs = {
   notes: number;
   bonPourAccord: number;
   mentions: number;
+  /** Hauteur d'un paragraphe de CGV (plus petit corps), et du titre de l'annexe. */
+  paragrapheCgv: (p: string) => number;
+  titreCgv: number;
 };
 
 export function estimerHauteurs(vue: VueDocument): Hauteurs {
@@ -88,7 +93,9 @@ export function estimerHauteurs(vue: VueDocument): Hauteurs {
 
   const lignesEmetteur = 1 + [e.raisonSociale, e.adresse || e.ville, e.siret].filter(Boolean).length
     + lignesDeTexte(e.texteEntete, largeurTexte, f, c);
-  const entete = Math.max(vue.style.afficherLogo && e.logoUrl ? 64 : 0, 26 + lignesEmetteur * hl(f), 110) + 40;
+  // GP V1 (lot G) : les références (réf. interne, votre référence, chantier) s'ajoutent sous le titre.
+  const lignesTitre = 3 + vue.references.length;
+  const entete = Math.max(vue.style.afficherLogo && e.logoUrl ? 64 : 0, 26 + lignesEmetteur * hl(f), 110, 40 + lignesTitre * hl(f)) + 40;
 
   const d = vue.destinataire;
   const destinataire = 16 + (1 + (d.adresse || d.ville ? 1 : 0) + (d.siret ? 1 : 0)) * hl(f) + 24;
@@ -114,7 +121,8 @@ export function estimerHauteurs(vue: VueDocument): Hauteurs {
     const nDesignation = lignesDeTexte(l.designation, largeur, policeTableau, c) || 1;
     const nDescription = vue.style.afficherDescriptions ? lignesDeTexte(l.description, largeur, policeDescription, c) : 0;
     const mention = l.mentionTva ? hl(policeDescription) : 0;
-    return s(14 + nDesignation * hl(policeTableau) + nDescription * hl(policeDescription) + mention + 1);
+    const reference = vue.style.afficherReferences && l.reference ? hl(policeDescription) : 0;
+    return s(14 + nDesignation * hl(policeTableau) + nDescription * hl(policeDescription) + mention + reference + 1);
   };
 
   const t = vue.totaux;
@@ -133,6 +141,8 @@ export function estimerHauteurs(vue: VueDocument): Hauteurs {
     notes: texte(vue.notes),
     bonPourAccord: vue.bonPourAccord ? s(118) : 0,
     mentions: s(20 + mentions * 15 + (vue.duplicata ? 15 : 0)),
+    paragrapheCgv: (p: string) => s(6 + lignesDeTexte(p, CONTENU_LARGEUR_PX - 8, f - 2, c) * hl(f - 2)),
+    titreCgv: s(34),
   };
 }
 
@@ -204,6 +214,27 @@ export function paginer(vue: VueDocument, hauteurs: Hauteurs = estimerHauteurs(v
   if (hauteurs.notes) poser({ type: "notes" }, hauteurs.notes);
   if (hauteurs.bonPourAccord) poser({ type: "bon_pour_accord" }, hauteurs.bonPourAccord);
   poser({ type: "mentions" }, hauteurs.mentions);
+
+  // GP V1 (lot G) : annexe CGV — toujours après le document, sur ses propres pages, coupée entre deux
+  // paragraphes. Un paragraphe plus haut qu'une page est posé seul et signalé (jamais tronqué).
+  if (vue.cgv.length > 0) {
+    nouvellePage();
+    let bloc: Extract<BlocPage, { type: "cgv" }> = { type: "cgv", paragraphes: [], suite: false };
+    page.blocs.push(bloc);
+    page.hauteurEstimeePx += hauteurs.titreCgv;
+    for (const paragraphe of vue.cgv) {
+      const h = hauteurs.paragrapheCgv(paragraphe);
+      if (!tient(h) && bloc.paragraphes.length > 0) {
+        nouvellePage();
+        bloc = { type: "cgv", paragraphes: [], suite: true };
+        page.blocs.push(bloc);
+        page.hauteurEstimeePx += hauteurs.titreCgv;
+      }
+      if (!tient(h)) page.debordement = true;
+      bloc.paragraphes.push(paragraphe);
+      page.hauteurEstimeePx += h;
+    }
+  }
   pages.push(page);
 
   return pages.map((p) => ({ ...p, total: pages.length }));

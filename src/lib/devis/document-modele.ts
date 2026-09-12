@@ -49,6 +49,17 @@ export type StyleDocument = {
   afficherLogo: boolean;
   afficherDescriptions: boolean;
   afficherTvaLignes: boolean;
+  /** GP V1 (lot G) : imprimer la référence interne des lignes. Faux par défaut. */
+  afficherReferences: boolean;
+};
+
+/** Références imprimées en en-tête (GP V1, lot G) ; toutes facultatives. */
+export type ReferencesDocument = {
+  interne: string | null;
+  client: string | null;
+  chantierNom: string | null;
+  chantierReference: string | null;
+  chantierAdresse: string | null;
 };
 
 export type IdentiteDestinataire = {
@@ -79,6 +90,9 @@ export type SourceDocument = {
   filigrane: FiligraneResolu;
   duplicata?: { numeroOriginal: string; dateEmissionOriginal: string | null } | null;
   nomProduit: string;
+  /** GP V1 (lot G) : références (en-tête) et conditions générales de vente (annexe, devis seulement). */
+  references?: Partial<ReferencesDocument> | null;
+  cgv?: string | null;
 };
 
 export type VueDocument = {
@@ -108,6 +122,10 @@ export type VueDocument = {
   /** Résumé textuel : propriétés du PDF, lecteurs d'écran. */
   resumeAccessible: string;
   piedProduit: string;
+  /** Lignes « libellé : valeur » sous le titre (réf. interne, votre référence, chantier). Vide : rien. */
+  references: Array<{ libelle: string; valeur: string }>;
+  /** Paragraphes des CGV imprimés en annexe ; vide : pas d'annexe. */
+  cgv: string[];
 };
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -129,7 +147,24 @@ export function normaliserStyle(s: Partial<StyleDocument> | null | undefined): S
     afficherLogo: s?.afficherLogo !== false,
     afficherDescriptions: s?.afficherDescriptions !== false,
     afficherTvaLignes: s?.afficherTvaLignes !== false,
+    afficherReferences: s?.afficherReferences === true,
   };
+}
+
+function referencesImprimees(r: Partial<ReferencesDocument> | null | undefined): Array<{ libelle: string; valeur: string }> {
+  if (!r) return [];
+  const lignes: Array<{ libelle: string; valeur: string }> = [];
+  if (r.interne) lignes.push({ libelle: "Réf. interne", valeur: r.interne });
+  if (r.client) lignes.push({ libelle: "Votre référence", valeur: r.client });
+  if (r.chantierNom || r.chantierReference) lignes.push({ libelle: "Chantier", valeur: [r.chantierReference, r.chantierNom].filter(Boolean).join(" — ") });
+  if (r.chantierAdresse) lignes.push({ libelle: "Adresse du chantier", valeur: r.chantierAdresse });
+  return lignes;
+}
+
+/** Paragraphes des CGV : lignes vides = séparateurs ; jamais d'annexe sur une facture. */
+export function paragraphesCgv(texte: string | null | undefined, typeDocument: "devis" | "facture"): string[] {
+  if (typeDocument !== "devis" || !texte) return [];
+  return texte.replace(/\r/g, "").split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
 }
 
 /** « 2026-09-11 » → « 11/09/2026 », sans passer par un fuseau horaire. */
@@ -205,5 +240,7 @@ export function construireVueDocument(s: SourceDocument): VueDocument {
       filigraneTexte,
     ].filter(Boolean).join(" — "),
     piedProduit: `Document généré par ${s.nomProduit}`,
+    references: referencesImprimees(s.references),
+    cgv: paragraphesCgv(s.cgv, s.typeDocument),
   };
 }

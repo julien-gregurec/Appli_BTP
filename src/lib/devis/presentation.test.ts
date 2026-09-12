@@ -19,7 +19,7 @@ const devis = (instance: InstanceOuvrage): ElementDevis[] => [{ type: "ouvrage",
 
 const CLES_AUTORISEES = [
   "cle", "genre", "niveau", "enTeteOuvrage", "designation", "description", "quantite", "unite",
-  "prixUnitaireHt", "remisePct", "totalHt", "tauxTva", "mentionTva",
+  "prixUnitaireHt", "remisePct", "totalHt", "tauxTva", "mentionTva", "reference",
 ].sort();
 
 function sansFuite(lignes: LigneClient[]) {

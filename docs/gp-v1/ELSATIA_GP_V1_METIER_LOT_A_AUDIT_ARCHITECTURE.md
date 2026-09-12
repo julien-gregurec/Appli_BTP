@@ -560,3 +560,43 @@ par salarié et par évènement** (ajouté, retiré, modifié, annulé), en `on 
 3. Le PDF n'a pas été produit sur ce poste (Chromium serverless absent, comme pour les devis) : la page d'impression est rendue et testée, la route reprend le mécanisme des devis à l'identique.
 4. L'impression en vue **mois** liste les jours du mois en colonnes (jusqu'à 31) : lisible en A4 paysage à 9 px, dense.
 5. La page historique et la fiche d'un évènement supposent le schéma migré : sans le lot 0, `/planning` reste l'ancien écran.
+
+## 17. Lot G — PDF, e-mail, historique (livré)
+
+Périmètre du prompt (§ 11, 12, 13) : références et CGV sur le document, e-mail avec destinataire,
+Cc, Cci, objet, modèle, PDF joint, CGV jointes, pièces complémentaires, conservation dans
+l'historique ; historique des envois et des PDF. Tout est additif et ne change rien aux PDF émis.
+
+### 17.1 Livrables
+
+| Fichier | Rôle |
+|---|---|
+| `supabase/proposed/gp-v1-metier-envoi-documents.sql.proposed` (247 l.) + pgTAP 24 | `entreprises.cgv_texte`, `entreprises.afficher_references_documents` (faux par défaut) ; snapshot d'entreprise et constructeurs de rendu v2 enrichis (`references` : interne, client, chantier — via `references_document`, exécutable par `authenticated` seulement) ; `modeles_email` (RLS : lecture membre, écriture `gerer_parametres`, un seul « par défaut » par type par déclencheur) ; `documents_envois` (lecture selon `acces_devis` / `acces_factures`, **aucune écriture directe**) ; RPC `journaliser_envoi_document` et `journaliser_pdf_document` (SECURITY DEFINER, membre actif + document de l'entreprise, historique « envoi » / « pdf ») |
+| `packages/email/src/index.ts` (+ test) | transport Brevo commun : `cc` et `cci` (Bcc) — optionnels, absents = payload inchangé |
+| `src/lib/email-modeles.ts` (+ test, 4 cas) | variables `{numero} {client} {montant_ttc} {entreprise} {prenom} {date_validite} {date_echeance} {chantier} {reference_client}`, classement des modèles, nettoyage d'une liste d'adresses |
+| `src/lib/documents-envoi.ts` (+ 6 tests) | `OptionsEnvoiDocument` : Cc/Cci validés (une adresse inexploitable refuse l'envoi), objet et message du modèle ou saisis, **CGV en PDF** produit depuis le texte de l'entreprise (HTML échappé, `genererPdfDepuisHtml`), **pièces complémentaires** prises dans `documents_chantier` de l'entreprise (bucket `chantier-documents`, 5 au plus, 8 Mo au total), consignation par RPC de chaque envoi — réussi **ou refusé par le transport** |
+| `src/components/EmailDocumentButton.tsx` | dialogue d'envoi : Cc, Cci, modèle de message, objet, message modifiables, pièces jointes (PDF toujours, CGV si renseignées — sinon case grisée avec le motif, documents du chantier) ; mode « messagerie » : Cc et Cci dans le `mailto:` |
+| `src/lib/envoi-documents-serveur.ts`, fiches devis et facture | modèles, CGV et pièces proposés au dialogue (variables du document renseignées) ; tolérant sans la migration |
+| `src/app/api/documents/devis|factures/[id]/pdf/route.ts` | chaque PDF produit est tracé (« PDF généré ») sans jamais bloquer le téléchargement |
+| `src/lib/devis/document-modele.ts`, `presentation.ts`, `rendu-source.ts`, `pagination.ts`, `DocumentA4.tsx` (+ tests) | en-tête : « Réf. interne », « Votre référence », « Chantier », « Adresse du chantier » ; lignes : `Réf. …` sous la désignation **si l'entreprise le demande** ; annexe « Conditions générales de vente » sur ses propres pages, coupée entre paragraphes, jamais sur une facture ; hauteurs estimées tenues à jour |
+| Paramètres › documents, `src/app/actions/entreprise.ts` | CGV (texte) et case « imprimer la référence interne des lignes » (drapeau posé) ; Paramètres › **Modèles d'e-mail** (`/parametres/emails`, actions dédiées) |
+| `src/lib/historique.ts` | lecture des entrées « Envoyé » (destinataire, copies, pièces, échec) et « PDF généré » |
+| `supabase/proposed/gp-v1-metier-references-internes.pgtap.sql.proposed` | assertion « commande journalisée » rendue robuste à la journalisation de création du lot E |
+
+### 17.2 Résultats
+
+| Contrôle | Résultat |
+|---|---|
+| SQL appliqué deux fois | 0 erreur |
+| pgTAP du lot | **24/24** (colonnes, snapshot, références sur devis et facture, cloisonnement B, un seul modèle par défaut, ouvrier lit mais n'écrit pas, envoi journalisé avec pièces, devis de B introuvable, refus hors entreprise, aucune écriture directe, PDF journalisé, envois invisibles sans le module) |
+| pgTAP rejouées : devis v2, grille, références, surface d'isolation | 111/111 · 36/36 · 69/69 · 10/10 |
+| Suite pgTAP complète (70 fichiers) | 1 901 ok / 1 échec préexistant (`reserves_v2_terrain_capture`) |
+| Vitest projet | 2 375 verts ; `xlsx.test.ts` échoue sous charge, vert seul (préexistant) |
+| Typecheck / lint du projet | 0 / 0 (6 avertissements préexistants) |
+
+### 17.3 Réserves
+
+1. Le PDF des CGV et le PDF du document ne sont pas produits sur ce poste (Chromium serverless) ; la génération est testée par doublure, le HTML des CGV est vérifié échappé.
+2. Le dialogue d'envoi n'a pas de recette navigateur (composant à état, ouvert au clic) ; la logique d'envoi est couverte par 6 tests serveur.
+3. « Page de garde optionnelle » (§ 11) non faite : l'architecture (blocs de page décidés par les données) la permet en V3 sans refonte.
+4. Le rendu **figé** d'un document déjà émis ne porte pas de `references` : l'en-tête n'apparaît que sur les documents émis après la migration ; les documents antérieurs sont imprimés à l'identique (voulu).

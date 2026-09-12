@@ -58,3 +58,24 @@ describe("modèle de présentation unique (moteur v2)", () => {
     expect(dateFr("demain")).toBe("demain");
   });
 });
+
+describe("GP V1, lot G — références et CGV", () => {
+  it("imprime les références du document en en-tête, seulement celles qui existent", () => {
+    const vue = construireVueDocument(sourceFictive({ references: { interne: "DEV-0007", client: null, chantierNom: "Maison Dupont", chantierReference: "CH-0003", chantierAdresse: "12 rue des Lilas 00000 Ville" } }));
+    expect(vue.references).toEqual([
+      { libelle: "Réf. interne", valeur: "DEV-0007" },
+      { libelle: "Chantier", valeur: "CH-0003 — Maison Dupont" },
+      { libelle: "Adresse du chantier", valeur: "12 rue des Lilas 00000 Ville" },
+    ]);
+    expect(construireVueDocument(sourceFictive()).references).toEqual([]);
+  });
+  it("découpe les CGV en paragraphes sur un devis, jamais sur une facture", () => {
+    const cgv = "Article 1\nObjet.\n\n\nArticle 2 — Prix.\r\n\r\n  ";
+    expect(construireVueDocument(sourceFictive({ cgv })).cgv).toEqual(["Article 1\nObjet.", "Article 2 — Prix."]);
+    expect(construireVueDocument(sourceFictive({ typeDocument: "facture", titre: "Facture", cgv })).cgv).toEqual([]);
+  });
+  it("les références des lignes ne s'impriment que si l'entreprise le demande (faux par défaut)", () => {
+    expect(construireVueDocument(sourceFictive()).style.afficherReferences).toBe(false);
+    expect(construireVueDocument(sourceFictive({ style: { afficherReferences: true } })).style.afficherReferences).toBe(true);
+  });
+});

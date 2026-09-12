@@ -2,9 +2,10 @@ import { euros } from "@/lib/devis";
 
 type ClientMail = { nom: string | null; prenom: string | null; societe: string | null; email: string | null };
 
-export function construireLienMailto(opts:{to:string;sujet:string;corps:string;cc?:string}){
+export function construireLienMailto(opts:{to:string;sujet:string;corps:string;cc?:string;cci?:string}){
   const parametres=[`subject=${encodeURIComponent(opts.sujet)}`,`body=${encodeURIComponent(opts.corps)}`];
   if(opts.cc?.trim())parametres.push(`cc=${encodeURIComponent(opts.cc.split(/[;,]/).map(adresse=>adresse.trim()).filter(Boolean).join(","))}`);
+  if(opts.cci?.trim())parametres.push(`bcc=${encodeURIComponent(opts.cci.split(/[;,]/).map(adresse=>adresse.trim()).filter(Boolean).join(","))}`);
   return `mailto:${encodeURIComponent(opts.to.trim())}?${parametres.join("&")}`;
 }
 

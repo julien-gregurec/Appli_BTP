@@ -86,6 +86,8 @@ export type RenduDocument = {
   filigranes_entreprise?: ReglagesFiligraneEntreprise | null;
   ouvrages: OuvrageRendu[];
   lignes: LigneRendu[];
+  /** GP V1 (lot G) : références du document ; absent sur un rendu antérieur. */
+  references?: { interne?: string | null; client?: string | null; chantier_nom?: string | null; chantier_reference?: string | null; chantier_adresse?: string | null } | null;
 };
 
 export type ReponseRendu = { source: "instantane" | "brouillon" | "moteur_v1"; rendu: RenduDocument | null };
@@ -154,6 +156,7 @@ export function elementsDepuisRendu(r: Pick<RenduDocument, "ouvrages" | "lignes"
         tauxTva: nombre(l.taux_tva),
         typeLigne: estTypeLigne(l.type_ligne) ? l.type_ligne : TYPE_LIGNE_DEFAUT,
         remiseSectionPct: l.remise_section_pct === null || l.remise_section_pct === undefined ? null : nombre(l.remise_section_pct),
+        referenceInterne: l.reference_interne_instantane ?? null,
       },
     }));
   for (const o of r.ouvrages) {
@@ -228,6 +231,7 @@ function style(e: Record<string, unknown> | null): Partial<StyleDocument> {
     afficherLogo: x.afficher_logo_documents !== false,
     afficherDescriptions: x.afficher_descriptions_documents !== false,
     afficherTvaLignes: x.afficher_tva_lignes_documents !== false,
+    afficherReferences: x.afficher_references_documents === true,
   };
 }
 
@@ -288,5 +292,9 @@ export function sourceDepuisRendu(
     }),
     duplicata: duplicata && r.numero ? { numeroOriginal: r.numero, dateEmissionOriginal: r.date_emission } : null,
     nomProduit: o.nomProduit,
+    references: r.references
+      ? { interne: texte(r.references.interne), client: texte(r.references.client), chantierNom: texte(r.references.chantier_nom), chantierReference: texte(r.references.chantier_reference), chantierAdresse: texte(r.references.chantier_adresse) }
+      : null,
+    cgv: texte((r.entreprise ?? {}).cgv_texte),
   };
 }

@@ -1,0 +1,60 @@
+-- PREUVE pgTAP PROPOSÉE — GP V1, lot G « PDF, e-mail, historique »
+begin;
+create extension if not exists pgtap with schema extensions;
+select * from no_plan();
+\ir ../tests/fixtures/isolation_multitenant.inc
+create or replace function pg_temp.jwt(p_sub uuid) returns void language plpgsql as $$
+begin
+  perform set_config('request.jwt.claim.sub', p_sub::text, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', p_sub, 'role', 'authenticated')::text, true);
+end $$;
+
+-- Colonnes et rendu
+select has_column('public', 'entreprises', 'cgv_texte', 'entreprises.cgv_texte');
+select has_column('public', 'entreprises', 'afficher_references_documents', 'entreprises.afficher_references_documents');
+select is((select afficher_references_documents from public.entreprises where id = 'a0000000-0000-0000-0000-000000000001'), false, 'références des lignes : faux par défaut (PDF existants inchangés)');
+update public.entreprises set cgv_texte = 'Article 1 — Objet. PGTAP.' where id = 'a0000000-0000-0000-0000-000000000001';
+-- Un devis émis est immuable : les références sont vérifiées sur un brouillon.
+insert into public.devis (id, entreprise_id, client_id, chantier_id, statut, montant_ht, montant_tva, montant_ttc, reference_client, reference_interne)
+values ('a9000000-0000-0000-0000-00000000f0f7', 'a0000000-0000-0000-0000-000000000001', 'a3000000-0000-0000-0000-000000000001', 'a4000000-0000-0000-0000-000000000001', 'brouillon', 0, 0, 0, 'REF-CLI-7', 'DEV-PGTAP-7');
+select is((select public.construire_entreprise_snapshot('a0000000-0000-0000-0000-000000000001') ->> 'cgv_texte'), 'Article 1 — Objet. PGTAP.', 'snapshot d''entreprise : CGV présentes');
+select is((select public.construire_rendu_devis(d) -> 'references' ->> 'client' from public.devis d where d.id = 'a9000000-0000-0000-0000-00000000f0f7'), 'REF-CLI-7', 'rendu devis : référence client');
+select is((select public.construire_rendu_devis(d) -> 'references' ->> 'interne' from public.devis d where d.id = 'a9000000-0000-0000-0000-00000000f0f7'), 'DEV-PGTAP-7', 'rendu devis : référence interne');
+select is((select public.construire_rendu_devis(d) -> 'references' ->> 'chantier_nom' from public.devis d where d.id = 'a9000000-0000-0000-0000-00000000f0f7'),
+          (select nom from public.chantiers where id = 'a4000000-0000-0000-0000-000000000001'), 'rendu devis : nom du chantier');
+select ok((select public.construire_rendu_facture(f) ? 'references' from public.factures f where f.id = 'aa000000-0000-0000-0000-000000000001'), 'rendu facture : références présentes');
+select is((select public.construire_rendu_devis(d) -> 'references' ->> 'chantier_nom' from public.devis d where d.id = 'b9000000-0000-0000-0000-000000000001'),
+          (select nom from public.chantiers where id = 'b4000000-0000-0000-0000-000000000001'), 'rendu devis B : son propre chantier');
+
+-- Modèles d'e-mail : le dirigeant (gerer_parametres) crée, un seul par défaut par type ; l'ouvrier lit, n'écrit pas
+set local role authenticated;
+select pg_temp.jwt('10000000-0000-0000-0000-000000000001');
+insert into public.modeles_email (entreprise_id, nom, type_document, objet, corps, par_defaut) values
+  ('a0000000-0000-0000-0000-000000000001', 'Devis standard', 'devis', 'Devis {numero}', 'Bonjour {client}, …', true),
+  ('a0000000-0000-0000-0000-000000000001', 'Devis relance', 'devis', 'Rappel devis {numero}', 'Bonjour {client}, …', true);
+select is((select count(*)::int from public.modeles_email where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and type_document = 'devis' and par_defaut), 1, 'modèles : un seul par défaut par type');
+select is((select nom from public.modeles_email where entreprise_id = 'a0000000-0000-0000-0000-000000000001' and par_defaut), 'Devis relance', 'modèles : le dernier marqué par défaut l''emporte');
+select pg_temp.jwt('10000000-0000-0000-0000-000000000002');
+select is((select count(*)::int from public.modeles_email), 2, 'modèles : lisibles par tout membre actif (ouvrier)');
+select throws_ok($$ insert into public.modeles_email (entreprise_id, nom, objet, corps) values ('a0000000-0000-0000-0000-000000000001', 'X', 'o', 'c') $$, '42501', null, 'modèles : l''ouvrier ne crée pas (RLS)');
+
+-- Envoi journalisé par RPC, visible selon le module, historique « envoi »
+select pg_temp.jwt('10000000-0000-0000-0000-000000000001');
+select lives_ok($$ select public.journaliser_envoi_document('a0000000-0000-0000-0000-000000000001', 'devis', 'a9000000-0000-0000-0000-000000000001',
+  'client@exemple.invalid', array['cc@exemple.invalid'], array['cci@exemple.invalid'], 'Devis TEST_A_DEV_001',
+  '[{"nom":"devis-TEST_A_DEV_001.pdf","taille":1234},{"nom":"CGV.pdf","taille":10}]'::jsonb, 'brevo', 'envoye', null) $$, 'envoi : journalisé par le dirigeant');
+select is((select numero from public.documents_envois where document_id = 'a9000000-0000-0000-0000-000000000001'), 'TEST_A_DEV_001', 'envoi : numéro du document repris');
+select is((select copies_cachees from public.documents_envois where document_id = 'a9000000-0000-0000-0000-000000000001'), array['cci@exemple.invalid'], 'envoi : copie cachée conservée');
+select is((select apres -> 'pieces' from public.historique_objets where ressource = 'devis' and ressource_id = 'a9000000-0000-0000-0000-000000000001' and action = 'envoi'),
+          '["devis-TEST_A_DEV_001.pdf", "CGV.pdf"]'::jsonb, 'historique : action « envoi » avec les pièces jointes');
+select throws_ok($$ select public.journaliser_envoi_document('a0000000-0000-0000-0000-000000000001', 'devis', 'b9000000-0000-0000-0000-000000000001', 'x@exemple.invalid') $$, 'P0002', null, 'envoi : un devis de l''entreprise B est introuvable depuis A');
+select throws_ok($$ select public.journaliser_envoi_document('b0000000-0000-0000-0000-000000000001', 'devis', 'b9000000-0000-0000-0000-000000000001', 'x@exemple.invalid') $$, '42501', null, 'envoi : refusé hors de son entreprise');
+select throws_ok($$ insert into public.documents_envois (entreprise_id, type_document, document_id, destinataire, objet, canal, statut) values ('a0000000-0000-0000-0000-000000000001', 'devis', 'a9000000-0000-0000-0000-000000000001', 'x', 'o', 'brevo', 'envoye') $$, '42501', null, 'envoi : aucune écriture directe');
+select lives_ok($$ select public.journaliser_pdf_document('a0000000-0000-0000-0000-000000000001', 'devis', 'a9000000-0000-0000-0000-000000000001') $$, 'pdf : journalisé');
+select is((select count(*)::int from public.historique_objets where ressource = 'devis' and ressource_id = 'a9000000-0000-0000-0000-000000000001' and action = 'pdf'), 1, 'historique : action « pdf »');
+select pg_temp.jwt('10000000-0000-0000-0000-000000000002');
+select is((select count(*)::int from public.documents_envois), 0, 'envois : invisibles à l''ouvrier sans acces_devis');
+select pg_temp.jwt('10000000-0000-0000-0000-000000000005');
+select is((select count(*)::int from public.documents_envois where type_document = 'devis'), 0, 'envois : le comptable (factures) ne voit pas les envois de devis');
+select * from finish();
+rollback;

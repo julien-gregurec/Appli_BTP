@@ -21,6 +21,9 @@ export async function envoyerEmailBrevo(params: {
   html?: string;
   replyTo?: string | null;
   piecesJointes?: PieceJointeBrevo[];
+  /** Copies (Cc) et copies cachées (Cci) — adresses déjà validées par l'appelant. */
+  cc?: string[];
+  cci?: string[];
 }) {
   const apiKey = process.env.BREVO_API_KEY;
   const fromAddress = process.env.EMAIL_FROM_ADDRESS;
@@ -33,6 +36,8 @@ export async function envoyerEmailBrevo(params: {
     body: JSON.stringify({
       sender: { name: fromName, email: fromAddress },
       to: [{ email: params.to, name: params.toName || undefined }],
+      cc: params.cc?.length ? params.cc.map((email) => ({ email })) : undefined,
+      bcc: params.cci?.length ? params.cci.map((email) => ({ email })) : undefined,
       replyTo: params.replyTo ? { email: params.replyTo } : undefined,
       subject: params.sujet,
       textContent: params.texte,

@@ -11,7 +11,7 @@ import type { LigneDevis } from "@/lib/devis";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { peutSurchargerDestinataire } from "@/lib/permissions-envoi";
 import type { SurchargeDestinataire } from "@/lib/document-resend-override";
-import { envoyerDocumentCommercialParEmail } from "@/lib/documents-envoi";
+import { envoyerDocumentCommercialParEmail, type OptionsEnvoiDocument } from "@/lib/documents-envoi";
 import { construireSnapshotEntreprise } from "@/lib/documents-commerciaux";
 import { lienPaiementStripeEstActif } from "@/lib/stripe";
 import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
@@ -126,6 +126,7 @@ export async function changerStatutFactureAction(factureId: string, statut: stri
 export async function envoyerFactureEmailAction(
   factureId: string,
   surchargeDestinataire?: SurchargeDestinataire | null,
+  options?: OptionsEnvoiDocument | null,
 ): Promise<{ error: string } | { ok: true }> {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
@@ -154,6 +155,7 @@ export async function envoyerFactureEmailAction(
     complementCorps: lienPaiement ? `Vous pouvez régler cette facture en ligne de façon sécurisée :\n${lienPaiement}` : undefined,
     surchargeDestinataire,
     peutSurchargerDestinataire: peutSurchargerDestinataire(permissions),
+    options,
   });
   if ("error" in resultat) return resultat;
 

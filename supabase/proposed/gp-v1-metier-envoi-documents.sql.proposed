@@ -1,0 +1,247 @@
+-- =====================================================================================================
+-- PROPOSITION — NON APPLIQUÉE, NON NUMÉROTÉE, HORS supabase/migrations
+-- Lot : ELSATIA-GP-V1-METIER — G « PDF, e-mail, historique »
+-- Branche : feat/gp-v1-metier-devis-planning-references-v1
+-- =====================================================================================================
+-- PRÉREQUIS : devis v2 (construire_rendu_devis/facture, snapshot d'entreprise), références internes
+-- (historique_objets, journaliser_objet). Rejouable. Tout est ADDITIF :
+--
+--   1. entreprises : texte des conditions générales de vente (annexe du document, pièce jointe) et
+--      choix d'imprimer les références internes des lignes (faux par défaut : PDF existants inchangés)
+--   2. snapshot d'entreprise et rendus v2 : références du document (interne, client, chantier) et
+--      réglages ci-dessus, pour que l'aperçu, le PDF, le portail et la pièce jointe portent la même chose
+--   3. modeles_email : modèles d'objet et de message par entreprise (variables {numero}, {client}…)
+--   4. documents_envois : chaque envoi (destinataire, copies, pièces, issue) ; alimenté par RPC,
+--      jamais en écriture directe ; journalisé dans l'historique de l'objet (« envoi », « pdf »)
+-- =====================================================================================================
+do $$
+begin
+  if to_regprocedure('public.journaliser_objet(uuid,text,uuid,text,text,jsonb,jsonb,boolean)') is null
+     or to_regprocedure('public.construire_rendu_devis(devis,text)') is null then
+    raise exception 'Prérequis absent : appliquer d''abord le devis v2 puis gp-v1-metier-references-internes' using errcode = '55000';
+  end if;
+end $$;
+
+-- 1. Entreprise ─────────────────────────────────────────────────────────────────────────────────────
+alter table public.entreprises add column if not exists cgv_texte text;
+alter table public.entreprises add column if not exists afficher_references_documents boolean not null default false;
+comment on column public.entreprises.cgv_texte is 'Conditions générales de vente imprimées en annexe des devis et jointes aux e-mails (GP V1, lot G).';
+comment on column public.entreprises.afficher_references_documents is 'Imprimer la référence interne des lignes sur les documents (GP V1, lot G) ; faux : rendu historique.';
+
+-- 2. Snapshot d'entreprise et rendus ────────────────────────────────────────────────────────────────
+create or replace function public.construire_entreprise_snapshot(p_entreprise_id uuid)
+returns jsonb language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'nom', e.nom, 'raison_sociale', e.raison_sociale, 'siret', e.siret, 'adresse', e.adresse,
+    'code_postal', e.code_postal, 'ville', e.ville, 'logo_url', e.logo_url,
+    'assurance_decennale_numero', e.assurance_decennale_numero,
+    'assurance_decennale_assureur', e.assurance_decennale_assureur,
+    'assurance_rc_pro_numero', e.assurance_rc_pro_numero, 'taux_penalites_retard', e.taux_penalites_retard,
+    'texte_entete', e.texte_entete, 'texte_pied_page', e.texte_pied_page,
+    'police_documents', e.police_documents, 'taille_police_documents', e.taille_police_documents,
+    'logo_largeur_documents', e.logo_largeur_documents, 'couleur_documents', e.couleur_documents,
+    'couleur_secondaire_documents', e.couleur_secondaire_documents,
+    'mise_en_page_documents', e.mise_en_page_documents, 'position_logo_documents', e.position_logo_documents,
+    'afficher_logo_documents', e.afficher_logo_documents,
+    'afficher_descriptions_documents', e.afficher_descriptions_documents,
+    'afficher_tva_lignes_documents', e.afficher_tva_lignes_documents,
+    -- GP V1, lot G
+    'cgv_texte', e.cgv_texte,
+    'afficher_references_documents', e.afficher_references_documents)
+  from public.entreprises e where e.id = p_entreprise_id
+$$;
+
+-- Références d'un document : les siennes, celles du client (« votre référence ») et du chantier.
+create or replace function public.references_document(p_reference_interne text, p_reference_client text, p_chantier_id uuid)
+returns jsonb language sql stable security definer set search_path = public as $$
+  select jsonb_build_object('interne', p_reference_interne, 'client', p_reference_client)
+      || coalesce((select jsonb_build_object('chantier_nom', c.nom, 'chantier_reference', c.reference_interne,
+                                             'chantier_adresse', nullif(concat_ws(' ', c.adresse, c.code_postal, c.ville), ''))
+                   from public.chantiers c where c.id = p_chantier_id), '{}'::jsonb)
+$$;
+-- Appelée par les constructeurs de rendu (eux-mêmes SECURITY DEFINER) : jamais par anon.
+revoke all on function public.references_document(text, text, uuid) from public, anon, service_role;
+grant execute on function public.references_document(text, text, uuid) to authenticated;
+
+create or replace function public.construire_rendu_devis(d public.devis, p_provenance text default 'emission')
+returns jsonb language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'version', 1,
+    'moteur', coalesce(d.moteur_presentation, 1),
+    'type_document', 'devis',
+    'provenance', p_provenance,
+    'capture_le', now(),
+    'numero', d.numero,
+    'statut', d.statut,
+    'date_emission', d.date_emission,
+    'date_validite', d.date_validite,
+    'remise_globale', d.remise_globale,
+    'montants', jsonb_build_object('ht', d.montant_ht, 'tva', d.montant_tva, 'ttc', d.montant_ttc),
+    'conditions', d.conditions,
+    'notes_client', d.notes_client,
+    'entreprise', public.construire_entreprise_snapshot(d.entreprise_id),
+    'client', coalesce(d.client_snapshot, public.construire_client_snapshot(d.client_id, d.entreprise_id, p_provenance)),
+    'filigrane', public.filigrane_a_figer(d.filigrane, d.entreprise_id),
+    'filigrane_document', d.filigrane,
+    'filigranes_entreprise', (select e.filigranes_documents from public.entreprises e where e.id = d.entreprise_id),
+    -- GP V1, lot G : références imprimées (en-tête du document)
+    'references', public.references_document(d.reference_interne, d.reference_client, d.chantier_id),
+    'ouvrages', coalesce((select jsonb_agg(public.ouvrage_pour_rendu(to_jsonb(o)) order by o.ordre)
+                            from public.devis_ouvrages o where o.devis_id = d.id), '[]'::jsonb),
+    'lignes', coalesce((select jsonb_agg(public.ligne_pour_rendu(to_jsonb(l)) order by l.ordre)
+                          from public.lignes_devis l where l.devis_id = d.id), '[]'::jsonb))
+$$;
+
+create or replace function public.construire_rendu_facture(f public.factures, p_provenance text default 'emission')
+returns jsonb language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'version', 1,
+    'moteur', coalesce(f.moteur_presentation, 1),
+    'type_document', 'facture',
+    'type_facture', f.type,
+    'provenance', p_provenance,
+    'capture_le', now(),
+    'numero', f.numero,
+    'statut', f.statut,
+    'date_emission', f.date_emission,
+    'date_echeance', f.date_echeance,
+    'remise_globale', f.remise_globale,
+    'montants', jsonb_build_object('ht', f.montant_ht, 'tva', f.montant_tva, 'ttc', f.montant_ttc),
+    'notes_client', f.notes_client,
+    'entreprise', coalesce(f.entreprise_snapshot, public.construire_entreprise_snapshot(f.entreprise_id)),
+    'client', coalesce(f.client_snapshot, public.construire_client_snapshot(f.client_id, f.entreprise_id, p_provenance)),
+    'filigrane', public.filigrane_a_figer(f.filigrane, f.entreprise_id),
+    'filigrane_document', f.filigrane,
+    'filigranes_entreprise', (select e.filigranes_documents from public.entreprises e where e.id = f.entreprise_id),
+    'references', public.references_document(f.reference_interne, f.reference_client, f.chantier_id),
+    'ouvrages', coalesce((select jsonb_agg(public.ouvrage_pour_rendu(to_jsonb(o)) order by o.ordre)
+                            from public.factures_ouvrages o where o.facture_id = f.id), '[]'::jsonb),
+    'lignes', coalesce((select jsonb_agg(public.ligne_pour_rendu(to_jsonb(l)) order by l.ordre)
+                          from public.lignes_factures l where l.facture_id = f.id), '[]'::jsonb))
+$$;
+
+-- 3. Modèles d'e-mail ──────────────────────────────────────────────────────────────────────────────
+create table if not exists public.modeles_email (
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references public.entreprises(id) on delete cascade,
+  nom text not null check (length(btrim(nom)) between 1 and 80),
+  type_document text not null default 'tous' check (type_document in ('devis', 'facture', 'tous')),
+  objet text not null check (length(objet) between 1 and 200),
+  corps text not null check (length(corps) between 1 and 8000),
+  par_defaut boolean not null default false,
+  actif boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists modeles_email_entreprise_idx on public.modeles_email (entreprise_id, type_document) where actif;
+alter table public.modeles_email enable row level security;
+drop policy if exists modeles_email_lecture on public.modeles_email;
+create policy modeles_email_lecture on public.modeles_email for select to authenticated
+  using (public.est_membre_actif(entreprise_id));
+drop policy if exists modeles_email_ecriture on public.modeles_email;
+create policy modeles_email_ecriture on public.modeles_email for all to authenticated
+  using (public.est_membre_actif(entreprise_id) and public.a_permission(entreprise_id, 'gerer_parametres'))
+  with check (public.est_membre_actif(entreprise_id) and public.a_permission(entreprise_id, 'gerer_parametres'));
+grant select, insert, update, delete on public.modeles_email to authenticated;
+
+-- Un seul modèle par défaut par type de document et par entreprise.
+create or replace function public.trg_modele_email_defaut()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  new.updated_at := now();
+  if new.par_defaut then
+    update public.modeles_email set par_defaut = false
+     where entreprise_id = new.entreprise_id and type_document = new.type_document and id <> new.id and par_defaut;
+  end if;
+  return new;
+end $$;
+revoke all on function public.trg_modele_email_defaut() from public, anon;
+drop trigger if exists zz_modele_email_defaut on public.modeles_email;
+create trigger zz_modele_email_defaut before insert or update on public.modeles_email
+  for each row execute function public.trg_modele_email_defaut();
+
+-- 4. Envois ────────────────────────────────────────────────────────────────────────────────────────
+create table if not exists public.documents_envois (
+  id uuid primary key default gen_random_uuid(),
+  entreprise_id uuid not null references public.entreprises(id) on delete cascade,
+  type_document text not null check (type_document in ('devis', 'facture')),
+  document_id uuid not null,
+  numero text,
+  destinataire text not null,
+  copies text[] not null default '{}',
+  copies_cachees text[] not null default '{}',
+  objet text not null,
+  pieces_jointes jsonb not null default '[]'::jsonb,
+  canal text not null check (canal in ('brevo', 'messagerie')),
+  statut text not null check (statut in ('envoye', 'echec', 'prepare')),
+  erreur text,
+  utilisateur_id uuid references public.utilisateurs(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists documents_envois_document_idx on public.documents_envois (entreprise_id, type_document, document_id, created_at desc);
+alter table public.documents_envois enable row level security;
+drop policy if exists documents_envois_lecture on public.documents_envois;
+create policy documents_envois_lecture on public.documents_envois for select to authenticated
+  using (public.est_membre_actif(entreprise_id)
+         and public.a_permission(entreprise_id, case type_document when 'devis' then 'acces_devis' else 'acces_factures' end));
+grant select on public.documents_envois to authenticated;
+-- Aucune écriture directe : la RPC ci-dessous vérifie l'appartenance du document et journalise.
+
+create or replace function public.journaliser_envoi_document(
+  p_entreprise_id uuid, p_type_document text, p_document_id uuid, p_destinataire text,
+  p_copies text[] default '{}', p_copies_cachees text[] default '{}', p_objet text default '',
+  p_pieces jsonb default '[]'::jsonb, p_canal text default 'brevo', p_statut text default 'envoye', p_erreur text default null)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare
+  v_numero text;
+  v_id uuid;
+begin
+  if not public.est_membre_actif(p_entreprise_id) then
+    raise exception 'Accès refusé' using errcode = '42501';
+  end if;
+  if p_type_document = 'devis' then
+    select numero into v_numero from public.devis where id = p_document_id and entreprise_id = p_entreprise_id;
+  elsif p_type_document = 'facture' then
+    select numero into v_numero from public.factures where id = p_document_id and entreprise_id = p_entreprise_id;
+  else
+    raise exception 'Type de document inconnu' using errcode = '22023';
+  end if;
+  if not found then
+    raise exception 'Document introuvable' using errcode = 'P0002';
+  end if;
+  insert into public.documents_envois (entreprise_id, type_document, document_id, numero, destinataire, copies, copies_cachees, objet,
+                                       pieces_jointes, canal, statut, erreur, utilisateur_id)
+  values (p_entreprise_id, p_type_document, p_document_id, v_numero, p_destinataire, coalesce(p_copies, '{}'), coalesce(p_copies_cachees, '{}'),
+          left(coalesce(p_objet, ''), 200), coalesce(p_pieces, '[]'::jsonb), p_canal, p_statut, left(p_erreur, 500), auth.uid())
+  returning id into v_id;
+  perform public.journaliser_objet(p_entreprise_id, p_type_document, p_document_id, 'envoi', null, null,
+    jsonb_build_object('destinataire', p_destinataire, 'copies', coalesce(p_copies, '{}'), 'statut', p_statut, 'canal', p_canal,
+                       'pieces', coalesce((select jsonb_agg(p ->> 'nom') from jsonb_array_elements(coalesce(p_pieces, '[]'::jsonb)) p), '[]'::jsonb)),
+    false);
+  return v_id;
+end $$;
+revoke all on function public.journaliser_envoi_document(uuid, text, uuid, text, text[], text[], text, jsonb, text, text, text) from public, anon, service_role;
+grant execute on function public.journaliser_envoi_document(uuid, text, uuid, text, text[], text[], text, jsonb, text, text, text) to authenticated;
+
+create or replace function public.journaliser_pdf_document(p_entreprise_id uuid, p_type_document text, p_document_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare v_numero text;
+begin
+  if not public.est_membre_actif(p_entreprise_id) then
+    raise exception 'Accès refusé' using errcode = '42501';
+  end if;
+  if p_type_document = 'devis' then
+    select numero into v_numero from public.devis where id = p_document_id and entreprise_id = p_entreprise_id;
+  elsif p_type_document = 'facture' then
+    select numero into v_numero from public.factures where id = p_document_id and entreprise_id = p_entreprise_id;
+  else
+    raise exception 'Type de document inconnu' using errcode = '22023';
+  end if;
+  if not found then
+    raise exception 'Document introuvable' using errcode = 'P0002';
+  end if;
+  perform public.journaliser_objet(p_entreprise_id, p_type_document, p_document_id, 'pdf', null, null,
+    jsonb_build_object('numero', v_numero), false);
+end $$;
+revoke all on function public.journaliser_pdf_document(uuid, text, uuid) from public, anon, service_role;
+grant execute on function public.journaliser_pdf_document(uuid, text, uuid) to authenticated;

@@ -106,3 +106,26 @@ describe("30–33. filigranes rendus", () => {
     for (const page of pages) expect((page.match(/class="doc-a4__motif"/g) ?? []).length).toBe(6);
   });
 });
+
+describe("GP V1, lot G — références et CGV sur le document", () => {
+  it("imprime les références en en-tête, la référence des lignes seulement sur demande, et l'annexe CGV", () => {
+    const vue = construireVueDocument(sourceFictive({
+      references: { interne: "DEV-0007", client: "PO-78", chantierNom: "Maison Dupont", chantierReference: "CH-0003" },
+      cgv: "Article 1 — Objet.\n\nArticle 2 — Prix.",
+      style: { afficherReferences: true },
+    }));
+    const html = rendre(vue);
+    expect(html).toContain('data-testid="references"');
+    expect(html).toContain("Votre référence : </span>PO-78");
+    expect(html).toContain("CH-0003 — Maison Dupont");
+    expect(html).toContain('data-testid="cgv"');
+    expect(html).toContain("Article 2 — Prix.");
+    // Les pages CGV sont les dernières et portent le pied « Page x / n ».
+    const pages = pagesRendues(html);
+    expect(pages.length).toBeGreaterThanOrEqual(2);
+    const sansRef = rendre(construireVueDocument(sourceFictive()));
+    expect(sansRef).not.toContain('data-testid="references"');
+    expect(sansRef).not.toContain('data-testid="cgv"');
+    expect(sansRef).not.toContain("doc-a4__reference\"");
+  });
+});

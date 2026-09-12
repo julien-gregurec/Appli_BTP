@@ -79,6 +79,13 @@ export function valeurLisible(valeur: unknown): string {
   if (typeof valeur === "object") {
     const o = valeur as Record<string, unknown>;
     if ("code" in o) return valeurLisible(o.code);
+    // Envoi (GP V1, lot G) : destinataire, issue, pièces jointes.
+    if ("destinataire" in o) {
+      const pieces = Array.isArray(o.pieces) && o.pieces.length ? ` · ${o.pieces.length} pièce${o.pieces.length > 1 ? "s" : ""} jointe${o.pieces.length > 1 ? "s" : ""}` : "";
+      const copies = Array.isArray(o.copies) && o.copies.length ? ` (copie : ${o.copies.join(", ")})` : "";
+      return `${valeurLisible(o.destinataire)}${copies}${o.statut === "echec" ? " — échec" : ""}${pieces}`;
+    }
+    if ("numero" in o && Object.keys(o).length === 1) return valeurLisible(o.numero);
     if ("coefficient" in o) return `${valeurLisible(o.coefficient)} (${o.mode_prix === "calcule" ? "prix calculé" : "prix saisi"})`;
     if ("source_reference" in o || "source_id" in o) return o.source_reference ? `depuis ${String(o.source_reference)}` : "depuis un autre article";
     if ("libelle" in o) return valeurLisible(o.libelle);
@@ -91,7 +98,7 @@ export function valeurLisible(valeur: unknown): string {
 export function resumeEntree(e: Pick<EntreeHistorique, "action" | "champ" | "avant" | "apres">): string {
   const action = libelleAction(e.action);
   const champ = libelleChamp(e.champ);
-  if (e.action === "creation" || e.action === "duplication") {
+  if (e.action === "creation" || e.action === "duplication" || e.action === "envoi" || e.action === "pdf") {
     const detail = valeurLisible(e.apres);
     return detail === "—" ? action : `${action} — ${detail}`;
   }

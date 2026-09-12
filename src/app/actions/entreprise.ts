@@ -171,6 +171,8 @@ export async function modifierEntrepriseAction(formData: FormData) {
     afficher_logo_documents: formData.get("afficher_logo_documents") === "on",
     afficher_descriptions_documents: formData.get("afficher_descriptions_documents") === "on",
     afficher_tva_lignes_documents: formData.get("afficher_tva_lignes_documents") === "on",
+    // GP V1 (lot G) : ces deux champs n'existent dans le formulaire que drapeau posé ; absents, on ne touche à rien.
+    ...(formData.has("cgv_texte") ? { cgv_texte: String(formData.get("cgv_texte") ?? "").replace(/\r/g, "").trim().slice(0, 30000) || null, afficher_references_documents: formData.get("afficher_references_documents") === "on" } : {}),
     horaires_journaliers: horaires,
     seuil_ecart_pointage: seuilEcart,
     suivi_zone_actif: suiviZoneActif,

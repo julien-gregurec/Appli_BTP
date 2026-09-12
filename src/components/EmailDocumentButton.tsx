@@ -6,10 +6,14 @@ import { changerStatutFactureAction } from "@/app/actions/factures";
 import { changerStatutCommandeAction } from "@/app/actions/commandes";
 import { construireLienMailto } from "@/lib/email";
 import { adresseRemisePlausible, mentionEcartAdresse } from "@/lib/document-resend-override";
+import { appliquerModele, listeAdresses, type ModeleEmail, type VariablesEmail } from "@/lib/email-modeles";
 
 type ResultatEnvoi = { error: string } | { ok: true };
 
 type SurchargeDestinataire = { email?: string | null; motif?: string | null };
+
+/** Options d'envoi (GP V1, lot G) — même forme que `OptionsEnvoiDocument` côté serveur. */
+type OptionsEnvoi = { cc?: string[]; cci?: string[]; objet?: string | null; corps?: string | null; joindreCgv?: boolean; piecesComplementaires?: string[] };
 
 type Props = {
   type: "devis" | "facture" | "commande";
@@ -20,7 +24,12 @@ type Props = {
   corps: string;
   pdfUrl: string;
   envoiAutomatiqueDisponible?: boolean;
-  envoyerAutomatiquementAction?: (id: string, surcharge?: SurchargeDestinataire | null) => Promise<ResultatEnvoi>;
+  envoyerAutomatiquementAction?: (id: string, surcharge?: SurchargeDestinataire | null, options?: OptionsEnvoi | null) => Promise<ResultatEnvoi>;
+  /** GP V1 (lot G) : modèles de l'entreprise, variables du document, CGV et pièces du chantier. */
+  modeles?: ModeleEmail[];
+  variables?: VariablesEmail;
+  cgvDisponible?: boolean;
+  piecesDisponibles?: Array<{ id: string; nom: string; taille: number | null }>;
   emailEnvoyeLe?: string | null;
   // Adresse figée sur le document émis. Reste la destination par défaut et
   // reste visible même lorsqu'une autre adresse est choisie.
@@ -42,13 +51,33 @@ export function EmailDocumentButton({
   emailEnvoyeLe,
   adresseFigee = null,
   peutSurchargerDestinataire = false,
+  modeles = [],
+  variables,
+  cgvDisponible = false,
+  piecesDisponibles = [],
 }: Props) {
   const [open, setOpen] = useState(false);
   const [modeManuel, setModeManuel] = useState(!envoiAutomatiqueDisponible);
   const [to, setTo] = useState(initialTo);
   const [cc, setCc] = useState("");
+  const [cci, setCci] = useState("");
+  const [modeleId, setModeleId] = useState("");
+  const [joindreCgv, setJoindreCgv] = useState(false);
+  const [pieces, setPieces] = useState<string[]>([]);
   const [sujet, setSujet] = useState(initialSujet);
   const [corps, setCorps] = useState(initialCorps);
+  const appliquerModeleChoisi = (id: string) => {
+    setModeleId(id);
+    const m = modeles.find((x) => x.id === id);
+    if (!m) { setSujet(initialSujet); setCorps(initialCorps); return; }
+    const r = variables ? appliquerModele(m, variables) : { objet: m.objet, corps: m.corps };
+    setSujet(r.objet); setCorps(r.corps);
+  };
+  const options = (): OptionsEnvoi => ({
+    cc: listeAdresses(cc), cci: listeAdresses(cci),
+    objet: sujet !== initialSujet ? sujet : null, corps: corps !== initialCorps ? corps : null,
+    joindreCgv, piecesComplementaires: pieces,
+  });
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoye, setEnvoye] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -88,6 +117,7 @@ export function EmailDocumentButton({
       const resultat = await envoyerAutomatiquementAction!(
         id,
         surchargeActive ? { email: surchargeSaisie, motif: motifSurcharge.trim() || null } : null,
+        options(),
       );
       if ("error" in resultat) {
         setErreur(resultat.error);
@@ -101,7 +131,7 @@ export function EmailDocumentButton({
   const ouvrirMessagerie = () =>
     startTransition(async () => {
       await marquerStatutEnvoye();
-      window.location.href = construireLienMailto({ to, sujet, corps, cc });
+      window.location.href = construireLienMailto({ to, sujet, corps, cc, cci });
       setOpen(false);
       router.refresh();
     });
@@ -222,6 +252,49 @@ export function EmailDocumentButton({
                   )}
                 </div>
 
+                {/* GP V1 (lot G) : copies, modèle, objet, message, CGV et pièces complémentaires. */}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="text-xs text-neutral-500">
+                    Copie (Cc)
+                    <input value={cc} onChange={(e) => setCc(e.target.value)} placeholder="conducteur@…, comptable@…" className="mt-1 w-full rounded-md border px-3 py-2 text-sm dark:bg-neutral-900" />
+                  </label>
+                  <label className="text-xs text-neutral-500">
+                    Copie cachée (Cci)
+                    <input value={cci} onChange={(e) => setCci(e.target.value)} placeholder="archives@…" className="mt-1 w-full rounded-md border px-3 py-2 text-sm dark:bg-neutral-900" />
+                  </label>
+                  {modeles.length > 0 && (
+                    <label className="text-xs text-neutral-500 sm:col-span-2">
+                      Modèle de message
+                      <select value={modeleId} onChange={(e) => appliquerModeleChoisi(e.target.value)} className="mt-1 w-full rounded-md border px-3 py-2 text-sm dark:bg-neutral-900">
+                        <option value="">Message standard</option>
+                        {modeles.map((m) => <option key={m.id} value={m.id}>{m.nom}{m.parDefaut ? " (par défaut)" : ""}</option>)}
+                      </select>
+                    </label>
+                  )}
+                  <label className="text-xs text-neutral-500 sm:col-span-2">
+                    Objet
+                    <input value={sujet} onChange={(e) => setSujet(e.target.value)} className="mt-1 w-full rounded-md border px-3 py-2 text-sm dark:bg-neutral-900" />
+                  </label>
+                  <label className="text-xs text-neutral-500 sm:col-span-2">
+                    Message
+                    <textarea rows={7} value={corps} onChange={(e) => setCorps(e.target.value)} className="mt-1 w-full rounded-md border px-3 py-2 text-sm dark:bg-neutral-900" />
+                  </label>
+                </div>
+                <fieldset className="rounded-md border border-neutral-200 px-3 py-2 text-xs dark:border-neutral-800">
+                  <legend className="px-1 text-neutral-500">Pièces jointes</legend>
+                  <div className="flex min-h-8 items-center gap-2"><input type="checkbox" checked readOnly aria-label="PDF du document" />PDF du document (toujours joint)</div>
+                  <label className={`flex min-h-8 items-center gap-2 ${cgvDisponible ? "" : "text-neutral-400"}`} title={cgvDisponible ? undefined : "Renseignez les conditions générales de vente dans Paramètres."}>
+                    <input type="checkbox" checked={joindreCgv} disabled={!cgvDisponible} onChange={(e) => setJoindreCgv(e.target.checked)} />Conditions générales de vente{cgvDisponible ? "" : " — non renseignées"}
+                  </label>
+                  {piecesDisponibles.map((p) => (
+                    <label key={p.id} className="flex min-h-8 items-center gap-2">
+                      <input type="checkbox" checked={pieces.includes(p.id)} onChange={(e) => setPieces(e.target.checked ? [...pieces, p.id] : pieces.filter((x) => x !== p.id))} />
+                      {p.nom}{p.taille ? <span className="text-neutral-400"> · {Math.max(1, Math.round(p.taille / 1024))} Ko</span> : null}
+                    </label>
+                  ))}
+                  {piecesDisponibles.length === 0 && <div className="text-neutral-400">Aucune pièce complémentaire : les documents du chantier lié apparaissent ici.</div>}
+                </fieldset>
+
                 <div className="flex items-center justify-between border-t pt-4 dark:border-neutral-800">
                   <button type="button" onClick={() => setModeManuel(true)} className="text-sm text-neutral-500 hover:underline">
                     Préparer un e-mail manuellement à la place
@@ -266,6 +339,10 @@ export function EmailDocumentButton({
                       className="mt-1 w-full rounded-md border px-3 py-2 text-sm dark:bg-neutral-900"
                     />
                     <span className="mt-1 block">Sépare plusieurs adresses par une virgule.</span>
+                  </label>
+                  <label className="text-xs text-neutral-500">
+                    Copie cachée (Cci)
+                    <input value={cci} onChange={(e) => setCci(e.target.value)} placeholder="archives@…" className="mt-1 w-full rounded-md border px-3 py-2 text-sm dark:bg-neutral-900" />
                   </label>
                   <label className="text-xs text-neutral-500">
                     Objet
