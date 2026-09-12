@@ -86,13 +86,16 @@ if (action === "setup") {
     cpSync(join(root, "supabase", name), join(directory, "supabase", name), {
       recursive: true,
     });
-  if (process.argv.includes("--lot-a"))
-    unlinkSync(
-      join(
-        directory,
-        "supabase/migrations/20260912140000_studio_media_upload.sql",
-      ),
-    );
+  const excludedMigrations = process.argv.includes("--lot-a")
+    ? [
+        "20260912140000_studio_media_upload.sql",
+        "20260912160000_studio_project_management.sql",
+      ]
+    : process.argv.includes("--lot-b")
+      ? ["20260912160000_studio_project_management.sql"]
+      : [];
+  for (const migration of excludedMigrations)
+    unlinkSync(join(directory, "supabase/migrations", migration));
   writeFileSync(statePath, JSON.stringify({ directory, projectId }));
   run(
     [

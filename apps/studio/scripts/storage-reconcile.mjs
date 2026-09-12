@@ -37,14 +37,9 @@ for (;;) {
       summary.expired++;
       deleted = true;
       if (apply) {
-        const { error } = await client
-          .from("studio_media_assets")
-          .update({
-            deleted_at: new Date().toISOString(),
-            upload_status: "deleted",
-          })
-          .eq("id", asset.id)
-          .neq("upload_status", "ready");
+        const { error } = await client.rpc("studio_expire_media", {
+          p_asset: asset.id,
+        });
         if (error) {
           summary.errors++;
           continue;
@@ -75,6 +70,15 @@ for (;;) {
     if (deleted && Date.parse(asset.purge_after) < Date.now()) {
       summary.purged++;
       if (apply) {
+        const refs = await client
+          .from("studio_project_assets")
+          .select("asset_id")
+          .eq("asset_id", asset.id)
+          .limit(1);
+        if (refs.error || refs.data.length) {
+          summary.errors++;
+          continue;
+        }
         const { error } = await bucket.remove([asset.storage_key]);
         if (error) {
           summary.errors++;

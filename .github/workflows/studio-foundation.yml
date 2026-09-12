@@ -1,4 +1,4 @@
-name: Studio Foundation and Media
+name: Studio Foundation Media and Projects
 on:
   pull_request:
     paths:
