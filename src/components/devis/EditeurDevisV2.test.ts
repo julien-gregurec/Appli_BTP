@@ -41,7 +41,7 @@ function props(p: Partial<Props> = {}): Props {
     style: {},
     filigranesEntreprise: { defaut: null, brouillon: { type: "texte", preset: "BROUILLON" } },
     logoDisponible: false,
-    droits: { voirCouts: false, gererCouts: false, modifierPrix: true, modifierUnite: true },
+    droits: { voirCouts: false, gererCouts: false, modifierPrix: true, modifierUnite: true, modifierRemise: true },
     seuilTauxMarquePct: null,
     nomProduit: "ELSATIA",
     ...p,
@@ -56,14 +56,16 @@ describe("éditeur visuel v2 — rendu", () => {
     expect(html).toContain(">BROUILLON</span>");
     expect(html).toContain("Client Fictif");
     expect(html).toContain("Plancher chauffant");
-    expect(html).toContain("Ajouter des articles");
+    // GP V1 : la barre d'outils de la grille remplace le bouton « Ajouter des articles ».
+    expect(html).toContain("Articles");
+    expect(html).toContain('role="grid"');
   });
   it("n'affiche aucun prix d'achat ni marge sans voir_couts_devis", () => {
     const html = renderToStaticMarkup(createElement(EditeurDevisV2, props()));
     expect(html).not.toMatch(/achat 12,34|Coût |marge /);
   });
   it("affiche coût et marge avec voir_couts_devis, jamais dans l'aperçu du document", () => {
-    const html = renderToStaticMarkup(createElement(EditeurDevisV2, props({ droits: { voirCouts: true, gererCouts: true, modifierPrix: true, modifierUnite: true } })));
+    const html = renderToStaticMarkup(createElement(EditeurDevisV2, props({ droits: { voirCouts: true, gererCouts: true, modifierPrix: true, modifierUnite: true, modifierRemise: true } })));
     expect(html).toMatch(/Coût /);
     const apercu = html.slice(html.indexOf('class="doc-a4 doc-a4--apercu"'));
     expect(apercu).not.toMatch(/achat|Coût|marge|NOTE-INTERNE-SECRETE/);

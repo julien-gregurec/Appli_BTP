@@ -1,5 +1,7 @@
 "use server";
 
+import { MOTIF_DROIT_FIN, possedeDroitFin } from "@/lib/droits-devis";
+
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -68,6 +70,7 @@ export async function modifierFactureAction(factureId: string, payload: FactureP
 export async function creerFactureDepuisDevisAction(devisId: string, type: string = "simple") {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  if (!possedeDroitFin(await permissionsUtilisateur(ctx), "transformer_devis")) redirect(`/devis/${devisId}?error=${encodeURIComponent(MOTIF_DROIT_FIN.transformer_devis)}`);
 
   const { data: devis } = await supabase.from("devis").select("id").eq("id", devisId).eq("entreprise_id", ctx.entrepriseId).eq("statut", "accepte").single();
   if (!devis) redirect(`/devis/${devisId}?error=${encodeURIComponent("Devis accepté introuvable")}`);

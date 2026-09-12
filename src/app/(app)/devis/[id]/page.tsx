@@ -17,6 +17,8 @@ import { SearchableSelect } from "@/components/SearchableSelect";
 import { SignatureDocumentMetier } from "@/components/SignatureDocumentMetier";
 import { RelanceDocumentSection } from "@/components/RelanceDocumentSection";
 import { devisV2Actif } from "@/lib/devis/v2-serveur";
+import { DocumentsIssusDevis } from "@/components/devis/DocumentsIssusDevis";
+import { MOTIF_DROIT_FIN, possedeDroitFin } from "@/lib/droits-devis";
 
 export default async function DevisDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; success?: string }> }) {
   const { id } = await params;
@@ -25,6 +27,9 @@ export default async function DevisDetailPage({ params, searchParams }: { params
   const supabase = await createClient();
   const permissions = await permissionsUtilisateur(ctx);
   const peutGererDevis = permissions === null || permissions.includes("gerer_devis");
+  // GP V1 (D4) : droits fins hérités de gerer_devis ; la base reste l'autorité.
+  const peutTransformer = peutGererDevis && possedeDroitFin(permissions, "transformer_devis");
+  const peutSupprimerDroit = peutGererDevis && possedeDroitFin(permissions, "supprimer_devis");
 
   const { data: devis } = await supabase
     .from("devis")
@@ -62,7 +67,7 @@ export default async function DevisDetailPage({ params, searchParams }: { params
   const supprimer = supprimerDevisAction.bind(null, id);
   const creerFacture = creerFactureDepuisDevisAction.bind(null, id, "simple");
   const dupliquer = dupliquerDevisAction.bind(null, id);
-  const peutSupprimer = ["brouillon", "refuse", "annule"].includes(devis.statut);
+  const peutSupprimer = ["brouillon", "refuse", "annule"].includes(devis.statut) && peutSupprimerDroit;
   // Un devis déjà émis affiche — et réexpédie — l'identité du destinataire figée
   // à son émission ; seul un brouillon reflète la fiche client actuelle.
   const identiteDocument = identiteClientDocument({
@@ -278,13 +283,21 @@ export default async function DevisDetailPage({ params, searchParams }: { params
           </div>
         )}
 
+        {devisV2Actif() && <DocumentsIssusDevis devisId={id} />}
+
         <div className="flex items-center justify-between border-t border-neutral-100 pt-4 dark:border-neutral-800">
           {devis.statut === "accepte" ? (
-            <form action={creerFacture}>
-              <button type="submit" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">
+            peutTransformer ? (
+              <form action={creerFacture}>
+                <button type="submit" className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">
+                  Créer une facture depuis ce devis
+                </button>
+              </form>
+            ) : (
+              <button type="button" aria-disabled="true" title={MOTIF_DROIT_FIN.transformer_devis} className="cursor-not-allowed rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white opacity-50 dark:bg-white dark:text-neutral-900">
                 Créer une facture depuis ce devis
               </button>
-            </form>
+            )
           ) : (
             <p className="text-sm text-neutral-500">
               Passe le devis au statut « Accepté » pour pouvoir le transformer en facture.

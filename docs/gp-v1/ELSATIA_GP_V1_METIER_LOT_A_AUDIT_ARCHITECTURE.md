@@ -438,3 +438,42 @@ Additif : supprimer les colonnes `type_ligne`, `remise_section_pct`, `commentair
 | H E2E, performance, non-régression, rapport final | non démarré |
 
 Verdict provisoire : **GO SOUS CONDITIONS pour les lots livrés**, NO-GO V1 COMMERCIALISABLE tant que D à H ne sont pas faits et que le lot 0 (SQL devis v2 numéroté au ledger) n'est pas intégré.
+
+## 14. Lot D — droits fins, calcul unique, transformations, documents issus (livré)
+
+### 14.1 Livrables
+
+| Fichier | Rôle |
+|---|---|
+| `supabase/proposed/gp-v1-metier-droits-transformations.sql.proposed` (+ `.pgtap`, 26 assertions) | six clés fines (D4), rattrapage, modèles Commercial et Poseur, droits tenus en base, historique des documents, documents issus |
+| `src/lib/droits-devis.ts` (+ test) | miroir de `droit_fin` : clé accordée ou héritée du parent ; motifs lisibles pour les actions grisées |
+| `src/app/actions/devis.ts`, `factures.ts`, `suite-metier.ts`, `chantiers.ts` | contrôles TypeScript avant la base : statut « envoyé », suppression, e-mail, facture, acompte, situation, chantier depuis devis |
+| `src/lib/devis/editeur-v2-serveur.ts`, `colonnes-grille.ts`, `GrilleDevis.tsx`, `EditeurDevisV2.tsx` | prix de vente, remise de ligne, ligne de remise et remise globale suivent `modifier_prix_vente` / `modifier_remise` |
+| `src/components/FactureEditor.tsx`, `factures/[id]/modifier/page.tsx` | défaut A2 corrigé : totaux exacts (`totauxDocument`), remise globale comprise ; plus de calcul flottant |
+| `src/components/devis/DocumentsIssusDevis.tsx`, `devis/[id]/page.tsx` | « Documents issus de ce devis » (factures, acomptes, avoirs, situations, chantier) sous la RLS ; transformation grisée avec motif sans le droit |
+
+### 14.2 Ce que fait le lot
+
+- **Six clés** : `modifier_prix_vente`, `modifier_remise`, `supprimer_devis`, `transformer_devis`, `envoyer_devis` (Devis) et `affecter_ressources` (Planning, consommée au lot F).
+- **Aucune perte de droit** : rattrapage des postes existants (ouvertes si le poste gère déjà les devis / le planning), ajout aux modèles qui gèrent les devis, et règle `droit_fin` : une clé non configurée est **héritée** du droit parent, une clé configurée à faux ferme. Un poste créé hors catalogue ne perd rien ; l'administrateur peut fermer finement.
+- **Modèles** « Poseur » (terrain, aucun prix) et « Commercial » (clients, devis, prix de vente, remises, envoi, transformation ; ni coût, ni marge, ni comptabilité).
+- **Tenue en base** : suppression (politique RLS restrictive) ; passage à « envoyé » (déclencheur) ; conversion en facture (RPC) ; prix et remises **dans la RPC d'enregistrement** : sans `modifier_prix_vente`, une ligne existante garde son prix, un article inséré prend le prix du catalogue, aucune ligne libre chiffrée ; sans `modifier_remise`, remise globale, remises de ligne et lignes de remise inchangées. Acompte, situation et chantier depuis le devis : contrôle TypeScript (les fonctions historiques ne sont pas redéfinies ici — réserve).
+- **Historique** : création, statut et numéro des devis et factures dans `historique_objets`.
+- **Documents issus** : la fiche devis liste ce qui en découle ; navigation devis → facture → paiements déjà présente côté facture.
+- **Calcul unique** : `FactureEditor` passe sur `totauxDocument` avec la remise globale (défaut A2).
+
+### 14.3 Résultats
+
+| Contrôle | Résultat |
+|---|---|
+| SQL appliqué deux fois (après devis v2, références, bibliothèque, grille) | 0 erreur |
+| pgTAP du lot | **26/26** (héritage, fermeture explicite, prix/remise refusés et acceptés, suppression sans effet, envoi refusé puis accepté, conversion refusée au comptable sans le droit, documents issus cloisonnés) |
+| pgTAP devis v2 / grille, rejouées après | 111/111 · 36/36 |
+| Vitest (`src/lib`, `src/components`) | 1 794 verts ; 1 échec `xlsx.test.ts` (préexistant, fichier identique à `516469d`, vert seul) |
+| Typecheck du projet, lint des fichiers touchés | 0 / 0 |
+
+### 14.4 Réserves
+
+1. `creer_facture_avancee`, `creer_situation_travaux`, `creer_chantier_depuis_devis` : `transformer_devis` n'est vérifié qu'en TypeScript (redéfinir ces trois fonctions historiques est un lot à part).
+2. Le prix des composants d'un **ouvrage** n'est pas soumis à `modifier_prix_vente` (le prix global de l'ouvrage passe par ses propres dialogues) — à étendre.
+3. L'écran ne voit pas une clé configurée à **faux** (seules les clés accordées sont transmises) : un bouton peut rester actif et la base refuser avec un message clair. Le lot E lit les mêmes droits pour griser.

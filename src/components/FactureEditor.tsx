@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { calcTotaux, euros, LIGNE_TYPES, TAUX_TVA, UNITES, type LigneDevis } from "@/lib/devis";
+import { euros, LIGNE_TYPES, TAUX_TVA, UNITES, type LigneDevis } from "@/lib/devis";
+import { totauxDocument } from "@/lib/devis/montants";
 import { FACTURE_TYPES } from "@/lib/factures";
 import { prestationVersLigne, type PrestationCatalogue } from "@/lib/prestations";
 import { modifierFactureAction } from "@/app/actions/factures";
@@ -12,6 +13,8 @@ type FactureInitiale = {
   id: string; client_id: string; chantier_id: string | null; type: string;
   date_emission: string; date_echeance: string | null;
   notes_client: string | null; notes_internes: string | null; lignes: LigneDevis[];
+  /** Remise globale héritée du devis (GP V1) ; absente sur une facture historique. */
+  remise_globale?: number | null;
 };
 const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 const ligneVide = (): LigneDevis => ({ designation: "", description: null, type: "fourniture", quantite: 1, unite: "u", prix_unitaire_ht: 0, remise_ligne: 0, taux_tva: 20 });
@@ -33,7 +36,12 @@ export function FactureEditor({ facture, clients, chantiers, prestations }: {
   const [notesClient, setNotesClient] = useState(facture.notes_client ?? "");
   const [notesInternes, setNotesInternes] = useState(facture.notes_internes ?? "");
   const [lignes, setLignes] = useState<LigneDevis[]>(facture.lignes.length ? facture.lignes : [ligneVide()]);
-  const totaux = calcTotaux(lignes, 0);
+  // GP V1 : même calcul exact que la base et le devis (remise globale comprise) — plus de calcul flottant.
+  const t = totauxDocument(
+    lignes.map((l) => ({ quantite: Number(l.quantite) || 0, prixUnitaireHt: Number(l.prix_unitaire_ht) || 0, remiseLignePct: Number(l.remise_ligne) || 0, tauxTva: Number(l.taux_tva) || 0 })),
+    Number(facture.remise_globale ?? 0),
+  );
+  const totaux = { ht: t.totalHt, tva: t.totalTva, ttc: t.totalTtc };
   const maj = (i: number, cle: keyof LigneDevis, valeur: string | number) => setLignes((avant) => avant.map((ligne, index) => index === i ? { ...ligne, [cle]: valeur } : ligne));
 
   function insererPrestation(id: string) {

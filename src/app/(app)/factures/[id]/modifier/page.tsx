@@ -11,6 +11,7 @@ export default async function ModifierFacturePage({ params }: { params: Promise<
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const [{ data: facture }, { data: lignes }, { data: clients }, { data: chantiers }, { data: prestations }] = await Promise.all([
+    // GP V1 : la remise globale de facture n'existe qu'avec le moteur v2 (colonne de sa migration).
     supabase.from("factures").select("id, client_id, chantier_id, type, date_emission, date_echeance, notes_client, notes_internes, statut").eq("id", id).eq("entreprise_id", ctx.entrepriseId).single(),
     supabase.from("lignes_factures").select("designation, description, type, quantite, unite, prix_unitaire_ht, remise_ligne, taux_tva").eq("facture_id", id).order("ordre"),
     supabase.from("clients").select("id, nom, prenom, societe").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
@@ -19,6 +20,10 @@ export default async function ModifierFacturePage({ params }: { params: Promise<
   ]);
   if (!facture) notFound();
   if (facture.statut !== "brouillon") redirect(`/factures/${id}`);
+  // GP V1 : la remise globale de facture n'existe qu'avec le moteur v2 (colonne de sa migration).
+  const remiseGlobale = devisV2Actif()
+    ? Number(((await supabase.from("factures").select("remise_globale").eq("id", id).maybeSingle()).data as { remise_globale?: number | string | null } | null)?.remise_globale ?? 0)
+    : 0;
 
   // Moteur v2 : une facture issue d'un devis à ouvrages garde la présentation de son devis. L'éditeur
   // historique réécrirait ses lignes à plat — la base le refuse d'ailleurs ; on l'explique plutôt
@@ -43,7 +48,7 @@ export default async function ModifierFacturePage({ params }: { params: Promise<
   }
 
   return <main className="p-8"><div className="mx-auto max-w-3xl space-y-6"><div><Link href={`/factures/${id}`} className="text-sm text-neutral-500 hover:underline">← Facture</Link><h1 className="mt-1 text-xl font-semibold">Modifier la facture brouillon</h1></div><FactureEditor
-    facture={{ ...facture, lignes: (lignes ?? []).map((ligne) => ({ ...ligne, quantite: Number(ligne.quantite), prix_unitaire_ht: Number(ligne.prix_unitaire_ht), remise_ligne: Number(ligne.remise_ligne), taux_tva: Number(ligne.taux_tva) })) }}
+    facture={{ ...facture, remise_globale: remiseGlobale, lignes: (lignes ?? []).map((ligne) => ({ ...ligne, quantite: Number(ligne.quantite), prix_unitaire_ht: Number(ligne.prix_unitaire_ht), remise_ligne: Number(ligne.remise_ligne), taux_tva: Number(ligne.taux_tva) })) }}
     clients={(clients ?? []).map((client) => ({ id: client.id, label: nomClient(client) }))}
     chantiers={(chantiers ?? []).map((chantier) => ({ id: chantier.id, label: chantier.nom, client_id: chantier.client_id }))}
     prestations={prestations ?? []}

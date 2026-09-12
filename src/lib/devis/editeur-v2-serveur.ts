@@ -5,6 +5,7 @@ import { nomClient } from "@/lib/chantier-statuts";
 import type { ContexteEntreprise } from "@/lib/entreprise";
 import { ENTETE_ENTREPRISE_COLONNES } from "@/lib/documents-commerciaux";
 import { permissionsUtilisateur } from "@/lib/permissions";
+import { possedeDroitFin } from "@/lib/droits-devis";
 import { enteteDepuisBase, etatDepuisBase, type DevisBase, type LigneDevisBase, type OuvrageDevisBase } from "@/lib/devis/brouillon-v2";
 import type { EnteteDevisV2 } from "@/lib/devis/enregistrement-v2";
 import type { EtatElements } from "@/lib/devis/editeur-etat";
@@ -27,7 +28,7 @@ export type DonneesEditeurV2 = {
   filigranesEntreprise: ReglagesFiligraneEntreprise | null;
   logoDisponible: boolean;
   seuilTauxMarquePct: number | null;
-  droits: { voirCouts: boolean; gererCouts: boolean; modifierPrix: boolean; modifierUnite: boolean };
+  droits: { voirCouts: boolean; gererCouts: boolean; modifierPrix: boolean; modifierUnite: boolean; modifierRemise: boolean };
   nomProduit: string;
   /** Salariés actifs pouvant être rattachés comme commercial (GP V1). */
   commerciaux: Array<{ id: string; label: string }>;
@@ -74,8 +75,10 @@ export async function chargerDonneesEditeurV2(supabase: SupabaseClient, ctx: Con
     droits: {
       voirCouts: possede(permissions, "voir_couts_devis"),
       gererCouts: possede(permissions, "gerer_couts_devis"),
-      modifierPrix: possede(permissions, "gerer_devis"),
+      // Droits fins (D4) : hérités de gerer_devis ; la base reste l'autorité (verifier_droits_prix_devis).
+      modifierPrix: possede(permissions, "gerer_devis") && possedeDroitFin(permissions, "modifier_prix_vente"),
       modifierUnite: possede(permissions, "gerer_devis"),
+      modifierRemise: possede(permissions, "gerer_devis") && possedeDroitFin(permissions, "modifier_remise"),
     },
     nomProduit: PRODUCT_NAME,
     commerciaux: ((employes ?? []) as Array<{ id: string; prenom: string | null; nom: string | null }>)

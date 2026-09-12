@@ -35,7 +35,7 @@ import { indicateursPrix, TAUX_TVA_ADMIS } from "@/lib/devis/prix";
 
 export type ClientEditeur = { id: string; label: string; adresse: string | null; codePostal: string | null; ville: string | null; siret: string | null };
 export type ChantierEditeur = { id: string; label: string; clientId: string | null };
-export type DroitsEditeur = { voirCouts: boolean; gererCouts: boolean; modifierPrix: boolean; modifierUnite: boolean };
+export type DroitsEditeur = { voirCouts: boolean; gererCouts: boolean; modifierPrix: boolean; modifierUnite: boolean; modifierRemise: boolean };
 
 type Dialogue = null | { type: "articles" } | { type: "ouvrage"; instance: InstanceOuvrage | null; apresCle?: string | null } | { type: "prix"; instance: InstanceOuvrage } | { type: "colonnes" } | { type: "ligne_mobile"; cle: string };
 type Instantane = { entete: EnteteDevisV2; etat: EtatElements };
@@ -339,7 +339,7 @@ export function EditeurDevisV2({
             </label>
             <label className="flex flex-col gap-1 text-sm">
               Remise globale (%)
-              <input type="number" min={0} max={100} step="any" value={entete.remise_globale} onChange={(e) => majEntete({ remise_globale: Number(e.target.value) })} className={champ} />
+              <input type="number" min={0} max={100} step="any" value={entete.remise_globale} disabled={!droits.modifierRemise} title={droits.modifierRemise ? undefined : "Votre poste ne permet pas d’accorder des remises."} onChange={(e) => majEntete({ remise_globale: Number(e.target.value) })} className={champ} />
             </label>
             <label className="flex flex-col gap-1 text-sm sm:col-span-2 lg:col-span-3">
               Conditions (visibles par le client)

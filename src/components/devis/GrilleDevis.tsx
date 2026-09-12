@@ -469,7 +469,7 @@ const LigneGrille = memo(function LigneGrille({ index, ligne, origine, colonnes,
             if (type === "remise") {
               return (
                 <div key={c.cle} role="gridcell" className="flex min-w-0 items-center" title={tvaMixte ? "Section à plusieurs taux de TVA : indiquez le taux de la remise" : undefined}>
-                  <input data-cellule={`${index}:prix_vente`} aria-label="Remise (% de la section ou montant)" inputMode="decimal" disabled={!peut(c, "prixUnitaireHt")}
+                  <input data-cellule={`${index}:prix_vente`} aria-label="Remise (% de la section ou montant)" inputMode="decimal" disabled={!droits.modifierRemise}
                     defaultValue={ligne.remiseSectionPct !== null && ligne.remiseSectionPct !== undefined ? `${fr(ligne.remiseSectionPct, 2)} %` : fr(ligne.prixUnitaireHt, 2)}
                     key={`${ligne.remiseSectionPct}|${ligne.prixUnitaireHt}`}
                     onFocus={onFocus}

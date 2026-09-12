@@ -1,5 +1,8 @@
 "use server";
 
+import { MOTIF_DROIT_FIN, possedeDroitFin } from "@/lib/droits-devis";
+import { permissionsUtilisateur } from "@/lib/permissions";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getContexteEntreprise } from "@/lib/entreprise";
@@ -20,6 +23,7 @@ const retourErreur = (chemin: string, message: string): never =>
 export async function creerSituationAction(formData: FormData) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  if (!possedeDroitFin(await permissionsUtilisateur(ctx), "transformer_devis")) retourErreur("/facturation-avancee", MOTIF_DROIT_FIN.transformer_devis);
   const { error } = await supabase.rpc("creer_situation_travaux", {
     p_entreprise_id: ctx.entrepriseId,
     p_devis_id: texte(formData, "devis_id"),
@@ -48,6 +52,7 @@ export async function facturerSituationAction(situationId: string) {
 export async function creerFactureAvanceeAction(formData: FormData) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  if (!possedeDroitFin(await permissionsUtilisateur(ctx), "transformer_devis")) retourErreur("/facturation-avancee", MOTIF_DROIT_FIN.transformer_devis);
   const type = texte(formData, "type");
   const { data, error } = await supabase.rpc("creer_facture_avancee", {
     p_entreprise_id: ctx.entrepriseId,

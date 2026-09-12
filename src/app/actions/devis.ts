@@ -1,5 +1,7 @@
 "use server";
 
+import { MOTIF_DROIT_FIN, possedeDroitFin } from "@/lib/droits-devis";
+
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -176,6 +178,10 @@ export async function associerDevisDepuisChantierAction(chantierId: string, form
 export async function changerStatutDevisAction(devisId: string, statut: string) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  // GP V1 : contrôle en TypeScript avant la base (RLS + déclencheur d'envoi).
+  const permissions = await permissionsUtilisateur(ctx);
+  if (!(permissions === null || permissions.includes("gerer_devis"))) { revalidatePath(`/devis/${devisId}`); return; }
+  if (statut === "envoye" && !possedeDroitFin(permissions, "envoyer_devis")) { revalidatePath(`/devis/${devisId}`); return; }
 
   const { data: devis } = await supabase.from("devis").select("statut, chantier_id").eq("id", devisId).eq("entreprise_id", ctx.entrepriseId).single();
   if (!devis || (statut !== devis.statut && !(TRANSITIONS_DEVIS[devis.statut] ?? []).includes(statut))) {
@@ -201,6 +207,7 @@ export async function changerStatutDevisAction(devisId: string, statut: string) 
 export async function supprimerDevisAction(devisId: string) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  if (!possedeDroitFin(await permissionsUtilisateur(ctx), "supprimer_devis")) redirect(`/devis/${devisId}?error=${encodeURIComponent(MOTIF_DROIT_FIN.supprimer_devis)}`);
 
   const { data: devis } = await supabase
     .from("devis")
@@ -243,6 +250,7 @@ export async function envoyerDevisEmailAction(
   if (permissions !== null && !permissions.includes("gerer_devis")) {
     return { error: "Votre poste ne permet pas d'envoyer de devis par e-mail." };
   }
+  if (!possedeDroitFin(permissions, "envoyer_devis")) return { error: MOTIF_DROIT_FIN.envoyer_devis };
 
   const resultat = await envoyerDocumentCommercialParEmail(supabase, {
     entrepriseId: ctx.entrepriseId,

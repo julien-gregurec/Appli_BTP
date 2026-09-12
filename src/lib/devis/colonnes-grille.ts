@@ -7,7 +7,7 @@
  * sont une commodité locale (localStorage), lus avec indulgence : un réglage inconnu est ignoré.
  */
 
-export type DroitsGrille = { voirCouts: boolean; gererCouts: boolean; modifierPrix: boolean; modifierUnite: boolean };
+export type DroitsGrille = { voirCouts: boolean; gererCouts: boolean; modifierPrix: boolean; modifierUnite: boolean; modifierRemise: boolean };
 
 export type CleColonne =
   | "poignee" | "type" | "reference" | "designation" | "description" | "reference_fabricant" | "code_fournisseur"
@@ -37,7 +37,7 @@ export const COLONNES_GRILLE: readonly Colonne[] = [
   { cle: "reference", libelle: "Référence interne", court: "Réf.", largeurPx: 110, alignement: "gauche", modifiable: false, defaut: true },
   { cle: "designation", libelle: "Désignation", court: "Désignation", largeurPx: 320, alignement: "gauche", defaut: true, obligatoire: true },
   { cle: "description", libelle: "Description", court: "Description", largeurPx: 220, alignement: "gauche", defaut: false },
-  { cle: "reference_fabricant", libelle: "Référence fabricant", court: "Réf. fab.", largeurPx: 110, alignement: "gauche", modifiable: false, defaut: false },
+  { cle: "reference_fabricant", libelle: "Référence fabricant", court: "Réf. fab.", largeurPx: 110, alignement: "gauche", modifiable: false, defaut: true },
   { cle: "code_fournisseur", libelle: "Code distributeur", court: "Code distrib.", largeurPx: 110, alignement: "gauche", modifiable: false, defaut: false },
   { cle: "famille", libelle: "Famille", court: "Famille", largeurPx: 130, alignement: "gauche", modifiable: false, defaut: false },
   { cle: "fournisseur", libelle: "Fournisseur", court: "Fourn.", largeurPx: 120, alignement: "gauche", modifiable: false, defaut: false },
@@ -49,7 +49,7 @@ export const COLONNES_GRILLE: readonly Colonne[] = [
   { cle: "marge", libelle: "Marge HT", court: "Marge €", largeurPx: 90, alignement: "droite", sensible: true, modifiable: false, defaut: true },
   { cle: "marge_pct", libelle: "Taux de marque", court: "Marge %", largeurPx: 76, alignement: "droite", sensible: true, modifiable: false, defaut: false },
   { cle: "prix_vente", libelle: "Prix de vente unitaire HT", court: "PU HT", largeurPx: 100, alignement: "droite", modifiable: "modifierPrix", defaut: true, obligatoire: true },
-  { cle: "remise", libelle: "Remise de ligne (%)", court: "Rem. %", largeurPx: 70, alignement: "droite", defaut: true },
+  { cle: "remise", libelle: "Remise de ligne (%)", court: "Rem. %", largeurPx: 70, alignement: "droite", modifiable: "modifierRemise", defaut: true },
   { cle: "tva", libelle: "TVA", court: "TVA", largeurPx: 70, alignement: "droite", defaut: true },
   { cle: "total_ht", libelle: "Total HT", court: "Total HT", largeurPx: 104, alignement: "droite", modifiable: false, defaut: true, obligatoire: true },
   { cle: "commentaire_interne", libelle: "Commentaire interne", court: "Comm. interne", largeurPx: 180, alignement: "gauche", defaut: false },

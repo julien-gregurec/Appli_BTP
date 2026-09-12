@@ -76,9 +76,33 @@ on conflict (cle) do update set nom = excluded.nom, description = excluded.descr
 -- ─────────────────────────────────────────────────────────────────────────────────────────────────────
 -- 2. Droits tenus en base
 -- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- Droit fin « accordé d'office » : ouvert si la clé est accordée ; fermé si elle est explicitement
+-- configurée à faux pour le poste ; sinon HÉRITÉ du droit parent (gerer_devis, gerer_planning). Ainsi un
+-- poste créé hors catalogue, ou avant le rattrapage, ne perd rien ; et l'administrateur peut fermer
+-- finement. Même règle pour l'écran (src/lib/droits-devis.ts).
+create or replace function public.droit_fin(p_entreprise_id uuid, p_cle text, p_parent text)
+returns boolean
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if public.a_permission(p_entreprise_id, p_cle) then
+    return true;
+  end if;
+  if exists (
+    select 1
+    from public.utilisateurs_entreprises ue
+    join public.permissions_poste pp on pp.poste_id = ue.poste_id and pp.entreprise_id = ue.entreprise_id
+    where ue.utilisateur_id = auth.uid() and ue.entreprise_id = p_entreprise_id and pp.cle_permission = p_cle
+  ) then
+    return false;
+  end if;
+  return public.a_permission(p_entreprise_id, p_parent);
+end $$;
+revoke all on function public.droit_fin(uuid, text, text) from public, anon, service_role;
+grant execute on function public.droit_fin(uuid, text, text) to authenticated;
+
 drop policy if exists devis_suppression_droit on public.devis;
 create policy devis_suppression_droit on public.devis as restrictive for delete to authenticated
-  using (public.a_permission(entreprise_id, 'supprimer_devis'));
+  using (public.droit_fin(entreprise_id, 'supprimer_devis', 'gerer_devis'));
 
 -- Passage au statut « envoyé » : droit d'envoi. Un chemin sans utilisateur (migration, tâche serveur)
 -- n'est pas concerné.
@@ -86,7 +110,7 @@ create or replace function public.verifier_droit_envoi_devis()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
   if new.statut = 'envoye' and old.statut is distinct from 'envoye' and auth.uid() is not null
-     and not public.a_permission(new.entreprise_id, 'envoyer_devis') then
+     and not public.droit_fin(new.entreprise_id, 'envoyer_devis', 'gerer_devis') then
     raise exception 'Accès refusé : envoyer un devis exige le droit « envoyer_devis ».' using errcode = '42501';
   end if;
   return new;
@@ -105,11 +129,13 @@ security invoker
 set search_path = public
 as $$
 declare
-  v_prix boolean := public.a_permission(p_entreprise_id, 'modifier_prix_vente');
-  v_remise boolean := public.a_permission(p_entreprise_id, 'modifier_remise');
+  v_prix boolean := public.droit_fin(p_entreprise_id, 'modifier_prix_vente', 'gerer_devis');
+  v_remise boolean := public.droit_fin(p_entreprise_id, 'modifier_remise', 'gerer_devis');
   v_remise_globale numeric := 0;
   n record;
-  a record;
+  v_a_prix numeric;
+  v_a_remise numeric;
+  v_a_pct numeric;
   v_catalogue numeric;
 begin
   if v_prix and v_remise then
@@ -128,25 +154,25 @@ begin
     from jsonb_to_recordset(p_lignes) as l(cle_ligne text, type_ligne text, ouvrage_cle text, source_catalogue text, source_id uuid,
                                            prix_unitaire_ht numeric, remise_ligne numeric, remise_section_pct numeric)
   loop
-    a := null;
+    v_a_prix := null; v_a_remise := null; v_a_pct := null;
     if p_devis_id is not null then
-      select prix_unitaire_ht, remise_ligne, remise_section_pct into a
+      select prix_unitaire_ht, remise_ligne, remise_section_pct into v_a_prix, v_a_remise, v_a_pct
       from public.lignes_devis where devis_id = p_devis_id and cle_ligne = n.cle_ligne;
     end if;
 
     if not v_remise then
-      if n.remise_ligne <> coalesce(a.remise_ligne, 0) then
+      if n.remise_ligne <> coalesce(v_a_remise, 0) then
         raise exception 'Vos droits ne permettent pas d''accorder une remise de ligne.' using errcode = '42501';
       end if;
-      if n.type_ligne = 'remise' and (a.prix_unitaire_ht is null
-          or a.prix_unitaire_ht <> n.prix_unitaire_ht or a.remise_section_pct is distinct from n.remise_section_pct) then
+      if n.type_ligne = 'remise' and (v_a_prix is null
+          or v_a_prix <> n.prix_unitaire_ht or v_a_pct is distinct from n.remise_section_pct) then
         raise exception 'Vos droits ne permettent pas d''ajouter ou de modifier une ligne de remise.' using errcode = '42501';
       end if;
     end if;
 
     if not v_prix and n.type_ligne in ('article', 'libre') and n.ouvrage_cle is null then
-      if a.prix_unitaire_ht is not null then
-        if a.prix_unitaire_ht <> n.prix_unitaire_ht then
+      if v_a_prix is not null then
+        if v_a_prix <> n.prix_unitaire_ht then
           raise exception 'Vos droits ne permettent pas de modifier un prix de vente.' using errcode = '42501';
         end if;
       elsif n.source_id is not null then
@@ -398,7 +424,7 @@ begin
   if not public.a_permission(v_devis.entreprise_id, 'gerer_factures') then
     raise exception 'Accès refusé : la création de facture exige le droit de gérer les factures.' using errcode = '42501';
   end if;
-  if not public.a_permission(v_devis.entreprise_id, 'transformer_devis') then
+  if not public.droit_fin(v_devis.entreprise_id, 'transformer_devis', 'gerer_devis') then
     raise exception 'Accès refusé : transformer un devis exige le droit « transformer_devis ».' using errcode = '42501';
   end if;
   if v_devis.statut <> 'accepte' then raise exception 'Le devis doit etre accepte avant facturation'; end if;

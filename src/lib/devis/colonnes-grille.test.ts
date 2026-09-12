@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { basculerColonne, colonneModifiable, colonnesReglables, colonnesVisibles, COLONNES_GRILLE, lireReglagesColonnes, reglagesParDefaut } from "./colonnes-grille";
 
-const tous = { voirCouts: true, gererCouts: true, modifierPrix: true, modifierUnite: true };
-const poseur = { voirCouts: false, gererCouts: false, modifierPrix: false, modifierUnite: false };
+const tous = { voirCouts: true, gererCouts: true, modifierPrix: true, modifierUnite: true, modifierRemise: true };
+const poseur = { voirCouts: false, gererCouts: false, modifierPrix: false, modifierUnite: false, modifierRemise: false };
 
 describe("colonnes de la grille", () => {
   it("sans droit sur les coûts, aucune colonne sensible n'existe — même explicitement demandée", () => {

@@ -1,5 +1,7 @@
 "use server";
 
+import { MOTIF_DROIT_FIN, possedeDroitFin } from "@/lib/droits-devis";
+
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -375,6 +377,7 @@ export async function previsualiserChantierDepuisDevis(devisId: string): Promise
 
 export async function creerChantierDepuisDevisAction(devisId: string, formData: FormData) {
   const supabase = await createClient();
+  if (!possedeDroitFin(await permissionsUtilisateur(await getContexteEntreprise()), "transformer_devis")) redirect(`/devis/${devisId}?error=${encodeURIComponent(MOTIF_DROIT_FIN.transformer_devis)}`);
   const nom = champ(formData, "nom");
   const adresse = champ(formData, "adresse");
   const codePostal = champ(formData, "code_postal");
