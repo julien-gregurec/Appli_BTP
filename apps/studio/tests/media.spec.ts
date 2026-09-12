@@ -3,7 +3,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, rm } from "node:fs/promises";
 import { fixtures, largeFixture } from "./media-fixtures";
 const password = "Studio-Media-Fixture-876!";
 function client() {
@@ -59,6 +59,9 @@ async function post(page: Page, path: string, data: unknown = {}) {
 let sample: Awaited<ReturnType<typeof fixtures>>;
 test.beforeAll(async ({ browser }) => {
   sample = await fixtures(browser);
+});
+test.afterAll(async () => {
+  if (sample) await rm(sample.directory, { recursive: true, force: true });
 });
 test("Vacances Croatie 2026 : cinq photos, deux vidéos, reload, preview, suppression", async ({
   page,
@@ -370,7 +373,10 @@ test("Chantier Strasbourg : mobile, MOV, erreurs et accès A/B/rôles", async ({
     ).ok(),
   ).toBe(false);
 });
-test("1 Gio réel : transfert direct, interruption, retry TUS, progression et mémoire", async ({
+const volumeMiB = Number(process.env.STUDIO_E2E_LARGE_MIB ?? 1024);
+if (![64, 1024].includes(volumeMiB))
+  throw new Error("STUDIO_E2E_LARGE_MIB must be 64 (smoke) or 1024 (volume)");
+test(`TUS réel : transfert direct, interruption, retry, progression et mémoire (${volumeMiB} Mio)`, async ({
   page,
 }) => {
   test.setTimeout(720000);
@@ -382,7 +388,11 @@ test("1 Gio réel : transfert direct, interruption, retry TUS, progression et m�
   });
   const project = (await created.json()).id;
   await page.goto(`/projects/${project}`);
-  const path = await largeFixture(sample.directory, sample.mp4);
+  const path = await largeFixture(
+    sample.directory,
+    sample.mp4,
+    volumeMiB * 1024 ** 2,
+  );
   let faults = 0;
   const offsets: number[] = [];
   let nextPayload = 0;
@@ -472,7 +482,7 @@ test("1 Gio réel : transfert direct, interruption, retry TUS, progression et m�
     "test-results/media-large-metrics.json",
     JSON.stringify(
       {
-        bytes: 1024 ** 3,
+        bytes: volumeMiB * 1024 ** 2,
         injectedFailures: faults,
         patchRequests: offsets.length,
         maxOffset: Math.max(...offsets),

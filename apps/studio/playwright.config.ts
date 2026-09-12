@@ -15,6 +15,7 @@ for (const value of [baseURL, process.env.NEXT_PUBLIC_SUPABASE_URL]) {
 }
 export default defineConfig({
   testDir: "tests",
+  globalSetup: "./scripts/e2e-setup.mjs",
   testMatch: "**/*.spec.ts",
   workers: 1,
   retries: 0,
@@ -26,7 +27,9 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  reporter: [["list"]],
+  reporter: process.env.STUDIO_E2E_RESULT
+    ? [["list"], ["json", { outputFile: process.env.STUDIO_E2E_RESULT }]]
+    : [["list"]],
   webServer: {
     command: "npm run start",
     url: `${baseURL}/login`,

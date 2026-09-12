@@ -1,3 +1,4 @@
+import { rm } from "node:fs/promises";
 import { test, expect, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
@@ -52,6 +53,9 @@ let sample: Awaited<ReturnType<typeof fixtures>>;
 test.beforeAll(async ({ browser }) => {
   sample = await fixtures(browser);
 });
+test.afterAll(async () => {
+  if (sample) await rm(sample.directory, { recursive: true, force: true });
+});
 async function create(
   page: Page,
   workspace: string,
@@ -92,6 +96,12 @@ test("Lot C Chantier : paramètres, cover, ordre, archive/restauration et tablet
 }) => {
   test.setTimeout(240000);
   const a = await user(page);
+  const roleBefore = await a.api.rpc("studio_my_role", {
+    p_workspace_id: a.workspace,
+  });
+  expect(roleBefore.error).toBeNull();
+  expect(roleBefore.data).toBe("owner");
+  expect((await a.api.auth.getUser()).data.user?.id).toBe(a.id);
   await create(page, a.workspace, "Chantier Strasbourg", "construction");
   await page.getByLabel("Ville", { exact: true }).fill("Strasbourg");
   await page
@@ -137,7 +147,17 @@ test("Lot C Chantier : paramètres, cover, ordre, archive/restauration et tablet
   await expect(page.locator(".ordering-list li span").first()).toHaveText(
     names[1],
   );
-  expect((await request(page, `/api/projects/${id}`)).body).toMatchObject({
+  const roleAfter = await a.api.rpc("studio_my_role", {
+    p_workspace_id: a.workspace,
+  });
+  expect(roleAfter.error).toBeNull();
+  expect(roleAfter.data).toBe("owner");
+  const projectResponse = await request(page, `/api/projects/${id}`);
+  expect(projectResponse.status, JSON.stringify(projectResponse.body)).toBe(
+    200,
+  );
+  expect(projectResponse.body).toMatchObject({
+    workspace_id: a.workspace,
     location_label: "Strasbourg",
     target_duration_seconds: 60,
     target_aspect_ratio: "9:16",
