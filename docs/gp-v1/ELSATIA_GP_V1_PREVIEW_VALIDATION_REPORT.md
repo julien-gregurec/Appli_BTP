@@ -60,3 +60,31 @@ vérifier visuellement l'accès aux nouvelles versions. **Aucune action sur la P
    ```
    `db push` applique **toutes** les migrations manquantes de la preview (si elle est en retard sur 280, les
    intermédiaires sont indispensables à cette branche), puis 282→289. La Production n'est jamais liée.
+
+## 5. Reprise après le message « projet restauré » (2026-09-13, 00:30 → 01:10)
+
+**Constat.** L'API Supabase (`supabase projects list`) renvoie toujours `elsatia-preview … INACTIVE` et le
+point de santé `https://pgvvpqyjziyapbbkydmc.supabase.co/auth/v1/health` ne répond pas (code 000), relevés
+toutes les 40 s pendant 40 minutes (dernier relevé 01:09:12). `supabase link --project-ref pgvvpqyjziyapbbkydmc`
+répond « project is paused ». La restauration n'est donc pas effective côté Supabase, ou n'a pas été lancée
+sur ce projet. Rien n'a été fait sur Production (`exhvuzegsefmoguxoiak`, jamais lié, jamais interrogé).
+
+**Fait pendant l'attente, sans la base.**
+- Jeu de données de recette `docs/gp-v1/preview/seed-recette-gp-v1.sql` (commit `9d7dc99`, poussé) :
+  entreprise « ELSATIA Recette V2 » sur l'offre **Pro**, compte Dirigeant `dirigeant.recette@elsatia-preview.invalid`
+  avec tous les droits sauf `mode_compte_depot` (107 clés), compte Conducteur sans coûts, 8 salariés, 4 clients,
+  4 chantiers, 5 familles, 12 articles (références internes, fabricants, coûts d'achat et coefficients sur 10),
+  1 équipe, 3 ressources, 10 évènements sur la semaine courante avec 15 affectations. Le mot de passe est passé
+  par variable psql (`-v mdp=…`), jamais dans le fichier. Rejouable (`on conflict do nothing`).
+  Prouvé sur une copie locale du ledger 289 (`gpv1_seedtest`, créée puis détruite) : COMMIT, rejeu sans erreur.
+- Runbook `preview-db.sh` (scratchpad) avec garde-fou : refuse tout projet lié autre que `pgvvpqyjziyapbbkydmc`.
+  Étapes prévues dans l'ordre demandé : `link` → `ledger` (`migration list --linked`) → `backup`
+  (`db dump` schéma + données + rôles, horodatés) → `dryrun` → `push` (seules les migrations absentes de
+  l'historique distant, donc 282→289 si la preview est au 280) → `seed` → `verify`.
+
+**Ce qu'il manque pour continuer (Julien).**
+1. Le projet doit être réellement ACTIVE : Dashboard → https://supabase.com/dashboard/project/pgvvpqyjziyapbbkydmc →
+   « Restore project » (ou vérifier qu'une restauration est en cours ; elle peut prendre plusieurs minutes).
+2. Le **mot de passe de la base preview** (Settings → Database → « Reset database password » si inconnu) :
+   `link`, `migration list`, `db dump` et `db push` en ont besoin. Seule `db query` (Management API) s'en passe.
+   Ce mot de passe concerne la preview uniquement ; il ne sera ni commité ni écrit dans un rapport.
