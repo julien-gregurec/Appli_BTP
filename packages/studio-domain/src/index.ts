@@ -82,3 +82,5 @@ export function safeStudioDestination(value: unknown): string {
     return "/dashboard";
   return value;
 }
+
+export * from "./media";

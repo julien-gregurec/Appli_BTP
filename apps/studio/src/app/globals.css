@@ -366,3 +366,69 @@ nav small {
     flex-wrap: wrap;
   }
 }
+
+/* Media library: original files load only after an explicit preview request. */
+.drop-zone {
+  border: 2px dashed var(--line, #b6c4b9);
+  margin: 24px 0;
+}
+.file-label input {
+  max-width: 100%;
+}
+.upload-list {
+  list-style: none;
+  padding: 0;
+}
+.upload-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #d9ded7;
+}
+.upload-list li > div {
+  flex: 1;
+  min-width: 180px;
+  overflow-wrap: anywhere;
+}
+.upload-list img {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.upload-list progress {
+  width: min(100%, 300px);
+  margin-right: 12px;
+  accent-color: #24533f;
+}
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
+  gap: 20px;
+}
+.media-card {
+  min-width: 0;
+}
+.media-card h3 {
+  overflow-wrap: anywhere;
+}
+.media-preview img,
+.media-preview video,
+.media-placeholder {
+  width: 100%;
+  height: 170px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #e8ece5;
+}
+.media-placeholder {
+  display: grid;
+  place-items: center;
+  letter-spacing: 0.16em;
+  color: #536451;
+}
+.media-preview button {
+  margin-top: 10px;
+}

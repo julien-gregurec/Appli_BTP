@@ -1,4 +1,9 @@
 import type {
+  StudioProject,
+  StudioMediaAsset,
+  MediaLimits,
+} from "./media-contract";
+import type {
   StudioWorkspace,
   StudioWorkspaceMember,
 } from "@elsatia/studio-domain";
@@ -12,6 +17,9 @@ type Table<Row> = {
 export type Database = {
   public: {
     Tables: {
+      studio_projects: Table<StudioProject>;
+      studio_media_assets: Table<StudioMediaAsset>;
+      studio_media_limits: Table<MediaLimits>;
       studio_workspaces: Table<StudioWorkspace>;
       studio_workspace_members: Table<StudioWorkspaceMember>;
     };
@@ -19,6 +27,21 @@ export type Database = {
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
     Functions: {
+      studio_create_project: {
+        Args: { p_workspace: string; p_name: string; p_type: string };
+        Returns: string;
+      };
+      studio_reserve_media: {
+        Args: {
+          p_project: string;
+          p_request: string;
+          p_name: string;
+          p_mime: string;
+          p_bytes: number;
+        };
+        Returns: string;
+      };
+      studio_delete_media: { Args: { p_asset: string }; Returns: undefined };
       studio_create_workspace: {
         Args: { p_name: string; p_type: string };
         Returns: string;

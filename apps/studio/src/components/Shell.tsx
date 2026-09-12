@@ -7,7 +7,7 @@ export default function Shell({
   children,
 }: {
   context: Awaited<ReturnType<typeof getActiveStudioWorkspace>>;
-  page: "dashboard" | "settings" | "members";
+  page: "dashboard" | "settings" | "members" | "projects";
   children: React.ReactNode;
 }) {
   const { user, workspace, workspaces, membership } = context;
@@ -29,9 +29,12 @@ export default function Shell({
           >
             Tableau de bord
           </Link>
-          <span>
-            Projets <small>À venir</small>
-          </span>
+          <Link
+            href={`/projects${suffix}`}
+            aria-current={page === "projects" ? "page" : undefined}
+          >
+            Projets
+          </Link>
           <span>
             Templates <small>À venir</small>
           </span>
@@ -54,7 +57,7 @@ export default function Shell({
         <div className="aside-foot">
           Vos images. Votre histoire.
           <br />
-          <small>Fondations · Lot A</small>
+          <small>Bibliothèque privée</small>
         </div>
       </aside>
       <div className="workspace">

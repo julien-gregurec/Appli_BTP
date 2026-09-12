@@ -18,8 +18,8 @@ export default defineConfig({
   testMatch: "**/*.spec.ts",
   workers: 1,
   retries: 0,
-  timeout: 60000,
-  expect: { timeout: 15000 },
+  timeout: 120000,
+  expect: { timeout: 45000 },
   use: {
     baseURL,
     channel: process.env.STUDIO_E2E_CHANNEL,

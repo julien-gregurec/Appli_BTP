@@ -1,4 +1,4 @@
-name: Studio Foundation
+name: Studio Foundation and Media
 on:
   pull_request:
     paths:
@@ -33,8 +33,7 @@ jobs:
       - run: npm run build --prefix apps/studio
       - run: apps/studio/node_modules/.bin/playwright install --with-deps chromium
       - run: npm run test:e2e --prefix apps/studio
-        env:
-          STUDIO_E2E_PRODUCTION: '1'
+      - run: node --env-file=apps/studio/.env.local apps/studio/scripts/storage-reconcile.mjs
       - if: always()
         run: node apps/studio/scripts/local-test.mjs stop
       - uses: actions/upload-artifact@v4

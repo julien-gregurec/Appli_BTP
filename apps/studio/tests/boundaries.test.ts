@@ -37,3 +37,15 @@ it("ne crée aucune FK métier BTP", () => {
   );
   expect(sql).toContain("deferrable initially deferred");
 });
+
+it("confine le credential Storage au module serveur", () => {
+  for (const file of sources(resolve("src"))) {
+    const code = readFileSync(file, "utf8");
+    if (code.includes("STUDIO_STORAGE_SERVICE_KEY")) {
+      expect(file).toBe(resolve("src/lib/storage-admin.ts"));
+      expect(code).toMatch(/import ["']server-only["']/);
+    }
+    if (code.includes('"use client"'))
+      expect(code).not.toMatch(/storage-admin|media-service|media-inspection/);
+  }
+});
