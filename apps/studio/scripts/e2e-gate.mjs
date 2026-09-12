@@ -27,6 +27,69 @@ if (existsSync(envPath)) renameSync(envPath, backup);
 console.log(`Evidence: ${output}`);
 const individual = process.argv.includes("--individual");
 let owned = false;
+let renderer = null,
+  redisName = null;
+const renderRoot = resolve(app, "../../workers/studio-video");
+const redisPort = Number(process.env.STUDIO_RENDER_REDIS_PORT || 64379);
+async function startRenderer(label) {
+  redisName = `studio-render-${JSON.parse(readFileSync(statePath, "utf8")).projectId}`;
+  execFileSync(
+    "docker",
+    [
+      "run",
+      "-d",
+      "--name",
+      redisName,
+      "--memory=128m",
+      "--cpus=0.5",
+      "-p",
+      `127.0.0.1:${redisPort}:6379`,
+      "redis:7.4.2-alpine@sha256:02419de7eddf55aa5bcf49efb74e88fa8d931b4d77c07eff8a6b2144472b6952",
+      "redis-server",
+      "--save",
+      "",
+      "--appendonly",
+      "no",
+    ],
+    { stdio: "ignore", timeout: 120000 },
+  );
+  const log = openSync(join(output, `${label}-worker.log`), "w", 0o600);
+  const environment = {
+    ...process.env,
+    STUDIO_REDIS_URL: `redis://127.0.0.1:${redisPort}`,
+    STUDIO_RENDER_TMP: join(output, `${label}-scratch`),
+  };
+  for (const key of ["NEXT_PUBLIC_SUPABASE_URL", "STUDIO_STORAGE_SERVICE_KEY"])
+    delete environment[key];
+  renderer = spawn(
+    process.execPath,
+    [
+      `--env-file=${envPath}`,
+      "--import",
+      join(renderRoot, "node_modules/tsx/dist/loader.mjs"),
+      join(renderRoot, "src/worker.ts"),
+    ],
+    { cwd: renderRoot, env: environment, stdio: ["ignore", log, log] },
+  );
+  renderer.once("close", () => closeSync(log));
+}
+async function stopRenderer() {
+  if (renderer) {
+    const child = renderer;
+    renderer = null;
+    if (child.exitCode === null) {
+      child.kill("SIGTERM");
+      await new Promise((resolve) => child.once("close", resolve));
+    }
+  }
+  if (redisName) {
+    execFileSync("docker", ["rm", "-f", redisName], {
+      stdio: "ignore",
+      timeout: 30000,
+    });
+    redisName = null;
+  }
+}
 const results = [];
 async function run(command, args, label, extra = {}) {
   console.log(`Gate: ${label}`);
@@ -53,6 +116,7 @@ async function run(command, args, label, extra = {}) {
     throw Error(`${label} failed (${status}); inspect ${output}`);
 }
 async function stop(label) {
+  await stopRenderer();
   if (!owned) return;
   const state = JSON.parse(readFileSync(statePath, "utf8"));
   // Capture only this gate's containers; raw logs are private local artifacts, never committed.
@@ -96,7 +160,7 @@ try {
     );
     await run(
       process.execPath,
-      ["scripts/timeline-migration-check.mjs"],
+      ["scripts/render-migration-check.mjs"],
       `${label}-migration-check`,
     );
     await run(
@@ -115,6 +179,7 @@ try {
       ["scripts/local-test.mjs", "test-db"],
       `${label}-sql`,
     );
+    await startRenderer(label);
     const targets = individual
       ? JSON.parse(
           execFileSync(
@@ -124,8 +189,8 @@ try {
           ),
         ).suites.flatMap((s) => s.specs.map((t) => `${s.file}:${t.line}`))
       : [null];
-    if (individual && targets.length !== 14)
-      throw Error(`Expected 14 individual E2E cases, found ${targets.length}`);
+    if (individual && targets.length !== 18)
+      throw Error(`Expected 18 individual E2E cases, found ${targets.length}`);
     if (individual && process.argv.includes("--foundation-first")) {
       const foundation = targets.find((t) =>
         t.startsWith("foundation.spec.ts:"),
@@ -142,6 +207,9 @@ try {
         name,
         {
           STUDIO_E2E_RESULT: report,
+          STUDIO_RENDER_INTERNAL_PREVIEW: "1",
+          STUDIO_REDIS_URL: `redis://127.0.0.1:${redisPort}`,
+          STUDIO_RENDER_TMP: join(output, `${label}-scratch`),
           STUDIO_RUNTIME_TRACE: join(output, `${name}-http.jsonl`),
           NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --import=${new URL("runtime-observer.mjs", import.meta.url).href}`,
         },
@@ -154,7 +222,7 @@ try {
         .map((line) => JSON.parse(line));
       if (trace.some((row) => row.status >= 500 || row.status === 0))
         throw Error(`${name}: runtime transport failure or HTTP 5xx`);
-      const expected = target ? 1 : 14;
+      const expected = target ? 1 : 18;
       if (
         stats.expected !== expected ||
         stats.unexpected ||

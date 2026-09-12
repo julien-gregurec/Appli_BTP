@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'apps/studio/**'
+      - 'workers/studio-video/**'
       - 'packages/studio-domain/**'
       - 'supabase/migrations/**'
       - 'supabase/tests/**'
@@ -23,18 +24,21 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             apps/studio/package-lock.json
+            workers/studio-video/package-lock.json
       - run: npm ci
       - run: npm ci --prefix apps/studio
       - run: npm audit --prefix apps/studio --audit-level=high
       - run: node scripts/verify-migrations.mjs
       - run: node apps/studio/scripts/local-test.mjs setup
-      - run: node apps/studio/scripts/timeline-migration-check.mjs
+      - run: node apps/studio/scripts/render-migration-check.mjs
       - run: node --env-file=apps/studio/.env.local apps/studio/scripts/runtime-check.mjs ready
       - run: node apps/studio/scripts/local-test.mjs test-db
       - run: npm run typecheck --prefix apps/studio && npm run lint --prefix apps/studio && npm test --prefix apps/studio
+      - run: npm ci --prefix workers/studio-video
+      - run: npm run lint --prefix workers/studio-video && npm run typecheck --prefix workers/studio-video && npm test --prefix workers/studio-video
       - run: npm run build --prefix apps/studio
       - run: apps/studio/node_modules/.bin/playwright install --with-deps chromium
-      - run: npm run test:e2e --prefix apps/studio
+      - run: npm run test:e2e --prefix apps/studio -- --grep-invert "Lot E"
       - run: node --env-file=apps/studio/.env.local apps/studio/scripts/storage-reconcile.mjs
       - if: always()
         run: node apps/studio/scripts/local-test.mjs stop
