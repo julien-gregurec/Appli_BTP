@@ -1,0 +1,44 @@
+name: Studio Foundation
+on:
+  pull_request:
+    paths:
+      - 'apps/studio/**'
+      - 'packages/studio-domain/**'
+      - 'supabase/migrations/**'
+      - 'supabase/tests/**'
+      - '.github/workflows/studio-foundation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/studio/package-lock.json
+      - run: npm ci
+      - run: npm ci --prefix apps/studio
+      - run: npm audit --prefix apps/studio --audit-level=high
+      - run: node scripts/verify-migrations.mjs
+      - run: node apps/studio/scripts/local-test.mjs setup
+      - run: node apps/studio/scripts/local-test.mjs test-db
+      - run: npm run typecheck --prefix apps/studio && npm run lint --prefix apps/studio && npm test --prefix apps/studio
+      - run: npm run build --prefix apps/studio
+      - run: apps/studio/node_modules/.bin/playwright install --with-deps chromium
+      - run: npm run test:e2e --prefix apps/studio
+        env:
+          STUDIO_E2E_PRODUCTION: '1'
+      - if: always()
+        run: node apps/studio/scripts/local-test.mjs stop
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: studio-test-results
+          path: apps/studio/test-results

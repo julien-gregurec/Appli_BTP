@@ -16,6 +16,7 @@ const eslintConfig = defineConfig([
     "test-results/**",
     // Application autonome : vérifiée par son propre lint via le script racine.
     "apps/tools/**",
+    "apps/studio/**",
     // Archive documentaire non exécutable et explicitement non reproductible.
     "docs/archive/naming-studio-recovery/**",
     "next-env.d.ts",
