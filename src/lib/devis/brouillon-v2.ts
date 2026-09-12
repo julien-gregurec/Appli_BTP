@@ -20,6 +20,7 @@ import type {
   TypeLigneDevis,
 } from "@/lib/devis/ouvrages";
 import type { ElementDevis } from "@/lib/devis/presentation";
+import { estTypeLigne, TYPE_LIGNE_DEFAUT } from "@/lib/devis/types-ligne";
 
 export type LigneDevisBase = {
   cle_ligne: string;
@@ -47,7 +48,17 @@ export type LigneDevisBase = {
   description_client_personnalisee: string | null;
   motif_ajustement: string | null;
   detail_calcul: string | null;
+  // GP V1 (lot C) — absents avant la migration de la grille.
+  type_ligne?: string | null;
+  remise_section_pct?: number | string | null;
+  commentaire_interne?: string | null;
+  famille_instantane?: string | null;
+  fournisseur_instantane?: string | null;
+  code_fournisseur_instantane?: string | null;
 };
+
+/** Coûts d'une ligne lus en base (table protégée) ; `prix_achat_ht` seul avant la grille. */
+export type CoutLigneBase = { prix_achat_ht: number | string; cout_main_oeuvre_ht?: number | string | null; coefficient?: number | string | null };
 
 export type OuvrageDevisBase = {
   cle: string;
@@ -78,9 +89,15 @@ export type DevisBase = {
   notes_internes: string | null;
   remise_globale: number | string;
   filigrane: Partial<Filigrane> | null;
+  reference_interne?: string | null;
+  reference_client?: string | null;
+  mode_reglement?: string | null;
+  conditions_paiement?: string | null;
+  commercial_employe_id?: string | null;
 };
 
 const n = (x: number | string | null | undefined) => Number(x ?? 0);
+const nOuNul = (x: number | string | null | undefined) => (x === null || x === undefined || x === "" ? null : Number(x));
 const MODES: readonly ModePresentation[] = ["regroupe", "semi_detaille", "eclate", "personnalise"];
 const ORIGINES_LIBRES = ["saisie", "catalogue", "ia", "modele"] as const;
 
@@ -124,11 +141,15 @@ function ligneOuvrageDepuisBase(l: LigneDevisBase, instanceCle: string, manuelle
   };
 }
 
-/** État de l'éditeur depuis les lignes, instances d'ouvrages et coûts enregistrés. */
+/**
+ * État de l'éditeur depuis les lignes, instances d'ouvrages et coûts enregistrés.
+ * `couts` : prix d'achat par clé de ligne ; `coutsDetail` (GP V1) : main-d'œuvre et coefficient.
+ */
 export function etatDepuisBase(
   lignes: readonly LigneDevisBase[],
   ouvrages: readonly OuvrageDevisBase[],
   couts: Readonly<Record<string, number>> = {},
+  coutsDetail: Readonly<Record<string, Pick<CoutLigneBase, "cout_main_oeuvre_ht" | "coefficient">>> = {},
 ): EtatElements {
   const cles = new Set(ouvrages.map((o) => o.cle));
   const origines: Record<string, OrigineLigneLibre> = {};
@@ -137,6 +158,7 @@ export function etatDepuisBase(
   for (const l of lignes) {
     if (l.ouvrage_cle && cles.has(l.ouvrage_cle)) continue;
     const origine = (ORIGINES_LIBRES as readonly string[]).includes(l.origine_ligne ?? "") ? (l.origine_ligne as OrigineLigneLibre["origine"]) : "saisie";
+    const detail = coutsDetail[l.cle_ligne];
     origines[l.cle_ligne] = {
       origine,
       sourceCatalogue: l.source_catalogue,
@@ -144,6 +166,11 @@ export function etatDepuisBase(
       referenceInterne: l.reference_interne_instantane,
       referenceFabricant: l.reference_fabricant_instantane,
       prixAchatHt: couts[l.cle_ligne] ?? null,
+      famille: l.famille_instantane ?? null,
+      fournisseur: l.fournisseur_instantane ?? null,
+      codeFournisseur: l.code_fournisseur_instantane ?? null,
+      coutMainOeuvreHt: detail ? nOuNul(detail.cout_main_oeuvre_ht) : null,
+      coefficient: detail ? nOuNul(detail.coefficient) : null,
     };
     elements.push({
       type: "ligne",
@@ -158,6 +185,9 @@ export function etatDepuisBase(
         prixUnitaireHt: n(l.prix_unitaire_ht),
         remiseLignePct: n(l.remise_ligne),
         tauxTva: n(l.taux_tva),
+        typeLigne: estTypeLigne(l.type_ligne) ? l.type_ligne : TYPE_LIGNE_DEFAUT,
+        remiseSectionPct: nOuNul(l.remise_section_pct),
+        commentaireInterne: l.commentaire_interne ?? null,
       },
     });
   }
@@ -207,5 +237,10 @@ export function enteteDepuisBase(d: DevisBase): EnteteDevisV2 {
     notes_internes: d.notes_internes,
     remise_globale: n(d.remise_globale),
     filigrane: d.filigrane,
+    reference_interne: d.reference_interne ?? null,
+    reference_client: d.reference_client ?? null,
+    mode_reglement: d.mode_reglement ?? null,
+    conditions_paiement: d.conditions_paiement ?? null,
+    commercial_employe_id: d.commercial_employe_id ?? null,
   };
 }

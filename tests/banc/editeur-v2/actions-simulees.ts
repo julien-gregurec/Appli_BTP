@@ -81,7 +81,7 @@ export async function enregistrerDevisV2Action(
 ) {
   const payload = payloadEnregistrementV2(entete, elements, { inclureCouts: banc().droits.gererCouts, origines });
   banc().enregistrements.push({ devisId, entete, elements, payload: JSON.parse(JSON.stringify(payload)) });
-  return { id: "devis-banc" };
+  return { id: "devis-banc", revision: banc().enregistrements.length };
 }
 
 export async function publierOuvrageAction() {

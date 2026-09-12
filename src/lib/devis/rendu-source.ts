@@ -21,6 +21,7 @@ import type {
   TypeLigneDevis,
 } from "@/lib/devis/ouvrages";
 import type { ElementDevis } from "@/lib/devis/presentation";
+import { estTypeLigne, TYPE_LIGNE_DEFAUT } from "@/lib/devis/types-ligne";
 import { typeFactureLabel } from "@/lib/factures";
 
 export type LigneRendu = {
@@ -44,6 +45,9 @@ export type LigneRendu = {
   afficher_prix?: boolean | null;
   description_client_personnalisee?: string | null;
   motif_ajustement?: MotifAjustement | null;
+  /** GP V1 : type de ligne de la grille ; absent sur un rendu antérieur (ligne chiffrée). */
+  type_ligne?: string | null;
+  remise_section_pct?: number | string | null;
 };
 
 export type OuvrageRendu = {
@@ -148,6 +152,8 @@ export function elementsDepuisRendu(r: Pick<RenduDocument, "ouvrages" | "lignes"
         prixUnitaireHt: nombre(l.prix_unitaire_ht),
         remiseLignePct: nombre(l.remise_ligne),
         tauxTva: nombre(l.taux_tva),
+        typeLigne: estTypeLigne(l.type_ligne) ? l.type_ligne : TYPE_LIGNE_DEFAUT,
+        remiseSectionPct: l.remise_section_pct === null || l.remise_section_pct === undefined ? null : nombre(l.remise_section_pct),
       },
     }));
   for (const o of r.ouvrages) {

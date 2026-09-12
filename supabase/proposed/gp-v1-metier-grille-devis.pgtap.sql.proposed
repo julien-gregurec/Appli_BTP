@@ -1,0 +1,158 @@
+-- =====================================================================================================
+-- PREUVE pgTAP PROPOSÉE — ELSATIA-GP-V1-METIER, lot C « grille de devis »
+-- =====================================================================================================
+-- Base jetable au ledger 280 + devis v2 + références + bibliothèque + grille.
+-- Acteurs : A dirigeant …-0006 (tous droits), A conducteur …-0004 (devis sans coûts), B dirigeant 2…-0006.
+-- =====================================================================================================
+begin;
+create extension if not exists pgtap with schema extensions;
+select * from no_plan();
+
+\ir ../tests/fixtures/isolation_multitenant.inc
+
+create or replace function pg_temp.jwt(p_sub uuid) returns void language plpgsql as $$
+begin
+  perform set_config('request.jwt.claim.sub', p_sub::text, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', p_sub, 'role', 'authenticated')::text, true);
+end $$;
+
+-- Lignes d'un devis « grille » : titre, article, prestation libre, remise de section (5 % de 1 000 = −50),
+-- sous-total (calculé, 0 en base), commentaire, ligne vide sans désignation, saut de page.
+create or replace function pg_temp.lignes_grille() returns jsonb language sql as $$
+  select '[
+    {"cle_ligne":"t1","ordre":1000,"type_ligne":"titre","designation":"Lot 1 — Plâtrerie","type":"forfait","quantite":0,"unite":"u","prix_unitaire_ht":0,"remise_ligne":0,"taux_tva":20},
+    {"cle_ligne":"a1","ordre":2000,"type_ligne":"article","designation":"Plaque BA13 (fictif)","type":"fourniture","quantite":40,"unite":"m²","prix_unitaire_ht":20,"remise_ligne":0,"taux_tva":20,"famille_instantane":"Plâtrerie › Plaques","fournisseur_instantane":"Distributeur fictif","code_fournisseur_instantane":"DIS-9001","commentaire_interne":"Négocié −8 % en janvier"},
+    {"cle_ligne":"l1","ordre":3000,"type_ligne":"libre","designation":"Pose (fictif)","type":"main_oeuvre","quantite":4,"unite":"h","prix_unitaire_ht":50,"remise_ligne":0,"taux_tva":20},
+    {"cle_ligne":"r1","ordre":4000,"type_ligne":"remise","designation":"Remise commerciale","type":"forfait","quantite":1,"unite":"u","prix_unitaire_ht":-50,"remise_ligne":0,"taux_tva":20,"remise_section_pct":5},
+    {"cle_ligne":"s1","ordre":5000,"type_ligne":"sous_total","designation":"Sous-total lot 1","type":"forfait","quantite":0,"unite":"u","prix_unitaire_ht":0,"remise_ligne":0,"taux_tva":20},
+    {"cle_ligne":"c1","ordre":6000,"type_ligne":"commentaire","designation":"Travaux réalisés hors week-end.","type":"forfait","quantite":0,"unite":"u","prix_unitaire_ht":0,"remise_ligne":0,"taux_tva":20},
+    {"cle_ligne":"v1","ordre":7000,"type_ligne":"vide","designation":"","type":"forfait","quantite":0,"unite":"u","prix_unitaire_ht":0,"remise_ligne":0,"taux_tva":20},
+    {"cle_ligne":"p1","ordre":8000,"type_ligne":"saut_page","designation":"","type":"forfait","quantite":0,"unite":"u","prix_unitaire_ht":0,"remise_ligne":0,"taux_tva":20}
+  ]'::jsonb
+$$;
+
+-- En-tête complet, tel que l'éditeur l'envoie à CHAQUE enregistrement (un champ absent est effacé).
+create or replace function pg_temp.entete() returns jsonb language sql as $$
+  select '{"client_id":"a3000000-0000-0000-0000-000000000001","conditions":"PGTAP-GRILLE","reference_interne":"AFF-2026-07",
+           "reference_client":"PO-77","mode_reglement":"Virement","conditions_paiement":"30 % à la commande",
+           "commercial_employe_id":"a2000000-0000-0000-0000-000000000004"}'::jsonb
+$$;
+
+set local role authenticated;
+select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- A. Enregistrement : types de lignes, totaux, retour {id, revision}
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+create temp table t_r as select public.enregistrer_devis_brouillon_v2('a0000000-0000-0000-0000-000000000001', null,
+  '{"client_id":"a3000000-0000-0000-0000-000000000001","remise_globale":0,"conditions":"PGTAP-GRILLE",
+    "reference_interne":" AFF-2026-07 ","reference_client":"PO-77","mode_reglement":"Virement","conditions_paiement":"30 % à la commande",
+    "commercial_employe_id":"a2000000-0000-0000-0000-000000000004"}'::jsonb,
+  '[]'::jsonb, pg_temp.lignes_grille(),
+  '[{"cle_ligne":"a1","prix_achat_ht":12.5,"cout_main_oeuvre_ht":0,"coefficient":1.6},{"cle_ligne":"l1","prix_achat_ht":0,"cout_main_oeuvre_ht":35,"coefficient":null}]'::jsonb) as r;
+select is((select r ->> 'revision' from t_r), '1', 'enregistrement : première révision = 1');
+select ok((select (r ->> 'id')::uuid is not null from t_r), 'enregistrement : identifiant rendu');
+create temp table t_d as select (r ->> 'id')::uuid as id from t_r;
+
+select is((select montant_ht from public.devis where id = (select id from t_d)), 950.00::numeric,
+  'totaux : 800 + 200 − 50, les lignes de structure comptent 0 (recalc_totaux_devis inchangé)');
+select is((select count(*)::int from public.lignes_devis where devis_id = (select id from t_d)), 8, 'huit lignes enregistrées, saut de page et ligne vide compris');
+select is((select string_agg(type_ligne, ',' order by ordre) from public.lignes_devis where devis_id = (select id from t_d)),
+  'titre,article,libre,remise,sous_total,commentaire,vide,saut_page', 'types de lignes conservés dans l''ordre');
+select is((select remise_section_pct from public.lignes_devis where devis_id = (select id from t_d) and cle_ligne = 'r1'), 5.000::numeric, 'remise : pourcentage de section conservé');
+select is((select reference_interne || '|' || reference_client || '|' || mode_reglement || '|' || conditions_paiement from public.devis where id = (select id from t_d)),
+  'AFF-2026-07|PO-77|Virement|30 % à la commande', 'en-tête : références nettoyées, règlement et conditions enregistrés');
+select is((select commercial_employe_id from public.devis where id = (select id from t_d)), 'a2000000-0000-0000-0000-000000000004'::uuid, 'en-tête : commercial rattaché');
+select is((select coefficient from public.lignes_devis_couts where devis_id = (select id from t_d) and cle_ligne = 'a1'), 1.6000::numeric, 'coûts : coefficient enregistré');
+select is((select cout_main_oeuvre_ht from public.lignes_devis_couts where devis_id = (select id from t_d) and cle_ligne = 'l1'), 35.0000::numeric, 'coûts : main-d''œuvre enregistrée');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- B. Refus : structure chiffrée, remise positive, titre sans désignation, commercial étranger, type inconnu
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+select throws_ok($$select public.enregistrer_devis_brouillon_v2('a0000000-0000-0000-0000-000000000001', null,
+  '{"client_id":"a3000000-0000-0000-0000-000000000001"}'::jsonb, '[]'::jsonb,
+  '[{"cle_ligne":"x","type_ligne":"titre","designation":"Titre","quantite":1,"prix_unitaire_ht":10,"taux_tva":20}]'::jsonb)$$,
+  'P0001', null, 'refus : un titre ne porte ni quantité ni prix');
+select throws_ok($$select public.enregistrer_devis_brouillon_v2('a0000000-0000-0000-0000-000000000001', null,
+  '{"client_id":"a3000000-0000-0000-0000-000000000001"}'::jsonb, '[]'::jsonb,
+  '[{"cle_ligne":"x","type_ligne":"remise","designation":"Remise","quantite":1,"prix_unitaire_ht":10,"taux_tva":20}]'::jsonb)$$,
+  'P0001', null, 'refus : une remise est un montant négatif');
+select throws_ok($$select public.enregistrer_devis_brouillon_v2('a0000000-0000-0000-0000-000000000001', null,
+  '{"client_id":"a3000000-0000-0000-0000-000000000001"}'::jsonb, '[]'::jsonb,
+  '[{"cle_ligne":"x","type_ligne":"titre","designation":"  ","quantite":0,"prix_unitaire_ht":0,"taux_tva":20}]'::jsonb)$$,
+  'P0001', null, 'refus : un titre exige une désignation (une ligne vide non)');
+select throws_ok($$select public.enregistrer_devis_brouillon_v2('a0000000-0000-0000-0000-000000000001', null,
+  '{"client_id":"a3000000-0000-0000-0000-000000000001","commercial_employe_id":"b2000000-0000-0000-0000-000000000001"}'::jsonb, '[]'::jsonb,
+  '[{"cle_ligne":"x","designation":"L","quantite":1,"prix_unitaire_ht":10,"taux_tva":20}]'::jsonb)$$,
+  'P0001', null, 'refus : commercial d''une autre entreprise');
+select throws_ok($$select public.enregistrer_devis_brouillon_v2('a0000000-0000-0000-0000-000000000001', null,
+  '{"client_id":"a3000000-0000-0000-0000-000000000001"}'::jsonb, '[]'::jsonb,
+  '[{"cle_ligne":"x","type_ligne":"note","designation":"L","quantite":1,"prix_unitaire_ht":10,"taux_tva":20}]'::jsonb)$$,
+  'P0001', null, 'refus : type de ligne inconnu');
+reset role;
+select throws_ok($$update public.lignes_devis set quantite = 3 where cle_ligne = 's1' and devis_id = (select id from t_d)$$,
+  '23514', null, 'contrainte : un sous-total ne se chiffre jamais, même en direct');
+set local role authenticated;
+select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- C. Verrou optimiste (révision) et journal des coûts
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+select throws_ok(format($$select public.enregistrer_devis_brouillon_v2('a0000000-0000-0000-0000-000000000001', %L,
+  pg_temp.entete(), '[]'::jsonb, pg_temp.lignes_grille(), '[]'::jsonb, 7)$$, (select id from t_d)),
+  '40001', null, 'révision : un enregistrement sur une révision périmée est refusé');
+select is((select revision from public.devis where id = (select id from t_d)), 1, 'révision : inchangée après le refus');
+select lives_ok(format($$select public.enregistrer_devis_brouillon_v2('a0000000-0000-0000-0000-000000000001', %L,
+  pg_temp.entete(), '[]'::jsonb, pg_temp.lignes_grille(),
+  '[{"cle_ligne":"a1","prix_achat_ht":12.5,"cout_main_oeuvre_ht":4,"coefficient":1.75}]'::jsonb, 1)$$, (select id from t_d)),
+  'révision : enregistrement accepté sur la bonne révision');
+select is((select revision from public.devis where id = (select id from t_d)), 2, 'révision : incrémentée');
+select is((select count(*)::int from public.devis_prix_journal where devis_id = (select id from t_d) and champ in ('cout_main_oeuvre_ht', 'coefficient')), 2,
+  'journal : main-d''œuvre et coefficient modifiés, tracés');
+select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
+select is((select count(*)::int from public.devis_prix_journal where devis_id = (select id from t_d) and champ in ('prix_achat_ht', 'cout_main_oeuvre_ht', 'coefficient')), 0,
+  'journal : invisibles sans voir_couts_devis');
+select is((select count(*)::int from public.lignes_devis_couts where devis_id = (select id from t_d)), 0, 'coûts : invisibles pour le conducteur');
+select lives_ok(format($$select public.enregistrer_devis_brouillon_v2('a0000000-0000-0000-0000-000000000001', %L,
+  pg_temp.entete(), '[]'::jsonb, pg_temp.lignes_grille(),
+  '[{"cle_ligne":"a1","prix_achat_ht":1,"cout_main_oeuvre_ht":1,"coefficient":9}]'::jsonb, 2)$$, (select id from t_d)),
+  'conducteur : enregistre sans droit sur les coûts');
+reset role;
+select is((select coefficient from public.lignes_devis_couts where devis_id = (select id from t_d) and cle_ligne = 'a1'), 1.7500::numeric,
+  'coûts : ceux envoyés sans droit sont ignorés, les enregistrés survivent');
+set local role authenticated;
+select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- D. Rendu : rien d'interne ; le type de ligne passe
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+create temp table t_rendu as select public.document_rendu('devis', (select id from t_d)) as r;
+select ok((select r -> 'rendu' -> 'lignes' @> '[{"cle_ligne":"t1","type_ligne":"titre"}]'::jsonb from t_rendu), 'rendu : type de ligne présent');
+select ok((select (r -> 'rendu')::text not like '%Négocié%' and (r -> 'rendu')::text not like '%commentaire_interne%' from t_rendu), 'rendu : le commentaire interne n''y est jamais');
+select ok((select (r -> 'rendu')::text not like '%DIS-9001%' and (r -> 'rendu')::text not like '%Distributeur fictif%' from t_rendu), 'rendu : ni code ni nom du distributeur');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- E. Duplication et conversion en facture
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+create temp table t_dup as select public.dupliquer_devis((select id from t_d)) as id;
+select is((select string_agg(type_ligne, ',' order by ordre) from public.lignes_devis where devis_id = (select id from t_dup)),
+  'titre,article,libre,remise,sous_total,commentaire,vide,saut_page', 'duplication : types de lignes recopiés');
+select is((select reference_client || '|' || mode_reglement from public.devis where id = (select id from t_dup)), 'PO-77|Virement', 'duplication : en-tête recopié');
+select is((select coefficient from public.lignes_devis_couts where devis_id = (select id from t_dup) and cle_ligne = 'a1'), 1.7500::numeric, 'duplication : coefficient recopié');
+
+reset role;
+update public.devis set statut = 'accepte' where id = (select id from t_d);
+select lives_ok($$update public.devis set reference_interne = 'AFF-2026-08', commercial_employe_id = null where id = (select id from t_d)$$,
+  'devis émis : la référence d''affaire et le commercial restent modifiables');
+select throws_ok($$update public.devis set reference_client = 'PO-99' where id = (select id from t_d)$$, 'P0001', null,
+  'devis émis : la référence client (imprimée) est figée');
+set local role authenticated;
+select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
+create temp table t_f as select public.creer_facture_depuis_devis((select id from t_d)) as id;
+select is((select string_agg(type_ligne, ',' order by ordre) from public.lignes_factures where facture_id = (select id from t_f)),
+  'titre,article,libre,remise,sous_total,commentaire,vide,saut_page', 'facture : types de lignes recopiés');
+select is((select montant_ht from public.factures where id = (select id from t_f)), 950.00::numeric, 'facture : même total HT que le devis');
+select is((select reference_client from public.factures where id = (select id from t_f)), 'PO-77', 'facture : référence client recopiée');
+
+select * from finish();
+rollback;

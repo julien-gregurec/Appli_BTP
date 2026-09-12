@@ -29,7 +29,7 @@ export default async function ModifierDevisPage({ params }: { params: Promise<{ 
     return (
       <main className="p-4 lg:p-6">
         <Link href={`/devis/${id}`} className="text-sm text-neutral-500 hover:underline">← Devis</Link>
-        <EditeurDevisV2 devisId={id} {...donnees} enteteInitiale={brouillon.entete} etatInitial={brouillon.etat} />
+        <EditeurDevisV2 devisId={id} {...donnees} enteteInitiale={brouillon.entete} etatInitial={brouillon.etat} revisionInitiale={brouillon.revision} />
       </main>
     );
   }

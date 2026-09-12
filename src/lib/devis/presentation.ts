@@ -24,17 +24,25 @@ import {
   type TotauxDocument,
 } from "@/lib/devis/montants";
 import type { InstanceOuvrage, LigneOuvrage, TypeLigneDevis } from "@/lib/devis/ouvrages";
+import { porteMontant, typeDe, type TypeLigneGrille } from "@/lib/devis/types-ligne";
 
 export type LigneLibre = {
   cle: string;
   designation: string;
   description: string | null;
+  /** Nature comptable d'une ligne chiffrée (main-d'œuvre, fourniture…). */
   type: TypeLigneDevis;
   quantite: number;
   unite: string;
   prixUnitaireHt: number;
   remiseLignePct: number;
   tauxTva: number;
+  /** Type de ligne de la grille (GP V1). Absent : ligne chiffrée « libre », comme avant. */
+  typeLigne?: TypeLigneGrille | null;
+  /** Remise en % de la section (type « remise ») ; `null` : montant fixe. Le montant est dans `prixUnitaireHt` (≤ 0). */
+  remiseSectionPct?: number | null;
+  /** Jamais imprimé. */
+  commentaireInterne?: string | null;
 };
 
 export type ElementDevis =
@@ -48,19 +56,74 @@ const montantDe = (l: LigneOuvrage): LigneMontant => ({
   tauxTva: l.tauxTva,
 });
 
-/** Toutes les lignes qui entrent dans les totaux — indépendamment de toute présentation. */
+/**
+ * Toutes les lignes qui entrent dans les totaux — indépendamment de toute présentation. Les lignes
+ * de structure (titre, sous-total, commentaire…) n'y sont pas : un sous-total est recalculé, jamais
+ * additionné.
+ */
 export function lignesMontants(elements: readonly ElementDevis[]): LigneMontant[] {
   return [...elements]
     .sort((a, b) => a.ordre - b.ordre)
-    .flatMap((e) => (e.type === "ligne" ? [e.ligne] : e.instance.lignes.map(montantDe)));
+    .flatMap((e) => (e.type === "ligne" ? (porteMontant(typeDe(e.ligne)) ? [e.ligne] : []) : e.instance.lignes.map(montantDe)));
 }
 
 export function totauxDevis(elements: readonly ElementDevis[], remiseGlobalePct = 0): TotauxDocument {
   return totauxDocument(lignesMontants(elements), remiseGlobalePct);
 }
 
+/**
+ * Montant HT d'une section pour chaque sous-total : la somme des lignes chiffrées, ouvrages et
+ * remises depuis le sous-total précédent (ou le début). Clé du sous-total → montant.
+ */
+export function sousTotauxSections(elements: readonly ElementDevis[]): Map<string, number> {
+  const resultat = new Map<string, number>();
+  let cumul = somme([]);
+  for (const e of [...elements].sort((a, b) => a.ordre - b.ordre)) {
+    if (e.type === "ouvrage") {
+      cumul = somme([cumul, ...e.instance.lignes.map((l) => montantLigneHtExact(montantDe(l)))]);
+      continue;
+    }
+    const type = typeDe(e.ligne);
+    if (type === "sous_total") {
+      resultat.set(e.ligne.cle, versNombre(arrondir(cumul)));
+      cumul = somme([]);
+    } else if (porteMontant(type)) {
+      cumul = somme([cumul, montantLigneHtExact(e.ligne)]);
+    }
+  }
+  return resultat;
+}
+
+/**
+ * Base d'une remise en pourcentage : les lignes chiffrées et ouvrages de sa section, AVANT elle,
+ * depuis le sous-total précédent — jamais les autres remises (pas de remise sur remise).
+ */
+export function baseRemiseSection(elements: readonly ElementDevis[], cleRemise: string): { montantHt: number; tauxTva: number[] } {
+  let cumul = somme([]);
+  const taux = new Set<number>();
+  for (const e of [...elements].sort((a, b) => a.ordre - b.ordre)) {
+    if (e.type === "ouvrage") {
+      cumul = somme([cumul, ...e.instance.lignes.map((l) => montantLigneHtExact(montantDe(l)))]);
+      e.instance.lignes.forEach((l) => taux.add(l.tauxTva));
+      continue;
+    }
+    const type = typeDe(e.ligne);
+    if (e.ligne.cle === cleRemise) break;
+    if (type === "sous_total") { cumul = somme([]); taux.clear(); continue; }
+    if (type === "article" || type === "libre") {
+      cumul = somme([cumul, montantLigneHtExact(e.ligne)]);
+      taux.add(e.ligne.tauxTva);
+    }
+  }
+  return { montantHt: versNombre(arrondir(cumul)), tauxTva: [...taux].sort((a, b) => a - b) };
+}
+
+export type GenreLigneClient = "ligne" | "titre" | "sous_titre" | "commentaire" | "sous_total" | "remise" | "vide" | "separateur" | "saut_page";
+
 export type LigneClient = {
   cle: string;
+  /** Rendu de la ligne : chiffrée (défaut), titre, sous-total… */
+  genre: GenreLigneClient;
   /** 0 : ligne ou ouvrage ; 1 : composant affiché sous son ouvrage. */
   niveau: 0 | 1;
   enTeteOuvrage: boolean;
@@ -89,6 +152,7 @@ function tauxUnique(lignes: readonly LigneOuvrage[]): { tauxTva: number | null; 
 function enTete(instance: InstanceOuvrage): LigneClient {
   return {
     cle: instance.cle,
+    genre: "ligne",
     niveau: 0,
     enTeteOuvrage: true,
     designation: instance.libelleClient,
@@ -108,6 +172,7 @@ function ligneComposant(
 ): LigneClient {
   return {
     cle: l.cle,
+    genre: "ligne",
     niveau: 1,
     enTeteOuvrage: false,
     designation: l.designation,
@@ -156,6 +221,7 @@ export function lignesClientOuvrage(instance: InstanceOuvrage): LigneClient[] {
       if (internes.length) {
         lignes.push({
           cle: `${instance.cle}-annexes`,
+          genre: "ligne",
           niveau: 1,
           enTeteOuvrage: false,
           designation: "Autres fournitures et prestations de l’ouvrage",
@@ -180,26 +246,64 @@ export function lignesClientOuvrage(instance: InstanceOuvrage): LigneClient[] {
   }
 }
 
-/** Toutes les lignes client du devis, dans l'ordre des éléments. */
+const vide = (l: LigneLibre, genre: GenreLigneClient): LigneClient => ({
+  cle: l.cle,
+  genre,
+  niveau: 0,
+  enTeteOuvrage: false,
+  designation: l.designation,
+  description: l.description,
+  quantite: null,
+  unite: null,
+  prixUnitaireHt: null,
+  remisePct: null,
+  totalHt: null,
+  tauxTva: null,
+  mentionTva: null,
+});
+
+/**
+ * Toutes les lignes client du devis, dans l'ordre des éléments. Une ligne de structure (titre,
+ * commentaire, sous-total, remise, mise en page) est rendue selon son genre ; le sous-total porte le
+ * montant calculé de sa section, jamais une valeur saisie.
+ */
 export function lignesClient(elements: readonly ElementDevis[]): LigneClient[] {
+  const sousTotaux = sousTotauxSections(elements);
   return [...elements]
     .sort((a, b) => a.ordre - b.ordre)
     .flatMap((e) => {
       if (e.type === "ouvrage") return lignesClientOuvrage(e.instance);
       const l = e.ligne;
-      return [{
-        cle: l.cle,
-        niveau: 0 as const,
-        enTeteOuvrage: false,
-        designation: l.designation,
-        description: l.description,
-        quantite: l.quantite,
-        unite: l.unite,
-        prixUnitaireHt: l.prixUnitaireHt,
-        remisePct: l.remiseLignePct || null,
-        totalHt: arrondi(l),
-        tauxTva: l.tauxTva,
-        mentionTva: null,
-      }];
+      const type = typeDe(l);
+      switch (type) {
+        case "article":
+        case "libre":
+          return [{
+            cle: l.cle,
+            genre: "ligne" as const,
+            niveau: 0 as const,
+            enTeteOuvrage: false,
+            designation: l.designation,
+            description: l.description,
+            quantite: l.quantite,
+            unite: l.unite,
+            prixUnitaireHt: l.prixUnitaireHt,
+            remisePct: l.remiseLignePct || null,
+            totalHt: arrondi(l),
+            tauxTva: l.tauxTva,
+            mentionTva: null,
+          }];
+        case "sous_total":
+          return [{ ...vide(l, "sous_total"), totalHt: sousTotaux.get(l.cle) ?? 0 }];
+        case "remise":
+          return [{
+            ...vide(l, "remise"),
+            description: l.remiseSectionPct ? `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }).format(l.remiseSectionPct)} % de la section` : l.description,
+            totalHt: arrondi(l),
+            tauxTva: l.tauxTva,
+          }];
+        default:
+          return [vide(l, type)];
+      }
     });
 }

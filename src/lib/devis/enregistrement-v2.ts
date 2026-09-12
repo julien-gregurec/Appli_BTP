@@ -15,6 +15,7 @@
 import { TYPE_LIGNE_PAR_NATURE, type InstanceOuvrage, type LigneOuvrage } from "@/lib/devis/ouvrages";
 import type { Filigrane } from "@/lib/devis/filigrane";
 import type { ElementDevis } from "@/lib/devis/presentation";
+import { estChiffree, normaliserSelonType, typeDe, type TypeLigneGrille } from "@/lib/devis/types-ligne";
 
 export const PAS_ORDRE = 1000;
 
@@ -29,6 +30,15 @@ export type EnteteDevisV2 = {
   remise_globale: number;
   /** `null` : hérite des réglages de l'entreprise. */
   filigrane: Partial<Filigrane> | null;
+  // GP V1 (lot C). Absents : inchangés en base.
+  /** Référence d'affaire dans l'entreprise (non unique). */
+  reference_interne?: string | null;
+  /** Référence du bon de commande ou du dossier chez le client, imprimée. */
+  reference_client?: string | null;
+  mode_reglement?: string | null;
+  conditions_paiement?: string | null;
+  /** Salarié commercial rattaché (employé de l'entreprise). */
+  commercial_employe_id?: string | null;
 };
 
 export type LigneDevisV2 = {
@@ -57,6 +67,20 @@ export type LigneDevisV2 = {
   description_client_personnalisee: string | null;
   motif_ajustement: string | null;
   detail_calcul: string | null;
+  // GP V1 (lot C)
+  type_ligne: TypeLigneGrille;
+  remise_section_pct: number | null;
+  commentaire_interne: string | null;
+  famille_instantane: string | null;
+  fournisseur_instantane: string | null;
+  code_fournisseur_instantane: string | null;
+};
+
+export type CoutLigneV2 = {
+  cle_ligne: string;
+  prix_achat_ht: number;
+  cout_main_oeuvre_ht: number;
+  coefficient: number | null;
 };
 
 export type OuvrageDevisV2 = {
@@ -82,10 +106,10 @@ export type PayloadEnregistrementV2 = {
   p_devis: EnteteDevisV2;
   p_ouvrages: OuvrageDevisV2[];
   p_lignes: LigneDevisV2[];
-  p_couts: Array<{ cle_ligne: string; prix_achat_ht: number }>;
+  p_couts: CoutLigneV2[];
 };
 
-/** Ligne libre de l'éditeur, avec son origine et ses éventuelles références figées. */
+/** Ligne libre de l'éditeur, avec son origine, ses références figées et ses coûts (selon droits). */
 export type OrigineLigneLibre = {
   origine?: "saisie" | "catalogue" | "ia" | "modele";
   sourceCatalogue?: "prestation" | "article" | null;
@@ -93,6 +117,12 @@ export type OrigineLigneLibre = {
   referenceInterne?: string | null;
   referenceFabricant?: string | null;
   prixAchatHt?: number | null;
+  // GP V1 (lot C) : instantanés de la fiche article, et coûts par ligne.
+  famille?: string | null;
+  fournisseur?: string | null;
+  codeFournisseur?: string | null;
+  coutMainOeuvreHt?: number | null;
+  coefficient?: number | null;
 };
 
 function parametres(l: LigneOuvrage): Record<string, unknown> {
@@ -136,8 +166,16 @@ function ligneDOuvrage(instance: InstanceOuvrage, l: LigneOuvrage, rang: number,
     description_client_personnalisee: l.descriptionPersonnalisee,
     motif_ajustement: l.motifAjustement,
     detail_calcul: l.detailCalcul || null,
+    type_ligne: "libre",
+    remise_section_pct: null,
+    commentaire_interne: null,
+    famille_instantane: null,
+    fournisseur_instantane: null,
+    code_fournisseur_instantane: null,
   };
 }
+
+const nombreOuNul = (x: number | null | undefined): number | null => (x === null || x === undefined || !Number.isFinite(x) ? null : x);
 
 /**
  * Construit l'appel d'enregistrement. `origines` complète les lignes libres (catalogue, IA…) par
@@ -151,12 +189,12 @@ export function payloadEnregistrementV2(
   const tries = [...elements].sort((a, b) => a.ordre - b.ordre);
   const p_ouvrages: OuvrageDevisV2[] = [];
   const p_lignes: LigneDevisV2[] = [];
-  const p_couts: Array<{ cle_ligne: string; prix_achat_ht: number }> = [];
+  const p_couts: CoutLigneV2[] = [];
 
   tries.forEach((e, index) => {
     const rang = index + 1;
     if (e.type === "ligne") {
-      const l = e.ligne;
+      const l = normaliserSelonType(e.ligne);
       const origine = o.origines?.[l.cle] ?? {};
       p_lignes.push({
         cle_ligne: l.cle,
@@ -184,9 +222,24 @@ export function payloadEnregistrementV2(
         description_client_personnalisee: null,
         motif_ajustement: null,
         detail_calcul: null,
+        type_ligne: typeDe(l),
+        remise_section_pct: typeDe(l) === "remise" ? nombreOuNul(l.remiseSectionPct) : null,
+        commentaire_interne: l.commentaireInterne?.trim() || null,
+        famille_instantane: origine.famille ?? null,
+        fournisseur_instantane: origine.fournisseur ?? null,
+        code_fournisseur_instantane: origine.codeFournisseur ?? null,
       });
-      if (o.inclureCouts && origine.prixAchatHt !== null && origine.prixAchatHt !== undefined) {
-        p_couts.push({ cle_ligne: l.cle, prix_achat_ht: origine.prixAchatHt });
+      // Coûts : seulement pour une ligne chiffrée, et seulement s'il y a quelque chose à écrire (un
+      // prix d'achat, ou une main-d'œuvre sans prix d'achat, enregistrée avec un achat à 0).
+      const achat = nombreOuNul(origine.prixAchatHt);
+      const mo = nombreOuNul(origine.coutMainOeuvreHt);
+      if (o.inclureCouts && estChiffree(typeDe(l)) && (achat !== null || (mo !== null && mo > 0))) {
+        p_couts.push({
+          cle_ligne: l.cle,
+          prix_achat_ht: achat ?? 0,
+          cout_main_oeuvre_ht: mo ?? 0,
+          coefficient: nombreOuNul(origine.coefficient),
+        });
       }
       return;
     }
@@ -213,7 +266,7 @@ export function payloadEnregistrementV2(
       const ligne = ligneDOuvrage(i, l, rang, k);
       p_lignes.push(ligne);
       if (o.inclureCouts && l.origine !== "ajustement" && l.prixAchatHt !== null) {
-        p_couts.push({ cle_ligne: ligne.cle_ligne, prix_achat_ht: l.prixAchatHt });
+        p_couts.push({ cle_ligne: ligne.cle_ligne, prix_achat_ht: l.prixAchatHt, cout_main_oeuvre_ht: 0, coefficient: null });
       }
     });
   });

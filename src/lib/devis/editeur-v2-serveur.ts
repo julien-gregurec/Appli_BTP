@@ -29,6 +29,8 @@ export type DonneesEditeurV2 = {
   seuilTauxMarquePct: number | null;
   droits: { voirCouts: boolean; gererCouts: boolean; modifierPrix: boolean; modifierUnite: boolean };
   nomProduit: string;
+  /** Salariés actifs pouvant être rattachés comme commercial (GP V1). */
+  commerciaux: Array<{ id: string; label: string }>;
 };
 
 const possede = (p: string[] | null, cle: string) => p === null || p.includes(cle);
@@ -38,6 +40,7 @@ const COLONNES_LIGNES = [
   "remise_ligne", "taux_tva", "origine_ligne", "source_catalogue", "source_id", "reference_interne_instantane",
   "reference_fabricant_instantane", "nature", "parametres_quantite", "quantite_forcee", "visible_client",
   "afficher_quantite", "afficher_prix", "description_client_personnalisee", "motif_ajustement", "detail_calcul",
+  "type_ligne", "remise_section_pct", "commentaire_interne", "famille_instantane", "fournisseur_instantane", "code_fournisseur_instantane",
 ].join(",");
 
 const COLONNES_OUVRAGES = [
@@ -48,12 +51,13 @@ const COLONNES_OUVRAGES = [
 
 export async function chargerDonneesEditeurV2(supabase: SupabaseClient, ctx: ContexteEntreprise): Promise<DonneesEditeurV2> {
   const permissions = await permissionsUtilisateur(ctx);
-  const [{ data: clients }, { data: chantiers }, { data: entreprise }] = await Promise.all([
+  const [{ data: clients }, { data: chantiers }, { data: entreprise }, { data: employes }] = await Promise.all([
     supabase.from("clients").select("id, nom, prenom, societe, adresse_facturation, code_postal, ville, siret")
       .eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
     supabase.from("chantiers").select("id, nom, client_id").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
     supabase.from("entreprises").select([...ENTETE_ENTREPRISE_COLONNES, "filigranes_documents", "seuil_taux_marque_pct"].join(","))
       .eq("id", ctx.entrepriseId).maybeSingle(),
+    supabase.from("employes").select("id, prenom, nom, statut").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif").order("nom"),
   ]);
   const e = (entreprise ?? null) as Record<string, unknown> | null;
   const filigranes = (e?.filigranes_documents ?? null) as ReglagesFiligraneEntreprise | null;
@@ -74,6 +78,8 @@ export async function chargerDonneesEditeurV2(supabase: SupabaseClient, ctx: Con
       modifierUnite: possede(permissions, "gerer_devis"),
     },
     nomProduit: PRODUCT_NAME,
+    commerciaux: ((employes ?? []) as Array<{ id: string; prenom: string | null; nom: string | null }>)
+      .map((emp) => ({ id: String(emp.id), label: [emp.prenom, emp.nom].filter(Boolean).join(" ") || "Salarié" })),
   };
 }
 
@@ -86,21 +92,25 @@ export async function chargerBrouillonV2(
   ctx: ContexteEntreprise,
   devisId: string,
   voirCouts: boolean,
-): Promise<{ entete: EnteteDevisV2; etat: EtatElements } | null> {
+): Promise<{ entete: EnteteDevisV2; etat: EtatElements; revision: number } | null> {
+  type CoutLu = { cle_ligne: string; prix_achat_ht: number; cout_main_oeuvre_ht?: number | null; coefficient?: number | null };
   const [{ data: devis }, { data: lignes }, { data: ouvrages }, couts] = await Promise.all([
     supabase.from("devis")
-      .select("id, statut, client_id, chantier_id, date_emission, date_validite, conditions, notes_client, notes_internes, remise_globale, filigrane")
+      .select("id, statut, client_id, chantier_id, date_emission, date_validite, conditions, notes_client, notes_internes, remise_globale, filigrane, revision, reference_interne, reference_client, mode_reglement, conditions_paiement, commercial_employe_id")
       .eq("id", devisId).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),
     supabase.from("lignes_devis").select(COLONNES_LIGNES).eq("devis_id", devisId).order("ordre"),
     supabase.from("devis_ouvrages").select(COLONNES_OUVRAGES).eq("devis_id", devisId).order("ordre"),
     voirCouts
-      ? supabase.from("lignes_devis_couts").select("cle_ligne, prix_achat_ht").eq("devis_id", devisId)
-      : Promise.resolve({ data: [] as Array<{ cle_ligne: string; prix_achat_ht: number }> }),
+      ? supabase.from("lignes_devis_couts").select("cle_ligne, prix_achat_ht, cout_main_oeuvre_ht, coefficient").eq("devis_id", devisId)
+      : Promise.resolve({ data: [] as CoutLu[] }),
   ]);
   if (!devis || devis.statut !== "brouillon") return null;
-  const coutsParCle = Object.fromEntries((couts.data ?? []).map((c) => [c.cle_ligne, Number(c.prix_achat_ht)]));
+  const lus = (couts.data ?? []) as CoutLu[];
+  const coutsParCle = Object.fromEntries(lus.map((c) => [c.cle_ligne, Number(c.prix_achat_ht)]));
+  const detailParCle = Object.fromEntries(lus.map((c) => [c.cle_ligne, { cout_main_oeuvre_ht: c.cout_main_oeuvre_ht ?? null, coefficient: c.coefficient ?? null }]));
   return {
     entete: enteteDepuisBase(devis as unknown as DevisBase),
-    etat: etatDepuisBase((lignes ?? []) as unknown as LigneDevisBase[], (ouvrages ?? []) as unknown as OuvrageDevisBase[], coutsParCle),
+    etat: etatDepuisBase((lignes ?? []) as unknown as LigneDevisBase[], (ouvrages ?? []) as unknown as OuvrageDevisBase[], coutsParCle, detailParCle),
+    revision: Number((devis as { revision?: number }).revision ?? 0),
   };
 }

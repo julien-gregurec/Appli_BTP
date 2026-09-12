@@ -18,7 +18,7 @@ const depose: ElementDevis = {
 const devis = (instance: InstanceOuvrage): ElementDevis[] => [{ type: "ouvrage", ordre: 2, instance }, depose];
 
 const CLES_AUTORISEES = [
-  "cle", "niveau", "enTeteOuvrage", "designation", "description", "quantite", "unite",
+  "cle", "genre", "niveau", "enTeteOuvrage", "designation", "description", "quantite", "unite",
   "prixUnitaireHt", "remisePct", "totalHt", "tauxTva", "mentionTva",
 ].sort();
 

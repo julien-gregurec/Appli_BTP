@@ -184,13 +184,18 @@ export async function chargerOuvrageAction(ouvrageId: string): Promise<{ version
   };
 }
 
-/** Enregistre un brouillon v2 (création si `devisId` est nul) — atomique, en une seule fonction SQL. */
+/**
+ * Enregistre un brouillon v2 (création si `devisId` est nul) — atomique, en une seule fonction SQL.
+ * `revision` : révision lue par l'éditeur ; si la base a bougé entre-temps, l'enregistrement est refusé
+ * (`conflit`) plutôt qu'écrasé. Rend la révision suivante, que l'éditeur mémorise pour l'autosauvegarde.
+ */
 export async function enregistrerDevisV2Action(
   devisId: string | null,
   entete: EnteteDevisV2,
   elements: ElementDevis[],
   origines: Record<string, OrigineLigneLibre>,
-): Promise<{ id: string } | { error: string }> {
+  revision: number | null = null,
+): Promise<{ id: string; revision: number } | { error: string; conflit?: true }> {
   if (!devisV2Actif()) return INACTIF;
   const ctx = await getContexteEntreprise();
   const permissions = await permissionsUtilisateur(ctx);
@@ -211,13 +216,18 @@ export async function enregistrerDevisV2Action(
     p_ouvrages: payload.p_ouvrages,
     p_lignes: payload.p_lignes,
     p_couts: payload.p_couts,
+    p_revision: devisId ? revision : null,
   });
   if (error || !data) {
+    if (error?.code === "40001") {
+      return { error: "Ce devis a été modifié ailleurs (autre onglet ou autre poste) depuis votre dernière lecture. Rechargez-le avant d’enregistrer.", conflit: true };
+    }
     return { error: messageErreurUtilisateur("enregistrerDevisV2Action", error, "Impossible d’enregistrer ce devis. Vérifiez les informations saisies.") };
   }
+  const rendu = (typeof data === "string" ? { id: data, revision: 0 } : data) as { id: string; revision?: number };
   revalidatePath("/devis");
-  revalidatePath(`/devis/${data}`);
-  return { id: data as string };
+  revalidatePath(`/devis/${rendu.id}`);
+  return { id: String(rendu.id), revision: Number(rendu.revision ?? 0) };
 }
 
 /**

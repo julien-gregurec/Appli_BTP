@@ -98,6 +98,18 @@ export function estimerHauteurs(vue: VueDocument): Hauteurs {
   const largeurDesignation = CONTENU_LARGEUR_PX * PART_COLONNE_DESIGNATION - 16;
 
   const ligne = (l: LigneClient) => {
+    // GP V1 : lignes de structure — pleine largeur pour un titre ou un commentaire, hauteur fixe pour la
+    // mise en page. Un saut de page n'occupe aucune hauteur : il déclenche la coupure.
+    switch (l.genre) {
+      case "saut_page": return 0;
+      case "vide": return s(12);
+      case "separateur": return s(10);
+      case "titre": return s(18 + (lignesDeTexte(l.designation, CONTENU_LARGEUR_PX - 16, policeTableau + 1, c) || 1) * hl(policeTableau + 1));
+      case "sous_titre": return s(14 + (lignesDeTexte(l.designation, CONTENU_LARGEUR_PX - 16, policeTableau, c) || 1) * hl(policeTableau));
+      case "commentaire": return s(12 + (lignesDeTexte(l.designation, CONTENU_LARGEUR_PX - 16, policeDescription, c) || 1) * hl(policeDescription)
+        + (vue.style.afficherDescriptions ? lignesDeTexte(l.description, CONTENU_LARGEUR_PX - 16, policeDescription, c) * hl(policeDescription) : 0));
+      default: break;
+    }
     const largeur = l.niveau === 1 ? largeurDesignation - 14 : largeurDesignation;
     const nDesignation = lignesDeTexte(l.designation, largeur, policeTableau, c) || 1;
     const nDescription = vue.style.afficherDescriptions ? lignesDeTexte(l.description, largeur, policeDescription, c) : 0;
@@ -135,7 +147,8 @@ export function estimerHauteurs(vue: VueDocument): Hauteurs {
  *   composant ;
  * - les totaux, les conditions, les notes, le « bon pour accord » et les mentions sont
  *   indivisibles ;
- * - chaque ligne apparaît exactement une fois, dans l'ordre.
+ * - chaque ligne apparaît exactement une fois, dans l'ordre ;
+ * - un saut de page explicite (GP V1) coupe la page et n'est pas rendu.
  */
 export function paginer(vue: VueDocument, hauteurs: Hauteurs = estimerHauteurs(vue), hauteurUtile = CONTENU_HAUTEUR_PX): PageDocument[] {
   const pages: Array<Omit<PageDocument, "total">> = [];
@@ -161,6 +174,12 @@ export function paginer(vue: VueDocument, hauteurs: Hauteurs = estimerHauteurs(v
   poser({ type: "destinataire" }, hauteurs.destinataire);
 
   vue.lignes.forEach((ligne, i) => {
+    // GP V1 : un saut de page explicite ferme la page courante (si elle porte déjà des lignes) et n'est
+    // jamais rendu comme une ligne. Un saut en tête de document ou deux sauts consécutifs sont sans effet.
+    if (ligne.genre === "saut_page") {
+      if (tableau && tableau.lignes.length > 0) nouvellePage();
+      return;
+    }
     const suivante = vue.lignes[i + 1];
     let besoin = hauteurs.ligne(ligne);
     if (ligne.enTeteOuvrage && suivante?.niveau === 1) besoin += hauteurs.ligne(suivante);

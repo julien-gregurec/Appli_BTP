@@ -15,11 +15,22 @@ import type { InstanceOuvrage, TypeLigneDevis } from "@/lib/devis/ouvrages";
 import type { ElementDevis, LigneLibre } from "@/lib/devis/presentation";
 import {
   ajouterSelection,
+  instantaneLigne,
   type ArticleCatalogue,
   type DecisionDejaPresent,
   type LigneDevisInstantanee,
   type Selection,
 } from "@/lib/devis/recherche-articles";
+import { baseRemiseSection } from "@/lib/devis/presentation";
+import { arrondir, dec, mul, versNombre } from "@/lib/devis/montants";
+import {
+  DESIGNATION_PAR_DEFAUT,
+  estChiffree,
+  exigeDesignation,
+  normaliserSelonType,
+  typeDe,
+  type TypeLigneGrille,
+} from "@/lib/devis/types-ligne";
 
 export type EtatElements = {
   elements: ElementDevis[];
@@ -162,6 +173,7 @@ export function ajouterLigneLibre(etat: EtatElements, cle: string, ligne: Partia
         prixUnitaireHt: 0,
         remiseLignePct: 0,
         tauxTva: TAUX_TVA_PAR_DEFAUT,
+        typeLigne: "libre",
         ...ligne,
       },
     }],
@@ -170,10 +182,12 @@ export function ajouterLigneLibre(etat: EtatElements, cle: string, ligne: Partia
 }
 
 export function modifierLigneLibre(etat: EtatElements, cle: string, patch: Partial<Omit<LigneLibre, "cle">>): EtatElements {
-  return {
-    elements: etat.elements.map((e) => (estLigne(e) && e.ligne.cle === cle ? { ...e, ligne: { ...e.ligne, ...patch } } : e)),
+  const suivant = {
+    elements: etat.elements.map((e) => (estLigne(e) && e.ligne.cle === cle ? { ...e, ligne: normaliserSelonType({ ...e.ligne, ...patch }) } : e)),
     origines: etat.origines,
   };
+  // Un changement de type ou de montant peut modifier la base d'une remise en pourcentage plus bas.
+  return recalculerRemisesSection(suivant);
 }
 
 export function ajouterOuvrage(etat: EtatElements, instance: InstanceOuvrage): EtatElements {
@@ -211,13 +225,20 @@ export function validerBrouillon(o: { clientId: string | null | undefined; remis
   for (const e of o.elements) {
     if (e.type === "ligne") {
       const l = e.ligne;
+      const type = typeDe(l);
       const nom = l.designation.trim() || "Une ligne";
-      if (!l.designation.trim()) return "Chaque ligne doit porter une désignation.";
+      if (exigeDesignation(type) && !l.designation.trim()) return "Chaque ligne doit porter une désignation.";
       if (!fini(l.quantite)) return `« ${nom} » : quantité invalide.`;
       if (!fini(l.prixUnitaireHt)) return `« ${nom} » : prix invalide.`;
       if (!entre(l.remiseLignePct, 0, 100)) return `« ${nom} » : la remise doit être comprise entre 0 et 100 %.`;
       if (!entre(l.tauxTva, 0, 100)) return `« ${nom} » : taux de TVA invalide.`;
       if (!TYPES_LIGNE.includes(l.type)) return `« ${nom} » : type de ligne inconnu.`;
+      if (type === "remise") {
+        if (l.quantite !== 1 || l.prixUnitaireHt > 0) return `« ${nom} » : une remise est un montant négatif, quantité 1.`;
+        if (l.remiseSectionPct !== null && l.remiseSectionPct !== undefined && !entre(l.remiseSectionPct, 0, 100)) return `« ${nom} » : le pourcentage de remise doit être compris entre 0 et 100.`;
+      } else if (!estChiffree(type) && (l.quantite !== 0 || l.prixUnitaireHt !== 0 || l.remiseLignePct !== 0)) {
+        return `« ${nom} » : une ligne « ${type} » ne porte ni quantité ni prix.`;
+      }
       continue;
     }
     const i = e.instance;
@@ -244,4 +265,152 @@ export function deplacerElement(etat: EtatElements, cle: string, sens: -1 | 1): 
   if (i < 0 || j < 0 || j >= tries.length) return { elements: tries, origines: etat.origines };
   [tries[i], tries[j]] = [tries[j], tries[i]];
   return { elements: renumeroter(tries.map((e, k) => ({ ...e, ordre: k + 1 }))), origines: etat.origines };
+}
+
+// ── GP V1 (lot C) : grille — insertion, duplication, déplacement libre, remises de section ────────
+
+const indexDe = (elements: readonly ElementDevis[], cle: string) => renumeroter(elements).findIndex((e) => cleElement(e) === cle);
+
+/** Insère un élément après `apresCle` (ou à la fin si `null`), puis renumérote. */
+function insererElement(etat: EtatElements, element: ElementDevis, apresCle: string | null): EtatElements {
+  const tries = renumeroter(etat.elements);
+  const i = apresCle === null ? tries.length - 1 : indexDe(tries, apresCle);
+  const position = i < 0 ? tries.length : i + 1;
+  tries.splice(position, 0, element);
+  return { elements: renumeroter(tries.map((e, k) => ({ ...e, ordre: k + 1 }))), origines: etat.origines };
+}
+
+/**
+ * Nouvelle ligne d'un type donné, après `apresCle` (ou à la fin). Les valeurs numériques suivent le
+ * type (une ligne de titre ne porte ni quantité ni prix) ; la désignation par défaut est celle du type.
+ */
+export function insererLigne(etat: EtatElements, cle: string, typeLigne: TypeLigneGrille, apresCle: string | null, ligne: Partial<LigneLibre> = {}): EtatElements {
+  const base: LigneLibre = normaliserSelonType({
+    cle,
+    designation: DESIGNATION_PAR_DEFAUT[typeLigne] ?? "",
+    description: null,
+    type: "fourniture",
+    quantite: 1,
+    unite: "u",
+    prixUnitaireHt: 0,
+    remiseLignePct: 0,
+    tauxTva: TAUX_TVA_PAR_DEFAUT,
+    typeLigne,
+    remiseSectionPct: null,
+    commentaireInterne: null,
+    ...ligne,
+  });
+  const suivant = insererElement({ ...etat, origines: { ...etat.origines, [cle]: { origine: "saisie" } } }, { type: "ligne", ordre: 0, ligne: base }, apresCle);
+  return recalculerRemisesSection(suivant);
+}
+
+/** Insère un ouvrage après `apresCle` (ou à la fin). */
+export function insererOuvrage(etat: EtatElements, instance: InstanceOuvrage, apresCle: string | null): EtatElements {
+  return insererElement(etat, { type: "ouvrage", ordre: 0, instance }, apresCle);
+}
+
+/**
+ * Duplique un élément juste après lui. Une ligne reçoit `nouvelleCle` et hérite de son origine (références,
+ * coûts) ; un ouvrage reçoit une nouvelle clé d'instance (ses composants gardent leurs clés, scopées par elle).
+ */
+export function dupliquerElement(etat: EtatElements, cle: string, nouvelleCle: string): EtatElements {
+  const source = etat.elements.find((e) => cleElement(e) === cle);
+  if (!source) return etat;
+  if (source.type === "ligne") {
+    const copie: ElementDevis = { type: "ligne", ordre: 0, ligne: { ...source.ligne, cle: nouvelleCle } };
+    const origines = { ...etat.origines, [nouvelleCle]: { ...(etat.origines[cle] ?? { origine: "saisie" as const }) } };
+    return recalculerRemisesSection(insererElement({ ...etat, origines }, copie, cle));
+  }
+  const copie: ElementDevis = { type: "ouvrage", ordre: 0, instance: { ...source.instance, cle: nouvelleCle } };
+  return recalculerRemisesSection(insererElement(etat, copie, cle));
+}
+
+/** Déplace un élément à l'index cible (0-based), pour le glisser-déposer. */
+export function deplacerElementVers(etat: EtatElements, cle: string, indexCible: number): EtatElements {
+  const tries = renumeroter(etat.elements);
+  const i = indexDe(tries, cle);
+  if (i < 0) return { elements: tries, origines: etat.origines };
+  const cible = Math.max(0, Math.min(tries.length - 1, indexCible));
+  if (cible === i) return { elements: tries, origines: etat.origines };
+  const [element] = tries.splice(i, 1);
+  tries.splice(cible, 0, element);
+  return recalculerRemisesSection({ elements: renumeroter(tries.map((e, k) => ({ ...e, ordre: k + 1 }))), origines: etat.origines });
+}
+
+/**
+ * Remplace une ligne par l'INSTANTANÉ d'un article (recherche depuis la cellule) : la clé est conservée,
+ * l'origine devient « catalogue » avec ses références, sa famille, son distributeur et son prix d'achat.
+ */
+export function remplacerLigneParArticle(etat: EtatElements, cle: string, article: ArticleCatalogue, selection: Partial<Selection> = {}): EtatElements {
+  const instantane = instantaneLigne(article, { articleId: article.id, quantite: selection.quantite ?? 1, ...selection });
+  const elements = etat.elements.map((e): ElementDevis => {
+    if (!estLigne(e) || e.ligne.cle !== cle) return e;
+    return {
+      ...e,
+      ligne: normaliserSelonType({
+        ...e.ligne,
+        typeLigne: "article",
+        designation: instantane.designation,
+        description: instantane.description,
+        type: typeDeLigne(instantane.typeLigne, instantane.sourceCatalogue),
+        quantite: instantane.quantite,
+        unite: instantane.unite,
+        prixUnitaireHt: instantane.prixUnitaireHt,
+        tauxTva: instantane.tauxTva ?? TAUX_TVA_PAR_DEFAUT,
+        remiseSectionPct: null,
+      }),
+    };
+  });
+  const origines = {
+    ...etat.origines,
+    [cle]: {
+      origine: "catalogue" as const,
+      sourceCatalogue: article.source,
+      sourceId: article.id,
+      referenceInterne: article.referenceInterne,
+      referenceFabricant: article.referenceFabricant,
+      prixAchatHt: article.prixAchatHt,
+      famille: article.famille ?? null,
+      fournisseur: article.fournisseur,
+      codeFournisseur: article.codesFournisseurs?.[0] ?? null,
+      coutMainOeuvreHt: null,
+      coefficient: null,
+    },
+  };
+  return recalculerRemisesSection({ elements, origines });
+}
+
+/** Modifie les coûts d'une ligne (prix d'achat, main-d'œuvre, coefficient) — droits vérifiés par l'appelant. */
+export function modifierCoutsLigne(etat: EtatElements, cle: string, couts: { prixAchatHt?: number | null; coutMainOeuvreHt?: number | null; coefficient?: number | null }): EtatElements {
+  const actuelle = etat.origines[cle] ?? { origine: "saisie" as const };
+  return { elements: etat.elements, origines: { ...etat.origines, [cle]: { ...actuelle, ...couts } } };
+}
+
+/**
+ * Recalcule le montant des remises exprimées en pourcentage de leur section (lignes chiffrées et ouvrages
+ * depuis le sous-total précédent, avant la remise). Le montant enregistré est `prixUnitaireHt` ≤ 0 : la base
+ * n'a pas à connaître la règle pour totaliser juste. Une remise à montant fixe n'est pas touchée.
+ */
+export function recalculerRemisesSection(etat: EtatElements): EtatElements {
+  let modifie = false;
+  const elements = etat.elements.map((e): ElementDevis => {
+    if (!estLigne(e) || typeDe(e.ligne) !== "remise") return e;
+    const pct = e.ligne.remiseSectionPct;
+    if (pct === null || pct === undefined || !Number.isFinite(pct)) return e;
+    const base = baseRemiseSection(etat.elements, e.ligne.cle);
+    const montant = -versNombre(arrondir(mul(dec(base.montantHt), dec(pct / 100)), 2));
+    const tauxTva = base.tauxTva.length === 1 ? base.tauxTva[0] : e.ligne.tauxTva;
+    if (montant === e.ligne.prixUnitaireHt && tauxTva === e.ligne.tauxTva) return e;
+    modifie = true;
+    return { ...e, ligne: { ...e.ligne, prixUnitaireHt: montant, quantite: 1, remiseLignePct: 0, tauxTva } };
+  });
+  return modifie ? { elements, origines: etat.origines } : etat;
+}
+
+/** Remises en % dont la section mélange plusieurs taux de TVA : à signaler, jamais réparti en silence. */
+export function remisesTvaMixte(etat: EtatElements): string[] {
+  return etat.elements
+    .filter((e): e is LigneElement => estLigne(e) && typeDe(e.ligne) === "remise" && e.ligne.remiseSectionPct !== null && e.ligne.remiseSectionPct !== undefined)
+    .filter((e) => baseRemiseSection(etat.elements, e.ligne.cle).tauxTva.length > 1)
+    .map((e) => e.ligne.cle);
 }

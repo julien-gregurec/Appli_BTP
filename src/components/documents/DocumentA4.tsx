@@ -72,6 +72,14 @@ const CSS = `
 .doc-a4__tableau tr[data-niveau="1"] td:first-child{padding-left:22px;}
 .doc-a4__tableau tr[data-entete-ouvrage="true"] td{font-weight:700;background:rgba(0,0,0,.03);}
 .doc-a4__description{color:#777;font-size:calc(var(--doc-taille) - 2px);font-weight:400;white-space:pre-wrap;}
+.doc-a4__tableau tr[data-genre="titre"] td{font-family:inherit;font-weight:700;font-size:calc(var(--doc-taille) + 1px);text-align:left;padding-top:12px;border-bottom:2px solid var(--doc-couleur);}
+.doc-a4__tableau tr[data-genre="sous_titre"] td{font-family:inherit;font-weight:600;text-align:left;padding-top:9px;}
+.doc-a4__tableau tr[data-genre="commentaire"] td{font-family:inherit;text-align:left;font-style:italic;color:#555;font-size:calc(var(--doc-taille) - 1px);white-space:pre-wrap;}
+.doc-a4__tableau tr[data-genre="sous_total"] td{font-weight:700;background:rgba(0,0,0,.04);border-bottom:2px solid #ccc;}
+.doc-a4__tableau tr[data-genre="sous_total"] td:first-child{text-align:right;font-family:inherit;}
+.doc-a4__tableau tr[data-genre="remise"] td{color:#444;}
+.doc-a4__tableau tr[data-genre="vide"] td{padding:6px 0;border-bottom:none;}
+.doc-a4__tableau tr[data-genre="separateur"] td{padding:4px 0;border-bottom:1px solid var(--doc-couleur);}
 .doc-a4__suite{font-size:10px;color:#888;text-align:right;margin-bottom:2px;}
 .doc-a4__totaux{display:flex;justify-content:flex-end;margin-top:14px;}
 .doc-a4__totaux table{min-width:290px;font-size:var(--doc-taille);border-collapse:collapse;}
@@ -154,6 +162,48 @@ function Entete({ vue }: { vue: VueDocument }) {
 }
 
 function Ligne({ l, afficherTva, afficherDescription }: { l: LigneClient; afficherTva: boolean; afficherDescription: boolean }) {
+  const colonnes = afficherTva ? 5 : 4;
+  // GP V1 : lignes de structure — jamais de quantité ni de prix unitaire ; le sous-total est calculé.
+  switch (l.genre) {
+    case "saut_page":
+      return null;
+    case "vide":
+    case "separateur":
+      return <tr data-cle={l.cle} data-genre={l.genre} data-niveau={0}><td colSpan={colonnes} aria-hidden="true" /></tr>;
+    case "titre":
+    case "sous_titre":
+    case "commentaire":
+      return (
+        <tr data-cle={l.cle} data-genre={l.genre} data-niveau={0}>
+          <td colSpan={colonnes}>
+            {l.designation}
+            {afficherDescription && l.description && <div className="doc-a4__description">{l.description}</div>}
+          </td>
+        </tr>
+      );
+    case "sous_total":
+      return (
+        <tr data-cle={l.cle} data-genre="sous_total" data-niveau={0}>
+          <td colSpan={colonnes - 1}>{l.designation || "Sous-total"}</td>
+          <td>{l.totalHt !== null ? euros(l.totalHt) : ""}</td>
+        </tr>
+      );
+    case "remise":
+      return (
+        <tr data-cle={l.cle} data-genre="remise" data-niveau={0}>
+          <td>
+            {l.designation}
+            {afficherDescription && l.description && <div className="doc-a4__description">{l.description}</div>}
+          </td>
+          <td />
+          <td />
+          {afficherTva && <td>{l.tauxTva !== null ? tauxFr(l.tauxTva) : ""}</td>}
+          <td>{l.totalHt !== null ? euros(l.totalHt) : ""}</td>
+        </tr>
+      );
+    default:
+      break;
+  }
   return (
     <tr data-cle={l.cle} data-niveau={l.niveau} data-entete-ouvrage={l.enTeteOuvrage}>
       <td>
@@ -185,7 +235,7 @@ function Tableau({ vue, bloc }: { vue: VueDocument; bloc: Extract<BlocPage, { ty
           </tr>
         </thead>
         <tbody>
-          {bloc.lignes.map((l) => <Ligne key={l.cle} l={l} afficherTva={tva} afficherDescription={vue.style.afficherDescriptions} />)}
+          {bloc.lignes.filter((l) => l.genre !== "saut_page").map((l) => <Ligne key={l.cle} l={l} afficherTva={tva} afficherDescription={vue.style.afficherDescriptions} />)}
         </tbody>
       </table>
     </>
