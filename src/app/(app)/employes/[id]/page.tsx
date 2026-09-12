@@ -1,3 +1,5 @@
+import { actionsSalarie } from "@/lib/actions-contextuelles/registre";
+import { PanneauActions } from "@/components/actions/PanneauActions";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -86,8 +88,9 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
       </div>
     ) : null;
 
+  const actionsPanneau = actionsSalarie({ id, statut: employe.statut, utilisateurId: employe.utilisateur_id ?? null }, permissions);
   return (
-    <main className="p-8">
+    <main className="lg:pr-72 p-8"><PanneauActions titre="Salarié" actions={actionsPanneau} />
       <div className="mx-auto max-w-3xl space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-4">

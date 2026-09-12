@@ -195,11 +195,17 @@ export function EditeurDevisV2({
     return () => window.clearTimeout(t);
   }, [sale, enCours, sauvegarde, enregistrer]);
 
+  // La palette de recherche globale cède Ctrl+K à l'éditeur (elle répond alors à Ctrl+Maj+K).
+  useEffect(() => {
+    document.body.dataset.editeurDevis = "1";
+    return () => { delete document.body.dataset.editeurDevis; };
+  }, []);
+
   useEffect(() => {
     const clavier = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return;
       const k = e.key.toLowerCase();
-      if (k === "k") { e.preventDefault(); setDialogue({ type: "articles" }); }
+      if (k === "k" && !e.shiftKey) { e.preventDefault(); setDialogue({ type: "articles" }); }
       if (k === "s") { e.preventDefault(); enregistrer({ explicite: true }); }
       if (k === "z" && !e.shiftKey) { e.preventDefault(); annulerEdition(); }
       if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); retablirEdition(); }

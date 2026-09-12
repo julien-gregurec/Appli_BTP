@@ -1,3 +1,5 @@
+import { actionsChantier } from "@/lib/actions-contextuelles/registre";
+import { PanneauActions } from "@/components/actions/PanneauActions";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -99,8 +101,9 @@ export default async function ChantierDetailPage({ params, searchParams }: { par
       </div>
     ) : null;
 
+  const actionsPanneau = actionsChantier({ id, statut: chantier.statut, clientId: chantier.client_id ?? null, adresse: [chantier.adresse, chantier.ville].filter(Boolean).join(", ") || null }, permissions);
   return (
-    <main className="ecran-mobile p-4 sm:p-8">
+    <main className="lg:pr-72 ecran-mobile p-4 sm:p-8"><PanneauActions titre="Chantier" contexte={chantier.reference_interne ?? undefined} actions={actionsPanneau} />
       <div className="mx-auto max-w-4xl space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

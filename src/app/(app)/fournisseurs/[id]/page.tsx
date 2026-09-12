@@ -1,3 +1,5 @@
+import { actionsFournisseur } from "@/lib/actions-contextuelles/registre";
+import { PanneauActions } from "@/components/actions/PanneauActions";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -25,7 +27,8 @@ export default async function FournisseurDetailPage({ params, searchParams }: { 
   if (!fournisseur) notFound();
   const action = modifierFournisseurAction.bind(null, id);
   const input = (nom:string, label:string, valeur:string|null, type="text") => <label className="text-xs text-neutral-500">{label}<input name={nom} type={type} defaultValue={valeur ?? ""} className={`mt-1 ${champ}`}/></label>;
-  return <main className="p-4 sm:p-8"><div className="mx-auto max-w-4xl space-y-6">
+  const actionsPanneau = actionsFournisseur({ id, telephone: fournisseur.telephone ?? null, email: fournisseur.email ?? null, actif: fournisseur.actif !== false }, permissions);
+  return <main className="lg:pr-72 p-4 sm:p-8"><PanneauActions titre="Fournisseur" contexte={fournisseur.reference ?? undefined} actions={actionsPanneau} /><div className="mx-auto max-w-4xl space-y-6">
     <header><Link href="/fournisseurs" className="text-sm text-neutral-500 hover:underline">← Fournisseurs</Link><h1 className="mt-1 text-2xl font-semibold">{fournisseur.nom}</h1><p className="font-mono text-xs text-neutral-500">{fournisseur.reference}</p></header>
     {messages.error && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{messages.error}</p>}{messages.success && <p className="rounded bg-green-50 p-3 text-sm text-green-700">{messages.success}</p>}
     <form action={action} className="grid gap-3 rounded-md border p-4 sm:grid-cols-2">

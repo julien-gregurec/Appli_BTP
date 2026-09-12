@@ -1,0 +1,37 @@
+-- PREUVE pgTAP PROPOSÉE — GP V1, lot E « recherche globale, dernières actions »
+begin;
+create extension if not exists pgtap with schema extensions;
+select * from no_plan();
+\ir ../tests/fixtures/isolation_multitenant.inc
+create or replace function pg_temp.jwt(p_sub uuid) returns void language plpgsql as $$
+begin
+  perform set_config('request.jwt.claim.sub', p_sub::text, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', p_sub, 'role', 'authenticated')::text, true);
+end $$;
+update public.clients set telephone = '06 12 34 56 78', email = 'contact@client-fictif.invalid' where id = 'a3000000-0000-0000-0000-000000000001';
+
+set local role authenticated;
+select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
+select is((select rang from public.recherche_globale('a0000000-0000-0000-0000-000000000001', 'test a cli 001') where type = 'client' limit 1), 1, 'recherche : référence client exacte au rang 1 (normalisée)');
+select is((select type || ':' || titre from public.recherche_globale('a0000000-0000-0000-0000-000000000001', 'TEST_A_DEV_001') limit 1), 'devis:TEST_A_DEV_001', 'recherche : numéro de devis');
+select is((select count(*)::int from public.recherche_globale('a0000000-0000-0000-0000-000000000001', '0612345678') where type = 'client'), 1, 'recherche : par téléphone, espaces ignorés');
+select is((select count(*)::int from public.recherche_globale('a0000000-0000-0000-0000-000000000001', 'client-fictif.invalid') where type = 'client'), 1, 'recherche : par e-mail');
+select is((select count(*)::int from public.recherche_globale('a0000000-0000-0000-0000-000000000001', 'chantier assign') where type = 'chantier'), 1, 'recherche : par nom de chantier (partie)');
+select is((select count(*)::int from public.recherche_globale('a0000000-0000-0000-0000-000000000001', 'TEST_A_STK_001') where type = 'article_stock'), 1, 'recherche : article du stock par code');
+select is((select count(*)::int from public.recherche_globale('a0000000-0000-0000-0000-000000000001', 'TEST_B')), 0, 'recherche : rien de l''entreprise B');
+select is((select count(*)::int from public.recherche_globale('a0000000-0000-0000-0000-000000000001', '')), 0, 'recherche : vide = aucun résultat');
+select pg_temp.jwt('10000000-0000-0000-0000-000000000002');
+select is((select count(*)::int from public.recherche_globale('a0000000-0000-0000-0000-000000000001', 'TEST_A') where type in ('client', 'devis', 'facture', 'fournisseur')), 0, 'recherche : l''ouvrier sans accès clients/devis/factures/achats n''en voit aucun (RLS)');
+select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
+select ok((select count(*) from public.recherche_globale('a0000000-0000-0000-0000-000000000001', 'TEST_A') where type in ('client','devis','chantier')) >= 3
+   and (select count(*) from public.recherche_globale('a0000000-0000-0000-0000-000000000001', 'TEST_A') where type = 'facture') = 0,
+  'recherche : le conducteur voit clients, devis, chantiers — pas les factures (RLS)');
+
+-- Dernières actions : le conducteur crée un client, il apparaît ; pas pour un autre utilisateur.
+insert into public.clients (entreprise_id, nom, type, statut) values ('a0000000-0000-0000-0000-000000000001', 'PGTAP Nouveau', 'particulier', 'actif');
+select is((select titre from public.dernieres_actions('a0000000-0000-0000-0000-000000000001', 5) limit 1), 'PGTAP Nouveau', 'dernières actions : le client créé est en tête');
+select is((select url from public.dernieres_actions('a0000000-0000-0000-0000-000000000001', 5) limit 1), '/clients/' || (select id from public.clients where nom = 'PGTAP Nouveau'), 'dernières actions : lien vers la fiche');
+select pg_temp.jwt('10000000-0000-0000-0000-000000000006');
+select is((select count(*)::int from public.dernieres_actions('a0000000-0000-0000-0000-000000000001', 5) where titre = 'PGTAP Nouveau'), 0, 'dernières actions : propres à chaque utilisateur');
+select * from finish();
+rollback;

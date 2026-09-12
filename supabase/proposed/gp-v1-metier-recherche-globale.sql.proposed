@@ -1,0 +1,137 @@
+-- =====================================================================================================
+-- PROPOSITION — NON APPLIQUÉE, NON NUMÉROTÉE, HORS supabase/migrations
+-- Lot : ELSATIA-GP-V1-METIER — E « recherche globale, dernières actions »
+-- Branche : feat/gp-v1-metier-devis-planning-references-v1
+-- =====================================================================================================
+-- PRÉREQUIS : références internes (normaliser_reference, historique_objets), grille, droits. Rejouable.
+--
+--   1. création des tiers et commandes journalisée (pour « dernières actions »)
+--   2. recherche_globale : référence, numéro, nom, désignation, adresse, téléphone, e-mail — SECURITY
+--      INVOKER : la RLS de chaque table filtre, un poste sans accès à un module n'en voit rien
+--   3. dernieres_actions : les derniers objets touchés PAR L'UTILISATEUR, sous la RLS de l'historique
+-- =====================================================================================================
+do $$
+begin
+  if to_regprocedure('public.journaliser_objet(uuid,text,uuid,text,text,jsonb,jsonb,boolean)') is null
+     or to_regprocedure('public.droit_fin(uuid,text,text)') is null then
+    raise exception 'Prérequis absent : appliquer d''abord gp-v1-metier-droits-transformations' using errcode = '55000';
+  end if;
+end $$;
+
+-- 1. Création journalisée (les changements de référence le sont déjà depuis A-bis).
+create or replace function public.trg_historique_creation()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v jsonb := to_jsonb(new);
+begin
+  perform public.journaliser_objet(new.entreprise_id, tg_argv[0], new.id, 'creation', null, null,
+    jsonb_build_object('libelle', coalesce(v ->> tg_argv[1], v ->> 'nom', v ->> 'numero')), false);
+  return null;
+end $$;
+drop trigger if exists gp_historique_creation on public.clients;
+create trigger gp_historique_creation after insert on public.clients for each row execute function public.trg_historique_creation('client', 'nom');
+drop trigger if exists gp_historique_creation on public.chantiers;
+create trigger gp_historique_creation after insert on public.chantiers for each row execute function public.trg_historique_creation('chantier', 'nom');
+drop trigger if exists gp_historique_creation on public.fournisseurs;
+create trigger gp_historique_creation after insert on public.fournisseurs for each row execute function public.trg_historique_creation('fournisseur', 'nom');
+drop trigger if exists gp_historique_creation on public.commandes_fournisseurs;
+create trigger gp_historique_creation after insert on public.commandes_fournisseurs for each row execute function public.trg_historique_creation('commande', 'numero');
+
+-- 2. Recherche globale.
+create or replace function public.recherche_globale(p_entreprise_id uuid, p_texte text, p_limite integer default 30)
+returns table (type text, id uuid, titre text, sous_titre text, reference text, url text, rang integer)
+language sql stable security invoker set search_path = public as $$
+  with q as (select public.normaliser_reference(p_texte) as v, lower(btrim(p_texte)) as brut),
+  candidats as (
+    select 'client'::text as type, c.id, coalesce(nullif(c.societe, ''), btrim(concat_ws(' ', c.prenom, c.nom))) as titre,
+           concat_ws(' · ', c.ville, c.telephone, c.email) as sous_titre, c.reference_interne as reference, '/clients/' || c.id as url,
+           array[c.reference_interne] as refs, array[c.nom, c.prenom, c.societe, c.adresse_facturation, c.ville, c.email] as textes, array[c.telephone] as tels
+    from public.clients c where c.entreprise_id = p_entreprise_id
+    union all
+    select 'chantier', ch.id, ch.nom, concat_ws(' · ', ch.adresse, ch.ville, ch.statut), ch.reference_interne, '/chantiers/' || ch.id,
+           array[ch.reference_interne], array[ch.nom, ch.adresse, ch.ville], array[]::text[]
+    from public.chantiers ch where ch.entreprise_id = p_entreprise_id
+    union all
+    select 'devis', d.id, coalesce(d.numero, 'Devis brouillon'), concat_ws(' · ', d.statut, d.reference_client, to_char(d.date_emission, 'DD/MM/YYYY')),
+           coalesce(d.numero, d.reference_interne), '/devis/' || d.id,
+           array[d.numero, d.reference_interne, d.reference_client], array[]::text[], array[]::text[]
+    from public.devis d where d.entreprise_id = p_entreprise_id
+    union all
+    select 'facture', f.id, coalesce(f.numero, 'Facture brouillon'), concat_ws(' · ', f.type, f.statut, to_char(f.date_emission, 'DD/MM/YYYY')),
+           coalesce(f.numero, f.reference_interne), '/factures/' || f.id,
+           array[f.numero, f.reference_interne, f.reference_client], array[]::text[], array[]::text[]
+    from public.factures f where f.entreprise_id = p_entreprise_id
+    union all
+    select 'fournisseur', fo.id, fo.nom, concat_ws(' · ', fo.ville, fo.telephone, fo.email), fo.reference, '/fournisseurs/' || fo.id,
+           array[fo.reference], array[fo.nom, fo.adresse, fo.ville, fo.email], array[fo.telephone]
+    from public.fournisseurs fo where fo.entreprise_id = p_entreprise_id
+    union all
+    select 'article', p.id, p.designation, concat_ws(' · ', p.categorie, p.fabricant), p.reference_interne, '/prestations/' || p.id || '/modifier',
+           array[p.reference_interne, p.reference_fabricant, p.code_barres], array[p.designation, p.fabricant, p.categorie], array[]::text[]
+    from public.prestations_catalogue p where p.entreprise_id = p_entreprise_id
+    union all
+    select 'article_stock', a.id, a.designation, concat_ws(' · ', 'stock', a.marque), coalesce(a.reference_interne, a.reference), '/stock/' || a.id,
+           array[a.reference, a.reference_interne, a.reference_fabricant, a.code_barres], array[a.designation, a.marque], array[]::text[]
+    from public.articles_stock a where a.entreprise_id = p_entreprise_id
+    union all
+    select 'ouvrage', o.id, o.nom, concat_ws(' · ', 'ouvrage', o.categorie), o.reference_interne, '/ouvrages/bibliotheque/' || o.id,
+           array[o.reference_interne], array[o.nom, o.categorie], array[]::text[]
+    from public.ouvrages o where o.entreprise_id = p_entreprise_id
+  ),
+  classes as (
+    select c.type, c.id, c.titre, c.sous_titre, c.reference, c.url,
+      case
+        when exists (select 1 from unnest(c.refs) r, q where public.normaliser_reference(r) <> '' and public.normaliser_reference(r) = q.v) then 1
+        when exists (select 1 from unnest(c.refs) r, q where public.normaliser_reference(r) <> '' and starts_with(public.normaliser_reference(r), q.v)) then 2
+        when exists (select 1 from unnest(c.tels) t, q where public.normaliser_reference(t) <> '' and strpos(public.normaliser_reference(t), q.v) > 0) then 2
+        when exists (select 1 from unnest(c.refs) r, q where strpos(public.normaliser_reference(r), q.v) > 0) then 3
+        when exists (select 1 from unnest(c.textes) t, q where t is not null and (strpos(lower(t), q.brut) > 0 or strpos(public.normaliser_reference(t), q.v) > 0)) then 4
+      end as rang
+    from candidats c
+  )
+  select k.type, k.id, k.titre, k.sous_titre, k.reference, k.url, k.rang
+  from classes k, q
+  where q.v <> '' and k.rang is not null
+  order by k.rang, k.titre
+  limit greatest(1, least(coalesce(p_limite, 30), 100))
+$$;
+revoke all on function public.recherche_globale(uuid, text, integer) from public, anon, service_role;
+grant execute on function public.recherche_globale(uuid, text, integer) to authenticated;
+
+-- 3. Dernières actions de l'utilisateur.
+create or replace function public.dernieres_actions(p_entreprise_id uuid, p_limite integer default 10)
+returns table (ressource text, id uuid, titre text, action text, cree_le timestamptz, url text)
+language sql stable security invoker set search_path = public as $$
+  with derniers as (
+    select distinct on (h.ressource, h.ressource_id) h.ressource, h.ressource_id, h.action, h.cree_le
+    from public.historique_objets h
+    where h.entreprise_id = p_entreprise_id and h.utilisateur_id = auth.uid()
+    order by h.ressource, h.ressource_id, h.cree_le desc
+  )
+  select d.ressource, d.ressource_id,
+    case d.ressource
+      when 'client' then (select coalesce(nullif(c.societe, ''), btrim(concat_ws(' ', c.prenom, c.nom))) from public.clients c where c.id = d.ressource_id)
+      when 'chantier' then (select ch.nom from public.chantiers ch where ch.id = d.ressource_id)
+      when 'fournisseur' then (select f.nom from public.fournisseurs f where f.id = d.ressource_id)
+      when 'commande' then (select 'Commande ' || co.numero from public.commandes_fournisseurs co where co.id = d.ressource_id)
+      when 'devis' then (select 'Devis ' || coalesce(dv.numero, 'brouillon') from public.devis dv where dv.id = d.ressource_id)
+      when 'facture' then (select 'Facture ' || coalesce(fa.numero, 'brouillon') from public.factures fa where fa.id = d.ressource_id)
+      when 'article' then (select p.designation from public.prestations_catalogue p where p.id = d.ressource_id)
+      when 'article_stock' then (select a.designation from public.articles_stock a where a.id = d.ressource_id)
+      when 'ouvrage' then (select o.nom from public.ouvrages o where o.id = d.ressource_id)
+      else d.ressource end as titre,
+    d.action, d.cree_le,
+    case d.ressource
+      when 'client' then '/clients/' || d.ressource_id when 'chantier' then '/chantiers/' || d.ressource_id
+      when 'fournisseur' then '/fournisseurs/' || d.ressource_id when 'commande' then '/commandes/' || d.ressource_id
+      when 'devis' then '/devis/' || d.ressource_id when 'facture' then '/factures/' || d.ressource_id
+      when 'article' then '/prestations/' || d.ressource_id || '/modifier' when 'article_stock' then '/stock/' || d.ressource_id
+      when 'ouvrage' then '/ouvrages/bibliotheque/' || d.ressource_id when 'planning' then '/planning'
+      else '/dashboard' end as url
+  from derniers d
+  order by d.cree_le desc
+  limit greatest(1, least(coalesce(p_limite, 10), 50))
+$$;
+revoke all on function public.dernieres_actions(uuid, integer) from public, anon, service_role;
+grant execute on function public.dernieres_actions(uuid, integer) to authenticated;
+
+notify pgrst, 'reload schema';

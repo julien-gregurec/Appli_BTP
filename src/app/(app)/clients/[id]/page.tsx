@@ -1,3 +1,8 @@
+import { devisV2Actif } from "@/lib/devis/v2-serveur";
+import { HistoriqueObjet } from "@/components/HistoriqueObjet";
+import { actionsClient } from "@/lib/actions-contextuelles/registre";
+import { PanneauActions } from "@/components/actions/PanneauActions";
+import { permissionsUtilisateur } from "@/lib/permissions";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -11,6 +16,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const { id } = await params;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  const permissions = await permissionsUtilisateur(ctx);
 
   const { data: client } = await supabase
     .from("clients")
@@ -46,8 +52,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       </div>
     ) : null;
 
+  const actionsPanneau = actionsClient({ id, telephone: client.telephone ?? null, email: client.email ?? null, adresse: [client.adresse_facturation, client.ville].filter(Boolean).join(", ") || null, statut: client.statut }, permissions);
   return (
-    <main className="p-8">
+    <main className="lg:pr-72 p-8"><PanneauActions titre="Client" contexte={client.reference_interne ?? undefined} actions={actionsPanneau} />
       <div className="mx-auto max-w-3xl space-y-6">
         <div className="flex items-start justify-between">
           <div>
@@ -142,6 +149,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           )}
         </section>
       </div>
+      {devisV2Actif() && <div className="mx-auto mt-6 max-w-5xl"><HistoriqueObjet ressource="client" id={id} /></div>}
     </main>
   );
 }

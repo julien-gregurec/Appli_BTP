@@ -1,3 +1,7 @@
+import { changerStatutDevisAction } from "@/app/actions/devis";
+import { HistoriqueObjet } from "@/components/HistoriqueObjet";
+import { actionsDevis } from "@/lib/actions-contextuelles/registre";
+import { PanneauActions } from "@/components/actions/PanneauActions";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -84,8 +88,9 @@ export default async function DevisDetailPage({ params, searchParams }: { params
     prenomEmetteur: ctx.prenom,
   });
 
+  const actionsPanneau = actionsDevis({ id, statut: devis.statut, chantierId: devis.chantier_id ?? null, clientId: devis.client_id ?? null, moteurV2: devisV2Actif(), aDesLignes: true }, permissions);
   return (
-    <main className="p-8">
+    <main className="lg:pr-72 p-8"><PanneauActions titre="Devis" contexte={`${devis.numero ?? "brouillon"} · ${devis.statut}`} actions={actionsPanneau} formActions={{ dupliquer: dupliquerDevisAction.bind(null, id), transformer_facture: creerFacture, archiver: changerStatutDevisAction.bind(null, id, "annule"), supprimer }} />
       <div className="mx-auto max-w-3xl space-y-6">
         {erreurAction && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erreurAction}</p>}
         {succesAction && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{succesAction}</p>}
@@ -284,6 +289,7 @@ export default async function DevisDetailPage({ params, searchParams }: { params
         )}
 
         {devisV2Actif() && <DocumentsIssusDevis devisId={id} />}
+        {devisV2Actif() && <HistoriqueObjet ressource="devis" id={id} />}
 
         <div className="flex items-center justify-between border-t border-neutral-100 pt-4 dark:border-neutral-800">
           {devis.statut === "accepte" ? (

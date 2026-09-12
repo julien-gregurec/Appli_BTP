@@ -1,3 +1,5 @@
+import { actionsArticleStock } from "@/lib/actions-contextuelles/registre";
+import { PanneauActions } from "@/components/actions/PanneauActions";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -49,7 +51,8 @@ export default async function ArticleStockPage({ params, searchParams }: { param
   const ajouterTeinte = ajouterTeinteAction.bind(null, id);
   const ajouterFiche = ajouterFicheTechniqueArticleAction.bind(null, id);
   const un = <T,>(value: T | T[] | null): T | null => Array.isArray(value) ? value[0] ?? null : value;
-  return <main className="p-3 sm:p-8"><div className="mx-auto max-w-4xl space-y-6">
+  const actionsPanneau = actionsArticleStock({ id, actif: (articleData as { actif?: boolean } | null)?.actif !== false }, permissions);
+  return <main className="lg:pr-72 p-3 sm:p-8"><PanneauActions titre="Article de stock" actions={actionsPanneau} /><div className="mx-auto max-w-4xl space-y-6">
     <div><Link href="/stock" className="text-sm text-neutral-500 hover:underline">← Stock</Link><h1 className="mt-1 text-xl font-semibold">{article.reference} · {article.designation}</h1><p className="text-sm text-neutral-500">{article.marque ?? "Sans marque"} · code-barres {article.code_barres ?? "non renseigné"}</p></div>
     {messages.error && <p className="rounded bg-red-50 p-3 text-sm text-red-700">{messages.error}</p>}{messages.success && <p className="rounded bg-green-50 p-3 text-sm text-green-700">{messages.success}</p>}
     <div className={`grid gap-3 ${peutVoirPrix ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}><div className="rounded border p-4"><p className="text-xs text-neutral-500">Stock</p><strong className="text-xl">{article.quantite_stock} {article.unite}</strong></div><div className="rounded border p-4"><p className="text-xs text-neutral-500">Seuil</p><strong className="text-xl">{article.seuil_alerte} {article.unite}</strong></div>{peutVoirPrix ? <><div className="rounded border p-4"><p className="text-xs text-neutral-500">Prix achat HT</p><strong className="text-xl">{euros(article.prix_achat_ht)}</strong></div><div className="rounded border p-4"><p className="text-xs text-neutral-500">Prix revente HT</p><strong className="text-xl">{euros(article.prix_vente_ht)}</strong></div></> : <div className="rounded border border-blue-200 bg-blue-50 p-4"><p className="text-xs text-blue-700">Prix du stock</p><strong className="text-sm text-blue-950">Masqués par votre administrateur</strong></div>}</div>

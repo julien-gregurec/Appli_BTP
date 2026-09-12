@@ -477,3 +477,33 @@ Verdict provisoire : **GO SOUS CONDITIONS pour les lots livrés**, NO-GO V1 COMM
 1. `creer_facture_avancee`, `creer_situation_travaux`, `creer_chantier_depuis_devis` : `transformer_devis` n'est vérifié qu'en TypeScript (redéfinir ces trois fonctions historiques est un lot à part).
 2. Le prix des composants d'un **ouvrage** n'est pas soumis à `modifier_prix_vente` (le prix global de l'ouvrage passe par ses propres dialogues) — à étendre.
 3. L'écran ne voit pas une clé configurée à **faux** (seules les clés accordées sont transmises) : un bouton peut rester actif et la base refuser avec un message clair. Le lot E lit les mêmes droits pour griser.
+
+## 15. Lot E — barre latérale contextuelle, recherche globale, dernières actions (livré)
+
+### 15.1 Livrables
+
+| Fichier | Rôle |
+|---|---|
+| `src/lib/actions-contextuelles/registre.ts` (+ test, 10 cas) | registre PUR : devis (23 actions), client, facture, chantier, fournisseur, article, ouvrage, commande, stock, salarié, planning, situation — chaque action indisponible porte son motif |
+| `src/components/actions/PanneauActions.tsx` (+ test de rendu) | colonne fixe à droite sur ordinateur, barre basse + feuille sur tablette et téléphone ; indisponible = visible, grisé, `aria-disabled`, motif en infobulle et au lecteur d'écran (jamais `disabled`) |
+| Fiches devis, client, facture, chantier, fournisseur, salarié, commande, stock, article | panneau monté, actions serveur branchées (dupliquer, transformer en facture, annuler, supprimer, archiver…) |
+| `supabase/proposed/gp-v1-metier-recherche-globale.sql.proposed` (+ pgTAP 13) | `recherche_globale` (référence, numéro, nom, désignation, adresse, téléphone, e-mail ; SECURITY INVOKER : la RLS filtre), `dernieres_actions`, création des tiers journalisée |
+| `src/app/actions/recherche.ts`, `src/components/PaletteRecherche.tsx` | palette Ctrl+K partout (Ctrl+Maj+K dans l'éditeur de devis, qui garde Ctrl+K pour ses articles), ↑ ↓ Entrée Échap, dernières actions sans saisie |
+| `src/components/DernieresActions.tsx`, tableau de bord | bloc « Dernières actions » (un clic rouvre l'objet) |
+| `src/components/HistoriqueObjet.tsx` | historique par objet (devis, client, facture), sous la RLS de l'historique |
+
+### 15.2 Résultats
+
+| Contrôle | Résultat |
+|---|---|
+| SQL appliqué deux fois | 0 erreur |
+| pgTAP du lot | **13/13** (référence normalisée au rang 1, numéro, téléphone sans espaces, e-mail, nom partiel, code stock, cloisonnement B, ouvrier sans accès : aucun client/devis/facture, conducteur : pas de facture ; dernières actions propres à l'utilisateur) |
+| Vitest registre + panneau + historique | 21/21 |
+| Typecheck du projet, lint des fichiers touchés | 0 / 0 |
+
+### 15.3 Réserves
+
+1. Panneau non monté sur la fiche **ouvrage** (structure de page non lue), sur les **situations** (liste unique) ni sur le **planning** (lot F) ; GED, Réserves et DOE sont des liens du panneau chantier (`/documents`, `#reserves`, `/doe`).
+2. « Importer des lignes » et « Transformer en commande » sont annoncés indisponibles en V1 (motif explicite), pas cachés.
+3. Le panneau fixe suppose une marge droite (`lg:pr-72`) posée page par page ; les pages non montées ne la portent pas.
+4. Recette navigateur du panneau et de la palette non faite (rendu serveur testé) : à couvrir au lot H.

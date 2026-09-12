@@ -1,3 +1,6 @@
+import { HistoriqueObjet } from "@/components/HistoriqueObjet";
+import { actionsFacture } from "@/lib/actions-contextuelles/registre";
+import { PanneauActions } from "@/components/actions/PanneauActions";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -84,8 +87,9 @@ export default async function FactureDetailPage({
     prenomEmetteur: ctx.prenom,
   });
 
+  const actionsPanneau = actionsFacture({ id, statut: facture.statut, resteAPayer, devisOrigineId: facture.devis_origine_id ?? null, moteurV2: devisV2Actif() }, permissions);
   return (
-    <main className="p-8">
+    <main className="lg:pr-72 p-8"><PanneauActions titre="Facture" contexte={`${facture.numero ?? "brouillon"} · ${facture.statut}`} actions={actionsPanneau} />
       <div className="mx-auto max-w-3xl space-y-6">
         <div className="flex items-start justify-between">
           <div>
@@ -289,6 +293,7 @@ export default async function FactureDetailPage({
           </section>
         )}
       </div>
+      {devisV2Actif() && <div className="mx-auto mt-6 max-w-5xl"><HistoriqueObjet ressource="facture" id={id} /></div>}
     </main>
   );
 }

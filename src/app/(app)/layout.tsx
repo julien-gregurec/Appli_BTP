@@ -20,6 +20,8 @@ import { activeFeaturesForCompany } from "@/lib/feature-flags";
 import { boutiqueEstActive, iaEstActive } from "@/lib/preview-features";
 import { listerApplicationsPourSwitcher } from "@/lib/multi-app-server";
 import { lireEtatAssistance } from "@/lib/assistance-server";
+import { PaletteRecherche } from "@/components/PaletteRecherche";
+import { devisV2Actif } from "@/lib/devis/v2-serveur";
 
 // Layout des pages authentifiées avec navigation latérale.
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -66,6 +68,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <ModuleAccessBoundary permissions={permissions} activeFeatures={activeFeatures}>{children}</ModuleAccessBoundary>
       </div>
       <MobileBack />
+      {/* GP V1 : recherche globale (Ctrl+K) — la RPC arrive avec les migrations du moteur v2. */}
+      <PaletteRecherche actif={devisV2Actif() && !ctx.accesSupportPlateforme} />
       <MiseAJourApplication />
       <AideButton />
       {iaEstActive() && aAccesIA(permissions) && <AssistantIA />}

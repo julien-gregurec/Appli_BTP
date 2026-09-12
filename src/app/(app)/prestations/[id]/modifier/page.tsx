@@ -10,6 +10,10 @@ import { permissionsUtilisateur } from "@/lib/permissions";
 import { chargerFicheArticleV2, chargerOptionsCatalogueV2 } from "@/lib/prestations-catalogue-v2-serveur";
 import type { ChampsCatalogueV2 } from "@/lib/prestations-catalogue-v2";
 import { ActionsFicheArticle, FicheArticleComplements } from "@/components/prestations/FicheArticleComplements";
+import { PanneauActions } from "@/components/actions/PanneauActions";
+import { actionsArticle } from "@/lib/actions-contextuelles/registre";
+import { changerActivationPrestationAction } from "@/app/actions/prestations";
+import { dupliquerPrestationAction } from "@/app/actions/catalogue-v2";
 
 const SUCCES_FICHE: Record<string, string> = {
   image: "Image enregistrée.",
@@ -36,7 +40,7 @@ async function ModifierPrestationV2({ id, error, succes }: { id: string; error?:
   const supabase = await createClient();
   const [{ data }, catalogueV2, permissions] = await Promise.all([
     supabase.from("prestations_catalogue")
-      .select("id, designation, description, type, unite, prix_unitaire_ht, taux_tva, reference_interne, reference_fabricant, code_barres, fabricant, fournisseur_id, categorie, famille_id, notes_internes, image_chemin")
+      .select("id, designation, description, type, unite, prix_unitaire_ht, taux_tva, actif, reference_interne, reference_fabricant, code_barres, fabricant, fournisseur_id, categorie, famille_id, notes_internes, image_chemin")
       .eq("id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle(),
     chargerOptionsCatalogueV2(id),
     permissionsUtilisateur(ctx),
@@ -44,9 +48,12 @@ async function ModifierPrestationV2({ id, error, succes }: { id: string; error?:
   if (!data) notFound();
   const fiche = await chargerFicheArticleV2(id, (data.image_chemin as string | null) ?? null);
   const peutGerer = permissions === null || permissions.includes("gerer_devis");
+  const actif = (data as { actif?: boolean }).actif !== false;
+  const actionsPanneau = actionsArticle({ id, actif }, permissions);
 
   return (
-    <main className="p-4 sm:p-8">
+    <main className="lg:pr-72 p-4 sm:p-8">
+      <PanneauActions titre="Article" contexte={(data.reference_interne as string | null) ?? undefined} actions={actionsPanneau} formActions={{ dupliquer: dupliquerPrestationAction.bind(null, id), archiver: changerActivationPrestationAction.bind(null, id, false), reactiver: changerActivationPrestationAction.bind(null, id, true) }} />
       <div className="mx-auto max-w-6xl space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

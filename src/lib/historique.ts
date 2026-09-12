@@ -33,6 +33,9 @@ const ACTIONS: Record<string, string> = {
   code_fournisseur_retire: "Code distributeur retiré",
   prix_achat_modifie: "Prix d’achat",
   coefficient_modifie: "Coefficient",
+  numero_attribue: "Numéro attribué",
+  envoi: "Envoyé",
+  pdf: "PDF généré",
 };
 
 const CHAMPS: Record<string, string> = {

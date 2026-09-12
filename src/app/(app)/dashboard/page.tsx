@@ -1,3 +1,5 @@
+import { DernieresActions } from "@/components/DernieresActions";
+import { devisV2Actif } from "@/lib/devis/v2-serveur";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { euros, statutDevis } from "@/lib/devis";
@@ -269,6 +271,7 @@ export default async function DashboardPage() {
   }) : undefined;
   const optionsWidgets = [
     ...((notifications??[]).length ? [{id:"notifications",label:"Notifications"}] : []),
+    ...(devisV2Actif() ? [{id:"dernieres_actions",label:"Dernières actions"}] : []),
     ...(raccourcis.length ? [{id:"modules",label:"Raccourcis modules"}] : []),
     ...((chantierGraphique || moisGraphique || (voirIndicateursFinanciers && voir.factures)) ? [{id:"analyses",label:"Graphiques et analyses"}] : []),
     ...(voirIndicateursFinanciers && (voir.factures || voir.devis) ? [{id:"indicateurs",label:"Indicateurs financiers"}] : []),
@@ -291,6 +294,7 @@ export default async function DashboardPage() {
         )}
         <DashboardWidgetFirstConnection options={optionsWidgets}/>
 
+        {devisV2Actif()&&<DashboardWidget id="dernieres_actions"><DernieresActions /></DashboardWidget>}
         {(notifications??[]).length>0&&<DashboardWidget id="notifications"><section className="rounded-xl border border-blue-200 bg-blue-50 p-4"><div className="mb-3 flex items-center justify-between"><div><h2 className="font-semibold">Mes notifications</h2><p className="text-xs text-neutral-500">Décisions, demandes et vérifications qui vous concernent.</p></div><span className="rounded-full bg-blue-700 px-2.5 py-1 text-xs font-semibold text-white">{notifications?.length}</span></div><div className="grid gap-2 sm:grid-cols-2">{notifications?.map(notification=><Link key={notification.id} href={notification.lien??"/dashboard"} className={`rounded-lg border bg-white p-3 text-sm ${notification.niveau==="critique"?"border-red-400":notification.niveau==="attention"?"border-amber-300":"border-blue-200"}`}><strong>{notification.titre}</strong>{notification.message&&<p className="mt-1 text-xs text-neutral-600">{notification.message}</p>}</Link>)}</div></section></DashboardWidget>}
 
         {raccourcis.length > 0 && (

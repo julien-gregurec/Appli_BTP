@@ -1,3 +1,6 @@
+import { actionsCommande } from "@/lib/actions-contextuelles/registre";
+import { PanneauActions } from "@/components/actions/PanneauActions";
+import { permissionsUtilisateur } from "@/lib/permissions";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -22,6 +25,7 @@ export default async function CommandeDetailPage({
   const { error, reception } = await searchParams;
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  const permissions = await permissionsUtilisateur(ctx);
 
   const { data: commande } = await supabase
     .from("commandes_fournisseurs")
@@ -53,8 +57,9 @@ export default async function CommandeDetailPage({
   const enregistrerReception = enregistrerReceptionCommandeAction.bind(null, id);
   const email = fournisseur ? contenuEmailCommande({ numero: commande.numero, fournisseurNom: fournisseur.nom, fournisseurEmail: fournisseur.email, montantTtc: Number(commande.montant_ttc), entrepriseNom: ctx.entrepriseNom, dateLivraison: commande.date_livraison_prevue }) : null;
 
+  const actionsPanneau = actionsCommande({ id, statut: commande.statut, fournisseurId: commande.fournisseur_id ?? null }, permissions);
   return (
-    <main className="p-8">
+    <main className="lg:pr-72 p-8"><PanneauActions titre="Commande" contexte={commande.numero ?? undefined} actions={actionsPanneau} formActions={{ supprimer }} />
       <div className="mx-auto max-w-3xl space-y-6">
         <div className="flex items-start justify-between">
           <div>
