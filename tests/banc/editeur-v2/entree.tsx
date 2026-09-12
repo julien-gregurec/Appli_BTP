@@ -4,9 +4,12 @@
  */
 import { createRoot } from "react-dom/client";
 import { EditeurDevisV2 } from "@/components/devis/EditeurDevisV2";
+import { elementsFictifs } from "@/lib/devis/fixtures/document-fictif";
 
 const parametres = new URLSearchParams(window.location.search);
 const couts = parametres.get("couts") === "1";
+// Banc de performance (GP V1, lot H) : `?lignes=500` ouvre l'éditeur avec autant de lignes fictives.
+const nbLignes = Math.max(0, Math.min(2000, Number(parametres.get("lignes") ?? 0) || 0));
 window.__banc = {
   droits: { voirCouts: couts, gererCouts: couts, modifierPrix: true, modifierUnite: true, modifierRemise: true },
   enregistrements: [],
@@ -27,7 +30,7 @@ createRoot(document.getElementById("racine")!).render(
         client_id: "c1", chantier_id: null, date_emission: "2026-09-11", date_validite: "2026-10-11", conditions: null,
         notes_client: null, notes_internes: null, remise_globale: 0, filigrane: null,
       }}
-      etatInitial={{ elements: [], origines: {} }}
+      etatInitial={{ elements: nbLignes > 0 ? elementsFictifs({ lignesLibres: nbLignes, ouvrage: false }) : [], origines: {} }}
       emetteur={{
         nom: "Entreprise Fictive BTP", raisonSociale: "Entreprise Fictive BTP SARL", siret: "000 000 000 00000",
         adresse: "1 rue de l’Exemple", codePostal: "00000", ville: "Villefictive", logoUrl: null,

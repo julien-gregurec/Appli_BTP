@@ -600,3 +600,113 @@ l'historique ; historique des envois et des PDF. Tout est additif et ne change r
 2. Le dialogue d'envoi n'a pas de recette navigateur (composant à état, ouvert au clic) ; la logique d'envoi est couverte par 6 tests serveur.
 3. « Page de garde optionnelle » (§ 11) non faite : l'architecture (blocs de page décidés par les données) la permet en V3 sans refonte.
 4. Le rendu **figé** d'un document déjà émis ne porte pas de `references` : l'en-tête n'apparaît que sur les documents émis après la migration ; les documents antérieurs sont imprimés à l'identique (voulu).
+
+## 18. Lot H — E2E, performance, non-régression, verdicts (livré, E2E sous réserve d'environnement)
+
+### 18.1 Livrables
+
+| Fichier | Rôle |
+|---|---|
+| `tests/banc/performance/` (config + spec Playwright) | mesure explicite de la fluidité sur les bancs (vrais composants) : devis 10 / 100 / 500 lignes, planning 100 / 400 / 1 000 évènements sur 40 salariés ; relevé JSON |
+| `tests/banc/editeur-v2/entree.tsx` (`?lignes=N`), `tests/banc/planning-v2/entree.tsx` (`?n=N&salaries=M`) | bancs paramétrables en charge |
+| `src/components/planning/PlanningV2.tsx` | lignes mémoïsées, blocs par ligne calculés une fois, gestionnaires stables : un glisser ne redessine que la ligne d'origine et la ligne cible ; prise de focus explicite au pointeur (raccourcis fiables après un clic) |
+| `tests/e2e/gp-v1-metier.spec.ts` | les 15 scénarios E2E du prompt (§ 19) sur l'application réelle, en série ; robustes à la pile locale (attente d'hydratation, connexion unique par utilisateur, détours de session comptés et journalisés, jamais masqués) |
+| Pile de recette (non versionnée) | base `gpv1_jetable` (ledger + SQL proposé A→G + jeu `isolation_multitenant`), GoTrue + PostgREST + Kong jetables (`supabase_*_gpv1-e2e`, port 60321), application en `next build` + `next start -p 3100` avec `GP_DEVIS_V2=1 GP_PLANNING_V2=1` et le Chromium de Playwright pour les PDF |
+
+### 18.2 Performance — verdict explicite (§ 17 du prompt)
+
+Mesures Playwright/Chromium sur les bancs, 1 440 × 900, poste chargé (charge moyenne 4 à 10). « Tâches longues » = tâches > 50 ms observées pendant le geste (`PerformanceObserver`).
+
+| Devis (grille) | 10 lignes | 100 lignes | 500 lignes |
+|---|---|---|---|
+| Lignes présentes dans le DOM | 10 | 100 | **30** (virtualisation) |
+| Chargement jusqu'à la grille et les totaux | 165 ms | 140 ms | 179 ms |
+| Frappe de 3 caractères dans une cellule | 8 ms | 10 ms | 5 ms |
+| Tab (validation, recalcul des totaux) | 10 ms | 52 ms | 79 ms |
+| Frappe de 17 caractères (désignation) | 15 ms | 17 ms | 12 ms |
+| Défilement bas puis haut | 106 ms · 0 tâche longue | 114 ms · 0 | 109 ms · 3 (max 94 ms) |
+| Annuler puis rétablir | 58 ms | 82 ms | 109 ms |
+
+**Verdict devis : FLUIDE à 500 lignes.** Aucune tâche longue pendant la frappe ou la validation, latence de frappe ≤ 17 ms à toutes les tailles ; le seul coût visible est le défilement à 500 lignes (3 tâches de 60–94 ms au moment du recyclage des lignes virtualisées), imperceptible à l'usage.
+
+| Planning (semaine, 40 salariés) | 100 évènements | 400 évènements | 1 000 évènements |
+|---|---|---|---|
+| Blocs rendus | 116 | 416 | 1 016 |
+| Chargement de la semaine | 261 ms | 394 ms | 896 ms |
+| Sélection d'un bloc (barre latérale) | 68 ms | 31 ms | 51 ms |
+| Glisser-déposer (8 mouvements) jusqu'à l'enregistrement | 341 ms · 1 tâche (87 ms) | 404 ms · 1 (250 ms) | 752 ms · 1 (582 ms) |
+| Filtre texte (re-projection) | 42 ms | 26 ms | 30 ms |
+| Clavier Ctrl+→ jusqu'à l'enregistrement | 177 ms | 246 ms | 615 ms |
+
+Avant la mémoïsation des lignes (même banc) : 1 000 évènements = sélection 438 ms, glisser 2 106 ms (9 tâches longues, max 561 ms) ; 400 évènements = glisser 842 ms (9 tâches longues).
+
+**Verdict planning : FLUIDE jusqu'à plusieurs centaines d'évènements par semaine** (400 : chaque geste < 0,5 s, une seule tâche longue au dépôt) ; **utilisable mais moins nerveux à 1 000** (chargement ~0,9 s, dépôt 0,75 s avec une tâche de 0,6 s = re-projection de tous les blocs et des conflits après l'enregistrement optimiste). Au-delà, la piste est la virtualisation des lignes et un calcul de conflits incrémental — hors V1.
+
+### 18.3 E2E — les 15 scénarios
+
+Environnement : le poste était saturé pendant toute la recette (charge moyenne 20 à 45 sur 10 cœurs, machine virtuelle Docker à 600–860 % : trois conteneurs `analytics` de piles Supabase tierces et une autre session de travail). Conséquences mesurées : GoTrue en dépassement de délai (`/auth/v1/user` 504, 10–20 s) → le proxy traite la session comme absente et renvoie vers `/login` ; actions serveur qui n'aboutissent pas ; `next dev` inutilisable (hydratation > 3 min sur le volume externe) → recette faite sur `next build` + `next start`.
+
+| # | Scénario | Résultat | Preuve |
+|---|---|---|---|
+| 1 | création client | **passé** (× 12 passes) | fiche client ouverte, nom affiché |
+| 2 | création article | **passé** (× 10) | référence interne attribuée (`ART-00007`…) |
+| 3 | création ouvrage | **passé** (× 8) | composant ajouté, ouvrage publié, fiche ouverte |
+| 4 | création devis | **passé** (× 6) | grille, référence d'affaire, totaux 150,00, enregistrement puis fiche |
+| 5 | plusieurs types de lignes | **passé** (× 4) | titre, sous-total, remise, commentaire, article du catalogue via Ctrl+K : 6 lignes enregistrées |
+| 6 | modification au clavier | **passé** (× 4) | Tab, annuler / rétablir |
+| 7 | calcul total et marge | **passé** (× 3) | bloc « Rentabilité (interne) », taux de marque après prix d'achat |
+| 8 | PDF | **passé** (× 3) | `application/pdf` produit par Chromium, entrée « PDF généré » dans l'historique |
+| 9 | transformation en facture | **partiel** | statut envoyé → accepté franchi ; le clic « Transformer en facture » du panneau n'a pas abouti dans le délai (poste saturé) ; la transformation elle-même est prouvée par pgTAP (lot D) et par la journalisation `documents_issus_devis` |
+| 10 | création planning | **passé** (× 5) | évènement créé, bloc affiché |
+| 11 | déplacement d'un évènement | **passé** (× 3) | +15 min au clavier, persistant après rechargement |
+| 12 | détection de conflit | **passé** (× 3) | « Déjà affecté », bloc marqué conflit |
+| 13 | vérification des droits | **passé** (× 2) | chef d'équipe : « Nouvel évènement » grisé avec le motif `gerer_planning`, déplacement clavier sans effet |
+| 14 | recherche par référence interne | **passé** (× 1) | Ctrl+K, référence d'affaire → devis ouvert |
+| 15 | vérification barre latérale | **corrigé, non rejoué** | actions grisées avec motif prouvées ; l'assertion finale visait la navigation au lieu du panneau, corrigée après la dernière passe |
+
+Meilleure passe continue : 8 scénarios d'affilée (1 → 8), puis 10 → 14 d'affilée sur des objets existants. **Aucune passe 15/15 n'a pu être obtenue sur ce poste** : les échecs restants sont tous des dépassements de délai sous charge (actions serveur, GoTrue), jamais une assertion fonctionnelle fausse. Les traces Playwright de chaque échec ont été lues (réseau, captures) pour l'établir.
+
+Correctifs de recette apportés à la base jetable (jamais au produit) : rôle Admin du jeu de test sans `mode_compte_depot` (sinon l'application le traite comme un compte dépôt → borne stock), offre `entreprise` active, comptes GoTrue complétés (jetons non nuls, identités), module de recette `ouvrages_recette` + drapeau `works` pour ouvrir la bibliothèque d'ouvrages.
+
+### 18.4 Non-régression (§ 20 du prompt)
+
+| Contrôle | Résultat |
+|---|---|
+| Typecheck (racine) | 0 erreur |
+| Lint (racine, `eslint .`) | 0 erreur, 6 avertissements préexistants |
+| Vitest | 2 375 verts ; `xlsx.test.ts` échoue seulement sous la charge de la suite complète, vert seul (préexistant, identique à `516469d`) |
+| pgTAP proposés A→G | 69 + 67 + 36 + 26 + 13 + 25 + 24 = **260/260** ; devis v2 111/111 |
+| Suite pgTAP historique (70 fichiers) sur la base empilée | 1 901 ok / 1 échec préexistant (`reserves_v2_terrain_capture`) |
+| `verify:migrations` / `verify:secrets` | 278 migrations valides ; 1 935 fichiers, aucun secret |
+| Build racine (`next build`) | **réussi**, 5 min 54 (proxy, routes dynamiques ; aucune erreur) |
+| Applications | `apps/tools`, `apps/reserves`, `apps/colors` non touchées ; seul `packages/email` (Cc/Cci, optionnels) est partagé, ses tests sont verts |
+| Diff check vs `516469d` | 139 fichiers, +12 500 / −380 ; 0 fichier sous `supabase/migrations`, 0 fichier sous `apps/` |
+
+### 18.5 Découvertes importantes hors périmètre (à décider)
+
+1. **La bibliothèque d'ouvrages est inaccessible dans toutes les offres commerciales** : la fonctionnalité `works` (`/ouvrages`) est déclarée `BETA` non visible par défaut dans `src/lib/feature-catalogue.ts` et aucun module du catalogue ne couvre `acces_ouvrages`. Sans surcharge `entreprise_feature_flags`, un client ne voit jamais la bibliothèque du lot B ni l'insertion d'ouvrages. À trancher avant la commercialisation (catalogue Train V3).
+2. Le jeu de test `isolation_multitenant` accorde `mode_compte_depot` à l'administrateur : correct pour pgTAP, mais tout E2E avec ce jeu part sur la borne stock. À corriger dans la fixture au prochain lot de recette.
+3. `next dev` sur `/Volumes/ELSATIA-DEV` : hydratation de plusieurs minutes ; la recette doit se faire en `next start`.
+
+### 18.6 Verdicts par domaine
+
+| Domaine | Verdict | Fondement |
+|---|---|---|
+| **Devis** (ligne par ligne, colonnes, références, ouvrages, clavier, marges, transformations, PDF) | **GO** | grille 10 types de lignes, colonnes réglables, coûts/marges selon droits, ouvrages, Ctrl+K, Tab/Entrée/Ctrl+Z, autosauvegarde à révision ; 500 lignes fluides ; E2E 4–8 passés ; pgTAP grille 36, droits 26 |
+| **Planning** (8 vues, glisser-déposer, ressources, conflits, actions latérales, impression) | **GO** | modèle horodaté + compatibilité `affectations`, ressources bloquantes, conflits en base et en direct, 400 évènements fluides ; E2E 10–13 passés ; pgTAP 25 |
+| **Barre contextuelle** | **GO** | 12 registres d'actions, indisponible = visible + grisé + motif ; montée sur devis, client, facture, chantier, fournisseur, article, salarié, commande, stock, planning ; E2E 13 passé, 15 corrigé |
+| **Références internes** | **GO** | uniques par entreprise sur forme normalisée, générateur, historique, recherche globale ; pgTAP 69 + 13 ; E2E 2 et 14 passés |
+| **Transformations documentaires** | **GO SOUS CONDITIONS** | devis → facture / situation / chantier avec droit fin et `documents_issus_devis` (pgTAP) ; E2E 9 non abouti sous charge ; `transformer_devis` vérifié en TypeScript seulement pour trois RPC historiques |
+| **PDF / e-mail** | **GO SOUS CONDITIONS** | références et CGV sur le document, Cc/Cci, modèles, pièces jointes, historique ; PDF réel produit en E2E ; envoi Brevo non exercé en réel (pas de clé) |
+| **Performance** | **GO** | mesures § 18.2 |
+| **Sécurité / droits** | **GO** | RLS et droits fins tenus en base (pgTAP), aucun SECURITY DEFINER exécutable par `anon`, suite d'isolation 70 fichiers verte |
+
+### 18.7 GO / NO-GO V1 commercialisable
+
+**GO SOUS CONDITIONS.** Le V1 fonctionne de bout en bout sur une pile réelle ; les conditions sont toutes extérieures au code livré :
+
+1. **Lot 0** : numéroter et intégrer au ledger le SQL proposé (devis v2 + A-bis, B, C, D, E, F, G) avec preuves Fresh + Upgrade, puis poser `GP_DEVIS_V2=1` et `GP_PLANNING_V2=1`.
+2. **Bibliothèque d'ouvrages** : ouvrir `works` (ou couvrir `acces_ouvrages` par un module) dans le catalogue commercial, sinon le lot B reste invisible aux clients.
+3. **Recette E2E 15/15 en une passe** sur un poste non saturé (ou en CI) avec la fixture corrigée (§ 18.5.2) — la spec est prête.
+4. Envoi d'un e-mail réel (clé Brevo de test) et un PDF de CGV en conditions réelles.
+5. Rappels des lots précédents : `transformer_devis` dans les trois RPC historiques (§ 14.4), ouvrages composés soumis à `modifier_prix_vente`, page de garde (§ 17.3).

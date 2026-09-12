@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type PointerEvent as ReactPointerEvent } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition, type PointerEvent as ReactPointerEvent } from "react";
 import { useRouter } from "next/navigation";
 import { enregistrerEvenementAction, supprimerEvenementAction } from "@/app/actions/planning-v2";
 import { PanneauActions } from "@/components/actions/PanneauActions";
@@ -144,6 +144,9 @@ export function PlanningV2({ donnees, jour, vue }: { donnees: DonneesPlanningV2;
   const debutGlisser = (e: ReactPointerEvent, bloc: Bloc, mode: Glisser["mode"]) => {
     if (!donnees.droits.gerer || e.button !== 0) return;
     e.preventDefault(); e.stopPropagation();
+    // preventDefault sur pointerdown empêche la prise de focus : on la fait explicitement, sinon les
+    // raccourcis clavier resteraient dirigés vers le champ précédemment actif (ex. la recherche).
+    (e.currentTarget as HTMLElement).focus();
     try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* pointeur synthétique */ }
     setSelection(bloc.evenement.id);
     majGlisser({ bloc, mode, x0: e.clientX, y0: e.clientY, alt: e.altKey, ligneCle: bloc.ligne, jour: bloc.jour, minutes0: 0, deltaMin: 0, deltaJours: 0, ligneCible: bloc.ligne });
@@ -188,23 +191,22 @@ export function PlanningV2({ donnees, jour, vue }: { donnees: DonneesPlanningV2;
     majGlisser({ bloc: fictif, mode: "creer", x0: e.clientX, y0: e.clientY, alt: false, ligneCle, jour: jourCible, minutes0: minutes, deltaMin: 0, deltaJours: 0, ligneCible: ligneCle });
   };
 
-  const styleBloc = (b: Bloc): React.CSSProperties => {
-    const enGlisser = glisser && glisser.mode !== "creer" && glisser.bloc.evenement.id === b.evenement.id && glisser.bloc.ligne === b.ligne;
-    const decalage = enGlisser && glisser.mode === "deplacer" ? glisser.deltaMin : 0;
-    const etire = enGlisser && glisser.mode === "etirer" ? glisser.deltaMin : 0;
-    if (vue === "jour") {
-      const debut = Math.max(HEURE_DEBUT * 60, b.debutMin + decalage);
-      const fin = Math.min(HEURE_FIN * 60, b.finMin + decalage + etire);
-      const h = Math.max(HAUTEUR_LIGNE, 8 + 24 * b.colonnes);
-      return { left: LARGEUR_LIBELLE + ((debut - HEURE_DEBUT * 60) / 60) * pxHeure, width: Math.max(pxHeure / 4, ((fin - debut) / 60) * pxHeure), top: 4 + b.colonne * (h - 8) / b.colonnes, height: (h - 8) / b.colonnes - 2 };
-    }
-    const i = jours.indexOf(b.jour) + (enGlisser && glisser.mode === "deplacer" ? glisser.deltaJours : 0);
-    const l = largeurColonne();
-    const h = Math.max(HAUTEUR_LIGNE, 8 + 30 * b.colonnes);
-    return { left: LARGEUR_LIBELLE + i * l + 2, width: l - 4, top: 4 + b.colonne * (h - 8) / b.colonnes, height: (h - 8) / b.colonnes - 2 };
-  };
-
-  const heures = Array.from({ length: HEURE_FIN - HEURE_DEBUT }, (_, i) => HEURE_DEBUT + i);
+  const heures = useMemo(() => Array.from({ length: HEURE_FIN - HEURE_DEBUT }, (_, i) => HEURE_DEBUT + i), []);
+  // Blocs par ligne, calculés une fois par projection : le glisser ne recrée pas ces tableaux, donc les
+  // lignes non concernées (mémoïsées) ne se redessinent pas à chaque mouvement du pointeur.
+  const blocsParLigne = useMemo(() => {
+    const m = new Map<string, Bloc[]>();
+    for (const b of blocs) m.set(b.ligne, [...(m.get(b.ligne) ?? []), b]);
+    return m;
+  }, [blocs]);
+  const AUCUN: Bloc[] = useMemo(() => [], []);
+  // Gestionnaires stables (identité constante) : ils lisent la dernière version via une référence.
+  const derniers = useRef({ creerDepuisZone, debutGlisser });
+  useEffect(() => { derniers.current = { creerDepuisZone, debutGlisser }; });
+  const onCreerStable = useCallback((e: ReactPointerEvent, l: string, j: string) => derniers.current.creerDepuisZone(e, l, j), []);
+  const onGlisserStable = useCallback((e: ReactPointerEvent, b: Bloc, mode: "deplacer" | "etirer") => derniers.current.debutGlisser(e, b, mode), []);
+  const onOuvrirStable = useCallback((ev: Evenement) => setEdition(ev), []);
+  const largeurColonneCourante = largeurColonne();
   const largeurGrille = vue === "jour" ? LARGEUR_LIBELLE + heures.length * pxHeure : undefined;
 
   return (
@@ -287,11 +289,17 @@ export function PlanningV2({ donnees, jour, vue }: { donnees: DonneesPlanningV2;
                 ? heures.map((h) => <div key={h} role="columnheader" style={{ width: pxHeure }} className="shrink-0 border-l border-neutral-100 px-1 py-1 tabular-nums dark:border-neutral-800">{String(h).padStart(2, "0")}:00</div>)
                 : jours.map((j) => <div key={j} role="columnheader" style={{ width: largeurColonne() }} className={`shrink-0 border-l border-neutral-100 px-1 py-1 dark:border-neutral-800 ${j === jourDe(new Date()) ? "text-blue-700" : ""}`}>{jourFr(j)}</div>)}
             </div>
-            {lignes.map((l) => (
-              <LigneGrille key={l.cle} ligne={l} vue={vue} jours={jours} heures={heures} pxHeure={pxHeure} largeurColonne={largeurColonne()} blocs={blocs.filter((b) => b.ligne === l.cle)} selection={selection} conflitsDe={conflitsDe} styleBloc={styleBloc}
-                cible={glisser?.ligneCible === l.cle && glisser.ligneCible !== glisser.ligneCle}
-                onCreer={creerDepuisZone} onGlisser={debutGlisser} onSelection={setSelection} onOuvrir={(ev) => setEdition(ev)} salaries={donnees.salaries} />
-            ))}
+            {lignes.map((l) => {
+              const blocsLigne = blocsParLigne.get(l.cle) ?? AUCUN;
+              const concerne = glisser !== null && (glisser.ligneCle === l.cle || glisser.ligneCible === l.cle);
+              return (
+                <LigneGrille key={l.cle} ligne={l} vue={vue} jours={jours} heures={heures} pxHeure={pxHeure} largeurColonne={largeurColonneCourante} blocs={blocsLigne}
+                  selection={selection !== null && blocsLigne.some((b) => b.evenement.id === selection) ? selection : null}
+                  conflits={conflits} glisser={concerne ? glisser : null}
+                  cible={glisser !== null && glisser.ligneCible === l.cle && glisser.ligneCible !== glisser.ligneCle}
+                  onCreer={onCreerStable} onGlisser={onGlisserStable} onSelection={setSelection} onOuvrir={onOuvrirStable} salaries={donnees.salaries} />
+              );
+            })}
           </div>
         </div>
       )}
@@ -312,12 +320,30 @@ export function PlanningV2({ donnees, jour, vue }: { donnees: DonneesPlanningV2;
   );
 }
 
-function LigneGrille({ ligne, vue, jours, heures, pxHeure, largeurColonne, blocs, selection, conflitsDe, styleBloc, cible, onCreer, onGlisser, onSelection, onOuvrir, salaries }: {
-  ligne: Ligne; vue: Vue; jours: string[]; heures: number[]; pxHeure: number; largeurColonne: number; blocs: Bloc[]; selection: string | null; conflitsDe: (id: string) => Conflit[];
-  styleBloc: (b: Bloc) => React.CSSProperties; cible: boolean;
+/** Position et taille d'un bloc, en tenant compte d'un glisser en cours (fonction pure). */
+function styleDeBloc(b: Bloc, glisser: Glisser | null, vue: Vue, jours: string[], pxHeure: number, largeurColonne: number): React.CSSProperties {
+  const enGlisser = glisser && glisser.mode !== "creer" && glisser.bloc.evenement.id === b.evenement.id && glisser.bloc.ligne === b.ligne;
+  const decalage = enGlisser && glisser.mode === "deplacer" ? glisser.deltaMin : 0;
+  const etire = enGlisser && glisser.mode === "etirer" ? glisser.deltaMin : 0;
+  if (vue === "jour") {
+    const debut = Math.max(HEURE_DEBUT * 60, b.debutMin + decalage);
+    const fin = Math.min(HEURE_FIN * 60, b.finMin + decalage + etire);
+    const h = Math.max(HAUTEUR_LIGNE, 8 + 24 * b.colonnes);
+    return { left: LARGEUR_LIBELLE + ((debut - HEURE_DEBUT * 60) / 60) * pxHeure, width: Math.max(pxHeure / 4, ((fin - debut) / 60) * pxHeure), top: 4 + b.colonne * (h - 8) / b.colonnes, height: (h - 8) / b.colonnes - 2 };
+  }
+  const i = jours.indexOf(b.jour) + (enGlisser && glisser.mode === "deplacer" ? glisser.deltaJours : 0);
+  const h = Math.max(HAUTEUR_LIGNE, 8 + 30 * b.colonnes);
+  return { left: LARGEUR_LIBELLE + i * largeurColonne + 2, width: largeurColonne - 4, top: 4 + b.colonne * (h - 8) / b.colonnes, height: (h - 8) / b.colonnes - 2 };
+}
+
+const LigneGrille = memo(function LigneGrille({ ligne, vue, jours, heures, pxHeure, largeurColonne, blocs, selection, conflits, glisser, cible, onCreer, onGlisser, onSelection, onOuvrir, salaries }: {
+  ligne: Ligne; vue: Vue; jours: string[]; heures: number[]; pxHeure: number; largeurColonne: number; blocs: Bloc[]; selection: string | null; conflits: Conflit[];
+  glisser: Glisser | null; cible: boolean;
   onCreer: (e: ReactPointerEvent, ligne: string, jour: string) => void; onGlisser: (e: ReactPointerEvent, b: Bloc, mode: "deplacer" | "etirer") => void; onSelection: (id: string) => void; onOuvrir: (e: Evenement) => void;
   salaries: Array<{ id: string; nom: string }>;
 }) {
+  const conflitsDe = (id: string) => conflits.filter((c) => c.evenementId === id);
+  const styleBloc = (b: Bloc) => styleDeBloc(b, glisser, vue, jours, pxHeure, largeurColonne);
   const empiles = Math.max(1, ...blocs.map((b) => b.colonnes));
   const hauteur = vue === "jour" ? Math.max(HAUTEUR_LIGNE, 8 + 24 * empiles) : Math.max(HAUTEUR_LIGNE, 8 + 30 * empiles);
   return (
@@ -352,7 +378,7 @@ function LigneGrille({ ligne, vue, jours, heures, pxHeure, largeurColonne, blocs
       })}
     </div>
   );
-}
+});
 
 function EditeurEvenement({ evenement, donnees, enCours, onFermer, onSauver, onSupprimer }: {
   evenement: Evenement; donnees: DonneesPlanningV2; enCours: boolean; onFermer: () => void; onSauver: (e: Evenement) => void; onSupprimer: () => void;
