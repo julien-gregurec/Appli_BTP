@@ -1,4 +1,6 @@
+import { verifiedUser, StudioAuthUnavailable } from "./verified-user";
 import "server-only";
+import { cache } from "react";
 import { isStudioId } from "@elsatia/studio-domain";
 import { createStudioClient } from "./supabase";
 import { storageAdmin, STUDIO_BUCKET, PREVIEW_SECONDS } from "./storage-admin";
@@ -18,40 +20,62 @@ export class MediaError extends Error {
     super(message);
   }
 }
-export async function mediaContext() {
+// React cache is scoped to one Server Component request, never shared across sessions.
+export const mediaContext = cache(async () => {
   const client = await createStudioClient();
-  const {
-    data: { user },
-  } = await client.auth.getUser();
+  const user = await verifiedUser(() => client.auth.getUser()).catch(
+    (error) => {
+      if (error instanceof StudioAuthUnavailable)
+        throw new MediaError(error.message, 503);
+      throw error;
+    },
+  );
   if (!user) throw new MediaError("Connexion requise.", 401);
   return { client, user };
-}
+});
 export async function authorizeProject(id: string, write = false) {
   if (!isStudioId(id)) throw new MediaError("Projet inaccessible.", 404);
   const { client, user } = await mediaContext();
-  const { data: project } = await client
+  const { data: project, error: projectError } = await client
     .from("studio_projects")
     .select("*")
     .eq("id", id)
     .maybeSingle();
+  if (projectError)
+    throw new MediaError("Service projets temporairement indisponible.", 503);
   if (!project) throw new MediaError("Projet inaccessible.", 404);
-  const { data: role } = await client.rpc("studio_my_role", {
+  const { data: role, error: roleError } = await client.rpc("studio_my_role", {
     p_workspace_id: project.workspace_id,
   });
+  if (roleError)
+    throw new MediaError(
+      "Vérification des droits temporairement indisponible.",
+      503,
+    );
   if (!role || (write && !writable(role)))
     throw new MediaError("Lecture seule : opération refusée.", 403);
+  if (write && project.status === "archived")
+    throw new MediaError(
+      "Projet archivé : restaurez-le avant modification.",
+      409,
+    );
   return { client, user, project, role };
 }
 export async function authorizeAsset(id: string, write = false) {
   if (!isStudioId(id)) throw new MediaError("Média inaccessible.", 404);
-  const { client } = await mediaContext();
-  const { data: asset } = await client
+  const { client, user } = await mediaContext();
+  const { data: asset, error: assetError } = await client
     .from("studio_media_assets")
     .select("*")
     .eq("id", id)
     .maybeSingle();
+  if (assetError)
+    throw new MediaError("Service médias temporairement indisponible.", 503);
   if (!asset) throw new MediaError("Média inaccessible.", 404);
-  return { ...(await authorizeProject(asset.project_id, write)), asset };
+  if (write)
+    return { ...(await authorizeProject(asset.project_id, true)), asset };
+  // project_id is immutable upload provenance; read access follows live project references.
+  return { client, user, asset };
 }
 export async function mediaLimits() {
   const { client } = await mediaContext();

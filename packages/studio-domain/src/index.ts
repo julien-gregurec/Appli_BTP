@@ -84,3 +84,5 @@ export function safeStudioDestination(value: unknown): string {
 }
 
 export * from "./media";
+
+export * from "./projects";

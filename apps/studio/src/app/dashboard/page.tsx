@@ -1,3 +1,6 @@
+import { dashboardStats, listStudioProjects } from "../../lib/projects";
+import ProjectCards from "../../components/ProjectCards";
+import { bytes } from "../../lib/media-contract";
 import Link from "next/link";
 import Shell from "../../components/Shell";
 import Notice from "../../components/Notice";
@@ -9,6 +12,10 @@ export default async function Dashboard({
 }) {
   const params = await searchParams;
   const context = await getActiveStudioWorkspace(params.workspace);
+  const [stats, recent] = await Promise.all([
+    dashboardStats(context.workspace.id),
+    listStudioProjects(context.workspace.id),
+  ]);
   return (
     <Shell context={context} page="dashboard">
       <p className="eyebrow">TABLEAU DE BORD</p>
@@ -21,6 +28,36 @@ export default async function Dashboard({
         Votre espace est prêt. La création vidéo arrive dans les prochains lots.
       </p>
       <Notice message={params.error} />
+      <section className="card" aria-label="Statistiques Studio">
+        <h2>Votre bibliothèque</h2>
+        <p>
+          {stats.projects} projets · {stats.photos} photos · {stats.videos}{" "}
+          vidéos · {bytes(stats.bytes)}
+        </p>
+        <Link
+          href={`/projects?workspace=${context.workspace.id}#nouveau-projet`}
+        >
+          Nouveau projet
+        </Link>
+      </section>
+      {recent.total === 0 ? (
+        <section className="card">
+          <h2>Vous n’avez encore aucun projet.</h2>
+          <Link
+            href={`/projects?workspace=${context.workspace.id}#nouveau-projet`}
+          >
+            Créer mon premier projet
+          </Link>
+        </section>
+      ) : (
+        <>
+          <h2>Projets récents</h2>
+          <ProjectCards
+            projects={recent.projects.slice(0, 6)}
+            role={context.membership.role}
+          />
+        </>
+      )}
       <div className="cards">
         <section className="card accent">
           <span className="eyebrow">VOTRE WORKSPACE</span>
