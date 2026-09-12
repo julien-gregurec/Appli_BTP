@@ -212,3 +212,13 @@ Owner/admin/editor créent/modifient/dupliquent et gèrent les médias actifs ; 
 Liste paginée par 24, recherche littérale et filtres/tris SQL ; compteurs agrégés dans une RPC par liste, sans N+1 par carte. Dashboard compte les médias physiques une seule fois. Couvertures privées chargées sur demande. API projet bornée à 64 Kio pour l’ordre complet, API upload maintenue à 4 Kio ; aucun média binaire dans Next.
 
 Rollback destructif réservé à un schéma projet vide de recette ; sur données réelles, rollback applicatif/correction additive. Détails et preuves : [rapport Lot C](ELSATIA-STUDIO-V1-LOT-C-REPORT.md).
+
+## 12. Décisions effectives du Lot D Automatic Timeline
+
+Le Lot D est limité à la composition persistée et éditable. `packages/studio-domain/src/timeline.ts` fournit le moteur pur v1 ; `apps/studio` expose ses services, commandes et une section Montage du projet. Aucun worker, rendu MP4, musique, texte ou pipeline FFmpeg/Remotion.
+
+La demande Lot D retient des millisecondes entières. La convention effective est **séquentielle, transitions incluses dans le clip entrant**, sans chevauchement, au lieu de la proposition initiale en frames de la section 6. Les frontières absolues seront converties au profil de sortie par le futur renderer. Sources vidéo bornées, mouvement photo explicite, paramètres d’effets allowlistés et déterministes. Le [contrat montage](ELSATIA-STUDIO-TIMELINE-CONTRACT.md) définit toutes les sémantiques de composition, y compris la référence précédente figée pendant les transitions.
+
+`studio_timelines` et `studio_timeline_clips` sont la source relationnelle canonique ; une RPC de lecture compose le document sous un seul snapshot SQL. Il n’existe pas de manifeste JSON parallèle modifiable. La génération crée une nouvelle version et l’active ; les éditions modifient cette version avec une révision optimiste. Les futurs rendus devront figer leur révision d’entrée, car les montages de travail restent éditables. Suppression d’une version owner/admin, autres modifications editor+, Viewer readonly. Les mutations et références sont revérifiées sous le verrou workspace/projet existant, sans modification des règles Foundation.
+
+La suppression de média Lot B/C conserve sa sémantique : le montage n’ajoute pas de rétention cachée d’originaux. Une ancienne version peut contenir des sources devenues indisponibles ; elle demeure lisible comme historique, sans nouvelle signature de média supprimé, et tout futur rendu devra refuser les sources manquantes. Le retrait d’un clip n’enlève pas le média du projet. La duplication de projet Lot C conserve uniquement son comportement validé : paramètres et références médias, sans copie implicite de montage.

@@ -90,9 +90,9 @@ node --env-file=apps/studio/.env.local apps/studio/scripts/storage-reconcile.mjs
 
 Dry-run par défaut ; commandes exclusivement locales, sans cron. Le test volumétrique génère un vrai transfert de 1 Gio hors Git, injecte une coupure et mesure progression/mémoire. `mp4-muxer` est réservé aux fixtures de test WebCodecs ; il n’est pas importé dans l’application.
 
-Pour tester l’upgrade : `setup --lot-a` installe les 253 migrations Foundation dans une instance neuve ; copier ensuite la migration Lot B dans **ce dossier jetable** puis `supabase db push --local --workdir CHEMIN_JETABLE`. Le mode `setup --lot-b` applique les 254 migrations ; le setup normal inclut désormais le Lot C (255 migrations). Avant le rollback local `scripts/rollback-media-local.sql`, vider puis supprimer le bucket `studio-originals` avec les API Storage ; le SQL refuse d’effacer directement les tables du fournisseur. Réappliquer ensuite uniquement la migration Lot B dans la même instance jetable. Ne jamais transposer ce rollback à des données réelles.
+Pour tester l’upgrade : `setup --lot-a` installe les 253 migrations Foundation dans une instance neuve ; copier ensuite la migration Lot B dans **ce dossier jetable** puis `supabase db push --local --workdir CHEMIN_JETABLE`. Le mode `setup --lot-b` applique les 254 migrations ; le setup normal inclut les lots C/D (256 migrations). Avant le rollback local `scripts/rollback-media-local.sql`, vider puis supprimer le bucket `studio-originals` avec les API Storage ; le SQL refuse d’effacer directement les tables du fournisseur. Réappliquer ensuite uniquement la migration Lot B dans la même instance jetable. Ne jamais transposer ce rollback à des données réelles.
 
-Détails : [contrat Storage](../../ELSATIA-STUDIO-STORAGE-CONTRACT.md), [rapport Lot B](../../ELSATIA-STUDIO-V1-LOT-B-REPORT.md). La CI couvre les lots A/B/C sans déploiement. Confirmation email distante, fournisseur distant, Safari/iOS physique et débit Internet mobile restent à recetter avant mise en ligne.
+Détails : [contrat Storage](../../ELSATIA-STUDIO-STORAGE-CONTRACT.md), [rapport Lot B](../../ELSATIA-STUDIO-V1-LOT-B-REPORT.md). La CI couvre les lots A/B/C/D sans déploiement. Confirmation email distante, fournisseur distant, Safari/iOS physique et débit Internet mobile restent à recetter avant mise en ligne.
 
 ## Lot C — gestion des projets
 
@@ -100,6 +100,14 @@ La liste propose recherche, filtres, tri et pagination. Le formulaire couvre les
 
 Owner/admin/editor créent, modifient et dupliquent. Owner/admin archivent, restaurent et suppriment après confirmation. Les archives restent lisibles ; restaurez-les avant modification. Viewer reste en lecture seule. Les projets dupliqués partagent les originaux privés, avec un ordre propre. Un média n’est purgé qu’après retrait de sa dernière référence, suivant la rétention Lot B.
 
-`setup --lot-b` prépare 254 migrations pour un upgrade C ; le setup normal en installe 255. `scripts/rollback-projects-local.sql` est limité à un schéma projet vide dans l’instance jetable et restaure le comportement B ; il refuse les projets peuplés et ne constitue pas une procédure de rollback Production.
+`setup --lot-b` prépare 254 migrations pour un upgrade C ; `setup --lot-c` en installe 255 et le setup normal 256. `scripts/rollback-projects-local.sql` est limité à un schéma projet vide dans l’instance jetable et restaure le comportement B ; il refuse les projets peuplés et ne constitue pas une procédure de rollback Production.
 
 Tests supplémentaires : `tests/projects.test.ts`, `projects-service.test.ts`, `projects.spec.ts` et `supabase/tests/studio_project_management.test.sql`. Le workflow Studio les inclut sans déploiement. Voir [rapport Lot C](../../ELSATIA-STUDIO-V1-LOT-C-REPORT.md).
+
+### Montage automatique — Lot D
+
+La section Montage d’un projet génère une composition de données versionnée, sans MP4. Les originaux, uploads et permissions des lots précédents sont conservés. Contrat : `../../ELSATIA-STUDIO-TIMELINE-CONTRACT.md` ; recette : `../../ELSATIA-STUDIO-V1-LOT-D-REPORT.md`.
+
+`node scripts/timeline-migration-check.mjs` qualifie le rollback/réapplication uniquement sur une instance Studio jetable enregistrée, avec tables de montage vides. Le gate exécute maintenant 14 E2E (10 A/B/C + 4 D), sans retries Playwright. Les tests du moteur et des services sont inclus dans `npm test` ; les tests RLS et batch 500 clips dans `local-test.mjs test-db`.
+
+Qualification finale : [rapport D-bis](../../ELSATIA-STUDIO-V1-LOT-D-FINAL-QUALIFICATION.md). `node scripts/e2e-gate.mjs --individual --foundation-first` exécute d’abord le scénario onboarding, puis les 14 scénarios individuellement. Sans options, le gate exécute deux suites complètes sur deux runtimes neufs. Il refuse les résultats skipped/flaky et les échecs de transport ou HTTP 5xx tracés. La readiness vérifie aussi la table timeline et sa RPC de lecture. Réserver une capacité Docker suffisante avant la recette ; le harnais ne modifie jamais les autres services.
