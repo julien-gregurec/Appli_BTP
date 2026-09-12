@@ -1,14 +1,4 @@
-export type ProjectType = "construction" | "travel" | "event" | "free";
-export interface StudioProject {
-  id: string;
-  workspace_id: string;
-  name: string;
-  project_type: ProjectType;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-  deleted_at: string | null;
-}
+export type { ProjectType, StudioProject } from "./projects";
 export interface MediaLimits {
   id: boolean;
   image_bytes: number;
@@ -20,6 +10,7 @@ export interface MediaLimits {
 }
 export interface StudioMediaAsset {
   id: string;
+  sort_order?: number;
   workspace_id: string;
   project_id: string;
   uploaded_by: string;

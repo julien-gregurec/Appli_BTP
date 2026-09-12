@@ -1,4 +1,10 @@
 import type {
+  ProjectAsset,
+  ProjectList,
+  DashboardStats,
+  ProjectInput,
+} from "@elsatia/studio-domain";
+import type {
   StudioProject,
   StudioMediaAsset,
   MediaLimits,
@@ -18,6 +24,7 @@ export type Database = {
   public: {
     Tables: {
       studio_projects: Table<StudioProject>;
+      studio_project_assets: Table<ProjectAsset>;
       studio_media_assets: Table<StudioMediaAsset>;
       studio_media_limits: Table<MediaLimits>;
       studio_workspaces: Table<StudioWorkspace>;
@@ -27,6 +34,64 @@ export type Database = {
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
     Functions: {
+      studio_project_media_stats: {
+        Args: { p_project: string };
+        Returns: { photos: number; videos: number; bytes: number };
+      };
+      studio_save_project: {
+        Args: {
+          p_workspace: string;
+          p_project: string | null;
+          p_data: ProjectInput;
+          p_revision: number | null;
+        };
+        Returns: string;
+      };
+      studio_project_lifecycle: {
+        Args: { p_project: string; p_action: string };
+        Returns: undefined;
+      };
+      studio_duplicate_project: {
+        Args: { p_project: string };
+        Returns: string;
+      };
+      studio_set_project_cover: {
+        Args: { p_project: string; p_asset: string | null };
+        Returns: undefined;
+      };
+      studio_remove_project_media: {
+        Args: { p_project: string; p_asset: string };
+        Returns: undefined;
+      };
+      studio_order_project_media: {
+        Args: {
+          p_project: string;
+          p_ids: string[];
+          p_chronological: boolean;
+          p_revision: number;
+        };
+        Returns: undefined;
+      };
+      studio_list_project_media: {
+        Args: { p_project: string; p_offset?: number; p_limit?: number };
+        Returns: StudioMediaAsset[];
+      };
+      studio_project_summaries: {
+        Args: {
+          p_workspace: string;
+          p_query?: string;
+          p_type?: string;
+          p_status?: string;
+          p_since?: string | null;
+          p_sort?: string;
+          p_offset?: number;
+        };
+        Returns: ProjectList;
+      };
+      studio_dashboard_stats: {
+        Args: { p_workspace: string };
+        Returns: DashboardStats;
+      };
       studio_create_project: {
         Args: { p_workspace: string; p_name: string; p_type: string };
         Returns: string;

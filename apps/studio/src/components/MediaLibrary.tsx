@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-img-element -- Private signed and blob previews must bypass the image optimizer. */
 /* Signed capabilities only. No Supabase Auth session or privileged credential in the browser. */
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Upload } from "tus-js-client";
 import {
   validateFile,
@@ -78,11 +79,16 @@ export default function MediaLibrary({
   project,
   limits,
   canWrite,
+  refreshVersion,
+  cover,
 }: {
   project: string;
   limits: MediaLimits;
   canWrite: boolean;
+  refreshVersion?: number;
+  cover?: string | null;
 }) {
+  const router = useRouter();
   const entries = useRef<Entry[]>([]),
     active = useRef(0),
     mounted = useRef(true);
@@ -102,21 +108,27 @@ export default function MediaLibrary({
       setError(e instanceof Error ? e.message : "Bibliothèque indisponible.");
     }
   }, [project]);
-  const paint = () => {
-    if (mounted.current) setRows(entries.current.map((e) => ({ ...e })));
-  };
   useEffect(() => {
-    mounted.current = true;
+    let current = true;
     void api<{ assets: StudioMediaAsset[] }>(`projects/${project}`)
       .then((r) => {
-        if (mounted.current) {
+        if (current) {
           setAssets(r.assets);
           setHasMore(r.assets.length === 24);
         }
       })
       .catch(() => {
-        if (mounted.current) setError("Bibliothèque indisponible.");
+        if (current) setError("Bibliothèque indisponible.");
       });
+    return () => {
+      current = false;
+    };
+  }, [project, refreshVersion]);
+  const paint = () => {
+    if (mounted.current) setRows(entries.current.map((e) => ({ ...e })));
+  };
+  useEffect(() => {
+    mounted.current = true;
     const list = entries.current;
     return () => {
       mounted.current = false;
@@ -219,6 +231,7 @@ export default function MediaLibrary({
       active.current--;
       paint();
       pump();
+      if (active.current === 0 && entry.status === "ready") router.refresh();
     }
   };
   function pump() {
@@ -262,8 +275,15 @@ export default function MediaLibrary({
   // Cancellation is implemented as pause then a tombstone; network retry reuses asset and TUS URL.
   async function remove(asset: StudioMediaAsset) {
     try {
-      await api(`assets/${asset.id}`, "DELETE");
+      const response = await fetch(`/api/projects/${project}/remove`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ asset: asset.id }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw Error(data.error);
       await refresh();
+      router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Suppression impossible.");
     }
@@ -412,6 +432,7 @@ export default function MediaLibrary({
           {bytes(assets.reduce((n, a) => n + a.file_size_bytes, 0))} réservés
           sur cette page
         </p>
+        {assets.length === 0 && <p>Ajoutez vos premières photos ou vidéos.</p>}
         <div className="media-grid">
           {assets.map((asset) => (
             <article className="card media-card" key={asset.id}>
@@ -433,6 +454,40 @@ export default function MediaLibrary({
                     : ""}
                 </p>
               )}
+              {canWrite &&
+                asset.media_type === "image" &&
+                asset.upload_status === "ready" && (
+                  <button
+                    className="secondary"
+                    onClick={async () => {
+                      try {
+                        const r = await fetch(
+                          `/api/projects/${project}/cover`,
+                          {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              asset: cover === asset.id ? null : asset.id,
+                            }),
+                          },
+                        );
+                        const d = await r.json();
+                        if (!r.ok) throw Error(d.error);
+                        router.refresh();
+                      } catch (e) {
+                        setError(
+                          e instanceof Error
+                            ? e.message
+                            : "Couverture non enregistrée.",
+                        );
+                      }
+                    }}
+                  >
+                    {cover === asset.id
+                      ? "Retirer la couverture"
+                      : "Définir comme couverture"}
+                  </button>
+                )}
               {canWrite && (
                 <button
                   className="text-button"

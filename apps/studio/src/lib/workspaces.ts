@@ -1,3 +1,4 @@
+import { verifiedUser } from "./verified-user";
 import "server-only";
 import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
@@ -10,9 +11,7 @@ import {
 import { createStudioClient } from "./supabase";
 export const getCurrentStudioUser = cache(async () => {
   const client = await createStudioClient();
-  const {
-    data: { user },
-  } = await client.auth.getUser();
+  const user = await verifiedUser(() => client.auth.getUser());
   if (!user) redirect("/login");
   return { id: user.id, email: user.email ?? null };
 });

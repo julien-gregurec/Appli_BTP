@@ -1,3 +1,4 @@
+import { projectMedia } from "../../../../lib/projects";
 import { studioOrigin } from "../../../../lib/config";
 import {
   mediaContext,
@@ -31,20 +32,13 @@ async function handle(
         headers: { "Cache-Control": "private, no-store" },
       });
     if (request.method === "GET" && path[0] === "projects") {
-      const { client } = await authorizeProject(path[1]);
+      await authorizeProject(path[1]);
       const offset = Number(
         new URL(request.url).searchParams.get("offset") ?? 0,
       );
       if (!Number.isSafeInteger(offset) || offset < 0 || offset > 10000)
         throw new MediaError("Pagination invalide.");
-      const { data, error } = await client
-        .from("studio_media_assets")
-        .select("*")
-        .eq("project_id", path[1])
-        .order("created_at")
-        .order("id")
-        .range(offset, offset + 23);
-      if (error) throw new MediaError("Bibliothèque indisponible.", 503);
+      const data = await projectMedia(path[1], offset);
       return Response.json(
         { assets: data },
         { headers: { "Cache-Control": "private, no-store" } },
