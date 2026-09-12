@@ -96,6 +96,11 @@ try {
     );
     await run(
       process.execPath,
+      ["scripts/timeline-migration-check.mjs"],
+      `${label}-migration-check`,
+    );
+    await run(
+      process.execPath,
       ["scripts/runtime-check.mjs", "ready"],
       `${label}-ready`,
     );
@@ -119,8 +124,15 @@ try {
           ),
         ).suites.flatMap((s) => s.specs.map((t) => `${s.file}:${t.line}`))
       : [null];
-    if (individual && targets.length !== 10)
-      throw Error(`Expected 10 individual E2E cases, found ${targets.length}`);
+    if (individual && targets.length !== 14)
+      throw Error(`Expected 14 individual E2E cases, found ${targets.length}`);
+    if (individual && process.argv.includes("--foundation-first")) {
+      const foundation = targets.find((t) =>
+        t.startsWith("foundation.spec.ts:"),
+      );
+      if (!foundation) throw Error("Foundation scenario missing");
+      targets.unshift(foundation);
+    }
     for (const [index, target] of targets.entries()) {
       const name = `${label}-e2e-${index + 1}`,
         report = join(output, `${name}.json`);
@@ -135,7 +147,14 @@ try {
         },
       );
       const stats = JSON.parse(readFileSync(report, "utf8")).stats;
-      const expected = target ? 1 : 10;
+      const trace = readFileSync(join(output, `${name}-http.jsonl`), "utf8")
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => JSON.parse(line));
+      if (trace.some((row) => row.status >= 500 || row.status === 0))
+        throw Error(`${name}: runtime transport failure or HTTP 5xx`);
+      const expected = target ? 1 : 14;
       if (
         stats.expected !== expected ||
         stats.unexpected ||
