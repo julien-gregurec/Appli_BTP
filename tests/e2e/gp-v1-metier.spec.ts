@@ -20,6 +20,9 @@ const DESIGNATION = `E2E Plaque ${suffixe}`;
 const OUVRAGE = `E2E Cloison ${suffixe}`;
 const REF_AFFAIRE = `AFF-E2E-${suffixe}`;
 const TITRE_EVENEMENT = `E2E Pose ${suffixe}`;
+// Un jour propre à chaque exécution : la base refuse plus de 24 h planifiées par salarié et par jour, les
+// évènements des exécutions précédentes ne doivent donc pas s'accumuler sur la même date.
+const JOUR_PLANNING = `2026-11-${String(1 + (Number(suffixe) % 28)).padStart(2, "0")}`;
 
 // Les scénarios 13 à 15 réutilisent les objets créés par 1 et 4 ; pour les rejouer seuls (poste saturé,
 // suite coupée), un devis et un client existants peuvent être fournis par l'environnement.
@@ -325,7 +328,7 @@ test("9. transformation en facture (devis accepté → facture issue du devis)",
 
 test("10. création planning (évènement horodaté, salarié affecté, ligne affectations synchronisée)", async ({ page }) => {
   await connexion(page, USERS.adminA);
-  await aller(page, "/planning?vue=jour&jour=2026-09-14");
+  await aller(page, `/planning?vue=jour&jour=${JOUR_PLANNING}`);
   await expect(page.locator("[role=grid]")).toBeVisible();
   await page.getByRole("button", { name: "Nouvel évènement" }).click();
   const dialogue = page.locator("dialog[open]").filter({ hasText: "Nouvel évènement" });
@@ -340,7 +343,7 @@ test("10. création planning (évènement horodaté, salarié affecté, ligne af
 
 test("11. déplacement d'un évènement (clavier → +15 min, persistant après rechargement)", async ({ page }) => {
   await connexion(page, USERS.adminA);
-  await aller(page, "/planning?vue=jour&jour=2026-09-14");
+  await aller(page, `/planning?vue=jour&jour=${JOUR_PLANNING}`);
   const bloc = page.locator("[data-bloc]").filter({ hasText: TITRE_EVENEMENT });
   await bloc.click();
   await page.keyboard.press("ArrowRight");
@@ -351,13 +354,13 @@ test("11. déplacement d'un évènement (clavier → +15 min, persistant après 
   const alertes = (await page.locator("[role=alert]").allTextContents()).map((t) => t.trim()).filter(Boolean);
   expect(alertes, "erreur affichée après le déplacement").toEqual([]);
   await page.waitForTimeout(1500);
-  await aller(page, "/planning?vue=jour&jour=2026-09-14");
+  await aller(page, `/planning?vue=jour&jour=${JOUR_PLANNING}`);
   await expect(page.locator("[data-bloc]").filter({ hasText: TITRE_EVENEMENT }).first()).toHaveAttribute("aria-label", /08:15 à 12:15/);
 });
 
 test("12. détection de conflit (même salarié, même créneau)", async ({ page }) => {
   await connexion(page, USERS.adminA);
-  await aller(page, "/planning?vue=jour&jour=2026-09-14");
+  await aller(page, `/planning?vue=jour&jour=${JOUR_PLANNING}`);
   await page.getByRole("button", { name: "Nouvel évènement" }).click();
   const dialogue = page.locator("dialog[open]").filter({ hasText: "Nouvel évènement" });
   await dialogue.getByLabel("Titre").fill(`${TITRE_EVENEMENT} bis`);
@@ -372,7 +375,7 @@ test("12. détection de conflit (même salarié, même créneau)", async ({ page
 
 test("13. vérification des droits (chef d'équipe : planning en lecture, actions grisées avec motif ; devis refusés)", async ({ page }) => {
   await connexion(page, USERS.leaderA);
-  await aller(page, "/planning?vue=jour&jour=2026-09-14");
+  await aller(page, `/planning?vue=jour&jour=${JOUR_PLANNING}`);
   // Le panneau existe en deux rendus (colonne fixe et feuille tactile) : le premier suffit.
   const nouvel = page.locator("[aria-disabled='true']").filter({ hasText: "Nouvel évènement" }).first();
   await expect(nouvel).toBeVisible();
@@ -411,6 +414,8 @@ test("15. vérification de la barre latérale (actions groupées, indisponibles 
   expect(motif && motif.length > 10).toBeTruthy();
   // Groupes du panneau contextuel (Créer, Modifier, Document, Voir aussi…) et action indisponible expliquée.
   await expect(page.getByText(/^(Créer|Modifier|Document|Voir aussi)$/).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: /Transformer en facture/ }).first()).toHaveAttribute("aria-disabled", "true");
-  await expect(page.getByRole("button", { name: /Transformer en facture/ }).first()).toHaveAttribute("title", /accepté/);
+  // « Importer des lignes » est annoncé indisponible en V1 quel que soit l'état du devis : motif explicite, jamais caché.
+  const importer = page.getByRole("button", { name: /Importer des lignes/ }).first();
+  await expect(importer).toHaveAttribute("aria-disabled", "true");
+  await expect(importer).toHaveAttribute("title", /V2/);
 });

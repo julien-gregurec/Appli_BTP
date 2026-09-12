@@ -314,7 +314,7 @@ export function PlanningV2({ donnees, jour, vue }: { donnees: DonneesPlanningV2;
       )}
 
       {edition && (
-        <EditeurEvenement evenement={edition} donnees={donnees} enCours={enCours} onFermer={() => { if (edition.id.startsWith("nouveau:")) setEvenements((l) => l.filter((x) => x.id !== edition.id)); setEdition(null); }} onSauver={(ev) => sauver(ev)} onSupprimer={() => { supprimer(edition.id); setEdition(null); }} />
+        <EditeurEvenement evenement={edition} donnees={donnees} enCours={enCours} erreur={erreur} onFermer={() => { if (edition.id.startsWith("nouveau:")) setEvenements((l) => l.filter((x) => x.id !== edition.id)); setEdition(null); }} onSauver={(ev) => sauver(ev)} onSupprimer={() => { supprimer(edition.id); setEdition(null); }} />
       )}
     </div>
   );
@@ -380,8 +380,8 @@ const LigneGrille = memo(function LigneGrille({ ligne, vue, jours, heures, pxHeu
   );
 });
 
-function EditeurEvenement({ evenement, donnees, enCours, onFermer, onSauver, onSupprimer }: {
-  evenement: Evenement; donnees: DonneesPlanningV2; enCours: boolean; onFermer: () => void; onSauver: (e: Evenement) => void; onSupprimer: () => void;
+function EditeurEvenement({ evenement, donnees, enCours, erreur, onFermer, onSauver, onSupprimer }: {
+  evenement: Evenement; donnees: DonneesPlanningV2; enCours: boolean; erreur: string | null; onFermer: () => void; onSauver: (e: Evenement) => void; onSupprimer: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [ev, setEv] = useState(evenement);
@@ -423,6 +423,8 @@ function EditeurEvenement({ evenement, donnees, enCours, onFermer, onSauver, onS
             </div>
           </fieldset>
         </div>
+        {/* Le refus de la base (ex. plus de 24 h planifiées dans la journée) se lit DANS le dialogue, pas derrière lui. */}
+        {erreur && <p role="alert" className="mx-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erreur}</p>}
         <footer className="flex gap-2 border-t border-neutral-200 p-3 dark:border-neutral-800">
           {!evenement.id.startsWith("nouveau:") && donnees.droits.gerer && <button type="button" onClick={() => { if (window.confirm("Supprimer cet évènement ?")) onSupprimer(); }} className={`${bouton} text-red-700`}>Supprimer</button>}
           <button type="button" onClick={() => ref.current?.close()} className={`${bouton} ml-auto`}>Annuler</button>

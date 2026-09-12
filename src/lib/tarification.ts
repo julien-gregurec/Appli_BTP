@@ -56,6 +56,9 @@ const GESTION = [
   "acces_interventions",
   "acces_crm",
   "voir_devis_chantier_sans_prix",
+  // Bibliothèque d'ouvrages composés (GP V1, lot B) : incluse dès Pro, jamais sur Mini — décision du
+  // 2026-09-12 (Mini : non ; Pro, Business, Entreprise : oui).
+  "acces_ouvrages",
 ] as const;
 
 const PILOTAGE = [
@@ -63,7 +66,6 @@ const PILOTAGE = [
   "utiliser_borne_stock",
   "acces_outillage",
   "acces_flotte",
-  "acces_ouvrages",
   "acces_rentabilite",
   "acces_exports",
   "consulter_sa_paie",

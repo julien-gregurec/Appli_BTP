@@ -87,6 +87,9 @@ where p.id in (
   'a1000000-0000-0000-0000-000000000001',
   'b1000000-0000-0000-0000-000000000001'
 )
+  -- Le mode « compte dépôt » (borne stock) est un rôle à part entière, jamais un droit d'administrateur :
+  -- avec lui, l'application enverrait l'admin de test sur la borne au lieu du tableau de bord (GP V1, lot H).
+  and d.cle <> 'mode_compte_depot'
 on conflict do nothing;
 
 insert into public.permissions_poste (entreprise_id, poste_id, cle_permission, autorise)
@@ -149,6 +152,7 @@ where p.id in (
   'a1000000-0000-0000-0000-000000000006',
   'b1000000-0000-0000-0000-000000000006'
 )
+  and d.cle <> 'mode_compte_depot'
 on conflict do nothing;
 
 insert into public.employes (

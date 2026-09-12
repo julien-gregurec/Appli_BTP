@@ -601,7 +601,7 @@ l'historique ; historique des envois et des PDF. Tout est additif et ne change r
 3. « Page de garde optionnelle » (§ 11) non faite : l'architecture (blocs de page décidés par les données) la permet en V3 sans refonte.
 4. Le rendu **figé** d'un document déjà émis ne porte pas de `references` : l'en-tête n'apparaît que sur les documents émis après la migration ; les documents antérieurs sont imprimés à l'identique (voulu).
 
-## 18. Lot H — E2E, performance, non-régression, verdicts (livré, E2E sous réserve d'environnement)
+## 18. Lot H — E2E, performance, non-régression, verdicts (livré ; E2E 15/15 obtenu, voir § 18.8)
 
 ### 18.1 Livrables
 
@@ -710,3 +710,38 @@ Correctifs de recette apportés à la base jetable (jamais au produit) : rôle A
 3. **Recette E2E 15/15 en une passe** sur un poste non saturé (ou en CI) avec la fixture corrigée (§ 18.5.2) — la spec est prête.
 4. Envoi d'un e-mail réel (clé Brevo de test) et un PDF de CGV en conditions réelles.
 5. Rappels des lots précédents : `transformer_devis` dans les trois RPC historiques (§ 14.4), ouvrages composés soumis à `modifier_prix_vente`, page de garde (§ 17.3).
+
+### 18.8 Complément du 2026-09-12 (soir) — machine allégée, 15/15, conditions fermées
+
+Décisions de Julien (message du 2026-09-12) : mettre en pause les trois conteneurs `analytics` tiers,
+rejouer les 15 scénarios, corriger la fixture « compte dépôt », trancher `works` (Mini : non ; Pro,
+Business, Entreprise : oui), et seulement ensuite le lot 0.
+
+1. **Machine allégée.** Les trois conteneurs `analytics` (capacity-r2, reserves-v4, btp-platform) étaient déjà
+   arrêtés à l'ouverture de la séance (`Exited (137)`) ; aucune pause n'a été nécessaire. Charge moyenne
+   retombée de 20–45 à **3**. Aucun volume touché, Production inchangée.
+2. **Fixture corrigée** (`supabase/tests/fixtures/isolation_multitenant.inc`) : les postes Admin et Dirigeant
+   du jeu de test ne reçoivent plus `mode_compte_depot`. Preuve sur base propre (`gpv1_verif` = ledger +
+   devis v2 + SQL proposé A→G) : `borne_stock_securisee` 11/11, `essai_30_jours_modules_catalogue_v1` 29/29,
+   `stripe_subscription_lifecycle_closure_v1` 44/44, `isolation_multitenant_roles` 24/24,
+   `isolation_multitenant_comportement` 56/56, `isolation_multitenant_surface` 10/10 — identiques avec la
+   fixture d'origine (le correctif ne change aucun résultat pgTAP).
+3. **Décision `works` appliquée dans le code** : `src/lib/tarification.ts` déplace `acces_ouvrages` du groupe
+   PILOTAGE (Business+) vers GESTION (inclus dès **Pro**) ; `src/lib/feature-catalogue.ts` passe `works` de
+   BETA à `active`, visible, `plans: pro, business, entreprise, sur_mesure` (Mini exclu). Tests tarification,
+   catalogue, accès socle/essai, comparatif : 230/230. Les surcharges de recette de la base jetable (module
+   `ouvrages_recette`, drapeau `works`) ont été retirées et l'entreprise de test placée sur **Pro** : la
+   bibliothèque s'ouvre par la seule règle produit.
+4. **Erreur du dialogue planning rendue visible** : la règle métier « un ouvrier ne peut pas dépasser 24 h
+   planifiées par jour » (déclencheur historique) refusait l'enregistrement, mais le message s'affichait derrière
+   la modale ; il s'affiche désormais dans le dialogue (`role="alert"`). Le scénario 10 échouait pour cette
+   raison légitime (accumulation des évènements des passes précédentes sur le même jour) : la spec utilise
+   maintenant un jour propre à chaque exécution.
+5. **E2E : 15/15 en une passe continue** sur l'application reconstruite (`next build` 12 min, `next start`),
+   3,7 min : scénarios 1 → 15 d'affilée. Le scénario 9 (transformation en facture) a été *flaky* au premier
+   essai de cette passe (clic du panneau sans navigation dans les 90 s, réussi en 4,8 s au second essai) ;
+   la passe précédente l'avait passé du premier coup. Il reste à comprendre ce premier clic (confirmation
+   `window.confirm` et action serveur du panneau) — réserve mineure, non bloquante.
+
+**Conditions du GO** (§ 18.7) : 1 (lot 0) reste ouverte ; 2 (`works`) **fermée** ; 3 (15/15, fixture)
+**fermée** ; 4 (e-mail réel) ouverte ; 5 inchangée.
