@@ -1,3 +1,4 @@
+import { isTransportError, restErrorStatus } from "../../../../lib/rest-status";
 import { projectMedia } from "../../../../lib/projects";
 import { studioOrigin } from "../../../../lib/config";
 import {
@@ -46,10 +47,14 @@ async function handle(
     }
     if (request.method === "DELETE" && path[0] === "assets") {
       const { client } = await authorizeAsset(path[1], true);
-      const { error } = await client.rpc("studio_delete_media", {
+      const { error, status } = await client.rpc("studio_delete_media", {
         p_asset: path[1],
       });
-      if (error) throw new MediaError("Suppression refusée.", 403);
+      if (error)
+        throw new MediaError(
+          "Suppression refusée.",
+          restErrorStatus(error, status),
+        );
       return Response.json({ deleted: true });
     }
     if (request.method === "POST" && path[0] === "assets") {
@@ -121,12 +126,19 @@ async function handle(
         )
           throw new MediaError("Projet invalide.");
         const { client } = await mediaContext();
-        const { data, error } = await client.rpc("studio_create_project", {
-          p_workspace: body.workspace,
-          p_name: body.name,
-          p_type: body.type,
-        });
-        if (error) throw new MediaError("Création refusée.", 403);
+        const { data, error, status } = await client.rpc(
+          "studio_create_project",
+          {
+            p_workspace: body.workspace,
+            p_name: body.name,
+            p_type: body.type,
+          },
+        );
+        if (error)
+          throw new MediaError(
+            "Création refusée.",
+            restErrorStatus(error, status),
+          );
         return Response.json({ id: data });
       }
     }
@@ -140,7 +152,14 @@ async function handle(
             : "Opération indisponible. Vérifiez le fichier puis réessayez.",
       },
       {
-        status: error instanceof MediaError ? error.status : 400,
+        status:
+          error instanceof MediaError
+            ? error.status
+            : isTransportError(error)
+              ? 503
+              : error instanceof SyntaxError
+                ? 400
+                : 500,
         headers: { "Cache-Control": "private, no-store" },
       },
     );

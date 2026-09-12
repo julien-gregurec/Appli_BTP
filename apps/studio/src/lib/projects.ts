@@ -1,3 +1,4 @@
+import { restErrorStatus } from "./rest-status";
 import "server-only";
 import {
   isStudioId,
@@ -10,13 +11,14 @@ function result<T>(
   data: T | null,
   error: { code?: string } | null,
   message: string,
+  status?: number,
 ): T {
   if (error || data === null)
     throw new MediaError(
       error?.code === "40001"
         ? "Le projet a changé. Rechargez avant de sauvegarder."
         : message,
-      error?.code === "42501" ? 403 : error?.code === "40001" ? 409 : 400,
+      error ? restErrorStatus(error, status) : 500,
     );
   return data;
 }
@@ -34,6 +36,7 @@ export async function createStudioProject(workspace: string, input: unknown) {
     r.data,
     r.error,
     "Création refusée. Vérifiez les informations et votre rôle.",
+    r.status,
   );
 }
 export async function updateStudioProject(
@@ -53,6 +56,7 @@ export async function updateStudioProject(
     r.data,
     r.error,
     "Sauvegarde refusée. Vérifiez les dates et les informations.",
+    r.status,
   );
 }
 export const getStudioProject = authorizeProject;
@@ -90,14 +94,14 @@ export async function listStudioProjects(
     p_sort: sort,
     p_offset: offset,
   });
-  return result(r.data, r.error, "Liste des projets indisponible.");
+  return result(r.data, r.error, "Liste des projets indisponible.", r.status);
 }
 export async function dashboardStats(workspace: string) {
   const { client } = await mediaContext();
   const r = await client.rpc("studio_dashboard_stats", {
     p_workspace: workspace,
   });
-  return result(r.data, r.error, "Statistiques indisponibles.");
+  return result(r.data, r.error, "Statistiques indisponibles.", r.status);
 }
 async function lifecycle(id: string, action: "archive" | "restore" | "delete") {
   // SQL rechecks owner/admin and permits the archived source for restore/delete.
@@ -109,7 +113,7 @@ async function lifecycle(id: string, action: "archive" | "restore" | "delete") {
   if (r.error)
     throw new MediaError(
       "Action réservée au propriétaire ou à un administrateur.",
-      403,
+      restErrorStatus(r.error, r.status),
     );
 }
 export const archiveStudioProject = (id: string) => lifecycle(id, "archive");
@@ -122,6 +126,7 @@ export async function duplicateStudioProject(id: string) {
     r.data,
     r.error,
     "Duplication refusée. Terminez ou retirez les imports non validés, puis vérifiez votre rôle et les limites du projet.",
+    r.status,
   );
 }
 export async function setProjectCover(id: string, asset: string | null) {
@@ -133,7 +138,10 @@ export async function setProjectCover(id: string, asset: string | null) {
     p_asset: asset,
   });
   if (r.error)
-    throw new MediaError("Choisissez une image validée de ce projet.", 403);
+    throw new MediaError(
+      "Choisissez une image validée de ce projet.",
+      restErrorStatus(r.error, r.status),
+    );
 }
 export async function removeProjectMedia(id: string, asset: string) {
   if (!isStudioId(asset)) throw new MediaError("Média non autorisé.");
@@ -142,7 +150,11 @@ export async function removeProjectMedia(id: string, asset: string) {
     p_project: id,
     p_asset: asset,
   });
-  if (r.error) throw new MediaError("Suppression du média refusée.", 403);
+  if (r.error)
+    throw new MediaError(
+      "Suppression du média refusée.",
+      restErrorStatus(r.error, r.status),
+    );
 }
 export async function reorderProjectMedia(
   id: string,
@@ -168,7 +180,7 @@ export async function reorderProjectMedia(
       r.error.code === "40001"
         ? "Les médias ont changé. Rechargez le projet."
         : "Ordre ou média non autorisé.",
-      r.error.code === "40001" ? 409 : 403,
+      restErrorStatus(r.error, r.status),
     );
 }
 export async function projectMedia(id: string, offset = 0, limit = 24) {
@@ -178,11 +190,11 @@ export async function projectMedia(id: string, offset = 0, limit = 24) {
     p_offset: offset,
     p_limit: limit,
   });
-  return result(r.data, r.error, "Bibliothèque indisponible.");
+  return result(r.data, r.error, "Bibliothèque indisponible.", r.status);
 }
 
 export async function projectStats(id: string) {
   const { client } = await authorizeProject(id);
   const r = await client.rpc("studio_project_media_stats", { p_project: id });
-  return result(r.data, r.error, "Compteurs indisponibles.");
+  return result(r.data, r.error, "Compteurs indisponibles.", r.status);
 }

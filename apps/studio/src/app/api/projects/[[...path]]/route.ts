@@ -1,3 +1,4 @@
+import { isTransportError } from "../../../../lib/rest-status";
 import { ProjectValidationError } from "@elsatia/studio-domain";
 import { studioOrigin } from "../../../../lib/config";
 import { MediaError } from "../../../../lib/media-service";
@@ -121,10 +122,20 @@ async function handle(
             ? error.message
             : error instanceof ProjectValidationError
               ? error.message
-              : "Demande invalide.",
+              : error instanceof SyntaxError
+                ? "Demande invalide."
+                : "Service projets indisponible.",
       },
       {
-        status: error instanceof MediaError ? error.status : 400,
+        status:
+          error instanceof MediaError
+            ? error.status
+            : isTransportError(error)
+              ? 503
+              : error instanceof SyntaxError ||
+                  error instanceof ProjectValidationError
+                ? 400
+                : 500,
         headers: { "Cache-Control": "private, no-store" },
       },
     );
