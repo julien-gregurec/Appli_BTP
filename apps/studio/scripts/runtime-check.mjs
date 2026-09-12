@@ -122,8 +122,8 @@ async function postgres() {
     ],
     { encoding: "utf8", timeout: 10000 },
   );
-  if (Number(output.trim()) !== 255)
-    throw Error("Expected 255 applied migrations");
+  if (Number(output.trim()) !== 256)
+    throw Error("Expected 256 applied migrations");
 }
 async function waitReady(check) {
   const end = Date.now() + 120000;
@@ -136,7 +136,7 @@ async function waitReady(check) {
       // A real denial or wrong identity/role is not a startup transport failure.
       if (
         (error.status >= 400 && error.status < 500) ||
-        /mismatch|Expected 255/.test(error.message)
+        /mismatch|Expected 256/.test(error.message)
       )
         throw error;
       last = error;
@@ -148,6 +148,21 @@ async function waitReady(check) {
 }
 const mode = process.argv[2] ?? "ready";
 const probePath = join(state.directory, "runtime-probe.json");
+async function timelineReady(project, token) {
+  // The readiness project intentionally has no montage; exercise both RLS and
+  // the atomic document RPC before browser tests populate their own fixtures.
+  const timelines = await request(
+    `/rest/v1/studio_timelines?project_id=eq.${project}&select=id`,
+    { token },
+  );
+  const document = await request("/rest/v1/rpc/studio_get_timeline", {
+    token,
+    method: "POST",
+    body: { p_project: project, p_timeline: randomUUID() },
+  });
+  if (timelines.length !== 0 || document !== null)
+    throw Error("Timeline readiness fixture mismatch");
+}
 try {
   if (mode === "ready") {
     await waitReady(async () => {
@@ -216,6 +231,7 @@ try {
     );
     if (workspaces.length !== 1 || projects[0]?.workspace_id !== workspace)
       throw Error("REST fixture mismatch");
+    await timelineReady(project, token);
     const key = `studio/runtime-${randomUUID()}/original.png`;
     const png = Buffer.from(
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jZ1kAAAAASUVORK5CYII=",
@@ -283,6 +299,7 @@ try {
         body: { p_workspace_id: fixture.workspace },
       });
       if (role !== "owner") throw Error("Readiness role mismatch");
+      await timelineReady(fixture.project, fixture.token);
       const buckets = await request("/storage/v1/bucket");
       if (
         !buckets.some((b) => b.id === "studio-originals" && b.public === false)
