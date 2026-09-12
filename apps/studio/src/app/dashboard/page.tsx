@@ -37,13 +37,15 @@ export default async function Dashboard({
           </Link>
         </section>
         <section className="card">
-          <span className="eyebrow">PROCHAINEMENT</span>
+          <span className="eyebrow">VOS MÉDIAS</span>
           <h2>De l’image à l’histoire.</h2>
           <p>
-            Import, montage et export vidéo seront disponibles dans les
-            prochains lots.
+            Importez vos photos et vidéos dans un projet privé. Le montage et
+            l’export arriveront plus tard.
           </p>
-          <button disabled>Nouveau projet · À venir</button>
+          <Link href={`/projects?workspace=${context.workspace.id}`}>
+            Nouveau projet →
+          </Link>
         </section>
       </div>
       <section className="card details">

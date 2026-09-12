@@ -71,6 +71,10 @@ if (action === "setup") {
   );
   for (let i = 0; i < 10; i++)
     config = config.replaceAll(String(54320 + i), String(base + i));
+  config = config.replace(
+    'file_size_limit = "50MiB"',
+    'file_size_limit = "1GiB"',
+  );
   config = config
     .replaceAll("http://127.0.0.1:3000", "http://127.0.0.1:3030")
     .replace(
@@ -82,6 +86,13 @@ if (action === "setup") {
     cpSync(join(root, "supabase", name), join(directory, "supabase", name), {
       recursive: true,
     });
+  if (process.argv.includes("--lot-a"))
+    unlinkSync(
+      join(
+        directory,
+        "supabase/migrations/20260912140000_studio_media_upload.sql",
+      ),
+    );
   writeFileSync(statePath, JSON.stringify({ directory, projectId }));
   run(
     [
@@ -89,7 +100,7 @@ if (action === "setup") {
       "--workdir",
       directory,
       "--exclude",
-      "realtime,storage-api,imgproxy,studio,postgres-meta,edge-runtime,logflare,vector,supavisor",
+      "realtime,imgproxy,studio,postgres-meta,edge-runtime,logflare,vector,supavisor",
     ],
     "start.log",
     directory,
@@ -101,11 +112,11 @@ if (action === "setup") {
     throw new Error("Non-loopback API rejected.");
   writeFileSync(
     join(app, ".env.local"),
-    `NEXT_PUBLIC_STUDIO_URL=http://127.0.0.1:3030\nNEXT_PUBLIC_SUPABASE_URL=${status.API_URL}\nNEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${status.ANON_KEY}\n`,
+    `NEXT_PUBLIC_STUDIO_URL=http://127.0.0.1:3030\nNEXT_PUBLIC_SUPABASE_URL=${status.API_URL}\nNEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${status.ANON_KEY}\nSTUDIO_STORAGE_SERVICE_KEY=${status.SERVICE_ROLE_KEY}\n`,
     { mode: 0o600 },
   );
   console.log(
-    `Disposable Studio instance ready: ${projectId}. Only its public API key was written to apps/studio/.env.local.`,
+    `Disposable Studio instance ready: ${projectId}. Public API and server-only storage credentials were written to the ignored local environment to apps/studio/.env.local.`,
   );
 } else if (action === "test-db") {
   const { directory } = state();
