@@ -6,6 +6,8 @@ import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { PlanningAffectationForm } from "@/components/PlanningAffectationForm";
 import { Lien as Link } from "@/components/Lien";
 import { lienMaps } from "@/lib/maps";
+import { planningV2Actif } from "@/lib/planning/v2-serveur";
+import { PlanningV2Page } from "./PlanningV2Page";
 
 type A = {
   id: string;
@@ -83,8 +85,10 @@ function FormulaireModifierAffectation({ a, chantiers, retour, autresMemeLot, pe
   );
 }
 
-export default async function PlanningPage({ searchParams }: { searchParams: Promise<{ semaine?: string; error?: string }> }) {
+export default async function PlanningPage({ searchParams }: { searchParams: Promise<{ semaine?: string; error?: string; jour?: string; vue?: string }> }) {
   const p = await searchParams;
+  // GP V1 (lot F) : planning v2 derrière son drapeau ; éteint, la page historique est rendue à l'identique.
+  if (planningV2Actif()) return <PlanningV2Page searchParams={p} />;
   const debut = lundi(p.semaine);
   const dates = Array.from({ length: 7 }, (_, i) => new Date(debut.getTime() + i * 86400000));
   const fin = dates[6];

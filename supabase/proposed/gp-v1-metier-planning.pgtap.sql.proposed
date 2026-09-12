@@ -1,0 +1,95 @@
+-- PREUVE pgTAP PROPOSÉE — GP V1, lot F « planning »
+begin;
+create extension if not exists pgtap with schema extensions;
+select * from no_plan();
+\ir ../tests/fixtures/isolation_multitenant.inc
+create or replace function pg_temp.jwt(p_sub uuid) returns void language plpgsql as $$
+begin
+  perform set_config('request.jwt.claim.sub', p_sub::text, true);
+  perform set_config('request.jwt.claims', json_build_object('sub', p_sub, 'role', 'authenticated')::text, true);
+end $$;
+create or replace function pg_temp.ev(p_titre text, p_debut text, p_fin text, p_type text default 'chantier', p_chantier text default 'a4000000-0000-0000-0000-000000000001', p_id text default null) returns jsonb language sql as $$
+  select jsonb_build_object('id', p_id, 'titre', p_titre, 'type', p_type, 'statut', 'planifie', 'debut', p_debut, 'fin', p_fin, 'chantier_id', p_chantier)
+$$;
+insert into public.planning_ressources (id, entreprise_id, type, nom) values ('cc000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'nacelle', 'Nacelle 12 m');
+insert into public.equipes (id, entreprise_id, nom) values ('ee000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'Équipe pose');
+insert into public.equipes_membres (equipe_id, employe_id, entreprise_id) values
+  ('ee000000-0000-0000-0000-000000000001', 'a2000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001'),
+  ('ee000000-0000-0000-0000-000000000001', 'a2000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001');
+
+set local role authenticated;
+select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
+
+-- A. Création, synchronisation vers affectations
+create temp table t_e1 as select public.enregistrer_evenement_planning('a0000000-0000-0000-0000-000000000001',
+  pg_temp.ev('Pose cloisons', '2026-09-08T08:00:00+02:00', '2026-09-08T12:00:00+02:00'),
+  '[{"employe_id":"a2000000-0000-0000-0000-000000000002"}]'::jsonb) as id;
+select ok((select id is not null from t_e1), 'évènement créé par le conducteur (gerer_planning)');
+select is((select count(*)::int from public.affectations where notes = 'PLN:' || (select id from t_e1)), 1, 'compatibilité : une ligne affectations par salarié et par jour');
+select is((select heures || '|' || date || '|' || type_activite || '|' || coalesce(chantier_id::text, '') from public.affectations where notes = 'PLN:' || (select id from t_e1)),
+  '4.00|2026-09-08|chantier|a4000000-0000-0000-0000-000000000001', 'compatibilité : 4 h le 08/09 sur le chantier');
+select ok((select tache like 'Pose cloisons [%' from public.affectations where notes = 'PLN:' || (select id from t_e1)), 'compatibilité : tâche = titre + identifiant court');
+
+-- B. Modification : horaires, équipe, plusieurs jours
+select lives_ok(format($$select public.enregistrer_evenement_planning('a0000000-0000-0000-0000-000000000001',
+  pg_temp.ev('Pose cloisons', '2026-09-08T08:00:00+02:00', '2026-09-09T17:00:00+02:00', 'chantier', 'a4000000-0000-0000-0000-000000000001', %L),
+  '[{"equipe_id":"ee000000-0000-0000-0000-000000000001"}]'::jsonb)$$, (select id from t_e1)), 'modification : équipe de deux, sur deux jours');
+select is((select count(*)::int from public.affectations where notes = 'PLN:' || (select id from t_e1)), 4, 'compatibilité : 2 salariés × 2 jours');
+select is((select sum(heures) from public.affectations where notes = 'PLN:' || (select id from t_e1) and employe_id = 'a2000000-0000-0000-0000-000000000002'), 33.00::numeric,
+  'compatibilité : 16 h le premier jour (08:00 → minuit), 17 h le second');
+reset role;
+delete from public.equipes_membres where employe_id = 'a2000000-0000-0000-0000-000000000003';
+select is((select count(*)::int from public.affectations where notes = 'PLN:' || (select id from t_e1)), 2, 'compatibilité : retirer un membre de l''équipe retire ses lignes');
+set local role authenticated;
+select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
+
+-- C. Ressource physique : refus bloquant du double emploi
+select lives_ok(format($$select public.enregistrer_evenement_planning('a0000000-0000-0000-0000-000000000001',
+  pg_temp.ev('Pose cloisons', '2026-09-08T08:00:00+02:00', '2026-09-08T12:00:00+02:00', 'chantier', 'a4000000-0000-0000-0000-000000000001', %L),
+  '[{"employe_id":"a2000000-0000-0000-0000-000000000002"},{"ressource_id":"cc000000-0000-0000-0000-000000000001"}]'::jsonb)$$, (select id from t_e1)), 'ressource : nacelle affectée');
+select throws_ok($$select public.enregistrer_evenement_planning('a0000000-0000-0000-0000-000000000001',
+  pg_temp.ev('Autre chantier', '2026-09-08T10:00:00+02:00', '2026-09-08T14:00:00+02:00', 'chantier', 'a4000000-0000-0000-0000-000000000002'),
+  '[{"ressource_id":"cc000000-0000-0000-0000-000000000001"}]'::jsonb)$$, 'P0001', null, 'ressource : déjà réservée sur le créneau → refusé');
+select lives_ok($$select public.enregistrer_evenement_planning('a0000000-0000-0000-0000-000000000001',
+  pg_temp.ev('Autre chantier', '2026-09-08T13:00:00+02:00', '2026-09-08T17:00:00+02:00', 'chantier', 'a4000000-0000-0000-0000-000000000002'),
+  '[{"ressource_id":"cc000000-0000-0000-0000-000000000001"}]'::jsonb)$$, 'ressource : libre l''après-midi → accepté');
+
+-- D. Conflits signalés : même salarié sur deux évènements
+create temp table t_e2 as select public.enregistrer_evenement_planning('a0000000-0000-0000-0000-000000000001',
+  pg_temp.ev('Rendez-vous client', '2026-09-08T11:00:00+02:00', '2026-09-08T12:30:00+02:00', 'rendez_vous', null),
+  '[{"employe_id":"a2000000-0000-0000-0000-000000000002"}]'::jsonb) as id;
+select is((select count(*)::int from public.conflits_planning('a0000000-0000-0000-0000-000000000001', '2026-09-07', '2026-09-14') where type_conflit = 'salarie_double'), 2,
+  'conflits : salarié en double, signalé sur les deux évènements');
+select is((select type_activite from public.affectations where notes = 'PLN:' || (select id from t_e2)), 'autre', 'compatibilité : un rendez-vous sans chantier = activité « autre »');
+
+-- E. Droits
+select pg_temp.jwt('10000000-0000-0000-0000-000000000003');
+select ok((select count(*) from public.planning_evenements where entreprise_id = 'a0000000-0000-0000-0000-000000000001') >= 2, 'chef d''équipe (acces_planning) : lit le planning');
+select throws_ok($$select public.enregistrer_evenement_planning('a0000000-0000-0000-0000-000000000001', pg_temp.ev('X', '2026-09-10T08:00:00+02:00', '2026-09-10T09:00:00+02:00'))$$,
+  '42501', null, 'chef d''équipe sans gerer_planning : création refusée');
+reset role;
+insert into public.permissions_poste (entreprise_id, poste_id, cle_permission, autorise) values ('a0000000-0000-0000-0000-000000000001', 'a1000000-0000-0000-0000-000000000004', 'affecter_ressources', false)
+  on conflict (entreprise_id, poste_id, cle_permission) do update set autorise = false;
+set local role authenticated;
+select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
+select throws_ok(format($$select public.enregistrer_evenement_planning('a0000000-0000-0000-0000-000000000001',
+  pg_temp.ev('Pose cloisons', '2026-09-08T08:00:00+02:00', '2026-09-08T12:00:00+02:00', 'chantier', 'a4000000-0000-0000-0000-000000000001', %L),
+  '[{"employe_id":"a2000000-0000-0000-0000-000000000004"}]'::jsonb)$$, (select id from t_e1)), '42501', null, 'sans affecter_ressources : changer les affectations est refusé');
+select lives_ok(format($$select public.enregistrer_evenement_planning('a0000000-0000-0000-0000-000000000001',
+  pg_temp.ev('Pose cloisons — matin', '2026-09-08T08:00:00+02:00', '2026-09-08T12:00:00+02:00', 'chantier', 'a4000000-0000-0000-0000-000000000001', %L),
+  '[{"employe_id":"a2000000-0000-0000-0000-000000000002"},{"ressource_id":"cc000000-0000-0000-0000-000000000001"}]'::jsonb)$$, (select id from t_e1)), 'sans affecter_ressources : modifier le titre sans toucher aux affectations passe');
+select pg_temp.jwt('20000000-0000-0000-0000-000000000006');
+select is((select count(*)::int from public.planning_evenements where entreprise_id = 'a0000000-0000-0000-0000-000000000001'), 0, 'cloisonnement : rien de l''entreprise A pour B');
+select throws_ok(format($$select public.supprimer_evenement_planning(%L)$$, (select id from t_e1)), 'P0001', null, 'cloisonnement : suppression impossible depuis B (introuvable sous RLS)');
+
+-- F. Annulation et suppression : la compatibilité suit
+select pg_temp.jwt('10000000-0000-0000-0000-000000000004');
+select lives_ok(format($$select public.enregistrer_evenement_planning('a0000000-0000-0000-0000-000000000001',
+  pg_temp.ev('Rendez-vous client', '2026-09-08T11:00:00+02:00', '2026-09-08T12:30:00+02:00', 'rendez_vous', null, %L) || '{"statut":"annule"}', null)$$, (select id from t_e2)), 'annulation');
+select is((select count(*)::int from public.affectations where notes = 'PLN:' || (select id from t_e2)), 0, 'compatibilité : un évènement annulé n''a plus de ligne affectations');
+select lives_ok(format($$select public.supprimer_evenement_planning(%L)$$, (select id from t_e1)), 'suppression');
+select is((select count(*)::int from public.affectations where notes = 'PLN:' || (select id from t_e1)), 0, 'compatibilité : suppression propagée');
+select ok(exists (select 1 from public.historique_objets where ressource = 'planning' and ressource_id = (select id from t_e1) and action = 'suppression'), 'historique : suppression journalisée');
+select ok(exists (select 1 from public.historique_objets where ressource = 'planning' and ressource_id = (select id from t_e1) and action = 'affectation_modifiee'), 'historique : affectations journalisées');
+select * from finish();
+rollback;

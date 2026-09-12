@@ -140,10 +140,12 @@ select throws_like(
   '%violates%', '16b. La contrainte composite chantier_id bloque toujours un chantier etranger'
 );
 
--- 17. Les policies RLS de devis restent inchangees (5 policies : 1 PERMISSIVE + 4 RESTRICTIVE)
+-- 17. Les policies RLS de devis restent inchangees (5 policies : 1 PERMISSIVE + 4 RESTRICTIVE).
+-- GP V1 (lot D, droits fins) ajoute une policy RESTRICTIVE de suppression `devis_suppression_droit` :
+-- elle est exclue du compte pour que l'assertion vaille avant et apres cette migration.
 reset role;
 select is(
-  (select count(*)::int from pg_policies where schemaname='public' and tablename='devis'), 5,
+  (select count(*)::int from pg_policies where schemaname='public' and tablename='devis' and policyname <> 'devis_suppression_droit'), 5,
   '17. Les policies RLS existantes sur devis restent inchangees (5 policies)'
 );
 

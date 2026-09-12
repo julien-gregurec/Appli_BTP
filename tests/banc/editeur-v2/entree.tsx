@@ -8,7 +8,7 @@ import { EditeurDevisV2 } from "@/components/devis/EditeurDevisV2";
 const parametres = new URLSearchParams(window.location.search);
 const couts = parametres.get("couts") === "1";
 window.__banc = {
-  droits: { voirCouts: couts, gererCouts: couts, modifierPrix: true, modifierUnite: true },
+  droits: { voirCouts: couts, gererCouts: couts, modifierPrix: true, modifierUnite: true, modifierRemise: true },
   enregistrements: [],
   recherches: [],
 };

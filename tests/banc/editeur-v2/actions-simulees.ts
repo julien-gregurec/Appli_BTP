@@ -13,7 +13,7 @@ import type { VersionOuvrage } from "@/lib/devis/ouvrages";
 import { plancherChauffantFictif } from "@/lib/devis/fixtures/plancher-chauffant-fictif";
 
 type Banc = {
-  droits: { voirCouts: boolean; gererCouts: boolean; modifierPrix: boolean; modifierUnite: boolean };
+  droits: { voirCouts: boolean; gererCouts: boolean; modifierPrix: boolean; modifierUnite: boolean; modifierRemise: boolean };
   enregistrements: Array<{ devisId: string | null; entete: EnteteDevisV2; elements: ElementDevis[]; payload: ReturnType<typeof payloadEnregistrementV2> }>;
   recherches: string[];
 };

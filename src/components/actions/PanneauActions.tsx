@@ -15,10 +15,12 @@ export type ActionsServeur = Record<string, (formData: FormData) => void | Promi
 
 const ORDRE: GroupeAction[] = ["creer", "modifier", "transformer", "document", "navigation", "danger"];
 
-export function PanneauActions({ titre, actions, formActions = {}, contexte }: {
+export function PanneauActions({ titre, actions, formActions = {}, handlers = {}, contexte }: {
   titre: string;
   actions: ActionContextuelle[];
   formActions?: ActionsServeur;
+  /** Gestionnaires côté navigateur (écrans interactifs : planning). */
+  handlers?: Record<string, () => void>;
   /** Bref rappel de l'objet (numéro, statut). */
   contexte?: ReactNode;
 }) {
@@ -36,7 +38,7 @@ export function PanneauActions({ titre, actions, formActions = {}, contexte }: {
           <div key={groupe}>
             <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">{LIBELLES_GROUPES[groupe]}</div>
             <ul className="space-y-0.5">
-              {items.map((a) => <li key={a.cle}><Action a={a} formAction={formActions[a.cle]} /></li>)}
+              {items.map((a) => <li key={a.cle}><Action a={a} formAction={formActions[a.cle]} handler={handlers[a.cle]} /></li>)}
             </ul>
           </div>
         );
@@ -69,7 +71,7 @@ export function PanneauActions({ titre, actions, formActions = {}, contexte }: {
   );
 }
 
-function Action({ a, formAction }: { a: ActionContextuelle; formAction?: (formData: FormData) => void | Promise<void> }) {
+function Action({ a, formAction, handler }: { a: ActionContextuelle; formAction?: (formData: FormData) => void | Promise<void>; handler?: () => void }) {
   const classes = `flex min-h-10 w-full items-center gap-2 rounded px-2 text-left text-sm ${a.danger ? "text-red-700" : ""} ${a.disponible ? "hover:bg-neutral-100 dark:hover:bg-neutral-800" : "cursor-not-allowed text-neutral-400 dark:text-neutral-600"}`;
   const raccourci = a.raccourci ? <span className="ml-auto text-[10px] text-neutral-400">{a.raccourci}</span> : null;
   if (!a.disponible) {
@@ -84,6 +86,9 @@ function Action({ a, formAction }: { a: ActionContextuelle; formAction?: (formDa
     return a.externe
       ? <a href={a.href} target={a.href.startsWith("tel:") || a.href.startsWith("mailto:") ? undefined : "_blank"} rel="noopener" title={a.raccourci} className={classes}>{a.libelle}{raccourci}</a>
       : <Link href={a.href} title={a.raccourci} className={classes}>{a.libelle}{raccourci}</Link>;
+  }
+  if (handler) {
+    return <button type="button" title={a.raccourci} className={classes} onClick={() => { if (!a.confirmation || window.confirm(a.confirmation)) handler(); }}>{a.libelle}{raccourci}</button>;
   }
   if (formAction) {
     return (

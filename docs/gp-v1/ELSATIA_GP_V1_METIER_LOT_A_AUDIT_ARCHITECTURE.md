@@ -507,3 +507,56 @@ Verdict provisoire : **GO SOUS CONDITIONS pour les lots livrés**, NO-GO V1 COMM
 2. « Importer des lignes » et « Transformer en commande » sont annoncés indisponibles en V1 (motif explicite), pas cachés.
 3. Le panneau fixe suppose une marge droite (`lg:pr-72`) posée page par page ; les pages non montées ne la portent pas.
 4. Recette navigateur du panneau et de la palette non faite (rendu serveur testé) : à couvrir au lot H.
+
+## 16. Lot F — planning refondu façon Batappli (livré)
+
+Le planning historique (table journalière `affectations`, formulaire par cellule) reste rendu à
+l'identique quand `GP_PLANNING_V2` est absent. Drapeau posé (`GP_PLANNING_V2=1`) **et** schéma
+migré, `/planning` devient un planning horodaté, dense, manipulé directement, avec ressources,
+conflits et barre latérale (décision D1 : nouveau modèle + `affectations` maintenue par déclencheur).
+
+### 16.1 Livrables
+
+| Fichier | Rôle |
+|---|---|
+| `supabase/proposed/gp-v1-metier-planning.sql.proposed` (525 l.) | `planning_evenements` (titre, type, statut, début/fin horodatés, journée entière, couleur, chantier, client, adresse, notes), `planning_ressources` (véhicule, nacelle, machine, matériel), `equipes` + `equipes_membres`, `planning_disponibilites`, `planning_affectations` (salarié, équipe ou ressource) ; **compatibilité** : `affectations` (jour + heures, `notes = 'PLN:<id>'`) réécrite par déclencheur à chaque changement d'évènement, d'affectation ou de membre d'équipe — les ~12 fonctions SQL historiques (paie, pointage, alertes) continuent de lire la même table ; ressource physique **bloquante** (deux évènements simultanés sur la même nacelle refusés, P0001) ; `conflits_planning` (salarié en double, ressource en double, congé, hors disponibilités, plus de 10 h) ; RPC `enregistrer_evenement_planning` / `supprimer_evenement_planning` (SECURITY DEFINER, membre actif et `gerer_planning` vérifiés explicitement, `affecter_ressources` pour les affectations, historique journalisé) ; RLS par entreprise, lecture pour `acces_planning`, écriture pour `gerer_planning` |
+| `…planning.pgtap.sql.proposed` | 25 assertions |
+| `src/lib/planning/modele.ts` (+ test, 12 cas) | module PUR : dates Paris sans bibliothèque, jours d'une vue, lignes (salarié, équipe, chantier, ressource), projection en **blocs** (chevauchements en colonnes en vue jour, empilement en vues à colonnes-jours), conflits calculés en direct (miroir de la base), `deplacer`, `redimensionner`, `changerLigne`, `dupliquer` |
+| `src/lib/planning/serveur.ts`, `src/app/actions/planning-v2.ts` | chargement sous la RLS de l'utilisateur ; actions serveur qui revérifient drapeau, entreprise, droit, titre, type, statut, bornes avant la RPC |
+| `src/components/planning/PlanningV2.tsx` (+ test de rendu, 6 cas) | **8 vues** : jour (salariés × heures, zoom 32–160 px/h), semaine, mois, par salarié, par équipe, par chantier, par ressource, compacte (liste dense) ; **glisser-déposer** au pointeur (déplacer dans le temps et d'une ligne à l'autre — changer de salarié, d'équipe, de chantier, de ressource), **étirer** la fin (vue jour), **Alt + glisser** = dupliquer, **glisser sur une zone vide** = créer (heure de début à 15 min près), clic = sélection (barre latérale), double clic / Entrée = détail ; clavier : ← → (15 min, Ctrl : 1 jour), ↑ ↓ (ligne), Ctrl+D, Suppr, Échap ; filtres type / chantier / recherche ; conflits sur les blocs (⚠, liseré) et récapitulés sous la grille ; dialogue d'édition avec salariés, équipes et ressources (lecture seule sans `affecter_ressources`) ; mise à jour optimiste puis rafraîchissement serveur, erreur de la base rendue et état restauré |
+| `src/components/actions/PanneauActions.tsx` | prop `handlers` (gestionnaires navigateur) — le planning est le premier écran interactif à l'utiliser : Nouvel évènement, Modifier, Déplacer, Dupliquer, Affecter une équipe, Changer l'horaire, Ouvrir le chantier / le client / les documents, Imprimer, Historique, Supprimer — chaque action indisponible reste visible avec son motif |
+| `src/app/(app)/planning/page.tsx` → `PlanningV2Page.tsx` | aiguillage par drapeau ; `?jour=AAAA-MM-JJ&vue=` (l'ancien `?semaine=` est accepté) |
+| `src/app/(app)/planning/historique/page.tsx` | historique d'un évènement (création, modification, affectations, suppression) |
+| `src/app/imprimer/planning/page.tsx`, `src/app/api/documents/planning/pdf/route.ts` | impression A4 paysage (grille sujets × jours ou liste chronologique, conflits) ; PDF par Chromium avec le cookie de l'appelant (moteur 2, format fixé par la page) |
+| `tests/banc/planning-v2/` | banc navigateur (vrais composants, données fictives, actions doublées en mémoire) |
+| `supabase/tests/correctif_isolation_devis_client.test.sql` | assertion « 5 policies sur devis » rendue tolérante à la policy restrictive de suppression du lot D (comptée à part) — vraie avant et après la migration |
+| `src/app/actions/workflow-devis.test.ts` | permissions doublées ; cas ajouté : sans `transformer_devis` ni `gerer_devis`, refus avant tout appel RPC avec le motif |
+
+### 16.2 Point délicat résolu : notifications
+
+Le déclencheur historique `trg_notifications_affectations` notifie ligne par ligne ; une synchronisation
+réécrit plusieurs lignes (salariés × jours) dans la **même transaction** et l'index
+`notifications_evenement_unique` (utilisateur, type, ressource, `created_at`) refusait la seconde
+(23505). Le lot redéfinit ce déclencheur avec son corps historique **inchangé** pour toute ligne
+ordinaire et un seul ajout : les lignes `PLN:%` sont ignorées ; le planning v2 notifie alors **une fois
+par salarié et par évènement** (ajouté, retiré, modifié, annulé), en `on conflict do nothing`.
+
+### 16.3 Résultats
+
+| Contrôle | Résultat |
+|---|---|
+| SQL appliqué deux fois sur `gpv1_jetable` | 0 erreur |
+| pgTAP du lot | **25/25** (compatibilité : 1 évènement 8 h–12 h = 1 ligne `affectations` de 4 h ; équipe de deux sur deux jours = 4 lignes, 33 h ; retrait d'un membre = lignes retirées ; annulation = lignes retirées ; ressource en double refusée P0001 ; conflit salarié détecté ; `affecter_ressources` refusé 42501 ; ouvrier sans `gerer_planning` refusé ; cloisonnement B ; historique journalisé) |
+| Suite pgTAP complète (70 fichiers) sur la base empilée A-bis → F | **1 901 ok / 1 échec** préexistant (`reserves_v2_terrain_capture`, identique sans le lot) |
+| Vitest planning (modèle 12, composant 6) | 18/18 |
+| Vitest projet | 2 360 verts ; `xlsx.test.ts` échoue sous la charge de la suite complète et passe seul (préexistant, § 14.3) |
+| Typecheck du projet / lint du projet | 0 erreur / 0 erreur (6 avertissements préexistants) |
+| Banc navigateur (Chromium du poste, 1 100 × 720) | vue semaine : une ligne par salarié, 7 colonnes, blocs empilés dans une case ; glisser « Dépannage » du mardi (Ali) au jeudi (Dan) → enregistrement `debut` +2 jours, affectation `s1` → `s4` ; Alt + glisser « Livraison » → nouvel évènement enregistré, l'original conservé (2 blocs) ; vue jour : glisser +2 h → 10:00–14:00 ; étirer +1 h → fin 18:00 ; glisser sur une zone vide 14 h → 16 h → dialogue « Nouvel évènement » 14:00–16:00, salarié de la ligne coché, enregistré avec le titre saisi, fermeture sans enregistrer = brouillon retiré ; clavier → +15 min, ↓ change de salarié ; vues équipe (« Hors équipe »), ressource (« Sans ressource »), chantier, compacte (11 lignes), mois (5 semaines) ; lecture seule : actions grisées avec le motif `gerer_planning` ; téléphone : agenda en colonne, feuille « Actions » en bas |
+
+### 16.4 Réserves
+
+1. `hors_disponibilite` en base repose sur le jour de **début** de l'évènement (un évènement à cheval sur deux jours n'est vérifié que sur le premier) ; le TypeScript fait de même.
+2. Aucune récurrence (répéter chaque semaine) : hors périmètre V1, à noter comme demande.
+3. Le PDF n'a pas été produit sur ce poste (Chromium serverless absent, comme pour les devis) : la page d'impression est rendue et testée, la route reprend le mécanisme des devis à l'identique.
+4. L'impression en vue **mois** liste les jours du mois en colonnes (jusqu'à 31) : lisible en A4 paysage à 9 px, dense.
+5. La page historique et la fiche d'un évènement supposent le schéma migré : sans le lot 0, `/planning` reste l'ancien écran.
