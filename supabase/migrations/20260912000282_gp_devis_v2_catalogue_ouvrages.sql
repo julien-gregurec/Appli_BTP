@@ -1,53 +1,7 @@
--- =====================================================================================================
--- PROPOSITION — NON APPLIQUÉE, NON NUMÉROTÉE, HORS supabase/migrations
--- Lot : ELSATIA-GP-DEVIS-WYSIWYG-CATALOGUE-OUVRAGES-V1 (branche feat/gp-devis-wysiwyg-catalogue-ouvrages-v1)
--- =====================================================================================================
---
--- Ledger constaté le 2026-09-11 : Train V3 (52d3282) et GP mobile (bb17c17) = 278 fichiers, n° max 280 ;
--- 20260909000281 existe sur une branche Colors NON fusionnée. AUCUN numéro n'est réservé ici.
--- Pour intégrer : copier ce fichier, SANS le modifier, dans supabase/migrations sous le numéro que l'audit
--- global du ledger attribuera au moment de l'intégration. Aucune migration existante n'est modifiée : les
--- fonctions existantes étendues ici sont REDÉFINIES (create or replace), jamais éditées dans leur fichier.
---
--- Remplace supabase/proposed/devis-references-articles-selection-multiple.sql.proposed (phase L du lot
--- mobile), dont il corrige trois défauts : `unaccent` et `pg_trgm` y étaient appelés sans jamais être créés,
--- ses contraintes n'étaient pas rejouables, et sa recherche lisait `articles_stock.prix_achat_ht` en
--- SECURITY INVOKER — requête qui échouerait dès que la restriction par colonne de la 108 serait rétablie.
---
--- Rejouable : chaque instruction est idempotente (if not exists, create or replace, blocs DO gardés).
---
--- Contenu :
---   1. normalisation des références (IMMUTABLE, sans extension)
---   2. catalogue des devis : références distinctes, fabricant, fournisseur, catégorie, archivage seul
---   3. catalogue du stock : références distinctes (la colonne `reference` n'est pas touchée)
---   4. coûts d'achat du catalogue, à part, sous permission
---   5. bibliothèque d'ouvrages versionnée (versions immuables, coûts à part)
---   6. structure des devis et factures : instances d'ouvrages, lignes enrichies, coûts de ligne
---   7. journal des modifications de prix (ajout seul)
---   8. filigranes, moteur de présentation, instantané de rendu
---   9. capture à l'émission et verrous (devis émis, lignes, ouvrages, coûts)
---  10. RPC : enregistrement v2, conversion devis → facture corrigée, recherches, rendu par jeton
---  11. permissions voir_couts_devis / gerer_couts_devis
---  12. RLS et droits
---
--- Défauts existants corrigés ici (audit du lot) :
---   P1  la conversion devis → facture perdait la remise globale (facture plus chère que le devis) ;
---   P1  la conversion ne vérifiait pas `gerer_factures` (SECURITY DEFINER, seul `est_membre_actif`) ;
---   P1  un devis `envoye` n'était pas verrouillé en base (seul `accepte` l'était) ;
---   P1  `factures.entreprise_snapshot` n'était capturé que par l'application (contournable) ;
---   P2  remise de ligne non bornée à la saisie (contrainte NOT VALID : les lignes existantes ne sont pas
---       revérifiées, aucune n'est modifiée).
--- Défaut connu NON traité ici (lot dédié) : `articles_stock.prix_achat_ht` lisible par tout membre depuis
--- la 20260729000189 (grant table entière). La recherche ci-dessous ne s'en sert pas : elle filtre elle-même.
--- =====================================================================================================
+-- Devis v2 : catalogue, ouvrages composés, rendu WYSIWYG (lot ELSATIA-GP-DEVIS-WYSIWYG-CATALOGUE-OUVRAGES-V1)
+-- Intégré au ledger le 2026-09-12 (GP V1, lot 0) depuis supabase/proposed/gp-devis-wysiwyg-catalogue-ouvrages-v1.sql.proposed, contenu inchangé.
+-- Rejouable ; additif ; Fresh + Upgrade prouvés (docs/gp-v1, § 19).
 
-
--- ─────────────────────────────────────────────────────────────────────────────────────────────────────
--- 0. Outils de migration (session seulement)
--- ─────────────────────────────────────────────────────────────────────────────────────────────────────
-
--- Crée un index unique (id, entreprise_id) SEULEMENT si aucun index unique ne porte déjà exactement ces
--- colonnes — une clé étrangère composite en a besoin, un doublon d'index serait inutile.
 create or replace function pg_temp.assurer_unicite_id_entreprise(p_table regclass, p_nom text)
 returns void language plpgsql as $$
 begin

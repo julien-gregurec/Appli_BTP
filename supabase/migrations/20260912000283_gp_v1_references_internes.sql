@@ -1,44 +1,7 @@
--- =====================================================================================================
--- PROPOSITION — NON APPLIQUÉE, NON NUMÉROTÉE, HORS supabase/migrations
--- Lot : ELSATIA-GP-V1-METIER — A-bis « références internes »
--- Branche : feat/gp-v1-metier-devis-planning-references-v1
--- =====================================================================================================
---
--- PRÉREQUIS : gp-devis-wysiwyg-catalogue-ouvrages-v1.sql.proposed appliquée AVANT ce fichier (elle crée
--- `normaliser_reference`, `ouvrages` et les colonnes de références du catalogue). Le bloc 0 le vérifie.
--- Ledger constaté le 2026-09-11 : n° max 281 (Colors, non fusionné). AUCUN numéro réservé.
--- Pour intégrer : copier ce fichier, SANS le modifier, sous le numéro que l'audit global du ledger
--- attribuera, juste APRÈS celui de la proposition devis v2. Aucune migration existante n'est modifiée :
--- les fonctions étendues sont REDÉFINIES (create or replace). Rejouable (if not exists, gardes).
---
--- Décisions de Julien appliquées (2026-09-11) :
---   D3  « référence fournisseur » = référence du FABRICANT (colonne `reference_fabricant`, déjà prévue) ;
---       « code article fournisseur » = code de l'article chez le DISTRIBUTEUR, un par fournisseur
---       (table `catalogue_codes_fournisseurs`, sans aucun prix).
---   Référence interne UNIQUE par entreprise et par nature d'objet, sur la forme normalisée : ceci
---   REMPLACE le choix « aucune unicité » de la proposition devis v2 pour `reference_interne` (la
---   référence fabricant, elle, reste non unique : teintes, conditionnements).
---
--- Contenu :
---   1. paramètres des références par entreprise (préfixe, largeur, année, génération automatique)
---   2. générateur sûr : n'attribue jamais une valeur déjà saisie à la main (défaut A5 du lot A)
---   3. déclencheurs de normalisation (vide → NULL, espaces retirés) et d'attribution
---   4. reprise : `articles_stock.reference_interne` initialisée depuis `reference` quand elle est libre
---   5. références d'affaire et client sur devis, factures, commandes fournisseurs
---   6. codes articles des distributeurs (D3)
---   7. historique des objets (ajout seul) et journal des changements de référence
---   8. doublons signalés (toutes sources) puis unicité normalisée, refusée s'il reste des doublons
---   9. attribution des références manquantes à la demande
---  10. RLS et droits
---
--- Défaut connu NON traité ici : `a_permission` accorde toutes les clés à une session support côté SQL
--- (20260718000110) — lot sécurité dédié.
--- =====================================================================================================
+-- GP V1 — références internes uniques, historique des objets
+-- Intégré au ledger le 2026-09-12 (GP V1, lot 0) depuis supabase/proposed/gp-v1-metier-references-internes.sql.proposed, contenu inchangé.
+-- Rejouable ; additif ; Fresh + Upgrade prouvés (docs/gp-v1, § 19).
 
-
--- ─────────────────────────────────────────────────────────────────────────────────────────────────────
--- 0. Prérequis et outils de session
--- ─────────────────────────────────────────────────────────────────────────────────────────────────────
 do $$
 begin
   if to_regprocedure('public.normaliser_reference(text)') is null

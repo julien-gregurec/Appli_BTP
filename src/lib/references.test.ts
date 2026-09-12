@@ -13,7 +13,7 @@ import {
 } from "./references";
 
 const SQL = readFileSync(
-  path.join(process.cwd(), "supabase/proposed/gp-v1-metier-references-internes.sql.proposed"),
+  path.join(process.cwd(), "supabase/migrations/20260912000283_gp_v1_references_internes.sql"),
   "utf8",
 );
 

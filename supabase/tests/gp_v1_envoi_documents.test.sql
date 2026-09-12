@@ -1,8 +1,8 @@
--- PREUVE pgTAP PROPOSÉE — GP V1, lot G « PDF, e-mail, historique »
+-- PREUVE pgTAP (intégrée au ledger le 2026-09-12, GP V1 lot 0) — GP V1, lot G « PDF, e-mail, historique »
 begin;
 create extension if not exists pgtap with schema extensions;
 select * from no_plan();
-\ir ../tests/fixtures/isolation_multitenant.inc
+\ir fixtures/isolation_multitenant.inc
 create or replace function pg_temp.jwt(p_sub uuid) returns void language plpgsql as $$
 begin
   perform set_config('request.jwt.claim.sub', p_sub::text, true);

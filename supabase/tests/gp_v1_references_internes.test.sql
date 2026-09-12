@@ -1,5 +1,5 @@
 -- =====================================================================================================
--- PREUVE pgTAP PROPOSÉE — ELSATIA-GP-V1-METIER, A-bis « références internes »
+-- PREUVE pgTAP (intégrée au ledger le 2026-09-12, GP V1 lot 0) — ELSATIA-GP-V1-METIER, A-bis « références internes »
 -- =====================================================================================================
 -- Se joue sur une base jetable au ledger 280 à laquelle ont été appliquées, dans l'ordre,
 -- gp-devis-wysiwyg-catalogue-ouvrages-v1.sql.proposed puis gp-v1-metier-references-internes.sql.proposed.
@@ -14,7 +14,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select * from no_plan();
 
-\ir ../tests/fixtures/isolation_multitenant.inc
+\ir fixtures/isolation_multitenant.inc
 
 create or replace function pg_temp.jwt(p_sub uuid) returns void language plpgsql as $$
 begin

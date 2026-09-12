@@ -1,19 +1,7 @@
--- =====================================================================================================
--- PROPOSITION — NON APPLIQUÉE, NON NUMÉROTÉE, HORS supabase/migrations
--- Lot : ELSATIA-GP-V1-METIER — G « PDF, e-mail, historique »
--- Branche : feat/gp-v1-metier-devis-planning-references-v1
--- =====================================================================================================
--- PRÉREQUIS : devis v2 (construire_rendu_devis/facture, snapshot d'entreprise), références internes
--- (historique_objets, journaliser_objet). Rejouable. Tout est ADDITIF :
---
---   1. entreprises : texte des conditions générales de vente (annexe du document, pièce jointe) et
---      choix d'imprimer les références internes des lignes (faux par défaut : PDF existants inchangés)
---   2. snapshot d'entreprise et rendus v2 : références du document (interne, client, chantier) et
---      réglages ci-dessus, pour que l'aperçu, le PDF, le portail et la pièce jointe portent la même chose
---   3. modeles_email : modèles d'objet et de message par entreprise (variables {numero}, {client}…)
---   4. documents_envois : chaque envoi (destinataire, copies, pièces, issue) ; alimenté par RPC,
---      jamais en écriture directe ; journalisé dans l'historique de l'objet (« envoi », « pdf »)
--- =====================================================================================================
+-- GP V1 — références et CGV sur les documents, modèles d'e-mail, historique des envois et PDF
+-- Intégré au ledger le 2026-09-12 (GP V1, lot 0) depuis supabase/proposed/gp-v1-metier-envoi-documents.sql.proposed, contenu inchangé.
+-- Rejouable ; additif ; Fresh + Upgrade prouvés (docs/gp-v1, § 19).
+
 do $$
 begin
   if to_regprocedure('public.journaliser_objet(uuid,text,uuid,text,text,jsonb,jsonb,boolean)') is null

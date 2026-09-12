@@ -1,31 +1,7 @@
--- =====================================================================================================
--- PROPOSITION — NON APPLIQUÉE, NON NUMÉROTÉE, HORS supabase/migrations
--- Lot : ELSATIA-GP-V1-METIER — B « bibliothèque articles et ouvrages »
--- Branche : feat/gp-v1-metier-devis-planning-references-v1
--- =====================================================================================================
---
--- PRÉREQUIS, dans l'ordre : gp-devis-wysiwyg-catalogue-ouvrages-v1.sql.proposed, puis
--- gp-v1-metier-references-internes.sql.proposed. Le bloc 0 le vérifie.
--- AUCUN numéro de ledger réservé. Rejouable (if not exists, create or replace, gardes).
---
--- Contenu :
---   1. familles et sous-familles (deux niveaux), communes au catalogue, au stock et aux ouvrages
---   2. colonnes : famille, notes internes, image
---   3. catégorie texte = libellé dérivé de la famille (la recherche et l'import historique s'en servent)
---   4. reprise : les catégories existantes deviennent des familles
---   5. favoris par utilisateur
---   6. coefficient et mode de prix (saisi / calculé) — dans la table des coûts, sous permission
---   7. images d'articles : bucket privé, jamais supprimées
---   8. recherche d'articles : codes distributeurs, famille, favoris
---   9. duplication d'un article
---  10. historique du catalogue et des ouvrages (création, prix, archivage ; coûts en entrée sensible)
---  11. RLS et droits
--- =====================================================================================================
+-- GP V1 — bibliothèque d'articles et d'ouvrages (familles, favoris, codes distributeurs, images)
+-- Intégré au ledger le 2026-09-12 (GP V1, lot 0) depuis supabase/proposed/gp-v1-metier-bibliotheque.sql.proposed, contenu inchangé.
+-- Rejouable ; additif ; Fresh + Upgrade prouvés (docs/gp-v1, § 19).
 
-
--- ─────────────────────────────────────────────────────────────────────────────────────────────────────
--- 0. Prérequis et outils de session
--- ─────────────────────────────────────────────────────────────────────────────────────────────────────
 do $$
 begin
   if to_regclass('public.historique_objets') is null or to_regclass('public.catalogue_codes_fournisseurs') is null then

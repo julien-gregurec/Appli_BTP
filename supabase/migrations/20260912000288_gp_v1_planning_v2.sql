@@ -1,23 +1,7 @@
--- =====================================================================================================
--- PROPOSITION — NON APPLIQUÉE, NON NUMÉROTÉE, HORS supabase/migrations
--- Lot : ELSATIA-GP-V1-METIER — F « planning Batappli-like »
--- Branche : feat/gp-v1-metier-devis-planning-references-v1
--- =====================================================================================================
--- PRÉREQUIS : références internes (historique_objets), droits (droit_fin). Rejouable.
--- Décision D1 (Julien) : nouveau modèle horodaté ; la table journalière `affectations` (lue par ~12
--- fonctions : pointage, paie, visibilité chantier, congés) est CONSERVÉE et alimentée par déclencheur.
---
--- CONTRÔLE PRÉALABLE EN PRODUCTION (lecture seule) : `select count(*) from public.planning_evenements`
--- — la table existe depuis 20260710000009, n'est écrite par aucun écran ; ce lot l'étend. Si elle
--- contient des lignes, leur `type` reste accepté (l'ancienne liste est conservée dans la contrainte).
---
---   1. évènements horodatés : types, couleur, client, journée entière, adresse, lot, auteur
---   2. ressources matérielles, équipes et membres, disponibilités
---   3. affectations d'un évènement (salarié, équipe, ressource) ; une ressource ne se réserve pas deux fois
---   4. compatibilité : `affectations` (jour + heures) maintenue par déclencheur, marquée `notes = 'PLN:<id>'`
---   5. conflits (signalés) ; RPC d'enregistrement et de suppression ; historique
---   6. RLS et droits (acces_planning, gerer_planning, affecter_ressources)
--- =====================================================================================================
+-- GP V1 — planning v2 : évènements horodatés, ressources, équipes, conflits, compatibilité affectations
+-- Intégré au ledger le 2026-09-12 (GP V1, lot 0) depuis supabase/proposed/gp-v1-metier-planning.sql.proposed, contenu inchangé.
+-- Rejouable ; additif ; Fresh + Upgrade prouvés (docs/gp-v1, § 19).
+
 do $$
 begin
   if to_regprocedure('public.droit_fin(uuid,text,text)') is null then

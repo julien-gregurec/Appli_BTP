@@ -1,158 +1,175 @@
--- =====================================================================================================
--- PROPOSITION — NON APPLIQUÉE, NON NUMÉROTÉE, HORS supabase/migrations
--- Lot : ELSATIA-GP-V1-METIER — C « grille de devis ligne par ligne »
--- Branche : feat/gp-v1-metier-devis-planning-references-v1
--- =====================================================================================================
---
--- PRÉREQUIS, dans l'ordre : gp-devis-wysiwyg-catalogue-ouvrages-v1, gp-v1-metier-references-internes,
--- gp-v1-metier-bibliotheque. Le bloc 0 le vérifie. AUCUN numéro de ledger réservé. Rejouable.
---
--- Contenu :
---   1. types de lignes (titre, sous-titre, commentaire, sous-total, remise, vide, séparateur, saut de page)
---      sur les lignes de devis ET de facture ; règle : une ligne non chiffrée porte 0 / 0 / 0, un sous-total
---      n'est JAMAIS enregistré comme montant, une remise est un montant négatif à quantité 1
---   2. instantanés de fiche article par ligne (famille, fournisseur, code distributeur), commentaire interne
---   3. coûts de ligne : main-d'œuvre et coefficient, dans la table protégée ; journal des prix étendu
---   4. en-tête du devis : révision (verrou optimiste de l'autosauvegarde), mode de règlement, conditions de
---      paiement, commercial ; références d'affaire et client (A-bis) rendues modifiables
---   5. verrou du devis émis : la référence d'affaire, le commercial et la révision restent libres
---   6. rendu : le commentaire interne et les instantanés fournisseur n'atteignent jamais le document client
---   7. RPC d'enregistrement v2 : signature étendue (révision), retour {id, revision}, validation par type
---   8. duplication et conversion en facture : nouvelles colonnes recopiées
--- =====================================================================================================
+-- GP V1 — droits fins, calcul unique des factures, documents issus
+-- Intégré au ledger le 2026-09-12 (GP V1, lot 0) depuis supabase/proposed/gp-v1-metier-droits-transformations.sql.proposed, contenu inchangé.
+-- Rejouable ; additif ; Fresh + Upgrade prouvés (docs/gp-v1, § 19).
 
 do $$
 begin
-  if to_regclass('public.catalogue_familles') is null or to_regclass('public.lignes_devis_couts') is null then
-    raise exception 'Prérequis absent : appliquer d''abord gp-v1-metier-bibliotheque' using errcode = '55000';
-  end if;
-end $$;
-
-create or replace function pg_temp.ajouter_contrainte(p_table regclass, p_nom text, p_definition text)
-returns void language plpgsql as $$
-begin
-  if not exists (select 1 from pg_constraint where conrelid = p_table and conname = p_nom) then
-    execute format('alter table %s add constraint %I %s', p_table, p_nom, p_definition);
+  if to_regclass('public.historique_objets') is null
+     or not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'lignes_devis' and column_name = 'type_ligne') then
+    raise exception 'Prérequis absent : appliquer d''abord gp-v1-metier-grille-devis' using errcode = '55000';
   end if;
 end $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────────────────────────────
--- 1. Types de lignes
+-- 1. Clés, rattrapage, modèles
 -- ─────────────────────────────────────────────────────────────────────────────────────────────────────
-do $$
-declare v_table text;
+insert into public.permissions_disponibles (cle, module, description) values
+  ('modifier_prix_vente', 'Devis', 'Modifier le prix de vente d’une ligne de devis (sinon : prix du catalogue, ligne existante inchangée)'),
+  ('modifier_remise', 'Devis', 'Accorder ou modifier une remise (globale, de ligne ou de section)'),
+  ('supprimer_devis', 'Devis', 'Supprimer un devis brouillon, refusé ou annulé'),
+  ('transformer_devis', 'Devis', 'Transformer un devis en facture, acompte, situation ou chantier'),
+  ('envoyer_devis', 'Devis', 'Envoyer un devis au client (e-mail) et le passer au statut « envoyé »'),
+  ('affecter_ressources', 'Planning', 'Affecter salariés, équipes et matériel aux évènements du planning')
+on conflict (cle) do update set module = excluded.module, description = excluded.description;
+
+-- Rattrapage : chaque poste reçoit les clés, ouvertes s'il gère déjà les devis (ou le planning).
+insert into public.permissions_poste (entreprise_id, poste_id, cle_permission, autorise)
+select p.entreprise_id, p.id, d.cle,
+       exists (select 1 from public.permissions_poste x
+                where x.poste_id = p.id and x.entreprise_id = p.entreprise_id and x.autorise
+                  and x.cle_permission = case when d.cle = 'affecter_ressources' then 'gerer_planning' else 'gerer_devis' end)
+from public.postes p
+cross join (values ('modifier_prix_vente'), ('modifier_remise'), ('supprimer_devis'), ('transformer_devis'), ('envoyer_devis'), ('affecter_ressources')) d(cle)
+on conflict (entreprise_id, poste_id, cle_permission) do nothing;
+
+update public.modeles_roles_predefinis set permissions = array(
+  select distinct x from unnest(permissions || array['modifier_prix_vente', 'modifier_remise', 'supprimer_devis', 'transformer_devis', 'envoyer_devis']) x
+) where not tous_les_droits and 'gerer_devis' = any (permissions);
+
+update public.modeles_roles_predefinis set permissions = array(
+  select distinct x from unnest(permissions || array['affecter_ressources']) x
+) where not tous_les_droits and 'gerer_planning' = any (permissions);
+
+insert into public.modeles_roles_predefinis (cle, nom, description, ordre, permissions, tous_les_droits) values
+  ('poseur', 'Poseur', 'Terrain : chantiers affectés, devis des chantiers sans prix, planning, pointage, stock et interventions. Aucun prix d’achat, aucune marge.', 12,
+   array['acces_chantiers', 'voir_devis_chantier_sans_prix', 'acces_planning', 'acces_pointage', 'saisir_son_pointage', 'saisir_ses_notes_frais',
+         'demander_ses_conges', 'utiliser_borne_stock', 'effectuer_entree_stock', 'effectuer_sortie_stock', 'acces_stock', 'acces_interventions', 'acces_messagerie'], false),
+  ('commercial', 'Commercial', 'Clients, devis et prix de vente, remises et envoi ; transformation en facture. Ni prix d’achat, ni marge, ni comptabilité.', 35,
+   array['acces_clients', 'gerer_clients', 'acces_chantiers', 'acces_devis', 'gerer_devis', 'acces_ouvrages', 'modifier_prix_vente', 'modifier_remise',
+         'envoyer_devis', 'transformer_devis', 'acces_planning', 'acces_crm', 'gerer_crm', 'acces_messagerie', 'gerer_messagerie'], false)
+on conflict (cle) do update set nom = excluded.nom, description = excluded.description, ordre = excluded.ordre, permissions = excluded.permissions;
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- 2. Droits tenus en base
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- Droit fin « accordé d'office » : ouvert si la clé est accordée ; fermé si elle est explicitement
+-- configurée à faux pour le poste ; sinon HÉRITÉ du droit parent (gerer_devis, gerer_planning). Ainsi un
+-- poste créé hors catalogue, ou avant le rattrapage, ne perd rien ; et l'administrateur peut fermer
+-- finement. Même règle pour l'écran (src/lib/droits-devis.ts).
+create or replace function public.droit_fin(p_entreprise_id uuid, p_cle text, p_parent text)
+returns boolean
+language plpgsql stable security definer set search_path = public as $$
 begin
-  foreach v_table in array array['lignes_devis', 'lignes_factures'] loop
-    execute format($f$
-      alter table public.%1$I
-        add column if not exists type_ligne                  text not null default 'libre',
-        add column if not exists remise_section_pct          numeric(7, 3),
-        add column if not exists commentaire_interne         text,
-        add column if not exists famille_instantane          text,
-        add column if not exists fournisseur_instantane      text,
-        add column if not exists code_fournisseur_instantane text
-    $f$, v_table);
-    perform pg_temp.ajouter_contrainte(format('public.%I', v_table)::regclass, v_table || '_type_ligne_check',
-      $c$check (type_ligne in ('article', 'libre', 'titre', 'sous_titre', 'commentaire', 'sous_total', 'remise', 'vide', 'separateur', 'saut_page'))$c$);
-    -- Règle des montants par type. NOT VALID : les lignes existantes (toutes « libre ») ne sont pas revérifiées.
-    perform pg_temp.ajouter_contrainte(format('public.%I', v_table)::regclass, v_table || '_type_ligne_montants_check',
-      $c$check (case type_ligne
-                 when 'article' then true
-                 when 'libre' then true
-                 when 'remise' then quantite = 1 and prix_unitaire_ht <= 0 and remise_ligne = 0
-                 else quantite = 0 and prix_unitaire_ht = 0 and remise_ligne = 0 end) not valid$c$);
-    perform pg_temp.ajouter_contrainte(format('public.%I', v_table)::regclass, v_table || '_grille_longueurs_check',
-      $c$check ((remise_section_pct is null or remise_section_pct between 0 and 100)
-                and coalesce(length(commentaire_interne), 0) <= 2000
-                and coalesce(length(famille_instantane), 0) <= 250
-                and coalesce(length(fournisseur_instantane), 0) <= 200
-                and coalesce(length(code_fournisseur_instantane), 0) <= 120)$c$);
-  end loop;
+  if public.a_permission(p_entreprise_id, p_cle) then
+    return true;
+  end if;
+  if exists (
+    select 1
+    from public.utilisateurs_entreprises ue
+    join public.permissions_poste pp on pp.poste_id = ue.poste_id and pp.entreprise_id = ue.entreprise_id
+    where ue.utilisateur_id = auth.uid() and ue.entreprise_id = p_entreprise_id and pp.cle_permission = p_cle
+  ) then
+    return false;
+  end if;
+  return public.a_permission(p_entreprise_id, p_parent);
 end $$;
+revoke all on function public.droit_fin(uuid, text, text) from public, anon, service_role;
+grant execute on function public.droit_fin(uuid, text, text) to authenticated;
 
--- ─────────────────────────────────────────────────────────────────────────────────────────────────────
--- 3. Coûts de ligne : main-d'œuvre, coefficient ; journal des prix étendu
--- ─────────────────────────────────────────────────────────────────────────────────────────────────────
-alter table public.lignes_devis_couts
-  add column if not exists cout_main_oeuvre_ht numeric(12, 4) not null default 0,
-  add column if not exists coefficient         numeric(8, 4);
-select pg_temp.ajouter_contrainte('public.lignes_devis_couts', 'lignes_devis_couts_mo_coef_check',
-  'check (cout_main_oeuvre_ht >= 0 and (coefficient is null or (coefficient > 0 and coefficient <= 1000)))');
+drop policy if exists devis_suppression_droit on public.devis;
+create policy devis_suppression_droit on public.devis as restrictive for delete to authenticated
+  using (public.droit_fin(entreprise_id, 'supprimer_devis', 'gerer_devis'));
 
-alter table public.devis_prix_journal drop constraint if exists devis_prix_journal_champ_check;
-alter table public.devis_prix_journal add constraint devis_prix_journal_champ_check
-  check (champ in ('prix_unitaire_ht', 'quantite', 'remise_ligne', 'prix_achat_ht', 'remise_globale', 'cout_main_oeuvre_ht', 'coefficient'));
-
-drop policy if exists devis_prix_journal_lecture on public.devis_prix_journal;
-create policy devis_prix_journal_lecture on public.devis_prix_journal as restrictive for select to authenticated
-  using (public.a_permission(entreprise_id, 'acces_devis')
-         and (champ not in ('prix_achat_ht', 'cout_main_oeuvre_ht', 'coefficient') or public.a_permission(entreprise_id, 'voir_couts_devis')));
-
--- ─────────────────────────────────────────────────────────────────────────────────────────────────────
--- 4. En-tête du devis
--- ─────────────────────────────────────────────────────────────────────────────────────────────────────
-alter table public.devis
-  add column if not exists revision              integer not null default 0,
-  add column if not exists mode_reglement        text,
-  add column if not exists conditions_paiement   text,
-  add column if not exists commercial_employe_id uuid references public.employes (id) on delete set null;
-select pg_temp.ajouter_contrainte('public.devis', 'devis_entete_grille_check',
-  'check (revision >= 0 and coalesce(length(mode_reglement), 0) <= 60 and coalesce(length(conditions_paiement), 0) <= 500)');
-alter table public.factures
-  add column if not exists mode_reglement      text,
-  add column if not exists conditions_paiement text;
-
--- ─────────────────────────────────────────────────────────────────────────────────────────────────────
--- 5. Verrou du devis émis : champs internes qui restent libres
--- ─────────────────────────────────────────────────────────────────────────────────────────────────────
-create or replace function public.verrouiller_devis_emis()
+-- Passage au statut « envoyé » : droit d'envoi. Un chemin sans utilisateur (migration, tâche serveur)
+-- n'est pas concerné.
+create or replace function public.verifier_droit_envoi_devis()
 returns trigger language plpgsql security definer set search_path = public as $$
-declare
-  v_old jsonb;
-  v_new jsonb;
-  v_libre text;
 begin
-  if tg_op = 'DELETE' then
-    return old;
-  end if;
-  if old.statut <> 'brouillon' then
-    if new.statut = 'brouillon' then
-      raise exception 'Ce devis a déjà été émis et ne peut pas redevenir brouillon.';
-    end if;
-    v_old := to_jsonb(old);
-    v_new := to_jsonb(new);
-    foreach v_libre in array array[
-      'statut', 'email_envoye_le', 'email_envoye_a', 'relance_auto_exclue', 'notes_internes',
-      'chantier_id', 'updated_at', 'client_snapshot', 'client_snapshot_at',
-      'reference_interne', 'commercial_employe_id', 'revision'
-    ] loop
-      v_old := v_old - v_libre;
-      v_new := v_new - v_libre;
-    end loop;
-    if v_old is distinct from v_new then
-      raise exception 'Ce devis a déjà été émis et ne peut plus être modifié.';
-    end if;
+  if new.statut = 'envoye' and old.statut is distinct from 'envoye' and auth.uid() is not null
+     and not public.droit_fin(new.entreprise_id, 'envoyer_devis', 'gerer_devis') then
+    raise exception 'Accès refusé : envoyer un devis exige le droit « envoyer_devis ».' using errcode = '42501';
   end if;
   return new;
 end $$;
 
--- ─────────────────────────────────────────────────────────────────────────────────────────────────────
--- 6. Rendu : rien d'interne vers le client
--- ─────────────────────────────────────────────────────────────────────────────────────────────────────
-create or replace function public.ligne_pour_rendu(p_ligne jsonb)
-returns jsonb language sql immutable as $$
-  select p_ligne - 'devis_id' - 'facture_id' - 'parametres_quantite' - 'detail_calcul' - 'quantite_forcee'
-                 - 'source_id' - 'created_at'
-                 - 'commentaire_interne' - 'fournisseur_instantane' - 'code_fournisseur_instantane' - 'famille_instantane'
-$$;
+drop trigger if exists aa_droit_envoi_devis on public.devis;
+create trigger aa_droit_envoi_devis
+  before update of statut on public.devis
+  for each row execute function public.verifier_droit_envoi_devis();
 
--- ─────────────────────────────────────────────────────────────────────────────────────────────────────
--- 7. RPC d'enregistrement v2 — signature étendue
--- ─────────────────────────────────────────────────────────────────────────────────────────────────────
--- `p_revision` : révision lue par l'éditeur ; si elle ne correspond plus (un autre onglet, un autre poste a
--- enregistré entre-temps), l'enregistrement est REFUSÉ (40001) : jamais d'écrasement silencieux. `null`
--- (appelant historique) : aucun contrôle. Retour {id, revision}.
-drop function if exists public.enregistrer_devis_brouillon_v2(uuid, uuid, jsonb, jsonb, jsonb, jsonb);
+-- Prix de vente et remises : comparés aux lignes ENREGISTRÉES (clé stable) et au catalogue.
+create or replace function public.verifier_droits_prix_devis(p_entreprise_id uuid, p_devis_id uuid, p_devis jsonb, p_lignes jsonb)
+returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_prix boolean := public.droit_fin(p_entreprise_id, 'modifier_prix_vente', 'gerer_devis');
+  v_remise boolean := public.droit_fin(p_entreprise_id, 'modifier_remise', 'gerer_devis');
+  v_remise_globale numeric := 0;
+  n record;
+  v_a_prix numeric;
+  v_a_remise numeric;
+  v_a_pct numeric;
+  v_catalogue numeric;
+begin
+  if v_prix and v_remise then
+    return;
+  end if;
+  if p_devis_id is not null then
+    select remise_globale into v_remise_globale from public.devis where id = p_devis_id;
+  end if;
+  if not v_remise and coalesce((p_devis ->> 'remise_globale')::numeric, 0) <> coalesce(v_remise_globale, 0) then
+    raise exception 'Vos droits ne permettent pas de modifier la remise globale.' using errcode = '42501';
+  end if;
+
+  for n in
+    select l.cle_ligne, coalesce(l.type_ligne, 'libre') as type_ligne, l.ouvrage_cle, l.source_catalogue, l.source_id,
+           l.prix_unitaire_ht, coalesce(l.remise_ligne, 0) as remise_ligne, l.remise_section_pct
+    from jsonb_to_recordset(p_lignes) as l(cle_ligne text, type_ligne text, ouvrage_cle text, source_catalogue text, source_id uuid,
+                                           prix_unitaire_ht numeric, remise_ligne numeric, remise_section_pct numeric)
+  loop
+    v_a_prix := null; v_a_remise := null; v_a_pct := null;
+    if p_devis_id is not null then
+      select prix_unitaire_ht, remise_ligne, remise_section_pct into v_a_prix, v_a_remise, v_a_pct
+      from public.lignes_devis where devis_id = p_devis_id and cle_ligne = n.cle_ligne;
+    end if;
+
+    if not v_remise then
+      if n.remise_ligne <> coalesce(v_a_remise, 0) then
+        raise exception 'Vos droits ne permettent pas d''accorder une remise de ligne.' using errcode = '42501';
+      end if;
+      if n.type_ligne = 'remise' and (v_a_prix is null
+          or v_a_prix <> n.prix_unitaire_ht or v_a_pct is distinct from n.remise_section_pct) then
+        raise exception 'Vos droits ne permettent pas d''ajouter ou de modifier une ligne de remise.' using errcode = '42501';
+      end if;
+    end if;
+
+    if not v_prix and n.type_ligne in ('article', 'libre') and n.ouvrage_cle is null then
+      if v_a_prix is not null then
+        if v_a_prix <> n.prix_unitaire_ht then
+          raise exception 'Vos droits ne permettent pas de modifier un prix de vente.' using errcode = '42501';
+        end if;
+      elsif n.source_id is not null then
+        if n.source_catalogue = 'article' then
+          select prix_vente_ht into v_catalogue from public.articles_stock where id = n.source_id and entreprise_id = p_entreprise_id;
+        else
+          select prix_unitaire_ht into v_catalogue from public.prestations_catalogue where id = n.source_id and entreprise_id = p_entreprise_id;
+        end if;
+        if v_catalogue is null or v_catalogue <> n.prix_unitaire_ht then
+          raise exception 'Vos droits imposent le prix du catalogue pour un article inséré.' using errcode = '42501';
+        end if;
+      elsif n.prix_unitaire_ht <> 0 then
+        raise exception 'Vos droits ne permettent pas de fixer un prix de vente sur une ligne libre.' using errcode = '42501';
+      end if;
+    end if;
+  end loop;
+end $$;
+
+revoke all on function public.verifier_droits_prix_devis(uuid, uuid, jsonb, jsonb) from public, anon, service_role;
+grant execute on function public.verifier_droits_prix_devis(uuid, uuid, jsonb, jsonb) to authenticated;
+
 create or replace function public.enregistrer_devis_brouillon_v2(
   p_entreprise_id uuid,
   p_devis_id      uuid,
@@ -177,6 +194,8 @@ begin
   if not public.a_permission(p_entreprise_id, 'gerer_devis') then
     raise exception 'Accès refusé' using errcode = '42501';
   end if;
+  -- GP V1 (lot D) : droits fins sur le prix de vente et les remises, vérifiés EN BASE.
+  perform public.verifier_droits_prix_devis(p_entreprise_id, p_devis_id, p_devis, p_lignes);
   if jsonb_typeof(coalesce(p_lignes, 'null'::jsonb)) <> 'array' or jsonb_array_length(p_lignes) = 0 then
     raise exception 'Un devis compte au moins une ligne.';
   end if;
@@ -359,73 +378,9 @@ begin
   return jsonb_build_object('id', v_id, 'revision', v_revision);
 end $$;
 
+
 revoke all on function public.enregistrer_devis_brouillon_v2(uuid, uuid, jsonb, jsonb, jsonb, jsonb, integer) from public, anon, service_role;
 grant execute on function public.enregistrer_devis_brouillon_v2(uuid, uuid, jsonb, jsonb, jsonb, jsonb, integer) to authenticated;
-
--- ─────────────────────────────────────────────────────────────────────────────────────────────────────
--- 8. Duplication et conversion en facture : nouvelles colonnes recopiées
--- ─────────────────────────────────────────────────────────────────────────────────────────────────────
-create or replace function public.dupliquer_devis(p_devis_id uuid)
-returns uuid
-language plpgsql
-set search_path = public
-as $$
-declare
-  v_source public.devis;
-  v_nouveau_id uuid;
-begin
-  select * into v_source from public.devis where id = p_devis_id;
-  if not found then
-    raise exception 'Devis introuvable';
-  end if;
-
-  insert into public.devis (
-    entreprise_id, client_id, chantier_id, statut, date_emission,
-    date_validite, conditions, notes_client, notes_internes, remise_globale, filigrane, moteur_presentation,
-    reference_interne, reference_client, mode_reglement, conditions_paiement, commercial_employe_id, revision
-  ) values (
-    v_source.entreprise_id, v_source.client_id, v_source.chantier_id, 'brouillon', current_date,
-    null, v_source.conditions, v_source.notes_client, v_source.notes_internes, v_source.remise_globale,
-    v_source.filigrane, v_source.moteur_presentation,
-    v_source.reference_interne, v_source.reference_client, v_source.mode_reglement, v_source.conditions_paiement,
-    v_source.commercial_employe_id, 1
-  ) returning id into v_nouveau_id;
-
-  insert into public.devis_ouvrages (
-    devis_id, entreprise_id, cle, ordre, ouvrage_id, ouvrage_version, ouvrage_reference, ouvrage_nom,
-    categorie, unite_principale, quantite_principale, options, saisies, libelle_client, description_client,
-    mode_presentation, instantane_modele, modifications_manuelles
-  )
-  select v_nouveau_id, o.entreprise_id, o.cle, o.ordre, o.ouvrage_id, o.ouvrage_version, o.ouvrage_reference,
-         o.ouvrage_nom, o.categorie, o.unite_principale, o.quantite_principale, o.options, o.saisies,
-         o.libelle_client, o.description_client, o.mode_presentation, o.instantane_modele, o.modifications_manuelles
-  from public.devis_ouvrages o where o.devis_id = p_devis_id;
-
-  insert into public.lignes_devis (
-    devis_id, designation, description, type, quantite, unite, prix_unitaire_ht, remise_ligne, taux_tva, ordre,
-    cle_ligne, ouvrage_cle, origine_ligne, source_catalogue, source_id, reference_interne_instantane,
-    reference_fabricant_instantane, nature, parametres_quantite, quantite_forcee, visible_client,
-    afficher_quantite, afficher_prix, description_client_personnalisee, motif_ajustement, detail_calcul,
-    type_ligne, remise_section_pct, commentaire_interne, famille_instantane, fournisseur_instantane, code_fournisseur_instantane
-  )
-  select v_nouveau_id, designation, description, type, quantite, unite, prix_unitaire_ht, remise_ligne, taux_tva, ordre,
-         cle_ligne, ouvrage_cle, origine_ligne, source_catalogue, source_id, reference_interne_instantane,
-         reference_fabricant_instantane, nature, parametres_quantite, quantite_forcee, visible_client,
-         afficher_quantite, afficher_prix, description_client_personnalisee, motif_ajustement, detail_calcul,
-         type_ligne, remise_section_pct, commentaire_interne, famille_instantane, fournisseur_instantane, code_fournisseur_instantane
-  from public.lignes_devis
-  where devis_id = p_devis_id
-  order by ordre;
-
-  if public.a_permission(v_source.entreprise_id, 'gerer_couts_devis') then
-    insert into public.lignes_devis_couts (devis_id, cle_ligne, entreprise_id, prix_achat_ht, cout_main_oeuvre_ht, coefficient)
-    select v_nouveau_id, c.cle_ligne, c.entreprise_id, c.prix_achat_ht, c.cout_main_oeuvre_ht, c.coefficient
-    from public.lignes_devis_couts c where c.devis_id = p_devis_id;
-  end if;
-
-  return v_nouveau_id;
-end;
-$$;
 
 create or replace function public.creer_facture_depuis_devis(p_devis_id uuid, p_type text default 'simple')
 returns uuid
@@ -444,6 +399,9 @@ begin
   if not public.est_membre_actif(v_devis.entreprise_id) then raise exception 'Accès refusé'; end if;
   if not public.a_permission(v_devis.entreprise_id, 'gerer_factures') then
     raise exception 'Accès refusé : la création de facture exige le droit de gérer les factures.' using errcode = '42501';
+  end if;
+  if not public.droit_fin(v_devis.entreprise_id, 'transformer_devis', 'gerer_devis') then
+    raise exception 'Accès refusé : transformer un devis exige le droit « transformer_devis ».' using errcode = '42501';
   end if;
   if v_devis.statut <> 'accepte' then raise exception 'Le devis doit etre accepte avant facturation'; end if;
   if v_devis.client_id is null then raise exception 'Le devis doit etre rattache a un client'; end if;
@@ -498,7 +456,54 @@ begin
 end;
 $$;
 
+
 revoke all on function public.creer_facture_depuis_devis(uuid, text) from public, anon;
 grant execute on function public.creer_facture_depuis_devis(uuid, text) to authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- 3. Historique des devis et factures
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+create or replace function public.trg_historique_document()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if tg_op = 'INSERT' then
+    perform public.journaliser_objet(new.entreprise_id, tg_argv[0], new.id, 'creation', null, null,
+      jsonb_build_object('libelle', coalesce(new.numero, 'brouillon'), 'statut', new.statut), false);
+    return null;
+  end if;
+  if old.statut is distinct from new.statut then
+    perform public.journaliser_objet(new.entreprise_id, tg_argv[0], new.id, 'statut_modifie', 'statut',
+      to_jsonb(old.statut), to_jsonb(new.statut), false);
+  end if;
+  if old.numero is distinct from new.numero and new.numero is not null then
+    perform public.journaliser_objet(new.entreprise_id, tg_argv[0], new.id, 'numero_attribue', 'numero', to_jsonb(old.numero), to_jsonb(new.numero), false);
+  end if;
+  return null;
+end $$;
+
+drop trigger if exists gp_historique_document on public.devis;
+create trigger gp_historique_document after insert or update of statut, numero on public.devis
+  for each row execute function public.trg_historique_document('devis');
+drop trigger if exists gp_historique_document on public.factures;
+create trigger gp_historique_document after insert or update of statut, numero on public.factures
+  for each row execute function public.trg_historique_document('facture');
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+-- 4. Documents issus d'un devis (SECURITY INVOKER : chacun ne voit que ce que la RLS lui montre)
+-- ─────────────────────────────────────────────────────────────────────────────────────────────────────
+create or replace function public.documents_issus_devis(p_devis_id uuid)
+returns jsonb language sql stable security invoker set search_path = public as $$
+  select jsonb_build_object(
+    'factures', coalesce((select jsonb_agg(jsonb_build_object('id', f.id, 'numero', f.numero, 'type', f.type, 'statut', f.statut,
+                                'montant_ttc', f.montant_ttc, 'date_emission', f.date_emission, 'facture_origine_id', f.facture_origine_id) order by f.created_at)
+                          from public.factures f where f.devis_origine_id = p_devis_id), '[]'::jsonb),
+    'situations', coalesce((select jsonb_agg(jsonb_build_object('id', s.id, 'numero', s.numero, 'statut', s.statut,
+                                  'montant_periode_ht', s.montant_periode_ht, 'date_situation', s.date_situation, 'facture_id', s.facture_id) order by s.date_situation)
+                            from public.situations_travaux s where s.devis_id = p_devis_id), '[]'::jsonb),
+    'chantiers', coalesce((select jsonb_agg(jsonb_build_object('id', c.id, 'nom', c.nom, 'statut', c.statut))
+                           from public.chantiers c where c.devis_source_id = p_devis_id), '[]'::jsonb))
+$$;
+revoke all on function public.documents_issus_devis(uuid) from public, anon, service_role;
+grant execute on function public.documents_issus_devis(uuid) to authenticated;
 
 notify pgrst, 'reload schema';

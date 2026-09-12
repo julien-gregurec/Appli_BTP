@@ -1,5 +1,5 @@
 -- =====================================================================================================
--- PREUVE pgTAP PROPOSÉE — ELSATIA-GP-V1-METIER, lot D « droits fins, transformations, documents issus »
+-- PREUVE pgTAP (intégrée au ledger le 2026-09-12, GP V1 lot 0) — ELSATIA-GP-V1-METIER, lot D « droits fins, transformations, documents issus »
 -- =====================================================================================================
 -- Acteurs : A dirigeant …-0006 (tous droits) ; A conducteur …-0004 (gerer_devis → reçoit les clés fines,
 -- puis on lui en retire pour prouver les refus) ; A ouvrier …-0002 ; A comptable …-0005 (gerer_factures).
@@ -8,7 +8,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 select * from no_plan();
 
-\ir ../tests/fixtures/isolation_multitenant.inc
+\ir fixtures/isolation_multitenant.inc
 
 create or replace function pg_temp.jwt(p_sub uuid) returns void language plpgsql as $$
 begin

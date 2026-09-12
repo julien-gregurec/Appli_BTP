@@ -1,15 +1,7 @@
--- =====================================================================================================
--- PROPOSITION — NON APPLIQUÉE, NON NUMÉROTÉE, HORS supabase/migrations
--- Lot : ELSATIA-GP-V1-METIER — E « recherche globale, dernières actions »
--- Branche : feat/gp-v1-metier-devis-planning-references-v1
--- =====================================================================================================
--- PRÉREQUIS : références internes (normaliser_reference, historique_objets), grille, droits. Rejouable.
---
---   1. création des tiers et commandes journalisée (pour « dernières actions »)
---   2. recherche_globale : référence, numéro, nom, désignation, adresse, téléphone, e-mail — SECURITY
---      INVOKER : la RLS de chaque table filtre, un poste sans accès à un module n'en voit rien
---   3. dernieres_actions : les derniers objets touchés PAR L'UTILISATEUR, sous la RLS de l'historique
--- =====================================================================================================
+-- GP V1 — recherche globale, dernières actions
+-- Intégré au ledger le 2026-09-12 (GP V1, lot 0) depuis supabase/proposed/gp-v1-metier-recherche-globale.sql.proposed, contenu inchangé.
+-- Rejouable ; additif ; Fresh + Upgrade prouvés (docs/gp-v1, § 19).
+
 do $$
 begin
   if to_regprocedure('public.journaliser_objet(uuid,text,uuid,text,text,jsonb,jsonb,boolean)') is null

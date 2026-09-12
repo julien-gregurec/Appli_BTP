@@ -12,8 +12,8 @@ describe("droits fins du devis", () => {
     expect(possedeDroitFin(["acces_devis"], "envoyer_devis")).toBe(false);
     expect(possedeDroitFin([], "transformer_devis")).toBe(false);
   });
-  it("les six clés sont déclarées à l'identique dans le SQL proposé", () => {
-    const sql = readFileSync(path.join(process.cwd(), "supabase/proposed/gp-v1-metier-droits-transformations.sql.proposed"), "utf8");
+  it("les six clés sont déclarées à l'identique dans la migration 286", () => {
+    const sql = readFileSync(path.join(process.cwd(), "supabase/migrations/20260912000286_gp_v1_droits_fins_transformations.sql"), "utf8");
     for (const cle of Object.keys(DROITS_FINS_DEVIS)) expect(sql).toContain(`('${cle}', `);
   });
 });

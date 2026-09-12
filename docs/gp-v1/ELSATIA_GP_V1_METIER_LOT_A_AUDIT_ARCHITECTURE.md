@@ -745,3 +745,54 @@ Business, Entreprise : oui), et seulement ensuite le lot 0.
 
 **Conditions du GO** (§ 18.7) : 1 (lot 0) reste ouverte ; 2 (`works`) **fermée** ; 3 (15/15, fixture)
 **fermée** ; 4 (e-mail réel) ouverte ; 5 inchangée.
+
+## 19. Lot 0 — intégration du SQL au ledger (livré)
+
+Lancé après la passe E2E 15/15 (§ 18.8), conformément à l'ordre fixé par Julien.
+
+### 19.1 Numérotation et collisions
+
+| Numéro | Fichier | Origine (proposé, contenu inchangé) |
+|---|---|---|
+| 282 | `20260912000282_gp_devis_v2_catalogue_ouvrages.sql` (1 662 l.) | `gp-devis-wysiwyg-catalogue-ouvrages-v1` |
+| 283 | `20260912000283_gp_v1_references_internes.sql` | A-bis |
+| 284 | `20260912000284_gp_v1_bibliotheque_articles_ouvrages.sql` | B |
+| 285 | `20260912000285_gp_v1_grille_devis.sql` | C |
+| 286 | `20260912000286_gp_v1_droits_fins_transformations.sql` | D |
+| 287 | `20260912000287_gp_v1_recherche_globale.sql` | E |
+| 288 | `20260912000288_gp_v1_planning_v2.sql` | F |
+| 289 | `20260912000289_gp_v1_envoi_documents.sql` | G |
+
+Collision vérifiée sur **toutes** les branches distantes (`git ls-tree` après `git fetch`) : le numéro 281
+est pris par `20260909000281_colors_finition_reference_nuancier_v15.sql` (branche Colors, non fusionnée) et
+laissé libre ; une branche « studio » porte un préfixe hors convention (`20260912140000`), postérieur aux
+nôtres. Aucun numéro ≥ 282 n'existait ailleurs. `verify:migrations` : **286 migrations valides, noms et
+horodatages uniques**. Seul l'en-tête « proposition » a été remplacé par un en-tête de migration ; le corps
+est identique aux fichiers proposés recettés aux lots précédents. Les huit preuves pgTAP ont été déplacées
+dans `supabase/tests/gp_*.test.sql` (chemin des fixtures ajusté) ; deux tests Vitest de cohérence TS/SQL
+lisent désormais les migrations 283 et 286. Restent en `supabase/proposed` deux fichiers d'autres lots
+(`devis-references-articles-selection-multiple`, remplacé par la 282 comme son en-tête l'indique, et
+`pointage-origine-hors-ligne`).
+
+### 19.2 Preuves Fresh + Upgrade (conteneurs Postgres jetables, image Supabase 17.6.1.143 + prélude storage)
+
+| Scénario | Résultat | Schéma obtenu |
+|---|---|---|
+| **Fresh** : 286 migrations d'un coup | OK, 0 erreur | 241 tables, 613 fonctions, `planning_evenements` et `modeles_email` présentes |
+| **Upgrade depuis 280** (état précédent du ledger) : 278 puis les 8 | OK | identique |
+| **Upgrade depuis 210** (Production) : 202 puis 84 | OK | identique |
+| Suite pgTAP complète sur le Fresh : **78 fichiers** (70 historiques + 8 GP V1) | **2 273 ok / 0 échec / 0 erreur** | — dont `reserves_v2_terrain_capture` 94/94 : son « échec préexistant » venait de la base jetable clonée, pas du ledger |
+
+### 19.3 Drapeaux et tests finaux
+
+- `GP_DEVIS_V2` et `GP_PLANNING_V2` documentés dans `.env.example` et `.env.preview.example` (à 0 ; à poser à 1
+  sur un environnement **après** application des migrations 282..289 — la pose effective sur Preview ou
+  Production est un geste de déploiement, hors de ce lot).
+- Vitest : suite complète verte hormis les deux tests du webhook Boutique, qui échouent seulement sous la
+  charge de la suite complète et passent seuls (préexistant, identique à `516469d`) ; typecheck et lint à 0.
+- Poussé sur la branche, sans fusion ni déploiement.
+
+**Conditions du GO (§ 18.7) après ce lot** : 1 (lot 0) **fermée** ; 2 (`works`) fermée ; 3 (15/15, fixture)
+fermée ; 4 (e-mail Brevo réel) ouverte ; 5 (rappels des lots précédents) ouverte. Le verdict passe à
+**GO V1 COMMERCIALISABLE SOUS DEUX RÉSERVES MINEURES** : un envoi d'e-mail réel avec une clé Brevo de test,
+et les trois compléments listés au § 18.7-5, aucun n'étant bloquant pour la mise en service.
