@@ -134,6 +134,8 @@ export function appliquerSelectionArticles(
       ordre: ordreMax + k + 1,
       ligne: {
         cle,
+        // Ligne issue du catalogue : type de ligne « Article » (la grille affichait « Libre » — recette preview).
+        typeLigne: "article",
         designation: l.designation,
         description: l.description,
         type: typeDeLigne(l.typeLigne, l.sourceCatalogue),
