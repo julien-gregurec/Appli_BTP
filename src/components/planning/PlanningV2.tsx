@@ -363,10 +363,13 @@ const LigneGrille = memo(function LigneGrille({ ligne, vue, jours, heures, pxHeu
             tabIndex={0}
             aria-label={`${b.evenement.titre}, ${heureFr(b.evenement.debut)} à ${heureFr(b.evenement.fin)}${conflits.length ? `, ${conflits.length} conflit` : ""}`}
             title={`${b.evenement.titre}\n${heureFr(b.evenement.debut)}–${heureFr(b.evenement.fin)}${b.evenement.adresse ? `\n${b.evenement.adresse}` : ""}${conflits.length ? `\n⚠ ${conflits.map((c) => c.detail).join(" · ")}` : ""}`}
-            onPointerDown={(e) => onGlisser(e, b, "deplacer")}
+            // Le focus est posé explicitement au pointeur : le glisser-déposer capture l'évènement et, sans
+            // cela, Entrée après un clic n'atteignait jamais le bloc (recette preview). Entrée ou Espace ouvre
+            // le détail ; Suppr est laissé au dialogue (suppression confirmée).
+            onPointerDown={(e) => { e.currentTarget.focus(); onGlisser(e, b, "deplacer"); }}
             onClick={() => onSelection(b.evenement.id)}
             onDoubleClick={() => onOuvrir(b.evenement)}
-            onKeyDown={(e) => { if (e.key === "Enter") onOuvrir(b.evenement); }}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelection(b.evenement.id); onOuvrir(b.evenement); } }}
             className={`absolute cursor-grab select-none overflow-hidden rounded px-1.5 py-0.5 text-[11px] leading-tight text-white shadow-sm active:cursor-grabbing ${selection === b.evenement.id ? "ring-2 ring-blue-500 ring-offset-1" : ""} ${b.evenement.statut === "termine" ? "opacity-60" : ""}`}
             style={{ ...s, background: couleurDe(b.evenement), borderLeft: conflits.length ? "3px solid #b45309" : undefined }}
           >

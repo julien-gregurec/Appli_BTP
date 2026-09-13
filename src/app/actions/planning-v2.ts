@@ -12,6 +12,21 @@ import { STATUTS_EVENEMENT, TYPES_EVENEMENT, type Evenement } from "@/lib/planni
 // DEFINER à vérifications explicites, déclencheurs de compatibilité et de ressources).
 const INACTIF = { error: "Le nouveau planning n’est pas encore activé." };
 
+/**
+ * Les règles métier de la base (24 h planifiées par jour et par salarié, chevauchements interdits d'une
+ * ressource…) sont rendues avec leur message, pour que le dialogue explique le refus au lieu d'un repli
+ * générique (constaté en recette preview) ; toute autre erreur garde le repli.
+ */
+const REGLES_METIER_PLANNING: ReadonlyArray<[RegExp, string]> = [
+  [/24 heures planifiées par jour/i, "Ce salarié dépasserait 24 heures planifiées ce jour-là. Réduisez la durée ou déplacez un autre de ses évènements."],
+  [/La fin doit suivre le début/i, "La fin doit suivre le début."],
+];
+function messageErreurPlanning(erreur: unknown, repli: string): string {
+  const texte = erreur instanceof Error ? erreur.message : typeof erreur === "object" && erreur !== null ? ["message", "details", "hint"].map((k) => String((erreur as Record<string, unknown>)[k] ?? "")).join(" ") : String(erreur ?? "");
+  for (const [motif, message] of REGLES_METIER_PLANNING) if (motif.test(texte)) { console.error("enregistrerEvenementAction", erreur); return message; }
+  return messageErreurUtilisateur("enregistrerEvenementAction", erreur, repli);
+}
+
 export async function enregistrerEvenementAction(e: Evenement): Promise<{ id: string } | { error: string }> {
   if (!planningV2Actif()) return INACTIF;
   const ctx = await getContexteEntreprise();
@@ -33,7 +48,7 @@ export async function enregistrerEvenementAction(e: Evenement): Promise<{ id: st
     },
     p_affectations: (e.affectations ?? []).map((a) => ({ employe_id: a.employeId ?? null, equipe_id: a.equipeId ?? null, ressource_id: a.ressourceId ?? null })),
   });
-  if (error || !data) return { error: messageErreurUtilisateur("enregistrerEvenementAction", error, "Impossible d’enregistrer cet évènement.") };
+  if (error || !data) return { error: messageErreurPlanning(error, "Impossible d’enregistrer cet évènement.") };
   revalidatePath("/planning");
   return { id: String(data) };
 }
