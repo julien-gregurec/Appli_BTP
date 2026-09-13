@@ -24,3 +24,13 @@ describe("badgePreviewVisible", () => {
     expect(badgePreviewVisible({ drapeau: "1", vercelEnv: undefined, appUrl: "n'importe quoi" })).toBe(true);
   });
 });
+
+describe("environnementPreviewActif — accès démo de la page de connexion", () => {
+  it("suit exactement le verrou du badge : preview oui, Production jamais", async () => {
+    const { environnementPreviewActif } = await import("./badge-preview");
+    expect(environnementPreviewActif({ drapeau: "1", vercelEnv: "preview", appUrl: "https://elsatia-preview.vercel.app" })).toBe(true);
+    expect(environnementPreviewActif({ drapeau: "1", vercelEnv: "production", appUrl: "https://elsatia-preview.vercel.app" })).toBe(false);
+    expect(environnementPreviewActif({ drapeau: "1", vercelEnv: undefined, appUrl: "https://app.elsatia.fr" })).toBe(false);
+    expect(environnementPreviewActif({ drapeau: undefined, vercelEnv: "preview", appUrl: undefined })).toBe(false);
+  });
+});
