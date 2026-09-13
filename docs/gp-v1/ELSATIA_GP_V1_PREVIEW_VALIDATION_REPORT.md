@@ -236,7 +236,7 @@ Aucun `entreprise_feature_flags`, aucun override de recette : la visibilité vie
 | Copier / coller de lignes | ⚠️ non présent en tant que tel (duplication oui) |
 | Aperçu A4 fidèle au PDF, en-tête complet | ✅ |
 | Grille pleine largeur | ✅ après correction (« Masquer l'aperçu ») ; par défaut l'aperçu prend la moitié ⚠️ à trancher |
-| Fiche devis (lecture) : lignes de structure affichées « Fourniture · 0 u · 0,00 € », ouvrage éclaté | ⚠️ présentation à aligner sur la v2 |
+| Fiche devis (lecture) : structure sans montant, ouvrage regroupé, remise, sous-total calculé | ✅ après correction `2e67d69` (capture 37) |
 | PDF téléchargeable depuis la preview | ✅ après correction (§ 13-14 : indice de runtime AL2023 ; 502 avant) |
 
 **Planning**
@@ -247,8 +247,8 @@ Aucun `entreprise_feature_flags`, aucun override de recette : la visibilité vie
 | Horaires, chantier, client, adresse, couleur, notes | ✅ |
 | Absences / congés, conflits (salarié doublé, congé, disponibilités, surcharge) | ✅ |
 | Filtres (type, chantier, recherche) | ✅ |
-| Temps de réponse avec 400 évènements | ⚠️ 6,5 s de rendu serveur (§ 12) ; correctif SQL prêt (migration 290, non appliquée) |
-| Bouton « Compacte » actif peu lisible (texte clair sur fond clair) | ⚠️ cosmétique |
+| Temps de réponse avec 400 évènements | ✅ 2,6-3,2 s après la migration 290 (§ 17) ; reste le coût RLS plateforme ⚠️ |
+| Bouton de vue actif lisible au survol | ✅ après correction `2e67d69` |
 
 ## 12. Performance mesurée sur la preview (Vercel fra1 → Supabase eu-west-3, Chromium 1440 × 900)
 
@@ -329,7 +329,7 @@ Aucune modification de Production, aucune fusion, aucun déploiement Production,
 | Typecheck | `tsc --noEmit` : 0 erreur |
 | Lint | `npm run lint` : 0 erreur, 8 avertissements préexistants (`no-unused-vars`) |
 | Tests unitaires | vitest 2 380 tests : 2 373 verts, 3 ignorés ; sous charge 4 échecs (stripe webhook ×2, surface remises legacy, xlsx) qui **passent tous rejoués seuls** — `xlsx.test.ts` est connu pour dépasser 5 s sous charge |
-| Migrations | `verify-migrations` : 287 fichiers valides ; preview au ledger 289 (290 prête, non appliquée) ; pgTAP GP V1 : preuve du Fresh (§ 19 métier) + planning 25/25 et surface 10/10 avec la 290 |
+| Migrations | `verify-migrations` : 287 fichiers valides ; preview au ledger **290** (287 versions, § 17) ; pgTAP GP V1 : preuve du Fresh (§ 19 métier) + planning 25/25 et surface 10/10 avec la 290 |
 | Devis V2 visible | ✅ éditeur ligne par ligne, badge « Devis V2 actif » |
 | Planning V2 visible | ✅ badge « Planning V2 actif » |
 | Works visible sur Pro | ✅ entreprise de recette en Pro, sans override |
@@ -339,8 +339,27 @@ Aucune modification de Production, aucune fusion, aucun déploiement Production,
 | Production intacte | ✅ (jamais liée, jamais interrogée, aucun déploiement) |
 | PDF | ✅ 200 après `7f86053` |
 
-**Verdict : PRÊT POUR VALIDATION UTILISATEUR**, avec les points ouverts du § 15 (migration 290 à autoriser,
-aperçu par défaut, fiche de lecture, badge à retirer avant promotion, contraste « Compacte »).
+**Verdict : PRÊT POUR VALIDATION UTILISATEUR.** Points encore ouverts après le § 17 : aperçu A4 par défaut
+(décision produit), badge à retirer avant promotion, copier/coller de lignes (décision produit), incident
+`db push` 276 à traiter dans le train, coût RLS plateforme (lot plateforme). PDF confirmé par Julien en Production.
 
 Temps passé sur cette étape : 03:00 → 09:50 (sauvegarde, répétition générale, push en trois temps, seed,
 recette scriptée devis + planning + perf, 7 correctifs, rapport).
+
+## 17. Suite après retour de Julien (2026-09-13, 10:00 → 10:30)
+
+Julien confirme que « Télécharger PDF » fonctionne en Production et demande de continuer.
+
+- **Migration 290 appliquée sur la preview** (`db push`, 1 fichier, ledger 287 → dernière `20260913000290`) :
+  `conflits_planning` sous RLS **3 980 ms → 192 ms** ; surface `anon` inchangée (3). Page planning
+  40 salariés / 400 évènements : rendu serveur **6,5 s → 2,6-3,2 s**, blocs visibles 7,9 s → 3,9-4,9 s ;
+  enregistrement d'un déplacement clavier 9,4 s → 3,8 s ; vue jour 40 salariés 3,3 s → 1,6 s.
+  Le reste du temps est le coût ligne à ligne des politiques RLS (`est_membre_actif`, ≈ 1,8 ms/ligne),
+  préexistant et commun à toute la plateforme : à traiter dans un lot plateforme, pas dans GP V1.
+- **Fiche devis en lecture** (`2e67d69`) : moteur v2 seulement, module pur `lecture-lignes.ts` (3 tests) +
+  composant serveur `LignesDevisLecture` : titres / sous-titres / commentaires / séparateurs / sauts de page
+  sans montant, **ouvrage regroupé** au-dessus de ses composants (référence, quantité principale, total),
+  remise avec sa règle (« 5 % de la section »), **sous-total calculé** depuis le précédent. L'affichage
+  historique (drapeau éteint) est inchangé.
+- **Planning** (`2e67d69`) : bouton de vue actif lisible au survol (« Compacte » paraissait grisé).
+- Gate rejoué sur ces commits : lint 0 erreur, typecheck 0 erreur, tests ciblés verts, build Vercel Ready.
