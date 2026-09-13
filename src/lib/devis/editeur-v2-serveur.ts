@@ -1,4 +1,5 @@
 import "server-only";
+import { lireParametresDevis, type ParametresDevis } from "@/lib/devis/parametres-devis";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PRODUCT_NAME } from "@/lib/brand";
 import { nomClient } from "@/lib/chantier-statuts";
@@ -33,6 +34,8 @@ export type DonneesEditeurV2 = {
   nomProduit: string;
   /** Salariés actifs pouvant être rattachés comme commercial (GP V1). */
   commerciaux: Array<{ id: string; label: string }>;
+  /** Réglages de devis de l'entreprise (Paramètres > Devis) : défauts et rappel de sauvegarde. */
+  parametresDevis: ParametresDevis;
 };
 
 const possede = (p: string[] | null, cle: string) => p === null || p.includes(cle);
@@ -65,6 +68,7 @@ export async function chargerDonneesEditeurV2(supabase: SupabaseClient, ctx: Con
   const filigranes = (e?.filigranes_documents ?? null) as ReglagesFiligraneEntreprise | null;
   return {
     entrepriseId: ctx.entrepriseId,
+    parametresDevis: lireParametresDevis((await supabase.from("parametres_devis").select("*").eq("entreprise_id", ctx.entrepriseId).maybeSingle()).data),
     clients: (clients ?? []).map((c) => ({
       id: c.id, label: nomClient(c), adresse: c.adresse_facturation, codePostal: c.code_postal, ville: c.ville, siret: c.siret,
     })),

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { dateValiditeParDefaut } from "@/lib/devis/parametres-devis";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
@@ -22,6 +23,7 @@ export default async function NouveauDevisPage({
   // et le moteur activé. Sinon, l'éditeur historique ci-dessous, inchangé.
   if (devisV2Actif()) {
     const donnees = await chargerDonneesEditeurV2(supabase, ctx);
+    const aujourdhui = new Date().toISOString().slice(0, 10);
     const chantier = chantierPreselect ? donnees.chantiers.find((c) => c.id === chantierPreselect) : undefined;
     return (
       <main className="p-4 lg:p-6">
@@ -31,13 +33,15 @@ export default async function NouveauDevisPage({
           enteteInitiale={{
             client_id: clientPreselect ?? chantier?.clientId ?? "",
             chantier_id: chantier?.id ?? null,
-            date_emission: null,
-            date_validite: null,
-            conditions: null,
+            date_emission: aujourdhui,
+            date_validite: dateValiditeParDefaut(aujourdhui, donnees.parametresDevis.validiteJours),
+            conditions: donnees.parametresDevis.conditionsDefaut,
             notes_client: null,
             notes_internes: null,
             remise_globale: 0,
             filigrane: null,
+            mode_reglement: donnees.parametresDevis.modeReglementDefaut,
+            conditions_paiement: donnees.parametresDevis.conditionsPaiementDefaut,
           }}
           etatInitial={{ elements: [], origines: {} }}
         />

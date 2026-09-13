@@ -4,6 +4,7 @@
  */
 import { createRoot } from "react-dom/client";
 import { EditeurDevisV2 } from "@/components/devis/EditeurDevisV2";
+import { PARAMETRES_DEVIS_DEFAUT } from "@/lib/devis/parametres-devis";
 import { elementsFictifs } from "@/lib/devis/fixtures/document-fictif";
 
 const parametres = new URLSearchParams(window.location.search);
@@ -17,6 +18,9 @@ const parametres = new URLSearchParams(window.location.search);
 const couts = parametres.get("couts") === "1";
 // Banc de performance (GP V1, lot H) : `?lignes=500` ouvre l'éditeur avec autant de lignes fictives.
 const nbLignes = Math.max(0, Math.min(2000, Number(parametres.get("lignes") ?? 0) || 0));
+// Rappel de sauvegarde : `?rappel=0.05` (3 s) pour les tests, `?rappel=off` pour le couper.
+const rappel = parametres.get("rappel");
+const parametresDevis = { ...PARAMETRES_DEVIS_DEFAUT, rappelSauvegardeActif: rappel !== "off", rappelSauvegardeMinutes: rappel && rappel !== "off" ? Number(rappel) : PARAMETRES_DEVIS_DEFAUT.rappelSauvegardeMinutes, uniteDefaut: parametres.get("unite") ?? "u", tauxTvaDefaut: Number(parametres.get("tva") ?? 20) };
 window.__banc = {
   droits: { voirCouts: couts, gererCouts: couts, modifierPrix: true, modifierUnite: true, modifierRemise: true },
   enregistrements: [],
@@ -29,6 +33,7 @@ window.__navigations = [];
 createRoot(document.getElementById("racine")!).render(
   <main className="p-4 lg:p-6">
     <EditeurDevisV2
+      parametresDevis={parametresDevis}
       devisId={null}
       entrepriseId="e-banc"
       clients={[

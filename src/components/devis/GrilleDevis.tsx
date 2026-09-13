@@ -42,6 +42,8 @@ export type ActionsGrille = {
   coller: (texte: string, apresCle: string | null) => { ok: boolean; texte?: boolean };
   /** Signale à l'utilisateur une saisie refusée (message affiché par l'éditeur). */
   signaler: (texte: string) => void;
+  /** Unité et TVA des nouvelles lignes (Paramètres > Devis). */
+  defautsLigne: { unite: string; tauxTva: number };
 };
 
 /** Sélection de lignes : clés sélectionnées et ancre de l'extension (Maj). */
@@ -159,7 +161,7 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
 
   const nouvelleLigneApres = useCallback((cle: string | null, type: TypeLigneGrille = "libre") => {
     const nouvelle = actions.genererCle();
-    actions.setEtat((courant) => insererLigne(courant, nouvelle, type, cle));
+    actions.setEtat((courant) => insererLigne(courant, nouvelle, type, cle, actions.defautsLigne));
     const i = cle === null ? tries.length : cles.indexOf(cle) + 1;
     setActive(nouvelle);
     setCible({ index: i, colonne: "designation" });
@@ -172,7 +174,7 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
   const elementsMenu = useCallback((cle: string, index: number): ElementMenu[] => {
     const element = tries[index];
     const estLigne = element?.type === "ligne";
-    const insererAuDessus = (type: TypeLigneGrille) => { const nouvelle = actions.genererCle(); actions.setEtat((courant) => deplacerElementVers(insererLigne(courant, nouvelle, type, cle), nouvelle, index)); setActive(nouvelle); setCible({ index, colonne: "designation" }); };
+    const insererAuDessus = (type: TypeLigneGrille) => { const nouvelle = actions.genererCle(); actions.setEtat((courant) => deplacerElementVers(insererLigne(courant, nouvelle, type, cle, actions.defautsLigne), nouvelle, index)); setActive(nouvelle); setCible({ index, colonne: "designation" }); };
     const transformer: ElementMenu[] = estLigne
       ? TYPES_LIGNE_GRILLE.filter((t) => t.cle !== "article" && t.cle !== typeDe(element.ligne)).map((t) => ({ cle: `type-${t.cle}`, libelle: `→ ${t.libelle}`, titre: t.aide, action: () => actions.setEtat((courant) => modifierLigneLibre(courant, cle, { typeLigne: t.cle })) }))
       : [];

@@ -11,6 +11,8 @@ import { CLE_STOCKAGE_PRESSE_PAPIER, collerElements, copierElements, libelleColl
 import { basculerColonne, CLE_STOCKAGE_COLONNES, colonnesReglables, colonnesVisibles, lireReglagesColonnes, reglagesParDefaut, type ReglagesColonnes } from "@/lib/devis/colonnes-grille";
 import { annuler, creerHistorique, peutAnnuler, peutRetablir, pousser, remplacerPresent, retablir } from "@/lib/devis/historique-edition";
 import { dupliquerElement, insererLigne, insererOuvrage, interpreterRemisePct } from "@/lib/devis/editeur-etat";
+import { PARAMETRES_DEVIS_DEFAUT, type ParametresDevis } from "@/lib/devis/parametres-devis";
+import { cleIgnorerRappel, doitRappeler, delaiRappelMs } from "@/lib/devis/rappel-sauvegarde";
 import { margeLigne } from "@/lib/devis/marge-ligne";
 import { lignesMontants } from "@/lib/devis/presentation";
 import { libelleTypeLigne, typeDe, TYPES_LIGNE_GRILLE, type TypeLigneGrille } from "@/lib/devis/types-ligne";
@@ -50,6 +52,8 @@ type Sauvegarde = { statut: "ok"; heure: string } | { statut: "en_cours" } | { s
 const effacerErreurSimple = (s: Sauvegarde): Sauvegarde => (s.statut === "erreur" && !s.conflit ? { statut: "jamais" } : s);
 
 const DELAI_AUTOSAUVEGARDE_MS = 2000;
+/** Surcharge personnelle du rappel de sauvegarde (ce navigateur) : `{ actif?: boolean; minutes?: number }`. */
+export const CLE_RAPPEL_PERSONNEL = "gp.devis.rappel.v1";
 
 const champ = "min-h-11 rounded-md border border-neutral-300 px-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 const bouton = "min-h-11 rounded-md border border-neutral-300 px-3 text-sm hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900";
@@ -76,6 +80,7 @@ export function EditeurDevisV2({
   seuilTauxMarquePct,
   nomProduit,
   revisionInitiale = null,
+  parametresDevis = PARAMETRES_DEVIS_DEFAUT,
   commerciaux = [],
   entrepriseId,
 }: {
@@ -95,6 +100,8 @@ export function EditeurDevisV2({
   nomProduit: string;
   /** Révision lue en base (verrou optimiste de l'autosauvegarde) ; `null` pour un nouveau devis. */
   revisionInitiale?: number | null;
+  /** Réglages de devis (défauts des lignes, rappel de sauvegarde) ; absents = valeurs historiques. */
+  parametresDevis?: ParametresDevis;
   commerciaux?: Array<{ id: string; label: string }>;
 }) {
   const router = useRouter();
@@ -129,6 +136,38 @@ export function EditeurDevisV2({
   const genererCle = useCallback(() => crypto.randomUUID(), []);
   /** Message d'erreur de saisie (remise hors bornes, montant illisible…), dans la zone de retour de l'éditeur. */
   const signaler = useCallback((texte: string) => setRetourPressePapier({ genre: "erreur", texte }), []);
+  const defautsLigne = useMemo(() => ({ unite: parametresDevis.uniteDefaut, tauxTva: parametresDevis.tauxTvaDefaut }), [parametresDevis.uniteDefaut, parametresDevis.tauxTvaDefaut]);
+  // Rappel de sauvegarde (Paramètres > Devis, surcharge personnelle possible) : informe, n'écrit jamais.
+  const [rappel, setRappel] = useState<{ actif: boolean; minutes: number }>({ actif: parametresDevis.rappelSauvegardeActif, minutes: parametresDevis.rappelSauvegardeMinutes });
+  const [rappelVisible, setRappelVisible] = useState(false);
+  const derniereSauvegardeReussieA = useRef(0);
+  useEffect(() => { derniereSauvegardeReussieA.current = Date.now(); }, []);
+  const dernierRappelA = useRef<number | null>(null);
+  const [ignorerRappel, setIgnorerRappel] = useState(false);
+  useEffect(() => {
+    // Surcharge personnelle (ce navigateur) : { actif?, minutes? } ; ignoré si illisible.
+    const t = window.setTimeout(() => {
+      try {
+        const brut = window.localStorage.getItem(CLE_RAPPEL_PERSONNEL);
+        if (brut) { const o = JSON.parse(brut) as { actif?: unknown; minutes?: unknown }; setRappel((r) => ({ actif: typeof o.actif === "boolean" ? o.actif : r.actif, minutes: typeof o.minutes === "number" && o.minutes >= 1 && o.minutes <= 240 ? o.minutes : r.minutes })); }
+        setIgnorerRappel(window.sessionStorage.getItem(cleIgnorerRappel(devisId)) === "1");
+      } catch { /* stockage indisponible */ }
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [devisId]);
+  useEffect(() => {
+    if (!rappel.actif || ignorerRappel) return;
+    const pas = Math.max(500, Math.min(5_000, Math.floor(delaiRappelMs(rappel.minutes) / 3)));
+    const t = window.setInterval(() => {
+      if (!sale) { if (rappelVisible) setRappelVisible(false); return; }
+      if (doitRappeler({ actif: rappel.actif, minutes: rappel.minutes, modifie: sale, derniereSauvegardeReussieA: derniereSauvegardeReussieA.current, dernierRappelA: dernierRappelA.current, ignorePourCeDevis: ignorerRappel, dejaAffiche: rappelVisible }, Date.now())) {
+        dernierRappelA.current = Date.now();
+        setRappelVisible(true);
+      }
+    }, pas);
+    return () => window.clearInterval(t);
+  }, [rappel, sale, ignorerRappel, rappelVisible]);
+
 
   // Réglage des colonnes : commodité locale, lue avec indulgence (voir colonnes-grille.ts).
   useEffect(() => {
@@ -271,6 +310,8 @@ export function EditeurDevisV2({
       setRevision(r.revision);
       setSale(false);
       setSauvegarde({ statut: "ok", heure: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) });
+      derniereSauvegardeReussieA.current = Date.now();
+      setRappelVisible(false);
       // Premier enregistrement d'un nouveau devis : l'identifiant est retenu en mémoire, SANS toucher à
       // l'adresse. Toute modification de l'URL (`replaceState` vers `/devis/<id>/modifier` ou même un
       // fragment) fait resynchroniser le routeur : re-rendu de la page, dialogue fermé, et un collage
@@ -293,6 +334,7 @@ export function EditeurDevisV2({
     const r = await enregistrerDevisV2Action(devisIdCourant, entete, etat.elements, etat.origines, revision);
     if ("error" in r) { setErreur(r.error); setSauvegarde({ statut: "erreur", message: r.error, conflit: r.conflit === true }); return false; }
     setRevision(r.revision); setSale(false); setSauvegarde({ statut: "ok", heure: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) });
+    derniereSauvegardeReussieA.current = Date.now(); setRappelVisible(false);
     if (!devisIdCourant) setDevisIdCourant(r.id);
     return true;
   }, [devisIdCourant, entete, etat, revision]);
@@ -487,11 +529,11 @@ export function EditeurDevisV2({
 
           <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 bg-white/90 py-2 backdrop-blur dark:bg-neutral-950/90" role="toolbar" aria-label="Lignes">
             <BoutonMenu libelle="Ajouter" className={principal} testId="menu-ajouter" titre="Ajouter une ligne, un article, un ouvrage, un titre…" elements={[
-              { cle: "libre", libelle: "Ligne libre", raccourci: "Entrée", action: () => { const cle = genererCle(); setEtat((courant) => insererLigne(courant, cle, "libre", null)); } },
+              { cle: "libre", libelle: "Ligne libre", raccourci: "Entrée", action: () => { const cle = genererCle(); setEtat((courant) => insererLigne(courant, cle, "libre", null, defautsLigne)); } },
               { cle: "article", libelle: "Article du catalogue", raccourci: "Ctrl+K", action: () => setDialogue({ type: "articles" }) },
               { cle: "ouvrage", libelle: "Ouvrage composé", action: () => setDialogue({ type: "ouvrage", instance: null, apresCle: null }) },
               { cle: "sep", type: "separateur" },
-              ...TYPES_LIGNE_GRILLE.filter((t) => !t.chiffree).map((t) => ({ cle: t.cle, libelle: t.libelle, titre: t.aide, action: () => { const cle = genererCle(); setEtat((courant) => insererLigne(courant, cle, t.cle, null)); } })),
+              ...TYPES_LIGNE_GRILLE.filter((t) => !t.chiffree).map((t) => ({ cle: t.cle, libelle: t.libelle, titre: t.aide, action: () => { const cle = genererCle(); setEtat((courant) => insererLigne(courant, cle, t.cle, null, defautsLigne)); } })),
             ]} />
             <span className="mx-1 hidden h-6 w-px bg-neutral-200 sm:inline-block dark:bg-neutral-800" aria-hidden="true" />
             <button type="button" onClick={copierDepuisBouton} className={bouton} title="Copier les lignes sélectionnées (Ctrl+C)" aria-keyshortcuts="Control+C">Copier{selection.cles.length ? ` (${selection.cles.length})` : ""}</button>
@@ -513,6 +555,14 @@ export function EditeurDevisV2({
             {devisIdCourant && <button type="button" onClick={() => { const cible = `/devis/${devisIdCourant}#envoyer`; if (demanderNavigation(cible)) router.push(cible); }} className={bouton} title="Envoyer le devis depuis sa fiche (enregistrement demandé si nécessaire)">Envoyer…</button>}
           </div>
 
+          {rappelVisible && (
+            <div role="status" data-testid="rappel-sauvegarde" className="flex flex-wrap items-center gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+              <span><strong>Sauvegarder le devis ?</strong> Des modifications ont été apportées depuis la dernière sauvegarde.</span>
+              <button type="button" onClick={() => enregistrer({ explicite: false })} className="min-h-9 rounded-md bg-neutral-900 px-3 text-sm font-medium text-white dark:bg-white dark:text-neutral-900">Sauvegarder maintenant</button>
+              <button type="button" onClick={() => { dernierRappelA.current = Date.now(); setRappelVisible(false); }} className="min-h-9 rounded-md border border-neutral-300 px-3 text-sm dark:border-neutral-700">Plus tard</button>
+              <button type="button" onClick={() => { try { window.sessionStorage.setItem(cleIgnorerRappel(devisId), "1"); } catch { /* stockage indisponible */ } setIgnorerRappel(true); setRappelVisible(false); }} className="text-xs underline">Ne plus me le rappeler pour ce devis</button>
+            </div>
+          )}
           <BarreFormatage onSignal={signaler} />
           {retourPressePapier && (
             <p role={retourPressePapier.genre === "erreur" ? "alert" : "status"} data-testid="retour-presse-papier" data-genre={retourPressePapier.genre}
@@ -537,6 +587,7 @@ export function EditeurDevisV2({
                 setEtat,
                 genererCle,
                 signaler,
+                defautsLigne,
                 ouvrirOuvrage: (instance, apresCle) => setDialogue({ type: "ouvrage", instance, apresCle }),
                 prixGlobal: (instance) => setDialogue({ type: "prix", instance }),
                 copier: copierLignes,

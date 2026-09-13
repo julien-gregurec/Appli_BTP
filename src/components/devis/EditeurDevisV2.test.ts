@@ -58,7 +58,7 @@ describe("éditeur visuel v2 — rendu", () => {
     expect(html).toContain("Client Fictif");
     expect(html).toContain("Plancher chauffant");
     // GP V1 : la barre d'outils de la grille remplace le bouton « Ajouter des articles ».
-    expect(html).toContain("Articles");
+    expect(html).toContain("Ajouter");
     expect(html).toContain('role="grid"');
   });
   it("n'affiche aucun prix d'achat ni marge sans voir_couts_devis", () => {
