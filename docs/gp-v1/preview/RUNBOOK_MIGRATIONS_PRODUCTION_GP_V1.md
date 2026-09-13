@@ -29,8 +29,10 @@ Vercel `elsatia-production` (branche de production `release/commercialisation-v1
 - Aucune sauvegarde physique n'existe sur les projets sans PITR (constaté sur la preview) : faire une
   **sauvegarde logique datée** avant toute écriture — `db dump --linked -f schema.sql`,
   `--data-only --use-copy -f data.sql`, `--role-only -f roles.sql` — et la conserver hors du dépôt.
-- Relever les volumes de référence : `devis`, `factures`, `lignes_devis`, `planning_evenements`,
-  `entreprises`, `auth.users`.
+- Relever les **compteurs de référence** (conservés dans le rapport de mise en Production) : `count(*)` de
+  `devis`, `factures`, `lignes_devis`, `lignes_factures`, `planning_evenements`, `entreprises`, `auth.users`,
+  et `max(numero)` de `devis` et de `factures`. Ils sont rejoués après migration (§ 11.2) : toute
+  différence = STOP.
 
 ## 3. Comparaison des ledgers
 
@@ -96,15 +98,47 @@ refusée dans le dialogue avec son message, suppression de l'évènement de test
 Devis existant (moteur historique) et devis v2 (moteur 2, multi-pages) : 200, `application/pdf`, pages
 cohérentes avec l'aperçu.
 
-## 11. Conditions d'arrêt et retour arrière
+## 11. Conditions d'arrêt (STOP) et retour arrière
 
-- STOP avant migration si : ledger distant ≠ 210 attendu, versions distantes absentes en local, répétition
-  générale rouge, sauvegarde absente.
-- STOP pendant : une migration échoue → ne pas forcer ; analyser ; la cause connue (dérive) est corrigée
-  avec accord explicite, sinon retour arrière.
-- Retour arrière = restauration de la sauvegarde logique (schéma + données + rôles) dans le projet
-  Production après arrêt de l'application ; les migrations ne prévoient pas de `down`. Les drapeaux
-  applicatifs restent à 0 tant que la base n'est pas au 293.
+Chaque condition ci-dessous **arrête** la mise en Production ; on ne « force » jamais. Le responsable nommé
+(§ 1) décide de la reprise après analyse, ou du retour arrière (§ 11.3).
+
+### 11.1 STOP avant toute écriture
+
+| Condition | Contrôle | Décision |
+| --- | --- | --- |
+| **Ledger inattendu** : `max(version)` distant ≠ `20260810000210` attendu, ou versions distantes absentes en local | `supabase migration list --linked` (§ 3) | STOP — ledger inconnu, ne pas pousser |
+| Sauvegarde logique datée absente ou incomplète (schéma, données, rôles) | § 2 | STOP |
+| Répétition générale rouge (clone de la sauvegarde → 293, pgTAP) | § 4 | STOP |
+| Compteurs de référence non relevés (`devis`, `factures`, `lignes_devis`, `planning_evenements`, `entreprises`, `auth.users`) | § 2 | STOP |
+
+### 11.2 STOP pendant et juste après la migration
+
+| Condition | Contrôle | Décision |
+| --- | --- | --- |
+| **Une migration échoue** (transaction annulée, message d'erreur) | sortie de `db push` | STOP — ne pas relancer à l'aveugle ; cause connue (dérive § 4.3) corrigée avec accord explicite, sinon retour arrière |
+| **Compteurs devis / factures incohérents** : `count(*)` de `devis`, `factures`, `lignes_devis`, `lignes_factures` différent d'avant migration, ou `max(numero)` modifié | requêtes de § 2 rejouées | STOP + retour arrière (une migration ne crée ni ne supprime de document) |
+| **Surface RLS / sécurité changée de façon imprévue** : privilèges DDL des rôles applicatifs ≠ 0, SECURITY DEFINER exécutables par `anon` ≠ exactement les 3 attendus, fonctions SECURITY DEFINER sans `search_path` ≠ 0, `enregistrer_devis_brouillon_v2` exécutable par `anon` ou `service_role` | § 5.2 | STOP + retour arrière |
+| Ledger final ≠ 290 / `20260913000293` | § 5.2 | STOP |
+
+### 11.3 STOP après déploiement applicatif (smoke, § 7-10)
+
+| Condition | Contrôle | Décision |
+| --- | --- | --- |
+| **Devis V2 inaccessible** : `/devis/nouveau` ou `/devis/<id>/modifier` ne rend pas la grille (erreur, page blanche, éditeur historique alors que `GP_DEVIS_V2=1`) | smoke § 8 | STOP — retirer les drapeaux (retour v1 immédiat, sans toucher à la base) |
+| **Planning V2 inaccessible** : `/planning` en erreur ou sans blocs | smoke § 9 | STOP — idem drapeaux |
+| **PDF cassé** : `/api/documents/devis/<id>/pdf` ≠ 200 `application/pdf`, ou pages incohérentes avec l'aperçu | § 10 | STOP — les devis restent consultables, ne pas annoncer la mise en service |
+| **Erreur d'authentification généralisée** : connexion impossible pour plus d'un compte de smoke, erreurs 5xx sur `/login`, sessions perdues | § 7 | STOP — retour arrière applicatif (déploiement précédent) puis analyse base |
+| Toute erreur `57014` (statement timeout) à l'enregistrement d'un devis | journaux | STOP — régression des 292/293, analyser avant d'annoncer |
+
+### 11.4 Retour arrière
+
+- **Applicatif** : redéployer le déploiement Vercel précédent et/ou retirer `GP_DEVIS_V2` / `GP_PLANNING_V2`
+  (l'application revient en v1 ; le schéma 293 est compatible v1, preuve : E2E et pgTAP historiques verts).
+- **Base** : restauration de la sauvegarde logique (schéma + données + rôles) dans le projet Production après
+  arrêt de l'application ; les migrations ne prévoient pas de `down`. Les drapeaux applicatifs restent à 0
+  tant que la base n'est pas au 293.
+- Consigner l'heure, la cause, la décision et le responsable dans le rapport.
 
 ## 12. Surveillance post-déploiement (48 h)
 

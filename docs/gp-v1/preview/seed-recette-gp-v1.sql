@@ -278,4 +278,27 @@ insert into public.employes (id, entreprise_id, utilisateur_id, prenom, nom, num
   ('e3000000-0000-4000-8000-000000000021', 'e0000000-0000-4000-8000-000000000002', 'e1000000-0000-4000-8000-000000000004', 'Élodie', 'Essai', 'ESS-0001', 'S0001', 'Dirigeant', 'cdi', 'actif', 'e2000000-0000-4000-8000-000000000011'),
   ('e3000000-0000-4000-8000-000000000022', 'e0000000-0000-4000-8000-000000000002', 'e1000000-0000-4000-8000-000000000005', 'Malik', 'Employé-Essai', 'ESS-0002', 'S0002', 'Ouvrier', 'cdi', 'actif', 'e2000000-0000-4000-8000-000000000012')
 on conflict (id) do nothing;
+
+-- Devis de performance (100 et 500 lignes libres, client Nguyen) -------------------------------------------
+-- Identifiants fixes (ceux de la preview) ; créés seulement s'ils n'existent pas ; aucune ligne d'ouvrage.
+-- Un ouvrage sans composant rend un brouillon invalide (validerBrouillon) : ce jeu n'en contient jamais.
+insert into public.devis (id, entreprise_id, client_id, chantier_id, statut, revision, reference_interne, date_emission, remise_globale, moteur_presentation)
+values
+  ('797529fd-d64e-46a7-8357-5b9c5820f216', 'e0000000-0000-4000-8000-000000000001', 'e4000000-0000-4000-8000-000000000004', 'e5000000-0000-4000-8000-000000000004', 'brouillon', 1, 'PERF 100 lignes', current_date, 0, 2),
+  ('55fe530d-3387-4ad6-b930-3f99b8d0c891', 'e0000000-0000-4000-8000-000000000001', 'e4000000-0000-4000-8000-000000000004', 'e5000000-0000-4000-8000-000000000004', 'brouillon', 1, 'PERF 500 lignes', current_date, 0, 2)
+on conflict (id) do nothing;
+insert into public.lignes_devis (devis_id, designation, type, quantite, unite, prix_unitaire_ht, remise_ligne, taux_tva, ordre, cle_ligne, origine_ligne, visible_client, afficher_quantite, afficher_prix, type_ligne)
+select d.id,
+       case when g = 1 then 'Section ' || d.n else 'Prestation de recette n° ' || (g - 1) end,
+       'fourniture', case when g = 1 then 0 else 1 + (g % 7) end, 'u', case when g = 1 then 0 else 10 + (g % 90) end, 0, 20,
+       g * 1000, gen_random_uuid()::text, 'saisie', true, true, true, case when g = 1 then 'titre' else 'libre' end
+from (values ('797529fd-d64e-46a7-8357-5b9c5820f216'::uuid, 100, 1), ('55fe530d-3387-4ad6-b930-3f99b8d0c891'::uuid, 500, 2)) as d(id, nb, n)
+cross join generate_series(1, d.nb) g
+where not exists (select 1 from public.lignes_devis l where l.devis_id = d.id);
+-- Garde-fou : aucun ouvrage sans composant dans les devis de l'entreprise de recette (un tel ouvrage bloque
+-- l'enregistrement du brouillon et n'a aucun sens métier ; il ne peut venir que d'un script de diagnostic).
+delete from public.devis_ouvrages o
+using public.devis d
+where d.id = o.devis_id and d.entreprise_id = 'e0000000-0000-4000-8000-000000000001'
+  and not exists (select 1 from public.lignes_devis l where l.devis_id = o.devis_id and l.ouvrage_cle = o.cle);
 commit;
