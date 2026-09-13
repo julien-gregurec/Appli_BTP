@@ -236,3 +236,9 @@ Concurrence 1, deadline configurable, limites mémoire/disque, cancellation et r
 ## 14. Templates et présentation — Lot F
 
 Catalogue système v1 immuable dans `packages/studio-domain/src/templates.ts`, snapshots complets dans `studio_timelines.presentation`, previews locales dans l'application. Les règles de timing étendent le moteur D existant ; les intros/outros sont des clips `card` explicites. Overlays et logo référencent les clés stables des clips. Le renderer E interprète ces primitives sans branchement métier par template. Polices Noto locales sous OFL, mesures Fontkit, dessin FFmpeg borné aux safe areas. L'authentification, les workspaces, la RLS et les stockages privés A–E sont conservés. Détails et contraintes : `ELSATIA-STUDIO-TEMPLATE-CONTRACT.md`.
+
+## 15. Éditeur simple — Lot G
+
+`/projects/[projectId]/editor` manipule directement le document D/F. Commandes pures et historique local borné, autosave atomique de 600 ms avec révision optimiste, fenêtre de 18 blocs pour les longues timelines. Aperçu navigateur de travail à un seul original courant, et aperçu fidèle basse résolution par le renderer E existant. Les MP4 indiquent leur version/révision et deviennent explicitement anciens après édition.
+
+La migration additive G crée deux fonctions transactionnelles seulement : sauvegarde + réponse du document sous le même verrou, et admission d'un rendu contre la version active attendue. Elles enveloppent les fonctions D/E/F sans changer Auth, workspaces, tables ou politiques RLS. Rollback local sans perte de données. Les détails de persistance, permissions, textes, prévisualisation et limites sont dans `ELSATIA-STUDIO-EDITOR-CONTRACT.md`. Aucun Lot H.
