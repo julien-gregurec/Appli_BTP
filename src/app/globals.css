@@ -61,3 +61,9 @@ body {
   background: var(--elsatia-gold);
   color: var(--elsatia-navy);
 }
+
+/* Éditeur de devis ouvert : le bouton flottant « Rechercher Ctrl+K » (haut droite) recouvrirait
+   « Enregistrer et fermer » ; l'éditeur prend Ctrl+K, la recherche globale reste sur Ctrl+Maj+K. */
+body[data-editeur-devis="1"] [data-recherche-globale] {
+  display: none;
+}

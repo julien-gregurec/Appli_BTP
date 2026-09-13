@@ -67,11 +67,11 @@ describe("PlanningV2 (rendu statique)", () => {
     expect(html).toContain("septembre 2026");
   });
 
-  it("sans droit de gestion : rien n'est glissable, pas de bouton Nouvel évènement, menu d'actions présent", () => {
+  it("sans droit de gestion : rien n'est glissable, bouton Nouvel évènement grisé et expliqué, menu d'actions présent", () => {
     const d = donnees([ev("e1", "Pose", "2026-09-16", 8, 12, ["s1"])]);
     d.droits = { gerer: false, affecter: false }; d.permissions = ["acces_planning"];
     const html = renderToStaticMarkup(createElement(PlanningV2, { donnees: d, jour: "2026-09-14", vue: "semaine" }));
-    expect(html).not.toContain("Nouvel évènement");
+    expect(html).toMatch(/aria-disabled="true"[^>]*gerer_planning[^>]*>Nouvel évènement/);
     expect(html).toContain('data-testid="menu-actions-evenement"');
   });
 });

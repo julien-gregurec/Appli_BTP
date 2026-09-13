@@ -5,7 +5,7 @@ Version 2026-09-13 (session autonome). Issu de la recette preview
 Production** ; il décrit ce qui a été fait sur la preview et ce qui doit l'être en Production, dans l'ordre,
 avec le rôle réellement utilisé et les conditions d'arrêt.
 
-Périmètre : ledger `20260710000001` → `20260913000293` (290 fichiers), branche
+Périmètre : ledger `20260710000001` → `20260913000295` (292 fichiers), branche
 `feat/gp-v1-metier-devis-planning-references-v1`, projet Supabase Production `exhvuzegsefmoguxoiak`, projet
 Vercel `elsatia-production` (branche de production `release/commercialisation-v1`).
 
@@ -14,7 +14,7 @@ Vercel `elsatia-production` (branche de production `release/commercialisation-v1
 1. Julien a validé visuellement Devis V2, Planning V2, le copier/coller et l'accès recette sur la preview ; il
    a autorisé explicitement la mise en Production (aucune étape ci-dessous ne se joue sans cet accord).
 2. Branche fusionnée dans `release/commercialisation-v1` **sans force** ; HEAD local = distant ;
-   `npm run verify:migrations` (290 valides), `npm run verify:secrets`, `git diff --check` verts ;
+   `npm run verify:migrations` (292 valides), `npm run verify:secrets`, `git diff --check` verts ;
    `npx tsc --noEmit`, `npm run lint`, vitest complet, pgTAP complet (2 284 ok sur le Fresh) verts.
 3. Rôle qui migre : `supabase link --project-ref exhvuzegsefmoguxoiak` puis `db push --linked` — la CLI se
    connecte via l'API de gestion avec le rôle temporaire `cli_login_postgres` (membre de `postgres`, objets
@@ -59,14 +59,17 @@ Vercel `elsatia-production` (branche de production `release/commercialisation-v1
 
 1. `db push --linked --include-all --yes`, rôle CLI (voir § 1.3). Chaque migration est une transaction :
    un arrêt laisse les précédentes appliquées ; corriger la cause puis relancer (reprise aux manquantes).
-2. Contrôles immédiats : `count(*)` et `max(version)` de `supabase_migrations.schema_migrations` = 290 /
-   `20260913000293` ; surface de sécurité — privilèges DDL des rôles applicatifs 0, SECURITY DEFINER
+2. Contrôles immédiats : `count(*)` et `max(version)` de `supabase_migrations.schema_migrations` = 292 /
+   `20260913000295` ; surface de sécurité — privilèges DDL des rôles applicatifs 0, SECURITY DEFINER
    exécutables par `anon` = exactement `document_commercial_par_token`, `document_rendu_par_token`,
    `reserves_invitation_consulter`, sans `search_path` 0 ; volumes inchangés ; `conflits_planning` en
    SECURITY DEFINER (290) ; déclencheurs `lignes_devis_source_meme_entreprise` et
    `devis_ouvrages_ouvrage_meme_entreprise` présents (291) ; `recalc_devis_apres_ligne` absent et les trois
    déclencheurs `recalc_devis_apres_lignes_*` présents (292) ; `enregistrer_devis_brouillon_v2` en SECURITY
-   DEFINER, non exécutable par `anon` / `service_role` (293).
+   DEFINER, non exécutable par `anon` / `service_role` (293) ; tables `numerotation_documents` (294) et
+   `parametres_devis` (295) présentes, RLS active, vides tant qu'aucune entreprise n'a réglé ; le format des
+   numéros sans réglage reste `DEV-AAAA-NNN` / `FAC-AAAA-NNN` / `CMD-AAAA-NNN` (fonction
+   `numero_document_apercu('<entreprise>', 'devis')`).
 
 ## 6. Drapeaux et déploiement applicatif
 
@@ -84,9 +87,12 @@ Connexion, tableau de bord, `/devis` (liste), un devis existant en lecture, `/pl
 
 ## 8. Contrôles devis
 
-Nouveau devis brouillon de test : ouvrage inséré, article Ctrl+K, ligne libre, titre, commentaire, remise,
-sous-total ; copier/coller de la section dans le même devis (nouvelles clés) ; enregistrement ; lecture ;
-aperçu A4 ; PDF ; suppression du devis de test.
+Nouveau devis brouillon de test : client créé depuis le devis (« + Client »), chantier « + Chantier »,
+ouvrage inséré (menu Ajouter ▾), article Ctrl+K, ligne libre en m² avec remise 5 % (PU net affiché), titre,
+commentaire, texte riche (gras / souligné / couleur : identique en lecture, A4 et PDF), sous-total ;
+copier/coller de la section ; menu contextuel de ligne (clic droit) ; bascule Grille / Document ;
+enregistrement ; retour avec la garde « modifications non enregistrées » ; lecture ; PDF ; suppression du
+devis de test. Paramètres > Devis et Paramètres > Numérotation ouverts, aperçu du prochain numéro lisible.
 
 ## 9. Contrôles planning
 
@@ -119,7 +125,7 @@ Chaque condition ci-dessous **arrête** la mise en Production ; on ne « force �
 | **Une migration échoue** (transaction annulée, message d'erreur) | sortie de `db push` | STOP — ne pas relancer à l'aveugle ; cause connue (dérive § 4.3) corrigée avec accord explicite, sinon retour arrière |
 | **Compteurs devis / factures incohérents** : `count(*)` de `devis`, `factures`, `lignes_devis`, `lignes_factures` différent d'avant migration, ou `max(numero)` modifié | requêtes de § 2 rejouées | STOP + retour arrière (une migration ne crée ni ne supprime de document) |
 | **Surface RLS / sécurité changée de façon imprévue** : privilèges DDL des rôles applicatifs ≠ 0, SECURITY DEFINER exécutables par `anon` ≠ exactement les 3 attendus, fonctions SECURITY DEFINER sans `search_path` ≠ 0, `enregistrer_devis_brouillon_v2` exécutable par `anon` ou `service_role` | § 5.2 | STOP + retour arrière |
-| Ledger final ≠ 290 / `20260913000293` | § 5.2 | STOP |
+| Ledger final ≠ 292 / `20260913000295` | § 5.2 | STOP |
 
 ### 11.3 STOP après déploiement applicatif (smoke, § 7-10)
 
@@ -137,7 +143,7 @@ Chaque condition ci-dessous **arrête** la mise en Production ; on ne « force �
   (l'application revient en v1 ; le schéma 293 est compatible v1, preuve : E2E et pgTAP historiques verts).
 - **Base** : restauration de la sauvegarde logique (schéma + données + rôles) dans le projet Production après
   arrêt de l'application ; les migrations ne prévoient pas de `down`. Les drapeaux applicatifs restent à 0
-  tant que la base n'est pas au 293.
+  tant que la base n'est pas au 295.
 - Consigner l'heure, la cause, la décision et le responsable dans le rapport.
 
 ## 12. Surveillance post-déploiement (48 h)

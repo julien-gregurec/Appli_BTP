@@ -55,8 +55,6 @@ test.afterAll(() => { if (detoursInfra) console.log(`[infra] détours session/Go
  * ouvre la fiche. Sous charge, cette navigation douce peut être avortée par un délai GoTrue ; on
  * exige la preuve de l'enregistrement, puis on ouvre la fiche nous-mêmes en comptant le détour.
  */
-async function ajouterLigne(page: Page, type: string) { await page.getByTestId("menu-ajouter").click(); await page.locator(`[role=menuitem][data-cle="${type}"]`).click(); }
-
 async function enregistrerEtFermer(page: Page): Promise<string> {
   await page.getByRole("button", { name: "Enregistrer et fermer" }).click();
   const debut = Date.now();

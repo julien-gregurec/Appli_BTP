@@ -32,7 +32,7 @@ export function PaletteRecherche({ actif }: { actif: boolean }) {
     const clavier = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "k") return;
       const editeurDevis = document.body.dataset.editeurDevis === "1";
-      if (editeurDevis && !e.shiftKey) return;
+      if (editeurDevis && !e.shiftKey) return; // l’éditeur de devis prend Ctrl+K (catalogue) ; la palette répond à Ctrl+Maj+K
       e.preventDefault();
       setOuverte(true);
     };
@@ -72,7 +72,7 @@ export function PaletteRecherche({ actif }: { actif: boolean }) {
 
   return (
     <>
-      <button type="button" onClick={() => setOuverte(true)} className="fixed right-3 top-3 z-40 hidden min-h-9 items-center gap-2 rounded-md border border-neutral-300 bg-white px-3 text-xs text-neutral-600 shadow-sm hover:bg-neutral-50 md:flex dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300" title="Recherche globale (Ctrl+K)">
+      <button type="button" onClick={() => setOuverte(true)} data-recherche-globale="1" className="fixed right-3 top-3 z-40 hidden min-h-9 items-center gap-2 rounded-md border border-neutral-300 bg-white px-3 text-xs text-neutral-600 shadow-sm hover:bg-neutral-50 md:flex dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300" title="Recherche globale (Ctrl+K)">
         <span aria-hidden="true">⌕</span> Rechercher <kbd className="rounded border px-1 text-[10px]">Ctrl+K</kbd>
       </button>
       <dialog ref={dialogue} onClose={() => setOuverte(false)} aria-label="Recherche globale" className="w-[min(94vw,40rem)] rounded-md border border-neutral-200 p-0 backdrop:bg-black/40 dark:border-neutral-700 dark:bg-neutral-950 dark:text-neutral-100">

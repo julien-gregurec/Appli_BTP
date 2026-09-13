@@ -241,7 +241,7 @@ export function PlanningV2({ donnees, jour, vue }: { donnees: DonneesPlanningV2;
         <MenuContextuel x={menu.x} y={menu.y} etiquette="Actions de l’évènement" elements={elementsMenu(menu.evenement)} onFermer={() => setMenu(null)} />
       )}
 
-      <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="Navigation du planning">
+      <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="Navigation du planning" data-consultation="1">
         <button type="button" className={bouton} onClick={() => naviguer(ajouterJours(jour, -pas))} aria-label="Précédent">‹</button>
         <button type="button" className={bouton} onClick={() => naviguer(jourDe(new Date()))}>Aujourd’hui</button>
         <button type="button" className={bouton} onClick={() => naviguer(ajouterJours(jour, pas))} aria-label="Suivant">›</button>
@@ -251,12 +251,15 @@ export function PlanningV2({ donnees, jour, vue }: { donnees: DonneesPlanningV2;
           {VUES.map((v) => <button key={v.cle} type="button" role="tab" aria-selected={vue === v.cle} onClick={() => naviguer(jour, v.cle)} className={`${bouton} ${vue === v.cle ? "bg-neutral-900 text-white hover:bg-neutral-900 dark:bg-white dark:text-neutral-900 dark:hover:bg-white" : ""}`}>{v.libelle}</button>)}
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2 text-sm" data-consultation="1">
         <input type="search" value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Rechercher un évènement…" className={champ} aria-label="Rechercher" />
         <select value={filtreType} onChange={(e) => setFiltreType(e.target.value)} className={champ} aria-label="Type"><option value="">Tous les types</option>{TYPES_EVENEMENT.map((t) => <option key={t.cle} value={t.cle}>{t.libelle}</option>)}</select>
         <select value={filtreChantier} onChange={(e) => setFiltreChantier(e.target.value)} className={champ} aria-label="Chantier"><option value="">Tous les chantiers</option>{donnees.chantiers.map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}</select>
         {vue === "jour" && <label className="flex items-center gap-1">Zoom<input type="range" min={32} max={160} value={pxHeure} onChange={(e) => setPxHeure(Number(e.target.value))} aria-label="Zoom temporel" /></label>}
-        {donnees.droits.gerer && <button type="button" onClick={() => { const ev = nouvelEvenement(); setEvenements((l) => [...l, ev]); setEdition(ev); }} className={`${bouton} bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-900`} title="Ou glissez sur une zone vide de la grille">Nouvel évènement</button>}
+        {/* Sans droit de gestion, le bouton reste VISIBLE et expliqué (principe « indisponible visible et expliqué », comme les fiches). */}
+        {donnees.droits.gerer
+          ? <button type="button" onClick={() => { const ev = nouvelEvenement(); setEvenements((l) => [...l, ev]); setEdition(ev); }} className={`${bouton} bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-900`} title="Ou glissez sur une zone vide de la grille">Nouvel évènement</button>
+          : <button type="button" aria-disabled="true" className={`${bouton} cursor-not-allowed opacity-50`} title="Création réservée aux postes ayant le droit gerer_planning">Nouvel évènement</button>}
         <BoutonMenu libelle={selectionne ? `Actions · ${selectionne.titre.slice(0, 24)}` : "Actions"} className={bouton} testId="menu-actions-evenement" titre={selectionne ? "Actions sur l’évènement sélectionné" : "Sélectionnez un évènement (clic) : ses actions s’affichent ici, ou faites un clic droit sur le bloc"} elements={selectionne ? elementsMenu(selectionne) : [{ cle: "aucun", libelle: "Aucun évènement sélectionné", desactive: true, action: () => {} }]} />
         <a href={`/imprimer/planning?jour=${jour}&vue=${vue}`} target="_blank" rel="noopener" className={bouton}>Imprimer</a>
         <a href={`/api/documents/planning/pdf?jour=${jour}&vue=${vue}`} target="_blank" rel="noopener" className={bouton}>PDF</a>

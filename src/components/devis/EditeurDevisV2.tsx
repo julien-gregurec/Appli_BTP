@@ -559,6 +559,9 @@ export function EditeurDevisV2({
               { cle: "position-fin", libelle: `${positionCollage === "fin" ? "✓ " : ""}à la fin du devis`, action: () => setPositionCollage("fin") },
               { cle: "sep", type: "separateur" },
               { cle: "colonnes", libelle: "Colonnes affichées…", action: () => setDialogue({ type: "colonnes" }) },
+              // Le bouton flottant « Rechercher » est masqué dans l'éditeur (il recouvrait « Enregistrer et fermer ») :
+              // la recherche globale reste accessible ici et par Ctrl+Maj+K.
+              { cle: "recherche-globale", libelle: "Recherche globale…", raccourci: "Ctrl+Maj+K", action: () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, shiftKey: true })) },
             ]} />
             <span className="ml-auto" />
             <div className="hidden lg:flex" role="group" aria-label="Mode de travail">

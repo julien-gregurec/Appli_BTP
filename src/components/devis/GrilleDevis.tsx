@@ -475,8 +475,9 @@ function CelluleChoix({ valeur, options, onChange, index, colonne, disabled, onK
   );
 }
 
-function CelluleLecture({ children, alignement, titre }: { children?: ReactNode; alignement?: "gauche" | "droite" | "centre"; titre?: string }) {
-  return <div role="gridcell" title={titre} className={`flex h-9 min-w-0 items-center truncate px-2 text-sm tabular-nums text-neutral-700 dark:text-neutral-300 ${alignement === "droite" ? "justify-end" : ""}`}>{children}</div>;
+/** Cellule calculée, non éditable ; `cle` (« index:colonne ») l'expose en `data-lecture` pour les tests et la recette. */
+function CelluleLecture({ children, alignement, titre, cle }: { children?: ReactNode; alignement?: "gauche" | "droite" | "centre"; titre?: string; cle?: string }) {
+  return <div role="gridcell" title={titre} data-lecture={cle} className={`flex h-9 min-w-0 items-center truncate px-2 text-sm tabular-nums text-neutral-700 dark:text-neutral-300 ${alignement === "droite" ? "justify-end" : ""}`}>{children}</div>;
 }
 
 // ── Recherche d'article depuis la cellule Désignation ──────────────────────────
@@ -602,7 +603,7 @@ const LigneGrille = memo(function LigneGrille({ index, ligne, origine, colonnes,
           case "fournisseur": return <CelluleLecture key={c.cle}>{origine?.fournisseur ?? ""}</CelluleLecture>;
           case "quantite": return <Cellule key={c.cle} {...commun} colonne="quantite" aria="Quantité" format="nombre" alignement="droite" valeur={champModifiable(type, "quantite") ? fr(ligne.quantite, 3) : ""} disabled={!peut(c, "quantite")} onCommit={(v) => { const n = nombre(v); if (n !== null) onChange({ quantite: n }); }} />;
           case "unite": return <Cellule key={c.cle} {...commun} colonne="unite" aria="Unité" liste="unites-devis" valeur={champModifiable(type, "unite") ? ligne.unite : ""} disabled={!peut(c, "unite")} onCommit={(v) => onChange({ unite: v.trim() || "u" })} />;
-          case "pu_net": return <CelluleLecture key={c.cle} alignement="droite" titre="Prix unitaire HT après remise de ligne">{estChiffree(type) ? euros(ligne.prixUnitaireHt * (1 - ligne.remiseLignePct / 100)) : ""}</CelluleLecture>;
+          case "pu_net": return <CelluleLecture key={c.cle} cle={`${index}:${c.cle}`} alignement="droite" titre="Prix unitaire HT après remise de ligne">{estChiffree(type) ? euros(ligne.prixUnitaireHt * (1 - ligne.remiseLignePct / 100)) : ""}</CelluleLecture>;
           case "prix_achat": return <Cellule key={c.cle} {...commun} colonne="prix_achat" aria="Prix d’achat HT" format="nombre" alignement="droite" valeur={type === "article" || type === "libre" ? fr(origine?.prixAchatHt ?? null, 4) : ""} disabled={!colonneModifiable(c, droits) || !(type === "article" || type === "libre")} onCommit={(v) => onCouts({ prixAchatHt: nombre(v) })} />;
           case "cout_mo": return <Cellule key={c.cle} {...commun} colonne="cout_mo" aria="Coût main-d’œuvre HT" format="nombre" alignement="droite" valeur={type === "article" || type === "libre" ? fr(origine?.coutMainOeuvreHt ?? null, 4) : ""} disabled={!colonneModifiable(c, droits) || !(type === "article" || type === "libre")} onCommit={(v) => onCouts({ coutMainOeuvreHt: nombre(v) })} />;
           case "coefficient": return <Cellule key={c.cle} {...commun} colonne="coefficient" aria="Coefficient" format="nombre" alignement="droite" valeur={type === "article" || type === "libre" ? fr(origine?.coefficient ?? null, 4) : ""} disabled={!colonneModifiable(c, droits) || !(type === "article" || type === "libre")} onCommit={(v) => { const k = nombre(v); const achat = origine?.prixAchatHt; onCouts({ coefficient: k }, k !== null && achat !== null && achat !== undefined ? { prixUnitaireHt: Math.round((achat + (origine?.coutMainOeuvreHt ?? 0)) * k * 100) / 100 } : undefined); }} />;
@@ -640,7 +641,7 @@ const LigneGrille = memo(function LigneGrille({ index, ligne, origine, colonnes,
           case "tva": return champModifiable(type, "tauxTva")
             ? <CelluleChoix key={c.cle} {...commun} colonne="tva" aria="TVA" valeur={String(ligne.tauxTva)} onChange={(v) => onChange({ tauxTva: Number(v) })} options={[...new Set([...TAUX_TVA_ADMIS, ligne.tauxTva])].map((t) => ({ v: String(t), l: `${t} %` }))} />
             : <CelluleLecture key={c.cle} />;
-          case "total_ht": return <CelluleLecture key={c.cle} alignement="droite"><span className={type === "sous_total" ? "font-semibold" : ""}>{totalHt === null ? "" : euros(totalHt)}</span></CelluleLecture>;
+          case "total_ht": return <CelluleLecture key={c.cle} cle={`${index}:${c.cle}`} alignement="droite"><span className={type === "sous_total" ? "font-semibold" : ""}>{totalHt === null ? "" : euros(totalHt)}</span></CelluleLecture>;
           case "commentaire_interne": return <Cellule key={c.cle} {...commun} colonne="commentaire_interne" aria="Commentaire interne" valeur={ligne.commentaireInterne ?? ""} disabled={!champModifiable(type, "commentaireInterne")} onCommit={(v) => onChange({ commentaireInterne: v || null })} />;
           default: return <CelluleLecture key={c.cle} />;
         }
@@ -671,13 +672,13 @@ const LigneOuvrageGrille = memo(function LigneOuvrageGrille({ index, instance, c
           case "designation": return <Cellule key={c.cle} {...commun} colonne="designation" aria="Libellé pour le client" valeur={instance.libelleClient} onCommit={(v) => onChange({ ...instance, libelleClient: v })} />;
           case "quantite": return <CelluleLecture key={c.cle} alignement="droite">{fr(instance.quantitePrincipale, 3)}</CelluleLecture>;
           case "unite": return <CelluleLecture key={c.cle}>{instance.unitePrincipale}</CelluleLecture>;
-          case "pu_net": return <CelluleLecture key={c.cle} alignement="droite" />;
+          case "pu_net": return <CelluleLecture key={c.cle} cle={`${index}:${c.cle}`} alignement="droite" />;
           case "prix_achat": return <CelluleLecture key={c.cle} alignement="droite">{ind.coutAchatHt === null ? "incomplet" : euros(ind.coutAchatHt)}</CelluleLecture>;
           case "marge": return <CelluleLecture key={c.cle} alignement="droite">{ind.margeHt === null ? "" : euros(ind.margeHt)}</CelluleLecture>;
           case "marge_pct": return <CelluleLecture key={c.cle} alignement="droite">{ind.tauxMarquePct === null ? "" : `${fr(ind.tauxMarquePct, 1)} %`}</CelluleLecture>;
           case "prix_vente": return <CelluleLecture key={c.cle} alignement="droite"><button type="button" className="underline" onClick={onPrix} title="Prix global de l’ouvrage">{euros(instance.quantitePrincipale ? ind.prixVenteRetenuHt / instance.quantitePrincipale : ind.prixVenteRetenuHt)}</button></CelluleLecture>;
           case "tva": return <CelluleChoix key={c.cle} {...commun} colonne="tva" aria="Présentation client" valeur={instance.mode} onChange={(v) => onChange({ ...instance, mode: v as ModePresentation })} options={MODES_PRESENTATION.map((m) => ({ v: m.cle, l: m.libelle }))} />;
-          case "total_ht": return <CelluleLecture key={c.cle} alignement="droite"><span className="font-medium">{euros(ind.prixVenteRetenuHt)}</span></CelluleLecture>;
+          case "total_ht": return <CelluleLecture key={c.cle} cle={`${index}:${c.cle}`} alignement="droite"><span className="font-medium">{euros(ind.prixVenteRetenuHt)}</span></CelluleLecture>;
           case "commentaire_interne": return <CelluleLecture key={c.cle}><button type="button" className="text-xs underline" onClick={onModifier}>Modifier l’ouvrage</button></CelluleLecture>;
           default: return <CelluleLecture key={c.cle} />;
         }

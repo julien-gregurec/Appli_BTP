@@ -932,3 +932,242 @@ ici : noter ce qui gêne, sans obligation de justifier.
 
 **Décisions attendues de Julien** : validation ou remarques point par point ; autorisation explicite (ou non)
 de la mise en Production selon le runbook ; choix esthétiques éventuels pour un lot ultérieur.
+
+## 36. Refonte UX utilisateur Julien (2026-09-13, 17:30 → )
+
+Verdict utilisateur de départ : **PAS OK** — produit fonctionnel, ergonomie trop éloignée de la logique
+Batappli. Priorité : ergonomie métier, rapidité, souplesse, visuel du devis. Travail sur la branche,
+le local et la preview uniquement ; Production intouchée.
+
+### 36.1 Phase A — audit Batappli vs existant (synthèse)
+
+| Sujet | Existant au départ | Écart | Décision |
+| --- | --- | --- | --- |
+| Édition du devis | grille cellule par cellule ; aperçu A4 à la demande | pas de vue « document » éditable, barre d'outils dispersée (3 boutons + `Insérer…`), aucun menu contextuel | modes Grille / Document, toolbar regroupée, menu de ligne |
+| Client / chantier | sélecteurs alimentés par la base ; création inline seulement dans l'éditeur historique v1 | l'éditeur v2 obligeait Devis → Clients → Nouveau → retour | dialogues « + Client » / « + Chantier » |
+| Unités | 7 valeurs (`u m² ml h forfait kg L`), saisie libre sans suggestion en grille | liste métier incomplète | 22 unités métier + saisie libre conservée |
+| Remise de ligne | `Rem. %` en grille, net porté par « Total HT » seulement | pas de PU net visible | colonne « PU net » + net sous le PU sur l'A4 |
+| Numérotation | `DEV-AAAA-NNN` codé en dur dans les déclencheurs ; références internes configurables (283) | préfixe obligatoire, aucun réglage documents | migration 294 + Paramètres > Numérotation |
+| Texte | `text` brut, aucun formatage, aucune bibliothèque | gras / italique / couleur impossibles | format interne balisé à liste blanche (§ 36.7) |
+| Navigation | pas d'en-tête partagé ; planning v2 et deux sous-pages Paramètres sans sortie ; aucune garde de saisie | perte silencieuse possible | `EnTetePage`, bouton Retour de l'éditeur, `GardeModifications` |
+| Planning | panneau latéral fixe de 12 actions (`lg:pr-72`) | jugé lourd | menu contextuel + « Actions ▾ » + « Nouvel évènement » |
+| Paramètres | 12 écrans ; devis : aucun défaut (validité, conditions, paiement, unité, TVA) ; pas de rappel | matrice § 36.11 | migration 295 + Paramètres > Devis |
+| Compte de recette | 4 clients, 4 chantiers, 12 articles, 2 ouvrages, 8 salariés, 2 devis brouillon, 0 facture, abonnement 1 an | données insuffisantes | seed démo complète (§ 36.2) |
+
+### 36.2 Phase B — compte de recette complet (`96ea433`)
+
+Entreprise **ELSATIA Recette V2** (offre Pro, abonnement actif jusqu'au **31/01/2028**, compte
+`dirigeant.recette@elsatia-preview.invalid` = Dirigeant, tous droits fonctionnels sauf mode compte dépôt),
+bouton « Ouvrir la démo GP V1 » de la page de connexion → ce compte. Seed idempotent
+`docs/gp-v1/preview/seed-recette-demo-complete.sql` (à jouer après le seed de base ; rejoué deux fois en
+local, mêmes volumes ; appliqué sur la preview) : 16 clients (particuliers, professionnels, collectivité,
+promoteur, syndic) avec 13 contacts, 12 chantiers (prospect → terminé), 6 fournisseurs / sous-traitants,
+60 articles sur 10 familles avec coûts d'achat, 10 ouvrages composés avec coûts, 12 salariés et 2 équipes,
+3 ressources, 9 devis démo (3 brouillons, 2 envoyés, 3 acceptés, 1 refusé ; titres, articles du catalogue,
+remise de ligne, sous-totaux ; numérotés par la base), 3 factures issues des devis acceptés (brouillon,
+envoyée, payée), 18 évènements sur la semaine courante.
+
+### 36.3 Phase C — création client / chantier inline (`c8b90a5`)
+
+« + Client » à côté du champ Client : type, raison sociale ou nom / prénom, adresse, code postal, ville,
+téléphone, e-mail, SIRET et contact pour un professionnel ; création par l'action existante (statut
+prospect, droit `gerer_clients`), affectation immédiate au brouillon, message « Client « … » créé et affecté
+au devis ». « + Chantier » : client prérempli, adresse reprise du client, rattachement immédiat. Le
+brouillon reste en mémoire : aucune navigation, rien de perdu. Banc `tiers-inline` (création, affectation,
+préremplissage, refus du serveur).
+
+### 36.4 Phase D — unités (`78e47ad`)
+
+`src/lib/unites.ts` : unité, pièce, paire, ensemble, lot, m, ml, m², m³, litre, kg, g, tonne, heure, jour,
+forfait, boîte, rouleau, palette, sac, plaque, panneau — suggestions (`datalist` avec libellés longs) dans la
+cellule Unité de la grille et la carte mobile, saisie libre conservée (unité personnalisée stockée telle
+quelle, colonne `text`). Les clés historiques sont inchangées ; les éditeurs v1 et le schéma IA lisent la
+même liste. Aucune contrainte base n'existait ni n'est ajoutée (audit § 36.1).
+
+### 36.5 Phase E — remise de ligne (`78e47ad`)
+
+Colonne calculée **PU net** (prix unitaire après remise de ligne) entre Rem. % et TVA, visible par défaut ;
+A4 / PDF : « remise −5 % → 95,00 € » sous le PU ; le total de ligne reste le net. Remise de section (« 5 % »
+dans la cellule PU d'une ligne Remise) et remise fixe (montant) inchangées et distinctes de la remise globale
+de l'en-tête. Remise en valeur par ligne : le modèle (`remise_ligne` en %) ne la porte pas ; non implémentée,
+documentée.
+
+### 36.6 Phase F — numérotation configurable, préfixe facultatif (`fa82faa`, migration 294)
+
+Table `numerotation_documents` (devis, facture, avoir, commande) : préfixe **facultatif** (`DEV-2026-00125`
+ou `00125`), année et mois facultatifs, séparateur `-` / `/` / aucun, largeur 1 à 8, remise à zéro annuelle.
+Attribution toujours **en base**, à la première sortie du brouillon, par les mêmes déclencheurs, via un
+compteur atomique par entreprise et par nature (`on conflict do update`) et `unique (entreprise_id,
+numero)` : deux devis simultanés ne partagent jamais un numéro ; aucune renumérotation ; sans réglage,
+format identique à l'historique (avoirs sur la séquence des factures sauf réglage propre). Fonction
+d'aperçu du prochain numéro sans consommation (membres). Paramètres > Numérotation : préfixe, année, mois,
+séparateur, chiffres, remise annuelle, aperçu immédiat, prochain numéro. pgTAP 25/25 ; miroir TS 4 tests.
+
+### 36.7 Phase G — texte riche (`8785262`)
+
+Format interne structuré et sûr (pas de HTML) : balises à liste blanche `[b] [i] [u] [h] [c=couleur]` dans les
+colonnes `text` existantes ; tout le reste (balise inconnue, couleur hors palette, fermeture orpheline, HTML
+saisi) reste du texte littéral, jamais un caractère perdu. Rendu = `<span>` React avec styles calculés →
+**même formatage** dans l'éditeur (aperçu), la lecture, l'impression A4, le PDF (Chromium sur la même
+page) et la pièce jointe e-mail ; pagination sur le texte brut. Palette : accent et couleur principale de
+l'entreprise + rouge, vert, bleu, orange, gris (pas de HEX libre). Barre de formatage sur la sélection du
+champ actif (désignation, description, texte des titres / commentaires, conditions, notes) : boutons ou
+Ctrl+B / I / U, surlignage, couleur. Champs concernés : désignation (texte simple conservé si aucune
+balise), description, titre, sous-titre, commentaire, conditions, notes client. Tests unitaires (parseur,
+sûreté, bascule) et banc `texte-riche` (éditeur → A4, HTML rendu en texte).
+
+### 36.8 Phase H — retour / quitter, modifications non enregistrées (`fac04f4`)
+
+`EnTetePage` partagé (retour, titre, sous-titre, actions) ; bouton « ← Retour » dans l'éditeur ; sorties
+ajoutées au planning et aux pages Sécurité / Mes données. `GardeModifications` : fermeture / rechargement
+du navigateur → avertissement natif ; toute navigation interne (lien, barre latérale, bouton retour mobile,
+bouton Retour) interceptée : **« Des modifications ne sont pas enregistrées. »** avec Enregistrer et quitter
+/ Quitter sans enregistrer / Annuler. Banc `garde` (3 choix + interception d'un lien).
+
+### 36.9 Phase I — barre d'outils devis et menu contextuel de ligne (`b830495`)
+
+Toolbar : **Ajouter ▾** (ligne libre, article Ctrl+K, ouvrage, titre, sous-titre, commentaire, sous-total,
+remise, ligne vide, séparateur, saut de page), Copier, Coller, Dupliquer, **Plus ▾** (position de collage,
+colonnes), Grille / Document, Aperçu A4, PDF, Envoyer…, Enregistrer et fermer. Menu de ligne (clic droit,
+bouton ⋯ près de la poignée, Maj+F10) : insérer au-dessus / en dessous, titre au-dessus, dupliquer, copier,
+coller après, transformer en (tout type), supprimer. Menus natifs (`role=menu`, clavier), positionnés en
+coordonnées de fenêtre. Banc `menu-ligne`.
+
+### 36.10 Phase J — planning sans grand panneau (`ce36c8b`)
+
+Panneau latéral retiré (pleine largeur). Clic = sélection, double clic = modifier, glisser = déplacer,
+Alt+glisser = dupliquer (inchangés) ; clic droit / bouton ⋯ du bloc sélectionné / Maj+F10 → menu :
+modifier, dupliquer, affecter une équipe ou un salarié, ouvrir le chantier, ouvrir le client, historique,
+imprimer, supprimer (droits et motifs du registre existant). Barre : Aujourd'hui, ‹ ›, date, 8 vues,
+recherche, filtres, zoom (jour), **Nouvel évènement**, **Actions ▾** (tactile), Imprimer, PDF. En-tête avec
+retour « Tableau de bord ». Tests statiques adaptés.
+
+### 36.11 Phase K — paramètres (`8b60070`, migration 295) et audit
+
+| Réglage | Existe | Partiel | Absent | Recommandation / fait |
+| --- | --- | --- | --- | --- |
+| Numérotation des documents | — | — | ✗ → **fait** (294) | préfixe facultatif, année, mois, séparateur, largeur, remise annuelle |
+| Préfixes | références internes (283) | | | + documents (294) |
+| Unités | | liste figée | | liste métier + unité par défaut (295) |
+| TVA | | ligne à ligne | | TVA par défaut des lignes (295) |
+| Remises | remise globale / ligne / section par document | | défaut entreprise | non nécessaire (pas de remise « automatique ») |
+| Devis (défauts) | | modèles de devis | validité, conditions, paiement | **fait** (295) |
+| Factures (défauts) | | | ✗ | à traiter dans un lot factures (hors périmètre devis) |
+| Conditions | par devis | | | conditions par défaut (295) |
+| Validité devis | date manuelle | | | durée par défaut (295) |
+| Paiement | par document / tiers | | | mode + conditions par défaut (295) |
+| Mentions, texte légal (CGV), pied de page, en-tête | ✓ | | | conservés |
+| Signatures | | bloc « Bon pour accord » imprimé d'office ; module e-signature « à venir » | | inchangé (lot dédié) |
+| Affichage coûts / marges | permissions + seuil de marque | | | conservé (droits) |
+| Références (impression) | ✓ | | | conservé |
+| PDF (modèle), logo, couleurs, police, taille, descriptions, TVA par ligne, filigranes | ✓ | | | conservés |
+| Colonnes | réglage local (navigateur) | ordre / largeur | | visibles / masquées par navigateur (inchangé) ; ordre et largeur : § 36.15 |
+| Arrondis | | | ✗ (centime fixe) | non recommandé (règle comptable) |
+| Devise | | | ✗ (EUR) | non recommandé en V1 |
+| Formats de date | | | ✗ (JJ/MM/AAAA) | non recommandé en V1 |
+| Modèle e-mail | ✓ | | | conservé |
+| Pages / pagination | | | ✗ (A4 calculé) | non recommandé (pagination automatique fiable) |
+| Affichage ouvrages / composants | par instance (4 modes) | défaut entreprise | | à étudier après validation |
+| **Sauvegarde : rappel** | — | — | ✗ → **fait** (295) | activé / fréquence 2-5-10-15-30 / personnalisé, 10 min recommandé, surcharge personnelle |
+
+Paramètres > Devis : validité (jours), unité et TVA par défaut des lignes, conditions, mode et conditions de
+paiement — repris par tout nouveau devis (date de validité = émission + N, nouvelles lignes) ; section
+**Sauvegarde** : rappel activé, fréquence, préférence personnelle (ce navigateur). Propres à l'entreprise
+(RLS ; pgTAP 10/10).
+
+**Rappel de sauvegarde** : bandeau non bloquant « Sauvegarder le devis ? — Des modifications ont été
+apportées depuis la dernière sauvegarde. » avec Sauvegarder maintenant / Plus tard / Ne plus me le rappeler
+pour ce devis. N'apparaît que si le devis est modifié et qu'aucune sauvegarde n'a réussi depuis la référence
+(dernière sauvegarde réussie, dernier rappel ou « Plus tard ») ; compteur remis à zéro par toute sauvegarde
+**réussie** (manuelle, autosauvegarde, « Sauvegarder maintenant »), jamais par un échec ; le rappel n'écrit
+jamais (aucune double écriture ni conflit avec l'autosauvegarde technique, inchangée) ; la garde de
+navigation reste prioritaire. Décision pure testée (8 cas : désactivé, 2/5/10/15/30 et personnalisé,
+inchangé, modifié, réussite, échec, autosave, plusieurs modifications, « Plus tard », opt-out) ; banc
+`rappel` (bandeau, échec/réussite, Plus tard, opt-out, mobile, deux onglets).
+
+### 36.12 Phase L — modes Grille / Document (`dd26ee2`)
+
+Grand écran : **Grille** (tableau rapide, aperçu A4 optionnel à côté) ou **Document** (le devis tel qu'il
+sera imprimé, pleine largeur ; clic sur une ligne → fiche de la ligne, clic sur un ouvrage → son dialogue ;
+toolbar disponible). Préférence mémorisée par navigateur ; défaut = Grille tant que Julien n'a pas tranché
+(les deux à tester sur le compte de recette). Sous 1 024 px : onglets Saisie / Aperçu inchangés. Banc
+`mode-document`.
+
+### 36.13 Phase M — cohérence A4 / PDF
+
+Un seul composant (`DocumentA4`) sert l'aperçu, l'impression, le PDF et l'e-mail : texte riche, PU net après
+remise, unités, remises de section et globale y sont rendus à l'identique (E2E 47 : `font-weight:700` et
+`text-decoration:underline` présents dans la page d'impression, PDF 200).
+
+### 36.14 Checklist — chaque exigence du prompt de Julien
+
+| # | Exigence Julien | Statut | Preuve |
+| --- | --- | --- | --- |
+| 1 | Devis = grille / feuille directement éditable (voir, modifier, ajouter, supprimer, déplacer, formater, unités, remises, prix, textes, sous-totaux, titres, commentaires, articles, ouvrages) sans quitter le visuel | ✅ | grille v2 + menu de ligne + Ajouter ▾ + barre de formatage ; banc `menu-ligne`, `texte-riche` ; E2E 47 |
+| 2 | Vue principale proche du devis final, éditeur type document / tableur, colonnes selon droits | ✅ | mode Document (§ 36.12), colonnes sensibles retirées sans droit (§ 23) |
+| 3 | Aperçu PDF / A4 immédiat, bascule grille ↔ document, pas de gros panneau latéral permanent | ✅ | boutons Grille / Document / Aperçu A4 ; aperçu masqué par défaut |
+| 4 | Panneau latéral d'actions à revoir (menu contextuel, toolbar, clic droit, boutons dans la ligne, double clic) | ✅ devis et planning | § 36.9, § 36.10 ; fiches (client, chantier, facture…) : panneau conservé, § 36.15 |
+| 5 | Création client depuis le devis (nom, adresse, téléphone, e-mail, SIRET, contact) → affecté | ✅ | § 36.3 ; banc `tiers-inline` ; E2E 47 |
+| 6 | Création chantier depuis le devis, client prérempli, retour immédiat | ✅ | idem |
+| 7 | Unités — liste complète, choix simple dans la cellule, unité personnalisée | ✅ | § 36.4 |
+| 8 | Remise par ligne en %, calcul visible (PU, Rem. %, PU net), remise globale indépendante | ✅ (remise en valeur par ligne : non supportée par le modèle) | § 36.5 ; E2E 39 |
+| 9 | Remise section / fixe / globale claires | ✅ | remise « 5 % » vs montant dans la cellule PU ; remise globale en-tête ; banc `remise` |
+| 10 | Référence interne visible, préfixe NON obligatoire | ✅ | § 36.6 ; pgTAP (B sans préfixe) ; E2E 49 |
+| 11 | Paramètres > Numérotation (devis, factures, avoirs, commandes ; préfixe, année, mois, séparateur, largeur, prochain numéro, aperçu) | ✅ | `/parametres/numerotation` |
+| 12 | Numérotation sécurisée (unicité, audit, séquence, concurrence, backend autoritaire) | ✅ | compteur atomique + contrainte unique + déclencheurs ; pgTAP 25 |
+| 13 | Mise en forme : gras, italique, souligné, couleur (+ surlignage) | ✅ (alignement, listes : non) | § 36.7 |
+| 14 | Éditeur riche : format structuré sûr, pas de HTML arbitraire, sanitization | ✅ | balises à liste blanche, rendu en nœuds React, tests de sûreté |
+| 15 | Champs : description, commentaire, titre, sous-titre, conditions, texte libre ; désignation étudiée | ✅ (désignation : texte simple si aucune balise) | § 36.7 |
+| 16 | Formatage respecté en lecture, A4, PDF, impression, e-mail | ✅ | un seul composant de rendu ; E2E 47 (impression / PDF) |
+| 17 | Couleurs raisonnables : palette + couleurs entreprise, HEX non ouvert | ✅ | palette de 7 (accent, principale, 5 standard) |
+| 18 | Audit complet des paramètres (matrice) | ✅ | § 36.11 |
+| 19 | Paramètres propres à l'entreprise | ✅ | tables par `entreprise_id`, RLS ; pgTAP |
+| 20 | Retour / quitter sur toutes les pages métier | ✅ | § 36.8 (fiches déjà pourvues ; planning, paramètres, éditeur ajoutés) |
+| 21 | Modifications non enregistrées : Enregistrer et quitter / Quitter sans enregistrer / Annuler | ✅ | banc `garde` ; E2E 47, 51 |
+| 22 | Plus de comptes expirés / vides : compte de recette stable | ✅ | § 36.2 |
+| 23 | Compte Julien : entreprise, plan Pro, actif ≥ fin 2027, Dirigeant, tous droits | ✅ | échéance 31/01/2028, dirigeant.recette |
+| 24 | Données de démo (clients 10-20, chantiers 10+, contacts, articles 50+, ouvrages 10+, devis 4 états, factures, employés 10+, planning, fournisseurs, prestations, matériel) | ✅ (matériel = ressources planning ; table matériel inexistante) | § 36.2 |
+| 25 | Aucune expiration, abonnement stable documenté | ✅ | seed + § 36.2 |
+| 26 | Bouton démo → compte complet | ✅ | `/login` « Ouvrir la démo GP V1 » → dirigeant.recette |
+| 27 | Planning : clic, double clic, drag, Alt+drag, clic droit / menu (modifier, dupliquer, affecter, supprimer, chantier, client, imprimer) | ✅ | § 36.10 ; E2E 48 |
+| 28 | Planning : barre (aujourd'hui, ‹ ›, vues, filtres, nouvel évènement, imprimer), pas de panneau permanent | ✅ | idem |
+| 29 | Toolbar devis cohérente, menus regroupés | ✅ | § 36.9 |
+| 30 | Menu contextuel ligne (insérer au-dessus / dessous, dupliquer, copier, supprimer, transformer) | ✅ | banc `menu-ligne` |
+| 31 | Colonnes (référence, désignation, description, unité, quantité, prix achat si autorisé, coefficient / marge, PV HT, remise, TVA, total HT), largeur | ✅ colonnes · ⚠ largeur fixe | § 36.15 |
+| 32 | Personnalisation colonnes (afficher / masquer, ordre, largeur), coûts soumis aux droits | ⚠ afficher / masquer seulement (réglage navigateur) | § 36.15 |
+| 33 | Mode « Document » (proche du PDF, édition dans la mise en page) sans casser la grille | ✅ | § 36.12 |
+| 34 | Mode « Grille » conservé, préférence mémorisée par utilisateur | ✅ (par navigateur) | idem |
+| 35 | Mode par défaut : les deux testés, pas de décision imposée | ✅ | défaut Grille, à trancher par Julien |
+| 36 | Test création client inline (devis → client absent → créer → sélection auto → brouillon intact) | ✅ | banc `tiers-inline` ; E2E 47 |
+| 37 | Test unités (éditeur, lecture, PDF, facture si transformation) | ✅ éditeur / lecture / PDF (m²) ; facture : lignes recopiées (§ 25) | E2E 47 |
+| 38 | Test texte riche sur la phrase « Cloison vitrée bord à bord avec porte toute hauteur » (gras, souligné, italique, accent) → A4 / PDF | ✅ | E2E 47, banc `texte-riche` |
+| 39 | Test remises 0, 5, 25, 100 | ✅ | E2E 39 (PU net 100 / 95 / 75 / 0, totaux) |
+| 40 | Paramètres : implémenter les réglages raisonnables, pas de réglages fictifs | ✅ | 294, 295 |
+| 41 | Navigation retour cohérente (composant partagé) | ✅ | `EnTetePage`, `GardeModifications` |
+| 42 | Compte recette : seed idempotent, preview seulement | ✅ | § 36.2 |
+| 43 | Aucune Production | ✅ | aucun lien ni déploiement |
+| 44 | Session autonome longue, minutieuse | ✅ | phases A → O |
+| 45 | Ordre de travail A → O | ✅ | sections 36.1 → 36.16 |
+| 46 | Tests unitaires, SQL, E2E, non-régression | ✅ | § 36.16 |
+| 47 | E2E devis (18 étapes) | ✅ | `tests/e2e/gp-v1-ux.spec.ts` scénario 47 |
+| 48 | E2E planning (9 étapes) | ✅ | scénario 48 |
+| 49 | E2E numérotation A / B | ✅ | scénario 49 |
+| 50 | E2E texte riche (éditeur = lecture = A4 = PDF) | ✅ | scénario 47 (partie 11-15) |
+| 51 | Mobile (devis, toolbar, client inline, retour, planning) | ✅ | scénario 51 ; banc `rappel` mobile |
+| 52 | Performance 100 / 500 / 1 000 lignes, planning 400 | ✅ | § 36.16 |
+| 53 | Documentation : section + checklist | ✅ | § 36 |
+| 54 | Rapport final | ✅ | message de fin de session |
+| — | Rappel de sauvegarde (nouvelle exigence) | ✅ | § 36.11 ; banc `rappel` ; 8 tests unitaires ; pgTAP 295 |
+
+### 36.15 Écarts assumés et suites
+
+- **Colonnes : ordre et largeur** non réglables (ordre canonique, largeurs fixes par colonne, réglage
+  visible / masqué par navigateur) — lot suivant : préférences par utilisateur en base (ordre, largeur).
+- **Remise en valeur par ligne** : le modèle porte un pourcentage ; une remise en euros se fait par une
+  ligne « Remise » (montant) dans la section.
+- **Alignement et listes** dans le texte riche : non couverts (gras, italique, souligné, surlignage, couleur
+  livrés).
+- **Panneau d'actions des fiches** (client, chantier, facture, fournisseur…) : conservé tel quel ; seuls le
+  devis et le planning ont été revus — à étendre après validation si Julien le souhaite.
+- **Banc historique `editeur-v2.banc.spec.ts`** : toujours rouge (11/13) pour des raisons antérieures
+  (aperçu masqué par défaut, libellés) ; hors gate ; à réécrire.
