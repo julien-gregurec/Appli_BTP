@@ -313,15 +313,21 @@ test("9. transformation en facture (devis accepté → facture issue du devis)",
   const statutAccept = page.locator("select").filter({ has: page.locator("option[value='accepte']") }).first();
   await expect(statutAccept).toBeVisible({ timeout: 30_000 });
   await statutAccept.selectOption("accepte");
-  await expect.poll(async () => (await page.locator("main").innerText()).includes("· accepte") || (await page.locator("select option:checked").allTextContents()).some((t) => /Accepté/.test(t)), { timeout: 30_000 }).toBe(true);
+  // Preuve côté serveur (contexte « n° · accepte » rendu par la page) : l'option cochée côté client précède
+  // l'action serveur, et recharger à ce moment-là l'interrompt (transformation alors grisée).
+  await expect.poll(async () => (await page.locator("main").innerText()).includes("· accepte"), { timeout: 30_000 }).toBe(true);
   await aller(page, urlDevis);
   page.on("dialog", (d) => d.accept());
   const transformer = page.getByRole("button", { name: "Transformer en facture" }).first();
   await expect(transformer).toBeVisible();
+  // L'action n'est cliquable qu'une fois le statut « accepté » rendu par le serveur (sinon : span aria-disabled).
+  await expect(transformer).not.toHaveAttribute("aria-disabled", "true", { timeout: 30_000 });
   await transformer.scrollIntoViewIfNeeded();
   const clique = await transformer.click({ timeout: 20_000 }).then(() => true).catch(() => false);
   if (!clique) await transformer.dispatchEvent("click");
-  await page.waitForURL(/\/factures\/[0-9a-f-]{36}/, { timeout: 90_000 });
+  // L'action serveur redirige vers la facture créée, ou revient sur le devis avec ?error= : on veut le motif, pas un délai.
+  await page.waitForURL((u) => /\/factures\/[0-9a-f-]{36}/.test(u.pathname) || u.searchParams.has("error"), { timeout: 90_000 });
+  if (new URL(page.url()).searchParams.has("error")) throw new Error(`Transformation refusée : ${new URL(page.url()).searchParams.get("error")}`);
   await aller(page, urlDevis);
   await expect(page.locator("main")).toContainText(/Documents issus|facture/i);
 });

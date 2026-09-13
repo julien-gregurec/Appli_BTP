@@ -163,3 +163,29 @@ test("boutons, position de collage, 100 et 500 lignes", async ({ page }) => {
   const d = await designations(page);
   expect(d[0]).toBe(d[3]);
 });
+
+test("une validation de cellule différée (blur) n'écrase pas un collage ni une duplication survenus juste après", async ({ page }) => {
+  await page.goto(url("?lignes=3"));
+  await cellule(page, 1, "poignee").click();
+  await cellule(page, 2, "poignee").click({ modifiers: ["Shift"] });
+  await page.keyboard.press("ControlOrMeta+c");
+  await expect(retour(page)).toContainText("2 lignes copiées");
+  // Saisie dans la désignation de la ligne 1, puis collage immédiat (la validation de la cellule est différée de 120 ms).
+  await cellule(page, 0, "designation").click();
+  await page.keyboard.type(" modifiée");
+  await cellule(page, 2, "poignee").click();
+  await page.keyboard.press("ControlOrMeta+v");
+  await expect(grille(page)).toHaveAttribute("aria-rowcount", "5");
+  await page.waitForTimeout(400);
+  await expect(grille(page)).toHaveAttribute("aria-rowcount", "5");
+  await expect(cellule(page, 0, "designation")).toHaveValue(/ modifiée$/);
+  // Même chose avec Ctrl+D depuis une cellule dont la saisie vient d'être quittée.
+  await cellule(page, 1, "designation").click();
+  await page.keyboard.type(" bis");
+  await cellule(page, 3, "designation").click();
+  await page.keyboard.press("Control+d");
+  await expect(grille(page)).toHaveAttribute("aria-rowcount", "6");
+  await page.waitForTimeout(400);
+  await expect(grille(page)).toHaveAttribute("aria-rowcount", "6");
+  await expect(cellule(page, 1, "designation")).toHaveValue(/ bis$/);
+});

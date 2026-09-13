@@ -31,7 +31,8 @@ import { CLE_STOCKAGE_PRESSE_PAPIER, ressembleAPressePapier } from "@/lib/devis/
  */
 
 export type ActionsGrille = {
-  setEtat: (suivant: EtatElements) => void;
+  /** Mise à jour d'état : de préférence une fonction de l'état le plus récent (une validation de cellule différée ne doit jamais écraser un collage ou une duplication survenus entre-temps). */
+  setEtat: (suivant: EtatElements | ((etat: EtatElements) => EtatElements)) => void;
   genererCle: () => string;
   ouvrirOuvrage: (instance: InstanceOuvrage | null, apresCle: string | null) => void;
   prixGlobal: (instance: InstanceOuvrage) => void;
@@ -150,16 +151,17 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
   );
   const finGlisser = (e: DragEndEvent) => {
     if (!e.over || e.active.id === e.over.id) return;
-    actions.setEtat(deplacerElementVers(etat, String(e.active.id), cles.indexOf(String(e.over.id))));
+    const source = String(e.active.id), cible = cles.indexOf(String(e.over.id));
+    actions.setEtat((courant) => deplacerElementVers(courant, source, cible));
   };
 
   const nouvelleLigneApres = useCallback((cle: string | null, type: TypeLigneGrille = "libre") => {
     const nouvelle = actions.genererCle();
-    actions.setEtat(insererLigne(etat, nouvelle, type, cle));
+    actions.setEtat((courant) => insererLigne(courant, nouvelle, type, cle));
     const i = cle === null ? tries.length : cles.indexOf(cle) + 1;
     setActive(nouvelle);
     setCible({ index: i, colonne: "designation" });
-  }, [actions, etat, tries.length, cles, setActive]);
+  }, [actions, tries.length, cles, setActive]);
 
   /** Clavier de la grille : navigation entre cellules et opérations de ligne. */
   const clavier = (e: KeyboardEvent<HTMLDivElement>, index: number, colonne: string) => {
@@ -194,14 +196,14 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
       e.preventDefault();
       return nouvelleLigneApres(cle);
     }
-    if (ctrl && e.key === "ArrowUp") { e.preventDefault(); if (index > 0) { actions.setEtat(deplacerElementVers(etat, cle, index - 1)); setCible({ index: index - 1, colonne }); } return; }
-    if (ctrl && e.key === "ArrowDown") { e.preventDefault(); if (index < tries.length - 1) { actions.setEtat(deplacerElementVers(etat, cle, index + 1)); setCible({ index: index + 1, colonne }); } return; }
+    if (ctrl && e.key === "ArrowUp") { e.preventDefault(); if (index > 0) { actions.setEtat((courant) => deplacerElementVers(courant, cle, index - 1)); setCible({ index: index - 1, colonne }); } return; }
+    if (ctrl && e.key === "ArrowDown") { e.preventDefault(); if (index < tries.length - 1) { actions.setEtat((courant) => deplacerElementVers(courant, cle, index + 1)); setCible({ index: index + 1, colonne }); } return; }
     if (e.key === "ArrowUp" && tag !== "SELECT" && tag !== "TEXTAREA" && index > 0) return aller(index - 1, colonne);
     if (e.key === "ArrowDown" && tag !== "SELECT" && tag !== "TEXTAREA" && index < tries.length - 1) return aller(index + 1, colonne);
-    if (ctrl && e.key.toLowerCase() === "d") { e.preventDefault(); const n = actions.genererCle(); actions.setEtat(dupliquerElement(etat, cle, n)); setCible({ index: index + 1, colonne }); return; }
+    if (ctrl && e.key.toLowerCase() === "d") { e.preventDefault(); const n = actions.genererCle(); actions.setEtat((courant) => dupliquerElement(courant, cle, n)); setCible({ index: index + 1, colonne }); return; }
     if (ctrl && (e.key === "Delete" || e.key === "Backspace")) {
       e.preventDefault();
-      actions.setEtat(retirerElement(etat, cle));
+      actions.setEtat((courant) => retirerElement(courant, cle));
       if (tries.length > 1) setCible({ index: Math.min(index, tries.length - 2), colonne });
       return;
     }
@@ -270,11 +272,11 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
           tvaMixte={tvaMixte.has(element.ligne.cle)}
           onFocus={() => setActive(element.ligne.cle)}
           onKeyDown={(e, colonne) => clavier(e, index, colonne)}
-          onChange={(patch) => actions.setEtat(modifierLigneLibre(etat, element.ligne.cle, patch))}
-          onCouts={(c, prix) => { const e1 = modifierCoutsLigne(etat, element.ligne.cle, c); actions.setEtat(prix ? modifierLigneLibre(e1, element.ligne.cle, prix) : e1); }}
-          onArticle={(a) => actions.setEtat(remplacerLigneParArticle(etat, element.ligne.cle, a))}
+          onChange={(patch) => actions.setEtat((courant) => modifierLigneLibre(courant, element.ligne.cle, patch))}
+          onCouts={(c, prix) => actions.setEtat((courant) => { const e1 = modifierCoutsLigne(courant, element.ligne.cle, c); return prix ? modifierLigneLibre(e1, element.ligne.cle, prix) : e1; })}
+          onArticle={(a) => actions.setEtat((courant) => remplacerLigneParArticle(courant, element.ligne.cle, a))}
           onOuvrage={() => actions.ouvrirOuvrage(null, element.ligne.cle)}
-          onRetirer={() => actions.setEtat(retirerElement(etat, element.ligne.cle))}
+          onRetirer={() => actions.setEtat((courant) => retirerElement(courant, element.ligne.cle))}
         />
       ) : (
         <LigneOuvrageGrille
@@ -286,10 +288,10 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
           poignee={poignee}
           onFocus={() => setActive(element.instance.cle)}
           onKeyDown={(e, colonne) => clavier(e, index, colonne)}
-          onChange={(instance) => actions.setEtat({ elements: etat.elements.map((x) => (x.type === "ouvrage" && x.instance.cle === instance.cle ? { ...x, instance } : x)), origines: etat.origines })}
+          onChange={(instance) => actions.setEtat((courant) => ({ elements: courant.elements.map((x) => (x.type === "ouvrage" && x.instance.cle === instance.cle ? { ...x, instance } : x)), origines: courant.origines }))}
           onModifier={() => actions.ouvrirOuvrage(element.instance, null)}
           onPrix={() => actions.prixGlobal(element.instance)}
-          onRetirer={() => actions.setEtat(retirerElement(etat, element.instance.cle))}
+          onRetirer={() => actions.setEtat((courant) => retirerElement(courant, element.instance.cle))}
         />
       )}
     </LigneSortable>

@@ -131,7 +131,13 @@ export function EditeurDevisV2({
   };
   const colonnes = useMemo(() => colonnesVisibles(reglagesColonnes, droits), [reglagesColonnes, droits]);
 
-  const setEtat = useCallback((suivant: EtatElements) => { setHistorique((h) => pousser(h, { entete: h.present.entete, etat: suivant })); setSale(true); }, []);
+  // Un état complet ou, de préférence, une fonction de l'état le plus récent : la validation différée d'une
+  // cellule (120 ms après le blur) ne doit jamais écraser un collage, une duplication ou une insertion
+  // survenus entre-temps (constaté en recette preview : lignes collées « perdues » à l'enregistrement).
+  const setEtat = useCallback((suivant: EtatElements | ((etat: EtatElements) => EtatElements)) => {
+    setHistorique((h) => pousser(h, { entete: h.present.entete, etat: typeof suivant === "function" ? suivant(h.present.etat) : suivant }));
+    setSale(true);
+  }, []);
   // L'en-tête se modifie sans entrée d'historique à chaque frappe ; une entrée est poussée à la sortie du champ.
   const majEntete = (patch: Partial<EnteteDevisV2>) => { setHistorique((h) => remplacerPresent(h, { ...h.present, entete: { ...h.present.entete, ...patch } })); setSale(true); };
   const focusEntete = () => { enteteAvantFocus.current = entete; };
@@ -162,8 +168,11 @@ export function EditeurDevisV2({
       return { ok: false };
     }
     const position: PositionCollage = ou === "fin" || !apresCle ? { type: "fin" } : ou === "avant" ? { type: "avant", cle: apresCle } : { type: "apres", cle: apresCle };
-    const colle = collerElements(etat, lu.payload.elements, position, genererCle);
-    setEtat(colle.etat);
+    // Les clés sont tirées une fois (retour et sélection immédiats) puis rejouées dans l'ordre si l'état
+    // a bougé entre le rendu et l'application (même résultat, calculé sur l'état le plus récent).
+    const clesTirees: string[] = [];
+    const colle = collerElements(etat, lu.payload.elements, position, () => { const c = genererCle(); clesTirees.push(c); return c; });
+    setEtat((courant) => { if (courant === etat) return colle.etat; let i = 0; return collerElements(courant, lu.payload.elements, position, () => clesTirees[i++] ?? genererCle()).etat; });
     setSelection({ cles: colle.clesAjoutees, ancre: colle.clesAjoutees[0] ?? null });
     setRetourPressePapier({ genre: "collage", texte: libelleCollage(colle.clesAjoutees.length) });
     return { ok: true };
@@ -427,10 +436,10 @@ export function EditeurDevisV2({
           <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 bg-white/90 py-2 backdrop-blur dark:bg-neutral-950/90" role="toolbar" aria-label="Lignes">
             <button type="button" onClick={() => setDialogue({ type: "articles" })} className={principal} title="Ctrl+K">Articles <span className="opacity-60">Ctrl+K</span></button>
             <button type="button" onClick={() => setDialogue({ type: "ouvrage", instance: null, apresCle: null })} className={bouton} title="Ouvrage composé de la bibliothèque">Ouvrage</button>
-            <button type="button" onClick={() => setEtat(insererLigne(etat, genererCle(), "libre", null))} className={bouton} title="Entrée en bas de grille">Ligne libre</button>
+            <button type="button" onClick={() => { const cle = genererCle(); setEtat((courant) => insererLigne(courant, cle, "libre", null)); }} className={bouton} title="Entrée en bas de grille">Ligne libre</button>
             <label className="flex items-center gap-1 text-sm">
               <span className="sr-only">Insérer une ligne de structure</span>
-              <select value="" onChange={(e) => { const t = e.target.value as TypeLigneGrille; if (t) setEtat(insererLigne(etat, genererCle(), t, null)); }} className={champ} aria-label="Insérer">
+              <select value="" onChange={(e) => { const t = e.target.value as TypeLigneGrille; if (t) { const cle = genererCle(); setEtat((courant) => insererLigne(courant, cle, t, null)); } }} className={champ} aria-label="Insérer">
                 <option value="">Insérer…</option>
                 {TYPES_LIGNE_GRILLE.filter((t) => !t.chiffree).map((t) => <option key={t.cle} value={t.cle} title={t.aide}>{t.libelle}</option>)}
               </select>
@@ -496,8 +505,8 @@ export function EditeurDevisV2({
                     <span className="shrink-0 tabular-nums text-neutral-500">{euros(indicateursPrix(e.instance).prixVenteRetenuHt)}</span>
                   </button>
                 )}
-                <button type="button" onClick={() => setEtat(deplacerElement(etat, cleElement(e), -1))} className="min-h-11 min-w-11 text-neutral-500" aria-label="Monter">↑</button>
-                <button type="button" onClick={() => setEtat(deplacerElement(etat, cleElement(e), 1))} className="min-h-11 min-w-11 text-neutral-500" aria-label="Descendre">↓</button>
+                <button type="button" onClick={() => setEtat((courant) => deplacerElement(courant, cleElement(e), -1))} className="min-h-11 min-w-11 text-neutral-500" aria-label="Monter">↑</button>
+                <button type="button" onClick={() => setEtat((courant) => deplacerElement(courant, cleElement(e), 1))} className="min-h-11 min-w-11 text-neutral-500" aria-label="Descendre">↓</button>
               </li>
             ))}
           </ol>
@@ -553,7 +562,7 @@ export function EditeurDevisV2({
           seuilTauxMarquePct={seuilTauxMarquePct}
           onFermer={() => setDialogue(null)}
           onValider={(instance) => {
-            setEtat(dialogue.instance ? remplacerOuvrage(etat, instance) : dialogue.apresCle ? insererOuvrage(etat, instance, dialogue.apresCle) : ajouterOuvrage(etat, instance));
+            setEtat((courant) => (dialogue.instance ? remplacerOuvrage(courant, instance) : dialogue.apresCle ? insererOuvrage(courant, instance, dialogue.apresCle) : ajouterOuvrage(courant, instance)));
             setDialogue(null);
           }}
         />
@@ -566,8 +575,8 @@ export function EditeurDevisV2({
           ligne={ligneMobile.ligne}
           origine={etat.origines[ligneMobile.ligne.cle]}
           droits={droits}
-          onChange={(patch) => setEtat(modifierLigneLibre(etat, ligneMobile.ligne.cle, patch))}
-          onRetirer={() => { setEtat(retirerElement(etat, ligneMobile.ligne.cle)); setDialogue(null); }}
+          onChange={(patch) => setEtat((courant) => modifierLigneLibre(courant, ligneMobile.ligne.cle, patch))}
+          onRetirer={() => { setEtat((courant) => retirerElement(courant, ligneMobile.ligne.cle)); setDialogue(null); }}
           onFermer={() => setDialogue(null)}
         />
       )}
@@ -577,7 +586,7 @@ export function EditeurDevisV2({
           peutVoirCouts={droits.voirCouts}
           seuilTauxMarquePct={seuilTauxMarquePct}
           onFermer={() => setDialogue(null)}
-          onValider={(instance) => { setEtat(remplacerOuvrage(etat, instance)); setDialogue(null); }}
+          onValider={(instance) => { setEtat((courant) => remplacerOuvrage(courant, instance)); setDialogue(null); }}
         />
       )}
       <datalist id="unites-devis">{UNITES.map((u) => <option key={u} value={u} />)}</datalist>
