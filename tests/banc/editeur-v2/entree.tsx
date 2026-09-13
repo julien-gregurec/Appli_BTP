@@ -7,6 +7,13 @@ import { EditeurDevisV2 } from "@/components/devis/EditeurDevisV2";
 import { elementsFictifs } from "@/lib/devis/fixtures/document-fictif";
 
 const parametres = new URLSearchParams(window.location.search);
+// Presse-papier système simulé (le banc est servi en file:// : l'API réelle y est indisponible ou refusée).
+// Même contrat que navigator.clipboard, mémoire par page : le partage entre onglets passe par le repli
+// localStorage de l'éditeur, exactement comme dans un navigateur qui refuse la lecture du presse-papier.
+{
+  let contenu = "";
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (t: string) => { contenu = t; }, readText: async () => contenu } });
+}
 const couts = parametres.get("couts") === "1";
 // Banc de performance (GP V1, lot H) : `?lignes=500` ouvre l'éditeur avec autant de lignes fictives.
 const nbLignes = Math.max(0, Math.min(2000, Number(parametres.get("lignes") ?? 0) || 0));

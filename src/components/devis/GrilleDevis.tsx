@@ -205,25 +205,37 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
       if (tries.length > 1) setCible({ index: Math.min(index, tries.length - 2), colonne });
       return;
     }
-    // Sélection de lignes au clavier : Ctrl+Maj+↑/↓ étend depuis l'ancre ; Échap vide la sélection ;
-    // Ctrl+A hors d'un champ texte sélectionne toutes les lignes.
-    if (ctrl && e.shiftKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); etendreSelection(index, e.key === "ArrowUp" ? -1 : 1); return; }
-    if (e.key === "Escape" && selection.cles.length) { onSelection({ cles: [], ancre: null }); return; }
-    if (ctrl && e.key.toLowerCase() === "a" && !estChampTexte(e.target)) { e.preventDefault(); onSelection({ cles: [...cles], ancre: cles[0] ?? null }); return; }
-    // Copier des lignes : Ctrl+C prend la main seulement si aucun texte n'est sélectionné dans le champ.
-    if (ctrl && e.key.toLowerCase() === "c" && !champAvecSelectionTexte(e.target)) {
-      const aCopier = clesACopier(cle);
+  };
+
+  /**
+   * Raccourcis de SÉLECTION et de PRESSE-PAPIER, au niveau de la grille (ils valent aussi sur la poignée,
+   * qui n'est pas une cellule) : Ctrl+Maj+↑/↓ étend la sélection depuis l'ancre ; Échap la vide ; Ctrl+A hors
+   * d'un champ texte sélectionne toutes les lignes ; Ctrl+C copie les lignes sauf si du texte est sélectionné
+   * dans le champ (la copie de texte garde alors la main) ; Ctrl+V hors d'un champ texte colle les lignes
+   * (dans un champ, l'évènement natif `paste` ci-dessous décide : lignes si c'est un presse-papier de lignes,
+   * texte sinon).
+   */
+  const clavierGrille = (e: KeyboardEvent<HTMLDivElement>) => {
+    const ctrl = e.ctrlKey || e.metaKey;
+    const k = e.key.toLowerCase();
+    const champ = estChampTexte(e.target);
+    const ligne = (e.target as HTMLElement | null)?.closest?.("[role=row]") as HTMLElement | null;
+    const index = ligne?.dataset.index !== undefined ? Number(ligne.dataset.index) : -1;
+    const cle = index >= 0 ? (cles[index] ?? null) : null;
+    if (ctrl && e.shiftKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) { if (index >= 0) { e.preventDefault(); etendreSelection(index, e.key === "ArrowUp" ? -1 : 1); } return; }
+    if (e.key === "Escape" && selection.cles.length && !champ) { onSelection({ cles: [], ancre: null }); return; }
+    if (ctrl && k === "a" && !champ) { e.preventDefault(); onSelection({ cles: [...cles], ancre: cles[0] ?? null }); return; }
+    if (ctrl && k === "c" && !champAvecSelectionTexte(e.target)) {
+      const aCopier = clesACopier(cle ?? active);
       if (aCopier.length) { e.preventDefault(); copierVersSysteme(aCopier); }
       return;
     }
-    // Coller : l'évènement natif `paste` (ci-dessous) reçoit le presse-papier système ; hors champ texte,
-    // le navigateur ne le déclenche pas toujours — on lit alors le presse-papier ou le repli local.
-    if (ctrl && e.key.toLowerCase() === "v" && !estChampTexte(e.target)) {
+    if (ctrl && k === "v" && !champ) {
       e.preventDefault();
-      const apres = derniereSelectionnee() ?? cle;
+      const apres = derniereSelectionnee() ?? cle ?? active;
       const lire = typeof navigator !== "undefined" && navigator.clipboard?.readText ? navigator.clipboard.readText() : Promise.reject(new Error("indisponible"));
-      lire.then((t) => actions.coller(t, apres)).catch(() => actions.coller(localStorage.getItem(CLE_STOCKAGE_PRESSE_PAPIER) ?? "", apres));
-      return;
+      lire.then((t) => { const r = actions.coller(t, apres); if (!r.ok && r.texte) actions.coller(localStorage.getItem(CLE_STOCKAGE_PRESSE_PAPIER) ?? "", apres); })
+        .catch(() => actions.coller(localStorage.getItem(CLE_STOCKAGE_PRESSE_PAPIER) ?? "", apres));
     }
   };
 
@@ -288,7 +300,7 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
 
   return (
     <div className="rounded-md border border-neutral-200 dark:border-neutral-800">
-      <div ref={conteneur} className={`overflow-auto ${virtualise ? "max-h-[70dvh]" : ""}`} role="grid" aria-label="Lignes du devis" aria-rowcount={tries.length} aria-multiselectable="true" onCopy={copierNatif} onPaste={collerNatif}>
+      <div ref={conteneur} className={`overflow-auto ${virtualise ? "max-h-[70dvh]" : ""}`} role="grid" aria-label="Lignes du devis" aria-rowcount={tries.length} aria-multiselectable="true" onKeyDown={clavierGrille} onCopy={copierNatif} onPaste={collerNatif}>
         <div style={{ minWidth: largeur, ["--grille" as string]: grilleTemplate }}>
           <div role="row" className="sticky top-0 z-10 grid border-b border-neutral-200 bg-neutral-50 text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900" style={{ gridTemplateColumns: grilleTemplate }}>
             {colonnes.map((c) => (
