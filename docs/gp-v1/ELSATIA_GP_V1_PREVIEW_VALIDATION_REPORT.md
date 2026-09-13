@@ -460,3 +460,95 @@ remplacés par le composant central ; le module `preavisEssai` du socle reste en
 
 Gate : lint 0 erreur (8 avertissements préexistants), typecheck 0 erreur, vitest 2 397 verts (3 échecs sous
 charge — xlsx, webhook boutique — qui passent seuls), build Vercel Ready.
+
+## 20. Session autonome (2026-09-13, 12:15 → ) — copier/coller inter-devis
+
+**Baseline (phase 0)** : branche `feat/gp-v1-metier-devis-planning-references-v1`, HEAD `8dbcb4c` = distant,
+arbre propre ; 287 migrations locales = 287 sur la preview (max `20260913000290`) ; Supabase preview et
+Production `ACTIVE_HEALTHY` (Production jamais liée) ; Vercel Preview Ready, badge et encart démo en
+ligne ; smoke : typecheck 0 erreur, lint 0 erreur (1 avertissement préexistant), 364 tests devis/planning verts.
+
+### 20.1 Conception
+
+- **Format** `elsatia/devis-lines-v1` (`src/lib/devis/presse-papier.ts`, module pur, 11 tests) :
+  `{ format, version: 1, entrepriseId, copieLe, elements[] }` ; un élément est une ligne (sans clé, avec
+  son origine : catalogue, références figées, coûts si autorisés) ou un ouvrage entier (instance sans
+  clé ni ordre : composants, modèle instantané, options, saisies, mode de présentation ; auteur du
+  modèle retiré). **Jamais** d'identifiant de ligne, de devis, de dates ni d'auteur.
+- **Validation stricte** au collage (`lirePressePapier`) : format et version exacts, entreprise
+  identique (sinon refus « autre entreprise », rien créé), bornes de texte, nombres finis, types de
+  ligne connus, natures et modes d'ouvrage connus, listes blanches de clés d'origine ; un document
+  corrompu ou tronqué est refusé ; un texte ordinaire est laissé au collage de texte.
+- **Collage** (`collerElements`) : nouvelle clé pour chaque ligne et chaque ouvrage, origine recopiée
+  sous la nouvelle clé, position après / avant / fin, puis `recalculerRemisesSection` ; les sous-totaux
+  restent calculés à l'affichage (jamais recopiés) ; la remise de section garde sa règle (%) et est
+  recalculée dans la section cible (prouvé : −82,40 € dans la source, −92,40 € dans la cible dont la
+  section contient une ligne de plus).
+- **Coûts** : retirés à la copie pour qui ne voit pas les coûts, retirés au collage si l'utilisateur ne
+  les voit pas (presse-papier forgé) ; la base reste l'autorité (`enregistrer_devis_brouillon_v2`
+  n'écrit `lignes_devis_couts` qu'avec `gerer_couts_devis`).
+- **Inter-entreprises** : refusé côté client (marque d'entreprise) **et** côté base : migration
+  `20260913000291` = deux déclencheurs BEFORE (`lignes_devis.source_id` selon `source_catalogue`,
+  `devis_ouvrages.ouvrage_id`) qui refusent toute référence étrangère à l'entreprise du devis (pgTAP
+  11/11 ; suites devis v2 36/36, 111/111, 26/26 et surface 10/10 inchangées). Appliquée sur la preview.
+- **Atomicité, lot, concurrence** : inchangés et hérités — un collage est un changement d'état local ;
+  l'enregistrement (autosauvegarde ou « Enregistrer et fermer ») envoie toutes les lignes en **une RPC**,
+  **une transaction**, avec le **verrou de révision** (conflit explicite si le devis a changé ailleurs).
+  Pas une requête par ligne.
+- **Annuler** : le collage entre dans l'historique existant (Ctrl+Z / bouton) ; le retour « N lignes
+  ajoutées au devis » propose « Annuler le collage ».
+
+### 20.2 Interface
+
+Grille : sélection par clic sur la poignée (Maj = plage depuis l'ancre, Ctrl/Cmd = ajouter), Ctrl+Maj+↑/↓
+étend, Ctrl+A (hors champ texte) sélectionne tout, Échap vide ; lignes sélectionnées surlignées
+(`aria-selected`, poignée ✓, compteur « N sélectionnées »). **Ctrl+C** copie les lignes sauf si du texte
+est sélectionné dans le champ (la copie de texte garde la main) ; **Ctrl+V** dans un champ : lignes si le
+presse-papier système est un presse-papier de lignes, texte sinon ; hors champ : lignes (presse-papier
+système, sinon repli local partagé entre onglets). Barre d'outils : **Copier (N)**, **Coller**, position
+« après la sélection / avant / à la fin ». Mobile : case par ligne + mêmes boutons. Retour : « 6 lignes
+copiées », « 6 lignes ajoutées au devis », messages d'erreur explicites.
+
+## 21. Répétition générale des migrations (phase 9, 12:38 → 12:41, harnais `train-v3-dbtest`, Postgres nu 17.6)
+
+| Scénario | Résultat |
+| --- | --- |
+| **Fresh** 1 → 291 (288 fichiers) | 288 appliquées, 615 fonctions `public`, schéma 23 825 lignes |
+| **pgTAP complet sur le Fresh** | **79 fichiers, 2 284 ok, 0 not ok, 0 erreur** (dont 291 : 11/11) |
+| **Upgrade depuis 210** (ancien état Production connu) | 193 puis 95 appliquées ; schéma **identique** au Fresh (seul le jeton aléatoire `\restrict` de pg_dump diffère) |
+| **Upgrade depuis 280** (avant GP V1) | 277 puis 11 appliquées ; schéma **identique** au Fresh |
+| **Upgrade depuis la sauvegarde preview réelle** (251 + 2 dérives corrigées) | 46 appliquées (dont 290, 291) ; devis 152 / factures 106 / lignes 437 / entreprises 10 inchangés ; schéma identique au Fresh **sauf deux dérives préexistantes de la preview** : contrainte `plateforme_admins_actif_requiert_utilisateur_id` absente sur la preview (posée par le ledger, présente sur Fresh et sur Production après migration), et `pointages_coordonnees_check` écrite avec un parenthésage différent (même règle) |
+| Migration 276 (`gin_trgm_ops` qualifié) | traversée par les quatre chemins ; cas « rôle sans `extensions` » prouvé au § 18 |
+| Migration 290 | index / RPC en SECURITY DEFINER : traversée ; performance mesurée sur la preview (192 ms sous RLS) |
+| Migration 291 (nouvelle, presse-papier) | traversée par les quatre chemins ; appliquée sur la preview (ledger 288 = local) ; surface `anon` inchangée (3) |
+
+Aucune migration historique modifiée par ce lot (la 276 l'avait été au § 18 sur décision de Julien).
+
+## 22. Planning V2 — durcissement (phase 6, preview, 12:45 → 13:10)
+
+| Mesure | 40 salariés / 400 évènements (21-27/09) | 40 salariés / 1 000 évènements (5-11/10) |
+| --- | --- | --- |
+| Rendu serveur (TTFB) | 4,1 s (2,6-3,2 s lors du § 17 ; variance Vercel / charge du poste pendant la répétition générale) | 5,6 s |
+| Blocs visibles | 6,1-6,7 s | 7,4 s (1,1 Mo transférés) ; vue jour 9,7 s (200 blocs) ; liste compacte 5,8 s |
+| Déplacement clavier : réaction / enregistrement | 0,24 s / 5,7 s | 0,56 s / 7,8 s |
+| Conflits (RPC sous RLS, § 17) | 192 ms | inclus dans le rendu |
+
+1 000 évènements restent utilisables (rendu < 8 s, réaction < 0,6 s), sans être aussi fluides que 400 ; la
+limite est le coût ligne à ligne des politiques RLS (backlog plateforme) et le poids du rendu serveur.
+
+**Règle 24 h** (jour vierge, un salarié) : 8 h + 8 h + 7 h 59 acceptés (23 h 59), la minute suivante et
+l'heure de trop refusées, **dans le dialogue** (jamais derrière la modale). Le message était le repli
+générique « Impossible d'enregistrer cet évènement. » : corrigé (`ca9ec99`) — la règle de la base
+« Un ouvrier ne peut pas dépasser 24 heures planifiées par jour » est rendue explicitement. Première
+tentative sur un jour où le salarié portait déjà 8 h d'évènements de perf : refus dès 23 h 59, cohérent.
+
+**Glisser-déposer** (semaine du 7/09, relu en base) : autre salarié ✅ (Ravalement : Emma → Dan, la
+nacelle conservée), conflit ✅ (Formation → Emma, vendredi : « 3 conflits », bloc marqué), absence ✅
+(Pose cloisons → jeudi, jour du congé d'Ali : « 1 conflit », détail « Déjà affecté à « Congé recette » »),
+même jour autre horaire (vue jour) ✅ (Réunion 14 h → 16 h), autre jour ⚠️ : le bloc d'une heure
+« Livraison plaques » (07:00-08:00, empilé sous un bloc de 9 h) n'a pas suivi le glisser scripté vers le
+jeudi, alors que le même geste avait déplacé « Peinture bureaux » au § 9 ; à revérifier à la main.
+
+**Clavier** : Tab atteint les blocs (`tabindex=0`, `role=button`) ; Entrée n'ouvrait pas le détail après un
+clic (le glisser-déposer capturait le pointeur sans poser le focus) : corrigé (`ca9ec99`) — focus au
+pointeur, Entrée ou Espace ouvre le détail, Échap le ferme.
