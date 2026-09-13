@@ -95,6 +95,9 @@ export function EditeurDevisV2({
   const [erreur, setErreur] = useState<string | null>(null);
   const [sale, setSale] = useState(false);
   const [onglet, setOnglet] = useState<"saisie" | "apercu">("saisie");
+  // Grand écran : l'aperçu A4 occupe la moitié de la largeur ; le masquer rend toute la largeur à la
+  // grille (14 colonnes possibles), comme dans un logiciel de devis de bureau. Réglage de session.
+  const [apercuVisible, setApercuVisible] = useState(true);
   const [surligne, setSurligne] = useState<string | null>(null);
   const [aujourdhui] = useState(() => new Date().toISOString().slice(0, 10));
   const [devisIdCourant, setDevisIdCourant] = useState(devisId);
@@ -304,7 +307,7 @@ export function EditeurDevisV2({
         ))}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className={`grid gap-4 ${apercuVisible ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" : ""}`}>
         <div className={`${onglet === "saisie" ? "block" : "hidden"} space-y-4 lg:block`}>
           <fieldset className="grid gap-3 rounded-md border border-neutral-200 p-3 sm:grid-cols-2 lg:grid-cols-3 dark:border-neutral-800" onFocus={focusEntete} onBlur={blurEntete}>
             <legend className="px-1 text-sm font-medium">En-tête du devis</legend>
@@ -386,6 +389,9 @@ export function EditeurDevisV2({
               </select>
             </label>
             <button type="button" onClick={() => setDialogue({ type: "colonnes" })} className={`${bouton} ml-auto`} title="Choisir les colonnes affichées">Colonnes…</button>
+            <button type="button" onClick={() => setApercuVisible((v) => !v)} aria-pressed={apercuVisible} className={`${bouton} hidden lg:inline-flex lg:items-center`} title={apercuVisible ? "Masquer l’aperçu A4 : la grille prend toute la largeur" : "Afficher l’aperçu A4 à côté de la grille"}>
+              {apercuVisible ? "Masquer l’aperçu" : "Afficher l’aperçu"}
+            </button>
           </div>
 
           <div className="hidden lg:block">
@@ -446,7 +452,7 @@ export function EditeurDevisV2({
           </section>
         </div>
 
-        <div className={`${onglet === "apercu" ? "block" : "hidden"} lg:sticky lg:top-2 lg:block lg:h-[calc(100dvh-7rem)]`}>
+        <div className={`${onglet === "apercu" ? "block" : "hidden"} lg:sticky lg:top-2 ${apercuVisible ? "lg:block" : "lg:hidden"} lg:h-[calc(100dvh-7rem)]`}>
           <div className="h-[75dvh] overflow-hidden rounded-md border border-neutral-200 lg:h-full dark:border-neutral-800">
             <ApercuDevisV2 source={source} onChoisirLigne={choisirLigne} />
           </div>
