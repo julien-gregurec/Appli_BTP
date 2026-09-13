@@ -1,4 +1,5 @@
 import type {
+  StudioMediaAnalysis,
   ProjectAsset,
   StudioRenderJob,
   StudioRenderOutput,
@@ -29,6 +30,7 @@ type Table<Row> = {
 export type Database = {
   public: {
     Tables: {
+      studio_media_analysis: Table<StudioMediaAnalysis>;
       studio_render_jobs: Table<StudioRenderJob>;
       studio_render_outputs: Table<StudioRenderOutput>;
       studio_timelines: Table<StudioTimeline>;
@@ -44,6 +46,18 @@ export type Database = {
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
     Functions: {
+      studio_list_analysis: {
+        Args: { p_project: string };
+        Returns: StudioMediaAnalysis[];
+      };
+      studio_request_analysis: {
+        Args: { p_project: string; p_force: boolean };
+        Returns: number;
+      };
+      studio_cancel_analysis: {
+        Args: { p_project: string };
+        Returns: undefined;
+      };
       studio_save_editor: {
         Args: {
           p_project: string;

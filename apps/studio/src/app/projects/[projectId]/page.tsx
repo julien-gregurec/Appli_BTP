@@ -1,3 +1,5 @@
+import AnalysisPanel from "../../../components/AnalysisPanel";
+import { studioAnalysisEnabled } from "../../../lib/analysis";
 import Link from "next/link";
 import RenderPanel from "../../../components/RenderPanel";
 import TimelineEditor from "../../../components/TimelineEditor";
@@ -98,6 +100,12 @@ export default async function Project({
           {edit ? "Modifier le montage" : "Parcourir le montage"}
         </Link>
       </p>
+      <AnalysisPanel
+        project={p.id}
+        canWrite={edit}
+        enabled={studioAnalysisEnabled()}
+      />
+      <div id="montage-sans-analyse" />
       <TimelineEditor
         project={p.id}
         canWrite={edit}

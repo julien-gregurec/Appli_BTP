@@ -94,3 +94,5 @@ export * from "./presentation";
 export * from "./templates";
 
 export * from "./editor";
+
+export * from "./analysis";

@@ -601,3 +601,10 @@ summary {
 .editor-timeline { margin-top:1rem; min-width:0; }
 @media(max-width:760px) { .editor-layout { display:flex; flex-direction:column; } .editor-preview,.editor-properties { width:100%; box-sizing:border-box; } .editor-screen { max-height:340px; width:240px; } .editor-properties { max-height:440px; border-radius:20px 20px 8px 8px; } .editor-toolbar button { font-size:.85rem; } }
 @media(max-width:760px) { .video-editor { display:flex; flex-direction:column; } .editor-layout { display:contents; } .editor-preview { order:1; } .editor-timeline { order:2; } .editor-properties { order:3; } .video-editor > section[aria-label="Vidéo exportée"] { order:4; } .video-editor > details { order:5; } }
+
+.analysis-actions { display:flex; flex-wrap:wrap; gap:.5rem; margin:1rem 0; }
+.analysis-grid { list-style:none; padding:0; display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr)); gap:1rem; }
+.analysis-grid li { border:1px solid #b5c5be; border-radius:12px; padding:1rem; overflow-wrap:anywhere; }
+.analysis-panel label { display:block; margin:.75rem 0; }
+.analysis-panel progress { width:100%; }
+.analysis-badge { padding:.75rem; background:#edf3ee; border-radius:8px; }

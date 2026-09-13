@@ -1,5 +1,6 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- Tiny in-memory thumbnails of visited private media only. */
+import AnalysisPanel from "./AnalysisPanel";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   animationNames,
@@ -43,10 +44,12 @@ export default function VideoEditor({
   initial,
   assets,
   canWrite,
+  analysisEnabled = false,
 }: {
   initial: TimelineDocument;
   assets: StudioMediaAsset[];
   canWrite: boolean;
+  analysisEnabled?: boolean;
 }) {
   const [history, setHistory] = useState<EditorHistory>(() =>
     editorHistory(initial),
@@ -261,6 +264,12 @@ export default function VideoEditor({
   }
   return (
     <div className="video-editor" data-editor-revision={revision}>
+      <AnalysisPanel
+        project={doc.project_id}
+        canWrite={false}
+        enabled={analysisEnabled}
+        asset={clip?.asset_id ?? null}
+      />
       <div className="editor-toolbar">
         <p>
           <strong>Durée : {editorTime(doc.total_duration_ms)}</strong> · Cible :{" "}
