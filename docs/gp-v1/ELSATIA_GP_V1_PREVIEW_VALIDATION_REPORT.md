@@ -237,7 +237,7 @@ Aucun `entreprise_feature_flags`, aucun override de recette : la visibilité vie
 | Aperçu A4 fidèle au PDF, en-tête complet | ✅ |
 | Grille pleine largeur | ✅ après correction (« Masquer l'aperçu ») ; par défaut l'aperçu prend la moitié ⚠️ à trancher |
 | Fiche devis (lecture) : lignes de structure affichées « Fourniture · 0 u · 0,00 € », ouvrage éclaté | ⚠️ présentation à aligner sur la v2 |
-| PDF téléchargeable depuis la preview | ❌ 502 (Chromium ne démarre pas sur Vercel, voir § 13) |
+| PDF téléchargeable depuis la preview | ✅ après correction (§ 13-14 : indice de runtime AL2023 ; 502 avant) |
 
 **Planning**
 | Critère | État |
@@ -278,8 +278,12 @@ la politique `est_membre_actif(entreprise_id)`, préexistant et commun à toute 
    (`serverExternalPackages`, `outputFileTracingIncludes`) et la version Node (24.x) sont **identiques sur le
    projet Vercel de Production** : le défaut est très probablement préexistant et indépendant de GP V1
    (la branche ne modifie pas le lancement). L'archive `al2023.tar.br` contient bien `lib/libnspr4.so` ; la
-   variable `LD_LIBRARY_PATH` ou l'extraction dans `/tmp` semble en cause côté runtime. La cause exacte est
-   maintenant journalisée côté serveur (§ 14) — voir § 16 pour le relevé.
+   cause, journalisée côté serveur : **la fonction ne reçoit pas `VERCEL=1`** (`VERCEL=` vide, aucun
+   `AWS_EXECUTION_ENV`) → `@sparticuz/chromium` se croit sur Amazon Linux 2, n'extrait pas ses bibliothèques
+   AL2023 (`/tmp/al2023/lib/libnspr4.so=false`) et Chromium échoue. Vercel n'expose `VERCEL=1` à l'exécution
+   que si « Automatically expose System Environment Variables » est coché sur le projet. **Corrigé** dans le
+   lanceur (§ 14, `7f86053`) : PDF **200**, vrai PDF Chromium (Skia/PDF m149). Si Production n'a pas cette case
+   cochée, ses PDF étaient dans le même état ; le correctif la couvre aussi.
 2. **Planning 400 évènements en 6,5 s** (§ 12) — correctif SQL prêt, non appliqué (migration 290, § 14).
 3. **Dialogue « Ouvrage » fermé par la première autosauvegarde** d'un nouveau devis (§ 14, corrigé).
 4. **Ligne de la palette typée « Libre »** au lieu de « Article » (§ 14, corrigé).
@@ -295,6 +299,8 @@ la politique `est_membre_actif(entreprise_id)`, préexistant et commun à toute 
 | --- | --- | --- | --- |
 | `8309d04` | devis | `EditeurDevisV2` : la première autosauvegarde d'un nouveau devis gardait la route `/devis/nouveau` mais changeait l'URL en `/devis/<id>/modifier` par `replaceState` ; la prochaine action serveur faisait alors re-rendre la page « modifier » (arbre du routeur ≠ URL) et fermait le dialogue ouvert. L'identifiant voyage dans le fragment `#devis=<id>`, relu au rechargement. | reproduit 2 × avant, dialogue conservé après (diag C/D) ; 343 tests |
 | `059d699`, `372ce47` | devis / PDF | route `/api/documents/devis/[id]/pdf` : la cause d'un échec est journalisée (`[pdf] …`) avec l'environnement Chromium ; le 502 n'est plus muet. | lint, tsc |
+| `7f86053` | PDF | `generer.ts` : dans une fonction serverless (`/var/task`) sans aucun indice de runtime, pose `AWS_LAMBDA_JS_RUNTIME=nodejs<majeur>.x` avant l'import de `@sparticuz/chromium` → bibliothèques AL2023 extraites. | PDF preview 200 après build ; 20 tests `src/lib/pdf` |
+| `8e37d2f` | tests | deux tests du catalogue lisaient le SQL proposé supprimé au lot 0 → migration 284. | 33 tests |
 | `75da3be`, `d33b103` | devis | bouton « Masquer l'aperçu » (grand écran) : grille pleine largeur, 14 colonnes visibles ; colonne unique bornée pour que la grille défile dans son cadre. | capture 39 ; 7 tests composant |
 | `b6229c4` | devis | ligne insérée depuis la palette d'articles : `typeLigne = "article"`. | 343 tests |
 | `a086250` | planning (SQL) | **migration `20260913000290`** : `conflits_planning` en SECURITY DEFINER avec garde `est_membre_actif(p_entreprise_id)`, corps / signature / droits inchangés. **Non appliquée sur la preview** (autorisation demandée). | local : clone du ledger + 290, pgTAP planning 25/25, surface 10/10 ; `verify-migrations` 287 valides |
@@ -304,9 +310,9 @@ Aucune modification de Production, aucune fusion, aucun déploiement Production,
 
 ## 15. Points à valider par Julien
 
-1. **PDF** : vérifier sur app.elsatia.fr (compte réel) que « Télécharger PDF » fonctionne encore ; si non, le
-   défaut est préexistant (runtime Vercel Node 24 + `@sparticuz/chromium`) et relève d'un lot plateforme
-   (option : `@sparticuz/chromium-min` avec pack distant, ou épinglage de la version Node du projet).
+1. **PDF en Production** : vérifier sur app.elsatia.fr que « Télécharger PDF » fonctionne aujourd'hui. S'il échoue,
+   le défaut est préexistant (projet Vercel sans exposition des variables système) et le correctif `7f86053` de
+   cette branche le couvre ; l'autre remède est de cocher « Automatically expose System Environment Variables ».
 2. **Autoriser** l'application de la migration 290 sur la preview (`db push`, 1 fichier) pour mesurer le gain.
 3. **Aperçu A4 par défaut** : conserver l'aperçu ouvert par défaut (état actuel) ou ouvrir la grille pleine largeur
    par défaut, l'aperçu à la demande (plus proche de Batappli).
@@ -314,3 +320,27 @@ Aucune modification de Production, aucune fusion, aucun déploiement Production,
 5. **Retirer le badge** `NEXT_PUBLIC_GP_PREVIEW_BADGE` de tout environnement promu.
 6. **Compacte** : contraste du bouton actif.
 7. Décision produit : copier / coller de lignes entre devis (absent ; duplication présente).
+
+## 16. Gate avant livraison et verdict
+
+| Contrôle | Résultat |
+| --- | --- |
+| Build | Vercel Preview `Ready` pour chaque commit (dernier `7f86053`, déploiement `elsatia-preview-5v2aa59k0`) |
+| Typecheck | `tsc --noEmit` : 0 erreur |
+| Lint | `npm run lint` : 0 erreur, 8 avertissements préexistants (`no-unused-vars`) |
+| Tests unitaires | vitest 2 380 tests : 2 373 verts, 3 ignorés ; sous charge 4 échecs (stripe webhook ×2, surface remises legacy, xlsx) qui **passent tous rejoués seuls** — `xlsx.test.ts` est connu pour dépasser 5 s sous charge |
+| Migrations | `verify-migrations` : 287 fichiers valides ; preview au ledger 289 (290 prête, non appliquée) ; pgTAP GP V1 : preuve du Fresh (§ 19 métier) + planning 25/25 et surface 10/10 avec la 290 |
+| Devis V2 visible | ✅ éditeur ligne par ligne, badge « Devis V2 actif » |
+| Planning V2 visible | ✅ badge « Planning V2 actif » |
+| Works visible sur Pro | ✅ entreprise de recette en Pro, sans override |
+| Overrides de recette | aucun (`entreprise_feature_flags` vide pour l'entreprise de recette) |
+| Flags actifs | Preview uniquement |
+| Migrations preview appliquées | 286/286 |
+| Production intacte | ✅ (jamais liée, jamais interrogée, aucun déploiement) |
+| PDF | ✅ 200 après `7f86053` |
+
+**Verdict : PRÊT POUR VALIDATION UTILISATEUR**, avec les points ouverts du § 15 (migration 290 à autoriser,
+aperçu par défaut, fiche de lecture, badge à retirer avant promotion, contraste « Compacte »).
+
+Temps passé sur cette étape : 03:00 → 09:50 (sauvegarde, répétition générale, push en trois temps, seed,
+recette scriptée devis + planning + perf, 7 correctifs, rapport).
