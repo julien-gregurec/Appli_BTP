@@ -1,5 +1,6 @@
 import type { AspectRatio, StudioProject } from "./projects";
 import type { StudioMediaAsset } from "./media";
+import type { TimelinePresentation } from "./presentation";
 export const animationNames = {
   static: "Fixe",
   zoom_in: "Zoom avant",
@@ -27,8 +28,8 @@ export interface Motion {
   easing: "linear";
 }
 export interface TimelineClipDraft {
-  asset_id: string;
-  clip_type: "image" | "video";
+  asset_id: string | null;
+  clip_type: "image" | "video" | "card";
   sort_order: number;
   source_start_ms: number;
   source_end_ms: number | null;
@@ -46,7 +47,15 @@ export interface TimelineClipDraft {
   transition_in: Transition;
   transition_out: Transition;
   transition_duration_ms: number;
-  metadata_json: { motion: Motion };
+  metadata_json: {
+    motion: Motion;
+    key?: string;
+    card?: {
+      kind: "intro" | "outro";
+      color: string;
+      media_mode: "solid" | "cover";
+    };
+  };
 }
 export interface TimelineDraft {
   generator_version: "v1";
@@ -55,6 +64,7 @@ export interface TimelineDraft {
   total_duration_ms: number;
   excluded_assets: number;
   clips: TimelineClipDraft[];
+  presentation?: TimelinePresentation | null;
 }
 export interface StudioTimeline extends Omit<TimelineDraft, "clips"> {
   id: string;
@@ -131,6 +141,12 @@ export type TimelineAsset = Pick<
   StudioMediaAsset,
   "id" | "media_type" | "duration_ms" | "upload_status" | "deleted_at"
 >;
+export interface TimelineTimingRules {
+  photoMinDuration: number;
+  photoPreferredDuration: number;
+  photoMaxDuration: number;
+  videoPreferredDuration: number;
+}
 export function buildTimeline(input: {
   project: Pick<
     StudioProject,
@@ -138,6 +154,8 @@ export function buildTimeline(input: {
   >;
   assets: TimelineAsset[];
   generator_version?: "v1";
+  timingRules?: TimelineTimingRules;
+  target_duration_ms?: number | null;
 }): TimelineDraft {
   if (input.generator_version && input.generator_version !== "v1")
     throw new TimelineValidationError("Version de moteur inconnue.");
@@ -150,18 +168,42 @@ export function buildTimeline(input: {
     throw new TimelineValidationError(
       "Ajoutez au moins un média avant de créer la vidéo.",
     );
+  const rules = input.timingRules ?? {
+    photoMinDuration: 1000,
+    photoPreferredDuration: 3000,
+    photoMaxDuration: 15000,
+    videoPreferredDuration: 5000,
+  };
+  for (const n of Object.values(rules)) integer(n, 34, 600000, "Rythme");
+  if (
+    rules.photoMinDuration > rules.photoPreferredDuration ||
+    rules.photoPreferredDuration > rules.photoMaxDuration
+  )
+    throw new TimelineValidationError("Rythme incohérent.");
   const min = assets.map((a) =>
-    a.media_type === "image" ? 1000 : Math.min(1000, videoDuration(a)),
+    a.media_type === "image"
+      ? rules.photoMinDuration
+      : Math.min(1000, videoDuration(a)),
   );
   const max = assets.map((a) =>
-    a.media_type === "image" ? 15000 : Math.min(15000, videoDuration(a)),
+    a.media_type === "image"
+      ? rules.photoMaxDuration
+      : Math.min(15000, videoDuration(a)),
   );
   const automatic = assets.map((a) =>
-    a.media_type === "image" ? 3000 : Math.min(5000, videoDuration(a)),
+    a.media_type === "image"
+      ? rules.photoPreferredDuration
+      : Math.min(rules.videoPreferredDuration, videoDuration(a)),
   );
   const seconds = input.project.target_duration_seconds;
   if (seconds !== null) integer(seconds, 1, 600, "Durée cible");
-  const target = seconds === null ? null : seconds * 1000;
+  const target =
+    input.target_duration_ms !== undefined
+      ? input.target_duration_ms
+      : seconds === null
+        ? null
+        : seconds * 1000;
+  if (target !== null) integer(target, 0, 600000, "Budget montage");
   const duration = target === null ? automatic : [...min];
   if (target !== null) {
     let remaining = Math.max(
@@ -249,7 +291,7 @@ export interface ClipEdit {
 export function editTimelineClip<T extends TimelineClipDraft>(
   clip: T,
   patch: ClipEdit,
-  asset: TimelineAsset,
+  asset: TimelineAsset | undefined,
 ): T {
   const c = { ...clip };
   for (const key of Object.keys(patch))
@@ -271,9 +313,12 @@ export function editTimelineClip<T extends TimelineClipDraft>(
     )
       throw new TimelineValidationError("Animation invalide.");
     c.animation_type = patch.animation_type;
-    c.metadata_json = { motion: photoMotion(c.animation_type) };
+    c.metadata_json = {
+      ...c.metadata_json,
+      motion: photoMotion(c.animation_type),
+    };
   }
-  if (c.clip_type === "image") {
+  if (c.clip_type !== "video") {
     if (
       patch.source_start_ms !== undefined ||
       patch.source_end_ms !== undefined
@@ -285,6 +330,7 @@ export function editTimelineClip<T extends TimelineClipDraft>(
       throw new TimelineValidationError(
         "Modifiez le début et la fin de la vidéo.",
       );
+    if (!asset) throw new TimelineValidationError("Média indisponible.");
     c.source_start_ms = patch.source_start_ms ?? c.source_start_ms;
     c.source_end_ms = patch.source_end_ms ?? c.source_end_ms;
     integer(c.source_start_ms, 0, videoDuration(asset) - 1, "Début");

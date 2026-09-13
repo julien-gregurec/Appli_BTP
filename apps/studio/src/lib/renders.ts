@@ -44,7 +44,14 @@ export async function requestStudioRender(
   const timeline = await getActiveStudioTimeline(projectId);
   if (!timeline?.clips.length)
     throw new MediaError("Préparez un montage avant de créer la vidéo.");
-  const ids = [...new Set(timeline.clips.map((c) => c.asset_id))];
+  const ids = [
+    ...new Set(
+      [
+        ...timeline.clips.map((c) => c.asset_id),
+        timeline.presentation?.logo?.asset_id,
+      ].filter((id): id is string => typeof id === "string"),
+    ),
+  ];
   const assets = await client
     .from("studio_media_assets")
     .select("*")

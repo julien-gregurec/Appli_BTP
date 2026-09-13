@@ -1,3 +1,8 @@
+import { textFilters } from "./text-layout.ts";
+import {
+  validatePresentation,
+  safeAreas,
+} from "../../../packages/studio-domain/src/presentation.ts";
 import { spawn, execFile } from "node:child_process";
 import { writeFile, stat, readdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -40,6 +45,13 @@ export function frames(ms: number) {
 export function validateTimeline(t: TimelineDocument) {
   if (!t.clips.length || t.clips.length > 1000 || t.total_duration_ms > 600000)
     throw new RenderError("TIMELINE_INVALID");
+  if (t.presentation) {
+    try {
+      validatePresentation(t.presentation, t.clips);
+    } catch {
+      throw new RenderError("TIMELINE_INVALID");
+    }
+  }
   let end = 0;
   for (const c of t.clips) {
     if (
@@ -65,6 +77,15 @@ export function validateTimeline(t: TimelineDocument) {
       ].includes(c.transition_in) ||
       c.transition_duration_ms < 0 ||
       c.transition_duration_ms > c.duration_ms / 2
+    )
+      throw new RenderError("TIMELINE_INVALID");
+    if (
+      c.clip_type === "card" &&
+      (!c.metadata_json.card ||
+        !/^#[0-9a-f]{6}$/i.test(c.metadata_json.card.color) ||
+        !["intro", "outro"].includes(c.metadata_json.card.kind) ||
+        !["solid", "cover"].includes(c.metadata_json.card.media_mode) ||
+        (c.metadata_json.card.media_mode === "solid") !== (c.asset_id === null))
     )
       throw new RenderError("TIMELINE_INVALID");
     const m = c.metadata_json.motion;
@@ -221,22 +242,26 @@ export async function renderTimeline(
   for (const [i, c] of t.clips.entries()) {
     await r.progress("rendering", 10 + Math.floor((i / t.clips.length) * 65));
     r.signal.throwIfAborted();
-    const input = files.get(c.asset_id);
-    if (!input) throw new RenderError("ASSET_MISSING");
-    const info = await probe(input, r),
-      v = info.streams.find((s) => s.codec_type === "video");
+    const solid = c.clip_type === "card" && c.asset_id === null;
+    const input = c.asset_id ? files.get(c.asset_id) : undefined;
+    if (!solid && !input) throw new RenderError("ASSET_MISSING");
+    const info = input ? await probe(input, r) : null,
+      v = info?.streams.find((s) => s.codec_type === "video");
     if (
-      !v ||
-      (c.clip_type === "video" && v.codec_name !== "h264") ||
+      (!solid && !v) ||
+      (c.clip_type === "card" &&
+        !solid &&
+        !["mjpeg", "png", "webp", "h264"].includes(v?.codec_name ?? "")) ||
+      (c.clip_type === "video" && v?.codec_name !== "h264") ||
       (c.clip_type === "image" &&
-        !["mjpeg", "png", "webp"].includes(v.codec_name))
+        !["mjpeg", "png", "webp"].includes(v?.codec_name ?? ""))
     )
       throw new RenderError("UNSUPPORTED_CODEC");
     if (
       c.clip_type === "video" &&
       (!c.source_end_ms ||
         c.source_start_ms < 0 ||
-        c.source_end_ms > Number(info.format.duration) * 1000 + 50)
+        c.source_end_ms > Number(info?.format.duration) * 1000 + 50)
     )
       throw new RenderError("TIMELINE_INVALID");
     const n = frames(c.timeline_end_ms) - frames(c.timeline_start_ms),
@@ -246,13 +271,24 @@ export async function renderTimeline(
       last = join(dir, `last-${i}.png`);
     const args = [
       ...base,
-      "-protocol_whitelist",
-      "file,pipe",
-      ...(c.clip_type === "image"
-        ? ["-loop", "1", "-framerate", "30"]
-        : ["-ss", String(c.source_start_ms / 1000)]),
-      "-i",
-      input,
+      ...(solid
+        ? [
+            "-f",
+            "lavfi",
+            "-i",
+            `color=c=${c.metadata_json.card!.color}:s=${p.width}x${p.height}:r=30`,
+          ]
+        : [
+            "-protocol_whitelist",
+            "file,pipe",
+            ...(["mjpeg", "png", "webp"].includes(v?.codec_name ?? "")
+              ? ["-loop", "1", "-framerate", "30"]
+              : c.clip_type === "card"
+                ? ["-stream_loop", "-1"]
+                : ["-ss", String(c.source_start_ms / 1000)]),
+            "-i",
+            input!,
+          ]),
       "-f",
       "lavfi",
       "-i",
@@ -260,13 +296,51 @@ export async function renderTimeline(
     ];
     const hasAudio =
       c.clip_type === "video" &&
-      info.streams.some((s) => s.codec_type === "audio");
+      info?.streams.some((s) => s.codec_type === "audio");
     const audio = hasAudio
       ? `[0:a]atrim=duration=${c.duration_ms / 1000},asetpts=PTS-STARTPTS,volume=${c.volume},aresample=48000,apad,atrim=duration=${seconds}[a]`
       : `[1:a]atrim=duration=${seconds}[a]`;
+    const overlays =
+      t.presentation?.overlays.filter(
+        (o) => o.clip_key === c.metadata_json.key,
+      ) ?? [];
+    const text = t.presentation
+      ? await textFilters(
+          overlays,
+          t.presentation,
+          t.aspect_ratio,
+          p.width,
+          p.height,
+          dir,
+          `text-${i}`,
+        )
+      : [];
+    const logo =
+      t.presentation?.logo &&
+      t.presentation.logo.clip_key === c.metadata_json.key
+        ? t.presentation.logo
+        : null;
+    let video = `[0:v]trim=duration=${c.duration_ms / 1000},setpts=PTS-STARTPTS,fps=30,tpad=stop_mode=clone:stop_duration=0.1,trim=duration=${seconds},${motionFilter(c, p, n)}${text.length ? "," + text.join(",") : ""}`;
+    if (logo) {
+      const path = files.get(logo.asset_id);
+      if (!path) throw new RenderError("ASSET_MISSING");
+      const info = await probe(path, r);
+      if (!info.streams.some((s) => ["mjpeg", "png"].includes(s.codec_name)))
+        throw new RenderError("UNSUPPORTED_CODEC");
+      args.push("-loop", "1", "-framerate", "30", "-i", path);
+      const safe = safeAreas[t.aspect_ratio],
+        w = Math.floor(p.width * logo.width),
+        h = Math.floor(p.height * 0.1),
+        x = Math.floor((p.width - w) / 2),
+        y = Math.floor(
+          p.height *
+            (logo.position === "top" ? safe.top : 1 - safe.bottom - 0.1),
+        );
+      video += `[text];[2:v]scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:color=black@0,format=rgba[logo];[text][logo]overlay=${x}:${y}:shortest=1`;
+    }
     args.push(
       "-filter_complex",
-      `[0:v]fps=30,trim=duration=${c.duration_ms / 1000},setpts=PTS-STARTPTS,${motionFilter(c, p, n)}[v];${audio}`,
+      `${video}[v];${audio}`,
       "-map",
       "[v]",
       "-map",

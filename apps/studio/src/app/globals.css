@@ -567,3 +567,11 @@ summary {
 .montage select {
   max-width: 100%;
 }
+
+.template-gallery { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:1rem; margin-block:1rem; }
+.template-card { border:2px solid #ddd; border-radius:12px; padding:1rem; min-width:0; }
+.template-card[data-selected="true"] { border-color:#087f78; background:#f0faf7; }
+.template-card video { width:100%; aspect-ratio:16/9; object-fit:contain; background:#162b33; border-radius:8px; }
+.template-card h4 { font-size:1.1rem; margin-block:.7rem; }
+.montage fieldset { min-width:0; border:1px solid #ccc; border-radius:8px; margin-block:1rem; }
+.montage textarea { width:100%; min-height:5rem; font:inherit; }

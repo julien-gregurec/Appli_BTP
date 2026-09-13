@@ -4,6 +4,7 @@ import { MediaError } from "../../../../lib/media-service";
 import { isTransportError } from "../../../../lib/rest-status";
 import {
   generateStudioTimeline,
+  updateTimelineText,
   getStudioTimelineState,
   updateTimelineClip,
   reorderTimelineClips,
@@ -52,7 +53,7 @@ async function handle(
         throw new MediaError("Origine refusée.", 403);
       const b = await bodyOf(request);
       if (b.action === "generate")
-        output = await generateStudioTimeline(projectId);
+        output = await generateStudioTimeline(projectId, b.template);
       else {
         const timeline = string(b.timeline);
         if (b.action === "activate")
@@ -66,7 +67,15 @@ async function handle(
             !Number.isSafeInteger(b.revision)
           )
             throw new MediaError("Révision invalide.");
-          if (b.action === "remove")
+          if (b.action === "text")
+            output = await updateTimelineText(
+              projectId,
+              timeline,
+              b.revision,
+              string(b.overlay),
+              string(b.text),
+            );
+          else if (b.action === "remove")
             output = await removeTimelineClip(
               projectId,
               timeline,

@@ -1,9 +1,11 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- Private expiring preview, loaded only on request. */
+import TemplateGallery from "./TemplateGallery";
 import { useEffect, useState } from "react";
 import {
   animationNames,
   transitionNames,
+  type StudioProject,
   type StudioTimeline,
   type TimelineDocument,
   type StudioTimelineClip,
@@ -69,6 +71,7 @@ export default function TimelineEditor({
   canWrite: boolean;
   canDelete: boolean;
 }) {
+  const [projectInfo, setProjectInfo] = useState<StudioProject | null>(null);
   const [active, setActive] = useState<TimelineDocument | null>(null),
     [versions, setVersions] = useState<StudioTimeline[]>([]),
     [assets, setAssets] = useState<StudioMediaAsset[]>([]),
@@ -83,6 +86,7 @@ export default function TimelineEditor({
       api(`/api/projects/${project}/order`),
     ]);
     setActive(d.active);
+    setProjectInfo(d.project);
     setVersions(d.versions);
     setAssets(m.assets);
     setLoaded(true);
@@ -93,6 +97,7 @@ export default function TimelineEditor({
       .then(([d, m]) => {
         if (!cancelled) {
           setActive(d.active);
+          setProjectInfo(d.project);
           setVersions(d.versions);
           setAssets(m.assets);
           setLoaded(true);
@@ -144,8 +149,8 @@ export default function TimelineEditor({
     >
       <h2>Montage</h2>
       <p>
-        Préparez l’ordre, les durées et les mouvements. L’export vidéo sera
-        disponible dans un prochain lot.
+        Choisissez un style puis ajustez les clips et les textes avant votre
+        export MP4.
       </p>
       {error && (
         <>
@@ -171,13 +176,20 @@ export default function TimelineEditor({
         </>
       )}
       {!loaded && !error && <p role="status">Chargement du montage…</p>}
-      {canWrite && (
-        <button
-          disabled={busy || !loaded}
-          onClick={() => void command({ action: "generate" })}
-        >
-          {active ? "Régénérer le montage" : "Préparer le montage"}
-        </button>
+      {canWrite && loaded && projectInfo && (
+        <TemplateGallery
+          project={projectInfo}
+          assets={available}
+          busy={busy}
+          active={!!active}
+          initialTemplate={active?.presentation?.template.id}
+          onGenerate={(template) =>
+            void command({
+              action: "generate",
+              ...(template ? { template } : {}),
+            })
+          }
+        />
       )}
       {active && (
         <>
@@ -238,22 +250,61 @@ export default function TimelineEditor({
               >
                 <h3>
                   {i + 1}.{" "}
-                  {byId.get(c.asset_id)?.original_filename ??
-                    "Média indisponible"}
+                  {c.clip_type === "card"
+                    ? c.metadata_json.card?.kind === "intro"
+                      ? "Introduction"
+                      : "Conclusion"
+                    : (byId.get(c.asset_id ?? "")?.original_filename ??
+                      "Média indisponible")}
                 </h3>
-                {!byId.has(c.asset_id) && (
+                {c.clip_type !== "card" && !byId.has(c.asset_id ?? "") && (
                   <p role="alert">
                     Ce média a été retiré du projet. Retirez ce clip du montage.
                   </p>
                 )}
-                <ClipPreview asset={byId.get(c.asset_id)} />
+                {c.asset_id && <ClipPreview asset={byId.get(c.asset_id)} />}
+                {active.presentation?.overlays
+                  .filter((o) => o.clip_key === c.metadata_json.key)
+                  .map((o) => (
+                    <form
+                      key={o.id}
+                      aria-label={`Texte ${o.id}`}
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void command({
+                          action: "text",
+                          overlay: o.id,
+                          text: new FormData(e.currentTarget).get("text"),
+                        });
+                      }}
+                    >
+                      <label>
+                        Texte {o.font_role}
+                        <textarea
+                          name="text"
+                          maxLength={500}
+                          defaultValue={o.text}
+                          disabled={!canWrite || busy}
+                        />
+                      </label>
+                      {canWrite && (
+                        <button disabled={busy}>Enregistrer le texte</button>
+                      )}
+                    </form>
+                  ))}
                 <p>
-                  {c.clip_type === "image" ? "Photo" : "Vidéo"} ·{" "}
-                  {c.duration_ms / 1000} s · {transitionNames[c.transition_in]}{" "}
-                  ·{" "}
-                  {c.clip_type === "image"
-                    ? animationNames[c.animation_type]
-                    : "Extrait vidéo"}
+                  {c.clip_type === "card"
+                    ? "Écran"
+                    : c.clip_type === "image"
+                      ? "Photo"
+                      : "Vidéo"}{" "}
+                  · {c.duration_ms / 1000} s ·{" "}
+                  {transitionNames[c.transition_in]} ·{" "}
+                  {c.clip_type === "card"
+                    ? "Fond d’écran"
+                    : c.clip_type === "image"
+                      ? animationNames[c.animation_type]
+                      : "Extrait vidéo"}
                 </p>
                 {canWrite && (
                   <>
@@ -377,9 +428,10 @@ function ClipForm({
             Number(f.get("transition_duration")) * 1000,
           ),
         };
-        if (clip.clip_type === "image") {
+        if (clip.clip_type !== "video") {
           patch.duration_ms = Math.round(Number(f.get("duration")) * 1000);
-          patch.animation_type = f.get("animation");
+          if (clip.clip_type === "image")
+            patch.animation_type = f.get("animation");
         } else {
           patch.source_start_ms = Math.round(Number(f.get("start")) * 1000);
           patch.source_end_ms = Math.round(Number(f.get("end")) * 1000);
@@ -387,10 +439,10 @@ function ClipForm({
         void save(patch);
       }}
     >
-      {clip.clip_type === "image" ? (
+      {clip.clip_type !== "video" ? (
         <>
           <label>
-            Durée photo (s)
+            {clip.clip_type === "card" ? "Durée écran (s)" : "Durée photo (s)"}
             <input
               name="duration"
               type="number"
@@ -403,7 +455,11 @@ function ClipForm({
           </label>
           <label>
             Animation
-            <select name="animation" defaultValue={clip.animation_type}>
+            <select
+              name="animation"
+              disabled={clip.clip_type === "card"}
+              defaultValue={clip.animation_type}
+            >
               {Object.entries(animationNames).map(([v, n]) => (
                 <option key={v} value={v}>
                   {n}
