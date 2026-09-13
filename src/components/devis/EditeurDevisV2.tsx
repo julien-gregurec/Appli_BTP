@@ -182,7 +182,11 @@ export function EditeurDevisV2({
       setSauvegarde({ statut: "ok", heure: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) });
       if (!devisIdCourant) {
         setDevisIdCourant(r.id);
-        try { window.history.replaceState(null, "", `/devis/${r.id}/modifier`); } catch { /* sans importance */ }
+        // L'adresse garde la route « nouveau » : changer de chemin (`/devis/<id>/modifier`) ferait
+        // re-rendre la page « modifier » à la prochaine action serveur (l'arbre du routeur ne correspond
+        // plus à l'URL) et perdrait l'état local — dialogue ouvert, saisie en cours (constaté en
+        // recette preview). L'identifiant voyage dans le fragment, relu au rechargement ci-dessous.
+        try { window.history.replaceState(null, "", `/devis/nouveau#devis=${r.id}`); } catch { /* sans importance */ }
       }
       if (o.explicite) router.push(`/devis/${r.id}`);
     });
@@ -194,6 +198,13 @@ export function EditeurDevisV2({
     const t = window.setTimeout(() => enregistrer({ explicite: false }), DELAI_AUTOSAUVEGARDE_MS);
     return () => window.clearTimeout(t);
   }, [sale, enCours, sauvegarde, enregistrer]);
+
+  // Rechargement de « nouveau » après une première autosauvegarde : le brouillon existe déjà, on l'ouvre.
+  useEffect(() => {
+    if (devisId) return;
+    const m = /^#devis=([0-9a-f-]{36})$/.exec(window.location.hash);
+    if (m) router.replace(`/devis/${m[1]}/modifier`);
+  }, [devisId, router]);
 
   // La palette de recherche globale cède Ctrl+K à l'éditeur (elle répond alors à Ctrl+Maj+K).
   useEffect(() => {
