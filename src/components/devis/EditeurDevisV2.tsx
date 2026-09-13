@@ -52,6 +52,8 @@ type Sauvegarde = { statut: "ok"; heure: string } | { statut: "en_cours" } | { s
 const effacerErreurSimple = (s: Sauvegarde): Sauvegarde => (s.statut === "erreur" && !s.conflit ? { statut: "jamais" } : s);
 
 const DELAI_AUTOSAUVEGARDE_MS = 2000;
+/** Mode de travail mémorisé (ce navigateur) : « grille » ou « document ». */
+export const CLE_MODE_EDITEUR = "gp.devis.mode.v1";
 /** Surcharge personnelle du rappel de sauvegarde (ce navigateur) : `{ actif?: boolean; minutes?: number }`. */
 export const CLE_RAPPEL_PERSONNEL = "gp.devis.rappel.v1";
 
@@ -117,6 +119,15 @@ export function EditeurDevisV2({
   // logiciel de devis de bureau ; l'aperçu A4 s'ouvre à la demande, à côté de la grille (décision de
   // Julien, recette preview 2026-09-13). Réglage de session.
   const [apercuVisible, setApercuVisible] = useState(false);
+  // Mode de travail (grand écran) : « grille » (tableau rapide) ou « document » (le devis tel qu'il sera
+  // imprimé, cliquable pour modifier une ligne). Préférence mémorisée par utilisateur dans ce navigateur ;
+  // aucun des deux n'est imposé (décision laissée à Julien après essai).
+  const [mode, setMode] = useState<"grille" | "document">("grille");
+  useEffect(() => {
+    const t = window.setTimeout(() => { try { const m = window.localStorage.getItem(CLE_MODE_EDITEUR); if (m === "document" || m === "grille") setMode(m); } catch { /* stockage indisponible */ } }, 0);
+    return () => window.clearTimeout(t);
+  }, []);
+  const changerMode = (m: "grille" | "document") => { setMode(m); try { window.localStorage.setItem(CLE_MODE_EDITEUR, m); } catch { /* idem */ } };
   const [surligne, setSurligne] = useState<string | null>(null);
   const [aujourdhui] = useState(() => new Date().toISOString().slice(0, 10));
   const [devisIdCourant, setDevisIdCourant] = useState(devisId);
@@ -385,7 +396,9 @@ export function EditeurDevisV2({
     const id = cleElement(cible);
     setOnglet("saisie");
     setSurligne(id);
-    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches && cible.type === "ligne") setDialogue({ type: "ligne_mobile", cle: id });
+    const petitEcran = typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches;
+    if ((petitEcran || mode === "document") && cible.type === "ligne") setDialogue({ type: "ligne_mobile", cle: id });
+    else if (mode === "document" && cible.type === "ouvrage") setDialogue({ type: "ouvrage", instance: cible.instance, apresCle: null });
     setTimeout(() => setSurligne((s) => (s === id ? null : s)), 800);
   };
 
@@ -451,7 +464,7 @@ export function EditeurDevisV2({
         ))}
       </div>
 
-      <div className={`grid gap-4 ${apercuVisible ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" : "lg:grid-cols-[minmax(0,1fr)]"}`}>
+      <div className={`grid gap-4 ${apercuVisible && mode === "grille" ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" : "lg:grid-cols-[minmax(0,1fr)]"}`} data-mode={mode}>
         <div className={`${onglet === "saisie" ? "block" : "hidden"} space-y-4 lg:block`}>
           <fieldset className="grid gap-3 rounded-md border border-neutral-200 p-3 sm:grid-cols-2 lg:grid-cols-3 dark:border-neutral-800" onFocus={focusEntete} onBlur={blurEntete}>
             <legend className="px-1 text-sm font-medium">En-tête du devis</legend>
@@ -548,9 +561,15 @@ export function EditeurDevisV2({
               { cle: "colonnes", libelle: "Colonnes affichées…", action: () => setDialogue({ type: "colonnes" }) },
             ]} />
             <span className="ml-auto" />
-            <button type="button" onClick={() => setApercuVisible((v) => !v)} aria-pressed={apercuVisible} className={`${bouton} hidden lg:inline-flex lg:items-center`} title={apercuVisible ? "Masquer l’aperçu A4 : la grille reprend toute la largeur" : "Afficher l’aperçu A4 réel à côté de la grille"}>
-              {apercuVisible ? "Masquer l’aperçu" : "Aperçu A4"}
-            </button>
+            <div className="hidden lg:flex" role="group" aria-label="Mode de travail">
+              <button type="button" onClick={() => changerMode("grille")} aria-pressed={mode === "grille"} className={`${bouton} rounded-r-none ${mode === "grille" ? "bg-neutral-900 text-white hover:bg-neutral-900 dark:bg-white dark:text-neutral-900" : ""}`} title="Tableau rapide : saisie cellule par cellule">Grille</button>
+              <button type="button" onClick={() => changerMode("document")} aria-pressed={mode === "document"} className={`${bouton} rounded-l-none border-l-0 ${mode === "document" ? "bg-neutral-900 text-white hover:bg-neutral-900 dark:bg-white dark:text-neutral-900" : ""}`} title="Vue document : le devis tel qu’il sera imprimé, cliquez une ligne pour la modifier">Document</button>
+            </div>
+            {mode === "grille" && (
+              <button type="button" onClick={() => setApercuVisible((v) => !v)} aria-pressed={apercuVisible} className={`${bouton} hidden lg:inline-flex lg:items-center`} title={apercuVisible ? "Masquer l’aperçu A4 : la grille reprend toute la largeur" : "Afficher l’aperçu A4 réel à côté de la grille"}>
+                {apercuVisible ? "Masquer l’aperçu" : "Aperçu A4"}
+              </button>
+            )}
             {devisIdCourant && <a href={`/api/documents/devis/${devisIdCourant}/pdf`} target="_blank" rel="noreferrer" className={bouton} title="Ouvrir le PDF du dernier état enregistré">PDF</a>}
             {devisIdCourant && <button type="button" onClick={() => { const cible = `/devis/${devisIdCourant}#envoyer`; if (demanderNavigation(cible)) router.push(cible); }} className={bouton} title="Envoyer le devis depuis sa fiche (enregistrement demandé si nécessaire)">Envoyer…</button>}
           </div>
@@ -573,7 +592,7 @@ export function EditeurDevisV2({
             </p>
           )}
 
-          <div className="hidden lg:block">
+          <div className={mode === "document" ? "hidden" : "hidden lg:block"}>
             <GrilleDevis
               etat={etat}
               colonnes={colonnes}
@@ -639,7 +658,7 @@ export function EditeurDevisV2({
           </section>
         </div>
 
-        <div className={`${onglet === "apercu" ? "block" : "hidden"} lg:sticky lg:top-2 ${apercuVisible ? "lg:block" : "lg:hidden"} lg:h-[calc(100dvh-7rem)]`}>
+        <div className={`${onglet === "apercu" ? "block" : "hidden"} ${mode === "document" ? "lg:static lg:block lg:h-auto" : `lg:sticky lg:top-2 ${apercuVisible ? "lg:block" : "lg:hidden"} lg:h-[calc(100dvh-7rem)]`}`} data-testid="zone-document">
           <div className="h-[75dvh] overflow-hidden rounded-md border border-neutral-200 lg:h-full dark:border-neutral-800">
             <ApercuDevisV2 source={source} onChoisirLigne={choisirLigne} />
           </div>
