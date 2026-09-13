@@ -25,7 +25,6 @@ export default async function NouveauDevisPage({
     const chantier = chantierPreselect ? donnees.chantiers.find((c) => c.id === chantierPreselect) : undefined;
     return (
       <main className="p-4 lg:p-6">
-        <Link href="/devis" className="text-sm text-neutral-500 hover:underline">← Devis</Link>
         <EditeurDevisV2
           devisId={null}
           {...donnees}

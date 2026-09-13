@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
+import { demanderNavigation } from "@/components/GardeModifications";
 
 // Bouton « retour » flottant, visible uniquement sur mobile (notamment en PWA standalone
 // où il n'y a pas de bouton retour du navigateur).
@@ -17,7 +18,7 @@ export function MobileBack() {
   return (
     <button
       type="button"
-      onClick={() => router.push(destination)}
+      onClick={() => { if (demanderNavigation(destination)) router.push(destination); }}
       aria-label="Revenir à la page précédente"
       title="Retour"
       className="fixed left-4 z-50 flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-[#243447] bg-[#0d1b2a] text-xl text-white shadow-lg md:hidden"

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { MfaSecurityPanel } from "@/components/MfaSecurityPanel";
@@ -17,7 +18,7 @@ export default async function SecuriteComptePage({ searchParams }: { searchParam
   return (
     <main className="p-4 sm:p-8">
       <div className="mx-auto max-w-2xl space-y-6">
-        <div><h1 className="text-xl font-semibold">Sécurité du compte</h1><p className="text-sm text-neutral-500">Gérez les applications d’authentification associées à votre compte.</p></div>
+        <div><Link href="/parametres" className="text-sm text-neutral-500 hover:underline">← Paramètres</Link><h1 className="mt-1 text-xl font-semibold">Sécurité du compte</h1><p className="text-sm text-neutral-500">Gérez les applications d’authentification associées à votre compte.</p></div>
         <MfaSecurityPanel facteursInitiaux={liste.data?.all ?? []} aalInitial={niveau.data?.currentLevel ?? null} erreurInitiale={Boolean(liste.error || niveau.error)} prochain={prochain} requisPlateforme={params.requis === "plateforme"} />
       </div>
     </main>

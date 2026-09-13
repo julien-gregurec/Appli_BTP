@@ -3,6 +3,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { chargerPlanningV2 } from "@/lib/planning/serveur";
 import { jourDe, joursDeVue, VUES, type Vue } from "@/lib/planning/modele";
 import { PlanningV2 } from "@/components/planning/PlanningV2";
+import { EnTetePage } from "@/components/EnTetePage";
 
 /** Lit « jour » (AAAA-MM-JJ) et « vue » de l'URL, avec repli (aujourd'hui, semaine). */
 export function parametresPlanning(p: { jour?: string; vue?: string; semaine?: string }): { jour: string; vue: Vue } {
@@ -20,7 +21,7 @@ export async function PlanningV2Page({ searchParams }: { searchParams: { jour?: 
   const donnees = await chargerPlanningV2(supabase, ctx, joursDeVue(vue, jour));
   return (
     <main className="p-4 sm:p-6">
-      <h1 className="sr-only">Planning</h1>
+      <EnTetePage titre="Planning" retour={{ href: "/dashboard", libelle: "Tableau de bord" }} />
       {searchParams.error && <p role="alert" className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{searchParams.error}</p>}
       <PlanningV2 donnees={donnees} jour={jour} vue={vue} />
     </main>

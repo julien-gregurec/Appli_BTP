@@ -19,6 +19,7 @@ import { PrixGlobalDialog } from "@/components/devis/PrixGlobalDialog";
 import { SelectionArticlesDialog } from "@/components/devis/SelectionArticlesDialog";
 import { ChantierRapideDialog, ClientRapideDialog } from "@/components/devis/TiersRapideDialogs";
 import { BarreFormatage } from "@/components/devis/BarreFormatage";
+import { demanderNavigation, GardeModifications } from "@/components/GardeModifications";
 import { FiligraneSelecteur } from "@/components/documents/FiligraneSelecteur";
 import type { IdentiteEmetteur, SourceDocument, StyleDocument } from "@/lib/devis/document-modele";
 import {
@@ -276,6 +277,17 @@ export function EditeurDevisV2({
     });
   }, [devisId, devisIdCourant, entete, etat, revision, router]);
 
+  /** Enregistrement synchrone pour la garde de navigation : vrai si le brouillon est bien en base. */
+  const enregistrerPourQuitter = useCallback(async (): Promise<boolean> => {
+    const invalide = validerBrouillon({ clientId: entete.client_id, remiseGlobalePct: entete.remise_globale, elements: etat.elements });
+    if (invalide) { setErreur(invalide); return false; }
+    const r = await enregistrerDevisV2Action(devisIdCourant, entete, etat.elements, etat.origines, revision);
+    if ("error" in r) { setErreur(r.error); setSauvegarde({ statut: "erreur", message: r.error, conflit: r.conflit === true }); return false; }
+    setRevision(r.revision); setSale(false); setSauvegarde({ statut: "ok", heure: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) });
+    if (!devisIdCourant) setDevisIdCourant(r.id);
+    return true;
+  }, [devisIdCourant, entete, etat, revision]);
+
   // Autosauvegarde : après une pause de saisie. Après une erreur (conflit, refus du serveur, brouillon
   // invalide), aucune nouvelle tentative automatique tant que rien n'a changé : une erreur durable ne doit
   // pas marteler le serveur (constaté en recette : nouvel essai toutes les 12 s après un dépassement de
@@ -350,9 +362,11 @@ export function EditeurDevisV2({
 
   return (
     <div className="flex flex-col gap-3">
+      <GardeModifications actif={sale} onEnregistrer={enregistrerPourQuitter} />
       <datalist id="unites-devis">{UNITES_METIER.map((u) => <option key={u.cle} value={u.cle}>{u.libelle}</option>)}</datalist>
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-xl font-semibold">{devisIdCourant ? "Devis brouillon" : "Nouveau devis"}</h1>
+        <button type="button" onClick={() => { const cible = devisIdCourant ? `/devis/${devisIdCourant}` : "/devis"; if (demanderNavigation(cible)) router.push(cible); }} className="text-sm text-neutral-500 hover:underline" data-testid="retour-devis">← {devisIdCourant ? "Retour au devis" : "Retour aux devis"}</button>
+          <h1 className="text-xl font-semibold">{devisIdCourant ? "Devis brouillon" : "Nouveau devis"}</h1>
         <span className="text-xs text-neutral-500" aria-live="polite" data-sauvegarde={sauvegarde.statut}>
           {sauvegarde.statut === "en_cours" ? "Enregistrement…"
             : sauvegarde.statut === "hors_ligne" ? "Hors ligne — modifications conservées ici, enregistrement au retour du réseau"

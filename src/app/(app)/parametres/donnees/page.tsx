@@ -29,7 +29,8 @@ export default async function DonneesRgpdPage({
     <main className="p-8">
       <div className="mx-auto max-w-3xl space-y-6">
         <div>
-          <h1 className="text-xl font-semibold">Mes données</h1>
+          <Link href="/parametres" className="text-sm text-neutral-500 hover:underline">← Paramètres</Link>
+          <h1 className="mt-1 text-xl font-semibold">Mes données</h1>
           <p className="text-sm text-neutral-500">
             Exercer vos droits sur vos données personnelles (RGPD). Voir aussi notre{" "}
             <Link href="/confidentialite" className="underline">politique de confidentialité</Link>.
