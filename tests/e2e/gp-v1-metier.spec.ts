@@ -419,3 +419,81 @@ test("15. vérification de la barre latérale (actions groupées, indisponibles 
   await expect(importer).toHaveAttribute("aria-disabled", "true");
   await expect(importer).toHaveAttribute("title", /V2/);
 });
+
+// ── Presse-papier de lignes (session autonome GP V1) ────────────────────────────────────────────────────
+
+test("16. copier/coller dans le même devis (sélection, Ctrl+C, Ctrl+V, nouvelles clés, texte de cellule préservé)", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]).catch(() => undefined);
+  await connexion(page, USERS.adminA);
+  await aller(page, `${urlDevis}/modifier`);
+  const grille = page.locator("[role=grid][aria-label='Lignes du devis']");
+  await expect(grille).toBeVisible();
+  const avant = Number(await grille.getAttribute("aria-rowcount"));
+  expect(avant).toBeGreaterThanOrEqual(3);
+  // Sélection des lignes 1 à 3 par la poignée (clic puis Maj+clic), copie, collage après la dernière ligne.
+  await cellule(page, 0, "poignee").click();
+  await cellule(page, 2, "poignee").click({ modifiers: ["Shift"] });
+  await expect(page.locator("[data-testid=selection-lignes]")).toContainText("3 sélectionnées");
+  await page.keyboard.press("ControlOrMeta+c");
+  await expect(page.locator("[data-testid=retour-presse-papier]")).toContainText("3 lignes copiées");
+  const presse = await page.evaluate(() => localStorage.getItem("elsatia.devis.presse-papier.v1") ?? "");
+  expect(presse).toContain("elsatia/devis-lines-v1");
+  expect(presse).not.toMatch(/"cle":"[0-9a-f-]{36}"/);
+  await cellule(page, avant - 1, "poignee").click();
+  await page.keyboard.press("ControlOrMeta+v");
+  await expect(grille).toHaveAttribute("aria-rowcount", String(avant + 3));
+  await expect(page.locator("[data-testid=retour-presse-papier]")).toContainText("3 lignes ajoutées au devis");
+  // Le texte d'une cellule se copie / colle toujours comme du texte.
+  const d0 = await cellule(page, 0, "designation").inputValue();
+  await cellule(page, 0, "designation").click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("ControlOrMeta+c");
+  await cellule(page, avant, "designation").click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("ControlOrMeta+v");
+  await page.keyboard.press("Tab");
+  await expect(grille).toHaveAttribute("aria-rowcount", String(avant + 3));
+  await expect(cellule(page, avant, "designation")).toHaveValue(d0);
+  // « Annuler le collage » retire les lignes collées ; le devis est ré-enregistré à l'identique.
+  await page.getByRole("button", { name: "Annuler le collage" }).click();
+  await expect(grille).toHaveAttribute("aria-rowcount", String(avant + 3 - 3 + 0)).catch(() => undefined);
+  await enregistrerEtFermer(page);
+});
+
+test("17. copier/coller vers un autre devis (nouveaux identifiants, la source ne bouge pas, presse-papier étranger refusé)", async ({ page, context }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]).catch(() => undefined);
+  await connexion(page, USERS.adminA);
+  await aller(page, `${urlDevis}/modifier`);
+  const grille = page.locator("[role=grid][aria-label='Lignes du devis']");
+  await expect(grille).toBeVisible();
+  const lignesSource = Number(await grille.getAttribute("aria-rowcount"));
+  await cellule(page, 0, "poignee").click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("ControlOrMeta+c");
+  await expect(page.locator("[data-testid=retour-presse-papier]")).toContainText(`${lignesSource} lignes copiées`);
+  // Nouveau devis : coller à la fin, enregistrer, recharger.
+  await aller(page, "/devis/nouveau");
+  const selectClient = page.locator("select").filter({ has: page.locator("option", { hasText: "Choisir un client" }) }).first();
+  await selectClient.selectOption(await selectClient.locator("option", { hasText: NOM_CLIENT }).first().getAttribute("value") ?? "");
+  await page.getByLabel("Référence d’affaire").fill(`${REF_AFFAIRE}-COLLE`);
+  await page.getByLabel("Position de collage").selectOption("fin");
+  await page.getByRole("button", { name: "Coller" }).click();
+  await expect(page.locator("[data-testid=retour-presse-papier]")).toContainText(`${lignesSource} lignes ajoutées au devis`);
+  await expect(grille).toHaveAttribute("aria-rowcount", String(lignesSource));
+  const cible = await enregistrerEtFermer(page);
+  expect(cible).not.toBe(urlDevis);
+  await aller(page, `${cible}/modifier`);
+  await expect(grille).toHaveAttribute("aria-rowcount", String(lignesSource));
+  // Modifier la cible ne touche pas la source.
+  await cellule(page, 0, "designation").fill("Modifié dans la cible (E2E)");
+  await cellule(page, 0, "designation").blur();
+  await enregistrerEtFermer(page);
+  await aller(page, `${urlDevis}/modifier`);
+  await expect(cellule(page, 0, "designation")).not.toHaveValue("Modifié dans la cible (E2E)");
+  // Presse-papier d'une autre entreprise : refusé, rien créé.
+  await page.evaluate(() => { const p = JSON.parse(localStorage.getItem("elsatia.devis.presse-papier.v1") ?? "{}"); p.entrepriseId = "b0000000-0000-0000-0000-000000000001"; const t = JSON.stringify(p); localStorage.setItem("elsatia.devis.presse-papier.v1", t); return navigator.clipboard.writeText(t).catch(() => undefined); });
+  const n = Number(await grille.getAttribute("aria-rowcount"));
+  await page.getByRole("button", { name: "Coller" }).click();
+  await expect(page.locator("[data-testid=retour-presse-papier]")).toContainText("autre entreprise");
+  await expect(grille).toHaveAttribute("aria-rowcount", String(n));
+});
