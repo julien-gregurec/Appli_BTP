@@ -575,3 +575,29 @@ summary {
 .template-card h4 { font-size:1.1rem; margin-block:.7rem; }
 .montage fieldset { min-width:0; border:1px solid #ccc; border-radius:8px; margin-block:1rem; }
 .montage textarea { width:100%; min-height:5rem; font:inherit; }
+
+/* Lot G: a bounded horizontal strip and a responsive single-clip inspector. */
+.video-editor { min-width:0; }
+.editor-toolbar,.editor-add,.row { display:flex; gap:.7rem; flex-wrap:wrap; align-items:center; }
+.editor-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(280px,380px); gap:1.2rem; align-items:start; }
+.editor-preview { min-width:0; padding:1rem; border-radius:16px; background:#e9edf2; }
+.editor-screen { position:relative; margin:auto; max-height:430px; max-width:100%; width:330px; overflow:hidden; border-radius:8px; }
+.editor-overlay { position:absolute; white-space:normal; overflow:hidden; overflow-wrap:anywhere; max-height:32%; padding:.25rem; }
+.editor-preview p { font-size:.82rem; }
+.editor-preview input[type=range] { width:100%; }
+.editor-properties { max-height:650px; overflow:auto; min-width:0; }
+.editor-properties fieldset { border:1px solid #ccd4de; border-radius:8px; padding:.75rem; margin:.75rem 0; min-width:0; }
+.editor-properties label,.editor-add label { display:grid; gap:.3rem; margin:.6rem 0; }
+.editor-properties input,.editor-properties select,.editor-properties textarea { width:100%; min-width:0; }
+.editor-text { background:#f7f9fc; }
+.editor-strip { overflow-x:auto; overflow-y:hidden; width:100%; padding:.5rem 0; }
+.editor-block { position:absolute; top:0; height:124px; display:flex; flex-direction:column; gap:5px; justify-content:space-between; background:#f1f5fa; color:#18344f; border:2px solid #cad4df; border-radius:10px; overflow:hidden; padding:8px; }
+.editor-block[aria-pressed=true] { border-color:#176db1; background:#dcefff; }
+.editor-block span { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.editor-block-icon { font-size:24px; }
+.editor-block small { font-size:.72rem; }
+.video-editor button:focus-visible,.video-editor input:focus-visible,.editor-strip:focus-visible { outline:3px solid #1879bd; outline-offset:3px; }
+.video-editor button:disabled { opacity:.55; cursor:not-allowed; }
+.editor-timeline { margin-top:1rem; min-width:0; }
+@media(max-width:760px) { .editor-layout { display:flex; flex-direction:column; } .editor-preview,.editor-properties { width:100%; box-sizing:border-box; } .editor-screen { max-height:340px; width:240px; } .editor-properties { max-height:440px; border-radius:20px 20px 8px 8px; } .editor-toolbar button { font-size:.85rem; } }
+@media(max-width:760px) { .video-editor { display:flex; flex-direction:column; } .editor-layout { display:contents; } .editor-preview { order:1; } .editor-timeline { order:2; } .editor-properties { order:3; } .video-editor > section[aria-label="Vidéo exportée"] { order:4; } .video-editor > details { order:5; } }

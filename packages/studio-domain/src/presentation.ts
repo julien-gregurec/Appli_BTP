@@ -20,6 +20,8 @@ export interface TextOverlay {
   id: string;
   clip_key: string;
   text: string;
+  /** Hidden copy for reversible visibility; renderer reads only text. */
+  hidden_text?: string;
   start_ms: number;
   end_ms: number;
   position: "top" | "center" | "bottom";
@@ -133,6 +135,8 @@ export function validatePresentation(
       !clip ||
       !/^[a-zA-Z0-9-]{1,120}$/.test(o.id) ||
       boundedText(o.text) !== o.text ||
+      (o.hidden_text !== undefined &&
+        (boundedText(o.hidden_text) !== o.hidden_text || o.text !== "")) ||
       !Number.isSafeInteger(o.start_ms) ||
       !Number.isSafeInteger(o.end_ms) ||
       o.start_ms < 0 ||

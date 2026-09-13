@@ -1,3 +1,4 @@
+import Link from "next/link";
 import RenderPanel from "../../../components/RenderPanel";
 import TimelineEditor from "../../../components/TimelineEditor";
 import { projectStats } from "../../../lib/projects";
@@ -92,6 +93,11 @@ export default async function Project({
         </p>
         <p>Template : à configurer dans un prochain lot.</p>
       </section>
+      <p>
+        <Link href={`/projects/${p.id}/editor`} prefetch={false}>
+          {edit ? "Modifier le montage" : "Parcourir le montage"}
+        </Link>
+      </p>
       <TimelineEditor
         project={p.id}
         canWrite={edit}

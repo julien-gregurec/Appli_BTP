@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 type Job = {
   id: string;
+  timeline_id: string;
+  timeline_revision: number;
   status: string;
   progress_percent: number;
   error_code: string | null;
@@ -12,15 +14,23 @@ type Output = { id: string; render_job_id: string };
 export default function RenderPanel({
   project,
   canWrite,
+  editorState,
 }: {
   project: string;
   canWrite: boolean;
+  editorState?: { timeline: string; revision: number; dirty: boolean };
 }) {
   const [jobs, setJobs] = useState<Job[]>([]),
     [outputs, setOutputs] = useState<Output[]>([]),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [url, setUrl] = useState("");
+  const [remoteState, setRemoteState] = useState<{
+    timeline: string;
+    revision: number;
+    dirty: boolean;
+  } | null>(null);
+  const state = editorState ?? remoteState;
   const endpoint = `/api/renders/${project}`;
   async function action(body: Record<string, unknown>) {
     setBusy(true);
@@ -29,7 +39,15 @@ export default function RenderPanel({
       const r = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(
+          body.action === "create" && editorState
+            ? {
+                ...body,
+                timeline: editorState.timeline,
+                revision: editorState.revision,
+              }
+            : body,
+        ),
       });
       const d = await r.json();
       if (!r.ok) throw Error(d.error);
@@ -51,6 +69,7 @@ export default function RenderPanel({
         const d = await r.json();
         if (!r.ok) throw Error(d.error);
         if (!stopped) {
+          setRemoteState(d.active);
           setJobs(d.jobs);
           setOutputs(d.outputs);
         }
@@ -71,7 +90,7 @@ export default function RenderPanel({
       <h2>Vidéo exportée</h2>
       {canWrite && (
         <button
-          disabled={busy}
+          disabled={busy || editorState?.dirty}
           onClick={() =>
             void action({ action: "create", requestId: crypto.randomUUID() })
           }
@@ -79,10 +98,42 @@ export default function RenderPanel({
           Créer la vidéo
         </button>
       )}
+      {canWrite && editorState && (
+        <button
+          disabled={busy || editorState.dirty}
+          onClick={() =>
+            void action({
+              action: "create",
+              requestId: crypto.randomUUID(),
+              preview: true,
+            })
+          }
+        >
+          Générer un aperçu fidèle
+        </button>
+      )}
+      {state &&
+        (state.dirty ||
+          !jobs.some(
+            (j) =>
+              j.status === "completed" &&
+              j.timeline_id === state.timeline &&
+              j.timeline_revision === state.revision,
+          )) && (
+          <p role="status">
+            La vidéo doit être régénérée pour inclure vos dernières
+            modifications.
+          </p>
+        )}
       {error && <p role="alert">{error}</p>}
       {jobs.map((j) => (
         <div key={j.id} data-render-job={j.id}>
           <p role="status">
+            {state &&
+              (state.dirty ||
+                j.timeline_id !== state.timeline ||
+                j.timeline_revision !== state.revision) &&
+              "Ancienne version · "}
             {j.status} · {j.progress_percent} %
           </p>
           <progress
@@ -106,7 +157,7 @@ export default function RenderPanel({
             )}
           {canWrite && j.status === "failed" && j.retry_count < 3 && (
             <button
-              disabled={busy}
+              disabled={busy || editorState?.dirty}
               onClick={() =>
                 void action({
                   action: "create",

@@ -44,6 +44,27 @@ export type Database = {
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
     Functions: {
+      studio_save_editor: {
+        Args: {
+          p_project: string;
+          p_timeline: string;
+          p_revision: number;
+          p_project_revision: number;
+          p_draft: TimelineDraft;
+        };
+        Returns: TimelineDocument;
+      };
+      studio_request_editor_render: {
+        Args: {
+          p_project: string;
+          p_request: string;
+          p_timeline: string;
+          p_revision: number;
+          p_profile: string;
+          p_retry: string | null;
+        };
+        Returns: string;
+      };
       studio_request_render: {
         Args: {
           p_project: string;
