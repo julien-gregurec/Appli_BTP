@@ -242,9 +242,15 @@ export function EditeurDevisV2({
         // recette preview). L'identifiant voyage dans le fragment, relu au rechargement ci-dessous.
         try { window.history.replaceState(null, "", `/devis/nouveau#devis=${r.id}`); } catch { /* sans importance */ }
       }
-      if (o.explicite) router.push(`/devis/${r.id}`);
+      if (o.explicite) {
+        // Depuis « nouveau » (adresse portant le fragment #devis=…), une navigation douce vers la fiche
+        // entrait en concurrence avec la resynchronisation du routeur et ramenait sur /devis/nouveau
+        // (recette preview) : on quitte la page par une navigation complète. Sinon, navigation douce.
+        if (!devisId) window.location.assign(`/devis/${r.id}`);
+        else router.push(`/devis/${r.id}`);
+      }
     });
-  }, [devisIdCourant, entete, etat, revision, router]);
+  }, [devisId, devisIdCourant, entete, etat, revision, router]);
 
   // Autosauvegarde : après une pause de saisie, tant qu'aucun conflit n'est en cours.
   useEffect(() => {
@@ -254,8 +260,11 @@ export function EditeurDevisV2({
   }, [sale, enCours, sauvegarde, enregistrer]);
 
   // Rechargement de « nouveau » après une première autosauvegarde : le brouillon existe déjà, on l'ouvre.
+  // Une seule fois, au montage : le fragment est posé par cet éditeur lui-même ensuite.
+  const redirectionFaite = useRef(false);
   useEffect(() => {
-    if (devisId) return;
+    if (devisId || redirectionFaite.current) return;
+    redirectionFaite.current = true;
     const m = /^#devis=([0-9a-f-]{36})$/.exec(window.location.hash);
     if (m) router.replace(`/devis/${m[1]}/modifier`);
   }, [devisId, router]);
