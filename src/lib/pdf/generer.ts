@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import "server-only";
 import type { Browser, Page, PDFOptions } from "puppeteer-core";
 
@@ -48,6 +49,15 @@ async function lancerNavigateur(): Promise<Browser> {
     });
   }
 
+  // Vercel n'expose `VERCEL=1` à l'exécution que si « Automatically expose System Environment
+  // Variables » est coché sur le projet. Sans cet indice, `@sparticuz/chromium` se croit sur Amazon
+  // Linux 2, n'extrait pas ses bibliothèques AL2023 et Chromium échoue (`libnspr4.so` introuvable —
+  // constaté sur la preview, Node 24). Une fonction Vercel en Node ≥ 20 tourne toujours sur AL2023 :
+  // on le dit explicitement, uniquement dans une fonction serverless (arborescence `/var/task`) qui
+  // n'a reçu aucun indice. La détection se fait à l'import du module, d'où l'ordre.
+  if (!process.env.AWS_EXECUTION_ENV && !process.env.AWS_LAMBDA_JS_RUNTIME && !process.env.VERCEL && existsSync("/var/task")) {
+    process.env.AWS_LAMBDA_JS_RUNTIME = `nodejs${process.versions.node.split(".")[0]}.x`;
+  }
   const chromium = (await import("@sparticuz/chromium")).default;
   return launch({
     args: chromium.args,
