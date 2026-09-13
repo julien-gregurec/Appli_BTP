@@ -17,6 +17,11 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r workers/studio-video/analysis/requirements.txt
+      - run: echo "STUDIO_ANALYSIS_PYTHON=$(which python)" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -30,7 +35,7 @@ jobs:
       - run: npm audit --prefix apps/studio --audit-level=high
       - run: node scripts/verify-migrations.mjs
       - run: node apps/studio/scripts/local-test.mjs setup
-      - run: node apps/studio/scripts/editor-migration-check.mjs
+      - run: node apps/studio/scripts/analysis-migration-check.mjs
       - run: node --env-file=apps/studio/.env.local apps/studio/scripts/runtime-check.mjs ready
       - run: node apps/studio/scripts/local-test.mjs test-db
       - run: npm run typecheck --prefix apps/studio && npm run lint --prefix apps/studio && npm test --prefix apps/studio
@@ -38,7 +43,7 @@ jobs:
       - run: npm run lint --prefix workers/studio-video && npm run typecheck --prefix workers/studio-video && npm test --prefix workers/studio-video
       - run: npm run build --prefix apps/studio
       - run: apps/studio/node_modules/.bin/playwright install --with-deps chromium
-      - run: npm run test:e2e --prefix apps/studio -- --grep-invert "Lot E|Lot F|Lot G"
+      - run: npm run test:e2e --prefix apps/studio -- --grep-invert "Lot E|Lot F|Lot G|Lot H"
       - run: node --env-file=apps/studio/.env.local apps/studio/scripts/storage-reconcile.mjs
       - if: always()
         run: node apps/studio/scripts/local-test.mjs stop

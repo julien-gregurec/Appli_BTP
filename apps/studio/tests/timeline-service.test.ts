@@ -23,6 +23,7 @@ import {
 const id = "54000000-0000-0000-0000-000000000001",
   asset = "54000000-0000-0000-0000-000000000002";
 const project = {
+  name: "Projet test",
   id,
   workspace_id: id,
   revision: 5,
@@ -162,4 +163,54 @@ it("editor returns the exact transaction response without a later racy read", as
   expect(saved.revision).toBe(4);
   expect(mocks.rpc).toHaveBeenCalledTimes(3);
   expect(mocks.rpc.mock.calls[2][0]).toBe("studio_save_editor");
+});
+it("explicit selection rejects stale revision, foreign assets and repeated IDs before saving", async () => {
+  for (const selection of [
+    { ids: [asset], revision: 4 },
+    { ids: [id], revision: 5 },
+    { ids: [asset, asset], revision: 5 },
+    { ids: [], revision: 5 },
+  ]) {
+    await expect(
+      generateStudioTimeline(id, undefined, selection),
+    ).rejects.toThrow();
+  }
+  expect(
+    mocks.rpc.mock.calls.some((c) => c[0] === "studio_save_timeline"),
+  ).toBe(false);
+});
+it("explicit selection preserves the user's order with a chronological travel template", async () => {
+  const other = "54000000-0000-0000-0000-000000000003";
+  mocks.rpc.mockImplementation(async (name: string) => ({
+    data:
+      name === "studio_list_project_media"
+        ? [
+            { ...assets[0], captured_at: "2026-01-01", sort_order: 0 },
+            {
+              ...assets[0],
+              id: other,
+              captured_at: "2026-01-02",
+              sort_order: 1,
+            },
+          ]
+        : id,
+    error: null,
+    status: 200,
+  }));
+  await generateStudioTimeline(
+    id,
+    { templateId: "voyage", templateVersion: 1 },
+    { ids: [other, asset], revision: 5 },
+  );
+  const call = mocks.rpc.mock.calls.find(
+    (c) => c[0] === "studio_save_timeline",
+  )!;
+  const sourceIds: string[] = call[1].p_draft.clips
+    .filter((c: { asset_id: string | null }) => c.asset_id)
+    .map((c: { asset_id: string }) => c.asset_id);
+  expect(
+    sourceIds.filter(
+      (value, index) => index === 0 || value !== sourceIds[index - 1],
+    ),
+  ).toEqual([other, asset]);
 });
