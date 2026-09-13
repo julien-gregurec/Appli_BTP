@@ -1,14 +1,16 @@
+import { badgePreviewVisible } from "@/lib/badge-preview";
 import { devisV2Actif } from "@/lib/devis/v2-serveur";
 import { planningV2Actif } from "@/lib/planning/v2-serveur";
 
 /**
  * Indicateur discret d'environnement de PREVIEW (GP V1). Rendu uniquement si la variable
- * `NEXT_PUBLIC_GP_PREVIEW_BADGE` vaut « 1 » (posée sur l'environnement Preview seulement, jamais en
- * Production). Il affiche l'état RÉEL des drapeaux tels que le serveur les lit : c'est la preuve
- * runtime que Devis V2 et Planning V2 sont actifs sur cet environnement.
+ * `NEXT_PUBLIC_GP_PREVIEW_BADGE` vaut « 1 » (posée sur l'environnement Preview seulement) ET que le
+ * déploiement n'est pas promu en Production (`VERCEL_ENV`, adresse publique) — voir `badge-preview.ts`.
+ * Il affiche l'état RÉEL des drapeaux tels que le serveur les lit : c'est la preuve runtime que
+ * Devis V2 et Planning V2 sont actifs sur cet environnement.
  */
 export function BadgePreview() {
-  if (process.env.NEXT_PUBLIC_GP_PREVIEW_BADGE !== "1") return null;
+  if (!badgePreviewVisible({ drapeau: process.env.NEXT_PUBLIC_GP_PREVIEW_BADGE, vercelEnv: process.env.VERCEL_ENV, appUrl: process.env.NEXT_PUBLIC_APP_URL })) return null;
   const devis = devisV2Actif();
   const planning = planningV2Actif();
   return (

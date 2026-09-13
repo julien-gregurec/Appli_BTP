@@ -95,9 +95,10 @@ export function EditeurDevisV2({
   const [erreur, setErreur] = useState<string | null>(null);
   const [sale, setSale] = useState(false);
   const [onglet, setOnglet] = useState<"saisie" | "apercu">("saisie");
-  // Grand écran : l'aperçu A4 occupe la moitié de la largeur ; le masquer rend toute la largeur à la
-  // grille (14 colonnes possibles), comme dans un logiciel de devis de bureau. Réglage de session.
-  const [apercuVisible, setApercuVisible] = useState(true);
+  // Grand écran : la grille (14 colonnes possibles) prend toute la largeur par défaut, comme dans un
+  // logiciel de devis de bureau ; l'aperçu A4 s'ouvre à la demande, à côté de la grille (décision de
+  // Julien, recette preview 2026-09-13). Réglage de session.
+  const [apercuVisible, setApercuVisible] = useState(false);
   const [surligne, setSurligne] = useState<string | null>(null);
   const [aujourdhui] = useState(() => new Date().toISOString().slice(0, 10));
   const [devisIdCourant, setDevisIdCourant] = useState(devisId);
@@ -389,8 +390,8 @@ export function EditeurDevisV2({
               </select>
             </label>
             <button type="button" onClick={() => setDialogue({ type: "colonnes" })} className={`${bouton} ml-auto`} title="Choisir les colonnes affichées">Colonnes…</button>
-            <button type="button" onClick={() => setApercuVisible((v) => !v)} aria-pressed={apercuVisible} className={`${bouton} hidden lg:inline-flex lg:items-center`} title={apercuVisible ? "Masquer l’aperçu A4 : la grille prend toute la largeur" : "Afficher l’aperçu A4 à côté de la grille"}>
-              {apercuVisible ? "Masquer l’aperçu" : "Afficher l’aperçu"}
+            <button type="button" onClick={() => setApercuVisible((v) => !v)} aria-pressed={apercuVisible} className={`${bouton} hidden lg:inline-flex lg:items-center`} title={apercuVisible ? "Masquer l’aperçu A4 : la grille reprend toute la largeur" : "Afficher l’aperçu A4 réel à côté de la grille"}>
+              {apercuVisible ? "Masquer l’aperçu" : "Aperçu A4"}
             </button>
           </div>
 
