@@ -234,18 +234,15 @@ export function EditeurDevisV2({
       setRevision(r.revision);
       setSale(false);
       setSauvegarde({ statut: "ok", heure: new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) });
-      if (!devisIdCourant) {
-        setDevisIdCourant(r.id);
-        // L'adresse garde la route « nouveau » : changer de chemin (`/devis/<id>/modifier`) ferait
-        // re-rendre la page « modifier » à la prochaine action serveur (l'arbre du routeur ne correspond
-        // plus à l'URL) et perdrait l'état local — dialogue ouvert, saisie en cours (constaté en
-        // recette preview). L'identifiant voyage dans le fragment, relu au rechargement ci-dessous.
-        try { window.history.replaceState(null, "", `/devis/nouveau#devis=${r.id}`); } catch { /* sans importance */ }
-      }
+      // Premier enregistrement d'un nouveau devis : l'identifiant est retenu en mémoire, SANS toucher à
+      // l'adresse. Toute modification de l'URL (`replaceState` vers `/devis/<id>/modifier` ou même un
+      // fragment) fait resynchroniser le routeur : re-rendu de la page, dialogue fermé, et un collage
+      // effectué pendant l'autosauvegarde perdu (constaté en recette preview). Un rechargement de
+      // « nouveau » rouvre un éditeur vide ; le brouillon déjà enregistré reste dans la liste des devis.
+      if (!devisIdCourant) setDevisIdCourant(r.id);
       if (o.explicite) {
-        // Depuis « nouveau » (adresse portant le fragment #devis=…), une navigation douce vers la fiche
-        // entrait en concurrence avec la resynchronisation du routeur et ramenait sur /devis/nouveau
-        // (recette preview) : on quitte la page par une navigation complète. Sinon, navigation douce.
+        // Depuis « nouveau », la fiche est ouverte par une navigation complète (le brouillon vient d'être
+        // créé, aucun état local à conserver) ; depuis « modifier », navigation douce.
         if (!devisId) window.location.assign(`/devis/${r.id}`);
         else router.push(`/devis/${r.id}`);
       }
@@ -258,16 +255,6 @@ export function EditeurDevisV2({
     const t = window.setTimeout(() => enregistrer({ explicite: false }), DELAI_AUTOSAUVEGARDE_MS);
     return () => window.clearTimeout(t);
   }, [sale, enCours, sauvegarde, enregistrer]);
-
-  // Rechargement de « nouveau » après une première autosauvegarde : le brouillon existe déjà, on l'ouvre.
-  // Une seule fois, au montage : le fragment est posé par cet éditeur lui-même ensuite.
-  const redirectionFaite = useRef(false);
-  useEffect(() => {
-    if (devisId || redirectionFaite.current) return;
-    redirectionFaite.current = true;
-    const m = /^#devis=([0-9a-f-]{36})$/.exec(window.location.hash);
-    if (m) router.replace(`/devis/${m[1]}/modifier`);
-  }, [devisId, router]);
 
   // La palette de recherche globale cède Ctrl+K à l'éditeur (elle répond alors à Ctrl+Maj+K).
   useEffect(() => {
