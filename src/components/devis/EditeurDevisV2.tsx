@@ -10,7 +10,7 @@ import { GrilleDevis, type SelectionGrille } from "@/components/devis/GrilleDevi
 import { CLE_STOCKAGE_PRESSE_PAPIER, collerElements, copierElements, libelleCollage, libelleCopie, lirePressePapier, messageRefus, ressembleAPressePapier, serialiserPressePapier, type PositionCollage } from "@/lib/devis/presse-papier";
 import { basculerColonne, CLE_STOCKAGE_COLONNES, colonnesReglables, colonnesVisibles, lireReglagesColonnes, reglagesParDefaut, type ReglagesColonnes } from "@/lib/devis/colonnes-grille";
 import { annuler, creerHistorique, peutAnnuler, peutRetablir, pousser, remplacerPresent, retablir } from "@/lib/devis/historique-edition";
-import { insererLigne, insererOuvrage, interpreterRemisePct } from "@/lib/devis/editeur-etat";
+import { dupliquerElement, insererLigne, insererOuvrage, interpreterRemisePct } from "@/lib/devis/editeur-etat";
 import { margeLigne } from "@/lib/devis/marge-ligne";
 import { lignesMontants } from "@/lib/devis/presentation";
 import { libelleTypeLigne, typeDe, TYPES_LIGNE_GRILLE, type TypeLigneGrille } from "@/lib/devis/types-ligne";
@@ -19,6 +19,7 @@ import { PrixGlobalDialog } from "@/components/devis/PrixGlobalDialog";
 import { SelectionArticlesDialog } from "@/components/devis/SelectionArticlesDialog";
 import { ChantierRapideDialog, ClientRapideDialog } from "@/components/devis/TiersRapideDialogs";
 import { BarreFormatage } from "@/components/devis/BarreFormatage";
+import { BoutonMenu } from "@/components/Menu";
 import { demanderNavigation, GardeModifications } from "@/components/GardeModifications";
 import { FiligraneSelecteur } from "@/components/documents/FiligraneSelecteur";
 import type { IdentiteEmetteur, SourceDocument, StyleDocument } from "@/lib/devis/document-modele";
@@ -203,6 +204,14 @@ export function EditeurDevisV2({
     try { if (typeof navigator !== "undefined" && navigator.clipboard?.readText) texte = await navigator.clipboard.readText(); } catch { texte = ""; }
     if (!ressembleAPressePapier(texte)) { try { texte = localStorage.getItem(CLE_STOCKAGE_PRESSE_PAPIER) ?? ""; } catch { texte = ""; } }
     collerLignes(texte, apres, positionCollage);
+  };
+  const dupliquerDepuisBouton = () => {
+    const cles = selection.cles.length ? selection.cles : ligneActive ? [ligneActive] : [];
+    if (!cles.length) { setRetourPressePapier({ genre: "erreur", texte: "Sélectionnez d’abord une ou plusieurs lignes (clic sur la poignée ⋮⋮, Maj pour une plage)." }); return; }
+    const nouvelles = cles.map(() => genererCle());
+    setEtat((courant) => cles.reduce((e, cle, i) => dupliquerElement(e, cle, nouvelles[i]), courant));
+    setSelection({ cles: nouvelles, ancre: nouvelles[0] ?? null });
+    setRetourPressePapier({ genre: "info", texte: nouvelles.length === 1 ? "1 ligne dupliquée" : `${nouvelles.length} lignes dupliquées` });
   };
   const derniereDe = (cles: readonly string[]) => { const ordre = [...etat.elements].sort((a, b) => a.ordre - b.ordre).map(cleElement); return [...cles].sort((a, b) => ordre.indexOf(a) - ordre.indexOf(b)).at(-1) ?? null; };
 
@@ -477,28 +486,31 @@ export function EditeurDevisV2({
           <FiligraneSelecteur valeur={entete.filigrane} onChange={(f) => majEntete({ filigrane: f })} heritable logoDisponible={logoDisponible} legende="Filigrane de ce devis" />
 
           <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 bg-white/90 py-2 backdrop-blur dark:bg-neutral-950/90" role="toolbar" aria-label="Lignes">
-            <button type="button" onClick={() => setDialogue({ type: "articles" })} className={principal} title="Ctrl+K">Articles <span className="opacity-60">Ctrl+K</span></button>
-            <button type="button" onClick={() => setDialogue({ type: "ouvrage", instance: null, apresCle: null })} className={bouton} title="Ouvrage composé de la bibliothèque">Ouvrage</button>
-            <button type="button" onClick={() => { const cle = genererCle(); setEtat((courant) => insererLigne(courant, cle, "libre", null)); }} className={bouton} title="Entrée en bas de grille">Ligne libre</button>
-            <label className="flex items-center gap-1 text-sm">
-              <span className="sr-only">Insérer une ligne de structure</span>
-              <select value="" onChange={(e) => { const t = e.target.value as TypeLigneGrille; if (t) { const cle = genererCle(); setEtat((courant) => insererLigne(courant, cle, t, null)); } }} className={champ} aria-label="Insérer">
-                <option value="">Insérer…</option>
-                {TYPES_LIGNE_GRILLE.filter((t) => !t.chiffree).map((t) => <option key={t.cle} value={t.cle} title={t.aide}>{t.libelle}</option>)}
-              </select>
-            </label>
+            <BoutonMenu libelle="Ajouter" className={principal} testId="menu-ajouter" titre="Ajouter une ligne, un article, un ouvrage, un titre…" elements={[
+              { cle: "libre", libelle: "Ligne libre", raccourci: "Entrée", action: () => { const cle = genererCle(); setEtat((courant) => insererLigne(courant, cle, "libre", null)); } },
+              { cle: "article", libelle: "Article du catalogue", raccourci: "Ctrl+K", action: () => setDialogue({ type: "articles" }) },
+              { cle: "ouvrage", libelle: "Ouvrage composé", action: () => setDialogue({ type: "ouvrage", instance: null, apresCle: null }) },
+              { cle: "sep", type: "separateur" },
+              ...TYPES_LIGNE_GRILLE.filter((t) => !t.chiffree).map((t) => ({ cle: t.cle, libelle: t.libelle, titre: t.aide, action: () => { const cle = genererCle(); setEtat((courant) => insererLigne(courant, cle, t.cle, null)); } })),
+            ]} />
             <span className="mx-1 hidden h-6 w-px bg-neutral-200 sm:inline-block dark:bg-neutral-800" aria-hidden="true" />
             <button type="button" onClick={copierDepuisBouton} className={bouton} title="Copier les lignes sélectionnées (Ctrl+C)" aria-keyshortcuts="Control+C">Copier{selection.cles.length ? ` (${selection.cles.length})` : ""}</button>
             <button type="button" onClick={() => void collerDepuisBouton()} className={bouton} title="Coller les lignes copiées (Ctrl+V)" aria-keyshortcuts="Control+V">Coller</button>
-            <select value={positionCollage} onChange={(e) => setPositionCollage(e.target.value as "apres" | "avant" | "fin")} className={champ} aria-label="Position de collage">
-              <option value="apres">après la sélection</option>
-              <option value="avant">avant la sélection</option>
-              <option value="fin">à la fin du devis</option>
-            </select>
-            <button type="button" onClick={() => setDialogue({ type: "colonnes" })} className={`${bouton} ml-auto`} title="Choisir les colonnes affichées">Colonnes…</button>
+            <button type="button" onClick={dupliquerDepuisBouton} className={bouton} title="Dupliquer les lignes sélectionnées ou la ligne active (Ctrl+D)" aria-keyshortcuts="Control+D">Dupliquer</button>
+            <BoutonMenu libelle="Plus" className={bouton} testId="menu-plus" titre="Position de collage, colonnes" elements={[
+              { cle: "titre-position", type: "titre", libelle: "Coller…" },
+              { cle: "position-apres", libelle: `${positionCollage === "apres" ? "✓ " : ""}après la sélection`, action: () => setPositionCollage("apres") },
+              { cle: "position-avant", libelle: `${positionCollage === "avant" ? "✓ " : ""}avant la sélection`, action: () => setPositionCollage("avant") },
+              { cle: "position-fin", libelle: `${positionCollage === "fin" ? "✓ " : ""}à la fin du devis`, action: () => setPositionCollage("fin") },
+              { cle: "sep", type: "separateur" },
+              { cle: "colonnes", libelle: "Colonnes affichées…", action: () => setDialogue({ type: "colonnes" }) },
+            ]} />
+            <span className="ml-auto" />
             <button type="button" onClick={() => setApercuVisible((v) => !v)} aria-pressed={apercuVisible} className={`${bouton} hidden lg:inline-flex lg:items-center`} title={apercuVisible ? "Masquer l’aperçu A4 : la grille reprend toute la largeur" : "Afficher l’aperçu A4 réel à côté de la grille"}>
               {apercuVisible ? "Masquer l’aperçu" : "Aperçu A4"}
             </button>
+            {devisIdCourant && <a href={`/api/documents/devis/${devisIdCourant}/pdf`} target="_blank" rel="noreferrer" className={bouton} title="Ouvrir le PDF du dernier état enregistré">PDF</a>}
+            {devisIdCourant && <button type="button" onClick={() => { const cible = `/devis/${devisIdCourant}#envoyer`; if (demanderNavigation(cible)) router.push(cible); }} className={bouton} title="Envoyer le devis depuis sa fiche (enregistrement demandé si nécessaire)">Envoyer…</button>}
           </div>
 
           <BarreFormatage onSignal={signaler} />

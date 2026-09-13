@@ -13,6 +13,7 @@ const url = (parametres = "") => `${pathToFileURL(path.join(dossier!, "index.htm
 const grille = (page: Page) => page.locator("[role=grid][aria-label='Lignes du devis']");
 const cellule = (page: Page, i: number, c: string) => page.locator(`[data-cellule='${i}:${c}']`);
 const retour = (page: Page) => page.locator("[data-testid=retour-presse-papier]");
+const ajouter = async (page: Page, type: string) => { await page.getByTestId("menu-ajouter").click(); await page.locator(`[role=menuitem][data-cle="${type}"]`).click(); };
 const designations = (page: Page) => page.locator("[data-cellule$=':designation']").evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value ?? e.textContent));
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] });
@@ -88,14 +89,14 @@ test("deux onglets : copie dans A, collage dans B ; refus d'une autre entreprise
 test("ouvrage copié entier, remise et sous-total recalculés, sans coût pour un profil sans droit", async ({ page }) => {
   await page.goto(url("?couts=1"));
   // Ouvrage fictif de la bibliothèque du banc via le bouton Ouvrage.
-  await page.getByRole("button", { name: /^Ouvrage$/ }).first().click();
+  await ajouter(page, "ouvrage");
   const dlg = page.locator("dialog[open]").last();
   await dlg.locator("#recherche-ouvrage").pressSequentially("PC", { delay: 20 });
   await dlg.locator("li button").first().click();
   await dlg.getByRole("button", { name: /Insérer tout/ }).click();
   await expect(grille(page)).toHaveAttribute("aria-rowcount", "1");
-  await page.getByLabel("Insérer").selectOption("remise");
-  await page.getByLabel("Insérer").selectOption("sous_total");
+  await ajouter(page, "remise");
+  await ajouter(page, "sous_total");
   await expect(grille(page)).toHaveAttribute("aria-rowcount", "3");
   await cellule(page, 0, "poignee").click();
   await page.keyboard.press("ControlOrMeta+a");
@@ -112,7 +113,7 @@ test("ouvrage copié entier, remise et sous-total recalculés, sans coût pour u
   expect(totaux).toContain("Total HT");
   // Profil sans droit : rien de coût dans le presse-papier.
   await page.goto(url());
-  await page.getByLabel("Insérer").selectOption("titre");
+  await ajouter(page, "titre");
   await page.getByRole("button", { name: "Coller" }).click();
   await expect(retour(page)).toContainText("ajoutée");
   await cellule(page, 0, "poignee").click();
@@ -130,7 +131,7 @@ test("boutons, position de collage, 100 et 500 lignes", async ({ page }) => {
   await page.getByRole("button", { name: /^Copier/ }).click();
   await expect(retour(page)).toContainText("100 lignes copiées");
   const copie100 = Date.now() - t0;
-  await page.getByLabel("Position de collage").selectOption("fin");
+  await page.getByTestId("menu-plus").click(); await page.locator('[role=menuitem][data-cle="position-fin"]').click();
   const t1 = Date.now();
   await page.getByRole("button", { name: "Coller" }).click();
   await expect(grille(page)).toHaveAttribute("aria-rowcount", "200");
@@ -143,7 +144,7 @@ test("boutons, position de collage, 100 et 500 lignes", async ({ page }) => {
   await page.getByRole("button", { name: /^Copier/ }).click();
   await expect(retour(page)).toContainText("500 lignes copiées");
   const copie500 = Date.now() - t2;
-  await page.getByLabel("Position de collage").selectOption("fin");
+  await page.getByTestId("menu-plus").click(); await page.locator('[role=menuitem][data-cle="position-fin"]').click();
   const t3 = Date.now();
   await page.getByRole("button", { name: "Coller" }).click();
   await expect(grille(page)).toHaveAttribute("aria-rowcount", "1000");
@@ -156,7 +157,7 @@ test("boutons, position de collage, 100 et 500 lignes", async ({ page }) => {
   await cellule(page, 2, "poignee").click();
   await page.keyboard.press("ControlOrMeta+c");
   await cellule(page, 0, "poignee").click();
-  await page.getByLabel("Position de collage").selectOption("avant");
+  await page.getByTestId("menu-plus").click(); await page.locator('[role=menuitem][data-cle="position-avant"]').click();
   await page.getByRole("button", { name: "Coller" }).click();
   await expect(grille(page)).toHaveAttribute("aria-rowcount", "4");
   const d = await designations(page);

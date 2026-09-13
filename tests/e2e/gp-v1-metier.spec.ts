@@ -55,6 +55,8 @@ test.afterAll(() => { if (detoursInfra) console.log(`[infra] détours session/Go
  * ouvre la fiche. Sous charge, cette navigation douce peut être avortée par un délai GoTrue ; on
  * exige la preuve de l'enregistrement, puis on ouvre la fiche nous-mêmes en comptant le détour.
  */
+async function ajouterLigne(page: Page, type: string) { await page.getByTestId("menu-ajouter").click(); await page.locator(`[role=menuitem][data-cle="${type}"]`).click(); }
+
 async function enregistrerEtFermer(page: Page): Promise<string> {
   await page.getByRole("button", { name: "Enregistrer et fermer" }).click();
   const debut = Date.now();
@@ -226,11 +228,7 @@ test("5. ajout de plusieurs types de lignes (titre, article du catalogue, sous-t
   await aller(page, `${urlDevis}/modifier`);
   const grille = page.locator("[role=grid][aria-label='Lignes du devis']");
   await expect(grille).toBeVisible();
-  const inserer = page.getByLabel("Insérer");
-  await inserer.selectOption("titre");
-  await inserer.selectOption("sous_total");
-  await inserer.selectOption("remise");
-  await inserer.selectOption("commentaire");
+  for (const type of ["titre", "sous_total", "remise", "commentaire"]) { await page.getByTestId("menu-ajouter").click(); await page.locator(`[role=menuitem][data-cle="${type}"]`).click(); }
   await expect(grille).toHaveAttribute("aria-rowcount", "5");
   // Chaque ligne de structure reçoit son libellé (un titre ou un commentaire vide n'est pas enregistrable).
   const libelles: Record<number, string> = { 1: "Gros œuvre (E2E)", 2: "Sous-total gros œuvre", 3: "Remise commerciale", 4: "Commentaire pour le client (E2E)" };
@@ -488,7 +486,8 @@ test("17. copier/coller vers un autre devis (nouveaux identifiants, la source ne
   const selectClient = page.locator("select").filter({ has: page.locator("option", { hasText: "Choisir un client" }) }).first();
   await selectClient.selectOption(await selectClient.locator("option", { hasText: NOM_CLIENT }).first().getAttribute("value") ?? "");
   await page.getByLabel("Référence d’affaire").fill(`${REF_AFFAIRE}-COLLE`);
-  await page.getByLabel("Position de collage").selectOption("fin");
+  await page.getByTestId("menu-plus").click();
+  await page.locator('[role=menuitem][data-cle="position-fin"]').click();
   await page.getByRole("button", { name: "Coller" }).click();
   await expect(page.locator("[data-testid=retour-presse-papier]")).toContainText(`${lignesSource} lignes ajoutées au devis`);
   await expect(grille).toHaveAttribute("aria-rowcount", String(lignesSource));

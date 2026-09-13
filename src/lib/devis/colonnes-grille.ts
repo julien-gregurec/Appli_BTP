@@ -32,7 +32,7 @@ export type Colonne = {
 };
 
 export const COLONNES_GRILLE: readonly Colonne[] = [
-  { cle: "poignee", libelle: "Sélection et déplacement", court: "", largeurPx: 44, alignement: "centre", modifiable: false, defaut: true, obligatoire: true },
+  { cle: "poignee", libelle: "Sélection et déplacement", court: "", largeurPx: 64, alignement: "centre", modifiable: false, defaut: true, obligatoire: true },
   { cle: "type", libelle: "Type de ligne", court: "Type", largeurPx: 84, alignement: "gauche", defaut: true },
   { cle: "reference", libelle: "Référence interne", court: "Réf.", largeurPx: 110, alignement: "gauche", modifiable: false, defaut: true },
   { cle: "designation", libelle: "Désignation", court: "Désignation", largeurPx: 320, alignement: "gauche", defaut: true, obligatoire: true },

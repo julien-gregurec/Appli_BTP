@@ -16,6 +16,7 @@ import { MODES_PRESENTATION, type InstanceOuvrage, type ModePresentation } from 
 import { sousTotauxSections, type ElementDevis, type LigneLibre } from "@/lib/devis/presentation";
 import { indicateursPrix, TAUX_TVA_ADMIS } from "@/lib/devis/prix";
 import { champModifiable, estChiffree, libelleTypeLigne, typeDe, TYPES_LIGNE_GRILLE, type TypeLigneGrille } from "@/lib/devis/types-ligne";
+import { MenuContextuel, type ElementMenu } from "@/components/Menu";
 import { montantLigneHt } from "@/lib/devis/montants";
 import { CLE_STOCKAGE_PRESSE_PAPIER, ressembleAPressePapier } from "@/lib/devis/presse-papier";
 
@@ -164,6 +165,31 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
     setCible({ index: i, colonne: "designation" });
   }, [actions, tries.length, cles, setActive]);
 
+  // Menu contextuel de ligne (clic droit, bouton ⋯, Maj+F10) : insérer au-dessus / dessous, dupliquer, copier,
+  // transformer, supprimer — les mêmes opérations que le clavier, sans quitter la grille.
+  const [menu, setMenu] = useState<{ cle: string; index: number; x: number; y: number } | null>(null);
+  const ouvrirMenu = useCallback((cle: string, index: number, x: number, y: number) => { setActive(cle); setMenu({ cle, index, x, y }); }, [setActive]);
+  const elementsMenu = useCallback((cle: string, index: number): ElementMenu[] => {
+    const element = tries[index];
+    const estLigne = element?.type === "ligne";
+    const insererAuDessus = (type: TypeLigneGrille) => { const nouvelle = actions.genererCle(); actions.setEtat((courant) => deplacerElementVers(insererLigne(courant, nouvelle, type, cle), nouvelle, index)); setActive(nouvelle); setCible({ index, colonne: "designation" }); };
+    const transformer: ElementMenu[] = estLigne
+      ? TYPES_LIGNE_GRILLE.filter((t) => t.cle !== "article" && t.cle !== typeDe(element.ligne)).map((t) => ({ cle: `type-${t.cle}`, libelle: `→ ${t.libelle}`, titre: t.aide, action: () => actions.setEtat((courant) => modifierLigneLibre(courant, cle, { typeLigne: t.cle })) }))
+      : [];
+    return [
+      { cle: "dessus", libelle: "Insérer une ligne au-dessus", action: () => insererAuDessus("libre") },
+      { cle: "dessous", libelle: "Insérer une ligne en dessous", raccourci: "Entrée", action: () => nouvelleLigneApres(cle) },
+      { cle: "titre-dessus", libelle: "Insérer un titre au-dessus", action: () => insererAuDessus("titre") },
+      { cle: "sep1", type: "separateur" },
+      { cle: "dupliquer", libelle: "Dupliquer", raccourci: "Ctrl+D", action: () => { const n = actions.genererCle(); actions.setEtat((courant) => dupliquerElement(courant, cle, n)); setCible({ index: index + 1, colonne: "designation" }); } },
+      { cle: "copier", libelle: "Copier", raccourci: "Ctrl+C", action: () => copierVersSysteme(clesACopier(cle)) },
+      { cle: "coller", libelle: "Coller après", raccourci: "Ctrl+V", action: () => { void (async () => { let texte = ""; try { texte = await navigator.clipboard.readText(); } catch { texte = ""; } actions.coller(texte, cle); })(); } },
+      ...(transformer.length ? [{ cle: "sep2", type: "separateur" } as ElementMenu, { cle: "titre-transformer", type: "titre", libelle: "Transformer en" } as ElementMenu, ...transformer] : []),
+      { cle: "sep3", type: "separateur" },
+      { cle: "supprimer", libelle: "Supprimer la ligne", raccourci: "Ctrl+Suppr", danger: true, action: () => { actions.setEtat((courant) => retirerElement(courant, cle)); if (tries.length > 1) setCible({ index: Math.min(index, tries.length - 2), colonne: "designation" }); } },
+    ];
+  }, [tries, actions, setActive, nouvelleLigneApres, copierVersSysteme, clesACopier]);
+
   /** Clavier de la grille : navigation entre cellules et opérations de ligne. */
   const clavier = (e: KeyboardEvent<HTMLDivElement>, index: number, colonne: string) => {
     const element = tries[index];
@@ -201,6 +227,7 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
     if (ctrl && e.key === "ArrowDown") { e.preventDefault(); if (index < tries.length - 1) { actions.setEtat((courant) => deplacerElementVers(courant, cle, index + 1)); setCible({ index: index + 1, colonne }); } return; }
     if (e.key === "ArrowUp" && tag !== "SELECT" && tag !== "TEXTAREA" && index > 0) return aller(index - 1, colonne);
     if (e.key === "ArrowDown" && tag !== "SELECT" && tag !== "TEXTAREA" && index < tries.length - 1) return aller(index + 1, colonne);
+    if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) { e.preventDefault(); const r = (e.target as HTMLElement).getBoundingClientRect(); ouvrirMenu(cle, index, r.left, r.bottom); return; }
     if (ctrl && e.key.toLowerCase() === "d") { e.preventDefault(); const n = actions.genererCle(); actions.setEtat((courant) => dupliquerElement(courant, cle, n)); setCible({ index: index + 1, colonne }); return; }
     if (ctrl && (e.key === "Delete" || e.key === "Backspace")) {
       e.preventDefault();
@@ -260,7 +287,7 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
   };
 
   const rendreLigne = (element: ElementDevis, index: number, mesurer?: (el: HTMLElement | null) => void) => (
-    <LigneSortable key={cleElement(element)} id={cleElement(element)} mesurer={mesurer} index={index} active={active === cleElement(element)} selectionnee={selectionnees.has(cleElement(element))} onSelectionner={(ev) => selectionner(cleElement(element), ev)}>
+    <LigneSortable key={cleElement(element)} id={cleElement(element)} mesurer={mesurer} index={index} active={active === cleElement(element)} selectionnee={selectionnees.has(cleElement(element))} onMenu={(x, y) => ouvrirMenu(cleElement(element), index, x, y)} onSelectionner={(ev) => selectionner(cleElement(element), ev)}>
       {(poignee) => element.type === "ligne" ? (
         <LigneGrille
           index={index}
@@ -305,6 +332,7 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
   return (
     <div className="rounded-md border border-neutral-200 dark:border-neutral-800">
       <div ref={conteneur} className={`overflow-auto ${virtualise ? "max-h-[70dvh]" : ""}`} role="grid" aria-label="Lignes du devis" aria-rowcount={tries.length} aria-multiselectable="true" onKeyDown={clavierGrille} onCopy={copierNatif} onPaste={collerNatif}>
+        {menu && <MenuContextuel x={menu.x} y={menu.y} etiquette={`Actions de la ligne ${menu.index + 1}`} elements={elementsMenu(menu.cle, menu.index)} onFermer={() => setMenu(null)} />}
         <div style={{ minWidth: largeur, ["--grille" as string]: grilleTemplate }}>
           <div role="row" className="sticky top-0 z-10 grid border-b border-neutral-200 bg-neutral-50 text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900" style={{ gridTemplateColumns: grilleTemplate }}>
             {colonnes.map((c) => (
@@ -343,7 +371,7 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
 
 // ── Ligne triable (glisser-déposer) ────────────────────────────────────────────
 
-function LigneSortable({ id, index, active, selectionnee, onSelectionner, mesurer, children }: { id: string; index: number; active: boolean; selectionnee: boolean; onSelectionner: (e: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) => void; mesurer?: (el: HTMLElement | null) => void; children: (poignee: ReactNode) => ReactNode }) {
+function LigneSortable({ id, index, active, selectionnee, onSelectionner, onMenu, mesurer, children }: { id: string; index: number; active: boolean; selectionnee: boolean; onMenu: (x: number, y: number) => void; onSelectionner: (e: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) => void; mesurer?: (el: HTMLElement | null) => void; children: (poignee: ReactNode) => ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const poignee = (
     <button
@@ -361,6 +389,12 @@ function LigneSortable({ id, index, active, selectionnee, onSelectionner, mesure
       {selectionnee ? "✓" : "⋮⋮"}
     </button>
   );
+  const poigneeEtMenu = (
+    <div className="flex h-9 items-stretch">
+      <div className="min-w-0 flex-1">{poignee}</div>
+      <button type="button" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); onMenu(r.left, r.bottom); }} data-cellule={`${index}:menu`} className="w-5 shrink-0 text-neutral-400 hover:text-neutral-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 dark:hover:text-white" aria-label={`Actions de la ligne ${index + 1}`} title="Actions : insérer, dupliquer, copier, transformer, supprimer (clic droit sur la ligne)">⋯</button>
+    </div>
+  );
   return (
     <div
       ref={(el) => { setNodeRef(el); mesurer?.(el); }}
@@ -369,10 +403,11 @@ function LigneSortable({ id, index, active, selectionnee, onSelectionner, mesure
       aria-selected={selectionnee || active}
       data-index={index}
       data-active={active ? "1" : undefined}
+      onContextMenu={(e) => { if ((e.target as HTMLElement).closest("input, textarea, select")?.matches(":focus") && window.getSelection()?.toString()) return; e.preventDefault(); onMenu(e.clientX, e.clientY); }}
       style={{ transform: CSS.Transform.toString(transform), transition, gridTemplateColumns: "var(--grille)" }}
       className={`grid border-b border-neutral-100 dark:border-neutral-800 ${isDragging ? "z-20 bg-blue-50 shadow-lg dark:bg-neutral-800" : selectionnee ? "bg-blue-100/70 ring-1 ring-inset ring-blue-300 dark:bg-blue-950/40 dark:ring-blue-800" : active ? "bg-blue-50/60 dark:bg-neutral-900" : "hover:bg-neutral-50/70 dark:hover:bg-neutral-900/50"}`}
     >
-      {children(poignee)}
+      {children(poigneeEtMenu)}
     </div>
   );
 }

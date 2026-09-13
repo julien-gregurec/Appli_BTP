@@ -66,7 +66,7 @@ test("remise de section : « 150 % » refusée, « 12,5 % » acceptée ; remise 
   await cellule(page, 1, "quantite").fill("1"); await page.keyboard.press("Tab");
   await cellule(page, 1, "prix_vente").fill("1000"); await page.keyboard.press("Tab");
   await expect.poll(() => totalHt(page)).toBe("2000,00");
-  await page.getByLabel("Insérer").selectOption("remise");
+  await page.getByTestId("menu-ajouter").click(); await page.locator('[role=menuitem][data-cle="remise"]').click();
   const remise = page.locator("[data-cellule='2:prix_vente']");
   await expect(remise).toBeVisible();
   await remise.fill("150 %"); await page.keyboard.press("Tab");
