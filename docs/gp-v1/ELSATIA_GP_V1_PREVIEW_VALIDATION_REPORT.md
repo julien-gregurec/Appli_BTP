@@ -509,6 +509,36 @@ système, sinon repli local partagé entre onglets). Barre d'outils : **Copier (
 « après la sélection / avant / à la fin ». Mobile : case par ligne + mêmes boutons. Retour : « 6 lignes
 copiées », « 6 lignes ajoutées au devis », messages d'erreur explicites.
 
+### 20.3 Qualification sur la preview (phase 2) — défaut trouvé, prouvé et corrigé
+
+**Symptôme** (scripts Playwright sur la preview, compte Dirigeant) : dans le même devis, copier 8 lignes puis
+coller fonctionne (copie 7 ms, collage 30 ms, 18 lignes rechargées, clés toutes distinctes, sous-total
+recalculé). Vers un **nouveau** devis (« nouveau devis → titre → coller → Enregistrer et fermer »), la fiche
+rouvrait avec le **titre seul** (devis `CLIPBOARD CIBLE B`, `DIAG COLLE 2/3`, bisect `BISECT …` : 1 ligne,
+révision 1), alors que d'autres passes identiques gardaient les 11 lignes (`DIAG COLLE`, `4`, `5`, `6`).
+
+**Fausse piste** (`cc8fcc3`) : le premier enregistrement d'un devis neuf réécrivait l'adresse
+(`replaceState`) — supprimé (l'identifiant est retenu en mémoire, la fiche s'ouvre par navigation complète
+à l'enregistrement explicite). Amélioration réelle (plus de resynchronisation du routeur), mais le défaut
+persistait après déploiement (`CLIPBOARD CIBLE B` à 13:39 : 1 ligne).
+
+**Cause prouvée** (journal des requêtes, `DIAG COLLE 6`) : la grille passait à 9 lignes puis **revenait à
+1 ligne** quelques millisecondes après le collage, avant tout enregistrement. La cellule Désignation valide sa
+saisie **120 ms après le blur** (pour qu'un clic dans sa liste de résultats survive), et cette validation
+reconstruisait l'état depuis **l'état du rendu** (`modifierLigneLibre(etat, …)`) : un collage, une
+duplication (Ctrl+D) ou une insertion survenus dans cette fenêtre étaient écrasés. Un script enchaîne
+blur → poignée → position → Coller en moins de 120 ms ; un utilisateur rapide (blur puis Ctrl+V) aussi.
+
+**Correctif** (`17f25a2`) : toutes les mises à jour de la grille et de l'éditeur sont des **fonctions de
+l'état le plus récent** (`setEtat((courant) => …)`, historique inclus) ; le collage tire ses clés une fois
+(retour et sélection immédiats) et les rejoue si l'état a bougé entre le rendu et l'application. Test de
+banc ajouté (`presse-papier.banc.spec.ts`, « validation différée ») : **rouge sur le code précédent**
+(3 lignes au lieu de 5), vert après ; les 4 autres tests du banc inchangés (copie 500 = 108 ms, collage
+500 = 201 ms, 30 cellules DOM). Devis v2 : 357 tests vitest verts, typecheck 0, lint 0 erreur.
+
+**Portée** : ce défaut préexistait au copier/coller (toute saisie suivie d'une action de grille dans les
+120 ms), il explique aussi l'échec du Ctrl+D scripté de la phase 3 (rejoué après correctif, § 25).
+
 ## 21. Répétition générale des migrations (phase 9, 12:38 → 12:41, harnais `train-v3-dbtest`, Postgres nu 17.6)
 
 | Scénario | Résultat |
@@ -520,7 +550,8 @@ copiées », « 6 lignes ajoutées au devis », messages d'erreur explicites.
 | **Upgrade depuis la sauvegarde preview réelle** (251 + 2 dérives corrigées) | 46 appliquées (dont 290, 291) ; devis 152 / factures 106 / lignes 437 / entreprises 10 inchangés ; schéma identique au Fresh **sauf deux dérives préexistantes de la preview** : contrainte `plateforme_admins_actif_requiert_utilisateur_id` absente sur la preview (posée par le ledger, présente sur Fresh et sur Production après migration), et `pointages_coordonnees_check` écrite avec un parenthésage différent (même règle) |
 | Migration 276 (`gin_trgm_ops` qualifié) | traversée par les quatre chemins ; cas « rôle sans `extensions` » prouvé au § 18 |
 | Migration 290 | index / RPC en SECURITY DEFINER : traversée ; performance mesurée sur la preview (192 ms sous RLS) |
-| Migration 291 (nouvelle, presse-papier) | traversée par les quatre chemins ; appliquée sur la preview (ledger 288 = local) ; surface `anon` inchangée (3) |
+| Migration 291 (nouvelle, presse-papier) | traversée par les quatre chemins ; appliquée sur la preview ; surface `anon` inchangée (3) |
+| **Migrations 292 et 293** (phase 13, § 31) | Fresh 1 → 293 : **290 appliquées**, 615 fonctions, schéma 23 861 lignes ; pgTAP complet **81 fichiers, 2 313 ok, 0 not ok** (2 302 + les 11 du test 293 rejoué après correction de son prélude) ; Upgrade 291 → 293 : schéma **identique** au Fresh ; appliquées sur la preview (`db push`, ledger **290 = local, max `20260913000293`**) |
 
 Aucune migration historique modifiée par ce lot (la 276 l'avait été au § 18 sur décision de Julien).
 
@@ -552,3 +583,220 @@ jeudi, alors que le même geste avait déplacé « Peinture bureaux » au § 9 ;
 **Clavier** : Tab atteint les blocs (`tabindex=0`, `role=button`) ; Entrée n'ouvrait pas le détail après un
 clic (le glisser-déposer capturait le pointeur sans poser le focus) : corrigé (`ca9ec99`) — focus au
 pointeur, Entrée ou Espace ouvre le détail, Échap le ferme.
+
+## 23. Revue de sécurité (phase 14)
+
+| Point | Constat |
+| --- | --- |
+| RLS / surface | Après les 288 migrations (preview) : privilèges DDL / TRUNCATE / TRIGGER / REFERENCES des rôles applicatifs = 0 ; fonctions SECURITY DEFINER exécutables par `anon` = exactement la liste blanche documentée (3 : partage public de document, rendu par jeton, invitation Réserves) ; SECURITY DEFINER sans `search_path` = 0 ; test `isolation_multitenant_surface` 10/10 sur Fresh et sur clone preview migré. |
+| Coûts (prix d'achat, coût MO, coefficient, marge) | Absents du DOM du Conducteur (colonnes et bloc « Rentabilité » absents, § 8) ; l'enregistrement n'écrit `lignes_devis_couts` qu'avec `gerer_couts_devis` (RPC `enregistrer_devis_brouillon_v2`, base autoritaire) ; le presse-papier d'un profil sans `voir_couts_devis` ne contient aucun coût (copie) et un presse-papier forgé avec coûts est nettoyé au collage puis ignoré par la base. |
+| Presse-papier | Format versionné, validation stricte (types, bornes, listes blanches), aucun identifiant technique, aucune donnée hors devis ; refus « autre entreprise » sans écriture ; document corrompu refusé. |
+| Inter-entreprises (base) | Migration 291 : `lignes_devis.source_id` (prestation ou article de stock) et `devis_ouvrages.ouvrage_id` doivent appartenir à l'entreprise du devis (déclencheurs BEFORE, erreur 23514) — pgTAP 11/11. |
+| RPC | Toutes les RPC GP V1 en SECURITY DEFINER vérifient `est_membre_actif` / `a_permission` et posent `search_path` ; `conflits_planning` (290) garde `est_membre_actif(p_entreprise_id)` ; `anon` et `service_role` révoqués. |
+| Clé service | `SUPABASE_SERVICE_ROLE_KEY` n'apparaît que côté serveur (aucun fichier client) ; `npm run verify:secrets` : 1 958 fichiers, aucun secret (1 exception nommée). |
+| Preview / démo | Badge et encart démo conditionnés par `NEXT_PUBLIC_GP_PREVIEW_BADGE=1` **et** déploiement non promu (`VERCEL_ENV ≠ production`, adresse ≠ `app.elsatia.fr`) — 12 tests ; le projet Vercel de Production ne porte aucune variable GP / démo ; pas de connexion automatique (URL de preview publique). |
+| Routes protégées | Le proxy (`src/proxy.ts`) inchangé ; `/imprimer/devis/<id>` et `/api/documents/devis/<id>/pdf` exigent la session (cookie réémis à Chromium, vérification `getContexteEntreprise` + RLS). |
+| Validation des charges utiles | Presse-papier : `lirePressePapier` (11 tests) ; enregistrement : RPC (types de lignes, bornes remise / TVA, structure sans montant, remise globale) ; planning : action serveur (titre, type, statut, fin > début) + règles de la base (24 h / jour). |
+
+## 24. Preview — sécurité et drapeaux (phase 8)
+
+| Variable | Projet Vercel `elsatia-preview` | Projet Vercel de Production |
+| --- | --- | --- |
+| `GP_DEVIS_V2`, `GP_PLANNING_V2` | posées (`1`) | **absentes** (vérifié au § 18 : aucune variable GP) |
+| `NEXT_PUBLIC_GP_PREVIEW_BADGE` | `1` | absente ; refusée par le code si un jour posée (`badge-preview.ts`) |
+| `NEXT_PUBLIC_GP_DEMO_EMAIL` | compte recette | absente ; l'encart démo suit le même verrou que le badge |
+| `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SUPABASE_URL` | preview (`pgvvpqyjziyapbbkydmc`) | Production (`exhvuzegsefmoguxoiak`), jamais lue par cette session |
+
+- Le badge « PREVIEW » et l'encart « Accès démo » exigent **à la fois** le drapeau et un déploiement non
+  promu (`VERCEL_ENV ≠ production`, adresse ≠ `app.elsatia.fr`) : 12 tests unitaires (`badge-preview.test.ts`),
+  vérifiés en ligne sur la preview (badge visible, encart visible, `?demo=1` préremplit l'adresse seulement —
+  **aucun mot de passe** dans le code, l'URL, le dépôt ou la page).
+- Les drapeaux `GP_DEVIS_V2` / `GP_PLANNING_V2` sont lus **côté serveur** uniquement (pages et actions) :
+  drapeau absent = comportement v1 inchangé (éditeur historique, planning historique), aucune route v2
+  exposée. Production reste donc en v1 tant que les variables ne sont pas posées, même après fusion du code.
+- Les comptes de recette (`*.recette@elsatia-preview.invalid`) n'existent que dans la base preview ; le seed
+  (`docs/gp-v1/preview/seed-recette-gp-v1.sql`) est idempotent et refuse de s'exécuter hors de la preview
+  (garde sur le project ref). Aucune donnée réelle : clients, devis et planning de recette sont synthétiques.
+- Limiteur applicatif (`RATE_LIMIT_HMAC_KEY`) actif sur la preview comme en Production ; la pile E2E locale
+  utilise une clé jetable.
+
+## 25. Qualification Devis V2 après le presse-papier (phases 2-5 et 7, preview, build `17f25a2`)
+
+Scripts Playwright `.recette-tmp/recette-clipboard.mjs`, `recette-phase3.mjs`, `recette-phase5*.mjs`,
+`recette-essai.mjs` (hors dépôt), compte Dirigeant sauf mention ; devis de recette
+`b3896aaa…` (12 lignes + 1 ouvrage, statut brouillon inchangé, révision 7).
+
+| Cas | Résultat |
+| --- | --- |
+| 2.1 Même devis : sélection poignée + Maj, Ctrl+C, Ctrl+V après la dernière ligne | 8 lignes copiées (7 ms), collées (30 ms), 18 lignes rechargées, clés toutes distinctes en base, sous-total recalculé (§ 20) |
+| 2.2 Autre devis (nouveau → titre → Coller à la fin → Enregistrer et fermer → recharger) | **après correctif** : 9 lignes à l'écran, **11 lignes + 1 ouvrage en base** (`73f570ac`, révision 1) ; avant correctif : titre seul (§ 20.3) |
+| 2.2 bis : modifier B ne modifie pas A | A relu : lignes et quantité de la ligne 4 (24) inchangées ; B relu : 9 lignes |
+| 2.3 Deux onglets (A copie 2 lignes, B colle : presse-papier système, repli local) | B passe de 9 à 11 lignes, « 2 lignes ajoutées au devis » |
+| 2.5 Conducteur (sans `voir_couts_devis`) copie l'ouvrage et un article | presse-papier relu champ par champ : `prixAchatHt` **null** partout, aucune clé `coutMainOeuvreHt` ni coefficient de coût (origine nettoyée) ; les seuls `coefficient` présents sont les coefficients de **métré** des composants de l'ouvrage (1 / 1,2 / 0,8 : quantité par unité d'ouvrage, visibles de tous dans le dialogue Ouvrage), pas des coûts ; en-têtes de grille sans colonne de coût |
+| 2.6 Presse-papier **forgé avec coûts** collé par le Conducteur puis enregistré (devis `cca3b5dd`) | « 2 lignes ajoutées », devis enregistré (4 lignes) ; **0 ligne dans `lignes_devis_couts`** pour ce devis (base autoritaire) |
+| 2.7 Presse-papier d'une **autre entreprise** / document **corrompu** | preview : « Ce presse-papier vient d’une autre entreprise : collage refusé, rien n’a été créé. », 1 ligne inchangée ; document corrompu : aucune ligne créée (10 → 10), message vérifié sur le banc (« corrompu ») et refus prouvé par l'E2E 17 |
+| 3.1 Clavier : Tab quantité → unité → prix d'achat, Entrée sur cellule chiffrée crée une ligne, ↑/↓, Ctrl+D, Ctrl+↓, Ctrl+Suppr, Échap | conformes ; Ctrl+D scripté dans les 120 ms suivant une saisie duplique la ligne avant sa validation (course corrigée `17f25a2`, cf. § 20.3 ; un humain n'atteint pas ce délai) |
+| 3.4 Calculs limites | prix 999 999,99 × remise 100 % → 0,00 € ; remise 101 : la cellule garde « 101 », la base refuse (`lignes_devis_remise_ligne_check`, pgTAP) — à borner aussi dans la cellule (mineur, § 29) ; qté 0,001 → 1 000,00 € ; TVA 5,5 % → 55,00 € / TTC 1 055,00 € ; TVA 0 ; coefficient 1,5 sur 500 € → PV 750 000 (× qté), marge 250 €, taux de marque 33,3 % |
+| 3.5 Conducteur — DOM / API / lecture / PDF | colonnes `Type, Réf., Désignation, Réf. fab., Qté, U., PU HT, Rem. %, TVA, Total HT` (aucun coût), bloc Rentabilité absent, fiche lecture sans coût (200), PDF 200 (54 Ko) |
+| 4 Cohérence éditeur → lecture → A4 → PDF (devis de recette) | Total HT 4 662,60 € / TVA 932,52 € / TTC 5 595,12 € identiques dans l'éditeur, la fiche (titre, sous-titre, ouvrage OUV-0001 et ses 3 composants « ↳ », fournitures, commentaire, remise, sous-total) et l'impression |
+| 4 PDF multi-pages | 100 lignes : 200, 264 Ko, **9 pages**, 1,9 s ; 500 lignes : 200, 1,18 Mo, **41 pages**, 2,7 s |
+| 5 Transformation en facture (copie `aac0a700` : Dupliquer → envoyé → accepté → Transformer, confirmation acceptée) | facture `47ac5d61` créée en 1,8 s, **12 lignes identiques** (titres, composants de l'ouvrage, commentaire, remise, sous-total), HT 4 662,60 € / TTC 5 595,12 € = devis ; fiche du devis : « Documents issus de ce devis » + historique `envoye → accepte` |
+| 7 Essai / onboarding (non-régression après tous les correctifs) | encart démo, `?demo=1` préremplit l'adresse seule, « Changer de compte » (déconnexion réelle, 0 cookie de session), compte Pro sans bandeau, Devis V2 et Planning V2 actifs ; niveaux J-30 (carte + latéral), J-18, J-7, J-3, J-1, J0 (bandeau), expiré → `/abonnement-suspendu?motif=essai_expire` ; employé sans CTA ; entreprise d'essai remise à J-5 |
+
+Devis de test laissés sur la preview (repérables par leur référence d'affaire `DIAG COLLE *`, `BISECT *`,
+`CLIPBOARD *`, `QUALIF PHASE 3`, copie `DEV-2026-001` + facture brouillon) : données synthétiques, sans effet
+sur la recette ; supprimables depuis l'application.
+
+## 26. Performance finale (phase 13)
+
+| Mesure | 10-12 lignes | 100 lignes | 500 lignes |
+| --- | --- | --- | --- |
+| Éditeur : rendu serveur / hydraté (preview, § 12) | 0,7 s / 1,8 s | 1,5 s / 2,6 s (101 cellules DOM) | 1,5 s / 2,7 s (**30 cellules DOM**, virtualisé ; défilement 0,4 s) |
+| Frappe → totaux recalculés (preview, § 12) | immédiat | 48 ms | 81 ms |
+| Copier / coller (banc, `17f25a2`) | — | 69 ms / 102 ms | 108 ms / 201 ms |
+| Copier / coller (preview, 8 lignes, RPC réelle) | 7 ms / 30 ms | — | — |
+| Enregistrement (une RPC, une transaction) — **avant 292/293** | preview : autosauvegarde 1,3 s · explicite 2,7 s (11 lignes + ouvrage) | preview : 100 lignes OK (§ 12) ; **202 lignes : délai 8 s dépassé** | preview : 500 OK en ~10 s ; **1 000 lignes : délai dépassé, autosauvegarde en boucle** |
+| Enregistrement — **après 292 + 293** (RPC seule, local Postgres 17, rollback) | — | 86 ms (500 lignes) | 87 ms (1 000 lignes) — § 31 pour la preview |
+| PDF (preview) | 200 (§ 8) | 1,9 s, 264 Ko, 9 pages | 2,7 s, 1,18 Mo, 41 pages |
+
+| Planning | 400 évènements | 1 000 évènements |
+| --- | --- | --- |
+| Ouverture (TTFB / blocs visibles) | 4,1 s / 6,1-6,7 s | 5,6 s / 7,4 s |
+| Déplacement clavier (réaction / enregistrement) | 0,24 s / 5,7 s | 0,56 s / 7,8 s |
+| Conflit (RPC 290 sous RLS) | 192 ms | inclus |
+
+E2E complet (17 scénarios, pile locale, sans retry) : **1,3 min**. Limite connue : coût des politiques RLS
+ligne à ligne sur le planning (backlog plateforme, décision de Julien § 18).
+
+## 27. Gate de tests complet (phases 11-12, HEAD `59541ef`)
+
+| Contrôle | Résultat |
+| --- | --- |
+| `npx tsc --noEmit` | 0 erreur |
+| `npm run lint` | **0 erreur**, 19 avertissements : 12 dans `.recette-tmp/` (scripts de recette hors dépôt, ignorés par git mais parcourus par ESLint), 7 préexistants dans le dépôt (`<img>` boutique / signature, `useVirtualizer` incompatible avec le compilateur React, dépendance `identite` mobile, import inutilisé Réserves) — aucun introduit par ce lot |
+| `npx vitest run` (complet) | **2 411 réussis, 1 échec, 3 ignorés / 202 fichiers** ; l'échec est `src/lib/xlsx.test.ts` (dépassement 9 s sous charge, connu § 13) — **vert rejoué seul (2/2)** |
+| pgTAP complet (Fresh 293, harnais Postgres 17.6) | 81 fichiers, **2 313 ok, 0 not ok** (§ 21) |
+| `next build` (Turbopack, environnement E2E : drapeaux V2 + badge) | exit 0, 0 erreur (deux fois : avant et après `17f25a2`) |
+| `npm run verify:migrations` | 290 migrations valides, noms et horodatages uniques |
+| `npm run verify:secrets` | 1 958 fichiers, aucun secret (1 exception nommée) |
+| `git diff --check` | OK |
+| **E2E complet** `tests/e2e/gp-v1-metier.spec.ts` (pile locale Kong 60321, base `gpv1_jetable`, build E2E) | **17/17, `--retries=0`, aucun `skip`**, rejoué trois fois : au 291 (1,3 min), au 293 (1,7 min) et après le durcissement de l'autosauvegarde (§ 32) : client, article, ouvrage, devis, 5 types de lignes, clavier + Ctrl+Z, marge, PDF journalisé, transformation en facture, planning (création, +15 min persistant, conflit), droits chef d'équipe, palette Ctrl+K, barre latérale, copier/coller même devis, copier/coller autre devis + presse-papier étranger refusé |
+| Banc éditeur v2 (`presse-papier.banc.spec.ts`, `sauvegarde.banc.spec.ts`) | **7/7** : 5 tests presse-papier dont la course « validation différée » (rouge avant `17f25a2`), 2 tests d'autosauvegarde (brouillon invalide, refus simulé du serveur : une seule tentative) |
+| Conteneurs analytics tiers | non arrêtés : la suite E2E est passée sans saturation (aucun état à restaurer) |
+
+Corrections de tests de cette phase (pas de contournement du produit) : scénario 9 attend le statut rendu par
+le serveur avant de recharger et remonte le motif `?error=` au lieu d'un délai muet ; scénarios 16-17
+partent d'un brouillon obtenu par « Dupliquer » (le devis de la suite est accepté depuis le scénario 9).
+
+## 28. Production readiness (phases 9-10, 14-16)
+
+- **Répétition générale** (§ 21) : Fresh, Upgrade 210 → 291, Upgrade 280 → 291 et **clone de la sauvegarde
+  preview réelle** → 291 donnent le même schéma ; pgTAP complet vert ; 276 et 290 traversées ; 291 nouvelle.
+- **Dry-run sur clone de sauvegarde Production (phase 10)** : **non réalisable dans cette session** — aucune
+  sauvegarde Production n'est accessible sans interroger le projet Production (`exhvuzegsefmoguxoiak`), ce
+  qui est interdit. Le chemin équivalent a été joué depuis l'état Production connu (`20260810000210`, § 21)
+  et depuis la sauvegarde preview ; le runbook (§ 4) impose ce dry-run sur la sauvegarde logique datée le
+  jour J, avant toute écriture.
+- **Migrations à appliquer en Production** : 97 versions en attente depuis 210 (dont 200, 232, 236-240 <
+  maximum distant → `--include-all`), rôle CLI `cli_login_postgres` suffisant (276 qualifiée).
+- **Sécurité** (§ 23) : RLS / SECURITY DEFINER / `anon` inchangés, coûts protégés en base, presse-papier
+  validé et borné à l'entreprise (client + déclencheurs 291), aucune clé service côté client, aucun secret.
+- **Drapeaux** (§ 24) : Production reste en v1 tant que `GP_DEVIS_V2` / `GP_PLANNING_V2` ne sont pas posés ;
+  badge et démo impossibles en Production par construction.
+- **Runbook** : `docs/gp-v1/preview/RUNBOOK_MIGRATIONS_PRODUCTION_GP_V1.md` (12 sections, mis à jour avec le
+  gate final).
+
+## 29. Risques restants
+
+| Risque | Gravité | Traitement |
+| --- | --- | --- |
+| Coût RLS ligne à ligne : planning 400-1 000 évènements en 4-8 s de rendu serveur | moyen (confort) | backlog plateforme (décision Julien § 18) ; 290 a déjà divisé le temps par 2 ; l'enregistrement de devis en est sorti par la 293 (§ 31) |
+| RPC d'enregistrement en SECURITY DEFINER (293) : la sécurité repose sur les gardes explicites de la fonction, plus sur les politiques RLS | faible | gardes prouvées par pgTAP (membre, devis, client, chantier, commercial ; `anon` / `service_role` révoqués) ; même modèle que `conflits_planning` (290) |
+| Remise de ligne : la cellule accepte « 101 » (la base refuse `remise_ligne between 0 and 100`) | mineur | borner la cellule à 100 dans un lot ultérieur ; aucune donnée invalide ne peut être écrite |
+| Collage / dialogue Ouvrage : `collerElements` et `onApplique` construisent leur résultat sur l'état du rendu (clés rejouées si l'état a bougé) — fenêtre théorique < 1 rendu | faible | couvert pour le collage par le rejeu des clés ; à surveiller |
+| Test `xlsx.test.ts` sensible à la charge (9 s) | faible | vert seul ; à isoler en CI |
+| Dérives de schéma constatées sur la preview (contrainte `plateforme_admins…` absente, `pointages_coordonnees_check`) | faible | absentes du Fresh et du chemin 210 → 291 ; à chercher sur Production lors du dry-run (runbook § 4) |
+| Deux avertissements de compilation React (`useVirtualizer`) | nul | préexistant, bibliothèque tierce |
+
+## 30. Preview finale (phase 17, alias de branche, build `17f25a2` puis `59541ef`, 14:24-14:40)
+
+URL : `https://elsatia-preview-git-feat-gp-v1-metier-d-467e36-julien-gregurec1.vercel.app` (rejeu du script de
+recette visuelle complet `recette-preview.mjs`, compte Dirigeant puis Conducteur, 1440 × 900).
+
+| Point | Constat |
+| --- | --- |
+| Badge | « GP V1 PREVIEW · Devis V2 actif · Planning V2 actif » |
+| Accès démo (`/login`, `?demo=1`) | encart présent, adresse préremplie, aucun mot de passe (§ 25 ligne 7) |
+| Catalogue / bibliothèque d'ouvrages | 12 articles (familles, favoris), ouvrages actifs/archivés, 3,0 s / 4,5 s |
+| Nouveau devis | 2,0 s ; boutons Annuler, Rétablir, Enregistrer et fermer, Saisie / Aperçu, Articles Ctrl+K, Ouvrage, Ligne libre, **Copier, Coller**, Colonnes…, Aperçu A4 ; Insérer… = Titre, Sous-titre, Commentaire, Sous-total, Remise, Ligne vide, Séparateur, Saut de page |
+| Dialogue Ouvrage | recherche OUV-0001, composants avec quantité / coefficient / perte / PU, quantité principale 12, « Marge : 956,70 € » (Dirigeant), « Insérer tout l'ouvrage » → 4 lignes ; article Ctrl+K → 5 lignes ; remise de section 5 % ; 10 lignes au final |
+| Colonnes Dirigeant | Type, Réf., Désignation, Réf. fab., Qté, U., **Achat HT, Coef., Marge €**, PU HT, Rem. %, TVA, Total HT ; totaux HT 3 237,60 € / TTC 3 885,12 € ; rentabilité (coût 2 078,90 €, marge 1 158,70 €, taux 35,8 %) |
+| Clavier | Tab quantité → unité ; Ctrl+Z rétablit « 2 » |
+| Enregistrement / fiche | « Enregistré à 14:24 » ; fiche brouillon avec panneau d'actions groupées et motifs (« Importer des lignes » annoncé V2) |
+| Impression A4 / PDF | `/imprimer/devis/<id>` 200 (46 Ko, en-tête entreprise, DEVIS BROUILLON) ; PDF 200, `application/pdf`, 54 Ko, `%PDF-1.4` Chromium |
+| Planning V2 | 3,9 s ; contrôles Jour / Semaine / Mois, Par salarié / équipe / chantier / ressource ; 17 blocs ; détail (titre, type, statut, jour, début, fin, chantier) ; déplacement clavier 08:30 → **08:45 persistant** après rechargement, conflit toujours signalé |
+| Conducteur | en-têtes sans coût, bloc Rentabilité absent |
+| Copier / coller | § 25 (2.1-2.7) sur ce même build |
+
+## 31. Enregistrement des gros devis — diagnostic et correctifs (phase 13, migrations 292 et 293)
+
+**Symptôme** (preview, script de perf du presse-papier) : coller 100 lignes dans le devis de 100 lignes
+(202 lignes) ou 500 dans celui de 500 (1 000 lignes) puis attendre l'autosauvegarde : « Impossible
+d'enregistrer ce devis », **jamais « Enregistré à »**, et l'autosauvegarde **réessaie en boucle** toutes les
+12 s. Journaux Vercel : `enregistrerDevisV2Action { code: '57014', message: 'canceling statement due to
+statement timeout' }` — la limite Supabase de 8 s pour le rôle `authenticated`. Un devis de 20 lignes
+s'enregistrait déjà en 3,8 s.
+
+**Diagnostic** (base locale Postgres 17, `explain analyze` avec temps des déclencheurs, puis `auto_explain`
+sur les instructions internes de la RPC) :
+
+| Cause | Mesure (500 lignes, local) | Correctif |
+| --- | --- | --- |
+| `recalc_devis_apres_ligne` (migration 5) : déclencheur **par ligne** qui relit toutes les lignes du devis — la RPC supprime puis réinsère toutes les lignes → coût quadratique | 407 ms sur 435 ms de l'insertion ; ×4 à 1 000 lignes | **292** : recalcul **par instruction** (tables de transition), une fois par devis touché, résultat identique — insertion 500 lignes 435 → 27 ms |
+| RPC exécutée avec les droits de l'appelant : **politique RLS évaluée ligne à ligne** (`est_membre_actif`) sur la relecture des lignes (journal des prix) et sur chaque ligne insérée | journal 452 ms + insertion 448 ms sur 1,0-3,2 s (plans `auto_explain` : `Index Scan … Filter: EXISTS(SubPlan)` × 500) | **293** : RPC en **SECURITY DEFINER** (modèle 290) avec gardes explicites — membre actif, `gerer_devis`, devis / client / chantier / commercial de `p_entreprise_id` ; corps de la 286 inchangé ; `anon` / `service_role` révoqués, `search_path` figé |
+
+**Résultat** (RPC seule, local, transaction annulée) : 500 lignes **2,3-3,2 s → 86 ms**, 1 000 lignes
+**> 12 s → 87 ms**. **Preview après 293** (même script, action serveur complète Vercel → Supabase, rendu RSC
+compris) : coller 500 lignes dans le devis de 500 → **1 000 lignes enregistrées en 4,1 s**, retour à 500 en
+3,6 s, plus aucune erreur 57014 ; modification simple sur 500 lignes : « Enregistré à » en ~3 s. Preuves : pgTAP `gp_v1_devis_totaux_par_instruction` (13 assertions : déclencheurs,
+insertion / modification / suppression groupées, instruction à vide, remise globale) et
+`gp_v1_devis_v2_enregistrement_security_definer` (10 assertions : mode, `search_path`, privilèges, A enregistre,
+B ne peut ni réécrire le devis de A, ni se faire passer pour A, ni viser un client de A ; devis de A intact).
+
+**Hors périmètre, documenté** : les politiques RLS elles-mêmes ne sont pas touchées (backlog plateforme,
+décision de Julien) ; l'autosauvegarde continue de réessayer après une erreur non liée à un conflit (à
+revoir : repli explicite après N échecs).
+
+## 32. Autosauvegarde — brouillon invalide et erreurs durables (phase 3/13)
+
+**Constat 1** : le devis de recette « 100 lignes » (`797529fd`) ne s'enregistrait plus du tout — ni
+autosauvegarde, ni requête — sans autre indication que « Modifications non enregistrées ». Cause : son
+ouvrage « Cloison plaques de plâtre 72/48 » n'a plus aucun composant (données de recette), donc
+`validerBrouillon` refuse le brouillon ; l'autosauvegarde abandonnait **en silence** (le motif n'apparaissait
+qu'en cliquant « Enregistrer et fermer »). Un utilisateur pouvait croire son travail sauvegardé.
+
+**Constat 2** : après une erreur du serveur (dépassement de délai 57014 avant 292/293), l'autosauvegarde
+**réessayait toutes les 12 s** avec la même charge (535 Ko), indéfiniment.
+
+**Correctif** (`EditeurDevisV2.tsx`) : le motif d'un brouillon invalide est affiché dans l'état
+d'enregistrement (« Non enregistré — « Cloison … » : l'ouvrage n'a plus aucun composant. ») ; après une
+erreur (serveur, invalide), **aucune nouvelle tentative automatique tant que rien ne change** ; la
+modification suivante (saisie, annuler, rétablir, en-tête) efface l'erreur simple et relance le cycle ; un
+conflit de révision exige toujours un rechargement (inchangé). Typecheck 0, lint 0, 357 tests devis verts,
+banc et E2E rejoués (§ 27).
+
+## 33. Synthèse de la session autonome (2026-09-13, 12:15 → 16:00)
+
+| Commit | Objet |
+| --- | --- |
+| `1bc1f23` … `766d8fb` | presse-papier de lignes (module, grille, éditeur, banc, migration 291, E2E 16-17), rehearsal, planning, runbook |
+| `cc8fcc3` | le premier enregistrement d'un devis neuf ne touche plus à l'adresse |
+| `17f25a2` | **mises à jour de grille fonction de l'état le plus récent** (course de la validation différée) |
+| `59541ef` | E2E 16-17 partent d'un brouillon dupliqué ; scénario 9 attend le statut serveur |
+| `5cfcf1d` | **migration 292** : totaux de devis recalculés par instruction |
+| `470b991` | **migration 293** : RPC d'enregistrement en SECURITY DEFINER avec gardes explicites |
+| `d046b53` | autosauvegarde : motif d'un brouillon invalide affiché, plus de réessai automatique après erreur |
+
+Preview : Supabase `pgvvpqyjziyapbbkydmc` au ledger **290 / `20260913000293`** ; Vercel alias de branche
+reconstruit à chaque commit (dernier build : `d046b53`). **Production intouchée** : aucun lien, aucune
+requête, aucune variable, aucun déploiement, aucun merge.

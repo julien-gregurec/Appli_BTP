@@ -5,7 +5,7 @@ Version 2026-09-13 (session autonome). Issu de la recette preview
 Production** ; il décrit ce qui a été fait sur la preview et ce qui doit l'être en Production, dans l'ordre,
 avec le rôle réellement utilisé et les conditions d'arrêt.
 
-Périmètre : ledger `20260710000001` → `20260913000291` (288 fichiers), branche
+Périmètre : ledger `20260710000001` → `20260913000293` (290 fichiers), branche
 `feat/gp-v1-metier-devis-planning-references-v1`, projet Supabase Production `exhvuzegsefmoguxoiak`, projet
 Vercel `elsatia-production` (branche de production `release/commercialisation-v1`).
 
@@ -14,7 +14,7 @@ Vercel `elsatia-production` (branche de production `release/commercialisation-v1
 1. Julien a validé visuellement Devis V2, Planning V2, le copier/coller et l'accès recette sur la preview ; il
    a autorisé explicitement la mise en Production (aucune étape ci-dessous ne se joue sans cet accord).
 2. Branche fusionnée dans `release/commercialisation-v1` **sans force** ; HEAD local = distant ;
-   `npm run verify:migrations` (288 valides), `npm run verify:secrets`, `git diff --check` verts ;
+   `npm run verify:migrations` (290 valides), `npm run verify:secrets`, `git diff --check` verts ;
    `npx tsc --noEmit`, `npm run lint`, vitest complet, pgTAP complet (2 284 ok sur le Fresh) verts.
 3. Rôle qui migre : `supabase link --project-ref exhvuzegsefmoguxoiak` puis `db push --linked` — la CLI se
    connecte via l'API de gestion avec le rôle temporaire `cli_login_postgres` (membre de `postgres`, objets
@@ -57,12 +57,14 @@ Vercel `elsatia-production` (branche de production `release/commercialisation-v1
 
 1. `db push --linked --include-all --yes`, rôle CLI (voir § 1.3). Chaque migration est une transaction :
    un arrêt laisse les précédentes appliquées ; corriger la cause puis relancer (reprise aux manquantes).
-2. Contrôles immédiats : `count(*)` et `max(version)` de `supabase_migrations.schema_migrations` = 288 /
-   `20260913000291` ; surface de sécurité — privilèges DDL des rôles applicatifs 0, SECURITY DEFINER
+2. Contrôles immédiats : `count(*)` et `max(version)` de `supabase_migrations.schema_migrations` = 290 /
+   `20260913000293` ; surface de sécurité — privilèges DDL des rôles applicatifs 0, SECURITY DEFINER
    exécutables par `anon` = exactement `document_commercial_par_token`, `document_rendu_par_token`,
    `reserves_invitation_consulter`, sans `search_path` 0 ; volumes inchangés ; `conflits_planning` en
    SECURITY DEFINER (290) ; déclencheurs `lignes_devis_source_meme_entreprise` et
-   `devis_ouvrages_ouvrage_meme_entreprise` présents (291).
+   `devis_ouvrages_ouvrage_meme_entreprise` présents (291) ; `recalc_devis_apres_ligne` absent et les trois
+   déclencheurs `recalc_devis_apres_lignes_*` présents (292) ; `enregistrer_devis_brouillon_v2` en SECURITY
+   DEFINER, non exécutable par `anon` / `service_role` (293).
 
 ## 6. Drapeaux et déploiement applicatif
 
@@ -102,13 +104,13 @@ cohérentes avec l'aperçu.
   avec accord explicite, sinon retour arrière.
 - Retour arrière = restauration de la sauvegarde logique (schéma + données + rôles) dans le projet
   Production après arrêt de l'application ; les migrations ne prévoient pas de `down`. Les drapeaux
-  applicatifs restent à 0 tant que la base n'est pas au 291.
+  applicatifs restent à 0 tant que la base n'est pas au 293.
 
 ## 12. Surveillance post-déploiement (48 h)
 
 - Journaux Vercel : `[pdf]` (échecs Chromium), erreurs 5xx sur `/api/documents/**`, `/devis/**`, `/planning`.
 - Supabase : temps de réponse de `contexte_abonnement_courant`, `conflits_planning`,
-  `enregistrer_devis_brouillon_v2` ; verrous de révision (« modifié ailleurs ») ; erreurs 23514 des
+  `enregistrer_devis_brouillon_v2` (attendu < 1 s jusqu'à 1 000 lignes après 292/293 ; toute erreur 57014 = régression) ; verrous de révision (« modifié ailleurs ») ; erreurs 23514 des
   déclencheurs 291 (référence étrangère = tentative anormale).
 - Métier : premiers devis v2 enregistrés, premiers PDF, planning semaine ; retours clients sur le
   copier/coller.
