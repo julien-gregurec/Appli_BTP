@@ -800,3 +800,135 @@ banc et E2E rejoués (§ 27).
 Preview : Supabase `pgvvpqyjziyapbbkydmc` au ledger **290 / `20260913000293`** ; Vercel alias de branche
 reconstruit à chaque commit (dernier build : `d046b53`). **Production intouchée** : aucun lien, aucune
 requête, aucune variable, aucun déploiement, aucun merge.
+
+## 34. Durcissements finaux avant validation utilisateur (2026-09-13, 16:10 → )
+
+### 34.1 Remises bornées (0 à 100 %) — `8054e92`
+
+**Défaut** : la cellule de remise plafonnait en silence à 100 et, quand la valeur retenue ne changeait pas
+(déjà 100), gardait le texte saisi « 101 » à l'écran ; un texte illisible restait affiché lui aussi.
+
+**Correctif** : une seule fonction d'interprétation (`interpreterRemisePct`) pour toutes les saisies de
+pourcentage — cellule de ligne, remise de section (« 12,5 % »), remise globale de l'en-tête, carte et dialogue
+mobiles : 0 à 100 acceptés (virgule ou point, « % » toléré, vide = 0) ; au-delà de 100, négatif ou illisible :
+**refus avec message** (« Remise « 101 » refusée : une remise ne peut pas dépasser 100 %. ») et **valeur
+précédente rétablie**, au clavier comme au collage de texte. Le message paraît dans la zone de retour de
+l'éditeur (`role=alert`). La validation serveur est inchangée (`validerBrouillon` avant envoi, bornes de la RPC et
+contrainte `remise_ligne between 0 and 100` en base).
+
+**Remise fixe** (ligne « Remise » avec un montant) : règle existante vérifiée — montant négatif, quantité 1,
+sans plafond à 100 (une remise de 250 € sur une section de 2 000 € est légitime) ; un montant illisible est
+refusé avec message. Aucun changement de règle métier.
+
+**Cas limites** (banc `remise.banc.spec.ts` 2/2, unitaires 3 cas × 15 valeurs) :
+
+| Saisie | Résultat |
+| --- | --- |
+| 0 · 0,01 · 50 · 99,99 · 100 | acceptées ; total HT 1 000 → 1 000,00 / 999,90 / 500,00 / 0,10 / 0,00 |
+| 100,01 · 101 · 150 (collage) | refusées « ne peut pas dépasser 100 % », cellule et total rétablis (50 / 500,00) |
+| −5 · −0,01 | refusées « ne peut pas être négative » |
+| abc · 10a · « - » | refusées « n’est pas un pourcentage » |
+| section « 150 % » / « 12,5 % » / « 250 » / « abc » | refusée / 1 750,00 / −250 € (fixe) / « n’est pas un montant » |
+| remise globale « 101 » (frappe) | refusée, champ reste à 10, total 1 575,00 |
+
+### 34.2 Données de recette — `2b9acb1`
+
+Le devis « 100 lignes » portait un ouvrage sans composant (reste d'un script de diagnostic, référence
+« DIAG A-… ») : brouillon invalide, message parasite. Sur la preview : ouvrage vide supprimé (1), devis renommés
+« PERF 100 lignes » / « PERF 500 lignes ». Le seed du dépôt crée désormais ces deux devis de façon
+reproductible (identifiants fixes, lignes générées, aucun ouvrage) et retire tout ouvrage sans composant de
+l'entreprise de recette. Aucune règle métier assouplie : un ouvrage vide reste refusé.
+
+### 34.3 Rejeu Devis V2 après correction (preview, build `2b9acb1` puis `8cea858`)
+
+Script `recette-remise.mjs` (nouveau devis « REMISE BORNES ») : remise 100 → 0,00 € ; 50 → 500,00 € ; 100,01 /
+101 / −5 / abc / **collage « 150 »** → refusés avec leur message, cellule et total rétablis ; remise de section
+« 150 % » refusée, « 10 % » → 450,00 € ; sous-total inséré ; remise globale « 101 » refusée (champ à 10,
+total 405,00 €) ; **effacer le champ = 0** (`8cea858`) ; ouvrage OUV-0001 inséré (4 lignes) ; enregistrement ;
+fiche, impression A4 (200, remise et sous-total présents) et PDF (200, `application/pdf`, 41 Ko).
+
+### 34.4 Non-régression copier/coller (preview, `recette-clipboard.mjs`)
+
+Une ligne (mobile : « 1 ligne copiée ») ; plusieurs lignes (8 copiées / collées, 2 entre onglets) ; autre devis
+(9 lignes, A inchangé) ; ouvrage (copié entier) ; **cross-tenant refusé** (« Ce presse-papier vient d’une autre
+entreprise : collage refusé, rien n’a été créé. ») ; Conducteur sans coûts (`prixAchatHt` null, presse-papier
+forgé collé sans coût, 0 ligne de coût en base) ; texte dans une cellule = collage de texte ; 10 / 100 / 500
+lignes : copie 5 / 35 / 52 ms, collage 62 / 111 / 288 ms.
+
+### 34.5 Gros devis (preview, après 292 / 293)
+
+| Devis | Collage | Enregistrement après collage | Retour (Annuler le collage) |
+| --- | --- | --- | --- |
+| PERF 100 lignes → 200 | 129 ms | **2,9 s**, « Enregistré à » | 4,4 s |
+| PERF 500 lignes → 1 000 | 409 ms | **4,0 s**, « Enregistré à » | 3,9 s |
+
+Aucune erreur 57014, aucune boucle de réessai ; autosauvegarde et enregistrement explicite verts ; cohérent
+avec les mesures du § 31 (4,1 s pour 1 000 lignes).
+
+### 34.6 Planning — smoke (preview, `recette-phase6.mjs`, aucun développement)
+
+400 évènements : blocs visibles en 6,0-6,2 s, déplacement clavier réaction 0,58 s / enregistrement 6,0 s ;
+1 000 évènements : 7,1-7,9 s, réaction 0,9 s / enregistrement 10,9 s, vue jour 4,6 s. **Règle 24 h** : message
+explicite « Ce salarié dépasserait 24 heures planifiées ce jour-là… » affiché dans le dialogue à chaque
+dépassement (5 cas), sauvegarde refusée. Glisser-déposer scripté : « autre jour » suivi ; « autre salarié »
+et le bloc « Réunion » non reproduits par le script (fragilité déjà notée au § 22) — laissé à la validation
+manuelle de Julien (checklist § 35) ; le déplacement clavier persiste après rechargement (smoke).
+
+### 34.7 Gate et preview finale
+
+Typecheck 0 ; lint 0 erreur (7 avertissements préexistants dans le dépôt, le reste dans `.recette-tmp/` hors
+dépôt) ; vitest complet 2 411 + 3 nouveaux verts (3 flakies connus `xlsx` / `stripe webhook` verts seuls) ;
+banc 9/9 (remise 2, sauvegarde 2, presse-papier 5) — le banc historique `editeur-v2.banc.spec.ts` est rouge
+depuis les décisions d'affichage antérieures (11/13 à `285983d` comme après, non compté dans le gate) ;
+pgTAP inchangé (aucune migration nouvelle ; 2 313 ok au § 27) ; **E2E 17/17 sans retry** sur le code final
+(deux passes ; une troisième passe lancée pendant le rebuild du banc, la relecture lint et les scripts preview a
+vu le scénario 10 échouer une fois — bloc « E2E Pose » non trouvé sous charge —, verte au rejeu machine au repos) ;
+`next build` 0 erreur ; verify:migrations 290 ; verify:secrets 1 964 fichiers ; `git diff --check` OK.
+Preview (`8cea858`) : badge, encart démo sur `/login` (sans session), Devis V2, Planning V2, copier/coller,
+remise > 100 refusée, devis de performance sans ouvrage vide et enregistrables.
+
+## 35. Validation visuelle Julien — checklist
+
+Preview : `https://elsatia-preview-git-feat-gp-v1-metier-d-467e36-julien-gregurec1.vercel.app` (badge « GP V1
+PREVIEW »), compte `dirigeant.recette@elsatia-preview.invalid` (mot de passe transmis séparément) ; encart
+« Accès démo » sur la page de connexion. Devis de recette : « DEVIS TEST V2 - VALIDATION VISUELLE » ; devis
+« PERF 100 lignes » et « PERF 500 lignes » ; planning : semaine courante, semaine du 21/09 (400 évènements).
+Chaque point est un **constat à cocher** ; l'esthétique (couleurs, densité, typographie) n'est pas tranchée
+ici : noter ce qui gêne, sans obligation de justifier.
+
+**Devis** (`/devis` → « DEVIS TEST V2 … » → Modifier)
+
+- [ ] Grille pleine largeur par défaut ; « Aperçu A4 » ouvre l'aperçu à côté, « Masquer l'aperçu » le referme.
+- [ ] Ordre des colonnes lisible pour un devis BTP (Type, Réf., Désignation, Réf. fab., Qté, U., Achat HT, Coef.,
+      Marge €, PU HT, Rem. %, TVA, Total HT) ; « Colonnes… » permet de masquer / réordonner.
+- [ ] Références internes visibles sur les articles (Réf.) et l'ouvrage (OUV-0001) ; recherche Ctrl+K par
+      référence.
+- [ ] Ouvrage : bouton « Ouvrage », recherche « OUV », « Insérer tout l'ouvrage » ; composants regroupés (↳),
+      quantité principale, marge ; « Modifier » rouvre le dialogue.
+- [ ] Copier/coller : clic sur la poignée ⋮⋮ (Maj pour une plage), Ctrl+C → « N lignes copiées », Ctrl+V →
+      « N lignes ajoutées au devis », « Annuler le collage » ; collage dans un autre devis (nouveau devis →
+      Coller) ; Ctrl+C / Ctrl+V dans une cellule reste du texte.
+- [ ] Remise : cellule Rem. % accepte 0 à 100 ; « 101 » ou « -5 » → message rouge et valeur rétablie ; remise
+      de section « 5 % » ou montant « 50 » ; remise globale de l'en-tête.
+- [ ] Sous-total : « Insérer… → Sous-total » calcule la section ; se recalcule après collage / remise.
+- [ ] Aperçu A4 : titres, sous-titres, ouvrage et composants, commentaire, remise, sous-total, totaux
+      identiques à la grille.
+- [ ] PDF : « Télécharger PDF » (fiche) → même contenu que l'aperçu, multi-pages sur « PERF 100 lignes ».
+- [ ] Message d'erreur : brouillon invalide (ex. désignation vide) → « Non enregistré — … » sous les boutons ;
+      « Enregistrer et fermer » affiche le motif ; après correction, « Enregistré à hh:mm ».
+
+**Planning** (`/planning`)
+
+- [ ] Vue semaine : jours, heures, blocs lisibles ; Jour / Semaine / Mois ; Par salarié / équipe / chantier.
+- [ ] Lisibilité des blocs (titre, horaire, chantier, conflit signalé) sur 16 puis 400 évènements (semaine du
+      21/09).
+- [ ] Salariés : lignes par salarié, absences (congé) visibles, filtre.
+- [ ] Évènements : « Nouvel évènement », détail (titre, type, statut, jour, début, fin, chantier), suppression.
+- [ ] Drag & drop : déplacer un bloc vers un autre jour / salarié ; conflit ou absence signalés ; clavier :
+      Tab → bloc, Entrée → détail, Ctrl+flèches → ± 15 min.
+- [ ] Règle 24 h : un salarié ne peut pas dépasser 24 h planifiées par jour ; message explicite dans le dialogue.
+- [ ] Vitesse perçue : semaine courante (< 4 s), semaine du 21/09 avec 400 évènements (4 à 7 s), réaction
+      d'un déplacement (< 1 s) — noter si c'est acceptable pour l'usage quotidien.
+
+**Décisions attendues de Julien** : validation ou remarques point par point ; autorisation explicite (ou non)
+de la mise en Production selon le runbook ; choix esthétiques éventuels pour un lot ultérieur.
