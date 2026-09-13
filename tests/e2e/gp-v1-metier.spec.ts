@@ -431,6 +431,12 @@ test("15. vérification de la barre latérale (actions groupées, indisponibles 
 test("16. copier/coller dans le même devis (sélection, Ctrl+C, Ctrl+V, nouvelles clés, texte de cellule préservé)", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]).catch(() => undefined);
   await connexion(page, USERS.adminA);
+  // Le devis de la suite est « accepté » (scénario 9) : « Dupliquer » ouvre un brouillon aux mêmes lignes,
+  // qui devient le devis source des scénarios 16 et 17.
+  await aller(page, urlDevis);
+  await page.getByRole("button", { name: "Dupliquer" }).first().click();
+  await page.waitForURL(/\/devis\/[0-9a-f-]{36}\/modifier/, { timeout: 60_000 });
+  urlDevis = page.url().replace(/\/modifier$/, "");
   await aller(page, `${urlDevis}/modifier`);
   const grille = page.locator("[role=grid][aria-label='Lignes du devis']");
   await expect(grille).toBeVisible();
