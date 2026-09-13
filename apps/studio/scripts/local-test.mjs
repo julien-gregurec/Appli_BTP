@@ -106,6 +106,12 @@ if (action === "setup") {
     )
   )
     excludedMigrations.push("20260913010000_studio_render_engine.sql");
+  if (
+    ["--lot-a", "--lot-b", "--lot-c", "--lot-d", "--lot-e"].some((flag) =>
+      process.argv.includes(flag),
+    )
+  )
+    excludedMigrations.push("20260913020000_studio_templates.sql");
   for (const migration of excludedMigrations)
     unlinkSync(join(directory, "supabase/migrations", migration));
   writeFileSync(statePath, JSON.stringify({ directory, projectId }));
