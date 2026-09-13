@@ -14,6 +14,7 @@
  */
 
 import { euros } from "@/lib/devis";
+import { TexteRiche } from "@/components/documents/TexteRiche";
 import { descriptionAccessible, type FiligraneResolu } from "@/lib/devis/filigrane";
 import type { VueDocument } from "@/lib/devis/document-modele";
 import { MARGES_MM, PAGE_A4_MM, PIED_MM, paginer, type BlocPage, type PageDocument } from "@/lib/devis/pagination";
@@ -187,8 +188,8 @@ function Ligne({ l, afficherTva, afficherDescription, afficherReference }: { l: 
       return (
         <tr data-cle={l.cle} data-genre={l.genre} data-niveau={0}>
           <td colSpan={colonnes}>
-            {l.designation}
-            {afficherDescription && l.description && <div className="doc-a4__description">{l.description}</div>}
+            <TexteRiche texte={l.designation} />
+            {afficherDescription && l.description && <div className="doc-a4__description"><TexteRiche texte={l.description} /></div>}
           </td>
         </tr>
       );
@@ -203,8 +204,8 @@ function Ligne({ l, afficherTva, afficherDescription, afficherReference }: { l: 
       return (
         <tr data-cle={l.cle} data-genre="remise" data-niveau={0}>
           <td>
-            {l.designation}
-            {afficherDescription && l.description && <div className="doc-a4__description">{l.description}</div>}
+            <TexteRiche texte={l.designation} />
+            {afficherDescription && l.description && <div className="doc-a4__description"><TexteRiche texte={l.description} /></div>}
           </td>
           <td />
           <td />
@@ -218,9 +219,9 @@ function Ligne({ l, afficherTva, afficherDescription, afficherReference }: { l: 
   return (
     <tr data-cle={l.cle} data-niveau={l.niveau} data-entete-ouvrage={l.enTeteOuvrage}>
       <td>
-        {l.designation}
+        <TexteRiche texte={l.designation} />
         {afficherReference && l.reference && <div className="doc-a4__reference">Réf. {l.reference}</div>}
-        {afficherDescription && l.description && <div className="doc-a4__description">{l.description}</div>}
+        {afficherDescription && l.description && <div className="doc-a4__description"><TexteRiche texte={l.description} /></div>}
         {l.mentionTva && <div className="doc-a4__description">{l.mentionTva}</div>}
       </td>
       <td>{l.quantite !== null ? `${quantiteFr(l.quantite)} ${l.unite ?? ""}`.trim() : ""}</td>
@@ -305,9 +306,9 @@ function Bloc({ vue, bloc, apercu }: { vue: VueDocument; bloc: BlocPage; apercu:
     case "totaux":
       return <Totaux vue={vue} apercu={apercu} />;
     case "conditions":
-      return <div className="doc-a4__texte"><div className="doc-a4__etiquette">Conditions</div>{vue.conditions}</div>;
+      return <div className="doc-a4__texte"><div className="doc-a4__etiquette">Conditions</div><TexteRiche texte={vue.conditions} /></div>;
     case "notes":
-      return <div className="doc-a4__texte"><div className="doc-a4__etiquette">Notes</div>{vue.notes}</div>;
+      return <div className="doc-a4__texte"><div className="doc-a4__etiquette">Notes</div><TexteRiche texte={vue.notes} /></div>;
     case "bon_pour_accord":
       return (
         <div className="doc-a4__accord">

@@ -18,6 +18,7 @@ import { InsertionOuvrageDialog } from "@/components/devis/InsertionOuvrageDialo
 import { PrixGlobalDialog } from "@/components/devis/PrixGlobalDialog";
 import { SelectionArticlesDialog } from "@/components/devis/SelectionArticlesDialog";
 import { ChantierRapideDialog, ClientRapideDialog } from "@/components/devis/TiersRapideDialogs";
+import { BarreFormatage } from "@/components/devis/BarreFormatage";
 import { FiligraneSelecteur } from "@/components/documents/FiligraneSelecteur";
 import type { IdentiteEmetteur, SourceDocument, StyleDocument } from "@/lib/devis/document-modele";
 import {
@@ -447,11 +448,11 @@ export function EditeurDevisV2({
             </label>
             <label className="flex flex-col gap-1 text-sm sm:col-span-2 lg:col-span-3">
               Conditions (visibles par le client)
-              <textarea rows={2} value={entete.conditions ?? ""} onChange={(e) => majEntete({ conditions: e.target.value || null })} className={`${champ} py-1`} />
+              <textarea data-texte-riche="1" rows={2} value={entete.conditions ?? ""} onChange={(e) => majEntete({ conditions: e.target.value || null })} className={`${champ} py-1`} />
             </label>
             <label className="flex flex-col gap-1 text-sm sm:col-span-2 lg:col-span-3">
               Notes pour le client
-              <textarea rows={2} value={entete.notes_client ?? ""} onChange={(e) => majEntete({ notes_client: e.target.value || null })} className={`${champ} py-1`} />
+              <textarea data-texte-riche="1" rows={2} value={entete.notes_client ?? ""} onChange={(e) => majEntete({ notes_client: e.target.value || null })} className={`${champ} py-1`} />
             </label>
             <label className="flex flex-col gap-1 text-sm sm:col-span-2 lg:col-span-3">
               Notes internes (jamais imprimées)
@@ -486,6 +487,7 @@ export function EditeurDevisV2({
             </button>
           </div>
 
+          <BarreFormatage onSignal={signaler} />
           {retourPressePapier && (
             <p role={retourPressePapier.genre === "erreur" ? "alert" : "status"} data-testid="retour-presse-papier" data-genre={retourPressePapier.genre}
                className={`flex flex-wrap items-center gap-3 rounded-md px-3 py-2 text-sm ${retourPressePapier.genre === "erreur" ? "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-200" : retourPressePapier.genre === "info" ? "bg-blue-50 text-blue-900 dark:bg-blue-950/40 dark:text-blue-100" : "bg-green-50 text-green-800 dark:bg-green-950/40 dark:text-green-200"}`}>
@@ -670,7 +672,7 @@ function CarteLigne({
           {droits.voirCouts && origine.prixAchatHt !== null && origine.prixAchatHt !== undefined && <> · achat {euros(origine.prixAchatHt)}</>}
         </p>
       )}
-      <textarea aria-label="Description pour le client" rows={2} placeholder="Description pour le client" value={ligne.description ?? ""} onChange={(e) => onChange({ description: e.target.value || null })} className={`${champ} w-full py-1`} />
+      <textarea data-texte-riche="1" aria-label="Description pour le client" rows={2} placeholder="Description pour le client" value={ligne.description ?? ""} onChange={(e) => onChange({ description: e.target.value || null })} className={`${champ} w-full py-1`} />
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         <label className="flex flex-col text-xs">Quantité<input type="number" step="any" value={ligne.quantite} onChange={(e) => onChange({ quantite: Number(e.target.value) })} className={champ} /></label>
         <label className="flex flex-col text-xs">Unité<input list="unites-devis" disabled={!droits.modifierUnite} value={ligne.unite} onChange={(e) => onChange({ unite: e.target.value })} className={champ} /></label>
@@ -749,8 +751,8 @@ function LigneMobileDialog({ ligne, origine, droits, onChange, onRetirer, onFerm
             <p className="text-sm text-neutral-500">{libelleTypeLigne(type)} : aucune saisie.</p>
           ) : (
             <div className="space-y-2">
-              <input aria-label="Texte" value={ligne.designation} onChange={(e) => onChange({ designation: e.target.value })} className={`${champ} w-full`} />
-              {type !== "sous_total" && <textarea aria-label="Description" rows={3} value={ligne.description ?? ""} onChange={(e) => onChange({ description: e.target.value || null })} className={`${champ} w-full py-1`} />}
+              <input data-texte-riche="1" aria-label="Texte" value={ligne.designation} onChange={(e) => onChange({ designation: e.target.value })} className={`${champ} w-full`} />
+              {type !== "sous_total" && <textarea data-texte-riche="1" aria-label="Description" rows={3} value={ligne.description ?? ""} onChange={(e) => onChange({ description: e.target.value || null })} className={`${champ} w-full py-1`} />}
             </div>
           )}
           <label className="mt-3 flex flex-col text-xs">Commentaire interne (jamais imprimé)

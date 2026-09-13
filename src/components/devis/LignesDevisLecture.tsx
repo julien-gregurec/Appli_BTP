@@ -1,4 +1,5 @@
 import { euros, LIGNE_TYPES } from "@/lib/devis";
+import { TexteRiche } from "@/components/documents/TexteRiche";
 import { libelleStructure, rangeesLecture, type LigneLue, type OuvrageLu } from "@/lib/devis/lecture-lignes";
 
 const nature = (t: string) => LIGNE_TYPES.find((x) => x.cle === t)?.libelle ?? t;
@@ -34,7 +35,7 @@ export function LignesDevisLecture({ lignes, ouvrages }: { lignes: LigneLue[]; o
               const style = r.typeLigne === "titre" ? "font-semibold" : r.typeLigne === "sous_titre" ? "font-medium" : "italic text-neutral-600 dark:text-neutral-400";
               return (
                 <tr key={r.cle} className={tr}>
-                  <td className={`px-3 py-2 ${style}`} colSpan={r.typeLigne === "commentaire" ? 5 : 1}>{r.designation}{r.description && <div className="text-xs font-normal not-italic text-neutral-500">{r.description}</div>}</td>
+                  <td className={`px-3 py-2 ${style}`} colSpan={r.typeLigne === "commentaire" ? 5 : 1}><TexteRiche texte={r.designation} />{r.description && <div className="whitespace-pre-line text-xs font-normal not-italic text-neutral-500"><TexteRiche texte={r.description} /></div>}</td>
                   {r.typeLigne !== "commentaire" && <td className="px-3 py-2 text-xs text-neutral-500" colSpan={4}>{libelleStructure(r.typeLigne)}</td>}
                   <td />
                 </tr>
@@ -76,8 +77,8 @@ export function LignesDevisLecture({ lignes, ouvrages }: { lignes: LigneLue[]; o
             return (
               <tr key={r.cle} className={`${tr} ${r.composant ? "text-neutral-600 dark:text-neutral-400" : ""}`}>
                 <td className={`px-3 py-2 ${r.composant ? "pl-7" : ""}`}>
-                  {r.composant && <span className="mr-1 text-neutral-400">↳</span>}{l.designation}
-                  {l.description && <div className="text-xs text-neutral-500">{l.description}</div>}
+                  {r.composant && <span className="mr-1 text-neutral-400">↳</span>}<TexteRiche texte={l.designation} />
+                  {l.description && <div className="whitespace-pre-line text-xs text-neutral-500"><TexteRiche texte={l.description} /></div>}
                 </td>
                 <td className="px-3 py-2 text-xs text-neutral-500">{nature(l.type)}</td>
                 <td className={cellule}>{qte(l.quantite)} {l.unite}</td>

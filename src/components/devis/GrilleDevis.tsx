@@ -380,7 +380,7 @@ function LigneSortable({ id, index, active, selectionnee, onSelectionner, mesure
 // ── Cellules ───────────────────────────────────────────────────────────────────
 
 /** Champ texte ou nombre validé à la sortie (blur, Entrée, Tab) ; Échap restaure. */
-function Cellule({ valeur, onCommit, index, colonne, disabled, alignement, onKeyDown, onFocus, format, aria, liste }: {
+function Cellule({ valeur, onCommit, index, colonne, disabled, alignement, onKeyDown, onFocus, format, aria, liste, texteRiche }: {
   valeur: string;
   onCommit: (v: string) => void;
   index: number;
@@ -393,6 +393,8 @@ function Cellule({ valeur, onCommit, index, colonne, disabled, alignement, onKey
   aria: string;
   /** `id` d'un `<datalist>` de suggestions (unités) ; la saisie libre reste possible. */
   liste?: string;
+  /** Champ éligible à la barre de formatage (gras, italique…). */
+  texteRiche?: boolean;
 }) {
   const [brouillon, setBrouillon] = useState(valeur);
   const [edition, setEdition] = useState(false);
@@ -413,6 +415,7 @@ function Cellule({ valeur, onCommit, index, colonne, disabled, alignement, onKey
         disabled={disabled}
         inputMode={format === "nombre" ? "decimal" : undefined}
         list={liste}
+        data-texte-riche={texteRiche ? "1" : undefined}
         onFocus={() => { setEdition(true); setSaisi(false); onFocus(); }}
         onChange={(e) => { setSaisi(true); setBrouillon(e.target.value); }}
         onBlur={commettre}
@@ -494,6 +497,7 @@ function CelluleDesignation({ ligne, origine, index, colonne, onCommit, onArticl
       <input
         data-cellule={`${index}:${colonne}`}
         data-recherche={ouverte ? "1" : undefined}
+        data-texte-riche="1"
         aria-label="Désignation"
         role="combobox"
         aria-expanded={ouverte}
@@ -554,7 +558,7 @@ const LigneGrille = memo(function LigneGrille({ index, ligne, origine, colonnes,
           case "designation":
             if (!champModifiable(type, "designation")) return <CelluleLecture key={c.cle}><span className="text-xs uppercase tracking-wide text-neutral-400">{libelleTypeLigne(type)}</span></CelluleLecture>;
             return <CelluleDesignation key={c.cle} {...commun} colonne="designation" ligne={ligne} origine={origine} onCommit={(v) => onChange({ designation: v })} onArticle={onArticle} onOuvrage={onOuvrage} />;
-          case "description": return <Cellule key={c.cle} {...commun} colonne="description" aria="Description" valeur={ligne.description ?? ""} disabled={!champModifiable(type, "description")} onCommit={(v) => onChange({ description: v || null })} />;
+          case "description": return <Cellule key={c.cle} {...commun} colonne="description" aria="Description" texteRiche valeur={ligne.description ?? ""} disabled={!champModifiable(type, "description")} onCommit={(v) => onChange({ description: v || null })} />;
           case "reference_fabricant": return <CelluleLecture key={c.cle}><span className="font-mono text-xs">{origine?.referenceFabricant ?? ""}</span></CelluleLecture>;
           case "code_fournisseur": return <CelluleLecture key={c.cle}><span className="font-mono text-xs">{origine?.codeFournisseur ?? ""}</span></CelluleLecture>;
           case "famille": return <CelluleLecture key={c.cle} titre={origine?.famille ?? undefined}>{origine?.famille ?? ""}</CelluleLecture>;

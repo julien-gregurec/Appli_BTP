@@ -13,6 +13,7 @@
  */
 
 import type { VueDocument } from "@/lib/devis/document-modele";
+import { texteBrut } from "@/lib/texte-riche";
 import type { LigneClient } from "@/lib/devis/presentation";
 
 export const PAGE_A4_MM = { largeur: 210, hauteur: 297 } as const;
@@ -64,7 +65,8 @@ const LARGEUR_CARACTERE: Record<VueDocument["style"]["police"], number> = {
 export function lignesDeTexte(texte: string | null | undefined, largeurPx: number, policePx: number, facteur: number): number {
   if (!texte) return 0;
   const parLigne = Math.max(1, Math.floor(largeurPx / (policePx * facteur)));
-  return texte.split("\n").reduce((n, paragraphe) => n + Math.max(1, Math.ceil(paragraphe.length / parLigne)), 0);
+  // Les balises de mise en forme (`[b]…[/b]`) n'occupent aucune place : on mesure le texte brut.
+  return texteBrut(texte).split("\n").reduce((n, paragraphe) => n + Math.max(1, Math.ceil(paragraphe.length / parLigne)), 0);
 }
 
 export type Hauteurs = {
