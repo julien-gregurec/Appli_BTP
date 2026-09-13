@@ -26,9 +26,12 @@ const backup = join(output, "environment.previous");
 if (existsSync(envPath)) renameSync(envPath, backup);
 console.log(`Evidence: ${output}`);
 const individual = process.argv.includes("--individual");
+const analysisOnly = process.argv.includes("--analysis-only");
 const editorOnly = process.argv.includes("--editor-only");
-if (individual && editorOnly) throw Error("Choose one qualification scope");
+if ([individual, editorOnly, analysisOnly].filter(Boolean).length > 1)
+  throw Error("Choose one qualification scope");
 let owned = false;
+let analysisWorker = null;
 let renderer = null,
   redisName = null;
 const renderRoot = resolve(app, "../../workers/studio-video");
@@ -74,8 +77,45 @@ async function startRenderer(label) {
     { cwd: renderRoot, env: environment, stdio: ["ignore", log, log] },
   );
   renderer.once("close", () => closeSync(log));
+  if (analysisOnly) {
+    if (!process.env.STUDIO_ANALYSIS_PYTHON)
+      throw Error("STUDIO_ANALYSIS_PYTHON required");
+    const analysisLog = openSync(
+      join(output, `${label}-analysis-worker.log`),
+      "w",
+      0o600,
+    );
+    analysisWorker = spawn(
+      process.execPath,
+      [
+        `--env-file=${envPath}`,
+        "--import",
+        join(renderRoot, "node_modules/tsx/dist/loader.mjs"),
+        join(renderRoot, "src/analysis-worker.ts"),
+      ],
+      {
+        cwd: renderRoot,
+        env: {
+          ...environment,
+          STUDIO_AI_ANALYSIS: "1",
+          STUDIO_ANALYSIS_TMP: join(output, `${label}-analysis-scratch`),
+        },
+        stdio: ["ignore", analysisLog, analysisLog],
+      },
+    );
+    analysisWorker.once("close", () => closeSync(analysisLog));
+  }
 }
 async function stopRenderer() {
+  if (analysisWorker) {
+    const child = analysisWorker;
+    analysisWorker = null;
+    if (child.exitCode === null) {
+      child.kill("SIGTERM");
+      await new Promise((resolve) => child.once("close", resolve));
+    }
+  }
+
   if (renderer) {
     const child = renderer;
     renderer = null;
@@ -96,7 +136,11 @@ const results = [];
 async function run(command, args, label, extra = {}) {
   console.log(`Gate: ${label}`);
   const log = openSync(join(output, `${label}.log`), "w", 0o600);
-  const environment = { ...process.env, ...extra };
+  const environment = {
+    ...process.env,
+    STUDIO_AI_ANALYSIS: analysisOnly ? "1" : "0",
+    ...extra,
+  };
   // Do not let a parent shell's other local project override this fresh .env.local.
   for (const key of [
     "NEXT_PUBLIC_STUDIO_URL",
@@ -154,7 +198,7 @@ async function stop(label) {
 try {
   for (
     let iteration = 1;
-    iteration <= (individual || editorOnly ? 1 : 2);
+    iteration <= (individual || editorOnly || analysisOnly ? 1 : 2);
     iteration++
   ) {
     const label = individual ? "individual" : `run-${iteration}`;
@@ -166,7 +210,7 @@ try {
     );
     await run(
       process.execPath,
-      ["scripts/editor-migration-check.mjs"],
+      ["scripts/analysis-migration-check.mjs"],
       `${label}-migration-check`,
     );
     await run(
@@ -190,13 +234,19 @@ try {
       ? JSON.parse(
           execFileSync(
             resolve(app, "node_modules/.bin/playwright"),
-            ["test", "--list", "--reporter=json"],
+            [
+              "test",
+              "--list",
+              "--reporter=json",
+              "--grep-invert",
+              "Lot H (?!OFF)",
+            ],
             { cwd: app, encoding: "utf8" },
           ),
         ).suites.flatMap((s) => s.specs.map((t) => `${s.file}:${t.line}`))
       : [null];
-    if (individual && targets.length !== 30)
-      throw Error(`Expected 30 individual E2E cases, found ${targets.length}`);
+    if (individual && targets.length !== 31)
+      throw Error(`Expected 31 individual E2E cases, found ${targets.length}`);
     if (individual && process.argv.includes("--foundation-first")) {
       const foundation = targets.find((t) =>
         t.startsWith("foundation.spec.ts:"),
@@ -213,7 +263,13 @@ try {
           "run",
           "test:e2e",
           "--",
-          ...(target ? [target] : editorOnly ? ["tests/editor.spec.ts"] : []),
+          ...(target
+            ? [target]
+            : analysisOnly
+              ? ["tests/analysis.spec.ts", "--grep-invert", "Lot H OFF"]
+              : editorOnly
+                ? ["tests/editor.spec.ts"]
+                : ["--grep-invert", "Lot H (?!OFF)"]),
         ],
         name,
         {
@@ -233,7 +289,7 @@ try {
         .map((line) => JSON.parse(line));
       if (trace.some((row) => row.status >= 500 || row.status === 0))
         throw Error(`${name}: runtime transport failure or HTTP 5xx`);
-      const expected = target ? 1 : editorOnly ? 8 : 30;
+      const expected = target ? 1 : analysisOnly ? 4 : editorOnly ? 8 : 31;
       if (
         stats.expected !== expected ||
         stats.unexpected ||
@@ -275,6 +331,7 @@ try {
         verdict: process.exitCode ? "NO-GO" : "GO",
         individual,
         editorOnly,
+        analysisOnly,
         results,
       },
       null,

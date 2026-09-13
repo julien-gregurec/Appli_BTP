@@ -8,6 +8,11 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r workers/studio-video/analysis/requirements.txt
+      - run: echo "STUDIO_ANALYSIS_PYTHON=$(which python)" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -18,6 +23,10 @@ jobs:
       - run: node apps/studio/scripts/e2e-gate.mjs
         env:
           STUDIO_E2E_LARGE_MIB: 64
+      - run: node apps/studio/scripts/e2e-gate.mjs --analysis-only
+        env:
+          STUDIO_E2E_LARGE_MIB: 64
+          STUDIO_AI_TEST_PROVIDER_FAILURE: "1"
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
