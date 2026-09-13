@@ -1,0 +1,144 @@
+{
+  "devis_nouveau": {
+    "ttfb_ms": 30,
+    "dom_ms": 1029,
+    "transfert_ko": 17,
+    "total_ms": 2354,
+    "recherche_flottante_visible": false,
+    "retour": "← Retour aux devis",
+    "toolbar": ""
+  },
+  "menu_ajouter": [
+    "libre",
+    "article",
+    "ouvrage",
+    "titre",
+    "sous_titre",
+    "commentaire",
+    "sous_total",
+    "remise",
+    "vide",
+    "separateur",
+    "saut_page"
+  ],
+  "pu_net_total": {
+    "pu_net": "90,00 €",
+    "total": "180,00 €"
+  },
+  "menu_ligne": [
+    "dessus",
+    "dessous",
+    "titre-dessus",
+    "dupliquer",
+    "copier",
+    "coller",
+    "type-titre",
+    "type-sous_titre",
+    "type-commentaire",
+    "type-sous_total",
+    "type-remise",
+    "type-vide",
+    "type-separateur",
+    "type-saut_page",
+    "supprimer"
+  ],
+  "mode_document": {
+    "zone": true,
+    "grille_cachee": true
+  },
+  "garde": "Sauvegarder avant de quitter ?\n\nDes modifications ne sont pas enregistrées.\n\nAnnuler\nQuitter sans enregistrer\nEnregistrer et quitter",
+  "apres_quitter": "/devis",
+  "07-parametres-devis": {
+    "ms": 4279,
+    "titre": "Devis"
+  },
+  "08-parametres-numerotation": {
+    "ms": 2190,
+    "titre": "Numérotation des documents"
+  },
+  "09-parametres": {
+    "ms": 3060,
+    "titre": "Paramètres de l’entreprise"
+  },
+  "numerotation_apercus": {},
+  "planning_semaine": {
+    "ttfb_ms": 2833,
+    "dom_ms": 2872,
+    "transfert_ko": 137,
+    "total_ms": 4239,
+    "blocs": 25,
+    "panneau_lateral": 1
+  },
+  "planning_menu": [
+    "modifier",
+    "dupliquer",
+    "affecter",
+    "chantier",
+    "client",
+    "historique",
+    "imprimer",
+    "supprimer"
+  ],
+  "devis_100": {
+    "ttfb_ms": 1667,
+    "dom_ms": 1733,
+    "transfert_ko": 810,
+    "total_ms": 2869,
+    "lignes": 100,
+    "cellules_dom": 100,
+    "frappe_vers_totaux_ms": 41,
+    "autosauvegarde_ms": 2856,
+    "mode_document_ms": 175,
+    "statut": "Enregistré à 01:41"
+  },
+  "devis_500": {
+    "ttfb_ms": 1989,
+    "dom_ms": 2048,
+    "transfert_ko": 904,
+    "total_ms": 3182,
+    "lignes": 500,
+    "cellules_dom": 30,
+    "frappe_vers_totaux_ms": 51,
+    "autosauvegarde_ms": 3453,
+    "mode_document_ms": 181,
+    "statut": "Enregistré à 01:42"
+  },
+  "copie_500": "500 lignes copiées\n×",
+  "devis_1000": {
+    "lignes": 1001,
+    "collage_500_ms": 80,
+    "collage_500_bis_ms": 163,
+    "premiere_sauvegarde_ms": 3933,
+    "frappe_vers_totaux_ms": 70,
+    "autosauvegarde_apres_frappe_ms": 3656,
+    "cellules_dom": 30,
+    "statut": "Enregistré à 01:42"
+  },
+  "nettoyage_1000": {
+    "id": "41765278-9d2b-46e2-8d7e-a64c3007bb3a",
+    "url_apres": "/devis/41765278-9d2b-46e2-8d7e-a64c3007bb3a"
+  },
+  "planning_400": {
+    "ttfb_ms": 4321,
+    "dom_ms": 4349,
+    "transfert_ko": 532,
+    "blocs_visibles_ms": 5780,
+    "blocs": 404
+  },
+  "planning_1000": {
+    "ttfb_ms": 5559,
+    "dom_ms": 5634,
+    "transfert_ko": 1112,
+    "blocs_visibles_ms": 7780,
+    "blocs": 1000
+  },
+  "mobile_devis": {
+    "menu_ajouter": true,
+    "retour": true,
+    "bouton_client": true
+  },
+  "mobile_planning": {
+    "menu_actions": true,
+    "aside": 1
+  }
+}

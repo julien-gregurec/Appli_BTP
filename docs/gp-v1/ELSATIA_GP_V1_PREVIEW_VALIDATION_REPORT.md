@@ -1154,7 +1154,7 @@ remise, unités, remises de section et globale y sont rendus à l'identique (E2E
 | 49 | E2E numérotation A / B | ✅ | scénario 49 |
 | 50 | E2E texte riche (éditeur = lecture = A4 = PDF) | ✅ | scénario 47 (partie 11-15) |
 | 51 | Mobile (devis, toolbar, client inline, retour, planning) | ✅ | scénario 51 ; banc `rappel` mobile |
-| 52 | Performance 100 / 500 / 1 000 lignes, planning 400 | ✅ | § 36.16 |
+| 52 | Performance 100 / 500 / 1 000 lignes, planning 400 | ✅ | § 36.17 (preview : 41 / 51 / 70 ms frappe → totaux ; planning 400 évts 5,8 s, 1 000 évts 7,8 s) |
 | 53 | Documentation : section + checklist | ✅ | § 36 |
 | 54 | Rapport final | ✅ | message de fin de session |
 | — | Rappel de sauvegarde (nouvelle exigence) | ✅ | § 36.11 ; banc `rappel` ; 8 tests unitaires ; pgTAP 295 |
@@ -1171,3 +1171,84 @@ remise, unités, remises de section et globale y sont rendus à l'identique (E2E
   devis et le planning ont été revus — à étendre après validation si Julien le souhaite.
 - **Banc historique `editeur-v2.banc.spec.ts`** : toujours rouge (11/13) pour des raisons antérieures
   (aperçu masqué par défaut, libellés) ; hors gate ; à réécrire.
+
+### 36.16 Phase N — tests et non-régression (`5be19e3`, machine au repos)
+
+| Contrôle | Résultat | Détail |
+| --- | --- | --- |
+| pgTAP, base **Fresh** au ledger 295 | 83 fichiers, **2 343 ok, 0 not ok** | harnais `train-v3-dbtest` ; upgrade 291 → 295 = schéma identique (8 lignes = jeton `\restrict` du dump) |
+| Vitest complet | **2 433 réussis**, 3 ignorés, 4 délais dépassés sous charge | `xlsx`, `stripe webhook` ×2, `stripe-discount-legacy-surface` : dépassement des 5 s pendant que la gate E2E tournait ; rejoués 3 fois seuls et sur HEAD : **8/8 verts** — sans rapport avec le lot |
+| Typecheck / lint | 0 erreur / 0 erreur (48 avertissements préexistants) | `tsc --noEmit`, `eslint` |
+| `verify:migrations` / `verify:secrets` / `git diff --check` | 292 migrations valides · 1 996 fichiers, aucun secret · propre | — |
+| Banc de l'éditeur (`tests/banc/editeur-v2`, `file://`, Chromium) | **18/18** en une passe, sans nouvel essai | garde, menu de ligne, mode document, presse-papier ×5, rappel ×4, remise ×2, sauvegarde ×2, texte riche, tiers inline |
+| E2E pile jetable (`gp-v1-metier.spec.ts`) | **17/17** en une passe, sans nouvel essai | build `next build` E2E puis `next start`, Kong 60321, base `gpv1_jetable` (migrations 294/295 appliquées) |
+| E2E UX (`gp-v1-ux.spec.ts`, nouveau) | **5/5** en une passe | 47 devis complet (client + chantier inline, titre, ouvrage, article m², remise 5 %, texte riche, sous-total, copier/coller, A4, Document, enregistrer, lecture, PDF, page d'impression, retour + garde) · 39 remises 0/5/25/100 (PU net 100/95/75/0, totaux 1 200/1 140/900/0) · 48 planning (nouvel évènement, double clic, glisser, Alt+glisser, menu contextuel, chantier, retour, imprimer, aucun `aside`) · 49 numérotation A « DEV-2026-… » / B « 00001 » consécutifs, uniques · 51 mobile 390 px |
+
+**Défauts trouvés par la gate et corrigés** (`5be19e3`) :
+
+1. **Bouton flottant « Rechercher Ctrl+K » sur « Enregistrer et fermer »** — depuis que le lien « ← Devis »
+   est porté par l'éditeur, l'en-tête est remonté d'une ligne et le bouton flottant (`fixed`, haut droite,
+   affiché dès `md`) recouvrait exactement le bouton d'enregistrement à 1 280 px : Playwright cliquait la
+   recherche (scénario 4 en échec, `button` « visible, enabled » mais interceptée) — un utilisateur aussi.
+   Correction : bouton masqué tant que l'éditeur est ouvert (`body[data-editeur-devis]`), entrée
+   « Recherche globale… Ctrl+Maj+K » dans le menu Plus de l'éditeur.
+2. **Mode consultation du planning** — `.lecture-seule` (pilote mobile, « Mode consultation ») masque tous
+   les `button[type=button]` du `main` pour un utilisateur sans droit d'écriture : un chef d'équipe ne
+   pouvait plus changer de jour ni de vue (‹ › Aujourd'hui, onglets) — défaut préexistant, révélé par le
+   retrait du panneau. Correction : barres de navigation / filtres / menu Actions marquées
+   `data-consultation` (boutons conservés, actions d'écriture grisées avec motif) ; « Nouvel évènement »
+   reste visible, grisé et expliqué sans `gerer_planning` (principe des fiches, scénario 13).
+3. **Recherche d'ouvrage E2E** : « a » ne correspond à aucun ouvrage de la pile (`normaliser_reference`
+   n'indexe pas les lettres isolées) — le scénario cherche « Cloison ».
+4. **Cellules calculées** (PU net, total HT) : exposées en `data-lecture="i:colonne"` (elles ne sont pas
+   des cellules de saisie).
+5. **Style sérialisé** : le rendu serveur écrit `font-weight:700`, le client `font-weight: 700` — les
+   assertions du texte riche lisent le **style calculé** (`toHaveCSS`) et l'accent est vérifié comme couleur
+   différente du texte courant (couleur d'entreprise variable).
+6. Deux `getByLabel` ambigus (« Chantier » ⊂ options du type ; « Année » ⊂ « Repart à 1 chaque année »),
+   `getByRole("status")` doublé par le badge preview.
+
+**Environnement** : le poste portait deux conteneurs `supabase_analytics` (Logflare) à 210 % CPU chacun
+(charge 12 ; scénario 2 à 47 s, connexions en délai, PDF 502 par dépassement des 30 s de navigation Chromium).
+Arrêtés (`docker stop`, réversible) : charge 2,7, PDF 6-11 s, suite complète 1,8 min. À noter pour toute
+recette locale : **vérifier `docker stats` avant d'imputer un délai à l'application.**
+
+### 36.17 Phase O — preview finale (`0b607d1`, alias de branche, 2026-09-14 01:40, Chromium 1440 × 900 / iPhone 13)
+
+Déploiement Vercel `elsatia-preview-a2l58bdvl` (Ready, sert `0b607d1`) ; base preview inchangée (ledger
+`20260913000295`, seed complet du compte de recette). Script `.recette-tmp/recette-ux-finale.mjs` (hors
+dépôt), journal et 17 captures dans `docs/gp-v1/preview/captures/ux/`.
+
+| Écran | Constat | Capture |
+| --- | --- | --- |
+| Nouveau devis | bouton flottant « Rechercher » absent dans l'éditeur ; « ← Retour aux devis » ; Ajouter ▾ (libre, article, ouvrage, titre, sous-titre, commentaire, sous-total, remise, vide, séparateur, saut de page) ; Copier / Coller / Dupliquer / Plus ▾ ; Grille · Document ; Aperçu A4 | 01, 02, 04 |
+| Ligne : remise 10 % sur 2 × 100 € | PU net **90,00 €**, total **180,00 €** ; menu contextuel (au-dessus, en dessous, titre au-dessus, dupliquer, copier, coller, transformer en …, supprimer) | 03 |
+| Mode Document | grille masquée, document cliquable, totaux, barre de formatage | 05 |
+| Retour avec modifications | « Sauvegarder avant de quitter ? » Annuler / Quitter sans enregistrer / Enregistrer et quitter → `/devis` | 06 |
+| Paramètres > Devis / Numérotation / Paramètres | pages servies (4,3 s à froid / 2,2 s / 3,1 s) ; aperçus DEV-2026-001 → prochain DEV-2026-008, FAC-2026-003, CMD-2026-001 | 07, 08, 09 |
+| Planning semaine (25 blocs) | sans panneau latéral ; « Nouvel évènement », « Actions · <évènement> ▾ », Imprimer, PDF ; clic droit = modifier, dupliquer, affecter, chantier, client, historique, imprimer, supprimer | 10, 11 |
+| Mobile 390 px | Ajouter ▾ / retour / « + Client » présents ; planning : menu Actions, pas de panneau | 15, 16 |
+
+**Performance mesurée (preview, réseau réel)** :
+
+| Mesure | 100 lignes | 500 lignes | 1 000 lignes (1 001, nouveau devis) | Planning 400 évts (semaine 22/9) | Planning 1 000 évts (semaine 5/10) |
+| --- | --- | --- | --- | --- | --- |
+| TTFB / DOM / page utilisable | 1,7 s / 1,7 s / 2,9 s | 2,0 s / 2,0 s / 3,2 s | — | 4,3 s / 4,3 s / **5,8 s** (404 blocs, 532 Ko) | 5,6 s / 5,6 s / **7,8 s** (1 000 blocs, 1,1 Mo) |
+| Cellules DOM (virtualisation) | 100 | **30** | **30** | — | — |
+| Frappe → totaux | **41 ms** | **51 ms** | **70 ms** | — | — |
+| Autosauvegarde après une modification | 2,9 s | 3,5 s | 3,7 s | — | — |
+| Collage de 500 lignes (mémoire) | — | — | 80 ms puis 163 ms ; première sauvegarde des 1 001 lignes **3,9 s** | — | — |
+| Bascule Grille → Document | 175 ms | 181 ms | — | — | — |
+
+Le devis de 1 001 lignes (« PERF-1000-UX ») a été créé puis supprimé ; les devis de perf 100 et 500 lignes
+existants sont conservés (une quantité modifiée à 7 sur la ligne 4 de chacun, sans incidence).
+
+**Points relevés pour la validation visuelle** (non corrigés, décision Julien) :
+
+- À 1 440 × 900, l'en-tête (références, client, dates, conditions, notes, filigrane) occupe tout l'écran :
+  la barre d'outils et la grille arrivent sous le pli (capture 01). Piste : en-tête repliable ou réduit
+  (client / chantier / dates), le reste dans un volet.
+- Sur mobile, la bulle « Assistant » et le bouton d'aide flottants recouvrent par moments le bord droit
+  du formulaire (bouton « + Client » selon le défilement, capture 15) — commun à toute l'application.
+- Le bouton flottant « Rechercher Ctrl+K » reste affiché sur les autres écrans, en haut à droite, au-dessus
+  d'une zone vide ; il n'est masqué que dans l'éditeur.
