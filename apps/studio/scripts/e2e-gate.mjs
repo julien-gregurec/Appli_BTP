@@ -26,6 +26,8 @@ const backup = join(output, "environment.previous");
 if (existsSync(envPath)) renameSync(envPath, backup);
 console.log(`Evidence: ${output}`);
 const individual = process.argv.includes("--individual");
+const editorOnly = process.argv.includes("--editor-only");
+if (individual && editorOnly) throw Error("Choose one qualification scope");
 let owned = false;
 let renderer = null,
   redisName = null;
@@ -150,7 +152,11 @@ async function stop(label) {
   if (existsSync(envPath)) unlinkSync(envPath);
 }
 try {
-  for (let iteration = 1; iteration <= (individual ? 1 : 2); iteration++) {
+  for (
+    let iteration = 1;
+    iteration <= (individual || editorOnly ? 1 : 2);
+    iteration++
+  ) {
     const label = individual ? "individual" : `run-${iteration}`;
     owned = true; // local-test records ownership before starting Docker; failed setup can still be cleaned.
     await run(
@@ -160,7 +166,7 @@ try {
     );
     await run(
       process.execPath,
-      ["scripts/templates-migration-check.mjs"],
+      ["scripts/editor-migration-check.mjs"],
       `${label}-migration-check`,
     );
     await run(
@@ -189,8 +195,8 @@ try {
           ),
         ).suites.flatMap((s) => s.specs.map((t) => `${s.file}:${t.line}`))
       : [null];
-    if (individual && targets.length !== 22)
-      throw Error(`Expected 22 individual E2E cases, found ${targets.length}`);
+    if (individual && targets.length !== 30)
+      throw Error(`Expected 30 individual E2E cases, found ${targets.length}`);
     if (individual && process.argv.includes("--foundation-first")) {
       const foundation = targets.find((t) =>
         t.startsWith("foundation.spec.ts:"),
@@ -203,7 +209,12 @@ try {
         report = join(output, `${name}.json`);
       await run(
         "npm",
-        ["run", "test:e2e", "--", ...(target ? [target] : [])],
+        [
+          "run",
+          "test:e2e",
+          "--",
+          ...(target ? [target] : editorOnly ? ["tests/editor.spec.ts"] : []),
+        ],
         name,
         {
           STUDIO_E2E_RESULT: report,
@@ -222,7 +233,7 @@ try {
         .map((line) => JSON.parse(line));
       if (trace.some((row) => row.status >= 500 || row.status === 0))
         throw Error(`${name}: runtime transport failure or HTTP 5xx`);
-      const expected = target ? 1 : 22;
+      const expected = target ? 1 : editorOnly ? 8 : 30;
       if (
         stats.expected !== expected ||
         stats.unexpected ||
@@ -260,7 +271,12 @@ try {
   writeFileSync(
     join(output, "verdict.json"),
     JSON.stringify(
-      { verdict: process.exitCode ? "NO-GO" : "GO", individual, results },
+      {
+        verdict: process.exitCode ? "NO-GO" : "GO",
+        individual,
+        editorOnly,
+        results,
+      },
       null,
       2,
     ),

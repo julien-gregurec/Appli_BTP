@@ -126,3 +126,40 @@ it("no ready media returns useful business error", async () => {
     "Ajoutez au moins un média",
   );
 });
+
+it("editor requires matching revision and rejects foreign asset snapshots before persistence", async () => {
+  const { saveStudioEditor } = await import("../src/lib/timelines");
+  await expect(saveStudioEditor(id, id, 2, doc)).rejects.toMatchObject({
+    status: 409,
+  });
+  await expect(
+    saveStudioEditor(id, id, 3, {
+      ...doc,
+      clips: [
+        { ...doc.clips[0], asset_id: "54000000-0000-0000-0000-000000000099" },
+      ],
+    }),
+  ).rejects.toThrow();
+  expect(
+    mocks.rpc.mock.calls.some((c) => c[0] === "studio_save_timeline"),
+  ).toBe(false);
+});
+it("editor returns the exact transaction response without a later racy read", async () => {
+  const { saveStudioEditor } = await import("../src/lib/timelines");
+  mocks.authorize.mockResolvedValue({
+    client: { rpc: mocks.rpc },
+    project: { ...project, active_timeline_id: id },
+  });
+  mocks.rpc
+    .mockResolvedValueOnce({ data: doc, error: null, status: 200 })
+    .mockResolvedValueOnce({ data: assets, error: null, status: 200 })
+    .mockResolvedValueOnce({
+      data: { ...doc, revision: 4 },
+      error: null,
+      status: 200,
+    });
+  const saved = await saveStudioEditor(id, id, 3, doc);
+  expect(saved.revision).toBe(4);
+  expect(mocks.rpc).toHaveBeenCalledTimes(3);
+  expect(mocks.rpc.mock.calls[2][0]).toBe("studio_save_editor");
+});

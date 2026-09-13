@@ -289,7 +289,9 @@ test("Lot E failure : asset manquant après admission, cleanup et retry", async 
     control("resume");
   }
   const panel = page.getByRole("region", { name: "Vidéo exportée" });
-  await expect(panel.getByRole("status")).toContainText("failed", {
+  await expect(
+    panel.locator("[data-render-job]").getByRole("status"),
+  ).toContainText("failed", {
     timeout: 30000,
   });
   await expect(panel).toContainText("ASSET_MISSING");
@@ -418,11 +420,15 @@ test("Lot E cancellation : worker arrêté, aucun output", async ({ page }) => {
     .getByRole("button", { name: "Créer la vidéo", exact: true })
     .click();
   const panel = page.getByRole("region", { name: "Vidéo exportée" });
-  await expect(panel.getByRole("status")).toContainText("rendering", {
+  await expect(
+    panel.locator("[data-render-job]").getByRole("status"),
+  ).toContainText("rendering", {
     timeout: 60000,
   });
   await panel.getByRole("button", { name: "Annuler le rendu" }).click();
-  await expect(panel.getByRole("status")).toContainText("cancelled", {
+  await expect(
+    panel.locator("[data-render-job]").getByRole("status"),
+  ).toContainText("cancelled", {
     timeout: 15000,
   });
   const jobs = await request(page, `/api/renders/${id}`);

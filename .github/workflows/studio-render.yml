@@ -1,4 +1,4 @@
-name: Studio full render and templates qualification
+name: Studio full render templates and editor qualification
 on: workflow_dispatch
 permissions:
   contents: read
