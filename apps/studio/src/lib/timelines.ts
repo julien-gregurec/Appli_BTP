@@ -1,6 +1,10 @@
 import "server-only";
 import {
   buildTimeline,
+  buildTemplateTimeline,
+  parseTemplateOptions,
+  retimePresentation,
+  boundedText,
   recalculateTimeline,
   editTimelineClip,
   isStudioId,
@@ -72,7 +76,10 @@ export async function getActiveStudioTimeline(projectId: string) {
     ? readWithClient(client, projectId, project.active_timeline_id)
     : null;
 }
-export async function generateStudioTimeline(projectId: string) {
+export async function generateStudioTimeline(
+  projectId: string,
+  options?: unknown,
+) {
   const { client, project } = await authorizeProject(projectId, true);
   const assets =
     checked(
@@ -82,7 +89,10 @@ export async function generateStudioTimeline(projectId: string) {
         p_limit: 1000,
       }),
     ) ?? [];
-  const draft = buildTimeline({ project, assets });
+  const draft =
+    options === undefined
+      ? buildTimeline({ project, assets })
+      : buildTemplateTimeline(project, assets, parseTemplateOptions(options));
   const result = checked(
     await client.rpc("studio_save_timeline", {
       p_project: projectId,
@@ -113,6 +123,7 @@ async function mutate(
     );
   const draft = change(doc, await assetsFor(client, projectId));
   draft.clips = recalculateTimeline(draft.clips);
+  draft.presentation = retimePresentation(draft.presentation, draft.clips);
   draft.total_duration_ms = draft.clips.at(-1)?.timeline_end_ms ?? 0;
   checked(
     await client.rpc("studio_save_timeline", {
@@ -147,7 +158,7 @@ export function updateTimelineClip(
   return mutate(projectId, timelineId, revision, (doc, assets) => {
     const clip = doc.clips.find((c) => c.id === clipId),
       asset = assets.find((a) => a.id === clip?.asset_id);
-    if (!clip || !asset)
+    if (!clip || (!asset && clip.clip_type !== "card"))
       throw new MediaError(
         "Média indisponible. Retirez le clip ou réimportez le média.",
         409,
@@ -242,5 +253,27 @@ export async function getStudioTimelineState(projectId: string) {
   const active = project.active_timeline_id
     ? await readWithClient(client, projectId, project.active_timeline_id)
     : null;
-  return { active, versions: await listWithClient(client, projectId) };
+  return { active, versions: await listWithClient(client, projectId), project };
+}
+
+export function updateTimelineText(
+  projectId: string,
+  timelineId: string,
+  revision: number,
+  overlayId: string,
+  text: string,
+) {
+  return mutate(projectId, timelineId, revision, (doc) => {
+    if (!doc.presentation?.overlays.some((o) => o.id === overlayId))
+      throw new MediaError("Texte inaccessible.", 404);
+    return {
+      ...doc,
+      presentation: {
+        ...doc.presentation,
+        overlays: doc.presentation.overlays.map((o) =>
+          o.id === overlayId ? { ...o, text: boundedText(text) } : o,
+        ),
+      },
+    };
+  });
 }

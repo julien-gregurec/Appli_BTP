@@ -88,4 +88,7 @@ export * from "./media";
 export * from "./projects";
 
 export * from "./timeline";
-export * from './render';
+export * from "./render";
+
+export * from "./presentation";
+export * from "./templates";
