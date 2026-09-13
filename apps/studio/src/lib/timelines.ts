@@ -1,6 +1,8 @@
 import "server-only";
 import {
   buildTimeline,
+  parseEditorDraft,
+  editorFingerprint,
   buildTemplateTimeline,
   parseTemplateOptions,
   retimePresentation,
@@ -276,4 +278,48 @@ export function updateTimelineText(
       },
     };
   });
+}
+
+/** One atomic write for the editor; revision guards are enforced again under the DB lock. */
+export async function saveStudioEditor(
+  projectId: string,
+  timelineId: string,
+  revision: number,
+  value: unknown,
+) {
+  const { client, project } = await authorizeProject(projectId, true);
+  const doc = await readWithClient(client, projectId, timelineId);
+  if (
+    !Number.isSafeInteger(revision) ||
+    revision !== doc.revision ||
+    project.active_timeline_id !== timelineId
+  )
+    throw new MediaError(
+      "Cette version a été modifiée ailleurs. Rechargez la page.",
+      409,
+    );
+  const draft = parseEditorDraft(
+    value,
+    doc,
+    await assetsFor(client, projectId),
+  );
+  const result = checked(
+    await client.rpc("studio_save_editor", {
+      p_project: projectId,
+      p_timeline: timelineId,
+      p_revision: revision,
+      p_project_revision: project.revision,
+      p_draft: draft,
+    }),
+  );
+  if (
+    !result ||
+    result.revision !== revision + 1 ||
+    editorFingerprint(result) !== editorFingerprint(draft)
+  )
+    throw new MediaError(
+      "Réponse de sauvegarde incohérente. Rechargez la page.",
+      409,
+    );
+  return result;
 }

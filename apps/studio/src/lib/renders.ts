@@ -4,12 +4,12 @@ import { authorizeProject, MediaError } from "./media-service";
 import { storageAdmin } from "./storage-admin";
 import { getActiveStudioTimeline } from "./timelines";
 export async function getStudioRenders(projectId: string) {
-  const { client } = await authorizeProject(projectId);
+  const { client, project } = await authorizeProject(projectId);
   const [jobs, outputs] = await Promise.all([
     client
       .from("studio_render_jobs")
       .select(
-        "id,project_id,status,progress_percent,width,height,retry_count,error_code,error_message,created_at",
+        "id,project_id,status,progress_percent,width,height,retry_count,error_code,error_message,created_at,timeline_id,timeline_revision:snapshot->timeline->revision",
       )
       .eq("project_id", projectId)
       .order("created_at", { ascending: false })
@@ -23,8 +23,25 @@ export async function getStudioRenders(projectId: string) {
   ]);
   if (jobs.error || outputs.error)
     throw new MediaError("Rendus indisponibles.", 503);
+  const active = project.active_timeline_id
+    ? await client.rpc("studio_get_timeline", {
+        p_project: projectId,
+        p_timeline: project.active_timeline_id,
+      })
+    : null;
+  if (active?.error) throw new MediaError("Montage indisponible.", 503);
   return {
-    jobs: jobs.data,
+    active: active?.data
+      ? {
+          timeline: active.data.id,
+          revision: active.data.revision,
+          dirty: false,
+        }
+      : null,
+    jobs: jobs.data.map((job) => ({
+      ...job,
+      timeline_revision: Number(job.timeline_revision),
+    })),
     outputs: outputs.data.map((o) => ({
       id: o.id,
       render_job_id: o.render_job_id,
@@ -37,6 +54,8 @@ export async function requestStudioRender(
   projectId: string,
   requestId: string,
   retry: string | null,
+  preview = false,
+  expected?: { timeline: string; revision: number },
 ) {
   const { client } = await authorizeProject(projectId, true);
   if (!isStudioId(requestId) || (retry !== null && !isStudioId(retry)))
@@ -67,17 +86,35 @@ export async function requestStudioRender(
       throw new MediaError("ASSET_MISSING");
   }
   const profile =
-    process.env.STUDIO_RENDER_INTERNAL_PREVIEW === "1" ? "preview" : "standard";
-  const r = await client.rpc("studio_request_render", {
+    preview || process.env.STUDIO_RENDER_INTERNAL_PREVIEW === "1"
+      ? "preview"
+      : "standard";
+  if (
+    expected &&
+    (!isStudioId(expected.timeline) || !Number.isSafeInteger(expected.revision))
+  )
+    throw new MediaError("Révision invalide.");
+  const args = {
     p_project: projectId,
     p_request: requestId,
     p_profile: profile,
     p_retry: retry,
-  });
+  };
+  const r = expected
+    ? await client.rpc("studio_request_editor_render", {
+        ...args,
+        p_timeline: expected.timeline,
+        p_revision: expected.revision,
+      })
+    : await client.rpc("studio_request_render", args);
   if (r.error)
     throw new MediaError(
-      r.error.code === "22023" ? r.error.message : "Création du rendu refusée.",
-      r.error.code === "42501" ? 403 : 400,
+      r.error.code === "22023"
+        ? r.error.message
+        : r.error.code === "40001"
+          ? "Cette version a changé. Rechargez avant de lancer le rendu."
+          : "Création du rendu refusée.",
+      r.error.code === "42501" ? 403 : r.error.code === "40001" ? 409 : 400,
     );
   return { id: r.data };
 }

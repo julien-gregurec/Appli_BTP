@@ -92,3 +92,5 @@ export * from "./render";
 
 export * from "./presentation";
 export * from "./templates";
+
+export * from "./editor";

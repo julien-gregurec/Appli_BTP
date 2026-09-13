@@ -38,6 +38,16 @@ async function handle(
       if (!b || typeof b !== "object" || !("action" in b))
         throw new MediaError("Demande invalide.");
       if (
+        ("timeline" in b || "revision" in b) &&
+        (!("timeline" in b) ||
+          typeof b.timeline !== "string" ||
+          !("revision" in b) ||
+          typeof b.revision !== "number" ||
+          !Number.isSafeInteger(b.revision) ||
+          b.revision < 1)
+      )
+        throw new MediaError("Révision invalide.");
+      if (
         b.action === "create" &&
         "requestId" in b &&
         typeof b.requestId === "string"
@@ -46,6 +56,13 @@ async function handle(
           projectId,
           b.requestId,
           "retry" in b && typeof b.retry === "string" ? b.retry : null,
+          "preview" in b && b.preview === true,
+          "timeline" in b &&
+            typeof b.timeline === "string" &&
+            "revision" in b &&
+            typeof b.revision === "number"
+            ? { timeline: b.timeline, revision: b.revision }
+            : undefined,
         );
       else if (b.action === "cancel" && "job" in b && typeof b.job === "string")
         result = await cancelStudioRender(projectId, b.job);

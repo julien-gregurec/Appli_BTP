@@ -4,6 +4,7 @@ import { MediaError } from "../../../../lib/media-service";
 import { isTransportError } from "../../../../lib/rest-status";
 import {
   generateStudioTimeline,
+  saveStudioEditor,
   updateTimelineText,
   getStudioTimelineState,
   updateTimelineClip,
@@ -24,7 +25,8 @@ async function bodyOf(request: Request): Promise<Record<string, unknown>> {
       const { done, value } = await reader.read();
       if (done) break;
       size += value.length;
-      if (size > 65536) throw new MediaError("Demande trop volumineuse.", 413);
+      if (size > 2097152)
+        throw new MediaError("Demande trop volumineuse.", 413);
       chunks.push(value);
     }
   } finally {
@@ -33,7 +35,10 @@ async function bodyOf(request: Request): Promise<Record<string, unknown>> {
   const value: unknown = JSON.parse(Buffer.concat(chunks).toString("utf8"));
   if (!value || typeof value !== "object" || Array.isArray(value))
     throw new MediaError("Demande invalide.");
-  return Object.fromEntries(Object.entries(value));
+  const result = Object.fromEntries(Object.entries(value));
+  if (size > 65536 && result.action !== "saveEditor")
+    throw new MediaError("Demande trop volumineuse.", 413);
+  return result;
 }
 function string(v: unknown) {
   if (typeof v !== "string") throw new MediaError("Identifiant invalide.");
@@ -67,7 +72,14 @@ async function handle(
             !Number.isSafeInteger(b.revision)
           )
             throw new MediaError("Révision invalide.");
-          if (b.action === "text")
+          if (b.action === "saveEditor")
+            output = await saveStudioEditor(
+              projectId,
+              timeline,
+              b.revision,
+              b.draft,
+            );
+          else if (b.action === "text")
             output = await updateTimelineText(
               projectId,
               timeline,
