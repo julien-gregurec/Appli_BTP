@@ -190,4 +190,36 @@ begin
     ('ea000000-0000-4000-8000-000000000010', e, 'e3000000-0000-4000-8000-000000000008', null, null)
   on conflict do nothing;
 end $$;
+
+-- Bibliothèque d'ouvrages (offre Pro) : composition sans prix d'achat dans le JSON, coûts à part ------------------
+insert into public.ouvrages (id, entreprise_id, reference_interne, nom, categorie, unite_principale, statut, version_courante, famille_id) values
+  ('eb000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000001', 'OUV-0001', 'Cloison vitrée toute hauteur', 'Menuiserie', 'm²', 'actif', 1, 'e6000000-0000-4000-8000-000000000004'),
+  ('eb000000-0000-4000-8000-000000000002', 'e0000000-0000-4000-8000-000000000001', 'OUV-0002', 'Cloison plaques de plâtre 72/48', 'Plâtrerie', 'm²', 'actif', 1, 'e6000000-0000-4000-8000-000000000001')
+on conflict (id) do nothing;
+insert into public.ouvrages_versions (id, ouvrage_id, entreprise_id, version, reference_interne, nom, description_interne, description_client, categorie, unite_principale, quantite_principale, composants) values
+  ('ec000000-0000-4000-8000-000000000001', 'eb000000-0000-4000-8000-000000000001', 'e0000000-0000-4000-8000-000000000001', 1, 'OUV-0001', 'Cloison vitrée toute hauteur',
+   'Vitrage trempé 10 mm sur profilés alu laqués ; pose comprise.', 'Fourniture et pose d’une cloison vitrée toute hauteur, vitrage trempé 10 mm sur ossature aluminium laquée blanc.',
+   'Menuiserie', 'm²', 1,
+   '[{"cle":"vitrage","ordre":1,"nature":"article","designation":"Vitrage clair trempé 10 mm","unite":"m²","coefficient":1,"base":{"type":"principale"},"quantiteFixe":null,"saisieRequise":false,"pertePct":5,"arrondi":{"mode":"aucun"},"quantiteMin":null,"condition":{"type":"toujours"},"source":{"catalogue":"prestation","id":"e7000000-0000-4000-8000-000000000006"},"referenceInterne":"ART-0006","referenceFabricant":"VIT-CLR-10","fabricant":"Saint-Gobain","fournisseur":null,"descriptionClient":null,"prixVenteHt":145,"tauxTva":20,"visibleClient":true},
+     {"cle":"profile","ordre":2,"nature":"article","designation":"Profilé aluminium pour cloison vitrée","unite":"ml","coefficient":1.2,"base":{"type":"principale"},"quantiteFixe":null,"saisieRequise":false,"pertePct":0,"arrondi":{"mode":"superieur","pas":0.5},"quantiteMin":null,"condition":{"type":"toujours"},"source":{"catalogue":"prestation","id":"e7000000-0000-4000-8000-000000000007"},"referenceInterne":"ART-0007","referenceFabricant":"PROF-ALU-CV","fabricant":"Technal","fournisseur":null,"descriptionClient":null,"prixVenteHt":38,"tauxTva":20,"visibleClient":true},
+     {"cle":"pose","ordre":3,"nature":"main_oeuvre","designation":"Main-d’œuvre menuisier","unite":"h","coefficient":0.8,"base":{"type":"principale"},"quantiteFixe":null,"saisieRequise":false,"pertePct":0,"arrondi":{"mode":"proche","pas":0.25},"quantiteMin":1,"condition":{"type":"toujours"},"source":{"catalogue":"prestation","id":"e7000000-0000-4000-8000-000000000010"},"referenceInterne":"MO-0002","referenceFabricant":null,"fabricant":null,"fournisseur":null,"descriptionClient":null,"prixVenteHt":48,"tauxTva":20,"visibleClient":false}]'::jsonb),
+  ('ec000000-0000-4000-8000-000000000002', 'eb000000-0000-4000-8000-000000000002', 'e0000000-0000-4000-8000-000000000001', 1, 'OUV-0002', 'Cloison plaques de plâtre 72/48',
+   'Une plaque BA13 par face, rails et montants 48, laine 45 mm.', 'Cloison de distribution 72/48 : ossature métallique, isolant laine de verre 45 mm, une plaque BA13 par face.',
+   'Plâtrerie', 'm²', 1,
+   '[{"cle":"plaque","ordre":1,"nature":"article","designation":"Plaque de plâtre BA13 standard","unite":"m²","coefficient":2,"base":{"type":"principale"},"quantiteFixe":null,"saisieRequise":false,"pertePct":10,"arrondi":{"mode":"superieur","pas":3},"quantiteMin":null,"condition":{"type":"toujours"},"source":{"catalogue":"prestation","id":"e7000000-0000-4000-8000-000000000001"},"referenceInterne":"ART-0001","referenceFabricant":"BA13-STD","fabricant":"Placo","fournisseur":null,"descriptionClient":null,"prixVenteHt":9.8,"tauxTva":20,"visibleClient":true},
+     {"cle":"rail","ordre":2,"nature":"article","designation":"Rail métallique 48 mm","unite":"ml","coefficient":0.8,"base":{"type":"principale"},"quantiteFixe":null,"saisieRequise":false,"pertePct":0,"arrondi":{"mode":"superieur","pas":3},"quantiteMin":null,"condition":{"type":"toujours"},"source":{"catalogue":"prestation","id":"e7000000-0000-4000-8000-000000000003"},"referenceInterne":"ART-0003","referenceFabricant":"R48","fabricant":"Knauf","fournisseur":null,"descriptionClient":null,"prixVenteHt":2.9,"tauxTva":20,"visibleClient":true},
+     {"cle":"montant","ordre":3,"nature":"article","designation":"Montant métallique 48 mm","unite":"ml","coefficient":1.7,"base":{"type":"principale"},"quantiteFixe":null,"saisieRequise":false,"pertePct":0,"arrondi":{"mode":"superieur","pas":2.5},"quantiteMin":null,"condition":{"type":"toujours"},"source":{"catalogue":"prestation","id":"e7000000-0000-4000-8000-000000000004"},"referenceInterne":"ART-0004","referenceFabricant":"M48","fabricant":"Knauf","fournisseur":null,"descriptionClient":null,"prixVenteHt":3.4,"tauxTva":20,"visibleClient":true},
+     {"cle":"laine","ordre":4,"nature":"article","designation":"Laine de verre 45 mm","unite":"m²","coefficient":1,"base":{"type":"principale"},"quantiteFixe":null,"saisieRequise":false,"pertePct":5,"arrondi":{"mode":"aucun"},"quantiteMin":null,"condition":{"type":"toujours"},"source":{"catalogue":"prestation","id":"e7000000-0000-4000-8000-000000000005"},"referenceInterne":"ART-0005","referenceFabricant":"LDV-45","fabricant":"Isover","fournisseur":null,"descriptionClient":null,"prixVenteHt":6.2,"tauxTva":20,"visibleClient":true},
+     {"cle":"pose","ordre":5,"nature":"main_oeuvre","designation":"Main-d’œuvre plaquiste","unite":"h","coefficient":0.6,"base":{"type":"principale"},"quantiteFixe":null,"saisieRequise":false,"pertePct":0,"arrondi":{"mode":"proche","pas":0.25},"quantiteMin":1,"condition":{"type":"toujours"},"source":{"catalogue":"prestation","id":"e7000000-0000-4000-8000-000000000009"},"referenceInterne":"MO-0001","referenceFabricant":null,"fabricant":null,"fournisseur":null,"descriptionClient":null,"prixVenteHt":42,"tauxTva":20,"visibleClient":false}]'::jsonb)
+on conflict (id) do nothing;
+insert into public.ouvrages_composants_couts (version_id, cle_composant, entreprise_id, prix_achat_ht) values
+  ('ec000000-0000-4000-8000-000000000001', 'vitrage', 'e0000000-0000-4000-8000-000000000001', 98.00),
+  ('ec000000-0000-4000-8000-000000000001', 'profile', 'e0000000-0000-4000-8000-000000000001', 24.00),
+  ('ec000000-0000-4000-8000-000000000001', 'pose', 'e0000000-0000-4000-8000-000000000001', 31.00),
+  ('ec000000-0000-4000-8000-000000000002', 'plaque', 'e0000000-0000-4000-8000-000000000001', 6.10),
+  ('ec000000-0000-4000-8000-000000000002', 'rail', 'e0000000-0000-4000-8000-000000000001', 1.80),
+  ('ec000000-0000-4000-8000-000000000002', 'montant', 'e0000000-0000-4000-8000-000000000001', 2.10),
+  ('ec000000-0000-4000-8000-000000000002', 'laine', 'e0000000-0000-4000-8000-000000000001', 3.90),
+  ('ec000000-0000-4000-8000-000000000002', 'pose', 'e0000000-0000-4000-8000-000000000001', 28.00)
+on conflict do nothing;
 commit;
