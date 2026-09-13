@@ -307,7 +307,7 @@ export function EditeurDevisV2({
         ))}
       </div>
 
-      <div className={`grid gap-4 ${apercuVisible ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" : ""}`}>
+      <div className={`grid gap-4 ${apercuVisible ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" : "lg:grid-cols-[minmax(0,1fr)]"}`}>
         <div className={`${onglet === "saisie" ? "block" : "hidden"} space-y-4 lg:block`}>
           <fieldset className="grid gap-3 rounded-md border border-neutral-200 p-3 sm:grid-cols-2 lg:grid-cols-3 dark:border-neutral-800" onFocus={focusEntete} onBlur={blurEntete}>
             <legend className="px-1 text-sm font-medium">En-tête du devis</legend>
