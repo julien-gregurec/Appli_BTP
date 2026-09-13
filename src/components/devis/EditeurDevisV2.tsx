@@ -41,6 +41,8 @@ export type DroitsEditeur = { voirCouts: boolean; gererCouts: boolean; modifierP
 type Dialogue = null | { type: "articles" } | { type: "ouvrage"; instance: InstanceOuvrage | null; apresCle?: string | null } | { type: "prix"; instance: InstanceOuvrage } | { type: "colonnes" } | { type: "ligne_mobile"; cle: string };
 type Instantane = { entete: EnteteDevisV2; etat: EtatElements };
 type Sauvegarde = { statut: "ok"; heure: string } | { statut: "en_cours" } | { statut: "erreur"; message: string; conflit: boolean } | { statut: "hors_ligne" } | { statut: "jamais" };
+/** Une modification efface une erreur d'enregistrement simple (pas un conflit) : l'autosauvegarde réessaie alors. */
+const effacerErreurSimple = (s: Sauvegarde): Sauvegarde => (s.statut === "erreur" && !s.conflit ? { statut: "jamais" } : s);
 
 const DELAI_AUTOSAUVEGARDE_MS = 2000;
 
@@ -137,17 +139,18 @@ export function EditeurDevisV2({
   const setEtat = useCallback((suivant: EtatElements | ((etat: EtatElements) => EtatElements)) => {
     setHistorique((h) => pousser(h, { entete: h.present.entete, etat: typeof suivant === "function" ? suivant(h.present.etat) : suivant }));
     setSale(true);
+    setSauvegarde(effacerErreurSimple);
   }, []);
   // L'en-tête se modifie sans entrée d'historique à chaque frappe ; une entrée est poussée à la sortie du champ.
-  const majEntete = (patch: Partial<EnteteDevisV2>) => { setHistorique((h) => remplacerPresent(h, { ...h.present, entete: { ...h.present.entete, ...patch } })); setSale(true); };
+  const majEntete = (patch: Partial<EnteteDevisV2>) => { setHistorique((h) => remplacerPresent(h, { ...h.present, entete: { ...h.present.entete, ...patch } })); setSale(true); setSauvegarde(effacerErreurSimple); };
   const focusEntete = () => { enteteAvantFocus.current = entete; };
   const blurEntete = () => {
     const avant = enteteAvantFocus.current;
     enteteAvantFocus.current = null;
     if (avant && avant !== entete) setHistorique((h) => pousser(remplacerPresent(h, { ...h.present, entete: avant }), { ...h.present }));
   };
-  const annulerEdition = useCallback(() => { setHistorique((h) => { if (!peutAnnuler(h)) return h; setSale(true); return annuler(h); }); }, []);
-  const retablirEdition = useCallback(() => { setHistorique((h) => { if (!peutRetablir(h)) return h; setSale(true); return retablir(h); }); }, []);
+  const annulerEdition = useCallback(() => { setHistorique((h) => { if (!peutAnnuler(h)) return h; setSale(true); setSauvegarde(effacerErreurSimple); return annuler(h); }); }, []);
+  const retablirEdition = useCallback(() => { setHistorique((h) => { if (!peutRetablir(h)) return h; setSale(true); setSauvegarde(effacerErreurSimple); return retablir(h); }); }, []);
 
   /** Copie des lignes : presse-papier structuré, repli local (autres onglets) ; rend le texte pour le presse-papier système. */
   const copierLignes = useCallback((cles: readonly string[]): string | null => {
@@ -229,7 +232,13 @@ export function EditeurDevisV2({
    */
   const enregistrer = useCallback((o: { explicite: boolean }) => {
     const invalide = validerBrouillon({ clientId: entete.client_id, remiseGlobalePct: entete.remise_globale, elements: etat.elements });
-    if (invalide) { if (o.explicite) setErreur(invalide); return; }
+    if (invalide) {
+      // Un brouillon invalide ne part jamais en base ; le motif est affiché dans l'état d'enregistrement (et
+      // en alerte sur une demande explicite) au lieu d'un silence pris pour une sauvegarde acquise.
+      if (o.explicite) setErreur(invalide);
+      setSauvegarde((s) => (s.statut === "erreur" && !s.conflit && s.message === invalide ? s : { statut: "erreur", message: invalide, conflit: false }));
+      return;
+    }
     if (typeof navigator !== "undefined" && navigator.onLine === false) { setSauvegarde({ statut: "hors_ligne" }); return; }
     setErreur(null);
     setSauvegarde({ statut: "en_cours" });
@@ -258,9 +267,13 @@ export function EditeurDevisV2({
     });
   }, [devisId, devisIdCourant, entete, etat, revision, router]);
 
-  // Autosauvegarde : après une pause de saisie, tant qu'aucun conflit n'est en cours.
+  // Autosauvegarde : après une pause de saisie. Après une erreur (conflit, refus du serveur, brouillon
+  // invalide), aucune nouvelle tentative automatique tant que rien n'a changé : une erreur durable ne doit
+  // pas marteler le serveur (constaté en recette : nouvel essai toutes les 12 s après un dépassement de
+  // délai). La prochaine modification efface l'erreur simple et relance le cycle ; un conflit exige un
+  // rechargement.
   useEffect(() => {
-    if (!sale || enCours || (sauvegarde.statut === "erreur" && sauvegarde.conflit)) return;
+    if (!sale || enCours || sauvegarde.statut === "erreur") return;
     const t = window.setTimeout(() => enregistrer({ explicite: false }), DELAI_AUTOSAUVEGARDE_MS);
     return () => window.clearTimeout(t);
   }, [sale, enCours, sauvegarde, enregistrer]);
@@ -333,7 +346,7 @@ export function EditeurDevisV2({
         <span className="text-xs text-neutral-500" aria-live="polite" data-sauvegarde={sauvegarde.statut}>
           {sauvegarde.statut === "en_cours" ? "Enregistrement…"
             : sauvegarde.statut === "hors_ligne" ? "Hors ligne — modifications conservées ici, enregistrement au retour du réseau"
-            : sauvegarde.statut === "erreur" ? (sauvegarde.conflit ? "Conflit : rechargez le devis" : "Enregistrement impossible")
+            : sauvegarde.statut === "erreur" ? (sauvegarde.conflit ? "Conflit : rechargez le devis" : `Non enregistré — ${sauvegarde.message}`)
             : sale ? "Modifications non enregistrées" : sauvegarde.statut === "ok" ? `Enregistré à ${sauvegarde.heure}` : ""}
         </span>
         <div className="ml-auto flex flex-wrap gap-2">

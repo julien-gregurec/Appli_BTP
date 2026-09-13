@@ -21,6 +21,8 @@ window.__banc = {
   droits: { voirCouts: couts, gererCouts: couts, modifierPrix: true, modifierUnite: true, modifierRemise: true },
   enregistrements: [],
   recherches: [],
+  refus: null,
+  tentatives: 0,
 };
 window.__navigations = [];
 

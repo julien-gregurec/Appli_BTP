@@ -16,6 +16,9 @@ type Banc = {
   droits: { voirCouts: boolean; gererCouts: boolean; modifierPrix: boolean; modifierUnite: boolean; modifierRemise: boolean };
   enregistrements: Array<{ devisId: string | null; entete: EnteteDevisV2; elements: ElementDevis[]; payload: ReturnType<typeof payloadEnregistrementV2> }>;
   recherches: string[];
+  /** Refus simulé de l'enregistrement (message renvoyé) ; `tentatives` compte tous les appels, réussis ou non. */
+  refus: string | null;
+  tentatives: number;
 };
 
 declare global {
@@ -79,6 +82,8 @@ export async function enregistrerDevisV2Action(
   elements: ElementDevis[],
   origines: Record<string, OrigineLigneLibre>,
 ) {
+  banc().tentatives += 1;
+  if (banc().refus) return { error: banc().refus, conflit: false };
   const payload = payloadEnregistrementV2(entete, elements, { inclureCouts: banc().droits.gererCouts, origines });
   banc().enregistrements.push({ devisId, entete, elements, payload: JSON.parse(JSON.stringify(payload)) });
   return { id: "devis-banc", revision: banc().enregistrements.length };

@@ -11,7 +11,6 @@ test.skip(!dossier, "BANC_EDITEUR_V2 non défini : construire le banc d'abord");
 
 const url = (parametres = "") => `${pathToFileURL(path.join(dossier!, "index.html")).href}${parametres}`;
 const grille = (page: Page) => page.locator("[role=grid][aria-label='Lignes du devis']");
-const rows = async (page: Page) => Number(await grille(page).getAttribute("aria-rowcount"));
 const cellule = (page: Page, i: number, c: string) => page.locator(`[data-cellule='${i}:${c}']`);
 const retour = (page: Page) => page.locator("[data-testid=retour-presse-papier]");
 const designations = (page: Page) => page.locator("[data-cellule$=':designation']").evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value ?? e.textContent));
