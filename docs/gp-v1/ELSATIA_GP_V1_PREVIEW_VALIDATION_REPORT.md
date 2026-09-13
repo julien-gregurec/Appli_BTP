@@ -363,3 +363,29 @@ Julien confirme que « Télécharger PDF » fonctionne en Production et demande 
   historique (drapeau éteint) est inchangé.
 - **Planning** (`2e67d69`) : bouton de vue actif lisible au survol (« Compacte » paraissait grisé).
 - Gate rejoué sur ces commits : lint 0 erreur, typecheck 0 erreur, tests ciblés verts, build Vercel Ready.
+
+## 18. Décisions de Julien et préparation Production (2026-09-13, 10:35 → 11:30)
+
+Décisions : (1) grille pleine largeur par défaut, aperçu A4 à la demande ; (2) copier/coller de lignes
+entre devis : oui, après la validation visuelle finale ; (3) badge preview absent automatiquement de tout
+environnement promu ; (4) migration 276 à qualifier avec le rôle réellement utilisé ; (5) coût RLS →
+backlog plateforme. Traités ici : 1, 3, 4.
+
+- **(1) Éditeur** (`c139ee2`) : `apercuVisible` à `false` par défaut sur grand écran ; bouton « Aperçu A4 »
+  ouvre l'aperçu réel à côté de la grille, « Masquer l'aperçu » le referme. Mobile inchangé (onglets).
+- **(3) Badge** (`c139ee2`) : module pur `badge-preview.ts` (7 tests) — visible seulement si
+  `NEXT_PUBLIC_GP_PREVIEW_BADGE=1` **et** `VERCEL_ENV ≠ production` **et** `NEXT_PUBLIC_APP_URL` ≠
+  `app.elsatia.fr`. Le projet Vercel `elsatia-production` ne porte ni cette variable ni les drapeaux GP.
+- **(4) Migration 276** : `gin_trgm_ops` qualifié par le schéma réel de `pg_trgm` (lu dans `pg_extension`,
+  bloc `do … execute format`), sans dépendre du `search_path` du rôle qui migre. Preuves en harnais :
+  **A.** Fresh complet 1→290 sur Postgres nu (287 appliquées, 3 index, extension en `extensions`) ;
+  **B.** cas Supabase (pg_trgm dans `extensions`), la 276 jouée par un rôle de connexion sans `extensions`
+  dans son `search_path` puis `set role postgres`, comme la CLI — voir résultat ci-dessous.
+  Runbook : `docs/gp-v1/preview/RUNBOOK_MIGRATIONS_PRODUCTION_GP_V1.md` (rôle utilisé, sauvegarde,
+  répétition générale, dérives à chercher, contrôles). Rien n'a été joué sur Production.
+  Résultat **B** : 273 migrations avant, **276 OK** jouée par `cli_login_test` (`search_path` = `"$user", public`,
+  puis `set role postgres` comme la CLI), 14 migrations après, les 3 index sur `extensions.gin_trgm_ops`.
+  Résultat **A** (Fresh 1→290 avec la 276 qualifiée) : voir le journal `preuve-276a.log` du scratchpad, reporté
+  dans le message de livraison. La 247 (Colors) écrit déjà `extensions.gin_trgm_ops` en dur : elle passe avec
+  ce rôle (preuve B l'a traversée). Preview : vérifié après build — badge présent sur la preview, grille
+  1 150 px par défaut sans aperçu, bouton « Aperçu A4 » ouvre l'aperçu (captures 30, 30c).

@@ -62,14 +62,26 @@ $$;
 
 create extension if not exists pg_trgm;
 
-create index if not exists entreprises_recherche_nom_trgm
-  on public.entreprises using gin (public.elsatia_normaliser_recherche(nom) gin_trgm_ops);
-
-create index if not exists entreprises_recherche_raison_trgm
-  on public.entreprises using gin (public.elsatia_normaliser_recherche(coalesce(raison_sociale, '')) gin_trgm_ops);
-
-create index if not exists entreprises_recherche_ville_trgm
-  on public.entreprises using gin (public.elsatia_normaliser_recherche(coalesce(ville, '')) gin_trgm_ops);
+-- Sur Supabase, `pg_trgm` est installé dans le schéma `extensions` ; sur un Postgres nu, l'ordre ci-dessus
+-- le pose dans `public`. Le rôle de connexion de la CLI Supabase (`cli_login_postgres`, utilisé par
+-- `supabase db push`) n'a pas `extensions` dans son `search_path` : « operator class "gin_trgm_ops" does not
+-- exist » (constaté sur la preview, 2026-09-13). La classe d'opérateurs est donc qualifiée par le schéma réel
+-- de l'extension, quel qu'il soit, sans dépendre du `search_path` du rôle qui migre (même principe que la
+-- 247 de Colors, qui écrit `extensions.gin_trgm_ops` en dur).
+do $$
+declare
+  v_schema text;
+begin
+  select n.nspname into v_schema
+  from pg_extension e join pg_namespace n on n.oid = e.extnamespace
+  where e.extname = 'pg_trgm';
+  if v_schema is null then
+    raise exception 'pg_trgm absent : impossible de créer les index trigramme de l''annuaire';
+  end if;
+  execute format('create index if not exists entreprises_recherche_nom_trgm on public.entreprises using gin (public.elsatia_normaliser_recherche(nom) %I.gin_trgm_ops)', v_schema);
+  execute format('create index if not exists entreprises_recherche_raison_trgm on public.entreprises using gin (public.elsatia_normaliser_recherche(coalesce(raison_sociale, '''')) %I.gin_trgm_ops)', v_schema);
+  execute format('create index if not exists entreprises_recherche_ville_trgm on public.entreprises using gin (public.elsatia_normaliser_recherche(coalesce(ville, '''')) %I.gin_trgm_ops)', v_schema);
+end $$;
 
 create index if not exists entreprises_siret_chiffres
   on public.entreprises (public.elsatia_chiffres_seuls(coalesce(siret, '')));
