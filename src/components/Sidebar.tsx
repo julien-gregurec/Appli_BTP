@@ -11,6 +11,7 @@ import { BrandWordmark } from "@/components/BrandWordmark";
 import { PRODUCT_NAME } from "@/lib/brand";
 import { ApplicationSwitcherGestionPro } from "@/components/ApplicationSwitcherGestionPro";
 import type { DestinationApplication } from "@/lib/multi-app";
+import { libelleCompactEssai, type StatutEssai } from "@/lib/essai-statut";
 
 export function Sidebar({
   entrepriseNom,
@@ -21,8 +22,10 @@ export function Sidebar({
   boutiqueActive = true,
   activeFeatures,
   applications = [],
+  essai = null,
 }: {
   entrepriseNom: string;
+  essai?: StatutEssai | null;
   logoUrl?: string | null;
   authDisabled?: boolean;
   permissions?: string[] | null;
@@ -32,6 +35,8 @@ export function Sidebar({
   applications?: DestinationApplication[];
 }) {
   const pathname = usePathname();
+  const essaiCompact = essai ? libelleCompactEssai(essai) : null;
+  const essaiUrgent = essai?.etat === "expire" || (essai?.etat === "essai" && essai.joursRestants <= 7);
   const [ouvert, setOuvert] = useState(false);
   const compteDepot = permissions?.includes("mode_compte_depot") === true;
   const navigationBrute = compteDepot
@@ -78,7 +83,7 @@ export function Sidebar({
         <div className="mt-3 flex items-center gap-2 rounded-md bg-white/5 p-2">
           {/* eslint-disable-next-line @next/next/no-img-element -- URL Supabase variable, miniature de contexte */}
           {logoUrl&&<img src={logoUrl} alt={`Logo de ${entrepriseNom}`} className="h-7 w-9 rounded bg-white object-contain p-0.5"/>}
-          <div className="min-w-0"><div className="text-[9px] uppercase tracking-wider text-white/40">Entreprise active</div><div className="truncate text-xs text-white/75">{entrepriseNom}</div></div>
+          <div className="min-w-0"><div className="text-[9px] uppercase tracking-wider text-white/40">Entreprise active</div><div className="truncate text-xs text-white/75">{entrepriseNom}</div>{essaiCompact&&<div data-testid="essai-sidebar" className={`mt-0.5 text-[11px] ${essaiUrgent?"font-semibold text-[#f0b46a]":"text-white/60"}`}>{essaiCompact}</div>}</div>
         </div>
         <ApplicationSwitcherGestionPro applications={applications} />
       </div>

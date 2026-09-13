@@ -15,6 +15,14 @@ export type EnvironnementBadge = {
 
 export const HOTE_PRODUCTION = "app.elsatia.fr";
 
+/**
+ * Vrai si le déploiement est un environnement de preview / staging (drapeau posé ET non promu).
+ * Sert au badge et à l'accès rapide au compte de recette de la page de connexion.
+ */
+export function environnementPreviewActif(env: EnvironnementBadge): boolean {
+  return badgePreviewVisible(env);
+}
+
 export function badgePreviewVisible(env: EnvironnementBadge): boolean {
   if (env.drapeau !== "1") return false;
   if ((env.vercelEnv ?? "").toLowerCase() === "production") return false;

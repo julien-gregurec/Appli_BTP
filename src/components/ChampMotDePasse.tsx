@@ -13,12 +13,14 @@ export function ChampMotDePasse({
   autoComplete,
   required,
   minLength,
+  autoFocus,
 }: {
   id: string;
   name: string;
   autoComplete: string;
   required?: boolean;
   minLength?: number;
+  autoFocus?: boolean;
 }) {
   const [visible, setVisible] = useState(false);
 
@@ -30,6 +32,7 @@ export function ChampMotDePasse({
         type={visible ? "text" : "password"}
         required={required}
         minLength={minLength}
+        autoFocus={autoFocus}
         autoComplete={autoComplete}
         className="w-full rounded-md border border-neutral-300 px-3 py-2 pr-16 text-sm"
       />

@@ -17,6 +17,8 @@ import { DOMAINE_VERS_PERMISSION_DELEGATION, type DelegationAlerte, type Employe
 import { activeFeaturesForCompany } from "@/lib/feature-flags";
 import { featureForPath } from "@/lib/feature-catalogue";
 import { estPlateformeAdmin } from "@/lib/plateforme";
+import { TrialStatusBanner } from "@/components/TrialStatusBanner";
+import { statutEssai } from "@/lib/essai-statut";
 
 function un<T>(valeur: T | T[] | null): T | null {
   if (!valeur) return null;
@@ -291,6 +293,13 @@ export default async function DashboardPage() {
             <h1 className="text-xl font-semibold">Bonjour{prenomAffiche ? ` ${prenomAffiche}` : ""}</h1>
             <p className="text-sm text-neutral-500">{ctx.entrepriseNom}</p>
           </div>
+        )}
+        {!ctx.accesSupportPlateforme && (
+          <TrialStatusBanner
+            statut={statutEssai({ abonnementStatut: ctx.abonnementStatut, essaiDebut: ctx.abonnementEssaiDebut, essaiFin: ctx.abonnementEssaiFin })}
+            peutSouscrire={permissions === null || permissions.includes("gerer_utilisateurs") || permissions.includes("gerer_parametres")}
+            variante="carte"
+          />
         )}
         <DashboardWidgetFirstConnection options={optionsWidgets}/>
 

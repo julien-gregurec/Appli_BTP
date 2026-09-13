@@ -15,8 +15,8 @@ import { AssistantIA } from "@/components/AssistantIA";
 import { AppPresenceTracker } from "@/components/AppPresenceTracker";
 import { AbonnementBanner } from "@/components/AbonnementBanner";
 import { SupportAccessBanner } from "@/components/SupportAccessBanner";
-import { EssaiExpireBanner, EssaiPreavisBanner } from "@/components/EssaiBanner";
-import { preavisEssai } from "@/lib/acces-socle-essai";
+import { TrialStatusBanner } from "@/components/TrialStatusBanner";
+import { statutEssai } from "@/lib/essai-statut";
 import { activeFeaturesForCompany } from "@/lib/feature-flags";
 import { boutiqueEstActive, iaEstActive } from "@/lib/preview-features";
 import { listerApplicationsPourSwitcher } from "@/lib/multi-app-server";
@@ -43,9 +43,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Préavis de fin d'essai (ELSATIA-GP-TRIAL-EXPIRY-P1-CLOSURE-V1) : visible par
   // TOUS les membres — ils subissent le blocage à J31 — mais seul un profil
   // habilité se voit proposer le lien de souscription, qui exige acces_parametres.
-  const preavis = ctx.accesSupportPlateforme
+  const essai = ctx.accesSupportPlateforme
     ? null
-    : preavisEssai({
+    : statutEssai({
         abonnementStatut: ctx.abonnementStatut,
         essaiDebut: ctx.abonnementEssaiDebut,
         essaiFin: ctx.abonnementEssaiFin,
@@ -54,12 +54,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="app-shell flex min-h-full flex-1">
       <AppPresenceTracker actif={!isEmailLoginDisabled()} />
-      <Sidebar entrepriseNom={ctx.entrepriseNom} logoUrl={ctx.logoUrl} authDisabled={isEmailLoginDisabled()} permissions={permissions} plateformeAdmin={plateformeAdmin} boutiqueActive={boutiqueEstActive()} activeFeatures={activeFeatures} applications={applications} />
+      <Sidebar entrepriseNom={ctx.entrepriseNom} logoUrl={ctx.logoUrl} essai={essai} authDisabled={isEmailLoginDisabled()} permissions={permissions} plateformeAdmin={plateformeAdmin} boutiqueActive={boutiqueEstActive()} activeFeatures={activeFeatures} applications={applications} />
       <div className="min-w-0 flex-1">
         {ctx.accesSupportPlateforme&&<SupportAccessBanner entrepriseNom={ctx.entrepriseNom} bandeau={bandeauAssistance}/>}
         {!ctx.accesSupportPlateforme&&ctx.suspensionPrevueAt&&peutVoirAlerteAbonnement&&<AbonnementBanner echeance={ctx.suspensionPrevueAt} message={ctx.impayeMessage}/>}
-        {ctx.essaiExpireSansOffre&&<EssaiExpireBanner peutSouscrire={peutVoirAlerteAbonnement}/>}
-        {preavis&&<EssaiPreavisBanner joursRestants={preavis.joursRestants} niveau={preavis.niveau} finEssai={ctx.abonnementEssaiFin} peutSouscrire={peutVoirAlerteAbonnement}/>}
+        {essai&&<TrialStatusBanner statut={essai} peutSouscrire={peutVoirAlerteAbonnement} variante="bandeau"/>}
         <IndicateurReseau />
         {/* La file n'existe que pour un utilisateur rattaché à une entreprise réelle : le
             support plateforme consulte les écrans d'un client, il n'y prépare aucune saisie. */}

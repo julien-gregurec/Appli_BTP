@@ -1,6 +1,7 @@
 import { activerCompteEmployeAction, createEntrepriseAction, rejoindreEntrepriseAction } from "@/app/actions/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { estCodeOffreTarifaire, offreTarifaireParCle } from "@/lib/tarification";
+import { ChangerDeCompte } from "@/components/ChangerDeCompte";
 
 export default async function OnboardingPage({
   searchParams,
@@ -18,6 +19,7 @@ export default async function OnboardingPage({
   return (
     <main className="flex flex-1 items-center justify-center p-6">
       <div className="w-full max-w-md space-y-6">
+        <ChangerDeCompte email={user?.email ?? null} />
         <div>
           <h1 className="text-xl font-semibold">Configurer votre accès</h1>
           <p className="text-sm text-neutral-500">

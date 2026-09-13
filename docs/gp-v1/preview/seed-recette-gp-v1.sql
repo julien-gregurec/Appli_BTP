@@ -17,15 +17,20 @@ values
    '{"provider":"email","providers":["email"]}', '{}', '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000', 'e1000000-0000-4000-8000-000000000002', 'authenticated', 'authenticated',
    'conducteur.recette@elsatia-preview.invalid', crypt(:'mdp', gen_salt('bf')), now(), now(), now(),
+   '{"provider":"email","providers":["email"]}', '{}', '', '', '', ''),
+  -- Compte SANS entreprise : sert à recetter la page « Configurer votre accès » et son bouton « Changer de compte ».
+  ('00000000-0000-0000-0000-000000000000', 'e1000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated',
+   'sans-entreprise.recette@elsatia-preview.invalid', crypt(:'mdp', gen_salt('bf')), now(), now(), now(),
    '{"provider":"email","providers":["email"]}', '{}', '', '', '', '')
 on conflict (id) do nothing;
 insert into auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
 select gen_random_uuid(), u.id, u.id::text, jsonb_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true), 'email', now(), now(), now()
-from auth.users u where u.id in ('e1000000-0000-4000-8000-000000000001', 'e1000000-0000-4000-8000-000000000002')
+from auth.users u where u.id in ('e1000000-0000-4000-8000-000000000001', 'e1000000-0000-4000-8000-000000000002', 'e1000000-0000-4000-8000-000000000003')
   and not exists (select 1 from auth.identities i where i.user_id = u.id and i.provider = 'email');
 insert into public.utilisateurs (id, prenom, nom) values
   ('e1000000-0000-4000-8000-000000000001', 'Julien', 'Recette'),
-  ('e1000000-0000-4000-8000-000000000002', 'Camille', 'Conducteur')
+  ('e1000000-0000-4000-8000-000000000002', 'Camille', 'Conducteur'),
+  ('e1000000-0000-4000-8000-000000000003', 'Sam', 'Sans-Entreprise')
 on conflict (id) do update set prenom = excluded.prenom, nom = excluded.nom;
 
 -- Entreprise sur l'offre Pro ---------------------------------------------------------------------------
@@ -222,4 +227,55 @@ insert into public.ouvrages_composants_couts (version_id, cle_composant, entrepr
   ('ec000000-0000-4000-8000-000000000002', 'laine', 'e0000000-0000-4000-8000-000000000001', 3.90),
   ('ec000000-0000-4000-8000-000000000002', 'pose', 'e0000000-0000-4000-8000-000000000001', 28.00)
 on conflict do nothing;
+-- Entreprise EN PÉRIODE D'ESSAI (sans offre) : recette du statut d'essai (bandeau J-7, carte, barre latérale,
+-- bouton d'abonnement pour le Dirigeant, information seule pour l'employé). Fin d'essai = aujourd'hui + 5 jours ;
+-- pendant la recette, la date se déplace par UPDATE pour photographier J-7, J-3, J-1, J0 et l'expiration.
+insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at,
+                        raw_app_meta_data, raw_user_meta_data, confirmation_token, recovery_token, email_change_token_new, email_change)
+values
+  ('00000000-0000-0000-0000-000000000000', 'e1000000-0000-4000-8000-000000000004', 'authenticated', 'authenticated',
+   'essai.recette@elsatia-preview.invalid', crypt(:'mdp', gen_salt('bf')), now(), now(), now(),
+   '{"provider":"email","providers":["email"]}', '{}', '', '', '', ''),
+  ('00000000-0000-0000-0000-000000000000', 'e1000000-0000-4000-8000-000000000005', 'authenticated', 'authenticated',
+   'essai-employe.recette@elsatia-preview.invalid', crypt(:'mdp', gen_salt('bf')), now(), now(), now(),
+   '{"provider":"email","providers":["email"]}', '{}', '', '', '', '')
+on conflict (id) do nothing;
+insert into auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+select gen_random_uuid(), u.id, u.id::text, jsonb_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true), 'email', now(), now(), now()
+from auth.users u where u.id in ('e1000000-0000-4000-8000-000000000004', 'e1000000-0000-4000-8000-000000000005')
+  and not exists (select 1 from auth.identities i where i.user_id = u.id and i.provider = 'email');
+insert into public.utilisateurs (id, prenom, nom) values
+  ('e1000000-0000-4000-8000-000000000004', 'Élodie', 'Essai'),
+  ('e1000000-0000-4000-8000-000000000005', 'Malik', 'Employé-Essai')
+on conflict (id) do update set prenom = excluded.prenom, nom = excluded.nom;
+insert into public.entreprises (id, nom, raison_sociale, siret, adresse, code_postal, ville, code_adhesion,
+                                abonnement_offre, abonnement_statut, abonnement_essai_debut, abonnement_essai_fin)
+values ('e0000000-0000-4000-8000-000000000002', 'ELSATIA Recette Essai', 'ELSATIA Recette Essai SAS', '000 000 000 00002',
+        '5 rue de l’Essai', '67000', 'Strasbourg', 'RECETTE2', null, 'essai', current_date - 25, current_date + 5)
+on conflict (id) do nothing;
+update public.entreprises set abonnement_offre = null, abonnement_statut = 'essai', abonnement_essai_debut = current_date - 25, abonnement_essai_fin = current_date + 5
+ where id = 'e0000000-0000-4000-8000-000000000002';
+update public.utilisateurs set entreprise_active_id = 'e0000000-0000-4000-8000-000000000002'
+ where id in ('e1000000-0000-4000-8000-000000000004', 'e1000000-0000-4000-8000-000000000005');
+insert into public.postes (id, entreprise_id, nom) values
+  ('e2000000-0000-4000-8000-000000000011', 'e0000000-0000-4000-8000-000000000002', 'Dirigeant'),
+  ('e2000000-0000-4000-8000-000000000012', 'e0000000-0000-4000-8000-000000000002', 'Ouvrier')
+on conflict (id) do nothing;
+insert into public.permissions_poste (entreprise_id, poste_id, cle_permission, autorise)
+select 'e0000000-0000-4000-8000-000000000002', 'e2000000-0000-4000-8000-000000000011', d.cle, true
+from public.permissions_disponibles d where d.cle <> 'mode_compte_depot'
+on conflict do nothing;
+insert into public.permissions_poste (entreprise_id, poste_id, cle_permission, autorise)
+select 'e0000000-0000-4000-8000-000000000002', 'e2000000-0000-4000-8000-000000000012', d.cle, true
+from public.permissions_disponibles d
+where d.cle in ('acces_dashboard','voir_chantiers_assignes','acces_pointage','saisir_son_pointage','acces_planning','demander_ses_conges')
+on conflict do nothing;
+insert into public.utilisateurs_entreprises (utilisateur_id, entreprise_id, poste_id, statut) values
+  ('e1000000-0000-4000-8000-000000000004', 'e0000000-0000-4000-8000-000000000002', 'e2000000-0000-4000-8000-000000000011', 'actif'),
+  ('e1000000-0000-4000-8000-000000000005', 'e0000000-0000-4000-8000-000000000002', 'e2000000-0000-4000-8000-000000000012', 'actif')
+on conflict do nothing;
+insert into public.employes (id, entreprise_id, utilisateur_id, prenom, nom, numero_inscription, identifiant_interne, poste, type_contrat, statut, poste_id) values
+  ('e3000000-0000-4000-8000-000000000021', 'e0000000-0000-4000-8000-000000000002', 'e1000000-0000-4000-8000-000000000004', 'Élodie', 'Essai', 'ESS-0001', 'S0001', 'Dirigeant', 'cdi', 'actif', 'e2000000-0000-4000-8000-000000000011'),
+  ('e3000000-0000-4000-8000-000000000022', 'e0000000-0000-4000-8000-000000000002', 'e1000000-0000-4000-8000-000000000005', 'Malik', 'Employé-Essai', 'ESS-0002', 'S0002', 'Ouvrier', 'cdi', 'actif', 'e2000000-0000-4000-8000-000000000012')
+on conflict (id) do nothing;
 commit;
