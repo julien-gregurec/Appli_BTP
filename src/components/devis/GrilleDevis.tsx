@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from "react";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -18,6 +18,7 @@ import { sousTotauxSections, type ElementDevis, type LigneLibre } from "@/lib/de
 import { indicateursPrix, TAUX_TVA_ADMIS } from "@/lib/devis/prix";
 import { champModifiable, libelleTypeLigne, typeDe, TYPES_LIGNE_GRILLE, type TypeLigneGrille } from "@/lib/devis/types-ligne";
 import { montantLigneHt } from "@/lib/devis/montants";
+import { CLE_STOCKAGE_PRESSE_PAPIER, ressembleAPressePapier } from "@/lib/devis/presse-papier";
 
 /**
  * Grille de saisie du devis (GP V1) : une ligne par élément, des cellules validées à la sortie
@@ -34,7 +35,14 @@ export type ActionsGrille = {
   genererCle: () => string;
   ouvrirOuvrage: (instance: InstanceOuvrage | null, apresCle: string | null) => void;
   prixGlobal: (instance: InstanceOuvrage) => void;
+  /** Copie ces lignes dans le presse-papier (tenu par l'éditeur) ; rend le texte à placer dans le presse-papier système. */
+  copier: (cles: readonly string[]) => string | null;
+  /** Colle un presse-papier après `apresCle` ; `texte: true` = ce n'est pas un presse-papier de lignes, le collage de texte suit son cours. */
+  coller: (texte: string, apresCle: string | null) => { ok: boolean; texte?: boolean };
 };
+
+/** Sélection de lignes : clés sélectionnées et ancre de l'extension (Maj). */
+export type SelectionGrille = { cles: readonly string[]; ancre: string | null };
 
 type Position = { index: number; colonne: string };
 
@@ -49,7 +57,7 @@ const fr = (v: number | null | undefined, decimales = 2) => (v === null || v ===
 
 const VIRTUALISATION_AU_DELA = 150;
 
-export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, actions, ligneCiblee }: {
+export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, actions, ligneCiblee, selection, onSelection, onActive }: {
   etat: EtatElements;
   colonnes: Colonne[];
   droits: DroitsGrille;
@@ -57,15 +65,55 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
   actions: ActionsGrille;
   /** Clé à mettre en avant (clic dans l'aperçu). */
   ligneCiblee: string | null;
+  /** Sélection de lignes (copier / coller), tenue par l'éditeur. */
+  selection: SelectionGrille;
+  onSelection: (selection: SelectionGrille) => void;
+  /** Ligne active (dernière cellule visitée), pour la position de collage des boutons. */
+  onActive?: (cle: string | null) => void;
 }) {
   const tries = useMemo(() => [...etat.elements].sort((a, b) => a.ordre - b.ordre), [etat.elements]);
   const cles = useMemo(() => tries.map(cleElement), [tries]);
   const sousTotaux = useMemo(() => sousTotauxSections(etat.elements), [etat.elements]);
   const tvaMixte = useMemo(() => new Set(remisesTvaMixte(etat)), [etat]);
   const [cible, setCible] = useState<Position | null>(null);
-  const [active, setActive] = useState<string | null>(null);
-  const pressePapier = useRef<ElementDevis | null>(null);
+  const [active, setActiveInterne] = useState<string | null>(null);
+  const setActive = useCallback((cle: string | null) => { setActiveInterne(cle); onActive?.(cle); }, [onActive]);
   const conteneur = useRef<HTMLDivElement>(null);
+  const selectionnees = useMemo(() => new Set(selection.cles), [selection.cles]);
+  /** Sélection par clic sur la poignée : clic = cette ligne, Maj+clic = plage depuis l'ancre, Ctrl/Cmd+clic = bascule. */
+  const selectionner = useCallback((cle: string, e: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) => {
+    if (e.shiftKey && selection.ancre) {
+      const a = cles.indexOf(selection.ancre); const b = cles.indexOf(cle);
+      if (a >= 0 && b >= 0) { const [d, f] = a < b ? [a, b] : [b, a]; onSelection({ cles: cles.slice(d, f + 1), ancre: selection.ancre }); return; }
+    }
+    if (e.ctrlKey || e.metaKey) {
+      onSelection({ cles: selectionnees.has(cle) ? selection.cles.filter((c) => c !== cle) : [...selection.cles, cle], ancre: cle });
+      return;
+    }
+    onSelection({ cles: selectionnees.has(cle) && selection.cles.length === 1 ? [] : [cle], ancre: cle });
+  }, [cles, onSelection, selection, selectionnees]);
+  const etendreSelection = useCallback((index: number, sens: -1 | 1) => {
+    const cle = cles[index]; const voisin = cles[index + sens];
+    if (!voisin) return;
+    const ancre = selection.ancre ?? cle;
+    const a = cles.indexOf(ancre); const b = index + sens;
+    const [d, f] = a < b ? [a, b] : [b, a];
+    onSelection({ cles: cles.slice(d, f + 1), ancre });
+  }, [cles, onSelection, selection.ancre]);
+  /** Texte sélectionné dans un champ : Ctrl+C / Ctrl+V restent du texte. */
+  const champAvecSelectionTexte = (t: EventTarget | null) => {
+    const el = t as HTMLInputElement | HTMLTextAreaElement | null;
+    if (!el || (el.tagName !== "INPUT" && el.tagName !== "TEXTAREA")) return false;
+    try { return el.selectionStart !== null && el.selectionEnd !== null && el.selectionStart !== el.selectionEnd; } catch { return false; }
+  };
+  const estChampTexte = (t: EventTarget | null) => { const tag = (t as HTMLElement | null)?.tagName; return tag === "INPUT" || tag === "TEXTAREA"; };
+  /** Lignes à copier : la sélection, sinon la ligne active. */
+  const clesACopier = useCallback((cleCourante: string | null) => (selection.cles.length ? [...selection.cles] : cleCourante ? [cleCourante] : []), [selection.cles]);
+  const copierVersSysteme = useCallback((clesCopiees: readonly string[]) => {
+    const texte = actions.copier(clesCopiees);
+    if (texte && typeof navigator !== "undefined" && navigator.clipboard?.writeText) navigator.clipboard.writeText(texte).catch(() => undefined);
+  }, [actions]);
+  const derniereSelectionnee = () => (selection.cles.length ? [...selection.cles].sort((a, b) => cles.indexOf(a) - cles.indexOf(b)).at(-1) ?? null : null);
   const editables = useMemo(() => colonnes.filter((c) => c.cle !== "poignee" && c.modifiable !== false).map((c) => c.cle as string), [colonnes]);
 
   const virtualise = tries.length > VIRTUALISATION_AU_DELA;
@@ -94,7 +142,7 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
     if (!ligneCiblee) return;
     const i = cles.indexOf(ligneCiblee);
     if (i >= 0) { setActive(ligneCiblee); setCible({ index: i, colonne: "designation" }); }
-  }, [ligneCiblee, cles]);
+  }, [ligneCiblee, cles, setActive]);
 
   const capteurs = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -111,7 +159,7 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
     const i = cle === null ? tries.length : cles.indexOf(cle) + 1;
     setActive(nouvelle);
     setCible({ index: i, colonne: "designation" });
-  }, [actions, etat, tries.length, cles]);
+  }, [actions, etat, tries.length, cles, setActive]);
 
   /** Clavier de la grille : navigation entre cellules et opérations de ligne. */
   const clavier = (e: KeyboardEvent<HTMLDivElement>, index: number, colonne: string) => {
@@ -157,22 +205,47 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
       if (tries.length > 1) setCible({ index: Math.min(index, tries.length - 2), colonne });
       return;
     }
-    if (ctrl && e.key.toLowerCase() === "c" && tag !== "INPUT" && tag !== "TEXTAREA") { pressePapier.current = element; return; }
-    if (ctrl && e.key.toLowerCase() === "v" && pressePapier.current && tag !== "INPUT" && tag !== "TEXTAREA") {
+    // Sélection de lignes au clavier : Ctrl+Maj+↑/↓ étend depuis l'ancre ; Échap vide la sélection ;
+    // Ctrl+A hors d'un champ texte sélectionne toutes les lignes.
+    if (ctrl && e.shiftKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); etendreSelection(index, e.key === "ArrowUp" ? -1 : 1); return; }
+    if (e.key === "Escape" && selection.cles.length) { onSelection({ cles: [], ancre: null }); return; }
+    if (ctrl && e.key.toLowerCase() === "a" && !estChampTexte(e.target)) { e.preventDefault(); onSelection({ cles: [...cles], ancre: cles[0] ?? null }); return; }
+    // Copier des lignes : Ctrl+C prend la main seulement si aucun texte n'est sélectionné dans le champ.
+    if (ctrl && e.key.toLowerCase() === "c" && !champAvecSelectionTexte(e.target)) {
+      const aCopier = clesACopier(cle);
+      if (aCopier.length) { e.preventDefault(); copierVersSysteme(aCopier); }
+      return;
+    }
+    // Coller : l'évènement natif `paste` (ci-dessous) reçoit le presse-papier système ; hors champ texte,
+    // le navigateur ne le déclenche pas toujours — on lit alors le presse-papier ou le repli local.
+    if (ctrl && e.key.toLowerCase() === "v" && !estChampTexte(e.target)) {
       e.preventDefault();
-      const copie = pressePapier.current;
-      const n = actions.genererCle();
-      const colle = copie.type === "ligne"
-        ? insererLigne({ ...etat, origines: { ...etat.origines, [n]: etat.origines[copie.ligne.cle] ?? { origine: "saisie" } } }, n, typeDe(copie.ligne), cle, { ...copie.ligne, cle: n })
-        : deplacerElementVers(dupliquerElement(etat, copie.instance.cle, n), n, index + 1);
-      actions.setEtat(colle);
-      setCible({ index: index + 1, colonne });
+      const apres = derniereSelectionnee() ?? cle;
+      const lire = typeof navigator !== "undefined" && navigator.clipboard?.readText ? navigator.clipboard.readText() : Promise.reject(new Error("indisponible"));
+      lire.then((t) => actions.coller(t, apres)).catch(() => actions.coller(localStorage.getItem(CLE_STOCKAGE_PRESSE_PAPIER) ?? "", apres));
       return;
     }
   };
 
+  /** Presse-papier système : `paste` porte le texte, y compris depuis un autre onglet ou une autre fenêtre. */
+  const collerNatif = (e: ClipboardEvent<HTMLDivElement>) => {
+    const texte = e.clipboardData?.getData("text/plain") ?? "";
+    if (!ressembleAPressePapier(texte)) return; // texte ordinaire : collage normal dans la cellule
+    e.preventDefault();
+    actions.coller(texte, derniereSelectionnee() ?? active);
+  };
+  const copierNatif = (e: ClipboardEvent<HTMLDivElement>) => {
+    if (champAvecSelectionTexte(e.target)) return; // texte sélectionné : copie de texte
+    const aCopier = clesACopier(active);
+    if (!aCopier.length) return;
+    const texte = actions.copier(aCopier);
+    if (!texte) return;
+    e.clipboardData?.setData("text/plain", texte);
+    e.preventDefault();
+  };
+
   const rendreLigne = (element: ElementDevis, index: number, mesurer?: (el: HTMLElement | null) => void) => (
-    <LigneSortable key={cleElement(element)} id={cleElement(element)} mesurer={mesurer} index={index} active={active === cleElement(element)}>
+    <LigneSortable key={cleElement(element)} id={cleElement(element)} mesurer={mesurer} index={index} active={active === cleElement(element)} selectionnee={selectionnees.has(cleElement(element))} onSelectionner={(ev) => selectionner(cleElement(element), ev)}>
       {(poignee) => element.type === "ligne" ? (
         <LigneGrille
           index={index}
@@ -215,7 +288,7 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
 
   return (
     <div className="rounded-md border border-neutral-200 dark:border-neutral-800">
-      <div ref={conteneur} className={`overflow-auto ${virtualise ? "max-h-[70dvh]" : ""}`} role="grid" aria-label="Lignes du devis" aria-rowcount={tries.length}>
+      <div ref={conteneur} className={`overflow-auto ${virtualise ? "max-h-[70dvh]" : ""}`} role="grid" aria-label="Lignes du devis" aria-rowcount={tries.length} aria-multiselectable="true" onCopy={copierNatif} onPaste={collerNatif}>
         <div style={{ minWidth: largeur, ["--grille" as string]: grilleTemplate }}>
           <div role="row" className="sticky top-0 z-10 grid border-b border-neutral-200 bg-neutral-50 text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900" style={{ gridTemplateColumns: grilleTemplate }}>
             {colonnes.map((c) => (
@@ -246,6 +319,7 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
         <button type="button" className="min-h-9 rounded px-2 hover:bg-neutral-100 dark:hover:bg-neutral-800" onClick={() => nouvelleLigneApres(active)} title="Entrée sur la dernière ligne">+ Ligne</button>
         <span aria-hidden="true">·</span>
         <span>{tries.length} ligne{tries.length > 1 ? "s" : ""}{virtualise ? " · affichage virtualisé" : ""}</span>
+        {selection.cles.length > 0 && <span data-testid="selection-lignes" className="rounded bg-blue-50 px-2 py-0.5 text-blue-800 dark:bg-blue-950/40 dark:text-blue-200">{selection.cles.length} sélectionnée{selection.cles.length > 1 ? "s" : ""} · Ctrl+C pour copier · Échap</span>}
       </div>
     </div>
   );
@@ -253,19 +327,22 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
 
 // ── Ligne triable (glisser-déposer) ────────────────────────────────────────────
 
-function LigneSortable({ id, index, active, mesurer, children }: { id: string; index: number; active: boolean; mesurer?: (el: HTMLElement | null) => void; children: (poignee: ReactNode) => ReactNode }) {
+function LigneSortable({ id, index, active, selectionnee, onSelectionner, mesurer, children }: { id: string; index: number; active: boolean; selectionnee: boolean; onSelectionner: (e: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) => void; mesurer?: (el: HTMLElement | null) => void; children: (poignee: ReactNode) => ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const poignee = (
     <button
       type="button"
       {...attributes}
       {...listeners}
+      onClick={(e) => onSelectionner({ shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey })}
       data-cellule={`${index}:poignee`}
-      className="flex h-9 w-full cursor-grab items-center justify-center text-neutral-400 hover:text-neutral-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 active:cursor-grabbing"
-      aria-label={`Déplacer la ligne ${index + 1}`}
-      title="Glisser pour déplacer · Espace puis flèches au clavier"
+      data-selectionnee={selectionnee ? "1" : undefined}
+      className={`flex h-9 w-full cursor-grab items-center justify-center focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 active:cursor-grabbing ${selectionnee ? "text-blue-700 dark:text-blue-300" : "text-neutral-400 hover:text-neutral-700"}`}
+      aria-label={`${selectionnee ? "Ligne sélectionnée · " : ""}Sélectionner ou déplacer la ligne ${index + 1}`}
+      aria-pressed={selectionnee}
+      title="Clic : sélectionner (Maj = plage, Ctrl = ajouter) · Glisser pour déplacer · Espace puis flèches au clavier"
     >
-      ⋮⋮
+      {selectionnee ? "✓" : "⋮⋮"}
     </button>
   );
   return (
@@ -273,10 +350,11 @@ function LigneSortable({ id, index, active, mesurer, children }: { id: string; i
       ref={(el) => { setNodeRef(el); mesurer?.(el); }}
       role="row"
       aria-rowindex={index + 1}
-      aria-selected={active}
+      aria-selected={selectionnee || active}
       data-index={index}
+      data-active={active ? "1" : undefined}
       style={{ transform: CSS.Transform.toString(transform), transition, gridTemplateColumns: "var(--grille)" }}
-      className={`grid border-b border-neutral-100 dark:border-neutral-800 ${isDragging ? "z-20 bg-blue-50 shadow-lg dark:bg-neutral-800" : active ? "bg-blue-50/60 dark:bg-neutral-900" : "hover:bg-neutral-50/70 dark:hover:bg-neutral-900/50"}`}
+      className={`grid border-b border-neutral-100 dark:border-neutral-800 ${isDragging ? "z-20 bg-blue-50 shadow-lg dark:bg-neutral-800" : selectionnee ? "bg-blue-100/70 ring-1 ring-inset ring-blue-300 dark:bg-blue-950/40 dark:ring-blue-800" : active ? "bg-blue-50/60 dark:bg-neutral-900" : "hover:bg-neutral-50/70 dark:hover:bg-neutral-900/50"}`}
     >
       {children(poignee)}
     </div>

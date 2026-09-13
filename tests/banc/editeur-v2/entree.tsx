@@ -21,6 +21,7 @@ createRoot(document.getElementById("racine")!).render(
   <main className="p-4 lg:p-6">
     <EditeurDevisV2
       devisId={null}
+      entrepriseId="e-banc"
       clients={[
         { id: "c1", label: "Client Fictif SARL", adresse: "2 avenue du Test", codePostal: "00000", ville: "Testville", siret: null },
         { id: "c2", label: "Autre Client Fictif", adresse: null, codePostal: null, ville: null, siret: null },

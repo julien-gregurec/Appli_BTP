@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { euros, LIGNE_TYPES, UNITES } from "@/lib/devis";
 import { enregistrerDevisV2Action } from "@/app/actions/devis-v2";
 import { ApercuDevisV2 } from "@/components/devis/ApercuDevisV2";
-import { GrilleDevis } from "@/components/devis/GrilleDevis";
+import { GrilleDevis, type SelectionGrille } from "@/components/devis/GrilleDevis";
+import { CLE_STOCKAGE_PRESSE_PAPIER, collerElements, copierElements, libelleCollage, libelleCopie, lirePressePapier, messageRefus, ressembleAPressePapier, serialiserPressePapier, type PositionCollage } from "@/lib/devis/presse-papier";
 import { basculerColonne, CLE_STOCKAGE_COLONNES, colonnesReglables, colonnesVisibles, lireReglagesColonnes, reglagesParDefaut, type ReglagesColonnes } from "@/lib/devis/colonnes-grille";
 import { annuler, creerHistorique, peutAnnuler, peutRetablir, pousser, remplacerPresent, retablir } from "@/lib/devis/historique-edition";
 import { insererLigne, insererOuvrage } from "@/lib/devis/editeur-etat";
@@ -69,8 +70,11 @@ export function EditeurDevisV2({
   nomProduit,
   revisionInitiale = null,
   commerciaux = [],
+  entrepriseId,
 }: {
   devisId: string | null;
+  /** Entreprise du devis : marque le presse-papier de lignes, dont le collage est refusé ailleurs. */
+  entrepriseId: string;
   clients: ClientEditeur[];
   chantiers: ChantierEditeur[];
   enteteInitiale: EnteteDevisV2;
@@ -105,6 +109,11 @@ export function EditeurDevisV2({
   const [revision, setRevision] = useState<number | null>(revisionInitiale);
   const [sauvegarde, setSauvegarde] = useState<Sauvegarde>({ statut: "jamais" });
   const [reglagesColonnes, setReglagesColonnes] = useState<ReglagesColonnes>(reglagesParDefaut);
+  // Presse-papier de lignes : sélection (tenue ici pour les boutons et la liste mobile), retour utilisateur.
+  const [selection, setSelection] = useState<SelectionGrille>({ cles: [], ancre: null });
+  const [ligneActive, setLigneActive] = useState<string | null>(null);
+  const [positionCollage, setPositionCollage] = useState<"apres" | "avant" | "fin">("apres");
+  const [retourPressePapier, setRetourPressePapier] = useState<{ genre: "copie" | "collage" | "erreur"; texte: string } | null>(null);
   const enteteAvantFocus = useRef<EnteteDevisV2 | null>(null);
   const genererCle = useCallback(() => crypto.randomUUID(), []);
 
@@ -122,7 +131,7 @@ export function EditeurDevisV2({
   };
   const colonnes = useMemo(() => colonnesVisibles(reglagesColonnes, droits), [reglagesColonnes, droits]);
 
-  const setEtat = (suivant: EtatElements) => { setHistorique((h) => pousser(h, { entete: h.present.entete, etat: suivant })); setSale(true); };
+  const setEtat = useCallback((suivant: EtatElements) => { setHistorique((h) => pousser(h, { entete: h.present.entete, etat: suivant })); setSale(true); }, []);
   // L'en-tête se modifie sans entrée d'historique à chaque frappe ; une entrée est poussée à la sortie du champ.
   const majEntete = (patch: Partial<EnteteDevisV2>) => { setHistorique((h) => remplacerPresent(h, { ...h.present, entete: { ...h.present.entete, ...patch } })); setSale(true); };
   const focusEntete = () => { enteteAvantFocus.current = entete; };
@@ -133,6 +142,47 @@ export function EditeurDevisV2({
   };
   const annulerEdition = useCallback(() => { setHistorique((h) => { if (!peutAnnuler(h)) return h; setSale(true); return annuler(h); }); }, []);
   const retablirEdition = useCallback(() => { setHistorique((h) => { if (!peutRetablir(h)) return h; setSale(true); return retablir(h); }); }, []);
+
+  /** Copie des lignes : presse-papier structuré, repli local (autres onglets) ; rend le texte pour le presse-papier système. */
+  const copierLignes = useCallback((cles: readonly string[]): string | null => {
+    if (!cles.length) return null;
+    const payload = copierElements(etat, cles, { entrepriseId, voirCouts: droits.voirCouts });
+    if (!payload.elements.length) return null;
+    const texte = serialiserPressePapier(payload);
+    try { localStorage.setItem(CLE_STOCKAGE_PRESSE_PAPIER, texte); } catch { /* stockage indisponible */ }
+    setRetourPressePapier({ genre: "copie", texte: libelleCopie(payload.elements.length) });
+    return texte;
+  }, [etat, entrepriseId, droits.voirCouts]);
+  /** Colle un presse-papier (validé strictement) à la position demandée ; refuse une autre entreprise. */
+  const collerLignes = useCallback((texte: string, apresCle: string | null, ou: "apres" | "avant" | "fin" = "apres"): { ok: boolean; texte?: boolean } => {
+    const lu = lirePressePapier(texte, { entrepriseId, voirCouts: droits.voirCouts });
+    if (!lu.ok) {
+      if (lu.motif === "format") { if (!texte) setRetourPressePapier({ genre: "erreur", texte: "Aucune ligne de devis dans le presse-papier. Copiez d’abord des lignes (Ctrl+C sur une sélection)." }); return { ok: false, texte: true }; }
+      setRetourPressePapier({ genre: "erreur", texte: messageRefus(lu.motif) });
+      return { ok: false };
+    }
+    const position: PositionCollage = ou === "fin" || !apresCle ? { type: "fin" } : ou === "avant" ? { type: "avant", cle: apresCle } : { type: "apres", cle: apresCle };
+    const colle = collerElements(etat, lu.payload.elements, position, genererCle);
+    setEtat(colle.etat);
+    setSelection({ cles: colle.clesAjoutees, ancre: colle.clesAjoutees[0] ?? null });
+    setRetourPressePapier({ genre: "collage", texte: libelleCollage(colle.clesAjoutees.length) });
+    return { ok: true };
+  }, [etat, entrepriseId, droits.voirCouts, genererCle, setEtat]);
+  /** Boutons Copier / Coller (barre d'outils, mobile) : la sélection, sinon la ligne active. */
+  const copierDepuisBouton = () => {
+    const cles = selection.cles.length ? selection.cles : ligneActive ? [ligneActive] : [];
+    const texte = copierLignes(cles);
+    if (texte && typeof navigator !== "undefined" && navigator.clipboard?.writeText) navigator.clipboard.writeText(texte).catch(() => undefined);
+    if (!texte) setRetourPressePapier({ genre: "erreur", texte: "Sélectionnez d’abord une ou plusieurs lignes (clic sur la poignée ⋮⋮, Maj pour une plage)." });
+  };
+  const collerDepuisBouton = async () => {
+    const apres = selection.cles.length ? derniereDe(selection.cles) : ligneActive;
+    let texte = "";
+    try { if (typeof navigator !== "undefined" && navigator.clipboard?.readText) texte = await navigator.clipboard.readText(); } catch { texte = ""; }
+    if (!ressembleAPressePapier(texte)) { try { texte = localStorage.getItem(CLE_STOCKAGE_PRESSE_PAPIER) ?? ""; } catch { texte = ""; } }
+    collerLignes(texte, apres, positionCollage);
+  };
+  const derniereDe = (cles: readonly string[]) => { const ordre = [...etat.elements].sort((a, b) => a.ordre - b.ordre).map(cleElement); return [...cles].sort((a, b) => ordre.indexOf(a) - ordre.indexOf(b)).at(-1) ?? null; };
 
   const client = clients.find((c) => c.id === entete.client_id);
   const source: SourceDocument = useMemo(() => ({
@@ -389,11 +439,28 @@ export function EditeurDevisV2({
                 {TYPES_LIGNE_GRILLE.filter((t) => !t.chiffree).map((t) => <option key={t.cle} value={t.cle} title={t.aide}>{t.libelle}</option>)}
               </select>
             </label>
+            <span className="mx-1 hidden h-6 w-px bg-neutral-200 sm:inline-block dark:bg-neutral-800" aria-hidden="true" />
+            <button type="button" onClick={copierDepuisBouton} className={bouton} title="Copier les lignes sélectionnées (Ctrl+C)" aria-keyshortcuts="Control+C">Copier{selection.cles.length ? ` (${selection.cles.length})` : ""}</button>
+            <button type="button" onClick={() => void collerDepuisBouton()} className={bouton} title="Coller les lignes copiées (Ctrl+V)" aria-keyshortcuts="Control+V">Coller</button>
+            <select value={positionCollage} onChange={(e) => setPositionCollage(e.target.value as "apres" | "avant" | "fin")} className={champ} aria-label="Position de collage">
+              <option value="apres">après la sélection</option>
+              <option value="avant">avant la sélection</option>
+              <option value="fin">à la fin du devis</option>
+            </select>
             <button type="button" onClick={() => setDialogue({ type: "colonnes" })} className={`${bouton} ml-auto`} title="Choisir les colonnes affichées">Colonnes…</button>
             <button type="button" onClick={() => setApercuVisible((v) => !v)} aria-pressed={apercuVisible} className={`${bouton} hidden lg:inline-flex lg:items-center`} title={apercuVisible ? "Masquer l’aperçu A4 : la grille reprend toute la largeur" : "Afficher l’aperçu A4 réel à côté de la grille"}>
               {apercuVisible ? "Masquer l’aperçu" : "Aperçu A4"}
             </button>
           </div>
+
+          {retourPressePapier && (
+            <p role={retourPressePapier.genre === "erreur" ? "alert" : "status"} data-testid="retour-presse-papier" data-genre={retourPressePapier.genre}
+               className={`flex flex-wrap items-center gap-3 rounded-md px-3 py-2 text-sm ${retourPressePapier.genre === "erreur" ? "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-200" : "bg-green-50 text-green-800 dark:bg-green-950/40 dark:text-green-200"}`}>
+              <span>{retourPressePapier.texte}</span>
+              {retourPressePapier.genre === "collage" && <button type="button" onClick={() => { annulerEdition(); setSelection({ cles: [], ancre: null }); setRetourPressePapier(null); }} className="underline">Annuler le collage</button>}
+              <button type="button" onClick={() => setRetourPressePapier(null)} className="ml-auto text-xs opacity-70" aria-label="Fermer ce message">×</button>
+            </p>
+          )}
 
           <div className="hidden lg:block">
             <GrilleDevis
@@ -402,11 +469,16 @@ export function EditeurDevisV2({
               droits={droits}
               seuilTauxMarquePct={seuilTauxMarquePct}
               ligneCiblee={surligne}
+              selection={selection}
+              onSelection={setSelection}
+              onActive={setLigneActive}
               actions={{
                 setEtat,
                 genererCle,
                 ouvrirOuvrage: (instance, apresCle) => setDialogue({ type: "ouvrage", instance, apresCle }),
                 prixGlobal: (instance) => setDialogue({ type: "prix", instance }),
+                copier: copierLignes,
+                coller: (texte, apresCle) => collerLignes(texte, apresCle, "apres"),
               }}
             />
           </div>
@@ -415,7 +487,8 @@ export function EditeurDevisV2({
           <ol className="space-y-1 lg:hidden" aria-label="Lignes du devis">
             {tries.length === 0 && <li className="rounded-md border border-dashed p-4 text-sm text-neutral-500">Ajoutez des articles, un ouvrage ou une ligne libre.</li>}
             {tries.map((e) => (
-              <li key={cleElement(e)} id={`el-${cleElement(e)}`} className={`flex min-h-11 items-center gap-2 rounded-md border px-3 text-sm ${surligne === cleElement(e) ? "border-blue-500" : "border-neutral-200 dark:border-neutral-800"}`}>
+              <li key={cleElement(e)} id={`el-${cleElement(e)}`} data-selectionnee={selection.cles.includes(cleElement(e)) ? "1" : undefined} className={`flex min-h-11 items-center gap-2 rounded-md border px-3 text-sm ${selection.cles.includes(cleElement(e)) ? "border-blue-400 bg-blue-50 dark:bg-blue-950/30" : surligne === cleElement(e) ? "border-blue-500" : "border-neutral-200 dark:border-neutral-800"}`}>
+                <input type="checkbox" aria-label={`Sélectionner la ligne ${e.ordre}`} checked={selection.cles.includes(cleElement(e))} onChange={(ev) => setSelection((s) => ({ cles: ev.target.checked ? [...s.cles, cleElement(e)] : s.cles.filter((c) => c !== cleElement(e)), ancre: cleElement(e) }))} className="h-5 w-5 shrink-0" />
                 {e.type === "ligne" ? (
                   <button type="button" className="flex min-h-11 flex-1 items-center justify-between gap-2 text-left" onClick={() => setDialogue({ type: "ligne_mobile", cle: e.ligne.cle })}>
                     <span className="min-w-0 truncate">{typeDe(e.ligne) === "libre" || typeDe(e.ligne) === "article" ? e.ligne.designation || "(sans désignation)" : `${libelleTypeLigne(typeDe(e.ligne))}${e.ligne.designation ? ` — ${e.ligne.designation}` : ""}`}</span>

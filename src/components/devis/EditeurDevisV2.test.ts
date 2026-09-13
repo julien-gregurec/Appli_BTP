@@ -26,6 +26,7 @@ if (ouvrage.type !== "ouvrage") throw new Error("fixture");
 function props(p: Partial<Props> = {}): Props {
   return {
     devisId: null,
+    entrepriseId: "e-fictive",
     clients: [{ id: "c1", label: "Client Fictif", adresse: "1 rue", codePostal: "00000", ville: "Ville", siret: null }],
     chantiers: [],
     enteteInitiale: {

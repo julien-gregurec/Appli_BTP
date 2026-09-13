@@ -21,6 +21,7 @@ import { emetteurDepuisEntreprise, styleDepuisEntreprise } from "@/lib/devis/ren
 export type ClientEditeurServeur = { id: string; label: string; adresse: string | null; codePostal: string | null; ville: string | null; siret: string | null };
 
 export type DonneesEditeurV2 = {
+  entrepriseId: string;
   clients: ClientEditeurServeur[];
   chantiers: Array<{ id: string; label: string; clientId: string | null }>;
   emetteur: IdentiteEmetteur;
@@ -63,6 +64,7 @@ export async function chargerDonneesEditeurV2(supabase: SupabaseClient, ctx: Con
   const e = (entreprise ?? null) as Record<string, unknown> | null;
   const filigranes = (e?.filigranes_documents ?? null) as ReglagesFiligraneEntreprise | null;
   return {
+    entrepriseId: ctx.entrepriseId,
     clients: (clients ?? []).map((c) => ({
       id: c.id, label: nomClient(c), adresse: c.adresse_facturation, codePostal: c.code_postal, ville: c.ville, siret: c.siret,
     })),
