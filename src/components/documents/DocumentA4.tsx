@@ -224,7 +224,7 @@ function Ligne({ l, afficherTva, afficherDescription, afficherReference }: { l: 
         {l.mentionTva && <div className="doc-a4__description">{l.mentionTva}</div>}
       </td>
       <td>{l.quantite !== null ? `${quantiteFr(l.quantite)} ${l.unite ?? ""}`.trim() : ""}</td>
-      <td>{l.prixUnitaireHt !== null ? euros(l.prixUnitaireHt) : ""}{l.remisePct ? <div className="doc-a4__description">−{tauxFr(l.remisePct)}</div> : null}</td>
+      <td>{l.prixUnitaireHt !== null ? euros(l.prixUnitaireHt) : ""}{l.remisePct && l.prixUnitaireHt !== null ? <div className="doc-a4__description">remise −{tauxFr(l.remisePct)} → {euros(l.prixUnitaireHt * (1 - l.remisePct / 100))}</div> : null}</td>
       {afficherTva && <td>{l.tauxTva !== null ? tauxFr(l.tauxTva) : l.mentionTva ? "multiple" : ""}</td>}
       <td>{l.totalHt !== null ? euros(l.totalHt) : ""}</td>
     </tr>

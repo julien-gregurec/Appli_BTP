@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { euros, LIGNE_TYPES, UNITES } from "@/lib/devis";
+import { euros, LIGNE_TYPES } from "@/lib/devis";
+import { UNITES_METIER } from "@/lib/unites";
 import { enregistrerDevisV2Action } from "@/app/actions/devis-v2";
 import { ApercuDevisV2 } from "@/components/devis/ApercuDevisV2";
 import { GrilleDevis, type SelectionGrille } from "@/components/devis/GrilleDevis";
@@ -348,6 +349,7 @@ export function EditeurDevisV2({
 
   return (
     <div className="flex flex-col gap-3">
+      <datalist id="unites-devis">{UNITES_METIER.map((u) => <option key={u.cle} value={u.cle}>{u.libelle}</option>)}</datalist>
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl font-semibold">{devisIdCourant ? "Devis brouillon" : "Nouveau devis"}</h1>
         <span className="text-xs text-neutral-500" aria-live="polite" data-sauvegarde={sauvegarde.statut}>
@@ -630,7 +632,7 @@ export function EditeurDevisV2({
           onValider={(instance) => { setEtat((courant) => remplacerOuvrage(courant, instance)); setDialogue(null); }}
         />
       )}
-      <datalist id="unites-devis">{UNITES.map((u) => <option key={u} value={u} />)}</datalist>
+
     </div>
   );
 }

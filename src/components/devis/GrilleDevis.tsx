@@ -15,7 +15,7 @@ import { margeLigne } from "@/lib/devis/marge-ligne";
 import { MODES_PRESENTATION, type InstanceOuvrage, type ModePresentation } from "@/lib/devis/ouvrages";
 import { sousTotauxSections, type ElementDevis, type LigneLibre } from "@/lib/devis/presentation";
 import { indicateursPrix, TAUX_TVA_ADMIS } from "@/lib/devis/prix";
-import { champModifiable, libelleTypeLigne, typeDe, TYPES_LIGNE_GRILLE, type TypeLigneGrille } from "@/lib/devis/types-ligne";
+import { champModifiable, estChiffree, libelleTypeLigne, typeDe, TYPES_LIGNE_GRILLE, type TypeLigneGrille } from "@/lib/devis/types-ligne";
 import { montantLigneHt } from "@/lib/devis/montants";
 import { CLE_STOCKAGE_PRESSE_PAPIER, ressembleAPressePapier } from "@/lib/devis/presse-papier";
 
@@ -380,7 +380,7 @@ function LigneSortable({ id, index, active, selectionnee, onSelectionner, mesure
 // ── Cellules ───────────────────────────────────────────────────────────────────
 
 /** Champ texte ou nombre validé à la sortie (blur, Entrée, Tab) ; Échap restaure. */
-function Cellule({ valeur, onCommit, index, colonne, disabled, alignement, onKeyDown, onFocus, format, aria }: {
+function Cellule({ valeur, onCommit, index, colonne, disabled, alignement, onKeyDown, onFocus, format, aria, liste }: {
   valeur: string;
   onCommit: (v: string) => void;
   index: number;
@@ -391,6 +391,8 @@ function Cellule({ valeur, onCommit, index, colonne, disabled, alignement, onKey
   onFocus: () => void;
   format?: "nombre";
   aria: string;
+  /** `id` d'un `<datalist>` de suggestions (unités) ; la saisie libre reste possible. */
+  liste?: string;
 }) {
   const [brouillon, setBrouillon] = useState(valeur);
   const [edition, setEdition] = useState(false);
@@ -410,6 +412,7 @@ function Cellule({ valeur, onCommit, index, colonne, disabled, alignement, onKey
         value={brouillon}
         disabled={disabled}
         inputMode={format === "nombre" ? "decimal" : undefined}
+        list={liste}
         onFocus={() => { setEdition(true); setSaisi(false); onFocus(); }}
         onChange={(e) => { setSaisi(true); setBrouillon(e.target.value); }}
         onBlur={commettre}
@@ -557,7 +560,8 @@ const LigneGrille = memo(function LigneGrille({ index, ligne, origine, colonnes,
           case "famille": return <CelluleLecture key={c.cle} titre={origine?.famille ?? undefined}>{origine?.famille ?? ""}</CelluleLecture>;
           case "fournisseur": return <CelluleLecture key={c.cle}>{origine?.fournisseur ?? ""}</CelluleLecture>;
           case "quantite": return <Cellule key={c.cle} {...commun} colonne="quantite" aria="Quantité" format="nombre" alignement="droite" valeur={champModifiable(type, "quantite") ? fr(ligne.quantite, 3) : ""} disabled={!peut(c, "quantite")} onCommit={(v) => { const n = nombre(v); if (n !== null) onChange({ quantite: n }); }} />;
-          case "unite": return <Cellule key={c.cle} {...commun} colonne="unite" aria="Unité" valeur={champModifiable(type, "unite") ? ligne.unite : ""} disabled={!peut(c, "unite")} onCommit={(v) => onChange({ unite: v || "u" })} />;
+          case "unite": return <Cellule key={c.cle} {...commun} colonne="unite" aria="Unité" liste="unites-devis" valeur={champModifiable(type, "unite") ? ligne.unite : ""} disabled={!peut(c, "unite")} onCommit={(v) => onChange({ unite: v.trim() || "u" })} />;
+          case "pu_net": return <CelluleLecture key={c.cle} alignement="droite" titre="Prix unitaire HT après remise de ligne">{estChiffree(type) ? euros(ligne.prixUnitaireHt * (1 - ligne.remiseLignePct / 100)) : ""}</CelluleLecture>;
           case "prix_achat": return <Cellule key={c.cle} {...commun} colonne="prix_achat" aria="Prix d’achat HT" format="nombre" alignement="droite" valeur={type === "article" || type === "libre" ? fr(origine?.prixAchatHt ?? null, 4) : ""} disabled={!colonneModifiable(c, droits) || !(type === "article" || type === "libre")} onCommit={(v) => onCouts({ prixAchatHt: nombre(v) })} />;
           case "cout_mo": return <Cellule key={c.cle} {...commun} colonne="cout_mo" aria="Coût main-d’œuvre HT" format="nombre" alignement="droite" valeur={type === "article" || type === "libre" ? fr(origine?.coutMainOeuvreHt ?? null, 4) : ""} disabled={!colonneModifiable(c, droits) || !(type === "article" || type === "libre")} onCommit={(v) => onCouts({ coutMainOeuvreHt: nombre(v) })} />;
           case "coefficient": return <Cellule key={c.cle} {...commun} colonne="coefficient" aria="Coefficient" format="nombre" alignement="droite" valeur={type === "article" || type === "libre" ? fr(origine?.coefficient ?? null, 4) : ""} disabled={!colonneModifiable(c, droits) || !(type === "article" || type === "libre")} onCommit={(v) => { const k = nombre(v); const achat = origine?.prixAchatHt; onCouts({ coefficient: k }, k !== null && achat !== null && achat !== undefined ? { prixUnitaireHt: Math.round((achat + (origine?.coutMainOeuvreHt ?? 0)) * k * 100) / 100 } : undefined); }} />;
@@ -626,6 +630,7 @@ const LigneOuvrageGrille = memo(function LigneOuvrageGrille({ index, instance, c
           case "designation": return <Cellule key={c.cle} {...commun} colonne="designation" aria="Libellé pour le client" valeur={instance.libelleClient} onCommit={(v) => onChange({ ...instance, libelleClient: v })} />;
           case "quantite": return <CelluleLecture key={c.cle} alignement="droite">{fr(instance.quantitePrincipale, 3)}</CelluleLecture>;
           case "unite": return <CelluleLecture key={c.cle}>{instance.unitePrincipale}</CelluleLecture>;
+          case "pu_net": return <CelluleLecture key={c.cle} alignement="droite" />;
           case "prix_achat": return <CelluleLecture key={c.cle} alignement="droite">{ind.coutAchatHt === null ? "incomplet" : euros(ind.coutAchatHt)}</CelluleLecture>;
           case "marge": return <CelluleLecture key={c.cle} alignement="droite">{ind.margeHt === null ? "" : euros(ind.margeHt)}</CelluleLecture>;
           case "marge_pct": return <CelluleLecture key={c.cle} alignement="droite">{ind.tauxMarquePct === null ? "" : `${fr(ind.tauxMarquePct, 1)} %`}</CelluleLecture>;

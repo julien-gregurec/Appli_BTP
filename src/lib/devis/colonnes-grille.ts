@@ -12,7 +12,7 @@ export type DroitsGrille = { voirCouts: boolean; gererCouts: boolean; modifierPr
 export type CleColonne =
   | "poignee" | "type" | "reference" | "designation" | "description" | "reference_fabricant" | "code_fournisseur"
   | "famille" | "fournisseur" | "quantite" | "unite" | "prix_achat" | "cout_mo" | "coefficient" | "marge" | "marge_pct"
-  | "prix_vente" | "remise" | "tva" | "total_ht" | "commentaire_interne";
+  | "prix_vente" | "remise" | "pu_net" | "tva" | "total_ht" | "commentaire_interne";
 
 export type Colonne = {
   cle: CleColonne;
@@ -50,6 +50,7 @@ export const COLONNES_GRILLE: readonly Colonne[] = [
   { cle: "marge_pct", libelle: "Taux de marque", court: "Marge %", largeurPx: 76, alignement: "droite", sensible: true, modifiable: false, defaut: false },
   { cle: "prix_vente", libelle: "Prix de vente unitaire HT", court: "PU HT", largeurPx: 100, alignement: "droite", modifiable: "modifierPrix", defaut: true, obligatoire: true },
   { cle: "remise", libelle: "Remise de ligne (%)", court: "Rem. %", largeurPx: 70, alignement: "droite", modifiable: "modifierRemise", defaut: true },
+  { cle: "pu_net", libelle: "Prix unitaire net HT (après remise)", court: "PU net", largeurPx: 96, alignement: "droite", modifiable: false, defaut: true },
   { cle: "tva", libelle: "TVA", court: "TVA", largeurPx: 70, alignement: "droite", defaut: true },
   { cle: "total_ht", libelle: "Total HT", court: "Total HT", largeurPx: 104, alignement: "droite", modifiable: false, defaut: true, obligatoire: true },
   { cle: "commentaire_interne", libelle: "Commentaire interne", court: "Comm. interne", largeurPx: 180, alignement: "gauche", defaut: false },
