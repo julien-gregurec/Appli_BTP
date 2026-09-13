@@ -220,6 +220,19 @@ const entre = (x: unknown, min: number, max: number) => fini(x) && x >= min && x
  * Validation SERVEUR d'un brouillon avant enregistrement — première erreur rencontrée, `null` si
  * tout est enregistrable. Le navigateur n'est jamais cru sur parole : la base revérifie ensuite.
  */
+/** Pourcentage de remise saisi (0 à 100, virgule ou point, « % » toléré). Une valeur hors bornes ou illisible est
+ * refusée avec son motif : l'interface ne doit jamais retenir une remise que la base refusera. Vide = 0. */
+export function interpreterRemisePct(texte: string): { ok: true; valeur: number } | { ok: false; motif: string } {
+  const brut = texte.trim();
+  const t = brut.replace(/[\s\u202f\u00a0%]/g, "").replace(",", ".");
+  if (t === "") return { ok: true, valeur: 0 };
+  const n = Number(t);
+  if (!Number.isFinite(n)) return { ok: false, motif: `« ${brut} » n’est pas un pourcentage : indiquez une remise entre 0 et 100 %.` };
+  if (n < 0) return { ok: false, motif: `Remise « ${brut} » refusée : une remise ne peut pas être négative (0 à 100 %).` };
+  if (n > 100) return { ok: false, motif: `Remise « ${brut} » refusée : une remise ne peut pas dépasser 100 %.` };
+  return { ok: true, valeur: n };
+}
+
 export function validerBrouillon(o: { clientId: string | null | undefined; remiseGlobalePct: number; elements: readonly ElementDevis[] }): string | null {
   if (!o.clientId) return "Choisissez un client.";
   if (!entre(o.remiseGlobalePct, 0, 100)) return "La remise globale doit être comprise entre 0 et 100 %.";

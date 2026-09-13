@@ -10,8 +10,7 @@ import { rechercherArticlesDevisAction, type ArticleTrouve } from "@/app/actions
 import { colonneModifiable, type Colonne, type DroitsGrille } from "@/lib/devis/colonnes-grille";
 import {
   cleElement, deplacerElementVers, dupliquerElement, insererLigne, modifierCoutsLigne, modifierLigneLibre,
-  remisesTvaMixte, remplacerLigneParArticle, retirerElement, type EtatElements,
-} from "@/lib/devis/editeur-etat";
+  remisesTvaMixte, remplacerLigneParArticle, retirerElement, type EtatElements, interpreterRemisePct } from "@/lib/devis/editeur-etat";
 import { margeLigne } from "@/lib/devis/marge-ligne";
 import { MODES_PRESENTATION, type InstanceOuvrage, type ModePresentation } from "@/lib/devis/ouvrages";
 import { sousTotauxSections, type ElementDevis, type LigneLibre } from "@/lib/devis/presentation";
@@ -40,6 +39,8 @@ export type ActionsGrille = {
   copier: (cles: readonly string[]) => string | null;
   /** Colle un presse-papier après `apresCle` ; `texte: true` = ce n'est pas un presse-papier de lignes, le collage de texte suit son cours. */
   coller: (texte: string, apresCle: string | null) => { ok: boolean; texte?: boolean };
+  /** Signale à l'utilisateur une saisie refusée (message affiché par l'éditeur). */
+  signaler: (texte: string) => void;
 };
 
 /** Sélection de lignes : clés sélectionnées et ancre de l'extension (Maj). */
@@ -277,6 +278,7 @@ export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, action
           onArticle={(a) => actions.setEtat((courant) => remplacerLigneParArticle(courant, element.ligne.cle, a))}
           onOuvrage={() => actions.ouvrirOuvrage(null, element.ligne.cle)}
           onRetirer={() => actions.setEtat((courant) => retirerElement(courant, element.ligne.cle))}
+          onSignal={actions.signaler}
         />
       ) : (
         <LigneOuvrageGrille
@@ -397,7 +399,9 @@ function Cellule({ valeur, onCommit, index, colonne, disabled, alignement, onKey
   const [saisi, setSaisi] = useState(false);
   const [recue, setRecue] = useState(valeur);
   if (valeur !== recue) { setRecue(valeur); if (!edition || !saisi) setBrouillon(valeur); }
-  const commettre = () => { setEdition(false); setSaisi(false); if (saisi && brouillon !== valeur) onCommit(brouillon); };
+  // Après validation, le brouillon revient à la valeur reçue : une saisie refusée (remise 101, texte) ne reste
+  // jamais affichée ; une saisie acceptée est resynchronisée dès que la nouvelle valeur arrive.
+  const commettre = () => { setEdition(false); setSaisi(false); if (saisi && brouillon !== valeur) onCommit(brouillon); setBrouillon(valeur); };
   return (
     <div role="gridcell" className="min-w-0" onKeyDown={(e) => { if (e.key === "Escape") { setBrouillon(valeur); setEdition(false); return; } if (e.key === "Enter" || e.key === "Tab") commettre(); onKeyDown(e, colonne); }}>
       <input
@@ -521,13 +525,15 @@ function CelluleDesignation({ ligne, origine, index, colonne, onCommit, onArticl
 
 // ── Ligne libre ────────────────────────────────────────────────────────────────
 
-const LigneGrille = memo(function LigneGrille({ index, ligne, origine, colonnes, droits, poignee, sousTotal, tvaMixte, onFocus, onKeyDown, onChange, onCouts, onArticle, onOuvrage, onRetirer }: {
+const LigneGrille = memo(function LigneGrille({ index, ligne, origine, colonnes, droits, poignee, sousTotal, tvaMixte, onFocus, onKeyDown, onChange, onCouts, onArticle, onOuvrage, onRetirer, onSignal }: {
   index: number; ligne: LigneLibre; origine: EtatElements["origines"][string] | undefined; colonnes: Colonne[]; droits: DroitsGrille; poignee: ReactNode;
   sousTotal: number | null; tvaMixte: boolean; onFocus: () => void; onKeyDown: (e: KeyboardEvent<HTMLDivElement>, colonne: string) => void;
   onChange: (patch: Partial<Omit<LigneLibre, "cle">>) => void;
   /** Coûts, et éventuel prix de vente dérivé, appliqués en UNE modification. */
   onCouts: (c: { prixAchatHt?: number | null; coutMainOeuvreHt?: number | null; coefficient?: number | null }, prix?: Partial<Omit<LigneLibre, "cle">>) => void;
   onArticle: (a: ArticleTrouve) => void; onOuvrage: () => void; onRetirer: () => void;
+  /** Saisie refusée (remise hors bornes, montant illisible) : message pour l'utilisateur. */
+  onSignal: (texte: string) => void;
 }) {
   const type = typeDe(ligne);
   const marge = margeLigne(ligne, origine);
@@ -566,13 +572,26 @@ const LigneGrille = memo(function LigneGrille({ index, ligne, origine, colonnes,
                     key={`${ligne.remiseSectionPct}|${ligne.prixUnitaireHt}`}
                     onFocus={onFocus}
                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Tab") (e.target as HTMLInputElement).blur(); onKeyDown(e as unknown as KeyboardEvent<HTMLDivElement>, "prix_vente"); }}
-                    onBlur={(e) => { const t = e.target.value.trim(); if (t.endsWith("%")) { const p = nombre(t.slice(0, -1)); if (p !== null) onChange({ remiseSectionPct: Math.max(0, Math.min(100, p)) }); } else { const m = nombre(t); if (m !== null) onChange({ remiseSectionPct: null, prixUnitaireHt: -Math.abs(m) }); } }}
+                    onBlur={(e) => {
+                      // « 5 % » : pourcentage de la section (0 à 100) ; « 50 » : montant fixe en euros (négatif, sans plafond
+                      // arbitraire : la règle de la base est « montant négatif, quantité 1 »). Saisie refusée → valeur affichée rétablie.
+                      const t = e.target.value.trim();
+                      const affichee = ligne.remiseSectionPct !== null && ligne.remiseSectionPct !== undefined ? `${fr(ligne.remiseSectionPct, 2)} %` : fr(ligne.prixUnitaireHt, 2);
+                      if (t.endsWith("%")) {
+                        const r = interpreterRemisePct(t.slice(0, -1));
+                        if (r.ok) onChange({ remiseSectionPct: r.valeur }); else { onSignal(r.motif); e.target.value = affichee; }
+                      } else {
+                        const m = nombre(t);
+                        if (m !== null) onChange({ remiseSectionPct: null, prixUnitaireHt: -Math.abs(m) });
+                        else if (t !== "") { onSignal(`« ${t} » n’est pas un montant : indiquez un montant en euros, ou un pourcentage suivi de %.`); e.target.value = affichee; }
+                      }
+                    }}
                     className={`${cellule} text-right ${tvaMixte ? "ring-1 ring-amber-500" : ""}`} />
                 </div>
               );
             }
             return <Cellule key={c.cle} {...commun} colonne="prix_vente" aria="Prix de vente unitaire HT" format="nombre" alignement="droite" valeur={champModifiable(type, "prixUnitaireHt") ? fr(ligne.prixUnitaireHt, 4) : ""} disabled={!peut(c, "prixUnitaireHt")} onCommit={(v) => { const n = nombre(v); if (n !== null) onChange({ prixUnitaireHt: n }); }} />;
-          case "remise": return <Cellule key={c.cle} {...commun} colonne="remise" aria="Remise de ligne (%)" format="nombre" alignement="droite" valeur={champModifiable(type, "remiseLignePct") ? fr(ligne.remiseLignePct, 2) : ""} disabled={!peut(c, "remiseLignePct")} onCommit={(v) => { const n = nombre(v); if (n !== null) onChange({ remiseLignePct: Math.max(0, Math.min(100, n)) }); }} />;
+          case "remise": return <Cellule key={c.cle} {...commun} colonne="remise" aria="Remise de ligne (%)" format="nombre" alignement="droite" valeur={champModifiable(type, "remiseLignePct") ? fr(ligne.remiseLignePct, 2) : ""} disabled={!peut(c, "remiseLignePct")} onCommit={(v) => { const r = interpreterRemisePct(v); if (r.ok) onChange({ remiseLignePct: r.valeur }); else onSignal(r.motif); }} />;
           case "tva": return champModifiable(type, "tauxTva")
             ? <CelluleChoix key={c.cle} {...commun} colonne="tva" aria="TVA" valeur={String(ligne.tauxTva)} onChange={(v) => onChange({ tauxTva: Number(v) })} options={[...new Set([...TAUX_TVA_ADMIS, ligne.tauxTva])].map((t) => ({ v: String(t), l: `${t} %` }))} />
             : <CelluleLecture key={c.cle} />;

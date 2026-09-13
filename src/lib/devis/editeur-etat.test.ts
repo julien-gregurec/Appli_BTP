@@ -8,6 +8,7 @@ import {
   modifierLigneLibre,
   retirerElement,
   validerBrouillon,
+  interpreterRemisePct,
   type EtatElements,
 } from "@/lib/devis/editeur-etat";
 import { instancierOuvrage } from "@/lib/devis/ouvrages";
@@ -149,5 +150,30 @@ describe("opérations sur les éléments", () => {
     deplacerElement(e, "l2", -1);
     modifierLigneLibre(e, "l1", { quantite: 9 });
     expect(JSON.stringify(e)).toBe(avant);
+  });
+});
+
+describe("interpreterRemisePct — bornes 0 à 100 (cohérentes avec la base)", () => {
+  const ok = (t: string) => { const r = interpreterRemisePct(t); return r.ok ? r.valeur : `refus:${r.motif}`; };
+  it("accepte 0, 0,01, 50, 99,99 et 100, virgule ou point, « % » toléré, vide = 0", () => {
+    expect(ok("0")).toBe(0);
+    expect(ok("0,01")).toBe(0.01);
+    expect(ok("50")).toBe(50);
+    expect(ok("99.99")).toBe(99.99);
+    expect(ok("100")).toBe(100);
+    expect(ok(" 12,5 % ")).toBe(12.5);
+    expect(ok("")).toBe(0);
+  });
+  it("refuse 100,01, 101, 150 et les valeurs négatives avec un motif explicite", () => {
+    expect(ok("100,01")).toMatch(/^refus:.*dépasser 100 %/);
+    expect(ok("101")).toMatch(/^refus:Remise « 101 » refusée/);
+    expect(ok("150")).toMatch(/^refus:.*dépasser 100 %/);
+    expect(ok("-5")).toMatch(/^refus:.*négative/);
+    expect(ok("-0,01")).toMatch(/^refus:.*négative/);
+  });
+  it("refuse un texte illisible sans jamais rendre de valeur", () => {
+    expect(ok("abc")).toMatch(/^refus:« abc » n’est pas un pourcentage/);
+    expect(ok("10a")).toMatch(/^refus:/);
+    expect(ok("-")).toMatch(/^refus:/);
   });
 });

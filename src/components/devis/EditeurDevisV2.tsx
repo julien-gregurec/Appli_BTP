@@ -9,7 +9,7 @@ import { GrilleDevis, type SelectionGrille } from "@/components/devis/GrilleDevi
 import { CLE_STOCKAGE_PRESSE_PAPIER, collerElements, copierElements, libelleCollage, libelleCopie, lirePressePapier, messageRefus, ressembleAPressePapier, serialiserPressePapier, type PositionCollage } from "@/lib/devis/presse-papier";
 import { basculerColonne, CLE_STOCKAGE_COLONNES, colonnesReglables, colonnesVisibles, lireReglagesColonnes, reglagesParDefaut, type ReglagesColonnes } from "@/lib/devis/colonnes-grille";
 import { annuler, creerHistorique, peutAnnuler, peutRetablir, pousser, remplacerPresent, retablir } from "@/lib/devis/historique-edition";
-import { insererLigne, insererOuvrage } from "@/lib/devis/editeur-etat";
+import { insererLigne, insererOuvrage, interpreterRemisePct } from "@/lib/devis/editeur-etat";
 import { margeLigne } from "@/lib/devis/marge-ligne";
 import { lignesMontants } from "@/lib/devis/presentation";
 import { libelleTypeLigne, typeDe, TYPES_LIGNE_GRILLE, type TypeLigneGrille } from "@/lib/devis/types-ligne";
@@ -118,6 +118,8 @@ export function EditeurDevisV2({
   const [retourPressePapier, setRetourPressePapier] = useState<{ genre: "copie" | "collage" | "erreur"; texte: string } | null>(null);
   const enteteAvantFocus = useRef<EnteteDevisV2 | null>(null);
   const genererCle = useCallback(() => crypto.randomUUID(), []);
+  /** Message d'erreur de saisie (remise hors bornes, montant illisible…), dans la zone de retour de l'éditeur. */
+  const signaler = useCallback((texte: string) => setRetourPressePapier({ genre: "erreur", texte }), []);
 
   // Réglage des colonnes : commodité locale, lue avec indulgence (voir colonnes-grille.ts).
   useEffect(() => {
@@ -428,7 +430,7 @@ export function EditeurDevisV2({
             </label>
             <label className="flex flex-col gap-1 text-sm">
               Remise globale (%)
-              <input type="number" min={0} max={100} step="any" value={entete.remise_globale} disabled={!droits.modifierRemise} title={droits.modifierRemise ? undefined : "Votre poste ne permet pas d’accorder des remises."} onChange={(e) => majEntete({ remise_globale: Number(e.target.value) })} className={champ} />
+              <input type="number" min={0} max={100} step="any" value={entete.remise_globale} disabled={!droits.modifierRemise} title={droits.modifierRemise ? undefined : "Votre poste ne permet pas d’accorder des remises."} onChange={(e) => { if (e.target.value === "") return; const r = interpreterRemisePct(e.target.value); if (r.ok) majEntete({ remise_globale: r.valeur }); else signaler(r.motif); }} onBlur={(e) => { if (e.target.value === "") majEntete({ remise_globale: 0 }); }} className={champ} />
             </label>
             <label className="flex flex-col gap-1 text-sm sm:col-span-2 lg:col-span-3">
               Conditions (visibles par le client)
@@ -493,6 +495,7 @@ export function EditeurDevisV2({
               actions={{
                 setEtat,
                 genererCle,
+                signaler,
                 ouvrirOuvrage: (instance, apresCle) => setDialogue({ type: "ouvrage", instance, apresCle }),
                 prixGlobal: (instance) => setDialogue({ type: "prix", instance }),
                 copier: copierLignes,
@@ -590,6 +593,7 @@ export function EditeurDevisV2({
           droits={droits}
           onChange={(patch) => setEtat((courant) => modifierLigneLibre(courant, ligneMobile.ligne.cle, patch))}
           onRetirer={() => { setEtat((courant) => retirerElement(courant, ligneMobile.ligne.cle)); setDialogue(null); }}
+          onSignal={signaler}
           onFermer={() => setDialogue(null)}
         />
       )}
@@ -616,11 +620,13 @@ function CarteLigne({
   origine,
   droits,
   onChange,
+  onSignal,
 }: {
   ligne: LigneLibre;
   origine: EtatElements["origines"][string] | undefined;
   droits: DroitsEditeur;
   onChange: (patch: Partial<Omit<LigneLibre, "cle">>) => void;
+  onSignal: (texte: string) => void;
 }) {
   const ht = ligne.quantite * ligne.prixUnitaireHt * (1 - ligne.remiseLignePct / 100);
   return (
@@ -643,7 +649,7 @@ function CarteLigne({
         <label className="flex flex-col text-xs">Quantité<input type="number" step="any" value={ligne.quantite} onChange={(e) => onChange({ quantite: Number(e.target.value) })} className={champ} /></label>
         <label className="flex flex-col text-xs">Unité<input list="unites-devis" disabled={!droits.modifierUnite} value={ligne.unite} onChange={(e) => onChange({ unite: e.target.value })} className={champ} /></label>
         <label className="flex flex-col text-xs">PU HT<input type="number" step="any" disabled={!droits.modifierPrix} value={ligne.prixUnitaireHt} onChange={(e) => onChange({ prixUnitaireHt: Number(e.target.value) })} className={champ} /></label>
-        <label className="flex flex-col text-xs">Remise %<input type="number" min={0} max={100} step="any" value={ligne.remiseLignePct} onChange={(e) => onChange({ remiseLignePct: Number(e.target.value) })} className={champ} /></label>
+        <label className="flex flex-col text-xs">Remise %<input type="number" min={0} max={100} step="any" value={ligne.remiseLignePct} onChange={(e) => { if (e.target.value === "") return; const r = interpreterRemisePct(e.target.value); if (r.ok) onChange({ remiseLignePct: r.valeur }); else onSignal(r.motif); }} onBlur={(e) => { if (e.target.value === "") onChange({ remiseLignePct: 0 }); }} className={champ} /></label>
         <label className="flex flex-col text-xs">TVA
           <select value={ligne.tauxTva} onChange={(e) => onChange({ tauxTva: Number(e.target.value) })} className={champ}>
             {[...new Set([...TAUX_TVA_ADMIS, ligne.tauxTva])].map((t) => <option key={t} value={t}>{t} %</option>)}
@@ -683,9 +689,9 @@ function ColonnesDialog({ reglages, droits, onChange, onFermer }: { reglages: Re
 }
 
 /** Saisie d'une ligne en plein écran (téléphone, tablette) : les mêmes champs que la grille, empilés. */
-function LigneMobileDialog({ ligne, origine, droits, onChange, onRetirer, onFermer }: {
+function LigneMobileDialog({ ligne, origine, droits, onChange, onRetirer, onFermer, onSignal }: {
   ligne: LigneLibre; origine: EtatElements["origines"][string] | undefined; droits: DroitsEditeur;
-  onChange: (patch: Partial<Omit<LigneLibre, "cle">>) => void; onRetirer: () => void; onFermer: () => void;
+  onChange: (patch: Partial<Omit<LigneLibre, "cle">>) => void; onRetirer: () => void; onFermer: () => void; onSignal: (texte: string) => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => { ref.current?.showModal(); }, []);
@@ -704,12 +710,12 @@ function LigneMobileDialog({ ligne, origine, droits, onChange, onRetirer, onFerm
         </header>
         <div className="flex-1 overflow-auto p-4">
           {type === "article" || type === "libre" ? (
-            <CarteLigne ligne={ligne} origine={origine} droits={droits} onChange={onChange} />
+            <CarteLigne ligne={ligne} origine={origine} droits={droits} onChange={onChange} onSignal={onSignal} />
           ) : type === "remise" ? (
             <div className="space-y-2">
               <input aria-label="Désignation" value={ligne.designation} onChange={(e) => onChange({ designation: e.target.value })} className={`${champ} w-full`} />
               <label className="flex flex-col text-xs">Pourcentage de la section (vide : montant fixe)
-                <input inputMode="decimal" value={ligne.remiseSectionPct ?? ""} onChange={(e) => onChange({ remiseSectionPct: e.target.value === "" ? null : Number(e.target.value.replace(",", ".")) })} className={champ} /></label>
+                <input inputMode="decimal" value={ligne.remiseSectionPct ?? ""} onChange={(e) => { if (e.target.value === "") { onChange({ remiseSectionPct: null }); return; } const r = interpreterRemisePct(e.target.value); if (r.ok) onChange({ remiseSectionPct: r.valeur }); else onSignal(r.motif); }} className={champ} /></label>
               <label className="flex flex-col text-xs">Montant HT (négatif)
                 <input inputMode="decimal" value={ligne.prixUnitaireHt} disabled={ligne.remiseSectionPct !== null && ligne.remiseSectionPct !== undefined} onChange={(e) => onChange({ prixUnitaireHt: -Math.abs(Number(e.target.value.replace(",", ".")) || 0) })} className={champ} /></label>
             </div>
