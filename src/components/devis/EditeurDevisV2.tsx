@@ -430,7 +430,7 @@ export function EditeurDevisV2({
             </label>
             <label className="flex flex-col gap-1 text-sm">
               Remise globale (%)
-              <input type="number" min={0} max={100} step="any" value={entete.remise_globale} disabled={!droits.modifierRemise} title={droits.modifierRemise ? undefined : "Votre poste ne permet pas d’accorder des remises."} onChange={(e) => { if (e.target.value === "") return; const r = interpreterRemisePct(e.target.value); if (r.ok) majEntete({ remise_globale: r.valeur }); else signaler(r.motif); }} onBlur={(e) => { if (e.target.value === "") majEntete({ remise_globale: 0 }); }} className={champ} />
+              <input type="number" min={0} max={100} step="any" value={entete.remise_globale} disabled={!droits.modifierRemise} title={droits.modifierRemise ? undefined : "Votre poste ne permet pas d’accorder des remises."} onChange={(e) => { const r = interpreterRemisePct(e.target.value); if (r.ok) majEntete({ remise_globale: r.valeur }); else signaler(r.motif); }} className={champ} />
             </label>
             <label className="flex flex-col gap-1 text-sm sm:col-span-2 lg:col-span-3">
               Conditions (visibles par le client)
@@ -649,7 +649,7 @@ function CarteLigne({
         <label className="flex flex-col text-xs">Quantité<input type="number" step="any" value={ligne.quantite} onChange={(e) => onChange({ quantite: Number(e.target.value) })} className={champ} /></label>
         <label className="flex flex-col text-xs">Unité<input list="unites-devis" disabled={!droits.modifierUnite} value={ligne.unite} onChange={(e) => onChange({ unite: e.target.value })} className={champ} /></label>
         <label className="flex flex-col text-xs">PU HT<input type="number" step="any" disabled={!droits.modifierPrix} value={ligne.prixUnitaireHt} onChange={(e) => onChange({ prixUnitaireHt: Number(e.target.value) })} className={champ} /></label>
-        <label className="flex flex-col text-xs">Remise %<input type="number" min={0} max={100} step="any" value={ligne.remiseLignePct} onChange={(e) => { if (e.target.value === "") return; const r = interpreterRemisePct(e.target.value); if (r.ok) onChange({ remiseLignePct: r.valeur }); else onSignal(r.motif); }} onBlur={(e) => { if (e.target.value === "") onChange({ remiseLignePct: 0 }); }} className={champ} /></label>
+        <label className="flex flex-col text-xs">Remise %<input type="number" min={0} max={100} step="any" value={ligne.remiseLignePct} onChange={(e) => { const r = interpreterRemisePct(e.target.value); if (r.ok) onChange({ remiseLignePct: r.valeur }); else onSignal(r.motif); }} className={champ} /></label>
         <label className="flex flex-col text-xs">TVA
           <select value={ligne.tauxTva} onChange={(e) => onChange({ tauxTva: Number(e.target.value) })} className={champ}>
             {[...new Set([...TAUX_TVA_ADMIS, ligne.tauxTva])].map((t) => <option key={t} value={t}>{t} %</option>)}
