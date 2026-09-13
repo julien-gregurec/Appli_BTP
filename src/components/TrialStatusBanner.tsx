@@ -27,7 +27,9 @@ export function TrialStatusBanner({ statut, peutSouscrire, variante }: { statut:
   if (variante === "bandeau" && !statut.bandeau) return null;
   const cta = ctaAbonnementVisible(statut, peutSouscrire);
   const urgent = statut.niveau === "fort" || statut.niveau === "expire";
-  const cadre = variante === "bandeau" ? "border-b px-4 py-3" : "rounded-md border px-4 py-3";
+  // Bandeau : marge droite réservée au bouton flottant de recherche (Ctrl+K) pour que le bouton
+  // d'abonnement reste cliquable ; constaté en recette preview.
+  const cadre = variante === "bandeau" ? "border-b px-4 py-3 lg:pr-52" : "rounded-md border px-4 py-3";
   return (
     <div
       role={urgent ? "alert" : "status"}

@@ -389,3 +389,74 @@ backlog plateforme. Traités ici : 1, 3, 4.
   dans le message de livraison. La 247 (Colors) écrit déjà `extensions.gin_trgm_ops` en dur : elle passe avec
   ce rôle (preuve B l'a traversée). Preview : vérifié après build — badge présent sur la preview, grille
   1 150 px par défaut sans aperçu, bouton « Aperçu A4 » ouvre l'aperçu (captures 30, 30c).
+
+## 19. Accès recette et période d'essai (2026-09-13, 11:45 → )
+
+Constat de Julien : un compte sans entreprise arrive sur « Configurer votre accès » sans sortie. Lot traité
+sur la branche, preview seule, Production intouchée.
+
+**Page « Configurer votre accès »** (`ChangerDeCompte.tsx`) : en tête de page, adresse du compte connecté
+et bouton **« Changer de compte »** (formulaire → `logoutAction` : `supabase.auth.signOut()` puis `/login`,
+aucune donnée touchée ; un compte dépôt est renvoyé vers sa borne comme partout ailleurs). Pleine largeur
+sur mobile, jamais dans un menu.
+
+**Accès recette sur la preview** (`/login`) : encart « Environnement de preview — démo GP V1 » affiché
+uniquement si `NEXT_PUBLIC_GP_DEMO_EMAIL` est posée **et** que le déploiement est une preview (même verrou
+que le badge : drapeau + `VERCEL_ENV ≠ production` + adresse ≠ `app.elsatia.fr`). Le bouton « Ouvrir la démo
+GP V1 » préremplit l'adresse du compte de recette et place le curseur sur le mot de passe. **Pas de connexion
+automatique** : l'URL de preview est publique (aucune protection de déploiement Vercel), une connexion
+sans mot de passe ouvrirait l'entreprise de recette à quiconque ; aucun mot de passe n'existe dans le code,
+les variables ou le navigateur. Variable posée sur l'environnement Preview du projet `elsatia-preview`
+seulement ; le projet `elsatia-production` ne porte aucune variable GP / démo (vérifié).
+
+**Compte de recette** : `dirigeant.recette@elsatia-preview.invalid`, entreprise « ELSATIA Recette V2 »,
+poste Dirigeant (107 droits, sans `mode_compte_depot`), offre **Pro**, statut **actif**, échéance
+13/09/2027, aucun `entreprise_feature_flags`, entreprise active positionnée → tableau de bord direct.
+
+**Période d'essai — source de vérité.** `getContexteEntreprise()` (serveur) → RPC
+`contexte_abonnement_courant` → `entreprises.abonnement_statut`, `abonnement_essai_debut`,
+`abonnement_essai_fin`. Fin effective = `finEssaiEffective` du socle (`abonnement_essai_fin`, à défaut
+début + 30 jours). Aucune valeur du navigateur n'entre dans le calcul. Statut `actif` = abonnement actif
+(rien à afficher) ; `essai` sans fenêtre calculable = rien à afficher (le socle considère l'essai en cours) ;
+`suspendu` / `annule` = pris en charge par la redirection existante.
+
+**Fuseau.** Convention produit = calendrier de Paris : l'essai couvre toute la journée `abonnement_essai_fin`
+(date sans heure) ; « aujourd'hui » et le décompte sont des jours calendaires `Europe/Paris`, jamais UTC
+(à 00:30 à Paris on est déjà au nouveau jour). Le blocage du socle (proxy) reste à `fin T23:59:59.999Z`,
+soit 01:59 (été) / 00:59 (hiver) le lendemain à Paris : l'affichage annonce « terminée » avant que l'accès
+ne soit coupé, jamais après. Module pur `src/lib/essai-statut.ts`, 16 tests (30 j, 8 j, 7 j, 3 j, 1 j, jour
+de fin, expiré, abonnement actif, sans essai, employé, minuit Paris / UTC).
+
+**Niveaux et libellés** : > 7 j « Période d'essai — N jours restants » (info discrète, pas de bandeau) ;
+7 → 4 « Votre période d'essai se termine dans N jours. » (avertissement, bandeau) ; 3 → 2 (renforcé) ;
+1 « Votre période d'essai se termine demain. » et 0 « Dernier jour de votre période d'essai. » (fort) ;
+expiré « Votre période d'essai est terminée. » avec la date et « vos données sont conservées ». Détail
+systématique : « Votre essai se termine le 25 septembre 2026. ».
+
+**Emplacements** : carte du tableau de bord (toute la durée de l'essai), ligne compacte sous « Entreprise
+active » dans la barre latérale (« Essai · 12 j restants »), bandeau dans toute l'application dès J-7 et à
+l'expiration (jamais de modale bloquante). **CTA** « Choisir mon abonnement » → parcours `/abonnement`
+existant, réservé aux profils qui peuvent souscrire (`gerer_utilisateurs` ou `gerer_parametres`, ou poste
+sans restriction) ; un employé voit le décompte sans bouton et, à l'expiration, « Contactez votre
+administrateur ». Les bandeaux historiques `EssaiPreavisBanner` / `EssaiExpireBanner` du layout sont
+remplacés par le composant central ; le module `preavisEssai` du socle reste en place (proxy, tests).
+
+**Résultats sur la preview** (script Playwright, build `fb4ee31` puis correctif de marge) :
+| Vérification | Résultat |
+| --- | --- |
+| `/login` : encart démo présent, « Ouvrir la démo GP V1 » → `/login?demo=1`, adresse préremplie | ✅ (captures 70-71) |
+| Compte sans entreprise → `/onboarding`, bouton « Changer de compte » visible desktop et mobile (390 px), clic → `/login`, 0 cookie de session, `/dashboard` renvoie vers `/login` | ✅ (captures 72-73) |
+| Compte de recette Pro : `/dashboard` direct, entreprise « ELSATIA Recette V2 », aucun bandeau d'essai, `/devis/nouveau` = grille v2, `/planning` = planning v2 | ✅ |
+| Essai J-30 / J-18 (Dirigeant) : carte + barre latérale, pas de bandeau, bouton d'abonnement | ✅ (captures 77, 75-J18) |
+| J-7 : bandeau « … dans 7 jours. » niveau avertissement | ✅ (75-J7) |
+| J-3 : niveau renforcé | ✅ (75-J3) |
+| J-1 : « … se termine demain. » niveau fort | ✅ (75-J1) |
+| J0 : « Dernier jour de votre période d'essai. », barre latérale « Essai · dernier jour » | ✅ (75-J0) |
+| Expiré : redirection existante `/abonnement-suspendu?motif=essai_expire` — page explicite (« Votre essai gratuit est terminé », données conservées, Choisir une offre / Exporter / Support / Se déconnecter) ; le bandeau « terminée » du composant central couvre les pages restées ouvertes (`/abonnement`, `/aide`, `/parametres/donnees`) | ✅ (75-expire) |
+| Employé (J-3) : bandeau, carte et barre latérale sans bouton d'abonnement ; expiré → même page de sortie | ✅ (78) |
+| CTA « Choisir mon abonnement » → `/abonnement` (parcours existant, aucun Stripe ni pricing ajouté) | ✅ |
+| Correctif après capture 74 : le bouton du bandeau passait sous le bouton flottant de recherche → marge droite réservée (`lg:pr-52`) | ✅ |
+| Dates de la recette : `entreprises_essai_dates_coherentes` impose fin ∈ [début, début + 30] ; la recette déplace début et fin ensemble ; entreprise d'essai remise à J-5 | — |
+
+Gate : lint 0 erreur (8 avertissements préexistants), typecheck 0 erreur, vitest 2 397 verts (3 échecs sous
+charge — xlsx, webhook boutique — qui passent seuls), build Vercel Ready.
