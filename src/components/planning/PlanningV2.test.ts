@@ -26,7 +26,7 @@ function donnees(evenements: Evenement[]): DonneesPlanningV2 {
 }
 
 describe("PlanningV2 (rendu statique)", () => {
-  it("vue semaine : une ligne par salarié, les 7 jours, le bloc sur la bonne ligne, barre latérale et 8 vues", () => {
+  it("vue semaine : une ligne par salarié, les 7 jours, le bloc sur la bonne ligne, barre d'outils sans panneau latéral et 8 vues", () => {
     const html = renderToStaticMarkup(createElement(PlanningV2, { donnees: donnees([ev("e1", "Pose cuisine", "2026-09-16", 8, 12, ["s1"])]), jour: "2026-09-14", vue: "semaine" }));
     expect(html).toContain("Ali Poseur");
     expect(html).toContain("Bea Chef");
@@ -35,7 +35,9 @@ describe("PlanningV2 (rendu statique)", () => {
     expect(html).toContain("08:00–12:00 Pose cuisine");
     expect((html.match(/role="tab"/g) ?? []).length).toBe(8);
     expect(html).toContain("Nouvel évènement");
-    expect(html).toContain("Sélectionnez un évènement du planning.");
+    expect(html).toContain('data-testid="menu-actions-evenement"');
+    expect(html).not.toContain("data-panneau-actions");
+    expect(html).not.toContain("lg:pr-72");
   });
 
   it("vue jour : colonnes horaires et bloc positionné selon l'heure", () => {
@@ -65,10 +67,11 @@ describe("PlanningV2 (rendu statique)", () => {
     expect(html).toContain("septembre 2026");
   });
 
-  it("sans droit de gestion : rien n'est glissable, le bouton Nouvel évènement est expliqué", () => {
+  it("sans droit de gestion : rien n'est glissable, pas de bouton Nouvel évènement, menu d'actions présent", () => {
     const d = donnees([ev("e1", "Pose", "2026-09-16", 8, 12, ["s1"])]);
     d.droits = { gerer: false, affecter: false }; d.permissions = ["acces_planning"];
     const html = renderToStaticMarkup(createElement(PlanningV2, { donnees: d, jour: "2026-09-14", vue: "semaine" }));
-    expect(html).toContain("gerer_planning");
+    expect(html).not.toContain("Nouvel évènement");
+    expect(html).toContain('data-testid="menu-actions-evenement"');
   });
 });

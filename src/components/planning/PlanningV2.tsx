@@ -3,7 +3,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition, type PointerEvent as ReactPointerEvent } from "react";
 import { useRouter } from "next/navigation";
 import { enregistrerEvenementAction, supprimerEvenementAction } from "@/app/actions/planning-v2";
-import { PanneauActions } from "@/components/actions/PanneauActions";
+import { BoutonMenu, MenuContextuel, type ElementMenu } from "@/components/Menu";
 import { actionsPlanning } from "@/lib/actions-contextuelles/registre";
 import type { DonneesPlanningV2 } from "@/lib/planning/serveur";
 import {
@@ -18,7 +18,7 @@ import {
  * Vues : jour (lignes = salariés, colonnes = heures), semaine / par salarié / équipe / chantier /
  * ressource (lignes = sujets, colonnes = 7 jours), mois (calendrier), compacte (liste dense).
  * Interactions : glisser un bloc (déplacer dans le temps et entre lignes), étirer sa fin, Alt+glisser
- * duplique, glisser sur une zone vide crée, clic sélectionne (barre latérale), double clic ouvre le
+ * duplique, glisser sur une zone vide crée, clic sélectionne, double clic ouvre le détail, clic droit / ⋯ ouvre le
  * détail, ← → ↑ ↓ déplacent la sélection de 15 min / d'une ligne (Ctrl : d'un jour), Suppr retire,
  * Ctrl+D duplique. Conflits calculés en direct (miroir de la base) et affichés sur les blocs.
  */
@@ -104,6 +104,32 @@ export function PlanningV2({ donnees, jour, vue }: { donnees: DonneesPlanningV2;
       router.refresh();
     });
   }, [router]);
+
+  // Menu contextuel d'un évènement (clic droit, bouton ⋯ du bloc sélectionné, « Actions ▾ » de la barre) :
+  // même registre de droits et de motifs que l'ancien panneau latéral, sans panneau permanent.
+  const [menu, setMenu] = useState<{ evenement: Evenement; x: number; y: number } | null>(null);
+  const ouvrirMenu = useCallback((e: Evenement, x: number, y: number) => { setSelection(e.id); setMenu({ evenement: e, x, y }); }, []);
+  const elementsMenu = useCallback((e: Evenement): ElementMenu[] => {
+    const registre = actionsPlanning({ id: e.id, chantierId: e.chantierId, clientId: e.clientId, statut: e.statut }, donnees.permissions);
+    const de = (cle: string) => registre.find((a) => a.cle === cle);
+    const item = (cle: string, libelle: string, action: () => void, extra: Partial<ElementMenu> = {}): ElementMenu | null => {
+      const a = de(cle); if (!a) return null;
+      return { cle, libelle, action, desactive: !a.disponible, titre: a.disponible ? undefined : a.motif, raccourci: a.raccourci, ...extra } as ElementMenu;
+    };
+    const lien = (cle: string, libelle: string) => { const a = de(cle); return a ? item(cle, libelle, () => { if (a.href) router.push(a.href); }) : null; };
+    return [
+      item("modifier", "Modifier", () => setEdition(e), { raccourci: "Double clic" }),
+      item("dupliquer", "Dupliquer", () => { const d = dupliquer(e, `nouveau:${crypto.randomUUID()}`); setEvenements((l) => [...l, d]); setEdition(d); }, { raccourci: "Alt + glisser · Ctrl+D" }),
+      item("affecter", "Affecter une équipe ou un salarié", () => setEdition(e)),
+      { cle: "sep1", type: "separateur" },
+      lien("chantier", "Ouvrir le chantier"),
+      lien("client", "Ouvrir le client"),
+      item("historique", "Historique", () => router.push(`/planning/historique?evenement=${e.id}`)),
+      item("imprimer", "Imprimer le planning", () => window.open(`/imprimer/planning?jour=${jour}&vue=${vue}`, "_blank", "noopener")),
+      { cle: "sep2", type: "separateur" },
+      item("supprimer", "Supprimer", () => { if (window.confirm("Supprimer cet évènement ?")) supprimer(e.id); }, { danger: true, raccourci: "Suppr" }),
+    ].filter((x): x is ElementMenu => x !== null);
+  }, [donnees.permissions, router, jour, vue, supprimer]);
 
   const nouvelEvenement = (o: Partial<Evenement> = {}): Evenement => ({
     id: `nouveau:${crypto.randomUUID()}`, titre: "", type: "chantier", statut: "planifie", debut: instant(jour, 8 * 60), fin: instant(jour, 12 * 60),
@@ -210,22 +236,10 @@ export function PlanningV2({ donnees, jour, vue }: { donnees: DonneesPlanningV2;
   const largeurGrille = vue === "jour" ? LARGEUR_LIBELLE + heures.length * pxHeure : undefined;
 
   return (
-    <div className="space-y-3 lg:pr-72">
-      <PanneauActions
-        titre="Planning"
-        contexte={selectionne ? `${selectionne.titre} · ${jourFr(jourDe(selectionne.debut))}` : "Aucun évènement sélectionné"}
-        actions={actionsPlanning(selectionne ? { id: selectionne.id, chantierId: selectionne.chantierId, clientId: selectionne.clientId, statut: selectionne.statut } : null, donnees.permissions)}
-        handlers={{
-          creer: () => { const ev = nouvelEvenement(); setEvenements((l) => [...l, ev]); setEdition(ev); },
-          modifier: () => selectionne && setEdition(selectionne),
-          deplacer: () => selectionne && setEdition(selectionne),
-          horaire: () => selectionne && setEdition(selectionne),
-          affecter: () => selectionne && setEdition(selectionne),
-          dupliquer: () => { if (!selectionne) return; const d = dupliquer(selectionne, `nouveau:${crypto.randomUUID()}`); setEvenements((l) => [...l, d]); setEdition(d); },
-          supprimer: () => selectionne && supprimer(selectionne.id),
-          historique: () => selectionne && router.push(`/planning/historique?evenement=${selectionne.id}`),
-        }}
-      />
+    <div className="space-y-3">
+      {menu && (
+        <MenuContextuel x={menu.x} y={menu.y} etiquette="Actions de l’évènement" elements={elementsMenu(menu.evenement)} onFermer={() => setMenu(null)} />
+      )}
 
       <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="Navigation du planning">
         <button type="button" className={bouton} onClick={() => naviguer(ajouterJours(jour, -pas))} aria-label="Précédent">‹</button>
@@ -242,6 +256,8 @@ export function PlanningV2({ donnees, jour, vue }: { donnees: DonneesPlanningV2;
         <select value={filtreType} onChange={(e) => setFiltreType(e.target.value)} className={champ} aria-label="Type"><option value="">Tous les types</option>{TYPES_EVENEMENT.map((t) => <option key={t.cle} value={t.cle}>{t.libelle}</option>)}</select>
         <select value={filtreChantier} onChange={(e) => setFiltreChantier(e.target.value)} className={champ} aria-label="Chantier"><option value="">Tous les chantiers</option>{donnees.chantiers.map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}</select>
         {vue === "jour" && <label className="flex items-center gap-1">Zoom<input type="range" min={32} max={160} value={pxHeure} onChange={(e) => setPxHeure(Number(e.target.value))} aria-label="Zoom temporel" /></label>}
+        {donnees.droits.gerer && <button type="button" onClick={() => { const ev = nouvelEvenement(); setEvenements((l) => [...l, ev]); setEdition(ev); }} className={`${bouton} bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-900`} title="Ou glissez sur une zone vide de la grille">Nouvel évènement</button>}
+        <BoutonMenu libelle={selectionne ? `Actions · ${selectionne.titre.slice(0, 24)}` : "Actions"} className={bouton} testId="menu-actions-evenement" titre={selectionne ? "Actions sur l’évènement sélectionné" : "Sélectionnez un évènement (clic) : ses actions s’affichent ici, ou faites un clic droit sur le bloc"} elements={selectionne ? elementsMenu(selectionne) : [{ cle: "aucun", libelle: "Aucun évènement sélectionné", desactive: true, action: () => {} }]} />
         <a href={`/imprimer/planning?jour=${jour}&vue=${vue}`} target="_blank" rel="noopener" className={bouton}>Imprimer</a>
         <a href={`/api/documents/planning/pdf?jour=${jour}&vue=${vue}`} target="_blank" rel="noopener" className={bouton}>PDF</a>
         <span className="text-xs text-neutral-500" aria-live="polite">{enCours ? "Enregistrement…" : conflits.length ? `${conflits.length} conflit${conflits.length > 1 ? "s" : ""}` : ""}</span>
@@ -267,7 +283,7 @@ export function PlanningV2({ donnees, jour, vue }: { donnees: DonneesPlanningV2;
           <thead className="bg-neutral-50 text-left uppercase text-neutral-500 dark:bg-neutral-900"><tr><th className="px-2 py-1">Jour</th><th className="px-2 py-1">Heures</th><th className="px-2 py-1">Évènement</th><th className="px-2 py-1">Type</th><th className="px-2 py-1">Chantier</th><th className="px-2 py-1">Salariés</th><th className="px-2 py-1">Statut</th><th className="px-2 py-1">Conflits</th></tr></thead>
           <tbody>
             {blocs.sort((a, b) => a.jour.localeCompare(b.jour) || a.debutMin - b.debutMin).map((b) => (
-              <tr key={`${b.evenement.id}-${b.jour}`} className={`cursor-pointer border-t border-neutral-100 dark:border-neutral-800 ${selection === b.evenement.id ? "bg-blue-50 dark:bg-neutral-900" : ""}`} onClick={() => setSelection(b.evenement.id)} onDoubleClick={() => setEdition(b.evenement)}>
+              <tr key={`${b.evenement.id}-${b.jour}`} className={`cursor-pointer border-t border-neutral-100 dark:border-neutral-800 ${selection === b.evenement.id ? "bg-blue-50 dark:bg-neutral-900" : ""}`} onContextMenu={(e) => { e.preventDefault(); ouvrirMenu(b.evenement, e.clientX, e.clientY); }} onClick={() => setSelection(b.evenement.id)} onDoubleClick={() => setEdition(b.evenement)}>
                 <td className="px-2 py-1 whitespace-nowrap">{jourFr(b.jour)}</td>
                 <td className="px-2 py-1 whitespace-nowrap tabular-nums">{b.evenement.journeeEntiere ? "Journée" : `${heureFr(b.evenement.debut)}–${heureFr(b.evenement.fin)}`}</td>
                 <td className="px-2 py-1"><span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ background: couleurDe(b.evenement) }} />{b.evenement.titre}</td>
@@ -297,7 +313,7 @@ export function PlanningV2({ donnees, jour, vue }: { donnees: DonneesPlanningV2;
                   selection={selection !== null && blocsLigne.some((b) => b.evenement.id === selection) ? selection : null}
                   conflits={conflits} glisser={concerne ? glisser : null}
                   cible={glisser !== null && glisser.ligneCible === l.cle && glisser.ligneCible !== glisser.ligneCle}
-                  onCreer={onCreerStable} onGlisser={onGlisserStable} onSelection={setSelection} onOuvrir={onOuvrirStable} salaries={donnees.salaries} />
+                  onCreer={onCreerStable} onGlisser={onGlisserStable} onSelection={setSelection} onOuvrir={onOuvrirStable} onMenu={ouvrirMenu} salaries={donnees.salaries} />
               );
             })}
           </div>
@@ -336,10 +352,10 @@ function styleDeBloc(b: Bloc, glisser: Glisser | null, vue: Vue, jours: string[]
   return { left: LARGEUR_LIBELLE + i * largeurColonne + 2, width: largeurColonne - 4, top: 4 + b.colonne * (h - 8) / b.colonnes, height: (h - 8) / b.colonnes - 2 };
 }
 
-const LigneGrille = memo(function LigneGrille({ ligne, vue, jours, heures, pxHeure, largeurColonne, blocs, selection, conflits, glisser, cible, onCreer, onGlisser, onSelection, onOuvrir, salaries }: {
+const LigneGrille = memo(function LigneGrille({ ligne, vue, jours, heures, pxHeure, largeurColonne, blocs, selection, conflits, glisser, cible, onCreer, onGlisser, onSelection, onOuvrir, onMenu, salaries }: {
   ligne: Ligne; vue: Vue; jours: string[]; heures: number[]; pxHeure: number; largeurColonne: number; blocs: Bloc[]; selection: string | null; conflits: Conflit[];
   glisser: Glisser | null; cible: boolean;
-  onCreer: (e: ReactPointerEvent, ligne: string, jour: string) => void; onGlisser: (e: ReactPointerEvent, b: Bloc, mode: "deplacer" | "etirer") => void; onSelection: (id: string) => void; onOuvrir: (e: Evenement) => void;
+  onCreer: (e: ReactPointerEvent, ligne: string, jour: string) => void; onGlisser: (e: ReactPointerEvent, b: Bloc, mode: "deplacer" | "etirer") => void; onSelection: (id: string) => void; onOuvrir: (e: Evenement) => void; onMenu: (e: Evenement, x: number, y: number) => void;
   salaries: Array<{ id: string; nom: string }>;
 }) {
   const conflitsDe = (id: string) => conflits.filter((c) => c.evenementId === id);
@@ -369,13 +385,15 @@ const LigneGrille = memo(function LigneGrille({ ligne, vue, jours, heures, pxHeu
             onPointerDown={(e) => { e.currentTarget.focus(); onGlisser(e, b, "deplacer"); }}
             onClick={() => onSelection(b.evenement.id)}
             onDoubleClick={() => onOuvrir(b.evenement)}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelection(b.evenement.id); onOuvrir(b.evenement); } }}
+            onContextMenu={(e) => { e.preventDefault(); onMenu(b.evenement, e.clientX, e.clientY); }}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelection(b.evenement.id); onOuvrir(b.evenement); } if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) { e.preventDefault(); const r = e.currentTarget.getBoundingClientRect(); onMenu(b.evenement, r.left, r.bottom); } }}
             className={`absolute cursor-grab select-none overflow-hidden rounded px-1.5 py-0.5 text-[11px] leading-tight text-white shadow-sm active:cursor-grabbing ${selection === b.evenement.id ? "ring-2 ring-blue-500 ring-offset-1" : ""} ${b.evenement.statut === "termine" ? "opacity-60" : ""}`}
             style={{ ...s, background: couleurDe(b.evenement), borderLeft: conflits.length ? "3px solid #b45309" : undefined }}
           >
             <div className="truncate font-semibold">{b.evenement.journeeEntiere ? "" : `${heureFr(b.evenement.debut)}–${heureFr(b.evenement.fin)} `}{b.evenement.titre}{conflits.length ? " ⚠" : ""}</div>
             {(s.height as number) > 26 && <div className="truncate opacity-90">{[b.evenement.adresse, salariesDe(b.evenement, []).map((id) => salaries.find((x) => x.id === id)?.nom).filter(Boolean).join(", ")].filter(Boolean).join(" · ")}</div>}
             {vue === "jour" && <div role="separator" aria-label="Étirer" onPointerDown={(e) => onGlisser(e, b, "etirer")} className="absolute inset-y-0 right-0 w-2 cursor-ew-resize" />}
+            {selection === b.evenement.id && <button type="button" aria-label="Actions de l’évènement" title="Modifier, dupliquer, affecter, supprimer…" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); onMenu(b.evenement, r.left, r.bottom); }} className="absolute right-0 top-0 h-5 w-5 rounded-bl bg-black/30 text-center text-[11px] leading-5 text-white hover:bg-black/50" data-testid="bloc-menu">⋯</button>}
           </div>
         );
       })}
