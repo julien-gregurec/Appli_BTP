@@ -71,3 +71,6 @@ output/verification/
 /output/video/orchestre.wav
 /output/video/bornes.json
 /output/video/points.json
+
+# Banc de l’éditeur v2 : sortie de construire.mjs, jamais versionnée.
+tests/banc/editeur-v2/dist/
