@@ -1,3 +1,4 @@
+import { studioAnalysisEnabled } from "../../../../lib/analysis";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import Shell from "../../../../components/Shell";
@@ -39,6 +40,7 @@ export default async function EditorPage({
         <VideoEditor
           key={timeline.id}
           initial={timeline}
+          analysisEnabled={studioAnalysisEnabled()}
           assets={media.data ?? []}
           canWrite={canEditProject(access.role, access.project.status)}
         />

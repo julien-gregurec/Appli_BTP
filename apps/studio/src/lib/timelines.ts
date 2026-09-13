@@ -81,9 +81,10 @@ export async function getActiveStudioTimeline(projectId: string) {
 export async function generateStudioTimeline(
   projectId: string,
   options?: unknown,
+  selection?: { ids: string[]; revision: number },
 ) {
   const { client, project } = await authorizeProject(projectId, true);
-  const assets =
+  let assets =
     checked(
       await client.rpc("studio_list_project_media", {
         p_project: projectId,
@@ -91,10 +92,34 @@ export async function generateStudioTimeline(
         p_limit: 1000,
       }),
     ) ?? [];
+  if (selection) {
+    if (selection.revision !== project.revision)
+      throw new MediaError("Le projet a changé. Rechargez la sélection.", 409);
+    if (
+      !selection.ids.length ||
+      selection.ids.length > 1000 ||
+      new Set(selection.ids).size !== selection.ids.length ||
+      selection.ids.some((i) => !isStudioId(i))
+    )
+      throw new MediaError("Sélection invalide.");
+    const available = new Map(
+      assets
+        .filter((a) => a.upload_status === "ready" && !a.deleted_at)
+        .map((a) => [a.id, a]),
+    );
+    if (selection.ids.some((i) => !available.has(i)))
+      throw new MediaError("Média absent ou non autorisé.", 403);
+    assets = selection.ids.map((i) => available.get(i)!);
+  }
   const draft =
     options === undefined
       ? buildTimeline({ project, assets })
-      : buildTemplateTimeline(project, assets, parseTemplateOptions(options));
+      : buildTemplateTimeline(
+          project,
+          assets,
+          parseTemplateOptions(options),
+          selection !== undefined,
+        );
   const result = checked(
     await client.rpc("studio_save_timeline", {
       p_project: projectId,

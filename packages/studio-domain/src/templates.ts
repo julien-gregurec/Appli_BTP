@@ -456,6 +456,7 @@ export function buildTemplateTimeline(
   project: StudioProject,
   allAssets: StudioMediaAsset[],
   options: TemplateOptions,
+  preserveOrder = false,
 ): TimelineDraft {
   const o = parseTemplateOptions(options),
     t = resolveStudioTemplate(o.templateId, o.templateVersion);
@@ -496,7 +497,7 @@ export function buildTemplateTimeline(
       ...assets.filter((a) => after.has(a.id)),
     ];
   }
-  if (t.overlayConfig.structure === "chronological")
+  if (t.overlayConfig.structure === "chronological" && !preserveOrder)
     assets = assets
       .map((a, i) => ({ a, i }))
       .sort((x, y) => {

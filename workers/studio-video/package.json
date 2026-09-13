@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "tsx src/worker.ts",
+    "start:analysis": "tsx src/analysis-worker.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "node ../../apps/studio/node_modules/eslint/bin/eslint.js ."
