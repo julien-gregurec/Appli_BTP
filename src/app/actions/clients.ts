@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 import { lireIdentiteLegale } from "@/lib/client-identite-legale";
+import { permissionsUtilisateur } from "@/lib/permissions";
 
 function champ(formData: FormData, nom: string): string | null {
   const v = String(formData.get(nom) ?? "").trim();
@@ -60,21 +61,32 @@ export type ClientRapide = {
   societe?: string | null;
   telephone?: string | null;
   email?: string | null;
+  adresse_facturation?: string | null;
   code_postal?: string | null;
   ville?: string | null;
+  siret?: string | null;
+  /** Contact principal créé en même temps (nom seul suffit). */
+  contact_nom?: string | null;
 };
 
+export type ClientRapideCree = { id: string; label: string; adresse: string | null; codePostal: string | null; ville: string | null; siret: string | null };
+
+/** Création « rapide » depuis un devis ou un chantier : mêmes règles que la fiche complète (statut prospect,
+ * identité minimale), droit `gerer_clients` requis, contact principal optionnel. Aucune navigation. */
 export async function creerClientRapideAction(
   data: ClientRapide,
-): Promise<{ id: string; label: string } | { error: string }> {
+): Promise<ClientRapideCree | { error: string }> {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  const permissions = await permissionsUtilisateur(ctx);
+  if (!(permissions === null || permissions.includes("gerer_clients"))) return { error: "Votre poste ne permet pas de créer un client." };
 
   const nom = data.nom?.trim() || null;
   const societe = data.societe?.trim() || null;
   if (!nom && !societe) {
     return { error: "Renseigne au moins un nom ou une société." };
   }
+  const siret = data.siret?.trim().replace(/\s+/g, " ") || null;
 
   const { data: cree, error } = await supabase
     .from("clients")
@@ -86,20 +98,27 @@ export async function creerClientRapideAction(
       societe,
       telephone: data.telephone?.trim() || null,
       email: data.email?.trim() || null,
+      adresse_facturation: data.adresse_facturation?.trim() || null,
       code_postal: data.code_postal?.trim() || null,
       ville: data.ville?.trim() || null,
+      siret,
       statut: "prospect",
     })
-    .select("id, nom, prenom, societe")
+    .select("id, nom, prenom, societe, adresse_facturation, code_postal, ville, siret")
     .single();
 
   if (error || !cree) {
     return { error: messageErreurUtilisateur("creerClientRapideAction", error, "Impossible d’enregistrer ce client. Vérifiez les informations saisies.") };
   }
+  const contact = data.contact_nom?.trim();
+  if (contact) {
+    const { error: erreurContact } = await supabase.from("contacts_clients").insert({ client_id: cree.id, nom: contact, telephone: data.telephone?.trim() || null, email: data.email?.trim() || null, principal: true });
+    if (erreurContact) console.error("creerClientRapideAction contact", erreurContact);
+  }
 
   revalidatePath("/clients");
   const label = cree.societe || [cree.prenom, cree.nom].filter(Boolean).join(" ") || "Client";
-  return { id: cree.id, label };
+  return { id: cree.id, label, adresse: cree.adresse_facturation ?? null, codePostal: cree.code_postal ?? null, ville: cree.ville ?? null, siret: cree.siret ?? null };
 }
 
 export async function modifierClientAction(clientId: string, formData: FormData) {

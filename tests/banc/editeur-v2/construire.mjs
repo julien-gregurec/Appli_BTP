@@ -19,6 +19,8 @@ await mkdir(sortie, { recursive: true });
 
 const doublures = {
   "@/app/actions/devis-v2": path.join(ici, "actions-simulees.ts"),
+  "@/app/actions/clients": path.join(ici, "actions-simulees.ts"),
+  "@/app/actions/chantiers": path.join(ici, "actions-simulees.ts"),
   "next/navigation": path.join(ici, "navigation-simulee.ts"),
 };
 

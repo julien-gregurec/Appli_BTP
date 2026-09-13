@@ -96,3 +96,20 @@ export async function publierOuvrageAction() {
 export async function changerStatutOuvrageAction() {
   return { ok: true as const };
 }
+
+// ── Tiers créés depuis le devis (doublures de @/app/actions/clients et @/app/actions/chantiers) ─────────────
+export type ClientRapide = { type: string; nom?: string | null; prenom?: string | null; societe?: string | null; telephone?: string | null; email?: string | null; adresse_facturation?: string | null; code_postal?: string | null; ville?: string | null; siret?: string | null; contact_nom?: string | null };
+let compteurTiers = 0;
+export async function creerClientRapideAction(data: ClientRapide) {
+  const nom = data.nom?.trim() || null; const societe = data.societe?.trim() || null;
+  if (!nom && !societe) return { error: "Renseigne au moins un nom ou une société." };
+  if (societe === "REFUS") return { error: "Refus simulé du serveur." };
+  compteurTiers += 1;
+  const label = societe || [data.prenom?.trim(), nom].filter(Boolean).join(" ") || "Client";
+  return { id: `client-banc-${compteurTiers}`, label, adresse: data.adresse_facturation ?? null, codePostal: data.code_postal ?? null, ville: data.ville ?? null, siret: data.siret ?? null };
+}
+export async function creerChantierRapideAction(data: { client_id: string; nom: string; adresse?: string | null; code_postal?: string | null; ville?: string | null }) {
+  if (!data.nom?.trim()) return { error: "Donne un nom au chantier." };
+  compteurTiers += 1;
+  return { id: `chantier-banc-${compteurTiers}`, label: data.nom.trim() };
+}

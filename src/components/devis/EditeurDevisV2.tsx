@@ -16,6 +16,7 @@ import { libelleTypeLigne, typeDe, TYPES_LIGNE_GRILLE, type TypeLigneGrille } fr
 import { InsertionOuvrageDialog } from "@/components/devis/InsertionOuvrageDialog";
 import { PrixGlobalDialog } from "@/components/devis/PrixGlobalDialog";
 import { SelectionArticlesDialog } from "@/components/devis/SelectionArticlesDialog";
+import { ChantierRapideDialog, ClientRapideDialog } from "@/components/devis/TiersRapideDialogs";
 import { FiligraneSelecteur } from "@/components/documents/FiligraneSelecteur";
 import type { IdentiteEmetteur, SourceDocument, StyleDocument } from "@/lib/devis/document-modele";
 import {
@@ -38,7 +39,7 @@ export type ClientEditeur = { id: string; label: string; adresse: string | null;
 export type ChantierEditeur = { id: string; label: string; clientId: string | null };
 export type DroitsEditeur = { voirCouts: boolean; gererCouts: boolean; modifierPrix: boolean; modifierUnite: boolean; modifierRemise: boolean };
 
-type Dialogue = null | { type: "articles" } | { type: "ouvrage"; instance: InstanceOuvrage | null; apresCle?: string | null } | { type: "prix"; instance: InstanceOuvrage } | { type: "colonnes" } | { type: "ligne_mobile"; cle: string };
+type Dialogue = null | { type: "articles" } | { type: "ouvrage"; instance: InstanceOuvrage | null; apresCle?: string | null } | { type: "prix"; instance: InstanceOuvrage } | { type: "colonnes" } | { type: "ligne_mobile"; cle: string } | { type: "client" } | { type: "chantier" };
 type Instantane = { entete: EnteteDevisV2; etat: EtatElements };
 type Sauvegarde = { statut: "ok"; heure: string } | { statut: "en_cours" } | { statut: "erreur"; message: string; conflit: boolean } | { statut: "hors_ligne" } | { statut: "jamais" };
 /** Une modification efface une erreur d'enregistrement simple (pas un conflit) : l'autosauvegarde réessaie alors. */
@@ -115,7 +116,11 @@ export function EditeurDevisV2({
   const [selection, setSelection] = useState<SelectionGrille>({ cles: [], ancre: null });
   const [ligneActive, setLigneActive] = useState<string | null>(null);
   const [positionCollage, setPositionCollage] = useState<"apres" | "avant" | "fin">("apres");
-  const [retourPressePapier, setRetourPressePapier] = useState<{ genre: "copie" | "collage" | "erreur"; texte: string } | null>(null);
+  const [retourPressePapier, setRetourPressePapier] = useState<{ genre: "copie" | "collage" | "erreur" | "info"; texte: string } | null>(null);
+  // Tiers créés depuis le devis (client, chantier) : listes locales enrichies sans rechargement, brouillon conservé.
+  const [clientsListe, setClientsListe] = useState(clients);
+  const [chantiersListe, setChantiersListe] = useState(chantiers);
+  const clientCourant = clientsListe.find((c) => c.id === entete.client_id) ?? null;
   const enteteAvantFocus = useRef<EnteteDevisV2 | null>(null);
   const genererCle = useCallback(() => crypto.randomUUID(), []);
   /** Message d'erreur de saisie (remise hors bornes, montant illisible…), dans la zone de retour de l'éditeur. */
@@ -319,7 +324,7 @@ export function EditeurDevisV2({
     setTimeout(() => setSurligne((s) => (s === id ? null : s)), 800);
   };
 
-  const chantiersClient = chantiers.filter((c) => !entete.client_id || c.clientId === entete.client_id);
+  const chantiersClient = chantiersListe.filter((c) => !entete.client_id || c.clientId === entete.client_id);
   const tries = [...etat.elements].sort((a, b) => a.ordre - b.ordre);
   const rentabilite = useMemo(() => {
     if (!droits.voirCouts) return null;
@@ -399,17 +404,23 @@ export function EditeurDevisV2({
             </label>
             <label className="flex flex-col gap-1 text-sm">
               Client
-              <select value={entete.client_id} onChange={(e) => majEntete({ client_id: e.target.value, chantier_id: null })} className={champ}>
-                <option value="">— Choisir un client —</option>
-                {clients.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-              </select>
+              <span className="flex gap-1">
+                <select aria-label="Client" value={entete.client_id} onChange={(e) => majEntete({ client_id: e.target.value, chantier_id: null })} className={`${champ} min-w-0 flex-1`}>
+                  <option value="">— Choisir un client —</option>
+                  {clientsListe.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                </select>
+                <button type="button" onClick={() => setDialogue({ type: "client" })} className={`${bouton} shrink-0`} title="Créer un client sans quitter le devis">+ Client</button>
+              </span>
             </label>
             <label className="flex flex-col gap-1 text-sm">
               Chantier (optionnel)
-              <select value={entete.chantier_id ?? ""} onChange={(e) => majEntete({ chantier_id: e.target.value || null })} disabled={!entete.client_id} className={champ}>
-                <option value="">— Sans chantier —</option>
-                {chantiersClient.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-              </select>
+              <span className="flex gap-1">
+                <select aria-label="Chantier" value={entete.chantier_id ?? ""} onChange={(e) => majEntete({ chantier_id: e.target.value || null })} disabled={!entete.client_id} className={`${champ} min-w-0 flex-1`}>
+                  <option value="">— Sans chantier —</option>
+                  {chantiersClient.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                </select>
+                <button type="button" onClick={() => setDialogue({ type: "chantier" })} disabled={!entete.client_id} className={`${bouton} shrink-0`} title={entete.client_id ? "Créer un chantier pour ce client sans quitter le devis" : "Choisissez d’abord un client"}>+ Chantier</button>
+              </span>
             </label>
             <label className="flex flex-col gap-1 text-sm">
               Date du devis
@@ -475,7 +486,7 @@ export function EditeurDevisV2({
 
           {retourPressePapier && (
             <p role={retourPressePapier.genre === "erreur" ? "alert" : "status"} data-testid="retour-presse-papier" data-genre={retourPressePapier.genre}
-               className={`flex flex-wrap items-center gap-3 rounded-md px-3 py-2 text-sm ${retourPressePapier.genre === "erreur" ? "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-200" : "bg-green-50 text-green-800 dark:bg-green-950/40 dark:text-green-200"}`}>
+               className={`flex flex-wrap items-center gap-3 rounded-md px-3 py-2 text-sm ${retourPressePapier.genre === "erreur" ? "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-200" : retourPressePapier.genre === "info" ? "bg-blue-50 text-blue-900 dark:bg-blue-950/40 dark:text-blue-100" : "bg-green-50 text-green-800 dark:bg-green-950/40 dark:text-green-200"}`}>
               <span>{retourPressePapier.texte}</span>
               {retourPressePapier.genre === "collage" && <button type="button" onClick={() => { annulerEdition(); setSelection({ cles: [], ancre: null }); setRetourPressePapier(null); }} className="underline">Annuler le collage</button>}
               <button type="button" onClick={() => setRetourPressePapier(null)} className="ml-auto text-xs opacity-70" aria-label="Fermer ce message">×</button>
@@ -581,6 +592,19 @@ export function EditeurDevisV2({
             setEtat((courant) => (dialogue.instance ? remplacerOuvrage(courant, instance) : dialogue.apresCle ? insererOuvrage(courant, instance, dialogue.apresCle) : ajouterOuvrage(courant, instance)));
             setDialogue(null);
           }}
+        />
+      )}
+      {dialogue?.type === "client" && (
+        <ClientRapideDialog
+          onFermer={() => setDialogue(null)}
+          onCree={(c) => { setClientsListe((l) => [c, ...l]); majEntete({ client_id: c.id, chantier_id: null }); setDialogue(null); setRetourPressePapier({ genre: "info", texte: `Client « ${c.label} » créé et affecté au devis.` }); }}
+        />
+      )}
+      {dialogue?.type === "chantier" && clientCourant && (
+        <ChantierRapideDialog
+          client={clientCourant}
+          onFermer={() => setDialogue(null)}
+          onCree={(ch) => { setChantiersListe((l) => [ch, ...l]); majEntete({ chantier_id: ch.id }); setDialogue(null); setRetourPressePapier({ genre: "info", texte: `Chantier « ${ch.label} » créé et rattaché au devis.` }); }}
         />
       )}
       {dialogue?.type === "colonnes" && (
