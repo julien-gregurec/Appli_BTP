@@ -234,7 +234,7 @@ export function PlanningV2({ donnees, jour, vue }: { donnees: DonneesPlanningV2;
         <input type="date" value={jour} onChange={(e) => e.target.value && naviguer(e.target.value)} className={champ} aria-label="Date" />
         <strong className="text-sm">{vue === "mois" ? new Intl.DateTimeFormat("fr-FR", { month: "long", year: "numeric" }).format(new Date(`${jour}T12:00:00`)) : vue === "jour" ? jourFr(jour, true) : `Semaine du ${jourFr(jours[0])} au ${jourFr(jours[jours.length - 1])}`}</strong>
         <div className="ml-auto flex flex-wrap gap-1" role="tablist" aria-label="Vue">
-          {VUES.map((v) => <button key={v.cle} type="button" role="tab" aria-selected={vue === v.cle} onClick={() => naviguer(jour, v.cle)} className={`${bouton} ${vue === v.cle ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900" : ""}`}>{v.libelle}</button>)}
+          {VUES.map((v) => <button key={v.cle} type="button" role="tab" aria-selected={vue === v.cle} onClick={() => naviguer(jour, v.cle)} className={`${bouton} ${vue === v.cle ? "bg-neutral-900 text-white hover:bg-neutral-900 dark:bg-white dark:text-neutral-900 dark:hover:bg-white" : ""}`}>{v.libelle}</button>)}
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 text-sm">

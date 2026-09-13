@@ -22,6 +22,8 @@ import { SignatureDocumentMetier } from "@/components/SignatureDocumentMetier";
 import { RelanceDocumentSection } from "@/components/RelanceDocumentSection";
 import { devisV2Actif } from "@/lib/devis/v2-serveur";
 import { DocumentsIssusDevis } from "@/components/devis/DocumentsIssusDevis";
+import { LignesDevisLecture } from "@/components/devis/LignesDevisLecture";
+import type { LigneLue, OuvrageLu } from "@/lib/devis/lecture-lignes";
 import { MOTIF_DROIT_FIN, possedeDroitFin } from "@/lib/droits-devis";
 import { chargerContexteEnvoi } from "@/lib/envoi-documents-serveur";
 import { euros as eurosFr } from "@/lib/devis";
@@ -46,7 +48,7 @@ export default async function DevisDetailPage({ params, searchParams }: { params
 
   if (!devis) notFound();
 
-  const [{ data: lignes }, { data: piecesJointes }, { data: relances }] = await Promise.all([
+  const [{ data: lignes }, { data: piecesJointes }, { data: relances }, { data: ouvragesDevis }] = await Promise.all([
     supabase.from("lignes_devis").select("*").eq("devis_id", id).order("ordre"),
     supabase
       .from("pieces_jointes_devis")
@@ -57,6 +59,7 @@ export default async function DevisDetailPage({ params, searchParams }: { params
     peutGererDevis
       ? supabase.from("relances_documents").select("id,niveau,statut,automatique,date_envoi,created_at").eq("type_document", "devis").eq("document_id", id).order("created_at", { ascending: false })
       : Promise.resolve({ data: null }),
+    devisV2Actif() ? supabase.from("devis_ouvrages").select("cle, ouvrage_reference, ouvrage_nom, libelle_client, quantite_principale, unite_principale").eq("devis_id", id).order("ordre") : Promise.resolve({ data: [] as OuvrageLu[] }),
   ]);
 
   const chantiersClient = peutGererDevis
@@ -163,6 +166,7 @@ export default async function DevisDetailPage({ params, searchParams }: { params
 
         {peutGererDevis && <section className="rounded-md border border-blue-200 bg-blue-50/40 p-4 dark:border-blue-900 dark:bg-blue-950/20"><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold">Chantier associé au devis</h2><p className="text-sm text-neutral-500">La liste contient uniquement les chantiers du même client. La fiche chantier affichera automatiquement ce devis.</p></div>{chantier && <Link href={`/chantiers/${chantier.id}`} className="text-sm font-medium text-blue-700 hover:underline dark:text-blue-300">Ouvrir {chantier.nom}</Link>}</div><form action={associerDevisChantierAction.bind(null, id, `/devis/${id}`)} className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end"><label className="flex-1 text-xs text-neutral-500">Sélectionner un chantier<SearchableSelect name="chantier_id" defaultValue={devis.chantier_id ?? ""} options={chantiersClient.map((item) => ({ value: item.id, label: `${item.nom}${item.ville ? ` · ${item.ville}` : ""}`, search: item.statut }))} placeholder="Écrire le nom du chantier…" emptyLabel={devis.statut === "accepte" ? undefined : "— Aucun chantier —"} className="mt-1" /></label><button className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Enregistrer l’association</button></form>{devis.statut === "accepte" && <p className="mt-2 text-xs text-amber-800 dark:text-amber-300">Un devis accepté peut être déplacé vers un autre chantier, mais ne peut plus être laissé sans chantier afin de conserver ses tâches synchronisées.</p>}</section>}
 
+        {devisV2Actif() ? <LignesDevisLecture lignes={(lignes ?? []) as LigneLue[]} ouvrages={(ouvragesDevis ?? []) as OuvrageLu[]} /> : (
         <div className="overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-800">
           <table className="w-full text-sm">
             <thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500 dark:bg-neutral-900">
@@ -198,6 +202,7 @@ export default async function DevisDetailPage({ params, searchParams }: { params
             </tbody>
           </table>
         </div>
+        )}
 
         <div className="flex justify-end">
           <div className="w-64 space-y-1 text-sm">
