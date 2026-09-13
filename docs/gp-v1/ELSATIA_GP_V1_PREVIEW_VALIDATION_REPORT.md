@@ -88,3 +88,49 @@ sur ce projet. Rien n'a été fait sur Production (`exhvuzegsefmoguxoiak`, jamai
 2. Le **mot de passe de la base preview** (Settings → Database → « Reset database password » si inconnu) :
    `link`, `migration list`, `db dump` et `db push` en ont besoin. Seule `db query` (Management API) s'en passe.
    Ce mot de passe concerne la preview uniquement ; il ne sera ni commité ni écrit dans un rapport.
+
+## 6. Base preview active — ledger, sauvegarde, répétition générale (2026-09-13, 03:00 → 04:10)
+
+**Projet.** `elsatia-preview` (`pgvvpqyjziyapbbkydmc`) `ACTIVE_HEALTHY` à 03:05 ; CLI liée (`supabase link`,
+sans mot de passe : la CLI utilise son rôle de connexion via l'API de gestion, `db push --dry-run` s'est connecté).
+Production (`exhvuzegsefmoguxoiak`) : jamais liée, jamais interrogée.
+
+**Ledger preview.** 242 versions appliquées, min `20260710000001`, max `20260901000251`. Le ledger local
+(286 fichiers) contient **44 versions absentes de la preview**, aucune version preview absente en local
+(pas de collision inverse) :
+- 7 sous le maximum distant (à pousser avec `--include-all`) : `20260815000200` (réconciliation pré-tarifs v2),
+  `20260825000232` (préflight signature, documenté no-op sur preview), `20260830000236`…`20260901000240`
+  (Tools R8→R10 + réconciliation AAL2) ; aucun objet commun avec 241→251 déjà en place ;
+- 29 du train (`252`→`280`) ; 8 GP V1 (`282`→`289`).
+Données existantes : 10 entreprises, 26 comptes, 152 devis, 106 factures, 0 évènement planning.
+
+**Sauvegarde logique (avant toute écriture).** `supabase db dump --linked` ×3, horodatées `20260913-031435`
+dans le scratchpad de session : schéma 1,2 Mo, données (201 blocs COPY, `auth` inclus), rôles. Aucune
+sauvegarde physique n'existe côté Supabase pour ce projet (`backups list` : vide, PITR désactivé).
+
+**Répétition générale sur la sauvegarde réelle.** Sauvegarde restaurée dans un Postgres jetable
+(`public.ecr.aws/supabase/postgres:17.6.1.143`), puis les 44 migrations dans l'ordre exact de `db push`.
+Deux dérives propres à la preview bloquent :
+1. `plateforme_admins.utilisateur_id` porte un **NOT NULL posé hors migration** (l'en-tête de la 235 le
+   signale : « déjà présent, hors migration, jamais commité, sur Preview »). Le ledger le déclare nullable et la
+   contrainte `statut_coherent_check` (236) exige NULL pour `en_attente`. La 266 insère
+   `julien@elsatia.fr … utilisateur_id null on conflict (email) do nothing` : PostgreSQL vérifie NOT NULL
+   avant l'arbitrage ON CONFLICT → **échec certain de la 266 sur la preview** (reproduit deux fois).
+2. **4 postes orphelins** « Compte dépôt » (entreprises `d1…0099`, `fb…0099`, `fb…0097`, `1e…0099` absentes
+   malgré la FK ON DELETE CASCADE ; 0 utilisateur, 0 employé, 0 permission) : la 282 pose deux permissions
+   sur chaque poste → violation FK → **échec certain de la 282**.
+   La preview compte d'autres orphelins (`categories_notes_frais` 44, `compteurs_reference` 30,
+   `types_chantier` 20…) qui ne gênent aucune des 44 migrations (répétition passée).
+Avec ces deux corrections (`docs/gp-v1/preview/preview-derive-avant-migrations.sql`, 2 ordres SQL,
+preview uniquement) : **44/44 migrations appliquées**, devis 152 / factures 106 / lignes 437 inchangés,
+8 fonctions v2 présentes, propriétaire plateforme désigné. Les pgTAP GP V1 ne sont pas exploitables sur cette
+copie (fixtures Storage : buckets non restaurés dans le conteneur nu) ; leur preuve reste celle du Fresh
+(§ 19 du rapport métier, 2 273/0).
+
+**Surface de sécurité preview, relevé AVANT** (à comparer après push) : privilèges DDL des rôles applicatifs
+0 ; fonctions SECURITY DEFINER exécutables par `anon` 1 (partage public documenté) ; sans `search_path` 0.
+
+**Point d'arrêt.** L'exécution des deux ordres de dérive sur la preview a été refusée deux fois par le
+classificateur de permissions de l'outil (écriture de schéma + suppression sur une base distante).
+Rien n'a été écrit sur la preview. Reprise possible dès que Julien exécute ce fichier dans l'éditeur SQL
+du projet preview, ou autorise l'action.
