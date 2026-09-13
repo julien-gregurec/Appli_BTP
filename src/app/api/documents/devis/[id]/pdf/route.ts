@@ -31,6 +31,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       : await genererPdfDepuisUrl(url.toString(), request.headers.get("cookie"));
   } catch (e) {
     if (estDebordementMiseEnPage(e)) return NextResponse.json({ error: e.message }, { status: 422 });
+    // La cause (Chromium, page d'impression, délai) n'est jamais renvoyée au client ; elle est journalisée
+    // côté serveur, sinon un 502 reste muet en exploitation (constaté en recette preview).
+    console.error(`[pdf] devis ${id} : ${e instanceof Error ? `${e.name}: ${e.message}` : String(e)}`);
     return NextResponse.json({ error: "Génération du PDF impossible" }, { status: 502 });
   }
   // GP V1 (lot G) : la production d'un PDF est tracée dans l'historique de l'objet ; un historique
