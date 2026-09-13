@@ -37,3 +37,17 @@ node --env-file=.env.local --import=tsx src/reconcile.ts --apply
 ```
 
 L'origine doit être `127.0.0.1` et `STUDIO_RENDER_TMP` un chemin absolu dédié. Dry run par défaut. Dossiers temporaires de leases inactives et objets sans output conservé : délai minimum d'une heure. Les sorties publiées et leases actives sont conservées. Refus si fenêtre de 1 000 jobs/outputs ou 20 000 objets dépassée : prévoir alors une pagination supervisée. Les historiques failed/cancelled restent en base ; seuls leurs déchets physiques sont nettoyés. Aucun cron ou déploiement Production installé.
+
+## Templates et texte — Lot F
+
+Appliquer également `20260913020000_studio_templates.sql` dans l'environnement local de test. Le worker utilise les primitives du snapshot et ne consulte pas le catalogue métier. Déployer son dossier `fonts/` avec le code : Noto Sans/Serif regular/bold, licence OFL et hashes dans `provenance.json`. Aucun fetch de fontes au runtime. FFmpeg doit fournir `drawtext`, `drawbox` et `overlay` en plus des filtres E. Fontkit est verrouillé dans le lockfile. Les glyphes européens courants sont qualifiés ; un glyphe absent provoque un échec de rendu.
+
+Depuis le dossier worker, pour les preuves F locales :
+
+```sh
+node --import tsx tests/compare-templates.ts
+node --import tsx tests/qualify-templates.ts
+node --import tsx tests/qualify-text.ts
+```
+
+Le premier script compare les six styles avec les mêmes médias et 60 secondes. Le deuxième génère neuf MP4 et les frames dans `/tmp/elsatia-studio-lot-f/qualification`. Le troisième utilise sa fixture image pour quatre vidéos de texte long. `qualify-templates.ts --previews` régénère les petits aperçus publics dans `apps/studio/public/template-previews/` : ces fichiers sont des démonstrations synthétiques, pas des médias utilisateur. Ne pas exécuter ces commandes simultanément avec un autre gate sur une machine contrainte.
