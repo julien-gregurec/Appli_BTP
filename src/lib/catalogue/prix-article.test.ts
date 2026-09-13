@@ -73,7 +73,7 @@ describe("lireCoefficient", () => {
   });
 
   it("bornes identiques à la contrainte proposée", () => {
-    const sql = readFileSync(path.join(process.cwd(), "supabase/proposed/gp-v1-metier-bibliotheque.sql.proposed"), "utf8");
+    const sql = readFileSync(path.join(process.cwd(), "supabase/migrations/20260912000284_gp_v1_bibliotheque_articles_ouvrages.sql"), "utf8");
     expect(sql).toContain(`coefficient > 0 and coefficient <= ${COEFFICIENT_MAX}`);
   });
 });

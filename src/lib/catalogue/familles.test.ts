@@ -24,7 +24,7 @@ const toutes = [plaques, menuiserie, rails, platrerie, archivee];
 
 describe("parité avec la base", () => {
   it("même séparateur que libelle_famille en SQL", () => {
-    const sql = readFileSync(path.join(process.cwd(), "supabase/proposed/gp-v1-metier-bibliotheque.sql.proposed"), "utf8");
+    const sql = readFileSync(path.join(process.cwd(), "supabase/migrations/20260912000284_gp_v1_bibliotheque_articles_ouvrages.sql"), "utf8");
     expect(sql).toContain(`p.nom || '${SEPARATEUR_FAMILLE}' || f.nom`);
   });
 });
