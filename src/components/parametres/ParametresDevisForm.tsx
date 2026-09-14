@@ -5,11 +5,13 @@ import { modifierParametresDevisAction } from "@/app/actions/parametres-devis";
 import { FREQUENCES_RAPPEL, RAPPEL_MINUTES_MAX, RAPPEL_MINUTES_MIN, type ParametresDevis } from "@/lib/devis/parametres-devis";
 import { UNITES_METIER } from "@/lib/unites";
 import { CLE_RAPPEL_PERSONNEL } from "@/components/devis/EditeurDevisV2";
+import { useZoneDense } from "@/lib/ui-dense";
 
 const champ = "min-h-11 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
 /** Paramètres > Devis : défauts des nouveaux devis, rappel de sauvegarde (entreprise) et surcharge personnelle. */
 export function ParametresDevisForm({ initial, peutGerer }: { initial: ParametresDevis; peutGerer: boolean }) {
+  useZoneDense();
   const standard = FREQUENCES_RAPPEL.includes(initial.rappelSauvegardeMinutes as (typeof FREQUENCES_RAPPEL)[number]);
   const [frequence, setFrequence] = useState<string>(standard ? String(initial.rappelSauvegardeMinutes) : "personnalise");
   const [minutes, setMinutes] = useState(initial.rappelSauvegardeMinutes);

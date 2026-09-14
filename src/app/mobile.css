@@ -141,3 +141,14 @@
    chantier : la règle ci-dessus, qui masque tout bouton, les rendait inaccessibles. Une zone
    marquée `data-consultation` garde ses boutons. */
 .lecture-seule main [data-consultation] button[type="button"] { display: inline-flex !important; }
+
+/* Bulles flottantes (Aide, Assistant IA) — polish UX Julien, 2026-09-14 : sur mobile, une bulle fixée en
+   bas à droite finit tôt ou tard exactement sur un champ ou un bouton (« + Client » du devis, constaté en
+   recette), puisque rien dans la page ne « sait » qu'elle existe. On ne la déplace pas (ce serait une
+   décision de design) : on l'efface pendant qu'une zone de saisie dense est ouverte — `useZoneDense` pose
+   `<body data-ui-dense="1">` — et elle réapparaît dès qu'on en ressort. L'aide reste joignable pendant ce
+   temps par le menu (« Guide d'utilisation »). Desktop non concerné : ces zones y ouvrent assez d'espace
+   pour que rien ne coïncide avec le coin bas droit. */
+@media (max-width: 767px) {
+  body[data-ui-dense="1"] .bulle-flottante { display: none !important; }
+}

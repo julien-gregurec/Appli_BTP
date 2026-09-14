@@ -23,6 +23,7 @@ import { ChantierRapideDialog, ClientRapideDialog } from "@/components/devis/Tie
 import { BarreFormatage } from "@/components/devis/BarreFormatage";
 import { BoutonMenu } from "@/components/Menu";
 import { demanderNavigation, GardeModifications } from "@/components/GardeModifications";
+import { useZoneDense } from "@/lib/ui-dense";
 import { FiligraneSelecteur } from "@/components/documents/FiligraneSelecteur";
 import type { IdentiteEmetteur, SourceDocument, StyleDocument } from "@/lib/devis/document-modele";
 import {
@@ -56,6 +57,8 @@ const DELAI_AUTOSAUVEGARDE_MS = 2000;
 export const CLE_MODE_EDITEUR = "gp.devis.mode.v1";
 /** Surcharge personnelle du rappel de sauvegarde (ce navigateur) : `{ actif?: boolean; minutes?: number }`. */
 export const CLE_RAPPEL_PERSONNEL = "gp.devis.rappel.v1";
+/** En-tête repliée ou non (ce navigateur), tous devis confondus : « 1 » = repliée. */
+export const CLE_ENTETE_REPLIEE = "gp.devis.entete.v1";
 
 const champ = "min-h-11 rounded-md border border-neutral-300 px-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 const bouton = "min-h-11 rounded-md border border-neutral-300 px-3 text-sm hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900";
@@ -128,6 +131,26 @@ export function EditeurDevisV2({
     return () => window.clearTimeout(t);
   }, []);
   const changerMode = (m: "grille" | "document") => { setMode(m); try { window.localStorage.setItem(CLE_MODE_EDITEUR, m); } catch { /* idem */ } };
+  // En-tête repliable (polish UX Julien, 2026-09-14) : à 1440×900 l'en-tête complet poussait la grille
+  // sous le pli. Un devis TOUJOURS NOUVEAU s'ouvre développé (rien à replier « de façon surprenante » —
+  // l'utilisateur doit d'abord voir le client, les dates…) ; un devis déjà ouvert respecte la préférence
+  // mémorisée dans ce navigateur, repliée ou non. Le bouton « Enregistrer et fermer » et l'indicateur de
+  // sauvegarde restent HORS de l'en-tête (rangée du haut) : ils sont donc visibles dans les deux états.
+  const [enteteRepliee, setEnteteRepliee] = useState(false);
+  useEffect(() => {
+    if (!devisId) return; // nouveau devis : toujours développé, jamais restauré replié.
+    const t = window.setTimeout(() => {
+      try { if (window.localStorage.getItem(CLE_ENTETE_REPLIEE) === "1") setEnteteRepliee(true); } catch { /* stockage indisponible */ }
+    }, 0);
+    return () => window.clearTimeout(t);
+  }, [devisId]);
+  const basculerEntete = useCallback(() => {
+    setEnteteRepliee((r) => {
+      const suivant = !r;
+      try { window.localStorage.setItem(CLE_ENTETE_REPLIEE, suivant ? "1" : "0"); } catch { /* idem */ }
+      return suivant;
+    });
+  }, []);
   const [surligne, setSurligne] = useState<string | null>(null);
   const [aujourdhui] = useState(() => new Date().toISOString().slice(0, 10));
   const [devisIdCourant, setDevisIdCourant] = useState(devisId);
@@ -366,6 +389,7 @@ export function EditeurDevisV2({
     document.body.dataset.editeurDevis = "1";
     return () => { delete document.body.dataset.editeurDevis; };
   }, []);
+  useZoneDense();
 
   useEffect(() => {
     const clavier = (e: KeyboardEvent) => {
@@ -375,10 +399,11 @@ export function EditeurDevisV2({
       if (k === "s") { e.preventDefault(); enregistrer({ explicite: true }); }
       if (k === "z" && !e.shiftKey) { e.preventDefault(); annulerEdition(); }
       if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); retablirEdition(); }
+      if (k === "h" && e.shiftKey) { e.preventDefault(); basculerEntete(); }
     };
     window.addEventListener("keydown", clavier);
     return () => window.removeEventListener("keydown", clavier);
-  }, [enregistrer, annulerEdition, retablirEdition]);
+  }, [enregistrer, annulerEdition, retablirEdition, basculerEntete]);
 
   useEffect(() => {
     if (!sale) return;
@@ -423,6 +448,13 @@ export function EditeurDevisV2({
   }, [tries, etat.origines, droits.voirCouts, totaux.totalHt]);
   void lignesMontants;
   const ligneMobile = dialogue?.type === "ligne_mobile" ? tries.find((e) => e.type === "ligne" && e.ligne.cle === dialogue.cle) : undefined;
+  const chantierCourant = chantiersListe.find((c) => c.id === entete.chantier_id) ?? null;
+  // Texte de statut de sauvegarde : partagé entre la rangée du haut (toujours visible) et la barre
+  // compacte de l'en-tête replié (même information, jamais dupliquée à divergence possible).
+  const texteSauvegarde = sauvegarde.statut === "en_cours" ? "Enregistrement…"
+    : sauvegarde.statut === "hors_ligne" ? "Hors ligne — modifications conservées ici, enregistrement au retour du réseau"
+    : sauvegarde.statut === "erreur" ? (sauvegarde.conflit ? "Conflit : rechargez le devis" : `Non enregistré — ${sauvegarde.message}`)
+    : sale ? "Modifications non enregistrées" : sauvegarde.statut === "ok" ? `Enregistré à ${sauvegarde.heure}` : "";
 
   return (
     <div className="flex flex-col gap-3">
@@ -431,12 +463,7 @@ export function EditeurDevisV2({
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => { const cible = devisIdCourant ? `/devis/${devisIdCourant}` : "/devis"; if (demanderNavigation(cible)) router.push(cible); }} className="text-sm text-neutral-500 hover:underline" data-testid="retour-devis">← {devisIdCourant ? "Retour au devis" : "Retour aux devis"}</button>
           <h1 className="text-xl font-semibold">{devisIdCourant ? "Devis brouillon" : "Nouveau devis"}</h1>
-        <span className="text-xs text-neutral-500" aria-live="polite" data-sauvegarde={sauvegarde.statut}>
-          {sauvegarde.statut === "en_cours" ? "Enregistrement…"
-            : sauvegarde.statut === "hors_ligne" ? "Hors ligne — modifications conservées ici, enregistrement au retour du réseau"
-            : sauvegarde.statut === "erreur" ? (sauvegarde.conflit ? "Conflit : rechargez le devis" : `Non enregistré — ${sauvegarde.message}`)
-            : sale ? "Modifications non enregistrées" : sauvegarde.statut === "ok" ? `Enregistré à ${sauvegarde.heure}` : ""}
-        </span>
+        <span className="text-xs text-neutral-500" aria-live="polite" data-sauvegarde={sauvegarde.statut}>{texteSauvegarde}</span>
         <div className="ml-auto flex flex-wrap gap-2">
           <button type="button" onClick={annulerEdition} disabled={!peutAnnuler(historique)} className={bouton} title="Annuler (Ctrl+Z)" aria-label="Annuler">↶</button>
           <button type="button" onClick={retablirEdition} disabled={!peutRetablir(historique)} className={bouton} title="Rétablir (Ctrl+Y)" aria-label="Rétablir">↷</button>
@@ -466,8 +493,31 @@ export function EditeurDevisV2({
 
       <div className={`grid gap-4 ${apercuVisible && mode === "grille" ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" : "lg:grid-cols-[minmax(0,1fr)]"}`} data-mode={mode}>
         <div className={`${onglet === "saisie" ? "block" : "hidden"} space-y-4 lg:block`}>
-          <fieldset className="grid gap-3 rounded-md border border-neutral-200 p-3 sm:grid-cols-2 lg:grid-cols-3 dark:border-neutral-800" onFocus={focusEntete} onBlur={blurEntete}>
-            <legend className="px-1 text-sm font-medium">En-tête du devis</legend>
+          {/* En-tête repliable (polish UX Julien) : cette barre reste TOUJOURS visible (repliée ou non) — elle
+              porte le résumé (référence, client, chantier, statut, totaux, sauvegarde) quand l'en-tête est
+              replié, pour ne jamais perdre le contexte en travaillant sur la grille. */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800" data-testid="entete-devis-barre" data-repliee={enteteRepliee ? "1" : "0"}>
+            {enteteRepliee ? (
+              <>
+                <span className="font-medium">{entete.reference_interne || "Sans référence"}</span>
+                <span className="text-neutral-500">{clientCourant ? clientCourant.label : "Aucun client"}</span>
+                {chantierCourant && <span className="text-neutral-500">· {chantierCourant.label}</span>}
+                <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">Brouillon</span>
+                <span className="tabular-nums text-neutral-500">HT {euros(totaux.totalHt)}</span>
+                <span className="tabular-nums font-medium">TTC {euros(totaux.totalTtc)}</span>
+                <span className="text-xs text-neutral-500" aria-live="polite">{texteSauvegarde}</span>
+              </>
+            ) : (
+              <span className="font-medium text-neutral-600 dark:text-neutral-300">En-tête du devis</span>
+            )}
+            <button type="button" onClick={basculerEntete} aria-expanded={!enteteRepliee} aria-controls="entete-devis-detail" className={`${bouton} ml-auto shrink-0`} title="Replier ou déplier l’en-tête du devis (Ctrl+Maj+H)" data-testid="entete-devis-bouton">
+              {enteteRepliee ? "Détails du devis ▾" : "Réduire ▴"}
+            </button>
+          </div>
+          {!enteteRepliee && (
+          <>
+          <fieldset id="entete-devis-detail" className="grid gap-3 rounded-md border border-neutral-200 p-3 sm:grid-cols-2 lg:grid-cols-3 dark:border-neutral-800" onFocus={focusEntete} onBlur={blurEntete}>
+            <legend className="sr-only">En-tête du devis</legend>
             <label className="flex flex-col gap-1 text-sm">
               Référence d’affaire
               <input value={entete.reference_interne ?? ""} maxLength={120} onChange={(e) => majEntete({ reference_interne: e.target.value || null })} className={champ} placeholder="Interne, non imprimée" />
@@ -539,6 +589,8 @@ export function EditeurDevisV2({
           </fieldset>
 
           <FiligraneSelecteur valeur={entete.filigrane} onChange={(f) => majEntete({ filigrane: f })} heritable logoDisponible={logoDisponible} legende="Filigrane de ce devis" />
+          </>
+          )}
 
           <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 bg-white/90 py-2 backdrop-blur dark:bg-neutral-950/90" role="toolbar" aria-label="Lignes">
             <BoutonMenu libelle="Ajouter" className={principal} testId="menu-ajouter" titre="Ajouter une ligne, un article, un ouvrage, un titre…" elements={[
@@ -641,7 +693,10 @@ export function EditeurDevisV2({
             ))}
           </ol>
 
-          <section aria-label="Totaux" className="space-y-1 rounded-md bg-neutral-50 p-3 text-sm dark:bg-neutral-900">
+          {/* Masqué en mode Document (grand écran) : les mêmes totaux figurent déjà dans le document
+              ci-dessous, entre le tableau des lignes et le pied de page — les dupliquer poussait le
+              document réel plus bas sans apporter d'information (incohérence relevée en polish UX). */}
+          <section aria-label="Totaux" className={`space-y-1 rounded-md bg-neutral-50 p-3 text-sm dark:bg-neutral-900 ${mode === "document" ? "lg:hidden" : ""}`}>
             {totaux.remiseGlobaleHt !== 0 && (
               <>
                 <Ligne libelle="Sous-total HT" valeur={euros(totaux.sousTotalHt)} />

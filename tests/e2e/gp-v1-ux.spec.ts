@@ -262,6 +262,23 @@ test("48. planning : nouvel évènement, double clic, glisser, Alt+glisser, menu
   await page.mouse.up();
   await expect(bloc2).toHaveAttribute("aria-label", /10:00 à 12:00/, { timeout: 30_000 });
   await expect.poll(async () => (await page.locator("main").innerText()).includes("Enregistrement…"), { timeout: 60_000 }).toBe(false);
+  // 4b. Glisser vers un autre salarié (ligne suivante) — polish UX Julien, § 29 : la destination est
+  // identifiée par sa ligne (`data-ligne`, le salarié réel), jamais par un delta de pixels absolu, pour
+  // rester robuste à un changement de hauteur de ligne ou de densité de l'écran.
+  const ligneActuelle = await bloc2.evaluate((el) => el.closest("[role=row][data-ligne]")?.getAttribute("data-ligne"));
+  const ligneSuivante = page.locator(`[role=row][data-ligne]:not([data-ligne="${ligneActuelle}"])`).first();
+  const bLigne = await ligneSuivante.boundingBox();
+  const b3 = await bloc2.boundingBox();
+  if (!bLigne || !b3) throw new Error("ligne ou bloc sans boîte");
+  await page.mouse.move(b3.x + 20, b3.y + b3.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(b3.x + 20, bLigne.y + bLigne.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => (await page.locator("main").innerText()).includes("Enregistrement…"), { timeout: 60_000 }).toBe(false);
+  await expect.poll(
+    async () => bloc2.evaluate((el) => el.closest("[role=row][data-ligne]")?.getAttribute("data-ligne")),
+    { timeout: 30_000 },
+  ).not.toBe(ligneActuelle);
   // 5. Alt+glisser → duplication (deux blocs portent le titre).
   const b2 = await bloc2.boundingBox();
   if (!b2) throw new Error("bloc sans boîte");
@@ -366,4 +383,42 @@ test("51. mobile 390 px : toolbar, client inline, retour + garde, planning sans 
   await expect(page.getByTestId("menu-actions-evenement")).toBeVisible();
   const debordement = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(debordement).toBeLessThanOrEqual(1);
+});
+
+test("60. en-tête du devis repliable : nouveau devis développé, barre compacte correcte, raccourci, mémorisation, jamais sous le pli", async ({ page }) => {
+  await connexion(page, USERS.adminA);
+  await aller(page, "/devis/nouveau");
+  // 1. Nouveau devis : toujours développé, jamais replié « de façon surprenante ».
+  const barre = page.getByTestId("entete-devis-barre");
+  await expect(barre).toHaveAttribute("data-repliee", "0");
+  await expect(barre).toContainText("En-tête du devis");
+  // 2. Client, chantier et une ligne, puis repli : la barre porte le résumé, la grille reste visible.
+  await page.getByRole("combobox", { name: "Client", exact: true }).selectOption({ index: 1 });
+  await ajouterLigne(page, "libre");
+  await cellule(page, 0, "designation").fill("Ligne en-tête repliable");
+  await page.keyboard.press("Tab");
+  await cellule(page, 0, "quantite").fill("2"); await page.keyboard.press("Tab");
+  await cellule(page, 0, "prix_vente").fill("100"); await page.keyboard.press("Tab");
+  await expect(lecture(page, 0, "total_ht")).toContainText("200,00");
+  await page.getByTestId("entete-devis-bouton").click();
+  await expect(barre).toHaveAttribute("data-repliee", "1");
+  await expect(barre).toContainText("Brouillon");
+  await expect(barre).toContainText("HT 200,00 €");
+  await expect(barre).toContainText("TTC 240,00 €");
+  await expect(grille(page)).toBeVisible();
+  // 3. Le bouton Enregistrer et l'indicateur de sauvegarde restent visibles, en-tête replié.
+  await expect(page.getByRole("button", { name: "Enregistrer et fermer" })).toBeVisible();
+  // 4. Raccourci clavier : redéplie, puis reréplie.
+  await page.keyboard.press("Control+Shift+H");
+  await expect(barre).toHaveAttribute("data-repliee", "0");
+  await expect(page.getByLabel("Référence d’affaire")).toBeVisible();
+  await page.keyboard.press("Control+Shift+H");
+  await expect(barre).toHaveAttribute("data-repliee", "1");
+  // 5. Préférence mémorisée : sauvegarder, rouvrir le devis existant → reste replié.
+  const url = await enregistrerEtFermer(page);
+  await aller(page, `${url}/modifier`);
+  await expect(page.getByTestId("entete-devis-barre")).toHaveAttribute("data-repliee", "1");
+  // 6. Un AUTRE nouveau devis reste développé malgré la préférence mémorisée (jamais replié par surprise).
+  await aller(page, "/devis/nouveau");
+  await expect(page.getByTestId("entete-devis-barre")).toHaveAttribute("data-repliee", "0");
 });

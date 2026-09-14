@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { enregistrerEvenementAction, supprimerEvenementAction } from "@/app/actions/planning-v2";
 import { BoutonMenu, MenuContextuel, type ElementMenu } from "@/components/Menu";
 import { actionsPlanning } from "@/lib/actions-contextuelles/registre";
+import { useZoneDense } from "@/lib/ui-dense";
 import type { DonneesPlanningV2 } from "@/lib/planning/serveur";
 import {
   ajouterJours, arrondirAuPas, blocsDeVue, changerLigne, couleurDe, deplacer, detecterConflits, dupliquer, heureFr, instant, joursDeVue, jourDe,
@@ -36,6 +37,7 @@ const jourFr = (j: string, long = false) => new Intl.DateTimeFormat("fr-FR", lon
 
 export function PlanningV2({ donnees, jour, vue }: { donnees: DonneesPlanningV2; jour: string; vue: Vue }) {
   const router = useRouter();
+  useZoneDense();
   const [enCours, demarrer] = useTransition();
   const [evenements, setEvenements] = useState(donnees.evenements);
   const [selection, setSelection] = useState<string | null>(null);
@@ -261,6 +263,11 @@ export function PlanningV2({ donnees, jour, vue }: { donnees: DonneesPlanningV2;
           ? <button type="button" onClick={() => { const ev = nouvelEvenement(); setEvenements((l) => [...l, ev]); setEdition(ev); }} className={`${bouton} bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-white dark:text-neutral-900`} title="Ou glissez sur une zone vide de la grille">Nouvel évènement</button>
           : <button type="button" aria-disabled="true" className={`${bouton} cursor-not-allowed opacity-50`} title="Création réservée aux postes ayant le droit gerer_planning">Nouvel évènement</button>}
         <BoutonMenu libelle={selectionne ? `Actions · ${selectionne.titre.slice(0, 24)}` : "Actions"} className={bouton} testId="menu-actions-evenement" titre={selectionne ? "Actions sur l’évènement sélectionné" : "Sélectionnez un évènement (clic) : ses actions s’affichent ici, ou faites un clic droit sur le bloc"} elements={selectionne ? elementsMenu(selectionne) : [{ cle: "aucun", libelle: "Aucun évènement sélectionné", desactive: true, action: () => {} }]} />
+        {/* Découvrabilité des gestes (polish UX Julien) : rien sur la grille elle-même n'indique qu'un
+            évènement se déplace ou se duplique à la souris avant de l'avoir sélectionné une première fois. */}
+        {donnees.droits.gerer && (
+          <span tabIndex={0} role="note" aria-label="Aide : gestes de la grille" title="Glissez un évènement pour le déplacer (créneau, jour ou salarié). Alt+glissez pour le dupliquer. Étirez son bord bas pour changer sa durée. Double-cliquez pour l’ouvrir. Clic droit ou « ⋯ » pour le menu." className="flex h-9 w-9 shrink-0 cursor-help items-center justify-center rounded-md border border-dashed border-neutral-300 text-sm text-neutral-500 dark:border-neutral-700">ⓘ</span>
+        )}
         <a href={`/imprimer/planning?jour=${jour}&vue=${vue}`} target="_blank" rel="noopener" className={bouton}>Imprimer</a>
         <a href={`/api/documents/planning/pdf?jour=${jour}&vue=${vue}`} target="_blank" rel="noopener" className={bouton}>PDF</a>
         <span className="text-xs text-neutral-500" aria-live="polite">{enCours ? "Enregistrement…" : conflits.length ? `${conflits.length} conflit${conflits.length > 1 ? "s" : ""}` : ""}</span>

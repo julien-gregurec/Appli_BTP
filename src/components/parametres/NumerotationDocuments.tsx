@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { modifierNumerotationDocumentsAction } from "@/app/actions/numerotation-documents";
+import { useZoneDense } from "@/lib/ui-dense";
 import { formaterNumero, LARGEUR_MAX, LARGEUR_MIN, LIBELLES_TYPES_DOCUMENT, SEPARATEURS, TYPES_DOCUMENT_NUMEROTES, validerFormatNumerotation, type FormatNumerotation, type Separateur, type TypeDocumentNumerote } from "@/lib/numerotation-documents";
 
 const champ = "min-h-11 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
@@ -14,6 +15,7 @@ export type EtatNumerotation = Record<TypeDocumentNumerote, { format: FormatNume
  * attribué par la base à la sortie du brouillon : ce formulaire ne renumérote rien.
  */
 export function NumerotationDocuments({ initial, peutGerer, voitProchain }: { initial: EtatNumerotation; peutGerer: boolean; voitProchain: boolean }) {
+  useZoneDense();
   const [formats, setFormats] = useState<Record<TypeDocumentNumerote, FormatNumerotation>>({ devis: initial.devis.format, facture: initial.facture.format, avoir: initial.avoir.format, commande: initial.commande.format });
   const [avoirPropre, setAvoirPropre] = useState(initial.avoir.configure);
   const maj = (type: TypeDocumentNumerote, patch: Partial<FormatNumerotation>) => setFormats((f) => ({ ...f, [type]: { ...f[type], ...patch } }));

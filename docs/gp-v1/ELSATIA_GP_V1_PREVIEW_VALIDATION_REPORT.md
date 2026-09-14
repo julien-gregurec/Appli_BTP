@@ -1252,3 +1252,254 @@ existants sont conservés (une quantité modifiée à 7 sur la ligne 4 de chacun
   du formulaire (bouton « + Client » selon le défilement, capture 15) — commun à toute l'application.
 - Le bouton flottant « Rechercher Ctrl+K » reste affiché sur les autres écrans, en haut à droite, au-dessus
   d'une zone vide ; il n'est masqué que dans l'éditeur.
+
+## 37. Polish UX final avant validation Julien (2026-09-14, session autonome)
+
+Lot demandé par Julien après la refonte UX (§ 36) : « un dernier lot de polish UX objectif sans prendre de
+décision esthétique à sa place ». Base `468f6db`. Aucune migration (aucun changement SQL cette session,
+confirmé par `verify:migrations` = 292 migrations inchangées et pgTAP Fresh identique). Aucune décision
+tranchée à la place de Julien : Grille/Document reste au choix, le mode par défaut n'a pas changé.
+
+### 37.1 En-tête du devis repliable (exigences 1-4)
+
+**Constat confirmé** : à 1440 × 900, l'en-tête occupait tout l'écran, la grille arrivait sous le pli
+(mesuré à la capture 01 du § 36.17).
+
+**Correctif** (`EditeurDevisV2.tsx`) : une barre TOUJOURS visible remplace la légende du bloc d'en-tête —
+repliée, elle porte le résumé (référence, client, chantier, statut « Brouillon », total HT, total TTC,
+indicateur de sauvegarde) et un bouton « Détails du devis ▾ » ; dépliée, le formulaire complet (client,
+chantier, dates, commercial, validité, règlement, remise globale, conditions, notes, filigrane) reste
+identique à avant. Le bouton « Enregistrer et fermer » et l'indicateur de sauvegarde vivent HORS de
+l'en-tête (rangée du haut) : visibles dans les deux états, satisfaisant à eux seuls l'exigence 15.
+
+Comportement automatique : un devis **nouveau** s'ouvre toujours développé, quelle que soit la préférence
+mémorisée (jamais replié « de façon surprenante ») ; un devis **existant** respecte la préférence du
+navigateur (`localStorage`, clé `gp.devis.entete.v1`, même mécanisme que le mode Grille/Document et le
+rappel de sauvegarde déjà en place). Raccourci **Ctrl/Cmd+Maj+H** pour basculer, documenté au § 37.12.
+Sur mobile et tablette (< 1024 px), le même mécanisme s'applique : à 768 px, l'en-tête replié laisse voir
+la grille et le formulaire de saisie sans défiler (capture vérifiée). Aucun composant distinct créé pour
+mobile — la demande « informations du devis ▾ en accordéon » est cette même barre, déjà responsive.
+
+Vérifié en direct (navigateur, build de production) : nouveau devis développé ; ligne saisie (3 × 100 €) ;
+repli → barre "Sans référence · UX Client · BROUILLON · HT 300,00 € · TTC 360,00 € · Enregistré à HH:MM" ;
+Ctrl+Maj+H déplie puis replie ; enregistrement puis réouverture du devis → reste replié ; un AUTRE nouveau
+devis reste développé malgré la préférence mémorisée. Couvert par le test E2E 60 (nouveau,
+`tests/e2e/gp-v1-ux.spec.ts`), vert.
+
+### 37.2 Grille / Document — aucun défaut tranché (exigences 5-6)
+
+Les deux modes restent disponibles, mémorisés par navigateur (`gp.devis.mode.v1`, inchangé), instantanés
+(bascule CSS, aucun remontage des composants : sélection, focus et défilement de la grille sont conservés
+en changeant de mode — vérifié en manipulant une ligne, en basculant deux fois, puis en relisant sa
+valeur). L'indicateur (paire de boutons contrastés, `aria-pressed`, groupe `aria-label="Mode de travail"`)
+n'a pas été jugé ambigu à l'usage — aucun changement visuel apporté, conformément à la consigne de ne pas
+trancher une préférence esthétique.
+
+### 37.3 Mode Document — incohérence évidente corrigée (exigence 7)
+
+**Défaut trouvé** : en mode Document, un bloc « Total HT / TVA / Total TTC » (celui de la grille)
+s'affichait ENTRE la barre d'outils et le document A4 réel — qui affiche lui-même ses propres totaux, dans
+son pied de tableau. Doublon pur, sans information supplémentaire, qui poussait le document (la vue
+demandée par ce mode) plus bas. Corrigé : la section Totaux de la grille se masque désormais en mode
+Document à partir de `lg:` (grand écran) ; elle reste visible sur mobile, où « Document » est un onglet
+séparé (« Aperçu du document »), pas ce mode. Vérifié en direct : après bascule, le document A4 suit
+immédiatement la barre de formatage, sans doublon. Aucun autre écart évident trouvé dans les marges, la
+largeur A4 simulée, l'édition inline (clic sur une ligne du document → dialogue d'édition, inchangé), le
+rendu des titres, sous-totaux, ouvrages et remises.
+
+### 37.4 Mode Grille — polish (exigence 8)
+
+Revue de la densité, l'alignement, la troncature, les info-bulles, la largeur des colonnes, le focus de
+cellule, la ligne sélectionnée, le menu contextuel et les raccourcis (Ctrl+C/V/D, flèches, Échap, Ctrl+A) :
+déjà conformes (héritage du lot précédent — sélection visible en bleu, menu contextuel avec motifs de
+droits, cellules calculées désormais exposées en `data-lecture`). Aucune incohérence évidente trouvée ;
+aucun changement.
+
+### 37.5 Bulles flottantes — ne recouvrent plus rien (exigences 9-12)
+
+**Défaut confirmé** : sur mobile, le bouton « Aide » (fixe, bas-droite) et la bulle « Assistant IA »
+(fixe, au-dessus) restent à une position d'écran constante quelle que soit la page ; sur un formulaire
+court (ex. le devis), ils coïncident en permanence avec un champ ou une action réelle (« + Client »,
+constaté à la capture 15 du § 36.17) — pas seulement transitoirement au défilement.
+
+**Correctif** : nouveau hook partagé `useZoneDense()` (`src/lib/ui-dense.ts`, compteur partagé pour des
+zones denses imbriquées) posant `<body data-ui-dense="1">` tant qu'un composant dense est monté — câblé
+sur l'éditeur de devis, l'éditeur de facture (`FactureEditor`), le planning (`PlanningV2`) et les deux
+pages de réglages denses (Devis, Numérotation). Règle CSS (`mobile.css`, `@media max-width:767px`) :
+les bulles marquées `.bulle-flottante` (Aide, lanceur de l'Assistant — pas le panneau ouvert, qui reste
+utilisable) s'effacent tant que la zone dense est ouverte, et réapparaissent dès qu'on la quitte. L'aide
+reste accessible autrement pendant ce temps : « Guide d'utilisation » dans le menu latéral (déjà présent),
+sans changement nécessaire pour satisfaire l'exigence 12. Desktop non concerné (assez d'espace).
+
+Vérifié en direct à 375 px : `data-ui-dense="1"` posé dans l'éditeur de devis et sur le planning,
+`display:none` mesuré sur le bouton Aide ; sur la liste des devis (page non dense), `data-ui-dense` absent
+et le bouton repasse en `display:flex`.
+
+### 37.6 Zone de sécurité mobile (exigence 11)
+
+Les deux bulles et le panneau ouvert de l'Assistant respectent désormais `env(safe-area-inset-bottom)` et
+`env(safe-area-inset-right)` (même motif que `MobileBack`, qui les avait déjà). Le clavier virtuel n'est
+pas testable en environnement automatisé sans IME réel ; les zones fixes n'ayant pas de comportement
+spécifique au clavier (pas de `position:fixed` ancrée à une saisie), aucun changement supplémentaire jugé
+nécessaire sans preuve d'un défaut réel.
+
+### 37.7 Toolbar devis — revue finale (exigences 13-16)
+
+Actions principales (Ajouter, Copier, Coller, Dupliquer, Aperçu A4, PDF, Envoyer) et secondaires (Plus ▾ :
+position de collage, colonnes, recherche globale) inchangées — déjà correctement réparties. Testé à
+1440, 1280 et 1024 px : la barre tient sur une ligne jusqu'à 1280 px inclus ; à 1024 px elle se répartit
+sur deux lignes (`flex-wrap`), sans qu'aucune action sorte de l'écran. « Enregistrer et fermer » reste
+hors de l'en-tête repliable, donc toujours visible et lisible (§ 37.1). Le rappel de sauvegarde (bandeau
+ambre) n'a pas été déplacé : il s'affiche sous la barre de formatage, jamais derrière une modale (les
+dialogues de l'éditeur sont natifs, au-dessus de tout) ni superposé à un message d'erreur (canaux distincts
+— `erreur` en haut, rappel dans le flux).
+
+### 37.8 Création client / chantier inline — audit (exigences 17-18)
+
+Focus initial (`autoFocus`), validation (nom/raison sociale requis, message clair), erreurs serveur
+affichées en `role="alert"`, bouton Annuler, sélection automatique du tiers créé dans le devis (`onCree`
+met à jour `client_id`/`chantier_id` sans navigation), chantier préremplant l'adresse du client : déjà
+conformes (lot précédent). Aucune perte de saisie du devis pendant l'échange (le brouillon reste en
+mémoire). Aucun changement.
+
+### 37.9 Unités (exigence 19)
+
+22 unités métier, déjà accessibles par une recherche native (`<input list>` / `<datalist>`, filtrage au
+fil de la frappe dans le navigateur) dans la grille et dans les réglages par défaut. Pas de menu déroulant
+à défilement pénible. Aucun changement nécessaire.
+
+### 37.10 Texte riche (exigences 20-22)
+
+Gras/italique/souligné/surligné/couleur déjà couverts sur désignation (titre, sous-titre, commentaire,
+article, ligne libre), description et conditions ; Ctrl/Cmd+B/I/U déjà actifs, limités aux champs marqués
+`data-texte-riche`, sans conflit avec les raccourcis de la grille (vérifié par lecture du code : le
+gestionnaire ignore tout champ non marqué). **Nouveauté de cette session** : avertissement de contraste
+(`CouleurDocumentChamp.tsx`) sur les couleurs de marque (« Couleur principale », « Couleur d'accent » —
+utilisées entre autres par `[c=accent]`/`[c=principale]` dans les devis) — calcul du contraste WCAG contre
+un fond blanc, avertissement sous le sélecteur si le résultat est inférieur à 1,5:1. Vérifié en direct :
+`#fefefe` déclenche l'avertissement, la couleur par défaut de l'application (`#c9a24a`, contraste ≈ 2,4:1)
+n'en déclenche pas.
+
+### 37.11 Navigation retour et modifications non enregistrées (exigences 23-24)
+
+Audit des 8 zones nommées (Devis, Facture, Client, Chantier, Planning, Paramètres, Ouvrages, Articles) :
+chaque fiche/formulaire porte un lien « ← Retour » ou « Fermer » cohérent (`grep` sur `src/app/(app)`,
+aucune fiche des 8 zones sans ce lien). **Défaut trouvé** : l'éditeur de facture (`FactureEditor.tsx`)
+n'avait AUCUNE garde de modifications non enregistrées — un clic sur « ← Facture » ou un lien de la barre
+latérale perdait la saisie en silence, sans le moindre avertissement. Corrigé : réutilisation du composant
+`GardeModifications` déjà éprouvé sur l'éditeur de devis (aucun nouveau design), `sale` dérivé par
+comparaison à l'état initial (pas de drapeau à poser sur chaque champ). Vérifié en direct : modification →
+clic sur « ← Facture » → dialogue « Sauvegarder avant de quitter ? » (Annuler / Quitter sans enregistrer /
+Enregistrer et quitter).
+
+**Défaut PRÉEXISTANT découvert en testant ce correctif** (§ 37.16, à faire valider par Julien) :
+l'enregistrement d'une facture existante échoue actuellement avec « Impossible de créer cette facture »
+— reproduit à l'identique via le bouton « Enregistrer les modifications » d'origine, donc indépendant de
+la garde ajoutée. Cause exacte identifiée : `permission denied for function recalc_totaux_facture`
+(journal serveur). La migration `20260902000255_acl_reconciliation_v1.sql` révoque `EXECUTE` sur
+`public.recalc_totaux_facture` pour `authenticated` et `service_role` ; la migration
+`20260912000282_gp_devis_v2_catalogue_ouvrages.sql` (ce train) la redéfinit (`create or replace`, ce qui
+ne réattribue PAS les privilèges) et l'appelle depuis un déclencheur qui s'exécute avec les privilèges de
+l'appelant. C'est très exactement la classe de défaut déjà répertoriée dans la mémoire de session
+« service_role après la 255 » (12 flux cassés, correctifs déjà poussés sur deux branches jumelles) :
+`recalc_totaux_facture` n'y figurait apparemment pas encore. **Aucune migration ajoutée dans ce lot** pour
+rester majoritairement UX (consigne explicite) — le correctif (un `GRANT EXECUTE` ciblé, dans le même
+esprit que les 12 flux déjà traités) est à faire dans le train de migrations, pas en polish UX isolé.
+
+### 37.12 Aide clavier (exigence 3, documentation)
+
+Raccourcis actifs dans l'éditeur de devis, tous déjà implémentés (sauf Ctrl+Maj+H, nouveau) : Ctrl+S
+(enregistrer), Ctrl+Z / Ctrl+Y (annuler/rétablir), Ctrl+K (catalogue d'articles), Ctrl+Maj+K (recherche
+globale, cédée par la palette dans l'éditeur), **Ctrl/Cmd+Maj+H (replier/déplier l'en-tête, nouveau)**,
+Ctrl/Cmd+B/I/U dans un champ de texte riche. Non documentés avant cette session dans l'aide utilisateur ;
+ajout recommandé dans une prochaine itération de la FAQ (`src/components/FaqAide.tsx`) — non fait ce tour
+pour rester dans le périmètre code demandé (« ne code que ce qui est raisonnable dans ce lot »).
+
+### 37.13 Planning — polish contextuel (exigences 25-29)
+
+**État sans sélection** : déjà propre — pas de grand panneau vide (le panneau latéral permanent a été
+retiré au lot précédent) ; le bouton « Actions » affiche un menu désactivé avec « Aucun évènement
+sélectionné », expliqué par son `title`. Aucun changement.
+
+**Découvrabilité** (défaut trouvé) : rien n'indiquait qu'un évènement se glisse (déplacer), s'Alt+glisse
+(dupliquer) ou s'étire (durée) avant de l'avoir sélectionné une première fois. Ajout d'un bouton « ⓘ »
+dans la barre d'outils (uniquement pour les postes avec droit d'écriture), avec l'explication complète en
+info-bulle native, focusable au clavier.
+
+**Toolbar** : Aujourd'hui / précédent / suivant / vues / filtres / Nouvel évènement / Imprimer déjà
+responsive (`flex-wrap`), vérifié à 1440 et 375 px.
+
+**Consultation** (défaut confirmé) : le mode `.lecture-seule` (support plateforme / pilote mobile)
+masquait TOUS les `button[type=button]` du `main`, y compris la navigation du planning (‹ › Aujourd'hui,
+onglets de vue) pour un chef d'équipe sans droit d'écriture — corrigé la session précédente
+(`data-consultation`), reconfirmé fonctionnel ici (scénario E2E 13 vert).
+
+**Glisser simulé Playwright** (nouveauté de cette session) : le scénario 48 glissait déjà un évènement
+dans le temps (même salarié) et Alt-glissait pour dupliquer, avec un delta de pixels calé sur un
+commentaire de code (« 64 px par heure »). **Ajouté** : un glisser vers un AUTRE salarié, dont la
+destination est déterminée par la ligne DOM réelle (`[role=row][data-ligne]`) plutôt que par un pixel
+absolu — robuste à un changement de densité ou de hauteur de ligne. Les séquences « conflit » et « 24 h »
+restent couvertes par d'autres scénarios (E2E 12 : détection de conflit par création directe ; E2E 11 :
+persistance après rechargement) ; non dupliquées en glisser pour limiter le risque de fragilité, cohérent
+avec la consigne de préférer une API plus stable quand le pixel-perfect n'apporte rien de plus.
+
+### 37.14 Paramètres — organisation et réglages futurs (exigences 32-34)
+
+Pages Devis (Général : validité, unité, TVA par défaut, conditions, mode de règlement ; Sauvegarde :
+rappel entreprise + préférence personnelle) et Numérotation (par type de document) restent deux pages
+distinctes (elles l'étaient déjà, pour ne pas dupliquer un même réglage à deux endroits) — **ajout** d'un
+lien croisé dans chacune (« Numérotation des documents (préfixe, format des numéros) → » /
+« ← Valeurs par défaut des devis et rappel de sauvegarde ») pour qu'elles se découvrent mutuellement, sans
+fusionner deux pages qui fonctionnaient bien séparément.
+
+Inventaire des réglages « futurs » suggérés par le prompt, vérifié un à un dans le code — **la plupart
+existent déjà** (à ne pas re-proposer à Julien comme manquants) : modèles de PDF (6 gabarits, déjà
+choisissables), couleurs d'entreprise (déjà réglables, avertissement de contraste ajouté ce tour),
+conditions par défaut (déjà réglables), pied de page / mentions légales (`texte_pied_page`, déjà réglable ;
+les mentions légales elles-mêmes sont calculées depuis les infos légales de l'entreprise, pas un champ
+libre). **Réellement absents** : l'ORDRE des colonnes de la grille (seule la visibilité se règle
+aujourd'hui — écart déjà noté au § 36.15) et un arrondi PAR DÉFAUT au niveau devis (l'arrondi existe déjà
+par composant d'ouvrage, `arrondi.mode`, mais pas de valeur par défaut entreprise). Non codés ce tour
+(réglages non demandés explicitement, consigne de ne pas ajouter de dizaines de réglages).
+
+### 37.15 Compte et données de démonstration (exigences 30-31)
+
+`dirigeant.recette@elsatia-preview.invalid` reste actif (`abonnement_statut = 'actif'`) — vérifié via le
+code (`statutEssai()`, `src/lib/essai-statut.ts` : le statut « actif » court-circuite entièrement la
+lecture de `abonnement_essai_fin`, qui peut donc être n'importe quelle date passée ou proche sans risquer
+la moindre redirection vers `/abonnement-suspendu`) : **le compte ne peut pas expirer par accident**, la
+date d'essai affichée en base (2026-10-13) est sans effet tant que le statut reste « actif ». Données
+(preview, requête en lecture seule) : 16 clients, 12 chantiers, 60 articles, 10 ouvrages, 51 devis
+(4 statuts distincts), 4 factures, 1431 évènements de planning ; 0 ouvrage sans composant, 0 client sans
+nom. Volumes en hausse par rapport au dernier relevé (accumulation des recettes successives) — sans
+incohérence détectée ; seed toujours idempotent (script inchangé).
+
+### 37.16 Tests (exigence 38)
+
+| Contrôle | Résultat |
+| --- | --- |
+| pgTAP, Fresh 1→292 (aucune migration touchée) | 83 fichiers, **2 343 ok, 0 not ok** — identique au relevé § 36.16 |
+| Vitest complet | **2 434 réussis**, 3 ignorés, 3 délais dépassés sous charge (xlsx, webhook Stripe ×2) — rejoués seuls : 7/7 verts, sans rapport avec ce lot |
+| E2E principale (`gp-v1-metier.spec.ts`) | **17/17** en une passe |
+| E2E UX (`gp-v1-ux.spec.ts`, + scénario 60 nouveau) | **6/6** en une passe |
+| Banc de l'éditeur | **18/18** |
+| Lint | 0 erreur, 48 avertissements préexistants (un faux positif du bundle du banc, généré et jamais commité, exclu du lint — § 37.17) |
+| Typecheck, build production | 0 erreur |
+| `verify:migrations` / `verify:secrets` / `git diff --check` | 292 migrations inchangées · aucun secret · propre |
+
+### 37.17 Défaut d'outillage corrigé en cours de route
+
+Le bundle esbuild du banc de l'éditeur (`tests/banc/editeur-v2/dist/`, généré par `construire.mjs`,
+gitignoré depuis la session précédente) n'était pas exclu du lint : une reconstruction a produit un motif
+de code React minifié que `react-hooks/rules-of-hooks` interprète à tort comme un appel de Hook
+conditionnel (14 erreurs). Le bundle n'est ni du code source ni exécuté par l'application — rejoué par
+Playwright dans une page `file://` du banc. Exclu explicitement (`eslint.config.mjs`), au même titre que
+`test-results/` et `playwright-report/`.
+
+### 37.18 Benchmark visuel (exigence 35)
+
+Capturé en direct (navigateur de session, build de production) à 1440 × 900, 1280 × 800, 1024 × 800 (rupture
+`lg`) et 375 × 812 (mobile) sur l'éditeur de devis, avant/après repli de l'en-tête, en mode Document, et
+sur le planning (bureau et mobile). Constat central confirmé aux quatre tailles : la grille (ou le
+formulaire d'ajout) est visible sans défilement dès l'en-tête replié, y compris à 375 px. Pas de
+débordement horizontal mesuré à aucune des quatre tailles (toolbar et grille).

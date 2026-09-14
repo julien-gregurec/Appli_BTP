@@ -20,6 +20,7 @@ export default async function ParametresDevisPage({ searchParams }: { searchPara
           <Link href="/parametres" className="text-sm text-neutral-500 hover:underline">← Paramètres</Link>
           <h1 className="mt-1 text-xl font-semibold">Devis</h1>
           <p className="text-sm text-neutral-500">Valeurs par défaut des nouveaux devis et rappel de sauvegarde. Propres à votre entreprise.</p>
+          <Link href="/parametres/numerotation" className="mt-1 inline-block text-sm text-[#0d1b2a] underline dark:text-white">Numérotation des documents (préfixe, format des numéros) →</Link>
         </div>
         {error && <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         {succes && <p role="status" className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Réglages enregistrés.</p>}
