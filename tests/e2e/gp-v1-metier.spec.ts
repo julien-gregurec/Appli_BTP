@@ -28,6 +28,7 @@ const JOUR_PLANNING = `2026-11-${String(1 + (Number(suffixe) % 28)).padStart(2, 
 // suite coupée), un devis et un client existants peuvent être fournis par l'environnement.
 let urlDevis = process.env.E2E_DEVIS_URL ?? "";
 let urlClient = process.env.E2E_CLIENT_URL ?? "";
+let urlFacture = "";
 const REF_RECHERCHE = () => process.env.E2E_REF_AFFAIRE ?? REF_AFFAIRE;
 
 const cellule = (page: Page, index: number, colonne: string) => page.locator(`[data-cellule='${index}:${colonne}']`);
@@ -324,8 +325,43 @@ test("9. transformation en facture (devis accepté → facture issue du devis)",
   // L'action serveur redirige vers la facture créée, ou revient sur le devis avec ?error= : on veut le motif, pas un délai.
   await page.waitForURL((u) => /\/factures\/[0-9a-f-]{36}/.test(u.pathname) || u.searchParams.has("error"), { timeout: 90_000 });
   if (new URL(page.url()).searchParams.has("error")) throw new Error(`Transformation refusée : ${new URL(page.url()).searchParams.get("error")}`);
+  urlFacture = page.url();
   await aller(page, urlDevis);
   await expect(page.locator("main")).toContainText(/Documents issus|facture/i);
+});
+
+test("9b. modification d'une facture existante — correctif recalc_totaux_facture (quantité, prix, remise, TVA)", async ({ page }) => {
+  await connexion(page, USERS.adminA);
+  await aller(page, `${urlFacture}/modifier`);
+  const quantite = page.locator("input[type=number]").first();
+  const prix = page.locator("input[type=number]").nth(1);
+  const remise = page.locator("input[type=number]").nth(2);
+  const tva = page.locator("select").filter({ has: page.locator("option[value='5.5']") }).first();
+  await quantite.fill("6");
+  await prix.fill("37");
+  await remise.fill("10");
+  await tva.selectOption("5.5");
+  // 6 × 37 × (1 - 10 %) = 199,80 HT pour cette ligne (les autres lignes de la facture, issues du devis,
+  // sont inchangées : on vérifie le recalcul de LA ligne modifiée, pas le total de la facture entière,
+  // qui dépend aussi des lignes qu'on n'a pas touchées).
+  await page.getByRole("button", { name: "Enregistrer les modifications" }).click();
+  // L'action serveur redirige vers la fiche facture en cas de succès ; le défaut corrigé restait bloqué
+  // sur cette même page avec « Impossible de créer cette facture » — on veut la preuve qu'il ne revient pas.
+  await page.waitForURL((u) => /\/factures\/[0-9a-f-]{36}$/.test(u.pathname), { timeout: 30_000 });
+  const alertes = (await page.locator("[role=alert]").allTextContents()).map((t) => t.trim()).filter(Boolean);
+  expect(alertes, "aucune erreur affichée après l'enregistrement").toEqual([]);
+  await expect(page.locator("main")).toContainText("199,80");
+  // Persistance après relecture (nouvelle navigation, pas le même rendu client).
+  await aller(page, urlFacture);
+  await expect(page.locator("main")).toContainText("199,80");
+  // Aucune régression du PDF après le correctif.
+  const pdf = await page.evaluate(async (u) => {
+    const res = await fetch(u);
+    return { status: res.status, type: res.headers.get("content-type") ?? "", taille: (await res.arrayBuffer()).byteLength };
+  }, `/api/documents/factures/${urlFacture.split("/").pop()}/pdf`);
+  expect(pdf.status, JSON.stringify(pdf)).toBe(200);
+  expect(pdf.type, JSON.stringify(pdf)).toContain("application/pdf");
+  expect(pdf.taille).toBeGreaterThan(1000);
 });
 
 test("10. création planning (évènement horodaté, salarié affecté, ligne affectations synchronisée)", async ({ page }) => {
