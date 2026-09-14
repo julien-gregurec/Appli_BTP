@@ -10,11 +10,15 @@ const mocks = vi.hoisted(() => ({
   client: null as Record<string, unknown> | null,
   chantierLie: null as Record<string, unknown> | null,
   rpc: vi.fn(async (): Promise<{ data: string | null; error: { message: string } | null }> => ({ data: "chantier-nouveau", error: null })),
+  /** Permissions de l'utilisateur ; `null` = administrateur (tous droits), sinon la liste effective. */
+  permissions: null as string[] | null,
 }));
 
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/entreprise", () => ({ getContexteEntreprise: vi.fn(async () => mocks.ctx) }));
+// GP V1 (lot D) : la transformation exige le droit fin `transformer_devis` (hérité de `gerer_devis`).
+vi.mock("@/lib/permissions", () => ({ permissionsUtilisateur: vi.fn(async () => mocks.permissions) }));
 
 function tableMock(table: string) {
   const requete: Record<string, unknown> = {};
@@ -153,6 +157,15 @@ describe("creerChantierDepuisDevisAction", () => {
   it("13. idempotence : le RPC refuse un doublon (chantier_existant:<id>) -> redirige vers le chantier existant, pas d'erreur générique", async () => {
     mocks.rpc.mockResolvedValue({ data: null, error: { message: "chantier_existant:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" } });
     await expect(creerChantierDepuisDevisAction("devis-1", formulaire({ nom: "X" }))).rejects.toThrow(/REDIRECT:\/chantiers\/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\?success=/);
+  });
+
+  it("14 bis. sans le droit fin transformer_devis (ni gerer_devis) -> refus avant tout appel RPC, motif lisible", async () => {
+    mocks.permissions = ["acces_devis"];
+    await expect(creerChantierDepuisDevisAction("devis-1", formulaire({ nom: "X" }))).rejects.toThrow(/REDIRECT:\/devis\/devis-1\?error=.*transformer/);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    mocks.permissions = ["gerer_devis"];
+    await expect(creerChantierDepuisDevisAction("devis-1", formulaire({ nom: "X" }))).rejects.toThrow(/REDIRECT:\/chantiers\/chantier-nouveau\?success=/);
+    mocks.permissions = null;
   });
 
   it("14. permission refusée par le RPC -> message clair sur la fiche devis", async () => {

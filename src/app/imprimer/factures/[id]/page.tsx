@@ -3,12 +3,34 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { chargerDonneesFactureImprimable } from "@/lib/documents-commerciaux";
 import { DocumentImprimable } from "@/components/DocumentImprimable";
+import { DocumentA4 } from "@/components/documents/DocumentA4";
 import { AutoPrint } from "@/components/AutoPrint";
+import { chargerRenduDocument, vueDepuisReponse } from "@/lib/devis/v2-serveur";
 
-export default async function ImprimerFacturePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ImprimerFacturePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ duplicata?: string }>;
+}) {
   const { id } = await params;
+  // Duplicata : reproduction du document FIGÉ, marquée comme telle ; l'original n'est jamais touché.
+  const estDuplicata = (await searchParams).duplicata === "1";
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+
+  const reponse = await chargerRenduDocument(supabase, "facture", id);
+  if (!reponse) notFound();
+  const vue = vueDepuisReponse(reponse, { estDuplicata });
+  if (vue) {
+    return (
+      <>
+        <AutoPrint />
+        <DocumentA4 vue={vue} mode="impression" />
+      </>
+    );
+  }
 
   const donnees = await chargerDonneesFactureImprimable(supabase, { id, entrepriseId: ctx.entrepriseId });
   if (!donnees) notFound();

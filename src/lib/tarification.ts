@@ -51,6 +51,9 @@ const GESTION = [
   "acces_interventions",
   "acces_crm",
   "voir_devis_chantier_sans_prix",
+  // Bibliothèque d'ouvrages composés (GP V1, lot B) : incluse dès Pro, jamais sur Mini — décision du
+  // 2026-09-12 (Mini : non ; Pro, Business, Entreprise : oui).
+  "acces_ouvrages",
 ] as const;
 
 const PILOTAGE = [
@@ -58,7 +61,6 @@ const PILOTAGE = [
   "utiliser_borne_stock",
   "acces_outillage",
   "acces_flotte",
-  "acces_ouvrages",
   "acces_rentabilite",
   "acces_exports",
   "consulter_sa_paie",
@@ -247,6 +249,21 @@ export function permissionIncluseDansOffre(permission: string, codeOffre: string
   // que les portes d'entrée de modules connues afin de ne jamais élargir un droit.
   if (!PERMISSIONS_MODULES_LIMITEES.has(permission)) return true;
   return offre.fonctionnalites.includes(permission);
+}
+
+/**
+ * Vrai si cette permission est réellement une porte d'entrée de module/offre
+ * (donc concernée par ELSATIA-TRIAL-MODULES-POLICY-CLOSURE-V1 : sans offre
+ * choisie, seul l'entitlement module — achat ou essai actif — peut l'ouvrir).
+ * Les permissions administratives de base (paramètres, utilisateurs) et toute
+ * permission hors grille tarifaire restent hors périmètre : `permissionIncluseDansOffre`
+ * les laisse déjà toujours ouvertes, offre choisie ou non, et ça ne change pas ici.
+ */
+export function permissionEstPorteDEntreeModule(permission: string): boolean {
+  return permission !== "acces_parametres"
+    && permission !== "gerer_parametres"
+    && permission !== "gerer_utilisateurs"
+    && PERMISSIONS_MODULES_LIMITEES.has(permission);
 }
 
 export function filtrerPermissionsSelonOffre(permissions: Iterable<string>, codeOffre: string | null | undefined) {

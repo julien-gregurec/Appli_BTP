@@ -1,0 +1,708 @@
+"use client";
+
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from "react";
+import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { euros, LIGNE_TYPES, UNITES } from "@/lib/devis";
+import { rechercherArticlesDevisAction, type ArticleTrouve } from "@/app/actions/devis-v2";
+import { colonneModifiable, type Colonne, type DroitsGrille } from "@/lib/devis/colonnes-grille";
+import {
+  cleElement, deplacerElementVers, dupliquerElement, insererLigne, modifierCoutsLigne, modifierLigneLibre,
+  remisesTvaMixte, remplacerLigneParArticle, retirerElement, type EtatElements, interpreterRemisePct } from "@/lib/devis/editeur-etat";
+import { margeLigne } from "@/lib/devis/marge-ligne";
+import { MODES_PRESENTATION, type InstanceOuvrage, type ModePresentation } from "@/lib/devis/ouvrages";
+import { sousTotauxSections, type ElementDevis, type LigneLibre } from "@/lib/devis/presentation";
+import { indicateursPrix, TAUX_TVA_ADMIS } from "@/lib/devis/prix";
+import { champModifiable, estChiffree, libelleTypeLigne, typeDe, TYPES_LIGNE_GRILLE, type TypeLigneGrille } from "@/lib/devis/types-ligne";
+import { MenuContextuel, type ElementMenu } from "@/components/Menu";
+import { montantLigneHt } from "@/lib/devis/montants";
+import { CLE_STOCKAGE_PRESSE_PAPIER, ressembleAPressePapier } from "@/lib/devis/presse-papier";
+
+/**
+ * Grille de saisie du devis (GP V1) : une ligne par élément, des cellules validées à la sortie
+ * (Tab, Entrée, clic ailleurs), clavier complet, glisser-déposer, recherche d'article depuis la cellule
+ * Désignation, colonnes selon droits. Virtualisée au-delà de ~150 lignes.
+ *
+ * Raccourcis : Tab / Maj+Tab cellules · Entrée valide et descend (crée une ligne en bas) · ↑ ↓ lignes ·
+ * Ctrl+D dupliquer · Ctrl+↑ / Ctrl+↓ déplacer · Ctrl+Suppr retirer · Ctrl+C / Ctrl+V copier-coller une
+ * ligne · Échap annule la cellule. Annuler / rétablir et Ctrl+K sont tenus par l'éditeur.
+ */
+
+export type ActionsGrille = {
+  /** Mise à jour d'état : de préférence une fonction de l'état le plus récent (une validation de cellule différée ne doit jamais écraser un collage ou une duplication survenus entre-temps). */
+  setEtat: (suivant: EtatElements | ((etat: EtatElements) => EtatElements)) => void;
+  genererCle: () => string;
+  ouvrirOuvrage: (instance: InstanceOuvrage | null, apresCle: string | null) => void;
+  prixGlobal: (instance: InstanceOuvrage) => void;
+  /** Copie ces lignes dans le presse-papier (tenu par l'éditeur) ; rend le texte à placer dans le presse-papier système. */
+  copier: (cles: readonly string[]) => string | null;
+  /** Colle un presse-papier après `apresCle` ; `texte: true` = ce n'est pas un presse-papier de lignes, le collage de texte suit son cours. */
+  coller: (texte: string, apresCle: string | null) => { ok: boolean; texte?: boolean };
+  /** Signale à l'utilisateur une saisie refusée (message affiché par l'éditeur). */
+  signaler: (texte: string) => void;
+  /** Unité et TVA des nouvelles lignes (Paramètres > Devis). */
+  defautsLigne: { unite: string; tauxTva: number };
+};
+
+/** Sélection de lignes : clés sélectionnées et ancre de l'extension (Maj). */
+export type SelectionGrille = { cles: readonly string[]; ancre: string | null };
+
+type Position = { index: number; colonne: string };
+
+const cellule = "h-9 w-full border-0 bg-transparent px-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 disabled:text-neutral-400";
+const nombre = (s: string): number | null => {
+  const t = s.replace(/\s/g, "").replace(",", ".");
+  if (t === "" || t === "-") return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+};
+const fr = (v: number | null | undefined, decimales = 2) => (v === null || v === undefined ? "" : new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 0, maximumFractionDigits: decimales }).format(v));
+
+const VIRTUALISATION_AU_DELA = 150;
+
+export function GrilleDevis({ etat, colonnes, droits, seuilTauxMarquePct, actions, ligneCiblee, selection, onSelection, onActive }: {
+  etat: EtatElements;
+  colonnes: Colonne[];
+  droits: DroitsGrille;
+  seuilTauxMarquePct: number | null;
+  actions: ActionsGrille;
+  /** Clé à mettre en avant (clic dans l'aperçu). */
+  ligneCiblee: string | null;
+  /** Sélection de lignes (copier / coller), tenue par l'éditeur. */
+  selection: SelectionGrille;
+  onSelection: (selection: SelectionGrille) => void;
+  /** Ligne active (dernière cellule visitée), pour la position de collage des boutons. */
+  onActive?: (cle: string | null) => void;
+}) {
+  const tries = useMemo(() => [...etat.elements].sort((a, b) => a.ordre - b.ordre), [etat.elements]);
+  const cles = useMemo(() => tries.map(cleElement), [tries]);
+  const sousTotaux = useMemo(() => sousTotauxSections(etat.elements), [etat.elements]);
+  const tvaMixte = useMemo(() => new Set(remisesTvaMixte(etat)), [etat]);
+  const [cible, setCible] = useState<Position | null>(null);
+  const [active, setActiveInterne] = useState<string | null>(null);
+  const setActive = useCallback((cle: string | null) => { setActiveInterne(cle); onActive?.(cle); }, [onActive]);
+  const conteneur = useRef<HTMLDivElement>(null);
+  const selectionnees = useMemo(() => new Set(selection.cles), [selection.cles]);
+  /** Sélection par clic sur la poignée : clic = cette ligne, Maj+clic = plage depuis l'ancre, Ctrl/Cmd+clic = bascule. */
+  const selectionner = useCallback((cle: string, e: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) => {
+    if (e.shiftKey && selection.ancre) {
+      const a = cles.indexOf(selection.ancre); const b = cles.indexOf(cle);
+      if (a >= 0 && b >= 0) { const [d, f] = a < b ? [a, b] : [b, a]; onSelection({ cles: cles.slice(d, f + 1), ancre: selection.ancre }); return; }
+    }
+    if (e.ctrlKey || e.metaKey) {
+      onSelection({ cles: selectionnees.has(cle) ? selection.cles.filter((c) => c !== cle) : [...selection.cles, cle], ancre: cle });
+      return;
+    }
+    onSelection({ cles: selectionnees.has(cle) && selection.cles.length === 1 ? [] : [cle], ancre: cle });
+  }, [cles, onSelection, selection, selectionnees]);
+  const etendreSelection = useCallback((index: number, sens: -1 | 1) => {
+    const cle = cles[index]; const voisin = cles[index + sens];
+    if (!voisin) return;
+    const ancre = selection.ancre ?? cle;
+    const a = cles.indexOf(ancre); const b = index + sens;
+    const [d, f] = a < b ? [a, b] : [b, a];
+    onSelection({ cles: cles.slice(d, f + 1), ancre });
+  }, [cles, onSelection, selection.ancre]);
+  /** Texte sélectionné dans un champ : Ctrl+C / Ctrl+V restent du texte. */
+  const champAvecSelectionTexte = (t: EventTarget | null) => {
+    const el = t as HTMLInputElement | HTMLTextAreaElement | null;
+    if (!el || (el.tagName !== "INPUT" && el.tagName !== "TEXTAREA")) return false;
+    try { return el.selectionStart !== null && el.selectionEnd !== null && el.selectionStart !== el.selectionEnd; } catch { return false; }
+  };
+  const estChampTexte = (t: EventTarget | null) => { const tag = (t as HTMLElement | null)?.tagName; return tag === "INPUT" || tag === "TEXTAREA"; };
+  /** Lignes à copier : la sélection, sinon la ligne active. */
+  const clesACopier = useCallback((cleCourante: string | null) => (selection.cles.length ? [...selection.cles] : cleCourante ? [cleCourante] : []), [selection.cles]);
+  const copierVersSysteme = useCallback((clesCopiees: readonly string[]) => {
+    const texte = actions.copier(clesCopiees);
+    if (texte && typeof navigator !== "undefined" && navigator.clipboard?.writeText) navigator.clipboard.writeText(texte).catch(() => undefined);
+  }, [actions]);
+  const derniereSelectionnee = () => (selection.cles.length ? [...selection.cles].sort((a, b) => cles.indexOf(a) - cles.indexOf(b)).at(-1) ?? null : null);
+  const editables = useMemo(() => colonnes.filter((c) => c.cle !== "poignee" && c.modifiable !== false).map((c) => c.cle as string), [colonnes]);
+
+  const virtualise = tries.length > VIRTUALISATION_AU_DELA;
+  const virtualiseur = useVirtualizer({
+    count: tries.length,
+    getScrollElement: () => conteneur.current,
+    estimateSize: () => 40,
+    overscan: 12,
+    enabled: virtualise,
+  });
+
+  // Résolution du focus : la ligne peut ne pas être rendue (virtualisation) — on la fait venir, puis on cible.
+  useEffect(() => {
+    if (!cible) return;
+    if (virtualise) virtualiseur.scrollToIndex(cible.index, { align: "auto" });
+    const t = window.setTimeout(() => {
+      const el = conteneur.current?.querySelector<HTMLElement>(`[data-cellule="${cible.index}:${cible.colonne}"]`);
+      // Déjà au bon endroit (focus posé de façon synchrone par la navigation) : ne pas resélectionner, une
+      // frappe en cours serait écrasée.
+      if (el && document.activeElement !== el) { el.focus(); if (el instanceof HTMLInputElement) el.select(); }
+    }, virtualise ? 30 : 0);
+    return () => window.clearTimeout(t);
+  }, [cible, virtualise, virtualiseur]);
+
+  useEffect(() => {
+    if (!ligneCiblee) return;
+    const i = cles.indexOf(ligneCiblee);
+    if (i >= 0) { setActive(ligneCiblee); setCible({ index: i, colonne: "designation" }); }
+  }, [ligneCiblee, cles, setActive]);
+
+  const capteurs = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const finGlisser = (e: DragEndEvent) => {
+    if (!e.over || e.active.id === e.over.id) return;
+    const source = String(e.active.id), cible = cles.indexOf(String(e.over.id));
+    actions.setEtat((courant) => deplacerElementVers(courant, source, cible));
+  };
+
+  const nouvelleLigneApres = useCallback((cle: string | null, type: TypeLigneGrille = "libre") => {
+    const nouvelle = actions.genererCle();
+    actions.setEtat((courant) => insererLigne(courant, nouvelle, type, cle, actions.defautsLigne));
+    const i = cle === null ? tries.length : cles.indexOf(cle) + 1;
+    setActive(nouvelle);
+    setCible({ index: i, colonne: "designation" });
+  }, [actions, tries.length, cles, setActive]);
+
+  // Menu contextuel de ligne (clic droit, bouton ⋯, Maj+F10) : insérer au-dessus / dessous, dupliquer, copier,
+  // transformer, supprimer — les mêmes opérations que le clavier, sans quitter la grille.
+  const [menu, setMenu] = useState<{ cle: string; index: number; x: number; y: number } | null>(null);
+  const ouvrirMenu = useCallback((cle: string, index: number, x: number, y: number) => { setActive(cle); setMenu({ cle, index, x, y }); }, [setActive]);
+  const elementsMenu = useCallback((cle: string, index: number): ElementMenu[] => {
+    const element = tries[index];
+    const estLigne = element?.type === "ligne";
+    const insererAuDessus = (type: TypeLigneGrille) => { const nouvelle = actions.genererCle(); actions.setEtat((courant) => deplacerElementVers(insererLigne(courant, nouvelle, type, cle, actions.defautsLigne), nouvelle, index)); setActive(nouvelle); setCible({ index, colonne: "designation" }); };
+    const transformer: ElementMenu[] = estLigne
+      ? TYPES_LIGNE_GRILLE.filter((t) => t.cle !== "article" && t.cle !== typeDe(element.ligne)).map((t) => ({ cle: `type-${t.cle}`, libelle: `→ ${t.libelle}`, titre: t.aide, action: () => actions.setEtat((courant) => modifierLigneLibre(courant, cle, { typeLigne: t.cle })) }))
+      : [];
+    return [
+      { cle: "dessus", libelle: "Insérer une ligne au-dessus", action: () => insererAuDessus("libre") },
+      { cle: "dessous", libelle: "Insérer une ligne en dessous", raccourci: "Entrée", action: () => nouvelleLigneApres(cle) },
+      { cle: "titre-dessus", libelle: "Insérer un titre au-dessus", action: () => insererAuDessus("titre") },
+      { cle: "sep1", type: "separateur" },
+      { cle: "dupliquer", libelle: "Dupliquer", raccourci: "Ctrl+D", action: () => { const n = actions.genererCle(); actions.setEtat((courant) => dupliquerElement(courant, cle, n)); setCible({ index: index + 1, colonne: "designation" }); } },
+      { cle: "copier", libelle: "Copier", raccourci: "Ctrl+C", action: () => copierVersSysteme(clesACopier(cle)) },
+      { cle: "coller", libelle: "Coller après", raccourci: "Ctrl+V", action: () => { void (async () => { let texte = ""; try { texte = await navigator.clipboard.readText(); } catch { texte = ""; } actions.coller(texte, cle); })(); } },
+      ...(transformer.length ? [{ cle: "sep2", type: "separateur" } as ElementMenu, { cle: "titre-transformer", type: "titre", libelle: "Transformer en" } as ElementMenu, ...transformer] : []),
+      { cle: "sep3", type: "separateur" },
+      { cle: "supprimer", libelle: "Supprimer la ligne", raccourci: "Ctrl+Suppr", danger: true, action: () => { actions.setEtat((courant) => retirerElement(courant, cle)); if (tries.length > 1) setCible({ index: Math.min(index, tries.length - 2), colonne: "designation" }); } },
+    ];
+  }, [tries, actions, setActive, nouvelleLigneApres, copierVersSysteme, clesACopier]);
+
+  /** Clavier de la grille : navigation entre cellules et opérations de ligne. */
+  const clavier = (e: KeyboardEvent<HTMLDivElement>, index: number, colonne: string) => {
+    const element = tries[index];
+    const cle = cleElement(element);
+    const tag = (e.target as HTMLElement).tagName;
+    const ctrl = e.ctrlKey || e.metaKey;
+    const col = editables.indexOf(colonne);
+    // Focus posé tout de suite quand la cellule est rendue (frappe rapide après Tab) ; l'effet ci-dessus
+    // prend le relais quand la ligne doit d'abord être amenée à l'écran (virtualisation).
+    const aller = (i: number, c: string) => {
+      e.preventDefault();
+      setActive(cleElement(tries[i]));
+      setCible({ index: i, colonne: c });
+      const el = conteneur.current?.querySelector<HTMLElement>(`[data-cellule="${i}:${c}"]`);
+      if (el) { el.focus(); if (el instanceof HTMLInputElement) el.select(); }
+    };
+
+    if (e.key === "Tab") {
+      if (e.shiftKey) {
+        if (col > 0) return aller(index, editables[col - 1]);
+        if (index > 0) return aller(index - 1, editables[editables.length - 1]);
+        return;
+      }
+      if (col < editables.length - 1) return aller(index, editables[col + 1]);
+      if (index < tries.length - 1) return aller(index + 1, editables[0]);
+      e.preventDefault();
+      return nouvelleLigneApres(cle);
+    }
+    if (e.key === "Enter" && !e.shiftKey && tag !== "TEXTAREA" && !(e.target as HTMLElement).dataset.recherche) {
+      if (index < tries.length - 1) return aller(index + 1, colonne);
+      e.preventDefault();
+      return nouvelleLigneApres(cle);
+    }
+    if (ctrl && e.key === "ArrowUp") { e.preventDefault(); if (index > 0) { actions.setEtat((courant) => deplacerElementVers(courant, cle, index - 1)); setCible({ index: index - 1, colonne }); } return; }
+    if (ctrl && e.key === "ArrowDown") { e.preventDefault(); if (index < tries.length - 1) { actions.setEtat((courant) => deplacerElementVers(courant, cle, index + 1)); setCible({ index: index + 1, colonne }); } return; }
+    if (e.key === "ArrowUp" && tag !== "SELECT" && tag !== "TEXTAREA" && index > 0) return aller(index - 1, colonne);
+    if (e.key === "ArrowDown" && tag !== "SELECT" && tag !== "TEXTAREA" && index < tries.length - 1) return aller(index + 1, colonne);
+    if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) { e.preventDefault(); const r = (e.target as HTMLElement).getBoundingClientRect(); ouvrirMenu(cle, index, r.left, r.bottom); return; }
+    if (ctrl && e.key.toLowerCase() === "d") { e.preventDefault(); const n = actions.genererCle(); actions.setEtat((courant) => dupliquerElement(courant, cle, n)); setCible({ index: index + 1, colonne }); return; }
+    if (ctrl && (e.key === "Delete" || e.key === "Backspace")) {
+      e.preventDefault();
+      actions.setEtat((courant) => retirerElement(courant, cle));
+      if (tries.length > 1) setCible({ index: Math.min(index, tries.length - 2), colonne });
+      return;
+    }
+  };
+
+  /**
+   * Raccourcis de SÉLECTION et de PRESSE-PAPIER, au niveau de la grille (ils valent aussi sur la poignée,
+   * qui n'est pas une cellule) : Ctrl+Maj+↑/↓ étend la sélection depuis l'ancre ; Échap la vide ; Ctrl+A hors
+   * d'un champ texte sélectionne toutes les lignes ; Ctrl+C copie les lignes sauf si du texte est sélectionné
+   * dans le champ (la copie de texte garde alors la main) ; Ctrl+V hors d'un champ texte colle les lignes
+   * (dans un champ, l'évènement natif `paste` ci-dessous décide : lignes si c'est un presse-papier de lignes,
+   * texte sinon).
+   */
+  const clavierGrille = (e: KeyboardEvent<HTMLDivElement>) => {
+    const ctrl = e.ctrlKey || e.metaKey;
+    const k = e.key.toLowerCase();
+    const champ = estChampTexte(e.target);
+    const ligne = (e.target as HTMLElement | null)?.closest?.("[role=row]") as HTMLElement | null;
+    const index = ligne?.dataset.index !== undefined ? Number(ligne.dataset.index) : -1;
+    const cle = index >= 0 ? (cles[index] ?? null) : null;
+    if (ctrl && e.shiftKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) { if (index >= 0) { e.preventDefault(); etendreSelection(index, e.key === "ArrowUp" ? -1 : 1); } return; }
+    if (e.key === "Escape" && selection.cles.length && !champ) { onSelection({ cles: [], ancre: null }); return; }
+    if (ctrl && k === "a" && !champ) { e.preventDefault(); onSelection({ cles: [...cles], ancre: cles[0] ?? null }); return; }
+    if (ctrl && k === "c" && !champAvecSelectionTexte(e.target)) {
+      const aCopier = clesACopier(cle ?? active);
+      if (aCopier.length) { e.preventDefault(); copierVersSysteme(aCopier); }
+      return;
+    }
+    if (ctrl && k === "v" && !champ) {
+      e.preventDefault();
+      const apres = derniereSelectionnee() ?? cle ?? active;
+      const lire = typeof navigator !== "undefined" && navigator.clipboard?.readText ? navigator.clipboard.readText() : Promise.reject(new Error("indisponible"));
+      lire.then((t) => { const r = actions.coller(t, apres); if (!r.ok && r.texte) actions.coller(localStorage.getItem(CLE_STOCKAGE_PRESSE_PAPIER) ?? "", apres); })
+        .catch(() => actions.coller(localStorage.getItem(CLE_STOCKAGE_PRESSE_PAPIER) ?? "", apres));
+    }
+  };
+
+  /** Presse-papier système : `paste` porte le texte, y compris depuis un autre onglet ou une autre fenêtre. */
+  const collerNatif = (e: ClipboardEvent<HTMLDivElement>) => {
+    const texte = e.clipboardData?.getData("text/plain") ?? "";
+    if (!ressembleAPressePapier(texte)) return; // texte ordinaire : collage normal dans la cellule
+    e.preventDefault();
+    actions.coller(texte, derniereSelectionnee() ?? active);
+  };
+  const copierNatif = (e: ClipboardEvent<HTMLDivElement>) => {
+    if (champAvecSelectionTexte(e.target)) return; // texte sélectionné : copie de texte
+    const aCopier = clesACopier(active);
+    if (!aCopier.length) return;
+    const texte = actions.copier(aCopier);
+    if (!texte) return;
+    e.clipboardData?.setData("text/plain", texte);
+    e.preventDefault();
+  };
+
+  const rendreLigne = (element: ElementDevis, index: number, mesurer?: (el: HTMLElement | null) => void) => (
+    <LigneSortable key={cleElement(element)} id={cleElement(element)} mesurer={mesurer} index={index} active={active === cleElement(element)} selectionnee={selectionnees.has(cleElement(element))} onMenu={(x, y) => ouvrirMenu(cleElement(element), index, x, y)} onSelectionner={(ev) => selectionner(cleElement(element), ev)}>
+      {(poignee) => element.type === "ligne" ? (
+        <LigneGrille
+          index={index}
+          ligne={element.ligne}
+          origine={etat.origines[element.ligne.cle]}
+          colonnes={colonnes}
+          droits={droits}
+          poignee={poignee}
+          sousTotal={sousTotaux.get(element.ligne.cle) ?? null}
+          tvaMixte={tvaMixte.has(element.ligne.cle)}
+          onFocus={() => setActive(element.ligne.cle)}
+          onKeyDown={(e, colonne) => clavier(e, index, colonne)}
+          onChange={(patch) => actions.setEtat((courant) => modifierLigneLibre(courant, element.ligne.cle, patch))}
+          onCouts={(c, prix) => actions.setEtat((courant) => { const e1 = modifierCoutsLigne(courant, element.ligne.cle, c); return prix ? modifierLigneLibre(e1, element.ligne.cle, prix) : e1; })}
+          onArticle={(a) => actions.setEtat((courant) => remplacerLigneParArticle(courant, element.ligne.cle, a))}
+          onOuvrage={() => actions.ouvrirOuvrage(null, element.ligne.cle)}
+          onRetirer={() => actions.setEtat((courant) => retirerElement(courant, element.ligne.cle))}
+          onSignal={actions.signaler}
+        />
+      ) : (
+        <LigneOuvrageGrille
+          index={index}
+          instance={element.instance}
+          colonnes={colonnes}
+          droits={droits}
+          seuilTauxMarquePct={seuilTauxMarquePct}
+          poignee={poignee}
+          onFocus={() => setActive(element.instance.cle)}
+          onKeyDown={(e, colonne) => clavier(e, index, colonne)}
+          onChange={(instance) => actions.setEtat((courant) => ({ elements: courant.elements.map((x) => (x.type === "ouvrage" && x.instance.cle === instance.cle ? { ...x, instance } : x)), origines: courant.origines }))}
+          onModifier={() => actions.ouvrirOuvrage(element.instance, null)}
+          onPrix={() => actions.prixGlobal(element.instance)}
+          onRetirer={() => actions.setEtat((courant) => retirerElement(courant, element.instance.cle))}
+        />
+      )}
+    </LigneSortable>
+  );
+
+  const largeur = colonnes.reduce((s, c) => s + c.largeurPx, 0);
+  const grilleTemplate = colonnes.map((c) => `${c.largeurPx}px`).join(" ");
+
+  return (
+    <div className="rounded-md border border-neutral-200 dark:border-neutral-800">
+      <div ref={conteneur} className={`overflow-auto ${virtualise ? "max-h-[70dvh]" : ""}`} role="grid" aria-label="Lignes du devis" aria-rowcount={tries.length} aria-multiselectable="true" onKeyDown={clavierGrille} onCopy={copierNatif} onPaste={collerNatif}>
+        {menu && <MenuContextuel x={menu.x} y={menu.y} etiquette={`Actions de la ligne ${menu.index + 1}`} elements={elementsMenu(menu.cle, menu.index)} onFermer={() => setMenu(null)} />}
+        <div style={{ minWidth: largeur, ["--grille" as string]: grilleTemplate }}>
+          <div role="row" className="sticky top-0 z-10 grid border-b border-neutral-200 bg-neutral-50 text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900" style={{ gridTemplateColumns: grilleTemplate }}>
+            {colonnes.map((c) => (
+              <div key={c.cle} role="columnheader" title={c.libelle} className={`truncate px-2 py-2 ${c.alignement === "droite" ? "text-right" : c.alignement === "centre" ? "text-center" : ""}`}>{c.court}</div>
+            ))}
+          </div>
+          <DndContext sensors={capteurs} collisionDetection={closestCenter} onDragEnd={finGlisser}>
+            <SortableContext items={cles} strategy={verticalListSortingStrategy}>
+              {tries.length === 0 && (
+                <div className="p-4 text-sm text-neutral-500">
+                  Aucune ligne. <button type="button" className="underline" onClick={() => nouvelleLigneApres(null)}>Ajouter une ligne</button> (ou Entrée dans la grille, Ctrl+K pour le catalogue).
+                </div>
+              )}
+              {virtualise ? (
+                <div style={{ height: virtualiseur.getTotalSize(), position: "relative" }}>
+                  {virtualiseur.getVirtualItems().map((v) => (
+                    <div key={cles[v.index]} data-index={v.index} ref={virtualiseur.measureElement} style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${v.start}px)` }}>
+                      {rendreLigne(tries[v.index], v.index)}
+                    </div>
+                  ))}
+                </div>
+              ) : tries.map((el, i) => rendreLigne(el, i))}
+            </SortableContext>
+          </DndContext>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-2 border-t border-neutral-200 px-2 py-1 text-xs text-neutral-500 dark:border-neutral-800">
+        <button type="button" className="min-h-9 rounded px-2 hover:bg-neutral-100 dark:hover:bg-neutral-800" onClick={() => nouvelleLigneApres(active)} title="Entrée sur la dernière ligne">+ Ligne</button>
+        <span aria-hidden="true">·</span>
+        <span>{tries.length} ligne{tries.length > 1 ? "s" : ""}{virtualise ? " · affichage virtualisé" : ""}</span>
+        {selection.cles.length > 0 && <span data-testid="selection-lignes" className="rounded bg-blue-50 px-2 py-0.5 text-blue-800 dark:bg-blue-950/40 dark:text-blue-200">{selection.cles.length} sélectionnée{selection.cles.length > 1 ? "s" : ""} · Ctrl+C pour copier · Échap</span>}
+      </div>
+    </div>
+  );
+}
+
+// ── Ligne triable (glisser-déposer) ────────────────────────────────────────────
+
+function LigneSortable({ id, index, active, selectionnee, onSelectionner, onMenu, mesurer, children }: { id: string; index: number; active: boolean; selectionnee: boolean; onMenu: (x: number, y: number) => void; onSelectionner: (e: { shiftKey: boolean; ctrlKey: boolean; metaKey: boolean }) => void; mesurer?: (el: HTMLElement | null) => void; children: (poignee: ReactNode) => ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const poignee = (
+    <button
+      type="button"
+      {...attributes}
+      {...listeners}
+      onClick={(e) => onSelectionner({ shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey })}
+      data-cellule={`${index}:poignee`}
+      data-selectionnee={selectionnee ? "1" : undefined}
+      className={`flex h-9 w-full cursor-grab items-center justify-center focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 active:cursor-grabbing ${selectionnee ? "text-blue-700 dark:text-blue-300" : "text-neutral-400 hover:text-neutral-700"}`}
+      aria-label={`${selectionnee ? "Ligne sélectionnée · " : ""}Sélectionner ou déplacer la ligne ${index + 1}`}
+      aria-pressed={selectionnee}
+      title="Clic : sélectionner (Maj = plage, Ctrl = ajouter) · Glisser pour déplacer · Espace puis flèches au clavier"
+    >
+      {selectionnee ? "✓" : "⋮⋮"}
+    </button>
+  );
+  const poigneeEtMenu = (
+    <div className="flex h-9 items-stretch">
+      <div className="min-w-0 flex-1">{poignee}</div>
+      <button type="button" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); onMenu(r.left, r.bottom); }} data-cellule={`${index}:menu`} className="w-5 shrink-0 text-neutral-400 hover:text-neutral-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 dark:hover:text-white" aria-label={`Actions de la ligne ${index + 1}`} title="Actions : insérer, dupliquer, copier, transformer, supprimer (clic droit sur la ligne)">⋯</button>
+    </div>
+  );
+  return (
+    <div
+      ref={(el) => { setNodeRef(el); mesurer?.(el); }}
+      role="row"
+      aria-rowindex={index + 1}
+      aria-selected={selectionnee || active}
+      data-index={index}
+      data-active={active ? "1" : undefined}
+      onContextMenu={(e) => { if ((e.target as HTMLElement).closest("input, textarea, select")?.matches(":focus") && window.getSelection()?.toString()) return; e.preventDefault(); onMenu(e.clientX, e.clientY); }}
+      style={{ transform: CSS.Transform.toString(transform), transition, gridTemplateColumns: "var(--grille)" }}
+      className={`grid border-b border-neutral-100 dark:border-neutral-800 ${isDragging ? "z-20 bg-blue-50 shadow-lg dark:bg-neutral-800" : selectionnee ? "bg-blue-100/70 ring-1 ring-inset ring-blue-300 dark:bg-blue-950/40 dark:ring-blue-800" : active ? "bg-blue-50/60 dark:bg-neutral-900" : "hover:bg-neutral-50/70 dark:hover:bg-neutral-900/50"}`}
+    >
+      {children(poigneeEtMenu)}
+    </div>
+  );
+}
+
+// ── Cellules ───────────────────────────────────────────────────────────────────
+
+/** Champ texte ou nombre validé à la sortie (blur, Entrée, Tab) ; Échap restaure. */
+function Cellule({ valeur, onCommit, index, colonne, disabled, alignement, onKeyDown, onFocus, format, aria, liste, texteRiche }: {
+  valeur: string;
+  onCommit: (v: string) => void;
+  index: number;
+  colonne: string;
+  disabled?: boolean;
+  alignement?: "gauche" | "droite" | "centre";
+  onKeyDown: (e: KeyboardEvent<HTMLDivElement>, colonne: string) => void;
+  onFocus: () => void;
+  format?: "nombre";
+  aria: string;
+  /** `id` d'un `<datalist>` de suggestions (unités) ; la saisie libre reste possible. */
+  liste?: string;
+  /** Champ éligible à la barre de formatage (gras, italique…). */
+  texteRiche?: boolean;
+}) {
+  const [brouillon, setBrouillon] = useState(valeur);
+  const [edition, setEdition] = useState(false);
+  // Rien tapé depuis l'entrée dans la cellule : un brouillon intact ne doit jamais écraser une valeur qui
+  // vient de changer (coefficient appliqué, annulation…). Le brouillon suit la valeur reçue, pendant le rendu.
+  const [saisi, setSaisi] = useState(false);
+  const [recue, setRecue] = useState(valeur);
+  if (valeur !== recue) { setRecue(valeur); if (!edition || !saisi) setBrouillon(valeur); }
+  // Après validation, le brouillon revient à la valeur reçue : une saisie refusée (remise 101, texte) ne reste
+  // jamais affichée ; une saisie acceptée est resynchronisée dès que la nouvelle valeur arrive.
+  const commettre = () => { setEdition(false); setSaisi(false); if (saisi && brouillon !== valeur) onCommit(brouillon); setBrouillon(valeur); };
+  return (
+    <div role="gridcell" className="min-w-0" onKeyDown={(e) => { if (e.key === "Escape") { setBrouillon(valeur); setEdition(false); return; } if (e.key === "Enter" || e.key === "Tab") commettre(); onKeyDown(e, colonne); }}>
+      <input
+        data-cellule={`${index}:${colonne}`}
+        aria-label={aria}
+        value={brouillon}
+        disabled={disabled}
+        inputMode={format === "nombre" ? "decimal" : undefined}
+        list={liste}
+        data-texte-riche={texteRiche ? "1" : undefined}
+        onFocus={() => { setEdition(true); setSaisi(false); onFocus(); }}
+        onChange={(e) => { setSaisi(true); setBrouillon(e.target.value); }}
+        onBlur={commettre}
+        className={`${cellule} ${alignement === "droite" ? "text-right" : ""}`}
+      />
+    </div>
+  );
+}
+
+function CelluleChoix({ valeur, options, onChange, index, colonne, disabled, onKeyDown, onFocus, aria }: {
+  valeur: string; options: Array<{ v: string; l: string }>; onChange: (v: string) => void; index: number; colonne: string; disabled?: boolean;
+  onKeyDown: (e: KeyboardEvent<HTMLDivElement>, colonne: string) => void; onFocus: () => void; aria: string;
+}) {
+  return (
+    <div role="gridcell" className="min-w-0" onKeyDown={(e) => onKeyDown(e, colonne)}>
+      <select data-cellule={`${index}:${colonne}`} aria-label={aria} value={valeur} disabled={disabled} onFocus={onFocus} onChange={(e) => onChange(e.target.value)} className={cellule}>
+        {options.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
+      </select>
+    </div>
+  );
+}
+
+/** Cellule calculée, non éditable ; `cle` (« index:colonne ») l'expose en `data-lecture` pour les tests et la recette. */
+function CelluleLecture({ children, alignement, titre, cle }: { children?: ReactNode; alignement?: "gauche" | "droite" | "centre"; titre?: string; cle?: string }) {
+  return <div role="gridcell" title={titre} data-lecture={cle} className={`flex h-9 min-w-0 items-center truncate px-2 text-sm tabular-nums text-neutral-700 dark:text-neutral-300 ${alignement === "droite" ? "justify-end" : ""}`}>{children}</div>;
+}
+
+// ── Recherche d'article depuis la cellule Désignation ──────────────────────────
+
+function CelluleDesignation({ ligne, origine, index, colonne, onCommit, onArticle, onOuvrage, onKeyDown, onFocus, disabled }: {
+  ligne: LigneLibre; origine: EtatElements["origines"][string] | undefined; index: number; colonne: string;
+  onCommit: (v: string) => void; onArticle: (a: ArticleTrouve) => void; onOuvrage: () => void;
+  onKeyDown: (e: KeyboardEvent<HTMLDivElement>, colonne: string) => void; onFocus: () => void; disabled?: boolean;
+}) {
+  const [brouillon, setBrouillon] = useState(ligne.designation);
+  const [edition, setEdition] = useState(false);
+  const [resultats, setResultats] = useState<ArticleTrouve[]>([]);
+  const [surligne, setSurligne] = useState(-1);
+  const sequence = useRef(0);
+  const rechercheActive = typeDe(ligne) === "libre" && !origine?.sourceId;
+  const [saisi, setSaisi] = useState(false);
+  const [recue, setRecue] = useState(ligne.designation);
+  if (ligne.designation !== recue) { setRecue(ligne.designation); if (!edition || !saisi) setBrouillon(ligne.designation); }
+  const texteRecherche = edition && rechercheActive ? brouillon.trim() : "";
+  const listeId = `recherche-${ligne.cle}`;
+
+  // Recherche différée depuis la cellule ; une réponse dépassée par une frappe plus récente est ignorée.
+  useEffect(() => {
+    if (texteRecherche.length < 2) return;
+    const n = ++sequence.current;
+    const t = window.setTimeout(async () => {
+      const r = await rechercherArticlesDevisAction(texteRecherche);
+      if (n !== sequence.current) return;
+      setResultats("articles" in r ? r.articles.slice(0, 8) : []);
+      setSurligne(-1);
+    }, 200);
+    return () => window.clearTimeout(t);
+  }, [texteRecherche]);
+
+  const commettre = () => { setEdition(false); setResultats([]); setSaisi(false); if (saisi && brouillon !== ligne.designation) onCommit(brouillon); };
+  const choisir = (a: ArticleTrouve) => { setEdition(false); setResultats([]); setSaisi(false); onArticle(a); };
+  const ouverte = texteRecherche.length >= 2 && resultats.length > 0;
+
+  return (
+    <div
+      role="gridcell"
+      className="relative min-w-0"
+      onKeyDown={(e) => {
+        if (ouverte) {
+          if (e.key === "ArrowDown") { e.preventDefault(); setSurligne((s) => Math.min(resultats.length - 1, s + 1)); return; }
+          if (e.key === "ArrowUp") { e.preventDefault(); setSurligne((s) => Math.max(-1, s - 1)); return; }
+          if (e.key === "Enter" && surligne >= 0) { e.preventDefault(); choisir(resultats[surligne]); return; }
+          if (e.key === "Escape") { e.preventDefault(); setResultats([]); return; }
+        }
+        if (e.key === "Escape") { setBrouillon(ligne.designation); setEdition(false); return; }
+        if (e.key === "Enter" || e.key === "Tab") commettre();
+        onKeyDown(e, colonne);
+      }}
+    >
+      <input
+        data-cellule={`${index}:${colonne}`}
+        data-recherche={ouverte ? "1" : undefined}
+        data-texte-riche="1"
+        aria-label="Désignation"
+        role="combobox"
+        aria-expanded={ouverte}
+        aria-controls={listeId}
+        aria-autocomplete="list"
+        value={brouillon}
+        disabled={disabled}
+        placeholder={rechercheActive ? "Désignation ou référence…" : ""}
+        onFocus={() => { setEdition(true); setSaisi(false); onFocus(); }}
+        onChange={(e) => { setSaisi(true); setBrouillon(e.target.value); }}
+        onBlur={() => window.setTimeout(commettre, 120)}
+        className={`${cellule} ${typeDe(ligne) === "titre" ? "font-semibold" : typeDe(ligne) === "sous_titre" ? "font-medium" : typeDe(ligne) === "commentaire" ? "italic" : ""}`}
+      />
+      {ouverte && (
+        <ul id={listeId} role="listbox" className="absolute left-0 top-full z-30 max-h-72 w-[28rem] max-w-[80vw] overflow-auto rounded-md border border-neutral-200 bg-white text-sm shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+          {resultats.map((a, i) => (
+            <li key={a.id} role="option" aria-selected={i === surligne} onMouseDown={(e) => { e.preventDefault(); choisir(a); }} onMouseEnter={() => setSurligne(i)}
+              className={`cursor-pointer px-3 py-1.5 ${i === surligne ? "bg-blue-50 dark:bg-neutral-800" : ""}`}>
+              <span className="font-mono text-xs">{a.referenceInterne ?? "—"}</span> <span className="font-medium">{a.designation}</span>
+              <span className="float-right tabular-nums">{euros(a.prixVenteHt)}/{a.unite}</span>
+              {a.famille && <div className="text-xs text-neutral-500">{a.famille}</div>}
+            </li>
+          ))}
+          <li role="option" aria-selected={false} onMouseDown={(e) => { e.preventDefault(); onOuvrage(); }} className="cursor-pointer border-t px-3 py-1.5 text-neutral-600 dark:border-neutral-700">
+            Insérer un ouvrage composé…
+          </li>
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ── Ligne libre ────────────────────────────────────────────────────────────────
+
+const LigneGrille = memo(function LigneGrille({ index, ligne, origine, colonnes, droits, poignee, sousTotal, tvaMixte, onFocus, onKeyDown, onChange, onCouts, onArticle, onOuvrage, onRetirer, onSignal }: {
+  index: number; ligne: LigneLibre; origine: EtatElements["origines"][string] | undefined; colonnes: Colonne[]; droits: DroitsGrille; poignee: ReactNode;
+  sousTotal: number | null; tvaMixte: boolean; onFocus: () => void; onKeyDown: (e: KeyboardEvent<HTMLDivElement>, colonne: string) => void;
+  onChange: (patch: Partial<Omit<LigneLibre, "cle">>) => void;
+  /** Coûts, et éventuel prix de vente dérivé, appliqués en UNE modification. */
+  onCouts: (c: { prixAchatHt?: number | null; coutMainOeuvreHt?: number | null; coefficient?: number | null }, prix?: Partial<Omit<LigneLibre, "cle">>) => void;
+  onArticle: (a: ArticleTrouve) => void; onOuvrage: () => void; onRetirer: () => void;
+  /** Saisie refusée (remise hors bornes, montant illisible) : message pour l'utilisateur. */
+  onSignal: (texte: string) => void;
+}) {
+  const type = typeDe(ligne);
+  const marge = margeLigne(ligne, origine);
+  const totalHt = type === "sous_total" ? sousTotal : (type === "article" || type === "libre" || type === "remise") ? montantLigneHt(ligne) : null;
+  const peut = (c: Colonne, champ: Parameters<typeof champModifiable>[1]) => colonneModifiable(c, droits) && champModifiable(type, champ);
+  const commun = { index, onKeyDown, onFocus };
+
+  return (
+    <>
+      {colonnes.map((c) => {
+        switch (c.cle) {
+          case "poignee": return <div key={c.cle} role="gridcell">{poignee}</div>;
+          case "type": return <CelluleChoix key={c.cle} {...commun} colonne="type" aria="Type de ligne" valeur={type} onChange={(v) => onChange({ typeLigne: v as TypeLigneGrille })} options={TYPES_LIGNE_GRILLE.map((t) => ({ v: t.cle, l: t.court }))} />;
+          case "reference": return <CelluleLecture key={c.cle} titre={origine?.referenceInterne ?? undefined}><span className="font-mono text-xs">{origine?.referenceInterne ?? ""}</span></CelluleLecture>;
+          case "designation":
+            if (!champModifiable(type, "designation")) return <CelluleLecture key={c.cle}><span className="text-xs uppercase tracking-wide text-neutral-400">{libelleTypeLigne(type)}</span></CelluleLecture>;
+            return <CelluleDesignation key={c.cle} {...commun} colonne="designation" ligne={ligne} origine={origine} onCommit={(v) => onChange({ designation: v })} onArticle={onArticle} onOuvrage={onOuvrage} />;
+          case "description": return <Cellule key={c.cle} {...commun} colonne="description" aria="Description" texteRiche valeur={ligne.description ?? ""} disabled={!champModifiable(type, "description")} onCommit={(v) => onChange({ description: v || null })} />;
+          case "reference_fabricant": return <CelluleLecture key={c.cle}><span className="font-mono text-xs">{origine?.referenceFabricant ?? ""}</span></CelluleLecture>;
+          case "code_fournisseur": return <CelluleLecture key={c.cle}><span className="font-mono text-xs">{origine?.codeFournisseur ?? ""}</span></CelluleLecture>;
+          case "famille": return <CelluleLecture key={c.cle} titre={origine?.famille ?? undefined}>{origine?.famille ?? ""}</CelluleLecture>;
+          case "fournisseur": return <CelluleLecture key={c.cle}>{origine?.fournisseur ?? ""}</CelluleLecture>;
+          case "quantite": return <Cellule key={c.cle} {...commun} colonne="quantite" aria="Quantité" format="nombre" alignement="droite" valeur={champModifiable(type, "quantite") ? fr(ligne.quantite, 3) : ""} disabled={!peut(c, "quantite")} onCommit={(v) => { const n = nombre(v); if (n !== null) onChange({ quantite: n }); }} />;
+          case "unite": return <Cellule key={c.cle} {...commun} colonne="unite" aria="Unité" liste="unites-devis" valeur={champModifiable(type, "unite") ? ligne.unite : ""} disabled={!peut(c, "unite")} onCommit={(v) => onChange({ unite: v.trim() || "u" })} />;
+          case "pu_net": return <CelluleLecture key={c.cle} cle={`${index}:${c.cle}`} alignement="droite" titre="Prix unitaire HT après remise de ligne">{estChiffree(type) ? euros(ligne.prixUnitaireHt * (1 - ligne.remiseLignePct / 100)) : ""}</CelluleLecture>;
+          case "prix_achat": return <Cellule key={c.cle} {...commun} colonne="prix_achat" aria="Prix d’achat HT" format="nombre" alignement="droite" valeur={type === "article" || type === "libre" ? fr(origine?.prixAchatHt ?? null, 4) : ""} disabled={!colonneModifiable(c, droits) || !(type === "article" || type === "libre")} onCommit={(v) => onCouts({ prixAchatHt: nombre(v) })} />;
+          case "cout_mo": return <Cellule key={c.cle} {...commun} colonne="cout_mo" aria="Coût main-d’œuvre HT" format="nombre" alignement="droite" valeur={type === "article" || type === "libre" ? fr(origine?.coutMainOeuvreHt ?? null, 4) : ""} disabled={!colonneModifiable(c, droits) || !(type === "article" || type === "libre")} onCommit={(v) => onCouts({ coutMainOeuvreHt: nombre(v) })} />;
+          case "coefficient": return <Cellule key={c.cle} {...commun} colonne="coefficient" aria="Coefficient" format="nombre" alignement="droite" valeur={type === "article" || type === "libre" ? fr(origine?.coefficient ?? null, 4) : ""} disabled={!colonneModifiable(c, droits) || !(type === "article" || type === "libre")} onCommit={(v) => { const k = nombre(v); const achat = origine?.prixAchatHt; onCouts({ coefficient: k }, k !== null && achat !== null && achat !== undefined ? { prixUnitaireHt: Math.round((achat + (origine?.coutMainOeuvreHt ?? 0)) * k * 100) / 100 } : undefined); }} />;
+          case "marge": return <CelluleLecture key={c.cle} alignement="droite"><span className={marge.margeHt !== null && marge.margeHt < 0 ? "text-red-700" : ""}>{marge.margeHt === null ? "" : euros(marge.margeHt)}</span></CelluleLecture>;
+          case "marge_pct": return <CelluleLecture key={c.cle} alignement="droite">{marge.tauxMarquePct === null ? "" : `${fr(marge.tauxMarquePct, 1)} %`}</CelluleLecture>;
+          case "prix_vente":
+            if (type === "remise") {
+              return (
+                <div key={c.cle} role="gridcell" className="flex min-w-0 items-center" title={tvaMixte ? "Section à plusieurs taux de TVA : indiquez le taux de la remise" : undefined}>
+                  <input data-cellule={`${index}:prix_vente`} aria-label="Remise (% de la section ou montant)" inputMode="decimal" disabled={!droits.modifierRemise}
+                    defaultValue={ligne.remiseSectionPct !== null && ligne.remiseSectionPct !== undefined ? `${fr(ligne.remiseSectionPct, 2)} %` : fr(ligne.prixUnitaireHt, 2)}
+                    key={`${ligne.remiseSectionPct}|${ligne.prixUnitaireHt}`}
+                    onFocus={onFocus}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Tab") (e.target as HTMLInputElement).blur(); onKeyDown(e as unknown as KeyboardEvent<HTMLDivElement>, "prix_vente"); }}
+                    onBlur={(e) => {
+                      // « 5 % » : pourcentage de la section (0 à 100) ; « 50 » : montant fixe en euros (négatif, sans plafond
+                      // arbitraire : la règle de la base est « montant négatif, quantité 1 »). Saisie refusée → valeur affichée rétablie.
+                      const t = e.target.value.trim();
+                      const affichee = ligne.remiseSectionPct !== null && ligne.remiseSectionPct !== undefined ? `${fr(ligne.remiseSectionPct, 2)} %` : fr(ligne.prixUnitaireHt, 2);
+                      if (t.endsWith("%")) {
+                        const r = interpreterRemisePct(t.slice(0, -1));
+                        if (r.ok) onChange({ remiseSectionPct: r.valeur }); else { onSignal(r.motif); e.target.value = affichee; }
+                      } else {
+                        const m = nombre(t);
+                        if (m !== null) onChange({ remiseSectionPct: null, prixUnitaireHt: -Math.abs(m) });
+                        else if (t !== "") { onSignal(`« ${t} » n’est pas un montant : indiquez un montant en euros, ou un pourcentage suivi de %.`); e.target.value = affichee; }
+                      }
+                    }}
+                    className={`${cellule} text-right ${tvaMixte ? "ring-1 ring-amber-500" : ""}`} />
+                </div>
+              );
+            }
+            return <Cellule key={c.cle} {...commun} colonne="prix_vente" aria="Prix de vente unitaire HT" format="nombre" alignement="droite" valeur={champModifiable(type, "prixUnitaireHt") ? fr(ligne.prixUnitaireHt, 4) : ""} disabled={!peut(c, "prixUnitaireHt")} onCommit={(v) => { const n = nombre(v); if (n !== null) onChange({ prixUnitaireHt: n }); }} />;
+          case "remise": return <Cellule key={c.cle} {...commun} colonne="remise" aria="Remise de ligne (%)" format="nombre" alignement="droite" valeur={champModifiable(type, "remiseLignePct") ? fr(ligne.remiseLignePct, 2) : ""} disabled={!peut(c, "remiseLignePct")} onCommit={(v) => { const r = interpreterRemisePct(v); if (r.ok) onChange({ remiseLignePct: r.valeur }); else onSignal(r.motif); }} />;
+          case "tva": return champModifiable(type, "tauxTva")
+            ? <CelluleChoix key={c.cle} {...commun} colonne="tva" aria="TVA" valeur={String(ligne.tauxTva)} onChange={(v) => onChange({ tauxTva: Number(v) })} options={[...new Set([...TAUX_TVA_ADMIS, ligne.tauxTva])].map((t) => ({ v: String(t), l: `${t} %` }))} />
+            : <CelluleLecture key={c.cle} />;
+          case "total_ht": return <CelluleLecture key={c.cle} cle={`${index}:${c.cle}`} alignement="droite"><span className={type === "sous_total" ? "font-semibold" : ""}>{totalHt === null ? "" : euros(totalHt)}</span></CelluleLecture>;
+          case "commentaire_interne": return <Cellule key={c.cle} {...commun} colonne="commentaire_interne" aria="Commentaire interne" valeur={ligne.commentaireInterne ?? ""} disabled={!champModifiable(type, "commentaireInterne")} onCommit={(v) => onChange({ commentaireInterne: v || null })} />;
+          default: return <CelluleLecture key={c.cle} />;
+        }
+      })}
+      <span className="sr-only"><button type="button" onClick={onRetirer}>Retirer la ligne {index + 1}</button></span>
+    </>
+  );
+});
+
+// ── Ligne ouvrage ──────────────────────────────────────────────────────────────
+
+const LigneOuvrageGrille = memo(function LigneOuvrageGrille({ index, instance, colonnes, droits, seuilTauxMarquePct, poignee, onFocus, onKeyDown, onChange, onModifier, onPrix, onRetirer }: {
+  index: number; instance: InstanceOuvrage; colonnes: Colonne[]; droits: DroitsGrille; seuilTauxMarquePct: number | null; poignee: ReactNode;
+  onFocus: () => void; onKeyDown: (e: KeyboardEvent<HTMLDivElement>, colonne: string) => void; onChange: (i: InstanceOuvrage) => void; onModifier: () => void; onPrix: () => void; onRetirer: () => void;
+}) {
+  void seuilTauxMarquePct;
+  const ind = indicateursPrix(instance);
+  const [deplie, setDeplie] = useState(false);
+  const commun = { index, onKeyDown, onFocus };
+  const largeur = colonnes.map((c) => `${c.largeurPx}px`).join(" ");
+  return (
+    <>
+      {colonnes.map((c) => {
+        switch (c.cle) {
+          case "poignee": return <div key={c.cle} role="gridcell">{poignee}</div>;
+          case "type": return <CelluleLecture key={c.cle}><button type="button" className="text-xs underline" onClick={() => setDeplie((d) => !d)} aria-expanded={deplie}>Ouvrage {deplie ? "▾" : "▸"}</button></CelluleLecture>;
+          case "reference": return <CelluleLecture key={c.cle}><span className="font-mono text-xs">{instance.referenceInterne ?? ""} v{instance.version}</span></CelluleLecture>;
+          case "designation": return <Cellule key={c.cle} {...commun} colonne="designation" aria="Libellé pour le client" valeur={instance.libelleClient} onCommit={(v) => onChange({ ...instance, libelleClient: v })} />;
+          case "quantite": return <CelluleLecture key={c.cle} alignement="droite">{fr(instance.quantitePrincipale, 3)}</CelluleLecture>;
+          case "unite": return <CelluleLecture key={c.cle}>{instance.unitePrincipale}</CelluleLecture>;
+          case "pu_net": return <CelluleLecture key={c.cle} cle={`${index}:${c.cle}`} alignement="droite" />;
+          case "prix_achat": return <CelluleLecture key={c.cle} alignement="droite">{ind.coutAchatHt === null ? "incomplet" : euros(ind.coutAchatHt)}</CelluleLecture>;
+          case "marge": return <CelluleLecture key={c.cle} alignement="droite">{ind.margeHt === null ? "" : euros(ind.margeHt)}</CelluleLecture>;
+          case "marge_pct": return <CelluleLecture key={c.cle} alignement="droite">{ind.tauxMarquePct === null ? "" : `${fr(ind.tauxMarquePct, 1)} %`}</CelluleLecture>;
+          case "prix_vente": return <CelluleLecture key={c.cle} alignement="droite"><button type="button" className="underline" onClick={onPrix} title="Prix global de l’ouvrage">{euros(instance.quantitePrincipale ? ind.prixVenteRetenuHt / instance.quantitePrincipale : ind.prixVenteRetenuHt)}</button></CelluleLecture>;
+          case "tva": return <CelluleChoix key={c.cle} {...commun} colonne="tva" aria="Présentation client" valeur={instance.mode} onChange={(v) => onChange({ ...instance, mode: v as ModePresentation })} options={MODES_PRESENTATION.map((m) => ({ v: m.cle, l: m.libelle }))} />;
+          case "total_ht": return <CelluleLecture key={c.cle} cle={`${index}:${c.cle}`} alignement="droite"><span className="font-medium">{euros(ind.prixVenteRetenuHt)}</span></CelluleLecture>;
+          case "commentaire_interne": return <CelluleLecture key={c.cle}><button type="button" className="text-xs underline" onClick={onModifier}>Modifier l’ouvrage</button></CelluleLecture>;
+          default: return <CelluleLecture key={c.cle} />;
+        }
+      })}
+      {deplie && (
+        <div role="row" className="col-span-full bg-neutral-50 px-3 py-2 text-xs dark:bg-neutral-900" style={{ gridColumn: `1 / span ${colonnes.length}`, ["--grille" as string]: largeur }}>
+          <ul className="space-y-0.5">
+            {instance.lignes.map((l) => (
+              <li key={l.cle} className="flex justify-between gap-2">
+                <span>{l.designation}{!l.visibleClient ? " (interne)" : ""}</span>
+                <span className="tabular-nums">{fr(l.quantite, 3)} {l.unite} × {euros(l.prixVenteHt)}{droits.voirCouts && l.prixAchatHt !== null ? ` · achat ${euros(l.prixAchatHt)}` : ""}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-2 flex gap-3">
+            <button type="button" className="underline" onClick={onModifier}>Modifier l’ouvrage</button>
+            <button type="button" className="underline" onClick={onPrix}>Prix global…</button>
+            <button type="button" className="text-red-700 underline" onClick={onRetirer}>Retirer</button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+});
+
+export const LIBELLES_LIGNE_TYPE = LIGNE_TYPES;
+export const UNITES_GRILLE = UNITES;

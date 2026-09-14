@@ -33,7 +33,10 @@ export const LIGNE_TYPES = [
   { cle: "forfait", libelle: "Forfait" },
 ] as const;
 
-export const UNITES = ["u", "m²", "ml", "h", "forfait", "kg", "L"] as const;
+import { UNITES_CLES } from "@/lib/unites";
+
+/** Unités proposées (liste métier ouverte, voir `src/lib/unites.ts`). */
+export const UNITES: ReadonlyArray<string> = UNITES_CLES;
 
 export const TAUX_TVA = [20, 10, 5.5, 0] as const;
 

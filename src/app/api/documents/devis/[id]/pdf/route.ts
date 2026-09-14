@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { genererPdfDepuisUrl, nomFichierPdf } from "@/lib/pdf/generer";
+import { chargerRenduDocument, estDebordementMiseEnPage, moteurDeReponse } from "@/lib/devis/v2-serveur";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -22,10 +23,23 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const url = new URL(`/imprimer/devis/${id}`, request.url);
   let pdf: Buffer;
   try {
-    pdf = await genererPdfDepuisUrl(url.toString(), request.headers.get("cookie"));
-  } catch {
+    // Moteur v2 : pages A4 décidées par les données, imprimées sans marge ni pied Chromium. Moteur 1 :
+    // appel strictement identique à celui d'avant.
+    const moteur = moteurDeReponse(await chargerRenduDocument(supabase, "devis", id));
+    pdf = moteur === 2
+      ? await genererPdfDepuisUrl(url.toString(), request.headers.get("cookie"), { moteur: 2 })
+      : await genererPdfDepuisUrl(url.toString(), request.headers.get("cookie"));
+  } catch (e) {
+    if (estDebordementMiseEnPage(e)) return NextResponse.json({ error: e.message }, { status: 422 });
+    // La cause (Chromium, page d'impression, délai) n'est jamais renvoyée au client ; elle est journalisée
+    // côté serveur, sinon un 502 reste muet en exploitation (constaté en recette preview).
+    const { existsSync } = await import("node:fs");
+    console.error(`[pdf] devis ${id} : ${e instanceof Error ? `${e.name}: ${e.message}` : String(e)} — node ${process.version}, VERCEL=${process.env.VERCEL ?? ""}, LD_LIBRARY_PATH=${process.env.LD_LIBRARY_PATH ?? "(absent)"}, /tmp/al2023/lib/libnspr4.so=${existsSync("/tmp/al2023/lib/libnspr4.so")}, /tmp/chromium=${existsSync("/tmp/chromium")}`);
     return NextResponse.json({ error: "Génération du PDF impossible" }, { status: 502 });
   }
+  // GP V1 (lot G) : la production d'un PDF est tracée dans l'historique de l'objet ; un historique
+  // indisponible (schéma non migré) ne bloque jamais le téléchargement.
+  try { await supabase.rpc("journaliser_pdf_document", { p_entreprise_id: ctx.entrepriseId, p_type_document: "devis", p_document_id: id }); } catch { /* sans effet */ }
 
   return new NextResponse(new Uint8Array(pdf), {
     headers: {

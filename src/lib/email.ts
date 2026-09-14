@@ -2,9 +2,10 @@ import { euros } from "@/lib/devis";
 
 type ClientMail = { nom: string | null; prenom: string | null; societe: string | null; email: string | null };
 
-export function construireLienMailto(opts:{to:string;sujet:string;corps:string;cc?:string}){
+export function construireLienMailto(opts:{to:string;sujet:string;corps:string;cc?:string;cci?:string}){
   const parametres=[`subject=${encodeURIComponent(opts.sujet)}`,`body=${encodeURIComponent(opts.corps)}`];
   if(opts.cc?.trim())parametres.push(`cc=${encodeURIComponent(opts.cc.split(/[;,]/).map(adresse=>adresse.trim()).filter(Boolean).join(","))}`);
+  if(opts.cci?.trim())parametres.push(`bcc=${encodeURIComponent(opts.cci.split(/[;,]/).map(adresse=>adresse.trim()).filter(Boolean).join(","))}`);
   return `mailto:${encodeURIComponent(opts.to.trim())}?${parametres.join("&")}`;
 }
 
@@ -12,7 +13,7 @@ export function construireLienMailto(opts:{to:string;sujet:string;corps:string;c
 // (notamment l'ajout manuel du PDF) restent dans l'interface et ne doivent jamais
 // apparaître dans l'e-mail professionnel.
 export function contenuEmailDocument(opts: {
-  typeDoc: "devis" | "facture";
+  typeDoc: "devis" | "facture" | "avoir";
   numero: string | null;
   client: ClientMail;
   montantTtc: number;
@@ -22,20 +23,23 @@ export function contenuEmailDocument(opts: {
   const to = opts.client.email?.trim();
   if (!to) return null;
 
-  const estFacture = opts.typeDoc === "facture";
-  const libelle = estFacture ? "facture" : "devis";
-  const ref = opts.numero ?? (estFacture ? "facture" : "devis");
+  // Un avoir suit le ton "facture" (même relation contractuelle), mais ne doit jamais être
+  // appelé "facture" dans l'objet/le corps — seul le libellé et l'article changent.
+  const estAvoir = opts.typeDoc === "avoir";
+  const estFacture = opts.typeDoc === "facture" || estAvoir;
+  const libelle = estAvoir ? "avoir" : estFacture ? "facture" : "devis";
+  const article = estAvoir ? "l'" : estFacture ? "la " : "le ";
+  const ref = opts.numero ?? libelle;
   const contact = [opts.client.prenom, opts.client.nom].filter(Boolean).join(" ");
   const salutation = contact || "Madame, Monsieur";
 
-  const sujet = `${estFacture ? "Facture" : "Devis"} ${ref} — ${opts.entrepriseNom}`;
+  const sujetLabel = estAvoir ? "Avoir" : estFacture ? "Facture" : "Devis";
+  const sujet = `${sujetLabel} ${ref} — ${opts.entrepriseNom}`;
 
   const corps = [
     `Bonjour ${salutation},`,
     "",
-    estFacture
-      ? `Veuillez trouver ci-joint la ${libelle} ${ref} d'un montant de ${euros(opts.montantTtc)} TTC.`
-      : `Veuillez trouver ci-joint le ${libelle} ${ref} d'un montant de ${euros(opts.montantTtc)} TTC.`,
+    `Veuillez trouver ci-joint ${article}${libelle} ${ref} d'un montant de ${euros(opts.montantTtc)} TTC.`,
     "",
     estFacture
       ? "Nous restons à votre disposition pour tout renseignement et vous remercions de votre confiance."

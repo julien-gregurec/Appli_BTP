@@ -38,7 +38,9 @@ export const FEATURE_CATALOGUE: Record<FeatureKey, FeatureDefinition> = {
 
   // Modules conservés dans le code et la base, mais retirés du produit V3 tant
   // que leurs parcours complets n'ont pas été validés en conditions réelles.
-  advanced_invoicing: BETA, works: BETA, interventions: BETA, subcontractors: BETA,
+  advanced_invoicing: BETA, interventions: BETA, subcontractors: BETA,
+  // Bibliothèque d'ouvrages composés (GP V1) : active dès l'offre Pro (décision du 2026-09-12), absente de Mini.
+  works: { status: "active", visibleByDefault: true, plans: ["pro", "business", "entreprise", "sur_mesure"] },
   travel: BETA, payroll: BETA, crm: BETA,
 
   // Intégrations et offres post-V3 explicitement hors périmètre commercial.

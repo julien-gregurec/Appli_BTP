@@ -2,16 +2,21 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { calcTotaux, euros, LIGNE_TYPES, TAUX_TVA, UNITES, type LigneDevis } from "@/lib/devis";
+import { useZoneDense } from "@/lib/ui-dense";
+import { euros, LIGNE_TYPES, TAUX_TVA, UNITES, type LigneDevis } from "@/lib/devis";
+import { totauxDocument } from "@/lib/devis/montants";
 import { FACTURE_TYPES } from "@/lib/factures";
 import { prestationVersLigne, type PrestationCatalogue } from "@/lib/prestations";
 import { modifierFactureAction } from "@/app/actions/factures";
+import { GardeModifications } from "@/components/GardeModifications";
 
 type Option = { id: string; label: string };
 type FactureInitiale = {
   id: string; client_id: string; chantier_id: string | null; type: string;
   date_emission: string; date_echeance: string | null;
   notes_client: string | null; notes_internes: string | null; lignes: LigneDevis[];
+  /** Remise globale héritée du devis (GP V1) ; absente sur une facture historique. */
+  remise_globale?: number | null;
 };
 const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 const ligneVide = (): LigneDevis => ({ designation: "", description: null, type: "fourniture", quantite: 1, unite: "u", prix_unitaire_ht: 0, remise_ligne: 0, taux_tva: 20 });
@@ -23,6 +28,7 @@ export function FactureEditor({ facture, clients, chantiers, prestations }: {
   prestations: PrestationCatalogue[];
 }) {
   const router = useRouter();
+  useZoneDense();
   const [pending, startTransition] = useTransition();
   const [erreur, setErreur] = useState<string | null>(null);
   const [clientId, setClientId] = useState(facture.client_id);
@@ -33,23 +39,43 @@ export function FactureEditor({ facture, clients, chantiers, prestations }: {
   const [notesClient, setNotesClient] = useState(facture.notes_client ?? "");
   const [notesInternes, setNotesInternes] = useState(facture.notes_internes ?? "");
   const [lignes, setLignes] = useState<LigneDevis[]>(facture.lignes.length ? facture.lignes : [ligneVide()]);
-  const totaux = calcTotaux(lignes, 0);
+  // GP V1 : même calcul exact que la base et le devis (remise globale comprise) — plus de calcul flottant.
+  const t = totauxDocument(
+    lignes.map((l) => ({ quantite: Number(l.quantite) || 0, prixUnitaireHt: Number(l.prix_unitaire_ht) || 0, remiseLignePct: Number(l.remise_ligne) || 0, tauxTva: Number(l.taux_tva) || 0 })),
+    Number(facture.remise_globale ?? 0),
+  );
+  const totaux = { ht: t.totalHt, tva: t.totalTva, ttc: t.totalTtc };
   const maj = (i: number, cle: keyof LigneDevis, valeur: string | number) => setLignes((avant) => avant.map((ligne, index) => index === i ? { ...ligne, [cle]: valeur } : ligne));
+  // Garde « modifications non enregistrées » (polish UX Julien) : ce formulaire n'avait aucune protection —
+  // un clic sur « ← Facture » ou un lien de la barre latérale perdait la saisie en silence. Comparaison à
+  // l'état initial plutôt qu'un drapeau posé à la main : correct même si un champ revient à sa valeur de
+  // départ, sans toucher aux gestionnaires existants.
+  const sale = clientId !== facture.client_id
+    || chantierId !== (facture.chantier_id ?? "")
+    || type !== facture.type
+    || dateEmission !== facture.date_emission
+    || dateEcheance !== (facture.date_echeance ?? "")
+    || notesClient !== (facture.notes_client ?? "")
+    || notesInternes !== (facture.notes_internes ?? "")
+    || JSON.stringify(lignes) !== JSON.stringify(facture.lignes.length ? facture.lignes : [ligneVide()]);
 
   function insererPrestation(id: string) {
     const prestation = prestations.find((item) => item.id === id);
     if (prestation) setLignes((avant) => [...avant.filter((ligne) => ligne.designation.trim()), prestationVersLigne(prestation)]);
   }
-  function enregistrer() {
+  async function enregistrerPourGarde(): Promise<boolean> {
     setErreur(null);
-    if (!clientId) return setErreur("Choisissez un client.");
-    startTransition(async () => {
-      const resultat = await modifierFactureAction(facture.id, { client_id: clientId, chantier_id: chantierId || null, type, date_emission: dateEmission, date_echeance: dateEcheance || null, notes_client: notesClient || null, notes_internes: notesInternes || null, lignes });
-      if (resultat.error) setErreur(resultat.error); else router.push(`/factures/${facture.id}`);
-    });
+    if (!clientId) { setErreur("Choisissez un client."); return false; }
+    const resultat = await modifierFactureAction(facture.id, { client_id: clientId, chantier_id: chantierId || null, type, date_emission: dateEmission, date_echeance: dateEcheance || null, notes_client: notesClient || null, notes_internes: notesInternes || null, lignes });
+    if (resultat.error) { setErreur(resultat.error); return false; }
+    return true;
+  }
+  function enregistrer() {
+    startTransition(async () => { if (await enregistrerPourGarde()) router.push(`/factures/${facture.id}`); });
   }
 
   return <div className="space-y-6">
+    <GardeModifications actif={sale} onEnregistrer={enregistrerPourGarde} />
     {erreur && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erreur}</p>}
     <div className="grid grid-cols-2 gap-4">
       <label className="space-y-1 text-sm font-medium">Client<select value={clientId} onChange={(e) => { setClientId(e.target.value); setChantierId(""); }} className={input + " w-full"}>{clients.map((client) => <option key={client.id} value={client.id}>{client.label}</option>)}</select></label>

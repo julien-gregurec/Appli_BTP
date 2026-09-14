@@ -4,6 +4,7 @@
 // différentes"). Aucune logique d'éligibilité ne doit exister ailleurs dans le code.
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { nomClientDocument } from "@/lib/client-snapshot";
 import { brevoEstConfigure, envoyerEmailBrevo } from "@/lib/brevo";
 import { corpsHtmlEmailDocument } from "@/lib/email";
 import { contenuEmailRelanceDevis, contenuEmailRelanceFacture } from "@/lib/relances-email";
@@ -34,6 +35,7 @@ type LigneDevisEligibilite = {
   montant_ttc: number;
   relance_auto_exclue: boolean;
   client_id: string;
+  client_snapshot: unknown;
   client: { nom: string | null; prenom: string | null; societe: string | null; email: string | null; relance_auto_exclue: boolean } | null;
 };
 
@@ -47,6 +49,7 @@ type LigneFactureEligibilite = {
   montant_paye: number;
   relance_auto_exclue: boolean;
   client_id: string;
+  client_snapshot: unknown;
   client: { nom: string | null; prenom: string | null; societe: string | null; email: string | null; relance_auto_exclue: boolean } | null;
 };
 
@@ -55,9 +58,22 @@ function normaliserClient(brut: unknown): { nom: string | null; prenom: string |
   return (c as ReturnType<typeof normaliserClient>) ?? null;
 }
 
-function nomAffiche(client: { nom: string | null; prenom: string | null; societe: string | null } | null): string {
-  if (!client) return "Client";
-  return client.societe || [client.prenom, client.nom].filter(Boolean).join(" ") || "Client";
+// Une relance porte sur un document DÉJÀ ÉMIS : le nom du destinataire qu'elle
+// rappelle est celui figé sur ce document, jamais la fiche client d'aujourd'hui
+// (ELSATIA-GP-CLIENT-DOCUMENT-SNAPSHOT-P0-V1).
+//
+// Règle documentée et volontairement asymétrique : seule l'IDENTITÉ rappelée
+// vient du snapshot. L'ADRESSE de destination et les exclusions
+// (relance_auto_exclue) restent lues sur la fiche client courante : une relance
+// n'est pas une copie du document, c'est une action de recouvrement émise
+// aujourd'hui, qui doit atteindre le client d'aujourd'hui et respecter ses
+// préférences actuelles.
+function nomAffiche(
+  snapshot: unknown,
+  client: { nom: string | null; prenom: string | null; societe: string | null } | null,
+): string {
+  const nom = nomClientDocument(snapshot, client);
+  return nom && nom !== "—" ? nom : "Client";
 }
 
 async function niveauSuivant(supabase: SupabaseClient, typeDocument: TypeDocumentRelance, documentId: string): Promise<number> {
@@ -103,7 +119,7 @@ export async function evaluerEligibiliteDevis(
   const aujourdhui = opts.aujourdhui ?? new Date();
   const { data } = await supabase
     .from("devis")
-    .select("id, entreprise_id, numero, statut, date_emission, montant_ttc, relance_auto_exclue, client_id, client:clients!devis_client_id_fkey(nom, prenom, societe, email, relance_auto_exclue)")
+    .select("id, entreprise_id, numero, statut, date_emission, montant_ttc, relance_auto_exclue, client_id, client_snapshot, client:clients!devis_client_id_fkey(nom, prenom, societe, email, relance_auto_exclue)")
     .eq("id", devisId)
     .eq("entreprise_id", entrepriseId)
     .maybeSingle();
@@ -137,7 +153,7 @@ export async function evaluerEligibiliteDevis(
       entrepriseId: devis.entreprise_id,
       numero: devis.numero,
       niveau,
-      clientNom: nomAffiche(client),
+      clientNom: nomAffiche(devis.client_snapshot, client),
       clientEmail: client.email.trim(),
       montant: Number(devis.montant_ttc),
       dateReference: devis.date_emission,
@@ -160,7 +176,7 @@ export async function evaluerEligibiliteFacture(
   const aujourdhui = opts.aujourdhui ?? new Date();
   const { data } = await supabase
     .from("factures")
-    .select("id, entreprise_id, numero, statut, date_echeance, montant_ttc, montant_paye, relance_auto_exclue, client_id, client:clients!factures_client_id_fkey(nom, prenom, societe, email, relance_auto_exclue)")
+    .select("id, entreprise_id, numero, statut, date_echeance, montant_ttc, montant_paye, relance_auto_exclue, client_id, client_snapshot, client:clients!factures_client_id_fkey(nom, prenom, societe, email, relance_auto_exclue)")
     .eq("id", factureId)
     .eq("entreprise_id", entrepriseId)
     .maybeSingle();
@@ -201,7 +217,7 @@ export async function evaluerEligibiliteFacture(
       entrepriseId: facture.entreprise_id,
       numero: facture.numero,
       niveau,
-      clientNom: nomAffiche(client),
+      clientNom: nomAffiche(facture.client_snapshot, client),
       clientEmail: client.email.trim(),
       montant: reste,
       dateReference: facture.date_echeance,

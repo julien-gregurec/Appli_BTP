@@ -1,0 +1,162 @@
+/* ELSATIA Gestion Pro — règles d'adaptation mobile et tablette.
+   ---------------------------------------------------------------------------
+   Ce fichier remplace le bloc <style> qui vivait dans (app)/layout.tsx. Il était
+   re-sérialisé dans le HTML à CHAQUE rendu serveur de CHAQUE page authentifiée ;
+   ici il est minifié, mis en cache et servi une fois.
+
+   Il reste ce qu'il était : un CORRECTIF DE RATTRAPAGE. Ses règles emploient
+   `!important` sur des sélecteurs d'attribut pour forcer en une colonne des mises
+   en page conçues pour un grand écran. C'est un pis-aller assumé pour la centaine
+   de pages de gestion que ce lot ne refond pas — mieux vaut une colonne un peu
+   tassée qu'un débordement horizontal.
+
+   Ce n'est PAS une cible. Une page réellement pensée pour le mobile n'en a pas
+   besoin et doit pouvoir s'y soustraire : c'est le rôle de `.ecran-mobile`, posée
+   par la page sur son propre <main>. Elle déclare ainsi assumer sa mise en page
+   sur petit écran, et le correctif la laisse tranquille. Le périmètre V1 terrain
+   l'utilise ; le reste de l'application continue d'être rattrapé.
+
+   La classe est portée par <main> plutôt que détectée par `:has()` à dessein. Un
+   sélecteur `:has()` non reconnu fait tomber la règle ENTIÈRE : sur un navigateur
+   qui ne le gère pas, le rattrapage disparaîtrait d'un coup pour les cent pages
+   qui en dépendent. `:not(.ecran-mobile)` est compris partout.
+
+   La règle à retenir pour la suite : on retire du correctif au fur et à mesure
+   que des pages passent en `.ecran-mobile`. Le jour où il ne reste plus rien à
+   rattraper, ce fichier disparaît. */
+
+@media (max-width: 767px) {
+  /* ── Règles valables sur TOUTE page, shell authentifié ou non ──────────────
+     Ces deux règles étaient d'abord portées par `.app-shell`. La MESURE au
+     navigateur a montré l'erreur : /login, /signup, /mfa, /mot-de-passe-oublie et
+     /nouveau-mot-de-passe vivent HORS du shell — ils n'en recevaient donc aucune.
+     C'est précisément l'écran de connexion, c'est-à-dire le premier que voit un
+     salarié sur son téléphone, qui était le moins bien traité. */
+
+  /* Un champ sous 16 px déclenche le zoom automatique de Safari iOS : la page
+     saute à la mise au point, l'utilisateur perd son repère et doit dézoomer à la
+     main. Mesuré à 14 px sur le formulaire de connexion. */
+  :is(input, select, textarea) { font-size: max(16px, 1em); }
+
+  /* Zone tactile : 44 px est le seuil recommandé par Apple ET par Android. La
+     valeur précédente, 42 px, passait juste en dessous des deux.
+     Portée aux COMMANDES seulement — boutons et liens présentés comme des
+     boutons. Un lien de texte en ligne (« CGV » dans un pied de page) n'est pas
+     une commande : lui imposer 44 px de haut étirerait le pied de page sans
+     rendre le lien plus facile à toucher. */
+  :is(button, [role="button"], a.rounded-md, a.rounded-lg) { min-height: 44px; }
+
+  /* Le header mobile est fixe : on décale le contenu dessous, zone sûre iOS comprise,
+     sinon le titre et les liens « ← Retour » passent sous la barre. */
+  .app-shell > header {
+    padding-top: env(safe-area-inset-top) !important;
+    height: auto !important;
+    min-height: 4rem;
+  }
+
+  .app-shell main {
+    width: 100%;
+    min-width: 0;
+    padding:
+      calc(4rem + env(safe-area-inset-top) + 0.5rem) 1rem
+      calc(1rem + env(safe-area-inset-bottom)) !important;
+  }
+
+  .app-shell main > div { width: 100%; min-width: 0; }
+  .app-shell main article { min-width: 0; }
+  .app-shell main h1 { font-size: 1.35rem; line-height: 1.25; }
+  .app-shell main h2 { line-height: 1.3; }
+
+  .app-shell main :is(input, select, textarea, button) { max-width: 100%; }
+
+  /* Les dialogues doivent tenir dans la hauteur VISIBLE (dvh) : avec vh, la barre
+     d'adresse mobile masque le bas de la boîte, donc ses boutons de validation. */
+  .app-shell main .fixed[role="dialog"] > div {
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    padding: 1rem;
+  }
+
+  /* ── Correctif de rattrapage — ne s'applique pas aux pages `.ecran-mobile` ── */
+
+  .app-shell main:not(.ecran-mobile) [class*="grid-cols-"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .app-shell main:not(.ecran-mobile) [class*="col-span-"] {
+    grid-column: auto !important;
+  }
+  .app-shell main:not(.ecran-mobile) .flex { flex-wrap: wrap; }
+  .app-shell main:not(.ecran-mobile) form.flex { align-items: stretch; }
+  .app-shell main:not(.ecran-mobile) form.flex > :is(input, select, textarea, label) {
+    min-width: 0;
+    width: 100%;
+  }
+
+  /* Un tableau de gestion ne se replie pas : on le laisse déborder DANS son
+     conteneur, qui devient défilable. C'est un pis-aller — on fait défiler à
+     l'aveugle — mais c'est préférable à des colonnes écrasées à 20 px.
+     Les pages du périmètre V1 fournissent une vraie vue mobile à la place. */
+  .app-shell main:not(.ecran-mobile) table { min-width: 680px; }
+  .app-shell main:not(.ecran-mobile) :is(.overflow-hidden, .overflow-x-hidden):has(> table) {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ── Palier tablette ─────────────────────────────────────────────────────────
+   L'application n'avait qu'une rupture, à 768 px : au-delà, elle servait la mise
+   en page de bureau telle quelle. Un iPad en portrait fait 768 px de large et
+   recevait donc une barre latérale de 240 px plus un contenu prévu pour 1 280 px.
+
+   On ne redessine rien ici : on rend au contenu la largeur que la barre latérale
+   lui prend, et on ramène les grilles très denses à un nombre de colonnes tenable
+   au doigt. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .app-shell > aside { width: 13rem; }
+
+  .app-shell main [class*="grid-cols-"]:not([class*="sm:grid-cols-1"]) {
+    grid-template-columns: repeat(auto-fit, minmax(min(15rem, 100%), 1fr));
+  }
+
+  /* Le doigt reste le moyen de pointage sur une tablette : on garde le seuil
+     tactile et la taille de champ, hors du shell comme dedans — la connexion se
+     fait aussi sur iPad. */
+  :is(button, [role="button"], a.rounded-md, a.rounded-lg) { min-height: 44px; }
+  :is(input, select, textarea) { font-size: max(16px, 1em); }
+}
+
+/* Mode lecture seule (support plateforme) — inchangé, déplacé ici avec le reste. */
+.lecture-seule main form:not([method="get"]),
+.lecture-seule main a[href$="/nouveau"],
+.lecture-seule main a[href*="/modifier"],
+.lecture-seule main button[type="button"] { display: none !important; }
+.lecture-seule main form[method="get"] { display: flex !important; }
+.lecture-seule main form[method="get"] button { display: inline-flex !important; }
+/* Consulter n'est pas modifier : les barres marquées `data-consultation` (navigation du planning,
+   filtres, menu d'actions dont les entrées indisponibles restent visibles et expliquées) gardent
+   leurs boutons ; les actions d'écriture y sont grisées par le composant, avec leur motif. */
+.lecture-seule main [data-consultation] button[type="button"] { display: inline-flex !important; }
+/* Consultation sur l'appareil : emporter, consulter, retirer une copie locale ne modifient
+   RIEN côté serveur. Ces gestes sont précisément ceux d'un salarié en lecture seule sur un
+   chantier : la règle ci-dessus, qui masque tout bouton, les rendait inaccessibles. Une zone
+   marquée `data-consultation` garde ses boutons. */
+.lecture-seule main [data-consultation] button[type="button"] { display: inline-flex !important; }
+
+/* Bulles flottantes (Aide, Assistant IA) — polish UX Julien, 2026-09-14 : sur mobile, une bulle fixée en
+   bas à droite finit tôt ou tard exactement sur un champ ou un bouton (« + Client » du devis, constaté en
+   recette), puisque rien dans la page ne « sait » qu'elle existe. On ne la déplace pas (ce serait une
+   décision de design) : on l'efface pendant qu'une zone de saisie dense est ouverte — `useZoneDense` pose
+   `<body data-ui-dense="1">` — et elle réapparaît dès qu'on en ressort. L'aide reste joignable pendant ce
+   temps par le menu (« Guide d'utilisation »). Desktop non concerné : ces zones y ouvrent assez d'espace
+   pour que rien ne coïncide avec le coin bas droit. */
+@media (max-width: 767px) {
+  body[data-ui-dense="1"] .bulle-flottante { display: none !important; }
+}
+
+/* Barre d'actions contextuelle repliable (GP V1, 2026-09-14) : elle occupe elle aussi le coin bas droit
+   sur grand écran — la seule zone dense, à ce jour, où « Desktop non concerné » ci-dessus ne tient plus
+   (constaté en recette preview : « Aide »/« Assistant » chevauchent la section « Documents »/« Autres » de
+   la barre à 1440×900). Même traitement, étendu à cette zone précise : on l'efface, elle réapparaît à la
+   fermeture. Les autres zones denses de bureau (facture, réserves…) gardent le comportement inchangé —
+   elles n'ont pas cette barre. */
+body[data-ui-dense="1"]:has([data-panneau-actions][data-repliee]) .bulle-flottante { display: none !important; }

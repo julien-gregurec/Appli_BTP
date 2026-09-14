@@ -1,9 +1,12 @@
+import { HistoriqueObjet } from "@/components/HistoriqueObjet";
+import { actionsFacture } from "@/lib/actions-contextuelles/registre";
+import { PanneauActions } from "@/components/actions/PanneauActions";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { euros, LIGNE_TYPES } from "@/lib/devis";
-import { nomClient } from "@/lib/chantier-statuts";
+import { identiteClientDocument, mentionOrigineIdentite } from "@/lib/client-snapshot";
 import { typeFactureLabel, MODES_PAIEMENT } from "@/lib/factures";
 import { StatutFactureSelect } from "@/components/StatutFactureSelect";
 import { enregistrerPaiementAction, modifierEcheanceFactureAction, supprimerPaiementAction, envoyerFactureEmailAction } from "@/app/actions/factures";
@@ -17,6 +20,9 @@ import { CopierLienPaiement } from "@/components/CopierLienPaiement";
 import { SignatureDocumentMetier } from "@/components/SignatureDocumentMetier";
 import { RelanceDocumentSection } from "@/components/RelanceDocumentSection";
 import { permissionsUtilisateur } from "@/lib/permissions";
+import { peutSurchargerDestinataire } from "@/lib/permissions-envoi";
+import { devisV2Actif } from "@/lib/devis/v2-serveur";
+import { chargerContexteEnvoi } from "@/lib/envoi-documents-serveur";
 
 const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -65,17 +71,28 @@ export default async function FactureDetailPage({
     : null;
   const enregistrer = enregistrerPaiementAction.bind(null, id);
   const modifierEcheance = modifierEcheanceFactureAction.bind(null, id);
+  // Une facture ou un avoir déjà émis affiche — et réexpédie — l'identité du
+  // destinataire figée à son émission (un avoir reprend celle de la facture
+  // qu'il crédite) ; seul un brouillon reflète la fiche client actuelle.
+  const identiteDocument = identiteClientDocument({
+    snapshot: facture.client_snapshot,
+    fiche: client,
+    captureeLe: facture.client_snapshot_at,
+  });
   const email = contenuEmailDocument({
     typeDoc: "facture",
     numero: facture.numero,
-    client,
+    client: { nom: identiteDocument.entete.nom_affiche, prenom: null, societe: null, email: identiteDocument.email },
     montantTtc: Number(facture.montant_ttc),
     entrepriseNom: ctx.entrepriseNom,
     prenomEmetteur: ctx.prenom,
   });
 
+  const contexteEnvoi = devisV2Actif() ? await chargerContexteEnvoi(supabase, { entrepriseId: ctx.entrepriseId, typeDocument: "facture", chantierId: facture.chantier_id ?? null }) : { modeles: [], cgvDisponible: false, piecesDisponibles: [] };
+  const variablesEmail = { numero: facture.numero ?? "brouillon", client: identiteDocument.entete.nom_affiche, montant_ttc: euros(Number(facture.montant_ttc)), entreprise: ctx.entrepriseNom, prenom: ctx.prenom ?? "", date_echeance: facture.date_echeance ? new Date(String(facture.date_echeance)).toLocaleDateString("fr-FR") : null, chantier: chantier?.nom ?? null, reference_client: (facture as { reference_client?: string | null }).reference_client ?? null };
+  const actionsPanneau = actionsFacture({ id, statut: facture.statut, resteAPayer, devisOrigineId: facture.devis_origine_id ?? null, moteurV2: devisV2Actif() }, permissions);
   return (
-    <main className="p-8">
+    <main className="lg:pr-72 p-8"><PanneauActions titre="Facture" contexte={`${facture.numero ?? "brouillon"} · ${facture.statut}`} actions={actionsPanneau} />
       <div className="mx-auto max-w-3xl space-y-6">
         <div className="flex items-start justify-between">
           <div>
@@ -85,10 +102,11 @@ export default async function FactureDetailPage({
               <span className="ml-2 text-sm font-normal text-neutral-500">· {typeFactureLabel(facture.type)}</span>
             </h1>
             <p className="text-sm text-neutral-500">
-              {client ? nomClient(client) : "—"}
+              {identiteDocument.entete.nom_affiche}
               {chantier && <> · chantier <Link href={`/chantiers/${chantier.id}`} className="hover:underline">{chantier.nom}</Link></>}
               {devis && <> · devis <Link href={`/devis/${devis.id}`} className="hover:underline">{devis.numero}</Link></>}
             </p>
+            <p className="mt-1 text-xs text-neutral-500">{mentionOrigineIdentite(identiteDocument)}</p>
           </div>
           <div className="flex items-center gap-3">
             {facture.statut === "brouillon" && <Link href={`/factures/${id}/modifier`} className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700">Modifier</Link>}
@@ -100,6 +118,17 @@ export default async function FactureDetailPage({
             >
               Télécharger PDF
             </a>
+            {/* Duplicata : reproduction du document FIGÉ à l'émission (moteur v2), marquée comme telle. */}
+            {devisV2Actif() && facture.statut !== "brouillon" && (facture as { rendu_instantane?: { moteur?: number } | null }).rendu_instantane?.moteur === 2 && (
+              <a
+                href={`/api/documents/factures/${id}/pdf?duplicata=1`}
+                target="_blank"
+                rel="noopener"
+                className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700"
+              >
+                Duplicata PDF
+              </a>
+            )}
             {email ? (
               <EmailDocumentButton
                 type="facture"
@@ -112,6 +141,12 @@ export default async function FactureDetailPage({
                 envoiAutomatiqueDisponible={brevoEstConfigure()}
                 envoyerAutomatiquementAction={envoyerFactureEmailAction}
                 emailEnvoyeLe={facture.email_envoye_le}
+                adresseFigee={identiteDocument.email}
+                peutSurchargerDestinataire={peutSurchargerDestinataire(permissions)}
+                modeles={contexteEnvoi.modeles}
+                variables={variablesEmail}
+                cgvDisponible={false}
+                piecesDisponibles={contexteEnvoi.piecesDisponibles}
               />
             ) : (
               <span className="cursor-default rounded-md border border-neutral-200 px-3 py-1.5 text-sm text-neutral-400 dark:border-neutral-800" title="Aucun email renseigné pour ce client">
@@ -265,6 +300,7 @@ export default async function FactureDetailPage({
           </section>
         )}
       </div>
+      {devisV2Actif() && <div className="mx-auto mt-6 max-w-5xl"><HistoriqueObjet ressource="facture" id={id} /></div>}
     </main>
   );
 }

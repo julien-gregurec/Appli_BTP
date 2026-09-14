@@ -1,5 +1,7 @@
 "use server";
 
+import { MOTIF_DROIT_FIN, possedeDroitFin } from "@/lib/droits-devis";
+
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -7,7 +9,9 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { TRANSITIONS_FACTURES } from "@/lib/factures";
 import type { LigneDevis } from "@/lib/devis";
 import { permissionsUtilisateur } from "@/lib/permissions";
-import { envoyerDocumentCommercialParEmail } from "@/lib/documents-envoi";
+import { peutSurchargerDestinataire } from "@/lib/permissions-envoi";
+import type { SurchargeDestinataire } from "@/lib/document-resend-override";
+import { envoyerDocumentCommercialParEmail, type OptionsEnvoiDocument } from "@/lib/documents-envoi";
 import { construireSnapshotEntreprise } from "@/lib/documents-commerciaux";
 import { lienPaiementStripeEstActif } from "@/lib/stripe";
 import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
@@ -66,6 +70,7 @@ export async function modifierFactureAction(factureId: string, payload: FactureP
 export async function creerFactureDepuisDevisAction(devisId: string, type: string = "simple") {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
+  if (!possedeDroitFin(await permissionsUtilisateur(ctx), "transformer_devis")) redirect(`/devis/${devisId}?error=${encodeURIComponent(MOTIF_DROIT_FIN.transformer_devis)}`);
 
   const { data: devis } = await supabase.from("devis").select("id").eq("id", devisId).eq("entreprise_id", ctx.entrepriseId).eq("statut", "accepte").single();
   if (!devis) redirect(`/devis/${devisId}?error=${encodeURIComponent("Devis accepté introuvable")}`);
@@ -118,7 +123,11 @@ export async function changerStatutFactureAction(factureId: string, statut: stri
   }
 }
 
-export async function envoyerFactureEmailAction(factureId: string): Promise<{ error: string } | { ok: true }> {
+export async function envoyerFactureEmailAction(
+  factureId: string,
+  surchargeDestinataire?: SurchargeDestinataire | null,
+  options?: OptionsEnvoiDocument | null,
+): Promise<{ error: string } | { ok: true }> {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const permissions = await permissionsUtilisateur(ctx);
@@ -144,6 +153,9 @@ export async function envoyerFactureEmailAction(factureId: string): Promise<{ er
     typeDocument: "facture",
     documentId: factureId,
     complementCorps: lienPaiement ? `Vous pouvez régler cette facture en ligne de façon sécurisée :\n${lienPaiement}` : undefined,
+    surchargeDestinataire,
+    peutSurchargerDestinataire: peutSurchargerDestinataire(permissions),
+    options,
   });
   if ("error" in resultat) return resultat;
 

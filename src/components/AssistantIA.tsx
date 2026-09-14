@@ -350,7 +350,7 @@ export function AssistantIA() {
   return (
     <>
       {ouvert && (
-        <div className="fixed bottom-4 right-4 z-50 flex h-[32rem] max-h-[70vh] w-96 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-2xl dark:border-neutral-700 dark:bg-neutral-900">
+        <div className="fixed z-50 flex h-[32rem] max-h-[70vh] w-96 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-2xl dark:border-neutral-700 dark:bg-neutral-900" style={{ bottom: "calc(1rem + env(safe-area-inset-bottom))", right: "calc(1rem + env(safe-area-inset-right))" }}>
           <div className="flex items-center justify-between border-b border-neutral-200 bg-elsatia-navy px-4 py-3 dark:border-neutral-700">
             <span className="text-sm font-semibold text-white">✨ Assistant {PRODUCT_NAME}</span>
             <div className="flex items-center gap-3">
@@ -596,7 +596,11 @@ export function AssistantIA() {
           type="button"
           onClick={() => setOuvert(true)}
           aria-label={`Assistant ${PRODUCT_NAME}`}
-          className="fixed bottom-20 right-4 z-40 flex items-center gap-2 rounded-full bg-elsatia-gold px-4 py-3 text-sm font-semibold text-elsatia-navy shadow-lg hover:brightness-95"
+          // `bulle-flottante` (polish UX Julien) : masqué sur mobile pendant une saisie dense (voir
+          // `useZoneDense`), pour ne jamais recouvrir un champ ou une action principale. `bottom-20`
+          // (au-dessus du bouton Aide) et `env(safe-area-inset-*)` évitent le bandeau d'accueil iOS.
+          className="bulle-flottante fixed z-40 flex items-center gap-2 rounded-full bg-elsatia-gold px-4 py-3 text-sm font-semibold text-elsatia-navy shadow-lg hover:brightness-95"
+          style={{ bottom: "calc(5rem + env(safe-area-inset-bottom))", right: "calc(1rem + env(safe-area-inset-right))" }}
         >
           <span aria-hidden="true">✨</span>
           <span className="hidden sm:inline">Assistant</span>

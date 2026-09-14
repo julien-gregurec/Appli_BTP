@@ -6,8 +6,18 @@ function estActive(valeur: string | undefined): boolean {
   return valeur?.trim().toLowerCase() !== "false";
 }
 
+// FAIL-CLOSED (P0 de l'audit Boutique). La Boutique est une surface COMMERCIALE :
+// elle expose un catalogue, un panier, un paiement et un webhook. Elle s'appuyait
+// jusqu'ici sur `estActive()`, dont la règle est « tout sauf false vaut actif » —
+// si bien qu'une variable absente, vide, mal orthographiée ou perdue au cours d'un
+// déploiement OUVRAIT la boutique au lieu de la fermer. C'est l'inverse de ce que
+// doit faire un drapeau qui garde un encaissement.
+//
+// Désormais, seule la valeur explicite « true » active la Boutique. Absente, vide
+// ou invalide, elle est fermée — en Production comme ailleurs : il n'existe aucun
+// chemin qui l'ouvre sans que quelqu'un ait écrit `FEATURE_BOUTIQUE_ENABLED=true`.
 export function boutiqueEstActive(environnement: FeatureEnvironment = serverEnvironment): boolean {
-  return estActive(environnement.FEATURE_BOUTIQUE_ENABLED);
+  return environnement.FEATURE_BOUTIQUE_ENABLED?.trim().toLowerCase() === "true";
 }
 
 // Fail-closed, contrairement a estActive() ci-dessus : une fonctionnalite commerciale
