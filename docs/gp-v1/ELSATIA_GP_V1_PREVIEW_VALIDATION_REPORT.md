@@ -1895,7 +1895,107 @@ aussi les 8 fiches déjà validées et déployées, hors de la demande de ce lot
 2. **Planning** : confirmer que cette version compacte et repliable répond à l'objection « lourd » qui avait
    fait retirer l'ancien panneau — sinon, la barre reste additive et se retire sans effet sur le reste (menu
    « Actions ▾ » et menu contextuel restent la voie principale).
-3. **Cosmétique** (§ 39.9) : corriger ou non la couleur de « Supprimer » indisponible sur les 8 fiches +
-   cette barre, dans un lot séparé.
+3. ~~Cosmétique~~ **corrigé au § 40** (couleur de « Supprimer » indisponible) à l'occasion de la refonte
+   visuelle de la barre droite — même fichier, même rendu, plus l'occasion d'y revenir séparément.
 4. Les 4 points déjà identifiés en § 38 restent inchangés et ouverts : Grille ou Document par défaut,
    validation visuelle Devis V2, validation visuelle Planning V2, autorisation Production.
+
+## 40. Saisie directe & interface rétractable (2026-09-14, session autonome)
+
+Julien a rouvert la validation visuelle à partir de captures Batappli, avec cinq demandes précises :
+ancrage du menu « Ajouter », style visuel de la barre droite, confirmation de la saisie directe dans la
+grille, et un menu gauche à trois états (ouvert / compact / masqué) pour maximiser l'espace de travail.
+
+### 40.1 Menu « Ajouter » — bogue réel trouvé et corrigé
+
+Audit avant correctif (même discipline qu'aux § 38-39) : `BoutonMenu`/`MenuContextuel` positionnaient déjà
+le menu en `position: fixed`, ancré au bouton, avec un recalcul au défilement — en théorie correct. Mesure
+en direct sur la preview locale (`getBoundingClientRect()` du bouton et du menu) : le menu s'ouvrait à plus
+de 400 px du bouton « Ajouter », près du haut de la page au lieu d'en dessous du bouton.
+
+**Cause exacte** : la barre d'outils de la grille est `sticky` avec `backdrop-blur` (`backdrop-filter:
+blur(8px)`), une propriété CSS qui établit un nouveau « bloc englobant » pour tout descendant
+`position: fixed` — le menu se positionnait donc par rapport à cette barre (haute de 44 px) et non par
+rapport à la fenêtre, d'où des coordonnées incohérentes avec le calcul fait en JavaScript (lui, correct,
+en coordonnées de fenêtre). Un cas d'école de bloc englobant involontaire par `filter`/`backdrop-filter`.
+
+**Correctif** (`src/components/Menu.tsx`) : le menu est désormais rendu dans un **portail React directement
+sur `<body>`** (`createPortal`), qui échappe par construction à tout `backdrop-filter`/`filter`/`transform`
+d'un ancêtre — la classe entière de bogue devient impossible, pas seulement pour « Ajouter » mais pour tout
+menu actuel ou futur du dépôt. Le calcul de position a aussi été enrichi d'un vrai **basculement** :
+au-dessus du bouton si la place manque en dessous (et qu'il y en a assez au-dessus), aligné à droite si la
+place manque à droite — avec un filet de clampage final qui garantit qu'il ne sort jamais de l'écran, quel
+que soit le point de départ. Mesuré après correctif : le menu s'ouvre exactement au bord du bouton (écart
+< 1 px), au-dessus comme en dessous. `MenuContextuel` reste rétrocompatible (l'ancre est optionnelle) : les
+deux menus contextuels existants (ligne de grille, bloc de planning), ouverts au pointeur et non à un
+bouton, sont inchangés.
+
+### 40.2 Saisie directe dans la grille — déjà en place, vérifié
+
+Audit du modèle de colonnes (`src/lib/devis/colonnes-grille.ts`) et de la grille (`GrilleDevis.tsx`) :
+la saisie ligne par ligne demandée par Julien (référence, désignation, description, quantité, unité, prix
+d'achat/coefficient/marge selon droits, prix de vente, remise, TVA, total HT) **existe déjà en totalité**,
+construite lors d'un lot antérieur (« lot C ») — chaque colonne est une cellule directement éditable au
+clic (validation Tab / Maj+Tab / Entrée / Échap déjà supportée), le total HT est calculé et non modifiable,
+et les colonnes de coût (achat, coefficient, marge) sont **absentes du DOM**, pas seulement masquées, sans
+le droit `voir_couts_devis` — exactement l'exigence « ne doivent même pas apparaître dans le DOM ». La
+colonne Description est une cellule de texte riche directement dans la grille (pas un panneau plein écran),
+togglable via « Colonnes affichées… » (masquée par défaut, comme 4 autres colonnes secondaires). Aucun
+changement de code nécessaire ici ; seule une vérification en direct (§ 40.6) et une capture (§ 40.7).
+
+### 40.3 Barre droite — style « Batappli »
+
+`src/components/actions/PanneauActions.tsx` (même composant qu'au § 39, pas un second) :
+- **Pictogrammes plus grands et colorés** : chaque icône est désormais un pictogramme dans une pastille
+  32×32, colorée par catégorie d'action — or/ambre pour Créer, vert pour Modifier, bleu ciel pour
+  Documents, indigo pour Transformer, sarcelle pour Voir aussi, rouge pour Autres/dangereux — cohérent
+  avec l'or `#c9a24a` déjà en usage dans le menu gauche, sans arc-en-ciel incohérent. Une action
+  indisponible garde une pastille neutre grise : le code couleur ne s'applique qu'à ce qui est cliquable.
+- **Correctif au passage** : le texte rouge d'une action « danger » (ex. Supprimer) s'affichait même
+  indisponible, ce qui se lisait comme une alerte alors que l'action est simplement grisée-expliquée
+  (bogue préexistant du composant, présent sur les 8 fiches ET signalé sans correctif au § 39.9) — corrigé
+  ici à l'occasion de la refonte des couleurs, sur le même fichier.
+- Lignes portées à 44 px (`min-h-11`, le standard tactile déjà en usage partout ailleurs dans GP V1).
+- Largeurs inchangées et déjà conformes : dépliée 240 px (« compacte mais suffisante pour le texte »),
+  repliée 56 px (dans la fourchette demandée de 48-64 px).
+- Défilement propre déjà en place (`overflow-auto`, hauteur maximale sous l'en-tête) : Créer reste toujours
+  visible en haut.
+
+### 40.4 Menu gauche — trois états, mémorisés
+
+`src/components/Sidebar.tsx` — utilisé par **toutes** les pages authentifiées de GP, pas seulement Devis et
+Planning : le repli est un comportement de BUREAU uniquement (≥ 768 px), au moyen d'un `matchMedia` suivi en
+direct ; en dessous, le tiroir mobile garde exactement son fonctionnement d'avant, intact.
+
+- **Ouvert** (par défaut) : identique à avant — icône, texte, groupes en accordéon.
+- **Compact** (`‹`, ~64 px) : liste plate d'icônes-badges (deux lettres, ex. « Cl » pour Clients, « Ch »
+  pour Chantiers) — ce dépôt n'a pas de jeu d'icônes réel (même choix que la barre droite, § 39/40.3) ; le
+  libellé complet reste porté par `aria-label` et le tooltip, jamais par le badge seul. Deux entrées
+  peuvent partager un badge visuellement proche (« Congés »/« Commandes » → « Co ») — accepté comme
+  compromis pragmatique plutôt que dessiner un jeu d'icônes pour la cinquantaine d'entrées de navigation de
+  toute l'application, largement hors du périmètre « Devis/Planning » de cette demande ; signalé pour
+  arbitrage si Julien le juge gênant à l'usage.
+- **Masqué** (`«`) : largeur ramenée à 0, contenu rendu `inert` (jamais atteignable au clavier tant qu'il
+  est masqué) ; un petit bouton fixe `☰` en haut à gauche le réaffiche.
+- Préférence mémorisée par navigateur (`elsatia.menu.etat.v1`), indépendante du tiroir mobile.
+- Aucun remontage de l'éditeur de devis ou du planning au changement d'état : `Sidebar` et le contenu de la
+  page sont deux sous-arbres React distincts dans `(app)/layout.tsx` — architecture déjà séparée, pas un
+  changement de ce lot. Prouvé par un scénario E2E dédié (§ 40.6) : une saisie non validée dans une cellule
+  survit à un repli du menu.
+- Bandeau `GP V1 PREVIEW…` (bas gauche) : remonté au-dessus de la nouvelle barre « Actions » mobile pleine
+  largeur sous 1024 px, pour ne plus s'y superposer visuellement (il ne bloquait déjà aucun clic,
+  `pointer-events-none`, mais se voyait mal placé sur les captures).
+
+### 40.5 Responsive et performance
+
+- **1440 / 1280 px** : menu gauche ouvert + barre droite ouverte tient largement ; les deux compacts
+  libèrent l'essentiel de la largeur pour la grille.
+- **1024 px** : palier `lg` déjà en usage dans tout GP V1 (grille bureau / liste mobile) — sous ce seuil,
+  la barre droite devient déjà la feuille tactile (§ 39). Le menu gauche, lui, reste sur préférence
+  mémorisée plutôt qu'un forçage automatique au compact à ce point précis : cohérent avec l'exigence « ne
+  pas revenir ouvert à chaque page » — un forçage par gabarit s'ajouterait à la préférence et la
+  contredirait selon l'écran.
+- **390 px** : tiroir mobile inchangé, barre droite en feuille (§ 39), grille en cellule par cellule
+  (§ 40.2) — comportement déjà validé, revérifié ici sans régression.
+- Performance : le repli du menu gauche ne touche que `Sidebar` (sous-arbre React séparé du contenu) —
+  aucun re-rendu de la grille de devis ni du planning, quelle que soit leur taille.
