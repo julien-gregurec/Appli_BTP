@@ -1,0 +1,11 @@
+{
+  "entete_nouveau_repliee": "0",
+  "entete_repliee_apres_clic": "1",
+  "raccourci_deplie": "0",
+  "totaux_dupliques_en_document": false,
+  "avertissement_contraste": true,
+  "mobile_ui_dense_devis": "1",
+  "mobile_aide_visible_devis": false,
+  "mobile_aide_visible_liste": true,
+  "mobile_ui_dense_planning": "1"
+}

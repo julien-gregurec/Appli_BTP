@@ -1280,8 +1280,8 @@ Sur mobile et tablette (< 1024 px), le même mécanisme s'applique : à 768 px, 
 la grille et le formulaire de saisie sans défiler (capture vérifiée). Aucun composant distinct créé pour
 mobile — la demande « informations du devis ▾ en accordéon » est cette même barre, déjà responsive.
 
-Vérifié en direct (navigateur, build de production) : nouveau devis développé ; ligne saisie (3 × 100 €) ;
-repli → barre "Sans référence · UX Client · BROUILLON · HT 300,00 € · TTC 360,00 € · Enregistré à HH:MM" ;
+Vérifié en direct (navigateur, build de production) : nouveau devis développé ; ligne saisie (2 × 100 €) ;
+repli → barre « Sans référence · <client> · Brouillon · HT 200,00 € · TTC 240,00 € · Enregistré à HH:MM » ;
 Ctrl+Maj+H déplie puis replie ; enregistrement puis réouverture du devis → reste replié ; un AUTRE nouveau
 devis reste développé malgré la préférence mémorisée. Couvert par le test E2E 60 (nouveau,
 `tests/e2e/gp-v1-ux.spec.ts`), vert.
@@ -1503,3 +1503,28 @@ Capturé en direct (navigateur de session, build de production) à 1440 × 900, 
 sur le planning (bureau et mobile). Constat central confirmé aux quatre tailles : la grille (ou le
 formulaire d'ajout) est visible sans défilement dès l'en-tête replié, y compris à 375 px. Pas de
 débordement horizontal mesuré à aucune des quatre tailles (toolbar et grille).
+
+### 37.19 Confirmation sur la preview (exigence 39)
+
+Déployé UNIQUEMENT sur `elsatia-preview` (commit `40508a9`, alias de branche
+`elsatia-preview-git-feat-gp-v1-metier-d-467e36-julien-gregurec1.vercel.app`, confirmé servant ce commit).
+Aucune Production touchée (aucun déploiement, aucune migration, aucune variable, aucun DNS). Script
+`.recette-tmp/recette-polish-smoke.mjs` (hors dépôt) rejoué sur la preview, 9/9 constats attendus,
+captures dans `docs/gp-v1/preview/captures/polish/` :
+
+| Constat | Attendu | Preview |
+| --- | --- | --- |
+| Nouveau devis : en-tête repliée | non (`0`) | ✅ `0` |
+| Après clic « Détails du devis » | repliée (`1`) | ✅ `1` |
+| Après Ctrl+Maj+H | dépliée (`0`) | ✅ `0` |
+| Mode Document : bloc Totaux dupliqué | absent | ✅ absent |
+| Couleur d'accent `#fefefe` : avertissement | affiché | ✅ affiché |
+| Mobile, éditeur de devis : `data-ui-dense` | posé | ✅ posé |
+| Mobile, éditeur de devis : bulle Aide | masquée | ✅ masquée |
+| Mobile, liste des devis (non dense) : bulle Aide | visible | ✅ visible |
+| Mobile, planning : `data-ui-dense` | posé | ✅ posé |
+
+Performance (Devis 100/500/1000 lignes, planning 400/1000 évènements) **non re-mesurée ce tour** : aucun
+changement de ce lot ne touche les chemins de calcul, de virtualisation ou d'enregistrement (RPC
+inchangées) — les chiffres du § 36.17 restent valables (frappe → totaux 41/51/70 ms, planning 400/1000
+évènements 5,8/7,8 s).
