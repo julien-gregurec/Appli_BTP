@@ -156,7 +156,8 @@ test("47. devis complet : client et chantier inline, titre, ouvrage, article en 
   await page.keyboard.press("ControlOrMeta+v");
   await expect(grille(page)).toHaveAttribute("aria-rowcount", "8");
   // 14. Aperçu A4 (mode grille + aperçu, puis mode document) : gras / souligné / italique / accent rendus, aucune balise.
-  await page.getByRole("button", { name: "Aperçu A4" }).click();
+  // `.first()` : « Aperçu A4 » existe aussi dans la barre d'actions contextuelle (GP V1, 2026-09-14).
+  await page.getByRole("button", { name: "Aperçu A4" }).first().click();
   const doc = page.locator(".doc-a4").first();
   await expect(doc).toBeVisible();
   // Styles CALCULÉS (l'attribut `style` sérialisé diffère entre rendu serveur et client).
@@ -168,10 +169,12 @@ test("47. devis complet : client et chantier inline, titre, ouvrage, article en 
   await expect(doc).not.toContainText("[b]");
   await expect(doc).toContainText("m²");
   await expect(doc).toContainText("remise −5 %");
-  await page.getByRole("button", { name: "Document" }).click();
+  // `exact: true` : la barre d'actions contextuelle (GP V1, 2026-09-14) porte un bouton « Passer en vue
+  // Document »/« Passer en vue Grille », dont le nom accessible contient ces mots sans leur être égal.
+  await page.getByRole("button", { name: "Document", exact: true }).click();
   await expect(grille(page)).toBeHidden();
   await expect(page.getByTestId("zone-document")).toBeVisible();
-  await page.getByRole("button", { name: "Grille" }).click();
+  await page.getByRole("button", { name: "Grille", exact: true }).click();
   // 16. Sauvegarder.
   urlDevis = await enregistrerEtFermer(page);
   const id = urlDevis.split("/").pop();
@@ -223,14 +226,17 @@ test("39. remises de ligne 0, 5, 25, 100 : calculs corrects (PU net et total)", 
   if (await garde.isVisible().catch(() => false)) await garde.getByRole("button", { name: "Quitter sans enregistrer" }).click();
 });
 
-test("48. planning : nouvel évènement, double clic, glisser, Alt+glisser, menu contextuel, ouvrir le chantier, retour, imprimer — sans panneau latéral", async ({ page, context }) => {
+test("48. planning : nouvel évènement, double clic, glisser, Alt+glisser, menu contextuel, ouvrir le chantier, retour, imprimer, barre d'actions contextuelle", async ({ page, context }) => {
   await connexion(page, USERS.adminA);
   await aller(page, `/planning?vue=jour&jour=${JOUR_PLANNING}`);
   await expect(page.locator("[role=grid]")).toBeVisible();
-  await expect(page.locator("[data-panneau-actions]")).toHaveCount(0);
+  // Barre d'actions contextuelle repliable (GP V1, 2026-09-14) : additive au menu « Actions ▾ » et au menu
+  // contextuel du bloc, jamais un panneau permanent imposé (celui-ci se replie, largeur compacte).
+  await expect(page.locator("[data-panneau-actions]")).toHaveCount(1);
+  await expect(page.getByTestId("rail-planning")).toBeVisible();
   await expect(page.getByRole("link", { name: "← Tableau de bord" })).toBeVisible();
   // 2. Créer.
-  await page.getByRole("button", { name: "Nouvel évènement" }).click();
+  await page.getByRole("button", { name: "Nouvel évènement" }).first().click();
   const dialogue = page.locator("dialog[open]").filter({ hasText: "Nouvel évènement" });
   await dialogue.getByLabel("Titre").fill(TITRE_EVENEMENT);
   await dialogue.getByLabel("Début").fill("08:00");
@@ -312,6 +318,21 @@ test("48. planning : nouvel évènement, double clic, glisser, Alt+glisser, menu
   await page.getByTestId("menu-actions-evenement").click();
   await expect(page.getByTestId("menu-contextuel").locator('[role=menuitem][data-cle="supprimer"]')).toHaveCount(1);
   await page.keyboard.press("Escape");
+  // Barre d'actions contextuelle : « Modifier » depuis la barre ouvre la même fiche que le double clic ;
+  // repli en icônes (préférence mémorisée) sans perdre l'accès aux actions.
+  await page.locator("[data-bloc]").filter({ hasText: `${TITRE_EVENEMENT} bis` }).first().click();
+  await expect(page.getByTestId("rail-planning-action-modifier")).toBeVisible();
+  await page.getByTestId("rail-planning-action-modifier").click();
+  const editionRail = page.locator("dialog[open]");
+  await expect(editionRail).toBeVisible();
+  await editionRail.getByRole("button", { name: "Annuler" }).click();
+  await page.getByTestId("rail-planning-bascule").click();
+  await expect(page.getByTestId("rail-planning")).toHaveAttribute("data-repliee", "1");
+  await page.reload();
+  await attendreHydratation(page);
+  await expect(page.getByTestId("rail-planning")).toHaveAttribute("data-repliee", "1");
+  await page.getByTestId("rail-planning-bascule").click();
+  await expect(page.getByTestId("rail-planning")).toHaveAttribute("data-repliee", "0");
 });
 
 test("49. numérotation : entreprise A avec préfixe DEV, entreprise B sans préfixe — références correctes et uniques", async ({ page }) => {
@@ -362,13 +383,24 @@ test("49. numérotation : entreprise A avec préfixe DEV, entreprise B sans pré
   await expect(page.locator("main")).toContainText(/DEV-\d{4}-\d{3}/);
 });
 
-test("51. mobile 390 px : toolbar, client inline, retour + garde, planning sans panneau avec menu Actions", async ({ page }) => {
+test("51. mobile 390 px : toolbar, client inline, retour + garde, barre d'actions en feuille tactile (pas une grande barre verticale), planning avec menu Actions", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await connexion(page, USERS.adminA);
   await aller(page, "/devis/nouveau");
   await expect(page.getByTestId("menu-ajouter")).toBeVisible();
   await ajouterLigne(page, "libre");
   await expect(page.locator("ol li")).toHaveCount(1);
+  // Barre d'actions contextuelle (GP V1, 2026-09-14) : sur téléphone, un bouton « Actions (n) » en bas
+  // d'écran ouvre une feuille — jamais la grande barre verticale du bureau (`lg:fixed` reste masqué ici).
+  const boutonActionsDevis = page.getByTestId("rail-devis-mobile-bouton");
+  await expect(boutonActionsDevis).toBeVisible();
+  await boutonActionsDevis.click();
+  const feuilleDevis = page.getByTestId("rail-devis-mobile-feuille");
+  await expect(feuilleDevis).toBeVisible();
+  await expect(feuilleDevis).toContainText("Ligne libre");
+  await expect(feuilleDevis).toContainText("Article du catalogue");
+  await feuilleDevis.getByRole("button", { name: "Fermer" }).click();
+  await expect(feuilleDevis).toBeHidden();
   await page.getByRole("button", { name: "+ Client" }).click();
   const dlg = page.locator("[data-testid=dialogue-client-rapide]");
   await expect(dlg).toBeVisible();
@@ -379,7 +411,7 @@ test("51. mobile 390 px : toolbar, client inline, retour + garde, planning sans 
   await expect(page.getByTestId("garde-modifications")).toBeVisible();
   await page.getByTestId("garde-modifications").getByRole("button", { name: "Annuler" }).click();
   await aller(page, `/planning?vue=semaine&jour=${JOUR_PLANNING}`);
-  await expect(page.locator("[data-panneau-actions]")).toHaveCount(0);
+  await expect(page.getByTestId("rail-planning-mobile-bouton")).toBeVisible();
   await expect(page.getByTestId("menu-actions-evenement")).toBeVisible();
   const debordement = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(debordement).toBeLessThanOrEqual(1);
@@ -421,4 +453,44 @@ test("60. en-tête du devis repliable : nouveau devis développé, barre compact
   // 6. Un AUTRE nouveau devis reste développé malgré la préférence mémorisée (jamais replié par surprise).
   await aller(page, "/devis/nouveau");
   await expect(page.getByTestId("entete-devis-barre")).toHaveAttribute("data-repliee", "0");
+});
+
+test("61. barre d'actions contextuelle du devis : motif sans sélection, Copier/Coller depuis la barre, repli mémorisé, sans casser la barre d'outils", async ({ page }) => {
+  await connexion(page, USERS.adminA);
+  await aller(page, "/devis/nouveau");
+  await page.getByRole("combobox", { name: "Client", exact: true }).selectOption({ index: 1 });
+  // 1. Rien sélectionné : Copier/Dupliquer/Supprimer portent le motif, en infobulle ET au lecteur d'écran.
+  const railCopier = page.getByTestId("rail-devis-action-copier");
+  await expect(railCopier).toHaveAttribute("aria-disabled", "true");
+  await expect(railCopier).toHaveAttribute("title", /Sélectionnez d’abord/);
+  // 2. Deux lignes, sélection, Copier PUIS Coller — depuis la barre, pas la barre d'outils ni Ctrl+C/V.
+  await ajouterLigne(page, "libre");
+  await cellule(page, 0, "designation").fill("Ligne rail A"); await page.keyboard.press("Tab");
+  await cellule(page, 0, "quantite").fill("1"); await page.keyboard.press("Tab");
+  await cellule(page, 0, "prix_vente").fill("50"); await page.keyboard.press("Tab");
+  await ajouterLigne(page, "libre");
+  await cellule(page, 1, "designation").fill("Ligne rail B"); await page.keyboard.press("Tab");
+  await cellule(page, 1, "quantite").fill("2"); await page.keyboard.press("Tab");
+  await cellule(page, 1, "prix_vente").fill("30"); await page.keyboard.press("Tab");
+  await cellule(page, 0, "poignee").click();
+  await cellule(page, 1, "poignee").click({ modifiers: ["Shift"] });
+  await expect(railCopier).not.toHaveAttribute("aria-disabled", "true");
+  await railCopier.click();
+  await expect(page.locator("[data-testid=retour-presse-papier]")).toContainText("2 lignes copiées");
+  await cellule(page, 1, "poignee").click();
+  await page.getByTestId("rail-devis-action-coller").click();
+  await expect(grille(page)).toHaveAttribute("aria-rowcount", "4");
+  // 3. La barre d'outils « Ajouter »/« Plus » d'origine fonctionne toujours (additive, pas un remplacement).
+  await expect(page.getByTestId("menu-ajouter")).toBeVisible();
+  await expect(page.getByTestId("menu-plus")).toBeVisible();
+  // 4. Repli en icônes seules, mémorisé après rechargement.
+  await page.getByTestId("rail-devis-bascule").click();
+  await expect(page.getByTestId("rail-devis")).toHaveAttribute("data-repliee", "1");
+  const railCopierReplie = page.getByTestId("rail-devis-action-copier");
+  await expect(railCopierReplie).toHaveAttribute("aria-label", "Copier");
+  await page.getByTestId("retour-devis").click();
+  const gardeRepli = page.getByTestId("garde-modifications");
+  if (await gardeRepli.isVisible().catch(() => false)) await gardeRepli.getByRole("button", { name: "Quitter sans enregistrer" }).click();
+  await aller(page, "/devis/nouveau");
+  await expect(page.getByTestId("rail-devis")).toHaveAttribute("data-repliee", "1");
 });

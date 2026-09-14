@@ -27,4 +27,29 @@ describe("PanneauActions", () => {
     expect(html).toContain("data-panneau-actions-mobile");
     expect(html).toContain("Transformer");
   });
+  it("sans `pliable`, les 8 fiches existantes gardent EXACTEMENT le rendu d'avant (pas de bouton de repli, largeur fixe)", () => {
+    expect(html).not.toContain("-bascule");
+    expect(html).toContain("lg:w-60");
+    expect(html).not.toContain("data-repliee");
+  });
+});
+
+describe("PanneauActions — variante repliable (GP V1, barre d'actions contextuelle, 2026-09-14)", () => {
+  const actions = actionsDevis(devis, null);
+  it("dépliée par défaut : bouton de repli présent, groupes titrés, icônes décoratives (aria-hidden)", () => {
+    const html = renderToStaticMarkup(createElement(PanneauActions, { titre: "Devis", actions, pliable: true, cleStockageRepli: "test.repli.v1", testId: "t" }));
+    expect(html).toContain('data-testid="t-bascule"');
+    expect(html).toContain('data-repliee="0"');
+    expect(html).toContain("lg:w-60");
+    expect(html).toContain("Créer");
+    expect(html).toContain('aria-expanded="true"');
+  });
+  it("le rendu repliable en mode disponible reste un lien/formulaire identique, juste enrichi d'icônes et de data-testid", () => {
+    const html = renderToStaticMarkup(createElement(PanneauActions, {
+      titre: "Devis", actions, formActions: { dupliquer: async () => {} }, pliable: true, cleStockageRepli: "test.repli.v1", testId: "t",
+    }));
+    expect(html).toContain('href="/imprimer/devis/d1"');
+    expect(html).toContain('data-testid="t-action-dupliquer"');
+    expect(html).toContain('data-testid="t-action-apercu"');
+  });
 });

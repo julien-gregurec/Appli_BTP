@@ -78,6 +78,38 @@ describe("éditeur visuel v2 — rendu", () => {
   });
 });
 
+describe("barre d'actions contextuelle (GP V1, 2026-09-14)", () => {
+  it("rend la barre repliable avec ses 4 sections, additive à la barre d'outils existante", () => {
+    const html = renderToStaticMarkup(createElement(EditeurDevisV2, props()));
+    expect(html).toContain('data-testid="rail-devis"');
+    expect(html).toContain('data-testid="rail-devis-bascule"');
+    expect(html).toContain('data-testid="rail-devis-mobile-bouton"');
+    expect(html).toContain('aria-label="Créer"');
+    expect(html).toContain('aria-label="Modifier"');
+    expect(html).toContain('aria-label="Documents"');
+    expect(html).toContain('aria-label="Autres"');
+    // Additive : la barre d'outils « Ajouter »/« Plus » d'origine reste présente, inchangée.
+    expect(html).toContain('data-testid="menu-ajouter"');
+    expect(html).toContain('data-testid="menu-plus"');
+  });
+  it("sans sélection, Copier/Dupliquer/Supprimer portent le motif de sélection ; sans devis enregistré, PDF/Envoyer aussi", () => {
+    const html = renderToStaticMarkup(createElement(EditeurDevisV2, props()));
+    expect(html).toMatch(/aria-disabled="true"[^>]*data-testid="rail-devis-action-copier"/);
+    expect(html).toMatch(/aria-disabled="true"[^>]*data-testid="rail-devis-action-dupliquer"/);
+    expect(html).toMatch(/aria-disabled="true"[^>]*data-testid="rail-devis-action-supprimer_selection"/);
+    expect(html).toContain("Sélectionnez d’abord une ou plusieurs lignes");
+    expect(html).toMatch(/aria-disabled="true"[^>]*data-testid="rail-devis-action-pdf"/);
+    expect(html).toMatch(/aria-disabled="true"[^>]*data-testid="rail-devis-action-envoyer"/);
+    expect(html).toContain("Enregistrez d’abord le devis");
+  });
+  it("sans le droit modifier_remise, seule l'action « Ajouter une remise » est grisée dans la barre", () => {
+    const html = renderToStaticMarkup(createElement(EditeurDevisV2, props({ droits: { voirCouts: false, gererCouts: false, modifierPrix: true, modifierUnite: true, modifierRemise: false } })));
+    expect(html).toMatch(/aria-disabled="true"[^>]*data-testid="rail-devis-action-remise"/);
+    expect(html).toContain("Votre poste ne permet pas d’accorder des remises.");
+    expect(html).not.toMatch(/aria-disabled="true"[^>]*data-testid="rail-devis-action-ligne_libre"/);
+  });
+});
+
 describe("boîtes de dialogue — rendu", () => {
   it("sélection d'articles : recherche au clavier, liste multisélection, cibles tactiles", () => {
     const html = renderToStaticMarkup(createElement(SelectionArticlesDialog, {

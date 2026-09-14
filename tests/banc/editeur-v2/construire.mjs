@@ -22,6 +22,9 @@ const doublures = {
   "@/app/actions/clients": path.join(ici, "actions-simulees.ts"),
   "@/app/actions/chantiers": path.join(ici, "actions-simulees.ts"),
   "next/navigation": path.join(ici, "navigation-simulee.ts"),
+  // Barre d'actions contextuelle (GP V1, 2026-09-14) : `PanneauActions` peut rendre un `<Link>` (via
+  // `Lien`) pour ses actions à `href` — même doublure que le banc du planning.
+  "next/link": path.join(ici, "lien-simule.tsx"),
 };
 
 await build({

@@ -27,6 +27,9 @@ export type ActionContextuelle = {
   /** Demande une confirmation avant exécution. */
   confirmation?: string;
   danger?: true;
+  /** Glyphe court pour la barre d'actions repliable (icône seule) — GP V1, décoratif (aria-hidden), le
+      libellé reste la seule information portée à l'utilisateur et au lecteur d'écran. */
+  icone?: string;
 };
 
 export type Droits = readonly string[] | null;
@@ -234,18 +237,18 @@ export function actionsPlanning(e: EvenementPourActions | null, permissions: Dro
   const selection: [boolean, string] = [e !== null, "Sélectionnez un évènement du planning."];
   const modifiable: [boolean, string] = [e !== null && e.statut !== "annule", "Évènement annulé."];
   return [
-    action({ cle: "creer", libelle: "Nouvel évènement", groupe: "creer", raccourci: "Glisser sur une zone vide" }, [gerer]),
-    action({ cle: "modifier", libelle: "Modifier", groupe: "modifier" }, [gerer, selection, modifiable]),
-    action({ cle: "deplacer", libelle: "Déplacer", groupe: "modifier", raccourci: "Glisser-déposer" }, [gerer, selection, modifiable]),
-    action({ cle: "dupliquer", libelle: "Dupliquer", groupe: "modifier", raccourci: "Alt + glisser" }, [gerer, selection]),
-    action({ cle: "affecter", libelle: "Affecter une équipe", groupe: "modifier" }, [droitFin(permissions, "affecter_ressources"), selection, modifiable]),
-    action({ cle: "horaire", libelle: "Changer l’horaire", groupe: "modifier", raccourci: "Étirer le bloc" }, [gerer, selection, modifiable]),
-    action({ cle: "chantier", libelle: "Ouvrir le chantier", groupe: "navigation", href: e?.chantierId ? `/chantiers/${e.chantierId}` : undefined }, [selection, [!!e?.chantierId, "Cet évènement n’est pas lié à un chantier."]]),
-    action({ cle: "client", libelle: "Ouvrir le client", groupe: "navigation", href: e?.clientId ? `/clients/${e.clientId}` : undefined }, [selection, [!!e?.clientId, "Aucun client lié."]]),
-    action({ cle: "documents", libelle: "Documents", groupe: "navigation", href: e?.chantierId ? `/chantiers/${e.chantierId}/documents` : undefined }, [selection, [!!e?.chantierId, "Aucun chantier lié."]]),
-    action({ cle: "imprimer", libelle: "Imprimer", groupe: "document", href: "/imprimer/planning", externe: true }, [droit(permissions, "acces_planning")]),
-    action({ cle: "historique", libelle: "Historique", groupe: "navigation" }, [selection]),
-    action({ cle: "supprimer", libelle: "Supprimer", groupe: "danger", danger: true, confirmation: "Supprimer cet évènement du planning ?" }, [gerer, selection]),
+    action({ cle: "creer", libelle: "Nouvel évènement", groupe: "creer", raccourci: "Glisser sur une zone vide", icone: "+" }, [gerer]),
+    action({ cle: "modifier", libelle: "Modifier", groupe: "modifier", icone: "✎" }, [gerer, selection, modifiable]),
+    action({ cle: "deplacer", libelle: "Déplacer", groupe: "modifier", raccourci: "Glisser-déposer", icone: "⇕" }, [gerer, selection, modifiable]),
+    action({ cle: "dupliquer", libelle: "Dupliquer", groupe: "modifier", raccourci: "Alt + glisser", icone: "❐" }, [gerer, selection]),
+    action({ cle: "affecter", libelle: "Affecter une équipe", groupe: "modifier", icone: "◍" }, [droitFin(permissions, "affecter_ressources"), selection, modifiable]),
+    action({ cle: "horaire", libelle: "Changer l’horaire", groupe: "modifier", raccourci: "Étirer le bloc", icone: "⏱" }, [gerer, selection, modifiable]),
+    action({ cle: "chantier", libelle: "Ouvrir le chantier", groupe: "navigation", href: e?.chantierId ? `/chantiers/${e.chantierId}` : undefined, icone: "⌂" }, [selection, [!!e?.chantierId, "Cet évènement n’est pas lié à un chantier."]]),
+    action({ cle: "client", libelle: "Ouvrir le client", groupe: "navigation", href: e?.clientId ? `/clients/${e.clientId}` : undefined, icone: "◈" }, [selection, [!!e?.clientId, "Aucun client lié."]]),
+    action({ cle: "documents", libelle: "Documents", groupe: "navigation", href: e?.chantierId ? `/chantiers/${e.chantierId}/documents` : undefined, icone: "▤" }, [selection, [!!e?.chantierId, "Aucun chantier lié."]]),
+    action({ cle: "imprimer", libelle: "Imprimer", groupe: "document", href: "/imprimer/planning", externe: true, icone: "⎙" }, [droit(permissions, "acces_planning")]),
+    action({ cle: "historique", libelle: "Historique", groupe: "navigation", icone: "↻" }, [selection]),
+    action({ cle: "supprimer", libelle: "Supprimer", groupe: "danger", danger: true, confirmation: "Supprimer cet évènement du planning ?", icone: "✕" }, [gerer, selection]),
   ];
 }
 

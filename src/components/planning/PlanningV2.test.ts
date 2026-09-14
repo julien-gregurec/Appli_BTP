@@ -26,7 +26,7 @@ function donnees(evenements: Evenement[]): DonneesPlanningV2 {
 }
 
 describe("PlanningV2 (rendu statique)", () => {
-  it("vue semaine : une ligne par salarié, les 7 jours, le bloc sur la bonne ligne, barre d'outils sans panneau latéral et 8 vues", () => {
+  it("vue semaine : une ligne par salarié, les 7 jours, le bloc sur la bonne ligne, barre d'outils, menu Actions et barre repliable, et 8 vues", () => {
     const html = renderToStaticMarkup(createElement(PlanningV2, { donnees: donnees([ev("e1", "Pose cuisine", "2026-09-16", 8, 12, ["s1"])]), jour: "2026-09-14", vue: "semaine" }));
     expect(html).toContain("Ali Poseur");
     expect(html).toContain("Bea Chef");
@@ -36,8 +36,31 @@ describe("PlanningV2 (rendu statique)", () => {
     expect((html.match(/role="tab"/g) ?? []).length).toBe(8);
     expect(html).toContain("Nouvel évènement");
     expect(html).toContain('data-testid="menu-actions-evenement"');
-    expect(html).not.toContain("data-panneau-actions");
-    expect(html).not.toContain("lg:pr-72");
+    // Barre d'actions contextuelle repliable (GP V1, 2026-09-14) : additive au menu « Actions ▾ » et au
+    // menu contextuel du bloc (même registre `actionsPlanning`) — remplace le panneau permanent retiré
+    // le 2026-09-13 (jugé lourd) par une version compacte et repliable, préférence mémorisée.
+    expect(html).toContain('data-testid="rail-planning"');
+    expect(html).toContain('data-testid="rail-planning-bascule"');
+    expect(html).toContain("lg:pr-72");
+  });
+
+  it("barre d'actions : rien sélectionné, seul « Nouvel évènement » est disponible, les autres portent leur motif", () => {
+    const html = renderToStaticMarkup(createElement(PlanningV2, { donnees: donnees([ev("e1", "Pose cuisine", "2026-09-16", 8, 12, ["s1"])]), jour: "2026-09-14", vue: "semaine" }));
+    expect(html).toContain('data-testid="rail-planning-action-creer"');
+    expect(html).toMatch(/aria-disabled="true"[^>]*data-testid="rail-planning-action-modifier"/);
+    expect(html).toContain("Sélectionnez un évènement du planning.");
+    // Gestes de glisser (Déplacer, Changer l'horaire) : pas des actions cliquables, exclus de la barre.
+    expect(html).not.toContain('data-testid="rail-planning-action-deplacer"');
+    expect(html).not.toContain('data-testid="rail-planning-action-horaire"');
+  });
+
+  it("sans droit de gestion : la barre d'actions grise aussi Modifier et Supprimer avec leur motif", () => {
+    const d = donnees([ev("e1", "Pose", "2026-09-16", 8, 12, ["s1"])]);
+    d.droits = { gerer: false, affecter: false }; d.permissions = ["acces_planning"];
+    const html = renderToStaticMarkup(createElement(PlanningV2, { donnees: d, jour: "2026-09-14", vue: "semaine" }));
+    expect(html).toMatch(/aria-disabled="true"[^>]*data-testid="rail-planning-action-modifier"/);
+    expect(html).toMatch(/aria-disabled="true"[^>]*data-testid="rail-planning-action-supprimer"/);
+    expect(html).toContain('data-testid="rail-planning-mobile-bouton"');
   });
 
   it("vue jour : colonnes horaires et bloc positionné selon l'heure", () => {

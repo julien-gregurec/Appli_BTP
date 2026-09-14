@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition,
 import { useRouter } from "next/navigation";
 import { enregistrerEvenementAction, supprimerEvenementAction } from "@/app/actions/planning-v2";
 import { BoutonMenu, MenuContextuel, type ElementMenu } from "@/components/Menu";
+import { PanneauActions } from "@/components/actions/PanneauActions";
 import { actionsPlanning } from "@/lib/actions-contextuelles/registre";
 import { useZoneDense } from "@/lib/ui-dense";
 import type { DonneesPlanningV2 } from "@/lib/planning/serveur";
@@ -34,6 +35,9 @@ const champ = "min-h-9 rounded-md border border-neutral-300 px-2 text-sm dark:bo
 type Glisser = { bloc: Bloc; mode: "deplacer" | "etirer" | "creer"; x0: number; y0: number; alt: boolean; ligneCle: string; jour: string; minutes0: number; deltaMin: number; deltaJours: number; ligneCible: string };
 
 const jourFr = (j: string, long = false) => new Intl.DateTimeFormat("fr-FR", long ? { weekday: "long", day: "numeric", month: "long" } : { weekday: "short", day: "numeric", month: "short" }).format(new Date(`${j}T12:00:00`));
+
+/** Repli de la barre d'actions contextuelle (ce navigateur), tous plannings confondus : « 1 » = repliée. */
+const CLE_RAIL_PLANNING = "gp.planning.rail.v1";
 
 export function PlanningV2({ donnees, jour, vue }: { donnees: DonneesPlanningV2; jour: string; vue: Vue }) {
   const router = useRouter();
@@ -133,10 +137,31 @@ export function PlanningV2({ donnees, jour, vue }: { donnees: DonneesPlanningV2;
     ].filter((x): x is ElementMenu => x !== null);
   }, [donnees.permissions, router, jour, vue, supprimer]);
 
-  const nouvelEvenement = (o: Partial<Evenement> = {}): Evenement => ({
+  const nouvelEvenement = useCallback((o: Partial<Evenement> = {}): Evenement => ({
     id: `nouveau:${crypto.randomUUID()}`, titre: "", type: "chantier", statut: "planifie", debut: instant(jour, 8 * 60), fin: instant(jour, 12 * 60),
     journeeEntiere: false, couleur: null, chantierId: null, clientId: null, adresse: null, notes: null, affectations: [], ...o,
-  });
+  }), [jour]);
+
+  // Barre d'actions contextuelle (GP V1, « barre repliable type Batappli », 2026-09-14) : additive au
+  // menu « Actions ▾ » et au menu contextuel ci-dessus (même registre `actionsPlanning`, mêmes motifs),
+  // pas un remplacement — le panneau permanent d'origine avait été retiré le 2026-09-13 car jugé lourd
+  // (commit « planning without the permanent side panel ») ; celui-ci en diffère : repliable en icônes
+  // (largeur compacte), préférence mémorisée, jamais imposé. « Déplacer » et « Changer l'horaire » sont
+  // des gestes de glisser, pas des clics : exclus de la barre, ils restent dans le menu contextuel.
+  const [railReplie, setRailReplie] = useState(false);
+  const actionsRail = useMemo(
+    () => actionsPlanning(selectionne ? { id: selectionne.id, chantierId: selectionne.chantierId, clientId: selectionne.clientId, statut: selectionne.statut } : null, donnees.permissions)
+      .filter((a) => a.cle !== "deplacer" && a.cle !== "horaire"),
+    [selectionne, donnees.permissions],
+  );
+  const handlersRail = useMemo<Record<string, () => void>>(() => ({
+    creer: () => { const ev = nouvelEvenement(); setEvenements((l) => [...l, ev]); setEdition(ev); },
+    modifier: () => { if (selectionne) setEdition(selectionne); },
+    dupliquer: () => { if (!selectionne) return; const d = dupliquer(selectionne, `nouveau:${crypto.randomUUID()}`); setEvenements((l) => [...l, d]); setEdition(d); },
+    affecter: () => { if (selectionne) setEdition(selectionne); },
+    historique: () => { if (selectionne) router.push(`/planning/historique?evenement=${selectionne.id}`); },
+    supprimer: () => { if (selectionne) supprimer(selectionne.id); },
+  }), [selectionne, router, supprimer, nouvelEvenement]);
 
   // Clavier sur la sélection.
   useEffect(() => {
@@ -238,10 +263,21 @@ export function PlanningV2({ donnees, jour, vue }: { donnees: DonneesPlanningV2;
   const largeurGrille = vue === "jour" ? LARGEUR_LIBELLE + heures.length * pxHeure : undefined;
 
   return (
-    <div className="space-y-3">
+    <div className={`space-y-3 ${railReplie ? "lg:pr-20" : "lg:pr-72"}`}>
       {menu && (
         <MenuContextuel x={menu.x} y={menu.y} etiquette="Actions de l’évènement" elements={elementsMenu(menu.evenement)} onFermer={() => setMenu(null)} />
       )}
+
+      <PanneauActions
+        titre="Planning"
+        actions={actionsRail}
+        handlers={handlersRail}
+        contexte={selectionne ? selectionne.titre : "Aucun évènement sélectionné"}
+        pliable
+        cleStockageRepli={CLE_RAIL_PLANNING}
+        onRepliChange={setRailReplie}
+        testId="rail-planning"
+      />
 
       <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="Navigation du planning" data-consultation="1">
         <button type="button" className={bouton} onClick={() => naviguer(ajouterJours(jour, -pas))} aria-label="Précédent">‹</button>

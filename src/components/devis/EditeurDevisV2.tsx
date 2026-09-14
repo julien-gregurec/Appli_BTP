@@ -22,6 +22,8 @@ import { SelectionArticlesDialog } from "@/components/devis/SelectionArticlesDia
 import { ChantierRapideDialog, ClientRapideDialog } from "@/components/devis/TiersRapideDialogs";
 import { BarreFormatage } from "@/components/devis/BarreFormatage";
 import { BoutonMenu } from "@/components/Menu";
+import { PanneauActions } from "@/components/actions/PanneauActions";
+import type { ActionContextuelle } from "@/lib/actions-contextuelles/registre";
 import { demanderNavigation, GardeModifications } from "@/components/GardeModifications";
 import { useZoneDense } from "@/lib/ui-dense";
 import { FiligraneSelecteur } from "@/components/documents/FiligraneSelecteur";
@@ -59,6 +61,8 @@ export const CLE_MODE_EDITEUR = "gp.devis.mode.v1";
 export const CLE_RAPPEL_PERSONNEL = "gp.devis.rappel.v1";
 /** En-tête repliée ou non (ce navigateur), tous devis confondus : « 1 » = repliée. */
 export const CLE_ENTETE_REPLIEE = "gp.devis.entete.v1";
+/** Repli de la barre d'actions contextuelle (ce navigateur), tous devis confondus : « 1 » = repliée. */
+export const CLE_RAIL_DEVIS = "gp.devis.rail.v1";
 
 const champ = "min-h-11 rounded-md border border-neutral-300 px-2 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 const bouton = "min-h-11 rounded-md border border-neutral-300 px-3 text-sm hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900";
@@ -288,6 +292,62 @@ export function EditeurDevisV2({
   };
   const derniereDe = (cles: readonly string[]) => { const ordre = [...etat.elements].sort((a, b) => a.ordre - b.ordre).map(cleElement); return [...cles].sort((a, b) => ordre.indexOf(a) - ordre.indexOf(b)).at(-1) ?? null; };
 
+  // Barre d'actions contextuelle (GP V1, « barre repliable type Batappli », 2026-09-14) : additive à la
+  // barre d'outils ci-dessous (§ « Ajouter »/« Plus »), pas un remplacement — mêmes fonctions, juste un
+  // accès permanent et repliable sur grand écran. « Autres » (groupe `danger` du registre, déjà affiché
+  // sous ce nom sur les 8 fiches existantes) réunit les réglages annexes et la suppression de sélection.
+  const [railReplie, setRailReplie] = useState(false);
+  const peutAgirSurSelection = selection.cles.length > 0 || ligneActive !== null;
+  const motifSelectionVide = "Sélectionnez d’abord une ou plusieurs lignes (clic sur la poignée ⋮⋮, Maj pour une plage).";
+  const actionsRail = useMemo<ActionContextuelle[]>(() => [
+    { cle: "ligne_libre", libelle: "Ligne libre", groupe: "creer", raccourci: "Entrée", icone: "+", disponible: true },
+    { cle: "article", libelle: "Article du catalogue", groupe: "creer", raccourci: "Ctrl+K", icone: "K", disponible: true },
+    { cle: "ouvrage", libelle: "Ouvrage composé", groupe: "creer", icone: "▦", disponible: true },
+    { cle: "titre", libelle: "Insérer un titre", groupe: "creer", icone: "T", disponible: true },
+    { cle: "sous_total", libelle: "Insérer un sous-total", groupe: "creer", icone: "Σ", disponible: true },
+    { cle: "remise", libelle: "Ajouter une remise", groupe: "creer", icone: "%", disponible: droits.modifierRemise, motif: droits.modifierRemise ? undefined : "Votre poste ne permet pas d’accorder des remises." },
+    { cle: "commentaire", libelle: "Ajouter un commentaire", groupe: "creer", icone: "✎", disponible: true },
+    { cle: "copier", libelle: "Copier", groupe: "modifier", raccourci: "Ctrl+C", icone: "⧉", disponible: peutAgirSurSelection, motif: peutAgirSurSelection ? undefined : motifSelectionVide },
+    { cle: "coller", libelle: "Coller", groupe: "modifier", raccourci: "Ctrl+V", icone: "⎘", disponible: true },
+    { cle: "dupliquer", libelle: "Dupliquer", groupe: "modifier", raccourci: "Ctrl+D", icone: "❐", disponible: peutAgirSurSelection, motif: peutAgirSurSelection ? undefined : motifSelectionVide },
+    { cle: "annuler", libelle: "Annuler", groupe: "modifier", raccourci: "Ctrl+Z", icone: "↶", disponible: peutAnnuler(historique), motif: peutAnnuler(historique) ? undefined : "Aucune modification à annuler." },
+    { cle: "retablir", libelle: "Rétablir", groupe: "modifier", raccourci: "Ctrl+Y", icone: "↷", disponible: peutRetablir(historique), motif: peutRetablir(historique) ? undefined : "Aucune modification à rétablir." },
+    { cle: "apercu", libelle: apercuVisible ? "Masquer l’aperçu A4" : "Aperçu A4", groupe: "document", icone: "▤", disponible: mode === "grille", motif: mode === "grille" ? undefined : "Disponible en vue Grille : la vue Document affiche déjà le document réel." },
+    { cle: "pdf", libelle: "PDF", groupe: "document", icone: "⇩", href: devisIdCourant ? `/api/documents/devis/${devisIdCourant}/pdf` : undefined, externe: true, disponible: devisIdCourant !== null, motif: devisIdCourant !== null ? undefined : "Enregistrez d’abord le devis (Ctrl+S)." },
+    { cle: "envoyer", libelle: "Envoyer…", groupe: "document", icone: "✉", disponible: devisIdCourant !== null, motif: devisIdCourant !== null ? undefined : "Enregistrez d’abord le devis (Ctrl+S)." },
+    { cle: "colonnes", libelle: "Colonnes affichées…", groupe: "danger", icone: "▥", disponible: true },
+    { cle: "recherche", libelle: "Recherche globale…", groupe: "danger", raccourci: "Ctrl+Maj+K", icone: "⌕", disponible: true },
+    { cle: "bascule_mode", libelle: mode === "grille" ? "Passer en vue Document" : "Passer en vue Grille", groupe: "danger", icone: "⇄", disponible: true },
+    { cle: "supprimer_selection", libelle: "Supprimer la sélection", groupe: "danger", danger: true, icone: "✕", confirmation: "Supprimer la ou les lignes sélectionnées ?", disponible: peutAgirSurSelection, motif: peutAgirSurSelection ? undefined : motifSelectionVide },
+  ], [droits.modifierRemise, peutAgirSurSelection, historique, apercuVisible, mode, devisIdCourant]);
+  const handlersRail = useMemo<Record<string, () => void>>(() => ({
+    ligne_libre: () => { const cle = genererCle(); setEtat((courant) => insererLigne(courant, cle, "libre", null, defautsLigne)); },
+    article: () => setDialogue({ type: "articles" }),
+    ouvrage: () => setDialogue({ type: "ouvrage", instance: null, apresCle: null }),
+    titre: () => { const cle = genererCle(); setEtat((courant) => insererLigne(courant, cle, "titre", null, defautsLigne)); },
+    sous_total: () => { const cle = genererCle(); setEtat((courant) => insererLigne(courant, cle, "sous_total", null, defautsLigne)); },
+    remise: () => { const cle = genererCle(); setEtat((courant) => insererLigne(courant, cle, "remise", null, defautsLigne)); },
+    commentaire: () => { const cle = genererCle(); setEtat((courant) => insererLigne(courant, cle, "commentaire", null, defautsLigne)); },
+    copier: copierDepuisBouton,
+    coller: () => void collerDepuisBouton(),
+    dupliquer: dupliquerDepuisBouton,
+    annuler: annulerEdition,
+    retablir: retablirEdition,
+    apercu: () => setApercuVisible((v) => !v),
+    envoyer: () => { const cible = `/devis/${devisIdCourant}#envoyer`; if (demanderNavigation(cible)) router.push(cible); },
+    colonnes: () => setDialogue({ type: "colonnes" }),
+    recherche: () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, shiftKey: true })),
+    bascule_mode: () => changerMode(mode === "grille" ? "document" : "grille"),
+    supprimer_selection: () => {
+      const cles = selection.cles.length ? selection.cles : ligneActive ? [ligneActive] : [];
+      if (!cles.length) return;
+      setEtat((courant) => cles.reduce((e, cle) => retirerElement(e, cle), courant));
+      setSelection({ cles: [], ancre: null });
+      setRetourPressePapier({ genre: "info", texte: cles.length === 1 ? "1 ligne supprimée" : `${cles.length} lignes supprimées` });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [genererCle, defautsLigne, devisIdCourant, router, mode, selection, ligneActive]);
+
   const client = clients.find((c) => c.id === entete.client_id);
   const source: SourceDocument = useMemo(() => ({
     typeDocument: "devis",
@@ -457,8 +517,18 @@ export function EditeurDevisV2({
     : sale ? "Modifications non enregistrées" : sauvegarde.statut === "ok" ? `Enregistré à ${sauvegarde.heure}` : "";
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className={`flex flex-col gap-3 ${railReplie ? "lg:pr-20" : "lg:pr-72"}`}>
       <GardeModifications actif={sale} onEnregistrer={enregistrerPourQuitter} />
+      <PanneauActions
+        titre="Devis"
+        actions={actionsRail}
+        handlers={handlersRail}
+        contexte={entete.reference_interne || (devisIdCourant ? "Devis brouillon" : "Nouveau devis")}
+        pliable
+        cleStockageRepli={CLE_RAIL_DEVIS}
+        onRepliChange={setRailReplie}
+        testId="rail-devis"
+      />
       <datalist id="unites-devis">{UNITES_METIER.map((u) => <option key={u.cle} value={u.cle}>{u.libelle}</option>)}</datalist>
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => { const cible = devisIdCourant ? `/devis/${devisIdCourant}` : "/devis"; if (demanderNavigation(cible)) router.push(cible); }} className="text-sm text-neutral-500 hover:underline" data-testid="retour-devis">← {devisIdCourant ? "Retour au devis" : "Retour aux devis"}</button>

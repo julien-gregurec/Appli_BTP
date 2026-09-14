@@ -261,15 +261,17 @@ test("6. modification au clavier (Tab entre cellules, Ctrl+Z)", async ({ page })
   await expect(cellule(page, 0, "quantite")).toHaveValue("12");
   await expect(page.getByLabel("Totaux")).toContainText("€");
   // La validation d'une cellule crée une étape d'historique : le bouton « Annuler » (Ctrl+Z) s'active.
-  await expect(page.getByRole("button", { name: "Annuler", exact: true })).toBeEnabled();
+  // `.first()` : depuis la barre d'actions contextuelle (GP V1, 2026-09-14), « Annuler »/« Rétablir »
+  // existent désormais à deux endroits (rangée du haut ET barre repliable) — même geste, même résultat.
+  await expect(page.getByRole("button", { name: "Annuler", exact: true }).first()).toBeEnabled();
   await page.keyboard.press("ControlOrMeta+z");
   const annule = await expect(cellule(page, 0, "quantite")).toHaveValue("10", { timeout: 5_000 }).then(() => true).catch(() => false);
   if (!annule) {
     // Raccourci absorbé par le champ actif : le bouton de la barre d'outils fait la même chose.
-    await page.getByRole("button", { name: "Annuler", exact: true }).click();
+    await page.getByRole("button", { name: "Annuler", exact: true }).first().click();
     await expect(cellule(page, 0, "quantite")).toHaveValue("10");
   }
-  await page.getByRole("button", { name: "Rétablir", exact: true }).click();
+  await page.getByRole("button", { name: "Rétablir", exact: true }).first().click();
   await expect(cellule(page, 0, "quantite")).toHaveValue("12");
   await enregistrerEtFermer(page);
 });
@@ -368,7 +370,7 @@ test("10. création planning (évènement horodaté, salarié affecté, ligne af
   await connexion(page, USERS.adminA);
   await aller(page, `/planning?vue=jour&jour=${JOUR_PLANNING}`);
   await expect(page.locator("[role=grid]")).toBeVisible();
-  await page.getByRole("button", { name: "Nouvel évènement" }).click();
+  await page.getByRole("button", { name: "Nouvel évènement" }).first().click();
   const dialogue = page.locator("dialog[open]").filter({ hasText: "Nouvel évènement" });
   await dialogue.getByLabel("Titre").fill(TITRE_EVENEMENT);
   await dialogue.getByLabel("Début").fill("08:00");
@@ -399,7 +401,7 @@ test("11. déplacement d'un évènement (clavier → +15 min, persistant après 
 test("12. détection de conflit (même salarié, même créneau)", async ({ page }) => {
   await connexion(page, USERS.adminA);
   await aller(page, `/planning?vue=jour&jour=${JOUR_PLANNING}`);
-  await page.getByRole("button", { name: "Nouvel évènement" }).click();
+  await page.getByRole("button", { name: "Nouvel évènement" }).first().click();
   const dialogue = page.locator("dialog[open]").filter({ hasText: "Nouvel évènement" });
   await dialogue.getByLabel("Titre").fill(`${TITRE_EVENEMENT} bis`);
   await dialogue.getByLabel("Début").fill("10:00");
@@ -522,7 +524,9 @@ test("17. copier/coller vers un autre devis (nouveaux identifiants, la source ne
   await page.getByLabel("Référence d’affaire").fill(`${REF_AFFAIRE}-COLLE`);
   await page.getByTestId("menu-plus").click();
   await page.locator('[role=menuitem][data-cle="position-fin"]').click();
-  await page.getByRole("button", { name: "Coller" }).click();
+  // `.first()` : « Coller » existe aussi dans la barre d'actions contextuelle (GP V1, 2026-09-14), même
+  // fonction `collerDepuisBouton` et même position de collage mémorisée que le bouton de la barre d'outils.
+  await page.getByRole("button", { name: "Coller" }).first().click();
   await expect(page.locator("[data-testid=retour-presse-papier]")).toContainText(`${lignesSource} lignes ajoutées au devis`);
   await expect(grille).toHaveAttribute("aria-rowcount", String(lignesSource));
   const cible = await enregistrerEtFermer(page);
@@ -538,7 +542,7 @@ test("17. copier/coller vers un autre devis (nouveaux identifiants, la source ne
   // Presse-papier d'une autre entreprise : refusé, rien créé.
   await page.evaluate(() => { const p = JSON.parse(localStorage.getItem("elsatia.devis.presse-papier.v1") ?? "{}"); p.entrepriseId = "b0000000-0000-0000-0000-000000000001"; const t = JSON.stringify(p); localStorage.setItem("elsatia.devis.presse-papier.v1", t); return navigator.clipboard.writeText(t).catch(() => undefined); });
   const n = Number(await grille.getAttribute("aria-rowcount"));
-  await page.getByRole("button", { name: "Coller" }).click();
+  await page.getByRole("button", { name: "Coller" }).first().click();
   await expect(page.locator("[data-testid=retour-presse-papier]")).toContainText("autre entreprise");
   await expect(grille).toHaveAttribute("aria-rowcount", String(n));
 });
