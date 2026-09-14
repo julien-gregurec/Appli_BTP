@@ -1,5 +1,12 @@
 -- Jeu de données strictement local pour les tests d'isolation multitenant.
 -- Les UUID fixes rendent les diagnostics reproductibles.
+
+-- Le chargement de fixtures n'est pas soumis au plafond de personnes actives
+-- (ELSATIA-ACTIVE-PERSON-CAPACITY-R1). L'échappatoire n'a d'effet que sous une
+-- session superutilisateur (cas pgTAP) ; un test dédié au plafond peut la
+-- désactiver avec `reset elsatia.capacite_personnes_bypass`.
+set local elsatia.capacite_personnes_bypass = 'on';
+
 insert into auth.users (
   instance_id, id, aud, role, email, encrypted_password,
   email_confirmed_at, created_at, updated_at
@@ -80,6 +87,9 @@ where p.id in (
   'a1000000-0000-0000-0000-000000000001',
   'b1000000-0000-0000-0000-000000000001'
 )
+  -- Le mode « compte dépôt » (borne stock) est un rôle à part entière, jamais un droit d'administrateur :
+  -- avec lui, l'application enverrait l'admin de test sur la borne au lieu du tableau de bord (GP V1, lot H).
+  and d.cle <> 'mode_compte_depot'
 on conflict do nothing;
 
 insert into public.permissions_poste (entreprise_id, poste_id, cle_permission, autorise)
@@ -142,6 +152,7 @@ where p.id in (
   'a1000000-0000-0000-0000-000000000006',
   'b1000000-0000-0000-0000-000000000006'
 )
+  and d.cle <> 'mode_compte_depot'
 on conflict do nothing;
 
 insert into public.employes (
@@ -214,9 +225,13 @@ insert into storage.objects (id, bucket_id, name, metadata) values
   ('b8000000-0000-0000-0000-000000000001', 'chantier-documents', 'b0000000-0000-0000-0000-000000000001/b4000000-0000-0000-0000-000000000001/plan.pdf', '{"mimetype":"application/pdf"}')
 on conflict (id) do nothing;
 
-insert into public.plateforme_admins (email)
-values ('plateforme@invalid.local')
-on conflict (email) do nothing;
+-- GP_V1_RC : le schéma de cette RC n'a pas encore le modèle d'identité canonique de
+-- `plateforme_admins` (utilisateur_id/actif/statut_identite/activation_at) — introduit par une
+-- migration plateforme (20260826000235 et suivantes) hors périmètre GP V1, vérifié : aucune
+-- migration GP V1 ne référence `plateforme_admins`. Insertion adaptée à la forme réelle de cette RC.
+insert into public.plateforme_admins (email, role)
+values ('plateforme@invalid.local', 'total')
+on conflict (email) do update set role = excluded.role;
 
 insert into public.devis (
   id, entreprise_id, numero, client_id, chantier_id, statut,

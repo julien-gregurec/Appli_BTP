@@ -8,14 +8,21 @@ select plan(4);
 
 \ir fixtures/isolation_multitenant.inc
 
--- Correctif local au fixture partagé : plateforme_role_courant() (donc
--- est_plateforme_admin()) filtre sur plateforme_admins.utilisateur_id = auth.uid(), mais
--- fixtures/isolation_multitenant.inc n'insère que la colonne email -- utilisateur_id y
--- reste donc NULL et l'admin plateforme de la fixture n'est jamais reconnu comme tel par
--- ce mécanisme. Corrigé ici localement (pas dans le fixture partagé, pour ne rien changer
--- aux ~15 autres fichiers qui le réutilisent) -- signalé séparément comme dette de fixture.
-update public.plateforme_admins set utilisateur_id = '30000000-0000-0000-0000-000000000001', actif = true, role = coalesce(role, 'total')
-where email = 'plateforme@invalid.local';
+-- GP_V1_RC : le correctif local historique (mise à jour de `plateforme_admins.utilisateur_id`)
+-- ne s'applique plus ici (colonne absente du schéma de ce périmètre, migration 235+, hors
+-- périmètre GP V1). Mais l'accès réel d'un admin plateforme à une entreprise donnée ne passe
+-- pas par `est_plateforme_admin()` seul : les policies RLS d'`entreprises` (héritées de
+-- `est_membre_actif`/`a_permission`) ne s'ouvrent que via `est_acces_support_actif()`, qui
+-- exige une session active dans `plateforme_acces_entreprises` (table et fonction déjà dans la
+-- 211-baseline, migration 20260714000075 -- ni l'une ni l'autre ajoutée par GP V1). Le fixture
+-- partagé ne seedait déjà aucune session de ce type ; ce n'est pas propre à cette RC (constaté :
+-- le fichier baseline échoue à la même ligne, avec ou sans migration GP, faute de la colonne
+-- `utilisateur_id` qu'il tentait d'écrire). Séance ouverte ici, localement à ce test. Une seule
+-- session active par admin plateforme à la fois
+-- (`plateforme_acces_entreprise_session_unique`, sur plateforme_user_id) : ce test n'agit que
+-- sur l'entreprise A, une seule ligne suffit.
+insert into public.plateforme_acces_entreprises (plateforme_user_id, entreprise_id, motif)
+values ('30000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'test pgTAP');
 
 -- Valeur de depart connue. Le trigger proteger_colonnes_remise s'applique a TOUT UPDATE,
 -- y compris celui-ci : il faut donc seeder sous contexte admin plateforme (comme pour le

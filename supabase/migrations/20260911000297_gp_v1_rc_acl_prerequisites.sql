@@ -1,6 +1,16 @@
 -- GP_V1_RC — sous-ensemble de 20260902000255_acl_reconciliation_v1.sql, EXTRAIT pour la branche
 -- release/gp-v1-rc.
 --
+-- RENOMMÉE le 2026-09-14 : ce fichier portait initialement le numéro fonctionnel 000281
+-- (`20260911000281`). Un scan de toutes les branches distantes a révélé que ce numéro était déjà
+-- utilisé par `20260909000281_colors_finition_reference_nuancier_v15.sql`
+-- (`integration/colors-pilot-readiness-v1`) — réservé à Colors avant que ce travail n'existe.
+-- Aucune des deux migrations n'étant publiée nulle part d'autre au moment du constat, c'est
+-- celle-ci qui a été déplacée : numéro fonctionnel 000297, globalement libre (vérifié sur
+-- l'historique complet des 207 branches distantes le 2026-09-14), date inchangée (20260911) pour
+-- conserver exactement la même position chronologique d'application déjà prouvée par pgTAP
+-- (565/565, § 4 du rapport RC). Contenu et comportement strictement inchangés par ce renommage.
+--
 -- Origine : `feat/gp-v1-metier-devis-planning-references-v1`, migration `20260902000255`
 -- (« Réconcilie... les ACL historiques excédentaires... avec la référence Fresh canonique »).
 -- Cette migration originale révoque des privilèges EXCÉDENTAIRES sur ~1100 objets (fonctions,

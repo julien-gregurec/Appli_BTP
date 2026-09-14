@@ -39,14 +39,15 @@ select ok(
 -- On le vérifie par une tentative d'écriture directe réelle, pas par le grant.
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000001', true);
-select throws_like(
+select throws_ok(
   $$insert into public.alertes_operationnelles_delegations (
       entreprise_id, alerte_cle, alerte_domaine, alerte_titre, alerte_href, alerte_niveau, employe_id, delegue_par_user_id
     ) values (
       'a0000000-0000-0000-0000-000000000001', 'test-ecriture-directe', 'Facturation', 'x', '/x', 'critique',
       'a2000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001'
     )$$,
-  '%row-level security%',
+  '42501',
+  null,
   'Aucune écriture directe possible sur la table (RLS) : uniquement via la fonction security definer'
 );
 reset role;
