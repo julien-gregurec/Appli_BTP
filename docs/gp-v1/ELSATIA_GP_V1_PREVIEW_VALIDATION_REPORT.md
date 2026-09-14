@@ -1999,3 +1999,74 @@ direct ; en dessous, le tiroir mobile garde exactement son fonctionnement d'avan
   (§ 40.2) — comportement déjà validé, revérifié ici sans régression.
 - Performance : le repli du menu gauche ne touche que `Sidebar` (sous-arbre React séparé du contenu) —
   aucun re-rendu de la grille de devis ni du planning, quelle que soit leur taille.
+- Bogue de coulisse (visuel local, pré-capture) : le repli à 0 px du menu gauche restait bloqué à 240 px
+  malgré `md:w-0` — deux règles CSS ciblaient la même propriété `width` avec la même spécificité
+  (`w-[min(19rem,86vw)]` sans préfixe et `md:w-0`), l'ordre entre une valeur arbitraire et un utilitaire
+  préfixé n'étant pas garanti par Tailwind. Corrigé en rendant la première conditionnelle (`max-md:w-[...]`)
+  plutôt que de compter sur un écrasement — les deux règles ne ciblent plus jamais le même gabarit.
+  `inert` seul ne suffisait pas non plus à retirer le menu masqué de l'arbre d'accessibilité pour
+  Playwright (`getByRole` continuait de trouver ses liens) : `aria-hidden` ajouté en complément.
+- Effet de bord corrigé en aval : le bouton flottant « Retour » (`MobileBack`, préexistant, tout écran
+  mobile) partageait le coin bas-gauche avec la nouvelle barre « Actions » pleine largeur — remonté de
+  1 rem à 4,5 rem du bas pour ne plus s'y superposer (capture § 40.7, n° 8).
+
+### 40.6 Tests
+
+**Unitaires** (`vitest run`) : 2 444/2 448 (3 skip inchangés, 1 échec de charge sans rapport avec ce lot —
+`xlsx.test.ts`, déjà connu du § 39 — rejoué seul : vert). Lint **0 erreur**, typecheck **0 erreur**, build
+complet réussi (`next build`, app + `apps/tools`), `verify:migrations` **293 migrations** (inchangé, aucune
+migration nouvelle), `verify:secrets` propre, `git diff --check` propre.
+
+**E2E** (pile locale jetable) — **28/28** sur les deux suites, aucune régression :
+- `gp-v1-metier.spec.ts` : 18/18 (inchangé).
+- `gp-v1-ux.spec.ts` : 10/10, dont 4 nouveaux scénarios pour ce lot :
+  - **62** — le menu « Ajouter » et le menu « Plus » s'ouvrent à moins de 20 px du bouton, en-tête repliée
+    (barre d'outils `sticky`, condition exacte du bogue).
+  - **63** — les trois états du menu gauche (largeur mesurée < 80 px compact, ≤ 1 px masqué, > 200 px
+    ouvert), mémorisation après rechargement à chaque état, réaffichage par le bouton flottant.
+  - **64** — une saisie non validée (pas de Tab) dans une cellule de devis survit à un repli du menu
+    gauche : preuve directe de l'absence de remontage.
+  - Scénario 48 (planning) et 61 (rail devis) étendus au § 39 restent verts, inchangés par ce lot.
+
+**Banc de performance** (`tests/banc/performance`, vrais composants, données fictives, rejoué avec le
+code final de ce lot) :
+
+| Devis | Chargement | Frappe (3 car.) | Tab | Frappe désignation | Défilement | Annuler/Rétablir |
+| --- | --- | --- | --- | --- | --- | --- |
+| 10 lignes | 179 ms | 7 ms | 12 ms | 10 ms | 105 ms | 54 ms |
+| 100 lignes | 167 ms | 5 ms | 58 ms | 16 ms | 111 ms | 80 ms |
+| 500 lignes | 198 ms | 6 ms | 96 ms | 10 ms | 108 ms (2 tâches > 50 ms) | 120 ms |
+
+| Planning (40 salariés) | Chargement | Sélection | Glisser-déposer | Filtre | Clavier (Ctrl+→) |
+| --- | --- | --- | --- | --- | --- |
+| 100 évènements | 189 ms | 22 ms | 327 ms | 31 ms | 178 ms |
+| 400 évènements | 420 ms | 34 ms | 422 ms | 21 ms | 255 ms |
+| 1 000 évènements | 946 ms | 27 ms | 754 ms | 31 ms | 633 ms |
+
+Chiffres identiques (à la variance de mesure près) à ceux du § 39.8 : les pictogrammes colorés et le menu
+gauche rétractable n'ajoutent aucun coût mesurable, y compris aux plus gros volumes.
+
+### 40.7 Captures (preview, alias de branche)
+
+Recette Playwright (`.recette-tmp/recette-retractable.mjs`, gitignoré, mot de passe hors code), compte
+`dirigeant.recette@elsatia-preview.invalid`, 8 captures nommées :
+
+| # | Fichier | État |
+| --- | --- | --- |
+| 1 | `01-menu-ouvert-rail-ouvert.png` | Devis, menu gauche ouvert + barre droite ouverte (défaut) |
+| 2 | `02-menu-compact-rail-compact.png` | Devis, menu gauche compact (icônes-badges) + barre droite compacte |
+| 3 | `03-menu-masque-rail-compact.png` | Devis, menu gauche masqué (bouton ☰ flottant) + barre compacte |
+| 4 | `04-saisie-inline-ligne.png` | Saisie directe dans la grille : désignation, quantité, unité, PU HT, remise |
+| 5 | `05-menu-ajouter-ancre.png` | Dropdown « Ajouter » ouvert, ancré exactement sous le bouton |
+| 6 | `06-planning-rail-ouvert.png` | Planning, barre droite ouverte, aucune sélection |
+| 7 | `07-planning-rail-compact.png` | Planning, barre droite compacte |
+| 8 | `08-mobile-devis.png` | 390 px : tiroir fermé, bouton « Actions », bandeau preview et bouton retour sans chevauchement |
+
+### 40.8 Points restant à Julien
+
+1. Validation visuelle de la saisie directe, du menu « Ajouter » ancré, de la barre droite colorée et du
+   menu gauche rétractable (3 états) — captures ci-dessus.
+2. Les points déjà ouverts restent inchangés : Grille ou Document par défaut, validation visuelle finale
+   Devis V2 et Planning V2 (barre droite, § 39), autorisation Production éventuelle.
+3. Badge visuel des entrées du menu compact (deux lettres, pas d'icônes réelles) : à confirmer à l'usage —
+   voir § 40.4.
