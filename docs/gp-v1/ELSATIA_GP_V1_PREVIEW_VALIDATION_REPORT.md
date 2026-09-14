@@ -1680,3 +1680,222 @@ enregistrement sans erreur, redirection vers la fiche, **374,00 €** de total d
 rechargement complet de la page (pas le même rendu client) — exactement 5 × 88 × 0,85. Le code applicatif
 déployé n'a pas changé dans ce lot (seule la base a été migrée) : l'alias de branche existant sert déjà la
 correction.
+
+## 39. Barre d'actions contextuelle droite type Batappli (2026-09-14, session autonome)
+
+### 39.1 Constat de départ : le composant existait déjà, ailleurs
+
+Avant d'écrire une ligne de code, audit du dépôt (même discipline que le correctif § 38) : une barre
+latérale contextuelle **existe déjà** — `src/components/actions/PanneauActions.tsx` (lot E, 2026-09-13) —
+et sert 8 fiches (client, devis, facture, chantier, fournisseur, commande, article, employé) : colonne
+fixe à droite sur ordinateur, bouton « Actions (n) » + feuille sur téléphone, actions indisponibles
+visibles et grisées avec motif accessible (`aria-disabled`, jamais `disabled`, motif au lecteur d'écran).
+
+Le planning avait eu ce même panneau (lot F), **retiré le 2026-09-13** (commit « planning without the
+permanent side panel ») avec ce message de Julien : *« Le panneau d'actions fixe (jugé lourd) disparaît :
+la page utilise toute sa largeur. »* Il n'avait ni repli, ni largeur compacte — toujours grand ouvert.
+
+Décision (principe : réutiliser plutôt que dupliquer, comme le correctif § 38 avait retiré un appel
+redondant plutôt que d'élargir des droits) : **étendre `PanneauActions`** d'un mode repliable (icônes
+seules, préférence mémorisée) plutôt que créer un second composant. Cela répond au point 1 de la demande
+(« éviter deux implémentations différentes Devis/Planning ») de la manière la plus stricte possible — un
+seul composant, déjà éprouvé sur 8 pages, dont le rendu par défaut (non repliable) est **inchangé au
+caractère près** (prouvé par `PanneauActions.test.ts`, voir § 39.6).
+
+**Point d'attention pour Julien** : la barre revient sur le planning sous une forme volontairement
+différente de celle retirée — repliable, largeur compacte (`lg:w-14` repliée contre `lg:w-60` fixe avant)
+— précisément pour répondre au motif du retrait (« lourd »). Mais c'est bien le même geste : remettre une
+colonne fixe à droite sur cet écran. À trancher à la validation visuelle (§ 39.10).
+
+### 39.2 Composant : `PanneauActions` étendu, pas remplacé
+
+Nouvelles props, toutes optionnelles (défaut = comportement d'avant, zéro changement pour les 8 fiches) :
+`pliable`, `cleStockageRepli`, `onRepliChange`, `testId`. Type `ActionContextuelle` (registre pur) enrichi
+d'un champ `icone?: string` optionnel (glyphe décoratif, `aria-hidden`, jamais la seule information —
+libellé toujours porté par `aria-label`/`title`/texte visible).
+
+Repliée : largeur `lg:w-14`, icône seule, `aria-label` = libellé complet, `title` = libellé + raccourci
+(ou + motif si indisponible). Bouton `‹`/`›` avec `aria-expanded`/`aria-controls`. Préférence lue après
+hydratation (`localStorage`, même schéma retardé que l'en-tête repliable § 36), écrite au bascule. Sur
+téléphone : **toujours** la feuille à libellés complets — jamais l'icône seule, jamais une grande barre
+verticale (exigence explicite de Julien, vérifiée par le scénario E2E 51).
+
+Pour ne pas recouvrir la grille, la page conteneuse (Devis, Planning) réserve la place réelle en fonction
+de l'état plié/déplié (`lg:pr-72` déplié, `lg:pr-20` replié — même technique `lg:pr-*` que celle retirée du
+planning avec l'ancien panneau, confirmé par `PlanningV2.test.ts`) : la barre est en `position:fixed`
+(comme avant) mais le contenu ne se fait jamais recouvrir, ni son ascenseur. Les dialogues natifs
+(`<dialog>`, déjà utilisés partout dans GP V1) restent au-dessus de la barre sans configuration
+particulière (couche native du navigateur).
+
+### 39.3 Devis (éditeur) — sections et actions
+
+La barre du devis est **additive** : la barre d'outils « Ajouter »/« Plus », Copier/Coller/Dupliquer,
+Grille/Document, Aperçu A4, PDF, Envoyer restent à l'identique, inchangés. La barre reprend les mêmes
+fonctions (mêmes callbacks que les boutons existants) sous forme de sections :
+
+| Section | Actions |
+| --- | --- |
+| **Créer** | Ligne libre, Article du catalogue, Ouvrage composé, Insérer un titre, Insérer un sous-total, Ajouter une remise (grisée sans le droit `modifier_remise`), Ajouter un commentaire |
+| **Modifier** | Copier, Coller, Dupliquer (grisés — motif « Sélectionnez d'abord... » — sans sélection ni ligne active), Annuler, Rétablir (grisés sans historique) |
+| **Documents** | Aperçu A4 (grisé en mode Document), PDF, Envoyer… (grisés — motif « Enregistrez d'abord le devis » — tant que le devis n'est pas encore créé) |
+| **Autres** | Colonnes affichées…, Recherche globale…, Passer en vue Document/Grille, Supprimer la sélection (danger, confirmation) |
+
+Aucune nouvelle exposition de coût : les actions sont structurelles (insertion, sélection, navigation),
+pas de nouvelle colonne ni de nouveau chiffre. La seule action gardée par un droit (`modifierRemise`) l'est
+déjà ailleurs dans l'éditeur — aucun nouveau seuil de permission introduit.
+
+*Lecture seule* : l'éditeur de devis (`/devis/[id]/modifier`) n'a pas de mode « consultation » distinct —
+y accéder, c'est pouvoir éditer les lignes ; seule l'action « Ajouter une remise » est gardée par un droit
+fin existant (`modifier_remise`), exactement comme le reste de l'éditeur. Aucune régression introduite ici.
+
+### 39.4 Planning — sections et actions
+
+Le menu « Actions ▾ » de la barre d'outils et le menu contextuel du bloc (clic droit, ⋯, Shift+F10)
+restent inchangés — même registre `actionsPlanning`, mêmes motifs. La barre latérale lit le **même**
+registre (évite toute divergence de droits) et l'affiche en continu, sans clic préalable :
+
+| Section (registre) | Actions | Filtrées de la barre |
+| --- | --- | --- |
+| Créer | Nouvel évènement | — |
+| Modifier | Modifier, Dupliquer, Affecter une équipe | *Déplacer*, *Changer l'horaire* — gestes de glisser, pas des clics : gardés au menu contextuel comme rappel du raccourci, absents de la barre |
+| Documents | Imprimer | — |
+| Voir aussi | Ouvrir le chantier, Ouvrir le client, Documents, Historique | — |
+| Autres | Supprimer (danger, confirmation) | — |
+
+Sans sélection : tout sauf « Nouvel évènement » et « Imprimer » porte le motif « Sélectionnez un évènement
+du planning. », lisible en infobulle et au lecteur d'écran. Sans le droit `gerer_planning` : « Nouvel
+évènement », « Modifier », « Supprimer » (et les autres actions liées) se grisent avec leur motif de droit,
+exactement le même registre que le menu contextuel déjà validé le 2026-09-13 (§ 36) — vérifié par un
+scénario E2E dédié (§ 39.7) et par une extension du test statique `PlanningV2.test.ts`.
+
+### 39.5 Responsive et repli
+
+- **≥ 1024 px (`lg`)** : colonne fixe à droite, `lg:w-60` dépliée / `lg:w-14` repliée (icônes) ; la grille
+  et l'aperçu A4 ne perdent que la largeur réservée (`lg:pr-72`/`lg:pr-20`), jamais recouverts.
+- **< 1024 px (tablette et téléphone)** : la colonne disparaît, remplacée par un bouton « Actions (n) » fixé
+  en bas d'écran, qui ouvre une feuille (`<dialog>`) à libellés complets — jamais une grande barre
+  verticale. C'est la limite de palier déjà en usage dans tout GP V1 (grille devis `hidden lg:block` / liste
+  mobile `lg:hidden`) : au-delà, aucune palier « tablette » séparé n'existe ailleurs dans l'application —
+  en introduire un ici aurait été incohérent avec le reste de l'interface. À 1440 et 1280 px, la barre
+  dépliée (240 px) laisse largement la place à la grille ; en dessous de `lg` (1024), c'est la feuille.
+- Préférence de repli mémorisée **par navigateur**, indépendamment entre Devis (`gp.devis.rail.v1`) et
+  Planning (`gp.planning.rail.v1`) — un utilisateur peut replier l'un et garder l'autre déplié.
+
+### 39.6 Accessibilité
+
+- Clavier : chaque action est un `<button>`/`<a>` natif, atteint par Tab dans l'ordre du DOM ; une action
+  indisponible reste **focusable** (`aria-disabled`, jamais `disabled`) pour que son motif soit lisible au
+  clavier — le même choix que les 8 fiches existantes, documenté dans `PanneauActions.tsx` depuis le lot E.
+- Tooltips : `title` = raccourci si disponible (repliée : libellé + raccourci), motif si indisponible.
+- Motifs indisponibles : toujours un texte humain (« Sélectionnez d'abord... », « Enregistrez d'abord le
+  devis... », « Votre poste ne permet pas... »), jamais un état muet ; doublé d'un `<span class="sr-only">`
+  pour le lecteur d'écran, comme sur les 8 fiches existantes.
+- Icônes : purement décoratives (`aria-hidden="true"`), jamais la seule information — le libellé reste
+  porté par `aria-label` (repliée) ou le texte visible (dépliée).
+- Bascule de repli : `aria-expanded`/`aria-controls`, `aria-label` explicite (« Réduire »/« Développer la
+  barre d'actions »).
+
+### 39.7 Tests
+
+**Unitaires** (`vitest run`, rendu serveur `renderToStaticMarkup`, même méthode que l'existant) :
+- `PanneauActions.test.ts` : 3 tests inchangés (non-régression du rendu par défaut) + 3 nouveaux (mode
+  repliable — bouton de repli, icônes, `data-testid`, largeur).
+- `EditeurDevisV2.test.ts` : 3 nouveaux tests (4 sections rendues, barre d'outils d'origine intacte, motifs
+  sans sélection/sans devis enregistré, remise grisée sans le droit).
+- `PlanningV2.test.ts` : 2 tests réécrits (le panneau existe désormais — assertion inversée, documentée) +
+  1 nouveau (motifs sans droit de gestion sur la barre).
+
+**E2E** (pile locale jetable, `tests/e2e/gp-v1-ux.spec.ts`, scénario 48 étendu + nouveau scénario 61,
+scénario 51 étendu) : sélection → Copier → Coller depuis la barre (2 lignes, `aria-rowcount` 4), motif
+sans sélection, repli mémorisé après rechargement, barre d'outils d'origine toujours fonctionnelle ;
+planning : « Modifier » depuis la barre ouvre la même fiche que le double clic, repli mémorisé ; mobile :
+feuille « Actions » à libellés complets sur devis et planning, pas de débordement horizontal.
+
+**Effet de bord corrigé** : la barre réutilise volontairement les mêmes libellés que la barre d'outils
+(« Copier », « Coller », « Annuler », « Rétablir », « Aperçu A4 », « Nouvel évènement »…) — cohérence
+voulue, pas une régression — mais cela crée deux éléments au même nom accessible sur la page. 6 anciens
+tests E2E qui ciblaient ces boutons sans les distinguer ont été mis à jour (`.first()` ou `exact: true`,
+selon le cas) : ils vérifient un comportement, pas un unique point d'entrée, et les deux déclenchent
+exactement la même fonction. Documenté en commentaire à chaque endroit corrigé.
+
+**Régression complète** : E2E principale `gp-v1-metier.spec.ts` **18/18**, E2E UX `gp-v1-ux.spec.ts`
+**7/7** (dont les 3 scénarios touchés par la barre), Vitest **2 441/2 448** (3 skip inchangés, 4 échecs
+d'un tour de suite sous charge — `xlsx`, remise Stripe legacy, webhook boutique — **tous sans rapport avec
+ce lot**, rejoués seuls : verts), lint **0 erreur**, typecheck **0 erreur**, build complet (`next build`,
+app + `apps/tools`) réussi, `verify:migrations` **293 migrations** (inchangé, aucune migration nouvelle —
+lot 100 % applicatif), `verify:secrets` propre.
+
+### 39.8 Performance (exigence explicite : 500/1 000 lignes devis, 400/1 000 évènements planning)
+
+Banc dédié rejoué (`tests/banc/performance/perf.banc.spec.ts`, vrais composants, données fictives,
+`file://`, aucune base) — la barre d'actions ne dépend, dans ses deux pages, que de la sélection courante
+(devis) ou de l'évènement sélectionné (planning), jamais du nombre de lignes/évènements : son rendu ne
+grossit donc pas avec le volume.
+
+| Devis | Chargement | Frappe (3 car.) | Tab | Frappe désignation | Défilement | Annuler/Rétablir |
+| --- | --- | --- | --- | --- | --- | --- |
+| 10 lignes | 167 ms | 7 ms | 17 ms | 15 ms | 106 ms | 47 ms |
+| 100 lignes | 159 ms | 4 ms | 52 ms | 12 ms | 111 ms | 88 ms |
+| 500 lignes | 189 ms | 5 ms (1 tâche > 50 ms) | 100 ms | 11 ms (2 tâches > 50 ms) | 120 ms (1 tâche > 50 ms) | 118 ms |
+
+| Planning (40 salariés) | Chargement | Sélection | Glisser-déposer | Filtre | Clavier (Ctrl+→) |
+| --- | --- | --- | --- | --- | --- |
+| 100 évènements | 178 ms | 24 ms | 340 ms | 28 ms | 181 ms |
+| 400 évènements | 423 ms | 36 ms | 411 ms | 26 ms | 261 ms |
+| 1 000 évènements | 941 ms | 55 ms | 774 ms | 27 ms | 605 ms |
+
+Aucune tâche longue nouvelle imputable à la barre (les quelques tâches > 50 ms à 500/1 000 relèvent du
+glisser-déposer et de la virtualisation de la grille, déjà présentes avant ce lot). **Verdict : aucune
+régression.**
+
+**Défaut d'infrastructure trouvé et corrigé en cours de route** : le banc de l'éditeur de devis ne
+disposait pas d'une doublure pour `next/link` (le banc du planning en avait déjà une, depuis le lot F) —
+`PanneauActions` peut rendre un `<Link>` pour ses actions à `href` (comme les 8 fiches existantes) ; sans
+doublure, `next/link` embarque un fragment interne (`has-base-path.js`) qui référence `process.env` — objet
+absent d'un module autonome sans Node. Corrigé en ajoutant la même doublure que celle déjà utilisée par le
+planning (`tests/banc/editeur-v2/lien-simule.tsx`) ; sans effet sur l'application réelle (Next.js fournit
+`next/link` normalement) — seulement sur ce banc de mesure autonome.
+
+### 39.9 Captures sur la preview déployée (branche uniquement, aucune Production)
+
+Recette Playwright (`.recette-tmp/recette-rail.mjs`, gitignoré, mot de passe hors code) sur l'alias de
+branche, compte `dirigeant.recette@elsatia-preview.invalid`, 9 captures nommées :
+
+| Fichier | État |
+| --- | --- |
+| `01-devis-rail-1440-depliee.png` | Devis, nouveau devis, barre dépliée, 4 sections visibles |
+| `02-devis-rail-1440-selection.png` | Devis, 2 lignes sélectionnées, « Copier » actif |
+| `03-devis-rail-1440-repliee.png` | Devis, barre repliée (icônes), barre d'outils d'origine intacte à côté |
+| `04-planning-rail-1440-aucune-selection.png` | Planning, aucune sélection, motifs visibles |
+| `05-planning-rail-1440-selection.png` | Planning, évènement sélectionné, « Modifier » actif |
+| `06-devis-rail-1280.png` | 1 280 px : aucun débordement horizontal |
+| `07-planning-rail-tablette-820.png` | 820 px : barre fixe absente, bouton feuille présent (palier `lg`) |
+| `08-devis-rail-mobile-390-feuille.png` | Feuille tactile, libellés complets, jamais l'icône seule |
+| `09-planning-rail-mobile-390-feuille.png` | Idem planning, aucun débordement horizontal |
+
+**Défaut trouvé et corrigé grâce à la capture n° 1** : à 1440×900, la barre dépliée est la première zone
+dense de bureau à occuper réellement le coin bas droit — les bulles flottantes « Aide »/« Assistant IA »
+(masquées seulement sur mobile jusqu'ici, cf. § 37) recouvraient sa section « Documents ». Corrigé
+(`src/app/mobile.css`) en étendant le même mécanisme d'effacement à cette zone précise, sans toucher aux
+autres écrans denses de bureau (facture, réserves…). Reconfirmé sur la preview après correctif : capture
+n° 1 refaite, bulles absentes, section « Documents » entièrement visible.
+
+**Observation, non corrigée (hors périmètre de ce lot)** : sur la capture n° 4, l'action « Supprimer »
+(planning, groupe « danger ») apparaît en texte rouge alors qu'elle est indisponible (rien sélectionné) —
+son style de couleur « danger » l'emporte visuellement sur le style « grisé ». C'est un comportement de
+`PanneauActions.tsx` antérieur à ce lot (le même code de classes CSS existait déjà pour les 8 fiches en
+production) : l'action reste correctement inaccessible et expliquée (`aria-disabled`, motif), seule la
+teinte est trompeuse. Signalé pour arbitrage plutôt que corrigé en silence, puisqu'un correctif toucherait
+aussi les 8 fiches déjà validées et déployées, hors de la demande de ce lot.
+
+### 39.10 Points restant à Julien
+
+1. **Validation visuelle** : la barre du devis et celle du planning, aux deux états (dépliée, repliée), en
+   sélection et sans, sur les 4 gabarits (1440, 1280, tablette, mobile) — captures ci-dessus.
+2. **Planning** : confirmer que cette version compacte et repliable répond à l'objection « lourd » qui avait
+   fait retirer l'ancien panneau — sinon, la barre reste additive et se retire sans effet sur le reste (menu
+   « Actions ▾ » et menu contextuel restent la voie principale).
+3. **Cosmétique** (§ 39.9) : corriger ou non la couleur de « Supprimer » indisponible sur les 8 fiches +
+   cette barre, dans un lot séparé.
+4. Les 4 points déjà identifiés en § 38 restent inchangés et ouverts : Grille ou Document par défaut,
+   validation visuelle Devis V2, validation visuelle Planning V2, autorisation Production.
