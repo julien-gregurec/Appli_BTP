@@ -152,3 +152,11 @@
 @media (max-width: 767px) {
   body[data-ui-dense="1"] .bulle-flottante { display: none !important; }
 }
+
+/* Barre d'actions contextuelle repliable (GP V1, 2026-09-14) : elle occupe elle aussi le coin bas droit
+   sur grand écran — la seule zone dense, à ce jour, où « Desktop non concerné » ci-dessus ne tient plus
+   (constaté en recette preview : « Aide »/« Assistant » chevauchent la section « Documents »/« Autres » de
+   la barre à 1440×900). Même traitement, étendu à cette zone précise : on l'efface, elle réapparaît à la
+   fermeture. Les autres zones denses de bureau (facture, réserves…) gardent le comportement inchangé —
+   elles n'ont pas cette barre. */
+body[data-ui-dense="1"]:has([data-panneau-actions][data-repliee]) .bulle-flottante { display: none !important; }
