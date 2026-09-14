@@ -20,6 +20,21 @@ export type ActionsServeur = Record<string, (formData: FormData) => void | Promi
 
 const ORDRE: GroupeAction[] = ["creer", "modifier", "transformer", "document", "navigation", "danger"];
 
+/**
+ * Couleur du pictogramme par type d'action (GP V1, style « Batappli », 2026-09-14) : un repère visuel
+ * immédiat, pas un arc-en-ciel — cohérent avec les tons ELSATIA déjà en usage (or `#c9a24a` du menu).
+ * Ne s'applique qu'aux actions qui portent une icône (`a.icone`) — les 8 fiches existantes n'en ont
+ * pas dans leur registre et gardent donc un rendu texte identique à avant.
+ */
+const COULEUR_GROUPE: Record<GroupeAction, string> = {
+  creer: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+  modifier: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300",
+  transformer: "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300",
+  document: "bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300",
+  navigation: "bg-teal-100 text-teal-700 dark:bg-teal-500/15 dark:text-teal-300",
+  danger: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300",
+};
+
 export function PanneauActions({ titre, actions, formActions = {}, handlers = {}, contexte, pliable = false, cleStockageRepli, onRepliChange, testId }: {
   titre: string;
   actions: ActionContextuelle[];
@@ -138,8 +153,15 @@ export function PanneauActions({ titre, actions, formActions = {}, handlers = {}
 }
 
 function Action({ a, formAction, handler, compact, testId }: { a: ActionContextuelle; formAction?: (formData: FormData) => void | Promise<void>; handler?: () => void; compact: boolean; testId?: string }) {
-  const classes = `flex min-h-10 w-full items-center gap-2 rounded px-2 text-sm ${compact ? "justify-center" : "text-left"} ${a.danger ? "text-red-700" : ""} ${a.disponible ? "hover:bg-neutral-100 dark:hover:bg-neutral-800" : "cursor-not-allowed text-neutral-400 dark:text-neutral-600"}`;
-  const icone = a.icone && <span aria-hidden="true" className="shrink-0">{a.icone}</span>;
+  // Le rouge « danger » ne s'affiche que sur une action RÉELLEMENT exécutable : sinon il se lisait comme
+  // une alerte alors que l'action est simplement grisée-expliquée (bogue préexistant du composant,
+  // corrigé ici en même temps que la couleur des icônes — même fichier, même occasion).
+  const classes = `flex min-h-11 w-full items-center gap-2 rounded-md px-2 text-sm ${compact ? "justify-center" : "text-left"} ${a.disponible && a.danger ? "text-red-700 dark:text-red-400" : ""} ${a.disponible ? "hover:bg-neutral-100 dark:hover:bg-neutral-800" : "cursor-not-allowed text-neutral-400 dark:text-neutral-600"}`;
+  const icone = a.icone && (
+    <span aria-hidden="true" className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-base font-semibold ${a.disponible ? COULEUR_GROUPE[a.groupe] : "bg-neutral-100 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-600"}`}>
+      {a.icone}
+    </span>
+  );
   const raccourci = !compact && a.raccourci ? <span className="ml-auto text-[10px] text-neutral-400">{a.raccourci}</span> : null;
   // Repliée, la barre ne montre que l'icône : le libellé complet reste porté par `aria-label` et `title`
   // (lecteur d'écran et infobulle), jamais seulement par le glyphe décoratif.

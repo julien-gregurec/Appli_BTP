@@ -494,3 +494,86 @@ test("61. barre d'actions contextuelle du devis : motif sans sélection, Copier/
   await aller(page, "/devis/nouveau");
   await expect(page.getByTestId("rail-devis")).toHaveAttribute("data-repliee", "1");
 });
+
+test("62. menu « Ajouter » ancré au bouton (portail), jamais tout en bas de page, même sous une barre d'outils collante", async ({ page }) => {
+  await connexion(page, USERS.adminA);
+  await aller(page, "/devis/nouveau");
+  await page.getByRole("combobox", { name: "Client", exact: true }).selectOption({ index: 1 });
+  // En-tête repliée : la barre d'outils devient `sticky` près du haut, reproduisant exactement les
+  // conditions du bogue signalé par Julien (`backdrop-blur` détournait le positionnement `fixed` du
+  // menu vers ce conteneur au lieu de la fenêtre).
+  await page.keyboard.press("Control+Shift+H");
+  const boutonAjouter = page.getByTestId("menu-ajouter");
+  await boutonAjouter.click();
+  const menu = page.getByTestId("menu-contextuel");
+  await expect(menu).toBeVisible();
+  const [rBouton, rMenu] = await Promise.all([boutonAjouter.boundingBox(), menu.boundingBox()]);
+  if (!rBouton || !rMenu) throw new Error("mesures indisponibles");
+  expect(Math.abs(rMenu.y - (rBouton.y + rBouton.height))).toBeLessThan(20);
+  expect(Math.abs(rMenu.x - rBouton.x)).toBeLessThan(20);
+  await page.keyboard.press("Escape");
+  // Même vérification pour « Plus », deuxième bouton de la même barre.
+  const boutonPlus = page.getByTestId("menu-plus");
+  await boutonPlus.click();
+  const menu2 = page.getByTestId("menu-contextuel");
+  const [rBouton2, rMenu2] = await Promise.all([boutonPlus.boundingBox(), menu2.boundingBox()]);
+  if (!rBouton2 || !rMenu2) throw new Error("mesures indisponibles");
+  expect(Math.abs(rMenu2.y - (rBouton2.y + rBouton2.height))).toBeLessThan(20);
+  await page.keyboard.press("Escape");
+});
+
+test("63. menu gauche à trois états (ouvert, compact, masqué), préférence mémorisée, réaffichage", async ({ page }) => {
+  await connexion(page, USERS.adminA);
+  // Pas « /dashboard » : la fiche « Personnalisez votre tableau de bord » (première connexion) y ouvre un
+  // dialogue modal sans rapport avec ce scénario — n'importe quelle autre page authentifiée convient.
+  await aller(page, "/clients");
+  const aside = page.locator("#navigation-mobile");
+  let boite = await aside.boundingBox();
+  expect(boite?.width ?? 0).toBeGreaterThan(200);
+  // 1. Réduit en icônes.
+  await page.getByTestId("menu-reduire").click();
+  await page.waitForTimeout(300);
+  boite = await aside.boundingBox();
+  expect(boite?.width ?? 0).toBeLessThan(80);
+  await expect(page.getByTestId("menu-developper")).toBeVisible();
+  // 2. Mémorisé après rechargement.
+  await page.reload();
+  await attendreHydratation(page);
+  boite = await aside.boundingBox();
+  expect(boite?.width ?? 0).toBeLessThan(80);
+  // 3. Masque complètement.
+  await page.getByTestId("menu-developper").click();
+  await page.waitForTimeout(300);
+  await page.getByTestId("menu-masquer").click();
+  await page.waitForTimeout(300);
+  boite = await aside.boundingBox();
+  expect(boite?.width ?? 0).toBeLessThanOrEqual(1);
+  await expect(page.getByTestId("menu-reafficher")).toBeVisible();
+  // 4. Mémorisé aussi masqué ; le contenu récupère l'espace.
+  await page.reload();
+  await attendreHydratation(page);
+  await expect(page.getByTestId("menu-reafficher")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Tableau de bord" })).toHaveCount(0);
+  // 5. Réaffiche.
+  await page.getByTestId("menu-reafficher").click();
+  await page.waitForTimeout(300);
+  boite = await aside.boundingBox();
+  expect(boite?.width ?? 0).toBeGreaterThan(200);
+  await expect(page.getByRole("link", { name: "Tableau de bord" })).toBeVisible();
+});
+
+test("64. repli du menu gauche ne remonte pas l'éditeur de devis : la saisie non validée est préservée", async ({ page }) => {
+  await connexion(page, USERS.adminA);
+  await aller(page, "/devis/nouveau");
+  await page.getByRole("combobox", { name: "Client", exact: true }).selectOption({ index: 1 });
+  await ajouterLigne(page, "libre");
+  const d = cellule(page, 0, "designation");
+  await d.fill("Ne doit pas disparaître au repli");
+  // Pas de Tab : la valeur reste dans l'état local du champ, jamais encore validée dans l'état React de
+  // l'éditeur — un remontage de l'arbre la perdrait, une simple réduction du menu gauche ne le doit pas
+  // (Sidebar et l'éditeur sont deux sous-arbres React distincts, cf. `(app)/layout.tsx`).
+  await page.getByTestId("menu-reduire").click();
+  await page.waitForTimeout(300);
+  await expect(d).toHaveValue("Ne doit pas disparaître au repli");
+  await page.getByTestId("menu-developper").click();
+});

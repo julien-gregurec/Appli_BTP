@@ -20,7 +20,10 @@ export function BadgePreview() {
       data-testid="badge-preview"
       data-devis-v2={devis ? "1" : "0"}
       data-planning-v2={planning ? "1" : "0"}
-      className="pointer-events-none fixed bottom-2 left-2 z-[60] rounded-md border border-amber-400 bg-amber-50/95 px-2 py-1 font-mono text-[11px] leading-tight text-amber-900 shadow print:hidden"
+      // `bottom-16` en dessous de `lg` (1024 px) : sous ce palier, la barre d'actions contextuelle
+      // (GP V1, § 39) pose un bouton « Actions » sur toute la largeur en bas d'écran — le badge ne doit
+      // jamais s'y superposer visuellement, même sans bloquer le clic (`pointer-events-none`).
+      className="pointer-events-none fixed bottom-16 left-2 z-[60] rounded-md border border-amber-400 bg-amber-50/95 px-2 py-1 font-mono text-[11px] leading-tight text-amber-900 shadow print:hidden lg:bottom-2"
     >
       GP V1 PREVIEW · Devis V2 {devis ? "actif" : "INACTIF"} · Planning V2 {planning ? "actif" : "INACTIF"}
     </div>

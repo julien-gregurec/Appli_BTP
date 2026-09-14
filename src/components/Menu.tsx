@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 /**
  * Menus légers (GP V1, attente « Batappli ») : un menu déroulant sous un bouton de barre d'outils, ou un
@@ -50,40 +51,64 @@ export function ListeMenu({ elements, onFermer, etiquette }: { elements: Element
   );
 }
 
+type RectAncre = { top: number; bottom: number; left: number; right: number };
+
 /** Bouton de barre d'outils ouvrant un menu déroulant. */
 export function BoutonMenu({ libelle, elements, className, titre, testId }: { libelle: ReactNode; elements: ElementMenu[]; className?: string; titre?: string; testId?: string }) {
-  // Positionné en coordonnées de fenêtre (`fixed`) : indépendant des conteneurs collants (barre d'outils
-  // `sticky`) et des défilements, donc stable pour l'œil comme pour les tests.
-  const [ouvert, setOuvert] = useState<{ x: number; y: number } | null>(null);
+  // L'ancre (rectangle du bouton, coordonnées de fenêtre) sert à ancrer le menu SOUS le bouton et à le
+  // faire basculer au-dessus s'il manque de place — recalculée au défilement/redimensionnement pour
+  // rester collée au bouton, y compris dans une barre d'outils `sticky`.
+  const [ancre, setAncre] = useState<RectAncre | null>(null);
   const bouton = useRef<HTMLButtonElement>(null);
-  const fermer = useCallback(() => setOuvert(null), []);
+  const fermer = useCallback(() => setAncre(null), []);
   useEffect(() => {
-    if (!ouvert) return;
-    const suivre = () => { const r = bouton.current?.getBoundingClientRect(); if (r) setOuvert({ x: r.left, y: r.bottom + 4 }); };
+    if (!ancre) return;
+    const suivre = () => { const r = bouton.current?.getBoundingClientRect(); if (r) setAncre({ top: r.top, bottom: r.bottom, left: r.left, right: r.right }); };
     window.addEventListener("scroll", suivre, true);
     window.addEventListener("resize", suivre);
     return () => { window.removeEventListener("scroll", suivre, true); window.removeEventListener("resize", suivre); };
-  }, [ouvert]);
+  }, [ancre]);
   return (
     <>
-      <button ref={bouton} type="button" onClick={(e) => { if (ouvert) { setOuvert(null); return; } const r = e.currentTarget.getBoundingClientRect(); setOuvert({ x: r.left, y: r.bottom + 4 }); }} aria-haspopup="menu" aria-expanded={ouvert !== null} title={titre} data-testid={testId} className={className}>{libelle} <span aria-hidden="true">▾</span></button>
-      {ouvert && <MenuContextuel x={ouvert.x} y={ouvert.y} elements={elements} etiquette={typeof libelle === "string" ? libelle : "Menu"} onFermer={fermer} />}
+      <button ref={bouton} type="button" onClick={(e) => { if (ancre) { setAncre(null); return; } const r = e.currentTarget.getBoundingClientRect(); setAncre({ top: r.top, bottom: r.bottom, left: r.left, right: r.right }); }} aria-haspopup="menu" aria-expanded={ancre !== null} title={titre} data-testid={testId} className={className}>{libelle} <span aria-hidden="true">▾</span></button>
+      {ancre && <MenuContextuel x={ancre.left} y={ancre.bottom + 4} ancre={ancre} elements={elements} etiquette={typeof libelle === "string" ? libelle : "Menu"} onFermer={fermer} />}
     </>
   );
 }
 
-/** Menu contextuel positionné au pointeur (clic droit) ou sous un bouton « ⋯ ». */
-export function MenuContextuel({ x, y, elements, etiquette, onFermer }: { x: number; y: number; elements: ElementMenu[]; etiquette: string; onFermer: () => void }) {
+/**
+ * Menu contextuel positionné au pointeur (clic droit), sous un bouton « ⋯ », ou ancré à un bouton de
+ * barre d'outils (`ancre`, depuis `BoutonMenu`). Rendu dans un portail direct sur `<body>` : un menu
+ * `fixed` posé DANS un conteneur avec `backdrop-filter`/`filter`/`transform` (la barre d'outils collante
+ * du devis, `backdrop-blur`) se positionnerait relativement à ce conteneur au lieu de la fenêtre — c'est
+ * la cause exacte du « menu Ajouter tout en bas de la page » constatée par Julien (2026-09-14). Le
+ * portail rend ce bogue impossible, ici et pour tout futur menu.
+ */
+export function MenuContextuel({ x, y, ancre, elements, etiquette, onFermer }: { x: number; y: number; ancre?: RectAncre; elements: ElementMenu[]; etiquette: string; onFermer: () => void }) {
   const [pos, setPos] = useState({ x, y });
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = ref.current; if (!el) return;
     const r = el.getBoundingClientRect();
-    setPos({ x: Math.max(4, Math.min(x, window.innerWidth - r.width - 4)), y: Math.max(4, Math.min(y, window.innerHeight - r.height - 4)) });
-  }, [x, y]);
-  return (
+    const marge = 4;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let left = x, top = y;
+    if (ancre) {
+      // Sous le bouton par défaut ; au-dessus si la place manque en dessous ET qu'il y en a assez au-dessus.
+      const assezEnDessous = ancre.bottom + r.height + marge <= vh;
+      const assezAuDessus = ancre.top - r.height - marge >= 0;
+      top = assezEnDessous || !assezAuDessus ? ancre.bottom + marge : ancre.top - r.height - marge;
+      // Aligné à gauche du bouton par défaut ; aligné à droite si la place manque à droite.
+      left = ancre.left + r.width + marge <= vw ? ancre.left : Math.max(marge, ancre.right - r.width);
+    }
+    // Filet de sécurité : jamais hors écran, quelle que soit l'origine du point demandé.
+    setPos({ x: Math.max(marge, Math.min(left, vw - r.width - marge)), y: Math.max(marge, Math.min(top, vh - r.height - marge)) });
+  }, [x, y, ancre]);
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div ref={ref} className="fixed z-40" style={{ left: pos.x, top: pos.y }} data-testid="menu-contextuel">
       <ListeMenu elements={elements} etiquette={etiquette} onFermer={onFermer} />
-    </div>
+    </div>,
+    document.body,
   );
 }
