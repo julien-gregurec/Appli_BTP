@@ -1528,3 +1528,155 @@ Performance (Devis 100/500/1000 lignes, planning 400/1000 évènements) **non re
 changement de ce lot ne touche les chemins de calcul, de virtualisation ou d'enregistrement (RPC
 inchangées) — les chiffres du § 36.17 restent valables (frappe → totaux 41/51/70 ms, planning 400/1000
 évènements 5,8/7,8 s).
+
+## 38. Correctif — droits d'exécution de `recalc_totaux_facture` (2026-09-14, migration 296)
+
+Défaut préexistant signalé par Julien (repéré en testant le correctif du § 37.11) : l'enregistrement
+d'une facture brouillon existante échouait avec `permission denied for function recalc_totaux_facture`.
+Corrigé AVANT toute validation Production, comme demandé, sur `elsatia-preview` uniquement.
+
+### 38.1 Audit exact (avant toute modification)
+
+Base jetable locale, ledger 295, requêtes directes sur `pg_proc` / `pg_policies` / `information_schema` :
+
+| Fonction | Propriétaire | SECURITY | `search_path` | EXECUTE `anon` | EXECUTE `authenticated` | EXECUTE `service_role` |
+| --- | --- | --- | --- | --- | --- | --- |
+| `recalc_totaux_facture(uuid)` | postgres | DEFINER | `public` (figé) | non | **non** (révoqué, 255) | non |
+| `trg_recalc_facture()` (déclencheur) | postgres | DEFINER | `public` | non | non | non |
+| `trg_recalc_facture_apres_remise()` (déclencheur) | postgres | DEFINER | `public` | non | non | non |
+| `modifier_facture_brouillon(uuid,jsonb,jsonb)` | postgres | **INVOKER** | `public` | non | oui (déjà, inchangé) | non |
+| `creer_facture_avancee(...)` (dernière définition active) | postgres | DEFINER | `public` | non | oui | non |
+| `creer_facture_depuis_devis(uuid,text)` (dernière définition active) | postgres | DEFINER | `public` | non | oui | non |
+| *Modèle de comparaison* `recalc_totaux_devis(uuid)` | postgres | DEFINER | `public` | non | **non** (révoqué, 255 — même traitement) | non |
+
+Recherche exhaustive des appels à `recalc_totaux_facture(` dans les migrations (hors définitions et
+`REVOKE`) : exactement **3 sites**. Deux sont internes à des déclencheurs SECURITY DEFINER (sûrs, quel
+que soit l'appelant d'origine — un déclencheur SECURITY DEFINER s'exécute, pour tout ce qu'il appelle en
+interne, avec les privilèges de son propriétaire). Le troisième est la dernière ligne de
+`modifier_facture_brouillon` (SECURITY INVOKER) : cet appel s'exécute avec les privilèges de L'APPELANT
+(`authenticated`), qui a perdu EXECUTE sur `recalc_totaux_facture` avec la migration
+`20260902000255_acl_reconciliation_v1` (même révocation, dans le même lot, que `recalc_totaux_devis` —
+politique déclarée et délibérée, pas un oubli isolé).
+
+Or `lignes_factures` porte déjà un déclencheur `AFTER INSERT OR UPDATE OR DELETE FOR EACH ROW` posé en
+20260710000006 (`recalc_facture_apres_ligne` → `trg_recalc_facture` → `recalc_totaux_facture`), SECURITY
+DEFINER. `modifier_facture_brouillon` vide puis réinsère les lignes de la facture : ce déclencheur
+recalcule donc déjà les totaux à chaque ligne touchée, correctement (sa dernière exécution — sur la
+dernière ligne insérée, ou sur la dernière ligne supprimée s'il n'en reste aucune — voit l'état à jour de
+la transaction). **L'appel explicite en fin de fonction était strictement redondant.**
+
+Comparaison au modèle devis (`20260913000292_gp_v1_devis_totaux_par_instruction`, cité par Julien) :
+`recalc_totaux_devis` a exactement le même traitement de droits, et n'est jamais appelée que depuis des
+déclencheurs SECURITY DEFINER — jamais depuis une RPC exposée non privilégiée. C'est le modèle voulu de
+cette base : les fonctions de recalcul internes ne sont exécutables ni en RPC ni en appel direct, seul le
+déclencheur y accède.
+
+### 38.2 Principe de moindre privilège — décision
+
+**Aucun `GRANT EXECUTE` n'a été ajouté, à aucun rôle.** `recalc_totaux_facture` ne vérifie aucune
+appartenance d'entreprise (elle ne prend qu'un `facture_id`) : lui accorder EXECUTE sur `authenticated`
+l'aurait exposée comme RPC PostgREST appelable avec l'identifiant de facture de n'importe qui, y compris
+d'une AUTRE entreprise — un risque que la fonction elle-même ne bloque pas. Le correctif retire, dans une
+nouvelle migration, le seul appel direct non privilégié — celui-là seul était fautif — et documente
+explicitement (par des `REVOKE ALL` idempotents, à l'image de la 292) que ces fonctions restent
+inaccessibles à tout rôle client. Zéro nouveau privilège pour zéro nouveau rôle : le principe de moindre
+privilège appliqué au sens strict — retirer un accès en trop plutôt qu'en ajouter un.
+
+Une alternative envisagée puis écartée : rendre `modifier_facture_brouillon` elle-même SECURITY DEFINER
+(modèle de la 293, `enregistrer_devis_brouillon_v2`). Écartée parce que ce modèle exige de RÉÉCRIRE en
+gardes explicites (membre actif, permission, appartenance du client et du chantier à l'entreprise) tout ce
+que la RLS fait aujourd'hui gratuitement pour cette fonction — une bien plus grande surface de
+changement, pour un problème qui n'est ni un problème de performance (la 293 en corrigeait un, mesuré,
+sur des devis à centaines de lignes ; une facture par ce formulaire historique en compte rarement plus
+qu'une poignée) ni un problème de droits mal posés (les droits actuels, via RLS, sont corrects — seul un
+appel redondant les contournait par accident).
+
+### 38.3 Migration `20260914000296_gp_v1_recalc_totaux_facture_execution.sql`
+
+- `create or replace function public.modifier_facture_brouillon(...)` : corps identique à la version de la
+  20260912000282, MOINS la dernière ligne (`perform public.recalc_totaux_facture(...)`). Signature
+  inchangée : les droits déjà accordés (`authenticated` seul) sont conservés automatiquement par Postgres,
+  sans avoir besoin de les redéclarer.
+- `revoke all on function public.recalc_totaux_facture(uuid) / trg_recalc_facture() /
+  trg_recalc_facture_apres_remise() from public, anon, authenticated, service_role;` — idempotent
+  (n'ôte rien qui soit déjà accordé, vérifié par l'audit), documentation explicite de l'intention.
+- Ne modifie ni ne renumérote aucune migration historique (282, 255 inchangées). Aucune donnée métier
+  touchée.
+
+### 38.4 Tests SQL de droits — `supabase/tests/correctif_recalc_totaux_facture_execution.test.sql` (34/34)
+
+| Preuve | Résultat |
+| --- | --- |
+| `recalc_totaux_facture` / les deux déclencheurs : EXECUTE toujours refusé à `anon`, `authenticated`, `service_role` | ✅ |
+| `modifier_facture_brouillon` : droits inchangés (`authenticated` seul) | ✅ |
+| Même politique que `recalc_totaux_devis` (modèle) | ✅ |
+| **Utilisateur autorisé** (comptable A : `gerer_factures`, PAS administrateur) enregistre une facture existante — quantité, prix, remise, TVA — sans erreur de permission ; totaux exacts (405,00 HT / 22,28 TVA / 427,28 TTC pour 3 × 150 € − 10 % à 5,5 %) ; persistance après relecture | ✅ |
+| Cas limite : vider toutes les lignes d'une facture retombe à zéro totaux, sans erreur | ✅ |
+| **Utilisateur non autorisé** (ouvrier A : membre actif, sans `gerer_factures`) : refusé (« Facture introuvable », RLS), totaux et lignes inchangés — aucun contournement | ✅ |
+| **`anon`** : refus d'exécution avant toute évaluation RLS (42501) | ✅ |
+| **Autre entreprise** (comptable B, `gerer_factures` chez B) : ne voit pas la facture de A, dans les deux sens (A↔B) — aucune fuite, aucune ligne étrangère insérée | ✅ |
+| **Droits « coûts »** : hors sujet par construction — ni `factures` ni `lignes_factures` ne portent de colonne de coût, marge ou prix d'achat (vérifié sur le schéma) ; le correctif ne peut donc exposer aucune donnée de coût à personne | ✅ |
+
+Contre-épreuve : la définition d'AVANT correctif (avec l'appel redondant restauré) a été réappliquée sur
+la même base et rejouée contre cette suite : **8 échecs**, avec exactement le message d'origine
+(`42501: permission denied for function recalc_totaux_facture`) sur le test de l'utilisateur autorisé —
+la suite détecte bien la régression qu'elle est censée prévenir. Le correctif a ensuite été réappliqué :
+retour à 34/34.
+
+### 38.5 Facture existante, facture nouvelle, transformation devis → facture (exigences 5-7)
+
+- **Facture existante** : scénario E2E `9b` ajouté (`tests/e2e/gp-v1-metier.spec.ts`, suite à la 9) —
+  ouvre une facture brouillon réelle issue d'une transformation de devis, modifie quantité (6), prix
+  (37 €), remise (10 %) et TVA (5,5 %) sur une ligne, enregistre via le bouton applicatif réel : aucune
+  alerte, ligne recalculée à 199,80 € HT, persistée après une navigation fraîche, PDF régénéré sans
+  régression (200, `application/pdf`, > 1 Ko). Rejoué aussi en direct au niveau SQL avec un vrai
+  navigateur sur une facture à 6 lignes : mêmes résultats.
+- **Facture nouvelle** : `creer_facture_depuis_devis` (SECURITY DEFINER, non concernée par le défaut)
+  rejouée après le correctif — création réussie — puis la facture fraîchement créée immédiatement modifiée
+  via `modifier_facture_brouillon` : recalcul correct (4 × 25 € − 5 % = 95,00 HT, TVA 20 % = 19,00, TTC
+  114,00), aucune erreur de permission.
+- **Devis → facture avec ouvrage, remise, sous-total** : couverte par la suite pgTAP existante
+  `gp_devis_v2_catalogue_ouvrages.test.sql` § H (conversion d'un devis à ouvrage, remise globale reprise,
+  lignes rattachées à leur ouvrage, `modifier_facture_brouillon` refuse explicitement d'aplatir une
+  facture à ouvrages) — rejouée intacte dans la répétition générale ci-dessous, 0 régression.
+
+### 38.6 Fresh / Upgrade / réapplication (exigence 10)
+
+Harnais `ELSATIA-STACKS/train-v3-dbtest`, bases jetables, aucune Production :
+
+| Contrôle | Résultat |
+| --- | --- |
+| Fresh 1 → 296 (293 migrations) | 84 fichiers pgTAP, **2 377 ok, 0 not ok, 0 ERROR** |
+| Upgrade : Fresh 1 → 295, puis 296 seule appliquée par-dessus | `authenticated` sans EXECUTE sur `recalc_totaux_facture` avant ET après (aucun nouveau droit) ; pgTAP identique : **2 377 ok, 0 not ok, 0 ERROR** |
+| Réapplication de la 296 sur une base déjà à 296 | `CREATE FUNCTION` + 3 × `REVOKE`, aucune erreur — idempotente |
+
+Fresh et Upgrade produisent un état strictement identique (même décompte pgTAP), migrations historiques
+non modifiées.
+
+### 38.7 Suite complète (non-régression)
+
+E2E principale **18/18** (dont le nouveau 9b), E2E UX **6/6**, banc éditeur (non concerné, inchangé),
+Vitest **2 436 réussis** (1 délai dépassé sous charge, `xlsx.test.ts`, déjà connu — rejoué seul : vert),
+lint **0 erreur**, typecheck **0 erreur**, `verify:migrations` **293 migrations valides**,
+`verify:secrets` propre, `git diff --check` propre.
+
+### 38.8 Application preview uniquement (exigence 11)
+
+Migration `20260914000296` appliquée UNIQUEMENT sur `elsatia-preview` (`pgvvpqyjziyapbbkydmc`) via
+`supabase db push --linked`, projet lié vérifié avant toute écriture (`supabase/.temp/project-ref` =
+la preview, jamais `exhvuzegsefmoguxoiak`). Aucune Production touchée.
+
+**Ledger** (`supabase migration list --linked`) : `20260914000296` passe de `remote: ""` à
+`remote: "20260914000296"` — 293 migrations désormais en phase entre local et distant, aucun écart.
+
+**Droits vérifiés directement sur la preview** (requête en lecture seule) : identiques à l'audit local —
+`recalc_totaux_facture` / `trg_recalc_facture` / `trg_recalc_facture_apres_remise` toujours sans EXECUTE
+pour `anon`, `authenticated`, `service_role` ; `modifier_facture_brouillon` inchangée
+(`authenticated` seul).
+
+**Preuve en direct sur la preview déployée** (compte `dirigeant.recette@elsatia-preview.invalid`, facture
+brouillon réelle « Peinture » du chantier Lefebvre) : quantité, prix et remise modifiés (5 × 88 € − 15 %),
+enregistrement sans erreur, redirection vers la fiche, **374,00 €** de total de ligne confirmé après un
+rechargement complet de la page (pas le même rendu client) — exactement 5 × 88 × 0,85. Le code applicatif
+déployé n'a pas changé dans ce lot (seule la base a été migrée) : l'alias de branche existant sert déjà la
+correction.
