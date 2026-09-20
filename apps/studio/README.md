@@ -1,4 +1,4 @@
-# ELSATIA Studio — Lots A, B et C
+# ELSATIA Studio
 
 Application autonome dans `apps/studio`, port 3030. Contrats purs dans `packages/studio-domain`. Le Lot A couvre compte ELSATIA/Supabase, workspaces personnels/professionnels, membres, rôles, onboarding et RLS. Le Lot B ajoute import direct TUS signé, bibliothèque privée et réconciliation ; le Lot C complète la gestion des projets et de leurs références média. Aucun moteur vidéo ni dépendance métier Gestion Pro.
 
@@ -117,3 +117,15 @@ Qualification finale : [rapport D-bis](../../ELSATIA-STUDIO-V1-LOT-D-FINAL-QUALI
 La section Vidéo exportée du projet lance maintenant un vrai rendu via le worker séparé `../../workers/studio-video`. Après installation de ses dépendances, le gate complet exécute **18 scénarios A–E, deux fois sur deux bases fraîches**, avec son Redis local dédié. Le mode individuel exécute aussi les 18 scénarios. `render-migration-check.mjs` valide fresh 257, rollback 256, données D, upgrade/réapplication 257.
 
 Le Web reste en profil standard 1080p. `STUDIO_RENDER_INTERNAL_PREVIEW=1`, uniquement côté serveur, sélectionne la demi-résolution pour les recettes. La queue/FFmpeg ne tournent jamais dans Next. Voir le [README worker](../../workers/studio-video/README.md), le [contrat](../../ELSATIA-STUDIO-RENDER-CONTRACT.md) et le [rapport E](../../ELSATIA-STUDIO-V1-LOT-E-REPORT.md). La CI rapide conserve les 14 scénarios A–D et ajoute les vrais rendus unitaires courts ; la qualification complète E est un workflow manuel distinct.
+
+## Lots de finalisation (nuit du 2026-09-20)
+
+Détail, preuves et statuts : `docs/qualification/ELSATIA_STUDIO_FINALISATION_MASTER_LEDGER.md` et `ELSATIA_STUDIO_NIGHT_LOTS_REPORT.md` (racine du dépôt). Nouveautés d'exploitation :
+
+- `STUDIO_ENABLED=0|false|off` : interrupteur général (503 partout). Ne **jamais** définir `STUDIO_RENDER_INTERNAL_PREVIEW` hors recette (force des rendus 540×960).
+- Table `studio_render_limits` : `admission_open`, plafonds de rendus actifs/horaires/journaliers, modifiables par l'exploitant.
+- Colonne `studio_workspaces.render_watermark` : filigrane serveur, positionné par l'exploitant seulement.
+- Réconciliation Storage à distance : `STUDIO_RECONCILE_ALLOW_REMOTE_HOST=<hôte exact>` (dry-run par défaut, `--apply` explicite).
+- Redirections Auth à autoriser : `/auth/callback`, `/auth/confirm`, `/auth/recovery`.
+- Qualification : `node scripts/e2e-gate.mjs` (base Lot H, contrôles A→H, puis `post-h-migration-check.mjs`) ; recette pleine taille opt-in : `STUDIO_ACCEPTANCE=1 npx playwright test` contre un serveur démarré sans `STUDIO_RENDER_INTERNAL_PREVIEW`. Sur ce Mac : `STUDIO_E2E_CHANNEL=chrome` ; attendre la fin de `runtime-check.mjs ready` (le jeton de sonde expire au bout d'une heure).
+
