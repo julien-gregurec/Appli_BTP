@@ -88,7 +88,7 @@ Méthode : 28 capacités critiques ; QUALIFIED = 1, WORKING-UNQUALIFIED/PARTIAL 
 | R02 | Reset mot de passe | 0 | 1 | E2E réel PASS |
 | R03 | Confirmation e-mail | 0,5 | 0,5 | non prouvée en distant |
 | R04 | Workspaces | 1 | 1 | |
-| R05 | Membres/invitations utilisables | 0,5 | 0,5 | pas d'invitation par e-mail |
+| R05 | Membres/invitations utilisables | 0,5 | 1 | V2 : invitation par e-mail (lien haché, 7 j, usage unique, réservé à l'adresse, révocable) — pgTAP 36 + E2E ; envoi prouvé sur Mailpit local seulement |
 | R06 | Projets | 1 | 1 | |
 | R07 | Upload TUS + limites | 1 | 1 | |
 | R08 | Cycle de vie du quota / purge | 0,5 | 0,5 | purge Production non planifiée |
@@ -99,21 +99,21 @@ Méthode : 28 capacités critiques ; QUALIFIED = 1, WORKING-UNQUALIFIED/PARTIAL 
 | R13 | Rendu réel | 1 | 1 | |
 | R14 | Profils 720/1080 prouvés | 0 | 0,5 | 1080 prouvé pleine taille (acceptation) ; 720p : dimensions SQL seulement, rendu 720 non joué |
 | R15 | Admission/anti-abus rendu | 0 | 1 | |
-| R16 | Musique importée | 0 | 0 | non démarré |
+| R16 | Musique importée | 0 | 1 | V2 : import audio, volume/fondus, coupe/boucle, remplacement/retrait, fichier manquant refusé ; pgTAP 37, worker, E2E, 60 s (piste 120 s coupée) et 90 s (piste 25 s bouclée) en 1080×1920 avec énergie audio mesurée |
 | R17 | Brand Kit | 0 | 1 | |
 | R18 | Preview/téléchargement | 1 | 1 | |
 | R19 | Partage révocable | 0 | 1 | |
-| R20 | Watermark / plans | 0 | 0,5 | mécanisme qualifié, politique non décidée |
+| R20 | Watermark / plans | 0 | 1 | V2 : Q-003 tranchée — filigrane configurable par espace côté serveur (défaut : aucun) ; le filigrane fait partie du fichier rendu, donc un espace configuré le porte aussi sur ses liens publics ; pas de dérivée filigranée dédiée par lien (post-V1) |
 | R21 | Métering d'usage | 0 | 1 | registre + résumé ; aucune facturation |
 | R22 | Isolation tenant/RLS | 1 | 1 | |
-| R23 | Légal / consentement | 0 | 0 | Q-002 |
-| R24 | RGPD suppression/export | 0 | 0 | Q-008 |
+| R23 | Légal / consentement | 0 | 0,5 | V2 : pages `/legal/*`, pied de page, case de consentement versionnée ; **textes = LEGAL REVIEW REQUIRED**, non publiables |
+| R24 | RGPD suppression/export | 0 | 0,5 | V2 : suppression de compte technique qualifiée (pgTAP 44, E2E : stockage vidé, Auth supprimé, bloqué si propriétaire d'espace partagé, voisin intact) ; **export des données absent**, durées légales à valider |
 | R25 | Observabilité web | 0 | 0,5 | journal sans PII, pas d'alerte |
 | R26 | E2E Strasbourg exact (10+3, 1080) | 0,5 | 0,5 | format/durée/images prouvés ; **musique et logo absents** de la recette |
 | R27 | E2E Croatie exact (20+5, 1080) | 0,5 | 0,5 | format/durée/images prouvés ; **dates EXIF et chapitres par journée non couverts** |
 | R28 | Mobile/WebKit qualifié | 0,5 | 0,5 | Chromium seul ; Q-005 |
 
-**Score initial : 12,5 / 28 = 44,6 %. Score final : 20 / 28 = 71,4 %.**
+**Score initial : 12,5 / 28 = 44,6 %. Score fin de nuit 1 : 20 / 28 = 71,4 %. Score après reprise V2 : 23 / 28 = 82,1 %.**
 
 ## QUEUE
 

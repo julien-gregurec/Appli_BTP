@@ -109,7 +109,10 @@ reset role;
 set constraints studio_owner_membership_fk immediate;
 select throws_ok(format('delete from public.studio_workspace_members where workspace_id=%L and role=%L',current_setting('studio.test.a')::uuid,'owner'), '23503', 'update or delete on table "studio_workspace_members" violates foreign key constraint "studio_owner_membership_fk" on table "studio_workspaces"', 'Contrainte DB protège owner même en écriture privilégiée');
 select ok((select bool_and(relrowsecurity) from pg_class where oid in ('public.studio_workspaces'::regclass,'public.studio_workspace_members'::regclass)), 'RLS activée sur les deux tables');
-select is((select count(*) from public.utilisateurs_entreprises where utilisateur_id::text like '51000000-%'), 0::bigint, 'Aucune entreprise créée pour les utilisateurs Studio');
+-- In the dedicated Studio project the Gestion Pro table does not exist at all (nothing can be created there).
+select is(case when to_regclass('public.utilisateurs_entreprises') is null then 0::bigint
+ else (xpath('/row/c/text()',query_to_xml('select count(*) as c from public.utilisateurs_entreprises where utilisateur_id::text like ''51000000-%''',false,true,'')))[1]::text::bigint end,
+ 0::bigint, 'Aucune entreprise créée pour les utilisateurs Studio');
 select ok(not has_function_privilege('anon','public.studio_create_workspace(text,text)','EXECUTE'), 'Anon ne peut exécuter studio_create_workspace(text,text)');
 select ok(not has_function_privilege('anon','public.studio_rename_workspace(uuid,text)','EXECUTE'), 'Anon ne peut exécuter studio_rename_workspace(uuid,text)');
 select ok(not has_function_privilege('anon','public.studio_archive_workspace(uuid)','EXECUTE'), 'Anon ne peut exécuter studio_archive_workspace(uuid)');
