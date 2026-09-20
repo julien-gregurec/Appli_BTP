@@ -1,4 +1,4 @@
-# ELSATIA STUDIO — Lots de la nuit du 2026-09-20 (S1 → J2)
+# ELSATIA STUDIO — Lots de la nuit du 2026-09-20 (S1 → S5, J1, I, J2)
 
 Base : `214d47fd` (lots A→H). Train : `integration/studio-commercial-ready-v1`. Aucun push, aucune action Production/Preview/DNS/Stripe. Les statuts de test sont ceux du ledger maître (PASS / FAIL / BLOCKED / NOT RUN) ; ce document décrit **ce qui a été construit et pourquoi**.
 
@@ -42,6 +42,10 @@ Base : `214d47fd` (lots A→H). Train : `integration/studio-commercial-ready-v1`
 - Liens de partage : seul le SHA-256 du secret est stocké ; exports finals uniquement ; 1 à 30 jours ; 5 liens actifs maximum par export ; editor+ créent/révoquent, viewer et autre tenant refusés ; la table n'a aucun droit client ; résolution réservée au service_role, sans champ tenant dans la réponse (la clé de stockage, donc l'URL signée d'une minute, contient toutefois les UUID opaques d'espace et de projet : aucun nom, e-mail ni identifiant de compte). Page publique `/s/[token]` : sans session, `noindex`, `no-referrer`, URL signée d'une minute renouvelée par le lecteur.
 - Filigrane : `studio_workspaces.render_watermark` (défaut faux, positionné par l'exploitant) copié dans chaque snapshot par un déclencheur ; le worker dessine « ELSATIA Studio » sur l'encodage final uniquement si le snapshot le demande. **Aucune politique commerciale décidée** (Q-003).
 - **Migration** : `20260920070000_studio_shares_watermark.sql`.
+
+## S5 — Miniatures et retrait d'un média utilisé
+- `GET /api/media/assets/{id}/thumbnail` : WebP 320 px généré à la demande depuis l'original privé (autorisation RLS, pixels bornés, orientation EXIF appliquée), privé et mis en cache par le navigateur ; la bibliothèque l'affiche dans un `div role="img"` (l'aperçu complet reste le seul `<img>` de la carte). **Conception pilote** : aucune dérivée stockée ; coût CPU/E-S à chaque première vue d'une image lourde.
+- Retirer un média référencé par le montage actif répond 409 avec un message clair ; la bibliothèque demande confirmation puis relance avec `force`. Le refus inter-tenant reste prioritaire.
 
 ## Qualification et outillage
 - Le gate `e2e-gate.mjs` construit désormais la base **Lot H** (`setup --lot-h`), exécute les contrôles A→H inchangés, puis `post-h-migration-check.mjs` : upgrade des migrations post-H sur des données H, retour arrière inverse (SQL par migration qui refuse de détruire des données utilisateur), réapplication, données identiques octet pour octet.
