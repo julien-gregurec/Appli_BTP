@@ -2,6 +2,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import {
+  parseBrandKitInput,
   canManageWorkspace,
   isStudioId,
   isStudioRole,
@@ -182,4 +183,44 @@ export async function updatePassword(form: FormData) {
   const { error } = await client.auth.updateUser({ password });
   if (error) failure("/reset-password", notices.passwordFailed);
   redirect("/dashboard");
+}
+export async function saveBrandKit(form: FormData) {
+  const { workspace, membership } = await getActiveStudioWorkspace(
+    field(form, "workspace"),
+  );
+  const path = `/brand-kit?workspace=${workspace.id}`;
+  if (!canManageWorkspace(membership.role)) failure(path, notices.denied);
+  let data: ReturnType<typeof parseBrandKitInput>;
+  try {
+    data = parseBrandKitInput({
+      company_name: field(form, "company_name"),
+      tagline: field(form, "tagline"),
+      phone: field(form, "phone"),
+      website: field(form, "website"),
+      email: "",
+      logo_asset_id: field(form, "logo") || null,
+    });
+  } catch {
+    failure(path, notices.brandInvalid);
+  }
+  const revision = Number(field(form, "revision"));
+  const client = await createStudioClient();
+  const { error } = await client.rpc("studio_save_brand_kit", {
+    p_workspace: workspace.id,
+    p_data: data,
+    p_revision: Number.isInteger(revision) && revision > 0 ? revision : null,
+  });
+  if (error)
+    failure(
+      path,
+      error.code === "40001"
+        ? notices.brandConflict
+        : error.code === "22023" && /Logo/.test(error.message)
+          ? notices.brandLogoInvalid
+          : error.code === "22023"
+            ? notices.brandInvalid
+            : notices.brandFailed,
+    );
+  revalidatePath("/", "layout");
+  redirect(`${path}&saved=1`);
 }

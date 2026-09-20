@@ -1,4 +1,6 @@
 import type {
+  BrandKitInput,
+  StudioBrandKit,
   StudioMediaAnalysis,
   ProjectAsset,
   StudioRenderJob,
@@ -207,6 +209,41 @@ export type Database = {
           p_role: string | null;
         };
         Returns: undefined;
+      };
+      studio_get_brand_kit: {
+        Args: { p_workspace: string };
+        Returns: StudioBrandKit | null;
+      };
+      studio_save_brand_kit: {
+        Args: {
+          p_workspace: string;
+          p_data: BrandKitInput;
+          p_revision: number | null;
+        };
+        Returns: StudioBrandKit;
+      };
+      studio_list_brand_logo_candidates: {
+        Args: { p_workspace: string };
+        Returns: {
+          id: string;
+          original_filename: string;
+          project_id: string;
+          project_name: string;
+        }[];
+      };
+      studio_attach_brand_logo: {
+        Args: { p_project: string };
+        Returns: string;
+      };
+      studio_workspace_usage: {
+        Args: { p_workspace: string; p_since?: string };
+        Returns: {
+          since: string;
+          exports: number;
+          render_seconds: number;
+          media_bytes: number;
+          render_bytes: number;
+        };
       };
     };
   };

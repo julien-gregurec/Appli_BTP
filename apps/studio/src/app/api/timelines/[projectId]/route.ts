@@ -58,7 +58,12 @@ async function handle(
         throw new MediaError("Origine refusée.", 403);
       const b = await bodyOf(request);
       if (b.action === "generate")
-        output = await generateStudioTimeline(projectId, b.template);
+        output = await generateStudioTimeline(
+          projectId,
+          b.template,
+          undefined,
+          b.attachBrandLogo === true,
+        );
       else {
         const timeline = string(b.timeline);
         if (b.action === "activate")

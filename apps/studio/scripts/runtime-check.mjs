@@ -1,5 +1,5 @@
 /** Local-only functional readiness and stability probes. No business-test retries. */
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
@@ -122,8 +122,12 @@ async function postgres() {
     ],
     { encoding: "utf8", timeout: 10000 },
   );
-  if (Number(output.trim()) !== 260)
-    throw Error("Expected 260 applied migrations");
+  // Every migration file of the disposable project must be applied (260 at Lot H, plus post-H lots).
+  const expected = readdirSync(
+    join(state.directory, "supabase/migrations"),
+  ).filter((name) => name.endsWith(".sql")).length;
+  if (Number(output.trim()) !== expected)
+    throw Error(`Expected ${expected} applied migrations`);
 }
 async function waitReady(check) {
   const end = Date.now() + 120000;
@@ -136,7 +140,7 @@ async function waitReady(check) {
       // A real denial or wrong identity/role is not a startup transport failure.
       if (
         (error.status >= 400 && error.status < 500) ||
-        /mismatch|Expected 260/.test(error.message)
+        /mismatch|Expected \d+ applied/.test(error.message)
       )
         throw error;
       last = error;
