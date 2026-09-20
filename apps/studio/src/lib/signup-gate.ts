@@ -1,26 +1,19 @@
-/** Registration gate: no public opening yet (decision Q-007). Pure, unit-tested. */
+/**
+ * Registration gate. The decision itself lives in the database (`studio_signup_permitted`, table
+ * `studio_signup_policy`, default `closed`) and is enforced by the Auth hook `before_user_created`, by
+ * `studio_create_workspace` and by the `signup` server action: one source of truth, none of it in the
+ * environment. This module only holds the fail-closed reading of what the database answers.
+ */
 export type SignupMode = "open" | "allowlist" | "closed";
-export function parseSignupMode(value: string | undefined): SignupMode {
-  const v = (value ?? "open").trim().toLowerCase();
-  return v === "allowlist" || v === "closed" ? v : "open";
+/** Anything that is not a known mode — including an absent value — is `closed`. */
+export function parseSignupMode(value: string | null | undefined): SignupMode {
+  const v = (value ?? "").trim().toLowerCase();
+  return v === "open" || v === "allowlist" ? v : "closed";
 }
-/** Entries are full addresses or `@domain.tld`; comparison is case-insensitive. */
-export function isAllowlisted(email: string, list: string | undefined): boolean {
-  const address = email.trim().toLowerCase();
-  const domain = address.slice(address.lastIndexOf("@"));
-  return (list ?? "")
-    .split(",")
-    .map((entry) => entry.trim().toLowerCase())
-    .filter(Boolean)
-    .some((entry) => entry === address || (entry.startsWith("@") && entry === domain));
-}
-export function signupDecision(
-  mode: SignupMode,
-  email: string,
-  allowlist: string | undefined,
-  hasInvitation: boolean,
+/** Only an explicit `true` from the database admits; an RPC error, a null or any other value refuses. */
+export function interpretSignupPermitted(
+  data: unknown,
+  error: unknown,
 ): boolean {
-  if (mode === "open") return true;
-  if (hasInvitation) return true;
-  return mode === "allowlist" && isAllowlisted(email, allowlist);
+  return !error && data === true;
 }

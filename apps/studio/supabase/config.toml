@@ -291,9 +291,14 @@ max_frequency = "5s"
 # inactivity_timeout = "8h"
 
 # This hook runs before a new user is created and allows developers to reject the request based on the incoming user object.
-# [auth.hook.before_user_created]
-# enabled = true
-# uri = "pg-functions://postgres/auth/before-user-created-hook"
+# Studio: closes direct `POST /auth/v1/signup` calls (public key) with the same policy as the signup action
+# (`studio_signup_permitted`, table `studio_signup_policy`, closed by default). Dedicated Studio project ONLY:
+# never enable it on a project shared with another application (it would refuse their sign-ups too).
+# On the hosted project this file is not applied: set the hook in Dashboard > Authentication > Hooks
+# (Before User Created -> Postgres function public.studio_hook_before_user_created).
+[auth.hook.before_user_created]
+enabled = true
+uri = "pg-functions://postgres/public/studio_hook_before_user_created"
 
 # This hook runs before a token is issued and allows you to add additional claims based on the authentication method used.
 # [auth.hook.custom_access_token]

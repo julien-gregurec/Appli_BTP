@@ -1,0 +1,1 @@
+../../../../supabase/migrations/20260921070000_studio_signup_policy.sql

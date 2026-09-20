@@ -54,6 +54,34 @@ function state() {
     throw new Error("Not a Studio disposable project.");
   return value;
 }
+// Registration is closed by default (table studio_signup_policy, enforced by the Auth hook and by
+// studio_create_workspace). The E2E fixtures create accounts through auth.signUp directly and the pgTAP fixtures
+// insert users then call studio_create_workspace, so this DISPOSABLE stack opens the policy explicitly;
+// nothing here bypasses the gate and no other environment is touched.
+function openDisposableSignupPolicy(projectId) {
+  const opened = spawnSync(
+    "docker",
+    [
+      "exec",
+      `supabase_db_${projectId}`,
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      // Historical --lot-x baselines are built without the policy table.
+      "do $$ begin if to_regclass('public.studio_signup_policy') is not null then update public.studio_signup_policy set mode='open', updated_at=now(); end if; end $$",
+    ],
+    { encoding: "utf8" },
+  );
+  if (opened.status !== 0)
+    throw new Error(
+      `Could not open the disposable signup policy: ${opened.stderr ?? ""}`,
+    );
+}
 const action = process.argv[2];
 if (action === "setup") {
   if (existsSync(statePath))
@@ -168,6 +196,7 @@ if (action === "setup") {
   );
   if (new URL(status.API_URL).hostname !== "127.0.0.1")
     throw new Error("Non-loopback API rejected.");
+  openDisposableSignupPolicy(projectId);
   writeFileSync(
     join(app, ".env.local"),
     `NEXT_PUBLIC_STUDIO_URL=http://127.0.0.1:3030\nNEXT_PUBLIC_SUPABASE_URL=${status.API_URL}\nNEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${status.ANON_KEY}\nSTUDIO_STORAGE_SERVICE_KEY=${status.SERVICE_ROLE_KEY}\n`,
@@ -177,7 +206,8 @@ if (action === "setup") {
     `Disposable Studio instance ready: ${projectId}. Public API and server-only storage credentials were written to the ignored local environment to apps/studio/.env.local.`,
   );
 } else if (action === "test-db") {
-  const { directory } = state();
+  const { directory, projectId } = state();
+  openDisposableSignupPolicy(projectId);
   run(
     [
       "test",

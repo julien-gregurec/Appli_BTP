@@ -1,37 +1,49 @@
-import { describe, it, expect } from "vitest";
-import {
-  isAllowlisted,
-  parseSignupMode,
-  signupDecision,
-} from "../src/lib/signup-gate";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+vi.mock("server-only", () => ({}));
+const rpc = vi.fn();
+vi.mock("../src/lib/storage-admin", () => ({ storageAdmin: () => ({ rpc }) }));
+import { interpretSignupPermitted, parseSignupMode } from "../src/lib/signup-gate";
+import { registrationGate } from "../src/lib/entitlement";
 
-describe("signup gate", () => {
-  it("parses the mode and falls back to open only for unknown/absent values", () => {
-    expect(parseSignupMode(undefined)).toBe("open");
+describe("signup gate (fail-closed)", () => {
+  it("absent or unknown mode is closed, never open", () => {
+    expect(parseSignupMode(undefined)).toBe("closed");
+    expect(parseSignupMode(null)).toBe("closed");
+    expect(parseSignupMode("")).toBe("closed");
+    expect(parseSignupMode("nonsense")).toBe("closed");
     expect(parseSignupMode(" CLOSED ")).toBe("closed");
+    expect(parseSignupMode("Open")).toBe("open");
     expect(parseSignupMode("allowlist")).toBe("allowlist");
-    expect(parseSignupMode("nonsense")).toBe("open");
   });
-  it("matches full addresses and @domain entries, case-insensitively", () => {
-    const list = "Alice@Example.com, @elsatia.fr ,";
-    expect(isAllowlisted("alice@example.com", list)).toBe(true);
-    expect(isAllowlisted("bob@ELSATIA.FR", list)).toBe(true);
-    expect(isAllowlisted("bob@example.com", list)).toBe(false);
-    expect(isAllowlisted("x@evil-elsatia.fr", list)).toBe(false);
-    expect(isAllowlisted("x@sub.elsatia.fr", list)).toBe(false);
-    expect(isAllowlisted("alice@example.com", undefined)).toBe(false);
-    expect(isAllowlisted("alice@example.com", "")).toBe(false);
+  it("only an explicit true without error admits", () => {
+    expect(interpretSignupPermitted(true, null)).toBe(true);
+    expect(interpretSignupPermitted(false, null)).toBe(false);
+    expect(interpretSignupPermitted(null, null)).toBe(false);
+    expect(interpretSignupPermitted("true", null)).toBe(false);
+    expect(interpretSignupPermitted(1, null)).toBe(false);
+    expect(interpretSignupPermitted(true, { code: "42501" })).toBe(false);
   });
-  it("closed refuses everyone except invited addresses", () => {
-    expect(signupDecision("closed", "a@b.fr", "@b.fr", false)).toBe(false);
-    expect(signupDecision("closed", "a@b.fr", "@b.fr", true)).toBe(true);
+});
+
+describe("registrationGate.canSignUp (same predicate as the database hook)", () => {
+  beforeEach(() => {
+    rpc.mockReset();
   });
-  it("allowlist admits listed addresses and invited ones", () => {
-    expect(signupDecision("allowlist", "a@b.fr", "@b.fr", false)).toBe(true);
-    expect(signupDecision("allowlist", "a@c.fr", "@b.fr", false)).toBe(false);
-    expect(signupDecision("allowlist", "a@c.fr", "@b.fr", true)).toBe(true);
+  it("asks the database function with the normalized address", async () => {
+    rpc.mockResolvedValue({ data: true, error: null });
+    expect(await registrationGate.canSignUp("  A@B.FR ")).toBe(true);
+    expect(rpc).toHaveBeenCalledWith("studio_signup_permitted", { p_email: "a@b.fr" });
   });
-  it("open admits everyone", () => {
-    expect(signupDecision("open", "a@c.fr", undefined, false)).toBe(true);
+  it("refuses when the database refuses", async () => {
+    rpc.mockResolvedValue({ data: false, error: null });
+    expect(await registrationGate.canSignUp("a@b.fr")).toBe(false);
+  });
+  it("refuses on an RPC error (no fail-open)", async () => {
+    rpc.mockResolvedValue({ data: null, error: { message: "boom" } });
+    expect(await registrationGate.canSignUp("a@b.fr")).toBe(false);
+  });
+  it("refuses when the call itself throws (no fail-open)", async () => {
+    rpc.mockImplementation(() => Promise.reject(new Error("network")));
+    expect(await registrationGate.canSignUp("a@b.fr")).toBe(false);
   });
 });

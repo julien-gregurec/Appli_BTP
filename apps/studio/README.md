@@ -54,6 +54,7 @@ Ce stop ne concerne que l’instance enregistrée dans `.local-test.json`. Il co
 ## Parcours et sécurité
 
 - `/login`, `/signup` : compte Supabase commun ; aucun profil/mot de passe dupliqué.
+- Inscription **fermée par défaut**, imposée par la base et non par la seule action `signup` : table `studio_signup_policy` (`closed` | `allowlist` | `open`, liste d'adresses ou `@domaine`), fonction `studio_signup_permitted(email)` (invitation en attente toujours admise) appelée par le hook Auth `before_user_created` (`supabase/config.toml` en local ; **à régler dans Authentication > Hooks sur le projet hébergé**, projet Studio dédié uniquement), par `studio_create_workspace` et par l'action `signup`. Changer la politique = SQL (`update public.studio_signup_policy set mode = 'allowlist', allowlist = array['@exemple.fr']`). Les variables `STUDIO_SIGNUP_MODE` / `STUDIO_SIGNUP_ALLOWLIST` sont retirées (ignorées). Les fixtures E2E ouvrent la politique de la pile jetable explicitement (`local-test.mjs setup`).
 - `/auth/callback` : échange PKCE ; `/auth/confirm` : confirmation token_hash de type email.
 - `/onboarding` : bouton d’ouverture/création du workspace personnel, RPC idempotente et verrouillée.
 - `/dashboard?workspace=UUID` : workspace actif explicite. Sans paramètre, premier workspace autorisé ; sans aucun workspace, onboarding. Un UUID fourni mais inaccessible donne une page 404, jamais un autre workspace par défaut.
