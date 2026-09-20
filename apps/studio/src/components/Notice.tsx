@@ -1,7 +1,10 @@
+import { knownNotice } from "../lib/notices";
+/** Renders only messages from the fixed notice list; anything else in the URL is ignored. */
 export default function Notice({ message }: { message?: string }) {
-  return message ? (
+  const text = knownNotice(message);
+  return text ? (
     <p role="alert" className="notice">
-      {message.slice(0, 300)}
+      {text}
     </p>
   ) : null;
 }

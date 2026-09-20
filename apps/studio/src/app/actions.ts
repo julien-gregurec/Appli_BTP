@@ -10,6 +10,7 @@ import {
 } from "@elsatia/studio-domain";
 import { createStudioClient } from "../lib/supabase";
 import { studioOrigin } from "../lib/config";
+import { notices } from "../lib/notices";
 import {
   createPersonalStudioWorkspace,
   createStudioWorkspace,
@@ -28,13 +29,13 @@ export async function login(form: FormData) {
   const email = field(form, "email").trim();
   const password = field(form, "password");
   if (!email || email.length > 254 || password.length > 256)
-    failure("/login", "Identifiants invalides.");
+    failure("/login", notices.invalidCredentials);
   const client = await createStudioClient();
   const { error } = await client.auth.signInWithPassword({ email, password });
   if (error)
     failure(
       "/login",
-      "Connexion impossible. Vérifiez vos identifiants et la confirmation de votre email.",
+      notices.loginFailed,
     );
   redirect(safeStudioDestination(field(form, "next")));
 }
@@ -49,7 +50,7 @@ export async function signup(form: FormData) {
   )
     failure(
       "/signup",
-      "Indiquez un email valide et un mot de passe de 12 caractères minimum.",
+      notices.signupInvalid,
     );
   const client = await createStudioClient();
   const { data, error } = await client.auth.signUp({
@@ -60,7 +61,7 @@ export async function signup(form: FormData) {
   if (error)
     failure(
       "/signup",
-      "Inscription indisponible. Réessayez ou connectez-vous avec votre compte ELSATIA.",
+      notices.signupUnavailable,
     );
   if (data.session) redirect("/onboarding");
   redirect("/login?notice=confirmation");
@@ -68,7 +69,7 @@ export async function signup(form: FormData) {
 export async function logout() {
   const client = await createStudioClient();
   const { error } = await client.auth.signOut({ scope: "local" });
-  if (error) failure("/dashboard", "Déconnexion impossible. Réessayez.");
+  if (error) failure("/dashboard", notices.logoutFailed);
   redirect("/login");
 }
 export async function onboarding() {
@@ -78,7 +79,7 @@ export async function onboarding() {
   } catch {
     failure(
       "/onboarding",
-      "Création impossible. Réessayez dans quelques instants.",
+      notices.onboardingFailed,
     );
   }
   redirect(`/dashboard?workspace=${id}`);
@@ -90,7 +91,7 @@ export async function createProfessional(form: FormData) {
   } catch {
     failure(
       "/settings",
-      "Création impossible : nom de 1 à 100 caractères et 20 espaces maximum.",
+      notices.workspaceCreateFailed,
     );
   }
   redirect(`/dashboard?workspace=${id}`);
@@ -100,19 +101,19 @@ export async function renameWorkspace(form: FormData) {
     field(form, "workspace"),
   );
   const path = `/settings?workspace=${workspace.id}`;
-  if (!canManageWorkspace(membership.role)) failure(path, "Accès refusé.");
+  if (!canManageWorkspace(membership.role)) failure(path, notices.denied);
   let name: string;
   try {
     name = workspaceName(field(form, "name"));
   } catch {
-    failure(path, "Nom invalide.");
+    failure(path, notices.invalidName);
   }
   const client = await createStudioClient();
   const { error } = await client.rpc("studio_rename_workspace", {
     p_workspace_id: workspace.id,
     p_name: name,
   });
-  if (error) failure(path, "Modification refusée ou espace indisponible.");
+  if (error) failure(path, notices.renameFailed);
   revalidatePath("/", "layout");
   redirect(path);
 }
@@ -122,12 +123,12 @@ export async function archiveWorkspace(form: FormData) {
   );
   const path = `/settings?workspace=${workspace.id}`;
   if (membership.role !== "owner" || field(form, "confirm") !== workspace.name)
-    failure(path, "Saisissez le nom exact de l’espace pour confirmer.");
+    failure(path, notices.archiveConfirm);
   const client = await createStudioClient();
   const { error } = await client.rpc("studio_archive_workspace", {
     p_workspace_id: workspace.id,
   });
-  if (error) failure(path, "Suppression refusée ou espace indisponible.");
+  if (error) failure(path, notices.archiveFailed);
   revalidatePath("/", "layout");
   redirect("/dashboard");
 }
@@ -143,7 +144,7 @@ export async function changeMember(form: FormData) {
     !isStudioId(userId) ||
     (role !== "remove" && !isStudioRole(role))
   )
-    failure(path, "Modification refusée.");
+    failure(path, notices.memberDenied);
   const client = await createStudioClient();
   const { error } = await client.rpc("studio_set_member", {
     p_workspace_id: workspace.id,
@@ -153,8 +154,32 @@ export async function changeMember(form: FormData) {
   if (error)
     failure(
       path,
-      "Modification refusée : rôle protégé ou membre indisponible.",
+      notices.memberFailed,
     );
   revalidatePath("/", "layout");
   redirect(path);
+}
+export async function requestPasswordReset(form: FormData) {
+  const email = field(form, "email").trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254)
+    failure("/forgot-password", notices.resetInvalid);
+  const client = await createStudioClient();
+  // The outcome is deliberately ignored: the answer never reveals whether an account exists.
+  await client.auth.resetPasswordForEmail(email, {
+    redirectTo: `${studioOrigin()}/auth/recovery`,
+  });
+  redirect("/forgot-password?notice=sent");
+}
+export async function updatePassword(form: FormData) {
+  const password = field(form, "password");
+  if (password.length < 12 || password.length > 256)
+    failure("/reset-password", notices.passwordInvalid);
+  if (password !== field(form, "confirm"))
+    failure("/reset-password", notices.passwordMismatch);
+  const client = await createStudioClient();
+  const { data } = await client.auth.getUser();
+  if (!data.user) failure("/login", notices.invalidLink);
+  const { error } = await client.auth.updateUser({ password });
+  if (error) failure("/reset-password", notices.passwordFailed);
+  redirect("/dashboard");
 }

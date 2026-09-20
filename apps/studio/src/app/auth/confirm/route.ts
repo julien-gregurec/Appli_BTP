@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createStudioClient } from "../../../lib/supabase";
 import { studioOrigin } from "../../../lib/config";
+import { notices } from "../../../lib/notices";
 export async function GET(request: NextRequest) {
   const token_hash = request.nextUrl.searchParams.get("token_hash");
   const type = request.nextUrl.searchParams.get("type");
@@ -14,6 +15,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL("/dashboard", studioOrigin()));
   }
   return NextResponse.redirect(
-    new URL("/login?error=Lien+invalide+ou+expiré", studioOrigin()),
+    new URL(
+      `/login?error=${encodeURIComponent(notices.invalidLink)}`,
+      studioOrigin(),
+    ),
   );
 }

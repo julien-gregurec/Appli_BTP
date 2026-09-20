@@ -60,6 +60,9 @@ export default async function Login({
         <Submit>Se connecter</Submit>
       </form>
       <p>
+        <Link href="/forgot-password">Mot de passe oublié ?</Link>
+      </p>
+      <p>
         Première visite ? <Link href="/signup">Créer mon compte</Link>
       </p>
     </main>

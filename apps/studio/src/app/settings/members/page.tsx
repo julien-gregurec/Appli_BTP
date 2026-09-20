@@ -7,6 +7,12 @@ import {
   getStudioWorkspaceMembers,
 } from "../../../lib/workspaces";
 import { changeMember } from "../../actions";
+const roleLabels: Record<string, string> = {
+  owner: "Propriétaire",
+  admin: "Administrateur",
+  editor: "Éditeur",
+  viewer: "Lecteur",
+};
 export default async function Members({
   searchParams,
 }: {
@@ -20,10 +26,15 @@ export default async function Members({
       <p className="eyebrow">MEMBRES</p>
       <h1>Chacun sa place.</h1>
       <p>
-        Le propriétaire est protégé. Le transfert de propriété et les
-        invitations par email viendront dans un prochain lot.
+        Le propriétaire est protégé. Pour ajouter quelqu’un, demandez-lui son
+        identifiant de compte (affiché ci-dessous sur sa propre page).
       </p>
       <Notice message={params.error} />
+      <section className="card">
+        <h2>Votre identifiant de compte</h2>
+        <p>Communiquez-le à l’administrateur d’un espace pour être ajouté.</p>
+        <code data-testid="own-account-id">{context.user.id}</code>
+      </section>
       <section className="card">
         <ul className="member-list">
           {members.map((member) => (
@@ -32,10 +43,10 @@ export default async function Members({
                 <strong>
                   {member.user_id === context.user.id
                     ? "Vous"
-                    : "Compte ELSATIA"}
+                    : `Compte ELSATIA ${member.user_id.slice(0, 8)}`}
                 </strong>
                 <code>{member.user_id}</code>
-                <span>{member.role}</span>
+                <span>{roleLabels[member.role] ?? member.role}</span>
               </div>
               {canManageMember(
                 context.membership.role,

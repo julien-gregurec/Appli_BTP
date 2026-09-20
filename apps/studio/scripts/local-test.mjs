@@ -80,7 +80,7 @@ if (action === "setup") {
     .replaceAll("http://127.0.0.1:3000", "http://127.0.0.1:3030")
     .replace(
       'additional_redirect_urls = ["https://127.0.0.1:3000"]',
-      'additional_redirect_urls = ["http://127.0.0.1:3030/auth/callback"]',
+      'additional_redirect_urls = ["http://127.0.0.1:3030/auth/callback", "http://127.0.0.1:3030/auth/recovery"]',
     );
   writeFileSync(join(directory, "supabase/config.toml"), config);
   for (const name of ["migrations", "templates"])
