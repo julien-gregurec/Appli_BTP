@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { readFile, writeFile, rm } from "node:fs/promises";
-import { fixtures, largeFixture } from "./media-fixtures";
+import { fixtures, largeFixture, fileInputReady } from "./media-fixtures";
 const password = "Studio-Media-Fixture-876!";
 function client() {
   return createClient(
@@ -84,6 +84,7 @@ test("Vacances Croatie 2026 : cinq photos, deux vidéos, reload, preview, suppre
     join(sample.directory, "video-0.mp4"),
     join(sample.directory, "video-1.mp4"),
   ];
+  await fileInputReady(page);
   await page.getByLabel("Choisir des fichiers").setInputFiles(files);
   await expect(page.getByRole("progressbar")).toHaveCount(7);
   await expect(
@@ -139,6 +140,7 @@ test("Chantier Strasbourg : mobile, MOV, erreurs et accès A/B/rôles", async ({
   expect(created.ok()).toBe(true);
   const project = (await created.json()).id;
   await page.goto(`/projects/${project}`);
+  await fileInputReady(page);
   await page
     .getByLabel("Choisir des fichiers")
     .setInputFiles([
@@ -273,6 +275,7 @@ test("Chantier Strasbourg : mobile, MOV, erreurs et accès A/B/rôles", async ({
     ).status(),
   ).toBe(404);
   // Same declaration, actual hostile bytes: server must inspect Storage, not browser metadata.
+  await fileInputReady(page);
   await page.getByLabel("Choisir des fichiers").setInputFiles({
     name: "fake.jpg",
     mimeType: "image/jpeg",
@@ -448,6 +451,7 @@ test(`TUS réel : transfert direct, interruption, retry, progression et mémoire
       .catch(() => {});
   }, 200);
   try {
+    await fileInputReady(page);
     await page.getByLabel("Choisir des fichiers").setInputFiles(path);
     await expect
       .poll(() =>

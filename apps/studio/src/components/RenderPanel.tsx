@@ -20,6 +20,13 @@ type Job = {
   retry_count: number;
 };
 type Output = { id: string; render_job_id: string };
+type Share = {
+  id: string;
+  output_id: string;
+  expires_at: string;
+  revoked_at: string | null;
+  active: boolean;
+};
 export default function RenderPanel({
   project,
   canWrite,
@@ -35,6 +42,8 @@ export default function RenderPanel({
     [busy, setBusy] = useState(false),
     [url, setUrl] = useState(""),
     [playing, setPlaying] = useState(""),
+    [shares, setShares] = useState<Share[]>([]),
+    [link, setLink] = useState(""),
     [quality, setQuality] = useState<"standard" | "hd720">("standard");
   const renewals = useRef(new Map<string, number>());
   const [remoteState, setRemoteState] = useState<{
@@ -52,6 +61,7 @@ export default function RenderPanel({
       setRemoteState(d.active);
       setJobs(d.jobs);
       setOutputs(d.outputs);
+      setShares(d.shares ?? []);
       return (d.jobs as Job[]).some((j) => !terminal.includes(j.status));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Rendus indisponibles.");
@@ -77,7 +87,11 @@ export default function RenderPanel({
       });
       const d = await r.json();
       if (!r.ok) throw Error(d.error);
-      if (d.url) {
+      if (body.action === "share") {
+        // The secret is shown once: only its hash is stored.
+        setLink(d.url);
+        void load();
+      } else if (d.url) {
         if (body.download) window.location.assign(d.url);
         else {
           setUrl(d.url);
@@ -242,10 +256,52 @@ export default function RenderPanel({
                 >
                   Télécharger
                 </button>
+                {canWrite && j.profile !== "preview" && (
+                  <button
+                    disabled={busy}
+                    onClick={() =>
+                      void action({ action: "share", output: o.id, days: 7 })
+                    }
+                  >
+                    Créer un lien de partage (7 jours)
+                  </button>
+                )}
+                {shares
+                  .filter((sh) => sh.output_id === o.id)
+                  .map((sh) => (
+                    <p key={sh.id} data-share={sh.id}>
+                      {sh.active
+                        ? `Lien actif jusqu’au ${new Date(sh.expires_at).toLocaleDateString("fr-FR")}`
+                        : sh.revoked_at
+                          ? "Lien révoqué"
+                          : "Lien expiré"}
+                      {sh.active && canWrite && (
+                        <button
+                          disabled={busy}
+                          onClick={() =>
+                            void action({ action: "revokeShare", share: sh.id })
+                          }
+                        >
+                          Révoquer ce lien
+                        </button>
+                      )}
+                    </p>
+                  ))}
               </div>
             ))}
         </div>
       ))}
+      {link && (
+        <p role="status">
+          Lien à copier maintenant (il ne sera plus affiché) :{" "}
+          <input
+            readOnly
+            value={link}
+            aria-label="Lien de partage"
+            onFocus={(e) => e.currentTarget.select()}
+          />
+        </p>
+      )}
       {url && (
         <video
           src={url}

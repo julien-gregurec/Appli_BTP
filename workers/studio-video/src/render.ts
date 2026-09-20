@@ -1,4 +1,4 @@
-import { textFilters } from "./text-layout.ts";
+import { textFilters, watermarkFilter } from "./text-layout.ts";
 import {
   validatePresentation,
   safeAreas,
@@ -36,6 +36,8 @@ export interface Probe {
 export interface Runtime {
   ffmpeg: string;
   ffprobe: string;
+  /** Set only from the server-side job snapshot: draws the ELSATIA watermark on the final encode. */
+  watermark?: boolean;
   signal: AbortSignal;
   progress: (stage: string, percent: number) => Promise<void>;
 }
@@ -443,6 +445,9 @@ export async function renderTimeline(
       "0:v",
       "-map",
       "0:a",
+      ...(r.watermark
+        ? ["-vf", await watermarkFilter(dir, p.width, p.height)]
+        : []),
       ...videoCodec,
       "-c:a",
       "aac",

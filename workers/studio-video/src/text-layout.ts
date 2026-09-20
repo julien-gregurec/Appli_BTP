@@ -169,3 +169,20 @@ export async function textFilters(
   }
   return filters;
 }
+/**
+ * Server-controlled watermark. The text is a constant and the only inputs are the output
+ * size and a private scratch directory: no user content can reach this filter.
+ */
+export async function watermarkFilter(
+  dir: string,
+  width: number,
+  height: number,
+) {
+  const file = join(dir, "watermark.txt");
+  await writeFile(file, "ELSATIA Studio", "utf8");
+  const size = Math.max(14, Math.round(height * 0.028)),
+    margin = Math.max(8, Math.round(Math.min(width, height) * 0.04)),
+    quote = (v: string) =>
+      v.replaceAll("\\", "\\\\").replaceAll(":", "\\:").replaceAll("'", "'\\''");
+  return `drawtext=fontfile='${quote(fontFile("sans", 700))}':textfile='${quote(file)}':expansion=none:fontsize=${size}:fontcolor=white@0.6:borderw=2:bordercolor=black@0.35:x=w-text_w-${margin}:y=h-text_h-${margin}`;
+}

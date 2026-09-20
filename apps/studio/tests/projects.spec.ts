@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { fixtures } from "./media-fixtures";
+import { fixtures, fileInputReady } from "./media-fixtures";
 const password = "Studio-Projects-Local-398!";
 const admin = () =>
   createClient(
@@ -83,6 +83,7 @@ async function upload(page: Page, count = 7) {
     join(sample.directory, "video-0.mp4"),
     join(sample.directory, "video-1.mp4"),
   ].slice(0, count);
+  await fileInputReady(page);
   await page.getByLabel("Choisir des fichiers").setInputFiles(files);
   await expect(page.locator('.upload-list [data-status="ready"]')).toHaveCount(
     count,

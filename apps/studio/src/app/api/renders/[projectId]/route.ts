@@ -6,6 +6,7 @@ import {
   cancelStudioRender,
   getRenderDownloadUrl,
 } from "../../../../lib/renders";
+import { createRenderShare, revokeRenderShare } from "../../../../lib/shares";
 export const runtime = "nodejs";
 async function handle(
   request: Request,
@@ -77,6 +78,20 @@ async function handle(
           b.output,
           "download" in b && b.download === true,
         );
+      else if (
+        b.action === "share" &&
+        "output" in b &&
+        typeof b.output === "string" &&
+        "days" in b &&
+        typeof b.days === "number"
+      )
+        result = await createRenderShare(projectId, b.output, b.days);
+      else if (
+        b.action === "revokeShare" &&
+        "share" in b &&
+        typeof b.share === "string"
+      )
+        result = await revokeRenderShare(projectId, b.share);
       else throw new MediaError("Action invalide.");
     }
     return Response.json(result, {
