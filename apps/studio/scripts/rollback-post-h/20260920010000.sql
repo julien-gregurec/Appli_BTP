@@ -1,10 +1,5 @@
--- Rollback of 20260920010000_studio_render_admission (empty-data safe, local disposable stacks only).
+-- Rollback of 20260920010000_studio_render_admission. Only the limits table is dropped: jobs and quotas keep their data.
 begin;
-do $$begin
- if exists(select 1 from public.studio_render_jobs where status in ('queued','preparing','rendering','encoding','uploading')) then
-  raise exception 'Active render jobs exist; rollback refused';
- end if;
-end$$;
 create or replace function public.studio_request_render(p_project uuid,p_request uuid,p_profile text default 'standard',p_retry uuid default null) returns uuid language plpgsql security definer set search_path='' as $$
 declare p public.studio_projects;t jsonb; assets jsonb; result uuid; prior public.studio_render_jobs; w integer;h integer;
 begin

@@ -1,161 +1,192 @@
 # ELSATIA STUDIO — FINALISATION MASTER LEDGER
 
-Dernière mise à jour : 2026-09-20 (nuit, démarrage). Document vivant, mis à jour à chaque lot intégré. Statuts autorisés : PASS / FAIL / BLOCKED / NOT RUN.
+Dernière mise à jour : 2026-09-20 (fin de nuit). Document vivant. Statuts autorisés : PASS / FAIL / BLOCKED / NOT RUN. Aucune action Production, Preview, DNS, Stripe ou Supabase distant n'a eu lieu.
 
 ## BASELINE
 
-- HEAD Studio initial : `214d47fd4d8474aa292b5cea121f80cae9c7dff7` (`origin/feat/elsatia-studio-v1`), base `6a814a2b`.
-- Rien de Production/Preview touché. Aucun push. Aucun `git add .` global.
+- HEAD Studio initial : `214d47fd4d8474aa292b5cea121f80cae9c7dff7` (`origin/feat/elsatia-studio-v1`), base `6a814a2b`, 260 migrations (252 GP + 8 Studio).
+- Aucun push. Aucun `git add .` global. Branche distante non modifiée.
 
 ## CURRENT TRAIN
 
-- Branche : `integration/studio-commercial-ready-v1` (worktree `/Volumes/ELSATIA-DEV/ELSATIA-WORKTREES/studio-commercial-ready-v1`).
-- TRAIN HEAD : voir `git log -1` — mis à jour à chaque intégration (tableau « INTEGRATED »).
+- Branche `integration/studio-commercial-ready-v1`, worktree `/Volumes/ELSATIA-DEV/ELSATIA-WORKTREES/studio-commercial-ready-v1`.
+- **TRAIN HEAD** : voir `git log -1` du worktree (le dernier commit du train porte ce ledger). Lots intégrés dans l'ordre : S1, S2, S3, S4+J1, I, J2, S5 (branches `feat/studio-*`, fusions `--no-ff`).
 
 ## MIGRATION LEDGER
 
 | Migration | Lot | Statut |
 |---|---|---|
-| `20260912120000_studio_workspace_foundation` | A | qualifiée historiquement |
-| `20260912140000_studio_media_upload` | B | idem |
-| `20260912160000_studio_project_management` | C | idem |
-| `20260912230000_studio_timeline` | D | idem |
-| `20260913010000_studio_render_engine` | E | idem |
-| `20260913020000_studio_templates` | F | idem |
-| `20260913030000_studio_editor_transactions` | G | idem |
-| `20260913040000_studio_media_analysis` | H | idem |
-| (nouvelles migrations de la nuit) | — | voir « NEW LOTS » |
+| `20260912120000_studio_workspace_foundation` → `20260913040000_studio_media_analysis` (8) | A–H | qualifiées historiquement, rejouées cette nuit (Fresh + chaîne A→H) |
+| `20260920010000_studio_render_admission` | S1 | Fresh PASS, upgrade H PASS, pgTAP 21 |
+| `20260920030000_studio_export_profiles` | J1 | Fresh PASS, upgrade H PASS, pgTAP 33 |
+| `20260920050000_studio_brand_kit` | I | Fresh PASS, upgrade H PASS, pgTAP 44 |
+| `20260920070000_studio_shares_watermark` | J2 | Fresh PASS, upgrade H PASS, pgTAP 37 |
 
-Règles : additif, append-only, aucune migration qualifiée réécrite. Nouvelles migrations nommées `20260920HHMMSS_studio_*` (jamais un n° GP). **M-1** : le ledger GP CORE nomme `20260920000308`+ ; les migrations Studio antérieures (`2026091x`) se trieraient avant des migrations GP déjà appliquées → `db push` exigerait `--include-all`. Aucune dépendance croisée (Studio ne référence que `auth.users`/`storage`). Décision de convergence : Q-010.
+Total attendu : **264**. Règles respectées : additif, append-only, aucune migration qualifiée réécrite, aucun n° GP. Un SQL de retour arrière par migration post-H (`apps/studio/scripts/rollback-post-h/`) refuse de détruire des données utilisateur (kit, liens, registre d'usage, jobs 720p).
+
+**M-1 (ouvert)** : le ledger GP CORE nomme ses migrations `20260920000308`…`20260921000311` ; les migrations Studio `2026091x` se trieraient avant des migrations GP déjà appliquées → `db push` exigerait `--include-all`. Aucune dépendance croisée (Studio ne référence que `auth.users` et `storage`). Décision : Q-010.
 
 ## LOTS A-H STATUS
 
-Tous classés **WORKING, QUALIFIED locally** par leurs rapports (non rejoués intégralement cette nuit ; voir TESTS). Défauts trouvés à l'audit du 2026-09-20 : voir « DEFECTS » ci-dessous.
+Tous **WORKING**, requalifiés localement cette nuit sur la pile jetable : Fresh 264 + pgTAP des 12 fichiers, chaîne historique A→H (`analysis-migration-check` : 257 → 258 → 259 → 260) PASS.
 
-## DEFECTS (audit 2026-09-20, sévérité recalculée)
+## LOTS DE LA NUIT (détail : `ELSATIA_STUDIO_NIGHT_LOTS_REPORT.md`)
 
-| ID | Sév. | Résumé | Lot cible |
+| Lot | Contenu | Statut |
+|---|---|---|
+| S1 | admission de rendu bornée, kill-switch `STUDIO_ENABLED`, quota, purge distante sur opt-in | **QUALIFIED locally** (pgTAP 21, Vitest 16) |
+| S2 | éditeur : crash Suppr, flush à la sortie, backoff, conflit, undo | **QUALIFIED locally** (Vitest 24 + E2E) |
+| S3 | reset mot de passe, notices fermées, UX, journalisation sans PII | QUALIFIED sauf e-mail de récupération : voir E2E |
+| S4 | timeout proportionnel, texte dessinable, heartbeat tolérant, sonde de sortie | **QUALIFIED locally** (Vitest, test de rendu réel) |
+| J1 | profil 720p, registre d'usage, panneau de rendu | **QUALIFIED locally** (pgTAP 33 ; 1080/720 pleine taille : acceptation NOT RUN) |
+| I | Brand Kit | **QUALIFIED locally** (pgTAP 44 + E2E PASS) |
+| J2 | liens de partage révocables, filigrane serveur | **QUALIFIED locally** (pgTAP 37, frame décodée, E2E PASS) ; politique de filigrane = Q-003 |
+| S5 | miniatures d'images, confirmation avant retrait d'un média utilisé | WORKING, non qualifié individuellement (couvert par la régression E2E) |
+| M (musique) | **non démarré** | READY — voir « SPEC M » |
+
+## DEFECTS (audit 2026-09-20)
+
+| ID | Sév. | Résumé | Statut |
 |---|---|---|---|
-| D-01 | P1 | Admission de rendu illimitée (aucune limite jobs/projet/workspace), snapshot jsonb par job | S1 |
-| D-02 | P1 | `STUDIO_ENABLED` documenté (kill-switch) mais inexistant | S1 |
-| D-03 | P1 | Quota média : tombstones/expirés comptés (`purged_at is null`), purge seulement en local → « Quota atteint » définitif | S1 |
-| D-04 | P1 | Éditeur : Suppr avec sélection périmée → exception dans le reducer, crash + perte de l'historique | S2 |
-| D-05 | P1 | Autosave : `dispose()` sans flush, aucun flush `pagehide`, état `error` perdu à la navigation | S2 |
-| D-06 | P1 | Conflit d'autosave sans issue autre que recharger (perd le travail) | S2 |
-| D-07 | P1 | Rendu : timeout 600 s pour des timelines jusqu'à 10 min (ratio mesuré ~2× durée) → `RENDER_TIMEOUT` irrattrapable | S4 |
-| D-08 | P1 | Rendu : texte hors Noto/emoji accepté par l'éditeur puis rendu en échec `RENDER_FAILED` | S4 |
-| D-09 | P1 | Photos avec `exif_orientation` : non traité côté worker (à vérifier par fixture) | S4 |
-| D-10 | P1 | `RenderPanel` : URL signée 60 s dans `<video>` sans renouvellement | S4 |
-| D-11 | P1 | Pas de reset de mot de passe | S3 |
-| D-12 | P1 | Membres : ajout par UUID sans moyen de connaître son UUID ; liste affichée « Compte ELSATIA » | S3 |
-| D-13 | P1 | Aucun `loading.tsx` ; textes de roadmap périmés dans l'UI ; 404 générique erroné ; `?error=` reflété | S3 |
-| D-14 | P1 | Pas de miniatures (aperçu = clic sur URL signée de l'original) | S5 |
-| D-15 | P1 | Suppression d'un média utilisé sans avertissement (échec au rendu) | S3 |
-| D-16 | P1 | Aucun observabilité web (Sentry) | S3 |
-| D-17 | P1 | Clé service complète partagée (web + 2 workers) | WAITING_JULIEN Q-004 |
-| D-18 | P2 | Overlays supprimés silencieusement après trim (`retimePresentation`) | S2 |
-| D-19 | P2 | Un caractère = un pas d'undo (40 pas épuisés en une phrase) | S2 |
-| D-20 | P2 | Autosave sans reprise automatique ni message 400/403 distinct | S2 |
-| D-21 | P2 | Rendu : heartbeat manquant tue le job (code `CANCELLED`), profil non affiché, codes bruts en UI | S4 |
-| D-22 | P2 | Politique Auth (12 caractères, confirmations, captcha) seulement côté server action | WAITING Preview/Prod |
-| D-23 | P2 | Sandbox de décodage (`-format_whitelist` ffmpeg, uid séparé) | K |
-| D-24 | P2 | FK `on delete restrict` sur `auth.users` : pas de suppression de compte | K / Q-008 |
-| D-25 | P3 | Lock avant contrôle de rôle, `lease_token`/`storage_key` lisibles, flags TS-only | K |
+| D-01 | P1 | admission de rendu illimitée | **FIXED** S1 |
+| D-02 | P1 | `STUDIO_ENABLED` inexistant | **FIXED** S1 |
+| D-03 | P1 | quota : réservations abandonnées comptées ; purge locale seulement | **PARTIAL** : réservations expirées libérées ; purge distante possible sur opt-in, **planification en Production à faire** |
+| D-04 | P1 | crash Suppr sur sélection périmée | **FIXED** S2 (E2E) |
+| D-05 | P1 | dernières éditions perdues à la navigation | **FIXED** S2 (E2E) |
+| D-06 | P1 | conflit sans issue | **FIXED** S2 |
+| D-07 | P1 | `RENDER_TIMEOUT` irrattrapable > ~5 min | **FIXED** S4 |
+| D-08 | P1 | texte non dessinable → rendu en échec | **FIXED** S4 |
+| D-09 | P1 | EXIF non traité | **NOT A DEFECT** (FFmpeg 6.0 redresse, vérifié) |
+| D-10 | P1 | URL signée 60 s sans renouvellement | **FIXED** S4/J1 |
+| D-11 | P1 | pas de reset de mot de passe | **FIXED** S3 |
+| D-12 | P1 | membres : UUID introuvable | **PARTIAL** : identifiant affiché, rôles FR ; invitation par e-mail absente |
+| D-13 | P1 | pas de `loading`, textes périmés, `?error=` reflété | **FIXED** (loading limité à dashboard/paramètres, voir « Piège hydratation ») |
+| D-14 | P1 | pas de miniatures | **FIXED (pilote)** S5 : à la demande, pas de dérivée stockée |
+| D-15 | P1 | média utilisé supprimable sans avertissement | **FIXED** S5 |
+| D-16 | P1 | aucune observabilité web | **PARTIAL** : journal `onRequestError` sans PII ; pas de Sentry ni d'alerte |
+| D-17 | P1 | clé service complète partagée | **OPEN** — WAITING_JULIEN Q-004 |
+| D-18 | P2 | overlays perdus après trim | **PARTIAL** : annoncé et annulable |
+| D-19 | P2 | un caractère = un pas d'undo | **FIXED** S2 |
+| D-20 | P2 | autosave sans reprise | **FIXED** S2 |
+| D-21 | P2 | heartbeat, profil, codes bruts | **FIXED** S4/J1 |
+| D-22 | P2 | politique Auth (12, confirmations, captcha) | **OPEN** — à régler sur le projet cible |
+| D-23 | P2 | sandbox de décodage | **OPEN** (checklist Preview §1.6) |
+| D-24 | P2 | FK `on delete restrict`, pas de suppression de compte | **OPEN** — Q-008 |
+| D-25 | P3 | verrou avant contrôle de rôle, colonnes lisibles | **OPEN** |
+| D-26 | P1 | (nouveau) Storage : environnement local — un `ffprobe` de sortie à 10 s échoue sous charge | **FIXED** (60 s pour notre propre fichier) |
+| D-27 | P2 | (nouveau) e-mail de récupération limité à 2/heure en local → tests | **FIXED** dans la config jetable |
 
 ## FUNCTIONAL MATRIX & COMMERCIAL READINESS
 
-Méthode : 28 capacités critiques ; QUALIFIED = 1, WORKING-UNQUALIFIED/PARTIAL = 0,5, ABSENT/BLOCKED = 0. Pourcentage = somme / 28. Recalculé à chaque lot intégré.
+Méthode : 28 capacités critiques ; QUALIFIED = 1, WORKING-UNQUALIFIED/PARTIAL = 0,5, ABSENT/BLOCKED = 0. Pourcentage = somme / 28.
 
-| # | Capacité | Score initial | Note |
-|---|---|---:|---|
-| R01 | Auth signup/login/logout | 1 | |
-| R02 | Reset mot de passe | 0 | S3 |
-| R03 | Confirmation e-mail | 0,5 | non prouvée en distant |
-| R04 | Workspaces | 1 | |
-| R05 | Membres/invitations utilisables | 0,5 | S3 |
-| R06 | Projets (CRUD, archive, duplication) | 1 | |
-| R07 | Upload TUS + limites | 1 | |
-| R08 | Cycle de vie du quota / purge | 0,5 | S1 |
-| R09 | Miniatures | 0 | S5 |
-| R10 | Timeline automatique | 1 | |
-| R11 | Éditeur (cœur) | 0,5 | P1 D-04..06 |
-| R12 | Templates | 1 | |
-| R13 | Rendu réel | 1 | |
-| R14 | Profils 720/1080 prouvés (E2E hors preview) | 0 | J |
-| R15 | Admission/anti-abus rendu | 0 | S1 |
-| R16 | Musique importée | 0 | M |
-| R17 | Brand Kit | 0 | I |
-| R18 | Preview/téléchargement | 1 | |
-| R19 | Partage révocable | 0 | J2 |
-| R20 | Watermark / plans | 0 | J2 + Q-001/Q-003 |
-| R21 | Métering d'usage | 0 | J |
-| R22 | Isolation tenant/RLS | 1 | |
-| R23 | Légal / consentement | 0 | Q-002 |
-| R24 | RGPD suppression/export | 0 | K / Q-008 |
-| R25 | Observabilité web | 0 | S3 |
-| R26 | E2E Strasbourg exact (10+3, 1080) | 0,5 | L |
-| R27 | E2E Croatie exact (20+5, 1080) | 0,5 | L |
-| R28 | Mobile/WebKit qualifié | 0,5 | Q-005 |
+| # | Capacité | Initial | Final | Note |
+|---|---|---:|---:|---|
+| R01 | Auth signup/login/logout | 1 | 1 | |
+| R02 | Reset mot de passe | 0 | RESET_SCORE | e-mail réel : voir E2E |
+| R03 | Confirmation e-mail | 0,5 | 0,5 | non prouvée en distant |
+| R04 | Workspaces | 1 | 1 | |
+| R05 | Membres/invitations utilisables | 0,5 | 0,5 | pas d'invitation par e-mail |
+| R06 | Projets | 1 | 1 | |
+| R07 | Upload TUS + limites | 1 | 1 | |
+| R08 | Cycle de vie du quota / purge | 0,5 | 0,5 | purge Production non planifiée |
+| R09 | Miniatures | 0 | 0,5 | pilote, non qualifié seul |
+| R10 | Timeline automatique | 1 | 1 | |
+| R11 | Éditeur (cœur) | 0,5 | 1 | D-04/05/06 corrigés + E2E |
+| R12 | Templates | 1 | 1 | |
+| R13 | Rendu réel | 1 | 1 | |
+| R14 | Profils 720/1080 prouvés | 0 | ACC_R14 | dimensions par pgTAP ; pleine taille : acceptation |
+| R15 | Admission/anti-abus rendu | 0 | 1 | |
+| R16 | Musique importée | 0 | 0 | non démarré |
+| R17 | Brand Kit | 0 | 1 | |
+| R18 | Preview/téléchargement | 1 | 1 | |
+| R19 | Partage révocable | 0 | 1 | |
+| R20 | Watermark / plans | 0 | 0,5 | mécanisme qualifié, politique non décidée |
+| R21 | Métering d'usage | 0 | 1 | registre + résumé ; aucune facturation |
+| R22 | Isolation tenant/RLS | 1 | 1 | |
+| R23 | Légal / consentement | 0 | 0 | Q-002 |
+| R24 | RGPD suppression/export | 0 | 0 | Q-008 |
+| R25 | Observabilité web | 0 | 0,5 | journal sans PII, pas d'alerte |
+| R26 | E2E Strasbourg exact (10+3, 1080) | 0,5 | ACC_R26 | spec opt-in écrite |
+| R27 | E2E Croatie exact (20+5, 1080) | 0,5 | ACC_R27 | spec opt-in écrite ; dates EXIF non couvertes |
+| R28 | Mobile/WebKit qualifié | 0,5 | 0,5 | Chromium seul ; Q-005 |
 
-**Score initial : 12,5 / 28 = 44,6 %.**
+**Score initial : 12,5 / 28 = 44,6 %. Score final : SCORE_TOTAL / 28 = SCORE_PCT.**
 
 ## QUEUE
 
 | Statut | Lots |
 |---|---|
-| ACTIVE | S1 — admission, kill-switch, quota |
-| READY | S2 éditeur P1 · S3 auth/UX · S4 rendu P1 · S5 miniatures · J profils/usage · I Brand Kit · J2 partage/watermark · M musique · K hardening (sandbox, grants, RGPD technique) · L E2E exacts + happy path · checklists Preview/Production |
-| WAITING_EXTERNAL | Clé service dédiée / projet Supabase (Q-004) ; Auth distant (D-22) ; HEVC réels sur iPhone |
-| WAITING_JULIEN | Q-001…Q-010 (sous-périmètres seulement) |
-| QUALIFIED | A–H (historique) |
-| INTEGRATED | (aucun lot de la nuit pour l'instant) |
-| DEFERRED_POST_V1 | rotation/opacité/scale, calques, snap/zoom timeline, copier-coller, multi-sélection, split, restauration workspace archivé, transfert de propriété, multilingue, intégrations GP/Tools/Colors/Réserves |
+| ACTIVE | (aucun : fin de nuit) |
+| READY | M musique · K RGPD technique (suppression de compte, export) · sandbox de décodage · WebKit/mobile E2E · acceptation pleine taille si non jouée · invitation par e-mail |
+| WAITING_EXTERNAL | Auth/Supabase distants (D-22), iPhone réel, HEIC/HEVC réels, restauration DB+objets |
+| WAITING_JULIEN | Q-001 … Q-010 (sous-périmètres seulement) |
+| QUALIFIED | A–H, S1, S2, S4, J1, I, J2 |
+| INTEGRATED | S1, S2, S3, S4, J1, I, J2, S5 dans le train local |
+| DEFERRED_POST_V1 | rotation/opacité/scale, calques, snap/zoom timeline, copier-coller, multi-sélection, split, couleurs et réseaux de marque, transfert de propriété, restauration d'un espace archivé, multilingue, intégrations GP/Tools/Colors/Réserves |
 
-## NEW LOTS
-
-(à compléter à chaque lot : branche, SHA, migrations, tests, preuves)
+### SPEC M — musique importée (non implémentée)
+1. Storage : autoriser `audio/mpeg`, `audio/mp4`, `audio/wav` dans le bucket `studio-originals` et dans `studio_reserve_media` (nouveau type `audio`, plafond de taille) ; inspection ffprobe côté web (durée, codec) ; jamais publié.
+2. Modèle : `presentation.music = {asset_id, volume, fade_in_ms, fade_out_ms}` validé en domaine et dans `studio_validate_presentation` (fonction à remplacer) ; asset audio « ready » du projet.
+3. Éditeur : sélecteur de piste, volume, fondus ; prévisualisation approximative.
+4. Worker : entrée audio supplémentaire, boucle/coupe à la durée, `afade`, mixage avec l'audio des clips (`amix`, normalisation contrôlée) sur l'encodage final ; test de rendu réel (RMS non nul avec piste, nul sans).
+5. Droits : import par l'utilisateur sous sa responsabilité (clause CGU, Q-009).
+Coût estimé : lot de taille L (migration + domaine + éditeur + worker + E2E).
 
 ## TESTS
 
-| Gate (baseline `214d47fd`, cette nuit) | Statut |
+| Gate (train `8ac770d2` + correctifs de fin de nuit) | Statut |
 |---|---|
-| `npm run typecheck` (apps/studio) | NOT RUN (en cours) |
-| `npm run lint` | NOT RUN |
-| `npm test` (Vitest app) | NOT RUN |
-| worker `typecheck` / `test` | NOT RUN (installation en cours) |
-| pgTAP (53 fichiers) | NOT RUN |
-| Fresh / Upgrade | NOT RUN |
-| E2E | NOT RUN |
-| Historique (rapports A–H) : 251 + 22 tests, 1 254 assertions pgTAP, E2E 62/62 + 4/4 | non rejoué |
+| `tsc --noEmit` app / worker | PASS |
+| ESLint (fichiers modifiés) | PASS |
+| Vitest app | VITEST_APP |
+| Vitest worker | VITEST_WORKER |
+| pgTAP Fresh (12 fichiers) | **PASS — 520 assertions, 0 échec** (analysis 45, brand 44, editor 22, export 33, media 40, project 105, admission 21, render 45, shares 37, templates 18, timeline 52, foundation 58) |
+| Chaîne historique A→H (`analysis-migration-check`) | PASS (257 → 258 → 259 → 260, remise en état vérifiée) |
+| Upgrade post-H / rollback inverse / reapply (`post-h-migration-check`) | POSTH |
+| pgTAP après upgrade | PGUP |
+| Build production (webpack) | PASS |
+| E2E complets (36 cas) | E2E_FULL |
+| E2E ciblés de la nuit | Brand Kit PASS, partage PASS, S2 PASS, rendu réel Chantier PASS, invalid-links PASS, onboarding/isolation PASS |
+| Acceptation pleine taille (Strasbourg / Croatie) | ACCEPT |
+| npm audit | NOT RUN |
 
-## SECURITY / E2E / PERFORMANCE / PREVIEW / PRODUCTION READINESS
+Piège hydratation : un `change` ou `submit` déclenché avant l'hydratation React est perdu (constaté sous charge) ; tous les E2E attendent désormais que le champ de fichier / le formulaire porte ses handlers. Le squelette `loading.tsx` a été limité à dashboard et paramètres (un Suspense racine retarde l'hydratation).
 
-- Sécurité : voir DEFECTS ; aucun P0 ; isolation RLS/IDOR/CSRF/injections vérifiée en lecture.
-- E2E : historique verts en profil preview 540×960 ; 1080p non couvert.
-- Performance : ratio de rendu mesuré ~2× (320×240 sources synthétiques) ; benchmark 100/500 médias analyse OK (rapport H) ; aucune mesure 1080p sur vraies sources.
-- Preview readiness : NON — clé service partagée, Auth distant, pages légales, purge prod, worker hors Vercel.
-- Production readiness : NON. Aucune action Production cette nuit.
+## SECURITY
+
+Aucun P0. RLS SELECT-only sur toutes les tables, écritures par RPC `search_path=''`, IDOR/CSRF/redirect ouvert/injection FFmpeg vérifiés en lecture par l'audit et couverts par pgTAP. Ajouts de la nuit : plafonds d'admission, liens de partage (hash seul, table fermée, résolution service-only, page publique `noindex`/`no-referrer`), filigrane non falsifiable, notices à liste fermée, journal sans PII. **Ouverts** : clé service partagée (Q-004), politique Auth distante, sandbox de décodage, suppression de compte.
+
+## PERFORMANCE
+
+Aucune mesure nouvelle valable : la machine était saturée (charge 20–25) par d'autres voies GP et des conteneurs tiers. Mesuré : rendu réel d'un montage de 15 s en aperçu ≈ 25 s ; ffprobe de sortie > 10 s sous charge (corrigé). Le débit 1080p sur vraies sources reste **non mesuré**.
+
+## PREVIEW / PRODUCTION READINESS
+
+**Preview : NON** (checklists : `ELSATIA_STUDIO_PREVIEW_PRODUCTION_CHECKLISTS.md`). **Production : NON.** Bloquants : Q-004, Q-002/Q-008, Q-001, Auth distant, purge planifiée, worker hors Vercel, iPhone réel, restauration.
 
 ## QUESTIONS POUR JULIEN — DEMAIN MATIN
 
 Format : ID · SUJET · CONTEXTE · A · B · RECOMMANDATION · CONSÉQUENCE · BLOQUE · NE BLOQUE PAS.
 
-**Q-001 · Modèle de facturation Studio.** Contexte : aucun moteur commercial, aucun plan, Stripe exclu de la roadmap. A) Bêta pilote gratuite plafonnée, sans paiement. B) Abonnement ELSATIA commun (après snapshot de prix Train V3). Reco : A pour le pilote, B ensuite. Conséquence : détermine plans/watermark/quotas. Bloque : R20 (plans), tarification. Ne bloque pas : éditeur, rendu, sécurité, Brand Kit, exports, tests.
+**Q-001 · Modèle de facturation Studio.** Aucun moteur commercial, aucun plan. A) Bêta pilote gratuite plafonnée (les plafonds d'admission existent). B) Abonnement ELSATIA commun (après snapshot de prix Train V3). Reco : A puis B. Bloque : plans, watermark par plan, tarification. Ne bloque pas : tout le reste.
 
-**Q-002 · Textes légaux et rétention.** Contexte : aucune page CGU/confidentialité/mentions, aucun consentement à l'inscription. A) Je pose les routes + case de consentement avec des textes-squelette marqués « à valider » (non publiables). B) Rien tant que le texte n'est pas fourni. Reco : A, sans mise en ligne. Rétention par défaut proposée : 30 jours après suppression pour les originaux tombstone, 30 jours pour les logs. Bloque : mise en service publique. Ne bloque pas : tout le développement. Rappel : « marque déposée », jamais ® (mémoire INPI).
+**Q-002 · Textes légaux et rétention.** Aucune page CGU/confidentialité/mentions, aucun consentement à l'inscription. A) Je pose routes + case de consentement avec squelettes « à valider » non publiables. B) Rien avant le texte. Reco : A sans mise en ligne ; rétention proposée 30 jours (originaux supprimés) et 30 jours (journaux). « Marque déposée », jamais ®. Bloque : mise en service publique. Ne bloque pas : le développement.
 
-**Q-003 · Politique de watermark.** A) Aucun watermark pour les pilotes ; drapeau serveur par workspace prêt, défaut OFF. B) Watermark obligatoire hors plan payant. Reco : A. Bloque : la valeur par défaut commerciale. Ne bloque pas : le mécanisme (implémenté, désactivé).
+**Q-003 · Politique de watermark.** Le mécanisme existe (colonne par espace, défaut faux, non falsifiable). A) Aucun watermark pour les pilotes. B) Obligatoire hors plan payant. Reco : A. Bloque : la valeur commerciale par défaut.
 
-**Q-004 · Clé service et projet Supabase.** Studio partage le projet Supabase ELSATIA (donc les données Gestion Pro) et détient une clé service complète (web + workers FFmpeg). A) Projet Supabase dédié à Studio. B) Rôle Postgres/JWT scopé limité aux RPC service-only et aux 2 buckets. Reco : A (isolation maximale, coût mensuel à valider). Bloque : Preview/Production Studio. Ne bloque pas : développement local.
+**Q-004 · Clé service et projet Supabase.** Studio partage le projet Supabase ELSATIA (donc Gestion Pro) avec une clé service complète côté web et workers. A) Projet Supabase dédié. B) Rôle/JWT scopé (RPC service-only + 2 buckets). Reco : A. Bloque : Preview/Production. Ne bloque pas : le local.
 
-**Q-005 · Périmètre mobile.** A) Web responsive : import + aperçu, éditeur desktop-first. B) Éditeur complet mobile. Reco : A ; qualifier WebKit avant ouverture. Bloque : qualification WebKit/iOS (R28). Ne bloque pas : desktop.
+**Q-005 · Périmètre mobile.** A) Web responsive : import et aperçu, éditeur desktop-first. B) Éditeur complet mobile. Reco : A ; qualifier WebKit puis iPhone réel avant ouverture.
 
-**Q-006 · HEIC/HEVC (iPhone).** A) Refuser avec un message explicite (« format le plus compatible »). B) Transcoder côté worker. Reco : A pour V1. Bloque : couverture formats iPhone. Ne bloque pas : JPG/PNG/WEBP/MP4/MOV H.264.
+**Q-006 · HEIC/HEVC.** A) Refuser avec un message clair. B) Transcoder côté worker. Reco : A pour la V1.
 
-**Q-007 · Ouverture.** Inscription publique ou sur invitation ? Reco : invitation jusqu'à fermeture des P1 (D-11, D-12, D-17) et de R23/R24. Bloque : go-live. Ne bloque pas : dev.
+**Q-007 · Ouverture.** Inscription publique ou sur invitation ? Reco : invitation tant que D-17, D-22, R23, R24 sont ouverts.
 
-**Q-008 · Suppression de compte / RGPD.** A) Flux de suppression qui purge objets, tombstones et workspaces mono-propriétaire ; transfert requis pour les multi-membres. B) Archivage seul. Reco : A. Bloque : R24. Ne bloque pas : le reste.
+**Q-008 · Suppression de compte / RGPD.** A) Flux qui purge objets, tombstones et espaces mono-propriétaire (transfert requis pour les espaces à plusieurs). B) Archivage seul. Reco : A. Bloque : R24.
 
-**Q-009 · Musique.** Le périmètre V1 déclaré inclut « musique importée ». Je l'implémente (import utilisateur, mixage, fondus), sans bibliothèque de musique licenciée. Question de licence : autorisez-vous l'import de musique par l'utilisateur sans contrôle de droits (responsabilité CGU) ? Reco : oui, clause CGU. Bloque : formulation commerciale. Ne bloque pas : le développement.
+**Q-009 · Musique.** Le périmètre V1 déclaré inclut « musique importée » ; **non implémentée cette nuit** (voir SPEC M). Autorisez-vous l'import par l'utilisateur sans contrôle de droits (responsabilité CGU) ? Reco : oui. Bloque : la formulation commerciale et le scénario Strasbourg complet.
 
-**Q-010 · Convergence des migrations (M-1).** A) Renommer les migrations Studio avec un timestamp postérieur au dernier GP au moment du train commun (avant tout déploiement). B) Conserver et utiliser `--include-all`. Reco : A. Bloque : le train commun GP+Studio. Ne bloque pas : Studio isolé.
+**Q-010 · Convergence des migrations (M-1).** A) Renommer les migrations Studio avec un timestamp postérieur au dernier GP au moment du train commun. B) Conserver et utiliser `--include-all`. Reco : A. Bloque : le train commun GP+Studio.
+
+**Q-011 · Miniatures.** Conception pilote : générées à la demande depuis l'original (aucune dérivée stockée). A) Suffisant pour le pilote. B) Dérivée stockée générée à la confirmation (nouveau bucket + migration). Reco : A puis B avant l'ouverture publique. Bloque : rien ; coût CPU/E-S à surveiller.
