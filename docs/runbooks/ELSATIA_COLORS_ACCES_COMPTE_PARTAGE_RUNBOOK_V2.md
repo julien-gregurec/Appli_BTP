@@ -173,3 +173,30 @@ sans droit plateforme et sans second modèle de rôles. Décision d'aller plus l
 
 Rejouer la recette locale : voir `tests/e2e/colors-compte-partage.spec.ts` (en-tête) ;
 variables `E2E_BASE_URL`, `MDP_RECETTE`, `COLORS_DB_CONTAINER`.
+
+---
+
+## 7. Rejouer la recette locale
+
+La pile de la nuit (`ELSATIA-STACKS/colors-night`, hors dépôt) est **arrêtée** ; ses données sont
+conservées dans des volumes Docker. Ports 64321-64329 (les 62xxx sont pris par une pile Studio).
+Points d'attention de son `config.toml` : `[auth.email.template.*]` désactivés — Docker Desktop
+refuse le montage d'un fichier du volume externe (`mkdir /host_mnt/Volumes/ELSATIA-DEV: file exists`),
+donc le gabarit de réinitialisation n'y est pas rejoué.
+
+```bash
+cd /Volumes/ELSATIA-DEV/ELSATIA-STACKS/colors-night
+W=/Volumes/ELSATIA-DEV/ELSATIA-WORKTREES/colors-pilot-readiness-v1
+$W/node_modules/.bin/supabase start -x studio,realtime,vector,imgproxy,edge-runtime,logflare
+rm -f ARRET && (nohup ./servir-colors.sh >/dev/null 2>&1 &)          # Colors sur 127.0.0.1:3141, relancé s'il est tué
+set -a; . ./.cles.env; set +a; export MDP_RECETTE="$(cat .mdp)"       # mot de passe LOCAL des comptes .invalid
+for f in colors-pilote colors-compte-partage; do
+  docker exec -i -e MDP_RECETTE="$MDP_RECETTE" supabase_db_colors-night psql -U postgres -d postgres -v ON_ERROR_STOP=1 -q < $W/tests/e2e/fixtures/$f.sql
+done
+cd $W && E2E_BASE_URL=http://127.0.0.1:3141 COLORS_DB_CONTAINER=supabase_db_colors-night \
+  E2E_SUPABASE_URL="$API_URL" E2E_SUPABASE_ANON_KEY="$PUBLISHABLE_KEY" E2E_SUPABASE_SERVICE_ROLE_KEY="$SERVICE_ROLE_KEY" \
+  npx playwright test tests/e2e/colors-parcours-authentifies.spec.ts tests/e2e/colors-surface-publique.spec.ts tests/e2e/colors-compte-partage.spec.ts --project=desktop-chromium
+```
+
+Ne jamais lancer `pkill -f next…` sur cette machine : d'autres sessions y font tourner leurs propres
+serveurs. Arrêter par port : `lsof -ti tcp:3141 -sTCP:LISTEN | xargs kill`.
