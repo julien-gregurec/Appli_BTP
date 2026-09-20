@@ -423,7 +423,7 @@ test("Lot E cancellation : worker arrêté, aucun output", async ({ page }) => {
   const panel = page.getByRole("region", { name: "Vidéo exportée" });
   await expect(
     panel.locator("[data-render-job]").getByRole("status"),
-  ).toContainText("rendering", {
+  ).toContainText("Rendu en cours", {
     timeout: 60000,
   });
   await panel.getByRole("button", { name: "Annuler le rendu" }).click();

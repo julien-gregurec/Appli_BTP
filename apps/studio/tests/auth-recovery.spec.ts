@@ -24,24 +24,28 @@ const api = () =>
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     { auth: { persistSession: false } },
   );
-// Local Supabase mailbox (Inbucket) sits three ports above the API in the disposable stack.
+// Local Supabase mail catcher (Mailpit) sits three ports above the API in the disposable stack.
 const mailbox = () => {
   const port = Number(new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).port);
-  return `http://127.0.0.1:${port + 3}/api/v1/mailbox`;
+  return `http://127.0.0.1:${port + 3}/api/v1`;
 };
-async function recoveryLink(name: string) {
+async function recoveryLink(email: string) {
   let link = "";
   await expect
     .poll(
       async () => {
-        const list = await fetch(`${mailbox()}/${name}`);
+        const list = await fetch(
+          `${mailbox()}/search?query=${encodeURIComponent(`to:${email}`)}`,
+        );
         if (!list.ok) return "";
-        const messages = (await list.json()) as { id: string }[];
-        const last = messages.at(-1);
-        if (!last) return "";
-        const body = await (await fetch(`${mailbox()}/${name}/${last.id}`)).json();
+        const { messages } = (await list.json()) as { messages: { ID: string }[] };
+        if (!messages?.length) return "";
+        const message = await (
+          await fetch(`${mailbox()}/message/${messages[0].ID}`)
+        ).json();
+        const text = `${message.Text ?? ""} ${message.HTML ?? ""}`.replaceAll("&amp;", "&");
         link =
-          /https?:\/\/[^\s"<>]+verify[^\s"<>]+/.exec(body.body?.text ?? "")?.[0] ??
+          /https?:\/\/[^\s"'<>]+(?:auth\/confirm|auth\/v1\/verify)[^\s"'<>]+type=recovery[^\s"'<>]*/.exec(text)?.[0] ??
           "";
         return link;
       },
@@ -49,6 +53,24 @@ async function recoveryLink(name: string) {
     )
     .not.toBe("");
   return link;
+}
+const answer = "Si un compte existe pour cet email";
+/** Retries the whole request: a form filled before React settles can be reset under load. */
+async function requestRecovery(
+  page: import("@playwright/test").Page,
+  address: string,
+) {
+  await expect(async () => {
+    await page.goto("/forgot-password");
+    await formReady(page);
+    const input = page.getByLabel("Email", { exact: true });
+    await input.fill(address);
+    await expect(input).toHaveValue(address);
+    await page.getByRole("button", { name: "Envoyer le lien" }).click();
+    await expect(page.locator("p.notice[role=status]")).toContainText(answer, {
+      timeout: 30000,
+    });
+  }).toPass({ timeout: 240000 });
 }
 test("mot de passe oublié : lien e-mail, nouveau mot de passe et anciens identifiants refusés", async ({
   page,
@@ -59,29 +81,19 @@ test("mot de passe oublié : lien e-mail, nouveau mot de passe et anciens identi
   expect(signup.error).toBeNull();
   await page.goto("/login");
   await page.getByRole("link", { name: "Mot de passe oublié ?" }).click();
-  // Unknown accounts receive the same answer: no enumeration.
-  await page.getByLabel("Email", { exact: true }).fill(`inconnu-${name}@example.test`);
-  await formReady(page);
-  await page.getByRole("button", { name: "Envoyer le lien" }).click();
-  const answer = "Si un compte existe pour cet email";
-  await expect(page.locator("p.notice[role=status]")).toContainText(answer, {
-    timeout: 120000,
-  });
-  await page.getByLabel("Email", { exact: true }).fill(email);
-  await formReady(page);
-  await page.getByRole("button", { name: "Envoyer le lien" }).click();
-  await expect(page.locator("p.notice[role=status]")).toContainText(answer, {
-    timeout: 120000,
-  });
-  await page.goto(await recoveryLink(name));
+  // Unknown accounts receive the same answer as known ones: no enumeration.
+  await requestRecovery(page, `inconnu-${name}@example.test`);
+  await requestRecovery(page, email);
+  await page.goto(await recoveryLink(email));
   await expect(page).toHaveURL(/reset-password/);
-  await page.getByLabel("Nouveau mot de passe", { exact: true }).fill(replacement);
-  await page.getByLabel("Confirmer le mot de passe").fill(replacement + "x");
+  await formReady(page);
+  await page.locator('input[name="password"]').fill(replacement);
+  await page.locator('input[name="confirm"]').fill(replacement + "x");
   await formReady(page);
   await page.getByRole("button", { name: "Enregistrer" }).click();
   await expect(page.locator("p.notice")).toContainText("ne correspondent pas");
-  await page.getByLabel("Nouveau mot de passe", { exact: true }).fill(replacement);
-  await page.getByLabel("Confirmer le mot de passe").fill(replacement);
+  await page.locator('input[name="password"]').fill(replacement);
+  await page.locator('input[name="confirm"]').fill(replacement);
   await formReady(page);
   await page.getByRole("button", { name: "Enregistrer" }).click();
   await expect(page).toHaveURL(/dashboard|onboarding/);
