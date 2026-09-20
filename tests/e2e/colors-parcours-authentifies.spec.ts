@@ -82,7 +82,10 @@ test.describe("@colors-auth parcours métier", () => {
 
     await page.getByText("Modifier les informations").click();
     await page.getByLabel("Produit", { exact: true }).fill("Produit corrigé");
-    await page.getByRole("button", { name: "Enregistrer" }).click();
+    // `exact` : « Enregistrer » est aussi un fragment de « Enregistrer la finition » (V1.5).
+    // Sans lui, le sélecteur désignait deux boutons et le test échouait pour une raison de
+    // sélecteur, à chaque passe — pas à cause de la charge du poste.
+    await page.getByRole("button", { name: "Enregistrer", exact: true }).click();
     await page.waitForURL(/ok=informations-mises-a-jour/);
     await expect(page.getByText("Informations mises à jour")).toBeVisible();
 

@@ -1,4 +1,5 @@
 import { LIBELLES_ECART, type ResultatNuancier } from "@/lib/nuancier/correspondance";
+import { BoutonEnvoi } from "@/components/BoutonEnvoi";
 import { FINITIONS, LIBELLES_FINITION, type FinitionSeau } from "@/lib/finition-colors";
 import { confirmerReferenceNuancierAction, definirFinitionAction } from "@/app/actions-metier";
 
@@ -116,7 +117,7 @@ export function CorrespondanceNuancier({
                 ))}
               </select>
             </label>
-            <button className="outline-button" data-test="enregistrer-finition">Enregistrer la finition</button>
+            <BoutonEnvoi className="outline-button" data-test="enregistrer-finition">Enregistrer la finition</BoutonEnvoi>
           </form>
 
           {/*
@@ -130,9 +131,9 @@ export function CorrespondanceNuancier({
             <form action={confirmerReferenceNuancierAction.bind(null, seauId)} className="inline-form">
               <input type="hidden" name="reference" value={resultat.code}/>
               <input type="hidden" name="distance" value={resultat.distance}/>
-              <button className="outline-button" data-test="confirmer-reference">
+              <BoutonEnvoi className="outline-button" data-test="confirmer-reference">
                 Retenir « {resultat.code} » pour ce seau
-              </button>
+              </BoutonEnvoi>
             </form>
           )}
 
@@ -148,7 +149,7 @@ export function CorrespondanceNuancier({
           {reference.code && (
             <form action={confirmerReferenceNuancierAction.bind(null, seauId)} className="inline-form">
               <input type="hidden" name="reference" value=""/>
-              <button className="outline-button" data-test="retirer-reference">Retirer la référence retenue</button>
+              <BoutonEnvoi className="outline-button" data-test="retirer-reference">Retirer la référence retenue</BoutonEnvoi>
             </form>
           )}
         </div>
