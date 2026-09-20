@@ -58,7 +58,7 @@ test("mot de passe oublié : lien e-mail, nouveau mot de passe et anciens identi
   await page.getByLabel("Nouveau mot de passe", { exact: true }).fill(replacement);
   await page.getByLabel("Confirmer le mot de passe").fill(replacement + "x");
   await page.getByRole("button", { name: "Enregistrer" }).click();
-  await expect(page.getByRole("alert")).toContainText("ne correspondent pas");
+  await expect(page.locator("p.notice")).toContainText("ne correspondent pas");
   await page.getByLabel("Nouveau mot de passe", { exact: true }).fill(replacement);
   await page.getByLabel("Confirmer le mot de passe").fill(replacement);
   await page.getByRole("button", { name: "Enregistrer" }).click();
@@ -71,10 +71,12 @@ test("mot de passe oublié : lien e-mail, nouveau mot de passe et anciens identi
 test("liens invalides et messages d'erreur forgés", async ({ page }) => {
   await page.goto("/auth/recovery?code=invalide");
   await expect(page).toHaveURL(/login/);
-  await expect(page.getByRole("alert")).toContainText("Lien invalide ou expiré.");
+  await expect(page.locator("p.notice")).toContainText(
+    "Lien invalide ou expiré.",
+  );
   await page.goto("/reset-password");
   await expect(page).toHaveURL(/login/);
   await page.goto("/login?error=Votre+compte+est+bloque+appelez+le+0800");
-  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(page.locator("p.notice")).toHaveCount(0);
   await expect(page.getByText("0800")).toHaveCount(0);
 });
