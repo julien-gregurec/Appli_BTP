@@ -33,7 +33,9 @@ export default defineConfig({
   webServer: {
     command: "npm run start",
     url: `${baseURL}/login`,
-    reuseExistingServer: false,
-    timeout: 120000,
+    // Fresh server by default. Slow shared machines may extend the start-up wait, and an
+    // iterating developer may reuse an already started server (never used by the gate).
+    reuseExistingServer: process.env.STUDIO_E2E_REUSE_SERVER === "1",
+    timeout: Number(process.env.STUDIO_E2E_SERVER_TIMEOUT_MS || 120000),
   },
 });
