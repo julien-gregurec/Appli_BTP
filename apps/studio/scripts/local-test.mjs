@@ -72,6 +72,8 @@ if (action === "setup") {
   );
   for (let i = 0; i < 10; i++)
     config = config.replaceAll(String(54320 + i), String(base + i));
+  // Disposable stack only: the shipped limit (2 e-mails/hour) starves the recovery E2E on a reused stack.
+  config = config.replace("email_sent = 2", "email_sent = 200");
   config = config.replace(
     'file_size_limit = "50MiB"',
     'file_size_limit = "1GiB"',

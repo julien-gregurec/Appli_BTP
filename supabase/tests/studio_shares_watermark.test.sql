@@ -83,7 +83,7 @@ reset role;set local role service_role;
 select is((public.studio_resolve_render_share(current_setting('test.d.hash1'))->>'width')::int,1080,'server resolves a valid link');
 select ok((public.studio_resolve_render_share(current_setting('test.d.hash1'))->>'storage_key') like 'studio/%/output.mp4','server gets the storage key');
 select is(public.studio_resolve_render_share(encode(extensions.digest('unknown','sha256'),'hex')),null,'unknown secret resolves to nothing');
-select ok(public.studio_resolve_render_share(current_setting('test.d.hash1'))::text not like '%workspace%','resolution exposes no tenant identifier');
+select ok(public.studio_resolve_render_share(current_setting('test.d.hash1'))::text not like '%workspace%','resolution has no workspace field (the storage key holds only opaque UUIDs)');
 reset role;
 
 -- Roles.

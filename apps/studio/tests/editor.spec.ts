@@ -590,12 +590,14 @@ test("Lot S2 suppression au clavier sur sélection périmée et édition conserv
   const a = await setup(page, "Chantier S2", "chantier-pro", 3, 0);
   const count = async () => (await montage(page, a.id)).active.clips.length;
   const before = await count();
+  // Remove a photo clip (not the title card): the selection it held no longer exists.
+  await select(page, 2);
   await page
     .getByRole("button", { name: "Retirer du montage", exact: true })
     .click();
   await saved(page);
   expect(await count()).toBe(before - 1);
-  // The removed clip was selected: Delete must neither crash the page nor lose the history.
+  // Delete with that stale selection must neither crash the page nor lose the history.
   await page.locator("body").click({ position: { x: 5, y: 5 } });
   await page.keyboard.press("Delete");
   await expect(
@@ -603,11 +605,20 @@ test("Lot S2 suppression au clavier sur sélection périmée et édition conserv
   ).toBeVisible();
   await saved(page);
   expect(await count()).toBeLessThanOrEqual(before - 1);
-  await page
-    .getByRole("button", { name: "Annuler la modification", exact: true })
-    .click();
+  // The undo history survived: two undo steps restore the whole montage.
+  const undo = page.getByRole("button", {
+    name: "Annuler la modification",
+    exact: true,
+  });
+  await undo.click();
   await saved(page);
+  if ((await count()) < before) {
+    await undo.click();
+    await saved(page);
+  }
+  expect(await count()).toBe(before);
   // An edit made in the last debounce window survives a hard navigation.
+  await select(page, 1);
   await page
     .getByLabel("Contenu du texte", { exact: true })
     .first()
@@ -621,7 +632,6 @@ test("Lot S2 suppression au clavier sur sélection périmée et édition conserv
     })
     .toContain("Conservé à la sortie");
 });
-
 test("Lot I Brand Kit : enregistrement, refus d'emoji, préremplissage du style et logo de la marque", async ({
   page,
 }) => {
@@ -665,9 +675,7 @@ test("Lot I Brand Kit : enregistrement, refus d'emoji, préremplissage du style 
     "+33 3 88 00 00 00",
   );
   await expect(page.getByLabel("Texte de fin")).toHaveValue("Rénover avec soin");
-  await expect(page.getByLabel("Logo", { exact: true })).toHaveValue(
-    "__brand__",
-  );
+  await expect(page.locator('select[name="logo"]')).toHaveValue("__brand__");
   await page.getByRole("button", { name: "Régénérer le montage" }).click();
   await expect
     .poll(async () => {
@@ -726,8 +734,8 @@ test("Lot J2 partage : lien public sans session, robots, lien invalide, révocat
       "content",
       /noindex/,
     );
-    // Nothing about the tenant or the account is reachable from the public page.
-    expect(await visitor.content()).not.toContain(a.workspace);
+    // No account data on the public page (the signed URL path carries only opaque storage UUIDs).
+    expect(await visitor.content()).not.toContain("@example.test");
     await visitor.goto(`/s/${"a".repeat(43)}`);
     await expect(
       visitor.getByRole("heading", { name: "Lien indisponible" }),

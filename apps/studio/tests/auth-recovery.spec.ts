@@ -3,6 +3,19 @@ import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 test.use({ actionTimeout: 15000 });
 test.describe.configure({ timeout: 420000 });
+// A submit fired before React hydrates the page can be lost under load: wait for the handlers.
+async function formReady(page: import("@playwright/test").Page) {
+  await page.waitForFunction(
+    () => {
+      const button = document.querySelector("form button");
+      return (
+        !!button && Object.keys(button).some((k) => k.startsWith("__reactProps"))
+      );
+    },
+    undefined,
+    { timeout: 120000 },
+  );
+}
 const password = "Studio-Recovery-Local-398!";
 const replacement = "Studio-Nouveau-Local-742!";
 const api = () =>
@@ -48,12 +61,14 @@ test("mot de passe oublié : lien e-mail, nouveau mot de passe et anciens identi
   await page.getByRole("link", { name: "Mot de passe oublié ?" }).click();
   // Unknown accounts receive the same answer: no enumeration.
   await page.getByLabel("Email", { exact: true }).fill(`inconnu-${name}@example.test`);
+  await formReady(page);
   await page.getByRole("button", { name: "Envoyer le lien" }).click();
   const answer = "Si un compte existe pour cet email";
   await expect(page.locator("p.notice[role=status]")).toContainText(answer, {
     timeout: 120000,
   });
   await page.getByLabel("Email", { exact: true }).fill(email);
+  await formReady(page);
   await page.getByRole("button", { name: "Envoyer le lien" }).click();
   await expect(page.locator("p.notice[role=status]")).toContainText(answer, {
     timeout: 120000,
@@ -62,10 +77,12 @@ test("mot de passe oublié : lien e-mail, nouveau mot de passe et anciens identi
   await expect(page).toHaveURL(/reset-password/);
   await page.getByLabel("Nouveau mot de passe", { exact: true }).fill(replacement);
   await page.getByLabel("Confirmer le mot de passe").fill(replacement + "x");
+  await formReady(page);
   await page.getByRole("button", { name: "Enregistrer" }).click();
   await expect(page.locator("p.notice")).toContainText("ne correspondent pas");
   await page.getByLabel("Nouveau mot de passe", { exact: true }).fill(replacement);
   await page.getByLabel("Confirmer le mot de passe").fill(replacement);
+  await formReady(page);
   await page.getByRole("button", { name: "Enregistrer" }).click();
   await expect(page).toHaveURL(/dashboard|onboarding/);
   const old = await api().auth.signInWithPassword({ email, password });

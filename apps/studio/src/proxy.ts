@@ -70,7 +70,9 @@ export async function proxy(request: NextRequest) {
   });
   await client.auth.getUser(); // Refresh only; pages and actions independently verify identity and membership.
   response.headers.set("Content-Security-Policy", csp);
-  response.headers.set("Cache-Control", "private, no-store, max-age=0");
+  // Thumbnails are private but browser-cacheable (they set their own Cache-Control); all else is uncacheable.
+  if (!request.nextUrl.pathname.endsWith("/thumbnail"))
+    response.headers.set("Cache-Control", "private, no-store, max-age=0");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "no-referrer");
   response.headers.set("X-Frame-Options", "DENY");
