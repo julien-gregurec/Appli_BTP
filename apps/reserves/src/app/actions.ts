@@ -3,6 +3,12 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { cheminInterneSur } from "@/lib/redirection-sure";
+import {
+  CODE_ACCES_RESERVES_ABSENT,
+  CODE_DECONNEXION,
+  CODE_IDENTIFIANTS_INVALIDES,
+  CODE_SERVICE_INDISPONIBLE,
+} from "@/lib/messages-auth";
 import { createClient } from "@/lib/supabase/server";
 import {
   MIMES_PHOTO, MIMES_PLAN, TAILLE_MAX_PHOTO, TAILLE_MAX_PLAN,
@@ -16,9 +22,6 @@ import { deposerLienInvitation } from "@/lib/invitation-relais";
 import { estCleIdempotence } from "@/lib/offline/contrat";
 import { deposerObjet } from "@/lib/depot-photo";
 
-const MESSAGE_SANS_RESERVES = "Votre compte ELSATIA ne dispose pas d’un accès actif à Réserves.";
-const MESSAGE_INDISPONIBLE =
-  "Le service d’authentification ne répond pas. Vos identifiants sont probablement corrects : réessayez dans un instant.";
 
 /**
  * Distingue une INDISPONIBILITÉ d'un refus d'identifiants.
@@ -66,17 +69,23 @@ export async function connexionAction(formData: FormData) {
     // Les confondre envoie l'utilisateur chercher une faute de frappe qui n'existe pas,
     // et lui fait ressaisir ses identifiants pendant que le serveur est simplement
     // indisponible — exactement le mauvais geste sur un chantier mal couvert.
-    redirect(`/login?error=${encodeURIComponent(
-      estIndisponibilite(error) ? MESSAGE_INDISPONIBLE : "Identifiants incorrects.",
-    )}`);
+    redirect(`/login?error=${estIndisponibilite(error) ? CODE_SERVICE_INDISPONIBLE : CODE_IDENTIFIANTS_INVALIDES}`);
   }
 
   const { data: contexte, error: erreurContexte } = await supabase
     .rpc("contexte_application_courant")
     .maybeSingle();
-  if (erreurContexte || !contexte) {
+  // Une ERREUR de la RPC n'est pas une ABSENCE d'accès : sous charge, un délai dépassé
+  // faisait annoncer « pas d'accès actif » à une personne parfaitement habilitée, et l'envoyait
+  // demander une habilitation au lieu d'attendre le retour du service. Seule une réponse VIDE,
+  // rendue par le contrat canonique, est une absence.
+  if (erreurContexte) {
     await supabase.auth.signOut();
-    redirect(`/login?error=${encodeURIComponent(MESSAGE_SANS_RESERVES)}`);
+    redirect(`/login?error=${CODE_SERVICE_INDISPONIBLE}`);
+  }
+  if (!contexte) {
+    await supabase.auth.signOut();
+    redirect(`/login?error=${CODE_ACCES_RESERVES_ABSENT}`);
   }
 
   const canonique = contexte as ContexteCanonique;
@@ -86,7 +95,7 @@ export async function connexionAction(formData: FormData) {
   });
   if (erreurAcces) {
     await supabase.auth.signOut();
-    redirect(`/login?error=${encodeURIComponent(MESSAGE_SANS_RESERVES)}`);
+    redirect(`/login?error=${CODE_SERVICE_INDISPONIBLE}`);
   }
   if (autorise === true) redirect(destination);
 
@@ -111,13 +120,13 @@ export async function connexionAction(formData: FormData) {
   // jamais cela comme un mot de passe erroné : la session est fermée et le message dit
   // la vraie raison.
   await supabase.auth.signOut();
-  redirect(`/login?error=${encodeURIComponent(MESSAGE_SANS_RESERVES)}`);
+  redirect(`/login?error=${CODE_ACCES_RESERVES_ABSENT}`);
 }
 
 export async function deconnexionAction() {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  redirect("/login?message=Vous êtes déconnecté");
+  redirect(`/login?message=${CODE_DECONNEXION}`);
 }
 
 // ── Actions métier ──────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ import { Marque } from "@/components/Marque";
 import { connexionAction } from "@/app/actions";
 import { createClient } from "@/lib/supabase/server";
 import { cheminInterneSur } from "@/lib/redirection-sure";
+import { messageConfirmationConnexion, messageErreurConnexion } from "@/lib/messages-auth";
 
 export const metadata: Metadata = { title: "Connexion" };
 
@@ -17,8 +18,8 @@ export default async function PageConnexion({
   const { data: { user } } = await supabase.auth.getUser();
   if (user) redirect("/dashboard");
 
-  const erreur = typeof params.error === "string" ? params.error : null;
-  const message = typeof params.message === "string" ? params.message : null;
+  const erreur = messageErreurConnexion(params.error);
+  const message = messageConfirmationConnexion(params.message);
   const suivant = cheminInterneSur(params.next);
 
   return (
