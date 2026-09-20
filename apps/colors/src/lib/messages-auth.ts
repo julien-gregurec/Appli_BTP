@@ -11,6 +11,13 @@ export const CODE_IDENTIFIANTS_INVALIDES = "identifiants";
 export const CODE_ACCES_COLORS_ABSENT = "acces-colors";
 export const CODE_DECONNEXION = "deconnexion";
 export const CODE_SESSION_EXPIREE = "session-expiree";
+/**
+ * Mot de passe juste, adresse jamais confirmée. GoTrue ne répond `email_not_confirmed`
+ * qu'APRÈS avoir vérifié le mot de passe : ce message n'est donc pas un oracle
+ * d'existence de compte. Le taire renvoyait la personne chercher une faute de frappe
+ * dans un mot de passe qui était correct.
+ */
+export const CODE_EMAIL_NON_CONFIRME = "email-non-confirme";
 /** Le service d'authentification n'a pas répondu. Ce n'est pas un mot de passe faux. */
 export const CODE_SERVICE_INDISPONIBLE = "service-indisponible";
 
@@ -37,6 +44,10 @@ const ERREURS = new Map<string, string>([
   [
     CODE_SERVICE_INDISPONIBLE,
     "Le service d’authentification ELSATIA ne répond pas pour l’instant. Réessayez dans un instant : vos identifiants ne sont pas en cause.",
+  ],
+  [
+    CODE_EMAIL_NON_CONFIRME,
+    "Votre adresse email n’est pas encore confirmée. Ouvrez le message de confirmation ELSATIA reçu à l’inscription : votre mot de passe n’est pas en cause.",
   ],
   [CODE_EMAIL_REQUIS, "Saisissez votre adresse email."],
   [

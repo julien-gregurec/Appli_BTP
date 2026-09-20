@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   CODE_ACCES_COLORS_ABSENT,
   CODE_DECONNEXION,
+  CODE_EMAIL_NON_CONFIRME,
   CODE_IDENTIFIANTS_INVALIDES,
   CODE_SERVICE_INDISPONIBLE,
   messageConfirmationConnexion,
@@ -51,5 +52,14 @@ describe("une panne d'authentification n'est pas un mot de passe faux", () => {
   it("il reste distinct du refus d'identifiants", () => {
     expect(messageErreurConnexion(CODE_SERVICE_INDISPONIBLE))
       .not.toBe(messageErreurConnexion(CODE_IDENTIFIANTS_INVALIDES));
+  });
+});
+
+describe("un e-mail non confirmé n'est pas un mot de passe faux", () => {
+  it("a son propre libellé, qui disculpe le mot de passe et ne cite aucun compte", () => {
+    const libelle = messageErreurConnexion(CODE_EMAIL_NON_CONFIRME);
+    expect(libelle).toMatch(/pas encore confirmée/);
+    expect(libelle).toMatch(/mot de passe n’est pas en cause/);
+    expect(libelle).not.toBe(messageErreurConnexion(CODE_IDENTIFIANTS_INVALIDES));
   });
 });

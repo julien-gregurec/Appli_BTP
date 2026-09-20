@@ -13,6 +13,7 @@ import {
   CODE_ACCES_COLORS_ABSENT,
   CODE_DECONNEXION,
   CODE_DEMANDE_ENVOYEE,
+  CODE_EMAIL_NON_CONFIRME,
   CODE_EMAIL_REQUIS,
   CODE_IDENTIFIANTS_INVALIDES,
   CODE_LIEN_INVALIDE,
@@ -55,6 +56,7 @@ export async function connexionAction(formData: FormData) {
     const panne = error.name === "AuthRetryableFetchError"
       || (typeof error.status === "number" && error.status >= 500);
     if (panne) journaliserEchecTechnique("connexion.service", error);
+    if (error.code === "email_not_confirmed") redirect(`/login?error=${CODE_EMAIL_NON_CONFIRME}`);
     redirect(`/login?error=${panne ? CODE_SERVICE_INDISPONIBLE : CODE_IDENTIFIANTS_INVALIDES}`);
   }
 
