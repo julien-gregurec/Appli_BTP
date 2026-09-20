@@ -1,10 +1,19 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  renderErrorMessage,
+  renderProfileLabel,
+  renderStatusLabel,
+} from "../lib/render-labels";
+const terminal = ["completed", "failed", "cancelled"];
 type Job = {
   id: string;
   timeline_id: string;
   timeline_revision: number;
   status: string;
+  profile: string;
+  width: number;
+  height: number;
   progress_percent: number;
   error_code: string | null;
   error_message: string | null;
@@ -24,7 +33,10 @@ export default function RenderPanel({
     [outputs, setOutputs] = useState<Output[]>([]),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
-    [url, setUrl] = useState("");
+    [url, setUrl] = useState(""),
+    [playing, setPlaying] = useState(""),
+    [quality, setQuality] = useState<"standard" | "hd720">("standard");
+  const renewals = useRef(new Map<string, number>());
   const [remoteState, setRemoteState] = useState<{
     timeline: string;
     revision: number;
@@ -32,6 +44,20 @@ export default function RenderPanel({
   } | null>(null);
   const state = editorState ?? remoteState;
   const endpoint = `/api/renders/${project}`;
+  const load = useCallback(async (): Promise<boolean> => {
+    try {
+      const r = await fetch(endpoint, { cache: "no-store" });
+      const d = await r.json();
+      if (!r.ok) throw Error(d.error);
+      setRemoteState(d.active);
+      setJobs(d.jobs);
+      setOutputs(d.outputs);
+      return (d.jobs as Job[]).some((j) => !terminal.includes(j.status));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Rendus indisponibles.");
+      return true;
+    }
+  }, [endpoint]);
   async function action(body: Record<string, unknown>) {
     setBusy(true);
     setError("");
@@ -53,46 +79,73 @@ export default function RenderPanel({
       if (!r.ok) throw Error(d.error);
       if (d.url) {
         if (body.download) window.location.assign(d.url);
-        else setUrl(d.url);
-      }
+        else {
+          setUrl(d.url);
+          setPlaying(String(body.output));
+        }
+      } else void load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Action refusée.");
     } finally {
       setBusy(false);
     }
   }
+  // Fast while a job is active, slow when idle, paused while the tab is hidden.
   useEffect(() => {
-    let stopped = false;
-    const poll = async () => {
-      try {
-        const r = await fetch(endpoint, { cache: "no-store" });
-        const d = await r.json();
-        if (!r.ok) throw Error(d.error);
-        if (!stopped) {
-          setRemoteState(d.active);
-          setJobs(d.jobs);
-          setOutputs(d.outputs);
-        }
-      } catch (e) {
-        if (!stopped)
-          setError(e instanceof Error ? e.message : "Rendus indisponibles.");
-      }
+    let stopped = false,
+      timer: ReturnType<typeof setTimeout> | undefined;
+    const tick = async () => {
+      const active = await load();
+      if (stopped) return;
+      timer = setTimeout(
+        () => void tick(),
+        document.visibilityState === "hidden" ? 20000 : active ? 1500 : 8000,
+      );
     };
-    void poll();
-    const timer = setInterval(() => void poll(), 1500);
+    const wake = () => {
+      if (document.visibilityState !== "visible") return;
+      clearTimeout(timer);
+      void tick();
+    };
+    void tick();
+    document.addEventListener("visibilitychange", wake);
     return () => {
       stopped = true;
-      clearInterval(timer);
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", wake);
     };
-  }, [endpoint]);
+  }, [load]);
+  // The signed URL lasts one minute: renew it (twice at most) when playback fails after expiry.
+  function renewPlayback() {
+    const n = renewals.current.get(playing) ?? 0;
+    if (!playing || n >= 2) return;
+    renewals.current.set(playing, n + 1);
+    void action({ action: "preview", output: playing });
+  }
   return (
     <section className="card" aria-label="Vidéo exportée">
       <h2>Vidéo exportée</h2>
       {canWrite && (
+        <label>
+          Qualité de la vidéo
+          <select
+            value={quality}
+            onChange={(e) => setQuality(e.target.value as typeof quality)}
+          >
+            <option value="standard">Haute qualité (1080)</option>
+            <option value="hd720">Rapide (720)</option>
+          </select>
+        </label>
+      )}
+      {canWrite && (
         <button
           disabled={busy || editorState?.dirty}
           onClick={() =>
-            void action({ action: "create", requestId: crypto.randomUUID() })
+            void action({
+              action: "create",
+              requestId: crypto.randomUUID(),
+              quality,
+            })
           }
         >
           Créer la vidéo
@@ -134,20 +187,17 @@ export default function RenderPanel({
                 j.timeline_id !== state.timeline ||
                 j.timeline_revision !== state.revision) &&
               "Ancienne version · "}
-            {j.status} · {j.progress_percent} %
+            {renderStatusLabel(j.status)} · {j.progress_percent} %
           </p>
+          <p>{renderProfileLabel(j.profile, j.width, j.height)}</p>
           <progress
             aria-label="Progression du rendu"
             max="100"
             value={j.progress_percent}
           />
-          {j.error_code && (
-            <p>
-              {j.error_code} — {j.error_message}
-            </p>
-          )}
+          {j.error_code && <p>{renderErrorMessage(j.error_code)}</p>}
           {canWrite &&
-            !["completed", "failed", "cancelled"].includes(j.status) && (
+            !terminal.includes(j.status) && (
               <button
                 disabled={busy}
                 onClick={() => void action({ action: "cancel", job: j.id })}
@@ -163,6 +213,7 @@ export default function RenderPanel({
                   action: "create",
                   requestId: crypto.randomUUID(),
                   retry: j.id,
+                  quality: j.profile === "hd720" ? "hd720" : "standard",
                 })
               }
             >
@@ -201,6 +252,7 @@ export default function RenderPanel({
           controls
           preload="metadata"
           aria-label="Vidéo finale"
+          onError={renewPlayback}
           style={{ maxWidth: "100%" }}
         />
       )}

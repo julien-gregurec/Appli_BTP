@@ -2,6 +2,7 @@ import "server-only";
 import { isStudioId } from "@elsatia/studio-domain";
 import { authorizeProject, MediaError } from "./media-service";
 import { renderRefusal } from "./render-refusal";
+import { downloadFileName } from "./render-labels";
 
 const assetMissingMessage = renderRefusal({
   code: "22023",
@@ -15,7 +16,7 @@ export async function getStudioRenders(projectId: string) {
     client
       .from("studio_render_jobs")
       .select(
-        "id,project_id,status,progress_percent,width,height,retry_count,error_code,error_message,created_at,timeline_id,timeline_revision:snapshot->timeline->revision",
+        "id,project_id,status,profile,progress_percent,width,height,retry_count,error_code,error_message,created_at,timeline_id,timeline_revision:snapshot->timeline->revision",
       )
       .eq("project_id", projectId)
       .order("created_at", { ascending: false })
@@ -62,6 +63,7 @@ export async function requestStudioRender(
   retry: string | null,
   preview = false,
   expected?: { timeline: string; revision: number },
+  quality: "standard" | "hd720" = "standard",
 ) {
   const { client } = await authorizeProject(projectId, true);
   if (!isStudioId(requestId) || (retry !== null && !isStudioId(retry)))
@@ -94,7 +96,7 @@ export async function requestStudioRender(
   const profile =
     preview || process.env.STUDIO_RENDER_INTERNAL_PREVIEW === "1"
       ? "preview"
-      : "standard";
+      : quality;
   if (
     expected &&
     (!isStudioId(expected.timeline) || !Number.isSafeInteger(expected.revision))
@@ -138,7 +140,7 @@ export async function getRenderDownloadUrl(
   outputId: string,
   download = false,
 ) {
-  const { client } = await authorizeProject(projectId);
+  const { client, project } = await authorizeProject(projectId);
   if (!isStudioId(outputId)) throw new MediaError("Export inaccessible.", 404);
   const r = await client
     .from("studio_render_outputs")
@@ -151,7 +153,9 @@ export async function getRenderDownloadUrl(
   const signed = await storageAdmin()
     .storage.from("studio-renders")
     .createSignedUrl(r.data.storage_key, 60, {
-      download: download ? "elsatia-studio.mp4" : false,
+      download: download
+        ? downloadFileName(project.name, r.data.width, r.data.height)
+        : false,
     });
   if (signed.error) throw new MediaError("Export indisponible.", 503);
   return { url: signed.data.signedUrl };
