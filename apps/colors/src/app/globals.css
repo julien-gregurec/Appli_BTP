@@ -257,6 +257,8 @@ a { color: inherit; text-decoration: none; }
   .mobile-overlay { position: fixed; inset: 0; z-index: 80; display: block; border: 0; background: rgba(29,19,32,.45); backdrop-filter: blur(3px); }
   .mobile-drawer { position: fixed; inset: 0 auto 0 0; z-index: 90; display: flex; width: min(88vw, 330px); flex-direction: column; background: var(--paper); transform: translateX(-105%); transition: transform .24s ease; }
   .mobile-drawer.open { transform: translateX(0); }
+  .mobile-drawer-footer { margin-top: auto; display: grid; gap: 10px; padding: 16px 18px calc(16px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
+  .mobile-drawer-footer .account-link, .mobile-drawer-footer button { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 44px; }
   .mobile-drawer-head { height: 74px; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; border-bottom: 1px solid var(--line); }
   .mobile-drawer-head button { width: 44px; height: 44px; border: 0; border-radius: 10px; background: #f5eff5; font-size: 24px; }
   .account-avatar { min-width: 44px; width: 44px; height: 44px; }

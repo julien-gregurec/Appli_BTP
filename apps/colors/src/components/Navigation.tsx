@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Brand } from "@/components/Brand";
 import { NavIcon } from "@/components/NavIcon";
 import { NAVIGATION_COLORS } from "@/lib/navigation";
@@ -30,7 +30,12 @@ export function DesktopNavigation() {
   return <LiensNavigation />;
 }
 
-export function MobileNavigation() {
+/**
+ * `pied` est rendu par le serveur (formulaire de déconnexion, lien de compte) et transmis tel quel :
+ * la barre latérale qui les porte sur grand écran disparaît sous 900 px, et sans ce pied la
+ * personne sur téléphone — l'usage terrain de Colors — n'avait AUCUN moyen de se déconnecter.
+ */
+export function MobileNavigation({ pied }: { pied?: ReactNode }) {
   const [ouvert, setOuvert] = useState(false);
   const declencheur = useRef<HTMLButtonElement>(null);
   const tiroir = useRef<HTMLElement>(null);
@@ -80,6 +85,7 @@ export function MobileNavigation() {
           <button type="button" onClick={fermerNavigation} aria-label="Fermer la navigation">×</button>
         </div>
         <LiensNavigation fermer={fermerNavigation} />
+        {pied}
       </aside>}
     </>
   );

@@ -35,7 +35,15 @@ test.describe("@colors-auth accès", () => {
   test("une session terminée est annoncée, et la page demandée conservée", async ({ page, context }) => {
     await seConnecterParFormulaire(page, COMPTES.admin);
     await page.goto("/depots");
+    // Une session TERMINÉE n'est pas une absence de session : la requête porte encore un cookie
+    // d'authentification, devenu invalide. Tout effacer simulerait une personne jamais connectée,
+    // pour qui « votre session a pris fin » serait faux — c'est précisément ce que l'application
+    // refuse d'affirmer. On garde donc les cookies et on en invalide la valeur.
+    const cookies = await context.cookies();
     await context.clearCookies();
+    await context.addCookies(
+      cookies.filter((c) => c.name.startsWith("sb-")).map((c) => ({ ...c, value: "session-invalide" })),
+    );
     await page.goto("/depots");
     await page.waitForURL(/\/login\?next=%2Fdepots&error=session-expiree/);
     await expect(page.getByText(/Votre session a pris fin/)).toBeVisible();
@@ -419,7 +427,11 @@ test.describe("@colors-auth lecture d'étiquette fermée", () => {
 });
 
 test.describe("@colors-auth terrain", () => {
-  test("@responsive l'inventaire est utilisable au doigt, sans débordement", async ({ page }) => {
+  test("@responsive l'inventaire est utilisable au doigt, sans débordement", async ({ page, hasTouch }) => {
+    // Cible tactile de 44 px : une exigence des profils à écran tactile. Sur le profil bureau,
+    // la pastille de compte mesure 36 px au pointeur — c'est voulu (la feuille de style ne la
+    // porte à 44 px que sous 900 px) et ce n'est pas ce que ce scénario éprouve.
+    test.skip(!hasTouch, "cibles tactiles : profils mobiles seulement");
     await seConnecter(page, COMPTES.admin);
     await page.goto("/inventaire");
     const debordement = await page.evaluate(

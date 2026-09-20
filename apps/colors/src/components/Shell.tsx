@@ -45,7 +45,12 @@ export function Shell({
 
       <div className="shell-main">
         <header className="topbar">
-          <div className="mobile-brand"><MobileNavigation/><Brand compact /></div>
+          <div className="mobile-brand"><MobileNavigation pied={
+            <div className="mobile-drawer-footer">
+              <Link href={compteUrl} className="account-link">Compte et abonnements <span>↗</span></Link>
+              <form action={deconnexionAction}><button className="outline-button" type="submit">Se déconnecter</button></form>
+            </div>
+          }/><Brand compact /></div>
           <ApplicationSwitcher contexte={contexte} />
           <div className="topbar-actions">
             <span className="secure-pill"><i/> Accès sécurisé</span>

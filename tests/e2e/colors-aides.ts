@@ -78,6 +78,9 @@ export async function seConnecter(page: Page, email: string, destination: RegExp
 
 export async function seDeconnecter(page: Page) {
   await page.goto("/dashboard");
+  // Sous 900 px la barre latérale n'existe plus : la déconnexion est dans le tiroir de navigation.
+  const menu = page.getByRole("button", { name: "Ouvrir la navigation" });
+  if (await menu.isVisible()) await menu.click();
   await page.getByRole("button", { name: "Se déconnecter" }).first().click();
   await page.waitForURL(/\/login/);
 }
