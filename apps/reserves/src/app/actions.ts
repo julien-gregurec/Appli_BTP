@@ -57,6 +57,17 @@ function cheminSur(valeur: string, defaut: string) {
   return cheminInterneSur(valeur, defaut);
 }
 
+/**
+ * Portée de la déconnexion appliquée à un REFUS d'accès à cette application.
+ *
+ * `supabase.auth.signOut()` vaut `{ scope: "global" }` (auth-js `GoTrueClient.signOut`) : il
+ * invalide tous les refresh tokens du compte, donc les sessions de Gestion Pro, de Réserves,
+ * de Colors, etc. Se voir refuser UNE application ne doit fermer que la session de CELLE-CI.
+ * Les déconnexions globales restent réservées aux gestes explicites : déconnexion volontaire,
+ * changement de mot de passe, et (à venir) compromission ou fermeture de compte.
+ */
+const PORTEE_DECONNEXION_REFUS_ACCES = { scope: "local" } as const;
+
 export async function connexionAction(formData: FormData) {
   const email = texte(formData, "email");
   const password = texte(formData, "password");
@@ -80,11 +91,11 @@ export async function connexionAction(formData: FormData) {
   // demander une habilitation au lieu d'attendre le retour du service. Seule une réponse VIDE,
   // rendue par le contrat canonique, est une absence.
   if (erreurContexte) {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut(PORTEE_DECONNEXION_REFUS_ACCES);
     redirect(`/login?error=${CODE_SERVICE_INDISPONIBLE}`);
   }
   if (!contexte) {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut(PORTEE_DECONNEXION_REFUS_ACCES);
     redirect(`/login?error=${CODE_ACCES_RESERVES_ABSENT}`);
   }
 
@@ -94,7 +105,7 @@ export async function connexionAction(formData: FormData) {
     p_application_code: "reserves",
   });
   if (erreurAcces) {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut(PORTEE_DECONNEXION_REFUS_ACCES);
     redirect(`/login?error=${CODE_SERVICE_INDISPONIBLE}`);
   }
   if (autorise === true) redirect(destination);
@@ -119,7 +130,7 @@ export async function connexionAction(formData: FormData) {
   // Sinon, l'authentification est valide mais l'accès ne l'est pas. On ne présente
   // jamais cela comme un mot de passe erroné : la session est fermée et le message dit
   // la vraie raison.
-  await supabase.auth.signOut();
+  await supabase.auth.signOut(PORTEE_DECONNEXION_REFUS_ACCES);
   redirect(`/login?error=${CODE_ACCES_RESERVES_ABSENT}`);
 }
 

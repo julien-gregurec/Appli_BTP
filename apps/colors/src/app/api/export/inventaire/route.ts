@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getContexteColors } from "@/lib/contexte";
 import { exigerAccesApplication } from "@/lib/applications-elsatia";
+import { refusApiDepuisErreur } from "@/lib/refus-api-colors";
 import { resoudreRoleColors } from "@/lib/acces-colors";
 import { peutEffectuerColors } from "@/lib/permissions-colors";
 import { createClient } from "@/lib/supabase/server";
@@ -32,7 +33,8 @@ const COLONNES = "marque,produit,reference_produit,teinte_nom,teinte_reference,c
  */
 export async function GET() {
   const contexte = await getContexteColors();
-  await exigerAccesApplication(contexte, "colors");
+  try { await exigerAccesApplication(contexte, "colors"); }
+  catch (erreur) { const refus = refusApiDepuisErreur(erreur); if (refus) return refus; throw erreur; }
   if (!contexte.entrepriseId || !peutEffectuerColors(await resoudreRoleColors(contexte), "exporter")) {
     return NextResponse.json({ erreur: "Export non autorisé" }, { status: 403 });
   }

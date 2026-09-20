@@ -34,6 +34,17 @@ function texte(formData: FormData, cle: string) {
   return String(formData.get(cle) ?? "").trim();
 }
 
+/**
+ * Portée de la déconnexion appliquée à un REFUS d'accès à cette application.
+ *
+ * `supabase.auth.signOut()` vaut `{ scope: "global" }` (auth-js `GoTrueClient.signOut`) : il
+ * invalide tous les refresh tokens du compte, donc les sessions de Gestion Pro, de Réserves,
+ * de Colors, etc. Se voir refuser UNE application ne doit fermer que la session de CELLE-CI.
+ * Les déconnexions globales restent réservées aux gestes explicites : déconnexion volontaire,
+ * changement de mot de passe, et (à venir) compromission ou fermeture de compte.
+ */
+const PORTEE_DECONNEXION_REFUS_ACCES = { scope: "local" } as const;
+
 export async function connexionAction(formData: FormData) {
   const email = texte(formData, "email");
   const password = texte(formData, "password");
@@ -79,11 +90,11 @@ export async function connexionAction(formData: FormData) {
     .maybeSingle();
   if (erreurContexte) {
     journaliserEchecTechnique("connexion.contexte", erreurContexte);
-    await supabase.auth.signOut();
+    await supabase.auth.signOut(PORTEE_DECONNEXION_REFUS_ACCES);
     redirect(`/login?error=${CODE_SERVICE_INDISPONIBLE}`);
   }
   if (!contexte) {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut(PORTEE_DECONNEXION_REFUS_ACCES);
     redirect(`/login?error=${CODE_ACCES_COLORS_ABSENT}`);
   }
 
@@ -94,7 +105,7 @@ export async function connexionAction(formData: FormData) {
   });
   if (erreurAcces) {
     journaliserEchecTechnique("connexion.acces", erreurAcces);
-    await supabase.auth.signOut();
+    await supabase.auth.signOut(PORTEE_DECONNEXION_REFUS_ACCES);
     redirect(`/login?error=${CODE_SERVICE_INDISPONIBLE}`);
   }
   if (autorise === true) redirect(destination);
@@ -102,7 +113,7 @@ export async function connexionAction(formData: FormData) {
   // Une authentification valide ne doit jamais être présentée comme un échec
   // de mot de passe. On ferme néanmoins la session non autorisée avant de
   // revenir au formulaire avec le message produit attendu.
-  await supabase.auth.signOut();
+  await supabase.auth.signOut(PORTEE_DECONNEXION_REFUS_ACCES);
   redirect(`/login?error=${CODE_ACCES_COLORS_ABSENT}`);
 }
 

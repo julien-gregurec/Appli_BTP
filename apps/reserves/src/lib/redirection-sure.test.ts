@@ -16,6 +16,17 @@ describe("cheminInterneSur — navigations locales acceptées", () => {
   ])("accepte %s", (entree, attendu) => {
     expect(cheminInterneSur(entree)).toBe(attendu);
   });
+
+  // Destinations réellement émises par Réserves (liens d'e-mail, /login?next=…).
+  it.each([
+    ["/reserve/123", "/reserve/123"],
+    ["/reserves/9f1c2b3a-0000-4000-8000-000000000001", "/reserves/9f1c2b3a-0000-4000-8000-000000000001"],
+    ["/invitation/jeton-opaque", "/invitation/jeton-opaque"],
+    ["/rejoindre/9f1c2b3a-0000-4000-8000-000000000001", "/rejoindre/9f1c2b3a-0000-4000-8000-000000000001"],
+    ["/messages", "/messages"],
+  ])("accepte la destination Réserves %s", (entree, attendu) => {
+    expect(cheminInterneSur(entree, "/dashboard")).toBe(attendu);
+  });
 });
 
 describe("cheminInterneSur — destinations externes refusées", () => {

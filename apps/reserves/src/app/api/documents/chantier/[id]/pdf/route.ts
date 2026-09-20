@@ -34,9 +34,19 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Authentification requise" }, { status: 401 });
 
-  const { data: entete } = await supabase
+  const { data: entete, error: erreurEntete } = await supabase
     .rpc("reserves_export_entete", { p_chantier_id: id })
     .maybeSingle();
+  // Une ERREUR de la RPC n'est pas une ABSENCE de chantier : sous charge, un délai dépassé
+  // annonçait « Chantier introuvable » à une personne parfaitement habilitée. Seule une
+  // réponse VIDE (la RLS n'a rien rendu) reste un 404 — c'est ce qui empêche d'énumérer
+  // les chantiers d'une autre organisation.
+  if (erreurEntete) {
+    return NextResponse.json(
+      { error: "Service momentanément indisponible, réessayez", code: "indisponible" },
+      { status: 503, headers: { "Retry-After": "30", "Cache-Control": "private, no-store" } },
+    );
+  }
   const details = entete as { chantier: string } | null;
   if (!details) return NextResponse.json({ error: "Chantier introuvable" }, { status: 404 });
 

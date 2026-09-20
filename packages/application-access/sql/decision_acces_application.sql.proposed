@@ -1,0 +1,172 @@
+-- PROPOSITION — NON NUMÉROTÉE, NON RÉSERVÉE. Ne pas placer dans supabase/migrations avant le train
+-- de convergence (numéro : NEXT_MIGRATION_AFTER_CONVERGED_TRAIN).
+--
+-- decision_acces_application : décision d'accès AVEC MOTIF. Additive : `a_acces_application` reste
+-- inchangée (compatibilité). Invariant vérifié par le jeu d'essai
+-- (docs/qualification/access-convergence-v1/decision-cases.sql) :
+--     decision = 'autorise'  ⇔  a_acces_application(entreprise, app) = true
+--
+-- Contrat v1 : packages/application-access/src/decision-acces.ts.
+-- Aucun prix, aucun plan, aucune donnée modifiée : lecture seule.
+
+-- ── Noyau : évalue pour un utilisateur donné et rend décision + diagnostic complet ────────────
+create or replace function public._decision_acces_noyau(
+  p_uid uuid, p_entreprise_id uuid, p_application_code text
+) returns jsonb
+language plpgsql security definer stable set search_path = public
+as $$
+declare
+  v_app public.applications_elsatia%rowtype;
+  v_statut_membre text;
+  v_ent public.entreprises%rowtype;
+  v_ae public.acces_applications_entreprises%rowtype;
+  v_hu public.habilitations_applications_utilisateurs%rowtype;
+  v_role_actif boolean;
+  v_admin boolean;
+  v_support boolean := false;
+  v_decision text;
+  v_role text;
+  v_membre boolean := false;
+  v_diag jsonb := '{}'::jsonb;
+begin
+  if p_uid is null then
+    return jsonb_build_object('decision','non_authentifie','membre',false,'diagnostic','{}'::jsonb);
+  end if;
+
+  select * into v_app from public.applications_elsatia where code = p_application_code;
+  if not found or not v_app.actif then
+    return jsonb_build_object('decision','erreur_configuration','membre',false,
+      'diagnostic', jsonb_build_object('cause','application_inconnue_ou_inactive'));
+  end if;
+
+  -- Même condition que a_acces_application : administrateur plateforme actif, identité active.
+  select exists(select 1 from public.plateforme_admins
+                where utilisateur_id = p_uid and actif and statut_identite = 'active') into v_admin;
+  if v_admin then
+    return jsonb_build_object('decision','autorise','role_code','administrateur_plateforme_global','membre',false,
+      'diagnostic', jsonb_build_object('bypass','administrateur_plateforme'));
+  end if;
+
+  if p_entreprise_id is null then
+    return jsonb_build_object('decision','sans_organisation','membre',false,
+      'diagnostic', jsonb_build_object('cause','entreprise_active_nulle'));
+  end if;
+
+  select ue.statut into v_statut_membre from public.utilisateurs_entreprises ue
+   where ue.utilisateur_id = p_uid and ue.entreprise_id = p_entreprise_id;
+  if not found then
+    return jsonb_build_object('decision','sans_organisation','membre',false,
+      'diagnostic', jsonb_build_object('cause','aucune_appartenance'));
+  end if;
+  v_membre := true;
+  v_diag := jsonb_build_object('membre_statut', v_statut_membre);
+
+  if v_statut_membre = 'invite' then
+    return jsonb_build_object('decision','invitation_en_attente','membre',true,'diagnostic',v_diag);
+  elsif v_statut_membre = 'en_attente_validation' then
+    return jsonb_build_object('decision','validation_en_attente','membre',true,'diagnostic',v_diag);
+  elsif v_statut_membre = 'desactive' then
+    return jsonb_build_object('decision','utilisateur_desactive','membre',true,'diagnostic',v_diag);
+  elsif v_statut_membre <> 'actif' then
+    return jsonb_build_object('decision','erreur_configuration','membre',true,
+      'diagnostic', v_diag || jsonb_build_object('cause','statut_membre_inconnu'));
+  end if;
+
+  select * into v_ent from public.entreprises where id = p_entreprise_id;
+  if not found then
+    return jsonb_build_object('decision','erreur_configuration','membre',true,
+      'diagnostic', v_diag || jsonb_build_object('cause','entreprise_introuvable'));
+  end if;
+  -- Une session d'assistance ouverte sur cette entreprise passe l'état d'abonnement (comme est_membre_actif).
+  if p_uid = auth.uid() then v_support := coalesce(public.est_acces_support_actif(p_entreprise_id), false); end if;
+  v_diag := v_diag || jsonb_build_object('abonnement_statut', v_ent.abonnement_statut,
+                                         'suspension_prevue_at', v_ent.suspension_prevue_at,
+                                         'support', v_support);
+  if not v_support then
+    if v_ent.abonnement_statut = 'annule' then
+      return jsonb_build_object('decision','entreprise_inactive','membre',true,'diagnostic',v_diag);
+    elsif v_ent.abonnement_statut = 'suspendu'
+       or (v_ent.suspension_prevue_at is not null and v_ent.suspension_prevue_at <= now()) then
+      return jsonb_build_object('decision','abonnement_suspendu','membre',true,'diagnostic',v_diag);
+    end if;
+  end if;
+
+  -- Droit d'usage de l'organisation.
+  select * into v_ae from public.acces_applications_entreprises
+   where entreprise_id = p_entreprise_id and application_code = p_application_code;
+  if not found or not v_ae.autorise then
+    return jsonb_build_object('decision','application_non_incluse','membre',true,
+      'diagnostic', v_diag || jsonb_build_object('droit_org', case when found then 'desactive' else 'absent' end));
+  end if;
+  if (v_ae.valide_du is not null and v_ae.valide_du > now())
+     or (v_ae.valide_jusqu_au is not null and v_ae.valide_jusqu_au <= now()) then
+    return jsonb_build_object(
+      'decision', case when v_ae.source = 'essai' then 'essai_expire' else 'application_non_incluse' end,
+      'membre',true,
+      'diagnostic', v_diag || jsonb_build_object('droit_org','hors_fenetre','source',v_ae.source,
+                                                 'valide_du',v_ae.valide_du,'valide_jusqu_au',v_ae.valide_jusqu_au));
+  end if;
+
+  -- Habilitation de l'utilisateur.
+  select * into v_hu from public.habilitations_applications_utilisateurs
+   where entreprise_id = p_entreprise_id and utilisateur_id = p_uid and application_code = p_application_code;
+  if not found then
+    return jsonb_build_object('decision','sans_habilitation','membre',true,'diagnostic',v_diag);
+  end if;
+  select r.actif into v_role_actif from public.roles_applications_elsatia r
+   where r.application_code = v_hu.application_code and r.code = v_hu.role_code;
+  if not v_hu.autorise or coalesce(v_role_actif, false) = false
+     or (v_hu.valide_du is not null and v_hu.valide_du > now())
+     or (v_hu.valide_jusqu_au is not null and v_hu.valide_jusqu_au <= now()) then
+    return jsonb_build_object('decision','sans_role','membre',true,
+      'diagnostic', v_diag || jsonb_build_object('role_code',v_hu.role_code,'role_actif',v_role_actif,
+                                                 'habilitation_autorise',v_hu.autorise,
+                                                 'valide_du',v_hu.valide_du,'valide_jusqu_au',v_hu.valide_jusqu_au));
+  end if;
+
+  return jsonb_build_object('decision','autorise','role_code',v_hu.role_code,'membre',true,'diagnostic',v_diag);
+end;
+$$;
+revoke all on function public._decision_acces_noyau(uuid,uuid,text) from public, anon, authenticated, service_role;
+
+-- ── Vue CLIENT : décision + rôle propre + nom d'entreprise SI l'appelant en est membre ───────
+create or replace function public.decision_acces_application(
+  p_application_code text, p_entreprise_id uuid default null
+) returns jsonb
+language plpgsql security definer stable set search_path = public
+as $$
+declare
+  v jsonb := public._decision_acces_noyau(auth.uid(), p_entreprise_id, p_application_code);
+  v_nom text;
+begin
+  if (v->>'membre')::boolean then
+    select nom into v_nom from public.entreprises where id = p_entreprise_id;
+  end if;
+  return jsonb_build_object(
+    'version', 1,
+    'decision', v->>'decision',
+    'application_code', p_application_code,
+    'role_code', case when v->>'decision' = 'autorise' then v->>'role_code' end,
+    'entreprise', case when v_nom is not null then jsonb_build_object('id', p_entreprise_id, 'nom', v_nom) end
+  );
+end;
+$$;
+revoke all on function public.decision_acces_application(text,uuid) from public, anon;
+grant execute on function public.decision_acces_application(text,uuid) to authenticated;
+
+-- ── Vue ADMIN/LOGS : diagnostic complet pour un tiers (administrateur plateforme uniquement) ─
+create or replace function public.diagnostic_acces_application(
+  p_utilisateur_id uuid, p_entreprise_id uuid, p_application_code text
+) returns jsonb
+language plpgsql security definer stable set search_path = public
+as $$
+begin
+  if not public.est_plateforme_admin() then
+    raise exception 'Réservé aux administrateurs de la plateforme' using errcode = '42501';
+  end if;
+  return public._decision_acces_noyau(p_utilisateur_id, p_entreprise_id, p_application_code);
+end;
+$$;
+revoke all on function public.diagnostic_acces_application(uuid,uuid,text) from public, anon;
+grant execute on function public.diagnostic_acces_application(uuid,uuid,text) to authenticated;
+-- À DÉCIDER : exiger aussi rôle plateforme `total` + AAL2 comme les RPC d'habilitation (00239).

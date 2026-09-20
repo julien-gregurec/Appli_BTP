@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
 
-import { connexionAction } from "@/app/actions";
+import { connexionAction, deconnexionAction } from "@/app/actions";
 
 function formulaire(email = "personne@example.test", password = "secret", suivant = "/dashboard") {
   const donnees = new FormData();
@@ -82,7 +82,10 @@ describe("connexion Colors", () => {
     await expect(connexionAction(formulaire())).rejects.toMatchObject({
       destination: "/login?error=acces-colors",
     });
+    // Un refus Colors ne doit fermer QUE la session Colors : `signOut()` sans option vaut
+    // `scope: "global"` et révoquerait aussi les sessions de Gestion Pro, Réserves, Studio…
     expect(supabase.auth.signOut).toHaveBeenCalledOnce();
+    expect(supabase.auth.signOut).toHaveBeenCalledWith({ scope: "local" });
   });
 
   it.each([
@@ -118,6 +121,7 @@ describe("une panne n'est jamais presentee comme une absence de droit", () => {
       destination: "/login?error=service-indisponible",
     });
     expect(supabase.auth.signOut).toHaveBeenCalledOnce();
+    expect(supabase.auth.signOut).toHaveBeenCalledWith({ scope: "local" });
   });
 
   it("un contexte VIDE reste une absence d'acces : la base a repondu", async () => {
@@ -129,5 +133,41 @@ describe("une panne n'est jamais presentee comme une absence de droit", () => {
     await expect(connexionAction(formulaire())).rejects.toMatchObject({
       destination: "/login?error=acces-colors",
     });
+    expect(supabase.auth.signOut).toHaveBeenCalledWith({ scope: "local" });
+  });
+
+  it("une erreur de la décision d'accès annonce aussi le service, en portée locale", async () => {
+    const supabase = client();
+    supabase.rpc = vi.fn().mockImplementation((fonction: string) => {
+      if (fonction === "contexte_application_courant") {
+        return { maybeSingle: vi.fn().mockResolvedValue({ data: { entreprise_id: "entreprise-a" }, error: null }) };
+      }
+      return Promise.resolve({ data: null, error: { code: "57014", message: "statement timeout" } });
+    });
+    mocks.createClient.mockResolvedValue(supabase);
+    await expect(connexionAction(formulaire())).rejects.toMatchObject({
+      destination: "/login?error=service-indisponible",
+    });
+    expect(supabase.auth.signOut).toHaveBeenCalledWith({ scope: "local" });
+  });
+});
+
+describe("déconnexion : quand elle reste globale", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("la déconnexion volontaire n'a pas de portée locale : défaut supabase-js (global)", async () => {
+    const supabase = client();
+    mocks.createClient.mockResolvedValue(supabase);
+    await expect(deconnexionAction()).rejects.toMatchObject({ destination: expect.stringContaining("/login") });
+    expect(supabase.auth.signOut).toHaveBeenCalledOnce();
+    // Aucun argument : l'utilisateur qui se déconnecte de sa propre initiative ferme tout.
+    expect(supabase.auth.signOut).toHaveBeenCalledWith();
+  });
+
+  it("une connexion autorisée ne déconnecte personne", async () => {
+    const supabase = client({ autorise: true });
+    mocks.createClient.mockResolvedValue(supabase);
+    await expect(connexionAction(formulaire())).rejects.toMatchObject({ destination: "/dashboard" });
+    expect(supabase.auth.signOut).not.toHaveBeenCalled();
   });
 });

@@ -56,6 +56,17 @@ export class AccesApplicationRefuseError extends Error {
   }
 }
 
+/**
+ * La décision d'accès n'a pas pu être obtenue (délai, réseau, erreur de la RPC). Ce n'est PAS un
+ * refus : un appelant d'API répond 503, pas 403, et ne déconnecte personne. Message inchangé.
+ */
+export class AccesApplicationIndisponibleError extends Error {
+  constructor(message = "Vérification d’accès indisponible") {
+    super(message);
+    this.name = "AccesApplicationIndisponibleError";
+  }
+}
+
 export function estCodeApplicationElsatia(
   value: unknown,
 ): value is CodeApplicationElsatia {
@@ -82,7 +93,7 @@ export function creerControleAccesApplications(
       p_entreprise_id: ctx.entrepriseId,
       p_application_code: applicationCode,
     });
-    if (error) throw new Error("Vérification d’accès indisponible");
+    if (error) throw new AccesApplicationIndisponibleError();
     return data === true;
   }
 
@@ -102,7 +113,7 @@ export function creerControleAccesApplications(
     const { data, error } = await client.rpc("applications_autorisees", {
       p_entreprise_id: ctx.entrepriseId,
     });
-    if (error) throw new Error("Sélecteur d’applications indisponible");
+    if (error) throw new AccesApplicationIndisponibleError("Sélecteur d’applications indisponible");
     if (!Array.isArray(data)) return [];
 
     return data.flatMap((ligne: {
@@ -145,3 +156,7 @@ export function creerControleAccesApplications(
     listerApplicationsAutorisees,
   };
 }
+
+// Contrat commun de décision d'accès avec motif (additif — voir decision-acces.ts).
+export * from "./decision-acces";
+export * from "./refus-api";
