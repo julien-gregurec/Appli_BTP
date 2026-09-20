@@ -55,6 +55,19 @@ export const safeAreas: Record<
   "1:1": { x: 0.1, top: 0.1, bottom: 0.14 },
   "4:5": { x: 0.1, top: 0.1, bottom: 0.18 },
 };
+// Latin, Cyrillic, Vietnamese/Latin extended, general punctuation, euro and trademark:
+// the ranges every bundled Noto face is verified to cover. Emoji and rare symbols have no glyph.
+const renderableCharacters =
+  /^[\s\u0020-\u007e\u00a0-\u024f\u0400-\u04ff\u1e00-\u1eff\u2010-\u2027\u2030-\u205e\u20ac\u2122]*$/u;
+/** Write-path validation: bounded AND drawable with the bundled fonts, so a render cannot fail on glyphs. */
+export function renderableText(value: string): string {
+  const clean = boundedText(value);
+  if (!renderableCharacters.test(clean))
+    throw new TimelineValidationError(
+      "Ce texte contient des caractères non pris en charge (emoji, symboles rares). Utilisez des lettres, chiffres et ponctuation.",
+    );
+  return clean;
+}
 export function boundedText(value: string): string {
   if (
     typeof value !== "string" ||

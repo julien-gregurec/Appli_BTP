@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import type { StudioRenderJob } from "../../../packages/studio-domain/src/render.ts";
 import { renderTimeline, RenderError, renderMetrics } from "./render.ts";
 import { mayDiscardUpload } from "./cleanup.ts";
+import { renderTimeoutSeconds } from "./timeouts.ts";
 const required = (key: string) => {
   const v = process.env[key];
   if (!v) throw Error(`Missing ${key}`);
@@ -84,7 +85,8 @@ const worker = new Worker<{ id: string }>(
     let stage = "preparing",
       percent = 1,
       pushing: Promise<void> | null = null,
-      published = false;
+      published = false,
+      missedHeartbeats = 0;
     const sync = async () => {
       if (pushing) return pushing;
       pushing = (async () => {
@@ -94,10 +96,15 @@ const worker = new Worker<{ id: string }>(
           p_status: stage,
           p_progress: percent,
         });
+        missedHeartbeats = 0;
+        // false = lease lost or cancellation requested: stop immediately.
         if (!ok) controller.abort();
       })()
         .catch(() => {
-          controller.abort();
+          // A transient database or network failure must not kill a healthy render:
+          // the lease tolerates about a minute without a heartbeat.
+          if (++missedHeartbeats >= 5)
+            controller.abort(new RenderError("HEARTBEAT_LOST"));
         })
         .finally(() => {
           pushing = null;
@@ -107,9 +114,9 @@ const worker = new Worker<{ id: string }>(
     const heartbeat = setInterval(() => void sync(), 1000);
     const timeout = setTimeout(
       () => controller.abort(new RenderError("RENDER_TIMEOUT")),
-      Math.min(
-        3600,
-        Math.max(30, Number(process.env.STUDIO_RENDER_TIMEOUT_SECONDS || 600)),
+      renderTimeoutSeconds(
+        process.env.STUDIO_RENDER_TIMEOUT_SECONDS,
+        job.snapshot.timeline.total_duration_ms,
       ) * 1000,
     );
     let dir = "";
@@ -255,7 +262,9 @@ const worker = new Worker<{ id: string }>(
           : "CANCELLED"
         : error instanceof RenderError
           ? error.code
-          : "RENDER_FAILED";
+          : error instanceof Error && error.message === "FONT_GLYPH_MISSING"
+            ? "TEXT_UNSUPPORTED"
+            : "RENDER_FAILED";
       if (
         process.env.STUDIO_RENDER_DIAGNOSTICS === "1" &&
         error instanceof Error &&

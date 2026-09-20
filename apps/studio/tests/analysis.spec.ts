@@ -123,7 +123,7 @@ async function render(page: Page, id: string) {
   const panel = page.getByRole("region", { name: "Vidéo exportée" });
   await expect(panel.locator("[data-render-job]")).toHaveCount(1);
   const job = panel.locator("[data-render-job]").first();
-  await expect(job.getByRole("status")).toContainText("completed", {
+  await expect(job.getByRole("status")).toContainText("Terminé", {
     timeout: 600000,
   });
   await job.getByRole("button", { name: "Voir la vidéo", exact: true }).click();
