@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { logoutAction } from "@/app/actions/auth";
 import { ouvrirPortailAbonnementSuspenduAction } from "@/app/actions/abonnement";
+import { peutGererAbonnementSuspendu } from "@/lib/acces-support-abonnement";
 
 // GP-EXTERNAL-PILOT-CLOSURE-V1 — expérience compte suspendu (hors moteur
 // billing) : raison générique et exacte selon le motif réel (avant ce
@@ -56,30 +57,17 @@ export default async function AbonnementSuspenduPage({
   );
 }
 
-// Même contrôle que ouvrirPortailAbonnementSuspenduAction (droit gerer_parametres
-// ou accès support actif), en lecture seule ici : ne sert qu'à décider si le
-// bouton doit apparaître, jamais à autoriser l'action elle-même (qui refait sa
-// propre vérification). Requêtes brutes (pas getContexteEntreprise) : cette
-// page EST la destination de sa redirection, l'appeler reboucierait.
+// Même contrôle que ouvrirPortailAbonnementSuspenduAction (via
+// peutGererAbonnementSuspendu, source unique), en lecture seule ici : ne sert
+// qu'à décider si le bouton doit apparaître, jamais à autoriser l'action
+// elle-même (qui revérifie de son côté). Requêtes brutes (pas
+// getContexteEntreprise) : cette page EST la destination de sa redirection,
+// l'appeler rebouclerait.
 async function utilisateurPeutRegulariser(): Promise<boolean> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
   const { data: profil } = await supabase.from("utilisateurs").select("entreprise_active_id").eq("id", user.id).maybeSingle();
   if (!profil?.entreprise_active_id) return false;
-  const [{ data: support }, { data: appartenance }] = await Promise.all([
-    supabase.rpc("est_acces_support_actif", { p_entreprise_id: profil.entreprise_active_id }),
-    supabase.from("utilisateurs_entreprises").select("poste_id").eq("utilisateur_id", user.id).eq("entreprise_id", profil.entreprise_active_id).eq("statut", "actif").maybeSingle(),
-  ]);
-  if (support === true) return true;
-  if (!appartenance?.poste_id) return false;
-  const { data: permission } = await supabase
-    .from("permissions_poste")
-    .select("autorise")
-    .eq("entreprise_id", profil.entreprise_active_id)
-    .eq("poste_id", appartenance.poste_id)
-    .eq("cle_permission", "gerer_parametres")
-    .eq("autorise", true)
-    .maybeSingle();
-  return Boolean(permission);
+  return peutGererAbonnementSuspendu(supabase, user.id, profil.entreprise_active_id);
 }
