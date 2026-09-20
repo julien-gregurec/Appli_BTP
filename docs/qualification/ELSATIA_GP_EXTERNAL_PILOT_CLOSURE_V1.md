@@ -43,7 +43,7 @@ Cinq commits sur `integration/gp-external-pilot-closure-v1`, poussés au fur et
 (qui bootstrappe Postgres+GoTrue+PostgREST+Storage localement) est donc
 inexécutable ici. Conséquence directe et assumée :
 
-- **pgTAP n'a jamais tourné cette nuit.** 6 fichiers de tests pgTAP ont été
+- **pgTAP n'a jamais tourné cette nuit.** 7 fichiers de tests pgTAP ont été
   écrits pour les nouvelles fonctionnalités (voir tableau), relus attentivement,
   mais **aucun n'a été exécuté**. Trois migrations SQL de cette nuit
   (`20260916000302`, `303`, `304`) n'ont pas de suite pgTAP dédiée du tout.
@@ -77,7 +77,8 @@ la toute première chose à faire avant tout pilote réel.**
 | **Devis sans identité émettrice figée** | `factures.entreprise_snapshot` existait, `devis` non — logo/adresse/CGV d'un devis envoyé changeaient si l'entreprise modifiait sa fiche | Colonne + trigger de capture + verrou d'immuabilité, symétriques à ceux des factures ; rendu v2 et RPC de partage public mis à jour pour préférer le snapshot figé | `20260916000303...sql` | Logique revue ; **non testé en base** |
 | **Paiement (encaissement) — course TOCTOU** | `enregistrerPaiementAction` : `select` puis `insert` direct, sans verrou ; double clic/deux sessions pouvaient dépasser `montant_ttc` | RPC `enregistrer_paiement_facture` avec `for update` sur la facture + **`revoke insert` sur `paiements` pour `authenticated`** (trouvé manquant en revue indépendante, corrigé) | `20260916000301...sql` (corrigé par `e109954` après revue) | Logique revue deux fois (dont une revue indépendante) ; **non testé en base** |
 | **Avoir — double création possible** | Verrou pris sur le devis mais aucune règle anti-doublon pour `type='avoir'` : double clic = deux avoirs intégraux | Index unique partiel `factures_avoir_unique_par_origine` + pré-check + résolution `unique_violation` | Même migration | Logique revue ; **non testé en base**. ⚠️ Une régression a été introduite puis corrigée le même soir : la recréation de `creer_facture_avancee` avait par erreur repris la version *pré-avenants* (`20260818000211`) au lieu de la dernière réelle (`20260818000215`, plafond `montant_contractuel_devis`) — détecté par la revue indépendante, corrigé dans `e109954` |
-| **Session support plateforme — persistance permanente** | `est_membre_actif`/`a_permission` traitent une session support active comme un membre actif PARTOUT, y compris sur `utilisateurs_entreprises`/`permissions_poste` (INSERT) : un support pouvait s'ajouter un siège ou une permission permanente, survivant à la fin de la session | Nouvelle fonction `est_membre_actif_reel` (sans le OU support) utilisée spécifiquement sur ces deux policies créatrices d'état permanent | `20260916000304...sql` | Logique revue ; **non testé en base**. Reste ouvert : l'auto-promotion de rôle plateforme (`plateforme_ajouter_admin`, lecture→total) — simplification V1 documentée, rôles non encore appliqués nulle part, jugé structurel, non touché |
+| **Session support plateforme — persistance permanente** | `est_membre_actif`/`a_permission` traitent une session support active comme un membre actif PARTOUT, y compris sur `utilisateurs_entreprises`/`permissions_poste` (INSERT) : un support pouvait s'ajouter un siège ou une permission permanente, survivant à la fin de la session | Nouvelle fonction `est_membre_actif_reel` (sans le OU support) utilisée spécifiquement sur ces deux policies créatrices d'état permanent | `20260916000304...sql` | Logique revue ; **non testé en base** |
+| **Auto-promotion de rôle plateforme** — correction de trajectoire en cours de nuit : d'abord classé « cosmétique, non exploitable » (rôles jamais vérifiés nulle part), puis **requalifié en exploitable** après vérification que `20260719000115` a bien introduit une application réelle des rôles (`plateforme_exiger_role`, utilisée par les fonctions d'abonnement/tarifs/impayés réservées à 'total'/'facturation') — sans jamais mettre à jour `plateforme_ajouter_admin`, qui ne vérifie toujours que « est membre plateforme », n'importe quel rôle. Un membre en 'lecture' pouvait donc s'auto-promouvoir 'total' et obtenir un accès réel aux fonctions désormais protégées | `plateforme_ajouter_admin`/`plateforme_retirer_admin` exigent maintenant `plateforme_exiger_role('total')` (les deux comptes fondateurs restent 'total' par seed direct en base, jamais via cette RPC — bootstrap non affecté) | `20260916000309...sql` + `supabase/tests/gp_pilot_plateforme_admin_role_total.test.sql` (6 assertions, non exécuté) | Logique revue ; **non testé en base**. Exemple concret de pourquoi ce rapport reste `NOT READY` : une conclusion tirée sans revérifier une migration ultérieure aurait laissé une vraie faille ouverte |
 | **`relance_finaliser` sans contrôle de droit** | N'importe quel membre actif (même sans `gerer_devis`/`gerer_factures`) pouvait forger le résultat d'une relance manuelle | Même contrôle `a_permission` que `relance_reclamer`, dérivé de `type_document` | Même migration (`20260916000304`) | Logique revue ; **non testé en base** |
 | **`relances_documents` : SELECT retiré par erreur à `authenticated`** | Historique des relances invisible sur les pages devis/facture (échec silencieux, pas une fuite) | `grant select` restauré (INSERT/UPDATE/DELETE restent fermés, volontaire) | Même migration | Logique revue ; **non testé en base** |
 | **Export RGPD sans manifeste de fichiers** | Données tabulaires exportées, mais aucun résumé « quels fichiers, où, à qui » | `manifeste_fichiers_entreprise()` (devis-medias, chantier-documents, notes-frais, bulletins-paie, cartes BTP, signatures) intégré à `exporter_donnees_entreprise` | `20260916000305...sql` + `supabase/tests/gp_pilot_rgpd_manifeste_fichiers.test.sql` (9 assertions, non exécuté) | Couvre les buckets métier principaux, **pas un ZIP** (hors périmètre assumé) ; non testé en base |
@@ -158,11 +159,12 @@ ensemble (même fonction, `exporter_donnees_entreprise`).
   lecture des deux systèmes de relance, ancien et nouveau) ; deux failles
   adjacentes réelles trouvées et fermées (`relance_finaliser`, grant
   `relances_documents`).
-- Session support plateforme : le risque concret (persistance permanente)
-  fermé ; le risque structurel (auto-promotion de rôle plateforme) documenté,
-  non fermé — `LEGAL REVIEW REQUIRED` / `DECISION_REQUIRED` sur la voie à
-  choisir (implémenter le moindre privilège par rôle, ou accepter que
-  `plateforme_admins` reste "tout ou rien" pour l'instant).
+- Session support plateforme : la persistance permanente est fermée. L'auto-
+  promotion de rôle plateforme (`plateforme_ajouter_admin`) est **également
+  fermée** — trouvaille tardive, corrigée dans le même lot après avoir vérifié
+  qu'une migration ultérieure (`20260719000115`) rend les rôles plateforme
+  réellement contraignants ailleurs (ce qui n'était pas le cas à l'écriture de
+  `plateforme_ajouter_admin`, jamais mise à jour depuis).
 - `employes` : fondation posée (vue), fermeture complète non faite.
 - Revue indépendante (`/code-review`, effort élevé) passée sur tout le diff :
   3 trouvailles, les 3 corrigées et re-vérifiées (tsc/eslint/vitest/build
@@ -208,7 +210,7 @@ ensemble (même fonction, `exporter_donnees_entreprise`).
 | ESLint (fichiers touchés) | ✅ Vert |
 | Vitest (suite complète) | ✅ Vert — 1150 tests passés, 3 skip, 0 échec (120 fichiers) |
 | `next build` (Turbopack) | ✅ Vert — cassé au départ (dépendances manquantes), corrigé et revérifié 4 fois au fil des changements |
-| pgTAP (6 nouvelles suites + suites existantes) | ❌ **Non exécuté** — pas de Docker/Supabase CLI dans cet environnement |
+| pgTAP (7 nouvelles suites + suites existantes) | ❌ **Non exécuté** — pas de Docker/Supabase CLI dans cet environnement |
 | Fresh (base neuve → migrations → fixtures → tests) | ❌ Non exécuté, même raison |
 | Upgrade (base antérieure réaliste → migration par migration) | ❌ Non exécuté, même raison |
 | Bancs de concurrence | ❌ Non exécuté, même raison |
@@ -235,12 +237,13 @@ qu'il en reste d'autres, invisibles sans exécution réelle, n'est pas nulle.
 1. **Faire tourner les 7 suites pgTAP de cette nuit** (`document_partage_public_par_jeton_v1`,
    `factures_relance_auto_exclue_verrou_v1`, `gp_pilot_paiement_avoir_idempotence`,
    `gp_pilot_rgpd_manifeste_fichiers`, `gp_pilot_notification_devis_accepte`,
-   `gp_pilot_document_partage_medias`, plus les suites pgTAP existantes non
-   rejouées) sur une pile Supabase locale réelle (`supabase start` +
-   `supabase test db`), et corriger ce qu'elles révèlent. Aucune migration de
-   cette nuit n'a de test pgTAP dédié pour `20260916000302` (gel échéance),
-   `20260916000303` (snapshot entreprise devis) et `20260916000304` (session
-   support / relance_finaliser) — à ajouter avant de les considérer clos.
+   `gp_pilot_document_partage_medias`, `gp_pilot_plateforme_admin_role_total`,
+   plus les suites pgTAP existantes non rejouées) sur une pile Supabase locale
+   réelle (`supabase start` + `supabase test db`), et corriger ce qu'elles
+   révèlent. Aucune migration de cette nuit n'a de test pgTAP dédié pour
+   `20260916000302` (gel échéance), `20260916000303` (snapshot entreprise
+   devis) et la partie session-support de `20260916000304` — à ajouter avant
+   de les considérer clos.
 2. **Rejouer Fresh et Upgrade** (base neuve, puis base réaliste avec documents
    émis/paiements/salariés) pour confirmer que les 9 nouvelles migrations
    s'appliquent proprement sur les 240 existantes, dans les deux sens.
@@ -250,12 +253,7 @@ qu'il en reste d'autres, invisibles sans exécution réelle, n'est pas nulle.
    « le produit journalise les actions internes » et « le produit peut
    prouver qu'un client a dit oui », qui est probablement la première
    question du pilote et de son assureur/comptable.
-4. **Décider (`DECISION_REQUIRED`)** de la voie pour `plateforme_admins` :
-   implémenter réellement le moindre privilège par rôle (`lecture`/`support`/
-   `facturation`/`total`), ou documenter formellement que c'est tout-ou-rien
-   pour ce pilote. Voie réversible recommandée : documenter pour l'instant,
-   ne pas construire un nouveau système de permissions cette semaine.
-5. Fermer complètement `employes` (policy SELECT resserrée + migration des
+4. Fermer complètement `employes` (policy SELECT resserrée + migration des
    points de lecture identifiés vers `employes_annuaire` ou une RPC dédiée),
    idempotence entreprise/client/chantier, et un audit du cycle de vie des
    demandes de support — dans cet ordre de priorité décroissante.
