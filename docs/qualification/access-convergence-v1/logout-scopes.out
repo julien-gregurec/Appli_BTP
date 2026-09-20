@@ -1,0 +1,17 @@
+signup (compte fictif, base jetable)                           HTTP 200 
+connexion « Gestion Pro » (une session par application)        HTTP 200 
+connexion « Colors » (une session par application)             HTTP 200 
+connexion « Réserves » (une session par application)           HTTP 200 
+-- Colors refuse l'accès : signOut({ scope:'local' }) sur la session Colors
+POST /logout?scope=local (session Colors)                      HTTP 204 
+  session Colors : GET /user avec son jeton d'accès            HTTP 403 session_not_found
+  session Colors : refresh du refresh token                    HTTP 400 refresh_token_not_found
+  session GP : GET /user (toujours valide ?)                   HTTP 200 
+  session GP : refresh                                         HTTP 200 
+  session Réserves : refresh                                   HTTP 200 
+-- Comportement ACTUEL : signOut() sans option = scope global, déclenché par un refus dans une app
+connexion « Colors (2e tentative) » (une session par application) HTTP 200 
+POST /logout?scope=global (refus Colors, code actuel)          HTTP 204 
+  session GP : GET /user après le logout global                HTTP 403 session_not_found
+  session GP : refresh après le logout global                  HTTP 400 refresh_token_not_found
+  session Réserves : refresh après le logout global            HTTP 400 refresh_token_not_found

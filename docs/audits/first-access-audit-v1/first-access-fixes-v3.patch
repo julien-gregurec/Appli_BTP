@@ -1,0 +1,273 @@
+diff --git a/apps/colors/src/app/actions.ts b/apps/colors/src/app/actions.ts
+index 0285a01..856a3e6 100644
+--- a/apps/colors/src/app/actions.ts
++++ b/apps/colors/src/app/actions.ts
+@@ -45,7 +45,7 @@ export async function connexionAction(formData: FormData) {
+     .rpc("contexte_application_courant")
+     .maybeSingle();
+   if (erreurContexte || !contexte) {
+-    await supabase.auth.signOut();
++    await supabase.auth.signOut({ scope: "local" });
+     redirect(`/login?error=${CODE_ACCES_COLORS_ABSENT}`);
+   }
+ 
+@@ -55,7 +55,7 @@ export async function connexionAction(formData: FormData) {
+     p_application_code: "colors",
+   });
+   if (erreurAcces) {
+-    await supabase.auth.signOut();
++    await supabase.auth.signOut({ scope: "local" });
+     redirect(`/login?error=${CODE_ACCES_COLORS_ABSENT}`);
+   }
+   if (autorise === true) redirect(destination);
+@@ -63,7 +63,7 @@ export async function connexionAction(formData: FormData) {
+   // Une authentification valide ne doit jamais être présentée comme un échec
+   // de mot de passe. On ferme néanmoins la session non autorisée avant de
+   // revenir au formulaire avec le message produit attendu.
+-  await supabase.auth.signOut();
++  await supabase.auth.signOut({ scope: "local" });
+   redirect(`/login?error=${CODE_ACCES_COLORS_ABSENT}`);
+ }
+ 
+diff --git a/apps/reserves/src/app/actions.ts b/apps/reserves/src/app/actions.ts
+index 7d4beac..d0d3de3 100644
+--- a/apps/reserves/src/app/actions.ts
++++ b/apps/reserves/src/app/actions.ts
+@@ -3,6 +3,7 @@
+ import { redirect } from "next/navigation";
+ import { revalidatePath } from "next/cache";
+ import { createClient } from "@/lib/supabase/server";
++import { cheminInterneSur } from "@/lib/redirection-sure";
+ import {
+   MIMES_PHOTO, MIMES_PLAN, TAILLE_MAX_PHOTO, TAILLE_MAX_PLAN,
+ } from "@/lib/images";
+@@ -45,7 +46,7 @@ function texteOuNull(formData: FormData, cle: string) {
+ }
+ 
+ function cheminSur(valeur: string, defaut: string) {
+-  return valeur.startsWith("/") && !valeur.startsWith("//") ? valeur : defaut;
++  return cheminInterneSur(valeur, defaut);
+ }
+ 
+ export async function connexionAction(formData: FormData) {
+@@ -69,7 +70,7 @@ export async function connexionAction(formData: FormData) {
+     .rpc("contexte_application_courant")
+     .maybeSingle();
+   if (erreurContexte || !contexte) {
+-    await supabase.auth.signOut();
++    await supabase.auth.signOut({ scope: "local" });
+     redirect(`/login?error=${encodeURIComponent(MESSAGE_SANS_RESERVES)}`);
+   }
+ 
+@@ -79,7 +80,7 @@ export async function connexionAction(formData: FormData) {
+     p_application_code: "reserves",
+   });
+   if (erreurAcces) {
+-    await supabase.auth.signOut();
++    await supabase.auth.signOut({ scope: "local" });
+     redirect(`/login?error=${encodeURIComponent(MESSAGE_SANS_RESERVES)}`);
+   }
+   if (autorise === true) redirect(destination);
+@@ -104,7 +105,7 @@ export async function connexionAction(formData: FormData) {
+   // Sinon, l'authentification est valide mais l'accès ne l'est pas. On ne présente
+   // jamais cela comme un mot de passe erroné : la session est fermée et le message dit
+   // la vraie raison.
+-  await supabase.auth.signOut();
++  await supabase.auth.signOut({ scope: "local" });
+   redirect(`/login?error=${encodeURIComponent(MESSAGE_SANS_RESERVES)}`);
+ }
+ 
+diff --git a/apps/reserves/src/app/auth/callback/route.ts b/apps/reserves/src/app/auth/callback/route.ts
+index 536900b..4dc3364 100644
+--- a/apps/reserves/src/app/auth/callback/route.ts
++++ b/apps/reserves/src/app/auth/callback/route.ts
+@@ -1,5 +1,6 @@
+ import { NextResponse } from "next/server";
+ import { createClient } from "@/lib/supabase/server";
++import { cheminInterneSur } from "@/lib/redirection-sure";
+ 
+ export async function GET(request: Request) {
+   const url = new URL(request.url);
+@@ -9,6 +10,6 @@ export async function GET(request: Request) {
+     const supabase = await createClient();
+     await supabase.auth.exchangeCodeForSession(code);
+   }
+-  const destination = suivant?.startsWith("/") && !suivant.startsWith("//") ? suivant : "/dashboard";
++  const destination = cheminInterneSur(suivant, "/dashboard");
+   return NextResponse.redirect(new URL(destination, url.origin));
+ }
+diff --git a/apps/reserves/src/lib/redirection-sure.test.ts b/apps/reserves/src/lib/redirection-sure.test.ts
+new file mode 100644
+index 0000000..3c0c3a7
+--- /dev/null
++++ b/apps/reserves/src/lib/redirection-sure.test.ts
+@@ -0,0 +1,77 @@
++import { describe, expect, it } from "vitest";
++
++import { DESTINATION_INTERNE_PAR_DEFAUT, cheminInterneSur } from "@/lib/redirection-sure";
++
++const REPLI = DESTINATION_INTERNE_PAR_DEFAUT;
++
++describe("cheminInterneSur — navigations locales acceptées", () => {
++  it.each([
++    ["/", "/"],
++    ["/dashboard", "/dashboard"],
++    ["/profil", "/profil"],
++    ["/login?x=1", "/login?x=1"],
++    ["/foo#bar", "/foo#bar"],
++    ["/inventaire/9f1c2b3a-0000-4000-8000-000000000001", "/inventaire/9f1c2b3a-0000-4000-8000-000000000001"],
++    ["/inventaire?etat=ouvert&depot=hall%201", "/inventaire?etat=ouvert&depot=hall%201"],
++  ])("accepte %s", (entree, attendu) => {
++    expect(cheminInterneSur(entree)).toBe(attendu);
++  });
++});
++
++describe("cheminInterneSur — destinations externes refusées", () => {
++  it.each([
++    ["schéma absolu https", "https://evil.example.com"],
++    ["schéma absolu http", "http://evil.example.com"],
++    ["chemin relatif au protocole", "//evil.example.com"],
++    ["barre oblique inverse littérale", "/\\evil.example.com"],
++    ["barre oblique inverse encodée", "/%5Cevil.example.com"],
++    ["tabulation encodée", "/%09/evil.example.com"],
++    ["tabulation littérale", "/\t/evil.example.com"],
++    ["injection CRLF encodée", "/%0d%0aLocation:https://evil.example.com"],
++    ["injection CRLF littérale", "/\r\nLocation:https://evil.example.com"],
++    ["schéma javascript", "javascript:alert(1)"],
++    ["schéma data", "data:text/html,test"],
++    ["schéma javascript encodé en casse mixte", "JaVaScRiPt:alert(1)"],
++    ["hôte externe avec identifiants", "https://colors.elsatia.fr@evil.example.com/"],
++    ["barre oblique inverse doublement encodée", "/%255Cevil.example.com"],
++    ["blanc de tête", " //evil.example.com"],
++    ["retour à la ligne de tête", "\n//evil.example.com"],
++    ["caractère nul encodé", "/%00//evil.example.com"],
++    ["chemin relatif", "dashboard"],
++    ["chemin remontant relatif", "../../evil"],
++  ])("refuse %s", (_cas, entree) => {
++    expect(cheminInterneSur(entree)).toBe(REPLI);
++  });
++});
++
++describe("cheminInterneSur — valeurs absentes ou malformées", () => {
++  it.each([
++    ["null", null],
++    ["undefined", undefined],
++    ["chaîne vide", ""],
++    ["tableau (searchParams répété)", ["/dashboard", "/inventaire"]],
++    ["nombre", 42],
++    ["objet", { toString: () => "/inventaire" }],
++  ])("replie sur la destination interne pour %s", (_cas, entree) => {
++    expect(cheminInterneSur(entree)).toBe(REPLI);
++  });
++
++  it.each([
++    ["pourcentage isolé", "/%"],
++    ["séquence pourcent incomplète", "/foo%E0%A4"],
++    ["séquence pourcent invalide", "/foo%zz"],
++  ])("ne lève jamais sur %s", (_cas, entree) => {
++    expect(() => cheminInterneSur(entree)).not.toThrow();
++    expect(cheminInterneSur(entree)).toBe(REPLI);
++  });
++});
++
++describe("cheminInterneSur — repli explicite", () => {
++  it("respecte le repli fourni par l’appelant", () => {
++    expect(cheminInterneSur("https://evil.example.com", "/login")).toBe("/login");
++  });
++
++  it("n’utilise pas le repli quand la destination est locale", () => {
++    expect(cheminInterneSur("/inventaire", "/login")).toBe("/inventaire");
++  });
++});
+diff --git a/apps/reserves/src/lib/redirection-sure.ts b/apps/reserves/src/lib/redirection-sure.ts
+new file mode 100644
+index 0000000..17aa415
+--- /dev/null
++++ b/apps/reserves/src/lib/redirection-sure.ts
+@@ -0,0 +1,86 @@
++/**
++ * Validation centrale des destinations de redirection interne.
++ *
++ * Point de vérité unique pour toute valeur de navigation reçue de l'extérieur :
++ * `next` du callback d'authentification, `next` du formulaire de connexion,
++ * `next` de l'URL de `/login`. Aucune logique concurrente ne doit subsister
++ * ailleurs dans l'application.
++ */
++
++/** Destination retenue dès que la valeur reçue n'est pas une navigation locale sûre. */
++export const DESTINATION_INTERNE_PAR_DEFAUT = "/dashboard";
++
++/**
++ * Origine témoin servant de base à l'analyse WHATWG. Elle n'est jamais émise :
++ * seule l'égalité `url.origin === ORIGINE_TEMOIN` atteste que la valeur reste
++ * locale. Le TLD `.invalid` est réservé (RFC 2606) et ne peut être enregistré.
++ */
++const ORIGINE_TEMOIN = "https://origine.invalid";
++
++/**
++ * Caractères de contrôle que l'analyseur d'URL supprime ou normalise
++ * silencieusement : C0, DEL, C1, séparateurs de ligne Unicode, BOM. Leur
++ * présence — brute ou obtenue après décodage — suffit à écarter la valeur.
++ * L'espace simple en est exclu à dessein : il ne peut apparaître en tête (la
++ * valeur doit commencer par `/`) et reste ré-encodé par l'analyseur ailleurs.
++ */
++const CARACTERES_NEUTRALISES = /[\u0000-\u001f\u007f-\u009f\u2028\u2029\ufeff]/;
++
++/** Nombre de passes de décodage pourcent avant abandon. */
++const PASSES_DECODAGE = 3;
++
++function estFormeDangereuse(valeur: string): boolean {
++  if (valeur === "") return true;
++  // Un chemin local commence toujours par une barre oblique unique : tout le
++  // reste est un schéma absolu (http:, javascript:, data:…) ou un chemin
++  // relatif au protocole.
++  if (!valeur.startsWith("/")) return true;
++  if (valeur.startsWith("//")) return true;
++  // WHATWG normalise `\` en `/` pour les schémas spéciaux : `/\evil.example`
++  // devient `//evil.example`, donc une origine externe.
++  if (valeur.includes("\\")) return true;
++  if (CARACTERES_NEUTRALISES.test(valeur)) return true;
++  return false;
++}
++
++/**
++ * Renvoie une destination interne sûre, ou `repli` si la valeur reçue ne peut
++ * pas être prouvée locale. Ne lève jamais.
++ */
++export function cheminInterneSur(
++  valeur: unknown,
++  repli: string = DESTINATION_INTERNE_PAR_DEFAUT,
++): string {
++  if (typeof valeur !== "string") return repli;
++
++  // 1. Formes dangereuses, y compris celles qui n'apparaissent qu'une fois
++  //    l'encodage pourcent défait (`%5C`, `%09`, `%0d%0a`…).
++  let courant = valeur;
++  for (let passe = 0; passe < PASSES_DECODAGE; passe += 1) {
++    if (estFormeDangereuse(courant)) return repli;
++    if (!courant.includes("%")) break;
++    let decode: string;
++    try {
++      decode = decodeURIComponent(courant);
++    } catch {
++      return repli; // séquence pourcent invalide : valeur écartée sans exception.
++    }
++    if (decode === courant) break;
++    courant = decode;
++  }
++  if (estFormeDangereuse(courant)) return repli;
++
++  // 2. Preuve d'origine : la valeur, résolue contre l'origine témoin, doit y rester.
++  let url: URL;
++  try {
++    url = new URL(valeur, ORIGINE_TEMOIN);
++  } catch {
++    return repli;
++  }
++  if (url.origin !== ORIGINE_TEMOIN) return repli;
++
++  // 3. On ne renvoie jamais la chaîne d'entrée mais sa forme normalisée par
++  //    l'analyseur, revérifiée une dernière fois.
++  const destination = `${url.pathname}${url.search}${url.hash}`;
++  return estFormeDangereuse(destination) ? repli : destination;
++}

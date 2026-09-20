@@ -1,0 +1,132 @@
+label | probe | result
+c1-auth-seul | applications_autorisees | (vide)
+c1-auth-seul | contexte_abonnement_courant (GP) | (aucune ligne)
+c1-auth-seul | contexte_acces_proxy(acces_devis) (GP) | {"connecte": true, "droit_acces": false, "compte_depot": false, "acces_support": false, "droit_gestion": false, "entreprise_id": null}
+c1-auth-seul | contexte_application_courant | (aucune ligne)
+c1-auth-seul | tools_lister_entreprises_autorisees | (aucune)
+c1-auth-seul | tools_resoudre_entitlements (niveau perso) | free / source=free-default
+c1-auth-seul | a_acces_application(colors) | false
+c1-auth-seul | a_acces_application(gestion_pro) | false
+c1-auth-seul | a_acces_application(reserves) | false
+c1-auth-seul | a_acces_application(tools) | false
+c10-habilitation-retiree | applications_autorisees | (vide)
+c10-habilitation-retiree | contexte_abonnement_courant (GP) | (e1000000-0000-4000-8000-000000000001,"ENTREPRISE-A (active, droits org sur les 4 apps)",ENT-005,,actif,,2026-09-20,2026-10-20,,,f)
+c10-habilitation-retiree | contexte_acces_proxy(acces_devis) (GP) | {"connecte": true, "droit_acces": false, "compte_depot": false, "acces_support": false, "droit_gestion": false, "entreprise_id": "e1000000-0000-4000-8000-000000000001"}
+c10-habilitation-retiree | contexte_application_courant | e1000000-0000-4000-8000-000000000001/ENTREPRISE-A (active, droits org sur les 4 apps)
+c10-habilitation-retiree | tools_lister_entreprises_autorisees | (aucune)
+c10-habilitation-retiree | tools_resoudre_entitlements (niveau perso) | free / source=free-default
+c10-habilitation-retiree | a_acces_application(colors) | false
+c10-habilitation-retiree | a_acces_application(gestion_pro) | false
+c10-habilitation-retiree | a_acces_application(reserves) | false
+c10-habilitation-retiree | a_acces_application(tools) | false
+c11-droit-org-expire | applications_autorisees | (vide)
+c11-droit-org-expire | contexte_abonnement_courant (GP) | (e5000000-0000-4000-8000-000000000005,"ENTREPRISE-E (droit org EXPIRÉ)",ENT-008,,actif,,2026-09-20,2026-10-20,,,f)
+c11-droit-org-expire | contexte_acces_proxy(acces_devis) (GP) | {"connecte": true, "droit_acces": false, "compte_depot": false, "acces_support": false, "droit_gestion": false, "entreprise_id": "e5000000-0000-4000-8000-000000000005"}
+c11-droit-org-expire | contexte_application_courant | e5000000-0000-4000-8000-000000000005/ENTREPRISE-E (droit org EXPIRÉ)
+c11-droit-org-expire | tools_lister_entreprises_autorisees | (aucune)
+c11-droit-org-expire | tools_resoudre_entitlements (niveau perso) | free / source=free-default
+c11-droit-org-expire | a_acces_application(colors) | false
+c11-droit-org-expire | a_acces_application(gestion_pro) | false
+c11-droit-org-expire | a_acces_application(reserves) | false
+c11-droit-org-expire | a_acces_application(tools) | false
+c12-admin-plateforme-actif | applications_autorisees | colors:administrateur_plateforme_global, drone:administrateur_plateforme_global, gestion_pro:administrateur_plateforme_global, reserves:administrateur_plateforme_global, tools:administrateur_plateforme_global
+c12-admin-plateforme-actif | contexte_abonnement_courant (GP) | (aucune ligne)
+c12-admin-plateforme-actif | contexte_acces_proxy(acces_devis) (GP) | {"connecte": true, "droit_acces": false, "compte_depot": false, "acces_support": false, "droit_gestion": false, "entreprise_id": null}
+c12-admin-plateforme-actif | contexte_application_courant | (aucune ligne)
+c12-admin-plateforme-actif | tools_lister_entreprises_autorisees | (aucune)
+c12-admin-plateforme-actif | tools_resoudre_entitlements (niveau perso) | free / source=free-default
+c12-admin-plateforme-actif | a_acces_application(colors) | true
+c12-admin-plateforme-actif | a_acces_application(gestion_pro) | true
+c12-admin-plateforme-actif | a_acces_application(reserves) | true
+c12-admin-plateforme-actif | a_acces_application(tools) | true
+c13-admin-plateforme-en-attente(julien) | applications_autorisees | (vide)
+c13-admin-plateforme-en-attente(julien) | contexte_abonnement_courant (GP) | (aucune ligne)
+c13-admin-plateforme-en-attente(julien) | contexte_acces_proxy(acces_devis) (GP) | {"connecte": true, "droit_acces": false, "compte_depot": false, "acces_support": false, "droit_gestion": false, "entreprise_id": null}
+c13-admin-plateforme-en-attente(julien) | contexte_application_courant | (aucune ligne)
+c13-admin-plateforme-en-attente(julien) | tools_lister_entreprises_autorisees | (aucune)
+c13-admin-plateforme-en-attente(julien) | tools_resoudre_entitlements (niveau perso) | free / source=free-default
+c13-admin-plateforme-en-attente(julien) | a_acces_application(colors) | false
+c13-admin-plateforme-en-attente(julien) | a_acces_application(gestion_pro) | false
+c13-admin-plateforme-en-attente(julien) | a_acces_application(reserves) | false
+c13-admin-plateforme-en-attente(julien) | a_acces_application(tools) | false
+c1b-sans-profil-gp | applications_autorisees | (vide)
+c1b-sans-profil-gp | contexte_abonnement_courant (GP) | (aucune ligne)
+c1b-sans-profil-gp | contexte_acces_proxy(acces_devis) (GP) | {"connecte": true, "droit_acces": false, "compte_depot": false, "acces_support": false, "droit_gestion": false, "entreprise_id": null}
+c1b-sans-profil-gp | contexte_application_courant | (aucune ligne)
+c1b-sans-profil-gp | tools_lister_entreprises_autorisees | (aucune)
+c1b-sans-profil-gp | tools_resoudre_entitlements (niveau perso) | free / source=free-default
+c1b-sans-profil-gp | a_acces_application(colors) | false
+c1b-sans-profil-gp | a_acces_application(gestion_pro) | false
+c1b-sans-profil-gp | a_acces_application(reserves) | false
+c1b-sans-profil-gp | a_acces_application(tools) | false
+c3-membre-sans-droit-org | applications_autorisees | (vide)
+c3-membre-sans-droit-org | contexte_abonnement_courant (GP) | (e2000000-0000-4000-8000-000000000002,"ENTREPRISE-B (active, AUCUN droit org)",ENT-006,,actif,,2026-09-20,2026-10-20,,,f)
+c3-membre-sans-droit-org | contexte_acces_proxy(acces_devis) (GP) | {"connecte": true, "droit_acces": false, "compte_depot": false, "acces_support": false, "droit_gestion": false, "entreprise_id": "e2000000-0000-4000-8000-000000000002"}
+c3-membre-sans-droit-org | contexte_application_courant | e2000000-0000-4000-8000-000000000002/ENTREPRISE-B (active, AUCUN droit org)
+c3-membre-sans-droit-org | tools_lister_entreprises_autorisees | (aucune)
+c3-membre-sans-droit-org | tools_resoudre_entitlements (niveau perso) | free / source=free-default
+c3-membre-sans-droit-org | a_acces_application(colors) | false
+c3-membre-sans-droit-org | a_acces_application(gestion_pro) | false
+c3-membre-sans-droit-org | a_acces_application(reserves) | false
+c3-membre-sans-droit-org | a_acces_application(tools) | false
+c4-droit-org-sans-role | applications_autorisees | (vide)
+c4-droit-org-sans-role | contexte_abonnement_courant (GP) | (e1000000-0000-4000-8000-000000000001,"ENTREPRISE-A (active, droits org sur les 4 apps)",ENT-005,,actif,,2026-09-20,2026-10-20,,,f)
+c4-droit-org-sans-role | contexte_acces_proxy(acces_devis) (GP) | {"connecte": true, "droit_acces": false, "compte_depot": false, "acces_support": false, "droit_gestion": false, "entreprise_id": "e1000000-0000-4000-8000-000000000001"}
+c4-droit-org-sans-role | contexte_application_courant | e1000000-0000-4000-8000-000000000001/ENTREPRISE-A (active, droits org sur les 4 apps)
+c4-droit-org-sans-role | tools_lister_entreprises_autorisees | (aucune)
+c4-droit-org-sans-role | tools_resoudre_entitlements (niveau perso) | free / source=free-default
+c4-droit-org-sans-role | a_acces_application(colors) | false
+c4-droit-org-sans-role | a_acces_application(gestion_pro) | false
+c4-droit-org-sans-role | a_acces_application(reserves) | false
+c4-droit-org-sans-role | a_acces_application(tools) | false
+c5-role-sans-droit-org | applications_autorisees | (vide)
+c5-role-sans-droit-org | contexte_abonnement_courant (GP) | (e2000000-0000-4000-8000-000000000002,"ENTREPRISE-B (active, AUCUN droit org)",ENT-006,,actif,,2026-09-20,2026-10-20,,,f)
+c5-role-sans-droit-org | contexte_acces_proxy(acces_devis) (GP) | {"connecte": true, "droit_acces": false, "compte_depot": false, "acces_support": false, "droit_gestion": false, "entreprise_id": "e2000000-0000-4000-8000-000000000002"}
+c5-role-sans-droit-org | contexte_application_courant | e2000000-0000-4000-8000-000000000002/ENTREPRISE-B (active, AUCUN droit org)
+c5-role-sans-droit-org | tools_lister_entreprises_autorisees | (aucune)
+c5-role-sans-droit-org | tools_resoudre_entitlements (niveau perso) | free / source=free-default
+c5-role-sans-droit-org | a_acces_application(colors) | false
+c5-role-sans-droit-org | a_acces_application(gestion_pro) | false
+c5-role-sans-droit-org | a_acces_application(reserves) | false
+c5-role-sans-droit-org | a_acces_application(tools) | false
+c6-acces-complet | applications_autorisees | colors:colors_consultation, gestion_pro:gestion_pro_utilisateur, reserves:reserves_consultation, tools:tools_pro
+c6-acces-complet | contexte_abonnement_courant (GP) | (e1000000-0000-4000-8000-000000000001,"ENTREPRISE-A (active, droits org sur les 4 apps)",ENT-005,,actif,,2026-09-20,2026-10-20,,,f)
+c6-acces-complet | contexte_acces_proxy(acces_devis) (GP) | {"connecte": true, "droit_acces": false, "compte_depot": false, "acces_support": false, "droit_gestion": false, "entreprise_id": "e1000000-0000-4000-8000-000000000001"}
+c6-acces-complet | contexte_application_courant | e1000000-0000-4000-8000-000000000001/ENTREPRISE-A (active, droits org sur les 4 apps)
+c6-acces-complet | tools_lister_entreprises_autorisees | (e1000000-0000-4000-8000-000000000001,"ENTREPRISE-A (active, droits org sur les 4 apps)",t)
+c6-acces-complet | tools_resoudre_entitlements (niveau perso) | free / source=free-default
+c6-acces-complet | a_acces_application(colors) | true
+c6-acces-complet | a_acces_application(gestion_pro) | true
+c6-acces-complet | a_acces_application(reserves) | true
+c6-acces-complet | a_acces_application(tools) | true
+c7-entreprise-suspendue | applications_autorisees | (vide)
+c7-entreprise-suspendue | contexte_abonnement_courant (GP) | (e4000000-0000-4000-8000-000000000004,"ENTREPRISE-D (SUSPENDUE, droits org)",ENT-007,,suspendu,,2026-09-20,2026-10-20,,,f)
+c7-entreprise-suspendue | contexte_acces_proxy(acces_devis) (GP) | {"connecte": true, "droit_acces": false, "compte_depot": false, "acces_support": false, "droit_gestion": false, "entreprise_id": "e4000000-0000-4000-8000-000000000004"}
+c7-entreprise-suspendue | contexte_application_courant | e4000000-0000-4000-8000-000000000004/ENTREPRISE-D (SUSPENDUE, droits org)
+c7-entreprise-suspendue | tools_lister_entreprises_autorisees | (aucune)
+c7-entreprise-suspendue | tools_resoudre_entitlements (niveau perso) | free / source=free-default
+c7-entreprise-suspendue | a_acces_application(colors) | false
+c7-entreprise-suspendue | a_acces_application(gestion_pro) | false
+c7-entreprise-suspendue | a_acces_application(reserves) | false
+c7-entreprise-suspendue | a_acces_application(tools) | false
+c8-desactive | applications_autorisees | (vide)
+c8-desactive | contexte_abonnement_courant (GP) | (e1000000-0000-4000-8000-000000000001,"ENTREPRISE-A (active, droits org sur les 4 apps)",ENT-005,,actif,,2026-09-20,2026-10-20,,,f)
+c8-desactive | contexte_acces_proxy(acces_devis) (GP) | {"connecte": true, "droit_acces": false, "compte_depot": false, "acces_support": false, "droit_gestion": false, "entreprise_id": "e1000000-0000-4000-8000-000000000001"}
+c8-desactive | contexte_application_courant | (aucune ligne)
+c8-desactive | tools_lister_entreprises_autorisees | (aucune)
+c8-desactive | tools_resoudre_entitlements (niveau perso) | free / source=free-default
+c8-desactive | a_acces_application(colors) | false
+c8-desactive | a_acces_application(gestion_pro) | false
+c8-desactive | a_acces_application(reserves) | false
+c8-desactive | a_acces_application(tools) | false
+c9-invite-en-attente | applications_autorisees | (vide)
+c9-invite-en-attente | contexte_abonnement_courant (GP) | (e1000000-0000-4000-8000-000000000001,"ENTREPRISE-A (active, droits org sur les 4 apps)",ENT-005,,actif,,2026-09-20,2026-10-20,,,f)
+c9-invite-en-attente | contexte_acces_proxy(acces_devis) (GP) | {"connecte": true, "droit_acces": false, "compte_depot": false, "acces_support": false, "droit_gestion": false, "entreprise_id": "e1000000-0000-4000-8000-000000000001"}
+c9-invite-en-attente | contexte_application_courant | (aucune ligne)
+c9-invite-en-attente | tools_lister_entreprises_autorisees | (aucune)
+c9-invite-en-attente | tools_resoudre_entitlements (niveau perso) | free / source=free-default
+c9-invite-en-attente | a_acces_application(colors) | false
+c9-invite-en-attente | a_acces_application(gestion_pro) | false
+c9-invite-en-attente | a_acces_application(reserves) | false
+c9-invite-en-attente | a_acces_application(tools) | false
+(130 rows)

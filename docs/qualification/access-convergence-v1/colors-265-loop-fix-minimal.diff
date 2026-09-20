@@ -1,0 +1,321 @@
+diff --git a/apps/colors/src/app/abonnement-requis/page.tsx b/apps/colors/src/app/abonnement-requis/page.tsx
+index 58070c07..816bd2fa 100644
+--- a/apps/colors/src/app/abonnement-requis/page.tsx
++++ b/apps/colors/src/app/abonnement-requis/page.tsx
+@@ -1,13 +1,18 @@
+ import type { Metadata } from "next";
++import { redirect } from "next/navigation";
+ import { Brand } from "@/components/Brand";
+ import { deconnexionAction } from "@/app/actions";
+-import { getContexteColors } from "@/lib/contexte";
++import { ENTREPRISE_PAR_DEFAUT, lireContexteRefus } from "@/lib/contexte";
+ 
+ export const metadata: Metadata = { title: "Abonnement requis" };
+ 
++/** Page terminale : même règle que `/acces-refuse`, aucun contexte redirigeant. */
+ export default async function AbonnementRequisPage() {
+-  const contexte = await getContexteColors();
++  const contexte = await lireContexteRefus();
++  if (!contexte.authentifie) redirect("/login");
++
+   const compteUrl = process.env.NEXT_PUBLIC_ELSATIA_ACCOUNT_URL ?? "http://localhost:3000/abonnement";
++  const organisation = contexte.entrepriseNom ?? ENTREPRISE_PAR_DEFAUT;
+   return (
+     <main className="denied-page">
+       <section className="denied-card">
+@@ -15,7 +20,7 @@ export default async function AbonnementRequisPage() {
+         <div className="denied-symbol" aria-hidden="true">◌</div>
+         <span className="eyebrow">Droit organisation requis</span>
+         <h1>ELSATIA Colors n’est pas activé</h1>
+-        <p>L’organisation <strong>{contexte.entrepriseNom}</strong> ne dispose pas actuellement d’un droit d’usage Colors actif. Cette situation est distincte de vos habilitations personnelles.</p>
++        <p>L’organisation <strong>{organisation}</strong> ne dispose pas actuellement d’un droit d’usage Colors actif. Cette situation est distincte de vos habilitations personnelles.</p>
+         <div className="denied-actions">
+           <a className="primary" href={compteUrl}>Voir les produits ELSATIA</a>
+           <form action={deconnexionAction}><button type="submit">Se déconnecter</button></form>
+diff --git a/apps/colors/src/app/acces-refuse/page.tsx b/apps/colors/src/app/acces-refuse/page.tsx
+index f03c9c1e..44b00254 100644
+--- a/apps/colors/src/app/acces-refuse/page.tsx
++++ b/apps/colors/src/app/acces-refuse/page.tsx
+@@ -1,13 +1,24 @@
+ import type { Metadata } from "next";
++import { redirect } from "next/navigation";
+ import { Brand } from "@/components/Brand";
+ import { deconnexionAction } from "@/app/actions";
+-import { getContexteColors } from "@/lib/contexte";
++import { ENTREPRISE_PAR_DEFAUT, lireContexteRefus } from "@/lib/contexte";
++import { explicationRefus } from "@/lib/messages-refus";
+ 
+ export const metadata: Metadata = { title: "Accès non habilité" };
+ 
+-export default async function AccesRefusePage() {
+-  const contexte = await getContexteColors();
++/**
++ * Page terminale : elle ne redirige que vers `/login`, et uniquement pour une
++ * session absente. Elle n'appelle jamais `getContexteColors`, qui redirigerait
++ * ici même — la boucle historique. `/login` renvoie les sessions valides vers
++ * `/dashboard` et non vers cette page : aucun rebond n'est possible.
++ */
++export default async function AccesRefusePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
++  const [params, contexte] = await Promise.all([searchParams, lireContexteRefus()]);
++  if (!contexte.authentifie) redirect("/login");
++
+   const compteUrl = process.env.NEXT_PUBLIC_ELSATIA_ACCOUNT_URL ?? "http://localhost:3000/abonnement";
++  const organisation = contexte.entrepriseNom ?? ENTREPRISE_PAR_DEFAUT;
+   return (
+     <main className="denied-page">
+       <section className="denied-card">
+@@ -15,7 +26,7 @@ export default async function AccesRefusePage() {
+         <div className="denied-symbol" aria-hidden="true">⌁</div>
+         <span className="eyebrow">Habilitation utilisateur requise</span>
+         <h1>Votre accès Colors doit être autorisé</h1>
+-        <p><strong>{contexte.entrepriseNom}</strong> dispose de Colors, mais votre compte n’a pas d’habilitation active. Contactez l’administrateur Colors de votre organisation.</p>
++        <p><strong>{organisation}</strong> — {explicationRefus(params.motif)}</p>
+         <div className="denied-actions">
+           <a className="primary" href={compteUrl}>Ouvrir le compte ELSATIA</a>
+           <form action={deconnexionAction}><button type="submit">Se déconnecter</button></form>
+diff --git a/apps/colors/src/lib/acces-refuse.test.ts b/apps/colors/src/lib/acces-refuse.test.ts
+new file mode 100644
+index 00000000..3d7a4228
+--- /dev/null
++++ b/apps/colors/src/lib/acces-refuse.test.ts
+@@ -0,0 +1,135 @@
++import { beforeEach, describe, expect, it, vi } from "vitest";
++import { readFileSync } from "node:fs";
++import { fileURLToPath } from "node:url";
++
++vi.mock("server-only", () => ({}));
++
++const mocks = vi.hoisted(() => ({
++  createClient: vi.fn(),
++  redirect: vi.fn((cible: string) => {
++    throw new Error(`REDIRECT:${cible}`);
++  }),
++}));
++vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
++vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
++
++import { getContexteColors, lireContexteRefus } from "@/lib/contexte";
++import { MOTIF_APPARTENANCE, MOTIF_PAR_DEFAUT, explicationRefus } from "@/lib/messages-refus";
++
++function source(chemin: string) {
++  return readFileSync(fileURLToPath(new URL(chemin, import.meta.url)), "utf8");
++}
++
++const PAGE_ACCES_REFUSE = source("../app/acces-refuse/page.tsx");
++const PAGE_ABONNEMENT = source("../app/abonnement-requis/page.tsx");
++const CONTEXTE = source("./contexte.ts");
++
++function client({ user, contexte }: { user: unknown; contexte: unknown }) {
++  return {
++    auth: { getUser: vi.fn().mockResolvedValue({ data: { user } }) },
++    rpc: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: contexte, error: null }) }),
++  };
++}
++
++/** Exécute l'appel et renvoie la cible de redirection émise. */
++async function cible(execution: Promise<unknown>) {
++  try {
++    await execution;
++  } catch (erreur) {
++    return String((erreur as Error).message).replace("REDIRECT:", "");
++  }
++  throw new Error("aucune redirection émise");
++}
++
++describe("boucle /acces-refuse — moitié amont reproduite", () => {
++  beforeEach(() => vi.clearAllMocks());
++
++  it.each([
++    ["contrat canonique absent", null],
++    ["contexte désignant une autre personne", { utilisateur_id: "u2", entreprise_nom: "Autre" }],
++    [
++      "compte sans entreprise ni rôle plateforme",
++      { utilisateur_id: "u1", entreprise_id: null, entreprise_nom: "", est_admin_plateforme: false },
++    ],
++  ])("getContexteColors renvoie vers /acces-refuse (%s)", async (_cas, contexte) => {
++    mocks.createClient.mockResolvedValue(client({ user: { id: "u1" }, contexte }));
++    // Moitié amont de la boucle historique : la page /acces-refuse appelait
++    // elle-même getContexteColors et recevait donc cette redirection en retour,
++    // indéfiniment. La moitié aval est fermée par l'invariant ci-dessous.
++    await expect(cible(getContexteColors())).resolves.toBe("/acces-refuse?motif=appartenance");
++  });
++});
++
++describe("boucle /acces-refuse — invariant structurel", () => {
++  it("getContexteColors renvoie bien vers /acces-refuse (origine de la boucle)", () => {
++    expect(CONTEXTE).toContain("redirect(`/acces-refuse?motif=${MOTIF_APPARTENANCE}`)");
++  });
++
++  it("aucune page terminale n’appelle le contexte redirigeant", () => {
++    // C’était exactement la boucle : /acces-refuse appelait getContexteColors,
++    // qui redirige vers /acces-refuse pour la population que la page accueille.
++    for (const page of [PAGE_ACCES_REFUSE, PAGE_ABONNEMENT]) {
++      const imports = [...page.matchAll(/import\s*\{([^}]+)\}\s*from\s*"@\/lib\/contexte"/g)]
++        .flatMap((m) => m[1].split(",").map((nom) => nom.trim()));
++      expect(imports).toContain("lireContexteRefus");
++      expect(imports).not.toContain("getContexteColors");
++    }
++  });
++
++  it("aucune page terminale ne peut se rediriger vers elle-même", () => {
++    for (const page of [PAGE_ACCES_REFUSE, PAGE_ABONNEMENT]) {
++      const cibles = [...page.matchAll(/redirect\("([^"]+)"\)/g)].map((m) => m[1]);
++      expect(cibles).toEqual(["/login"]);
++      expect(cibles).not.toContain("/acces-refuse");
++      expect(cibles).not.toContain("/abonnement-requis");
++    }
++  });
++});
++
++describe("lireContexteRefus — jamais de redirection", () => {
++  beforeEach(() => vi.clearAllMocks());
++
++  it("signale l’absence de session sans rediriger", async () => {
++    mocks.createClient.mockResolvedValue(client({ user: null, contexte: null }));
++    await expect(lireContexteRefus()).resolves.toEqual({ authentifie: false, entrepriseNom: null });
++  });
++
++  it("accueille une session sans contrat canonique — le cas qui bouclait", async () => {
++    mocks.createClient.mockResolvedValue(client({ user: { id: "u1" }, contexte: null }));
++    await expect(lireContexteRefus()).resolves.toEqual({ authentifie: true, entrepriseNom: null });
++  });
++
++  it("accueille une session dont le contexte désigne une autre personne", async () => {
++    mocks.createClient.mockResolvedValue(
++      client({ user: { id: "u1" }, contexte: { utilisateur_id: "u2", entreprise_nom: "Autre" } }),
++    );
++    await expect(lireContexteRefus()).resolves.toEqual({ authentifie: true, entrepriseNom: null });
++  });
++
++  it("accueille un compte sans entreprise (admin plateforme compris)", async () => {
++    mocks.createClient.mockResolvedValue(
++      client({ user: { id: "u1" }, contexte: { utilisateur_id: "u1", entreprise_id: null, entreprise_nom: "", est_admin_plateforme: true } }),
++    );
++    await expect(lireContexteRefus()).resolves.toEqual({ authentifie: true, entrepriseNom: null });
++  });
++
++  it("restitue la raison sociale d’un utilisateur rattaché mais non habilité", async () => {
++    mocks.createClient.mockResolvedValue(
++      client({ user: { id: "u1" }, contexte: { utilisateur_id: "u1", entreprise_id: "e1", entreprise_nom: "SARL Peinture", est_admin_plateforme: false } }),
++    );
++    await expect(lireContexteRefus()).resolves.toEqual({ authentifie: true, entrepriseNom: "SARL Peinture" });
++  });
++});
++
++describe("motif de refus — jeu fermé", () => {
++  it("explicite le motif connu", () => {
++    expect(explicationRefus(MOTIF_APPARTENANCE)).toContain("aucune organisation");
++  });
++
++  it("n’affiche jamais un texte arbitraire reçu par l’URL", () => {
++    expect(explicationRefus("Compte suspendu — appelez le 01 23 45 67 89")).toBe(MOTIF_PAR_DEFAUT);
++    expect(explicationRefus("__proto__")).toBe(MOTIF_PAR_DEFAUT);
++    expect(explicationRefus(["appartenance"])).toBe(MOTIF_PAR_DEFAUT);
++    expect(explicationRefus(undefined)).toBe(MOTIF_PAR_DEFAUT);
++  });
++});
+diff --git a/apps/colors/src/lib/contexte.ts b/apps/colors/src/lib/contexte.ts
+index 6635f0bd..14dd2d3d 100644
+--- a/apps/colors/src/lib/contexte.ts
++++ b/apps/colors/src/lib/contexte.ts
+@@ -2,6 +2,7 @@ import "server-only";
+ import { cache } from "react";
+ import { redirect } from "next/navigation";
+ import { createClient } from "@/lib/supabase/server";
++import { MOTIF_APPARTENANCE } from "@/lib/messages-refus";
+ import type { RoleApplicationColors } from "@elsatia/application-access";
+ 
+ export type ContexteColors = {
+@@ -22,6 +23,8 @@ type ContexteApplicationCourant = {
+   est_admin_plateforme: boolean;
+ };
+ 
++export const ENTREPRISE_PAR_DEFAUT = "Votre organisation";
++
+ export const getContexteColors = cache(async (): Promise<ContexteColors> => {
+   const supabase = await createClient();
+   const { data: { user } } = await supabase.auth.getUser();
+@@ -31,17 +34,51 @@ export const getContexteColors = cache(async (): Promise<ContexteColors> => {
+   if (error) throw new Error("Contexte ELSATIA indisponible");
+   const contexte = data as ContexteApplicationCourant | null;
+   if (!contexte || contexte.utilisateur_id !== user.id) {
+-    redirect("/acces-refuse?motif=appartenance");
++    redirect(`/acces-refuse?motif=${MOTIF_APPARTENANCE}`);
+   }
+-  if (!contexte.entreprise_id && !contexte.est_admin_plateforme) redirect("/acces-refuse?motif=appartenance");
++  if (!contexte.entreprise_id && !contexte.est_admin_plateforme) redirect(`/acces-refuse?motif=${MOTIF_APPARTENANCE}`);
+ 
+   return {
+     userId: user.id,
+     email: user.email ?? null,
+     prenom: contexte.prenom,
+     entrepriseId: contexte.entreprise_id,
+-    entrepriseNom: contexte.entreprise_nom || "Votre organisation",
++    entrepriseNom: contexte.entreprise_nom || ENTREPRISE_PAR_DEFAUT,
+     estAdminPlateforme: contexte.est_admin_plateforme === true,
+     roleColors: null,
+   };
+ });
++
++export type ContexteRefus = {
++  /** Une session Supabase valide est présente. */
++  authentifie: boolean;
++  /**
++   * Raison sociale connue, ou `null` lorsque le contrat canonique ne rattache
++   * la personne à aucune organisation exploitable.
++   */
++  entrepriseNom: string | null;
++};
++
++/**
++ * Lecture de contexte **sans aucune redirection**.
++ *
++ * `getContexteColors` renvoie vers `/acces-refuse` dès que le contrat canonique
++ * ne rattache pas la personne à une organisation. Les pages de refus ne peuvent
++ * donc pas s'appuyer dessus : `/acces-refuse` qui appelle `getContexteColors`
++ * se redirige vers lui-même indéfiniment pour exactement la population qu'il
++ * est censé accueillir. Cette lecture-ci ne redirige jamais et constitue le
++ * seul contexte admissible sur une page terminale. Volontairement hors `cache`
++ * de React : une page terminale ne la lit qu'une fois.
++ */
++export async function lireContexteRefus(): Promise<ContexteRefus> {
++  const supabase = await createClient();
++  const { data: { user } } = await supabase.auth.getUser();
++  if (!user) return { authentifie: false, entrepriseNom: null };
++
++  const { data } = await supabase.rpc("contexte_application_courant").maybeSingle();
++  const contexte = data as ContexteApplicationCourant | null;
++  if (!contexte || contexte.utilisateur_id !== user.id) {
++    return { authentifie: true, entrepriseNom: null };
++  }
++  return { authentifie: true, entrepriseNom: contexte.entreprise_nom || null };
++}
+diff --git a/apps/colors/src/lib/messages-refus.ts b/apps/colors/src/lib/messages-refus.ts
+new file mode 100644
+index 00000000..3102b723
+--- /dev/null
++++ b/apps/colors/src/lib/messages-refus.ts
+@@ -0,0 +1,23 @@
++/**
++ * Jeu fermé des nuances affichables sur les pages terminales de refus.
++ *
++ * `motif` arrive par l'URL : il ne peut donc désigner qu'un libellé connu.
++ * Un motif inconnu retombe silencieusement sur l'explication par défaut.
++ */
++
++export const MOTIF_APPARTENANCE = "appartenance";
++
++const MOTIFS = new Map<string, string>([
++  [
++    MOTIF_APPARTENANCE,
++    "Votre compte ELSATIA n’est rattaché à aucune organisation exploitable par Colors.",
++  ],
++]);
++
++export const MOTIF_PAR_DEFAUT =
++  "Votre compte n’a pas d’habilitation Colors active. Contactez l’administrateur Colors de votre organisation.";
++
++/** Explication associée au motif, ou l'explication par défaut si le motif est inconnu. */
++export function explicationRefus(motif: unknown): string {
++  return (typeof motif === "string" ? MOTIFS.get(motif) : undefined) ?? MOTIF_PAR_DEFAUT;
++}
