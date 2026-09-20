@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { logWarn } from "@/lib/observability/logger";
 
 export type PayloadPush = { titre: string; message: string | null; lien: string | null; niveau: string };
 
@@ -53,7 +54,10 @@ export async function traiterNotificationPush(admin: SupabaseClient, notificatio
   if (!notification || notification.push_envoyee_at) return;
 
   try {
-    if (!pushEstConfigure()) return;
+    if (!pushEstConfigure()) {
+      logWarn("worker", "Notification push non envoyée : clés VAPID absentes (EMAIL_NOT_SENT équivalent push)", { operation: "push", notificationId });
+      return;
+    }
 
     const [{ data: preference }, { data: abonnements }] = await Promise.all([
       admin.from("preferences_notifications_push").select("actif").eq("utilisateur_id", notification.utilisateur_id).eq("type", notification.type).maybeSingle(),
@@ -68,6 +72,11 @@ export async function traiterNotificationPush(admin: SupabaseClient, notificatio
         const resultat = await envoyerNotificationPush(abonnement, payload);
         if (!resultat.ok && resultat.abonnementExpire) {
           await admin.from("push_abonnements").delete().eq("id", abonnement.id);
+        } else if (!resultat.ok) {
+          // Échec réel (pas un abonnement mort) : la notification sera quand même marquée
+          // traitée ci-dessous (évite une boucle de retentative infinie), donc ce log est le
+          // seul endroit où cet échec reste visible — distinction ACCEPTED_BY_PROVIDER vs échec.
+          logWarn("worker", "Envoi push échoué (abonnement conservé, notification marquée traitée)", { operation: "push", notificationId, abonnementId: abonnement.id, erreur: resultat.erreur });
         }
       }),
     );

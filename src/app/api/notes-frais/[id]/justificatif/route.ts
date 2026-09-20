@@ -2,8 +2,11 @@ import { NextResponse } from "next/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
+import { reponseErreurStorage } from "@/lib/observability/storage-error";
+import { obtenirIdCorrelation } from "@/lib/observability/request-id";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const requestId = obtenirIdCorrelation(request);
   if (isEmailLoginDisabled()) return NextResponse.json({ error: "Accès personnel sécurisé requis" }, { status: 403 });
   const { id } = await params;
   const ctx = await getContexteEntreprise();
@@ -18,7 +21,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   const telecharger = new URL(request.url).searchParams.get("download") === "1";
   const {data:fichier,error}=await supabase.storage.from("notes-frais").download(note.justificatif_storage_path);
-  if(error||!fichier)return NextResponse.json({error:"Document indisponible"},{status:503});
+  if(error||!fichier){
+    return reponseErreurStorage(error,{introuvable:"Justificatif introuvable",indisponible:"Document indisponible"},{requestId,route:"/api/notes-frais/[id]/justificatif",operation:"download"});
+  }
   const bytes=new Uint8Array(await fichier.arrayBuffer()),nom=(note.justificatif_nom??"justificatif").replace(/[\r\n"]/g,"_");
   const contenu=bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength) as ArrayBuffer;
   return new NextResponse(contenu,{headers:{

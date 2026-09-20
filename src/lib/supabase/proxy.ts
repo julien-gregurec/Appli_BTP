@@ -3,8 +3,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { GESTION_PERMISSION_PAR_CHEMIN, MODULE_PERMISSION_PAR_CHEMIN, PERMISSIONS_ACCES_ALTERNATIVES, PERMISSIONS_MUTATION_ALTERNATIVES } from "@/lib/module-permissions";
 import { permissionIncluseDansOffre } from "@/lib/tarification";
+import { journaliserErreurAuthGetUser } from "@/lib/observability/auth-log";
+import { logErreur } from "@/lib/observability/logger";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/tarifs", "/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/confidentialite", "/cookies", "/auth", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu", "/guides", "/videos", "/paiement", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements", "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import"];
+const PUBLIC_PATHS = ["/login", "/signup", "/tarifs", "/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/confidentialite", "/cookies", "/auth", "/mot-de-passe-oublie", "/nouveau-mot-de-passe", "/abonnement-suspendu", "/guides", "/videos", "/paiement", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements", "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import", "/api/healthz"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -41,7 +43,7 @@ export async function updateSession(request: NextRequest) {
   // réseau pour servir un PDF ou une vidéo. La page d'accueil vérifie elle-même
   // la session pour rediriger un utilisateur déjà connecté vers /dashboard.
   const CHEMINS_SANS_SESSION = ["/offline", "/monitoring", "/mentions-legales", "/cgv", "/cgu", "/confidentialite", "/cookies", "/guides", "/videos", "/api/stripe/webhook", "/api/stripe/abonnement/webhook", "/api/stripe/boutique/webhook", "/api/cron/abonnements",
-                                "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import"];
+                                "/api/cron/notifications-push", "/api/webhooks/notifications-push", "/api/paiements-bancaires/powens", "/api/paie/import", "/api/healthz"];
   if (estAccueil || CHEMINS_SANS_SESSION.some((c) => request.nextUrl.pathname.startsWith(c))) {
     return response;
   }
@@ -49,7 +51,9 @@ export async function updateSession(request: NextRequest) {
   // getUser() vérifie le token auprès du serveur Auth — ne jamais se fier à getSession() ici.
   const {
     data: { user },
+    error: erreurAuth,
   } = await supabase.auth.getUser();
+  journaliserErreurAuthGetUser(erreurAuth, { route: request.nextUrl.pathname });
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
@@ -78,10 +82,14 @@ export async function updateSession(request: NextRequest) {
     ? PERMISSIONS_MUTATION_ALTERNATIVES[Object.keys(PERMISSIONS_MUTATION_ALTERNATIVES).find((c) => correspond(c)) ?? ""] ?? [droitGestion]
     : [];
 
-  const { data: acces } = await supabase.rpc("contexte_acces_proxy", {
+  const { data: acces, error: erreurAcces } = await supabase.rpc("contexte_acces_proxy", {
     p_droits_acces: droitsAcces,
     p_droits_gestion: droitsGestion,
   });
+  // Échec = accès refusé par défaut (comportement inchangé, le plus prudent), mais
+  // désormais visible : sans ce log, une panne DB sur cette RPC — appelée à chaque
+  // requête protégée — se traduisait par des refus d'accès en masse sans aucune trace.
+  if (erreurAcces) logErreur("security", "Échec RPC contexte_acces_proxy — accès refusé par défaut", { route: request.nextUrl.pathname, operation: "contexte_acces_proxy" }, erreurAcces.message);
   const ctx = (acces ?? {}) as {
     compte_depot?: boolean; entreprise_id?: string | null;
     acces_support?: boolean; droit_acces?: boolean; droit_gestion?: boolean;

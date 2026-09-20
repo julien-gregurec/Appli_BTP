@@ -1,13 +1,18 @@
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { OFFRES_TARIFAIRES, offreTarifaireParCle, type OffreTarifaire } from "@/lib/tarification";
+import { logErreur } from "@/lib/observability/logger";
 
 // L'espace plateforme est réservé au propriétaire (identifié par son email, table plateforme_admins).
 // En mode prototype (sans connexion), on l'autorise pour la démo mono-entreprise.
 export async function estPlateformeAdmin(): Promise<boolean> {
   if (isEmailLoginDisabled()) return true;
   const supabase = await createClient();
-  const { data } = await supabase.rpc("est_plateforme_admin");
+  const { data, error } = await supabase.rpc("est_plateforme_admin");
+  // Échec = refus par défaut (comportement inchangé, volontairement le plus prudent),
+  // mais désormais visible : un pic soudain de ces refus peut signaler une panne DB
+  // plutôt qu'un simple utilisateur non-admin.
+  if (error) logErreur("security", "Échec RPC est_plateforme_admin — accès refusé par défaut", { operation: "est_plateforme_admin" }, error.message);
   return data === true;
 }
 

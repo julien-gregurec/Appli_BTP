@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ajouterDepassementAppareilsFacture, ajouterDepassementStockageFacture, calculerDepassementAppareils, reconcilierAbonnementStripe, recupererAbonnementStripe, statutAbonnementDepuisStripe, type StripeSubscription } from "@/lib/stripe-abonnement";
 import { verifierSignatureStripe } from "@/lib/stripe";
+import { logErreur, logWarn } from "@/lib/observability/logger";
+import { obtenirIdCorrelation } from "@/lib/observability/request-id";
 
 type StripeReference = string | { id?: string } | null | undefined;
 type StripeObjet = {
@@ -140,10 +142,12 @@ async function synchroniserFactureAbonnement(entrepriseId: string, objet: Stripe
 }
 
 export async function POST(request: Request) {
+  const requestId = obtenirIdCorrelation(request);
   const secret = process.env.STRIPE_WEBHOOK_ABONNEMENT_SECRET;
   if (!secret) return NextResponse.json({ error: "Webhook abonnement non configuré" }, { status: 503 });
   const brut = await request.text();
   if (!verifierSignatureStripe(brut, request.headers.get("stripe-signature"), secret)) {
+    logWarn("security", "Signature Stripe invalide (webhook abonnement)", { requestId, route: "/api/stripe/abonnement/webhook" });
     return NextResponse.json({ error: "Signature invalide" }, { status: 400 });
   }
   let evenement: StripeEvent;
@@ -209,6 +213,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true });
   } catch (error) {
     await admin.from("abonnement_evenements").delete().eq("stripe_event_id", evenement.id);
+    logErreur("billing", "Échec de synchronisation d'un évènement Stripe (webhook abonnement) — marque retirée pour permettre un nouvel essai", { requestId, route: "/api/stripe/abonnement/webhook", operation: evenement.type, entrepriseId: entrepriseId ?? undefined }, error);
     return NextResponse.json({ error: error instanceof Error ? error.message : "Synchronisation impossible" }, { status: 500 });
   }
 }

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ajouterOptionIAAbonnement, estPalierOptionIA, estPeriodiciteAbonnement, reconcilierAbonnementStripe } from "@/lib/stripe-abonnement";
+import { obtenirIdCorrelation } from "@/lib/observability/request-id";
+import { demarrerJobRun, terminerJobRun } from "@/lib/observability/job-run";
 
 // Bascule les essais Option IA expires vers la facturation reelle. Regroupe avec le cron
 // des abonnements (et non un cron dedie) car le plan Vercel Hobby limite le nombre de
@@ -63,13 +65,22 @@ async function notifierPointagesManquantsEtAValider(admin: ReturnType<typeof cre
   return { ok: !error, raison: error?.message };
 }
 
+const NOM_JOB = "cron:abonnements";
+
 export async function GET(request: Request) {
+  const requestId = obtenirIdCorrelation(request);
+  const debutMs = Date.now();
   const secret = process.env.CRON_SECRET;
   if (!secret) return NextResponse.json({ error: "CRON_SECRET absent" }, { status: 503 });
   if (request.headers.get("authorization") !== `Bearer ${secret}`) return NextResponse.json({ error: "Accès refusé" }, { status: 401 });
   const admin = createAdminClient();
+  const runId = await demarrerJobRun(admin, NOM_JOB, requestId);
+
   const { data: entreprises, error } = await admin.from("entreprises").select("id").not("stripe_subscription_id", "is", null).in("abonnement_statut", ["essai", "actif"]);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    await terminerJobRun(admin, runId, { jobName: NOM_JOB, requestId, statut: "echec", erreur: error.message, debutMs });
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
   const resultats: Array<{ entrepriseId: string; synchronise: boolean; raison?: string }> = [];
   for (const entreprise of entreprises ?? []) {
     try {
@@ -82,5 +93,18 @@ export async function GET(request: Request) {
   const optionIA = await convertirEssaisOptionIAExpires(admin);
   const paiePeriodes = await synchroniserPeriodesPaieOuvertes(admin);
   const alertesPointage = await notifierPointagesManquantsEtAValider(admin);
-  return NextResponse.json({ traitees: resultats.length, resultats, optionIA, paiePeriodes, alertesPointage });
+
+  const echecs = resultats.filter((r) => !r.synchronise).length
+    + optionIA.filter((r) => !r.ok).length
+    + paiePeriodes.filter((r) => !r.ok).length
+    + (alertesPointage.ok ? 0 : 1);
+  const total = resultats.length + optionIA.length + paiePeriodes.length + 1;
+  const statut = echecs === 0 ? "succes" : echecs >= total ? "echec" : "echec_partiel";
+  await terminerJobRun(admin, runId, { jobName: NOM_JOB, requestId, statut, resume: { total, echecs }, debutMs });
+
+  const corps = { traitees: resultats.length, resultats, optionIA, paiePeriodes, alertesPointage };
+  // 207 quand une partie du lot échoue : un moniteur qui ne regarde que le statut
+  // HTTP (ex. Vercel cron monitoring) ne verra alors jamais un simple "200 OK"
+  // masquant des échecs silencieux dans le corps JSON.
+  return NextResponse.json(corps, { status: statut === "succes" ? 200 : statut === "echec_partiel" ? 207 : 500 });
 }

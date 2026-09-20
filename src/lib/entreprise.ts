@@ -2,6 +2,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
+import { journaliserErreurAuthGetUser } from "@/lib/observability/auth-log";
 
 export type ContexteEntreprise = {
   userId: string;
@@ -89,7 +90,9 @@ export const getContexteEntreprise = cache(async function getContexteEntreprise(
 
   const {
     data: { user },
+    error: erreurAuth,
   } = await supabase.auth.getUser();
+  journaliserErreurAuthGetUser(erreurAuth, { route: "getContexteEntreprise" });
   if (!user) {
     redirect("/login");
   }

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { headers } from "next/headers";
+import { logErreur, logInfo } from "@/lib/observability/logger";
 
 export async function origineApplication() {
   const entetes = await headers();
@@ -124,7 +125,15 @@ export async function demanderReinitialisationAction(formData: FormData) {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${origine}/auth/callback?next=${encodeURIComponent("/nouveau-mot-de-passe")}`,
   });
-  if (error) redirect(`/mot-de-passe-oublie?error=${encodeURIComponent(error.message)}`);
+  // Distinction EMAIL_NOT_SENT (erreur du fournisseur — SMTP Supabase, quota, config) vs
+  // EMAIL_ACCEPTED_BY_PROVIDER (aucune erreur : Supabase a accepté l'envoi — ne prouve pas
+  // la remise réelle en boîte, seulement l'acceptation). Aucun état persistant : seul
+  // canal d'observabilité pour ce flux tant qu'aucune table de suivi des envois n'existe.
+  if (error) {
+    logErreur("email", "EMAIL_NOT_SENT — échec resetPasswordForEmail", { operation: "resetPasswordForEmail" }, error.message);
+    redirect(`/mot-de-passe-oublie?error=${encodeURIComponent(error.message)}`);
+  }
+  logInfo("email", "EMAIL_ACCEPTED_BY_PROVIDER — resetPasswordForEmail", { operation: "resetPasswordForEmail" });
   redirect(`/mot-de-passe-oublie?message=${encodeURIComponent("Si ce compte existe, un lien de réinitialisation vient d’être envoyé.")}`);
 }
 
