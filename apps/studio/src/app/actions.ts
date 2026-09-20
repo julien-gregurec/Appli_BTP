@@ -12,6 +12,18 @@ import {
 import { createStudioClient } from "../lib/supabase";
 import { studioOrigin } from "../lib/config";
 import { notices } from "../lib/notices";
+import { registrationGate } from "../lib/entitlement";
+import { legalVersion } from "../lib/legal";
+import {
+  InvitationError,
+  acceptInvitation as acceptInvitationRpc,
+  inviteMember as inviteMemberRpc,
+  revokeInvitation as revokeInvitationRpc,
+} from "../lib/invitations";
+import { executeAccountDeletion } from "../lib/account-deletion";
+import { createClient } from "@supabase/supabase-js";
+import { supabaseConfig } from "../lib/config";
+import { getCurrentStudioUser } from "../lib/workspaces";
 import {
   createPersonalStudioWorkspace,
   createStudioWorkspace,
@@ -53,18 +65,26 @@ export async function signup(form: FormData) {
       "/signup",
       notices.signupInvalid,
     );
+  if (field(form, "terms") !== "on") failure("/signup", notices.consentRequired);
+  if (!(await registrationGate.canSignUp(email)))
+    failure("/signup", notices.signupClosed);
+  const next = safeStudioDestination(field(form, "next"));
   const client = await createStudioClient();
   const { data, error } = await client.auth.signUp({
     email,
     password,
-    options: { emailRedirectTo: `${studioOrigin()}/auth/callback` },
+    options: {
+      emailRedirectTo: `${studioOrigin()}/auth/callback?next=${encodeURIComponent(next)}`,
+      // Consent record (version of the texts accepted); LEGAL REVIEW REQUIRED for the final wording.
+      data: { terms_version: legalVersion(), terms_accepted_at: new Date().toISOString() },
+    },
   });
   if (error)
     failure(
       "/signup",
       notices.signupUnavailable,
     );
-  if (data.session) redirect("/onboarding");
+  if (data.session) redirect(next.startsWith("/invitations/") ? next : "/onboarding");
   redirect("/login?notice=confirmation");
 }
 export async function logout() {
@@ -223,4 +243,74 @@ export async function saveBrandKit(form: FormData) {
     );
   revalidatePath("/", "layout");
   redirect(`${path}&saved=1`);
+}
+export async function inviteMember(form: FormData) {
+  const { workspace, membership, user } = await getActiveStudioWorkspace(
+    field(form, "workspace"),
+  );
+  const path = `/settings/members?workspace=${workspace.id}`;
+  if (!canManageWorkspace(membership.role)) failure(path, notices.denied);
+  try {
+    const result = await inviteMemberRpc(
+      workspace.id,
+      workspace.name,
+      user.email,
+      field(form, "email"),
+      field(form, "role"),
+    );
+    revalidatePath("/settings/members");
+    // The link is shown once so it can be copied when no mail provider is configured.
+    redirect(
+      `${path}&invited=${result.emailed ? "sent" : "link"}&link=${encodeURIComponent(result.emailed ? "" : result.url)}`,
+    );
+  } catch (error) {
+    if (error instanceof InvitationError) failure(path, notices.inviteInvalid);
+    throw error;
+  }
+}
+export async function revokeInvitation(form: FormData) {
+  const { workspace, membership } = await getActiveStudioWorkspace(field(form, "workspace"));
+  const path = `/settings/members?workspace=${workspace.id}`;
+  if (!canManageWorkspace(membership.role)) failure(path, notices.denied);
+  try {
+    await revokeInvitationRpc(field(form, "invitation"));
+  } catch {
+    failure(path, notices.inviteFailed);
+  }
+  revalidatePath("/settings/members");
+  redirect(path);
+}
+export async function acceptInvitation(form: FormData) {
+  const token = field(form, "token");
+  let workspace: string;
+  try {
+    workspace = await acceptInvitationRpc(token);
+  } catch (error) {
+    redirect(
+      `/invitations/${encodeURIComponent(token)}?error=${encodeURIComponent(error instanceof Error ? error.message : "Invitation invalide ou expirée.")}`,
+    );
+  }
+  revalidatePath("/", "layout");
+  redirect(`/dashboard?workspace=${workspace}`);
+}
+export async function deleteAccount(form: FormData) {
+  const user = await getCurrentStudioUser();
+  const typed = field(form, "confirm_email").trim().toLowerCase();
+  if (!user.email || typed !== user.email.toLowerCase() || field(form, "acknowledge") !== "on")
+    failure("/settings", notices.deleteConfirm);
+  // Strong confirmation: the password is verified again against Auth, never trusted from the session alone.
+  const { url, key } = supabaseConfig();
+  const verifier = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  const check = await verifier.auth.signInWithPassword({ email: user.email, password: field(form, "password") });
+  if (check.error) failure("/settings", notices.deleteConfirm);
+  let outcome: Awaited<ReturnType<typeof executeAccountDeletion>>;
+  try {
+    outcome = await executeAccountDeletion(user.id);
+  } catch {
+    failure("/settings", notices.deleteFailed);
+  }
+  if (outcome.blocked) failure("/settings", notices.deleteBlocked);
+  const client = await createStudioClient();
+  await client.auth.signOut({ scope: "local" }).catch(() => undefined);
+  redirect("/login?notice=account-deleted");
 }

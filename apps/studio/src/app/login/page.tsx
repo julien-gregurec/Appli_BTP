@@ -25,6 +25,11 @@ export default async function Login({
         nécessaire.
       </p>
       <Notice message={params.error} />
+      {params.notice === "account-deleted" && (
+        <p role="status" className="notice">
+          Votre compte et vos espaces ont été supprimés.
+        </p>
+      )}
       {params.notice === "confirmation" && (
         <p role="status" className="notice">
           Si l’inscription peut être finalisée, un email de confirmation vous a
@@ -63,7 +68,7 @@ export default async function Login({
         <Link href="/forgot-password">Mot de passe oublié ?</Link>
       </p>
       <p>
-        Première visite ? <Link href="/signup">Créer mon compte</Link>
+        Première visite ? <Link href={`/signup?next=${encodeURIComponent(safeStudioDestination(params.next))}`}>Créer mon compte</Link>
       </p>
     </main>
   );

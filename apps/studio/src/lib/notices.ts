@@ -32,6 +32,18 @@ export const notices = {
   brandLogoInvalid:
     "Logo refusé : choisissez une image PNG ou JPEG importée dans l’un de vos projets.",
   brandFailed: "Enregistrement impossible. Réessayez dans quelques instants.",
+  inviteInvalid: "Invitation impossible : vérifiez l’adresse e-mail et le rôle.",
+  inviteFailed: "Invitation impossible pour le moment. Réessayez.",
+  signupClosed:
+    "Les inscriptions sont fermées : demandez une invitation à l’administrateur d’un espace Studio.",
+  consentRequired:
+    "Acceptez les conditions d’utilisation et la politique de confidentialité pour créer un compte.",
+  deleteConfirm:
+    "Confirmation incorrecte : saisissez votre adresse e-mail exacte, votre mot de passe et cochez la case.",
+  deleteBlocked:
+    "Suppression impossible : vous êtes propriétaire d’un espace partagé. Retirez les autres membres ou archivez l’espace, puis recommencez.",
+  deleteFailed:
+    "La suppression n’a pas pu être terminée. Rien n’est perdu : réessayez, l’opération reprend là où elle s’est arrêtée.",
   passwordFailed:
     "Mise à jour impossible. Redemandez un lien de réinitialisation.",
 } as const;

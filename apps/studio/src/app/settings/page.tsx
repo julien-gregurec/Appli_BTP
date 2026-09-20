@@ -10,7 +10,9 @@ import {
   renameWorkspace,
   createProfessional,
   archiveWorkspace,
+  deleteAccount,
 } from "../actions";
+import { getDeletionPlan } from "../../lib/account-deletion";
 export default async function Settings({
   searchParams,
 }: {
@@ -19,6 +21,7 @@ export default async function Settings({
   const params = await searchParams;
   const context = await getActiveStudioWorkspace(params.workspace);
   const { workspace, membership } = context;
+  const plan = await getDeletionPlan();
   const usage = canManageWorkspace(membership.role)
     ? await createStudioClient()
         .then((client) =>
@@ -116,6 +119,79 @@ export default async function Settings({
           </form>
         </section>
       )}
+    <section className="card" aria-label="Suppression du compte">
+        <h2>Supprimer mon compte</h2>
+        <p>
+          Cette action est définitive. Elle supprime votre compte Studio et les
+          données décrites ci-dessous.
+        </p>
+        {plan && (
+          <>
+            <h3>Supprimé définitivement</h3>
+            {plan.purge.length === 0 ? (
+              <p>Aucun espace ne vous appartient seul.</p>
+            ) : (
+              <ul>
+                {plan.purge.map((w) => (
+                  <li key={w.id}>
+                    « {w.name} » : {w.projects} projet(s), {w.assets} média(s),{" "}
+                    {w.renders} vidéo(s) exportée(s), {w.shares} lien(s) de
+                    partage, identité de marque et invitations, avec les
+                    fichiers stockés.
+                  </li>
+                ))}
+              </ul>
+            )}
+            {plan.leave.length > 0 && (
+              <>
+                <h3>Espaces que vous quittez</h3>
+                <ul>
+                  {plan.leave.map((w) => (
+                    <li key={w.id}>
+                      « {w.name} » : vos {w.contributions} contribution(s) sont
+                      conservées pour cet espace, rattachées à son propriétaire
+                      (sans lien avec votre compte).
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {plan.blocked.length > 0 && (
+              <div role="alert">
+                <strong>Suppression impossible pour le moment.</strong> Vous
+                êtes propriétaire d’espaces partagés (
+                {plan.blocked.map((w) => `« ${w.name} » : ${w.members} autre(s) membre(s)`).join(", ")}
+                ). Retirez les autres membres ou archivez l’espace, puis
+                revenez ici.
+              </div>
+            )}
+          </>
+        )}
+        <p>
+          <small>
+            Durées de conservation légales : à définir (LEGAL REVIEW
+            REQUIRED). Aucune donnée personnelle n’est conservée au-delà d’une
+            trace d’audit sans identité (empreinte du compte et compteurs).
+          </small>
+        </p>
+        {(!plan || plan.blocked.length === 0) && (
+          <form action={deleteAccount}>
+            <label>
+              Saisissez votre adresse e-mail ({context.user.email}) pour confirmer
+              <input name="confirm_email" type="email" autoComplete="off" required />
+            </label>
+            <label>
+              Mot de passe
+              <input name="password" type="password" autoComplete="current-password" required maxLength={256} />
+            </label>
+            <label className="consent">
+              <input type="checkbox" name="acknowledge" required />
+              <span>Je comprends que cette suppression est irréversible.</span>
+            </label>
+            <Submit>Supprimer définitivement mon compte</Submit>
+          </form>
+        )}
+      </section>
     </Shell>
   );
 }

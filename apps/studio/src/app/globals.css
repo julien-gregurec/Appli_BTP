@@ -613,3 +613,23 @@ summary {
 .analysis-panel label { display:block; margin:.75rem 0; }
 .analysis-panel progress { width:100%; }
 .analysis-badge { padding:.75rem; background:#edf3ee; border-radius:8px; }
+
+.legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding: 24px 16px;
+  font-size: 0.85rem;
+  justify-content: center;
+}
+@media (max-width: 700px) {
+  .desktop-hint {
+    display: block;
+  }
+}
+.desktop-hint {
+  display: none;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #e8ece5;
+}

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import LegalLinks from "../components/LegalLinks";
 export const metadata: Metadata = {
   title: "ELSATIA Studio",
   description: "Votre espace de création, indépendant et personnel.",
@@ -14,6 +15,9 @@ export default function Layout({
           Aller au contenu
         </a>
         {children}
+        <footer>
+          <LegalLinks />
+        </footer>
       </body>
     </html>
   );
