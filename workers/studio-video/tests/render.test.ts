@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
@@ -267,3 +267,58 @@ it("fade spends exactly half its duration fading to black, then half fading in",
     await rm(dir, { recursive: true, force: true });
   }
 }, 120000);
+it("server watermark: drawn bottom-right on the final encode only when the job asks for it", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "studio-watermark-"));
+  const cornerBrightness = (file: string) =>
+    Math.max(
+      ...execFileSync(runtime.ffmpeg, [
+        "-v",
+        "error",
+        "-i",
+        file,
+        "-vf",
+        "select=eq(n\\,20),crop=iw*0.6:ih*0.12:iw*0.4:ih*0.86,format=gray",
+        "-vsync",
+        "0",
+        "-f",
+        "rawvideo",
+        "pipe:1",
+      ]),
+    );
+  try {
+    const path = join(dir, "black.png");
+    await command(
+      runtime.ffmpeg,
+      ["-y", "-f", "lavfi", "-i", "color=black:s=270x480", "-frames:v", "1", path],
+      runtime.signal,
+    );
+    const render = async (watermark: boolean) => {
+      const out = join(dir, watermark ? "wm" : "plain");
+      await mkdir(out);
+      const t = doc();
+      t.presentation = null;
+      return renderTimeline(
+        t,
+        new Map([["image", path]]),
+        { width: 270, height: 480, fps: 30 },
+        out,
+        { ...runtime, watermark },
+      );
+    };
+    const plain = await render(false),
+      marked = await render(true);
+    expect(cornerBrightness(plain.output)).toBeLessThan(30);
+    expect(cornerBrightness(marked.output)).toBeGreaterThan(100);
+    // Same geometry, codec and duration: the watermark never changes the container contract.
+    const stream = (r: typeof plain) =>
+      r.probe.streams.find((x) => x.codec_type === "video");
+    expect(stream(marked)?.width).toBe(stream(plain)?.width);
+    expect(stream(marked)?.codec_name).toBe("h264");
+    expect(Number(marked.probe.format.duration)).toBeCloseTo(
+      Number(plain.probe.format.duration),
+      1,
+    );
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}, 180000);

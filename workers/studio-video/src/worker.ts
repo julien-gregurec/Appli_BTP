@@ -203,6 +203,7 @@ const worker = new Worker<{ id: string }>(
         {
           ffmpeg,
           ffprobe,
+          watermark: job.snapshot.watermark === true,
           signal: controller.signal,
           progress: async (s, p) => {
             stage = s;
