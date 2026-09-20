@@ -20,7 +20,7 @@ export interface StudioMediaAsset {
   storage_key: string;
   original_filename: string;
   mime_type: string;
-  media_type: "image" | "video";
+  media_type: "image" | "video" | "audio";
   file_size_bytes: number;
   width: number | null;
   height: number | null;
@@ -42,6 +42,10 @@ export const formats: Record<string, readonly string[]> = {
   "image/webp": ["webp"],
   "video/mp4": ["mp4"],
   "video/quicktime": ["mov"],
+  "audio/mpeg": ["mp3"],
+  "audio/mp4": ["m4a"],
+  "audio/wav": ["wav"],
+  "audio/x-wav": ["wav"],
 };
 export function validateFile(
   name: string,
@@ -57,12 +61,13 @@ export function validateFile(
     !formats[mime]?.includes(ext)
   )
     throw new Error(
-      "Format refusé : JPG, PNG, WEBP, MP4 ou MOV H.264 uniquement.",
+      "Format refusé : JPG, PNG, WEBP, MP4 ou MOV H.264 (musique : MP3, M4A ou WAV) uniquement.",
     );
   if (!Number.isSafeInteger(size) || size <= 0)
     throw new Error("Le fichier est vide ou sa taille est invalide.");
   if (
-    size > (mime.startsWith("image/") ? limits.image_bytes : limits.video_bytes)
+    size >
+    (mime.startsWith("video/") ? limits.video_bytes : limits.image_bytes)
   )
     throw new Error("Le fichier dépasse la taille autorisée.");
 }

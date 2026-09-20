@@ -34,6 +34,14 @@ export interface TextOverlay {
   color: string;
   max_lines: number;
 }
+/** One imported audio track per montage, mixed under the clips' own audio at export. */
+export interface TimelineMusic {
+  asset_id: string;
+  /** 0..1 gain applied to the track (the clips' audio keeps its own volume). */
+  volume: number;
+  fade_in_ms: number;
+  fade_out_ms: number;
+}
 export interface TimelinePresentation {
   version: 1;
   template: { id: string; version: number; snapshot: object };
@@ -45,6 +53,46 @@ export interface TimelinePresentation {
     position: "top" | "bottom";
     width: number;
   } | null;
+  music?: TimelineMusic | null;
+}
+const uuidFormat =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Strict shape check: unknown keys, out-of-range gains or fades are refused, never clamped silently. */
+export function parseMusic(value: unknown): TimelineMusic | null {
+  if (value === null || value === undefined) return null;
+  const fail = () => {
+    throw new TimelineValidationError("Musique invalide.");
+  };
+  if (typeof value !== "object" || Array.isArray(value)) return fail();
+  const v = value as Record<string, unknown>;
+  const keys = Object.keys(v);
+  if (
+    keys.length !== 4 ||
+    !["asset_id", "volume", "fade_in_ms", "fade_out_ms"].every((k) =>
+      keys.includes(k),
+    )
+  )
+    return fail();
+  const { asset_id, volume, fade_in_ms, fade_out_ms } = v;
+  if (
+    typeof asset_id !== "string" ||
+    !uuidFormat.test(asset_id) ||
+    typeof volume !== "number" ||
+    !(volume >= 0 && volume <= 1) ||
+    !Number.isInteger(fade_in_ms) ||
+    !Number.isInteger(fade_out_ms) ||
+    (fade_in_ms as number) < 0 ||
+    (fade_out_ms as number) < 0 ||
+    (fade_in_ms as number) > 10000 ||
+    (fade_out_ms as number) > 10000
+  )
+    return fail();
+  return {
+    asset_id,
+    volume,
+    fade_in_ms: fade_in_ms as number,
+    fade_out_ms: fade_out_ms as number,
+  };
 }
 export const safeAreas: Record<
   AspectRatio,
@@ -115,6 +163,7 @@ export function validatePresentation(
     typeof p.template.snapshot !== "object"
   )
     fail();
+  parseMusic(p.music);
   for (const role of fontRoles) {
     const f = p.typography?.[role];
     if (

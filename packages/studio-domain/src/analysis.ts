@@ -244,7 +244,10 @@ export function rankProjectAssets(
       .map((a) => [a.asset_id, a]),
   );
   const sorted = assets
-    .filter((a) => a.upload_status === "ready" && !a.deleted_at)
+    .filter(
+      (a) =>
+        a.upload_status === "ready" && !a.deleted_at && a.media_type !== "audio",
+    )
     .slice()
     .sort((a, b) => a.id.localeCompare(b.id));
   const groups: RankedAsset[][] = [],

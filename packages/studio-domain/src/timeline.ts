@@ -162,7 +162,8 @@ export function buildTimeline(input: {
   if (input.assets.length > 1000)
     throw new TimelineValidationError("1000 médias maximum.");
   const assets = input.assets.filter(
-    (a) => a.upload_status === "ready" && !a.deleted_at,
+    (a) =>
+      a.upload_status === "ready" && !a.deleted_at && a.media_type !== "audio",
   );
   if (!assets.length)
     throw new TimelineValidationError(
@@ -243,7 +244,7 @@ export function buildTimeline(input: {
         a.media_type === "image" ? cycle[photo++ % cycle.length] : "static";
       return {
         asset_id: a.id,
-        clip_type: a.media_type,
+        clip_type: a.media_type as "image" | "video", // audio is filtered out upstream
         sort_order: i,
         source_start_ms: 0,
         source_end_ms: a.media_type === "video" ? duration[i] : null,
