@@ -9,10 +9,8 @@ import {
   legalVersion,
   type LegalSlug,
 } from "../../../lib/legal";
-export const dynamicParams = false;
-export function generateStaticParams() {
-  return legalSlugs.map((doc) => ({ doc }));
-}
+// Rendered per request (like every other page behind the nonce-based CSP); unknown slugs 404 through notFound().
+export const dynamic = "force-dynamic";
 export async function generateMetadata({
   params,
 }: {

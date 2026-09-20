@@ -33,6 +33,16 @@ async function formReady(page: Page, selector = "form button") {
     { timeout: 120000 },
   );
 }
+/** Counts the files below `studio/<workspace>/`, folders included (keys are studio/<ws>/<project>/<asset>/original.ext). */
+async function objects(bucket: string, workspace: string) {
+  const walk = async (prefix: string): Promise<number> => {
+    const { data } = await admin().storage.from(bucket).list(prefix, { limit: 1000 });
+    let total = 0;
+    for (const entry of data ?? []) total += entry.id ? 1 : await walk(`${prefix}/${entry.name}`);
+    return total;
+  };
+  return walk(`studio/${workspace}`);
+}
 async function account(label: string) {
   const email = `${label}-${randomUUID()}@example.test`;
   const client = api();
@@ -113,7 +123,7 @@ test("invitation par e-mail : lien à usage unique, réservé à l'adresse, rév
   await guestPage.getByRole("button", { name: "Rejoindre l’espace" }).click();
   await expect(guestPage).toHaveURL(/dashboard/, { timeout: 45000 });
   await invitee.client.auth.signInWithPassword({ email: invitee.email, password });
-  const membership = await invitee.client.from("studio_workspace_members").select("role").eq("workspace_id", workspace);
+  const membership = await invitee.client.from("studio_workspace_members").select("role").eq("workspace_id", workspace).eq("user_id", invitee.id);
   expect(membership.data).toEqual([{ role: "editor" }]);
   // Single use.
   await guestPage.goto(link);
@@ -167,36 +177,32 @@ test("suppression de compte : stockage, base, propriétaire bloqué, isolation e
     await fileInputReady(page);
     await page.getByLabel("Choisir des fichiers").setInputFiles(join(sample.directory, "photo-0.jpg"));
     await expect(page.locator('.upload-list [data-status="ready"]')).toHaveCount(1, { timeout: 90000 });
-    const before = await admin().storage.from("studio-originals").list(workspace);
-    expect(before.data?.length ?? 0).toBeGreaterThan(0);
+    expect(await objects("studio-originals", workspace)).toBeGreaterThan(0);
     // Confirmation is mandatory: wrong e-mail and wrong password both refuse, nothing is deleted.
-    await page.goto("/settings");
-    await expect(page.getByRole("heading", { name: "Supprimer mon compte" })).toBeVisible();
-    await expect(page.locator("main")).toContainText("Espace à supprimer");
-    const form = page.locator("form:has(input[name=confirm_email])");
-    await formReady(page, "form:has(input[name=confirm_email]) button");
-    await form.locator("input[name=confirm_email]").fill("autre@example.test");
-    await form.locator("input[name=password]").fill(password);
-    await form.locator("input[name=acknowledge]").check();
-    await form.getByRole("button", { name: /Supprimer définitivement/ }).click();
+    // Each attempt starts from a fresh page so the URL change (?error=…) is an unambiguous signal.
+    const attempt = async (typed: string, secret: string) => {
+      await page.goto("/settings");
+      await expect(page.getByRole("heading", { name: "Supprimer mon compte" })).toBeVisible();
+      await expect(page.locator("main")).toContainText("Espace à supprimer");
+      await formReady(page, "form:has(input[name=confirm_email]) button");
+      const form = page.locator("form:has(input[name=confirm_email])");
+      await form.locator("input[name=confirm_email]").fill(typed);
+      await form.locator("input[name=password]").fill(secret);
+      await form.locator("input[name=acknowledge]").check();
+      await form.getByRole("button", { name: /Supprimer définitivement/ }).click();
+    };
+    await attempt("autre@example.test", password);
+    await expect(page).toHaveURL(/\/settings\?error=/, { timeout: 60000 });
     await expect(page.locator("p.notice")).toBeVisible();
-    await form.locator("input[name=confirm_email]").fill(victim.email);
-    await form.locator("input[name=password]").fill("Mauvais-mot-de-passe-1!");
-    await form.locator("input[name=acknowledge]").check();
-    await form.getByRole("button", { name: /Supprimer définitivement/ }).click();
-    await expect(page.locator("p.notice")).toBeVisible();
+    await attempt(victim.email, "Mauvais-mot-de-passe-1!");
+    await expect(page).toHaveURL(/\/settings\?error=/, { timeout: 60000 });
     expect((await victim.client.auth.signInWithPassword({ email: victim.email, password })).error).toBeNull();
     // Real deletion.
-    await formReady(page, "form:has(input[name=confirm_email]) button");
-    await form.locator("input[name=confirm_email]").fill(victim.email);
-    await form.locator("input[name=password]").fill(password);
-    await form.locator("input[name=acknowledge]").check();
-    await form.getByRole("button", { name: /Supprimer définitivement/ }).click();
+    await attempt(victim.email, password);
     await expect(page).toHaveURL(/\/login\?notice=account-deleted/, { timeout: 120000 });
     expect((await victim.client.auth.signInWithPassword({ email: victim.email, password })).error).not.toBeNull();
     expect((await admin().auth.admin.getUserById(victim.id)).data.user).toBeNull();
-    const after = await admin().storage.from("studio-originals").list(workspace);
-    expect(after.data ?? []).toEqual([]);
+    expect(await objects("studio-originals", workspace)).toBe(0);
     // Idempotent: the neighbour tenant is intact and its owner can still work.
     expect((await bystander.client.from("studio_workspaces").select("id").eq("id", keep.data as string)).data).toHaveLength(1);
   } finally {
@@ -216,7 +222,7 @@ test("suppression refusée pour un propriétaire d'espace partagé, sans rien su
   expect(added.error).toBeNull();
   await signIn(page, owner.email);
   await page.goto("/settings");
-  await expect(page.locator("[role=alert]")).toContainText("Suppression impossible");
+  await expect(page.locator("main [role=alert]")).toContainText("Suppression impossible");
   await expect(page.locator("form:has(input[name=confirm_email])")).toHaveCount(0);
   expect((await admin().auth.admin.getUserById(owner.id)).data.user).not.toBeNull();
 });

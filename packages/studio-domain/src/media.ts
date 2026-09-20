@@ -54,6 +54,10 @@ export function validateFile(
   limits: Pick<MediaLimits, "image_bytes" | "video_bytes">,
 ) {
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  if (/\.hei[cf]$/i.test(name) || /^image\/hei[cf]/.test(mime))
+    throw new Error(
+      "Le format HEIC n’est pas pris en charge. Sur iPhone, choisissez Réglages > Appareil photo > Formats > « Le plus compatible », ou exportez la photo en JPEG.",
+    );
   if (
     !name ||
     name.length > 255 ||

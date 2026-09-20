@@ -20,10 +20,10 @@ export default defineConfig({
   // STUDIO_RENDER_INTERNAL_PREVIEW and would appear as skipped in the gate.
   testMatch:
     process.env.STUDIO_ACCEPTANCE === "1"
-      ? "**/acceptance.spec.ts"
+      ? "**/acceptance*.spec.ts"
       : "**/*.spec.ts",
   testIgnore:
-    process.env.STUDIO_ACCEPTANCE === "1" ? [] : ["**/acceptance.spec.ts"],
+    process.env.STUDIO_ACCEPTANCE === "1" ? [] : ["**/acceptance*.spec.ts"],
   workers: 1,
   retries: 0,
   timeout: 120000,

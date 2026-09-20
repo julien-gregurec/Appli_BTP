@@ -342,6 +342,11 @@ export default function VideoEditor({
         enabled={analysisEnabled}
         asset={clip?.asset_id ?? null}
       />
+      <p className="desktop-hint" role="note">
+        L’édition du montage est conçue pour ordinateur. Sur téléphone, vous
+        pouvez consulter le projet, lancer l’export, télécharger et partager la
+        vidéo.
+      </p>
       <div className="editor-toolbar">
         <p>
           <strong>Durée : {editorTime(doc.total_duration_ms)}</strong> · Cible :{" "}
