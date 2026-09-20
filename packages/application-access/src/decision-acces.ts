@@ -1,5 +1,6 @@
 /**
- * Contrat commun d'une DÉCISION D'ACCÈS AVEC MOTIF (v1) — types et règles pures.
+ * Contrat commun d'une DÉCISION D'ACCÈS AVEC MOTIF (v1, FIGÉ le 2026-09-20 après les décisions D1-D3
+ * de Julien) — types et règles pures.
  *
  * Aujourd'hui `a_acces_application` renvoie un booléen : suspendu, désactivé, invité, sans rôle,
  * sans droit d'usage et expiré y sont indiscernables, et chaque application reconstitue
@@ -7,7 +8,12 @@
  * traduction en écran / statut HTTP / portée de déconnexion, AVANT que la RPC
  * `decision_acces_application` n'existe. Il n'appelle rien et ne change aucun comportement.
  *
- * Spécification complète : docs/qualification/ELSATIA_APPLICATION_ACCESS_CONVERGENCE_V1.md §8.
+ * Changements par rapport à la première version : `entreprise_inactive` retiré (couvert par
+ * `suspension_plateforme`, portée organisation) ; `suspension_plateforme` ajouté ; `abonnement_suspendu`
+ * est désormais le statut commercial de CETTE application (D3 : une suspension de Gestion Pro ne coupe
+ * pas Colors, Réserves ni Tools).
+ *
+ * Spécification complète : docs/qualification/ELSATIA_APPLICATION_ACCESS_CONVERGENCE_V1.md §7.
  */
 
 export const VERSION_CONTRAT_DECISION_ACCES = 1 as const;
@@ -22,12 +28,15 @@ export const VERSION_CONTRAT_DECISION_ACCES = 1 as const;
 export const DECISIONS_ACCES = [
   "non_authentifie",
   "erreur_configuration",
-  "autorise", // bypass administrateur plateforme inclus (voir spécification §8.3)
+  // Suspension GLOBALE explicite (sécurité plateforme) du compte ELSATIA ou d'une organisation.
+  // Prime sur tout, bypass administrateur compris : c'est la seule décision qui coupe toutes les applications.
+  "suspension_plateforme",
+  "autorise", // bypass administrateur plateforme inclus (voir spécification §7.3)
   "sans_organisation",
   "invitation_en_attente",
   "validation_en_attente",
   "utilisateur_desactive",
-  "entreprise_inactive",
+  // Statut commercial de CETTE application uniquement (D3) — jamais celui d'une autre application.
   "abonnement_suspendu",
   "essai_expire",
   "application_non_incluse",
@@ -51,6 +60,7 @@ export type ActionSuggeree =
   | "ouvrir_compte_elsatia" // toutes les autres applications
   | "accepter_invitation"
   | "attendre_validation"
+  | "contacter_support_elsatia" // suspension plateforme : seul ELSATIA peut la lever
   | "contacter_administrateur"
   | "voir_abonnement"
   | "regulariser_abonnement" // réservée aux administrateurs de l'entreprise
@@ -63,7 +73,7 @@ export type EcranAcces =
   | "invitation"
   | "attente_validation"
   | "compte_desactive"
-  | "entreprise_inactive"
+  | "suspension_plateforme"
   | "abonnement_suspendu"
   | "essai_expire"
   | "abonnement_requis"
@@ -90,7 +100,7 @@ export const REGLES_DECISION: Record<DecisionAccesClient, RegleDecision> = {
   invitation_en_attente: { statutHttp: 403, ecran: "invitation", action: "accepter_invitation", nomEntrepriseExposable: true, reessayable: false },
   validation_en_attente: { statutHttp: 403, ecran: "attente_validation", action: "attendre_validation", nomEntrepriseExposable: true, reessayable: false },
   utilisateur_desactive: { statutHttp: 403, ecran: "compte_desactive", action: "contacter_administrateur", nomEntrepriseExposable: true, reessayable: false },
-  entreprise_inactive: { statutHttp: 423, ecran: "entreprise_inactive", action: "contacter_administrateur", nomEntrepriseExposable: true, reessayable: false },
+  suspension_plateforme: { statutHttp: 423, ecran: "suspension_plateforme", action: "contacter_support_elsatia", nomEntrepriseExposable: false, reessayable: false },
   abonnement_suspendu: { statutHttp: 423, ecran: "abonnement_suspendu", action: "regulariser_abonnement", nomEntrepriseExposable: true, reessayable: false },
   essai_expire: { statutHttp: 423, ecran: "essai_expire", action: "voir_abonnement", nomEntrepriseExposable: true, reessayable: false },
   application_non_incluse: { statutHttp: 403, ecran: "abonnement_requis", action: "voir_abonnement", nomEntrepriseExposable: true, reessayable: false },
@@ -111,6 +121,20 @@ export type DecisionAccesApplication = {
   /** Renseignés seulement si l'appelant possède une appartenance (tout statut) à cette entreprise. */
   entreprise: { id: string; nom: string } | null;
 };
+
+/**
+ * Portée d'une suspension (D3). Une suspension COMMERCIALE ne concerne que l'application évaluée ;
+ * seule la suspension PLATEFORME coupe tout le compte ELSATIA. Une application qui recevrait
+ * `abonnement_suspendu` pour GP ne doit jamais en déduire quoi que ce soit pour Colors ou Tools.
+ */
+export const PORTEE_SUSPENSION = {
+  abonnement_suspendu: "application",
+  suspension_plateforme: "compte_elsatia",
+} as const;
+
+export function decisionCoupeToutesLesApplications(decision: DecisionAccesClient): boolean {
+  return decision === "suspension_plateforme";
+}
 
 const CODES = new Set<string>(DECISIONS_ACCES);
 

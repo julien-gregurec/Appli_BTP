@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { MODULE_PERMISSION_PAR_CHEMIN, PERMISSIONS_ACCES_ALTERNATIVES, droitsGestionPour } from "@/lib/module-permissions";
 import { droitOuvertSansModule } from "@/lib/acces-socle-essai";
+import { observateurAccesGp } from "@/lib/acces-gp/observation";
 import { appliquerRateLimit, politiquesRateLimitPour } from "@/lib/security/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { clePubliqueSupabase } from "@/lib/supabase/keys";
@@ -164,6 +165,24 @@ export async function updateSession(request: NextRequest) {
   });
   if (limiteAuthentifiee) return limiteAuthentifiee;
 
+  // D1 étape 1 : OBSERVATION seulement (ELSATIA_GP_ACCES_APP=observe). Synchrone, ne lève jamais,
+  // ne bloque jamais et ne modifie aucune décision ci-dessous — voir src/lib/acces-gp/observation.ts.
+  const observationGp = observateurAccesGp.observer({
+    utilisateurId: user.id,
+    entrepriseId: ctx.entreprise_id,
+    chemin,
+    publique: isPublic,
+    compteDepot: ctx.compte_depot === true,
+    accesSupport: ctx.acces_support === true,
+    droitRequis: droitRequis ?? null,
+    droitAcces: ctx.droit_acces,
+    appeler: (signal) =>
+      supabase.rpc("decision_acces_application", {
+        p_application_code: "gestion_pro",
+        p_entreprise_id: ctx.entreprise_id ?? null,
+      }).abortSignal(signal),
+  });
+
   // « Module non inclus » est un cul-de-sac informatif : il explique à
   // l'utilisateur ce que l'offre de l'entreprise ne couvre pas. Il ne porte
   // aucune donnée sensible et ne doit JAMAIS être renvoyé vers une route
@@ -249,6 +268,7 @@ export async function updateSession(request: NextRequest) {
         });
         droitsInclus = parModule === true;
       }
+      observationGp.completer({ moduleInclus: droitsInclus, abonnementStatut: entreprise?.abonnement_statut ?? null });
       if (!droitsInclus) {
         const url = request.nextUrl.clone();
         url.pathname = "/abonnement/module-non-inclus";

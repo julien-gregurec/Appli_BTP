@@ -4,6 +4,8 @@ import {
   DECISIONS_ACCES,
   REGLES_DECISION,
   VERSION_CONTRAT_DECISION_ACCES,
+  PORTEE_SUSPENSION,
+  decisionCoupeToutesLesApplications,
   decisionDepuisBooleen,
   ecranPourDecision,
   lireDecisionAcces,
@@ -35,6 +37,7 @@ const CAS: {
   { situation: "6. désactivé", decision: "utilisateur_desactive", ecran: "compte_desactive", http: 403, deconnexion: "local" },
   { situation: "7. invitation en attente", decision: "invitation_en_attente", ecran: "invitation", http: 403, deconnexion: null },
   { situation: "8. non connecté", decision: "non_authentifie", ecran: "login", http: 401, deconnexion: null },
+  { situation: "8b. suspension plateforme (sécurité)", decision: "suspension_plateforme", ecran: "suspension_plateforme", http: 423, deconnexion: "local" },
   { situation: "9. essai expiré", decision: "essai_expire", ecran: "essai_expire", http: 423, deconnexion: "local" },
   { situation: "10. panne du service de décision", decision: "indisponible", ecran: "erreur_technique", http: 503, deconnexion: null },
 ];
@@ -80,13 +83,13 @@ describe("invariants du contrat", () => {
   });
 
   it("l'état d'abonnement d'une entreprise n'est jamais exposé à qui n'en est pas membre", () => {
-    for (const d of ["sans_organisation", "non_authentifie"] as const) {
+    for (const d of ["sans_organisation", "non_authentifie", "suspension_plateforme"] as const) {
       expect(REGLES_DECISION[d].nomEntrepriseExposable).toBe(false);
     }
     // Les états personnels précèdent les états d'entreprise dans l'ordre d'évaluation.
     const i = (d: string) => DECISIONS_ACCES.indexOf(d as (typeof DECISIONS_ACCES)[number]);
     for (const perso of ["sans_organisation", "invitation_en_attente", "validation_en_attente", "utilisateur_desactive"]) {
-      for (const entreprise of ["entreprise_inactive", "abonnement_suspendu", "essai_expire"]) {
+      for (const entreprise of ["abonnement_suspendu", "essai_expire"]) {
         expect(i(perso)).toBeLessThan(i(entreprise));
       }
     }
@@ -94,6 +97,26 @@ describe("invariants du contrat", () => {
     expect(i("abonnement_suspendu")).toBeLessThan(i("application_non_incluse"));
     expect(i("application_non_incluse")).toBeLessThan(i("sans_habilitation"));
     expect(i("sans_habilitation")).toBeLessThan(i("sans_role"));
+  });
+
+  it("la suspension plateforme prime sur tout, bypass administrateur compris", () => {
+    expect(DECISIONS_ACCES.indexOf("suspension_plateforme")).toBeLessThan(DECISIONS_ACCES.indexOf("autorise"));
+    expect(DECISIONS_ACCES.indexOf("non_authentifie")).toBeLessThan(DECISIONS_ACCES.indexOf("suspension_plateforme"));
+  });
+
+  it("l'ancienne décision entreprise_inactive n'existe plus dans le contrat figé", () => {
+    expect(DECISIONS_ACCES as readonly string[]).not.toContain("entreprise_inactive");
+    expect(Object.keys(REGLES_DECISION)).not.toContain("entreprise_inactive");
+  });
+
+  it("D3 — une suspension commerciale ne concerne que son application ; seule la suspension plateforme coupe tout", () => {
+    expect(PORTEE_SUSPENSION.abonnement_suspendu).toBe("application");
+    expect(PORTEE_SUSPENSION.suspension_plateforme).toBe("compte_elsatia");
+    expect(decisionCoupeToutesLesApplications("abonnement_suspendu")).toBe(false);
+    expect(decisionCoupeToutesLesApplications("suspension_plateforme")).toBe(true);
+    for (const d of Object.keys(REGLES_DECISION) as DecisionAccesClient[]) {
+      if (d !== "suspension_plateforme") expect(decisionCoupeToutesLesApplications(d)).toBe(false);
+    }
   });
 
   it("l'ordre d'évaluation n'a pas de doublon", () => {
