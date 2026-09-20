@@ -49,6 +49,7 @@ export default async function DocumentPartagePage({ params }: { params: Promise<
             estFacture={donnees.estFacture}
             signatures={donnees.signatures}
             photos={[]}
+            urlSignature={(signature) => `/api/documents/partage/${token}/media?type=signature&id=${signature.id}`}
           />
         </div>
       </div>

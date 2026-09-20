@@ -35,6 +35,8 @@ export default async function ImprimerPartagePage({ params }: { params: Promise<
       estFacture={donnees.estFacture}
       signatures={donnees.signatures}
       photos={donnees.photos}
+      urlPhoto={(photoId) => `/api/documents/partage/${token}/media?type=photo&id=${photoId}`}
+      urlSignature={(signature) => `/api/documents/partage/${token}/media?type=signature&id=${signature.id}`}
     />
   );
 }
