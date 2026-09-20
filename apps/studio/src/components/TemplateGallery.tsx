@@ -3,9 +3,11 @@ import { useState } from "react";
 import {
   listStudioTemplates,
   type TemplateOptions,
+  type StudioBrandKit,
   type StudioMediaAsset,
   type StudioProject,
 } from "@elsatia/studio-domain";
+const brandLogoValue = "__brand__";
 export default function TemplateGallery({
   project,
   assets,
@@ -13,13 +15,18 @@ export default function TemplateGallery({
   active,
   onGenerate,
   initialTemplate,
+  brandKit = null,
 }: {
   project: StudioProject;
   assets: StudioMediaAsset[];
   busy: boolean;
   active: boolean;
-  onGenerate: (options?: TemplateOptions) => void;
+  onGenerate: (
+    options?: TemplateOptions,
+    extra?: { attachBrandLogo: boolean },
+  ) => void;
   initialTemplate?: string;
+  brandKit?: StudioBrandKit | null;
 }) {
   const [selected, setSelected] = useState(initialTemplate ?? ""),
     [open, setOpen] = useState(!active),
@@ -117,7 +124,10 @@ export default function TemplateGallery({
                 company: String(f.get("company") ?? ""),
                 website: String(f.get("website") ?? ""),
                 phone: String(f.get("phone") ?? ""),
-                logoAssetId: String(f.get("logo") ?? "") || null,
+                logoAssetId:
+                  String(f.get("logo") ?? "") === brandLogoValue
+                    ? (brandKit?.logo?.id ?? null)
+                    : String(f.get("logo") ?? "") || null,
                 introDuration: Math.round(Number(f.get("intro")) * 1000),
                 outroDuration: Math.round(
                   Number(f.get("outroDuration")) * 1000,
@@ -136,7 +146,9 @@ export default function TemplateGallery({
                   .filter((c) => c.title.trim()),
               }
             : undefined;
-          onGenerate(opts);
+          onGenerate(opts, {
+            attachBrandLogo: String(f.get("logo") ?? "") === brandLogoValue,
+          });
         }}
       >
         {t && (
@@ -163,7 +175,7 @@ export default function TemplateGallery({
               <input
                 name="outro"
                 maxLength={500}
-                defaultValue={t.outroConfig.text}
+                defaultValue={brandKit?.tagline || t.outroConfig.text}
               />
             </label>
             <div className="row">
@@ -196,20 +208,40 @@ export default function TemplateGallery({
               <>
                 <label>
                   Entreprise (facultatif)
-                  <input name="company" maxLength={150} />
+                  <input
+                    name="company"
+                    maxLength={150}
+                    defaultValue={brandKit?.company_name ?? ""}
+                  />
                 </label>
                 <label>
                   Site (facultatif)
-                  <input name="website" maxLength={150} />
+                  <input
+                    name="website"
+                    maxLength={150}
+                    defaultValue={brandKit?.website ?? ""}
+                  />
                 </label>
                 <label>
                   Téléphone (facultatif)
-                  <input name="phone" maxLength={50} />
+                  <input
+                    name="phone"
+                    maxLength={50}
+                    defaultValue={brandKit?.phone ?? ""}
+                  />
                 </label>
                 <label>
-                  Logo temporaire
-                  <select name="logo">
+                  Logo
+                  <select
+                    name="logo"
+                    defaultValue={brandKit?.logo ? brandLogoValue : ""}
+                  >
                     <option value="">Sans logo</option>
+                    {brandKit?.logo && (
+                      <option value={brandLogoValue}>
+                        Logo de la marque ({brandKit.logo.original_filename})
+                      </option>
+                    )}
                     {assets
                       .filter((a) =>
                         ["image/png", "image/jpeg"].includes(a.mime_type),

@@ -96,3 +96,4 @@ export * from "./templates";
 export * from "./editor";
 
 export * from "./analysis";
+export * from "./brand";

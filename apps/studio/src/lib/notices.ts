@@ -25,6 +25,13 @@ export const notices = {
   resetInvalid: "Indiquez un email valide.",
   passwordInvalid: "Le mot de passe doit contenir 12 caractères minimum.",
   passwordMismatch: "Les deux mots de passe ne correspondent pas.",
+  brandInvalid:
+    "Vérifiez les champs : lettres, chiffres et ponctuation courante uniquement (pas d’emoji).",
+  brandConflict:
+    "Le kit a été modifié ailleurs. Rechargez la page avant d’enregistrer.",
+  brandLogoInvalid:
+    "Logo refusé : choisissez une image PNG ou JPEG importée dans l’un de vos projets.",
+  brandFailed: "Enregistrement impossible. Réessayez dans quelques instants.",
   passwordFailed:
     "Mise à jour impossible. Redemandez un lien de réinitialisation.",
 } as const;

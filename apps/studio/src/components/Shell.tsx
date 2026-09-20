@@ -7,7 +7,7 @@ export default function Shell({
   children,
 }: {
   context: Awaited<ReturnType<typeof getActiveStudioWorkspace>>;
-  page: "dashboard" | "settings" | "members" | "projects";
+  page: "dashboard" | "settings" | "members" | "projects" | "brand";
   children: React.ReactNode;
 }) {
   const { user, workspace, workspaces, membership } = context;
@@ -35,9 +35,12 @@ export default function Shell({
           >
             Projets
           </Link>
-          <span>
-            Brand Kit <small>À venir</small>
-          </span>
+          <Link
+            aria-current={page === "brand" ? "page" : undefined}
+            href={`/brand-kit${suffix}`}
+          >
+            Identité de marque
+          </Link>
           <Link
             aria-current={page === "settings" ? "page" : undefined}
             href={`/settings${suffix}`}
