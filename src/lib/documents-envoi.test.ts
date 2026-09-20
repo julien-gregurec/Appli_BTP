@@ -5,6 +5,7 @@ const chargerFactureMock = vi.fn();
 const brevoEstConfigureMock = vi.fn();
 const envoyerEmailBrevoMock = vi.fn();
 const genererPdfMock = vi.fn();
+const genererPdfHtmlMock = vi.fn();
 const obtenirTokenMock = vi.fn();
 
 vi.mock("@/lib/documents-commerciaux", () => ({
@@ -14,9 +15,11 @@ vi.mock("@/lib/documents-commerciaux", () => ({
 vi.mock("@/lib/brevo", () => ({
   brevoEstConfigure: (...args: unknown[]) => brevoEstConfigureMock(...args),
   envoyerEmailBrevo: (...args: unknown[]) => envoyerEmailBrevoMock(...args),
+  echapperHtml: (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"),
 }));
 vi.mock("@/lib/pdf/generer", () => ({
   genererPdfDepuisUrl: (...args: unknown[]) => genererPdfMock(...args),
+  genererPdfDepuisHtml: (...args: unknown[]) => genererPdfHtmlMock(...args),
   nomFichierPdf: (estFacture: boolean, numero: string) => `${estFacture ? "facture" : "devis"}-${numero}.pdf`,
 }));
 vi.mock("@/lib/documents-partage", () => ({
@@ -25,7 +28,7 @@ vi.mock("@/lib/documents-partage", () => ({
   urlImpressionPartage: (token: string) => `https://app.elsatia.fr/imprimer/partage/${token}`,
 }));
 
-import { envoyerDocumentCommercialParEmail } from "@/lib/documents-envoi";
+import { envoyerDocumentCommercialParEmail, htmlCgv } from "@/lib/documents-envoi";
 
 const donneesDevis = {
   typeDoc: "Devis",
@@ -43,7 +46,10 @@ const donneesDevis = {
   estAvoir: false,
   signatures: [],
   photos: [],
-  statut: "brouillon",
+  // Un devis/une facture émis(e) : c'est le cas nominal de cette fonction
+  // (envoyer un document déjà émis). Le garde-fou brouillon (GP-EXTERNAL-
+  // PILOT-CLOSURE-V1) a son propre test dédié, avec un override explicite.
+  statut: "envoye",
   clientEmail: "client@example.invalid",
   emailEnvoyeLe: null,
   entrepriseNom: "ELSATIA",
@@ -82,6 +88,28 @@ function supabaseMock() {
   } as unknown as import("@supabase/supabase-js").SupabaseClient;
 }
 
+// Mock traçant : enregistre chaque table touchée et chaque ligne insérée, pour
+// prouver ce qui est écrit — et surtout ce qui ne l'est PAS (public.clients,
+// devis.client_snapshot).
+type EcritureTracee = { table: string; operation: "insert" | "update"; charge: unknown };
+
+function supabaseTracant() {
+  const ecritures: EcritureTracee[] = [];
+  const client = {
+    from: (table: string) => ({
+      insert: (charge: unknown) => {
+        ecritures.push({ table, operation: "insert", charge });
+        return Promise.resolve({ error: null });
+      },
+      update: (charge: unknown) => {
+        ecritures.push({ table, operation: "update", charge });
+        return { eq: () => ({ eq: () => Promise.resolve({ error: null }) }) };
+      },
+    }),
+  } as unknown as import("@supabase/supabase-js").SupabaseClient;
+  return { client, ecritures };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   chargerDevisMock.mockResolvedValue(donneesDevis);
@@ -99,10 +127,34 @@ describe("envoyerDocumentCommercialParEmail", () => {
     expect(envoyerEmailBrevoMock).not.toHaveBeenCalled();
   });
 
-  it("échoue si le client n'a pas d'adresse e-mail", async () => {
+  // GP-EXTERNAL-PILOT-CLOSURE-V1 (P0) : un devis/une facture encore brouillon
+  // ne doit jamais pouvoir partir par e-mail, ni générer de PDF, ni créer de
+  // lien de partage public — aucun des trois n'a lieu si le garde-fou coupe
+  // avant obtenirNouveauTokenPartage.
+  it("échoue si le devis est encore un brouillon, sans créer de lien de partage ni générer de PDF", async () => {
+    chargerDevisMock.mockResolvedValue({ ...donneesDevis, statut: "brouillon" });
+    const resultat = await envoyerDocumentCommercialParEmail(supabaseMock(), paramsBase);
+    expect(resultat).toEqual({ error: "Ce devis est encore un brouillon : il doit d'abord être émis avant de pouvoir être envoyé." });
+    expect(envoyerEmailBrevoMock).not.toHaveBeenCalled();
+    expect(obtenirTokenMock).not.toHaveBeenCalled();
+    expect(genererPdfMock).not.toHaveBeenCalled();
+  });
+
+  it("échoue si la facture est encore un brouillon", async () => {
+    chargerFactureMock.mockResolvedValue({ ...donneesFacture, statut: "brouillon" });
+    const resultat = await envoyerDocumentCommercialParEmail(supabaseMock(), { ...paramsBase, typeDocument: "facture" });
+    expect(resultat).toEqual({ error: "Cette facture est encore un brouillon : elle doit d'abord être émise avant de pouvoir être envoyée." });
+    expect(envoyerEmailBrevoMock).not.toHaveBeenCalled();
+  });
+
+  // Message reformulé par ELSATIA-GP-DOCUMENT-RESEND-OVERRIDE-V1 : depuis le
+  // lot Snapshot, l'adresse utilisée est celle FIGÉE SUR LE DOCUMENT, pas celle
+  // de la fiche client — « ce client n'a pas d'adresse » était devenu inexact.
+  // Le scénario, le refus et l'absence d'envoi sont inchangés.
+  it("échoue si le document ne porte aucune adresse de destinataire", async () => {
     chargerDevisMock.mockResolvedValue({ ...donneesDevis, clientEmail: null });
     const resultat = await envoyerDocumentCommercialParEmail(supabaseMock(), paramsBase);
-    expect(resultat).toEqual({ error: "Ce client n'a pas d'adresse e-mail renseignée" });
+    expect(resultat).toEqual({ error: "Ce document ne porte aucune adresse e-mail de destinataire." });
     expect(envoyerEmailBrevoMock).not.toHaveBeenCalled();
   });
 
@@ -182,5 +234,238 @@ describe("envoyerDocumentCommercialParEmail", () => {
     const appel = envoyerEmailBrevoMock.mock.calls[0][0];
     expect(appel.sujet).toBe("Devis DEV-2026-0001 — ELSATIA");
     expect(appel.texte).toContain("le devis DEV-2026-0001");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ELSATIA-GP-DOCUMENT-RESEND-OVERRIDE-V1
+// ---------------------------------------------------------------------------
+
+describe("surcharge de l'adresse de renvoi", () => {
+  const FIGEE = "client@example.invalid";
+  const AUTRE = "nouveau-contact@example.invalid";
+
+  it("1. envoie à l'adresse figée quand aucune surcharge n'est demandée", async () => {
+    const { client, ecritures } = supabaseTracant();
+    const resultat = await envoyerDocumentCommercialParEmail(client, paramsBase);
+    expect(resultat).toEqual({ ok: true });
+    expect(envoyerEmailBrevoMock.mock.calls[0][0].to).toBe(FIGEE);
+    // Aucun écart : aucune entrée de journal.
+    expect(ecritures.filter((e) => e.table === "journal_activite")).toHaveLength(0);
+  });
+
+  it("2. + 5. envoie à l'adresse surchargée et journalise l'écart", async () => {
+    const { client, ecritures } = supabaseTracant();
+    const resultat = await envoyerDocumentCommercialParEmail(client, {
+      ...paramsBase,
+      surchargeDestinataire: { email: AUTRE, motif: "Le contact a changé" },
+      peutSurchargerDestinataire: true,
+    });
+    expect(resultat).toEqual({ ok: true });
+    expect(envoyerEmailBrevoMock.mock.calls[0][0].to).toBe(AUTRE);
+
+    const journal = ecritures.filter((e) => e.table === "journal_activite");
+    expect(journal).toHaveLength(1);
+    expect(journal[0].charge).toMatchObject({
+      entreprise_id: "ent-1",
+      utilisateur_id: "user-1",
+      action: "envoi_document_adresse_surchargee",
+      ressource: "devis",
+      ressource_id: "devis-1",
+      metadata: {
+        adresse_figee: FIGEE,
+        adresse_utilisee: AUTRE,
+        motif: "Le contact a changé",
+        type_envoi: "envoi_initial",
+        resultat: "succes",
+      },
+    });
+  });
+
+  it("4. refuse la surcharge d'un utilisateur non autorisé, sans rien envoyer", async () => {
+    const { client, ecritures } = supabaseTracant();
+    const resultat = await envoyerDocumentCommercialParEmail(client, {
+      ...paramsBase,
+      surchargeDestinataire: { email: AUTRE },
+      peutSurchargerDestinataire: false,
+    });
+    expect(resultat).toMatchObject({ error: expect.stringContaining("ne permet pas") });
+    expect(envoyerEmailBrevoMock).not.toHaveBeenCalled();
+    expect(ecritures).toHaveLength(0);
+  });
+
+  it("6. le PDF joint reste celui du document, généré depuis la page du snapshot", async () => {
+    const { client } = supabaseTracant();
+    await envoyerDocumentCommercialParEmail(client, {
+      ...paramsBase,
+      surchargeDestinataire: { email: AUTRE },
+      peutSurchargerDestinataire: true,
+    });
+    // Le PDF est produit à partir de l'URL d'impression partagée, sans aucun
+    // paramètre lié à l'adresse : la surcharge ne peut pas l'influencer.
+    expect(genererPdfMock).toHaveBeenCalledWith("https://app.elsatia.fr/imprimer/partage/token-abc");
+    const appel = envoyerEmailBrevoMock.mock.calls[0][0];
+    expect(appel.piecesJointes).toHaveLength(1);
+    expect(appel.piecesJointes[0].nom).toBe("devis-DEV-2026-0001.pdf");
+    // Le corps s'adresse toujours au destinataire figé du document.
+    expect(appel.texte).toContain("DEV-2026-0001");
+  });
+
+  it("7. + 8. n'écrit ni le snapshot du document, ni la fiche client", async () => {
+    const { client, ecritures } = supabaseTracant();
+    await envoyerDocumentCommercialParEmail(client, {
+      ...paramsBase,
+      surchargeDestinataire: { email: AUTRE },
+      peutSurchargerDestinataire: true,
+    });
+    expect(ecritures.some((e) => e.table === "clients")).toBe(false);
+    const tables = new Set(ecritures.map((e) => e.table));
+    expect([...tables].sort()).toEqual(["devis", "journal_activite"]);
+    // La seule écriture sur le document est la traçabilité d'envoi : jamais
+    // client_snapshot, jamais client_id.
+    const surDocument = ecritures.filter((e) => e.table === "devis");
+    for (const ecriture of surDocument) {
+      expect(Object.keys(ecriture.charge as object).sort()).toEqual(["email_envoye_a", "email_envoye_le"]);
+    }
+  });
+
+  it("9. journalise un envoi refusé par le fournisseur, avec sa cause", async () => {
+    envoyerEmailBrevoMock.mockRejectedValue(new Error("Brevo 401"));
+    const { client, ecritures } = supabaseTracant();
+    const resultat = await envoyerDocumentCommercialParEmail(client, {
+      ...paramsBase,
+      surchargeDestinataire: { email: AUTRE },
+      peutSurchargerDestinataire: true,
+    });
+    expect(resultat).toEqual({ error: "Brevo 401" });
+    const journal = ecritures.filter((e) => e.table === "journal_activite");
+    expect(journal).toHaveLength(1);
+    expect(journal[0].charge).toMatchObject({ metadata: { resultat: "echec", erreur: "Brevo 401" } });
+  });
+
+  it("10. une nouvelle tentative après échec ajoute une seconde entrée de journal", async () => {
+    envoyerEmailBrevoMock.mockRejectedValueOnce(new Error("Brevo 401"));
+    const { client, ecritures } = supabaseTracant();
+    const surcharge = { surchargeDestinataire: { email: AUTRE }, peutSurchargerDestinataire: true };
+
+    await envoyerDocumentCommercialParEmail(client, { ...paramsBase, ...surcharge });
+    chargerDevisMock.mockResolvedValue({ ...donneesDevis, emailEnvoyeLe: "2026-09-07T10:00:00.000Z" });
+    const seconde = await envoyerDocumentCommercialParEmail(client, { ...paramsBase, ...surcharge });
+
+    expect(seconde).toEqual({ ok: true });
+    const journal = ecritures.filter((e) => e.table === "journal_activite");
+    expect(journal).toHaveLength(2);
+    expect(journal[0].charge).toMatchObject({ metadata: { resultat: "echec", type_envoi: "envoi_initial" } });
+    expect(journal[1].charge).toMatchObject({ metadata: { resultat: "succes", type_envoi: "renvoi" } });
+  });
+
+  it("un journal indisponible ne fait pas échouer un envoi réussi", async () => {
+    const client = {
+      from: (table: string) => ({
+        insert: () => {
+          if (table === "journal_activite") throw new Error("journal indisponible");
+          return Promise.resolve({ error: null });
+        },
+        update: () => ({ eq: () => ({ eq: () => Promise.resolve({ error: null }) }) }),
+      }),
+    } as unknown as import("@supabase/supabase-js").SupabaseClient;
+
+    const resultat = await envoyerDocumentCommercialParEmail(client, {
+      ...paramsBase,
+      surchargeDestinataire: { email: AUTRE },
+      peutSurchargerDestinataire: true,
+    });
+    expect(resultat).toEqual({ ok: true });
+  });
+
+  it("enregistre l'adresse réellement utilisée dans la traçabilité d'envoi du document", async () => {
+    const { client, ecritures } = supabaseTracant();
+    await envoyerDocumentCommercialParEmail(client, {
+      ...paramsBase,
+      surchargeDestinataire: { email: AUTRE },
+      peutSurchargerDestinataire: true,
+    });
+    const surDocument = ecritures.find((e) => e.table === "devis");
+    expect(surDocument?.charge).toMatchObject({ email_envoye_a: AUTRE });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GP V1, lot G — copies, modèle, pièces jointes, historique des envois
+// ---------------------------------------------------------------------------
+
+describe("options d'envoi (GP V1, lot G)", () => {
+  function supabaseLotG(o: { cgv?: string | null; docs?: Array<{ id: string; nom: string; storage_path: string; taille_octets: number }> } = {}) {
+    const rpc = vi.fn().mockResolvedValue({ data: "envoi-1", error: null });
+    const download = vi.fn(async () => ({ data: { arrayBuffer: async () => new TextEncoder().encode("piece").buffer }, error: null }));
+    const client = {
+      rpc,
+      storage: { from: () => ({ download }) },
+      from: (table: string) => ({
+        update: () => ({ eq: () => ({ eq: () => Promise.resolve({ error: null }) }) }),
+        insert: () => Promise.resolve({ error: null }),
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({ data: table === "entreprises" ? { nom: "ELSATIA", cgv_texte: o.cgv ?? null } : null }),
+            in: async () => ({ data: o.docs ?? [] }),
+          }),
+        }),
+      }),
+    } as unknown as import("@supabase/supabase-js").SupabaseClient;
+    return { client, rpc, download };
+  }
+
+  it("transmet Cc et Cci validés, l'objet et le message du modèle, et consigne l'envoi", async () => {
+    const { client, rpc } = supabaseLotG();
+    const resultat = await envoyerDocumentCommercialParEmail(client, { ...paramsBase, options: { cc: ["Conducteur@Exemple.invalid", " conducteur@exemple.invalid "], cci: ["archives@exemple.invalid"], objet: "Votre devis DEV-2026-0001", corps: "Bonjour,\nci-joint." } });
+    expect(resultat).toEqual({ ok: true });
+    const appel = envoyerEmailBrevoMock.mock.calls[0][0];
+    expect(appel.cc).toEqual(["conducteur@exemple.invalid"]);
+    expect(appel.cci).toEqual(["archives@exemple.invalid"]);
+    expect(appel.sujet).toBe("Votre devis DEV-2026-0001");
+    expect(appel.texte).toBe("Bonjour,\nci-joint.");
+    expect(rpc).toHaveBeenCalledWith("journaliser_envoi_document", expect.objectContaining({
+      p_type_document: "devis", p_document_id: "devis-1", p_destinataire: "client@example.invalid", p_copies: ["conducteur@exemple.invalid"], p_copies_cachees: ["archives@exemple.invalid"], p_statut: "envoye",
+      p_pieces: [{ nom: "devis-DEV-2026-0001.pdf", taille: 3, source: "document" }],
+    }));
+  });
+
+  it("refuse une adresse en copie inexploitable sans rien envoyer", async () => {
+    const { client } = supabaseLotG();
+    const resultat = await envoyerDocumentCommercialParEmail(client, { ...paramsBase, options: { cc: ["pas-une-adresse"] } });
+    expect(resultat).toEqual({ error: "Adresse en copie inexploitable : pas-une-adresse" });
+    expect(envoyerEmailBrevoMock).not.toHaveBeenCalled();
+  });
+
+  it("joint les CGV (PDF produit depuis le texte de l'entreprise) et une pièce du chantier", async () => {
+    const { client, download } = supabaseLotG({ cgv: "Article 1 — Objet.", docs: [{ id: "doc-1", nom: "plan.pdf", storage_path: "ent-1/plan.pdf", taille_octets: 5 }] });
+    genererPdfHtmlMock.mockResolvedValue(Buffer.from("cgv-pdf"));
+    const resultat = await envoyerDocumentCommercialParEmail(client, { ...paramsBase, options: { joindreCgv: true, piecesComplementaires: ["doc-1"] } });
+    expect(resultat).toEqual({ ok: true });
+    expect(genererPdfHtmlMock.mock.calls[0][0]).toContain("Conditions générales de vente");
+    expect(genererPdfHtmlMock.mock.calls[0][0]).toContain("Article 1 — Objet.");
+    expect(download).toHaveBeenCalledWith("ent-1/plan.pdf");
+    const noms = envoyerEmailBrevoMock.mock.calls[0][0].piecesJointes.map((p: { nom: string }) => p.nom);
+    expect(noms).toEqual(["devis-DEV-2026-0001.pdf", "conditions-generales-de-vente.pdf", "plan.pdf"]);
+  });
+
+  it("refuse de joindre des CGV absentes, ou une pièce qui n'appartient pas à l'entreprise", async () => {
+    const { client } = supabaseLotG({ cgv: "" });
+    expect(await envoyerDocumentCommercialParEmail(client, { ...paramsBase, options: { joindreCgv: true } })).toEqual({ error: "Aucune condition générale de vente n'est renseignée dans les paramètres." });
+    expect(await envoyerDocumentCommercialParEmail(client, { ...paramsBase, options: { piecesComplementaires: ["doc-etranger"] } })).toEqual({ error: "Une pièce complémentaire est introuvable ou n'appartient pas à cette entreprise." });
+    expect(envoyerEmailBrevoMock).not.toHaveBeenCalled();
+  });
+
+  it("consigne aussi un envoi refusé par le transport", async () => {
+    const { client, rpc } = supabaseLotG();
+    envoyerEmailBrevoMock.mockRejectedValue(new Error("Envoi email impossible (Brevo a répondu 500)"));
+    const resultat = await envoyerDocumentCommercialParEmail(client, paramsBase);
+    expect(resultat).toEqual({ error: "Envoi email impossible (Brevo a répondu 500)" });
+    expect(rpc).toHaveBeenCalledWith("journaliser_envoi_document", expect.objectContaining({ p_statut: "echec", p_erreur: "Envoi email impossible (Brevo a répondu 500)" }));
+  });
+
+  it("htmlCgv échappe le texte venu de la base", () => {
+    expect(htmlCgv({ nom: "A & B", cgv: "<script>x</script>\n\nArticle 2" })).toContain("&lt;script&gt;x&lt;/script&gt;");
+    expect(htmlCgv({ nom: "A & B", cgv: "x" })).toContain("A &amp; B");
   });
 });

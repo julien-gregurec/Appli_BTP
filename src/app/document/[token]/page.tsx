@@ -1,27 +1,22 @@
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { resoudreTokenPartage } from "@/lib/documents-partage";
-import { chargerDonneesDevisImprimable, chargerDonneesFactureImprimable } from "@/lib/documents-commerciaux";
+import { chargerDonneesDocumentPartage } from "@/lib/documents-commerciaux";
 import { DocumentImprimable } from "@/components/DocumentImprimable";
 
 export const metadata = { robots: { index: false, follow: false } };
 
 // Page publique (sans authentification, sans navigation interne ELSATIA) :
 // c'est ce que voit un client externe qui a reçu un lien de devis/facture.
-// Ne doit jamais exposer autre chose que ce document précis — voir
-// resoudreTokenPartage() pour la résolution du token et son isolation.
+// Ne doit jamais exposer autre chose que ce document précis — la résolution
+// du jeton (révocation/expiration/tenance/statut) et l'isolation des colonnes
+// renvoyées sont entièrement faites par la fonction SECURITY DEFINER
+// document_commercial_public_par_token(), jamais par une lecture directe de
+// table ici (service_role n'a plus aucun privilège sur devis/factures depuis
+// 20260911000297_gp_v1_rc_acl_prerequisites.sql).
 export default async function DocumentPartagePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
-  const supabaseAnon = await createClient();
-  const resolution = await resoudreTokenPartage(supabaseAnon, token);
-  if (!resolution) notFound();
-
   const supabaseAdmin = createAdminClient();
-  const donnees =
-    resolution.typeDocument === "devis"
-      ? await chargerDonneesDevisImprimable(supabaseAdmin, { id: resolution.documentId, entrepriseId: resolution.entrepriseId })
-      : await chargerDonneesFactureImprimable(supabaseAdmin, { id: resolution.documentId, entrepriseId: resolution.entrepriseId });
+  const donnees = await chargerDonneesDocumentPartage(supabaseAdmin, token);
   if (!donnees) notFound();
 
   return (

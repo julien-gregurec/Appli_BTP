@@ -161,29 +161,17 @@ export async function enregistrerPaiementAction(factureId: string, formData: For
     redirect(`/factures/${factureId}?error=${encodeURIComponent("Montant invalide")}`);
   }
 
-
-  const { data: facture } = await supabase
-    .from("factures")
-    .select("montant_ttc, montant_paye, statut")
-    .eq("id", factureId)
-    .eq("entreprise_id", ctx.entrepriseId)
-    .single();
-
-  if (!facture) redirect(`/factures/${factureId}?error=${encodeURIComponent("Facture introuvable")}`);
-  if (["brouillon", "annulee", "avoir_emis"].includes(facture.statut)) {
-    redirect(`/factures/${factureId}?error=${encodeURIComponent("Un paiement ne peut pas être ajouté à cette facture")}`);
-  }
-  const reste = Math.max(0, Number(facture.montant_ttc) - Number(facture.montant_paye));
-  if (montant > reste + 0.005) {
-    redirect(`/factures/${factureId}?error=${encodeURIComponent(`Le paiement dépasse le reste dû (${reste.toFixed(2)} €)`)}`);
-  }
-
-  const { error } = await supabase.from("paiements").insert({
-    facture_id: factureId,
-    montant,
-    date: String(formData.get("date") || new Date().toISOString().slice(0, 10)),
-    mode: String(formData.get("mode") || "virement"),
-    reference: String(formData.get("reference") || "") || null,
+  // enregistrer_paiement_facture verrouille la facture (for update) le temps de
+  // la transaction : deux enregistrements concurrents (double clic, deux
+  // onglets, deux utilisateurs) ne peuvent plus lire le même montant_paye
+  // périmé ni dépasser ensemble le reste dû (GP-EXTERNAL-PILOT-CLOSURE-V1).
+  const { error } = await supabase.rpc("enregistrer_paiement_facture", {
+    p_entreprise_id: ctx.entrepriseId,
+    p_facture_id: factureId,
+    p_montant: montant,
+    p_date: String(formData.get("date") || new Date().toISOString().slice(0, 10)),
+    p_mode: String(formData.get("mode") || "virement"),
+    p_reference: String(formData.get("reference") || "") || null,
   });
 
   if (error) {
@@ -209,6 +197,17 @@ export async function modifierEcheanceFactureAction(factureId: string, formData:
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const dateEcheance = String(formData.get("date_echeance") ?? "") || null;
+
+  // GP-EXTERNAL-PILOT-CLOSURE-V1 — la date d'échéance est un champ légalement
+  // significatif (base des pénalités de retard) : une fois la facture émise,
+  // elle est figée comme les montants et les lignes (garde-fou dupliqué côté
+  // base par verrouiller_facture_emise, qui refuserait de toute façon l'écriture).
+  const { data: facture } = await supabase.from("factures").select("statut").eq("id", factureId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+  if (!facture) redirect(`/factures/${factureId}?error=${encodeURIComponent("Facture introuvable")}`);
+  if (facture.statut !== "brouillon") {
+    redirect(`/factures/${factureId}?error=${encodeURIComponent("Cette facture est déjà émise : sa date d’échéance est figée et ne peut plus être modifiée.")}`);
+  }
+
   const { error } = await supabase
     .from("factures")
     .update({ date_echeance: dateEcheance, updated_at: new Date().toISOString() })

@@ -125,11 +125,18 @@ export default async function FactureDetailPage({
         {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         {success && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{success}</p>}
 
-        <form action={modifierEcheance} className="flex items-end gap-2 rounded-md border border-neutral-200 p-3 dark:border-neutral-800">
-          <div className="space-y-1"><label className="text-xs text-neutral-500">Date d’échéance</label><input name="date_echeance" type="date" defaultValue={facture.date_echeance ?? ""} className={input} /></div>
-          <button type="submit" className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700">Enregistrer l’échéance</button>
-          {facture.date_echeance && facture.date_echeance < new Date().toISOString().slice(0, 10) && resteAPayer > 0 && <span className="ml-auto text-sm font-medium text-red-600">Échéance dépassée</span>}
-        </form>
+        {facture.statut === "brouillon" ? (
+          <form action={modifierEcheance} className="flex items-end gap-2 rounded-md border border-neutral-200 p-3 dark:border-neutral-800">
+            <div className="space-y-1"><label className="text-xs text-neutral-500">Date d’échéance</label><input name="date_echeance" type="date" defaultValue={facture.date_echeance ?? ""} className={input} /></div>
+            <button type="submit" className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700">Enregistrer l’échéance</button>
+          </form>
+        ) : (
+          <div className="flex items-center gap-2 rounded-md border border-neutral-200 p-3 text-sm dark:border-neutral-800">
+            <span className="text-neutral-500">Date d’échéance (figée à l’émission) :</span>
+            <span className="font-medium">{facture.date_echeance ? new Date(String(facture.date_echeance)).toLocaleDateString("fr-FR") : "—"}</span>
+            {facture.date_echeance && facture.date_echeance < new Date().toISOString().slice(0, 10) && resteAPayer > 0 && <span className="ml-auto text-sm font-medium text-red-600">Échéance dépassée</span>}
+          </div>
+        )}
 
         <div className="overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-800">
           <table className="w-full text-sm">
