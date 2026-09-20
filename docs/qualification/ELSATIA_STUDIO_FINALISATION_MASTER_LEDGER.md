@@ -36,9 +36,9 @@ Tous **WORKING**, requalifiés localement cette nuit sur la pile jetable : Fresh
 |---|---|---|
 | S1 | admission de rendu bornée, kill-switch `STUDIO_ENABLED`, quota, purge distante sur opt-in | **QUALIFIED locally** (pgTAP 21, Vitest 16) |
 | S2 | éditeur : crash Suppr, flush à la sortie, backoff, conflit, undo | **QUALIFIED locally** (Vitest 24 + E2E) |
-| S3 | reset mot de passe, notices fermées, UX, journalisation sans PII | QUALIFIED sauf e-mail de récupération : voir E2E |
+| S3 | reset mot de passe (e-mail réel Mailpit → lien → nouveau mot de passe → ancien refusé), notices fermées, UX, journalisation sans PII | **QUALIFIED locally** (E2E PASS) |
 | S4 | timeout proportionnel, texte dessinable, heartbeat tolérant, sonde de sortie | **QUALIFIED locally** (Vitest, test de rendu réel) |
-| J1 | profil 720p, registre d'usage, panneau de rendu | **QUALIFIED locally** (pgTAP 33 ; 1080/720 pleine taille : acceptation NOT RUN) |
+| J1 | profil 720p, registre d'usage, panneau de rendu | **QUALIFIED locally** (pgTAP 33 ; rendu 1080 pleine taille : acceptation PASS ; rendu 720 : NOT RUN, dimensions par pgTAP seulement) |
 | I | Brand Kit | **QUALIFIED locally** (pgTAP 44 + E2E PASS) |
 | J2 | liens de partage révocables, filigrane serveur | **QUALIFIED locally** (pgTAP 37, frame décodée, E2E PASS) ; politique de filigrane = Q-003 |
 | S5 | miniatures d'images, confirmation avant retrait d'un média utilisé | WORKING, non qualifié individuellement (couvert par la régression E2E) |
@@ -75,6 +75,8 @@ Tous **WORKING**, requalifiés localement cette nuit sur la pile jetable : Fresh
 | D-25 | P3 | verrou avant contrôle de rôle, colonnes lisibles | **OPEN** |
 | D-26 | P1 | (nouveau) Storage : environnement local — un `ffprobe` de sortie à 10 s échoue sous charge | **FIXED** (60 s pour notre propre fichier) |
 | D-27 | P2 | (nouveau) e-mail de récupération limité à 2/heure en local → tests | **FIXED** dans la config jetable |
+| D-28 | P1 | (nouveau, trouvé par E2E) les e-mails de récupération des gabarits Auth partagés pointent vers `/auth/confirm?type=recovery`, non géré : reset impossible | **FIXED** (`/auth/confirm` gère email/signup/recovery) |
+| D-29 | P2 | (nouveau) action déclenchée avant l'hydratation React perdue sous charge | **MITIGATED** : E2E attendent l'hydratation ; à surveiller côté utilisateur (formulaires natifs OK, champs contrôlés à vérifier) |
 
 ## FUNCTIONAL MATRIX & COMMERCIAL READINESS
 
@@ -83,7 +85,7 @@ Méthode : 28 capacités critiques ; QUALIFIED = 1, WORKING-UNQUALIFIED/PARTIAL 
 | # | Capacité | Initial | Final | Note |
 |---|---|---:|---:|---|
 | R01 | Auth signup/login/logout | 1 | 1 | |
-| R02 | Reset mot de passe | 0 | RESET_SCORE | e-mail réel : voir E2E |
+| R02 | Reset mot de passe | 0 | 1 | E2E réel PASS |
 | R03 | Confirmation e-mail | 0,5 | 0,5 | non prouvée en distant |
 | R04 | Workspaces | 1 | 1 | |
 | R05 | Membres/invitations utilisables | 0,5 | 0,5 | pas d'invitation par e-mail |
@@ -95,7 +97,7 @@ Méthode : 28 capacités critiques ; QUALIFIED = 1, WORKING-UNQUALIFIED/PARTIAL 
 | R11 | Éditeur (cœur) | 0,5 | 1 | D-04/05/06 corrigés + E2E |
 | R12 | Templates | 1 | 1 | |
 | R13 | Rendu réel | 1 | 1 | |
-| R14 | Profils 720/1080 prouvés | 0 | ACC_R14 | dimensions par pgTAP ; pleine taille : acceptation |
+| R14 | Profils 720/1080 prouvés | 0 | 0,5 | 1080 prouvé pleine taille (acceptation) ; 720p : dimensions SQL seulement, rendu 720 non joué |
 | R15 | Admission/anti-abus rendu | 0 | 1 | |
 | R16 | Musique importée | 0 | 0 | non démarré |
 | R17 | Brand Kit | 0 | 1 | |
@@ -107,11 +109,11 @@ Méthode : 28 capacités critiques ; QUALIFIED = 1, WORKING-UNQUALIFIED/PARTIAL 
 | R23 | Légal / consentement | 0 | 0 | Q-002 |
 | R24 | RGPD suppression/export | 0 | 0 | Q-008 |
 | R25 | Observabilité web | 0 | 0,5 | journal sans PII, pas d'alerte |
-| R26 | E2E Strasbourg exact (10+3, 1080) | 0,5 | ACC_R26 | spec opt-in écrite |
-| R27 | E2E Croatie exact (20+5, 1080) | 0,5 | ACC_R27 | spec opt-in écrite ; dates EXIF non couvertes |
+| R26 | E2E Strasbourg exact (10+3, 1080) | 0,5 | 0,5 | format/durée/images prouvés ; **musique et logo absents** de la recette |
+| R27 | E2E Croatie exact (20+5, 1080) | 0,5 | 0,5 | format/durée/images prouvés ; **dates EXIF et chapitres par journée non couverts** |
 | R28 | Mobile/WebKit qualifié | 0,5 | 0,5 | Chromium seul ; Q-005 |
 
-**Score initial : 12,5 / 28 = 44,6 %. Score final : SCORE_TOTAL / 28 = SCORE_PCT.**
+**Score initial : 12,5 / 28 = 44,6 %. Score final : 20 / 28 = 71,4 %.**
 
 ## QUEUE
 
@@ -139,16 +141,16 @@ Coût estimé : lot de taille L (migration + domaine + éditeur + worker + E2E).
 |---|---|
 | `tsc --noEmit` app / worker | PASS |
 | ESLint (fichiers modifiés) | PASS |
-| Vitest app | VITEST_APP |
-| Vitest worker | VITEST_WORKER |
+| Vitest app | **PASS 297/297** (18 fichiers ; était 251) |
+| Vitest worker | 22 PASS ; 4 tests d'analyse **BLOCKED** (module OpenCV `cv2` absent ; aucun téléchargement fait) |
 | pgTAP Fresh (12 fichiers) | **PASS — 520 assertions, 0 échec** (analysis 45, brand 44, editor 22, export 33, media 40, project 105, admission 21, render 45, shares 37, templates 18, timeline 52, foundation 58) |
 | Chaîne historique A→H (`analysis-migration-check`) | PASS (257 → 258 → 259 → 260, remise en état vérifiée) |
-| Upgrade post-H / rollback inverse / reapply (`post-h-migration-check`) | POSTH |
-| pgTAP après upgrade | PGUP |
+| Upgrade post-H / rollback inverse / reapply (`post-h-migration-check`) | **PASS** (4 migrations sur base H peuplée : 260 → 264 → 260 → 264, données identiques) |
+| pgTAP après upgrade | **PASS — 520 assertions, 12 fichiers** |
 | Build production (webpack) | PASS |
-| E2E complets (36 cas) | E2E_FULL |
+| E2E complets (36 cas, aperçus 540×960, Chrome installé) | **34/36 en un passage** ; les 2 échecs (attente « rendering » périmée dans un test ; flux de récupération = vrai défaut de route `/auth/confirm`) sont corrigés et **PASS individuellement** — second passage complet NOT RUN |
 | E2E ciblés de la nuit | Brand Kit PASS, partage PASS, S2 PASS, rendu réel Chantier PASS, invalid-links PASS, onboarding/isolation PASS |
-| Acceptation pleine taille (Strasbourg / Croatie) | ACCEPT |
+| Acceptation pleine taille (hors gate, sans drapeau aperçu) | **PASS ×2** : Strasbourg 10 photos + 3 vidéos, Chantier Pro, 9:16, 60 s ; Croatie 20 + 5, Voyage, 9:16, 90 s → MP4 H.264/AAC 1080×1920 30 fps, 1 800 / 2 700 images ±1, durée ±0,1 s, images décodées non noires. **Limites** : sources synthétiques minuscules, sans musique ni logo, sans dates EXIF |
 | npm audit | NOT RUN |
 
 Piège hydratation : un `change` ou `submit` déclenché avant l'hydratation React est perdu (constaté sous charge) ; tous les E2E attendent désormais que le champ de fichier / le formulaire porte ses handlers. Le squelette `loading.tsx` a été limité à dashboard et paramètres (un Suspense racine retarde l'hydratation).
@@ -159,7 +161,7 @@ Aucun P0. RLS SELECT-only sur toutes les tables, écritures par RPC `search_path
 
 ## PERFORMANCE
 
-Aucune mesure nouvelle valable : la machine était saturée (charge 20–25) par d'autres voies GP et des conteneurs tiers. Mesuré : rendu réel d'un montage de 15 s en aperçu ≈ 25 s ; ffprobe de sortie > 10 s sous charge (corrigé). Le débit 1080p sur vraies sources reste **non mesuré**.
+Première moitié de la nuit : mesures invalides (machine saturée, charge 20–25, par d'autres voies GP et des conteneurs tiers ; un `ffprobe` de sortie a dépassé 10 s, corrigé). Une fois la machine calmée : rendu 1080×1920 de 60 s ≈ **17 s** (journal worker `renderMs` 16 826, RSS Node 96 Mio, RSS enfant 77 Mio) et scénario Strasbourg complet (13 imports + génération + rendu + ffprobe) en 53 s ; Croatie (25 imports, 90 s) en 2,0 min. **Sources synthétiques minuscules** : aucun débit garanti pour de vraies photos/vidéos de téléphone, non mesuré.
 
 ## PREVIEW / PRODUCTION READINESS
 
