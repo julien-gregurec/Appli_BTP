@@ -162,7 +162,12 @@ export async function command(
     });
   });
 }
-export async function probe(path: string, r: Runtime): Promise<Probe> {
+export async function probe(
+  path: string,
+  r: Runtime,
+  // Untrusted inputs get a tight deadline; the finished output is our own file and may wait on a loaded host.
+  timeoutMs = 10000,
+): Promise<Probe> {
   try {
     const result: Probe = JSON.parse(
       await command(
@@ -180,7 +185,7 @@ export async function probe(path: string, r: Runtime): Promise<Probe> {
           "json",
           path,
         ],
-        AbortSignal.any([r.signal, AbortSignal.timeout(10000)]),
+        AbortSignal.any([r.signal, AbortSignal.timeout(timeoutMs)]),
       ),
     );
     const v = result.streams.find((x) => x.codec_type === "video");
@@ -463,7 +468,7 @@ export async function renderTimeline(
     ],
     r.signal,
   );
-  const result = await probe(output, r),
+  const result = await probe(output, r, 60000),
     v = result.streams.find((s) => s.codec_type === "video"),
     a = result.streams.find((s) => s.codec_type === "audio");
   if (
