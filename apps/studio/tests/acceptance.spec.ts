@@ -71,6 +71,8 @@ async function scenario(
     videos: number;
     seconds: number;
     template: Record<string, unknown>;
+    /** Imported music track (synthetic sine): longer than the video is cut, shorter is looped. */
+    musicSeconds?: number;
   },
 ) {
   const a = await user(page);
@@ -103,16 +105,24 @@ async function scenario(
   }
   for (let i = 0; i < o.videos; i++)
     files.push({ name: `video-${i}.mp4`, mimeType: "video/mp4", buffer: sample.mp4 });
+  let trackName = "";
+  if (o.musicSeconds) {
+    trackName = `musique-${o.musicSeconds}s.mp3`;
+    const track = join(sample.directory, trackName);
+    execFileSync(ffmpeg, ["-y", "-v", "error", "-f", "lavfi", "-i", `sine=frequency=330:duration=${o.musicSeconds}`, track]);
+    files.push({ name: trackName, mimeType: "audio/mpeg", buffer: await readFile(track) });
+  }
+  const uploads = o.photos + o.videos + (o.musicSeconds ? 1 : 0);
   await fileInputReady(page);
   await page.getByLabel("Choisir des fichiers").setInputFiles(files);
   await expect(page.locator('.upload-list [data-status="ready"]')).toHaveCount(
-    o.photos + o.videos,
+    uploads,
     { timeout: 600000 },
   );
   await page.reload();
   const order = await request(page, `/api/projects/${id}/order`);
   const ids = order.body.assets.map((x: { id: string }) => x.id);
-  expect(ids).toHaveLength(o.photos + o.videos);
+  expect(ids).toHaveLength(uploads);
   const generated = await request(page, `/api/timelines/${id}`, {
     action: "generate",
     template: { templateId: o.style, templateVersion: 1, ...o.template },
@@ -121,6 +131,10 @@ async function scenario(
   const doc = (await request(page, `/api/timelines/${id}`)).body.active;
   expect(doc.total_duration_ms).toBe(o.seconds * 1000);
   await page.goto(`/projects/${id}/editor`);
+  if (trackName) {
+    await page.getByLabel("Musique du montage").selectOption({ label: trackName });
+    await expect(page.getByText("Enregistré", { exact: false }).first()).toBeVisible({ timeout: 60000 });
+  }
   await page.getByLabel("Qualité de la vidéo").selectOption("standard");
   await page.getByRole("button", { name: "Créer la vidéo", exact: true }).click();
   const panel = page.getByRole("region", { name: "Vidéo exportée" });
@@ -169,6 +183,16 @@ async function scenario(
   };
   const samples = [1, o.seconds / 2, o.seconds - 1].map(luma);
   for (const value of samples) expect(value).toBeGreaterThan(5);
+  if (trackName) {
+    // Audible music at the start, in the middle and just before the end (cut for a longer track, looped for a shorter one).
+    const rms = (t: number) => {
+      const pcm = execFileSync(ffmpeg, ["-v", "error", "-ss", String(t), "-t", "1", "-i", file, "-vn", "-ac", "1", "-ar", "8000", "-f", "f32le", "pipe:1"]);
+      let sum = 0;
+      for (let i = 0; i < pcm.length; i += 4) sum += pcm.readFloatLE(i) ** 2;
+      return Math.sqrt(sum / Math.max(1, pcm.length / 4));
+    };
+    for (const t of [1, o.seconds / 2, o.seconds - 3]) expect(rms(t)).toBeGreaterThan(0.01);
+  }
   return { id, ids, size: bytes.length, samples };
 }
 test.describe("acceptation V1", () => {
@@ -183,6 +207,7 @@ test.describe("acceptation V1", () => {
       videos: 3,
       seconds: 60,
       template: { title: "Chantier Strasbourg", outro: "Merci", company: "Dupont Bâtiment", phone: "+33 3 88 00 00 00" },
+      musicSeconds: 120,
     });
     expect(r.size).toBeGreaterThan(1000);
   });
@@ -196,6 +221,7 @@ test.describe("acceptation V1", () => {
       videos: 5,
       seconds: 90,
       template: { title: "Vacances Croatie 2026", outro: "À bientôt" },
+      musicSeconds: 25,
     });
     expect(r.size).toBeGreaterThan(1000);
   });
