@@ -1,10 +1,12 @@
 # ELSATIA — Répétition générale de release vers Preview (V1)
 
-**Date** : 2026-09-20 (mise à jour : fermeture ciblée de 2 blockers techniques, même jour)
+**Date** : 2026-09-20 (mise à jour : fermeture ciblée de 2 blockers techniques, puis des 7 RPC sœurs identifiées par l'audit de systémicité, même jour)
 **Portée** : répétition/qualification d'un parcours CODE QUALIFIÉ → MIGRATIONS → CONFIGURATION → PREVIEW → AUTH → STORAGE → TESTS → ROLLBACK. **Aucun déploiement Production. Aucun Stripe Live. Aucune donnée cliente réelle.**
 **Auteur** : session Claude Code autonome (~4-6h), sandbox isolée, sans accès réseau à Supabase/Vercel/Stripe.
 
-> **Mise à jour post-répétition** : les 2 blockers techniques identifiés en §RELEASE GATE (CVE critique Next.js, fuite RPC `module_gestion_pro_actif_entreprise`) ont été **corrigés, testés et poussés dans un lot isolé** : branche `claude/preview-rehearsal-security-fixes-v1` (commit `bb42e1d`, base `WORKING_REHEARSAL_BASE`), **non fusionnée** dans `release/tools-store-preflight-v1`, `main`, ni aucun autre train — aucun merge général, aucun déploiement. Voir §FERMETURE DES BLOCKERS pour le détail (reproduction, cause racine, correctif, témoins, non-régression). Un audit des RPC voisines a par ailleurs révélé que le défaut n'était **pas isolé** : 7 fonctions supplémentaires partagent le même type de faille, **non corrigées** dans ce lot (hors périmètre explicite "pas de refactor massif") et documentées comme nouveaux blockers.
+> **Mise à jour post-répétition (1/2)** : les 2 blockers techniques identifiés en §RELEASE GATE (CVE critique Next.js, fuite RPC `module_gestion_pro_actif_entreprise`) ont été **corrigés, testés et poussés dans un lot isolé** : branche `claude/preview-rehearsal-security-fixes-v1` (commit `bb42e1d`, base `WORKING_REHEARSAL_BASE`), **non fusionnée** dans `release/tools-store-preflight-v1`, `main`, ni aucun autre train — aucun merge général, aucun déploiement. Voir §FERMETURE DES BLOCKERS pour le détail (reproduction, cause racine, correctif, témoins, non-régression). Un audit des RPC voisines a par ailleurs révélé que le défaut n'était **pas isolé** : 7 fonctions supplémentaires partageaient le même type de faille.
+>
+> **Mise à jour post-répétition (2/2)** : ces 7 RPC ont été **fermées** dans un second lot ciblé (pas de nouvel audit large, pas de refactor massif) : branche `claude/preview-rehearsal-security-fixes-v1-rpc-sweep` (commit `71565ed`, base la branche précédente), **non fusionnée**. Voir §FERMETURE DES 7 RPC pour le détail par fonction (reproduction, modèle attendu, correctif, témoins, non-régression, audit final des grants). **Verdict : `RPC SECURITY BLOCKERS CLOSED`.** `FINAL_PREVIEW_CONVERGENCE_BASE` reste `DECISION_REQUIRED`.
 
 ## 0. Note de méthode — ce que cet environnement peut et ne peut pas prouver
 
@@ -30,7 +32,7 @@ Le harnais de répétition locale (stub `auth`/`storage`/rôles/`pgsodium`, scri
 | 6. Migrations — Fresh | Rejouer la séquence exacte sur base jetable | 263/263 migrations rejouées sur PostgreSQL 16 local | PASS (2 écarts d'infrastructure documentés, 0 erreur applicative) | §MIGRATIONS | — |
 | 6bis. Migrations — Upgrade | Depuis l'état Preview réel ou clone fidèle | `main` (178) utilisé comme **`SIMULATED_UPGRADE_BASELINE`** (Preview réelle non interrogeable) | Chaîne sans collision ni trou | §MIGRATIONS | `ACTUAL_PREVIEW_UPGRADE = NOT_PROVEN_REMOTE` |
 | 7. Auth | signup/login/refresh/logout/reset/MFA/AAL2/suspension | Cartographie statique complète du code (tous les flux localisés fichier:ligne) | Code cohérent, 1 point à confirmer (voir §AUTH) | §AUTH | **NOT_PROVEN_REMOTE** (test humain sur vraie Preview requis) |
-| 8. Multi-tenant | A/B isolation lecture/écriture/Storage/RPC | Rejoué réellement en local avec 2 tenants synthétiques + RLS active | Isolation PASS ; fuite RPC `module_gestion_pro_actif_entreprise` **`SECURITY_BLOCKER_FIXED`** ; 7 fuites sœurs **`SECURITY_BLOCKER_OPEN`** (voir §FERMETURE DES BLOCKERS) | §MULTI-TENANT | Validation finale sur Preview réelle `NOT_PROVEN_REMOTE` ; 7 nouveaux blockers à scoper |
+| 8. Multi-tenant | A/B isolation lecture/écriture/Storage/RPC | Rejoué réellement en local avec 2 tenants synthétiques + RLS active | Isolation PASS ; fuite RPC `module_gestion_pro_actif_entreprise` + 7 fuites sœurs, **toutes `SECURITY_BLOCKER_FIXED`** (voir §FERMETURE DES BLOCKERS / §FERMETURE DES 7 RPC) | §MULTI-TENANT | Validation finale sur Preview réelle `NOT_PROVEN_REMOTE` |
 | 9. Applications (Colors/Tools/GP) | URL/login/session/entitlement/401-403/nav | Inventaire statique (3 apps Next.js distinctes identifiées) | Table produite, aucune ligne testée en vrai | §APPLICATIONS | **NOT_PROVEN_REMOTE** |
 | 10. Gestion Pro — smoke métier | client→devis→facture→encaissement→pointage | Flux localisés dans le code, non exécutés en vrai | Checklist prête | §GP | **NOT_PROVEN_REMOTE** |
 | 11. Documents | brouillon/émis/PDF/lien public/snapshot | Checklist prête depuis le code | — | §GP | **NOT_PROVEN_REMOTE** |
@@ -38,7 +40,7 @@ Le harnais de répétition locale (stub `auth`/`storage`/rôles/`pgsodium`, scri
 | 13. Storage | upload/lecture/permissions/suppression/orphelin | Rejoué en local (RLS storage.objects réelle) | PASS sur les chemins testés | §STORAGE | **NOT_PROVEN_REMOTE** pour signed URLs réelles |
 | 14. Healthcheck/observabilité | détection front/API/DB/Auth/Storage/worker/webhook down | Revue statique | 3 lacunes trouvées (voir §DR) | §DR | À corriger avant Preview surveillée |
 | 15. Rollback | code + DB + restauration + validation | Rejoué en local (backup/restore réel), doctrine existante lue intégralement | `LOCAL_POSTGRES_BACKUP_RESTORE = PASS` | §ROLLBACK | `HOSTED_SUPABASE_RESTORE = NOT_PROVEN_REMOTE` |
-| 16. Release gate | PASS/WARN/BLOCK code/migrations/env/secrets/build/tests/DR | Exécuté réellement, puis rejoué après correctifs (`npm run verify` + pgTAP + npm audit, 3 apps) | Voir tableau §RELEASE GATE | §RELEASE GATE / §FERMETURE DES BLOCKERS | 2 blocages initiaux **`SECURITY_BLOCKER_FIXED`** ; **7 nouveaux `SECURITY_BLOCKER_OPEN`** (audit de systémicité) |
+| 16. Release gate | PASS/WARN/BLOCK code/migrations/env/secrets/build/tests/DR | Exécuté réellement, puis rejoué après chaque lot de correctifs (`npm run verify` + pgTAP + npm audit, 3 apps) | Voir tableau §RELEASE GATE | §RELEASE GATE / §FERMETURE DES BLOCKERS / §FERMETURE DES 7 RPC | **9/9 blocages de sécurité `SECURITY_BLOCKER_FIXED`** (2 initiaux + 7 audit de systémicité) |
 
 ---
 
@@ -123,9 +125,9 @@ Rejoué **réellement** en local : 2 entreprises synthétiques A/B, RLS active (
 
 **✅ FINDING CORRIGÉ (`SECURITY_BLOCKER_FIXED`, voir §FERMETURE DES BLOCKERS)** : `module_gestion_pro_actif_entreprise(p_entreprise_id, p_module_code)` — fonction `SECURITY DEFINER`, `EXECUTE` accordé à `authenticated` — **ne vérifiait pas** que l'appelant est membre de `p_entreprise_id` avant de répondre (contrairement à `a_acces_application`/`applications_autorisees`, qui le font correctement). Confirmé par lecture du corps de fonction (`\sf`) et par preuve empirique : l'entreprise B a un module `stock` actif ; l'utilisateur A (sans lien avec B) appelant `module_gestion_pro_actif_entreprise('<ENT_B>','stock')` obtenait **`true`** — fuite booléenne de l'état d'activation d'un module payant d'une entreprise tierce (pas de fuite de lignes de données, mais fuite de métadonnée commerciale cross-tenant). **Corrigé** (migration `20260905000266`), témoins négatif/positif et pgTAP de non-régression exécutés avec succès.
 
-**⚠️ NOUVEAU (`SECURITY_BLOCKER_OPEN`, non corrigé)** : l'audit des RPC voisines au même pattern (SECURITY DEFINER + argument `entreprise_id` + `EXECUTE` accordé à `authenticated` + aucune vérification d'appartenance) a trouvé **7 fonctions génuinement vulnérables** sur 20 candidates analysées en détail (13 faux positifs, gardées par un mécanisme différemment nommé). Le défaut **n'est pas isolé** — voir §FERMETURE DES BLOCKERS pour la liste précise et l'analyse de systémicité.
+**✅ NOUVEAU, PUIS CORRIGÉ (`SECURITY_BLOCKER_FIXED`)** : l'audit des RPC voisines au même pattern (SECURITY DEFINER + argument `entreprise_id` + `EXECUTE` accordé à `authenticated` + aucune vérification d'appartenance) avait trouvé **7 fonctions génuinement vulnérables** sur 20 candidates analysées en détail (13 faux positifs, gardées par un mécanisme différemment nommé) — le défaut n'était **pas isolé**. Les 7 ont depuis été fermées dans un lot dédié — voir §FERMETURE DES 7 RPC pour le détail par fonction.
 
-`Verdict section` : isolation de données = **PASS local** ; fuite originale = **`SECURITY_BLOCKER_FIXED`** ; 7 fuites sœurs = **`SECURITY_BLOCKER_OPEN`** (non corrigées, hors périmètre de ce lot) ; validation finale sur Preview réelle = `NOT_PROVEN_REMOTE`.
+`Verdict section` : isolation de données = **PASS local** ; fuite originale et 7 fuites sœurs = **`SECURITY_BLOCKER_FIXED`** (9/9) ; validation finale sur Preview réelle = `NOT_PROVEN_REMOTE`.
 
 ---
 
@@ -261,7 +263,7 @@ Une première tentative de correctif (garde inconditionnelle, puis retrait pur e
 
 **Non-régression** : nouveau fichier `supabase/tests/module_gestion_pro_actif_entreprise_tenant_guard.test.sql`, **5/5 assertions PASS**. Suite pgTAP complète rejouée : **54/55 fichiers verts, 1130/1130 assertions, zéro régression** (le seul fichier non exécutable reste `platform_stripe_state_attestation_r72.test.sql`, bloqué par l'écart `pgsodium` déjà documenté en §MIGRATIONS, sans rapport avec ce correctif).
 
-### 3. Audit des RPC voisines — `SECURITY_BLOCKER_OPEN` (non corrigé, nouveau)
+### 3. Audit des RPC voisines — `SECURITY_BLOCKER_FIXED` (voir §FERMETURE DES 7 RPC)
 
 Scan systématique : fonctions `SECURITY DEFINER`, argument nommé `entreprise_id`, `EXECUTE` accordé à `authenticated`, sans aucune référence à `auth.uid()` ni à un helper de garde connu → **20 candidates**. Chacune lue intégralement (corps de fonction, appelants applicatifs, migrations d'origine) : **13 faux positifs** (gardées par un mécanisme correctement implémenté mais différemment nommé — `peut_gerer_acces`, `a_permission`, `colors_action_autorisee`, `peut_pointer_pour_employe`, `plateforme_exiger_permission`, ou par nature une prédicat RLS public sans donnée sensible), **7 génuinement vulnérables** :
 
@@ -281,7 +283,51 @@ Scan systématique : fonctions `SECURITY DEFINER`, argument nommé `entreprise_i
 
 Partout où le pattern `peut_gerer_acces`/`a_permission`/`est_membre_actif` est appliqué directement dans la fonction auditée (gestion des postes/permissions, pointage, stock Colors), la garde est correcte — le risque est concentré dans la fonctionnalité capacité de sièges/réconciliation Stripe et un helper boutique, pas répandu uniformément.
 
-**Décision** : conformément à l'instruction explicite "pas de refactor massif", **ces 7 fonctions ne sont pas corrigées dans ce lot**. Elles sont documentées ici comme nouveaux blockers `SECURITY_BLOCKER_OPEN`, à traiter dans un lot dédié et scopé séparément.
+**Décision initiale** : conformément à l'instruction explicite "pas de refactor massif" reçue au moment de l'audit, ces 7 fonctions n'ont **pas** été corrigées dans le lot précédent — documentées comme blockers `SECURITY_BLOCKER_OPEN`, à traiter dans un lot dédié et scopé séparément. **Ce lot dédié a depuis été autorisé et exécuté — voir §FERMETURE DES 7 RPC ci-dessous.**
+
+---
+
+## FERMETURE DES 7 RPC (lot dédié, deuxième mise à jour)
+
+Autorisation reçue : fermeture ciblée **uniquement** des 7 fonctions déjà identifiées par l'audit précédent — pas de nouvel audit large, pas de refactor massif. Toujours **aucun environnement distant** : pas de Preview, pas de Production, pas de Stripe Live, pas de fusion générale. Lot appliqué sur une branche isolée continuant la précédente : `claude/preview-rehearsal-security-fixes-v1-rpc-sweep` (commit `71565ed`, base `claude/preview-rehearsal-security-fixes-v1`), **non fusionnée**. `WORKING_REHEARSAL_BASE` reste `release/tools-store-preflight-v1` ; `FINAL_PREVIEW_CONVERGENCE_BASE` reste `DECISION_REQUIRED`.
+
+**Méthode identique pour les 7** : (1) reproduction de l'accès/l'écriture non autorisé sur la base locale rejouée, avec effet visible avant correctif ; (2) identification du modèle attendu à partir du code applicatif réel (`grep` exhaustif de `src/`/`apps/` pour tout appel `supabase.rpc(...)`/`admin.rpc(...)` direct) et de la suite pgTAP existante (chaque référence existante vérifiée quant à son contexte de rôle — superuser, `authenticated`, `service_role`) ; (3) correctif minimal ; (4) témoins négatif/positif/interne ; (5) suite pgTAP rejouée en intégralité ; (6) audit final des grants.
+
+**Résultat de l'identification de modèle** : **aucune des 7 fonctions n'avait d'usage légitime d'appel direct par `authenticated`** (contrairement à `module_gestion_pro_actif_entreprise`, qui avait un vrai usage même-tenant documenté dans la suite de tests). Le correctif retenu pour les 7 est donc systématiquement le plus simple des deux prévus par la consigne — **retrait du `GRANT EXECUTE` à `authenticated`**, sans toucher au corps d'aucune fonction ni les rendre "JWT-aware" — jamais l'ajout d'une garde. Migration unique : `20260905000267_revoke_authenticated_on_internal_capacity_boutique_rpcs.sql`.
+
+| RPC | Vulnérabilité | Modèle attendu | Correctif | Test avant | Test après | Statut |
+| --- | --- | --- | --- | --- | --- | --- |
+| `capacite_personnes_base(uuid)` | Lecture cross-tenant : divulgue le palier de sièges inclus d'une entreprise tierce | Brique interne du wrapper gardé `capacite_personnes_entreprise()` (vérifie déjà `est_membre_actif`/`est_plateforme_admin`) ; 0 appelant applicatif direct, 0 appel `authenticated` dans la suite pgTAP existante (uniquement superuser, avant tout `SET ROLE`) | `REVOKE EXECUTE ... FROM authenticated` | A (non-membre de B) → `3` (fuite confirmée) | A → `ERROR 42501 permission denied` ; wrapper `capacite_personnes_entreprise(A)` par un membre réel → fonctionne toujours | **`SECURITY_BLOCKER_FIXED`** |
+| `capacite_personnes_totale(uuid)` | Lecture cross-tenant : divulgue la capacité totale de sièges achetée | Idem — brique interne du même wrapper | `REVOKE EXECUTE ... FROM authenticated` | A → `3` (fuite confirmée) | A → `ERROR 42501` ; wrapper inchangé | **`SECURITY_BLOCKER_FIXED`** |
+| `compter_personnes_actives_entreprise(uuid)` | Lecture cross-tenant : divulgue l'effectif actif | Idem — brique interne du même wrapper | `REVOKE EXECUTE ... FROM authenticated` | A → `4` (fuite confirmée) | A → `ERROR 42501` ; wrapper inchangé | **`SECURITY_BLOCKER_FIXED`** |
+| `etat_capacite_personnes(uuid)` | Lecture cross-tenant : divulgue si l'entreprise est à/au-dessus de sa limite de sièges | Idem — brique interne du même wrapper | `REVOKE EXECUTE ... FROM authenticated` | A → `over_capacity` (fuite confirmée) | A → `ERROR 42501` ; wrapper inchangé | **`SECURITY_BLOCKER_FIXED`** |
+| `appliquer_baisse_capacite_planifiee_service(uuid)` | **Écriture cross-tenant** : force/accélère une baisse de capacité planifiée sur une entreprise tierce | `service_role` uniquement (appelée exclusivement via `deps.admin.rpc(...)` dans `src/lib/stripe-capacite-reconcile.ts:392`) ; grant `authenticated` obsolète, une pgTAP assertait explicitement (à tort) ce grant | `REVOKE EXECUTE ... FROM authenticated` (conserve `service_role`) | A (non-membre de B) → `true`, `capacite_personnes_supplementaire` de B passe de `5` à `1` (écriture réelle confirmée) | A → `ERROR 42501` ; `service_role` → `true`, écriture fonctionne toujours | **`SECURITY_BLOCKER_FIXED`** |
+| `capacite_stripe_avancer_marqueur_evenement(uuid, timestamptz)` | **Écriture cross-tenant** : avance arbitrairement le marqueur de synchronisation Stripe, fait ignorer silencieusement les futurs webhooks réels de la victime | `service_role` uniquement (appelée exclusivement via `admin.rpc(...)` dans `src/lib/stripe-capacite-reconcile.ts:227`) | `REVOKE EXECUTE ... FROM authenticated` (conserve `service_role`) | A → `capacite_stripe_sync_evenement_at` de B avancé à 2036 (+10 ans, écriture réelle confirmée) | A → `ERROR 42501` ; `service_role` → fonctionne toujours | **`SECURITY_BLOCKER_FIXED`** |
+| `obtenir_ou_creer_fournisseur_boutique(uuid)` | **Écriture cross-tenant** : insère un fournisseur non sollicité dans la comptabilité d'une entreprise tierce | Brique interne, appelée uniquement par `boutique_finaliser_commande_payee()` (elle-même gardée par un `stripe_checkout_id` Stripe non devinable, jamais par `entreprise_id` seul) ; 0 appelant applicatif direct | `REVOKE EXECUTE ... FROM authenticated` | A → insertion réussie, UUID du fournisseur retourné (écriture réelle confirmée) | A → `ERROR 42501` | **`SECURITY_BLOCKER_FIXED`** |
+
+**Effet de bord découvert et corrigé en cours de route** : une assertion pgTAP existante (`supabase/tests/capacity_stripe_r2_b_v1.test.sql`, "RPC de service exposées à service_role + authenticated") vérifiait explicitement que `authenticated` avait `EXECUTE` sur `appliquer_baisse_capacite_planifiee_service` — c'est-à-dire qu'elle testait l'ancien grant, maintenant considéré à tort. Corrigée pour vérifier l'inverse (grant `service_role` conservé, `authenticated` exclu), avec commentaire renvoyant à la migration `20260905000267`.
+
+**Non-régression** : nouveau fichier `supabase/tests/capacity_boutique_internal_rpc_grants_v1.test.sql` (11 assertions : 7 témoins négatifs `authenticated`, 1 témoin positif wrapper, 2 témoins positifs `service_role`, 1 audit final des grants inline) — **11/11 PASS**. Suite pgTAP complète rejouée : **55/56 fichiers verts, 1141/1141 assertions, zéro régression** (seul `platform_stripe_state_attestation_r72.test.sql` reste bloqué par l'écart `pgsodium` déjà documenté, sans rapport).
+
+**Audit final des grants** (`information_schema.routine_privileges`, vérifié après correctif) :
+
+| Fonction | `authenticated` | `service_role` | `postgres` |
+|---|---|---|---|
+| `capacite_personnes_base` | ❌ (retiré) | — | ✅ |
+| `capacite_personnes_totale` | ❌ (retiré) | — | ✅ |
+| `compter_personnes_actives_entreprise` | ❌ (retiré) | — | ✅ |
+| `etat_capacite_personnes` | ❌ (retiré) | — | ✅ |
+| `appliquer_baisse_capacite_planifiee_service` | ❌ (retiré) | ✅ (conservé) | ✅ |
+| `capacite_stripe_avancer_marqueur_evenement` | ❌ (retiré) | ✅ (conservé) | ✅ |
+| `obtenir_ou_creer_fournisseur_boutique` | ❌ (retiré) | — | ✅ |
+
+Aucune des 7 n'était, et n'est, accessible à `anon`.
+
+### Verdict de cette fermeture
+
+# `RPC SECURITY BLOCKERS CLOSED`
+
+Les 9 blockers de sécurité identifiés au total par cette répétition (2 initiaux + 7 par l'audit de systémicité) sont désormais tous **`SECURITY_BLOCKER_FIXED`**, testés (témoins + non-régression pgTAP complète à chaque étape), et documentés. Aucun n'a été fusionné, déployé, ni testé en conditions distantes réelles — ces preuves restent `NOT_PROVEN_REMOTE` jusqu'à un accès Preview réel. `FINAL_PREVIEW_CONVERGENCE_BASE` reste explicitement `DECISION_REQUIRED`.
 
 ---
 
@@ -303,33 +349,35 @@ Exécuté réellement dans le worktree de `WORKING_REHEARSAL_BASE` initialement,
 | Secrets Preview réels | — | `NOT_PROVEN_REMOTE` | idem |
 | DR hébergé | — | `NOT_PROVEN_REMOTE` (`HOSTED_SUPABASE_RESTORE`) | idem |
 | Multi-tenant RPC (`module_gestion_pro_actif_entreprise`) | revue de code + repro + correctif + témoins + pgTAP | **`SECURITY_BLOCKER_FIXED`** | Voir §FERMETURE DES BLOCKERS — témoins négatif/positif/admin/interne tous corrects, 0 régression sur 1130 assertions |
-| Multi-tenant RPC (7 fonctions sœurs) | audit systématique de 20 candidates | **`SECURITY_BLOCKER_OPEN`** | 7 fonctions génuinement vulnérables au même pattern, non corrigées (hors périmètre "pas de refactor massif") — voir §FERMETURE DES BLOCKERS |
+| Multi-tenant RPC (7 fonctions sœurs) | audit systématique de 20 candidates, puis lot dédié de fermeture | **`SECURITY_BLOCKER_FIXED`** | 7 fonctions génuinement vulnérables au même pattern, toutes fermées (retrait du `GRANT authenticated`, 0 changement de corps de fonction) — voir §FERMETURE DES 7 RPC |
 | CI existante | `.github/workflows/ci.yml` | **PASS (structurel)** | Un seul job `verification` = `npm run verify` (GP uniquement — **Colors et Tools n'y sont pas branchés**, écart de couverture CI à corriger, inchangé par les correctifs) |
 
-**Verdict release gate global : `SECURITY_BLOCKER_OPEN`** — les 2 blocages originaux sont **`SECURITY_BLOCKER_FIXED`** (vérifiés, testés, poussés sur un lot isolé non fusionné), mais l'audit de systémicité déclenché par leur correction a ouvert **7 nouveaux blocages réels** (`SECURITY_BLOCKER_OPEN`), sans compter les `NOT_PROVEN_REMOTE` toujours en attente d'accès distant.
+**Verdict release gate global : `RPC SECURITY BLOCKERS CLOSED`** — les 9 blocages de sécurité identifiés au total (2 initiaux + 7 par l'audit de systémicité) sont désormais **`SECURITY_BLOCKER_FIXED`**, vérifiés et testés, poussés sur des lots isolés non fusionnés. Restent uniquement les `NOT_PROVEN_REMOTE` (accès distant absent) et `FINAL_PREVIEW_CONVERGENCE_BASE = DECISION_REQUIRED`.
 
 ---
 
 ## Verdict final
 
 # `PREVIEW RELEASE PLAN READY`
+### (sous-verdict sécurité RPC : `RPC SECURITY BLOCKERS CLOSED`)
 
-*(Plafond imposé explicitement pour cette session : sans accès réel à Preview/Vercel/Supabase/Auth/Storage, le verdict ne peut jamais être `PREVIEW QUALIFIED`. Il ne peut pas non plus être `PREVIEW DEPLOYMENT CANDIDATE` : les 2 blocages initiaux sont désormais `SECURITY_BLOCKER_FIXED`, mais l'audit de systémicité qu'ils ont déclenché a ouvert 7 nouveaux blocages réels — `SECURITY_BLOCKER_OPEN` — qui doivent être traités avant qu'un train soit raisonnablement "candidat au déploiement", indépendamment de l'accès distant. `FINAL_PREVIEW_CONVERGENCE_BASE` reste par ailleurs `DECISION_REQUIRED`.)*
+*(Plafond imposé explicitement pour cette session : sans accès réel à Preview/Vercel/Supabase/Auth/Storage, le verdict global ne peut jamais être `PREVIEW QUALIFIED`. Il ne peut pas non plus être `PREVIEW DEPLOYMENT CANDIDATE` : même si les 9 blocages de sécurité identifiés (2 initiaux + 7 par l'audit de systémicité) sont désormais tous `SECURITY_BLOCKER_FIXED`, aucun n'a été porté/fusionné dans un train, et `FINAL_PREVIEW_CONVERGENCE_BASE` reste explicitement `DECISION_REQUIRED` — un train n'est "candidat au déploiement" que lorsque sa convergence finale est elle-même décidée, indépendamment de l'accès distant.)*
 
-Ce qui est acquis : un plan de migration/backup/rollback précis et **réellement répété** (pas seulement rédigé) sur infrastructure PostgreSQL locale authentique ; 264/264 migrations rejouées sans erreur ; 1130/1130 assertions pgTAP réelles passantes ; isolation multi-tenant vérifiée par expérimentation réelle ; backup/restore local prouvé avec checksum ; gate de code/lint/typecheck/tests/secrets/build/audit entièrement vert sur les 3 apps ; **2 blocages de sécurité identifiés, reproduits, corrigés, testés (témoins + non-régression) et poussés sur un lot isolé non fusionné** ; l'audit de systémicité qui en a découlé a lui-même produit un résultat actionnable (7 fonctions précisément identifiées, 2 anti-patterns caractérisés) plutôt qu'un simple soupçon.
+Ce qui est acquis : un plan de migration/backup/rollback précis et **réellement répété** (pas seulement rédigé) sur infrastructure PostgreSQL locale authentique ; 265/265 migrations rejouées sans erreur ; 1141/1141 assertions pgTAP réelles passantes ; isolation multi-tenant vérifiée par expérimentation réelle ; backup/restore local prouvé avec checksum ; gate de code/lint/typecheck/tests/secrets/build/audit entièrement vert sur les 3 apps ; **9 blocages de sécurité identifiés (2 initiaux + 7 par un audit de systémicité rigoureux, distinguant 7 vulnérabilités réelles de 13 faux positifs), tous reproduits, corrigés par le correctif minimal correspondant à leur modèle réel, testés (témoins négatifs/positifs/internes + non-régression pgTAP complète à chaque étape) et poussés sur des lots isolés non fusionnés**.
 
-Ce qui manque pour passer à `PREVIEW DEPLOYMENT CANDIDATE` puis `PREVIEW QUALIFIED` : voir blockers ci-dessous.
+Ce qui manque pour passer à `PREVIEW DEPLOYMENT CANDIDATE` puis `PREVIEW QUALIFIED` : voir blockers ci-dessous — désormais uniquement la convergence du train et l'accès distant, plus aucun blocage de sécurité connu.
 
 ---
 
 ## Blockers indispensables avant la prochaine Preview
 
-1. **`FINAL_PREVIEW_CONVERGENCE_BASE` = `DECISION_REQUIRED`** — décider quel train représente réellement l'intention de release (fusion `tools-store-preflight-v1` + `gp-v1-rc` + `gp-postcutover-precommercial-ops-v1` + `canonical-final-r73` + clôtures QA/rollback, ou un autre choix explicite) et clarifier la référence `integration/gp-external-pilot-readiness-v1@f2917b54` qui n'existe pas sur `origin`. **Inchangé par cette mise à jour** — `WORKING_REHEARSAL_BASE` reste une base de travail, pas la branche de déploiement.
-2. ~~CVE critique Next.js~~ — **`SECURITY_BLOCKER_FIXED`** (branche `claude/preview-rehearsal-security-fixes-v1`, commit `bb42e1d`, non fusionnée). Reste à porter/merger dans le train qui sera retenu comme `FINAL_PREVIEW_CONVERGENCE_BASE`.
-3. ~~Fuite RPC `module_gestion_pro_actif_entreprise`~~ — **`SECURITY_BLOCKER_FIXED`** (même branche/commit). Reste à porter/merger de même.
-4. **NOUVEAU — 7 RPC sœurs vulnérables au même pattern (`SECURITY_BLOCKER_OPEN`)** : `capacite_personnes_base`, `capacite_personnes_totale`, `compter_personnes_actives_entreprise`, `etat_capacite_personnes` (contournement d'un wrapper déjà gardé, fonctionnalité capacité de sièges), `appliquer_baisse_capacite_planifiee_service`, `capacite_stripe_avancer_marqueur_evenement` (grants `authenticated` obsolètes sur fonctions destinées au `service_role`, la seconde de sévérité élevée — sabotage silencieux de sync Stripe), `obtenir_ou_creer_fournisseur_boutique`. Non corrigées dans ce lot (hors périmètre explicite). À traiter dans un lot dédié.
-5. **Accès réel manquant** : aucun credential Supabase Preview / Vercel Preview / Stripe Test dans cette session — nécessaire pour prouver `ACTUAL_PREVIEW_UPGRADE`, `HOSTED_SUPABASE_RESTORE`, et tous les tests Auth/Multi-tenant/Applications/GP/Storage/Commercial en conditions réelles.
-6. **`apps/colors` non branché dans `npm run verify`/CI** — écart de couverture du gate à corriger (actuellement vérifié manuellement hors gate automatisé). Inchangé par cette mise à jour.
-7. **Crypto Ed25519 (`pgsodium`, attestation Stripe r72/r73) non prouvable hors Supabase hébergé** — nécessite vérification sur Preview réelle ou `supabase db branch`. Inchangé.
-8. **3 lacunes d'observabilité** — route `/monitoring` référencée mais inexistante, config Sentry client absente, échecs cron par-tenant silencieux (HTTP 200) — à corriger avant de s'appuyer sur la surveillance Preview. Inchangé.
-9. **`logoutAction` en portée globale par défaut** — à confirmer intentionnel avant tout test fonctionnel supposant une isolation par session/appareil. Inchangé.
+1. **`FINAL_PREVIEW_CONVERGENCE_BASE` = `DECISION_REQUIRED`** — décider quel train représente réellement l'intention de release (fusion `tools-store-preflight-v1` + `gp-v1-rc` + `gp-postcutover-precommercial-ops-v1` + `canonical-final-r73` + clôtures QA/rollback, ou un autre choix explicite) et clarifier la référence `integration/gp-external-pilot-readiness-v1@f2917b54` qui n'existe pas sur `origin`. **Inchangé par ces mises à jour** — `WORKING_REHEARSAL_BASE` reste une base de travail, pas la branche de déploiement. **C'est désormais le seul blocker non-sécurité de fond restant.**
+2. ~~CVE critique Next.js~~ — **`SECURITY_BLOCKER_FIXED`** (branche `claude/preview-rehearsal-security-fixes-v1`, commit `bb42e1d`, non fusionnée).
+3. ~~Fuite RPC `module_gestion_pro_actif_entreprise`~~ — **`SECURITY_BLOCKER_FIXED`** (même branche/commit).
+4. ~~7 RPC sœurs vulnérables au même pattern~~ (`capacite_personnes_base`, `capacite_personnes_totale`, `compter_personnes_actives_entreprise`, `etat_capacite_personnes`, `appliquer_baisse_capacite_planifiee_service`, `capacite_stripe_avancer_marqueur_evenement`, `obtenir_ou_creer_fournisseur_boutique`) — **`SECURITY_BLOCKER_FIXED`** (branche `claude/preview-rehearsal-security-fixes-v1-rpc-sweep`, commit `71565ed`, non fusionnée).
+5. **Les 3 lots de correctifs (`bb42e1d`, `71565ed` sur leurs branches respectives) restent à porter/fusionner** dans le train qui sera retenu comme `FINAL_PREVIEW_CONVERGENCE_BASE` — aucun merge général n'a été fait, conformément à la consigne.
+6. **Accès réel manquant** : aucun credential Supabase Preview / Vercel Preview / Stripe Test dans cette session — nécessaire pour prouver `ACTUAL_PREVIEW_UPGRADE`, `HOSTED_SUPABASE_RESTORE`, et tous les tests Auth/Multi-tenant/Applications/GP/Storage/Commercial en conditions réelles.
+7. **`apps/colors` non branché dans `npm run verify`/CI** — écart de couverture du gate à corriger (actuellement vérifié manuellement hors gate automatisé). Inchangé.
+8. **Crypto Ed25519 (`pgsodium`, attestation Stripe r72/r73) non prouvable hors Supabase hébergé** — nécessite vérification sur Preview réelle ou `supabase db branch`. Inchangé.
+9. **3 lacunes d'observabilité** — route `/monitoring` référencée mais inexistante, config Sentry client absente, échecs cron par-tenant silencieux (HTTP 200) — à corriger avant de s'appuyer sur la surveillance Preview. Inchangé.
+10. **`logoutAction` en portée globale par défaut** — à confirmer intentionnel avant tout test fonctionnel supposant une isolation par session/appareil. Inchangé.
