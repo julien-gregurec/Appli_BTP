@@ -28,6 +28,7 @@ import {
 } from "../lib/editor-autosave";
 import EditorPreview, { editorTime } from "./EditorPreview";
 import RenderPanel from "./RenderPanel";
+import MusicPanel from "./MusicPanel";
 
 /** Lets a user keep unsaved work after a conflict; a plain JSON file, no upload. */
 function downloadDraft(doc: TimelineDocument) {
@@ -86,7 +87,8 @@ export default function VideoEditor({
   const [scroll, setScroll] = useState(0),
     [drag, setDrag] = useState(""),
     [media, setMedia] = useState(
-      assets.find((a) => a.upload_status === "ready")?.id ?? "",
+      assets.find((a) => a.upload_status === "ready" && a.media_type !== "audio")
+        ?.id ?? "",
     ),
     [insertion, setInsertion] = useState("after");
   const save = useRef<EditorAutosave | null>(null),
@@ -864,7 +866,12 @@ export default function VideoEditor({
                 onChange={(e) => setMedia(e.target.value)}
               >
                 {assets
-                  .filter((a) => a.upload_status === "ready" && !a.deleted_at)
+                  .filter(
+                    (a) =>
+                      a.upload_status === "ready" &&
+                      !a.deleted_at &&
+                      a.media_type !== "audio",
+                  )
                   .map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.original_filename}
@@ -911,6 +918,12 @@ export default function VideoEditor({
           </div>
         )}
       </section>
+      <MusicPanel
+        music={doc.presentation?.music ?? null}
+        assets={assets}
+        canWrite={canWrite}
+        change={change}
+      />
       <RenderPanel
         project={initial.project_id}
         canWrite={canWrite}

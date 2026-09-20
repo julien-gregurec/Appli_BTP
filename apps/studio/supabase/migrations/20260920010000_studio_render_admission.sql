@@ -1,0 +1,1 @@
+../../../../supabase/migrations/20260920010000_studio_render_admission.sql

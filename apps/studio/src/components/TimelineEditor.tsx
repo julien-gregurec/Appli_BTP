@@ -140,7 +140,10 @@ export default function TimelineEditor({
     void command({ action: "order", ids });
   }
   const available = assets.filter(
-      (a) => a.upload_status === "ready" && !a.deleted_at,
+      (a) =>
+        a.upload_status === "ready" &&
+        !a.deleted_at &&
+        a.media_type !== "audio",
     ),
     byId = new Map(assets.map((a) => [a.id, a]));
   return (

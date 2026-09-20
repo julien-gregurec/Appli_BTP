@@ -17,6 +17,10 @@ const app = fileURLToPath(new URL("../", import.meta.url));
 const root = resolve(app, "../..");
 const statePath = join(app, ".local-test.json");
 const cli = join(root, "node_modules/.bin/supabase");
+// --studio-only: the dedicated Studio Supabase project (own config, templates and Studio-only migrations),
+// proving that Studio installs on an empty project with a ledger independent of Gestion Pro.
+const studioOnly = process.argv.includes("--studio-only");
+const source = studioOnly ? join(app, "supabase") : join(root, "supabase");
 function run(args, logName, dir) {
   const result = spawnSync(cli, args, {
     cwd: root,
@@ -66,10 +70,12 @@ if (action === "setup") {
   const directory = mkdtempSync(join(tmpdir(), "elsatia-studio-a-"));
   const projectId = directory.split("/").at(-1).toLowerCase();
   mkdirSync(join(directory, "supabase"));
-  let config = readFileSync(join(root, "supabase/config.toml"), "utf8").replace(
-    'project_id = "btp-platform"',
+  let config = readFileSync(join(source, "config.toml"), "utf8").replace(
+    studioOnly ? 'project_id = "elsatia-studio"' : 'project_id = "btp-platform"',
     `project_id = "${projectId}"`,
   );
+  // The dedicated project asks for e-mail confirmation; the disposable stack signs users in at once.
+  if (studioOnly) config = config.replace("enable_confirmations = true", "enable_confirmations = false");
   for (let i = 0; i < 10; i++)
     config = config.replaceAll(String(54320 + i), String(base + i));
   // Disposable stack only: the shipped limit (2 e-mails/hour) starves the recovery E2E on a reused stack.
@@ -86,8 +92,9 @@ if (action === "setup") {
     );
   writeFileSync(join(directory, "supabase/config.toml"), config);
   for (const name of ["migrations", "templates"])
-    cpSync(join(root, "supabase", name), join(directory, "supabase", name), {
+    cpSync(join(source, name), join(directory, "supabase", name), {
       recursive: true,
+      dereference: true,
     });
   const excludedMigrations = process.argv.includes("--lot-a")
     ? [

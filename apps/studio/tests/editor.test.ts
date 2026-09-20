@@ -532,3 +532,78 @@ describe("Lot S2 editor resilience", () => {
     expect(saveFailureMessage(new EditorSaveError("x", 403)).message).toMatch(/droit/);
   });
 });
+
+describe("Lot M music command", () => {
+  const audio = (over: Record<string, unknown> = {}) =>
+    ({
+      id: id(900),
+      media_type: "audio" as const,
+      duration_ms: null,
+      upload_status: "ready",
+      deleted_at: null,
+      ...over,
+    }) as unknown as (typeof assets)[number];
+  const music = { asset_id: id(900), volume: 0.6, fade_in_ms: 500, fade_out_ms: 1500 };
+  it("adds, replaces and removes a track, and undo restores the previous state", () => {
+    const pool = [...assets, audio(), audio({ id: id(901) })];
+    let h = editorHistory(document());
+    h = editorStep(h, applyEditorCommand(h.present, { type: "music", music }, pool));
+    expect(h.present.presentation?.music).toEqual(music);
+    const replaced = { ...music, asset_id: id(901), volume: 1 };
+    h = editorStep(h, applyEditorCommand(h.present, { type: "music", music: replaced }, pool));
+    expect(h.present.presentation?.music?.asset_id).toBe(id(901));
+    h = editorStep(h, applyEditorCommand(h.present, { type: "music", music: null }, pool));
+    expect(h.present.presentation?.music).toBeNull();
+    expect(editorUndo(h).present.presentation?.music?.asset_id).toBe(id(901));
+    expect(editorUndo(editorUndo(h)).present.presentation?.music?.asset_id).toBe(id(900));
+  });
+  it.each([
+    ["a photo", audio({ media_type: "image" })],
+    ["a video", audio({ media_type: "video" })],
+    ["a pending upload", audio({ upload_status: "pending" })],
+    ["a deleted track", audio({ deleted_at: "2026-01-01" })],
+  ])("refuses %s as music", (_label, asset) => {
+    expect(() =>
+      applyEditorCommand(document(), { type: "music", music }, [...assets, asset]),
+    ).toThrow(/Musique indisponible/);
+  });
+  it("refuses tracks that are not in the project pool and out-of-range settings", () => {
+    expect(() =>
+      applyEditorCommand(document(), { type: "music", music }, assets),
+    ).toThrow(/Musique indisponible/);
+    for (const bad of [
+      { ...music, volume: 1.5 },
+      { ...music, volume: -0.1 },
+      { ...music, fade_in_ms: -1 },
+      { ...music, fade_out_ms: 20000 },
+      { ...music, fade_in_ms: 1.5 },
+      { ...music, extra: true },
+      { asset_id: id(900), volume: 1 },
+      { ...music, asset_id: "not-a-uuid" },
+    ])
+      expect(() =>
+        applyEditorCommand(document(), { type: "music", music: bad as never }, [...assets, audio()]),
+      ).toThrow(/Musique invalide/);
+  });
+  it("audio is never a clip: insertion of a track is refused and generation ignores audio", () => {
+    expect(() =>
+      applyEditorCommand(
+        document(),
+        { type: "insert", asset: id(900), id: id(950), index: 0 },
+        [...assets, audio()],
+      ),
+    ).toThrow();
+    const built = buildTimeline({
+      project: { target_duration_seconds: 15, target_aspect_ratio: "9:16" },
+      assets: [...assets, audio()],
+    });
+    expect(built.clips.every((c) => c.asset_id !== id(900))).toBe(true);
+  });
+  it("music survives text edits and parseEditorDraft round-trips it", () => {
+    const pool = [...assets, audio()];
+    let d = applyEditorCommand(document(), { type: "music", music }, pool);
+    d = applyEditorCommand(d, { type: "remove", id: d.clips[0].id }, pool);
+    expect(d.presentation?.music).toEqual(music);
+    expect(parseEditorDraft(d, d, pool).presentation?.music).toEqual(music);
+  });
+});

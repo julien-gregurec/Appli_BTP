@@ -463,7 +463,8 @@ export function buildTemplateTimeline(
   if (!t.supportedAspectRatios.includes(project.target_aspect_ratio))
     throw new TimelineValidationError("Format indisponible.");
   let assets = allAssets.filter(
-    (a) => a.upload_status === "ready" && !a.deleted_at,
+    (a) =>
+      a.upload_status === "ready" && !a.deleted_at && a.media_type !== "audio",
   );
   const known = new Map(assets.map((a) => [a.id, a]));
   if (o.logoAssetId) {

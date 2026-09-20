@@ -163,8 +163,19 @@ export async function removeProjectMedia(
         "Vérification du montage indisponible.",
         restErrorStatus(used.error, used.status),
       );
+    const music = await client
+      .from("studio_timelines")
+      .select("id", { count: "exact", head: true })
+      .eq("id", project.active_timeline_id)
+      .eq("presentation->music->>asset_id", asset);
+    if (music.error)
+      throw new MediaError(
+        "Vérification du montage indisponible.",
+        restErrorStatus(music.error, music.status),
+      );
     // 409 asks the caller to confirm explicitly before the reference is removed.
-    if ((used.count ?? 0) > 0) throw new MediaError(assetInUseMessage, 409);
+    if ((used.count ?? 0) > 0 || (music.count ?? 0) > 0)
+      throw new MediaError(assetInUseMessage, 409);
   }
   const r = await client.rpc("studio_remove_project_media", {
     p_project: id,

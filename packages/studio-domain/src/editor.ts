@@ -17,7 +17,9 @@ import {
   retimePresentation,
   validatePresentation,
   type TextOverlay,
+  type TimelineMusic,
   type TimelinePresentation,
+  parseMusic,
 } from "./presentation";
 
 /** The editor stores the canonical timeline, never a parallel composition model. */
@@ -32,7 +34,8 @@ export type EditorCommand =
   | { type: "crop"; id: string; value: "cover" | "contain" }
   | { type: "overlay"; overlay: TextOverlay }
   | { type: "removeOverlay"; id: string }
-  | { type: "logo"; logo: TimelinePresentation["logo"] };
+  | { type: "logo"; logo: TimelinePresentation["logo"] }
+  | { type: "music"; music: TimelineMusic | null };
 function stable(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stable);
   if (value && typeof value === "object")
@@ -73,6 +76,26 @@ function finish(doc: TimelineDocument): TimelineDocument {
     total_duration_ms: clips.at(-1)?.timeline_end_ms ?? 0,
   };
 }
+/** A montage without a template style gets this neutral presentation on its first overlay or music. */
+function manualPresentation(): TimelinePresentation {
+  return {
+    version: 1,
+    template: { id: "manual", version: 1, snapshot: {} },
+    typography: Object.fromEntries(
+      fontRoles.map((role) => [
+        role,
+        {
+          family: "sans",
+          size: role === "title" ? 0.06 : 0.04,
+          weight: 700,
+          spacing: 0,
+        },
+      ]),
+    ) as TimelinePresentation["typography"],
+    overlays: [],
+    logo: null,
+  };
+}
 export function applyEditorCommand(
   doc: TimelineDocument,
   command: EditorCommand,
@@ -85,7 +108,11 @@ export function applyEditorCommand(
   const c = clips[index];
   const source = (id: string) => {
     const a = assets.find(
-      (a) => a.id === id && a.upload_status === "ready" && !a.deleted_at,
+      (a) =>
+        a.id === id &&
+        a.upload_status === "ready" &&
+        !a.deleted_at &&
+        a.media_type !== "audio",
     );
     if (!a)
       throw new TimelineValidationError("Média indisponible dans ce projet.");
@@ -196,7 +223,7 @@ export function applyEditorCommand(
         clips[index] = {
           ...c,
           asset_id: a.id,
-          clip_type: a.media_type,
+          clip_type: a.media_type as "image" | "video", // audio is filtered out upstream
           duration_ms: duration,
           source_start_ms: 0,
           source_end_ms: a.media_type === "video" ? duration : null,
@@ -232,24 +259,7 @@ export function applyEditorCommand(
       clips[index] = { ...c, crop_mode: command.value };
       break;
     case "overlay":
-      if (!presentation)
-        presentation = {
-          version: 1,
-          template: { id: "manual", version: 1, snapshot: {} },
-          typography: Object.fromEntries(
-            fontRoles.map((role) => [
-              role,
-              {
-                family: "sans",
-                size: role === "title" ? 0.06 : 0.04,
-                weight: 700,
-                spacing: 0,
-              },
-            ]),
-          ) as TimelinePresentation["typography"],
-          overlays: [],
-          logo: null,
-        };
+      presentation ??= manualPresentation();
       clips = clips.map((c) =>
         !c.metadata_json.key && c.id === command.overlay.clip_key
           ? { ...c, metadata_json: { ...c.metadata_json, key: c.id } }
@@ -284,6 +294,23 @@ export function applyEditorCommand(
     case "logo":
       if (presentation) presentation = { ...presentation, logo: command.logo };
       break;
+    case "music": {
+      presentation ??= manualPresentation();
+      const music = parseMusic(command.music);
+      if (
+        music &&
+        !assets.some(
+          (a) =>
+            a.id === music.asset_id &&
+            a.media_type === "audio" &&
+            a.upload_status === "ready" &&
+            !a.deleted_at,
+        )
+      )
+        throw new TimelineValidationError("Musique indisponible.");
+      presentation = { ...presentation, music };
+      break;
+    }
   }
   return finish({ ...doc, clips, presentation });
 }

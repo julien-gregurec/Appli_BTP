@@ -251,6 +251,29 @@ export type Database = {
         Args: { p_token_hash: string };
         Returns: unknown;
       };
+      studio_invite_member: {
+        Args: {
+          p_workspace: string;
+          p_email: string;
+          p_role: string;
+          p_token_hash: string;
+          p_days: number;
+        };
+        Returns: string;
+      };
+      studio_revoke_invitation: { Args: { p_invitation: string }; Returns: undefined };
+      studio_list_invitations: { Args: { p_workspace: string }; Returns: unknown };
+      studio_resolve_invitation: { Args: { p_token_hash: string }; Returns: unknown };
+      studio_accept_invitation: { Args: { p_token_hash: string }; Returns: string };
+      studio_pending_invitation_for: { Args: { p_email: string }; Returns: boolean };
+      studio_my_deletion_plan: { Args: Record<string, never>; Returns: unknown };
+      studio_deletion_prepare: { Args: { p_user: string }; Returns: unknown };
+      studio_deletion_finish: { Args: { p_user: string }; Returns: unknown };
+      studio_deletion_pending_keys: { Args: { p_limit: number }; Returns: unknown };
+      studio_deletion_mark_purged: {
+        Args: { p_bucket: string; p_keys: string[] };
+        Returns: number;
+      };
       studio_workspace_usage: {
         Args: { p_workspace: string; p_since?: string };
         Returns: {

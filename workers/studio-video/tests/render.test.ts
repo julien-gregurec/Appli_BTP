@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
@@ -322,3 +322,126 @@ it("server watermark: drawn bottom-right on the final encode only when the job a
     await rm(dir, { recursive: true, force: true });
   }
 }, 180000);
+
+// ---- Lot M: imported music -------------------------------------------------
+import { musicGraph } from "../src/render.ts";
+const TRACK = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const typography = Object.fromEntries(
+  ["display", "title", "subtitle", "body", "caption"].map((r) => [
+    r,
+    { family: "sans", weight: 700, size: 0.05, spacing: 0 },
+  ]),
+);
+function withMusic(
+  m: { volume: number; fade_in_ms: number; fade_out_ms: number } | null,
+) {
+  const t = doc();
+  t.presentation = {
+    version: 1,
+    template: { id: "manual", version: 1, snapshot: {} },
+    typography,
+    overlays: [],
+    logo: null,
+    music: m ? { asset_id: TRACK, ...m } : null,
+  } as unknown as TimelineDocument["presentation"];
+  return t;
+}
+async function tone(dir: string, name: string, seconds: number) {
+  const path = join(dir, name);
+  await command(
+    runtime.ffmpeg,
+    ["-y", "-f", "lavfi", "-i", `sine=frequency=440:duration=${seconds}`, "-ar", "44100", path],
+    runtime.signal,
+  );
+  return path;
+}
+function windowRms(path: string, from: number, length: number) {
+  const pcm = execFileSync(runtime.ffmpeg, [
+    "-v", "error", "-ss", String(from), "-t", String(length), "-i", path,
+    "-vn", "-ac", "1", "-ar", "8000", "-f", "f32le", "pipe:1",
+  ]);
+  let sum = 0;
+  for (let i = 0; i < pcm.length; i += 4) sum += pcm.readFloatLE(i) ** 2;
+  return Math.sqrt(sum / Math.max(1, pcm.length / 4));
+}
+async function renderWith(
+  dir: string,
+  t: TimelineDocument,
+  files: Map<string, string>,
+) {
+  const png = join(dir, "image.png");
+  await command(
+    runtime.ffmpeg,
+    ["-y", "-f", "lavfi", "-i", "color=blue:s=64x64", "-frames:v", "1", png],
+    runtime.signal,
+  );
+  files.set("image", png);
+  const out = join(dir, `out-${files.size}-${Math.random().toString(36).slice(2)}`);
+  await mkdir(out);
+  return renderTimeline(t, files, { width: 270, height: 480, fps: 30 }, out, runtime);
+}
+it.each([
+  ["a shorter WAV loops", "short.wav", 0.6, 0.5],
+  ["a longer MP3 is cut", "long.mp3", 8, 0.5],
+  ["an AAC/M4A track", "song.m4a", 3, 0.5],
+])("music: %s, AAC output, exact duration, audible", async (_label, file, seconds, volume) => {
+  const dir = await mkdtemp(join(tmpdir(), "studio-music-"));
+  try {
+    const track = await tone(dir, file, seconds);
+    const r = await renderWith(dir, withMusic({ volume, fade_in_ms: 0, fade_out_ms: 0 }), new Map([[TRACK, track]]));
+    const audio = r.probe.streams.find((s) => s.codec_type === "audio");
+    const video = r.probe.streams.find((s) => s.codec_type === "video");
+    expect(audio?.codec_name).toBe("aac");
+    expect(video?.codec_name).toBe("h264");
+    expect(Number(r.probe.format.duration)).toBeCloseTo(2, 1);
+    // lavfi sine peaks at 1/8 full scale: 0.044 RMS at volume 0.5, versus < 0.001 without music.
+    expect(windowRms(r.output, 0.1, 0.4)).toBeGreaterThan(0.02);
+    // The last half second is still audible: a short track loops instead of going silent.
+    expect(windowRms(r.output, 1.4, 0.5)).toBeGreaterThan(0.02);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}, 180000);
+it("music: volume scales the track, 0 is silent, and fades shape the ends", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "studio-music-"));
+  try {
+    const track = await tone(dir, "t.wav", 5);
+    const files = () => new Map([[TRACK, track]]);
+    const loud = await renderWith(dir, withMusic({ volume: 1, fade_in_ms: 0, fade_out_ms: 0 }), files());
+    const soft = await renderWith(dir, withMusic({ volume: 0.25, fade_in_ms: 0, fade_out_ms: 0 }), files());
+    const mute = await renderWith(dir, withMusic({ volume: 0, fade_in_ms: 0, fade_out_ms: 0 }), files());
+    const faded = await renderWith(dir, withMusic({ volume: 1, fade_in_ms: 800, fade_out_ms: 800 }), files());
+    expect(windowRms(loud.output, 0.5, 0.5) / windowRms(soft.output, 0.5, 0.5)).toBeGreaterThan(3);
+    expect(windowRms(mute.output, 0.2, 1.5)).toBeLessThan(0.001);
+    expect(windowRms(faded.output, 0, 0.1)).toBeLessThan(windowRms(faded.output, 0.9, 0.1) * 0.5);
+    expect(windowRms(faded.output, 1.9, 0.1)).toBeLessThan(windowRms(faded.output, 0.9, 0.1) * 0.5);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}, 240000);
+it("music: no track keeps the silent AAC, and a missing or unusable track fails with a precise code", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "studio-music-"));
+  try {
+    const none = await renderWith(dir, withMusic(null), new Map());
+    expect(none.probe.streams.find((s) => s.codec_type === "audio")?.codec_name).toBe("aac");
+    expect(windowRms(none.output, 0, 1.5)).toBeLessThan(0.001);
+    const settings = { volume: 0.5, fade_in_ms: 0, fade_out_ms: 0 };
+    await expect(renderWith(dir, withMusic(settings), new Map())).rejects.toMatchObject({ code: "ASSET_MISSING" });
+    const text = join(dir, "not-audio.mp3");
+    await writeFile(text, "this is not an mp3 file at all");
+    await expect(renderWith(dir, withMusic(settings), new Map([[TRACK, text]]))).rejects.toMatchObject({ code: "MUSIC_UNREADABLE" });
+    const silentVideo = join(dir, "video.mp4");
+    await command(runtime.ffmpeg, ["-y", "-f", "lavfi", "-i", "testsrc=s=64x64:d=1", "-pix_fmt", "yuv420p", silentVideo], runtime.signal);
+    await expect(renderWith(dir, withMusic(settings), new Map([[TRACK, silentVideo]]))).rejects.toMatchObject({ code: "MUSIC_UNREADABLE" });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}, 240000);
+it("music graph clamps fades to short videos and never fades past the end", () => {
+  const g = musicGraph({ volume: 0.5, fade_in_ms: 10000, fade_out_ms: 10000 }, 2);
+  expect(g).toContain("afade=t=in:st=0:d=2.000");
+  expect(g).toContain("afade=t=out:st=0.000:d=2.000");
+  expect(g).toContain("atrim=0:2.000");
+  expect(g).toContain("alimiter");
+  expect(musicGraph({ volume: 1, fade_in_ms: 0, fade_out_ms: 0 }, 60)).not.toContain("afade");
+});

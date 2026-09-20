@@ -1,0 +1,1 @@
+../../../../supabase/migrations/20260913020000_studio_templates.sql

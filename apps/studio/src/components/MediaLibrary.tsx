@@ -53,6 +53,14 @@ function Preview({ asset }: { asset: StudioMediaAsset }) {
       {url ? (
         asset.media_type === "image" ? (
           <img src={url} alt={asset.original_filename} loading="lazy" />
+        ) : asset.media_type === "audio" ? (
+          <audio
+            src={url}
+            controls
+            preload="metadata"
+            aria-label={asset.original_filename}
+            style={{ width: "100%" }}
+          />
         ) : (
           <video
             src={url}
@@ -73,7 +81,11 @@ function Preview({ asset }: { asset: StudioMediaAsset }) {
         />
       ) : (
         <div className="media-placeholder">
-          {asset.media_type === "image" ? "PHOTO" : "VIDÉO"}
+          {asset.media_type === "image"
+            ? "PHOTO"
+            : asset.media_type === "audio"
+              ? "MUSIQUE"
+              : "VIDÉO"}
         </div>
       )}
       {asset.upload_status === "ready" && (
@@ -325,7 +337,7 @@ export default function MediaLibrary({
             <input
               type="file"
               multiple
-              accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime"
+              accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,audio/mpeg,audio/mp4,audio/wav,audio/x-wav"
               onChange={(e) => {
                 if (e.target.files) add(e.target.files);
                 e.target.value = "";
@@ -333,7 +345,7 @@ export default function MediaLibrary({
             />
           </label>
           <p className="muted">
-            Images : {bytes(limits.image_bytes)} · Vidéos H.264 :{" "}
+            Images et musique (MP3, M4A, WAV) : {bytes(limits.image_bytes)} · Vidéos H.264 :{" "}
             {bytes(limits.video_bytes)} · {limits.concurrency} transferts
             simultanés.
           </p>

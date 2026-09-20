@@ -4,6 +4,9 @@ import { randomUUID } from "node:crypto";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
+import { mkdtemp } from "node:fs/promises";
 import { fixtures, fileInputReady } from "./media-fixtures";
 test.use({ actionTimeout: 15000 });
 const password = "Studio-Montage-Local-398!";
@@ -768,4 +771,92 @@ test("Lot J2 partage : lien public sans session, robots, lien invalide, révocat
   } finally {
     await anonymous.close();
   }
+});
+
+// ---- Lot M: imported music -------------------------------------------------
+const workerRequire = createRequire(
+  join(process.cwd(), "../../workers/studio-video/package.json"),
+);
+const ffmpegBinary = workerRequire("ffmpeg-static") as string;
+const ffprobeBinary = (workerRequire("ffprobe-static") as { path: string }).path;
+function audioWindow(file: string, from: number, length: number) {
+  const pcm = execFileSync(ffmpegBinary, [
+    "-v", "error", "-ss", String(from), "-t", String(length), "-i", file,
+    "-vn", "-ac", "1", "-ar", "8000", "-f", "f32le", "pipe:1",
+  ]);
+  let sum = 0;
+  for (let i = 0; i < pcm.length; i += 4) sum += pcm.readFloatLE(i) ** 2;
+  return Math.sqrt(sum / Math.max(1, pcm.length / 4));
+}
+async function tracks(dir: string) {
+  const make = (name: string, seconds: number) => {
+    execFileSync(ffmpegBinary, [
+      "-y", "-v", "error", "-f", "lavfi", "-i", `sine=frequency=440:duration=${seconds}`, join(dir, name),
+    ]);
+    return join(dir, name);
+  };
+  return { short: make("court.wav", 2), long: make("long.mp3", 40) };
+}
+async function downloadLatest(page: Page, id: string, name: string) {
+  const list = await request(page, `/api/renders/${id}`);
+  const output = list.body.outputs[0];
+  const signed = await request(page, `/api/renders/${id}`, { action: "preview", output: output.id });
+  const bytes = await (await page.request.get(signed.body.url)).body();
+  const file = test.info().outputPath(name);
+  await writeFile(file, bytes);
+  return file;
+}
+test("Lot M musique : import, choix, rendu AAC audible, remplacement, suppression et fichier manquant", async ({ page }) => {
+  test.setTimeout(900000);
+  const a = await setup(page, "Chantier Musique", "chantier-pro", 3, 0);
+  const dir = await mkdtemp(join(tmpdir(), "studio-music-e2e-"));
+  const files = await tracks(dir);
+  // Import the two tracks in the media library like any other media.
+  await page.goto(`/projects/${a.id}`);
+  await fileInputReady(page);
+  await page.getByLabel("Choisir des fichiers").setInputFiles([files.short, files.long]);
+  await expect(page.locator('.upload-list [data-status="ready"]')).toHaveCount(2, { timeout: 180000 });
+  await page.reload();
+  await expect(page.getByText("MUSIQUE", { exact: true }).first()).toBeVisible();
+  // A track is not a clip: it never appears among the media offered for the montage.
+  await page.goto(`/projects/${a.id}/editor`);
+  const picker = page.getByLabel("Média à ajouter ou remplacer");
+  await expect(picker.locator("option", { hasText: "long.mp3" })).toHaveCount(0);
+  // Choose the long track (cut to the video length) with a fade-out.
+  const musicSelect = page.getByLabel("Musique du montage");
+  await musicSelect.selectOption({ label: "long.mp3" });
+  await page.getByLabel("Fondu de sortie (secondes)").fill("1");
+  await saved(page);
+  const stored = (await montage(page, a.id)).active.presentation.music;
+  expect(stored).toMatchObject({ volume: 0.5, fade_in_ms: 500, fade_out_ms: 1000 });
+  await page.reload();
+  await expect(page.getByLabel("Musique du montage").locator("option:checked")).toHaveText("long.mp3");
+  // Real render: AAC audio, audible music, montage duration unchanged (40 s track cut to the video).
+  await render(page, a.id);
+  const first = test.info().outputPath("edited-output.mp4");
+  expect(audioWindow(first, 1, 1)).toBeGreaterThan(0.01);
+  const probe = JSON.parse(execFileSync(ffprobeBinary, ["-v", "error", "-show_streams", "-of", "json", first]).toString());
+  expect(probe.streams.find((s: { codec_type: string }) => s.codec_type === "audio").codec_name).toBe("aac");
+  // Replace by the shorter track (looped) and render again.
+  await page.getByLabel("Musique du montage").selectOption({ label: "court.wav" });
+  await saved(page);
+  await page.getByRole("button", { name: "Créer la vidéo", exact: true }).click();
+  const panel = page.getByRole("region", { name: "Vidéo exportée" });
+  await expect(panel.locator("[data-render-job]")).toHaveCount(2, { timeout: 60000 });
+  await expect(panel.locator("[data-render-job]").first().getByRole("status")).toContainText("Terminé", { timeout: 600000 });
+  const second = await downloadLatest(page, a.id, "replaced.mp4");
+  expect(audioWindow(second, 0.5, 1)).toBeGreaterThan(0.01);
+  // Removal: no music selected anymore, persisted.
+  await page.getByLabel("Musique du montage").selectOption({ label: "Aucune musique" });
+  await saved(page);
+  expect((await montage(page, a.id)).active.presentation.music ?? null).toBeNull();
+  // A track whose file vanished is refused with a clear message, never a silent render.
+  await page.getByLabel("Musique du montage").selectOption({ label: "long.mp3" });
+  await saved(page);
+  const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.STUDIO_STORAGE_SERVICE_KEY!, { auth: { persistSession: false } });
+  const order = await request(page, `/api/projects/${a.id}/order`);
+  const longAsset = order.body.assets.find((x: { original_filename: string }) => x.original_filename === "long.mp3");
+  expect((await admin.storage.from("studio-originals").remove([longAsset.storage_key])).error).toBeNull();
+  await page.getByRole("button", { name: "Créer la vidéo", exact: true }).click();
+  await expect(panel.getByRole("alert")).toContainText("introuvable", { timeout: 60000 });
 });

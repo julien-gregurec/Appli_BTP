@@ -1,0 +1,1 @@
+../../../../supabase/migrations/20260912120000_studio_workspace_foundation.sql
