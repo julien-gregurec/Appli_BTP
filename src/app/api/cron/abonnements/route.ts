@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
+import { strToU8 } from "fflate";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ajouterOptionIAAbonnement, estPalierOptionIA, estPeriodiciteAbonnement, reconcilierAbonnementStripe } from "@/lib/stripe-abonnement";
+import { purgerStorageEntreprise, purgeStorageReussie } from "@/lib/rgpd/storage";
+import { purgerAuthUtilisateursEntreprise } from "@/lib/rgpd/auth";
+import { sha256 } from "@/lib/expenses/integrity";
 
 // Bascule les essais Option IA expires vers la facturation reelle. Regroupe avec le cron
 // des abonnements (et non un cron dedie) car le plan Vercel Hobby limite le nombre de
@@ -63,6 +67,83 @@ async function notifierPointagesManquantsEtAValider(admin: ReturnType<typeof cre
   return { ok: !error, raison: error?.message };
 }
 
+// Orchestrateur RGPD (art. 17) : fait avancer l'état-machine de suppression
+// d'entreprise (requested→review, retention→purge_ready) puis exécute la
+// purge finale (SQL, Storage, Auth) des entreprises prêtes ou déjà en cours
+// (reprise après crash : si le Storage ou l'Auth avait échoué au passage
+// précédent, le statut restait 'purging' et est repris ici sans repasser par
+// la purge SQL légale, idempotente). Greffé ici pour la même raison que les
+// autres jobs de ce fichier (limite de crons du plan Vercel Hobby) : voir
+// docs/qualification/ELSATIA_RGPD_ERASURE_PORTABILITY_V1.md.
+async function purgerEntreprisesRgpdDues(admin: ReturnType<typeof createAdminClient>) {
+  await admin.rpc("avancer_purges_dues");
+  await admin.rpc("avancer_purges_pretes");
+
+  const { data: candidates, error } = await admin
+    .from("entreprises")
+    .select("id, suppression_statut")
+    .in("suppression_statut", ["purge_ready", "purging"]);
+  if (error) return [{ entrepriseId: "-", ok: false, etape: "lecture_candidats", raison: error.message }];
+
+  const resultats: Array<{ entrepriseId: string; ok: boolean; etape?: string; raison?: string }> = [];
+
+  for (const entreprise of candidates ?? []) {
+    const entrepriseId = entreprise.id as string;
+    try {
+      if (entreprise.suppression_statut === "purge_ready") {
+        const { error: erreurLegale } = await admin.rpc("executer_purge_legale_entreprise", { p_entreprise_id: entrepriseId });
+        if (erreurLegale) {
+          resultats.push({ entrepriseId, ok: false, etape: "purge_legale", raison: erreurLegale.message });
+          continue;
+        }
+      }
+
+      const resultatsStorage = await purgerStorageEntreprise(admin, entrepriseId);
+      await admin.rpc("journaliser_etape_purge_entreprise", {
+        p_entreprise_id: entrepriseId,
+        p_etape: "purge_storage",
+        p_details: { buckets: resultatsStorage.map((r) => ({ bucket: r.bucket, supprimes: r.supprimes, erreurs: r.erreurs.length })) },
+      });
+      if (!purgeStorageReussie(resultatsStorage)) {
+        resultats.push({ entrepriseId, ok: false, etape: "purge_storage", raison: "voir journal_purge_entreprise (reprise au prochain passage)" });
+        continue;
+      }
+
+      const resultatAuth = await purgerAuthUtilisateursEntreprise(admin, entrepriseId);
+      await admin.rpc("journaliser_etape_purge_entreprise", {
+        p_entreprise_id: entrepriseId,
+        p_etape: "purge_auth",
+        p_details: { comptes_supprimes: resultatAuth.utilisateursSansAutreEntreprise.length, erreurs: resultatAuth.erreurs.length },
+      });
+      if (!resultatAuth.ok) {
+        resultats.push({ entrepriseId, ok: false, etape: "purge_auth", raison: resultatAuth.erreurs.join("; ") });
+        continue;
+      }
+
+      const manifeste = {
+        storage: resultatsStorage.map((r) => ({ bucket: r.bucket, supprimes: r.supprimes })),
+        auth: { comptes_supprimes: resultatAuth.utilisateursSansAutreEntreprise.length },
+      };
+      const manifesteSha256 = sha256(strToU8(JSON.stringify(manifeste)));
+      const { error: erreurCloture } = await admin.rpc("marquer_purge_terminee_entreprise", {
+        p_entreprise_id: entrepriseId,
+        p_manifeste: manifeste,
+        p_manifeste_sha256: manifesteSha256,
+      });
+      if (erreurCloture) {
+        resultats.push({ entrepriseId, ok: false, etape: "cloture", raison: erreurCloture.message });
+        continue;
+      }
+
+      resultats.push({ entrepriseId, ok: true });
+    } catch (erreur) {
+      resultats.push({ entrepriseId, ok: false, etape: "exception", raison: erreur instanceof Error ? erreur.message : "Erreur" });
+    }
+  }
+
+  return resultats;
+}
+
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return NextResponse.json({ error: "CRON_SECRET absent" }, { status: 503 });
@@ -82,5 +163,6 @@ export async function GET(request: Request) {
   const optionIA = await convertirEssaisOptionIAExpires(admin);
   const paiePeriodes = await synchroniserPeriodesPaieOuvertes(admin);
   const alertesPointage = await notifierPointagesManquantsEtAValider(admin);
-  return NextResponse.json({ traitees: resultats.length, resultats, optionIA, paiePeriodes, alertesPointage });
+  const purgesRgpd = await purgerEntreprisesRgpdDues(admin);
+  return NextResponse.json({ traitees: resultats.length, resultats, optionIA, paiePeriodes, alertesPointage, purgesRgpd });
 }
