@@ -7,6 +7,7 @@ import {
   cpSync,
   existsSync,
   unlinkSync,
+  readdirSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
@@ -130,6 +131,15 @@ if (action === "setup") {
     ].some((flag) => process.argv.includes(flag))
   )
     excludedMigrations.push("20260913040000_studio_media_analysis.sql");
+  // Post-H lots are additive on top of the H baseline: any historical --lot-x
+  // baseline (including --lot-h itself) is built without them.
+  if (
+    ["--lot-a", "--lot-b", "--lot-c", "--lot-d", "--lot-e", "--lot-f", "--lot-g", "--lot-h"].some(
+      (flag) => process.argv.includes(flag),
+    )
+  )
+    for (const name of readdirSync(join(directory, "supabase/migrations")))
+      if (/^2026092\d{7,}_studio_/.test(name)) excludedMigrations.push(name);
   for (const migration of excludedMigrations)
     unlinkSync(join(directory, "supabase/migrations", migration));
   writeFileSync(statePath, JSON.stringify({ directory, projectId }));

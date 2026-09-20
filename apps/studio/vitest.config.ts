@@ -8,5 +8,6 @@ export default defineConfig({
       ),
     },
   },
-  test: { include: ["tests/**/*.test.ts"] },
+  // Source-walking boundary tests read the whole tree; allow slow external volumes.
+  test: { include: ["tests/**/*.test.ts"], testTimeout: 60000 },
 });

@@ -1,6 +1,12 @@
 import "server-only";
 import { isStudioId } from "@elsatia/studio-domain";
 import { authorizeProject, MediaError } from "./media-service";
+import { renderRefusal } from "./render-refusal";
+
+const assetMissingMessage = renderRefusal({
+  code: "22023",
+  message: "ASSET_MISSING",
+}).message;
 import { storageAdmin } from "./storage-admin";
 import { getActiveStudioTimeline } from "./timelines";
 export async function getStudioRenders(projectId: string) {
@@ -76,14 +82,14 @@ export async function requestStudioRender(
     .select("*")
     .in("id", ids);
   if (assets.error) throw new MediaError("Médias indisponibles.", 503);
-  if (assets.data.length !== ids.length) throw new MediaError("ASSET_MISSING");
+  if (assets.data.length !== ids.length) throw new MediaError(assetMissingMessage);
   const admin = storageAdmin();
   for (const a of assets.data) {
     const info = await admin.storage
       .from("studio-originals")
       .info(a.storage_key);
     if (info.error || a.upload_status !== "ready")
-      throw new MediaError("ASSET_MISSING");
+      throw new MediaError(assetMissingMessage);
   }
   const profile =
     preview || process.env.STUDIO_RENDER_INTERNAL_PREVIEW === "1"
@@ -107,15 +113,10 @@ export async function requestStudioRender(
         p_revision: expected.revision,
       })
     : await client.rpc("studio_request_render", args);
-  if (r.error)
-    throw new MediaError(
-      r.error.code === "22023"
-        ? r.error.message
-        : r.error.code === "40001"
-          ? "Cette version a changé. Rechargez avant de lancer le rendu."
-          : "Création du rendu refusée.",
-      r.error.code === "42501" ? 403 : r.error.code === "40001" ? 409 : 400,
-    );
+  if (r.error) {
+    const refusal = renderRefusal(r.error);
+    throw new MediaError(refusal.message, refusal.status);
+  }
   return { id: r.data };
 }
 export async function cancelStudioRender(projectId: string, jobId: string) {

@@ -28,3 +28,8 @@ export function studioOrigin() {
     throw new Error("Origine Studio non sécurisée.");
   return url.origin;
 }
+/** Operator kill-switch: STUDIO_ENABLED=0|false|off closes the whole web surface (503). Unset means enabled. */
+export function studioEnabled(value = process.env.STUDIO_ENABLED): boolean {
+  const flag = (value ?? "").trim().toLowerCase();
+  return !["0", "false", "off", "no"].includes(flag);
+}
