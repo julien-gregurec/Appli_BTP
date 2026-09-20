@@ -9,7 +9,7 @@ déployée, aucune migration, aucune écriture Preview ni Production.**
 | Application | Existe | Déployée | Login julien@elsatia.fr | Droits | Navigation | État | Action restante |
 |---|---|---|---|---|---|---|---|
 | **Colors** | ✅ | **Prod : ancien build** (`/robots.txt`, `/mot-de-passe-oublie` en 404) | ❌ non testable sans le vrai mot de passe · ✅ prouvé sur un jumeau local | ❓ à lire (diagnostic SQL, runbook V2 §6) | ✅ local (7 pages + refresh + retour) | 🟡 | Déployer le train V3, exécuter le diagnostic, connexion réelle |
-| Gestion Pro | ✅ | Prod (`app.elsatia.fr`) | ❌ non testé | ⚠️ propriétaire = admin plateforme **inactif** (aucune interface pour l'activer) | ⚪ non testé | 🟡 | Activer l'identité propriétaire (Q2) |
+| Gestion Pro | ✅ | Prod (`app.elsatia.fr`) | ❌ réel non testé · ✅ le jumeau local entre dans Gestion Pro **puis** dans Colors avec les mêmes identifiants | ⚠️ propriétaire = admin plateforme **inactif** (aucune interface pour l'activer) | ✅ local (connexion, tableau de bord, sélecteur d'applications → Colors, retour) | 🟡 | Activer l'identité propriétaire (Q2) |
 | Tools | ✅ | Prod (`tools.elsatia.fr`) | ❌ non testé | ⚠️ Free sans entreprise active, jamais Pro | — | 🟡 (Free) / 🔴 (Pro) | Q4 |
 | Studio | ❌ pas dans cette branche | Non | — | — | — | ⚪ NON DÉPLOYÉ / NON TESTABLE | — |
 | Réserves | ✅ | **Non** (`reserves.elsatia.fr` ne résout pas, `url_production` nulle) | — | ✅ modèle propre | — | 🟡 code / ⚪ déploiement | Choisir l'hôte |
@@ -75,6 +75,15 @@ ensuite.
 **COLORS : 🟡 PARTIEL** — code 🟢 (prouvé en local), Production 🔴 (ancien build),
 compte réel ⚪ (non vérifiable cette nuit).
 
+### Un compte, deux applications (prouvé en local)
+
+`tests/e2e/compte-partage-inter-apps.spec.ts` (1 scénario, vert) : le jumeau se connecte à **Gestion
+Pro** (`next dev` réel), le sélecteur d'applications lui propose « ELSATIA Colors » (lien vers l'hôte
+de Colors), Colors — sur un autre nom d'hôte — **ne connaît pas** sa session (voulu) et l'accepte
+avec les mêmes identifiants ; retour sur Gestion Pro et sur Colors : les deux sessions sont intactes.
+Deux noms d'hôte (`127.0.0.1` / `localhost`) sont nécessaires : sur un même nom d'hôte avec deux
+ports, les cookies seraient partagés, ce qui n'arrive pas entre `app.` et `colors.elsatia.fr`.
+
 ### Ce qui est prouvé (pile locale jetable, Colors construit depuis cet arbre)
 
 Voir le tableau des quinze parcours dans
@@ -85,6 +94,7 @@ pile locale, Colors construit depuis cet arbre :
 |---|---|
 | Desktop Chromium — 35 parcours existants + surface publique + **13 scénarios du compte partagé** | **66 verts, 1 ignoré** (le test des cibles tactiles, propre aux profils tactiles), 0 rouge |
 | iPhone (WebKit), Android (Chromium), iPad (WebKit) — 3 scénarios `@responsive` chacun | **9/9 verts** |
+| Colors ↔ Gestion Pro, même compte | 1/1 vert |
 | Unitaires Colors | 428/428 (avec un délai de 60-90 s : trois tests balaient l'arbre entier et dépassent 5 s sur ce volume) |
 | Typecheck Colors, Réserves, Tools · lint Colors | propres |
 
