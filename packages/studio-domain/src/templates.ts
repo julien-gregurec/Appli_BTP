@@ -10,7 +10,7 @@ import {
   type TimelineDraft,
 } from "./timeline";
 import {
-  boundedText,
+  renderableText,
   validatePresentation,
   type Typography,
   type TextOverlay,
@@ -399,7 +399,7 @@ export function parseTemplateOptions(value: unknown): TemplateOptions {
     if (v[key] !== undefined) {
       if (typeof v[key] !== "string")
         throw new TimelineValidationError("Texte invalide.");
-      out[key] = boundedText(v[key]);
+      out[key] = renderableText(v[key]);
     }
   const id = (x: unknown): x is string =>
     typeof x === "string" &&
@@ -443,7 +443,7 @@ export function parseTemplateOptions(value: unknown): TemplateOptions {
         typeof c.title !== "string"
       )
         throw new TimelineValidationError("Chapitre invalide.");
-      return { assetId: c.assetId, title: boundedText(c.title) };
+      return { assetId: c.assetId, title: renderableText(c.title) };
     });
     if (
       new Set(out.chapters.map((c) => c.assetId)).size !== out.chapters.length
@@ -609,7 +609,7 @@ export function buildTemplateTimeline(
     position: TextOverlay["position"],
     full = false,
   ) {
-    const clean = boundedText(text);
+    const clean = renderableText(text);
     if (!clean) return;
     const clip = clips.find((c) => c.metadata_json.key === key)!;
     overlays.push({

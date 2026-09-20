@@ -63,6 +63,7 @@ async function handle(
             typeof b.revision === "number"
             ? { timeline: b.timeline, revision: b.revision }
             : undefined,
+          "quality" in b && b.quality === "hd720" ? "hd720" : "standard",
         );
       else if (b.action === "cancel" && "job" in b && typeof b.job === "string")
         result = await cancelStudioRender(projectId, b.job);

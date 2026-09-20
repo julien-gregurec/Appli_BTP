@@ -13,7 +13,7 @@ import {
 } from "./timeline";
 import {
   fontRoles,
-  boundedText,
+  renderableText,
   retimePresentation,
   validatePresentation,
   type TextOverlay,
@@ -258,9 +258,9 @@ export function applyEditorCommand(
       {
         const overlay = {
           ...command.overlay,
-          text: boundedText(command.overlay.text),
+          text: renderableText(command.overlay.text),
           ...(command.overlay.hidden_text !== undefined
-            ? { hidden_text: boundedText(command.overlay.hidden_text) }
+            ? { hidden_text: renderableText(command.overlay.hidden_text) }
             : {}),
         };
         presentation = {
