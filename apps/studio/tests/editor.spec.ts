@@ -590,12 +590,14 @@ test("Lot S2 suppression au clavier sur sélection périmée et édition conserv
   const a = await setup(page, "Chantier S2", "chantier-pro", 3, 0);
   const count = async () => (await montage(page, a.id)).active.clips.length;
   const before = await count();
+  // Remove a photo clip (not the title card): the selection it held no longer exists.
+  await select(page, 2);
   await page
     .getByRole("button", { name: "Retirer du montage", exact: true })
     .click();
   await saved(page);
   expect(await count()).toBe(before - 1);
-  // The removed clip was selected: Delete must neither crash the page nor lose the history.
+  // Delete with that stale selection must neither crash the page nor lose the history.
   await page.locator("body").click({ position: { x: 5, y: 5 } });
   await page.keyboard.press("Delete");
   await expect(
@@ -603,10 +605,18 @@ test("Lot S2 suppression au clavier sur sélection périmée et édition conserv
   ).toBeVisible();
   await saved(page);
   expect(await count()).toBeLessThanOrEqual(before - 1);
-  await page
-    .getByRole("button", { name: "Annuler la modification", exact: true })
-    .click();
+  // The undo history survived: two undo steps restore the whole montage.
+  const undo = page.getByRole("button", {
+    name: "Annuler la modification",
+    exact: true,
+  });
+  await undo.click();
   await saved(page);
+  if ((await count()) < before) {
+    await undo.click();
+    await saved(page);
+  }
+  expect(await count()).toBe(before);
   // An edit made in the last debounce window survives a hard navigation.
   await select(page, 1);
   await page
@@ -622,7 +632,6 @@ test("Lot S2 suppression au clavier sur sélection périmée et édition conserv
     })
     .toContain("Conservé à la sortie");
 });
-
 test("Lot I Brand Kit : enregistrement, refus d'emoji, préremplissage du style et logo de la marque", async ({
   page,
 }) => {
