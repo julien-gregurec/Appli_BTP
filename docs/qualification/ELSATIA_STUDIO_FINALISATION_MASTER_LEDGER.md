@@ -148,7 +148,7 @@ Coût estimé : lot de taille L (migration + domaine + éditeur + worker + E2E).
 | Upgrade post-H / rollback inverse / reapply (`post-h-migration-check`) | **PASS** (4 migrations sur base H peuplée : 260 → 264 → 260 → 264, données identiques) |
 | pgTAP après upgrade | **PASS — 520 assertions, 12 fichiers** |
 | Build production (webpack) | PASS |
-| E2E complets (36 cas, aperçus 540×960, Chrome installé) | **34/36 en un passage** ; les 2 échecs (attente « rendering » périmée dans un test ; flux de récupération = vrai défaut de route `/auth/confirm`) sont corrigés et **PASS individuellement** — second passage complet NOT RUN |
+| E2E complets (36 cas, aperçus 540×960, Chrome installé, worker + Redis réels) | **36/36 PASS en un seul passage (12,0 min) sur le build final** ; le premier passage (avant correctifs) avait donné 34/36 : attente « rendering » périmée dans un test, et flux de récupération = vrai défaut de route `/auth/confirm` (D-28) |
 | E2E ciblés de la nuit | Brand Kit PASS, partage PASS, S2 PASS, rendu réel Chantier PASS, invalid-links PASS, onboarding/isolation PASS |
 | Acceptation pleine taille (hors gate, sans drapeau aperçu) | **PASS ×2** : Strasbourg 10 photos + 3 vidéos, Chantier Pro, 9:16, 60 s ; Croatie 20 + 5, Voyage, 9:16, 90 s → MP4 H.264/AAC 1080×1920 30 fps, 1 800 / 2 700 images ±1, durée ±0,1 s, images décodées non noires. **Limites** : sources synthétiques minuscules, sans musique ni logo, sans dates EXIF |
 | npm audit | NOT RUN |
