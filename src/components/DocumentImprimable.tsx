@@ -70,6 +70,8 @@ export function DocumentImprimable({
   estFacture,
   signatures = [],
   photos = [],
+  urlPhoto,
+  urlSignature,
 }: {
   typeDoc: string;
   numero: string;
@@ -85,7 +87,19 @@ export function DocumentImprimable({
   estFacture: boolean;
   signatures?: SignatureImprimable[];
   photos?: Array<{ id: string; nom: string; legende?: string | null }>;
+  // Chemin de lecture de la photo : par défaut la route authentifiée
+  // (session ELSATIA). La page publique par jeton (/document/[token],
+  // /imprimer/partage/[token]) n'a pas de session — GP-EXTERNAL-PILOT-
+  // CLOSURE-V1 lui fait passer la route publique scopée par jeton à la
+  // place, sans quoi l'image renvoie 401/redirige vers /login et casse le
+  // PDF public (mission §9).
+  urlPhoto?: (photoId: string) => string;
+  // Même besoin que urlPhoto, pour l'image de signature interne.
+  urlSignature?: (signature: SignatureImprimable) => string;
 }) {
+  const construireUrlPhoto = urlPhoto ?? ((photoId: string) => `/api/devis/pieces-jointes/${photoId}`);
+  const construireUrlSignature =
+    urlSignature ?? ((signature: SignatureImprimable) => `/api/employes/${signature.employe_id}/signature?document=${signature.id}`);
   const polices={arial:"Arial, Helvetica, sans-serif",georgia:"Georgia, 'Times New Roman', serif",trebuchet:"'Trebuchet MS', Arial, sans-serif",verdana:"Verdana, Geneva, sans-serif"};
   const police=polices[entreprise.police_documents??"arial"]??polices.arial;
   const couleur=/^#[0-9a-f]{6}$/i.test(entreprise.couleur_documents??"")?entreprise.couleur_documents!:"#0d1b2a";
@@ -218,7 +232,7 @@ export function DocumentImprimable({
             {photos.map((photo) => (
               <figure key={photo.id} style={{ margin: 0, border: "1px solid #ddd", padding: "6px", borderRadius: "4px" }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`/api/devis/pieces-jointes/${photo.id}`} alt={photo.legende || photo.nom} style={{ width: "100%", height: "160px", objectFit: "cover" }} />
+                <img src={construireUrlPhoto(photo.id)} alt={photo.legende || photo.nom} style={{ width: "100%", height: "160px", objectFit: "cover" }} />
                 <figcaption style={{ marginTop: "4px", color: "#666", fontSize: "9px" }}>{photo.legende || photo.nom}</figcaption>
               </figure>
             ))}
@@ -233,7 +247,7 @@ export function DocumentImprimable({
             {signatures.map((signature) => (
               <div key={signature.id} style={{ minWidth: "190px", padding: "10px", border: "1px solid #ddd", borderRadius: "4px" }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`/api/employes/${signature.employe_id}/signature?document=${signature.id}`} alt={`Signature de ${signature.nom_signataire}`} style={{ width: "150px", height: "55px", objectFit: "contain" }} />
+                <img src={construireUrlSignature(signature)} alt={`Signature de ${signature.nom_signataire}`} style={{ width: "150px", height: "55px", objectFit: "contain" }} />
                 <div style={{ fontWeight: 600 }}>{signature.nom_signataire}</div>
                 <div style={{ color: "#666", fontSize: "9px" }}>{signature.fonction_signataire || "Fonction non renseignée"} · {new Date(signature.signed_at).toLocaleString("fr-FR")}</div>
                 <div style={{ color: "#999", fontFamily: "monospace", fontSize: "8px" }}>Empreinte {signature.document_sha256.slice(0, 16)}…</div>
