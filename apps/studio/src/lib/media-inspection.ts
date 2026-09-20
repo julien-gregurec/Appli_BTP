@@ -9,6 +9,11 @@ export interface Inspection {
   exif_orientation?: number;
   rotation_degrees?: number;
 }
+/** Audio is checked by magic bytes only: the worker probes the real stream before any render uses it. */
+export interface AudioInspection {
+  codec: "mp3" | "wav" | "aac";
+  source: "server-header";
+}
 export type ReadRange = (start: number, end: number) => Promise<Buffer>;
 function result(
   width: number,
@@ -66,10 +71,38 @@ export async function inspectMedia(
   mime: string,
   size: number,
   read: ReadRange,
-): Promise<Inspection> {
+): Promise<Inspection | AudioInspection> {
   const head = await read(0, Math.min(size - 1, 262143));
   const range: ReadRange = async (start, end) =>
     end < head.length ? head.subarray(start, end + 1) : read(start, end);
+  if (mime.startsWith("audio/")) {
+    const mp3 =
+      head.toString("ascii", 0, 3) === "ID3" ||
+      (head[0] === 0xff && (head[1] & 0xe0) === 0xe0);
+    const wav =
+      head.toString("ascii", 0, 4) === "RIFF" &&
+      head.toString("ascii", 8, 12) === "WAVE";
+    const m4a =
+      head.toString("ascii", 4, 8) === "ftyp" &&
+      ["M4A ", "isom", "iso2", "mp41", "mp42"].includes(
+        head.toString("ascii", 8, 12),
+      );
+    const kind =
+      mime === "audio/mpeg"
+        ? mp3
+          ? "mp3"
+          : null
+        : mime === "audio/mp4"
+          ? m4a
+            ? "aac"
+            : null
+          : wav
+            ? "wav"
+            : null;
+    if (!kind || size < 64)
+      throw new Error("Signature du fichier audio incompatible avec son type.");
+    return { codec: kind, source: "server-header" };
+  }
   if (mime.startsWith("image/")) {
     const ok =
       mime === "image/jpeg"

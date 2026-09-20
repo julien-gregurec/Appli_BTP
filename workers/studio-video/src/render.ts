@@ -165,8 +165,8 @@ export async function command(
 export async function probe(
   path: string,
   r: Runtime,
-  // Untrusted inputs get a tight deadline; the finished output is our own file and may wait on a loaded host.
-  timeoutMs = 10000,
+  // Untrusted inputs still get a bounded deadline (30 s: a saturated host took over 10 s); our own output waits longer.
+  timeoutMs = 30000,
 ): Promise<Probe> {
   try {
     const result: Probe = JSON.parse(

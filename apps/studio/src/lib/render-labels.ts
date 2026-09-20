@@ -20,6 +20,8 @@ export const renderErrorMessages: Record<string, string> = {
   HEARTBEAT_LOST:
     "La connexion au service de rendu a été perdue. Relancez le rendu.",
   CANCELLED: "Le rendu a été annulé.",
+  MUSIC_UNREADABLE:
+    "La musique ne peut pas être lue. Remplacez-la par un MP3, M4A ou WAV valide, ou retirez-la.",
   TEXT_UNSUPPORTED:
     "Un texte contient des caractères que la police ne sait pas dessiner (emoji, symboles rares). Modifiez-le puis relancez.",
   RESOURCE_LIMIT:
