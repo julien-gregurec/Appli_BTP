@@ -83,7 +83,7 @@ test("onboarding réel sans entreprise, scopes, membres, révocation et logout",
   ).not.toBeNull();
   await page.goto(`/dashboard?workspace=${workspaceB}`);
   await expect(
-    page.getByRole("heading", { name: "Espace inaccessible." }),
+    page.getByRole("heading", { name: "Page ou espace inaccessible." }),
   ).toBeVisible();
   await expect(page.getByText("Privé B", { exact: true })).toHaveCount(0);
   await page.goto(`/settings?workspace=${workspaceA}`);

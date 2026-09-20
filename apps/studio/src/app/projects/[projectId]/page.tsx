@@ -93,7 +93,7 @@ export default async function Project({
           Format {p.target_aspect_ratio} · Durée{" "}
           {durationLabel(p.target_duration_seconds)}
         </p>
-        <p>Template : à configurer dans un prochain lot.</p>
+        <p>Choisissez un modèle dans l’éditeur de montage.</p>
       </section>
       <p>
         <Link href={`/projects/${p.id}/editor`} prefetch={false}>

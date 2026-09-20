@@ -36,9 +36,6 @@ export default function Shell({
             Projets
           </Link>
           <span>
-            Templates <small>À venir</small>
-          </span>
-          <span>
             Brand Kit <small>À venir</small>
           </span>
           <Link
