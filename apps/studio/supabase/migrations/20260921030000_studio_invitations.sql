@@ -1,0 +1,1 @@
+../../../../supabase/migrations/20260921030000_studio_invitations.sql
