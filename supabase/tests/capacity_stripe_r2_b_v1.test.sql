@@ -124,10 +124,18 @@ select is(
   'completed', 'statut terminal préservé (completed, pas failed)');
 
 -- ── ACL ────────────────────────────────────────────────────────────────────
+-- 20260905000267 a retiré le GRANT authenticated sur
+-- appliquer_baisse_capacite_planifiee_service : ce grant était obsolète
+-- (aucun chemin d'appel serveur "action" ne l'utilise dans le code actuel,
+-- seul deps.admin.rpc(...) côté service_role) et permettait à n'importe quel
+-- utilisateur authentifié de forcer une baisse de capacité planifiée sur une
+-- entreprise tierce. La fonction reste appelable par service_role
+-- (webhook/cron), plus par authenticated.
 select ok(
   has_function_privilege('service_role','public.synchroniser_capacite_stripe_service(uuid,text,integer,integer,text,text,text,text,text,text,text,jsonb,timestamptz,text,timestamptz,text)','EXECUTE')
-  and has_function_privilege('authenticated','public.appliquer_baisse_capacite_planifiee_service(uuid)','EXECUTE'),
-  'RPC de service exposées à service_role + authenticated (webhook/cron/action)');
+  and has_function_privilege('service_role','public.appliquer_baisse_capacite_planifiee_service(uuid)','EXECUTE')
+  and not has_function_privilege('authenticated','public.appliquer_baisse_capacite_planifiee_service(uuid)','EXECUTE'),
+  'RPC de service exposées à service_role uniquement (webhook/cron), authenticated exclu depuis 20260905000267');
 select ok(
   not has_function_privilege('anon','public.synchroniser_capacite_stripe_service(uuid,text,integer,integer,text,text,text,text,text,text,text,jsonb,timestamptz,text,timestamptz,text)','EXECUTE'),
   'anon exclu');
