@@ -429,6 +429,11 @@ nav small {
   letter-spacing: 0.16em;
   color: #536451;
 }
+.media-thumb {
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
 .media-preview button {
   margin-top: 10px;
 }

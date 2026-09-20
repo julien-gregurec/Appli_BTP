@@ -251,8 +251,8 @@ try {
           ),
         ).suites.flatMap((s) => s.specs.map((t) => `${s.file}:${t.line}`))
       : [null];
-    if (individual && targets.length !== 31)
-      throw Error(`Expected 31 individual E2E cases, found ${targets.length}`);
+    if (individual && targets.length !== 36)
+      throw Error(`Expected 36 individual E2E cases, found ${targets.length}`);
     if (individual && process.argv.includes("--foundation-first")) {
       const foundation = targets.find((t) =>
         t.startsWith("foundation.spec.ts:"),
@@ -295,7 +295,7 @@ try {
         .map((line) => JSON.parse(line));
       if (trace.some((row) => row.status >= 500 || row.status === 0))
         throw Error(`${name}: runtime transport failure or HTTP 5xx`);
-      const expected = target ? 1 : analysisOnly ? 4 : editorOnly ? 8 : 31;
+      const expected = target ? 1 : analysisOnly ? 4 : editorOnly ? 11 : 36;
       if (
         stats.expected !== expected ||
         stats.unexpected ||

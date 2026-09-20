@@ -8,6 +8,7 @@ import {
   authorizeUpload,
   confirmMedia,
   getStudioMediaSignedUrl,
+  getAssetThumbnail,
   authorizeAsset,
   authorizeProject,
 } from "../../../../lib/media-service";
@@ -31,6 +32,18 @@ async function handle(
     )
       return Response.json(await getStudioMediaSignedUrl(path[1]), {
         headers: { "Cache-Control": "private, no-store" },
+      });
+    if (
+      request.method === "GET" &&
+      path[0] === "assets" &&
+      path[2] === "thumbnail"
+    )
+      return new Response(new Uint8Array(await getAssetThumbnail(path[1])), {
+        headers: {
+          "Content-Type": "image/webp",
+          "Cache-Control": "private, max-age=600",
+          "X-Content-Type-Options": "nosniff",
+        },
       });
     if (request.method === "GET" && path[0] === "projects") {
       await authorizeProject(path[1]);

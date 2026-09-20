@@ -61,6 +61,16 @@ function Preview({ asset }: { asset: StudioMediaAsset }) {
             aria-label={asset.original_filename}
           />
         )
+      ) : asset.media_type === "image" && asset.upload_status === "ready" ? (
+        // A div (not an img): the full preview keeps being the only <img> of the card.
+        <div
+          className="media-placeholder media-thumb"
+          role="img"
+          aria-label={`Miniature de ${asset.original_filename}`}
+          style={{
+            backgroundImage: `url(/api/media/assets/${asset.id}/thumbnail)`,
+          }}
+        />
       ) : (
         <div className="media-placeholder">
           {asset.media_type === "image" ? "PHOTO" : "VIDÉO"}
@@ -273,14 +283,20 @@ export default function MediaLibrary({
     paint();
   }
   // Cancellation is implemented as pause then a tombstone; network retry reuses asset and TUS URL.
-  async function remove(asset: StudioMediaAsset) {
+  async function remove(asset: StudioMediaAsset, force = false) {
     try {
       const response = await fetch(`/api/projects/${project}/remove`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ asset: asset.id }),
+        body: JSON.stringify({ asset: asset.id, force }),
       });
       const data = await response.json();
+      // 409 = used by the active montage: ask before breaking it.
+      if (response.status === 409 && !force) {
+        if (window.confirm(`${data.error}\n\nRetirer quand même ?`))
+          await remove(asset, true);
+        return;
+      }
       if (!response.ok) throw Error(data.error);
       await refresh();
       router.refresh();

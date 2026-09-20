@@ -143,9 +143,29 @@ export async function setProjectCover(id: string, asset: string | null) {
       restErrorStatus(r.error, r.status),
     );
 }
-export async function removeProjectMedia(id: string, asset: string) {
+export const assetInUseMessage =
+  "Ce média est utilisé dans le montage actif. Le retirer empêchera de rendre la vidéo tant qu'il n'est pas remplacé.";
+export async function removeProjectMedia(
+  id: string,
+  asset: string,
+  force = false,
+) {
   if (!isStudioId(asset)) throw new MediaError("Média non autorisé.");
-  const { client } = await authorizeProject(id, true);
+  const { client, project } = await authorizeProject(id, true);
+  if (!force && project.active_timeline_id) {
+    const used = await client
+      .from("studio_timeline_clips")
+      .select("id", { count: "exact", head: true })
+      .eq("timeline_id", project.active_timeline_id)
+      .eq("asset_id", asset);
+    if (used.error)
+      throw new MediaError(
+        "Vérification du montage indisponible.",
+        restErrorStatus(used.error, used.status),
+      );
+    // 409 asks the caller to confirm explicitly before the reference is removed.
+    if ((used.count ?? 0) > 0) throw new MediaError(assetInUseMessage, 409);
+  }
   const r = await client.rpc("studio_remove_project_media", {
     p_project: id,
     p_asset: asset,
