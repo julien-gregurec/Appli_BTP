@@ -42,6 +42,19 @@ jobs:
           node-version: 24
           cache: npm
 
+      # Contrôle du manifeste d'environnement : AUCUNE installation ni valeur de secret requise
+      # (lecture du code et des gabarits seulement). Placé AVANT `npm ci` pour échouer vite.
+      # Il refuse : variable inconnue, secret sous un nom public, secret injecté par next.config,
+      # variable serveur dans un composant client, gabarit incohérent (variable requise absente,
+      # adresse locale en preview/production, ELSATIA_APPLICATION_ENV faux, drapeau à la mauvaise
+      # valeur, secret avec une vraie valeur). Il SIGNALE (sans échouer) les DECISION_REQUIRED
+      # dont les contrats Stripe incompatibles. Voir docs/runbooks/ELSATIA_ENV_MANIFEST_RUNBOOK_V1.md.
+      - name: Manifeste d'environnement (code, gabarits, public/secret, DR)
+        run: npm run verify:env-manifest
+
+      - name: Scan de secrets dans les fichiers suivis
+        run: npm run verify:secrets
+
       - name: Installation verrouillée
         run: npm ci
 
