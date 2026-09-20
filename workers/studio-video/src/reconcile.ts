@@ -1,10 +1,18 @@
-/** Manual, local-only reconciliation. Dry run by default; never touches originals. */
+/**
+ * Manual reconciliation. Dry run by default; never touches originals.
+ * A non-loopback project needs STUDIO_RECONCILE_ALLOW_REMOTE_HOST set to its exact host.
+ */
 import { createClient } from "@supabase/supabase-js";
 import { readdir, stat, rm } from "node:fs/promises";
 import { join } from "node:path";
 const origin = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-if (new URL(origin).hostname !== "127.0.0.1")
-  throw Error("Local reconciliation only");
+const host = origin ? new URL(origin).hostname : "";
+if (
+  !host ||
+  (host !== "127.0.0.1" &&
+    process.env.STUDIO_RECONCILE_ALLOW_REMOTE_HOST !== host)
+)
+  throw Error("Remote reconciliation needs STUDIO_RECONCILE_ALLOW_REMOTE_HOST");
 const root = process.env.STUDIO_RENDER_TMP;
 if (!root || !root.startsWith("/"))
   throw Error("Explicit absolute scratch root required");

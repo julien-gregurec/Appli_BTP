@@ -3,9 +3,41 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   studioCookieAttributes,
   studioCookieOptions,
+  studioEnabled,
   supabaseConfig,
 } from "./lib/config";
+const suspendedHeaders = {
+  "Cache-Control": "no-store",
+  "Retry-After": "300",
+  "X-Content-Type-Options": "nosniff",
+  "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
+};
+const suspendedPage =
+  '<!doctype html><html lang="fr"><meta charset="utf-8">' +
+  "<title>ELSATIA Studio</title>" +
+  '<body style="font-family:system-ui;max-width:32rem;margin:4rem auto;padding:0 1rem">' +
+  "<h1>Service temporairement indisponible</h1>" +
+  "<p>ELSATIA Studio est en maintenance. Vos projets et vos médias sont conservés. Réessayez dans quelques minutes.</p>" +
+  "</body></html>";
+function suspended(request: NextRequest) {
+  if (request.nextUrl.pathname.startsWith("/api/"))
+    return Response.json(
+      { error: "ELSATIA Studio est temporairement indisponible." },
+      { status: 503, headers: suspendedHeaders },
+    );
+  return new Response(
+    suspendedPage,
+    {
+      status: 503,
+      headers: {
+        ...suspendedHeaders,
+        "Content-Type": "text/html; charset=utf-8",
+      },
+    },
+  );
+}
 export async function proxy(request: NextRequest) {
+  if (!studioEnabled()) return suspended(request);
   const storageOrigin = new URL(supabaseConfig().url).origin;
   const directOrigin = storageOrigin.replace(
     /\.supabase\.co$/,
