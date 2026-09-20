@@ -81,6 +81,12 @@ effacée → `/acces-refuse`, page terminale (recharger la laisse en place), bou
 répond `email_not_confirmed` qu'après avoir vérifié le mot de passe, donc aucun oracle
 d'existence de compte (vérifié : mauvais mot de passe → `invalid_credentials`).
 
+**Recette complète** (même pile, Colors reconstruit) : desktop 66 verts / 1 ignoré / 0 rouge —
+les 35 parcours existants, la surface publique et les 13 scénarios ci-dessus — puis iPhone,
+Android et iPad **9/9**. Quatre défauts réels sont sortis de cette recette et sont corrigés dans
+la branche (double envoi = deux seaux ; **aucune déconnexion sur téléphone** ; service worker
+absent sur `127.0.0.1` ; e-mail non confirmé) : rapport `docs/audits/ELSATIA-COLORS-ACCES-COMPTE-PARTAGE-NUIT-2026-09-20.md` §E.
+
 Ce que ces résultats **ne prouvent pas** : que `julien@elsatia.fr` existe, ni ses droits,
 ni le mot de passe, ni l'état de Preview/Production. Voir §3.
 
