@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
 import { fixtures } from "./media-fixtures";
 test.use({ actionTimeout: 15000 });
 const password = "Studio-Montage-Local-398!";
@@ -618,4 +619,144 @@ test("Lot S2 suppression au clavier sur sélection périmée et édition conserv
       return JSON.stringify(r.body.active?.presentation?.overlays ?? []);
     })
     .toContain("Conservé à la sortie");
+});
+
+test("Lot I Brand Kit : enregistrement, refus d'emoji, préremplissage du style et logo de la marque", async ({
+  page,
+}) => {
+  test.setTimeout(300000);
+  page.on("dialog", (d) => void d.accept());
+  const a = await setup(page, "Chantier Marque", "chantier-pro", 3, 0);
+  await page.goto(`/brand-kit?workspace=${a.workspace}`);
+  await page.getByLabel("Nom de l’entreprise").fill("Dupont Bâtiment");
+  await page.getByLabel("Signature (texte de fin par défaut)").fill("Rénover avec soin");
+  await page.getByLabel("Téléphone").fill("+33 3 88 00 00 00");
+  await page.getByLabel("Site web").fill("dupont.example");
+  await page.getByLabel("Logo").selectOption({ index: 1 });
+  await page
+    .getByRole("button", { name: "Enregistrer l’identité de marque" })
+    .click();
+  await expect(page.locator("p.notice")).toContainText(
+    "Identité de marque enregistrée.",
+  );
+  // Emoji cannot be drawn by the bundled fonts: refused before any render fails.
+  await page.getByLabel("Nom de l’entreprise").fill("Plage 😀");
+  await page
+    .getByRole("button", { name: "Enregistrer l’identité de marque" })
+    .click();
+  await expect(page.locator("p.notice")).toContainText("pas d’emoji");
+  await page.goto(`/brand-kit?workspace=${a.workspace}`);
+  await expect(page.getByLabel("Nom de l’entreprise")).toHaveValue(
+    "Dupont Bâtiment",
+  );
+  // The style form is prefilled from the kit and offers the brand logo.
+  await page.goto(`/projects/${a.id}`);
+  await page
+    .getByRole("button", { name: "Changer de style", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Choisir Chantier Pro", exact: true })
+    .click();
+  await expect(page.getByLabel("Entreprise (facultatif)")).toHaveValue(
+    "Dupont Bâtiment",
+  );
+  await expect(page.getByLabel("Téléphone (facultatif)")).toHaveValue(
+    "+33 3 88 00 00 00",
+  );
+  await expect(page.getByLabel("Texte de fin")).toHaveValue("Rénover avec soin");
+  await expect(page.getByLabel("Logo", { exact: true })).toHaveValue(
+    "__brand__",
+  );
+  await page.getByRole("button", { name: "Régénérer le montage" }).click();
+  await expect
+    .poll(async () => {
+      const r = await request(page, `/api/timelines/${a.id}`);
+      return r.body.active?.presentation?.logo?.asset_id ?? "";
+    })
+    .toMatch(/^[0-9a-f-]{36}$/);
+  const active = (await montage(page, a.id)).active;
+  expect(JSON.stringify(active.presentation)).toContain("Dupont Bâtiment");
+});
+test("Lot J2 partage : lien public sans session, robots, lien invalide, révocation et refus tiers", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(900000);
+  const a = await setup(page, "Chantier Partage", "chantier-pro", 3, 0);
+  await render(page, a.id);
+  // The gate forces 540x960 previews: promote the finished job to a final export in the disposable DB only.
+  const state = JSON.parse(
+    await readFile(join(process.cwd(), ".local-test.json"), "utf8"),
+  );
+  execFileSync(
+    "docker",
+    [
+      "exec",
+      "-i",
+      `supabase_db_${state.projectId}`,
+      "psql",
+      "-XAt",
+      "-U",
+      "postgres",
+      "-c",
+      `update public.studio_render_jobs set profile='standard' where project_id='${a.id}'`,
+    ],
+    { timeout: 30000 },
+  );
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Créer un lien de partage (7 jours)" })
+    .first()
+    .click();
+  const link = await page.getByLabel("Lien de partage").inputValue();
+  expect(link).toMatch(/\/s\/[A-Za-z0-9_-]{43}$/);
+  const anonymous = await browser.newContext();
+  const visitor = await anonymous.newPage();
+  try {
+    await visitor.goto(link);
+    const video = visitor.getByLabel("Vidéo Chantier Partage");
+    await expect(video).toBeVisible();
+    await expect
+      .poll(() => video.evaluate((v: HTMLVideoElement) => v.readyState), {
+        timeout: 60000,
+      })
+      .toBeGreaterThanOrEqual(1);
+    await expect(visitor.locator('meta[name="robots"]')).toHaveAttribute(
+      "content",
+      /noindex/,
+    );
+    // Nothing about the tenant or the account is reachable from the public page.
+    expect(await visitor.content()).not.toContain(a.workspace);
+    await visitor.goto(`/s/${"a".repeat(43)}`);
+    await expect(
+      visitor.getByRole("heading", { name: "Lien indisponible" }),
+    ).toBeVisible();
+    await visitor.goto("/s/court");
+    await expect(
+      visitor.getByRole("heading", { name: "Lien indisponible" }),
+    ).toBeVisible();
+    // Another tenant cannot create or revoke links on this project.
+    const other = await browser.newPage();
+    const b = await user(other);
+    void b;
+    const denied = await request(other, `/api/renders/${a.id}`, {
+      action: "share",
+      output: randomUUID(),
+      days: 7,
+    });
+    expect([403, 404]).toContain(denied.status);
+    await other.close();
+    // Revocation is immediate for the public page.
+    await page
+      .getByRole("button", { name: "Révoquer ce lien" })
+      .first()
+      .click();
+    await expect(page.getByText("Lien révoqué")).toBeVisible();
+    await visitor.goto(link);
+    await expect(
+      visitor.getByRole("heading", { name: "Lien indisponible" }),
+    ).toBeVisible();
+  } finally {
+    await anonymous.close();
+  }
 });

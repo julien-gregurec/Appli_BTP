@@ -235,6 +235,22 @@ export type Database = {
         Args: { p_project: string };
         Returns: string;
       };
+      studio_create_render_share: {
+        Args: { p_output: string; p_token_hash: string; p_days: number };
+        Returns: string;
+      };
+      studio_revoke_render_share: {
+        Args: { p_share: string };
+        Returns: undefined;
+      };
+      studio_list_render_shares: {
+        Args: { p_project: string };
+        Returns: unknown;
+      };
+      studio_resolve_render_share: {
+        Args: { p_token_hash: string };
+        Returns: unknown;
+      };
       studio_workspace_usage: {
         Args: { p_workspace: string; p_since?: string };
         Returns: {

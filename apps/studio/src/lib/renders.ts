@@ -3,6 +3,7 @@ import { isStudioId } from "@elsatia/studio-domain";
 import { authorizeProject, MediaError } from "./media-service";
 import { renderRefusal } from "./render-refusal";
 import { downloadFileName } from "./render-labels";
+import { listRenderShares } from "./shares";
 
 const assetMissingMessage = renderRefusal({
   code: "22023",
@@ -37,7 +38,9 @@ export async function getStudioRenders(projectId: string) {
       })
     : null;
   if (active?.error) throw new MediaError("Montage indisponible.", 503);
+  const shares = await listRenderShares(projectId);
   return {
+    shares,
     active: active?.data
       ? {
           timeline: active.data.id,
