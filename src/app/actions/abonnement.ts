@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur } from "@/lib/permissions";
+import { peutGererAbonnementSuspendu } from "@/lib/acces-support-abonnement";
 import { PRODUCT_NAME } from "@/lib/brand";
 import { abonnementsPublicsOuverts, MESSAGE_OUVERTURE_PROCHAINE } from "@/lib/commercialisation-abonnements";
 import {
@@ -384,12 +385,9 @@ export async function ouvrirPortailAbonnementSuspenduAction() {
   if (!user) redirect("/login");
   const { data: profil } = await supabase.from("utilisateurs").select("entreprise_active_id").eq("id", user.id).maybeSingle();
   if (!profil?.entreprise_active_id) redirect("/onboarding");
-  const [{ data: support }, { data: appartenance }] = await Promise.all([
-    supabase.rpc("est_acces_support_actif", { p_entreprise_id: profil.entreprise_active_id }),
-    supabase.from("utilisateurs_entreprises").select("poste_id").eq("utilisateur_id", user.id).eq("entreprise_id", profil.entreprise_active_id).eq("statut", "actif").maybeSingle(),
-  ]);
-  const { data: permission } = appartenance?.poste_id ? await supabase.from("permissions_poste").select("autorise").eq("entreprise_id", profil.entreprise_active_id).eq("poste_id", appartenance.poste_id).eq("cle_permission", "gerer_parametres").eq("autorise", true).maybeSingle() : { data: null };
-  if (support !== true && !permission) redirect(`/abonnement-suspendu?error=${encodeURIComponent("Seul un administrateur peut gérer l’abonnement")}`);
+  if (!(await peutGererAbonnementSuspendu(supabase, user.id, profil.entreprise_active_id))) {
+    redirect(`/abonnement-suspendu?error=${encodeURIComponent("Seul un administrateur peut gérer l’abonnement")}`);
+  }
   const { data: entreprise } = await supabase.from("entreprises").select("stripe_customer_id").eq("id", profil.entreprise_active_id).maybeSingle();
   if (!entreprise?.stripe_customer_id) redirect(`/abonnement-suspendu?error=${encodeURIComponent(`Aucun abonnement Stripe n’est associé. Contactez ${PRODUCT_NAME}.`)}`);
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");

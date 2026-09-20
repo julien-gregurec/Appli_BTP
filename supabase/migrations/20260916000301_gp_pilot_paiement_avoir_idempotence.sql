@@ -72,6 +72,18 @@ $$;
 revoke all on function public.enregistrer_paiement_facture(uuid, uuid, numeric, date, text, text) from public, anon;
 grant execute on function public.enregistrer_paiement_facture(uuid, uuid, numeric, date, text, text) to authenticated;
 
+-- Le verrou ci-dessus ne sert à rien si `authenticated` peut toujours écrire
+-- directement dans `paiements` par PostgREST : 20260818000211 lui a accordé
+-- INSERT/UPDATE/DELETE sans restriction (seul un oubli de GRANT était corrigé
+-- à l'époque, pas une garde anti-doublon). On ferme uniquement INSERT — le
+-- seul verbe qui peut créer un encaissement en double — en le réservant à
+-- cette RPC (revoke all + grant execute juste au-dessus). SELECT/UPDATE/
+-- DELETE restent inchangés : supprimerPaiementAction (src/app/actions/
+-- factures.ts) continue de fonctionner tel quel, et rien d'autre ne dépendait
+-- d'un INSERT direct (grep confirmé : seul enregistrerPaiementAction écrivait
+-- dans cette table, désormais migré vers la RPC).
+revoke insert on table public.paiements from authenticated;
+
 -- ─────────────────────────────────────────────────────────────
 -- 2. AVOIR — verrou pris mais règle métier anti-doublon absente
 -- ─────────────────────────────────────────────────────────────
@@ -85,6 +97,14 @@ grant execute on function public.enregistrer_paiement_facture(uuid, uuid, numeri
 -- même pattern que chantiers_devis_source_id_unique (index unique partiel +
 -- pré-check applicatif + capture de unique_violation qui résout vers
 -- l'existant, jamais une erreur brute).
+--
+-- IMPORTANT : la dernière définition réelle de cette fonction est
+-- 20260818000215_avenants_v1_integration_facturation.sql (pas 20260818000211
+-- ci-dessus, qui ne concerne que la version pré-avenants) — elle plafonne
+-- acompte/finale sur `montant_contractuel_devis()` (montant_ht + avenants
+-- acceptés), pas sur `devis.montant_ht` seul. Reprise ici À L'IDENTIQUE, seul
+-- l'ajout ci-dessous (bloc avoir) est nouveau : recréer par erreur la version
+-- 211 aurait fait régresser l'anti-surfacturation d'un devis avec avenant.
 create unique index if not exists factures_avoir_unique_par_origine
   on public.factures(facture_origine_id)
   where type = 'avoir' and facture_origine_id is not null and statut <> 'annulee';
@@ -92,7 +112,8 @@ create unique index if not exists factures_avoir_unique_par_origine
 create or replace function public.creer_facture_avancee(
  p_entreprise_id uuid,p_devis_id uuid,p_type text,p_pourcentage numeric default 100,p_est_dgd boolean default false,p_facture_origine_id uuid default null
 ) returns uuid language plpgsql security definer set search_path=public as $$
-declare v_d public.devis;v_id uuid;v_facteur numeric;v_signe numeric:=1;v_deja_facture numeric;v_montant_nouveau numeric;v_avoir_existant uuid;
+declare
+  v_d public.devis;v_id uuid;v_facteur numeric;v_signe numeric:=1;v_deja_facture numeric;v_montant_nouveau numeric;v_montant_contractuel numeric;v_avoir_existant uuid;
 begin
  if not public.a_permission(p_entreprise_id,'gerer_facturation_avancee') then raise exception 'Accès refusé';end if;
  if p_type not in('acompte','avoir','finale') then raise exception 'Type de facture invalide';end if;
@@ -115,11 +136,12 @@ begin
    end if;
  end if;
  if p_type<>'avoir' then
+   v_montant_contractuel := public.montant_contractuel_devis(p_entreprise_id, p_devis_id);
    v_deja_facture:=public.montant_facture_devis(p_entreprise_id,p_devis_id);
    v_montant_nouveau:=v_d.montant_ht*v_facteur;
-   if v_deja_facture+v_montant_nouveau>v_d.montant_ht+0.01 then
-     raise exception 'Ce document (%) dépasserait le montant du devis : déjà facturé %, devis %',
-       to_char(v_montant_nouveau,'FM999999990.00'),to_char(v_deja_facture,'FM999999990.00'),to_char(v_d.montant_ht,'FM999999990.00');
+   if v_deja_facture+v_montant_nouveau>v_montant_contractuel+0.01 then
+     raise exception 'Ce document (%) dépasserait le montant contractuel du devis (avenants compris) : déjà facturé %, montant contractuel %',
+       to_char(v_montant_nouveau,'FM999999990.00'),to_char(v_deja_facture,'FM999999990.00'),to_char(v_montant_contractuel,'FM999999990.00');
    end if;
  end if;
  insert into public.factures(entreprise_id,client_id,chantier_id,devis_origine_id,type,statut,avancement_pct,est_dgd,notes_client,facture_origine_id)
