@@ -208,7 +208,7 @@ test("suppression refusée pour un propriétaire d'espace partagé, sans rien su
   const ws = await owner.client.rpc("studio_create_workspace", { p_name: "Espace partagé", p_type: "professional" });
   expect(ws.error).toBeNull();
   const member = await account("del-member");
-  const added = await owner.client.rpc("studio_set_member_role", {
+  const added = await owner.client.rpc("studio_set_member", {
     p_workspace_id: ws.data as string,
     p_user_id: member.id,
     p_role: "editor",
