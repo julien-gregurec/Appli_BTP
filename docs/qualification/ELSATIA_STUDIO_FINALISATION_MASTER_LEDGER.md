@@ -115,19 +115,19 @@ Méthode : 28 capacités critiques ; QUALIFIED = 1, WORKING-UNQUALIFIED/PARTIAL 
 
 **Score initial : 12,5 / 28 = 44,6 %. Score fin de nuit 1 : 20 / 28 = 71,4 %. Score après reprise V2 : 23 / 28 = 82,1 %.**
 
-## QUEUE
+## QUEUE (mis à jour à la reprise V2, HEAD `6d9d6f51`)
 
 | Statut | Lots |
 |---|---|
-| ACTIVE | (aucun : fin de nuit) |
-| READY | M musique · K RGPD technique (suppression de compte, export) · sandbox de décodage · WebKit/mobile E2E · acceptation pleine taille si non jouée · invitation par e-mail |
-| WAITING_EXTERNAL | Auth/Supabase distants (D-22), iPhone réel, HEIC/HEVC réels, restauration DB+objets |
-| WAITING_JULIEN | Q-001 … Q-010 (sous-périmètres seulement) |
-| QUALIFIED | A–H, S1, S2, S4, J1, I, J2 |
-| INTEGRATED | S1, S2, S3, S4, J1, I, J2, S5 dans le train local |
-| DEFERRED_POST_V1 | rotation/opacité/scale, calques, snap/zoom timeline, copier-coller, multi-sélection, split, couleurs et réseaux de marque, transfert de propriété, restauration d'un espace archivé, multilingue, intégrations GP/Tools/Colors/Réserves |
+| ACTIVE | (aucun) |
+| READY | sandbox de décodage · observabilité avec alertes · export RGPD des données · E2E du mode d'inscription fermé · dérivée stockée des miniatures |
+| WAITING_EXTERNAL | fichiers réels (recette sources réelles, prête) · autorisation de créer STUDIO PREVIEW · relecture juridique · fournisseur d'e-mail · iPhone/WebKit · HEIC/HEVC réels + licence · émetteur de jeton plateforme |
+| WAITING_JULIEN | voir « blocages » du rapport V2 (section 14) |
+| QUALIFIED | A–H, S1–S5, J1, I, J2, **M musique, invitations, suppression de compte, projet dédié (Fresh + Upgrade)** |
+| INTEGRATED | tous les lots ci-dessus dans le train local |
+| DEFERRED_POST_V1 | rotation/opacité/scale, calques, snap/zoom timeline, copier-coller, multi-sélection, split, couleurs et réseaux de marque, transfert de propriété, restauration d'un espace archivé, multilingue, dérivée filigranée par lien |
 
-### SPEC M — musique importée (non implémentée)
+### SPEC M — musique importée (IMPLÉMENTÉE à la reprise V2, voir rapport V2 §3)
 1. Storage : autoriser `audio/mpeg`, `audio/mp4`, `audio/wav` dans le bucket `studio-originals` et dans `studio_reserve_media` (nouveau type `audio`, plafond de taille) ; inspection ffprobe côté web (durée, codec) ; jamais publié.
 2. Modèle : `presentation.music = {asset_id, volume, fade_in_ms, fade_out_ms}` validé en domaine et dans `studio_validate_presentation` (fonction à remplacer) ; asset audio « ready » du projet.
 3. Éditeur : sélecteur de piste, volume, fondus ; prévisualisation approximative.
@@ -165,9 +165,11 @@ Première moitié de la nuit : mesures invalides (machine saturée, charge 20–
 
 ## PREVIEW / PRODUCTION READINESS
 
-**Preview : NON** (checklists : `ELSATIA_STUDIO_PREVIEW_PRODUCTION_CHECKLISTS.md`). **Production : NON.** Bloquants : Q-004, Q-002/Q-008, Q-001, Auth distant, purge planifiée, worker hors Vercel, iPhone réel, restauration.
+**Preview fermée : prête à préparer, NON exécutée** (aucun projet distant créé ; autorisation requise). **Production : NON.** Détail : `ELSATIA_STUDIO_FINALISATION_REPORT_V2.md` §14 et §16 ; runbook : `ELSATIA_STUDIO_SUPABASE_DEDICATED_RUNBOOK.md` ; checklists : `ELSATIA_STUDIO_PREVIEW_PRODUCTION_CHECKLISTS.md`.
 
 ## QUESTIONS POUR JULIEN — DEMAIN MATIN
+
+> **Reprise V2 : Q-001 → Q-011 sont TRANCHÉES par Julien (2026-09-20) et appliquées** (voir rapport V2). Le texte ci-dessous est conservé comme historique. Nouveaux blocages : rapport V2 §14.
 
 Format : ID · SUJET · CONTEXTE · A · B · RECOMMANDATION · CONSÉQUENCE · BLOQUE · NE BLOQUE PAS.
 
