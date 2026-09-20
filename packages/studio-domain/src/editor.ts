@@ -307,6 +307,15 @@ export function editorStep(
     future: [],
   };
 }
+/** Replaces the present without a new undo step (merged typing or slider ticks). */
+export function editorCoalesce(
+  state: EditorHistory,
+  next: TimelineDocument,
+): EditorHistory {
+  if (editorFingerprint(state.present) === editorFingerprint(next))
+    return state;
+  return { present: next, past: state.past, future: [] };
+}
 export function editorUndo(state: EditorHistory): EditorHistory {
   const present = state.past.at(-1);
   return present

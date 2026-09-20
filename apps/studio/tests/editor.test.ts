@@ -6,11 +6,16 @@ import {
   editorStep,
   editorUndo,
   editorRedo,
+  editorCoalesce,
   editorFingerprint,
   parseEditorDraft,
   type TimelineDocument,
 } from "@elsatia/studio-domain";
-import { EditorAutosave, EditorSaveError } from "../src/lib/editor-autosave";
+import {
+  EditorAutosave,
+  EditorSaveError,
+  saveFailureMessage,
+} from "../src/lib/editor-autosave";
 const id = (n: number) =>
   `54000000-0000-0000-0000-${String(n).padStart(12, "0")}`;
 const assets = [
@@ -400,4 +405,130 @@ it("text editing preserves layer order and supports hide/show without losing con
       assets,
     ),
   ).toThrow();
+});
+
+describe("Lot S2 editor resilience", () => {
+  it("coalesces merged edits into a single undo step", () => {
+    const d = document();
+    const a = applyEditorCommand(
+        d,
+        { type: "volume", id: d.clips[1].id, value: 0.5 },
+        assets,
+      ),
+      b = applyEditorCommand(
+        d,
+        { type: "volume", id: d.clips[1].id, value: 0.25 },
+        assets,
+      );
+    let h = editorStep(editorHistory(d), a);
+    h = editorCoalesce(h, b);
+    expect(h.past).toHaveLength(1);
+    expect(h.present.clips[1].volume).toBe(0.25);
+    expect(editorUndo(h).present).toEqual(d);
+    expect(editorCoalesce(h, b)).toBe(h);
+  });
+  it("flushes unsaved edits once when the editor is closed", async () => {
+    vi.useFakeTimers();
+    const d = document(),
+      a = applyEditorCommand(d, { type: "remove", id: d.clips[0].id }, assets),
+      write = vi.fn(async (doc: TimelineDocument) => ({ ...doc, revision: 2 })),
+      notify = vi.fn(),
+      s = new EditorAutosave(d, write, notify);
+    s.update(a);
+    s.dispose();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(write.mock.calls[0][0]).toEqual(a);
+    const calls = notify.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(notify.mock.calls.length).toBe(calls);
+  });
+  it("sends edits made while a save is in flight when closing", async () => {
+    vi.useFakeTimers();
+    const d = document();
+    let resolve!: (doc: TimelineDocument) => void;
+    const first = applyEditorCommand(
+        d,
+        { type: "volume", id: d.clips[1].id, value: 0.5 },
+        assets,
+      ),
+      last = applyEditorCommand(
+        d,
+        { type: "volume", id: d.clips[1].id, value: 0.25 },
+        assets,
+      ),
+      write = vi
+        .fn()
+        .mockImplementationOnce(
+          () =>
+            new Promise<TimelineDocument>((r) => {
+              resolve = r;
+            }),
+        )
+        .mockImplementation(async (doc: TimelineDocument) => ({
+          ...doc,
+          revision: 3,
+        })),
+      s = new EditorAutosave(d, write, vi.fn());
+    s.update(first);
+    await vi.advanceTimersByTimeAsync(600);
+    s.update(last);
+    s.dispose();
+    expect(write).toHaveBeenCalledTimes(1);
+    resolve({ ...first, revision: 2 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(write).toHaveBeenCalledTimes(2);
+    expect(write.mock.calls[1][0].clips[1].volume).toBe(0.25);
+    expect(write.mock.calls[1][1]).toBe(2);
+  });
+  it("recovers by itself from a transient failure with backoff", async () => {
+    vi.useFakeTimers();
+    const d = document(),
+      a = applyEditorCommand(d, { type: "remove", id: d.clips[0].id }, assets),
+      write = vi
+        .fn()
+        .mockRejectedValueOnce(new EditorSaveError("boom", 503))
+        .mockRejectedValueOnce(new TypeError("fetch failed"))
+        .mockResolvedValue({ ...a, revision: 2 }),
+      s = new EditorAutosave(d, write, vi.fn());
+    s.update(a);
+    await vi.advanceTimersByTimeAsync(600);
+    expect(s.status).toBe("error");
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(write).toHaveBeenCalledTimes(2);
+    expect(s.status).toBe("error");
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(write).toHaveBeenCalledTimes(3);
+    expect(s.status).toBe("saved");
+    s.dispose();
+  });
+  it.each([400, 401, 403, 404])(
+    "does not retry a %i and gives a specific message",
+    async (status) => {
+      vi.useFakeTimers();
+      const d = document(),
+        write = vi.fn().mockRejectedValue(new EditorSaveError("refus", status)),
+        notify = vi.fn(),
+        s = new EditorAutosave(d, write, notify);
+      s.update(
+        applyEditorCommand(d, { type: "remove", id: d.clips[0].id }, assets),
+      );
+      await vi.advanceTimersByTimeAsync(600);
+      await vi.advanceTimersByTimeAsync(120000);
+      expect(write).toHaveBeenCalledTimes(1);
+      expect(s.status).toBe("error");
+      expect(saveFailureMessage(new EditorSaveError("refus", status)).retryable).toBe(
+        false,
+      );
+      s.dispose();
+    },
+  );
+  it("classifies failures", () => {
+    expect(saveFailureMessage(new TypeError("fetch failed")).retryable).toBe(true);
+    expect(saveFailureMessage(new EditorSaveError("x", 500)).retryable).toBe(true);
+    expect(saveFailureMessage(new EditorSaveError("x", 429)).retryable).toBe(true);
+    expect(saveFailureMessage(new EditorSaveError("x", 401)).message).toMatch(/session/);
+    expect(saveFailureMessage(new EditorSaveError("x", 403)).message).toMatch(/droit/);
+  });
 });

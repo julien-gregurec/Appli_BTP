@@ -580,3 +580,42 @@ test("Lot G 10 100 500 clips : DOM borné sélection et déplacement", async ({
     fullPage: true,
   });
 });
+test("Lot S2 suppression au clavier sur sélection périmée et édition conservée à la navigation", async ({
+  page,
+}) => {
+  test.setTimeout(300000);
+  page.on("dialog", (d) => void d.accept());
+  const a = await setup(page, "Chantier S2", "chantier-pro", 3, 0);
+  const count = async () => (await montage(page, a.id)).active.clips.length;
+  const before = await count();
+  await page
+    .getByRole("button", { name: "Retirer du montage", exact: true })
+    .click();
+  await saved(page);
+  expect(await count()).toBe(before - 1);
+  // The removed clip was selected: Delete must neither crash the page nor lose the history.
+  await page.locator("body").click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press("Delete");
+  await expect(
+    page.getByRole("heading", { name: "Chantier S2", exact: true }),
+  ).toBeVisible();
+  await saved(page);
+  expect(await count()).toBeLessThanOrEqual(before - 1);
+  await page
+    .getByRole("button", { name: "Annuler la modification", exact: true })
+    .click();
+  await saved(page);
+  // An edit made in the last debounce window survives a hard navigation.
+  await page
+    .getByLabel("Contenu du texte", { exact: true })
+    .first()
+    .fill("Conservé à la sortie");
+  await page.goto("/dashboard");
+  await expect(page).toHaveURL(/dashboard/);
+  await expect
+    .poll(async () => {
+      const r = await request(page, `/api/timelines/${a.id}`);
+      return JSON.stringify(r.body.active?.presentation?.overlays ?? []);
+    })
+    .toContain("Conservé à la sortie");
+});
