@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Marque } from "@/components/Marque";
 import { connexionAction } from "@/app/actions";
 import { createClient } from "@/lib/supabase/server";
+import { cheminInterneSur } from "@/lib/redirection-sure";
 
 export const metadata: Metadata = { title: "Connexion" };
 
@@ -18,7 +19,7 @@ export default async function PageConnexion({
 
   const erreur = typeof params.error === "string" ? params.error : null;
   const message = typeof params.message === "string" ? params.message : null;
-  const suivant = typeof params.next === "string" ? params.next : "/dashboard";
+  const suivant = cheminInterneSur(params.next);
 
   return (
     <div className="page-publique">

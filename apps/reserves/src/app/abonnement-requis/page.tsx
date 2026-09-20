@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Marque } from "@/components/Marque";
+import { deconnexionAction } from "@/app/actions";
 
 /**
  * Rendu dynamique EXIGÉ par la politique de contenu.
@@ -35,7 +35,8 @@ export default function PageAbonnementRequis() {
           qui vous sont attribuées.
         </p>
         <div className="actions">
-          <Link className="bouton secondaire" href="/login">Retour à la connexion</Link>
+          {/* /login renvoie une session valide vers /dashboard, donc ici : seule une déconnexion est une sortie. */}
+          <form action={deconnexionAction}><button className="bouton secondaire" type="submit">Se déconnecter</button></form>
         </div>
       </div>
     </div>

@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cheminInterneSur } from "@/lib/redirection-sure";
 import { createClient } from "@/lib/supabase/server";
 import {
   MIMES_PHOTO, MIMES_PLAN, TAILLE_MAX_PHOTO, TAILLE_MAX_PLAN,
@@ -44,8 +45,13 @@ function texteOuNull(formData: FormData, cle: string) {
   return valeur === "" ? null : valeur;
 }
 
+/**
+ * Destination interne sûre. `startsWith("/") && !startsWith("//")` laissait passer
+ * `/\\hôte` : l'analyseur d'URL WHATWG normalise `\` en `/`, donc une origine
+ * externe. Le validateur est celui de Colors et de Gestion Pro (`redirection-sure.ts`).
+ */
 function cheminSur(valeur: string, defaut: string) {
-  return valeur.startsWith("/") && !valeur.startsWith("//") ? valeur : defaut;
+  return cheminInterneSur(valeur, defaut);
 }
 
 export async function connexionAction(formData: FormData) {

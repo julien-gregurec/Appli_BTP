@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextRequest, NextResponse } from "next/server";
 import { construireCsp, entetesSecurite } from "@/lib/securite/entetes";
+import { clePubliqueSupabase } from "@/lib/supabase/cles";
 
 /**
  * Proxy de Réserves (l'ancien « middleware » de Next 15).
@@ -34,7 +35,7 @@ export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request: requete });
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    clePubliqueSupabase(),
     {
       cookies: {
         getAll: () => requete.cookies.getAll(),
