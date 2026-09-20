@@ -203,15 +203,21 @@ try {
   ) {
     const label = individual ? "individual" : `run-${iteration}`;
     owned = true; // local-test records ownership before starting Docker; failed setup can still be cleaned.
+    // Historical A-H gates run on the Lot H baseline; post-H lots are then upgraded on top of it.
     await run(
       process.execPath,
-      ["scripts/local-test.mjs", "setup"],
+      ["scripts/local-test.mjs", "setup", "--lot-h"],
       `${label}-setup`,
     );
     await run(
       process.execPath,
       ["scripts/analysis-migration-check.mjs"],
       `${label}-migration-check`,
+    );
+    await run(
+      process.execPath,
+      ["scripts/post-h-migration-check.mjs"],
+      `${label}-post-h-migration-check`,
     );
     await run(
       process.execPath,
