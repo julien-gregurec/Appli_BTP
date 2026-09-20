@@ -38,11 +38,19 @@ export default async function DocumentsChantierPage({
   ]);
   if (!chantier) notFound();
 
-  const avecUrls = await Promise.all((documents ?? []).map(async (document) => {
-    if (!document.mime_type.startsWith("image/")) return { ...document, previewUrl: null };
-    const { data } = await supabase.storage.from("chantier-documents")
-      .createSignedUrl(document.storage_path, 900);
-    return { ...document, previewUrl: data?.signedUrl ?? null };
+  // Performance : un appel Storage par document (N+1) devenait notable avec
+  // plusieurs centaines de photos sur un même chantier — createSignedUrls
+  // (pluriel) fait tous les documents images en un seul aller-retour réseau.
+  const cheminsImages = (documents ?? [])
+    .filter((document) => document.mime_type.startsWith("image/"))
+    .map((document) => document.storage_path);
+  const { data: signedUrls } = cheminsImages.length
+    ? await supabase.storage.from("chantier-documents").createSignedUrls(cheminsImages, 900)
+    : { data: [] as { path: string | null; signedUrl: string | null }[] };
+  const urlParChemin = new Map((signedUrls ?? []).map((entry) => [entry.path, entry.signedUrl]));
+  const avecUrls = (documents ?? []).map((document) => ({
+    ...document,
+    previewUrl: document.mime_type.startsWith("image/") ? urlParChemin.get(document.storage_path) ?? null : null,
   }));
   const ajouter = ajouterDocumentChantierAction.bind(null, id);
 
