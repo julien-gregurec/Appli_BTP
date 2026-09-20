@@ -1,73 +1,132 @@
 == Cas ==
-label | app | attendu | obtenu | a_acces_application | verdict | exposition | note
-(aucun jeton) | colors | non_authentifie | non_authentifie | f | PASS | aucun nom (non-membre) | non connecté
-c1-auth-seul | colors | sans_organisation | sans_organisation | f | PASS | aucun nom (non-membre) | pas d'organisation
-c1-auth-seul | gestion_pro | sans_organisation | sans_organisation | f | PASS | aucun nom (non-membre) | pas d'organisation
-c1-auth-seul | reserves | sans_organisation | sans_organisation | f | PASS | aucun nom (non-membre) | pas d'organisation
-c1-auth-seul | tools | sans_organisation | sans_organisation | f | PASS | aucun nom (non-membre) | pas d'organisation
-c10-habilitation-retiree | colors | sans_role | sans_role | f | PASS | nom exposé (membre) | habilitation retirée (autorise=false)
-c10-habilitation-retiree | gestion_pro | sans_role | sans_role | f | PASS | nom exposé (membre) | habilitation retirée (autorise=false)
-c10-habilitation-retiree | reserves | sans_role | sans_role | f | PASS | nom exposé (membre) | habilitation retirée (autorise=false)
-c10-habilitation-retiree | tools | sans_role | sans_role | f | PASS | nom exposé (membre) | habilitation retirée (autorise=false)
-c11-droit-org-expire | colors | application_non_incluse | application_non_incluse | f | PASS | nom exposé (membre) | droit d'usage expiré (hors essai)
-c11-droit-org-expire | gestion_pro | application_non_incluse | application_non_incluse | f | PASS | nom exposé (membre) | droit d'usage expiré (hors essai)
-c11-droit-org-expire | reserves | application_non_incluse | application_non_incluse | f | PASS | nom exposé (membre) | droit d'usage expiré (hors essai)
-c11-droit-org-expire | tools | application_non_incluse | application_non_incluse | f | PASS | nom exposé (membre) | droit d'usage expiré (hors essai)
-c12-admin-plateforme-actif | colors | autorise | autorise | t | PASS | aucun nom (non-membre) | administrateur plateforme actif
-c12-admin-plateforme-actif | gestion_pro | autorise | autorise | t | PASS | aucun nom (non-membre) | administrateur plateforme actif
-c12-admin-plateforme-actif | reserves | autorise | autorise | t | PASS | aucun nom (non-membre) | administrateur plateforme actif
-c12-admin-plateforme-actif | tools | autorise | autorise | t | PASS | aucun nom (non-membre) | administrateur plateforme actif
-c13-admin-plateforme-en-attente(julien) | colors | sans_organisation | sans_organisation | f | PASS | aucun nom (non-membre) | Julien tel que documenté : en_attente, non actif
-c13-admin-plateforme-en-attente(julien) | gestion_pro | sans_organisation | sans_organisation | f | PASS | aucun nom (non-membre) | Julien tel que documenté : en_attente, non actif
-c13-admin-plateforme-en-attente(julien) | reserves | sans_organisation | sans_organisation | f | PASS | aucun nom (non-membre) | Julien tel que documenté : en_attente, non actif
-c13-admin-plateforme-en-attente(julien) | tools | sans_organisation | sans_organisation | f | PASS | aucun nom (non-membre) | Julien tel que documenté : en_attente, non actif
-c1b-sans-profil-gp | colors | sans_organisation | sans_organisation | f | PASS | aucun nom (non-membre) | compte Auth sans ligne utilisateurs
-c1b-sans-profil-gp | gestion_pro | sans_organisation | sans_organisation | f | PASS | aucun nom (non-membre) | compte Auth sans ligne utilisateurs
-c1b-sans-profil-gp | reserves | sans_organisation | sans_organisation | f | PASS | aucun nom (non-membre) | compte Auth sans ligne utilisateurs
-c1b-sans-profil-gp | tools | sans_organisation | sans_organisation | f | PASS | aucun nom (non-membre) | compte Auth sans ligne utilisateurs
-c3-membre-sans-droit-org | colors | application_non_incluse | application_non_incluse | f | PASS | nom exposé (membre) | pas d'entitlement (aucun droit d'usage)
-c3-membre-sans-droit-org | gestion_pro | application_non_incluse | application_non_incluse | f | PASS | nom exposé (membre) | pas d'entitlement (aucun droit d'usage)
-c3-membre-sans-droit-org | reserves | application_non_incluse | application_non_incluse | f | PASS | nom exposé (membre) | pas d'entitlement (aucun droit d'usage)
-c3-membre-sans-droit-org | tools | application_non_incluse | application_non_incluse | f | PASS | nom exposé (membre) | pas d'entitlement (aucun droit d'usage)
-c4-droit-org-sans-role | colors | sans_habilitation | sans_habilitation | f | PASS | nom exposé (membre) | pas de rôle : aucune habilitation
-c4-droit-org-sans-role | gestion_pro | sans_habilitation | sans_habilitation | f | PASS | nom exposé (membre) | pas de rôle : aucune habilitation
-c4-droit-org-sans-role | reserves | sans_habilitation | sans_habilitation | f | PASS | nom exposé (membre) | pas de rôle : aucune habilitation
-c4-droit-org-sans-role | tools | sans_habilitation | sans_habilitation | f | PASS | nom exposé (membre) | pas de rôle : aucune habilitation
-c5-role-sans-droit-org | colors | application_non_incluse | application_non_incluse | f | PASS | nom exposé (membre) | rôle sans entitlement
-c5-role-sans-droit-org | gestion_pro | application_non_incluse | application_non_incluse | f | PASS | nom exposé (membre) | rôle sans entitlement
-c5-role-sans-droit-org | reserves | application_non_incluse | application_non_incluse | f | PASS | nom exposé (membre) | rôle sans entitlement
-c5-role-sans-droit-org | tools | application_non_incluse | application_non_incluse | f | PASS | nom exposé (membre) | rôle sans entitlement
-c6-acces-complet | application_qui_nexiste_pas | erreur_configuration | erreur_configuration | f | PASS | aucun nom (membre) | application inconnue (échec fermé, aucun nom)
-c6-acces-complet | colors | autorise | autorise | t | PASS | nom exposé (membre) | accès complet
-c6-acces-complet | gestion_pro | autorise | autorise | t | PASS | nom exposé (membre) | accès complet
-c6-acces-complet | reserves | autorise | autorise | t | PASS | nom exposé (membre) | accès complet
-c6-acces-complet | tools | autorise | autorise | t | PASS | nom exposé (membre) | accès complet
-c7-entreprise-suspendue | colors | abonnement_suspendu | abonnement_suspendu | f | PASS | nom exposé (membre) | suspendu
-c7-entreprise-suspendue | gestion_pro | abonnement_suspendu | abonnement_suspendu | f | PASS | nom exposé (membre) | suspendu
-c7-entreprise-suspendue | reserves | abonnement_suspendu | abonnement_suspendu | f | PASS | nom exposé (membre) | suspendu
-c7-entreprise-suspendue | tools | abonnement_suspendu | abonnement_suspendu | f | PASS | nom exposé (membre) | suspendu
-c8-desactive | colors | utilisateur_desactive | utilisateur_desactive | f | PASS | nom exposé (membre) | désactivé
-c8-desactive | gestion_pro | utilisateur_desactive | utilisateur_desactive | f | PASS | nom exposé (membre) | désactivé
-c8-desactive | reserves | utilisateur_desactive | utilisateur_desactive | f | PASS | nom exposé (membre) | désactivé
-c8-desactive | tools | utilisateur_desactive | utilisateur_desactive | f | PASS | nom exposé (membre) | désactivé
-c9-invite-en-attente | colors | invitation_en_attente | invitation_en_attente | f | PASS | nom exposé (membre) | invitation en attente
-c9-invite-en-attente | gestion_pro | invitation_en_attente | invitation_en_attente | f | PASS | nom exposé (membre) | invitation en attente
-c9-invite-en-attente | reserves | invitation_en_attente | invitation_en_attente | f | PASS | nom exposé (membre) | invitation en attente
-c9-invite-en-attente | tools | invitation_en_attente | invitation_en_attente | f | PASS | nom exposé (membre) | invitation en attente
-x1-entreprise-annulee | colors | entreprise_inactive | entreprise_inactive | f | PASS | nom exposé (membre) | entreprise annulée
-x2-droit-essai-expire | colors | essai_expire | essai_expire | f | PASS | nom exposé (membre) | droit d'usage issu d'un essai, expiré
-x3-validation-en-attente | colors | validation_en_attente | validation_en_attente | f | PASS | nom exposé (membre) | rejoint par code, validation admin en attente
-x4-suspension-prevue-echue | colors | abonnement_suspendu | abonnement_suspendu | f | PASS | nom exposé (membre) | suspension prévue échue
-x5-habilitation-hors-fenetre | colors | sans_role | sans_role | f | PASS | nom exposé (membre) | habilitation hors fenêtre de validité
-(59 rows)
+label|app|attendu|obtenu|a_acces_application|verdict|exposition|note
+(aucun jeton)|colors|non_authentifie|non_authentifie|f|PASS|aucun nom (non-membre)|non connecté
+c1-auth-seul|colors|sans_organisation|sans_organisation|f|PASS|aucun nom (non-membre)|pas d'organisation
+c1-auth-seul|gestion_pro|sans_organisation|sans_organisation|f|PASS|aucun nom (non-membre)|pas d'organisation
+c1-auth-seul|reserves|sans_organisation|sans_organisation|f|PASS|aucun nom (non-membre)|pas d'organisation
+c1-auth-seul|tools|sans_organisation|sans_organisation|f|PASS|aucun nom (non-membre)|pas d'organisation
+c10-habilitation-retiree|colors|sans_role|sans_role|f|PASS|nom exposé (membre)|habilitation retirée (autorise=false)
+c10-habilitation-retiree|gestion_pro|sans_role|sans_role|f|PASS|nom exposé (membre)|habilitation retirée (autorise=false)
+c10-habilitation-retiree|reserves|sans_role|sans_role|f|PASS|nom exposé (membre)|habilitation retirée (autorise=false)
+c10-habilitation-retiree|tools|sans_role|sans_role|f|PASS|nom exposé (membre)|habilitation retirée (autorise=false)
+c11-droit-org-expire|colors|application_non_incluse|application_non_incluse|f|PASS|nom exposé (membre)|droit d'usage expiré (hors essai)
+c11-droit-org-expire|gestion_pro|application_non_incluse|application_non_incluse|f|PASS|nom exposé (membre)|droit d'usage expiré (hors essai)
+c11-droit-org-expire|reserves|application_non_incluse|application_non_incluse|f|PASS|nom exposé (membre)|droit d'usage expiré (hors essai)
+c11-droit-org-expire|tools|application_non_incluse|application_non_incluse|f|PASS|nom exposé (membre)|droit d'usage expiré (hors essai)
+c12-admin-plateforme-actif|colors|autorise|autorise|t|PASS|aucun nom (non-membre)|administrateur plateforme actif
+c12-admin-plateforme-actif|gestion_pro|autorise|autorise|t|PASS|aucun nom (non-membre)|administrateur plateforme actif
+c12-admin-plateforme-actif|reserves|autorise|autorise|t|PASS|aucun nom (non-membre)|administrateur plateforme actif
+c12-admin-plateforme-actif|tools|autorise|autorise|t|PASS|aucun nom (non-membre)|administrateur plateforme actif
+c13-admin-plateforme-en-attente(julien)|colors|sans_organisation|sans_organisation|f|PASS|aucun nom (non-membre)|Julien tel que documenté : en_attente, non actif
+c13-admin-plateforme-en-attente(julien)|gestion_pro|sans_organisation|sans_organisation|f|PASS|aucun nom (non-membre)|Julien tel que documenté : en_attente, non actif
+c13-admin-plateforme-en-attente(julien)|reserves|sans_organisation|sans_organisation|f|PASS|aucun nom (non-membre)|Julien tel que documenté : en_attente, non actif
+c13-admin-plateforme-en-attente(julien)|tools|sans_organisation|sans_organisation|f|PASS|aucun nom (non-membre)|Julien tel que documenté : en_attente, non actif
+c1b-sans-profil-gp|colors|sans_organisation|sans_organisation|f|PASS|aucun nom (non-membre)|compte Auth sans ligne utilisateurs
+c1b-sans-profil-gp|gestion_pro|sans_organisation|sans_organisation|f|PASS|aucun nom (non-membre)|compte Auth sans ligne utilisateurs
+c1b-sans-profil-gp|reserves|sans_organisation|sans_organisation|f|PASS|aucun nom (non-membre)|compte Auth sans ligne utilisateurs
+c1b-sans-profil-gp|tools|sans_organisation|sans_organisation|f|PASS|aucun nom (non-membre)|compte Auth sans ligne utilisateurs
+c3-membre-sans-droit-org|colors|application_non_incluse|application_non_incluse|f|PASS|nom exposé (membre)|pas d'entitlement (aucun droit d'usage)
+c3-membre-sans-droit-org|gestion_pro|application_non_incluse|application_non_incluse|f|PASS|nom exposé (membre)|pas d'entitlement (aucun droit d'usage)
+c3-membre-sans-droit-org|reserves|application_non_incluse|application_non_incluse|f|PASS|nom exposé (membre)|pas d'entitlement (aucun droit d'usage)
+c3-membre-sans-droit-org|tools|application_non_incluse|application_non_incluse|f|PASS|nom exposé (membre)|pas d'entitlement (aucun droit d'usage)
+c4-droit-org-sans-role|colors|sans_habilitation|sans_habilitation|f|PASS|nom exposé (membre)|pas de rôle : aucune habilitation
+c4-droit-org-sans-role|gestion_pro|sans_habilitation|sans_habilitation|f|PASS|nom exposé (membre)|pas de rôle : aucune habilitation
+c4-droit-org-sans-role|reserves|sans_habilitation|sans_habilitation|f|PASS|nom exposé (membre)|pas de rôle : aucune habilitation
+c4-droit-org-sans-role|tools|sans_habilitation|sans_habilitation|f|PASS|nom exposé (membre)|pas de rôle : aucune habilitation
+c5-role-sans-droit-org|colors|application_non_incluse|application_non_incluse|f|PASS|nom exposé (membre)|rôle sans entitlement
+c5-role-sans-droit-org|gestion_pro|application_non_incluse|application_non_incluse|f|PASS|nom exposé (membre)|rôle sans entitlement
+c5-role-sans-droit-org|reserves|application_non_incluse|application_non_incluse|f|PASS|nom exposé (membre)|rôle sans entitlement
+c5-role-sans-droit-org|tools|application_non_incluse|application_non_incluse|f|PASS|nom exposé (membre)|rôle sans entitlement
+c6-acces-complet|application_qui_nexiste_pas|erreur_configuration|erreur_configuration|f|PASS|aucun nom (membre)|application inconnue (échec fermé, aucun nom)
+c6-acces-complet|colors|autorise|autorise|t|PASS|nom exposé (membre)|accès complet
+c6-acces-complet|gestion_pro|autorise|autorise|t|PASS|nom exposé (membre)|accès complet
+c6-acces-complet|reserves|autorise|autorise|t|PASS|nom exposé (membre)|accès complet
+c6-acces-complet|tools|autorise|autorise|t|PASS|nom exposé (membre)|accès complet
+c7-entreprise-suspendue|colors|autorise|autorise|t|PASS|nom exposé (membre)|D3 : abonnement GP suspendu ne coupe pas Colors
+c7-entreprise-suspendue|gestion_pro|abonnement_suspendu|abonnement_suspendu|f|PASS|nom exposé (membre)|abonnement GP suspendu : GP refusé
+c7-entreprise-suspendue|reserves|autorise|autorise|t|PASS|nom exposé (membre)|D3 : abonnement GP suspendu ne coupe pas Réserves
+c7-entreprise-suspendue|tools|autorise|autorise|t|PASS|nom exposé (membre)|D3 : abonnement GP suspendu ne coupe pas Tools
+c8-desactive|colors|utilisateur_desactive|utilisateur_desactive|f|PASS|nom exposé (membre)|désactivé
+c8-desactive|gestion_pro|utilisateur_desactive|utilisateur_desactive|f|PASS|nom exposé (membre)|désactivé
+c8-desactive|reserves|utilisateur_desactive|utilisateur_desactive|f|PASS|nom exposé (membre)|désactivé
+c8-desactive|tools|utilisateur_desactive|utilisateur_desactive|f|PASS|nom exposé (membre)|désactivé
+c9-invite-en-attente|colors|invitation_en_attente|invitation_en_attente|f|PASS|nom exposé (membre)|invitation en attente
+c9-invite-en-attente|gestion_pro|invitation_en_attente|invitation_en_attente|f|PASS|nom exposé (membre)|invitation en attente
+c9-invite-en-attente|reserves|invitation_en_attente|invitation_en_attente|f|PASS|nom exposé (membre)|invitation en attente
+c9-invite-en-attente|tools|invitation_en_attente|invitation_en_attente|f|PASS|nom exposé (membre)|invitation en attente
+x1-entreprise-annulee|colors|autorise|autorise|t|PASS|nom exposé (membre)|D3 : abonnement GP annulé ne coupe pas Colors (ancien attendu : entreprise_inactive)
+x1-entreprise-annulee|gestion_pro|abonnement_suspendu|abonnement_suspendu|f|PASS|nom exposé (membre)|abonnement GP annulé : GP refusé (`entreprise_inactive` supprimé)
+x2-droit-essai-expire|colors|essai_expire|essai_expire|f|PASS|nom exposé (membre)|droit d'usage issu d'un essai, expiré
+x3-validation-en-attente|colors|validation_en_attente|validation_en_attente|f|PASS|nom exposé (membre)|rejoint par code, validation admin en attente
+x4-suspension-prevue-echue|colors|autorise|autorise|t|PASS|nom exposé (membre)|D3 : suspension GP prévue échue ne coupe pas Colors (ancien attendu : abonnement_suspendu)
+x4-suspension-prevue-echue|gestion_pro|abonnement_suspendu|abonnement_suspendu|f|PASS|nom exposé (membre)|suspension GP prévue échue : GP refusé
+x5-habilitation-hors-fenetre|colors|sans_role|sans_role|f|PASS|nom exposé (membre)|habilitation hors fenêtre de validité
+y1-colors-suspendu|colors|abonnement_suspendu|abonnement_suspendu|f|PASS|nom exposé (membre)|D3 : Colors suspendu (statut propre)
+y1-colors-suspendu|gestion_pro|autorise|autorise|t|PASS|nom exposé (membre)|D3 : Colors suspendu ne coupe pas GP
+y1-colors-suspendu|reserves|autorise|autorise|t|PASS|nom exposé (membre)|D3 : Colors suspendu ne coupe pas Réserves
+y1-colors-suspendu|tools|autorise|autorise|t|PASS|nom exposé (membre)|D3 : Colors suspendu ne coupe pas Tools
+y10-invite-org-suspendue-plateforme|colors|suspension_plateforme|suspension_plateforme|f|PASS|nom exposé (membre)|suspension plateforme prime sur invitation_en_attente
+y10-invite-org-suspendue-plateforme|gestion_pro|suspension_plateforme|suspension_plateforme|f|PASS|nom exposé (membre)|suspension plateforme prime sur invitation_en_attente
+y10-invite-org-suspendue-plateforme|reserves|suspension_plateforme|suspension_plateforme|f|PASS|nom exposé (membre)|suspension plateforme prime sur invitation_en_attente
+y10-invite-org-suspendue-plateforme|tools|suspension_plateforme|suspension_plateforme|f|PASS|nom exposé (membre)|suspension plateforme prime sur invitation_en_attente
+y11-suspension-non-active-encore|colors|autorise|autorise|t|PASS|nom exposé (membre)|suspension programmée dans le futur : pas encore active
+y11-suspension-non-active-encore|gestion_pro|autorise|autorise|t|PASS|nom exposé (membre)|suspension programmée dans le futur : pas encore active
+y11-suspension-non-active-encore|reserves|autorise|autorise|t|PASS|nom exposé (membre)|suspension programmée dans le futur : pas encore active
+y11-suspension-non-active-encore|tools|autorise|autorise|t|PASS|nom exposé (membre)|suspension programmée dans le futur : pas encore active
+y2-colors-annule|colors|abonnement_suspendu|abonnement_suspendu|f|PASS|nom exposé (membre)|D3 : Colors annulé
+y2-colors-annule|gestion_pro|autorise|autorise|t|PASS|nom exposé (membre)|D3 : Colors annulé ne coupe pas GP
+y3-suspension-organisation|colors|suspension_plateforme|suspension_plateforme|f|PASS|nom exposé (membre)|suspension plateforme, portée organisation
+y3-suspension-organisation|gestion_pro|suspension_plateforme|suspension_plateforme|f|PASS|nom exposé (membre)|suspension plateforme, portée organisation
+y3-suspension-organisation|reserves|suspension_plateforme|suspension_plateforme|f|PASS|nom exposé (membre)|suspension plateforme, portée organisation
+y3-suspension-organisation|tools|suspension_plateforme|suspension_plateforme|f|PASS|nom exposé (membre)|suspension plateforme, portée organisation
+y4-suspension-compte|colors|suspension_plateforme|suspension_plateforme|f|PASS|nom exposé (membre)|suspension plateforme, portée compte (autre organisation saine)
+y4-suspension-compte|gestion_pro|suspension_plateforme|suspension_plateforme|f|PASS|nom exposé (membre)|suspension plateforme, portée compte (autre organisation saine)
+y4-suspension-compte|reserves|suspension_plateforme|suspension_plateforme|f|PASS|nom exposé (membre)|suspension plateforme, portée compte (autre organisation saine)
+y4-suspension-compte|tools|suspension_plateforme|suspension_plateforme|f|PASS|nom exposé (membre)|suspension plateforme, portée compte (autre organisation saine)
+y5-admin-suspendu-compte|colors|suspension_plateforme|suspension_plateforme|f|PASS|aucun nom (non-membre)|la suspension du compte PRIME sur le bypass administrateur
+y5-admin-suspendu-compte|gestion_pro|suspension_plateforme|suspension_plateforme|f|PASS|aucun nom (non-membre)|la suspension du compte PRIME sur le bypass administrateur
+y5-admin-suspendu-compte|reserves|suspension_plateforme|suspension_plateforme|f|PASS|aucun nom (non-membre)|la suspension du compte PRIME sur le bypass administrateur
+y5-admin-suspendu-compte|tools|suspension_plateforme|suspension_plateforme|f|PASS|aucun nom (non-membre)|la suspension du compte PRIME sur le bypass administrateur
+y6-suspension-expiree|colors|autorise|autorise|t|PASS|nom exposé (membre)|suspension échue (fin_at passé) : rétablit
+y6-suspension-expiree|gestion_pro|autorise|autorise|t|PASS|nom exposé (membre)|suspension échue (fin_at passé) : rétablit
+y6-suspension-expiree|reserves|autorise|autorise|t|PASS|nom exposé (membre)|suspension échue (fin_at passé) : rétablit
+y6-suspension-expiree|tools|autorise|autorise|t|PASS|nom exposé (membre)|suspension échue (fin_at passé) : rétablit
+y7-suspension-revoquee|colors|autorise|autorise|t|PASS|nom exposé (membre)|suspension révoquée : rétablit
+y7-suspension-revoquee|gestion_pro|autorise|autorise|t|PASS|nom exposé (membre)|suspension révoquée : rétablit
+y7-suspension-revoquee|reserves|autorise|autorise|t|PASS|nom exposé (membre)|suspension révoquée : rétablit
+y7-suspension-revoquee|tools|autorise|autorise|t|PASS|nom exposé (membre)|suspension révoquée : rétablit
+y8-tools-suspendu-gp-suspendu|colors|autorise|autorise|t|PASS|nom exposé (membre)|ni GP ni Tools suspendus ne coupent Colors
+y8-tools-suspendu-gp-suspendu|gestion_pro|abonnement_suspendu|abonnement_suspendu|f|PASS|nom exposé (membre)|GP suspendu
+y8-tools-suspendu-gp-suspendu|reserves|autorise|autorise|t|PASS|nom exposé (membre)|ni GP ni Tools suspendus ne coupent Réserves
+y8-tools-suspendu-gp-suspendu|tools|abonnement_suspendu|abonnement_suspendu|f|PASS|nom exposé (membre)|Tools suspendu (statut propre)
+y9-desactive-org-gp-suspendue|colors|utilisateur_desactive|utilisateur_desactive|f|PASS|nom exposé (membre)|priorité : membre désactivé d'une org GP suspendue = utilisateur_desactive
+y9-desactive-org-gp-suspendue|gestion_pro|utilisateur_desactive|utilisateur_desactive|f|PASS|nom exposé (membre)|priorité : membre désactivé d'une org GP suspendue = utilisateur_desactive
+y9-desactive-org-gp-suspendue|reserves|utilisateur_desactive|utilisateur_desactive|f|PASS|nom exposé (membre)|priorité : membre désactivé d'une org GP suspendue = utilisateur_desactive
+y9-desactive-org-gp-suspendue|tools|utilisateur_desactive|utilisateur_desactive|f|PASS|nom exposé (membre)|priorité : membre désactivé d'une org GP suspendue = utilisateur_desactive
+(103 rows)
 == Synthèse ==
-pass | fail | total
-59 | 0 | 59
+pass|fail|total
+103|0|103
 (1 row)
 == Invariant : decision = autorise <=> a_acces_application ==
 violations
 0
 (1 row)
+== Contrat : décisions rendues hors des 13 codes du contrat figé (attendu 0) ==
+hors_contrat
+0
+(1 row)
+== Découplage D3 : lignes GP suspendu -> autorise sur une autre application ==
+label|app|obtenu
+c7-entreprise-suspendue|colors|autorise
+c7-entreprise-suspendue|gestion_pro|abonnement_suspendu
+c7-entreprise-suspendue|reserves|autorise
+c7-entreprise-suspendue|tools|autorise
+x1-entreprise-annulee|colors|autorise
+x1-entreprise-annulee|gestion_pro|abonnement_suspendu
+x4-suspension-prevue-echue|colors|autorise
+x4-suspension-prevue-echue|gestion_pro|abonnement_suspendu
+(8 rows)
 == Confidentialité ==
 set_config
 {"sub":"a0000000-0000-4000-8000-000000000001","role":"authenticated"}
@@ -75,17 +134,29 @@ set_config
 set_config
 a0000000-0000-4000-8000-000000000001
 (1 row)
-sonde | resultat
-auth seul, entreprise D suspendue tierce -> vue client | {"version": 1, "decision": "sans_organisation", "role_code": null, "entreprise": null, "application_code": "colors"}
+sonde|resultat
+auth seul, entreprise D suspendue tierce -> vue client|{"version": 1, "decision": "sans_organisation", "role_code": null, "entreprise": null, "application_code": "colors"}
 (1 row)
 NOTICE:  diagnostic par un non-admin : REFUSE (42501)
 NOTICE:  noyau appelable par authenticated : NON (42501)
+set_config
+{"sub":"a2000000-0000-4000-8000-000000000003","role":"authenticated"}
+(1 row)
+set_config
+a2000000-0000-4000-8000-000000000003
+(1 row)
+sonde|resultat
+membre d'une org suspendue par la plateforme -> vue client (ni motif ni diagnostic)|{"version": 1, "decision": "suspension_plateforme", "role_code": null, "entreprise": {"id": "ec000000-0000-4000-8000-00000000000c", "nom": "ENTREPRISE-L (SUSPENDUE PAR LA PLATEFORME, GP actif)"}, "application_code": "colors"}
+(1 row)
 set_config
 {"sub":"a0000000-0000-4000-8000-00000000000c","role":"authenticated"}
 (1 row)
 set_config
 a0000000-0000-4000-8000-00000000000c
 (1 row)
-sonde | resultat
-diagnostic admin sur le compte suspendu (c7) | {"membre": true, "decision": "abonnement_suspendu", "diagnostic": {"support": false, "membre_statut": "actif", "abonnement_statut": "suspendu", "suspension_prevue_at": null}}
-(1 row)
+sonde|resultat
+diagnostic admin, c7 (GP suspendu) sur gestion_pro|{"membre": true, "decision": "abonnement_suspendu", "diagnostic": {"membre_statut": "actif", "abonnement_statut": "suspendu", "suspension_prevue_at": null}}
+diagnostic admin, c7 (GP suspendu) sur colors|{"membre": true, "decision": "autorise", "role_code": "colors_consultation", "diagnostic": {"membre_statut": "actif", "suspendu_depuis": null, "statut_commercial": "actif"}}
+diagnostic admin, y1 (Colors suspendu) sur colors|{"membre": true, "decision": "abonnement_suspendu", "diagnostic": {"membre_statut": "actif", "suspendu_depuis": "2026-09-17T21:56:07.970169+00:00", "statut_commercial": "suspendu"}}
+diagnostic admin, y3 (org suspendue plateforme) : motif visible ici seulement|{"membre": true, "decision": "suspension_plateforme", "diagnostic": {"suspension": {"id": "2ee715b3-6ef0-4eb0-891f-dd1d8f6eb895", "motif": "AUDIT-D3 organisation suspendue", "fin_at": null, "portee": "organisation", "debut_at": "2026-09-20T20:56:07.972468+00:00"}}}
+(4 rows)

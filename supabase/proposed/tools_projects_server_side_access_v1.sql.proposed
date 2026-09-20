@@ -1,0 +1,285 @@
+-- PROPOSITION — NON NUMÉROTÉE, NON RÉSERVÉE. Ne pas placer dans supabase/migrations avant le train
+-- de convergence (numéro : NEXT_MIGRATION_AFTER_CONVERGED_TRAIN). Aucun prix, aucun plan modifié.
+--
+-- ELSATIA Tools — projets d'organisation : contrôle d'accès CÔTÉ SERVEUR (décision D2).
+--
+-- Constat [EXÉCUTÉ sur base jetable, avant correctif] : la RLS de `tools_projects` et la RPC
+-- `tools_sync_project_entreprise` (R10, 00238) n'exigent que `a_acces_application(org,'tools')`.
+-- Un membre Free ou un ex-abonné (entitlement expiré/révoqué) qui garde l'habilitation `tools_pro`
+-- continue donc d'écrire du cloud ; `project_payload` accepte 60 Mo, aucun quota de lignes.
+-- (Ce qui TENAIT déjà : aucun accès inter-utilisateurs ni inter-organisations, la RLS impose
+-- `user_id = auth.uid()` ; connaître l'identifiant d'un projet d'autrui ne donne rien.)
+--
+-- Modèle D2 implémenté. Accès (lecture ET écriture) à un projet d'organisation si TOUT :
+--   (i)   membre `actif` de l'organisation, SANS dépendre de l'abonnement GP (`est_membre_actif`
+--         embarque l'abonnement GP : non utilisé ici, D3) ;
+--   (ii)  entitlement Tools Pro actif portant la capacité `saved-projects`
+--         (`tools_resoudre_entitlements()` : personnel, jamais d'entitlement d'organisation aujourd'hui) ;
+--   (iii) droits sur le projet : `a_acces_application(org,'tools')` conservé (droit d'usage de
+--         l'organisation + habilitation), isolé derrière UN seul point de substitution
+--         `tools_droit_projet_organisation()` ;
+--   (iv)  propriétaire = créateur : `user_id = auth.uid()` (comportement actuel, inchangé).
+-- Tools Free : `tools_resoudre_entitlements()` n'est PAS modifiée, elle rend toujours `free`
+-- (jamais de refus applicatif). Seul le cloud est fermé ; le client garde le stockage local.
+--
+-- DECISION_REQUIRED: l'habilitation `tools_pro` (couche iii) est-elle redondante avec l'entitlement
+--   Pro (ii) ? — défaut conservateur appliqué : conservée (les deux sont exigées).
+-- DECISION_REQUIRED: un gestionnaire d'accès (`peut_gerer_acces`) ou un autre membre doit-il lire /
+--   écrire les projets d'un créateur ? Le schéma porte un créateur (`user_id`) mais AUCUN partage
+--   n'existe aujourd'hui — défaut conservateur : créateur seul, on ne crée pas de partage.
+-- DECISION_REQUIRED: projets PERSONNELS Pro (sans organisation) : aucun stockage serveur n'existe
+--   (`organization_id is null` n'est atteignable par aucune policy) — défaut conservateur : NON créé.
+-- DECISION_REQUIRED: un ex-abonné garde-t-il une lecture seule de ses projets cloud (fenêtre de X
+--   jours, export) ? — défaut conservateur : aucun accès ; les lignes ne sont PAS supprimées, elles
+--   réapparaissent au renouvellement.
+-- DECISION_REQUIRED: purge des projets supprimés (tombstones, `DELETE` révoqué par 00255) — défaut
+--   conservateur : plafond total de lignes (5000) pour borner l'abus, aucune purge automatique.
+--
+-- Codes d'erreur stables (exploitables côté API ; `hint` = jeton machine, `message` = français) :
+--   28000  authentification requise
+--   42501  droit refusé    hint tools_org_non_autorisee | tools_pro_requis
+--   22023  projet invalide (dont conversions de types ratées : plus de message de base brut)
+--   54000  projet trop volumineux            hint tools_projet_trop_volumineux
+--   53400  quota de projets atteint          hint tools_quota_projets | tools_quota_lignes
+
+-- ── Bornes (un seul endroit à modifier) ──────────────────────────────────────────────────────
+-- 256 Kio : un projet valide côté client (model.ts : nom 100, chantier 100, notes 1000,
+-- paramètres 80 car./clé, 50 options ≤ 250 car., 12 tags) pèse < 40 Kio ; marge ×6, alignée sous la
+-- limite d'import de fichier du client (500 000 car.).
+create or replace function public.tools_projets_taille_max_octets() returns integer
+language sql immutable parallel safe as $$ select 262144 $$;
+-- 500 projets ACTIFS par utilisateur et par organisation (usage artisan : dizaines) ; plafond
+-- de 5000 lignes au total (tombstones compris) pour qu'un cycle créer/supprimer ne remplisse pas la base.
+create or replace function public.tools_projets_quota_max() returns integer
+language sql immutable parallel safe as $$ select 500 $$;
+create or replace function public.tools_projets_lignes_max() returns integer
+language sql immutable parallel safe as $$ select 5000 $$;
+
+-- ── (ii) Entitlement Pro avec la capacité `saved-projects` ───────────────────────────────────
+create or replace function public.tools_a_entitlement_projets_cloud() returns boolean
+language sql stable security definer set search_path = public as $$
+  select auth.uid() is not null
+    and coalesce((select r->>'tier' = 'pro' and (r->'capabilities') ? 'saved-projects'
+                  from (select public.tools_resoudre_entitlements() as r) s), false);
+$$;
+
+-- ── (iii) Droits sur le projet : point de substitution unique ────────────────────────────────
+-- Aujourd'hui : droit d'usage de l'organisation + habilitation applicative. NB : `a_acces_application`
+-- s'appuie encore sur `est_membre_actif` (abonnement GP) ; tant que le contrat de décision v1 (D3)
+-- n'est pas livré, une suspension GP coupe donc aussi le cloud Tools [EXÉCUTÉ]. À substituer par la
+-- décision `autorise` par application dès qu'elle existe (une seule ligne à changer ici).
+create or replace function public.tools_droit_projet_organisation(p_entreprise_id uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select public.a_acces_application(p_entreprise_id, 'tools');
+$$;
+
+-- ── (i) + (iii) Organisation autorisée pour l'appelant, SANS l'entitlement ───────────────────
+-- Appartenance `actif` lue inline (pas d'`est_membre_actif`). À substituer par `est_membre_organisation(uuid)`
+-- (proposé par le lot D3) une fois livré.
+create or replace function public.tools_organisation_projets_autorisee(p_entreprise_id uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select auth.uid() is not null and p_entreprise_id is not null
+    and exists (select 1 from public.utilisateurs_entreprises ue
+                where ue.utilisateur_id = auth.uid() and ue.entreprise_id = p_entreprise_id and ue.statut = 'actif')
+    and public.tools_droit_projet_organisation(p_entreprise_id);
+$$;
+
+-- Ensemble des organisations où l'appelant peut lire/écrire ses projets cloud (i + ii + iii).
+-- Sous-requête non corrélée dans la RLS : évaluée UNE fois par requête, pas par ligne.
+create or replace function public.tools_organisations_projets_autorisees() returns setof uuid
+language sql stable security definer set search_path = public as $$
+  select ue.entreprise_id
+  from public.utilisateurs_entreprises ue
+  where auth.uid() is not null
+    and ue.utilisateur_id = auth.uid() and ue.statut = 'actif'
+    and public.tools_a_entitlement_projets_cloud()
+    and public.tools_droit_projet_organisation(ue.entreprise_id);
+$$;
+
+-- ── RLS : mêmes conditions que la RPC (plus d'écart base / interface) ────────────────────────
+drop policy if exists tools_projects_lecture on public.tools_projects;
+drop policy if exists tools_projects_insertion on public.tools_projects;
+drop policy if exists tools_projects_modification on public.tools_projects;
+create policy tools_projects_lecture on public.tools_projects for select to authenticated using (
+  user_id = auth.uid() and organization_id is not null
+  and organization_id in (select public.tools_organisations_projets_autorisees())
+);
+create policy tools_projects_insertion on public.tools_projects for insert to authenticated with check (
+  user_id = auth.uid() and organization_id is not null
+  and organization_id in (select public.tools_organisations_projets_autorisees())
+);
+create policy tools_projects_modification on public.tools_projects for update to authenticated using (
+  user_id = auth.uid() and organization_id is not null
+  and organization_id in (select public.tools_organisations_projets_autorisees())
+) with check (
+  user_id = auth.uid() and organization_id is not null
+  and organization_id in (select public.tools_organisations_projets_autorisees())
+);
+
+-- ── Bornes de taille et de quota : trigger (couvre la RPC ET l'écriture directe PostgREST) ───
+-- SECURITY DEFINER : le décompte voit toutes les lignes du couple (utilisateur, organisation),
+-- même celles que la RLS masquerait. Verrou consultatif par couple : deux appareils qui poussent
+-- en parallèle ne dépassent pas le quota. On ne tronque jamais : refus explicite.
+create or replace function public.tools_projects_garde_bornes() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare
+  v_taille integer := public.tools_projets_taille_max_octets();
+  v_ajout_vivant integer := 0; v_ajout_total integer := 0;
+  v_vivants bigint; v_total bigint;
+begin
+  if octet_length(new.project_payload::text) > v_taille
+     or octet_length(new.input_parameters::text) > v_taille
+     or octet_length(new.options::text) > v_taille then
+    raise exception 'Projet Tools trop volumineux (maximum % octets)', v_taille
+      using errcode = '54000', hint = 'tools_projet_trop_volumineux';
+  end if;
+
+  if new.organization_id is not null then
+    if tg_op = 'INSERT' or new.organization_id is distinct from old.organization_id
+       or new.user_id is distinct from old.user_id then
+      v_ajout_total := 1;
+      v_ajout_vivant := case when new.deleted_at is null then 1 else 0 end;
+    elsif old.deleted_at is not null and new.deleted_at is null then
+      v_ajout_vivant := 1;   -- restauration d'un projet supprimé : redevient actif
+    end if;
+    if v_ajout_total + v_ajout_vivant > 0 then
+      perform pg_advisory_xact_lock(hashtextextended('tools_projects:' || new.user_id || ':' || new.organization_id, 0));
+      select count(*) filter (where deleted_at is null), count(*) into v_vivants, v_total
+      from public.tools_projects where user_id = new.user_id and organization_id = new.organization_id;
+      if v_ajout_vivant = 1 and v_vivants + 1 > public.tools_projets_quota_max() then
+        raise exception 'Quota de projets cloud atteint (% projets actifs par entreprise)', public.tools_projets_quota_max()
+          using errcode = '53400', hint = 'tools_quota_projets';
+      end if;
+      if v_ajout_total = 1 and v_total + 1 > public.tools_projets_lignes_max() then
+        raise exception 'Quota de lignes cloud atteint (% projets, supprimés compris)', public.tools_projets_lignes_max()
+          using errcode = '53400', hint = 'tools_quota_lignes';
+      end if;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists tools_projects_bornes on public.tools_projects;
+create trigger tools_projects_bornes before insert or update on public.tools_projects
+  for each row execute function public.tools_projects_garde_bornes();
+
+-- ── RPC : mêmes signature et charge utile de retour que R10 (clients existants inchangés) ────
+-- Ordre : authentification, organisation (message identique pour organisation inexistante ou
+-- étrangère : aucune fuite), puis entitlement Pro, puis validation. Vérification de droit AVANT
+-- toute lecture de `tools_projects`.
+create or replace function public.tools_sync_project_entreprise(
+  p_entreprise_id uuid, p_project jsonb, p_expected_revision bigint default 0, p_device_id text default null
+) returns jsonb language plpgsql security invoker set search_path = public
+as $$
+declare
+  v_user_id uuid := auth.uid(); v_local_id text := p_project->>'id';
+  v_current public.tools_projects%rowtype; v_saved public.tools_projects%rowtype;
+begin
+  if v_user_id is null then
+    raise exception 'Authentification requise' using errcode = '28000';
+  end if;
+  if not public.tools_organisation_projets_autorisee(p_entreprise_id) then
+    raise exception 'Entreprise non autorisée pour ELSATIA Tools'
+      using errcode = '42501', hint = 'tools_org_non_autorisee';
+  end if;
+  if not public.tools_a_entitlement_projets_cloud() then
+    raise exception 'Synchronisation cloud réservée à ELSATIA Tools Pro (capacité saved-projects requise)'
+      using errcode = '42501', hint = 'tools_pro_requis';
+  end if;
+
+  begin
+    perform (p_project->>'deletedAt')::timestamptz, (p_project->>'archived')::boolean;   -- lève 22P02/22007 si mal typés
+    if jsonb_typeof(p_project) <> 'object' or v_local_id is null or v_local_id !~ '^[a-zA-Z0-9-]{16,80}$'
+      or coalesce((p_project->>'schemaVersion')::integer, 0) <= 0
+      or char_length(btrim(coalesce(p_project->>'name', ''))) not between 1 and 100
+      or coalesce(p_project->>'toolId', '') !~ '^[a-z0-9-]{2,80}$'
+      or jsonb_typeof(coalesce(p_project->'inputParameters', 'null'::jsonb)) <> 'object'
+      or jsonb_typeof(coalesce(p_project->'options', '{}'::jsonb)) <> 'object'
+      or (p_project->>'createdAt')::timestamptz is null or (p_project->>'updatedAt')::timestamptz is null
+      or (p_project->>'updatedAt')::timestamptz < (p_project->>'createdAt')::timestamptz
+    then
+      raise exception 'Projet Tools invalide' using errcode = '22023';
+    end if;
+  exception
+    -- conversions de types ratées (entier, date, booléen) : jamais de message de base brut.
+    when invalid_text_representation or invalid_datetime_format or datetime_field_overflow
+         or numeric_value_out_of_range then
+      raise exception 'Projet Tools invalide' using errcode = '22023';
+  end;
+
+  select * into v_current from public.tools_projects
+  where user_id = v_user_id and organization_id = p_entreprise_id and local_id = v_local_id for update;
+  -- révision attendue absente = 0 (un null contournait la détection de conflit)
+  if v_current.id is not null and v_current.revision <> coalesce(p_expected_revision, 0) then
+    return jsonb_build_object('status', 'conflict', 'revision', v_current.revision,
+      'project', v_current.project_payload, 'cloud_updated_at', v_current.cloud_updated_at);
+  end if;
+
+  if v_current.id is null then
+    insert into public.tools_projects(user_id, organization_id, local_id, schema_version, tool_id, name, site_name, notes,
+      input_parameters, options, project_payload, created_at, updated_at, archived, deleted_at, revision, device_id)
+    values (v_user_id, p_entreprise_id, v_local_id, (p_project->>'schemaVersion')::integer, p_project->>'toolId',
+      p_project->>'name', nullif(p_project->>'siteName', ''), nullif(p_project->>'notes', ''),
+      coalesce(p_project->'inputParameters', '{}'::jsonb), coalesce(p_project->'options', '{}'::jsonb), p_project,
+      (p_project->>'createdAt')::timestamptz, (p_project->>'updatedAt')::timestamptz,
+      coalesce((p_project->>'archived')::boolean, false),
+      case when p_project ? 'deletedAt' then (p_project->>'deletedAt')::timestamptz else null end,
+      1, left(p_device_id, 100)) returning * into v_saved;
+  else
+    update public.tools_projects set schema_version = (p_project->>'schemaVersion')::integer, tool_id = p_project->>'toolId',
+      name = p_project->>'name', site_name = nullif(p_project->>'siteName', ''), notes = nullif(p_project->>'notes', ''),
+      input_parameters = coalesce(p_project->'inputParameters', '{}'::jsonb), options = coalesce(p_project->'options', '{}'::jsonb),
+      project_payload = p_project, updated_at = (p_project->>'updatedAt')::timestamptz,
+      archived = coalesce((p_project->>'archived')::boolean, false),
+      deleted_at = case when p_project ? 'deletedAt' then (p_project->>'deletedAt')::timestamptz else null end,
+      revision = revision + 1, device_id = left(p_device_id, 100), cloud_updated_at = now()
+    where id = v_current.id returning * into v_saved;
+  end if;
+  return jsonb_build_object('status', 'applied', 'revision', v_saved.revision,
+    'project', v_saved.project_payload, 'cloud_updated_at', v_saved.cloud_updated_at);
+end;
+$$;
+
+-- ── ACL : mêmes règles que 00255 (ni public, ni anon, ni service_role) ───────────────────────
+revoke all on function public.tools_projets_taille_max_octets(), public.tools_projets_quota_max(), public.tools_projets_lignes_max(),
+  public.tools_a_entitlement_projets_cloud(), public.tools_droit_projet_organisation(uuid),
+  public.tools_organisation_projets_autorisee(uuid), public.tools_organisations_projets_autorisees(),
+  public.tools_projects_garde_bornes() from public, anon, authenticated, service_role;
+grant execute on function public.tools_projets_taille_max_octets(), public.tools_projets_quota_max(), public.tools_projets_lignes_max(),
+  public.tools_a_entitlement_projets_cloud(), public.tools_droit_projet_organisation(uuid),
+  public.tools_organisation_projets_autorisee(uuid), public.tools_organisations_projets_autorisees() to authenticated;
+revoke all on function public.tools_sync_project_entreprise(uuid, jsonb, bigint, text) from public, anon, service_role;
+grant execute on function public.tools_sync_project_entreprise(uuid, jsonb, bigint, text) to authenticated;
+
+notify pgrst, 'reload schema';
+
+-- ══ DIAGNOSTIC AVANT DÉPLOIEMENT (lecture seule — à jouer en Production avant d'appliquer) ═══
+-- Qui perdrait l'accès cloud ? Une ligne par (utilisateur, organisation) ayant des projets, sans
+-- entitlement Tools Pro actif portant `saved-projects` (et qui n'est pas superuser plateforme).
+--   select tp.user_id, tp.organization_id, count(*) filter (where tp.deleted_at is null) as projets_actifs,
+--          count(*) as lignes
+--   from public.tools_projects tp
+--   where not exists (select 1 from public.entitlements_utilisateurs_elsatia e
+--                     where e.utilisateur_id = tp.user_id and e.application_code = 'tools' and e.niveau = 'pro'
+--                       and e.status in ('active','grace') and e.revoked_at is null and e.valide_du <= now()
+--                       and (e.expire_le is null or e.expire_le > now()) and 'saved-projects' = any (e.capabilities))
+--     and not exists (select 1 from public.plateforme_admins pa where pa.utilisateur_id = tp.user_id
+--                       and pa.actif and pa.statut_identite = 'active' and pa.role = 'total')
+--   group by 1, 2 order by lignes desc;
+-- Lignes déjà hors bornes (restent lisibles ; refusées à la prochaine écriture de l'appelant) :
+--   select id, user_id, organization_id, octet_length(project_payload::text) as octets
+--   from public.tools_projects where octet_length(project_payload::text) > 262144;
+--   select user_id, organization_id, count(*) filter (where deleted_at is null) as actifs, count(*) as total
+--   from public.tools_projects group by 1, 2 having count(*) filter (where deleted_at is null) > 500 or count(*) > 5000;
+-- Lignes orphelines (organisation supprimée, `on delete set null`) : invisibles aujourd'hui aussi.
+--   select count(*) from public.tools_projects where organization_id is null;
+-- Membres qui perdent l'accès (habilitation tools sans Pro), même sans projet :
+--   select hu.entreprise_id, hu.utilisateur_id from public.habilitations_applications_utilisateurs hu
+--   where hu.application_code = 'tools' and hu.autorise
+--     and not exists (select 1 from public.entitlements_utilisateurs_elsatia e where e.utilisateur_id = hu.utilisateur_id
+--       and e.application_code = 'tools' and e.niveau = 'pro' and e.status in ('active','grace') and e.revoked_at is null
+--       and e.valide_du <= now() and (e.expire_le is null or e.expire_le > now()) and 'saved-projects' = any (e.capabilities));
+
+-- ══ RETOUR ARRIÈRE (si besoin) : rejouer les policies et la RPC de 00238 puis
+--   drop trigger tools_projects_bornes on public.tools_projects; drop function public.tools_projects_garde_bornes();
+--   puis les fonctions tools_* ajoutées ci-dessus. Aucune donnée n'est modifiée par cette proposition.

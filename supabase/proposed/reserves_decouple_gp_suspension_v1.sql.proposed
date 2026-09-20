@@ -1,0 +1,337 @@
+-- ELSATIA — D3 : découpler du statut d'abonnement Gestion Pro les 11 objets Réserves qui appelaient
+-- encore `est_membre_actif` directement (résidu de l'annexe D3 §4).
+-- PROPOSITION NON NUMÉROTÉE, NON RÉSERVÉE (NEXT_MIGRATION_AFTER_CONVERGED_TRAIN). NON APPLIQUÉE.
+-- Doc : docs/qualification/access-convergence-v1/annexe-d3-reserves-residu.md
+-- Preuve : supabase/proposed/tests/reserves_decouple_gp_suspension.test.sql
+--
+-- PRÉREQUIS, dans cet ordre (cette proposition échoue nettement sans eux : `est_membre_organisation` absente) :
+--   1. supabase/proposed/per_application_status_and_platform_suspension_v1.sql.proposed
+--   2. packages/application-access/sql/decision_acces_application.sql.proposed
+--   3. la présente proposition
+--
+-- POURQUOI. Décision D3 : suspendre Gestion Pro ne coupe PAS les autres applications. `a_acces_application` est
+-- découplée, donc `reserves_role_courant`/`reserves_action_autorisee` (tables, plans, photos, storage) le sont
+-- aussi. Mais 11 objets Réserves testaient encore `est_membre_actif`, qui embarque l'abonnement GP : pour une
+-- organisation GP suspendue, un utilisateur pourtant « autorisé » à Réserves y perdait notifications, préférences,
+-- annuaire de sa propre fiche et flux d'invitation.
+--
+-- CE QUI CHANGE : le PRÉDICAT d'appartenance, rien d'autre. Signatures, LANGUAGE, STABLE, SECURITY DEFINER,
+-- `search_path`, corps hors prédicat et ACL sont inchangés (`create or replace` conserve les GRANT existants).
+--   - Objets DÉJÀ gardés par `a_acces_application(..., 'reserves')` (7) : `est_membre_actif` -> `est_membre_organisation`.
+--   - Objets sans garde applicative (`preferences_lire`, `preferences_definir`, policy `reserves_annuaire_select`) :
+--     `est_membre_organisation` ET `a_acces_application(..., 'reserves')`. C'est plus RESTRICTIF qu'avant pour un membre
+--     sans habilitation Réserves (il n'y avait aucune garde) : aucun élargissement possible du côté de Réserves.
+--   - ÉCART À LA RECOMMANDATION §4 DE L'ANNEXE D3 : `reserves_invitation_accepter`, `reserves_rejoindre_intervention`
+--     et `reserves_invitations_en_attente` reçoivent `est_membre_organisation` SEULE, sans `a_acces_application`.
+--     Ces trois chemins servent précisément une personne qui n'a PAS ENCORE d'accès Réserves : l'acceptation crée
+--     l'entitlement d'organisation et l'habilitation `reserves_intervenant`. Y exiger `a_acces_application` rendrait
+--     l'acceptation impossible (poule et oeuf) — prouvé dans l'annexe.
+--
+-- CE QUI RESTE VOLONTAIREMENT COUPLÉ À GP : tout le reste des 146 policies/73 fonctions Gestion Pro (inchangé).
+-- NOTE : `est_membre_organisation` ne lit pas `suspensions_plateforme` (DECISION_REQUIRED n°1 de l'annexe D3) ; pour les
+-- 8 objets gardés par `a_acces_application` la suspension plateforme coupe quand même (via la décision) ; pour les 3 flux
+-- d'invitation elle ne coupe pas, exactement comme avant cette proposition.
+--
+-- RETOUR ARRIÈRE : rejouer les 9 fonctions et 2 policies avec `est_membre_actif` (bloc « RETOUR ARRIÈRE » en pied).
+
+-- [1/11] déjà gardée par a_acces_application : appartenance seule change
+CREATE OR REPLACE FUNCTION public.reserves_notifications_compteur()
+ RETURNS integer
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select count(*)::integer
+  from public.reserves_evenements_notifications ev
+  left join public.reserves_notifications_lectures lec
+    on lec.evenement_id = ev.id and lec.utilisateur_id = auth.uid()
+  where ev.destinataire_entreprise_id is not null
+    and public.est_membre_organisation(ev.destinataire_entreprise_id)
+    and public.a_acces_application(ev.destinataire_entreprise_id, 'reserves')
+    and lec.utilisateur_id is null;
+$function$;
+
+-- [2/11] idem
+CREATE OR REPLACE FUNCTION public.reserves_notifications_in_app(p_limite integer DEFAULT 50, p_non_lues_seulement boolean DEFAULT false)
+ RETURNS TABLE(id uuid, type text, libelle text, categorie text, critique boolean, chantier_id uuid, chantier text, reserve_id uuid, reserve_numero integer, reserve_titre text, payload jsonb, lu boolean, created_at timestamp with time zone)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select ev.id, ev.type, t.libelle, t.categorie, t.critique,
+         ev.chantier_id, c.nom, ev.reserve_id, r.numero, r.titre,
+         ev.payload, lec.utilisateur_id is not null, ev.created_at
+  from public.reserves_evenements_notifications ev
+  join public.reserves_notifications_types t on t.type = ev.type
+  left join public.reserves_chantiers c on c.id = ev.chantier_id
+  left join public.reserves r on r.id = ev.reserve_id
+  left join public.reserves_notifications_lectures lec
+    on lec.evenement_id = ev.id and lec.utilisateur_id = auth.uid()
+  where ev.destinataire_entreprise_id is not null
+    and public.est_membre_organisation(ev.destinataire_entreprise_id)
+    and public.a_acces_application(ev.destinataire_entreprise_id, 'reserves')
+    and (not coalesce(p_non_lues_seulement, false) or lec.utilisateur_id is null)
+  order by ev.created_at desc
+  limit least(greatest(coalesce(p_limite, 50), 1), 200);
+$function$;
+
+-- [3/11] idem
+CREATE OR REPLACE FUNCTION public.reserves_notifications_marquer_lues(p_ids uuid[] DEFAULT NULL::uuid[])
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare v_lues integer;
+begin
+  if auth.uid() is null then return 0; end if;
+  with visibles as (
+    select ev.id from public.reserves_evenements_notifications ev
+    where ev.destinataire_entreprise_id is not null
+      and public.est_membre_organisation(ev.destinataire_entreprise_id)
+      and public.a_acces_application(ev.destinataire_entreprise_id, 'reserves')
+      and (p_ids is null or ev.id = any (p_ids))
+  ),
+  inserees as (
+    insert into public.reserves_notifications_lectures (evenement_id, utilisateur_id)
+    select v.id, auth.uid() from visibles v
+    on conflict (evenement_id, utilisateur_id) do nothing
+    returning evenement_id
+  )
+  select count(*) into v_lues from inserees;
+  return v_lues;
+end;
+$function$;
+
+-- [4/11] idem
+CREATE OR REPLACE FUNCTION public.reserves_intervenant_courant(p_intervenant_id uuid)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select p_intervenant_id is not null
+    and auth.uid() is not null
+    and exists (
+      select 1
+      from public.reserves_intervenants i
+      where i.id = p_intervenant_id
+        and i.statut = 'active'
+        and i.entreprise_intervenante_id is not null
+        and public.est_membre_organisation(i.entreprise_intervenante_id)
+        and public.a_acces_application(i.entreprise_intervenante_id, 'reserves')
+    );
+$function$;
+
+-- [5/11] + garde a_acces_application(...,'reserves') (aucune auparavant)
+CREATE OR REPLACE FUNCTION public.reserves_preferences_lire(p_entreprise_id uuid)
+ RETURNS TABLE(categorie text, libelle text, email boolean, contient_critique boolean)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select cat.categorie,
+         cat.libelle,
+         coalesce(pref.email, true),
+         cat.contient_critique
+  from (
+    select t.categorie,
+           min(t.libelle) as libelle,
+           bool_or(t.critique) as contient_critique
+    from public.reserves_notifications_types t
+    group by t.categorie
+  ) cat
+  left join public.reserves_preferences_notifications pref
+    on pref.categorie = cat.categorie
+   and pref.utilisateur_id = auth.uid()
+   and pref.entreprise_id = p_entreprise_id
+  where public.est_membre_organisation(p_entreprise_id)
+    and public.a_acces_application(p_entreprise_id, 'reserves')
+  order by cat.categorie;
+$function$;
+
+-- [6/11] + garde a_acces_application(...,'reserves') (aucune auparavant)
+CREATE OR REPLACE FUNCTION public.reserves_preferences_definir(p_entreprise_id uuid, p_categorie text, p_email boolean)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+begin
+  if auth.uid() is null then raise exception 'Authentification requise'; end if;
+  if not public.est_membre_organisation(p_entreprise_id) then
+    raise exception 'Vous n''êtes pas membre actif de cette organisation';
+  end if;
+  if not public.a_acces_application(p_entreprise_id, 'reserves') then
+    raise exception 'Accès à Réserves non autorisé pour cette organisation';
+  end if;
+  if not exists (
+    select 1 from public.reserves_notifications_types where categorie = p_categorie
+  ) then
+    raise exception 'Catégorie de notification inconnue';
+  end if;
+
+  insert into public.reserves_preferences_notifications (
+    utilisateur_id, entreprise_id, categorie, email
+  ) values (auth.uid(), p_entreprise_id, p_categorie, coalesce(p_email, true))
+  on conflict (utilisateur_id, entreprise_id, categorie)
+  do update set email = excluded.email, updated_at = now();
+end;
+$function$;
+
+-- [7/11] appartenance seule : la personne n'a pas encore d'accès Réserves (l'acceptation le crée)
+CREATE OR REPLACE FUNCTION public.reserves_invitation_accepter(p_token_hash text, p_entreprise_id uuid)
+ RETURNS uuid
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare v_inv public.reserves_invitations;
+begin
+  if auth.uid() is null then raise exception 'Authentification requise'; end if;
+
+  select * into v_inv from public.reserves_invitations
+  where token_hash = p_token_hash
+    and consomme_at is null and revoque_at is null and expire_at > now()
+  for update;
+  if not found then raise exception 'Ce lien d''invitation n''est plus valide'; end if;
+
+  if not public.est_membre_organisation(p_entreprise_id) then
+    raise exception 'Vous n''êtes pas membre actif de cette organisation';
+  end if;
+  if p_entreprise_id = v_inv.entreprise_id then
+    raise exception 'Une organisation ne peut pas intervenir sur son propre chantier en tant qu''entreprise invitée';
+  end if;
+  -- Lien nominatif : s'il désigne une organisation, il ne rattache que celle-là.
+  if v_inv.entreprise_cible_id is not null and v_inv.entreprise_cible_id <> p_entreprise_id then
+    raise exception 'Ce lien a été émis pour une autre organisation';
+  end if;
+
+  -- Rattachement de l'intervention. `statut` reste « invitee » jusqu'ici : la ligne
+  -- devient active dans le même geste, puisque la personne qui accepte EST le tiers.
+  update public.reserves_intervenants
+  set entreprise_intervenante_id = p_entreprise_id,
+      statut = 'active',
+      invite_at = coalesce(invite_at, now()),
+      rejoint_at = now(),
+      onboarding_statut = 'rattachee'
+  where id = v_inv.intervenant_id
+    and statut = 'invitee'
+    and (entreprise_intervenante_id is null or entreprise_intervenante_id = p_entreprise_id);
+  if not found then
+    raise exception 'Cette intervention n''est plus au statut « invitée »';
+  end if;
+
+  -- Compte gratuit limité : accès applicatif à l'organisation, habilitation minimale à
+  -- la personne. `do nothing` de part et d'autre : un client Réserves payant ne voit
+  -- jamais son propre droit ni son rôle réécrits par l'invitation d'un tiers.
+  insert into public.acces_applications_entreprises (
+    entreprise_id, application_code, autorise, source, reference_externe
+  ) values (
+    p_entreprise_id, 'reserves', true,
+    'reserves_invitation_gratuite', v_inv.intervenant_id::text
+  )
+  on conflict (entreprise_id, application_code) do nothing;
+
+  insert into public.habilitations_applications_utilisateurs (
+    entreprise_id, utilisateur_id, application_code, role_code, autorise, attribue_par
+  ) values (
+    p_entreprise_id, auth.uid(), 'reserves', 'reserves_intervenant', true, auth.uid()
+  )
+  on conflict (entreprise_id, utilisateur_id, application_code) do nothing;
+
+  update public.reserves_invitations
+  set consomme_at = now(),
+      consomme_par = auth.uid(),
+      consomme_entreprise_id = p_entreprise_id
+  where id = v_inv.id;
+
+  insert into public.historique_acces_applications (
+    cible_type, cible_id, application_code, action, auteur_email
+  ) values (
+    'entreprise', p_entreprise_id, 'reserves',
+    'reserves_invitation_acceptee:' || v_inv.intervenant_id::text, auth.email()
+  );
+
+  return v_inv.intervenant_id;
+end;
+$function$;
+
+-- [8/11] appartenance seule : liste ce que la personne peut rejoindre AVANT d'être habilitée
+CREATE OR REPLACE FUNCTION public.reserves_invitations_en_attente()
+ RETURNS TABLE(intervenant_id uuid, nom text, entreprise_intervenante_id uuid)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  select i.id, i.nom, i.entreprise_intervenante_id
+  from public.reserves_intervenants i
+  where i.statut = 'invitee'
+    and i.entreprise_intervenante_id is not null
+    and auth.uid() is not null
+    and public.est_membre_organisation(i.entreprise_intervenante_id)
+  order by i.created_at desc;
+$function$;
+
+-- [9/11] appartenance seule : l'habilitation est créée par ce geste
+CREATE OR REPLACE FUNCTION public.reserves_rejoindre_intervention(p_intervenant_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+declare v_cible uuid;
+begin
+  select entreprise_intervenante_id into v_cible
+  from public.reserves_intervenants where id = p_intervenant_id and statut = 'invitee';
+  if v_cible is null then raise exception 'Aucune invitation en attente pour cet intervenant'; end if;
+  if not public.est_membre_organisation(v_cible) then
+    raise exception 'Vous n''êtes pas membre actif de l''entreprise invitée';
+  end if;
+
+  -- Habilitation gratuite au rôle strictement limité. `do nothing` protège un rôle
+  -- Réserves supérieur déjà détenu par l'utilisateur dans sa propre organisation.
+  insert into public.habilitations_applications_utilisateurs (
+    entreprise_id, utilisateur_id, application_code, role_code, autorise, attribue_par
+  ) values (
+    v_cible, auth.uid(), 'reserves', 'reserves_intervenant', true, auth.uid()
+  )
+  on conflict (entreprise_id, utilisateur_id, application_code) do nothing;
+
+  update public.reserves_intervenants
+  set statut = 'active', rejoint_at = now()
+  where id = p_intervenant_id;
+
+  insert into public.historique_acces_applications (
+    cible_type, cible_id, application_code, action, auteur_email
+  ) values ('utilisateur', auth.uid(), 'reserves', 'intervenant_rejoint', auth.email());
+end;
+$function$;
+
+-- [10/11] policy reserves_notifications_select (reserves_evenements_notifications) — même commande, même rôle.
+alter policy reserves_notifications_select on public.reserves_evenements_notifications
+  using (
+    destinataire_entreprise_id is not null
+    and public.est_membre_organisation(destinataire_entreprise_id)
+    and public.a_acces_application(destinataire_entreprise_id, 'reserves')
+  );
+
+-- [11/11] policy reserves_annuaire_select (reserves_annuaire_publication) — même commande, même rôle.
+-- Une organisation ne lit que SA fiche d'annuaire ; désormais aussi seulement si elle a le droit d'usage Réserves.
+alter policy reserves_annuaire_select on public.reserves_annuaire_publication
+  using (
+    public.est_membre_organisation(entreprise_id)
+    and public.a_acces_application(entreprise_id, 'reserves')
+  );
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- RETOUR ARRIÈRE (à jouer manuellement ; les corps d'origine sont ceux de la migration 20260907000270 ;
+-- rejouer chaque `create or replace` en remplaçant est_membre_organisation par est_membre_actif et en retirant
+-- les deux gardes ajoutées à preferences_lire/preferences_definir, puis :)
+--   alter policy reserves_notifications_select on public.reserves_evenements_notifications
+--     using (destinataire_entreprise_id is not null and public.est_membre_actif(destinataire_entreprise_id)
+--            and public.a_acces_application(destinataire_entreprise_id, 'reserves'));
+--   alter policy reserves_annuaire_select on public.reserves_annuaire_publication
+--     using (public.est_membre_actif(entreprise_id));
+-- ═══════════════════════════════════════════════════════════════════════════════

@@ -1,21 +1,20 @@
-# ELSATIA — Convergence d'accès inter-applications — V1
+# ELSATIA — Convergence d'accès inter-applications — V1.1
 
-Date : 2026-09-20 · Branche de travail `fix/app-access-convergence-v1` (locale, **non poussée**) · **Rien déployé, ni Preview ni Production touchés, aucun prix ni plan modifié, Studio non refondu.**
+Date : 2026-09-20 (V1) · **mise à jour 2026-09-21 : décisions D1/D2/D3 de Julien intégrées** · Branche de travail `fix/app-access-convergence-v1` (locale, **non poussée**) · **Rien déployé, ni Preview ni Production touchés, aucun prix ni plan modifié, Studio non refondu.**
 Suite de l'audit `docs/audits/ELSATIA_APP_FIRST_ACCESS_AUDIT_V1.md` (mêmes identifiants de constats).
 
 ## 0. Résumé
 
 | Sujet | Résultat |
 | --- | --- |
-| Base de travail | `fix/colors-shared-auth-access-night-v1` @ `d7d59c9e` = **Train V3 (`59e960a0`) + 30 commits** (Colors V1.5, compte partagé, correctifs Réserves du 2026-09-20). C'est la version la plus récente et la plus complète de Colors/Réserves/Tools qui contient V3 |
-| P1 « open-redirect Réserves » | **Déjà corrigé à la base** (`96db69fc`, validateur identique à Colors, 37 tests). Non redoublé. J'ai ajouté les cas Réserves demandés et un test **au niveau de l'action** |
-| P1 « logout global sur refus » | **Corrigé** (Colors + Réserves) et **prouvé sur un vrai GoTrue** : `scope:'local'` laisse GP/Réserves connectés, `signOut()` les coupe instantanément (§4) |
-| P0 « Colors 265 boucle sur `/acces-refuse` » | Cause, commit correcteur et **port minimal en 5 fichiers** identifiés et testés sur une copie de Colors 265 (§3). **Ne jamais déployer Colors 265 tel quel** |
-| Écart GP (`droit_acces=true` / `a_acces_application=false`) | Expliqué ligne à ligne : **deux modèles sans brique commune**. Convergence en 3 paliers, **palier 0 = observation seule** (§6). Rien codé côté GP |
-| Contrat `decision_acces_application` | Livré en **contrat TypeScript testé** + **prototype SQL non numéroté validé 59/59** sur base jetable (279 migrations), invariant `autorise ⇔ a_acces_application` : 0 violation (§7) |
-| API | 2 corrections triviales appliquées (Colors 403/503 JSON ; Réserves PDF 503 sur erreur RPC), helper commun prêt, reste documenté (§9) |
-| Tools | Free jamais bloqué, contrat écrit. **2 P1 côté cloud** (RLS/RPC `tools_projects` sans entitlement) (§8) |
-| Studio | Écart documenté ; signup fermé **contournable en un appel** (P1), correctif proposé, non appliqué (§10) |
+| Base de travail | `fix/colors-shared-auth-access-night-v1` @ `d7d59c9e` = **Train V3 (`59e960a0`) + 30 commits** — la version la plus récente et la plus complète de Colors/Réserves/Tools qui contient V3 |
+| **D1 — GP exige l'habilitation** | **Étapes 1 et 2 livrées, étape 3 NON activée.** Observation (`off` par défaut, `enforce` rétrogradé, aucun blocage, 68 tests de non-régression du proxy) ; backfill en fonctions SQL (5 `certain` / 12 `ambigu` sur le jeu d'essai, **0 non couvert** après, aucun prix ni plan touché) ; enforcement = checklist seulement (§6) |
+| **D2 — Tools** | **P1 T-P1-a fermé en proposition** : projet d'organisation = membre `actif` + entitlement Pro (`saved-projects`) + droit projet, bornes de taille/quota, SQLSTATE stables ; Free jamais bloqué. Avant : Free et ex-abonné écrivaient dans le cloud ; **pas d'IDOR** inter-organisation (§8) |
+| **D3 — suspension par application** | **Contrat figé** (`suspension_plateforme` ajouté, `entreprise_inactive` retiré, `abonnement_suspendu` = statut de CETTE application). Découplage prouvé : GP suspendu ⇒ Colors/Réserves/Tools autorisés **et leurs données visibles**, 0 régression sur 14×3×6×6 (§7, §7bis). **Limite : la suspension plateforme ne coupe pas encore les données GP** |
+| Contrat `decision_acces_application` | v1 **figé** : 14 étapes de priorité, 66 + 103 pgTAP, 103 cas, invariant `autorise ⇔ a_acces_application` : 0 violation |
+| Studio | **Signup fermé corrigé sur une branche isolée** `fix/studio-signup-closed-v1` @ `634651a0` ; prouvé sur GoTrue réel (avant 200 / après 403). **Le hook doit être réglé sur le projet hébergé** (§10) |
+| P1 open-redirect Réserves / logout global / Colors 265 | inchangés (lot V1) : déjà corrigé à la base / corrigé et **prouvé sur GoTrue réel** / cause + port minimal, **ne jamais déployer la 265** (§3-§5) |
+| Rejeu | vitest 258 + 435 + 216 + 108 ; pgTAP des 4 propositions appliquées **ensemble** + 19 fichiers existants rejoués (seul `r10` original échoue, par conception, version adaptée fournie) (§16) |
 
 ## 1. Base de travail et validation du patch précédent
 
@@ -34,11 +33,11 @@ Suite de l'audit `docs/audits/ELSATIA_APP_FIRST_ACCESS_AUDIT_V1.md` (mêmes iden
 
 | Application | Auth | Organisation | Entitlement | Rôle | Suspension | Logout local | Motif affiché | État |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| **Gestion Pro** | cookie SSR propre à l'origine ; proxy `getUser()`, `/login` sans `next` | `entreprise_active_id` + `utilisateurs_entreprises.statut` ; sans entreprise → `/onboarding` **(création ouverte à tout compte)** | abonnement / offre / `modules_entreprises` (+ socle d'essai). **`acces_applications_entreprises` jamais lue** | **permissions de poste** (`permissions_poste`). Habilitation `gestion_pro_*` **jamais lue** | **écran dédié** `/abonnement-suspendu` (seule app) | sans objet (GP ne déconnecte pas sur refus) ; déconnexion volontaire = `signOut()` **global** (à trancher, §11) | module non inclus (clé brute) ; refus de rôle **muet** (`?acces=refuse` non lu) ; `/en-attente` faux pour un compte désactivé | **hors modèle multi-app** — convergence par paliers (§6) |
+| **Gestion Pro** | cookie SSR propre à l'origine ; proxy `getUser()`, `/login` sans `next` | `entreprise_active_id` + `utilisateurs_entreprises.statut` ; sans entreprise → `/onboarding` **(création ouverte à tout compte)** | abonnement / offre / `modules_entreprises` (+ socle d'essai). **`acces_applications_entreprises` jamais lue** | **permissions de poste** (`permissions_poste`). Habilitation `gestion_pro_*` **jamais lue** | **écran dédié** `/abonnement-suspendu` (seule app) | sans objet (GP ne déconnecte pas sur refus) ; déconnexion volontaire = `signOut()` **global** (à trancher, §11) | module non inclus (clé brute) ; refus de rôle **muet** (`?acces=refuse` non lu) ; `/en-attente` faux pour un compte désactivé | **hors modèle multi-app → D1 : observation livrée, backfill préparé, enforcement non activé** (§6) |
 | **Colors** | cookie SSR ; proxy = rafraîchissement seul ; garde au layout `exigerShellColors` | `contexte_application_courant` | `acces_applications_entreprises` via `a_acces_application` | `habilitations_applications_utilisateurs` | non distinguée : « n'est pas activé » | **oui — appliqué** (4 sites de refus) ; volontaire/mot de passe = global | codes fermés (login) ; `/acces-refuse`, `/abonnement-requis` (sans boucle en V3+) | **OK** ; API : 403/503 JSON **appliqués** ; motif fin dépend du contrat §7 |
-| **Tools** | supabase-js **client** (aucun serveur) ; compte facultatif | facultative (`tools_lister_entreprises_autorisees`) pour le cloud | **par utilisateur** (`entitlements_utilisateurs_elsatia`), Free par défaut | `tools_pro` (habilitation d'organisation) pour le cloud seulement | coupe le cloud via `est_membre_actif` → Free | **déjà local** (`AccountProvider.tsx:96`) | unique : « mode Free » | **contrat particulier** (§8) ; **2 P1 cloud** |
+| **Tools** | supabase-js **client** (aucun serveur) ; compte facultatif | facultative (`tools_lister_entreprises_autorisees`) pour le cloud | **par utilisateur** (`entitlements_utilisateurs_elsatia`), Free par défaut | `tools_pro` (habilitation d'organisation) pour le cloud seulement | coupe le cloud via `est_membre_actif` → Free | **déjà local** (`AccountProvider.tsx:96`) | unique : « mode Free » | **contrat particulier** (§8) ; RLS/RPC cloud durcies **en proposition** (D2) |
 | **Réserves** | cookie SSR ; proxy = rafraîchissement + CSP ; garde layout **et** par page | `contexte_application_courant` | `a_acces_application` (droit d'usage) | habilitation (`reserves_*`) + invitations (lien, désignation) | non distinguée (« pas encore ouvert ») | **oui — appliqué** (4 sites) ; volontaire = global | codes fermés ; `/acces-refuse` (action réelle : `reserves_attribuer_role`) | **OK** ; open-redirect fermé (base) ; API « anonyme ≈ sans organisation » (P2) |
-| **Studio** | **Auth dédiée** prévue (`config.toml`) — README dit « partagée » (contradiction) | **workspace** (`studio_workspaces`), pas d'entreprise | **aucun à l'exécution** ; filtre à l'inscription seulement | `studio_workspace_members` (owner/admin/editor/viewer) | kill-switch global 503 ; `admission_open` | sans objet (aucun refus par droit d'app) | login générique ; invitation « indisponible » (sans oracle) | **isolé** ; raccord = lot séparé ; signup fermé contournable (P1) |
+| **Studio** | **Auth dédiée** prévue (`config.toml`) — README dit « partagée » (contradiction) | **workspace** (`studio_workspaces`), pas d'entreprise | **aucun à l'exécution** ; filtre à l'inscription seulement | `studio_workspace_members` (owner/admin/editor/viewer) | kill-switch global 503 ; `admission_open` | sans objet (aucun refus par droit d'app) | login générique ; invitation « indisponible » (sans oracle) | **isolé** ; raccord = lot séparé ; signup fermé **corrigé sur branche isolée** (§10) |
 
 ## 3. Colors : la divergence 265 / V3 / base
 
@@ -94,105 +93,122 @@ Correctif à la base (`96db69fc`) : `cheminSur` et `/auth/callback` passent par 
 
 GP a son propre validateur (`destinationInterneSure`, `src/lib/security/redirects.ts`) : **trois copies** du même principe. Convergence proposée : extraire dans `packages/application-access` (lot séparé, non trivial : trois signatures différentes).
 
-## 6. GP hors modèle multi-app
+## 6. Gestion Pro — D1 : habilitation `gestion_pro` exigée, en 3 étapes (observation et backfill livrés, **enforcement NON activé**)
 
-Analyse détaillée : `annexe-gp-ecart-modele.md`. **Aucun code GP modifié.**
+**Décision D1 (Julien)** : GP exige une habilitation applicative ; le poste n'est plus la seule porte. Modèle cible : compte ELSATIA → organisation → membership actif → entitlement / habilitation `gestion_pro` → rôle / poste → permissions métier. **Jamais d'enforcement direct sur les utilisateurs existants.** Détail complet : `annexe-d1-gp-observation-backfill.md` ; analyse de l'écart d'origine : `annexe-gp-ecart-modele.md`.
 
-**Pourquoi GP autorise alors que `a_acces_application` refuse** [LU, prouvé par l'audit précédent] — les deux décisions ne partagent **aucune brique** :
+**Rappel de l'écart** [LU + exécuté] : le proxy GP décide sur `contexte_acces_proxy` (`utilisateurs_entreprises × permissions_poste`) ; `a_acces_application` exige un droit d'usage d'organisation **et** une habilitation. Aucune brique commune ; aucun trigger/backfill ne crée d'habilitation `gestion_pro`. Donc un compte au poste valide mais sans habilitation passe le proxy (`droit_acces=true`) alors que la décision dit `false`.
 
-| Couche | `a_acces_application` | GP (proxy) |
+| Étape | Statut | Contenu |
 | --- | --- | --- |
-| Organisation | `est_membre_actif` (statut `actif` + abonnement ∉ {suspendu, annulé}) | `utilisateurs_entreprises.statut='actif'` + `entreprise.ts:172-203` |
-| Abonnement / offre | `acces_applications_entreprises` (fenêtre) | `entreprises.abonnement_*`, `modules_entreprises`, socle d'essai |
-| Habilitation / rôle | oui | **jamais** |
-| Permission de poste | jamais | oui (`contexte_acces_proxy` : `ue × permissions_poste`, migration `…000117:52-65`) |
+| **1. Observation** | **livrée, `off` par défaut** | flag `ELSATIA_GP_ACCES_APP` = `off` (défaut, valeur inconnue comprise) \| `observe`. **`enforce` n'existe pas** : la valeur est reconnue puis **rétrogradée en `observe`** avec l'avertissement « enforcement non implémenté : qualification du backfill requise ». En `observe`, après la réponse (`after()`, valide dans un proxy Next 16), le proxy appelle `decision_acces_application('gestion_pro', entreprise)` (délai 400 ms, échantillon 1 %, exemptions : chemins publics/machine, compte dépôt, assistance, admin plateforme, `/onboarding`, `/abonnement*`, sortie d'essai…), compare à la décision GP actuelle et **journalise** une ligne JSON sans PII (identifiants hachés) : `gp_autorise_decision_refuse` (le cas bloquant), `gp_refuse_decision_autorise`, `concordant_*`, `decision_indisponible`. RPC absente (`42883`/`PGRST202`, Production ledger 210) : un seul avertissement, puis silence. **Ne bloque personne** : 68 tests prouvent que statut, destination, en-têtes et cookies du proxy sont **identiques** au mode `off` sur 11 scénarios × 6 comportements de la RPC |
+| **2. Backfill** | **livré comme fonctions SQL, rien écrit à l'application** | `gp_backfill_rapport()` (certain / ambigu / exclu + raison), `gp_backfill_couverture()` (**critère de sortie**), `gp_backfill_appliquer(p_appliquer default false, p_entreprise_id)` (simulation par défaut, canari par organisation, insère **uniquement** les `certain`, `on conflict do nothing`, historisé, idempotent), `gp_backfill_retour_arriere()`. Exécutables par `postgres` seul (garde interne contre tout JWT applicatif). Règles durcies : tout doute = `ambigu` ; poste « Admin » sans `gerer_utilisateurs`, employé sorti/fermé, statut `pause`, `entreprise_active_id` incohérente, organisation suspendue/annulée, compte dépôt, geste plateforme `autorise=false` → **jamais backfillés** |
+| **3. Enforcement** | **préparé en documentation seulement — aucun code actif** | checklist chiffrée (0 écart / 14 j en Préproduction, 0 / 7 j en Production, 0 `non_couvert`, revue humaine de 100 % des ambigus, trigger/RPC d'habilitation pour les nouveaux membres, habilitation par l'administrateur d'entreprise, retour arrière par flag ≤ 5 min), design (fusion dans `contexte_acces_proxy` plutôt qu'une RPC de plus sur le chemin critique), E2E par cas |
 
-Le socle multi-app a été porté depuis Colors et « n'accorde aucun droit automatiquement » (`…000234:1-7`) ; **GP n'y a jamais été branché**. Aucun trigger/backfill ne crée d'habilitation `gestion_pro` (bootstrap, rejoindre par code, activer compte employé, Stripe, essai : **non** partout) ; seuls les RPC plateforme (`total` + AAL2) et Réserves écrivent ces tables.
+> **L'enforcement ne doit pas être fusionné sans preuve que le backfill couvre les utilisateurs existants.**
 
-**Conséquences** : (1) désactiver GP pour une organisation côté plateforme n'a **aucun effet** dans GP ; (2) exiger `a_acces_application` demain **coupe tous les membres actuels** (aucune habilitation, aucune ligne `gestion_pro`) ; (3) l'assistance ne peut pas ouvrir de session GP sans droit d'usage (`…000277:675-686`).
+**Preuve du backfill** [EXÉCUTÉ, 73/73 pgTAP, base jetable] : fixtures historiques réalistes → **5 `certain`, 12 `ambigu`** (+ 6 `exclu`) ; couverture avant 0 couvert / 5 non couverts, **après 5 couverts / 0 non couvert / 12 ambigus** ; un `certain` passe de `application_non_incluse`/`sans_habilitation` à `autorise` ; **un ambigu sans poste reste `sans_habilitation` : l'enforcement le couperait** — d'où la revue humaine obligatoire. Hash avant/après de 13 tables (`entreprises`, `modules_entreprises`, `plans_abonnement`, postes, permissions, tarifs, capacité…) **identique** : aucun prix ni plan touché (un témoin négatif prouve que le hash détecte une modification).
 
-**Convergence proposée — 3 paliers, aucun n'est appliqué** :
+**Fichiers** : `src/lib/acces-gp/{mode,comparaison,observation}.ts` (+ 4 fichiers de tests, **209 tests**), `src/lib/supabase/proxy.ts` (+20 lignes : import, amorçage, un `completer()`), `supabase/proposed/gp_backfill_habilitations_v1.sql.proposed`, `supabase/proposed/tests/gp_backfill_habilitations.test.sql`.
 
-| Palier | Contenu | Risque | Retour arrière |
-| --- | --- | --- | --- |
-| **0 — observation** | flag `ELSATIA_GP_ACCES_APP=observe` : le proxy appelle `a_acces_application` en parallèle (échantillonné, `try/catch`, RPC absente en Production ledger 210) et **journalise l'écart** sans rien changer | quasi nul | retirer la variable |
-| **1 — backfill + triggers** | migration additive idempotente : `acces_applications_entreprises(gestion_pro, source='backfill_gp_socle')` pour les entreprises ≠ `annule` ; habilitation `gestion_pro_admin`/`_utilisateur` pour chaque membre `actif` ; triggers sur activation / poste / création d'entreprise. **Aucune colonne de prix ni de plan** (vérifié : ces tables n'en ont pas) ; ne jamais écrire `modules_entreprises`, `abonnement_offre`, `capacite_*` | moyen (effets visibles : sélecteur d'applications, compteurs d'annuaire) | suppression par `source`/`attribue_par is null` ; `drop trigger` |
-| **2 — enforcement** | `…=enforce`, **seulement** si l'écart mesuré est nul 7 jours, avec exemptions : `PUBLIC_PATHS`, webhooks Stripe, crons, `paie/import`, Powens, portail `/document`, `/imprimer/partage`, `/api/tools/monetization/*`, sortie d'essai, onboarding, `/plateforme*`, comptes dépôt, sessions d'assistance | élevé | repasser à `observe` |
+**Risques pour les utilisateurs historiques** : sans backfill un enforcement couperait **tous** les membres actuels ; après backfill les **ambigus** (12 sur 17 dans le jeu d'essai) restent coupés → la revue humaine bloque ; sans trigger ni RPC d'habilitation (D-9), chaque nouvel employé exigerait un geste ELSATIA ; le backfill fait apparaître GP dans le sélecteur d'applications, monte les compteurs d'annuaire, rend GP ciblable par l'assistance ; l'échantillon de 1 % peut mettre des jours à voir un cas rare (100 % en Préproduction) ; **Production au ledger 210** : ni ces tables ni la RPC — l'observation y reste muette, aucun backfill avant le cutover. Retour arrière : observation = retirer la variable ; backfill = `gp_backfill_retour_arriere()` (ne retire que ce qui n'a pas été retouché). **Reste DECISION_REQUIRED** : D-1 à D-12 de l'annexe D1 (backfiller les organisations suspendues ? rôle du compte dépôt ? poste « Admin » sans permission ? migration = fonctions seules ou backfill exécuté — défaut : fonctions seules ; indisponibilité de la RPC en enforcement, ouvert ou fermé — défaut : ouvert avec alerte).
 
-**Risques utilisateurs historiques** : tous les membres actuels perdraient l'accès au palier 2 sans palier 1 ; comptes dépôt/borne (`est_compte_depot_courant`) à classer ; entreprise repassant d'`annule` à actif à couvrir par trigger ; **Production au ledger 210** (tables absentes) → aucun palier 1/2 avant la migration de cutover. Migration : **numéro non réservé** (`NEXT_MIGRATION_AFTER_CONVERGED_TRAIN`). **Non trivial, hors petit lot** : fusion `contexte_acces_proxy` / `a_acces_application`, chemin d'habilitation par l'admin d'entreprise (aujourd'hui `total`+AAL2 seulement), rôle applicatif vs poste.
+## 7. Contrat `decision_acces_application` — **v1 FIGÉ** (2026-09-21)
 
-## 7. Contrat `decision_acces_application` (v1)
+Livrables : `packages/application-access/src/decision-acces.ts` (+ test, 44 tests), `refus-api.ts`, `sql/decision_acces_application.sql.proposed` (**non numéroté, hors `supabase/migrations`**), `supabase/proposed/per_application_status_and_platform_suspension_v1.sql.proposed` (prérequis), pgTAP `supabase/proposed/tests/decision_acces_application.test.sql` (66) et `per_application_status.test.sql` (103), jeu d'essai `docs/qualification/access-convergence-v1/decision-cases.sql` (103 cas). Détail D3 : `annexe-d3-suspension-par-application.md`.
 
-Livrables : `packages/application-access/src/decision-acces.ts` (+ test), `refus-api.ts`, `sql/decision_acces_application.sql.proposed` (**non numéroté, non dans `supabase/migrations`**), `docs/qualification/access-convergence-v1/decision-cases.sql` + `.results.txt`.
+**Changements par rapport à la première version** (décision D3) : `entreprise_inactive` **retiré** (couvert par `suspension_plateforme`, portée organisation) ; `suspension_plateforme` **ajouté** ; `abonnement_suspendu` = statut commercial de **CETTE application** (jamais celui d'une autre) ; `a_acces_application` est **réécrite** = « la décision est `autorise` pour l'utilisateur courant », signature/GRANT/REVOKE inchangés.
 
 ### 7.1 Signature
-`decision_acces_application(p_application_code text, p_entreprise_id uuid default null) returns jsonb` — `security definer`, `stable`, `authenticated` seulement. `a_acces_application` **reste** (compat.) ; à terme `= (decision_acces_application(...)->>'decision') = 'autorise'`.
+`decision_acces_application(p_application_code text, p_entreprise_id uuid default null) returns jsonb` — `security definer`, `stable`, `authenticated` seulement (`service_role` retiré). Noyau `_decision_acces_noyau(uid, entreprise, app)` inaccessible aux rôles applicatifs. Vue admin `diagnostic_acces_application(utilisateur, entreprise, app)` : administrateur plateforme uniquement (42501 sinon).
 
 ### 7.2 Retour (vue client)
 ```json
 { "version": 1, "decision": "abonnement_suspendu", "application_code": "colors",
   "role_code": null, "entreprise": { "id": "…", "nom": "…" } }
 ```
-`role_code` : seulement si `autorise`. `entreprise` : seulement si l'appelant **possède une appartenance** (tout statut) à cette entreprise ; sinon `null`.
+`role_code` : seulement si `autorise`. `entreprise` : seulement si l'appelant possède une appartenance (tout statut) ; sinon `null`.
 
-### 7.3 Décisions et **priorité d'évaluation** (la première qui s'applique gagne)
+### 7.3 Décisions et **priorité** (la première qui s'applique gagne)
 
 | # | Décision | Règle | HTTP | Écran cible |
 | --- | --- | --- | --- | --- |
 | 1 | `non_authentifie` | `auth.uid() is null` | 401 | login |
-| 2 | `erreur_configuration` | application inconnue/inactive, statut de membre inconnu, entreprise introuvable | 500 | erreur technique |
-| 3 | `autorise` (bypass) | administrateur plateforme actif, identité active, application active | 200 | application |
-| 4 | `sans_organisation` | `entreprise_id` nul ou **aucune** appartenance | 403 | GP : onboarding ; ailleurs : compte ELSATIA |
-| 5 | `invitation_en_attente` | membre `invite` | 403 | accepter l'invitation |
-| 6 | `validation_en_attente` | membre `en_attente_validation` (rejoint par code) | 403 | attendre la validation |
-| 7 | `utilisateur_desactive` | membre `desactive` | 403 | compte désactivé |
-| 8 | `entreprise_inactive` | `abonnement_statut='annule'` (hors session d'assistance) | 423 | entreprise inactive |
-| 9 | `abonnement_suspendu` | `suspendu` ou `suspension_prevue_at ≤ now()` (hors assistance) | 423 | suspendu (dédié) |
+| 2 | `erreur_configuration` | application inconnue/inactive, statut de membre inconnu (`pause`…), entreprise introuvable | 500 | erreur technique |
+| 3 | **`suspension_plateforme`** | suspension GLOBALE explicite (sécurité plateforme) du **compte** ou de l'**organisation** — table dédiée, écrite par RPC `total` + AAL2 ; **prime sur tout, bypass administrateur compris** | 423 | suspension plateforme (contacter ELSATIA) |
+| 4 | `autorise` (bypass) | administrateur plateforme actif, identité active, application active | 200 | application |
+| 5 | `sans_organisation` | `entreprise_id` nul ou **aucune** appartenance | 403 | GP : onboarding ; ailleurs : compte ELSATIA |
+| 6 | `invitation_en_attente` | membre `invite` | 403 | accepter l'invitation |
+| 7 | `validation_en_attente` | membre `en_attente_validation` | 403 | attendre la validation |
+| 8 | `utilisateur_desactive` | membre `desactive` | 403 | compte désactivé |
+| 9 | **`abonnement_suspendu`** | **de CETTE application** : `gestion_pro` → `entreprises.abonnement_statut ∈ {suspendu, annule}` ou `suspension_prevue_at` échue ; toute autre application → `statut_commercial` de **sa** ligne d'entitlement d'organisation | 423 | suspendu (dédié) |
 | 10 | `essai_expire` | droit d'usage hors fenêtre **et** `source='essai'` | 423 | essai expiré → offres |
 | 11 | `application_non_incluse` | pas de droit d'usage, désactivé, ou hors fenêtre (hors essai) | 403 | abonnement / offres |
-| 12 | `sans_habilitation` | aucune ligne d'habilitation pour cette application | 403 | accès refusé |
-| 13 | `sans_role` | habilitation existante mais inopérante : `autorise=false`, hors fenêtre, rôle inactif | 403 | accès refusé |
+| 12 | `sans_habilitation` | aucune habilitation pour cette application | 403 | accès refusé |
+| 13 | `sans_role` | habilitation inopérante : `autorise=false`, hors fenêtre, rôle inactif | 403 | accès refusé |
 | 14 | `autorise` | tout le reste, avec `role_code` | 200 | application |
 
-**Pourquoi cet ordre** : (a) les états **personnels** (4-7) précèdent les états **d'entreprise** (8-10), sinon on révèle à un non-membre, ou à un membre en attente/désactivé, l'état commercial de l'entreprise — c'est le défaut P1-7 de l'audit ; (b) entreprise → droit d'usage → habilitation → rôle : du plus général au plus fin ; (c) `erreur_configuration` avant tout jugement métier (échec fermé).
-
-**Décisions produites côté client, jamais par la base** : `indisponible` (RPC muette : 503, **jamais un refus, jamais une déconnexion**, réessayable) ; `refus_non_qualifie` (adaptateur transitoire d'un `false` de l'ancienne RPC).
-Hors contrat, **volontairement** : les **permissions métier de poste** (couche 5, `permission_refusee`, restent à GP) et le **module non inclus** (grain fin GP).
+**Pourquoi cet ordre** : les états **personnels** (5-8) précèdent les états **d'entreprise** (9-10) — on ne révèle pas l'état commercial d'une entreprise à un non-membre, à un invité ou à un désactivé ; entreprise → droit d'usage → habilitation → rôle : du plus général au plus fin ; `erreur_configuration` avant tout jugement métier (échec fermé) ; la suspension plateforme prime sur le bypass administrateur car c'est **la seule** décision qui coupe tout le compte.
+**Côté client uniquement** : `indisponible` (RPC muette : 503, jamais un refus, jamais une déconnexion) et `refus_non_qualifie` (adaptateur transitoire d'un `false`). **Hors contrat** : permissions métier de poste (couche 5, restent à GP) et module non inclus (grain fin GP).
 
 ### 7.4 Exposable au client / réservé aux logs et administrateurs
 
-| Exposable (vue client) | Réservé aux logs serveur et administrateurs (`diagnostic_acces_application`, administrateur plateforme) |
+| Exposable (vue client) | Réservé aux logs serveur et administrateurs (`diagnostic_acces_application`) |
 | --- | --- |
-| code de décision, application, **son propre** rôle, nom de l'entreprise **s'il en est membre** | statut d'abonnement brut, `suspension_prevue_at`, fenêtres de validité, `source` du droit, identifiants de lignes, `attribue_par`, autres appartenances, bypass utilisé, message d'erreur SQL |
-| action suggérée (`regulariser_abonnement` seulement pour un administrateur de l'entreprise) | jamais de PII dans les logs applicatifs : décision + application + hash de l'utilisateur |
+| code de décision, application, **son propre** rôle, nom de l'entreprise **s'il en est membre** ; jamais de nom pour `suspension_plateforme`, `sans_organisation`, `non_authentifie` | statut d'abonnement brut, `suspension_prevue_at`, `statut_commercial`, fenêtres de validité, `source`, identifiants de lignes, `attribue_par`, motif et auteur de la suspension plateforme, autres appartenances, bypass utilisé, message d'erreur SQL |
+| action suggérée (`regulariser_abonnement` seulement pour un administrateur de l'entreprise) | logs applicatifs : décision + application + **hash** de l'utilisateur, jamais de PII |
 
-**Prouvé** : un compte sans appartenance qui pointe `entreprise_active_id` vers une entreprise suspendue tierce obtient `{"decision":"sans_organisation","entreprise":null}` — **aucune fuite**, contrairement à `contexte_abonnement_courant` (U1). Le noyau `_decision_acces_noyau` n'est appelable par aucun rôle applicatif ; le diagnostic est refusé à un non-administrateur (42501).
+### 7.5 Validation exécutée (base jetable, 279 migrations)
+pgTAP : `decision_acces_application` **66/66**, `per_application_status` **103/103** ; jeu d'essai **103/103**, invariant `decision='autorise' ⇔ a_acces_application` **0 violation**, 0 décision hors contrat. **Différentiel contre l'ancienne `a_acces_application` (migration 234)** : 14 utilisateurs × 3 organisations × 6 applications × 6 états (GP annulé, suspension prévue échue, essai expiré…) → **0 refus nouveau, 0 autorisation nouvelle pour `gestion_pro`** ; seule différence = le découplage voulu (§7bis). ACL et signature identiques. TypeScript (`decision-acces.test.ts`, 44 tests) : matrice situation → écran / statut / déconnexion, invariants, lecture **fail-closed**, `PORTEE_SUSPENSION` (D3 encodé dans le contrat).
 
-### 7.5 Validation exécutée (base jetable, 279 migrations, `decision-cases.results.txt`)
-59 cas → **59 PASS** : les 7 situations demandées (sans organisation, sans entitlement, sans rôle, suspendu, autorisé, désactivé, invitation) × 4 applications, plus entreprise annulée, essai expiré, validation en attente, suspension prévue échue, habilitation hors fenêtre, application inconnue, absence de jeton, Julien tel que documenté (`en_attente` → `sans_organisation`). **Invariant `decision='autorise' ⇔ a_acces_application` : 0 violation.**
-Côté TypeScript (`decision-acces.test.ts`, 40 tests) : matrice situation → écran / statut / déconnexion, invariants (seul `autorise` rend 200 ; aucune décision ne prescrit une déconnexion globale ; une panne n'est jamais `sans_organisation`), lecture **fail-closed** (`true`, objet vide, code inconnu, version ultérieure → `erreur_configuration`, jamais `autorise`).
+### 7.6 Points ouverts du contrat (`DECISION_REQUIRED`, défauts conservateurs appliqués)
+`diagnostic` : administrateur actif seulement (ou `total` + AAL2 ?) · **AAL2 du bypass administrateur** (aucune exigence aujourd'hui) · statut d'appartenance `pause` → `erreur_configuration` (fail-closed) · ordre 10/11 (un droit `autorise=false` avec fenêtre d'essai échue reste `application_non_incluse`) · `annule` et `suspendu` hors GP = même code (distinction dans le diagnostic seulement) · session d'assistance et comptes dépôt/borne · `essai_expire` de GP (`abonnement_essai_fin`) hors périmètre tant que GP n'est pas branché.
 
-### 7.6 Points ouverts du contrat
-Session d'assistance et **comptes dépôt/borne** (non modélisés) ; **AAL2** du bypass administrateur plateforme (aujourd'hui aucune exigence — décision produit) ; `essai_expire` de **GP** (`abonnement_essai_fin`) hors périmètre tant que GP n'est pas branché ; exiger aussi `total` + AAL2 pour le diagnostic.
+## 7bis. D3 — suspension **par application** (le découplage)
 
-## 8. Tools — contrat particulier
+**Décision D3** : `gestion_pro = suspended` ⇒ GP bloqué, Colors et Tools continuent ; chaque application a son propre entitlement/statut ; seule une suspension `platform_global_suspension` coupe tout le compte. **On ne réutilise pas un état de membership d'entreprise comme suspension commerciale d'une application.** Proposition : `supabase/proposed/per_application_status_and_platform_suspension_v1.sql.proposed`.
 
-| Situation | Comportement voulu | Réel |
-| --- | --- | --- |
-| Anonyme, sans compte, sans entreprise, sans habilitation, sans entitlement, entreprise suspendue | **Free** (`basic-calculation`, `basic-tracing`, `site-instructions`), **jamais bloqué** | conforme : `FREE_ACCESS` codé en dur, tout échec de résolution retombe sur Free |
-| Entitlement `pro` actif (+ capacité) | Pro | conforme |
-| Cloud (projets synchronisés) | entitlement **et** droit d'organisation **et** rôle `tools_pro` | **incomplet côté serveur** (ci-dessous) |
+| Objet proposé | Rôle |
+| --- | --- |
+| `acces_applications_entreprises.statut_commercial` (`actif`/`suspendu`/`annule`, défaut `actif`) + `suspendu_depuis` | statut commercial **par application** ; lignes existantes inchangées (`actif`) ; **ignoré pour `gestion_pro`** (son statut reste `entreprises.abonnement_statut`) |
+| `est_membre_organisation(uuid)` | appartenance active **sans** l'abonnement GP ; `est_membre_actif` reste **intact** (il protège les données GP : 142 policies) |
+| table + `_suspension_plateforme_active()` + RPC `plateforme_suspendre_globalement` / `plateforme_lever_suspension_globale` | suspension plateforme explicite (compte ou organisation), `total` + AAL2, auto-suspension interdite, historisée |
+| RPC `plateforme_definir_statut_application_entreprise` | suspendre/annuler/réactiver **une** application d'**une** organisation (mêmes gardes que `plateforme_desactiver_application_entreprise`) |
+| `a_acces_application` réécrite (dans le fichier de décision) | Colors, Réserves (20 objets), Tools (4 fonctions + 3 policies), `applications_autorisees` cessent d'hériter de la suspension GP **en une seule réécriture** |
 
-**Le moteur Pro tourne dans le navigateur** (composants importés statiquement, précachés par le service worker, exports/impression locaux) : la protection y est purement interface (`hasCapability()`), et le cache d'entitlement est signé avec une clé stockée au même endroit. Inévitable pour une SPA hors ligne ; **P2 assumé** (la valeur protégée est le cloud et la facturation).
+**Preuve** [EXÉCUTÉ] : GP suspendu, même utilisateur → **avant** `a_acces_application` faux partout et 0 seau / 0 chantier / 0 projet visibles ; **après** vrai pour Colors/Réserves/Tools et 1/1/1 ligne visible (RLS) ; GP refusé. Colors suspendu ⇒ seul Colors refusé. Suspension plateforme du compte ⇒ **tout** refusé, y compris les autres applications ; lever la suspension rétablit.
 
-**Ne pas transformer Tools en système bloqué** : le contrat commun (§7) s'y applique **uniquement** à la synchronisation cloud ; en cas de refus, Tools reste en Free et affiche la **cause** (sans organisation / sans habilitation / suspendue) au lieu du seul « mode Free ».
+**Limites — à lire** :
+1. **La suspension plateforme ne coupe pas encore les données GP** (`est_membre_actif` ne lit pas la table ; sonde : compte suspendu, décision `suspension_plateforme`, mais 5 lignes de `types_chantier` restent lisibles). Elle ne sera honorée par GP qu'à l'étape 3 de D1 ou par un correctif d'une ligne dans `est_membre_actif` — **sensible (142 policies, chemin chaud) → lot dédié avec mesure de charge**. `DECISION_REQUIRED`.
+2. **11 objets Réserves** (9 fonctions, 2 policies) appellent encore `est_membre_actif` : un utilisateur « autorisé » à Réserves y perd certaines lectures quand GP est suspendu (ex. `reserves_preferences_lire` → 0 ligne). **Proposition prête et prouvée** (`supabase/proposed/reserves_decouple_gp_suspension_v1.sql.proposed`, `annexe-d3-reserves-residu.md`) : 11 objets découplés (`pg_get_functiondef` avant/après : seul le prédicat change ; signatures, `SECURITY DEFINER`, ACL identiques), pgTAP **30/30** (16/30 échouent sans la proposition), 12 pgTAP Réserves/isolation/ACL **identiques au témoin**. **La recommandation d'une ligne de l'annexe D3 était FAUSSE pour 3 objets d'invitation** (`reserves_invitation_accepter`, `reserves_rejoindre_intervention`, `reserves_invitations_en_attente`) : y exiger `a_acces_application` est circulaire (l'acceptation *crée* l'entitlement et l'habilitation ; variante rejouée : 8/30 échecs) → `est_membre_organisation` seule pour ceux-là. Trois objets (préférences, annuaire) deviennent **plus restrictifs** pour un membre sans habilitation Réserves.
+3. Support et communications d'un client GP suspendu (`support_msg_select`, `support_marquer_lus_entreprise`, segment `expire`) restent couplés : un client GP suspendu ne lit plus les réponses du support, même s'il utilise Colors. `DECISION_REQUIRED` (non modifié).
+4. `plateforme_activer_application_entreprise` ne lève pas une suspension commerciale (deux actes distincts) ; FK de la suspension globale en `ON DELETE CASCADE` (à arbitrer avec l'audit RGPD).
 
-| P1 | Constat | Scénario | Correctif |
-| --- | --- | --- | --- |
-| **T-P1-a** | la RLS de `tools_projects` et la RPC `tools_sync_project_entreprise` (`20260831000238:49-62,73`) ne testent que `a_acces_application(org,'tools')` : ni l'entitlement utilisateur ni la capacité `saved-projects` ; `project_payload` non borné, aucun quota de lignes | un abonné résilie : l'interface repasse en Free, mais son JWT et son organisation gardent l'accès `tools` → `POST /rest/v1/tools_projects` (clé publique) **continue d'écrire du cloud sans droit Pro** | ajouter le test d'entitlement/capacité dans la RLS et la RPC + borne de taille et quota — **migration**, lot dédié |
-| **T-P1-b** | l'achat Pro ne vérifie aucune entreprise ; la base exige un accès d'organisation, l'interface un accès + entitlement ; migration 277 déclare Tools `portee_donnees='compte'` alors que la RLS reste par entreprise | un particulier paie Tools Pro sans organisation activée : débité, reste Free | trancher `compte` vs `entreprise` (Q2) |
+## 8. Tools — D2 : Free personnel, Pro personnel ou organisationnel, contrôles **côté serveur**
 
-P2 : une exception de sync rétrograde un Pro sain en Free ; catalogue public appelant Stripe sans limite de débit ; achat réel impossible en l'état (clés de test, Apple SANDBOX, Google `sandbox`).
+**Décision D2 (Julien)** : Tools Free reste personnel (jamais bloqué, aucune entreprise). Tools Pro peut être **personnel** (compte → entitlement Pro utilisateur) ou **organisationnel** (compte → Tools Pro → membership actif → droits sur le projet). Pour tout projet d'organisation, contrôle serveur/RPC/RLS. Proposition : `supabase/proposed/tools_projects_server_side_access_v1.sql.proposed` ; détail `annexe-d2-tools-serveur.md`.
+
+**Ce qui passait AVANT** [EXÉCUTÉ, base témoin] :
+- **Pas d'IDOR inter-utilisateur/inter-organisation** : la RLS impose `user_id = auth.uid()` ; lire ou modifier par identifiant d'autrui → 0 ligne ; la RPC avec le `local_id` d'autrui crée **sa propre** ligne. *(Le P1 de la session précédente était donc plus étroit que « connaître l'identifiant » : l'abus réel est ci-dessous.)*
+- **Membre Free et ex-abonné** (entitlement expiré/révoqué, habilitation `tools_pro` gardée) : INSERT direct dans l'organisation **accepté**, RPC `tools_sync_project_entreprise` **`applied`**, RPC historique idem → **le P1 T-P1-a est confirmé**.
+- **Aucune borne** : 60 Mo de `project_payload` stockés ; 1 500 projets d'un seul utilisateur acceptés.
+- Refus en `P0001` sans code exploitable ; types mal formés en `22P02` brut.
+- **Couplage D3** : GP suspendu ⇒ un Pro sain refusé (via `est_membre_actif`) — corrigé par §7bis.
+
+**Ce qui est bloqué APRÈS** [EXÉCUTÉ] : un projet d'organisation n'est accessible (lecture **et** écriture) que si l'utilisateur est **membre `actif`** (lu directement, **sans** l'abonnement GP), détient un **entitlement Tools Pro actif avec la capacité `saved-projects`**, et passe la couche « droits sur le projet » (`a_acces_application(org,'tools')`, conservée par défaut) ; le créateur reste seul propriétaire. Free et ex-abonné : refus RLS, RPC en `42501` avec `hint` machine (`tools_pro_requis`, `tools_org_non_autorisee`…) ; **`tools_resoudre_entitlements()` rend toujours `free`** — jamais un blocage applicatif. Bornes par trigger (RPC **et** écriture directe) : payload > 256 Kio → `54000`, > 500 projets actifs par utilisateur et organisation → `53400`, plafond de 5 000 lignes (supprimées comprises) → `53400` ; rien n'est tronqué. Deux corrections au passage : une révision attendue `null` contournait la détection de conflit ; conversions ratées → `22023` explicite. Non-régression : les Pro membres ont exactement les mêmes résultats qu'avant.
+
+| Fichier pgTAP | Résultat |
+| --- | --- |
+| `tools_projects_access.test.sql` (70 assertions : acteurs × opérations × projets, IDOR, ex-abonné puis renouvellement, Pro sans `saved-projects`, bornes, ACL) | **70/70** ; **sans la proposition : 26 `not ok`** (le test a des dents) |
+| `elsatia_tools_r8` / `r9` | 28/28 · 26/26 (identiques au témoin) |
+| `elsatia_tools_r10` **original** | **échec par conception** : il encode l'ancien comportement (le membre `…0002` écrit dans le cloud avec l'habilitation seule, sans entitlement) — exactement l'abus fermé |
+| `elsatia_tools_r10.adapted.test.sql` (deux blocs de fixture ajoutés, rien d'autre) | **17/17** |
+
+**Perdent l'accès cloud à l'application de la migration** : membres Free, ex-abonnés (y compris sans `saved-projects`), Pro sans habilitation `tools_pro` ; aucune ligne supprimée, elles réapparaissent au renouvellement. **Requêtes de diagnostic à jouer AVANT déploiement** : en pied du fichier `.sql.proposed`.
+
+**Client** : aucune dégradation de Pro en Free n'est introduite (`push` avale l'erreur, `SyncService` l'attrape par projet). Limite : l'utilisateur ne sait jamais pourquoi. Diff minimal proposé, **non appliqué** (annexe §8) : un `CloudSyncError` classé par `code`/`hint` dans `sync.ts` ; `syncNow` ne rappelle `refresh()` que sur `pro_requis`/`org_non_autorisee`.
+
+**DECISION_REQUIRED** (défauts conservateurs appliqués) : (1) l'habilitation `tools_pro` est-elle redondante avec l'entitlement Pro ? — *les deux sont exigées* ; (2) un gestionnaire d'accès peut-il lire/écrire les projets d'un créateur ? — *aucun partage n'existe : créateur seul* ; (3) projets Pro **personnels** sans organisation : **aucun stockage serveur n'existe** — *non créé* ; (4) lecture seule pour un ex-abonné ? — *aucun accès* ; (5) purge des projets supprimés — *aucune, plafond de lignes* ; (6) valeurs des bornes (256 Kio, 500, 5 000) — *défauts conservateurs, marge ×6 sur le pire projet valide* ; (7) `portee_donnees='compte'` (migration 277) contredit la RLS par organisation ; pas d'entitlement d'organisation ; (8) administrateurs plateforme non membres et sessions d'assistance perdent l'écriture cloud d'organisation (membership `actif` exigé).
 
 ## 9. API protégées
 
@@ -213,15 +229,17 @@ Inventaire complet : `annexe-api-inventaire.md`. **Cible** : 401 JSON (non authe
 
 **Documenté, non appliqué (non triviaux)** : proxy GP → 401 JSON sur `/api/*` **conditionné à `sec-fetch-mode !== "navigate"`** (un 401 systématique afficherait du JSON brut sur les liens `<a href="/api/…pdf">`, `rgpd/export`) ; `getContexteEntrepriseApi()` (suspendu → 423, sans entreprise → 403) sur ~20 routes, **sans** sortir l'appel du `try` des 4 routes qui avalent le redirect ; Colors sans redirection (`lireContexteRefus`) ; Réserves « sans organisation » → 403 + client hors-ligne (`synchronisation.ts`, sans test unitaire : serveur d'abord) ; routes `tools/monetization` hors `PUBLIC_PATHS` (à vérifier sur pile locale : surface publique à décider).
 
-## 10. Studio — écart documenté, pas de refonte
+## 10. Studio — signup fermé corrigé sur une **branche isolée** (pas de refonte, pas de raccord plateforme)
 
-- **Identité** : Auth **dédiée** (`config.toml:1-3`, contrat d'accès §1, Q-004) — le README/`.env.example` disent encore « partagée » : **à aligner** ; `deleteUser` supprimerait l'identité **commune** si l'Auth était partagée (P0 conditionnel).
-- **Membership** : `studio_workspace_members` ; aucune notion d'entreprise ni de droit applicatif ELSATIA ; `EntitlementProvider.canSignUp` = interrupteur provisoire, **jamais appelé à l'exécution**.
-- **Contrat multi-app final** : absent (ni émetteur ni vérificateur de jeton d'habilitation). **Raccord = lot séparé.**
+Écart inchangé : Auth **dédiée** (`config.toml`) alors que README/`.env.example` disent « partagée » ; membership = `studio_workspace_members` ; aucun contrat multi-app ELSATIA (raccord = lot séparé).
 
-**Signup fermé — contournable par un chemin évident (P1, non corrigé)** :
-(a) `POST /auth/v1/signup` avec la clé publique crée un compte : `enable_signup=true` (`config.toml:181,226`), hook `before_user_created` commenté, garde seulement dans la server action (`actions.ts:69-70`) ; (b) ce compte peut ouvrir un workspace (`studio_create_workspace` accordée à `authenticated`, sans admission ; jusqu'à 20 espaces) et lancer des rendus (30/h) ; (c) invitation : pas de rejeu (jeton 32 octets haché, usage unique, adresse liée) — réserves : confirmation e-mail coupée sur l'hébergé, adresse invitée « squattable » ; (d) `STUDIO_SIGNUP_MODE` **ouvert par défaut** (`signup-gate.ts:4-5`) contre le contrat fail-closed.
-**Correctif minimal recommandé (non appliqué)** : table `studio_signup_policy` (défaut `closed`) + `studio_signup_permitted(email)`, hook `before_user_created` fail-closed, même prédicat dans `studio_create_workspace`, adapter 5 fixtures E2E. `enable_signup=false` + clé service écarté (place le secret le plus fort dans le chemin d'inscription).
+**Isolation** : Studio n'est pas dans cette branche. Vérifié : le tip `integration/studio-commercial-ready-v1` est resté à `05c775d5` et aucune branche `*studio*` ne touche `signup-gate`, `config.toml` ni les migrations d'admission → **pas de collision aujourd'hui**. Le correctif vit sur **`fix/studio-signup-closed-v1` @ `634651a0`** (un commit depuis `05c775d5`, worktree `/Users/juliengregurec/Projects/.worktrees/studio-signup-closed-v1`, **non poussé**) ; diff exporté : `access-convergence-v1/studio-signup-closed.patch` ; détail `annexe-studio-signup.md`.
+
+**Correctif** : table `studio_signup_policy` (défaut **`closed`**, ligne absente = fermé, aucun GRANT ni policy) ; `studio_signup_permitted(email)` = source unique (ouvert / fermé / liste d'autorisation ou `@domaine` / invitation en attente) ; **hook Auth `before_user_created`** (403 au message identique pour tous les refus) ; **même prédicat** dans `studio_create_workspace` (défense en profondeur) ; la server action appelle la même fonction ; `STUDIO_SIGNUP_MODE` absent ou inconnu → **fermé** (l'ancien défaut « open » disparaît). Fichiers (9) : migration `20260921070000_studio_signup_policy.sql`, `supabase/tests/studio_signup_policy.test.sql`, `signup-gate.ts`, `entitlement.ts`, `tests/signup-gate.test.ts`, `config.toml`, `scripts/local-test.mjs`, `README.md`.
+
+**Preuves** [EXÉCUTÉ] : **GoTrue réel** (v2.192.0 sur Postgres Supabase vierge) — **avant** : `POST /auth/v1/signup` → **200, compte créé** malgré la politique `closed` ; **après**, hook actif : **403** en mode fermé (0 compte créé) et pour une adresse hors liste ; 200 pour une adresse listée, un `@domaine` listé, une invitation en attente ou le mode ouvert ; politique supprimée → 403 (fail-closed). pgTAP `studio_signup_policy` **35/35** ; vitest **9/9**, `tsc` exit 0, eslint propre. Les 15 pgTAP Studio existants passent **à l'identique du témoin** sur base en politique `open` ; **en politique `closed` ils échouent tous** (leurs fixtures créent des utilisateurs en SQL puis appellent `studio_create_workspace`) — **la CI pgTAP Studio devra ouvrir la politique de test explicitement**. E2E Playwright non joués (pile Supabase CLI bloquée sur ce poste).
+
+**Limites** : `config.toml` n'est **pas** appliqué au projet hébergé — le hook doit y être réglé (Authentication › Hooks), sinon le contournement reste ouvert en production et seul `studio_create_workspace` tient ; le hook agit sur tout le projet Auth (réservé à un projet **dédié**) ; invitation « squattable » sans confirmation d'e-mail (`enable_confirmations = true` doit rester actif) ; un invité accepté peut créer ses espaces en mode fermé. **Conflits possibles** si le train Studio avance : `signup-gate.ts`, `entitlement.ts`, bloc hook de `config.toml`, `local-test.mjs`, l'horodatage `20260921070000` (à renuméroter), toute autre redéfinition de `studio_create_workspace` ; `ELSATIA_STUDIO_CATALOGUE_ACCESS_CONTRACT.md` cite encore `STUDIO_SIGNUP_MODE`. **DECISION_REQUIRED** : politique par défaut en production (*`closed`*), liste d'autorisation initiale (*vide*), invité créateur d'espaces (*oui*), qui règle le hook hébergé et quand (*aucune action distante*).
 
 ## 11. Matrice UX cible (textes non modifiés dans ce lot)
 
@@ -232,7 +250,7 @@ Inventaire complet : `annexe-api-inventaire.md`. **Cible** : 401 JSON (non authe
 | Invitation en attente | écran d'invitation | accepter | ✓ | ✓ (Réserves : `/invitation`, `/rejoindre`) |
 | Validation en attente | écran d'attente | attendre l'administrateur | remplace le faux « Demande envoyée » | idem |
 | Compte désactivé | écran **spécifique** | contacter l'administrateur ; se déconnecter | remplace `/en-attente` | idem |
-| Entreprise inactive/annulée | écran dédié | contacter l'administrateur | dédié | dédié |
+| **Suspension plateforme** (`suspension_plateforme`) | écran dédié « compte suspendu par ELSATIA » | contacter le support ELSATIA (aucun nom d'entreprise exposé) | dédié | dédié |
 | **Suspendu** | écran **dédié** commun | **Régulariser** pour un administrateur **seulement** ; sinon « Contactez votre administrateur » | garde `/abonnement-suspendu`, corrige le bouton non-admin | remplace « n'est pas activé » |
 | Essai expiré | écran offres | choisir une offre (administrateur) | ✓ | ✓ |
 | Application non incluse | **écran abonnement** | voir l'offre ; jamais la clé technique | remplace la clé brute `acces_devis` | ✓ |
@@ -243,60 +261,80 @@ Inventaire complet : `annexe-api-inventaire.md`. **Cible** : 401 JSON (non authe
 
 | # | Changement | Fichiers | Tests |
 | --- | --- | --- | --- |
-| A1 | Logout **local** sur les refus d'accès (Colors, Réserves) | `apps/{colors,reserves}/src/app/actions.ts` | Colors `actions.test.ts` (+3 tests, 2 assertions renforcées), Réserves `actions.test.ts` (nouveau) |
-| A2 | Cas Réserves du validateur de redirection + preuve au niveau de l'action | `apps/reserves/src/lib/redirection-sure.test.ts`, `app/actions.test.ts` | +5 validateur / 13 action |
+| A1 | Logout **local** sur les refus d'accès (Colors, Réserves) | `apps/{colors,reserves}/src/app/actions.ts` | Colors `actions.test.ts` (+3), Réserves `actions.test.ts` (13) |
+| A2 | Cas Réserves du validateur de redirection + preuve au niveau de l'action | `apps/reserves/src/lib/redirection-sure.test.ts`, `app/actions.test.ts` | +5 / 13 |
 | A3 | Colors API : refus/panne → 403/503 JSON | `apps/colors/src/app/api/{photos,export/inventaire,ocr}/route.ts`, `lib/refus-api-colors.ts` | 4 |
-| A4 | Réserves PDF : erreur RPC → 503 | `apps/reserves/src/app/api/documents/chantier/[id]/pdf/route.ts` | (e2e existant, non rejouable ici) |
-| A5 | Paquet partagé : `AccesApplicationIndisponibleError`, contrat de décision, helper de réponse d'API | `packages/application-access/src/{index,decision-acces,refus-api}.ts` | 40 |
+| A4 | Réserves PDF : erreur RPC → 503 | `apps/reserves/src/app/api/documents/chantier/[id]/pdf/route.ts` | (e2e non rejouable) |
+| A5 | Paquet partagé : `AccesApplicationIndisponibleError`, **contrat de décision v1 figé** (`suspension_plateforme`, `PORTEE_SUSPENSION`), helper d'API | `packages/application-access/src/{index,decision-acces,refus-api}.ts` | 44 |
+| **A6** | **D1 étape 1 — observation GP** (`off` par défaut ; `enforce` rétrogradé ; aucun blocage) | `src/lib/acces-gp/**`, `src/lib/supabase/proxy.ts` (+20 lignes) | 209 (dont 68 de non-régression du proxy) |
 
-## 13. Préparé, **non appliqué**
+Le code ne change le comportement **d'aucun utilisateur** tant que `ELSATIA_GP_ACCES_APP` n'est pas `observe`, et même alors il ne bloque personne.
+
+## 13. Préparé, **non appliqué** (SQL sous `supabase/proposed/`, sans numéro de migration)
 
 | Élément | Où | Condition d'usage |
 | --- | --- | --- |
-| Prototype SQL `decision_acces_application` + diagnostic | `packages/application-access/sql/decision_acces_application.sql.proposed` | numérotation au prochain train ; lot de raccordement des apps |
-| Jeu d'essai SQL (59 cas) | `docs/qualification/access-convergence-v1/decision-cases.sql` | rejouable sur toute base V3+ |
+| **D3** statut par application, suspension plateforme, `est_membre_organisation`, RPC d'écriture | `supabase/proposed/per_application_status_and_platform_suspension_v1.sql.proposed` | numérotation au prochain train ; **prérequis** de la décision |
+| `decision_acces_application` + diagnostic + `a_acces_application` réécrite | `packages/application-access/sql/decision_acces_application.sql.proposed` | après le précédent |
+| **D2** Tools : RLS/RPC `tools_projects` (membre actif + entitlement Pro + droit projet, bornes, SQLSTATE stables) | `supabase/proposed/tools_projects_server_side_access_v1.sql.proposed` (+ requêtes de diagnostic à jouer avant) | **détecter avant** les utilisateurs qui perdraient le cloud |
+| **D1** backfill GP (rapport, couverture, appliquer, retour arrière) | `supabase/proposed/gp_backfill_habilitations_v1.sql.proposed` | **fonctions seules** ; exécution = geste séparé, canari par organisation, après revue des ambigus |
+| D3 résidu Réserves (11 objets) | `supabase/proposed/reserves_decouple_gp_suspension_v1.sql.proposed` (+ pgTAP 30 assertions) | après la réécriture de `a_acces_application` ; **DECISION_REQUIRED** : rôle `reserves_intervenant` auto-octroyé, suspension plateforme sur les 3 flux d'invitation |
+| pgTAP des propositions | `supabase/proposed/tests/*.test.sql` (dont `elsatia_tools_r10.adapted.test.sql`) | à substituer aux tests d'origine à la numérotation |
+| Jeu d'essai SQL (103 cas) | `docs/qualification/access-convergence-v1/decision-cases.sql` | rejouable sur toute base V3+ |
+| Signup Studio | branche `fix/studio-signup-closed-v1` @ `634651a0` + `studio-signup-closed.patch` | fusion dans le train Studio ; **hook à régler sur le projet hébergé** |
 | Port minimal du correctif de boucle Colors 265 | `…/colors-265-loop-fix-minimal.diff` | seulement si la 265 devait être déployée |
-| Paliers GP 0/1/2 | §6 | décision Q1 |
-| Correctif signup Studio, RLS Tools cloud, proxy GP 401 conditionnel | §8-§10 | lots dédiés |
+| **D1 étape 3 — enforcement** | annexe D1 §3 (checklist, design, E2E) | **aucun code** ; jamais sans preuve de couverture du backfill |
+| Diff client Tools (`CloudSyncError`), proxy GP 401 conditionnel, `getContexteEntrepriseApi()` | annexes D2 §8 / API | lots dédiés |
 
 ## 14. P0 / P1 / P2 restants
 
-**P0** — Colors 265 boucle (réf. **non retenue** ; conditionné au déploiement) · Studio `deleteUser` sur Auth partagée (conditionnel, à trancher avant Preview).
-**P1** — modèles d'accès divergents (GP) · `/onboarding` ouvert à tout compte (GP) · aucun chemin d'habilitation par l'admin d'organisation (Colors/Tools) · suspension non distinguée et couplée entre apps (`est_membre_actif`) · U1 `entreprise_active_id` modifiable (déjà SEC-13 ; correctif 342 hors V3) · `/en-attente` faux pour un compte désactivé · erreur transitoire GP lue comme « pas d'entreprise » · **Tools cloud sans contrôle d'entitlement serveur (T-P1-a)** · **Tools Pro payé invisible (T-P1-b)** · Réserves `on conflict do nothing` consomme le jeton d'invitation · **Studio signup fermé contournable** et ouvert par défaut.
-**P2** — liens profonds perdus au login (aucune app ne conserve `next`) · API GP en 307 · `AccesApplicationRefuseError` non rattrapée hors des 3 routes Colors corrigées · Réserves sans error boundary, API « anonyme ≈ sans organisation » · pas d'AAL2 sur le bypass administrateur plateforme · Tools : verrous Pro côté interface, message « Droits vérifiés » pour Free · trois copies du validateur de redirection · deux migrations `…236_*` et deux `…237_*`.
+**P0** — Colors 265 boucle (réf. **non retenue** ; conditionné au déploiement) · Studio `deleteUser` sur Auth partagée (conditionnel ; Auth dédiée présumée — Q5).
+**P1** — **GP n'exige pas encore l'habilitation** (D1 en cours : observation livrée, backfill préparé, enforcement volontairement absent) · **la suspension plateforme ne coupe pas les données GP** (`est_membre_actif`) · **couplage résiduel GP → 11 objets Réserves (proposition prête, non appliquée), support et communications** (§7bis) · `/onboarding` ouvert à tout compte (GP) · aucun chemin d'habilitation par l'administrateur d'organisation (Colors/Tools/GP — prérequis de l'enforcement) · U1 `entreprise_active_id` modifiable (SEC-13, correctif 342 hors V3) · `/en-attente` faux pour un compte désactivé · erreur transitoire GP lue comme « pas d'entreprise » · Tools Pro payé sans organisation invisible (T-P1-b, décision D2 : à traduire côté client) · Réserves `on conflict do nothing` consomme le jeton d'invitation · **Studio : hook `before_user_created` à régler sur le projet hébergé** (sinon contournement ouvert).
+*Fermés dans ce lot (en proposition, à appliquer) : Tools cloud sans contrôle d'entitlement serveur (T-P1-a) ; suspension GP qui coupait Colors/Tools/Réserves ; signup fermé Studio contournable et ouvert par défaut.*
+**P2** — liens profonds perdus au login · API GP en 307 · `AccesApplicationRefuseError` non rattrapée hors des 3 routes Colors corrigées · Réserves sans error boundary, API « anonyme ≈ sans organisation » · pas d'AAL2 sur le bypass administrateur · Tools : verrous Pro côté interface uniquement pour le local (inévitable), message « Droits vérifiés » pour Free · trois copies du validateur de redirection · deux migrations `…236_*` et deux `…237_*` · cascade de la suspension globale (RGPD).
 
-## 15. Décisions Julien restantes
+## 15. Décisions Julien
 
-1. **Q1** — GP doit-il exiger l'habilitation applicative (palier 2) ou le poste reste-t-il la seule porte ? *(bloque §6)*
-2. **Q2** — Tools : Pro lié à une organisation, ou à l'entitlement personnel seul (`portee_donnees='compte'`) ? *(bloque T-P1-a/b)*
-3. **Q3** — La suspension d'abonnement GP doit-elle couper Colors/Réserves/Tools ? *(couplage `est_membre_actif`)*
-4. **Q4** — Seul GP crée des entreprises (onboarding) ?
-5. **Q5** — Studio : Auth dédiée confirmée ? *(bloque suppression de compte et raccord)*
-6. **Q6** — Déconnexion volontaire : globale (actuel) ou locale + « se déconnecter partout » ?
-7. **Q7** — Bypass administrateur plateforme : exiger AAL2 dans la décision ?
-8. **Q8** — Quels comptes (dépôt/borne, assistance) entrent dans le contrat de décision ?
-9. Validation de la **priorité** du §7.3 (notamment `entreprise_inactive` vs `abonnement_suspendu`, et `essai_expire` réservé aux droits d'usage issus d'un essai).
+**Tranchées le 2026-09-21** : **D1** (GP exige l'habilitation, en 3 étapes, enforcement jamais direct) → §6 · **D2** (Tools Free personnel ; Pro personnel ou organisationnel ; contrôles serveur) → §8 · **D3** (suspension par application ; seule la suspension plateforme coupe tout) → §7bis.
 
-## 16. Tests rejoués et limites
+**Non bloquantes — défaut conservateur appliqué, à confirmer** (`DECISION_REQUIRED`) :
+
+| # | Question | Défaut appliqué |
+| --- | --- | --- |
+| Q4 | Seul GP crée des entreprises (onboarding) ? | règle inscrite dans le contrat (`ecranPourDecision`), **aucun changement de GP** |
+| Q5 | Studio : Auth dédiée confirmée ? | **dédiée présumée** (config) ; le correctif signup y est calé ; suppression de compte inchangée |
+| Q6 | Déconnexion volontaire : globale ou locale + « se déconnecter partout » ? | **globale** (comportement actuel, inchangé) |
+| Q7 | Bypass administrateur plateforme : exiger AAL2 dans la décision ? | **non exigé** (comportement actuel) ; visible dans le diagnostic ; la suspension plateforme prime |
+| Q8 | Comptes dépôt/borne et sessions d'assistance dans le contrat ? | **exemptés** de l'observation GP ; `ambigu` au backfill ; assistance non modélisée |
+| Q9 | Validation de la priorité §7.3 (`essai_expire` réservé aux droits issus d'un essai ; ordre 10/11) | priorité **figée telle quelle** (demande « figer le contrat ») ; ordre 10/11 inchangé |
+| Q10 | 12 décisions D-1…D-12 du backfill (annexe D1 §4) et 8 décisions Tools (§8) | défauts listés dans les annexes ; **rien n'est appliqué** |
+| Q11 | Faire honorer la suspension plateforme par les données GP (`est_membre_actif`) | **non modifié** (lot dédié + mesure de charge) |
+| Q12 | Découpler support/communications d'un client GP suspendu | **non modifié** |
+
+## 16. Tests rejoués
 
 | Suite | Résultat |
 | --- | --- |
-| Colors (`apps/colors`) | **435 tests** (base 428 + 3 action + 4 helper) : 434 verts au passage complet ; le 435e (`nettoyage-photo.test.ts`, 5 s de délai dépassé sous charge, 3 suites lancées en parallèle sur volume externe) **20/20 rejoué seul**. `tsc --noEmit` **exit 0** |
-| Réserves (`apps/reserves`) | **216/216** (base 198 + 13 action + 5 validateur), 16 fichiers. `tsc --noEmit` **exit 0** |
-| `packages/application-access` | **45/45** (5 existants + 40 contrat). `tsc --strict` des 3 sources **exit 0** |
-| SQL : matrice décision | **59/59 PASS**, invariant 0 violation |
-| GoTrue réel : portée du logout | prouvé (§4) |
-| Port minimal Colors 265 (copie) | `acces-refuse.test.ts` **13/13** |
-
-**Limites** : voir §17 ; pas de pgTAP existants rejoués (la fonction proposée est additive, aucune migration modifiée) ; pas de test navigateur ; Production/Preview non observées ; le PDF Réserves ne se teste qu'en e2e (pile Supabase complète).
+| Vitest `packages/application-access` + `src/lib/acces-gp` | **258/258** (paquet 49 dont 44 de contrat ; observation GP 209 dont 68 de non-régression du proxy) |
+| Vitest Colors | **435/435**, 39 fichiers |
+| Vitest Réserves | **216/216**, 16 fichiers |
+| Vitest Tools (`apps/tools`, 20 fichiers dont `access`, `entitlements`, `projects/sync`) | **108/108** (aucun changement client) |
+| pgTAP **des 5 propositions**, appliquées **ensemble dans l'ordre** (statut par application → décision → Tools → backfill GP → résidu Réserves) sur une base neuve (279 migrations) | `decision_acces_application` **66/66** · `per_application_status` **103/103** (avec et sans la proposition Réserves : son assertion « résidu » suit l'état réel ; fixture complétée pour l'interaction avec D2) · `tools_projects_access` **70/70** · `gp_backfill_habilitations` **73/73** · `reserves_decouple_gp_suspension` **30/30** (16/30 sans la proposition) · `elsatia_tools_r10.adapted` **17/17** |
+| pgTAP **existants** rejoués APRÈS les 5 propositions (base intégrée) | `elsatia_multi_app_convergence_v1` 27 · `platform_global_owner_all_apps_v1` 40 · `platform_support_isolation_audit_v1` 67 · `platform_aal2_role_integrity_v1` 80 · `platform_support_uid_security_v1` 38 · `platform_admin_uid_canonical_v1` 13 · `reserves_v1` 98 · `v2` 94 · `v3_collaboration` 148 · `v3_parcours` 41 · `v4` 14 · `v5` 18 · `colors_canonical_integration_v1` 8 · `colors_functional_core_v1` 46 · `colors_integrity_v11` 41 · `elsatia_tools_r8` 28 · `r9` 26 · `isolation_multitenant_{comportement,roles,surface}` 56 · 24 · 10 — **tous PASS** ; **seul `elsatia_tools_r10` original échoue, par conception** (§8) ; l'agent Réserves a en outre rejoué `platform_residual_acl_hardening_r74` (28) et `platform_write_surface_hardening_v1` (23), identiques au témoin |
+| Différentiel `a_acces_application` ancienne/nouvelle | 14 × 3 × 6 × 6 états : 0 refus nouveau, 0 autorisation nouvelle pour `gestion_pro` |
+| GoTrue réel — portée du logout | prouvé (§4) |
+| GoTrue réel — signup Studio | avant 200 / après 403 (§10) |
+| Studio (branche isolée) | vitest 9/9, pgTAP 35/35, `tsc` 0, eslint propre |
+| Typecheck | `tsc --noEmit` **racine** (GP : `src/lib/acces-gp`, proxy, paquet) **exit 0** ; paquet en `--strict` **exit 0** ; Colors et Réserves : dernier `tsc` exit 0 (lot V1, aucun fichier d'application modifié depuis) |
+| Lint | **ESLint exit 0, aucune alerte** sur tous les fichiers modifiés : racine (`src/lib/acces-gp`, `proxy.ts`, `packages/application-access/src`), Colors (7 fichiers), Réserves (4 fichiers) — le blocage d'E/S du lot V1 ne s'est pas reproduit |
 
 ## 17. Non exécuté, à rejouer
 
-- **ESLint** : lancé sur les fichiers modifiés de Colors, **non terminé** (bloqué en E/S sur le volume externe, 4 s de CPU en 16 min, tué) — **à rejouer** ; aucune erreur de lint n'a été observée, aucune n'est affirmée absente.
-- **`next build`** : non lancé.
-- **pgTAP existants** : non rejoués (aucune migration modifiée ; la fonction SQL proposée est hors `supabase/migrations`).
-- **E2E Playwright** : non rejoués (piles Supabase complètes requises) — notamment le PDF Réserves (A4) et le parcours d'invitation.
+- **E2E Playwright** (piles Supabase complètes requises, CLI bloquée sur ce poste) : parcours GP en mode `observe`, PDF Réserves (A4), invitation Réserves, signup Studio de bout en bout.
+- **`next build`** non lancé ; **pgTAP complets du dépôt** (`supabase/tests/*`, ≈ 100 fichiers) non rejoués en bloc — seuls les fichiers concernés (liste §16) l'ont été.
+- **Aucune application des propositions SQL** à une base durable ; **Production et Preview jamais observées** ; l'observation GP n'a jamais tourné contre une vraie base (la RPC n'existe pas en Production, ledger 210).
+- **Client Tools** : diff `CloudSyncError` non appliqué ni testé.
 
 ## 18. Annexes
 
-`access-convergence-v1/` : `annexe-gp-ecart-modele.md`, `annexe-tools-studio.md`, `annexe-api-inventaire.md`, `decision-cases.sql` / `.results.txt`, `logout-scopes.py` / `.out`, `colors-265-loop-fix-minimal.diff`. Audit amont : `docs/audits/ELSATIA_APP_FIRST_ACCESS_AUDIT_V1.md` + `first-access-audit-v1/` (le patch `first-access-fixes-v3.patch` de ce dossier est **remplacé** par cette branche).
+`access-convergence-v1/` : `annexe-d1-gp-observation-backfill.md`, `annexe-d2-tools-serveur.md`, `annexe-d3-suspension-par-application.md`, `annexe-d3-reserves-residu.md`, `annexe-studio-signup.md`, `annexe-gp-ecart-modele.md`, `annexe-tools-studio.md`, `annexe-api-inventaire.md`, `decision-cases.sql` / `.results.txt`, `logout-scopes.py` / `.out`, `colors-265-loop-fix-minimal.diff`, `studio-signup-closed.patch`. SQL proposé : `supabase/proposed/` et `packages/application-access/sql/`. Audit amont : `docs/audits/ELSATIA_APP_FIRST_ACCESS_AUDIT_V1.md` + `first-access-audit-v1/` (le patch `first-access-fixes-v3.patch` est **remplacé** par cette branche).

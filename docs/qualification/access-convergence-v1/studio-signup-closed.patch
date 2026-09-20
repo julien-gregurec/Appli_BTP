@@ -1,0 +1,449 @@
+diff --git a/apps/studio/README.md b/apps/studio/README.md
+index fbe7d683..c08e5c88 100644
+--- a/apps/studio/README.md
++++ b/apps/studio/README.md
+@@ -54,6 +54,7 @@ Ce stop ne concerne que l’instance enregistrée dans `.local-test.json`. Il co
+ ## Parcours et sécurité
+ 
+ - `/login`, `/signup` : compte Supabase commun ; aucun profil/mot de passe dupliqué.
++- Inscription **fermée par défaut**, imposée par la base et non par la seule action `signup` : table `studio_signup_policy` (`closed` | `allowlist` | `open`, liste d'adresses ou `@domaine`), fonction `studio_signup_permitted(email)` (invitation en attente toujours admise) appelée par le hook Auth `before_user_created` (`supabase/config.toml` en local ; **à régler dans Authentication > Hooks sur le projet hébergé**, projet Studio dédié uniquement), par `studio_create_workspace` et par l'action `signup`. Changer la politique = SQL (`update public.studio_signup_policy set mode = 'allowlist', allowlist = array['@exemple.fr']`). Les variables `STUDIO_SIGNUP_MODE` / `STUDIO_SIGNUP_ALLOWLIST` sont retirées (ignorées). Les fixtures E2E ouvrent la politique de la pile jetable explicitement (`local-test.mjs setup`).
+ - `/auth/callback` : échange PKCE ; `/auth/confirm` : confirmation token_hash de type email.
+ - `/onboarding` : bouton d’ouverture/création du workspace personnel, RPC idempotente et verrouillée.
+ - `/dashboard?workspace=UUID` : workspace actif explicite. Sans paramètre, premier workspace autorisé ; sans aucun workspace, onboarding. Un UUID fourni mais inaccessible donne une page 404, jamais un autre workspace par défaut.
+diff --git a/apps/studio/scripts/local-test.mjs b/apps/studio/scripts/local-test.mjs
+index 93d2870c..8c88a20f 100644
+--- a/apps/studio/scripts/local-test.mjs
++++ b/apps/studio/scripts/local-test.mjs
+@@ -54,6 +54,34 @@ function state() {
+     throw new Error("Not a Studio disposable project.");
+   return value;
+ }
++// Registration is closed by default (table studio_signup_policy, enforced by the Auth hook and by
++// studio_create_workspace). The E2E fixtures create accounts through auth.signUp directly and the pgTAP fixtures
++// insert users then call studio_create_workspace, so this DISPOSABLE stack opens the policy explicitly;
++// nothing here bypasses the gate and no other environment is touched.
++function openDisposableSignupPolicy(projectId) {
++  const opened = spawnSync(
++    "docker",
++    [
++      "exec",
++      `supabase_db_${projectId}`,
++      "psql",
++      "-U",
++      "postgres",
++      "-d",
++      "postgres",
++      "-v",
++      "ON_ERROR_STOP=1",
++      "-c",
++      // Historical --lot-x baselines are built without the policy table.
++      "do $$ begin if to_regclass('public.studio_signup_policy') is not null then update public.studio_signup_policy set mode='open', updated_at=now(); end if; end $$",
++    ],
++    { encoding: "utf8" },
++  );
++  if (opened.status !== 0)
++    throw new Error(
++      `Could not open the disposable signup policy: ${opened.stderr ?? ""}`,
++    );
++}
+ const action = process.argv[2];
+ if (action === "setup") {
+   if (existsSync(statePath))
+@@ -168,6 +196,7 @@ if (action === "setup") {
+   );
+   if (new URL(status.API_URL).hostname !== "127.0.0.1")
+     throw new Error("Non-loopback API rejected.");
++  openDisposableSignupPolicy(projectId);
+   writeFileSync(
+     join(app, ".env.local"),
+     `NEXT_PUBLIC_STUDIO_URL=http://127.0.0.1:3030\nNEXT_PUBLIC_SUPABASE_URL=${status.API_URL}\nNEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${status.ANON_KEY}\nSTUDIO_STORAGE_SERVICE_KEY=${status.SERVICE_ROLE_KEY}\n`,
+@@ -177,7 +206,8 @@ if (action === "setup") {
+     `Disposable Studio instance ready: ${projectId}. Public API and server-only storage credentials were written to the ignored local environment to apps/studio/.env.local.`,
+   );
+ } else if (action === "test-db") {
+-  const { directory } = state();
++  const { directory, projectId } = state();
++  openDisposableSignupPolicy(projectId);
+   run(
+     [
+       "test",
+diff --git a/apps/studio/src/lib/entitlement.ts b/apps/studio/src/lib/entitlement.ts
+index 8545c32a..33f2f23e 100644
+--- a/apps/studio/src/lib/entitlement.ts
++++ b/apps/studio/src/lib/entitlement.ts
+@@ -1,19 +1,25 @@
+ import "server-only";
+-import { hasPendingInvitation } from "./invitations";
+-import { parseSignupMode, signupDecision } from "./signup-gate";
++import { interpretSignupPermitted } from "./signup-gate";
++import { storageAdmin } from "./storage-admin";
+ /**
+- * Access decision for a new account. Today: the local registration gate (open | allowlist | closed, with a live
+- * invitation always accepted). Later: a `platform-token` implementation verifying the ELSATIA entitlement token
+- * described in ELSATIA_STUDIO_CATALOGUE_ACCESS_CONTRACT.md, without any link to the Gestion Pro database.
++ * Access decision for a new account. Today: the registration policy held by the database
++ * (`studio_signup_permitted`: open | allowlist | closed, a live invitation always admitted), the very same
++ * predicate the Auth hook and `studio_create_workspace` apply. Later: a `platform-token` implementation verifying
++ * the ELSATIA entitlement token described in ELSATIA_STUDIO_CATALOGUE_ACCESS_CONTRACT.md, without any link to
++ * the Gestion Pro database.
+  */
+ export interface EntitlementProvider {
+   canSignUp(email: string): Promise<boolean>;
+ }
+ export const registrationGate: EntitlementProvider = {
+   async canSignUp(email) {
+-    const mode = parseSignupMode(process.env.STUDIO_SIGNUP_MODE);
+-    if (mode === "open") return true;
+-    const invited = await hasPendingInvitation(email).catch(() => false);
+-    return signupDecision(mode, email, process.env.STUDIO_SIGNUP_ALLOWLIST, invited);
++    try {
++      const r = await storageAdmin().rpc("studio_signup_permitted", {
++        p_email: email.trim().toLowerCase(),
++      });
++      return interpretSignupPermitted(r.data, r.error);
++    } catch {
++      return false; // fail-closed: an unreachable database never opens registration
++    }
+   },
+ };
+diff --git a/apps/studio/src/lib/signup-gate.ts b/apps/studio/src/lib/signup-gate.ts
+index 25f8b683..d153fbb5 100644
+--- a/apps/studio/src/lib/signup-gate.ts
++++ b/apps/studio/src/lib/signup-gate.ts
+@@ -1,26 +1,19 @@
+-/** Registration gate: no public opening yet (decision Q-007). Pure, unit-tested. */
++/**
++ * Registration gate. The decision itself lives in the database (`studio_signup_permitted`, table
++ * `studio_signup_policy`, default `closed`) and is enforced by the Auth hook `before_user_created`, by
++ * `studio_create_workspace` and by the `signup` server action: one source of truth, none of it in the
++ * environment. This module only holds the fail-closed reading of what the database answers.
++ */
+ export type SignupMode = "open" | "allowlist" | "closed";
+-export function parseSignupMode(value: string | undefined): SignupMode {
+-  const v = (value ?? "open").trim().toLowerCase();
+-  return v === "allowlist" || v === "closed" ? v : "open";
++/** Anything that is not a known mode — including an absent value — is `closed`. */
++export function parseSignupMode(value: string | null | undefined): SignupMode {
++  const v = (value ?? "").trim().toLowerCase();
++  return v === "open" || v === "allowlist" ? v : "closed";
+ }
+-/** Entries are full addresses or `@domain.tld`; comparison is case-insensitive. */
+-export function isAllowlisted(email: string, list: string | undefined): boolean {
+-  const address = email.trim().toLowerCase();
+-  const domain = address.slice(address.lastIndexOf("@"));
+-  return (list ?? "")
+-    .split(",")
+-    .map((entry) => entry.trim().toLowerCase())
+-    .filter(Boolean)
+-    .some((entry) => entry === address || (entry.startsWith("@") && entry === domain));
+-}
+-export function signupDecision(
+-  mode: SignupMode,
+-  email: string,
+-  allowlist: string | undefined,
+-  hasInvitation: boolean,
++/** Only an explicit `true` from the database admits; an RPC error, a null or any other value refuses. */
++export function interpretSignupPermitted(
++  data: unknown,
++  error: unknown,
+ ): boolean {
+-  if (mode === "open") return true;
+-  if (hasInvitation) return true;
+-  return mode === "allowlist" && isAllowlisted(email, allowlist);
++  return !error && data === true;
+ }
+diff --git a/apps/studio/supabase/config.toml b/apps/studio/supabase/config.toml
+index b8f0894b..94527520 100644
+--- a/apps/studio/supabase/config.toml
++++ b/apps/studio/supabase/config.toml
+@@ -291,9 +291,14 @@ max_frequency = "5s"
+ # inactivity_timeout = "8h"
+ 
+ # This hook runs before a new user is created and allows developers to reject the request based on the incoming user object.
+-# [auth.hook.before_user_created]
+-# enabled = true
+-# uri = "pg-functions://postgres/auth/before-user-created-hook"
++# Studio: closes direct `POST /auth/v1/signup` calls (public key) with the same policy as the signup action
++# (`studio_signup_permitted`, table `studio_signup_policy`, closed by default). Dedicated Studio project ONLY:
++# never enable it on a project shared with another application (it would refuse their sign-ups too).
++# On the hosted project this file is not applied: set the hook in Dashboard > Authentication > Hooks
++# (Before User Created -> Postgres function public.studio_hook_before_user_created).
++[auth.hook.before_user_created]
++enabled = true
++uri = "pg-functions://postgres/public/studio_hook_before_user_created"
+ 
+ # This hook runs before a token is issued and allows you to add additional claims based on the authentication method used.
+ # [auth.hook.custom_access_token]
+diff --git a/apps/studio/supabase/migrations/20260921070000_studio_signup_policy.sql b/apps/studio/supabase/migrations/20260921070000_studio_signup_policy.sql
+new file mode 120000
+index 00000000..b09e30c8
+--- /dev/null
++++ b/apps/studio/supabase/migrations/20260921070000_studio_signup_policy.sql
+@@ -0,0 +1 @@
++../../../../supabase/migrations/20260921070000_studio_signup_policy.sql
+\ No newline at end of file
+diff --git a/apps/studio/tests/signup-gate.test.ts b/apps/studio/tests/signup-gate.test.ts
+index 0c42ac42..eed1e725 100644
+--- a/apps/studio/tests/signup-gate.test.ts
++++ b/apps/studio/tests/signup-gate.test.ts
+@@ -1,37 +1,49 @@
+-import { describe, it, expect } from "vitest";
+-import {
+-  isAllowlisted,
+-  parseSignupMode,
+-  signupDecision,
+-} from "../src/lib/signup-gate";
++import { describe, it, expect, vi, beforeEach } from "vitest";
++vi.mock("server-only", () => ({}));
++const rpc = vi.fn();
++vi.mock("../src/lib/storage-admin", () => ({ storageAdmin: () => ({ rpc }) }));
++import { interpretSignupPermitted, parseSignupMode } from "../src/lib/signup-gate";
++import { registrationGate } from "../src/lib/entitlement";
+ 
+-describe("signup gate", () => {
+-  it("parses the mode and falls back to open only for unknown/absent values", () => {
+-    expect(parseSignupMode(undefined)).toBe("open");
++describe("signup gate (fail-closed)", () => {
++  it("absent or unknown mode is closed, never open", () => {
++    expect(parseSignupMode(undefined)).toBe("closed");
++    expect(parseSignupMode(null)).toBe("closed");
++    expect(parseSignupMode("")).toBe("closed");
++    expect(parseSignupMode("nonsense")).toBe("closed");
+     expect(parseSignupMode(" CLOSED ")).toBe("closed");
++    expect(parseSignupMode("Open")).toBe("open");
+     expect(parseSignupMode("allowlist")).toBe("allowlist");
+-    expect(parseSignupMode("nonsense")).toBe("open");
+   });
+-  it("matches full addresses and @domain entries, case-insensitively", () => {
+-    const list = "Alice@Example.com, @elsatia.fr ,";
+-    expect(isAllowlisted("alice@example.com", list)).toBe(true);
+-    expect(isAllowlisted("bob@ELSATIA.FR", list)).toBe(true);
+-    expect(isAllowlisted("bob@example.com", list)).toBe(false);
+-    expect(isAllowlisted("x@evil-elsatia.fr", list)).toBe(false);
+-    expect(isAllowlisted("x@sub.elsatia.fr", list)).toBe(false);
+-    expect(isAllowlisted("alice@example.com", undefined)).toBe(false);
+-    expect(isAllowlisted("alice@example.com", "")).toBe(false);
++  it("only an explicit true without error admits", () => {
++    expect(interpretSignupPermitted(true, null)).toBe(true);
++    expect(interpretSignupPermitted(false, null)).toBe(false);
++    expect(interpretSignupPermitted(null, null)).toBe(false);
++    expect(interpretSignupPermitted("true", null)).toBe(false);
++    expect(interpretSignupPermitted(1, null)).toBe(false);
++    expect(interpretSignupPermitted(true, { code: "42501" })).toBe(false);
+   });
+-  it("closed refuses everyone except invited addresses", () => {
+-    expect(signupDecision("closed", "a@b.fr", "@b.fr", false)).toBe(false);
+-    expect(signupDecision("closed", "a@b.fr", "@b.fr", true)).toBe(true);
++});
++
++describe("registrationGate.canSignUp (same predicate as the database hook)", () => {
++  beforeEach(() => {
++    rpc.mockReset();
++  });
++  it("asks the database function with the normalized address", async () => {
++    rpc.mockResolvedValue({ data: true, error: null });
++    expect(await registrationGate.canSignUp("  A@B.FR ")).toBe(true);
++    expect(rpc).toHaveBeenCalledWith("studio_signup_permitted", { p_email: "a@b.fr" });
++  });
++  it("refuses when the database refuses", async () => {
++    rpc.mockResolvedValue({ data: false, error: null });
++    expect(await registrationGate.canSignUp("a@b.fr")).toBe(false);
+   });
+-  it("allowlist admits listed addresses and invited ones", () => {
+-    expect(signupDecision("allowlist", "a@b.fr", "@b.fr", false)).toBe(true);
+-    expect(signupDecision("allowlist", "a@c.fr", "@b.fr", false)).toBe(false);
+-    expect(signupDecision("allowlist", "a@c.fr", "@b.fr", true)).toBe(true);
++  it("refuses on an RPC error (no fail-open)", async () => {
++    rpc.mockResolvedValue({ data: null, error: { message: "boom" } });
++    expect(await registrationGate.canSignUp("a@b.fr")).toBe(false);
+   });
+-  it("open admits everyone", () => {
+-    expect(signupDecision("open", "a@c.fr", undefined, false)).toBe(true);
++  it("refuses when the call itself throws (no fail-open)", async () => {
++    rpc.mockImplementation(() => Promise.reject(new Error("network")));
++    expect(await registrationGate.canSignUp("a@b.fr")).toBe(false);
+   });
+ });
+diff --git a/supabase/migrations/20260921070000_studio_signup_policy.sql b/supabase/migrations/20260921070000_studio_signup_policy.sql
+new file mode 100644
+index 00000000..fd95a2d8
+--- /dev/null
++++ b/supabase/migrations/20260921070000_studio_signup_policy.sql
+@@ -0,0 +1,80 @@
++-- Studio : inscription fermée par défaut, imposée par la base (et non par la seule server action).
++-- Le contournement constaté : `POST /auth/v1/signup` avec la clé publique créait un compte sans passer par
++-- l'action `signup`. Ce lot met UNE politique en base, lue par trois points d'application :
++--   1. le hook Auth `before_user_created` (refuse la création du compte, quel que soit le chemin) ;
++--   2. `studio_create_workspace` (défense en profondeur : un compte créé par un autre chemin n'ouvre pas d'espace) ;
++--   3. la server action `signup` (message clair avant l'appel Auth) via `studio_signup_permitted`.
++-- Fail-closed : ligne absente, mode inconnu, erreur => refus. Le défaut livré est `closed`.
++begin;
++
++create table public.studio_signup_policy (
++ singleton boolean primary key default true check (singleton),
++ mode text not null default 'closed' check (mode in ('open','allowlist','closed')),
++ -- Adresses complètes ou `@domaine.tld`, en minuscules ; comparaison exacte (pas de sous-domaine).
++ allowlist text[] not null default '{}' check (cardinality(allowlist) <= 500),
++ updated_at timestamptz not null default now()
++);
++insert into public.studio_signup_policy(singleton,mode) values (true,'closed');
++alter table public.studio_signup_policy enable row level security;
++revoke all on public.studio_signup_policy from public,anon,authenticated,service_role;
++-- Ni politique RLS ni GRANT : la politique se change en SQL (éditeur SQL / migration), jamais par l'API.
++
++-- Source unique de la décision. `open` est le seul mode qui admet sans condition ; une invitation en attente
++-- pour l'adresse est toujours admise (l'invité est autorisé par un administrateur d'espace).
++create function public.studio_signup_permitted(p_email text) returns boolean
++language plpgsql stable security definer set search_path='' as $$
++declare p public.studio_signup_policy; mail text:=lower(btrim(coalesce(p_email,'')));
++begin
++ select * into p from public.studio_signup_policy where singleton;
++ if not found then return false; end if;
++ if p.mode='open' then return true; end if;
++ if mail='' or mail !~ '^[^\s@]+@[^\s@]+\.[^\s@]+$' then return false; end if;
++ if public.studio_pending_invitation_for(mail) then return true; end if;
++ return p.mode='allowlist' and exists(
++  select 1 from unnest(p.allowlist) e
++  where lower(btrim(e))=mail or (lower(btrim(e)) like '@%' and lower(btrim(e))=substring(mail from '@[^@]*$')));
++end $$;
++
++-- Hook Auth `before_user_created` : payload `{"metadata":{…},"user":{"email":…,…}}` ; `{}` = accepter,
++-- `{"error":{…}}` = refuser. Message volontairement identique pour tous les refus (aucun oracle sur la liste).
++create function public.studio_hook_before_user_created(event jsonb) returns jsonb
++language plpgsql stable security definer set search_path='' as $$
++begin
++ if public.studio_signup_permitted(event->'user'->>'email') then return '{}'::jsonb; end if;
++ return jsonb_build_object('error',jsonb_build_object('http_code',403,'message','Les inscriptions à ELSATIA Studio sont fermées.'));
++end $$;
++
++-- Ouverture d'espace : la même décision, avec deux reconnaissances de compte déjà admis (un compte qui possède
++-- ou appartient déjà à un espace a été admis avant la fermeture ou par invitation ; fermer ne l'expulse pas).
++create or replace function public.studio_create_workspace(p_name text default 'Mon Studio', p_type text default 'personal')
++returns uuid language plpgsql security definer set search_path = '' as $$
++declare v_uid uuid := auth.uid(); v_id uuid; v_mail text;
++begin
++  if v_uid is null then raise exception 'Authentification requise' using errcode = '42501'; end if;
++  if p_name is null or char_length(btrim(p_name)) not between 1 and 100 or p_type is null or p_type not in ('personal','professional') then
++    raise exception 'Workspace invalide' using errcode = '22023';
++  end if;
++  -- Serialize per identity: concurrent onboarding cannot create two personal workspaces.
++  select lower(email) into v_mail from auth.users where id = v_uid for update;
++  if not found then raise exception 'Authentification requise' using errcode = '42501'; end if;
++  if not (public.studio_signup_permitted(v_mail)
++    or exists(select 1 from public.studio_workspace_members where user_id = v_uid)) then
++    raise exception 'Inscription fermée' using errcode = '42501';
++  end if;
++  if p_type = 'personal' then
++    select id into v_id from public.studio_workspaces where owner_user_id = v_uid and workspace_type = 'personal' and deleted_at is null;
++    if v_id is not null then return v_id; end if;
++  end if;
++  if (select count(*) from public.studio_workspaces where owner_user_id = v_uid and deleted_at is null) >= 20 then
++    raise exception 'Limite de 20 workspaces atteinte' using errcode = '22023';
++  end if;
++  insert into public.studio_workspaces(name, workspace_type, owner_user_id) values (btrim(p_name), p_type, v_uid) returning id into v_id;
++  insert into public.studio_workspace_members(workspace_id, user_id, role) values (v_id, v_uid, 'owner');
++  return v_id;
++end $$;
++
++revoke all on function public.studio_signup_permitted(text),public.studio_hook_before_user_created(jsonb) from public,anon,authenticated,service_role;
++-- Le serveur Studio (clé de service) lit la décision ; jamais `authenticated` (oracle sur invitations et liste).
++grant execute on function public.studio_signup_permitted(text) to service_role;
++grant execute on function public.studio_hook_before_user_created(jsonb) to supabase_auth_admin;
++commit;
+diff --git a/supabase/tests/studio_signup_policy.test.sql b/supabase/tests/studio_signup_policy.test.sql
+new file mode 100644
+index 00000000..4c65333b
+--- /dev/null
++++ b/supabase/tests/studio_signup_policy.test.sql
+@@ -0,0 +1,91 @@
++-- Studio : inscription fermée par défaut, une seule décision pour le hook Auth, l'action signup et l'ouverture d'espace.
++begin;
++create extension if not exists pgtap with schema extensions;
++select plan(35);
++create function pg_temp.h(s text) returns text language sql as $$select encode(extensions.digest(s,'sha256'),'hex')$$;
++create function pg_temp.hook(mail text) returns jsonb language sql as
++ $$select public.studio_hook_before_user_created(jsonb_build_object('metadata',jsonb_build_object('name','before-user-created'),'user',jsonb_build_object('email',mail)))$$;
++
++-- Contrat : état livré. La pile jetable E2E ouvre la politique ; ici on repart de l'état livré explicitement.
++update public.studio_signup_policy set mode='closed', allowlist='{}';
++select is((select count(*) from public.studio_signup_policy),1::bigint,'une seule ligne de politique');
++select throws_ok($$insert into public.studio_signup_policy(singleton,mode) values (false,'closed')$$,'23514',null,'singleton imposé');
++select throws_ok($$update public.studio_signup_policy set mode='maybe'$$,'23514',null,'mode inconnu refusé par la table');
++
++-- Décision selon le mode.
++select is(public.studio_signup_permitted('anyone@example.test'),false,'fermé : refus par défaut');
++select is(public.studio_signup_permitted(null),false,'fermé : adresse absente refusée');
++select is(public.studio_signup_permitted('pas un email'),false,'fermé : adresse invalide refusée');
++update public.studio_signup_policy set mode='allowlist', allowlist=array['Alice@Example.Test','@Elsatia.fr'];
++select is(public.studio_signup_permitted('alice@example.test'),true,'liste : adresse exacte, casse ignorée');
++select is(public.studio_signup_permitted('bob@elsatia.fr'),true,'liste : @domaine');
++select is(public.studio_signup_permitted('bob@sub.elsatia.fr'),false,'liste : pas de sous-domaine');
++select is(public.studio_signup_permitted('x@evil-elsatia.fr'),false,'liste : pas de suffixe trompeur');
++select is(public.studio_signup_permitted('bob@example.test'),false,'liste : adresse hors liste');
++update public.studio_signup_policy set mode='open';
++select is(public.studio_signup_permitted('anyone@example.test'),true,'ouvert : admis');
++update public.studio_signup_policy set mode='closed';
++
++-- Hook Auth : `{}` accepte, `{error}` refuse ; même prédicat.
++select is(pg_temp.hook('anyone@example.test'),jsonb_build_object('error',jsonb_build_object('http_code',403,'message','Les inscriptions à ELSATIA Studio sont fermées.')),'hook : refus en mode fermé');
++select is(public.studio_hook_before_user_created('{}'::jsonb)->'error'->>'http_code','403','hook : événement sans utilisateur refusé');
++select is(public.studio_hook_before_user_created('{"user":{}}'::jsonb)->'error'->>'http_code','403','hook : utilisateur sans e-mail refusé');
++update public.studio_signup_policy set mode='allowlist', allowlist=array['@elsatia.fr'];
++select is(pg_temp.hook('bob@elsatia.fr'),'{}'::jsonb,'hook : liste, adresse admise');
++select is(pg_temp.hook('bob@example.test')->'error'->>'http_code','403','hook : liste, adresse refusée');
++update public.studio_signup_policy set mode='open';
++select is(pg_temp.hook('anyone@example.test'),'{}'::jsonb,'hook : ouvert accepte');
++delete from public.studio_signup_policy;
++select is(public.studio_signup_permitted('bob@elsatia.fr'),false,'ligne absente : refus (fail-closed)');
++select is(pg_temp.hook('bob@elsatia.fr')->'error'->>'http_code','403','hook : ligne absente refusée (fail-closed)');
++insert into public.studio_signup_policy(singleton,mode) values (true,'closed');
++
++-- Comptes : un propriétaire admis (politique ouverte le temps de son onboarding), puis fermeture.
++insert into auth.users(id,email) values
++ ('5c000000-0000-0000-0000-000000000001','sp-owner@example.test'),
++ ('5c000000-0000-0000-0000-000000000002','sp-stranger@example.test'),
++ ('5c000000-0000-0000-0000-000000000003','Sp-Invitee@Example.Test'),
++ ('5c000000-0000-0000-0000-000000000004','sp-listed@elsatia.fr');
++update public.studio_signup_policy set mode='open';
++set local role authenticated;
++select set_config('request.jwt.claim.sub','5c000000-0000-0000-0000-000000000001',true);
++select set_config('test.sp.w',public.studio_create_workspace('Espace SP','personal')::text,true);
++reset role;
++update public.studio_signup_policy set mode='closed';
++
++-- Invitation : admet l'adresse invitée tant qu'elle est en attente.
++set local role authenticated;
++select set_config('request.jwt.claim.sub','5c000000-0000-0000-0000-000000000001',true);
++select set_config('test.sp.i',public.studio_invite_member(current_setting('test.sp.w')::uuid,'sp-invitee@example.test','editor',pg_temp.h('sp'),7)::text,true);
++reset role;
++select is(public.studio_signup_permitted('SP-Invitee@example.test'),true,'fermé : invitation en attente admise');
++select is(pg_temp.hook('sp-invitee@example.test'),'{}'::jsonb,'hook : invitation en attente acceptée');
++select is(public.studio_signup_permitted('sp-stranger@example.test'),false,'fermé : autre adresse toujours refusée');
++
++-- Ouverture d'espace : même prédicat, compte créé par un autre chemin.
++set local role authenticated;
++select set_config('request.jwt.claim.sub','5c000000-0000-0000-0000-000000000002',true);
++select throws_ok($$select public.studio_create_workspace('Intrus','personal')$$,'42501','Inscription fermée','fermé : compte non admis, pas d''espace');
++select is((select count(*) from public.studio_workspaces),0::bigint,'l''intrus ne voit aucun espace');
++select set_config('request.jwt.claim.sub','5c000000-0000-0000-0000-000000000003',true);
++select lives_ok($$select public.studio_create_workspace('Espace invité','professional')$$,'fermé : invité (invitation en attente) ouvre un espace');
++select set_config('request.jwt.claim.sub','5c000000-0000-0000-0000-000000000001',true);
++select lives_ok($$select public.studio_create_workspace('Second espace','professional')$$,'fermeture : propriétaire déjà admis garde ses droits');
++select is(public.studio_create_workspace('Espace SP','personal'),current_setting('test.sp.w')::uuid,'idempotence du workspace personnel conservée');
++reset role;
++update public.studio_signup_policy set mode='allowlist', allowlist=array['@elsatia.fr'];
++set local role authenticated;
++select set_config('request.jwt.claim.sub','5c000000-0000-0000-0000-000000000004',true);
++select lives_ok($$select public.studio_create_workspace('Espace liste','personal')$$,'liste : adresse admise ouvre un espace');
++select set_config('request.jwt.claim.sub','5c000000-0000-0000-0000-000000000002',true);
++select throws_ok($$select public.studio_create_workspace('Intrus','personal')$$,'42501','Inscription fermée','liste : adresse hors liste refusée');
++reset role;
++
++-- Privilèges : la décision n'est jamais lisible ni exécutable par un client.
++select is(has_function_privilege('authenticated','public.studio_signup_permitted(text)','execute'),false,'authenticated ne lit pas la décision');
++select is(has_function_privilege('anon','public.studio_signup_permitted(text)','execute'),false,'anon ne lit pas la décision');
++select is((has_function_privilege('service_role','public.studio_signup_permitted(text)','execute'),has_function_privilege('supabase_auth_admin','public.studio_hook_before_user_created(jsonb)','execute')),row(true,true)::record,'service_role lit la décision, supabase_auth_admin appelle le hook');
++select is((has_function_privilege('authenticated','public.studio_hook_before_user_created(jsonb)','execute'),has_function_privilege('anon','public.studio_hook_before_user_created(jsonb)','execute')),row(false,false)::record,'le hook n''est pas appelable par un client');
++select is((has_table_privilege('authenticated','public.studio_signup_policy','select'),has_table_privilege('service_role','public.studio_signup_policy','select'),has_table_privilege('anon','public.studio_signup_policy','update')),row(false,false,false)::record,'la politique n''est ni lisible ni modifiable par l''API');
++select * from finish();
++rollback;

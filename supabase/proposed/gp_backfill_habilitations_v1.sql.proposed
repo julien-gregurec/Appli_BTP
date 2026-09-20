@@ -1,0 +1,467 @@
+-- PROPOSITION — NON NUMÉROTÉE, NON RÉSERVÉE, NON APPLIQUÉE.
+-- Ne pas placer dans supabase/migrations avant le train de convergence
+-- (numéro : NEXT_MIGRATION_AFTER_CONVERGED_TRAIN).
+--
+-- D1 étape 2 : BACKFILL des habilitations `gestion_pro` pour les organisations et utilisateurs
+-- dont l'usage de Gestion Pro est PROUVÉ — et RIEN d'autre.
+--
+-- Cette proposition ne CRÉE que des fonctions. Elle ne modifie AUCUNE donnée à l'application de la
+-- migration : le backfill est un geste séparé, délibéré, précédé de la lecture du rapport :
+--
+--   select * from public.gp_backfill_rapport();                    -- 1. diagnostic (lecture seule)
+--   select * from public.gp_backfill_couverture();                 -- 2. couverture AVANT
+--   select * from public.gp_backfill_appliquer(false);             -- 3. SIMULATION (défaut) : compte, n'écrit rien
+--   select * from public.gp_backfill_appliquer(true, '<entreprise>'); -- 4. canari : une organisation
+--   select * from public.gp_backfill_appliquer(true);              -- 5. généralisation
+--   select * from public.gp_backfill_couverture();                 -- 6. couverture APRÈS (critère de sortie)
+--   select * from public.gp_backfill_retour_arriere(true);         -- retour arrière (défaut : simulation)
+--
+-- Garanties (prouvées par supabase/proposed/tests/gp_backfill_habilitations.test.sql) :
+--   * seules les paires classées `certain` reçoivent une ligne ; ambigus et exclus n'en reçoivent jamais ;
+--   * `on conflict do nothing` : un geste plateforme existant (activation, désactivation, rôle) n'est
+--     JAMAIS écrasé, et une désactivation explicite rend la paire `ambigu` (jamais réactivée) ;
+--   * idempotent : la 2e exécution n'écrit aucune ligne ;
+--   * historisé (`historique_acces_applications`) et réversible par marqueur ;
+--   * AUCUN prix, plan, offre, module ou capacité n'est écrit (hash avant/après des tables commerciales) ;
+--   * fonctions réservées à l'exploitation (rôle `postgres`, sans JWT applicatif) : ni `authenticated`,
+--     ni `anon`, ni `service_role` ne peuvent les exécuter (un membre ne liste jamais les autres organisations).
+--
+-- Lectures de classification (jamais écrites) : `entreprises.abonnement_statut/_offre/_essai_*`,
+-- `suspension_prevue_at`, `utilisateurs_entreprises`, `postes`, `permissions_poste`, `employes`,
+-- `plateforme_admins`, `utilisateurs.entreprise_active_id`.
+--
+-- Prérequis : socle multi-app (migration …000234, …000236, …000239). Production (ledger 210) : ces
+-- tables n'existent pas encore — rien à jouer avant le cutover.
+
+-- ── 1. Rapport de classification (lecture seule) ─────────────────────────────────────────────
+create or replace function public.gp_backfill_rapport(p_entreprise_id uuid default null)
+returns table(
+  entreprise_id uuid,
+  entreprise_nom text,
+  utilisateur_id uuid,
+  statut_membre text,
+  poste_id uuid,
+  poste_nom text,
+  classe text,               -- certain | ambigu | exclu
+  raison_code text,          -- stable, exploitable par script
+  raison text,               -- lisible
+  role_propose text,         -- seulement pour `certain`
+  action_recommandee text,
+  couvert_effectif boolean   -- true = habilitation gestion_pro déjà effective (droit d'usage + habilitation)
+)
+language plpgsql
+stable
+set search_path = public
+as $fn$
+#variable_conflict use_column
+begin
+  -- Réservé à l'exploitation : un utilisateur applicatif (JWT) ne peut jamais lister d'autres organisations.
+  if auth.uid() is not null then
+    raise exception 'gp_backfill_rapport est reservee a l''exploitation (postgres), pas aux utilisateurs applicatifs'
+      using errcode = '42501';
+  end if;
+
+  return query
+  with
+  libelles(code, raison, action) as (values
+    ('certain_admin',          'Membre actif d''une organisation à abonnement GP prouvé, poste administrateur prouvé (permission gerer_utilisateurs)', 'backfill : habilitation gestion_pro_admin'),
+    ('certain_utilisateur',    'Membre actif d''une organisation à abonnement GP prouvé, poste avec permissions GP effectives',                        'backfill : habilitation gestion_pro_utilisateur'),
+    ('admin_plateforme',       'Administrateur plateforme actif : bypass de la décision, aucune habilitation nécessaire',                              'aucune'),
+    ('sans_profil',            'Compte d''authentification sans profil utilisateur',                                                                   'aucune (aucune appartenance possible)'),
+    ('statut_invite',          'Invitation non acceptée',                                                                                              'aucune : l''habilitation devra être créée à l''activation (prérequis d''enforcement)'),
+    ('statut_en_attente_validation','Demande de rattachement en attente de validation par un administrateur',                                          'aucune : l''habilitation devra être créée à la validation (prérequis d''enforcement)'),
+    ('statut_desactive',       'Membre désactivé',                                                                                                     'aucune'),
+    ('statut_pause',           'Statut « pause » (inconnu du contrat de décision)',                                                                    'revue humaine'),
+    ('compte_depot',           'Compte dépôt/borne partagé (permission mode_compte_depot) : rôle applicatif non tranché',                              'DECISION_REQUIRED : rôle du compte dépôt ; exempter en enforcement'),
+    ('organisation_annulee',   'Organisation annulée : les droits se créeraient mais le blocage reste porté par l''abonnement',                        'DECISION_REQUIRED : backfill des organisations annulées ?'),
+    ('organisation_suspendue', 'Organisation suspendue (ou suspension échue) : les droits se créeraient mais le blocage reste porté par l''abonnement', 'DECISION_REQUIRED : backfill des organisations suspendues ?'),
+    ('employe_ecarte',         'Utilisateur lié à un employé sorti, suspendu, anonymisé ou au compte applicatif fermé',                                'revue humaine : désactiver le membre ou rétablir l''employé'),
+    ('sans_poste',             'Membre actif sans poste : aucune permission GP',                                                                       'revue humaine : attribuer un poste ou désactiver'),
+    ('poste_sans_permission',  'Poste sans aucune permission GP autorisée',                                                                            'revue humaine : corriger le poste ou désactiver'),
+    ('abonnement_gp_non_prouve','Organisation sans offre, sans essai daté et sans statut actif : usage de GP non prouvé',                             'revue humaine : régulariser l''abonnement'),
+    ('entreprise_active_incoherente','utilisateurs.entreprise_active_id nul ou sans appartenance active correspondante',                               'corriger l''entreprise active puis relancer le rapport'),
+    ('poste_admin_par_nom_seulement','Poste nommé « admin/gérant » sans permission gerer_utilisateurs : administrateur non prouvé',                    'revue humaine : attribuer gerer_utilisateurs ou fixer le rôle'),
+    ('organisation_sans_admin','Aucun administrateur identifiable dans l''organisation : personne ne pourrait gérer les habilitations ensuite',        'DECISION_REQUIRED : désigner un administrateur avant backfill'),
+    ('droit_org_desactive_par_plateforme','Le droit d''usage gestion_pro de l''organisation a été désactivé explicitement : geste plateforme à respecter','aucune : ne jamais réactiver automatiquement'),
+    ('habilitation_desactivee_par_plateforme','Habilitation gestion_pro désactivée explicitement pour ce membre : geste plateforme à respecter',           'aucune : ne jamais réactiver automatiquement')
+  ),
+  membres as (
+    select ue.entreprise_id, ue.utilisateur_id, ue.statut, ue.poste_id,
+           e.nom as e_nom, e.abonnement_statut, e.abonnement_offre,
+           e.abonnement_essai_debut, e.abonnement_essai_fin, e.suspension_prevue_at,
+           p.nom as p_nom, u.entreprise_active_id
+      from public.utilisateurs_entreprises ue
+      join public.entreprises e on e.id = ue.entreprise_id
+      join public.utilisateurs u on u.id = ue.utilisateur_id
+      left join public.postes p on p.id = ue.poste_id and p.entreprise_id = ue.entreprise_id
+     where p_entreprise_id is null or ue.entreprise_id = p_entreprise_id
+  ),
+  perm as (
+    select pp.entreprise_id, pp.poste_id,
+           bool_or(pp.autorise and pp.cle_permission <> 'mode_compte_depot') as a_perm,
+           bool_or(pp.autorise and pp.cle_permission = 'gerer_utilisateurs')  as gere,
+           bool_or(pp.autorise and pp.cle_permission = 'mode_compte_depot')   as depot
+      from public.permissions_poste pp
+     group by pp.entreprise_id, pp.poste_id
+  ),
+  emp as (
+    select em.utilisateur_id, em.entreprise_id,
+           bool_or(em.statut in ('sorti', 'suspendu')
+                   or em.anonymise_at is not null
+                   or (em.date_sortie is not null and em.date_sortie <= current_date)
+                   or em.compte_application_statut in ('ferme', 'pause')) as ecarte
+      from public.employes em
+     where em.utilisateur_id is not null
+     group by em.utilisateur_id, em.entreprise_id
+  ),
+  plat as (
+    select distinct pa.utilisateur_id
+      from public.plateforme_admins pa
+     where pa.actif and pa.statut_identite = 'active' and pa.utilisateur_id is not null
+  ),
+  enrichi as (
+    select m.*,
+           coalesce(pm.a_perm, false) as a_perm,
+           coalesce(pm.gere, false)   as gere,
+           coalesce(pm.depot, false)  as depot,
+           coalesce(em.ecarte, false) as ecarte,
+           (pl.utilisateur_id is not null) as est_plat,
+           (m.abonnement_offre is not null or m.abonnement_statut = 'actif'
+            or m.abonnement_essai_debut is not null or m.abonnement_essai_fin is not null) as abo_reel,
+           (m.entreprise_active_id is null
+            or not exists (select 1 from public.utilisateurs_entreprises x
+                            where x.utilisateur_id = m.utilisateur_id
+                              and x.entreprise_id = m.entreprise_active_id
+                              and x.statut = 'actif')) as active_incoh,
+           (lower(m.p_nom) in ('admin', 'administrateur', 'admin/gérant', 'gérant')) as nom_admin
+      from membres m
+      left join perm pm on pm.entreprise_id = m.entreprise_id and pm.poste_id = m.poste_id
+      left join emp  em on em.entreprise_id = m.entreprise_id and em.utilisateur_id = m.utilisateur_id
+      left join plat pl on pl.utilisateur_id = m.utilisateur_id
+  ),
+  -- Étape 1 : classification individuelle. Le PREMIER motif applicable gagne ; l'ordre va du plus
+  -- exclusif (statut, plateforme) au plus fin, et tout doute est `ambigu`, jamais `certain`.
+  etape1 as (
+    select en.*,
+           case
+             when en.est_plat then 'admin_plateforme'
+             when en.statut = 'invite' then 'statut_invite'
+             when en.statut = 'en_attente_validation' then 'statut_en_attente_validation'
+             when en.statut = 'desactive' then 'statut_desactive'
+             when en.statut <> 'actif' then 'statut_' || en.statut
+             when en.depot then 'compte_depot'
+             when en.abonnement_statut = 'annule' then 'organisation_annulee'
+             when en.abonnement_statut = 'suspendu'
+               or (en.suspension_prevue_at is not null and en.suspension_prevue_at <= now()) then 'organisation_suspendue'
+             when en.ecarte then 'employe_ecarte'
+             when en.poste_id is null then 'sans_poste'
+             when not en.a_perm then 'poste_sans_permission'
+             when not en.abo_reel then 'abonnement_gp_non_prouve'
+             when en.active_incoh then 'entreprise_active_incoherente'
+             when en.gere then 'candidat_admin'
+             when en.nom_admin then 'poste_admin_par_nom_seulement'
+             else 'candidat_utilisateur'
+           end as code1
+      from enrichi en
+  ),
+  orgs as (
+    select e1.entreprise_id, bool_or(e1.code1 = 'candidat_admin') as a_admin
+      from etape1 e1
+     group by e1.entreprise_id
+  ),
+  -- Étape 2 : contexte d'organisation et gestes plateforme existants (jamais écrasés).
+  etape2 as (
+    select e1.*, o.a_admin, ae.autorise as ae_autorise, hu.autorise as hu_autorise,
+           case
+             when e1.code1 in ('candidat_admin', 'candidat_utilisateur') then
+               case
+                 when not o.a_admin then 'organisation_sans_admin'
+                 when ae.autorise is false then 'droit_org_desactive_par_plateforme'
+                 when hu.autorise is false then 'habilitation_desactivee_par_plateforme'
+                 when e1.code1 = 'candidat_admin' then 'certain_admin'
+                 else 'certain_utilisateur'
+               end
+             else e1.code1
+           end as code
+      from etape1 e1
+      join orgs o on o.entreprise_id = e1.entreprise_id
+      left join public.acces_applications_entreprises ae
+             on ae.entreprise_id = e1.entreprise_id and ae.application_code = 'gestion_pro'
+      left join public.habilitations_applications_utilisateurs hu
+             on hu.entreprise_id = e1.entreprise_id and hu.utilisateur_id = e1.utilisateur_id
+            and hu.application_code = 'gestion_pro'
+  )
+  select e2.entreprise_id, e2.e_nom, e2.utilisateur_id, e2.statut, e2.poste_id, e2.p_nom,
+         case when e2.code in ('certain_admin', 'certain_utilisateur') then 'certain'
+              when e2.code = 'admin_plateforme' or left(e2.code, 7) = 'statut_' then 'exclu'
+              else 'ambigu' end,
+         e2.code,
+         l.raison,
+         case e2.code when 'certain_admin' then 'gestion_pro_admin'
+                      when 'certain_utilisateur' then 'gestion_pro_utilisateur' end,
+         l.action,
+         (
+           exists (select 1 from public.acces_applications_entreprises ae
+                    where ae.entreprise_id = e2.entreprise_id and ae.application_code = 'gestion_pro'
+                      and ae.autorise
+                      and (ae.valide_du is null or ae.valide_du <= now())
+                      and (ae.valide_jusqu_au is null or ae.valide_jusqu_au > now()))
+           and exists (select 1 from public.habilitations_applications_utilisateurs hu
+                         join public.roles_applications_elsatia r
+                           on r.application_code = hu.application_code and r.code = hu.role_code and r.actif
+                        where hu.entreprise_id = e2.entreprise_id and hu.utilisateur_id = e2.utilisateur_id
+                          and hu.application_code = 'gestion_pro' and hu.autorise
+                          and (hu.valide_du is null or hu.valide_du <= now())
+                          and (hu.valide_jusqu_au is null or hu.valide_jusqu_au > now()))
+         )
+    from etape2 e2
+    join libelles l on l.code = e2.code
+  union all
+  -- Comptes d'authentification sans profil : hors de toute organisation (rapport complet du parc).
+  select null::uuid, null::text, au.id, 'sans_profil', null::uuid, null::text,
+         'exclu', 'sans_profil', l.raison, null::text, l.action, false
+    from auth.users au
+    join libelles l on l.code = 'sans_profil'
+   where p_entreprise_id is null
+     and not exists (select 1 from public.utilisateurs u where u.id = au.id)
+  order by 1, 3;
+end;
+$fn$;
+
+-- ── 2. Couverture (critère de sortie de l'étape 3) ───────────────────────────────────────────
+-- Pour chaque paire (organisation, membre ACTIF légitime — hors administrateur plateforme) :
+--   couvert            : habilitation gestion_pro déjà EFFECTIVE (droit d'usage + habilitation valides) ;
+--   non_couvert        : classée `certain` mais pas couverte = à corriger ; DOIT être 0 avant tout enforcement ;
+--   ambigu_non_tranche : classée `ambigu`, pas couverte : expliquée (raison_code) mais à trancher par un humain.
+create or replace function public.gp_backfill_couverture(p_entreprise_id uuid default null)
+returns table(categorie text, raison_code text, nombre_paires bigint)
+language plpgsql
+stable
+set search_path = public
+as $fn$
+#variable_conflict use_column
+begin
+  if auth.uid() is not null then
+    raise exception 'gp_backfill_couverture est reservee a l''exploitation (postgres), pas aux utilisateurs applicatifs'
+      using errcode = '42501';
+  end if;
+
+  return query
+  with legitimes as (
+    select r.*
+      from public.gp_backfill_rapport(p_entreprise_id) r
+     where r.statut_membre = 'actif' and r.raison_code <> 'admin_plateforme'
+  ),
+  cat as (
+    select case when l.couvert_effectif then 'couvert'
+                when l.classe = 'certain' then 'non_couvert'
+                else 'ambigu_non_tranche' end as categorie,
+           case when l.couvert_effectif then 'habilitation_effective'
+                when l.classe = 'certain' then 'certain_non_couvert'
+                else l.raison_code end as raison_code
+      from legitimes l
+  )
+  select c.categorie, c.raison_code, count(*)::bigint
+    from cat c
+   group by c.categorie, c.raison_code
+  union all
+  select 'total', 'paires_legitimes', count(*)::bigint from cat
+  order by 1, 2;
+end;
+$fn$;
+
+-- ── 3. Backfill (SIMULATION par défaut) ──────────────────────────────────────────────────────
+create or replace function public.gp_backfill_appliquer(
+  p_appliquer boolean default false,
+  p_entreprise_id uuid default null
+) returns table(etape text, nombre bigint)
+language plpgsql
+volatile
+set search_path = public
+as $fn$
+#variable_conflict use_column
+declare
+  v_marqueur constant text := 'backfill_gp_habilitation_v1';
+  v_ent bigint;
+  v_hab bigint;
+  v_hist bigint;
+begin
+  if auth.uid() is not null then
+    raise exception 'gp_backfill_appliquer est reservee a l''exploitation (postgres), pas aux utilisateurs applicatifs'
+      using errcode = '42501';
+  end if;
+  if not exists (select 1 from public.applications_elsatia where code = 'gestion_pro' and actif) then
+    raise exception 'application gestion_pro absente ou inactive : backfill impossible';
+  end if;
+  -- Une seule exécution à la fois (deux opérateurs, ou une migration et un opérateur).
+  perform pg_advisory_xact_lock(hashtext(v_marqueur));
+
+  if not p_appliquer then
+    with certains as (
+      select r.entreprise_id, r.utilisateur_id from public.gp_backfill_rapport(p_entreprise_id) r where r.classe = 'certain'
+    )
+    select
+      (select count(distinct c.entreprise_id) from certains c
+        where not exists (select 1 from public.acces_applications_entreprises ae
+                           where ae.entreprise_id = c.entreprise_id and ae.application_code = 'gestion_pro')),
+      (select count(*) from certains c
+        where not exists (select 1 from public.habilitations_applications_utilisateurs hu
+                           where hu.entreprise_id = c.entreprise_id and hu.utilisateur_id = c.utilisateur_id
+                             and hu.application_code = 'gestion_pro'))
+    into v_ent, v_hab;
+    return query values ('simulation:entreprises_a_creer'::text, v_ent), ('simulation:habilitations_a_creer'::text, v_hab);
+    return;
+  end if;
+
+  -- UNE instruction : les insertions et leur historique sont atomiques et cohérents avec le même rapport.
+  with certains as materialized (
+    select r.entreprise_id, r.utilisateur_id, r.role_propose
+      from public.gp_backfill_rapport(p_entreprise_id) r where r.classe = 'certain'
+  ),
+  ins_org as (
+    insert into public.acces_applications_entreprises(entreprise_id, application_code, autorise, source, metadata)
+    select distinct c.entreprise_id, 'gestion_pro', true, v_marqueur,
+           jsonb_build_object('backfill', v_marqueur, 'execute_le', now())
+      from certains c
+    on conflict (entreprise_id, application_code) do nothing
+    returning entreprise_id
+  ),
+  ins_hab as (
+    insert into public.habilitations_applications_utilisateurs(entreprise_id, utilisateur_id, application_code, role_code, autorise)
+    select c.entreprise_id, c.utilisateur_id, 'gestion_pro', c.role_propose, true
+      from certains c
+    on conflict (entreprise_id, utilisateur_id, application_code) do nothing
+    returning entreprise_id, utilisateur_id, role_code
+  ),
+  h_org as (
+    insert into public.historique_acces_applications(cible_type, cible_id, application_code, action, auteur_email, ancien, nouveau, resultat)
+    select 'entreprise', o.entreprise_id, 'gestion_pro', 'backfill_droit_usage', v_marqueur, null,
+           jsonb_build_object('autorise', true, 'source', v_marqueur), 'cree'
+      from ins_org o
+    returning 1
+  ),
+  h_hab as (
+    insert into public.historique_acces_applications(cible_type, cible_id, application_code, action, auteur_email, ancien, nouveau, resultat)
+    select 'utilisateur', h.utilisateur_id, 'gestion_pro', 'habilitation_backfill:' || h.role_code, v_marqueur, null,
+           jsonb_build_object('autorise', true, 'role_code', h.role_code, 'entreprise_id', h.entreprise_id, 'source', v_marqueur), 'cree'
+      from ins_hab h
+    returning 1
+  )
+  select (select count(*) from ins_org), (select count(*) from ins_hab),
+         (select count(*) from h_org) + (select count(*) from h_hab)
+    into v_ent, v_hab, v_hist;
+
+  return query values ('entreprises_creees'::text, v_ent), ('habilitations_creees'::text, v_hab), ('lignes_historique'::text, v_hist);
+end;
+$fn$;
+
+-- ── 4. Retour arrière (SIMULATION par défaut) ────────────────────────────────────────────────
+-- Ne retire QUE ce que le backfill a créé ET que personne n'a modifié depuis : ligne portant le
+-- marqueur dans l'historique, `attribue_par` nul, `updated_at = created_at`. Une habilitation ou un
+-- droit d'usage retouché par la plateforme depuis est CONSERVÉ. Le droit d'usage d'une organisation
+-- n'est retiré que s'il ne reste aucune habilitation gestion_pro pour elle.
+create or replace function public.gp_backfill_retour_arriere(
+  p_appliquer boolean default false,
+  p_entreprise_id uuid default null
+) returns table(etape text, nombre bigint)
+language plpgsql
+volatile
+set search_path = public
+as $fn$
+#variable_conflict use_column
+declare
+  v_marqueur constant text := 'backfill_gp_habilitation_v1';
+  v_hab bigint;
+  v_ent bigint;
+begin
+  if auth.uid() is not null then
+    raise exception 'gp_backfill_retour_arriere est reservee a l''exploitation (postgres), pas aux utilisateurs applicatifs'
+      using errcode = '42501';
+  end if;
+  perform pg_advisory_xact_lock(hashtext(v_marqueur));
+
+  if not p_appliquer then
+    with cibles as (
+      select hu.id, hu.entreprise_id from public.habilitations_applications_utilisateurs hu
+       where hu.application_code = 'gestion_pro' and hu.attribue_par is null and hu.updated_at = hu.created_at
+         and (p_entreprise_id is null or hu.entreprise_id = p_entreprise_id)
+         and exists (select 1 from public.historique_acces_applications x
+                      where x.cible_type = 'utilisateur' and x.cible_id = hu.utilisateur_id
+                        and x.application_code = 'gestion_pro'
+                        and x.nouveau ->> 'source' = v_marqueur
+                        and x.nouveau ->> 'entreprise_id' = hu.entreprise_id::text)
+    )
+    select (select count(*) from cibles),
+           (select count(*) from public.acces_applications_entreprises ae
+             where ae.application_code = 'gestion_pro' and ae.source = v_marqueur and ae.updated_at = ae.created_at
+               and (p_entreprise_id is null or ae.entreprise_id = p_entreprise_id)
+               and not exists (select 1 from public.habilitations_applications_utilisateurs h2
+                                where h2.entreprise_id = ae.entreprise_id and h2.application_code = 'gestion_pro'
+                                  and h2.id not in (select id from cibles)))
+      into v_hab, v_ent;
+    return query values ('simulation:habilitations_a_retirer'::text, v_hab), ('simulation:droits_usage_a_retirer'::text, v_ent);
+    return;
+  end if;
+
+  with cibles as materialized (
+    select hu.id, hu.entreprise_id, hu.utilisateur_id, hu.role_code
+      from public.habilitations_applications_utilisateurs hu
+     where hu.application_code = 'gestion_pro' and hu.attribue_par is null and hu.updated_at = hu.created_at
+       and (p_entreprise_id is null or hu.entreprise_id = p_entreprise_id)
+       and exists (select 1 from public.historique_acces_applications x
+                    where x.cible_type = 'utilisateur' and x.cible_id = hu.utilisateur_id
+                      and x.application_code = 'gestion_pro'
+                      and x.nouveau ->> 'source' = v_marqueur
+                      and x.nouveau ->> 'entreprise_id' = hu.entreprise_id::text)
+  ),
+  del_hab as (
+    delete from public.habilitations_applications_utilisateurs hu
+     using cibles c where hu.id = c.id
+    returning hu.entreprise_id, hu.utilisateur_id, hu.role_code
+  ),
+  del_org as (
+    delete from public.acces_applications_entreprises ae
+     where ae.application_code = 'gestion_pro' and ae.source = v_marqueur and ae.updated_at = ae.created_at
+       and (p_entreprise_id is null or ae.entreprise_id = p_entreprise_id)
+       and not exists (select 1 from public.habilitations_applications_utilisateurs h2
+                        where h2.entreprise_id = ae.entreprise_id and h2.application_code = 'gestion_pro'
+                          and h2.id not in (select id from cibles))
+    returning ae.entreprise_id
+  ),
+  h_hab as (
+    insert into public.historique_acces_applications(cible_type, cible_id, application_code, action, auteur_email, ancien, nouveau, resultat)
+    select 'utilisateur', d.utilisateur_id, 'gestion_pro', 'retour_arriere_backfill', v_marqueur,
+           jsonb_build_object('role_code', d.role_code, 'entreprise_id', d.entreprise_id, 'source', v_marqueur), null, 'modifie'
+      from del_hab d
+    returning 1
+  ),
+  h_org as (
+    insert into public.historique_acces_applications(cible_type, cible_id, application_code, action, auteur_email, ancien, nouveau, resultat)
+    select 'entreprise', o.entreprise_id, 'gestion_pro', 'retour_arriere_backfill', v_marqueur,
+           jsonb_build_object('source', v_marqueur), null, 'modifie'
+      from del_org o
+    returning 1
+  )
+  select (select count(*) from del_hab), (select count(*) from del_org)
+    into v_hab, v_ent;
+  return query values ('habilitations_retirees'::text, v_hab), ('droits_usage_retires'::text, v_ent);
+end;
+$fn$;
+
+-- ── 5. ACL : exploitation seulement ──────────────────────────────────────────────────────────
+-- Aucun rôle applicatif : un membre ne doit jamais pouvoir lister les autres organisations, et une
+-- fonction qui écrit des droits ne s'expose pas à `service_role` (qui n'a d'ailleurs plus aucun droit
+-- sur ces tables depuis …000255).
+revoke all on function public.gp_backfill_rapport(uuid) from public, anon, authenticated, service_role;
+revoke all on function public.gp_backfill_couverture(uuid) from public, anon, authenticated, service_role;
+revoke all on function public.gp_backfill_appliquer(boolean, uuid) from public, anon, authenticated, service_role;
+revoke all on function public.gp_backfill_retour_arriere(boolean, uuid) from public, anon, authenticated, service_role;
+
+comment on function public.gp_backfill_rapport(uuid) is
+  'D1 étape 2 : classe chaque (organisation, membre) en certain/ambigu/exclu avec raison. Lecture seule, exploitation uniquement.';
+comment on function public.gp_backfill_couverture(uuid) is
+  'D1 étape 2 : couverture des membres actifs légitimes par une habilitation gestion_pro effective. Critère de sortie : 0 non_couvert.';
+comment on function public.gp_backfill_appliquer(boolean, uuid) is
+  'D1 étape 2 : n''insère QUE les certain, on conflict do nothing, historisé, idempotent. Simulation par défaut.';
+comment on function public.gp_backfill_retour_arriere(boolean, uuid) is
+  'D1 étape 2 : retire uniquement les lignes créées par le backfill et non modifiées depuis. Simulation par défaut.';

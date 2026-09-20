@@ -1,12 +1,22 @@
 -- PROPOSITION — NON NUMÉROTÉE, NON RÉSERVÉE. Ne pas placer dans supabase/migrations avant le train
 -- de convergence (numéro : NEXT_MIGRATION_AFTER_CONVERGED_TRAIN).
 --
--- decision_acces_application : décision d'accès AVEC MOTIF. Additive : `a_acces_application` reste
--- inchangée (compatibilité). Invariant vérifié par le jeu d'essai
--- (docs/qualification/access-convergence-v1/decision-cases.sql) :
---     decision = 'autorise'  ⇔  a_acces_application(entreprise, app) = true
+-- decision_acces_application : décision d'accès AVEC MOTIF, au contrat v1 FIGÉ (D1-D3 de Julien).
+-- PRÉREQUIS : supabase/proposed/per_application_status_and_platform_suspension_v1.sql.proposed
+-- (statut commercial par application, suspension plateforme, est_membre_organisation).
 --
--- Contrat v1 : packages/application-access/src/decision-acces.ts.
+-- Ordre d'évaluation = priorité, la première étape qui s'applique gagne :
+--   1 non_authentifie · 2 erreur_configuration · 3 suspension_plateforme (prime sur tout, bypass
+--   administrateur compris) · 4 autorise (bypass administrateur plateforme actif) ·
+--   5 sans_organisation · 6 invitation_en_attente · 7 validation_en_attente ·
+--   8 utilisateur_desactive · 9 abonnement_suspendu (statut commercial de CETTE application) ·
+--   10 essai_expire · 11 application_non_incluse · 12 sans_habilitation · 13 sans_role ·
+--   14 autorise.
+-- `entreprise_inactive` est RETIRÉ (couvert par `suspension_plateforme`, portée organisation).
+--
+-- `a_acces_application` est RÉÉCRITE en fin de fichier : « la décision est `autorise` pour
+-- l'utilisateur courant ». Même signature, mêmes GRANT/REVOKE, même bypass administrateur.
+-- Seule différence voulue : l'abonnement Gestion Pro ne coupe plus que Gestion Pro (D3).
 -- Aucun prix, aucun plan, aucune donnée modifiée : lecture seule.
 
 -- ── Noyau : évalue pour un utilisateur donné et rend décision + diagnostic complet ────────────
@@ -18,49 +28,63 @@ as $$
 declare
   v_app public.applications_elsatia%rowtype;
   v_statut_membre text;
-  v_ent public.entreprises%rowtype;
+  v_membre boolean := false;
+  v_susp jsonb;
+  v_ent_statut text;
+  v_ent_suspension_prevue timestamptz;
+  v_abonnement_suspendu boolean;
   v_ae public.acces_applications_entreprises%rowtype;
+  v_ae_trouve boolean;
   v_hu public.habilitations_applications_utilisateurs%rowtype;
   v_role_actif boolean;
-  v_admin boolean;
-  v_support boolean := false;
-  v_decision text;
-  v_role text;
-  v_membre boolean := false;
   v_diag jsonb := '{}'::jsonb;
 begin
+  -- 1. non authentifié
   if p_uid is null then
     return jsonb_build_object('decision','non_authentifie','membre',false,'diagnostic','{}'::jsonb);
   end if;
 
+  -- 2. application inconnue ou inactive : échec fermé (le nom d'entreprise n'est pas exposé)
   select * into v_app from public.applications_elsatia where code = p_application_code;
   if not found or not v_app.actif then
     return jsonb_build_object('decision','erreur_configuration','membre',false,
       'diagnostic', jsonb_build_object('cause','application_inconnue_ou_inactive'));
   end if;
 
-  -- Même condition que a_acces_application : administrateur plateforme actif, identité active.
-  select exists(select 1 from public.plateforme_admins
-                where utilisateur_id = p_uid and actif and statut_identite = 'active') into v_admin;
-  if v_admin then
-    return jsonb_build_object('decision','autorise','role_code','administrateur_plateforme_global','membre',false,
+  -- Appartenance de l'utilisateur à l'organisation demandée (sert au drapeau `membre` et aux étapes 5-8).
+  if p_entreprise_id is not null then
+    select ue.statut into v_statut_membre from public.utilisateurs_entreprises ue
+     where ue.utilisateur_id = p_uid and ue.entreprise_id = p_entreprise_id;
+    v_membre := found;
+  end if;
+
+  -- 3. suspension plateforme globale explicite : prime sur tout, y compris le bypass administrateur
+  v_susp := public._suspension_plateforme_active(p_uid, p_entreprise_id);
+  if v_susp is not null then
+    return jsonb_build_object('decision','suspension_plateforme','membre',v_membre,
+      'diagnostic', jsonb_build_object('suspension', v_susp));
+  end if;
+
+  -- 4. bypass administrateur plateforme actif (même condition que l'ancienne a_acces_application)
+  if exists(select 1 from public.plateforme_admins
+             where utilisateur_id = p_uid and actif and statut_identite = 'active') then
+    return jsonb_build_object('decision','autorise','role_code','administrateur_plateforme_global','membre',v_membre,
       'diagnostic', jsonb_build_object('bypass','administrateur_plateforme'));
   end if;
 
+  -- 5. sans organisation
   if p_entreprise_id is null then
     return jsonb_build_object('decision','sans_organisation','membre',false,
       'diagnostic', jsonb_build_object('cause','entreprise_active_nulle'));
   end if;
-
-  select ue.statut into v_statut_membre from public.utilisateurs_entreprises ue
-   where ue.utilisateur_id = p_uid and ue.entreprise_id = p_entreprise_id;
-  if not found then
+  if not v_membre then
     return jsonb_build_object('decision','sans_organisation','membre',false,
       'diagnostic', jsonb_build_object('cause','aucune_appartenance'));
   end if;
-  v_membre := true;
   v_diag := jsonb_build_object('membre_statut', v_statut_membre);
 
+  -- 6-8. état de l'appartenance (avant tout état commercial : un membre désactivé d'une
+  -- organisation suspendue reçoit `utilisateur_desactive`, pas `abonnement_suspendu`)
   if v_statut_membre = 'invite' then
     return jsonb_build_object('decision','invitation_en_attente','membre',true,'diagnostic',v_diag);
   elsif v_statut_membre = 'en_attente_validation' then
@@ -68,35 +92,43 @@ begin
   elsif v_statut_membre = 'desactive' then
     return jsonb_build_object('decision','utilisateur_desactive','membre',true,'diagnostic',v_diag);
   elsif v_statut_membre <> 'actif' then
+    -- inclut `pause` : ni actif ni désactivé, l'état n'est pas défini par le contrat
     return jsonb_build_object('decision','erreur_configuration','membre',true,
       'diagnostic', v_diag || jsonb_build_object('cause','statut_membre_inconnu'));
   end if;
 
-  select * into v_ent from public.entreprises where id = p_entreprise_id;
-  if not found then
-    return jsonb_build_object('decision','erreur_configuration','membre',true,
-      'diagnostic', v_diag || jsonb_build_object('cause','entreprise_introuvable'));
-  end if;
-  -- Une session d'assistance ouverte sur cette entreprise passe l'état d'abonnement (comme est_membre_actif).
-  if p_uid = auth.uid() then v_support := coalesce(public.est_acces_support_actif(p_entreprise_id), false); end if;
-  v_diag := v_diag || jsonb_build_object('abonnement_statut', v_ent.abonnement_statut,
-                                         'suspension_prevue_at', v_ent.suspension_prevue_at,
-                                         'support', v_support);
-  if not v_support then
-    if v_ent.abonnement_statut = 'annule' then
-      return jsonb_build_object('decision','entreprise_inactive','membre',true,'diagnostic',v_diag);
-    elsif v_ent.abonnement_statut = 'suspendu'
-       or (v_ent.suspension_prevue_at is not null and v_ent.suspension_prevue_at <= now()) then
-      return jsonb_build_object('decision','abonnement_suspendu','membre',true,'diagnostic',v_diag);
-    end if;
-  end if;
-
-  -- Droit d'usage de l'organisation.
+  -- Droit d'usage de l'organisation pour CETTE application (lu une fois : étapes 9, 10, 11).
   select * into v_ae from public.acces_applications_entreprises
    where entreprise_id = p_entreprise_id and application_code = p_application_code;
-  if not found or not v_ae.autorise then
+  v_ae_trouve := found;
+
+  -- 9. abonnement_suspendu : statut commercial de CETTE application (D3).
+  --    gestion_pro : abonnement de l'entreprise ; toute autre application : statut porté par son
+  --    propre droit d'usage. L'abonnement Gestion Pro n'est JAMAIS lu pour une autre application.
+  if p_application_code = 'gestion_pro' then
+    select e.abonnement_statut, e.suspension_prevue_at into v_ent_statut, v_ent_suspension_prevue
+      from public.entreprises e where e.id = p_entreprise_id;
+    if not found then
+      return jsonb_build_object('decision','erreur_configuration','membre',true,
+        'diagnostic', v_diag || jsonb_build_object('cause','entreprise_introuvable'));
+    end if;
+    v_abonnement_suspendu := v_ent_statut in ('suspendu','annule')
+      or (v_ent_suspension_prevue is not null and v_ent_suspension_prevue <= now());
+    v_diag := v_diag || jsonb_build_object('abonnement_statut', v_ent_statut,
+                                           'suspension_prevue_at', v_ent_suspension_prevue);
+  else
+    v_abonnement_suspendu := v_ae_trouve and v_ae.statut_commercial in ('suspendu','annule');
+    v_diag := v_diag || jsonb_build_object('statut_commercial', case when v_ae_trouve then v_ae.statut_commercial end,
+                                           'suspendu_depuis', case when v_ae_trouve then v_ae.suspendu_depuis end);
+  end if;
+  if v_abonnement_suspendu then
+    return jsonb_build_object('decision','abonnement_suspendu','membre',true,'diagnostic',v_diag);
+  end if;
+
+  -- 10-11. droit d'usage : absent/désactivé, ou hors fenêtre (essai expiré vs droit non inclus)
+  if not v_ae_trouve or not v_ae.autorise then
     return jsonb_build_object('decision','application_non_incluse','membre',true,
-      'diagnostic', v_diag || jsonb_build_object('droit_org', case when found then 'desactive' else 'absent' end));
+      'diagnostic', v_diag || jsonb_build_object('droit_org', case when v_ae_trouve then 'desactive' else 'absent' end));
   end if;
   if (v_ae.valide_du is not null and v_ae.valide_du > now())
      or (v_ae.valide_jusqu_au is not null and v_ae.valide_jusqu_au <= now()) then
@@ -107,12 +139,14 @@ begin
                                                  'valide_du',v_ae.valide_du,'valide_jusqu_au',v_ae.valide_jusqu_au));
   end if;
 
-  -- Habilitation de l'utilisateur.
+  -- 12. habilitation de l'utilisateur
   select * into v_hu from public.habilitations_applications_utilisateurs
    where entreprise_id = p_entreprise_id and utilisateur_id = p_uid and application_code = p_application_code;
   if not found then
     return jsonb_build_object('decision','sans_habilitation','membre',true,'diagnostic',v_diag);
   end if;
+
+  -- 13. rôle actif et fenêtre de validité de l'habilitation
   select r.actif into v_role_actif from public.roles_applications_elsatia r
    where r.application_code = v_hu.application_code and r.code = v_hu.role_code;
   if not v_hu.autorise or coalesce(v_role_actif, false) = false
@@ -124,12 +158,16 @@ begin
                                                  'valide_du',v_hu.valide_du,'valide_jusqu_au',v_hu.valide_jusqu_au));
   end if;
 
+  -- 14. autorisé
   return jsonb_build_object('decision','autorise','role_code',v_hu.role_code,'membre',true,'diagnostic',v_diag);
 end;
 $$;
 revoke all on function public._decision_acces_noyau(uuid,uuid,text) from public, anon, authenticated, service_role;
 
 -- ── Vue CLIENT : décision + rôle propre + nom d'entreprise SI l'appelant en est membre ───────
+-- Retour v1 : {version, decision, application_code, role_code (seulement si autorise),
+-- entreprise:{id,nom} (seulement si l'appelant a une appartenance à cette organisation)}.
+-- Aucun diagnostic, aucun motif de suspension, aucun statut commercial n'est renvoyé.
 create or replace function public.decision_acces_application(
   p_application_code text, p_entreprise_id uuid default null
 ) returns jsonb
@@ -151,10 +189,13 @@ begin
   );
 end;
 $$;
-revoke all on function public.decision_acces_application(text,uuid) from public, anon;
+revoke all on function public.decision_acces_application(text,uuid) from public, anon, service_role;
 grant execute on function public.decision_acces_application(text,uuid) to authenticated;
 
 -- ── Vue ADMIN/LOGS : diagnostic complet pour un tiers (administrateur plateforme uniquement) ─
+-- DECISION_REQUIRED: exiger aussi rôle plateforme `total` + AAL2 comme les RPC d'habilitation
+-- (00239) ? — défaut appliqué : administrateur plateforme actif seulement (lecture seule ; un
+-- administrateur actif obtient déjà le bypass sur toutes les applications).
 create or replace function public.diagnostic_acces_application(
   p_utilisateur_id uuid, p_entreprise_id uuid, p_application_code text
 ) returns jsonb
@@ -167,6 +208,27 @@ begin
   return public._decision_acces_noyau(p_utilisateur_id, p_entreprise_id, p_application_code);
 end;
 $$;
-revoke all on function public.diagnostic_acces_application(uuid,uuid,text) from public, anon;
+revoke all on function public.diagnostic_acces_application(uuid,uuid,text) from public, anon, service_role;
 grant execute on function public.diagnostic_acces_application(uuid,uuid,text) to authenticated;
--- À DÉCIDER : exiger aussi rôle plateforme `total` + AAL2 comme les RPC d'habilitation (00239).
+
+-- ── Compatibilité : `a_acces_application` = la décision est `autorise` pour l'utilisateur courant ─
+-- Signature, sécurité, GRANT/REVOKE inchangés (migrations 234 + 255). Elle alimente aujourd'hui
+-- colors_role_courant, reserves_role_courant, les RPC/RLS Tools et applications_autorisees :
+-- en une seule réécriture, ces chemins cessent de dépendre de l'abonnement Gestion Pro.
+-- Appelle le noyau (et non la vue client) : même décision, sans reconstruire le JSON ni lire le
+-- nom d'entreprise, car elle est évaluée ligne par ligne dans des politiques RLS.
+create or replace function public.a_acces_application(
+  p_entreprise_id uuid,
+  p_application_code text
+) returns boolean
+language sql
+security definer
+stable
+set search_path=public
+as $$
+  select coalesce(
+    public._decision_acces_noyau(auth.uid(), p_entreprise_id, p_application_code)->>'decision' = 'autorise',
+    false);
+$$;
+revoke all on function public.a_acces_application(uuid,text) from public, anon, service_role;
+grant execute on function public.a_acces_application(uuid,text) to authenticated;

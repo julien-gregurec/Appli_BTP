@@ -1,0 +1,241 @@
+-- PROPOSITION — NON NUMÉROTÉE, NON RÉSERVÉE. Ne pas placer dans supabase/migrations avant le train
+-- de convergence (numéro : NEXT_MIGRATION_AFTER_CONVERGED_TRAIN).
+--
+-- Décision D3 (Julien) : une suspension commerciale de Gestion Pro ne coupe PAS les autres
+-- applications ; chaque application porte son propre statut ; seule une suspension plateforme
+-- explicite (sécurité) coupe tout un compte ou toute une organisation.
+--
+-- Cette proposition :
+--   1. ajoute à `acces_applications_entreprises` un statut commercial PAR application ;
+--   2. crée `est_membre_organisation()` = appartenance active SANS l'abonnement Gestion Pro
+--      (`est_membre_actif()` reste intact : il protège les données Gestion Pro) ;
+--   3. crée la suspension plateforme globale explicite (table + lecture + deux RPC d'écriture) ;
+--   4. crée le RPC d'écriture du statut commercial d'UNE application d'UNE organisation ;
+--   (la décision au contrat FIGÉ et la réécriture de `a_acces_application` sont dans
+--   packages/application-access/sql/decision_acces_application.sql.proposed, à appliquer APRÈS
+--   ce fichier : elles lisent les objets créés ici.)
+--
+-- Aucun prix, aucun plan, aucune donnée existante modifiée : les lignes existantes restent `actif`.
+-- Aucune RLS Colors/Réserves/Tools n'est modifiée (voir annexe-d3-suspension-par-application.md).
+
+-- ── 1. Statut commercial PAR application ─────────────────────────────────────────────────────
+-- Pourquoi une colonne dédiée et pas `autorise` / `valide_jusqu_au` :
+--   * `autorise=false` = « droit retiré » → la décision répond `application_non_incluse`, ce qui se
+--     confond avec « jamais souscrit » (l'écran ne saurait pas proposer « régulariser ») ;
+--   * `valide_*` est la fenêtre contractuelle/essai ; `plateforme_activer_application_entreprise`
+--     la réécrit à chaque activation, elle ne doit pas porter un état d'impayé réversible.
+-- Pour `gestion_pro` cette colonne n'est PAS lue : le statut Gestion Pro reste porté par
+-- `entreprises.abonnement_statut` / `suspension_prevue_at` (Stripe, `plateforme_modifier_abonnement`).
+alter table public.acces_applications_entreprises
+  add column if not exists statut_commercial text not null default 'actif',
+  add column if not exists suspendu_depuis timestamptz;
+
+alter table public.acces_applications_entreprises
+  drop constraint if exists acces_applications_statut_commercial_check,
+  drop constraint if exists acces_applications_statut_commercial_coherent;
+alter table public.acces_applications_entreprises
+  add constraint acces_applications_statut_commercial_check
+    check (statut_commercial in ('actif', 'suspendu', 'annule')),
+  add constraint acces_applications_statut_commercial_coherent
+    check (statut_commercial = 'actif' or suspendu_depuis is not null);
+
+comment on column public.acces_applications_entreprises.statut_commercial is
+  'Statut commercial de CETTE application pour cette organisation (D3). Ignoré pour gestion_pro (abonnement = entreprises.abonnement_statut).';
+
+-- ── 2. Appartenance sans l'abonnement Gestion Pro ────────────────────────────────────────────
+-- Mêmes règles que `est_membre_actif` (session d'assistance active OU appartenance `actif`) moins
+-- la condition d'abonnement. Le seul écart volontaire est donc l'état de l'abonnement GP : le
+-- remplacement d'un `est_membre_actif` par `est_membre_organisation` dans une RLS non-GP ne change
+-- rien d'autre. Elle ne lit PAS la suspension plateforme (voir DECISION_REQUIRED n°4, annexe).
+create or replace function public.est_membre_organisation(p_entreprise_id uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select public.est_acces_support_actif(p_entreprise_id) or exists (
+    select 1
+    from public.utilisateurs_entreprises ue
+    where ue.entreprise_id = p_entreprise_id
+      and ue.utilisateur_id = auth.uid()
+      and ue.statut = 'actif'
+  );
+$$;
+revoke all on function public.est_membre_organisation(uuid) from public, anon, service_role;
+grant execute on function public.est_membre_organisation(uuid) to authenticated;
+
+-- ── 3. Suspension plateforme globale explicite ───────────────────────────────────────────────
+-- Un enregistrement = une décision de sécurité datée, motivée, attribuée, révocable. Jamais
+-- supprimé (la révocation pose `revoque_at`). Périmètre : un COMPTE (toutes ses organisations,
+-- toutes les applications) ou une ORGANISATION (tous ses membres, toutes les applications).
+create table if not exists public.suspensions_plateforme (
+  id uuid primary key default gen_random_uuid(),
+  portee text not null check (portee in ('compte', 'organisation')),
+  utilisateur_id uuid references auth.users(id) on delete cascade,
+  entreprise_id uuid references public.entreprises(id) on delete cascade,
+  motif text not null check (length(btrim(motif)) >= 5),
+  debut_at timestamptz not null default now(),
+  fin_at timestamptz,
+  cree_par uuid references auth.users(id) on delete set null,
+  cree_par_email text,
+  revoque_at timestamptz,
+  revoque_par uuid references auth.users(id) on delete set null,
+  revoque_motif text,
+  created_at timestamptz not null default now(),
+  constraint suspensions_plateforme_cible_coherente check (
+    (portee = 'compte' and utilisateur_id is not null and entreprise_id is null)
+    or (portee = 'organisation' and entreprise_id is not null and utilisateur_id is null)
+  ),
+  constraint suspensions_plateforme_fin_apres_debut check (fin_at is null or fin_at > debut_at),
+  constraint suspensions_plateforme_revocation_coherente check (
+    (revoque_at is null and revoque_par is null and revoque_motif is null) or revoque_at is not null
+  )
+);
+create index if not exists suspensions_plateforme_compte_idx
+  on public.suspensions_plateforme(utilisateur_id) where revoque_at is null and portee = 'compte';
+create index if not exists suspensions_plateforme_organisation_idx
+  on public.suspensions_plateforme(entreprise_id) where revoque_at is null and portee = 'organisation';
+
+alter table public.suspensions_plateforme enable row level security;
+revoke all on table public.suspensions_plateforme from public, anon, authenticated, service_role;
+grant select on table public.suspensions_plateforme to authenticated;
+drop policy if exists suspensions_plateforme_lecture on public.suspensions_plateforme;
+create policy suspensions_plateforme_lecture on public.suspensions_plateforme
+  for select to authenticated using (public.est_plateforme_admin());
+
+-- Lecture pour la décision : rend la suspension active applicable à (utilisateur, organisation),
+-- ou NULL. Interne : aucun rôle applicatif ne l'appelle (le motif est réservé au diagnostic admin).
+create or replace function public._suspension_plateforme_active(p_uid uuid, p_entreprise_id uuid)
+returns jsonb
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select jsonb_build_object('id', s.id, 'portee', s.portee, 'motif', s.motif,
+                            'debut_at', s.debut_at, 'fin_at', s.fin_at)
+  from public.suspensions_plateforme s
+  where s.revoque_at is null
+    and s.debut_at <= now()
+    and (s.fin_at is null or s.fin_at > now())
+    and ((s.portee = 'compte' and s.utilisateur_id = p_uid)
+      or (s.portee = 'organisation' and p_entreprise_id is not null and s.entreprise_id = p_entreprise_id))
+  order by s.debut_at desc
+  limit 1;
+$$;
+revoke all on function public._suspension_plateforme_active(uuid, uuid) from public, anon, authenticated, service_role;
+
+-- Écriture : mêmes gardes que `plateforme_desactiver_application_entreprise` (rôle plateforme
+-- `total` + session AAL2). La table est elle-même le journal (auteur, début, fin, révocation).
+create or replace function public.plateforme_suspendre_globalement(
+  p_portee text, p_cible_id uuid, p_motif text, p_fin_at timestamptz default null
+) returns uuid
+language plpgsql security definer set search_path = public as $$
+declare v_id uuid;
+begin
+  perform public.plateforme_exiger_role('total');
+  perform public.plateforme_exiger_session_aal2();
+  if p_portee not in ('compte', 'organisation') then
+    raise exception 'Portée de suspension invalide (compte ou organisation)' using errcode = '22023';
+  end if;
+  if p_motif is null or length(btrim(p_motif)) < 5 then
+    raise exception 'Motif de suspension obligatoire (5 caractères minimum)' using errcode = '22023';
+  end if;
+  if p_fin_at is not null and p_fin_at <= now() then
+    raise exception 'La fin de suspension doit être dans le futur' using errcode = '22023';
+  end if;
+  if p_portee = 'compte' and p_cible_id = auth.uid() then
+    raise exception 'Un administrateur ne peut pas suspendre son propre compte' using errcode = '22023';
+  end if;
+  if p_portee = 'compte' and not exists (select 1 from auth.users where id = p_cible_id) then
+    raise exception 'Compte introuvable' using errcode = '22023';
+  end if;
+  if p_portee = 'organisation' and not exists (select 1 from public.entreprises where id = p_cible_id) then
+    raise exception 'Organisation introuvable' using errcode = '22023';
+  end if;
+  insert into public.suspensions_plateforme(portee, utilisateur_id, entreprise_id, motif, fin_at, cree_par, cree_par_email)
+  values (p_portee,
+          case when p_portee = 'compte' then p_cible_id end,
+          case when p_portee = 'organisation' then p_cible_id end,
+          btrim(p_motif), p_fin_at, auth.uid(), auth.email())
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+
+create or replace function public.plateforme_lever_suspension_globale(p_id uuid, p_motif text)
+returns boolean
+language plpgsql security definer set search_path = public as $$
+declare v_ligne public.suspensions_plateforme%rowtype;
+begin
+  perform public.plateforme_exiger_role('total');
+  perform public.plateforme_exiger_session_aal2();
+  if p_motif is null or length(btrim(p_motif)) < 5 then
+    raise exception 'Motif de levée obligatoire (5 caractères minimum)' using errcode = '22023';
+  end if;
+  select * into v_ligne from public.suspensions_plateforme where id = p_id for update;
+  if not found or v_ligne.revoque_at is not null then return false; end if;
+  update public.suspensions_plateforme
+     set revoque_at = now(), revoque_par = auth.uid(), revoque_motif = btrim(p_motif)
+   where id = p_id;
+  return true;
+end;
+$$;
+revoke all on function public.plateforme_suspendre_globalement(text, uuid, text, timestamptz) from public, anon, service_role;
+revoke all on function public.plateforme_lever_suspension_globale(uuid, text) from public, anon, service_role;
+grant execute on function public.plateforme_suspendre_globalement(text, uuid, text, timestamptz) to authenticated;
+grant execute on function public.plateforme_lever_suspension_globale(uuid, text) to authenticated;
+
+-- ── 4. Écriture du statut commercial d'UNE application d'UNE organisation ────────────────────
+-- Gardes identiques à `plateforme_desactiver_application_entreprise` (migration …239) : rôle
+-- plateforme `total`, session AAL2, ligne d'historique dans `historique_acces_applications`.
+-- Choix : (a) `gestion_pro` refusé — son statut est l'abonnement (plateforme_modifier_abonnement,
+-- Stripe) ; l'écrire ici créerait un second état trompeur, jamais lu ; (b) le droit d'usage doit
+-- exister (créé par plateforme_activer_application_entreprise) : on n'invente pas un droit en
+-- posant un statut ; (c) motif obligatoire quand on suspend/annule.
+-- L'activation d'une application (plateforme_activer_application_entreprise) NE réinitialise PAS
+-- ce statut : lever un impayé et réactiver un droit sont deux actes distincts et tracés.
+create or replace function public.plateforme_definir_statut_application_entreprise(
+  p_entreprise_id uuid, p_application_code text, p_statut text, p_motif text default null
+) returns boolean
+language plpgsql security definer set search_path = public as $$
+declare v_ancien public.acces_applications_entreprises%rowtype;
+begin
+  perform public.plateforme_exiger_role('total');
+  perform public.plateforme_exiger_session_aal2();
+  if p_statut not in ('actif', 'suspendu', 'annule') then
+    raise exception 'Statut commercial invalide (actif, suspendu ou annule)' using errcode = '22023';
+  end if;
+  if p_application_code = 'gestion_pro' then
+    raise exception 'Le statut de Gestion Pro est porté par l''abonnement de l''entreprise (plateforme_modifier_abonnement)'
+      using errcode = '22023';
+  end if;
+  if p_statut <> 'actif' and (p_motif is null or length(btrim(p_motif)) < 5) then
+    raise exception 'Motif obligatoire pour suspendre ou annuler (5 caractères minimum)' using errcode = '22023';
+  end if;
+  select * into v_ancien from public.acces_applications_entreprises
+   where entreprise_id = p_entreprise_id and application_code = p_application_code for update;
+  if not found then
+    raise exception 'Aucun droit d''usage pour cette application dans cette organisation' using errcode = '22023';
+  end if;
+  if v_ancien.statut_commercial = p_statut then return false; end if;
+  update public.acces_applications_entreprises
+     set statut_commercial = p_statut,
+         suspendu_depuis = case when p_statut = 'actif' then null else coalesce(v_ancien.suspendu_depuis, now()) end
+   where id = v_ancien.id;
+  insert into public.historique_acces_applications(
+    cible_type, cible_id, application_code, action, auteur_email, auteur_utilisateur_id,
+    ancien, nouveau, resultat
+  ) values (
+    'entreprise', p_entreprise_id, p_application_code, 'statut_commercial:' || p_statut,
+    auth.email(), auth.uid(),
+    jsonb_build_object('statut_commercial', v_ancien.statut_commercial, 'suspendu_depuis', v_ancien.suspendu_depuis),
+    jsonb_build_object('statut_commercial', p_statut, 'motif', nullif(btrim(coalesce(p_motif, '')), '')),
+    'modifie'
+  );
+  return true;
+end;
+$$;
+revoke all on function public.plateforme_definir_statut_application_entreprise(uuid, text, text, text) from public, anon, service_role;
+grant execute on function public.plateforme_definir_statut_application_entreprise(uuid, text, text, text) to authenticated;
