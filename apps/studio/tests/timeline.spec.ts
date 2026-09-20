@@ -5,7 +5,7 @@ import { readFile, rm } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
-import { fixtures } from "./media-fixtures";
+import { fixtures, fileInputReady } from "./media-fixtures";
 const password = "Studio-Montage-Local-398!";
 async function user(page: Page) {
   const api = createClient(
@@ -91,6 +91,7 @@ async function upload(page: Page, photos: number, videos: number) {
       mimeType: "video/mp4",
       buffer: sample.mp4,
     });
+  await fileInputReady(page);
   await page.getByLabel("Choisir des fichiers").setInputFiles(files);
   await expect(page.locator('.upload-list [data-status="ready"]')).toHaveCount(
     photos + videos,

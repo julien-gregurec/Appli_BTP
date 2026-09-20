@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
-import { fixtures } from "./media-fixtures";
+import { fixtures, fileInputReady } from "./media-fixtures";
 test.use({ actionTimeout: 15000 });
 const password = "Studio-Montage-Local-398!";
 async function user(page: Page) {
@@ -91,6 +91,7 @@ async function upload(page: Page, photos: number, videos: number) {
       mimeType: "video/mp4",
       buffer: sample.mp4,
     });
+  await fileInputReady(page);
   await page.getByLabel("Choisir des fichiers").setInputFiles(files);
   await expect(page.locator('.upload-list [data-status="ready"]')).toHaveCount(
     photos + videos,

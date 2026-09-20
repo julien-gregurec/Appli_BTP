@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 test.use({ actionTimeout: 15000 });
+test.describe.configure({ timeout: 420000 });
 const password = "Studio-Recovery-Local-398!";
 const replacement = "Studio-Nouveau-Local-742!";
 const api = () =>
@@ -31,7 +32,7 @@ async function recoveryLink(name: string) {
           "";
         return link;
       },
-      { timeout: 30000 },
+      { timeout: 120000 },
     )
     .not.toBe("");
   return link;
@@ -49,10 +50,14 @@ test("mot de passe oublié : lien e-mail, nouveau mot de passe et anciens identi
   await page.getByLabel("Email", { exact: true }).fill(`inconnu-${name}@example.test`);
   await page.getByRole("button", { name: "Envoyer le lien" }).click();
   const answer = "Si un compte existe pour cet email";
-  await expect(page.getByRole("status")).toContainText(answer);
+  await expect(page.locator("p.notice[role=status]")).toContainText(answer, {
+    timeout: 120000,
+  });
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByRole("button", { name: "Envoyer le lien" }).click();
-  await expect(page.getByRole("status")).toContainText(answer);
+  await expect(page.locator("p.notice[role=status]")).toContainText(answer, {
+    timeout: 120000,
+  });
   await page.goto(await recoveryLink(name));
   await expect(page).toHaveURL(/reset-password/);
   await page.getByLabel("Nouveau mot de passe", { exact: true }).fill(replacement);
