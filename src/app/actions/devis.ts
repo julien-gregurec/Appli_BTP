@@ -188,6 +188,13 @@ export async function changerStatutDevisAction(devisId: string, statut: string) 
     .eq("entreprise_id", ctx.entrepriseId);
 
   if (!error) {
+    // GP-EXTERNAL-PILOT-CLOSURE-V1 (mission §20) : personne n'était informé
+    // qu'un devis venait d'être marqué accepté. Journalise et notifie les
+    // responsables (gerer_devis) — best effort, ne doit jamais faire échouer
+    // le changement de statut lui-même s'il échoue.
+    if (statut === "accepte" && devis.statut !== "accepte") {
+      await supabase.rpc("notifier_devis_accepte", { p_devis_id: devisId });
+    }
     revalidatePath(`/devis/${devisId}`);
     revalidatePath("/devis");
     revalidatePath("/dashboard");
