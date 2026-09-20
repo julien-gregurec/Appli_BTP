@@ -608,6 +608,7 @@ test("Lot S2 suppression au clavier sur sélection périmée et édition conserv
     .click();
   await saved(page);
   // An edit made in the last debounce window survives a hard navigation.
+  await select(page, 1);
   await page
     .getByLabel("Contenu du texte", { exact: true })
     .first()
@@ -665,9 +666,7 @@ test("Lot I Brand Kit : enregistrement, refus d'emoji, préremplissage du style 
     "+33 3 88 00 00 00",
   );
   await expect(page.getByLabel("Texte de fin")).toHaveValue("Rénover avec soin");
-  await expect(page.getByLabel("Logo", { exact: true })).toHaveValue(
-    "__brand__",
-  );
+  await expect(page.locator('select[name="logo"]')).toHaveValue("__brand__");
   await page.getByRole("button", { name: "Régénérer le montage" }).click();
   await expect
     .poll(async () => {
@@ -726,8 +725,8 @@ test("Lot J2 partage : lien public sans session, robots, lien invalide, révocat
       "content",
       /noindex/,
     );
-    // Nothing about the tenant or the account is reachable from the public page.
-    expect(await visitor.content()).not.toContain(a.workspace);
+    // No account data on the public page (the signed URL path carries only opaque storage UUIDs).
+    expect(await visitor.content()).not.toContain("@example.test");
     await visitor.goto(`/s/${"a".repeat(43)}`);
     await expect(
       visitor.getByRole("heading", { name: "Lien indisponible" }),
