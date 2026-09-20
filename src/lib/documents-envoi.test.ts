@@ -46,7 +46,10 @@ const donneesDevis = {
   estAvoir: false,
   signatures: [],
   photos: [],
-  statut: "brouillon",
+  // Un devis/une facture émis(e) : c'est le cas nominal de cette fonction
+  // (envoyer un document déjà émis). Le garde-fou brouillon (GP-EXTERNAL-
+  // PILOT-CLOSURE-V1) a son propre test dédié, avec un override explicite.
+  statut: "envoye",
   clientEmail: "client@example.invalid",
   emailEnvoyeLe: null,
   entrepriseNom: "ELSATIA",
@@ -121,6 +124,26 @@ describe("envoyerDocumentCommercialParEmail", () => {
     chargerDevisMock.mockResolvedValue(null);
     const resultat = await envoyerDocumentCommercialParEmail(supabaseMock(), paramsBase);
     expect(resultat).toEqual({ error: "Devis introuvable" });
+    expect(envoyerEmailBrevoMock).not.toHaveBeenCalled();
+  });
+
+  // GP-EXTERNAL-PILOT-CLOSURE-V1 (P0) : un devis/une facture encore brouillon
+  // ne doit jamais pouvoir partir par e-mail, ni générer de PDF, ni créer de
+  // lien de partage public — aucun des trois n'a lieu si le garde-fou coupe
+  // avant obtenirNouveauTokenPartage.
+  it("échoue si le devis est encore un brouillon, sans créer de lien de partage ni générer de PDF", async () => {
+    chargerDevisMock.mockResolvedValue({ ...donneesDevis, statut: "brouillon" });
+    const resultat = await envoyerDocumentCommercialParEmail(supabaseMock(), paramsBase);
+    expect(resultat).toEqual({ error: "Ce devis est encore un brouillon : il doit d'abord être émis avant de pouvoir être envoyé." });
+    expect(envoyerEmailBrevoMock).not.toHaveBeenCalled();
+    expect(obtenirTokenMock).not.toHaveBeenCalled();
+    expect(genererPdfMock).not.toHaveBeenCalled();
+  });
+
+  it("échoue si la facture est encore un brouillon", async () => {
+    chargerFactureMock.mockResolvedValue({ ...donneesFacture, statut: "brouillon" });
+    const resultat = await envoyerDocumentCommercialParEmail(supabaseMock(), { ...paramsBase, typeDocument: "facture" });
+    expect(resultat).toEqual({ error: "Cette facture est encore un brouillon : elle doit d'abord être émise avant de pouvoir être envoyée." });
     expect(envoyerEmailBrevoMock).not.toHaveBeenCalled();
   });
 

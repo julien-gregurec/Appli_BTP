@@ -49,7 +49,7 @@ export async function chargerDonneesDevisImprimable(
   const { data: devis } = await supabase
     .from("devis")
     .select(
-      "id,numero,statut,date_emission,date_validite,montant_ht,montant_tva,montant_ttc,notes_client,email_envoye_le,email_envoye_a,client_snapshot,client_snapshot_at,client:clients!devis_client_id_fkey(nom,prenom,societe,email,adresse_facturation,code_postal,ville,siret)",
+      "id,numero,statut,date_emission,date_validite,montant_ht,montant_tva,montant_ttc,notes_client,email_envoye_le,email_envoye_a,entreprise_snapshot,client_snapshot,client_snapshot_at,client:clients!devis_client_id_fkey(nom,prenom,societe,email,adresse_facturation,code_postal,ville,siret)",
     )
     .eq("id", params.id)
     .eq("entreprise_id", params.entrepriseId)
@@ -89,7 +89,12 @@ export async function chargerDonneesDevisImprimable(
     numero: devis.numero ?? "BROUILLON",
     dateEmission: devis.date_emission,
     dateSecondaire: devis.date_validite ? { label: "Valable jusqu'au", valeur: devis.date_validite } : null,
-    entreprise: entreprise ?? { nom: "" },
+    // Un devis émis (statut <> brouillon) garde à vie l'identité de l'entreprise
+    // telle qu'elle était à son envoi (voir 20260916000303) ; seul un brouillon
+    // reflète l'entreprise actuelle.
+    entreprise: devis.entreprise_snapshot
+      ? entrepriseSnapshotVersEntete(devis.entreprise_snapshot as Record<string, unknown>)
+      : (entreprise ?? { nom: "" }),
     client: identiteClient.entete,
     lignes: (lignes ?? []).map((l) => ({
       designation: l.designation,
@@ -189,6 +194,82 @@ export async function chargerDonneesFactureImprimable(
     clientSnapshotAt: facture.client_snapshot_at ?? null,
     emailEnvoyeLe: facture.email_envoye_le,
     entrepriseNom: entrepriseCourante?.nom ?? "",
+  };
+}
+
+// Lecture publique par jeton (/document/[token], /imprimer/partage/[token]) :
+// contrairement aux deux chargeurs ci-dessus (RLS standard, client authentifié
+// scopé à son entreprise), ce chemin est appelé avec service_role — depuis
+// 20260911000297_gp_v1_rc_acl_prerequisites.sql, service_role n'a plus AUCUN
+// privilège sur devis/factures/lignes/clients. On passe donc par la fonction
+// SECURITY DEFINER dédiée (20260915000300_document_partage_public_par_jeton.sql),
+// qui résout elle-même le jeton, vérifie révocation/expiration/tenance/statut
+// (jamais un brouillon), et ne renvoie que les colonnes imprimées — jamais les
+// tables elles-mêmes. `supabaseAdmin` n'est là que pour porter l'appel RPC.
+export async function chargerDonneesDocumentPartage(
+  supabaseAdmin: SupabaseClient,
+  token: string,
+): Promise<DonneesDocumentImprimable | null> {
+  const { data, error } = await supabaseAdmin.rpc("document_commercial_public_par_token", { p_token: token });
+  if (error || !data) return null;
+
+  const typeDocument = data.type_document as "devis" | "facture";
+  const document = data.document as Record<string, unknown>;
+  const lignes = (data.lignes as Array<Record<string, unknown>>) ?? [];
+  const entreprise = (data.entreprise as Record<string, unknown> | null) ?? { nom: "" };
+  const client = data.client as { nom?: string | null; prenom?: string | null; societe?: string | null; adresse_facturation?: string | null; code_postal?: string | null; ville?: string | null; siret?: string | null } | null;
+
+  const identiteClient = identiteClientDocument({
+    snapshot: document.client_snapshot,
+    fiche: client,
+    captureeLe: (document.client_snapshot_at as string | null) ?? null,
+  });
+
+  const estFacture = typeDocument === "facture";
+  const type = (document.type as string | undefined) ?? "simple";
+  const typeDoc = !estFacture ? "Devis" : type === "simple" ? "Facture" : `Facture — ${typeFactureLabel(type)}`;
+  const dateSecondaire = !estFacture
+    ? document.date_validite
+      ? { label: "Valable jusqu'au", valeur: document.date_validite as string }
+      : null
+    : document.date_echeance
+      ? { label: "Échéance le", valeur: document.date_echeance as string }
+      : null;
+
+  return {
+    typeDoc,
+    numero: (document.numero as string | null) ?? "BROUILLON",
+    dateEmission: document.date_emission as string,
+    dateSecondaire,
+    entreprise: entrepriseSnapshotVersEntete(entreprise),
+    client: identiteClient.entete,
+    lignes: lignes.map((l) => ({
+      designation: l.designation as string,
+      description: l.description as string | null,
+      quantite: l.quantite as number,
+      unite: l.unite as string,
+      prix_unitaire_ht: l.prix_unitaire_ht as number,
+      remise_ligne: l.remise_ligne as number,
+      taux_tva: l.taux_tva as number,
+    })),
+    montantHt: document.montant_ht as number,
+    montantTva: document.montant_tva as number,
+    montantTtc: document.montant_ttc as number,
+    notesClient: (document.notes_client as string | null) ?? null,
+    estFacture,
+    estAvoir: estFacture && type === "avoir",
+    signatures: (data.signatures as SignatureImprimable[]) ?? [],
+    photos: ((data.photos as Array<{ id: string; nom_original: string; legende?: string | null }>) ?? []).map((p) => ({
+      id: p.id,
+      nom: p.nom_original,
+      legende: p.legende,
+    })),
+    statut: document.statut as string,
+    clientEmail: identiteClient.email,
+    clientOrigine: identiteClient.origine,
+    clientSnapshotAt: (document.client_snapshot_at as string | null) ?? null,
+    emailEnvoyeLe: null,
+    entrepriseNom: (entreprise.nom as string | undefined) ?? "",
   };
 }
 

@@ -179,9 +179,17 @@ export const getContexteEntreprise = cache(async function getContexteEntreprise(
     && essaiFin < Date.now();
 
   if (suspenduPourImpaye) {
-    redirect("/abonnement-suspendu");
-  }
-  if (essaiExpireSansOffre) {
+    // GP-EXTERNAL-PILOT-CLOSURE-V1 — même sortie que l'essai expiré (aide,
+    // export RGPD, souscription) : un compte suspendu (impayé ou fermeture
+    // administrative, hors moteur billing) ne doit jamais retenir les données
+    // du client ni lui couper tout accès au support. Seul le métier reste
+    // bloqué. Avant ce correctif, cette branche redirigeait sans exception
+    // possible, y compris vers /parametres/donnees ou /aide.
+    const cheminActuel = (await headers()).get("x-elsatia-pathname");
+    if (!cheminAccessibleEssaiExpire(cheminActuel)) {
+      redirect("/abonnement-suspendu");
+    }
+  } else if (essaiExpireSansOffre) {
     // Le métier reste bloqué ; l'aide, l'export RGPD et la souscription restent
     // ouverts — un essai terminé ne doit pas retenir les données du client.
     const cheminActuel = (await headers()).get("x-elsatia-pathname");

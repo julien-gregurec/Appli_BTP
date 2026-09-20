@@ -86,6 +86,20 @@ export async function envoyerDocumentCommercialParEmail(
       ? await chargerDonneesDevisImprimable(supabase, { id: params.documentId, entrepriseId: params.entrepriseId })
       : await chargerDonneesFactureImprimable(supabase, { id: params.documentId, entrepriseId: params.entrepriseId });
   if (!donnees) return { error: `${params.typeDocument === "devis" ? "Devis" : "Facture"} introuvable` };
+  // GP-EXTERNAL-PILOT-CLOSURE-V1 — garde brouillon (P0) : aucun devis/facture
+  // encore brouillon ne doit pouvoir partir comme document officiel, que ce
+  // soit par e-mail, par PDF joint, ou via le lien de partage public créé
+  // juste après ce point (obtenirNouveauTokenPartage, plus bas). La fonction
+  // de résolution publique par jeton refuse aussi les brouillons côté base
+  // (document_commercial_public_par_token) : double garde, serveur et base.
+  if (donnees.statut === "brouillon") {
+    return {
+      error:
+        params.typeDocument === "devis"
+          ? "Ce devis est encore un brouillon : il doit d'abord être émis avant de pouvoir être envoyé."
+          : "Cette facture est encore un brouillon : elle doit d'abord être émise avant de pouvoir être envoyée.",
+    };
+  }
 
   if (!brevoEstConfigure()) return { error: "L'envoi automatique par e-mail n'est pas encore configuré" };
 
