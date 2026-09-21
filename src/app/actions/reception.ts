@@ -6,7 +6,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 type LigneLot = { article_id: string; quantite: number };
-type Attribution = { ligne_commande_id: string; quantite: number };
+type Attribution = { ligne_commande_id: string; quantite: number; article_id?: string };
 export type TypeDestinationSortie = "chantier" | "vehicule" | "outil" | null;
 type IdentiteBorne = { identifiantEmploye: string; motDePasseStock: string };
 
@@ -22,6 +22,7 @@ export async function receptionLotAction(
   attributions: Attribution[],
   motif: string | null,
   identite: IdentiteBorne | null = null,
+  idempotencyKey: string | null = null,
 ): Promise<ResultatReception> {
   const ctx = await getContexteEntreprise();
   if (!lignes.length) return { ok: false, erreur: "Aucun article scanné." };
@@ -32,6 +33,7 @@ export async function receptionLotAction(
     p_lignes: lignes,
     p_attributions: attributions,
     p_motif: motif,
+    p_idempotency_key: idempotencyKey,
     ...(identite ? {
       p_identifiant_employe: identite.identifiantEmploye,
       p_mot_de_passe: identite.motDePasseStock,
