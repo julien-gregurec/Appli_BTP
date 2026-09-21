@@ -528,6 +528,6 @@ Deux nouveaux points ouverts, spécifiques à ce lot, à traiter avant toute qua
 
 ### 16.9 — Statut après ce lot
 
-`CONVERGENCE_TRAIN_CANDIDATE` = HEAD de `claude/compassionate-euler-5j6avr` après le commit de ce rapport (voir historique Git pour le SHA exact — ce rapport est lui-même le dernier commit du lot). `FINAL_PREVIEW_TRAIN = NOT_YET`.
+`CONVERGENCE_TRAIN_CANDIDATE = 67b1564` (branche `claude/compassionate-euler-5j6avr`, à pousser). `FINAL_PREVIEW_TRAIN = NOT_YET`.
 
 C'était le 6ᵉ et dernier lot de la liste transmise. **Aucun des deux `DECISION_REQUIRED` du lot Studio (§16.4, §16.5) n'est tranché** ; le train reste un candidat de convergence, pas une base Preview qualifiée. Aucun déploiement, aucune Preview, aucune Production.
