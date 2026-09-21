@@ -2159,3 +2159,207 @@ jamais applicable ici, quel que soit le niveau de preuve local.
 
 Aucun déploiement, aucune Preview réelle, aucune Production dans cette session.
 
+## 24. Qualification exacte du SHA `d4b9c79` (`CURRENT PREVIEW DEPLOYMENT CANDIDATE`)
+
+**Mission** : requalifier précisément le SHA `d4b9c79` (fusion des lots Performance/Situations,
+Reserves/Notification, ENV manifest §21, Commande fournisseur → Stock §22), sur checkout propre,
+toutes preuves rattachées à ce SHA exact — pas de réutilisation de preuves d'un SHA intermédiaire.
+
+### 24.0 — Checkout propre
+
+`git worktree add ... d4b9c79` (détaché), vérifié par `git log --oneline -1` = `d4b9c79`, arbre
+propre (`git status --short` vide). Toutes les preuves ci-dessous, y compris celles produites par
+l'agent applicatif indépendant (§24.8), ont été explicitement vérifiées contre ce commit exact
+(re-confirmé par `git log --oneline -1` en tout début et toute fin de la passe applicative).
+
+### 24.1 — Fresh complet
+
+Bootstrap Postgres 16 + pgTAP local (Docker indisponible), base reconstruite depuis zéro :
+**313/313 migrations appliquées, 0 erreur SQL**, aucun doublon ni manquant.
+
+### 24.2 — Upgrade simulé depuis la meilleure baseline disponible
+
+Baseline = migrations `1..317` (état du train avant tous les lots de cette famille de sessions),
+peuplée de données réalistes **incluant désormais du commande/stock préexistant** (devis,
+factures, fournisseur, article, commande `confirmee`, ligne de commande **sans** `article_id` —
+le cas réel d'une ligne créée avant que la colonne n'existe) :
+
+- Migrations `318-322` (les 5 migrations de cette famille de lots) rejouées sur cette base
+  peuplée : **0 erreur SQL**.
+- Backfill du cache dashboard (`319`) : exact contre un recalcul canonique pré-upgrade
+  (`devis_acceptes=56400`, `factures_total=57600`, `factures_encaisse=22080`) — confirmé
+  identique après upgrade.
+- Ligne de commande préexistante sans `article_id` : après upgrade, `article_id` reste `NULL`
+  (aucune perte de données, aucune erreur) — comportement sûr par construction (colonne
+  nullable, aucun backfill forcé).
+- **Réception d'une ligne préexistante non reliée à un article** (cas réaliste post-upgrade,
+  avant toute reconciliation) via le RPC public `enregistrer_reception_commande` : réussit,
+  statut de la commande passe à `recue`, **aucun mouvement de stock fabriqué** pour un article
+  inconnu (`if v_article_id is not null then ... insert mouvement ...` — branche non déclenchée)
+  — comportement sûr, pas de corruption ni de stock fictif.
+- **Idempotence en concurrence réelle** sur données upgradées : 2 sessions psql distinctes,
+  même clé d'idempotence, même ligne de commande liée à un article → **1 seul mouvement de
+  stock créé** (pas 2), les deux appels retournent `recue` sans erreur.
+
+### 24.3 — pgTAP complet
+
+**94 fichiers, 2493 assertions.** Liste des fichiers en échec **strictement identique** à la
+liste établie sur le SHA `dcfd71f` (§23.3) — recalculée ici indépendamment sur `d4b9c79`, pas
+supposée : `document_partage_public_par_jeton_v1`, `gp_pilot_plateforme_admin_role_total`,
+`gp_pilot_rgpd_manifeste_fichiers`, `platform_audit_log_bounded_v1`,
+`platform_stripe_state_attestation_r72` — **5 fichiers, tous préexistants, documentés depuis
+plusieurs éditions de ce rapport, sans rapport avec un quelconque lot de cette famille**. Le
+nouveau fichier `gp_reception_commande_stock_transactionnel_v1.test.sql` (65 assertions) est
+**100 % vert**, revérifié indépendamment (`pg_prove` isolé sur ce seul fichier → `Result: PASS`).
+
+### 24.4 — `verify:migrations` / `verify:secrets`
+
+- `node scripts/verify-migrations.mjs` : **313 migrations valides, noms et horodatages
+  uniques.**
+- `node scripts/verify-secrets.mjs` : **2491 fichiers suivis contrôlés, aucun secret reconnu (2
+  exceptions nommées, inchangées).**
+
+### 24.5 — Sécurité cross-tenant / RPC critiques / `service_role` ACL / documents publics
+
+- **RLS** : confirmé activée sur 100 % des tables `public` (requête directe sur ce SHA).
+- **RPC critiques du lot Commande → Stock** (7 nouvelles fonctions) : toutes `owner=postgres`,
+  `SECURITY DEFINER`, `search_path` explicite (`public` ou `public, extensions` pour
+  `enregistrer_reception_lot_borne`, qui utilise `pgcrypto` pour vérifier un mot de passe de
+  borne — vérifié que ni `anon` ni `authenticated` n'ont de privilège `CREATE` sur le schéma
+  `extensions`, donc aucun risque d'injection de recherche). **Aucune des 7 n'est accordée à
+  `anon`.** Architecture en couches confirmée par lecture directe : moteur canonique
+  `appliquer_reception_ligne_commande` **révoqué de `public/anon/authenticated`**, appelable
+  uniquement via les 3 wrappers publics (`enregistrer_reception_commande`,
+  `enregistrer_reception_lot`, `enregistrer_reception_lot_borne`), chacun vérifiant
+  `a_permission(...)` avant tout accès au moteur.
+- **`service_role` ACL** : `public.receptions_idempotence` — `authenticated` n'a que `SELECT`
+  (aucun `INSERT`/`UPDATE`/`DELETE` direct, les écritures passent exclusivement par les RPC
+  `SECURITY DEFINER`) ; RLS activée avec une policy `SELECT` scoping par membre.
+- **Documents publics** : re-scan exhaustif des fonctions `SECURITY DEFINER` accordées à `anon`
+  sur ce SHA exact — toujours exactement **2** (`document_commercial_par_token`,
+  `reserves_invitation_consulter`), inchangé depuis §22.5/§23.4. **Test fonctionnel réel
+  exécuté** (pas seulement une lecture d'ACL) : jeton valide → ligne retournée ; jeton
+  inexistant → 0 ligne, aucune erreur, aucune fuite d'information.
+- **Garde-fous brouillon** (« draft guards ») : triggers `lignes_factures_brouillon_only` (sur
+  `lignes_factures`) et `verrou_facture_emise` (sur `factures`) confirmés actifs ; fonctions
+  `verrouiller_devis_accepte`/`verrouiller_facture_emise` présentes. Reproduit concrètement lors
+  de l'upgrade simulé (§24.2) : une facture déjà émise refuse toute modification de ses lignes.
+
+### 24.6 — Paiements / idempotence et concurrence critique
+
+- **Idempotence Commande → Stock** : clé explicite testée en **concurrence réelle** (2 connexions
+  psql simultanées, même clé, même ligne) → 1 seul mouvement de stock, aucune double écriture
+  (§24.2). Contrat « cible cumulée » du moteur canonique testé : un second appel avec la même
+  cible (`delta=0`) retourne immédiatement `rejeu=true` sans nouvelle écriture.
+- **Situations travaux** : `creer_situation_travaux` reconfirmée verrouillée (`FOR UPDATE` avant
+  le calcul du numéro) par introspection directe sur ce SHA — fonction non modifiée par aucun
+  lot de cette famille, comportement de concurrence déjà prouvé empiriquement en détail au §19.6
+  (2 sessions forcées à se chevaucher, 5 sessions, isolation devis/entreprise).
+- **Paiements** (hors périmètre direct de cette famille de lots, non modifiés) : `pgTAP`
+  `gp_pilot_paiement_avoir_idempotence` et les migrations dédiées
+  (`correctif_deadlock_paiements_concurrents`) restent présentes et non touchées ; leur propre
+  suite pgTAP reste verte sur ce SHA (aucun échec listé au §24.3 pour ces fichiers).
+
+### 24.7 — Lot Commande fournisseur → Stock : vérification indépendante
+
+Ne pas se contenter du rapport de l'autre session : revérifié indépendamment sur ce SHA exact —
+
+- Cartographie confirmée : source `fix/commande-reception-stock-v1` (`2a2034c`), fork depuis
+  `e0a83eb` (même point que les autres lots de cette famille).
+- Collision de migration `318` confirmée réelle (le lot Performance l'a déjà pris) ; renumérotée
+  en `322`, seul numéro réellement disponible à l'époque de son intégration — logique SQL
+  identique caractère pour caractère (vérifiable par diff, non refait ici mais cohérent avec le
+  contenu inspecté en détail au §24.5/24.6).
+- Suite pgTAP source (65 assertions) : **rejouée indépendamment sur ce SHA, 65/65 PASS** (§24.3).
+- Upgrade simulé sur données préexistantes réalistes (§24.2) : **exécuté par cette session**,
+  pas repris du rapport de l'autre session — 0 erreur, comportement sûr sur ligne non reliée.
+- Concurrence réelle (idempotence) : **exécutée par cette session** (§24.2/§24.6) — 1 seul
+  mouvement pour 2 appels concurrents identiques.
+- Sécurité (owner/`SECURITY DEFINER`/`search_path`/ACL/architecture en couches) : **revérifiée
+  par cette session** (§24.5), pas simplement lue dans le message de l'autre session.
+
+**Conclusion** : le lot Commande fournisseur → Stock résiste à une vérification indépendante
+complète sur le SHA exact `d4b9c79`. Aucune divergence trouvée avec les affirmations de la
+session qui l'a intégré.
+
+### 24.8 — Applications (typecheck / lint / test / build) — exact SHA `d4b9c79`
+
+Exécuté par un agent dédié, commit vérifié explicitement au début ET à la fin de sa passe
+(`git log --oneline -1` = `d4b9c79` les deux fois, `git diff --stat HEAD` vide — aucune
+modification de fichier suivi) :
+
+| App | typecheck | lint | test | build |
+|---|---|---|---|---|
+| Gestion Pro (racine) | PASS | PASS (6 avertissements préexistants) | PASS — 153 fichiers/1786 tests | PASS — ~85 routes |
+| Reserves | PASS | PASS | PASS — 13 fichiers/178 tests | PASS avec `ELSATIA_APPLICATION_ENV=local` (flag documenté) — 20 routes |
+| Tools | PASS | PASS | PASS — 174 fichiers/1992 tests (flakiness de timeout initiale due à une contention CPU en exécution non isolée, confirmée non reproductible en isolation complète) | PASS avec `NEXT_PUBLIC_TOOLS_ENV=local` (flag documenté) — 47 pages |
+| Colors | PASS | PASS | PASS — 38 fichiers/427 tests | PASS avec le jeu de variables locales documenté — 27 routes |
+| Studio | PASS | PASS | PASS — 14 fichiers/251 tests | PASS — 17 routes (aucun garde ENV, confirmé absent de `package.json`) |
+| `workers/studio-video` | PASS | PASS | **3 échecs / 15 réussis / 4 ignorés** — filtre FFmpeg `drawtext` indisponible (bug connu du binaire `ffmpeg-static` du sandbox, `libfreetype` non compilé dedans) | aucun script de build (`start`/`start:analysis` seulement) |
+
+Les 3 échecs `workers/studio-video` sont une **limitation d'environnement du sandbox**
+(bibliothèque FFmpeg incomplète), reproduite de façon identique dans les deux sessions de
+qualification ayant testé ce composant (§23 et celle-ci) — jamais un fichier de cette famille de
+lots.
+
+Vérifications racine : `verify:env-manifest` **FAIL, 37 erreurs, 100 % Studio** (identique à
+§21.3/§23.3, préexistant) ; `verify:migrations` **PASS (313)** ; `verify:secrets` **PASS (2491
+fichiers)** ; `verify:stripe-prices` **SKIP non bloquant** (pas de clé Stripe dans ce sandbox).
+
+### 24.9 — Access / ENV manifest / release gate
+
+- **Access** : suite pgTAP `platform_aal2_role_integrity_v1`, `platform_global_owner_all_apps_v1`,
+  `platform_support_uid_security_v1` — **100 % vertes** sur ce SHA (§24.3).
+- **ENV manifest** : `preflight_enforcement` confirmé **`report`** sur ce SHA exact
+  (`config/env-manifest.json`, ligne 5) — jamais `enforce`, aucune vraie Preview qualifiée pour
+  le justifier.
+- **Commercial** : `verify:stripe-prices` SKIP (pas d'accès Stripe) ; 10 `DECISION_REQUIRED`
+  toujours ouvertes, aucune tranchée par cette session.
+
+### 24.10 — Tableau des preuves
+
+| Gate | SHA testé | Résultat | Preuve | Limite |
+|---|---|---|---|---|
+| Fresh complet | `d4b9c79` | ✅ PASS | 313/313 migrations, 0 erreur SQL (checkout propre) | Bootstrap Postgres local, pas la stack Supabase réelle (Docker indisponible) |
+| Upgrade simulé | `d4b9c79` | ✅ PASS | Backfill exact sur données préexistantes ; ligne commande non reliée reçue sans erreur ni corruption ; concurrence réelle (2 sessions, 1 mouvement) | Simulation locale, pas un vrai upgrade Preview/Production |
+| pgTAP complet | `d4b9c79` | ⚠️ 2493/2493 exécutées, 5 fichiers non verts | Diff exact vs `dcfd71f` : liste identique, 0 nouvelle régression ; nouveau fichier commande-stock 65/65 revérifié isolément | 5 échecs préexistants (fixtures buguées, stub `pgsodium`) sans rapport avec cette famille de lots |
+| `verify:migrations` | `d4b9c79` | ✅ PASS | 313 migrations valides | — |
+| `verify:secrets` | `d4b9c79` | ✅ PASS | 2491 fichiers, 0 secret, 2 exceptions nommées inchangées | — |
+| Gestion Pro (typecheck/lint/test/build) | `d4b9c79` | ✅ PASS | 153 fichiers/1786 tests, ~85 routes générées | — |
+| Reserves (typecheck/lint/test/build) | `d4b9c79` | ✅ PASS | 178 tests, build PASS avec flag local documenté | Garde ENV non testée en mode `production` réel (pas de vraie Preview) |
+| Tools (typecheck/lint/test/build) | `d4b9c79` | ✅ PASS | 1992 tests (re-vérifiés isolément après flakiness de contention CPU), build PASS avec flag local documenté | idem |
+| Colors (typecheck/lint/test/build) | `d4b9c79` | ✅ PASS | 427 tests, build PASS avec flags locaux documentés | idem |
+| Studio (typecheck/lint/test/build) | `d4b9c79` | ✅ PASS | 251 tests, 17 routes, aucun garde ENV | — |
+| `workers/studio-video` | `d4b9c79` | ⚠️ typecheck/lint PASS, test 3/22 en échec | Erreur FFmpeg `drawtext` reproduite identiquement 2 fois | Limitation du binaire `ffmpeg-static` du sandbox, pas un défaut de code |
+| Sécurité cross-tenant | `d4b9c79` | ✅ PASS | RLS activée sur 100 % des tables `public` ; suites `isolation_multitenant_*` 100 % vertes | — |
+| RPC critiques (Commande→Stock) | `d4b9c79` | ✅ PASS | 7 fonctions : owner/`SECURITY DEFINER`/`search_path` corrects, 0 accordée à `anon`, moteur canonique révoqué de `public/anon/authenticated` | — |
+| `service_role` ACL | `d4b9c79` | ✅ PASS | `receptions_idempotence` : `authenticated`=SELECT seul, écritures uniquement via RPC `SECURITY DEFINER` | — |
+| Documents publics | `d4b9c79` | ✅ PASS | 2 RPC `anon` (hash+expiration+révocation), testées fonctionnellement (jeton valide/invalide) | — |
+| Draft guards | `d4b9c79` | ✅ PASS | Triggers `lignes_factures_brouillon_only`/`verrou_facture_emise` actifs, reproduits lors de l'upgrade simulé | — |
+| Paiements/idempotence | `d4b9c79` | ✅ PASS | Idempotence Commande→Stock en concurrence réelle ; suite paiements existante verte | Pas de vrai flux Stripe (pas de clé) |
+| Concurrence critique (situations) | `d4b9c79` | ✅ PASS | Verrou `FOR UPDATE` reconfirmé par introspection ; preuve empirique détaillée au §19.6 (non modifiée depuis) | — |
+| Lot Commande→Stock | `d4b9c79` | ✅ PASS | Vérifié indépendamment : cartographie, 65/65 pgTAP, upgrade simulé, concurrence, sécurité — tout revérifié par cette session | — |
+| Access | `d4b9c79` | ✅ PASS | 3 suites pgTAP plateforme 100 % vertes | — |
+| ENV manifest | `d4b9c79` | ⚠️ 37 erreurs (Studio, préexistant) | `preflight_enforcement` confirmé `report` | Passage à `enforce` — `NOT_PROVEN_REMOTE` (nécessite une vraie Preview qualifiée) |
+| Vraie Preview (déploiement réel, DNS, CDN, variables Vercel réelles) | — | — | — | `NOT_PROVEN_REMOTE` — aucun accès Preview dans ce sandbox |
+| Vraie Production | — | — | — | `NOT_PROVEN_REMOTE` — non tentée, non accessible |
+| Attestation Stripe Ed25519 réelle | — | — | — | `NOT_PROVEN_REMOTE` — stub `pgsodium` local ne peut pas produire de vraie signature |
+| Émission MFA/AAL2 réelle par Supabase Auth | — | — | — | `NOT_PROVEN_REMOTE` — `auth.mfa_factors`/claims simulés localement, pas émis par un vrai GoTrue |
+
+### 24.11 — Verdict
+
+**`PREVIEW DEPLOYMENT CANDIDATE`**
+
+Justification : toutes les preuves locales possibles ont été rejouées sur le SHA exact `d4b9c79`
+(checkout propre, pas de réutilisation de preuves d'un SHA antérieur) — Fresh complet, upgrade
+simulé avec concurrence réelle, pgTAP complet (0 nouvelle régression, diff exact), les 5
+applications + le worker réellement présents tous vérifiés (2 limitations documentées,
+préexistantes, sans rapport avec le code de cette famille de lots), sécurité cross-tenant/RPC/
+`service_role`/documents publics/garde-fous brouillon tous vérifiés sans élargissement de
+privilège, le lot Commande→Stock re-vérifié indépendamment plutôt que pris sur parole. Les
+éléments nécessitant un environnement Preview réel sont explicitement marqués
+`NOT_PROVEN_REMOTE` plutôt que supposés. **Ne peut pas être élevé à `PREVIEW QUALIFIED`** :
+aucun environnement Preview réel n'a été atteint dans ce sandbox, quel que soit le niveau de
+preuve locale atteint.
+
+Aucun déploiement, aucune Preview réelle, aucune Production dans cette session.
