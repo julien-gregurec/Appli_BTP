@@ -297,10 +297,18 @@ insert into public.boutique_lignes_commande(
   'TEST-MIG-194', 'Produit test migration', 100, 1, 100
 );
 
+-- ELSATIA-REDTEAM-V3 (20260922000323) : boutique_finaliser_commande_payee
+-- n'est plus exécutable par "authenticated" et le déclencheur D1 refuse
+-- statut='payee' hors service_role (commande marquée payée sans paiement
+-- réel, P0) — seul le webhook (service_role, src/app/api/stripe/boutique/
+-- webhook/route.ts) y a droit désormais, comme le fait réellement le code.
+set local role service_role;
+select set_config('request.jwt.claims','{"role":"service_role"}', true);
 select lives_ok(
   $$select public.boutique_finaliser_commande_payee('19400000-0000-0000-0000-000000000003', 'cs_test_migration_194')$$,
   'la commande est finalisée'
 );
+reset role;
 select is(
   (select statut from public.boutique_commandes where id = '19400000-0000-0000-0000-000000000003'),
   'payee',
@@ -319,10 +327,13 @@ select is(
   'un règlement est créé'
 );
 
+set local role service_role;
+select set_config('request.jwt.claims','{"role":"service_role"}', true);
 select lives_ok(
   $$select public.boutique_finaliser_commande_payee('19400000-0000-0000-0000-000000000003', 'cs_test_migration_194')$$,
   'le second appel de finalisation est accepté'
 );
+reset role;
 select is(
   (select count(*)::integer from public.depenses_fournisseurs where numero_piece = 'BTQ-19400000-0000-0000-0000-000000000003'),
   1,

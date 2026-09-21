@@ -26,8 +26,14 @@ select ok(
   'anon exclu');
 
 -- ── mise en place d'une baisse « scheduled » via le chemin de service ────────
-set local role authenticated;
-select set_config('request.jwt.claims','{"sub":"30000000-0000-0000-0000-000000000001","email":"plateforme@invalid.local","role":"authenticated","aal":"aal2"}', true);
+-- ELSATIA-REDTEAM-V3 (20260922000323) : synchroniser_capacite_stripe_service
+-- n'est plus exécutable par "authenticated" (auto-octroi de capacité payante
+-- sans appartenance vérifiée, P0) — seul service_role y a droit désormais,
+-- comme le fait réellement le webhook/cron (src/lib/stripe-capacite-
+-- reconcile.ts). La mise en place de fixture ci-dessous emprunte donc le
+-- même rôle que l'appelant réel, au lieu de authenticated.
+set local role service_role;
+select set_config('request.jwt.claims','{"role":"service_role"}', true);
 select lives_ok($$
   select public.synchroniser_capacite_stripe_service(
     'a0000000-0000-0000-0000-000000000001','baisse',10,4,'pro','mensuel','price_cap_pro_m',
