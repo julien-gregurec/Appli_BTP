@@ -95,6 +95,26 @@ begin
     where id=v_entreprise;
   end if;
 
+  -- Capacité de personnes : une entreprise en essai est limitée à 3 comptes actifs
+  -- (trigger trg_capacite_personnes_actives, migration 20260903000256) ; 28 salariés
+  -- la dépasseraient. En conditions réelles, ce geste est fait par un opérateur
+  -- plateforme via la RPC plateforme_definir_capacite_personnes_supplementaire
+  -- (voir docs/organisation/ELSATIA_GP_TRIAL_SOCLE_ACCESS_V1.md §5) — RPC elle-même
+  -- gardée par est_plateforme_admin()/AAL2, donc inappelable depuis ce script (même
+  -- limite qu'installer_roles_predefinis, cf. §2). On reproduit ici uniquement son
+  -- effet (mêmes colonnes, même ligne d'historique tracée) plutôt que le contournement
+  -- générique elsatia.capacite_personnes_bypass, pour rester fidèle au geste réel
+  -- qu'un opérateur pilote devra de toute façon faire le jour 1 (§9 du pack).
+  update public.entreprises set
+    capacite_personnes_supplementaire=30,capacite_personnes_source='systeme',
+    capacite_personnes_reference_externe='PILOTE-BTP-V1 - fixture de recette',
+    capacite_personnes_maj_at=now()
+  where id=v_entreprise;
+  insert into public.historique_capacite_personnes(entreprise_id,action,ancien,nouveau,source,reference_externe,motif)
+  values(v_entreprise,'capacite_supplementaire_definie','{"capacite_personnes_supplementaire":0}'::jsonb,
+    '{"capacite_personnes_supplementaire":30}'::jsonb,'systeme','PILOTE-BTP-V1 - fixture de recette',
+    '[PILOTE] Capacite etendue pour permettre les 28 salaries de la fixture de recette pilote');
+
   -- 2) Les 5 profils demandés pour la recette pilote (mêmes intitulés et permissions que le
   --    catalogue canonique des 9 rôles prédéfinis, cf. déclaration de v_roles ci-dessus).
   for v_i in 1..array_length(v_roles,1) loop
@@ -122,7 +142,7 @@ begin
   for v_i in 1..array_length(v_prenoms,1) loop
     insert into public.employes(
       entreprise_id,reference_interne,prenom,nom,email,telephone,poste,poste_id,type_contrat,date_entree,
-      taux_horaire,cout_horaire,statut,notes,carte_btp_numero,carte_btp_expiration,created_at
+      taux_horaire,statut,notes,carte_btp_numero,carte_btp_expiration,created_at
     ) values(
       v_entreprise,'PILOTE-EMP-'||lpad(v_i::text,3,'0'),v_prenoms[v_i],v_noms[v_i],
       'pilote.'||lower(v_prenoms[v_i])||'.'||lower(replace(v_noms[v_i],' ',''))||'@example.test',
@@ -135,8 +155,6 @@ begin
       current_date-(200+v_i*23),
       case v_role_cle[v_i] when 'gerant' then null when 'administration' then 17+v_i*0.2
         when 'chef_chantier' then 22+v_i*0.2 when 'chef_equipe' then 18+v_i*0.2 else 13+(v_i%5) end,
-      case v_role_cle[v_i] when 'gerant' then null when 'administration' then 24+v_i*0.3
-        when 'chef_chantier' then 31+v_i*0.3 when 'chef_equipe' then 26+v_i*0.3 else 19+(v_i%6) end,
       'actif','[PILOTE] Salarie fictif - fixture de recette, aucune donnee personnelle reelle',
       case when v_role_cle[v_i] in('ouvrier','chef_equipe','chef_chantier') then 'BTP-PILOTE-'||to_char(current_date,'YYYY')||'-'||lpad(v_i::text,5,'0') else null end,
       case when v_role_cle[v_i] in('ouvrier','chef_equipe','chef_chantier') then current_date+250+(v_i*11) else null end,
@@ -145,6 +163,47 @@ begin
       poste=excluded.poste,poste_id=excluded.poste_id,statut='actif',updated_at=now();
   end loop;
   select array_agg(id order by reference_interne) into v_employes from public.employes where entreprise_id=v_entreprise and reference_interne like 'PILOTE-EMP-%';
+
+  -- Cout horaire interne : colonne separee de la fiche employe depuis un
+  -- schema plus recent que le gabarit dont ce script s'inspire
+  -- (creer_entreprise_demo_18_mois.sql insere encore cout_horaire directement
+  -- sur employes ; ce n'est plus la structure reelle, corrige ici apres
+  -- detection par dry-run local, voir ELSATIA_PILOT_FIXTURE_INDEPENDENT_REVIEW_V1.md).
+  for v_i in 1..array_length(v_employes,1) loop
+    insert into public.employes_cout_horaire(entreprise_id,employe_id,cout_horaire) values(
+      v_entreprise,v_employes[v_i],
+      case v_role_cle[v_i] when 'gerant' then null when 'administration' then 24+v_i*0.3
+        when 'chef_chantier' then 31+v_i*0.3 when 'chef_equipe' then 26+v_i*0.3 else 19+(v_i%6) end
+    ) on conflict(employe_id) do update set cout_horaire=excluded.cout_horaire,updated_at=now();
+  end loop;
+
+  -- Comptes utilisateurs actives (auth.users + public.utilisateurs + utilisateurs_entreprises,
+  -- la table qui porte reellement les droits, separee de la fiche employe RH). Reutilise le
+  -- meme UUID que la fiche employe correspondante (espaces de cles independants, aucune
+  -- contrainte ne l'interdit) pour simplifier le script. Necessaire des la premiere execution :
+  -- demandes_conges.created_by et bulletins/mouvements optionnels referencent utilisateurs, pas
+  -- employes (detecte par dry-run local). Represente un pilote actif depuis ~2 mois ou toute
+  -- l'equipe a active son compte ; le parcours d'activation lui-meme (numero d'inscription) est
+  -- testé sur une entreprise neuve via l'onboarding reel, §2 du pack, pas reproduit ici.
+  for v_i in 1..array_length(v_employes,1) loop
+    insert into auth.users(id,email,created_at) values(
+      v_employes[v_i],
+      'pilote.'||lower(v_prenoms[v_i])||'.'||lower(replace(v_noms[v_i],' ',''))||'@example.test',
+      now()-interval '2 months'
+    ) on conflict(id) do nothing;
+    insert into public.utilisateurs(id,nom,prenom,entreprise_active_id,created_at) values(
+      v_employes[v_i],v_noms[v_i],v_prenoms[v_i],v_entreprise,now()-interval '2 months'
+    ) on conflict(id) do update set entreprise_active_id=excluded.entreprise_active_id;
+    insert into public.utilisateurs_entreprises(utilisateur_id,entreprise_id,poste_id,statut,pointage_personnel_actif) values(
+      v_employes[v_i],v_entreprise,
+      case v_role_cle[v_i] when 'gerant' then v_poste_gerant when 'administration' then v_poste_admin
+        when 'chef_chantier' then v_poste_chef_chantier when 'chef_equipe' then v_poste_chef_equipe
+        else v_poste_ouvrier end,
+      'actif',true
+    ) on conflict(utilisateur_id,entreprise_id) do update set poste_id=excluded.poste_id,statut='actif';
+    update public.employes set utilisateur_id=v_employes[v_i],compte_active_at=now()-interval '2 months',
+      compte_application_statut='actif' where id=v_employes[v_i];
+  end loop;
 
   -- Habilitations pour une partie de l'equipe terrain (CACES, SST, travail en hauteur).
   delete from public.habilitations_employe where entreprise_id=v_entreprise and libelle like '[PILOTE]%';
@@ -213,51 +272,65 @@ begin
 
   -- 6) Devis : un par chantier (statut coherent avec le chantier), + un envoye et un refuse pour le
   --    prospect Dumont Logistique, + un brouillon pour la cliente sans chantier (Blanchard).
+  --    Chaque devis est cree en 'brouillon', ses lignes inserees, puis son statut cible
+  --    applique par un UPDATE separe : un devis accepte est verrouille en ecriture par le
+  --    trigger verrouiller_devis_accepte() (montants/numero/dates figes), qui bloquerait le
+  --    recalcul automatique des montants (trg_recalc_devis) si les lignes etaient inserees
+  --    apres coup — detecte par dry-run local (voir
+  --    ELSATIA_PILOT_FIXTURE_INDEPENDENT_REVIEW_V1.md), meme precaution que pour les factures.
   if not exists(select 1 from public.devis where entreprise_id=v_entreprise and numero like 'DEV-PILOTE-%') then
     insert into public.devis(entreprise_id,numero,client_id,chantier_id,statut,date_emission,date_validite,conditions,notes_client,notes_internes,created_at)
-      values(v_entreprise,'DEV-PILOTE-001',v_clients[1],v_chantiers[1],'accepte',current_date-75,current_date-45,'Acompte 30% a la signature','Merci pour votre confiance.','[PILOTE] Fixture',(current_date-75)::timestamptz+interval '9 hours') returning id into v_devis;
+      values(v_entreprise,'DEV-PILOTE-001',v_clients[1],v_chantiers[1],'brouillon',current_date-75,current_date-45,'Acompte 30% a la signature','Merci pour votre confiance.','[PILOTE] Fixture',(current_date-75)::timestamptz+interval '9 hours') returning id into v_devis;
     insert into public.lignes_devis(devis_id,designation,description,type,quantite,unite,prix_unitaire_ht,remise_ligne,taux_tva,ordre) values
       (v_devis,'Extension 20m2 - gros oeuvre','Fondations, elevation murs','main_oeuvre',120,'h',48,0,20,1),
       (v_devis,'Fournitures maconnerie','Parpaings, ciment, armatures','fourniture',1,'forfait',9800,0,20,2),
       (v_devis,'Toiture extension','Charpente et couverture','forfait',1,'forfait',12500,0,10,3);
+    update public.devis set statut='accepte' where id=v_devis;
 
     insert into public.devis(entreprise_id,numero,client_id,chantier_id,statut,date_emission,date_validite,conditions,notes_client,notes_internes,created_at)
-      values(v_entreprise,'DEV-PILOTE-002',v_clients[2],v_chantiers[2],'accepte',current_date-58,current_date-28,'Acompte 30% a la signature','Merci pour votre confiance.','[PILOTE] Fixture',(current_date-58)::timestamptz+interval '9 hours') returning id into v_devis;
+      values(v_entreprise,'DEV-PILOTE-002',v_clients[2],v_chantiers[2],'brouillon',current_date-58,current_date-28,'Acompte 30% a la signature','Merci pour votre confiance.','[PILOTE] Fixture',(current_date-58)::timestamptz+interval '9 hours') returning id into v_devis;
     insert into public.lignes_devis(devis_id,designation,description,type,quantite,unite,prix_unitaire_ht,remise_ligne,taux_tva,ordre) values
       (v_devis,'Renovation salle de bain','Depose, plomberie, carrelage','forfait',1,'forfait',9800,0,10,1);
+    update public.devis set statut='accepte' where id=v_devis;
 
     insert into public.devis(entreprise_id,numero,client_id,chantier_id,statut,date_emission,date_validite,conditions,notes_client,notes_internes,created_at)
-      values(v_entreprise,'DEV-PILOTE-003',v_clients[3],v_chantiers[3],'accepte',current_date-33,current_date-3,'Situations mensuelles','Merci pour votre confiance.','[PILOTE] Fixture',(current_date-33)::timestamptz+interval '9 hours') returning id into v_devis;
+      values(v_entreprise,'DEV-PILOTE-003',v_clients[3],v_chantiers[3],'brouillon',current_date-33,current_date-3,'Situations mensuelles','Merci pour votre confiance.','[PILOTE] Fixture',(current_date-33)::timestamptz+interval '9 hours') returning id into v_devis;
     insert into public.lignes_devis(devis_id,designation,description,type,quantite,unite,prix_unitaire_ht,remise_ligne,taux_tva,ordre) values
       (v_devis,'Ravalement facade','Nettoyage, enduit, peinture','main_oeuvre',280,'h',42,0,10,1),
       (v_devis,'Echafaudage','Location et montage','forfait',1,'forfait',3200,0,20,2);
+    update public.devis set statut='accepte' where id=v_devis;
 
     insert into public.devis(entreprise_id,numero,client_id,chantier_id,statut,date_emission,date_validite,conditions,notes_client,notes_internes,created_at)
-      values(v_entreprise,'DEV-PILOTE-004',v_clients[4],v_chantiers[4],'accepte',current_date-43,current_date-13,'Acompte 20%, situations mensuelles, solde a livraison','Devis initial - 6 logements collectifs.','[PILOTE] Fixture - marche important',(current_date-43)::timestamptz+interval '9 hours') returning id into v_devis;
+      values(v_entreprise,'DEV-PILOTE-004',v_clients[4],v_chantiers[4],'brouillon',current_date-43,current_date-13,'Acompte 20%, situations mensuelles, solde a livraison','Devis initial - 6 logements collectifs.','[PILOTE] Fixture - marche important',(current_date-43)::timestamptz+interval '9 hours') returning id into v_devis;
     insert into public.lignes_devis(devis_id,designation,description,type,quantite,unite,prix_unitaire_ht,remise_ligne,taux_tva,ordre) values
       (v_devis,'Gros oeuvre 6 logements','Fondations, elevation, dalles','main_oeuvre',1800,'h',45,0,20,1),
       (v_devis,'Fournitures gros oeuvre','Beton, acier, blocs','fourniture',1,'forfait',185000,0,20,2),
       (v_devis,'Second oeuvre','Cloisons, electricite, plomberie','forfait',1,'forfait',95000,5,20,3);
+    update public.devis set statut='accepte' where id=v_devis;
 
     insert into public.devis(entreprise_id,numero,client_id,chantier_id,statut,date_emission,date_validite,conditions,notes_client,notes_internes,created_at)
-      values(v_entreprise,'DEV-PILOTE-005',v_clients[5],v_chantiers[5],'accepte',current_date-24,current_date+6,'Acompte 30% a la signature','Merci pour votre confiance.','[PILOTE] Fixture',(current_date-24)::timestamptz+interval '9 hours') returning id into v_devis;
+      values(v_entreprise,'DEV-PILOTE-005',v_clients[5],v_chantiers[5],'brouillon',current_date-24,current_date+6,'Acompte 30% a la signature','Merci pour votre confiance.','[PILOTE] Fixture',(current_date-24)::timestamptz+interval '9 hours') returning id into v_devis;
     insert into public.lignes_devis(devis_id,designation,description,type,quantite,unite,prix_unitaire_ht,remise_ligne,taux_tva,ordre) values
       (v_devis,'Refection toiture copropriete','Depose, charpente, couverture','forfait',1,'forfait',64500,0,10,1);
+    update public.devis set statut='accepte' where id=v_devis;
 
     insert into public.devis(entreprise_id,numero,client_id,chantier_id,statut,date_emission,date_validite,conditions,notes_client,notes_internes,created_at)
-      values(v_entreprise,'DEV-PILOTE-006',v_clients[6],v_chantiers[6],'accepte',current_date-18,current_date+12,'Acompte 20% a la signature','Marche public - ecole primaire.','[PILOTE] Fixture',(current_date-18)::timestamptz+interval '9 hours') returning id into v_devis;
+      values(v_entreprise,'DEV-PILOTE-006',v_clients[6],v_chantiers[6],'brouillon',current_date-18,current_date+12,'Acompte 20% a la signature','Marche public - ecole primaire.','[PILOTE] Fixture',(current_date-18)::timestamptz+interval '9 hours') returning id into v_devis;
     insert into public.lignes_devis(devis_id,designation,description,type,quantite,unite,prix_unitaire_ht,remise_ligne,taux_tva,ordre) values
       (v_devis,'Renovation ecole primaire','Menuiseries, peinture, sols','forfait',1,'forfait',156000,0,20,1);
+    update public.devis set statut='accepte' where id=v_devis;
 
     insert into public.devis(entreprise_id,numero,client_id,chantier_id,statut,date_emission,date_validite,conditions,notes_client,notes_internes,created_at)
-      values(v_entreprise,'DEV-PILOTE-007',v_clients[7],v_chantiers[7],'envoye',current_date-6,current_date+24,'Acompte 30% a la signature','En attente de votre retour.','[PILOTE] Fixture - devis en cours de negociation',(current_date-6)::timestamptz+interval '9 hours') returning id into v_devis;
+      values(v_entreprise,'DEV-PILOTE-007',v_clients[7],v_chantiers[7],'brouillon',current_date-6,current_date+24,'Acompte 30% a la signature','En attente de votre retour.','[PILOTE] Fixture - devis en cours de negociation',(current_date-6)::timestamptz+interval '9 hours') returning id into v_devis;
     insert into public.lignes_devis(devis_id,designation,description,type,quantite,unite,prix_unitaire_ht,remise_ligne,taux_tva,ordre) values
       (v_devis,'Extension entrepot 200m2','Structure metallique et bardage','forfait',1,'forfait',98000,0,20,1);
+    update public.devis set statut='envoye' where id=v_devis;
 
     insert into public.devis(entreprise_id,numero,client_id,chantier_id,statut,date_emission,date_validite,conditions,notes_client,notes_internes,created_at)
-      values(v_entreprise,'DEV-PILOTE-008',v_clients[7],v_chantiers[7],'refuse',current_date-9,current_date+21,'Acompte 30% a la signature','Variante non retenue par le client.','[PILOTE] Fixture - variante refusee',(current_date-9)::timestamptz+interval '9 hours') returning id into v_devis;
+      values(v_entreprise,'DEV-PILOTE-008',v_clients[7],v_chantiers[7],'brouillon',current_date-9,current_date+21,'Acompte 30% a la signature','Variante non retenue par le client.','[PILOTE] Fixture - variante refusee',(current_date-9)::timestamptz+interval '9 hours') returning id into v_devis;
     insert into public.lignes_devis(devis_id,designation,description,type,quantite,unite,prix_unitaire_ht,remise_ligne,taux_tva,ordre) values
       (v_devis,'Extension entrepot 200m2 - variante bois','Structure bois et bardage','forfait',1,'forfait',118000,0,20,1);
+    update public.devis set statut='refuse' where id=v_devis;
 
     insert into public.devis(entreprise_id,numero,client_id,chantier_id,statut,date_emission,date_validite,conditions,notes_client,notes_internes,created_at)
       values(v_entreprise,'DEV-PILOTE-009',v_clients[8],null,'brouillon',current_date-2,current_date+28,'A finaliser','','[PILOTE] Fixture - devis pas encore envoye, sans chantier',(current_date-2)::timestamptz+interval '9 hours') returning id into v_devis;
@@ -380,21 +453,21 @@ begin
 
   insert into public.articles_stock(entreprise_id,reference,designation,unite,quantite_stock,seuil_alerte,prix_achat_ht,prix_vente_ht,emplacement,actif) values
     (v_entreprise,'PILOTE-STK-001','Plaque BA13','u',85,20,6.9,11.5,'Depot - Zone A',true),
-    (v_entreprise,'PILOTE-STK-002','Sac de ciment 35kg','u',40,15,7.2,null,'Depot - Zone A',true),
-    (v_entreprise,'PILOTE-STK-003','Parpaing 20cm','u',600,150,1.4,null,'Depot - Zone B',true),
-    (v_entreprise,'PILOTE-STK-004','Cable electrique 3G2.5mm','ml',320,80,1.1,null,'Depot - Zone C',true),
-    (v_entreprise,'PILOTE-STK-005','Disjoncteur 20A','u',18,10,9.5,null,'Depot - Zone C',true),
-    (v_entreprise,'PILOTE-STK-006','Peinture acrylique blanche 10L','u',12,5,42,null,'Depot - Zone D',true),
-    (v_entreprise,'PILOTE-STK-007','Rouleau laine de verre','u',9,10,28,null,'Depot - Zone D',true),
-    (v_entreprise,'PILOTE-STK-008','Vis autoforantes boite 250','u',22,10,14,null,'Depot - Zone E',true),
-    (v_entreprise,'PILOTE-STK-009','Silicone sanitaire','u',30,15,4.8,null,'Depot - Zone E',true),
-    (v_entreprise,'PILOTE-STK-010','Carrelage gres cerame 60x60','m2',140,40,18.5,null,'Depot - Zone B',true),
-    (v_entreprise,'PILOTE-STK-011','Casque de chantier (EPI)','u',25,8,12,null,'Depot - EPI',true),
-    (v_entreprise,'PILOTE-STK-012','Gants de manutention (EPI)','paire',60,20,3.2,null,'Depot - EPI',true),
-    (v_entreprise,'PILOTE-STK-013','Gasoil non routier (GNR)','L',400,100,1.35,null,'Depot - Cuve',true),
-    (v_entreprise,'PILOTE-STK-014','Mortier-colle sac 25kg','u',35,15,9.8,null,'Depot - Zone A',true),
-    (v_entreprise,'PILOTE-STK-015','Tuile mecanique terre cuite','u',900,200,1.9,null,'Depot - Zone B',true)
-  on conflict(entreprise_id,reference) do update set quantite_stock=excluded.quantite_stock,prix_achat_ht=excluded.prix_achat_ht,actif=true;
+    (v_entreprise,'PILOTE-STK-002','Sac de ciment 35kg','u',40,15,7.2,11.9,'Depot - Zone A',true),
+    (v_entreprise,'PILOTE-STK-003','Parpaing 20cm','u',600,150,1.4,2.3,'Depot - Zone B',true),
+    (v_entreprise,'PILOTE-STK-004','Cable electrique 3G2.5mm','ml',320,80,1.1,1.8,'Depot - Zone C',true),
+    (v_entreprise,'PILOTE-STK-005','Disjoncteur 20A','u',18,10,9.5,15.6,'Depot - Zone C',true),
+    (v_entreprise,'PILOTE-STK-006','Peinture acrylique blanche 10L','u',12,5,42,67.2,'Depot - Zone D',true),
+    (v_entreprise,'PILOTE-STK-007','Rouleau laine de verre','u',9,10,28,44.8,'Depot - Zone D',true),
+    (v_entreprise,'PILOTE-STK-008','Vis autoforantes boite 250','u',22,10,14,22.4,'Depot - Zone E',true),
+    (v_entreprise,'PILOTE-STK-009','Silicone sanitaire','u',30,15,4.8,7.9,'Depot - Zone E',true),
+    (v_entreprise,'PILOTE-STK-010','Carrelage gres cerame 60x60','m2',140,40,18.5,29.6,'Depot - Zone B',true),
+    (v_entreprise,'PILOTE-STK-011','Casque de chantier (EPI)','u',25,8,12,19.2,'Depot - EPI',true),
+    (v_entreprise,'PILOTE-STK-012','Gants de manutention (EPI)','paire',60,20,3.2,5.3,'Depot - EPI',true),
+    (v_entreprise,'PILOTE-STK-013','Gasoil non routier (GNR)','L',400,100,1.35,1.35,'Depot - Cuve',true),
+    (v_entreprise,'PILOTE-STK-014','Mortier-colle sac 25kg','u',35,15,9.8,15.9,'Depot - Zone A',true),
+    (v_entreprise,'PILOTE-STK-015','Tuile mecanique terre cuite','u',900,200,1.9,3.1,'Depot - Zone B',true)
+  on conflict(entreprise_id,reference) do update set quantite_stock=excluded.quantite_stock,prix_achat_ht=excluded.prix_achat_ht,prix_vente_ht=excluded.prix_vente_ht,actif=true;
   select array_agg(id order by reference) into v_articles from public.articles_stock where entreprise_id=v_entreprise and reference like 'PILOTE-STK-%';
 
   delete from public.mouvements_stock where entreprise_id=v_entreprise and motif like '[PILOTE]%';
@@ -449,6 +522,8 @@ begin
   end if;
 
   -- 11) Notes de frais salariees : soumise, validee, refusee, remboursee.
+  --     valide_par reference public.utilisateurs (un compte connecte), pas employes -
+  --     fonctionne car la boucle de comptes ci-dessus reutilise le meme UUID.
   if not exists(select 1 from public.notes_frais where entreprise_id=v_entreprise and commentaire_salarie like '[PILOTE]%') then
     insert into public.notes_frais(entreprise_id,employe_id,chantier_id,date_frais,montant_ttc,categorie,description,statut,montant_ht,montant_tva,taux_tva,devise,moyen_paiement,commentaire_salarie,soumis_at,valide_at,valide_par,created_at,updated_at) values
       (v_entreprise,v_employes[7],v_chantiers[3],current_date-8,42.5,'repas','Repas chantier equipe','validee',38.64,3.86,10,'EUR','carte_personnelle','[PILOTE] Fixture',current_date::timestamptz-interval '7 days',current_date::timestamptz-interval '6 days',v_employes[4],now()-interval '8 days',now()-interval '6 days'),

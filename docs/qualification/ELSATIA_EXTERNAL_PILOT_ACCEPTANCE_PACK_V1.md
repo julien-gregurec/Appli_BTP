@@ -58,12 +58,20 @@ whitelisté dans `scripts/garde-scripts-production.mjs`, réservé au projet Pre
 node scripts/executer-script-production.mjs seed_entreprise_pilote_btp.sql
 ```
 
-**Non exécuté** au moment de la rédaction (même limite d'environnement que ci-dessus). Le script a
-été relu ligne à ligne, construit sur le gabarit déjà vérifié en conditions réelles
-(`creer_entreprise_demo_18_mois.sql`) et sur les schémas de table confirmés dans les migrations
-(`devis`, `factures`, `commandes_fournisseurs`, `notes_frais`, `demandes_conges`, `pointages`,
-etc., avec leurs contraintes `check` exactes). **À exécuter sur Preview et à vérifier visuellement
-avant tout usage réel en recette pilote** — c'est le premier item du GO/NO-GO (§12).
+**Non exécuté sur Preview** (même limite d'environnement que ci-dessus : pas de Docker/CLI
+Supabase). En revanche, une **revue indépendante** ultérieure l'a réellement exécuté — à
+plusieurs reprises, avec succès, y compris un test de panne forcée et un cycle complet
+seed→cleanup→re-seed — sur un PostgreSQL 16 local rejouant les 313 migrations réelles du
+dépôt (pas Preview, mais un vrai moteur avec le vrai schéma). Cette exécution a trouvé et fait
+corriger 7 défauts réels que la seule lecture n'avait pas révélés (colonne déplacée, plafond de
+capacité, verrou d'immuabilité des devis acceptés, contrainte `NOT NULL` manquante, FK vers les
+comptes utilisateurs). Voir
+**`docs/qualification/ELSATIA_PILOT_FIXTURE_INDEPENDENT_REVIEW_V1.md`** pour le détail complet,
+le script de nettoyage (`cleanup_entreprise_pilote_btp.sql`) et le script d'assertions
+(`assertions_entreprise_pilote_btp.sql`) qui l'accompagnent désormais. **À exécuter sur Preview
+et à vérifier avec `assertions_entreprise_pilote_btp.sql` avant tout usage réel en recette
+pilote** — c'est le premier item du GO/NO-GO (§12), désormais nettement moins risqué qu'au
+moment de la première rédaction de ce pack.
 
 Point d'attention corrigé pendant l'écriture : la fonction RPC `installer_roles_predefinis` a été
 volontairement **écartée** au profit d'un insert direct dans `postes`/`permissions_poste` — cette
@@ -437,7 +445,7 @@ processus « pilote » — ce pack ne couvre que ce qui est spécifique à l'exp
 | ID | Constat | Sévérité | Statut |
 | --- | --- | --- | --- |
 | P0-1 | **Aucune suite pgTAP n'a jamais tourné sur un vrai Postgres** pour les correctifs déjà fusionnés dans ce train (partage public, paiement TOCTOU, avoir anti-doublon, session support, etc.) — ni pendant la mission qui les a écrits, ni pendant celle-ci (même limite d'environnement : pas de Docker/CLI Supabase) | **P0** | **Ouvert** — à faire sur Preview avant le jour 1 du pilote : `supabase start` + `supabase test db`, puis exécuter la fixture §1 et vérifier visuellement les compteurs retournés |
-| P0-2 | La fixture pilote (`seed_entreprise_pilote_btp.sql`) elle-même n'a jamais été exécutée | **P0** | **Ouvert** — même action que P0-1, à faire dans la même session Preview |
+| P0-2 | La fixture pilote (`seed_entreprise_pilote_btp.sql`) elle-même n'avait jamais été exécutée | **P0 → largement réduit** | **Revue indépendante faite** (`ELSATIA_PILOT_FIXTURE_INDEPENDENT_REVIEW_V1.md`) : exécutée réellement plusieurs fois sur un Postgres 16 local avec le schéma réel (313 migrations rejouées), 7 défauts trouvés et corrigés, idempotence/isolation/cleanup vérifiés par exécution. **Reste à faire** : une exécution sur Preview lui-même (jamais faite, ni dans cette mission ni dans la précédente) reste requise avant le jour 1, ne serait-ce que pour confirmer que le schéma Preview réel correspond à celui rejoué localement — étape désormais rapide (`assertions_entreprise_pilote_btp.sql` la valide en une commande) |
 | P1-1 | Rôles prédéfinis non installés automatiquement à la création d'une entreprise (friction #1, §2) | **P1** | Contournement documenté : le facilitateur installe les rôles depuis `/parametres/acces` dès le jour 1 |
 | P1-2 | Invitation salarié en 2 temps déconnectés (fiche + activation par le salarié) | **P1** | Contournement documenté : communiquer la procédure au pilote avant les invitations |
 | P1-3 | Wizard `/onboarding/demarrage` incomplet (rôles, premier document non suivis) | **P1** | Contournement : ce pack (§2-§7) sert de checklist complémentaire |
@@ -467,11 +475,15 @@ processus « pilote » — ce pack ne couvre que ce qui est spécifique à l'exp
 
 ### Blockers réels avant le premier pilote
 
-Seuls **P0-1** et **P0-2** sont de vrais blocages techniques (absence de preuve d'exécution, pas un
-défaut de code connu) — tout le reste a un contournement documenté compatible avec un pilote
-**accompagné**. Les deux P0 partagent la même cause et la même action : obtenir un accès
-Docker/CLI Supabase (ou équivalent Preview) et exécuter `supabase test db` + la fixture avant le
-jour 1.
+**P0-1** (pgTAP jamais exécuté) reste un vrai blocage technique — absence de preuve d'exécution
+sur Preview, pas un défaut de code connu. **P0-2** (fixture jamais exécutée) est désormais
+**largement levé** par la revue indépendante (`ELSATIA_PILOT_FIXTURE_INDEPENDENT_REVIEW_V1.md`) :
+la fixture a été réellement exécutée à plusieurs reprises sur un Postgres 16 local rejouant le
+schéma réel, 7 défauts trouvés ont été corrigés, et un cleanup + des assertions testés
+l'accompagnent désormais. Il ne reste, pour clore P0-2 complètement, qu'à rejouer
+`assertions_entreprise_pilote_btp.sql` une fois sur Preview lui-même pour confirmer que son
+schéma correspond à celui rejoué localement — une vérification rapide, plus une inconnue
+complète. Tout le reste a un contournement documenté compatible avec un pilote **accompagné**.
 
 ### Verdict
 
@@ -480,9 +492,11 @@ PILOT READY WITH WORKAROUNDS
 ```
 
 Valable **uniquement pour un pilote externe accompagné** (facilitateur présent à chaque étape
-critique), à la condition suspensive que **P0-1 et P0-2 soient levés avant le premier jour réel**
-(exécution pgTAP + fixture sur Preview). Ce verdict ne concerne pas la commercialisation
-self-service (Stripe reste en mode Test, capacité de comptes non autonome, aucun SLA contractuel).
+critique), à la condition suspensive que **P0-1 soit levé avant le premier jour réel**
+(exécution pgTAP sur Preview) et que **P0-2 soit confirmé** par une exécution de
+`assertions_entreprise_pilote_btp.sql` sur Preview après le seed. Ce verdict ne concerne pas la
+commercialisation self-service (Stripe reste en mode Test, capacité de comptes non autonome,
+aucun SLA contractuel).
 
 ---
 
@@ -500,7 +514,15 @@ réel des routes/actions serveur du produit (pas une liste générique).
 - Fixture synthétique : `supabase/production/seed_entreprise_pilote_btp.sql` (whitelistée dans
   `scripts/garde-scripts-production.mjs`, documentée dans `supabase/production/README.md`).
 - Acceptance tests : `docs/qualification/pilote/ELSATIA_PILOT_ACCEPTANCE_TESTS_V1.md`.
+- Revue indépendante de la fixture (exécution réelle, 7 défauts trouvés et corrigés) :
+  `docs/qualification/ELSATIA_PILOT_FIXTURE_INDEPENDENT_REVIEW_V1.md`.
+- Nettoyage de la fixture : `supabase/production/cleanup_entreprise_pilote_btp.sql` (destructif,
+  whitelisté avec confirmation obligatoire).
+- Vérification post-seed : `supabase/production/assertions_entreprise_pilote_btp.sql` (lecture
+  seule).
 
-Aucun autre fichier produit/modifié en dehors de la documentation et de la fixture ci-dessus —
-conformément à la consigne « ne pas modifier le produit sauf défaut P0/P1 évident reproduit
-pendant la recette » (aucun tel défaut n'a été reproduit dans cette mission).
+Aucun autre fichier produit/modifié en dehors de la documentation et des scripts de recette
+ci-dessus — conformément à la consigne « ne pas modifier le produit sauf défaut P0/P1 évident
+reproduit pendant la recette » (aucun tel défaut n'a été reproduit dans cette mission ; les 7
+défauts trouvés et corrigés par la revue indépendante étaient tous dans la fixture elle-même,
+jamais dans le produit).

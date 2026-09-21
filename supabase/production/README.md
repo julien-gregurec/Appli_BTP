@@ -52,17 +52,28 @@ Si l'une de ces vérifications échoue, le script s'arrête (`ARRÊT SÛR : ...`
 avant toute exécution SQL. Aucune de ces vérifications ne dépend d'une valeur
 par défaut permissive : une variable absente est toujours un refus.
 
-## Script destructif : `supprimer_entreprises_test.sql`
+## Scripts destructifs : `supprimer_entreprises_test.sql`, `cleanup_entreprise_pilote_btp.sql`
 
-Ce script supprime des lignes en base (`DELETE`). En plus des vérifications
-ci-dessus, il exige :
+Ces scripts suppriment des lignes en base (`DELETE`). En plus des vérifications
+ci-dessus, ils exigent :
 
 ```bash
 CONFIRM_DELETE_TEST_DATA=YES node scripts/executer-script-production.mjs supprimer_entreprises_test.sql
+CONFIRM_DELETE_TEST_DATA=YES node scripts/executer-script-production.mjs cleanup_entreprise_pilote_btp.sql
 ```
 
 Sans cette variable, exactement à cette valeur, le wrapper refuse
 l'exécution.
+
+`cleanup_entreprise_pilote_btp.sql` supprime exclusivement l'entreprise
+`PILOTE-BTP-V1` créée par `seed_entreprise_pilote_btp.sql` (et ses comptes
+utilisateurs synthétiques) — jamais une autre entreprise. Il désactive
+individuellement, par nom, 4 triggers métier d'immuabilité (devis
+accepté/facture émise) le temps de la suppression, uniquement pour cette
+entreprise, puis les réactive ; voir l'en-tête du script et
+`docs/qualification/ELSATIA_PILOT_FIXTURE_INDEPENDENT_REVIEW_V1.md` (§14) pour
+le détail et la justification (testé de bout en bout : seed → cleanup → re-seed
+propre, sur un Postgres local avec les migrations réelles rejouées).
 
 ## Scripts non destructifs
 
@@ -70,9 +81,11 @@ l'exécution.
 `seed_entreprise_test_suivi_terrain.sql`, `seed_entreprise_test_tous_onglets.sql`,
 `seed_juju_6_mois.sql`, `corriger_encodage_juju.sql`,
 `seed_entreprise_pilote_btp.sql` (fixture entreprise BTP synthétique pour le pack de recette
-pilote externe, voir `docs/qualification/ELSATIA_EXTERNAL_PILOT_ACCEPTANCE_PACK_V1.md`) — ces scripts créent ou
-mettent à jour des données ciblées sur des entreprises de recette nommément
-identifiées (par référence interne ou par nom exact), sans supprimer de
+pilote externe, voir `docs/qualification/ELSATIA_EXTERNAL_PILOT_ACCEPTANCE_PACK_V1.md`),
+`assertions_entreprise_pilote_btp.sql` (vérifications de comptage en lecture seule après le
+seed pilote, voir `docs/qualification/ELSATIA_PILOT_FIXTURE_INDEPENDENT_REVIEW_V1.md`) — ces
+scripts créent, mettent à jour ou lisent des données ciblées sur des entreprises de recette
+nommément identifiées (par référence interne ou par nom exact), sans supprimer de
 données existantes. Ils restent malgré tout soumis aux vérifications de cible
 1 à 3 ci-dessus : la protection par nom d'entreprise seule ne suffit pas à
 garantir qu'on est sur le bon projet Supabase.
