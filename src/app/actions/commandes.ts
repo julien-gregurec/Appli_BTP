@@ -207,8 +207,10 @@ export async function enregistrerReceptionCommandeAction(id: string, formData: F
     redirect(`/commandes/${id}?error=${encodeURIComponent("Une quantité reçue est invalide ou supérieure à la quantité commandée")}`);
   }
 
+  const cleIdempotence = String(formData.get("cle_idempotence") ?? "").trim() || null;
   const { error } = await supabase.rpc("enregistrer_reception_commande", {
     p_entreprise_id: ctx.entrepriseId, p_commande_id: id, p_lignes: receptions,
+    p_idempotency_key: cleIdempotence,
   });
   if (error) redirect(`/commandes/${id}?error=${encodeURIComponent(messageErreurUtilisateur("enregistrerReceptionCommandeAction", error, "Impossible d’enregistrer la réception."))}`);
   revalidatePath(`/commandes/${id}`);

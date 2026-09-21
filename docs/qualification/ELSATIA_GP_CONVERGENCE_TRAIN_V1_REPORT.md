@@ -1529,7 +1529,439 @@ aucune Preview, aucune Production.
 
 SHA après ce lot : **`38cf99e`** (inchangé — aucun commit de code nécessaire).
 
-## 22. Qualification finale du HEAD résultant (`dcfd71f`) — `PREVIEW DEPLOYMENT CANDIDATE`
+---
+
+## 22. Lot Commande fournisseur → Stock (`COMMANDE STOCK FLOW INTEGRATED`)
+
+### 22.1 — Source et train cible
+
+- Lot source qualifié : branche `fix/commande-reception-stock-v1`, SHA
+  `2a2034cc9a4036a325961aa1dc62fa9e1fcea0d8` (re-vérifié au début de cette
+  session par `git ls-remote`/`git rev-parse` : le SHA n'a pas bougé). Verdict
+  source : `COMMANDE STOCK FLOW QUALIFIED`. La branche source part de
+  `e0a83ebbd430efb5217466f05be3c08f45ae4de5` — re-vérifié comme étant
+  effectivement l'ancêtre commun réel (`git merge-base`) avec le train cible.
+- HEAD réel du train `claude/compassionate-euler-5j6avr` au début de cette
+  session (re-vérifié par `git fetch` + `git rev-parse`, PAS supposé égal à
+  la valeur indiquée dans le prompt) : `38cf99e50d53c0c0dc6e80871c0a178addf6e9f1`
+  — identique à la valeur indiquée ; aucun commit supplémentaire n'était
+  apparu entre-temps. Train de départ : **312 migrations**.
+- La branche source n'a **pas** été mergée en bloc. Chaque fichier source a
+  été comparé individuellement au train cible (voir §22.2) et seuls les
+  changements nécessaires au lot Commande → Stock ont été portés. Tous les
+  autres lots déjà intégrés dans le train (Numbering §18, Performance/
+  Situations §19, Reserves public ENV + notification §20, sécurité, et toute
+  convergence antérieure) restent strictement inchangés — vérifiés inchangés
+  par relecture de `git diff` sur les 4 fichiers TS/TSX portés (aucune section
+  de ces fichiers en dehors du lot qualifié n'a bougé depuis `e0a83eb`).
+
+### 22.2 — Classement des changements source
+
+Le lot source comprenait exactement les 7 fichiers annoncés dans son propre
+rapport de qualification (`docs/qualification/ELSATIA_GP_COMMANDE_RECEPTION_STOCK_V1.md`,
+lu intégralement avant tout portage) :
+
+| Fichier source | Classement | Action |
+|---|---|---|
+| `supabase/migrations/20260922000318_gp_reception_commande_stock_transactionnel_v1.sql` | absent du train — collision de **numéro** uniquement (le train possède déjà un `318` distinct, voir §22.3), logique entièrement absente | porté, renuméroté `322`, en-tête de provenance réécrit, logique SQL strictement inchangée (diff caractère pour caractère du corps, seul l'en-tête commentaire change) |
+| `supabase/tests/gp_reception_commande_stock_transactionnel_v1.test.sql` | absent du train | porté à l'identique (65 assertions), seule une phrase de commentaire mentionnant l'ancien numéro `20260922000318` a été mise à jour pour référencer `20260922000322` |
+| `docs/qualification/ELSATIA_GP_COMMANDE_RECEPTION_STOCK_V1.md` | absent du train | conservé tel quel comme rapport du lot source (référence historique) — non modifié ; cette section 21 est le rapport du train, distinct |
+| `src/app/actions/commandes.ts` | absent du train (`grep`/`git diff e0a83eb HEAD` : fichier inchangé depuis la divergence) | porté à l'identique — vérifié octet pour octet contre la source après portage |
+| `src/app/actions/reception.ts` | absent du train, inchangé depuis `e0a83eb` | porté à l'identique |
+| `src/components/ReceptionCommandeForm.tsx` | absent du train, inchangé depuis `e0a83eb` | porté à l'identique |
+| `src/components/ReceptionScanner.tsx` | absent du train, inchangé depuis `e0a83eb` | porté à l'identique |
+
+Aucun fichier n'est tombé dans les catégories « déjà présent », « équivalent/
+supérieur » ou « devenu incompatible » : les 4 fichiers TS/TSX n'avaient reçu
+aucune modification concurrente sur le train entre `e0a83eb` et `38cf99e`, et
+aucune migration du train (299 à 321) ne touche `lignes_commande`,
+`commandes_fournisseurs`, `mouvements_stock` ou une fonction de réception —
+seule la migration `317` (`correctif_troncature_next_reference`) est dans ce
+voisinage temporel et elle est sans rapport (bug `lpad`, fonction
+`next_reference()`, jamais appelée par le moteur de réception).
+
+### 22.3 — Collision de migration
+
+Le train `38cf99e` possédait déjà `20260922000318_dashboard_indicateurs_bornes.sql`
+(lot Performance/Dashboard, intégré entretemps — voir §19), donc le numéro
+`20260922000318` du lot source était **pris**. Inventaire réel du ledger
+(`ls supabase/migrations | sort | tail`) : la dernière migration du train est
+`20260922000321_correctif_notification_devis_accepte_niveau.sql` ; aucune
+migration `322+` n'existait. Prochain numéro réellement libre : **`322`**
+(confirmé, pas supposé — hypothèse `322` du prompt vérifiée exacte).
+
+Migration renommée :
+`supabase/migrations/20260922000322_gp_reception_commande_stock_transactionnel_v1.sql`.
+
+Adapté dans cette migration : uniquement l'en-tête de provenance (SHA source,
+HEAD initial du train, explication de la collision et du renommage, référence
+au test porté). **Aucune ligne de logique SQL n'a été modifiée** — le corps
+(tables, contraintes, fonctions, grants) est un report caractère pour
+caractère du corps qualifié de la migration source à partir de la ligne
+« 1) Modèle canonique ». Vérifié par diff manuel section par section pendant
+la rédaction (voir aussi §22.11, Fresh + pgTAP, qui revalide cette absence de
+dérive fonctionnellement).
+
+### 22.4 — Architecture portée
+
+Strictement celle qualifiée par le lot source, sans réinvention :
+
+- **`lignes_commande.article_id`** (uuid, nullable) — nouvelle colonne,
+  additive. **FK composite** `(article_id, entreprise_id) →
+  articles_stock(id, entreprise_id)` — garantie tenant au niveau base,
+  indépendante de tout contrôle applicatif. Compatible avec le train actuel :
+  l'index unique `articles_stock(id, entreprise_id)` requis par cette FK
+  composite existait déjà (migration `20260710000025_depot_inventaires.sql`,
+  antérieure à la divergence), et le même patron de FK composite est déjà
+  utilisé ailleurs dans le train (`stock_import_nuanciers.sql`) — aucune
+  incompatibilité architecturale.
+- **`mouvements_stock.ligne_commande_id`** (uuid, nullable), FK composite
+  `(ligne_commande_id, entreprise_id) → lignes_commande(id, entreprise_id)` —
+  traçabilité du mouvement vers sa ligne de commande d'origine.
+- **`public.receptions_idempotence`** — nouvelle table, RLS activée,
+  lecture membres uniquement, aucune écriture directe accordée (uniquement
+  via les fonctions `SECURITY DEFINER`).
+- **Moteur canonique unique `public.appliquer_reception_ligne_commande`** —
+  contrat de quantité reçue **cumulée cible** (pas un delta), verrouillage
+  fixe commande puis ligne, fonction interne jamais accordée à
+  `anon`/`authenticated`.
+- **Convergence des trois anciennes voies** vers ce moteur :
+  `enregistrer_reception_commande_interne` (parcours `/commandes/[id]`),
+  `changer_statut_commande_interne('recue')` (bascule manuelle), et
+  `enregistrer_reception_lot`/`enregistrer_reception_lot_borne` (parcours
+  scan `/stock/reception`), chacune avec un `drop function if exists`
+  explicite sur l'ancienne signature pour ne laisser aucune ancienne
+  surcharge vulnérable exposée.
+- **Idempotence par clé explicite** (`p_idempotency_key`) pour les appels par
+  lot, en complément de l'idempotence naturelle par cible cumulée.
+
+Aucun écart d'architecture constaté entre le lot source et son portage sur ce
+train : la seule différence est le numéro de migration et les commentaires de
+provenance.
+
+### 22.5 — Réception totale, partielle, rejeu, dépassement
+
+Vérifiés réellement par le test pgTAP porté (§22.10) ET par des requêtes
+manuelles indépendantes sur une base rejouée depuis zéro (§22.11) :
+
+- **Réception totale** : commande 10 → cible 10 : `quantite_recue = 10`,
+  stock article +10, exactement 1 mouvement, statut `recue` — confirmé
+  (scénario 1 du test, `ok 1-4`).
+- **Réception partielle en deux temps** : commande 10 → cible 4 (statut
+  `recue_partiel`, stock +4) → cible 10 (statut `recue`, stock +6 de delta,
+  soit 10 au total) : exactement **2** mouvements (4 puis 6), jamais un
+  mouvement de 10 — confirmé (scénario 2, `ok 5-11`).
+- **Rejeu exact** : un second appel à cible identique (10) après réception
+  totale, y compris une fois la commande déjà `recue`, est un no-op :
+  `delta = 0`, aucun nouveau mouvement, aucun nouveau crédit de stock, même
+  statut renvoyé sans erreur — confirmé (scénario 4, `ok 15-18`). C'est
+  précisément le correctif du bug de conception trouvé par le lot source
+  pendant l'écriture de ses propres tests (garde de statut appliqué
+  seulement si `delta ≠ 0`).
+- **Dépassement** : une cible supérieure à la quantité commandée (tentative
+  de 7 sur une ligne de 5 déjà à 4) est rejetée avec le message qualifié
+  (`%invalide%`), sans écriture partielle — confirmé (scénario 3, `ok 12-14`).
+
+### 22.6 — Parcours scan
+
+Le parcours scan (`enregistrer_reception_lot`) converge vers le même moteur
+canonique pour la part rattachée à une commande fournisseur : une attribution
+de scan relie l'article à la ligne (si elle ne l'était pas déjà), crédite le
+stock via `appliquer_reception_ligne_commande`, et un rejeu sous la même clé
+d'idempotence ne double pas le mouvement — confirmé (bloc « Parcours scan »
+du test, `ok 43-49`). Il n'existe plus deux moteurs indépendants de
+réception : les entrées de stock non rattachées à une commande (réception
+dépôt libre) restent, comme dans le lot source, des mouvements directs — ce
+n'est pas le flux commande→stock visé par ce lot, rien n'a été retiré.
+
+### 22.7 — Idempotence
+
+- **Idempotence naturelle par cible cumulée** : double clic, retry réseau,
+  appel identique, rejeu après commande `recue` — tous des no-ops par
+  construction du moteur canonique (§22.5, scénario 4).
+- **Clé d'idempotence explicite** : un second appel sous la **même clé**
+  mais avec une **charge différente** (9 au lieu de 5) ne retraite jamais —
+  il renvoie le résultat déjà mémorisé du premier appel, sans écriture
+  supplémentaire — confirmé (scénario 5, `ok 19-22`).
+- **Appels concurrents** (deux sessions réelles, voir §22.9) : sérialisés par
+  le verrou de ligne, résultat final exact, aucun double mouvement.
+
+### 22.8 — Rollback / transaction
+
+Scénario 11 du test porté : un lot contenant une ligne valide et une ligne
+étrangère (id inexistant) dans le **même appel** à
+`enregistrer_reception_commande` est rejeté en bloc
+(`%invalide ou ligne étrangère%`), et la ligne par ailleurs valide du même
+lot n'a **rien** reçu : `quantite_recue = 0`, aucun mouvement de stock,
+statut de la commande inchangé — confirmé (`ok 32-35`). Chaque fonction de
+haut niveau reste une seule fonction PL/pgSQL `SECURITY DEFINER` : tout se
+passe dans une seule transaction Postgres, atomique par construction. Il est
+donc impossible d'obtenir `quantite_recue` sans mouvement, mouvement sans
+stock, stock sans mouvement, ou statut de commande incohérent — vérifié
+également par la cohérence globale du scénario 14 (`ok 28-30` : somme des
+mouvements liés = somme des `quantite_recue`, stock = somme signée des
+mouvements de l'article).
+
+### 22.9 — Concurrence réelle (deux connexions psql distinctes)
+
+Testé avec de **vraies sessions PostgreSQL concurrentes** (deux processus
+`psql` lancés en arrière-plan depuis un shell, jamais un test séquentiel
+simulé), sur des fixtures dédiées et permanentes (`public._concurrency_test_refs`,
+créées uniquement pour ce test, hors du schéma des migrations). Technique :
+la session A prend manuellement, dans sa propre transaction, les deux mêmes
+verrous que le moteur canonique acquiert en interne (`commandes_fournisseurs`
+puis `lignes_commande`, `for update`), attend 3 s (`pg_sleep(3)`), puis
+appelle la fonction publique réelle (qui ré-acquiert les verrous déjà tenus,
+sans effet) avant de committer. La session B, démarrée 1 s plus tard, appelle
+directement la fonction publique réelle et est chronométrée avec
+`clock_timestamp()`/`\timing`.
+
+| Scénario | Résultat mesuré | État final vérifié |
+|---|---|---|
+| Même ligne, rejeu identique (cible 10 par les deux sessions) | Session B bloquée **2,02 s** (11:19:48.699 → 11:19:50.719, exactement l'attente du verrou tenu par A jusqu'à 11:19:50.717) puis no-op | 1 mouvement, stock = 10, `quantite_recue` = 10, statut `recue` — vérifié par requête indépendante après coup |
+| Deux lignes différentes, même entreprise (commandes distinctes) | Session B **non bloquée** (~12 ms), pendant que A dormait encore | aucune interférence, chaque ligne reçoit sa propre quantité |
+| Deux entreprises différentes | Session B **non bloquée** (~12 ms) malgré le verrou tenu 3 s par A sur l'entreprise 1 | aucun verrou croisé entre tenants |
+
+Aucun deadlock observé dans aucun des trois scénarios. Les verrous ne portent
+jamais sur une commande ou une entreprise entière : seules les lignes ciblées
+sont verrouillées, ce qui explique l'absence de blocage entre lignes/
+entreprises différentes tout en garantissant la sérialisation stricte sur la
+même ligne.
+
+### 22.10 — Test pgTAP source (65 assertions)
+
+Porté à l'identique dans
+`supabase/tests/gp_reception_commande_stock_transactionnel_v1.test.sql`
+(seule une phrase de commentaire de tête, référençant l'ancien numéro de
+migration, a été mise à jour). Exécuté seul sur la base rejouée avec la
+migration `322` : **65/65 assertions vertes, 0 `not ok`, 0 erreur**
+(vérifié deux fois : une fois juste après application de la migration `322`
+seule, une fois après un Fresh complet des 313 migrations — résultat
+identique). Couvre les 14 scénarios métier, la convergence scan, et les
+contrôles de sécurité (owner, `SECURITY DEFINER`, `search_path`, grants,
+absence d'accès `anon`, unicité des signatures en base, FK composite).
+
+### 22.11 — Fresh (train complet)
+
+Base reconstruite intégralement depuis zéro sur ce Postgres natif (pas de
+Docker disponible dans cet environnement — voir Annexe A pour l'adaptation
+d'environnement). Les **313 migrations** (312 + la nouvelle `322`)
+s'appliquent dans l'ordre, **0 erreur SQL, aucun doublon d'horodatage,
+aucun contournement d'erreur**. `npm run verify:migrations` confirme
+indépendamment : « 313 migrations valides, noms et horodatages uniques. »
+
+### 22.12 — Full pgTAP : baseline avant/après (mesurée sur le HEAD réel de cette session, pas supposée)
+
+Le prompt indiquait, à titre indicatif, une baseline antérieure de 93
+fichiers / 2277 assertions / 17 fichiers non verts pour un train qualifié
+`38cf99e` antérieur. Cette valeur ne correspond **pas** à ce qui a été
+mesuré dans cette session sur le HEAD réel — attendu, puisque ce chiffre
+provient d'une édition antérieure de ce même rapport (§20.9, mesurée sur un
+état intermédiaire du train différent) et que l'environnement de test
+(bootstrap Postgres natif, voir Annexe A) a été enrichi au fil de cette
+session (rôles Supabase d'infrastructure, `auth.mfa_factors` avec ses
+colonnes réelles, schéma `extensions`), ce qui **réduit** artificiellement
+le nombre de fichiers en échec par rapport à une mesure antérieure faite
+avec un bootstrap plus pauvre — sans aucun rapport avec le lot Commande →
+Stock. La baseline ci-dessous est celle réellement mesurée dans **cette**
+session, sur le HEAD `38cf99e` réel, avant toute modification :
+
+| | Baseline (HEAD `38cf99e`, avant ce lot) | Après ce lot (HEAD intégré, 313 migrations) |
+|---|---|---|
+| Fichiers de test | 93 | 94 (**+1**, le nouveau fichier) |
+| Assertions `ok` | 2433 | 2498 (**+65**, exactement le nouveau fichier) |
+| Assertions `not ok` | 3 | 3 (**inchangé**) |
+| Total assertions exécutées | 2436 | 2501 (**+65**) |
+| Fichiers non intégralement verts | 5 | 5 (**même liste, aucun nouveau**) |
+
+Les 5 fichiers non intégralement verts, **identiques avant et après**, tous
+sans rapport avec le domaine Commande → Stock et déjà hors périmètre de ce
+lot (§17 : plateforme admin, RGPD, partage public de documents, Stripe) :
+
+- `document_partage_public_par_jeton_v1.test.sql` (10/42 exécutées avant
+  crash — échec métier préexistant sur `trg_lignes_factures_brouillon_only`,
+  domaine « partage public documents », hors périmètre) ;
+- `gp_pilot_plateforme_admin_role_total.test.sql` (0/6 — contrainte
+  `plateforme_admins_actif_requiert_utilisateur_id` sur une fixture du test,
+  domaine « plateforme admin », hors périmètre) ;
+- `gp_pilot_rgpd_manifeste_fichiers.test.sql` (1/9 — `permission denied for
+  function manifeste_fichiers_entreprise`, domaine RGPD, hors périmètre) ;
+- `platform_audit_log_bounded_v1.test.sql` (6/12, 3 assertions `not ok`
+  explicites — domaine plateforme/audit, hors périmètre) ;
+- `platform_stripe_state_attestation_r72.test.sql` (8 assertions passées
+  puis erreur avant `finish()` — domaine Stripe/attestation, dépend du stub
+  `pgsodium` non cryptographique de cet environnement, voir Annexe A, hors
+  périmètre).
+
+**Comparaison précise des listes d'échec avant/après : diff vide.** Aucun
+ancien test vert n'est devenu rouge, aucune nouvelle régression, et le
+nouveau test ajoute exactement ses 65 assertions vertes.
+
+### 22.13 — Multi-tenant et sécurité
+
+Vérifiés par le test porté (§22.10) :
+
+- Entreprise A contre commande B : « Commande introuvable », aucune fuite
+  d'existence cross-tenant, aucun crédit de stock (`ok 33-35`).
+- Article d'une autre entreprise : rejet explicite (« introuvable dans cette
+  entreprise »), ligne non reliée après la tentative (`ok 36-37`) ; **et**
+  au niveau base, FK composite `lignes_commande_article_entreprise_fk`
+  (`23503`) empêchant physiquement le rattachement (`ok 65`).
+- Utilisateur sans la permission `gerer_achats` : « Accès refusé », aucune
+  écriture (`ok 38-39`).
+- `anon` : aucun accès à aucune des fonctions publiques ni au moteur interne
+  (`ok 44, 47, 48, 50, 51`).
+- `authenticated` légitime : accès au point d'entrée public uniquement, pas
+  au moteur interne (`ok 45, 46, 49`).
+
+Documentation par fonction publique créée/modifiée (owner, sécurité,
+`search_path`, grants, `auth.uid()`, contrôle entreprise, contrôle
+permission) :
+
+| Fonction | Owner | Sécurité | `search_path` | `anon` | `authenticated` | Contrôle entreprise | Contrôle permission |
+|---|---|---|---|---|---|---|---|
+| `appliquer_reception_ligne_commande` (interne) | postgres | `DEFINER` | `public` (figé) | refusé | refusé (accès uniquement via les wrappers publics) | vérifié à chaque `select…where entreprise_id = p_entreprise_id` | aucun (fonction interne, pas de surface publique) |
+| `enregistrer_reception_commande_interne` (interne) | postgres | `DEFINER` | `public` (figé) | refusé | refusé | vérifié (jointures `entreprise_id`) | aucun (interne) |
+| `enregistrer_reception_commande` (public) | postgres | `DEFINER` | `public` (figé) | refusé | accordé | via la fonction interne | `a_permission(p_entreprise_id,'gerer_achats')` |
+| `changer_statut_commande_interne` (interne) | postgres | `DEFINER` | `public` (figé) | refusé | refusé | vérifié | délégué à l'appelant (fonction interne, jamais exposée directement) |
+| `enregistrer_reception_lot` (public, scan) | postgres | `DEFINER` | `public` (figé) | refusé | accordé | `est_membre_actif` | `a_permission(p_entreprise_id,'effectuer_entree_stock')` |
+| `enregistrer_reception_lot_borne` (public, borne) | postgres | `DEFINER` | `public, extensions` (figé) | refusé | accordé | via `employe_borne_autorise` | identité salarié + poste (`employe_borne_autorise`) |
+
+Une seule signature de chaque fonction modifiée est présente en base après
+la migration (`ok 62-64`) : les anciennes versions à arité différente ont
+été explicitement `drop function if exists` avant le `create or replace`,
+aucune surcharge vulnérable ou obsolète ne reste exposée. Vérifié aussi par
+`pg_proc`/`has_function_privilege` dans le test (privilèges effectifs, pas
+seulement les `GRANT`/`REVOKE` déclarés dans la migration).
+
+### 22.14 — `verify:migrations` / `verify:secrets`
+
+- `npm run verify:migrations` → **313 migrations valides, noms et
+  horodatages uniques.**
+- `npm run verify:secrets` → **2489 fichiers suivis contrôlés, aucun secret
+  reconnu (2 exceptions nommées)** — les mêmes 2 exceptions préexistantes,
+  aucune exception ajoutée par ce lot.
+
+### 22.15 — Applications
+
+Toutes exécutées réellement (installation des dépendances de chaque
+sous-application, pas seulement de la racine) :
+
+| Application | typecheck | lint | test | build |
+|---|---|---|---|---|
+| Gestion Pro (racine) | 0 erreur | 0 erreur, 6 avertissements préexistants sans rapport avec ce lot | 1786 tests, 153 fichiers, tous passants | `next build` — compilé avec succès, 38 pages statiques, arbre de routes complet (dont `/commandes/[id]`, `/stock/reception`) |
+| Tools (`apps/tools`) | 0 erreur | 0 erreur | 1992 tests, 174 fichiers, tous passants | **compilé avec succès** via le mécanisme local documenté (`apps/tools/.env.example` → `NEXT_PUBLIC_TOOLS_ENV=local`, garde `verify:public-env` non bloquante en mode local) — le lot source avait laissé ce build non exécuté faute de secrets ; ici entièrement vert |
+| Reserves (`apps/reserves`) | 0 erreur | 0 erreur | 178 tests, 13 fichiers, tous passants | compilé avec succès, garde `ELSATIA_APPLICATION_ENV=local` (le « nouveau garde public ENV » intégré au train, §20) respectée en mode non bloquant |
+| Colors (`apps/colors`) | 0 erreur | 0 erreur | 427 tests, 38 fichiers, tous passants | compilé avec succès via `apps/colors/.env.example` → `ELSATIA_APPLICATION_ENV=local` |
+| Studio (`apps/studio`) | 0 erreur | 0 erreur | 251 tests, 14 fichiers, tous passants | compilé avec succès via `apps/studio/.env.example` |
+
+Aucune application n'a nécessité de contournement : chaque garde de
+pré-build documentée (fichier `.env.example` de l'application concernée,
+`ELSATIA_APPLICATION_ENV=local` / `NEXT_PUBLIC_TOOLS_ENV=local`) a été
+suivie telle quelle, avec des valeurs locales de type « placeholder » (jamais
+un vrai secret) déclarées dans des fichiers `.env.local` non versionnés
+(`.gitignore` : `.env*` sauf les `.env*.example`), supprimés après usage.
+
+### 22.16 — Annexe A : adaptations d'environnement (honnêtes, documentées)
+
+Aucun daemon Docker n'était disponible dans cet environnement
+(`docker ps` échoue). Le CLI Supabase n'est pas installé et son
+téléchargement via `npx supabase` demande une confirmation interactive
+bloquante ; il n'a donc pas été utilisé. À la place, un Postgres 16 natif
+existant sur la machine (`pg_lsclusters`, déjà démarré au moment de cette
+session) a été utilisé, avec un **bootstrap minimal viable** construit pour
+cette session, qui reproduit uniquement les primitives que le code SQL du
+dépôt attend d'une vraie stack Supabase :
+
+- Rôles `anon` / `authenticated` / `service_role`, plus les rôles
+  d'infrastructure réels référencés par des tests/migrations du train
+  (`supabase_admin`, `supabase_migrator`, `supabase_storage_admin`,
+  `authenticator`) — non fonctionnels (pas de vraie stack GoTrue/PostgREST/
+  pooler derrière), juste présents pour que les `GRANT`/`SET ROLE`/checks de
+  rôle ne cassent pas sur « role does not exist ».
+- Schéma `auth` avec une table `users` (colonnes réellement utilisées par le
+  dépôt : `email_confirmed_at`, `banned_until`, `deleted_at`,
+  `raw_user_meta_data`, `raw_app_meta_data`, `phone`), une table
+  `mfa_factors` (colonnes `friendly_name`, `factor_type`, `status`,
+  `secret`), et des fonctions `auth.uid()` / `auth.role()` / `auth.email()` /
+  `auth.jwt()` qui lisent des GUC de session (`request.jwt.claim.sub`,
+  `request.jwt.claim.role`, `request.jwt.claims`) positionnés par
+  `set_config(...)` dans chaque session de test — exactement la convention
+  déjà utilisée par le test pgTAP source lui-même pour simuler un
+  utilisateur authentifié.
+- Schéma `storage` minimal (`buckets`, `objects`, `foldername()`) — pas de
+  moteur de fichiers réel, uniquement ce que les migrations du dépôt
+  référencent au niveau SQL (policies RLS, colonnes).
+- Schéma `extensions` avec `pg_trgm` et un wrapper `digest(bytea|text, text)`
+  vers `pgcrypto` (installé en `public`), et un `search_path` par défaut
+  `"$user", public, extensions` — convention Supabase réelle, nécessaire à
+  plusieurs migrations préexistantes (non liées à ce lot) qui qualifient ou
+  supposent ce schéma.
+- Un **stub local non cryptographique** de l'extension `pgsodium`
+  (`crypto_sign_verify_detached` renvoie toujours `false`, comportement
+  fail-closed cohérent avec l'absence de vraie clé installée ;
+  `crypto_sign_detached` lève une exception explicite si jamais appelée).
+  Ce stub n'existe que dans les fichiers d'extension locaux de ce Postgres
+  (`/usr/share/postgresql/16/extension/pgsodium*`), **jamais dans le dépôt
+  git** : il sert uniquement à permettre à une migration préexistante et
+  sans rapport (`20260828000244_stripe_state_attestation_r72.sql`, domaine
+  Stripe/attestation, hors périmètre de ce lot) de s'appliquer pendant le
+  Fresh complet, sans quoi tout le Fresh échouerait dès cette migration très
+  antérieure à celle de ce lot. Documenté explicitement ici comme une
+  approximation, pas une vraie primitive cryptographique — aucune assertion
+  de sécurité Stripe ne doit être considérée comme validée par ce stub (voir
+  §22.12, ce fichier de test reste dans la liste des non-verts).
+
+Cette approximation est un choix honnête et nécessaire face à l'absence de
+Docker dans cet environnement, pas un contournement du travail à faire : les
+313 migrations du dépôt (aucune modifiée par ce bootstrap) s'appliquent sans
+erreur, le test pgTAP qualifié de ce lot est vert à 65/65 sans aucune
+dépendance à ces stubs (il n'utilise ni `storage`, ni `mfa_factors`, ni
+`pgsodium`), et la comparaison avant/après de la suite pgTAP complète (§22.12)
+est faite avec le **même** bootstrap des deux côtés, donc rigoureusement
+comparable.
+
+### 22.17 — Verdict
+
+- Architecture source correctement portée, sans réinvention : moteur
+  canonique, `article_id`, FK composites, idempotence — **conformes**.
+- Migration renumérotée `318` → `322`, collision résolue, logique SQL
+  inchangée caractère pour caractère.
+- Test source : **65/65** assertions vertes (vérifié deux fois : après la
+  migration seule, après le Fresh complet).
+- Idempotence, concurrence réelle (deux sessions psql), rollback,
+  cohérence stock/mouvements, isolation tenant, sécurité (owner/`DEFINER`/
+  `search_path`/grants) : tous **vérifiés réellement**, pas supposés.
+- Fresh complet : **313/313 migrations, 0 erreur SQL, 0 doublon**.
+- Full pgTAP : **2501 assertions (2498 `ok` + 3 `not ok` préexistants),
+  94 fichiers, +65 par rapport à la baseline mesurée dans cette session,
+  0 nouvelle régression** (diff des listes d'échec avant/après : vide).
+- `verify:migrations` / `verify:secrets` : **PASS**, aucune exception
+  ajoutée.
+- Applications (Gestion Pro, Tools, Reserves, Colors, Studio) :
+  typecheck/lint/test/build **PASS** partout, y compris le build Tools que
+  le lot source avait laissé non exécuté faute de secrets.
+
+**`COMMANDE STOCK FLOW INTEGRATED`**
+
+Le lot qualifié séparément sous le SHA `2a2034c` est intégré sélectivement
+sur `claude/compassionate-euler-5j6avr`, sans fusion de branche, avec
+résolution explicite de la collision de numéro de migration (`318` → `322`)
+et requalification complète dans son nouvel environnement. Hors périmètre
+strictement respecté (modèle devis coût/marge, impayés, documents
+situations/facture finale, Studio légal/RGPD, partage public de documents,
+manifeste RGPD, pricing, Preview distante, Production) : aucun de ces
+domaines n'a été touché. Aucun déploiement.
+
+## 23. Qualification du HEAD `dcfd71f` (après le lot ENV manifest) — `PREVIEW DEPLOYMENT CANDIDATE`
+
+> **Note de fusion (résolution du conflit de branche)** : cette section qualifie le SHA
+> `dcfd71f`, HEAD réel de `claude/compassionate-euler-5j6avr` au moment où cette qualification a
+> été exécutée (immédiatement après le lot ENV manifest §21, sans code additionnel). Une autre
+> session a poussé en parallèle, sur cette même branche, le lot indépendant §22 (« Commande
+> fournisseur → Stock », commit `ac8d201`) — non inclus dans le périmètre qualifié ci-dessous, et
+> non ré-audité ici. Le HEAD réel de la branche après fusion des deux travaux est documenté en fin
+> de rapport (RETOUR FINAL / SHA final).
 
 **Mission** : après intégration du lot ENV manifest (§21, sans changement de code), qualifier
 sans attendre le HEAD final obtenu — Fresh, upgrade simulé, pgTAP complet, applications,
@@ -1540,7 +1972,7 @@ possible sans accès à une vraie Preview : `PREVIEW DEPLOYMENT CANDIDATE` (jama
 depuis, aucun commit de code entre `dcfd71f` et la fin de cette qualification). Toutes les
 preuves ci-dessous ont été mesurées sur ce SHA exact.
 
-### 22.1 — Fresh complet
+### 23.1 — Fresh complet
 
 Méthodologie identique aux lots précédents (bootstrap Postgres 16 + pgTAP local hors dépôt,
 Docker indisponible). Checkout propre d'un worktree dédié sur `dcfd71f`, base entièrement
@@ -1551,7 +1983,7 @@ reconstruite :
 - `node scripts/verify-secrets.mjs` : **2489 fichiers suivis contrôlés, aucun secret reconnu (2
   exceptions nommées, inchangées)**.
 
-### 22.2 — Upgrade simulé (Preview réelle inaccessible)
+### 23.2 — Upgrade simulé (Preview réelle inaccessible)
 
 Aucun accès à un environnement Preview réel dans ce sandbox. Simulation d'un upgrade sur base
 **déjà peuplée** (au lieu d'un Fresh à vide), pour vérifier que les migrations du lot Performance
@@ -1577,7 +2009,7 @@ seulement contre une base neuve :
 7. `notifier_devis_accepte()` appelé sur un devis préexistant (créé avant l'upgrade, permissions
    configurées après) : exécution sans erreur, entrée `journal_activite` créée correctement.
 
-### 22.3 — pgTAP complet et amélioration de la fiabilité du harnais local
+### 23.3 — pgTAP complet et amélioration de la fiabilité du harnais local
 
 **93 fichiers, 2428 assertions.** Deux gaps du harnais local (pas du code applicatif) identifiés
 et corrigés au cours de cette qualification, chacun vérifié pour n'introduire **aucune**
@@ -1630,12 +2062,12 @@ Tests ciblés rejoués explicitement sur ce SHA : `gp_dashboard_search_perf_dash
 `gp_dashboard_search_perf_isolation_listes_paginees`, `gp_dashboard_search_perf_next_reference_debordement`,
 `gp_pilot_notification_devis_accepte` — **38/38 PASS**.
 
-### 22.4 — Sécurité cross-tenant / RPC / service_role / documents
+### 23.4 — Sécurité cross-tenant / RPC / service_role / documents
 
 - **RLS activée sur 100 % des tables du schéma `public`** (`select relname from pg_class ... where
   relrowsecurity=false` → 0 ligne).
 - **Isolation cross-tenant du stockage documentaire** : confirmée empiriquement par RLS réelle
-  (§22.3) — 45 policies actives sur `storage.objects`, toutes basées sur
+  (§23.3) — 45 policies actives sur `storage.objects`, toutes basées sur
   `est_membre_actif(((storage.foldername(name))[1])::uuid)` (l'entreprise dérivée du chemin du
   fichier, jamais un paramètre client).
 - **RPC exposées à `anon`** : recherche exhaustive (`pg_proc.proacl`) — seules **2** fonctions
@@ -1655,7 +2087,7 @@ Tests ciblés rejoués explicitement sur ce SHA : `gp_dashboard_search_perf_dash
 - **`next_reference()`** et **`creer_situation_travaux()`** : toujours non modifiées par
   l'ensemble des lots de cette session (§19.2, §19.3) — reconfirmé par le rejeu Fresh de ce SHA.
 
-### 22.5 — Régressions de performance critiques
+### 23.5 — Régressions de performance critiques
 
 - `dashboard_indicateurs()` re-testé sur un tenant nominal (3000 devis/2000 factures) sur
   l'environnement final : **~11,5 ms**, résultat des 3 totaux en cache strictement égal au
@@ -1668,11 +2100,11 @@ Tests ciblés rejoués explicitement sur ce SHA : `gp_dashboard_search_perf_dash
   correction du harnais — aucune régression de performance ou de comportement détectée sur ces
   parcours.
 
-### 22.6 — Access, commercial, env/secrets/preflight, release gate
+### 23.6 — Access, commercial, env/secrets/preflight, release gate
 
 - **Access (contrôle des rôles plateforme)** : `platform_aal2_role_integrity_v1`,
   `platform_global_owner_all_apps_v1`, `platform_support_uid_security_v1` — **100 % verts** après
-  correction du harnais (§22.3). Confirme empiriquement : exigence AAL2 sur les mutations
+  correction du harnais (§23.3). Confirme empiriquement : exigence AAL2 sur les mutations
   administrateur sensibles, matrice de rôles (`total`/`support`) respectée, unicité UID
   plateforme.
 - **Commercial** : `verify:stripe-prices` **SKIP non bloquant** (aucune clé Stripe dans ce
@@ -1711,7 +2143,7 @@ Reserves, Notification, ENV manifest). Les éléments ⚠️ sont tous soit pré
 depuis plusieurs éditions de ce rapport, soit des limitations d'environnement du sandbox
 (FFmpeg, absence de clé Stripe, absence de Preview réelle) — aucun n'est un blocker de code.
 
-### 22.7 — Verdict
+### 23.7 — Verdict
 
 **`PREVIEW DEPLOYMENT CANDIDATE`**
 
