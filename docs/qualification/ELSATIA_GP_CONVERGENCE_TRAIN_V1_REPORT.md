@@ -268,3 +268,59 @@ Aucun des 12 items du §8 n'est affecté par ce lot (Access ne touche à aucun d
 ### 11.5 — Statut après ce lot
 
 `CONVERGENCE_TRAIN_CANDIDATE = 593e28f` (branche `claude/compassionate-euler-5j6avr`, poussée). `FINAL_PREVIEW_TRAIN = NOT_YET`. Prochains lots dans l'ordre demandé : ENV manifest → DR/release gate → Colors (voie restante) → Reserves → Studio.
+
+---
+
+## 12. Lot ENV manifest (3ᵉ édition de ce rapport, même branche, aucun train concurrent)
+
+**Point de départ** : `CONVERGENCE_TRAIN_CANDIDATE = 76ec759` (HEAD après le lot Access, §11). Poursuivi sur la même branche.
+
+### 12.1 — Comparaison avant portage
+
+`feat/env-manifest-canonical-v1` (4 commits : `9de09de` manifeste+contrôleur, `4445de0` gabarits, `816989a` CI+prebuild+raccord preflight, `5326118` tests+docs) a pour base `59e960a` (tip ECO), déjà fusionné dans ce train. Comparaison directe avant tout portage :
+
+- `config/env-manifest.json`, `scripts/check-env-manifest.mjs`, `scripts/lib/*`, `scripts/cutover/` : **absents** du train — rien d'équivalent trouvé, portage nécessaire.
+- `.github/workflows/ci.yml`, `package.json` : drift réel depuis `59e960a` (ajouts indépendants des lots sécurité/GP/Access : dépendances, versions Next/sharp, une étape `env: NEXT_PUBLIC_TOOLS_ENV`) — vérifié que les 4 commits n'écrivent pas aux mêmes lignes avant de cherry-picker.
+- `scripts/cutover/preflight-check.mjs` : **confirmé absent**, comme sur la branche source elle-même (son propre commit le documente : « ligne cutover absente de cette branche »). Le patch stocké (`docs/runbooks/patches/ELSATIA_PREFLIGHT_CHECK_ENV_MANIFEST_V1.patch`) reste donc inerte par construction sur ce train aussi — **non appliqué**, conservé uniquement comme référence documentaire, conformément à la consigne.
+
+### 12.2 — Porté
+
+Les 4 commits cherry-pickés dans l'ordre — **0 conflit réel** (auto-merge propre sur `.env.example`, `.github/workflows/ci.yml`, `package.json` malgré le drift, les zones touchées ne se recouvrant pas). Contenu porté :
+- `config/env-manifest.json` (187 variables déclarées à l'origine), `config/env-manifest.schema.json`, `scripts/check-env-manifest.mjs` + 3 modules (`env-manifest-{core,preflight,scan}.mjs`).
+- Gabarits `.env*.example` alignés (dont le vrai bug Reserves : le code lit `NEXT_PUBLIC_SUPABASE_ANON_KEY`, le gabarit déclarait `PUBLISHABLE_KEY` — vérifié sur le code réel du train avant d'accepter le correctif, toujours valide).
+- CI : étape `verify:env-manifest` avant `npm ci`, étape `verify:secrets` explicite — intégrées **sans dupliquer** les étapes déjà présentes (`audit:security`, `verify:stripe-prices`, `Contrôles reproductibles`) ; `verify:env-manifest` fusionné dans le script `verify` déjà étendu par ce train (build:reserves/colors, verify:stripe-prices), pas réécrit.
+- `package.json` : `verify:env-manifest`, `preflight:env`, `prebuild`/`prebuild:reserves`/`prebuild:colors` — non bloquants (`--auto`), confirmé par test réel (`npm run build` affiche `[env-manifest] build hors Vercel Preview/Production : preflight ignoré.` puis poursuit normalement).
+- 58 tests `node:test` + runbook + rapport de qualification.
+
+### 12.3 — Réconciliation nécessaire (le contrôleur lui-même a trouvé les écarts)
+
+Après cherry-pick, `node scripts/check-env-manifest.mjs` remontait **14 erreurs réelles** (13 déjà présentes en exécutant le contrôleur sur les fichiers source de la branche elle-même — un défaut hérité, pas introduit ici — + 1 nouvelle due au lot Access déjà porté). Conformément à « adapte le raccord au code réellement présent », chaque écart a été vérifié contre le code réel puis corrigé sans jamais toucher à un secret :
+
+| Écart trouvé | Cause | Correctif |
+|---|---|---|
+| Doublon complet du bloc « achats mobiles Tools » dans `.env.example` (`APPLE_ROOT_CA_BASE64`, `GOOGLE_PLAY_*`, `STRIPE_TOOLS_*`, `TOOLS_ALLOWED_ORIGINS`, `TOOLS_APP_URL`) | `4445de0` a été forké avant que ce train n'ait déjà ce bloc (apporté par CORE/`bf27e78`, hors de la lignée ECO d'où vient le lot ENV) — l'auto-merge n'a pas pu le détecter, les deux blocs étant à des lignes différentes | Bloc dupliqué retiré, seules les 2 variables réellement nouvelles (`TOOLS_STORE_ENVIRONMENT`, `TOOLS_STORE_ALLOW_SANDBOX`) conservées — au passage, supprime aussi le déclenchement `EXAMPLE-SECRET-VALUE` sur la valeur JSON factice du doublon |
+| `TOOLS_STORE_ENVIRONMENT`/`TOOLS_STORE_ALLOW_SANDBOX` attribuées à l'app `tools` dans le manifeste | Erreur de ma première passe : le code qui les lit (`src/lib/tools-store-environment.ts`) vit dans `gestion_pro`, pas dans `apps/tools/` | Corrigé (`applications: ["gestion_pro"]`) ; ajoutées à `.env.local.example`/`.env.preview.example`, absentes alors qu'obligatoires en preview/production selon le code |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` non déclarée pour `tools` | `apps/tools/src/lib/auth/client.ts` lit réellement ce nom canonique (chemin « compte ELSATIA »), **en plus** de l'alias legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` déjà documenté (autre chemin du même fichier) — vérifié sur le code source avant de conclure que les deux coexistent | Déclarée pour `tools` dans le manifeste + ajoutée à `apps/tools/.env.example`, sans retirer l'alias existant |
+| 4 variables `ACL_FLUX_PUSH_PORT`/`ACL_FLUX_EXTERNES_PORT`/`ACL_FLUX_CERT_DIR`/`ACL_FLUX_EXTERNES_URL` non déclarées | Introduites par le lot Access (`fix/service-role-flux-acl-255-v1`, §11.2), porté par ce train avant le lot ENV manifest — le manifeste ne pouvait pas les connaître | Déclarées (catégorie `tooling`, `applications: ["e2e"]`, même patron que les `E2E_*` existantes) |
+| 2 accès dynamiques `process.env[…]` non justifiés (`apps/tools/scripts/verify-public-env.mjs`, `src/lib/tools-store-environment.ts`) | Pré-existant sur la branche source elle-même | Ajoutés à `scan.dynamic_access_allowed` avec justification (lecture par nom de variable interne, jamais une entrée utilisateur) |
+
+Après correctifs : **`node scripts/check-env-manifest.mjs` → 0 erreur**, exit code 0. Restent 10 `DECISION_REQUIRED` **non bloquantes** (modèle de prix des modules, comptes supplémentaires, options IA, générations précédentes, bloc de stockage vendable, `FEATURE_CRONS_ENABLED` fail-open, `STUDIO_SIGNUP_MODE` fail-open) — ce sont des choix produit/commercial pour Julien, pas des défauts techniques ; **DECISION_REQUIRED, non tranchées ici, option la plus conservatrice retenue implicitement : aucune valeur par défaut changée, aucun flag basculé.**
+
+### 12.4 — Mode `report` et non-doublon confirmés
+
+- `config/env-manifest.json` → `"preflight_enforcement": "report"` — **inchangé**, jamais passé à `enforce`.
+- `scripts/cutover/preflight-check.mjs` **toujours absent** du train → le patch stocké dans `docs/runbooks/patches/` reste **non appliqué** (ni par moi, ni automatiquement — aucun mécanisme ne l'applique).
+- CI : 10 étapes nommées, aucune dupliquée (`verify:env-manifest` apparaît une fois, avant `npm ci` ; `verify:secrets` une fois ; les étapes déjà présentes du train — audit sécurité, tarifs Stripe stricts, contrôles reproductibles — inchangées).
+- Aucun secret réel modifié : uniquement des noms de variables et des valeurs placeholder (`sandbox`, `true`, `publishable-key`) dans des fichiers `.example`.
+
+### 12.5 — Tests rejoués
+
+`node scripts/check-env-manifest.mjs` (0 erreur) ; `node --test scripts/check-env-manifest.test.mjs` (**58/58 PASS**) ; `tsc --noEmit` (0 erreur) ; `eslint` (0 erreur, mêmes 5 avertissements pré-existants) ; `vitest run` (**1777/1777**, inchangé — ce lot ne touche aucun code applicatif testé par vitest) ; `verify:migrations` (**296, inchangé**) ; `verify:secrets` (2231 fichiers, 0 secret) ; `npm run build` (GP : succès complet, prebuild confirmé non bloquant hors Vercel ; Tools : bloqué par son propre garde-fou `verify:public-env`, pré-existant, sans rapport) ; builds Colors et Reserves individuels : succès. Fresh/pgTAP non rejoués (aucune migration touchée par ce lot).
+
+### 12.6 — MUST_NOT_LOSE — mise à jour
+
+Aucun des 12 items du §8 n'est affecté. Point ajouté : ne jamais réintroduire le bloc dupliqué « achats mobiles Tools » retiré en §12.3 si une future fusion (ex. Colors/Studio) réapporte une copie de `4445de0` sans passer par ce train.
+
+### 12.7 — Statut après ce lot
+
+`CONVERGENCE_TRAIN_CANDIDATE = b991365` (branche `claude/compassionate-euler-5j6avr`, à pousser). `FINAL_PREVIEW_TRAIN = NOT_YET`. Prochains lots : DR/release gate → Colors (voie restante) → Reserves → Studio.
