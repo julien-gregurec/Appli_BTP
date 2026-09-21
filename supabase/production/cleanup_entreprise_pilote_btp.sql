@@ -111,6 +111,7 @@ begin
   delete from public.equipes_chantiers where entreprise_id=v_entreprise and note like '[PILOTE]%';
   delete from public.habilitations_employe where entreprise_id=v_entreprise and libelle like '[PILOTE]%';
   delete from public.employes_cout_horaire where entreprise_id=v_entreprise;
+  delete from public.employes_taux_facture where entreprise_id=v_entreprise;
 
   delete from public.chantiers where entreprise_id=v_entreprise and reference_interne like 'PILOTE-CHA-%';
   delete from public.clients where entreprise_id=v_entreprise and reference_interne like 'PILOTE-CLI-%';

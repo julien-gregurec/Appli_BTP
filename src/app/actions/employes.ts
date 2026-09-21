@@ -46,7 +46,6 @@ function payloadEmploye(formData: FormData) {
     type_contrat: champ(formData, "type_contrat") ?? "cdi",
     date_entree: champ(formData, "date_entree"),
     date_sortie: statut === "sorti" ? champ(formData, "date_sortie") : null,
-    taux_horaire: nombre(formData, "taux_horaire"),
     statut,
     notes: champ(formData, "notes"),
   };
@@ -66,6 +65,25 @@ async function enregistrerCoutHoraireEmploye(
     .from("employes_cout_horaire")
     .upsert(
       { employe_id: employeId, entreprise_id: entrepriseId, cout_horaire: coutHoraire, updated_at: new Date().toISOString() },
+      { onConflict: "employe_id" },
+    );
+  return error;
+}
+
+// Même schéma que le coût interne ci-dessus : le taux facturé vit dans
+// `employes_taux_facture`, restreinte en lecture (permission
+// `voir_taux_facture_employe`) — jamais sur `employes` elle-même (colonne
+// supprimée par 20260922000323_securiser_taux_horaire_facture_employe.sql).
+async function enregistrerTauxFactureEmploye(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  entrepriseId: string,
+  employeId: string,
+  tauxHoraire: number | null,
+) {
+  const { error } = await supabase
+    .from("employes_taux_facture")
+    .upsert(
+      { employe_id: employeId, entreprise_id: entrepriseId, taux_horaire: tauxHoraire, updated_at: new Date().toISOString() },
       { onConflict: "employe_id" },
     );
   return error;
@@ -110,6 +128,15 @@ export async function creerEmployeAction(formData: FormData) {
     if (coutError) {
       revalidatePath("/employes");
       redirect(`/employes/${data.id}?error=${encodeURIComponent(messageErreurUtilisateur("creerEmployeAction:cout_horaire", coutError, "Employé créé, mais le coût horaire interne n’a pas pu être enregistré."))}`);
+    }
+  }
+
+  const tauxHoraire = nombre(formData, "taux_horaire");
+  if (tauxHoraire !== null) {
+    const tauxError = await enregistrerTauxFactureEmploye(supabase, ctx.entrepriseId, data.id, tauxHoraire);
+    if (tauxError) {
+      revalidatePath("/employes");
+      redirect(`/employes/${data.id}?error=${encodeURIComponent(messageErreurUtilisateur("creerEmployeAction:taux_horaire", tauxError, "Employé créé, mais le taux horaire facturé n’a pas pu être enregistré."))}`);
     }
   }
 
@@ -162,9 +189,9 @@ export async function modifierEmployeAction(employeId: string, formData: FormDat
     redirect(`/employes/${employeId}/modifier?error=${encodeURIComponent(messageErreurUtilisateur("modifierEmployeAction", error, "Impossible d’enregistrer les modifications de l’employé."))}`);
   }
 
-  // Le formulaire ne préremplit ce champ que pour les postes autorisés à voir
-  // le coût interne : ne jamais écrire ici pour les autres, sous peine
-  // d'effacer silencieusement une valeur que le formulaire n'a pas pu afficher.
+  // Le formulaire ne préremplit ces champs que pour les postes autorisés à
+  // les voir : ne jamais écrire ici pour les autres, sous peine d'effacer
+  // silencieusement une valeur que le formulaire n'a pas pu afficher.
   const permissions = await permissionsUtilisateur(ctx);
   const peutVoirCoutInterne = permissions === null || permissions.includes("voir_cout_interne_employe") || permissions.includes("acces_rentabilite");
   if (peutVoirCoutInterne) {
@@ -173,6 +200,15 @@ export async function modifierEmployeAction(employeId: string, formData: FormDat
       revalidatePath("/employes");
       revalidatePath(`/employes/${employeId}`);
       redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("modifierEmployeAction:cout_horaire", coutError, "Modifications enregistrées, mais le coût horaire interne n’a pas pu être mis à jour."))}`);
+    }
+  }
+  const peutVoirTauxFacture = permissions === null || permissions.includes("voir_taux_facture_employe");
+  if (peutVoirTauxFacture) {
+    const tauxError = await enregistrerTauxFactureEmploye(supabase, ctx.entrepriseId, employeId, nombre(formData, "taux_horaire"));
+    if (tauxError) {
+      revalidatePath("/employes");
+      revalidatePath(`/employes/${employeId}`);
+      redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("modifierEmployeAction:taux_horaire", tauxError, "Modifications enregistrées, mais le taux horaire facturé n’a pas pu être mis à jour."))}`);
     }
   }
 

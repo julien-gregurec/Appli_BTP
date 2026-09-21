@@ -20,17 +20,22 @@ export default async function ModifierEmployePage({
   const permissions = await permissionsUtilisateur(ctx);
   if (permissions !== null && !permissions.includes("gerer_employes")) redirect(`/employes/${id}?error=Acc%C3%A8s%20en%20lecture%20seule`);
   const peutVoirCoutInterne = permissions === null || permissions.includes("voir_cout_interne_employe") || permissions.includes("acces_rentabilite");
+  const peutVoirTauxFacture = permissions === null || permissions.includes("voir_taux_facture_employe");
   const supabase = await createClient();
 
-  const [{ data: employe }, { data: postes }, { data: coutHoraireLigne }] = await Promise.all([
+  const [{ data: employe }, { data: postes }, { data: coutHoraireLigne }, { data: tauxFactureLigne }] = await Promise.all([
     supabase.from("employes").select("*").eq("id", id).eq("entreprise_id", ctx.entrepriseId).single(),
     supabase.from("postes").select("id, nom").eq("entreprise_id", ctx.entrepriseId).order("nom"),
     peutVoirCoutInterne
       ? supabase.from("employes_cout_horaire").select("cout_horaire").eq("entreprise_id", ctx.entrepriseId).eq("employe_id", id).maybeSingle()
       : Promise.resolve({ data: null }),
+    peutVoirTauxFacture
+      ? supabase.from("employes_taux_facture").select("taux_horaire").eq("entreprise_id", ctx.entrepriseId).eq("employe_id", id).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
   if (!employe) notFound();
   employe.cout_horaire = coutHoraireLigne?.cout_horaire ?? null;
+  employe.taux_horaire = tauxFactureLigne?.taux_horaire ?? null;
 
   const action = modifierEmployeAction.bind(null, id);
 

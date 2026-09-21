@@ -47,6 +47,11 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
     : { data: null };
   employe.cout_horaire = coutHoraireLigne?.cout_horaire ?? null;
 
+  const { data: tauxFactureLigne } = peutVoirTauxFacture
+    ? await supabase.from("employes_taux_facture").select("taux_horaire").eq("entreprise_id", ctx.entrepriseId).eq("employe_id", id).maybeSingle()
+    : { data: null };
+  employe.taux_horaire = tauxFactureLigne?.taux_horaire ?? null;
+
   const { data: rib } = peutGererRib ? await supabase.from("coordonnees_bancaires")
     .select("titulaire,iban_quatre_derniers,verification_statut,verification_message")
     .eq("entreprise_id", ctx.entrepriseId).eq("employe_id", id).eq("actif", true).maybeSingle() : { data: null };

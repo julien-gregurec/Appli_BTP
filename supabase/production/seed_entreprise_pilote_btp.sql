@@ -142,7 +142,7 @@ begin
   for v_i in 1..array_length(v_prenoms,1) loop
     insert into public.employes(
       entreprise_id,reference_interne,prenom,nom,email,telephone,poste,poste_id,type_contrat,date_entree,
-      taux_horaire,statut,notes,carte_btp_numero,carte_btp_expiration,created_at
+      statut,notes,carte_btp_numero,carte_btp_expiration,created_at
     ) values(
       v_entreprise,'PILOTE-EMP-'||lpad(v_i::text,3,'0'),v_prenoms[v_i],v_noms[v_i],
       'pilote.'||lower(v_prenoms[v_i])||'.'||lower(replace(v_noms[v_i],' ',''))||'@example.test',
@@ -153,8 +153,6 @@ begin
         else v_poste_ouvrier end,
       case when v_i=28 then 'apprenti' else 'cdi' end,
       current_date-(200+v_i*23),
-      case v_role_cle[v_i] when 'gerant' then null when 'administration' then 17+v_i*0.2
-        when 'chef_chantier' then 22+v_i*0.2 when 'chef_equipe' then 18+v_i*0.2 else 13+(v_i%5) end,
       'actif','[PILOTE] Salarie fictif - fixture de recette, aucune donnee personnelle reelle',
       case when v_role_cle[v_i] in('ouvrier','chef_equipe','chef_chantier') then 'BTP-PILOTE-'||to_char(current_date,'YYYY')||'-'||lpad(v_i::text,5,'0') else null end,
       case when v_role_cle[v_i] in('ouvrier','chef_equipe','chef_chantier') then current_date+250+(v_i*11) else null end,
@@ -175,6 +173,18 @@ begin
       case v_role_cle[v_i] when 'gerant' then null when 'administration' then 24+v_i*0.3
         when 'chef_chantier' then 31+v_i*0.3 when 'chef_equipe' then 26+v_i*0.3 else 19+(v_i%6) end
     ) on conflict(employe_id) do update set cout_horaire=excluded.cout_horaire,updated_at=now();
+  end loop;
+
+  -- Taux horaire facture : meme correction que le cout horaire interne
+  -- ci-dessus, pour la meme raison (colonne separee de la fiche employe
+  -- depuis 20260922000323_securiser_taux_horaire_facture_employe.sql,
+  -- detectee par dry-run local lors de ELSATIA_EXTERNAL_PILOT_FULL_REHEARSAL_V2).
+  for v_i in 1..array_length(v_employes,1) loop
+    insert into public.employes_taux_facture(entreprise_id,employe_id,taux_horaire) values(
+      v_entreprise,v_employes[v_i],
+      case v_role_cle[v_i] when 'gerant' then null when 'administration' then 17+v_i*0.2
+        when 'chef_chantier' then 22+v_i*0.2 when 'chef_equipe' then 18+v_i*0.2 else 13+(v_i%5) end
+    ) on conflict(employe_id) do update set taux_horaire=excluded.taux_horaire,updated_at=now();
   end loop;
 
   -- Comptes utilisateurs actives (auth.users + public.utilisateurs + utilisateurs_entreprises,
