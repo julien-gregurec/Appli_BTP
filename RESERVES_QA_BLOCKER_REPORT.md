@@ -4,14 +4,18 @@
 **Branche :** `claude/tender-gates-nu4daj`
 **HEAD au moment de l'investigation :** `4d92ddb` (`feat: enrichir devis suivi terrain et pilotage`, dépôt `julien-gregurec/Appli_BTP`)
 
-## Verdict
+## Statut
 
-**Mission non exécutable en l'état — bloquée avant toute recette.** Aucun code de l'application « ELSATIA Réserves » n'a été trouvé dans les dépôts accessibles à cette session. Il n'y a donc rien à inventorier, faire parcourir par des rôles de chantier, ni corriger.
+```
+RESERVES_QA               = BLOCKED_ENVIRONMENT
+RESERVES_SOURCE_REPOSITORY = NOT_AVAILABLE_IN_CURRENT_ENVIRONMENT
+RESERVES_REMOTE_PREVIEW    = UNKNOWN / DECISION_REQUIRED
+PRODUCT_VERDICT             = NOT_ASSESSED (pas de NO-GO produit — simple absence d'accès dans cette session)
+```
 
-- **Verdict pilote terrain :** NO-GO (rien à piloter).
-- **Verdict vente :** NO-GO (produit non livrable, aucune preuve de fonctionnement possible).
+**Mission non exécutable dans cette session — blocage d'environnement, pas un verdict produit.** Aucun code de l'application « ELSATIA Réserves » n'a été trouvé dans les dépôts accessibles à cette session. Il n'y a donc rien à inventorier, faire parcourir par des rôles de chantier, ni corriger, **depuis cet environnement**. Ceci ne préjuge en rien de l'état réel du produit : le code et/ou un environnement de recette existent probablement ailleurs (environnement ELSATIA local approprié), simplement hors de portée de cette session.
 
-Aucun code n'a été modifié dans Gestion Pro, Tools, Studio, Colors ni le socle d'authentification partagé, conformément à la consigne. Aucun déploiement n'a été effectué.
+Aucun code n'a été modifié dans Gestion Pro, Tools, Studio, Colors ni le socle d'authentification partagé, conformément à la consigne. Aucun déploiement n'a été effectué. Cette session s'arrête ici pour Réserves ; aucune autre action code n'y sera tentée.
 
 ## Ce qui a été vérifié
 
@@ -37,11 +41,21 @@ Toutes les étapes suivantes du mandat sont sans objet tant que le dépôt réel
 - Cas difficiles (invitation non acceptée, photo absente, fichier supprimé, changement d'entreprise responsable, actions concurrentes).
 - Corrections de défauts, ajout de tests ciblés, exécution des vérifications (lint/typecheck/tests/build) sur le code de Réserves.
 
-## Questions pour toi (pas de réponse requise avant demain)
+## Réponses reçues du porteur de produit (2026-09-21)
 
-1. Le dépôt de code d'ELSATIA Réserves existe-t-il sous un autre nom/organisation GitHub, ou sur une autre plateforme (GitLab, etc.) ? Peux-tu me donner son URL ou l'ajouter à cette session ?
-2. Si Réserves est en réalité un module à construire **dans** Gestion Pro (ce dépôt) plutôt qu'une appli séparée malgré la consigne « ne touche pas à Gestion Pro » — est-ce une V1 à développer from scratch plutôt qu'une recette de correctifs ? (Cela change complètement la nature de la mission et son ampleur.)
-3. `reserves.elsatia.fr` ne répondant pas selon le rapport `elsatia-site`, le déploiement de Réserves existe-t-il quelque part (staging, préprod) que je pourrais examiner même sans avoir le code source ?
+1. **Dépôt Réserves.** Confirmé hors de portée de cette session (`RESERVES_SOURCE_REPOSITORY = NOT_AVAILABLE_IN_CURRENT_ENVIRONMENT`). Consigne explicite : ne pas recréer Réserves dans `Appli_BTP`, ne pas transformer Gestion Pro en dépôt Réserves. Le dépôt/worktree réel sera repris depuis l'environnement ELSATIA local approprié.
+
+2. **Architecture cible (décision déjà prise, à titre indicatif pour la reprise ailleurs) :**
+   - ELSATIA Réserves reste une **application standalone**, capable de fonctionner sans Gestion Pro, mais **jumelable** à GP.
+   - Modèle de comptes : `Compte ELSATIA commun` → `Organisation` → `Entitlement Réserves` → `Rôle Réserves`.
+   - Synchronisation GP → Réserves (quand GP est aussi utilisé) : chantier, plans, entreprises, contacts, intervenants.
+   - Remontée Réserves → GP : nombre de réserves, statuts, progression, liens vers les réserves, synthèses éventuelles.
+   - Les entreprises invitées doivent pouvoir utiliser un **compte intervenant gratuit/limité**.
+   - Réserves n'est donc pas un module interne dépendant de GP ; GP doit seulement rester **préparé** à cette intégration future (aucune action requise dans ce dépôt pour l'instant).
+
+3. **Préprod/Staging Réserves.** Pas de preuve d'existence actuellement (`RESERVES_REMOTE_PREVIEW = UNKNOWN / DECISION_REQUIRED`). À ne pas déduire des documents historiques du site vitrine.
+
+**Consigne de clôture :** ne plus toucher au code pour Réserves dans cette session ; conserver ce document comme rapport de blocage d'environnement ; arrêter la mission ici.
 
 ## Note annexe (sans impact sur la mission)
 
