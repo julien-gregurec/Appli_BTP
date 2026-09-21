@@ -419,23 +419,36 @@ verdict `QUALIFIED` ou `QUALIFIED WITH CONDITIONS` serait trompeur.
 
 ## VERDICT
 
-**`PREVIEW DEPLOYED / QUALIFICATION BLOCKED`**
+**`PREVIEW QUALIFICATION BLOCKED / REMOTE_ACTION_BLOCKED`**
+**`LOCAL STATIC GATE = PASS EXCEPT ENV MANIFEST`**
 
-Ce libellé est le plus proche des 4 options disponibles, mais avec une
-réserve explicite à respecter par tout lecteur : cette session **ne peut pas
-confirmer que le code est effectivement déployé** sur l'environnement
-Preview réel (point 9) — seul le statut documentaire antérieur
-(« PREVIEW DEPLOYMENT CANDIDATE ») l'affirme. Ce qui est certain et vérifié
-ici : (a) le code de `d4b9c79` est figé, cohérent, et son gate local échoue
-de façon réelle et reproductible sur un point précis et corrigible
-(§ENV/§RELEASE GATE) ; (b) aucune qualification en conditions Preview réelles
-(Auth, multi-tenant, apps, Stripe Test, Storage, Studio, suite d'attaque)
-n'a été ni simulée ni fabriquée — elle reste entièrement à faire, depuis un
-environnement d'exécution disposant d'un accès réel à Supabase, Vercel et
-Stripe Test.
+Correction appliquée (relecture Julien, 2026-09-21) : le verdict initial de
+cette session (« PREVIEW DEPLOYED / QUALIFICATION BLOCKED ») affirmait à
+tort un état de déploiement. Cette session ne peut ni confirmer ni infirmer
+que quoi que ce soit tourne réellement sur `elsatia-preview` (point 9) — le
+verdict ne doit donc porter aucune affirmation sur le déploiement, seulement
+sur ce qui a été réellement vérifié : le code et son gate local.
+
+Ce qui est certain et vérifié ici : (a) le code de `d4b9c79` est figé et
+cohérent ; (b) le gate statique local (`npm run verify`, sans identifiants
+distants) est **vert sur tout sauf un point précis et corrigible** —
+`typecheck`, `lint`, `verify:migrations`, `verify:secrets`,
+`verify:stripe-prices` (dégradé en `SKIP` gracieux), et les 4383 tests
+unitaires passent tous ; seul `verify:env-manifest`/`test:env-manifest`
+échoue, avec un blocker local concret et entièrement caractérisé :
+**`STUDIO ENV MANIFEST = 37 ERRORS`** (§ENV/§RELEASE GATE) ; (c) aucune
+qualification en conditions Preview réelles (Auth, multi-tenant, apps,
+Stripe Test, Storage, Studio, suite d'attaque) n'a été ni simulée ni
+fabriquée — elle reste entièrement à faire, depuis un environnement
+d'exécution disposant d'un accès réel à Supabase, Vercel et Stripe Test.
 
 **ELSATIA ne peut pas passer au pilote externe sur la base de cette seule
-session.** Prochaine étape recommandée : relancer les sections 1, 3, 6–16 et
-18 de cette mission depuis un poste ou une session CI disposant réellement
-des identifiants Supabase/Vercel/Stripe Test, après correction du point 3
-(dérive ENV Studio).
+session.** Suite donnée : le blocker `STUDIO ENV MANIFEST = 37 ERRORS` est
+traité dans un lot ciblé séparé (voir
+`docs/qualification/ELSATIA_STUDIO_ENV_MANIFEST_FIX_V1.md`). Une fois ce
+point fermé, il restera à relancer les sections 1, 3, 6–16 et 18 de cette
+mission depuis un poste ou une session CI disposant réellement des
+identifiants Supabase/Vercel/Stripe Test — aucune de ces sections n'est
+affectée par le correctif ENV manifest, qui ne touche que des gabarits
+`.env.example` et une entrée de manifeste, sans code applicatif ni valeur
+réelle.
