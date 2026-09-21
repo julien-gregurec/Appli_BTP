@@ -47,6 +47,10 @@
         {
           "path": "apps/colors/.env.example",
           "environment": "any"
+        },
+        {
+          "path": "apps/colors/.env.preview.example",
+          "environment": "preview"
         }
       ]
     },
@@ -60,6 +64,10 @@
         {
           "path": "apps/tools/.env.example",
           "environment": "any"
+        },
+        {
+          "path": "apps/tools/.env.preview.example",
+          "environment": "preview"
         }
       ]
     },
@@ -73,6 +81,10 @@
         {
           "path": "apps/reserves/.env.example",
           "environment": "any"
+        },
+        {
+          "path": "apps/reserves/.env.preview.example",
+          "environment": "preview"
         }
       ]
     },
@@ -87,6 +99,10 @@
         {
           "path": "apps/studio/.env.example",
           "environment": "any"
+        },
+        {
+          "path": "apps/studio/.env.preview.example",
+          "environment": "preview"
         }
       ]
     },
