@@ -4316,7 +4316,7 @@
       "applications": [
         "studio"
       ],
-      "required": true,
+      "required": false,
       "environments": [
         "production"
       ],
@@ -4325,7 +4325,7 @@
       "build_time": false,
       "runtime": true,
       "category": "legal",
-      "description": "Version du texte légal Studio présentée à l'acceptation.",
+      "description": "Version du texte légal Studio présentée à l'acceptation. Non lue par le code actuel (aucun affichage de version n'est implémenté) : déclarée « required » à tort, corrigée en facultative le 2026-09-21 (lot STUDIO ENV MANIFEST) le temps que la fonctionnalité d'affichage de version soit implémentée — à repasser en obligatoire à ce moment-là.",
       "fail_mode": "closed",
       "deprecated": false,
       "replacement": null,
