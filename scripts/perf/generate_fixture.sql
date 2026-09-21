@@ -13,6 +13,14 @@
 -- Destiné à une base Postgres jetable (jamais Production / Preview en écriture).
 -- Exécuté en tant que rôle superuser/postgres : contourne volontairement la
 -- RLS (comme le ferait un job de seed côté plateforme), pour aller vite.
+--
+-- Mise à jour (mission ELSATIA_GP_DASHBOARD_SEARCH_PERFORMANCE_V1) : ce
+-- script datait de perf/gp-capacity-readiness-v1 (release/gp-v1-rc) ; le
+-- schéma a divergé depuis (dénormalisation entreprise_id sur lignes_devis/
+-- lignes_factures déjà appliquée, colonnes employes/devis/factures/
+-- planning_evenements renommées ou supprimées, plafond de personnes
+-- actives ajouté). Remis en état de marche contre le schéma courant sans
+-- changer les volumétries ni la logique de génération.
 -- ============================================================================
 
 set client_min_messages = warning;
@@ -66,6 +74,14 @@ select
   1.5, 'actif',
   now() - interval '5 years'
 from fx.entreprises e;
+
+-- ACTIVE-PERSON-CAPACITY-R1-V1 (migration postérieure à l'écriture initiale de
+-- cette fixture) : plafond dur de personnes actives par forfait. La fixture
+-- vise 40/5 salariés — largement au-delà du forfait par défaut ('mini') —
+-- on achète donc explicitement de la capacité supplémentaire pour ne pas
+-- être bloqué par ce garde-fou, sans quoi le trigger de capacité rejetterait
+-- l'insertion des salariés au-delà de la limite du forfait.
+update public.entreprises set capacite_personnes_supplementaire = 1000;
 
 -- --------------------------------------------------------------------------
 -- 2. Utilisateurs (comptes de connexion) — auth.users + public.utilisateurs
@@ -163,7 +179,7 @@ from (
 where emp.seq = sub.employe_seq;
 
 insert into public.employes (id, entreprise_id, prenom, nom, email, telephone, poste, type_contrat,
-  date_entree, date_sortie, taux_horaire, cout_horaire, statut, numero_inscription, poste_id, utilisateur_id)
+  date_entree, date_sortie, taux_horaire, statut, numero_inscription, identifiant_interne, poste_id, utilisateur_id)
 select
   emp.id, ent.id,
   'Prenom' || emp.seq, 'NomSalarie' || emp.seq,
@@ -171,9 +187,10 @@ select
   '06' || lpad((10000000 + emp.seq)::text, 8, '0'),
   p.nom, case when random() < 0.85 then 'cdi' else 'cdd' end,
   emp.date_entree, emp.date_sortie,
-  round((14 + random()*12)::numeric, 2), round((18 + random()*14)::numeric, 2),
+  round((14 + random()*12)::numeric, 2),
   case when emp.date_sortie is not null then 'sorti' else 'actif' end,
   'MAT-' || ent.taille || '-' || lpad(emp.seq::text, 5, '0'),
+  'SAL-' || ent.taille || '-' || lpad(emp.seq::text, 5, '0'),
   p.id,
   au.id
 from fx.employes emp
@@ -296,18 +313,17 @@ select
 from (values (20),(20),(20),(100),(100),(100),(500),(500),(500),(1000),(1000),(1000)) as t(nb);
 
 insert into public.devis (id, entreprise_id, client_id, chantier_id, statut, date_emission, date_validite,
-  remise_globale, created_at, reference_interne)
+  remise_globale, created_at)
 select d.id, ent.id, cl.id, ch.id, 'brouillon', d.date_emission, d.date_emission + 60,
   case when random() < 0.15 then round((random()*5)::numeric, 2) else 0 end,
-  d.date_emission::timestamptz,
-  d.tag
+  d.date_emission::timestamptz
 from fx.devis d
 join fx.entreprises ent on ent.seq = d.entreprise_seq
 join fx.clients cl on cl.seq = d.client_seq
 left join fx.chantiers ch on ch.seq = d.chantier_seq;
 
 insert into public.lignes_devis (devis_id, designation, description, type, quantite, unite,
-  prix_unitaire_ht, remise_ligne, taux_tva, ordre, cle_ligne)
+  prix_unitaire_ht, remise_ligne, taux_tva, ordre)
 select
   d.id,
   'Prestation ' || d.seq || '.' || ln,
@@ -318,8 +334,7 @@ select
   round((10 + random()*450)::numeric, 2),
   case when random() < 0.1 then round((random()*10)::numeric, 2) else 0 end,
   (array[20,10,5.5])[1+floor(random()*3)],
-  ln,
-  'fx-devis-' || d.seq || '-' || ln
+  ln
 from fx.devis d
 cross join lateral generate_series(1, d.nb_lignes) ln;
 
@@ -361,7 +376,7 @@ join fx.clients cl on cl.seq = f.client_seq
 left join fx.chantiers ch on ch.seq = f.chantier_seq;
 
 insert into public.lignes_factures (facture_id, designation, description, type, quantite, unite,
-  prix_unitaire_ht, remise_ligne, taux_tva, ordre, cle_ligne)
+  prix_unitaire_ht, remise_ligne, taux_tva, ordre)
 select
   f.id,
   'Prestation facturée ' || f.seq || '.' || ln,
@@ -372,8 +387,7 @@ select
   round((10 + random()*450)::numeric, 2),
   0,
   (array[20,10,5.5])[1+floor(random()*3)],
-  ln,
-  'fx-facture-' || f.seq || '-' || ln
+  ln
 from fx.factures f
 cross join lateral generate_series(1, f.nb_lignes) ln;
 
@@ -488,15 +502,14 @@ cross join generate_series(1, case ent.taille when 'principale' then 70 else 20 
 --     principal, dont une fenêtre récente dense (~450 évènements sur les
 --     8 dernières semaines, pour le scénario "vue mensuelle 40 salariés").
 -- --------------------------------------------------------------------------
-insert into public.planning_evenements (entreprise_id, chantier_id, client_id, titre, type, statut,
-  debut, fin, journee_entiere)
+insert into public.planning_evenements (entreprise_id, chantier_id, titre, type, statut,
+  debut, fin)
 select
-  ent.id, ch.id, cl.id,
+  ent.id, ch.id,
   'Intervention ' || ch.seq || '.' || g,
-  (array['chantier','intervention','rendez_vous','livraison','deplacement'])[1+floor(random()*5)],
+  (array['intervention','rdv_client','livraison','controle'])[1+floor(random()*4)],
   (array['planifie','confirme','termine','termine','termine'])[1+floor(random()*5)],
-  ts, ts + (interval '2 hour' + (round((random()*6)::numeric, 4) || ' hours')::interval),
-  random() < 0.2
+  ts, ts + (interval '2 hour' + (round((random()*6)::numeric, 4) || ' hours')::interval)
 from fx.chantiers ch
 join fx.entreprises ent on ent.seq = ch.entreprise_seq
 join fx.clients cl on cl.seq = ch.client_seq
@@ -507,11 +520,11 @@ cross join lateral (
 ) t;
 
 -- Fenêtre récente dense (dernières 8 semaines), tenant principal uniquement.
-insert into public.planning_evenements (entreprise_id, chantier_id, client_id, titre, type, statut, debut, fin)
+insert into public.planning_evenements (entreprise_id, chantier_id, titre, type, statut, debut, fin)
 select
-  ent.id, ch.id, cl.id,
+  ent.id, ch.id,
   'Intervention récente ' || g,
-  (array['chantier','intervention','rendez_vous'])[1+floor(random()*3)],
+  (array['intervention','rdv_client','controle'])[1+floor(random()*3)],
   (array['planifie','confirme'])[1+floor(random()*2)],
   ts, ts + interval '4 hour'
 from fx.entreprises ent

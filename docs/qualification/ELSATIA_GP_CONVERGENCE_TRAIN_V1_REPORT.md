@@ -748,3 +748,387 @@ pgTAP 2412 assertions (85/90 fichiers entièrement verts, 4 échecs préexistant
 attribuable au harnais), typecheck/lint/Vitest/build GP confirmés PASS, frontières
 999/1000/1001 + concurrence réelle + isolation multi-tenant vérifiées empiriquement et non par
 déduction. Aucun déploiement, aucune Preview, aucune Production.
+## 19. Portage sélectif PERFORMANCE + vérification SITUATIONS (`PERFORMANCE + SITUATIONS INTEGRATED`)
+
+**Mission** : intégrer deux lots qualifiés indépendamment sur des branches sources distinctes,
+sans fusionner ces branches en bloc — uniquement ce qui manque réellement au train, après
+comparaison explicite.
+
+### 19.0 — Vérification du HEAD réel avant modification
+
+HEAD distant réel de `claude/compassionate-euler-5j6avr` au démarrage : **`e0a83eb`**
+(`docs(qualification): documente l'intégration du correctif de numérotation (NUMBERING FIX
+INTEGRATED)`) — identique au HEAD de référence attendu par la mission. Aucun écart à
+documenter.
+
+- Migrations au démarrage : **308** (dernière : `20260922000317_correctif_troncature_next_reference.sql`).
+- `NUMBERING FIX INTEGRATED` (§18 ci-dessus) confirmé toujours présent : le corps de
+  `public.next_reference()` utilise bien `lpad(v_numero::text, greatest(p_largeur,
+  length(v_numero::text)), '0')` — voir §19.2, ce correctif n'a **pas** été touché par ce lot.
+- Branches sources confirmées par `git ls-remote` (SHA réels, pas seulement les noms) :
+  - `claude/beautiful-franklin-7hwzq0` → `56aa7477958a480d484ddf3d71d25e1efc539d99` (identique au SHA qualifié attendu).
+  - `claude/trusting-archimedes-kvg62q` → `88b9d72f5c49e2c88721620040f01a9a0c1ae060` (identique au SHA qualifié attendu).
+
+### 19.1 — Cartographie LOT PERFORMANCE (`claude/beautiful-franklin-7hwzq0`, `56aa747`)
+
+`git merge-base` train/lot A = `76ec759` (ancêtre commun réel, sur le train). 7 commits propres
+à lot A par rapport à cette base : `eda2bc4`, `c56969c`, `3f9485d`, `5cea2c3`, `38a25e2`,
+`e27b9b6`, `56aa747`.
+
+Fichiers réellement modifiés par lot A (`git diff` contre le merge-base) :
+
+| Fichier | Nature |
+|---|---|
+| `docs/qualification/ELSATIA_GP_DASHBOARD_SEARCH_PERFORMANCE_V1.md` | doc de qualification source (1228 lignes) |
+| `scripts/perf/generate_fixture.sql` | remise en état contre le schéma courant |
+| `src/app/(app)/dashboard/page.tsx` | RPC unique au lieu de 2 chargements complets |
+| `supabase/migrations/20260922000315_correctif_debordement_next_reference.sql` | correctif `next_reference()` |
+| `supabase/migrations/20260922000316_dashboard_indicateurs_bornes.sql` | RPC `dashboard_indicateurs` + index |
+| `supabase/migrations/20260922000317_dashboard_cache_totaux.sql` | table cache + triggers devis/factures |
+| `supabase/migrations/20260922000318_correctif_cache_dashboard_changement_entreprise.sql` | correctif cache 12/12 (`UPDATE OF entreprise_id`) |
+| `supabase/tests/gp_dashboard_search_perf_dashboard_indicateurs.test.sql` | pgTAP (13 assertions) |
+| `supabase/tests/gp_dashboard_search_perf_isolation_listes_paginees.test.sql` | pgTAP (14 assertions) |
+| `supabase/tests/gp_dashboard_search_perf_next_reference_debordement.test.sql` | pgTAP (4 assertions) |
+
+**Collision de numéro confirmée** : le train a son propre `20260922000317` (`correctif_troncature_next_reference.sql`,
+NUMBERING FIX INTEGRATED), **différent** du `20260922000317_dashboard_cache_totaux.sql` de lot A. Les deux
+branches ont divergé de `76ec759` et attribué indépendamment des numéros dans la même plage
+(315-318). Aucune réutilisation aveugle de ces numéros : voir §19.4.
+
+**Classement élément par élément** :
+
+| Élément du lot Performance | Classement | Décision |
+|---|---|---|
+| Correctif `next_reference()` (source `315`) | **déjà présent, version équivalente** (`317` du train, NUMBERING FIX INTEGRATED — corps de fonction identique : même `greatest(p_largeur, length(v_numero::text))`, seuls les commentaires diffèrent) | **non porté** — ne jamais écraser le correctif déjà intégré |
+| `dashboard_indicateurs()` + index bornés (source `316`) | **absent** (aucune occurrence dans le train avant ce lot) | **porté** |
+| Table `entreprises_dashboard_cache` + triggers devis/factures (source `317`) | **absent** | **porté** |
+| Correctif cache 12/12, `UPDATE OF entreprise_id` (source `318`) | **absent** (le train n'avait même pas la table avant ce lot) | **porté** |
+| `src/app/(app)/dashboard/page.tsx` (RPC unique) | **absent** (fichier byte-identique au merge-base côté train — aucune dérive locale) | **porté** |
+| `scripts/perf/generate_fixture.sql` | **absent** (byte-identique au merge-base côté train) | **porté** |
+| 3 fichiers pgTAP | **absents** | **portés** (renumérotés en commentaire, contenu fonctionnel inchangé) |
+| Doc de qualification source (1228 lignes) | présente uniquement sur la branche source | **non recopiée telle quelle** — voir §19.7 |
+
+### 19.2 — Vérification explicite : cache 12/12 et `next_reference()`
+
+- `trg_maj_cache_dashboard_factures()` **porté directement dans sa forme finale corrigée** :
+  le trigger se déclenche sur `after insert or delete or update of statut, montant_ttc,
+  montant_paye, entreprise_id` (donc bien sur un changement de tenant seul), et le corps
+  traite `new.entreprise_id is distinct from old.entreprise_id` par une branche dédiée qui
+  débite l'ancienne entreprise et crédite la nouvelle par deux écritures distinctes du cache
+  (pas un delta scalaire net). Vérifié par lecture directe du fichier porté et confirmé par
+  pgTAP (§19.5, tests 10-13, 4/4 verts).
+- `public.next_reference()` : corps de fonction **inchangé** par ce lot (vérifié par
+  `pg_get_functiondef` après rejeu complet, §19.6) — toujours celui de `20260922000317`
+  (train), jamais celui de lot A `315`.
+
+### 19.3 — Cartographie LOT SITUATIONS (`claude/trusting-archimedes-kvg62q`, `88b9d72`)
+
+`git merge-base` train/lot B = `4d92ddb` (= HEAD de `main`, confirmant que la branche source
+est bien issue d'un ledger ancien, très en amont du train). **Un seul commit propre à lot B** :
+`88b9d72` (`fix: sérialiser l'attribution du numéro des situations de travaux`), qui ajoute une
+migration `20260729000184_verrou_numero_situation_travaux.sql` (numéro de l'ancien ledger, sans
+rapport avec la numérotation du train).
+
+**Vérification de la version actuelle de `public.creer_situation_travaux` dans le train** :
+la dernière redéfinition complète (`20260818000215_avenants_v1_integration_facturation.sql`,
+elle-même postérieure à `20260818000211_paiements_et_anti_surfacturation.sql`, qui a introduit
+le verrou) contient déjà :
+
+```sql
+select * into v_devis from public.devis where id=p_devis_id and entreprise_id=p_entreprise_id
+  and statut='accepte' for update;
+```
+
+— un verrou de ligne sur le devis, **pris dès la première lecture de `v_devis`**, donc avant
+*toutes* les validations métier ultérieures (avancement, plafond anti-surfacturation) et avant
+le calcul `select coalesce(max(numero),0)+1 into v_numero ...`. Ce verrou est **antérieur et
+plus large** que celui que `88b9d72` ajoute (qui ne verrouille, dans une instruction séparée,
+que juste avant le calcul du numéro). Le commentaire de la migration `20260818000211` confirme
+l'intention : *« Verrouille la ligne devis (for update) pour serialiser les appels concurrents
+sur le même devis avec les deux autres RPC ci-dessous »*.
+
+**Conclusion** : la race `MAX(numero)+1` décrite par le lot Situations **n'existe plus dans le
+train** — corrigée indépendamment, avant même la création de la branche source (le fork de lot
+B date de `4d92ddb`, antérieur à `20260818000211`). Conformément à l'instruction conditionnelle
+de la mission (« si la race existe encore, porte le correctif qualifié », sinon rien), **le
+lot Situations n'a pas été fusionné, ni son correctif porté, ni sa migration recréée sous un
+nouveau numéro**. Aucune migration créée pour ce lot. Preuve empirique en §19.6.
+
+### 19.4 — Ledger : migrations réellement créées
+
+Aucune modification rétroactive d'une migration historique. 3 migrations ajoutées, aux 3
+prochains numéros réellement disponibles du train au moment de la création (`318`, `319`,
+`320` — le `318` n'a **pas** été attribué aveuglément au contenu du `318` source, qui
+correspond en réalité au correctif cache, placé ici en `320`) :
+
+| Numéro final (train) | Contenu | Numéro source (lot A, ledger divergent) |
+|---|---|---|
+| `20260922000318_dashboard_indicateurs_bornes.sql` | RPC `dashboard_indicateurs` + 4 index bornés | `20260922000316` |
+| `20260922000319_dashboard_cache_totaux.sql` | table `entreprises_dashboard_cache` + triggers devis/factures + backfill | `20260922000317` |
+| `20260922000320_correctif_cache_dashboard_changement_entreprise.sql` | correctif `UPDATE OF entreprise_id` (cache 12/12) | `20260922000318` |
+
+Contenu fonctionnel vérifié **byte-identique** au commit source (seules les références croisées
+en commentaire vers les migrations voisines de ce même lot, et un bandeau de provenance, ont
+été ajustés — voir diff exact en §19.9). `20260922000317` du train (`correctif_troncature_next_reference.sql`,
+NUMBERING FIX INTEGRATED) n'a été ni renommé, ni déplacé, ni modifié.
+
+`node scripts/verify-migrations.mjs` : **311 migrations valides, noms et horodatages uniques**
+(308 + 3).
+
+### 19.5 — Tests ciblés PERFORMANCE (pgTAP)
+
+Les 3 fichiers portés, exécutés via `pg_prove` sur une base rejouant les 311 migrations du
+train (méthodologie complète en §19.6) :
+
+- **`gp_dashboard_search_perf_dashboard_indicateurs.test.sql` — 13/13 PASS.**
+  - `devis_acceptes_total`/`factures_total` égaux au recalcul canonique (`SUM(...) WHERE
+    statut=...`) — équivalence RPC vs recalcul.
+  - Maintenance incrémentale immédiate à l'INSERT d'un devis accepté (+600 sur le cache),
+    absence de faux positif sur un devis non accepté, paiement partiel reflété immédiatement
+    (`factures_encaisse_total`).
+  - Isolation tenant (2 assertions) : les totaux A et B diffèrent, l'entreprise B demandée
+    depuis un contexte A renvoie des champs vides (jamais les vrais chiffres de B).
+  - Cache **inaccessible en lecture et en écriture directes** pour `authenticated` (RLS activée
+    sans policy + `REVOKE ALL` — deny-all confirmé empiriquement, pas seulement lu dans le DDL).
+  - **Cache 12/12 (4 assertions dédiées, 10 à 13)** : changement direct de `entreprise_id` sur
+    une facture brouillon → cache de l'**ancien** tenant débité, cache du **nouveau** tenant
+    crédité du **montant complet** (1200, pas un delta net partiel) — les deux vérifiés
+    séparément contre un recalcul canonique indépendant, avant/après le déplacement.
+- **`gp_dashboard_search_perf_isolation_listes_paginees.test.sql` — 14/14 PASS** (les 4 RPC de
+  liste préexistantes `devis_liste_paginee`/`factures_liste_paginee`/`clients_liste_paginee`/
+  `chantiers_liste_paginee` refusent explicitement un `p_entreprise_id` étranger, jamais un
+  total à 0 silencieux ; recherche large ne fait pas fuiter les lignes de l'autre tenant).
+- **`gp_dashboard_search_perf_next_reference_debordement.test.sql` — 4/4 PASS**, contre le
+  correctif du **train** (`20260922000317`), pas contre celui de lot A (non porté, §19.2) :
+  999 → 1000 (`T-1000`, pas `T-100`), aucune collision, séquence complète sans erreur.
+
+**Benchmark** (base `elsatia_fresh_test`, tenant synthétique 3000 devis + 2000 factures, mix de
+statuts réaliste) :
+- `dashboard_indicateurs()` (RPC complète : cache + 5 devis à suivre + alertes + 6 mois
+  d'historique groupé) : **~26 ms**. Résultat des 3 totaux mis en cache **strictement égal**
+  au recalcul canonique indépendant (`devis_acceptes_total=1189200`, `factures_total=1920000`,
+  `factures_encaisse_total=1234215.27` — équivalence exacte, pas approximative).
+- Tenant vide (aucune ligne en cache) : RPC ne plante pas, renvoie des champs `null` proprement,
+  **~9 ms**.
+- Il n'a pas été nécessaire de reproduire la campagne complète à 5000 devis/tenant de la
+  qualification source (`ELSATIA_GP_DASHBOARD_SEARCH_PERFORMANCE_V1.md`, SHA `56aa747`) : le
+  résultat est structurellement équivalent (agrégats en cache O(1), listes bornées par `LIMIT`,
+  mêmes index) et aucune régression structurelle n'a été introduite par la renumérotation.
+
+### 19.6 — Vérification ciblée SITUATIONS (concurrence réelle)
+
+Preuve empirique, non déductive, sur `elsatia_fresh_test` (train rejoué), fonction **réellement
+active** du train (aucune migration ajoutée pour ce lot) :
+
+- **2 sessions concurrentes forcées, même entreprise + même devis** (harnais local avec
+  `pg_sleep(1)` injecté après acquisition du verrou, copie de test créée puis détruite, jamais
+  dans le dépôt) : durée mesurée **2,08 s** pour deux verrous de 1 s chacun → preuve directe que
+  la seconde session a **attendu** le verrou. **2 succès, numéros `1` et `2` (consécutifs),
+  0 erreur `23505`.**
+- **2 sessions concurrentes, timing naturel, même devis, avancement croissant (10 puis 20)** :
+  1 succès (`numero=1`), 1 rejet **métier propre** (« l'avancement doit être supérieur au cumul
+  précédent ») — **0 `23505`**, exactement le comportement attendu quand le verrou serialise
+  correctement l'accès (la seconde session voit le cumul déjà mis à jour par la première).
+- **5 sessions concurrentes, même devis, avancement croissant (10/20/30/40/50)** : 1 succès
+  (`numero=1`, la session à avancement le plus élevé ayant obtenu le verrou en premier), 4
+  rejets **métier propres** (même cause) — **0 `23505`, 0 deadlock, 0 timeout**. Distinction
+  explicite vérifiée entre échec de concurrence (`23505`/deadlock/timeout — zéro occurrence) et
+  rejet de règle métier (attendu, hors périmètre de cette mission).
+- **2 devis différents, même entreprise, concurrence forcée** : durée ≈ 0,07 s (proche d'un
+  seul appel, pas du double) — **aucun verrou croisé**, 2 succès indépendants.
+- **2 entreprises différentes, concurrence forcée** : durée ≈ 0,07 s — **aucun verrou global**,
+  2 succès indépendants.
+
+Confirme empiriquement la conclusion de §19.3 : le verrou déjà présent dans le train sérialise
+correctement la numérotation par `(entreprise_id, devis_id)`, sans verrou global, exactement le
+comportement que le correctif qualifié de lot B visait à apporter — déjà acquis autrement.
+
+### 19.7 — Documentation source non recopiée telle quelle
+
+`docs/qualification/ELSATIA_GP_DASHBOARD_SEARCH_PERFORMANCE_V1.md` (1228 lignes, branche
+source) documente en détail la campagne de qualification originale (dataset 5000 devis/tenant,
+benchmarks avant/après, reproduction du bug de cache) sous la numérotation **source**
+(`315`-`318`). Elle n'a **pas** été recopiée verbatim dans le train : le risque d'un
+renumérotage incomplet ou incohérent sur 1228 lignes de prose technique dépassait la valeur
+d'une copie littérale, alors que le contenu technique pertinent (RPC, cache, correctif 12/12)
+est intégralement vérifié et documenté ici, avec la numérotation réelle du train. La version
+source reste consultable sur `claude/beautiful-franklin-7hwzq0` (`56aa747`) pour le détail de
+la campagne de benchmark originale à 5000 devis/tenant.
+
+### 19.8 — Sécurité : comparaison avant/après pour toutes les fonctions/triggers portés
+
+Vérifié par introspection directe (`pg_proc`, `pg_class`, `pg_policies`, ACL brute) sur la base
+rejouée `elsatia_fresh_test`, pas seulement par lecture du SQL :
+
+| Objet | Owner | SECURITY | `search_path` | ACL | RLS |
+|---|---|---|---|---|---|
+| `dashboard_indicateurs(uuid,date)` | `postgres` | DEFINER | `{search_path=public}` | `postgres=X` (owner), `authenticated=X` — ni `anon` ni `public` | n/a (fonction) |
+| `trg_maj_cache_dashboard_devis()` | `postgres` | DEFINER | `{search_path=public}` | trigger interne (aucun accès direct) | n/a |
+| `trg_maj_cache_dashboard_factures()` | `postgres` | DEFINER | `{search_path=public}` | trigger interne (aucun accès direct) | n/a |
+| `public.entreprises_dashboard_cache` | `postgres` | — | — | `REVOKE ALL` confirmé pour `public/anon/authenticated/service_role` (aucun grant `SELECT`/`INSERT`/`UPDATE`/`DELETE` résiduel) | **activée, 0 policy** → deny-all pour tout rôle non-owner, confirmé empiriquement par pgTAP (§19.5, tests 8-9 : `authenticated` ne peut ni lire ni écrire) |
+| `public.next_reference()` | `postgres` | **INVOKER** (`prosecdef=f`, inchangé) | aucun override (inchangé) | inchangé (migration `20260902000255`, non re-touchée) | n/a |
+| `public.creer_situation_travaux(...)` | `postgres` | DEFINER (inchangé) | `{search_path=public}` (inchangé) | inchangée (aucune migration de ce lot ne la touche) | n/a |
+
+**Aucun élargissement de privilège** : ni `anon`, ni `public`, ni `service_role` n'obtiennent de
+nouvel accès direct à quoi que ce soit dans ce lot. La seule voie de lecture du cache reste la
+RPC `dashboard_indicateurs()`, qui reproduit exactement le contrôle `a_permission(...,
+'acces_devis'|'acces_factures')` déjà en place sur `devis`/`factures`. Aucun SQL dynamique
+introduit. `next_reference()` et `creer_situation_travaux()` : propriétaire, mode de sécurité,
+`search_path`, ACL et contrainte `unique(entreprise_id,devis_id,numero)` **strictement
+inchangés** — confirmé par requête directe sur la base rejouée, pas seulement par absence de
+diff textuel.
+
+### 19.9 — Fresh complet du train résultant
+
+Docker et le CLI Supabase ne sont pas disponibles dans cet environnement d'exécution (pas de
+démon Docker). Méthodologie de remplacement, documentée, entièrement hors dépôt :
+
+- Installation locale de PostgreSQL 16.13 + extension `pgtap` (paquets Ubuntu officiels,
+  absents par défaut) + `pgcrypto`/`pg_trgm`/`unaccent` (déjà présents).
+- Bootstrap manuel minimal (script hors dépôt, jamais commité) reproduisant ce que la
+  plateforme Supabase provisionne avant toute migration applicative : rôles
+  `anon`/`authenticated`/`service_role`/`supabase_migrator`/`authenticator`, schéma `auth`
+  (`auth.users` + `auth.uid()`/`auth.role()`/`auth.email()`/`auth.jwt()`), schéma `storage`
+  (`storage.buckets`/`storage.objects`/`storage.foldername()`), schéma `extensions` avec
+  `pgcrypto`/`pg_trgm`/`pgtap` pré-installés (comme sur une vraie plateforme).
+- **Un seul écart documenté, pré-existant, sans rapport avec ce lot** : la migration
+  `20260828000244_stripe_state_attestation_r72.sql` (bien antérieure à ce lot) requiert
+  l'extension `pgsodium`, propriétaire à Supabase et non empaquetée pour Postgres standard.
+  Un stub d'extension strictement local (fournissant uniquement
+  `pgsodium.crypto_sign_verify_detached(bytea,bytea,bytea)`, toujours `false`, jamais de vraie
+  clé) permet à cette migration historique de se rejouer structurellement, sans quoi le Fresh
+  échouerait dès cette migration pour une raison totalement étrangère aux lots Performance/
+  Situations. **Première tentative alternative rejetée** : dupliquer l'opérateur `gin_trgm_ops`
+  dans un second schéma pour satisfaire deux conventions de qualification différentes utilisées
+  par des migrations préexistantes (`extensions.gin_trgm_ops` vs `gin_trgm_ops` non qualifié) a
+  provoqué un **SIGSEGV reproductible du serveur Postgres** dès qu'un INSERT réel exerçait
+  l'index (bisection confirmée sur `public.entreprises`) — abandonnée. Analyse plus poussée :
+  cette double convention n'a en réalité jamais nécessité de duplication (`SET search_path`
+  dans le fichier concerné n'est qu'une option de fonction, pas une commande de session) ;
+  installer `pg_trgm` une seule fois dans `extensions` suffit et couvre les deux conventions.
+  Aucun de ces ajustements ne modifie un seul fichier du dépôt.
+- **Rejeu complet, 2 bases indépendantes (train + baseline `e0a83eb`), chacune reconstruite
+  depuis zéro** :
+  - Train (311 migrations) : **311/311 appliquées, 0 erreur SQL**, aucune migration dupliquée
+    ni manquante (`ls supabase/migrations | sort` = 311 fichiers uniques).
+  - Baseline `e0a83eb` (308 migrations, worktree dédié) : **308/308 appliquées, 0 erreur SQL**,
+    avec la **même** méthodologie de bootstrap — sert de témoin pour le §19.10.
+- `npm run verify:migrations` : **311 migrations valides, noms et horodatages uniques.**
+- `npm run verify:secrets` : **2479 fichiers suivis contrôlés, aucun secret reconnu (1
+  exception nommée, préexistante, inchangée).**
+
+### 19.10 — pgTAP complet : comparaison avec le baseline `e0a83eb`
+
+Suite complète rejouée avec `pg_prove` sur les deux bases (train et baseline), même harnais :
+
+| | Baseline `e0a83eb` (308 migrations) | Train (311 migrations) |
+|---|---|---|
+| Fichiers de test | 90 | 93 (+3, les fichiers portés) |
+| Assertions totales | 2246 | 2277 (+31, exactement les 3 fichiers portés) |
+| Fichiers avec ≥1 échec | **17** | **17** (liste strictement identique, mêmes numéros d'assertion en échec) |
+
+**Les 17 fichiers en échec sont identiques, fichier par fichier et assertion par assertion**,
+entre la baseline et le train — `colors_correctifs_v12` (2), `colors_functional_core_v1` (2),
+`document_partage_public_par_jeton_v1` (plan tronqué à 10/42), `gp_pilot_notification_devis_accepte`
+(3), `gp_pilot_plateforme_admin_role_total` (0/6), `gp_pilot_rgpd_manifeste_fichiers` (1/9),
+`isolation_multitenant_comportement` (8), `pieces_jointes_v1_lecture_documents_employes` (3),
+`platform_aal2_role_integrity_v1` (pas de plan), `platform_audit_log_bounded_v1` (3),
+`platform_global_owner_all_apps_v1` (0/40), `platform_stripe_state_attestation_r72` (hors de
+portée du harnais `pgsodium`, cf. §19.9), `platform_support_uid_security_v1` (32/38),
+`reserves_v1_foundation_workflow` (93/98), `reserves_v2_terrain_capture` (5), `reserves_v3_collaboration_livrables`
+(144/148), `studio_render_engine` (1), `terrain_mobile_v1b_permission_documents` (2). Ces
+échecs sont **documentés comme préexistants** dans ce même rapport (§17.3/§18.4) pour plusieurs
+d'entre eux, et confirmés ici indépendamment comme antérieurs à ce lot sur les deux — aucun
+n'implique `dashboard_indicateurs`, `entreprises_dashboard_cache`, `creer_situation_travaux` ou
+`next_reference`.
+
+**Les 3 fichiers pgTAP portés sont 100 % verts** (31/31, détail en §19.5) et n'apparaissent
+dans aucune des deux listes d'échecs. **0 nouvelle régression.**
+
+### 19.11 — Applications (typecheck / lint / test / build)
+
+`npm ci` à la racine (Gestion Pro) puis dans chaque application indépendante
+(`apps/tools`, `apps/reserves`, `apps/colors`, `apps/studio` — chacune a son propre
+`node_modules`, aucun workspace npm unique) :
+
+| Vérification | Gestion Pro | Tools | Reserves | Colors | Studio |
+|---|---|---|---|---|---|
+| `typecheck` | PASS | PASS | PASS | PASS | PASS |
+| `lint` | PASS (0 erreur) | PASS | PASS | PASS | PASS |
+| `test` (Vitest) | PASS — 153 fichiers / 1786 tests | PASS — 174/1992 | PASS — 12/154 | PASS — 38/427 | PASS — 14/251 |
+| `build` | **PASS** — `next build`, 38 routes dont `/dashboard` (nouveau chemin RPC) | PASS avec flag local documenté (voir ci-dessous) — 47 routes | PASS — 19 routes dont `/dashboard` | PASS avec flag local documenté — 27 routes dont `/dashboard` | — |
+
+6 avertissements ESLint préexistants (usage `<img>`, `window.location.assign`, un import
+inutilisé dans un spec e2e, export par défaut anonyme dans `workers/studio-video/eslint.config.mjs`)
+— **aucun dans un fichier touché par ce lot**.
+
+**`apps/tools` et `apps/colors`** : leur `prebuild` respectif (`verify-public-env.mjs`) refuse
+de builder sans variables d'environnement `NEXT_PUBLIC_*` réelles — garde-fou préexistant,
+documenté par le script lui-même, **sans rapport avec ce lot** (déjà rencontré et documenté de
+façon identique au §18.7 de ce même rapport). Confirmé en relançant avec le flag local que
+chaque script documente lui-même comme échappatoire de recette (`NEXT_PUBLIC_TOOLS_ENV=local`
+pour Tools, `ELSATIA_APPLICATION_ENV=local` pour Colors) : build réussi dans les deux cas.
+Aucun garde-fou ENV contourné silencieusement — flags documentés ici explicitement, comme exigé
+par la mission.
+
+`npm run verify:env-manifest` : **FAIL préexistant**, sans rapport avec ce lot — 37 erreurs
+(variables `STUDIO_*`/`RESEND_API_KEY` manquantes dans les `.env.example` de `apps/studio` et
+`workers/studio-video`) + 10 `DECISION_REQUIRED` d'ordre commercial (tarification Stripe
+modules/options IA/comptes supplémentaires, flag fail-open des crons), tous attribués à des
+décisions métier en attente, aucun ne référence `dashboard_indicateurs`,
+`entreprises_dashboard_cache` ni le fichier `dashboard/page.tsx`. Aucun flag de contournement
+utilisé pour cette commande.
+
+**Packages partagés / workers** : aucun fichier de `packages/*` ni `workers/*` n'est touché par
+ce lot (seuls `supabase/migrations`, `supabase/tests`, `scripts/perf/generate_fixture.sql`,
+`src/app/(app)/dashboard/page.tsx` et cette documentation le sont) — hors périmètre de
+régression pour ce lot précis ; `workers/studio-video` a son propre `package.json` mais relève
+du lot Studio, non touché ici.
+
+**Conclusion §19.11** : aucun échec applicatif imputable à ce lot. Les deux garde-fous ENV et le
+`verify:env-manifest` sont des états préexistants, déjà documentés ailleurs dans ce rapport pour
+les mêmes causes, confirmés à nouveau ici indépendamment.
+
+### 19.12 — Fichiers modifiés par ce lot
+
+```
+scripts/perf/generate_fixture.sql                                                  (modifié)
+src/app/(app)/dashboard/page.tsx                                                   (modifié)
+supabase/migrations/20260922000318_dashboard_indicateurs_bornes.sql                (nouveau)
+supabase/migrations/20260922000319_dashboard_cache_totaux.sql                      (nouveau)
+supabase/migrations/20260922000320_correctif_cache_dashboard_changement_entreprise.sql (nouveau)
+supabase/tests/gp_dashboard_search_perf_dashboard_indicateurs.test.sql             (nouveau)
+supabase/tests/gp_dashboard_search_perf_isolation_listes_paginees.test.sql         (nouveau)
+supabase/tests/gp_dashboard_search_perf_next_reference_debordement.test.sql        (nouveau)
+docs/qualification/ELSATIA_GP_CONVERGENCE_TRAIN_V1_REPORT.md                       (cette section)
+```
+
+Aucune migration historique modifiée. Aucun fichier hors de ce périmètre touché (aucune série
+FAC des avoirs, aucun compteur commun factures, aucune architecture Studio, aucun pricing,
+aucune Production/Preview).
+
+### 19.13 — Verdict
+
+- Fresh : **311/311 migrations, 0 erreur SQL** (2 bases indépendantes, train + baseline).
+- pgTAP : **2277 assertions, 93 fichiers** — 17 fichiers en échec **strictement identiques** à
+  la baseline `e0a83eb` (0 nouvelle régression), 3 fichiers portés **100 % verts** (31/31).
+- `verify:migrations` : **311 valides**. `verify:secrets` : **2479 fichiers, 0 secret**.
+- Sécurité : owner/`SECURITY DEFINER`/`search_path`/ACL/RLS vérifiés inchangés ou strictement
+  conformes à l'intention documentée pour tous les objets portés ; `next_reference()` et
+  `creer_situation_travaux()` confirmés **non modifiés**.
+- Concurrence Situations : 2 sessions (forcées et timing naturel), 5 sessions, devis/entreprises
+  différents — **0 `23505`, 0 deadlock, 0 timeout**, isolation multi-tenant confirmée.
+- Cache 12/12 (13/13 assertions du fichier porté) : OLD et NEW tenant vérifiés après déplacement
+  d'une facture entre entreprises, montant complet (pas un delta net).
+- Applications : Gestion Pro/Tools/Reserves/Colors/Studio — typecheck/lint/test/build **PASS**
+  (2 garde-fous ENV préexistants contournés uniquement par leurs flags locaux documentés,
+  `verify:env-manifest` FAIL préexistant sans rapport avec ce lot).
+
+**`PERFORMANCE + SITUATIONS INTEGRATED`**
+
+Lot Performance intégré sélectivement (3 migrations neuves sur 4 côté source, 1 déjà présente
+et donc non portée). Lot Situations vérifié et confirmé déjà résolu dans le train par un
+mécanisme antérieur et plus large — non fusionné, non porté, 0 migration créée pour ce lot,
+conformément à l'instruction conditionnelle de la mission. Aucun déploiement, aucune Preview,
+aucune Production.
+

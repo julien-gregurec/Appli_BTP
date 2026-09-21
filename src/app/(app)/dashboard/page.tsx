@@ -83,9 +83,18 @@ export default async function DashboardPage() {
   let requeteAffectations = supabase.from("affectations").select("id, date, heures, tache, chantier:chantiers(nom), employe:employes(prenom, nom)").eq("entreprise_id", ctx.entrepriseId).gte("date", aujourdhui).order("date").limit(6);
   if (permissions !== null && !peutGererPlanning) requeteAffectations = requeteAffectations.eq("employe_id", employeCompte?.id ?? "00000000-0000-0000-0000-000000000000");
 
-  const [devisResult, facturesResult, chantiersResult, affectationsResult, articlesResult, vehiculesResult, outilsResult, commandesResult, chantiersPointageResult, sessionsPointageResult, employesActifsResult, congesAujourdhuiResult, notificationsResult, relancesEchecResult] = await Promise.all([
-    voir.devis ? supabase.from("devis").select("id, numero, statut, montant_ttc, date_emission, date_validite, client:clients!devis_client_id_fkey(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }) : null,
-    voir.factures ? supabase.from("factures").select("id, numero, statut, date_emission, date_echeance, montant_ttc, montant_paye, client:clients!factures_client_id_fkey(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId) : null,
+  type DashboardIndicateurs = {
+    devis_acceptes_total?: number | null;
+    devis_a_suivre?: Array<{ id: string; numero: string | null; statut: string; montant_ttc: number; client: { nom: string | null; prenom: string | null; societe: string | null } | null }> | null;
+    devis_alertes?: Array<{ id: string; numero: string | null; montant_ttc: number; date_validite: string }> | null;
+    devis_mois?: Array<{ cle: string; total: number }> | null;
+    factures_total?: number | null;
+    factures_encaisse_total?: number | null;
+    factures_alertes?: Array<{ id: string; numero: string | null; montant_ttc: number; montant_paye: number; date_echeance: string; client: { nom: string | null; prenom: string | null; societe: string | null } | null }> | null;
+    factures_mois?: Array<{ cle: string; total: number }> | null;
+  };
+  const [dashboardIndicateursResult, chantiersResult, affectationsResult, articlesResult, vehiculesResult, outilsResult, commandesResult, chantiersPointageResult, sessionsPointageResult, employesActifsResult, congesAujourdhuiResult, notificationsResult, relancesEchecResult] = await Promise.all([
+    voir.devis || voir.factures ? supabase.rpc("dashboard_indicateurs", { p_entreprise_id: ctx.entrepriseId, p_aujourdhui: aujourdhui }) : null,
     voir.chantiers ? supabase.from("chantiers").select("id, nom, statut, date_fin_prevue").eq("entreprise_id", ctx.entrepriseId).order("updated_at", { ascending: false }) : null,
     voir.planning ? requeteAffectations : null,
     voir.stock ? supabase.from("articles_stock").select("id, reference, designation, quantite_stock, seuil_alerte, unite").eq("entreprise_id", ctx.entrepriseId).eq("actif", true) : null,
@@ -99,7 +108,8 @@ export default async function DashboardPage() {
     permissions !== null ? supabase.from("notifications_utilisateurs").select("id,titre,message,lien,niveau,created_at").eq("entreprise_id", ctx.entrepriseId).is("lue_at", null).order("created_at", { ascending: false }).limit(8) : null,
     voir.devis || voir.factures ? supabase.from("relances_documents").select("id,type_document,document_id,niveau,erreur_public_safe,created_at").eq("entreprise_id", ctx.entrepriseId).eq("statut", "echec").gte("created_at", septJoursAvantIso).order("created_at", { ascending: false }).limit(20) : null,
   ]);
-  const devis = devisResult?.data ?? [], factures = facturesResult?.data ?? [], chantiers = chantiersResult?.data ?? [];
+  const indicateurs = (dashboardIndicateursResult?.data ?? {}) as DashboardIndicateurs;
+  const chantiers = chantiersResult?.data ?? [];
   const affectations = affectationsResult?.data ?? [], articles = articlesResult?.data ?? [], vehicules = vehiculesResult?.data ?? [];
   const outils = outilsResult?.data ?? [], commandes = commandesResult?.data ?? [];
   const chantiersPointage = chantiersPointageResult?.data ?? [], sessionsPointage = sessionsPointageResult?.data ?? [];
@@ -107,13 +117,13 @@ export default async function DashboardPage() {
   const notifications = notificationsResult?.data ?? [];
   const relancesEnEchec = relancesEchecResult?.data ?? [];
 
-  const totalFacture = (factures ?? []).filter((f) => f.statut !== "annulee").reduce((s, f) => s + Number(f.montant_ttc ?? 0), 0);
-  const totalEncaisse = (factures ?? []).reduce((s, f) => s + Number(f.montant_paye ?? 0), 0);
+  const totalFacture = Number(indicateurs.factures_total ?? 0);
+  const totalEncaisse = Number(indicateurs.factures_encaisse_total ?? 0);
   const resteAEncaisser = Math.max(0, totalFacture - totalEncaisse);
-  const devisAcceptes = (devis ?? []).filter((d) => d.statut === "accepte").reduce((s, d) => s + Number(d.montant_ttc ?? 0), 0);
+  const devisAcceptes = Number(indicateurs.devis_acceptes_total ?? 0);
   const statutsActifs = ["accepte", "a_preparer", "en_attente_validation", "en_commande_materiel", "en_cours", "en_pause"];
   const chantiersActifs = (chantiers ?? []).filter((c) => statutsActifs.includes(c.statut));
-  const devisASuivre = (devis ?? []).filter((d) => ["brouillon", "envoye"].includes(d.statut)).slice(0, 5);
+  const devisASuivre = indicateurs.devis_a_suivre ?? [];
   type Alerte = { id: string; domaine: string; niveau: "critique" | "attention"; titre: string; detail: string; href: string; date?: string };
   const alertes: Alerte[] = [];
   const joursAvant = (date: string) => Math.round((Date.parse(`${date}T12:00:00`) - Date.parse(`${aujourdhui}T12:00:00`)) / 86_400_000);
@@ -122,14 +132,12 @@ export default async function DashboardPage() {
     if (jours <= anticipation) alertes.push({ ...alerte, date, niveau: jours <= 0 ? "critique" : "attention" });
   };
 
-  for (const facture of factures ?? []) {
-    if (facture.date_echeance && !["payee", "annulee", "avoir_emis"].includes(facture.statut)) {
-      const client = un(facture.client);
-      ajouterEcheance({ id: `facture-${facture.id}`, domaine: "Facturation", titre: `${facture.numero ?? "Facture"} à encaisser`, detail: voirIndicateursFinanciers ? `${client?.societe || [client?.prenom, client?.nom].filter(Boolean).join(" ") || "Client"} · reste ${euros(Number(facture.montant_ttc) - Number(facture.montant_paye))}` : `${client?.societe || [client?.prenom, client?.nom].filter(Boolean).join(" ") || "Client"} · échéance de règlement`, href: `/factures/${facture.id}` }, facture.date_echeance, 7);
-    }
+  for (const facture of indicateurs.factures_alertes ?? []) {
+    const client = un(facture.client);
+    ajouterEcheance({ id: `facture-${facture.id}`, domaine: "Facturation", titre: `${facture.numero ?? "Facture"} à encaisser`, detail: voirIndicateursFinanciers ? `${client?.societe || [client?.prenom, client?.nom].filter(Boolean).join(" ") || "Client"} · reste ${euros(Number(facture.montant_ttc) - Number(facture.montant_paye))}` : `${client?.societe || [client?.prenom, client?.nom].filter(Boolean).join(" ") || "Client"} · échéance de règlement`, href: `/factures/${facture.id}` }, facture.date_echeance, 7);
   }
-  for (const itemDevis of devis ?? []) {
-    if (itemDevis.date_validite && itemDevis.statut === "envoye") ajouterEcheance({ id: `devis-${itemDevis.id}`, domaine: "Commercial", titre: `${itemDevis.numero ?? "Devis"} arrive à expiration`, detail: voirIndicateursFinanciers ? `Montant ${euros(itemDevis.montant_ttc)}` : "Validité à contrôler", href: `/devis/${itemDevis.id}` }, itemDevis.date_validite, 7);
+  for (const itemDevis of indicateurs.devis_alertes ?? []) {
+    ajouterEcheance({ id: `devis-${itemDevis.id}`, domaine: "Commercial", titre: `${itemDevis.numero ?? "Devis"} arrive à expiration`, detail: voirIndicateursFinanciers ? `Montant ${euros(itemDevis.montant_ttc)}` : "Validité à contrôler", href: `/devis/${itemDevis.id}` }, itemDevis.date_validite, 7);
   }
   // RELANCES-AUTO-V1 §51 : uniquement les échecs (7 derniers jours) — pas une alerte "à
   // relancer" en doublon des échéances devis/facture déjà remontées ci-dessus.
@@ -261,12 +269,16 @@ export default async function DashboardPage() {
     const presentation = statutChantier(statut);
     return { label: presentation.libelle, value: (chantiers ?? []).filter((chantier) => chantier.statut === statut).length, color: presentation.couleur };
   }) : undefined;
-  const moisGraphique = voirIndicateursFinanciers && (voir.devis || voir.factures) ? Array.from({length:6},(_,index)=>{
-    const date=new Date();date.setDate(1);date.setMonth(date.getMonth()-(5-index));
-    const cle=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}`;
-    const label=new Intl.DateTimeFormat("fr-FR",{month:"short"}).format(date).replace(".","");
-    return {label,devis:(devis??[]).filter(item=>item.date_emission?.startsWith(cle)&&item.statut!=="annule").reduce((s,item)=>s+Number(item.montant_ttc),0),factures:(factures??[]).filter(item=>item.date_emission?.startsWith(cle)&&item.statut!=="annulee").reduce((s,item)=>s+Number(item.montant_ttc),0)};
-  }) : undefined;
+  const moisGraphique = voirIndicateursFinanciers && (voir.devis || voir.factures) ? (() => {
+    const devisParMois = new Map((indicateurs.devis_mois ?? []).map((m) => [m.cle, Number(m.total)]));
+    const facturesParMois = new Map((indicateurs.factures_mois ?? []).map((m) => [m.cle, Number(m.total)]));
+    return Array.from({length:6},(_,index)=>{
+      const date=new Date();date.setDate(1);date.setMonth(date.getMonth()-(5-index));
+      const cle=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}`;
+      const label=new Intl.DateTimeFormat("fr-FR",{month:"short"}).format(date).replace(".","");
+      return {label, devis: devisParMois.get(cle) ?? 0, factures: facturesParMois.get(cle) ?? 0};
+    });
+  })() : undefined;
   const optionsWidgets = [
     ...((notifications??[]).length ? [{id:"notifications",label:"Notifications"}] : []),
     ...(raccourcis.length ? [{id:"modules",label:"Raccourcis modules"}] : []),
