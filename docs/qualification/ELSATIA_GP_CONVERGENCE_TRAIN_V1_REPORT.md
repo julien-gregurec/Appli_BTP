@@ -591,3 +591,160 @@ Le risque #1 du §9 (« Fresh/pgTAP non rejoués depuis 296 migrations ») est *
 ### 17.6 — Statut après cette vérification
 
 `CONVERGENCE_TRAIN_CANDIDATE = cd4fe74` (inchangé — cette section est une vérification, aucun fichier du dépôt modifié). `FINAL_PREVIEW_TRAIN = NOT_YET`. Fresh 307/307, pgTAP 2382 assertions (83/88 fichiers exécutables entièrement verts, 1 hors de portée du harnais), 4 apps + Studio confirmés (§§2-16), 2 `DECISION_REQUIRED` Studio en attente (§16.4, §16.5). Aucun déploiement, aucune Preview, aucune Production.
+
+---
+
+## 18. Portage du correctif qualifié de troncature de `next_reference()` (`NUMBERING FIX INTEGRATED`)
+
+Mission dédiée : intégrer sur ce train (HEAD `a18325e`, 307 migrations) le correctif qualifié
+produit sur `claude/festive-hamilton-76vvre` (commit `c321849`, verdict source
+`NUMBERING OVERFLOW FIX QUALIFIED`), sans fusionner cette branche entière.
+
+### 18.1 — Vérification préalable (avant tout portage)
+
+Le train principal ne contenait **aucun correctif fonctionnellement équivalent** :
+`public.next_reference()` (définie une seule fois,
+`supabase/migrations/20260710000001_comptes_entreprises.sql:108`, jamais redéfinie depuis)
+utilisait toujours `lpad(v_numero::text, p_largeur, '0')`, sans plancher. La migration
+`20260921000299_correctif_debordement_numerotation_documents.sql`, déjà présente sur ce train,
+corrige uniquement `public.formater_numero_document()` — une fonction homonyme créée par
+cette même migration et **jamais appelée par aucun trigger ni RPC** du dépôt (confirmé par
+recherche exhaustive : aucun autre appelant que sa propre définition). Le vrai chemin de code,
+invoqué par les 13 callers de numérotation (`trg_devis_numero`, `trg_facture_numero`,
+`trg_commande_numero`, etc.), n'était donc jamais corrigé.
+
+Numérotation vérifiée avant portage : dernière migration du train `20260922000316` →
+`...000317` **libre** (aucune supposition faite sur sa disponibilité, comme demandé). Le
+correctif source et son test pgTAP utilisent déjà ce numéro dans leur contenu (nom de fichier
+et commentaires) : **aucune renumérotation nécessaire**, portage verbatim.
+
+### 18.2 — Contenu porté
+
+Les 3 fichiers du correctif qualifié, verbatim, depuis `c321849` :
+
+- `supabase/migrations/20260922000317_correctif_troncature_next_reference.sql` — `create or
+  replace function public.next_reference(...)`, signature strictement inchangée, seul le
+  formatage change : `lpad(v_numero::text, greatest(p_largeur, length(v_numero::text)), '0')` —
+  la largeur configurée devient un plancher, jamais un plafond.
+- `supabase/tests/gp_v1_numerotation_documents.test.sql` — 15 assertions pgTAP (frontières
+  1/9/99/999/1000/1001/9999 + devis/factures/avoir/commandes fournisseurs réels).
+- `docs/qualification/ELSATIA_GP_NUMBERING_OVERFLOW_FIX_V1.md` — rapport de qualification
+  source, conservé tel quel pour la provenance.
+
+Aucun autre changement de `festive-hamilton` porté. Aucune règle métier modifiée (vérifié
+explicitement avant portage et revérifié après) : série FAC des avoirs (l'avoir #1001 du test
+partage toujours la série `FAC-`), compteur commun facture/acompte/situation/finale/avoir,
+année basée sur `now()`, `situations_travaux` utilisant toujours `MAX()+1`
+(`supabase/migrations/20260715000080`, `20260818000211`, `20260818000215`, inchangées).
+
+Commit de portage : `f12436b` (poussé sur `claude/compassionate-euler-5j6avr`).
+
+### 18.3 — Rejeu complet depuis une base vide
+
+Harnais reconstruit à l'identique de la méthode du §17.1 (PostgreSQL 16 apt, schémas
+`auth`/`storage`/`extensions` stubés, rôles `anon`/`authenticated`/`service_role`,
+`auth.uid()/role()/jwt()/email()` par GUC `request.jwt.claim(s)`, `storage.foldername()`,
+extension `pgsodium` factice hors dépôt). Deux affinements du harnais découverts et corrigés
+dans cette session (aucun fichier du dépôt modifié) : `unaccent` doit être créée par la
+migration elle-même (dans `public`), pas pré-créée dans `extensions` ; le rejeu doit se faire
+en tant que `session_user = 'postgres'` (une migration gate un bypass de fixture sur ce nom de
+rôle exact) ; les rôles applicatifs créés par les migrations doivent être purgés entre deux
+rejeux (rôles globaux au cluster, sinon ils polluent les assertions d'appartenance de rôle
+d'un rejeu à l'autre).
+
+**Fresh : 308/308 migrations appliquées, 0 erreur SQL**, reproduit deux fois de façon
+indépendante (deux bases neuves distinctes, résultat identique). Compteurs post-migration :
+232 tables publiques (232/232 RLS active), 549 policies, 601 fonctions applicatives, 149
+triggers non internes — strictement identique au dénombrement du §17.2 (307 migrations),
+comme attendu d'un correctif qui ne fait que `CREATE OR REPLACE FUNCTION` sur une fonction déjà
+existante, sans ajouter ni table ni policy ni trigger.
+
+### 18.4 — pgTAP complet
+
+```
+Files=90, Tests=2412
+Result: FAIL (5 fichiers non entièrement verts sur 90)
+```
+
+**85/90 fichiers entièrement verts** (contre 83/88 au §17.3). Les 5 fichiers non verts ont des
+causes **vérifiées identiques, mot pour mot**, à celles déjà documentées au §17.3 — aucune
+nouvelle cause, aucune régression introduite par ce portage :
+
+| Fichier | État ici | État §17.3 | Cause |
+|---|---|---|---|
+| `document_partage_public_par_jeton_v1.test.sql` | 10/42 exécutés | 10/42 | `Les lignes d'une facture émise ne peuvent plus être modifiées` — identique |
+| `gp_pilot_notification_devis_accepte.test.sql` | 7 exécutés, 3 échoués | 7 exécutés, 3 échoués | `notifications_utilisateurs_niveau_check` — identique |
+| `gp_pilot_plateforme_admin_role_total.test.sql` | 0/6 exécutés | 0/6 | `plateforme_admins_actif_requiert_utilisateur_id` — identique |
+| `gp_pilot_rgpd_manifeste_fichiers.test.sql` | 1/9 exécutés | 1/9 | contradiction interne au test, décision requise — identique, non traité ici (hors périmètre de cette mission) |
+| `platform_stripe_state_attestation_r72.test.sql` | hors de portée du harnais | hors de portée | nécessite de **produire** une signature Ed25519, capacité que `pgsodium` factice ne fournit pas — identique |
+
+Une amélioration nette, attribuable au harnais et non au correctif : `platform_audit_log_bounded_v1.test.sql`,
+6/12 avec 3 échecs au §17.3 (« limite probable du harnais », déjà qualifiée comme telle), est
+**12/12 vert** dans ce rejeu. Net : 5 fichiers non verts contre 5 au §17.3 en comptant à
+périmètre identique (le 6ᵉ, `platform_audit_log_bounded_v1`, sort de la liste), **0 nouvelle
+régression**.
+
+### 18.5 — `gp_v1_numerotation_documents.test.sql` — 15/15 PASS
+
+Toutes les assertions passent, y compris les 3 charnières de la frontière
+999/1000/1001 (`AUD-999` inchangé, `AUD-1000` **et non** `AUD-100`, `AUD-1001`) et leur
+équivalent sur les chemins métier réels (devis `DEV-2026-999/1000/1001` via une vraie
+transition `brouillon → envoye`, factures `FAC-2026-999/1000/1001` avec l'avoir #1001 qui
+partage bien la même série, commandes fournisseurs `CMD-2026-999/1000`).
+
+Contre-preuve effectuée (fonction pré-correctif rejouée dans une transaction annulée, sur la
+même base migrée) : la version d'avant correctif produit `AUD-999 / AUD-100 / AUD-100` (collision
+déterministe) ; la version portée produit `AUD-999 / AUD-1000 / AUD-1001`.
+
+### 18.6 — 999 / 1000 / 1001, concurrence, isolation multi-tenant — vérifications explicites
+
+- **999 / 1000 / 1001** : couvert par §18.5 ci-dessus, sur `next_reference()` directement et
+  sur les 3 chemins métier réels (devis, factures, commandes fournisseurs).
+- **Concurrence réelle** : deux sessions PostgreSQL indépendantes, interleaving contrôlé par
+  FIFO nommés, sur le même compteur `(entreprise_id, type)` à 999. Verrou observé
+  empiriquement (`pg_stat_activity` : session B `active/Lock/transactionid` pendant que la
+  session A reste ouverte non validée) — pas seulement déduit par raisonnement. Résultat :
+  deux numéros distincts (`AUD-1000` / `AUD-1001`) sur l'appel direct, et `DEV-2026-1000` /
+  `DEV-2026-1001` (2 lignes, 2 numéros distincts, **0 erreur 23505**) sur le chemin métier réel
+  (`INSERT` + `UPDATE` déclenchant `trg_devis_numero`).
+- **Isolation multi-tenant à la frontière** : deux entreprises différentes, compteurs `devis`
+  tous deux à 999, deux transactions ouvertes **simultanément** (aucune des deux à l'état
+  `Lock` dans `pg_stat_activity` — confirmé qu'aucune n'attend l'autre). Chacune franchit
+  999→1000 indépendamment et obtient son propre `DEV-2026-1000` (compteurs
+  `compteurs_reference` étant des lignes distinctes par `(entreprise_id, type)`) : aucune
+  interférence.
+
+### 18.7 — Vérifications non-SQL rejouées
+
+- `verify:migrations` : **308** migrations, noms/horodatages uniques — PASS.
+- `verify:secrets` : **2476** fichiers suivis contrôlés, aucun secret reconnu (1 exception
+  nommée, inchangée) — PASS.
+- `npm run typecheck` (GP + Tools + Reserves + Colors) : **PASS**, 0 erreur, les 4 apps.
+- `npm run lint` (GP + Tools + Reserves + Colors) : **PASS**, 0 erreur (6 avertissements
+  préexistants sur GP, aucun dans un fichier touché par ce lot).
+- `npm run test` (Vitest, GP + Tools + Reserves + Colors) : **4359/4359 tests, 377/377
+  fichiers, tous PASS**, aucune régression.
+- Build : GP (`next build`, 195 routes) et Reserves **PASS** directement. Tools et Colors
+  s'arrêtent à leur garde-fou `verify-public-env` préexistant (`NEXT_PUBLIC_TOOLS_ENV=local` /
+  `ELSATIA_APPLICATION_ENV=local` requis hors déploiement réel, comportement documenté et
+  antérieur à ce lot, sans rapport avec un changement SQL/Markdown) ; compilation confirmée
+  **PASS** avec le flag local documenté par chaque garde-fou (Tools : 47 pages statiques ;
+  Colors : 27 routes). Aucun fichier TypeScript/JavaScript n'étant touché par ce lot (uniquement
+  SQL + Markdown), ces résultats ne peuvent pas être affectés par le correctif porté.
+
+Rejeu effectué deux fois de façon indépendante (deux bases neuves) pour le Fresh/pgTAP ; aucune
+modification de fichier du dépôt par ces vérifications elles-mêmes (harnais entièrement hors
+dépôt, comme au §17.1).
+
+### 18.8 — Statut après ce lot
+
+**Verdict : `NUMBERING FIX INTEGRATED`.**
+
+`CONVERGENCE_TRAIN_CANDIDATE` avance de `cd4fe74` à ce lot (portage `f12436b` + cette mise à
+jour documentaire). `FINAL_PREVIEW_TRAIN = NOT_YET` (inchangé — les 2 `DECISION_REQUIRED`
+Studio du §16.4/16.5 restent en attente, hors périmètre de cette mission). Fresh 308/308,
+pgTAP 2412 assertions (85/90 fichiers entièrement verts, 4 échecs préexistants identiques au
+§17.3 + 1 hors de portée du harnais identique, 0 nouvelle régression, 1 amélioration
+attribuable au harnais), typecheck/lint/Vitest/build GP confirmés PASS, frontières
+999/1000/1001 + concurrence réelle + isolation multi-tenant vérifiées empiriquement et non par
+déduction. Aucun déploiement, aucune Preview, aucune Production.
