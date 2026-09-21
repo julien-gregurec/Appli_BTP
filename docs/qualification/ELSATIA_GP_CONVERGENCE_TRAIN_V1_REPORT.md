@@ -324,3 +324,47 @@ Aucun des 12 items du §8 n'est affecté. Point ajouté : ne jamais réintroduir
 ### 12.7 — Statut après ce lot
 
 `CONVERGENCE_TRAIN_CANDIDATE = b991365` (branche `claude/compassionate-euler-5j6avr`, à pousser). `FINAL_PREVIEW_TRAIN = NOT_YET`. Prochains lots : DR/release gate → Colors (voie restante) → Reserves → Studio.
+
+---
+
+## 13. Lot DR / release gate (4ᵉ édition de ce rapport, même branche, aucun train concurrent)
+
+**Point de départ** : `CONVERGENCE_TRAIN_CANDIDATE = faad7d7` (HEAD après le lot ENV manifest, §12).
+
+### 13.1 — Comparaison avant portage
+
+| Branche candidate | Constat |
+|---|---|
+| `feat/preprod-e2e-runbook-integration-v1` (`6df3ebd`) | **Déjà ancêtre de HEAD** (`git merge-base --is-ancestor` confirmé) — le socle DR (runbook rollback + preuve E2E CODEX) était déjà absorbé via ECO. Rien à porter. |
+| `docs/elsatia-production-rollback-runbook-v1`, `codex/elsatia-preprod-db-e2e-rollback-v1` | Parents directs de `6df3ebd` ci-dessus — **déjà présents** (`docs/runbooks/ELSATIA_PRODUCTION_ROLLBACK_V1.md`, `docs/audits/ELSATIA_PREPROD_DB_E2E_ROLLBACK_V1.md` confirmés dans l'arbre). Rien à porter. |
+| `docs/gp-cutover-documentation-closure-v1` | 4 commits réellement absents (`aabe612`, `35d2d2b`, `8d4c248`, `70e11b9`) — doc-only, superset des 3 étapes précédentes de la même chaîne → **porté** (§13.2). |
+| `docs/gp-cutover-documentation-closure-on-hotfix-v1` | Diff ciblé sur les seuls fichiers cutover/runbook contre la branche ci-dessus : **vide** (contenu cutover identique octet pour octet). Son propre diff plus large ne porte que sur des docs GP postcutover pilot hotfix, hors périmètre DR → **non porté**, redondant pour ce lot. |
+| `docs/elsatia-production-migration-cutover-preflight-v1` | 3 commits, dont 2 hors sujet (`553966c` feat(billing), `da9c8be` docs(commercial) — pricing modulaire, sans rapport avec le cutover et potentiellement obsolètes face au socle commercial ECO déjà porté) → **1 seul commit porté** (`25e377b`, §13.3), les 2 autres écartés explicitement. |
+| `chore/restore-canonical-migration-history-v1` | Confirmé hors périmètre DR (restaure des fichiers de migration déjà appliqués, pas une procédure de sauvegarde/restauration DB — conforme à la lecture de la carte de convergence §11) → **non porté**. |
+
+### 13.2 — Porté : `docs/gp-cutover-documentation-closure-v1` (4 commits)
+
+Cherry-pickés dans l'ordre (`aabe612` → `35d2d2b` → `8d4c248` → `70e11b9`). **2 conflits réels**, tous deux résolus en conservant le contenu du train actuel et en y intégrant l'apport réel du commit source (pas un remplacement aveugle) :
+
+- `.env.example` (`aabe612`) : le commit datait d'avant l'essentiel de l'évolution de ce fichier dans ce train (`ELSATIA_APPLICATION_ENV`, `NEXT_PUBLIC_LEGAL_SIRET`, etc., déjà présents et plus complets côté HEAD) — contenu HEAD conservé intégralement, rien de l'ancienne version reporté.
+- `docs/runbooks/ELSATIA_PRODUCTION_CUTOVER_PREFLIGHT_FINAL_V1.md` (`35d2d2b`) : le paragraphe HEAD sur la convention de clé publique Supabase et la nouvelle sous-section « 5.0 Type Vercel `sensitive` » du commit source ne s'excluaient pas — **les deux fusionnés**, dans cet ordre.
+
+Apporte notamment : `docs/runbooks/ELSATIA_GP_CUTOVER_DAY_OF_RUNBOOK_V1.md`, `docs/runbooks/INDEX_CUTOVER_GP_V1.md`, `scripts/verify-cutover-docs.mjs`, et la distinction explicite PITR vs sauvegarde managée quotidienne (`70e11b9`).
+
+### 13.3 — Porté : `25e377b` seul (préflight cutover GP+Colors+Tools)
+
+Commit purement additif (1 nouveau fichier, `docs/audits/ELSATIA_PRODUCTION_MIGRATION_CUTOVER_PREFLIGHT_V1.md`, 0 fichier de code) — cherry-pické sans conflit. Les 2 autres commits de sa branche d'origine (pricing modulaire) **délibérément écartés** : hors du périmètre DR de ce lot, et le socle commercial de ce train (§2 lot 7, §7) a déjà évolué très au-delà de ce que ces 2 commits proposaient — les porter aurait réintroduit du contenu commercial potentiellement obsolète sous couvert d'un lot documentaire.
+
+### 13.4 — Vérifications
+
+- `node scripts/verify-cutover-docs.mjs` → **PASS 51/51** — cohérence interne des documents de cutover confirmée. **Réserve importante, à documenter explicitement** : ce contrôle vérifie la cohérence *entre les documents eux-mêmes* (SHA cible, ledger de migrations cités), pas leur exactitude par rapport à l'état réel actuel du train. Les documents portés référencent un SHA cible historique (`996be15`) et un ledger de 210→263 migrations — **notre train actuel compte 296 migrations et un HEAD très postérieur**. Le contenu procédural (ordre des étapes, points de non-retour, doctrine PITR/rollback) reste valide et réutilisable, mais **ces runbooks devront être rejoués/mis à jour contre le HEAD réel avant tout cutover effectif** — ce n'est pas fait dans ce lot (documentaire, hors périmètre "convergence").
+- Distinction PITR / sauvegarde managée quotidienne : **confirmée présente et correctement gardée** (`ELSATIA_GP_CUTOVER_DAY_OF_RUNBOOK_V1.md` : STOP explicite si le plan Supabase Production n'a pas de PITR constaté, aucune valeur par défaut supposée).
+- `tsc --noEmit` PASS (0 erreur) ; `eslint` PASS (0 erreur, mêmes 5 avertissements pré-existants) ; `vitest run` PASS **1786/1786** (153 fichiers, +9 tests — `src/components/DocumentLegal.test.ts` nouveau, `src/lib/ai/providers/openai.test.ts` modifié, apportés par `3184e3e`) ; `verify:migrations` PASS (**296, inchangé**) ; `verify:secrets` PASS (2236 fichiers, 0 secret) ; `check-env-manifest.mjs` toujours **0 erreur**. Fresh/pgTAP non rejoués (aucune migration touchée par ce lot).
+
+### 13.5 — MUST_NOT_LOSE — mise à jour
+
+Aucun des 12 items du §8 n'est affecté. Ajout d'un point de vigilance DR : la preuve E2E locale réelle (`codex/elsatia-preprod-db-e2e-rollback-v1`, item §18.12 de la carte de convergence) reste dans ce train exactement comme héritée d'ECO — non ré-exécutée dans cette session (aucun Docker/Supabase CLI disponible), sa valeur de preuve reste celle documentée à l'origine, pas revalidée contre les 296 migrations actuelles.
+
+### 13.6 — Statut après ce lot
+
+`CONVERGENCE_TRAIN_CANDIDATE = 693f877` (branche `claude/compassionate-euler-5j6avr`, à pousser). `FINAL_PREVIEW_TRAIN = NOT_YET`. Prochains lots : Colors (voie restante) → Reserves → Studio.
