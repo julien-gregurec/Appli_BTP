@@ -5,7 +5,10 @@ import {
   canManageWorkspace,
   isStudioId,
   isStudioRole,
+  isStudioSignupAllowlisted,
   safeStudioDestination,
+  studioLegalPublished,
+  studioSignupMode,
   workspaceName,
 } from "@elsatia/studio-domain";
 import { createStudioClient } from "../lib/supabase";
@@ -51,6 +54,17 @@ export async function signup(form: FormData) {
       "/signup",
       "Indiquez un email valide et un mot de passe de 12 caractères minimum.",
     );
+  // Server-only gate: enforced on every signup submission regardless of the client.
+  // Both branches use the same message so the response never reveals which gate closed.
+  if (!studioLegalPublished(process.env.STUDIO_LEGAL_PUBLISHED))
+    failure("/signup", "Inscription indisponible pour le moment.");
+  const signupMode = studioSignupMode(process.env.STUDIO_SIGNUP_MODE);
+  if (
+    signupMode === "closed" ||
+    (signupMode === "allowlist" &&
+      !isStudioSignupAllowlisted(email, process.env.STUDIO_SIGNUP_ALLOWLIST))
+  )
+    failure("/signup", "Inscription indisponible pour le moment.");
   const client = await createStudioClient();
   const { data, error } = await client.auth.signUp({
     email,
