@@ -13,10 +13,12 @@ mission `perf/gp-capacity-readiness-v1`, base `release/gp-v1-rc`) — Dashboard
 ~1,7-1,8 s, recherche texte ~1,76 s sous RLS — sans affaiblir la sécurité ni
 contourner la RLS de façon non contrôlée.**
 
-**Verdict : `PERFORMANCE CANDIDATE`** (confirmé par un lot de qualification
-dédié, § 12-13 : non promu `PERFORMANCE QUALIFIED`, un seul écart de cache à
-gravité faible et non exploitable par le produit actuel) — voir § 9
-(benchmark) et § 13 (verdict détaillé).
+**Verdict : `PERFORMANCE QUALIFIED`** (lot de qualification dédié, § 12-13 —
+l'unique écart de cache trouvé lors de la qualification, § 12.3, a depuis été
+root-causé, corrigé par un correctif minimal localisé au seul trigger
+concerné, et reverifié 12/12 sur deux bases indépendantes ; historique complet
+de la découverte à la correction conservé § 12.3) — voir § 9 (benchmark) et
+§ 13 (verdict détaillé).
 
 ---
 
@@ -803,7 +805,7 @@ aucune divergence.
 
 **Équivalence métier : PASS.**
 
-### 12.3 Audit du cache incrémental — un écart réel trouvé, non corrigé
+### 12.3 Audit du cache incrémental — un écart réel trouvé, puis corrigé
 
 Scénarios testés sur `entreprises_dashboard_cache`, avec vérification
 `cache == recalcul canonique depuis les tables sources` après chacun :
@@ -821,11 +823,16 @@ Scénarios testés sur `entreprises_dashboard_cache`, avec vérification
 | Transaction annulée (ROLLBACK) | ✅ effet du trigger annulé avec la transaction (garantie MVCC standard), cache revenu exactement à sa valeur d'avant, aucune ligne orpheline |
 | Écritures concurrentes (5 sessions réelles × 100 INSERT chacune, même tenant) | ✅ cache final exact (delta = somme des 500 lignes), 0 erreur, 0 deadlock |
 | Reconstruction complète du cache depuis les sources (tous les tenants du bac à sable) | ✅ 0 divergence |
-| **Changement d'entreprise (`entreprise_id`) sur une facture `brouillon`** | ❌ **cache non mis à jour** (voir ci-dessous) |
+| **Changement d'entreprise (`entreprise_id`) sur une facture `brouillon`** | ✅ **corrigé** (initialement ❌, voir historique ci-dessous) |
 
-**Écart trouvé — documenté, non corrigé** (conformément à l'esprit de la
-mission : une anomalie se documente, elle ne déclenche pas un second
-correctif improvisé) :
+**Historique — trouvé lors de cette qualification, documenté d'abord sans
+correction, puis corrigé lors d'un lot de qualification finale dédié.** Ce qui
+suit reconstitue les deux étapes sans effacer la première : le scénario 12/12
+a d'abord été observé en échec (11/12) et volontairement laissé tel quel
+(voir raisonnement « gravité faible » ci-dessous), avant qu'un lot de
+qualification finale explicite ne demande de fermer cet écart plutôt que de
+se contenter du statu quo — voir § « Correction appliquée » plus bas pour ce
+qui a effectivement changé.
 
 Le trigger `maj_cache_dashboard_factures` se déclenche `AFTER INSERT OR
 DELETE OR UPDATE OF statut, montant_ttc, montant_paye` — **pas** `OF
@@ -870,17 +877,105 @@ corriger dans ce lot) :
    confirmée par lecture des policies) — un profil rare, pas le flux normal
    d'un utilisateur.
 
-**Non corrigé dans ce lot** (élargirait la migration 317 hors du strict
-périmètre de qualification — signalé ici comme limite documentée plutôt que
-comme un second correctif improvisé, dans le même esprit que la consigne
-donnée pour `next_reference`). Une correction propre existerait (ajouter
-`OF entreprise_id` à la clause `UPDATE OF` du trigger) mais n'a pas été
-appliquée ici, conformément aux instructions de ce lot ("ne relance aucune
-optimisation fonctionnelle").
+**Non corrigé dans le lot de qualification précédent** (élargirait la
+migration 317 hors du strict périmètre de cette qualification-là — signalé
+comme limite documentée plutôt que comme un second correctif improvisé, dans
+le même esprit que la consigne donnée pour `next_reference`). Une correction
+propre existerait (ajouter `OF entreprise_id` à la clause `UPDATE OF` du
+trigger) mais n'avait pas été appliquée à ce stade.
 
-**Cohérence du cache : PASS partiel** — cohérent dans 11 des 12 scénarios
-testés ; l'unique écart est structurellement inatteignable par l'application
-réelle et n'affecte pas l'isolation tenant.
+**Cause technique exacte — démontrée en deux couches indépendantes**
+(rejouée sur base jetable dédiée, avant toute correction) :
+1. Le trigger `maj_cache_dashboard_factures` se déclenche `AFTER ... UPDATE
+   OF statut, montant_ttc, montant_paye` — `entreprise_id` absent de cette
+   liste. Un `UPDATE factures SET entreprise_id = <autre tenant>, client_id =
+   <...>` qui ne touche aucune des 3 colonnes surveillées **ne déclenche
+   jamais le trigger** : reproduit directement (`cache tenant 1 avant = 1200,
+   cache tenant 2 avant = NULL` → après la mutation, `cache tenant 1 = 1200`
+   inchangé, `cache tenant 2 = NULL` inchangé).
+2. Même quand le trigger se déclenche (parce que `entreprise_id` change **en
+   même temps** qu'une colonne surveillée, ex. `montant_paye`), le corps de
+   la fonction calculait un **delta scalaire unique appliqué à une seule
+   ligne** de cache — `coalesce(new.entreprise_id, old.entreprise_id)`
+   résout systématiquement vers `new.entreprise_id` en `UPDATE` (`old` n'est
+   jamais `NULL`) : l'ancien tenant n'était jamais débité, le nouveau ne
+   recevait qu'un delta net (parfois nul selon les montants), jamais le
+   montant complet de la facture déplacée. Reproduit séparément avec une
+   mutation combinée (`entreprise_id` + `montant_paye` modifiés ensemble).
+
+`devis` n'est **pas** touché par cette même classe de défaut, vérifié par
+lecture du code et test direct : `devis_acceptes_total` ne compte que les
+devis au statut `accepte`, et `verrouiller_devis_accepte` interdit tout
+changement d'`entreprise_id` (comme toute autre colonne) dès qu'un devis est
+accepté — la réattribution cross-tenant y est structurellement impossible,
+qu'un devis change d'entreprise avant d'être accepté n'a aucune incidence
+puisqu'il ne contribue au total qu'au moment où il devient `accepte`, sous sa
+nouvelle entreprise.
+
+**Correction appliquée** — migration
+`20260922000318_correctif_cache_dashboard_changement_entreprise.sql`, portant
+strictement sur ce trigger, décidée après un lot de qualification finale
+dédié qui a explicitement demandé de fermer cet écart plutôt que de le
+laisser en l'état, avec la consigne : même si le code applicatif actuel ne
+permet pas cette mutation, l'intégrité du cache doit rester correcte face à
+toute mutation SQL valide autorisée par le schéma. Deux changements
+minimaux, sans redesign du cache et sans toucher `dashboard_indicateurs()`,
+les 4 RPC de recherche, `next_reference()` ou une quelconque règle métier :
+1. Le trigger se déclenche désormais aussi sur `UPDATE OF entreprise_id`.
+2. Quand `entreprise_id` change réellement entre `OLD` et `NEW`, la fonction
+   applique **deux** UPSERT distincts (retire la contribution de l'ancienne
+   entreprise, ajoute celle de la nouvelle) au lieu d'un seul delta scalaire
+   mal attribué. Le chemin "même tenant" (100 % du trafic applicatif réel
+   actuel) reproduit exactement l'ancien corps de fonction, byte pour byte —
+   aucun comportement existant modifié.
+
+**Test avant/après** — couverture de régression ajoutée (assertions 10-13 de
+`gp_dashboard_search_perf_dashboard_indicateurs.test.sql`, plan porté de 9 à
+13) : `UPDATE factures SET entreprise_id = <autre tenant>` sur une facture
+brouillon, hors RLS (rôle propriétaire, la question de qui a le droit
+d'effectuer une telle mutation est auditée séparément § 12.4/12.5), avec
+vérification du cache de l'**ancien** tenant (débité, cohérent avec le
+recalcul canonique) et du **nouveau** tenant (crédité du montant complet, pas
+un delta net partiel). Confirmé empiriquement comme un vrai test de
+non-régression : **échoue** (3 assertions en échec) rejoué contre le trigger
+pré-correctif, **passe** (13/13) rejoué contre le trigger post-correctif —
+vérifié en revenant temporairement à l'ancienne version de la fonction puis
+en réappliquant la migration 318.
+
+**Non-dégradation vérifiée** sur le trigger corrigé, en plus des 12
+scénarios ci-dessus rejoués sans divergence :
+- **Écritures concurrentes sur le chemin inchangé** : 5 sessions réelles ×
+  100 `INSERT` chacune sur le même tenant → cache final exact (+60 000 sur
+  500 lignes), 0 erreur, 0 deadlock.
+- **Écritures concurrentes sur la nouvelle branche** : 5 sessions réelles
+  déplaçant en parallèle des factures (`SELECT ... FOR UPDATE SKIP LOCKED`)
+  entre deux mêmes tenants → 100/100 factures déplacées, cache de
+  **l'ancien** tenant et du **nouveau** tenant tous deux exacts vs recalcul
+  canonique, 0 erreur, 0 deadlock, 0 double-comptage.
+- INSERT, UPDATE statut, UPDATE montants, DELETE (facture brouillon
+  dédiée, verrou de statut non applicable), rollback (`SAVEPOINT` /
+  `ROLLBACK TO SAVEPOINT`) : tous rejoués après le correctif, valeurs
+  identiques aux attentes d'origine.
+- Reconstruction complète du cache depuis les tables sources (tous les
+  tenants) : 0 divergence, sur `gp_perf` comme sur `gp_perf_fresh`
+  (base entièrement neuve avec la migration 318 incluse, § 12.7).
+
+**Sécurité re-vérifiée** (le trigger modifié est `SECURITY DEFINER`) :
+owner `supabase_migrator` inchangé, `search_path = public` explicite
+inchangé, aucun GRANT direct exploitable (fonction de type `trigger`, non
+appelable directement), aucune fuite cross-tenant possible dans la nouvelle
+branche (deux UPSERT indépendants, chacun strictement scopé à son
+`entreprise_id`), aucun SQL dynamique, aucune élévation de privilège
+possible. Aucune propriété de sécurité non comportementale modifiée par
+rapport à la version précédente — seul le corps de la fonction (nouvelle
+branche de calcul) et la clause `UPDATE OF` du trigger ont changé.
+
+**Cohérence du cache : 12/12 — PASS complet**, après correction. L'écart
+initial (11/12) est resté réel et documenté dans l'historique de ce rapport ;
+il a été root-causé avec démonstration directe, corrigé par un changement
+minimal localisé au seul trigger concerné, couvert par un test de
+non-régression, et revérifié sans divergence sur deux bases indépendantes
+(`gp_perf` ×2 et `gp_perf_fresh` neuve).
 
 ### 12.4 Isolation multi-tenant — dashboard + 4 RPC de recherche
 
@@ -929,6 +1024,23 @@ sécurisé").**
 
 **SECURITY DEFINER : PASS.**
 
+**Re-audit après le correctif § 12.3** (le trigger
+`trg_maj_cache_dashboard_factures`, modifié par la migration 318, est
+lui-même `SECURITY DEFINER`) : owner `supabase_migrator` inchangé,
+`search_path = public` explicite inchangé (byte pour byte), aucun GRANT
+direct exploitable (fonction de type `trigger`, `PostgreSQL` refuse tout
+appel direct hors mécanisme de déclenchement quel que soit le GRANT), aucun
+SQL dynamique, aucun appel à une autre fonction `SECURITY DEFINER`, aucune
+instruction de rôle/grant dans le corps. Isolation tenant de la nouvelle
+branche vérifiée par lecture : les deux UPSERT du cas "changement
+d'entreprise" sont chacun scopés strictement à un seul `entreprise_id`
+(`old.entreprise_id` pour le débit, `new.entreprise_id` pour le crédit), sans
+variable partagée entre les deux écritures — aucune fuite cross-tenant
+possible. Aucune propriété de sécurité non comportementale modifiée par
+rapport à la version précédente (317) : seuls le corps de la fonction et la
+clause `UPDATE OF` du trigger ont changé. **Aucune nouvelle classe de
+vulnérabilité introduite. PASS.**
+
 ### 12.6 Benchmark reproductible — médiane/p95/max
 
 Harness reproductible (scripts SQL générés, `\timing on`, N=25 appels par
@@ -960,6 +1072,28 @@ l'objectif). Mesures stables (écart min-max étroit par scénario, pas de
 valeur aberrante isolée) — pas une mesure unique présentée comme
 représentative.
 
+**Non-régression avant/après le correctif § 12.3** — le changement est
+strictement local au trigger `trg_maj_cache_dashboard_factures` (jamais
+appelé par `dashboard_indicateurs()`, qui lit uniquement la table de cache
+déjà maintenue), donc pas de nouvelle campagne complète : contrôle ciblé du
+Dashboard nominal, rejoué avec le même harness (N=25, 3 d'échauffement
+écartés, n=22) sur `gp_perf_fresh` reconstruite avec la migration 318
+incluse :
+
+| Scénario | Avant (migration 317) | Après (migration 318) | Écart |
+| --- | ---: | ---: | ---: |
+| Médiane | 26,87 ms | 27,90 ms | +3,8 % |
+| p95 | 28,81 ms | 30,51 ms | +5,9 % |
+| Max | 30,73 ms | 31,94 ms | +3,9 % |
+
+Écart faible, cohérent avec du bruit de mesure (bases/sessions distinctes,
+même mission) — **aucune régression structurelle** : toujours très largement
+sous l'objectif de mission (<1 s), avec une marge d'environ ×31 sur la
+médiane. Complété par un contrôle de non-dégradation fonctionnelle du trigger
+lui-même (§ 12.3 : INSERT, UPDATE statut, UPDATE montants, DELETE, rollback,
+écritures concurrentes sur les deux branches — chemin inchangé et nouvelle
+branche — toutes vérifiées sans divergence).
+
 ### 12.7 Fresh qualification — base entièrement vide
 
 Rejoué en une seule séquence continue, sur une base créée de zéro pour ce
@@ -988,6 +1122,35 @@ mission) :
 9. `npx next build` : compilé avec succès (identique à la mission initiale ;
    `apps/tools` toujours hors périmètre, même cause pré-existante).
 
+**Rejeu complet, refait pour la qualification finale, avec la migration 318
+incluse** (fermeture de l'écart § 12.3 — `gp_perf_fresh` entièrement
+reconstruite de zéro, distincte de la précédente) :
+
+1. Rejeu des **300** migrations, dont la 318, en une seule séquence continue
+   (0 erreur).
+2. Fixture nominale régénérée de zéro (5312 devis/3200 factures — volume
+   nominal, légèrement différent d'un rejeu synthétique à l'autre par
+   construction du générateur, sans incidence sur la comparaison) — cache
+   construit exclusivement par les triggers incrémentaux, migration 318
+   incluse dès l'origine.
+3. Comparaison cache vs recalcul canonique, tous tenants : **0 divergence**.
+4. pgTAP — les 3 fichiers dédiés (`gp_dashboard_search_perf_*`, désormais 31
+   assertions au total : le fichier `dashboard_indicateurs` est passé de 9 à
+   13 assertions avec la couverture de régression § 12.3) : **31/31 PASS**,
+   y compris les 4 nouvelles assertions du scénario changement
+   d'`entreprise_id` (ancien tenant, nouveau tenant, delta exact).
+5. pgTAP — suite complète (82 fichiers) : **60/82 verts, exactement les 22
+   mêmes échecs pré-existants**, identiques byte pour byte à ceux déjà
+   documentés ci-dessus et à ceux observés sur `gp_perf` (les deux bases
+   rejouées pour cette clôture donnent la même liste de 22 fichiers).
+   **Aucun nouvel échec.**
+6. `npx tsc --noEmit` : 0 erreur.
+7. `npx eslint` (racine, périmètre Gestion Pro) : 0 erreur (5 avertissements
+   pré-existants, fichiers non touchés par cette migration).
+8. `npx vitest run --no-file-parallelism` : **1777/1777** (identique).
+9. `npx next build` : compilé avec succès, route `/dashboard` générée sans
+   erreur (identique).
+
 **Comparaison au baseline** : correction apportée au passage — le décompte
 initial de la mission précédente ("19 échecs pré-existants", § 8.2) était
 sous-évalué de 3 fichiers, omis par erreur de l'énumération manuelle
@@ -1010,50 +1173,56 @@ deux bases.
 | --- | --- |
 | Dashboard < 1 s au volume ×2 | ✅ 69,86 ms max (§ 12.6) |
 | Valeurs métier avant/après équivalentes | ✅ 24/24, 0 divergence (§ 12.2) |
-| Cache cohérent dans tous les scénarios testés | ❌ 11/12 — écart réel sur le changement d'`entreprise_id` d'une facture brouillon (§ 12.3) |
-| Aucune fuite cross-tenant détectée | ✅ (§ 12.4) |
-| RPC `SECURITY DEFINER` correctement bornées | ✅ (§ 12.5) |
+| Cache cohérent dans tous les scénarios testés | ✅ **12/12** — écart initial (changement d'`entreprise_id` d'une facture brouillon) root-causé et corrigé, revérifié sans divergence sur deux bases indépendantes (§ 12.3) |
+| Aucune fuite cross-tenant détectée | ✅ (§ 12.4), y compris sur la nouvelle branche du trigger corrigé (§ 12.3/12.5) |
+| RPC `SECURITY DEFINER` correctement bornées | ✅ (§ 12.5), trigger modifié re-audité : aucune propriété de sécurité altérée |
 | Recherches réelles dans des performances acceptables | ✅ toutes < 200 ms, objectif 500 ms (§ 12.6) |
 | `next_reference()` sans collision en qualification | ✅ (§ 12.1) |
-| Fresh replay | ✅ (§ 12.7) |
+| Fresh replay | ✅ (§ 12.7), rejoué une seconde fois avec la migration 318 incluse, 0 nouvel échec |
 | Aucune nouvelle régression pgTAP/Vitest/typecheck/lint/build | ✅ (§ 12.7) |
+| Aucune dégradation de performance introduite par le correctif du cache | ✅ Dashboard nominal avant/après : +3,8 % médiane, +5,9 % p95, bruit de mesure, aucune régression structurelle (§ 12.6) |
 
-8 critères sur 9 strictement satisfaits. Le seul écart (cache, changement
-d'entreprise sur facture brouillon) est réel, documenté avec preuve directe,
-mais structurellement inatteignable par le produit tel qu'il existe
-aujourd'hui (§ 12.3, 4 raisons convergentes), auto-réparable par
-reconstruction, et sans impact sur le cloisonnement tenant ni sur la
-performance. Ce n'est pas une gravité justifiant `PERFORMANCE NOT
-QUALIFIED` (pas de vulnérabilité de sécurité, pas de régression, pas de
-dépassement d'objectif de performance) — mais la lettre du critère 3
-("dans tous les scénarios testés") n'est, strictement, pas remplie à 100 %.
+**9 critères sur 9 strictement satisfaits.** L'unique écart trouvé au cours
+de cette qualification (cache, changement d'entreprise sur facture
+brouillon, § 12.3) a été root-causé avec démonstration directe, corrigé par
+un changement minimal strictement localisé au trigger concerné (aucun
+redesign du cache, aucune modification de `dashboard_indicateurs()`, des RPC
+de recherche, de `next_reference()` ou d'une règle métier), couvert par un
+test de non-régression qui échoue avant le correctif et passe après, et
+revérifié 12/12 sans aucune divergence sur deux bases indépendantes
+(`gp_perf` ×2 et `gp_perf_fresh` entièrement neuve, migration 318 incluse
+dès le rejeu des migrations).
 
 ### 13.2 Verdict
 
-**`PERFORMANCE CANDIDATE`** (inchangé — non promu à `PERFORMANCE QUALIFIED`
-par cette qualification).
+**`PERFORMANCE QUALIFIED`.**
 
 Justification : les deux goulets explicitement visés par la mission restent
-fermés et sont désormais qualifiés en profondeur — `next_reference()`
-qualifiée sans collision sous charge concurrente réelle, équivalence
-fonctionnelle du Dashboard prouvée à 100 % sur 3 tailles de tenant dont des
-cas limites construits à la main, isolation tenant démontrée à l'échelle
-réelle avec les rôles applicatifs, RPC `SECURITY DEFINER` auditées sans
-trouver de vulnérabilité, benchmarks reproductibles avec médiane/p95/max
-tous largement sous objectif, fresh replay et suite de tests complets sans
-aucune nouvelle régression. Le seul point qui empêche la promotion à
-`PERFORMANCE QUALIFIED` au sens strict des critères donnés est l'écart de
-cache documenté en § 12.3 : réel, mais de gravité faible et non accessible
-par un chemin applicatif existant — insuffisant pour `PERFORMANCE NOT
-QUALIFIED`, mais un critère explicite de verdict n'est pas rempli à 100 %,
-ce qui maintient `PERFORMANCE CANDIDATE` par une lecture stricte du § 8 de
-cette qualification.
+fermés et sont qualifiés en profondeur — `next_reference()` qualifiée sans
+collision sous charge concurrente réelle, équivalence fonctionnelle du
+Dashboard prouvée à 100 % sur 3 tailles de tenant dont des cas limites
+construits à la main, isolation tenant démontrée à l'échelle réelle avec les
+rôles applicatifs (dashboard, 4 RPC de recherche, et désormais la nouvelle
+branche du trigger de cache), RPC et trigger `SECURITY DEFINER` audités sans
+trouver de vulnérabilité (trigger modifié re-audité après correctif, aucune
+propriété de sécurité altérée), benchmarks reproductibles avec médiane/p95/max
+tous largement sous objectif et confirmés stables avant/après le correctif du
+cache, fresh replay et suite de tests complets (pgTAP, Vitest, typecheck,
+lint, build) rejoués deux fois — sans le correctif puis avec — sans aucune
+nouvelle régression. Le seul point qui empêchait la promotion à
+`PERFORMANCE QUALIFIED` lors du lot de qualification précédent — l'écart de
+cache documenté en § 12.3 — a été fermé par un lot de qualification finale
+dédié : cause démontrée, correction minimale appliquée et vérifiée sur les
+deux tenants (ancien débité, nouveau crédité du montant complet), aucune
+dégradation constatée sur aucun autre scénario. Les 9 critères du § 13.1 sont
+désormais tous strictement satisfaits — conformément à la consigne de ne pas
+maintenir `PERFORMANCE CANDIDATE` par prudence une fois que toutes les
+preuves de qualification sont réunies.
 
 Pas `DASHBOARD SEARCH PILOT READY` : cette mission n'a qualifié que deux
 parcours précis (Dashboard, recherche), pas l'ensemble de l'application à
 l'échelle d'un pilote (planning en écriture concurrente, pointages, etc. —
 hors périmètre, déjà couverts ou documentés par l'audit précédent). Pas
 `PERFORMANCE BLOCKERS OPEN` ni `PERFORMANCE NOT QUALIFIED` : aucun blocage
-résiduel, aucune vulnérabilité, aucune régression — uniquement une limite
-de cohérence de cache documentée, à gravité faible et non exploitable par
-le produit actuel.
+résiduel, aucune vulnérabilité, aucune régression, et — après ce lot de
+clôture — plus aucune limite de cohérence de cache ouverte.
