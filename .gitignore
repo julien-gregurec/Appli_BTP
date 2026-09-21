@@ -53,3 +53,6 @@ output/video/plans/
 
 # Rapports de vérification automatisée
 output/verification/
+
+# Worktrees d'agents (isolation background)
+.claude/worktrees/
