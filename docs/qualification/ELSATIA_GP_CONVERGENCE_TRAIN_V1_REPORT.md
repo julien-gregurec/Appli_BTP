@@ -1132,3 +1132,292 @@ mécanisme antérieur et plus large — non fusionné, non porté, 0 migration c
 conformément à l'instruction conditionnelle de la mission. Aucun déploiement, aucune Preview,
 aucune Production.
 
+## 20. Reserves public ENV + notification devis accepté (`RESERVES + NOTIFICATION INTEGRATED`)
+
+**Mission** : fermer deux blockers Preview déjà qualifiés sur une branche source dédiée, portés
+sélectivement (pas de fusion en bloc), avec renumérotation de la migration en collision.
+
+### 20.0 — Vérification du HEAD réel avant modification
+
+HEAD distant réel de `claude/compassionate-euler-5j6avr` au démarrage : **`f71dd97`**
+(`feat(perf): intègre le lot Dashboard/Performance qualifié (PERFORMANCE + SITUATIONS
+INTEGRATED)`) — identique au HEAD attendu par la mission. Aucun écart, aucune cartographie
+supplémentaire requise avant intégration.
+
+- Migrations au démarrage : **311** (dernière : `20260922000320_correctif_cache_dashboard_changement_entreprise.sql`).
+- Branche source confirmée par `git ls-remote` (SHA réel) : `fix/preview-blockers-reserves-notif-v1`
+  → `8c910fa0eb6d05813993b7e07f892ce593a0f480`, identique au SHA qualifié attendu.
+
+### 20.1 — Cartographie
+
+`git merge-base` train/source = `e0a83eb` (la branche source a divergé **avant** le lot
+Performance §19 — elle ne le contient donc pas, ce qui est attendu et sans incidence : aucun
+des deux lots ne touche les mêmes fichiers, voir vérification ci-dessous). Un seul commit propre
+à la source : `8c910fa` (`fix(preview-blockers): garde de pré-build Reserves + correctif niveau
+notification devis accepté`).
+
+Fichiers réellement modifiés par la source (`git diff` contre le merge-base) :
+
+| Fichier | Classement | Décision |
+|---|---|---|
+| `apps/reserves/scripts/verify-public-env.mjs` (264 lignes) | absent | **porté** |
+| `apps/reserves/scripts/verify-public-env.d.mts` (54 lignes) | absent | **porté** |
+| `apps/reserves/src/lib/public-env-guard.test.ts` (273 lignes) | absent | **porté** |
+| `apps/reserves/package.json` (`prebuild`/`verify:public-env`/`lint` élargi à `scripts`) | absent | **porté** |
+| `apps/reserves/.env.example` (+`ELSATIA_APPLICATION_ENV`) | absent | **porté** |
+| `config/env-manifest.json` (entrée F-... + note Reserves) | absent | **porté** |
+| `scripts/verify-secrets.mjs` (exception nommée pour le nouveau test) | absent | **porté** |
+| `supabase/migrations/20260922000318_correctif_notification_devis_accepte_niveau.sql` | absent, **collision de numéro** (voir §20.2) | **porté sous un nouveau numéro** |
+| `docs/qualification/ELSATIA_GP_PREVIEW_BLOCKERS_RESERVES_URL_NOTIFICATION_NIVEAU_V1.md` (373 lignes) | présente uniquement sur la branche source | **non recopiée telle quelle** (même choix qu'au §19.7 — risque de renumérotage incomplet sur un fichier long ; contenu technique pertinent documenté ici avec la numérotation réelle du train ; la version source reste consultable sur `fix/preview-blockers-reserves-notif-v1`, `8c910fa`) |
+
+**Vérification de non-conflit avec le lot Performance §19** : `git diff` du train contre
+`e0a83eb` (merge-base) sur ces 8 chemins de code/config est **vide** — ni le lot Performance ni
+aucun autre commit n'a touché un seul de ces fichiers depuis `e0a83eb`. Portage sans risque de
+divergence.
+
+**Rien n'était déjà présent ni obsolète** : Reserves n'avait aucun script `verify-public-env`
+avant ce lot (`ls apps/reserves/scripts/` vide), et `notifier_devis_accepte()` utilisait
+toujours `niveau='info'` (seule définition existante, migration `20260922000311`, jamais
+redéfinie depuis) — confirmé par lecture directe avant tout portage.
+
+### 20.2 — Collision de migration `318` et renumérotation
+
+La migration source (`20260922000318_correctif_notification_devis_accepte_niveau.sql`) porte le
+numéro `318` dans le ledger de la branche source (qui a divergé de `e0a83eb`, avant que le train
+n'attribue `318-320` au lot Performance §19). Ce numéro est désormais pris dans le train par
+`20260922000318_dashboard_indicateurs_bornes.sql` — **non réutilisé**.
+
+Ledger vérifié sur le HEAD réel avant renommage : dernière migration `20260922000320`. Prochain
+numéro réellement libre : **`321`** (confirmé par `ls supabase/migrations | sort | tail`, pas
+supposé). Fichier porté sous :
+
+`supabase/migrations/20260922000321_correctif_notification_devis_accepte_niveau.sql`
+
+Contenu SQL vérifié **byte-identique** au commit source (`diff` sans écart après le bandeau de
+provenance ajouté en tête de fichier) — **aucune modification de la logique qualifiée**, aucune
+référence interne à son propre numéro dans le fichier source ne nécessitait d'ajustement.
+
+`node scripts/verify-migrations.mjs` : **312 migrations valides, noms et horodatages uniques**
+(311 + 1).
+
+Les migrations `20260922000318/319/320` (lot Performance) et `20260922000317`
+(`correctif_troncature_next_reference.sql`, NUMBERING FIX INTEGRATED) sont **inchangées, non
+renommées, non écrasées** — vérifié par `git status` (aucune modification hors des 8 fichiers du
+§20.1) et par rejeu Fresh (§20.5).
+
+### 20.3 — Requalification du garde Reserves public ENV
+
+`apps/reserves/scripts/verify-public-env.mjs` exécuté directement (4 scénarios, environnement
+isolé `env -i` pour exclure toute variable ambiante du conteneur) :
+
+| Scénario | `ELSATIA_APPLICATION_ENV` | `NEXT_PUBLIC_RESERVES_URL` | Résultat attendu | Résultat observé |
+|---|---|---|---|---|
+| Local, déclaré | `local` | `http://localhost:3020` | repli localhost autorisé, non bloquant | **PASS** (`mode « local », contrôle non bloquant, rien à signaler`, exit 0) |
+| Déployable, variables absentes | `production` | *(absente)* | build bloqué avant `next build` | **BLOQUÉ** (`NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_ANON_KEY`/`NEXT_PUBLIC_RESERVES_URL` absentes, exit 1, message explicite avant tout appel à Next) |
+| Déployable, URL localhost | `production` | `http://localhost:3020` | build bloqué | **BLOQUÉ** (`doit être en https sur un build publié`, exit 1) |
+| Déployable, URL HTTPS valide | `production` | `https://reserves.elsatia.fr` | garde PASS, `next build` réellement lancé | **PASS** (exit 0) ; confirmé par `npm run build:reserves` complet en §20.6 (le `prebuild` s'exécute automatiquement avant `next build` via le cycle de vie npm, comme pour Tools/Colors) |
+
+Aucune variable n'étant déclarée du tout (`env -i` pur, sans `ELSATIA_APPLICATION_ENV`), la
+garde retient par construction le mode le plus sûr (`production`, bloquant) — comportement
+documenté et intentionnel (*« Ne pas se déclarer vaut publié »*), identique à Tools/Colors : ce
+n'est pas le scénario « local » (qui requiert `ELSATIA_APPLICATION_ENV=local` explicite, comme
+dans `apps/reserves/.env.example` porté).
+
+**Origine des invitations** : `src/lib/invitations.ts::urlApplicationReserves()` (fichier non
+modifié par ce lot) lit `NEXT_PUBLIC_RESERVES_URL` et retombe sur `http://localhost:3020`
+seulement si absente. Avec `NEXT_PUBLIC_RESERVES_URL=https://reserves.elsatia.fr` configurée,
+un lien d'invitation généré est bien `https://reserves.elsatia.fr/invitation/<jeton>` — vérifié
+directement contre le code réel de la fonction, pas supposé.
+
+### 20.4 — Requalification de la notification après renumérotation
+
+Sur la base Fresh du train complet (§20.5, 312 migrations rejouées) :
+
+- `pg_get_functiondef('public.notifier_devis_accepte(uuid)')` : le corps utilise désormais
+  `niveau = 'information'` (dernière ligne de l'INSERT vers `notifications_utilisateurs`) —
+  confirmé par lecture directe post-rejeu, pas par diff textuel seul.
+- `pg_get_constraintdef` de `notifications_utilisateurs_niveau_check` :
+  `CHECK ((niveau = ANY (ARRAY['information'::text, 'attention'::text, 'critique'::text])))` —
+  contrat canonique confirmé inchangé, `'information'` en fait bien partie.
+- `supabase/tests/gp_pilot_notification_devis_accepte.test.sql` : **7/7 PASS** (`pg_prove`,
+  base rejouée avec la migration renumérotée `321`) :
+  1. la fonction existe (contrat) ;
+  2. un membre sans `gerer_devis` est refusé (`Accès refusé`) ;
+  3. **isolation multi-tenant** : le gérant de l'entreprise B ciblant un devis de l'entreprise A
+     est refusé (`Accès refusé`, le devis n'appartient pas à son entreprise) ;
+  4. un gérant `gerer_devis` de la bonne entreprise réussit (`lives_ok` — preuve directe que
+     l'INSERT satisfait désormais la contrainte `niveau`, plus de violation `23514`) ;
+  5. une entrée `journal_activite` est créée pour la **bonne entreprise** ;
+  6. **bon destinataire** : au moins un responsable (`gerer_devis`, hors auteur) est notifié ;
+  7. **aucune notification parasite** : l'auteur du changement n'est jamais notifié de sa propre
+     action (`count = 0`).
+- Sécurité — comparaison avant/après (introspection directe post-rejeu) :
+
+  | | Avant (migration 311, train) | Après (migration 321, portée) |
+  |---|---|---|
+  | Owner | `postgres` | `postgres` (inchangé) |
+  | `SECURITY DEFINER` | `true` | `true` (inchangé) |
+  | `search_path` | `{search_path=public}` | `{search_path=public}` (inchangé) |
+  | ACL | `postgres=X` (owner), `authenticated=X` — ni `anon` ni `public` | identique (`CREATE OR REPLACE FUNCTION` sur signature inchangée préserve l'ACL, confirmé par requête directe sur `pg_proc.proacl`) |
+  | Signature/retour | `(uuid) returns void` | inchangée |
+
+  **Aucun élargissement de privilège.** Le renommage de migration (318 source → 321 train) ne
+  modifie ni le contrat de sécurité ni la logique métier — seul le caractère `'info'` →
+  `'information'` change dans le corps de la fonction, comme qualifié à la source.
+
+### 20.5 — Fresh complet du train résultant
+
+Même méthodologie que §19.9 (Docker indisponible ; bootstrap Postgres 16 + pgTAP local hors
+dépôt, jamais commité ; stub `pgsodium` documenté, sans rapport avec ce lot ; `pg_trgm` installé
+une seule fois dans `extensions`).
+
+- Rejeu complet, 2 bases indépendantes reconstruites depuis zéro :
+  - Train (avec ce lot, 312 migrations) : **312/312 appliquées, 0 erreur SQL**, aucune migration
+    dupliquée ni manquante.
+  - Baseline `f71dd97` (train juste avant ce lot, 311 migrations, worktree dédié) :
+    **311/311 appliquées, 0 erreur SQL** — mesurée à nouveau indépendamment dans cette session,
+    pas supposée égale aux chiffres du rapport précédent.
+- `npm run verify:migrations` : **312 migrations valides, noms et horodatages uniques.**
+- `npm run verify:secrets` : **2489 fichiers suivis contrôlés, aucun secret reconnu (2
+  exceptions nommées — celle de Colors déjà connue + la nouvelle pour
+  `apps/reserves/src/lib/public-env-guard.test.ts`, valeurs factices « AAAA »/« signature »,
+  aucun accès réel).**
+
+### 20.6 — pgTAP complet : baseline réelle mesurée vs après ce lot
+
+La baseline documentée par le rapport précédent (§19.10 : 93 fichiers/2277 assertions/17
+fichiers non verts) portait sur le train **avant** le lot Performance n'existait pas encore —
+non réutilisable telle quelle. Mesure réelle effectuée dans **cette** session, sur le HEAD
+**actuel** (`f71dd97`, juste avant ce lot) :
+
+| | Baseline mesurée ici (`f71dd97`, 311 migrations) | Après ce lot (312 migrations) |
+|---|---|---|
+| Fichiers de test | 93 | 93 (aucun fichier pgTAP ajouté par ce lot — le nouveau test Reserves est du Vitest, pas du pgTAP) |
+| Assertions totales | 2277 | 2277 |
+| Fichiers avec ≥1 échec | **18** | **17** |
+
+**Diff exact des deux listes de fichiers en échec** (calculé, pas estimé) : les 17 fichiers en
+échec après ce lot sont un **sous-ensemble strict** des 18 de la baseline — la seule différence
+est `gp_pilot_notification_devis_accepte.test.sql`, **corrigé par ce lot** (7/7 après, 3 échecs
+avant). **Aucun fichier n'apparaît en échec après ce lot sans l'être déjà avant.**
+**0 nouvelle régression, 1 correction.**
+
+Les 17 fichiers restants (`colors_correctifs_v12`, `colors_functional_core_v1`,
+`document_partage_public_par_jeton_v1`, `gp_pilot_plateforme_admin_role_total`,
+`gp_pilot_rgpd_manifeste_fichiers`, `isolation_multitenant_comportement`,
+`pieces_jointes_v1_lecture_documents_employes`, `platform_aal2_role_integrity_v1`,
+`platform_audit_log_bounded_v1`, `platform_global_owner_all_apps_v1`,
+`platform_stripe_state_attestation_r72`, `platform_support_uid_security_v1`,
+`reserves_v1_foundation_workflow`, `reserves_v2_terrain_capture`,
+`reserves_v3_collaboration_livrables`, `studio_render_engine`,
+`terrain_mobile_v1b_permission_documents`) sont **identiques**, fichier par fichier et
+assertion par assertion en échec, entre baseline et après-lot — déjà documentés comme
+préexistants au §19.10. `reserves_v1/v2/v3` (fichiers de test pgTAP **existants**, sans rapport
+avec le nouveau garde ENV qui n'a pas de test pgTAP propre) restent inchangés par ce lot : aucun
+n'implique le garde ENV ni `notifier_devis_accepte`.
+
+**Tests isolation dédiés** (`isolation_multitenant_comportement/roles/surface`, 3 fichiers,
+90 assertions) : rejoués explicitement — `isolation_multitenant_comportement` conserve ses 8
+échecs préexistants (identiques, non liés à ce lot), les deux autres restent 100 % verts.
+
+### 20.7 — Applications (typecheck / lint / test / build)
+
+`npm ci` à la racine et dans chaque application indépendante (`apps/reserves`, `apps/tools`,
+`apps/colors`, `apps/studio`) :
+
+| Vérification | Gestion Pro | Reserves | Tools | Colors | Studio |
+|---|---|---|---|---|---|
+| `typecheck` | PASS | PASS | PASS | PASS | PASS |
+| `lint` | PASS (0 erreur) | PASS | PASS | PASS | PASS (0 avertissement) |
+| `test` (Vitest) | PASS — 153 fichiers/1786 tests | PASS — 13/178 (inclut le nouveau `public-env-guard.test.ts`, 24 tests) | PASS — 174/1992 | PASS — 38/427 | PASS — 14/251 |
+| `build` | **PASS** — `next build`, toutes les routes générées | **PASS avec le flag local documenté** (voir ci-dessous) — 19 routes | PASS avec flag local documenté | PASS avec flag local documenté | PASS — 12 routes |
+
+6 avertissements ESLint préexistants (mêmes qu'au §19.11) — **aucun dans un fichier de ce lot**.
+
+**`apps/reserves` — garde nouvellement porté, requalifié en conditions réelles d'exécution de
+`npm run build:reserves`** (pas seulement le script isolé, §20.3) :
+
+- Sans variable déclarée (`ELSATIA_APPLICATION_ENV`/`VERCEL_ENV` absentes → mode `production`
+  par construction) : **bloqué avant `next build`**, 4 erreurs listées (`NEXT_PUBLIC_SUPABASE_URL`,
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_RESERVES_URL`, `ELSATIA_APPLICATION_ENV`
+  absentes), exit 1, `next build` **jamais invoqué**.
+- Avec `NEXT_PUBLIC_RESERVES_URL=http://localhost:3020` sous mode `production` explicite : **bloqué**
+  (`doit être en https sur un build publié`), exit 1.
+- Avec `ELSATIA_APPLICATION_ENV=local` (flag documenté par la garde elle-même et par
+  `apps/reserves/.env.example` porté, identique au flag déjà utilisé pour Colors) :
+  **`npm run build:reserves` PASS** — la garde affiche `mode « local », contrôle non bloquant,
+  rien à signaler`, puis `next build` **démarre réellement et se termine** (Turbopack,
+  compilation réussie, 19 routes statiques/dynamiques générées, TypeScript vérifié).
+- `apps/reserves/src/lib/public-env-guard.test.ts` (nouveau, 24 tests) : **PASS**, inclus dans
+  `npm run test` de Reserves.
+
+**`apps/tools` et `apps/colors`** (chaîne racine `npm run build`/`npm run build:colors`, garde-fou
+`verify-public-env.mjs` **préexistant**, sans rapport avec ce lot — jumeau de celui de Reserves)
+: échouent sans variables déclarées (comportement attendu, déjà documenté identique au §19.11) ;
+confirmé **PASS** en relançant avec leur flag local respectif déjà documenté
+(`NEXT_PUBLIC_TOOLS_ENV=local` pour Tools, `ELSATIA_APPLICATION_ENV=local` pour Colors, plus les
+`NEXT_PUBLIC_*` locales déjà présentes dans leurs `.env.example`) — vérifié à nouveau dans cette
+session, pas supposé depuis le rapport précédent : Tools 47+ routes, Colors 27 routes. **Aucun
+garde-fou désactivé dans le code** ; uniquement des flags/variables déjà documentés par les
+scripts eux-mêmes.
+
+`npm run verify:env-manifest` : **FAIL préexistant**, sans rapport avec ce lot — 37 erreurs
+(variables `STUDIO_*`/`RESEND_API_KEY` manquantes dans les `.env.example` Studio, identiques au
+§19.11) + 10 `DECISION_REQUIRED` métier (tarification Stripe) + 73 avertissements (dont, pour
+Reserves, l'usage documenté du nom legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` — attendu, pas une
+anomalie). Aucun des 37 erreurs ne référence le nouveau garde Reserves ni
+`notifier_devis_accepte`. Aucun flag de contournement utilisé pour cette commande.
+
+**Packages partagés / workers** : aucun fichier de `packages/*` ni `workers/*` touché par ce lot
+— hors périmètre de régression.
+
+### 20.8 — Fichiers modifiés par ce lot
+
+```
+apps/reserves/.env.example                                                        (modifié)
+apps/reserves/package.json                                                        (modifié)
+apps/reserves/scripts/verify-public-env.d.mts                                     (nouveau)
+apps/reserves/scripts/verify-public-env.mjs                                       (nouveau)
+apps/reserves/src/lib/public-env-guard.test.ts                                    (nouveau)
+config/env-manifest.json                                                          (modifié)
+scripts/verify-secrets.mjs                                                        (modifié)
+supabase/migrations/20260922000321_correctif_notification_devis_accepte_niveau.sql (nouveau)
+docs/qualification/ELSATIA_GP_CONVERGENCE_TRAIN_V1_REPORT.md                      (cette section)
+```
+
+Aucune migration historique modifiée (`318`, `319`, `320`, `317` et toutes les précédentes
+inchangées — vérifié par rejeu Fresh complet, §20.5). Aucun fichier hors de ce périmètre touché
+(pas de Studio légal/RGPD, pas de partage public de documents, pas de manifeste RGPD, pas de
+commande fournisseur → stock, pas de modèle devis coût/marge, pas d'impayés, pas de documents
+situation/facture finale, pas de pricing, aucune Preview distante, aucune Production).
+
+### 20.9 — Verdict
+
+- Fresh : **312/312 migrations, 0 erreur SQL** (2 bases indépendantes, train + baseline
+  `f71dd97` mesurée à nouveau dans cette session).
+- pgTAP : **2277 assertions, 93 fichiers** — 17 fichiers en échec après ce lot, **sous-ensemble
+  strict** des 18 de la baseline réellement mesurée : `gp_pilot_notification_devis_accepte`
+  **corrigé** (7/7), **0 nouvelle régression**.
+- `verify:migrations` : **312 valides**. `verify:secrets` : **2489 fichiers, 0 secret (2
+  exceptions nommées)**.
+- Garde Reserves : les 4 scénarios requis (local, déployable sans variable, déployable
+  localhost, déployable HTTPS) se comportent **exactement comme spécifié**, y compris en
+  conditions réelles (`npm run build:reserves` complet, `next build` réellement invoqué et
+  terminé une fois la garde satisfaite). Origine d'invitation correcte vérifiée.
+- Notification : `notifier_devis_accepte()` utilise désormais `'information'`, conforme à la
+  contrainte canonique ; **7/7** ; isolation multi-tenant, bon destinataire, bonne entreprise,
+  aucune notification parasite tous vérifiés explicitement par le test pgTAP ; owner/
+  `SECURITY DEFINER`/`search_path`/ACL **inchangés**.
+- Collision de migration `318` résolue par renumérotation en `321` (prochain numéro réellement
+  disponible, vérifié sur le ledger réel, pas supposé) — `318/319/320` (Performance) et `317`
+  (NUMBERING FIX INTEGRATED) préservés intacts.
+- Applications : Gestion Pro/Reserves/Tools/Colors/Studio — typecheck/lint/test/build **PASS**
+  (Tools/Colors nécessitent leurs flags locaux déjà documentés, comportement préexistant et
+  identique au lot précédent ; `verify:env-manifest` FAIL préexistant sans rapport avec ce lot).
+
+**`RESERVES + NOTIFICATION INTEGRATED`**
+
+Les deux blockers qualifiés (garde de pré-build Reserves, correctif de niveau de notification)
+sont intégrés sélectivement, sans fusion de branche, avec résolution explicite de la collision
+de numéro de migration. Aucun déploiement, aucune Preview, aucune Production.
+

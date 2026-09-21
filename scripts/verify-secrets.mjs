@@ -33,6 +33,13 @@ const EXCEPTIONS = new Map([
       + "`ressembleAUnSecret()` reconnaît une clé privée et un JWT de service. Les valeurs "
       + "y sont factices (« AAAA », « signature ») et n'ouvrent aucun accès.",
   ],
+  [
+    "apps/reserves/src/lib/public-env-guard.test.ts",
+    "Suite de tests du garde-fou d'environnement public de Réserves (jumelle de celle de "
+      + "Colors ci-dessus) : elle vérifie que `ressembleAUnSecret()` reconnaît une clé privée "
+      + "et un JWT de service. Les valeurs y sont factices (« AAAA », « signature ») et "
+      + "n'ouvrent aucun accès.",
+  ],
 ]);
 
 const alertes = [];
