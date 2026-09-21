@@ -185,16 +185,33 @@ describe("getContexteEntreprise — essai 30 jours vs suspension pour impayé", 
     await expect(getContexteEntreprise()).rejects.toThrow("REDIRECT:/abonnement-suspendu?motif=essai_expire");
   });
 
+  // GP-EXTERNAL-PILOT-CLOSURE-V1 : un compte suspendu pour impayé (hors moteur
+  // billing) réutilise la même liste blanche que la sortie d'essai — support,
+  // export RGPD et souscription restent atteignables, seul le métier reste
+  // bloqué. Avant ce correctif, cette branche redirigeait sans exception.
   it.each(["/aide", "/parametres/donnees", "/api/rgpd/export", "/abonnement"])(
-    "abonnement suspendu pour impayé : %s reste bloqué (la sortie d'essai n'est pas un contournement de statut)",
+    "abonnement suspendu pour impayé : %s reste accessible (même sortie que l'essai expiré)",
     async (chemin) => {
       mocks.rpcMaybeSingle.mockResolvedValue({
         data: abonnement({ abonnement_statut: "suspendu", abonnement_essai_fin: "2999-01-01" }),
       });
       mocks.headersGet.mockReturnValue(chemin);
-      await expect(getContexteEntreprise()).rejects.toThrow("REDIRECT:/abonnement-suspendu");
+      await getContexteEntreprise();
+      expect(mocks.redirect).not.toHaveBeenCalled();
     },
   );
+
+  it.each([
+    ["tableau de bord", "/dashboard"],
+    ["clients", "/clients"],
+    ["factures", "/factures"],
+  ])("abonnement suspendu pour impayé : %s (%s) reste bloqué, aucun module ne rouvre", async (_libelle, chemin) => {
+    mocks.rpcMaybeSingle.mockResolvedValue({
+      data: abonnement({ abonnement_statut: "suspendu", abonnement_essai_fin: "2999-01-01" }),
+    });
+    mocks.headersGet.mockReturnValue(chemin);
+    await expect(getContexteEntreprise()).rejects.toThrow("REDIRECT:/abonnement-suspendu");
+  });
 
   it("essai_fin absente mais essai_debut + 30 jours dans le futur : pas de redirection (repli défensif)", async () => {
     const debutHier = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -214,11 +231,11 @@ describe("getContexteEntreprise — essai 30 jours vs suspension pour impayé", 
     await expect(getContexteEntreprise()).rejects.toThrow("REDIRECT:/abonnement-suspendu?motif=essai_expire");
   });
 
-  it("abonnement réellement suspendu (impayé) : redirige vers /abonnement-suspendu SANS motif, même sur /abonnement", async () => {
+  it("abonnement réellement suspendu (impayé), page métier : redirige vers /abonnement-suspendu SANS motif (jamais ?motif=essai_expire)", async () => {
     mocks.rpcMaybeSingle.mockResolvedValue({
       data: abonnement({ abonnement_statut: "suspendu", abonnement_essai_fin: "2999-01-01" }),
     });
-    mocks.headersGet.mockReturnValue("/abonnement");
+    mocks.headersGet.mockReturnValue("/dashboard");
     await expect(getContexteEntreprise()).rejects.toThrow("REDIRECT:/abonnement-suspendu");
   });
 
