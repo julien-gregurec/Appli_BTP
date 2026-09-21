@@ -1,11 +1,17 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { studioEnabled } from "@elsatia/studio-domain";
 import {
   studioCookieAttributes,
   studioCookieOptions,
   supabaseConfig,
 } from "./lib/config";
 export async function proxy(request: NextRequest) {
+  if (!studioEnabled(process.env.STUDIO_ENABLED))
+    return new NextResponse("Studio temporairement indisponible.", {
+      status: 503,
+      headers: { "Cache-Control": "no-store", "Retry-After": "60" },
+    });
   const storageOrigin = new URL(supabaseConfig().url).origin;
   const directOrigin = storageOrigin.replace(
     /\.supabase\.co$/,
