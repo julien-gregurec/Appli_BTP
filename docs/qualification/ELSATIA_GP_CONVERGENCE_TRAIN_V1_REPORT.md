@@ -1529,3 +1529,201 @@ aucune Preview, aucune Production.
 
 SHA après ce lot : **`38cf99e`** (inchangé — aucun commit de code nécessaire).
 
+## 22. Qualification finale du HEAD résultant (`dcfd71f`) — `PREVIEW DEPLOYMENT CANDIDATE`
+
+**Mission** : après intégration du lot ENV manifest (§21, sans changement de code), qualifier
+sans attendre le HEAD final obtenu — Fresh, upgrade simulé, pgTAP complet, applications,
+sécurité, performance, access, commercial, env/secrets/preflight, release gate. Verdict maximum
+possible sans accès à une vraie Preview : `PREVIEW DEPLOYMENT CANDIDATE` (jamais `QUALIFIED`).
+
+**SHA qualifié** : `dcfd71f` (HEAD de `claude/compassionate-euler-5j6avr` après §21 — inchangé
+depuis, aucun commit de code entre `dcfd71f` et la fin de cette qualification). Toutes les
+preuves ci-dessous ont été mesurées sur ce SHA exact.
+
+### 22.1 — Fresh complet
+
+Méthodologie identique aux lots précédents (bootstrap Postgres 16 + pgTAP local hors dépôt,
+Docker indisponible). Checkout propre d'un worktree dédié sur `dcfd71f`, base entièrement
+reconstruite :
+
+- **312/312 migrations appliquées, 0 erreur SQL**, aucune migration dupliquée ni manquante.
+- `node scripts/verify-migrations.mjs` : **312 migrations valides**.
+- `node scripts/verify-secrets.mjs` : **2489 fichiers suivis contrôlés, aucun secret reconnu (2
+  exceptions nommées, inchangées)**.
+
+### 22.2 — Upgrade simulé (Preview réelle inaccessible)
+
+Aucun accès à un environnement Preview réel dans ce sandbox. Simulation d'un upgrade sur base
+**déjà peuplée** (au lieu d'un Fresh à vide), pour vérifier que les migrations du lot Performance
+(`318-320`) se comportent correctement contre des données préexistantes réalistes, pas
+seulement contre une base neuve :
+
+1. Base dédiée, migrations `1..317` rejouées seules (**308/308**, état « avant lot Performance »).
+2. Jeu de données synthétique réaliste inséré directement (2 entreprises, 230 devis, 170
+   factures, statuts mixtes, historique de 300 jours) — représentatif d'un tenant en production
+   avant l'upgrade.
+3. Totaux canoniques calculés **avant** upgrade par recalcul indépendant (`SUM` direct) :
+   tenant 1 = 87 600 / 144 000 / 89 461,83 ; tenant 2 = 10 800 / 9 600 / 6 098,84
+   (devis acceptés / factures totales / encaissé).
+4. Migrations `318-321` rejouées sur cette base déjà peuplée (« l'upgrade ») : **0 erreur SQL**.
+5. **Le backfill de `20260922000319` reproduit exactement les totaux canoniques pré-upgrade**,
+   pour les deux tenants, valeur par valeur — preuve directe que le calcul de rattrapage
+   fonctionne sur des données réelles préexistantes, pas seulement en écriture incrémentale
+   future.
+6. Déplacement d'une facture **brouillon préexistante** (pas une facture de test fraîchement
+   créée) entre les deux tenants post-upgrade : ancien tenant débité de 960 (144 000 → 143 040),
+   nouveau tenant crédité du montant complet (9 600 → 10 560) — cache 12/12 confirmé sur données
+   réellement upgradées.
+7. `notifier_devis_accepte()` appelé sur un devis préexistant (créé avant l'upgrade, permissions
+   configurées après) : exécution sans erreur, entrée `journal_activite` créée correctement.
+
+### 22.3 — pgTAP complet et amélioration de la fiabilité du harnais local
+
+**93 fichiers, 2428 assertions.** Deux gaps du harnais local (pas du code applicatif) identifiés
+et corrigés au cours de cette qualification, chacun vérifié pour n'introduire **aucune**
+régression avant d'être conservé :
+
+- **RLS non activée sur `storage.buckets`/`storage.objects`** dans le bootstrap local : les 45
+  policies RLS réelles créées par les migrations (isolation par `est_membre_actif` sur le dossier
+  = `entreprise_id`) existaient mais n'étaient jamais appliquées, faisant apparaître à tort des
+  échecs d'isolation cross-tenant sur le stockage. Correction : `alter table ... enable row level
+  security` sur les deux tables (hors dépôt, bootstrap local uniquement). Effet : **6 fichiers
+  pgTAP** (`colors_correctifs_v12`, `colors_functional_core_v1`,
+  `isolation_multitenant_comportement`, `pieces_jointes_v1_lecture_documents_employes`,
+  `studio_render_engine`, `terrain_mobile_v1b_permission_documents`) passent de « en échec » à
+  **100 % verts** — confirmant que l'isolation multi-tenant du stockage est **réellement
+  appliquée** par le code, contrairement à ce qu'un harnais incomplet laissait penser.
+- **`auth.mfa_factors` absente** du schéma `auth` minimal du bootstrap : plusieurs migrations de
+  sécurité plateforme (AAL2/MFA, `20260826000237`, `20260906000266`, `20260826000236`) et leurs
+  tests en dépendent directement. Correction : table minimale ajoutée (hors dépôt). Effet :
+  **6 fichiers pgTAP** supplémentaires (`platform_aal2_role_integrity_v1`,
+  `platform_global_owner_all_apps_v1`, `platform_support_uid_security_v1`,
+  `reserves_v1_foundation_workflow`, `reserves_v2_terrain_capture`,
+  `reserves_v3_collaboration_livrables`) passent à **100 % vert**.
+- **Tentative non conservée** : faire lire à `auth.uid()`/`auth.role()`/`auth.email()` à la fois
+  `request.jwt.claims` (JSON) et `request.jwt.claim.<nom>` (GUC individuelle) pour couvrir
+  `platform_audit_log_bounded_v1` (3 échecs restants) a **cassé** `elsatia_tools_r8.test.sql`
+  (mélange des deux conventions dans une même transaction pgTAP) — **annulée** : mieux vaut
+  garder un harnais stable et documenter les 3 échecs restants comme limitation de harnais que
+  d'échanger un gap contre un autre.
+
+Après ces deux corrections retenues (et le retour arrière de la troisième), comparaison exacte
+avant/après (diff de fichiers, pas d'estimation) contre la première mesure de cette session sur
+ce même SHA (17 fichiers en échec) : **12 fichiers corrigés, 0 nouvelle régression** (diff
+calculé par `comm`, ensemble vide côté régressions).
+
+**5 fichiers restent non verts, tous préexistants et documentés indépendamment de ce harnais**
+(déjà signalés aux §17.3/§18.4 de ce même rapport, antérieurs à toute la session) :
+
+| Fichier | Cause | Nature |
+|---|---|---|
+| `document_partage_public_par_jeton_v1.test.sql` (10/42) | fixture du test modifie les lignes d'une facture déjà émise (`trg_lignes_factures_brouillon_only`) | bug de fixture du test, pas du code applicatif |
+| `gp_pilot_plateforme_admin_role_total.test.sql` (0/6) | fixture viole `plateforme_admins_actif_requiert_utilisateur_id` | bug de fixture du test, documenté depuis §18.4 |
+| `gp_pilot_rgpd_manifeste_fichiers.test.sql` (1/9) | contradiction interne au test | documenté depuis §18.4, décision requise hors périmètre |
+| `platform_audit_log_bounded_v1.test.sql` (3/12) | mélange de conventions JWT dans la fixture du test (voir ci-dessus) | limitation de harnais local, non résolue sans casser un autre fichier |
+| `platform_stripe_state_attestation_r72.test.sql` | nécessite une vraie signature Ed25519, hors de portée du stub `pgsodium` local | limitation de harnais documentée depuis §18.4/§19.9 |
+
+**Aucun de ces 5 fichiers n'implique le dashboard, le cache, `notifier_devis_accepte`, le garde
+Reserves ou une migration de cette session.**
+
+Tests ciblés rejoués explicitement sur ce SHA : `gp_dashboard_search_perf_dashboard_indicateurs`,
+`gp_dashboard_search_perf_isolation_listes_paginees`, `gp_dashboard_search_perf_next_reference_debordement`,
+`gp_pilot_notification_devis_accepte` — **38/38 PASS**.
+
+### 22.4 — Sécurité cross-tenant / RPC / service_role / documents
+
+- **RLS activée sur 100 % des tables du schéma `public`** (`select relname from pg_class ... where
+  relrowsecurity=false` → 0 ligne).
+- **Isolation cross-tenant du stockage documentaire** : confirmée empiriquement par RLS réelle
+  (§22.3) — 45 policies actives sur `storage.objects`, toutes basées sur
+  `est_membre_actif(((storage.foldername(name))[1])::uuid)` (l'entreprise dérivée du chemin du
+  fichier, jamais un paramètre client).
+- **RPC exposées à `anon`** : recherche exhaustive (`pg_proc.proacl`) — seules **2** fonctions
+  `SECURITY DEFINER` sont accessibles à `anon` : `document_commercial_par_token(p_token_hash)` et
+  `reserves_invitation_consulter(p_token_hash)`. Les deux : paramètre = **hash** du jeton (jamais
+  le jeton brut), vérifient explicitement révocation/expiration/consommation, ne font aucun SQL
+  dynamique. Conception cohérente avec un partage public contrôlé, pas une fuite.
+- **`service_role`** : recherche exhaustive de `SUPABASE_SERVICE_ROLE_KEY` dans `src/`/`apps/*/src` —
+  présent uniquement dans des fichiers serveur explicitement dédiés
+  (`src/lib/supabase/admin.ts`, `apps/reserves/src/lib/supabase/admin.ts`,
+  `apps/colors/src/lib/supabase/admin-storage.ts`) et dans des fichiers de test. **Aucun fichier
+  marqué `"use client"` ne référence cette clé.**
+- **RPC portées par cette session** (`dashboard_indicateurs`, `trg_maj_cache_dashboard_devis`,
+  `trg_maj_cache_dashboard_factures`, `notifier_devis_accepte`) : owner/`SECURITY
+  DEFINER`/`search_path`/ACL déjà vérifiés aux §19.8 et §20.4 — confirmés inchangés à ce SHA
+  (aucune migration supplémentaire depuis).
+- **`next_reference()`** et **`creer_situation_travaux()`** : toujours non modifiées par
+  l'ensemble des lots de cette session (§19.2, §19.3) — reconfirmé par le rejeu Fresh de ce SHA.
+
+### 22.5 — Régressions de performance critiques
+
+- `dashboard_indicateurs()` re-testé sur un tenant nominal (3000 devis/2000 factures) sur
+  l'environnement final : **~11,5 ms**, résultat des 3 totaux en cache strictement égal au
+  recalcul canonique (`factures_total=1920000`). Aucune régression par rapport aux ~26 ms
+  mesurés au §19.5 (variation attendue selon la charge machine, pas une dérive structurelle —
+  même plan de requête, mêmes index, même mécanisme de cache O(1)).
+- Concurrence `situations_travaux` (§19.6) : fonction non modifiée depuis, non re-testée en
+  profondeur ici (aucun changement de code depuis sa dernière vérification empirique).
+- Suite pgTAP `reserves_v1/v2/v3` (98+94+148 assertions potentielles) : **100 % vertes** après
+  correction du harnais — aucune régression de performance ou de comportement détectée sur ces
+  parcours.
+
+### 22.6 — Access, commercial, env/secrets/preflight, release gate
+
+- **Access (contrôle des rôles plateforme)** : `platform_aal2_role_integrity_v1`,
+  `platform_global_owner_all_apps_v1`, `platform_support_uid_security_v1` — **100 % verts** après
+  correction du harnais (§22.3). Confirme empiriquement : exigence AAL2 sur les mutations
+  administrateur sensibles, matrice de rôles (`total`/`support`) respectée, unicité UID
+  plateforme.
+- **Commercial** : `verify:stripe-prices` **SKIP non bloquant** (aucune clé Stripe dans ce
+  sandbox — attendu, aucun accès Preview/Production réel). 10 `DECISION_REQUIRED` déjà ouvertes
+  dans le manifeste (contrats Stripe modules/comptes supplémentaires/options IA/générations
+  historiques, flag `FEATURE_CRONS_ENABLED`, défaut d'inscription Studio) — **aucune tranchée
+  dans cette session**, toutes laissées `DECISION_REQUIRED`, option la plus conservatrice
+  retenue par défaut (aucun flag fail-open changé).
+- **Env/secrets/preflight** : `verify:env-manifest` **37 erreurs, 100 % Studio** (gabarits
+  `.env.example` incomplets pour `apps/studio` et `workers/studio-video`, hors périmètre de
+  tous les lots de cette session) ; `verify:secrets` **PASS** ; `preflight_enforcement` **reste
+  `report`** (aucune Preview réelle qualifiée pour justifier `enforce`).
+- **Release gate** — synthèse :
+
+  | Critère | Statut |
+  |---|---|
+  | Fresh (migrations) | ✅ 312/312, 0 erreur |
+  | `verify:migrations` | ✅ PASS |
+  | `verify:secrets` | ✅ PASS |
+  | pgTAP | ⚠️ 2428/2428 exécutées, 5 fichiers non verts — **tous préexistants, documentés, sans rapport avec cette session** |
+  | Sécurité (RLS/RPC/service_role) | ✅ conforme, aucun élargissement de privilège |
+  | Performance | ✅ aucune régression détectée |
+  | Gestion Pro (typecheck/lint/test/build) | ✅ PASS |
+  | Reserves (typecheck/lint/test/build) | ✅ PASS (garde ENV avec flag local documenté) |
+  | Tools (typecheck/lint/test/build) | ✅ PASS (flag local documenté) |
+  | Colors (typecheck/lint/test/build) | ✅ PASS (flag local documenté) |
+  | Studio (typecheck/lint/test/build) | ✅ PASS (aucun garde ENV — confirmé) |
+  | `workers/studio-video` | ⚠️ typecheck/lint PASS ; 3 tests de rendu FFmpeg en échec — **limitation d'environnement du binaire `ffmpeg-static` du sandbox** (filtre `drawtext` indisponible), sans rapport avec un fichier de cette session |
+  | `verify:env-manifest` | ⚠️ 37 erreurs, 100 % Studio, préexistantes |
+  | `verify:stripe-prices` | ⏭️ SKIP non bloquant (pas d'accès Stripe dans ce sandbox) |
+  | Preview réelle | ❌ non accessible dans ce sandbox |
+  | Production | ❌ non accessible, non tentée |
+
+**Aucun blocker réel identifié sur le périmètre de cette session** (Performance, Situations,
+Reserves, Notification, ENV manifest). Les éléments ⚠️ sont tous soit préexistants et documentés
+depuis plusieurs éditions de ce rapport, soit des limitations d'environnement du sandbox
+(FFmpeg, absence de clé Stripe, absence de Preview réelle) — aucun n'est un blocker de code.
+
+### 22.7 — Verdict
+
+**`PREVIEW DEPLOYMENT CANDIDATE`**
+
+Justification : Fresh complet et upgrade simulé tous deux verts, pgTAP mesuré exhaustivement
+avec un harnais local significativement amélioré au cours de cette qualification (12 faux
+négatifs corrigés, 0 nouvelle régression), sécurité cross-tenant/RPC/service_role/documents
+vérifiée sans élargissement de privilège, performance sans régression, les 5 applications
+réellement présentes toutes vertes (guards ENV vérifiés avec leurs flags locaux documentés
+uniquement), `verify:migrations`/`verify:secrets` verts, `preflight_enforcement` maintenu en
+`report`. **Verdict plafonné à `PREVIEW DEPLOYMENT CANDIDATE`** conformément à la mission :
+aucune vraie Preview n'a été atteinte ni testée dans ce sandbox — `PREVIEW QUALIFIED` n'est donc
+jamais applicable ici, quel que soit le niveau de preuve local.
+
+Aucun déploiement, aucune Preview réelle, aucune Production dans cette session.
+
