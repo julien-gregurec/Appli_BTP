@@ -526,8 +526,22 @@ Deux nouveaux points ouverts, spécifiques à ce lot, à traiter avant toute qua
 - Ne jamais fermer `DECISION_REQUIRED:STUDIO-SIGNUP-DEFAULT` par un correctif partiel qui ignorerait sa dépendance au projet Supabase dédié (§16.4-16.5).
 - Ne jamais porter `fix/studio-signup-closed-v1` par cherry-pick isolé du seul dernier commit — la chaîne est solidaire (hook Auth + table + projet Supabase dédié) ; toute décision d'intégration doit statuer d'abord sur `DECISION_REQUIRED:STUDIO-DEDICATED-SUPABASE-AND-CONTINUATION`.
 
-### 16.9 — Statut après ce lot
+### 16.9 — Fusion avec une remédiation sécurité concurrente (même branche, autre session)
 
-`CONVERGENCE_TRAIN_CANDIDATE = 67b1564` (branche `claude/compassionate-euler-5j6avr`, à pousser). `FINAL_PREVIEW_TRAIN = NOT_YET`.
+Au moment de pousser (`67b1564`), `origin/claude/compassionate-euler-5j6avr` avait avancé de 6 commits non issus de cette session : une autre session Claude Code, travaillant sur la **même branche** (donc aucun train concurrent créé), avait fusionné mon commit `6eaaafa` (fin du lot Reserves) avec une remédiation de sécurité indépendante — épinglage `js-yaml >=4.3.2` (GHSA-2883-xcg3-v3hh, transitif dev-only via `eslint`), révocation de l'`EXECUTE PUBLIC/anon` involontaire sur 2 fonctions `SECURITY DEFINER` (`construire_entreprise_snapshot`, `est_membre_actif_reel`), et une migration `20260922000315_security_remediation_plateforme_admins_provisioning.sql` — documentée dans son propre rapport, `docs/qualification/ELSATIA_SECURITY_BLOCKERS_REMEDIATION_V1.md`.
+
+**Aucun recouvrement de fichier applicatif** avec le lot Studio (seul `package.json` racine touché des deux côtés, sur des sections disjointes — script `studio:e2e:gate` d'un côté, `overrides.js-yaml` de l'autre). Fusionné par `git merge` (commit de fusion, aucune réécriture d'historique, comme la pratique déjà suivie par cette autre session pour son propre `81420ad`) : **0 conflit**. Requalification complète rejouée sur l'arbre fusionné :
+
+- `verify:migrations` : **307** migrations (+2, les migrations de remédiation sécurité), noms/horodatages uniques.
+- `verify:secrets` : PASS (2476 fichiers, 1 exception nommée inchangée).
+- `npm run typecheck` (GP + Tools + Reserves + Colors) : **PASS**, 0 erreur.
+- `npm run lint` (GP + Tools + Reserves + Colors) : **une régression réelle trouvée et corrigée** — `packages/studio-domain/src/analysis.ts:368`, `prefer-const` sur `remaining` (mutée en place via `sort`/`shift`, jamais réassignée). Non détectée par le lint scindé d'`apps/studio` (`eslint src tests next.config.ts` ne couvre pas le paquet partagé `packages/studio-domain`, jamais lui-même ciblé par aucun script de lint dédié) — seule la fusion avec la commande racine (`eslint`, sans argument, qui couvre tout sauf les `globalIgnores`) l'a révélée. Corrigée en un commit dédié (`b0f51b0`) ; **0 erreur** après correctif, `apps/studio` (tsc + 251/251 tests) revérifié intact.
+- `npm run test` (GP + Tools + Reserves + Colors) : **1786 + 1992 + 154 + 427 = 4359 tests, tous PASS**, aucune régression.
+- `apps/studio` (tsc, eslint, vitest, build) et `workers/studio-video` (tsc) revérifiés après fusion : inchangés par rapport au §16.7.
+- Fresh/pgTAP : non rejoués dans cette session (même écart documenté au §16.7 ; les 2 migrations de remédiation sécurité n'ont pas non plus été exercées ici — l'autre session les a qualifiées séparément dans son propre rapport, à 299/299 puis 307/307 dans ses propres passes).
+
+### 16.10 — Statut après ce lot
+
+`CONVERGENCE_TRAIN_CANDIDATE = b0f51b0` (branche `claude/compassionate-euler-5j6avr`, à pousser — fusionne `67b1564` avec la remédiation sécurité `81420ad` et corrige la régression lint découverte par cette fusion). `FINAL_PREVIEW_TRAIN = NOT_YET`.
 
 C'était le 6ᵉ et dernier lot de la liste transmise. **Aucun des deux `DECISION_REQUIRED` du lot Studio (§16.4, §16.5) n'est tranché** ; le train reste un candidat de convergence, pas une base Preview qualifiée. Aucun déploiement, aucune Preview, aucune Production.
