@@ -13,6 +13,8 @@ import {
 } from "@/lib/documents";
 import { analyserDocumentIA, MIME_ANALYSABLES_IA } from "@/lib/ai/documents";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
+import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 const BUCKET = "chantier-documents";
 
@@ -47,7 +49,7 @@ export async function ajouterDocumentChantierAction(chantierId: string, formData
     cacheControl: "3600",
     upsert: false,
   });
-  if (uploadError) retour(chantierId, "error", uploadError.message);
+  if (uploadError) retour(chantierId, "error", messageErreurUtilisateur("ajouterDocumentAction:upload", uploadError, "Impossible d’envoyer le document. Réessayez dans un instant."));
 
   const { error: insertError } = await supabase.from("documents_chantier").insert({
     entreprise_id: ctx.entrepriseId,
@@ -62,12 +64,74 @@ export async function ajouterDocumentChantierAction(chantierId: string, formData
   });
   if (insertError) {
     await supabase.storage.from(BUCKET).remove([path]);
-    retour(chantierId, "error", insertError.message);
+    retour(chantierId, "error", messageErreurUtilisateur("ajouterDocumentAction:insert", insertError, "Impossible d’enregistrer le document."));
   }
 
   revalidatePath(`/chantiers/${chantierId}`);
   revalidatePath(`/chantiers/${chantierId}/documents`);
   retour(chantierId, "success", "Document ajouté");
+}
+
+// Une photo de compte-rendu est un document de chantier ordinaire (mêmes règles de
+// stockage/permission que documents_chantier), simplement rattaché à un compte-rendu via
+// compte_rendu_id — pas de bucket ni de logique dédiés (PIECES-JOINTES-V1).
+export async function ajouterPhotoCompteRenduAction(chantierId: string, compteRenduId: string, formData: FormData): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const fichier = formData.get("fichier");
+
+  const { data: compteRendu } = await supabase.from("comptes_rendus_chantier").select("id")
+    .eq("id", compteRenduId).eq("chantier_id", chantierId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+  if (!compteRendu) return { error: "Compte-rendu introuvable" };
+  if (!(fichier instanceof File) || fichier.size === 0) return { error: "Choisissez une photo" };
+  if (fichier.size > DOCUMENT_TAILLE_MAX) return { error: "La photo dépasse la limite de 15 Mo" };
+  if (!DOCUMENT_MIME_TYPES.includes(fichier.type as (typeof DOCUMENT_MIME_TYPES)[number])) {
+    return { error: "Format de fichier non pris en charge" };
+  }
+
+  const path = `${ctx.entrepriseId}/${chantierId}/${crypto.randomUUID()}-${nomFichierSecurise(fichier.name)}`;
+  const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, fichier, {
+    contentType: fichier.type,
+    cacheControl: "3600",
+    upsert: false,
+  });
+  if (uploadError) return { error: messageErreurUtilisateur("ajouterPhotoCompteRenduAction:upload", uploadError, "Impossible d’envoyer la photo. Réessayez dans un instant.") };
+
+  const { error: insertError } = await supabase.from("documents_chantier").insert({
+    entreprise_id: ctx.entrepriseId,
+    chantier_id: chantierId,
+    compte_rendu_id: compteRenduId,
+    nom: fichier.name,
+    categorie: "photo_pendant",
+    storage_path: path,
+    mime_type: fichier.type,
+    taille_octets: fichier.size,
+    audience: "tous_affectes",
+  });
+  if (insertError) {
+    await supabase.storage.from(BUCKET).remove([path]);
+    return { error: messageErreurUtilisateur("ajouterPhotoCompteRenduAction:insert", insertError, "Impossible d’enregistrer la photo.") };
+  }
+
+  revalidatePath(`/chantiers/${chantierId}/comptes-rendus`);
+  return { ok: true };
+}
+
+export async function supprimerPhotoCompteRenduAction(chantierId: string, documentId: string) {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const { data: document } = await supabase.from("documents_chantier")
+    .select("storage_path").eq("id", documentId).eq("chantier_id", chantierId)
+    .eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+  if (!document) redirect(`/chantiers/${chantierId}/comptes-rendus?error=${encodeURIComponent("Photo introuvable")}`);
+
+  await supabase.storage.from(BUCKET).remove([document.storage_path]);
+  const { error } = await supabase.from("documents_chantier").delete()
+    .eq("id", documentId).eq("chantier_id", chantierId).eq("entreprise_id", ctx.entrepriseId);
+  if (error) redirect(`/chantiers/${chantierId}/comptes-rendus?error=${encodeURIComponent(messageErreurUtilisateur("supprimerPhotoCompteRenduAction:delete", error, "Impossible de supprimer la photo."))}`);
+
+  revalidatePath(`/chantiers/${chantierId}/comptes-rendus`);
+  redirect(`/chantiers/${chantierId}/comptes-rendus?success=${encodeURIComponent("Photo retirée")}`);
 }
 
 export async function supprimerDocumentChantierAction(chantierId: string, documentId: string) {
@@ -79,11 +143,11 @@ export async function supprimerDocumentChantierAction(chantierId: string, docume
   if (!document) retour(chantierId, "error", "Document introuvable");
 
   const { error: storageError } = await supabase.storage.from(BUCKET).remove([document.storage_path]);
-  if (storageError) retour(chantierId, "error", storageError.message);
+  if (storageError) retour(chantierId, "error", messageErreurUtilisateur("supprimerDocumentAction:storage", storageError, "Impossible de supprimer le fichier du document."));
 
   const { error } = await supabase.from("documents_chantier").delete()
     .eq("id", documentId).eq("chantier_id", chantierId).eq("entreprise_id", ctx.entrepriseId);
-  if (error) retour(chantierId, "error", error.message);
+  if (error) retour(chantierId, "error", messageErreurUtilisateur("supprimerDocumentAction:delete", error, "Impossible de supprimer le document."));
 
   revalidatePath(`/chantiers/${chantierId}`);
   revalidatePath(`/chantiers/${chantierId}/documents`);
@@ -91,6 +155,7 @@ export async function supprimerDocumentChantierAction(chantierId: string, docume
 }
 
 export async function analyserDocumentIAAction(documentId: string) {
+  if (!iaEstActive()) return { error: MESSAGE_IA_INDISPONIBLE };
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
@@ -116,12 +181,15 @@ export async function analyserDocumentIAAction(documentId: string) {
 
   try {
     const octets = Buffer.from(await fichier.arrayBuffer());
-    const analyse = await analyserDocumentIA(octets, document.mime_type);
-    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "documents", statut: "succes" });
+    const { texte: analyse, usage } = await analyserDocumentIA(octets, document.mime_type);
+    journaliserAppelIA(supabase, {
+      entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "documents", statut: "succes",
+      jetonsEntree: usage?.jetonsEntree, jetonsSortie: usage?.jetonsSortie, jetonsTotal: usage?.jetonsTotal, coutEstimeHT: usage?.coutEstimeHT,
+    });
     return { analyse };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Erreur lors de l'analyse IA.";
-    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "documents", statut: "erreur", messageErreur: message });
-    return { error: message };
+    const messageBrut = err instanceof Error ? err.message : "Erreur lors de l'analyse IA.";
+    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "documents", statut: "erreur", messageErreur: messageBrut });
+    return { error: messageErreurUtilisateur("analyserDocumentIAAction", err, "L’analyse assistée du document n’est pas disponible pour le moment.") };
   }
 }

@@ -4,6 +4,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { euros } from "@/lib/devis";
 import { powensEstConfigure } from "@/lib/banking";
+import { BRAND_NAME } from "@/lib/brand";
 import {
   activerPowensAction,
   annulerLotVirementsAction,
@@ -62,7 +63,7 @@ export default async function PaiementsBancairesPage({ searchParams }: { searchP
     {messages.success && <p className="rounded-md bg-green-50 p-3 text-sm text-green-700">{messages.success}</p>}
 
     <section className="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/30">
-      <div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="font-semibold">Prestataire bancaire · Powens Pay</h2><p className="mt-1 max-w-3xl text-sm text-neutral-600 dark:text-neutral-300">Liria prépare les ordres. La banque exige ensuite une authentification forte avant de les exécuter. Aucun salaire ni fournisseur n’est payé à la simple réception d’un document.</p></div><span className={`rounded-full px-3 py-1 text-xs font-semibold ${connexion?.statut === "actif" || connexion?.statut === "pret" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-900"}`}>{connexion?.statut === "actif" || connexion?.statut === "pret" ? `Prêt · ${connexion.environnement}` : powensEstConfigure() ? "À activer" : "Contrat et clés requis"}</span></div>
+      <div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="font-semibold">Prestataire bancaire · Powens Pay</h2><p className="mt-1 max-w-3xl text-sm text-neutral-600 dark:text-neutral-300">{BRAND_NAME} prépare les ordres. La banque exige ensuite une authentification forte avant de les exécuter. Aucun salaire ni fournisseur n’est payé à la simple réception d’un document.</p></div><span className={`rounded-full px-3 py-1 text-xs font-semibold ${connexion?.statut === "actif" || connexion?.statut === "pret" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-900"}`}>{connexion?.statut === "actif" || connexion?.statut === "pret" ? `Prêt · ${connexion.environnement}` : powensEstConfigure() ? "À activer" : "Contrat et clés requis"}</span></div>
       {connexion?.dernier_message && <p className="mt-3 text-xs text-blue-900 dark:text-blue-200">{connexion.dernier_message}</p>}
       {autorise("executer_virements") && powensEstConfigure() && !["pret", "actif"].includes(connexion?.statut ?? "") && <form action={activerPowensAction} className="mt-3"><button className="rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white">Activer Powens pour cette entreprise</button></form>}
     </section>

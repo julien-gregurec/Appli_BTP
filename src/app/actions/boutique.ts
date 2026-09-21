@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { estPlateformeAdmin } from "@/lib/plateforme";
 import { creerSessionCheckoutBoutique } from "@/lib/stripe-boutique";
+import { boutiqueEstActive, MESSAGE_BOUTIQUE_INDISPONIBLE } from "@/lib/preview-features";
 
 type LignePanier = { produitId: string; quantite: number };
 
@@ -22,6 +23,7 @@ function parserPanier(brut: string): LignePanier[] {
 }
 
 export async function passerCommandeAction(formData: FormData) {
+  if (!boutiqueEstActive()) redirect(`/dashboard?error=${encodeURIComponent(MESSAGE_BOUTIQUE_INDISPONIBLE)}`);
   const ctx = await getContexteEntreprise();
   const droits = await permissionsUtilisateur(ctx);
   if (droits !== null && !droits.includes("gerer_boutique")) {
@@ -111,6 +113,7 @@ export async function passerCommandeAction(formData: FormData) {
 }
 
 export async function annulerCommandeAction(commandeId: string) {
+  if (!boutiqueEstActive()) redirect(`/dashboard?error=${encodeURIComponent(MESSAGE_BOUTIQUE_INDISPONIBLE)}`);
   const ctx = await getContexteEntreprise();
   const droits = await permissionsUtilisateur(ctx);
   if (droits !== null && !droits.includes("gerer_boutique")) {
@@ -128,6 +131,7 @@ export async function annulerCommandeAction(commandeId: string) {
 }
 
 export async function creerProduitBoutiqueAction(formData: FormData) {
+  if (!boutiqueEstActive()) redirect(`/plateforme?error=${encodeURIComponent(MESSAGE_BOUTIQUE_INDISPONIBLE)}`);
   if (!(await estPlateformeAdmin())) redirect("/dashboard");
   const sku = String(formData.get("sku") ?? "").trim();
   const nom = String(formData.get("nom") ?? "").trim();
@@ -153,6 +157,7 @@ export async function creerProduitBoutiqueAction(formData: FormData) {
 }
 
 export async function modifierProduitBoutiqueAction(produitId: string, formData: FormData) {
+  if (!boutiqueEstActive()) redirect(`/plateforme?error=${encodeURIComponent(MESSAGE_BOUTIQUE_INDISPONIBLE)}`);
   if (!(await estPlateformeAdmin())) redirect("/dashboard");
   const supabase = await createClient();
   const { error } = await supabase.from("boutique_produits").update({

@@ -4,6 +4,7 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { typesNotificationsDisponibles } from "@/lib/notifications-registre";
 import { PushNotificationsSettings } from "@/components/PushNotificationsSettings";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 export default async function NotificationsParametresPage() {
   const ctx = await getContexteEntreprise();
@@ -23,7 +24,7 @@ export default async function NotificationsParametresPage() {
         <div>
           <Link href="/parametres" className="text-sm text-neutral-500 hover:underline">← Paramètres</Link>
           <h1 className="mt-1 text-xl font-semibold">Notifications</h1>
-          <p className="text-sm text-neutral-500">Reçois une alerte sur ton téléphone ou ton ordinateur dès qu&apos;une action te concerne, même Liria fermé.</p>
+          <p className="text-sm text-neutral-500">Reçois une alerte sur ton téléphone ou ton ordinateur dès qu&apos;une action te concerne, même lorsque {PRODUCT_NAME} est fermé.</p>
         </div>
 
         <PushNotificationsSettings

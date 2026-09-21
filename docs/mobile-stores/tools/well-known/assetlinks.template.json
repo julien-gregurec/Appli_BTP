@@ -1,0 +1,11 @@
+[
+  {
+    "_comment": "MODELE — NE PAS DEPLOYER EN L'ETAT. Remplacer SHA256_FINGERPRINT_DE_LA_CLE_DE_SIGNATURE_PLAY par l'empreinte SHA-256 exacte relevee dans Play Console > Configuration > Integrite de l'application > Certificat de la cle de signature d'application (celle de Play App Signing, PAS celle de l'upload key), au format hexadecimal majuscule separe par des deux-points. Retirer ensuite la cle _comment. Le fichier doit etre servi par https://tools.elsatia.fr/.well-known/assetlinks.json en Content-Type application/json, en HTTPS, sans redirection.",
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "fr.elsatia.tools",
+      "sha256_cert_fingerprints": ["SHA256_FINGERPRINT_DE_LA_CLE_DE_SIGNATURE_PLAY"]
+    }
+  }
+]

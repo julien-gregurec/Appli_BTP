@@ -3,16 +3,19 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { euros, LIGNE_TYPES } from "@/lib/devis";
-import { nomClient } from "@/lib/chantier-statuts";
+import { identiteClientDocument, mentionOrigineIdentite } from "@/lib/client-snapshot";
 import { StatutDevisSelect } from "@/components/StatutDevisSelect";
-import { associerDevisChantierAction, dupliquerDevisAction, supprimerDevisAction } from "@/app/actions/devis";
+import { associerDevisChantierAction, dupliquerDevisAction, supprimerDevisAction, envoyerDevisEmailAction, retirerPieceJointeDevisAction } from "@/app/actions/devis";
 import { creerFactureDepuisDevisAction } from "@/app/actions/factures";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { contenuEmailDocument } from "@/lib/email";
+import { brevoEstConfigure } from "@/lib/brevo";
 import { EmailDocumentButton } from "@/components/EmailDocumentButton";
 import { permissionsUtilisateur } from "@/lib/permissions";
+import { peutSurchargerDestinataire } from "@/lib/permissions-envoi";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { SignatureDocumentMetier } from "@/components/SignatureDocumentMetier";
+import { RelanceDocumentSection } from "@/components/RelanceDocumentSection";
 
 export default async function DevisDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; success?: string }> }) {
   const { id } = await params;
@@ -24,14 +27,14 @@ export default async function DevisDetailPage({ params, searchParams }: { params
 
   const { data: devis } = await supabase
     .from("devis")
-    .select("*, client:clients(id, nom, prenom, societe, email), chantier:chantiers!devis_chantier_id_fkey(id, nom)")
+    .select("*, client:clients!devis_client_id_fkey(id, nom, prenom, societe, email), chantier:chantiers!devis_chantier_id_fkey(id, nom)")
     .eq("id", id)
     .eq("entreprise_id", ctx.entrepriseId)
     .single();
 
   if (!devis) notFound();
 
-  const [{ data: lignes }, { data: piecesJointes }] = await Promise.all([
+  const [{ data: lignes }, { data: piecesJointes }, { data: relances }] = await Promise.all([
     supabase.from("lignes_devis").select("*").eq("devis_id", id).order("ordre"),
     supabase
       .from("pieces_jointes_devis")
@@ -39,11 +42,18 @@ export default async function DevisDetailPage({ params, searchParams }: { params
       .eq("devis_id", id)
       .eq("entreprise_id", ctx.entrepriseId)
       .order("created_at"),
+    peutGererDevis
+      ? supabase.from("relances_documents").select("id,niveau,statut,automatique,date_envoi,created_at").eq("type_document", "devis").eq("document_id", id).order("created_at", { ascending: false })
+      : Promise.resolve({ data: null }),
   ]);
 
   const chantiersClient = peutGererDevis
     ? (await supabase.from("chantiers").select("id,nom,ville,statut").eq("entreprise_id", ctx.entrepriseId).eq("client_id", devis.client_id).not("statut", "in", "(archive,annule)").order("nom")).data ?? []
     : [];
+
+  const { data: chantierIssuDuDevis } = peutGererDevis && devis.statut === "accepte"
+    ? await supabase.from("chantiers").select("id, nom").eq("devis_source_id", id).eq("entreprise_id", ctx.entrepriseId).maybeSingle()
+    : { data: null };
 
   const client = Array.isArray(devis.client) ? devis.client[0] : devis.client;
   const chantier = Array.isArray(devis.chantier) ? devis.chantier[0] : devis.chantier;
@@ -52,10 +62,17 @@ export default async function DevisDetailPage({ params, searchParams }: { params
   const creerFacture = creerFactureDepuisDevisAction.bind(null, id, "simple");
   const dupliquer = dupliquerDevisAction.bind(null, id);
   const peutSupprimer = ["brouillon", "refuse", "annule"].includes(devis.statut);
+  // Un devis déjà émis affiche — et réexpédie — l'identité du destinataire figée
+  // à son émission ; seul un brouillon reflète la fiche client actuelle.
+  const identiteDocument = identiteClientDocument({
+    snapshot: devis.client_snapshot,
+    fiche: client,
+    captureeLe: devis.client_snapshot_at,
+  });
   const email = contenuEmailDocument({
     typeDoc: "devis",
     numero: devis.numero,
-    client,
+    client: { nom: identiteDocument.entete.nom_affiche, prenom: null, societe: null, email: identiteDocument.email },
     montantTtc: Number(devis.montant_ttc),
     entrepriseNom: ctx.entrepriseNom,
     prenomEmetteur: ctx.prenom,
@@ -71,9 +88,10 @@ export default async function DevisDetailPage({ params, searchParams }: { params
             <Link href="/devis" className="text-sm text-neutral-500 hover:underline">← Devis</Link>
             <h1 className="mt-1 text-xl font-semibold">{devis.numero ?? "Devis (brouillon)"}</h1>
             <p className="text-sm text-neutral-500">
-              {client ? nomClient(client) : "—"}
+              {identiteDocument.entete.nom_affiche}
               {chantier && <> · chantier <Link href={`/chantiers/${chantier.id}`} className="hover:underline">{chantier.nom}</Link></>}
             </p>
+            <p className="mt-1 text-xs text-neutral-500">{mentionOrigineIdentite(identiteDocument)}</p>
           </div>
           <div className="flex items-center gap-3">
             <form action={dupliquer}>
@@ -87,7 +105,7 @@ export default async function DevisDetailPage({ params, searchParams }: { params
               </Link>
             )}
             <a
-              href={`/imprimer/devis/${id}`}
+              href={`/api/documents/devis/${id}/pdf`}
               target="_blank"
               rel="noopener"
               className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700"
@@ -95,7 +113,20 @@ export default async function DevisDetailPage({ params, searchParams }: { params
               Télécharger PDF
             </a>
             {email ? (
-              <EmailDocumentButton type="devis" id={id} statut={devis.statut} to={email.to} sujet={email.sujet} corps={email.corps} pdfUrl={`/imprimer/devis/${id}`} />
+              <EmailDocumentButton
+                type="devis"
+                id={id}
+                statut={devis.statut}
+                to={email.to}
+                sujet={email.sujet}
+                corps={email.corps}
+                pdfUrl={`/api/documents/devis/${id}/pdf`}
+                envoiAutomatiqueDisponible={brevoEstConfigure()}
+                envoyerAutomatiquementAction={envoyerDevisEmailAction}
+                emailEnvoyeLe={devis.email_envoye_le}
+                adresseFigee={identiteDocument.email}
+                peutSurchargerDestinataire={peutSurchargerDestinataire(permissions)}
+              />
             ) : (
               <span className="cursor-default rounded-md border border-neutral-200 px-3 py-1.5 text-sm text-neutral-400 dark:border-neutral-800" title="Aucun email renseigné pour ce client">
                 Envoyer par email
@@ -190,9 +221,21 @@ export default async function DevisDetailPage({ params, searchParams }: { params
                   )}
                   <div className="flex items-center justify-between gap-2 border-t border-neutral-200 px-3 py-2 text-xs dark:border-neutral-800">
                     <span className="min-w-0 truncate">{piece.legende || piece.nom_original}</span>
-                    <a href={`/api/devis/pieces-jointes/${piece.id}?download=1`} className="shrink-0 font-medium text-blue-700 hover:underline dark:text-blue-300">
-                      Télécharger
-                    </a>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <a href={`/api/devis/pieces-jointes/${piece.id}?download=1`} className="font-medium text-blue-700 hover:underline dark:text-blue-300">
+                        Télécharger
+                      </a>
+                      {peutGererDevis && (
+                        <form action={retirerPieceJointeDevisAction.bind(null, id, piece.id)}>
+                          <ConfirmSubmitButton
+                            message={`Retirer « ${piece.legende || piece.nom_original} » de ce devis ?`}
+                            className="font-medium text-red-700 hover:underline dark:text-red-400"
+                          >
+                            Retirer
+                          </ConfirmSubmitButton>
+                        </form>
+                      )}
+                    </div>
                   </div>
                 </article>
               ))}
@@ -200,7 +243,34 @@ export default async function DevisDetailPage({ params, searchParams }: { params
           </section>
         )}
 
+        {peutGererDevis && devis.statut === "envoye" && (
+          <RelanceDocumentSection
+            type="devis"
+            documentId={id}
+            autoExclue={Boolean(devis.relance_auto_exclue)}
+            peutGerer={peutGererDevis}
+            historique={(relances ?? []).map((r) => ({ id: r.id, niveau: r.niveau, statut: r.statut, automatique: r.automatique, dateEnvoi: r.date_envoi, createdAt: r.created_at }))}
+          />
+        )}
+
         <SignatureDocumentMetier type="devis" documentId={id} />
+
+        {peutGererDevis && devis.statut === "accepte" && (
+          <div className="flex flex-wrap items-center gap-3 border-t border-neutral-100 pt-4 dark:border-neutral-800">
+            {chantierIssuDuDevis ? (
+              <>
+                <p className="text-sm text-neutral-600 dark:text-neutral-400">Un chantier existe déjà pour ce devis.</p>
+                <Link href={`/chantiers/${chantierIssuDuDevis.id}`} className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium dark:border-neutral-700">
+                  Ouvrir le chantier
+                </Link>
+              </>
+            ) : (
+              <Link href={`/devis/${id}/creer-chantier`} className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium dark:border-neutral-700">
+                Créer un chantier à partir de ce devis
+              </Link>
+            )}
+          </div>
+        )}
 
         <div className="flex items-center justify-between border-t border-neutral-100 pt-4 dark:border-neutral-800">
           {devis.statut === "accepte" ? (

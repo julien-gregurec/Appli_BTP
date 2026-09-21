@@ -1,0 +1,83 @@
+{
+  "archiveStatus": "PARTIAL_TECHNICAL_ARCHIVE",
+  "productionUse": "FORBIDDEN",
+  "reproducible": false,
+  "exactSourceCount": 11,
+  "sources": [
+    {
+      "path": "app/api/company-search/route.ts",
+      "sourceMap": "tools/naming-studio/.next/server/chunks/[root-of-the-server]__1c015k7._.js.map",
+      "sha256": "4428de6beee8256ce1ff8eb499e06919de47122463bc99051b3402855b1beb76",
+      "status": "EXACT"
+    },
+    {
+      "path": "app/api/domain-check/route.ts",
+      "sourceMap": "tools/naming-studio/.next/server/chunks/[root-of-the-server]__04fxjq0._.js.map",
+      "sha256": "389d6f0bee216dd9deca31bb0ba041b70bc47ab57b86db9d0517c83cea0990ac",
+      "status": "EXACT"
+    },
+    {
+      "path": "app/layout.tsx",
+      "sourceMap": "tools/naming-studio/.next/server/chunks/ssr/[root-of-the-server]__171axf1._.js.map",
+      "sha256": "e0e5418585a22b69e6279c06bb9bd15e38665556ba9d7985df64740dc56ac339",
+      "status": "EXACT"
+    },
+    {
+      "path": "app/page.tsx",
+      "sourceMap": "tools/naming-studio/.next/server/chunks/ssr/[root-of-the-server]__1_8dszo._.js.map",
+      "sha256": "418cfdef5b8e6b2d2fcd686dd8a7dcd973a333b5cb6e19ab04561ade4c852bd7",
+      "status": "EXACT"
+    },
+    {
+      "path": "components/naming-studio.tsx",
+      "sourceMap": "tools/naming-studio/.next/server/chunks/ssr/components_naming-studio_tsx_1s3sm0j._.js.map",
+      "sha256": "1c56623317d095cd237883f2772d7f5078e5e948782b7c854c8cb9f58b54d9de",
+      "status": "EXACT"
+    },
+    {
+      "path": "lib/ambigram.ts",
+      "sourceMap": "tools/naming-studio/.next/server/chunks/ssr/components_naming-studio_tsx_1s3sm0j._.js.map",
+      "sha256": "b48cae31bb7495693570c4cc44ed0f382ac47d143ed9bedbf5b02c0905aad349",
+      "status": "EXACT"
+    },
+    {
+      "path": "lib/csv.ts",
+      "sourceMap": "tools/naming-studio/.next/server/chunks/ssr/components_naming-studio_tsx_1s3sm0j._.js.map",
+      "sha256": "07f42b05c2de945a7e5959902765f20829abef3c38145cdf874af81660f36f3a",
+      "status": "EXACT"
+    },
+    {
+      "path": "lib/defaults.ts",
+      "sourceMap": "tools/naming-studio/.next/server/chunks/ssr/components_naming-studio_tsx_1s3sm0j._.js.map",
+      "sha256": "de41d39505f4d3177cfa290f2f14ac5467170a551c59e2aea7f5279f6abb7b18",
+      "status": "EXACT"
+    },
+    {
+      "path": "lib/generator.ts",
+      "sourceMap": "tools/naming-studio/.next/server/chunks/ssr/components_naming-studio_tsx_1s3sm0j._.js.map",
+      "sha256": "30abd94aa7fdb9bf3dd87b042eacb2bfe896becf1ad0057c2fd909959abbdfc7",
+      "status": "EXACT"
+    },
+    {
+      "path": "lib/scoring.ts",
+      "sourceMap": "tools/naming-studio/.next/server/chunks/ssr/components_naming-studio_tsx_1s3sm0j._.js.map",
+      "sha256": "ba9761d6e54a4f23de65e934b8a848a0aaf0571e43283da7150fde9e4f94bf1c",
+      "status": "EXACT"
+    },
+    {
+      "path": "lib/similarity.ts",
+      "sourceMap": "tools/naming-studio/.next/server/chunks/ssr/components_naming-studio_tsx_1s3sm0j._.js.map",
+      "sha256": "1d22c55881b2859b4a9ef5aa09a7e1979ee24731df03f533973c80d189935809",
+      "status": "EXACT"
+    }
+  ],
+  "missing": [
+    "lib/types.ts",
+    "app/globals.css (original authoring source)",
+    "package.json (exact original)",
+    "root lockfile",
+    "tsconfig.json (exact original)",
+    "possible ESLint/PostCSS configuration",
+    "possible tests"
+  ]
+}

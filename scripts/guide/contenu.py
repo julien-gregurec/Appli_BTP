@@ -31,8 +31,8 @@ def _droits():
 # ═══════════════════════════════════════════════════════════════════
 def introduction():
     return [
-        Titre("Bienvenue dans Liria Gestion Pro", 1),
-        p("Liria Gestion Pro réunit dans un seul logiciel tout ce qu'une entreprise du bâtiment "
+        Titre("Bienvenue dans ELSATIA Gestion Pro", 1),
+        p("ELSATIA Gestion Pro réunit dans un seul logiciel tout ce qu'une entreprise du bâtiment "
           "manipule au quotidien : les clients, les chantiers, les devis, les factures, le planning "
           "des équipes, les heures pointées, les achats, le stock, le matériel et la rentabilité. "
           "Chaque information n'est saisie qu'une fois : un devis accepté crée les tâches du chantier, "
@@ -324,7 +324,7 @@ def modes_operatoires_complets():
 def parcours_par_role():
     return [
         Titre("Le logiciel selon votre métier", 1),
-        p("Deux personnes n'utilisent pas Liria Gestion Pro de la même façon. Cette partie décrit le "
+        p("Deux personnes n'utilisent pas ELSATIA Gestion Pro de la même façon. Cette partie décrit le "
           "quotidien de chaque rôle : ce que vous ouvrez le matin, ce que vous faites, ce que vous ne "
           "voyez pas.", "chapo"),
 

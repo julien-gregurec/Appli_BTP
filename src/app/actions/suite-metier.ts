@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { createClient } from "@/lib/supabase/server";
 import { construireLienMailto } from "@/lib/email";
+import { brevoEstConfigure, envoyerEmailBrevo } from "@/lib/brevo";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 const texte = (formData: FormData, cle: string) => String(formData.get(cle) ?? "").trim();
 const nombre = (formData: FormData, cle: string, defaut = 0) => {
@@ -55,7 +57,15 @@ export async function creerFactureAvanceeAction(formData: FormData) {
     p_est_dgd: texte(formData, "est_dgd") === "true",
     p_facture_origine_id: type === "avoir" ? texte(formData, "facture_origine_id") || null : null,
   });
-  if (error || !data) retourErreur("/facturation-avancee", error?.message ?? "Création impossible");
+  if (error || !data) {
+    // Idempotence (GP-EXTERNAL-PILOT-CLOSURE-V1) : un double clic sur "Créer un
+    // avoir" résout vers l'avoir déjà créé au lieu d'en émettre un second (même
+    // convention que creerChantierDepuisDevisAction pour "chantier_existant:").
+    const brut = error?.message ?? "";
+    const avoirExistant = brut.match(/avoir_existant:([0-9a-f-]{36})/i);
+    if (avoirExistant) redirect(`/factures/${avoirExistant[1]}`);
+    retourErreur("/facturation-avancee", brut || "Création impossible");
+  }
   revalidatePath("/factures");
   redirect(`/factures/${data}`);
 }
@@ -138,7 +148,7 @@ export async function creerRelanceAction(formData: FormData) {
   const factureId = texte(formData, "facture_id");
   const canal = texte(formData, "canal") || "email";
   const { data: facture, error: factureError } = await supabase.from("factures")
-    .select("id,numero,montant_ttc,montant_paye,date_echeance,client:clients(nom,prenom,societe,email),chantier:chantiers(nom)")
+    .select("id,numero,montant_ttc,montant_paye,date_echeance,client:clients!factures_client_id_fkey(nom,prenom,societe,email),chantier:chantiers(nom)")
     .eq("id", factureId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
   if (factureError || !facture) return { error: "Facture introuvable ou inaccessible" };
   if (Number(facture.montant_ttc) <= Number(facture.montant_paye)) return { error: "Cette facture est déjà entièrement réglée" };
@@ -177,6 +187,34 @@ export async function marquerRelanceEnvoyeeAction(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("relances_impayes").update({ statut: "envoyee", date_envoi: new Date().toISOString() }).eq("id", id).eq("entreprise_id", ctx.entrepriseId);
   if (error) retourErreur("/crm", error.message);
+  revalidatePath("/crm");
+}
+
+// Envoi réel via l'API Brevo (pas le relais SMTP utilisé par Supabase Auth : nécessite sa propre
+// clé BREVO_API_KEY, jamais exposée côté client). Non bloquant : un échec redirige avec un message
+// clair mais ne touche pas au statut existant de la relance, qui reste "à renvoyer".
+export async function envoyerRelanceEmailAction(id: string) {
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const { data: relance, error: chargementErreur } = await supabase
+    .from("relances_impayes")
+    .select("id,canal,statut,destinataire,sujet,message")
+    .eq("id", id)
+    .eq("entreprise_id", ctx.entrepriseId)
+    .maybeSingle();
+  if (chargementErreur || !relance) retourErreur("/crm", "Relance introuvable");
+  if (relance!.canal !== "email" || !relance!.destinataire) retourErreur("/crm", "Cette relance n'a pas d'adresse e-mail associée");
+  if (!["a_envoyer", "preparee"].includes(relance!.statut)) retourErreur("/crm", "Cette relance a déjà été traitée");
+  if (!brevoEstConfigure()) retourErreur("/crm", "L'envoi automatique par e-mail n'est pas encore configuré");
+
+  try {
+    await envoyerEmailBrevo({ to: relance!.destinataire!, sujet: relance!.sujet || "Rappel de facture", texte: relance!.message || "" });
+  } catch (cause) {
+    retourErreur("/crm", cause instanceof Error ? cause.message : "Envoi de la relance impossible");
+  }
+
+  const { error: majErreur } = await supabase.from("relances_impayes").update({ statut: "envoyee", date_envoi: new Date().toISOString() }).eq("id", id).eq("entreprise_id", ctx.entrepriseId);
+  if (majErreur) retourErreur("/crm", majErreur.message);
   revalidatePath("/crm");
 }
 
@@ -315,7 +353,7 @@ export async function preparerConnecteurFournisseurLibreAction(formData: FormDat
     activation_demandee_at: new Date().toISOString(),
     configuration: { portail_url: portailUrl, fournisseur_libre: true, aucun_secret_stocke: true },
     dernier_message: mode === "portail"
-      ? "Compte fournisseur référencé. Le portail peut être ouvert depuis Liria Gestion Pro et les tarifs peuvent être importés."
+      ? `Compte fournisseur référencé. Le portail peut être ouvert depuis ${PRODUCT_NAME} et les tarifs peuvent être importés.`
       : "Connexion préparée. Demandez au fournisseur ses paramètres officiels ou son fichier de tarifs négociés.",
     updated_at: new Date().toISOString(),
   }, { onConflict: "entreprise_id,domaine,nom" });

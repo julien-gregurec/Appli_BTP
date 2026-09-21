@@ -2,7 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { isEmailLoginDisabled } from "@/lib/auth-mode";
 import { OFFRES_TARIFAIRES, offreTarifaireParCle, type OffreTarifaire } from "@/lib/tarification";
 
-// L'espace plateforme est réservé au propriétaire (identifié par son email, table plateforme_admins).
+// L'espace plateforme est réservé à une identité active reliée par auth.uid() à
+// plateforme_admins.utilisateur_id. L'email n'est jamais une preuve d'autorisation.
 // En mode prototype (sans connexion), on l'autorise pour la démo mono-entreprise.
 export async function estPlateformeAdmin(): Promise<boolean> {
   if (isEmailLoginDisabled()) return true;
@@ -46,6 +47,11 @@ export type EntrepriseAbonnement = {
   remise_stripe_coupon_id?: string | null;
   remise_description?: string | null;
   remise_appliquee_at?: string | null;
+  remise_motif_interne?: string | null;
+  remise_duree_mois?: number | null;
+  remise_cree_par?: string | null;
+  remise_type?: string | null;
+  remise_valeur?: number | null;
   option_ia_statut?: string | null;
   option_ia_essai_fin?: string | null;
   option_ia_palier?: string | null;
@@ -70,9 +76,11 @@ export type EntrepriseAbonnement = {
 export const DUREE_ESSAI_JOURS = 30;
 export const REDUCTION_ANNUELLE = 0;
 
-// Prix mensuel = base de l'offre (incluant N comptes) + comptes supplémentaires
-// au tarif de l'offre + éventuels dépassements d'appareils. Les montants sont
-// portés par chaque offre (voir OFFRES ci-dessous).
+// Simulateur de la GÉNÉRATION PRÉCÉDENTE : il facture les comptes au tarif du
+// FORFAIT (`parCompteSupHistorique`), pas au tarif du RÔLE. La grille courante
+// dépend du rôle réel du compte — voir `calculerTarifAbonnement()` dans
+// `tarification.ts`. Cette fonction est conservée pour lire un contrat souscrit
+// sous l'ancienne génération ; elle ne doit pas servir à en chiffrer un nouveau.
 export function prixAbonnementMensuel(
   nbComptesFacturables: number,
   offre: Offre = OFFRES[0],
@@ -80,18 +88,18 @@ export function prixAbonnementMensuel(
 ) {
   const sup = Math.max(0, nbComptesFacturables - offre.comptesInclus);
   const supAppareils = Number.isFinite(supplementAppareils) ? Math.max(0, supplementAppareils) : 0;
-  const total = offre.base + sup * offre.parCompteSup + supAppareils;
+  const total = offre.base + sup * offre.parCompteSupHistorique + supAppareils;
   const prixAnnuelFixe = offre.prixAnnuelCentimes / 100;
   return {
     total,
     base: offre.base,
     employesInclus: offre.comptesInclus,
     employesSupplementaires: sup,
-    parEmployeSup: offre.parCompteSup,
+    parEmployeSup: offre.parCompteSupHistorique,
     supplementAppareils: supAppareils,
     // Équivalent en paiement annuel (remise appliquée).
-    mensuelSiAnnuel: Math.round((prixAnnuelFixe / 12 + sup * offre.parCompteSup + supAppareils) * 100) / 100,
-    totalAnnuel: Math.round((prixAnnuelFixe + (sup * offre.parCompteSup + supAppareils) * 12) * 100) / 100,
+    mensuelSiAnnuel: Math.round((prixAnnuelFixe / 12 + sup * offre.parCompteSupHistorique + supAppareils) * 100) / 100,
+    totalAnnuel: Math.round((prixAnnuelFixe + (sup * offre.parCompteSupHistorique + supAppareils) * 12) * 100) / 100,
   };
 }
 
@@ -125,7 +133,7 @@ export const ATTENTES_OPTIONS = [
 ] as const;
 
 // Grille tarifaire publique. `base` inclut `comptesInclus` comptes ; chaque
-// compte au-delà est facturé `parCompteSup`. Positionnement ERP BTP complet
+// compte au-delà était facturé `parCompteSupHistorique`. Positionnement ERP BTP complet
 // (au-dessus des outils devis-factures simples). Ajuster ici après validation
 // auprès de prospects réels.
 export const OFFRES = OFFRES_TARIFAIRES;

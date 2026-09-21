@@ -3,17 +3,21 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { euros, LIGNE_TYPES } from "@/lib/devis";
-import { nomClient } from "@/lib/chantier-statuts";
+import { identiteClientDocument, mentionOrigineIdentite } from "@/lib/client-snapshot";
 import { typeFactureLabel, MODES_PAIEMENT } from "@/lib/factures";
 import { StatutFactureSelect } from "@/components/StatutFactureSelect";
-import { enregistrerPaiementAction, modifierEcheanceFactureAction, supprimerPaiementAction } from "@/app/actions/factures";
+import { enregistrerPaiementAction, modifierEcheanceFactureAction, supprimerPaiementAction, envoyerFactureEmailAction } from "@/app/actions/factures";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { contenuEmailDocument } from "@/lib/email";
+import { brevoEstConfigure } from "@/lib/brevo";
 import { EmailDocumentButton } from "@/components/EmailDocumentButton";
 import { creerLienPaiementStripeAction } from "@/app/actions/paiements-en-ligne";
 import { lienPaiementStripeEstActif, stripeEstConfigure } from "@/lib/stripe";
 import { CopierLienPaiement } from "@/components/CopierLienPaiement";
 import { SignatureDocumentMetier } from "@/components/SignatureDocumentMetier";
+import { RelanceDocumentSection } from "@/components/RelanceDocumentSection";
+import { permissionsUtilisateur } from "@/lib/permissions";
+import { peutSurchargerDestinataire } from "@/lib/permissions-envoi";
 
 const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -31,7 +35,7 @@ export default async function FactureDetailPage({
 
   const { data: facture } = await supabase
     .from("factures")
-    .select("*, client:clients(id, nom, prenom, societe, email), chantier:chantiers!factures_chantier_id_fkey(id, nom), devis:devis(id, numero)")
+    .select("*, client:clients!factures_client_id_fkey(id, nom, prenom, societe, email), chantier:chantiers!factures_chantier_id_fkey(id, nom), devis:devis!factures_devis_origine_id_fkey(id, numero)")
     .eq("id", id)
     .eq("entreprise_id", ctx.entrepriseId)
     .single();
@@ -44,6 +48,11 @@ export default async function FactureDetailPage({
     .from("paiements").select("*").eq("facture_id", id).order("date");
   const { data: avoirsLies } = await supabase
     .from("factures").select("id, numero, montant_ttc").eq("entreprise_id", ctx.entrepriseId).eq("facture_origine_id", id).eq("type", "avoir").neq("statut", "annulee");
+  const permissions = await permissionsUtilisateur(ctx);
+  const peutGererFactures = permissions === null || permissions.includes("gerer_factures");
+  const { data: relances } = peutGererFactures
+    ? await supabase.from("relances_documents").select("id,niveau,statut,automatique,date_envoi,created_at").eq("type_document", "facture").eq("document_id", id).order("created_at", { ascending: false })
+    : { data: null };
 
   const client = Array.isArray(facture.client) ? facture.client[0] : facture.client;
   const chantier = Array.isArray(facture.chantier) ? facture.chantier[0] : facture.chantier;
@@ -57,10 +66,18 @@ export default async function FactureDetailPage({
     : null;
   const enregistrer = enregistrerPaiementAction.bind(null, id);
   const modifierEcheance = modifierEcheanceFactureAction.bind(null, id);
+  // Une facture ou un avoir déjà émis affiche — et réexpédie — l'identité du
+  // destinataire figée à son émission (un avoir reprend celle de la facture
+  // qu'il crédite) ; seul un brouillon reflète la fiche client actuelle.
+  const identiteDocument = identiteClientDocument({
+    snapshot: facture.client_snapshot,
+    fiche: client,
+    captureeLe: facture.client_snapshot_at,
+  });
   const email = contenuEmailDocument({
     typeDoc: "facture",
     numero: facture.numero,
-    client,
+    client: { nom: identiteDocument.entete.nom_affiche, prenom: null, societe: null, email: identiteDocument.email },
     montantTtc: Number(facture.montant_ttc),
     entrepriseNom: ctx.entrepriseNom,
     prenomEmetteur: ctx.prenom,
@@ -77,15 +94,16 @@ export default async function FactureDetailPage({
               <span className="ml-2 text-sm font-normal text-neutral-500">· {typeFactureLabel(facture.type)}</span>
             </h1>
             <p className="text-sm text-neutral-500">
-              {client ? nomClient(client) : "—"}
+              {identiteDocument.entete.nom_affiche}
               {chantier && <> · chantier <Link href={`/chantiers/${chantier.id}`} className="hover:underline">{chantier.nom}</Link></>}
               {devis && <> · devis <Link href={`/devis/${devis.id}`} className="hover:underline">{devis.numero}</Link></>}
             </p>
+            <p className="mt-1 text-xs text-neutral-500">{mentionOrigineIdentite(identiteDocument)}</p>
           </div>
           <div className="flex items-center gap-3">
             {facture.statut === "brouillon" && <Link href={`/factures/${id}/modifier`} className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700">Modifier</Link>}
             <a
-              href={`/imprimer/factures/${id}`}
+              href={`/api/documents/factures/${id}/pdf`}
               target="_blank"
               rel="noopener"
               className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700"
@@ -100,7 +118,12 @@ export default async function FactureDetailPage({
                 to={email.to}
                 sujet={email.sujet}
                 corps={lienPaiement ? `${email.corps}\n\nVous pouvez régler cette facture en ligne de façon sécurisée :\n${lienPaiement}` : email.corps}
-                pdfUrl={`/imprimer/factures/${id}`}
+                pdfUrl={`/api/documents/factures/${id}/pdf`}
+                envoiAutomatiqueDisponible={brevoEstConfigure()}
+                envoyerAutomatiquementAction={envoyerFactureEmailAction}
+                emailEnvoyeLe={facture.email_envoye_le}
+                adresseFigee={identiteDocument.email}
+                peutSurchargerDestinataire={peutSurchargerDestinataire(permissions)}
               />
             ) : (
               <span className="cursor-default rounded-md border border-neutral-200 px-3 py-1.5 text-sm text-neutral-400 dark:border-neutral-800" title="Aucun email renseigné pour ce client">
@@ -114,11 +137,18 @@ export default async function FactureDetailPage({
         {error && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         {success && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{success}</p>}
 
-        <form action={modifierEcheance} className="flex items-end gap-2 rounded-md border border-neutral-200 p-3 dark:border-neutral-800">
-          <div className="space-y-1"><label className="text-xs text-neutral-500">Date d’échéance</label><input name="date_echeance" type="date" defaultValue={facture.date_echeance ?? ""} className={input} /></div>
-          <button type="submit" className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700">Enregistrer l’échéance</button>
-          {facture.date_echeance && facture.date_echeance < new Date().toISOString().slice(0, 10) && resteAPayer > 0 && <span className="ml-auto text-sm font-medium text-red-600">Échéance dépassée</span>}
-        </form>
+        {facture.statut === "brouillon" ? (
+          <form action={modifierEcheance} className="flex items-end gap-2 rounded-md border border-neutral-200 p-3 dark:border-neutral-800">
+            <div className="space-y-1"><label className="text-xs text-neutral-500">Date d’échéance</label><input name="date_echeance" type="date" defaultValue={facture.date_echeance ?? ""} className={input} /></div>
+            <button type="submit" className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700">Enregistrer l’échéance</button>
+          </form>
+        ) : (
+          <div className="flex items-center gap-2 rounded-md border border-neutral-200 p-3 text-sm dark:border-neutral-800">
+            <span className="text-neutral-500">Date d’échéance (figée à l’émission) :</span>
+            <span className="font-medium">{facture.date_echeance ? new Date(String(facture.date_echeance)).toLocaleDateString("fr-FR") : "—"}</span>
+            {facture.date_echeance && facture.date_echeance < new Date().toISOString().slice(0, 10) && resteAPayer > 0 && <span className="ml-auto text-sm font-medium text-red-600">Échéance dépassée</span>}
+          </div>
+        )}
 
         <div className="overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-800">
           <table className="w-full text-sm">
@@ -220,6 +250,15 @@ export default async function FactureDetailPage({
             </button>
           </form> : <p className="border-t border-neutral-100 pt-3 text-sm text-neutral-500 dark:border-neutral-800">{resteAPayer <= 0 ? "Cette facture est entièrement réglée." : "Les paiements ne sont pas disponibles pour ce statut."}</p>}
         </section>
+        {peutGererFactures && !['brouillon', 'annulee', 'avoir_emis', 'payee'].includes(facture.statut) && resteAPayer > 0 && (
+          <RelanceDocumentSection
+            type="facture"
+            documentId={id}
+            autoExclue={Boolean(facture.relance_auto_exclue)}
+            peutGerer={peutGererFactures}
+            historique={(relances ?? []).map((r) => ({ id: r.id, niveau: r.niveau, statut: r.statut, automatique: r.automatique, dateEnvoi: r.date_envoi, createdAt: r.created_at }))}
+          />
+        )}
         {!['brouillon', 'annulee', 'avoir_emis', 'payee'].includes(facture.statut) && resteAPayer > 0 && (
           <section className="rounded-md border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/30">
             <h2 className="text-sm font-semibold">Lien de paiement à envoyer au client</h2>

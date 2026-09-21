@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { NAVIGATION_APPLICATION, NAVIGATION_GROUPES, navigationAutorisee } from "@/lib/navigation";
 import { GESTION_PERMISSION_PAR_CHEMIN, PERMISSIONS_MUTATION_ALTERNATIVES } from "@/lib/module-permissions";
+import { BRAND_NAME, PRODUCT_NAME } from "@/lib/brand";
 
 type PermissionDetail = { cle: string; module: string; description: string };
 
@@ -44,12 +45,12 @@ export function ApercuPoste({ poste, entrepriseNom, permissions, catalogue }: {
     <div className="overflow-x-auto rounded-xl bg-neutral-200 p-3 dark:bg-neutral-800">
       <div className={`mx-auto overflow-hidden rounded-lg border bg-white shadow-xl transition-[max-width] dark:bg-neutral-950 ${mobile ? "max-w-[390px]" : "max-w-[1050px]"}`}>
         {mobile && <div className="flex h-14 items-center justify-between bg-[#0d1b2a] px-4 text-white">
-          <div><div className="text-xs font-semibold tracking-wide">LIRIA <span className="text-[#c9a24a]">GESTION PRO</span></div><div className="max-w-48 truncate text-[10px] text-white/60">{entrepriseNom}</div></div>
+          <div><div className="text-xs font-semibold tracking-wide">{BRAND_NAME}</div><div className="text-[9px] text-[#c9a24a]">{PRODUCT_NAME}</div><div className="max-w-48 truncate text-[10px] text-white/60">{entrepriseNom}</div></div>
           <span className="rounded border border-white/30 px-3 py-1.5 text-xs">☰ Menu</span>
         </div>}
         <div className={`flex ${mobile ? "min-h-[650px]" : "min-h-[620px]"}`}>
           {!mobile && <aside className="w-52 shrink-0 bg-[#0d1b2a] p-3 text-white">
-            <div className="border-b border-white/10 pb-3"><div className="text-sm font-semibold tracking-wide">LIRIA</div><div className="text-[10px] tracking-[0.16em] text-[#c9a24a]">GESTION PRO</div><div className="mt-2 truncate text-[10px] text-white/60">{entrepriseNom}</div></div>
+            <div className="border-b border-white/10 pb-3"><div className="text-sm font-semibold tracking-wide">{BRAND_NAME}</div><div className="text-[9px] text-[#c9a24a]">{PRODUCT_NAME}</div><div className="mt-2 truncate text-[10px] text-white/60">{entrepriseNom}</div></div>
             <nav className="mt-3 space-y-1">{NAVIGATION_GROUPES.map((groupe) => {
               const items = navigation.filter((item) => item.groupe === groupe.cle);
               if (!items.length) return null;

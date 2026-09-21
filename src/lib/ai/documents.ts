@@ -1,4 +1,4 @@
-import { obtenirProviderIA } from "@/lib/ai/provider";
+import { obtenirProviderIA, type UsageIA } from "@/lib/ai/provider";
 
 const TYPES_IMAGE_SUPPORTES = ["image/jpeg", "image/png", "image/gif", "image/webp"] as const;
 
@@ -17,7 +17,7 @@ const PROMPT_DOCUMENT =
   "et signale toute incohérence ou erreur apparente (total qui ne correspond pas, date manquante, information contradictoire). " +
   "Réponds en français, va à l'essentiel, pas de titre.";
 
-export async function analyserDocumentIA(donnees: Buffer, mimeType: string): Promise<string> {
+export async function analyserDocumentIA(donnees: Buffer, mimeType: string): Promise<{ texte: string; usage?: UsageIA }> {
   const estImage = (TYPES_IMAGE_SUPPORTES as readonly string[]).includes(mimeType);
   const estPdf = mimeType === "application/pdf";
   if (!estImage && !estPdf) {
@@ -25,12 +25,12 @@ export async function analyserDocumentIA(donnees: Buffer, mimeType: string): Pro
   }
 
   const provider = obtenirProviderIA();
-  const texte = await provider.completerAvecFichier({
+  const { texte, usage } = await provider.completerAvecFichier({
     texte: estImage ? PROMPT_PHOTO : PROMPT_DOCUMENT,
     fichier: { base64: donnees.toString("base64"), mimeType },
     maxTokens: 1000,
   });
 
   if (!texte.trim()) throw new Error("L'IA n'a pas retourné d'analyse exploitable.");
-  return texte;
+  return { texte, usage };
 }

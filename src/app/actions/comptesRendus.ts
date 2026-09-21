@@ -6,8 +6,11 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { structurerCompteRendu } from "@/lib/ai/compteRendu";
 import { verifierPlafondIA, journaliserAppelIA } from "@/lib/ai/journal";
+import { iaEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 export async function structurerCompteRenduIAAction(transcription: string) {
+  if (!iaEstActive()) return { error: MESSAGE_IA_INDISPONIBLE };
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
@@ -19,13 +22,16 @@ export async function structurerCompteRenduIAAction(transcription: string) {
   if (depassement) return { error: depassement };
 
   try {
-    const { titre, contenu } = await structurerCompteRendu(texte);
-    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "compte_rendu", statut: "succes" });
+    const { titre, contenu, usage } = await structurerCompteRendu(texte);
+    journaliserAppelIA(supabase, {
+      entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "compte_rendu", statut: "succes",
+      jetonsEntree: usage?.jetonsEntree, jetonsSortie: usage?.jetonsSortie, jetonsTotal: usage?.jetonsTotal, coutEstimeHT: usage?.coutEstimeHT,
+    });
     return { titre, contenu };
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Erreur lors de la structuration IA.";
-    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "compte_rendu", statut: "erreur", messageErreur: message });
-    return { error: message };
+    const messageBrut = err instanceof Error ? err.message : "Erreur lors de la structuration IA.";
+    journaliserAppelIA(supabase, { entrepriseId: ctx.entrepriseId, utilisateurId: ctx.userId, fonctionnalite: "compte_rendu", statut: "erreur", messageErreur: messageBrut });
+    return { error: messageErreurUtilisateur("structurerCompteRenduIAAction", err, "La structuration assistée n’est pas disponible pour le moment.") };
   }
 }
 
@@ -62,7 +68,7 @@ export async function enregistrerCompteRenduAction(
     })
     .select("id")
     .single();
-  if (error || !data) return { error: error?.message ?? "Erreur à l'enregistrement." };
+  if (error || !data) return { error: messageErreurUtilisateur("enregistrerCompteRenduAction", error, "Impossible d’enregistrer le compte-rendu.") };
 
   revalidatePath(`/chantiers/${chantierId}/comptes-rendus`);
   return { id: data.id as string };

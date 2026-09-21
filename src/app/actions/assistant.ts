@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
+import { iaEstActive, iaDevisEstActive, MESSAGE_IA_INDISPONIBLE } from "@/lib/preview-features";
+import { UNITES, TAUX_TVA, LIGNE_TYPES } from "@/lib/devis";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 // La conversation avec l'assistant passe par /api/assistant/chat (streaming SSE),
 // pas par une server action — voir src/app/api/assistant/chat/route.ts.
@@ -20,6 +23,7 @@ export async function creerAffectationDepuisPropositionAction(proposition: {
   heures: number;
   tache: string | null;
 }): Promise<{ error: string } | { ok: true }> {
+  if (!iaEstActive()) return { error: MESSAGE_IA_INDISPONIBLE };
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   const permissions = await permissionsUtilisateur(ctx);
@@ -56,8 +60,35 @@ export async function creerAffectationDepuisPropositionAction(proposition: {
     return { ok: true };
   }
 
-  const { error } = await supabase.from("affectations").insert(proposition.employeIds.map((employeId) => ({ entreprise_id: ctx.entrepriseId, employe_id: employeId, ...valeurs })));
-  if (error) return { error: error.message };
+  // Idempotence double-clic (AI-LAUNCH-V1B §37) : le bouton Confirmer est desactive cote
+  // client pendant la transition (disabled={pending} dans AssistantIA.tsx), mais ce n'est
+  // qu'une premiere ligne de defense (deux onglets, un rejeu reseau... contournent un simple
+  // etat client). Une affectation identique (meme entreprise/employe/date/heures/activite/
+  // chantier) creee dans les 10 dernieres secondes est traitee comme le resultat du meme clic,
+  // pas recreee.
+  const ilYA10Secondes = new Date(Date.now() - 10_000).toISOString();
+  let requeteRecentes = supabase
+    .from("affectations")
+    .select("employe_id")
+    .eq("entreprise_id", ctx.entrepriseId)
+    .in("employe_id", proposition.employeIds)
+    .eq("date", proposition.date)
+    .eq("heures", proposition.heures)
+    .eq("type_activite", proposition.typeActivite)
+    .gte("created_at", ilYA10Secondes);
+  requeteRecentes = estChantier
+    ? requeteRecentes.eq("chantier_id", proposition.chantierId as string)
+    : valeurs.lieu_activite
+      ? requeteRecentes.eq("lieu_activite", valeurs.lieu_activite)
+      : requeteRecentes.is("lieu_activite", null);
+  const { data: recentes } = await requeteRecentes;
+  const dejaCrees = new Set((recentes ?? []).map((r) => r.employe_id));
+  const aCreer = proposition.employeIds.filter((id) => !dejaCrees.has(id));
+
+  if (aCreer.length > 0) {
+    const { error } = await supabase.from("affectations").insert(aCreer.map((employeId) => ({ entreprise_id: ctx.entrepriseId, employe_id: employeId, ...valeurs })));
+    if (error) return { error: error.message };
+  }
 
   revalidatePath("/planning");
   return { ok: true };
@@ -77,6 +108,7 @@ export async function creerDemandeCongeDepuisPropositionAction(proposition: {
   demiJourFin: string;
   commentaire: string | null;
 }): Promise<{ error: string } | { ok: true }> {
+  if (!iaEstActive()) return { error: MESSAGE_IA_INDISPONIBLE };
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
@@ -121,6 +153,7 @@ export async function envoyerMessageInterneDepuisPropositionAction(proposition: 
   chantierId: string | null;
   contenu: string;
 }): Promise<{ error: string } | { ok: true }> {
+  if (!iaEstActive()) return { error: MESSAGE_IA_INDISPONIBLE };
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
@@ -162,20 +195,119 @@ export async function envoyerMessageInterneDepuisPropositionAction(proposition: 
 // Meme insertion que envoyerMessageSupportAction (saisie manuelle depuis /aide) — pas de
 // lien avec une fiche employe, un compte suffit.
 export async function envoyerMessageSupportDepuisPropositionAction(proposition: { contenu: string }): Promise<{ error: string } | { ok: true }> {
+  if (!iaEstActive()) return { error: MESSAGE_IA_INDISPONIBLE };
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
   if (!aAccesIA(await permissionsUtilisateur(ctx))) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
   if (!proposition.contenu.trim()) return { error: "Message vide." };
 
-  const { error } = await supabase.from("support_messages").insert({
-    entreprise_id: ctx.entrepriseId,
-    cote: "entreprise",
-    auteur_id: ctx.userId,
-    auteur_nom: [ctx.prenom, ctx.entrepriseNom].filter(Boolean).join(" · ") || "Entreprise",
-    contenu: proposition.contenu,
+  const { error } = await supabase.rpc("support_envoyer_message_entreprise", {
+    p_entreprise_id: ctx.entrepriseId,
+    p_contenu: proposition.contenu,
   });
   if (error) return { error: error.message };
 
   revalidatePath("/aide");
   return { ok: true };
+}
+
+const TYPES_LIGNE_AUTORISES: readonly string[] = LIGNE_TYPES.map((t) => t.cle);
+
+// IA-DEVIS-V1 : réécrit exactement le même RPC creer_devis_brouillon que la création manuelle
+// (src/app/actions/devis.ts, creerDevisAction) — aucune architecture d'écriture parallèle.
+// Le devis créé est donc TOUJOURS un brouillon (creer_devis_brouillon n'accepte aucun statut
+// en entrée), jamais accepté/envoyé automatiquement.
+export async function creerDevisDepuisPropositionAction(proposition: {
+  clientId: string;
+  objet: string;
+  lignes: Array<{
+    designation: string;
+    description: string | null;
+    type: string;
+    quantite: number;
+    unite: string;
+    prixUnitaireHt: number | null;
+    tauxTva: number;
+    remiseLigne: number;
+  }>;
+  notesClient: string | null;
+}): Promise<{ error: string } | { ok: true; devisId: string }> {
+  if (!iaEstActive()) return { error: MESSAGE_IA_INDISPONIBLE };
+  if (!iaDevisEstActive()) return { error: "La préparation de devis par l'assistant est désactivée dans cet environnement." };
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const permissions = await permissionsUtilisateur(ctx);
+  if (!aAccesIA(permissions)) return { error: "Ton poste n'a pas accès aux fonctionnalités IA." };
+  // Defense en profondeur : la RLS restrictive sur `devis`/`lignes_devis` impose deja
+  // gerer_devis (migration 20260713000043), mais un message clair ici vaut mieux que
+  // l'erreur Postgres brute remontee telle quelle.
+  if (!(permissions === null || permissions.includes("gerer_devis"))) return { error: "Ton poste n'a pas le droit de gérer les devis." };
+
+  const objet = proposition.objet.trim().slice(0, 200);
+  if (!objet) return { error: "Le devis doit avoir un objet." };
+  if (!proposition.clientId) return { error: "Aucun client sélectionné." };
+
+  // §36 : la proposition peut être obsolète (client supprimé entre la proposition et la
+  // confirmation) — on ne fait jamais confiance au snapshot du modèle, on revérifie.
+  const { data: client } = await supabase.from("clients").select("id").eq("id", proposition.clientId).eq("entreprise_id", ctx.entrepriseId).maybeSingle();
+  if (!client) return { error: "Ce client n'existe plus ou n'appartient pas à votre entreprise." };
+
+  const lignes = proposition.lignes
+    .filter((l) => l.designation.trim() !== "" && Number(l.quantite) > 0)
+    .slice(0, 40)
+    .map((l, i) => ({
+      designation: l.designation.trim().slice(0, 200),
+      description: l.description?.trim() || null,
+      type: TYPES_LIGNE_AUTORISES.includes(l.type) ? l.type : "forfait",
+      quantite: Number(l.quantite),
+      unite: (UNITES as readonly string[]).includes(l.unite) ? l.unite : "u",
+      // §6 : un prix jamais trouvé (null) est écrit à 0 — le schéma de lignes_devis n'a pas
+      // d'autre représentation possible (colonne NOT NULL) — mais la carte de proposition,
+      // elle, l'a affiché clairement comme "à renseigner" avant que l'utilisateur ne confirme.
+      prix_unitaire_ht: typeof l.prixUnitaireHt === "number" && l.prixUnitaireHt >= 0 ? l.prixUnitaireHt : 0,
+      remise_ligne: Math.min(100, Math.max(0, Number(l.remiseLigne) || 0)),
+      taux_tva: (TAUX_TVA as readonly number[]).includes(Number(l.tauxTva)) ? Number(l.tauxTva) : 20,
+      ordre: i,
+    }));
+  if (!lignes.length) return { error: "Aucune ligne valide à enregistrer." };
+
+  const notesClient = [objet, proposition.notesClient?.trim() || null].filter(Boolean).join("\n\n");
+
+  // Idempotence double-clic/double-confirmation (même principe que
+  // creerAffectationDepuisPropositionAction, §34/§35) : un devis brouillon identique (même
+  // entreprise/client/objet) créé dans les 10 dernières secondes est traité comme le résultat
+  // du même clic, pas recréé.
+  const ilYA10Secondes = new Date(Date.now() - 10_000).toISOString();
+  const { data: recent } = await supabase
+    .from("devis")
+    .select("id")
+    .eq("entreprise_id", ctx.entrepriseId)
+    .eq("client_id", proposition.clientId)
+    .eq("statut", "brouillon")
+    .eq("notes_client", notesClient)
+    .gte("created_at", ilYA10Secondes)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (recent?.id) return { ok: true, devisId: recent.id };
+
+  const { data: devisId, error } = await supabase.rpc("creer_devis_brouillon", {
+    p_entreprise_id: ctx.entrepriseId,
+    p_devis: {
+      client_id: proposition.clientId,
+      chantier_id: null,
+      date_emission: null,
+      date_validite: null,
+      conditions: null,
+      notes_client: notesClient,
+      notes_internes: "Brouillon préparé avec l'assistant IA.",
+      remise_globale: 0,
+    },
+    p_lignes: lignes,
+  });
+  if (error || !devisId) return { error: messageErreurUtilisateur("creerDevisDepuisPropositionAction", error, "Impossible de créer ce devis.") };
+
+  revalidatePath("/devis");
+  revalidatePath("/dashboard");
+  return { ok: true, devisId: devisId as string };
 }

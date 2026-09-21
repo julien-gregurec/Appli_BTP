@@ -18,6 +18,13 @@ describe("catalogue des fonctionnalités V3", () => {
     expect(FEATURE_CATALOGUE.interventions.visibleByDefault).toBe(false);
   });
 
+  it("masque les sous-traitants par défaut (section embarquée sur la fiche chantier incluse)", () => {
+    // La section « Sous-traitants du chantier » de /chantiers/[id] doit suivre
+    // ce même indicateur, pas seulement le droit de rôle acces_sous_traitants.
+    expect(FEATURE_CATALOGUE.subcontractors.status).toBe("beta");
+    expect(FEATURE_CATALOGUE.subcontractors.visibleByDefault).toBe(false);
+  });
+
   it("associe les routes sensibles à leur fonctionnalité", () => {
     expect(featureForPath("/clients/nouveau")).toBe("clients");
     expect(featureForPath("/facturation-avancee/situations")).toBe("advanced_invoicing");

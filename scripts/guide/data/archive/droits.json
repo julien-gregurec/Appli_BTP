@@ -1,0 +1,297 @@
+[
+  {
+    "cle": "acces_achats",
+    "module": "Achats",
+    "description": "Consulter commandes, fournisseurs, dépenses et charges"
+  },
+  {
+    "cle": "gerer_achats",
+    "module": "Achats",
+    "description": "Gérer commandes, fournisseurs, dépenses et charges"
+  },
+  {
+    "cle": "acces_chantiers",
+    "module": "Chantiers",
+    "description": "Consulter et utiliser le module Chantiers"
+  },
+  {
+    "cle": "gerer_chantiers",
+    "module": "Chantiers",
+    "description": "Gérer les chantiers et leurs documents"
+  },
+  {
+    "cle": "voir_heures_chantiers",
+    "module": "Chantiers",
+    "description": "Consulter les heures planifiées et pointées validées par chantier"
+  },
+  {
+    "cle": "acces_clients",
+    "module": "Clients",
+    "description": "Consulter et utiliser le module Clients"
+  },
+  {
+    "cle": "gerer_clients",
+    "module": "Clients",
+    "description": "Gérer les clients"
+  },
+  {
+    "cle": "creer_chantier",
+    "module": "Clients & Chantiers",
+    "description": "Créer un chantier"
+  },
+  {
+    "cle": "creer_client",
+    "module": "Clients & Chantiers",
+    "description": "Créer une fiche client"
+  },
+  {
+    "cle": "modifier_chantier",
+    "module": "Clients & Chantiers",
+    "description": "Modifier un chantier"
+  },
+  {
+    "cle": "modifier_client",
+    "module": "Clients & Chantiers",
+    "description": "Modifier une fiche client"
+  },
+  {
+    "cle": "acces_exports",
+    "module": "Comptabilité",
+    "description": "Télécharger les exports comptables"
+  },
+  {
+    "cle": "gerer_utilisateurs",
+    "module": "Comptes & Entreprises",
+    "description": "Inviter, désactiver, changer le poste des membres"
+  },
+  {
+    "cle": "demander_ses_conges",
+    "module": "Congés",
+    "description": "Créer et suivre uniquement ses propres demandes de congés"
+  },
+  {
+    "cle": "gerer_conges",
+    "module": "Congés",
+    "description": "Consulter et décider les demandes de congés de l’équipe"
+  },
+  {
+    "cle": "acces_connecteurs",
+    "module": "Connecteurs",
+    "description": "Consulter les connexions fournisseurs et comptables"
+  },
+  {
+    "cle": "gerer_connecteurs",
+    "module": "Connecteurs",
+    "description": "Configurer les connexions fournisseurs et comptables"
+  },
+  {
+    "cle": "acces_crm",
+    "module": "CRM",
+    "description": "Consulter les appels, relances et communications clients"
+  },
+  {
+    "cle": "gerer_crm",
+    "module": "CRM",
+    "description": "Gérer les appels, relances et communications clients"
+  },
+  {
+    "cle": "acces_devis",
+    "module": "Devis",
+    "description": "Consulter et utiliser les devis et prestations"
+  },
+  {
+    "cle": "gerer_devis",
+    "module": "Devis",
+    "description": "Gérer les devis et prestations"
+  },
+  {
+    "cle": "creer_employe",
+    "module": "Employes",
+    "description": "Creer une fiche employe"
+  },
+  {
+    "cle": "modifier_employe",
+    "module": "Employes",
+    "description": "Modifier une fiche employe"
+  },
+  {
+    "cle": "acces_employes",
+    "module": "Employés",
+    "description": "Consulter et gérer les employés"
+  },
+  {
+    "cle": "gerer_employes",
+    "module": "Employés",
+    "description": "Gérer les employés"
+  },
+  {
+    "cle": "acces_facturation_avancee",
+    "module": "Facturation avancée",
+    "description": "Consulter situations, acomptes, avoirs, DGD et remises en banque"
+  },
+  {
+    "cle": "gerer_facturation_avancee",
+    "module": "Facturation avancée",
+    "description": "Gérer situations, acomptes, avoirs, DGD et remises en banque"
+  },
+  {
+    "cle": "acces_factures",
+    "module": "Factures",
+    "description": "Consulter et utiliser les factures"
+  },
+  {
+    "cle": "gerer_factures",
+    "module": "Factures",
+    "description": "Gérer les factures et paiements"
+  },
+  {
+    "cle": "acces_flotte",
+    "module": "Flotte",
+    "description": "Consulter et gérer la flotte automobile"
+  },
+  {
+    "cle": "gerer_flotte",
+    "module": "Flotte",
+    "description": "Gérer la flotte automobile"
+  },
+  {
+    "cle": "acces_interventions",
+    "module": "Interventions",
+    "description": "Consulter les contrats, interventions et bons de travail"
+  },
+  {
+    "cle": "gerer_interventions",
+    "module": "Interventions",
+    "description": "Gérer les contrats, interventions et bons de travail"
+  },
+  {
+    "cle": "exporter_notes_frais",
+    "module": "Notes de frais",
+    "description": "Créer et télécharger les exports pour l’expert-comptable"
+  },
+  {
+    "cle": "gerer_notes_frais",
+    "module": "Notes de frais",
+    "description": "Consulter, valider, refuser et rembourser les notes de frais de l’équipe"
+  },
+  {
+    "cle": "saisir_ses_notes_frais",
+    "module": "Notes de frais",
+    "description": "Créer et consulter uniquement ses propres notes de frais"
+  },
+  {
+    "cle": "acces_outillage",
+    "module": "Outillage",
+    "description": "Consulter et gérer l’outillage"
+  },
+  {
+    "cle": "gerer_outillage",
+    "module": "Outillage",
+    "description": "Gérer l’outillage"
+  },
+  {
+    "cle": "acces_ouvrages",
+    "module": "Ouvrages et métrés",
+    "description": "Consulter les ouvrages, modèles et métrés"
+  },
+  {
+    "cle": "gerer_ouvrages",
+    "module": "Ouvrages et métrés",
+    "description": "Gérer les ouvrages, modèles et métrés"
+  },
+  {
+    "cle": "acces_parametres",
+    "module": "Paramètres",
+    "description": "Modifier les paramètres de l’entreprise"
+  },
+  {
+    "cle": "gerer_parametres",
+    "module": "Paramètres",
+    "description": "Modifier les paramètres de l’entreprise"
+  },
+  {
+    "cle": "acces_rentabilite",
+    "module": "Pilotage",
+    "description": "Consulter rentabilité et trésorerie"
+  },
+  {
+    "cle": "acces_planning",
+    "module": "Planning",
+    "description": "Consulter et modifier le planning"
+  },
+  {
+    "cle": "gerer_planning",
+    "module": "Planning",
+    "description": "Créer et modifier le planning"
+  },
+  {
+    "cle": "acces_pointage",
+    "module": "Pointage",
+    "description": "Consulter et saisir les pointages"
+  },
+  {
+    "cle": "gerer_pointage",
+    "module": "Pointage",
+    "description": "Saisir et gérer les pointages"
+  },
+  {
+    "cle": "saisir_son_pointage",
+    "module": "Pointage",
+    "description": "Pointer uniquement ses propres arrivées et départs"
+  },
+  {
+    "cle": "valider_pointages",
+    "module": "Pointage",
+    "description": "Valider ou rejeter les preuves terrain"
+  },
+  {
+    "cle": "voir_rentabilite",
+    "module": "Rentabilité",
+    "description": "Voir la rentabilité par chantier"
+  },
+  {
+    "cle": "effectuer_entree_stock",
+    "module": "Stock",
+    "description": "Enregistrer des retours et entrées de stock depuis la borne dépôt"
+  },
+  {
+    "cle": "effectuer_sortie_stock",
+    "module": "Stock",
+    "description": "Enregistrer des sorties de stock vers un chantier depuis la borne dépôt"
+  },
+  {
+    "cle": "gerer_codes_stock",
+    "module": "Stock",
+    "description": "Créer les codes personnels et les QR codes internes"
+  },
+  {
+    "cle": "gerer_stock",
+    "module": "Stock",
+    "description": "Gérer stock, dépôt et inventaires"
+  },
+  {
+    "cle": "mode_compte_depot",
+    "module": "Stock",
+    "description": "Compte partagé verrouillé sur le stock et la borne dépôt"
+  },
+  {
+    "cle": "utiliser_borne_stock",
+    "module": "Stock",
+    "description": "Scanner les entrées et sorties avec son code personnel"
+  },
+  {
+    "cle": "voir_indicateurs_financiers",
+    "module": "Tableau de bord",
+    "description": "Voir les chiffres financiers globaux de l’entreprise"
+  },
+  {
+    "cle": "voir_devis_chantier_sans_prix",
+    "module": "Terrain",
+    "description": "Voir les prestations sans prix des devis liés à ses chantiers"
+  },
+  {
+    "cle": "acces_stock",
+    "module": "utiliser_borne_stock",
+    "description": "mode_compte_depot"
+  }
+]

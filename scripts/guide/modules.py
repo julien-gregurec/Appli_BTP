@@ -866,7 +866,7 @@ IMPORT = {
 AIDE = {
     "titre": "L'aide et le support",
     "chapo": "Un bouton « Aide » est présent en permanence, en bas à droite de chaque écran. Il ouvre "
-             "une discussion directe avec l'équipe Liria Gestion Pro.",
+             "une discussion directe avec l'équipe ELSATIA Gestion Pro.",
     "liste": ("desktop-aide.png", "L'écran d'aide : guide, vidéos et discussion avec le support."),
     "titre_creer": "Obtenir de l'aide",
     "etapes": [
@@ -883,7 +883,7 @@ AIDE = {
 }
 
 DEMARRAGE = {
-    "titre": "Démarrer avec Liria Gestion Pro",
+    "titre": "Démarrer avec ELSATIA Gestion Pro",
     "chapo": "Ce chapitre couvre les toutes premières minutes : installer l'application sur son "
              "téléphone, créer son accès, rejoindre son entreprise. C'est le seul chapitre à lire "
              "avant tous les autres.",
@@ -1390,7 +1390,7 @@ GRANDS_DEPLACEMENTS = {
 
 PAIE = {
     "titre": "La préparation de la paie",
-    "chapo": "Liria prépare les variables à transmettre au cabinet de paie : heures validées, absences, "
+    "chapo": "ELSATIA prépare les variables à transmettre au cabinet de paie : heures validées, absences, "
              "congés, déplacements et remboursements. Il ne remplace pas le logiciel légal de paie de l’expert-comptable.",
     "droits": [
         ("consulter_sa_paie", "Consulter ses propres documents disponibles."),
@@ -1412,7 +1412,7 @@ PAIE = {
         ("Importer les bulletins", "Conservez les PDF privés reçus du cabinet et rendez chaque bulletin au seul salarié concerné."),
     ],
     "note": ("La paie légale reste produite par le prestataire",
-             "Liria consolide et transmet des variables. Le bulletin officiel, les cotisations et la DSN "
+             "ELSATIA consolide et transmet des variables. Le bulletin officiel, les cotisations et la DSN "
              "restent produits et contrôlés par le cabinet ou le logiciel de paie agréé."),
     "liens": [
         ["Pointage", "Seules les heures validées doivent alimenter les variables."],
@@ -1444,11 +1444,11 @@ PAIEMENTS_BANCAIRES = {
         ("Choisir la source", "Bulletins contrôlés, notes de frais validées ou factures fournisseurs à payer."),
         ("Créer le lot", "Vérifiez la date d’exécution, le montant et le libellé de chaque ordre."),
         ("Faire valider", "La personne ayant préparé ne doit pas être la seule à autoriser l’envoi."),
-        ("Transmettre", "Le prestataire bancaire ouvre une authentification forte ; Liria ne connaît pas vos identifiants bancaires."),
+        ("Transmettre", "Le prestataire bancaire ouvre une authentification forte ; ELSATIA ne connaît pas vos identifiants bancaires."),
         ("Rapprocher", "Actualisez le statut jusqu’à confirmation ou rejet. La source n’est marquée payée qu’après confirmation."),
     ],
     "note": ("Aucun virement réel sans prestataire réglementé",
-             "Sans contrat, clés et consentement bancaire valides, Liria prépare seulement le lot. "
+             "Sans contrat, clés et consentement bancaire valides, ELSATIA prépare seulement le lot. "
              "Ne marquez jamais une facture ou un salaire payé avant la confirmation de la banque."),
     "liens": [
         ["Employés", "Le RIB salarié sert aux salaires et remboursements de notes de frais."],

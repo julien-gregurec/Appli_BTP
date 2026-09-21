@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { marquerInvitationEmployeAction } from "@/app/actions/suivi-acces";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 export function InvitationEmploye({
   employeId,
@@ -32,7 +33,7 @@ export function InvitationEmploye({
   const router = useRouter();
   const invitation = () => {
     const lien = `${window.location.origin}/signup?numero=${encodeURIComponent(numero)}`;
-    const texte = `Bonjour ${nom}, ta fiche sur Liria Gestion Pro est prête. Crée ton accès personnel ici : ${lien} — Numéro d’inscription : ${numero}. Utilise l’adresse email enregistrée par ton employeur.`;
+    const texte = `Bonjour ${nom}, ta fiche sur ${PRODUCT_NAME} est prête. Crée ton accès personnel ici : ${lien} — Numéro d’inscription : ${numero}. Utilise l’adresse email enregistrée par ton employeur.`;
     return { lien, texte };
   };
 

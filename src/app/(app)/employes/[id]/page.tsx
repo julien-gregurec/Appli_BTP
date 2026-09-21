@@ -42,6 +42,11 @@ export default async function EmployeDetailPage({ params,searchParams }: { param
   if (!employe) notFound();
   const peutVoirHistoriqueFrais = employe.utilisateur_id === ctx.userId || permissions === null || permissions.includes("gerer_notes_frais") || permissions.includes("verifier_notes_frais") || permissions.includes("comptabiliser_notes_frais");
 
+  const { data: coutHoraireLigne } = peutVoirCoutInterne
+    ? await supabase.from("employes_cout_horaire").select("cout_horaire").eq("entreprise_id", ctx.entrepriseId).eq("employe_id", id).maybeSingle()
+    : { data: null };
+  employe.cout_horaire = coutHoraireLigne?.cout_horaire ?? null;
+
   const { data: rib } = peutGererRib ? await supabase.from("coordonnees_bancaires")
     .select("titulaire,iban_quatre_derniers,verification_statut,verification_message")
     .eq("entreprise_id", ctx.entrepriseId).eq("employe_id", id).eq("actif", true).maybeSingle() : { data: null };

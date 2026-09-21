@@ -1,4 +1,4 @@
-# Budget de mise en service — Liria Gestion Pro
+# Budget de mise en service — ELSATIA Gestion Pro
 
 Estimation vérifiée le 15 juillet 2026. Conversion indicative au taux BCE du 14 juillet 2026 : 1 € = 1,1405 $. Les montants réellement prélevés dépendent du taux de change, de la TVA et des dépassements de consommation.
 
@@ -56,7 +56,7 @@ L’analyse antivirus commerciale, l’horodatage qualifié, le système d’arc
 
 - **Würth** publie des solutions catalogue, FAB-DIS, PunchOut OCI/cXML et EDI. L’activation dépend d’un accord avec son équipe e-procurement.
 - **Foussier** publie PunchOut OCI/cXML et EDI. L’activation dépend de ses paramètres techniques.
-- **SIEHR**, **Espace Aubade/eBat** et **PROVITRAGE** publient des comptes professionnels et portails, mais pas de tarif public pour une API Liria. L’import CSV/Excel reste disponible en attendant un accord partenaire.
+- **SIEHR**, **Espace Aubade/eBat** et **PROVITRAGE** publient des comptes professionnels et portails, mais pas de tarif public pour une API ELSATIA. L’import CSV/Excel reste disponible en attendant un accord partenaire.
 - **BatiChiffrage est retiré** : aucun abonnement BatiChiffrage n’entre dans le budget.
 
 ## Coûts non inclus

@@ -1,21 +1,21 @@
-// Capture les vraies pages de Liria Gestion Pro pour illustrer le manuel utilisateur.
+// Capture les vraies pages d'ELSATIA Gestion Pro pour illustrer le manuel utilisateur.
 // Se connecte réellement, découvre les identifiants existants, puis photographie
 // listes, formulaires, fiches détail et documents imprimés, en desktop et en mobile.
 //
 // Identifiants fournis par l'environnement (jamais écrits dans le dépôt) :
-//   LIRIA_AUDIT_URL, LIRIA_AUDIT_EMAIL, LIRIA_AUDIT_PASSWORD
+//   ELSATIA_AUDIT_URL, ELSATIA_AUDIT_EMAIL, ELSATIA_AUDIT_PASSWORD
 // Sortie : output/audit/*.png + output/audit/manifeste.json
 
 import { chromium } from "playwright";
 import path from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 
-const baseUrl = process.env.LIRIA_AUDIT_URL ?? "http://127.0.0.1:3000";
-const email = process.env.LIRIA_AUDIT_EMAIL;
-const password = process.env.LIRIA_AUDIT_PASSWORD;
-const outputDir = path.resolve(process.env.LIRIA_AUDIT_OUTPUT ?? "output/audit");
+const baseUrl = process.env.ELSATIA_AUDIT_URL ?? "http://127.0.0.1:3000";
+const email = process.env.ELSATIA_AUDIT_EMAIL;
+const password = process.env.ELSATIA_AUDIT_PASSWORD;
+const outputDir = path.resolve(process.env.ELSATIA_AUDIT_OUTPUT ?? "output/audit");
 
-if (!email || !password) throw new Error("LIRIA_AUDIT_EMAIL et LIRIA_AUDIT_PASSWORD sont obligatoires.");
+if (!email || !password) throw new Error("ELSATIA_AUDIT_EMAIL et ELSATIA_AUDIT_PASSWORD sont obligatoires.");
 
 // Listes et formulaires à photographier. `detail` = motif des fiches à découvrir depuis la liste.
 const SECTIONS = [

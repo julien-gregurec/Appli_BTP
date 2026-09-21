@@ -26,7 +26,7 @@ export async function SignatureDocumentMetier({
   return (
     <section className="space-y-3 rounded-md border border-neutral-200 p-4 dark:border-neutral-800">
       <div>
-        <h2 className="font-semibold">Signatures du {LIBELLES_DOCUMENT_SIGNATURE[type]}</h2>
+        <h2 className="font-semibold">Signatures {LIBELLES_DOCUMENT_SIGNATURE[type]}</h2>
         <p className="text-xs text-neutral-500">
           Signature interne traçable : copie figée, date serveur et empreintes SHA-256. Elle ne constitue pas une signature électronique qualifiée eIDAS.
         </p>

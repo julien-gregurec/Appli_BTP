@@ -1,0 +1,56 @@
+{
+  "name": "elsatia-tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -p 3020",
+    "verify:public-env": "node scripts/verify-public-env.mjs",
+    "prebuild": "npm run verify:public-env",
+    "prebuild:native": "npm run verify:public-env",
+    "build": "next build --webpack && node scripts/generate-service-worker.mjs --mode=server",
+    "build:native": "ELSATIA_TOOLS_NATIVE=1 NEXT_PUBLIC_TOOLS_RUNTIME=native next build --webpack && node scripts/generate-service-worker.mjs --mode=export",
+    "start": "next start -p 3020",
+    "native:sync": "npm run build:native && cap sync",
+    "native:android": "npm run native:sync && cap open android",
+    "native:ios": "npm run native:sync && cap open ios",
+    "build:android:debug": "npm run native:sync && cap build android --androidreleasetype APK",
+    "build:ios:debug": "npm run native:sync && cap build ios",
+    "icons:generate": "node scripts/generate-icons.mjs",
+    "og:generate": "node scripts/generate-og-image.mjs",
+    "store:assets": "node scripts/generate-store-assets.mjs",
+    "lint": "eslint src scripts service-worker next.config.ts capacitor.config.ts",
+    "typecheck": "tsc --noEmit --incremental false",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/browser": "^8.0.4",
+    "@capacitor/core": "^8.5.0",
+    "@capacitor/filesystem": "^8.1.3",
+    "@capacitor/ios": "^8.5.0",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/share": "^8.0.1",
+    "@supabase/supabase-js": "^2.112.4",
+    "jspdf": "^4.2.1",
+    "next": "16.3.5",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.0",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.5",
+    "typescript": "^5",
+    "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "postcss": "8.5.24",
+    "sharp": "0.35.4",
+    "uuid": "11.1.1"
+  }
+}

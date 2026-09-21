@@ -1,19 +1,32 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { BRAND } from "@/lib/brand";
+
+// La CSP à nonce exige un rendu par requête pour que Next transmette le nonce
+// aux scripts générés. Cette décision privilégie la sécurité au cache statique.
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Liria Gestion Pro V3",
-  description: "Liria Gestion Pro V3 — Gestion quotidienne des entreprises du BTP",
-  applicationName: "Liria Gestion Pro V3",
+  metadataBase: BRAND.urlPublique ? new URL(BRAND.urlPublique) : undefined,
+  title: BRAND.nomApplication,
+  description: BRAND.description,
+  applicationName: BRAND.nomApplication,
   manifest: "/manifest.webmanifest",
-  icons: {
-    icon: [
-      { url: "/icons/liria-gestion-pro-v3-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icons/liria-gestion-pro-v3-512.png", sizes: "512x512", type: "image/png" },
-    ],
-    apple: [{ url: "/icons/liria-gestion-pro-v3-apple-touch.png", sizes: "180x180", type: "image/png" }],
+  // Application privée/authentifiée : jamais indexée par défaut. Le site
+  // marketing public (elsatia.fr) porte le référencement de la marque et des
+  // tarifs ; app.elsatia.fr reste hors des résultats de recherche, y compris
+  // ses pages non authentifiées (connexion, tarifs, mentions légales…) pour
+  // éviter tout contenu dupliqué. Une page individuelle peut redéfinir
+  // `robots` si elle doit un jour être indexée — aucune ne le fait ici.
+  robots: { index: false, follow: false, nocache: true },
+  openGraph: {
+    type: "website",
+    locale: "fr_FR",
+    siteName: BRAND.nomApplication,
+    title: BRAND.nomApplication,
+    description: BRAND.description,
   },
-  appleWebApp: { capable: true, title: "Liria Gestion Pro V3", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: BRAND.nomApplication, statusBarStyle: "black-translucent" },
   formatDetection: { telephone: false },
 };
 

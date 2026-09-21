@@ -6,6 +6,14 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { permissionsUtilisateur } from "@/lib/permissions";
 import { reconcilierAbonnementStripe } from "@/lib/stripe-abonnement";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
+import { verifierCapacitePersonnes } from "@/lib/capacite-personnes";
+
+// Une fiche compte dans le plafond de personnes actives dès qu'elle n'est ni
+// "sortie" ni "fermée" (contrat aligné sur compter_personnes_actives_entreprise).
+function ficheComptePourCapacite(statut: string | null | undefined, compteStatut?: string | null): boolean {
+  return statut !== "sorti" && compteStatut !== "ferme";
+}
 
 function champ(formData: FormData, nom: string): string | null {
   const v = String(formData.get(nom) ?? "").trim();
@@ -39,10 +47,28 @@ function payloadEmploye(formData: FormData) {
     date_entree: champ(formData, "date_entree"),
     date_sortie: statut === "sorti" ? champ(formData, "date_sortie") : null,
     taux_horaire: nombre(formData, "taux_horaire"),
-    cout_horaire: nombre(formData, "cout_horaire"),
     statut,
     notes: champ(formData, "notes"),
   };
+}
+
+// Le coût horaire interne vit dans `employes_cout_horaire`, une table dédiée
+// et restreinte en lecture (permission `voir_cout_interne_employe` ou
+// `acces_rentabilite`) — jamais sur `employes` elle-même (colonne supprimée
+// par 20260818000205_securiser_cout_horaire_employe.sql).
+async function enregistrerCoutHoraireEmploye(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  entrepriseId: string,
+  employeId: string,
+  coutHoraire: number | null,
+) {
+  const { error } = await supabase
+    .from("employes_cout_horaire")
+    .upsert(
+      { employe_id: employeId, entreprise_id: entrepriseId, cout_horaire: coutHoraire, updated_at: new Date().toISOString() },
+      { onConflict: "employe_id" },
+    );
+  return error;
 }
 
 export async function creerEmployeAction(formData: FormData) {
@@ -58,6 +84,13 @@ export async function creerEmployeAction(formData: FormData) {
     redirect(`/employes/nouveau?error=${encodeURIComponent("La date de sortie est obligatoire pour un salarié sorti")}`);
   }
 
+  if (ficheComptePourCapacite(payload.statut)) {
+    const capacite = await verifierCapacitePersonnes(ctx.entrepriseId, 1);
+    if (!capacite.ok) {
+      redirect(`/employes/nouveau?error=${encodeURIComponent(capacite.message)}`);
+    }
+  }
+
   const { data, error } = await supabase
     .from("employes")
     .insert({
@@ -68,7 +101,16 @@ export async function creerEmployeAction(formData: FormData) {
     .single();
 
   if (error || !data) {
-    redirect(`/employes/nouveau?error=${encodeURIComponent(error?.message ?? "Erreur")}`);
+    redirect(`/employes/nouveau?error=${encodeURIComponent(messageErreurUtilisateur("creerEmployeAction", error, "Impossible de créer l’employé."))}`);
+  }
+
+  const coutHoraire = nombre(formData, "cout_horaire");
+  if (coutHoraire !== null) {
+    const coutError = await enregistrerCoutHoraireEmploye(supabase, ctx.entrepriseId, data.id, coutHoraire);
+    if (coutError) {
+      revalidatePath("/employes");
+      redirect(`/employes/${data.id}?error=${encodeURIComponent(messageErreurUtilisateur("creerEmployeAction:cout_horaire", coutError, "Employé créé, mais le coût horaire interne n’a pas pu être enregistré."))}`);
+    }
   }
 
   revalidatePath("/employes");
@@ -88,6 +130,25 @@ export async function modifierEmployeAction(employeId: string, formData: FormDat
     redirect(`/employes/${employeId}/modifier?error=${encodeURIComponent("La date de sortie est obligatoire pour un salarié sorti")}`);
   }
 
+  // Réactivation (sorti → actif) : pré-contrôle du plafond de personnes actives.
+  if (ficheComptePourCapacite(payload.statut)) {
+    const { data: actuel } = await supabase
+      .from("employes")
+      .select("statut, compte_application_statut")
+      .eq("id", employeId)
+      .eq("entreprise_id", ctx.entrepriseId)
+      .maybeSingle();
+    const comptaitAvant = actuel
+      ? ficheComptePourCapacite(actuel.statut, actuel.compte_application_statut)
+      : true;
+    if (!comptaitAvant) {
+      const capacite = await verifierCapacitePersonnes(ctx.entrepriseId, 1);
+      if (!capacite.ok) {
+        redirect(`/employes/${employeId}/modifier?error=${encodeURIComponent(capacite.message)}`);
+      }
+    }
+  }
+
   const { error } = await supabase
     .from("employes")
     .update({
@@ -98,7 +159,21 @@ export async function modifierEmployeAction(employeId: string, formData: FormDat
     .eq("entreprise_id", ctx.entrepriseId);
 
   if (error) {
-    redirect(`/employes/${employeId}/modifier?error=${encodeURIComponent(error.message)}`);
+    redirect(`/employes/${employeId}/modifier?error=${encodeURIComponent(messageErreurUtilisateur("modifierEmployeAction", error, "Impossible d’enregistrer les modifications de l’employé."))}`);
+  }
+
+  // Le formulaire ne préremplit ce champ que pour les postes autorisés à voir
+  // le coût interne : ne jamais écrire ici pour les autres, sous peine
+  // d'effacer silencieusement une valeur que le formulaire n'a pas pu afficher.
+  const permissions = await permissionsUtilisateur(ctx);
+  const peutVoirCoutInterne = permissions === null || permissions.includes("voir_cout_interne_employe") || permissions.includes("acces_rentabilite");
+  if (peutVoirCoutInterne) {
+    const coutError = await enregistrerCoutHoraireEmploye(supabase, ctx.entrepriseId, employeId, nombre(formData, "cout_horaire"));
+    if (coutError) {
+      revalidatePath("/employes");
+      revalidatePath(`/employes/${employeId}`);
+      redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("modifierEmployeAction:cout_horaire", coutError, "Modifications enregistrées, mais le coût horaire interne n’a pas pu être mis à jour."))}`);
+    }
   }
 
   revalidatePath("/employes");
@@ -111,19 +186,36 @@ export async function changerStatutEmployeAction(employeId: string, statut: stri
   await exigerGestionEmployes(ctx, `/employes/${employeId}`);
   const supabase = await createClient();
 
+  // Réactivation (sorti → actif / en_conge / suspendu) : pré-contrôle du plafond.
+  if (ficheComptePourCapacite(statut)) {
+    const { data: actuel } = await supabase
+      .from("employes")
+      .select("statut, compte_application_statut")
+      .eq("id", employeId)
+      .eq("entreprise_id", ctx.entrepriseId)
+      .maybeSingle();
+    if (actuel && !ficheComptePourCapacite(actuel.statut, actuel.compte_application_statut)) {
+      const capacite = await verifierCapacitePersonnes(ctx.entrepriseId, 1);
+      if (!capacite.ok) {
+        redirect(`/employes/${employeId}?error=${encodeURIComponent(capacite.message)}`);
+      }
+    }
+  }
+
   const { error } = await supabase
     .from("employes")
     .update({ statut, date_sortie: statut === "sorti" ? new Date().toISOString().slice(0, 10) : null, updated_at: new Date().toISOString() })
     .eq("id", employeId)
     .eq("entreprise_id", ctx.entrepriseId);
 
-  if (!error) {
-    revalidatePath("/employes");
-    revalidatePath(`/employes/${employeId}`);
+  if (error) {
+    redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("changerStatutEmployeAction", error, "Impossible de modifier le statut de l’employé."))}`);
   }
+  revalidatePath("/employes");
+  revalidatePath(`/employes/${employeId}`);
 }
 
-export async function changerStatutCompteApplicationAction(employeId:string,statut:string){const ctx=await getContexteEntreprise();await exigerGestionEmployes(ctx,`/employes/${employeId}`);const supabase=await createClient();const{error}=await supabase.rpc("changer_statut_compte_application",{p_entreprise_id:ctx.entrepriseId,p_employe_id:employeId,p_statut:statut});if(error)redirect(`/employes/${employeId}?error=${encodeURIComponent(error.message)}`);await reconcilierAbonnementStripe(ctx.entrepriseId).catch(()=>undefined);revalidatePath("/employes");revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent(statut==="pause"?"Compte mis en pause — il reste facturable pour le mois":"Statut du compte mis à jour")}`);}
+export async function changerStatutCompteApplicationAction(employeId:string,statut:string){const ctx=await getContexteEntreprise();await exigerGestionEmployes(ctx,`/employes/${employeId}`);const supabase=await createClient();const{error}=await supabase.rpc("changer_statut_compte_application",{p_entreprise_id:ctx.entrepriseId,p_employe_id:employeId,p_statut:statut});if(error)redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("changerStatutCompteApplicationAction",error,"Impossible de modifier le statut du compte."))}`);await reconcilierAbonnementStripe(ctx.entrepriseId).catch(()=>undefined);revalidatePath("/employes");revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent(statut==="pause"?"Compte mis en pause — il reste facturable pour le mois":"Statut du compte mis à jour")}`);}
 
 export async function reinitialiserMotDePasseStockEmployeAction(employeId: string) {
   const ctx = await getContexteEntreprise();
@@ -133,7 +225,7 @@ export async function reinitialiserMotDePasseStockEmployeAction(employeId: strin
     p_entreprise_id: ctx.entrepriseId,
     p_employe_id: employeId,
   });
-  if (error) redirect(`/employes/${employeId}?error=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("reinitialiserMotDePasseStockEmployeAction", error, "Impossible de réinitialiser le mot de passe."))}`);
   revalidatePath(`/employes/${employeId}`);
   redirect(`/employes/${employeId}?success=${encodeURIComponent("Accès stock réinitialisé. L’employé doit créer un nouveau mot de passe depuis Mon espace")}`);
 }
@@ -149,9 +241,9 @@ export async function importerCarteBtpAction(employeId:string,formData:FormData)
   if(!(fichier instanceof File)||!fichier.size||!formats[fichier.type]||fichier.size>10*1024*1024)redirect(`/employes/${employeId}?error=${encodeURIComponent("Ajoutez une carte en PDF, PNG, JPG ou WebP de moins de 10 Mo")}`);
   const path=`${ctx.entrepriseId}/${employeId}/carte-btp-${crypto.randomUUID()}.${formats[fichier.type]}`;
   const{error:uploadError}=await supabase.storage.from("documents-employes").upload(path,fichier,{contentType:fichier.type,upsert:false});
-  if(uploadError)redirect(`/employes/${employeId}?error=${encodeURIComponent(uploadError.message)}`);
+  if(uploadError)redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("modifierCarteBtpEmployeAction:upload",uploadError,"Impossible d’envoyer la carte BTP."))}`);
   const{error}=await supabase.from("employes").update({carte_btp_storage_path:path,carte_btp_nom:fichier.name,carte_btp_mime_type:fichier.type,carte_btp_taille_octets:fichier.size,carte_btp_numero:numero,carte_btp_expiration:expiration,updated_at:new Date().toISOString()}).eq("id",employeId).eq("entreprise_id",ctx.entrepriseId);
-  if(error){await supabase.storage.from("documents-employes").remove([path]);redirect(`/employes/${employeId}?error=${encodeURIComponent(error.message)}`);}
+  if(error){await supabase.storage.from("documents-employes").remove([path]);redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("modifierCarteBtpEmployeAction:update",error,"Impossible d’enregistrer la carte BTP."))}`);}
   if(employe.carte_btp_storage_path)await supabase.storage.from("documents-employes").remove([employe.carte_btp_storage_path]);
   revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent("Carte BTP enregistrée")}`);
 }
@@ -167,9 +259,9 @@ export async function importerPhotoEmployeAction(employeId:string,formData:FormD
   if(!(fichier instanceof File)||!fichier.size||!formats[fichier.type]||fichier.size>10*1024*1024)redirect(`/employes/${employeId}?error=${encodeURIComponent("Ajoutez une photo JPG, PNG ou WebP de moins de 10 Mo")}`);
   const path=`${ctx.entrepriseId}/${employeId}/portrait-${crypto.randomUUID()}.${formats[fichier.type]}`;
   const{error:upload}=await supabase.storage.from("documents-employes").upload(path,fichier,{contentType:fichier.type,upsert:false});
-  if(upload)redirect(`/employes/${employeId}?error=${encodeURIComponent(upload.message)}`);
+  if(upload)redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("modifierPhotoEmployeAction:upload",upload,"Impossible d’envoyer la photo."))}`);
   const{error}=await supabase.from("employes").update({photo_storage_path:path,photo_url:null,photo_nom:fichier.name,photo_mime_type:fichier.type,photo_taille_octets:fichier.size,updated_at:new Date().toISOString()}).eq("id",employeId).eq("entreprise_id",ctx.entrepriseId);
-  if(error){await supabase.storage.from("documents-employes").remove([path]);redirect(`/employes/${employeId}?error=${encodeURIComponent(error.message)}`);}
+  if(error){await supabase.storage.from("documents-employes").remove([path]);redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("modifierPhotoEmployeAction:update",error,"Impossible d’enregistrer la photo."))}`);}
   if(employe.photo_storage_path)await supabase.storage.from("documents-employes").remove([employe.photo_storage_path]);
   revalidatePath("/employes");revalidatePath(`/employes/${employeId}`);redirect(`/employes/${employeId}?success=${encodeURIComponent("Photo de l’employé enregistrée")}`);
 }
@@ -185,7 +277,7 @@ export async function supprimerPhotoEmployeAction(employeId:string){
 export async function revoquerAppareilEmployeAction(employeId:string,appareilId:string){
   const ctx=await getContexteEntreprise();await exigerGestionEmployes(ctx,`/employes/${employeId}`);const supabase=await createClient();
   const{error}=await supabase.rpc("revoquer_appareil_compte",{p_entreprise_id:ctx.entrepriseId,p_appareil_id:appareilId});
-  if(error)redirect(`/employes/${employeId}?error=${encodeURIComponent(error.message)}`);
+  if(error)redirect(`/employes/${employeId}?error=${encodeURIComponent(messageErreurUtilisateur("revoquerAppareilEmployeAction",error,"Impossible de révoquer cet appareil."))}`);
   revalidatePath(`/employes/${employeId}`);revalidatePath("/plateforme");redirect(`/employes/${employeId}?success=${encodeURIComponent("Appareil révoqué")}`);
 }
 
@@ -202,9 +294,9 @@ export async function enregistrerSignatureEmployeAction(employeId: string, dataU
   if (!employe) return { ok: false as const, erreur: "Employé introuvable." };
   const path = `${ctx.entrepriseId}/${employeId}/signature-${crypto.randomUUID()}.png`;
   const { error: upload } = await supabase.storage.from("documents-employes").upload(path, buffer, { contentType: "image/png", upsert: false });
-  if (upload) return { ok: false as const, erreur: upload.message };
+  if (upload) return { ok: false as const, erreur: messageErreurUtilisateur("enregistrerSignatureEmployeAction:upload", upload, "Impossible d’enregistrer la signature.") };
   const { error } = await supabase.from("employes").update({ signature_storage_path: path, signature_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", employeId).eq("entreprise_id", ctx.entrepriseId);
-  if (error) { await supabase.storage.from("documents-employes").remove([path]); return { ok: false as const, erreur: error.message }; }
+  if (error) { await supabase.storage.from("documents-employes").remove([path]); return { ok: false as const, erreur: messageErreurUtilisateur("enregistrerSignatureEmployeAction:update", error, "Impossible d’enregistrer la signature.") }; }
   if (employe.signature_storage_path) await supabase.storage.from("documents-employes").remove([employe.signature_storage_path]);
   revalidatePath(`/employes/${employeId}`);
   return { ok: true as const };
@@ -248,6 +340,11 @@ export async function creerMaFicheEmployeAction(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const capacite = await verifierCapacitePersonnes(ctx.entrepriseId, 1);
+  if (!capacite.ok) {
+    redirect(`/mon-espace?error=${encodeURIComponent(capacite.message)}`);
+  }
+
   const { error } = await supabase.from("employes").insert({
     entreprise_id: ctx.entrepriseId,
     utilisateur_id: ctx.userId,
@@ -260,7 +357,7 @@ export async function creerMaFicheEmployeAction(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/mon-espace?error=${encodeURIComponent(error.message)}`);
+    redirect(`/mon-espace?error=${encodeURIComponent(messageErreurUtilisateur("declarerContratEmployeAction", error, "Impossible d’enregistrer ces informations."))}`);
   }
 
   revalidatePath("/mon-espace");

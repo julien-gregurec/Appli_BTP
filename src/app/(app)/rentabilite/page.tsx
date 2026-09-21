@@ -4,26 +4,29 @@ import { permissionsUtilisateur, aAccesIA } from "@/lib/permissions";
 import { euros } from "@/lib/devis";
 import { Lien as Link } from "@/components/Lien";
 import { AnalyseRentabiliteIA } from "@/components/AnalyseRentabiliteIA";
+import { iaEstActive } from "@/lib/preview-features";
 
-type PointageRentabilite = { chantier_id: string; heures_normales: number; heures_supplementaires: number; employe: { cout_horaire: number | null } | { cout_horaire: number | null }[] | null };
+type PointageRentabilite = { chantier_id: string; employe_id: string; heures_normales: number; heures_supplementaires: number };
 type MouvementStockRentabilite = { chantier_id: string; quantite: number; article: { prix_achat_ht: number } | { prix_achat_ht: number }[] | null };
 const un = <T,>(valeur: T | T[] | null): T | null => Array.isArray(valeur) ? valeur[0] ?? null : valeur;
 
 export default async function RentabilitePage() {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
-  const peutUtiliserIA = aAccesIA(await permissionsUtilisateur(ctx));
-  const [{ data: chantiers }, { data: factures }, { data: devis }, { data: donneesPointages }, { data: depenses }, { data: donneesIndemnites }, { data: donneesMouvementsStock }, { data: donneesNotesFrais }] = await Promise.all([
+  const peutUtiliserIA = iaEstActive() && aAccesIA(await permissionsUtilisateur(ctx));
+  const [{ data: chantiers }, { data: factures }, { data: devis }, { data: donneesPointages }, { data: depenses }, { data: donneesIndemnites }, { data: donneesMouvementsStock }, { data: donneesNotesFrais }, { data: couts }] = await Promise.all([
     supabase.from("chantiers").select("id, reference_interne, nom, statut, client:clients(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }),
     supabase.from("factures").select("chantier_id, montant_ht, statut, type").eq("entreprise_id", ctx.entrepriseId),
     supabase.from("devis").select("chantier_id, montant_ht, statut").eq("entreprise_id", ctx.entrepriseId).eq("statut", "accepte"),
-    supabase.from("pointages").select("chantier_id, heures_normales, heures_supplementaires, employe:employes(cout_horaire)").eq("entreprise_id", ctx.entrepriseId).eq("verification_statut", "valide"),
+    supabase.from("pointages").select("chantier_id, employe_id, heures_normales, heures_supplementaires").eq("entreprise_id", ctx.entrepriseId).eq("verification_statut", "valide"),
     supabase.from("depenses_fournisseurs").select("chantier_id, montant_ht, statut, categorie").eq("entreprise_id", ctx.entrepriseId),
     supabase.rpc("couts_indemnites_paie_par_chantier", { p_entreprise_id: ctx.entrepriseId }),
     supabase.from("mouvements_stock").select("chantier_id, quantite, article:articles_stock(prix_achat_ht)").eq("entreprise_id", ctx.entrepriseId).eq("type", "sortie").not("chantier_id", "is", null),
     supabase.from("notes_frais").select("chantier_id, montant_ttc, statut").eq("entreprise_id", ctx.entrepriseId).not("chantier_id", "is", null).in("statut", ["valide", "exporte_comptabilite", "verrouille", "archive", "validee", "remboursee"]),
+    supabase.from("employes_cout_horaire").select("employe_id, cout_horaire").eq("entreprise_id", ctx.entrepriseId),
   ]);
   const pointages = (donneesPointages ?? []) as PointageRentabilite[];
+  const coutHoraireParEmploye = new Map((couts ?? []).map((cout) => [cout.employe_id, cout.cout_horaire]));
   const indemnitesPaie = (donneesIndemnites ?? []) as { chantier_id: string; total: number }[];
   const mouvementsStock = (donneesMouvementsStock ?? []) as MouvementStockRentabilite[];
   const notesFrais = (donneesNotesFrais ?? []) as { chantier_id: string; montant_ttc: number }[];
@@ -33,7 +36,7 @@ export default async function RentabilitePage() {
     let heures = 0; let coutMainOeuvre = 0; let coutHoraireManquant = false;
     for (const pointage of pointages.filter((item) => item.chantier_id === chantier.id)) {
       const total = Number(pointage.heures_normales) + Number(pointage.heures_supplementaires);
-      const coutHoraire = un(pointage.employe)?.cout_horaire;
+      const coutHoraire = coutHoraireParEmploye.get(pointage.employe_id);
       if (!coutHoraire && total > 0) coutHoraireManquant = true;
       heures += total; coutMainOeuvre += total * Number(coutHoraire ?? 0);
     }
@@ -60,7 +63,7 @@ export default async function RentabilitePage() {
 
   return <main className="p-8"><div className="mx-auto max-w-6xl space-y-6">
     <div><h1 className="text-xl font-semibold">Rentabilité des chantiers</h1><p className="text-sm text-neutral-500">Chiffre d’affaires moins main-d’œuvre pointée et dépenses fournisseurs réelles.</p></div>
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-9"><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">CA HT</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalFacture)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Main-d’œuvre</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalCoutMo)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Achats / charges</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalAchats)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Stock consommé</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalStock)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Sous-traitance</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalSousTraitance)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Notes de frais</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalNotesFrais)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Indemnités paie</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalIndemnitesPaie)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Marge</div><div className={`mt-1 font-mono text-lg font-semibold ${totalMarge>=0?"text-green-700":"text-red-700"}`}>{euros(totalMarge)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Taux</div><div className="mt-1 font-mono text-lg font-semibold">{tauxGlobal.toFixed(1)} %</div></div></div>
+    <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-9"><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">CA HT</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalFacture)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Main-d’œuvre</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalCoutMo)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Achats / charges</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalAchats)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Stock consommé</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalStock)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Sous-traitance</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalSousTraitance)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Notes de frais</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalNotesFrais)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Indemnités paie</div><div className="mt-1 font-mono text-lg font-semibold">{euros(totalIndemnitesPaie)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Marge</div><div className={`mt-1 font-mono text-lg font-semibold ${totalMarge>=0?"text-green-700":"text-red-700"}`}>{euros(totalMarge)}</div></div><div className="rounded-md border p-4"><div className="text-xs text-neutral-500">Taux</div><div className="mt-1 font-mono text-lg font-semibold">{tauxGlobal.toFixed(1)} %</div></div></div>
     <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">La marge inclut désormais les factures fournisseurs rattachées au chantier, le stock sorti vers le chantier, les notes de frais validées, ainsi que les indemnités de trajet, panier et grand déplacement issues de la paie. Les frais généraux non affectés restent hors marge chantier.</div>
     {chantiersCoutHoraireManquant > 0 && <div className="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">⚠ {chantiersCoutHoraireManquant} chantier(s) ont des heures pointées par un salarié sans coût horaire renseigné : leur coût de main-d’œuvre est sous-estimé (compté à 0 €/h). <Link href="/employes" className="font-semibold underline">Renseigner le coût horaire</Link> dans la fiche du salarié concerné.</div>}
     {peutUtiliserIA && <AnalyseRentabiliteIA chantiers={lignes.map((l) => ({ id: l.id, nom: l.nom }))} />}

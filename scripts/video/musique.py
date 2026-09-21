@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fond musical original pour les vidéos Liria Gestion Pro.
+"""Fond musical original pour les vidéos ELSATIA Gestion Pro.
 
 Composé sur les paramètres d'un morceau de référence indiqué par Julien
 (« Balaclava ») : **86 BPM, tonalité de Sol**. Un tempo et une tonalité sont des

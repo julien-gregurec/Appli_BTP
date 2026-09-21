@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
 
 type LigneLot = { article_id: string; quantite: number };
-type Attribution = { ligne_commande_id: string; quantite: number };
+type Attribution = { ligne_commande_id: string; quantite: number; article_id?: string };
 export type TypeDestinationSortie = "chantier" | "vehicule" | "outil" | null;
 type IdentiteBorne = { identifiantEmploye: string; motDePasseStock: string };
 
@@ -21,6 +22,7 @@ export async function receptionLotAction(
   attributions: Attribution[],
   motif: string | null,
   identite: IdentiteBorne | null = null,
+  idempotencyKey: string | null = null,
 ): Promise<ResultatReception> {
   const ctx = await getContexteEntreprise();
   if (!lignes.length) return { ok: false, erreur: "Aucun article scanné." };
@@ -31,13 +33,14 @@ export async function receptionLotAction(
     p_lignes: lignes,
     p_attributions: attributions,
     p_motif: motif,
+    p_idempotency_key: idempotencyKey,
     ...(identite ? {
       p_identifiant_employe: identite.identifiantEmploye,
       p_mot_de_passe: identite.motDePasseStock,
     } : {}),
   };
   const { data, error } = await supabase.rpc(rpc, params);
-  if (error) return { ok: false, erreur: error.message };
+  if (error) return { ok: false, erreur: messageErreurUtilisateur("receptionLotAction", error, "Impossible d’enregistrer cette réception.") };
   revalidatePath("/stock");
   revalidatePath("/commandes");
   const res = data as { entrees: number; commandes: Array<{ commande_id: string; statut: string }> };
@@ -69,7 +72,7 @@ export async function sortieLotAction(
     } : {}),
   };
   const { data, error } = await supabase.rpc(rpc, params);
-  if (error) return { ok: false, erreur: error.message };
+  if (error) return { ok: false, erreur: messageErreurUtilisateur("sortieLotAction", error, "Impossible d’enregistrer cette sortie de stock.") };
   revalidatePath("/stock");
   return { ok: true, sorties: (data as { sorties: number }).sorties };
 }

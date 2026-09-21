@@ -5,6 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { analyserFichier, type FichierAnalyse } from "@/lib/import/parse";
 import { logicielSource, typeImport } from "@/lib/import/config";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
+import { contexteQuotaPersonnes } from "@/lib/capacite-personnes";
+import { messageImportCapacite } from "@/lib/quota-personnes-message";
 
 const MAX_LIGNES = 5000;
 
@@ -17,7 +20,7 @@ export async function analyserFichierImport(formData: FormData): Promise<Fichier
     const res = await analyserFichier(file);
     return { ...res, lignes: res.lignes.slice(0, MAX_LIGNES) };
   } catch (e) {
-    return { entete: [], lignes: [], total: 0, erreur: `Lecture impossible : ${(e as Error).message}` };
+    return { entete: [], lignes: [], total: 0, erreur: messageErreurUtilisateur("analyserFichierImport", e, "Lecture du fichier impossible. Vérifiez le format et réessayez.") };
   }
 }
 
@@ -158,7 +161,7 @@ export async function importerDonneesAction(payload: {
           .select("id")
           .single();
         if (error || !nouveau) {
-          erreurs.push(`Fournisseur « ${nomFournisseur} » : ${error?.message ?? "création impossible"}`);
+          erreurs.push(`Fournisseur « ${nomFournisseur} » : ${messageErreurUtilisateur("importerDonneesAction:fournisseur", error, "création impossible")}`);
           ignores++;
           continue;
         }
@@ -199,7 +202,7 @@ export async function importerDonneesAction(payload: {
         const { data: nouveau, error } = await supabase.from("clients")
           .insert({ entreprise_id: entrepriseId, type: "particulier", nom: clientNom, statut: "actif" })
           .select("id").single();
-        if (error || !nouveau) { erreurs.push(`Client « ${clientNom} » : ${error?.message ?? "création impossible"}`); ignores++; continue; }
+        if (error || !nouveau) { erreurs.push(`Client « ${clientNom} » : ${messageErreurUtilisateur("importerDonneesAction:client", error, "création impossible")}`); ignores++; continue; }
         clientId = nouveau.id;
         indexClient.set(clientNom.toLowerCase(), clientId!);
       }
@@ -213,6 +216,41 @@ export async function importerDonneesAction(payload: {
     }
   }
 
+  // Plafond de personnes actives : contrôle AVANT toute écriture, jamais d'import
+  // partiel silencieux. Les fiches importées sont toutes créées "actif".
+  if (payload.type === "employes" && enregistrements.length > 0) {
+    const { data: capaciteBrut } = await supabase
+      .rpc("capacite_personnes_entreprise", { p_entreprise_id: entrepriseId })
+      .maybeSingle();
+    const capacite = capaciteBrut as {
+      personnes_actives?: number | null;
+      capacite_totale?: number | null;
+    } | null;
+    if (capacite) {
+      const restant = Math.max(
+        0,
+        Number(capacite.capacite_totale ?? 0) - Number(capacite.personnes_actives ?? 0),
+      );
+      if (enregistrements.length > restant) {
+        // Message contextuel : ne propose jamais « ajoutez de la capacité » ou
+        // « changez d'offre » quand ces chemins sont fermés (essai sans offre,
+        // ABONNEMENTS_PUBLICS_OUVERTS=false).
+        return {
+          inseres: 0,
+          ignores: ignores + enregistrements.length,
+          erreurs: [
+            messageImportCapacite(await contexteQuotaPersonnes(entrepriseId), {
+              totale: Number(capacite.capacite_totale ?? 0),
+              actives: Number(capacite.personnes_actives ?? 0),
+              restant,
+              demandees: enregistrements.length,
+            }),
+          ],
+        };
+      }
+    }
+  }
+
   // Insertion par lots.
   let inseres = 0;
   for (let i = 0; i < enregistrements.length; i += 200) {
@@ -223,7 +261,7 @@ export async function importerDonneesAction(payload: {
         ? supabase.from(conf.table).upsert(lot, { onConflict: "entreprise_id,reference", count: "exact" })
         : supabase.from(conf.table).insert(lot, { count: "exact" });
     const { error, count } = await requete;
-    if (error) erreurs.push(`Lot ${i / 200 + 1} : ${error.message}`);
+    if (error) erreurs.push(`Lot ${i / 200 + 1} : ${messageErreurUtilisateur("importerDonneesAction:lot", error, "insertion impossible")}`);
     else inseres += count ?? lot.length;
   }
 

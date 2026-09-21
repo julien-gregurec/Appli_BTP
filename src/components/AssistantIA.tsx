@@ -6,18 +6,45 @@ import {
   creerDemandeCongeDepuisPropositionAction,
   envoyerMessageInterneDepuisPropositionAction,
   envoyerMessageSupportDepuisPropositionAction,
+  creerDevisDepuisPropositionAction,
 } from "@/app/actions/assistant";
-import type { MessageChat, PropositionAffectation, PropositionConge, PropositionMessageInterne, PropositionMessageSupport } from "@/lib/ai/assistant";
+import type { MessageChat, PropositionAffectation, PropositionConge, PropositionMessageInterne, PropositionMessageSupport, PropositionDevis } from "@/lib/ai/assistant";
 import { lienMaps } from "@/lib/maps";
+import { euros } from "@/lib/devis";
+import { BRAND_NAME, PRODUCT_NAME } from "@/lib/brand";
 
 type MessageAffiche = MessageChat & {
   proposition?: PropositionAffectation;
   propositionConge?: PropositionConge;
   propositionMessageInterne?: PropositionMessageInterne;
   propositionMessageSupport?: PropositionMessageSupport;
+  propositionDevis?: PropositionDevis;
   propositionStatut?: "en_attente" | "creee" | "refusee";
+  devisIdCree?: string;
   fichierNom?: string;
+  // Contenu textuel à renvoyer au modèle pour CE message dans l'historique de la prochaine
+  // requête, différent de ce qui est affiché dans la bulle (`contenu`). Sans ça, le modèle
+  // n'a plus aucune trace de la proposition qu'il vient de faire dès le tour suivant — il ne
+  // peut donc pas appliquer une correction ("passe la cloison à 130 m²") sur la proposition
+  // précédente, et en régénère une différente. Découvert en recette réelle IA-DEVIS-V1.
+  contenuPourModele?: string;
 };
+
+function resumeDevisPourModele(p: PropositionDevis): string {
+  const lignes = p.lignes
+    .map((l) => {
+      const prix = l.prixUnitaireHt !== null ? `${l.prixUnitaireHt} €HT/${l.unite} (source: ${l.sourcePrix})` : "prix non renseigné (source: absent)";
+      const remise = l.remiseLigne > 0 ? `, remise ${l.remiseLigne}%` : "";
+      return `- ${l.designation} | type ${l.type} | ${l.quantite} ${l.unite} | ${prix} | TVA ${l.tauxTva}%${remise}`;
+    })
+    .join("\n");
+  const hypotheses = p.hypotheses.length ? `\nHypothèses : ${p.hypotheses.join(" ; ")}` : "";
+  return (
+    `[Proposition de devis déjà faite à l'utilisateur, PAS ENCORE confirmée. Si l'utilisateur demande une modification, ` +
+    `rappelle proposer_devis avec CES MÊMES lignes en appliquant uniquement le changement demandé — ne régénère pas le reste depuis zéro.]\n` +
+    `client_id: ${p.clientId} (${p.clientNom})\nObjet: ${p.objet}\nLignes:\n${lignes}${hypotheses}`
+  );
+}
 const LIBELLES_TYPE_ACTIVITE: Record<string, string> = { chantier: "Chantier", bureau: "Bureau", depot: "Dépôt", visite_medicale: "Visite médicale", formation: "Formation", conge: "Congé / absence", autre: "Autre" };
 const LIBELLES_TYPE_CONGE: Record<string, string> = { conges_payes: "Congés payés", rtt: "RTT", sans_solde: "Sans solde", maladie: "Maladie", evenement_familial: "Événement familial", recuperation: "Récupération", autre: "Autre" };
 const LIBELLES_DEMI_JOURNEE: Record<string, string> = { journee: "journée entière", matin: "matin", apres_midi: "après-midi" };
@@ -30,6 +57,7 @@ type EvenementSSE =
   | { type: "proposition_conge"; proposition: PropositionConge }
   | { type: "proposition_message_interne"; proposition: PropositionMessageInterne }
   | { type: "proposition_message_support"; proposition: PropositionMessageSupport }
+  | { type: "proposition_devis"; proposition: PropositionDevis }
   | { type: "fin" }
   | { type: "erreur"; message: string };
 
@@ -96,8 +124,8 @@ export function AssistantIA() {
 
   useEffect(() => {
     const ouvrir = () => setOuvert(true);
-    window.addEventListener("liria:ouvrir-assistant", ouvrir);
-    return () => window.removeEventListener("liria:ouvrir-assistant", ouvrir);
+    window.addEventListener("elsatia:ouvrir-assistant", ouvrir);
+    return () => window.removeEventListener("elsatia:ouvrir-assistant", ouvrir);
   }, []);
 
   function envoyer(texte?: string) {
@@ -125,7 +153,7 @@ export function AssistantIA() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            historique: historiqueEnvoye.map((m) => ({ role: m.role, contenu: m.contenu, fichier: m.fichier })),
+            historique: historiqueEnvoye.map((m) => ({ role: m.role, contenu: m.contenuPourModele ?? m.contenu, fichier: m.fichier })),
           }),
         });
         if (!res.ok || !res.body) {
@@ -160,6 +188,9 @@ export function AssistantIA() {
               setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, propositionMessageInterne: evenement.proposition, propositionStatut: "en_attente" } : m)));
             } else if (evenement.type === "proposition_message_support") {
               setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, propositionMessageSupport: evenement.proposition, propositionStatut: "en_attente" } : m)));
+            } else if (evenement.type === "proposition_devis") {
+              const resume = resumeDevisPourModele(evenement.proposition);
+              setMessages((prev) => prev.map((m, i) => (i === prev.length - 1 ? { ...m, propositionDevis: evenement.proposition, propositionStatut: "en_attente", contenuPourModele: resume } : m)));
             } else if (evenement.type === "erreur") {
               setErreur(evenement.message);
             }
@@ -288,6 +319,30 @@ export function AssistantIA() {
     });
   }
 
+  function validerPropositionDevis(index: number) {
+    const message = messages[index];
+    if (!message.propositionDevis) return;
+    startTransition(async () => {
+      const res = await creerDevisDepuisPropositionAction({
+        clientId: message.propositionDevis!.clientId,
+        objet: message.propositionDevis!.objet,
+        lignes: message.propositionDevis!.lignes.map((l) => ({
+          designation: l.designation,
+          description: l.description,
+          type: l.type,
+          quantite: l.quantite,
+          unite: l.unite,
+          prixUnitaireHt: l.prixUnitaireHt,
+          tauxTva: l.tauxTva,
+          remiseLigne: l.remiseLigne,
+        })),
+        notesClient: message.propositionDevis!.notesClient,
+      });
+      setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, propositionStatut: "error" in res ? "en_attente" : "creee", devisIdCree: "error" in res ? undefined : res.devisId } : m)));
+      if ("error" in res) setErreur(res.error);
+    });
+  }
+
   function refuserProposition(index: number) {
     setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, propositionStatut: "refusee" } : m)));
   }
@@ -296,8 +351,8 @@ export function AssistantIA() {
     <>
       {ouvert && (
         <div className="fixed bottom-4 right-4 z-50 flex h-[32rem] max-h-[70vh] w-96 max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-2xl dark:border-neutral-700 dark:bg-neutral-900">
-          <div className="flex items-center justify-between border-b border-neutral-200 bg-liria-navy px-4 py-3 dark:border-neutral-700">
-            <span className="text-sm font-semibold text-white">✨ Assistant Liria</span>
+          <div className="flex items-center justify-between border-b border-neutral-200 bg-elsatia-navy px-4 py-3 dark:border-neutral-700">
+            <span className="text-sm font-semibold text-white">✨ Assistant {PRODUCT_NAME}</span>
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -314,7 +369,12 @@ export function AssistantIA() {
             </div>
           </div>
 
-          <div className="flex-1 space-y-3 overflow-y-auto p-4">
+          {/* AI-LAUNCH-V1B §35 : role="log" est le role ARIA prevu pour une suite de messages
+              (contrairement a un simple aria-live="polite" generique). Combine a
+              aria-relevant="additions", seule l'ajout d'une NOUVELLE bulle de message est
+              annonce — pas chaque delta de streaming qui modifie le texte d'une bulle deja
+              presente — pour eviter une lecture d'ecran insupportable pendant la reponse. */}
+          <div role="log" aria-live="polite" aria-relevant="additions" className="flex-1 space-y-3 overflow-y-auto p-4">
             {messages.length === 0 && (
               <p className="text-sm text-neutral-500">
                 Pose une question sur ton activité (à l&apos;écrit ou au micro 🎙️) : « quels chantiers sont en retard ? »,
@@ -327,7 +387,7 @@ export function AssistantIA() {
                   className={
                     "inline-block max-w-[85%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm " +
                     (m.role === "user"
-                      ? "bg-liria-navy text-white"
+                      ? "bg-elsatia-navy text-white"
                       : "bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100")
                   }
                 >
@@ -335,7 +395,7 @@ export function AssistantIA() {
                   {m.contenu || (m.role === "assistant" && i === messages.length - 1 && pending ? "…" : "")}
                 </span>
                 {m.proposition && (
-                  <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-liria-gold/60 bg-liria-gold/10 p-3 text-left text-sm">
+                  <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-elsatia-gold/60 bg-elsatia-gold/10 p-3 text-left text-sm">
                     {m.proposition.affectationId && <p className="text-[11px] font-medium uppercase tracking-wide text-blue-700">Modification</p>}
                     <p><strong>{m.proposition.employeNoms.join(", ")}</strong> → {m.proposition.typeActivite === "chantier" ? m.proposition.chantierNom : LIBELLES_TYPE_ACTIVITE[m.proposition.typeActivite]}</p>
                     {m.proposition.typeActivite !== "chantier" && m.proposition.lieuActivite && (
@@ -358,7 +418,7 @@ export function AssistantIA() {
                   </div>
                 )}
                 {m.propositionConge && (
-                  <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-liria-gold/60 bg-liria-gold/10 p-3 text-left text-sm">
+                  <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-elsatia-gold/60 bg-elsatia-gold/10 p-3 text-left text-sm">
                     <p><strong>{LIBELLES_TYPE_CONGE[m.propositionConge.typeConge]}</strong> · {m.propositionConge.dateDebut}{m.propositionConge.dateFin !== m.propositionConge.dateDebut ? ` → ${m.propositionConge.dateFin}` : ""}</p>
                     <p className="text-neutral-600 dark:text-neutral-300">
                       {m.propositionConge.demiJourDebut === m.propositionConge.demiJourFin ? LIBELLES_DEMI_JOURNEE[m.propositionConge.demiJourDebut] : `${LIBELLES_DEMI_JOURNEE[m.propositionConge.demiJourDebut]} → ${LIBELLES_DEMI_JOURNEE[m.propositionConge.demiJourFin]}`}
@@ -380,7 +440,7 @@ export function AssistantIA() {
                   </div>
                 )}
                 {m.propositionMessageInterne && (
-                  <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-liria-gold/60 bg-liria-gold/10 p-3 text-left text-sm">
+                  <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-elsatia-gold/60 bg-elsatia-gold/10 p-3 text-left text-sm">
                     <p>→ <strong>{m.propositionMessageInterne.destinataireEmployeNom ?? `Fil chantier · ${m.propositionMessageInterne.chantierNom}`}</strong></p>
                     <p className="whitespace-pre-wrap text-neutral-600 dark:text-neutral-300">{m.propositionMessageInterne.contenu}</p>
                     {m.propositionStatut === "en_attente" && (
@@ -398,8 +458,8 @@ export function AssistantIA() {
                   </div>
                 )}
                 {m.propositionMessageSupport && (
-                  <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-liria-gold/60 bg-liria-gold/10 p-3 text-left text-sm">
-                    <p><strong>Message au support Liria</strong></p>
+                  <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-elsatia-gold/60 bg-elsatia-gold/10 p-3 text-left text-sm">
+                    <p><strong>Message au support {BRAND_NAME}</strong></p>
                     <p className="whitespace-pre-wrap text-neutral-600 dark:text-neutral-300">{m.propositionMessageSupport.contenu}</p>
                     {m.propositionStatut === "en_attente" && (
                       <div className="mt-2 flex gap-2">
@@ -415,16 +475,71 @@ export function AssistantIA() {
                     {m.propositionStatut === "refusee" && <p className="mt-2 text-xs text-neutral-500">Ignoré</p>}
                   </div>
                 )}
+                {m.propositionDevis && (
+                  <div className="mt-1 inline-block w-full max-w-[85%] rounded-lg border border-elsatia-gold/60 bg-elsatia-gold/10 p-3 text-left text-sm">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500">Devis proposé (brouillon)</p>
+                    <p><strong>{m.propositionDevis.clientNom}</strong> · {m.propositionDevis.objet}</p>
+                    {/* Lignes empilées (pas de tableau) : la fenêtre de l'assistant reste étroite
+                        quelle que soit la largeur d'écran — voir AI-DEVIS-V1 §51. */}
+                    <div className="mt-2 space-y-1.5">
+                      {m.propositionDevis.lignes.map((l, li) => (
+                        <div key={li} className="rounded border border-neutral-200 bg-white/60 px-2 py-1.5 dark:border-neutral-700 dark:bg-neutral-900/40">
+                          <p className="font-medium">{l.designation}</p>
+                          <p className="flex flex-wrap gap-x-2 gap-y-0.5 text-xs text-neutral-600 dark:text-neutral-300">
+                            <span>{l.quantite} {l.unite}</span>
+                            <span>· {l.prixUnitaireHt !== null ? `${euros(l.prixUnitaireHt)} HT/${l.unite}` : "Prix à renseigner"}</span>
+                            {l.prixUnitaireHt !== null && l.sourcePrix === "historique" && <span className="text-amber-700 dark:text-amber-400">(basé sur un devis précédent)</span>}
+                            <span>· TVA {l.tauxTva}%</span>
+                            {l.remiseLigne > 0 && <span>· remise {l.remiseLigne}%</span>}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    {m.propositionDevis.hypotheses.length > 0 && (
+                      <div className="mt-2 rounded bg-amber-100 px-2 py-1.5 text-xs text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
+                        <p className="font-medium">Hypothèses :</p>
+                        <ul className="list-disc pl-4">
+                          {m.propositionDevis.hypotheses.map((h, hi) => (
+                            <li key={hi}>{h}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {m.propositionDevis.avertissement && <p className="mt-1 text-neutral-600 dark:text-neutral-300">{m.propositionDevis.avertissement}</p>}
+                    {m.propositionStatut === "en_attente" && (
+                      <div className="mt-2 flex gap-2">
+                        <button type="button" onClick={() => validerPropositionDevis(i)} disabled={pending} className="rounded-md bg-green-700 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">
+                          Créer le brouillon
+                        </button>
+                        <button type="button" onClick={() => refuserProposition(i)} className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium">
+                          Ignorer
+                        </button>
+                      </div>
+                    )}
+                    {m.propositionStatut === "creee" && (
+                      <p className="mt-2 text-xs font-medium text-green-700">
+                        ✓ Brouillon de devis créé
+                        {m.devisIdCree && (
+                          <>
+                            {" · "}
+                            <a href={`/devis/${m.devisIdCree}`} className="underline">Ouvrir le devis</a>
+                          </>
+                        )}
+                      </p>
+                    )}
+                    {m.propositionStatut === "refusee" && <p className="mt-2 text-xs text-neutral-500">Ignoré</p>}
+                  </div>
+                )}
               </div>
             ))}
-            {ecoute && <p className="text-sm text-liria-navy dark:text-liria-gold">🎙️ Je t&apos;écoute…</p>}
+            {ecoute && <p className="text-sm text-elsatia-navy dark:text-elsatia-gold">🎙️ Je t&apos;écoute…</p>}
             {erreur && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erreur}</p>}
             <div ref={finRef} />
           </div>
 
           <div className="border-t border-neutral-200 p-3 dark:border-neutral-700">
             {fichierJoint && (
-              <div className="mb-2 flex items-center gap-2 rounded-md bg-liria-gold/10 px-2 py-1 text-xs">
+              <div className="mb-2 flex items-center gap-2 rounded-md bg-elsatia-gold/10 px-2 py-1 text-xs">
                 <span className="min-w-0 flex-1 truncate">📎 {fichierJoint.nom}</span>
                 <button type="button" onClick={() => setFichierJoint(null)} aria-label="Retirer la pièce jointe" className="text-neutral-500 hover:text-red-600">×</button>
               </div>
@@ -461,13 +576,13 @@ export function AssistantIA() {
                   }
                 }}
                 placeholder="Écris ou parle…"
-                className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+                className="min-w-0 flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
               />
               <button
                 type="button"
                 onClick={() => envoyer()}
                 disabled={pending || (!saisie.trim() && !fichierJoint)}
-                className="rounded-md bg-liria-navy px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                className="rounded-md bg-elsatia-navy px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
               >
                 Envoyer
               </button>
@@ -480,8 +595,8 @@ export function AssistantIA() {
         <button
           type="button"
           onClick={() => setOuvert(true)}
-          aria-label="Assistant Liria"
-          className="fixed bottom-20 right-4 z-40 flex items-center gap-2 rounded-full bg-liria-gold px-4 py-3 text-sm font-semibold text-liria-navy shadow-lg hover:brightness-95"
+          aria-label={`Assistant ${PRODUCT_NAME}`}
+          className="fixed bottom-20 right-4 z-40 flex items-center gap-2 rounded-full bg-elsatia-gold px-4 py-3 text-sm font-semibold text-elsatia-navy shadow-lg hover:brightness-95"
         >
           <span aria-hidden="true">✨</span>
           <span className="hidden sm:inline">Assistant</span>

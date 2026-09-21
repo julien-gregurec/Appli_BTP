@@ -1,5 +1,4 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { calculerDepassementsAppareilsFacturables } from "@/lib/facturation-appareils";
 import { DUREE_ESSAI_JOURS, offreParCle, REDUCTION_ANNUELLE } from "@/lib/plateforme";
 
 export const OFFRES_ABONNEMENT = ["essentiel", "premium", "mini", "pro", "business", "entreprise", "sur_mesure"] as const;
@@ -38,8 +37,40 @@ export type StripeSubscription = {
   cancel_at?: number | null;
   cancel_at_period_end?: boolean;
   metadata?: Record<string, string>;
-  items?: { data?: Array<{ id: string; quantity?: number; price?: { id?: string } }> };
+  items?: { data?: Array<{ id: string; quantity?: number; price?: { id?: string }; current_period_start?: number; current_period_end?: number }> };
+  discounts?: Array<string | {
+    id?: string;
+    object?: string;
+    coupon?: string | { id?: string };
+    promotion_code?: string | { id?: string } | null;
+    source?: { type?: string; coupon?: string | { id?: string } | null };
+  }> | null;
 };
+
+export type ObservationRemiseStripe =
+  | {
+    status: "absent";
+    count: 0;
+    discount_id: null;
+    source_type: null;
+    source_id: null;
+    coupon_id: null;
+  }
+  | {
+    status: "present";
+    count: 1;
+    discount_id: string;
+    source_type: "coupon" | "promotion_code";
+    source_id: string;
+    coupon_id: string;
+  };
+
+export class ObservationRemiseStripeInexploitable extends Error {
+  constructor(public readonly raison: string, public readonly count: number, public readonly discountId: string | null = null) {
+    super("Observation Stripe de remise incomplète");
+    this.name = "ObservationRemiseStripeInexploitable";
+  }
+}
 
 const VARIABLES_PRIX: Partial<Record<OffreAbonnement, Record<PeriodiciteAbonnement, string>>> = {
   essentiel: {
@@ -68,6 +99,61 @@ const VARIABLES_PRIX_COMPTE_SUP: Partial<Record<OffreAbonnement, Record<Periodic
   entreprise: { mensuel: "STRIPE_PRICE_COMPTE_SUP_ENTREPRISE_MENSUEL", annuel: "STRIPE_PRICE_COMPTE_SUP_ENTREPRISE_ANNUEL" },
 };
 
+/**
+ * Price de forfait des GÉNÉRATIONS PRÉCÉDENTES encore portés par des
+ * abonnements en cours, listés par configuration (IDs séparés par des virgules).
+ *
+ * Repointer `STRIPE_PRICE_<OFFRE>_<PERIODICITE>` sur une nouvelle génération ne
+ * doit jamais rendre inclassable un abonnement déjà souscrit : le classifieur
+ * est fail-closed, un Price hors allowlist bloque toute réconciliation de
+ * capacité. Ces IDs restent donc *connus* (l'abonnement reste réconciliable)
+ * sans jamais devenir *sélectionnables* : `prixStripePour` ne les rend pas.
+ */
+export const VARIABLE_PRIX_BASE_GENERATIONS_PRECEDENTES =
+  "STRIPE_PRICE_BASE_GENERATIONS_PRECEDENTES";
+
+export function allowlistPrixBaseGenerationsPrecedentes(
+  environnement: Record<string, string | undefined> = process.env,
+): Set<string> {
+  const brut = environnement[VARIABLE_PRIX_BASE_GENERATIONS_PRECEDENTES] ?? "";
+  return new Set(
+    brut
+      .split(",")
+      .map((id) => id.trim())
+      .filter((id) => id.startsWith("price_")),
+  );
+}
+
+/**
+ * Un Price de génération historique a été présenté à la vente. Jamais rattrapable
+ * silencieusement : le client recevrait un tarif retiré du catalogue.
+ */
+export class PrixGenerationHistoriqueNonVendable extends Error {
+  constructor(public readonly priceId: string) {
+    super("Ce tarif appartient à une génération fermée et ne peut pas être vendu");
+    this.name = "PrixGenerationHistoriqueNonVendable";
+  }
+}
+
+/**
+ * Dernier rempart avant un nouveau contrat : *connu* ne vaut pas *vendable*.
+ *
+ * `allowlistPrixBase` reconnaît volontairement les Price des générations fermées,
+ * sans quoi les abonnements déjà souscrits deviendraient inclassables. Cette
+ * reconnaissance ne doit jamais déborder sur la vente — une variable courante
+ * repointée par erreur sur un ancien Price doit faire échouer le checkout, pas
+ * facturer un tarif retiré.
+ */
+export function verifierPrixVendable(
+  priceId: string,
+  environnement: Record<string, string | undefined> = process.env,
+): string {
+  if (allowlistPrixBaseGenerationsPrecedentes(environnement).has(priceId)) {
+    throw new PrixGenerationHistoriqueNonVendable(priceId);
+  }
+  return priceId;
+}
+
 export const PALIERS_OPTION_IA = ["100", "300", "illimite"] as const;
 export type PalierOptionIA = (typeof PALIERS_OPTION_IA)[number];
 export function estPalierOptionIA(valeur: string): valeur is PalierOptionIA {
@@ -80,7 +166,7 @@ const VARIABLES_PRIX_OPTION_IA: Record<PalierOptionIA, Record<PeriodiciteAbonnem
   illimite: { mensuel: "STRIPE_PRICE_OPTION_IA_ILLIMITE_MENSUEL", annuel: "STRIPE_PRICE_OPTION_IA_ILLIMITE_ANNUEL" },
 };
 
-export function prixOptionIAStripePour(palier: PalierOptionIA, periodicite: PeriodiciteAbonnement, environnement: NodeJS.ProcessEnv = process.env) {
+export function prixOptionIAStripePour(palier: PalierOptionIA, periodicite: PeriodiciteAbonnement, environnement: Record<string, string | undefined> = process.env) {
   return environnement[VARIABLES_PRIX_OPTION_IA[palier][periodicite]] || null;
 }
 
@@ -95,13 +181,76 @@ export function estPeriodiciteAbonnement(valeur: string): valeur is PeriodiciteA
 export function prixStripePour(
   offre: OffreAbonnement,
   periodicite: PeriodiciteAbonnement,
-  environnement: NodeJS.ProcessEnv = process.env,
+  environnement: Record<string, string | undefined> = process.env,
 ) {
   const variable = VARIABLES_PRIX[offre]?.[periodicite];
   return variable ? environnement[variable] || null : null;
 }
 
-export function variablesStripeBillingManquantes(environnement: NodeJS.ProcessEnv = process.env) {
+/**
+ * Ensemble des Price IDs de forfait de base *connus du serveur* : la génération
+ * courante (toutes offres × périodicités) plus celles des générations
+ * précédentes encore souscrites. Sert au classifieur, jamais à la vente.
+ */
+export function allowlistPrixBase(environnement: Record<string, string | undefined> = process.env): Set<string> {
+  const ids = new Set<string>();
+  for (const parPeriode of Object.values(VARIABLES_PRIX)) {
+    for (const variable of Object.values(parPeriode)) {
+      const valeur = environnement[variable];
+      if (valeur) ids.add(valeur);
+    }
+  }
+  for (const id of allowlistPrixBaseGenerationsPrecedentes(environnement)) ids.add(id);
+  return ids;
+}
+
+/** Ensemble de tous les Price IDs d'option IA configurés (tous paliers × périodicités). */
+export function allowlistPrixOptionIA(environnement: Record<string, string | undefined> = process.env): Set<string> {
+  const ids = new Set<string>();
+  for (const parPeriode of Object.values(VARIABLES_PRIX_OPTION_IA)) {
+    for (const variable of Object.values(parPeriode)) {
+      const valeur = environnement[variable];
+      if (valeur) ids.add(valeur);
+    }
+  }
+  return ids;
+}
+
+/**
+ * Price des modules et de l'IA de la génération courante. Une ligne d'abonnement
+ * qui les porte doit être reconnue, sinon le classifieur ferme sur un item
+ * pourtant légitime.
+ */
+const VARIABLES_PRIX_MODULES_ET_IA = [
+  "STRIPE_PRICE_MODULE_POINTAGE_MENSUEL",
+  "STRIPE_PRICE_MODULE_POINTAGE_ANNUEL",
+  "STRIPE_PRICE_MODULE_STOCK_MENSUEL",
+  "STRIPE_PRICE_MODULE_STOCK_ANNUEL",
+  "STRIPE_PRICE_MODULE_MATERIEL_VEHICULES_MENSUEL",
+  "STRIPE_PRICE_MODULE_MATERIEL_VEHICULES_ANNUEL",
+  "STRIPE_PRICE_MODULE_NOTES_FRAIS_MENSUEL",
+  "STRIPE_PRICE_MODULE_NOTES_FRAIS_ANNUEL",
+  "STRIPE_PRICE_MODULE_RENTABILITE_AVANCEE_MENSUEL",
+  "STRIPE_PRICE_MODULE_RENTABILITE_AVANCEE_ANNUEL",
+  "STRIPE_PRICE_IA_CREDITS_PACK_PONCTUEL",
+  "STRIPE_PRICE_IA_INTENSIVE_MENSUEL",
+  "STRIPE_PRICE_IA_INTENSIVE_ANNUEL",
+] as const;
+
+/**
+ * Tous les Price hors forfait de base et hors capacité que le serveur sait
+ * nommer : anciens paliers d'option IA, modules et IA de la génération courante.
+ */
+export function allowlistPrixHorsForfait(environnement: Record<string, string | undefined> = process.env): Set<string> {
+  const ids = allowlistPrixOptionIA(environnement);
+  for (const variable of VARIABLES_PRIX_MODULES_ET_IA) {
+    const valeur = environnement[variable];
+    if (valeur) ids.add(valeur);
+  }
+  return ids;
+}
+
+export function variablesStripeBillingManquantes(environnement: Record<string, string | undefined> = process.env) {
   const variables = [
     "STRIPE_SECRET_KEY",
     "STRIPE_WEBHOOK_ABONNEMENT_SECRET",
@@ -111,7 +260,7 @@ export function variablesStripeBillingManquantes(environnement: NodeJS.ProcessEn
   return variables.filter((nom) => !environnement[nom]);
 }
 
-export function stripeBillingEstConfigure(environnement: NodeJS.ProcessEnv = process.env) {
+export function stripeBillingEstConfigure(environnement: Record<string, string | undefined> = process.env) {
   return variablesStripeBillingManquantes(environnement).length === 0;
 }
 
@@ -189,10 +338,14 @@ export async function creerSessionAbonnementStripe(params: {
   customerId: string;
   offre: OffreAbonnement;
   periodicite: PeriodiciteAbonnement;
+  /** Injectable pour les tests ; `process.env` en exécution réelle. */
+  environnement?: Record<string, string | undefined>;
 }) {
-  const prix = prixStripePour(params.offre, params.periodicite);
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+  const prix = prixStripePour(params.offre, params.periodicite, params.environnement);
+  const baseUrl = (params.environnement ?? process.env).NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
   if (!prix || !baseUrl) throw new Error("Les tarifs Stripe Billing ne sont pas encore configurés");
+  // Aucun nouveau contrat ne repart sur une génération fermée.
+  verifierPrixVendable(prix, params.environnement);
   const corps = new URLSearchParams({
     mode: "subscription",
     customer: params.customerId,
@@ -211,7 +364,7 @@ export async function creerSessionAbonnementStripe(params: {
     "subscription_data[metadata][offre]": params.offre,
     "subscription_data[metadata][periodicite]": params.periodicite,
   });
-  if (process.env.STRIPE_AUTOMATIC_TAX_ENABLED === "true") {
+  if ((params.environnement ?? process.env).STRIPE_AUTOMATIC_TAX_ENABLED === "true") {
     corps.set("automatic_tax[enabled]", "true");
   }
   return requeteStripe<StripeSession>("checkout/sessions", {
@@ -238,7 +391,7 @@ type StripeCoupon = { id: string; name?: string | null };
 // l'abonnement de base d'une entreprise cliente. Un coupon par entreprise a la fois :
 // en appliquer un nouveau remplace l'ancien cote Stripe (comportement natif de
 // `subscriptions.update` avec le parametre coupon).
-export async function creerCouponRemise(params: { type: TypeRemise; valeur: number; duree: DureeRemise; dureeMois?: number; nom: string }) {
+export async function creerCouponRemise(params: { type: TypeRemise; valeur: number; duree: DureeRemise; dureeMois?: number; nom: string; cleIdempotence?: string }) {
   const corps = new URLSearchParams({ name: params.nom, duration: params.duree });
   if (params.type === "montant") {
     corps.set("amount_off", String(Math.round(params.valeur * 100)));
@@ -250,25 +403,113 @@ export async function creerCouponRemise(params: { type: TypeRemise; valeur: numb
     if (!params.dureeMois || params.dureeMois < 1) throw new Error("Le nombre de mois est obligatoire pour une remise limitée dans le temps");
     corps.set("duration_in_months", String(params.dureeMois));
   }
-  return requeteStripe<StripeCoupon>("coupons", { corps, idempotence: `remise-coupon-${Date.now()}-${Math.random().toString(36).slice(2)}` });
+  return requeteStripe<StripeCoupon>("coupons", { corps, idempotence: params.cleIdempotence ?? `remise-coupon-${Date.now()}-${Math.random().toString(36).slice(2)}` });
 }
 
-export async function appliquerCouponAbonnement(subscriptionId: string, couponId: string) {
+// Le compte Stripe de la plateforme fonctionne en billing_mode "flexible" : le paramètre
+// classique `coupon` est rejeté (invalid_request_error) sur ce type d'abonnement. Il faut
+// passer par `discounts[0][coupon]`, qui remplace automatiquement toute remise déjà posée
+// sur l'abonnement (vérifié empiriquement, REMISES-CLIENTS-V1) — un seul geste commercial
+// actif à la fois, comme avec l'ancien paramètre `coupon`. La remise ainsi posée s'applique
+// au prorata sur TOUTES les lignes de la facture (abonnement de base + éventuelle ligne
+// "comptes supplémentaires"), pas seulement sur le prix catalogue de l'offre.
+export async function appliquerCouponAbonnement(subscriptionId: string, couponId: string, cleIdempotence?: string) {
   return requeteStripe<StripeSubscription>(`subscriptions/${encodeURIComponent(subscriptionId)}`, {
-    corps: new URLSearchParams({ coupon: couponId }),
-    idempotence: `remise-application-${subscriptionId}-${couponId}`,
+    corps: new URLSearchParams({ "discounts[0][coupon]": couponId }),
+    idempotence: cleIdempotence ?? `remise-application-${subscriptionId}-${couponId}`,
   });
 }
 
 export async function retirerCouponAbonnement(subscriptionId: string) {
   return requeteStripe<StripeSubscription>(`subscriptions/${encodeURIComponent(subscriptionId)}/discount`, {
     methode: "DELETE",
-    idempotence: `remise-suppression-${subscriptionId}-${Date.now()}`,
   });
 }
 
+function identifiantStripeDeveloppe(valeur: unknown): string | null {
+  if (typeof valeur === "string") return valeur.trim() || null;
+  if (!valeur || typeof valeur !== "object") return null;
+  const id = (valeur as { id?: unknown }).id;
+  return typeof id === "string" && id.trim() ? id : null;
+}
+
+function observationInexploitable(raison: string, count: number, discountId: string | null = null): never {
+  console.warn("Observation Stripe de remise refusée", {
+    statut: "unresolved",
+    count,
+    discount_id: discountId,
+    raison,
+  });
+  throw new ObservationRemiseStripeInexploitable(raison, count, discountId);
+}
+
+/**
+ * Convertit exclusivement une réponse Stripe suffisamment développée en état
+ * signable. Une référence `di_…`, un objet partiel ou une source inconnue ne
+ * signifient jamais « aucune remise » : ces formes échouent fermées.
+ */
+export function observerRemiseDepuisAbonnement(abonnement: StripeSubscription): ObservationRemiseStripe {
+  if (!Array.isArray(abonnement.discounts)) {
+    return observationInexploitable("discounts_absent_ou_invalide", -1);
+  }
+  const count = abonnement.discounts.length;
+  if (count === 0) {
+    return { status: "absent", count: 0, discount_id: null, source_type: null, source_id: null, coupon_id: null };
+  }
+  if (count !== 1) return observationInexploitable("cardinalite_non_supportee", count);
+
+  const remise = abonnement.discounts[0];
+  if (typeof remise === "string") return observationInexploitable("discount_non_developpe", count, remise);
+  if (!remise || typeof remise !== "object") return observationInexploitable("discount_invalide", count);
+
+  const discountId = identifiantStripeDeveloppe(remise.id);
+  if (!discountId || !/^di_[A-Za-z0-9_:-]{1,125}$/.test(discountId)) {
+    return observationInexploitable("discount_id_invalide", count, discountId);
+  }
+
+  let couponId: string | null = null;
+  if (remise.source !== undefined) {
+    if (!remise.source || remise.source.type !== "coupon") {
+      return observationInexploitable("source_inconnue", count, discountId);
+    }
+    couponId = identifiantStripeDeveloppe(remise.source.coupon);
+  } else if (remise.coupon !== undefined) {
+    // Compatibilité stricte avec les versions Stripe où le coupon développé
+    // était directement porté par Discount.
+    couponId = identifiantStripeDeveloppe(remise.coupon);
+  }
+  if (!couponId || !/^[A-Za-z0-9_:-]{1,128}$/.test(couponId)) {
+    return observationInexploitable("coupon_non_resolu", count, discountId);
+  }
+
+  if (remise.promotion_code !== undefined && remise.promotion_code !== null) {
+    const promotionCodeId = identifiantStripeDeveloppe(remise.promotion_code);
+    if (!promotionCodeId || !/^promo_[A-Za-z0-9_:-]{1,122}$/.test(promotionCodeId)) {
+      return observationInexploitable("promotion_code_non_resolu", count, discountId);
+    }
+    return {
+      status: "present", count: 1, discount_id: discountId,
+      source_type: "promotion_code", source_id: promotionCodeId, coupon_id: couponId,
+    };
+  }
+  return {
+    status: "present", count: 1, discount_id: discountId,
+    source_type: "coupon", source_id: couponId, coupon_id: couponId,
+  };
+}
+
+export function couponActifDepuisAbonnement(abonnement: StripeSubscription): string | null {
+  const observation = observerRemiseDepuisAbonnement(abonnement);
+  return observation.status === "present" ? observation.coupon_id : null;
+}
+
 export async function recupererAbonnementStripe(subscriptionId: string) {
-  return requeteStripe<StripeSubscription>(`subscriptions/${encodeURIComponent(subscriptionId)}`, {
+  const expansions = new URLSearchParams();
+  // Stripe documente `expand[]=discounts` comme le moyen de remplacer chaque
+  // référence `di_…` par le Discount complet. L'identifiant `source.coupon`
+  // est ensuite une identité suffisante et reste accepté sous forme string.
+  expansions.append("expand[]", "discounts");
+  return requeteStripe<StripeSubscription>(`subscriptions/${encodeURIComponent(subscriptionId)}?${expansions}`, {
     methode: "GET",
   });
 }
@@ -305,8 +546,12 @@ export async function reconcilierAbonnementStripe(entrepriseId: string) {
   const variablePrixSupplement = VARIABLES_PRIX_COMPTE_SUP[offre]?.[periodicite];
   const prixSupplement = variablePrixSupplement ? process.env[variablePrixSupplement] : undefined;
   if (!prixSupplement) return { synchronise: false, raison: "prix_supplement_absent" } as const;
-  const { count } = await admin.from("employes").select("id", { count: "exact", head: true }).eq("entreprise_id", entrepriseId).in("compte_application_statut", ["actif", "pause"]);
-  const quantite = Math.max(0, Number(count ?? 0) - offreParCle(offre).comptesInclus);
+  // ACL canonique (migration 255) : service_role ne lit plus `employes` ; le nombre de comptes facturables
+  // vient d'une RPC de service. Échec explicite : un comptage absent ne doit jamais valoir 0, ce qui
+  // supprimerait l'item Stripe « comptes supplémentaires ».
+  const { data: nombreComptes, error: erreurComptage } = await admin.rpc("compter_comptes_application_service", { p_entreprise_id: entrepriseId });
+  if (erreurComptage || typeof nombreComptes !== "number") throw new Error("Comptage des comptes facturables impossible");
+  const quantite = Math.max(0, nombreComptes - offreParCle(offre).comptesInclus);
   const abonnement = await recupererAbonnementStripe(entreprise.stripe_subscription_id);
   const item = abonnement.items?.data?.find((ligne) => ligne.price?.id === prixSupplement);
   if (item && quantite === 0) {
@@ -367,17 +612,15 @@ export async function modifierOptionIAAbonnement(
 
 export async function calculerDepassementAppareils(entrepriseId: string) {
   const admin = createAdminClient();
-  const [{ data: appareils }, { data: employes }, { data: postes }, { data: entreprise }] = await Promise.all([
-    admin.from("appareils_comptes").select("utilisateur_id").eq("entreprise_id", entrepriseId).is("revoque_at", null),
-    admin.from("employes").select("utilisateur_id,prenom,nom,poste_id,compte_application_statut").eq("entreprise_id", entrepriseId).in("compte_application_statut", ["actif", "pause"]),
-    admin.from("postes").select("id,nom,tarif_compte_mensuel").eq("entreprise_id", entrepriseId),
+  // ACL canonique (migration 255) : `service_role` n'a plus SELECT sur
+  // `appareils_comptes` / `employes` / `postes`. Le calcul du dépassement passe
+  // par une RPC SECURITY DEFINER en lecture seule.
+  const [{ data: mensuelBrut, error }, { data: entreprise }] = await Promise.all([
+    admin.rpc("calculer_depassement_appareils_service", { p_entreprise_id: entrepriseId }),
     admin.from("entreprises").select("abonnement_periodicite").eq("id", entrepriseId).maybeSingle(),
   ]);
-  const mensuel = calculerDepassementsAppareilsFacturables({
-    appareils: appareils ?? [],
-    employes: employes ?? [],
-    postes: postes ?? [],
-  }).reduce((total, ligne) => total + ligne.supplementMensuelHt, 0);
+  if (error) throw new Error(error.message);
+  const mensuel = Math.max(0, Number(mensuelBrut ?? 0));
   return entreprise?.abonnement_periodicite === "annuel" ? Math.round(mensuel * 12 * (1 - REDUCTION_ANNUELLE) * 100) / 100 : mensuel;
 }
 
@@ -395,15 +638,10 @@ export async function ajouterDepassementStockageFacture(params: {
   invoiceId: string;
 }) {
   const admin = createAdminClient();
-  const { data: releveExistant } = await admin
-    .from("abonnement_stockage_releves")
-    .select("stripe_invoice_item_id,montant_ht")
-    .eq("stripe_invoice_id", params.invoiceId)
-    .maybeSingle();
-  if (releveExistant?.stripe_invoice_item_id || Number(releveExistant?.montant_ht ?? 0) === 0 && releveExistant) {
-    return releveExistant;
-  }
-
+  // ACL canonique (migration 255) : `service_role` n'a plus SELECT/INSERT/UPDATE
+  // sur `abonnement_stockage_releves`. Lecture offre (colonnes autorisées) +
+  // utilisation (RPC existante) restent directes ; l'enregistrement du relevé et
+  // sa finalisation passent par des RPC de service.
   const [{ data: entreprise, error: entrepriseErreur }, { data: utilisation, error: utilisationErreur }] = await Promise.all([
     admin
       .from("entreprises")
@@ -425,21 +663,24 @@ export async function ajouterDepassementStockageFacture(params: {
   const quotaGo = offreParCle(offre).stockageGoInclus;
   const calcul = calculerFacturationStockage({ octetsUtilises, quotaGo, periodicite });
 
-  const { error: releveErreur } = await admin.from("abonnement_stockage_releves").upsert({
-    entreprise_id: params.entrepriseId,
-    stripe_invoice_id: params.invoiceId,
-    offre,
-    periodicite,
-    octets_utilises: octetsUtilises,
-    fichiers,
-    quota_go: quotaGo,
-    depassement_go: calcul.depassementGo,
-    tarif_go_ht: TARIF_STOCKAGE_SUPPLEMENTAIRE_HT_PAR_GO,
-    nombre_mois: calcul.nombreMois,
-    montant_ht: calcul.montantHt,
-    updated_at: new Date().toISOString(),
-  }, { onConflict: "stripe_invoice_id" });
+  const { data: enregistrement, error: releveErreur } = await admin.rpc("enregistrer_releve_stockage_service", {
+    p_entreprise_id: params.entrepriseId,
+    p_stripe_invoice_id: params.invoiceId,
+    p_offre: offre,
+    p_periodicite: periodicite,
+    p_octets: octetsUtilises,
+    p_fichiers: fichiers,
+    p_quota_go: quotaGo,
+    p_depassement_go: calcul.depassementGo,
+    p_tarif_go_ht: TARIF_STOCKAGE_SUPPLEMENTAIRE_HT_PAR_GO,
+    p_nombre_mois: calcul.nombreMois,
+    p_montant_ht: calcul.montantHt,
+  });
   if (releveErreur) throw new Error(releveErreur.message);
+  // Invoice déjà facturé (item Stripe posé) ou dépassement nul : pas de re-facturation.
+  if ((enregistrement as { deja_traite?: boolean } | null)?.deja_traite) {
+    return { montant_ht: Number((enregistrement as { montant_ht?: number }).montant_ht ?? 0), stripe_invoice_item_id: null };
+  }
   if (calcul.montantHt <= 0) return { montant_ht: 0, stripe_invoice_item_id: null };
 
   const suffixePeriode = calcul.nombreMois === 12 ? " · période annuelle de 12 mois" : "";
@@ -457,10 +698,10 @@ export async function ajouterDepassementStockageFacture(params: {
     }),
     idempotence: `abonnement-stockage-${params.invoiceId}`,
   });
-  const { error: miseAJourErreur } = await admin
-    .from("abonnement_stockage_releves")
-    .update({ stripe_invoice_item_id: ligne.id, updated_at: new Date().toISOString() })
-    .eq("stripe_invoice_id", params.invoiceId);
+  const { error: miseAJourErreur } = await admin.rpc("finaliser_releve_stockage_service", {
+    p_stripe_invoice_id: params.invoiceId,
+    p_stripe_invoice_item_id: ligne.id,
+  });
   if (miseAJourErreur) throw new Error(miseAJourErreur.message);
   return ligne;
 }

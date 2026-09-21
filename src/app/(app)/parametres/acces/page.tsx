@@ -61,7 +61,7 @@ export default async function AccesPage({
           <Link href="/parametres" className="text-sm text-neutral-500 hover:underline">← Paramètres</Link>
           <h1 className="mt-1 text-xl font-semibold">Accès et rôles</h1>
           <p className="text-sm text-neutral-500">
-            Séparez l&apos;accès en consultation de la gestion. Un collaborateur peut voir un module sans pouvoir créer, modifier ou supprimer.
+            Séparez l&apos;accès en consultation de la gestion. Un employé peut voir un module sans pouvoir créer, modifier ou supprimer.
           </p>
         </div>
 
@@ -74,7 +74,7 @@ export default async function AccesPage({
         </section>
 
         <section className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-          <h2 className="font-semibold">Pointage facultatif par collaborateur</h2>
+          <h2 className="font-semibold">Pointage facultatif par employé</h2>
           <p className="mt-1 text-xs opacity-80">
             Vous choisissez ci-dessous, compte par compte, qui peut pointer en son nom. La consultation de l’équipe, la gestion et la validation restent des droits distincts du poste. Les modèles Administration et Conducteur de travaux ne pointent pas par défaut.
           </p>
@@ -83,7 +83,7 @@ export default async function AccesPage({
         <section className="rounded-md border border-[#c9a24a]/40 bg-[#c9a24a]/5 p-4">
           <h2 className="font-semibold">Code d&apos;entreprise</h2>
           <p className="text-sm text-neutral-500">
-            Pour un employé, préparez d&apos;abord sa fiche, son poste et ses droits dans le module Employés : sa fiche produit une invitation personnelle. Ce code général reste disponible pour un collaborateur qui n&apos;a pas encore de fiche.
+            Pour un employé, préparez d&apos;abord sa fiche, son poste et ses droits dans le module Employés : sa fiche produit une invitation personnelle. Ce code général reste disponible pour un employé qui n&apos;a pas encore de fiche.
           </p>
           {entreprise?.code_adhesion ? (
             <InvitationEntreprise code={entreprise.code_adhesion} inscriptionsActives={!isEmailLoginDisabled()} />
@@ -95,7 +95,7 @@ export default async function AccesPage({
         <section className="rounded-md border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-100">
           <h2 className="font-semibold">Compte partagé du dépôt</h2>
           <p className="mt-1">Créez un compte utilisateur dédié, puis affectez-le au poste protégé <strong>Compte dépôt</strong>. Ce compte reste connecté sur l’appareil du dépôt et ne voit que Stock, Borne stock et Dépôt.</p>
-          <p className="mt-2 text-xs opacity-80">Chaque salarié saisit ensuite son identifiant et son mot de passe personnel sur la borne. Les droits « entrée de stock » et « sortie de stock » sont contrôlés sur son propre poste. Un autre compte ne peut se connecter à cet appareil qu’après déconnexion explicite du compte dépôt.</p>
+          <p className="mt-2 text-xs opacity-80">Chaque employé saisit ensuite son identifiant et son mot de passe personnel sur la borne. Les droits « entrée de stock » et « sortie de stock » sont contrôlés sur son propre poste. Un autre compte ne peut se connecter à cet appareil qu’après déconnexion explicite du compte dépôt.</p>
         </section>
 
         <section className="rounded-md border p-4 dark:border-neutral-800">
@@ -165,7 +165,7 @@ export default async function AccesPage({
         </form>
 
         <section className="rounded-md border p-4 dark:border-neutral-800">
-          <div><h2 className="font-semibold">Aperçu par poste</h2><p className="text-sm text-neutral-500">Contrôlez le menu, les informations et les actions visibles avant d’attribuer un poste à un collaborateur.</p></div>
+          <div><h2 className="font-semibold">Aperçu par poste</h2><p className="text-sm text-neutral-500">Contrôlez le menu, les informations et les actions visibles avant d’attribuer un poste à un employé.</p></div>
           <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {postes?.map((poste) => {
               const autorise = new Set((droits ?? []).filter((d) => d.poste_id === poste.id && d.autorise).map((d) => d.cle_permission));

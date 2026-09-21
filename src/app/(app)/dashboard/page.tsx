@@ -9,7 +9,9 @@ import { DashboardAnalytics } from "@/components/DashboardAnalytics";
 import { DashboardWidget, DashboardWidgetFirstConnection } from "@/components/DashboardWidgets";
 import { BriefingMatin, type LigneBriefing } from "@/components/BriefingMatin";
 import { Lien as Link } from "@/components/Lien";
+import { iaEstActive } from "@/lib/preview-features";
 import { CentreAlertesOperationnelles, type AlerteOperationnelle } from "@/components/CentreAlertesOperationnelles";
+import { DOMAINE_VERS_PERMISSION_DELEGATION, type DelegationAlerte, type EmployeDelegable } from "@/lib/alertes-delegation";
 import { activeFeaturesForCompany } from "@/lib/feature-flags";
 import { featureForPath } from "@/lib/feature-catalogue";
 import { estPlateformeAdmin } from "@/lib/plateforme";
@@ -25,6 +27,7 @@ export default async function DashboardPage() {
   const activeFeatures = await activeFeaturesForCompany(ctx, permissions, plateformeAdmin);
   const supabase = await createClient();
   const aujourdhui = new Date().toISOString().slice(0, 10);
+  const septJoursAvantIso = new Date(new Date(aujourdhui).getTime() - 7 * 24 * 3600 * 1000).toISOString();
   const autorise = (cle: string) => permissions === null || permissions.includes(cle);
   // La base filtre elle-même les chantiers selon le choix de l'administrateur :
   // vue globale (`acces_chantiers`) ou uniquement les chantiers affectés.
@@ -74,15 +77,24 @@ export default async function DashboardPage() {
     return (!feature || activeFeatures.includes(feature)) && (module.permission === null || autorise(module.permission));
   });
 
-  const { data: employeCompte } = permissions !== null && (peutPointer || voir.planning)
+  const { data: employeCompte } = permissions !== null && (peutPointer || voir.planning || voir.factures || voir.devis || voir.stock || voir.flotte || voir.outillage || voir.achats)
     ? await supabase.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("utilisateur_id", ctx.userId).eq("statut", "actif").maybeSingle()
     : { data: null };
   let requeteAffectations = supabase.from("affectations").select("id, date, heures, tache, chantier:chantiers(nom), employe:employes(prenom, nom)").eq("entreprise_id", ctx.entrepriseId).gte("date", aujourdhui).order("date").limit(6);
   if (permissions !== null && !peutGererPlanning) requeteAffectations = requeteAffectations.eq("employe_id", employeCompte?.id ?? "00000000-0000-0000-0000-000000000000");
 
-  const [devisResult, facturesResult, chantiersResult, affectationsResult, articlesResult, vehiculesResult, outilsResult, commandesResult, chantiersPointageResult, sessionsPointageResult, employesActifsResult, congesAujourdhuiResult, notificationsResult] = await Promise.all([
-    voir.devis ? supabase.from("devis").select("id, numero, statut, montant_ttc, date_emission, date_validite, client:clients(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId).order("created_at", { ascending: false }) : null,
-    voir.factures ? supabase.from("factures").select("id, numero, statut, date_emission, date_echeance, montant_ttc, montant_paye, client:clients(nom, prenom, societe)").eq("entreprise_id", ctx.entrepriseId) : null,
+  type DashboardIndicateurs = {
+    devis_acceptes_total?: number | null;
+    devis_a_suivre?: Array<{ id: string; numero: string | null; statut: string; montant_ttc: number; client: { nom: string | null; prenom: string | null; societe: string | null } | null }> | null;
+    devis_alertes?: Array<{ id: string; numero: string | null; montant_ttc: number; date_validite: string }> | null;
+    devis_mois?: Array<{ cle: string; total: number }> | null;
+    factures_total?: number | null;
+    factures_encaisse_total?: number | null;
+    factures_alertes?: Array<{ id: string; numero: string | null; montant_ttc: number; montant_paye: number; date_echeance: string; client: { nom: string | null; prenom: string | null; societe: string | null } | null }> | null;
+    factures_mois?: Array<{ cle: string; total: number }> | null;
+  };
+  const [dashboardIndicateursResult, chantiersResult, affectationsResult, articlesResult, vehiculesResult, outilsResult, commandesResult, chantiersPointageResult, sessionsPointageResult, employesActifsResult, congesAujourdhuiResult, notificationsResult, relancesEchecResult] = await Promise.all([
+    voir.devis || voir.factures ? supabase.rpc("dashboard_indicateurs", { p_entreprise_id: ctx.entrepriseId, p_aujourdhui: aujourdhui }) : null,
     voir.chantiers ? supabase.from("chantiers").select("id, nom, statut, date_fin_prevue").eq("entreprise_id", ctx.entrepriseId).order("updated_at", { ascending: false }) : null,
     voir.planning ? requeteAffectations : null,
     voir.stock ? supabase.from("articles_stock").select("id, reference, designation, quantite_stock, seuil_alerte, unite").eq("entreprise_id", ctx.entrepriseId).eq("actif", true) : null,
@@ -94,21 +106,24 @@ export default async function DashboardPage() {
     peutVoirBriefing ? supabase.from("employes").select("id").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif") : null,
     peutVoirBriefing ? supabase.from("demandes_conges").select("employe_id").eq("entreprise_id", ctx.entrepriseId).eq("statut", "approuvee").lte("date_debut", aujourdhui).gte("date_fin", aujourdhui) : null,
     permissions !== null ? supabase.from("notifications_utilisateurs").select("id,titre,message,lien,niveau,created_at").eq("entreprise_id", ctx.entrepriseId).is("lue_at", null).order("created_at", { ascending: false }).limit(8) : null,
+    voir.devis || voir.factures ? supabase.from("relances_documents").select("id,type_document,document_id,niveau,erreur_public_safe,created_at").eq("entreprise_id", ctx.entrepriseId).eq("statut", "echec").gte("created_at", septJoursAvantIso).order("created_at", { ascending: false }).limit(20) : null,
   ]);
-  const devis = devisResult?.data ?? [], factures = facturesResult?.data ?? [], chantiers = chantiersResult?.data ?? [];
+  const indicateurs = (dashboardIndicateursResult?.data ?? {}) as DashboardIndicateurs;
+  const chantiers = chantiersResult?.data ?? [];
   const affectations = affectationsResult?.data ?? [], articles = articlesResult?.data ?? [], vehicules = vehiculesResult?.data ?? [];
   const outils = outilsResult?.data ?? [], commandes = commandesResult?.data ?? [];
   const chantiersPointage = chantiersPointageResult?.data ?? [], sessionsPointage = sessionsPointageResult?.data ?? [];
   const employesActifs = employesActifsResult?.data ?? [], congesAujourdhui = congesAujourdhuiResult?.data ?? [];
   const notifications = notificationsResult?.data ?? [];
+  const relancesEnEchec = relancesEchecResult?.data ?? [];
 
-  const totalFacture = (factures ?? []).filter((f) => f.statut !== "annulee").reduce((s, f) => s + Number(f.montant_ttc ?? 0), 0);
-  const totalEncaisse = (factures ?? []).reduce((s, f) => s + Number(f.montant_paye ?? 0), 0);
+  const totalFacture = Number(indicateurs.factures_total ?? 0);
+  const totalEncaisse = Number(indicateurs.factures_encaisse_total ?? 0);
   const resteAEncaisser = Math.max(0, totalFacture - totalEncaisse);
-  const devisAcceptes = (devis ?? []).filter((d) => d.statut === "accepte").reduce((s, d) => s + Number(d.montant_ttc ?? 0), 0);
+  const devisAcceptes = Number(indicateurs.devis_acceptes_total ?? 0);
   const statutsActifs = ["accepte", "a_preparer", "en_attente_validation", "en_commande_materiel", "en_cours", "en_pause"];
   const chantiersActifs = (chantiers ?? []).filter((c) => statutsActifs.includes(c.statut));
-  const devisASuivre = (devis ?? []).filter((d) => ["brouillon", "envoye"].includes(d.statut)).slice(0, 5);
+  const devisASuivre = indicateurs.devis_a_suivre ?? [];
   type Alerte = { id: string; domaine: string; niveau: "critique" | "attention"; titre: string; detail: string; href: string; date?: string };
   const alertes: Alerte[] = [];
   const joursAvant = (date: string) => Math.round((Date.parse(`${date}T12:00:00`) - Date.parse(`${aujourdhui}T12:00:00`)) / 86_400_000);
@@ -117,14 +132,25 @@ export default async function DashboardPage() {
     if (jours <= anticipation) alertes.push({ ...alerte, date, niveau: jours <= 0 ? "critique" : "attention" });
   };
 
-  for (const facture of factures ?? []) {
-    if (facture.date_echeance && !["payee", "annulee", "avoir_emis"].includes(facture.statut)) {
-      const client = un(facture.client);
-      ajouterEcheance({ id: `facture-${facture.id}`, domaine: "Facturation", titre: `${facture.numero ?? "Facture"} à encaisser`, detail: voirIndicateursFinanciers ? `${client?.societe || [client?.prenom, client?.nom].filter(Boolean).join(" ") || "Client"} · reste ${euros(Number(facture.montant_ttc) - Number(facture.montant_paye))}` : `${client?.societe || [client?.prenom, client?.nom].filter(Boolean).join(" ") || "Client"} · échéance de règlement`, href: `/factures/${facture.id}` }, facture.date_echeance, 7);
-    }
+  for (const facture of indicateurs.factures_alertes ?? []) {
+    const client = un(facture.client);
+    ajouterEcheance({ id: `facture-${facture.id}`, domaine: "Facturation", titre: `${facture.numero ?? "Facture"} à encaisser`, detail: voirIndicateursFinanciers ? `${client?.societe || [client?.prenom, client?.nom].filter(Boolean).join(" ") || "Client"} · reste ${euros(Number(facture.montant_ttc) - Number(facture.montant_paye))}` : `${client?.societe || [client?.prenom, client?.nom].filter(Boolean).join(" ") || "Client"} · échéance de règlement`, href: `/factures/${facture.id}` }, facture.date_echeance, 7);
   }
-  for (const itemDevis of devis ?? []) {
-    if (itemDevis.date_validite && itemDevis.statut === "envoye") ajouterEcheance({ id: `devis-${itemDevis.id}`, domaine: "Commercial", titre: `${itemDevis.numero ?? "Devis"} arrive à expiration`, detail: voirIndicateursFinanciers ? `Montant ${euros(itemDevis.montant_ttc)}` : "Validité à contrôler", href: `/devis/${itemDevis.id}` }, itemDevis.date_validite, 7);
+  for (const itemDevis of indicateurs.devis_alertes ?? []) {
+    ajouterEcheance({ id: `devis-${itemDevis.id}`, domaine: "Commercial", titre: `${itemDevis.numero ?? "Devis"} arrive à expiration`, detail: voirIndicateursFinanciers ? `Montant ${euros(itemDevis.montant_ttc)}` : "Validité à contrôler", href: `/devis/${itemDevis.id}` }, itemDevis.date_validite, 7);
+  }
+  // RELANCES-AUTO-V1 §51 : uniquement les échecs (7 derniers jours) — pas une alerte "à
+  // relancer" en doublon des échéances devis/facture déjà remontées ci-dessus.
+  for (const relance of relancesEnEchec) {
+    const estDevis = relance.type_document === "devis";
+    alertes.push({
+      id: `relance-echec-${relance.id}`,
+      domaine: estDevis ? "Commercial" : "Facturation",
+      niveau: "attention",
+      titre: `Échec d'envoi d'une relance ${estDevis ? "devis" : "facture"}`,
+      detail: relance.erreur_public_safe ?? "Vérifier la configuration d'envoi d'e-mail",
+      href: estDevis ? `/devis/${relance.document_id}` : `/factures/${relance.document_id}`,
+    });
   }
   for (const article of articles ?? []) {
     const stock = Number(article.quantite_stock), seuil = Number(article.seuil_alerte);
@@ -165,6 +191,45 @@ export default async function DashboardPage() {
   const alertesActives = alertesAvecSignature.filter((alerte) => signaturesIgnorees.get(alerte.id) !== alerte.signature);
   const prenomAffiche = ctx.prenom && ctx.prenom.toLocaleLowerCase("fr") !== "prototype" ? ctx.prenom : null;
 
+  // Délégation d'alertes (ALERTES-DELEGATION-V1) : le bouton n'est proposé
+  // que pour les domaines reliés à un droit de gestion existant, et jamais
+  // affiché seul comme contrôle d'accès — la fonction SQL revalide tout.
+  const domainesAlertesActives = [...new Set(alertesActives.map((alerte) => alerte.domaine))];
+  const domainesDelegables = domainesAlertesActives.filter((domaine) => DOMAINE_VERS_PERMISSION_DELEGATION[domaine]);
+  const domainesAutorisesDelegation = domainesDelegables.filter((domaine) => autorise(DOMAINE_VERS_PERMISSION_DELEGATION[domaine]));
+  const [{ data: employesDelegablesData }, { data: delegationsData }] = await Promise.all([
+    permissions !== null && domainesAutorisesDelegation.length > 0
+      ? supabase.rpc("employes_delegables_alertes", { p_entreprise_id: ctx.entrepriseId })
+      : Promise.resolve({ data: [] as Array<{ employe_id: string; prenom: string; nom: string; permissions: string[] }> }),
+    permissions !== null && alertesActives.length > 0
+      ? supabase
+        .from("alertes_operationnelles_delegations")
+        .select("alerte_cle,employe_id,delegue_par_user_id,delegue_at,commentaire,employe:employes(prenom,nom),delegue_par:utilisateurs!alertes_operationnelles_delegations_delegue_par_user_id_fkey(prenom,nom)")
+        .eq("entreprise_id", ctx.entrepriseId)
+        .in("alerte_cle", alertesActives.map((alerte) => alerte.id))
+      : Promise.resolve({ data: [] as Array<{ alerte_cle: string; employe_id: string; delegue_par_user_id: string; delegue_at: string; commentaire: string | null; employe: { prenom: string; nom: string } | { prenom: string; nom: string }[] | null; delegue_par: { prenom: string; nom: string } | { prenom: string; nom: string }[] | null }> }),
+  ]);
+  const employesDelegables: EmployeDelegable[] = (
+    (employesDelegablesData ?? []) as Array<{ employe_id: string; prenom: string; nom: string; permissions: string[] }>
+  ).map((employe) => ({
+    employeId: employe.employe_id, prenom: employe.prenom, nom: employe.nom, permissions: employe.permissions,
+  }));
+  const delegations: Record<string, DelegationAlerte> = Object.fromEntries(
+    (delegationsData ?? []).map((delegation) => {
+      const employe = un(delegation.employe);
+      const delegueParUtilisateur = un(delegation.delegue_par);
+      return [delegation.alerte_cle, {
+        employeId: delegation.employe_id,
+        employePrenom: employe?.prenom ?? "",
+        employeNom: employe?.nom ?? "",
+        deleguePar: delegueParUtilisateur ? `${delegueParUtilisateur.prenom ?? ""} ${delegueParUtilisateur.nom ?? ""}`.trim() : "",
+        delegueParUserId: delegation.delegue_par_user_id,
+        delegueAt: delegation.delegue_at,
+        commentaire: delegation.commentaire,
+      } satisfies DelegationAlerte];
+    }),
+  );
+
   const lignesBriefing: LigneBriefing[] = [];
   if (peutVoirBriefing) {
     const absentsAujourdhui = new Set(congesAujourdhui.map((c) => c.employe_id)).size;
@@ -204,12 +269,16 @@ export default async function DashboardPage() {
     const presentation = statutChantier(statut);
     return { label: presentation.libelle, value: (chantiers ?? []).filter((chantier) => chantier.statut === statut).length, color: presentation.couleur };
   }) : undefined;
-  const moisGraphique = voirIndicateursFinanciers && (voir.devis || voir.factures) ? Array.from({length:6},(_,index)=>{
-    const date=new Date();date.setDate(1);date.setMonth(date.getMonth()-(5-index));
-    const cle=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}`;
-    const label=new Intl.DateTimeFormat("fr-FR",{month:"short"}).format(date).replace(".","");
-    return {label,devis:(devis??[]).filter(item=>item.date_emission?.startsWith(cle)&&item.statut!=="annule").reduce((s,item)=>s+Number(item.montant_ttc),0),factures:(factures??[]).filter(item=>item.date_emission?.startsWith(cle)&&item.statut!=="annulee").reduce((s,item)=>s+Number(item.montant_ttc),0)};
-  }) : undefined;
+  const moisGraphique = voirIndicateursFinanciers && (voir.devis || voir.factures) ? (() => {
+    const devisParMois = new Map((indicateurs.devis_mois ?? []).map((m) => [m.cle, Number(m.total)]));
+    const facturesParMois = new Map((indicateurs.factures_mois ?? []).map((m) => [m.cle, Number(m.total)]));
+    return Array.from({length:6},(_,index)=>{
+      const date=new Date();date.setDate(1);date.setMonth(date.getMonth()-(5-index));
+      const cle=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}`;
+      const label=new Intl.DateTimeFormat("fr-FR",{month:"short"}).format(date).replace(".","");
+      return {label, devis: devisParMois.get(cle) ?? 0, factures: facturesParMois.get(cle) ?? 0};
+    });
+  })() : undefined;
   const optionsWidgets = [
     ...((notifications??[]).length ? [{id:"notifications",label:"Notifications"}] : []),
     ...(raccourcis.length ? [{id:"modules",label:"Raccourcis modules"}] : []),
@@ -225,7 +294,7 @@ export default async function DashboardPage() {
     <main className="p-8">
       <div className="mx-auto max-w-6xl space-y-6">
         {peutVoirBriefing ? (
-          <BriefingMatin prenom={prenomAffiche} lignes={lignesBriefing} peutUtiliserIA={aAccesIA(permissions)} />
+          <BriefingMatin prenom={prenomAffiche} lignes={lignesBriefing} peutUtiliserIA={iaEstActive() && aAccesIA(permissions)} />
         ) : (
           <div>
             <h1 className="text-xl font-semibold">Bonjour{prenomAffiche ? ` ${prenomAffiche}` : ""}</h1>
@@ -272,6 +341,11 @@ export default async function DashboardPage() {
             <CentreAlertesOperationnelles
               alertes={alertesActives}
               alertesIgnorees={alertesIgnorees}
+              domainesAutorisesDelegation={domainesAutorisesDelegation}
+              employesDelegables={employesDelegables}
+              delegations={delegations}
+              employeCourantId={employeCompte?.id ?? null}
+              utilisateurCourantId={ctx.userId}
             />
           </DashboardWidget>
         )}

@@ -11,13 +11,14 @@ Les plans sont découpés une fois depuis l'enregistrement réel de l'applicatio
     python3 scripts/video/monter.py punchy|journee|avant|tout
 """
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
 RACINE = Path(__file__).resolve().parents[2]
-FF = "/private/tmp/claude-501/-Users-juliengregurec/0fd16bf3-830d-4b6c-a1d8-e3dba37c1072/scratchpad/node_modules/@ffmpeg-installer/darwin-x64/ffmpeg"
-TTS = "/private/tmp/claude-501/-Users-juliengregurec/0fd16bf3-830d-4b6c-a1d8-e3dba37c1072/scratchpad/.venv/bin/edge-tts"
+FF = os.environ.get("FFMPEG_BIN", "ffmpeg")
+TTS = os.environ.get("EDGE_TTS_BIN", "edge-tts")
 PLANS = RACINE / "output/video/plans"
 TMP = RACINE / "output/video/montage"
 SORTIE = RACINE / "output/video"
@@ -181,7 +182,7 @@ def punchy():
         plan(cle, d, l, f, texte=t, sous_texte=s, zoom=z, taille=60)
         m.append(f)
 
-    carton("LIRIA GESTION PRO", "Du devis à la marge. Un seul logiciel.", 4.5, TMP / "p99.mp4",
+    carton("ELSATIA GESTION PRO", "Du devis à la marge. Un seul logiciel.", 4.5, TMP / "p99.mp4",
            couleur="white", taille=64)
     m.append(TMP / "p99.mp4")
 
@@ -209,7 +210,7 @@ def journee():
          [("rentabilite", 3.0, None)], "18:00", "Votre marge, sans un seul tableur"),
     ]
     m = []
-    carton("UNE JOURNÉE", "avec Liria Gestion Pro", 3.6, TMP / "j00.mp4")
+    carton("UNE JOURNÉE", "avec ELSATIA Gestion Pro", 3.6, TMP / "j00.mp4")
     m.append(TMP / "j00.mp4")
     pistes = []
     for cle, texte, plans_, heure, accroche in etapes:
@@ -221,7 +222,7 @@ def journee():
             plan(p, deb, part, g, texte=heure if i == 0 else None,
                  sous_texte=accroche if i == 0 else None, zoom=(i == 0), taille=58)
             m.append(g)
-    carton("LIRIA GESTION PRO", "Du devis à la marge, sans jamais ressaisir.", 4.2, TMP / "j99.mp4")
+    carton("ELSATIA GESTION PRO", "Du devis à la marge, sans jamais ressaisir.", 4.2, TMP / "j99.mp4")
     m.append(TMP / "j99.mp4")
 
     liste = TMP / "voix_journee.txt"
@@ -258,13 +259,13 @@ def avant():
         f = TMP / f"a1{i}.mp4"
         carton(t, s, 3.8, f, fond="0x1a1a1a", couleur="0xd0d0d0", taille=52)
         m.append(f)
-    carton("APRÈS", "Liria Gestion Pro", 2.6, TMP / "a50.mp4", taille=90)
+    carton("APRÈS", "ELSATIA Gestion Pro", 2.6, TMP / "a50.mp4", taille=90)
     m.append(TMP / "a50.mp4")
     for i, (cle, d, l, t, s) in enumerate(reponses, 1):
         f = TMP / f"a2{i}.mp4"
         plan(cle, d, l, f, texte=t, sous_texte=s, zoom=True, taille=58)
         m.append(f)
-    carton("ARRÊTEZ DE DEVINER", "Liria Gestion Pro — du devis à la marge.", 4.2, TMP / "a99.mp4")
+    carton("ARRÊTEZ DE DEVINER", "ELSATIA Gestion Pro — du devis à la marge.", 4.2, TMP / "a99.mp4")
     m.append(TMP / "a99.mp4")
 
     brut = TMP / "avant_brut.mp4"

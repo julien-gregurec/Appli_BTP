@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { Lien as Link } from "@/components/Lien";
+import { lireEtMigrerCleStockage } from "@/lib/browser-storage";
+
+const CLE_MODULES_MASQUES = "elsatia-dashboard-masques";
+const CLE_MODULES_MASQUES_HISTORIQUE = "liria-dashboard-masques";
 
 export type MobileModuleIconName =
   | "profil"
@@ -78,8 +82,8 @@ function ModuleIcon({ nom, grand = false }: { nom: MobileModuleIconName; grand?:
 
 export function MobileModuleGrid({ modules }: { modules: MobileModuleLink[] }) {
   const [edition,setEdition]=useState(false);
-  const [masques,setMasques]=useState<string[]>(()=>{if(typeof window==="undefined")return[];try{return JSON.parse(localStorage.getItem("liria-dashboard-masques")??"[]");}catch{return[];}});
-  const basculer=(href:string)=>setMasques(courants=>{const suivants=courants.includes(href)?courants.filter(item=>item!==href):[...courants,href];localStorage.setItem("liria-dashboard-masques",JSON.stringify(suivants));return suivants;});
+  const [masques,setMasques]=useState<string[]>(()=>{if(typeof window==="undefined")return[];try{return JSON.parse(lireEtMigrerCleStockage(localStorage,CLE_MODULES_MASQUES,CLE_MODULES_MASQUES_HISTORIQUE)??"[]");}catch{return[];}});
+  const basculer=(href:string)=>setMasques(courants=>{const suivants=courants.includes(href)?courants.filter(item=>item!==href):[...courants,href];localStorage.setItem(CLE_MODULES_MASQUES,JSON.stringify(suivants));return suivants;});
   const visibles=modules.filter(module=>!masques.includes(module.href));
   const couleurs: Record<MobileModuleIconName, string> = {
     profil: "#355b7d", travaux: "#6b5b95", pointage: "#d07a32", planning: "#be4d46",

@@ -1,0 +1,410 @@
+/**
+ * Scène de plan affichée par le viewport Atelier (§8).
+ *
+ * Le viewport reçoit une géométrie DÉJÀ RÉSOLUE en props : il n'appelle jamais le moteur
+ * géométrique et ne connaît aucun `modelId`. `PlanScene` est volontairement un sur-ensemble
+ * structurel minimal — un `ShapeGeometry` résolu par Engine B satisfait ce type tel quel, donc
+ * le branchement futur ne demandera pas d'adaptateur.
+ *
+ * Ce module est pur (aucun React, aucun DOM) pour rester testable côté Node.
+ */
+
+import type { Arc, BoundingBox, Circle, Dimension, Ellipse, Point, Polygon, Polyline, Segment } from "../../../lib/geometry/primitives";
+import { freeContourMeasures, type FreeContourMeasures } from "../../../lib/tracing/free-contour";
+
+export type PlanScene = {
+  id: string;
+  name: string;
+  bounds: BoundingBox;
+  points?: readonly Point[];
+  segments?: readonly Segment[];
+  /**
+   * Traits de construction du modèle (ATELIER-RESOLVED-MODEL-VIEWPORT-INTEGRATION-V1 §3).
+   * Champ distinct plutôt que des segments marqués `role: "construction"` : un `TraceModel`
+   * les publie déjà séparément (`ShapeGeometry.constructionLines`), donc le brancher ainsi
+   * reste une simple lecture — aucune recopie, aucune fusion de listes en amont.
+   */
+  constructionLines?: readonly Segment[];
+  arcs?: readonly Arc[];
+  circles?: readonly Circle[];
+  ellipses?: readonly Ellipse[];
+  polylines?: readonly Polyline[];
+  polygons?: readonly Polygon[];
+  /**
+   * Cotations du modèle (TRACING-WORKSHOP-UI-V1 §15). Optionnel et additif comme les autres
+   * champs : une `ShapeGeometry` les publie déjà, la scène se contente de les laisser passer.
+   *
+   * Ce sont des ANNOTATIONS, pas des entités sélectionnables : ni `listSceneEntities` ni le
+   * hit-test ne les considèrent. On ne désigne pas une cote au doigt sur un chantier, on la lit.
+   *
+   * Les AXES, eux, n'ont pas de champ propre : dans tous les modèles du moteur ils sont des
+   * `constructionLines` portant `role: "axis"` (voir `shapes.ts`). On les distingue donc par
+   * leur rôle, comme le fait déjà `AdvancedPlan`, plutôt que d'introduire une seconde source.
+   */
+  dimensions?: readonly Dimension[];
+};
+
+export type SceneEntityKind = "segment" | "arc" | "circle" | "ellipse" | "polyline" | "polygon" | "point";
+
+export type SceneEntitySummary = {
+  id: string;
+  kind: SceneEntityKind;
+  label: string;
+  /** Rôle métier porté par l'entité (`shape`, `construction`, `axis`, `center`…), quand il existe. */
+  role?: string;
+};
+
+export type PropertyRow = { label: string; value: string };
+
+export type SceneEntityDetails = SceneEntitySummary & {
+  rows: readonly PropertyRow[];
+};
+
+const KIND_LABELS: Record<SceneEntityKind, string> = {
+  segment: "Segment",
+  arc: "Arc",
+  circle: "Cercle",
+  ellipse: "Ellipse",
+  polyline: "Polyligne",
+  polygon: "Contour",
+  point: "Point",
+};
+
+export function entityKindLabel(kind: SceneEntityKind): string {
+  return KIND_LABELS[kind];
+}
+
+/**
+ * Libellé lisible d'une entité. Les identifiants métier portent déjà souvent leur nature
+ * (« contour », « spot-1 ») : préfixer aveuglément donnerait « Contour contour ». On ne préfixe
+ * donc que si l'identifiant ne dit pas déjà de quoi il s'agit.
+ */
+export function entityLabel(kind: SceneEntityKind, id: string): string {
+  const nature = KIND_LABELS[kind].toLowerCase();
+  if (!id.toLowerCase().includes(nature)) return `${KIND_LABELS[kind]} ${id}`;
+  return id.charAt(0).toUpperCase() + id.slice(1);
+}
+
+/**
+ * ATELIER-FREE-DRAWING-FOUNDATION-V1 §7/§12 — formatage exporté pour que le glissement d'un
+ * sommet libre affiche ses coordonnées avec EXACTEMENT la même écriture que la fiche
+ * propriétés. Deux formatages concurrents finiraient par arrondir différemment, et le chiffre
+ * lu pendant le geste ne serait plus celui relu après.
+ */
+export function formatMillimetres(value: number): string {
+  return millimetres(value);
+}
+
+export function formatWorldPoint(source: { x: number; y: number }): string {
+  return coordinates(source);
+}
+
+/**
+ * ATELIER-FREE-CONTOUR-AREA-V1 §12/§18 — écriture unique d'une surface en m².
+ *
+ * Exportée pour la même raison que `formatMillimetres` l'était : la surface annoncée pendant le
+ * tracé et celle relue dans la fiche propriétés doivent s'écrire à l'identique. Deux formatages
+ * concurrents finiraient par arrondir différemment, et l'on douterait du chiffre.
+ */
+export function formatSquareMetres(value: number): string {
+  return squareMetres(value);
+}
+
+function millimetres(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  const rounded = Math.round(value * 10) / 10;
+  return `${rounded.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} mm`;
+}
+
+function degrees(radians: number): string {
+  if (!Number.isFinite(radians)) return "—";
+  const value = ((radians * 180) / Math.PI) % 360;
+  return `${(Math.round(value * 10) / 10).toLocaleString("fr-FR", { maximumFractionDigits: 1 })}°`;
+}
+
+function coordinates(source: { x: number; y: number }): string {
+  return `X ${millimetres(source.x)} · Y ${millimetres(source.y)}`;
+}
+
+/**
+ * Segments de la scène, traits de construction compris. Les traits de construction d'un
+ * `TraceModel` n'ont pas toujours de `role` explicite — leur nature vient du champ qui les
+ * porte, on la restitue donc ici plutôt que de la présumer côté rendu.
+ */
+function sceneSegments(scene: PlanScene): readonly { item: Segment; role: string | undefined }[] {
+  return [
+    ...(scene.segments ?? []).map((item) => ({ item, role: item.role })),
+    ...(scene.constructionLines ?? []).map((item) => ({ item, role: item.role ?? "construction" })),
+  ];
+}
+
+/**
+ * Inventaire ordonné des entités sélectionnables de la scène. L'ordre est stable (contours,
+ * segments, arcs, cercles, ellipses, polylignes, points) pour que la liste de la fixture et le
+ * futur hit-testing désignent les mêmes objets.
+ */
+export function listSceneEntities(scene: PlanScene): readonly SceneEntitySummary[] {
+  const entities: SceneEntitySummary[] = [];
+  const push = (kind: SceneEntityKind, id: string, label: string | undefined, role?: string) => {
+    entities.push({ id, kind, label: label ?? entityLabel(kind, id), role });
+  };
+
+  for (const item of scene.polygons ?? []) push("polygon", item.id, undefined, item.role);
+  for (const { item, role } of sceneSegments(scene)) push("segment", item.id, undefined, role);
+  for (const item of scene.arcs ?? []) push("arc", item.id, undefined, item.role);
+  for (const item of scene.circles ?? []) push("circle", item.id, undefined, item.role);
+  for (const item of scene.ellipses ?? []) push("ellipse", item.id, undefined, item.role);
+  for (const item of scene.polylines ?? []) push("polyline", item.id, undefined, item.role);
+  for (const item of scene.points ?? []) push("point", item.id, item.label, item.role);
+
+  return entities;
+}
+
+/** Fiche « propriétés » d'une entité — lecture seule dans ce lot (§10 : aucune édition géométrique). */
+export function describeSceneEntity(scene: PlanScene, entityId: string | null): SceneEntityDetails | null {
+  if (!entityId) return null;
+
+  for (const { item, role } of sceneSegments(scene)) {
+    if (item.id !== entityId) continue;
+    const length = Math.hypot(item.end.x - item.start.x, item.end.y - item.start.y);
+    return {
+      id: item.id,
+      kind: "segment",
+      label: entityLabel("segment", item.id),
+      role,
+      rows: [
+        { label: "Départ", value: coordinates(item.start) },
+        { label: "Arrivée", value: coordinates(item.end) },
+        { label: "Longueur", value: millimetres(length) },
+        { label: "Angle", value: degrees(Math.atan2(item.end.y - item.start.y, item.end.x - item.start.x)) },
+      ],
+    };
+  }
+
+  for (const item of scene.arcs ?? []) {
+    if (item.id !== entityId) continue;
+    let sweep = item.endAngle - item.startAngle;
+    if (item.counterClockwise === false && sweep > 0) sweep -= Math.PI * 2;
+    if (item.counterClockwise !== false && sweep < 0) sweep += Math.PI * 2;
+    return {
+      id: item.id,
+      kind: "arc",
+      label: entityLabel("arc", item.id),
+      role: item.role,
+      rows: [
+        { label: "Centre", value: coordinates(item.centre) },
+        { label: "Rayon", value: millimetres(item.radius) },
+        { label: "Angle balayé", value: degrees(Math.abs(sweep)) },
+        { label: "Développé", value: millimetres(Math.abs(sweep) * item.radius) },
+      ],
+    };
+  }
+
+  for (const item of scene.circles ?? []) {
+    if (item.id !== entityId) continue;
+    return {
+      id: item.id,
+      kind: "circle",
+      label: entityLabel("circle", item.id),
+      role: item.role,
+      rows: [
+        { label: "Centre", value: coordinates(item.centre) },
+        { label: "Rayon", value: millimetres(item.radius) },
+        { label: "Diamètre", value: millimetres(item.radius * 2) },
+        { label: "Périmètre", value: millimetres(2 * Math.PI * item.radius) },
+      ],
+    };
+  }
+
+  for (const item of scene.ellipses ?? []) {
+    if (item.id !== entityId) continue;
+    return {
+      id: item.id,
+      kind: "ellipse",
+      label: entityLabel("ellipse", item.id),
+      role: item.role,
+      rows: [
+        { label: "Centre", value: coordinates(item.centre) },
+        { label: "Demi-grand axe", value: millimetres(Math.max(item.radiusX, item.radiusY)) },
+        { label: "Demi-petit axe", value: millimetres(Math.min(item.radiusX, item.radiusY)) },
+        { label: "Rotation", value: degrees(item.rotation ?? 0) },
+      ],
+    };
+  }
+
+  for (const item of scene.polylines ?? []) {
+    if (item.id !== entityId) continue;
+    return {
+      id: item.id,
+      kind: "polyline",
+      label: entityLabel("polyline", item.id),
+      role: item.role,
+      rows: [
+        { label: "Sommets", value: `${item.points.length}` },
+        { label: "Développé", value: millimetres(pathLength(item.points, false)) },
+      ],
+    };
+  }
+
+  for (const item of scene.polygons ?? []) {
+    if (item.id !== entityId) continue;
+    return {
+      id: item.id,
+      kind: "polygon",
+      label: entityLabel("polygon", item.id),
+      role: item.role,
+      rows: contourRows(item),
+    };
+  }
+
+  for (const item of scene.points ?? []) {
+    if (item.id !== entityId) continue;
+    return {
+      id: item.id,
+      kind: "point",
+      label: item.label ?? entityLabel("point", item.id),
+      role: item.role,
+      rows: [
+        { label: "Position", value: coordinates(item) },
+        { label: "Rôle", value: item.role ?? "reference" },
+      ],
+    };
+  }
+
+  return null;
+}
+
+/**
+ * ATELIER-INTERSECTIONS-MULTISELECT-V1 §10 — synthèse d'une sélection multiple.
+ *
+ * LECTURE SEULE, sans exception. Ce lot ne fournit aucun formulaire groupé et ne modifie
+ * jamais plusieurs entités d'un coup : une modification géométrique passe par une poignée ou
+ * par le formulaire de paramètres, un objet à la fois, pour que l'historique et l'autosave
+ * restent lisibles.
+ */
+export type SceneSelectionKindCount = { kind: SceneEntityKind; label: string; count: number };
+
+export type SceneSelectionDetails = {
+  count: number;
+  /** Répartition par nature, dans l'ordre stable de `listSceneEntities`. */
+  kinds: readonly SceneSelectionKindCount[];
+  /** Rôles métier présents, dédoublonnés et triés. */
+  roles: readonly string[];
+  /** Les entités elles-mêmes, dans l'ordre de désignation. */
+  entries: readonly SceneEntitySummary[];
+  /**
+   * Propriétés dont le libellé ET la valeur sont IDENTIQUES sur toutes les entités
+   * sélectionnées — cinq cercles de même rayon affichent donc « Rayon 120 mm ».
+   *
+   * Ce sont les seules lignes communes qu'on puisse afficher sans inventer de contrat : ni
+   * somme, ni moyenne, ni plage. Additionner des longueurs de natures différentes n'aurait
+   * pas de sens métier, et la somme d'un développé n'est pas une propriété de la sélection.
+   */
+  commonRows: readonly PropertyRow[];
+};
+
+const KIND_ORDER: readonly SceneEntityKind[] = ["polygon", "segment", "arc", "circle", "ellipse", "polyline", "point"];
+
+export function describeSceneSelection(
+  scene: PlanScene,
+  entityIds: readonly string[],
+): SceneSelectionDetails | null {
+  const details = entityIds
+    .map((id) => describeSceneEntity(scene, id))
+    .filter((item): item is SceneEntityDetails => item !== null);
+  if (details.length === 0) return null;
+
+  const counts = new Map<SceneEntityKind, number>();
+  for (const item of details) counts.set(item.kind, (counts.get(item.kind) ?? 0) + 1);
+
+  const kinds = KIND_ORDER.filter((kind) => counts.has(kind)).map((kind) => ({
+    kind,
+    label: entityKindLabel(kind),
+    count: counts.get(kind) ?? 0,
+  }));
+
+  const roles = [...new Set(details.map((item) => item.role).filter((role): role is string => Boolean(role)))].sort();
+
+  // Une ligne est commune si le couple libellé/valeur se retrouve à l'identique partout.
+  const [first, ...rest] = details;
+  const commonRows = first.rows.filter((row) =>
+    rest.every((item) => item.rows.some((other) => other.label === row.label && other.value === row.value)),
+  );
+
+  return {
+    count: details.length,
+    kinds,
+    roles,
+    entries: details.map(({ id, kind, label, role }) => ({ id, kind, label, role })),
+    commonRows,
+  };
+}
+
+/**
+ * ATELIER-FREE-CONTOUR-AREA-V1 §12 — fiche d'un contour : sommets, périmètre, surface,
+ * orientation, statut. LECTURE SEULE, comme toute cette fiche.
+ *
+ * Les mesures viennent de `free-contour.ts`, pas d'un calcul refait ici : c'est la même
+ * fonction qui décide de la surface affichée, de celle qui part à l'export et de celle que le
+ * report annonce. Trois arrondis différents du même contour seraient le plus sûr moyen de faire
+ * douter du chiffre sur un chantier.
+ *
+ * La ligne « Surface » ne disparaît JAMAIS : un contour invalide affiche la raison à sa place.
+ * Une ligne absente se lit comme une donnée qu'on n'a pas pensé à afficher ; une raison écrite
+ * se lit comme un refus motivé, et dit quoi corriger (§13).
+ */
+function contourRows(polygon: Polygon): readonly PropertyRow[] {
+  // Le contour est reconstitué en entité libre pour être mesuré : les deux représentations
+  // portent la même chose — des sommets ordonnés à fermeture implicite — et la conversion est
+  // une recopie, pas une traduction.
+  const measures: FreeContourMeasures = freeContourMeasures({
+    id: polygon.id,
+    kind: "polygon",
+    points: polygon.points.map((point) => ({ x: point.x, y: point.y })),
+  });
+
+  return [
+    { label: "Sommets", value: `${measures.vertexCount}` },
+    { label: "Périmètre", value: millimetres(measures.perimeterMm) },
+    { label: "Surface", value: measures.areaM2 === null ? "Non exploitable" : squareMetres(measures.areaM2) },
+    { label: "Orientation", value: ORIENTATION_LABELS[measures.orientation] },
+    { label: "Statut", value: measures.reason ?? "Contour fermé exploitable." },
+  ];
+}
+
+const ORIENTATION_LABELS: Readonly<Record<FreeContourMeasures["orientation"], string>> = {
+  "counter-clockwise": "Antihoraire",
+  clockwise: "Horaire",
+  indeterminate: "Indéterminée",
+};
+
+/**
+ * Surface en m², arrondie à trois décimales — le millimètre carré près serait illisible, et le
+ * centimètre carré près masquerait la différence entre 0,001 m² et rien du tout.
+ *
+ * L'arrondi est ICI, à l'affichage, et nulle part dans la source : `FreeContourMeasures` porte
+ * la valeur exacte (§6).
+ */
+function squareMetres(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  return `${value.toLocaleString("fr-FR", { maximumFractionDigits: 3 })} m²`;
+}
+
+function pathLength(points: readonly { x: number; y: number }[], closed: boolean): number {
+  if (points.length < 2) return 0;
+  let total = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    total += Math.hypot(points[index].x - points[index - 1].x, points[index].y - points[index - 1].y);
+  }
+  if (closed) {
+    const first = points[0];
+    const last = points[points.length - 1];
+    total += Math.hypot(first.x - last.x, first.y - last.y);
+  }
+  return total;
+}
+
+/** Nombre total d'entités rendues — sert au contrôle de charge de la scène (§14). */
+export function countSceneEntities(scene: PlanScene): number {
+  return listSceneEntities(scene).length;
+}

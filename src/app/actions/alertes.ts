@@ -64,3 +64,40 @@ export async function retablirAlerteOperationnelleAction(
   revalidatePath("/dashboard");
   return { ok: true };
 }
+
+export async function deleguerAlerteOperationnelleAction(
+  alerte: { id: string; domaine: string; titre: string; href: string; niveau: "critique" | "attention" },
+  employeId: string,
+  commentaire: string,
+): Promise<ResultatAction> {
+  const cle = nettoyerCle(alerte.id);
+  if (!cle) return { ok: false, error: "Cette alerte ne peut pas être déléguée." };
+  if (!employeId || employeId.trim().length === 0) {
+    return { ok: false, error: "Sélectionnez un employé." };
+  }
+  const commentaireNettoye = commentaire.trim().slice(0, 500);
+
+  const ctx = await getContexteEntreprise();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("deleguer_alerte_operationnelle", {
+    p_entreprise_id: ctx.entrepriseId,
+    p_alerte_cle: cle,
+    p_alerte_domaine: alerte.domaine,
+    p_alerte_titre: alerte.titre.slice(0, 250),
+    p_alerte_href: alerte.href.slice(0, 250),
+    p_alerte_niveau: alerte.niveau,
+    p_employe_id: employeId,
+    p_commentaire: commentaireNettoye || null,
+  });
+
+  if (error) {
+    console.error("deleguerAlerteOperationnelleAction", error);
+    if (error.message.includes("Accès refusé")) return { ok: false, error: "Vous n’avez pas les droits nécessaires pour déléguer cette alerte." };
+    if (error.message.includes("droits nécessaires")) return { ok: false, error: "Cet employé n’a pas les droits nécessaires pour cette alerte." };
+    if (error.message.includes("compte applicatif")) return { ok: false, error: "Cet employé n’a pas encore de compte applicatif." };
+    if (error.message.includes("Employé invalide")) return { ok: false, error: "Employé invalide." };
+    return { ok: false, error: "Impossible de déléguer l’alerte pour le moment." };
+  }
+  revalidatePath("/dashboard");
+  return { ok: true };
+}

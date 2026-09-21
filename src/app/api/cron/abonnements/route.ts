@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ajouterOptionIAAbonnement, estPalierOptionIA, estPeriodiciteAbonnement, reconcilierAbonnementStripe } from "@/lib/stripe-abonnement";
+import { cronsSontActifs, relancesAutoEstActive } from "@/lib/preview-features";
+import { traiterRelancesAutomatiques } from "@/lib/relances-cron";
+import { reprendreOperationsCapaciteStripe } from "@/lib/stripe-capacite-reconcile";
 
 // Bascule les essais Option IA expires vers la facturation reelle. Regroupe avec le cron
 // des abonnements (et non un cron dedie) car le plan Vercel Hobby limite le nombre de
@@ -63,13 +66,19 @@ async function notifierPointagesManquantsEtAValider(admin: ReturnType<typeof cre
   return { ok: !error, raison: error?.message };
 }
 
-export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return NextResponse.json({ error: "CRON_SECRET absent" }, { status: 503 });
-  if (request.headers.get("authorization") !== `Bearer ${secret}`) return NextResponse.json({ error: "Accès refusé" }, { status: 401 });
-  const admin = createAdminClient();
+// RELANCES-AUTO-PROD-ACTIVATION-V1 §9 : les jobs historiques (Stripe, option IA, paie,
+// pointage) restent gardés par FEATURE_CRONS_ENABLED. Les relances ont leur PROPRE porte,
+// FEATURE_RELANCES_AUTO_ENABLED, totalement indépendante — l'objectif explicite de ce lot
+// est de pouvoir activer les relances sans jamais réveiller les jobs historiques (Stripe
+// Live notamment), sans créer de deuxième cron Vercel ni de deuxième secret. Même endpoint,
+// même authentification CRON_SECRET, même cadence Vercel : seul le contenu exécuté à
+// l'intérieur se ramifie en deux branches indépendantes.
+async function executerJobsHistoriques(admin: ReturnType<typeof createAdminClient>) {
   const { data: entreprises, error } = await admin.from("entreprises").select("id").not("stripe_subscription_id", "is", null).in("abonnement_statut", ["essai", "actif"]);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("Échec du traitement périodique des abonnements", error);
+    return { erreur: "Traitement impossible" as const };
+  }
   const resultats: Array<{ entrepriseId: string; synchronise: boolean; raison?: string }> = [];
   for (const entreprise of entreprises ?? []) {
     try {
@@ -82,5 +91,50 @@ export async function GET(request: Request) {
   const optionIA = await convertirEssaisOptionIAExpires(admin);
   const paiePeriodes = await synchroniserPeriodesPaieOuvertes(admin);
   const alertesPointage = await notifierPointagesManquantsEtAValider(admin);
-  return NextResponse.json({ traitees: resultats.length, resultats, optionIA, paiePeriodes, alertesPointage });
+  // R2-B : reprise des opérations de capacité `needs_reconcile` et application
+  // des baisses de capacité programmées arrivées à échéance (fin de période).
+  let capacite: Awaited<ReturnType<typeof reprendreOperationsCapaciteStripe>> | { erreur: string } = { traitees: 0, details: [] };
+  try {
+    capacite = await reprendreOperationsCapaciteStripe();
+  } catch (erreur) {
+    capacite = { erreur: erreur instanceof Error ? erreur.message : "Reprise capacité impossible" };
+  }
+  return { traitees: resultats.length, resultats, optionIA, paiePeriodes, alertesPointage, capacite };
+}
+
+export async function GET(request: Request) {
+  const cronsActifs = cronsSontActifs();
+  const relancesActives = relancesAutoEstActive();
+  // §11 : si aucune des deux portes n'est ouverte, comportement identique à l'existant
+  // avant ce lot (404) — cohérent avec /api/cron/notifications-push, plutôt qu'un nouveau
+  // code 200 "no-op" qui masquerait silencieusement un oubli de configuration.
+  if (!cronsActifs && !relancesActives) {
+    return NextResponse.json({ error: "Tâches planifiées désactivées" }, { status: 404 });
+  }
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return NextResponse.json({ error: "CRON_SECRET absent" }, { status: 503 });
+  if (request.headers.get("authorization") !== `Bearer ${secret}`) return NextResponse.json({ error: "Accès refusé" }, { status: 401 });
+
+  const admin = createAdminClient();
+
+  // Branches réellement indépendantes : une erreur dans l'une ne doit jamais empêcher
+  // l'autre de s'exécuter (§13 — les relances doivent tourner même si crons historiques
+  // désactivés ; et symétriquement, une panne des jobs historiques ne doit jamais avaler
+  // silencieusement les relances).
+  const jobsHistoriques = cronsActifs
+    ? await executerJobsHistoriques(admin)
+    : { executes: false as const };
+  // traiterRelancesAutomatiques revérifie elle-même relancesAutoEstActive() en interne
+  // (defense en profondeur, cf. src/lib/relances-cron.ts) : l'appeler inconditionnellement
+  // ici est sûr, elle no-op proprement si le flag est faux.
+  const relances = await traiterRelancesAutomatiques(admin);
+
+  if (jobsHistoriques && "erreur" in jobsHistoriques) {
+    // Les jobs historiques ont échoué au chargement (erreur DB) : comportement identique à
+    // avant ce lot pour ce cas précis (500), mais SEULEMENT s'ils étaient sensés tourner —
+    // les relances ont déjà été exécutées ci-dessus dans tous les cas.
+    return NextResponse.json({ error: jobsHistoriques.erreur, relances }, { status: 500 });
+  }
+
+  return NextResponse.json({ cronsActifs, relancesActives, jobsHistoriques, relances });
 }

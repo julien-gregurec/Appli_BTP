@@ -1,4 +1,4 @@
-import { obtenirProviderIA } from "@/lib/ai/provider";
+import { obtenirProviderIA, type UsageIA } from "@/lib/ai/provider";
 
 export type DonneesRentabiliteChantier = {
   chantierNom: string;
@@ -15,10 +15,10 @@ export type DonneesRentabiliteChantier = {
   taux: number | null;
 };
 
-export async function analyserRentabilite(donnees: DonneesRentabiliteChantier): Promise<string> {
+export async function analyserRentabilite(donnees: DonneesRentabiliteChantier): Promise<{ texte: string; usage?: UsageIA }> {
   const provider = obtenirProviderIA();
 
-  const { texte } = await provider.completer({
+  const { texte, usage } = await provider.completer({
     system:
       "Tu es un assistant qui aide un dirigeant d'entreprise du BTP à comprendre la rentabilité d'un chantier. " +
       "On te donne les chiffres déjà calculés (ne recalcule rien, ne devine aucun chiffre absent). " +
@@ -45,5 +45,5 @@ Taux de marge : ${donnees.taux === null ? "non calculable (pas de facturation)" 
   });
 
   if (!texte.trim()) throw new Error("L'IA n'a pas pu analyser ce chantier.");
-  return texte;
+  return { texte, usage };
 }

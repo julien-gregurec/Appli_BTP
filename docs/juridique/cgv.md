@@ -1,10 +1,10 @@
 # Conditions Générales de Vente (CGV)
 
-_Applicables aux professionnels — Dernière mise à jour : [JJ/MM/AAAA] — Version 1.0_
+_Applicables aux professionnels — Dernière mise à jour : 21/08/2026 — Version 1.0_
 
 ## Article 1 — Objet et champ d'application
 
-Les présentes Conditions Générales de Vente (« CGV ») régissent la souscription et l'utilisation du service logiciel **Liria Gestion Pro** (« le Service »), édité par **[Julien GREGUREC], entrepreneur individuel** (« l'Éditeur »), par toute entreprise ou professionnel (« le Client »).
+Les présentes Conditions Générales de Vente (« CGV ») régissent la souscription et l'utilisation du service logiciel **ELSATIA Gestion Pro** (« le Service »), édité par **Julien GREGUREC, entrepreneur individuel, exerçant sous le nom commercial ELSATIA** (« l'Éditeur »), par toute entreprise ou professionnel (« le Client »).
 
 Le Service est un logiciel de gestion en ligne (SaaS) destiné aux entreprises du bâtiment : devis, factures, clients, chantiers, planning, pointage, stock, et modules associés.
 
@@ -24,11 +24,11 @@ Le Service peut être proposé avec une **période d'essai gratuite de 30 jours*
 
 ## Article 4 — Offres et prix
 
-4.1 Le Service est proposé selon plusieurs offres (à titre indicatif : Essentiel, Pro, Premium), dont le contenu et les tarifs sont présentés sur la page Tarifs du Service. Chaque offre inclut un nombre de comptes ; les comptes supplémentaires et certains dépassements d'usage (espace de stockage, nombre d'appareils) sont facturés en sus selon la grille en vigueur.
+4.1 Le Service est proposé selon plusieurs offres : Mini, Pro, Business et Entreprise, ainsi qu'une offre Sur mesure. Le contenu et les tarifs de chaque offre sont présentés sur la page Tarifs du Service. Chaque offre inclut un nombre de comptes ; les comptes supplémentaires et certains dépassements d'usage (espace de stockage, nombre d'appareils) sont facturés en sus selon la grille en vigueur.
 
-4.2 Les prix sont indiqués en euros. **TVA non applicable, article 293 B du Code général des impôts** (l'Éditeur bénéficie de la franchise en base). En cas de dépassement des seuils applicables ou de changement de régime, la TVA sera appliquée de plein droit et les prix indiqués s'entendront alors hors taxes.
+4.2 Les prix sont indiqués en euros hors taxes. Régime de TVA : **[EDITEUR_MENTION_TVA]**. En cas d'assujettissement ou de changement de régime, la TVA sera appliquée de plein droit aux prix indiqués.
 
-4.3 Le paiement annuel ouvre droit à une remise (à titre indicatif : −20 %) par rapport au paiement mensuel.
+4.3 Le paiement annuel correspond à dix mensualités, soit deux mois offerts par rapport au paiement mensuel.
 
 4.4 L'Éditeur peut modifier ses tarifs. Toute modification est notifiée au Client au moins **30 jours** avant sa prise d'effet ; elle s'applique au renouvellement suivant. À défaut d'acceptation, le Client peut résilier avant l'échéance.
 
@@ -39,6 +39,8 @@ Le Service peut être proposé avec une **période d'essai gratuite de 30 jours*
 5.2 Les factures sont émises et mises à disposition automatiquement dans l'espace du Client.
 
 5.3 **Défaut de paiement** : en cas d'échec de paiement, l'Éditeur peut, après relance restée sans effet, suspendre l'accès au Service. Les données du Client sont conservées pendant la période de suspension (voir article 10) avant toute suppression éventuelle.
+
+5.4 **Délai de paiement, pénalités et escompte** : le paiement étant prélevé automatiquement selon le mode décrit à l'article 5.1, il est exigible à la date d'échéance figurant sur la facture. Tout retard de paiement entraîne de plein droit, conformément à la loi, des pénalités de retard au taux de trois fois le taux d'intérêt légal (sauf taux différent indiqué sur la facture), ainsi qu'une indemnité forfaitaire pour frais de recouvrement de **quarante (40) euros**, sans préjudice d'une indemnisation complémentaire sur justification. **Aucun escompte n'est accordé** en cas de paiement anticipé.
 
 ## Article 6 — Durée, reconduction et résiliation
 

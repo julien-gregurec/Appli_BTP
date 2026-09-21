@@ -41,7 +41,7 @@ C'est **acceptable aujourd'hui** (aucune donnée client réelle — uniquement l
 |---|---|---|---|
 | H1 | `est_membre_actif` n'a pas `set search_path = public` (alors que `a_permission` l'a) | Faible | Ajouter `set search_path = public` par cohérence et bonne pratique |
 | H2 | Bucket public `entreprise-assets` | Faible | Confirmer qu'il ne contient que des logos/éléments non sensibles |
-| H3 | Rappel go-live | — | Supprimer le compte de démo `demo@entreprise-test.fr` et les données de test |
+| H3 | Rappel go-live | — | Supprimer le compte de démo `[IDENTIFIANTS HISTORIQUES RETIRÉS — rotation requise]` et les données de test |
 
 ### Correctif H1 (à intégrer dans une prochaine migration — domaine Codex)
 ```sql

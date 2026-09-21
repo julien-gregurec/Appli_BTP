@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 export function InvitationEntreprise({ code, inscriptionsActives }: { code: string; inscriptionsActives: boolean }) {
   const [message, setMessage] = useState("");
@@ -9,7 +10,7 @@ export function InvitationEntreprise({ code, inscriptionsActives }: { code: stri
     const lien = `${window.location.origin}/signup?code=${encodeURIComponent(code)}`;
     return {
       lien,
-      texte: `Rejoins notre entreprise sur Liria Gestion Pro. Crée ton compte avec ce lien : ${lien} — Code entreprise : ${code}`,
+      texte: `Rejoins notre entreprise sur ${PRODUCT_NAME}. Crée ton compte avec ce lien : ${lien} — Code entreprise : ${code}`,
     };
   };
 
@@ -22,7 +23,7 @@ export function InvitationEntreprise({ code, inscriptionsActives }: { code: stri
   async function partager() {
     const contenu = invitation();
     if (navigator.share) {
-      await navigator.share({ title: "Invitation Liria Gestion Pro", text: contenu.texte, url: contenu.lien });
+      await navigator.share({ title: `Invitation ${PRODUCT_NAME}`, text: contenu.texte, url: contenu.lien });
       return;
     }
     await copier(contenu.texte, "Invitation copiée");

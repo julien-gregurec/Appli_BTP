@@ -1,0 +1,5750 @@
+{
+  "$schema": "./env-manifest.schema.json",
+  "schema_version": 1,
+  "description": "Manifeste canonique des variables d'environnement ELSATIA. Source : docs/audits/ELSATIA_ENV_SECRETS_INVENTORY_V1.md. AUCUNE VALEUR n'a sa place ici. Contrôlé par scripts/check-env-manifest.mjs (CI et preflight).",
+  "preflight_enforcement": "report",
+  "applications": {
+    "gestion_pro": {
+      "kind": "web",
+      "label": "ELSATIA Gestion Pro (inclut Boutique, DOE, API de facturation Tools)",
+      "roots": [
+        "src/",
+        "next.config.ts",
+        "sentry.server.config.ts",
+        "sentry.edge.config.ts",
+        "vercel.json"
+      ],
+      "examples": [
+        {
+          "path": ".env.example",
+          "environment": "production"
+        },
+        {
+          "path": ".env.preview.example",
+          "environment": "preview"
+        },
+        {
+          "path": ".env.local.example",
+          "environment": "local"
+        }
+      ],
+      "note": "Boutique et DOE n'ont pas d'application propre : leurs variables sont déclarées sous gestion_pro (champ feature)."
+    },
+    "platform": {
+      "kind": "shared",
+      "label": "Socle commun (packages/*)",
+      "roots": [
+        "packages/"
+      ]
+    },
+    "colors": {
+      "kind": "web",
+      "label": "ELSATIA Colors",
+      "roots": [
+        "apps/colors/"
+      ],
+      "examples": [
+        {
+          "path": "apps/colors/.env.example",
+          "environment": "any"
+        }
+      ]
+    },
+    "tools": {
+      "kind": "web",
+      "label": "ELSATIA Tools",
+      "roots": [
+        "apps/tools/"
+      ],
+      "examples": [
+        {
+          "path": "apps/tools/.env.example",
+          "environment": "any"
+        }
+      ]
+    },
+    "reserves": {
+      "kind": "web",
+      "label": "ELSATIA Réserves",
+      "roots": [
+        "apps/reserves/"
+      ],
+      "examples": [
+        {
+          "path": "apps/reserves/.env.example",
+          "environment": "any"
+        }
+      ]
+    },
+    "studio": {
+      "kind": "web",
+      "label": "ELSATIA Studio",
+      "roots": [
+        "apps/studio/",
+        "packages/studio-domain/"
+      ],
+      "examples": [
+        {
+          "path": "apps/studio/.env.example",
+          "environment": "any"
+        }
+      ]
+    },
+    "studio_worker": {
+      "kind": "worker",
+      "label": "Worker vidéo Studio (hors Vercel)",
+      "roots": [
+        "workers/studio-video/"
+      ],
+      "examples": [
+        {
+          "path": "workers/studio-video/.env.example",
+          "environment": "any"
+        }
+      ]
+    },
+    "ops_scripts": {
+      "kind": "tooling",
+      "label": "Scripts d'administration, d'audit, de sécurité et de recette",
+      "roots": [
+        "scripts/",
+        "config/"
+      ]
+    },
+    "e2e": {
+      "kind": "tooling",
+      "label": "Bancs de test E2E",
+      "roots": [
+        "tests/",
+        "playwright.config.ts",
+        "vitest.config.ts",
+        "scripts/e2e/"
+      ]
+    },
+    "ci": {
+      "kind": "tooling",
+      "label": "GitHub Actions",
+      "roots": [
+        ".github/"
+      ]
+    }
+  },
+  "system_variables": [
+    {
+      "name": "NODE_ENV",
+      "justification": "Fixée par Node/Next.js, pas par ELSATIA."
+    },
+    {
+      "name": "CI",
+      "justification": "Fixée par GitHub Actions."
+    },
+    {
+      "name": "NEXT_RUNTIME",
+      "justification": "Fixée par Next.js."
+    },
+    {
+      "name": "VERCEL",
+      "justification": "Fixée par Vercel."
+    },
+    {
+      "name": "VERCEL_ENV",
+      "justification": "Fixée par Vercel : production | preview | development."
+    },
+    {
+      "name": "VERCEL_URL",
+      "justification": "Fixée par Vercel."
+    },
+    {
+      "name": "VERCEL_GIT_COMMIT_SHA",
+      "justification": "Fixée par Vercel."
+    },
+    {
+      "name": "VERCEL_PROJECT_PRODUCTION_URL",
+      "justification": "Fixée par Vercel."
+    },
+    {
+      "name": "HOME",
+      "justification": "Système."
+    },
+    {
+      "name": "PATH",
+      "justification": "Système."
+    },
+    {
+      "name": "NODE_OPTIONS",
+      "justification": "Node.js."
+    },
+    {
+      "name": "AWS_EXECUTION_ENV",
+      "justification": "Fixée par le runtime de fonctions Vercel (AWS Lambda)."
+    },
+    {
+      "name": "AWS_LAMBDA_JS_RUNTIME",
+      "justification": "Fixée par le runtime de fonctions Vercel."
+    },
+    {
+      "name": "LD_LIBRARY_PATH",
+      "justification": "Système."
+    }
+  ],
+  "scan": {
+    "exclude_paths": [
+      {
+        "path": "supabase/",
+        "justification": "Gabarit du CLI Supabase : les env(…) de config.toml sont lus par le CLI local, uniquement pour des fonctionnalités désactivées."
+      },
+      {
+        "path": "apps/colors/scripts/verify-public-env.mjs",
+        "justification": "Garde de pré-build de Colors : elle CONTIENT le contrat public de Colors (noms) et l'ancien nom rejeté, sans lire d'application. Sa cohérence avec le manifeste est contrôlée à part (COLORS-GUARD-CONTRACT)."
+      }
+    ],
+    "literal_prefixes": [
+      "STRIPE_",
+      "FEATURE_",
+      "ELSATIA_",
+      "STUDIO_",
+      "SUPABASE_",
+      "POWENS_",
+      "VAPID_",
+      "SENTRY_",
+      "GOOGLE_PLAY_",
+      "APPLE_",
+      "TOOLS_",
+      "NEXT_PUBLIC_",
+      "BREVO_",
+      "OPENAI_",
+      "E2E_",
+      "EMAIL_",
+      "CRON_",
+      "PAYROLL_",
+      "BANK_",
+      "NOTIFICATIONS_",
+      "RATE_LIMIT_",
+      "DISABLE_",
+      "ABONNEMENTS_",
+      "PDF_",
+      "RESEND_",
+      "IA_",
+      "GP_"
+    ],
+    "ignored_literals": [
+      {
+        "name": "STRIPE_PRICE_IA_INTENSIVE",
+        "justification": "Préfixe de famille : sert à construire STRIPE_PRICE_IA_INTENSIVE_MENSUEL et _ANNUEL, déclarées une à une."
+      }
+    ],
+    "reference_only": [
+      {
+        "name": "STRIPE_TOOLS_PRICE_MONTHLY",
+        "path": "apps/tools/src/lib/monetization.ts",
+        "justification": "Tools cite le NOM de la variable comme identifiant de produit renvoyé à l'API de facturation ; il n'en lit jamais la valeur (elle vit dans Gestion Pro)."
+      },
+      {
+        "name": "STRIPE_TOOLS_PRICE_ANNUAL",
+        "path": "apps/tools/src/lib/monetization.ts",
+        "justification": "Idem : nom cité, valeur jamais lue par Tools."
+      }
+    ],
+    "dynamic_access_allowed": [
+      {
+        "path": "scripts/garde-scripts-production.mjs",
+        "justification": "Lit la variable de confirmation dont le nom est passé en paramètre ; jamais une variable applicative (testé par garde-scripts-production.test.mjs)."
+      },
+      {
+        "path": "scripts/verify-stripe-prices.mjs",
+        "justification": "Lit les STRIPE_PRICE_* dont les noms sont dérivés du contrat canonique ; toutes déclarées au manifeste."
+      },
+      {
+        "path": "src/lib/stripe-abonnement.ts",
+        "justification": "Tables de noms STRIPE_PRICE_* littérales (VARIABLES_PRIX*) : chaque nom figure au manifeste."
+      },
+      {
+        "path": "src/lib/stripe-capacite-personnes.ts",
+        "justification": "Table de noms STRIPE_PRICE_COMPTE_SUP_* littérale : chaque nom figure au manifeste."
+      },
+      {
+        "path": "apps/studio/playwright.config.ts",
+        "justification": "Charge un fichier .env local de test dans process.env (banc E2E uniquement)."
+      },
+      {
+        "path": "apps/studio/scripts/e2e-gate.mjs",
+        "justification": "Retire des variables de l'environnement du banc E2E."
+      },
+      {
+        "path": "workers/studio-video/src/analysis-worker.ts",
+        "justification": "Helper required(nom) appelé avec des noms littéraux STUDIO_* / NEXT_PUBLIC_* déclarés au manifeste."
+      },
+      {
+        "path": "workers/studio-video/src/worker.ts",
+        "justification": "Helper required(nom) appelé avec des noms littéraux STUDIO_* / NEXT_PUBLIC_* déclarés au manifeste."
+      },
+      {
+        "path": "scripts/cutover/preflight-check.mjs",
+        "justification": "Affiche la présence (jamais la valeur) de variables listées, ligne de code du cutover opérateur."
+      },
+      {
+        "path": "apps/tools/scripts/verify-public-env.mjs",
+        "justification": "Itère sur la liste de variables publiques déclarées par ce même script pour construire son rapport ; ne lit jamais une variable applicative arbitraire."
+      },
+      {
+        "path": "apps/reserves/scripts/verify-public-env.mjs",
+        "justification": "Itère sur la liste de variables publiques déclarées par ce même script pour construire son rapport ; ne lit jamais une variable applicative arbitraire (jumelle de apps/tools/scripts/verify-public-env.mjs)."
+      },
+      {
+        "path": "src/lib/tools-store-environment.ts",
+        "justification": "Lit TOOLS_STORE_ENVIRONMENT/TOOLS_STORE_ALLOW_SANDBOX par un nom construit à partir d'une constante interne, jamais une entrée utilisateur."
+      },
+      {
+        "path": "apps/colors/src/lib/conservation/politique.ts",
+        "justification": "Lit une durée de rétention par un nom pris dans le registre interne VARIABLES_CONSERVATION, jamais une entrée utilisateur."
+      },
+      {
+        "path": "apps/colors/src/lib/nuancier/source.ts",
+        "justification": "Lit la source de nuancier active par un nom constant interne (VARIABLE_NUANCIER), jamais une entrée utilisateur."
+      },
+      {
+        "path": "apps/colors/src/lib/ocr/fournisseurs.ts",
+        "justification": "Lit l'activation/le fournisseur OCR par des noms constants internes (VARIABLE_OCR_ACTIF/FOURNISSEUR), jamais une entrée utilisateur."
+      }
+    ]
+  },
+  "external_secrets": [
+    {
+      "id": "supabase_project_jwt_secret",
+      "label": "Secret JWT du projet Supabase (signe access tokens et refresh)",
+      "dr_critical": true,
+      "recreatable": false,
+      "held_in": "Supabase (hébergé) + volume DR chiffré",
+      "dr_note": "Perdu ou changé : toutes les sessions et jetons invalides (mesuré à l'audit DR). Nécessaire à la restauration d'Auth ; l'ancien n'est pas recréable."
+    },
+    {
+      "id": "dr_volume_passphrase",
+      "label": "Passphrase / clé de récupération du volume DR chiffré (seul dépôt de secrets identifié)",
+      "dr_critical": true,
+      "recreatable": false,
+      "held_in": "à documenter (garde non vérifiée à l'audit DR)",
+      "dr_note": "Perdue : sauvegardes et secrets inaccessibles. Gouvernance non documentée : P0 ouvert."
+    },
+    {
+      "id": "supabase_service_role_db_passwords",
+      "label": "Mots de passe des rôles de service PostgreSQL",
+      "dr_critical": true,
+      "recreatable": true,
+      "held_in": "Supabase + coffre",
+      "dr_note": "Absents de tout dump (mesuré à l'audit DR) : à conserver séparément pour restaurer les services."
+    }
+  ],
+  "stripe_contracts": [
+    {
+      "id": "modules-flat-runtime",
+      "family": "modules",
+      "status": "runtime",
+      "decision": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
+      "description": "Un Price par module et par période (STRIPE_PRICE_MODULE_<MODULE>_<PÉRIODE>) : ce que lit le runtime d'abonnement.",
+      "evidence": [
+        {
+          "path": "src/lib/stripe-abonnement.ts",
+          "pattern": "STRIPE_PRICE_MODULE_POINTAGE_MENSUEL"
+        }
+      ]
+    },
+    {
+      "id": "modules-per-forfait-catalogue",
+      "family": "modules",
+      "status": "catalogue_contract",
+      "decision": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
+      "description": "Un Price par module × forfait × période (STRIPE_PRICE_MODULE_<MODULE>_<FORFAIT>_<PÉRIODE>) : contrat du catalogue commercial V3, « à créer » par le lot Stripe.",
+      "evidence": [
+        {
+          "path": "src/lib/commercial/stripe-mapping.ts",
+          "pattern": "STRIPE_PRICE_MODULE_\\$\\{moduleCle"
+        }
+      ]
+    },
+    {
+      "id": "supplementary-per-plan-runtime",
+      "family": "comptes_supplementaires",
+      "status": "runtime",
+      "decision": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS",
+      "description": "Personne active supplémentaire par PLAN (STRIPE_PRICE_COMPTE_SUP_<PLAN>_<PÉRIODE>) : ce que lit le runtime (capacité).",
+      "evidence": [
+        {
+          "path": "src/lib/stripe-capacite-personnes.ts",
+          "pattern": "STRIPE_PRICE_COMPTE_SUP_MINI_MENSUEL"
+        }
+      ]
+    },
+    {
+      "id": "supplementary-per-role-v4",
+      "family": "comptes_supplementaires",
+      "status": "catalogue_contract",
+      "decision": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS",
+      "description": "Compte supplémentaire par RÔLE (STRIPE_PRICE_COMPTE_SUP_ROLE_<RÔLE>_<PÉRIODE>) : grille V4, vérifiée par verify:stripe-prices, pas encore lue par le runtime.",
+      "evidence": [
+        {
+          "path": "scripts/lib/stripe-prices-attendus.mjs",
+          "pattern": "STRIPE_PRICE_COMPTE_SUP_ROLE_"
+        }
+      ]
+    },
+    {
+      "id": "ia-options-legacy-runtime",
+      "family": "options_ia",
+      "status": "runtime",
+      "decision": "DECISION_REQUIRED:STRIPE-IA-OPTIONS",
+      "description": "Options IA par palier 100 / 300 / illimité (STRIPE_PRICE_OPTION_IA_<PALIER>_<PÉRIODE>) encore lues par le runtime.",
+      "evidence": [
+        {
+          "path": "src/lib/stripe-abonnement.ts",
+          "pattern": "STRIPE_PRICE_OPTION_IA_100_MENSUEL"
+        }
+      ]
+    },
+    {
+      "id": "ia-pack-and-intensive-v4",
+      "family": "options_ia",
+      "status": "runtime",
+      "decision": "DECISION_REQUIRED:STRIPE-IA-OPTIONS",
+      "description": "Pack de crédits IA ponctuel + option IA intensive (grille V4), lus par le runtime.",
+      "evidence": [
+        {
+          "path": "src/lib/stripe-abonnement.ts",
+          "pattern": "STRIPE_PRICE_IA_CREDITS_PACK_PONCTUEL"
+        }
+      ]
+    },
+    {
+      "id": "forfaits-canonical",
+      "family": "forfaits",
+      "status": "runtime",
+      "description": "Forfaits mini | pro | business | entreprise × mensuel | annuel : contrat stable dans toutes les lignes.",
+      "evidence": [
+        {
+          "path": "src/lib/stripe-abonnement.ts",
+          "pattern": "STRIPE_PRICE_MINI_MENSUEL"
+        }
+      ]
+    },
+    {
+      "id": "forfaits-legacy-aliases",
+      "family": "forfaits",
+      "status": "legacy",
+      "description": "Offres historiques essentiel et premium, alias de mini et business.",
+      "evidence": [
+        {
+          "path": "src/lib/stripe-abonnement.ts",
+          "pattern": "STRIPE_PRICE_ESSENTIEL_MENSUEL"
+        }
+      ]
+    },
+    {
+      "id": "storage-block-catalogue",
+      "family": "stockage",
+      "status": "catalogue_contract",
+      "decision": "DECISION_REQUIRED:STRIPE-STORAGE-BLOCK",
+      "description": "Bloc de stockage (STRIPE_PRICE_BLOC_STOCKAGE_<PÉRIODE>) : décrit par le catalogue V3 seulement, aucun runtime ni gabarit. AUCUNE variable créée au manifeste.",
+      "evidence": [
+        {
+          "path": "src/lib/commercial/stripe-mapping.ts",
+          "pattern": "STRIPE_PRICE_BLOC_STOCKAGE_"
+        }
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "id": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
+      "owner": "Julien",
+      "question": "Le prix d'un module dépend-il du forfait de départ (contrat catalogue V3, jusqu'à 40 variables) ou est-il unique par module et période (contrat runtime, 10 variables) ?",
+      "options": [
+        "plat : un prix par module et période",
+        "par forfait : module × forfait × période"
+      ]
+    },
+    {
+      "id": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS",
+      "owner": "Julien",
+      "question": "Les comptes supplémentaires se facturent-ils par plan (runtime actuel) ou par rôle 5/9/15/0 (grille V4) ?",
+      "options": [
+        "par plan (capacité)",
+        "par rôle (V4)"
+      ]
+    },
+    {
+      "id": "DECISION_REQUIRED:STRIPE-IA-OPTIONS",
+      "owner": "Julien",
+      "question": "Les options IA par palier 100/300/illimité sont-elles remplacées par le pack ponctuel + IA intensive (V4), et quand retirer les anciennes ?",
+      "options": [
+        "V4 seule",
+        "cohabitation temporaire"
+      ]
+    },
+    {
+      "id": "DECISION_REQUIRED:STRIPE-LEGACY-GENERATIONS",
+      "owner": "Julien",
+      "question": "Quand retirer les Price IDs des offres historiques (essentiel, premium) et de la base des générations précédentes ?",
+      "options": [
+        "après épuisement des abonnements",
+        "date fixe"
+      ]
+    },
+    {
+      "id": "DECISION_REQUIRED:STRIPE-STORAGE-BLOCK",
+      "owner": "Julien",
+      "question": "Le bloc de stockage est-il un produit vendable ? Tant que non tranché, aucune variable Stripe n'est créée.",
+      "options": [
+        "oui",
+        "non"
+      ]
+    },
+    {
+      "id": "DECISION_REQUIRED:FLAG-CRONS-FAIL-OPEN",
+      "owner": "Julien",
+      "question": "Passer FEATURE_CRONS_ENABLED en fail-closed (« true » requis) ? Impact : la production doit alors poser la variable à true AVANT le déploiement, sinon les tâches planifiées s'arrêtent.",
+      "options": [
+        "fail-closed avec pose préalable en production",
+        "conserver fail-open (justifié)"
+      ]
+    },
+    {
+      "id": "DECISION_REQUIRED:STUDIO-SIGNUP-DEFAULT",
+      "owner": "Julien",
+      "question": "Valeur par défaut de l'inscription Studio : open (actuel) ou closed ?",
+      "options": [
+        "closed par défaut",
+        "open par défaut"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-DR-BANK-KEY-VERSIONING",
+      "severity": "P0",
+      "status": "open",
+      "variables": [
+        "BANK_DATA_ENCRYPTION_KEY"
+      ],
+      "text": "AES-256-GCM avec format chiffré « v1 » sans identifiant de clé : aucune rotation simple, perte = IBAN/BIC illisibles à jamais.",
+      "next_step": "Lot cryptographie séparé : key versioning (id de clé dans le chiffré), fenêtre à deux clés, rechiffrement."
+    },
+    {
+      "id": "F-DR-VOLUME-PASSPHRASE",
+      "severity": "P0",
+      "status": "open",
+      "variables": [],
+      "text": "La passphrase du volume DR, seul dépôt de secrets, n'a pas de garde documentée.",
+      "next_step": "Documenter deux dépositaires et un test de restauration."
+    },
+    {
+      "id": "F-SUPABASE-PUBLIC-KEY-NAME",
+      "severity": "P1",
+      "status": "detected",
+      "variables": [
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+      ],
+      "text": "Deux noms pour la clé publique Supabase : PUBLISHABLE (Gestion Pro, Colors, Studio) et ANON legacy (Tools, Réserves).",
+      "next_step": "Lot code : lecture canonique + repli sur l'alias dans Tools et Réserves, puis retrait de l'alias."
+    },
+    {
+      "id": "F-RESERVES-EXAMPLE-KEY",
+      "severity": "P1",
+      "status": "fixed",
+      "variables": [
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+      ],
+      "text": "Le gabarit de Réserves déclarait PUBLISHABLE alors que le code lit ANON : configurée selon l'exemple, l'application n'authentifiait personne.",
+      "next_step": "Corrigé : le gabarit déclare l'alias lu par le code. Test de non-régression : EXAMPLE-FOREIGN / EXAMPLE-MISSING."
+    },
+    {
+      "id": "F-STRIPE-EXPECTED-MODE-TEMPLATES",
+      "severity": "P1",
+      "status": "fixed",
+      "variables": [
+        "STRIPE_WEBHOOK_EXPECTED_MODE"
+      ],
+      "text": "Variable obligatoire (webhook 503 sinon) absente des trois gabarits racine.",
+      "next_step": "Corrigé : ajoutée aux trois gabarits."
+    },
+    {
+      "id": "F-FLAGS-TEMPLATES",
+      "severity": "P1",
+      "status": "fixed",
+      "variables": [
+        "FEATURE_BOUTIQUE_ENABLED",
+        "FEATURE_AI_ENABLED",
+        "FEATURE_AI_DEVIS_ENABLED",
+        "FEATURE_RELANCES_AUTO_ENABLED",
+        "FEATURE_CRONS_ENABLED"
+      ],
+      "text": "Drapeaux absents de .env.example (production) ; AI_DEVIS et RELANCES_AUTO dans aucun gabarit.",
+      "next_step": "Corrigé : déclarés dans les trois gabarits."
+    },
+    {
+      "id": "F-STRIPE-CONTRACTS-DIVERGENT",
+      "severity": "P1",
+      "status": "open",
+      "variables": [],
+      "text": "Plusieurs contrats de Price Stripe incompatibles coexistent (modules plat vs par forfait, comptes supplémentaires par plan vs par rôle, options IA).",
+      "next_step": "Décisions Julien : DECISION_REQUIRED:STRIPE-*. Le CI les signale à chaque exécution."
+    },
+    {
+      "id": "F-FLAG-CRONS-FAIL-OPEN",
+      "severity": "P1",
+      "status": "detected",
+      "variables": [
+        "FEATURE_CRONS_ENABLED"
+      ],
+      "text": "Seul drapeau fail-open parmi les FEATURE_* : absent = tâches planifiées actives.",
+      "next_step": "DECISION_REQUIRED:FLAG-CRONS-FAIL-OPEN. Comportement NON modifié dans ce lot."
+    },
+    {
+      "id": "F-ENV-FALLBACK-LOCAL",
+      "severity": "P1",
+      "status": "detected",
+      "variables": [
+        "ELSATIA_APPLICATION_ENV"
+      ],
+      "text": "environnementApplications() retombe silencieusement sur « local » ; « test » n'est pas reconnu par le code.",
+      "next_step": "Lot code : refuser l'absence sur un déploiement. En attendant : preflight --auto (avant build) et CI le détectent."
+    },
+    {
+      "id": "F-ENV-INDICATOR-ADOPTION",
+      "severity": "P1",
+      "status": "detected",
+      "variables": [
+        "ELSATIA_APPLICATION_ENV",
+        "NEXT_PUBLIC_TOOLS_ENV"
+      ],
+      "text": "Seuls Gestion Pro et Colors lisent ELSATIA_APPLICATION_ENV ; Tools a son propre indicateur public ; Réserves et Studio n'en ont aucun.",
+      "next_step": "Lot code : adoption par Réserves, Studio, Tools (variante NEXT_PUBLIC_ pour le navigateur)."
+    },
+    {
+      "id": "F-URL-LOCALHOST-FALLBACK",
+      "severity": "P1",
+      "status": "detected",
+      "variables": [
+        "NEXT_PUBLIC_COLORS_URL",
+        "NEXT_PUBLIC_ELSATIA_ACCOUNT_URL",
+        "NEXT_PUBLIC_RESERVES_URL"
+      ],
+      "text": "Replis localhost figés au build dans Colors et Réserves (liens d'invitation e-mail de Réserves).",
+      "next_step": "Colors et Réserves : garde de pré-build bloquante (apps/reserves/scripts/verify-public-env.mjs, sur le modèle de Colors/Tools — interrompt npm run build sans NEXT_PUBLIC_SUPABASE_URL/NEXT_PUBLIC_SUPABASE_ANON_KEY/NEXT_PUBLIC_RESERVES_URL sur un build publié). NEXT_PUBLIC_ELSATIA_ACCOUNT_URL (Gestion Pro) reste sur preflight --auto, hors périmètre de ce correctif. Lot code restant : supprimer les replis eux-mêmes (conservés à dessein pour le confort du développement local)."
+    },
+    {
+      "id": "F-STUDIO-SERVICE-KEY-NAME",
+      "severity": "P1",
+      "status": "detected",
+      "variables": [
+        "STUDIO_STORAGE_SERVICE_KEY"
+      ],
+      "text": "C'est une clé service_role (injectée depuis SERVICE_ROLE_KEY) sous un nom « storage », partagée avec un worker hors Vercel.",
+      "next_step": "Migration de nom recommandée vers SUPABASE_SERVICE_ROLE_KEY (lot Studio). Valeur et fonctionnement NON modifiés."
+    },
+    {
+      "id": "F-STUDIO-SIGNUP-DEFAULT-OPEN",
+      "severity": "P1",
+      "status": "fixed",
+      "variables": [
+        "STUDIO_SIGNUP_MODE"
+      ],
+      "text": "Inscription Studio ouverte par défaut si la variable était absente ou mal orthographiée.",
+      "next_step": "Corrigé le 2026-09-21 (lot STUDIO RUNTIME CONFIG WIRING V1) : studioSignupMode() est FAIL-CLOSED, absent/inconnu = closed. Reste ouvert, séparément : DECISION_REQUIRED:STUDIO-SIGNUP-DEFAULT (quelle valeur configurer réellement en production, décision produit et non un défaut de sécurité)."
+    },
+    {
+      "id": "F-STUDIO-MAIL-PROVIDER",
+      "severity": "P2",
+      "status": "accepted",
+      "variables": [
+        "BREVO_API_KEY"
+      ],
+      "text": "Studio n'envoie aucun e-mail transactionnel à ce jour (invitations par e-mail explicitement hors périmètre — ELSATIA-STUDIO-V1-ARCHITECTURE.md, ELSATIA-STUDIO-V1-LOT-A-REPORT.md). RESEND_API_KEY / STUDIO_MAIL_PROVIDER / STUDIO_MAIL_FROM retirés du manifeste le 2026-09-21 (lot STUDIO RUNTIME CONFIG WIRING V1) : variables sans consommateur réel, pas de code à câbler.",
+      "next_step": "À rouvrir avec un arbitrage produit (Resend vs Brevo) si et quand Studio implémente l'envoi d'e-mail (ex. invitations de membres)."
+    },
+    {
+      "id": "F-HMAC-STRIPE-OAUTH-STATE",
+      "severity": "P1",
+      "status": "detected",
+      "variables": [
+        "STRIPE_SECRET_KEY"
+      ],
+      "text": "STRIPE_SECRET_KEY signe aussi le state OAuth Connect : deux usages, rotation couplée.",
+      "next_step": "Variable dédiée future STRIPE_CONNECT_STATE_HMAC_KEY. Migration compatible : le vérifieur accepte l'ancienne signature (dérivée de STRIPE_SECRET_KEY) tant que les states émis avant la bascule n'ont pas expiré, puis on retire le repli."
+    },
+    {
+      "id": "F-HMAC-BANK-STATE-FALLBACK",
+      "severity": "P1",
+      "status": "detected",
+      "variables": [
+        "BANK_DATA_ENCRYPTION_KEY",
+        "POWENS_CLIENT_SECRET"
+      ],
+      "text": "La signature de l'état de paiement bancaire réutilise BANK_DATA_ENCRYPTION_KEY, avec repli sur POWENS_CLIENT_SECRET.",
+      "next_step": "Variable dédiée future BANK_OAUTH_STATE_HMAC_KEY (états valides 7 jours) : double vérification pendant 7 jours, puis retrait des replis. Cryptographie NON modifiée dans ce lot."
+    },
+    {
+      "id": "F-LEGAL-IDENTITY-VARS",
+      "severity": "P1",
+      "status": "fixed",
+      "variables": [
+        "NEXT_PUBLIC_LEGAL_SIRET",
+        "NEXT_PUBLIC_LEGAL_TVA"
+      ],
+      "text": "Variables lues par le code mais absentes des gabarits.",
+      "next_step": "Corrigé : déclarées dans .env.example. Les valeurs restent à fournir avant la commercialisation."
+    },
+    {
+      "id": "F-ADMIN-CLIENT-SERVER-ONLY",
+      "severity": "P2",
+      "status": "detected",
+      "variables": [
+        "SUPABASE_SERVICE_ROLE_KEY"
+      ],
+      "text": "src/lib/supabase/admin.ts (Gestion Pro) n'importe pas « server-only », contrairement à Réserves et Colors. Aucun import client aujourd'hui (contrôlé : ENV-SERVICE-ROLE-IN-CLIENT).",
+      "next_step": "Ajouter l'import dans un lot code."
+    },
+    {
+      "id": "F-PREFLIGHT-ENFORCEMENT",
+      "severity": "P1",
+      "status": "open",
+      "variables": [],
+      "text": "Le preflight --auto (avant build) est livré en mode « report » : il liste les erreurs sans bloquer.",
+      "next_step": "Le rejouer sur des valeurs Preview réelles (par Julien), puis passer preflight_enforcement à « enforce »."
+    }
+  ],
+  "variables": [
+    {
+      "name": "NEXT_PUBLIC_SUPABASE_URL",
+      "applications": [
+        "gestion_pro",
+        "colors",
+        "tools",
+        "reserves",
+        "studio",
+        "studio_worker"
+      ],
+      "required": true,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": true,
+      "category": "supabase_public",
+      "description": "URL HTTPS du projet Supabase (API publique). Identique dans toutes les applications d'un même environnement (SSO multi-application). Jamais localhost en preview ou production.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "url_class": "api_endpoint"
+    },
+    {
+      "name": "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+      "applications": [
+        "gestion_pro",
+        "colors",
+        "studio",
+        "tools"
+      ],
+      "required": true,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": true,
+      "category": "supabase_public",
+      "description": "CONVENTION CIBLE de la clé publique Supabase (clé publishable sb_publishable_…). Publique par conception, protégée par la RLS ; jamais une clé de service. Les clés JWT legacy sont désactivées côté projet.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "accepted_aliases": [
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+      ],
+      "value_pattern": "^sb_publishable_[A-Za-z0-9_-]+$"
+    },
+    {
+      "name": "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "applications": [
+        "tools",
+        "reserves"
+      ],
+      "required": true,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": true,
+      "category": "supabase_public",
+      "description": "ALIAS LEGACY de NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, encore lu par le code de Tools et de Réserves. Le NOM est legacy, la VALEUR doit déjà être une clé publishable (sb_publishable_…).",
+      "fail_mode": "closed",
+      "deprecated": true,
+      "replacement": "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+      "dr_critical": false,
+      "example_required": true,
+      "migration": "Lot code séparé : lire la clé canonique avec repli sur l'alias pendant la transition, puis retirer l'alias. Le gabarit de Réserves déclare l'alias TANT QUE le code le lit (test de non-régression).",
+      "value_pattern": "^sb_publishable_[A-Za-z0-9_-]+$",
+      "finding_ids": [
+        "F-SUPABASE-PUBLIC-KEY-NAME"
+      ]
+    },
+    {
+      "name": "SUPABASE_SERVICE_ROLE_KEY",
+      "applications": [
+        "gestion_pro",
+        "colors",
+        "reserves"
+      ],
+      "required": true,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "supabase_service_role",
+      "description": "Clé service_role du projet Supabase : contourne TOUTE la RLS. Serveur seul, jamais dans le navigateur ni dans next.config. Colors l'utilise pour les photos Storage, Réserves pour la distribution de notifications, Gestion Pro pour crons, webhooks, paie et documents partagés.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "STUDIO_STORAGE_SERVICE_KEY",
+      "applications": [
+        "studio",
+        "studio_worker"
+      ],
+      "required": true,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "supabase_service_role",
+      "description": "C'EST UNE CLÉ service_role du projet Supabase de Studio (injectée par local-test.mjs depuis SERVICE_ROLE_KEY), sous un nom historique « storage ». Privilège maximal : lecture/écriture Storage et contournement de la RLS. Utilisée aussi par le worker vidéo, hors Vercel.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "finding_ids": [
+        "F-STUDIO-SERVICE-KEY-NAME"
+      ]
+    },
+    {
+      "name": "ELSATIA_APPLICATION_ENV",
+      "applications": [
+        "gestion_pro",
+        "colors",
+        "reserves"
+      ],
+      "required": true,
+      "environments": [
+        "local",
+        "test",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": true,
+      "runtime": true,
+      "category": "env_indicator",
+      "description": "INDICATEUR D'ENVIRONNEMENT CANONIQUE : local | test | preview | production. Doit être posé explicitement sur tout déploiement. Repli actuel du code quand il est absent ou inconnu : « local » (URL localhost dans le sélecteur d'applications) : un déploiement mal configuré se croit local.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "allowed_values": [
+        "local",
+        "test",
+        "preview",
+        "production"
+      ],
+      "finding_ids": [
+        "F-ENV-FALLBACK-LOCAL",
+        "F-ENV-INDICATOR-ADOPTION"
+      ]
+    },
+    {
+      "name": "ELSATIA_ENV",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "env_indicator",
+      "description": "Indicateur d'environnement historique, lu uniquement par la détection de déploiement de production de l'assistance (redondant avec NODE_ENV et VERCEL_ENV). Aucun gabarit ne le déclare.",
+      "fail_mode": "default",
+      "deprecated": true,
+      "replacement": "ELSATIA_APPLICATION_ENV",
+      "dr_critical": false,
+      "example_required": false,
+      "migration": "Retirer la lecture dans src/lib/assistance-server.ts une fois ELSATIA_APPLICATION_ENV adopté ; NODE_ENV et VERCEL_ENV verrouillent déjà la production."
+    },
+    {
+      "name": "NEXT_PUBLIC_TOOLS_ENV",
+      "applications": [
+        "tools"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": true,
+      "category": "env_indicator",
+      "description": "Indicateur d'environnement PUBLIC de Tools (local | preview | production | native-dev | native-production). Valeur par défaut quand absent ou inconnu : « production ». Second indicateur, distinct d'ELSATIA_APPLICATION_ENV qui n'est pas publique.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "allowed_values": [
+        "local",
+        "preview",
+        "production",
+        "native-dev",
+        "native-production"
+      ],
+      "finding_ids": [
+        "F-ENV-INDICATOR-ADOPTION"
+      ]
+    },
+    {
+      "name": "NEXT_PUBLIC_APP_URL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": true,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": true,
+      "category": "url",
+      "description": "Origine canonique de Gestion Pro (liens, retours Stripe, callback Powens, e-mails). HTTPS sans chemin final. Production validée : https://app.elsatia.fr.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "url_class": "app_base"
+    },
+    {
+      "name": "NEXT_PUBLIC_COLORS_URL",
+      "applications": [
+        "colors",
+        "gestion_pro"
+      ],
+      "required": true,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": true,
+      "category": "url",
+      "description": "Origine publique de Colors : metadataBase et redirectTo de la réinitialisation de mot de passe. Repli du code : http://localhost:3010 (figé au build).",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "url_class": "auth_callback",
+      "finding_ids": [
+        "F-URL-LOCALHOST-FALLBACK"
+      ]
+    },
+    {
+      "name": "NEXT_PUBLIC_ELSATIA_ACCOUNT_URL",
+      "applications": [
+        "colors"
+      ],
+      "required": true,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": true,
+      "category": "url",
+      "description": "Portail de compte et d'abonnement ELSATIA (redirections « abonnement requis » et « accès refusé »). Repli du code : http://localhost:3000/abonnement (figé au build).",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "url_class": "cross_app_link",
+      "finding_ids": [
+        "F-URL-LOCALHOST-FALLBACK"
+      ]
+    },
+    {
+      "name": "NEXT_PUBLIC_RESERVES_URL",
+      "applications": [
+        "reserves"
+      ],
+      "required": true,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": true,
+      "category": "url",
+      "description": "Origine publique de Réserves : compose les liens d'invitation envoyés par e-mail, qui doivent être absolus. Repli du code : http://localhost:3020 (figé au build).",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "url_class": "auth_callback",
+      "finding_ids": [
+        "F-URL-LOCALHOST-FALLBACK"
+      ]
+    },
+    {
+      "name": "NEXT_PUBLIC_TOOLS_URL",
+      "applications": [
+        "tools"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": true,
+      "category": "url",
+      "description": "Origine publique de Tools. Repli du code : https://tools.elsatia.fr, soit l'URL de PRODUCTION même dans un preview.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "url_class": "app_base"
+    },
+    {
+      "name": "NEXT_PUBLIC_STUDIO_URL",
+      "applications": [
+        "studio"
+      ],
+      "required": true,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": true,
+      "category": "url",
+      "description": "Origine publique de Studio.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "url_class": "app_base"
+    },
+    {
+      "name": "NEXT_PUBLIC_TOOLS_BILLING_API_URL",
+      "applications": [
+        "tools"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": true,
+      "category": "url",
+      "description": "URL de l'API de facturation de Gestion Pro appelée par Tools (abonnement web).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que l'abonnement Tools est ouvert",
+      "url_class": "api_endpoint"
+    },
+    {
+      "name": "TOOLS_APP_URL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "url",
+      "description": "Origine de Tools utilisée par Gestion Pro pour composer les URL de retour Stripe Checkout de Tools.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que la facturation Tools est ouverte",
+      "url_class": "stripe_return"
+    },
+    {
+      "name": "TOOLS_ALLOWED_ORIGINS",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "url",
+      "description": "Liste blanche CORS (séparée par des virgules) des origines autorisées à appeler l'API de facturation. Les origines Capacitor de l'application native sont légitimes (hostname localhost, androidScheme https, iosScheme capacitor).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que Tools appelle l'API de facturation",
+      "url_class": "origin_list",
+      "local_origin_exceptions": [
+        "capacitor://localhost",
+        "https://localhost"
+      ]
+    },
+    {
+      "name": "DISABLE_EMAIL_LOGIN",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Désactive l'authentification e-mail pour la démonstration LOCALE. Ne prend effet que si TOUTES les conditions sont réunies (ELSATIA_LOCAL_DEMO, hors production, hors Vercel, URL Supabase locale). Doit valoir false ou être absent partout ailleurs.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "flag": {
+        "kind": "local_only",
+        "absent_behavior": "closed",
+        "owner": "Sécurité",
+        "criticality": "critical",
+        "expected": {
+          "local": "false",
+          "preview": "false",
+          "production": "false"
+        }
+      },
+      "forbidden_in": [
+        "preview",
+        "production"
+      ]
+    },
+    {
+      "name": "ELSATIA_LOCAL_DEMO",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Deuxième verrou du mode démonstration locale : refusé en production, en preview et sur Vercel, et exige une URL Supabase locale.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "flag": {
+        "kind": "local_only",
+        "absent_behavior": "closed",
+        "owner": "Sécurité",
+        "criticality": "critical",
+        "expected": {
+          "local": "false",
+          "preview": "false",
+          "production": "false"
+        }
+      },
+      "forbidden_in": [
+        "preview",
+        "production"
+      ]
+    },
+    {
+      "name": "BREVO_API_KEY",
+      "applications": [
+        "gestion_pro",
+        "platform",
+        "reserves"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "email",
+      "description": "Clé API du canal e-mail commun ELSATIA (Brevo) : invitations, réinitialisations, relances. Même valeur dans Gestion Pro et Réserves : le socle partage le canal, pas une seconde configuration.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que l'envoi d'e-mails est activé"
+    },
+    {
+      "name": "EMAIL_FROM_NAME",
+      "applications": [
+        "gestion_pro",
+        "platform",
+        "reserves"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "email",
+      "description": "Nom d'expéditeur des e-mails ; repli sûr : ELSATIA.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "EMAIL_FROM_ADDRESS",
+      "applications": [
+        "gestion_pro",
+        "platform",
+        "reserves"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "email",
+      "description": "Adresse d'expédition vérifiée par le fournisseur e-mail.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que l'envoi d'e-mails est activé"
+    },
+    {
+      "name": "SUPPORT_EMAIL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "email",
+      "description": "Adresse de contact affichée aux utilisateurs (boîte professionnelle).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que l'envoi d'e-mails est activé"
+    },
+    {
+      "name": "RATE_LIMIT_HMAC_KEY",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": true,
+      "environments": [
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "security",
+      "description": "Clé HMAC des identités de limitation de débit (32 octets minimum, aléatoire). Absente en production : les endpoints protégés répondent 503 (fail-closed). Hors production : repli sur une constante publique.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "CRON_SECRET",
+      "applications": [
+        "gestion_pro",
+        "reserves"
+      ],
+      "required": true,
+      "environments": [
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "cron",
+      "description": "Secret Bearer des tâches planifiées Vercel (Gestion Pro : abonnements et notifications push ; Réserves : notifications). Absent : 503. Même valeur dans Gestion Pro et Réserves par conception.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "NOTIFICATIONS_WEBHOOK_SECRET",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "push",
+      "description": "Secret du webhook base de données → route de distribution des notifications push. Absent : 503.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les notifications push sont actives"
+    },
+    {
+      "name": "PAYROLL_IMPORT_SECRET",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "security",
+      "description": "Secret Bearer de l'import de bulletins de paie (32 caractères minimum, comparaison à temps constant).",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que l'import de paie est activé"
+    },
+    {
+      "name": "VAPID_PRIVATE_KEY",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "push",
+      "description": "Clé privée VAPID des notifications push web. La régénérer invalide TOUS les abonnements push existants : irremplaçable sans perte.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": true,
+      "example_required": true,
+      "required_when": "dès que les notifications push sont actives",
+      "dr_note": "Régénérer invalide tous les push_abonnements : non recréable sans perte. Sauvegarder la paire avec la clé publique."
+    },
+    {
+      "name": "VAPID_PUBLIC_KEY",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "push",
+      "description": "Clé publique VAPID (passée au navigateur par la page de paramétrage : pas de préfixe NEXT_PUBLIC_). Doit correspondre à la clé privée.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les notifications push sont actives"
+    },
+    {
+      "name": "VAPID_SUBJECT",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "push",
+      "description": "Contact VAPID (mailto: ou https:) exigé par les services push.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les notifications push sont actives"
+    },
+    {
+      "name": "BANK_DATA_ENCRYPTION_KEY",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": true,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "encryption",
+      "description": "Clé AES-256-GCM (32 octets, hex ou base64) qui chiffre IBAN/BIC. Le format chiffré « v1 » ne porte AUCUN identifiant de clé : pas de rotation simple. Sert aussi de clé HMAC de l'état de paiement bancaire (repli sur POWENS_CLIENT_SECRET si absente).",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": true,
+      "example_required": true,
+      "dr_note": "Perdue : IBAN/BIC illisibles à jamais, non recréable. Deux dépositaires + registre DR. Rotation impossible sans key versioning (lot crypto séparé).",
+      "finding_ids": [
+        "F-DR-BANK-KEY-VERSIONING",
+        "F-HMAC-BANK-STATE-FALLBACK"
+      ]
+    },
+    {
+      "name": "POWENS_CLIENT_ID",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "banking",
+      "description": "Identifiant client Powens (paiements bancaires).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les paiements bancaires sont activés"
+    },
+    {
+      "name": "POWENS_CLIENT_SECRET",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "banking",
+      "description": "Secret client Powens. Sert aussi de repli à la signature de l'état de paiement quand BANK_DATA_ENCRYPTION_KEY est absente : à supprimer.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les paiements bancaires sont activés",
+      "finding_ids": [
+        "F-HMAC-BANK-STATE-FALLBACK"
+      ]
+    },
+    {
+      "name": "POWENS_API_BASE_URL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "banking",
+      "description": "URL de base de l'API Powens.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les paiements bancaires sont activés",
+      "url_class": "provider_base"
+    },
+    {
+      "name": "POWENS_WEBVIEW_BASE_URL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "banking",
+      "description": "URL de base du webview de paiement Powens.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les paiements bancaires sont activés",
+      "url_class": "provider_base"
+    },
+    {
+      "name": "STRIPE_SECRET_KEY",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": true,
+      "environments": [
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "payments",
+      "description": "Clé secrète Stripe (test en local/preview, live en production). Sert AUSSI de clé HMAC du state OAuth Stripe Connect : à séparer (STRIPE_CONNECT_STATE_HMAC_KEY).",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "value_pattern": "^(?:sk|rk)_(?:test|live)_[A-Za-z0-9]+$",
+      "finding_ids": [
+        "F-HMAC-STRIPE-OAUTH-STATE"
+      ]
+    },
+    {
+      "name": "STRIPE_WEBHOOK_EXPECTED_MODE",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": true,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "payments",
+      "description": "Mode Stripe attendu par les webhooks d'abonnement : test | live. Obligatoire : absente ou invalide, le webhook répond 503 (Stripe rejoue). Preview = test ; production = live à l'ouverture commerciale.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "allowed_values": [
+        "test",
+        "live"
+      ]
+    },
+    {
+      "name": "STRIPE_WEBHOOK_ABONNEMENT_SECRET",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": true,
+      "environments": [
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "payments",
+      "description": "Secret de signature du webhook Stripe Billing (abonnements). Distinct des autres webhooks.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "value_pattern": "^whsec_[A-Za-z0-9]+$"
+    },
+    {
+      "name": "STRIPE_WEBHOOK_SECRET",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "payments",
+      "description": "Secret de signature du webhook Stripe historique / Connect.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que Stripe Connect est activé",
+      "value_pattern": "^whsec_[A-Za-z0-9]+$"
+    },
+    {
+      "name": "STRIPE_WEBHOOK_BOUTIQUE_SECRET",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "payments",
+      "description": "Secret de signature du webhook de la Boutique. La Boutique n'a pas d'application propre : elle vit dans Gestion Pro.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que la Boutique est ouverte (FEATURE_BOUTIQUE_ENABLED=true)",
+      "value_pattern": "^whsec_[A-Za-z0-9]+$",
+      "feature": "boutique"
+    },
+    {
+      "name": "STRIPE_CONNECT_CLIENT_ID",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "payments",
+      "description": "Identifiant OAuth Stripe Connect (ca_…). Visible dans l'URL d'autorisation : non secret.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que Stripe Connect est activé",
+      "value_pattern": "^ca_[A-Za-z0-9]+$"
+    },
+    {
+      "name": "STRIPE_AUTOMATIC_TAX_ENABLED",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "TVA automatique Stripe Checkout. Seule la valeur « true » l'active ; absent = désactivée.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "flag": {
+        "kind": "boolean",
+        "absent_behavior": "closed",
+        "owner": "Finance",
+        "criticality": "high",
+        "expected": {
+          "local": "false",
+          "preview": "false",
+          "production": "decision"
+        },
+        "must_be_defined_in": [
+          "preview",
+          "production"
+        ]
+      }
+    },
+    {
+      "name": "STRIPE_STATE_ATTESTATION_KEY_ID",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "encryption",
+      "description": "Identifiant (non secret) de la paire Ed25519 d'attestation d'état Stripe ; doit correspondre à une ligne du registre stripe_attestation.public_keys.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que l'attestation d'état Stripe est active"
+    },
+    {
+      "name": "STRIPE_STATE_ATTESTATION_PRIVATE_KEY_B64",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "encryption",
+      "description": "Clé privée Ed25519 (base64) qui signe l'attestation d'état Stripe. Une seule copie aujourd'hui (volume DR + variable Vercel non lisible).",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": true,
+      "example_required": true,
+      "required_when": "dès que l'attestation d'état Stripe est active",
+      "dr_note": "Perdue : plus d'attestation ; nouvelle paire et nouvelle ligne de registre à provisionner par un DBA. Une seule copie : en faire deux (runbook Ed25519)."
+    },
+    {
+      "name": "STRIPE_TOOLS_SECRET_KEY",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "tools_billing",
+      "description": "Clé secrète Stripe dédiée à la facturation de Tools. Aucun repli sur STRIPE_SECRET_KEY : configuration séparée et fail-closed.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que la facturation Tools est ouverte",
+      "value_pattern": "^(?:sk|rk)_(?:test|live)_[A-Za-z0-9]+$"
+    },
+    {
+      "name": "STRIPE_TOOLS_WEBHOOK_SECRET",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "tools_billing",
+      "description": "Secret de signature du webhook Stripe de Tools.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que la facturation Tools est ouverte",
+      "value_pattern": "^whsec_[A-Za-z0-9]+$"
+    },
+    {
+      "name": "STRIPE_TOOLS_PRICE_MONTHLY",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tools_billing",
+      "description": "Price ID Stripe de l'abonnement Tools mensuel.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que la facturation Tools est ouverte",
+      "value_pattern": "^price_[A-Za-z0-9]+$"
+    },
+    {
+      "name": "STRIPE_TOOLS_PRICE_ANNUAL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tools_billing",
+      "description": "Price ID Stripe de l'abonnement Tools annuel.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que la facturation Tools est ouverte",
+      "value_pattern": "^price_[A-Za-z0-9]+$"
+    },
+    {
+      "name": "STRIPE_PRICE_MINI_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du forfait mini (mensuel). Forfait canonique, lu par le runtime.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$"
+    },
+    {
+      "name": "STRIPE_PRICE_MINI_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du forfait mini (annuel). Forfait canonique, lu par le runtime.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$"
+    },
+    {
+      "name": "STRIPE_PRICE_PRO_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du forfait pro (mensuel). Forfait canonique, lu par le runtime.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$"
+    },
+    {
+      "name": "STRIPE_PRICE_PRO_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du forfait pro (annuel). Forfait canonique, lu par le runtime.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$"
+    },
+    {
+      "name": "STRIPE_PRICE_BUSINESS_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du forfait business (mensuel). Forfait canonique, lu par le runtime.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$"
+    },
+    {
+      "name": "STRIPE_PRICE_BUSINESS_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du forfait business (annuel). Forfait canonique, lu par le runtime.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$"
+    },
+    {
+      "name": "STRIPE_PRICE_ENTREPRISE_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du forfait entreprise (mensuel). Forfait canonique, lu par le runtime.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$"
+    },
+    {
+      "name": "STRIPE_PRICE_ENTREPRISE_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du forfait entreprise (annuel). Forfait canonique, lu par le runtime.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$"
+    },
+    {
+      "name": "STRIPE_PRICE_ESSENTIEL_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID de l'offre historique essentiel (mensuel), non commercialisée, encore lue pour les abonnements existants.",
+      "fail_mode": "default",
+      "deprecated": true,
+      "replacement": "STRIPE_PRICE_MINI_MENSUEL",
+      "dr_critical": false,
+      "example_required": false,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-LEGACY-GENERATIONS",
+      "migration": "Retirer une fois plus aucun abonnement Stripe actif ne porte l'offre essentiel (alias essentiel→mini, premium→business)."
+    },
+    {
+      "name": "STRIPE_PRICE_ESSENTIEL_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID de l'offre historique essentiel (annuel), non commercialisée, encore lue pour les abonnements existants.",
+      "fail_mode": "default",
+      "deprecated": true,
+      "replacement": "STRIPE_PRICE_MINI_ANNUEL",
+      "dr_critical": false,
+      "example_required": false,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-LEGACY-GENERATIONS",
+      "migration": "Retirer une fois plus aucun abonnement Stripe actif ne porte l'offre essentiel (alias essentiel→mini, premium→business)."
+    },
+    {
+      "name": "STRIPE_PRICE_PREMIUM_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID de l'offre historique premium (mensuel), non commercialisée, encore lue pour les abonnements existants.",
+      "fail_mode": "default",
+      "deprecated": true,
+      "replacement": "STRIPE_PRICE_BUSINESS_MENSUEL",
+      "dr_critical": false,
+      "example_required": false,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-LEGACY-GENERATIONS",
+      "migration": "Retirer une fois plus aucun abonnement Stripe actif ne porte l'offre premium (alias essentiel→mini, premium→business)."
+    },
+    {
+      "name": "STRIPE_PRICE_PREMIUM_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID de l'offre historique premium (annuel), non commercialisée, encore lue pour les abonnements existants.",
+      "fail_mode": "default",
+      "deprecated": true,
+      "replacement": "STRIPE_PRICE_BUSINESS_ANNUEL",
+      "dr_critical": false,
+      "example_required": false,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-LEGACY-GENERATIONS",
+      "migration": "Retirer une fois plus aucun abonnement Stripe actif ne porte l'offre premium (alias essentiel→mini, premium→business)."
+    },
+    {
+      "name": "STRIPE_PRICE_COMPTE_SUP_MINI_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID d'une personne active supplémentaire, plan mini (mensuel). Nom historique « compte sup », sens réel : capacité. Contrat par PLAN, lu par le runtime.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS"
+    },
+    {
+      "name": "STRIPE_PRICE_COMPTE_SUP_MINI_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID d'une personne active supplémentaire, plan mini (annuel). Nom historique « compte sup », sens réel : capacité. Contrat par PLAN, lu par le runtime.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS"
+    },
+    {
+      "name": "STRIPE_PRICE_COMPTE_SUP_PRO_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID d'une personne active supplémentaire, plan pro (mensuel). Nom historique « compte sup », sens réel : capacité. Contrat par PLAN, lu par le runtime.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS"
+    },
+    {
+      "name": "STRIPE_PRICE_COMPTE_SUP_PRO_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID d'une personne active supplémentaire, plan pro (annuel). Nom historique « compte sup », sens réel : capacité. Contrat par PLAN, lu par le runtime.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS"
+    },
+    {
+      "name": "STRIPE_PRICE_COMPTE_SUP_BUSINESS_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID d'une personne active supplémentaire, plan business (mensuel). Nom historique « compte sup », sens réel : capacité. Contrat par PLAN, lu par le runtime.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS"
+    },
+    {
+      "name": "STRIPE_PRICE_COMPTE_SUP_BUSINESS_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID d'une personne active supplémentaire, plan business (annuel). Nom historique « compte sup », sens réel : capacité. Contrat par PLAN, lu par le runtime.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS"
+    },
+    {
+      "name": "STRIPE_PRICE_COMPTE_SUP_ENTREPRISE_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID d'une personne active supplémentaire, plan entreprise (mensuel). Nom historique « compte sup », sens réel : capacité. Contrat par PLAN, lu par le runtime.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS"
+    },
+    {
+      "name": "STRIPE_PRICE_COMPTE_SUP_ENTREPRISE_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID d'une personne active supplémentaire, plan entreprise (annuel). Nom historique « compte sup », sens réel : capacité. Contrat par PLAN, lu par le runtime.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS"
+    },
+    {
+      "name": "STRIPE_PRICE_COMPTE_SUP_ESSENTIEL_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID capacité de l'offre historique essentiel (mensuel), non commercialisée.",
+      "fail_mode": "default",
+      "deprecated": true,
+      "replacement": "STRIPE_PRICE_COMPTE_SUP_MINI_MENSUEL",
+      "dr_critical": false,
+      "example_required": false,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-LEGACY-GENERATIONS",
+      "migration": "Retirer avec l'offre historique correspondante."
+    },
+    {
+      "name": "STRIPE_PRICE_COMPTE_SUP_ESSENTIEL_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID capacité de l'offre historique essentiel (annuel), non commercialisée.",
+      "fail_mode": "default",
+      "deprecated": true,
+      "replacement": "STRIPE_PRICE_COMPTE_SUP_MINI_ANNUEL",
+      "dr_critical": false,
+      "example_required": false,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-LEGACY-GENERATIONS",
+      "migration": "Retirer avec l'offre historique correspondante."
+    },
+    {
+      "name": "STRIPE_PRICE_COMPTE_SUP_PREMIUM_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID capacité de l'offre historique premium (mensuel), non commercialisée.",
+      "fail_mode": "default",
+      "deprecated": true,
+      "replacement": "STRIPE_PRICE_COMPTE_SUP_BUSINESS_MENSUEL",
+      "dr_critical": false,
+      "example_required": false,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-LEGACY-GENERATIONS",
+      "migration": "Retirer avec l'offre historique correspondante."
+    },
+    {
+      "name": "STRIPE_PRICE_COMPTE_SUP_PREMIUM_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID capacité de l'offre historique premium (annuel), non commercialisée.",
+      "fail_mode": "default",
+      "deprecated": true,
+      "replacement": "STRIPE_PRICE_COMPTE_SUP_BUSINESS_ANNUEL",
+      "dr_critical": false,
+      "example_required": false,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-LEGACY-GENERATIONS",
+      "migration": "Retirer avec l'offre historique correspondante."
+    },
+    {
+      "name": "STRIPE_PRICE_COMPTE_SUP_ROLE_TERRAIN_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du compte supplémentaire par RÔLE terrain (mensuel). Contrat V4 par rôle : vérifié par verify:stripe-prices, PAS encore lu par le runtime (détecté comme orphelin).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS",
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
+    },
+    {
+      "name": "STRIPE_PRICE_COMPTE_SUP_ROLE_TERRAIN_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du compte supplémentaire par RÔLE terrain (annuel). Contrat V4 par rôle : vérifié par verify:stripe-prices, PAS encore lu par le runtime (détecté comme orphelin).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS",
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
+    },
+    {
+      "name": "STRIPE_PRICE_COMPTE_SUP_ROLE_CHEF_EQUIPE_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du compte supplémentaire par RÔLE chef equipe (mensuel). Contrat V4 par rôle : vérifié par verify:stripe-prices, PAS encore lu par le runtime (détecté comme orphelin).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS",
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
+    },
+    {
+      "name": "STRIPE_PRICE_COMPTE_SUP_ROLE_CHEF_EQUIPE_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du compte supplémentaire par RÔLE chef equipe (annuel). Contrat V4 par rôle : vérifié par verify:stripe-prices, PAS encore lu par le runtime (détecté comme orphelin).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS",
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
+    },
+    {
+      "name": "STRIPE_PRICE_COMPTE_SUP_ROLE_ADMINISTRATIF_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du compte supplémentaire par RÔLE administratif (mensuel). Contrat V4 par rôle : vérifié par verify:stripe-prices, PAS encore lu par le runtime (détecté comme orphelin).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS",
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
+    },
+    {
+      "name": "STRIPE_PRICE_COMPTE_SUP_ROLE_ADMINISTRATIF_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du compte supplémentaire par RÔLE administratif (annuel). Contrat V4 par rôle : vérifié par verify:stripe-prices, PAS encore lu par le runtime (détecté comme orphelin).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS",
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
+    },
+    {
+      "name": "STRIPE_PRICE_MODULE_POINTAGE_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du module pointage (mensuel). Contrat PLAT (un prix par module et période), lu par le runtime. Le catalogue commercial V3 décrit un autre contrat (module × forfait).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
+    },
+    {
+      "name": "STRIPE_PRICE_MODULE_POINTAGE_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du module pointage (annuel). Contrat PLAT (un prix par module et période), lu par le runtime. Le catalogue commercial V3 décrit un autre contrat (module × forfait).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
+    },
+    {
+      "name": "STRIPE_PRICE_MODULE_STOCK_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du module stock (mensuel). Contrat PLAT (un prix par module et période), lu par le runtime. Le catalogue commercial V3 décrit un autre contrat (module × forfait).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
+    },
+    {
+      "name": "STRIPE_PRICE_MODULE_STOCK_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du module stock (annuel). Contrat PLAT (un prix par module et période), lu par le runtime. Le catalogue commercial V3 décrit un autre contrat (module × forfait).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
+    },
+    {
+      "name": "STRIPE_PRICE_MODULE_MATERIEL_VEHICULES_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du module materiel vehicules (mensuel). Contrat PLAT (un prix par module et période), lu par le runtime. Le catalogue commercial V3 décrit un autre contrat (module × forfait).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
+    },
+    {
+      "name": "STRIPE_PRICE_MODULE_MATERIEL_VEHICULES_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du module materiel vehicules (annuel). Contrat PLAT (un prix par module et période), lu par le runtime. Le catalogue commercial V3 décrit un autre contrat (module × forfait).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
+    },
+    {
+      "name": "STRIPE_PRICE_MODULE_NOTES_FRAIS_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du module notes frais (mensuel). Contrat PLAT (un prix par module et période), lu par le runtime. Le catalogue commercial V3 décrit un autre contrat (module × forfait).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
+    },
+    {
+      "name": "STRIPE_PRICE_MODULE_NOTES_FRAIS_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du module notes frais (annuel). Contrat PLAT (un prix par module et période), lu par le runtime. Le catalogue commercial V3 décrit un autre contrat (module × forfait).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
+    },
+    {
+      "name": "STRIPE_PRICE_MODULE_RENTABILITE_AVANCEE_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du module rentabilite avancee (mensuel). Contrat PLAT (un prix par module et période), lu par le runtime. Le catalogue commercial V3 décrit un autre contrat (module × forfait).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
+    },
+    {
+      "name": "STRIPE_PRICE_MODULE_RENTABILITE_AVANCEE_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du module rentabilite avancee (annuel). Contrat PLAT (un prix par module et période), lu par le runtime. Le catalogue commercial V3 décrit un autre contrat (module × forfait).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
+    },
+    {
+      "name": "STRIPE_PRICE_IA_CREDITS_PACK_PONCTUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID du pack de crédits IA (achat ponctuel, sans périodicité).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-IA-OPTIONS"
+    },
+    {
+      "name": "STRIPE_PRICE_IA_INTENSIVE_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID de l'option IA intensive (mensuel).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-IA-OPTIONS"
+    },
+    {
+      "name": "STRIPE_PRICE_IA_INTENSIVE_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID de l'option IA intensive (annuel).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-IA-OPTIONS"
+    },
+    {
+      "name": "STRIPE_PRICE_OPTION_IA_100_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID de l'ancienne option IA 100 (mensuel), encore lue par le runtime.",
+      "fail_mode": "default",
+      "deprecated": true,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-IA-OPTIONS",
+      "migration": "Grille V4 : pack de crédits ponctuel + IA intensive. Retirer après épuisement des abonnements de génération précédente."
+    },
+    {
+      "name": "STRIPE_PRICE_OPTION_IA_100_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID de l'ancienne option IA 100 (annuel), encore lue par le runtime.",
+      "fail_mode": "default",
+      "deprecated": true,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-IA-OPTIONS",
+      "migration": "Grille V4 : pack de crédits ponctuel + IA intensive. Retirer après épuisement des abonnements de génération précédente."
+    },
+    {
+      "name": "STRIPE_PRICE_OPTION_IA_300_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID de l'ancienne option IA 300 (mensuel), encore lue par le runtime.",
+      "fail_mode": "default",
+      "deprecated": true,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-IA-OPTIONS",
+      "migration": "Grille V4 : pack de crédits ponctuel + IA intensive. Retirer après épuisement des abonnements de génération précédente."
+    },
+    {
+      "name": "STRIPE_PRICE_OPTION_IA_300_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID de l'ancienne option IA 300 (annuel), encore lue par le runtime.",
+      "fail_mode": "default",
+      "deprecated": true,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-IA-OPTIONS",
+      "migration": "Grille V4 : pack de crédits ponctuel + IA intensive. Retirer après épuisement des abonnements de génération précédente."
+    },
+    {
+      "name": "STRIPE_PRICE_OPTION_IA_ILLIMITE_MENSUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID de l'ancienne option IA illimite (mensuel), encore lue par le runtime.",
+      "fail_mode": "default",
+      "deprecated": true,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-IA-OPTIONS",
+      "migration": "Grille V4 : pack de crédits ponctuel + IA intensive. Retirer après épuisement des abonnements de génération précédente."
+    },
+    {
+      "name": "STRIPE_PRICE_OPTION_IA_ILLIMITE_ANNUEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Price ID de l'ancienne option IA illimite (annuel), encore lue par le runtime.",
+      "fail_mode": "default",
+      "deprecated": true,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
+      "value_pattern": "^price_[A-Za-z0-9]+$",
+      "decision": "DECISION_REQUIRED:STRIPE-IA-OPTIONS",
+      "migration": "Grille V4 : pack de crédits ponctuel + IA intensive. Retirer après épuisement des abonnements de génération précédente."
+    },
+    {
+      "name": "STRIPE_PRICE_BASE_GENERATIONS_PRECEDENTES",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "billing_price",
+      "description": "Registre JSON (identifiants de Price, non secrets) des générations tarifaires précédentes, tolérées pour les abonnements existants. Blob JSON stocké dans une variable : dette.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "tant que des abonnements de génération précédente existent",
+      "decision": "DECISION_REQUIRED:STRIPE-LEGACY-GENERATIONS"
+    },
+    {
+      "name": "FEATURE_BOUTIQUE_ENABLED",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Ouvre la Boutique (catalogue, panier, paiement, webhook). FAIL-CLOSED : seule la valeur « true » l'ouvre.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "flag": {
+        "kind": "boolean",
+        "absent_behavior": "closed",
+        "owner": "Produit — Boutique",
+        "criticality": "critical",
+        "expected": {
+          "local": "false",
+          "preview": "false",
+          "production": "decision"
+        },
+        "must_be_defined_in": [
+          "preview",
+          "production"
+        ]
+      },
+      "feature": "boutique"
+    },
+    {
+      "name": "FEATURE_AI_ENABLED",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Active l'assistant IA. FAIL-CLOSED : absent = IA indisponible.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "flag": {
+        "kind": "boolean",
+        "absent_behavior": "closed",
+        "owner": "Produit — IA",
+        "criticality": "high",
+        "expected": {
+          "local": "false",
+          "preview": "false",
+          "production": "decision"
+        },
+        "must_be_defined_in": [
+          "preview",
+          "production"
+        ]
+      },
+      "feature": "ai"
+    },
+    {
+      "name": "FEATURE_AI_DEVIS_ENABLED",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Sous-drapeau de FEATURE_AI_ENABLED : génération assistée de devis (rollback isolé). FAIL-CLOSED.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "flag": {
+        "kind": "boolean",
+        "absent_behavior": "closed",
+        "owner": "Produit — IA",
+        "criticality": "high",
+        "expected": {
+          "local": "false",
+          "preview": "false",
+          "production": "decision"
+        },
+        "must_be_defined_in": [
+          "preview",
+          "production"
+        ]
+      },
+      "feature": "ai"
+    },
+    {
+      "name": "FEATURE_RELANCES_AUTO_ENABLED",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Envoi AUTOMATIQUE des relances de factures (cron). La relance manuelle reste disponible. FAIL-CLOSED.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "flag": {
+        "kind": "boolean",
+        "absent_behavior": "closed",
+        "owner": "Produit — Facturation",
+        "criticality": "high",
+        "expected": {
+          "local": "false",
+          "preview": "false",
+          "production": "decision"
+        },
+        "must_be_defined_in": [
+          "preview",
+          "production"
+        ]
+      },
+      "feature": "relances"
+    },
+    {
+      "name": "FEATURE_CRONS_ENABLED",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Active les tâches planifiées historiques (abonnements, alertes, paie, pointage). ÉCART : FAIL-OPEN. Tout sauf « false » vaut actif ; absent = ACTIF. Vercel n'exécute les crons qu'en production, ce qui borne l'impact en preview.",
+      "fail_mode": "open",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "flag": {
+        "kind": "boolean",
+        "absent_behavior": "open",
+        "owner": "Produit — Exploitation",
+        "criticality": "critical",
+        "expected": {
+          "local": "false",
+          "preview": "false",
+          "production": "true"
+        },
+        "must_be_defined_in": [
+          "preview",
+          "production"
+        ]
+      },
+      "decision": "DECISION_REQUIRED:FLAG-CRONS-FAIL-OPEN",
+      "finding_ids": [
+        "F-FLAG-CRONS-FAIL-OPEN"
+      ]
+    },
+    {
+      "name": "ABONNEMENTS_PUBLICS_OUVERTS",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Ouvre la souscription publique en ligne. FAIL-CLOSED : absent = fermée, sans erreur (blocage commercial silencieux).",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "flag": {
+        "kind": "boolean",
+        "absent_behavior": "closed",
+        "owner": "Commerce",
+        "criticality": "critical",
+        "expected": {
+          "local": "false",
+          "preview": "false",
+          "production": "decision"
+        },
+        "must_be_defined_in": [
+          "preview",
+          "production"
+        ]
+      }
+    },
+    {
+      "name": "ELSATIA_ASSISTANCE_STRICTE",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Mode d'assistance interapplications. STRICT par défaut et VERROUILLÉ en production : absent, vide ou inconnu = strict. Seules les valeurs 0 et false demandent le mode hérité (tous les droits), refusé en production avec avertissement.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "flag": {
+        "kind": "mode",
+        "absent_behavior": "closed",
+        "owner": "Sécurité",
+        "criticality": "critical",
+        "expected": {
+          "production": "true"
+        }
+      },
+      "allowed_values": [
+        "true",
+        "1",
+        "yes",
+        "0",
+        "false"
+      ]
+    },
+    {
+      "name": "OPENAI_API_KEY",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "ai",
+      "description": "Clé API OpenAI. Nécessaire seulement si FEATURE_AI_ENABLED=true ; coûts facturés à l'usage.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que FEATURE_AI_ENABLED=true",
+      "feature": "ai"
+    },
+    {
+      "name": "OPENAI_MODEL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "ai",
+      "description": "Identifiant du modèle OpenAI autorisé ; défaut intégré au code.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "feature": "ai"
+    },
+    {
+      "name": "IA_PLAFOND_QUOTIDIEN",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "ai",
+      "description": "ORPHELINE : plafond quotidien IA par entreprise, jadis lu du gabarit. Le plafond est désormais en base (verifierPlafondIA, crédits). Plus aucune lecture dans le code.",
+      "fail_mode": "default",
+      "deprecated": true,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "migration": "Retirer des trois gabarits racine dans un lot de nettoyage (aucun effet runtime)."
+    },
+    {
+      "name": "APPLE_ROOT_CA_BASE64",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "mobile_iap",
+      "description": "Certificat racine Apple (public) pour valider les achats iOS de Tools.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les achats iOS Tools sont ouverts"
+    },
+    {
+      "name": "GOOGLE_PLAY_SERVICE_ACCOUNT_JSON",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "mobile_iap",
+      "description": "Compte de service Google Play (JSON contenant une clé privée) pour valider les achats Android de Tools.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les achats Android Tools sont ouverts"
+    },
+    {
+      "name": "GOOGLE_PLAY_RTDN_AUDIENCE",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "mobile_iap",
+      "description": "Audience attendue des notifications Google Play RTDN.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les achats Android Tools sont ouverts"
+    },
+    {
+      "name": "GOOGLE_PLAY_RTDN_SERVICE_ACCOUNT_EMAIL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "mobile_iap",
+      "description": "E-mail du compte de service émetteur des notifications RTDN.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "dès que les achats Android Tools sont ouverts"
+    },
+    {
+      "name": "ELSATIA_TOOLS_NATIVE",
+      "applications": [
+        "tools"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": true,
+      "runtime": false,
+      "category": "tooling",
+      "description": "Mode de build natif (Capacitor) de Tools : « 1 ». Absent = build web.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "allowed_values": [
+        "1"
+      ]
+    },
+    {
+      "name": "NEXT_PUBLIC_TOOLS_RUNTIME",
+      "applications": [
+        "tools"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Environnement d'exécution de Tools : « native » pour l'application Capacitor, sinon web.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "allowed_values": [
+        "native",
+        "web"
+      ]
+    },
+    {
+      "name": "NEXT_PUBLIC_LEGAL_SIRET",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": true,
+      "environments": [
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": true,
+      "category": "legal",
+      "description": "SIRET de l'éditeur affiché dans les mentions légales (public).",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "finding_ids": [
+        "F-LEGAL-IDENTITY-VARS"
+      ]
+    },
+    {
+      "name": "NEXT_PUBLIC_LEGAL_TVA",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": true,
+      "environments": [
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": true,
+      "category": "legal",
+      "description": "N° de TVA intracommunautaire affiché dans les mentions légales (public).",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "finding_ids": [
+        "F-LEGAL-IDENTITY-VARS"
+      ]
+    },
+    {
+      "name": "SENTRY_DSN",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "observability",
+      "description": "DSN Sentry côté serveur (public par conception). Doublon de NEXT_PUBLIC_SENTRY_DSN.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "NEXT_PUBLIC_SENTRY_DSN",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": true,
+      "category": "observability",
+      "description": "DSN Sentry côté navigateur (public par conception).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "SENTRY_AUTH_TOKEN",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": true,
+      "runtime": false,
+      "category": "observability",
+      "description": "Jeton d'API Sentry (publication des source maps au build). Build seulement, jamais dans le bundle.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "SENTRY_ORG",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": true,
+      "runtime": false,
+      "category": "observability",
+      "description": "Organisation Sentry (build).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "SENTRY_PROJECT",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": true,
+      "runtime": false,
+      "category": "observability",
+      "description": "Projet Sentry (build).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "PDF_CHROMIUM_EXECUTABLE_PATH",
+      "applications": [
+        "gestion_pro",
+        "reserves"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "media",
+      "description": "Chemin d'un binaire Chromium pour la génération de PDF ; défaut : binaire embarqué (variable de réglage, non requise dans les gabarits).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ELSATIA_APP_VERSION",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": false,
+      "category": "build_metadata",
+      "description": "Version de l'application (package.json). Injectée dans le bundle par next.config : jamais de donnée sensible.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "public_via": "next_config_env"
+    },
+    {
+      "name": "ELSATIA_BUILD_COMMIT",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": false,
+      "category": "build_metadata",
+      "description": "Commit du build (VERCEL_GIT_COMMIT_SHA ou git). Injectée dans le bundle par next.config : jamais de donnée sensible.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "public_via": "next_config_env"
+    },
+    {
+      "name": "ELSATIA_BUILD_DATE",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": false,
+      "category": "build_metadata",
+      "description": "Date du build (entrée facultative, sinon date courante). Injectée dans le bundle par next.config : jamais de donnée sensible.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "public_via": "next_config_env"
+    },
+    {
+      "name": "ELSATIA_BUILD_ENVIRONMENT",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": false,
+      "category": "build_metadata",
+      "description": "Environnement du build (VERCEL_ENV ou NODE_ENV). Injectée dans le bundle par next.config : jamais de donnée sensible.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "public_via": "next_config_env"
+    },
+    {
+      "name": "ELSATIA_DEPLOYMENT_DATE",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": false,
+      "category": "build_metadata",
+      "description": "Date de déploiement (entrée facultative). Injectée dans le bundle par next.config : jamais de donnée sensible.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "public_via": "next_config_env"
+    },
+    {
+      "name": "ELSATIA_DEPLOYMENT_URL",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "preview",
+        "production"
+      ],
+      "visibility": "public",
+      "secret": false,
+      "build_time": true,
+      "runtime": false,
+      "category": "build_metadata",
+      "description": "URL du déploiement (variables Vercel). Injectée dans le bundle par next.config : jamais de donnée sensible.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "public_via": "next_config_env"
+    },
+    {
+      "name": "STUDIO_ENABLED",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Interrupteur d'arrêt d'urgence de toute la surface web Studio : 0|false|off répond 503 partout. Câblé le 2026-09-21 (lot STUDIO RUNTIME CONFIG WIRING V1) dans apps/studio/src/proxy.ts (studioEnabled(), @elsatia/studio-domain), au tout début du proxy — s'applique à toutes les routes couvertes par son matcher.",
+      "fail_mode": "open",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "flag": {
+        "kind": "kill_switch",
+        "absent_behavior": "open",
+        "owner": "Studio — Exploitation",
+        "criticality": "high",
+        "expected": {
+          "local": "1",
+          "preview": "1",
+          "production": "1"
+        },
+        "open_by_design": "interrupteur d'arrêt : absent = actif par conception (apps/studio/src/proxy.ts, studioEnabled)"
+      },
+      "allowed_values": [
+        "1",
+        "0",
+        "true",
+        "false",
+        "on",
+        "off"
+      ]
+    },
+    {
+      "name": "STUDIO_SIGNUP_MODE",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Politique d'inscription Studio : open | allowlist | closed. Câblé le 2026-09-21 (lot STUDIO RUNTIME CONFIG WIRING V1) dans apps/studio/src/app/actions.ts (signup(), studioSignupMode() de @elsatia/studio-domain) : désormais FAIL-CLOSED côté code — absent ou toute valeur qui n'est pas exactement « open »/« allowlist » refuse l'inscription. La valeur cible réellement à configurer en production (open vs closed) reste une décision produit ouverte (voir « decision » ci-dessous), distincte de ce comportement de repli sûr.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "flag": {
+        "kind": "mode",
+        "absent_behavior": "closed",
+        "owner": "Studio — Produit",
+        "criticality": "critical",
+        "expected": {
+          "local": "open",
+          "preview": "closed",
+          "production": "decision"
+        },
+        "must_be_defined_in": [
+          "preview",
+          "production"
+        ]
+      },
+      "allowed_values": [
+        "open",
+        "allowlist",
+        "closed"
+      ],
+      "decision": "DECISION_REQUIRED:STUDIO-SIGNUP-DEFAULT",
+      "finding_ids": [
+        "F-STUDIO-SIGNUP-DEFAULT-OPEN"
+      ]
+    },
+    {
+      "name": "STUDIO_SIGNUP_ALLOWLIST",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "auth",
+      "description": "Liste d'adresses ou de domaines (@domaine) autorisés quand STUDIO_SIGNUP_MODE=allowlist. Câblé le 2026-09-21 (lot STUDIO RUNTIME CONFIG WIRING V1), isStudioSignupAllowlisted() de @elsatia/studio-domain, appelé depuis signup() (apps/studio/src/app/actions.ts) : FAIL-CLOSED, une liste vide ou absente n'autorise personne.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "quand STUDIO_SIGNUP_MODE=allowlist"
+    },
+    {
+      "name": "STUDIO_LEGAL_PUBLISHED",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Gate FAIL-CLOSED sur la création de compte Studio (signup()), et non l'affichage d'un parcours légal complet : aucune page légale/consentement n'existe dans le code à ce jour. « 1 » requis pour autoriser l'inscription. Câblé le 2026-09-21 (lot STUDIO RUNTIME CONFIG WIRING V1) dans apps/studio/src/app/actions.ts, studioLegalPublished() de @elsatia/studio-domain — interprétation documentée : tant que le parcours légal réel n'existe pas, cette variable bloque les nouvelles inscriptions plutôt que de prétendre afficher un texte légal absent.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "flag": {
+        "kind": "mode",
+        "absent_behavior": "closed",
+        "owner": "Studio — Juridique",
+        "criticality": "critical",
+        "expected": {
+          "local": "1",
+          "preview": "1",
+          "production": "decision"
+        },
+        "must_be_defined_in": [
+          "preview",
+          "production"
+        ]
+      },
+      "allowed_values": [
+        "0",
+        "1"
+      ]
+    },
+    {
+      "name": "STUDIO_AI_ANALYSIS",
+      "applications": [
+        "studio",
+        "studio_worker"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Analyse vidéo locale (Python), sans API externe. Défaut OFF : « 1 » l'active.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "flag": {
+        "kind": "mode",
+        "absent_behavior": "closed",
+        "owner": "Studio — Produit",
+        "criticality": "medium",
+        "expected": {
+          "local": "0",
+          "preview": "0",
+          "production": "decision"
+        }
+      },
+      "allowed_values": [
+        "0",
+        "1"
+      ],
+      "feature": "studio_ai"
+    },
+    {
+      "name": "STUDIO_ANALYSIS_PYTHON",
+      "applications": [
+        "studio",
+        "studio_worker"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "media",
+      "description": "Chemin du Python (avec analysis/requirements.txt) utilisé par le worker d'analyse.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "required_when": "quand STUDIO_AI_ANALYSIS=1"
+    },
+    {
+      "name": "STUDIO_ANALYSIS_CONCURRENCY",
+      "applications": [
+        "studio_worker"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "media",
+      "description": "Nombre d'analyses parallèles ; défaut 1.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "STUDIO_ANALYSIS_TIMEOUT_SECONDS",
+      "applications": [
+        "studio_worker"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "media",
+      "description": "Délai maximal d'une analyse, en secondes.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "STUDIO_ANALYSIS_TMP",
+      "applications": [
+        "studio_worker"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "media",
+      "description": "Répertoire temporaire d'analyse.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "STUDIO_RENDER_TMP",
+      "applications": [
+        "studio_worker"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "media",
+      "description": "Répertoire temporaire de rendu.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "STUDIO_RENDER_TIMEOUT_SECONDS",
+      "applications": [
+        "studio_worker"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "media",
+      "description": "Délai maximal d'un rendu, en secondes.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "STUDIO_FFMPEG_PATH",
+      "applications": [
+        "studio_worker"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "media",
+      "description": "Binaire ffmpeg de confiance ; défaut : binaires de développement épinglés.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "STUDIO_FFPROBE_PATH",
+      "applications": [
+        "studio_worker"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "media",
+      "description": "Binaire ffprobe de confiance ; défaut : binaires de développement épinglés.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "STUDIO_REDIS_URL",
+      "applications": [
+        "studio_worker"
+      ],
+      "required": true,
+      "environments": [
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "media",
+      "description": "URL Redis de la file de rendu. Peut contenir un mot de passe : traitée comme secret.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true,
+      "url_class": "provider_base"
+    },
+    {
+      "name": "STUDIO_RECONCILE_ALLOW_REMOTE_HOST",
+      "applications": [
+        "studio",
+        "studio_worker"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Autorise la réconciliation du stockage contre un hôte distant nommé exactement. Garde de sûreté : à ne poser que pour une opération ponctuelle.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "STUDIO_MAILPIT_URL",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "email",
+      "description": "URL Mailpit de développement (le code exige l'hôte 127.0.0.1).",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "forbidden_in": [
+        "preview",
+        "production"
+      ],
+      "url_class": "provider_base"
+    },
+    {
+      "name": "STUDIO_ACCEPTANCE",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Bascule de recette Studio. DIAGNOSTIC OU TEST : ne doit jamais être posée en preview ni en production.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "flag": {
+        "kind": "local_only",
+        "absent_behavior": "closed",
+        "owner": "Studio — Qualité",
+        "criticality": "medium",
+        "expected": {
+          "local": "0",
+          "preview": "0",
+          "production": "0"
+        }
+      },
+      "forbidden_in": [
+        "preview",
+        "production"
+      ],
+      "allowed_values": [
+        "0",
+        "1"
+      ]
+    },
+    {
+      "name": "STUDIO_AI_TEST_PROVIDER_FAILURE",
+      "applications": [
+        "studio_worker"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Injection de panne du fournisseur d'analyse (test). DIAGNOSTIC OU TEST : ne doit jamais être posée en preview ni en production.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "flag": {
+        "kind": "local_only",
+        "absent_behavior": "closed",
+        "owner": "Studio — Qualité",
+        "criticality": "medium",
+        "expected": {
+          "local": "0",
+          "preview": "0",
+          "production": "0"
+        }
+      },
+      "forbidden_in": [
+        "preview",
+        "production"
+      ],
+      "allowed_values": [
+        "0",
+        "1"
+      ]
+    },
+    {
+      "name": "STUDIO_RENDER_INTERNAL_PREVIEW",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Active l'aperçu de rendu interne. DIAGNOSTIC OU TEST : ne doit jamais être posée en preview ni en production.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "flag": {
+        "kind": "local_only",
+        "absent_behavior": "closed",
+        "owner": "Studio — Qualité",
+        "criticality": "medium",
+        "expected": {
+          "local": "0",
+          "preview": "0",
+          "production": "0"
+        }
+      },
+      "forbidden_in": [
+        "preview",
+        "production"
+      ],
+      "allowed_values": [
+        "0",
+        "1"
+      ]
+    },
+    {
+      "name": "STUDIO_RENDER_DIAGNOSTICS",
+      "applications": [
+        "studio_worker"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Active les diagnostics de rendu. DIAGNOSTIC OU TEST : ne doit jamais être posée en preview ni en production.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "flag": {
+        "kind": "local_only",
+        "absent_behavior": "closed",
+        "owner": "Studio — Qualité",
+        "criticality": "medium",
+        "expected": {
+          "local": "0",
+          "preview": "0",
+          "production": "0"
+        }
+      },
+      "forbidden_in": [
+        "preview",
+        "production"
+      ],
+      "allowed_values": [
+        "0",
+        "1"
+      ]
+    },
+    {
+      "name": "STUDIO_RUNTIME_TRACE",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Active les traces d'exécution. DIAGNOSTIC OU TEST : ne doit jamais être posée en preview ni en production.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "flag": {
+        "kind": "local_only",
+        "absent_behavior": "closed",
+        "owner": "Studio — Qualité",
+        "criticality": "medium",
+        "expected": {
+          "local": "0",
+          "preview": "0",
+          "production": "0"
+        }
+      },
+      "forbidden_in": [
+        "preview",
+        "production"
+      ],
+      "allowed_values": [
+        "0",
+        "1"
+      ]
+    },
+    {
+      "name": "STUDIO_TEMPLATE_COMPARISON",
+      "applications": [
+        "studio_worker"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "feature_flag",
+      "description": "Active la comparaison de modèles (qualification). DIAGNOSTIC OU TEST : ne doit jamais être posée en preview ni en production.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "flag": {
+        "kind": "local_only",
+        "absent_behavior": "closed",
+        "owner": "Studio — Qualité",
+        "criticality": "medium",
+        "expected": {
+          "local": "0",
+          "preview": "0",
+          "production": "0"
+        }
+      },
+      "forbidden_in": [
+        "preview",
+        "production"
+      ],
+      "allowed_values": [
+        "0",
+        "1"
+      ]
+    },
+    {
+      "name": "STUDIO_RENDER_EVIDENCE",
+      "applications": [
+        "studio_worker"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Répertoire de sortie des preuves de qualification de rendu.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "STUDIO_RENDER_REDIS_PORT",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Port Redis du banc de test de rendu.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "STUDIO_E2E_CHANNEL",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Canal du banc E2E Studio.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "STUDIO_E2E_RESULT",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Fichier de résultat E2E Studio.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "STUDIO_E2E_REUSE_SERVER",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Réutilise le serveur du banc E2E Studio.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "STUDIO_E2E_SERVER_TIMEOUT_MS",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Délai de démarrage du serveur E2E Studio.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "STUDIO_E2E_LARGE_MIB",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Taille (MiB) du fichier volumineux du banc E2E Studio.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "STUDIO_TEST_PORT_BASE",
+      "applications": [
+        "studio"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Port de base des piles de test Studio.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ELSATIA_AUDIT_URL",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "URL de l'application auditée par scripts/audit-application.mjs ; défaut 127.0.0.1. Le script n'a pas de garde anti-production.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ELSATIA_AUDIT_EMAIL",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Compte d'audit (e-mail) : à réserver à un compte de recette.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ELSATIA_AUDIT_PASSWORD",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Mot de passe du compte d'audit.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ELSATIA_AUDIT_DSN",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "DSN PostgreSQL du script d'audit des comptes supplémentaires historiques (contient un mot de passe).",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ELSATIA_AUDIT_OUTPUT",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Fichier de sortie de l'audit.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ELSATIA_LOCAL_URL",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "URL Supabase de la pile LOCALE jetable.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ELSATIA_LOCAL_ANON_KEY",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Clé publique de la pile locale jetable.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ELSATIA_LOCAL_SERVICE_ROLE_KEY",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Clé service_role de la pile LOCALE jetable (jamais un projet hébergé).",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ELSATIA_LOCAL_JWT_SECRET",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Secret JWT de la pile locale jetable.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ELSATIA_SUPABASE_PROJECT_NAME",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "preview"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Nom du projet attendu par la garde du script de seed Preview.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "SUPABASE_PROJECT_REF",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "preview"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Référence du projet attendue par la garde du script de seed Preview.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "SUPABASE_DB_CONTAINER",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Conteneur Postgres local ciblé par les scripts de recette SQL.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ELSATIA_VIDEO_SCENES_FILE",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Fichier de scènes du script de vidéo de démonstration.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ELSATIA_VIDEO_TARGET",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Cible du script de vidéo de démonstration.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "EDGE_TTS_BIN",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Binaire de synthèse vocale du script vidéo.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "FFMPEG_BIN",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Binaire ffmpeg du script vidéo.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "E2E_BASE_URL",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "URL de l'application sous test E2E.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "E2E_RESERVES_URL",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "URL de Réserves sous test E2E.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "E2E_SUPABASE_URL",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "URL Supabase de la pile E2E jetable.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "E2E_SUPABASE_ANON_KEY",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Clé publique de la pile E2E jetable.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "E2E_SUPABASE_SERVICE_ROLE_KEY",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Clé service_role de la pile E2E jetable.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "SUPABASE_ACCESS_TOKEN",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": true,
+      "environments": [
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Jeton d'accès Supabase du shell de l'OPÉRATEUR du cutover (pas une variable d'application). Lu par les scripts de cutover, jamais par un déploiement.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "external_consumer": "scripts/cutover/preflight-check.mjs (ligne cutover, absente du train V3)"
+    },
+    {
+      "name": "SUPABASE_DB_URL",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": true,
+      "environments": [
+        "production"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "URL PostgreSQL directe du shell de l'OPÉRATEUR du cutover (contient un mot de passe). Lue par les scripts de cutover, jamais par un déploiement.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false,
+      "external_consumer": "scripts/cutover/preflight-check.mjs (ligne cutover, absente du train V3)"
+    },
+    {
+      "name": "STRIPE_PRICES_VERIFY_STRICT",
+      "applications": [
+        "ci",
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "« 1 » : verify:stripe-prices échoue au lieu de sauter quand Stripe est absent.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "STRIPE_TEST_SECRET_KEY",
+      "applications": [
+        "ci"
+      ],
+      "required": false,
+      "environments": [
+        "test"
+      ],
+      "visibility": "server",
+      "secret": true,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Secret GitHub (environnement ci-verification) : clé Stripe TEST en lecture. Le script refuse une clé live.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "TOOLS_STORE_ENVIRONMENT",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": true,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tools_billing",
+      "description": "Environnement Store (sandbox|production) servi par ce déploiement Tools ; aucun repli implicite en production, voir src/lib/tools-store-environment.ts.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "TOOLS_STORE_ALLOW_SANDBOX",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tools_billing",
+      "description": "Autorise un déploiement production à accepter des transactions StoreKit/Play sandbox (phase TestFlight) ; à retirer à la mise en vente réelle.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "ACL_FLUX_PUSH_PORT",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Port HTTP local du serveur push simulé par le harnais e2e service-role-flux-acl (amorce/externes).",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ACL_FLUX_EXTERNES_PORT",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Port HTTP local du serveur de flux externes simulés par le harnais e2e service-role-flux-acl.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ACL_FLUX_CERT_DIR",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Répertoire des certificats TLS locaux utilisés par le harnais e2e service-role-flux-acl.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ACL_FLUX_EXTERNES_URL",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "URL de base du serveur de flux externes simulés, lue par le script d'interception du harnais e2e service-role-flux-acl.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "MDP_RECETTE",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Mot de passe partagé du harnais e2e Colors (fixtures de recette), aucun repli par défaut.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    }
+  ]
+}

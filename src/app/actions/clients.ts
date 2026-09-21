@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
+import { lireIdentiteLegale } from "@/lib/client-identite-legale";
 
 function champ(formData: FormData, nom: string): string | null {
   const v = String(formData.get(nom) ?? "").trim();
@@ -14,10 +16,16 @@ export async function creerClientAction(formData: FormData) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
 
+  const legal = lireIdentiteLegale(formData);
+  if (!legal.ok) {
+    redirect(`/clients/nouveau?error=${encodeURIComponent(legal.erreur)}`);
+  }
+
   const { data, error } = await supabase
     .from("clients")
     .insert({
       entreprise_id: ctx.entrepriseId,
+      ...legal.valeurs,
       type: champ(formData, "type") ?? "particulier",
       nom: champ(formData, "nom"),
       prenom: champ(formData, "prenom"),
@@ -37,7 +45,7 @@ export async function creerClientAction(formData: FormData) {
     .single();
 
   if (error || !data) {
-    redirect(`/clients/nouveau?error=${encodeURIComponent(error?.message ?? "Erreur")}`);
+    redirect(`/clients/nouveau?error=${encodeURIComponent(messageErreurUtilisateur("creerClientAction", error, "Impossible d’enregistrer ce client. Vérifiez les informations saisies."))}`);
   }
 
   revalidatePath("/clients");
@@ -86,7 +94,7 @@ export async function creerClientRapideAction(
     .single();
 
   if (error || !cree) {
-    return { error: error?.message ?? "Erreur lors de la création du client." };
+    return { error: messageErreurUtilisateur("creerClientRapideAction", error, "Impossible d’enregistrer ce client. Vérifiez les informations saisies.") };
   }
 
   revalidatePath("/clients");
@@ -98,9 +106,15 @@ export async function modifierClientAction(clientId: string, formData: FormData)
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
 
+  const legal = lireIdentiteLegale(formData);
+  if (!legal.ok) {
+    redirect(`/clients/${clientId}/modifier?error=${encodeURIComponent(legal.erreur)}`);
+  }
+
   const { error } = await supabase
     .from("clients")
     .update({
+      ...legal.valeurs,
       type: champ(formData, "type") ?? "particulier",
       nom: champ(formData, "nom"),
       prenom: champ(formData, "prenom"),
@@ -121,7 +135,7 @@ export async function modifierClientAction(clientId: string, formData: FormData)
     .eq("entreprise_id", ctx.entrepriseId);
 
   if (error) {
-    redirect(`/clients/${clientId}/modifier?error=${encodeURIComponent(error.message)}`);
+    redirect(`/clients/${clientId}/modifier?error=${encodeURIComponent(messageErreurUtilisateur("modifierClientAction", error, "Impossible d’enregistrer ces modifications. Vérifiez les informations saisies."))}`);
   }
 
   revalidatePath(`/clients/${clientId}`);

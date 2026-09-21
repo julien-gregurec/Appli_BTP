@@ -1,10 +1,13 @@
 "use client";
 
 import { type ReactNode, useSyncExternalStore } from "react";
+import { lireEtMigrerCleStockage } from "@/lib/browser-storage";
 
-const CLE = "liria-dashboard-widgets-v1";
-const CLE_CONFIGURATION = "liria-dashboard-widgets-configured-v1";
-const EVENEMENT = "liria-dashboard-widgets-change";
+const CLE = "elsatia-dashboard-widgets-v1";
+const CLE_HISTORIQUE = "liria-dashboard-widgets-v1";
+const CLE_CONFIGURATION = "elsatia-dashboard-widgets-configured-v1";
+const CLE_CONFIGURATION_HISTORIQUE = "liria-dashboard-widgets-configured-v1";
+const EVENEMENT = "elsatia-dashboard-widgets-change";
 
 export type DashboardWidgetOption = { id: string; label: string };
 
@@ -38,7 +41,7 @@ function ecouterMasques(actualiser: () => void) {
 function useMasques() {
   const valeurBrute = useSyncExternalStore(
     ecouterMasques,
-    () => localStorage.getItem(CLE) ?? "[]",
+    () => lireEtMigrerCleStockage(localStorage, CLE, CLE_HISTORIQUE) ?? "[]",
     () => "[]",
   );
   return decoderMasques(valeurBrute);
@@ -47,7 +50,7 @@ function useMasques() {
 function useConfigurationTerminee() {
   return useSyncExternalStore(
     ecouterMasques,
-    () => localStorage.getItem(CLE_CONFIGURATION) === "1",
+    () => lireEtMigrerCleStockage(localStorage, CLE_CONFIGURATION, CLE_CONFIGURATION_HISTORIQUE) === "1",
     () => true,
   );
 }

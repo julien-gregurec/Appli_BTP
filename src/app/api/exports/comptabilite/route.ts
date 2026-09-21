@@ -1,8 +1,18 @@
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
+import { permissionsUtilisateur } from "@/lib/permissions";
+import { peutExporterComptabilite } from "@/lib/permissions-financieres";
 import { periodeDepuisUrl, reponseCsv } from "@/lib/csv";
 import { reponseXlsx } from "@/lib/xlsx";
-const nomClient = (client: { nom: string | null; prenom: string | null; societe: string | null } | null) => client?.societe || [client?.prenom, client?.nom].filter(Boolean).join(" ") || "";
+import { nomClientDocument } from "@/lib/client-snapshot";
+// Un export comptable rejoue des documents DÉJÀ ÉMIS : il doit restituer le
+// destinataire tel qu'il figurait sur la facture, pas la fiche client
+// d'aujourd'hui (ELSATIA-GP-CLIENT-DOCUMENT-SNAPSHOT-P0-V1). La fiche reste
+// la source de repli pour les rares lignes sans identité figée.
+const client_snapshot_reference = (snapshot: unknown): string | null =>
+  typeof snapshot === "object" && snapshot !== null && !Array.isArray(snapshot)
+    ? ((snapshot as { reference_interne?: string | null }).reference_interne ?? null)
+    : null;
 const un = <T,>(value: T | T[] | null): T | null => Array.isArray(value) ? value[0] ?? null : value;
 const reponseExport = (lignes: unknown[][], nom: string, feuille: string, format: string) => format === "csv"
   ? reponseCsv(lignes, `${nom}.csv`)
@@ -10,22 +20,27 @@ const reponseExport = (lignes: unknown[][], nom: string, feuille: string, format
 export async function GET(request: Request) {
   const periode = periodeDepuisUrl(request.url); if (!periode) return Response.json({ error: "Période invalide" }, { status: 400 });
   const url = new URL(request.url); const type = url.searchParams.get("type") ?? "ventes"; const format = url.searchParams.get("format") === "csv" ? "csv" : "xlsx"; if (!["ventes", "reglements", "tva", "achats", "tva-achats"].includes(type)) return Response.json({ error: "Export inconnu" }, { status: 400 });
-  const ctx = await getContexteEntreprise(); const supabase = await createClient();
+  const ctx = await getContexteEntreprise();
+  const permissions = await permissionsUtilisateur(ctx);
+  if (!peutExporterComptabilite(permissions)) {
+    return Response.json({ error: "Accès aux exports comptables non autorisé" }, { status: 403 });
+  }
+  const supabase = await createClient();
   if (type === "ventes") {
-    const { data, error } = await supabase.from("factures").select("numero,date_emission,date_echeance,type,statut,montant_ht,montant_tva,montant_ttc,montant_paye,client:clients(reference_interne,nom,prenom,societe)").eq("entreprise_id", ctx.entrepriseId).not("numero", "is", null).gte("date_emission", periode.debut).lte("date_emission", periode.fin).order("date_emission").order("numero");
-    if (error) return Response.json({ error: error.message }, { status: 503 }); const lignes: unknown[][] = [["Date", "N° facture", "Type", "Statut", "Réf. client", "Client", "HT", "TVA", "TTC", "Encaissé", "Reste dû", "Échéance"]];
-    for (const facture of data ?? []) { const client = un(facture.client); const ttc = Number(facture.montant_ttc), paye = Number(facture.montant_paye); lignes.push([facture.date_emission, facture.numero, facture.type, facture.statut, client?.reference_interne ?? "", nomClient(client), Number(facture.montant_ht), Number(facture.montant_tva), ttc, paye, Math.max(0, ttc - paye), facture.date_echeance ?? ""]); }
+    const { data, error } = await supabase.from("factures").select("numero,date_emission,date_echeance,type,statut,montant_ht,montant_tva,montant_ttc,montant_paye,client_snapshot,client:clients!factures_client_id_fkey(reference_interne,nom,prenom,societe)").eq("entreprise_id", ctx.entrepriseId).not("numero", "is", null).gte("date_emission", periode.debut).lte("date_emission", periode.fin).order("date_emission").order("numero");
+    if (error) return Response.json({ error: "Export temporairement indisponible" }, { status: 503 }); const lignes: unknown[][] = [["Date", "N° facture", "Type", "Statut", "Réf. client", "Client", "HT", "TVA", "TTC", "Encaissé", "Reste dû", "Échéance"]];
+    for (const facture of data ?? []) { const client = un(facture.client); const ttc = Number(facture.montant_ttc), paye = Number(facture.montant_paye); lignes.push([facture.date_emission, facture.numero, facture.type, facture.statut, client_snapshot_reference(facture.client_snapshot) ?? client?.reference_interne ?? "", nomClientDocument(facture.client_snapshot, client), Number(facture.montant_ht), Number(facture.montant_tva), ttc, paye, Math.max(0, ttc - paye), facture.date_echeance ?? ""]); }
     return reponseExport(lignes, `journal-ventes-${periode.debut}-${periode.fin}`, "Journal des ventes", format);
   }
   if (type === "reglements") {
-    const { data, error } = await supabase.from("paiements").select("date,montant,mode,reference,facture:factures!inner(numero,entreprise_id,type,client:clients(reference_interne,nom,prenom,societe))").eq("facture.entreprise_id", ctx.entrepriseId).gte("date", periode.debut).lte("date", periode.fin).order("date");
-    if (error) return Response.json({ error: error.message }, { status: 503 }); const lignes: unknown[][] = [["Date", "N° facture", "Réf. client", "Client", "Mode", "Référence règlement", "Montant"]];
-    for (const paiement of data ?? []) { const facture = un(paiement.facture); const client = facture ? un(facture.client) : null; lignes.push([paiement.date, facture?.numero ?? "", client?.reference_interne ?? "", nomClient(client), paiement.mode, paiement.reference ?? "", (facture?.type === "avoir" ? -1 : 1) * Number(paiement.montant)]); }
+    const { data, error } = await supabase.from("paiements").select("date,montant,mode,reference,facture:factures!inner(numero,entreprise_id,type,client_snapshot,client:clients!factures_client_id_fkey(reference_interne,nom,prenom,societe))").eq("facture.entreprise_id", ctx.entrepriseId).gte("date", periode.debut).lte("date", periode.fin).order("date");
+    if (error) return Response.json({ error: "Export temporairement indisponible" }, { status: 503 }); const lignes: unknown[][] = [["Date", "N° facture", "Réf. client", "Client", "Mode", "Référence règlement", "Montant"]];
+    for (const paiement of data ?? []) { const facture = un(paiement.facture); const client = facture ? un(facture.client) : null; lignes.push([paiement.date, facture?.numero ?? "", client_snapshot_reference(facture?.client_snapshot) ?? client?.reference_interne ?? "", nomClientDocument(facture?.client_snapshot, client), paiement.mode, paiement.reference ?? "", (facture?.type === "avoir" ? -1 : 1) * Number(paiement.montant)]); }
     return reponseExport(lignes, `reglements-${periode.debut}-${periode.fin}`, "Règlements clients", format);
   }
   if (type === "achats") {
     const { data, error } = await supabase.from("depenses_fournisseurs").select("numero_piece,date_piece,date_echeance,categorie,statut,montant_ht,taux_tva,montant_tva,montant_ttc,montant_regle,fournisseur:fournisseurs(nom),chantier:chantiers(nom)").eq("entreprise_id", ctx.entrepriseId).gte("date_piece", periode.debut).lte("date_piece", periode.fin).neq("statut", "annulee").order("date_piece").order("numero_piece");
-    if (error) return Response.json({ error: error.message }, { status: 503 });
+    if (error) return Response.json({ error: "Export temporairement indisponible" }, { status: 503 });
     const lignes: unknown[][] = [["Date", "N° facture fournisseur", "Fournisseur", "Catégorie", "Chantier", "Statut", "HT", "Taux TVA", "TVA déductible", "TTC", "Réglé", "Reste à payer", "Échéance"]];
     for (const depense of data ?? []) {
       const fournisseur = un(depense.fournisseur); const chantier = un(depense.chantier);
@@ -35,7 +50,7 @@ export async function GET(request: Request) {
   }
   if (type === "tva-achats") {
     const { data, error } = await supabase.from("depenses_fournisseurs").select("numero_piece,date_piece,montant_ht,taux_tva,montant_tva,montant_ttc,fournisseur:fournisseurs(nom)").eq("entreprise_id", ctx.entrepriseId).gte("date_piece", periode.debut).lte("date_piece", periode.fin).neq("statut", "annulee").order("date_piece").order("numero_piece");
-    if (error) return Response.json({ error: error.message }, { status: 503 });
+    if (error) return Response.json({ error: "Export temporairement indisponible" }, { status: 503 });
     const lignes: unknown[][] = [["Date", "N° facture fournisseur", "Fournisseur", "Taux TVA", "Base HT", "TVA déductible", "TTC"]];
     const totaux = new Map<number, { ht: number; tva: number; ttc: number }>();
     for (const depense of data ?? []) {
@@ -48,7 +63,7 @@ export async function GET(request: Request) {
     return reponseExport(lignes, `tva-deductible-achats-${periode.debut}-${periode.fin}`, "TVA déductible", format);
   }
   const { data, error } = await supabase.from("lignes_factures").select("quantite,prix_unitaire_ht,remise_ligne,taux_tva,facture:factures!inner(numero,date_emission,entreprise_id,type,statut)").eq("facture.entreprise_id", ctx.entrepriseId).not("facture.numero", "is", null).gte("facture.date_emission", periode.debut).lte("facture.date_emission", periode.fin).neq("facture.statut", "annulee").order("date_emission", { referencedTable: "factures" });
-  if (error) return Response.json({ error: error.message }, { status: 503 });
+  if (error) return Response.json({ error: "Export temporairement indisponible" }, { status: 503 });
   const lignes: unknown[][] = [["Date", "N° facture", "Taux TVA", "Base HT", "TVA", "TTC"]];
   const details = new Map<string, { date: string; numero: string; taux: number; ht: number; tva: number }>();
   for (const ligne of data ?? []) {
