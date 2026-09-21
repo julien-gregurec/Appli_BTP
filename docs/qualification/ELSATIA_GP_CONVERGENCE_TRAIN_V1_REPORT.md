@@ -542,6 +542,6 @@ Au moment de pousser (`67b1564`), `origin/claude/compassionate-euler-5j6avr` ava
 
 ### 16.10 — Statut après ce lot
 
-`CONVERGENCE_TRAIN_CANDIDATE = b0f51b0` (branche `claude/compassionate-euler-5j6avr`, à pousser — fusionne `67b1564` avec la remédiation sécurité `81420ad` et corrige la régression lint découverte par cette fusion). `FINAL_PREVIEW_TRAIN = NOT_YET`.
+`CONVERGENCE_TRAIN_CANDIDATE = b824008` (branche `claude/compassionate-euler-5j6avr`, à pousser — fusionne `67b1564` avec la remédiation sécurité `81420ad`, corrige la régression lint découverte par cette fusion (`b0f51b0`), documente la fusion). `FINAL_PREVIEW_TRAIN = NOT_YET`.
 
 C'était le 6ᵉ et dernier lot de la liste transmise. **Aucun des deux `DECISION_REQUIRED` du lot Studio (§16.4, §16.5) n'est tranché** ; le train reste un candidat de convergence, pas une base Preview qualifiée. Aucun déploiement, aucune Preview, aucune Production.
