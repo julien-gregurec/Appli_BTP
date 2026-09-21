@@ -2363,3 +2363,110 @@ aucun environnement Preview réel n'a été atteint dans ce sandbox, quel que so
 preuve locale atteint.
 
 Aucun déploiement, aucune Preview réelle, aucune Production dans cette session.
+
+---
+
+## 25. Reprise de convergence — 5 lots Studio/Tools/Reserves (`claude/compassionate-euler-5j6avr`)
+
+### 25.1 — Cadrage réel du dépôt (fetch effectué, aucun SHA supposé)
+
+Mission de convergence reprise depuis zéro dans `julien-gregurec/Appli_BTP` (le seul dépôt
+confirmé — `main` correspond à une structure historique différente et n'est pas la cible). Après
+`git fetch origin --prune` :
+
+- **Cible confirmée** : `origin/claude/compassionate-euler-5j6avr` → HEAD réel
+  `f5a9e444a1e2bc21d601ff1b6f0c3d7f3f216430` (« docs(qualification): ajoute §24, qualification
+  exacte du SHA d4b9c79 », commit **documentaire uniquement**, un seul parent
+  `d4b9c7918ced93c6a58807cd40073d0c61b5bca1`).
+- **Branche de travail désignée** `claude/ecstatic-gauss-xrxf98` : n'existait pas encore côté
+  distant ; localement figée sur `4d92ddb` (29 juillet 2026), un point très antérieur. Elle a été
+  réinitialisée sur la cible confirmée (`git checkout -B claude/ecstatic-gauss-xrxf98
+  origin/claude/compassionate-euler-5j6avr`) avant tout portage, plutôt que de tenter de faire
+  converger l'ancien état de juillet — aucun risque de perte : ce SHA de juillet est un ancêtre de
+  `main` et de la cible, entièrement préservé dans l'historique distant.
+
+### 25.2 — Comparaison réelle de chaque branche (pas de suppositions)
+
+Cinq branches à comparer, vérifiées une à une avec `git merge-base --is-ancestor` et
+`git rev-list --count` contre la cible réelle :
+
+| Branche | Ancêtre de la cible ? | Commits absents de la cible | Merge-base avec la cible |
+|---|---|---|---|
+| `claude/studio-env-manifest-fix-v1` | non | 2 | `d4b9c79` |
+| `claude/studio-runtime-config-wiring-v1` | non | 4 | `d4b9c79` |
+| `claude/studio-build-isolation-v1` | non | 6 | `d4b9c79` |
+| `claude/tools-reserves-postcss-isolation-v1` | non | 8 | `d4b9c79` |
+| `claude/reserves-turbopack-sentry-isolation-v1` | non | 10 | `d4b9c79` |
+
+Point commun vérifié : les 5 branches ont exactement le même point de fourche, `d4b9c79`, qui est
+aussi le parent direct du HEAD de la cible. La cible ne contient donc, au-delà de ce point commun,
+que son propre commit documentaire `f5a9e44` — aucun des 5 lots n'était encore intégré.
+
+**Découverte structurelle (évite tout doublon)** : les 5 branches ne sont pas indépendantes — elles
+forment une **chaîne d'ascendance stricte**. Chaque branche contient l'intégralité des commits de
+la précédente plus exactement 2 commits propres (1 correctif/feature + 1 doc de qualification) :
+
+```
+d4b9c79 (base commune = parent de la cible)
+  └─ 8f66403 fix(env-manifest): ferme les 37 erreurs Studio
+      └─ 0bc9e92 docs: lot STUDIO ENV MANIFEST          ← tip de studio-env-manifest-fix-v1
+          └─ 82e5ce7 feat(studio): câble 4 variables de sécurité
+              └─ faebd70 docs: lot STUDIO RUNTIME CONFIG WIRING V1   ← tip de studio-runtime-config-wiring-v1
+                  └─ 9d4331c fix(studio): isole le pipeline PostCSS de Studio
+                      └─ a8f860c docs: lot STUDIO BUILD ISOLATION V1  ← tip de studio-build-isolation-v1
+                          └─ e79864f fix(tools,reserves): isole le pipeline PostCSS
+                              └─ cc6d8e0 docs: lot TOOLS+RESERVES POSTCSS ISOLATION V1  ← tip de tools-reserves-postcss-isolation-v1
+                                  └─ d6e3d7e fix(reserves): isole l'instrumentation Turbopack
+                                      └─ 0a9a99f docs: lot RESERVES TURBOPACK SENTRY ISOLATION V1  ← tip de reserves-turbopack-sentry-isolation-v1
+```
+
+Vérifié par `git diff --stat` cumulatif entre la cible et chaque tip : les fichiers touchés
+s'accumulent strictement (`.env.example` Studio → +runtime config → +postcss Studio → +postcss
+Tools/Reserves → +instrumentation Reserves), sans divergence ni fichier retiré entre deux branches
+consécutives de la chaîne. Aucune des 5 branches ne touche
+`docs/qualification/ELSATIA_GP_CONVERGENCE_TRAIN_V1_REPORT.md` (le « −204 lignes » visible dans un
+diff brut cible→branche n'est que l'absence, côté branche, des ajouts ultérieurs `§24` de la
+cible — pas une suppression réelle ni un conflit).
+
+Conséquence directe (règle « ne pas dupliquer si chaîne d'ascendance ») : **porter le tip de la
+chaîne (`reserves-turbopack-sentry-isolation-v1`) suffit à intégrer les 5 lots**, sans rejouer
+séparément chaque branche intermédiaire.
+
+### 25.3 — Classement de chaque lot
+
+| Lot / branche | Statut |
+|---|---|
+| `claude/studio-env-manifest-fix-v1` | `MUST_PORT` (contenu dans la chaîne portée) |
+| `claude/studio-runtime-config-wiring-v1` | `MUST_PORT` (contenu dans la chaîne portée) |
+| `claude/studio-build-isolation-v1` | `MUST_PORT` (contenu dans la chaîne portée) |
+| `claude/tools-reserves-postcss-isolation-v1` | `MUST_PORT` (contenu dans la chaîne portée) |
+| `claude/reserves-turbopack-sentry-isolation-v1` | `MUST_PORT` (tip de chaîne, porté intégralement) |
+
+Aucun lot `SUPERSEDED`, `DOC_ONLY` (chaque lot documentaire est accompagné d'un correctif réel non
+trivial) ni `NEEDS_MANUAL_RECONCILIATION` (aucun conflit rencontré, cf. §25.4).
+
+### 25.4 — Portage réel
+
+`git cherry-pick -x d4b9c79..origin/claude/reserves-turbopack-sentry-isolation-v1` rejoué sur
+`claude/ecstatic-gauss-xrxf98` (base = HEAD réel de la cible `f5a9e44`). **10/10 commits
+cherry-pickés sans conflit** (aucune résolution manuelle, aucun fichier en état `both modified`) :
+
+| # | SHA source | SHA porté | Sujet |
+|---|---|---|---|
+| 1 | `8f66403` | `91ae6f0` | fix(env-manifest): ferme les 37 erreurs Studio |
+| 2 | `0bc9e92` | `b8b236c` | docs: lot STUDIO ENV MANIFEST |
+| 3 | `82e5ce7` | `e0b502b` | feat(studio): câble 4 variables de sécurité |
+| 4 | `faebd70` | `deb4d28` | docs: lot STUDIO RUNTIME CONFIG WIRING V1 |
+| 5 | `9d4331c` | `9a523f8` | fix(studio): isole le pipeline PostCSS de Studio |
+| 6 | `a8f860c` | `efb54cc` | docs: lot STUDIO BUILD ISOLATION V1 |
+| 7 | `e79864f` | `f561379` | fix(tools,reserves): isole le pipeline PostCSS |
+| 8 | `cc6d8e0` | `811a3ed` | docs: lot TOOLS+RESERVES POSTCSS ISOLATION V1 |
+| 9 | `d6e3d7e` | `0da5a0b` | fix(reserves): isole l'instrumentation Turbopack |
+| 10 | `0a9a99f` | `5b57ea4` | docs: lot RESERVES TURBOPACK SENTRY ISOLATION V1 |
+
+HEAD local post-portage : `5b57ea4146141c68772c3d96d6ced6e7f314bbd2`. Aucun fichier lockfile
+(`package-lock.json`) touché par le portage — aucun drift introduit.
+
+### 25.5 — Vérifications post-convergence
+
+_À compléter après exécution complète (voir §25.6)._
