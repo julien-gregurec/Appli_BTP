@@ -1421,3 +1421,111 @@ Les deux blockers qualifiés (garde de pré-build Reserves, correctif de niveau 
 sont intégrés sélectivement, sans fusion de branche, avec résolution explicite de la collision
 de numéro de migration. Aucun déploiement, aucune Preview, aucune Production.
 
+## 21. Lot ENV manifest (`feat/env-manifest-canonical-v1`) — déjà intégré, rien porté
+
+**Mission** : intégrer sélectivement dans le train le manifeste canonique des variables
+d'environnement et son contrôleur, sans repartir de `main`, sans train concurrent.
+
+### 21.0 — Vérification du HEAD réel avant modification
+
+HEAD distant réel de `claude/compassionate-euler-5j6avr` au démarrage : **`38cf99e`**
+(`fix(preview-blockers): garde de pré-build Reserves + correctif niveau notification (RESERVES +
+NOTIFICATION INTEGRATED)`) — identique au HEAD attendu. Aucun écart.
+
+### 21.1 — Cartographie
+
+`git merge-base` train/source = `59e960a` — un point **ancien** de l'historique du train
+(antérieur même à `e0a83eb`, à `f71dd97` et à `38cf99e` : la branche source a divergé bien avant
+tous les lots récents). 4 commits propres à la source : `9de09de`, `4445de0`, `816989a`,
+`5326118`.
+
+**Constat déterminant** : les fichiers infrastructurels du lot source sont déjà présents dans le
+train, **byte-identiques** (`diff` vide) :
+
+| Fichier source | Identique au train ? |
+|---|---|
+| `scripts/check-env-manifest.mjs` (172 lignes) | ✅ identique |
+| `scripts/check-env-manifest.test.mjs` (565 lignes) | ✅ identique |
+| `scripts/lib/env-manifest-core.mjs` (243 lignes) | ✅ identique |
+| `scripts/lib/env-manifest-operator.mjs` (86 lignes) | ✅ identique |
+| `scripts/lib/env-manifest-preflight.mjs` (173 lignes) | ✅ identique |
+| `scripts/lib/env-manifest-scan.mjs` (462 lignes) | ✅ identique |
+| `config/env-manifest.schema.json` (244 lignes) | ✅ identique |
+| `docs/qualification/ELSATIA_ENV_MANIFEST_AND_CI_V1.md` | ✅ identique |
+| `docs/runbooks/ELSATIA_ENV_MANIFEST_RUNBOOK_V1.md` | ✅ identique |
+| `package.json` (scripts `verify:env-manifest`/`test:env-manifest`/`preflight:env`/`prebuild*`, chaîne `verify`) | ✅ déjà présents, mêmes commandes |
+| `.github/workflows/ci.yml` (étapes manifeste avant `npm ci`) | ✅ déjà présentes (`verify:env-manifest`, `test:env-manifest`, `verify:secrets`) |
+| `apps/reserves/.env.example` (nom legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` documenté) | ✅ déjà porté (lot §20, RESERVES + NOTIFICATION) |
+| `apps/tools/.env.example` | ✅ présent, **train a une ligne de plus** que la source (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, ajoutée par un lot ultérieur) — train **supérieur** à la source |
+| `config/env-manifest.json` | présent des deux côtés, mais le train (**5850 lignes**) a largement dépassé la version source (**4310 lignes**, `+3426` lignes de divergence) — évolutions ultérieures (dont l'entrée Reserves du lot §20) |
+
+**Classement de chaque élément du lot source** :
+
+| Élément | Classement |
+|---|---|
+| Contrôleur (`check-env-manifest.mjs` + libs), schéma, tests, doc, runbook | **déjà présent, identique** |
+| Câblage `package.json`/CI | **déjà présent, identique** |
+| Gabarits `.env.example`/`.env.local.example`/`.env.preview.example`, `apps/*/.env.example` | **déjà présent, version train égale ou supérieure** (`config/env-manifest.json` a grandi depuis ; les diffs de la branche source contre ces fichiers reflètent un état **antérieur**, pas des ajouts manquants) |
+| `docs/runbooks/patches/ELSATIA_PREFLIGHT_CHECK_ENV_MANIFEST_V1.patch` | **obsolète/inapplicable** — voir §21.2 |
+
+**Rien à porter.** Confirmé par la vérification directe la plus fiable possible : exécuter le
+contrôleur du train lui-même (`node scripts/check-env-manifest.mjs`, mode 1 — code ↔ manifeste ↔
+gabarits) plutôt que de comparer des diffs textuels contre une branche ancienne. Résultat : 194
+variables/10 applications/30 secrets déclarés, **37 erreurs, 0 en rapport avec ce lot** (détail
+§21.3) — aucune erreur `EXAMPLE-MISSING`/`EXAMPLE-FOREIGN` sur `gestion_pro`, `reserves`,
+`tools` ou `colors` (les 4 applications couvertes par le lot source).
+
+### 21.2 — Patch de cutover : non appliqué (obsolète)
+
+`docs/runbooks/patches/ELSATIA_PREFLIGHT_CHECK_ENV_MANIFEST_V1.patch` cible
+`scripts/cutover/preflight-check.mjs`. Recherche exhaustive dans l'historique complet du train
+(`git log --all -- scripts/cutover/preflight-check.mjs`) : **ce fichier n'a jamais existé dans
+la lignée de ce train**, y compris au commit de fusion le plus ancien concerné (`59e960a`,
+merge-base). Il appartient à une lignée de branche entièrement différente (probablement
+`release/gp-v1-rc`, jamais fusionnée ici). Conformément à l'instruction « n'applique pas
+aveuglément un ancien patch cutover si le code a changé » : **patch non appliqué**, ni sur ce
+fichier inexistant ni ailleurs. Le script de cutover réellement présent dans le train
+(`scripts/verify-cutover-docs.mjs` et les runbooks `docs/runbooks/*CUTOVER*`) est un dispositif
+distinct, non concerné par ce patch, non modifié par ce lot.
+
+### 21.3 — Vérification ENV : `verify:env-manifest`, `verify:secrets`, preflight
+
+- `node scripts/check-env-manifest.mjs` (mode dépôt) : **37 erreurs**, **toutes** concentrées sur
+  `apps/studio/.env.example` et `workers/studio-video/.env.example` (`STUDIO_ENABLED`,
+  `STUDIO_SIGNUP_MODE`, `STUDIO_SIGNUP_ALLOWLIST`, `STUDIO_LEGAL_PUBLISHED`,
+  `STUDIO_LEGAL_TEXT_VERSION`, `RESEND_API_KEY`, `STUDIO_MAIL_PROVIDER`, `STUDIO_MAIL_FROM`,
+  `STUDIO_AI_ANALYSIS`, `STUDIO_ANALYSIS_PYTHON`, `STUDIO_ANALYSIS_CONCURRENCY`,
+  `STUDIO_ANALYSIS_TIMEOUT_SECONDS`) + 1 `ENV-REQUIRED-UNUSED`. **Aucune de ces variables n'est
+  touchée par le lot source `feat/env-manifest-canonical-v1`** (son diff ne touche ni
+  `apps/studio/.env.example` ni `workers/studio-video/.env.example`) : gap préexistant, non
+  qualifié par ce lot, non traité ici — hors périmètre de « porter ce qui manque réellement au
+  lot source ».
+- **10 `DECISION_REQUIRED`** (`STRIPE-MODULE-PRICE-MODEL`, `STRIPE-SUPPLEMENTARY-ACCOUNTS`,
+  `STRIPE-IA-OPTIONS`, `STRIPE-LEGACY-GENERATIONS`, `STRIPE-STORAGE-BLOCK`,
+  `FLAG-CRONS-FAIL-OPEN`, `STUDIO-SIGNUP-DEFAULT`) : décisions commerciales/produit attribuées à
+  Julien dans le manifeste lui-même, **déjà ouvertes avant ce lot**, identiques des deux côtés
+  (source et train). Aucune n'est créée ni résolue par cette session — toutes restent
+  `DECISION_REQUIRED`, option la plus conservatrice retenue par défaut (aucun flag fail-open
+  changé, aucun contrat Stripe tranché).
+- **`preflight_enforcement`** : `"report"` — confirmé identique entre le manifeste source et le
+  manifeste du train (`grep` direct). **Conservé en `report`**, conformément à la mission :
+  aucune vraie Preview n'a été qualifiée dans cette session pour justifier un passage à
+  `enforce`.
+- `node scripts/verify-secrets.mjs` : **2489 fichiers suivis contrôlés, aucun secret reconnu (2
+  exceptions nommées, inchangées)** — **aucun secret modifié** par cette session (aucun fichier
+  touché, cartographie uniquement).
+- `node scripts/verify-migrations.mjs` : **312 migrations valides** (inchangé — ce lot ne touche
+  aucune migration).
+
+### 21.4 — Verdict de ce lot
+
+**Aucun fichier modifié, aucun commit de code.** Le lot `feat/env-manifest-canonical-v1`
+(`5326118`) est déjà entièrement intégré au train, dans une version égale ou plus évoluée sur
+chaque fichier comparé. Le patch de cutover associé est inapplicable (fichier cible inexistant
+dans cette lignée) et n'a pas été appliqué. Les 37 erreurs actuelles de `verify:env-manifest`
+(Studio) et les 10 `DECISION_REQUIRED` (Stripe/flags) sont préexistantes, non couvertes par ce
+lot source, non résolues ici. `preflight_enforcement` reste `report`. Aucun secret modifié,
+aucune Preview, aucune Production.
+
+SHA après ce lot : **`38cf99e`** (inchangé — aucun commit de code nécessaire).
+
