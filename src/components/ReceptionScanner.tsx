@@ -36,6 +36,10 @@ export function ReceptionScanner({
   const [motDePasseStock, setMotDePasseStock] = useState("");
   const [message, setMessage] = useState<{ type: "ok" | "err"; texte: string } | null>(null);
   const [enCours, demarrer] = useTransition();
+  // Clé d'idempotence du lot en cours : stable tant que le panier n'a pas été
+  // validé avec succès, pour qu'un double clic ou un retry réseau renvoie le
+  // résultat déjà obtenu au lieu de créditer le stock une seconde fois.
+  const [cleIdempotence, setCleIdempotence] = useState<string>(() => crypto.randomUUID());
   const champ = useRef<HTMLInputElement>(null);
 
   // Résolution d'un code scanné (douchette, QR ou saisie) en article.
@@ -111,11 +115,12 @@ export function ReceptionScanner({
       if (mode === "reception") {
         const attributions = panier
           .filter((l) => l.rattacherLigneId && l.quantiteRattachee > 0)
-          .map((l) => ({ ligne_commande_id: l.rattacherLigneId!, quantite: l.quantiteRattachee }));
-        const r = await receptionLotAction(lignes, attributions, null, identite);
+          .map((l) => ({ ligne_commande_id: l.rattacherLigneId!, quantite: l.quantiteRattachee, article_id: l.article.id }));
+        const r = await receptionLotAction(lignes, attributions, null, identite, cleIdempotence);
         if (!r.ok) { setMessage({ type: "err", texte: r.erreur ?? "Échec." }); return; }
         const maj = (r.commandes ?? []).length;
         setMessage({ type: "ok", texte: `${r.entrees} entrée(s) enregistrée(s)${maj ? ` · ${maj} commande(s) mise(s) à jour` : ""}.` });
+        setCleIdempotence(crypto.randomUUID());
       } else {
         if (typeDestination && !destinationId) {
           setMessage({ type: "err", texte: "Choisissez la destination de la sortie." });
