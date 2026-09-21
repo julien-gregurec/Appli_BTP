@@ -28,7 +28,7 @@
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { loadJson, MANIFEST_PATH, SCHEMA_PATH } from "./lib/env-manifest-core.mjs";
+import { loadJson, MANIFEST_PATH } from "./lib/env-manifest-core.mjs";
 import { parseEnvFile, runPreflight } from "./lib/env-manifest-preflight.mjs";
 
 const ROOT = resolve(import.meta.dirname, "..");
