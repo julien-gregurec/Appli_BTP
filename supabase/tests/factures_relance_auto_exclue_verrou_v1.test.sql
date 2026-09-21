@@ -1,7 +1,7 @@
 -- GP-EXTERNAL-PILOT-CLOSURE-V1 — preuve que l'exclusion des relances
 -- automatiques (exclureRelanceAutoDocumentAction) aboutit sur une facture
 -- émise, sans rien ouvrir d'autre dans verrouiller_facture_emise ni
--- contourner la RLS. Voir 20260915000299_factures_relance_auto_exclue_verrou_v1.sql.
+-- contourner la RLS. Voir 20260922000304_factures_relance_auto_exclue_verrou_v1.sql.
 
 begin;
 create extension if not exists pgtap with schema extensions;

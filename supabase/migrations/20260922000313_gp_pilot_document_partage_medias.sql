@@ -15,7 +15,7 @@
 -- images cassées — silencieusement, sans erreur visible côté serveur.
 --
 -- Correctif, même schéma que document_commercial_public_par_token
--- (20260915000300) : une fonction SECURITY DEFINER résolue par LE MÊME
+-- (20260922000305) : une fonction SECURITY DEFINER résolue par LE MÊME
 -- jeton, qui ne renvoie le chemin de stockage QUE si le média demandé
 -- appartient RÉELLEMENT au document que ce jeton précis ouvre (jamais un
 -- média choisi librement par l'appelant) — jamais de table rouverte à

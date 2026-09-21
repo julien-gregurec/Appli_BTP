@@ -108,7 +108,7 @@ returns jsonb language sql stable security definer set search_path = public as $
 $$;
 
 -- ---------------------------------------------------------------------------
--- Lecture publique par jeton (20260915000300) : elle lisait TOUJOURS
+-- Lecture publique par jeton (20260922000305) : elle lisait TOUJOURS
 -- l'entreprise en direct (v_entreprise, en fin de fonction), qu'un snapshot
 -- soit figé ou non — pour une facture émise, c'était déjà une divergence avec
 -- la lecture authentifiée (chargerDonneesFactureImprimable, qui préfère bien

@@ -90,7 +90,7 @@ export async function chargerDonneesDevisImprimable(
     dateEmission: devis.date_emission,
     dateSecondaire: devis.date_validite ? { label: "Valable jusqu'au", valeur: devis.date_validite } : null,
     // Un devis émis (statut <> brouillon) garde à vie l'identité de l'entreprise
-    // telle qu'elle était à son envoi (voir 20260916000303) ; seul un brouillon
+    // telle qu'elle était à son envoi (voir 20260922000308) ; seul un brouillon
     // reflète l'entreprise actuelle.
     entreprise: devis.entreprise_snapshot
       ? entrepriseSnapshotVersEntete(devis.entreprise_snapshot as Record<string, unknown>)
@@ -202,7 +202,7 @@ export async function chargerDonneesFactureImprimable(
 // scopé à son entreprise), ce chemin est appelé avec service_role — depuis
 // 20260911000297_gp_v1_rc_acl_prerequisites.sql, service_role n'a plus AUCUN
 // privilège sur devis/factures/lignes/clients. On passe donc par la fonction
-// SECURITY DEFINER dédiée (20260915000300_document_partage_public_par_jeton.sql),
+// SECURITY DEFINER dédiée (20260922000305_document_partage_public_par_jeton.sql),
 // qui résout elle-même le jeton, vérifie révocation/expiration/tenance/statut
 // (jamais un brouillon), et ne renvoie que les colonnes imprimées — jamais les
 // tables elles-mêmes. `supabaseAdmin` n'est là que pour porter l'appel RPC.

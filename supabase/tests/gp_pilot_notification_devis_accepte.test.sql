@@ -1,7 +1,7 @@
 -- GP-EXTERNAL-PILOT-CLOSURE-V1 — notifier_devis_accepte() journalise et
 -- notifie les responsables (gerer_devis) d'une entreprise, jamais ceux d'une
 -- autre, et refuse un appel sans droit. Voir
--- 20260916000306_gp_pilot_notification_devis_accepte.sql.
+-- 20260922000311_gp_pilot_notification_devis_accepte.sql.
 begin;
 create extension if not exists pgtap with schema extensions;
 select plan(7);

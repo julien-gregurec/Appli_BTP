@@ -1,7 +1,7 @@
 -- GP-EXTERNAL-PILOT-CLOSURE-V1 — document_partage_media_path() ne résout un
 -- média que s'il appartient au document ouvert par CE jeton précis, jamais un
 -- média d'un autre document/une autre entreprise, jamais pour un brouillon.
--- Voir 20260916000308_gp_pilot_document_partage_medias.sql.
+-- Voir 20260922000313_gp_pilot_document_partage_medias.sql.
 begin;
 create extension if not exists pgtap with schema extensions;
 select plan(9);

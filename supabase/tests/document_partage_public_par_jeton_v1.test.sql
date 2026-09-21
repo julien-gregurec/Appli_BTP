@@ -3,7 +3,7 @@
 -- rôle service_role (createAdminClient), qui ne lit toujours AUCUNE table
 -- documentaire — seul le jeton en clair ouvre le document visé, et jamais un
 -- document encore brouillon. Voir
--- 20260915000300_document_partage_public_par_jeton.sql.
+-- 20260922000305_document_partage_public_par_jeton.sql.
 begin;
 create extension if not exists pgtap with schema extensions;
 select plan(42);

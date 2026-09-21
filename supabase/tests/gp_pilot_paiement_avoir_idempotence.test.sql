@@ -1,7 +1,7 @@
 -- GP-EXTERNAL-PILOT-CLOSURE-V1 — enregistrer_paiement_facture() empêche le
 -- dépassement du reste dû même en cas de double appel, et creer_facture_avancee
 -- résout un deuxième avoir identique vers celui déjà créé au lieu d'en émettre
--- un second. Voir 20260916000301_gp_pilot_paiement_avoir_idempotence.sql.
+-- un second. Voir 20260922000306_gp_pilot_paiement_avoir_idempotence.sql.
 begin;
 create extension if not exists pgtap with schema extensions;
 select plan(11);

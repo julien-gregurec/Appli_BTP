@@ -12,7 +12,7 @@
 -- pas laissé « libre » comme `notes_internes`.
 --
 -- Retire uniquement 'date_echeance' de la liste blanche ; tout le reste de
--- 20260915000299_factures_relance_auto_exclue_verrou_v1.sql est inchangé.
+-- 20260922000304_factures_relance_auto_exclue_verrou_v1.sql est inchangé.
 
 create or replace function public.verrouiller_facture_emise()
 returns trigger

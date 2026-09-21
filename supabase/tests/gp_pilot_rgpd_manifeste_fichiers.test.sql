@@ -1,7 +1,7 @@
 -- GP-EXTERNAL-PILOT-CLOSURE-V1 — le manifeste de fichiers de l'export RGPD
 -- liste les fichiers de l'entreprise appelante, jamais ceux d'une autre, et
 -- exporter_donnees_entreprise l'inclut sous 'manifeste_fichiers'. Voir
--- 20260916000305_gp_pilot_rgpd_manifeste_fichiers.sql.
+-- 20260922000310_gp_pilot_rgpd_manifeste_fichiers.sql.
 begin;
 create extension if not exists pgtap with schema extensions;
 select plan(9);

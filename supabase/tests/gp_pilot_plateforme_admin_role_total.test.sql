@@ -1,6 +1,6 @@
 -- GP-EXTERNAL-PILOT-CLOSURE-V1 — un membre plateforme non-'total' ne peut
 -- plus s'auto-promouvoir (ni promouvoir qui que ce soit) via
--- plateforme_ajouter_admin(). Voir 20260916000309_gp_pilot_plateforme_admin_role_total.sql.
+-- plateforme_ajouter_admin(). Voir 20260922000314_gp_pilot_plateforme_admin_role_total.sql.
 begin;
 create extension if not exists pgtap with schema extensions;
 select plan(6);

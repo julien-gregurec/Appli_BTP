@@ -33,7 +33,7 @@ select
 from public.employes;
 
 comment on view public.employes_annuaire is
-  'Annuaire employés à colonnes réduites (identité + poste + statut, sans taux/coût horaire, coordonnées ni notes). security_invoker : la RLS de public.employes s''applique normalement. À utiliser pour tout affichage qui n''a besoin que de l''identité (pointage, planning, sélecteurs) — voir 20260916000307 pour le contexte et ce qui reste à faire.';
+  'Annuaire employés à colonnes réduites (identité + poste + statut, sans taux/coût horaire, coordonnées ni notes). security_invoker : la RLS de public.employes s''applique normalement. À utiliser pour tout affichage qui n''a besoin que de l''identité (pointage, planning, sélecteurs) — voir 20260922000312 pour le contexte et ce qui reste à faire.';
 
 grant select on public.employes_annuaire to authenticated;
 
