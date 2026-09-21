@@ -460,3 +460,74 @@ En régénérant le lockfile de `apps/reserves` pendant ce lot, `npm audit` a r�
 ### 15.6 — Statut après ce lot
 
 `CONVERGENCE_TRAIN_CANDIDATE = 5f720ef` (branche `claude/compassionate-euler-5j6avr`, à pousser). `FINAL_PREVIEW_TRAIN = NOT_YET`. Prochain lot : Studio (dernier, volontairement — fork le plus ancien, migrations au format `HHMMSS` à convertir, signup actuellement ouvert à trancher, **et vérifier sa version Next.js/sharp** compte tenu de la découverte ci-dessus).
+
+---
+
+## 16. Lot Studio (7ᵉ édition de ce rapport, même branche, aucun train concurrent) — dernier lot de la liste
+
+**Point de départ** : `CONVERGENCE_TRAIN_CANDIDATE = 5f720ef` (HEAD après le lot Reserves, §15).
+
+### 16.1 — Comparaison avant portage
+
+Source retenue : `feat/elsatia-studio-v1` (25 commits, lignée linéaire, aucun merge interne portant un contenu propre). Aucune collision technique de migrations avec le reste du train : `scripts/verify-migrations.mjs` ne compare que la chaîne à 14 chiffres complète, et les 8 migrations Studio (`20260912120000_…` à `20260913040000_…`) utilisent la convention `HHMMSS` (celle de Studio elle-même) sans jamais entrer en collision avec les compteurs séquentiels des autres apps — **aucune renumérotation nécessaire**, vérifié avant tout cherry-pick plutôt que supposé.
+
+### 16.2 — Porté
+
+Les 25 commits de `feat/elsatia-studio-v1`, cherry-pickés dans l'ordre. Deux conflits, tous les deux dans des fichiers de configuration racine partagés (aucun conflit applicatif) :
+
+- `tsconfig.json` : les deux côtés ajoutaient `apps` à `exclude` d'une manière légèrement différente. Résolu par une forme simplifiée, `"exclude": ["node_modules", "apps"]` — justifié : `include` ne couvre de toute façon jamais `apps/**`.
+- `eslint.config.mjs` : fusion additive — conservé les `globalIgnores` déjà présents (`apps/tools/**`, `docs/archive/naming-studio-recovery/**`) et ajouté `apps/studio/**` à côté, sans en écraser aucun.
+
+Contenu porté : l'app `apps/studio` complète, le paquet partagé `packages/studio-domain`, le worker `workers/studio-video` (rendu vidéo via `ffmpeg-static`), 8 migrations, les tests pgTAP correspondants (`supabase/tests/studio_*.test.sql`), et les workflows CI dédiés `studio-foundation.yml` / `studio-render.yml`.
+
+### 16.3 — Vérification CVE Next.js/sharp (suite à la découverte du §15.3)
+
+- `apps/studio/package.json` : `next@16.3.5`, `sharp@0.35.4` déclarés directement en dépendance, `overrides.sharp = 0.35.4` cohérent — **déjà sur la version sûre**, aucun correctif nécessaire (contrairement à Reserves au §15.3).
+- `workers/studio-video/package.json` : **aucune dépendance `next` ni `sharp`** — le rendu passe par `ffmpeg-static`/`ffprobe-static`/`fontkit`/`bullmq`/`ioredis`, hors périmètre de ce CVE. Vérifié explicitement plutôt que supposé absent.
+- **Item #3 MUST_NOT_LOSE désormais couvert pour les 5 applications** (GP, Colors, Tools, Reserves, Studio) — clos pour l'écosystème complet tel qu'intégré dans ce train.
+
+### 16.4 — DECISION_REQUIRED : inscription Studio ouverte par défaut
+
+Lecture du code réellement porté (`apps/studio/src/app/signup/page.tsx`, `apps/studio/src/app/actions.ts`) : `signup()` appelle directement `client.auth.signUp()` sans aucune porte — pas de code d'invitation, pas de liste blanche, pas de restriction de domaine, pas d'approbation. N'importe qui peut créer un compte et obtenir un espace personnel immédiatement via `onboarding()`. **Aucun garde-fou, même applicatif, n'existe dans les 25 commits portés.**
+
+Ce point était déjà anticipé par le lot ENV manifest (§12, lot 2 de ce train) : `config/env-manifest.json` porte une entrée `DECISION_REQUIRED:STUDIO-SIGNUP-DEFAULT` (« Valeur par défaut de l'inscription Studio : open (actuel) ou closed ? ») et un drapeau `FLAG-FAIL-OPEN` sur `STUDIO_SIGNUP_MODE`, documentés dans `docs/qualification/ELSATIA_ENV_MANIFEST_AND_CI_V1.md` (lignes 120, 150, 193, 199) comme « à contrôler à l'intégration » — c'est cette intégration.
+
+**`DECISION_REQUIRED:STUDIO-SIGNUP-DEFAULT`** — décision produit/sécurité qui appartient à Julien, non tranchée ici. **Option la plus conservatrice retenue : aucune modification du comportement actuel** (signup restant ouvert tel que porté), documentée plutôt que corrigée unilatéralement.
+
+### 16.5 — Découverte majeure : une continuation existe déjà, non portée par prudence
+
+`origin/fix/studio-signup-closed-v1` est une continuation **linéaire** de `feat/elsatia-studio-v1` (43 commits après le même point de fork, aucune branche concurrente) et se termine précisément par `634651a fix(studio): inscription fermee par defaut, imposee par la base et le hook Auth` — le correctif exact du §16.4.
+
+**Volontairement non porté dans ce lot**, pour une raison architecturale et non de confort : ce correctif dépend d'un commit antérieur de la même chaîne, `c31382f feat(studio): projet Supabase dedie prepare`, qui fait basculer Studio sur **son propre projet Supabase séparé** (sa propre migration vit d'ailleurs sous `apps/studio/supabase/20260921070000_studio_signup_policy.sql`, hors de l'arbre partagé `supabase/migrations/` utilisé par GP/Colors/Tools/Reserves et par tout le travail Fresh/pgTAP de ce train). Les 43 commits contiennent en outre des lots substantiels non demandés explicitement dans la liste des 6 lots (invitations par e-mail, suppression de compte RGPD, pages légales, import de musique — lot M, durcissement S1-S5, Brand Kit, partage/watermark, vignettes).
+
+Porter uniquement le dernier commit isolément aurait été un cherry-pick partiel et incohérent (le correctif présuppose le hook Auth et la table dédiés au projet Supabase séparé, qui n'existent pas dans ce train). Porter toute la chaîne aurait été une décision d'architecture (mono- vs multi-projet Supabase) et une extension de périmètre bien au-delà de « lot 6 : Studio », prise unilatéralement — exactement le type de décision que la consigne initiale demande de laisser en attente plutôt que de trancher.
+
+**`DECISION_REQUIRED:STUDIO-DEDICATED-SUPABASE-AND-CONTINUATION`** — à trancher par Julien : (a) le train adopte-t-il un projet Supabase séparé pour Studio, ou Studio doit-il être adapté pour rester sur l'instance partagée ? (b) les lots M (musique), invitations/RGPD/pages légales, et S1-S5 doivent-ils être portés comme lot(s) suivant(s) ? **Option la plus conservatrice retenue : aucun portage**, `fix/studio-signup-closed-v1` laissé intact sur `origin`, rien supprimé ni modifié.
+
+### 16.6 — Réconciliation du manifeste ENV (échec expliqué, non corrigé unilatéralement)
+
+`node scripts/check-env-manifest.mjs` : **ÉCHEC, 37 erreurs**, intégralement rattachées à Studio. Cause identifiée précisément : `config/env-manifest.json` (construit au lot 2 en analysant `--rev` la lignée complète, y compris la continuation `fix/studio-signup-closed-v1`, cf. `ELSATIA_ENV_MANIFEST_AND_CI_V1.md` ligne 164 : « Les gabarits Studio ne sont pas modifiés (branche Studio séparée) : ils seront contrôlés à l'intégration ») déclare déjà des variables que seule la continuation du §16.5 implémente réellement : `STUDIO_ENABLED`, `STUDIO_SIGNUP_MODE`, `STUDIO_SIGNUP_ALLOWLIST`, `STUDIO_LEGAL_PUBLISHED`, `STUDIO_LEGAL_TEXT_VERSION`, `RESEND_API_KEY`, `STUDIO_MAIL_PROVIDER`, `STUDIO_MAIL_FROM`. Vérifié par recherche exhaustive : **aucune de ces variables n'apparaît dans le code réellement porté** (`apps/studio/src`, `apps/studio/scripts`, `workers/studio-video/src`) — `signup-gate.ts` et `entitlement.ts`, qui les liraient, n'existent que dans la continuation non portée.
+
+Deux réparations auraient été possibles mais ont été délibérément écartées : ajouter ces variables aux gabarits `.env.example` (aurait documenté des variables que le code ne lit pas — mensonger) ou retirer ces entrées du manifeste (aurait supprimé une préparation légitime pour un lot futur, et aurait présupposé la réponse au §16.5). **Le manifeste et le code sont laissés inchangés** ; l'échec de `verify:env-manifest` pour Studio est un état connu, expliqué, directement causé par la décision du §16.5 de ne pas porter la continuation — **pas une régression de ce lot ni des lots précédents**. Les autres constats du contrôleur (contrats Stripe divergents, `FEATURE_CRONS_ENABLED` fail-open) sont préexistants, sans rapport avec Studio.
+
+`verify:migrations` : **305 migrations valides** (inchangé, cf. §16.1 — pas de renumérotation). `verify:secrets` : PASS (2472 fichiers suivis, aucun secret reconnu).
+
+### 16.7 — Tests rejoués
+
+- `apps/studio` (après `npm install`, absent avant ce lot) : `tsc --noEmit` **PASS** ; `eslint src tests next.config.ts` **PASS** (0 erreur) ; `vitest run` **251/251** ; `next build --webpack` **PASS** (12 routes générées).
+- `workers/studio-video` (après `npm install`) : `tsc --noEmit` **PASS** ; `vitest run` **15 réussis / 3 échoués / 4 ignorés (22)** — les 3 échecs sont dus au binaire `ffmpeg-static` (7.0.2, build statique johnvansickle.com) de ce bac à sable : le filtre `drawtext` est **absent de la compilation** (confirmé via `ffmpeg -filters`, `Filter not found` à l'exécution) et `xfade` échoue à configurer son pad de sortie dans ce conteneur contraint. **Limitation d'environnement d'exécution, pas un défaut du code porté** — signalé précisément plutôt que déclaré passant par inférence, conformément à la consigne. Non rejouable ici faute d'un binaire ffmpeg complet.
+- GP racine + Colors + Tools + Reserves revérifiés en parallèle : inchangés.
+- Fresh + pgTAP **non rejoués dans cette session** (écart connu, déjà signalé aux lots précédents : dernière exécution réelle à 296 migrations, train désormais à 305 — 8 migrations Studio ajoutées depuis, jamais rejouées sur l'instance PostgreSQL locale de ce bac à sable faute de la reconstruire). Risque résiduel documenté, pas dissimulé.
+
+### 16.8 — MUST_NOT_LOSE — mise à jour
+
+**Item #3 (CVE Next.js/sharp)** : clos pour l'écosystème complet tel qu'intégré (5/5 applications, §16.3).
+Deux nouveaux points ouverts, spécifiques à ce lot, à traiter avant toute qualification Preview de Studio :
+- Ne jamais fermer `DECISION_REQUIRED:STUDIO-SIGNUP-DEFAULT` par un correctif partiel qui ignorerait sa dépendance au projet Supabase dédié (§16.4-16.5).
+- Ne jamais porter `fix/studio-signup-closed-v1` par cherry-pick isolé du seul dernier commit — la chaîne est solidaire (hook Auth + table + projet Supabase dédié) ; toute décision d'intégration doit statuer d'abord sur `DECISION_REQUIRED:STUDIO-DEDICATED-SUPABASE-AND-CONTINUATION`.
+
+### 16.9 — Statut après ce lot
+
+`CONVERGENCE_TRAIN_CANDIDATE` = HEAD de `claude/compassionate-euler-5j6avr` après le commit de ce rapport (voir historique Git pour le SHA exact — ce rapport est lui-même le dernier commit du lot). `FINAL_PREVIEW_TRAIN = NOT_YET`.
+
+C'était le 6ᵉ et dernier lot de la liste transmise. **Aucun des deux `DECISION_REQUIRED` du lot Studio (§16.4, §16.5) n'est tranché** ; le train reste un candidat de convergence, pas une base Preview qualifiée. Aucun déploiement, aucune Preview, aucune Production.
