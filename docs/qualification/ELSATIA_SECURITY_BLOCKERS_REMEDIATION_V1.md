@@ -6,12 +6,12 @@ nouvelle, aucune logique métier modifiée sans nécessité démontrée, aucun d
 masqué, aucun contrôle de sécurité affaibli pour obtenir du vert.
 
 ```
-SHA de départ (qualifié)      = 76ec759fc97533bc27da864ce8128626ac2e0e62
-SHA final (correctifs)        = 95e80a3a37f9a56656a280f4da2f6a47b98c8ba7
-Branche                       = claude/compassionate-euler-5j6avr
+SHA de départ (qualifié)       = 76ec759fc97533bc27da864ce8128626ac2e0e62
+SHA final (correctifs + merge) = d081886f5b82fae576a0b2a73ef10b3bd6b42d11
+Branche                        = claude/compassionate-euler-5j6avr
 ```
 
-## 0. Note préalable — la branche a avancé pendant cette session
+## 0. Note préalable — la branche a avancé deux fois pendant cette session
 
 Au moment de reprendre le travail (`git fetch`), `origin/claude/compassionate-euler-5j6avr`
 n'était plus à `76ec759` mais à `69fcf10` (11 commits, lots **ENV manifest** et **DR/release gate**
@@ -19,10 +19,22 @@ intégrés par une autre session — exactement les deux lots que le rapport de 
 comme *"non intégrés à ce SHA"*). Vérifié avant tout correctif : `git diff --stat 76ec759 69fcf10`
 ne touche ni `supabase/migrations/` ni les dépendances (`package.json` ne fait qu'ajouter des
 scripts npm) — les deux blocages sécurité identifiés (js-yaml, `plateforme_admins`) sont donc
-strictement inchangés entre `76ec759` et `69fcf10`. Décision documentée plutôt que silencieuse :
-correctifs construits et poussés **sur `69fcf10`** (fast-forward, aucune réécriture d'historique
-sur une branche partagée), pas sur `76ec759` directement. Autorisation explicite obtenue avant
-d'écrire sur cette branche (contrainte système par défaut : pousser uniquement sur
+strictement inchangés entre `76ec759` et `69fcf10`. Correctifs construits et commités sur `69fcf10`
+(3 commits : `6940fb5`, `5d861eb`, `95e80a3`), pas sur `76ec759` directement.
+
+**Une seconde fois**, juste avant de pousser (`git fetch` de vérification), la branche avait de
+nouveau avancé : `69fcf10` → `6eaaafa` (34 commits, lots **Colors — voie restante** et **Reserves
+v6** — les deux derniers lots que le rapport de qualification listait comme non intégrés — dont un
+correctif CVE Next.js/sharp sur `apps/reserves`, indépendant de cette mission). **Fusionné** (merge
+commit, jamais de rebase/réécriture sur une branche partagée) plutôt que poussé en force : un seul
+conflit réel, `apps/reserves/package.json` (leur bump `sharp: 0.35.4` contre mon ajout `js-yaml:
+4.3.2` dans le même bloc `overrides`) — résolu en conservant les deux. Les 3 lockfiles concernés
+(`package-lock.json` racine, `apps/colors`, `apps/reserves`) régénérés proprement par `npm install`
+après fusion. **Toute la requalification du §4 ci-dessous est rejouée après cette fusion**, sur
+l'arbre final réellement poussé — pas sur l'état intermédiaire d'avant fusion.
+
+Aucune réécriture d'historique sur cette branche partagée dans les deux cas. Autorisation explicite
+obtenue avant d'écrire sur cette branche (contrainte système par défaut : pousser uniquement sur
 `claude/practical-archimedes-ajd588`).
 
 ---
@@ -205,17 +217,19 @@ Nouveau worktree Git détaché, PostgreSQL 16 + pgTAP réinstallés dans un serv
 Fresh/pgTAP reconstruit à l'identique de la méthode de qualification V1 (mêmes rôles/schémas/
 fonctions — voir ce rapport pour le détail complet du harnais).
 
-| Contrôle | SHA qualifié (`76ec759`) | Après correctifs (`95e80a3`) |
+| Contrôle | SHA qualifié (`76ec759`) | Après correctifs + fusion (arbre final poussé) |
 |---|---|---|
-| Install déterministe (4 apps) | PASS | **PASS** (`npm ci`/`npm install` sans erreur, 3 lockfiles régénérés proprement pour js-yaml) |
-| `verify:migrations` (statique) | PASS, 296 migrations | **PASS, 298 migrations** (296 + les 2 migrations de correctif) |
-| Fresh replay indépendant | PASS, 296/296, 0 erreur SQL | **PASS, 298/298, 0 erreur SQL** — rejoué 2 fois de zéro (harnais reconstruit, migrations recopiées), aucune erreur les deux fois |
+| Install déterministe (4 apps) | PASS | **PASS** (`npm ci`/`npm install` sans erreur, 3 lockfiles régénérés proprement après fusion) |
+| `verify:migrations` (statique) | PASS, 296 migrations | **PASS, 299 migrations** (296 + 2 migrations de correctif + 1 migration Colors fusionnée depuis `6eaaafa`, sans rapport) |
+| Fresh replay indépendant | PASS, 296/296, 0 erreur SQL | **PASS, 299/299, 0 erreur SQL** — rejoué 3 fois de zéro au total (harnais reconstruit à chaque fois), aucune erreur |
 | Typecheck (4 apps) | PASS (4/4) | **PASS (4/4)**, 0 erreur |
 | Lint (4 apps) | PASS (4/4) | **PASS (4/4)**, mêmes 5 avertissements pré-existants, 0 erreur |
-| Tests unitaires (4 apps) | 1777+1992+154+264 PASS | **1786+1992+154+264 PASS** (racine +9 tests, apportés par les commits ENV-manifest de `69fcf10`, sans rapport avec ce correctif) |
+| Tests unitaires (4 apps) | 1777+1992+154+264 PASS | **1786+1992+154+427 PASS** (racine +9 tests via `69fcf10` ; Colors +163 tests via `6eaaafa`, lot « Colors voie restante » — aucun des deux sans rapport avec ce correctif) |
 | Builds localement exécutables | GP PASS, Reserves PASS, Colors/Tools bloqués par garde-fou volontaire | **Identique** : GP PASS, Reserves PASS, Colors bloqué par le même garde-fou (variables `NEXT_PUBLIC_*` absentes du sandbox), Tools bloqué pareil mais reconfirmé sain en build diagnostique local |
-| pgTAP complet (80 fichiers) | 69 PASS / 9 FAIL / 1 BLOCKED (sur 79) | **74 PASS / 5 FAIL / 1 BLOCKED (sur 80)** — voir détail §3.2/3.4 |
+| pgTAP complet (81 fichiers) | 69 PASS / 9 FAIL / 1 BLOCKED (sur 79) | **75 PASS / 5 FAIL / 1 BLOCKED (sur 81)** — voir détail §3.2/3.4 ; le fichier fusionné depuis `6eaaafa` (`colors_finition_reference_nuancier_v15`) est pleinement vert |
 | `npm audit` (racine, `--audit-level=high`) | ÉCHEC réel (1 haute js-yaml, 2 modérées) | **PASS, exit 0** (2 modérées préexistantes sans rapport restantes) |
+| `npm audit` (`apps/colors`) | 1 haute (js-yaml) | **0 vulnérabilité** |
+| `npm audit` (`apps/reserves`) | 1 haute + 1 critique (next/sharp, sans rapport) + 1 haute (js-yaml) | **0 vulnérabilité** — le correctif next/sharp fusionné depuis `6eaaafa` (`5f720ef`, indépendant de cette mission) combiné à mon épinglage js-yaml résout l'intégralité de l'audit sur cette app |
 | Tests spécifiques `SECURITY DEFINER` | — | **7/7 PASS** (nouveau fichier, §2) |
 | Tests spécifiques aux corrections `plateforme_admins` | — | **118/118 PASS** (38+80, §3.2) |
 
@@ -246,8 +260,10 @@ documenté par la qualification V1 est **exclusivement** dû à l'absence du sec
 
 1. **5 fichiers pgTAP toujours en échec + 1 bloqué**, tous confirmés strictement inchangés et hors
    périmètre de cette mission (§3.4) — restent à traiter séparément.
-2. **`apps/reserves`** : 2 vulnérabilités `npm audit` préexistantes et sans rapport (next/sharp, 1
-   haute + 1 critique), non corrigées (nécessitent `--force`, hors périmètre nommé).
+2. ~~`apps/reserves` : 2 vulnérabilités `npm audit` next/sharp~~ — **résolu**, mais pas par cette
+   mission : la fusion de `6eaaafa` (commit `5f720ef`, autre session) a corrigé ce CVE
+   indépendamment pendant que cette remédiation était en cours. `apps/reserves` est à 0
+   vulnérabilité dans l'arbre final poussé (confirmé §4).
 3. **Gate CI Stripe** non confirmé vert en conditions réelles (secret absent du sandbox, §5).
 4. **`logoutAction` portée globale** — décision produit non tranchée, signalée par la qualification
    V1, non concernée par cette mission (pas un blocage sécurité identifié comme tel), inchangée.
