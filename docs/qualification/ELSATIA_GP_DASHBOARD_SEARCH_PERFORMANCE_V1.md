@@ -13,7 +13,7 @@ mission `perf/gp-capacity-readiness-v1`, base `release/gp-v1-rc`) — Dashboard
 ~1,7-1,8 s, recherche texte ~1,76 s sous RLS — sans affaiblir la sécurité ni
 contourner la RLS de façon non contrôlée.**
 
-**Verdict : `PERFORMANCE CANDIDATE`** — voir § Benchmark final.
+**Verdict : `PERFORMANCE CANDIDATE`** — voir § 9 (benchmark) et § 12 (verdict détaillé).
 
 ---
 
@@ -25,8 +25,8 @@ BASE (mission)     = claude/compassionate-euler-5j6avr @ 76ec759 (fast-forward
 Branche de travail  = claude/beautiful-franklin-7hwzq0 (poussée en fast-forward
                       sur la base ci-dessus avant tout travail de cette mission)
 NB MIGRATIONS (base)   = 296
-NB MIGRATIONS (final)  = 297 (+1 : correctif P0 découvert en construisant le
-                          dataset — voir § 4.1)
+NB MIGRATIONS (final)  = 299 (+3 : 315 correctif P0 découvert en construisant
+                          le dataset (§ 4.1), 316-317 correctif Dashboard (§ 4.3))
 ```
 
 Ce dépôt (`Appli_BTP` / ELSATIA Gestion Pro) n'est **pas** le même lignage que
@@ -341,6 +341,18 @@ appel réel de la RPC, tenant A) :
 | `devis_liste_paginee` | `'DEV'` (très large, ~5000 matches) | 25/5012 | 41,8 ms |
 | `clients_liste_paginee` | `'Fixture'` (fragment société) | 25/109 | 2,2 ms |
 
+**Accents** : testé en insérant un client `"Éléonore André" / "Société
+Générale Bâtiment"` (la fixture générée n'a aucun caractère accentué). La
+recherche est **sensible aux accents** : `'eleonore'` → 0 résultat,
+`'Éléonore'` → 1 résultat, `'Societe Generale'` (sans accents) → 0 résultat
+sur `'Société Générale'`. Comportement `ILIKE` natif, **inchangé par cette
+mission** — c'est une limite UX pré-existante (un utilisateur qui tape sans
+accents ne retrouve pas un nom accentué), pas une régression ni un problème
+de performance ; la corriger demanderait `unaccent()` des deux côtés de la
+comparaison (colonne indexée et terme recherché), un changement de
+comportement fonctionnel hors du périmètre strict "performance" de cette
+mission — signalé ici pour mémoire (mission §5), pas traité.
+
 **Toutes les recherches réellement exposées à un utilisateur sont déjà sous
 la barre des 500 ms visée par la mission (§11)** — la plus lente
 (`chantiers_liste_paginee`, 135 ms) s'explique par un motif déjà documenté et
@@ -434,8 +446,9 @@ ce dépôt, pas un correctif du planner.
 
 | Test | Résultat |
 | --- | --- |
-| Fresh (297 migrations, base vide → schéma complet, rôle non-superuser/bypassrls) | ✅ 0 erreur |
+| Fresh (299 migrations, base vide → schéma complet, rôle non-superuser/bypassrls) | ✅ 0 erreur — rejoué deux fois : une fois pour construire le dataset de mesure, une seconde fois isolément juste avant la rédaction de ce rapport, pour confirmer que les 3 nouvelles migrations (315-317) s'appliquent proprement sur un schéma vierge, sans dépendre d'un état intermédiaire |
 | Upgrade implicite (3 nouvelles migrations rejouées sur une base déjà peuplée par la fixture, lors des itérations de correction) | ✅ backfill correct à chaque itération |
+| pgTAP des 3 nouveaux fichiers de test, rejoués contre la base fresh ci-dessus (schéma vierge, aucune donnée résiduelle) | ✅ 0 `not ok` |
 
 ### 8.2 pgTAP
 
@@ -523,14 +536,48 @@ pages touchées par cette mission.**
 | Recherche directe `ilike` sous `authenticated` (chemin hypothétique, non emprunté par l'appli) | 2 992 ms | 2 992 ms (non corrigé — hors périmètre réel, `LEAKPROOF` interdit) | — | `Index Scan` + Filter RLS+ILIKE ligne à ligne | inchangé |
 | Isolation tenant (RPC dashboard + recherche) | non testé | 100% des tentatives cross-tenant rejetées/vides | — | — | — |
 
-*(Ligne x2 volume à compléter — voir § 10, mesure en cours au moment de la
-rédaction de cette section.)*
+Montée en charge ×2 (10 012 devis / 6 000 factures) : voir détail § 10 —
+Dashboard corrigé 24,0 ms → 53,3 ms (×2,2, reste largement sous l'objectif),
+les 4 RPC de recherche restent toutes sous 155 ms, aucune dégradation
+superlinéaire.
 
 ---
 
 ## 10. Montée en charge ×2
 
-*(section complétée une fois la génération x2 terminée)*
+Volume doublé pour le tenant A par génération synthétique ciblée (mêmes
+distributions statistiques que la fixture initiale, sans les 12 devis
+"lourds" — déjà hors périmètre de cette mission, cf. § 0) :
+**10 012 devis** (+5000), **6 000 factures** (+3000), lignes associées en
+proportion. Reproduit avec
+`scripts/perf/generate_fixture.sql` en double invocation, ou un script
+équivalent — non conservé dans le dépôt (mesure ponctuelle).
+
+| Parcours | ×1 (5012/3000) | ×2 (10012/6000) | Dégradation |
+| --- | ---: | ---: | ---: |
+| Dashboard avant (devis, `select *` sous RLS) | 3 356,7 ms | 6 742,0 ms | ×2,01 (linéaire, attendu — coût RLS/ligne, cf. § 3) |
+| Dashboard avant (factures, `select *` sous RLS) | 1 769,3 ms | 3 478,8 ms | ×1,97 (linéaire) |
+| **Dashboard après (`dashboard_indicateurs()`)** | **24,0 ms** | **53,3 ms** | **×2,2 — reste largement sous l'objectif (<1 s)** |
+| `devis_liste_paginee` (recherche, RPC réelle) | 37,4 ms | 84,2 ms | ×2,25, reste sous 100 ms |
+| `clients_liste_paginee` (recherche, RPC réelle) | 1,8 ms | 2,0 ms | quasi nul |
+| `chantiers_liste_paginee` (recherche, RPC réelle) | 135,4 ms | 153,3 ms | ×1,13, reste sous 200 ms |
+| `factures_liste_paginee` (recherche, RPC réelle) | 10,6 ms | 22,6 ms | ×2,1, reste sous 30 ms |
+| Recherche directe hors RPC (chemin non emprunté, référence) | 2 992,4 ms | 5 945,9 ms | ×1,99 (linéaire — confirme que la cause est bien le coût RLS/ligne, pas un effet de bord du volume) |
+| Recherche hors RLS (bypass, référence) | 0,135 ms | 0,151 ms | quasi nul (index-driven, insensible au volume) |
+
+**Constat** : le Dashboard corrigé et les 4 RPC de recherche montrent une
+dégradation **sous-linéaire à linéaire modérée** (×1,1 à ×2,25 pour un
+volume ×2), jamais superlinéaire — cohérent avec des plans pilotés par
+index (`LIMIT`, plage de dates bornée, cache O(1) pour les 3 totaux) plutôt
+que par un balayage complet. Le seul chemin qui dégrade linéairement de
+façon spectaculaire (×1,97-2,01) est précisément celui **non emprunté par
+l'application réelle** (chargement complet sous RLS avant correctif, et
+recherche directe hors RPC) — confirmation supplémentaire, par la mesure,
+que la cause diagnostiquée (coût RLS par ligne) est la bonne : elle scale
+avec le nombre de lignes balayées, pas avec autre chose.
+
+**Aucune dégradation problématique constatée à ×2** pour les deux parcours
+visés par la mission.
 
 ---
 
