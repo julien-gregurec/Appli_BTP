@@ -368,3 +368,95 @@ Aucun des 12 items du §8 n'est affecté. Ajout d'un point de vigilance DR : la 
 ### 13.6 — Statut après ce lot
 
 `CONVERGENCE_TRAIN_CANDIDATE = 693f877` (branche `claude/compassionate-euler-5j6avr`, à pousser). `FINAL_PREVIEW_TRAIN = NOT_YET`. Prochains lots : Colors (voie restante) → Reserves → Studio.
+
+---
+
+## 14. Lot Colors — voie restante (5ᵉ édition de ce rapport, même branche, aucun train concurrent)
+
+**Point de départ** : `CONVERGENCE_TRAIN_CANDIDATE = 69fcf10` (HEAD après le lot DR, §13).
+
+### 14.1 — Comparaison avant portage
+
+- `integration/colors-pilot-readiness-v1` (tip `a376984`) : merge-base avec HEAD = **exactement le tip ECO (`59e960a`)**, confirmé par `git merge-base`. 19 commits réellement absents (1 merge de fusion pure, sans diff propre — sauté ; 18 commits réels). Seule **1 migration** manquait (`20260909000281_colors_finition_reference_nuancier_v15.sql`) sur les 16 que la carte de convergence attribuait à cette branche — les 15 autres étaient déjà dans ce train via ECO.
+- `integration/colors-predeploy-final-v1` et ses 4 « correctifs orphelins » (`fix/colors-auth-callback-csp-p1-v2`, `fix/colors-security-p1-closure-v1`, `fix/colors-safe-next-redirect-v1`, `fix/elsatia-colors-standalone-build-v1`) : **découverte majeure** — ces 4 branches et les 2 branches « totalement orphelines » (`fix/colors-precommercial-noindex-robots-v1`, `fix/colors-supabase-public-key-predeploy-guard-v1`) forment en réalité **une seule chaîne linéaire** (chacune ancêtre directe de la suivante), pas 6 lignées séparées comme la lecture rapide de la carte de convergence pouvait le laisser penser. Porter le tip (`fix/colors-supabase-public-key-predeploy-guard-v1` @ `30fed99`) suffit à couvrir les 6.
+
+### 14.2 — Porté : `integration/colors-pilot-readiness-v1` (18 commits)
+
+Cherry-pickés dans l'ordre chronologique — **0 conflit de fusion** (seul un conflit trivial `package.json` auto-résolu par git). Apporte : parcours d'accès complet (destination mémorisée, session terminée, démarrage guidé), correspondance de nuancier + modèle de finition, lecture d'étiquette OCR (inactive par défaut, sans prestataire), retrait des valeurs métier des journaux, corrections responsive/contraste/PWA, export paginé, **le correctif CSP qui cassait l'application sur WebKit**, séparation RAL/fabricants (D1), nettoyage des métadonnées photo — GPS/EXIF/miniatures (D2), et la migration 281.
+
+**2 défauts trouvés et corrigés après coup** (§14.4) : `apps/colors/package.json` déclarait `sharp` à `0.35.3` (version vulnérable) après un auto-merge — sans risque réel (`overrides` forçait déjà `0.35.4`, confirmé par `npm ci`) mais trompeur, corrigé. Un test (`separation-ral-fabricant.test.ts`) assertait un total figé de 279 fichiers de migration — assertion non pertinente à l'intention du test (vérifier qu'une migration proposée n'est PAS appliquée), retirée plutôt que remplacée par un nouveau nombre voué à re-casser.
+
+### 14.3 — Non porté (5 des 6 commits « orphelins ») : déjà superseded
+
+En tentant de porter le tip de la chaîne linéaire identifiée en §14.1, **chaque conflit réel a révélé la même situation** : la lignée `colors-pilot-readiness-v1` avait déjà, indépendamment et plus tard, réimplémenté une version égale ou supérieure de la même protection. Vérifié fichier par fichier, jamais supposé :
+
+| Commit source | Prétention | Constat après comparaison directe |
+|---|---|---|
+| `5ea1d03` harden internal redirect validation | Ferme un open-redirect (`\`, `%5C`, encodage pourcent) | `apps/colors/src/lib/redirection-sure.ts` existe déjà, **plus rigoureux** : 3 passes de décodage pourcent, neutralisation de caractères de contrôle Unicode étendue, preuve d'origine WHATWG, revérification de la sortie normalisée. **Skip.** |
+| `260523c` close precommercial security p1 gaps | En-têtes de sécurité, fuites PostgreSQL, boucle `/acces-refuse`, récupération mot de passe | Chaque fichier vérifié (`security/en-tetes.ts`, `messages-metier.ts`, `quantites.ts`, pages de réinitialisation) déjà présent, `quantites.ts` **octet pour octet identique** à ce que ce commit propose. **Skip entier (16 fichiers).** |
+| `4de472d` complete auth callback and csp hardening | Complète la CSP par nonce | `apps/colors/src/proxy.ts` déjà une version plus complète (en-têtes de suivi de session/chemin, page hors-ligne incluse). **Skip.** |
+| `55c5820` enforce precommercial noindex and robots | Empêche l'indexation avant commercialisation | `apps/colors/src/lib/seo/indexation.ts` et `apps/colors/src/app/robots.ts` déjà présents ; seule ligne de collision (`RESSOURCES_PUBLIQUES`) déjà un sur-ensemble côté HEAD. **Skip (cherry-pick résolu à vide).** |
+| `30fed99` align Supabase public key and guard production builds | Convention `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, garde de build | `.env.example`, `verify-public-env.mjs` et `proxy.ts` déjà alignés et plus complets côté HEAD (garde OCR en plus). **Skip (cherry-pick résolu à vide).** |
+| `3870e1c`, `da74bb4`, `07a2af7` (docs/relais mot de passe) | Relais de récupération GP→Colors, flux multi-app | `src/lib/auth-relais-colors.ts` (racine GP) déjà présent. **Cherry-pick vide (no-op), confirmé par git lui-même.** |
+
+**Seul contenu réellement neuf porté** de toute cette chaîne : `e427f52` (`.gitignore` — ignorer `.vercel`/`.env*`), et 2 fichiers documentaires plus récents côté HEAD conservés tels quels (`77c6f4c` en conflit add/add, HEAD gardé car datant d'après ce correctif et le mentionnant déjà).
+
+**Aucune perte** : chaque skip a été décidé après lecture du contenu réel des deux côtés, jamais par déduction sur le nom de la branche.
+
+### 14.4 — Réconciliation du manifeste ENV (le contrôleur a de nouveau fait son travail)
+
+Après le lot Colors, `node scripts/check-env-manifest.mjs` remontait 4 nouvelles erreurs réelles : `MDP_RECETTE` (mot de passe du harnais e2e Colors, non déclaré) et 3 accès dynamiques `process.env[…]` non justifiés (`conservation/politique.ts`, `nuancier/source.ts`, `ocr/fournisseurs.ts` — tous trois lisent par un nom de constante interne, jamais une entrée utilisateur). Déclarés/justifiés selon le même patron qu'au §12.3. **0 erreur après correctif**, 58/58 tests du contrôleur toujours verts.
+
+### 14.5 — Tests rejoués
+
+`tsc --noEmit` (GP + Colors) PASS ; `eslint` (GP + Colors) PASS (0 erreur, mêmes avertissements pré-existants) ; `vitest run` GP **1786/1786** (inchangé) ; `vitest run` Colors **427/427** (après le retrait de l'assertion figée, initialement 1 échec) ; `verify:migrations` **297** (+1, migration 281) ; `verify:secrets` PASS (2279 fichiers) ; `check-env-manifest.mjs` **0 erreur** ; `next build` GP et Colors : **PASS** tous les deux. Fresh/pgTAP non rejoués dans cette session (1 migration ajoutée, additive et sans dépendance croisée avec les lots GP pilot/perf déjà vérifiés par Fresh au §6.2 — signalé, pas déclaré prouvé par inférence).
+
+### 14.6 — MUST_NOT_LOSE — mise à jour
+
+Aucun des 12 items du §8 n'est affecté. Point ajouté, spécifique à ce lot : ne jamais laisser un futur merge de la lignée r73/`colors-predeploy-final` réintroduire une version antérieure de `redirection-sure.ts`, `security/en-tetes.ts`, `proxy.ts` ou `messages-metier.ts` — ce train porte déjà la version la plus avancée de chacun, vérifiée au cas par cas en §14.3.
+
+### 14.7 — Statut après ce lot
+
+`CONVERGENCE_TRAIN_CANDIDATE = ee35a2d` (branche `claude/compassionate-euler-5j6avr`, à pousser). `FINAL_PREVIEW_TRAIN = NOT_YET`. Prochains lots : Reserves → Studio.
+
+---
+
+## 15. Lot Reserves (6ᵉ édition de ce rapport, même branche, aucun train concurrent)
+
+**Point de départ** : `CONVERGENCE_TRAIN_CANDIDATE = 8133a97` (HEAD après le lot Colors, §14).
+
+### 15.1 — Comparaison avant portage
+
+Les deux lignées que la carte de convergence documentait comme mutuellement divergentes le sont réellement (aucune n'est ancêtre de l'autre), mais leur écart réel avec HEAD s'est révélé bien plus petit qu'annoncé :
+
+- `fix/reserves-offline-resilience-train-v2` (tip `86ed10a`) : 4 commits absents, **0 migration neuve** (`comm -23` sur les arbres de migrations : vide).
+- `feat/reserves-v6-security-offline-pilot-gate-v1` (tip `75b5c62`) : 5 commits absents, 1 fichier de migration en apparence neuf (`20260907000271_reserves_v5_offline_idempotence_v1.sql`) — en réalité un doublon de contenu **déjà présent et documenté comme renuméroté** dans ce train sous `20260908000273_...` (le fichier canonique porte lui-même un commentaire de provenance expliquant la renumérotation faite par le train d'intégration ECO).
+- Fichiers applicatifs clés des deux lignées (`offline/base-locale.ts`, `offline/contrat.ts`, `offline/synchronisation.ts`, `offline/reprise.ts`, `securite/entetes.ts`, `components/offline/useReprise.ts`) : **déjà présents**, et systématiquement plus volumineux/complets côté HEAD (ex. `synchronisation.ts` 358 lignes contre 241 dans la version source).
+
+### 15.2 — Porté
+
+Les 9 commits réels des deux lignées cherry-pickés dans l'ordre chronologique. **Chaque conflit vérifié individuellement avant résolution** (jamais un `--theirs`/`--ours` en aveugle) :
+
+- Un doublon de migration réel introduit par le cherry-pick de `7c0fc3d` (réintroduisait `reserves_v5_offline_idempotence` sous son ancien numéro 271) — détecté immédiatement, retiré dans un commit dédié.
+- 2 conflits `identiteCourante` vs `resoudreIdentite` (import seul) — HEAD utilise déjà le second nom, seul nom réellement exporté par `identite.ts` ; résolu en gardant HEAD.
+- Le reste des conflits (`72aefe0`, `52e8ac2`) : vérifiés fichier par fichier, HEAD contenait déjà une version égale ou supérieure de chaque protection (ex. distinction 503/401 entre indisponibilité serveur et session expirée, déjà implémentée mot pour mot dans `route.ts`). Résolu en gardant HEAD partout, confirmé par des cherry-picks qui se terminent à vide une fois les imports alignés.
+- Seul contenu réellement neuf : les mises à jour de rapports d'audit (SHA consignés) et le retrait du doublon de migration.
+
+### 15.3 — Découverte de sécurité (hors périmètre direct du lot, corrigée immédiatement)
+
+En régénérant le lockfile de `apps/reserves` pendant ce lot, `npm audit` a révélé que **Reserves n'avait jamais reçu le correctif CVE Next.js/sharp** appliqué à GP, Colors et Tools par le lot sécurité (§2, lot 2) : `next@16.2.12` (RCE non authentifiée, `GHSA-p293-qw3h-jr36`/`GHSA-2xp9-vwfh-vxw4`) et `sharp@0.35.3` étaient toujours déclarés. Cause : le lot sécurité d'origine ne portait que sur 3 apps, Reserves n'étant pas dans son périmètre à l'époque, et aucune fusion ultérieure (y compris ECO) n'a comblé cet écart.
+
+**Corrigé immédiatement**, hors attente d'un lot dédié (risque de sécurité, pas une fonctionnalité) : `next` → `16.3.5`, `sharp` (override) → `0.35.4`, `eslint-config-next` → `16.3.5` — mêmes versions que les 3 autres apps. `npm audit` : critique et high résolus (reste 1 high `js-yaml`, dépendance de dev, même écart hors périmètre que documenté pour GP/Colors au §6.1).
+
+### 15.4 — Tests rejoués
+
+`tsc --noEmit` PASS ; `eslint` PASS (0 erreur, 0 avertissement) ; `vitest run` **154/154** ; `next build` **PASS** (avant et après le bump sécurité) ; `verify:migrations` **297** (inchangé — le doublon retiré compense la tentative de réintroduction) ; `verify:secrets` PASS (2279 fichiers) ; `check-env-manifest.mjs` **0 erreur** (aucune nouvelle variable introduite par ce lot). `tsc`/`eslint`/`vitest` GP racine revérifiés en parallèle : inchangés (1786/1786, 0 erreur). Fresh/pgTAP non rejoués (aucune migration nette ajoutée par ce lot).
+
+### 15.5 — MUST_NOT_LOSE — mise à jour
+
+**Item #3 (CVE Next.js/sharp) étendu** : ce train couvre désormais les 4 applications (GP, Colors, Tools, **Reserves**), pas seulement les 3 initialement corrigées — écart comblé au §15.3, à vérifier également pour Studio au prochain lot avant de considérer l'item #3 clos pour l'écosystème complet.
+**Item #10 (durcissement offline dédié Reserves v6)** : confirmé **non perdu** — chaque protection de `feat/reserves-v6-security-offline-pilot-gate-v1` a été vérifiée présente dans ce train sous une forme égale ou supérieure, pas simplement supposée couverte.
+
+### 15.6 — Statut après ce lot
+
+`CONVERGENCE_TRAIN_CANDIDATE = 5f720ef` (branche `claude/compassionate-euler-5j6avr`, à pousser). `FINAL_PREVIEW_TRAIN = NOT_YET`. Prochain lot : Studio (dernier, volontairement — fork le plus ancien, migrations au format `HHMMSS` à convertir, signup actuellement ouvert à trancher, **et vérifier sa version Next.js/sharp** compte tenu de la découverte ci-dessus).

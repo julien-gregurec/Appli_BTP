@@ -4,7 +4,7 @@ export const NAVIGATION_COLORS = [
   { href: "/ajout-photo", label: "Ajout par photo", icon: "camera", disponible: true },
   { href: "/depots", label: "Dépôts et emplacements", icon: "location", disponible: true },
   { href: "/activite", label: "Activité récente", icon: "movement", disponible: true },
-  { href: "/nuanciers", label: "Nuanciers", icon: "palette", disponible: false },
+  { href: "/nuanciers", label: "Nuanciers", icon: "palette", disponible: true },
   { href: "/catalogues", label: "Catalogues produits", icon: "catalog", disponible: false },
   { href: "/imports", label: "Imports", icon: "upload", disponible: false },
   { href: "/utilisateurs", label: "Utilisateurs et habilitations", icon: "users", disponible: false },

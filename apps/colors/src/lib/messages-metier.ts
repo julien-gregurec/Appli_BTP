@@ -40,6 +40,11 @@ export const CODE_SEAU_ARCHIVE = "seau-archive";
 export const CODE_SEAU_RESTAURE = "seau-restaure";
 export const CODE_INFORMATIONS_MISES_A_JOUR = "informations-mises-a-jour";
 export const CODE_PARAMETRES_ENREGISTRES = "parametres-enregistres";
+export const CODE_FINITION_ENREGISTREE = "finition-enregistree";
+export const CODE_REFERENCE_CONFIRMEE = "reference-confirmee";
+export const CODE_REFERENCE_EFFACEE = "reference-effacee";
+/** La référence proposée n'a pas le format que le schéma sait persister. */
+export const CODE_REFERENCE_NON_PERSISTABLE = "reference-non-persistable";
 
 const ERREURS = new Map<string, string>([
   [CODE_VALIDATION, "Les informations saisies ne sont pas valides."],
@@ -53,6 +58,10 @@ const ERREURS = new Map<string, string>([
   [CODE_QUANTITE_RESTANTE_NEGATIVE, "La quantité restante ne peut pas être négative."],
   [CODE_QUANTITE_RESTANTE_DEPASSE, "La quantité restante dépasse la quantité nominale."],
   [CODE_SEUIL_INVALIDE, "Le seuil doit être un nombre compris entre 0 et 100."],
+  [
+    CODE_REFERENCE_NON_PERSISTABLE,
+    "Cette référence ne peut pas être confirmée : seules les références au format RAL sont enregistrables aujourd’hui. La proposition reste affichée.",
+  ],
 ]);
 
 const CONFIRMATIONS = new Map<string, string>([
@@ -65,6 +74,9 @@ const CONFIRMATIONS = new Map<string, string>([
   [CODE_SEAU_RESTAURE, "Seau restauré"],
   [CODE_INFORMATIONS_MISES_A_JOUR, "Informations mises à jour"],
   [CODE_PARAMETRES_ENREGISTRES, "Paramètres enregistrés"],
+  [CODE_FINITION_ENREGISTREE, "Finition enregistrée"],
+  [CODE_REFERENCE_CONFIRMEE, "Référence confirmée"],
+  [CODE_REFERENCE_EFFACEE, "Référence retirée"],
 ]);
 
 function libelle(table: Map<string, string>, code: unknown): string | null {

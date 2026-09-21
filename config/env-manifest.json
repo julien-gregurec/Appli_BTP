@@ -289,6 +289,18 @@
       {
         "path": "src/lib/tools-store-environment.ts",
         "justification": "Lit TOOLS_STORE_ENVIRONMENT/TOOLS_STORE_ALLOW_SANDBOX par un nom construit à partir d'une constante interne, jamais une entrée utilisateur."
+      },
+      {
+        "path": "apps/colors/src/lib/conservation/politique.ts",
+        "justification": "Lit une durée de rétention par un nom pris dans le registre interne VARIABLES_CONSERVATION, jamais une entrée utilisateur."
+      },
+      {
+        "path": "apps/colors/src/lib/nuancier/source.ts",
+        "justification": "Lit la source de nuancier active par un nom constant interne (VARIABLE_NUANCIER), jamais une entrée utilisateur."
+      },
+      {
+        "path": "apps/colors/src/lib/ocr/fournisseurs.ts",
+        "justification": "Lit l'activation/le fournisseur OCR par des noms constants internes (VARIABLE_OCR_ACTIF/FOURNISSEUR), jamais une entrée utilisateur."
       }
     ]
   },
@@ -5802,6 +5814,28 @@
       "category": "tooling",
       "description": "URL de base du serveur de flux externes simulés, lue par le script d'interception du harnais e2e service-role-flux-acl.",
       "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "MDP_RECETTE",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Mot de passe partagé du harnais e2e Colors (fixtures de recette), aucun repli par défaut.",
+      "fail_mode": "closed",
       "deprecated": false,
       "replacement": null,
       "dr_critical": false,
