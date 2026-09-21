@@ -7,7 +7,13 @@
     "gestion_pro": {
       "kind": "web",
       "label": "ELSATIA Gestion Pro (inclut Boutique, DOE, API de facturation Tools)",
-      "roots": ["src/", "next.config.ts", "sentry.server.config.ts", "sentry.edge.config.ts", "vercel.json"],
+      "roots": [
+        "src/",
+        "next.config.ts",
+        "sentry.server.config.ts",
+        "sentry.edge.config.ts",
+        "vercel.json"
+      ],
       "examples": [
         {
           "path": ".env.example",
@@ -27,12 +33,16 @@
     "platform": {
       "kind": "shared",
       "label": "Socle commun (packages/*)",
-      "roots": ["packages/"]
+      "roots": [
+        "packages/"
+      ]
     },
     "colors": {
       "kind": "web",
       "label": "ELSATIA Colors",
-      "roots": ["apps/colors/"],
+      "roots": [
+        "apps/colors/"
+      ],
       "examples": [
         {
           "path": "apps/colors/.env.example",
@@ -43,7 +53,9 @@
     "tools": {
       "kind": "web",
       "label": "ELSATIA Tools",
-      "roots": ["apps/tools/"],
+      "roots": [
+        "apps/tools/"
+      ],
       "examples": [
         {
           "path": "apps/tools/.env.example",
@@ -54,7 +66,9 @@
     "reserves": {
       "kind": "web",
       "label": "ELSATIA Réserves",
-      "roots": ["apps/reserves/"],
+      "roots": [
+        "apps/reserves/"
+      ],
       "examples": [
         {
           "path": "apps/reserves/.env.example",
@@ -65,7 +79,10 @@
     "studio": {
       "kind": "web",
       "label": "ELSATIA Studio",
-      "roots": ["apps/studio/", "packages/studio-domain/"],
+      "roots": [
+        "apps/studio/",
+        "packages/studio-domain/"
+      ],
       "examples": [
         {
           "path": "apps/studio/.env.example",
@@ -76,7 +93,9 @@
     "studio_worker": {
       "kind": "worker",
       "label": "Worker vidéo Studio (hors Vercel)",
-      "roots": ["workers/studio-video/"],
+      "roots": [
+        "workers/studio-video/"
+      ],
       "examples": [
         {
           "path": "workers/studio-video/.env.example",
@@ -87,17 +106,27 @@
     "ops_scripts": {
       "kind": "tooling",
       "label": "Scripts d'administration, d'audit, de sécurité et de recette",
-      "roots": ["scripts/", "config/"]
+      "roots": [
+        "scripts/",
+        "config/"
+      ]
     },
     "e2e": {
       "kind": "tooling",
       "label": "Bancs de test E2E",
-      "roots": ["tests/", "playwright.config.ts", "vitest.config.ts", "scripts/e2e/"]
+      "roots": [
+        "tests/",
+        "playwright.config.ts",
+        "vitest.config.ts",
+        "scripts/e2e/"
+      ]
     },
     "ci": {
       "kind": "tooling",
       "label": "GitHub Actions",
-      "roots": [".github/"]
+      "roots": [
+        ".github/"
+      ]
     }
   },
   "system_variables": [
@@ -252,6 +281,14 @@
       {
         "path": "scripts/cutover/preflight-check.mjs",
         "justification": "Affiche la présence (jamais la valeur) de variables listées, ligne de code du cutover opérateur."
+      },
+      {
+        "path": "apps/tools/scripts/verify-public-env.mjs",
+        "justification": "Itère sur la liste de variables publiques déclarées par ce même script pour construire son rapport ; ne lit jamais une variable applicative arbitraire."
+      },
+      {
+        "path": "src/lib/tools-store-environment.ts",
+        "justification": "Lit TOOLS_STORE_ENVIRONMENT/TOOLS_STORE_ALLOW_SANDBOX par un nom construit à partir d'une constante interne, jamais une entrée utilisateur."
       }
     ]
   },
@@ -403,43 +440,64 @@
       "id": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
       "owner": "Julien",
       "question": "Le prix d'un module dépend-il du forfait de départ (contrat catalogue V3, jusqu'à 40 variables) ou est-il unique par module et période (contrat runtime, 10 variables) ?",
-      "options": ["plat : un prix par module et période", "par forfait : module × forfait × période"]
+      "options": [
+        "plat : un prix par module et période",
+        "par forfait : module × forfait × période"
+      ]
     },
     {
       "id": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS",
       "owner": "Julien",
       "question": "Les comptes supplémentaires se facturent-ils par plan (runtime actuel) ou par rôle 5/9/15/0 (grille V4) ?",
-      "options": ["par plan (capacité)", "par rôle (V4)"]
+      "options": [
+        "par plan (capacité)",
+        "par rôle (V4)"
+      ]
     },
     {
       "id": "DECISION_REQUIRED:STRIPE-IA-OPTIONS",
       "owner": "Julien",
       "question": "Les options IA par palier 100/300/illimité sont-elles remplacées par le pack ponctuel + IA intensive (V4), et quand retirer les anciennes ?",
-      "options": ["V4 seule", "cohabitation temporaire"]
+      "options": [
+        "V4 seule",
+        "cohabitation temporaire"
+      ]
     },
     {
       "id": "DECISION_REQUIRED:STRIPE-LEGACY-GENERATIONS",
       "owner": "Julien",
       "question": "Quand retirer les Price IDs des offres historiques (essentiel, premium) et de la base des générations précédentes ?",
-      "options": ["après épuisement des abonnements", "date fixe"]
+      "options": [
+        "après épuisement des abonnements",
+        "date fixe"
+      ]
     },
     {
       "id": "DECISION_REQUIRED:STRIPE-STORAGE-BLOCK",
       "owner": "Julien",
       "question": "Le bloc de stockage est-il un produit vendable ? Tant que non tranché, aucune variable Stripe n'est créée.",
-      "options": ["oui", "non"]
+      "options": [
+        "oui",
+        "non"
+      ]
     },
     {
       "id": "DECISION_REQUIRED:FLAG-CRONS-FAIL-OPEN",
       "owner": "Julien",
       "question": "Passer FEATURE_CRONS_ENABLED en fail-closed (« true » requis) ? Impact : la production doit alors poser la variable à true AVANT le déploiement, sinon les tâches planifiées s'arrêtent.",
-      "options": ["fail-closed avec pose préalable en production", "conserver fail-open (justifié)"]
+      "options": [
+        "fail-closed avec pose préalable en production",
+        "conserver fail-open (justifié)"
+      ]
     },
     {
       "id": "DECISION_REQUIRED:STUDIO-SIGNUP-DEFAULT",
       "owner": "Julien",
       "question": "Valeur par défaut de l'inscription Studio : open (actuel) ou closed ?",
-      "options": ["closed par défaut", "open par défaut"]
+      "options": [
+        "closed par défaut",
+        "open par défaut"
+      ]
     }
   ],
   "findings": [
@@ -447,7 +505,9 @@
       "id": "F-DR-BANK-KEY-VERSIONING",
       "severity": "P0",
       "status": "open",
-      "variables": ["BANK_DATA_ENCRYPTION_KEY"],
+      "variables": [
+        "BANK_DATA_ENCRYPTION_KEY"
+      ],
       "text": "AES-256-GCM avec format chiffré « v1 » sans identifiant de clé : aucune rotation simple, perte = IBAN/BIC illisibles à jamais.",
       "next_step": "Lot cryptographie séparé : key versioning (id de clé dans le chiffré), fenêtre à deux clés, rechiffrement."
     },
@@ -463,7 +523,10 @@
       "id": "F-SUPABASE-PUBLIC-KEY-NAME",
       "severity": "P1",
       "status": "detected",
-      "variables": ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"],
+      "variables": [
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+      ],
       "text": "Deux noms pour la clé publique Supabase : PUBLISHABLE (Gestion Pro, Colors, Studio) et ANON legacy (Tools, Réserves).",
       "next_step": "Lot code : lecture canonique + repli sur l'alias dans Tools et Réserves, puis retrait de l'alias."
     },
@@ -471,7 +534,9 @@
       "id": "F-RESERVES-EXAMPLE-KEY",
       "severity": "P1",
       "status": "fixed",
-      "variables": ["NEXT_PUBLIC_SUPABASE_ANON_KEY"],
+      "variables": [
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+      ],
       "text": "Le gabarit de Réserves déclarait PUBLISHABLE alors que le code lit ANON : configurée selon l'exemple, l'application n'authentifiait personne.",
       "next_step": "Corrigé : le gabarit déclare l'alias lu par le code. Test de non-régression : EXAMPLE-FOREIGN / EXAMPLE-MISSING."
     },
@@ -479,7 +544,9 @@
       "id": "F-STRIPE-EXPECTED-MODE-TEMPLATES",
       "severity": "P1",
       "status": "fixed",
-      "variables": ["STRIPE_WEBHOOK_EXPECTED_MODE"],
+      "variables": [
+        "STRIPE_WEBHOOK_EXPECTED_MODE"
+      ],
       "text": "Variable obligatoire (webhook 503 sinon) absente des trois gabarits racine.",
       "next_step": "Corrigé : ajoutée aux trois gabarits."
     },
@@ -509,7 +576,9 @@
       "id": "F-FLAG-CRONS-FAIL-OPEN",
       "severity": "P1",
       "status": "detected",
-      "variables": ["FEATURE_CRONS_ENABLED"],
+      "variables": [
+        "FEATURE_CRONS_ENABLED"
+      ],
       "text": "Seul drapeau fail-open parmi les FEATURE_* : absent = tâches planifiées actives.",
       "next_step": "DECISION_REQUIRED:FLAG-CRONS-FAIL-OPEN. Comportement NON modifié dans ce lot."
     },
@@ -517,7 +586,9 @@
       "id": "F-ENV-FALLBACK-LOCAL",
       "severity": "P1",
       "status": "detected",
-      "variables": ["ELSATIA_APPLICATION_ENV"],
+      "variables": [
+        "ELSATIA_APPLICATION_ENV"
+      ],
       "text": "environnementApplications() retombe silencieusement sur « local » ; « test » n'est pas reconnu par le code.",
       "next_step": "Lot code : refuser l'absence sur un déploiement. En attendant : preflight --auto (avant build) et CI le détectent."
     },
@@ -525,7 +596,10 @@
       "id": "F-ENV-INDICATOR-ADOPTION",
       "severity": "P1",
       "status": "detected",
-      "variables": ["ELSATIA_APPLICATION_ENV", "NEXT_PUBLIC_TOOLS_ENV"],
+      "variables": [
+        "ELSATIA_APPLICATION_ENV",
+        "NEXT_PUBLIC_TOOLS_ENV"
+      ],
       "text": "Seuls Gestion Pro et Colors lisent ELSATIA_APPLICATION_ENV ; Tools a son propre indicateur public ; Réserves et Studio n'en ont aucun.",
       "next_step": "Lot code : adoption par Réserves, Studio, Tools (variante NEXT_PUBLIC_ pour le navigateur)."
     },
@@ -533,7 +607,11 @@
       "id": "F-URL-LOCALHOST-FALLBACK",
       "severity": "P1",
       "status": "detected",
-      "variables": ["NEXT_PUBLIC_COLORS_URL", "NEXT_PUBLIC_ELSATIA_ACCOUNT_URL", "NEXT_PUBLIC_RESERVES_URL"],
+      "variables": [
+        "NEXT_PUBLIC_COLORS_URL",
+        "NEXT_PUBLIC_ELSATIA_ACCOUNT_URL",
+        "NEXT_PUBLIC_RESERVES_URL"
+      ],
       "text": "Replis localhost figés au build dans Colors et Réserves (liens d'invitation e-mail de Réserves).",
       "next_step": "Colors : garde de pré-build existante. Autres : preflight --auto. Lot code : supprimer les replis."
     },
@@ -541,7 +619,9 @@
       "id": "F-STUDIO-SERVICE-KEY-NAME",
       "severity": "P1",
       "status": "detected",
-      "variables": ["STUDIO_STORAGE_SERVICE_KEY"],
+      "variables": [
+        "STUDIO_STORAGE_SERVICE_KEY"
+      ],
       "text": "C'est une clé service_role (injectée depuis SERVICE_ROLE_KEY) sous un nom « storage », partagée avec un worker hors Vercel.",
       "next_step": "Migration de nom recommandée vers SUPABASE_SERVICE_ROLE_KEY (lot Studio). Valeur et fonctionnement NON modifiés."
     },
@@ -549,7 +629,9 @@
       "id": "F-STUDIO-SIGNUP-DEFAULT-OPEN",
       "severity": "P1",
       "status": "detected",
-      "variables": ["STUDIO_SIGNUP_MODE"],
+      "variables": [
+        "STUDIO_SIGNUP_MODE"
+      ],
       "text": "Inscription Studio ouverte par défaut.",
       "next_step": "DECISION_REQUIRED:STUDIO-SIGNUP-DEFAULT."
     },
@@ -557,7 +639,10 @@
       "id": "F-STUDIO-MAIL-PROVIDER",
       "severity": "P2",
       "status": "detected",
-      "variables": ["RESEND_API_KEY", "BREVO_API_KEY"],
+      "variables": [
+        "RESEND_API_KEY",
+        "BREVO_API_KEY"
+      ],
       "text": "Studio envoie ses e-mails par Resend, le reste de l'écosystème par Brevo : deux fournisseurs, deux jeux DNS.",
       "next_step": "Arbitrage produit."
     },
@@ -565,7 +650,9 @@
       "id": "F-HMAC-STRIPE-OAUTH-STATE",
       "severity": "P1",
       "status": "detected",
-      "variables": ["STRIPE_SECRET_KEY"],
+      "variables": [
+        "STRIPE_SECRET_KEY"
+      ],
       "text": "STRIPE_SECRET_KEY signe aussi le state OAuth Connect : deux usages, rotation couplée.",
       "next_step": "Variable dédiée future STRIPE_CONNECT_STATE_HMAC_KEY. Migration compatible : le vérifieur accepte l'ancienne signature (dérivée de STRIPE_SECRET_KEY) tant que les states émis avant la bascule n'ont pas expiré, puis on retire le repli."
     },
@@ -573,7 +660,10 @@
       "id": "F-HMAC-BANK-STATE-FALLBACK",
       "severity": "P1",
       "status": "detected",
-      "variables": ["BANK_DATA_ENCRYPTION_KEY", "POWENS_CLIENT_SECRET"],
+      "variables": [
+        "BANK_DATA_ENCRYPTION_KEY",
+        "POWENS_CLIENT_SECRET"
+      ],
       "text": "La signature de l'état de paiement bancaire réutilise BANK_DATA_ENCRYPTION_KEY, avec repli sur POWENS_CLIENT_SECRET.",
       "next_step": "Variable dédiée future BANK_OAUTH_STATE_HMAC_KEY (états valides 7 jours) : double vérification pendant 7 jours, puis retrait des replis. Cryptographie NON modifiée dans ce lot."
     },
@@ -581,7 +671,10 @@
       "id": "F-LEGAL-IDENTITY-VARS",
       "severity": "P1",
       "status": "fixed",
-      "variables": ["NEXT_PUBLIC_LEGAL_SIRET", "NEXT_PUBLIC_LEGAL_TVA"],
+      "variables": [
+        "NEXT_PUBLIC_LEGAL_SIRET",
+        "NEXT_PUBLIC_LEGAL_TVA"
+      ],
       "text": "Variables lues par le code mais absentes des gabarits.",
       "next_step": "Corrigé : déclarées dans .env.example. Les valeurs restent à fournir avant la commercialisation."
     },
@@ -589,7 +682,9 @@
       "id": "F-ADMIN-CLIENT-SERVER-ONLY",
       "severity": "P2",
       "status": "detected",
-      "variables": ["SUPABASE_SERVICE_ROLE_KEY"],
+      "variables": [
+        "SUPABASE_SERVICE_ROLE_KEY"
+      ],
       "text": "src/lib/supabase/admin.ts (Gestion Pro) n'importe pas « server-only », contrairement à Réserves et Colors. Aucun import client aujourd'hui (contrôlé : ENV-SERVICE-ROLE-IN-CLIENT).",
       "next_step": "Ajouter l'import dans un lot code."
     },
@@ -605,9 +700,20 @@
   "variables": [
     {
       "name": "NEXT_PUBLIC_SUPABASE_URL",
-      "applications": ["gestion_pro", "colors", "tools", "reserves", "studio", "studio_worker"],
+      "applications": [
+        "gestion_pro",
+        "colors",
+        "tools",
+        "reserves",
+        "studio",
+        "studio_worker"
+      ],
       "required": true,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "public",
       "secret": false,
       "build_time": true,
@@ -623,9 +729,18 @@
     },
     {
       "name": "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
-      "applications": ["gestion_pro", "colors", "studio"],
+      "applications": [
+        "gestion_pro",
+        "colors",
+        "studio",
+        "tools"
+      ],
       "required": true,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "public",
       "secret": false,
       "build_time": true,
@@ -637,14 +752,23 @@
       "replacement": null,
       "dr_critical": false,
       "example_required": true,
-      "accepted_aliases": ["NEXT_PUBLIC_SUPABASE_ANON_KEY"],
+      "accepted_aliases": [
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY"
+      ],
       "value_pattern": "^sb_publishable_[A-Za-z0-9_-]+$"
     },
     {
       "name": "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-      "applications": ["tools", "reserves"],
+      "applications": [
+        "tools",
+        "reserves"
+      ],
       "required": true,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "public",
       "secret": false,
       "build_time": true,
@@ -658,13 +782,23 @@
       "example_required": true,
       "migration": "Lot code séparé : lire la clé canonique avec repli sur l'alias pendant la transition, puis retirer l'alias. Le gabarit de Réserves déclare l'alias TANT QUE le code le lit (test de non-régression).",
       "value_pattern": "^sb_publishable_[A-Za-z0-9_-]+$",
-      "finding_ids": ["F-SUPABASE-PUBLIC-KEY-NAME"]
+      "finding_ids": [
+        "F-SUPABASE-PUBLIC-KEY-NAME"
+      ]
     },
     {
       "name": "SUPABASE_SERVICE_ROLE_KEY",
-      "applications": ["gestion_pro", "colors", "reserves"],
+      "applications": [
+        "gestion_pro",
+        "colors",
+        "reserves"
+      ],
       "required": true,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -679,9 +813,16 @@
     },
     {
       "name": "STUDIO_STORAGE_SERVICE_KEY",
-      "applications": ["studio", "studio_worker"],
+      "applications": [
+        "studio",
+        "studio_worker"
+      ],
       "required": true,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -693,13 +834,23 @@
       "replacement": null,
       "dr_critical": false,
       "example_required": true,
-      "finding_ids": ["F-STUDIO-SERVICE-KEY-NAME"]
+      "finding_ids": [
+        "F-STUDIO-SERVICE-KEY-NAME"
+      ]
     },
     {
       "name": "ELSATIA_APPLICATION_ENV",
-      "applications": ["gestion_pro", "colors"],
+      "applications": [
+        "gestion_pro",
+        "colors"
+      ],
       "required": true,
-      "environments": ["local", "test", "preview", "production"],
+      "environments": [
+        "local",
+        "test",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": true,
@@ -711,14 +862,26 @@
       "replacement": null,
       "dr_critical": false,
       "example_required": true,
-      "allowed_values": ["local", "test", "preview", "production"],
-      "finding_ids": ["F-ENV-FALLBACK-LOCAL", "F-ENV-INDICATOR-ADOPTION"]
+      "allowed_values": [
+        "local",
+        "test",
+        "preview",
+        "production"
+      ],
+      "finding_ids": [
+        "F-ENV-FALLBACK-LOCAL",
+        "F-ENV-INDICATOR-ADOPTION"
+      ]
     },
     {
       "name": "ELSATIA_ENV",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["production"],
+      "environments": [
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -734,9 +897,15 @@
     },
     {
       "name": "NEXT_PUBLIC_TOOLS_ENV",
-      "applications": ["tools"],
+      "applications": [
+        "tools"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "public",
       "secret": false,
       "build_time": true,
@@ -748,14 +917,28 @@
       "replacement": null,
       "dr_critical": false,
       "example_required": true,
-      "allowed_values": ["local", "preview", "production", "native-dev", "native-production"],
-      "finding_ids": ["F-ENV-INDICATOR-ADOPTION"]
+      "allowed_values": [
+        "local",
+        "preview",
+        "production",
+        "native-dev",
+        "native-production"
+      ],
+      "finding_ids": [
+        "F-ENV-INDICATOR-ADOPTION"
+      ]
     },
     {
       "name": "NEXT_PUBLIC_APP_URL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": true,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "public",
       "secret": false,
       "build_time": true,
@@ -771,9 +954,16 @@
     },
     {
       "name": "NEXT_PUBLIC_COLORS_URL",
-      "applications": ["colors", "gestion_pro"],
+      "applications": [
+        "colors",
+        "gestion_pro"
+      ],
       "required": true,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "public",
       "secret": false,
       "build_time": true,
@@ -786,13 +976,21 @@
       "dr_critical": false,
       "example_required": true,
       "url_class": "auth_callback",
-      "finding_ids": ["F-URL-LOCALHOST-FALLBACK"]
+      "finding_ids": [
+        "F-URL-LOCALHOST-FALLBACK"
+      ]
     },
     {
       "name": "NEXT_PUBLIC_ELSATIA_ACCOUNT_URL",
-      "applications": ["colors"],
+      "applications": [
+        "colors"
+      ],
       "required": true,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "public",
       "secret": false,
       "build_time": true,
@@ -805,13 +1003,21 @@
       "dr_critical": false,
       "example_required": true,
       "url_class": "cross_app_link",
-      "finding_ids": ["F-URL-LOCALHOST-FALLBACK"]
+      "finding_ids": [
+        "F-URL-LOCALHOST-FALLBACK"
+      ]
     },
     {
       "name": "NEXT_PUBLIC_RESERVES_URL",
-      "applications": ["reserves"],
+      "applications": [
+        "reserves"
+      ],
       "required": true,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "public",
       "secret": false,
       "build_time": true,
@@ -824,13 +1030,21 @@
       "dr_critical": false,
       "example_required": true,
       "url_class": "auth_callback",
-      "finding_ids": ["F-URL-LOCALHOST-FALLBACK"]
+      "finding_ids": [
+        "F-URL-LOCALHOST-FALLBACK"
+      ]
     },
     {
       "name": "NEXT_PUBLIC_TOOLS_URL",
-      "applications": ["tools"],
+      "applications": [
+        "tools"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "public",
       "secret": false,
       "build_time": true,
@@ -846,9 +1060,15 @@
     },
     {
       "name": "NEXT_PUBLIC_STUDIO_URL",
-      "applications": ["studio"],
+      "applications": [
+        "studio"
+      ],
       "required": true,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "public",
       "secret": false,
       "build_time": true,
@@ -864,9 +1084,15 @@
     },
     {
       "name": "NEXT_PUBLIC_TOOLS_BILLING_API_URL",
-      "applications": ["tools"],
+      "applications": [
+        "tools"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "public",
       "secret": false,
       "build_time": true,
@@ -883,9 +1109,15 @@
     },
     {
       "name": "TOOLS_APP_URL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -902,9 +1134,15 @@
     },
     {
       "name": "TOOLS_ALLOWED_ORIGINS",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -918,13 +1156,22 @@
       "example_required": true,
       "required_when": "dès que Tools appelle l'API de facturation",
       "url_class": "origin_list",
-      "local_origin_exceptions": ["capacitor://localhost", "https://localhost"]
+      "local_origin_exceptions": [
+        "capacitor://localhost",
+        "https://localhost"
+      ]
     },
     {
       "name": "DISABLE_EMAIL_LOGIN",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -947,13 +1194,22 @@
           "production": "false"
         }
       },
-      "forbidden_in": ["preview", "production"]
+      "forbidden_in": [
+        "preview",
+        "production"
+      ]
     },
     {
       "name": "ELSATIA_LOCAL_DEMO",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -976,13 +1232,24 @@
           "production": "false"
         }
       },
-      "forbidden_in": ["preview", "production"]
+      "forbidden_in": [
+        "preview",
+        "production"
+      ]
     },
     {
       "name": "BREVO_API_KEY",
-      "applications": ["gestion_pro", "platform", "reserves"],
+      "applications": [
+        "gestion_pro",
+        "platform",
+        "reserves"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -998,9 +1265,17 @@
     },
     {
       "name": "EMAIL_FROM_NAME",
-      "applications": ["gestion_pro", "platform", "reserves"],
+      "applications": [
+        "gestion_pro",
+        "platform",
+        "reserves"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1015,9 +1290,17 @@
     },
     {
       "name": "EMAIL_FROM_ADDRESS",
-      "applications": ["gestion_pro", "platform", "reserves"],
+      "applications": [
+        "gestion_pro",
+        "platform",
+        "reserves"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1033,9 +1316,15 @@
     },
     {
       "name": "SUPPORT_EMAIL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1051,9 +1340,14 @@
     },
     {
       "name": "RATE_LIMIT_HMAC_KEY",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": true,
-      "environments": ["preview", "production"],
+      "environments": [
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -1068,9 +1362,14 @@
     },
     {
       "name": "CRON_SECRET",
-      "applications": ["gestion_pro", "reserves"],
+      "applications": [
+        "gestion_pro",
+        "reserves"
+      ],
       "required": true,
-      "environments": ["production"],
+      "environments": [
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -1085,9 +1384,15 @@
     },
     {
       "name": "NOTIFICATIONS_WEBHOOK_SECRET",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -1103,9 +1408,15 @@
     },
     {
       "name": "PAYROLL_IMPORT_SECRET",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -1121,9 +1432,15 @@
     },
     {
       "name": "VAPID_PRIVATE_KEY",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -1140,9 +1457,15 @@
     },
     {
       "name": "VAPID_PUBLIC_KEY",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1158,9 +1481,15 @@
     },
     {
       "name": "VAPID_SUBJECT",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1176,9 +1505,15 @@
     },
     {
       "name": "BANK_DATA_ENCRYPTION_KEY",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": true,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -1191,13 +1526,22 @@
       "dr_critical": true,
       "example_required": true,
       "dr_note": "Perdue : IBAN/BIC illisibles à jamais, non recréable. Deux dépositaires + registre DR. Rotation impossible sans key versioning (lot crypto séparé).",
-      "finding_ids": ["F-DR-BANK-KEY-VERSIONING", "F-HMAC-BANK-STATE-FALLBACK"]
+      "finding_ids": [
+        "F-DR-BANK-KEY-VERSIONING",
+        "F-HMAC-BANK-STATE-FALLBACK"
+      ]
     },
     {
       "name": "POWENS_CLIENT_ID",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1213,9 +1557,15 @@
     },
     {
       "name": "POWENS_CLIENT_SECRET",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -1228,13 +1578,21 @@
       "dr_critical": false,
       "example_required": true,
       "required_when": "dès que les paiements bancaires sont activés",
-      "finding_ids": ["F-HMAC-BANK-STATE-FALLBACK"]
+      "finding_ids": [
+        "F-HMAC-BANK-STATE-FALLBACK"
+      ]
     },
     {
       "name": "POWENS_API_BASE_URL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1251,9 +1609,15 @@
     },
     {
       "name": "POWENS_WEBVIEW_BASE_URL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1270,9 +1634,14 @@
     },
     {
       "name": "STRIPE_SECRET_KEY",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": true,
-      "environments": ["preview", "production"],
+      "environments": [
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -1285,13 +1654,21 @@
       "dr_critical": false,
       "example_required": true,
       "value_pattern": "^(?:sk|rk)_(?:test|live)_[A-Za-z0-9]+$",
-      "finding_ids": ["F-HMAC-STRIPE-OAUTH-STATE"]
+      "finding_ids": [
+        "F-HMAC-STRIPE-OAUTH-STATE"
+      ]
     },
     {
       "name": "STRIPE_WEBHOOK_EXPECTED_MODE",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": true,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1303,13 +1680,21 @@
       "replacement": null,
       "dr_critical": false,
       "example_required": true,
-      "allowed_values": ["test", "live"]
+      "allowed_values": [
+        "test",
+        "live"
+      ]
     },
     {
       "name": "STRIPE_WEBHOOK_ABONNEMENT_SECRET",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": true,
-      "environments": ["preview", "production"],
+      "environments": [
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -1325,9 +1710,15 @@
     },
     {
       "name": "STRIPE_WEBHOOK_SECRET",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -1344,9 +1735,15 @@
     },
     {
       "name": "STRIPE_WEBHOOK_BOUTIQUE_SECRET",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -1364,9 +1761,15 @@
     },
     {
       "name": "STRIPE_CONNECT_CLIENT_ID",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1383,9 +1786,15 @@
     },
     {
       "name": "STRIPE_AUTOMATIC_TAX_ENABLED",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1407,14 +1816,23 @@
           "preview": "false",
           "production": "decision"
         },
-        "must_be_defined_in": ["preview", "production"]
+        "must_be_defined_in": [
+          "preview",
+          "production"
+        ]
       }
     },
     {
       "name": "STRIPE_STATE_ATTESTATION_KEY_ID",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1430,9 +1848,15 @@
     },
     {
       "name": "STRIPE_STATE_ATTESTATION_PRIVATE_KEY_B64",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -1449,9 +1873,15 @@
     },
     {
       "name": "STRIPE_TOOLS_SECRET_KEY",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -1468,9 +1898,15 @@
     },
     {
       "name": "STRIPE_TOOLS_WEBHOOK_SECRET",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -1487,9 +1923,15 @@
     },
     {
       "name": "STRIPE_TOOLS_PRICE_MONTHLY",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1506,9 +1948,15 @@
     },
     {
       "name": "STRIPE_TOOLS_PRICE_ANNUAL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1525,9 +1973,15 @@
     },
     {
       "name": "STRIPE_PRICE_MINI_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1544,9 +1998,15 @@
     },
     {
       "name": "STRIPE_PRICE_MINI_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1563,9 +2023,15 @@
     },
     {
       "name": "STRIPE_PRICE_PRO_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1582,9 +2048,15 @@
     },
     {
       "name": "STRIPE_PRICE_PRO_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1601,9 +2073,15 @@
     },
     {
       "name": "STRIPE_PRICE_BUSINESS_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1620,9 +2098,15 @@
     },
     {
       "name": "STRIPE_PRICE_BUSINESS_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1639,9 +2123,15 @@
     },
     {
       "name": "STRIPE_PRICE_ENTREPRISE_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1658,9 +2148,15 @@
     },
     {
       "name": "STRIPE_PRICE_ENTREPRISE_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1677,9 +2173,15 @@
     },
     {
       "name": "STRIPE_PRICE_ESSENTIEL_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1698,9 +2200,15 @@
     },
     {
       "name": "STRIPE_PRICE_ESSENTIEL_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1719,9 +2227,15 @@
     },
     {
       "name": "STRIPE_PRICE_PREMIUM_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1740,9 +2254,15 @@
     },
     {
       "name": "STRIPE_PRICE_PREMIUM_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1761,9 +2281,15 @@
     },
     {
       "name": "STRIPE_PRICE_COMPTE_SUP_MINI_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1781,9 +2307,15 @@
     },
     {
       "name": "STRIPE_PRICE_COMPTE_SUP_MINI_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1801,9 +2333,15 @@
     },
     {
       "name": "STRIPE_PRICE_COMPTE_SUP_PRO_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1821,9 +2359,15 @@
     },
     {
       "name": "STRIPE_PRICE_COMPTE_SUP_PRO_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1841,9 +2385,15 @@
     },
     {
       "name": "STRIPE_PRICE_COMPTE_SUP_BUSINESS_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1861,9 +2411,15 @@
     },
     {
       "name": "STRIPE_PRICE_COMPTE_SUP_BUSINESS_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1881,9 +2437,15 @@
     },
     {
       "name": "STRIPE_PRICE_COMPTE_SUP_ENTREPRISE_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1901,9 +2463,15 @@
     },
     {
       "name": "STRIPE_PRICE_COMPTE_SUP_ENTREPRISE_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1921,9 +2489,15 @@
     },
     {
       "name": "STRIPE_PRICE_COMPTE_SUP_ESSENTIEL_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1942,9 +2516,15 @@
     },
     {
       "name": "STRIPE_PRICE_COMPTE_SUP_ESSENTIEL_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1963,9 +2543,15 @@
     },
     {
       "name": "STRIPE_PRICE_COMPTE_SUP_PREMIUM_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -1984,9 +2570,15 @@
     },
     {
       "name": "STRIPE_PRICE_COMPTE_SUP_PREMIUM_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2005,9 +2597,15 @@
     },
     {
       "name": "STRIPE_PRICE_COMPTE_SUP_ROLE_TERRAIN_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2022,13 +2620,21 @@
       "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
       "value_pattern": "^price_[A-Za-z0-9]+$",
       "decision": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS",
-      "finding_ids": ["F-STRIPE-CONTRACTS-DIVERGENT"]
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
     },
     {
       "name": "STRIPE_PRICE_COMPTE_SUP_ROLE_TERRAIN_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2043,13 +2649,21 @@
       "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
       "value_pattern": "^price_[A-Za-z0-9]+$",
       "decision": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS",
-      "finding_ids": ["F-STRIPE-CONTRACTS-DIVERGENT"]
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
     },
     {
       "name": "STRIPE_PRICE_COMPTE_SUP_ROLE_CHEF_EQUIPE_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2064,13 +2678,21 @@
       "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
       "value_pattern": "^price_[A-Za-z0-9]+$",
       "decision": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS",
-      "finding_ids": ["F-STRIPE-CONTRACTS-DIVERGENT"]
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
     },
     {
       "name": "STRIPE_PRICE_COMPTE_SUP_ROLE_CHEF_EQUIPE_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2085,13 +2707,21 @@
       "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
       "value_pattern": "^price_[A-Za-z0-9]+$",
       "decision": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS",
-      "finding_ids": ["F-STRIPE-CONTRACTS-DIVERGENT"]
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
     },
     {
       "name": "STRIPE_PRICE_COMPTE_SUP_ROLE_ADMINISTRATIF_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2106,13 +2736,21 @@
       "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
       "value_pattern": "^price_[A-Za-z0-9]+$",
       "decision": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS",
-      "finding_ids": ["F-STRIPE-CONTRACTS-DIVERGENT"]
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
     },
     {
       "name": "STRIPE_PRICE_COMPTE_SUP_ROLE_ADMINISTRATIF_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2127,13 +2765,21 @@
       "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
       "value_pattern": "^price_[A-Za-z0-9]+$",
       "decision": "DECISION_REQUIRED:STRIPE-SUPPLEMENTARY-ACCOUNTS",
-      "finding_ids": ["F-STRIPE-CONTRACTS-DIVERGENT"]
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
     },
     {
       "name": "STRIPE_PRICE_MODULE_POINTAGE_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2148,13 +2794,21 @@
       "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
       "value_pattern": "^price_[A-Za-z0-9]+$",
       "decision": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
-      "finding_ids": ["F-STRIPE-CONTRACTS-DIVERGENT"]
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
     },
     {
       "name": "STRIPE_PRICE_MODULE_POINTAGE_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2169,13 +2823,21 @@
       "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
       "value_pattern": "^price_[A-Za-z0-9]+$",
       "decision": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
-      "finding_ids": ["F-STRIPE-CONTRACTS-DIVERGENT"]
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
     },
     {
       "name": "STRIPE_PRICE_MODULE_STOCK_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2190,13 +2852,21 @@
       "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
       "value_pattern": "^price_[A-Za-z0-9]+$",
       "decision": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
-      "finding_ids": ["F-STRIPE-CONTRACTS-DIVERGENT"]
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
     },
     {
       "name": "STRIPE_PRICE_MODULE_STOCK_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2211,13 +2881,21 @@
       "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
       "value_pattern": "^price_[A-Za-z0-9]+$",
       "decision": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
-      "finding_ids": ["F-STRIPE-CONTRACTS-DIVERGENT"]
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
     },
     {
       "name": "STRIPE_PRICE_MODULE_MATERIEL_VEHICULES_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2232,13 +2910,21 @@
       "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
       "value_pattern": "^price_[A-Za-z0-9]+$",
       "decision": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
-      "finding_ids": ["F-STRIPE-CONTRACTS-DIVERGENT"]
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
     },
     {
       "name": "STRIPE_PRICE_MODULE_MATERIEL_VEHICULES_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2253,13 +2939,21 @@
       "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
       "value_pattern": "^price_[A-Za-z0-9]+$",
       "decision": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
-      "finding_ids": ["F-STRIPE-CONTRACTS-DIVERGENT"]
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
     },
     {
       "name": "STRIPE_PRICE_MODULE_NOTES_FRAIS_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2274,13 +2968,21 @@
       "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
       "value_pattern": "^price_[A-Za-z0-9]+$",
       "decision": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
-      "finding_ids": ["F-STRIPE-CONTRACTS-DIVERGENT"]
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
     },
     {
       "name": "STRIPE_PRICE_MODULE_NOTES_FRAIS_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2295,13 +2997,21 @@
       "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
       "value_pattern": "^price_[A-Za-z0-9]+$",
       "decision": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
-      "finding_ids": ["F-STRIPE-CONTRACTS-DIVERGENT"]
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
     },
     {
       "name": "STRIPE_PRICE_MODULE_RENTABILITE_AVANCEE_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2316,13 +3026,21 @@
       "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
       "value_pattern": "^price_[A-Za-z0-9]+$",
       "decision": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
-      "finding_ids": ["F-STRIPE-CONTRACTS-DIVERGENT"]
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
     },
     {
       "name": "STRIPE_PRICE_MODULE_RENTABILITE_AVANCEE_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2337,13 +3055,21 @@
       "required_when": "dès que les abonnements en ligne sont ouverts (ABONNEMENTS_PUBLICS_OUVERTS=true ou abonnement Stripe existant)",
       "value_pattern": "^price_[A-Za-z0-9]+$",
       "decision": "DECISION_REQUIRED:STRIPE-MODULE-PRICE-MODEL",
-      "finding_ids": ["F-STRIPE-CONTRACTS-DIVERGENT"]
+      "finding_ids": [
+        "F-STRIPE-CONTRACTS-DIVERGENT"
+      ]
     },
     {
       "name": "STRIPE_PRICE_IA_CREDITS_PACK_PONCTUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2361,9 +3087,15 @@
     },
     {
       "name": "STRIPE_PRICE_IA_INTENSIVE_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2381,9 +3113,15 @@
     },
     {
       "name": "STRIPE_PRICE_IA_INTENSIVE_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2401,9 +3139,15 @@
     },
     {
       "name": "STRIPE_PRICE_OPTION_IA_100_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2422,9 +3166,15 @@
     },
     {
       "name": "STRIPE_PRICE_OPTION_IA_100_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2443,9 +3193,15 @@
     },
     {
       "name": "STRIPE_PRICE_OPTION_IA_300_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2464,9 +3220,15 @@
     },
     {
       "name": "STRIPE_PRICE_OPTION_IA_300_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2485,9 +3247,15 @@
     },
     {
       "name": "STRIPE_PRICE_OPTION_IA_ILLIMITE_MENSUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2506,9 +3274,15 @@
     },
     {
       "name": "STRIPE_PRICE_OPTION_IA_ILLIMITE_ANNUEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2527,9 +3301,15 @@
     },
     {
       "name": "STRIPE_PRICE_BASE_GENERATIONS_PRECEDENTES",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2546,9 +3326,15 @@
     },
     {
       "name": "FEATURE_BOUTIQUE_ENABLED",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2570,15 +3356,24 @@
           "preview": "false",
           "production": "decision"
         },
-        "must_be_defined_in": ["preview", "production"]
+        "must_be_defined_in": [
+          "preview",
+          "production"
+        ]
       },
       "feature": "boutique"
     },
     {
       "name": "FEATURE_AI_ENABLED",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2600,15 +3395,24 @@
           "preview": "false",
           "production": "decision"
         },
-        "must_be_defined_in": ["preview", "production"]
+        "must_be_defined_in": [
+          "preview",
+          "production"
+        ]
       },
       "feature": "ai"
     },
     {
       "name": "FEATURE_AI_DEVIS_ENABLED",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2630,15 +3434,24 @@
           "preview": "false",
           "production": "decision"
         },
-        "must_be_defined_in": ["preview", "production"]
+        "must_be_defined_in": [
+          "preview",
+          "production"
+        ]
       },
       "feature": "ai"
     },
     {
       "name": "FEATURE_RELANCES_AUTO_ENABLED",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2660,15 +3473,24 @@
           "preview": "false",
           "production": "decision"
         },
-        "must_be_defined_in": ["preview", "production"]
+        "must_be_defined_in": [
+          "preview",
+          "production"
+        ]
       },
       "feature": "relances"
     },
     {
       "name": "FEATURE_CRONS_ENABLED",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2690,16 +3512,27 @@
           "preview": "false",
           "production": "true"
         },
-        "must_be_defined_in": ["preview", "production"]
+        "must_be_defined_in": [
+          "preview",
+          "production"
+        ]
       },
       "decision": "DECISION_REQUIRED:FLAG-CRONS-FAIL-OPEN",
-      "finding_ids": ["F-FLAG-CRONS-FAIL-OPEN"]
+      "finding_ids": [
+        "F-FLAG-CRONS-FAIL-OPEN"
+      ]
     },
     {
       "name": "ABONNEMENTS_PUBLICS_OUVERTS",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2721,14 +3554,23 @@
           "preview": "false",
           "production": "decision"
         },
-        "must_be_defined_in": ["preview", "production"]
+        "must_be_defined_in": [
+          "preview",
+          "production"
+        ]
       }
     },
     {
       "name": "ELSATIA_ASSISTANCE_STRICTE",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2749,13 +3591,25 @@
           "production": "true"
         }
       },
-      "allowed_values": ["true", "1", "yes", "0", "false"]
+      "allowed_values": [
+        "true",
+        "1",
+        "yes",
+        "0",
+        "false"
+      ]
     },
     {
       "name": "OPENAI_API_KEY",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -2772,9 +3626,15 @@
     },
     {
       "name": "OPENAI_MODEL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2790,9 +3650,15 @@
     },
     {
       "name": "IA_PLAFOND_QUOTIDIEN",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2808,9 +3674,15 @@
     },
     {
       "name": "APPLE_ROOT_CA_BASE64",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2826,9 +3698,15 @@
     },
     {
       "name": "GOOGLE_PLAY_SERVICE_ACCOUNT_JSON",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -2844,9 +3722,15 @@
     },
     {
       "name": "GOOGLE_PLAY_RTDN_AUDIENCE",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2862,9 +3746,15 @@
     },
     {
       "name": "GOOGLE_PLAY_RTDN_SERVICE_ACCOUNT_EMAIL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2880,9 +3770,15 @@
     },
     {
       "name": "ELSATIA_TOOLS_NATIVE",
-      "applications": ["tools"],
+      "applications": [
+        "tools"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": true,
@@ -2894,13 +3790,21 @@
       "replacement": null,
       "dr_critical": false,
       "example_required": false,
-      "allowed_values": ["1"]
+      "allowed_values": [
+        "1"
+      ]
     },
     {
       "name": "NEXT_PUBLIC_TOOLS_RUNTIME",
-      "applications": ["tools"],
+      "applications": [
+        "tools"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "public",
       "secret": false,
       "build_time": true,
@@ -2912,13 +3816,20 @@
       "replacement": null,
       "dr_critical": false,
       "example_required": false,
-      "allowed_values": ["native", "web"]
+      "allowed_values": [
+        "native",
+        "web"
+      ]
     },
     {
       "name": "NEXT_PUBLIC_LEGAL_SIRET",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": true,
-      "environments": ["production"],
+      "environments": [
+        "production"
+      ],
       "visibility": "public",
       "secret": false,
       "build_time": true,
@@ -2930,13 +3841,19 @@
       "replacement": null,
       "dr_critical": false,
       "example_required": true,
-      "finding_ids": ["F-LEGAL-IDENTITY-VARS"]
+      "finding_ids": [
+        "F-LEGAL-IDENTITY-VARS"
+      ]
     },
     {
       "name": "NEXT_PUBLIC_LEGAL_TVA",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": true,
-      "environments": ["production"],
+      "environments": [
+        "production"
+      ],
       "visibility": "public",
       "secret": false,
       "build_time": true,
@@ -2948,13 +3865,20 @@
       "replacement": null,
       "dr_critical": false,
       "example_required": true,
-      "finding_ids": ["F-LEGAL-IDENTITY-VARS"]
+      "finding_ids": [
+        "F-LEGAL-IDENTITY-VARS"
+      ]
     },
     {
       "name": "SENTRY_DSN",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["preview", "production"],
+      "environments": [
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -2969,9 +3893,14 @@
     },
     {
       "name": "NEXT_PUBLIC_SENTRY_DSN",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["preview", "production"],
+      "environments": [
+        "preview",
+        "production"
+      ],
       "visibility": "public",
       "secret": false,
       "build_time": true,
@@ -2986,9 +3915,13 @@
     },
     {
       "name": "SENTRY_AUTH_TOKEN",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["production"],
+      "environments": [
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": true,
@@ -3003,9 +3936,13 @@
     },
     {
       "name": "SENTRY_ORG",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["production"],
+      "environments": [
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": true,
@@ -3020,9 +3957,13 @@
     },
     {
       "name": "SENTRY_PROJECT",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["production"],
+      "environments": [
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": true,
@@ -3037,9 +3978,16 @@
     },
     {
       "name": "PDF_CHROMIUM_EXECUTABLE_PATH",
-      "applications": ["gestion_pro", "reserves"],
+      "applications": [
+        "gestion_pro",
+        "reserves"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3054,9 +4002,14 @@
     },
     {
       "name": "ELSATIA_APP_VERSION",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["preview", "production"],
+      "environments": [
+        "preview",
+        "production"
+      ],
       "visibility": "public",
       "secret": false,
       "build_time": true,
@@ -3072,9 +4025,14 @@
     },
     {
       "name": "ELSATIA_BUILD_COMMIT",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["preview", "production"],
+      "environments": [
+        "preview",
+        "production"
+      ],
       "visibility": "public",
       "secret": false,
       "build_time": true,
@@ -3090,9 +4048,14 @@
     },
     {
       "name": "ELSATIA_BUILD_DATE",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["preview", "production"],
+      "environments": [
+        "preview",
+        "production"
+      ],
       "visibility": "public",
       "secret": false,
       "build_time": true,
@@ -3108,9 +4071,14 @@
     },
     {
       "name": "ELSATIA_BUILD_ENVIRONMENT",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["preview", "production"],
+      "environments": [
+        "preview",
+        "production"
+      ],
       "visibility": "public",
       "secret": false,
       "build_time": true,
@@ -3126,9 +4094,14 @@
     },
     {
       "name": "ELSATIA_DEPLOYMENT_DATE",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["preview", "production"],
+      "environments": [
+        "preview",
+        "production"
+      ],
       "visibility": "public",
       "secret": false,
       "build_time": true,
@@ -3144,9 +4117,14 @@
     },
     {
       "name": "ELSATIA_DEPLOYMENT_URL",
-      "applications": ["gestion_pro"],
+      "applications": [
+        "gestion_pro"
+      ],
       "required": false,
-      "environments": ["preview", "production"],
+      "environments": [
+        "preview",
+        "production"
+      ],
       "visibility": "public",
       "secret": false,
       "build_time": true,
@@ -3162,9 +4140,15 @@
     },
     {
       "name": "STUDIO_ENABLED",
-      "applications": ["studio"],
+      "applications": [
+        "studio"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3188,13 +4172,26 @@
         },
         "open_by_design": "interrupteur d'arrêt : absent = actif par conception (apps/studio/src/lib/config.ts)"
       },
-      "allowed_values": ["1", "0", "true", "false", "on", "off"]
+      "allowed_values": [
+        "1",
+        "0",
+        "true",
+        "false",
+        "on",
+        "off"
+      ]
     },
     {
       "name": "STUDIO_SIGNUP_MODE",
-      "applications": ["studio"],
+      "applications": [
+        "studio"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3216,17 +4213,32 @@
           "preview": "closed",
           "production": "decision"
         },
-        "must_be_defined_in": ["preview", "production"]
+        "must_be_defined_in": [
+          "preview",
+          "production"
+        ]
       },
-      "allowed_values": ["open", "allowlist", "closed"],
+      "allowed_values": [
+        "open",
+        "allowlist",
+        "closed"
+      ],
       "decision": "DECISION_REQUIRED:STUDIO-SIGNUP-DEFAULT",
-      "finding_ids": ["F-STUDIO-SIGNUP-DEFAULT-OPEN"]
+      "finding_ids": [
+        "F-STUDIO-SIGNUP-DEFAULT-OPEN"
+      ]
     },
     {
       "name": "STUDIO_SIGNUP_ALLOWLIST",
-      "applications": ["studio"],
+      "applications": [
+        "studio"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3242,9 +4254,15 @@
     },
     {
       "name": "STUDIO_LEGAL_PUBLISHED",
-      "applications": ["studio"],
+      "applications": [
+        "studio"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3266,15 +4284,25 @@
           "preview": "1",
           "production": "decision"
         },
-        "must_be_defined_in": ["preview", "production"]
+        "must_be_defined_in": [
+          "preview",
+          "production"
+        ]
       },
-      "allowed_values": ["0", "1"]
+      "allowed_values": [
+        "0",
+        "1"
+      ]
     },
     {
       "name": "STUDIO_LEGAL_TEXT_VERSION",
-      "applications": ["studio"],
+      "applications": [
+        "studio"
+      ],
       "required": true,
-      "environments": ["production"],
+      "environments": [
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3289,9 +4317,16 @@
     },
     {
       "name": "STUDIO_AI_ANALYSIS",
-      "applications": ["studio", "studio_worker"],
+      "applications": [
+        "studio",
+        "studio_worker"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3314,14 +4349,24 @@
           "production": "decision"
         }
       },
-      "allowed_values": ["0", "1"],
+      "allowed_values": [
+        "0",
+        "1"
+      ],
       "feature": "studio_ai"
     },
     {
       "name": "STUDIO_ANALYSIS_PYTHON",
-      "applications": ["studio", "studio_worker"],
+      "applications": [
+        "studio",
+        "studio_worker"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3337,9 +4382,15 @@
     },
     {
       "name": "STUDIO_ANALYSIS_CONCURRENCY",
-      "applications": ["studio_worker"],
+      "applications": [
+        "studio_worker"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3354,9 +4405,15 @@
     },
     {
       "name": "STUDIO_ANALYSIS_TIMEOUT_SECONDS",
-      "applications": ["studio_worker"],
+      "applications": [
+        "studio_worker"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3371,9 +4428,15 @@
     },
     {
       "name": "STUDIO_ANALYSIS_TMP",
-      "applications": ["studio_worker"],
+      "applications": [
+        "studio_worker"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3388,9 +4451,15 @@
     },
     {
       "name": "STUDIO_RENDER_TMP",
-      "applications": ["studio_worker"],
+      "applications": [
+        "studio_worker"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3405,9 +4474,15 @@
     },
     {
       "name": "STUDIO_RENDER_TIMEOUT_SECONDS",
-      "applications": ["studio_worker"],
+      "applications": [
+        "studio_worker"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3422,9 +4497,15 @@
     },
     {
       "name": "STUDIO_FFMPEG_PATH",
-      "applications": ["studio_worker"],
+      "applications": [
+        "studio_worker"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3439,9 +4520,15 @@
     },
     {
       "name": "STUDIO_FFPROBE_PATH",
-      "applications": ["studio_worker"],
+      "applications": [
+        "studio_worker"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3456,9 +4543,14 @@
     },
     {
       "name": "STUDIO_REDIS_URL",
-      "applications": ["studio_worker"],
+      "applications": [
+        "studio_worker"
+      ],
       "required": true,
-      "environments": ["preview", "production"],
+      "environments": [
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -3474,9 +4566,15 @@
     },
     {
       "name": "STUDIO_RECONCILE_ALLOW_REMOTE_HOST",
-      "applications": ["studio", "studio_worker"],
+      "applications": [
+        "studio",
+        "studio_worker"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3491,9 +4589,15 @@
     },
     {
       "name": "RESEND_API_KEY",
-      "applications": ["studio"],
+      "applications": [
+        "studio"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -3506,13 +4610,21 @@
       "dr_critical": false,
       "example_required": true,
       "required_when": "quand STUDIO_MAIL_PROVIDER=resend",
-      "finding_ids": ["F-STUDIO-MAIL-PROVIDER"]
+      "finding_ids": [
+        "F-STUDIO-MAIL-PROVIDER"
+      ]
     },
     {
       "name": "STUDIO_MAIL_PROVIDER",
-      "applications": ["studio"],
+      "applications": [
+        "studio"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3524,13 +4636,22 @@
       "replacement": null,
       "dr_critical": false,
       "example_required": true,
-      "allowed_values": ["mailpit", "resend"]
+      "allowed_values": [
+        "mailpit",
+        "resend"
+      ]
     },
     {
       "name": "STUDIO_MAIL_FROM",
-      "applications": ["studio"],
+      "applications": [
+        "studio"
+      ],
       "required": false,
-      "environments": ["local", "preview", "production"],
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3546,9 +4667,14 @@
     },
     {
       "name": "STUDIO_MAILPIT_URL",
-      "applications": ["studio"],
+      "applications": [
+        "studio"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3560,14 +4686,24 @@
       "replacement": null,
       "dr_critical": false,
       "example_required": false,
-      "forbidden_in": ["preview", "production"],
+      "forbidden_in": [
+        "preview",
+        "production"
+      ],
       "url_class": "provider_base"
     },
     {
       "name": "STUDIO_ACCEPTANCE",
-      "applications": ["studio"],
+      "applications": [
+        "studio"
+      ],
       "required": false,
-      "environments": ["local", "test", "preview", "production"],
+      "environments": [
+        "local",
+        "test",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3590,14 +4726,27 @@
           "production": "0"
         }
       },
-      "forbidden_in": ["preview", "production"],
-      "allowed_values": ["0", "1"]
+      "forbidden_in": [
+        "preview",
+        "production"
+      ],
+      "allowed_values": [
+        "0",
+        "1"
+      ]
     },
     {
       "name": "STUDIO_AI_TEST_PROVIDER_FAILURE",
-      "applications": ["studio_worker"],
+      "applications": [
+        "studio_worker"
+      ],
       "required": false,
-      "environments": ["local", "test", "preview", "production"],
+      "environments": [
+        "local",
+        "test",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3620,14 +4769,27 @@
           "production": "0"
         }
       },
-      "forbidden_in": ["preview", "production"],
-      "allowed_values": ["0", "1"]
+      "forbidden_in": [
+        "preview",
+        "production"
+      ],
+      "allowed_values": [
+        "0",
+        "1"
+      ]
     },
     {
       "name": "STUDIO_RENDER_INTERNAL_PREVIEW",
-      "applications": ["studio"],
+      "applications": [
+        "studio"
+      ],
       "required": false,
-      "environments": ["local", "test", "preview", "production"],
+      "environments": [
+        "local",
+        "test",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3650,14 +4812,27 @@
           "production": "0"
         }
       },
-      "forbidden_in": ["preview", "production"],
-      "allowed_values": ["0", "1"]
+      "forbidden_in": [
+        "preview",
+        "production"
+      ],
+      "allowed_values": [
+        "0",
+        "1"
+      ]
     },
     {
       "name": "STUDIO_RENDER_DIAGNOSTICS",
-      "applications": ["studio_worker"],
+      "applications": [
+        "studio_worker"
+      ],
       "required": false,
-      "environments": ["local", "test", "preview", "production"],
+      "environments": [
+        "local",
+        "test",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3680,14 +4855,27 @@
           "production": "0"
         }
       },
-      "forbidden_in": ["preview", "production"],
-      "allowed_values": ["0", "1"]
+      "forbidden_in": [
+        "preview",
+        "production"
+      ],
+      "allowed_values": [
+        "0",
+        "1"
+      ]
     },
     {
       "name": "STUDIO_RUNTIME_TRACE",
-      "applications": ["studio"],
+      "applications": [
+        "studio"
+      ],
       "required": false,
-      "environments": ["local", "test", "preview", "production"],
+      "environments": [
+        "local",
+        "test",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3710,14 +4898,27 @@
           "production": "0"
         }
       },
-      "forbidden_in": ["preview", "production"],
-      "allowed_values": ["0", "1"]
+      "forbidden_in": [
+        "preview",
+        "production"
+      ],
+      "allowed_values": [
+        "0",
+        "1"
+      ]
     },
     {
       "name": "STUDIO_TEMPLATE_COMPARISON",
-      "applications": ["studio_worker"],
+      "applications": [
+        "studio_worker"
+      ],
       "required": false,
-      "environments": ["local", "test", "preview", "production"],
+      "environments": [
+        "local",
+        "test",
+        "preview",
+        "production"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3740,14 +4941,25 @@
           "production": "0"
         }
       },
-      "forbidden_in": ["preview", "production"],
-      "allowed_values": ["0", "1"]
+      "forbidden_in": [
+        "preview",
+        "production"
+      ],
+      "allowed_values": [
+        "0",
+        "1"
+      ]
     },
     {
       "name": "STUDIO_RENDER_EVIDENCE",
-      "applications": ["studio_worker"],
+      "applications": [
+        "studio_worker"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3762,9 +4974,14 @@
     },
     {
       "name": "STUDIO_RENDER_REDIS_PORT",
-      "applications": ["studio"],
+      "applications": [
+        "studio"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3779,9 +4996,14 @@
     },
     {
       "name": "STUDIO_E2E_CHANNEL",
-      "applications": ["studio"],
+      "applications": [
+        "studio"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3796,9 +5018,14 @@
     },
     {
       "name": "STUDIO_E2E_RESULT",
-      "applications": ["studio"],
+      "applications": [
+        "studio"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3813,9 +5040,14 @@
     },
     {
       "name": "STUDIO_E2E_REUSE_SERVER",
-      "applications": ["studio"],
+      "applications": [
+        "studio"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3830,9 +5062,14 @@
     },
     {
       "name": "STUDIO_E2E_SERVER_TIMEOUT_MS",
-      "applications": ["studio"],
+      "applications": [
+        "studio"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3847,9 +5084,14 @@
     },
     {
       "name": "STUDIO_E2E_LARGE_MIB",
-      "applications": ["studio"],
+      "applications": [
+        "studio"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3864,9 +5106,14 @@
     },
     {
       "name": "STUDIO_TEST_PORT_BASE",
-      "applications": ["studio"],
+      "applications": [
+        "studio"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3881,9 +5128,14 @@
     },
     {
       "name": "ELSATIA_AUDIT_URL",
-      "applications": ["ops_scripts"],
+      "applications": [
+        "ops_scripts"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3898,9 +5150,14 @@
     },
     {
       "name": "ELSATIA_AUDIT_EMAIL",
-      "applications": ["ops_scripts"],
+      "applications": [
+        "ops_scripts"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3915,9 +5172,14 @@
     },
     {
       "name": "ELSATIA_AUDIT_PASSWORD",
-      "applications": ["ops_scripts"],
+      "applications": [
+        "ops_scripts"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -3932,9 +5194,14 @@
     },
     {
       "name": "ELSATIA_AUDIT_DSN",
-      "applications": ["ops_scripts"],
+      "applications": [
+        "ops_scripts"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -3949,9 +5216,14 @@
     },
     {
       "name": "ELSATIA_AUDIT_OUTPUT",
-      "applications": ["ops_scripts"],
+      "applications": [
+        "ops_scripts"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3966,9 +5238,14 @@
     },
     {
       "name": "ELSATIA_LOCAL_URL",
-      "applications": ["ops_scripts"],
+      "applications": [
+        "ops_scripts"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -3983,9 +5260,14 @@
     },
     {
       "name": "ELSATIA_LOCAL_ANON_KEY",
-      "applications": ["ops_scripts"],
+      "applications": [
+        "ops_scripts"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -4000,9 +5282,14 @@
     },
     {
       "name": "ELSATIA_LOCAL_SERVICE_ROLE_KEY",
-      "applications": ["ops_scripts"],
+      "applications": [
+        "ops_scripts"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -4017,9 +5304,14 @@
     },
     {
       "name": "ELSATIA_LOCAL_JWT_SECRET",
-      "applications": ["ops_scripts"],
+      "applications": [
+        "ops_scripts"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -4034,9 +5326,13 @@
     },
     {
       "name": "ELSATIA_SUPABASE_PROJECT_NAME",
-      "applications": ["ops_scripts"],
+      "applications": [
+        "ops_scripts"
+      ],
       "required": false,
-      "environments": ["preview"],
+      "environments": [
+        "preview"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -4051,9 +5347,13 @@
     },
     {
       "name": "SUPABASE_PROJECT_REF",
-      "applications": ["ops_scripts"],
+      "applications": [
+        "ops_scripts"
+      ],
       "required": false,
-      "environments": ["preview"],
+      "environments": [
+        "preview"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -4068,9 +5368,14 @@
     },
     {
       "name": "SUPABASE_DB_CONTAINER",
-      "applications": ["ops_scripts"],
+      "applications": [
+        "ops_scripts"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -4085,9 +5390,14 @@
     },
     {
       "name": "ELSATIA_VIDEO_SCENES_FILE",
-      "applications": ["ops_scripts"],
+      "applications": [
+        "ops_scripts"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -4102,9 +5412,14 @@
     },
     {
       "name": "ELSATIA_VIDEO_TARGET",
-      "applications": ["ops_scripts"],
+      "applications": [
+        "ops_scripts"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -4119,9 +5434,14 @@
     },
     {
       "name": "EDGE_TTS_BIN",
-      "applications": ["ops_scripts"],
+      "applications": [
+        "ops_scripts"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -4136,9 +5456,14 @@
     },
     {
       "name": "FFMPEG_BIN",
-      "applications": ["ops_scripts"],
+      "applications": [
+        "ops_scripts"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -4153,9 +5478,14 @@
     },
     {
       "name": "E2E_BASE_URL",
-      "applications": ["e2e"],
+      "applications": [
+        "e2e"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -4170,9 +5500,14 @@
     },
     {
       "name": "E2E_RESERVES_URL",
-      "applications": ["e2e"],
+      "applications": [
+        "e2e"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -4187,9 +5522,14 @@
     },
     {
       "name": "E2E_SUPABASE_URL",
-      "applications": ["e2e"],
+      "applications": [
+        "e2e"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -4204,9 +5544,14 @@
     },
     {
       "name": "E2E_SUPABASE_ANON_KEY",
-      "applications": ["e2e"],
+      "applications": [
+        "e2e"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -4221,9 +5566,14 @@
     },
     {
       "name": "E2E_SUPABASE_SERVICE_ROLE_KEY",
-      "applications": ["e2e"],
+      "applications": [
+        "e2e"
+      ],
       "required": false,
-      "environments": ["local", "test"],
+      "environments": [
+        "local",
+        "test"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -4238,9 +5588,13 @@
     },
     {
       "name": "SUPABASE_ACCESS_TOKEN",
-      "applications": ["ops_scripts"],
+      "applications": [
+        "ops_scripts"
+      ],
       "required": true,
-      "environments": ["production"],
+      "environments": [
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -4256,9 +5610,13 @@
     },
     {
       "name": "SUPABASE_DB_URL",
-      "applications": ["ops_scripts"],
+      "applications": [
+        "ops_scripts"
+      ],
       "required": true,
-      "environments": ["production"],
+      "environments": [
+        "production"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
@@ -4274,9 +5632,14 @@
     },
     {
       "name": "STRIPE_PRICES_VERIFY_STRICT",
-      "applications": ["ci", "ops_scripts"],
+      "applications": [
+        "ci",
+        "ops_scripts"
+      ],
       "required": false,
-      "environments": ["test"],
+      "environments": [
+        "test"
+      ],
       "visibility": "server",
       "secret": false,
       "build_time": false,
@@ -4291,15 +5654,153 @@
     },
     {
       "name": "STRIPE_TEST_SECRET_KEY",
-      "applications": ["ci"],
+      "applications": [
+        "ci"
+      ],
       "required": false,
-      "environments": ["test"],
+      "environments": [
+        "test"
+      ],
       "visibility": "server",
       "secret": true,
       "build_time": false,
       "runtime": true,
       "category": "tooling",
       "description": "Secret GitHub (environnement ci-verification) : clé Stripe TEST en lecture. Le script refuse une clé live.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "TOOLS_STORE_ENVIRONMENT",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": true,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tools_billing",
+      "description": "Environnement Store (sandbox|production) servi par ce déploiement Tools ; aucun repli implicite en production, voir src/lib/tools-store-environment.ts.",
+      "fail_mode": "closed",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "TOOLS_STORE_ALLOW_SANDBOX",
+      "applications": [
+        "gestion_pro"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "preview",
+        "production"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tools_billing",
+      "description": "Autorise un déploiement production à accepter des transactions StoreKit/Play sandbox (phase TestFlight) ; à retirer à la mise en vente réelle.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": true
+    },
+    {
+      "name": "ACL_FLUX_PUSH_PORT",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Port HTTP local du serveur push simulé par le harnais e2e service-role-flux-acl (amorce/externes).",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ACL_FLUX_EXTERNES_PORT",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Port HTTP local du serveur de flux externes simulés par le harnais e2e service-role-flux-acl.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ACL_FLUX_CERT_DIR",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Répertoire des certificats TLS locaux utilisés par le harnais e2e service-role-flux-acl.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "ACL_FLUX_EXTERNES_URL",
+      "applications": [
+        "e2e"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "URL de base du serveur de flux externes simulés, lue par le script d'interception du harnais e2e service-role-flux-acl.",
       "fail_mode": "none",
       "deprecated": false,
       "replacement": null,
