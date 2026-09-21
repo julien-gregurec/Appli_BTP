@@ -1,12 +1,13 @@
 # ELSATIA GP — Convergence du train principal V1 — Rapport
 
-**Date** : 2026-09-21
-**Branche de travail** : `claude/compassionate-euler-5j6avr`
-**HEAD final** : `62b1b12ffac1736319a708d9c51ab23892726077`
-**Base de référence** : `main` (`4d92ddb`), 456 commits en avance
-**Migrations finales** : 296 (`supabase/migrations/`), toutes horodatages 14 chiffres uniques (`node scripts/verify-migrations.mjs`)
+**Date de la 1ʳᵉ édition** : 2026-09-21
+**Branche de travail unique** : `claude/compassionate-euler-5j6avr` (aucun train concurrent créé)
+**HEAD à la 1ʳᵉ édition de ce rapport** : `62b1b12` (code) — le commit `0410591` qui a suivi n'ajoutait que ce document lui-même, sans changement de code
+**Statut** : `CONVERGENCE_TRAIN_CANDIDATE` confirmé par le demandeur sur `62b1b12` — **`FINAL_PREVIEW_TRAIN = NOT_YET`**. Voir §11 pour la suite des lots portés sur cette même branche, jamais redémarrés depuis `main`/`release/gp-v1-rc`/une autre branche ancienne.
+**Base de référence** : `main` (`4d92ddb`)
+**Migrations à la 1ʳᵉ édition** : 296 (`supabase/migrations/`), toutes horodatages 14 chiffres uniques (`node scripts/verify-migrations.mjs`)
 
-Mission : produire un train GP unique et vérifiable à partir de `ELSATIA_CONVERGENCE_MAP_V1.md` et `ELSATIA_PREVIEW_RELEASE_REHEARSAL_V1.md` (tous deux orphelins de `main`, retrouvés sur `claude/compassionate-davinci-g3fxtv` et `claude/awesome-einstein-tyfo4k`). Aucun déploiement Preview/Production, aucune donnée réelle, aucun accès Supabase/Vercel/Stripe distant dans cette session.
+Mission initiale : produire un train GP unique et vérifiable à partir de `ELSATIA_CONVERGENCE_MAP_V1.md` et `ELSATIA_PREVIEW_RELEASE_REHEARSAL_V1.md` (tous deux orphelins de `main`, retrouvés sur `claude/compassionate-davinci-g3fxtv` et `claude/awesome-einstein-tyfo4k`). Aucun déploiement Preview/Production, aucune donnée réelle, aucun accès Supabase/Vercel/Stripe distant dans aucune session de ce travail.
 
 ---
 
@@ -225,3 +226,45 @@ Aucun accès Supabase/Vercel/Stripe distant dans cette session (confirmé : pas 
 - Branche poussée sur `origin/claude/compassionate-euler-5j6avr`, HEAD `62b1b12`.
 
 **Ce qui manque pour un train de convergence complet** (non demandé comme condition de livraison ici, signalé pour mémoire) : Access, Env manifest, DR docs, Colors 3ᵉ voie, Reserves v6, Studio ; les 4 DECISION_REQUIRED commerciales/ACL ; la résolution des 9 échecs pgTAP restants ; un accès Preview/Vercel/Supabase/Stripe réel pour lever tous les `NOT_PROVEN_REMOTE`.
+
+---
+
+## 11. Lot Access convergence (2ᵉ édition de ce rapport, même branche, aucun train concurrent)
+
+**Point de départ** : `CONVERGENCE_TRAIN_CANDIDATE = 62b1b12` (confirmé par le demandeur). Travail poursuivi sur la **même branche**, jamais redémarré depuis `main`, `release/gp-v1-rc` ni aucune autre branche ancienne. Tous les acquis de la 1ʳᵉ édition sont préservés à l'identique : Fresh 296/296, pgTAP 1933 assertions, 4 apps vertes, collisions 299-303 résolues, migration 308 corrigée, 7 RPC déjà fermées.
+
+### 11.1 — Comparaison des commits déjà présents (avant tout cherry-pick)
+
+Conformément à la consigne « comparer d'abord, ne pas cherry-pick aveuglément », chaque branche candidate au lot Access a été comparée à HEAD **avant** toute décision de portage — pas seulement à sa propre base historique.
+
+| Branche candidate | Commits réellement absents de HEAD | Constat |
+|---|---|---|
+| `codex/admin-global-v1-stripe-observation-r73` (lignée discount F4 : revoke-legacy → discount-column-guard-r71 → stripe-attestation-r72 → stripe-observation-r73) | 11 commits en apparence | **Déjà intégré** — les 3 migrations (`20260827000243_discount_column_guard_r71.sql`, `20260828000244_stripe_state_attestation_r72.sql`, `20260828000245_stripe_discount_observation_r73.sql`) existent **déjà, octet pour octet identiques**, dans l'arbre courant (héritées via le socle commercial ECO, §2 lot 7 de ce rapport). Rien à porter. |
+| `codex/admin-global-v1-support-author-guard-r75` (lignée ACL : residual-acl-hardening-r74 → support-author-guard-r75) | 17 commits en apparence | **Déjà intégré**, mais **renuméroté** : `20260828000246_residual_acl_hardening_r74.sql` → présent sous `20260901000252_residual_acl_hardening_r74.sql` (diff vide, contenu identique) ; `20260828000247_support_message_author_guard_r75.sql` → présent sous `20260901000253_support_message_author_guard_r75.sql` (diff vide). Le code applicatif associé (`src/app/(app)/aide/page.tsx`, `src/app/actions/{assistant,plateforme,support}.ts`, `src/lib/support-author-guard.test.ts`) et les tests pgTAP (`platform_residual_acl_hardening_r74.test.sql`, `platform_support_author_guard_r75.test.sql`) sont également déjà présents. Rien à porter. |
+| `fix/service-role-flux-acl-255-v1` | 5 commits | **Génuinement absent**, base = tip ECO (`59e960a`, déjà fusionné) — aucune migration touchée, 0 diff avec HEAD sur les 9 fichiers concernés avant portage → **porté** (§11.2). |
+| `fix/document-partage-service-role-acl-v1` | 3 commits | **Redondant** avec une solution déjà intégrée et testée — voir §11.3, **non porté**, décision documentée. |
+
+Cette comparaison a évité un travail inutile (18 commits d'apparence nouvelle, en réalité 0 à porter pour les 2 premières branches) et un risque de régression (réintroduire une architecture alternative jamais qualifiée pour un problème déjà résolu, §11.3).
+
+### 11.2 — Porté : `fix/service-role-flux-acl-255-v1`
+
+5 commits cherry-pickés dans l'ordre chronologique (`0db2c79` → `3720d78` → `95efa1e` → `807d519` → `d41f835`) — **0 conflit** (base = ECO, déjà fusionné ; aucun de ces 9 fichiers n'avait été retouché depuis par ce train). Corrige les flux `service_role` cassés par la migration `20260902000255` (webhook Stripe abonnement + boutique, import paie, cron notifications push, moteur de relances) : remplace les lectures/écritures directes de table par des chemins compatibles avec les privilèges retirés par la 255, sans réintroduire de droit `service_role` élargi.
+
+**Tests rejoués** : `tsc --noEmit` PASS (0 erreur) ; `eslint` PASS (0 erreur, mêmes 5 avertissements pré-existants qu'avant) ; `vitest run` PASS **1777/1777** (152 fichiers, +5 fichiers de test/+24 tests par rapport à la 1ʳᵉ édition) ; `verify:migrations` PASS (296 migrations, **inchangé** — ce lot ne touche aucune migration) ; `verify:secrets` PASS (2219 fichiers, 0 secret). Fresh/pgTAP non rejoués (aucune migration modifiée par ce lot, résultats du §6.2 toujours valides tels quels).
+
+### 11.3 — Non porté (décision documentée) : `fix/document-partage-service-role-acl-v1`
+
+Ce lot propose une fonction `document_commercial_public_par_token` alternative (jamais appliquée comme vraie migration — `docs/migrations-proposees/*.proposed`, jamais numérotée) pour corriger exactement le même problème que celui déjà fermé par GP pilot-closure : les pages `/document/[token]` et `/imprimer/partage/[token]` cassées par la 255. Comparaison directe des deux solutions :
+
+- **Déjà intégrée (ce train)** : `document_commercial_public_par_token()`, migration `20260922000305` (ex-`20260915000300`), `EXECUTE` accordé à `service_role` seul, appelée depuis les deux pages via `createAdminClient()`. Testée (pgTAP + Fresh, §6.2).
+- **Cette branche** : après correction de sa propre proposition initiale (son premier commit ouvrait l'exécution à `anon`/`authenticated`, jugé trop large par son propre 2ᵉ commit), elle converge vers **exactement la même architecture** — `EXECUTE` à `service_role` seul, appelé depuis les mêmes deux pages. Jamais appliquée en migration réelle, jamais fusionnée.
+
+Porter ce lot réintroduirait une seconde implémentation, non qualifiée par Fresh/pgTAP, d'un problème déjà résolu et vérifié — un risque de régression pur, sans bénéfice fonctionnel. **Décision : ne pas porter.** Documenté ici plutôt que silencieusement ignoré, conformément à la consigne de ne jamais cherry-picker aveuglément.
+
+### 11.4 — MUST_NOT_LOSE — mise à jour
+
+Aucun des 12 items du §8 n'est affecté par ce lot (Access ne touche à aucun d'entre eux). Point de vigilance ajouté pour les lots futurs : les migrations `20260901000252`/`20260901000253` (résidus ACL/support déjà en place) ne doivent **jamais** être écrasées par une future fusion qui réintroduirait par erreur les fichiers `20260828000246`/`247` sous leur numérotation d'origine — collision garantie avec `colors_functional_core_v1`/`colors_integrity_v11` déjà à ces emplacements.
+
+### 11.5 — Statut après ce lot
+
+`CONVERGENCE_TRAIN_CANDIDATE = 593e28f` (branche `claude/compassionate-euler-5j6avr`, poussée). `FINAL_PREVIEW_TRAIN = NOT_YET`. Prochains lots dans l'ordre demandé : ENV manifest → DR/release gate → Colors (voie restante) → Reserves → Studio.
