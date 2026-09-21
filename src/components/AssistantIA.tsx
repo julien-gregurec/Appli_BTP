@@ -265,6 +265,7 @@ export function AssistantIA() {
     startTransition(async () => {
       const res = await creerAffectationDepuisPropositionAction({
         affectationId: message.proposition!.affectationId,
+        revision: message.proposition!.revision,
         employeIds: message.proposition!.employeIds,
         typeActivite: message.proposition!.typeActivite,
         chantierId: message.proposition!.chantierId,

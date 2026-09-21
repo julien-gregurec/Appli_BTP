@@ -17,6 +17,12 @@ export type TypeActiviteProposable = (typeof TYPES_ACTIVITE_PROPOSABLES_IA)[numb
 
 export type PropositionAffectation = {
   affectationId: string | null;
+  // Révision de l'affectation ciblée telle que lue au moment où l'assistant a résolu la
+  // proposition (jamais relue juste avant l'écriture, ce qui recréerait un simple
+  // last-write-wins) — null pour une création (aucune ligne existante à protéger). Verrou
+  // optimiste vérifié par creerAffectationDepuisPropositionAction, même mécanisme que
+  // modifierAffectationAction (saisie manuelle, src/app/actions/planning.ts).
+  revision: number | null;
   employeIds: string[];
   employeNoms: string[];
   typeActivite: TypeActiviteProposable;
@@ -218,6 +224,7 @@ async function resoudrePropositionAffectation(
 
   return {
     affectationId: null,
+    revision: null,
     employeIds,
     employeNoms,
     typeActivite: champs.typeActivite,
@@ -243,7 +250,7 @@ async function resoudrePropositionModificationAffectation(
   if (!peutGererPlanning) return null;
   const affectationId = String(input.affectation_id ?? "");
   if (!affectationId) return null;
-  const { data: existante } = await supabase.from("affectations").select("employe:employes(id, nom, prenom)").eq("id", affectationId).eq("entreprise_id", entrepriseId).maybeSingle();
+  const { data: existante } = await supabase.from("affectations").select("revision, employe:employes(id, nom, prenom)").eq("id", affectationId).eq("entreprise_id", entrepriseId).maybeSingle();
   if (!existante) return null;
   const employe = Array.isArray(existante.employe) ? existante.employe[0] : existante.employe;
   if (!employe) return null;
@@ -266,6 +273,7 @@ async function resoudrePropositionModificationAffectation(
 
   return {
     affectationId,
+    revision: existante.revision as number,
     employeIds: [employe.id],
     employeNoms: [`${employe.prenom} ${employe.nom}`],
     typeActivite: champs.typeActivite,

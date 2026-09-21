@@ -7,6 +7,12 @@ const mocks = vi.hoisted(() => ({
   chantier: { id: "chantier-1" },
   affectationsRecentes: [] as Array<{ employe_id: string }>,
   inserts: [] as Array<Record<string, unknown>[]>,
+  // Lignes que l'UPDATE (modification via l'assistant) doit "toucher" : simule le
+  // WHERE ... AND revision = $revision de creerAffectationDepuisPropositionAction — vide
+  // signifie qu'aucune ligne ne matche la révision attendue (conflit de concurrence ou ligne
+  // disparue), exactement comme un vrai `WHERE revision = $x` sous PostgREST.
+  updateMatches: [{ id: "affectation-1" }] as Array<{ id: string }>,
+  updates: [] as Array<{ table: string; valeurs: Record<string, unknown>; filtres: Record<string, unknown> }>,
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -21,7 +27,12 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({
     from(table: string) {
       const requete: Record<string, unknown> = {};
-      for (const methode of ["select", "eq", "in", "gte", "is", "update"]) requete[methode] = () => requete;
+      const filtres: Record<string, unknown> = {};
+      for (const methode of ["select", "in", "gte", "is"]) requete[methode] = () => requete;
+      requete.eq = (colonne: string, valeur: unknown) => {
+        filtres[colonne] = valeur;
+        return requete;
+      };
       requete.maybeSingle = async () => {
         if (table === "chantiers") return { data: mocks.chantier };
         return { data: null };
@@ -29,6 +40,16 @@ vi.mock("@/lib/supabase/server", () => ({
       requete.insert = (lignes: Record<string, unknown>[]) => {
         mocks.inserts.push(lignes);
         return { error: null };
+      };
+      requete.update = (valeurs: Record<string, unknown>) => {
+        // `filtres` est référencé (pas copié) : les .eq(...) chaînés APRÈS .update(...)
+        // (id, entreprise_id, revision) le remplissent encore après ce point — la copie ne
+        // doit être prise qu'une fois toute la chaîne exécutée (voir .select ci-dessous).
+        mocks.updates.push({ table, valeurs, filtres });
+        // .select("id") après .update(...).eq(...) : renvoie les lignes réellement "touchées"
+        // par le filtre simulé (dont revision), comme le ferait PostgREST.
+        requete.select = async () => ({ data: mocks.updateMatches, error: null });
+        return requete;
       };
       requete.then = (resolution: (v: unknown) => unknown) => {
         if (table === "employes") return Promise.resolve({ data: mocks.employesActifs }).then(resolution);
@@ -44,6 +65,7 @@ const { creerAffectationDepuisPropositionAction } = await import("./assistant");
 
 const propositionBase = {
   affectationId: null,
+  revision: null,
   employeIds: ["karim"],
   typeActivite: "chantier",
   chantierId: "chantier-1",
@@ -59,6 +81,8 @@ describe("creerAffectationDepuisPropositionAction", () => {
     mocks.employesActifs = [{ id: "karim" }];
     mocks.affectationsRecentes = [];
     mocks.inserts = [];
+    mocks.updates = [];
+    mocks.updateMatches = [{ id: "affectation-1" }];
     mocks.chantier = { id: "chantier-1" };
   });
 
@@ -114,5 +138,36 @@ describe("creerAffectationDepuisPropositionAction", () => {
     const resultat = await creerAffectationDepuisPropositionAction(propositionBase);
     expect(resultat).toHaveProperty("error");
     expect(mocks.inserts).toHaveLength(0);
+  });
+
+  describe("modification d'une affectation existante (proposition de correction) — verrou optimiste", () => {
+    const propositionModification = { ...propositionBase, affectationId: "affectation-1", revision: 3 };
+
+    it("applique la modification quand la révision transmise correspond toujours à l'état courant", async () => {
+      const resultat = await creerAffectationDepuisPropositionAction(propositionModification);
+      expect(resultat).toEqual({ ok: true });
+      expect(mocks.updates).toHaveLength(1);
+      expect(mocks.updates[0].table).toBe("affectations");
+      expect(mocks.updates[0].filtres).toEqual(expect.objectContaining({ id: "affectation-1", entreprise_id: "entreprise-1", revision: 3 }));
+    });
+
+    it("refuse sans écraser si l'affectation a été modifiée par quelqu'un d'autre depuis que l'assistant a construit la proposition (lost update)", async () => {
+      // Simule PostgREST : le WHERE ... AND revision = 3 ne matche plus aucune ligne, la
+      // révision réelle ayant avancé entre la proposition et la confirmation.
+      mocks.updateMatches = [];
+      const resultat = await creerAffectationDepuisPropositionAction(propositionModification);
+      expect(resultat).toHaveProperty("error");
+      expect((resultat as { error: string }).error).toMatch(/modifiée ou supprimée/);
+      // L'UPDATE a bien été tenté (avec la bonne révision), mais PostgREST rapporte 0 ligne
+      // touchée : aucune donnée n'a pu être silencieusement écrasée par cet appel.
+      expect(mocks.updates).toHaveLength(1);
+      expect(mocks.updates[0].filtres).toEqual(expect.objectContaining({ revision: 3 }));
+    });
+
+    it("ne vérifie jamais la révision sur le chemin de création (affectationId null)", async () => {
+      const resultat = await creerAffectationDepuisPropositionAction(propositionBase);
+      expect(resultat).toEqual({ ok: true });
+      expect(mocks.updates).toHaveLength(0);
+    });
   });
 });

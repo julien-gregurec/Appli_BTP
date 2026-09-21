@@ -15,6 +15,11 @@ const TYPES_ACTIVITE_AUTORISES = ["chantier", "bureau", "depot", "visite_medical
 
 export async function creerAffectationDepuisPropositionAction(proposition: {
   affectationId: string | null;
+  // Révision observée par l'assistant au moment où il a résolu la proposition (voir
+  // resoudrePropositionModificationAffectation) — null pour une création. Vérifiée ci-dessous
+  // avant toute modification d'une affectation existante : verrou optimiste, même mécanisme
+  // que modifierAffectationAction (saisie manuelle).
+  revision: number | null;
   employeIds: string[];
   typeActivite: string;
   chantierId: string | null;
@@ -54,8 +59,25 @@ export async function creerAffectationDepuisPropositionAction(proposition: {
   };
 
   if (proposition.affectationId) {
-    const { error } = await supabase.from("affectations").update(valeurs).eq("id", proposition.affectationId).eq("entreprise_id", ctx.entrepriseId);
+    // Verrouillage optimiste (cf. modifierAffectationAction) : la proposition peut avoir été
+    // affichée bien avant que l'utilisateur ne clique "Confirmer" (le temps de lire la réponse
+    // du modèle, voire de continuer la conversation) — quelqu'un d'autre a pu modifier ou
+    // supprimer cette même affectation entre-temps. On ne relit surtout pas la révision ici
+    // juste avant d'écrire (ça ne protégerait que contre une course au sein de cet appel, pas
+    // contre la fenêtre proposition→confirmation, qui est le vrai risque) : on vérifie que la
+    // révision est toujours celle que l'assistant avait observée quand il a construit la
+    // proposition soumise à l'utilisateur.
+    const { data: ligneModifiee, error } = await supabase
+      .from("affectations")
+      .update(valeurs)
+      .eq("id", proposition.affectationId)
+      .eq("entreprise_id", ctx.entrepriseId)
+      .eq("revision", proposition.revision)
+      .select("id");
     if (error) return { error: error.message };
+    if (!ligneModifiee || ligneModifiee.length === 0) {
+      return { error: "Cette affectation a été modifiée ou supprimée par quelqu’un d’autre depuis la proposition de l’assistant. Rechargez le planning et redemande la correction." };
+    }
     revalidatePath("/planning");
     return { ok: true };
   }
