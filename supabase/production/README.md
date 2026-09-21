@@ -68,7 +68,9 @@ l'exécution.
 
 `creer_entreprise_demo_18_mois.sql`, `seed_entreprise_test_5_ans.sql`,
 `seed_entreprise_test_suivi_terrain.sql`, `seed_entreprise_test_tous_onglets.sql`,
-`seed_juju_6_mois.sql`, `corriger_encodage_juju.sql` — ces scripts créent ou
+`seed_juju_6_mois.sql`, `corriger_encodage_juju.sql`,
+`seed_entreprise_pilote_btp.sql` (fixture entreprise BTP synthétique pour le pack de recette
+pilote externe, voir `docs/qualification/ELSATIA_EXTERNAL_PILOT_ACCEPTANCE_PACK_V1.md`) — ces scripts créent ou
 mettent à jour des données ciblées sur des entreprises de recette nommément
 identifiées (par référence interne ou par nom exact), sans supprimer de
 données existantes. Ils restent malgré tout soumis aux vérifications de cible

@@ -24,6 +24,7 @@ export const REGISTRE_SCRIPTS = Object.freeze({
   "seed_entreprise_test_tous_onglets.sql": { destructif: false },
   "seed_juju_6_mois.sql": { destructif: false },
   "corriger_encodage_juju.sql": { destructif: false },
+  "seed_entreprise_pilote_btp.sql": { destructif: false },
   "supprimer_entreprises_test.sql": { destructif: true, cleConfirmation: "CONFIRM_DELETE_TEST_DATA", valeurAttendue: "YES" },
 });
 
