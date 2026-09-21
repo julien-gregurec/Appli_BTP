@@ -644,23 +644,22 @@
     {
       "id": "F-STUDIO-SIGNUP-DEFAULT-OPEN",
       "severity": "P1",
-      "status": "detected",
+      "status": "fixed",
       "variables": [
         "STUDIO_SIGNUP_MODE"
       ],
-      "text": "Inscription Studio ouverte par défaut.",
-      "next_step": "DECISION_REQUIRED:STUDIO-SIGNUP-DEFAULT."
+      "text": "Inscription Studio ouverte par défaut si la variable était absente ou mal orthographiée.",
+      "next_step": "Corrigé le 2026-09-21 (lot STUDIO RUNTIME CONFIG WIRING V1) : studioSignupMode() est FAIL-CLOSED, absent/inconnu = closed. Reste ouvert, séparément : DECISION_REQUIRED:STUDIO-SIGNUP-DEFAULT (quelle valeur configurer réellement en production, décision produit et non un défaut de sécurité)."
     },
     {
       "id": "F-STUDIO-MAIL-PROVIDER",
       "severity": "P2",
-      "status": "detected",
+      "status": "accepted",
       "variables": [
-        "RESEND_API_KEY",
         "BREVO_API_KEY"
       ],
-      "text": "Studio envoie ses e-mails par Resend, le reste de l'écosystème par Brevo : deux fournisseurs, deux jeux DNS.",
-      "next_step": "Arbitrage produit."
+      "text": "Studio n'envoie aucun e-mail transactionnel à ce jour (invitations par e-mail explicitement hors périmètre — ELSATIA-STUDIO-V1-ARCHITECTURE.md, ELSATIA-STUDIO-V1-LOT-A-REPORT.md). RESEND_API_KEY / STUDIO_MAIL_PROVIDER / STUDIO_MAIL_FROM retirés du manifeste le 2026-09-21 (lot STUDIO RUNTIME CONFIG WIRING V1) : variables sans consommateur réel, pas de code à câbler.",
+      "next_step": "À rouvrir avec un arbitrage produit (Resend vs Brevo) si et quand Studio implémente l'envoi d'e-mail (ex. invitations de membres)."
     },
     {
       "id": "F-HMAC-STRIPE-OAUTH-STATE",
@@ -4171,7 +4170,7 @@
       "build_time": false,
       "runtime": true,
       "category": "feature_flag",
-      "description": "Interrupteur d'arrêt d'urgence de toute la surface web Studio : 0|false|off répond 503 partout.",
+      "description": "Interrupteur d'arrêt d'urgence de toute la surface web Studio : 0|false|off répond 503 partout. Câblé le 2026-09-21 (lot STUDIO RUNTIME CONFIG WIRING V1) dans apps/studio/src/proxy.ts (studioEnabled(), @elsatia/studio-domain), au tout début du proxy — s'applique à toutes les routes couvertes par son matcher.",
       "fail_mode": "open",
       "deprecated": false,
       "replacement": null,
@@ -4187,7 +4186,7 @@
           "preview": "1",
           "production": "1"
         },
-        "open_by_design": "interrupteur d'arrêt : absent = actif par conception (apps/studio/src/lib/config.ts)"
+        "open_by_design": "interrupteur d'arrêt : absent = actif par conception (apps/studio/src/proxy.ts, studioEnabled)"
       },
       "allowed_values": [
         "1",
@@ -4214,15 +4213,15 @@
       "build_time": false,
       "runtime": true,
       "category": "feature_flag",
-      "description": "Politique d'inscription Studio : open | allowlist | closed. ÉCART : FAIL-OPEN, absent ou inconnu = « open » (inscription publique).",
-      "fail_mode": "open",
+      "description": "Politique d'inscription Studio : open | allowlist | closed. Câblé le 2026-09-21 (lot STUDIO RUNTIME CONFIG WIRING V1) dans apps/studio/src/app/actions.ts (signup(), studioSignupMode() de @elsatia/studio-domain) : désormais FAIL-CLOSED côté code — absent ou toute valeur qui n'est pas exactement « open »/« allowlist » refuse l'inscription. La valeur cible réellement à configurer en production (open vs closed) reste une décision produit ouverte (voir « decision » ci-dessous), distincte de ce comportement de repli sûr.",
+      "fail_mode": "closed",
       "deprecated": false,
       "replacement": null,
       "dr_critical": false,
       "example_required": true,
       "flag": {
         "kind": "mode",
-        "absent_behavior": "open",
+        "absent_behavior": "closed",
         "owner": "Studio — Produit",
         "criticality": "critical",
         "expected": {
@@ -4261,8 +4260,8 @@
       "build_time": false,
       "runtime": true,
       "category": "auth",
-      "description": "Liste d'adresses ou de domaines (@domaine) autorisés quand STUDIO_SIGNUP_MODE=allowlist.",
-      "fail_mode": "default",
+      "description": "Liste d'adresses ou de domaines (@domaine) autorisés quand STUDIO_SIGNUP_MODE=allowlist. Câblé le 2026-09-21 (lot STUDIO RUNTIME CONFIG WIRING V1), isStudioSignupAllowlisted() de @elsatia/studio-domain, appelé depuis signup() (apps/studio/src/app/actions.ts) : FAIL-CLOSED, une liste vide ou absente n'autorise personne.",
+      "fail_mode": "closed",
       "deprecated": false,
       "replacement": null,
       "dr_critical": false,
@@ -4285,7 +4284,7 @@
       "build_time": false,
       "runtime": true,
       "category": "feature_flag",
-      "description": "Le parcours légal Studio est publié : « 1 » requis. FAIL-CLOSED.",
+      "description": "Gate FAIL-CLOSED sur la création de compte Studio (signup()), et non l'affichage d'un parcours légal complet : aucune page légale/consentement n'existe dans le code à ce jour. « 1 » requis pour autoriser l'inscription. Câblé le 2026-09-21 (lot STUDIO RUNTIME CONFIG WIRING V1) dans apps/studio/src/app/actions.ts, studioLegalPublished() de @elsatia/studio-domain — interprétation documentée : tant que le parcours légal réel n'existe pas, cette variable bloque les nouvelles inscriptions plutôt que de prétendre afficher un texte légal absent.",
       "fail_mode": "closed",
       "deprecated": false,
       "replacement": null,
@@ -4310,27 +4309,6 @@
         "0",
         "1"
       ]
-    },
-    {
-      "name": "STUDIO_LEGAL_TEXT_VERSION",
-      "applications": [
-        "studio"
-      ],
-      "required": true,
-      "environments": [
-        "production"
-      ],
-      "visibility": "server",
-      "secret": false,
-      "build_time": false,
-      "runtime": true,
-      "category": "legal",
-      "description": "Version du texte légal Studio présentée à l'acceptation.",
-      "fail_mode": "closed",
-      "deprecated": false,
-      "replacement": null,
-      "dr_critical": false,
-      "example_required": true
     },
     {
       "name": "STUDIO_AI_ANALYSIS",
@@ -4603,84 +4581,6 @@
       "replacement": null,
       "dr_critical": false,
       "example_required": false
-    },
-    {
-      "name": "RESEND_API_KEY",
-      "applications": [
-        "studio"
-      ],
-      "required": false,
-      "environments": [
-        "local",
-        "preview",
-        "production"
-      ],
-      "visibility": "server",
-      "secret": true,
-      "build_time": false,
-      "runtime": true,
-      "category": "email",
-      "description": "Clé API Resend pour les e-mails transactionnels de Studio. AUTRE fournisseur que le canal ELSATIA (Brevo).",
-      "fail_mode": "closed",
-      "deprecated": false,
-      "replacement": null,
-      "dr_critical": false,
-      "example_required": true,
-      "required_when": "quand STUDIO_MAIL_PROVIDER=resend",
-      "finding_ids": [
-        "F-STUDIO-MAIL-PROVIDER"
-      ]
-    },
-    {
-      "name": "STUDIO_MAIL_PROVIDER",
-      "applications": [
-        "studio"
-      ],
-      "required": false,
-      "environments": [
-        "local",
-        "preview",
-        "production"
-      ],
-      "visibility": "server",
-      "secret": false,
-      "build_time": false,
-      "runtime": true,
-      "category": "email",
-      "description": "Fournisseur e-mail Studio : mailpit (local) | resend | vide (lien à copier).",
-      "fail_mode": "default",
-      "deprecated": false,
-      "replacement": null,
-      "dr_critical": false,
-      "example_required": true,
-      "allowed_values": [
-        "mailpit",
-        "resend"
-      ]
-    },
-    {
-      "name": "STUDIO_MAIL_FROM",
-      "applications": [
-        "studio"
-      ],
-      "required": false,
-      "environments": [
-        "local",
-        "preview",
-        "production"
-      ],
-      "visibility": "server",
-      "secret": false,
-      "build_time": false,
-      "runtime": true,
-      "category": "email",
-      "description": "Expéditeur des e-mails Studio.",
-      "fail_mode": "default",
-      "deprecated": false,
-      "replacement": null,
-      "dr_critical": false,
-      "example_required": true,
-      "required_when": "quand STUDIO_MAIL_PROVIDER est défini"
     },
     {
       "name": "STUDIO_MAILPIT_URL",
