@@ -43,6 +43,9 @@ durée.
 - **Correctif appliqué, revérifié par témoins positifs/négatifs réels** (auto-octroi refusé,
   confused deputy tenant/compte Connect refusé, chemin serveur fonctionnel, montant plafonné,
   idempotence par session Checkout revérifiée) — §9-§13.
+- **Concurrence réelle testée avec deux processus OS distincts** (pas seulement raisonnée) : deux
+  connexions psql lancées en parallèle, synchronisées pour maximiser la fenêtre de course,
+  contention réelle observée sur l'index unique — §11.
 - **`npm ci` (804 paquets), `vitest run` complet (1 792/1 792), `tsc --noEmit` (0 erreur),
   `eslint` sur les fichiers modifiés (0 erreur), `verify:migrations` (315 migrations valides),
   `verify:secrets` (2 505 fichiers, aucun secret)** — tous exécutés réellement dans cette
@@ -361,6 +364,18 @@ interrogent en premier) : **fonctionne pour le cas nominal** — un événement 
 traité avec succès** est rejoué → `23505` → la route répond `{duplicate:true}` sans retraiter
 (test pgTAP #14).
 
+**Témoin bout-en-bout du cas nominal (chemin succès), exécuté réellement, distinct du test
+pgTAP** : réservation de `evt_success_then_retry` → `stripe_connect_encaisser_facture_service`
+réussit (`facture.stripe_payment_status='paid'`, `montant_paye=50.00`, 1 paiement) → **second**
+`INSERT` du même `event.id` (Stripe qui retente parce que sa réponse 200 s'est perdue en route,
+scénario distinct de la panne métier de la D3) → `duplicate key value violates unique constraint`
+immédiatement, **sans jamais rappeler la RPC** — le retry est absorbé exactement là où il doit
+l'être, parce que l'effet métier avait déjà eu lieu avant que le duplicate ne soit détecté. C'est
+la contrepartie exacte, et sûre, du scénario D3 : la différence entre les deux n'est jamais la
+mécanique de dé-duplication (identique dans les deux cas) mais **le moment où le retry
+survient** — avant ou après que le traitement métier ait réellement réussi. Aucune mécanique ne
+distingue aujourd'hui ces deux cas: c'est précisément le manque que la D3 documente.
+
 **Résidu confirmé, non corrigé, D3** (DECISION_REQUIRED-04) : la réservation (`INSERT` dans
 `stripe_webhook_events`) est une écriture **autonome**, commitée avant même que le traitement
 métier ne commence — elle n'est **pas** dans la même transaction que l'appel RPC qui suit. Si le
@@ -391,11 +406,17 @@ concrète.
 
 ## 11. ORDERING
 
-- **Événements concurrents du même `event.id`** : garanti par la contrainte `UNIQUE` Postgres
-  au niveau moteur, indépendamment de l'ordre d'arrivée réseau — un seul `INSERT` gagne, l'autre
-  lève `23505` immédiatement (pas de fenêtre de course observable, testé par insertion
-  successive dans la même transaction ; le comportement `UNIQUE` de Postgres garantit
-  l'atomicité même sous connexions concurrentes réelles).
+- **Événements concurrents du même `event.id`, testés avec de VRAIS processus concurrents** (pas
+  seulement raisonné, ni seulement deux `INSERT` séquentiels dans une même transaction) : deux
+  connexions psql/OS séparées (deux PID distincts), synchronisées par un `pg_sleep(0.3)` avant
+  l'`INSERT` pour maximiser la fenêtre de course, lancées en parallèle réel (`&` shell, deux
+  processus simultanés). Résultat : exactement une des deux connexions commite
+  (`INSERT 0 1`), l'autre reçoit une vraie erreur de contention
+  (`duplicate key value violates unique constraint "stripe_webhook_events_pkey"`) — pas un
+  artefact de test, une contention réelle au niveau de l'index unique. Compte final de lignes
+  pour cet `event.id` : **1**, jamais 2. La garantie ne repose sur aucune hypothèse d'ordre
+  d'arrivée réseau, uniquement sur l'atomicité de l'index unique Postgres, qui tient sous
+  connexions réellement concurrentes.
 - **`checkout.session.completed` puis rejeu du même événement** : testé (§10, couche 1),
   idempotent.
 - **Événements Connect vs Boutique sur la même table `stripe_webhook_events`** : les deux
