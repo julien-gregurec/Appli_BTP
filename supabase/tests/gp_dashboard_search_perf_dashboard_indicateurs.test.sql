@@ -7,7 +7,7 @@
 -- jamais les données de l'autre entreprise).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(9);
+select plan(13);
 
 \ir fixtures/isolation_multitenant.inc
 
@@ -92,6 +92,53 @@ select throws_ok(
   '42501',
   null,
   '9. authenticated ne peut pas écrire entreprises_dashboard_cache directement'
+);
+
+-- 10-13. Changement direct d'entreprise_id sur une facture brouillon
+-- (correctif 20260922000318, qualification finale § 12.3 du rapport de
+-- mission — reproduit avant correctif : les deux caches restaient
+-- incohérents, l'ancien tenant gardait la facture à son crédit, le nouveau
+-- ne la voyait jamais). Effectué hors RLS (rôle propriétaire) : ce test
+-- isole la correction du trigger, indépendamment de qui a le droit
+-- d'effectuer une telle mutation (déjà audité séparément, § 12.5/§ 8.4 du
+-- rapport — la contrainte composite factures_client_entreprise_fkey exige
+-- de changer client_id en même temps, seule protection structurelle dédiée
+-- à ce jour).
+reset role;
+set local role supabase_migrator;
+
+insert into public.factures (id, entreprise_id, client_id, statut, montant_ht, montant_tva, montant_ttc, montant_paye)
+values ('ae000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'a3000000-0000-0000-0000-000000000001', 'brouillon', 1000, 200, 1200, 0);
+
+select is(
+  (select factures_total from public.entreprises_dashboard_cache where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
+  (select coalesce(sum(montant_ttc) filter (where statut <> 'annulee'), 0) from public.factures where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
+  '10. Cache tenant A cohérent juste après création de la facture brouillon (avant mutation)'
+);
+
+-- Capture le total B AVANT le déplacement (B a déjà ses propres factures
+-- dans la fixture d'isolation : ne pas supposer que B part de zéro).
+create temp table _qual_cache_b_avant as
+select factures_total as v from public.entreprises_dashboard_cache where entreprise_id = 'b0000000-0000-0000-0000-000000000001';
+
+update public.factures
+set entreprise_id = 'b0000000-0000-0000-0000-000000000001', client_id = 'b3000000-0000-0000-0000-000000000001'
+where id = 'ae000000-0000-0000-0000-000000000001';
+
+select is(
+  (select factures_total from public.entreprises_dashboard_cache where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
+  (select coalesce(sum(montant_ttc) filter (where statut <> 'annulee'), 0) from public.factures where entreprise_id = 'a0000000-0000-0000-0000-000000000001'),
+  '11. ANCIEN tenant (A) : cache débité, cohérent avec le recalcul canonique après le changement d''entreprise'
+);
+select is(
+  (select factures_total from public.entreprises_dashboard_cache where entreprise_id = 'b0000000-0000-0000-0000-000000000001'),
+  (select coalesce(sum(montant_ttc) filter (where statut <> 'annulee'), 0) from public.factures where entreprise_id = 'b0000000-0000-0000-0000-000000000001'),
+  '12. NOUVEAU tenant (B) : cache crédité, cohérent avec le recalcul canonique après le changement d''entreprise'
+);
+select is(
+  (select factures_total from public.entreprises_dashboard_cache where entreprise_id = 'b0000000-0000-0000-0000-000000000001') - (select v from _qual_cache_b_avant),
+  1200::numeric,
+  '13. NOUVEAU tenant (B) : le montant complet de la facture déplacée (1200) s''ajoute, pas un delta net partiel'
 );
 
 select * from finish();
