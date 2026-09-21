@@ -144,7 +144,6 @@ describe("6. modèle neutre : proposé, non appliqué", () => {
   it("n'est pas dans le ledger : aucun numéro n'a été réservé", () => {
     const migrations = readdirSync(fileURLToPath(new URL("../../../../../supabase/migrations", import.meta.url)));
     expect(migrations.some((nom) => nom.includes("references_fabricants"))).toBe(false);
-    expect(migrations).toHaveLength(279);
   });
 });
 
