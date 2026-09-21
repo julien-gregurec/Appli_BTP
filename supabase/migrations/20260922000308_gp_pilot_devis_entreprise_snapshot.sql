@@ -20,6 +20,36 @@
 
 alter table public.devis add column if not exists entreprise_snapshot jsonb;
 
+-- CONVERGENCE V1 — fonction rapatriée telle quelle depuis
+-- integration/gp-external-pilot-closure-v1 (définie à l'origine dans
+-- 20260912000282_gp_devis_v2_catalogue_ouvrages.sql, absente de ce train :
+-- le moteur de rendu devis v2/devis_ouvrages de cette migration n'a jamais
+-- été intégré, voir plus bas). Fonction générique, autonome, indépendante du
+-- reste de 282 : simple projection jsonb des colonnes d'en-tête de
+-- l'entreprise, déjà utilisée telle quelle par `document_commercial_public_
+-- par_token` ci-dessous.
+create or replace function public.construire_entreprise_snapshot(p_entreprise_id uuid)
+returns jsonb language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'nom', e.nom, 'raison_sociale', e.raison_sociale, 'siret', e.siret, 'adresse', e.adresse,
+    'code_postal', e.code_postal, 'ville', e.ville, 'logo_url', e.logo_url,
+    'assurance_decennale_numero', e.assurance_decennale_numero,
+    'assurance_decennale_assureur', e.assurance_decennale_assureur,
+    'assurance_rc_pro_numero', e.assurance_rc_pro_numero, 'taux_penalites_retard', e.taux_penalites_retard,
+    'texte_entete', e.texte_entete, 'texte_pied_page', e.texte_pied_page,
+    'police_documents', e.police_documents, 'taille_police_documents', e.taille_police_documents,
+    'logo_largeur_documents', e.logo_largeur_documents, 'couleur_documents', e.couleur_documents,
+    'couleur_secondaire_documents', e.couleur_secondaire_documents,
+    'mise_en_page_documents', e.mise_en_page_documents, 'position_logo_documents', e.position_logo_documents,
+    'afficher_logo_documents', e.afficher_logo_documents,
+    'afficher_descriptions_documents', e.afficher_descriptions_documents,
+    'afficher_tva_lignes_documents', e.afficher_tva_lignes_documents)
+  from public.entreprises e where e.id = p_entreprise_id
+$$;
+
+comment on function public.construire_entreprise_snapshot(uuid) is
+  'Projection jsonb des colonnes d''en-tête d''une entreprise (identité, assurances, mise en forme des documents) — utilisée pour figer l''identité émettrice sur un document émis.';
+
 create or replace function public.capturer_entreprise_snapshot_devis()
 returns trigger
 language plpgsql
@@ -77,35 +107,18 @@ create trigger verrou_entreprise_snapshot_devis
   before update on public.devis
   for each row execute function public.verrouiller_entreprise_snapshot_devis();
 
--- Rendu v2 : lit désormais le snapshot figé s'il existe, comme pour les
--- factures. Comportement inchangé pour un brouillon (jamais de snapshot) ou
--- pour un devis émis avant ce lot mais déjà couvert par le backfill ci-dessus.
-create or replace function public.construire_rendu_devis(d public.devis, p_provenance text default 'emission')
-returns jsonb language sql stable security definer set search_path = public as $$
-  select jsonb_build_object(
-    'version', 1,
-    'moteur', coalesce(d.moteur_presentation, 1),
-    'type_document', 'devis',
-    'provenance', p_provenance,
-    'capture_le', now(),
-    'numero', d.numero,
-    'statut', d.statut,
-    'date_emission', d.date_emission,
-    'date_validite', d.date_validite,
-    'remise_globale', d.remise_globale,
-    'montants', jsonb_build_object('ht', d.montant_ht, 'tva', d.montant_tva, 'ttc', d.montant_ttc),
-    'conditions', d.conditions,
-    'notes_client', d.notes_client,
-    'entreprise', coalesce(d.entreprise_snapshot, public.construire_entreprise_snapshot(d.entreprise_id)),
-    'client', coalesce(d.client_snapshot, public.construire_client_snapshot(d.client_id, d.entreprise_id, p_provenance)),
-    'filigrane', public.filigrane_a_figer(d.filigrane, d.entreprise_id),
-    'filigrane_document', d.filigrane,
-    'filigranes_entreprise', (select e.filigranes_documents from public.entreprises e where e.id = d.entreprise_id),
-    'ouvrages', coalesce((select jsonb_agg(public.ouvrage_pour_rendu(to_jsonb(o)) order by o.ordre)
-                            from public.devis_ouvrages o where o.devis_id = d.id), '[]'::jsonb),
-    'lignes', coalesce((select jsonb_agg(public.ligne_pour_rendu(to_jsonb(l)) order by l.ordre)
-                          from public.lignes_devis l where l.devis_id = d.id), '[]'::jsonb))
-$$;
+-- CONVERGENCE V1 — `construire_rendu_devis()` (moteur de rendu devis v2,
+-- 20260912000282_gp_devis_v2_catalogue_ouvrages.sql) volontairement NON
+-- rapatriée ici : elle dépend de `devis_ouvrages`, `devis.moteur_presentation`,
+-- `devis.remise_globale`, `devis.conditions`, `devis.filigrane` et
+-- `entreprises.filigranes_documents` — toute l'infrastructure "devis v2" de
+-- la lignée release/gp-v1-rc, absente de ce train de convergence (base
+-- release/tools-store-preflight-v1, qui ne descend pas de gp-v1-rc et rend
+-- les devis via `chargerDonneesDevisImprimable`/`lignes_devis` directement,
+-- jamais via cette fonction — 0 appelant dans ce dépôt). La rapatrier
+-- nécessiterait de porter migrations 282-289 dans leur ensemble, hors
+-- périmètre de cette collision migratoire ; documenté dans le rapport de
+-- convergence comme dépendance non résolue, pas silencieusement ignorée.
 
 -- ---------------------------------------------------------------------------
 -- Lecture publique par jeton (20260922000305) : elle lisait TOUJOURS
