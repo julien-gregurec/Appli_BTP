@@ -287,6 +287,10 @@
         "justification": "Itère sur la liste de variables publiques déclarées par ce même script pour construire son rapport ; ne lit jamais une variable applicative arbitraire."
       },
       {
+        "path": "apps/reserves/scripts/verify-public-env.mjs",
+        "justification": "Itère sur la liste de variables publiques déclarées par ce même script pour construire son rapport ; ne lit jamais une variable applicative arbitraire (jumelle de apps/tools/scripts/verify-public-env.mjs)."
+      },
+      {
         "path": "src/lib/tools-store-environment.ts",
         "justification": "Lit TOOLS_STORE_ENVIRONMENT/TOOLS_STORE_ALLOW_SANDBOX par un nom construit à partir d'une constante interne, jamais une entrée utilisateur."
       },
@@ -625,7 +629,7 @@
         "NEXT_PUBLIC_RESERVES_URL"
       ],
       "text": "Replis localhost figés au build dans Colors et Réserves (liens d'invitation e-mail de Réserves).",
-      "next_step": "Colors : garde de pré-build existante. Autres : preflight --auto. Lot code : supprimer les replis."
+      "next_step": "Colors et Réserves : garde de pré-build bloquante (apps/reserves/scripts/verify-public-env.mjs, sur le modèle de Colors/Tools — interrompt npm run build sans NEXT_PUBLIC_SUPABASE_URL/NEXT_PUBLIC_SUPABASE_ANON_KEY/NEXT_PUBLIC_RESERVES_URL sur un build publié). NEXT_PUBLIC_ELSATIA_ACCOUNT_URL (Gestion Pro) reste sur preflight --auto, hors périmètre de ce correctif. Lot code restant : supprimer les replis eux-mêmes (conservés à dessein pour le confort du développement local)."
     },
     {
       "id": "F-STUDIO-SERVICE-KEY-NAME",
@@ -854,7 +858,8 @@
       "name": "ELSATIA_APPLICATION_ENV",
       "applications": [
         "gestion_pro",
-        "colors"
+        "colors",
+        "reserves"
       ],
       "required": true,
       "environments": [
