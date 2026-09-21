@@ -2,6 +2,16 @@
 -- liste les fichiers de l'entreprise appelante, jamais ceux d'une autre, et
 -- exporter_donnees_entreprise l'inclut sous 'manifeste_fichiers'. Voir
 -- 20260922000310_gp_pilot_rgpd_manifeste_fichiers.sql.
+--
+-- Corrigé lors de la revue ELSATIA-EXTERNAL-PILOT-FULL-REHEARSAL-V2 (jamais
+-- exécuté avant cette mission) : les contrôles qualitatifs (2-5 ci-dessous)
+-- appelaient `manifeste_fichiers_entreprise` directement en tant
+-- qu'`authenticated`, ce que son propre `revoke` (vérifié par le test 6, qui
+-- passait déjà) interdit explicitement — la fonction n'est atteignable que
+-- depuis `exporter_donnees_entreprise` (exécution SECURITY DEFINER, sous
+-- l'identité du propriétaire). Reproduits ici via le chemin réellement
+-- exposé, `exporter_donnees_entreprise(...) -> 'manifeste_fichiers' ->
+-- 'fichiers'`, déjà utilisé par les tests 7-8 de ce même fichier.
 begin;
 create extension if not exists pgtap with schema extensions;
 select plan(9);
@@ -18,22 +28,22 @@ select set_config('request.jwt.claim.sub', '10000000-0000-0000-0000-000000000001
 select set_config('request.jwt.claim.email', 'admin-a@invalid.local', true);
 
 select is(
-  jsonb_array_length(public.manifeste_fichiers_entreprise('a0000000-0000-0000-0000-000000000001')),
+  jsonb_array_length(public.exporter_donnees_entreprise('a0000000-0000-0000-0000-000000000001') -> 'manifeste_fichiers' -> 'fichiers'),
   2,
   'les deux documents_chantier de A (visible + privé) sont listés'
 );
 select ok(
-  position('secret.pdf' in public.manifeste_fichiers_entreprise('a0000000-0000-0000-0000-000000000001')::text) > 0,
+  position('secret.pdf' in (public.exporter_donnees_entreprise('a0000000-0000-0000-0000-000000000001') -> 'manifeste_fichiers' -> 'fichiers')::text) > 0,
   'un document « privé » (audience gestionnaires) reste dans le manifeste : c''est un inventaire, pas un contrôle de visibilité UI'
 );
 select ok(
-  position('Plan visible B' in public.manifeste_fichiers_entreprise('a0000000-0000-0000-0000-000000000001')::text) = 0
-  and position('/b4000000-0000-0000-0000-000000000001/' in public.manifeste_fichiers_entreprise('a0000000-0000-0000-0000-000000000001')::text) = 0,
+  position('Plan visible B' in (public.exporter_donnees_entreprise('a0000000-0000-0000-0000-000000000001') -> 'manifeste_fichiers' -> 'fichiers')::text) = 0
+  and position('/b4000000-0000-0000-0000-000000000001/' in (public.exporter_donnees_entreprise('a0000000-0000-0000-0000-000000000001') -> 'manifeste_fichiers' -> 'fichiers')::text) = 0,
   'aucun fichier de l''entreprise B ne fuite dans le manifeste de A'
 );
 select ok(
   (select bool_and((f ->> 'table') is not null and (f ->> 'bucket') is not null and (f ->> 'storage_path') is not null)
-   from jsonb_array_elements(public.manifeste_fichiers_entreprise('a0000000-0000-0000-0000-000000000001')) f),
+   from jsonb_array_elements(public.exporter_donnees_entreprise('a0000000-0000-0000-0000-000000000001') -> 'manifeste_fichiers' -> 'fichiers') f),
   'chaque entrée porte au minimum table/bucket/storage_path (inventaire exploitable)'
 );
 
