@@ -514,6 +514,15 @@
         "closed par défaut",
         "open par défaut"
       ]
+    },
+    {
+      "id": "DECISION_REQUIRED:STUDIO-DEDICATED-SUPABASE-AND-CONTINUATION",
+      "owner": "Julien",
+      "question": "Studio rejoint-il le projet Supabase partagé (GP/Colors/Tools/Reserves) ou reçoit-il son propre projet dédié ? Structurant pour la fermeture réelle de l'inscription : le correctif déjà écrit (branche fix/studio-signup-closed-v1 — table studio_signup_policy, hook Auth before_user_created, garde applicative en profondeur) présuppose un projet dédié et n'est pas porté dans ce train tant que ce choix n'est pas fait. Sans lui, la garde actuelle (STUDIO_SIGNUP_MODE/STUDIO_SIGNUP_ALLOWLIST, fail-closed par défaut — voir F-STUDIO-SIGNUP-DEFAULT-OPEN) reste contournable par un appel direct POST /auth/v1/signup avec la clé publique, hors de la couche Next.js qui porte la garde.",
+      "options": [
+        "projet Supabase dédié pour Studio (porter fix/studio-signup-closed-v1)",
+        "Studio rejoint le projet partagé (réconcilier autrement la fermeture d'inscription au niveau Auth)"
+      ]
     }
   ],
   "findings": [
@@ -4576,6 +4585,28 @@
       "runtime": true,
       "category": "tooling",
       "description": "Autorise la réconciliation du stockage contre un hôte distant nommé exactement. Garde de sûreté : à ne poser que pour une opération ponctuelle.",
+      "fail_mode": "default",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
+      "name": "STUDIO_HEALTHCHECK_SKIP_MAIN",
+      "applications": [
+        "studio_worker"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Empêche l'entrée en service (CLI) de src/healthcheck.ts de s'exécuter à l'import : réservé aux tests unitaires (tests/healthcheck.test.ts), jamais posé en Preview/Production.",
       "fail_mode": "default",
       "deprecated": false,
       "replacement": null,
