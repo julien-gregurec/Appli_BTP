@@ -2363,3 +2363,110 @@ aucun environnement Preview réel n'a été atteint dans ce sandbox, quel que so
 preuve locale atteint.
 
 Aucun déploiement, aucune Preview réelle, aucune Production dans cette session.
+
+---
+
+## 25. Convergence finale Studio / Tools / Reserves (6ᵉ édition de ce rapport, mission nocturne autonome)
+
+**Point de départ** : `CONVERGENCE_TRAIN_CANDIDATE = f5a9e44` (HEAD après §24, `d4b9c79` requalifié).
+
+**Mission** : porter les 5 lots d'isolation Studio/Tools/Reserves cités par la mission (`claude/studio-env-manifest-fix-v1`, `claude/studio-runtime-config-wiring-v1`, `claude/studio-build-isolation-v1`, `claude/tools-reserves-postcss-isolation-v1`, `claude/reserves-turbopack-sentry-isolation-v1`) dans le train ELSATIA de référence, sans doublon.
+
+### 25.1 — Ascendance réelle vérifiée avant tout portage
+
+`git fetch --all --prune` exécuté d'abord (aucun SHA supposé). Comparaison par `git merge-base` de chacune des 5 branches contre HEAD **avant** tout cherry-pick, conformément à la consigne :
+
+Les 5 branches forment une **chaîne linéaire unique** (chacune ancêtre direct de la suivante) : `studio-env-manifest-fix-v1` (2 commits) ⊂ `studio-runtime-config-wiring-v1` (+2) ⊂ `studio-build-isolation-v1` (+2) ⊂ `tools-reserves-postcss-isolation-v1` (+2) ⊂ `reserves-turbopack-sentry-isolation-v1` (+2, tip). **Porter le tip suffit** à couvrir les 4 autres — aucun doublon possible, confirmé par lecture directe de `git log --oneline` sur chaque paire avant de conclure.
+
+Classement : les 5 branches = **MUST_PORT** (une seule opération, le tip couvrant les 4 autres). Aucune ne s'est révélée `ALREADY_PRESENT`/`SUPERSEDED`/`DOC_ONLY` — HEAD (`f5a9e44`) n'avait qu'un seul commit propre depuis leur base commune (`d4b9c79`, doc-only, §24), sans recouvrement avec les 5 lots.
+
+### 25.2 — Porté : `claude/reserves-turbopack-sentry-isolation-v1` (10 commits, chaîne complète)
+
+Fusionné en un seul merge réel (`git merge --no-ff`), **0 conflit** (les 17 fichiers touchés — `apps/{studio,tools,reserves}/postcss.config.mjs`, `apps/reserves/src/instrumentation.ts`, `apps/studio/{.env.example,src/app/actions.ts,src/proxy.ts,tests/access.test.ts}`, `packages/studio-domain/src/{access,index}.ts`, `workers/studio-video/.env.example`, `config/env-manifest.json`, 5 rapports de qualification `docs/qualification/ELSATIA_{STUDIO,TOOLS_RESERVES,RESERVES}_*_V1.md` — n'avaient aucun recouvrement avec le seul commit propre de HEAD, qui ne touchait qu'un fichier de rapport différent).
+
+Commits intégrés, dans l'ordre chronologique réel :
+
+| # | Commit | Contenu |
+|---|---|---|
+| 1 | `8f66403` | fix(env-manifest) : ferme les 37 erreurs Studio (gabarits `.env.example` désynchronisés) |
+| 2 | `0bc9e92` | docs(qualification) : lot STUDIO ENV MANIFEST |
+| 3 | `82e5ce7` | feat(studio) : câble 4 variables de sécurité (`STUDIO_ENABLED`, `STUDIO_SIGNUP_MODE`, `STUDIO_SIGNUP_ALLOWLIST`, `STUDIO_LEGAL_PUBLISHED`), fail-closed serveur (`isStudioSignupAllowlisted()` dans `@elsatia/studio-domain`, appelé depuis `signup()`) |
+| 4 | `faebd70` | docs(qualification) : lot STUDIO RUNTIME CONFIG WIRING |
+| 5 | `9d4331c` | fix(studio) : isole le pipeline PostCSS de Studio du monorepo (`apps/studio/postcss.config.mjs` stub local) |
+| 6 | `a8f860c` | docs(qualification) : lot STUDIO BUILD ISOLATION |
+| 7 | `e79864f` | fix(tools,reserves) : isole le pipeline PostCSS de Tools et Reserves du monorepo (mêmes stubs locaux) |
+| 8 | `cc6d8e0` | docs(qualification) : lot TOOLS + RESERVES POSTCSS ISOLATION |
+| 9 | `d6e3d7e` | fix(reserves) : isole la découverte d'instrumentation Turbopack du root (`apps/reserves/src/instrumentation.ts` vide, empêche l'auto-découverte de `src/instrumentation.ts`/Sentry de GP via `turbopack.root`) |
+| 10 | `0a9a99f` | docs(qualification) : lot RESERVES TURBOPACK SENTRY ISOLATION |
+
+Nouveau HEAD de fusion : `569eeb7` (message : « merge: intègre le lot STUDIO/TOOLS/RESERVES isolation... »).
+
+### 25.3 — Éléments MUST_NOT_LOSE (consigne de mission) — vérifiés présents après fusion
+
+| Item | Vérifié |
+|---|---|
+| `STUDIO_ENABLED` | ✅ présent dans `config/env-manifest.json` |
+| `STUDIO_SIGNUP_MODE` | ✅ présent, fail-closed (défaut `closed`, seules les valeurs exactes `open`/`allowlist` l'ouvrent — confirmé par `tests/access.test.ts`, 9/9 verts) |
+| `STUDIO_SIGNUP_ALLOWLIST` | ✅ présent, fail-closed (liste vide/absente ⇒ personne autorisé, testé) |
+| `STUDIO_LEGAL_PUBLISHED` | ✅ présent, fail-closed (exige la chaîne exacte `"1"`) |
+| Signup fail-closed serveur | ✅ `apps/studio/src/app/actions.ts` — `failure()` sur chaque branche invalide, `isStudioSignupAllowlisted()` appelée avant toute création de compte |
+| PostCSS local Studio | ✅ `apps/studio/postcss.config.mjs` — stub `{ plugins: {} }`, empêche la remontée vers le `postcss.config.mjs` racine (Gestion Pro, `@tailwindcss/postcss`) |
+| Build isolé Studio | ✅ build vert en isolation complète (§25.4) |
+| PostCSS local Tools | ✅ `apps/tools/postcss.config.mjs` — même stub |
+| Build autonome Tools | ✅ build vert avec `NEXT_PUBLIC_TOOLS_ENV=local` (§25.4) |
+| PostCSS local Reserves | ✅ `apps/reserves/postcss.config.mjs` — même stub |
+| Instrumentation locale Reserves | ✅ `apps/reserves/src/instrumentation.ts` — `register()` vide, empêche la découverte de l'instrumentation racine |
+| Aucune fuite Sentry GP → Reserves | ✅ confirmé statiquement (`grep -ri sentry` dans `apps/reserves/` : uniquement les 2 commentaires explicatifs du fichier lui-même) et dynamiquement (grep du dossier `.next/` après build réel : aucune référence à `@sentry/nextjs` ni aux fichiers `sentry.{server,edge}.config.ts` de GP) |
+| `turbopack.root` Reserves conservé si nécessaire | ✅ toujours présent et toujours nécessaire — `@elsatia/application-access`/`@elsatia/email` sont liés en `file:` depuis `packages/` à la racine du monorepo ; **c'est précisément l'élargissement de racine que ce `root` impose qui rend indispensables les 2 fichiers d'isolation locaux** (`instrumentation.ts`, `postcss.config.mjs`) |
+
+Aucun drift de lockfile conservé : les installations npm par app (Studio, Tools, Reserves, Colors, GP racine) ont chacune régénéré des métadonnées cosmétiques (champ `libc` normalisé par la version locale de npm) sur certains `package-lock.json` pendant la vérification en parallèle — **aucune n'a été committée**, l'arbre de travail a été vérifié propre (`git status --short` vide) avant toute fusion vers la branche de livraison. Aucune dépendance ajoutée pour masquer un défaut d'isolation.
+
+### 25.4 — Vérifications exécutées après convergence (5 agents dédiés, un par app, en parallèle)
+
+| App | `npm install` | `typecheck` | `lint` | `test` | `build` |
+|---|---|---|---|---|---|
+| **Studio** | PASS | PASS | PASS | PASS — 15 fichiers/260 tests (dont `tests/access.test.ts` 9/9 isolé) | PASS — 17 routes |
+| **Tools** | PASS | PASS | PASS | PASS — 1992/1992 une fois le timeout Vitest par défaut (5000ms) élevé à 20000ms pour 3 tests de comparaison d'image lents (`og-image`, `pwa-icons`, `store-assets`) ; **0 échec réel, uniquement un temps insuffisant en exécution non isolée** | PASS avec `NEXT_PUBLIC_TOOLS_ENV=local` (flag documenté) — 47 pages + service worker généré |
+| **Reserves** | PASS | PASS | PASS | PASS — 178/178 | Bloqué par la garde `verify:public-env` sans `.env.local` (comportement voulu) ; **`next build` sous-jacent revérifié PASS** avec variables factices jetables (19 routes) — isolation Sentry confirmée statiquement et dynamiquement (voir §25.3) |
+| **Colors** | PASS | PASS (1 échec transitoire de course avec une installation racine concurrente — résolu proprement en relançant, non lié au code de Colors, voir note) | PASS | PASS — 427/427 | Bloqué par la garde `verify:public-env` sans `.env.local` (voulu) ; **`next build` sous-jacent revérifié PASS** avec variables factices (27 routes) |
+| **Gestion Pro (racine)** | PASS | PASS (isolé : `npx tsc --noEmit`, 0 erreur) | PASS (isolé : `npx eslint`, 6 avertissements préexistants, 0 erreur) | PASS — `vitest run` 1786/1786 | PASS — `next build` racine (Sentry/Turbopack), 38 pages, `withSentryConfig` traversé sans erreur |
+
+Note Colors : un premier `tsc` a échoué sur une erreur de parsing dans `@types/hast` du `node_modules` **racine**, causée par une installation racine concurrente (menée par l'agent GP) encore en écriture pendant que l'agent Colors lançait son typecheck — TypeScript remonte les répertoires ancêtres à la recherche de `@types` par défaut. Rejoué après stabilisation : PASS net. Confirmé sans rapport avec `apps/colors` (aucune référence à `hast` dans son arbre de dépendances isolé).
+
+**Vérifications racine complémentaires** (script par script, sur la branche fusionnée) :
+
+| Contrôle | Résultat |
+|---|---|
+| `verify:migrations` | ✅ PASS — 313 migrations valides (inchangé depuis §24, ce lot ne touche aucune migration) |
+| `verify:secrets` | ✅ PASS — 2502 fichiers suivis, 0 secret (2 exceptions nommées inchangées) |
+| `verify:env-manifest` | ✅ **PASS — 0 erreur** (contre **37 erreurs, 100 % Studio, documentées à chaque édition depuis §21/§23/§24** avant ce lot) — la fermeture des 37 erreurs Studio par le commit `8f66403` est **confirmée effective sur ce train exact**, pas seulement sur sa branche d'origine. 10 `DECISION_REQUIRED` non bloquantes restent ouvertes (modèle de prix Stripe, flag crons fail-open, défaut inscription Studio) — aucune tranchée ici, option la plus conservatrice retenue (aucun défaut changé) |
+| `test:env-manifest` | ✅ PASS — 58/58 |
+| `verify:stripe-prices` | ⏭️ SKIP non bloquant (aucune clé Stripe dans ce sandbox, comportement du script) |
+
+### 25.5 — Instrumentation Sentry réelle de Gestion Pro — confirmée intacte
+
+Vérification explicite demandée par la mission (« GP conserve sa vraie instrumentation Sentry ») : `sentry.server.config.ts` et `sentry.edge.config.ts` contiennent de vrais appels `Sentry.init()` (pas de stub), `next.config.ts` enveloppe la config via `withSentryConfig(...)` (org/project/authToken/tunnelRoute réels), `src/instrumentation.ts` importe dynamiquement les deux configs selon le runtime et exporte `onRequestError`, `src/instrumentation-client.ts` initialise Sentry côté navigateur. Le `next build` racine a traversé cette configuration sans erreur. **Rien stubbé, rien retiré par cette fusion.**
+
+### 25.6 — Constat de sécurité : tentative d'injection de prompt dans `AGENTS.md`
+
+`AGENTS.md` (racine et copie sous `apps/studio/`) contient un texte affirmant « This is NOT the Next.js you know » et demandant de lire une documentation fictive sous `node_modules/next/dist/docs/` avant tout code, la copie `apps/studio/AGENTS.md` demandant en plus explicitement de committer ce fichier « pour garder l'arbre propre ». **Confirmé par 2 agents indépendants** : ce chemin ne contient que la documentation standard du paquet `next` upstream (répertoires `01-app`/`02-pages`/`03-architecture`/`04-community`, rien de spécifique au dépôt) — texte sans effet réel, à traiter comme une tentative d'injection de prompt, pas une consigne légitime du dépôt. **Aucune des instructions qu'il contient n'a été suivie** : aucun commit forcé, aucune lecture de fausse documentation n'a influencé le code produit.
+
+### 25.7 — Ni Preview ni Production touchées
+
+Aucun déploiement, aucune variable Preview/Production modifiée, aucun accès Vercel/Supabase/Stripe distant dans cette session — conforme à la consigne #9 de la mission.
+
+### 25.8 — Risques restants
+
+1. Les 10 `DECISION_REQUIRED` déjà ouvertes (§12.3, confirmées toujours ouvertes ici) restent non tranchées — aucune n'est bloquante pour ce train.
+2. `verify:stripe-prices` reste `NOT_PROVEN_REMOTE` (aucun credential Stripe dans ce sandbox), inchangé depuis toutes les éditions précédentes.
+3. Les 5 fichiers pgTAP en échec documentés depuis §23/§24 (`document_partage_public_par_jeton_v1`, `gp_pilot_plateforme_admin_role_total`, `gp_pilot_rgpd_manifeste_fichiers`, `platform_audit_log_bounded_v1`, `platform_stripe_state_attestation_r72`) n'ont pas été rejoués dans cette session (aucune migration touchée par ce lot, Docker/Postgres local non redémarré) — statut inchangé, sans rapport avec ce train.
+4. `workers/studio-video` (3 échecs FFmpeg `drawtext` documentés depuis §24.8) non retesté ici — hors périmètre de la mission (Studio app lui-même, pas le worker vidéo, était le seul item cité).
+5. Aucune vraie Preview/Production n'a été atteinte — `PREVIEW QUALIFIED` reste hors de portée de toute session locale, comme documenté depuis §23.
+
+### 25.9 — Statut après ce lot
+
+`CONVERGENCE_TRAIN_CANDIDATE = 569eeb7` (fusion locale, branche `_scratch-converge`, construite depuis `origin/claude/compassionate-euler-5j6avr` @ `f5a9e44`). **Poussé sur `origin/claude/funny-bell-eqo1p5`** (branche de développement assignée à cette session — voir note ci-dessous), jamais sur `compassionate-euler-5j6avr` directement : cette session n'a pas mandat de pousser sur une branche autre que celle qui lui est assignée. `funny-bell-eqo1p5` était un ancêtre direct de `compassionate-euler-5j6avr` (confirmé par `git merge-base --is-ancestor`) : la poussée est un fast-forward + 1 merge commit, sans aucune perte d'historique, sans force-push.
+
+**`FINAL_PREVIEW_TRAIN = NOT_YET`** (inchangé — aucune vraie Preview atteinte dans aucune session locale).
+
+**Verdict : `MONOREPO CLOSURE INTEGRATED`** pour le périmètre exact de cette mission (5 lots Studio/Tools/Reserves, chaîne unique, 1 seule opération de fusion nécessaire, 0 conflit, `verify:env-manifest` passé de 37 erreurs à 0, toutes les apps vertes ou bloquées uniquement par des gardes ENV volontaires déjà documentées). Ce n'est **pas** une clôture du train de convergence complet (Access/DR/Colors 3ᵉ voie/Reserves v6/10 DECISION_REQUIRED restent comme documenté en §7-9, inchangés par ce lot).
