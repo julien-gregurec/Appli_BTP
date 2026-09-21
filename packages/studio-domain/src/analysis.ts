@@ -365,7 +365,7 @@ export function selectAssetsForTargetDuration(
   const chosen: RankedAsset[] = [],
     groups = new Set<string>(),
     scenes = new Map<string, number>();
-  let remaining = rows.slice();
+  const remaining = rows.slice();
   while (chosen.length < budget && remaining.length) {
     remaining.sort(
       (a, b) =>
