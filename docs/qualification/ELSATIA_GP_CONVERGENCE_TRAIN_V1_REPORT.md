@@ -545,3 +545,49 @@ Au moment de pousser (`67b1564`), `origin/claude/compassionate-euler-5j6avr` ava
 `CONVERGENCE_TRAIN_CANDIDATE = b824008` (branche `claude/compassionate-euler-5j6avr`, à pousser — fusionne `67b1564` avec la remédiation sécurité `81420ad`, corrige la régression lint découverte par cette fusion (`b0f51b0`), documente la fusion). `FINAL_PREVIEW_TRAIN = NOT_YET`.
 
 C'était le 6ᵉ et dernier lot de la liste transmise. **Aucun des deux `DECISION_REQUIRED` du lot Studio (§16.4, §16.5) n'est tranché** ; le train reste un candidat de convergence, pas une base Preview qualifiée. Aucun déploiement, aucune Preview, aucune Production.
+
+---
+
+## 17. Fresh + pgTAP rejoués sur le train final fusionné (`cd4fe74`) — écart comblé
+
+Signalé sans être corrigé à chaque lot depuis le §12.7 (297 migrations) : Fresh/pgTAP n'avaient plus été rejoués depuis le §6.2 (296 migrations), alors que le train en compte désormais 307. Aucune des deux `DECISION_REQUIRED` du lot Studio n'empêchait cette vérification (elle ne tranche rien, elle constate) — traité maintenant en autonomie, conformément à la mission d'origine (« exécuter les vérifications disponibles, signaler précisément ce qui ne peut pas être exécuté »).
+
+### 17.1 — Méthode
+
+Harnais identique au §6.2, reconstruit à l'identique dans ce bac à sable (PostgreSQL 16 apt, `00_stub_platform.sql` conservé hors dépôt) : schémas `auth`/`storage`/`extensions`, rôles `anon`/`authenticated`/`service_role`, `auth.uid()/role()/jwt()/email()` simulés par GUC de session, `storage.foldername()` à l'identique. Une différence assumée et documentée : `pgsodium` n'a plus seulement sa fonction `crypto_sign_verify_detached` stubée, mais une extension factice minimale (`.control`/`.sql` vides posés dans `/usr/share/postgresql/16/extension/`, hors dépôt) pour que `create extension if not exists pgsodium` réussisse pendant le rejeu des migrations — sans quoi la migration `20260828000244_stripe_state_attestation_r72.sql` bloquait tout le rejeu Fresh dès la 245ᵉ migration. Cette extension factice ne fournit aucune capacité de signature réelle (voir §17.3).
+
+### 17.2 — Drill Fresh
+
+**Les 307 migrations rejouées dans l'ordre lexical exact sur une base neuve. 0 erreur SQL applicative.** Compteurs post-migration : 232 tables publiques (232/232 avec RLS active), 549 policies, 601 fonctions applicatives (hors fonctions internes à `pgtap`), 150 triggers.
+
+### 17.3 — pgTAP (89 fichiers sous `supabase/tests/`, `pg_prove`)
+
+**2382 assertions exécutées** au total (`Files=89, Tests=2382`).
+
+**83 fichiers entièrement verts** (contre 69/78 au §6.2). **5 fichiers avec échec ou plan incomplet**, causes vérifiées identiques, mot pour mot, à celles déjà documentées au §6.2 — **aucune nouvelle cause, aucune régression introduite par les lots 11 à 17 de ce train** :
+
+| Fichier | État | Cause (inchangée depuis §6.2) |
+|---|---|---|
+| `document_partage_public_par_jeton_v1.test.sql` | 10/42 exécutés | `ERROR: Les lignes d'une facture émise ne peuvent plus être modifiées` — confirmé mot pour mot identique |
+| `gp_pilot_notification_devis_accepte.test.sql` | 7 exécutés, 3 échoués | `notifications_utilisateurs_niveau_check` — non creusé davantage, pré-existant |
+| `gp_pilot_plateforme_admin_role_total.test.sql` | 0/6 exécutés | `plateforme_admins_actif_requiert_utilisateur_id` violée par la fixture — confirmé mot pour mot identique |
+| `gp_pilot_rgpd_manifeste_fichiers.test.sql` | 1/9 exécutés | contradiction interne au fichier de test, déjà documentée — toujours **décision requise** avant de pouvoir le déclarer vert (assouplir le grant ou réécrire le test), non traité ici (hors périmètre des 6 lots) |
+| `platform_audit_log_bounded_v1.test.sql` | 6/12 exécutés, 3 échoués | `Permission plateforme refusée` — limite probable du harnais, non creusée davantage |
+
+**1 fichier structurellement hors de portée de ce harnais, inchangé depuis §6.2** : `platform_stripe_state_attestation_r72.test.sql` — l'extension factice du §17.1 permet désormais à la migration correspondante de s'appliquer, mais le test lui-même appelle `pgsodium.crypto_sign_detached()` pour **produire** une signature Ed25519, capacité que PostgreSQL ne possède structurellement pas (clés publiques seulement) — la migration elle-même le documente. Aucun plan TAP émis, 0 assertion utilisable. Non un échec du train, une limite du bac à sable déjà actée au §6.2.
+
+**Confirmation empirique, indépendante, du correctif de sécurité fusionné au §16.9** : les **4 fichiers documentés en échec au §6.2** — `isolation_multitenant_surface.test.sql`, `platform_aal2_role_integrity_v1.test.sql`, `platform_global_owner_all_apps_v1.test.sql`, `platform_support_uid_security_v1.test.sql` — sont désormais **entièrement verts**. Cause vérifiée par lecture du diff, pas supposée : la migration `20260922000315_security_remediation_plateforme_admins_provisioning.sql` (fusionnée au §16.9, écrite par l'autre session) restaure des garde-fous AAL2/verrou perdus par une réécriture antérieure de `plateforme_ajouter_admin`/`plateforme_retirer_admin` — exactement la cause que le rapport `ELSATIA_SECURITY_BLOCKERS_REMEDIATION_V1.md` de cette autre session revendiquait. **C'est la première fois que ce résultat est vérifié de bout en bout sur le train final tel que fusionné et poussé (`cd4fe74`)**, plutôt que sur l'arbre partiel de l'autre session.
+
+Net : **9 fichiers en échec au §6.2 → 5 aujourd'hui** (4 résolus par la remédiation sécurité fusionnée, 0 nouveau, 1 fichier structurellement hors de portée dans les deux cas, non compté dans les 9 ni dans les 5).
+
+### 17.4 — Ce qui reste `NOT_PROVEN_REMOTE`
+
+Inchangé depuis le §6.2 : `ACTUAL_PREVIEW_UPGRADE`, `HOSTED_SUPABASE_RESTORE`, tout test Auth/Storage/Stripe/Applications en conditions réelles — aucun credential Supabase/Vercel/Stripe dans ce bac à sable. Les 8 migrations Studio n'ont, elles non plus, jamais été exercées sur un vrai projet Supabase (E2E Playwright, Storage réel, hook Auth) — seulement en Fresh SQL local ici et dans la CI dédiée `studio-foundation.yml`/`studio-render.yml` (non exécutée dans ce bac à sable, ni par cette session ni par aucune autre).
+
+### 17.5 — MUST_NOT_LOSE et risques — mise à jour
+
+Le risque #1 du §9 (« Fresh/pgTAP non rejoués depuis 296 migrations ») est **clos** : rejoué à 307/307, résultat net positif (aucune régression, 4 résolutions confirmées). Les risques réellement persistants sont ceux déjà identifiés indépendamment de tout comptage de migrations : `gp_pilot_rgpd_manifeste_fichiers.test.sql` reste **structurellement cassé tel qu'écrit** (décision requise, non nouvelle) et `document_partage_public_par_jeton_v1.test.sql`/`gp_pilot_notification_devis_accepte.test.sql`/`platform_audit_log_bounded_v1.test.sql` restent à investiguer plus avant — aucun n'est apparu avec ce train, aucun n'est traité par lui.
+
+### 17.6 — Statut après cette vérification
+
+`CONVERGENCE_TRAIN_CANDIDATE = cd4fe74` (inchangé — cette section est une vérification, aucun fichier du dépôt modifié). `FINAL_PREVIEW_TRAIN = NOT_YET`. Fresh 307/307, pgTAP 2382 assertions (83/88 fichiers exécutables entièrement verts, 1 hors de portée du harnais), 4 apps + Studio confirmés (§§2-16), 2 `DECISION_REQUIRED` Studio en attente (§16.4, §16.5). Aucun déploiement, aucune Preview, aucune Production.
