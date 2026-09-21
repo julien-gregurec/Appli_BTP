@@ -418,3 +418,45 @@ Aucun des 12 items du §8 n'est affecté. Point ajouté, spécifique à ce lot :
 ### 14.7 — Statut après ce lot
 
 `CONVERGENCE_TRAIN_CANDIDATE = ee35a2d` (branche `claude/compassionate-euler-5j6avr`, à pousser). `FINAL_PREVIEW_TRAIN = NOT_YET`. Prochains lots : Reserves → Studio.
+
+---
+
+## 15. Lot Reserves (6ᵉ édition de ce rapport, même branche, aucun train concurrent)
+
+**Point de départ** : `CONVERGENCE_TRAIN_CANDIDATE = 8133a97` (HEAD après le lot Colors, §14).
+
+### 15.1 — Comparaison avant portage
+
+Les deux lignées que la carte de convergence documentait comme mutuellement divergentes le sont réellement (aucune n'est ancêtre de l'autre), mais leur écart réel avec HEAD s'est révélé bien plus petit qu'annoncé :
+
+- `fix/reserves-offline-resilience-train-v2` (tip `86ed10a`) : 4 commits absents, **0 migration neuve** (`comm -23` sur les arbres de migrations : vide).
+- `feat/reserves-v6-security-offline-pilot-gate-v1` (tip `75b5c62`) : 5 commits absents, 1 fichier de migration en apparence neuf (`20260907000271_reserves_v5_offline_idempotence_v1.sql`) — en réalité un doublon de contenu **déjà présent et documenté comme renuméroté** dans ce train sous `20260908000273_...` (le fichier canonique porte lui-même un commentaire de provenance expliquant la renumérotation faite par le train d'intégration ECO).
+- Fichiers applicatifs clés des deux lignées (`offline/base-locale.ts`, `offline/contrat.ts`, `offline/synchronisation.ts`, `offline/reprise.ts`, `securite/entetes.ts`, `components/offline/useReprise.ts`) : **déjà présents**, et systématiquement plus volumineux/complets côté HEAD (ex. `synchronisation.ts` 358 lignes contre 241 dans la version source).
+
+### 15.2 — Porté
+
+Les 9 commits réels des deux lignées cherry-pickés dans l'ordre chronologique. **Chaque conflit vérifié individuellement avant résolution** (jamais un `--theirs`/`--ours` en aveugle) :
+
+- Un doublon de migration réel introduit par le cherry-pick de `7c0fc3d` (réintroduisait `reserves_v5_offline_idempotence` sous son ancien numéro 271) — détecté immédiatement, retiré dans un commit dédié.
+- 2 conflits `identiteCourante` vs `resoudreIdentite` (import seul) — HEAD utilise déjà le second nom, seul nom réellement exporté par `identite.ts` ; résolu en gardant HEAD.
+- Le reste des conflits (`72aefe0`, `52e8ac2`) : vérifiés fichier par fichier, HEAD contenait déjà une version égale ou supérieure de chaque protection (ex. distinction 503/401 entre indisponibilité serveur et session expirée, déjà implémentée mot pour mot dans `route.ts`). Résolu en gardant HEAD partout, confirmé par des cherry-picks qui se terminent à vide une fois les imports alignés.
+- Seul contenu réellement neuf : les mises à jour de rapports d'audit (SHA consignés) et le retrait du doublon de migration.
+
+### 15.3 — Découverte de sécurité (hors périmètre direct du lot, corrigée immédiatement)
+
+En régénérant le lockfile de `apps/reserves` pendant ce lot, `npm audit` a révélé que **Reserves n'avait jamais reçu le correctif CVE Next.js/sharp** appliqué à GP, Colors et Tools par le lot sécurité (§2, lot 2) : `next@16.2.12` (RCE non authentifiée, `GHSA-p293-qw3h-jr36`/`GHSA-2xp9-vwfh-vxw4`) et `sharp@0.35.3` étaient toujours déclarés. Cause : le lot sécurité d'origine ne portait que sur 3 apps, Reserves n'étant pas dans son périmètre à l'époque, et aucune fusion ultérieure (y compris ECO) n'a comblé cet écart.
+
+**Corrigé immédiatement**, hors attente d'un lot dédié (risque de sécurité, pas une fonctionnalité) : `next` → `16.3.5`, `sharp` (override) → `0.35.4`, `eslint-config-next` → `16.3.5` — mêmes versions que les 3 autres apps. `npm audit` : critique et high résolus (reste 1 high `js-yaml`, dépendance de dev, même écart hors périmètre que documenté pour GP/Colors au §6.1).
+
+### 15.4 — Tests rejoués
+
+`tsc --noEmit` PASS ; `eslint` PASS (0 erreur, 0 avertissement) ; `vitest run` **154/154** ; `next build` **PASS** (avant et après le bump sécurité) ; `verify:migrations` **297** (inchangé — le doublon retiré compense la tentative de réintroduction) ; `verify:secrets` PASS (2279 fichiers) ; `check-env-manifest.mjs` **0 erreur** (aucune nouvelle variable introduite par ce lot). `tsc`/`eslint`/`vitest` GP racine revérifiés en parallèle : inchangés (1786/1786, 0 erreur). Fresh/pgTAP non rejoués (aucune migration nette ajoutée par ce lot).
+
+### 15.5 — MUST_NOT_LOSE — mise à jour
+
+**Item #3 (CVE Next.js/sharp) étendu** : ce train couvre désormais les 4 applications (GP, Colors, Tools, **Reserves**), pas seulement les 3 initialement corrigées — écart comblé au §15.3, à vérifier également pour Studio au prochain lot avant de considérer l'item #3 clos pour l'écosystème complet.
+**Item #10 (durcissement offline dédié Reserves v6)** : confirmé **non perdu** — chaque protection de `feat/reserves-v6-security-offline-pilot-gate-v1` a été vérifiée présente dans ce train sous une forme égale ou supérieure, pas simplement supposée couverte.
+
+### 15.6 — Statut après ce lot
+
+`CONVERGENCE_TRAIN_CANDIDATE = 5f720ef` (branche `claude/compassionate-euler-5j6avr`, à pousser). `FINAL_PREVIEW_TRAIN = NOT_YET`. Prochain lot : Studio (dernier, volontairement — fork le plus ancien, migrations au format `HHMMSS` à convertir, signup actuellement ouvert à trancher, **et vérifier sa version Next.js/sharp** compte tenu de la découverte ci-dessus).
