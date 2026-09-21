@@ -5135,6 +5135,28 @@
       "example_required": false
     },
     {
+      "name": "PREFLIGHT_PREVIEW_SKIP_MAIN",
+      "applications": [
+        "ops_scripts"
+      ],
+      "required": false,
+      "environments": [
+        "local",
+        "test"
+      ],
+      "visibility": "server",
+      "secret": false,
+      "build_time": false,
+      "runtime": true,
+      "category": "tooling",
+      "description": "Empêche l'exécution CLI (main) de scripts/preflight-preview.mjs à l'import : réservé à scripts/preflight-preview.test.mjs, jamais posé en Preview/Production.",
+      "fail_mode": "none",
+      "deprecated": false,
+      "replacement": null,
+      "dr_critical": false,
+      "example_required": false
+    },
+    {
       "name": "ELSATIA_AUDIT_PASSWORD",
       "applications": [
         "ops_scripts"
