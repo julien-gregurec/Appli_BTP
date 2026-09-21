@@ -9,6 +9,7 @@ import { destinationInterneSure } from "@/lib/security/redirects";
 import { estCodeOffreTarifaire } from "@/lib/tarification";
 import { traduireErreurAuth, MESSAGE_GENERIQUE as MESSAGE_TECHNIQUE_AUTH } from "@/lib/auth-erreurs";
 import { estPlateformeAdmin } from "@/lib/plateforme";
+import { VERSION_CGU, VERSION_CGV } from "@/lib/juridique";
 
 function destinationOnboarding(params: { numero?: string; code?: string; offre?: string }) {
   const query = new URLSearchParams();
@@ -32,6 +33,16 @@ export async function signupAction(formData: FormData) {
   const numeroEmploye = String(formData.get("numero_employe") ?? "").trim().toUpperCase();
   const offreBrute = String(formData.get("offre") ?? "").trim().toLowerCase();
   const offre = estCodeOffreTarifaire(offreBrute) ? offreBrute : "";
+  const conditionsAcceptees = formData.get("conditions_acceptees") === "on";
+
+  // Sans acceptation explicite des CGU/CGV, aucun compte n'est créé : un
+  // signUp accepté silencieusement laisserait un contrat sans preuve
+  // d'acceptation (audit commercialisation self-service V2, §7). L'attribut
+  // HTML `required` sur la case à cocher n'est qu'un confort d'UX ; la
+  // vérification qui compte est celle-ci, côté serveur.
+  if (!conditionsAcceptees) {
+    redirect(`/signup?error=${encodeURIComponent("Vous devez accepter les CGU et les CGV pour créer un compte.")}`);
+  }
 
   const destination = destinationOnboarding({ numero: numeroEmploye, code: codeEntreprise, offre });
   const emailRedirectTo = construireUrlCallbackAuth(destination);
@@ -39,12 +50,21 @@ export async function signupAction(formData: FormData) {
   const supabase = await createClient();
 
   // Le profil public.utilisateurs est créé côté base par le trigger on_auth_user_created,
-  // qui lit nom/prenom depuis les métadonnées passées ici.
+  // qui lit nom/prenom (et l'acceptation CGU/CGV) depuis les métadonnées passées ici.
+  // L'horodatage d'acceptation est fixé par le trigger via now(), jamais par le client.
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      data: { nom, prenom, code_entreprise: codeEntreprise || null, numero_employe: numeroEmploye || null, offre: offre || null },
+      data: {
+        nom,
+        prenom,
+        code_entreprise: codeEntreprise || null,
+        numero_employe: numeroEmploye || null,
+        offre: offre || null,
+        cgu_version_acceptee: VERSION_CGU,
+        cgv_version_acceptee: VERSION_CGV,
+      },
       emailRedirectTo,
     },
   });

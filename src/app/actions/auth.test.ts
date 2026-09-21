@@ -66,6 +66,7 @@ describe("actions Auth et URL canonique", () => {
     formData.set("nom", "Recette");
     formData.set("prenom", "Elsatia");
     formData.set("code_entreprise", "entreprise");
+    formData.set("conditions_acceptees", "on");
 
     await expect(signupAction(formData)).rejects.toThrow("REDIRECT:");
 
@@ -84,6 +85,7 @@ describe("actions Auth et URL canonique", () => {
     formData.set("nom", "Recette");
     formData.set("prenom", "Elsatia");
     formData.set("offre", "mini");
+    formData.set("conditions_acceptees", "on");
 
     await expect(signupAction(formData)).rejects.toThrow("REDIRECT:");
 
@@ -102,6 +104,7 @@ describe("actions Auth et URL canonique", () => {
     formData.set("nom", "Recette");
     formData.set("prenom", "Elsatia");
     formData.set("offre", "offre-inexistante");
+    formData.set("conditions_acceptees", "on");
 
     await expect(signupAction(formData)).rejects.toThrow("REDIRECT:");
 
@@ -109,6 +112,40 @@ describe("actions Auth et URL canonique", () => {
       options: expect.objectContaining({
         data: expect.objectContaining({ offre: null }),
         emailRedirectTo: `${mocks.urlCanonique}/auth/callback?next=%2Fonboarding`,
+      }),
+    }));
+  });
+
+  it("refuse la création de compte si les CGU/CGV ne sont pas explicitement acceptées", async () => {
+    const formData = new FormData();
+    formData.set("email", "recette@example.invalid");
+    formData.set("password", "mot-de-passe-test");
+    formData.set("nom", "Recette");
+    formData.set("prenom", "Elsatia");
+    // conditions_acceptees volontairement absent.
+
+    await expect(signupAction(formData)).rejects.toThrow(
+      "REDIRECT:/signup?error=Vous%20devez%20accepter%20les%20CGU%20et%20les%20CGV%20pour%20cr%C3%A9er%20un%20compte.",
+    );
+    expect(mocks.signUp).not.toHaveBeenCalled();
+  });
+
+  it("transmet la version des CGU/CGV acceptées dans les métadonnées du compte créé", async () => {
+    const formData = new FormData();
+    formData.set("email", "recette@example.invalid");
+    formData.set("password", "mot-de-passe-test");
+    formData.set("nom", "Recette");
+    formData.set("prenom", "Elsatia");
+    formData.set("conditions_acceptees", "on");
+
+    await expect(signupAction(formData)).rejects.toThrow("REDIRECT:");
+
+    expect(mocks.signUp).toHaveBeenCalledWith(expect.objectContaining({
+      options: expect.objectContaining({
+        data: expect.objectContaining({
+          cgu_version_acceptee: "1.0",
+          cgv_version_acceptee: "1.0",
+        }),
       }),
     }));
   });

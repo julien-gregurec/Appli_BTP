@@ -91,6 +91,26 @@ export default async function SignupPage({
               className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm"
             />
           </div>
+          <div className="flex items-start gap-2">
+            <input
+              id="conditions_acceptees"
+              name="conditions_acceptees"
+              type="checkbox"
+              required
+              className="mt-0.5 h-4 w-4 rounded border-neutral-300"
+            />
+            <label htmlFor="conditions_acceptees" className="text-sm text-neutral-600">
+              J’accepte les{" "}
+              <Link href="/cgu" target="_blank" className="font-medium underline">
+                Conditions Générales d’Utilisation
+              </Link>{" "}
+              et les{" "}
+              <Link href="/cgv" target="_blank" className="font-medium underline">
+                Conditions Générales de Vente
+              </Link>
+              .
+            </label>
+          </div>
           <button
             type="submit"
             className="w-full rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white"
