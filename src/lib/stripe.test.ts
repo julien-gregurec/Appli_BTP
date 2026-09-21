@@ -8,6 +8,9 @@ describe("signature webhook Stripe",()=>{
  it("refuse un contenu modifié",()=>{vi.stubEnv("STRIPE_WEBHOOK_SECRET","whsec_test");const timestamp=Math.floor(Date.now()/1000);const signature=createHmac("sha256","whsec_test").update(`${timestamp}.original`).digest("hex");expect(verifierSignatureStripe("modifie",`t=${timestamp},v1=${signature}`)).toBe(false);});
  it("refuse une signature trop ancienne",()=>{vi.stubEnv("STRIPE_WEBHOOK_SECRET","whsec_test");const timestamp=Math.floor(Date.now()/1000)-600;const signature=createHmac("sha256","whsec_test").update(`${timestamp}.corps`).digest("hex");expect(verifierSignatureStripe("corps",`t=${timestamp},v1=${signature}`)).toBe(false);});
  it("isole le secret abonnement du secret Stripe Connect",()=>{vi.stubEnv("STRIPE_WEBHOOK_SECRET","whsec_connect");const corps='{"id":"evt_abonnement"}',timestamp=Math.floor(Date.now()/1000);const signature=createHmac("sha256","whsec_abonnement").update(`${timestamp}.${corps}`).digest("hex");expect(verifierSignatureStripe(corps,`t=${timestamp},v1=${signature}`,"whsec_abonnement")).toBe(true);expect(verifierSignatureStripe(corps,`t=${timestamp},v1=${signature}`)).toBe(false);});
+ it("refuse une signature absente",()=>{vi.stubEnv("STRIPE_WEBHOOK_SECRET","whsec_test");expect(verifierSignatureStripe('{"id":"evt_test"}',null)).toBe(false);});
+ it("refuse quand le secret n'est pas configuré",()=>{vi.stubEnv("STRIPE_WEBHOOK_SECRET","");const timestamp=Math.floor(Date.now()/1000);expect(verifierSignatureStripe('{"id":"evt_test"}',`t=${timestamp},v1=abcd`)).toBe(false);});
+ it("refuse un en-tête de signature malformé (ni t=, ni v1=)",()=>{vi.stubEnv("STRIPE_WEBHOOK_SECRET","whsec_test");expect(verifierSignatureStripe('{"id":"evt_test"}',"signature-invalide-sans-structure")).toBe(false);});
 });
 
 describe("lien de paiement client",()=>{

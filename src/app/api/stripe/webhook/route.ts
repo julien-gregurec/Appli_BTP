@@ -1,12 +1,27 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifierSignatureStripe } from "@/lib/stripe";
+import { empreinteEvenementStripe, resoudreModeStripeWebhook } from "@/lib/stripe-webhook-environment";
 
 type StripeEvent={id:string;type:string;livemode:boolean;account?:string;data:{object:{id:string;payment_status?:string;payment_intent?:string;amount_total?:number;charges_enabled?:boolean;details_submitted?:boolean;metadata?:{facture_id?:string;entreprise_id?:string}}}};
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export async function POST(request:Request){
  const brut=await request.text();if(!verifierSignatureStripe(brut,request.headers.get("stripe-signature")))return NextResponse.json({error:"Signature invalide"},{status:400});
  let evenement:StripeEvent;try{evenement=JSON.parse(brut) as StripeEvent;}catch{return NextResponse.json({error:"JSON invalide"},{status:400});}
+ // CONTRÔLE DE MODE, FAIL-CLOSED — même contrat que le webhook Boutique (P0 de son audit) : ce
+ // webhook journalisait `livemode` sans jamais le confronter à l'environnement, contrairement aux
+ // webhooks Boutique et abonnement qui l'appliquent déjà. La signature ne protège pas de cela :
+ // chaque mode a sa propre clé, mais un endpoint mal recâblé reste correctement signé. Configuration
+ // absente, vide ou invalide ⇒ on refuse, on ne devine pas.
+ const configurationMode=resoudreModeStripeWebhook();
+ if(!configurationMode.valide){
+  console.error("Webhook Stripe Connect non traité",{categorie:`configuration_${configurationMode.motif}`,type_evenement:evenement.type,empreinte_evenement:empreinteEvenementStripe(evenement.id)});
+  return NextResponse.json({error:"Webhook temporairement indisponible"},{status:503});
+ }
+ if(evenement.livemode!==configurationMode.livemode){
+  console.warn("Webhook Stripe Connect non traité",{categorie:"mode_stripe_incorrect",type_evenement:evenement.type,empreinte_evenement:empreinteEvenementStripe(evenement.id),mode_recu:evenement.livemode?"live":"test",mode_attendu:configurationMode.mode});
+  return NextResponse.json({error:"Webhook temporairement indisponible"},{status:503});
+ }
  const objet=evenement.data.object,factureId=objet.metadata?.facture_id;const admin=createAdminClient();
  const{error:dedupe}=await admin.from("stripe_webhook_events").insert({id:evenement.id,event_type:evenement.type,livemode:evenement.livemode,facture_id:factureId||null});
  if(dedupe?.code==="23505")return NextResponse.json({received:true,duplicate:true});if(dedupe)return NextResponse.json({error:"Journal indisponible"},{status:500});

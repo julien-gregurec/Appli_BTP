@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ELSATIA-SERVICE-ROLE-FLUX-ACL-V1 : après la migration 255, service_role ne lit ni n'écrit plus
 // factures/paiements. Le webhook Connect passe par des RPC de service et ne doit plus avaler une
@@ -45,9 +45,41 @@ function paiementReussi(metadata: Record<string, string>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv("STRIPE_WEBHOOK_EXPECTED_MODE", "test");
   deps.insert.mockResolvedValue({ error: null });
   deps.rpc.mockResolvedValue({ data: "encaissee", error: null });
   vi.spyOn(console, "error").mockImplementation(() => {});
+  vi.spyOn(console, "warn").mockImplementation(() => {});
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+describe("webhook Stripe Connect — contrôle de mode fail-closed", () => {
+  it("refuse un événement Live reçu dans un contexte Test, sans appeler aucune RPC", async () => {
+    vi.stubEnv("STRIPE_WEBHOOK_EXPECTED_MODE", "test");
+    const reponse = await POST(requete({ ...paiementReussi({ facture_id: FACTURE, entreprise_id: ENTREPRISE }), livemode: true }));
+    expect(reponse.status).toBe(503);
+    expect(deps.insert).not.toHaveBeenCalled();
+    expect(deps.rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuse un événement Test reçu dans un contexte Live, sans appeler aucune RPC", async () => {
+    vi.stubEnv("STRIPE_WEBHOOK_EXPECTED_MODE", "live");
+    const reponse = await POST(requete(paiementReussi({ facture_id: FACTURE, entreprise_id: ENTREPRISE })));
+    expect(reponse.status).toBe(503);
+    expect(deps.insert).not.toHaveBeenCalled();
+  });
+
+  it("refuse quand le mode attendu est absent, vide ou invalide — jamais de devinette", async () => {
+    for (const valeur of ["", "   ", "prod", "TEST_"]) {
+      vi.stubEnv("STRIPE_WEBHOOK_EXPECTED_MODE", valeur);
+      const reponse = await POST(requete(paiementReussi({ facture_id: FACTURE, entreprise_id: ENTREPRISE })));
+      expect(reponse.status).toBe(503);
+    }
+    expect(deps.rpc).not.toHaveBeenCalled();
+  });
 });
 
 describe("webhook Stripe Connect des factures clients", () => {
