@@ -447,10 +447,25 @@ concrète.
 | Montant annoncé par Stripe supérieur au reste dû (falsification ou bug amont) | Encaissement accepté mais **plafonné** au reste dû réel (`least(...)`), jamais au montant annoncé — testé (pgTAP #25-26) |
 
 Le cas « la réponse elle-même échoue après un traitement métier réussi » (bogue serverless,
-coupure réseau juste avant l'envoi de la réponse HTTP 200) reproduit exactement le scénario D3
-côté Stripe (il retentera), et le comportement de ELSATIA est identique : le retraitement sera
-avalé comme duplicate. Documenté avec le reste du résidu D3, pas testé séparément (même cause
-racine, même correctif recommandé).
+coupure réseau juste avant l'envoi de la réponse HTTP 200) **a été testé séparément, pas
+seulement assimilé au résidu D3** (§10, témoin bout-en-bout) : contrairement à la D3, ce cas est
+**sûr** — Stripe retentera côté réseau, mais comme le traitement métier avait déjà réussi avant
+la coupure, le retry est absorbé par la même dé-duplication sans jamais rappeler la RPC. C'est
+la D3 qui reste ouverte (retry **avant** succès métier), pas ce cas (retry **après** succès
+métier).
+
+**Validation monétaire (mission §12, « MONEY VALIDATION »)** — `stripe_connect_encaisser_facture_service`
+compare systématiquement `amount_total` de l'événement au reste dû réel en base (jamais au
+montant demandé par le navigateur ni aux seules métadonnées) et plafonne toujours à ce reste dû
+(§ci-dessus). **Devise** : ni le webhook Connect ni le webhook Boutique ne comparent
+`evenement.data.object.currency` à une devise attendue — mais la session Checkout elle-même est
+créée par le serveur ELSATIA avec `currency: "eur"` codé en dur
+(`src/lib/stripe.ts:32`, `src/lib/stripe-boutique.ts:35`), jamais paramétrable par le client ni
+par les métadonnées de l'événement : Stripe ne peut pas renvoyer un événement d'une devise
+différente pour une session que ELSATIA a lui-même créée en EUR. Contrôle explicite absent, mais
+**non exploitable** avec l'architecture actuelle (vérifié par lecture du code de création de
+session, pas seulement supposé) — noté en risque résiduel P3 (§ Residual Risks) pour défense en
+profondeur, pas comme un bug ouvrant une voie d'exploitation.
 
 ---
 
@@ -590,6 +605,7 @@ Rien de bloquant pour fermer le P1 localement. Pour une Preview/Production réel
 | RT-V3-P2-01, P2-02, P3-01, P3-02, P3-03 | P2/P3 | Résidus déjà documentés par le rapport rouge-équipe V3, hors périmètre Stripe Connect/Boutique | Inchangés, non retouchés par cette mission |
 | 8 flux non-Stripe cassés par la 255 | P1 fonctionnel (paie, relances, Powens, push) | Toujours cassés | Documenté depuis le 2026-09-11, hors périmètre explicite de cette mission |
 | Harnais de test local (§0.1) | N/A (limite d'outillage, pas une faille produit) | 2 migrations non rejouables (`pgsodium`), 2 gaps de fidélité mineurs, 15 fichiers pgTAP avec échecs pré-existants non liés à Stripe | Documenté, identique avant/après ce correctif |
+| RT-CLOSURE-P3-01 (nouveau, trouvé par cette mission) | P3 (défense en profondeur, non exploitable avec l'architecture actuelle) | Ni le webhook Connect ni le webhook Boutique ne valident `evenement.data.object.currency` contre une devise attendue | Non corrigé — non exploitable tant que la création de session Checkout reste codée en dur en EUR côté serveur (§12) ; ajouter le contrôle par cohérence si le catalogue devient multi-devise |
 
 ---
 
