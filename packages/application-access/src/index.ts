@@ -1,4 +1,4 @@
-export const CODES_APPLICATIONS_ELSATIA = ["gestion_pro", "colors", "tools"] as const;
+export const CODES_APPLICATIONS_ELSATIA = ["gestion_pro", "colors", "tools", "reserves"] as const;
 export type CodeApplicationElsatia = string;
 
 export const ROLES_COLORS = [
@@ -9,8 +9,18 @@ export const ROLES_COLORS = [
 ] as const;
 export type RoleColors = (typeof ROLES_COLORS)[number];
 
+export const ROLES_RESERVES = [
+  "reserves_admin_organisation",
+  "reserves_responsable",
+  "reserves_emetteur",
+  "reserves_intervenant",
+  "reserves_consultation",
+] as const;
+export type RoleReserves = (typeof ROLES_RESERVES)[number];
+
 export const ROLE_ADMIN_PLATEFORME = "administrateur_plateforme_global" as const;
 export type RoleApplicationColors = RoleColors | typeof ROLE_ADMIN_PLATEFORME;
+export type RoleApplicationReserves = RoleReserves | typeof ROLE_ADMIN_PLATEFORME;
 
 export type ContexteAccesApplication = {
   entrepriseId: string | null;
@@ -54,6 +64,10 @@ export function estCodeApplicationElsatia(
 
 export function estRoleColors(value: unknown): value is RoleColors {
   return typeof value === "string" && ROLES_COLORS.includes(value as RoleColors);
+}
+
+export function estRoleReserves(value: unknown): value is RoleReserves {
+  return typeof value === "string" && ROLES_RESERVES.includes(value as RoleReserves);
 }
 
 export function creerControleAccesApplications(

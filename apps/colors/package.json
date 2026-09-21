@@ -5,14 +5,17 @@
   "type": "module",
   "scripts": {
     "dev": "next dev -p 3010",
+    "verify:public-env": "node scripts/verify-public-env.mjs",
+    "prebuild": "npm run verify:public-env",
     "build": "next build",
     "start": "next start -p 3010",
-    "lint": "eslint src next.config.ts",
+    "lint": "eslint src scripts next.config.ts",
     "typecheck": "tsc --noEmit --incremental false",
     "test": "vitest run"
   },
   "dependencies": {
     "@elsatia/application-access": "file:../../packages/application-access",
+    "@elsatia/platform-support-comms": "file:../../packages/platform-support-comms",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.110.2",
     "next": "16.3.5",

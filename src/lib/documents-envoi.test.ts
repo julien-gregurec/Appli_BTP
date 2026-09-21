@@ -147,6 +147,7 @@ describe("envoyerDocumentCommercialParEmail", () => {
     expect(envoyerEmailBrevoMock).not.toHaveBeenCalled();
   });
 
+
   // Message reformulé par ELSATIA-GP-DOCUMENT-RESEND-OVERRIDE-V1 : depuis le
   // lot Snapshot, l'adresse utilisée est celle FIGÉE SUR LE DOCUMENT, pas celle
   // de la fiche client — « ce client n'a pas d'adresse » était devenu inexact.

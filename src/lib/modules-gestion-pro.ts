@@ -19,29 +19,11 @@ import { createClient } from "@/lib/supabase/server";
 export type StatutCatalogueModule = "actif" | "bientot" | "interne" | "non_vendable";
 export type ModeApresDesactivation = "lecture_seule" | "inaccessible" | "export_uniquement";
 
-export const MODULES_GESTION_PRO_CODES = [
-  "chantier",
-  "pointage",
-  "planning_avance",
-  "scan_ocr",
-  "notes_frais",
-  "vehicules",
-  "materiel",
-  "stock",
-  "maintenance",
-  "safety",
-  "forms",
-  "signature",
-  "connect",
-  "rentabilite_avancee",
-  "facturation_electronique",
-  "automations",
-  "ia",
-  "stockage_supplementaire",
-  "sauvegarde_renforcee",
-] as const;
-
-export type ModuleGestionProCode = (typeof MODULES_GESTION_PRO_CODES)[number];
+// La liste des codes vit dans un fichier sans dépendance serveur, pour rester
+// importable depuis un composant client (ce fichier-ci tire `supabase/server`).
+export { MODULES_GESTION_PRO_CODES } from "@/lib/modules-gestion-pro-codes";
+export type { ModuleGestionProCode } from "@/lib/modules-gestion-pro-codes";
+import type { ModuleGestionProCode } from "@/lib/modules-gestion-pro-codes";
 
 export type LigneModuleEtat = {
   moduleCode: ModuleGestionProCode;

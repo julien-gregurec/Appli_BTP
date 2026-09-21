@@ -18,7 +18,7 @@ describe("shell autonome ELSATIA Colors", () => {
       "Inventaire",
       "Ajout par photo",
       "Dépôts et emplacements",
-      "Mouvements",
+      "Activité récente",
       "Nuanciers",
       "Catalogues produits",
       "Imports",
@@ -60,11 +60,34 @@ describe("shell autonome ELSATIA Colors", () => {
 
   it("ne transmet jamais une erreur Supabase brute au login", () => {
     const actions = readFileSync(join(process.cwd(), "src/app/actions.ts"), "utf8");
-    expect(actions).toContain("Identifiants incorrects.");
-    expect(actions).toContain("Votre compte ELSATIA ne dispose pas d’un accès actif à Colors.");
+    const messages = readFileSync(join(process.cwd(), "src/lib/messages-auth.ts"), "utf8");
+    // Les libellés vivent désormais dans le jeu fermé : `/login` ne reçoit que des codes.
+    expect(messages).toContain("Identifiants incorrects.");
+    expect(messages).toContain("Votre compte ELSATIA ne dispose pas d’un accès actif à Colors.");
+    expect(actions).toContain("CODE_IDENTIFIANTS_INVALIDES");
+    expect(actions).toContain("CODE_ACCES_COLORS_ABSENT");
     expect(actions).toContain('rpc("contexte_application_courant")');
     expect(actions).toContain('rpc("a_acces_application"');
     expect(actions).not.toMatch(/error\.message/);
+  });
+
+  it("valide toute redirection interne par le seul helper central", () => {
+    const centralise = ["src/app/actions.ts", "src/app/login/page.tsx", "src/app/auth/callback/route.ts"];
+    for (const fichier of centralise) {
+      const source = readFileSync(join(process.cwd(), fichier), "utf8");
+      expect(source).toContain("cheminInterneSur");
+      // Aucun validateur local concurrent ne doit subsister.
+      expect(source).not.toMatch(/startsWith\("\/"\)/);
+      expect(source).not.toMatch(/startsWith\("\/\/"\)/);
+    }
+  });
+
+  it("n’affiche sur /login que des libellés issus du jeu fermé", () => {
+    const login = readFileSync(join(process.cwd(), "src/app/login/page.tsx"), "utf8");
+    expect(login).toContain("messageErreurConnexion(params.error)");
+    expect(login).toContain("messageConfirmationConnexion(params.message)");
+    expect(login).not.toMatch(/params\.error === "string"/);
+    expect(login).not.toMatch(/params\.message === "string"/);
   });
 
   it("résout et affiche un rôle Colors canonique", () => {
@@ -83,6 +106,59 @@ describe("shell autonome ELSATIA Colors", () => {
     expect(menu).toContain('event.key === "Escape"');
     expect(menu).toContain("declencheur.current?.focus()");
     expect(menu).toContain('aria-label="Applications accessibles"');
+  });
+
+  it("piège le focus dans le tiroir mobile et le rend au déclencheur", () => {
+    const navigation = readFileSync(join(process.cwd(), "src/components/Navigation.tsx"), "utf8");
+    expect(navigation).toContain('event.key === "Escape"');
+    expect(navigation).toContain('event.key !== "Tab"');
+    expect(navigation).toContain("declencheur.current?.focus()");
+    expect(navigation).toContain('role="dialog"');
+    expect(navigation).toContain('aria-modal="true"');
+    expect(navigation).toContain("{ouvert && <aside");
+  });
+
+  it("rend la fermeture du seau et le motif d’ajustement explicites", () => {
+    const fiche = readFileSync(join(process.cwd(), "src/app/(colors)/inventaire/[id]/page.tsx"), "utf8");
+    expect(fiche).toContain('value="ferme"');
+    expect(fiche).toContain("Marquer fermé");
+    expect(fiche).toContain('<input name="motif" required/>');
+  });
+
+  it("affiche et suit explicitement la dette de nettoyage photo", () => {
+    const route = readFileSync(join(process.cwd(), "src/app/api/photos/route.ts"), "utf8");
+    const composant = readFileSync(join(process.cwd(), "src/components/PhotoUploader.tsx"), "utf8");
+    expect(route).toContain('rpc("colors_signaler_nettoyage_photo"');
+    expect(route).toContain('rpc("colors_resoudre_nettoyage_photo"');
+    expect(route).toContain("validerSignaturePhotoColors");
+    expect(route).toContain("createAdminStorageClient");
+    expect(composant).toContain("resultat.nettoyageRequis");
+  });
+
+  it("consulte une surface persistante et cloisonnée pour la dette de nettoyage (V1.3)", () => {
+    const metier = readFileSync(join(process.cwd(), "src/lib/metier-colors.ts"), "utf8");
+    const fiche = readFileSync(join(process.cwd(), "src/app/(colors)/inventaire/[id]/page.tsx"), "utf8");
+    // lecture via la RPC SECURITY DEFINER dédiée, jamais la table directement
+    expect(metier).toContain('rpc("colors_nettoyages_photos_seau"');
+    expect(metier).not.toMatch(/\.from\(\s*["'`]colors_nettoyages_photos["'`]\s*\)/);
+    expect(metier).toContain("obtenirNettoyagesPhotoSeau");
+    // la fiche affiche l'état persistant au chargement (pas seulement la réponse d'upload)
+    expect(fiche).toContain("nettoyageRequis");
+    expect(fiche).toContain("cleanup-notice");
+    expect(fiche).toContain("Nettoyage photo en attente");
+  });
+
+  it("ferme explicitement le DML direct anon/service_role sur les tables colors_* (migration V1.3)", () => {
+    const migration = readFileSync(
+      join(process.cwd(), "..", "..", "supabase", "migrations", "20260828000249_colors_security_cleanup_v13.sql"),
+      "utf8",
+    );
+    expect(migration).toMatch(/revoke\s+insert,\s*update,\s*delete,\s*truncate[\s\S]*from\s+public,\s*anon,\s*service_role/i);
+    expect(migration).toContain("create or replace function public.colors_nettoyages_photos_seau");
+    expect(migration).toContain("security definer");
+    expect(migration).toContain("set search_path = public");
+    expect(migration).toContain("grant execute on function public.colors_nettoyages_photos_seau(uuid) to authenticated");
+    expect(migration).not.toMatch(/grant\s+(insert|update|delete)[\s\S]*to\s+(anon|service_role)/i);
   });
 
   it("ne dépend d’aucune permission ni route du stock Gestion Pro", () => {

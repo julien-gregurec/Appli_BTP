@@ -11,8 +11,9 @@ import { consommationIAMensuelle } from "@/lib/ai/journal";
 import { iaEstActive } from "@/lib/preview-features";
 import { BRAND_NAME, PRODUCT_NAME, resoudreUrlContactCommercial } from "@/lib/brand";
 import { calculerGainsOffreSuivante, calculerReductionRemise, CATEGORIES_COMPARATIF, etatLigneComparatif, LIBELLE_ETAT_COMMERCIAL, type EtatCommercial } from "@/lib/comparatif-offres";
-import { estCodeOffreTarifaire } from "@/lib/tarification";
+import { estCodeOffreTarifaire, tarifCompteSupplementaireHistoriqueCentimes } from "@/lib/tarification";
 import { abonnementsPublicsOuverts } from "@/lib/commercialisation-abonnements";
+import { messageDepassementCapacite, messageLimiteAtteinte, type ContexteQuotaPersonnes } from "@/lib/quota-personnes-message";
 import { OFFRES_ABONNEMENT_COMMERCIALISEES } from "@/lib/stripe-abonnement";
 import { RACCOURCIS_CAPACITE, resoudreCibleCapacite, resumeChangementCapacite } from "@/lib/stripe-capacite-personnes";
 import { BoutonEnvoi } from "@/components/BoutonEnvoi";
@@ -133,6 +134,14 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
   const capaciteOffreEligible = (OFFRES_ABONNEMENT_COMMERCIALISEES as readonly string[]).includes(String(entreprise?.abonnement_offre ?? ""));
   const capaciteMensuel = entreprise?.abonnement_periodicite === "mensuel";
   const capaciteGerable = Boolean(cap) && souscrit && capaciteOffreEligible && capaciteMensuel;
+  // Contexte des messages de quota : n'expose que des actions réellement
+  // possibles (ELSATIA-GP-TRIAL-SOCLE-ACCESS-AND-CAPACITY-FIX-V1 §7).
+  const contexteQuota: ContexteQuotaPersonnes = {
+    abonnementOffre: entreprise?.abonnement_offre ?? null,
+    abonnementsOuverts,
+    capaciteAutogerable: souscrit && capaciteOffreEligible && capaciteMensuel,
+    urlContact: contactCommercial,
+  };
   const operationCapaciteEnCours = String(capStripe?.operation_en_cours ?? "");
   const capaciteFigee = ["pending", "stripe_applied", "db_applied", "needs_reconcile"].includes(operationCapaciteEnCours);
   const LIBELLE_OPERATION_CAPACITE: Record<string, { texte: string; classe: string }> = {
@@ -161,7 +170,7 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
     : null;
 
   return <main className="p-4 sm:p-8"><div className="mx-auto max-w-5xl space-y-6">
-    <header><h1 className="text-xl font-semibold">Mon abonnement {PRODUCT_NAME}</h1><p className="text-sm text-neutral-500">Offre, moyen de paiement, échéances et factures de votre entreprise.</p></header>
+    <header className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-xl font-semibold">Mon abonnement {PRODUCT_NAME}</h1><p className="text-sm text-neutral-500">Offre, moyen de paiement, échéances et factures de votre entreprise.</p></div><Link href="/abonnement/configurateur" className="rounded-md border px-3 py-2 text-sm font-medium">Configurer mon abonnement</Link></header>
     {ctx.essaiExpireSansOffre&&<div className="rounded-md border border-red-300 bg-red-50 p-4 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/30 dark:text-red-200">
       <p className="font-semibold">Votre essai gratuit de 30 jours est terminé.</p>
       <p className="mt-1">Les fonctionnalités métier de {PRODUCT_NAME} sont bloquées tant qu’aucune offre n’est choisie. Vos données sont conservées intégralement et seront immédiatement disponibles après souscription.</p>
@@ -194,19 +203,20 @@ export default async function AbonnementPage({ searchParams }: { searchParams: P
         <strong className={cap.etat==="ok" ? "text-lg" : "text-lg text-red-700"}>{cap.actives} / {cap.totale}</strong>
       </div>
       {cap.sup>0&&<p className="mt-2 text-xs text-neutral-500">{cap.base} incluses dans l’offre + {cap.sup} de capacité supplémentaire.</p>}
-      {cap.etat==="limite_atteinte"&&<p className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-900">Vous avez atteint la limite de personnes actives de votre abonnement. Pour en enregistrer une de plus : archivez une personne, ajoutez de la capacité ou changez d’offre. Aucune donnée n’est supprimée.</p>}
-      {cap.etat==="over_capacity"&&<p className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-800">Votre abonnement autorise {cap.totale} personnes actives et vous en avez actuellement {cap.actives}. Aucune nouvelle personne ne peut être activée tant que ce dépassement dure : archivez {Math.max(1,cap.actives-cap.totale)} personne(s), ajoutez de la capacité ou changez d’offre. Aucune donnée n’est supprimée.</p>}
+      {cap.etat==="limite_atteinte"&&<p className="mt-3 rounded-md bg-amber-50 p-3 text-sm text-amber-900">{messageLimiteAtteinte(contexteQuota)}</p>}
+      {cap.etat==="over_capacity"&&<p className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-800">{messageDepassementCapacite(contexteQuota,{actives:cap.actives,totale:cap.totale})}</p>}
 
       {capaciteGerable && <div className="mt-4 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h3 className="text-sm font-semibold">Capacité supplémentaire</h3>
-            <p className="mt-1 text-xs text-neutral-500">Personnes actives au-delà des {cap.base} incluses. {euros(offre.parCompteSup)} HT/mois par personne, facturé sur votre abonnement. Hausse : effet immédiat, facture proratisée. Baisse : effet à la fin de la période, sans suppression de personne.</p>
+            <p className="mt-1 text-xs text-neutral-500">Personnes actives au-delà des {cap.base} incluses. {euros(tarifCompteSupplementaireHistoriqueCentimes(entreprise?.abonnement_offre) / 100)} HT/mois par personne, facturé sur votre abonnement. Hausse : effet immédiat, facture proratisée. Baisse : effet à la fin de la période, sans suppression de personne.</p>
+            <p className="mt-1 text-xs text-neutral-500">Ce tarif est celui de votre contrat, à la génération tarifaire sous laquelle il a été souscrit. Il ne change pas : une nouvelle grille ne s’applique jamais rétroactivement à un abonnement en cours.</p>
           </div>
           {capaciteFigee && <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${LIBELLE_OPERATION_CAPACITE[operationCapaciteEnCours]?.classe ?? ""}`}>{LIBELLE_OPERATION_CAPACITE[operationCapaciteEnCours]?.texte ?? "Mise à jour en cours"}</span>}
         </div>
 
-        <p className="mt-3 text-sm">Aujourd’hui : <strong>{cap.sup}</strong> personne(s) supplémentaire(s) — {euros(cap.sup * offre.parCompteSup)} HT/mois.</p>
+        <p className="mt-3 text-sm">Aujourd’hui : <strong>{cap.sup}</strong> personne(s) supplémentaire(s) — {euros(cap.sup * tarifCompteSupplementaireHistoriqueCentimes(entreprise?.abonnement_offre) / 100)} HT/mois.</p>
 
         {baissePlanifiee && <div className="mt-2 rounded-md bg-neutral-100 p-3 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
           <p>Modification planifiée : passage à {baissePlanifiee.cible} personne(s) supplémentaire(s) le {new Date(baissePlanifiee.effetAt).toLocaleDateString("fr-FR")}. Aucune personne ne sera supprimée.</p>

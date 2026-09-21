@@ -67,6 +67,12 @@ select ok(
 -- SECURITY DEFINER + exécutable par anon (20260812000200_documents_commerciaux_p9.sql)
 -- pour les liens de partage public de devis/factures -- exclue explicitement plutôt que
 -- de relâcher l'assertion pour toute future fonction anon involontaire.
+--
+-- ELSATIA-RESERVES-V3 (20260907000270) ajoute la seconde et dernière exception :
+-- reserves_invitation_consulter(text) résout un lien d'invitation pour un destinataire
+-- qui n'a par définition pas encore de compte. Elle ne rend que ce qu'un jeton valide,
+-- non expiré et non révoqué justifie déjà — nom de l'organisation hôte, nom du chantier,
+-- nom de l'intervention — et aucune ligne pour un jeton inconnu.
 select is(
   (
     select count(*)::integer
@@ -76,7 +82,7 @@ select is(
       and p.prosecdef
       and has_function_privilege('anon', p.oid, 'EXECUTE')
       and p.prorettype <> 'trigger'::regtype
-      and p.proname <> 'document_commercial_par_token'
+      and p.proname not in ('document_commercial_par_token', 'reserves_invitation_consulter')
   ),
   0,
   'Aucune fonction SECURITY DEFINER métier n’est exécutable par anon (hors partage public documenté)'

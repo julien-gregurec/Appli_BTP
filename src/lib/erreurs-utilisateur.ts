@@ -24,9 +24,17 @@ type CategorieErreur =
  */
 export const CODE_ERREUR_CAPACITE_PERSONNES = "CAPACITE_PERSONNES_ATTEINTE";
 
+// Repli générique : ce module est pur (aucun accès base/env), il ne peut pas
+// savoir si « ajouter de la capacité » ou « changer d'offre » sont réellement
+// ouverts (ABONNEMENTS_PUBLICS_OUVERTS, abonnement Stripe existant). Il ne
+// propose donc QUE des actions toujours possibles — ELSATIA-GP-TRIAL-SOCLE-
+// ACCESS-AND-CAPACITY-FIX-V1 §7. Les appelants qui disposent du contexte
+// utilisent `messageLimiteAtteinte` (src/lib/quota-personnes-message.ts), plus
+// précis.
 const MESSAGE_CAPACITE_PERSONNES =
   "Votre abonnement autorise un nombre limité de personnes actives et cette limite est atteinte. " +
-  "Archivez une personne, ajoutez de la capacité ou changez d’offre.";
+  "Archivez une personne (un salarié sorti ou un compte fermé libère une place) ou contactez le " +
+  "support pour augmenter la capacité.";
 
 const MESSAGES_PAR_CATEGORIE: Record<CategorieErreur, string> = {
   doublon: "Cet élément existe déjà.",

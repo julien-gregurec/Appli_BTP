@@ -5,8 +5,11 @@ import { changerStatutDevisAction } from "@/app/actions/devis";
 import { changerStatutFactureAction } from "@/app/actions/factures";
 import { changerStatutCommandeAction } from "@/app/actions/commandes";
 import { construireLienMailto } from "@/lib/email";
+import { adresseRemisePlausible, mentionEcartAdresse } from "@/lib/document-resend-override";
 
 type ResultatEnvoi = { error: string } | { ok: true };
+
+type SurchargeDestinataire = { email?: string | null; motif?: string | null };
 
 type Props = {
   type: "devis" | "facture" | "commande";
@@ -17,8 +20,13 @@ type Props = {
   corps: string;
   pdfUrl: string;
   envoiAutomatiqueDisponible?: boolean;
-  envoyerAutomatiquementAction?: (id: string) => Promise<ResultatEnvoi>;
+  envoyerAutomatiquementAction?: (id: string, surcharge?: SurchargeDestinataire | null) => Promise<ResultatEnvoi>;
   emailEnvoyeLe?: string | null;
+  // Adresse figée sur le document émis. Reste la destination par défaut et
+  // reste visible même lorsqu'une autre adresse est choisie.
+  adresseFigee?: string | null;
+  // L'utilisateur a-t-il le droit de choisir une autre adresse (gerer_clients).
+  peutSurchargerDestinataire?: boolean;
 };
 
 export function EmailDocumentButton({
@@ -32,6 +40,8 @@ export function EmailDocumentButton({
   envoiAutomatiqueDisponible = false,
   envoyerAutomatiquementAction,
   emailEnvoyeLe,
+  adresseFigee = null,
+  peutSurchargerDestinataire = false,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [modeManuel, setModeManuel] = useState(!envoiAutomatiqueDisponible);
@@ -43,6 +53,26 @@ export function EmailDocumentButton({
   const [envoye, setEnvoye] = useState(false);
   const [pending, startTransition] = useTransition();
   const router = useRouter();
+  // Surcharge d'adresse : repliée par défaut. L'envoi part vers l'adresse du
+  // document tant que l'utilisateur ne l'ouvre pas explicitement.
+  const [surchargeOuverte, setSurchargeOuverte] = useState(false);
+  const [adresseSurchargee, setAdresseSurchargee] = useState("");
+  const [motifSurcharge, setMotifSurcharge] = useState("");
+
+  const adresseDocument = adresseFigee ?? initialTo;
+  const surchargeSaisie = adresseSurchargee.trim();
+  const surchargeActive = surchargeOuverte && surchargeSaisie.length > 0;
+  const surchargeDiverge =
+    surchargeActive && surchargeSaisie.toLowerCase() !== (adresseDocument ?? "").trim().toLowerCase();
+  const surchargeInvalide = surchargeActive && !adresseRemisePlausible(surchargeSaisie);
+  const destinataireEffectif = surchargeActive ? surchargeSaisie : adresseDocument;
+
+  const annulerSurcharge = () => {
+    setSurchargeOuverte(false);
+    setAdresseSurchargee("");
+    setMotifSurcharge("");
+    setErreur(null);
+  };
 
   const article = type === "commande" ? "de la commande" : type === "devis" ? "du devis" : "de la facture";
 
@@ -55,7 +85,10 @@ export function EmailDocumentButton({
   const envoyerAutomatiquement = () =>
     startTransition(async () => {
       setErreur(null);
-      const resultat = await envoyerAutomatiquementAction!(id);
+      const resultat = await envoyerAutomatiquementAction!(
+        id,
+        surchargeActive ? { email: surchargeSaisie, motif: motifSurcharge.trim() || null } : null,
+      );
       if ("error" in resultat) {
         setErreur(resultat.error);
         return;
@@ -112,7 +145,7 @@ export function EmailDocumentButton({
                 {!modeManuel && (
                   <p className="text-sm text-neutral-500">
                     Un e-mail avec le PDF en pièce jointe et un lien de consultation sécurisé sera envoyé à{" "}
-                    <strong>{to}</strong>.
+                    <strong>{destinataireEffectif}</strong>.
                   </p>
                 )}
               </div>
@@ -123,11 +156,72 @@ export function EmailDocumentButton({
 
             {envoye ? (
               <div className="mt-4 rounded-md bg-green-50 px-3 py-3 text-sm text-green-700 dark:bg-green-950/30 dark:text-green-400">
-                Envoyé avec succès à {to}.
+                Envoyé avec succès à {destinataireEffectif}.
               </div>
             ) : !modeManuel ? (
               <div className="mt-4 space-y-3">
                 {erreur && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-400">{erreur}</p>}
+
+                {/* L'adresse figée sur le document reste toujours visible, y compris
+                    quand une autre adresse est choisie pour cet envoi. */}
+                <div className="rounded-md border border-neutral-200 px-3 py-2 text-xs dark:border-neutral-800">
+                  <div className="text-neutral-500">
+                    Adresse du document : <strong className="font-mono">{adresseDocument || "aucune"}</strong>
+                  </div>
+                  {!surchargeOuverte && peutSurchargerDestinataire && (
+                    <button
+                      type="button"
+                      onClick={() => setSurchargeOuverte(true)}
+                      className="mt-1 text-neutral-500 underline hover:text-neutral-800 dark:hover:text-neutral-200"
+                    >
+                      Envoyer à une autre adresse
+                    </button>
+                  )}
+                  {!peutSurchargerDestinataire && (
+                    <div className="mt-1 text-neutral-400">
+                      Votre poste ne permet pas d’envoyer à une autre adresse.
+                    </div>
+                  )}
+                  {surchargeOuverte && (
+                    <div className="mt-2 grid gap-2">
+                      <label className="text-neutral-500">
+                        Envoyer plutôt à
+                        <input
+                          type="email"
+                          value={adresseSurchargee}
+                          onChange={(e) => setAdresseSurchargee(e.target.value)}
+                          placeholder="nouvelle.adresse@…"
+                          className="mt-1 w-full rounded-md border px-3 py-2 text-sm dark:bg-neutral-900"
+                        />
+                      </label>
+                      <label className="text-neutral-500">
+                        Motif (facultatif, conservé dans le journal)
+                        <input
+                          value={motifSurcharge}
+                          onChange={(e) => setMotifSurcharge(e.target.value)}
+                          placeholder="Le contact a changé"
+                          className="mt-1 w-full rounded-md border px-3 py-2 text-sm dark:bg-neutral-900"
+                        />
+                      </label>
+                      {surchargeInvalide && (
+                        <p className="text-red-700 dark:text-red-400">Cette adresse e-mail n’est pas exploitable.</p>
+                      )}
+                      {surchargeDiverge && !surchargeInvalide && (
+                        <p className="rounded-md bg-amber-50 px-3 py-2 text-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+                          {mentionEcartAdresse(adresseDocument)}
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        onClick={annulerSurcharge}
+                        className="justify-self-start text-neutral-500 underline hover:text-neutral-800 dark:hover:text-neutral-200"
+                      >
+                        Revenir à l’adresse du document
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex items-center justify-between border-t pt-4 dark:border-neutral-800">
                   <button type="button" onClick={() => setModeManuel(true)} className="text-sm text-neutral-500 hover:underline">
                     Préparer un e-mail manuellement à la place
@@ -138,7 +232,7 @@ export function EmailDocumentButton({
                     </button>
                     <button
                       type="button"
-                      disabled={pending}
+                      disabled={pending || surchargeInvalide}
                       onClick={envoyerAutomatiquement}
                       className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                     >

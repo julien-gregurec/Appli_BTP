@@ -58,7 +58,7 @@ describe("connexion Colors", () => {
     mocks.createClient.mockResolvedValue(supabase);
 
     await expect(connexionAction(formulaire())).rejects.toMatchObject({
-      destination: "/login?error=Identifiants%20incorrects.",
+      destination: "/login?error=identifiants",
     });
     expect(supabase.rpc).not.toHaveBeenCalled();
   });
@@ -80,16 +80,25 @@ describe("connexion Colors", () => {
     mocks.createClient.mockResolvedValue(supabase);
 
     await expect(connexionAction(formulaire())).rejects.toMatchObject({
-      destination: "/login?error=Votre%20compte%20ELSATIA%20ne%20dispose%20pas%20d%E2%80%99un%20acc%C3%A8s%20actif%20%C3%A0%20Colors.",
+      destination: "/login?error=acces-colors",
     });
     expect(supabase.auth.signOut).toHaveBeenCalledOnce();
   });
 
-  it("neutralise une destination externe", async () => {
+  it.each([
+    ["chemin relatif au protocole", "//evil.example.com"],
+    ["barre oblique inverse littérale", "/\\evil.example.com"],
+    ["barre oblique inverse encodée", "/%5Cevil.example.com"],
+    ["tabulation encodée", "/%09/evil.example.com"],
+    ["schéma absolu", "https://evil.example.com"],
+    ["schéma javascript", "javascript:alert(1)"],
+    ["valeur malformée", "/%"],
+    ["valeur vide", ""],
+  ])("neutralise une destination externe (%s)", async (_cas, suivant) => {
     const supabase = client();
     mocks.createClient.mockResolvedValue(supabase);
 
-    await expect(connexionAction(formulaire("personne@example.test", "secret", "//evil.example")))
+    await expect(connexionAction(formulaire("personne@example.test", "secret", suivant)))
       .rejects.toMatchObject({ destination: "/dashboard" });
   });
 });

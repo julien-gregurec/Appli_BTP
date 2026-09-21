@@ -14,6 +14,7 @@ const deps = vi.hoisted(() => ({
   libererVerrouRemise: vi.fn(),
   lireOperationActiveRemiseServeur: vi.fn(async () => null),
   reconcilierOperationRemiseSousVerrou: vi.fn(),
+  notifierPaiementAbonnementEchoue: vi.fn(async () => ({ envoye: true as const })),
   observerRemiseDepuisAbonnement: vi.fn((abonnement: { discounts?: unknown[] }) => {
     if (!Array.isArray(abonnement.discounts)) throw new Error("observation incomplète");
     if (abonnement.discounts.length === 0) return { status: "absent", count: 0, discount_id: null, source_type: null, source_id: null, coupon_id: null };
@@ -25,6 +26,7 @@ const deps = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: deps.createAdminClient }));
+vi.mock("@/lib/abonnement-notifications", () => ({ notifierPaiementAbonnementEchoue: deps.notifierPaiementAbonnementEchoue }));
 vi.mock("@/lib/stripe-abonnement", () => ({
   recupererAbonnementStripe: deps.recupererAbonnementStripe,
   statutAbonnementDepuisStripe: deps.statutAbonnementDepuisStripe,
@@ -47,14 +49,18 @@ vi.mock("@/lib/stripe-discount-server", () => ({
   synchroniserExpirationRemiseSousVerrou: deps.synchroniserExpirationRemiseSousVerrou,
 }));
 
-const { POST, synchroniserAbonnementCoordonne } = await import("./route");
+const { POST } = await import("./route");
+// La logique métier ne peut plus être exportée depuis `route.ts` (Next.js n'y
+// autorise que les gestionnaires HTTP) : elle vit dans son module dédié, où
+// elle reste directement testable.
+const { synchroniserAbonnementCoordonne } = await import("@/lib/stripe-abonnement-synchronisation");
 const { passerelleStripeRemise } = await import("@/lib/stripe-discount-gateway");
 const SECRET = "whsec_test_uniquement";
 const ENTREPRISE = "11111111-1111-4111-8111-111111111111";
 
 type AdminFakeOptions = {
   duplicate?: boolean;
-  entreprise?: { id: string; stripe_customer_id: string | null; stripe_subscription_id: string | null } | null;
+  entreprise?: { id: string; nom?: string; abonnement_offre?: string | null; abonnement_periodicite?: string | null; stripe_customer_id: string | null; stripe_subscription_id: string | null } | null;
   erreurLecture?: { code: string; message?: string } | null;
   erreurReservation?: { code: string; message?: string } | null;
 };
@@ -62,7 +68,7 @@ type AdminFakeOptions = {
 function adminFake(options: AdminFakeOptions = {}) {
   const appels: Array<{ table: string; methode: string; donnees?: unknown }> = [];
   const entreprise = options.entreprise === undefined
-    ? { id: ENTREPRISE, stripe_customer_id: "cus_test", stripe_subscription_id: "sub_test" }
+    ? { id: ENTREPRISE, nom: "SARL Test", abonnement_offre: "pro", abonnement_periodicite: "mensuel", stripe_customer_id: "cus_test", stripe_subscription_id: "sub_test" }
     : options.entreprise;
   const admin = {
     appels,
@@ -284,5 +290,137 @@ describe("coordination webhook et saga", () => {
     // réservation annulée pour permettre un rejeu propre
     expect(admin.appels.some((a) => a.table === "annuler_evenement_abonnement_service")).toBe(true);
     deps.acquerirVerrouRemise.mockImplementation(async () => "verrou-test");
+  });
+});
+
+// ── P1 — notification client d'un paiement d'abonnement échoué ───────────────
+function evenementFacture(type: string, objet: Record<string, unknown> = {}) {
+  return {
+    id: `evt_${type.replace(/\./g, "_")}`,
+    type,
+    livemode: false,
+    created: 1_757_060_000,
+    data: {
+      object: {
+        id: "in_test",
+        object: "invoice",
+        customer: "cus_test",
+        subscription: "sub_test",
+        status: type === "invoice.paid" ? "paid" : "open",
+        number: "ELS-0042",
+        customer_email: "gerant@exemple.test",
+        currency: "eur",
+        total: 11_880,
+        hosted_invoice_url: "https://invoice.stripe.com/i/acct_x/test_y",
+        metadata: { entreprise_id: ENTREPRISE },
+        ...objet,
+      },
+    },
+  };
+}
+
+describe("email de paiement échoué", () => {
+  it("notifie le client sur invoice.payment_failed avec le contexte facturation", async () => {
+    const response = await POST(request(evenementFacture("invoice.payment_failed")));
+    expect(response.status).toBe(200);
+    expect(deps.notifierPaiementAbonnementEchoue).toHaveBeenCalledTimes(1);
+    expect(deps.notifierPaiementAbonnementEchoue).toHaveBeenCalledWith(expect.objectContaining({
+      destinataire: "gerant@exemple.test",
+      entrepriseNom: "SARL Test",
+      offre: "pro",
+      periodicite: "mensuel",
+      montantTtc: 118.8,
+      devise: "eur",
+      numeroFacture: "ELS-0042",
+      lienFacture: "https://invoice.stripe.com/i/acct_x/test_y",
+    }));
+  });
+
+  it.each(["invoice.paid", "invoice.payment_action_required"])("ne notifie pas sur %s", async (type) => {
+    const response = await POST(request(evenementFacture(type)));
+    expect(response.status).toBe(200);
+    expect(deps.notifierPaiementAbonnementEchoue).not.toHaveBeenCalled();
+  });
+
+  it("ne notifie pas deux fois un évènement déjà traité (idempotence)", async () => {
+    deps.createAdminClient.mockReturnValue(adminFake({ duplicate: true }));
+    const response = await POST(request(evenementFacture("invoice.payment_failed")));
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ duplicate: true });
+    expect(deps.notifierPaiementAbonnementEchoue).not.toHaveBeenCalled();
+  });
+
+  it("répond 200 même si la notification échoue (jamais de rejeu Stripe pour un email)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    deps.notifierPaiementAbonnementEchoue.mockRejectedValueOnce(new Error("Brevo indisponible"));
+    const response = await POST(request(evenementFacture("invoice.payment_failed")));
+    expect(response.status).toBe(200);
+  });
+});
+
+// ── P0 — extraction de la logique métier hors de `route.ts` (build Next.js 16) ─
+// Next.js refuse tout export de `route.ts` autre qu'un gestionnaire HTTP ou une
+// clé de configuration de segment. Ces tests verrouillent le résultat de
+// l'extraction : surface d'export de la route, testabilité du module métier et
+// comportement Stripe inchangé.
+describe("surface d'export de la route et module métier", () => {
+  it("la route n'expose que le gestionnaire POST", async () => {
+    const routeModule = await import("./route");
+    expect(Object.keys(routeModule)).toEqual(["POST"]);
+  });
+
+  it("`synchroniserAbonnementCoordonne` reste appelable depuis son module métier", async () => {
+    const metier = await import("@/lib/stripe-abonnement-synchronisation");
+    expect(typeof metier.synchroniserAbonnementCoordonne).toBe("function");
+    const admin = adminFake();
+    await expect(
+      metier.synchroniserAbonnementCoordonne(admin as never, ENTREPRISE, "sub_test", "evt_module"),
+    ).resolves.toBe("actif");
+  });
+
+  it("un événement d'abonnement valide déclenche une seule coordination métier", async () => {
+    const admin = adminFake();
+    deps.createAdminClient.mockReturnValue(admin);
+    const response = await POST(request(event({ livemode: false, type: "customer.subscription.updated" })));
+    expect(response.status).toBe(200);
+    expect(deps.acquerirVerrouRemise).toHaveBeenCalledTimes(1);
+    expect(deps.libererVerrouRemise).toHaveBeenCalledTimes(1);
+    expect(admin.appels.filter((a) => a.table === "synchroniser_abonnement_stripe_service")).toHaveLength(1);
+  });
+
+  it("un type d'événement inconnu est journalisé sans erreur ni coordination", async () => {
+    const admin = adminFake();
+    deps.createAdminClient.mockReturnValue(admin);
+    const response = await POST(request(event({ livemode: false, type: "customer.discount.deleted" })));
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ received: true });
+    expect(deps.acquerirVerrouRemise).not.toHaveBeenCalled();
+    expect(admin.appels.some((a) => a.table === "finaliser_evenement_abonnement_service")).toBe(true);
+  });
+
+  it("une erreur métier renvoie 500 sans détail interne et rejoue l'événement", async () => {
+    const journal = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const admin = adminFake();
+    deps.createAdminClient.mockReturnValue(admin);
+    deps.recupererAbonnementStripe.mockRejectedValueOnce(new Error("secret interne Stripe"));
+    const response = await POST(request(event({ livemode: false, type: "customer.subscription.updated" })));
+    expect(response.status).toBe(500);
+    const corps = await response.text();
+    expect(corps).toContain("Synchronisation impossible");
+    expect(corps).not.toContain("secret interne Stripe");
+    expect(JSON.stringify(journal.mock.calls)).not.toContain("secret interne Stripe");
+    // réservation annulée : Stripe pourra re-livrer l'événement
+    expect(admin.appels.some((a) => a.table === "annuler_evenement_abonnement_service")).toBe(true);
+    // le verrou remise est relâché même en cas d'échec
+    expect(deps.libererVerrouRemise).toHaveBeenCalledWith(admin, "sub_test", "verrou-test");
+  });
+
+  it("le module métier ne contient ni secret Stripe, ni Price ID, ni montant tarifaire", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync("src/lib/stripe-abonnement-synchronisation.ts", "utf8");
+    expect(source).not.toMatch(/sk_(test|live)_/);
+    expect(source).not.toMatch(/whsec_/);
+    expect(source).not.toMatch(/\bprice_[A-Za-z0-9]/);
+    expect(source).not.toMatch(/unit_amount|montant_ht|montant_ttc/);
   });
 });

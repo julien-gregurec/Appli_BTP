@@ -9,7 +9,11 @@ export const CAPABILITIES = [
   "print-plan", "native-share", "project-duplicate", "project-archive",
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
-export const ENTITLEMENT_SOURCES = ["free-default", "web", "apple", "google", "elsatia", "internal"] as const;
+// `plateforme` n'est pas une source d'achat : elle identifie le niveau Pro résolu par le
+// serveur pour le propriétaire global ELSATIA (et les administrateurs plateforme « total »).
+// Elle n'est jamais écrite dans `entitlements_utilisateurs_elsatia` et ne peut pas être
+// produite côté client : seule `tools_resoudre_entitlements()` peut la renvoyer.
+export const ENTITLEMENT_SOURCES = ["free-default", "web", "apple", "google", "elsatia", "internal", "plateforme"] as const;
 export type EntitlementSource = (typeof ENTITLEMENT_SOURCES)[number];
 export type AccessGrant = { tier: AccessTier; source: EntitlementSource; expiresAt?: string };
 export type AccessContext = { tier: AccessTier; capabilities: ReadonlySet<Capability>; source: EntitlementSource };

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
+import { lireIdentiteLegale } from "@/lib/client-identite-legale";
 
 function champ(formData: FormData, nom: string): string | null {
   const v = String(formData.get(nom) ?? "").trim();
@@ -15,10 +16,16 @@ export async function creerClientAction(formData: FormData) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
 
+  const legal = lireIdentiteLegale(formData);
+  if (!legal.ok) {
+    redirect(`/clients/nouveau?error=${encodeURIComponent(legal.erreur)}`);
+  }
+
   const { data, error } = await supabase
     .from("clients")
     .insert({
       entreprise_id: ctx.entrepriseId,
+      ...legal.valeurs,
       type: champ(formData, "type") ?? "particulier",
       nom: champ(formData, "nom"),
       prenom: champ(formData, "prenom"),
@@ -99,9 +106,15 @@ export async function modifierClientAction(clientId: string, formData: FormData)
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
 
+  const legal = lireIdentiteLegale(formData);
+  if (!legal.ok) {
+    redirect(`/clients/${clientId}/modifier?error=${encodeURIComponent(legal.erreur)}`);
+  }
+
   const { error } = await supabase
     .from("clients")
     .update({
+      ...legal.valeurs,
       type: champ(formData, "type") ?? "particulier",
       nom: champ(formData, "nom"),
       prenom: champ(formData, "prenom"),

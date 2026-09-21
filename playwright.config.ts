@@ -13,6 +13,12 @@ export default defineConfig({
   outputDir: "test-results/e2e",
   use: {
     baseURL,
+    // Sans plafond explicite, une action visant un élément ABSENT attend indéfiniment et
+    // consomme tout le budget du test : l'échec se présente alors comme un dépassement de
+    // délai global, à des dizaines de lignes de la vraie cause. Ce plafond fait échouer
+    // l'action là où elle est écrite.
+    actionTimeout: 15_000,
+    navigationTimeout: 30_000,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "off",

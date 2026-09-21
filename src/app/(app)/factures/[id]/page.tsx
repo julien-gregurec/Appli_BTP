@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getContexteEntreprise } from "@/lib/entreprise";
 import { euros, LIGNE_TYPES } from "@/lib/devis";
-import { nomClient } from "@/lib/chantier-statuts";
+import { identiteClientDocument, mentionOrigineIdentite } from "@/lib/client-snapshot";
 import { typeFactureLabel, MODES_PAIEMENT } from "@/lib/factures";
 import { StatutFactureSelect } from "@/components/StatutFactureSelect";
 import { enregistrerPaiementAction, modifierEcheanceFactureAction, supprimerPaiementAction, envoyerFactureEmailAction } from "@/app/actions/factures";
@@ -17,6 +17,7 @@ import { CopierLienPaiement } from "@/components/CopierLienPaiement";
 import { SignatureDocumentMetier } from "@/components/SignatureDocumentMetier";
 import { RelanceDocumentSection } from "@/components/RelanceDocumentSection";
 import { permissionsUtilisateur } from "@/lib/permissions";
+import { peutSurchargerDestinataire } from "@/lib/permissions-envoi";
 
 const input = "rounded-md border border-neutral-300 px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-900";
 
@@ -65,10 +66,18 @@ export default async function FactureDetailPage({
     : null;
   const enregistrer = enregistrerPaiementAction.bind(null, id);
   const modifierEcheance = modifierEcheanceFactureAction.bind(null, id);
+  // Une facture ou un avoir déjà émis affiche — et réexpédie — l'identité du
+  // destinataire figée à son émission (un avoir reprend celle de la facture
+  // qu'il crédite) ; seul un brouillon reflète la fiche client actuelle.
+  const identiteDocument = identiteClientDocument({
+    snapshot: facture.client_snapshot,
+    fiche: client,
+    captureeLe: facture.client_snapshot_at,
+  });
   const email = contenuEmailDocument({
     typeDoc: "facture",
     numero: facture.numero,
-    client,
+    client: { nom: identiteDocument.entete.nom_affiche, prenom: null, societe: null, email: identiteDocument.email },
     montantTtc: Number(facture.montant_ttc),
     entrepriseNom: ctx.entrepriseNom,
     prenomEmetteur: ctx.prenom,
@@ -85,10 +94,11 @@ export default async function FactureDetailPage({
               <span className="ml-2 text-sm font-normal text-neutral-500">· {typeFactureLabel(facture.type)}</span>
             </h1>
             <p className="text-sm text-neutral-500">
-              {client ? nomClient(client) : "—"}
+              {identiteDocument.entete.nom_affiche}
               {chantier && <> · chantier <Link href={`/chantiers/${chantier.id}`} className="hover:underline">{chantier.nom}</Link></>}
               {devis && <> · devis <Link href={`/devis/${devis.id}`} className="hover:underline">{devis.numero}</Link></>}
             </p>
+            <p className="mt-1 text-xs text-neutral-500">{mentionOrigineIdentite(identiteDocument)}</p>
           </div>
           <div className="flex items-center gap-3">
             {facture.statut === "brouillon" && <Link href={`/factures/${id}/modifier`} className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm dark:border-neutral-700">Modifier</Link>}
@@ -112,6 +122,8 @@ export default async function FactureDetailPage({
                 envoiAutomatiqueDisponible={brevoEstConfigure()}
                 envoyerAutomatiquementAction={envoyerFactureEmailAction}
                 emailEnvoyeLe={facture.email_envoye_le}
+                adresseFigee={identiteDocument.email}
+                peutSurchargerDestinataire={peutSurchargerDestinataire(permissions)}
               />
             ) : (
               <span className="cursor-default rounded-md border border-neutral-200 px-3 py-1.5 text-sm text-neutral-400 dark:border-neutral-800" title="Aucun email renseigné pour ce client">

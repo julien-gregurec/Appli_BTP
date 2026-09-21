@@ -4,9 +4,9 @@ import { boutiqueEstActive, cronsSontActifs, iaEstActive, iaDevisEstActive } fro
 afterEach(() => vi.unstubAllEnvs());
 
 describe("garde-fous Preview", () => {
-  it("préserve le comportement existant (fail-open) quand les variables boutique/crons sont absentes", () => {
-    expect(boutiqueEstActive({})).toBe(true);
+  it("laisse les crons actifs par défaut, mais jamais la boutique", () => {
     expect(cronsSontActifs({})).toBe(true);
+    expect(boutiqueEstActive({})).toBe(false);
   });
 
   it("désactive explicitement chaque fonctionnalité", () => {
@@ -68,5 +68,34 @@ describe("FEATURE_AI_DEVIS_ENABLED — fail-closed", () => {
 
   it("reste indépendant de FEATURE_AI_ENABLED : l'IA générale active seule n'expose pas l'IA devis", () => {
     expect(iaDevisEstActive({ FEATURE_AI_ENABLED: "true" })).toBe(false);
+  });
+});
+
+// P0 de l'audit Boutique : `boutiqueEstActive()` était fail-open — toute valeur
+// autre que « false » ouvrait la boutique, y compris l'absence de variable. Une
+// surface qui encaisse ne doit jamais s'ouvrir par défaut d'oubli.
+describe("FEATURE_BOUTIQUE_ENABLED — fail-closed", () => {
+  it("ferme la boutique quand la variable est absente, vide ou invalide", () => {
+    expect(boutiqueEstActive({})).toBe(false);
+    expect(boutiqueEstActive({ FEATURE_BOUTIQUE_ENABLED: "" })).toBe(false);
+    expect(boutiqueEstActive({ FEATURE_BOUTIQUE_ENABLED: "   " })).toBe(false);
+    expect(boutiqueEstActive({ FEATURE_BOUTIQUE_ENABLED: "oui" })).toBe(false);
+    expect(boutiqueEstActive({ FEATURE_BOUTIQUE_ENABLED: "1" })).toBe(false);
+    expect(boutiqueEstActive({ FEATURE_BOUTIQUE_ENABLED: "enabled" })).toBe(false);
+    expect(boutiqueEstActive({ FEATURE_BOUTIQUE_ENABLED: "false" })).toBe(false);
+  });
+
+  it("n'ouvre la boutique que sur un « true » explicite", () => {
+    expect(boutiqueEstActive({ FEATURE_BOUTIQUE_ENABLED: "true" })).toBe(true);
+    expect(boutiqueEstActive({ FEATURE_BOUTIQUE_ENABLED: "TRUE" })).toBe(true);
+    expect(boutiqueEstActive({ FEATURE_BOUTIQUE_ENABLED: " true " })).toBe(true);
+  });
+
+  it("ne s'ouvre pas davantage en Production : aucun environnement n'est une exception", () => {
+    for (const environnement of ["production", "preview", "development"]) {
+      expect(boutiqueEstActive({ NODE_ENV: environnement, VERCEL_ENV: environnement })).toBe(false);
+    }
+    // Il n'existe aucun chemin d'activation implicite : seule la variable compte.
+    expect(boutiqueEstActive({ NODE_ENV: "production", FEATURE_BOUTIQUE_ENABLED: "true" })).toBe(true);
   });
 });

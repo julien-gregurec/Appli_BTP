@@ -1,0 +1,129 @@
+-- ============================================================================
+-- PROPOSITION — NON APPLICABLE EN L'ÉTAT — NE PAS DÉPLACER DANS supabase/migrations
+-- ============================================================================
+--
+-- ELSATIA-GP-CLIENT-LEGAL-FIELDS-V1 — champs d'identité légale sur public.clients.
+--
+-- Ce fichier porte l'extension `.sql.proposed` et vit hors de
+-- `supabase/migrations/` DÉLIBÉRÉMENT : il n'est vu ni par `supabase db reset`,
+-- ni par `scripts/verify-migrations.mjs` (qui ne lit que `supabase/migrations`
+-- et n'accepte que `*.sql`). Il ne peut donc pas s'appliquer par accident.
+--
+-- BLOQUÉ PAR LEDGER. La conversation
+-- ELSATIA-ECOSYSTEM-MIGRATION-LEDGER-RECONCILIATION-P0-V1 travaille sur le
+-- ledger au moment où ce lot est écrit. Choisir un numéro maintenant, c'est
+-- prendre le risque exact que le dépôt a déjà rencontré et documenté
+-- (`ELSATIA_GP_POSTCUTOVER_MIGRATION_TRAIN_RECONCILIATION_V1` : deux lots
+-- parallèles revendiquant `000266`, puis insertion rétrograde refusée par
+-- Supabase). Le préfixe 14 chiffres reste donc VOLONTAIREMENT non attribué.
+--
+-- Pour appliquer, après publication du rapport ledger :
+--   1. reprendre le numéro que ce rapport attribue à ce lot ;
+--   2. renommer en `supabase/migrations/<AAAAMMJJ><NNNNNN>_client_legal_fields_v1.sql` ;
+--   3. `npm run verify:migrations` puis `supabase db reset` sur pile isolée ;
+--   4. jouer les assertions pgTAP prévues (voir le rapport du lot, §champs légaux).
+--
+-- ---------------------------------------------------------------------------
+-- CE QUE CETTE MIGRATION N'AJOUTE PAS, ET POURQUOI
+-- ---------------------------------------------------------------------------
+--
+-- `nom_commercial` N'EST PAS AJOUTÉ. La colonne ferait double emploi avec
+-- `public.clients.societe`, qui existe, est peuplée, est saisie dans le
+-- formulaire client et sert déjà de nom d'affichage (`nomClient()`,
+-- src/lib/chantier-statuts.ts). Le contrat validé `@elsatia/client-contracts`
+-- distingue `legalName` (dénomination légale) et `tradeName` (nom commercial /
+-- enseigne) : la correspondance retenue pour Gestion Pro est
+--
+--     tradeName  -> public.clients.societe          (existante, utilisée)
+--     legalName  -> public.clients.raison_sociale   (existante, INEXPLOITÉE)
+--
+-- `clients.raison_sociale` existe depuis 20260710000004 et n'est lue ni écrite
+-- nulle part dans l'application (vérifié : toutes les occurrences de
+-- `raison_sociale` dans src/ portent sur `entreprises`, jamais sur `clients`).
+-- Il n'y a donc rien à ajouter pour la dénomination légale : il y a à
+-- l'ACTIVER dans le formulaire et l'affichage. C'est un travail applicatif,
+-- sans migration, décrit dans le rapport.
+--
+-- Ajouter `nom_commercial` créerait une TROISIÈME source pour le même nom.
+
+alter table public.clients
+  add column if not exists numero_tva text,
+  add column if not exists forme_juridique text,
+  add column if not exists adresse_complement text,
+  add column if not exists pays text;
+
+comment on column public.clients.numero_tva is
+  'Numéro de TVA intracommunautaire, forme normalisée sans espaces ni ponctuation (FR40303265045). Facultatif : requis sur facture seulement dans certaines situations (voir le rapport du lot), jamais pour un particulier.';
+comment on column public.clients.forme_juridique is
+  'SAS, SARL, EURL, SCI, commune… Champ libre : la liste officielle évolue. Miroir de entreprises.forme_juridique.';
+comment on column public.clients.adresse_complement is
+  'Deuxième ligne d''adresse de facturation (bâtiment, étage, boîte postale).';
+comment on column public.clients.pays is
+  'Code pays ISO 3166-1 alpha-2 en majuscules. NULL = non renseigné et traité comme FR à l''impression, faute de mieux ; ce défaut est appliqué à la LECTURE, jamais écrit en base, pour ne pas affirmer une information que personne n''a saisie.';
+
+-- ---------------------------------------------------------------------------
+-- Contraintes : formes, pas règles métier
+-- ---------------------------------------------------------------------------
+--
+-- Les contraintes ci-dessous vérifient la FORME et rien d'autre. La validité
+-- réelle d'un numéro de TVA (clé de contrôle française, formats nationaux)
+-- appartient à `@elsatia/client-contracts` (`isValidVatNumber`,
+-- `computeFrenchVatKey`), qui est validé, testé, et NE DOIT PAS être réécrit
+-- en SQL. Dupliquer cet algorithme en base créerait deux vérités divergentes.
+--
+-- `not valid` : les contraintes ne sont PAS vérifiées rétroactivement sur les
+-- lignes existantes. Un client déjà en base avec une donnée non conforme n'est
+-- pas rejeté et ne bloque pas la migration ; seules les écritures ultérieures
+-- sont contrôlées. Une validation rétroactive (`validate constraint`) pourra
+-- être décidée après inventaire, et non imposée par ce lot.
+
+alter table public.clients drop constraint if exists clients_numero_tva_forme_check;
+alter table public.clients add constraint clients_numero_tva_forme_check
+  check (numero_tva is null or numero_tva ~ '^[A-Z]{2}[0-9A-Z]{2,13}$') not valid;
+
+alter table public.clients drop constraint if exists clients_pays_forme_check;
+alter table public.clients add constraint clients_pays_forme_check
+  check (pays is null or pays ~ '^[A-Z]{2}$') not valid;
+
+-- ---------------------------------------------------------------------------
+-- Snapshot documentaire : AUCUN changement requis
+-- ---------------------------------------------------------------------------
+--
+-- `public.construire_client_snapshot` (20260908000272) construit le snapshot à
+-- partir de `to_jsonb(client)` filtré par une liste blanche qui contient DÉJÀ
+-- `numero_tva`, `forme_juridique`, `nom_commercial`, `adresse_complement` et
+-- `pays`. Une colonne absente rend simplement la clé à null ; le jour où la
+-- colonne existe, elle est capturée sans une ligne de code supplémentaire.
+--
+-- Vérifié par exécution, pas supposé — assertions 22 à 24 de
+-- supabase/tests/client_document_snapshot_v1.test.sql, qui prouvent que les
+-- cinq clés sont présentes et nulles alors que quatre colonnes n'existent pas.
+-- Ces assertions 23 et 24 devront être AJUSTÉES par le lot qui applique cette
+-- migration : elles constatent aujourd'hui l'absence des colonnes.
+--
+-- Aucun backfill n'est nécessaire ni honnête : ces champs n'ont jamais été
+-- saisis, il n'existe aucune source pour les reconstituer, et les documents
+-- déjà émis conservent — correctement — un snapshot où ils valent null. Écrire
+-- après coup un numéro de TVA sur un document historique reviendrait à
+-- fabriquer une mention qui n'a jamais figuré sur le document remis au client.
+
+-- ---------------------------------------------------------------------------
+-- RLS et multi-tenant : AUCUN changement requis
+-- ---------------------------------------------------------------------------
+--
+-- Ce sont quatre colonnes sur une table existante : elles héritent des policies
+-- de `public.clients` (cloisonnement par `entreprise_id`), sans nouvelle
+-- surface d'accès. Aucune table, aucune fonction, aucune permission créée —
+-- donc aucun INSERT dans `permissions_disponibles`, et rien à révoquer.
+
+-- ---------------------------------------------------------------------------
+-- Recherche future
+-- ---------------------------------------------------------------------------
+--
+-- `@elsatia/client-contracts` expose `CLIENT_SEARCH_FIELDS` et
+-- `buildClientSearchPlan` : l'indexation de recherche doit être décidée au
+-- moment de l'intégration de ce paquet, en cohérence avec ce plan, et non
+-- devinée ici. Un index partiel sur `numero_tva` sera vraisemblablement utile ;
+-- il n'est pas créé maintenant, faute de requête réelle à servir.
+
+notify pgrst, 'reload schema';

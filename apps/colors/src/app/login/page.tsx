@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Brand } from "@/components/Brand";
 import { connexionAction } from "@/app/actions";
 import { createClient } from "@/lib/supabase/server";
+import { cheminInterneSur } from "@/lib/redirection-sure";
+import { messageConfirmationConnexion, messageErreurConnexion } from "@/lib/messages-auth";
 
 export const metadata: Metadata = { title: "Connexion" };
 
@@ -11,9 +14,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (user) redirect("/dashboard");
-  const error = typeof params.error === "string" ? params.error : null;
-  const message = typeof params.message === "string" ? params.message : null;
-  const suivant = typeof params.next === "string" ? params.next : "/dashboard";
+  // Aucun texte reçu par l’URL n’est rendu : seuls des codes connus le sont.
+  const error = messageErreurConnexion(params.error);
+  const message = messageConfirmationConnexion(params.message);
+  const suivant = cheminInterneSur(params.next);
 
   return (
     <div className="public-page">
@@ -37,6 +41,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <label>Adresse email<input name="email" type="email" autoComplete="email" required placeholder="vous@entreprise.fr"/></label>
           <label>Mot de passe<input name="password" type="password" autoComplete="current-password" required placeholder="••••••••"/></label>
           <button className="primary-button" type="submit">Se connecter à Colors</button>
+          <p className="auth-link"><Link href="/mot-de-passe-oublie">Mot de passe oublié ?</Link></p>
           <p className="auth-foot">L’accès nécessite un droit Colors actif pour votre organisation et une habilitation individuelle. Les sessions de cette application restent isolées sur son domaine.</p>
         </form>
       </section>

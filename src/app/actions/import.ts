@@ -6,6 +6,8 @@ import { getContexteEntreprise } from "@/lib/entreprise";
 import { analyserFichier, type FichierAnalyse } from "@/lib/import/parse";
 import { logicielSource, typeImport } from "@/lib/import/config";
 import { messageErreurUtilisateur } from "@/lib/erreurs-utilisateur";
+import { contexteQuotaPersonnes } from "@/lib/capacite-personnes";
+import { messageImportCapacite } from "@/lib/quota-personnes-message";
 
 const MAX_LIGNES = 5000;
 
@@ -230,14 +232,19 @@ export async function importerDonneesAction(payload: {
         Number(capacite.capacite_totale ?? 0) - Number(capacite.personnes_actives ?? 0),
       );
       if (enregistrements.length > restant) {
+        // Message contextuel : ne propose jamais « ajoutez de la capacité » ou
+        // « changez d'offre » quand ces chemins sont fermés (essai sans offre,
+        // ABONNEMENTS_PUBLICS_OUVERTS=false).
         return {
           inseres: 0,
           ignores: ignores + enregistrements.length,
           erreurs: [
-            `Import annulé : votre abonnement autorise ${capacite.capacite_totale} personnes actives ` +
-              `(${capacite.personnes_actives} déjà enregistrées, ${restant} place(s) disponible(s)) et le ` +
-              `fichier contient ${enregistrements.length} personne(s) à créer. Ajoutez de la capacité, ` +
-              `changez d’offre ou réduisez le fichier avant de réessayer.`,
+            messageImportCapacite(await contexteQuotaPersonnes(entrepriseId), {
+              totale: Number(capacite.capacite_totale ?? 0),
+              actives: Number(capacite.personnes_actives ?? 0),
+              restant,
+              demandees: enregistrements.length,
+            }),
           ],
         };
       }

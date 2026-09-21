@@ -1,7 +1,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   allowlistPrixBase,
-  allowlistPrixOptionIA,
+  allowlistPrixHorsForfait,
   recupererAbonnementStripe,
   requeteStripe,
   type StripeSubscription,
@@ -190,7 +190,7 @@ export async function reconcilierCapacitePersonnesStripe(params: {
   const classification = classifierItemsAbonnement(itemsDeSubscription(sub), {
     prixBaseAttendus: allowlistPrixBase(deps.env),
     prixCapaciteAttendus: allowlistPrixCapacite(deps.env),
-    prixAutresConnus: allowlistPrixOptionIA(deps.env),
+    prixAutresConnus: allowlistPrixHorsForfait(deps.env),
   });
   // FAIL-CLOSED : classification non fiable (deux items capacité, quantité
   // invalide) OU présence d'items dont le Price n'est pas dans une allowlist
@@ -328,7 +328,7 @@ export async function reconcilierCapacitePersonnesStripe(params: {
   const classApres = classifierItemsAbonnement(itemsDeSubscription(subApres), {
     prixBaseAttendus: allowlistPrixBase(deps.env),
     prixCapaciteAttendus: allowlistPrixCapacite(deps.env),
-    prixAutresConnus: allowlistPrixOptionIA(deps.env),
+    prixAutresConnus: allowlistPrixHorsForfait(deps.env),
   });
   const itemApres = classApres.capacite;
   const coherent =

@@ -134,6 +134,52 @@ select throws_like(
   '%MFA du compte cible%', 'total AAL2 : cible sans MFA refusée'
 );
 
+-- E bis. Cas d'exploitation du cycle « second administrateur » désormais pilotable
+-- depuis l'écran plateforme (ELSATIA-GP-PLATFORM-SECOND-ADMIN-OPERABILITY-P1-V1).
+-- Un opérateur `total` en AAL2 reste tenu par la base sur chacun de ces refus.
+
+-- Utilisateur absent : un identifiant de compte qui n'existe pas dans auth.users ne
+-- rattache rien, même quand l'identité administrateur, elle, est bien déclarée.
+select throws_like(
+  $$select public.plateforme_rattacher_admin('cible-rattachement@invalid.local','ee900000-0000-4000-8000-0000000000ff')$$,
+  '%Compte Auth absent%', 'utilisateur absent : rattachement refusé'
+);
+
+-- Doublon : une identité déjà rattachée ne se rattache pas une seconde fois, et une
+-- identité déjà active ne se réactive pas. Le changement d'UID d'une identité active
+-- exige le cycle complet révocation puis détachement.
+select throws_like(
+  $$select public.plateforme_rattacher_admin('second-total-aal2@invalid.local','ee900000-0000-4000-8000-000000000001')$$,
+  '%état incompatible%', 'doublon : rattachement d’une identité active refusé'
+);
+select throws_like(
+  $$select public.plateforme_activer_admin('cible-mfa@invalid.local')$$,
+  '%Identité non rattachée%', 'doublon : réactivation d’une identité déjà active refusée'
+);
+select throws_like(
+  $$select public.plateforme_ajouter_admin('second-total-aal2@invalid.local',null,'lecture')$$,
+  '%déjà rattachée%', 'doublon : redéclaration d’une identité active refusée'
+);
+
+-- Cloisonnement : l'administrateur d'une entreprise cliente possède un compte Auth
+-- valide et confirmé. Cela ne lui ouvre aucun droit plateforme tant qu'aucune identité
+-- n'a été déclarée pour lui : l'email seul n'est jamais une preuve d'autorisation.
+select throws_like(
+  $$select public.plateforme_rattacher_admin('admin-a@invalid.local','10000000-0000-0000-0000-000000000001')$$,
+  '%état incompatible%', 'cloisonnement : gérant client non promu administrateur plateforme'
+);
+select throws_like(
+  $$select public.plateforme_activer_admin('admin-a@invalid.local')$$,
+  '%Identité non rattachée%', 'cloisonnement : gérant client non activable côté plateforme'
+);
+reset role;
+select is(
+  (select count(*) from public.plateforme_admins where email='admin-a@invalid.local'),
+  0::bigint, 'cloisonnement : aucune identité plateforme créée pour le gérant client'
+);
+set local role authenticated;
+select set_config('request.jwt.claims','{"sub":"30000000-0000-0000-0000-000000000001","email":"plateforme@invalid.local","role":"authenticated","aal":"aal2"}',true);
+
 -- F. Lecture : aucune mutation et aucun support.
 select set_config('request.jwt.claim.sub','ee900000-0000-4000-8000-000000000004',true);
 select set_config('request.jwt.claim.email','lecture-aal2@invalid.local',true);
@@ -382,7 +428,19 @@ select is(
    join pg_namespace n on n.oid=p.pronamespace
    where n.nspname='public'
      and p.proname like 'plateforme_%'
-     and p.proname <> 'plateforme_quitter_entreprise'
+     -- Deux exclusions, et deux seulement, toutes deux au titre de la FERMETURE PROPRE :
+     -- une opération qui met FIN à un accès ne doit jamais pouvoir être bloquée par
+     -- une exigence d'authentification renforcée, sans quoi on se retrouve incapable
+     -- de refermer ce qu'on a ouvert.
+     --   • `plateforme_quitter_entreprise` : sortie d'une entreprise ;
+     --   • `plateforme_journaliser` : écriture d'une TRACE, jamais d'un effet métier.
+     --     Elle n'écrit que dans `plateforme_journal_actions`, après avoir vérifié que
+     --     l'appelant porte bien un rôle plateforme, et elle est appelée par
+     --     `assistance_quitter` et `assistance_revoquer` : lui imposer AAL2 rendrait
+     --     impossible la FERMETURE d'une session d'assistance, et ferait perdre des
+     --     traces au lieu d'en garantir. Un journal doit être le plus facile possible
+     --     à écrire — une action non tracée est pire qu'une trace écrite en AAL1.
+     and p.proname not in ('plateforme_quitter_entreprise', 'plateforme_journaliser')
      and p.prosrc ~* '\m(insert|update|delete)\M'
      and has_function_privilege('authenticated',p.oid,'EXECUTE')
      and p.prosrc not like '%plateforme_exiger_session_aal2%'),

@@ -7,7 +7,7 @@ import { loadStoreProducts, monetizationConfigured } from "@/lib/monetization-cl
 import { getRuntimePlatform } from "@/lib/platform";
 import { EXTERNAL_URLS } from "@/lib/site";
 
-const SOURCE_LABELS = { web: "Web · Stripe", apple: "Apple App Store", google: "Google Play", elsatia: "ELSATIA", internal: "Interne", "free-default": "Free" } as const;
+const SOURCE_LABELS = { web: "Web · Stripe", apple: "Apple App Store", google: "Google Play", elsatia: "ELSATIA", internal: "Interne", "free-default": "Free", plateforme: "Plateforme ELSATIA" } as const;
 
 export function MonetizationPanel() {
   const account = useAccount();

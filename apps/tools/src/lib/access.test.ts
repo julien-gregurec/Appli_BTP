@@ -8,7 +8,7 @@ describe("entitlements Free / Pro", () => {
     expect(hasCapability(FREE_ACCESS, "export-pdf")).toBe(false);
   });
 
-  it.each(["web", "apple", "google", "elsatia", "internal"] as const)("peut accorder Pro depuis la source %s", (source) => {
+  it.each(["web", "apple", "google", "elsatia", "internal", "plateforme"] as const)("peut accorder Pro depuis la source %s", (source) => {
     const access = resolveAccess([{ tier: "pro", source }]);
     expect(access.tier).toBe("pro");
     expect(hasCapability(access, "export-svg")).toBe(true);
@@ -23,7 +23,7 @@ describe("entitlements Free / Pro", () => {
   });
 
   it("énumère les sources futures sans dépendre d’un fournisseur de paiement", () => {
-    expect(ENTITLEMENT_SOURCES).toEqual(["free-default", "web", "apple", "google", "elsatia", "internal"]);
+    expect(ENTITLEMENT_SOURCES).toEqual(["free-default", "web", "apple", "google", "elsatia", "internal", "plateforme"]);
   });
 
   it("ne contient aucun mécanisme client permettant de forcer Pro", async () => {

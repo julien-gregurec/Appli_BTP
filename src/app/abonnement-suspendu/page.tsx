@@ -13,6 +13,11 @@ import { peutGererAbonnementSuspendu } from "@/lib/acces-support-abonnement";
 // bouton « Régulariser » réservé aux utilisateurs autorisés (gerer_parametres
 // ou accès support), jamais affiché à un simple membre qui ne peut de toute
 // façon rien y faire (ouvrirPortailAbonnementSuspenduAction le refuserait).
+//
+// ELSATIA-GP-TRIAL-EXPIRY-P1-CLOSURE-V1 (fusionné avec ce qui précède) : la
+// variante essai n'est pas un cul-de-sac — un lien « Choisir une offre » vers
+// /abonnement reste affiché uniquement pour motif=essai_expire (aucun
+// abonnement n'existe encore, pas de portail Stripe à proposer).
 export default async function AbonnementSuspenduPage({
   searchParams,
 }: {
@@ -43,6 +48,9 @@ export default async function AbonnementSuspenduPage({
         <p className="text-sm text-neutral-600">{description}</p>
         {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p>}
         <div className="flex flex-wrap justify-center gap-2">
+          {motif === "essai_expire" && (
+            <Link href="/abonnement" className="rounded-md bg-[#0d1b2a] px-4 py-2 text-sm font-semibold text-white">Choisir une offre</Link>
+          )}
           <Link href="/parametres/donnees" className="rounded-md border px-4 py-2 text-sm">Exporter mes données</Link>
           <Link href="/aide" className="rounded-md border px-4 py-2 text-sm">Contacter le support</Link>
           {peutRegulariser && (
