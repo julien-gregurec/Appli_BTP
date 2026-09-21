@@ -13,7 +13,10 @@ mission `perf/gp-capacity-readiness-v1`, base `release/gp-v1-rc`) — Dashboard
 ~1,7-1,8 s, recherche texte ~1,76 s sous RLS — sans affaiblir la sécurité ni
 contourner la RLS de façon non contrôlée.**
 
-**Verdict : `PERFORMANCE CANDIDATE`** — voir § 9 (benchmark) et § 12 (verdict détaillé).
+**Verdict : `PERFORMANCE CANDIDATE`** (confirmé par un lot de qualification
+dédié, § 12-13 : non promu `PERFORMANCE QUALIFIED`, un seul écart de cache à
+gravité faible et non exploitable par le produit actuel) — voir § 9
+(benchmark) et § 13 (verdict détaillé).
 
 ---
 
@@ -457,9 +460,18 @@ ce dépôt, pas un correctif du planner.
 | `gp_dashboard_search_perf_next_reference_debordement.test.sql` (nouveau) | ✅ 4/4 |
 | `gp_dashboard_search_perf_dashboard_indicateurs.test.sql` (nouveau) | ✅ 9/9 |
 | `gp_dashboard_search_perf_isolation_listes_paginees.test.sql` (nouveau) | ✅ 14/14 |
-| Suite complète du dépôt (81 fichiers, dont les 3 ci-dessus) | 62/81 fichiers verts |
+| Suite complète du dépôt (82 fichiers, dont les 3 ci-dessus) | 60/82 fichiers verts |
 
-**19 fichiers pré-existants en échec, tous sans rapport avec cette
+**Correction (lot de qualification, § 13) : ce compte initial de « 19 » était
+sous-évalué — 3 fichiers pré-existants en échec avaient été omis de
+l'énumération manuelle ci-dessous par erreur (`gp_pilot_plateforme_admin_role_total`,
+`gp_pilot_rgpd_manifeste_fichiers`, `platform_audit_log_bounded_v1`). Le
+chiffre exact, revérifié deux fois par un rejeu automatisé complet (une fois
+sur la base de mesure, une fois sur une base fraîche indépendante — mêmes 22
+échecs, byte pour byte, sur les deux), est de 22 fichiers pré-existants en
+échec, tous sans rapport avec cette mission.**
+
+**22 fichiers pré-existants en échec, tous sans rapport avec cette
 mission** — vérifié un par un, aucun ne touche `devis`/`factures`/
 `dashboard_indicateurs`/`next_reference`/les 4 RPC de liste. Causes, toutes
 antérieures à cette session :
@@ -501,9 +513,21 @@ antérieures à cette session :
   ce que le verrou `verrouiller_lignes_factures_emise`
   (immutabilité après émission) rejette — un problème d'ordre dans le
   fixture du test lui-même, à corriger séparément.
+- **3 fichiers omis par erreur du décompte initial, revérifiés lors du lot
+  de qualification** — tous structurels/pré-existants, sans rapport avec
+  cette mission : `gp_pilot_plateforme_admin_role_total` (le fixture du
+  test viole directement `plateforme_admins_actif_requiert_utilisateur_id`
+  dès sa première insertion, avant tout test) ; `gp_pilot_rgpd_manifeste_fichiers`
+  (`permission denied for function manifeste_fichiers_entreprise` — un
+  GRANT manquant sur une fonction d'export RGPD, sans rapport avec devis/
+  factures/dashboard) ; `platform_audit_log_bounded_v1` (« Authentification
+  requise » — même famille que les échecs AAL2/MFA déjà documentés
+  ci-dessus, `auth.mfa_factors` absente du prelude minimal de ce bac à
+  sable).
 
-**Aucun des 19 échecs pré-existants ne concerne les tables, fonctions ou
-pages touchées par cette mission.**
+**Aucun des 22 échecs pré-existants ne concerne les tables, fonctions ou
+pages touchées par cette mission — reconfirmé par un rejeu identique et
+indépendant sur une seconde base entièrement fraîche (§ 13.4).**
 
 ### 8.3 Vitest / typecheck / lint / build
 
@@ -600,7 +624,7 @@ visés par la mission.
   documenté par l'audit précédent comme goulet structurel non résolu de ce
   schéma ; hors de cette mission, dont le périmètre était Dashboard +
   Recherche spécifiquement.
-- **19 échecs pgTAP pré-existants** documentés § 8.2, dont un bug réel
+- **22 échecs pgTAP pré-existants** documentés § 8.2, dont un bug réel
   (`niveau = 'info'`) signalé séparément.
 - **Environnement de test non conservé dans ce dépôt** (base Postgres locale
   au conteneur de session, prelude non versionné — spécifique à ce bac à
@@ -610,26 +634,426 @@ visés par la mission.
 
 ---
 
-## 12. Verdict
+## 12. Qualification — `PERFORMANCE CANDIDATE` → `PERFORMANCE QUALIFIED` ?
 
-**`PERFORMANCE CANDIDATE`**
+Lot de qualification (session du 2026-09-21, suite immédiate de la mission
+ci-dessus, même branche, aucune fusion, aucun redéploiement). Objectif :
+déterminer si le lot peut passer de `PERFORMANCE CANDIDATE` à
+`PERFORMANCE QUALIFIED`, sans nouvelle optimisation fonctionnelle, sans
+retoucher `next_reference()`, sans modifier `devis`/`factures` hors
+nécessité stricte de validation.
 
-Justification : les deux goulets explicitement visés par la mission sont
-fermés. Le Dashboard, écran le plus visité de l'application, passe de ~5,1 s
-à 24-37 ms (objectif <1 s largement dépassé). La recherche texte, sur ses 4
-chemins réellement empruntés par l'application, est déjà et reste sous les
-500 ms visés — la mesure "1,76 s" qui motivait ce volet de la mission décrit
-un mécanisme Postgres réel mais un chemin que l'application n'emprunte pas,
-une distinction établie ici avec preuve directe (§ 5) et désormais verrouillée
-par des tests qui ne préexistaient pas (§ 6, § 8.2/8.4). Un P0 réel
-(débordement de numérotation, § 4.1) a été trouvé et corrigé au passage, avec
-tests. Aucune régression détectée sur la suite existante (Vitest 1777/1777,
-build principal vert, 19 échecs pgTAP pré-existants tous vérifiés sans
-rapport avec cette mission).
+SHA initial (avant ce lot) = `5cea2c3`.
+
+### 12.1 Qualification de `next_reference()` (aucune réécriture)
+
+**Migration** : `20260922000315_correctif_debordement_next_reference.sql`.
+
+**Ancienne implémentation** (`20260710000001_comptes_entreprises.sql`,
+fonction d'origine) :
+```sql
+return p_prefix || '-' || v_annee || '-' || lpad(v_numero::text, p_largeur, '0');
+-- ou, sans année :
+return p_prefix || '-' || lpad(v_numero::text, p_largeur, '0');
+```
+**Nouvelle implémentation** (inchangée depuis, non retouchée dans ce lot) :
+```sql
+return p_prefix || '-' || v_annee || '-' ||
+  lpad(v_numero::text, greatest(p_largeur, length(v_numero::text)), '0');
+-- ou, sans année : idem sans le v_annee ||
+```
+Seul changement : `p_largeur` → `greatest(p_largeur, length(v_numero::text))`
+— la largeur configurée devient un plancher, jamais un plafond.
+
+**Callers recensés** (relecture exhaustive du ledger — le chiffre "13" cité
+par la migration 315 elle-même est légèrement inexact ; décompte précis
+refait ici) : **14 motifs de scope `(entreprise_id, type)` distincts**,
+portés par 12 déclencheurs de table + 1 RPC directe (`creer_lot_virements`)
++ 1 fonction partagée par 5 tables (`trg_reference_suite_metier`) :
+
+| # | Type (clé `compteurs_reference`) | Préfixe | Largeur | Avec année | Déclencheur | Scope contre-partie |
+| ---: | --- | --- | ---: | :---: | --- | --- |
+| 1 | `devis` | DEV | 3 | oui | `trg_devis_numero` | par entreprise |
+| 2 | `facture` | FAC | 3 | oui | `trg_facture_numero` | par entreprise |
+| 3 | `chantier` | CHA | 3 | oui | trigger `clients_chantiers.sql:114` | par entreprise |
+| 4 | `client` | CLI | 4 | non | trigger `clients_chantiers.sql:100` | par entreprise |
+| 5 | `employe` | EMP | 4 | non | trigger `employes.sql:43` | par entreprise |
+| 6 | `outil` | OUT | 4 | non | trigger `outillage.sql:41` | par entreprise |
+| 7 | `fournisseur` | FRN | 4 | non | trigger `commandes_fournisseurs.sql:30` | par entreprise |
+| 8 | `commande-YYYY` | CMD | 3 | oui | `trg_commande_numero` | par entreprise **+ année** (type dynamique) |
+| 9 | `inventaire-YYYY` | INV | 3 | oui | trigger `depot_inventaires.sql:49` | par entreprise **+ année** (type dynamique, année du document) |
+| 10 | `lot_virement` | VIR | 6 | oui | appel direct dans `creer_lot_virements()` (RPC, pas un trigger de table) | par entreprise |
+| 11 | `note_frais` | EXP | 6 | oui | `trg_reference_note_frais` | par entreprise |
+| 12 | `entreprise` | ENT | 3 | non | `trg_set_entreprise_reference` | **GLOBAL** (`p_entreprise_id = null` → scope `00000000-…-0000`) |
+| 13 | `identifiant_employe:<préfixe>` | *(préfixe configuré)* | 4 | non | trigger `identifiants_et_compte_depot.sql:30` | par entreprise **+ préfixe configuré** (type dynamique) |
+| 14 | `<table>-YYYY` ×5 (`contrats_entretien`, `interventions`, `bons_livraison`, `metres`, `remises_banque`) | CTR/INT/BL/MET/RB (ou DOC) | 4 | oui | `trg_reference_suite_metier` (une fonction, 5 triggers) | par entreprise **+ table + année** (type dynamique) |
+
+**Comportement à 998/999/1000/1001 et au-delà** (testé directement,
+appels réels, transaction annulée après coup) :
+```
+998e appel  -> Q-998
+999e appel  -> Q-999
+1000e appel -> Q-1000   (pas de troncature, pas de collision)
+1001e appel -> Q-1001
+10000e appel -> Q-10000 (pas de second seuil caché à 4 ou 5 chiffres)
+compteur final = 10000 (aucune dérive)
+```
+
+**Unicité par entreprise** : deux entreprises différentes, même type,
+premier appel chacune → `Q-001` et `Q-001` sans collision (clé réelle de
+`compteurs_reference` : `PRIMARY KEY (entreprise_id, type)`, pas `(type)`
+seul).
+
+**Unicité par type** : même entreprise, types `qual_scope`/`devis`/`facture`
+appelés en alternance → 3 compteurs strictement indépendants, aucune
+interférence.
+
+**Concurrence réelle** (pas une simulation — 4 vraies connexions psql
+séparées, lancées simultanément avec `&`/`wait`, 500 appels chacune sur le
+**même** couple `(entreprise_id, type)`) :
+```
+4 sessions x 500 appels = 2000 appels
+2000 valeurs "numero" retournées, 2000 DISTINCTES (0 collision)
+compteur final = 2000 (exact)
+0 erreur, 0 deadlock
+```
+Reproduit à l'identique avec un scénario de bout en bout (4 sessions × 50
+`INSERT INTO devis ... puis UPDATE statut='envoye'` concurrents sur le même
+tenant, déclenchant `next_reference` via le vrai trigger applicatif) : 200
+devis créés, 200 `numero` distincts, 0 erreur.
+
+**Changement d'année** : deux régimes distincts dans le ledger, tous deux
+protégés par le même correctif (le correctif vit dans `next_reference`
+elle-même, appliqué uniformément quel que soit l'appelant) —
+- *Type fixe* (devis/facture/chantier/fournisseur/lot_virement/note_frais/
+  entreprise/etc.) : le compteur ne dépend **jamais** de l'année — seule la
+  chaîne affichée (`v_annee := to_char(now(),'YYYY')`) change ; la clé de
+  l'UPSERT est `(entreprise_id, type)` sans l'année. Un changement d'année
+  réel ne peut ni remettre le compteur à zéro ni provoquer de collision.
+  Vérifié par lecture du corps de la fonction (aucune référence à `v_annee`
+  dans la clause `ON CONFLICT` ni le `WHERE`) et par deux appels consécutifs
+  sans discontinuité.
+- *Type dynamique incluant l'année* (`commande-YYYY`, `inventaire-YYYY`,
+  `<table>-YYYY`, `identifiant_employe:<préfixe>`) : chaque année (ou chaque
+  préfixe) constitue une clé `compteurs_reference` totalement différente —
+  testé directement : `commande-2026` poussé à 1000 appels (`CMD-2026-1000`,
+  sans collision) puis un premier appel sur un type `commande-2027`
+  entièrement indépendant repart à 1, sans aucune interférence avec 2026.
+  Le "changement d'année" pour ce motif est donc simplement l'apparition
+  d'une nouvelle clé, protégée par le même correctif que toutes les autres.
+
+**Contraintes/index protégeant les références** (défense en profondeur,
+vérifiée table par table pour les 14 motifs) : chacune des tables cibles
+porte une contrainte ou un index `UNIQUE` sur `(entreprise_id,
+numero|reference|reference_interne|identifiant_interne)` (ou global pour
+`entreprises.reference_interne`, cohérent avec le scope global de
+`next_reference(null, 'entreprise', ...)`) — `devis_entreprise_id_numero_key`,
+`factures_entreprise_id_numero_key`, `chantiers_entreprise_id_reference_interne_key`,
+`clients_entreprise_id_reference_interne_key`,
+`employes_entreprise_id_reference_interne_key`,
+`outils_entreprise_id_reference_key`, `fournisseurs_entreprise_id_reference_key`,
+`commandes_fournisseurs_entreprise_id_numero_key`,
+`inventaires_entreprise_id_numero_key`, `lots_virements_entreprise_id_numero_key`,
+`notes_frais_reference_unique` (index partiel `WHERE reference IS NOT NULL`),
+`entreprises_reference_interne_key` (global), `employes_identifiant_interne_unique`,
+et une contrainte `UNIQUE(entreprise_id, numero)` par table pour les 5
+tables `trg_reference_suite_metier`. Même en cas d'anomalie hypothétique
+dans `next_reference`, ces contraintes rejetteraient l'insertion (23505)
+plutôt que de corrompre silencieusement une donnée — confirmé qu'elles
+existent bien pour les 14 motifs, aucune lacune trouvée.
+
+**Aucune collision, aucune anomalie constatée** sur l'ensemble de ces tests
+→ qualification **PASS**, sans qu'aucune ligne de `next_reference()` n'ait
+été modifiée dans ce lot.
+
+### 12.2 Équivalence fonctionnelle `dashboard_indicateurs()`
+
+Comparaison automatisée (fonction SQL de test dédiée, non committée —
+harness de qualification), RPC vs recalcul canonique indépendant reproduisant
+la logique JS **originale** (pré-migration 316/317) : 8 champs
+(`devis_acceptes_total`, `factures_total`, `factures_encaisse_total`,
+`devis_a_suivre`, `devis_alertes`, `factures_alertes`, `devis_mois`,
+`factures_mois`) × 3 tailles de tenant :
+
+- **Tenant vide** (0 devis, 0 facture, créé pour ce lot) : RPC renvoie
+  `null` sur les 3 champs numériques (aucune ligne de cache — le trigger
+  n'a jamais eu l'occasion de s'exécuter). `page.tsx` neutralise ce cas
+  (`Number(indicateurs.x ?? 0)`, déjà en place depuis le correctif initial) :
+  **équivalent à 0 côté observable**, comportement documenté ici plutôt que
+  silencieux.
+- **Petit tenant** (construit à la main, cas limites exprès) : devis
+  `date_validite` **exactement** à J+7 (doit alerter) vs J+8 (ne doit pas),
+  facture `date_echeance` exactement à J+7 vs J+8, facture `payee` malgré
+  échéance proche (ne doit pas alerter), devis `annule` (exclu de tout,
+  y compris du graphique mensuel), devis accepté vieux de 7 mois (hors
+  fenêtre 6 mois du graphique), facture `annulee` avec paiement (exclue du
+  total facturé mais son `montant_paye` compte quand même dans l'encaissé —
+  comportement **non filtré** de la page originale, reproduit à l'identique).
+- **Grand tenant** (tenant A, volume ×2 : 10012 devis / 6000 factures).
+
+**Résultat : 24/24 comparaisons identiques (0 divergence)**, y compris tous
+les cas limites construits à la main. Confirmé une seconde fois par appel
+direct (`dashboard_indicateurs('<tenant vide>', ...)` → `devis_acceptes_total`
+brut = `NULL`, `entreprises_dashboard_cache` sans ligne pour ce tenant —
+comportement caractérisé, pas une anomalie).
+
+Filtres temporels : le seul paramètre est `p_aujourdhui` (date de référence
+pour les fenêtres 7 jours / 6 mois) — testé aux deux bornes exactes ci-dessus,
+aucune divergence.
+
+**Équivalence métier : PASS.**
+
+### 12.3 Audit du cache incrémental — un écart réel trouvé, non corrigé
+
+Scénarios testés sur `entreprises_dashboard_cache`, avec vérification
+`cache == recalcul canonique depuis les tables sources` après chacun :
+
+| Scénario | Résultat |
+| --- | --- |
+| INSERT devis accepté | ✅ cache += montant_ttc |
+| INSERT devis non accepté | ✅ cache inchangé |
+| UPDATE brouillon → accepté | ✅ cache += montant_ttc |
+| UPDATE montant (paiement partiel facture) | ✅ cache reflète immédiatement |
+| DELETE (500 devis acceptés, verrou de table désactivé pour le test puis réactivé) | ✅ cache -= somme exacte |
+| Annulation facture | ✅ exclue du total facturé (`statut <> 'annulee'`), `montant_paye` toujours compté (comportement non filtré, identique à l'original) |
+| Avoir (`statut = 'avoir_emis'`) | ✅ couvert par la reconstruction complète (§ ci-dessous), aucune divergence |
+| Suppression logique | **N/A** — `devis`/`factures` n'ont pas de colonne de suppression logique (`supprimee_at` existe uniquement sur `reserves_photos`, module sans rapport) |
+| Transaction annulée (ROLLBACK) | ✅ effet du trigger annulé avec la transaction (garantie MVCC standard), cache revenu exactement à sa valeur d'avant, aucune ligne orpheline |
+| Écritures concurrentes (5 sessions réelles × 100 INSERT chacune, même tenant) | ✅ cache final exact (delta = somme des 500 lignes), 0 erreur, 0 deadlock |
+| Reconstruction complète du cache depuis les sources (tous les tenants du bac à sable) | ✅ 0 divergence |
+| **Changement d'entreprise (`entreprise_id`) sur une facture `brouillon`** | ❌ **cache non mis à jour** (voir ci-dessous) |
+
+**Écart trouvé — documenté, non corrigé** (conformément à l'esprit de la
+mission : une anomalie se documente, elle ne déclenche pas un second
+correctif improvisé) :
+
+Le trigger `maj_cache_dashboard_factures` se déclenche `AFTER INSERT OR
+DELETE OR UPDATE OF statut, montant_ttc, montant_paye` — **pas** `OF
+entreprise_id`. Une facture au statut `brouillon` (non verrouillée par
+`verrouiller_facture_emise`, qui ne s'applique qu'à partir de `envoyee`)
+peut voir son `entreprise_id` changé par une seule requête `UPDATE ...
+SET entreprise_id = <autre tenant>, client_id = <client de cet autre
+tenant>` (le `client_id` doit changer simultanément — la contrainte
+composite `factures_client_entreprise_fkey` rejette un changement
+d'`entreprise_id` seul, **confirmé par test direct**, ce qui est déjà une
+protection structurelle partielle). Dans ce cas précis, ni `statut` ni
+`montant_ttc` ni `montant_paye` ne changent → le trigger ne se déclenche
+pas → le cache de l'ancien tenant reste au crédit d'une facture qui ne lui
+appartient plus, et celui du nouveau tenant ne la voit jamais.
+
+**Reproduit et confirmé directement** :
+```
+cache tenant 1 avant = 1200, cache tenant 2 avant = NULL
+UPDATE factures SET entreprise_id=tenant2, client_id=<client tenant2> -- reussit
+cache tenant 1 apres = 1200 (INCHANGE — devrait etre 0)
+cache tenant 2 apres = NULL (INCHANGE — devrait etre 1200)
+```
+
+**Gravité évaluée comme faible, pour 4 raisons convergentes** (aucune ne
+suffit seule, les 4 ensemble motivent le choix de documenter plutôt que de
+corriger dans ce lot) :
+1. **Aucun chemin applicatif ne fait jamais ceci** — recherche exhaustive
+   dans `src/` : un seul `.update()` direct existe sur `factures` dans tout
+   le code (`paiements-en-ligne.ts`, champs Stripe uniquement, jamais
+   `entreprise_id`) ; toute autre écriture passe par des RPC dédiées qui ne
+   construisent jamais une réattribution d'entreprise (aucune fonctionnalité
+   "déplacer un document entre entreprises" n'existe dans ce produit).
+2. Ce n'est **pas une fuite de cloisonnement tenant** : aucune donnée d'un
+   tenant n'est lue par un autre — c'est une staleness d'un total affiché,
+   pas un accès non autorisé à une ligne.
+3. **Auto-réparable** : une reconstruction du cache (§ ci-dessus, déjà testée
+   et exacte) corrige immédiatement toute dérive de ce type si elle se
+   produisait jamais.
+4. Réellement atteignable uniquement via un appel direct à l'API (PostgREST)
+   par un utilisateur disposant de `gerer_factures` dans **les deux**
+   entreprises simultanément (RLS `WITH CHECK` vérifiée des deux côtés,
+   confirmée par lecture des policies) — un profil rare, pas le flux normal
+   d'un utilisateur.
+
+**Non corrigé dans ce lot** (élargirait la migration 317 hors du strict
+périmètre de qualification — signalé ici comme limite documentée plutôt que
+comme un second correctif improvisé, dans le même esprit que la consigne
+donnée pour `next_reference`). Une correction propre existerait (ajouter
+`OF entreprise_id` à la clause `UPDATE OF` du trigger) mais n'a pas été
+appliquée ici, conformément aux instructions de ce lot ("ne relance aucune
+optimisation fonctionnelle").
+
+**Cohérence du cache : PASS partiel** — cohérent dans 11 des 12 scénarios
+testés ; l'unique écart est structurellement inatteignable par l'application
+réelle et n'affecte pas l'isolation tenant.
+
+### 12.4 Isolation multi-tenant — dashboard + 4 RPC de recherche
+
+Avec les rôles réellement utilisés par l'application (`authenticated`,
+`request.jwt.claim.sub` positionné sur un utilisateur réel de chaque
+tenant) :
+
+- `dashboard_indicateurs('<tenant A>', ...)` par un utilisateur A : ses
+  vrais chiffres (`devis_acceptes_total = 294469916.09`,
+  `factures_total = 197512196.23`).
+- `dashboard_indicateurs('<tenant B>', ...)` par le **même** utilisateur A :
+  tous les champs `null`/vides — jamais les vrais chiffres de B.
+- `dashboard_indicateurs('<tenant B>', ...)` par un utilisateur **de B** :
+  ses vrais chiffres (`devis_acceptes_total = 8403317.75`,
+  `factures_total = 6226724.67`) — confirme que B a bien des données
+  réelles et différentes, pas un tenant vide qui rendrait le test précédent
+  trivial.
+- Les 4 RPC de recherche (`devis_liste_paginee` et consœurs) : `Accès
+  refusé` explicite pour un `p_entreprise_id` étranger (pgTAP, 14
+  assertions, § 8.2/8.4) — recherche large (`'TEST_B'`) depuis le contexte
+  A : 0 résultat sur les 4 RPC, jamais une métadonnée de B.
+- Accès direct à `entreprises_dashboard_cache` (`SELECT`/`UPDATE`) sous
+  `authenticated` : refusé (`42501`), quel que soit le tenant visé.
+
+**Isolation multi-tenant : PASS**, dashboard et recherche, compteurs,
+montants, graphiques, alertes, métadonnées et table de cache elle-même.
+
+### 12.5 Audit `SECURITY DEFINER` — rien changé (déjà correctement sécurisé)
+
+Les 5 RPC concernées (`dashboard_indicateurs`, `devis_liste_paginee`,
+`factures_liste_paginee`, `clients_liste_paginee`, `chantiers_liste_paginee`) :
+
+| Propriété | Constat |
+| --- | --- |
+| Owner | `supabase_migrator` (rôle `BYPASSRLS` non-superuser, § 1.1) pour les 5 |
+| `search_path` | Fixé explicitement à `public` pour les 5 (`SET search_path = public`) — élimine le risque classique d'injection de `search_path` sur une fonction `SECURITY DEFINER` |
+| GRANT EXECUTE | `authenticated` uniquement (+ l'owner) pour les 5 ; **aucun GRANT à `anon`, `PUBLIC` ou `service_role`** — vérifié par requête directe sur `information_schema.routine_privileges`, 0 ligne pour ces 3 rôles sur les 5 fonctions |
+| Validation tenant + utilisateur | Les 5 appellent `a_permission(p_entreprise_id, '<permission du domaine>')`, qui vérifie `auth.uid()` contre `utilisateurs_entreprises` **pour ce `p_entreprise_id` précis** + `est_membre_actif` (statut d'abonnement inclus) — aucune fonction ne se contente d'un contrôle "utilisateur connecté" générique |
+| Exposition `anon` | Aucune (confirmé ci-dessus) |
+| `entreprise_id` arbitraire fourni par l'appelant | Possible par construction (paramètre `uuid` ordinaire) mais neutralisé dans les 5 cas : les 4 RPC de liste lèvent `Accès refusé` explicitement ; `dashboard_indicateurs` renvoie des champs vides sans lever d'exception (choix de conception différent, documenté § 12.2, sans risque de fuite dans les deux cas) |
+| SQL dynamique (`EXECUTE`, `format()`) | **Aucun** dans les 5 fonctions — la concaténation `'%' \|\| v_recherche \|\| '%'` construit une **valeur** passée à `ILIKE` via une requête statique paramétrée, pas du SQL dynamique ; aucun vecteur d'injection |
+
+**Aucune vulnérabilité réelle trouvée. Rien modifié, conformément à la
+consigne ("ne change rien si le mécanisme est déjà correctement
+sécurisé").**
+
+**SECURITY DEFINER : PASS.**
+
+### 12.6 Benchmark reproductible — médiane/p95/max
+
+Harness reproductible (scripts SQL générés, `\timing on`, N=25 appels par
+scénario dont 3 d'échauffement écartés + les 4 instructions de mise en
+contexte de session, n=22 mesures retenues par scénario), rejoué sur deux
+bases distinctes : `gp_perf` (tenant A au volume ×2, 10012 devis/6000
+factures, déjà mesuré en continu depuis la mission initiale) et
+`gp_perf_fresh` (base **entièrement neuve**, migrations rejouées de zéro,
+fixture régénérée de zéro pour ce lot, volume nominal 5012 devis/3000
+factures — le cache y a été construit **exclusivement** par les triggers
+incrémentaux pendant la génération de la fixture, jamais par un backfill
+après coup : confirmé identique au recalcul canonique, 0 divergence).
+
+| Scénario | Base | Médiane | p95 | Max |
+| --- | --- | ---: | ---: | ---: |
+| Dashboard (`dashboard_indicateurs`) | nominal (5012/3000) | 26,87 ms | 28,81 ms | 30,73 ms |
+| Dashboard (`dashboard_indicateurs`) | ×2 (10012/6000) | 67,18 ms | 69,26 ms | 69,86 ms |
+| Recherche devis, terme courant (`'123'`) | ×2 | 66,00 ms | 68,04 ms | 69,66 ms |
+| Recherche devis, 0 résultat (`'zzz-inexistant-999'`) | ×2 | 44,21 ms | 46,14 ms | 55,59 ms |
+| Recherche devis, terme très large (`'DEV'`, quasi tout le tenant) | ×2 | 62,12 ms | 73,36 ms | 93,72 ms |
+| Recherche factures, terme courant (`'2026'`) | ×2 | 18,05 ms | 21,30 ms | 29,79 ms |
+| Recherche clients, terme courant (`'Fixture'`) | ×2 | 1,49 ms | 1,74 ms | 1,76 ms |
+| Recherche chantiers, terme courant (`'rue'`) | ×2 | 137,87 ms | 158,96 ms | 178,80 ms |
+
+Tous les scénarios : **médiane, p95 et max sous les objectifs de la mission**
+(<1 s Dashboard, <500 ms recherche), avec une marge large (le pire cas
+mesuré, `chantiers_liste_paginee` à 178,80 ms, reste à moins de 36 % de
+l'objectif). Mesures stables (écart min-max étroit par scénario, pas de
+valeur aberrante isolée) — pas une mesure unique présentée comme
+représentative.
+
+### 12.7 Fresh qualification — base entièrement vide
+
+Rejoué en une seule séquence continue, sur une base créée de zéro pour ce
+lot (`gp_perf_fresh`, distincte de celle utilisée pour le reste de la
+mission) :
+
+1. Rejeu complet des 299 migrations (0 erreur).
+2. Génération de la fixture complète (`scripts/perf/generate_fixture.sql`) —
+   le cache `entreprises_dashboard_cache` s'est donc construit **uniquement**
+   via les triggers incrémentaux pendant l'insertion des ~5000 devis/3000
+   factures, jamais via le backfill de la migration 317 (qui s'était exécuté
+   plus tôt, sur une base encore vide) — le test le plus strict possible de
+   la maintenance incrémentale.
+3. Comparaison cache vs recalcul canonique sur cette base : 0 divergence
+   (§ 12.2 tableau, ligne "grand tenant" rejouée ici aussi).
+4. pgTAP — 3 nouveaux fichiers (27 assertions) : **27/27 PASS**.
+5. pgTAP — suite complète (82 fichiers) : **60/82 verts, exactement les 22
+   mêmes échecs pré-existants** qu'observés sur `gp_perf` (§ 8.2, liste
+   byte pour byte identique entre les deux bases) — confirme que ces 22
+   échecs sont un artefact d'environnement/de fixtures pré-existant,
+   indépendant de la base utilisée, et non une régression de ce lot.
+6. `npx tsc --noEmit` : 0 erreur.
+7. `npx eslint src/app/(app)/dashboard/page.tsx` : 0 erreur.
+8. `npx vitest run --no-file-parallelism` : 1777/1777 (identique à la
+   mission initiale).
+9. `npx next build` : compilé avec succès (identique à la mission initiale ;
+   `apps/tools` toujours hors périmètre, même cause pré-existante).
+
+**Comparaison au baseline** : correction apportée au passage — le décompte
+initial de la mission précédente ("19 échecs pré-existants", § 8.2) était
+sous-évalué de 3 fichiers, omis par erreur de l'énumération manuelle
+(`gp_pilot_plateforme_admin_role_total`, `gp_pilot_rgpd_manifeste_fichiers`,
+`platform_audit_log_bounded_v1` — tous trois structurels/pré-existants,
+vérifiés sans rapport avec cette mission, § 8.2 mis à jour). Le chiffre
+correct, revérifié deux fois sur deux bases indépendantes, est **22**.
+**Aucun nouvel échec** par rapport à ce baseline corrigé, sur aucune des
+deux bases.
+
+**Fresh qualification : PASS.**
+
+---
+
+## 13. Verdict final
+
+### 13.1 Critères de verdict
+
+| Critère | Résultat |
+| --- | --- |
+| Dashboard < 1 s au volume ×2 | ✅ 69,86 ms max (§ 12.6) |
+| Valeurs métier avant/après équivalentes | ✅ 24/24, 0 divergence (§ 12.2) |
+| Cache cohérent dans tous les scénarios testés | ❌ 11/12 — écart réel sur le changement d'`entreprise_id` d'une facture brouillon (§ 12.3) |
+| Aucune fuite cross-tenant détectée | ✅ (§ 12.4) |
+| RPC `SECURITY DEFINER` correctement bornées | ✅ (§ 12.5) |
+| Recherches réelles dans des performances acceptables | ✅ toutes < 200 ms, objectif 500 ms (§ 12.6) |
+| `next_reference()` sans collision en qualification | ✅ (§ 12.1) |
+| Fresh replay | ✅ (§ 12.7) |
+| Aucune nouvelle régression pgTAP/Vitest/typecheck/lint/build | ✅ (§ 12.7) |
+
+8 critères sur 9 strictement satisfaits. Le seul écart (cache, changement
+d'entreprise sur facture brouillon) est réel, documenté avec preuve directe,
+mais structurellement inatteignable par le produit tel qu'il existe
+aujourd'hui (§ 12.3, 4 raisons convergentes), auto-réparable par
+reconstruction, et sans impact sur le cloisonnement tenant ni sur la
+performance. Ce n'est pas une gravité justifiant `PERFORMANCE NOT
+QUALIFIED` (pas de vulnérabilité de sécurité, pas de régression, pas de
+dépassement d'objectif de performance) — mais la lettre du critère 3
+("dans tous les scénarios testés") n'est, strictement, pas remplie à 100 %.
+
+### 13.2 Verdict
+
+**`PERFORMANCE CANDIDATE`** (inchangé — non promu à `PERFORMANCE QUALIFIED`
+par cette qualification).
+
+Justification : les deux goulets explicitement visés par la mission restent
+fermés et sont désormais qualifiés en profondeur — `next_reference()`
+qualifiée sans collision sous charge concurrente réelle, équivalence
+fonctionnelle du Dashboard prouvée à 100 % sur 3 tailles de tenant dont des
+cas limites construits à la main, isolation tenant démontrée à l'échelle
+réelle avec les rôles applicatifs, RPC `SECURITY DEFINER` auditées sans
+trouver de vulnérabilité, benchmarks reproductibles avec médiane/p95/max
+tous largement sous objectif, fresh replay et suite de tests complets sans
+aucune nouvelle régression. Le seul point qui empêche la promotion à
+`PERFORMANCE QUALIFIED` au sens strict des critères donnés est l'écart de
+cache documenté en § 12.3 : réel, mais de gravité faible et non accessible
+par un chemin applicatif existant — insuffisant pour `PERFORMANCE NOT
+QUALIFIED`, mais un critère explicite de verdict n'est pas rempli à 100 %,
+ce qui maintient `PERFORMANCE CANDIDATE` par une lecture stricte du § 8 de
+cette qualification.
 
 Pas `DASHBOARD SEARCH PILOT READY` : cette mission n'a qualifié que deux
 parcours précis (Dashboard, recherche), pas l'ensemble de l'application à
 l'échelle d'un pilote (planning en écriture concurrente, pointages, etc. —
 hors périmètre, déjà couverts ou documentés par l'audit précédent). Pas
-`PERFORMANCE BLOCKERS OPEN` : aucun blocage résiduel trouvé sur les deux
-parcours ciblés une fois les correctifs appliqués.
+`PERFORMANCE BLOCKERS OPEN` ni `PERFORMANCE NOT QUALIFIED` : aucun blocage
+résiduel, aucune vulnérabilité, aucune régression — uniquement une limite
+de cohérence de cache documentée, à gravité faible et non exploitable par
+le produit actuel.
