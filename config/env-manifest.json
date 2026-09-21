@@ -539,6 +539,33 @@
         "projet Supabase dédié pour Studio (porter fix/studio-signup-closed-v1)",
         "Studio rejoint le projet partagé (réconcilier autrement la fermeture d'inscription au niveau Auth)"
       ]
+    },
+    {
+      "id": "DECISION_REQUIRED:PREVIEW-PROJECT-INVENTORY",
+      "owner": "Julien",
+      "question": "Un ou plusieurs projets Vercel/Supabase « Preview » existent-ils déjà côté plateformes réelles ? Aucun identifiant (project ref, domaine, variable déjà positionnée) n'est versionné dans ce dépôt, donc personne ne peut le confirmer depuis un sandbox. À vérifier en premier, avant de supposer un départ de zéro (docs/runbooks/ELSATIA_PREVIEW_DEPLOYMENT_RUNBOOK_V1.md §0).",
+      "options": [
+        "aucun projet Preview n'existe : provisionner à neuf",
+        "un ou plusieurs projets Preview existent déjà : les inventorier avant toute action"
+      ]
+    },
+    {
+      "id": "DECISION_REQUIRED:HOSTING-PROVIDER-STUDIO-WORKER",
+      "owner": "Julien",
+      "question": "Quel hébergeur de conteneurs à processus long pour workers/studio-video (Fly.io, Railway, Render, ECS/Fargate, Cloud Run, VM+systemd, etc.) ? Le dépôt n'impose aucun fournisseur (docs/runbooks/ELSATIA_STUDIO_VIDEO_WORKER_DEPLOYMENT_V1.md §3) : le Dockerfile livré est provider-agnostic, mais un choix doit être fait avant un déploiement réel.",
+      "options": [
+        "choisir un hébergeur maintenant (aucune préférence technique déduite du dépôt)",
+        "exclure le rendu vidéo Studio du périmètre de la première Preview"
+      ]
+    },
+    {
+      "id": "DECISION_REQUIRED:RESERVES-URL-FAIL-CLOSED",
+      "owner": "Julien",
+      "question": "apps/reserves/src/lib/invitations.ts et apps/reserves/src/app/layout.tsx retombent silencieusement sur http://localhost:3020 quand NEXT_PUBLIC_RESERVES_URL est absente (au lieu d'échouer explicitement, comme le font déjà Colors et Studio pour un cas équivalent). Un oubli de cette variable en Preview/Production envoie des liens d'invitation inaccessibles, sans faire échouer le build. Faut-il aligner ce comportement sur celui de Colors/Studio (échec explicite) ?",
+      "options": [
+        "faire échouer explicitement l'absence de NEXT_PUBLIC_RESERVES_URL (aligné sur Colors/Studio)",
+        "conserver le repli localhost (statu quo)"
+      ]
     }
   ],
   "findings": [
