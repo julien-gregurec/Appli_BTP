@@ -55,7 +55,7 @@ insert into fx.entreprises (seq, id, taille) values
 
 insert into public.entreprises (id, nom, raison_sociale, siret, adresse, code_postal, ville,
   couleur_accent, gabarit_pdf, assurance_decennale_numero, assurance_rc_pro_numero,
-  taux_penalites_retard, abonnement_statut, created_at)
+  taux_penalites_retard, abonnement_statut, capacite_personnes_supplementaire, created_at)
 select
   e.id,
   case e.taille when 'principale' then 'BTP Fixture Principale' else 'BTP Fixture Secondaire' end,
@@ -64,6 +64,12 @@ select
   '12 rue des Artisans', '69001', 'Lyon',
   '#0d1b2a', 'classique', 'DEC-FIXTURE-001', 'RCP-FIXTURE-001',
   1.5, 'actif',
+  -- Capacité de personnes actives (migration 20260903000256, postérieure à
+  -- la version du schéma contre laquelle ce script a été écrit initialement)
+  -- : le forfait de base ne suffit pas pour 40/5 salariés, on ajoute le
+  -- supplément nécessaire pour que la fixture reste représentative d'une
+  -- vraie PME sans se heurter au garde-fou d'abonnement.
+  200,
   now() - interval '5 years'
 from fx.entreprises e;
 
@@ -163,7 +169,7 @@ from (
 where emp.seq = sub.employe_seq;
 
 insert into public.employes (id, entreprise_id, prenom, nom, email, telephone, poste, type_contrat,
-  date_entree, date_sortie, taux_horaire, cout_horaire, statut, numero_inscription, poste_id, utilisateur_id)
+  date_entree, date_sortie, taux_horaire, statut, numero_inscription, poste_id, utilisateur_id)
 select
   emp.id, ent.id,
   'Prenom' || emp.seq, 'NomSalarie' || emp.seq,
@@ -171,7 +177,7 @@ select
   '06' || lpad((10000000 + emp.seq)::text, 8, '0'),
   p.nom, case when random() < 0.85 then 'cdi' else 'cdd' end,
   emp.date_entree, emp.date_sortie,
-  round((14 + random()*12)::numeric, 2), round((18 + random()*14)::numeric, 2),
+  round((14 + random()*12)::numeric, 2),
   case when emp.date_sortie is not null then 'sorti' else 'actif' end,
   'MAT-' || ent.taille || '-' || lpad(emp.seq::text, 5, '0'),
   p.id,
@@ -180,6 +186,15 @@ from fx.employes emp
 join fx.entreprises ent on ent.seq = emp.entreprise_seq
 join fx.postes p on p.seq = emp.poste_seq
 left join fx.auth_users au on au.seq = emp.utilisateur_seq;
+
+-- employes_cout_horaire : le coût horaire interne a été sorti de la table
+-- employes vers une table dédiée historisée (migration 20260818000206,
+-- postérieure à la version du schéma contre laquelle ce script a été écrit
+-- initialement) — alimentée séparément ici pour rester cohérente avec le
+-- schéma courant du train.
+insert into public.employes_cout_horaire (employe_id, entreprise_id, cout_horaire)
+select emp.id, emp.entreprise_id, round((18 + random()*14)::numeric, 2)
+from public.employes emp;
 
 -- utilisateurs_entreprises : rattache chaque compte de connexion à son entreprise (actif),
 -- condition nécessaire à est_membre_actif() / RLS.
@@ -257,6 +272,23 @@ join fx.entreprises ent on ent.seq = ch.entreprise_seq
 join fx.clients cl on cl.seq = ch.client_seq;
 
 -- --------------------------------------------------------------------------
+-- CONNU, NON CORRIGÉ ICI (hors périmètre de la mission qui a ajouté ce
+-- commentaire — lot Planning/Pointage concurrency v1) : le passage groupé au
+-- statut final ci-dessous (~5300 devis en une seule UPDATE, §7) peut échouer
+-- avec `duplicate key value violates unique constraint
+-- "devis_entreprise_id_numero_key"` sur un ledger de migrations où le
+-- garde-fou de troncature lpad (20260921000299) est déjà appliqué — donc un
+-- second bug de numérotation distinct, dans next_reference()/
+-- compteurs_reference (allocation du compteur annuel), pas dans
+-- formater_numero_document(). Reproduit et confirmé lors de cette mission ;
+-- non corrigé car hors sujet (concurrence Planning/Pointages) — voir
+-- docs/qualification/ELSATIA_GP_PLANNING_POINTAGE_CONCURRENCY_V1.md § OPEN
+-- RISKS. Si ce script est rejoué en entier, s'attendre à devoir contourner ce
+-- point (ex. répartir les devis "lourds" sur une seule année) en attendant un
+-- correctif dédié.
+-- --------------------------------------------------------------------------
+
+-- --------------------------------------------------------------------------
 -- 7. Devis (5000 + 12 "lourds" pour le tenant principal ; 300 pour le secondaire)
 --    + lignes_devis. Respecte le verrou "lignes modifiables seulement en
 --    brouillon" : on insère les lignes AVANT de faire passer le devis à son
@@ -295,19 +327,30 @@ select
   'PERF-' || t.nb || 'L'
 from (values (20),(20),(20),(100),(100),(100),(500),(500),(500),(1000),(1000),(1000)) as t(nb);
 
+-- Note : `devis` n'a jamais eu de colonne `reference_interne` (cette table
+-- utilise `numero`, généré par trigger à l'émission — voir
+-- `trg_devis_numero`, qui ne s'applique qu'aux devis non-brouillon). Le tag
+-- `d.tag` (ex. 'PERF-1000L') identifiait ces devis "lourds" dans le script
+-- d'origine mais visait une colonne inexistante ; il n'était de toute façon
+-- pas insérable tel quel dans `numero` (3 devis partagent chaque taille, ce
+-- qui violerait `devis_entreprise_id_numero_key`). Ces devis restent
+-- identifiables par leur nombre de lignes (`lignes_devis` group by
+-- `devis_id`), comme le fait déjà le reste de ce script.
 insert into public.devis (id, entreprise_id, client_id, chantier_id, statut, date_emission, date_validite,
-  remise_globale, created_at, reference_interne)
+  remise_globale, created_at)
 select d.id, ent.id, cl.id, ch.id, 'brouillon', d.date_emission, d.date_emission + 60,
   case when random() < 0.15 then round((random()*5)::numeric, 2) else 0 end,
-  d.date_emission::timestamptz,
-  d.tag
+  d.date_emission::timestamptz
 from fx.devis d
 join fx.entreprises ent on ent.seq = d.entreprise_seq
 join fx.clients cl on cl.seq = d.client_seq
 left join fx.chantiers ch on ch.seq = d.chantier_seq;
 
+-- Note : `lignes_devis`/`lignes_factures` n'ont jamais eu de colonne
+-- `cle_ligne` (aucune migration ne la crée) — retirée des deux inserts
+-- ci-dessous, qui échouaient à froid avant ce correctif.
 insert into public.lignes_devis (devis_id, designation, description, type, quantite, unite,
-  prix_unitaire_ht, remise_ligne, taux_tva, ordre, cle_ligne)
+  prix_unitaire_ht, remise_ligne, taux_tva, ordre)
 select
   d.id,
   'Prestation ' || d.seq || '.' || ln,
@@ -318,8 +361,7 @@ select
   round((10 + random()*450)::numeric, 2),
   case when random() < 0.1 then round((random()*10)::numeric, 2) else 0 end,
   (array[20,10,5.5])[1+floor(random()*3)],
-  ln,
-  'fx-devis-' || d.seq || '-' || ln
+  ln
 from fx.devis d
 cross join lateral generate_series(1, d.nb_lignes) ln;
 
@@ -361,7 +403,7 @@ join fx.clients cl on cl.seq = f.client_seq
 left join fx.chantiers ch on ch.seq = f.chantier_seq;
 
 insert into public.lignes_factures (facture_id, designation, description, type, quantite, unite,
-  prix_unitaire_ht, remise_ligne, taux_tva, ordre, cle_ligne)
+  prix_unitaire_ht, remise_ligne, taux_tva, ordre)
 select
   f.id,
   'Prestation facturée ' || f.seq || '.' || ln,
@@ -372,8 +414,7 @@ select
   round((10 + random()*450)::numeric, 2),
   0,
   (array[20,10,5.5])[1+floor(random()*3)],
-  ln,
-  'fx-facture-' || f.seq || '-' || ln
+  ln
 from fx.factures f
 cross join lateral generate_series(1, f.nb_lignes) ln;
 
@@ -488,15 +529,18 @@ cross join generate_series(1, case ent.taille when 'principale' then 70 else 20 
 --     principal, dont une fenêtre récente dense (~450 évènements sur les
 --     8 dernières semaines, pour le scénario "vue mensuelle 40 salariés").
 -- --------------------------------------------------------------------------
-insert into public.planning_evenements (entreprise_id, chantier_id, client_id, titre, type, statut,
-  debut, fin, journee_entiere)
+-- Note : `planning_evenements` n'a ni `client_id` ni `journee_entiere` (ces
+-- colonnes n'existent dans aucune migration du ledger courant — schéma
+-- probablement en avance sur la version contre laquelle ce script a été
+-- écrit à l'origine). Retirées des deux inserts ci-dessous.
+insert into public.planning_evenements (entreprise_id, chantier_id, titre, type, statut,
+  debut, fin)
 select
-  ent.id, ch.id, cl.id,
+  ent.id, ch.id,
   'Intervention ' || ch.seq || '.' || g,
-  (array['chantier','intervention','rendez_vous','livraison','deplacement'])[1+floor(random()*5)],
+  (array['intervention','rdv_client','livraison','controle','autre'])[1+floor(random()*5)],
   (array['planifie','confirme','termine','termine','termine'])[1+floor(random()*5)],
-  ts, ts + (interval '2 hour' + (round((random()*6)::numeric, 4) || ' hours')::interval),
-  random() < 0.2
+  ts, ts + (interval '2 hour' + (round((random()*6)::numeric, 4) || ' hours')::interval)
 from fx.chantiers ch
 join fx.entreprises ent on ent.seq = ch.entreprise_seq
 join fx.clients cl on cl.seq = ch.client_seq
@@ -507,11 +551,11 @@ cross join lateral (
 ) t;
 
 -- Fenêtre récente dense (dernières 8 semaines), tenant principal uniquement.
-insert into public.planning_evenements (entreprise_id, chantier_id, client_id, titre, type, statut, debut, fin)
+insert into public.planning_evenements (entreprise_id, chantier_id, titre, type, statut, debut, fin)
 select
-  ent.id, ch.id, cl.id,
+  ent.id, ch.id,
   'Intervention récente ' || g,
-  (array['chantier','intervention','rendez_vous'])[1+floor(random()*3)],
+  (array['intervention','rdv_client','autre'])[1+floor(random()*3)],
   (array['planifie','confirme'])[1+floor(random()*2)],
   ts, ts + interval '4 hour'
 from fx.entreprises ent
@@ -523,6 +567,38 @@ cross join lateral (
   select (now() - (round((random()*56)::numeric, 4) || ' days')::interval) + ((8+floor(random()*9))||' hours')::interval as ts
 ) t
 where ent.taille = 'principale';
+
+-- --------------------------------------------------------------------------
+-- 12bis. Affectations (public.affectations) — la table Planning réellement
+--     utilisée par l'application (src/app/actions/planning.ts) ; contrairement
+--     à `planning_evenements` (§12, table historique dont plus aucun code
+--     applicatif ne lit/écrit — voir le commentaire de
+--     20260710000009_planning.sql), c'est ici que se joue la qualification de
+--     concurrence en écriture sur le Planning. Une affectation par salarié et
+--     par jour ouvré sur ~2 ans (tenure-bornée comme les pointages, §10) :
+--     reste toujours sous le plafond de 24h/jour/salarié
+--     (trg_verifier_heures_affectation) et ne peut jamais entrer en collision
+--     avec affectations_tache_unique (une seule ligne par salarié/jour ici).
+-- --------------------------------------------------------------------------
+insert into public.affectations (entreprise_id, chantier_id, employe_id, date, heures, tache, type_activite)
+select
+  ent.id, ch.id, emp.id, d::date,
+  case when random() < 0.85 then 7 else 8 end,
+  (array['Maçonnerie','Second oeuvre','Finitions','Pose','Préparation','Nettoyage chantier'])[1+floor(random()*6)],
+  'chantier'
+from fx.employes emp
+join fx.entreprises ent on ent.seq = emp.entreprise_seq
+cross join lateral generate_series(
+  greatest(emp.date_entree, current_date - interval '2 years'),
+  least(coalesce(emp.date_sortie, current_date), current_date),
+  interval '1 day'
+) d
+join lateral (
+  select seq from fx.chantiers c2 where c2.entreprise_seq = emp.entreprise_seq order by random() limit 1
+) csel on true
+join fx.chantiers ch on ch.seq = csel.seq
+where extract(isodow from d) < 6  -- jours ouvrés uniquement (lun-ven)
+  and random() < 0.8;             -- pas d'affectation planifiée tous les jours
 
 -- --------------------------------------------------------------------------
 -- 13. Documents de chantier (métadonnées seules ; pas de vrais blobs).
@@ -596,6 +672,7 @@ union all select 'lignes_situations', count(*) from public.lignes_situations
 union all select 'pointages', count(*) from public.pointages
 union all select 'notes_frais', count(*) from public.notes_frais
 union all select 'planning_evenements', count(*) from public.planning_evenements
+union all select 'affectations', count(*) from public.affectations
 union all select 'documents_chantier', count(*) from public.documents_chantier
 union all select 'notifications_utilisateurs', count(*) from public.notifications_utilisateurs
 union all select 'journal_activite', count(*) from public.journal_activite

@@ -14,6 +14,7 @@ type A = {
   tache: string | null;
   type_activite: string;
   lieu_activite: string | null;
+  revision: number;
   chantier: { id: string; nom: string } | { id: string; nom: string }[] | null;
   employe: { id: string; prenom: string; nom: string } | { id: string; prenom: string; nom: string }[] | null;
 };
@@ -49,7 +50,7 @@ const champInput = "mt-1 w-full rounded border px-2 py-1 text-xs dark:bg-neutral
 function FormulaireModifierAffectation({ a, chantiers, retour, autresMemeLot, peutGererPlanning }: { a: A; chantiers: { id: string; nom: string }[]; retour: string; autresMemeLot: A[]; peutGererPlanning: boolean }) {
   if (!peutGererPlanning) return null;
   const ch = un(a.chantier);
-  const modifier = modifierAffectationAction.bind(null, a.id);
+  const modifier = modifierAffectationAction.bind(null, a.id, a.revision);
   return (
     <details className="mt-1">
       <summary className="cursor-pointer text-[11px] font-medium text-blue-700">Modifier</summary>
@@ -98,7 +99,7 @@ export default async function PlanningPage({ searchParams }: { searchParams: Pro
   const [{ data: chantiers }, { data: employes }, { data: affectationsData }, {data:pointagesData}] = await Promise.all([
     sb.from("chantiers").select("id,nom").eq("entreprise_id", ctx.entrepriseId).not("statut", "in", "(archive,annule)").order("nom"),
     sb.from("employes").select("id,prenom,nom").eq("entreprise_id", ctx.entrepriseId).eq("statut", "actif").order("nom"),
-    sb.from("affectations").select("id,date,heures,tache,type_activite,lieu_activite,chantier:chantiers(id,nom),employe:employes(id,prenom,nom)").eq("entreprise_id", ctx.entrepriseId).gte("date", iso(debut)).lte("date", iso(fin)).order("date"),
+    sb.from("affectations").select("id,date,heures,tache,type_activite,lieu_activite,revision,chantier:chantiers(id,nom),employe:employes(id,prenom,nom)").eq("entreprise_id", ctx.entrepriseId).gte("date", iso(debut)).lte("date", iso(fin)).order("date"),
     sb.from("pointages").select("date,heures_normales,heures_supplementaires,verification_statut,employe_id,chantier_id").eq("entreprise_id",ctx.entrepriseId).gte("date",iso(debut)).lte("date",iso(fin)).eq("verification_statut","valide"),
   ]);
 

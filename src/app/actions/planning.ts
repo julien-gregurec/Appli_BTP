@@ -53,7 +53,15 @@ export async function creerAffectationAction(formData: FormData) {
 // supprimer/recréer. ids_supplementaires liste les affectations d'autres employes (issues
 // de la meme saisie groupee) que l'utilisateur a explicitement cochees pour recevoir la
 // meme correction — jamais une propagation automatique, toujours un choix explicite.
-export async function modifierAffectationAction(affectationId: string, formData: FormData) {
+//
+// Verrouillage optimiste (revisionAttendue) : l'affectation principale (affectationId) n'est
+// modifiée que si sa révision n'a pas bougé depuis que l'utilisateur a chargé le formulaire —
+// sinon quelqu'un d'autre l'a modifiée ou supprimée entre-temps (lost update), et on renvoie
+// une erreur explicite plutôt que d'écraser silencieusement ce changement. Les éventuelles
+// affectations "supplémentaires" cochées dans le même lot restent, elles, mises à jour sans
+// vérification individuelle de révision (comportement inchangé : c'est un choix explicite de
+// l'utilisateur sur des lignes qu'il n'a pas rouvertes une à une pour en revérifier l'état).
+export async function modifierAffectationAction(affectationId: string, revisionAttendue: number, formData: FormData) {
   const ctx = await getContexteEntreprise();
   const supabase = await createClient();
 
@@ -63,7 +71,6 @@ export async function modifierAffectationAction(affectationId: string, formData:
   const date = champ(formData, "date");
   const heures = Number(formData.get("heures"));
   const idsSupplementaires = [...new Set(formData.getAll("ids_supplementaires").map(String).filter(Boolean))];
-  const idsACorriger = [...new Set([affectationId, ...idsSupplementaires])];
 
   const retour = champ(formData, "retour");
   const destination = retour ? `/planning?semaine=${encodeURIComponent(retour)}` : "/planning";
@@ -79,15 +86,32 @@ export async function modifierAffectationAction(affectationId: string, formData:
   }
   const tache = champ(formData, "tache");
   const lieuActivite = typeActivite === "chantier" ? null : champ(formData, "lieu_activite");
+  const valeurs = { chantier_id: chantierId, date, heures, tache, type_activite: typeActivite, lieu_activite: lieuActivite };
 
-  const { error } = await supabase
+  const { data: ligneModifiee, error } = await supabase
     .from("affectations")
-    .update({ chantier_id: chantierId, date, heures, tache, type_activite: typeActivite, lieu_activite: lieuActivite })
+    .update(valeurs)
     .eq("entreprise_id", ctx.entrepriseId)
-    .in("id", idsACorriger);
+    .eq("id", affectationId)
+    .eq("revision", revisionAttendue)
+    .select("id");
 
   if (error) {
     redirect(`${destination}${destination.includes("?") ? "&" : "?"}error=${encodeURIComponent(messageErreurUtilisateur("modifierAffectationAction", error, "Impossible de modifier cette affectation."))}`);
+  }
+  if (!ligneModifiee || ligneModifiee.length === 0) {
+    redirect(`${destination}${destination.includes("?") ? "&" : "?"}error=${encodeURIComponent("Cette affectation a été modifiée ou supprimée par quelqu’un d’autre entre-temps. Rechargez la page pour voir son état actuel.")}`);
+  }
+
+  if (idsSupplementaires.length) {
+    const { error: erreurLot } = await supabase
+      .from("affectations")
+      .update(valeurs)
+      .eq("entreprise_id", ctx.entrepriseId)
+      .in("id", idsSupplementaires);
+    if (erreurLot) {
+      redirect(`${destination}${destination.includes("?") ? "&" : "?"}error=${encodeURIComponent(messageErreurUtilisateur("modifierAffectationAction", erreurLot, "Affectation principale modifiée, mais le reste du lot n’a pas pu être corrigé."))}`);
+    }
   }
 
   revalidatePath("/planning");

@@ -113,7 +113,18 @@ export async function supprimerPointageAction(pointageId: string, mois: string) 
   redirect(`/pointage?mois=${mois}`);
 }
 
-export async function validerPointageAction(pointageId:string,statut:"valide"|"rejete",mois:string,formData:FormData){const ctx=await getContexteEntreprise(),supabase=await createClient(),{error}=await supabase.rpc("valider_preuve_pointage",{p_entreprise_id:ctx.entrepriseId,p_pointage_id:pointageId,p_statut:statut,p_commentaire:texte(formData,"commentaire_verification")});if(error)redirect(`/pointage?mois=${mois}&error=${encodeURIComponent(messageErreurUtilisateur("validerPointageAction",error,"Impossible de valider ce pointage."))}`);revalidatePath("/pointage");redirect(`/pointage?mois=${mois}&succes=validation`)}
+export async function validerPointageAction(pointageId:string,statut:"valide"|"rejete",mois:string,formData:FormData){
+  const ctx=await getContexteEntreprise(),supabase=await createClient();
+  const{error}=await supabase.rpc("valider_preuve_pointage",{p_entreprise_id:ctx.entrepriseId,p_pointage_id:pointageId,p_statut:statut,p_commentaire:texte(formData,"commentaire_verification")});
+  if(error){
+    // Cf. valider_preuve_pointage (verrou + détection de conflit) : une décision déjà prise
+    // par quelqu'un d'autre entre-temps ne doit pas ressortir comme une erreur technique
+    // générique, même si l'appelant fournit un repli (voir messageErreurUtilisateur).
+    const conflit=error.message?.includes("CONFLIT_CONCURRENCE_POINTAGE");
+    redirect(`/pointage?mois=${mois}&error=${encodeURIComponent(conflit?"Ce pointage a déjà été validé ou rejeté par quelqu’un d’autre entre-temps. Rechargez la page pour voir son état actuel.":messageErreurUtilisateur("validerPointageAction",error,"Impossible de valider ce pointage."))}`);
+  }
+  revalidatePath("/pointage");redirect(`/pointage?mois=${mois}&succes=validation`)
+}
 
 export async function creerMaFichePointageAdministrateurAction(){
   const ctx=await getContexteEntreprise();
