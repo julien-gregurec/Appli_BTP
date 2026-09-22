@@ -46,6 +46,30 @@ function q(sql) {
   const res = spawnSync('su', ['postgres', '-c', `psql -X -q -t -A -d ${DB} -c "${sql.replace(/"/g, '\\"')}"`], { encoding: 'utf8' });
   return (res.stdout || '').trim();
 }
+
+// ---- storage mock (local_storage_mock.mjs, V3) -- real storage.objects/RLS, see its header ----
+const STORAGE_URL = process.env.STORAGE_URL || 'http://localhost:5000';
+async function storageUpload(role, bucket, name, bodyText, contentType) {
+  const res = await fetch(`${STORAGE_URL}/object/${bucket}/${name}`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${TOKENS[role]}`, 'content-type': contentType },
+    body: bodyText,
+  });
+  return { ok: res.ok, status: res.status, body: await res.text() };
+}
+async function storageRemove(role, bucket, names) {
+  const res = await fetch(`${STORAGE_URL}/object/${bucket}`, {
+    method: 'DELETE',
+    headers: { authorization: `Bearer ${TOKENS[role]}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ prefixes: names }),
+  });
+  const body = await res.text();
+  return { ok: res.ok, status: res.status, body, deletedCount: (() => { try { return JSON.parse(body).length; } catch { return 0; } })() };
+}
+async function storageExists(role, bucket, name) {
+  const res = await fetch(`${STORAGE_URL}/object/${bucket}/${name}`, { headers: { authorization: `Bearer ${TOKENS[role]}` } });
+  return res.status === 200;
+}
 // last non-empty line of an unaligned/tuples-only run() result -- the RPC/select's own output
 function lastLine(stdout) {
   const lines = stdout.split('\n').map((l) => l.trim()).filter(Boolean);
@@ -342,6 +366,23 @@ let FA_NEW;
   const r = DEPENSE_1 ? run('admin', `select classer_facture_fournisseur('${ENT_A}', '${DEPENSE_1}', '${target}');`) : { ok: false, stdout: '', stderr: 'no depense fixture row' };
   record('DP-04', 'Dépense classée sur un chantier (visible dans le suivi budgétaire)', DEPENSE_1 && r.ok ? 'PASS' : 'FAIL', `depense=${DEPENSE_1} chantier_cible=${target}\n${r.stdout}\n${r.stderr}`);
 }
+{
+  // Was STORAGE_REQUIRED in V1/V2 -- real storage.objects/RLS now reachable
+  // via local_storage_mock.mjs (V3, see its header for what "mocked" means
+  // here). Reproduces ajouterJustificatifDepenseAction (src/app/actions/
+  // depenses.ts) step by step: upload to factures-fournisseurs under the
+  // user's own JWT (real RLS, not service_role), then lier_justificatif_depense.
+  // OCR itself ("si activé" in the acceptance criterion) is a separate,
+  // conditional downstream step with no local substitute -- not asserted here.
+  const path = DEPENSE_1 ? `${ENT_A}/${DEPENSE_1}/${crypto.randomUUID()}.pdf` : null;
+  const upload = path ? await storageUpload('admin', 'factures-fournisseurs', path, '%PDF-1.4 fake justificatif', 'application/pdf') : { ok: false, status: 0 };
+  const r = path && upload.ok
+    ? run('admin', `select lier_justificatif_depense('${ENT_A}', '${DEPENSE_1}', '${path}', 'justificatif-test.pdf', 'application/pdf', 27);`)
+    : { ok: false, stdout: '', stderr: 'upload failed' };
+  const check = path && r.ok ? q(`select justificatif_storage_path from depenses_fournisseurs where id='${DEPENSE_1}';`) : '';
+  record('DP-03', 'Justificatif PDF/image joint à une dépense, visible sur la fiche', DEPENSE_1 && upload.ok && r.ok && check === path ? 'PASS' : 'FAIL',
+    `depense=${DEPENSE_1} path=${path}\nupload=status ${upload.status}, ${upload.body}\nlier=${r.stdout}/${r.stderr}\njustificatif_storage_path en base=${check}\nOCR non testé ici (service externe conditionnel, aucun substitut local).`);
+}
 
 // =========================== NOTES DE FRAIS ===========================
 {
@@ -387,6 +428,26 @@ let FA_NEW;
   const r = run('admin', `update employes set carte_btp_numero='CARTE-TEST-V2-01', carte_btp_expiration=current_date+365 where id='${EMP_OUVRIER_ID}' returning carte_btp_numero;`);
   const r2 = run('admin', `update employes set carte_btp_numero=null, carte_btp_expiration=null where id='${EMP_OUVRIER_ID}' returning carte_btp_numero;`);
   record('PE-04', 'Numéro/échéance carte BTP importés puis supprimés', r.ok && r2.ok ? 'PASS' : 'FAIL', `import=${r.stdout}/${r.stderr}\ndelete=${r2.stdout}/${r2.stderr}`);
+}
+{
+  // Was STORAGE_REQUIRED in V1/V2 -- reproduces anonymiserEmployeAction
+  // (src/app/actions/rgpd.ts) step by step: upload a fake photo (real RLS,
+  // gerant's own JWT), record its path on the employe, run the
+  // anonymiser_employe RPC (blanks personal columns incl. *_storage_path,
+  // but per that RPC's own comment cannot reach the Storage API from pure
+  // SQL), then the admin/service_role removal the real action performs
+  // separately -- and confirm the file is actually gone, not just orphaned.
+  const empId = EMP_OUVRIER3;
+  const path = empId ? `${ENT_A}/${empId}-photo.jpg` : null;
+  const upload = path ? await storageUpload('gerant', 'documents-employes', path, 'fake-jpeg-bytes', 'image/jpeg') : { ok: false, status: 0 };
+  const linked = path && upload.ok ? run('gerant', `update employes set photo_storage_path='${path}' where id='${empId}' returning photo_storage_path;`) : { ok: false, stdout: '' };
+  const existsBefore = path ? await storageExists('gerant', 'documents-employes', path) : false;
+  const anon = empId && linked.ok ? run('gerant', `select anonymiser_employe('${ENT_A}', '${empId}');`) : { ok: false, stdout: '', stderr: 'setup failed' };
+  const pathAfterAnon = empId && anon.ok ? q(`select coalesce(photo_storage_path,'') from employes where id='${empId}';`) : 'n/a';
+  const removal = path && anon.ok ? await storageRemove('service_role', 'documents-employes', [path]) : { ok: false, status: 0, deletedCount: 0 };
+  const existsAfter = path ? await storageExists('gerant', 'documents-employes', path) : true;
+  record('PE-05', 'Anonymisation RGPD : colonnes personnelles vidées, fichiers Storage associés purgés', existsBefore && anon.ok && pathAfterAnon === '' && removal.ok && removal.deletedCount === 1 && !existsAfter ? 'PASS' : 'FAIL',
+    `employe=${empId} path=${path}\nupload=status ${upload.status}\nexiste avant anonymisation=${existsBefore}\nanonymiser_employe=${anon.stdout}/${anon.stderr}\nphoto_storage_path apres RPC (doit etre vide -- confirme que la RPC seule ne supprime QUE la colonne, pas le fichier)=${JSON.stringify(pathAfterAnon)}\nsuppression Storage (admin client, comme le fait réellement anonymiserEmployeAction)=status ${removal.status} deletedCount=${removal.deletedCount}\nexiste apres suppression=${existsAfter}`);
 }
 {
   const debut = q("select date_trunc('month', current_date + interval '2 months')::date;");

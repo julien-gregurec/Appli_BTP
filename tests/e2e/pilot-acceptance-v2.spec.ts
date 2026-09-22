@@ -57,6 +57,11 @@ const URL_GUARD_CASES: { id: string; path: string }[] = [
   { id: "AV-04", path: "/factures" },
 ];
 
+// PA-05: the one "preuve renforcée" case V2 didn't replay in a real browser
+// (§9 priorities). Same protocol as the group above, but with the
+// chef_chantier profile the pack's own criterion names.
+const PA_05_CASE = { id: "PA-05", path: "/paie", profile: "chef_chantier" as const };
+
 test.describe("URL guards -- direct access as ouvrier (no acces_* permission)", () => {
   for (const { id, path } of URL_GUARD_CASES) {
     test(`${id}: /${path} en tant qu'ouvrier`, async ({ page }) => {
@@ -75,6 +80,19 @@ test.describe("URL guards -- direct access as ouvrier (no acces_* permission)", 
       expect(bodyText).not.toMatch(/PILOTE-CLI-|DEV-PILOTE-|FAC-PILOTE-|CMD-PILOTE-/);
     });
   }
+});
+
+test.describe("PA-05: accès direct /paie par un chef de chantier (pas de droit paie)", () => {
+  test(`${PA_05_CASE.id}: /${PA_05_CASE.path} en tant que ${PA_05_CASE.profile}`, async ({ page }) => {
+    await login(page, PROFILES[PA_05_CASE.profile]);
+    const response = await page.goto(PA_05_CASE.path);
+    await page.waitForLoadState("networkidle");
+    const finalUrl = new URL(page.url()).pathname;
+    const bodyText = await page.locator("body").innerText();
+    console.log(`[URL-GUARD ${PA_05_CASE.id}] path=${PA_05_CASE.path} finalUrl=${finalUrl} status=${response?.status() ?? 0} redirected=${finalUrl !== PA_05_CASE.path}`);
+    expect(finalUrl).not.toBe(PA_05_CASE.path);
+    expect(bodyText).not.toMatch(/salaire|brut|net à payer/i);
+  });
 });
 
 test.describe("Flux principaux (smoke, réel PostgREST)", () => {
