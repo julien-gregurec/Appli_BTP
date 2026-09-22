@@ -28,8 +28,10 @@ vérifié indépendamment contre le code actuel de cette branche avec le même n
 `cacada0` (§14) : fuite de lecture de documents RH/fournisseurs/pointage sensibles, export
 comptable sans contrôle d'autorisation, policy RLS storage-paie fragile, durcissement de
 privilèges de socle, et un gap RGPD réel (fichiers Storage non supprimés par l'anonymisation
-RGPD). **7 correctifs au total ont maintenant été portés dans cette mission** (`cacada0` en
-seconde passe + 6 en troisième passe), tous additifs, tous revus par `npm run typecheck`/`lint`/
+RGPD). **8 correctifs au total ont maintenant été portés dans cette mission** (`cacada0` en
+seconde passe + `d357314` et les 6 de §14 en troisième passe — corrigé après coup : une version
+antérieure de ce paragraphe comptait « 7 » en omettant `d357314` de la somme ; voir §16 pour la
+note de cohérence), tous additifs, tous revus par `npm run typecheck`/`lint`/
 `test`/`build` quand ils touchent du code applicatif (node_modules a pu être installé cette
 fois — voir §9bis) et par les scripts SQL du dépôt sinon.
 
@@ -62,8 +64,36 @@ raison documentée (§17.2, dont deux pour un risque de régression de déploiem
 vérifiable dans ce bac à sable : une variable d'environnement obligatoire non confirmée sur les
 environnements réels, qui ferait échouer fermé — 503 — toute la route concernée si elle est
 absente au déploiement), et 2 sont non applicables car le code/les routes qu'ils corrigent
-n'existent pas sur cette branche (§17.3). **18 correctifs au total ont maintenant été portés dans
-cette mission.** Voir §17 pour le détail complet et §16 pour les décisions ouvertes mises à jour.
+n'existent pas sur cette branche (§17.3). **19 correctifs au total ont maintenant été portés dans
+cette mission** (8 avant cette passe, corrigé — voir §16 — + 11 ici). Voir §17 pour le détail
+complet et §16 pour les décisions ouvertes mises à jour.
+
+**Mise à jour du 2026-09-22 (sixième passe, même session/branche)** : reprend le tronc mono-app GP
+(§1.6) là où la cinquième passe s'était arrêtée, sur les 47 commits `fix(...)` restants. Examine 37
+commits en détail et **porte 10 correctifs supplémentaires** (§18.1, dont 3 partiellement), parmi
+lesquels une faille réelle de détournement de lien e-mail sensible (construction de liens de
+confirmation/réinitialisation à partir d'en-têtes HTTP fournis par l'appelant), un gap RLS réel sur
+`public.factures` (aucun verrou d'immutabilité en base pour une facture déjà émise), une élévation
+de privilège d'une session support pouvant devenir un accès permanent non tracé, et deux failles
+TOCTOU/doublon sur l'encaissement et les avoirs de facture. 27 autres commits sont déclinés avec
+raison documentée (§18.2), 2 sont proposés pour une session dédiée à l'outillage opérationnel plutôt
+que portés à la hâte (§18.3) — dont le cluster `338401b`/`503a14f`/`98ea6f2`/`cf13843`/`8ca1609`
+(extension du helper de masquage d'erreurs à ~50-80 fichiers), le premier de ces 5 commits déjà
+vérifié applicable mais les 4 autres hors budget de cette passe. **Avec cette passe, la totalité des
+~80 commits `fix(...)` de la branche source a désormais une décision documentée** ; le décompte
+cumulé de correctifs portés affiché à ce stade contenait un oubli (voir §16, corrigé en septième
+passe) — voir §18 pour le détail complet.
+
+**Mise à jour du 2026-09-22 (septième passe, session distincte)** : reprend le seul candidat resté
+ouvert en sortie de sixième passe — le cluster `338401b`/`503a14f`/`98ea6f2`/`cf13843`/`8ca1609`
+(§18.3) — et le porte intégralement après vérification fichier par fichier des 4 commits restants
+(**5 correctifs supplémentaires**, §19). Corrige au passage un décompte cumulé resté figé à « 28 »
+depuis la sixième passe, qui omettait un correctif (`d357314`, §13) d'une addition intermédiaire —
+recompté directement depuis `git log`, pas depuis la prose des passes précédentes. **34 correctifs
+au total ont désormais été portés sur l'ensemble de la mission.** Avec cette passe, l'audit des ~80
+commits `fix(...)` d'`integration/gp-external-pilot-closure-v1` annoncé en début de mission est
+complet : chacun a une décision documentée, et plus aucun cluster ne reste en suspens. Voir §19 pour
+le détail complet et §16 pour les décisions ouvertes mises à jour.
 
 **Portée de ce document** : reconstruction d'historique et comparaison de modèles à partir de
 preuves git réelles (SHA cités, contenu lu avec `git show`/`git log -S`, pas de suppositions),
@@ -73,8 +103,9 @@ n'est inventée** : chaque affirmation est tracée à une commande exécutée da
 mention explicite « rapporté par la session antérieure, non revérifié ici ».
 
 **Constat central, à lire avant tout le reste** : `main` (et donc `claude/quirky-noether-n8aerc`,
-qui lui était identique au démarrage de cette mission — voir §11 pour le seul commit qui l'en
-distingue désormais) est un dépôt **mono-application** — `liria-gestion-pro` (Gestion Pro
+qui lui était identique au démarrage de cette mission — voir §11/§13/§14/§17/§18/§19 pour les 34
+correctifs de sécurité mono-app qui l'en distinguent désormais) est un dépôt **mono-application** —
+`liria-gestion-pro` (Gestion Pro
 seul, `package.json` racine, pas de champ `workspaces`). Il n'y a **ni `apps/`, ni `packages/`**
 sur `main` (`ls apps/` → *No such file or directory*). Tout l'écosystème multi-application
 ELSATIA (Colors, Tools, Réserves, le paquet `packages/application-access`, le catalogue
@@ -84,6 +115,23 @@ lecture directe de l'arbre (§1.1), détermine tout le reste de ce rapport : il 
 branche d'intégration demandée, ni code ni schéma à qualifier ou à faire évoluer pour le modèle
 d'accès multi-app — seulement un historique à reconstruire et une décision à documenter
 honnêtement pour la suite.
+
+**OÙ COMMENCER LA LECTURE (propriétaire du dépôt)** :
+1. Lisez le « Constat central » ci-dessus, puis le paragraphe **CANONICAL MODEL NOT RESOLVED** tout
+   en bas du document — c'est le verdict complet en deux paragraphes.
+2. La **seule décision qui vous revient** est celle du §16, deuxième item (« plan concret pour la
+   convergence multi-app ») : si/quand/comment faire converger `main` vers le monorepo multi-app
+   (`fix/app-access-convergence-v1` comme candidat canonique documenté en §3). Aucune autre décision
+   d'architecture n'est en attente ; tout le reste de §16 liste des travaux de suivi techniques
+   (dépendances, RLS, portage conditionnel) plutôt que des choix à trancher.
+3. Pour l'état d'avancement du volet sécurité (mono-app, indépendant de la question ci-dessus) :
+   **§16 (OPEN DECISIONS)** donne la liste à jour de ce qui reste ouvert ; les **34 correctifs déjà
+   portés** sur cette branche sont détaillés section par section (§11, §13, §14, §17, §18, §19), un
+   commit source → un commit porté à chaque fois, avec la preuve de vérification citée.
+4. Le détail complet de chaque correctif, de chaque branche classifiée et de chaque décision de ne
+   pas porter quelque chose vit dans le corps du document ci-dessous (~1 500 lignes, organisé par
+   section numérotée) — c'est l'historique d'audit complet, à consulter au besoin plutôt qu'à lire
+   linéairement.
 
 ---
 
@@ -988,14 +1036,18 @@ suite complète du dépôt (§9bis).
   (`grant ... to authenticated` explicite plutôt qu'un défaut par omission), corrigé par le
   correctif porté en §13 (commit `d357314`). Plus de portage supplémentaire requis pour ce commit
   précis.
-- **RÉSOLU (sixième passe, §18)** : sur les ~80 commits `fix(...)` de
-  `integration/gp-external-pilot-closure-v1`, la totalité a désormais été examinée au moins par un
-  titre et une décision documentée (troisième passe : §14.1-14.6 portés, §14.7 examinés-non-portés ;
-  quatrième passe, §17 : 11 portés, 4 déclinés, 2 non applicables ; sixième passe, §18 : 10 portés
-  — 3 partiellement —, 27 déclinés). **28 correctifs portés au total sur l'ensemble de la mission.**
-  Il ne reste ouvert que le cluster `338401b`/`503a14f`/`98ea6f2`/`cf13843`/`8ca1609` (§18.3),
-  documenté comme candidat sûr mais volumineux pour une session dédiée future — plus un travail de
-  vérification exhaustive, l'inventaire lui-même est clos.
+- **RÉSOLU (sixième passe, §18, complétée par la septième passe, §19)** : sur les ~80 commits
+  `fix(...)` de `integration/gp-external-pilot-closure-v1`, la totalité a désormais été examinée au
+  moins par un titre et une décision documentée (troisième passe : §14.1-14.6 portés, §14.7
+  examinés-non-portés ; cinquième passe, §17 : 11 portés, 4 déclinés, 2 non applicables ; sixième
+  passe, §18 : 10 portés — 3 partiellement —, 27 déclinés ; septième passe, §19 : le dernier cluster
+  ouvert — `338401b`/`503a14f`/`98ea6f2`/`cf13843`/`8ca1609` — vérifié fichier par fichier et porté
+  intégralement, 5 correctifs). **34 correctifs portés au total sur l'ensemble de la mission**
+  (29 avant la septième passe — corrigé de « 28 » à « 29 » après avoir retrouvé `d357314` omis
+  d'un décompte intermédiaire, voir la note ci-dessus — + 5 de la septième passe). L'audit des ~80
+  commits `fix(...)` de cette branche est maintenant complet : chacun a une décision documentée
+  (porté / décliné avec raison / non applicable), et le seul cluster resté ouvert en sortie de
+  sixième passe a lui-même été refermé.
 - **DECISION_REQUIRED — cloisonnement des webhooks Stripe par environnement (§17.2, `fcdd4e7`)** :
   correctif identifié comme réel et bien conçu (empêche un webhook Stripe test d'être traité comme
   un événement live ou inversement), mais qui introduit une variable d'environnement obligatoire
@@ -1260,6 +1312,11 @@ complète en fin de passe), contrairement aux tests pgTAP jamais rejouables dans
   faible et l'infrastructure est prête ; c'est un volume de vérification, pas une difficulté
   technique — candidat idéal et bien scoping pour une session dédiée future, en commençant par
   `338401b` (déjà vérifié applicable).
+  **Mise à jour (septième passe, §19) : porté intégralement.** Les 4 commits restants ont été
+  vérifiés fichier par fichier contre le code actuel de cette branche, avec le même niveau de
+  rigueur que le reste de cette mission — voir §19 pour le détail complet (37 fichiers uniques
+  touchés au total sur les 5 commits — actions serveur, une route API, un composant client et le
+  garde-fou anti-régression `erreurs-brutes-core.test.ts`). Ce n'est plus un candidat ouvert.
 - **`4271906`, `fba2d93` (renommage boutique/préférences locales ELSATIA)** — non examinés en détail
   au-delà du titre (lignée de rebranding déjà classée N/A en §18.2 pour les 3 autres commits du même
   lot) ; à confirmer N/A par un futur passage si un doute subsiste, mais aucun indice contraire
@@ -1272,10 +1329,11 @@ raison documentée), auxquels s'ajoutent les ~33 déjà examinés lors des passe
 §14, §17) — soit **la totalité des ~80 commits `fix(...)` d'`integration/gp-external-pilot-closure-v1`
 désormais couverte au moins par un titre + une décision documentée** ; parmi eux, 5 (`338401b` et
 la suite « p12 ») restent volontairement non portés faute de budget malgré une applicabilité
-confirmée pour le premier — candidats explicites pour la prochaine session (§18.3). **28 correctifs
-au total portés sur l'ensemble de la mission** (18 des passes précédentes + 10 de cette passe),
-tous des commits séparés et minimaux, aucun ne touchant à un schéma absent de cette branche ni à la
-question du monorepo multi-app.
+confirmée pour le premier — candidats explicites pour la prochaine session (§18.3, **porté depuis
+en septième passe, §19**). **29 correctifs au total portés sur l'ensemble de la mission à l'issue de
+cette passe** (19 des passes précédentes, corrigé — voir §16 — + 10 de cette passe), tous des
+commits séparés et minimaux, aucun ne touchant à un schéma absent de cette branche ni à la
+question du monorepo multi-app. **34 en comptant les 5 de la septième passe (§19).**
 
 Sanity-check demandé par le mandat sur l'ensemble de la branche (`git diff origin/main...HEAD`) :
 **100 fichiers changés, +4804/-526 lignes, 35 commits d'avance sur `main`** ; aucune occurrence de
@@ -1284,6 +1342,91 @@ fichier dupliqué ; aucune paire d'horodatages de migration en collision (195 mi
 horodatages uniques, `node scripts/verify-migrations.mjs` vert) ; `git status --short` propre en fin
 de session (aucun fichier orphelin ni non commité) ; `package.json.name` reste `liria-gestion-pro`
 sur toute la branche. Rien de trivial à corriger trouvé, rien de non-trivial à signaler.
+
+---
+
+## 19. SEPTIÈME PASSE (2026-09-22, session distincte) — clôture du cluster `messageErreurUtilisateur`
+
+Reprise du seul candidat resté ouvert en sortie de sixième passe (§18.3) : les 5 commits
+`338401b`/`503a14f`/`98ea6f2`/`cf13843`/`8ca1609` d'`integration/gp-external-pilot-closure-v1`, qui
+étendent le helper `messageErreurUtilisateur` (porté en §18.1 #6/#10, commits `3bc6a5c`/`9b2e5df`) à
+~50-80 fichiers d'actions supplémentaires. La sixième passe avait déjà vérifié `338401b` (17
+fichiers) en détail et l'avait jugé applicable, sans budget pour les 4 autres. Cette passe reprend
+exactement là où la précédente s'était arrêtée : vérifie les 4 commits restants avec la même
+rigueur, puis porte l'ensemble des 5.
+
+**Méthode** : pour chacun des 5 commits, chaque site (`error.message`/`error?.message`/
+`err.message` renvoyé brut) a été comparé ligne par ligne au fichier actuel de cette branche via
+`git show <commit> -- <fichier>` puis une relecture directe du fichier courant — pas une application
+aveugle du diff source, qui aurait pu échouer silencieusement ou masquer un site ayant divergé
+depuis. **Résultat de cette vérification : les 5 commits sources s'appliquent intégralement, sans
+exception** — chaque site identifié par la source existe encore, à l'identique, sur
+`claude/quirky-noether-n8aerc` aujourd'hui (aucun fichier n'avait divergé depuis le clivage des deux
+lignées, contrairement à ce que la sixième passe redoutait par prudence pour
+`enregistrerPaiementAction`, un cas isolé déjà rencontré et traité en §18.1 #6). Aucun site n'était
+déjà corrigé, et aucun n'a été trouvé absent.
+
+**Vigilance appliquée à chaque site avant de le toucher** (le risque explicitement signalé par le
+mandat de cette passe — masquer un message doit rester informatif, et ne jamais avaler un chemin
+d'erreur différent) :
+- Les gardes `"digest" in e` (détection interne du `throw` de `redirect()` de Next.js dans
+  `stock.ts`/`flotte.ts`/`outillage.ts`) ont été explicitement préservés avant l'appel à
+  `messageErreurUtilisateur`, pour ne jamais intercepter une redirection normale comme une erreur
+  applicative.
+- Les messages métier déjà spécifiques et sûrs (ex. « Cet employé a déjà une arrivée ouverte » sur
+  la contrainte `23505` dans `pointages.ts`, « Une prestation porte déjà ce nom » dans
+  `prestations.ts`) restent prioritaires sur le message générique de repli — non remplacés.
+- Les validations métier locales avec message déjà explicite (ex. `positionTerrain()` dans
+  `pointages.ts`, `analyserAffectationDepense()` dans `notes-frais.ts`, montant/TVA invalide) ont été
+  laissées intactes : ce ne sont pas des erreurs SQL/PostgREST brutes, ce n'est pas le motif visé par
+  ce cluster.
+- Dans `paiements-en-ligne.ts`, le `catch` de `creerLienPaiementStripeAction` enveloppe à la fois une
+  erreur Supabase et une erreur Stripe : c'est exactement le cas d'usage de la catégorie
+  `service_externe` du helper (déjà prévue pour ça), pas un chemin d'erreur différent avalé par
+  erreur.
+
+**Ce qui a été porté** (5 commits distincts sur cette branche, groupés par thème comme dans le
+reste de cette mission) :
+
+| # | SHA source | SHA porté | Thème | Fichiers touchés |
+| - | --- | --- | --- | --- |
+| 1 | `503a14f` | `2f5007e` | Onboarding/documents/devis/paiement (P0) | 7 |
+| 2 | `98ea6f2` | `18e29c2` | Terrain P1 (pointage/employés/planning/congés) | 5 |
+| 3 | `cf13843` | `cf4f965` | Gestion P1 (stock/notes de frais/achats/flotte) | 11 |
+| 4 | `8ca1609` | `d51daa2` | Restants P1 et RGPD | 5 |
+| 5 | `338401b` | `1b7590c` | 17 fichiers CORE + garde-fou anti-régression | 17 |
+
+37 fichiers uniques touchés au total (des fichiers comme `documents.ts`, `commandes.ts`,
+`flotte.ts`, `inventaires.ts`, `messagerie.ts`, `notes-frais.ts`, `prestations.ts` et `employes.ts`
+sont touchés par plusieurs de ces commits, chacun sur des sites différents — d'où l'écart entre le
+nombre de sites individuellement vérifiés/portés et 37 fichiers réels). Le commit `338401b` porte
+aussi `src/lib/erreurs-brutes-core.test.ts`, repris à l'identique de la source : un garde-fou
+statique qui échoue si le motif `error.message` brut réapparaît dans l'un des 16 fichiers d'actions
+CORE qu'il couvre.
+
+**Validation** : `npm ci` exécuté en début de passe (`node_modules/` absent au départ). Chacun des 5
+commits a été validé indépendamment et est vert sur sa propre base : `npm run typecheck` (0 erreur),
+`npm run lint` (0 erreur, les 3 mêmes warnings `@next/next/no-img-element` préexistants et sans
+rapport que le reste de la mission), `npm run test` (157/157 avant le dernier commit, 189/189 après
+— 32 nouveaux tests du garde-fou anti-régression, tous réellement exécutés), `npm run build`
+(réussi). Comme pour tout le reste de cette mission, aucun test pgTAP/SQL n'était en jeu ici (lot
+purement TypeScript) ; aucune base de données n'a été nécessaire ni utilisée.
+
+**Correction de cohérence apportée dans la foulée (voir §16 et les notes en ligne)** : en reconstruisant
+le décompte des correctifs portés pour ce paragraphe, cette passe a trouvé que le total « 28 »
+affiché en plusieurs endroits du document depuis la sixième passe omettait `d357314` (§13) d'une
+addition intermédiaire — le vrai total avant cette passe était **29**, vérifié directement par
+`git log --oneline 4d92ddb..5b26d6d` (compte des commits `fix(...)` réellement présents sur la
+branche, pas une addition de prose). Les mentions de « 7 », « 18 » et « 28 » correctifs dans les
+sections précédentes ont été corrigées en conséquence, avec une note indiquant l'endroit exact de
+l'omission plutôt qu'une réécriture silencieuse. **34 correctifs au total portés sur l'ensemble de
+la mission** (29 + les 5 de cette passe).
+
+**Bilan** : les ~80 commits `fix(...)` d'`integration/gp-external-pilot-closure-v1` identifiés au
+début de cette mission (§1.6) ont désormais tous une décision documentée — porté, décliné avec
+raison, ou non applicable — et le dernier cluster resté en suspens est refermé. Rien de nouveau n'a
+été découvert dans cette passe au-delà de ce cluster : c'était un travail de vérification en volume,
+pas de découverte.
 
 ---
 
@@ -1318,11 +1461,13 @@ toute écriture sur `public.chantiers`, la table cœur du produit, était bloqu�
 mois, pour toutes les entreprises), trois correctifs d'isolation cross-tenant composite-FK
 accompagnés d'un correctif compagnon découvert nécessaire par cette session elle-même (pas
 signalé par la source) pour ne pas casser l'application en les posant seuls, et un gap métier
-générique (essais gratuits qui ne s'arrêtaient jamais). **18 correctifs au total sur l'ensemble de
-la mission**, tous des commits séparés et minimaux, aucun ne touchant à un schéma absent de cette
+générique (essais gratuits qui ne s'arrêtaient jamais). **19 correctifs au total sur l'ensemble de
+la mission** (1 `cacada0` + `d357314` et les 6 de §14 + 11 de §17 ; le décompte affiché en cours de
+route a compté 18 à cet endroit du document, un oubli de `d357314` corrigé après coup — voir §16),
+tous des commits séparés et minimaux, aucun ne touchant à un schéma absent de cette
 branche ni à la question du monorepo multi-app — exactement le type de geste que le mandat
 autorise sans requérir l'arbitrage du propriétaire du dépôt. La valeur ajoutée de cette mission
-est donc triple : ces 18 correctifs, une revérification complète d'un audit de 22 fonctions
+est donc triple : ces 19 correctifs, une revérification complète d'un audit de 22 fonctions
 initialement jugé trop volumineux pour être vérifié à la main, et ce document — reconstruction
 d'historique vérifiée, clarification qu'il s'agit d'une lignée d'entitlement unique et non de deux
 modèles rivaux, identification d'un second tronc mono-app jamais fusionné (§1.6), classification
@@ -1331,14 +1476,21 @@ non exécuté pour la convergence multi-app (§16) à l'attention du propriétai
 
 **Mise à jour (sixième passe, §18)** : sur le tronc mono-app GP (§1.6), la totalité des ~80 commits
 `fix(...)` a désormais été examinée au moins par un titre et une décision documentée (37 de plus
-dans cette passe, 10 portés). **28 correctifs au total ont été portés sur l'ensemble de la
-mission.** Il ne reste ouvert que le cluster `338401b`/`503a14f`/`98ea6f2`/`cf13843`/`8ca1609`
+dans cette passe, 10 portés). **29 correctifs au total ont été portés sur l'ensemble de la
+mission à ce stade** (corrigé de « 28 » à « 29 » après coup — un décompte intermédiaire avait omis
+`d357314`, voir §16). Il ne reste ouvert que le cluster `338401b`/`503a14f`/`98ea6f2`/`cf13843`/`8ca1609`
 (extension mécanique de `messageErreurUtilisateur` à ~50-80 fichiers supplémentaires), documenté en
 §18.3 comme candidat bien scopé — sûr et de faible risque, mais trop volumineux en vérification
 site-par-site pour le budget restant de cette passe — pour une session dédiée future.
 
+**Mise à jour (septième passe, §19)** : ce dernier cluster ouvert a été porté intégralement,
+fichier par fichier, avec le même niveau de rigueur que le reste de la mission — 5 correctifs de
+plus, **34 au total**. L'audit des ~80 commits `fix(...)` d'`integration/gp-external-pilot-closure-v1`
+est désormais complet : chacun a une décision documentée, et le seul candidat resté en suspens en
+sortie de sixième passe est refermé. Voir §19 pour le détail complet.
+
 ---
 
-**CANONICAL MODEL NOT RESOLVED** — les 28 correctifs portés en §11/§13/§14/§17/§18 sont tous
+**CANONICAL MODEL NOT RESOLVED** — les 34 correctifs portés en §11/§13/§14/§17/§18/§19 sont tous
 indépendants de cette question et ne la referment pas : le modèle d'entitlement multi-app reste un
 candidat documenté, non fusionné, en attente d'une décision du propriétaire du dépôt.
