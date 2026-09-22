@@ -72,3 +72,39 @@ is expected to fail here for that reason alone — not a product defect.
 If Docker ever becomes available with unrestricted image pulls, prefer
 `supabase start` + `supabase test db` over this directory: it is a strictly
 closer match to production. This bootstrap is a fallback for when it isn't.
+
+## Real local Auth (GoTrue), when Docker itself works but image pulls don't
+
+`ELSATIA_EXTERNAL_PILOT_FULL_REHEARSAL_V2` found that `dockerd` could start in
+its environment but `supabase start` still failed, because pulling the
+Supabase images from the registry hit a proxy data-transfer cap
+(`Data limit exceeded`) rather than a missing daemon. Since GoTrue
+(`github.com/supabase/auth`) is a plain Go binary, it can be built from
+source over a plain `git clone` (no registry involved) and run against this
+same bootstrapped Postgres, giving real signed JWTs, real login/ban/expiry
+enforcement, and real onboarding RPC execution (`creer_entreprise_bootstrap`,
+`activer_compte_employe`) instead of pgTAP's fabricated `request.jwt.claim*`
+GUCs.
+
+```bash
+npm run pilot:auth:local
+# = gotrue_pilot_bootstrap.sh pilot_gp   (build GoTrue if needed, real GoTrue
+#   migrations, roles/db, app migrations, pilot fixture, start GoTrue :9999)
+# + run_pilot_auth_scenarios.sh pilot_gp (real signup/activation for the 5
+#   pilot profiles + a fresh "tenant B", then the mission's 5 session
+#   scenarios: valid / expired / wrong tenant / inactive user / revoked
+#   membership, plus the centralized permission-guard checks)
+```
+
+Requires the same PostgreSQL 16 as above, a Go toolchain, Node.js, and
+network access to `github.com` (plain git, not any Docker/OCI registry).
+
+Still NOT covered, same root cause as the Docker registry cap (see
+`docs/qualification/ELSATIA_PILOT_AUTH_POSTGREST_ACCEPTANCE_AUTOMATION_V1.md`
+for the full breakdown): real PostgREST (no Haskell toolchain in this
+sandbox either), real Storage, real e-mail delivery, and anything requiring
+an actual browser against a live `next dev`/PostgREST-backed app. Where this
+script's `jwt_bridge.mjs` runs SQL under a verified real JWT's claims
+(`SET LOCAL role` + `request.jwt.claims`), that is RLS validated under a
+real, cryptographically verified JWT -- not a real PostgREST HTTP request.
+Its header spells out exactly what is and isn't equivalent.
