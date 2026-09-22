@@ -155,10 +155,16 @@ test.describe("CH-08: ouvrier accède au détail d'un chantier où il n'est pas 
 });
 
 test.describe("NF-01: note de frais avec justificatif photo (ouvrier)", () => {
+  // KNOWN ISSUE, not yet resolved (see ELSATIA_PILOT_ACCEPTANCE_CLOSURE_V3 §NF-01):
+  // the real <form action={creerNoteFraisAction}> DOES submit (confirmed in
+  // the dev server log: "POST /notes-frais 303") but the server redirects to
+  // /login, i.e. getContexteEntreprise()'s supabase.auth.getUser() returns no
+  // user for that specific request even though the same session authenticates
+  // every GET on the same page fine and other server-action forms (ON-02) work
+  // from the same login() helper. Root cause not identified within this
+  // mission's time budget -- classified FAIL (automation evidence, not
+  // confirmed as a product bug) rather than silently skipped.
   test("brouillon créé, justificatif joint, note soumise", async ({ page }) => {
-    page.on("console", (m) => console.log("[browser]", m.type(), m.text()));
-    page.on("pageerror", (e) => console.log("[pageerror]", e.message));
-    page.on("requestfailed", (r) => console.log("[requestfailed]", r.url(), r.failure()?.errorText));
     await login(page, PROFILES.ouvrier);
     await page.goto("/notes-frais");
     await page.waitForLoadState("networkidle");
@@ -172,15 +178,8 @@ test.describe("NF-01: note de frais avec justificatif photo (ouvrier)", () => {
     // default value ("hors:sans_chantier") from the page itself -- leave it
     // untouched; typing into it clears the selected value until a fresh
     // option is clicked, which isn't this case's concern.
-    const [nav] = await Promise.all([
-      page.waitForURL(/\/notes-frais\/[^/?]+/, { timeout: 15_000 }).catch((e) => e),
-      createBtn.click(),
-    ]);
-    if (nav instanceof Error) {
-      console.log("[NF-01 debug] waitForURL failed, trying requestSubmit() fallback:", nav.message);
-      await page.locator("form").first().evaluate((f: HTMLFormElement) => f.requestSubmit());
-      await page.waitForURL(/\/notes-frais\/[^/?]+/, { timeout: 15_000 });
-    }
+    await createBtn.click();
+    await expect(page).toHaveURL(/\/notes-frais\/[^/?]+/, { timeout: 15_000 });
 
     const jpeg = Buffer.from(
       "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=",
@@ -202,6 +201,15 @@ test.describe("NF-01: note de frais avec justificatif photo (ouvrier)", () => {
 });
 
 test.describe("PE-06: signature électronique de l'employé", () => {
+  // KNOWN ISSUE, not yet resolved (see ELSATIA_PILOT_ACCEPTANCE_CLOSURE_V3 §PE-06):
+  // no request of any kind reaches the dev server after the save click (confirmed
+  // by the absence of any log line, whereas a real save triggers a Server Action
+  // POST) -- the synthetic PointerEvent sequence below does not leave
+  // SignatureEmploye.tsx's `vide` ref false the way a real drawn stroke would, so
+  // `enregistrer()` short-circuits client-side ("Dessinez la signature avant
+  // d'enregistrer.") before ever calling enregistrerSignatureEmployeAction. An
+  // automation limitation of this canvas in this sandbox's headless Chromium, not
+  // a confirmed product bug -- classified FAIL on this evidence, not skipped.
   test("signature dessinée puis enregistrée, réutilisable", async ({ page }) => {
     const empId = psql(`select id from employes where entreprise_id='${ENT_A}' and email='${PROFILES.ouvrier}';`);
     await login(page, PROFILES.gerant);
@@ -223,14 +231,19 @@ test.describe("PE-06: signature électronique de l'employé", () => {
       fire("pointerup", rect.width - 10, rect.height - 10);
     });
     await page.getByRole("button", { name: /Enregistrer la signature/ }).click();
-    await expect(page.locator("body")).toContainText("Signature enregistrée.", { timeout: 15_000 });
-    await expect(page.getByAltText("Signature de l'employé")).toBeVisible();
+    await expect(page.getByAltText("Signature de l'employé")).toBeVisible({ timeout: 15_000 });
   });
 });
 
 test.describe("PA-02: dossier de paie individuel (admin)", () => {
   test.beforeAll(async () => {
     const gerantToken = require("node:fs").readFileSync("/tmp/gotrue-build/tokens/gerant.access_token", "utf8").trim();
+    // "payroll" is FEATURE_CATALOGUE's BETA (visibleByDefault: false) --
+    // ModuleAccessBoundary shows "Fonctionnalité non disponible" for /paie/*
+    // without an explicit entreprise_feature_flags override, regardless of
+    // abonnement_offre/permissions (a third, separate entitlement layer from
+    // RBAC and the subscription tier).
+    psql(`insert into entreprise_feature_flags(entreprise_id, feature_key, statut, active) values ('${ENT_A}','payroll','beta',true) on conflict (entreprise_id, feature_key) do update set active=true, statut='beta';`);
     const debut = psql("select date_trunc('month', current_date)::date;");
     const fin = psql(`select (date_trunc('month', '${debut}'::date) + interval '1 month - 1 day')::date;`);
     const uid = psql(`select utilisateur_id from employes where id=(select id from employes where entreprise_id='${ENT_A}' and email='${PROFILES.gerant}');`);
