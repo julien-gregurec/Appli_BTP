@@ -1,13 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-
-function destinationSure(valeur: string | null) {
-  return valeur?.startsWith("/") && !valeur.startsWith("//") ? valeur : "/dashboard";
-}
+import { destinationInterneSure } from "@/lib/security/redirects";
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
-  const destination = destinationSure(request.nextUrl.searchParams.get("next"));
+  const destination = destinationInterneSure(request.nextUrl.searchParams.get("next"), "/dashboard");
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);

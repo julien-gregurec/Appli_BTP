@@ -1,11 +1,7 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-
-function destinationSure(valeur: string | null, type: EmailOtpType | null) {
-  if (valeur?.startsWith("/") && !valeur.startsWith("//")) return valeur;
-  return type === "recovery" ? "/nouveau-mot-de-passe" : "/onboarding";
-}
+import { destinationInterneSure } from "@/lib/security/redirects";
 
 export async function GET(request: NextRequest) {
   const tokenHash = request.nextUrl.searchParams.get("token_hash");
@@ -13,7 +9,8 @@ export async function GET(request: NextRequest) {
   if (tokenHash && type) {
     const supabase = await createClient();
     const { error } = await supabase.auth.verifyOtp({ type, token_hash: tokenHash });
-    if (!error) return NextResponse.redirect(new URL(destinationSure(request.nextUrl.searchParams.get("next"), type), request.url));
+    const repli = type === "recovery" ? "/nouveau-mot-de-passe" : "/onboarding";
+    if (!error) return NextResponse.redirect(new URL(destinationInterneSure(request.nextUrl.searchParams.get("next"), repli), request.url));
   }
   return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent("Lien de confirmation invalide ou expiré.")}`, request.url));
 }

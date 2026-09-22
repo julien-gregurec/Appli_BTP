@@ -20,7 +20,10 @@ export async function GET(request: Request) {
     .is("push_envoyee_at", null)
     .gte("created_at", depuis)
     .limit(200);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error("Échec du traitement périodique des notifications", error);
+    return NextResponse.json({ error: "Traitement impossible" }, { status: 500 });
+  }
 
   for (const notification of enAttente ?? []) {
     await traiterNotificationPush(admin, notification.id);

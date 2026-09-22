@@ -209,6 +209,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true });
   } catch (error) {
     await admin.from("abonnement_evenements").delete().eq("stripe_event_id", evenement.id);
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Synchronisation impossible" }, { status: 500 });
+    console.error("Échec de synchronisation du webhook abonnement", error);
+    return NextResponse.json({ error: "Synchronisation impossible" }, { status: 500 });
   }
 }
