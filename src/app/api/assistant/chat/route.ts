@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     async start(controller) {
       const envoyer = (evenement: unknown) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(evenement)}\n\n`));
       try {
-        for await (const evenement of demanderAssistantIAStream(supabase, ctx.entrepriseId, ctx.entrepriseNom, ctx.userId, ctx.prenom, peutGererPlanning, historique)) {
+        for await (const evenement of demanderAssistantIAStream(supabase, ctx.entrepriseId, ctx.entrepriseNom, ctx.userId, ctx.prenom, peutGererPlanning, permissions, historique)) {
           envoyer(evenement);
         }
         envoyer({ type: "fin" });
