@@ -20,6 +20,8 @@
     "verify:env-manifest": "node scripts/check-env-manifest.mjs",
     "test:env-manifest": "node --test scripts/check-env-manifest.test.mjs",
     "preflight:env": "node scripts/check-env-manifest.mjs --preflight",
+    "preflight:preview": "node scripts/preflight-preview.mjs",
+    "test:preflight-preview": "node --test scripts/preflight-preview.test.mjs",
     "prebuild": "node scripts/check-env-manifest.mjs --auto --app gestion_pro",
     "prebuild:reserves": "node scripts/check-env-manifest.mjs --auto --app reserves",
     "prebuild:colors": "node scripts/check-env-manifest.mjs --auto --app colors",

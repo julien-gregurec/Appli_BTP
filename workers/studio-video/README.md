@@ -2,6 +2,14 @@
 
 Worker TypeScript séparé de Next.js. Node 24, FFmpeg, ffprobe, Redis 7 et la migration `20260913010000_studio_render_engine.sql` sont nécessaires. Le client Web n'importe jamais ce package. Contrat : [rendu v1](../../ELSATIA-STUDIO-RENDER-CONTRACT.md).
 
+## Déploiement Preview/Production
+
+Ce composant n'est pas une app Next.js (pas de script `build`, processus long) : il ne se déploie
+pas sur Vercel. `Dockerfile` (contexte = racine du dépôt, voir son en-tête) et
+`src/healthcheck.ts` fournissent un modèle de déploiement déterministe pour n'importe quel
+hébergeur de conteneurs à processus long. Détails complets (runtime, FFmpeg, queue, retry,
+concurrency, observabilité) : [`docs/runbooks/ELSATIA_STUDIO_VIDEO_WORKER_DEPLOYMENT_V1.md`](../../docs/runbooks/ELSATIA_STUDIO_VIDEO_WORKER_DEPLOYMENT_V1.md).
+
 ## Installation locale
 
 ```sh
